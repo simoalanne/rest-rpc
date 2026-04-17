@@ -1,6 +1,6 @@
 {
 	"name": "@contract-first-api/express",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"type": "module",
 	"description": "Mount shared API contracts on an Express app with typed handlers and request validation.",
 	"keywords": [
@@ -34,7 +34,7 @@
 		"test": "node --test src/**/*.test.ts"
 	},
 	"dependencies": {
-		"@contract-first-api/core": "workspace:1.0.0"
+		"@contract-first-api/core": "workspace:^"
 	},
 	"devDependencies": {
 		"@types/express": "^5.0.1"

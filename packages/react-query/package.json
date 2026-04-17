@@ -1,6 +1,6 @@
 {
 	"name": "@contract-first-api/react-query",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"type": "module",
 	"description": "Wrap a contract-first API client with React Query hooks and cache helpers.",
 	"keywords": [
@@ -34,8 +34,8 @@
 		"test": "node --test src/**/*.test.ts"
 	},
 	"dependencies": {
-		"@contract-first-api/api-client": "workspace:1.0.0",
-		"@contract-first-api/core": "workspace:1.0.0"
+		"@contract-first-api/api-client": "workspace:^",
+		"@contract-first-api/core": "workspace:^"
 	},
 	"peerDependencies": {
 		"@tanstack/react-query": "^5.0.0"
