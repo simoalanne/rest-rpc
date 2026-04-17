@@ -1,0 +1,28 @@
+{
+	"name": "@contract-first-api/react-query",
+	"version": "1.0.0",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"typecheck": "tsc -p tsconfig.json",
+		"test": "node --test src/**/*.test.ts"
+	},
+	"dependencies": {
+		"@contract-first-api/api-client": "workspace:1.0.0",
+		"@contract-first-api/core": "workspace:1.0.0"
+	},
+	"peerDependencies": {
+		"@tanstack/react-query": "^5.0.0"
+	}
+}

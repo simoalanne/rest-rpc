@@ -1,0 +1,30 @@
+{
+	"name": "@contract-first-api/express",
+	"version": "1.0.0",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"typecheck": "tsc -p tsconfig.json",
+		"test": "node --test src/**/*.test.ts"
+	},
+	"dependencies": {
+		"@contract-first-api/core": "workspace:1.0.0"
+	},
+	"devDependencies": {
+		"@types/express": "^5.0.1"
+	},
+	"peerDependencies": {
+		"express": "^4.21.2 || ^5.0.0"
+	}
+}
