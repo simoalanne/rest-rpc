@@ -1,7 +1,22 @@
 {
 	"name": "@contract-first-api/react-query",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"type": "module",
+	"description": "Wrap a contract-first API client with React Query hooks and cache helpers.",
+	"keywords": [
+		"contract-first",
+		"react-query",
+		"tanstack-query",
+		"react",
+		"typescript",
+		"api-client"
+	],
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/simoalanne/contract-first-api.git"
+	},
+	"homepage": "https://github.com/simoalanne/contract-first-api#readme",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {

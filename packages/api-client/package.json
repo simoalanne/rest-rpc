@@ -1,7 +1,22 @@
 {
 	"name": "@contract-first-api/api-client",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"type": "module",
+	"description": "Create a typed runtime API client from a shared contract tree.",
+	"keywords": [
+		"contract-first",
+		"api-client",
+		"fetch",
+		"typescript",
+		"zod",
+		"http-client"
+	],
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/simoalanne/contract-first-api.git"
+	},
+	"homepage": "https://github.com/simoalanne/contract-first-api#readme",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {

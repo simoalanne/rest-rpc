@@ -1,7 +1,22 @@
 {
 	"name": "@contract-first-api/core",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"type": "module",
+	"description": "Define shared API contracts and derive typed request and response helpers from Zod schemas.",
+	"keywords": [
+		"contract-first",
+		"api",
+		"typescript",
+		"zod",
+		"schema",
+		"contracts"
+	],
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/simoalanne/contract-first-api.git"
+	},
+	"homepage": "https://github.com/simoalanne/contract-first-api#readme",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {

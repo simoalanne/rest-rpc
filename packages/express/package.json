@@ -1,7 +1,22 @@
 {
 	"name": "@contract-first-api/express",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"type": "module",
+	"description": "Mount shared API contracts on an Express app with typed handlers and request validation.",
+	"keywords": [
+		"contract-first",
+		"express",
+		"api",
+		"typescript",
+		"zod",
+		"backend"
+	],
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/simoalanne/contract-first-api.git"
+	},
+	"homepage": "https://github.com/simoalanne/contract-first-api#readme",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
