@@ -1,6 +1,6 @@
 {
 	"name": "@contract-first-api/react-query",
-	"version": "1.0.2",
+	"version": "2.0.0",
 	"type": "module",
 	"description": "Wrap a contract-first API client with React Query hooks and cache helpers.",
 	"keywords": [
@@ -39,5 +39,8 @@
 	},
 	"peerDependencies": {
 		"@tanstack/react-query": "^5.0.0"
+	},
+	"devDependencies": {
+		"esmock": "^2.7.3"
 	}
 }

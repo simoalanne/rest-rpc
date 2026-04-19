@@ -1,16 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
-import { createCrudEndpoints } from "./createCrudEndpoints.ts";
+import { createCrudContracts } from "./createCrudContracts.ts";
 
-describe("createCrudEndpoints", () => {
+describe("createCrudContracts", () => {
 	it("should use override schemas for list and getById when provided", () => {
 		const baseSchema = z.object({ id: z.number(), name: z.string() });
 		const createSchema = z.object({ name: z.string() });
 		const listSchema = z.object({ id: z.number() });
 		const getByIdSchema = z.object({ id: z.number(), details: z.string() });
 
-		const endpoints = createCrudEndpoints({
+		const contracts = createCrudContracts({
 			entity: "products",
 			schema: baseSchema,
 			createSchema,
@@ -18,16 +18,16 @@ describe("createCrudEndpoints", () => {
 			getByIdSchema,
 		});
 
-		const listResult = endpoints.getAll.response.safeParse([{ id: 1 }]);
+		const listResult = contracts.getAll.response.safeParse([{ id: 1 }]);
 		assert.equal(listResult.success, true);
 
-		const getByIdResult = endpoints.getById.response.safeParse({
+		const getByIdResult = contracts.getById.response.safeParse({
 			id: 1,
 			details: "x",
 		});
 		assert.equal(getByIdResult.success, true);
 
-		const invalidGetByIdResult = endpoints.getById.response.safeParse({
+		const invalidGetByIdResult = contracts.getById.response.safeParse({
 			id: 1,
 		});
 		assert.equal(invalidGetByIdResult.success, false);
@@ -37,18 +37,18 @@ describe("createCrudEndpoints", () => {
 		const baseSchema = z.object({ id: z.number(), name: z.string() });
 		const createSchema = z.object({ name: z.string() });
 
-		const endpoints = createCrudEndpoints({
+		const contracts = createCrudContracts({
 			entity: "products",
 			schema: baseSchema,
 			createSchema,
 		});
 
-		const listResult = endpoints.getAll.response.safeParse([
+		const listResult = contracts.getAll.response.safeParse([
 			{ id: 1, name: "A" },
 		]);
 		assert.equal(listResult.success, true);
 
-		const getByIdResult = endpoints.getById.response.safeParse({
+		const getByIdResult = contracts.getById.response.safeParse({
 			id: 1,
 			name: "A",
 		});
@@ -59,16 +59,16 @@ describe("createCrudEndpoints", () => {
 		const baseSchema = z.object({ id: z.number(), name: z.string() });
 		const createSchema = z.object({ name: z.string() });
 
-		const endpoints = createCrudEndpoints({
+		const contracts = createCrudContracts({
 			entity: "products",
 			schema: baseSchema,
 			createSchema,
 		});
 
-		assert.equal(endpoints.getAll.path, "/products");
-		assert.equal(endpoints.getById.path, "/products/:id");
-		assert.equal(endpoints.create.path, "/products");
-		assert.equal(endpoints.update.path, "/products/:id");
-		assert.equal(endpoints.delete.path, "/products/:id");
+		assert.equal(contracts.getAll.path, "/products");
+		assert.equal(contracts.getById.path, "/products/:id");
+		assert.equal(contracts.create.path, "/products");
+		assert.equal(contracts.update.path, "/products/:id");
+		assert.equal(contracts.delete.path, "/products/:id");
 	});
 });

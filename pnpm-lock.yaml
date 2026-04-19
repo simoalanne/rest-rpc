@@ -45,6 +45,9 @@ importers:
       '@contract-first-api/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@contract-first-api/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@contract-first-api/react-query':
         specifier: workspace:*
         version: link:../../packages/react-query
@@ -89,7 +92,7 @@ importers:
   packages/api-client:
     dependencies:
       '@contract-first-api/core':
-        specifier: workspace:1.0.0
+        specifier: workspace:^
         version: link:../core
       zod:
         specifier: ^4.3.6
@@ -104,10 +107,10 @@ importers:
   packages/express:
     dependencies:
       '@contract-first-api/core':
-        specifier: workspace:1.0.0
+        specifier: workspace:^
         version: link:../core
       express:
-        specifier: ^4.21.2 || ^5.0.0
+        specifier: ^5.0.0
         version: 5.2.1
     devDependencies:
       '@types/express':
@@ -117,14 +120,18 @@ importers:
   packages/react-query:
     dependencies:
       '@contract-first-api/api-client':
-        specifier: workspace:1.0.0
+        specifier: workspace:^
         version: link:../api-client
       '@contract-first-api/core':
-        specifier: workspace:1.0.0
+        specifier: workspace:^
         version: link:../core
       '@tanstack/react-query':
         specifier: ^5.0.0
         version: 5.99.0(react@19.2.5)
+    devDependencies:
+      esmock:
+        specifier: ^2.7.3
+        version: 2.7.3
 
 packages:
 
@@ -753,6 +760,10 @@ packages:
 
   escape-html@1.0.3:
     resolution: {integrity: sha512-NiSupZ4OeuGwr68lGIeym/ksIZMJodUGOSCZ/FSnTxcrekbvqrgdUxlJOMpijaKZVjAJrWrGs/6Jy8OMuyj9ow==}
+
+  esmock@2.7.3:
+    resolution: {integrity: sha512-/M/YZOjgyLaVoY6K83pwCsGE1AJQnj4S4GyXLYgi/Y79KL8EeW6WU7Rmjc89UO7jv6ec8+j34rKeWOfiLeEu0A==}
+    engines: {node: '>=14.16.0'}
 
   etag@1.8.1:
     resolution: {integrity: sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg==}
@@ -1671,6 +1682,8 @@ snapshots:
   escalade@3.2.0: {}
 
   escape-html@1.0.3: {}
+
+  esmock@2.7.3: {}
 
   etag@1.8.1: {}
 

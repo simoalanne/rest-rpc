@@ -71,7 +71,7 @@ describe("ApiClient", () => {
 		});
 
 		try {
-			const endpoints = {
+			const contracts = {
 				items: {
 					update: {
 						path: "/items/:id",
@@ -88,7 +88,7 @@ describe("ApiClient", () => {
 
 			const client = new ApiClient({
 				baseUrl: server.baseUrl,
-				endpoints,
+				contracts,
 			});
 
 			const requestWithIgnoredField = {
@@ -122,7 +122,7 @@ describe("ApiClient", () => {
 		});
 
 		try {
-			const endpoints = {
+			const contracts = {
 				secure: {
 					path: "/secure",
 					method: "GET",
@@ -132,7 +132,7 @@ describe("ApiClient", () => {
 
 			const client = new ApiClient({
 				baseUrl: server.baseUrl,
-				endpoints,
+				contracts,
 				defaultHeaders: { "x-app": "shared-tests" },
 			});
 
@@ -141,6 +141,50 @@ describe("ApiClient", () => {
 			assert.equal(receivedHeaders["x-app"], "shared-tests");
 		} finally {
 			await server.close();
+		}
+	});
+
+	it("should pass through additional fetch init options that are not controlled by the client", async () => {
+		const originalFetch = globalThis.fetch;
+		let receivedInit: RequestInit | undefined;
+
+		globalThis.fetch = (async (
+			_input: RequestInfo | URL,
+			init?: RequestInit,
+		) => {
+			receivedInit = init;
+			return new Response(JSON.stringify({ ok: true }), {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			});
+		}) as typeof fetch;
+
+		try {
+			const contracts = {
+				status: {
+					path: "/status",
+					method: "GET",
+					response: z.object({ ok: z.literal(true) }),
+				},
+			} as const;
+
+			const client = new ApiClient({
+				baseUrl: "https://example.test",
+				contracts,
+			});
+
+			await client.api.status.fetch({
+				cache: "no-store",
+				credentials: "include",
+				redirect: "manual",
+			});
+
+			assert.equal(receivedInit?.cache, "no-store");
+			assert.equal(receivedInit?.credentials, "include");
+			assert.equal(receivedInit?.redirect, "manual");
+			assert.equal(receivedInit?.method, "GET");
+		} finally {
+			globalThis.fetch = originalFetch;
 		}
 	});
 
@@ -153,7 +197,7 @@ describe("ApiClient", () => {
 		}));
 
 		try {
-			const endpoints = {
+			const contracts = {
 				items: {
 					getById: {
 						path: "/items/:id",
@@ -168,7 +212,7 @@ describe("ApiClient", () => {
 
 			const client = new ApiClient({
 				baseUrl: server.baseUrl,
-				endpoints,
+				contracts,
 				onHttpError: () => {
 					onHttpErrorCalled = true;
 				},
@@ -206,7 +250,7 @@ describe("ApiClient", () => {
 		console.warn = () => {};
 
 		try {
-			const endpoints = {
+			const contracts = {
 				status: {
 					path: "/status",
 					method: "GET",
@@ -216,7 +260,7 @@ describe("ApiClient", () => {
 
 			const client = new ApiClient({
 				baseUrl: server.baseUrl,
-				endpoints,
+				contracts,
 			});
 
 			await assert.rejects(

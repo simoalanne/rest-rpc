@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createAdapterWithRuntime } from "./createAdapter.ts";
+import esmock from "esmock";
 
 const createQueryClientMock = () => ({
 	invalidateQueries: async (...args: unknown[]) => {
@@ -31,36 +31,41 @@ let useQueryCalls: unknown[] = [];
 let useSuspenseQueryCalls: unknown[] = [];
 let useMutationCalls: unknown[] = [];
 
-const createAdapterDouble = () => ({
-	queryClient: createQueryClientMock() as any,
-	useQuery: ((options: unknown) => {
-		useQueryCalls.push(options);
-		return { source: "useQuery", options };
-	}) as any,
-	useSuspenseQuery: ((options: unknown) => {
-		useSuspenseQueryCalls.push(options);
-		return { source: "useSuspenseQuery", options };
-	}) as any,
-	useMutation: ((options: any) => {
-		useMutationCalls.push(options);
-		return {
-			status: "idle",
-			mutate: (...args: unknown[]) => {
-				mutateCalls.push(args);
-			},
-			mutateAsync: async (...args: unknown[]) => {
-				mutateAsyncCalls.push(args);
-				return {
-					ok: true,
-					args,
-				};
-			},
-		};
-	}) as any,
-});
-
 let mutateCalls: unknown[][] = [];
 let mutateAsyncCalls: unknown[][] = [];
+
+const getCreateAdapter = async () => {
+	const module = await esmock("./createAdapter.ts", {
+		"@tanstack/react-query": {
+			useQuery: ((options: unknown) => {
+				useQueryCalls.push(options);
+				return { source: "useQuery", options };
+			}) as any,
+			useSuspenseQuery: ((options: unknown) => {
+				useSuspenseQueryCalls.push(options);
+				return { source: "useSuspenseQuery", options };
+			}) as any,
+			useMutation: ((options: any) => {
+				useMutationCalls.push(options);
+				return {
+					status: "idle",
+					mutate: (...args: unknown[]) => {
+						mutateCalls.push(args);
+					},
+					mutateAsync: async (...args: unknown[]) => {
+						mutateAsyncCalls.push(args);
+						return {
+							ok: true,
+							args,
+						};
+					},
+				};
+			}) as any,
+		},
+	});
+
+	return module.default;
+};
 
 const createApiTree = () =>
 	({
@@ -137,12 +142,13 @@ const resetState = () => {
 };
 
 describe("createAdapter", () => {
-	it("should preserve the API tree shape and expose GET helpers", () => {
+	it("should preserve the API tree shape and expose GET helpers", async () => {
 		resetState();
 
-		const wrapped = createAdapterWithRuntime(
+		const createAdapter = await getCreateAdapter();
+		const wrapped = createAdapter(
 			createApiTree(),
-			createAdapterDouble() as any,
+			createQueryClientMock() as any,
 		);
 
 		assert.equal(typeof wrapped.items.list.useQuery, "function");
@@ -158,9 +164,10 @@ describe("createAdapter", () => {
 	it("should configure useQuery with request-aware key, enabled flag and query function", async () => {
 		resetState();
 
-		const wrapped = createAdapterWithRuntime(
+		const createAdapter = await getCreateAdapter();
+		const wrapped = createAdapter(
 			createApiTree(),
-			createAdapterDouble() as any,
+			createQueryClientMock() as any,
 		);
 		const request = { id: "item-1" };
 		const options = { staleTime: 1234 };
@@ -181,12 +188,13 @@ describe("createAdapter", () => {
 		]);
 	});
 
-	it("should not enable request-based queries when request is missing", () => {
+	it("should not enable request-based queries when request is missing", async () => {
 		resetState();
 
-		const wrapped = createAdapterWithRuntime(
+		const createAdapter = await getCreateAdapter();
+		const wrapped = createAdapter(
 			createApiTree(),
-			createAdapterDouble() as any,
+			createQueryClientMock() as any,
 		);
 		wrapped.items.byId.useQuery(undefined as any);
 
@@ -195,12 +203,13 @@ describe("createAdapter", () => {
 		assert.deepStrictEqual(queryOptions.queryKey, ["items", "byId"]);
 	});
 
-	it("should treat first argument as options for GET endpoints without request", async () => {
+	it("should treat first argument as options for GET contracts without request", async () => {
 		resetState();
 
-		const wrapped = createAdapterWithRuntime(
+		const createAdapter = await getCreateAdapter();
+		const wrapped = createAdapter(
 			createApiTree(),
-			createAdapterDouble() as any,
+			createQueryClientMock() as any,
 		);
 		wrapped.items.list.useQuery({ gcTime: 50 } as any);
 
@@ -216,9 +225,10 @@ describe("createAdapter", () => {
 	it("should configure useSuspenseQuery with the same request forwarding behavior", async () => {
 		resetState();
 
-		const wrapped = createAdapterWithRuntime(
+		const createAdapter = await getCreateAdapter();
+		const wrapped = createAdapter(
 			createApiTree(),
-			createAdapterDouble() as any,
+			createQueryClientMock() as any,
 		);
 		const request = { id: "item-2" };
 		wrapped.items.byId.useSuspenseQuery(request, { retry: false } as any);
@@ -240,9 +250,10 @@ describe("createAdapter", () => {
 	it("should expose fetch helpers that forward request and fetch options correctly", async () => {
 		resetState();
 
-		const wrapped = createAdapterWithRuntime(
+		const createAdapter = await getCreateAdapter();
+		const wrapped = createAdapter(
 			createApiTree(),
-			createAdapterDouble() as any,
+			createQueryClientMock() as any,
 		);
 		const request = { id: "item-3" };
 		const fetchOptions = { signal: "fetch-signal" };
@@ -257,9 +268,10 @@ describe("createAdapter", () => {
 	it("should return success and failure results from tryFetch", async () => {
 		resetState();
 
-		const wrapped = createAdapterWithRuntime(
+		const createAdapter = await getCreateAdapter();
+		const wrapped = createAdapter(
 			createApiTree(),
-			createAdapterDouble() as any,
+			createQueryClientMock() as any,
 		);
 
 		const successResult = await wrapped.items.list.$tryFetch();
@@ -275,12 +287,13 @@ describe("createAdapter", () => {
 		});
 	});
 
-	it("should expose cache helper methods that use the endpoint path as query key", async () => {
+	it("should expose cache helper methods that use the contract path as query key", async () => {
 		resetState();
 
-		const wrapped = createAdapterWithRuntime(
+		const createAdapter = await getCreateAdapter();
+		const wrapped = createAdapter(
 			createApiTree(),
-			createAdapterDouble() as any,
+			createQueryClientMock() as any,
 		);
 		const request = { id: "item-4" };
 		const updater = (current: unknown) => current;
@@ -314,12 +327,13 @@ describe("createAdapter", () => {
 		]);
 	});
 
-	it("should wrap POST endpoints with useMutation and forward mutate arguments", async () => {
+	it("should wrap POST contracts with useMutation and forward mutate arguments", async () => {
 		resetState();
 
-		const wrapped = createAdapterWithRuntime(
+		const createAdapter = await getCreateAdapter();
+		const wrapped = createAdapter(
 			createApiTree(),
-			createAdapterDouble() as any,
+			createQueryClientMock() as any,
 		);
 		const mutation = wrapped.items.create.useMutation({
 			retry: false,
@@ -349,12 +363,13 @@ describe("createAdapter", () => {
 		});
 	});
 
-	it("should call mutation fetchers without variables for POST endpoints that do not take a request", async () => {
+	it("should call mutation fetchers without variables for POST contracts that do not take a request", async () => {
 		resetState();
 
-		const wrapped = createAdapterWithRuntime(
+		const createAdapter = await getCreateAdapter();
+		const wrapped = createAdapter(
 			createApiTree(),
-			createAdapterDouble() as any,
+			createQueryClientMock() as any,
 		);
 		const mutation = wrapped.items.refresh.useMutation() as any;
 		const mutationOptions = useMutationCalls[0] as any;
@@ -371,12 +386,13 @@ describe("createAdapter", () => {
 		assert.equal(mutateAsyncCalls[0][1], hookOptions);
 	});
 
-	it("should not expose query helpers for non-GET endpoints", () => {
+	it("should not expose query helpers for non-GET contracts", async () => {
 		resetState();
 
-		const wrapped = createAdapterWithRuntime(
+		const createAdapter = await getCreateAdapter();
+		const wrapped = createAdapter(
 			createApiTree(),
-			createAdapterDouble() as any,
+			createQueryClientMock() as any,
 		);
 
 		assert.equal(typeof wrapped.items.create.useMutation, "function");

@@ -15,9 +15,9 @@ export type {
 } from "./contracts.ts";
 
 export { initContracts } from "./contracts.ts";
-export { createCrudEndpoints } from "./utils/createCrudEndpoints.ts";
 export {
+	type FlattenedContract,
 	flattenContractTree,
 	mapContractTree,
-} from "./utils/endpointTransformers.ts";
-export { mapObjectValues } from "./utils/mapObjectValues.ts";
+	mapObjectValues,
+} from "./utils/contractTransformers.ts";

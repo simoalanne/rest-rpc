@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { api } from "./api.ts";
 
 const renderJson = (value: unknown) => JSON.stringify(value, null, 2);
@@ -8,10 +8,25 @@ const renderError = (error: unknown) =>
 		? String(error.message)
 		: String(error);
 
+const HealthPanel = () => {
+	const health = api.health.get.useSuspenseQuery();
+
+	return (
+		<section className="panel">
+			<h2>Health</h2>
+			<pre>{renderJson(health.data)}</pre>
+		</section>
+	);
+};
+
 export const App = () => {
 	const [title, setTitle] = useState("");
-	const health = api.health.get.useQuery();
+	const [searchInput, setSearchInput] = useState("");
+	const [searchQuery, setSearchQuery] = useState("");
 	const todos = api.todos.list.useQuery();
+	const todoSearch = api.todos.find.useQuery(
+		searchQuery ? { query: searchQuery } : "",
+	);
 	const createTodo = api.todos.create.useMutation({
 		onSuccess: async () => {
 			setTitle("");
@@ -30,6 +45,11 @@ export const App = () => {
 		await createTodo.mutateAsync({ title: trimmedTitle });
 	};
 
+	const onSearch = (event: FormEvent<HTMLFormElement>) => {
+		event.preventDefault();
+		setSearchQuery(searchInput.trim());
+	};
+
 	return (
 		<main className="shell">
 			<header className="hero">
@@ -41,16 +61,18 @@ export const App = () => {
 				</p>
 			</header>
 
-			<section className="panel">
-				<h2>Health</h2>
-				<pre>
-					{health.isLoading
-						? "Loading..."
-						: health.error
-							? renderError(health.error)
-							: renderJson(health.data)}
-				</pre>
-			</section>
+			<Suspense
+				fallback={
+					<section className="panel">
+						<h2>Health</h2>
+						<p className="loading-copy">
+							Waiting for delayed health response...
+						</p>
+					</section>
+				}
+			>
+				<HealthPanel />
+			</Suspense>
 
 			<section className="panel">
 				<h2>Create Todo</h2>
@@ -67,6 +89,27 @@ export const App = () => {
 				{createTodo.error ? (
 					<p className="error">{renderError(createTodo.error)}</p>
 				) : null}
+			</section>
+
+			<section className="panel">
+				<h2>Search Todos</h2>
+				<form className="todo-form" onSubmit={onSearch}>
+					<input
+						value={searchInput}
+						onChange={(event) => setSearchInput(event.target.value)}
+						placeholder="Search todos"
+					/>
+					<button type="submit">Search</button>
+				</form>
+				<pre>
+					{!searchQuery
+						? "Enter a search term to query /todos/find"
+						: todoSearch.isLoading
+							? "Searching..."
+							: todoSearch.error
+								? renderError(todoSearch.error)
+								: renderJson(todoSearch.data)}
+				</pre>
 			</section>
 
 			<section className="panel">

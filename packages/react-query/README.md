@@ -1,6 +1,6 @@
 # @contract-first-api/react-query
 
-`@contract-first-api/react-query` wraps an `ApiClient` tree with React Query helpers. It keeps the same contract structure, but gives each endpoint React Query-friendly methods like `useQuery`, `useMutation`, `invalidate`, and `$fetch`.
+`@contract-first-api/react-query` wraps an `ApiClient` tree with React Query helpers. It keeps the same contract structure, but gives each contract React Query-friendly methods like `useQuery`, `useMutation`, `invalidate`, and `$fetch`.
 
 ## What you do with this package
 
@@ -8,8 +8,9 @@ Use it to:
 
 - turn a typed API client into query and mutation hooks
 - keep query keys aligned with the contract path
-- invalidate or clear cache using the same endpoint tree
-- still access a plain `$fetch` method when needed
+- invalidate or clear cache using the same contract tree
+- inspect the original contract on each wrapped node through `$contract`
+- post-process the generated adapter with `mapWrappedContracts`
 
 ## Basic setup
 
@@ -21,7 +22,7 @@ import { contracts } from "@example/shared";
 
 const client = new ApiClient({
   baseUrl: "http://localhost:3001/api",
-  endpoints: contracts,
+  contracts,
 });
 
 export const queryClient = new QueryClient();
@@ -30,14 +31,14 @@ export const api = createAdapter(client.api, queryClient);
 
 ## How you use it in components
 
-For `GET` endpoints, use query hooks:
+For `GET` contracts, use query hooks:
 
 ```tsx
 const health = api.health.get.useQuery();
 const todos = api.todos.list.useQuery();
 ```
 
-For non-`GET` endpoints, use mutations:
+For non-`GET` contracts, use mutations:
 
 ```tsx
 const createTodo = api.todos.create.useMutation({
@@ -49,12 +50,11 @@ const createTodo = api.todos.create.useMutation({
 await createTodo.mutateAsync({ title: "New item" });
 ```
 
-This is a common usage pattern for form submissions and list refreshes.
+## Useful helpers on each contract
 
-## Useful helpers on each endpoint
+Wrapped contracts expose the original contract through `$contract`, direct calls through `$fetch`, and the React Query helpers that match the default behavior for that route:
 
-Depending on the HTTP method, wrapped endpoints expose helpers like:
-
+- `$contract` for the original contract definition, including `meta`
 - `$fetch` for direct calls without hooks
 - `$tryFetch` for `{ success, data | error }` style handling
 - `useQuery` and `useSuspenseQuery` for `GET` routes
@@ -63,13 +63,54 @@ Depending on the HTTP method, wrapped endpoints expose helpers like:
 - `clear` to remove cached queries
 - `$getKey` to get the query key for a request
 - `setData` to write into the cache
+- `$reactQueryApi` to access both query and mutation helpers during custom transforms
 
-Example:
+Examples:
 
 ```ts
 await api.todos.list.invalidate();
 const health = await api.health.get.$fetch();
+const cachedHealthKey = api.health.get.$getKey();
 ```
+
+`$fetch` also forwards fetch options to the underlying API client:
+
+```ts
+await api.health.get.$fetch({ cache: "no-store" });
+await api.todos.create.$fetch(
+  { title: "Ship docs" },
+  { credentials: "include" },
+);
+```
+
+## Post-processing the wrapped tree
+
+Use `mapWrappedContracts` when you want to build your own adapter layer on top of the generated one.
+
+```ts
+import createAdapter, {
+  mapWrappedContracts,
+} from "@contract-first-api/react-query";
+
+const baseApi = createAdapter(client.api, queryClient);
+
+type ReactQueryMeta = {
+  reactQuery?: {
+    safe?: boolean;
+  };
+};
+
+const customApi = mapWrappedContracts<ReactQueryMeta, typeof client.api>(
+  baseApi,
+  (node) =>
+    node.$contract.meta?.reactQuery?.safe || node.$contract.method === "GET"
+      ? node.$reactQueryApi
+      : node,
+);
+```
+
+That pattern is useful when contract metadata should influence how your app exposes or groups routes.
+`$reactQueryApi` gives your transform access to the full helper surface even when the default adapter only exposes the query or mutation subset.
 
 ## Practical flow
 
@@ -79,6 +120,7 @@ In a React app, the usual order is:
 2. Build an `ApiClient` from those contracts.
 3. Create a `QueryClient`.
 4. Wrap the client with `createAdapter`.
-5. Use the generated endpoint helpers inside components.
+5. Optionally post-process the wrapped tree with `mapWrappedContracts`.
+6. Use the generated contract helpers inside components.
 
 If your app already uses React Query, this package makes the contract tree feel like a native part of that setup.

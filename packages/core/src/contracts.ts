@@ -10,17 +10,20 @@ export type RequestSchema = {
 
 export type ResponseSchema = z.ZodType;
 
-export type Contract = {
+export type Contract<TMeta = unknown> = {
 	path: string;
 	method: HttpMethod;
 	request?: RequestSchema;
 	response?: ResponseSchema;
+	meta?: TMeta;
 };
 
-export type ContractTree = Contract | { [k: string]: ContractTree };
+export type ContractTree<TMeta = unknown> =
+	| Contract<TMeta>
+	| { [k: string]: ContractTree<TMeta> };
 
-export type AnyContractDefinition = Contract;
-export type AnyContractTree = ContractTree;
+export type AnyContractDefinition<TMeta = unknown> = Contract<TMeta>;
+export type AnyContractTree<TMeta = unknown> = ContractTree<TMeta>;
 
 export type ContractResponse<E extends AnyContractDefinition> = E extends {
 	response: infer R;
@@ -93,16 +96,16 @@ export type ContractApiResponse<
 	P extends DotPaths<T>,
 > = ContractResponse<ContractAtPath<T, P>>;
 
-type ContractTools = {
-	defineContract: <const TContract extends ContractTree>(
+type ContractTools<TMeta> = {
+	defineContract: <const TContract extends AnyContractTree<TMeta>>(
 		contract: TContract,
 	) => TContract;
-	mergeContracts: <const TContracts extends readonly ContractTree[]>(
+	mergeContracts: <const TContracts extends AnyContractTree<TMeta>[]>(
 		...contracts: TContracts
 	) => Merge<UnionToIntersection<TContracts[number]>>;
 };
 
-export const initContracts = (): ContractTools => ({
+export const initContracts = <TMeta = unknown>(): ContractTools<TMeta> => ({
 	defineContract: (contract) => contract,
 	mergeContracts: (...contracts) => Object.assign({}, ...contracts),
 });

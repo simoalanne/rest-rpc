@@ -121,6 +121,12 @@ pre {
 	color: #b33b24;
 }
 
+.loading-copy {
+	margin: 0;
+	padding: 1rem 0;
+	color: #35485a;
+}
+
 @media (max-width: 640px) {
 	.todo-form,
 	.section-heading {

@@ -101,13 +101,20 @@ type SharedFunctions<E extends Contract> = {
 	$tryFetch: (...args: FetchArgs<E>) => Promise<ApiResult<E>>;
 };
 
-type MutationFunctions<E extends Contract> = {
+type SharedProperties<E extends Contract> = {
+	$contract: E;
+} & SharedFunctions<E>;
+
+export type AllFunctions<E extends Contract> = QueryFunctions<E> &
+	MutationFunctions<E>;
+
+export type MutationFunctions<E extends Contract> = {
 	useMutation: (
 		options?: MutationOptionsFor<E, MutationVariables<E>>,
 	) => MutationWrapper<E>;
-} & SharedFunctions<E>;
+} & SharedProperties<E>;
 
-type QueryFunctions<E extends Contract> = {
+export type QueryFunctions<E extends Contract> = {
 	useQuery: <TData = ContractResponse<E>>(
 		...args: UseQueryArgs<E, TData>
 	) => QueryObserverResult<TData, ContractError>;
@@ -118,17 +125,20 @@ type QueryFunctions<E extends Contract> = {
 	invalidate: (request?: ContractRequest<E>) => Promise<void>;
 	clear: (request?: ContractRequest<E>) => void;
 	$getKey: (request?: ContractRequest<E>) => QueryKey;
-} & SharedFunctions<E>;
+} & SharedProperties<E>;
 
 type IsQueryLike<E extends Contract> = E["method"] extends "GET" ? true : false;
 
-export type QueryWrapper<E extends Contract> =
-	IsQueryLike<E> extends true ? QueryFunctions<E> : MutationFunctions<E>;
+export type QueryWrapper<E extends Contract> = (IsQueryLike<E> extends true
+	? QueryFunctions<E>
+	: MutationFunctions<E>) & {
+	$reactQueryApi: AllFunctions<E>;
+};
 
-export type WrapEndpoints<T> = {
+export type WrapContracts<T> = {
 	[K in keyof T]: T[K] extends ApiClientContractValue<infer E>
 		? QueryWrapper<E>
 		: T[K] extends Record<string, unknown>
-			? WrapEndpoints<T[K]>
+			? WrapContracts<T[K]>
 			: never;
 };

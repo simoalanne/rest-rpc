@@ -1,15 +1,21 @@
 import type {
 	AnyContractDefinition,
 	AnyContractTree,
+	Contract,
 	ContractRequest,
 	ContractResponse,
 	GetByPath,
 } from "@contract-first-api/core";
+import type { NextFunction, Request, Response } from "express";
 
-type MaybePromise<T> = T | Promise<T>;
+export type MaybePromise<T> = T | Promise<T>;
 type EmptyObject = Record<never, never>;
 type Merge<T> = {
 	[K in keyof T]: T[K];
+};
+
+export type RequestWithContract<TMeta = unknown> = Omit<Request, "contract"> & {
+	contract: Contract<TMeta>;
 };
 
 type ContextValue<TContext> = {
@@ -72,31 +78,30 @@ export type DefineService<T extends AnyContractTree, TContext = EmptyObject> = <
 	service: ServiceAtPath<T, P, TContext>,
 ) => ServiceAtPath<T, P, TContext>;
 
-export type ServiceTools<T extends AnyContractTree, TContext = EmptyObject> = {
+export type DefineMiddleware<TMeta> = <
+	TMiddleware extends (
+		req: RequestWithContract<TMeta>,
+		res: Response,
+		next: NextFunction,
+	) => MaybePromise<unknown>,
+>(
+	middleware: TMiddleware,
+) => TMiddleware;
+
+export type ServiceTools<
+	T extends AnyContractTree,
+	TMeta = unknown,
+	TContext = EmptyObject,
+> = {
 	defineService: DefineService<T, TContext>;
-	withContext: <TNextContext>() => ServiceTools<T, TNextContext>;
+	defineMiddleware: DefineMiddleware<TMeta>;
 };
 
-export const defineServiceFor =
-	<const T extends AnyContractTree, TContext = EmptyObject>(
-		_contracts: T,
-	): DefineService<T, TContext> =>
-	(_path, service) =>
-		service;
-
-const createServiceTools = <
-	const T extends AnyContractTree,
+export const initServices = <
+	T extends AnyContractTree,
+	TMeta = unknown,
 	TContext = EmptyObject,
->(
-	contracts: T,
-): ServiceTools<T, TContext> => ({
-	defineService: defineServiceFor<T, TContext>(contracts),
-	withContext: <TNextContext>() =>
-		createServiceTools<T, TNextContext>(contracts),
+>(): ServiceTools<T, TMeta, TContext> => ({
+	defineService: (_path, service) => service,
+	defineMiddleware: (middleware) => middleware,
 });
-
-export function initServices<const T extends AnyContractTree>(
-	contracts: T,
-): ServiceTools<T, EmptyObject> {
-	return createServiceTools<T, EmptyObject>(contracts);
-}

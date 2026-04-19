@@ -6,10 +6,10 @@
 
 Use it to:
 
-- describe endpoints with `path`, `method`, `request`, and `response`
+- describe contracts with `path`, `method`, `request`, `response`, and optional `meta`
 - keep request and response types shared between frontend and backend
-- generate helper types for specific contract paths
-- optionally create repeated CRUD shapes with `createCrudEndpoints`
+- create path-based helper types from the same tree
+- inspect or transform the tree when you need advanced behavior
 
 ## Basic usage
 
@@ -17,19 +17,30 @@ Use it to:
 import { initContracts } from "@contract-first-api/core";
 import z from "zod";
 
-const { defineContract } = initContracts();
+type ContractMeta = {
+  requiresAuth?: boolean;
+  auditLabel?: string;
+};
 
-export const contracts = defineContract({
+const { defineContract, mergeContracts } = initContracts<ContractMeta>();
+
+const healthContracts = defineContract({
   health: {
     get: {
       method: "GET",
       path: "/health",
+      meta: {
+        auditLabel: "health.get",
+      },
       response: z.object({
         status: z.literal("ok"),
         requestId: z.string(),
       }),
     },
   },
+});
+
+const todoContracts = defineContract({
   todos: {
     list: {
       method: "GET",
@@ -47,6 +58,10 @@ export const contracts = defineContract({
     create: {
       method: "POST",
       path: "/todos",
+      meta: {
+        requiresAuth: true,
+        auditLabel: "todos.create",
+      },
       request: {
         body: z.object({
           title: z.string().min(1),
@@ -60,11 +75,13 @@ export const contracts = defineContract({
     },
   },
 });
+
+export const contracts = mergeContracts(healthContracts, todoContracts);
 ```
 
-## Reusing types from the contract
+## Common pattern
 
-It is common to export path-based helper types so the backend and frontend stay aligned:
+It is common to export helper types from the shared contract package so the backend and frontend stay aligned:
 
 ```ts
 import type {
@@ -75,6 +92,7 @@ import type {
 
 export type ExampleContracts = typeof contracts;
 export type ApiPath = DotPaths<ExampleContracts>;
+export type ApiMeta = ContractMeta;
 
 export type ApiRequest<P extends ApiPath> = ContractApiRequest<
   ExampleContracts,
@@ -93,35 +111,16 @@ That lets you write application code like:
 type CreateTodoInput = ApiRequest<"todos.create">;
 type Todo = ApiResponse<"todos.create">;
 type Health = ApiResponse<"health.get">;
+type Meta = ApiMeta;
 ```
 
-## When to use `createCrudEndpoints`
+## Tree utilities
 
-If several resources follow the same CRUD shape, `createCrudEndpoints` can create a ready-made subtree:
+The package also exports a few small utilities for advanced transforms:
 
-```ts
-import { createCrudEndpoints, initContracts } from "@contract-first-api/core";
-import z from "zod";
-
-const { defineContract } = initContracts();
-
-const todoSchema = z.object({
-  id: z.number(),
-  title: z.string(),
-});
-
-const todoCreateSchema = z.object({
-  title: z.string().min(1),
-});
-
-export const contracts = defineContract({
-  todos: createCrudEndpoints({
-    entity: "todos",
-    schema: todoSchema,
-    createSchema: todoCreateSchema,
-  }),
-});
-```
+- `flattenContractTree(contracts)` to turn the tree into a flat list of contracts with `keySegments`
+- `mapContractTree(contracts, mappingFn)` to preserve the tree shape while mapping every contract
+- `mapObjectValues(tree, isLeaf, mappingFn)` for generic tree transforms
 
 ## Typical project structure
 

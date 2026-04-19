@@ -2,17 +2,17 @@ import z from "zod";
 import type { Contract } from "../contracts.ts";
 
 /**
- * Helper function to create standard CRUD endpoints for a given entity.
+ * Helper function to create standard CRUD contracts for a given entity.
  * Generates an object that is compatible with the `ContractTree` definition.
  *
- * @param entity - The name of the entity (e.g., "products", "categories").
+ * @param entity - The name of the entity
  * @param schema - The schema used for most operations unless overridden by listSchema or getByIdSchema.
  * @param createSchema - The schema used for create and update operations.
- * @param listSchema - Optional schema for the list endpoint.
- * @param getByIdSchema - Optional schema for the getById endpoint.
- * @returns An object containing the endpoint definitions for the specified CRUD operations.
+ * @param listSchema - Optional schema for the list contract. If not provided, defaults to the main schema.
+ * @param getByIdSchema - Optional schema for the getById contract. If not provided, defaults to the main schema.
+ * @returns An object containing the contract definitions for the specified CRUD operations.
  */
-export const createCrudEndpoints = <
+export const createCrudContracts = <
 	TSchema extends z.ZodObject,
 	TSchemaCreate extends z.ZodObject,
 	TListSchema extends z.ZodObject = TSchema,

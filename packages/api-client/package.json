@@ -1,6 +1,6 @@
 {
 	"name": "@contract-first-api/api-client",
-	"version": "1.0.2",
+	"version": "2.0.0",
 	"type": "module",
 	"description": "Create a typed runtime API client from a shared contract tree.",
 	"keywords": [

@@ -1,14 +1,16 @@
 import { createExpressRouter, initServices } from "@contract-first-api/express";
-import type { ApiRequest, ApiResponse } from "@example/shared";
-import { contracts } from "@example/shared";
+import type { ApiResponse, ExampleContractMeta } from "@example/shared";
+import { allContracts } from "@example/shared";
 import express from "express";
 
 type RequestContext = {
 	requestId: string;
+	auditLabel?: string;
 };
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const todos: ApiResponse<"todos.create">[] = [
 	{
@@ -18,11 +20,44 @@ const todos: ApiResponse<"todos.create">[] = [
 	},
 ];
 
-const { defineService } = initServices(contracts).withContext<RequestContext>();
+const { defineService, defineMiddleware } = initServices<
+	typeof allContracts,
+	ExampleContractMeta,
+	RequestContext
+>();
+
+declare global {
+	namespace Express {
+		interface Request {
+			viewerId?: string;
+		}
+	}
+}
+
+const middleware = defineMiddleware((req, _res, next) => {
+	const request = req;
+	if (request.contract.meta?.requiresAuth) {
+		request.viewerId = "viewer-123";
+	}
+
+	next();
+});
+
+const regularMiddleware = (
+	req: express.Request,
+	_res: express.Response,
+	next: express.NextFunction,
+) => {
+	// @ts-expect-error - meta is unknown in regular middleware but still exists at runtime and can be casted to the correct type if needed
+	req.contract.meta?.auditLabel;
+	console.log(`Received request for ${req.path}`);
+	next();
+};
 
 const services = {
 	health: defineService("health", {
-		get({ context }): ApiResponse<"health.get"> {
+		async get({ context }): Promise<ApiResponse<"health.get">> {
+			await sleep(900);
 			return {
 				status: "ok",
 				requestId: context.requestId,
@@ -35,8 +70,8 @@ const services = {
 				items: todos,
 			};
 		},
-		create({ title }: ApiRequest<"todos.create">) {
-			const todo: ApiResponse<"todos.create"> = {
+		create({ title }) {
+			const todo = {
 				id: `todo-${todos.length + 1}`,
 				title,
 				createdAt: new Date().toISOString(),
@@ -44,6 +79,11 @@ const services = {
 
 			todos.push(todo);
 			return todo;
+		},
+		find({ query }) {
+			return todos.filter((todo) =>
+				todo.title.toLowerCase().includes(query.toLowerCase()),
+			);
 		},
 	}),
 };
@@ -62,14 +102,20 @@ app.use((req, res, next) => {
 	next();
 });
 
-createExpressRouter({
+createExpressRouter<typeof allContracts, ExampleContractMeta, RequestContext>({
 	app,
-	contracts,
+	contracts: allContracts,
 	services,
 	routePrefix: "/api",
-	createContext: () => ({
-		requestId: crypto.randomUUID(),
-	}),
+	middlewares: [middleware, regularMiddleware],
+	createContext: (req) => {
+		return {
+			requestId: `${req.contract.meta?.auditLabel ?? "route"}:${crypto.randomUUID()}`,
+			auditLabel: req.viewerId
+				? `${req.contract.meta?.auditLabel ?? "route"}:${req.viewerId}`
+				: req.contract.meta?.auditLabel,
+		};
+	},
 });
 
 app.listen(port, () => {

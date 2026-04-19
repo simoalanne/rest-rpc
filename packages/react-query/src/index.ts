@@ -1,2 +1,7 @@
 export { default } from "./createAdapter.ts";
-export type { WrapEndpoints } from "./types.ts";
+export { mapWrappedContracts } from "./mapWrappedContracts.ts";
+export type {
+	MutationFunctions,
+	QueryFunctions,
+	WrapContracts,
+} from "./types.ts";

@@ -4,74 +4,45 @@ import {
 	flattenContractTree,
 	type HttpMethod,
 } from "@contract-first-api/core";
-import type { NextFunction, Request, RequestHandler, Response } from "express";
+import type express from "express";
+import type { NextFunction, Request, Response } from "express";
 import type { z } from "zod";
-import type { ServiceTree } from "./types.ts";
+import {
+	RequestValidationError,
+	type ValidationIssue,
+} from "./RequestValidationError.ts";
+import type { RequestWithContract, ServiceTree } from "./types.ts";
 
-type LowerHttpMethod = Lowercase<HttpMethod>;
+declare global {
+	namespace Express {
+		interface Request {
+			validatedRequest: Record<string, unknown>;
+			contract: Contract;
+		}
+	}
+}
+
 type EmptyObject = Record<never, never>;
 
-export type ExpressRequestLike = Request;
-
-export type ExpressResponseLike = Response;
-
-export type ExpressNextFunctionLike = NextFunction;
-
-export type ExpressHandlerLike = RequestHandler;
-
-export type ExpressRouteTarget = {
-	[K in LowerHttpMethod]: (
-		path: string,
-		handler: ExpressHandlerLike,
-	) => unknown;
-};
-
-export type ValidationIssue = {
-	code: string;
-	message: string;
-	path: PropertyKey[];
-};
-
-type CreateContextArgs<TContract extends Contract = Contract> = {
-	req: ExpressRequestLike;
-	res: ExpressResponseLike;
-	input: Record<string, unknown>;
-	contract: TContract;
-	path: string[];
-};
-
-type TransformResponseArgs<
-	TContext,
-	TContract extends Contract = Contract,
-> = CreateContextArgs<TContract> & {
-	context: TContext;
-	data: unknown;
-};
-
-type HandleErrorArgs<TContext> = {
-	error: unknown;
-	req: ExpressRequestLike;
-	res: ExpressResponseLike;
-	next: ExpressNextFunctionLike;
-	contract: Contract;
-	path: string[];
-	input: Record<string, unknown>;
-	context?: TContext;
-};
+type MiddlewareFunction<TMeta = unknown> = (
+	req: RequestWithContract<TMeta>,
+	res: Response,
+	next: NextFunction,
+) => unknown;
 
 export type CreateExpressRouterOptions<
 	TContracts extends AnyContractTree,
+	TMeta = unknown,
 	TContext = EmptyObject,
 > = {
-	app: ExpressRouteTarget;
+	app: ReturnType<typeof express>;
 	contracts: TContracts;
 	services: ServiceTree<TContracts, TContext>;
+	middlewares?: (MiddlewareFunction | MiddlewareFunction<TMeta>)[];
 	routePrefix?: string;
-	createContext?: (args: CreateContextArgs) => TContext | Promise<TContext>;
-	transformResponse?: (args: TransformResponseArgs<TContext>) => unknown;
-	handleError?: (
-		args: HandleErrorArgs<TContext>,
-	) => boolean | undefined | Promise<boolean | undefined>;
+	createContext?: (
+		req: Request & { contract: Contract<TMeta> },
+	) => TContext | Promise<TContext>;
 };
 
 const splitPath = (path: string) => path.split("/").filter(Boolean);
@@ -149,68 +120,60 @@ const formatValidationIssues = (
 		path: issue.path,
 	}));
 
-const validateRequest = (req: ExpressRequestLike, contract: Contract) => {
-	const errors: ValidationIssue[] = [];
-	const validatedSegments: {
-		body?: Record<string, unknown>;
-		query?: Record<string, unknown>;
-		params?: Record<string, unknown>;
-	} = {};
-
-	const requestSchema = contract.request;
-	if (!requestSchema) {
-		return {
-			success: true as const,
-			input: {} as Record<string, unknown>,
+const prepareRequest =
+	(contract: Contract) =>
+	(req: Request, _res: Response, next: NextFunction) => {
+		req.contract = contract;
+		req.validatedRequest = {};
+		const errors: ValidationIssue[] = [];
+		const validatedSegments = {
+			body: {},
+			query: {},
+			params: {},
 		};
-	}
 
-	const segmentEntries = [
-		["body", req.body],
-		["query", req.query],
-		["params", req.params],
-	] as const;
+		const requestSchema = contract.request;
 
-	for (const [segment, rawValue] of segmentEntries) {
-		const schema = requestSchema[segment];
-		if (!schema) continue;
-
-		const result = schema.safeParse(rawValue ?? {});
-		if (!result.success) {
-			errors.push(...formatValidationIssues(result.error.issues));
-			continue;
+		if (!requestSchema) {
+			next();
+			return;
 		}
 
-		validatedSegments[segment] = result.data as Record<string, unknown>;
-	}
+		const segmentEntries = [
+			["body", req.body],
+			["query", req.query],
+			["params", req.params],
+		] as const;
 
-	if (errors.length > 0) {
-		return {
-			success: false as const,
-			errors,
+		for (const [segment, rawValue] of segmentEntries) {
+			const schema = requestSchema[segment];
+			if (!schema) continue;
+
+			const result = schema.safeParse(rawValue);
+			if (!result.success) {
+				errors.push(...formatValidationIssues(result.error.issues));
+				continue;
+			}
+
+			validatedSegments[segment] = result.data;
+		}
+
+		if (errors.length > 0) {
+			throw new RequestValidationError({
+				message:
+					"Request validation failed. Check the validationErrors field for details.",
+				validationErrors: errors,
+			});
+		}
+
+		req.validatedRequest = {
+			...validatedSegments.body,
+			...validatedSegments.query,
+			...validatedSegments.params,
 		};
-	}
 
-	return {
-		success: true as const,
-		input: {
-			...(validatedSegments.body ?? {}),
-			...(validatedSegments.query ?? {}),
-			...(validatedSegments.params ?? {}),
-		},
+		next();
 	};
-};
-
-const sendValidationError = (
-	res: ExpressResponseLike,
-	errors: ValidationIssue[],
-) => {
-	res.status(400).json({
-		message:
-			"Request validation failed. Check the validationErrors field for details.",
-		validationErrors: errors,
-	});
-};
 
 const buildRoutePath = (routePrefix: string | undefined, path: string) => {
 	if (!routePrefix) return path;
@@ -227,6 +190,7 @@ const getRouteHandler = (services: unknown, path: string[]) =>
 
 export const createExpressRouter = <
 	TContracts extends AnyContractTree,
+	TMeta = unknown,
 	TContext = EmptyObject,
 >({
 	app,
@@ -234,79 +198,45 @@ export const createExpressRouter = <
 	services,
 	routePrefix,
 	createContext,
-	transformResponse,
-	handleError,
-}: CreateExpressRouterOptions<TContracts, TContext>) => {
+	middlewares = [],
+}: CreateExpressRouterOptions<TContracts, TMeta, TContext>) => {
 	const routes = flattenContractTree(contracts).sort(compareRouteSpecificity);
 
 	for (const route of routes) {
-		const method = route.method.toLowerCase() as LowerHttpMethod;
+		const method = route.method.toLowerCase() as Lowercase<HttpMethod>;
 		const handler = getRouteHandler(services, route.keySegments);
 		const routePath = buildRoutePath(routePrefix, route.path);
+		const requestPreparationMiddleware = prepareRequest(route);
+		const registeredMiddlewares = middlewares as Array<
+			(req: Request, res: Response, next: NextFunction) => unknown
+		>;
 
-		app[method](routePath, async (req, res, next) => {
-			const validationResult = validateRequest(req, route);
-			if (!validationResult.success) {
-				sendValidationError(res, validationResult.errors);
+		const serviceHandler = async (req: Request, res: Response) => {
+			const input = req.validatedRequest;
+			const context =
+				(await createContext?.(
+					req as Request & { contract: Contract<TMeta> },
+				)) || {};
+
+			const result = await handler({
+				...input,
+				context,
+			});
+
+			if (!route.response) {
+				res.sendStatus(204);
 				return;
 			}
 
-			const input = validationResult.input;
-			let context: TContext | undefined;
+			res.json(result);
+		};
 
-			try {
-				context = createContext
-					? await createContext({
-							req,
-							res,
-							input,
-							contract: route,
-							path: route.keySegments,
-						})
-					: ({} as TContext);
-
-				const request = {
-					...input,
-					context: context as TContext,
-				};
-				const result = await handler(request);
-
-				const transformed = transformResponse
-					? await transformResponse({
-							req,
-							res,
-							input,
-							context: context as TContext,
-							data: result,
-							contract: route,
-							path: route.keySegments,
-						})
-					: result;
-
-				if (route.response === undefined) {
-					res.status(204).end();
-					return;
-				}
-
-				res.json(transformed);
-			} catch (error) {
-				const handled = handleError
-					? await handleError({
-							error,
-							req,
-							res,
-							next,
-							contract: route,
-							path: route.keySegments,
-							input,
-							context,
-						})
-					: false;
-
-				if (handled) return;
-				next(error);
-			}
-		});
+		app[method](
+			routePath,
+			requestPreparationMiddleware,
+			...registeredMiddlewares,
+			serviceHandler,
+		);
 	}
 
 	return app;

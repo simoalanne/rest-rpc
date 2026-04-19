@@ -11,36 +11,17 @@ import {
 	useQuery,
 	useSuspenseQuery,
 } from "@tanstack/react-query";
-import type { WrapEndpoints } from "./types.ts";
-
-type ReactQueryRuntime = {
-	queryClient: QueryClient;
-	useMutation: typeof useMutation;
-	useQuery: typeof useQuery;
-	useSuspenseQuery: typeof useSuspenseQuery;
-};
+import type { WrapContracts } from "./types.ts";
 
 export default function createAdapter<TApi extends ApiClientTree>(
 	api: TApi,
 	queryClient: QueryClient,
-): WrapEndpoints<TApi> {
-	return createAdapterWithRuntime(api, {
-		queryClient,
-		useMutation,
-		useQuery,
-		useSuspenseQuery,
-	});
-}
-
-export const createAdapterWithRuntime = <TApi extends ApiClientTree>(
-	api: TApi,
-	adapter: ReactQueryRuntime,
-): WrapEndpoints<TApi> => {
+): WrapContracts<TApi> {
 	const wrapNode = (node: ApiClientContractValue, path: string[] = []) =>
-		wrapContractNode(node, path, adapter);
+		wrapContractNode(node, path, queryClient);
 
-	return mapApiClientTree(api, wrapNode) as WrapEndpoints<TApi>;
-};
+	return mapApiClientTree(api, wrapNode) as WrapContracts<TApi>;
+}
 
 type RequestArgs = unknown[];
 type ContractCall = (...args: unknown[]) => Promise<unknown>;
@@ -81,13 +62,9 @@ const getQueryKey = (request: unknown, path: string[]) =>
 	request ? [...path, request] : path;
 
 const buildMutation =
-	(
-		$fetch: (...args: RequestArgs) => Promise<unknown>,
-		ctx: Contract,
-		adapter: ReactQueryRuntime,
-	) =>
+	($fetch: (...args: RequestArgs) => Promise<unknown>, ctx: Contract) =>
 	(options?: object) => {
-		const mutation = adapter.useMutation({
+		const mutation = useMutation({
 			mutationFn: (request: unknown) =>
 				ctx.request ? $fetch(request) : $fetch(),
 			...options,
@@ -111,7 +88,7 @@ const buildMutation =
 const wrapContractNode = (
 	node: ApiClientContractValue,
 	path: string[],
-	adapter: ReactQueryRuntime,
+	queryClient: QueryClient,
 ) => {
 	const fn = node.fetch as ContractCall;
 	const { ctx } = node;
@@ -120,7 +97,7 @@ const wrapContractNode = (
 		return await callContract(fn, ctx, args);
 	};
 
-	const useMutation = buildMutation($fetch, ctx, adapter);
+	const useMutationHook = buildMutation($fetch, ctx);
 
 	const $tryFetch = async (...args: RequestArgs) => {
 		try {
@@ -134,40 +111,42 @@ const wrapContractNode = (
 	const $getKey = (request?: unknown) => getQueryKey(request, path);
 
 	const invalidate = (request?: unknown) =>
-		adapter.queryClient.invalidateQueries({
+		queryClient.invalidateQueries({
 			queryKey: getQueryKey(request, path),
 		});
 
 	const clear = (request?: unknown) => {
-		adapter.queryClient.cancelQueries({ queryKey: getQueryKey(request, path) });
-		adapter.queryClient.removeQueries({ queryKey: getQueryKey(request, path) });
+		queryClient.cancelQueries({ queryKey: getQueryKey(request, path) });
+		queryClient.removeQueries({ queryKey: getQueryKey(request, path) });
 	};
 
 	const setData = (...args: unknown[]) => {
 		if (args.length === 2) {
 			const [request, updater] = args;
-			adapter.queryClient.setQueryData($getKey(request), updater);
+			queryClient.setQueryData($getKey(request), updater);
 			return;
 		}
 		const [updater] = args;
-		adapter.queryClient.setQueriesData({ queryKey: path }, updater);
+		queryClient.setQueriesData({ queryKey: path }, updater);
 	};
 
-	if (ctx.method !== "GET") {
-		return {
-			useMutation,
-			$fetch,
-			$tryFetch,
-		};
-	}
+	const sharedProperties = {
+		$contract: ctx,
+		$fetch,
+		$tryFetch,
+	};
 
-	return {
+	const mutationProperties = {
+		useMutation: useMutationHook,
+	};
+
+	const queryProperties = {
 		useQuery: (...args: RequestArgs) => {
 			const request = readRequestArg(ctx, args);
 			const options = readHookOptionsArg(ctx, args);
 
 			const queryEnabled = !!(ctx.request && request) || !ctx.request;
-			return adapter.useQuery({
+			return useQuery({
 				queryKey: getQueryKey(request, path),
 				queryFn: async ({ signal }) =>
 					ctx.request
@@ -181,7 +160,7 @@ const wrapContractNode = (
 			const request = readRequestArg(ctx, args);
 			const options = readHookOptionsArg(ctx, args);
 
-			return adapter.useSuspenseQuery({
+			return useSuspenseQuery({
 				queryKey: getQueryKey(request, path),
 				queryFn: ({ signal }) =>
 					ctx.request ? $fetch(request, { signal }) : $fetch({ signal }),
@@ -189,10 +168,28 @@ const wrapContractNode = (
 			});
 		},
 		setData,
-		$fetch,
-		$tryFetch,
 		$getKey,
 		invalidate,
 		clear,
+	};
+
+	const $reactQueryApi = {
+		...sharedProperties,
+		...mutationProperties,
+		...queryProperties,
+	};
+
+	if (ctx.method !== "GET") {
+		return {
+			...sharedProperties,
+			...mutationProperties,
+			$reactQueryApi,
+		};
+	}
+
+	return {
+		...sharedProperties,
+		...queryProperties,
+		$reactQueryApi,
 	};
 };

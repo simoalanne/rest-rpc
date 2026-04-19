@@ -13,9 +13,11 @@ export type ContractError = {
 	message: string;
 };
 
-export type FetchOptions = {
+export type FetchOptions = Omit<
+	RequestInit,
+	"method" | "body" | "headers" | "signal"
+> & {
 	signal?: AbortSignal;
-	cache?: RequestCache;
 };
 
 export type FetchArgs<E extends Contract = Contract> =
@@ -50,13 +52,13 @@ export class ApiClientHttpError extends Error {
 }
 
 type ApiClientError = {
-	endpoint: string;
+	contract: string;
 	error: ApiClientHttpError;
 };
 
 export type ApiClientOptions<TTree extends ContractTree> = {
 	baseUrl: string;
-	endpoints: TTree;
+	contracts: TTree;
 	onHttpError?: (error: ApiClientError) => void;
 	defaultHeaders?: Record<string, string>;
 	timeoutMs?: number;
@@ -120,7 +122,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 	api: ApiClientTree<TTree>;
 
 	private baseUrl: string;
-	private endpoints: TTree;
+	private contracts: TTree;
 	private onHttpError?: (error: ApiClientError) => void;
 	private defaultHeaders: Record<string, string>;
 	private timeoutMs?: number;
@@ -135,7 +137,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 
 	constructor(options: ApiClientOptions<TTree>) {
 		this.baseUrl = options.baseUrl;
-		this.endpoints = options.endpoints;
+		this.contracts = options.contracts;
 		this.defaultHeaders = options.defaultHeaders ?? {};
 		this.onHttpError = options.onHttpError;
 		this.timeoutMs = options.timeoutMs;
@@ -217,6 +219,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 
 		try {
 			const rawResponse = await fetch(url, {
+				...options,
 				method: contract.method,
 				body: body ? JSON.stringify(body) : undefined,
 				headers: {
@@ -224,13 +227,12 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 					...(body ? { "Content-Type": "application/json" } : {}),
 				},
 				signal: signalState?.signal ?? options?.signal,
-				cache: options?.cache,
 			});
 
 			if (!rawResponse.ok) {
 				const httpError = new ApiClientHttpError(rawResponse);
 				this.onHttpError?.({
-					endpoint: `${contract.method} ${contract.path}`,
+					contract: `${contract.method} ${contract.path}`,
 					error: httpError,
 				});
 
@@ -263,7 +265,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 	}
 
 	private buildApiClient = () =>
-		mapContractTree(this.endpoints, (node) => ({
+		mapContractTree(this.contracts, (node) => ({
 			ctx: node,
 			fetch: (...args: FetchArgs<typeof node>) => this.fetch(node, ...args),
 		})) as ApiClientTree<TTree>;

@@ -9,7 +9,8 @@ Use it to:
 - mount routes from a shared contract tree
 - validate `params`, `query`, and `body` with the Zod schemas from the contracts
 - keep backend handler inputs and outputs typed from the same source as the frontend
-- optionally add per-request context
+- add typed request context
+- read contract metadata inside middlewares and `createContext`
 
 ## Basic usage
 
@@ -18,14 +19,40 @@ import { createExpressRouter, initServices } from "@contract-first-api/express";
 import { contracts } from "@example/shared";
 import express from "express";
 
+type ContractMeta = {
+  requiresAuth?: boolean;
+  auditLabel?: string;
+};
+
 type RequestContext = {
   requestId: string;
+  viewerId?: string;
 };
 
 const app = express();
 app.use(express.json());
 
-const { defineService } = initServices(contracts).withContext<RequestContext>();
+const { defineService, defineMiddleware } = initServices<
+  typeof contracts,
+  ContractMeta,
+  RequestContext
+>();
+
+declare global {
+  namespace Express {
+    interface Request {
+      viewerId?: string;
+    }
+  }
+}
+
+const authMiddleware = defineMiddleware((req, _res, next) => {
+  if (req.contract.meta?.requiresAuth) {
+    req.viewerId = "viewer-123";
+  }
+
+  next();
+});
 
 const services = {
   health: defineService("health", {
@@ -40,7 +67,8 @@ const services = {
     list() {
       return { items: [] };
     },
-    create({ title }) {
+    create({ title, context }) {
+      console.log("viewer", context.viewerId);
       return {
         id: crypto.randomUUID(),
         title,
@@ -55,60 +83,42 @@ createExpressRouter({
   contracts,
   services,
   routePrefix: "/api",
-  createContext: () => ({
-    requestId: crypto.randomUUID(),
+  middlewares: [authMiddleware],
+  createContext: (req) => ({
+    requestId: `${req.contract.meta?.auditLabel ?? "route"}:${crypto.randomUUID()}`,
+    viewerId: req.viewerId,
   }),
 });
 ```
 
-## How handlers are shaped
+## How it works
 
 Each service function receives one object:
 
 - request fields from the contract
 - `context` from `createContext`
 
-For example:
-
-```ts
-create({ title }) {
-  return {
-    id: `todo-${todos.length + 1}`,
-    title,
-    createdAt: new Date().toISOString(),
-  };
-}
-```
-
-For routes with no request schema, you can still access `context`:
-
-```ts
-get({ context }) {
-  return {
-    status: "ok",
-    requestId: context.requestId,
-  };
-}
-```
-
-## What happens automatically
+## Middleware and validation
 
 When you call `createExpressRouter`:
 
 - every contract route is registered on the Express app
 - incoming `body`, `query`, and `params` are validated against the contract
-- validated values are merged into the handler input object
-- a failed validation returns `400`
-- handler results are sent as JSON when the contract has a `response`
+- validated values are merged into `req.validatedRequest`
+- the current contract is attached to `req.contract`
+- custom middlewares run after validation and before `createContext`
+- a failed validation throws `RequestValidationError` with `statusCode = 400`
+- static routes are registered before parameter routes when paths overlap
 
 ## Common setup pattern
 
 A typical backend flow looks like this:
 
 1. Define contracts in a shared package.
-2. Call `initServices(contracts)` to type the service tree.
+2. Call `initServices<typeof contracts, ContractMeta, RequestContext>()` to type the service helpers.
 3. Implement handlers with `defineService`.
-4. Pass `app`, `contracts`, and `services` into `createExpressRouter`.
-5. Add a `routePrefix` like `/api` so the frontend client can target one API base URL.
+4. Add metadata-aware Express middleware with `defineMiddleware` when needed.
+5. Pass `app`, `contracts`, and `services` into `createExpressRouter`.
+6. Add a `routePrefix` like `/api` so the frontend client can target one API base URL.
 
 If you already have an Express app with middleware, keep that setup as-is and call `createExpressRouter` after the middleware you want the routes to use.

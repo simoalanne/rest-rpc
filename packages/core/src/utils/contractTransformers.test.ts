@@ -4,17 +4,17 @@ import type { ContractTree } from "../contracts.ts";
 import {
 	flattenContractTree,
 	mapContractTree,
-} from "./endpointTransformers.ts";
+} from "./contractTransformers.ts";
 
 describe("Contract Transformers", () => {
 	describe("flattenContractTree", () => {
 		it("should return a single contract with empty keySegments when tree is a contract", () => {
-			const endpoint: ContractTree = {
+			const contract: ContractTree = {
 				method: "GET",
 				path: "/health",
 			};
 
-			const flattened = flattenContractTree(endpoint);
+			const flattened = flattenContractTree(contract);
 
 			assert.equal(flattened.length, 1);
 			assert.deepStrictEqual(flattened[0], {
@@ -65,11 +65,11 @@ describe("Contract Transformers", () => {
 				},
 			};
 
-			const [endpoint] = flattenContractTree(tree);
+			const [contract] = flattenContractTree(tree);
 
-			assert.equal(endpoint.method, "DELETE");
-			assert.equal(endpoint.path, "/account");
-			assert.deepStrictEqual(endpoint.keySegments, ["secured"]);
+			assert.equal(contract.method, "DELETE");
+			assert.equal(contract.path, "/account");
+			assert.deepStrictEqual(contract.keySegments, ["secured"]);
 		});
 
 		it("should return an empty list for an empty tree", () => {
@@ -80,20 +80,20 @@ describe("Contract Transformers", () => {
 
 	describe("mapContractTree", () => {
 		it("should map a single contract when tree is a contract", () => {
-			const endpoint: ContractTree = {
+			const contract: ContractTree = {
 				method: "PATCH",
 				path: "/profile",
 			};
 
 			const mapped = mapContractTree(
-				endpoint,
+				contract,
 				(def) => `${def.method} ${def.path}`,
 			);
 
 			assert.equal(mapped, "PATCH /profile");
 		});
 
-		it("should map all endpoints and preserve nested tree shape", () => {
+		it("should map all contracts and preserve nested tree shape", () => {
 			const tree: ContractTree = {
 				producers: {
 					list: {

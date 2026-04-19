@@ -1,12 +1,12 @@
 # Example workspace
 
-This folder is a tiny monorepo-style example that pressure-tests the current library API.
+This folder is a tiny monorepo-style example that showcases the intended workflow across the packages.
 
 Packages:
 
 - `shared`: exports one small contract tree
-- `backend`: mounts the contracts with `createExpressRouter`
-- `frontend`: React app using `ApiClient` through the React Query adapter
+- `backend`: mounts the contracts with `createExpressRouter`, uses metadata-aware middleware, and builds request context from the same shared contract data
+- `frontend`: React app using `ApiClient` through the React Query adapter, including custom adapter transforms and Suspense
 
 Run the backend:
 

@@ -10,6 +10,7 @@
 	},
 	"dependencies": {
 		"@example/shared": "workspace:*",
+		"@contract-first-api/core": "workspace:*",
 		"@contract-first-api/api-client": "workspace:*",
 		"@contract-first-api/react-query": "workspace:*",
 		"@tanstack/react-query": "^5.90.2",
