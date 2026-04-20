@@ -60,7 +60,6 @@ export type ApiClientOptions<TTree extends ContractTree> = {
 	baseUrl: string;
 	contracts: TTree;
 	onHttpError?: (error: ApiClientError) => void;
-	defaultHeaders?: Record<string, string>;
 	timeoutMs?: number;
 };
 
@@ -113,6 +112,10 @@ const createRequestSignal = (
 	};
 };
 
+type GetHeadersFn = () =>
+	| Record<string, string>
+	| Promise<Record<string, string>>;
+
 export const mapApiClientTree = (
 	tree: ApiClientTree<ContractTree>,
 	mappingFn: (leaf: ApiClientContractValue, path: string[]) => unknown,
@@ -124,21 +127,20 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 	private baseUrl: string;
 	private contracts: TTree;
 	private onHttpError?: (error: ApiClientError) => void;
-	private defaultHeaders: Record<string, string>;
+	private getHeaders?: GetHeadersFn;
 	private timeoutMs?: number;
 
 	setOnHttpError = (onHttpError: (error: ApiClientError) => void) => {
 		this.onHttpError = onHttpError;
 	};
 
-	setDefaultHeaders = (defaultHeaders: Record<string, string>) => {
-		this.defaultHeaders = defaultHeaders;
+	setHeaders = (getHeaders: GetHeadersFn) => {
+		this.getHeaders = getHeaders;
 	};
 
 	constructor(options: ApiClientOptions<TTree>) {
 		this.baseUrl = options.baseUrl;
 		this.contracts = options.contracts;
-		this.defaultHeaders = options.defaultHeaders ?? {};
 		this.onHttpError = options.onHttpError;
 		this.timeoutMs = options.timeoutMs;
 
@@ -215,7 +217,9 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 			contract,
 			requestArgs as RuntimeArgs,
 		);
+
 		const signalState = createRequestSignal(options?.signal, this.timeoutMs);
+		const headers = (await this.getHeaders?.()) ?? {};
 
 		try {
 			const rawResponse = await fetch(url, {
@@ -223,7 +227,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 				method: contract.method,
 				body: body ? JSON.stringify(body) : undefined,
 				headers: {
-					...this.defaultHeaders,
+					...headers,
 					...(body ? { "Content-Type": "application/json" } : {}),
 				},
 				signal: signalState?.signal ?? options?.signal,

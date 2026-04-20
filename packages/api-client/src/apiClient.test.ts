@@ -133,8 +133,9 @@ describe("ApiClient", () => {
 			const client = new ApiClient({
 				baseUrl: server.baseUrl,
 				contracts,
-				defaultHeaders: { "x-app": "shared-tests" },
 			});
+
+			client.setHeaders(async () => ({ "x-app": "shared-tests" }));
 
 			await client.api.secure.fetch();
 
