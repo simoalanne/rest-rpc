@@ -4,9 +4,7 @@ import {
 	flattenContractTree,
 	type HttpMethod,
 } from "@contract-first-api/core";
-import type express from "express";
-import type { NextFunction, Request, Response } from "express";
-import type { z } from "zod";
+import type { Application, NextFunction, Request, Response } from "express";
 import {
 	RequestValidationError,
 	type ValidationIssue,
@@ -35,7 +33,7 @@ export type CreateExpressRouterOptions<
 	TMeta = unknown,
 	TContext = EmptyObject,
 > = {
-	app: ReturnType<typeof express>;
+	app: Application;
 	contracts: TContracts;
 	services: ServiceTree<TContracts, TContext>;
 	middlewares?: (MiddlewareFunction | MiddlewareFunction<TMeta>)[];
@@ -111,15 +109,6 @@ const resolveHandlerAtPath = <THandler extends (...args: unknown[]) => unknown>(
 	return current as THandler;
 };
 
-const formatValidationIssues = (
-	issues: z.core.$ZodIssue[],
-): ValidationIssue[] =>
-	issues.map((issue) => ({
-		code: issue.code,
-		message: issue.message,
-		path: issue.path,
-	}));
-
 const prepareRequest =
 	(contract: Contract) =>
 	(req: Request, _res: Response, next: NextFunction) => {
@@ -151,7 +140,13 @@ const prepareRequest =
 
 			const result = schema.safeParse(rawValue);
 			if (!result.success) {
-				errors.push(...formatValidationIssues(result.error.issues));
+				errors.push(
+					...result.error.issues.map((issue) => ({
+						code: issue.code,
+						message: issue.message,
+						path: issue.path,
+					})),
+				);
 				continue;
 			}
 
