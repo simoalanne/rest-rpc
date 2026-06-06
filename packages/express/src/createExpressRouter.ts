@@ -1,6 +1,7 @@
 import {
 	type AnyContractTree,
 	type Contract,
+	type ContractMetaOf,
 	flattenContractTree,
 	type HttpMethod,
 } from "@contract-first-api/core";
@@ -30,8 +31,8 @@ type MiddlewareFunction<TMeta = unknown> = (
 
 export type CreateExpressRouterOptions<
 	TContracts extends AnyContractTree,
-	TMeta = unknown,
 	TContext = EmptyObject,
+	TMeta = ContractMetaOf<TContracts>,
 > = {
 	app: Application;
 	contracts: TContracts;
@@ -185,8 +186,8 @@ const getRouteHandler = (services: unknown, path: string[]) =>
 
 export const createExpressRouter = <
 	TContracts extends AnyContractTree,
-	TMeta = unknown,
 	TContext = EmptyObject,
+	TMeta = ContractMetaOf<TContracts>,
 >({
 	app,
 	contracts,
@@ -194,7 +195,7 @@ export const createExpressRouter = <
 	routePrefix,
 	createContext,
 	middlewares = [],
-}: CreateExpressRouterOptions<TContracts, TMeta, TContext>) => {
+}: CreateExpressRouterOptions<TContracts, TContext, TMeta>) => {
 	const routes = flattenContractTree(contracts).sort(compareRouteSpecificity);
 
 	for (const route of routes) {

@@ -116,6 +116,9 @@ importers:
       '@types/express':
         specifier: ^5.0.1
         version: 5.0.6
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
 
   packages/react-query:
     dependencies:

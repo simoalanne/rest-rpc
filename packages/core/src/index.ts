@@ -4,6 +4,7 @@ export type {
 	Contract,
 	ContractApiRequest,
 	ContractApiResponse,
+	ContractMetaOf,
 	ContractRequest,
 	ContractResponse,
 	ContractTree,

@@ -16,6 +16,7 @@ export type Contract<TMeta = unknown> = {
 	request?: RequestSchema;
 	response?: ResponseSchema;
 	meta?: TMeta;
+	$meta?: TMeta;
 };
 
 export type ContractTree<TMeta = unknown> =
@@ -52,6 +53,14 @@ type UnionToIntersection<T> = (
 ) extends (value: infer R) => void
 	? R
 	: never;
+
+export type ContractMetaOf<T> = T extends { $meta?: infer TMeta }
+	? TMeta
+	: T extends object
+		? {
+				[K in keyof T]: ContractMetaOf<T[K]>;
+			}[keyof T]
+		: unknown;
 
 export type ContractRequest<E extends AnyContractDefinition> =
 	RawRequest<E> extends infer R
@@ -96,16 +105,25 @@ export type ContractApiResponse<
 	P extends DotPaths<T>,
 > = ContractResponse<ContractAtPath<T, P>>;
 
+type WithMetaMarker<T, TMeta> =
+	T extends Contract<TMeta>
+		? T & { $meta?: TMeta }
+		: {
+				[K in keyof T]: T[K] extends AnyContractTree<TMeta>
+					? WithMetaMarker<T[K], TMeta>
+					: never;
+			};
+
 type ContractTools<TMeta> = {
 	defineContract: <const TContract extends AnyContractTree<TMeta>>(
 		contract: TContract,
-	) => TContract;
+	) => WithMetaMarker<TContract, TMeta>;
 	mergeContracts: <const TContracts extends AnyContractTree<TMeta>[]>(
 		...contracts: TContracts
-	) => Merge<UnionToIntersection<TContracts[number]>>;
+	) => WithMetaMarker<Merge<UnionToIntersection<TContracts[number]>>, TMeta>;
 };
 
 export const initContracts = <TMeta = unknown>(): ContractTools<TMeta> => ({
-	defineContract: (contract) => contract,
-	mergeContracts: (...contracts) => Object.assign({}, ...contracts),
+	defineContract: (contract) => contract as never,
+	mergeContracts: (...contracts) => Object.assign({}, ...contracts) as never,
 });

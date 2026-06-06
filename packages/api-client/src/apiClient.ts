@@ -13,12 +13,7 @@ export type ContractError = {
 	message: string;
 };
 
-export type FetchOptions = Omit<
-	RequestInit,
-	"method" | "body" | "headers" | "signal"
-> & {
-	signal?: AbortSignal;
-};
+export type FetchOptions = Omit<RequestInit, "method" | "body" | "headers">;
 
 export type FetchArgs<E extends Contract = Contract> =
 	ContractRequest<E> extends never
@@ -96,7 +91,7 @@ const parseResponseDefinition = <T>(
 };
 
 const createRequestSignal = (
-	signal: AbortSignal | undefined,
+	signal: RequestInit["signal"],
 	timeoutMs: number | undefined,
 ) => {
 	if (!timeoutMs) return null;

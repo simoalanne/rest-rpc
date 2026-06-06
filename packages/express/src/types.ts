@@ -2,6 +2,7 @@ import type {
 	AnyContractDefinition,
 	AnyContractTree,
 	Contract,
+	ContractMetaOf,
 	ContractRequest,
 	ContractResponse,
 	GetByPath,
@@ -90,8 +91,8 @@ export type DefineMiddleware<TMeta> = <
 
 export type ServiceTools<
 	T extends AnyContractTree,
-	TMeta = unknown,
 	TContext = EmptyObject,
+	TMeta = ContractMetaOf<T>,
 > = {
 	defineService: DefineService<T, TContext>;
 	defineMiddleware: DefineMiddleware<TMeta>;
@@ -99,9 +100,9 @@ export type ServiceTools<
 
 export const initServices = <
 	T extends AnyContractTree,
-	TMeta = unknown,
 	TContext = EmptyObject,
->(): ServiceTools<T, TMeta, TContext> => ({
+	TMeta = ContractMetaOf<T>,
+>(): ServiceTools<T, TContext, TMeta> => ({
 	defineService: (_path, service) => service,
 	defineMiddleware: (middleware) => middleware,
 });

@@ -1,5 +1,5 @@
-import { createExpressRouter, initServices } from "@contract-first-api/express";
-import type { ApiResponse, ExampleContractMeta } from "@example/shared";
+import { initServer } from "@contract-first-api/express";
+import type { ApiResponse } from "@example/shared";
 import { allContracts } from "@example/shared";
 import express from "express";
 
@@ -20,9 +20,8 @@ const todos: ApiResponse<"todos.create">[] = [
 	},
 ];
 
-const { defineService, defineMiddleware } = initServices<
+const { defineService, defineMiddleware, createRouter } = initServer<
 	typeof allContracts,
-	ExampleContractMeta,
 	RequestContext
 >();
 
@@ -102,7 +101,7 @@ app.use((req, res, next) => {
 	next();
 });
 
-createExpressRouter<typeof allContracts, ExampleContractMeta, RequestContext>({
+createRouter({
 	app,
 	contracts: allContracts,
 	services,
