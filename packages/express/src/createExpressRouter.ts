@@ -188,6 +188,21 @@ const getSuccessStatusCode = (method: HttpMethod, hasResponse: boolean) => {
 	return 200;
 };
 
+const writeStreamResponse = async (
+	result: unknown,
+	res: Response,
+	statusCode: number,
+) => {
+	res.status(statusCode);
+	res.setHeader("content-type", "application/x-ndjson");
+
+	for await (const chunk of result as AsyncIterable<unknown>) {
+		res.write(`${JSON.stringify(chunk)}\n`);
+	}
+
+	res.end();
+};
+
 export const createExpressRouter = <
 	TContracts extends ContractTree,
 	TContext = EmptyObject,
@@ -230,6 +245,11 @@ export const createExpressRouter = <
 
 				if (!route.response) {
 					res.sendStatus(statusCode);
+					return;
+				}
+
+				if (route.options?.mode === "stream") {
+					await writeStreamResponse(result, res, statusCode);
 					return;
 				}
 

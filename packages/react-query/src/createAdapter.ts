@@ -1,5 +1,6 @@
 import {
 	type ApiClientContractValue,
+	type ApiClientJsonContractValue,
 	type ApiClientTree,
 	type FetchOptions,
 	mapApiClientTree,
@@ -17,8 +18,10 @@ export default function createAdapter<TApi extends ApiClientTree>(
 	api: TApi,
 	queryClient: QueryClient,
 ): WrapContracts<TApi> {
-	const wrapNode = (node: ApiClientContractValue, path: string[] = []) =>
-		wrapContractNode(node, path, queryClient);
+	const wrapNode = (node: ApiClientContractValue, path: string[] = []) => {
+		if (!("fetch" in node)) return node;
+		return wrapContractNode(node, path, queryClient);
+	};
 
 	return mapApiClientTree(api, wrapNode) as WrapContracts<TApi>;
 }
@@ -86,7 +89,7 @@ const buildMutation =
 	};
 
 const wrapContractNode = (
-	node: ApiClientContractValue,
+	node: ApiClientJsonContractValue,
 	path: string[],
 	queryClient: QueryClient,
 ) => {
@@ -174,17 +177,8 @@ const wrapContractNode = (
 		...queryProperties,
 	};
 
-	if (ctx.method !== "GET") {
-		return {
-			...sharedProperties,
-			...mutationProperties,
-			$reactQueryApi,
-		};
-	}
-
 	return {
-		...sharedProperties,
-		...queryProperties,
+		...$reactQueryApi,
 		$reactQueryApi,
 	};
 };

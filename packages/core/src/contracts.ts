@@ -19,12 +19,18 @@ export type KnownErrors = KnownErrorSchema | readonly KnownErrorSchema[];
 
 export type ResponseSchema = z.ZodType;
 
+export type ContractOptions = {
+	mode?: "json" | "stream";
+	streamFormat?: "ndjson";
+};
+
 export type Contract<TMeta = unknown> = {
 	path: string;
 	method: HttpMethod;
 	request?: RequestSchema;
 	response?: ResponseSchema;
 	errors?: KnownErrors;
+	options?: ContractOptions;
 	meta?: TMeta;
 	$meta?: TMeta;
 };
@@ -36,8 +42,18 @@ export type ContractTree<TMeta = unknown> =
 export type ContractResponse<E extends Contract> = E extends {
 	response: infer R;
 }
-	? z.infer<R>
+	? R extends z.ZodType
+		? IsStreamContract<E> extends true
+			? AsyncIterable<z.infer<R>>
+			: z.infer<R>
+		: never
 	: undefined;
+
+export type IsStreamContract<E extends Contract> = E extends {
+	options: { mode: "stream" };
+}
+	? true
+	: false;
 
 type InferRequest<R> = {
 	[K in keyof R]: R[K] extends z.ZodType ? z.infer<R[K]> : never;

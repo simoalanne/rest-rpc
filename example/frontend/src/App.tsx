@@ -1,5 +1,6 @@
 import type { FormEvent } from "react";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import type { TodoEvent } from "@example/shared";
 import { api } from "./api.ts";
 
 const renderJson = (value: unknown) => JSON.stringify(value, null, 2);
@@ -7,6 +8,18 @@ const renderError = (error: unknown) =>
 	error && typeof error === "object" && "message" in error
 		? String(error.message)
 		: String(error);
+
+const renderTodoEvent = (event: TodoEvent) => {
+	if (event.type === "created") {
+		return `${event.message} (${event.todo.id})`;
+	}
+
+	if (event.type === "renamed") {
+		return `${event.message}: ${event.title}`;
+	}
+
+	return event.message;
+};
 
 const HealthPanel = () => {
 	const health = api.health.get.useSuspenseQuery();
@@ -23,10 +36,23 @@ export const App = () => {
 	const [title, setTitle] = useState("");
 	const [searchInput, setSearchInput] = useState("");
 	const [searchQuery, setSearchQuery] = useState("");
+	const [activity, setActivity] = useState<TodoEvent[]>([]);
+	const [activityError, setActivityError] = useState<unknown>(null);
 	const todos = api.todos.list.useQuery();
 	const todoSearch = api.todos.find.useQuery(
 		searchQuery ? { query: searchQuery } : "",
 	);
+
+	useEffect(() => {
+		return api.todos.events.subscribe({
+			onData(event) {
+				setActivity((current) => [event, ...current].slice(0, 8));
+			},
+			onError(error) {
+				setActivityError(error);
+			},
+		});
+	}, []);
 
 	const createTodo = api.todos.create.useMutation({
 		onSuccess: async () => {
@@ -132,6 +158,25 @@ export const App = () => {
 							? renderError(todos.error)
 							: renderJson(todos.data)}
 				</pre>
+			</section>
+
+			<section className="panel">
+				<h2>Live Todo Activity</h2>
+				{activityError ? (
+					<p className="error">{renderError(activityError)}</p>
+				) : null}
+				<ul className="activity-list">
+					{activity.length === 0 ? (
+						<li className="activity-empty">Waiting for stream events...</li>
+					) : (
+						activity.map((event, index) => (
+							<li key={`${event.type}-${index}`}>
+								<span>{event.type}</span>
+								<p>{renderTodoEvent(event)}</p>
+							</li>
+						))
+					)}
+				</ul>
 			</section>
 		</main>
 	);

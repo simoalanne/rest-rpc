@@ -127,6 +127,42 @@ pre {
 	color: #35485a;
 }
 
+.activity-list {
+	display: grid;
+	gap: 0.75rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.activity-list li {
+	display: grid;
+	gap: 0.35rem;
+	padding: 0.85rem 1rem;
+	border: 1px solid rgba(19, 33, 44, 0.1);
+	border-radius: 12px;
+	background: rgba(255, 255, 255, 0.72);
+}
+
+.activity-list span {
+	width: fit-content;
+	padding: 0.2rem 0.55rem;
+	border-radius: 999px;
+	background: #13212c;
+	color: white;
+	font-size: 0.75rem;
+	text-transform: uppercase;
+}
+
+.activity-list p {
+	margin: 0;
+	color: #35485a;
+}
+
+.activity-empty {
+	color: #6d7c89;
+}
+
 @media (max-width: 640px) {
 	.todo-form,
 	.section-heading {

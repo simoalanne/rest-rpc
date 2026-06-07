@@ -402,7 +402,7 @@ describe("createAdapter", () => {
 		assert.equal(mutateAsyncCalls[0][1], hookOptions);
 	});
 
-	it("should not expose query helpers for non-GET contracts", async () => {
+	it("should expose query and mutation helpers for every JSON contract", async () => {
 		resetState();
 
 		const createAdapter = await getCreateAdapter();
@@ -411,9 +411,11 @@ describe("createAdapter", () => {
 			createQueryClientMock() as any,
 		);
 
+		assert.equal(typeof wrapped.items.list.useQuery, "function");
+		assert.equal(typeof wrapped.items.list.useMutation, "function");
 		assert.equal(typeof wrapped.items.create.useMutation, "function");
-		assert.equal("useQuery" in wrapped.items.create, false);
-		assert.equal("invalidate" in wrapped.items.create, false);
-		assert.equal("setData" in wrapped.items.create, false);
+		assert.equal(typeof wrapped.items.create.useQuery, "function");
+		assert.equal(typeof wrapped.items.create.invalidate, "function");
+		assert.equal(typeof wrapped.items.create.setData, "function");
 	});
 });

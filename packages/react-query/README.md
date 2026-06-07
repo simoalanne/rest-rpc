@@ -10,7 +10,6 @@ Use it to:
 - keep query keys aligned with the contract path
 - invalidate or clear cache using the same contract tree
 - inspect the original contract on each wrapped node through `$contract`
-- post-process the generated adapter with `mapWrappedContracts`
 
 ## Basic setup
 
@@ -31,14 +30,14 @@ export const api = createAdapter(client.api, queryClient);
 
 ## How you use it in components
 
-For `GET` contracts, use query hooks:
+Use query hooks for read/cache workflows:
 
 ```tsx
 const health = api.health.get.useQuery();
 const todos = api.todos.list.useQuery();
 ```
 
-For non-`GET` contracts, use mutations:
+Use mutations for imperative workflows:
 
 ```tsx
 const createTodo = api.todos.create.useMutation({
@@ -52,18 +51,18 @@ await createTodo.mutateAsync({ title: "New item" });
 
 ## Useful helpers on each contract
 
-Wrapped contracts expose the original contract through `$contract`, direct calls through `$fetch`, and the React Query helpers that match the default behavior for that route:
+Wrapped JSON contracts expose the original contract through `$contract`, direct calls through `$fetch`, and the full React Query helper surface:
 
 - `$contract` for the original contract definition, including `meta`
 - `$fetch` for direct calls without hooks
 - `$tryFetch` for `{ success, data | error }` style handling
-- `useQuery` and `useSuspenseQuery` for `GET` routes
-- `useMutation` for non-`GET` routes
+- `useQuery` and `useSuspenseQuery` for cacheable async state
+- `useMutation` for imperative async actions
 - `invalidate` to refresh cached queries
 - `clear` to remove cached queries
 - `$getKey` to get the query key for a request
 - `setData` to write into the cache
-- `$reactQueryApi` to access both query and mutation helpers during custom transforms
+- `$reactQueryApi` as an alias for the full helper surface
 
 Examples:
 
@@ -83,35 +82,6 @@ await api.todos.create.$fetch(
 );
 ```
 
-## Post-processing the wrapped tree
-
-Use `mapWrappedContracts` when you want to build your own adapter layer on top of the generated one.
-
-```ts
-import createAdapter, {
-  mapWrappedContracts,
-} from "@contract-first-api/react-query";
-
-const baseApi = createAdapter(client.api, queryClient);
-
-type ReactQueryMeta = {
-  reactQuery?: {
-    safe?: boolean;
-  };
-};
-
-const customApi = mapWrappedContracts<ReactQueryMeta, typeof client.api>(
-  baseApi,
-  (node) =>
-    node.$contract.meta?.reactQuery?.safe || node.$contract.method === "GET"
-      ? node.$reactQueryApi
-      : node,
-);
-```
-
-That pattern is useful when contract metadata should influence how your app exposes or groups routes.
-`$reactQueryApi` gives your transform access to the full helper surface even when the default adapter only exposes the query or mutation subset.
-
 ## Practical flow
 
 In a React app, the usual order is:
@@ -120,7 +90,6 @@ In a React app, the usual order is:
 2. Build an `ApiClient` from those contracts.
 3. Create a `QueryClient`.
 4. Wrap the client with `createAdapter`.
-5. Optionally post-process the wrapped tree with `mapWrappedContracts`.
-6. Use the generated contract helpers inside components.
+5. Use the generated contract helpers inside components.
 
 If your app already uses React Query, this package makes the contract tree feel like a native part of that setup.

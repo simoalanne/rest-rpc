@@ -309,13 +309,153 @@ describe("ApiClient", () => {
 		}
 	});
 
+	it("should expose stream for stream contracts and parse ndjson chunks", async () => {
+		const server = createServer((req, res) => {
+			assert.equal(req.method, "GET");
+			assert.equal(req.url, "/events?roomId=room-1");
+
+			res.statusCode = 200;
+			res.setHeader("content-type", "application/x-ndjson");
+			res.write(`${JSON.stringify({ type: "joined", payload: "Ada" })}\n`);
+			res.end(`${JSON.stringify({ type: "left", payload: "Linus" })}\n`);
+		});
+
+		await new Promise<void>((resolve) =>
+			server.listen(0, "127.0.0.1", resolve),
+		);
+		const address = server.address();
+		if (!address || typeof address === "string") {
+			throw new Error("Failed to resolve test server address");
+		}
+
+		try {
+			const contracts = {
+				events: {
+					path: "/events",
+					method: "GET",
+					request: {
+						query: z.object({ roomId: z.string() }),
+					},
+					response: z.object({
+						type: z.string(),
+						payload: z.string(),
+					}),
+					options: { mode: "stream" },
+				},
+			} as const;
+
+			const client = new ApiClient({
+				baseUrl: `http://127.0.0.1:${(address as AddressInfo).port}`,
+				contracts,
+			});
+
+			assert.equal("fetch" in client.api.events, false);
+			assert.equal("stream" in client.api.events, true);
+
+			const request = {
+				roomId: "room-1",
+			} satisfies Parameters<typeof client.api.events.stream>[0];
+
+			const stream = await client.api.events.stream(request);
+			const chunks = [];
+			for await (const chunk of stream) {
+				chunks.push(chunk);
+			}
+
+			assert.deepStrictEqual(chunks, [
+				{ type: "joined", payload: "Ada" },
+				{ type: "left", payload: "Linus" },
+			]);
+		} finally {
+			await new Promise<void>((resolve, reject) => {
+				server.close((err) => {
+					if (err) {
+						reject(err);
+						return;
+					}
+					resolve();
+				});
+			});
+		}
+	});
+
+	it("should expose subscribe for stream contracts and call callbacks", async () => {
+		const server = createServer((req, res) => {
+			assert.equal(req.method, "GET");
+			assert.equal(req.url, "/events?roomId=room-1");
+
+			res.statusCode = 200;
+			res.setHeader("content-type", "application/x-ndjson");
+			res.write(`${JSON.stringify({ type: "joined", payload: "Ada" })}\n`);
+			res.end(`${JSON.stringify({ type: "left", payload: "Linus" })}\n`);
+		});
+
+		await new Promise<void>((resolve) =>
+			server.listen(0, "127.0.0.1", resolve),
+		);
+		const address = server.address();
+		if (!address || typeof address === "string") {
+			throw new Error("Failed to resolve test server address");
+		}
+
+		try {
+			const contracts = {
+				events: {
+					path: "/events",
+					method: "GET",
+					request: {
+						query: z.object({ roomId: z.string() }),
+					},
+					response: z.object({
+						type: z.string(),
+						payload: z.string(),
+					}),
+					options: { mode: "stream" },
+				},
+			} as const;
+
+			const client = new ApiClient({
+				baseUrl: `http://127.0.0.1:${(address as AddressInfo).port}`,
+				contracts,
+			});
+
+			assert.equal("subscribe" in client.api.events, true);
+
+			const chunks: unknown[] = [];
+			await new Promise<void>((resolve, reject) => {
+				client.api.events.subscribe(
+					{ roomId: "room-1" },
+					{
+						onData(data) {
+							chunks.push(data);
+							if (chunks.length === 2) resolve();
+						},
+						onError: reject,
+					},
+				);
+			});
+
+			assert.deepStrictEqual(chunks, [
+				{ type: "joined", payload: "Ada" },
+				{ type: "left", payload: "Linus" },
+			]);
+		} finally {
+			await new Promise<void>((resolve, reject) => {
+				server.close((err) => {
+					if (err) {
+						reject(err);
+						return;
+					}
+					resolve();
+				});
+			});
+		}
+	});
+
 	it("should throw unknown error when success payload does not match response schema", async () => {
 		const server = await startServer(() => ({
 			body: { ok: false },
 		}));
-
-		const previousWarn = console.warn;
-		console.warn = () => {};
 
 		try {
 			const contracts = {
@@ -342,7 +482,6 @@ describe("ApiClient", () => {
 				},
 			);
 		} finally {
-			console.warn = previousWarn;
 			await server.close();
 		}
 	});

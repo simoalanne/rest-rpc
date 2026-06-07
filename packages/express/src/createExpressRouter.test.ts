@@ -68,6 +68,8 @@ const createRouteTargetDouble = () => {
 const createResponseDouble = () => {
 	let statusCode = 200;
 	let jsonBody: unknown;
+	const headers: Record<string, string> = {};
+	let bodyText = "";
 	let writableEnded = false;
 
 	return {
@@ -86,6 +88,13 @@ const createResponseDouble = () => {
 				this.headersSent = true;
 				return body;
 			},
+			setHeader(name: string, value: string) {
+				headers[name] = value;
+			},
+			write(chunk: string) {
+				bodyText += chunk;
+				this.headersSent = true;
+			},
 			sendStatus(code: number) {
 				statusCode = code;
 				jsonBody = undefined;
@@ -99,6 +108,7 @@ const createResponseDouble = () => {
 			},
 		},
 		read: () => ({ statusCode, jsonBody, writableEnded }),
+		readStream: () => ({ headers, bodyText }),
 	};
 };
 
@@ -194,6 +204,68 @@ describe("createExpressRouter", () => {
 				includePosts: true,
 			},
 			writableEnded: true,
+		});
+	});
+
+	it("should write stream contracts as ndjson chunks", async () => {
+		const { defineContractTree } = initContracts();
+		const contracts = defineContractTree({
+			events: {
+				stream: {
+					method: "GET",
+					path: "/events",
+					response: z.object({
+						type: z.string(),
+						payload: z.string(),
+					}),
+					options: { mode: "stream" },
+				},
+			},
+		});
+
+		const { defineService } = initServices<typeof contracts>();
+		const services = {
+			events: defineService("events", {
+				async *stream() {
+					yield { type: "joined", payload: "Ada" };
+					yield { type: "left", payload: "Linus" };
+				},
+			}),
+		};
+
+		const target = createRouteTargetDouble();
+		createExpressRouter({
+			app: target.app,
+			contracts,
+			services,
+		});
+
+		const response = createResponseDouble();
+		let nextError: unknown;
+
+		await target.routes["GET /events"](
+			{
+				body: {},
+				query: {},
+				params: {},
+				path: "/events",
+			},
+			response.res,
+			(error?: unknown) => {
+				nextError = error;
+			},
+		);
+
+		assert.equal(nextError, undefined);
+		assert.deepStrictEqual(response.read(), {
+			statusCode: 200,
+			jsonBody: undefined,
+			writableEnded: true,
+		});
+		assert.deepStrictEqual(response.readStream(), {
+			headers: { "content-type": "application/x-ndjson" },
+			bodyText:
+				'{"type":"joined","payload":"Ada"}\n{"type":"left","payload":"Linus"}\n',
 		});
 	});
 

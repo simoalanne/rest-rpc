@@ -84,6 +84,30 @@ const services = {
 				todo.title.toLowerCase().includes(query.toLowerCase()),
 			);
 		},
+		async *events() {
+			for (const todo of todos) {
+				yield {
+					type: "created" as const,
+					todo,
+					message: `Already on the board: ${todo.title}`,
+				};
+			}
+
+			await sleep(1200);
+			yield {
+				type: "renamed" as const,
+				id: todos[0]?.id ?? "todo-1",
+				title: "Try the contract-first example with streams",
+				message: "The sample todo got a streaming glow-up",
+			};
+
+			await sleep(1200);
+			yield {
+				type: "completed" as const,
+				id: todos[0]?.id ?? "todo-1",
+				message: "A live event says this todo is basically done",
+			};
+		},
 	}),
 };
 

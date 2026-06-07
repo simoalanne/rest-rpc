@@ -1,6 +1,7 @@
 import type {
-	ApiClientContractValue,
 	ApiClientError,
+	ApiClientJsonContractValue,
+	ApiClientStreamContractValue,
 	ApiResult,
 	FetchArgs,
 } from "@contract-first-api/api-client";
@@ -128,18 +129,16 @@ export type QueryFunctions<E extends Contract> = {
 	$getKey: (request?: ContractRequest<E>) => QueryKey;
 } & SharedProperties<E>;
 
-type IsQueryLike<E extends Contract> = E["method"] extends "GET" ? true : false;
-
-export type QueryWrapper<E extends Contract> = (IsQueryLike<E> extends true
-	? QueryFunctions<E>
-	: MutationFunctions<E>) & {
+export type QueryWrapper<E extends Contract> = AllFunctions<E> & {
 	$reactQueryApi: AllFunctions<E>;
 };
 
 export type WrapContracts<T> = {
-	[K in keyof T]: T[K] extends ApiClientContractValue<infer E>
+	[K in keyof T]: T[K] extends ApiClientJsonContractValue<infer E>
 		? QueryWrapper<E>
-		: T[K] extends Record<string, unknown>
-			? WrapContracts<T[K]>
-			: never;
+		: T[K] extends ApiClientStreamContractValue
+			? T[K]
+			: T[K] extends Record<string, unknown>
+				? WrapContracts<T[K]>
+				: never;
 };
