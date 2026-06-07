@@ -366,14 +366,15 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		contract: E,
 		...args: Parameters<SubscribeFn<E>>
 	) {
-		const { requestArgs, callbacks } = this.extractSubscribeArgs(contract, args);
+		const { requestArgs, callbacks } = this.extractSubscribeArgs(
+			contract,
+			args,
+		);
 		const controller = new AbortController();
 
-		const streamArgs = (
-			contract.request
-				? [requestArgs, { signal: controller.signal }]
-				: [{ signal: controller.signal }]
-		) as unknown as FetchArgs<E>;
+		const streamArgs = (contract.request
+			? [requestArgs, { signal: controller.signal }]
+			: [{ signal: controller.signal }]) as unknown as FetchArgs<E>;
 
 		void this.consumeStream(contract, callbacks, controller.signal, streamArgs);
 

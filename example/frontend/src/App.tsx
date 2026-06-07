@@ -1,6 +1,6 @@
+import type { TodoEvent } from "@example/shared";
 import type { FormEvent } from "react";
 import { Suspense, useEffect, useState } from "react";
-import type { TodoEvent } from "@example/shared";
 import { api } from "./api.ts";
 
 const renderJson = (value: unknown) => JSON.stringify(value, null, 2);
@@ -170,6 +170,7 @@ export const App = () => {
 						<li className="activity-empty">Waiting for stream events...</li>
 					) : (
 						activity.map((event, index) => (
+							// biome-ignore lint/suspicious/noArrayIndexKey: index won't cause issues here.
 							<li key={`${event.type}-${index}`}>
 								<span>{event.type}</span>
 								<p>{renderTodoEvent(event)}</p>

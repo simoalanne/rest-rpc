@@ -9,10 +9,10 @@ export type {
 	FetchArgs,
 	FetchFn,
 	FetchOptions,
-	SubscribeCallbackFunctions,
-	SubscribeFn,
 	StreamData,
 	StreamFn,
+	SubscribeCallbackFunctions,
+	SubscribeFn,
 	TryFetchFn,
 } from "./apiClient.ts";
 export { ApiClient, mapApiClientTree } from "./apiClient.ts";
