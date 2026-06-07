@@ -1,6 +1,6 @@
 {
 	"name": "@contract-first-api/express",
-	"version": "2.0.1",
+	"version": "3.0.0",
 	"type": "module",
 	"description": "Mount shared API contracts on an Express app with typed handlers and request validation.",
 	"keywords": [

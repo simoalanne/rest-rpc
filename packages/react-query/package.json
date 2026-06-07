@@ -1,6 +1,6 @@
 {
 	"name": "@contract-first-api/react-query",
-	"version": "2.0.0",
+	"version": "3.0.0",
 	"type": "module",
 	"description": "Wrap a contract-first API client with React Query hooks and cache helpers.",
 	"keywords": [
