@@ -1,9 +1,8 @@
 export type {
-	AnyContractDefinition,
-	AnyContractTree,
 	Contract,
 	ContractApiRequest,
 	ContractApiResponse,
+	ContractError,
 	ContractMetaOf,
 	ContractRequest,
 	ContractResponse,
@@ -11,6 +10,9 @@ export type {
 	DotPaths,
 	GetByPath,
 	HttpMethod,
+	KnownErrorSchema,
+	KnownErrors,
+	RequestBodySchema,
 	RequestSchema,
 	ResponseSchema,
 } from "./contracts.ts";

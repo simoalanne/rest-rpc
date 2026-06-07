@@ -54,7 +54,7 @@ const startServer = async (
 };
 
 describe("ApiClient", () => {
-	it("should map flat args into params, query and body and ignore unknown fields", async () => {
+	it("should map flat args into params, query and body", async () => {
 		const received: {
 			method?: string;
 			url?: string;
@@ -91,21 +91,77 @@ describe("ApiClient", () => {
 				contracts,
 			});
 
-			const requestWithIgnoredField = {
+			const request = {
 				id: "a b",
 				search: "carrot",
 				name: "Fresh",
-				ignored: "value",
-			} as unknown as Parameters<typeof client.api.items.update.fetch>[0];
+			} satisfies Parameters<typeof client.api.items.update.fetch>[0];
 
-			const result = await client.api.items.update.fetch(
-				requestWithIgnoredField,
-			);
+			const result = await client.api.items.update.fetch(request);
 
 			assert.deepStrictEqual(result, { ok: true });
 			assert.equal(received.method, "POST");
 			assert.equal(received.url, "/items/a%20b?search=carrot");
 			assert.deepStrictEqual(JSON.parse(received.bodyText ?? "{}"), {
+				name: "Fresh",
+			});
+		} finally {
+			await server.close();
+		}
+	});
+
+	it("should map discriminated union body args into the request body", async () => {
+		const received: {
+			url?: string;
+			bodyText?: string;
+		} = {};
+
+		const server = await startServer((req) => {
+			received.url = req.url;
+			received.bodyText = req.bodyText;
+			return { body: { ok: true } };
+		});
+
+		try {
+			const contracts = {
+				items: {
+					change: {
+						path: "/items/:id",
+						method: "POST",
+						request: {
+							params: z.object({ id: z.string() }),
+							query: z.object({ dryRun: z.boolean().optional() }),
+							body: z.discriminatedUnion("kind", [
+								z.object({
+									kind: z.literal("rename"),
+									name: z.string(),
+								}),
+								z.object({
+									kind: z.literal("archive"),
+									reason: z.string(),
+								}),
+							]),
+						},
+						response: z.object({ ok: z.literal(true) }),
+					},
+				},
+			} as const;
+
+			const client = new ApiClient({
+				baseUrl: server.baseUrl,
+				contracts,
+			});
+
+			await client.api.items.change.fetch({
+				id: "item-1",
+				dryRun: true,
+				kind: "rename",
+				name: "Fresh",
+			});
+
+			assert.equal(received.url, "/items/item-1?dryRun=true");
+			assert.deepStrictEqual(JSON.parse(received.bodyText ?? "{}"), {
+				kind: "rename",
 				name: "Fresh",
 			});
 		} finally {
@@ -189,24 +245,31 @@ describe("ApiClient", () => {
 		}
 	});
 
-	it("should call onHttpError and throw unexpected error for HTTP failures", async () => {
-		let onHttpErrorCalled = false;
-
+	it("should parse known HTTP errors and return them from tryFetch", async () => {
 		const server = await startServer(() => ({
-			status: 400,
-			body: { message: "Item not found" },
+			status: 409,
+			body: {
+				code: "TITLE_ALREADY_EXISTS",
+				title: "Try the contract-first example",
+				status: 409,
+			},
 		}));
 
 		try {
 			const contracts = {
 				items: {
-					getById: {
-						path: "/items/:id",
-						method: "GET",
+					create: {
+						path: "/items",
+						method: "POST",
 						request: {
-							params: z.object({ id: z.string() }),
+							body: z.object({ title: z.string() }),
 						},
 						response: z.object({ id: z.string() }),
+						errors: z.object({
+							code: z.literal("TITLE_ALREADY_EXISTS"),
+							title: z.string(),
+							status: z.literal(409),
+						}),
 					},
 				},
 			} as const;
@@ -214,35 +277,39 @@ describe("ApiClient", () => {
 			const client = new ApiClient({
 				baseUrl: server.baseUrl,
 				contracts,
-				onHttpError: () => {
-					onHttpErrorCalled = true;
-				},
 			});
 
 			await assert.rejects(
-				() => client.api.items.getById.fetch({ id: "1" }),
+				() =>
+					client.api.items.create.fetch({
+						title: "Try the contract-first example",
+					}),
 				(error: unknown) => {
-					assert.equal(typeof error, "object");
-					assert.notEqual(error, null);
-
-					const unexpectedError = error as {
-						type?: unknown;
-						status?: unknown;
-					};
-
-					assert.equal(unexpectedError.type, "unexpected");
-					assert.equal(unexpectedError.status, 400);
+					assert.deepStrictEqual(error, {
+						code: "TITLE_ALREADY_EXISTS",
+						status: 409,
+						title: "Try the contract-first example",
+					});
 					return true;
 				},
 			);
 
-			assert.equal(onHttpErrorCalled, true);
+			const result = await client.api.items.create.tryFetch({
+				title: "Try the contract-first example",
+			});
+
+			assert.equal(result.success, false);
+			if (!result.success) {
+				assert.equal(result.error.code, "TITLE_ALREADY_EXISTS");
+				assert.equal(result.error.status, 409);
+				assert.equal(result.error.title, "Try the contract-first example");
+			}
 		} finally {
 			await server.close();
 		}
 	});
 
-	it("should throw unexpected error when success payload does not match response schema", async () => {
+	it("should throw unknown error when success payload does not match response schema", async () => {
 		const server = await startServer(() => ({
 			body: { ok: false },
 		}));
@@ -267,16 +334,10 @@ describe("ApiClient", () => {
 			await assert.rejects(
 				() => client.api.status.fetch(),
 				(error: unknown) => {
-					assert.equal(typeof error, "object");
-					assert.notEqual(error, null);
-
-					const unexpectedError = error as {
-						type?: unknown;
-						message?: unknown;
-					};
-
-					assert.equal(unexpectedError.type, "unexpected");
-					assert.equal(typeof unexpectedError.message, "string");
+					assert.deepStrictEqual(error, {
+						code: "unknown",
+						message: "Backend returned its response in an unexpected format",
+					});
 					return true;
 				},
 			);

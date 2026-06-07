@@ -27,6 +27,7 @@ export const App = () => {
 	const todoSearch = api.todos.find.useQuery(
 		searchQuery ? { query: searchQuery } : "",
 	);
+
 	const createTodo = api.todos.create.useMutation({
 		onSuccess: async () => {
 			setTitle("");

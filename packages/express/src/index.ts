@@ -2,6 +2,7 @@ export type { CreateExpressRouterOptions } from "./createExpressRouter.ts";
 export { createExpressRouter } from "./createExpressRouter.ts";
 export type { ServerTools } from "./initServer.ts";
 export { initServer } from "./initServer.ts";
+export { KnownContractError } from "./KnownContractError.ts";
 export type {
 	RequestValidationErrorDetails,
 	ValidationIssue,

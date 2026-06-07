@@ -3,85 +3,64 @@ import { describe, it } from "node:test";
 import { initContracts } from "@contract-first-api/core";
 import z from "zod";
 import { createExpressRouter } from "./createExpressRouter.ts";
-import { RequestValidationError } from "./RequestValidationError.ts";
+import { KnownContractError } from "./KnownContractError.ts";
 import { initServices } from "./types.ts";
 
-type RegisteredHandler = (
-	req: {
-		body?: unknown;
-		query?: Record<string, unknown>;
-		params?: Record<string, unknown>;
-		[key: string]: unknown;
-	},
-	res: {
-		status: (code: number) => unknown;
-		json: (body: unknown) => unknown;
-		end: () => unknown;
-		headersSent?: boolean;
-		writableEnded?: boolean;
-	},
-	next: (error?: unknown) => void,
-) => Promise<void>;
-
-const chainHandlers =
-	(handlers: RegisteredHandler[]): RegisteredHandler =>
-	async (req, res, next) => {
-		let index = -1;
-
-		const dispatch = async (
-			handlerIndex: number,
-			error?: unknown,
-		): Promise<void> => {
-			if (error !== undefined) {
-				next(error);
-				return;
-			}
-
-			if (handlerIndex <= index) {
-				next(new Error("next() called multiple times"));
-				return;
-			}
-
-			index = handlerIndex;
-			const handler = handlers[handlerIndex];
+const chainHandlers = (handlers: ((...args: any[]) => unknown)[]) => {
+	return async (
+		req: Record<string, unknown>,
+		res: Record<string, unknown>,
+		next: (error?: unknown) => void,
+	) => {
+		const run = async (index: number): Promise<void> => {
+			const handler = handlers[index];
 			if (!handler) {
 				next();
 				return;
 			}
 
-			let nextPromise: Promise<void> | undefined;
+			let nextCalled = false;
+			let nextError: unknown;
 
-			await handler(req, res, (nextError) => {
-				nextPromise = dispatch(handlerIndex + 1, nextError);
-			});
+			try {
+				await handler(req, res, (error?: unknown) => {
+					nextCalled = true;
+					nextError = error;
+				});
+			} catch (error) {
+				next(error);
+				return;
+			}
 
-			await nextPromise;
+			if (!nextCalled) return;
+			if (nextError !== undefined) {
+				next(nextError);
+				return;
+			}
+
+			await run(index + 1);
 		};
 
-		await dispatch(0);
+		await run(0);
 	};
+};
 
 const createRouteTargetDouble = () => {
-	const routes: Record<string, RegisteredHandler> = {};
+	const routes: Record<string, ReturnType<typeof chainHandlers>> = {};
+	const register =
+		(method: string) =>
+		(path: string, ...handlers: ((...args: any[]) => unknown)[]) => {
+			routes[`${method} ${path}`] = chainHandlers(handlers);
+		};
 
 	return {
 		routes,
 		app: {
-			get(path: string, ...handlers: RegisteredHandler[]) {
-				routes[`GET ${path}`] = chainHandlers(handlers);
-			},
-			post(path: string, ...handlers: RegisteredHandler[]) {
-				routes[`POST ${path}`] = chainHandlers(handlers);
-			},
-			put(path: string, ...handlers: RegisteredHandler[]) {
-				routes[`PUT ${path}`] = chainHandlers(handlers);
-			},
-			delete(path: string, ...handlers: RegisteredHandler[]) {
-				routes[`DELETE ${path}`] = chainHandlers(handlers);
-			},
-			patch(path: string, ...handlers: RegisteredHandler[]) {
-				routes[`PATCH ${path}`] = chainHandlers(handlers);
-			},
+			get: register("GET"),
+			post: register("POST"),
+			put: register("PUT"),
+			delete: register("DELETE"),
+			patch: register("PATCH"),
 		},
 	};
 };
@@ -107,6 +86,13 @@ const createResponseDouble = () => {
 				this.headersSent = true;
 				return body;
 			},
+			sendStatus(code: number) {
+				statusCode = code;
+				jsonBody = undefined;
+				writableEnded = true;
+				this.headersSent = true;
+				return code;
+			},
 			end() {
 				writableEnded = true;
 				this.headersSent = true;
@@ -118,8 +104,8 @@ const createResponseDouble = () => {
 
 describe("createExpressRouter", () => {
 	it("should validate input, attach contract to req, create context, and call service", async () => {
-		const { defineContract } = initContracts();
-		const contracts = defineContract({
+		const { defineContractTree } = initContracts();
+		const contracts = defineContractTree({
 			users: {
 				getById: {
 					method: "GET",
@@ -211,9 +197,9 @@ describe("createExpressRouter", () => {
 		});
 	});
 
-	it("should throw RequestValidationError and skip service work when validation fails", async () => {
-		const { defineContract } = initContracts();
-		const contracts = defineContract({
+	it("should return validation errors as JSON and skip service work", async () => {
+		const { defineContractTree } = initContracts();
+		const contracts = defineContractTree({
 			posts: {
 				create: {
 					method: "POST",
@@ -261,36 +247,32 @@ describe("createExpressRouter", () => {
 		const response = createResponseDouble();
 		let nextError: unknown;
 
-		await assert.rejects(
-			() =>
-				handler(
-					{
-						body: {},
-					},
-					response.res,
-					(error) => {
-						nextError = error;
-					},
-				),
-			(error: unknown) => {
-				assert.ok(error instanceof RequestValidationError);
-				assert.equal(
-					error.message,
-					"Request validation failed. Check the validationErrors field for details.",
-				);
-				assert.equal(error.statusCode, 400);
-				assert.equal(error.validationErrors.length, 1);
-				return true;
+		await handler(
+			{
+				body: {},
+			},
+			response.res,
+			(error) => {
+				nextError = error;
 			},
 		);
 
 		assert.equal(createContextCalled, false);
 		assert.equal(serviceCalled, false);
 		assert.equal(nextError, undefined);
-		assert.deepStrictEqual(response.read(), {
-			statusCode: 200,
-			jsonBody: undefined,
-			writableEnded: false,
+		const result = response.read();
+		assert.equal(result.statusCode, 400);
+		assert.equal(result.writableEnded, true);
+		assert.deepStrictEqual(result.jsonBody, {
+			message:
+				"Request validation failed. Check the validationErrors field for details.",
+			validationErrors: [
+				{
+					code: "invalid_type",
+					message: "Invalid input: expected string, received undefined",
+					path: ["title"],
+				},
+			],
 		});
 	});
 
@@ -299,8 +281,8 @@ describe("createExpressRouter", () => {
 			requiresAuth?: boolean;
 		};
 
-		const { defineContract } = initContracts<ContractMeta>();
-		const contracts = defineContract({
+		const { defineContractTree } = initContracts<ContractMeta>();
+		const contracts = defineContractTree({
 			posts: {
 				create: {
 					method: "POST",
@@ -399,16 +381,73 @@ describe("createExpressRouter", () => {
 			viewerIdFromMiddleware: "viewer-123",
 			viewerIdInService: "viewer-123",
 		});
-		assert.deepStrictEqual(response.read().jsonBody, {
-			id: "post-1",
-			title: "Hello",
-			viewerId: "viewer-123",
+		assert.deepStrictEqual(response.read(), {
+			statusCode: 201,
+			jsonBody: {
+				id: "post-1",
+				title: "Hello",
+				viewerId: "viewer-123",
+			},
+			writableEnded: true,
 		});
 	});
 
-	it("should surface service errors as rejected handler promises", async () => {
-		const { defineContract } = initContracts();
-		const contracts = defineContract({
+	it("should return 204 for routes without response schemas", async () => {
+		const { defineContractTree } = initContracts();
+		const contracts = defineContractTree({
+			posts: {
+				delete: {
+					method: "DELETE",
+					path: "/posts/:id",
+					request: {
+						params: z.object({ id: z.string() }),
+					},
+				},
+			},
+		});
+
+		const { defineService } = initServices<typeof contracts>();
+		const target = createRouteTargetDouble();
+
+		createExpressRouter({
+			app: target.app,
+			contracts,
+			services: {
+				posts: defineService("posts", {
+					delete() {},
+				}),
+			},
+		});
+
+		const handler = target.routes["DELETE /posts/:id"];
+		assert.ok(handler);
+
+		const response = createResponseDouble();
+		let nextError: unknown;
+
+		await handler(
+			{
+				params: {
+					id: "post-1",
+				},
+			},
+			response.res,
+			(error) => {
+				nextError = error;
+			},
+		);
+
+		assert.equal(nextError, undefined);
+		assert.deepStrictEqual(response.read(), {
+			statusCode: 204,
+			jsonBody: undefined,
+			writableEnded: true,
+		});
+	});
+
+	it("should pass service errors to the next error handler", async () => {
+		const { defineContractTree } = initContracts();
+		const contracts = defineContractTree({
 			health: {
 				method: "GET",
 				path: "/health",
@@ -438,15 +477,72 @@ describe("createExpressRouter", () => {
 		const response = createResponseDouble();
 		let nextError: unknown;
 
-		await assert.rejects(
-			() =>
-				handler({}, response.res, (error) => {
-					nextError = error;
+		await handler({}, response.res, (error) => {
+			nextError = error;
+		});
+
+		assert.equal(nextError, serviceError);
+		assert.equal(response.read().jsonBody, undefined);
+	});
+
+	it("should return known contract errors as flat JSON", async () => {
+		const { defineContractTree } = initContracts();
+		const contracts = defineContractTree({
+			todos: {
+				create: {
+					method: "POST",
+					path: "/todos",
+					request: {
+						body: z.object({ title: z.string() }),
+					},
+					response: z.object({ id: z.string() }),
+					errors: z.object({
+						code: z.literal("TITLE_ALREADY_EXISTS"),
+					}),
+				},
+			},
+		});
+
+		const { defineService } = initServices<typeof contracts>();
+		const target = createRouteTargetDouble();
+		const knownError = { code: "TITLE_ALREADY_EXISTS" };
+		const thrownError = new KnownContractError(knownError);
+
+		createExpressRouter({
+			app: target.app,
+			contracts,
+			services: {
+				todos: defineService("todos", {
+					create() {
+						throw thrownError;
+					},
 				}),
-			(error: unknown) => error === serviceError,
+			},
+		});
+
+		const handler = target.routes["POST /todos"];
+		assert.ok(handler);
+
+		const response = createResponseDouble();
+		let nextError: unknown;
+
+		await handler(
+			{
+				body: {
+					title: "Hello",
+				},
+			},
+			response.res,
+			(error) => {
+				nextError = error;
+			},
 		);
 
 		assert.equal(nextError, undefined);
-		assert.equal(response.read().jsonBody, undefined);
+		assert.deepStrictEqual(response.read(), {
+			statusCode: 400,
+			jsonBody: knownError,
+			writableEnded: true,
+		});
 	});
 });

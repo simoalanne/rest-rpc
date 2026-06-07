@@ -1,15 +1,13 @@
 import {
-	type AnyContractTree,
 	type Contract,
 	type ContractMetaOf,
+	type ContractTree,
 	flattenContractTree,
 	type HttpMethod,
 } from "@contract-first-api/core";
 import type { Application, NextFunction, Request, Response } from "express";
-import {
-	RequestValidationError,
-	type ValidationIssue,
-} from "./RequestValidationError.ts";
+import { KnownContractError } from "./KnownContractError.ts";
+import type { ValidationIssue } from "./RequestValidationError.ts";
 import type { RequestWithContract, ServiceTree } from "./types.ts";
 
 declare global {
@@ -30,7 +28,7 @@ type MiddlewareFunction<TMeta = unknown> = (
 ) => unknown;
 
 export type CreateExpressRouterOptions<
-	TContracts extends AnyContractTree,
+	TContracts extends ContractTree,
 	TContext = EmptyObject,
 	TMeta = ContractMetaOf<TContracts>,
 > = {
@@ -111,8 +109,7 @@ const resolveHandlerAtPath = <THandler extends (...args: unknown[]) => unknown>(
 };
 
 const prepareRequest =
-	(contract: Contract) =>
-	(req: Request, _res: Response, next: NextFunction) => {
+	(contract: Contract) => (req: Request, res: Response, next: NextFunction) => {
 		req.contract = contract;
 		req.validatedRequest = {};
 		const errors: ValidationIssue[] = [];
@@ -151,15 +148,16 @@ const prepareRequest =
 				continue;
 			}
 
-			validatedSegments[segment] = result.data;
+			validatedSegments[segment] = result.data as Record<string, unknown>;
 		}
 
 		if (errors.length > 0) {
-			throw new RequestValidationError({
+			res.status(400).json({
 				message:
 					"Request validation failed. Check the validationErrors field for details.",
 				validationErrors: errors,
 			});
+			return;
 		}
 
 		req.validatedRequest = {
@@ -184,8 +182,14 @@ const getRouteHandler = (services: unknown, path: string[]) =>
 		request: Record<string, unknown>,
 	) => unknown | Promise<unknown>;
 
+const getSuccessStatusCode = (method: HttpMethod, hasResponse: boolean) => {
+	if (method === "POST") return 201;
+	if (!hasResponse) return 204;
+	return 200;
+};
+
 export const createExpressRouter = <
-	TContracts extends AnyContractTree,
+	TContracts extends ContractTree,
 	TContext = EmptyObject,
 	TMeta = ContractMetaOf<TContracts>,
 >({
@@ -214,17 +218,29 @@ export const createExpressRouter = <
 					req as Request & { contract: Contract<TMeta> },
 				)) || {};
 
-			const result = await handler({
-				...input,
-				context,
-			});
+			try {
+				const result = await handler({
+					...input,
+					context,
+				});
+				const statusCode = getSuccessStatusCode(
+					route.method,
+					Boolean(route.response),
+				);
 
-			if (!route.response) {
-				res.sendStatus(204);
-				return;
+				if (!route.response) {
+					res.sendStatus(statusCode);
+					return;
+				}
+
+				res.status(statusCode).json(result);
+			} catch (error) {
+				if (error instanceof KnownContractError) {
+					res.status(error.status).json(error.error);
+					return;
+				}
+				throw error;
 			}
-
-			res.json(result);
 		};
 
 		app[method](

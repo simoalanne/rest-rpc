@@ -41,9 +41,9 @@ type ContractMeta = {
   auditLabel?: string;
 };
 
-const { defineContract } = initContracts<ContractMeta>();
+const { defineContractTree } = initContracts<ContractMeta>();
 
-export const contracts = defineContract({
+export const contracts = defineContractTree({
   health: {
     get: {
       method: "GET",

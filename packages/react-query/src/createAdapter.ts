@@ -91,6 +91,7 @@ const wrapContractNode = (
 	queryClient: QueryClient,
 ) => {
 	const fn = node.fetch as ContractCall;
+	const tryFn = node.tryFetch as ContractCall;
 	const { ctx } = node;
 
 	const $fetch = async (...args: RequestArgs) => {
@@ -99,14 +100,8 @@ const wrapContractNode = (
 
 	const useMutationHook = buildMutation($fetch, ctx);
 
-	const $tryFetch = async (...args: RequestArgs) => {
-		try {
-			const data = await $fetch(...args);
-			return { success: true, data };
-		} catch (error) {
-			return { success: false, error };
-		}
-	};
+	const $tryFetch = async (...args: RequestArgs) =>
+		await callContract(tryFn, ctx, args);
 
 	const $getKey = (request?: unknown) => getQueryKey(request, path);
 

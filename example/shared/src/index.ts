@@ -14,7 +14,7 @@ export type ExampleContractMeta = {
 	};
 };
 
-const { defineContract, mergeContracts } = initContracts<ExampleContractMeta>();
+const { defineContractTree } = initContracts<ExampleContractMeta>();
 
 export const todoSchema = z.object({
 	id: z.string(),
@@ -22,7 +22,7 @@ export const todoSchema = z.object({
 	createdAt: z.string(),
 });
 
-export const healthContract = defineContract({
+export const healthContract = defineContractTree({
 	health: {
 		get: {
 			method: "GET",
@@ -38,7 +38,7 @@ export const healthContract = defineContract({
 	},
 });
 
-export const todoContracts = defineContract({
+export const todoContracts = defineContractTree({
 	todos: {
 		list: {
 			method: "GET",
@@ -59,6 +59,9 @@ export const todoContracts = defineContract({
 					title: z.string().min(1),
 				}),
 			},
+			errors: z.object({
+				code: z.literal("TITLE_ALREADY_EXISTS"),
+			}),
 			response: todoSchema,
 		},
 		find: {
@@ -79,7 +82,7 @@ export const todoContracts = defineContract({
 	},
 });
 
-export const allContracts = mergeContracts(healthContract, todoContracts);
+export const allContracts = { ...healthContract, ...todoContracts };
 
 export type ExampleContracts = typeof allContracts;
 export type ApiPath = DotPaths<ExampleContracts>;

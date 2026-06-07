@@ -60,9 +60,6 @@ const client = new ApiClient({
   baseUrl: "http://localhost:3001/api",
   contracts,
   timeoutMs: 10_000,
-  onHttpError: ({ contract, error }) => {
-    console.error("Request failed", contract, error.response.status);
-  },
 });
 
 // Headers are set via a callback as they are often dynamic and cannot be known at client creation time:

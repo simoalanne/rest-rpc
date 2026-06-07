@@ -22,9 +22,9 @@ type ContractMeta = {
   auditLabel?: string;
 };
 
-const { defineContract, mergeContracts } = initContracts<ContractMeta>();
+const { defineContractTree, mergeContracts } = initContracts<ContractMeta>();
 
-const healthContracts = defineContract({
+const healthContracts = defineContractTree({
   health: {
     get: {
       method: "GET",
@@ -40,7 +40,7 @@ const healthContracts = defineContract({
   },
 });
 
-const todoContracts = defineContract({
+const todoContracts = defineContractTree({
   todos: {
     list: {
       method: "GET",

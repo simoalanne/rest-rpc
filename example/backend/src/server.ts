@@ -55,7 +55,7 @@ const regularMiddleware = (
 
 const services = {
 	health: defineService("health", {
-		async get({ context }): Promise<ApiResponse<"health.get">> {
+		async get({ context }) {
 			await sleep(900);
 			return {
 				status: "ok",

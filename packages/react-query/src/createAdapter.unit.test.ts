@@ -67,52 +67,68 @@ const getCreateAdapter = async () => {
 	return module.default;
 };
 
+const createNode = (
+	ctx: Record<string, unknown>,
+	fetch: (...args: unknown[]) => Promise<unknown>,
+) => ({
+	ctx,
+	fetch,
+	tryFetch: async (...args: unknown[]) => {
+		try {
+			const data = await fetch(...args);
+			return { success: true, data };
+		} catch (error) {
+			return { success: false, error };
+		}
+	},
+});
+
 const createApiTree = () =>
 	({
 		items: {
-			list: {
-				ctx: { method: "GET", path: "/items" },
-				fetch: async (...args: unknown[]) => {
+			list: createNode(
+				{ method: "GET", path: "/items" },
+				async (...args: unknown[]) => {
 					listFetchCalls.push(args);
 					return { items: ["carrot"] };
 				},
-			},
-			byId: {
-				ctx: {
+			),
+			byId: createNode(
+				{
 					method: "GET",
 					path: "/items/:id",
 					request: { params: { shape: { id: true } } },
 				},
-				fetch: async (...args: unknown[]) => {
+				async (...args: unknown[]) => {
 					byIdFetchCalls.push(args);
 					return { id: "item-1" };
 				},
-			},
-			create: {
-				ctx: {
+			),
+			create: createNode(
+				{
 					method: "POST",
 					path: "/items",
 					request: { body: { shape: { name: true } } },
 				},
-				fetch: async (...args: unknown[]) => {
+				async (...args: unknown[]) => {
 					createFetchCalls.push(args);
 					return { created: true };
 				},
-			},
-			refresh: {
-				ctx: { method: "POST", path: "/items/refresh" },
-				fetch: async (...args: unknown[]) => {
+			),
+			refresh: createNode(
+				{ method: "POST", path: "/items/refresh" },
+				async (...args: unknown[]) => {
 					refreshFetchCalls.push(args);
 					return { refreshed: true };
 				},
-			},
-			failing: {
-				ctx: { method: "GET", path: "/items/failing" },
-				fetch: async (...args: unknown[]) => {
+			),
+			failing: createNode(
+				{ method: "GET", path: "/items/failing" },
+				async (...args: unknown[]) => {
 					failingFetchCalls.push(args);
 					throw failingError;
 				},
-			},
+			),
 		},
 	}) as any;
 

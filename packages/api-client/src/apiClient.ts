@@ -1,19 +1,23 @@
 import type {
 	Contract,
+	ContractError,
 	ContractRequest,
 	ContractResponse,
 	ContractTree,
-	ResponseSchema,
 } from "@contract-first-api/core";
 import { mapContractTree, mapObjectValues } from "@contract-first-api/core";
 
-export type ContractError = {
-	type: "unexpected";
+export type FetchOptions = Omit<RequestInit, "method" | "body" | "headers">;
+
+export type ApiClientUnknownError = {
+	code: "unknown";
 	status?: number;
-	message: string;
+	message?: string;
 };
 
-export type FetchOptions = Omit<RequestInit, "method" | "body" | "headers">;
+export type ApiClientError<E extends Contract> =
+	| (ContractError<E> & { status?: number })
+	| ApiClientUnknownError;
 
 export type FetchArgs<E extends Contract = Contract> =
 	ContractRequest<E> extends never
@@ -24,8 +28,17 @@ export type FetchFn<E extends Contract> = (
 	...args: FetchArgs<E>
 ) => Promise<ContractResponse<E>>;
 
+export type ApiResult<E extends Contract> =
+	| { success: true; data: ContractResponse<E> }
+	| { success: false; error: ApiClientError<E> };
+
+export type TryFetchFn<E extends Contract> = (
+	...args: FetchArgs<E>
+) => Promise<ApiResult<E>>;
+
 export type ApiClientContractValue<E extends Contract = Contract> = {
 	fetch: FetchFn<E>;
+	tryFetch: TryFetchFn<E>;
 	ctx: E;
 };
 
@@ -36,25 +49,9 @@ export type ApiClientTree<T extends ContractTree = ContractTree> =
 				[K in keyof T]: T[K] extends ContractTree ? ApiClientTree<T[K]> : never;
 			};
 
-export class ApiClientHttpError extends Error {
-	response: Response;
-
-	constructor(response: Response, message?: string) {
-		super(message ?? `HTTP ${response.status} ${response.statusText}`);
-		this.name = "ApiClientHttpError";
-		this.response = response;
-	}
-}
-
-type ApiClientError = {
-	contract: string;
-	error: ApiClientHttpError;
-};
-
 export type ApiClientOptions<TTree extends ContractTree> = {
 	baseUrl: string;
 	contracts: TTree;
-	onHttpError?: (error: ApiClientError) => void;
 	timeoutMs?: number;
 };
 
@@ -67,28 +64,6 @@ const isApiClientContractNode = (
 	value !== null &&
 	"fetch" in value &&
 	"ctx" in value;
-
-const parseJsonSafely = async (response: Response) => {
-	try {
-		return await response.json();
-	} catch {
-		return null;
-	}
-};
-
-const parseResponseDefinition = <T>(
-	definition: ResponseSchema | undefined,
-	payload: unknown,
-): { success: true; data: T | undefined } | { success: false } => {
-	if (definition === undefined) {
-		return { success: false };
-	}
-
-	const result = definition.safeParse(payload);
-	return result.success
-		? { success: true, data: result.data as T }
-		: { success: false };
-};
 
 const createRequestSignal = (
 	signal: RequestInit["signal"],
@@ -121,13 +96,8 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 
 	private baseUrl: string;
 	private contracts: TTree;
-	private onHttpError?: (error: ApiClientError) => void;
 	private getHeaders?: GetHeadersFn;
 	private timeoutMs?: number;
-
-	setOnHttpError = (onHttpError: (error: ApiClientError) => void) => {
-		this.onHttpError = onHttpError;
-	};
 
 	setHeaders = (getHeaders: GetHeadersFn) => {
 		this.getHeaders = getHeaders;
@@ -136,15 +106,14 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 	constructor(options: ApiClientOptions<TTree>) {
 		this.baseUrl = options.baseUrl;
 		this.contracts = options.contracts;
-		this.onHttpError = options.onHttpError;
 		this.timeoutMs = options.timeoutMs;
 
 		this.api = this.buildApiClient();
 	}
 
 	private groupKeysToRequest(args: RuntimeArgs, contract: Contract) {
-		const keyMap = new Map<string, "body" | "query" | "params">();
-		(["body", "query", "params"] as const).forEach((type) => {
+		const keyMap = new Map<string, "query" | "params">();
+		(["query", "params"] as const).forEach((type) => {
 			const keys = Object.keys(contract.request?.[type]?.shape ?? {});
 			keys.forEach((key) => {
 				keyMap.set(key, type);
@@ -154,9 +123,17 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		return Object.entries(args).reduce(
 			(acc, [k, v]) => {
 				const bucket = keyMap.get(k);
-				if (!bucket) return acc;
-				if (!acc[bucket]) acc[bucket] = {};
-				acc[bucket][k] = v;
+				if (bucket) {
+					if (!acc[bucket]) acc[bucket] = {};
+					acc[bucket][k] = v;
+					return acc;
+				}
+
+				if (contract.request?.body) {
+					if (!acc.body) acc.body = {};
+					acc.body[k] = v;
+				}
+
 				return acc;
 			},
 			{} as {
@@ -229,32 +206,31 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 			});
 
 			if (!rawResponse.ok) {
-				const httpError = new ApiClientHttpError(rawResponse);
-				this.onHttpError?.({
-					contract: `${contract.method} ${contract.path}`,
-					error: httpError,
-				});
-
+				const errorPayload = await rawResponse.json().catch(() => null);
+				for (const schema of [contract.errors ?? []].flat()) {
+					const result = schema.safeParse(errorPayload);
+					if (result.success) throw result.data;
+				}
 				throw {
-					type: "unexpected",
+					code: "unknown",
 					status: rawResponse.status,
-					message: httpError.message,
-				} as ContractError;
+					message: errorPayload?.message ?? rawResponse.statusText,
+				};
 			}
 
-			const response = await parseJsonSafely(rawResponse);
-			const parsedResponse = parseResponseDefinition(
-				contract.response,
-				response,
-			);
+			if (!contract.response) return undefined as ContractResponse<E>;
+
+			const response = await rawResponse.json().catch(() => null);
+
+			const parsedResponse = contract.response.safeParse(response);
 			if (!parsedResponse.success) {
 				console.warn(
 					`Backend returned a response that does not match the expected schema for contract ${contract.method} ${contract.path}.`,
 				);
 				throw {
-					type: "unexpected",
+					code: "unknown",
 					message: "Backend returned its response in an unexpected format",
-				} as ContractError;
+				};
 			}
 
 			return parsedResponse.data as ContractResponse<E>;
@@ -263,9 +239,23 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		}
 	}
 
+	private async tryFetch<E extends Contract>(
+		contract: E,
+		...args: FetchArgs<E>
+	): Promise<ApiResult<E>> {
+		try {
+			const data = await this.fetch(contract, ...args);
+			return { success: true, data };
+		} catch (error) {
+			return { success: false, error: error as ApiClientError<E> };
+		}
+	}
+
 	private buildApiClient = () =>
 		mapContractTree(this.contracts, (node) => ({
 			ctx: node,
 			fetch: (...args: FetchArgs<typeof node>) => this.fetch(node, ...args),
+			tryFetch: (...args: FetchArgs<typeof node>) =>
+				this.tryFetch(node, ...args),
 		})) as ApiClientTree<TTree>;
 }

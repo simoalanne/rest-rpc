@@ -1,10 +1,9 @@
 import type {
-	AnyContractDefinition,
-	AnyContractTree,
 	Contract,
 	ContractMetaOf,
 	ContractRequest,
 	ContractResponse,
+	ContractTree,
 	GetByPath,
 } from "@contract-first-api/core";
 import type { NextFunction, Request, Response } from "express";
@@ -23,56 +22,50 @@ type ContextValue<TContext> = {
 	context: TContext;
 };
 
-type HandlerResult<E extends AnyContractDefinition> =
+type HandlerResult<E extends Contract> =
 	ContractResponse<E> extends undefined
 		? MaybePromise<void>
 		: MaybePromise<ContractResponse<E>>;
 
-export type ServiceRequest<
-	E extends AnyContractDefinition,
-	TContext = EmptyObject,
-> =
+export type ServiceRequest<E extends Contract, TContext = EmptyObject> =
 	ContractRequest<E> extends never
 		? ContextValue<TContext>
 		: Merge<ContractRequest<E> & ContextValue<TContext>>;
 
-export type ServiceResponse<E extends AnyContractDefinition> =
-	ContractResponse<E>;
+export type ServiceResponse<E extends Contract> = ContractResponse<E>;
 
-export type ServiceHandler<
-	E extends AnyContractDefinition,
-	TContext = EmptyObject,
-> = (...args: [request: ServiceRequest<E, TContext>]) => HandlerResult<E>;
+export type ServiceHandler<E extends Contract, TContext = EmptyObject> = (
+	...args: [request: ServiceRequest<E, TContext>]
+) => HandlerResult<E>;
 
 export type ServiceTree<
-	T extends AnyContractTree,
+	T extends ContractTree,
 	TContext = EmptyObject,
-> = T extends AnyContractDefinition
+> = T extends Contract
 	? ServiceHandler<T, TContext>
 	: {
-			[K in keyof T]: T[K] extends AnyContractTree
+			[K in keyof T]: T[K] extends ContractTree
 				? ServiceTree<T[K], TContext>
 				: never;
 		};
 
-export type ServiceGroupPaths<T extends AnyContractTree> =
-	T extends AnyContractDefinition
-		? never
-		: {
-				[K in keyof T & string]: T[K] extends AnyContractDefinition
-					? never
-					: T[K] extends AnyContractTree
-						? K | `${K}.${ServiceGroupPaths<T[K]>}`
-						: never;
-			}[keyof T & string];
+export type ServiceGroupPaths<T extends ContractTree> = T extends Contract
+	? never
+	: {
+			[K in keyof T & string]: T[K] extends Contract
+				? never
+				: T[K] extends ContractTree
+					? K | `${K}.${ServiceGroupPaths<T[K]>}`
+					: never;
+		}[keyof T & string];
 
 export type ServiceAtPath<
-	T extends AnyContractTree,
+	T extends ContractTree,
 	P extends ServiceGroupPaths<T>,
 	TContext = EmptyObject,
-> = ServiceTree<Extract<GetByPath<T, P>, AnyContractTree>, TContext>;
+> = ServiceTree<Extract<GetByPath<T, P>, ContractTree>, TContext>;
 
-export type DefineService<T extends AnyContractTree, TContext = EmptyObject> = <
+export type DefineService<T extends ContractTree, TContext = EmptyObject> = <
 	P extends ServiceGroupPaths<T>,
 >(
 	path: P,
@@ -90,7 +83,7 @@ export type DefineMiddleware<TMeta> = <
 ) => TMiddleware;
 
 export type ServiceTools<
-	T extends AnyContractTree,
+	T extends ContractTree,
 	TContext = EmptyObject,
 	TMeta = ContractMetaOf<T>,
 > = {
@@ -99,7 +92,7 @@ export type ServiceTools<
 };
 
 export const initServices = <
-	T extends AnyContractTree,
+	T extends ContractTree,
 	TContext = EmptyObject,
 	TMeta = ContractMetaOf<T>,
 >(): ServiceTools<T, TContext, TMeta> => ({

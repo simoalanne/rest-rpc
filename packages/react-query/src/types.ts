@@ -1,6 +1,7 @@
 import type {
 	ApiClientContractValue,
-	ContractError,
+	ApiClientError,
+	ApiResult,
 	FetchArgs,
 } from "@contract-first-api/api-client";
 import type {
@@ -23,7 +24,7 @@ export type MutationVariables<E extends Contract> =
 	ContractRequest<E> extends never ? never : ContractRequest<E>;
 
 type QueryOptionsFor<E extends Contract, TData = ContractResponse<E>> = Omit<
-	UseQueryOptions<ContractResponse<E>, ContractError, TData>,
+	UseQueryOptions<ContractResponse<E>, ApiClientError<E>, TData>,
 	"queryKey" | "queryFn"
 >;
 
@@ -31,12 +32,12 @@ type SuspenseQueryOptionsFor<
 	E extends Contract,
 	TData = ContractResponse<E>,
 > = Omit<
-	UseSuspenseQueryOptions<ContractResponse<E>, ContractError, TData>,
+	UseSuspenseQueryOptions<ContractResponse<E>, ApiClientError<E>, TData>,
 	"queryKey" | "queryFn"
 >;
 
 type MutationOptionsFor<E extends Contract, TVariables> = Omit<
-	UseMutationOptions<ContractResponse<E>, ContractError, TVariables>,
+	UseMutationOptions<ContractResponse<E>, ApiClientError<E>, TVariables>,
 	"mutationFn"
 >;
 
@@ -70,16 +71,16 @@ export type UseMutationArgs<E extends Contract> =
 			];
 
 export type MutationWrapper<E extends Contract> = Omit<
-	UseMutationResult<ContractResponse<E>, ContractError, MutationVariables<E>>,
+	UseMutationResult<
+		ContractResponse<E>,
+		ApiClientError<E>,
+		MutationVariables<E>
+	>,
 	"mutate" | "mutateAsync"
 > & {
 	mutate: (...args: UseMutationArgs<E>) => void;
 	mutateAsync: (...args: UseMutationArgs<E>) => Promise<ContractResponse<E>>;
 };
-
-export type ApiResult<E extends Contract> =
-	| { success: true; data: ContractResponse<E> }
-	| { success: false; error: ContractError };
 
 type SetDataArgs<E extends Contract> =
 	| [
@@ -117,10 +118,10 @@ export type MutationFunctions<E extends Contract> = {
 export type QueryFunctions<E extends Contract> = {
 	useQuery: <TData = ContractResponse<E>>(
 		...args: UseQueryArgs<E, TData>
-	) => QueryObserverResult<TData, ContractError>;
+	) => QueryObserverResult<TData, ApiClientError<E>>;
 	useSuspenseQuery: <TData = ContractResponse<E>>(
 		...args: UseSuspenseQueryArgs<E, TData>
-	) => UseSuspenseQueryResult<TData, ContractError>;
+	) => UseSuspenseQueryResult<TData, ApiClientError<E>>;
 	setData: (...args: SetDataArgs<E>) => void;
 	invalidate: (request?: ContractRequest<E>) => Promise<void>;
 	clear: (request?: ContractRequest<E>) => void;
