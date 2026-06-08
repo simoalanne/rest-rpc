@@ -4,7 +4,9 @@ Wrap a typed `ApiClient` tree with React Query hooks and cache helpers.
 
 This package does not define contracts or make a client by itself. It consumes
 the `client.api` tree from `@contract-first-api/api-client`, keeps the same
-shape, and replaces each contract node with React Query-friendly helpers.
+shape, and replaces each contract node with React Query-friendly helpers. JSON
+contracts become query/mutation helpers, stream contracts expose stream helpers,
+and websocket contracts expose connect helpers.
 
 ## Install
 
@@ -237,6 +239,59 @@ Stream contract nodes expose:
 - `$contract`
 - `$stream`
 - `$subscribe`
+
+## WebSocket Contracts
+
+WebSocket contracts are not wrapped as React Query queries. They expose the
+connect helper from the API client with a `$` prefix.
+
+```tsx
+import { useEffect, useRef } from "react";
+
+export const Discussion = () => {
+	const socketRef = useRef<ReturnType<typeof api.discuss.room.$connect> | null>(
+		null,
+	);
+
+	useEffect(() => {
+		const socket = api.discuss.room.$connect();
+		socketRef.current = socket;
+
+		const offMessage = socket.onMessage((result) => {
+			if (!result.success) {
+				return;
+			}
+
+			console.log(result.data);
+		});
+
+		return () => {
+			offMessage();
+			socket.close();
+			socketRef.current = null;
+		};
+	}, []);
+
+	return (
+		<button
+			type="button"
+			onClick={() => {
+				socketRef.current?.send({
+					type: "message",
+					text: "Hello",
+				});
+			}}
+		>
+			Send
+		</button>
+	);
+};
+```
+
+WebSocket contract nodes expose:
+
+- `$contract`
+- `$connect`
 
 ## How It Connects
 

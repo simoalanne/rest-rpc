@@ -11,7 +11,8 @@
 	"dependencies": {
 		"@example/shared": "workspace:*",
 		"@contract-first-api/express": "workspace:*",
-		"express": "^5.1.0"
+		"express": "^5.1.0",
+		"ws": "^8.21.0"
 	},
 	"devDependencies": {
 		"@types/express": "^5.0.3",

@@ -1,7 +1,9 @@
+import type { ContractWebSocket } from "@contract-first-api/express";
 import { initServer } from "@contract-first-api/express";
-import type { ApiResponse } from "@example/shared";
+import type { ApiResponse, DiscussMessage } from "@example/shared";
 import { allContracts } from "@example/shared";
 import express from "express";
+import { createServer } from "node:http";
 
 type RequestContext = {
 	requestId: string;
@@ -9,6 +11,7 @@ type RequestContext = {
 };
 
 const app = express();
+const server = createServer(app);
 const port = Number(process.env.PORT ?? 3001);
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -19,6 +22,27 @@ const todos: ApiResponse<"todos.create">[] = [
 		createdAt: new Date().toISOString(),
 	},
 ];
+
+type DiscussSocket = ContractWebSocket<typeof allContracts.discuss.connect>;
+
+const discussMessages: DiscussMessage[] = [
+	{
+		id: "message-1",
+		author: "Example backend",
+		text: "WebSocket discussion is ready.",
+		createdAt: new Date().toISOString(),
+	},
+];
+const discussSockets = new Set<DiscussSocket>();
+
+const broadcastDiscussMessage = (message: DiscussMessage) => {
+	for (const socket of discussSockets) {
+		socket.send({
+			type: "message",
+			message,
+		});
+	}
+};
 
 const { defineService, defineMiddleware, createRouter } = initServer<
 	typeof allContracts,
@@ -109,6 +133,33 @@ const services = {
 			};
 		},
 	}),
+	discuss: defineService("discuss", {
+		connect({ socket }) {
+			discussSockets.add(socket);
+			socket.send({
+				type: "history",
+				messages: discussMessages,
+			});
+
+			socket.onMessage((result) => {
+				if (!result.success) return;
+
+				const message = {
+					id: `message-${crypto.randomUUID()}`,
+					author: result.data.author.trim(),
+					text: result.data.text.trim(),
+					createdAt: new Date().toISOString(),
+				};
+
+				discussMessages.push(message);
+				broadcastDiscussMessage(message);
+			});
+
+			socket.onClose(() => {
+				discussSockets.delete(socket);
+			});
+		},
+	}),
 };
 
 app.use(express.json());
@@ -127,6 +178,7 @@ app.use((req, res, next) => {
 
 createRouter({
 	app,
+	server,
 	contracts: allContracts,
 	services,
 	routePrefix: "/api",
@@ -141,6 +193,6 @@ createRouter({
 	},
 });
 
-app.listen(port, () => {
+server.listen(port, () => {
 	console.log(`Example backend listening on http://localhost:${port}`);
 });

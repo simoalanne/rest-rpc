@@ -138,6 +138,19 @@ const createApiTree = () =>
 				stream: async () => [],
 				subscribe: () => () => {},
 			},
+			socket: {
+				$contract: {
+					method: "GET",
+					path: "/items/socket",
+					options: { mode: "websocket" },
+				},
+				connect: () => ({
+					socket: {},
+					send: () => {},
+					subscribe: () => () => {},
+					close: () => {},
+				}),
+			},
 		},
 	}) as any;
 
@@ -191,6 +204,9 @@ describe("createAdapter", () => {
 		assert.equal(typeof wrapped.items.events.$subscribe, "function");
 		assert.equal("stream" in wrapped.items.events, false);
 		assert.equal("subscribe" in wrapped.items.events, false);
+		assert.equal(wrapped.items.socket.$contract.path, "/items/socket");
+		assert.equal(typeof wrapped.items.socket.$connect, "function");
+		assert.equal("connect" in wrapped.items.socket, false);
 	});
 
 	it("should configure useQuery with request-aware key, enabled flag and query function", async () => {

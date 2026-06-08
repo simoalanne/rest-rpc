@@ -1,17 +1,18 @@
 # contract-first-api
 
 Define API contracts once, then reuse them for runtime validation, typed Express
-handlers, typed HTTP clients, and optional React Query hooks.
+handlers, typed clients, and optional React Query hooks.
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Zod](https://img.shields.io/badge/Zod-4.3-3E67B1?logo=zod&logoColor=white)](https://zod.dev/)
 [![Express](https://img.shields.io/badge/Express-5.0-000000?logo=express&logoColor=white)](https://expressjs.com/)
 [![TanStack Query](https://img.shields.io/badge/TanStack_Query-5.0-FF4154?logo=reactquery&logoColor=white)](https://tanstack.com/query)
 
-`contract-first-api` is a small TypeScript toolkit for keeping REST APIs aligned
-across your stack. You describe each endpoint as a plain contract object, then
-the rest of the packages use that same contract tree to validate requests, type
-server handlers, build a runtime client, and wrap that client with React Query.
+`contract-first-api` is a small TypeScript toolkit for keeping JSON APIs,
+streams, and websockets aligned across your stack. You describe each endpoint
+as a plain contract object, then the rest of the packages use that same contract
+tree to validate requests, type server handlers, build a runtime client, and
+wrap that client with React Query.
 
 The goal is to keep normal HTTP semantics while getting the developer
 experience people usually reach for RPC libraries to get: typed handlers, typed
@@ -62,7 +63,7 @@ export const contracts = defineContractTree({
 From that tree:
 
 - `@contract-first-api/express` validates incoming requests and types services
-- `@contract-first-api/api-client` builds a typed runtime HTTP client
+- `@contract-first-api/api-client` builds a typed runtime client
 - `@contract-first-api/react-query` wraps the client with typed hooks and cache helpers
 - your shared package can expose path-based request, response, and error types
 
@@ -72,13 +73,15 @@ From that tree:
   errors with Zod schemas.
 - **Typed server handlers:** Express services receive validated request fields
   and typed context inferred from your setup.
-- **Typed HTTP client:** the client mirrors your contract tree and validates
-  backend responses at runtime.
+- **Typed client:** the client mirrors your contract tree and validates backend
+  JSON responses, stream chunks, and websocket messages at runtime.
 - **Metadata extension points:** attach route metadata for things like auth
   requirements, then read it from middleware or context creation.
 - **Known errors:** describe expected error payloads in the contract and handle
   them with typed client errors.
 - **Streaming:** model NDJSON endpoints with fetch streams.
+- **WebSockets:** model bidirectional JSON messages without leaving the
+  contract tree.
 - **React Query adapter:** optionally turn the typed client into hooks and cache
   helpers.
 - **No code generation:** contracts are plain objects and regular TypeScript
@@ -90,7 +93,7 @@ From that tree:
 | --- | --- |
 | [`@contract-first-api/core`](./packages/core/README.md) | Define contracts and derive shared helper types. |
 | [`@contract-first-api/express`](./packages/express/README.md) | Mount contracts on an Express app with validation and typed services. |
-| [`@contract-first-api/api-client`](./packages/api-client/README.md) | Create a typed runtime HTTP client from the contract tree. |
+| [`@contract-first-api/api-client`](./packages/api-client/README.md) | Create a typed runtime client from the contract tree. |
 | [`@contract-first-api/react-query`](./packages/react-query/README.md) | Wrap the API client with React Query hooks and cache helpers. |
 
 ## Install
@@ -105,6 +108,14 @@ Then add the integration packages you need:
 
 ```bash
 pnpm add @contract-first-api/express @contract-first-api/api-client @contract-first-api/react-query
+```
+
+If your backend uses websocket contracts with the Express adapter, install
+`ws` in that backend package:
+
+```bash
+pnpm add ws
+pnpm add -D @types/ws
 ```
 
 ## Quick Flow
@@ -149,6 +160,40 @@ export const contracts = defineContractTree({
 				title: z.string(),
 				ownerId: z.string().optional(),
 			}),
+		},
+	},
+});
+```
+
+## Contract Types
+
+Each contract is one of three shapes:
+
+- **JSON contracts** are the default. They can define request schemas, an
+  optional response schema, and known errors.
+- **Stream contracts** use `options: { mode: "stream" }`. They must define a
+  `response` schema, which describes each NDJSON chunk.
+- **WebSocket contracts** use `options: { mode: "websocket" }`. They use `GET`,
+  define `messages.client` and `messages.server`, and do not define a
+  `response` schema because communication happens after the connection opens.
+
+```ts
+export const contracts = defineContractTree({
+	discuss: {
+		connect: {
+			method: "GET",
+			path: "/discuss",
+			options: { mode: "websocket" },
+			messages: {
+				client: z.object({
+					type: z.literal("message"),
+					text: z.string().min(1),
+				}),
+				server: z.object({
+					type: z.literal("message"),
+					text: z.string(),
+				}),
+			},
 		},
 	},
 });
@@ -235,6 +280,25 @@ createRouter({
 });
 ```
 
+For websocket contracts, pass the underlying HTTP server to `createRouter()` so
+the Express adapter can handle upgrade requests:
+
+```ts
+import { createServer } from "node:http";
+
+const app = express();
+const server = createServer(app);
+
+createRouter({
+	app,
+	server,
+	contracts,
+	services,
+});
+
+server.listen(3001);
+```
+
 Create a typed client wherever you need to call the API:
 
 ```ts
@@ -254,6 +318,22 @@ client.setHeaders(() => ({
 const todos = await client.api.todos.list.fetch();
 const created = await client.api.todos.create.fetch({
 	title: "Write the README",
+});
+```
+
+WebSocket contracts expose `connect()` instead of `fetch()`:
+
+```ts
+const socket = client.api.discuss.connect.connect();
+
+socket.onMessage((result) => {
+	if (!result.success) return;
+	console.log(result.data);
+});
+
+socket.send({
+	type: "message",
+	text: "Hello",
 });
 ```
 
@@ -296,7 +376,9 @@ This library is intentionally small. It is not trying to be:
 - a project structure or architecture mandate
 - a solution for every possible API edge case
 
-The aim is to cover common REST API workflows with low ceremony, then leave escape hatches where your application needs something more specific.
+The aim is to cover common JSON API workflows with low ceremony, while keeping
+streaming and websocket routes inside the same end-to-end type-safe contract
+model when your application needs them.
 
 ## Design Principles
 

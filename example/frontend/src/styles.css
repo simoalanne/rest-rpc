@@ -86,6 +86,7 @@ pre {
 }
 
 .todo-form,
+.discuss-form,
 .section-heading {
 	display: flex;
 	gap: 0.75rem;
@@ -94,7 +95,8 @@ pre {
 	margin-bottom: 1rem;
 }
 
-.todo-form input {
+.todo-form input,
+.discuss-form input {
 	flex: 1;
 	padding: 0.8rem 0.9rem;
 	border: 1px solid rgba(19, 33, 44, 0.16);
@@ -103,6 +105,7 @@ pre {
 }
 
 .todo-form button,
+.discuss-form button,
 .section-heading button {
 	padding: 0.8rem 1rem;
 	border: 0;
@@ -111,7 +114,8 @@ pre {
 	color: white;
 }
 
-.todo-form button:disabled {
+.todo-form button:disabled,
+.discuss-form button:disabled {
 	opacity: 0.7;
 	cursor: progress;
 }
@@ -163,10 +167,70 @@ pre {
 	color: #6d7c89;
 }
 
+.connection {
+	padding: 0.25rem 0.6rem;
+	border-radius: 999px;
+	background: #efe4d2;
+	color: #745128;
+	font-size: 0.8rem;
+	font-weight: 700;
+}
+
+.connection.is-online {
+	background: #d9efe3;
+	color: #1d6a47;
+}
+
+.discussion-list {
+	display: grid;
+	gap: 0.75rem;
+	max-height: 18rem;
+	margin: 0;
+	padding: 0;
+	overflow-y: auto;
+	list-style: none;
+}
+
+.discussion-list li {
+	display: grid;
+	gap: 0.4rem;
+	padding: 0.85rem 1rem;
+	border: 1px solid rgba(19, 33, 44, 0.1);
+	border-radius: 12px;
+	background: rgba(255, 255, 255, 0.72);
+}
+
+.discussion-list div {
+	display: flex;
+	gap: 0.75rem;
+	align-items: baseline;
+	justify-content: space-between;
+}
+
+.discussion-list strong {
+	color: #13212c;
+}
+
+.discussion-list time {
+	color: #6d7c89;
+	font-size: 0.8rem;
+}
+
+.discussion-list p {
+	margin: 0;
+	color: #35485a;
+}
+
 @media (max-width: 640px) {
 	.todo-form,
+	.discuss-form,
 	.section-heading {
 		flex-direction: column;
 		align-items: stretch;
+	}
+
+	.discussion-list div {
+		display: grid;
+		gap: 0.15rem;
 	}
 }

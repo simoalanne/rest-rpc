@@ -1,3 +1,4 @@
+import type { Server as HttpServer } from "node:http";
 import {
 	type Contract,
 	type ContractError,
@@ -8,8 +9,14 @@ import {
 	flattenContractTree,
 	type GetByPath,
 	type HttpMethod,
+	type WebSocketContract,
 } from "@contract-first-api/core/contracts";
 import type { Application, NextFunction, Request, Response } from "express";
+import {
+	type ContractWebSocket,
+	registerWebSocketRoutes,
+	type WebSocketMessageResult,
+} from "./initWebSocketServer.ts";
 
 declare global {
 	namespace Express {
@@ -20,7 +27,7 @@ declare global {
 	}
 }
 
-type EmptyObject = Record<never, never>;
+export type EmptyObject = Record<never, never>;
 type MaybePromise<T> = T | Promise<T>;
 type Merge<T> = {
 	[K in keyof T]: T[K];
@@ -30,19 +37,30 @@ type ContextValue<TContext> = {
 	context: TContext;
 };
 
+type RequestValue<E extends Contract> =
+	ContractRequest<E> extends never ? EmptyObject : ContractRequest<E>;
+
+export type { ContractWebSocket, WebSocketMessageResult };
+
 export type RequestWithContract<TMeta = unknown> = Omit<Request, "contract"> & {
 	contract: Contract<TMeta>;
 };
 
-type HandlerResult<E extends Contract> =
-	ContractResponse<E> extends undefined
+type HandlerResult<E extends Contract> = E extends WebSocketContract
+	? MaybePromise<void>
+	: ContractResponse<E> extends undefined
 		? MaybePromise<void>
 		: MaybePromise<ContractResponse<E>>;
 
-export type ServiceRequest<E extends Contract, TContext = EmptyObject> =
-	ContractRequest<E> extends never
-		? ContextValue<TContext>
-		: Merge<ContractRequest<E> & ContextValue<TContext>>;
+export type ServiceRequest<
+	E extends Contract,
+	TContext = EmptyObject,
+> = E extends WebSocketContract
+	? Merge<
+			RequestValue<E> &
+				ContextValue<TContext> & { socket: ContractWebSocket<E> }
+		>
+	: Merge<RequestValue<E> & ContextValue<TContext>>;
 
 export type ServiceResponse<E extends Contract> = ContractResponse<E>;
 
@@ -106,12 +124,17 @@ export type ValidationIssue = {
 	path: PropertyKey[];
 };
 
+export type ValidationResult =
+	| { success: true; data: Record<string, unknown> }
+	| { success: false; errors: ValidationIssue[] };
+
 export type CreateRouterOptions<
 	TContracts extends ContractTree,
 	TContext = EmptyObject,
 	TMeta = ContractMetaOf<TContracts>,
 > = {
 	app: Application;
+	server?: HttpServer;
 	contracts: TContracts;
 	services: ServiceTree<TContracts, TContext>;
 	middlewares?: (MiddlewareFunction | MiddlewareFunction<TMeta>)[];
@@ -221,62 +244,124 @@ const prepareRequest =
 	(contract: Contract) => (req: Request, res: Response, next: NextFunction) => {
 		req.contract = contract;
 		req.validatedRequest = {};
-		const errors: ValidationIssue[] = [];
-		const validatedSegments = {
-			body: {},
-			query: {},
-			params: {},
-		};
+		const result = validateRequestSegments(contract, {
+			body: req.body,
+			query: req.query,
+			params: req.params,
+		});
 
-		const requestSchema = contract.request;
-
-		if (!requestSchema) {
-			next();
-			return;
-		}
-
-		const segmentEntries = [
-			["body", req.body],
-			["query", req.query],
-			["params", req.params],
-		] as const;
-
-		for (const [segment, rawValue] of segmentEntries) {
-			const schema = requestSchema[segment];
-			if (!schema) continue;
-
-			const result = schema.safeParse(rawValue);
-			if (!result.success) {
-				errors.push(
-					...result.error.issues.map((issue) => ({
-						code: issue.code,
-						message: issue.message,
-						path: issue.path,
-					})),
-				);
-				continue;
-			}
-
-			validatedSegments[segment] = result.data as Record<string, unknown>;
-		}
-
-		if (errors.length > 0) {
+		if (!result.success) {
 			res.status(400).json({
 				message:
 					"Request validation failed. Check the validationErrors field for details.",
-				validationErrors: errors,
+				validationErrors: result.errors,
 			});
 			return;
 		}
 
-		req.validatedRequest = {
+		req.validatedRequest = result.data;
+		next();
+	};
+
+const validateRequestSegments = (
+	contract: Contract,
+	segments: {
+		body?: unknown;
+		query?: unknown;
+		params?: unknown;
+	},
+	segmentNames: Array<"body" | "query" | "params"> = [
+		"body",
+		"query",
+		"params",
+	],
+): ValidationResult => {
+	const errors: ValidationIssue[] = [];
+	const validatedSegments = {
+		body: {},
+		query: {},
+		params: {},
+	};
+
+	const requestSchema = contract.request;
+
+	if (!requestSchema) {
+		return { success: true, data: {} };
+	}
+
+	const segmentEntries = segmentNames.map((segment) => [
+		segment,
+		segments[segment],
+	]) as Array<["body" | "query" | "params", unknown]>;
+
+	for (const [segment, rawValue] of segmentEntries) {
+		const schema = requestSchema[segment];
+		if (!schema) continue;
+
+		const result = schema.safeParse(rawValue);
+		if (!result.success) {
+			errors.push(
+				...result.error.issues.map((issue) => ({
+					code: issue.code,
+					message: issue.message,
+					path: issue.path,
+				})),
+			);
+			continue;
+		}
+
+		validatedSegments[segment] = result.data as Record<string, unknown>;
+	}
+
+	if (errors.length > 0) {
+		return { success: false, errors };
+	}
+
+	return {
+		success: true,
+		data: {
 			...validatedSegments.body,
 			...validatedSegments.query,
 			...validatedSegments.params,
-		};
-
-		next();
+		},
 	};
+};
+
+const isWebSocketContract = (
+	contract: Contract,
+): contract is WebSocketContract => contract.options?.mode === "websocket";
+
+const escapeRegExp = (value: string) =>
+	value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const createPathMatcher = (path: string) => {
+	const keys: string[] = [];
+	const segments = splitPath(path);
+	const pattern =
+		segments.length === 0
+			? "/"
+			: `/${segments
+					.map((segment) => {
+						if (!isParamSegment(segment)) return escapeRegExp(segment);
+						keys.push(segment.slice(1));
+						return "([^/]+)";
+					})
+					.join("/")}`;
+	const regex = new RegExp(`^${pattern}/?$`);
+
+	return (pathname: string) => {
+		const match = regex.exec(pathname);
+		if (!match) return null;
+
+		return keys.reduce(
+			(params, key, index) => {
+				params[key] = decodeURIComponent(match[index + 1] ?? "");
+				return params;
+			},
+			{} as Record<string, string>,
+		);
+	};
+};
 
 const buildRoutePath = (routePrefix: string | undefined, path: string) => {
 	if (!routePrefix) return path;
@@ -318,15 +403,46 @@ const createRouter = <
 	TMeta = ContractMetaOf<TContracts>,
 >({
 	app,
+	server,
 	contracts,
 	services,
 	routePrefix,
 	createContext,
 	middlewares = [],
 }: CreateRouterOptions<TContracts, TContext, TMeta>) => {
-	const routes = flattenContractTree(contracts).sort(compareRouteSpecificity);
+	const routes = flattenContractTree(contracts).sort(
+		compareRouteSpecificity,
+	) as Array<Contract<TMeta> & { keySegments: string[] }>;
+	const webSocketRoutes = routes.filter(
+		(route): route is WebSocketContract<TMeta> & { keySegments: string[] } =>
+			isWebSocketContract(route),
+	);
+
+	if (webSocketRoutes.length > 0) {
+		if (!server) {
+			throw new Error(
+				"createRouter() requires a server when contracts include WebSocket routes.",
+			);
+		}
+
+		registerWebSocketRoutes({
+			server,
+			routes: webSocketRoutes,
+			services,
+			routePrefix,
+			createContext,
+			buildRoutePath,
+			createPathMatcher,
+			resolveHandlerAtPath,
+			validateRequestSegments,
+			isKnownContractError: (error): error is KnownContractError =>
+				error instanceof KnownContractError,
+		});
+	}
 
 	for (const route of routes) {
+		if (isWebSocketContract(route)) continue;
+
 		const method = route.method.toLowerCase() as Lowercase<HttpMethod>;
 		const handler = getRouteHandler(services, route.keySegments);
 		const routePath = buildRoutePath(routePrefix, route.path);
@@ -347,12 +463,10 @@ const createRouter = <
 					...input,
 					context,
 				});
-				const statusCode = getSuccessStatusCode(
-					route.method,
-					Boolean(route.response),
-				);
+				const hasResponse = "response" in route && Boolean(route.response);
+				const statusCode = getSuccessStatusCode(route.method, hasResponse);
 
-				if (!route.response) {
+				if (!hasResponse) {
 					res.sendStatus(statusCode);
 					return;
 				}

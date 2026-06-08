@@ -1,11 +1,12 @@
 # @contract-first-api/api-client
 
-Create a typed runtime HTTP client from a shared contract tree.
+Create a typed runtime client from a shared contract tree.
 
 This package consumes contracts from `@contract-first-api/core` and builds a
-client whose `api` property mirrors the contract tree. It can be used directly
-in frontend code, server-to-server code, tests, or wrapped by
-`@contract-first-api/react-query`.
+client whose `api` property mirrors the contract tree. JSON contracts expose
+fetch helpers, stream contracts expose stream helpers, and websocket contracts
+expose connect helpers. It can be used directly in frontend code,
+server-to-server code, tests, or wrapped by `@contract-first-api/react-query`.
 
 ## Install
 
@@ -47,6 +48,9 @@ JSON contracts expose:
 - `fetch(...)`: call the endpoint or throw on errors
 - `tryFetch(...)`: call the endpoint and return a success/error result
 - `$contract`: the original contract definition
+
+Stream and websocket contracts expose different helpers because they do not use
+the normal request/response shape.
 
 ## Request Arguments
 
@@ -229,10 +233,69 @@ unsubscribe();
 If a stream chunk does not match the response schema, the stream throws an
 unknown client error.
 
+## WebSockets
+
+Contracts with `options: { mode: "websocket" }` expose `connect(...)` instead
+of JSON or stream helpers.
+
+```ts
+const socket = client.api.discuss.room.connect();
+
+socket.onOpen(() => {
+	socket.send({
+		type: "message",
+		text: "Hello",
+	});
+});
+
+socket.onMessage((result) => {
+	if (!result.success) {
+		return;
+	}
+
+	switch (result.data.type) {
+		case "history":
+			console.log(result.data.messages);
+			break;
+		case "message":
+			console.log(result.data.text);
+			break;
+	}
+});
+
+socket.onClose((event) => {
+	console.log(event.code);
+});
+```
+
+WebSocket contract nodes expose:
+
+- `connect(...)`: open a websocket connection and return an augmented native
+  `WebSocket`
+- `$contract`: the original contract definition
+
+The returned socket keeps the native websocket API and adds typed convenience
+methods:
+
+- `send(message)`: send a JSON message matching `messages.client`
+- `onOpen(callback)`: subscribe to open events and return an unsubscribe
+  function
+- `onMessage(callback)`: receive parsed `messages.server` results
+- `onClose(callback)`: subscribe to close events and return an unsubscribe
+  function
+
+Incoming messages are parsed as JSON and validated with `messages.server`.
+Invalid messages call `onMessage` with `{ success: false }` instead of throwing
+from inside the websocket event callback.
+
+The client uses the configured `baseUrl` and converts `http:` to `ws:` and
+`https:` to `wss:` when opening the connection.
+
 ## How It Connects
 
 - Define contracts with `@contract-first-api/core`.
 - Mount those contracts on your backend with `@contract-first-api/express`.
 - Create `new ApiClient({ baseUrl, contracts })` in any runtime with `fetch`.
+  WebSocket contracts also need a runtime with `WebSocket`.
 - Use `client.api` directly, or wrap it with
   `@contract-first-api/react-query` for client-side React apps.

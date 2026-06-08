@@ -457,6 +457,167 @@ describe("ApiClient", () => {
 		}
 	});
 
+	it("should expose connect for websocket contracts and validate messages", () => {
+		const originalWebSocket = globalThis.WebSocket;
+		const instances: MockWebSocket[] = [];
+
+		class MockWebSocket {
+			static CONNECTING = 0;
+			static OPEN = 1;
+			static CLOSING = 2;
+			static CLOSED = 3;
+
+			url: string;
+			readyState = MockWebSocket.OPEN;
+			sent: string[] = [];
+			closeArgs?: unknown[];
+			private listeners = new Map<string, Set<(event: unknown) => void>>();
+
+			constructor(url: string) {
+				this.url = url;
+				instances.push(this);
+			}
+
+			addEventListener(type: string, listener: (event: unknown) => void) {
+				const listeners = this.listeners.get(type) ?? new Set();
+				listeners.add(listener);
+				this.listeners.set(type, listeners);
+			}
+
+			removeEventListener(type: string, listener: (event: unknown) => void) {
+				this.listeners.get(type)?.delete(listener);
+			}
+
+			send(data: string) {
+				this.sent.push(data);
+			}
+
+			close(...args: unknown[]) {
+				this.readyState = MockWebSocket.CLOSED;
+				this.closeArgs = args;
+			}
+
+			emit(type: string, event: unknown) {
+				this.listeners.get(type)?.forEach((listener) => {
+					listener(event);
+				});
+			}
+		}
+
+		globalThis.WebSocket = MockWebSocket as unknown as typeof WebSocket;
+
+		try {
+			const contracts = {
+				room: {
+					path: "/rooms/:roomId/socket",
+					method: "GET",
+					request: {
+						params: z.object({ roomId: z.string() }),
+						query: z.object({ token: z.string() }),
+					},
+					options: { mode: "websocket" },
+					messages: {
+						client: z.object({
+							type: z.literal("ping"),
+							id: z.string(),
+						}),
+						server: z.object({
+							type: z.literal("pong"),
+							id: z.string(),
+						}),
+					},
+				},
+			} as const;
+
+			const client = new ApiClient({
+				baseUrl: "http://api.test",
+				contracts,
+			});
+
+			assert.equal("connect" in client.api.room, true);
+			assert.equal("fetch" in client.api.room, false);
+			assert.equal("stream" in client.api.room, false);
+
+			const socket = client.api.room.connect({
+				roomId: "room 1",
+				token: "secret",
+			});
+			const [rawSocket] = instances;
+
+			assert.equal(
+				socket.url,
+				"ws://api.test/rooms/room%201/socket?token=secret",
+			);
+			assert.equal(socket, rawSocket);
+
+			const opened: unknown[] = [];
+			const closed: unknown[] = [];
+			const results: unknown[] = [];
+			socket.onOpen((event) => opened.push(event));
+			const unsubscribeClose = socket.onClose((event) => closed.push(event));
+			const unsubscribeMessage = socket.onMessage((result) =>
+				results.push(result),
+			);
+
+			rawSocket.emit("open", { type: "open-event" });
+			rawSocket.emit("message", {
+				data: JSON.stringify({ type: "pong", id: "message-1" }),
+			});
+			socket.send({ type: "ping", id: "message-1" });
+
+			assert.deepStrictEqual(opened, [{ type: "open-event" }]);
+			assert.deepStrictEqual(results, [
+				{ success: true, data: { type: "pong", id: "message-1" } },
+			]);
+			assert.deepStrictEqual(rawSocket.sent, [
+				JSON.stringify({ type: "ping", id: "message-1" }),
+			]);
+
+			socket.send({ type: "ping", id: 123 } as unknown as {
+				type: "ping";
+				id: string;
+			});
+			assert.deepStrictEqual(rawSocket.sent, [
+				JSON.stringify({ type: "ping", id: "message-1" }),
+				JSON.stringify({ type: "ping", id: 123 }),
+			]);
+			rawSocket.emit("message", {
+				data: JSON.stringify({ type: "nope" }),
+			});
+			assert.deepStrictEqual(results, [
+				{ success: true, data: { type: "pong", id: "message-1" } },
+				{ success: false },
+			]);
+
+			assert.throws(() => {
+				rawSocket.readyState = MockWebSocket.CLOSED;
+				socket.send({ type: "ping", id: "message-2" } as {
+					type: "ping";
+					id: string;
+				});
+			});
+			rawSocket.readyState = MockWebSocket.OPEN;
+
+			unsubscribeMessage();
+			unsubscribeClose();
+			rawSocket.emit("message", {
+				data: JSON.stringify({ type: "pong", id: "message-2" }),
+			});
+			rawSocket.emit("close", { code: 1000 });
+
+			assert.deepStrictEqual(results, [
+				{ success: true, data: { type: "pong", id: "message-1" } },
+				{ success: false },
+			]);
+			assert.deepStrictEqual(closed, []);
+
+			socket.close(1000, "done");
+			assert.deepStrictEqual(rawSocket.closeArgs, [1000, "done"]);
+		} finally {
+			globalThis.WebSocket = originalWebSocket;
+		}
+	});
+
 	it("should throw unknown error when success payload does not match response schema", async () => {
 		const server = await startServer(() => ({
 			body: { ok: false },

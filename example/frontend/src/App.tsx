@@ -1,6 +1,6 @@
-import type { TodoEvent } from "@example/shared";
+import type { DiscussMessage, TodoEvent } from "@example/shared";
 import type { FormEvent } from "react";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { api } from "./api.ts";
 
 const renderJson = (value: unknown) => JSON.stringify(value, null, 2);
@@ -38,6 +38,14 @@ export const App = () => {
 	const [searchQuery, setSearchQuery] = useState("");
 	const [activity, setActivity] = useState<TodoEvent[]>([]);
 	const [activityError, setActivityError] = useState<unknown>(null);
+	const [discussName, setDiscussName] = useState("Frontend user");
+	const [discussText, setDiscussText] = useState("");
+	const [discussMessages, setDiscussMessages] = useState<DiscussMessage[]>([]);
+	const [discussConnected, setDiscussConnected] = useState(false);
+	const [discussParseError, setDiscussParseError] = useState(false);
+	const discussSocket = useRef<
+		ReturnType<typeof api.discuss.connect.$connect> | null
+	>(null);
 	const todos = api.todos.list.useQuery();
 	const todoSearch = api.todos.find.useQuery(
 		searchQuery ? { query: searchQuery } : "",
@@ -52,6 +60,41 @@ export const App = () => {
 				setActivityError(error);
 			},
 		});
+	}, []);
+
+	useEffect(() => {
+		const socket = api.discuss.connect.$connect();
+		discussSocket.current = socket;
+
+		const offOpen = socket.onOpen(() => {
+			setDiscussConnected(true);
+		});
+		const offClose = socket.onClose(() => {
+			setDiscussConnected(false);
+			discussSocket.current = null;
+		});
+		const offMessage = socket.onMessage((result) => {
+			if (!result.success) {
+				setDiscussParseError(true);
+				return;
+			}
+
+			if (result.data.type === "history") {
+				setDiscussMessages(result.data.messages);
+				return;
+			}
+
+			const { message } = result.data;
+			setDiscussMessages((current) => [...current, message]);
+		});
+
+		return () => {
+			offOpen();
+			offClose();
+			offMessage();
+			socket.close();
+			discussSocket.current = null;
+		};
 	}, []);
 
 	const createTodo = api.todos.create.useMutation({
@@ -75,6 +118,23 @@ export const App = () => {
 	const onSearch = (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		setSearchQuery(searchInput.trim());
+	};
+
+	const onDiscussSubmit = (event: FormEvent<HTMLFormElement>) => {
+		event.preventDefault();
+
+		const author = discussName.trim();
+		const text = discussText.trim();
+		if (!author || !text || !discussSocket.current) {
+			return;
+		}
+
+		discussSocket.current.send({
+			type: "message",
+			author,
+			text,
+		});
+		setDiscussText("");
 	};
 
 	return (
@@ -177,6 +237,50 @@ export const App = () => {
 							</li>
 						))
 					)}
+				</ul>
+			</section>
+
+			<section className="panel">
+				<div className="section-heading">
+					<h2>Discuss</h2>
+					<span
+						className={
+							discussConnected ? "connection is-online" : "connection"
+						}
+					>
+						{discussConnected ? "Connected" : "Connecting"}
+					</span>
+				</div>
+				<form className="discuss-form" onSubmit={onDiscussSubmit}>
+					<input
+						value={discussName}
+						onChange={(event) => setDiscussName(event.target.value)}
+						placeholder="Name"
+					/>
+					<input
+						value={discussText}
+						onChange={(event) => setDiscussText(event.target.value)}
+						placeholder="Message"
+					/>
+					<button type="submit" disabled={!discussConnected}>
+						Send
+					</button>
+				</form>
+				{discussParseError ? (
+					<p className="error">A websocket message did not match the contract.</p>
+				) : null}
+				<ul className="discussion-list">
+					{discussMessages.map((message) => (
+						<li key={message.id}>
+							<div>
+								<strong>{message.author}</strong>
+								<time dateTime={message.createdAt}>
+									{new Date(message.createdAt).toLocaleTimeString()}
+								</time>
+							</div>
+							<p>{message.text}</p>
+						</li>
+					))}
 				</ul>
 			</section>
 		</main>

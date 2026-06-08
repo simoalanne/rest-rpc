@@ -1,6 +1,6 @@
 {
 	"name": "@contract-first-api/express",
-	"version": "4.0.0",
+	"version": "4.1.0",
 	"type": "module",
 	"description": "Mount shared API contracts on an Express app with typed handlers and request validation.",
 	"keywords": [
@@ -38,9 +38,11 @@
 	},
 	"devDependencies": {
 		"@types/express": "^5.0.1",
+		"@types/ws": "^8.18.1",
 		"zod": "^4.3.6"
 	},
 	"peerDependencies": {
-		"express": "^5.0.0"
+		"express": "^5.0.0",
+		"ws": "^8.21.0"
 	}
 }

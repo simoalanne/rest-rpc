@@ -4,6 +4,7 @@ import {
 	type ApiClientJsonContractValue,
 	type ApiClientStreamContractValue,
 	type ApiClientTree,
+	type ApiClientWebSocketContractValue,
 	type ApiResult,
 	type FetchArgs,
 	type FetchOptions,
@@ -128,14 +129,21 @@ type ReactQueryStreamContractValue<E extends Contract> = {
 	$subscribe: ApiClientStreamContractValue<E>["subscribe"];
 };
 
+type ReactQueryWebSocketContractValue<E extends Contract> = {
+	$contract: E;
+	$connect: ApiClientWebSocketContractValue<E>["connect"];
+};
+
 export type WrapContracts<T> = {
 	[K in keyof T]: T[K] extends ApiClientJsonContractValue<infer E>
 		? ReactQueryContractValue<E>
 		: T[K] extends ApiClientStreamContractValue<infer E>
 			? ReactQueryStreamContractValue<E>
-			: T[K] extends Record<string, unknown>
-				? WrapContracts<T[K]>
-				: never;
+			: T[K] extends ApiClientWebSocketContractValue<infer E>
+				? ReactQueryWebSocketContractValue<E>
+				: T[K] extends Record<string, unknown>
+					? WrapContracts<T[K]>
+					: never;
 };
 
 export default function createAdapter<TApi extends ApiClientTree>(
@@ -143,6 +151,7 @@ export default function createAdapter<TApi extends ApiClientTree>(
 	queryClient: QueryClient,
 ): WrapContracts<TApi> {
 	const wrapNode = (node: ApiClientContractValue, path: string[] = []) => {
+		if ("connect" in node) return wrapWebSocketContractNode(node);
 		if (!("fetch" in node)) return wrapStreamContractNode(node);
 		return wrapContractNode(node, path, queryClient);
 	};
@@ -196,6 +205,11 @@ const wrapStreamContractNode = (node: ApiClientStreamContractValue) => ({
 	$contract: node.$contract,
 	$stream: node.stream,
 	$subscribe: node.subscribe,
+});
+
+const wrapWebSocketContractNode = (node: ApiClientWebSocketContractValue) => ({
+	$contract: node.$contract,
+	$connect: node.connect,
 });
 
 const buildMutation =

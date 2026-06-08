@@ -19,20 +19,42 @@ export type KnownErrors = KnownErrorSchema | readonly KnownErrorSchema[];
 export type ResponseSchema = z.ZodType;
 
 export type ContractOptions = {
-	mode?: "json" | "stream";
+	mode?: "json" | "stream" | "websocket";
 	streamFormat?: "ndjson";
 };
 
-export type Contract<TMeta = unknown> = {
+export type BaseContract<TMeta = unknown> = {
 	path: string;
 	method: HttpMethod;
 	request?: RequestSchema;
-	response?: ResponseSchema;
 	errors?: KnownErrors;
-	options?: ContractOptions;
 	meta?: TMeta;
 	$meta?: TMeta;
 };
+
+export type JsonContract<TMeta = unknown> = BaseContract<TMeta> & {
+	response?: ResponseSchema;
+	options?: { mode?: "json" };
+};
+
+export type StreamContract<TMeta = unknown> = BaseContract<TMeta> & {
+	response: ResponseSchema;
+	options: { mode: "stream"; streamFormat?: "ndjson" };
+};
+
+export type WebSocketContract<TMeta = unknown> = BaseContract<TMeta> & {
+	method: "GET";
+	options: { mode: "websocket" };
+	messages: {
+		client: z.ZodType;
+		server: z.ZodType;
+	};
+};
+
+export type Contract<TMeta = unknown> =
+	| JsonContract<TMeta>
+	| StreamContract<TMeta>
+	| WebSocketContract<TMeta>;
 
 export type ContractTree<TMeta = unknown> =
 	| Contract<TMeta>
@@ -117,6 +139,28 @@ export type IsStreamContract<E extends Contract> = E extends {
 }
 	? true
 	: false;
+
+export type IsWebSocketContract<E extends Contract> = E extends {
+	options: { mode: "websocket" };
+}
+	? true
+	: false;
+
+export type ContractClientMessage<E extends Contract> = E extends {
+	messages: { client: infer R };
+}
+	? R extends z.ZodType
+		? z.infer<R>
+		: never
+	: never;
+
+export type ContractServerMessage<E extends Contract> = E extends {
+	messages: { server: infer R };
+}
+	? R extends z.ZodType
+		? z.infer<R>
+		: never
+	: never;
 
 type InferRequest<R> = {
 	[K in keyof R]: R[K] extends z.ZodType ? z.infer<R[K]> : never;
@@ -225,12 +269,6 @@ const getRequestSchemaKeySet = (
 
 const validateContractTree = (tree: ContractTree) => {
 	for (const contract of flattenContractTree(tree)) {
-		if (contract.options?.mode === "stream" && !contract.response) {
-			throw new Error(
-				`Contract at path "${contract.path}" is marked as a stream but does not have a response schema defined.`,
-			);
-		}
-
 		if (contract.request) {
 			const requestKeySets = [
 				getRequestSchemaKeySet(contract.request.body),

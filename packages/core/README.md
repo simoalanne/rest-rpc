@@ -94,14 +94,33 @@ Each contract can define:
 | `method` | HTTP method: `GET`, `POST`, `PUT`, `DELETE`, or `PATCH`. |
 | `path` | HTTP path, with params using `:paramValue` syntax. |
 | `request` | Optional Zod schemas for `body`, `query`, and `params`. |
-| `response` | Optional Zod schema for the successful response body. |
+| `response` | Optional Zod schema for the successful JSON response body, or required stream chunk schema for stream contracts. |
 | `errors` | Optional known error schema or array of known error schemas. |
-| `options` | Optional contract behavior, such as streaming mode. |
+| `options` | Optional contract behavior, such as stream or websocket mode. |
+| `messages` | WebSocket client and server message schemas. |
 | `meta` | Optional app-defined metadata for integrations and middleware. |
 
 Contracts are plain objects. The package validates a few structural rules that cannot be enforced at compile time when
 you call `defineContractTree()`, but it does not require code generation or a
 separate schema compiler step.
+
+## Contract Types
+
+Contracts have three explicit shapes:
+
+- **JSON contracts** are the default. `options` can be omitted or set to
+  `{ mode: "json" }`. They can define request schemas, an optional `response`
+  schema, known errors, and metadata.
+- **Stream contracts** use `options: { mode: "stream" }`. They must define a
+  `response` schema, which describes each NDJSON chunk.
+- **WebSocket contracts** use `options: { mode: "websocket" }`. They must use
+  `method: "GET"` and define `messages.client` and `messages.server`. They do
+  not define `response`, because successful communication happens through
+  websocket messages after the upgrade.
+
+The integration packages use the contract mode to expose the right API. JSON
+contracts expose fetch helpers, stream contracts expose stream helpers, and
+websocket contracts expose connect helpers.
 
 ## Request Schemas
 
@@ -227,6 +246,44 @@ const contracts = defineContractTree({
 
 Stream contracts must define a `response` schema because the client validates each chunk.
 
+## WebSocket Contracts
+
+WebSocket contracts use `options: { mode: "websocket" }`. They define the JSON
+message shape each side is allowed to send.
+
+```ts
+const contracts = defineContractTree({
+	discuss: {
+		connect: {
+			method: "GET",
+			path: "/discuss",
+			options: { mode: "websocket" },
+			messages: {
+				client: z.object({
+					type: z.literal("message"),
+					text: z.string().min(1),
+				}),
+				server: z.discriminatedUnion("type", [
+					z.object({
+						type: z.literal("history"),
+						messages: z.array(z.string()),
+					}),
+					z.object({
+						type: z.literal("message"),
+						text: z.string(),
+					}),
+				]),
+			},
+		},
+	},
+});
+```
+
+The client message schema is used for messages sent by the API client to the
+backend. The server message schema is used for messages sent by the backend to
+the API client. Incoming websocket messages are parsed and exposed as a result
+object so application code can decide how to handle invalid messages.
+
 ## Metadata
 
 Use `meta` for app-specific information that integrations can read at runtime.
@@ -308,6 +365,6 @@ type CreateTodoError = ApiError<"todos.create">;
 - `@contract-first-api/express` imports the same contract tree to register
   routes, validate requests, and type service handlers.
 - `@contract-first-api/api-client` imports the same contract tree to create a
-  typed runtime HTTP client.
+  typed runtime client.
 - `@contract-first-api/react-query` wraps the API client tree with hooks and
   cache helpers.

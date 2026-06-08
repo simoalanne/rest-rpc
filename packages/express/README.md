@@ -1,7 +1,8 @@
 # @contract-first-api/express
 
 Mount a shared contract tree on an Express app with request validation, typed
-service handlers, middleware hooks, and typed request context.
+service handlers, middleware hooks, typed request context, streaming responses,
+and websocket routes.
 
 This package is the backend integration for `contract-first-api`. It consumes
 contracts from `@contract-first-api/core`; it does not define contracts itself
@@ -11,6 +12,14 @@ and it does not require the API client packages.
 
 ```bash
 pnpm add @contract-first-api/express express
+```
+
+If your contract tree includes websocket routes, also install `ws` and its
+types:
+
+```bash
+pnpm add ws
+pnpm add -D @types/ws
 ```
 
 ## Basic Setup
@@ -121,6 +130,9 @@ Service handlers receive one object:
 
 Handler return types are inferred from the contract response schema. If a
 contract does not define `response`, the handler should return nothing and the route responds with `204`.
+
+For websocket contracts, the service handler receives a typed `socket` instead
+of returning a response body.
 
 ## Request Validation
 
@@ -272,9 +284,81 @@ const services = {
 
 Streaming responses use `content-type: application/x-ndjson`.
 
+## WebSocket Routes
+
+For contracts with `options: { mode: "websocket" }`, `createRouter()` registers
+an upgrade handler on the provided HTTP server. Express still handles normal
+HTTP routes, but websocket upgrades happen on the underlying Node server, so
+the `server` option is required when websocket contracts are present.
+
+```ts
+import { initServer } from "@contract-first-api/express";
+import { contracts } from "@example/shared";
+import express from "express";
+import { createServer } from "node:http";
+
+const app = express();
+const server = createServer(app);
+
+const { createRouter, defineService } = initServer<typeof contracts>();
+
+const services = {
+	discuss: defineService("discuss", {
+		room({ socket }) {
+			socket.send({
+				type: "history",
+				messages: [],
+			});
+
+			socket.onMessage((result) => {
+				if (!result.success) {
+					return;
+				}
+
+				socket.send({
+					type: "message",
+					text: result.data.text,
+				});
+			});
+
+			socket.onClose(() => {
+				// clean up app-level connection state here
+			});
+		},
+	}),
+};
+
+createRouter({
+	app,
+	server,
+	contracts,
+	services,
+	routePrefix: "/api",
+});
+
+server.listen(3001);
+```
+
+The websocket service socket is an augmented `ws` socket:
+
+- `send(message)`: send a JSON message matching `messages.server`
+- `onMessage(callback)`: receive parsed `messages.client` results
+- `onClose(callback)`: subscribe to close events and return an unsubscribe
+  function
+
+Invalid incoming websocket messages call `onMessage` with `{ success: false }`.
+The library does not decide what that means for your application.
+
+WebSocket request validation happens before the upgrade. Since the upgrade
+request has no JSON body, websocket routes validate `query` and `params`
+schemas. If validation or context creation fails before the upgrade, the server
+responds with an HTTP error instead of opening the websocket.
+
 ## Route Registration
 
-`createRouter()` registers one Express route for every contract leaf.
+`createRouter()` registers one Express route for every JSON and stream contract
+leaf. WebSocket contracts are registered on the underlying HTTP server's
+upgrade event.
 
 ```ts
 createRouter({
