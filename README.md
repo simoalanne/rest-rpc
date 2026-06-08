@@ -177,14 +177,15 @@ declare global {
 	namespace Express {
 		interface Request {
 			// .contract: Contract; Added by the library automatically.
-			// .validatedRequest // Also added by the library automatically.
+			// .validatedRequest: Record<string, unknown>; Also added by the library automatically.
 			userId?: string;
 		}
 	}
 }
 
 const authMiddleware = defineMiddleware((req, res, next) => {
-	// if you use the defineMiddleware helper .meta is typed correctly, otherwise it's unknown type.
+	// if you use the defineMiddleware helper .meta is typed correctly. 
+	// otherwise it's unknown type.
 	if (!req.contract.meta?.requiresAuth) {
 		next();
 		return;
