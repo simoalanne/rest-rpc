@@ -2,9 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { initContracts } from "@contract-first-api/core";
 import z from "zod";
-import { createExpressRouter } from "./createExpressRouter.ts";
-import { KnownContractError } from "./KnownContractError.ts";
-import { initServices } from "./types.ts";
+import { initServer } from "./initServer.ts";
 
 const chainHandlers = (handlers: ((...args: any[]) => unknown)[]) => {
 	return async (
@@ -112,7 +110,7 @@ const createResponseDouble = () => {
 	};
 };
 
-describe("createExpressRouter", () => {
+describe("initServer", () => {
 	it("should validate input, attach contract to req, create context, and call service", async () => {
 		const { defineContractTree } = initContracts();
 		const contracts = defineContractTree({
@@ -133,7 +131,7 @@ describe("createExpressRouter", () => {
 			},
 		});
 
-		const { defineService } = initServices<
+		const { createRouter, defineService } = initServer<
 			typeof contracts,
 			{ viewerId: string }
 		>();
@@ -156,7 +154,7 @@ describe("createExpressRouter", () => {
 
 		const target = createRouteTargetDouble();
 
-		createExpressRouter({
+		createRouter({
 			app: target.app,
 			contracts,
 			services,
@@ -223,7 +221,7 @@ describe("createExpressRouter", () => {
 			},
 		});
 
-		const { defineService } = initServices<typeof contracts>();
+		const { createRouter, defineService } = initServer<typeof contracts>();
 		const services = {
 			events: defineService("events", {
 				async *stream() {
@@ -234,7 +232,7 @@ describe("createExpressRouter", () => {
 		};
 
 		const target = createRouteTargetDouble();
-		createExpressRouter({
+		createRouter({
 			app: target.app,
 			contracts,
 			services,
@@ -288,7 +286,7 @@ describe("createExpressRouter", () => {
 			},
 		});
 
-		const { defineService } = initServices<typeof contracts>();
+		const { createRouter, defineService } = initServer<typeof contracts>();
 		let createContextCalled = false;
 		let serviceCalled = false;
 
@@ -303,7 +301,7 @@ describe("createExpressRouter", () => {
 
 		const target = createRouteTargetDouble();
 
-		createExpressRouter({
+		createRouter({
 			app: target.app,
 			contracts,
 			services,
@@ -376,7 +374,7 @@ describe("createExpressRouter", () => {
 			},
 		});
 
-		const { defineMiddleware, defineService } = initServices<
+		const { createRouter, defineMiddleware, defineService } = initServer<
 			typeof contracts,
 			{ viewerId: string }
 		>();
@@ -413,7 +411,7 @@ describe("createExpressRouter", () => {
 
 		const target = createRouteTargetDouble();
 
-		createExpressRouter<typeof contracts, { viewerId: string }>({
+		createRouter({
 			app: target.app,
 			contracts,
 			services,
@@ -478,10 +476,10 @@ describe("createExpressRouter", () => {
 			},
 		});
 
-		const { defineService } = initServices<typeof contracts>();
+		const { createRouter, defineService } = initServer<typeof contracts>();
 		const target = createRouteTargetDouble();
 
-		createExpressRouter({
+		createRouter({
 			app: target.app,
 			contracts,
 			services: {
@@ -527,12 +525,12 @@ describe("createExpressRouter", () => {
 			},
 		});
 
-		const { defineService } = initServices<typeof contracts>();
+		const { createRouter, defineService } = initServer<typeof contracts>();
 		const serviceError = new Error("boom");
 
 		const target = createRouteTargetDouble();
 
-		createExpressRouter({
+		createRouter({
 			app: target.app,
 			contracts,
 			services: {
@@ -575,18 +573,17 @@ describe("createExpressRouter", () => {
 			},
 		});
 
-		const { defineService } = initServices<typeof contracts>();
+		const { createRouter, defineService, throwKnownError } =
+			initServer<typeof contracts>();
 		const target = createRouteTargetDouble();
 		const knownError = { code: "TITLE_ALREADY_EXISTS" };
-		const thrownError = new KnownContractError(knownError);
-
-		createExpressRouter({
+		createRouter({
 			app: target.app,
 			contracts,
 			services: {
 				todos: defineService("todos", {
 					create() {
-						throw thrownError;
+						throwKnownError(knownError);
 					},
 				}),
 			},

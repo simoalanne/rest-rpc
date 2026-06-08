@@ -1,25 +1,149 @@
 import {
 	type ApiClientContractValue,
+	type ApiClientError,
 	type ApiClientJsonContractValue,
+	type ApiClientStreamContractValue,
 	type ApiClientTree,
+	type ApiResult,
+	type FetchArgs,
 	type FetchOptions,
 	mapApiClientTree,
-} from "@contract-first-api/api-client";
-import type { Contract } from "@contract-first-api/core";
+} from "@contract-first-api/api-client/apiClient";
+import type {
+	Contract,
+	ContractRequest,
+	ContractResponse,
+} from "@contract-first-api/core/contracts";
 import {
 	type QueryClient,
+	type QueryKey,
+	type QueryObserverResult,
+	type Updater,
+	type UseMutationOptions,
+	type UseMutationResult,
+	type UseQueryOptions,
+	type UseSuspenseQueryOptions,
+	type UseSuspenseQueryResult,
 	useMutation,
 	useQuery,
 	useSuspenseQuery,
 } from "@tanstack/react-query";
-import type { WrapContracts } from "./types.ts";
+
+type MutationVariables<E extends Contract> =
+	ContractRequest<E> extends never ? never : ContractRequest<E>;
+
+type QueryOptionsFor<E extends Contract, TData = ContractResponse<E>> = Omit<
+	UseQueryOptions<ContractResponse<E>, ApiClientError<E>, TData>,
+	"queryKey" | "queryFn"
+>;
+
+type SuspenseQueryOptionsFor<
+	E extends Contract,
+	TData = ContractResponse<E>,
+> = Omit<
+	UseSuspenseQueryOptions<ContractResponse<E>, ApiClientError<E>, TData>,
+	"queryKey" | "queryFn"
+>;
+
+type MutationOptionsFor<E extends Contract, TVariables> = Omit<
+	UseMutationOptions<ContractResponse<E>, ApiClientError<E>, TVariables>,
+	"mutationFn"
+>;
+
+type QueryDisabled = false | null | undefined | "" | 0;
+
+type UseQueryArgs<E extends Contract, TData = ContractResponse<E>> =
+	ContractRequest<E> extends never
+		? [options?: QueryOptionsFor<E, TData>]
+		: [
+				request: ContractRequest<E> | QueryDisabled,
+				options?: QueryOptionsFor<E, TData>,
+			];
+
+type UseSuspenseQueryArgs<E extends Contract, TData = ContractResponse<E>> =
+	ContractRequest<E> extends never
+		? [options?: SuspenseQueryOptionsFor<E, TData>]
+		: [
+				request: ContractRequest<E>,
+				options?: SuspenseQueryOptionsFor<E, TData>,
+			];
+
+type UseMutationArgs<E extends Contract> =
+	ContractRequest<E> extends never
+		? [options?: MutationOptionsFor<E, void>]
+		: [
+				request: ContractRequest<E>,
+				options?: MutationOptionsFor<E, ContractRequest<E>>,
+			];
+
+type MutationWrapper<E extends Contract> = Omit<
+	UseMutationResult<
+		ContractResponse<E>,
+		ApiClientError<E>,
+		MutationVariables<E>
+	>,
+	"mutate" | "mutateAsync"
+> & {
+	mutate: (...args: UseMutationArgs<E>) => void;
+	mutateAsync: (...args: UseMutationArgs<E>) => Promise<ContractResponse<E>>;
+};
+
+type SetDataArgs<E extends Contract> =
+	| [
+			request: ContractRequest<E>,
+			updater: Updater<
+				ContractResponse<E> | undefined,
+				ContractResponse<E> | undefined
+			>,
+	  ]
+	| [
+			updater: Updater<
+				ContractResponse<E> | undefined,
+				ContractResponse<E> | undefined
+			>,
+	  ];
+
+type ReactQueryContractValue<E extends Contract> = {
+	$contract: E;
+	$fetch: (...args: FetchArgs<E>) => Promise<ContractResponse<E>>;
+	$tryFetch: (...args: FetchArgs<E>) => Promise<ApiResult<E>>;
+	useMutation: (
+		options?: MutationOptionsFor<E, MutationVariables<E>>,
+	) => MutationWrapper<E>;
+	useQuery: <TData = ContractResponse<E>>(
+		...args: UseQueryArgs<E, TData>
+	) => QueryObserverResult<TData, ApiClientError<E>>;
+	useSuspenseQuery: <TData = ContractResponse<E>>(
+		...args: UseSuspenseQueryArgs<E, TData>
+	) => UseSuspenseQueryResult<TData, ApiClientError<E>>;
+	setData: (...args: SetDataArgs<E>) => void;
+	invalidate: (request?: ContractRequest<E>) => Promise<void>;
+	clear: (request?: ContractRequest<E>) => void;
+	$getKey: (request?: ContractRequest<E>) => QueryKey;
+};
+
+type ReactQueryStreamContractValue<E extends Contract> = {
+	$contract: E;
+	$stream: ApiClientStreamContractValue<E>["stream"];
+	$subscribe: ApiClientStreamContractValue<E>["subscribe"];
+};
+
+export type WrapContracts<T> = {
+	[K in keyof T]: T[K] extends ApiClientJsonContractValue<infer E>
+		? ReactQueryContractValue<E>
+		: T[K] extends ApiClientStreamContractValue<infer E>
+			? ReactQueryStreamContractValue<E>
+			: T[K] extends Record<string, unknown>
+				? WrapContracts<T[K]>
+				: never;
+};
 
 export default function createAdapter<TApi extends ApiClientTree>(
 	api: TApi,
 	queryClient: QueryClient,
 ): WrapContracts<TApi> {
 	const wrapNode = (node: ApiClientContractValue, path: string[] = []) => {
-		if (!("fetch" in node)) return node;
+		if (!("fetch" in node)) return wrapStreamContractNode(node);
 		return wrapContractNode(node, path, queryClient);
 	};
 
@@ -29,32 +153,36 @@ export default function createAdapter<TApi extends ApiClientTree>(
 type RequestArgs = unknown[];
 type ContractCall = (...args: unknown[]) => Promise<unknown>;
 
-const readRequestArg = (ctx: Contract, args: RequestArgs) =>
-	ctx.request && args[0];
+const readRequestArg = (contract: Contract, args: RequestArgs) =>
+	contract.request && args[0];
 
-const readHookOptionsArg = (ctx: Contract, args: RequestArgs) =>
-	(ctx.request ? args[1] : args[0] || {}) as Record<string, unknown>;
+const readHookOptionsArg = (contract: Contract, args: RequestArgs) =>
+	(contract.request ? args[1] : args[0] || {}) as Record<string, unknown>;
 
-const readMutationVariablesArg = (ctx: Contract, args: RequestArgs) =>
-	ctx.request ? args[0] : undefined;
+const readMutationVariablesArg = (contract: Contract, args: RequestArgs) =>
+	contract.request ? args[0] : undefined;
 
 const readMutationHookOptionsArg = (
-	ctx: Contract,
+	contract: Contract,
 	args: RequestArgs,
 ): Record<string, unknown> | undefined =>
-	(ctx.request ? args[1] : args[0]) as Record<string, unknown> | undefined;
+	(contract.request ? args[1] : args[0]) as Record<string, unknown> | undefined;
 
 const readFetchOptionsArg = (
-	ctx: Contract,
+	contract: Contract,
 	args: RequestArgs,
 ): FetchOptions | undefined =>
-	(ctx.request ? args[1] : args[0]) as FetchOptions | undefined;
+	(contract.request ? args[1] : args[0]) as FetchOptions | undefined;
 
-const callContract = (fn: ContractCall, ctx: Contract, args: RequestArgs) => {
-	const request = readRequestArg(ctx, args);
-	const fetchOptions = readFetchOptionsArg(ctx, args);
+const callContract = (
+	fn: ContractCall,
+	contract: Contract,
+	args: RequestArgs,
+) => {
+	const request = readRequestArg(contract, args);
+	const fetchOptions = readFetchOptionsArg(contract, args);
 
-	if (!ctx.request) {
+	if (!contract.request) {
 		return fn(fetchOptions);
 	}
 
@@ -64,12 +192,18 @@ const callContract = (fn: ContractCall, ctx: Contract, args: RequestArgs) => {
 const getQueryKey = (request: unknown, path: string[]) =>
 	request ? [...path, request] : path;
 
+const wrapStreamContractNode = (node: ApiClientStreamContractValue) => ({
+	$contract: node.$contract,
+	$stream: node.stream,
+	$subscribe: node.subscribe,
+});
+
 const buildMutation =
-	($fetch: (...args: RequestArgs) => Promise<unknown>, ctx: Contract) =>
+	($fetch: (...args: RequestArgs) => Promise<unknown>, contract: Contract) =>
 	(options?: object) => {
 		const mutation = useMutation({
 			mutationFn: (request: unknown) =>
-				ctx.request ? $fetch(request) : $fetch(),
+				contract.request ? $fetch(request) : $fetch(),
 			...options,
 		});
 
@@ -77,13 +211,13 @@ const buildMutation =
 			...mutation,
 			mutate: (...args: RequestArgs) =>
 				mutation.mutate(
-					readMutationVariablesArg(ctx, args),
-					readMutationHookOptionsArg(ctx, args),
+					readMutationVariablesArg(contract, args),
+					readMutationHookOptionsArg(contract, args),
 				),
 			mutateAsync: (...args: RequestArgs) =>
 				mutation.mutateAsync(
-					readMutationVariablesArg(ctx, args),
-					readMutationHookOptionsArg(ctx, args),
+					readMutationVariablesArg(contract, args),
+					readMutationHookOptionsArg(contract, args),
 				),
 		};
 	};
@@ -95,16 +229,16 @@ const wrapContractNode = (
 ) => {
 	const fn = node.fetch as ContractCall;
 	const tryFn = node.tryFetch as ContractCall;
-	const { ctx } = node;
+	const contract = node.$contract;
 
 	const $fetch = async (...args: RequestArgs) => {
-		return await callContract(fn, ctx, args);
+		return await callContract(fn, contract, args);
 	};
 
-	const useMutationHook = buildMutation($fetch, ctx);
+	const useMutationHook = buildMutation($fetch, contract);
 
 	const $tryFetch = async (...args: RequestArgs) =>
-		await callContract(tryFn, ctx, args);
+		await callContract(tryFn, contract, args);
 
 	const $getKey = (request?: unknown) => getQueryKey(request, path);
 
@@ -129,7 +263,7 @@ const wrapContractNode = (
 	};
 
 	const sharedProperties = {
-		$contract: ctx,
+		$contract: contract,
 		$fetch,
 		$tryFetch,
 	};
@@ -140,14 +274,14 @@ const wrapContractNode = (
 
 	const queryProperties = {
 		useQuery: (...args: RequestArgs) => {
-			const request = readRequestArg(ctx, args);
-			const options = readHookOptionsArg(ctx, args);
+			const request = readRequestArg(contract, args);
+			const options = readHookOptionsArg(contract, args);
 
-			const queryEnabled = !!(ctx.request && request) || !ctx.request;
+			const queryEnabled = !!(contract.request && request) || !contract.request;
 			return useQuery({
 				queryKey: getQueryKey(request, path),
 				queryFn: async ({ signal }) =>
-					ctx.request
+					contract.request
 						? await $fetch(request, { signal })
 						: await $fetch({ signal }),
 				enabled: queryEnabled,
@@ -155,13 +289,13 @@ const wrapContractNode = (
 			});
 		},
 		useSuspenseQuery: (...args: RequestArgs) => {
-			const request = readRequestArg(ctx, args);
-			const options = readHookOptionsArg(ctx, args);
+			const request = readRequestArg(contract, args);
+			const options = readHookOptionsArg(contract, args);
 
 			return useSuspenseQuery({
 				queryKey: getQueryKey(request, path),
 				queryFn: ({ signal }) =>
-					ctx.request ? $fetch(request, { signal }) : $fetch({ signal }),
+					contract.request ? $fetch(request, { signal }) : $fetch({ signal }),
 				...options,
 			});
 		},
@@ -171,14 +305,9 @@ const wrapContractNode = (
 		clear,
 	};
 
-	const $reactQueryApi = {
+	return {
 		...sharedProperties,
 		...mutationProperties,
 		...queryProperties,
-	};
-
-	return {
-		...$reactQueryApi,
-		$reactQueryApi,
 	};
 };

@@ -5,8 +5,11 @@ import type {
 	ContractResponse,
 	ContractTree,
 	IsStreamContract,
-} from "@contract-first-api/core";
-import { mapContractTree, mapObjectValues } from "@contract-first-api/core";
+} from "@contract-first-api/core/contracts";
+import {
+	mapContractTree,
+	mapObjectValues,
+} from "@contract-first-api/core/contracts";
 
 export type FetchOptions = Omit<RequestInit, "method" | "body" | "headers">;
 
@@ -60,13 +63,13 @@ export type TryFetchFn<E extends Contract> = (
 export type ApiClientJsonContractValue<E extends Contract = Contract> = {
 	fetch: FetchFn<E>;
 	tryFetch: TryFetchFn<E>;
-	ctx: E;
+	$contract: E;
 };
 
 export type ApiClientStreamContractValue<E extends Contract = Contract> = {
 	stream: StreamFn<E>;
 	subscribe: SubscribeFn<E>;
-	ctx: E;
+	$contract: E;
 };
 
 export type ApiClientContractValue<E extends Contract = Contract> =
@@ -96,7 +99,7 @@ const isApiClientContractNode = (
 ): value is ApiClientContractValue =>
 	typeof value === "object" &&
 	value !== null &&
-	"ctx" in value &&
+	"$contract" in value &&
 	("fetch" in value || "stream" in value);
 
 const createRequestSignal = (
@@ -417,7 +420,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		mapContractTree(this.contracts, (node) => {
 			if (node.options?.mode === "stream") {
 				return {
-					ctx: node,
+					$contract: node,
 					stream: (...args: FetchArgs<typeof node>) =>
 						this.stream(node, ...args),
 					subscribe: (...args: Parameters<SubscribeFn<typeof node>>) =>
@@ -426,7 +429,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 			}
 
 			return {
-				ctx: node,
+				$contract: node,
 				fetch: (...args: FetchArgs<typeof node>) => this.fetch(node, ...args),
 				tryFetch: (...args: FetchArgs<typeof node>) =>
 					this.tryFetch(node, ...args),

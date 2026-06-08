@@ -91,6 +91,9 @@ describe("ApiClient", () => {
 				contracts,
 			});
 
+			assert.equal(client.api.items.update.$contract.path, "/items/:id");
+			assert.equal("ctx" in client.api.items.update, false);
+
 			const request = {
 				id: "a b",
 				search: "carrot",
@@ -351,6 +354,8 @@ describe("ApiClient", () => {
 
 			assert.equal("fetch" in client.api.events, false);
 			assert.equal("stream" in client.api.events, true);
+			assert.equal(client.api.events.$contract.path, "/events");
+			assert.equal("ctx" in client.api.events, false);
 
 			const request = {
 				roomId: "room-1",

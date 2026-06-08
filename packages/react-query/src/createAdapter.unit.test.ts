@@ -68,10 +68,10 @@ const getCreateAdapter = async () => {
 };
 
 const createNode = (
-	ctx: Record<string, unknown>,
+	$contract: Record<string, unknown>,
 	fetch: (...args: unknown[]) => Promise<unknown>,
 ) => ({
-	ctx,
+	$contract,
 	fetch,
 	tryFetch: async (...args: unknown[]) => {
 		try {
@@ -129,6 +129,15 @@ const createApiTree = () =>
 					throw failingError;
 				},
 			),
+			events: {
+				$contract: {
+					method: "GET",
+					path: "/items/events",
+					options: { mode: "stream" },
+				},
+				stream: async () => [],
+				subscribe: () => () => {},
+			},
 		},
 	}) as any;
 
@@ -172,9 +181,16 @@ describe("createAdapter", () => {
 		assert.equal(typeof wrapped.items.list.$fetch, "function");
 		assert.equal(typeof wrapped.items.list.$tryFetch, "function");
 		assert.equal(typeof wrapped.items.list.$getKey, "function");
+		assert.equal(typeof wrapped.items.list.$contract, "object");
 		assert.equal(typeof wrapped.items.list.invalidate, "function");
 		assert.equal(typeof wrapped.items.list.clear, "function");
 		assert.equal(typeof wrapped.items.list.setData, "function");
+		assert.equal("$reactQueryApi" in wrapped.items.list, false);
+		assert.equal(wrapped.items.events.$contract.path, "/items/events");
+		assert.equal(typeof wrapped.items.events.$stream, "function");
+		assert.equal(typeof wrapped.items.events.$subscribe, "function");
+		assert.equal("stream" in wrapped.items.events, false);
+		assert.equal("subscribe" in wrapped.items.events, false);
 	});
 
 	it("should configure useQuery with request-aware key, enabled flag and query function", async () => {

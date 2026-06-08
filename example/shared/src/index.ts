@@ -1,4 +1,5 @@
 import type {
+	ContractApiError,
 	ContractApiRequest,
 	ContractApiResponse,
 	DotPaths,
@@ -113,6 +114,8 @@ export type ApiResponse<P extends ApiPath> = ContractApiResponse<
 	ExampleContracts,
 	P
 >;
+
+export type ApiError<P extends ApiPath> = ContractApiError<ExampleContracts, P>;
 
 export type HealthResponse = ApiResponse<"health.get">;
 export type ListTodosResponse = ApiResponse<"todos.list">;

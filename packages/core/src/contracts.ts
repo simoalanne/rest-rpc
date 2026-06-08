@@ -1,5 +1,4 @@
 import type z from "zod";
-import { flattenContractTree } from "./utils/contractTransformers.ts";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
@@ -38,6 +37,70 @@ export type Contract<TMeta = unknown> = {
 export type ContractTree<TMeta = unknown> =
 	| Contract<TMeta>
 	| { [k: string]: ContractTree<TMeta> };
+
+type Tree<T> = Record<string, unknown> | T;
+
+export const mapObjectValues = <TLeaf>(
+	tree: Tree<TLeaf>,
+	isLeaf: (value: unknown) => value is TLeaf,
+	mappingFn: (value: TLeaf, path: string[]) => unknown,
+	path: string[] = [],
+): unknown =>
+	isLeaf(tree)
+		? mappingFn(tree, path)
+		: Object.entries(tree).reduce(
+				(acc, [k, v]) => {
+					acc[k] = mapObjectValues(v as Tree<TLeaf>, isLeaf, mappingFn, [
+						...path,
+						k,
+					]);
+					return acc;
+				},
+				{} as Record<string, unknown>,
+			);
+
+const isContractDefinition = <TMeta = unknown>(
+	value: unknown,
+): value is Contract<TMeta> =>
+	typeof value === "object" &&
+	value !== null &&
+	"path" in value &&
+	"method" in value;
+
+export const mapContractTree = <TMeta = unknown>(
+	tree: ContractTree<TMeta>,
+	mappingFn: (contract: Contract<TMeta>) => unknown,
+) => mapObjectValues(tree, isContractDefinition, mappingFn);
+
+export type FlattenedContract<TMeta = unknown> = Contract<TMeta> & {
+	keySegments: string[];
+};
+
+export const flattenContractTree = <
+	TMeta = unknown,
+	TTree extends ContractTree<TMeta> = ContractTree<TMeta>,
+>(
+	tree: TTree,
+): FlattenedContract<TMeta>[] => {
+	const result: FlattenedContract<TMeta>[] = [];
+
+	const visit = (node: ContractTree<TMeta>, keySegments: string[]) => {
+		if (isContractDefinition<TMeta>(node)) {
+			result.push({
+				...node,
+				keySegments,
+			});
+			return;
+		}
+
+		Object.entries(node).forEach(([key, child]) => {
+			visit(child as ContractTree<TMeta>, [...keySegments, key]);
+		});
+	};
+
+	visit(tree as ContractTree<TMeta>, []);
+	return result;
+};
 
 export type ContractResponse<E extends Contract> = E extends {
 	response: infer R;
@@ -128,6 +191,11 @@ export type ContractApiResponse<
 	P extends DotPaths<T>,
 > = ContractResponse<ContractAtPath<T, P>>;
 
+export type ContractApiError<
+	T extends ContractTree,
+	P extends DotPaths<T>,
+> = ContractError<ContractAtPath<T, P>>;
+
 type WithMetaMarker<T, TMeta> =
 	T extends Contract<TMeta>
 		? T & { $meta?: TMeta }
@@ -157,6 +225,12 @@ const getRequestSchemaKeySet = (
 
 const validateContractTree = (tree: ContractTree) => {
 	for (const contract of flattenContractTree(tree)) {
+		if (contract.options?.mode === "stream" && !contract.response) {
+			throw new Error(
+				`Contract at path "${contract.path}" is marked as a stream but does not have a response schema defined.`,
+			);
+		}
+
 		if (contract.request) {
 			const requestKeySets = [
 				getRequestSchemaKeySet(contract.request.body),

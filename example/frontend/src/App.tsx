@@ -44,7 +44,7 @@ export const App = () => {
 	);
 
 	useEffect(() => {
-		return api.todos.events.subscribe({
+		return api.todos.events.$subscribe({
 			onData(event) {
 				setActivity((current) => [event, ...current].slice(0, 8));
 			},
