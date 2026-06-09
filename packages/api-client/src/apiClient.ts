@@ -18,6 +18,7 @@ import {
 } from "@contract-first-api/core/contracts";
 
 export type FetchOptions = Omit<RequestInit, "method" | "body" | "headers">;
+export type ApiClientFetchOptions = Omit<FetchOptions, "signal">;
 
 export type ApiClientUnknownError = {
 	code: "unknown";
@@ -125,6 +126,7 @@ export type ApiClientTree<T extends ContractTree = ContractTree> =
 export type ApiClientOptions<TTree extends ContractTree> = {
 	baseUrl: string;
 	contracts: TTree;
+	fetchOptions?: ApiClientFetchOptions;
 	timeoutMs?: number;
 };
 
@@ -176,6 +178,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 
 	private baseUrl: string;
 	private contracts: TTree;
+	private fetchOptions?: ApiClientFetchOptions;
 	private getHeaders?: GetHeadersFn;
 	private timeoutMs?: number;
 
@@ -186,6 +189,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 	constructor(options: ApiClientOptions<TTree>) {
 		this.baseUrl = options.baseUrl;
 		this.contracts = options.contracts;
+		this.fetchOptions = options.fetchOptions;
 		this.timeoutMs = options.timeoutMs;
 
 		this.api = this.buildApiClient();
@@ -284,6 +288,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 
 		try {
 			const rawResponse = await fetch(url, {
+				...this.fetchOptions,
 				...options,
 				method: contract.method,
 				body: body ? JSON.stringify(body) : undefined,

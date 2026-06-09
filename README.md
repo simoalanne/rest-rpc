@@ -312,6 +312,9 @@ import { contracts } from "@example/shared";
 const client = new ApiClient({
 	baseUrl: process.env.API_BASE_URL,
 	contracts,
+	fetchOptions: {
+		cache: "no-store",
+	},
 });
 
 // headers are not typed but are passed through to fetch as usual.

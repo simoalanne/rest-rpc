@@ -141,7 +141,7 @@ export const App = () => {
 		<main className="shell">
 			<header className="hero">
 				<p className="eyebrow">Example Workspace</p>
-				<h1>my-own-contract-first</h1>
+				<h1>Contract-First API</h1>
 				<p className="lede">
 					A tiny React app using the shared contracts, the generated API client,
 					and the React Query adapter.

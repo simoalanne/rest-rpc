@@ -1,5 +1,5 @@
 {
-	"name": "my-own-contract-first",
+	"name": "contract-first-api",
 	"private": true,
 	"type": "module",
 	"description": "Contract-first TypeScript tools for shared API schemas, typed clients, Express servers, and React Query integration.",

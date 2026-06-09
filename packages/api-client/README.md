@@ -23,6 +23,9 @@ import { contracts } from "@example/shared";
 const client = new ApiClient({
 	baseUrl: process.env.API_BASE_URL,
 	contracts,
+	fetchOptions: {
+		cache: "no-store",
+	},
 	timeoutMs: 10_000,
 });
 ```
@@ -81,11 +84,19 @@ contract, so this flat input remains unambiguous.
 
 ## Fetch Options
 
-Every call can receive fetch options that the client does not control.
+Every call can receive fetch options that the client does not control. You can
+also set non-signal defaults when creating the client.
 
 ```ts
+const client = new ApiClient({
+	baseUrl: process.env.API_BASE_URL,
+	contracts,
+	fetchOptions: {
+		cache: "no-store",
+	},
+});
+
 await client.api.todos.list.fetch({
-	cache: "no-store",
 	credentials: "include",
 	signal: abortController.signal,
 });
@@ -97,8 +108,13 @@ await client.api.todos.create.fetch(
 ```
 
 The exported `FetchOptions` type is `RequestInit` without `method`, `body`, or
-`headers`. The client owns those fields so they stay aligned with the contract
-and configured default headers.
+`headers`. Constructor defaults use `ApiClientFetchOptions`, which also omits
+`signal` because abort signals are request-lifetime concerns. The client owns
+`method`, `body`, and `headers` so they stay aligned with the contract and
+configured default headers.
+
+Per-call options are shallow-merged over client defaults. The client still owns
+`method`, `body`, and `headers`.
 
 ## Headers And Timeout
 

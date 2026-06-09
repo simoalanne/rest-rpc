@@ -231,11 +231,14 @@ describe("ApiClient", () => {
 			const client = new ApiClient({
 				baseUrl: "https://example.test",
 				contracts,
+				fetchOptions: {
+					cache: "force-cache",
+					credentials: "include",
+				},
 			});
 
 			await client.api.status.fetch({
 				cache: "no-store",
-				credentials: "include",
 				redirect: "manual",
 			});
 
