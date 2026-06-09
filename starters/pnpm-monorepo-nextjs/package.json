@@ -1,0 +1,18 @@
+{
+	"name": "pnpm-monorepo-nextjs",
+	"private": true,
+	"type": "module",
+	"description": "Boilerplate pnpm monorepo implementing the contract first API approach with Next.js, Express, and React Query.",
+	"packageManager": "pnpm@11.5.2",
+	"scripts": {
+		"typecheck": "pnpm -r --parallel --no-bail typecheck",
+		"test": "pnpm -r --parallel --no-bail --if-present test",
+		"lint": "biome check --write",
+		"lint:unsafe": "biome check --write --unsafe ."
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.11",
+		"lefthook": "2.1.5",
+		"typescript": "^6.0.3"
+	}
+}

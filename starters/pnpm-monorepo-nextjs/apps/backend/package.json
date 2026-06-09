@@ -1,0 +1,25 @@
+{
+	"name": "backend",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"scripts": {
+		"start": "node src/index.ts",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@contract-first-api/express": "^4.2.0",
+		"@contract-first-api/openapi": "^1.0.1",
+		"@packages/contracts": "workspace:*",
+		"@scalar/express-api-reference": "^0.10.0",
+		"dotenv": "^17.4.2",
+		"express": "^5.1.0",
+		"ws": "^8.21.0"
+	},
+	"devDependencies": {
+		"@types/express": "^5.0.6",
+		"@types/node": "^25.9.2",
+		"@types/ws": "^8.18.1",
+		"typescript": "^6.0.3"
+	}
+}

@@ -1,0 +1,16 @@
+{
+	"name": "@packages/contracts",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc -noEmit"
+	},
+	"dependencies": {
+		"@contract-first-api/core": "^4.2.1",
+		"zod": "^4.3.6"
+	}
+}
