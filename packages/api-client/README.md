@@ -146,6 +146,11 @@ const client = new ApiClient({
 If a per-request `signal` is also provided, the request is aborted when either
 the per-request signal or the timeout signal aborts.
 
+For stream contracts, `timeoutMs` only applies until the streaming response has
+been established. After that, stream consumption stays open until the server
+ends the stream, the network fails, or the caller aborts the per-request
+`signal`.
+
 ## Responses
 
 Successful JSON responses are parsed and validated with the contract response

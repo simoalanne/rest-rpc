@@ -363,17 +363,16 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 			};
 		}
 
+		cleanup();
 		return this.parseNdjsonStream(
 			contract,
 			rawResponse.body,
-			cleanup,
 		) as unknown as ContractResponse<E>;
 	}
 
 	private async *parseNdjsonStream(
 		contract: StreamContract,
 		body: ReadableStream<Uint8Array>,
-		cleanup: () => void,
 	): AsyncIterable<unknown> {
 		const reader = body.getReader();
 		const decoder = new TextDecoder();
@@ -399,7 +398,6 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 				yield this.parseStreamLine(contract, buffer);
 			}
 		} finally {
-			cleanup();
 			reader.releaseLock();
 		}
 	}

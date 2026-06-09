@@ -387,6 +387,65 @@ describe("ApiClient", () => {
 		}
 	});
 
+	it("should not abort stream consumption after the request timeout elapses", async () => {
+		const server = createServer((req, res) => {
+			assert.equal(req.method, "GET");
+			assert.equal(req.url, "/events");
+
+			res.statusCode = 200;
+			res.setHeader("content-type", "application/x-ndjson");
+			res.write(`${JSON.stringify({ index: 1 })}\n`);
+			setTimeout(() => {
+				res.end(`${JSON.stringify({ index: 2 })}\n`);
+			}, 50);
+		});
+
+		await new Promise<void>((resolve) =>
+			server.listen(0, "127.0.0.1", resolve),
+		);
+		const address = server.address();
+		if (!address || typeof address === "string") {
+			throw new Error("Failed to resolve test server address");
+		}
+
+		try {
+			const contracts = {
+				events: {
+					path: "/events",
+					method: "GET",
+					response: z.object({
+						index: z.number(),
+					}),
+					options: { mode: "stream" },
+				},
+			} as const;
+
+			const client = new ApiClient({
+				baseUrl: `http://127.0.0.1:${(address as AddressInfo).port}`,
+				contracts,
+				timeoutMs: 10,
+			});
+
+			const stream = await client.api.events.stream();
+			const chunks = [];
+			for await (const chunk of stream) {
+				chunks.push(chunk);
+			}
+
+			assert.deepStrictEqual(chunks, [{ index: 1 }, { index: 2 }]);
+		} finally {
+			await new Promise<void>((resolve, reject) => {
+				server.close((err) => {
+					if (err) {
+						reject(err);
+						return;
+					}
+					resolve();
+				});
+			});
+		}
+	});
+
 	it("should expose subscribe for stream contracts and call callbacks", async () => {
 		const server = createServer((req, res) => {
 			assert.equal(req.method, "GET");
