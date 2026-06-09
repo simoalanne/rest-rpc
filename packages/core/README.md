@@ -369,3 +369,5 @@ type CreateTodoError = ApiError<"todos.create">;
   typed runtime client.
 - `@contract-first-api/react-query` wraps the API client tree with hooks and
   cache helpers.
+- `@contract-first-api/openapi` imports the same contract tree to generate a
+  plain OpenAPI document object from JSON contracts.

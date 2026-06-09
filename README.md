@@ -1,7 +1,7 @@
 # contract-first-api
 
 Define API contracts once, then reuse them for runtime validation, typed Express
-handlers, typed clients, and optional React Query hooks.
+handlers, typed clients, optional React Query hooks, and OpenAPI documents.
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Zod](https://img.shields.io/badge/Zod-4.3-3E67B1?logo=zod&logoColor=white)](https://zod.dev/)
@@ -12,7 +12,7 @@ handlers, typed clients, and optional React Query hooks.
 streams, and websockets aligned across your stack. You describe each endpoint
 as a plain contract object, then the rest of the packages use that same contract
 tree to validate requests, type server handlers, build a runtime client, and
-wrap that client with React Query.
+wrap that client with React Query or generate OpenAPI docs.
 
 The goal is to keep normal HTTP semantics while getting the developer
 experience people usually reach for RPC libraries to get: typed handlers, typed
@@ -65,6 +65,7 @@ From that tree:
 - `@contract-first-api/express` validates incoming requests and types services
 - `@contract-first-api/api-client` builds a typed runtime client
 - `@contract-first-api/react-query` wraps the client with typed hooks and cache helpers
+- `@contract-first-api/openapi` generates an OpenAPI document from JSON contracts
 - your shared package can expose path-based request, response, and error types
 
 ## Features
@@ -84,6 +85,8 @@ From that tree:
   contract tree.
 - **React Query adapter:** optionally turn the typed client into hooks and cache
   helpers.
+- **OpenAPI generator:** optionally turn JSON contracts into a plain OpenAPI
+  document object.
 - **No code generation:** contracts are plain objects and regular TypeScript
   inference does the work.
 
@@ -95,6 +98,7 @@ From that tree:
 | [`@contract-first-api/express`](./packages/express/README.md) | Mount contracts on an Express app with validation and typed services. |
 | [`@contract-first-api/api-client`](./packages/api-client/README.md) | Create a typed runtime client from the contract tree. |
 | [`@contract-first-api/react-query`](./packages/react-query/README.md) | Wrap the API client with React Query hooks and cache helpers. |
+| [`@contract-first-api/openapi`](./packages/openapi/README.md) | Generate an OpenAPI document from JSON contracts. |
 
 ## Install
 
@@ -107,7 +111,7 @@ pnpm add @contract-first-api/core
 Then add the integration packages you need:
 
 ```bash
-pnpm add @contract-first-api/express @contract-first-api/api-client @contract-first-api/react-query
+pnpm add @contract-first-api/express @contract-first-api/api-client @contract-first-api/react-query @contract-first-api/openapi
 ```
 
 If your backend uses websocket contracts with the Express adapter, install
