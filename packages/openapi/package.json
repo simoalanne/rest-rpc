@@ -1,6 +1,6 @@
 {
 	"name": "@contract-first-api/openapi",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"type": "module",
 	"description": "Generate OpenAPI documents from contract-first API contract trees.",
 	"keywords": [
