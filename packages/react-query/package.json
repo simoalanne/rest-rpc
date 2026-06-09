@@ -30,6 +30,7 @@
 	],
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
+		"prepublishOnly": "node ../../scripts/ensure-pnpm-publish.cjs",
 		"typecheck": "tsc -p tsconfig.json",
 		"test": "node --test src/**/*.test.ts"
 	},
