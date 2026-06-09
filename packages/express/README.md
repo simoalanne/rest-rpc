@@ -372,11 +372,14 @@ createRouter({
 The registered path is `routePrefix + contract.path`. Static routes are ordered
 before parameter routes when paths overlap.
 
-Success status codes are:
+Default success status codes are:
 
 - `201` for `POST`
 - `204` for contracts without a `response` schema
 - `200` for other successful responses
+
+Set `successStatusCode` on a JSON or stream contract when a route should use a
+different successful status code.
 
 ## How It Connects
 

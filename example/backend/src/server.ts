@@ -1,7 +1,13 @@
 import type { ContractWebSocket } from "@contract-first-api/express";
 import { initServer } from "@contract-first-api/express";
-import type { ApiResponse, DiscussMessage } from "@example/shared";
+import { createOpenApiDocument } from "@contract-first-api/openapi";
+import type {
+	ApiResponse,
+	DiscussMessage,
+	ExampleContractMeta,
+} from "@example/shared";
 import { allContracts } from "@example/shared";
+import { apiReference } from "@scalar/express-api-reference";
 import express from "express";
 import { createServer } from "node:http";
 
@@ -48,6 +54,32 @@ const { defineService, defineMiddleware, createRouter } = initServer<
 	typeof allContracts,
 	RequestContext
 >();
+
+const openApiDocument = createOpenApiDocument<ExampleContractMeta>(allContracts, {
+	info: {
+		title: "Contract First API Example",
+		version: "1.0.0",
+	},
+	servers: [{ url: `http://localhost:${port}/api` }],
+	transformOperation: ({ contract, operation }) => ({
+		...operation,
+		...(contract.meta?.requiresAuth
+			? { security: [{ bearerAuth: [] }] }
+			: {}),
+	}),
+	transformDocument: (document) => ({
+		...document,
+		components: {
+			...document.components,
+			securitySchemes: {
+				bearerAuth: {
+					type: "http",
+					scheme: "bearer",
+				},
+			},
+		},
+	}),
+});
 
 declare global {
 	namespace Express {
@@ -163,6 +195,15 @@ const services = {
 };
 
 app.use(express.json());
+app.get("/openapi.json", (_req, res) => {
+	res.json(openApiDocument);
+});
+app.use(
+	"/docs",
+	apiReference({
+		url: "/openapi.json",
+	}),
+);
 app.use((req, res, next) => {
 	res.setHeader("Access-Control-Allow-Origin", "*");
 	res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");

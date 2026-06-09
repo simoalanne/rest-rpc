@@ -376,8 +376,12 @@ const getRouteHandler = (services: unknown, path: string[]) =>
 		request: Record<string, unknown>,
 	) => unknown | Promise<unknown>;
 
-const getSuccessStatusCode = (method: HttpMethod, hasResponse: boolean) => {
-	if (method === "POST") return 201;
+const getSuccessStatusCode = (contract: Contract, hasResponse: boolean) => {
+	if ("successStatusCode" in contract && contract.successStatusCode) {
+		return contract.successStatusCode;
+	}
+
+	if (contract.method === "POST") return 201;
 	if (!hasResponse) return 204;
 	return 200;
 };
@@ -464,7 +468,7 @@ const createRouter = <
 					context,
 				});
 				const hasResponse = "response" in route && Boolean(route.response);
-				const statusCode = getSuccessStatusCode(route.method, hasResponse);
+				const statusCode = getSuccessStatusCode(route, hasResponse);
 
 				if (!hasResponse) {
 					res.sendStatus(statusCode);

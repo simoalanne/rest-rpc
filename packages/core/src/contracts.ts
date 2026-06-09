@@ -34,11 +34,13 @@ export type BaseContract<TMeta = unknown> = {
 
 export type JsonContract<TMeta = unknown> = BaseContract<TMeta> & {
 	response?: ResponseSchema;
+	successStatusCode?: number;
 	options?: { mode?: "json" };
 };
 
 export type StreamContract<TMeta = unknown> = BaseContract<TMeta> & {
 	response: ResponseSchema;
+	successStatusCode?: number;
 	options: { mode: "stream"; streamFormat?: "ndjson" };
 };
 

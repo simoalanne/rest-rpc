@@ -515,6 +515,52 @@ describe("initServer", () => {
 		});
 	});
 
+	it("should use custom success status codes when provided", async () => {
+		const { defineContractTree } = initContracts();
+		const contracts = defineContractTree({
+			posts: {
+				create: {
+					method: "POST",
+					path: "/posts",
+					successStatusCode: 202,
+					response: z.object({ id: z.string() }),
+				},
+			},
+		});
+
+		const { createRouter, defineService } = initServer<typeof contracts>();
+		const target = createRouteTargetDouble();
+
+		createRouter({
+			app: target.app,
+			contracts,
+			services: {
+				posts: defineService("posts", {
+					create() {
+						return { id: "post-1" };
+					},
+				}),
+			},
+		});
+
+		const handler = target.routes["POST /posts"];
+		assert.ok(handler);
+
+		const response = createResponseDouble();
+		let nextError: unknown;
+
+		await handler({}, response.res, (error) => {
+			nextError = error;
+		});
+
+		assert.equal(nextError, undefined);
+		assert.deepStrictEqual(response.read(), {
+			statusCode: 202,
+			jsonBody: { id: "post-1" },
+			writableEnded: true,
+		});
+	});
+
 	it("should pass service errors to the next error handler", async () => {
 		const { defineContractTree } = initContracts();
 		const contracts = defineContractTree({

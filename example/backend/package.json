@@ -9,8 +9,10 @@
 		"typecheck": "tsc -p tsconfig.json"
 	},
 	"dependencies": {
-		"@example/shared": "workspace:*",
 		"@contract-first-api/express": "workspace:*",
+		"@contract-first-api/openapi": "workspace:*",
+		"@example/shared": "workspace:*",
+		"@scalar/express-api-reference": "^0.10.0",
 		"express": "^5.1.0",
 		"ws": "^8.21.0"
 	},

@@ -95,6 +95,7 @@ Each contract can define:
 | `path` | HTTP path, with params using `:paramValue` syntax. |
 | `request` | Optional Zod schemas for `body`, `query`, and `params`. |
 | `response` | Optional Zod schema for the successful JSON response body, or required stream chunk schema for stream contracts. |
+| `successStatusCode` | Optional successful HTTP status code override for JSON and stream contracts. |
 | `errors` | Optional known error schema or array of known error schemas. |
 | `options` | Optional contract behavior, such as stream or websocket mode. |
 | `messages` | WebSocket client and server message schemas. |
