@@ -398,6 +398,7 @@ model when your application needs them.
 - [Express package](./packages/express/README.md)
 - [API client package](./packages/api-client/README.md)
 - [React Query package](./packages/react-query/README.md)
+- [OpenAPI package](./packages/openapi/README.md)
 - [Example project](./example/README.md)
 
 ## License
