@@ -1,3 +1,5 @@
+"use client";
+
 import createAdapter from "@contract-first-api/react-query";
 import { createApiClient } from "./apiClient";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

@@ -58,8 +58,8 @@ importers:
   apps/frontend:
     dependencies:
       '@contract-first-api/api-client':
-        specifier: ^4.1.0
-        version: 4.1.0
+        specifier: ^4.2.3
+        version: 4.2.3
       '@contract-first-api/react-query':
         specifier: ^4.1.0
         version: 4.1.0(@tanstack/react-query@5.101.0(react@19.2.4))
@@ -100,6 +100,10 @@ importers:
       zod:
         specifier: ^4.3.6
         version: 4.4.3
+    devDependencies:
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
 
 packages:
 
@@ -160,8 +164,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@contract-first-api/api-client@4.1.0':
-    resolution: {integrity: sha512-E3ArxsyQAg4znXG02RnsVYXUB0oclyhtwysZHN+PLfaxtyyVMO7JljKVQVdhn8tulv/vf6AaiOq8w/h5+O3ZAA==}
+  '@contract-first-api/api-client@4.2.3':
+    resolution: {integrity: sha512-hu/olQwkGMPRL59ld6TFL7hWd400VNhEOZAi29TZcHdEoX11gJhQA5Wa54IOPcW1HONuAxZoNsx+37ZFpoLxPQ==}
 
   '@contract-first-api/core@4.2.1':
     resolution: {integrity: sha512-ZQT8vpjZ/5tiaIOiWNGOS7K1HBMPwAgyp1PKOoaIJFZOdwd2OKBC/I9qRoeqpY9IFPQu5u5EtuWrjU8CvCCjAA==}
@@ -954,7 +958,7 @@ snapshots:
   '@biomejs/cli-win32-x64@2.4.11':
     optional: true
 
-  '@contract-first-api/api-client@4.1.0':
+  '@contract-first-api/api-client@4.2.3':
     dependencies:
       '@contract-first-api/core': 4.2.1
       zod: 4.4.3
@@ -976,7 +980,7 @@ snapshots:
 
   '@contract-first-api/react-query@4.1.0(@tanstack/react-query@5.101.0(react@19.2.4))':
     dependencies:
-      '@contract-first-api/api-client': 4.1.0
+      '@contract-first-api/api-client': 4.2.3
       '@contract-first-api/core': 4.2.1
       '@tanstack/react-query': 5.101.0(react@19.2.4)
 
