@@ -21,8 +21,8 @@ importers:
   apps/backend:
     dependencies:
       '@contract-first-api/express':
-        specifier: ^4.2.0
-        version: 4.2.0(express@5.2.1)(ws@8.21.0)
+        specifier: ^4.3.0
+        version: 4.3.0(express@5.2.1)(ws@8.21.0)
       '@contract-first-api/openapi':
         specifier: ^1.0.1
         version: 1.0.1
@@ -58,11 +58,11 @@ importers:
   apps/frontend:
     dependencies:
       '@contract-first-api/api-client':
-        specifier: ^4.2.3
-        version: 4.2.3
+        specifier: ^4.3.0
+        version: 4.3.0
       '@contract-first-api/react-query':
-        specifier: ^4.1.0
-        version: 4.1.0(@tanstack/react-query@5.101.0(react@19.2.4))
+        specifier: ^4.3.0
+        version: 4.3.0(@tanstack/react-query@5.101.0(react@19.2.4))
       '@packages/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -95,8 +95,8 @@ importers:
   packages/contracts:
     dependencies:
       '@contract-first-api/core':
-        specifier: ^4.2.1
-        version: 4.2.1
+        specifier: ^4.3.0
+        version: 4.3.0
       zod:
         specifier: ^4.3.6
         version: 4.4.3
@@ -164,14 +164,14 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@contract-first-api/api-client@4.2.3':
-    resolution: {integrity: sha512-hu/olQwkGMPRL59ld6TFL7hWd400VNhEOZAi29TZcHdEoX11gJhQA5Wa54IOPcW1HONuAxZoNsx+37ZFpoLxPQ==}
+  '@contract-first-api/api-client@4.3.0':
+    resolution: {integrity: sha512-U7OqVzMI4lfv7ytdcXidREvNWRD0sVFFCx+8i8k0knJ3pPJpaGRYGDZaII4+S92uF7H2DhSE165scSEIFuCD2A==}
 
-  '@contract-first-api/core@4.2.1':
-    resolution: {integrity: sha512-ZQT8vpjZ/5tiaIOiWNGOS7K1HBMPwAgyp1PKOoaIJFZOdwd2OKBC/I9qRoeqpY9IFPQu5u5EtuWrjU8CvCCjAA==}
+  '@contract-first-api/core@4.3.0':
+    resolution: {integrity: sha512-54V3CkaqxuCJ8QJT4Psdp5l7qkaJ56IkJBu5fjkq+V2r7RSytzWapl66BhR1BoXp6ItwSy6C4GFLFH9Eh+5VhQ==}
 
-  '@contract-first-api/express@4.2.0':
-    resolution: {integrity: sha512-y5yN0uv8a582yY3fO51VbZD7WINQ/juHQ0z1qa85qukVDsXNn1Co68N3TYO1RZ7HofbhdwfpYwQb96uX8nKYhw==}
+  '@contract-first-api/express@4.3.0':
+    resolution: {integrity: sha512-zzkwJdrVRTEyMcT/RfVtCu8d8DieK69wtJNzO1c1SRTNfkD5LUhjKZVlb5yd4nv6IlvJ2DPuvlnZ41zpsMZosA==}
     peerDependencies:
       express: ^5.0.0
       ws: ^8.21.0
@@ -179,8 +179,8 @@ packages:
   '@contract-first-api/openapi@1.0.1':
     resolution: {integrity: sha512-tJr7e1RXKhqOg69ove6ihMXHq0JQE4scP4Qp084okVF1mzx/2BZ+LPGcVBxxlgyMg0LPRZpOLyTMJYU0VEKf0Q==}
 
-  '@contract-first-api/react-query@4.1.0':
-    resolution: {integrity: sha512-U/xnn+qV6hr9kWR809Ih7nP5ft6KXsEkXeEqe5fpWKOHc+ZPPg0IzaJ8fK4f1eqBcK9X44aFGK09Q1wl2h80QQ==}
+  '@contract-first-api/react-query@4.3.0':
+    resolution: {integrity: sha512-UZ4h2y2bRAJBfjw/s73WiJw6oRuC4QbMELRZoTXB1k/bFCK1FwTwWfq4XzpYlqzBcHw+LVSklcyCa0Tc8v0k9w==}
     peerDependencies:
       '@tanstack/react-query': ^5.0.0
 
@@ -958,30 +958,30 @@ snapshots:
   '@biomejs/cli-win32-x64@2.4.11':
     optional: true
 
-  '@contract-first-api/api-client@4.2.3':
+  '@contract-first-api/api-client@4.3.0':
     dependencies:
-      '@contract-first-api/core': 4.2.1
+      '@contract-first-api/core': 4.3.0
       zod: 4.4.3
 
-  '@contract-first-api/core@4.2.1':
+  '@contract-first-api/core@4.3.0':
     dependencies:
       zod: 4.4.3
 
-  '@contract-first-api/express@4.2.0(express@5.2.1)(ws@8.21.0)':
+  '@contract-first-api/express@4.3.0(express@5.2.1)(ws@8.21.0)':
     dependencies:
-      '@contract-first-api/core': 4.2.1
+      '@contract-first-api/core': 4.3.0
       express: 5.2.1
       ws: 8.21.0
 
   '@contract-first-api/openapi@1.0.1':
     dependencies:
-      '@contract-first-api/core': 4.2.1
+      '@contract-first-api/core': 4.3.0
       zod: 4.4.3
 
-  '@contract-first-api/react-query@4.1.0(@tanstack/react-query@5.101.0(react@19.2.4))':
+  '@contract-first-api/react-query@4.3.0(@tanstack/react-query@5.101.0(react@19.2.4))':
     dependencies:
-      '@contract-first-api/api-client': 4.2.3
-      '@contract-first-api/core': 4.2.1
+      '@contract-first-api/api-client': 4.3.0
+      '@contract-first-api/core': 4.3.0
       '@tanstack/react-query': 5.101.0(react@19.2.4)
 
   '@emnapi/runtime@1.11.0':

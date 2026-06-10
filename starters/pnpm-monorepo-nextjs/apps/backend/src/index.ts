@@ -16,8 +16,10 @@ app.use(express.json());
 
 type RequestContext = Record<string, unknown>;
 
-const { defineService, defineMiddleware, createRouter, throwKnownError } =
-	initServer<typeof contracts, RequestContext>();
+const { defineService, defineMiddleware, createRouter } = initServer<
+	typeof contracts,
+	RequestContext
+>();
 
 const openApiDocument = createOpenApiDocument(contracts, {
 	info: {
@@ -86,9 +88,6 @@ createRouter({
 		}),
 		chatroom: defineService("chatroom", {
 			chat: ({ socket, username }) => {
-				if (sockets.some((s) => s.username === username)) {
-					return throwKnownError({ code: "USERNAME_TAKEN" });
-				}
 				sockets.push({ socket, username });
 
 				socket.onMessage((result) => {

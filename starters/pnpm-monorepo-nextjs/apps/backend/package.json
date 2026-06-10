@@ -8,7 +8,7 @@
 		"typecheck": "tsc -p tsconfig.json"
 	},
 	"dependencies": {
-		"@contract-first-api/express": "^4.2.0",
+		"@contract-first-api/express": "^4.3.0",
 		"@contract-first-api/openapi": "^1.0.1",
 		"@packages/contracts": "workspace:*",
 		"@scalar/express-api-reference": "^0.10.0",

@@ -10,7 +10,7 @@
 		"typecheck": "tsc -p tsconfig.json"
 	},
 	"dependencies": {
-		"@contract-first-api/core": "^4.2.1",
+		"@contract-first-api/core": "^4.3.0",
 		"zod": "^4.3.6"
 	},
 	"devDependencies": {

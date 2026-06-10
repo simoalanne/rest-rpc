@@ -2,8 +2,7 @@
 
 import { useApiClient } from "@/lib/apiClientProvider";
 import { useEffect, useState } from "react";
-import type { ChatRoomChatMessage, contracts } from "@packages/contracts";
-import type { ApiClientError } from "@contract-first-api/api-client";
+import type { ChatRoomChatMessage } from "@packages/contracts";
 
 export default function ChatSection() {
 	const api = useApiClient();
@@ -14,37 +13,40 @@ export default function ChatSection() {
 		typeof api.chatroom.chat.$connect
 	> | null>(null);
 
-  useEffect(() => {
-    return () => {
-      if (socket) {
-        socket.close();
-      }
-    };
-  }, [socket]);
+	useEffect(() => {
+		return () => {
+			if (socket) {
+				socket.close();
+			}
+		};
+	}, [socket]);
 
 	const handleJoinChat = () => {
 		if (!username.trim()) {
 			alert("Please enter a username");
 			return;
 		}
-
-		try {
-			const socket = api.chatroom.chat.$connect({ username });
-			setSocket(socket);
-			socket.onMessage((data) => {
-				if (!data.success) return;
-				setMessages((prev) => [...prev, data.data]);
-			});
-		} catch (error) {
-			const apiError = error as ApiClientError<typeof contracts.chatroom.chat>;
-			if (apiError.code === "USERNAME_TAKEN") {
-				setErrorMessage(
-					"Username is already taken. Please choose another one.",
-				);
-				return;
-			}
-			setErrorMessage("An unexpected error occurred. Please try again.");
+		const result = api.chatroom.chat.$tryConnect({ username });
+		if (!result.success) {
+			setErrorMessage("Failed to connect to chat. Please try again.");
+			return;
 		}
+		const socket = result.data;
+		setSocket(socket);
+		setErrorMessage("");
+		socket.onMessage((data) => {
+			if (!data.success) return;
+			setMessages((prev) => [...prev, data.data]);
+		});
+		socket.onClose((event) => {
+			setSocket(null);
+			if (event.code !== 1000) {
+				setErrorMessage("Chat connection closed unexpectedly.");
+			}
+		});
+		socket.onError(() => {
+			setErrorMessage("An error occurred with the chat connection.");
+		});
 	};
 
 	const handleSendMessage = (text: string) => {
@@ -73,9 +75,14 @@ export default function ChatSection() {
 					<ul>
 						{messages.map((msg) => (
 							<li key={msg.id}>
-								<strong style={{ color: msg.username === username ? "blue" : "black" }}>
+								<strong
+									style={{
+										color: msg.username === username ? "blue" : "black",
+									}}
+								>
 									{msg.username}:
-								</strong> {msg.text}
+								</strong>{" "}
+								{msg.text}
 							</li>
 						))}
 					</ul>

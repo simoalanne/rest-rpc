@@ -42,7 +42,6 @@ export const contracts = defineContractTree({
 			method: "GET",
 			path: "/chat",
 			request: { query: z.object({ username: z.string() }) },
-			errors: z.object({ code: z.literal("USERNAME_TAKEN") }),
 			messages: {
 				client: z.object({
 					text: z.string().min(1).trim(),
