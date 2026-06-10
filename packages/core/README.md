@@ -96,7 +96,7 @@ Each contract can define:
 | `request` | Optional Zod schemas for `body`, `query`, and `params`. |
 | `response` | Optional Zod schema for the successful JSON response body, or required stream chunk schema for stream contracts. |
 | `successStatusCode` | Optional successful HTTP status code override for JSON and stream contracts. |
-| `errors` | Optional known error schema or array of known error schemas. |
+| `errors` | Optional known error schema or array of known error schemas for JSON and stream contracts. |
 | `options` | Optional contract behavior, such as stream or websocket mode. |
 | `messages` | WebSocket client and server message schemas. |
 | `meta` | Optional app-defined metadata for integrations and middleware. |
@@ -116,8 +116,8 @@ Contracts have three explicit shapes:
   `response` schema, which describes each NDJSON chunk.
 - **WebSocket contracts** use `options: { mode: "websocket" }`. They must use
   `method: "GET"` and define `messages.client` and `messages.server`. They do
-  not define `response`, because successful communication happens through
-  websocket messages after the upgrade.
+  not define `response` or `errors`, because communication after the upgrade
+  happens through websocket messages and close events.
 
 The integration packages use the contract mode to expose the right API. JSON
 contracts expose fetch helpers, stream contracts expose stream helpers, and

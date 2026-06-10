@@ -27,7 +27,6 @@ export type BaseContract<TMeta = unknown> = {
 	path: string;
 	method: HttpMethod;
 	request?: RequestSchema;
-	errors?: KnownErrors;
 	meta?: TMeta;
 	$meta?: TMeta;
 };
@@ -35,12 +34,14 @@ export type BaseContract<TMeta = unknown> = {
 export type JsonContract<TMeta = unknown> = BaseContract<TMeta> & {
 	response?: ResponseSchema;
 	successStatusCode?: number;
+	errors?: KnownErrors;
 	options?: { mode?: "json" };
 };
 
 export type StreamContract<TMeta = unknown> = BaseContract<TMeta> & {
 	response: ResponseSchema;
 	successStatusCode?: number;
+	errors?: KnownErrors;
 	options: { mode: "stream"; streamFormat?: "ndjson" };
 };
 
@@ -51,6 +52,7 @@ export type WebSocketContract<TMeta = unknown> = BaseContract<TMeta> & {
 		client: z.ZodType;
 		server: z.ZodType;
 	};
+	errors?: never;
 };
 
 export type Contract<TMeta = unknown> =

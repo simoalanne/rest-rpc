@@ -614,20 +614,24 @@ describe("ApiClient", () => {
 
 			const opened: unknown[] = [];
 			const closed: unknown[] = [];
+			const errors: unknown[] = [];
 			const results: unknown[] = [];
 			socket.onOpen((event) => opened.push(event));
 			const unsubscribeClose = socket.onClose((event) => closed.push(event));
+			const unsubscribeError = socket.onError((event) => errors.push(event));
 			const unsubscribeMessage = socket.onMessage((result) =>
 				results.push(result),
 			);
 
 			rawSocket.emit("open", { type: "open-event" });
+			rawSocket.emit("error", { type: "error-event" });
 			rawSocket.emit("message", {
 				data: JSON.stringify({ type: "pong", id: "message-1" }),
 			});
 			socket.send({ type: "ping", id: "message-1" });
 
 			assert.deepStrictEqual(opened, [{ type: "open-event" }]);
+			assert.deepStrictEqual(errors, [{ type: "error-event" }]);
 			assert.deepStrictEqual(results, [
 				{ success: true, data: { type: "pong", id: "message-1" } },
 			]);
@@ -661,7 +665,9 @@ describe("ApiClient", () => {
 			rawSocket.readyState = MockWebSocket.OPEN;
 
 			unsubscribeMessage();
+			unsubscribeError();
 			unsubscribeClose();
+			rawSocket.emit("error", { type: "ignored-error-event" });
 			rawSocket.emit("message", {
 				data: JSON.stringify({ type: "pong", id: "message-2" }),
 			});
@@ -671,6 +677,7 @@ describe("ApiClient", () => {
 				{ success: true, data: { type: "pong", id: "message-1" } },
 				{ success: false },
 			]);
+			assert.deepStrictEqual(errors, [{ type: "error-event" }]);
 			assert.deepStrictEqual(closed, []);
 
 			socket.close(1000, "done");

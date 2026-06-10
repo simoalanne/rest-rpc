@@ -126,12 +126,15 @@ type ReactQueryContractValue<E extends Contract> = {
 type ReactQueryStreamContractValue<E extends Contract> = {
 	$contract: E;
 	$stream: ApiClientStreamContractValue<E>["stream"];
+	$tryStream: ApiClientStreamContractValue<E>["tryStream"];
 	$subscribe: ApiClientStreamContractValue<E>["subscribe"];
+	$trySubscribe: ApiClientStreamContractValue<E>["trySubscribe"];
 };
 
 type ReactQueryWebSocketContractValue<E extends Contract> = {
 	$contract: E;
 	$connect: ApiClientWebSocketContractValue<E>["connect"];
+	$tryConnect: ApiClientWebSocketContractValue<E>["tryConnect"];
 };
 
 export type WrapContracts<T> = {
@@ -204,12 +207,15 @@ const getQueryKey = (request: unknown, path: string[]) =>
 const wrapStreamContractNode = (node: ApiClientStreamContractValue) => ({
 	$contract: node.$contract,
 	$stream: node.stream,
+	$tryStream: node.tryStream,
 	$subscribe: node.subscribe,
+	$trySubscribe: node.trySubscribe,
 });
 
 const wrapWebSocketContractNode = (node: ApiClientWebSocketContractValue) => ({
 	$contract: node.$contract,
 	$connect: node.connect,
+	$tryConnect: node.tryConnect,
 });
 
 const buildMutation =

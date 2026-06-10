@@ -287,6 +287,10 @@ socket.onMessage((result) => {
 socket.onClose((event) => {
 	console.log(event.code);
 });
+
+socket.onError((event) => {
+	console.error(event);
+});
 ```
 
 WebSocket contract nodes expose:
@@ -302,12 +306,19 @@ methods:
 - `onOpen(callback)`: subscribe to open events and return an unsubscribe
   function
 - `onMessage(callback)`: receive parsed `messages.server` results
+- `onError(callback)`: subscribe to websocket error events and return an
+  unsubscribe function
 - `onClose(callback)`: subscribe to close events and return an unsubscribe
   function
 
 Incoming messages are parsed as JSON and validated with `messages.server`.
 Invalid messages call `onMessage` with `{ success: false }` instead of throwing
 from inside the websocket event callback.
+
+`connect()` returns the socket immediately. Connection failures, server-side
+rejections, and service crashes are reported later through native websocket
+`error` and `close` events, not by throwing from `connect()`. Use `onClose()` to
+inspect close codes and reasons.
 
 The client uses the configured `baseUrl` and converts `http:` to `ws:` and
 `https:` to `wss:` when opening the connection.

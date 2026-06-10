@@ -108,7 +108,11 @@ const createContractWebSocket = <E extends WebSocketContract>(
 
 	contractSocket.onMessage = (callback) => {
 		const onMessage = (data: WebSocket.RawData) => {
-			callback(parseIncomingMessage(data));
+			void Promise.resolve()
+				.then(() => callback(parseIncomingMessage(data)))
+				.catch(() => {
+					socket.close(1011, "WebSocket message handler failed.");
+				});
 		};
 
 		socket.on("message", onMessage);
@@ -116,11 +120,29 @@ const createContractWebSocket = <E extends WebSocketContract>(
 	};
 
 	contractSocket.onClose = (callback) => {
-		socket.on("close", callback);
-		return () => socket.off("close", callback);
+		const onClose = (code: number, reason: Buffer) => {
+			void Promise.resolve()
+				.then(() => callback(code, reason))
+				.catch(() => {});
+		};
+
+		socket.on("close", onClose);
+		return () => socket.off("close", onClose);
 	};
 
 	return contractSocket;
+};
+
+const runWebSocketServiceHandler = (
+	handler: (request: unknown) => unknown | Promise<unknown>,
+	request: unknown,
+	socket: Pick<WebSocket, "close">,
+) => {
+	void Promise.resolve()
+		.then(() => handler(request))
+		.catch(() => {
+			socket.close(1011, "WebSocket service failed.");
+		});
 };
 
 export const registerWebSocketRoutes = <TMeta, TContext>({
@@ -203,15 +225,15 @@ export const registerWebSocketRoutes = <TMeta, TContext>({
 				rawSocket,
 				matchedRoute.route,
 			);
-			void Promise.resolve(
-				matchedRoute.handler({
+			runWebSocketServiceHandler(
+				matchedRoute.handler,
+				{
 					...validation.data,
 					context,
 					socket: contractSocket,
-				}),
-			).catch(() => {
-				contractSocket.close(1011, "WebSocket service failed.");
-			});
+				},
+				contractSocket,
+			);
 		});
 	});
 };

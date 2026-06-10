@@ -71,6 +71,7 @@ export type ContractWebSocket<E extends WebSocketContract> = Omit<
 	onMessage: (
 		callback: (result: WebSocketMessageResult<E>) => void,
 	) => () => void;
+	onError: (callback: (event: Event) => void) => () => void;
 	onClose: (callback: (event: CloseEvent) => void) => () => void;
 };
 
@@ -82,13 +83,32 @@ export type ConnectFn<E extends Contract> = (
 	...args: ConnectArgs<E>
 ) => E extends WebSocketContract ? ContractWebSocket<E> : never;
 
-export type ApiResult<E extends Contract> =
-	| { success: true; data: ContractResponse<E> }
+export type ApiClientResult<E extends Contract, TData> =
+	| { success: true; data: TData }
 	| { success: false; error: ApiClientError<E> };
+
+export type ApiResult<E extends Contract> = ApiClientResult<
+	E,
+	ContractResponse<E>
+>;
 
 export type TryFetchFn<E extends Contract> = (
 	...args: FetchArgs<E>
 ) => Promise<ApiResult<E>>;
+
+export type TryStreamFn<E extends Contract> = (
+	...args: FetchArgs<E>
+) => Promise<ApiResult<E>>;
+
+export type TrySubscribeFn<E extends Contract> = (
+	...args: Parameters<SubscribeFn<E>>
+) => E extends StreamContract ? ApiClientResult<E, () => void> : never;
+
+export type TryConnectFn<E extends Contract> = (
+	...args: ConnectArgs<E>
+) => E extends WebSocketContract
+	? ApiClientResult<E, ContractWebSocket<E>>
+	: never;
 
 export type ApiClientJsonContractValue<E extends Contract = Contract> = {
 	fetch: FetchFn<E>;
@@ -98,12 +118,15 @@ export type ApiClientJsonContractValue<E extends Contract = Contract> = {
 
 export type ApiClientStreamContractValue<E extends Contract = Contract> = {
 	stream: StreamFn<E>;
+	tryStream: TryStreamFn<E>;
 	subscribe: SubscribeFn<E>;
+	trySubscribe: TrySubscribeFn<E>;
 	$contract: E;
 };
 
 export type ApiClientWebSocketContractValue<E extends Contract = Contract> = {
 	connect: ConnectFn<E>;
+	tryConnect: TryConnectFn<E>;
 	$contract: E;
 };
 
@@ -432,6 +455,18 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		return () => controller.abort();
 	}
 
+	private trySubscribe<E extends StreamContract>(
+		contract: E,
+		...args: Parameters<SubscribeFn<E>>
+	): ApiClientResult<E, () => void> {
+		try {
+			const data = this.subscribe(contract, ...args);
+			return { success: true, data };
+		} catch (error) {
+			return { success: false, error: error as ApiClientError<E> };
+		}
+	}
+
 	private async consumeStream<E extends StreamContract>(
 		contract: E,
 		callbacks: SubscribeCallbackFunctions<E>,
@@ -513,6 +548,11 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 			return () => socket.removeEventListener("close", callback);
 		};
 
+		socket.onError = (callback: (event: Event) => void) => {
+			socket.addEventListener("error", callback);
+			return () => socket.removeEventListener("error", callback);
+		};
+
 		socket.onMessage = (
 			callback: (result: WebSocketMessageResult<E>) => void,
 		) => {
@@ -539,6 +579,30 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		}
 	}
 
+	private async tryStream<E extends StreamContract>(
+		contract: E,
+		...args: FetchArgs<E>
+	): Promise<ApiResult<E>> {
+		try {
+			const data = await this.stream(contract, ...args);
+			return { success: true, data };
+		} catch (error) {
+			return { success: false, error: error as ApiClientError<E> };
+		}
+	}
+
+	private tryConnect<E extends WebSocketContract>(
+		contract: E,
+		...args: ConnectArgs<E>
+	): ApiClientResult<E, ContractWebSocket<E>> {
+		try {
+			const data = this.connect(contract, ...args);
+			return { success: true, data };
+		} catch (error) {
+			return { success: false, error: error as ApiClientError<E> };
+		}
+	}
+
 	private buildApiClient = () =>
 		mapContractTree(this.contracts, (node) => {
 			if (isWebSocketContractNode(node)) {
@@ -546,6 +610,8 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 					$contract: node,
 					connect: (...args: ConnectArgs<typeof node>) =>
 						this.connect(node, ...args),
+					tryConnect: (...args: ConnectArgs<typeof node>) =>
+						this.tryConnect(node, ...args),
 				};
 			}
 
@@ -554,8 +620,12 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 					$contract: node,
 					stream: (...args: FetchArgs<typeof node>) =>
 						this.stream(node, ...args),
+					tryStream: (...args: FetchArgs<typeof node>) =>
+						this.tryStream(node, ...args),
 					subscribe: (...args: Parameters<SubscribeFn<typeof node>>) =>
 						this.subscribe(node, ...args),
+					trySubscribe: (...args: Parameters<SubscribeFn<typeof node>>) =>
+						this.trySubscribe(node, ...args),
 				};
 			}
 
