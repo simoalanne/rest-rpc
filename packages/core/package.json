@@ -1,6 +1,6 @@
 {
 	"name": "@contract-first-api/core",
-	"version": "4.3.0",
+	"version": "4.4.0",
 	"type": "module",
 	"description": "Define shared API contracts and derive typed request and response helpers from Zod schemas.",
 	"keywords": [
