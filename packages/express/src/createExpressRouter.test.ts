@@ -660,4 +660,233 @@ describe("initServer", () => {
 			writableEnded: true,
 		});
 	});
+
+	it("should not run nonRaw middleware for raw request contracts", async () => {
+		const { defineContractTree } = initContracts();
+		const contracts = defineContractTree({
+			uploads: {
+				create: {
+					method: "POST",
+					path: "/uploads/:id",
+					request: {
+						params: z.object({ id: z.string() }),
+					},
+					options: { mode: "raw" },
+				},
+			},
+		});
+
+		const { createContractModeMiddleware } = initServer<typeof contracts>();
+		let middlewareCalls = 0;
+		const wrappedMiddleware = createContractModeMiddleware({
+			contracts,
+			nonRaw: (req, _res, next) => {
+				middlewareCalls += 1;
+				(req as typeof req & { parsedByJson?: boolean }).parsedByJson = true;
+				next();
+			},
+			routePrefix: "/api",
+		});
+
+		let nextCalled = false;
+		await wrappedMiddleware(
+			{
+				method: "POST",
+				path: "/api/uploads/file-1",
+			} as never,
+			{} as never,
+			() => {
+				nextCalled = true;
+			},
+		);
+
+		assert.equal(nextCalled, true);
+		assert.equal(middlewareCalls, 0);
+	});
+
+	it("should run nonRaw middleware for non-raw contracts", async () => {
+		const { defineContractTree } = initContracts();
+		const contracts = defineContractTree({
+			posts: {
+				create: {
+					method: "POST",
+					path: "/posts",
+					request: {
+						body: z.object({ title: z.string() }),
+					},
+				},
+			},
+		});
+
+		const { createContractModeMiddleware } = initServer<typeof contracts>();
+		let middlewareCalls = 0;
+		const wrappedMiddleware = createContractModeMiddleware({
+			contracts,
+			nonRaw: (_req, _res, next) => {
+				middlewareCalls += 1;
+				next();
+			},
+		});
+
+		let nextCalled = false;
+		await wrappedMiddleware(
+			{
+				method: "POST",
+				path: "/posts",
+			} as never,
+			{} as never,
+			() => {
+				nextCalled = true;
+			},
+		);
+
+		assert.equal(nextCalled, true);
+		assert.equal(middlewareCalls, 1);
+	});
+
+	it("should route requests to raw and non-raw middlewares based on contract mode", async () => {
+		const { defineContractTree } = initContracts();
+		const contracts = defineContractTree({
+			uploads: {
+				create: {
+					method: "POST",
+					path: "/uploads",
+					options: { mode: "raw" },
+				},
+			},
+			posts: {
+				create: {
+					method: "POST",
+					path: "/posts",
+					request: {
+						body: z.object({ title: z.string() }),
+					},
+				},
+			},
+		});
+
+		const { createContractModeMiddleware } = initServer<typeof contracts>();
+		const seenCalls: string[] = [];
+		const middleware = createContractModeMiddleware({
+			contracts,
+			raw: (_req, _res, next) => {
+				seenCalls.push("raw");
+				next();
+			},
+			nonRaw: (_req, _res, next) => {
+				seenCalls.push("nonRaw");
+				next();
+			},
+			routePrefix: "/api",
+		});
+
+		await middleware(
+			{
+				method: "POST",
+				path: "/api/uploads",
+			} as never,
+			{} as never,
+			() => {},
+		);
+		await middleware(
+			{
+				method: "POST",
+				path: "/api/posts",
+			} as never,
+			{} as never,
+			() => {},
+		);
+
+		assert.deepStrictEqual(seenCalls, ["raw", "nonRaw"]);
+	});
+
+	it("should prefer the most specific matching contract when selecting middleware", async () => {
+		const { defineContractTree } = initContracts();
+		const contracts = defineContractTree({
+			uploads: {
+				byId: {
+					method: "POST",
+					path: "/uploads/:id",
+					options: { mode: "raw" },
+				},
+				static: {
+					method: "POST",
+					path: "/uploads/static",
+					request: {
+						body: z.object({ title: z.string() }),
+					},
+				},
+			},
+		});
+
+		const { createContractModeMiddleware } = initServer<typeof contracts>();
+		const seenCalls: string[] = [];
+		const middleware = createContractModeMiddleware({
+			contracts,
+			raw: (_req, _res, next) => {
+				seenCalls.push("raw");
+				next();
+			},
+			nonRaw: (_req, _res, next) => {
+				seenCalls.push("nonRaw");
+				next();
+			},
+			routePrefix: "/api",
+		});
+
+		await middleware(
+			{
+				method: "POST",
+				path: "/api/uploads/static",
+			} as never,
+			{} as never,
+			() => {},
+		);
+
+		assert.deepStrictEqual(seenCalls, ["nonRaw"]);
+	});
+
+	it("should skip both middlewares when the request does not match a contract route", async () => {
+		const { defineContractTree } = initContracts();
+		const contracts = defineContractTree({
+			posts: {
+				create: {
+					method: "POST",
+					path: "/posts",
+					request: {
+						body: z.object({ title: z.string() }),
+					},
+				},
+			},
+		});
+
+		const { createContractModeMiddleware } = initServer<typeof contracts>();
+		const seenCalls: string[] = [];
+		const middleware = createContractModeMiddleware({
+			contracts,
+			raw: (_req, _res, next) => {
+				seenCalls.push("raw");
+				next();
+			},
+			nonRaw: (_req, _res, next) => {
+				seenCalls.push("nonRaw");
+				next();
+			},
+		});
+
+		let nextCalled = false;
+		await middleware(
+			{
+				method: "POST",
+				path: "/custom-upload",
+			} as never,
+			{} as never,
+			() => {
+				nextCalled = true;
+			},
+		);
+
+		assert.equal(nextCalled, true);
+		assert.deepStrictEqual(seenCalls, []);
+	});
 });

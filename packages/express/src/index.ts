@@ -1,4 +1,5 @@
 export type {
+	ContractModeMiddlewareOptions,
 	ContractWebSocket,
 	RequestWithContract,
 	WebSocketMessageResult,

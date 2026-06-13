@@ -5,8 +5,9 @@ Wrap a typed `ApiClient` tree with React Query hooks and cache helpers.
 This package does not define contracts or make a client by itself. It consumes
 the `client.api` tree from `@contract-first-api/api-client`, keeps the same
 shape, and replaces each contract node with React Query-friendly helpers. JSON
-contracts become query/mutation helpers, stream contracts expose stream helpers,
-and websocket contracts expose connect helpers.
+contracts become query/mutation helpers, raw request contracts expose direct
+fetch helpers, stream contracts expose stream helpers, and websocket contracts
+expose connect helpers.
 
 ## Install
 
@@ -212,6 +213,23 @@ await api.todos.create.$fetch(
 	{ title: "Write docs" },
 	{ signal: abortController.signal },
 );
+```
+
+## Raw Request Contracts
+
+Raw request contracts are not wrapped as React Query queries or mutations. They
+expose:
+
+- `$contract`
+- `$fetch`
+- `$tryFetch`
+
+Use them directly when you need to pass an untyped `rawBody` payload:
+
+```ts
+const result = await api.images.inspect.$fetch({
+	rawBody: file,
+});
 ```
 
 ## Streaming Contracts

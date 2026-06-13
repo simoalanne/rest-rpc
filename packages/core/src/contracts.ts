@@ -10,6 +10,8 @@ export type RequestSchema = {
 	params?: z.ZodObject;
 };
 
+export type RawRequestBody = unknown;
+
 export type KnownErrorSchema = z.ZodObject<{
 	code: z.ZodLiteral<string>;
 	status?: z.ZodLiteral<number>;
@@ -19,7 +21,7 @@ export type KnownErrors = KnownErrorSchema | readonly KnownErrorSchema[];
 export type ResponseSchema = z.ZodType;
 
 export type ContractOptions = {
-	mode?: "json" | "stream" | "websocket";
+	mode?: "json" | "raw" | "stream" | "websocket";
 	streamFormat?: "ndjson";
 };
 
@@ -36,6 +38,14 @@ export type JsonContract<TMeta = unknown> = BaseContract<TMeta> & {
 	successStatusCode?: number;
 	errors?: KnownErrors;
 	options?: { mode?: "json" };
+};
+
+export type RawRequestContract<TMeta = unknown> = BaseContract<TMeta> & {
+	response?: ResponseSchema;
+	request?: Omit<RequestSchema, "body">;
+	successStatusCode?: number;
+	errors?: KnownErrors;
+	options: { mode: "raw" };
 };
 
 export type StreamContract<TMeta = unknown> = BaseContract<TMeta> & {
@@ -57,6 +67,7 @@ export type WebSocketContract<TMeta = unknown> = BaseContract<TMeta> & {
 
 export type Contract<TMeta = unknown> =
 	| JsonContract<TMeta>
+	| RawRequestContract<TMeta>
 	| StreamContract<TMeta>
 	| WebSocketContract<TMeta>;
 
@@ -140,6 +151,12 @@ export type ContractResponse<E extends Contract> = E extends {
 
 export type IsStreamContract<E extends Contract> = E extends {
 	options: { mode: "stream" };
+}
+	? true
+	: false;
+
+export type IsRawRequestContract<E extends Contract> = E extends {
+	options: { mode: "raw" };
 }
 	? true
 	: false;

@@ -21,6 +21,71 @@ const server = createServer(app);
 const port = Number(process.env.PORT ?? 3001);
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const inspectImageBuffer = (buffer: Buffer) => {
+	if (buffer.length < 10) {
+		throw new Error("Image file is too small to inspect.");
+	}
+
+	// PNG: width and height are stored in the IHDR chunk.
+	if (
+		buffer.length >= 24 &&
+		buffer[0] === 0x89 &&
+		buffer[1] === 0x50 &&
+		buffer[2] === 0x4e &&
+		buffer[3] === 0x47
+	) {
+		return {
+			width: buffer.readUInt32BE(16),
+			height: buffer.readUInt32BE(20),
+		};
+	}
+
+	// GIF: logical screen width/height are little-endian at bytes 6-9.
+	if (
+		buffer.length >= 10 &&
+		buffer.toString("ascii", 0, 3) === "GIF"
+	) {
+		return {
+			width: buffer.readUInt16LE(6),
+			height: buffer.readUInt16LE(8),
+		};
+	}
+
+	// JPEG: scan for a Start Of Frame marker that carries dimensions.
+	if (buffer[0] === 0xff && buffer[1] === 0xd8) {
+		let offset = 2;
+
+		while (offset < buffer.length) {
+			if (buffer[offset] !== 0xff) {
+				offset += 1;
+				continue;
+			}
+
+			const marker = buffer[offset + 1];
+			if (marker === undefined) break;
+
+			if (marker === 0xd9 || marker === 0xda) {
+				break;
+			}
+
+			const blockLength = buffer.readUInt16BE(offset + 2);
+			if (
+				[0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd,
+					0xce, 0xcf].includes(marker)
+			) {
+				return {
+					height: buffer.readUInt16BE(offset + 5),
+					width: buffer.readUInt16BE(offset + 7),
+				};
+			}
+
+			offset += 2 + blockLength;
+		}
+	}
+
+	throw new Error("Only PNG, JPEG, and GIF images are supported in the example.");
+};
+
 const todos: ApiResponse<"todos.create">[] = [
 	{
 		id: "todo-1",
@@ -50,10 +115,16 @@ const broadcastDiscussMessage = (message: DiscussMessage) => {
 	}
 };
 
-const { defineService, defineMiddleware, createRouter } = initServer<
+const serverTools = initServer<
 	typeof allContracts,
 	RequestContext
 >();
+const {
+	defineService,
+	defineMiddleware,
+	createContractModeMiddleware,
+	createRouter,
+} = serverTools;
 
 const openApiDocument = createOpenApiDocument<ExampleContractMeta>(allContracts, {
 	info: {
@@ -165,6 +236,17 @@ const services = {
 			};
 		},
 	}),
+	images: defineService("images", {
+		inspect({ rawBody }) {
+			if (!Buffer.isBuffer(rawBody)) {
+				throw new Error(
+					"Expected a parsed raw request body. Add express.raw() middleware for image uploads.",
+				);
+			}
+
+			return inspectImageBuffer(rawBody);
+		},
+	}),
 	discuss: defineService("discuss", {
 		connect({ socket }) {
 			discussSockets.add(socket);
@@ -194,7 +276,17 @@ const services = {
 	}),
 };
 
-app.use(express.json());
+app.use(
+	createContractModeMiddleware({
+		contracts: allContracts,
+		nonRaw: express.json(),
+		raw: express.raw({
+			type: ["image/png", "image/jpeg", "image/gif"],
+			limit: "10mb",
+		}),
+		routePrefix: "/api",
+	}),
+);
 app.get("/openapi.json", (_req, res) => {
 	res.json(openApiDocument);
 });

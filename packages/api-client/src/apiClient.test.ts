@@ -251,6 +251,56 @@ describe("ApiClient", () => {
 		}
 	});
 
+	it("should send raw request bodies for raw contracts without query or params", async () => {
+		const received: {
+			method?: string;
+			url?: string;
+			bodyText?: string;
+			headers?: Record<string, string | string[] | undefined>;
+		} = {};
+
+		const server = await startServer((req) => {
+			received.method = req.method;
+			received.url = req.url;
+			received.bodyText = req.bodyText;
+			received.headers = req.headers;
+			return { body: { ok: true } };
+		});
+
+		try {
+			const contracts = {
+				images: {
+					inspect: {
+						path: "/images/inspect",
+						method: "POST",
+						options: { mode: "raw" },
+						response: z.object({ ok: z.literal(true) }),
+					},
+				},
+			} as const;
+
+			const client = new ApiClient({
+				baseUrl: server.baseUrl,
+				contracts,
+			});
+
+			const result = await client.api.images.inspect.fetch({
+				rawBody: "image-bytes",
+			});
+
+			assert.deepStrictEqual(result, { ok: true });
+			assert.equal(received.method, "POST");
+			assert.equal(received.url, "/images/inspect");
+			assert.equal(received.bodyText, "image-bytes");
+			assert.notEqual(
+				received.headers?.["content-type"],
+				"application/json",
+			);
+		} finally {
+			await server.close();
+		}
+	});
+
 	it("should parse known HTTP errors and return them from tryFetch", async () => {
 		const server = await startServer(() => ({
 			status: 409,

@@ -36,6 +36,9 @@ type RequestContext = {
 };
 
 const app = express();
+
+// JSON parsing middleware must be registered before createRouter(). See below how
+// to handle body parsing when you have mixed raw and non-raw contracts.
 app.use(express.json());
 
 const { createRouter, defineMiddleware, defineService } = initServer<
@@ -103,6 +106,62 @@ createRouter({
 	}),
 });
 ```
+
+If your contract tree includes raw request body contracts, you can use
+`createContractModeMiddleware()` from `initServer()` to choose different
+body-parsing middleware for raw and non-raw routes without hardcoding paths:
+
+```ts
+import express from "express";
+import { initServer } from "@contract-first-api/express";
+import { contracts } from "@example/shared";
+
+const app = express();
+const { createContractModeMiddleware, createRouter } = initServer<typeof contracts>();
+
+// Non-contract raw routes can be mounted before contract-aware parsing.
+app.use("/some-raw-route", someRawRouteHandler);
+
+// createContractModeMiddleware looks at the contract tree to decide which body parser to run.
+// If all contract routes use the same body format, you can use express.json() or express.raw() directly and skip
+// createContractModeMiddleware().
+app.use(
+	createContractModeMiddleware({
+		contracts,
+		nonRaw: express.json(),
+		raw: express.raw({
+			type: ["image/png", "image/jpeg", "image/gif"],
+		}),
+		routePrefix: "/api",
+	}),
+);
+
+createRouter({
+	app,
+	contracts,
+	services,
+	routePrefix: "/api",
+});
+
+// Non-contract JSON routes can still opt into JSON parsing afterwards.
+app.use(express.json());
+app.use("/some-json-route", someJsonRouteHandler);
+```
+
+`createContractModeMiddleware()` only looks at routes in the provided contract
+tree:
+
+- if the request matches a contract route with `options: { mode: "raw" }`, it runs `raw`
+- if the request matches any other contract route, it runs `nonRaw`
+- if the request does not match any contract route, it runs neither middleware and calls `next()`
+
+Route matching uses the same specificity rules as `createRouter()`, so more
+specific contract paths win over parameterized ones.
+
+For caller-owned routes outside the contract tree, mount whatever body parser
+they need directly on those routes. If you want those routes to stay completely
+independent from contract-aware body parsing, register them separately and do
+not rely on `createContractModeMiddleware()` to handle them.
 
 ## Services
 

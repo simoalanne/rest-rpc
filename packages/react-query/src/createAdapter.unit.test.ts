@@ -122,6 +122,17 @@ const createApiTree = () =>
 					return { refreshed: true };
 				},
 			),
+			upload: createNode(
+				{
+					method: "POST",
+					path: "/items/upload",
+					options: { mode: "raw" },
+				},
+				async (...args: unknown[]) => {
+					uploadFetchCalls.push(args);
+					return { uploaded: true };
+				},
+			),
 			failing: createNode(
 				{ method: "GET", path: "/items/failing" },
 				async (...args: unknown[]) => {
@@ -158,6 +169,7 @@ let listFetchCalls: unknown[][] = [];
 let byIdFetchCalls: unknown[][] = [];
 let createFetchCalls: unknown[][] = [];
 let refreshFetchCalls: unknown[][] = [];
+let uploadFetchCalls: unknown[][] = [];
 let failingFetchCalls: unknown[][] = [];
 const failingError = new Error("boom");
 
@@ -176,6 +188,7 @@ const resetState = () => {
 	byIdFetchCalls = [];
 	createFetchCalls = [];
 	refreshFetchCalls = [];
+	uploadFetchCalls = [];
 	failingFetchCalls = [];
 };
 
@@ -199,6 +212,10 @@ describe("createAdapter", () => {
 		assert.equal(typeof wrapped.items.list.clear, "function");
 		assert.equal(typeof wrapped.items.list.setData, "function");
 		assert.equal("$reactQueryApi" in wrapped.items.list, false);
+		assert.equal(typeof wrapped.items.upload.$fetch, "function");
+		assert.equal(typeof wrapped.items.upload.$tryFetch, "function");
+		assert.equal("useQuery" in wrapped.items.upload, false);
+		assert.equal("useMutation" in wrapped.items.upload, false);
 		assert.equal(wrapped.items.events.$contract.path, "/items/events");
 		assert.equal(typeof wrapped.items.events.$stream, "function");
 		assert.equal(typeof wrapped.items.events.$subscribe, "function");
@@ -311,6 +328,22 @@ describe("createAdapter", () => {
 
 		assert.deepStrictEqual(byIdFetchCalls, [[request, fetchOptions]]);
 		assert.deepStrictEqual(listFetchCalls, [[fetchOptions]]);
+	});
+
+	it("should treat raw contracts as fetch-only wrappers", async () => {
+		resetState();
+
+		const createAdapter = await getCreateAdapter();
+		const wrapped = createAdapter(
+			createApiTree(),
+			createQueryClientMock() as any,
+		);
+
+		await wrapped.items.upload.$fetch({ rawBody: "payload" } as any);
+
+		assert.deepStrictEqual(uploadFetchCalls, [[{ rawBody: "payload" }, undefined]]);
+		assert.equal(useMutationCalls.length, 0);
+		assert.equal(useQueryCalls.length, 0);
 	});
 
 	it("should return success and failure results from tryFetch", async () => {

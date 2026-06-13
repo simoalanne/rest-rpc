@@ -22,6 +22,10 @@ input {
 	font: inherit;
 }
 
+input[type="file"] {
+	max-width: 100%;
+}
+
 button {
 	cursor: pointer;
 }
@@ -86,6 +90,7 @@ pre {
 }
 
 .todo-form,
+.upload-form,
 .discuss-form,
 .section-heading {
 	display: flex;
@@ -96,6 +101,7 @@ pre {
 }
 
 .todo-form input,
+.upload-form input,
 .discuss-form input {
 	flex: 1;
 	padding: 0.8rem 0.9rem;
@@ -105,6 +111,7 @@ pre {
 }
 
 .todo-form button,
+.upload-form button,
 .discuss-form button,
 .section-heading button {
 	padding: 0.8rem 1rem;
@@ -115,9 +122,24 @@ pre {
 }
 
 .todo-form button:disabled,
+.upload-form button:disabled,
 .discuss-form button:disabled {
 	opacity: 0.7;
 	cursor: progress;
+}
+
+.helper-copy {
+	margin: 0 0 1rem;
+	color: #5c6d79;
+}
+
+.image-preview {
+	display: block;
+	width: min(100%, 18rem);
+	margin-bottom: 1rem;
+	border: 1px solid rgba(19, 33, 44, 0.12);
+	border-radius: 18px;
+	background: rgba(255, 255, 255, 0.82);
 }
 
 .error {
@@ -223,6 +245,7 @@ pre {
 
 @media (max-width: 640px) {
 	.todo-form,
+	.upload-form,
 	.discuss-form,
 	.section-heading {
 		flex-direction: column;

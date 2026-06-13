@@ -4,6 +4,8 @@ import {
 	type ContractError,
 	type ContractMetaOf,
 	type ContractRequest,
+	type RawRequestBody,
+	type RawRequestContract,
 	type ContractResponse,
 	type ContractTree,
 	flattenContractTree,
@@ -11,7 +13,13 @@ import {
 	type HttpMethod,
 	type WebSocketContract,
 } from "@contract-first-api/core/contracts";
-import type { Application, NextFunction, Request, Response } from "express";
+import type {
+	Application,
+	NextFunction,
+	Request,
+	RequestHandler,
+	Response,
+} from "express";
 import {
 	type ContractWebSocket,
 	registerWebSocketRoutes,
@@ -60,6 +68,11 @@ export type ServiceRequest<
 			RequestValue<E> &
 				ContextValue<TContext> & { socket: ContractWebSocket<E> }
 		>
+	: E extends RawRequestContract
+		? Merge<
+				RequestValue<E> &
+					ContextValue<TContext> & { rawBody: RawRequestBody }
+			>
 	: Merge<RequestValue<E> & ContextValue<TContext>>;
 
 export type ServiceResponse<E extends Contract> = ContractResponse<E>;
@@ -157,10 +170,20 @@ export type ServerTools<
 > = {
 	defineService: DefineService<TContracts, TContext>;
 	defineMiddleware: DefineMiddleware<TMeta>;
+	createContractModeMiddleware: (
+		options: ContractModeMiddlewareOptions & { contracts: TContracts },
+	) => RequestHandler;
 	createRouter: (
 		options: CreateRouterOptions<TContracts, TContext, TMeta>,
 	) => Application;
 	throwKnownError: (error: AllKnownErrors<TContracts>) => never;
+};
+
+export type ContractModeMiddlewareOptions = {
+	contracts: ContractTree;
+	routePrefix?: string;
+	raw?: RequestHandler;
+	nonRaw?: RequestHandler;
 };
 
 class KnownContractError extends Error {
@@ -331,6 +354,10 @@ const isWebSocketContract = (
 	contract: Contract,
 ): contract is WebSocketContract => contract.options?.mode === "websocket";
 
+const isRawRequestContract = (
+	contract: Contract,
+): contract is RawRequestContract => contract.options?.mode === "raw";
+
 const escapeRegExp = (value: string) =>
 	value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -369,6 +396,53 @@ const buildRoutePath = (routePrefix: string | undefined, path: string) => {
 		? routePrefix.slice(0, -1)
 		: routePrefix;
 	return `${normalizedPrefix}${path}`;
+};
+
+type ResolvedContractRoute<TMeta = unknown> = Contract<TMeta> & {
+	keySegments: string[];
+	matchPath: ReturnType<typeof createPathMatcher>;
+	routePath: string;
+};
+
+const resolveContractRoutes = <TMeta = unknown>(
+	contracts: ContractTree<TMeta>,
+	routePrefix?: string,
+) =>
+	flattenContractTree(contracts)
+		.sort(compareRouteSpecificity)
+		.map((route) => {
+			const routePath = buildRoutePath(routePrefix, route.path);
+			return {
+				...route,
+				routePath,
+				matchPath: createPathMatcher(routePath),
+			};
+		}) as Array<ResolvedContractRoute<TMeta>>;
+
+const createContractModeMiddleware = <TContracts extends ContractTree>(
+	options: ContractModeMiddlewareOptions & { contracts: TContracts },
+): RequestHandler => {
+	const routes = resolveContractRoutes(options.contracts, options.routePrefix);
+
+	return (req, res, next) => {
+		const pathname = req.path;
+		const matchedRoute = routes.find(
+			(route) =>
+				route.method === req.method && route.matchPath(pathname) !== null,
+		);
+		const middleware = matchedRoute
+			? isRawRequestContract(matchedRoute)
+				? options.raw
+				: options.nonRaw
+			: null;
+
+		if (!middleware) {
+			next();
+			return;
+		}
+
+		return middleware(req, res, next);
+	};
 };
 
 const getRouteHandler = (services: unknown, path: string[]) =>
@@ -414,11 +488,9 @@ const createRouter = <
 	createContext,
 	middlewares = [],
 }: CreateRouterOptions<TContracts, TContext, TMeta>) => {
-	const routes = flattenContractTree(contracts).sort(
-		compareRouteSpecificity,
-	) as Array<Contract<TMeta> & { keySegments: string[] }>;
+	const routes = resolveContractRoutes(contracts, routePrefix);
 	const webSocketRoutes = routes.filter(
-		(route): route is WebSocketContract<TMeta> & { keySegments: string[] } =>
+		(route): route is ResolvedContractRoute<TMeta> & WebSocketContract<TMeta> =>
 			isWebSocketContract(route),
 	);
 
@@ -447,13 +519,12 @@ const createRouter = <
 	for (const route of routes) {
 		if (isWebSocketContract(route)) continue;
 
-		const method = route.method.toLowerCase() as Lowercase<HttpMethod>;
-		const handler = getRouteHandler(services, route.keySegments);
-		const routePath = buildRoutePath(routePrefix, route.path);
-		const requestPreparationMiddleware = prepareRequest(route);
-		const registeredMiddlewares = middlewares as Array<
-			(req: Request, res: Response, next: NextFunction) => unknown
-		>;
+			const method = route.method.toLowerCase() as Lowercase<HttpMethod>;
+			const handler = getRouteHandler(services, route.keySegments);
+			const requestPreparationMiddleware = prepareRequest(route);
+			const registeredMiddlewares = middlewares as Array<
+				(req: Request, res: Response, next: NextFunction) => unknown
+			>;
 
 		const serviceHandler = async (req: Request, res: Response) => {
 			const input = req.validatedRequest;
@@ -466,6 +537,9 @@ const createRouter = <
 				const result = await handler({
 					...input,
 					context,
+					...(isRawRequestContract(route)
+						? { rawBody: req.body as RawRequestBody }
+						: {}),
 				});
 				const hasResponse = "response" in route && Boolean(route.response);
 				const statusCode = getSuccessStatusCode(route, hasResponse);
@@ -490,11 +564,11 @@ const createRouter = <
 			}
 		};
 
-		app[method](
-			routePath,
-			requestPreparationMiddleware,
-			...registeredMiddlewares,
-			serviceHandler,
+			app[method](
+				route.routePath,
+				requestPreparationMiddleware,
+				...registeredMiddlewares,
+				serviceHandler,
 		);
 	}
 
@@ -508,6 +582,7 @@ export const initServer = <
 >(): ServerTools<TContracts, TContext, TMeta> => ({
 	defineService: (_path, service) => service,
 	defineMiddleware: (middleware) => middleware,
+	createContractModeMiddleware: (options) => createContractModeMiddleware(options),
 	createRouter: (options) => createRouter<TContracts, TContext, TMeta>(options),
 	throwKnownError: (error) => {
 		throw new KnownContractError(error);

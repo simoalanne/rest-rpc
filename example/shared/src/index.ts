@@ -138,10 +138,25 @@ export const discussContracts = defineContractTree({
 	},
 });
 
+export const imageContracts = defineContractTree({
+	images: {
+		inspect: {
+			method: "POST",
+			path: "/images/inspect",
+			options: { mode: "raw" },
+			response: z.object({
+				width: z.number(),
+				height: z.number(),
+			}),
+		},
+	},
+});
+
 export const allContracts = {
 	...healthContract,
 	...todoContracts,
 	...discussContracts,
+	...imageContracts,
 };
 
 export type ExampleContracts = typeof allContracts;
@@ -169,3 +184,4 @@ export type FindTodosResponse = ApiResponse<"todos.find">;
 export type DiscussMessage = z.infer<typeof discussMessageSchema>;
 export type DiscussClientMessage = z.infer<typeof discussClientMessageSchema>;
 export type DiscussServerMessage = z.infer<typeof discussServerMessageSchema>;
+export type InspectImageResponse = ApiResponse<"images.inspect">;

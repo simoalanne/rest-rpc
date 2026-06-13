@@ -93,7 +93,7 @@ Each contract can define:
 | --- | --- |
 | `method` | HTTP method: `GET`, `POST`, `PUT`, `DELETE`, or `PATCH`. |
 | `path` | HTTP path, with params using `:paramValue` syntax. |
-| `request` | Optional Zod schemas for `body`, `query`, and `params`. |
+| `request` | Optional Zod schemas for `body`, `query`, and `params`. Raw request contracts can only define `query` and `params`. |
 | `response` | Optional Zod schema for the successful JSON response body, or required stream chunk schema for stream contracts. |
 | `successStatusCode` | Optional successful HTTP status code override for JSON and stream contracts. |
 | `errors` | Optional known error schema or array of known error schemas for JSON and stream contracts. |
@@ -107,11 +107,14 @@ separate schema compiler step.
 
 ## Contract Types
 
-Contracts have three explicit shapes:
+Contracts have four explicit shapes:
 
 - **JSON contracts** are the default. `options` can be omitted or set to
   `{ mode: "json" }`. They can define request schemas, an optional `response`
   schema, known errors, and metadata.
+- **Raw request contracts** use `options: { mode: "raw" }`. They can define
+  `query`, `params`, an optional `response`, known errors, and metadata, but
+  they do not define a contract-managed request `body` schema.
 - **Stream contracts** use `options: { mode: "stream" }`. They must define a
   `response` schema, which describes each NDJSON chunk.
 - **WebSocket contracts** use `options: { mode: "websocket" }`. They must use
@@ -120,8 +123,8 @@ Contracts have three explicit shapes:
   happens through websocket messages and close events.
 
 The integration packages use the contract mode to expose the right API. JSON
-contracts expose fetch helpers, stream contracts expose stream helpers, and
-websocket contracts expose connect helpers.
+and raw request contracts expose fetch helpers, stream contracts expose stream
+helpers, and websocket contracts expose connect helpers.
 
 ## Request Schemas
 
@@ -169,6 +172,41 @@ on typed service/client inputs.
 
 Request field names must be unique across `body`, `query`, and `params` for a
 single contract. This avoids ambiguous flat inputs.
+
+## Raw Request Contracts
+
+Raw request contracts are useful when the request body should be passed through
+without contract-level validation, but you still want typed params, query,
+responses, and known errors.
+
+```ts
+const contracts = defineContractTree({
+	images: {
+		analyze: {
+			method: "POST",
+			path: "/images/:imageId/analyze",
+			request: {
+				params: z.object({
+					imageId: z.string(),
+				}),
+				query: z.object({
+					profile: z.enum(["fast", "accurate"]).optional(),
+				}),
+			},
+			options: { mode: "raw" },
+			response: z.object({
+				width: z.number(),
+				height: z.number(),
+				format: z.string(),
+			}),
+		},
+	},
+});
+```
+
+The integration packages still expose a flat request shape for `params` and
+`query`. The raw request body itself is an explicit escape hatch handled by the
+integration packages rather than by a Zod body schema.
 
 ## Responses
 

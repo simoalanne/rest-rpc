@@ -9,6 +9,8 @@ import type {
 	IsStreamContract,
 	IsWebSocketContract,
 	JsonContract,
+	RawRequestBody,
+	RawRequestContract,
 	StreamContract,
 	WebSocketContract,
 } from "@contract-first-api/core/contracts";
@@ -30,10 +32,20 @@ export type ApiClientError<E extends Contract> =
 	| (ContractError<E> & { status?: number })
 	| ApiClientUnknownError;
 
+type Merge<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
+
+type ClientRequest<E extends Contract> = E extends RawRequestContract
+	? Merge<
+			(ContractRequest<E> extends never ? Record<never, never> : ContractRequest<E>) & {
+				rawBody: RawRequestBody;
+			}
+		>
+	: ContractRequest<E>;
+
 export type FetchArgs<E extends Contract = Contract> =
-	ContractRequest<E> extends never
+	ClientRequest<E> extends never
 		? [options?: FetchOptions]
-		: [request: ContractRequest<E>, options?: FetchOptions];
+		: [request: ClientRequest<E>, options?: FetchOptions];
 
 export type FetchFn<E extends Contract> = (
 	...args: FetchArgs<E>
@@ -166,6 +178,10 @@ const isApiClientContractNode = (
 const isStreamContractNode = (contract: Contract): contract is StreamContract =>
 	contract.options?.mode === "stream";
 
+const isRawRequestContractNode = (
+	contract: Contract,
+): contract is RawRequestContract => contract.options?.mode === "raw";
+
 const isWebSocketContractNode = (
 	contract: Contract,
 ): contract is WebSocketContract => contract.options?.mode === "websocket";
@@ -186,6 +202,9 @@ const createRequestSignal = (
 		cleanup: () => clearTimeout(timeoutId),
 	};
 };
+
+const takesRequestInput = (contract: Contract) =>
+	Boolean(contract.request) || isRawRequestContractNode(contract);
 
 type GetHeadersFn = () =>
 	| Record<string, string>
@@ -229,6 +248,11 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 
 		return Object.entries(args).reduce(
 			(acc, [k, v]) => {
+				if (k === "rawBody") {
+					acc.rawBody = v as RawRequestBody;
+					return acc;
+				}
+
 				const bucket = keyMap.get(k);
 				if (bucket) {
 					if (!acc[bucket]) acc[bucket] = {};
@@ -247,6 +271,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 				body?: Record<string, unknown>;
 				query?: Record<string, unknown>;
 				params?: Record<string, unknown>;
+				rawBody?: RawRequestBody;
 			},
 		);
 	}
@@ -254,11 +279,14 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 	private constructBaseRequest(
 		contract: Contract,
 		args?: RuntimeArgs,
-	): { url: string; body?: unknown } {
+	): { url: string; body?: BodyInit | null } {
 		let urlBase = `${this.baseUrl}${contract.path}`;
 		if (!args) return { url: urlBase };
 
-		const { body, query, params } = this.groupKeysToRequest(args, contract);
+		const { body, query, params, rawBody } = this.groupKeysToRequest(
+			args,
+			contract,
+		);
 		if (params) {
 			for (const [k, v] of Object.entries(params)) {
 				urlBase = urlBase.replace(`:${k}`, encodeURIComponent(String(v)));
@@ -275,11 +303,18 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 			urlBase += `?${new URLSearchParams(query as Record<string, string>)}`;
 		}
 
-		return { url: urlBase, body };
+		if (isRawRequestContractNode(contract)) {
+			return { url: urlBase, body: rawBody as BodyInit | null | undefined };
+		}
+
+		return {
+			url: urlBase,
+			body: body ? JSON.stringify(body) : undefined,
+		};
 	}
 
 	private extractArgs(contract: Contract, args: unknown[]) {
-		const requestArgs = contract.request && args[0];
+		const requestArgs = takesRequestInput(contract) ? args[0] : undefined;
 		const options = requestArgs ? args[1] : args[0];
 		return { requestArgs, options } as {
 			requestArgs?: unknown;
@@ -288,7 +323,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 	}
 
 	private extractSubscribeArgs(contract: Contract, args: unknown[]) {
-		const requestArgs = contract.request && args[0];
+		const requestArgs = takesRequestInput(contract) ? args[0] : undefined;
 		const callbacks = requestArgs ? args[1] : args[0];
 		return { requestArgs, callbacks } as {
 			requestArgs?: unknown;
@@ -314,10 +349,12 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 				...this.fetchOptions,
 				...options,
 				method: contract.method,
-				body: body ? JSON.stringify(body) : undefined,
+				body,
 				headers: {
 					...headers,
-					...(body ? { "Content-Type": "application/json" } : {}),
+					...(body && !isRawRequestContractNode(contract)
+						? { "Content-Type": "application/json" }
+						: {}),
 				},
 				signal: signalState?.signal ?? options?.signal,
 			});
@@ -345,7 +382,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		}
 	}
 
-	private async fetch<E extends JsonContract>(
+	private async fetch<E extends JsonContract | RawRequestContract>(
 		contract: E,
 		...args: FetchArgs<E>
 	): Promise<ContractResponse<E>> {
@@ -446,7 +483,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		);
 		const controller = new AbortController();
 
-		const streamArgs = (contract.request
+		const streamArgs = (takesRequestInput(contract)
 			? [requestArgs, { signal: controller.signal }]
 			: [{ signal: controller.signal }]) as unknown as FetchArgs<E>;
 
@@ -503,7 +540,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 			};
 		}
 
-		const requestArgs = contract.request && args[0];
+		const requestArgs = takesRequestInput(contract) ? args[0] : undefined;
 		const { url } = this.constructBaseRequest(
 			contract,
 			requestArgs as RuntimeArgs,
@@ -567,7 +604,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		return socket;
 	}
 
-	private async tryFetch<E extends JsonContract>(
+	private async tryFetch<E extends JsonContract | RawRequestContract>(
 		contract: E,
 		...args: FetchArgs<E>
 	): Promise<ApiResult<E>> {

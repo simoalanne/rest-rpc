@@ -14,6 +14,7 @@ import type {
 	Contract,
 	ContractRequest,
 	ContractResponse,
+	RawRequestContract,
 } from "@contract-first-api/core/contracts";
 import {
 	type QueryClient,
@@ -123,6 +124,12 @@ type ReactQueryContractValue<E extends Contract> = {
 	$getKey: (request?: ContractRequest<E>) => QueryKey;
 };
 
+type ReactQueryFetchOnlyContractValue<E extends Contract> = {
+	$contract: E;
+	$fetch: (...args: FetchArgs<E>) => Promise<ContractResponse<E>>;
+	$tryFetch: (...args: FetchArgs<E>) => Promise<ApiResult<E>>;
+};
+
 type ReactQueryStreamContractValue<E extends Contract> = {
 	$contract: E;
 	$stream: ApiClientStreamContractValue<E>["stream"];
@@ -139,7 +146,9 @@ type ReactQueryWebSocketContractValue<E extends Contract> = {
 
 export type WrapContracts<T> = {
 	[K in keyof T]: T[K] extends ApiClientJsonContractValue<infer E>
-		? ReactQueryContractValue<E>
+		? E extends RawRequestContract
+			? ReactQueryFetchOnlyContractValue<E>
+			: ReactQueryContractValue<E>
 		: T[K] extends ApiClientStreamContractValue<infer E>
 			? ReactQueryStreamContractValue<E>
 			: T[K] extends ApiClientWebSocketContractValue<infer E>
@@ -156,6 +165,9 @@ export default function createAdapter<TApi extends ApiClientTree>(
 	const wrapNode = (node: ApiClientContractValue, path: string[] = []) => {
 		if ("connect" in node) return wrapWebSocketContractNode(node);
 		if (!("fetch" in node)) return wrapStreamContractNode(node);
+		if (node.$contract.options?.mode === "raw") {
+			return wrapFetchOnlyContractNode(node);
+		}
 		return wrapContractNode(node, path, queryClient);
 	};
 
@@ -165,26 +177,36 @@ export default function createAdapter<TApi extends ApiClientTree>(
 type RequestArgs = unknown[];
 type ContractCall = (...args: unknown[]) => Promise<unknown>;
 
+const takesRequestInput = (contract: Contract) =>
+	Boolean(contract.request) || contract.options?.mode === "raw";
+
 const readRequestArg = (contract: Contract, args: RequestArgs) =>
-	contract.request && args[0];
+	takesRequestInput(contract) ? args[0] : undefined;
 
 const readHookOptionsArg = (contract: Contract, args: RequestArgs) =>
-	(contract.request ? args[1] : args[0] || {}) as Record<string, unknown>;
+	(takesRequestInput(contract) ? args[1] : args[0] || {}) as Record<
+		string,
+		unknown
+	>;
 
 const readMutationVariablesArg = (contract: Contract, args: RequestArgs) =>
-	contract.request ? args[0] : undefined;
+	takesRequestInput(contract) ? args[0] : undefined;
 
 const readMutationHookOptionsArg = (
 	contract: Contract,
 	args: RequestArgs,
 ): Record<string, unknown> | undefined =>
-	(contract.request ? args[1] : args[0]) as Record<string, unknown> | undefined;
+	(takesRequestInput(contract) ? args[1] : args[0]) as
+		| Record<string, unknown>
+		| undefined;
 
 const readFetchOptionsArg = (
 	contract: Contract,
 	args: RequestArgs,
 ): FetchOptions | undefined =>
-	(contract.request ? args[1] : args[0]) as FetchOptions | undefined;
+	(takesRequestInput(contract) ? args[1] : args[0]) as
+		| FetchOptions
+		| undefined;
 
 const callContract = (
 	fn: ContractCall,
@@ -194,7 +216,7 @@ const callContract = (
 	const request = readRequestArg(contract, args);
 	const fetchOptions = readFetchOptionsArg(contract, args);
 
-	if (!contract.request) {
+	if (!takesRequestInput(contract)) {
 		return fn(fetchOptions);
 	}
 
@@ -217,6 +239,19 @@ const wrapWebSocketContractNode = (node: ApiClientWebSocketContractValue) => ({
 	$connect: node.connect,
 	$tryConnect: node.tryConnect,
 });
+
+const wrapFetchOnlyContractNode = (node: ApiClientJsonContractValue) => {
+	const fn = node.fetch as ContractCall;
+	const tryFn = node.tryFetch as ContractCall;
+	const contract = node.$contract;
+
+	return {
+		$contract: contract,
+		$fetch: async (...args: RequestArgs) => await callContract(fn, contract, args),
+		$tryFetch: async (...args: RequestArgs) =>
+			await callContract(tryFn, contract, args),
+	};
+};
 
 const buildMutation =
 	($fetch: (...args: RequestArgs) => Promise<unknown>, contract: Contract) =>

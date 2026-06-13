@@ -3,10 +3,11 @@
 Create a typed runtime client from a shared contract tree.
 
 This package consumes contracts from `@contract-first-api/core` and builds a
-client whose `api` property mirrors the contract tree. JSON contracts expose
-fetch helpers, stream contracts expose stream helpers, and websocket contracts
-expose connect helpers. It can be used directly in frontend code,
-server-to-server code, tests, or wrapped by `@contract-first-api/react-query`.
+client whose `api` property mirrors the contract tree. JSON and raw request
+contracts expose fetch helpers, stream contracts expose stream helpers, and
+websocket contracts expose connect helpers. It can be used directly in
+frontend code, server-to-server code, tests, or wrapped by
+`@contract-first-api/react-query`.
 
 ## Install
 
@@ -46,7 +47,7 @@ const created = await client.api.todos.create.fetch({
 });
 ```
 
-JSON contracts expose:
+JSON and raw request contracts expose:
 
 - `fetch(...)`: call the endpoint or throw on errors
 - `tryFetch(...)`: call the endpoint and return a success/error result
@@ -81,6 +82,20 @@ The client sorts those fields into the real HTTP request:
 
 Request field names must be unique across `body`, `query`, and `params` in the
 contract, so this flat input remains unambiguous.
+
+Raw request contracts keep the same flat request shape for `params` and
+`query`, but use an explicit `rawBody` field for the untyped request payload:
+
+```ts
+await client.api.images.analyze.fetch({
+	imageId: "img_1",
+	profile: "accurate",
+	rawBody: file,
+});
+```
+
+For raw request contracts, the client passes `rawBody` through as the request
+body without JSON serialization.
 
 ## Fetch Options
 

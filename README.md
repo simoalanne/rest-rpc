@@ -9,10 +9,11 @@ handlers, typed clients, optional React Query hooks, and OpenAPI documents.
 [![TanStack Query](https://img.shields.io/badge/TanStack_Query-5.0-FF4154?logo=reactquery&logoColor=white)](https://tanstack.com/query)
 
 `contract-first-api` is a small TypeScript toolkit for keeping JSON APIs,
-streams, and websockets aligned across your stack. You describe each endpoint
-as a plain contract object, then the rest of the packages use that same contract
-tree to validate requests, type server handlers, build a runtime client, and
-wrap that client with React Query or generate OpenAPI docs.
+raw-request endpoints, streams, and websockets aligned across your stack. You
+describe each endpoint as a plain contract object, then the rest of the
+packages use that same contract tree to validate requests, type server
+handlers, build a runtime client, and wrap that client with React Query or
+generate OpenAPI docs.
 
 The goal is to keep normal HTTP semantics while getting the developer
 experience people usually reach for RPC libraries to get: typed handlers, typed
@@ -80,6 +81,8 @@ From that tree:
   requirements, then read it from middleware or context creation.
 - **Known errors:** describe expected error payloads in the contract and handle
   them with typed client errors.
+- **Raw request routes:** opt into passthrough request bodies while keeping
+  typed params, query, responses, and known errors.
 - **Streaming:** model NDJSON endpoints with fetch streams.
 - **WebSockets:** model bidirectional JSON messages without leaving the
   contract tree.
@@ -171,10 +174,14 @@ export const contracts = defineContractTree({
 
 ## Contract Types
 
-Each contract is one of three shapes:
+Each contract is one of four shapes:
 
 - **JSON contracts** are the default. They can define request schemas, an
   optional response schema, and known errors.
+- **Raw request contracts** use `options: { mode: "raw" }`. They can define
+  `query` and `params`, but not a contract-defined request `body`. They are
+  useful when the request body should be passed through as-is while the
+  response stays typed.
 - **Stream contracts** use `options: { mode: "stream" }`. They must define a
   `response` schema, which describes each NDJSON chunk.
 - **WebSocket contracts** use `options: { mode: "websocket" }`. They use `GET`,
@@ -198,6 +205,34 @@ export const contracts = defineContractTree({
 					text: z.string(),
 				}),
 			},
+		},
+	},
+});
+```
+
+Raw request contracts keep typed params, query, responses, and known errors,
+but leave the request body as an explicit escape hatch:
+
+```ts
+export const contracts = defineContractTree({
+	images: {
+		analyze: {
+			method: "POST",
+			path: "/images/:imageId/analyze",
+			request: {
+				params: z.object({
+					imageId: z.string(),
+				}),
+				query: z.object({
+					profile: z.enum(["fast", "accurate"]).optional(),
+				}),
+			},
+			options: { mode: "raw" },
+			response: z.object({
+				width: z.number(),
+				height: z.number(),
+				format: z.string(),
+			}),
 		},
 	},
 });

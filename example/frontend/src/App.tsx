@@ -1,5 +1,5 @@
-import type { DiscussMessage, TodoEvent } from "@example/shared";
-import type { FormEvent } from "react";
+import type { DiscussMessage, InspectImageResponse, TodoEvent } from "@example/shared";
+import type { ChangeEvent, FormEvent } from "react";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { api } from "./api.ts";
 
@@ -36,6 +36,14 @@ export const App = () => {
 	const [title, setTitle] = useState("");
 	const [searchInput, setSearchInput] = useState("");
 	const [searchQuery, setSearchQuery] = useState("");
+	const [selectedImage, setSelectedImage] = useState<File | null>(null);
+	const [selectedImagePreviewUrl, setSelectedImagePreviewUrl] = useState<
+		string | null
+	>(null);
+	const [imageInspection, setImageInspection] =
+		useState<InspectImageResponse | null>(null);
+	const [imageInspectionError, setImageInspectionError] = useState<unknown>(null);
+	const [isInspectingImage, setIsInspectingImage] = useState(false);
 	const [activity, setActivity] = useState<TodoEvent[]>([]);
 	const [activityError, setActivityError] = useState<unknown>(null);
 	const [discussName, setDiscussName] = useState("Frontend user");
@@ -97,6 +105,20 @@ export const App = () => {
 		};
 	}, []);
 
+	useEffect(() => {
+		if (!selectedImage) {
+			setSelectedImagePreviewUrl(null);
+			return;
+		}
+
+		const objectUrl = URL.createObjectURL(selectedImage);
+		setSelectedImagePreviewUrl(objectUrl);
+
+		return () => {
+			URL.revokeObjectURL(objectUrl);
+		};
+	}, [selectedImage]);
+
 	const createTodo = api.todos.create.useMutation({
 		onSuccess: async () => {
 			setTitle("");
@@ -118,6 +140,35 @@ export const App = () => {
 	const onSearch = (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		setSearchQuery(searchInput.trim());
+	};
+
+	const onImageChange = (event: ChangeEvent<HTMLInputElement>) => {
+		const file = event.target.files?.[0] ?? null;
+		setSelectedImage(file);
+		setImageInspection(null);
+		setImageInspectionError(null);
+	};
+
+	const onInspectImage = async (event: FormEvent<HTMLFormElement>) => {
+		event.preventDefault();
+		if (!selectedImage) {
+			return;
+		}
+
+		setIsInspectingImage(true);
+		setImageInspection(null);
+		setImageInspectionError(null);
+
+		try {
+			const response = await api.images.inspect.$fetch({
+				rawBody: selectedImage,
+			});
+			setImageInspection(response);
+		} catch (error) {
+			setImageInspectionError(error);
+		} finally {
+			setIsInspectingImage(false);
+		}
 	};
 
 	const onDiscussSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -196,6 +247,47 @@ export const App = () => {
 							: todoSearch.error
 								? renderError(todoSearch.error)
 								: renderJson(todoSearch.data)}
+				</pre>
+			</section>
+
+			<section className="panel">
+				<h2>Inspect Image</h2>
+				<form className="upload-form" onSubmit={(event) => void onInspectImage(event)}>
+					<input
+						type="file"
+						accept="image/png,image/jpeg,image/gif"
+						onChange={onImageChange}
+					/>
+					<button
+						type="submit"
+						disabled={!selectedImage || isInspectingImage}
+					>
+						{isInspectingImage ? "Inspecting..." : "Inspect image"}
+					</button>
+				</form>
+				{selectedImage ? (
+					<p className="helper-copy">
+						Selected: {selectedImage.name} ({Math.round(selectedImage.size / 1024)} KB)
+					</p>
+				) : (
+					<p className="helper-copy">
+						Choose a PNG, JPEG, or GIF to POST as a raw request body.
+					</p>
+				)}
+				{selectedImagePreviewUrl ? (
+					<img
+						className="image-preview"
+						src={selectedImagePreviewUrl}
+						alt="Selected upload preview"
+					/>
+				) : null}
+				{imageInspectionError ? (
+					<p className="error">{renderError(imageInspectionError)}</p>
+				) : null}
+				<pre>
+					{imageInspection
+						? renderJson(imageInspection)
+						: "Upload result will show the backend-measured width and height."}
 				</pre>
 			</section>
 
