@@ -1,0 +1,69 @@
+# contract-first-api overview
+
+Use this reference when the task spans multiple packages or when you need the
+library's overall mental model.
+
+## Purpose
+
+`contract-first-api` is a TypeScript toolkit for defining API contracts once
+and reusing them across:
+
+- runtime validation
+- typed Express handlers
+- typed runtime clients
+- optional React Query adapters
+- OpenAPI document generation
+
+The library is designed to keep normal HTTP semantics while avoiding duplicate
+request and response typing across backend and frontend.
+
+It has less features than larger contract first or RPC frameworks, but is more lightweight and less opinionated. It is intended for teams that want to keep their own HTTP stack and only need a shared contract tree with runtime validation and type inference.
+
+
+## Compared to Other Libraries
+ - `https://ts-rest.com/` is most similar and this library's inspiration. It's however heavier and is currently not actively developed.
+ - `https://orpc.dev/` is a ts-rest competitor but leans more heavily towards RPC than RESTful HTTP semantics. It also has a more complex setup and is less lightweight.
+
+## Core Model
+
+One shared contract tree is the source of truth.
+
+Contracts are plain TypeScript objects with Zod schemas. Integration packages
+consume that tree instead of generating a second representation.
+
+Typical package roles:
+
+- `@contract-first-api/core`
+  Defines contracts and shared types.
+- `@contract-first-api/express`
+  Mounts contracts on an Express app with validation and typed services.
+- `@contract-first-api/api-client`
+  Builds a typed runtime client from the contract tree.
+- `@contract-first-api/react-query`
+  Wraps the API client tree with React Query hooks and cache helpers.
+- `@contract-first-api/openapi`
+  Generates a plain OpenAPI document object from JSON contracts.
+
+## Contract Shapes
+
+Each contract is one of four modes:
+
+- `json`
+  Default request and response contract.
+- `raw`
+  Validated `params` and `query`, but no contract-managed request body.
+- `stream`
+  NDJSON streaming response with a chunk schema.
+- `websocket`
+  Bidirectional message schemas instead of a normal response body.
+
+These modes affect how every integration package behaves.
+
+## Practical Rules
+
+- Keep one shared contract tree in a shared package or shared module.
+- Let integrations derive behavior from the contract tree instead of
+  duplicating DTOs.
+- Keep backend route prefixes and client base URLs aligned.
+- When debugging, check both the package README and the package source/tests if
+  behavior is unclear.
