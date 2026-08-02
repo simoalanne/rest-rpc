@@ -34,13 +34,11 @@ consume that tree instead of generating a second representation.
 Typical package roles:
 
 - `@contract-first-api/core`
-  Defines contracts and shared types.
+  Defines contracts, shared types, response helpers, and the typed client.
 - `@contract-first-api/express`
   Mounts contracts on an Express app with validation and typed services.
-- `@contract-first-api/api-client`
-  Builds a typed runtime client from the contract tree.
 - `@contract-first-api/react-query`
-  Wraps the API client tree with React Query hooks and cache helpers.
+  Creates React Query hooks and cache helpers from contracts.
 - `@contract-first-api/openapi`
   Generates a plain OpenAPI document object from JSON contracts.
 
@@ -49,11 +47,11 @@ Typical package roles:
 Each contract is one of four modes:
 
 - `json`
-  Default request and response contract.
+  Default request and response contract with status-keyed `responses`.
 - `raw`
   Validated `params` and `query`, but no contract-managed request body.
-- `stream`
-  NDJSON streaming response with a chunk schema.
+- streaming
+  NDJSON streaming response declared with `stream(schema)`.
 - `websocket`
   Bidirectional message schemas instead of a normal response body.
 

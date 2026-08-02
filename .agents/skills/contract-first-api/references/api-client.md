@@ -1,132 +1,123 @@
-# @contract-first-api/api-client
+# Core API Client
 
-Use this reference for building and using typed runtime clients.
+Use this reference for building and using typed runtime clients with
+`@contract-first-api/core`.
 
 ## Purpose
 
-`@contract-first-api/api-client` creates a typed client whose `api` property
-mirrors the contract tree.
+`initClient()` creates a typed client tree that mirrors the shared contract
+tree.
 
 ## Main Setup
 
-Create an `ApiClient` with:
-
-- `contracts`
-- `baseUrl`
-- optional `fetchOptions`
-- optional `timeoutMs`
-
 ```ts
-const client = new ApiClient({
+import { initClient } from "@contract-first-api/core";
+
+const api = initClient(contracts, {
 	baseUrl: process.env.API_BASE_URL,
-	contracts,
+	fetchOptions: {
+		cache: "no-store",
+	},
+	getHeaders: async () => ({
+		Authorization: `Bearer ${await getAccessToken()}`,
+	}),
 	timeoutMs: 10_000,
-});
-```
-
-Common calls:
-
-```ts
-const todos = await client.api.todos.list.fetch();
-```
-
-```ts
-const todo = await client.api.todos.get.fetch({
-	id: "todo_1",
-	includeCompleted: true,
-});
-```
-
-```ts
-const created = await client.api.todos.create.fetch({
-	title: "Write docs",
 });
 ```
 
 ## Base URL Rule
 
-The client `baseUrl` must include the same route prefix used by the backend.
-
-If the server uses `routePrefix: "/api"`, the client base URL should point to
-that `/api` root.
+The client `baseUrl` must include the same route prefix used by the backend. If
+the server uses `routePrefix: "/api"`, the client base URL should point to that
+`/api` root.
 
 ## Request Shape
 
-`client.api` mirrors the contract tree.
-
-JSON and raw contracts expose:
-
-- `fetch(...)`
-- `tryFetch(...)`
-- `$contract`
-
-Requests use one flat object:
+The client tree mirrors the contract tree. Requests use one flat object:
 
 - `params` replace path segments
 - `query` becomes URL search params
 - `body` becomes JSON
 
+```ts
+const todo = await api.todos.get.fetch({
+	id: "todo_1",
+	includeCompleted: true,
+});
+```
+
 Raw contracts keep the same flat `params` and `query` fields, but use an
 explicit `rawBody` field for the request payload.
 
 ```ts
-await client.api.images.upload.fetch({
+const response = await api.images.inspect.fetchResponse({
 	imageId: "img_1",
 	rawBody: file,
 });
 ```
 
-Websocket contract call:
+## Responses
+
+Every HTTP contract exposes `fetchResponse()`.
 
 ```ts
-const socket = await client.api.chat.connect();
+const response = await api.todos.create.fetchResponse({
+	title: "Write docs",
+});
+
+if (response.declared && response.status === 201) {
+	console.log(response.body.id);
+}
+
+if (response.declared && response.status === 409) {
+	console.error(response.body.code);
+}
+```
+
+`fetchResponse()` returns:
+
+- `{ declared: true, status, body }` for a response declared in the contract
+- `{ declared: false, status, body }` for an undeclared backend response
+
+If a contract has exactly one successful response, it also exposes `fetch()`.
+`fetch()` returns the successful body directly and throws when the request does
+not produce a declared successful response.
+
+```ts
+const todos = await api.todos.list.fetch();
+console.log(todos.items);
+```
+
+Contracts with multiple successful responses only expose `fetchResponse()` so
+callers must handle the status.
+
+## WebSocket Contracts
+
+WebSocket contracts expose `connect()` and `tryConnect()`.
+
+```ts
+const socket = api.chat.connect.connect();
 
 socket.send({
 	text: "hello",
 });
 
-socket.onMessage((message: { text: string }) => {
-	console.log(message.text);
+socket.onMessage((result) => {
+	if (result.success) {
+		console.log(result.data);
+	}
 });
-```
-
-## Responses And Errors
-
-- Successful JSON responses are validated against the contract response schema.
-- Contracts without a response schema resolve to `undefined`.
-- Known contract errors are inferred from the contract.
-- Unknown failures use the client's unknown error shape.
-
-Use `tryFetch()` when you want a success/error result object instead of thrown
-exceptions. This is often easier to handle than catching unknown thrown errors
-because the result is already narrowed to the contract's known error shapes.
-
-```ts
-const result = await client.api.todos.create.tryFetch({
-	title: "Write docs",
-});
-
-if (!result.ok) {
-	console.error(result.error);
-}
 ```
 
 ## Headers And Timeout
 
-Use `setHeaders()` for headers that should be added to every request.
-
-`timeoutMs` aborts slow requests. For stream contracts, the timeout applies
-until the stream is established.
-
-```ts
-client.setHeaders(async () => ({
-	Authorization: `Bearer ${await getAccessToken()}`,
-}));
-```
+- `getHeaders` adds headers to every request.
+- `timeoutMs` aborts slow requests.
+- Per-call fetch options can pass `signal` and other `fetch` options.
 
 ## Use This Package When
 
 - creating frontend or server-to-server clients from the shared contract tree
 - debugging request flattening or path parameter substitution
 - aligning client base URLs with backend routing
-- handling known vs unknown errors
+- handling declared vs undeclared responses

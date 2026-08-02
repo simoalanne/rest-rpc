@@ -11,9 +11,8 @@
 	"dependencies": {
 		"@example/shared": "workspace:*",
 		"@contract-first-api/core": "workspace:*",
-		"@contract-first-api/api-client": "workspace:*",
 		"@contract-first-api/react-query": "workspace:*",
-		"@tanstack/react-query": "^5.90.2",
+		"@tanstack/react-query": "^5.0.0",
 		"react": "^19.2.0",
 		"react-dom": "^19.2.0"
 	},

@@ -1,7 +1,7 @@
-import type { DiscussMessage, InspectImageResponse, TodoEvent } from "@example/shared";
+import type { DiscussMessage, TodoEvent } from "@example/shared";
 import type { ChangeEvent, FormEvent } from "react";
-import { Suspense, useEffect, useRef, useState } from "react";
-import { api } from "./api.ts";
+import { useEffect, useRef, useState } from "react";
+import { api, client } from "./api.ts";
 
 const renderJson = (value: unknown) => JSON.stringify(value, null, 2);
 const renderError = (error: unknown) =>
@@ -21,17 +21,6 @@ const renderTodoEvent = (event: TodoEvent) => {
 	return event.message;
 };
 
-const HealthPanel = () => {
-	const health = api.health.get.useSuspenseQuery();
-
-	return (
-		<section className="panel">
-			<h2>Health</h2>
-			<pre>{renderJson(health.data)}</pre>
-		</section>
-	);
-};
-
 export const App = () => {
 	const [title, setTitle] = useState("");
 	const [searchInput, setSearchInput] = useState("");
@@ -40,10 +29,6 @@ export const App = () => {
 	const [selectedImagePreviewUrl, setSelectedImagePreviewUrl] = useState<
 		string | null
 	>(null);
-	const [imageInspection, setImageInspection] =
-		useState<InspectImageResponse | null>(null);
-	const [imageInspectionError, setImageInspectionError] = useState<unknown>(null);
-	const [isInspectingImage, setIsInspectingImage] = useState(false);
 	const [activity, setActivity] = useState<TodoEvent[]>([]);
 	const [activityError, setActivityError] = useState<unknown>(null);
 	const [discussName, setDiscussName] = useState("Frontend user");
@@ -51,27 +36,50 @@ export const App = () => {
 	const [discussMessages, setDiscussMessages] = useState<DiscussMessage[]>([]);
 	const [discussConnected, setDiscussConnected] = useState(false);
 	const [discussParseError, setDiscussParseError] = useState(false);
-	const discussSocket = useRef<
-		ReturnType<typeof api.discuss.connect.$connect> | null
-	>(null);
+	const discussSocket = useRef<ReturnType<
+		typeof client.discuss.connect.connect
+	> | null>(null);
+
+	const health = api.health.get.useQuery();
 	const todos = api.todos.list.useQuery();
 	const todoSearch = api.todos.find.useQuery(
 		searchQuery ? { query: searchQuery } : "",
 	);
+	const createTodo = api.todos.create.useMutation({
+		onSuccess: async () => {
+			setTitle("");
+			await api.todos.list.invalidate();
+		},
+	});
+	const inspectImage = api.images.inspect.useMutation();
 
 	useEffect(() => {
-		return api.todos.events.$subscribe({
-			onData(event) {
-				setActivity((current) => [event, ...current].slice(0, 8));
-			},
-			onError(error) {
+		const controller = new AbortController();
+
+		const readEvents = async () => {
+			try {
+				const stream = await client.todos.events.fetch({
+					signal: controller.signal,
+				});
+
+				for await (const event of stream) {
+					setActivity((current) => [event, ...current].slice(0, 8));
+				}
+			} catch (error) {
+				if (controller.signal.aborted) return;
 				setActivityError(error);
-			},
-		});
+			}
+		};
+
+		void readEvents();
+
+		return () => {
+			controller.abort();
+		};
 	}, []);
 
 	useEffect(() => {
-		const socket = api.discuss.connect.$connect();
+		const socket = client.discuss.connect.connect();
 		discussSocket.current = socket;
 
 		const offOpen = socket.onOpen(() => {
@@ -119,14 +127,7 @@ export const App = () => {
 		};
 	}, [selectedImage]);
 
-	const createTodo = api.todos.create.useMutation({
-		onSuccess: async () => {
-			setTitle("");
-			await api.todos.list.invalidate();
-		},
-	});
-
-	const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+	const onSubmit = (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 
 		const trimmedTitle = title.trim();
@@ -134,7 +135,9 @@ export const App = () => {
 			return;
 		}
 
-		await createTodo.mutateAsync({ title: trimmedTitle });
+		createTodo.mutate({
+			title: trimmedTitle,
+		});
 	};
 
 	const onSearch = (event: FormEvent<HTMLFormElement>) => {
@@ -145,30 +148,18 @@ export const App = () => {
 	const onImageChange = (event: ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0] ?? null;
 		setSelectedImage(file);
-		setImageInspection(null);
-		setImageInspectionError(null);
+		inspectImage.reset();
 	};
 
-	const onInspectImage = async (event: FormEvent<HTMLFormElement>) => {
+	const onInspectImage = (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		if (!selectedImage) {
 			return;
 		}
 
-		setIsInspectingImage(true);
-		setImageInspection(null);
-		setImageInspectionError(null);
-
-		try {
-			const response = await api.images.inspect.$fetch({
-				rawBody: selectedImage,
-			});
-			setImageInspection(response);
-		} catch (error) {
-			setImageInspectionError(error);
-		} finally {
-			setIsInspectingImage(false);
-		}
+		inspectImage.mutate({
+			rawBody: selectedImage,
+		});
 	};
 
 	const onDiscussSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -194,23 +185,21 @@ export const App = () => {
 				<p className="eyebrow">Example Workspace</p>
 				<h1>Contract-First API</h1>
 				<p className="lede">
-					A tiny React app using the shared contracts, the generated API client,
-					and the React Query adapter.
+					A tiny React app using shared contracts, React Query hooks, streaming
+					events, raw uploads, and websocket messages.
 				</p>
 			</header>
 
-			<Suspense
-				fallback={
-					<section className="panel">
-						<h2>Health</h2>
-						<p className="loading-copy">
-							Waiting for delayed health response...
-						</p>
-					</section>
-				}
-			>
-				<HealthPanel />
-			</Suspense>
+			<section className="panel">
+				<h2>Health</h2>
+				<pre>
+					{health.error
+						? renderError(health.error)
+						: health.data
+							? renderJson(health.data.body)
+							: "Waiting for delayed health response..."}
+				</pre>
+			</section>
 
 			<section className="panel">
 				<h2>Create Todo</h2>
@@ -246,13 +235,16 @@ export const App = () => {
 							? "Searching..."
 							: todoSearch.error
 								? renderError(todoSearch.error)
-								: renderJson(todoSearch.data)}
+								: renderJson(todoSearch.data?.body)}
 				</pre>
 			</section>
 
 			<section className="panel">
 				<h2>Inspect Image</h2>
-				<form className="upload-form" onSubmit={(event) => void onInspectImage(event)}>
+				<form
+					className="upload-form"
+					onSubmit={(event) => void onInspectImage(event)}
+				>
 					<input
 						type="file"
 						accept="image/png,image/jpeg,image/gif"
@@ -260,14 +252,15 @@ export const App = () => {
 					/>
 					<button
 						type="submit"
-						disabled={!selectedImage || isInspectingImage}
+						disabled={!selectedImage || inspectImage.isPending}
 					>
-						{isInspectingImage ? "Inspecting..." : "Inspect image"}
+						{inspectImage.isPending ? "Inspecting..." : "Inspect image"}
 					</button>
 				</form>
 				{selectedImage ? (
 					<p className="helper-copy">
-						Selected: {selectedImage.name} ({Math.round(selectedImage.size / 1024)} KB)
+						Selected: {selectedImage.name} (
+						{Math.round(selectedImage.size / 1024)} KB)
 					</p>
 				) : (
 					<p className="helper-copy">
@@ -281,12 +274,12 @@ export const App = () => {
 						alt="Selected upload preview"
 					/>
 				) : null}
-				{imageInspectionError ? (
-					<p className="error">{renderError(imageInspectionError)}</p>
+				{inspectImage.error ? (
+					<p className="error">{renderError(inspectImage.error)}</p>
 				) : null}
 				<pre>
-					{imageInspection
-						? renderJson(imageInspection)
+					{inspectImage.data
+						? renderJson(inspectImage.data.body)
 						: "Upload result will show the backend-measured width and height."}
 				</pre>
 			</section>
@@ -308,7 +301,7 @@ export const App = () => {
 						? "Loading..."
 						: todos.error
 							? renderError(todos.error)
-							: renderJson(todos.data)}
+							: renderJson(todos.data?.body)}
 				</pre>
 			</section>
 
@@ -336,9 +329,7 @@ export const App = () => {
 				<div className="section-heading">
 					<h2>Discuss</h2>
 					<span
-						className={
-							discussConnected ? "connection is-online" : "connection"
-						}
+						className={discussConnected ? "connection is-online" : "connection"}
 					>
 						{discussConnected ? "Connected" : "Connecting"}
 					</span>
@@ -359,7 +350,9 @@ export const App = () => {
 					</button>
 				</form>
 				{discussParseError ? (
-					<p className="error">A websocket message did not match the contract.</p>
+					<p className="error">
+						A websocket message did not match the contract.
+					</p>
 				) : null}
 				<ul className="discussion-list">
 					{discussMessages.map((message) => (

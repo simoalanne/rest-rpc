@@ -1,2 +1,7 @@
-export type { WrapContracts } from "./createAdapter.ts";
-export { default } from "./createAdapter.ts";
+export type {
+	ReactQueryClient,
+	ReactQueryClientOptions,
+	ReactQueryApiError,
+	ReactQueryApiTree,
+} from "./createAdapter.ts";
+export { initReactQueryClient, default } from "./createAdapter.ts";

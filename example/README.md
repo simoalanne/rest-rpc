@@ -5,12 +5,13 @@ workflow across the packages.
 
 Packages:
 
-- `shared`: defines contracts with `@contract-first-api/core` and exports
-  path-based helper types.
+- `shared`: defines contracts with `@contract-first-api/core`, including
+  status-keyed `responses`, a raw request contract, a stream response, and a
+  websocket contract.
 - `backend`: mounts the contracts with `initServer`, uses metadata-aware
-  middleware, builds request context, and serves JSON plus NDJSON stream routes.
-- `frontend`: creates an `ApiClient`, wraps it with the React Query adapter, and
-  renders the app inside `QueryClientProvider`.
+  middleware, builds request context, and returns contract-typed responses.
+- `frontend`: uses the React Query adapter for cacheable HTTP routes and the
+  core client for streams and websockets.
 
 Run the backend:
 

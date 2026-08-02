@@ -1,46 +1,42 @@
 import type {
 	Contract,
 	ContractClientMessage,
-	ContractError,
 	ContractRequest,
 	ContractResponse,
 	ContractServerMessage,
+	ContractSingleSuccessfulResponseBody,
 	ContractTree,
-	IsStreamContract,
 	IsWebSocketContract,
-	JsonContract,
 	RawRequestBody,
 	RawRequestContract,
-	StreamContract,
+	ResponseBodySchema,
+	StreamResponse,
 	WebSocketContract,
-} from "@contract-first-api/core/contracts";
+} from "./contracts.ts";
 import {
+	isNoBodyResponse,
+	isStreamResponse,
 	mapContractTree,
 	mapObjectValues,
-} from "@contract-first-api/core/contracts";
+} from "./contracts.ts";
 
 export type FetchOptions = Omit<RequestInit, "method" | "body" | "headers">;
 export type ApiClientFetchOptions = Omit<FetchOptions, "signal">;
 
-export type ApiClientUnknownError = {
-	code: "unknown";
-	status?: number;
-	message?: string;
-};
+export type Merge<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
 
-export type ApiClientError<E extends Contract> =
-	| (ContractError<E> & { status?: number })
-	| ApiClientUnknownError;
-
-type Merge<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
-
-type ClientRequest<E extends Contract> = E extends RawRequestContract
+export type ClientRequest<E extends Contract> = E extends RawRequestContract
 	? Merge<
-			(ContractRequest<E> extends never ? Record<never, never> : ContractRequest<E>) & {
+			(ContractRequest<E> extends never
+				? Record<never, never>
+				: ContractRequest<E>) & {
 				rawBody: RawRequestBody;
 			}
 		>
 	: ContractRequest<E>;
+
+export type RequestInput<E extends Contract> =
+	ClientRequest<E> extends never ? void : ClientRequest<E>;
 
 export type FetchArgs<E extends Contract = Contract> =
 	ClientRequest<E> extends never
@@ -49,27 +45,25 @@ export type FetchArgs<E extends Contract = Contract> =
 
 export type FetchFn<E extends Contract> = (
 	...args: FetchArgs<E>
-) => Promise<ContractResponse<E>>;
+) => Promise<ContractSingleSuccessfulResponseBody<E>>;
 
-export type StreamFn<E extends Contract> = (
-	...args: FetchArgs<E>
-) => Promise<ContractResponse<E>>;
-
-export type StreamData<E extends Contract> =
-	ContractResponse<E> extends AsyncIterable<infer TData>
-		? TData
-		: ContractResponse<E>;
-
-export type SubscribeCallbackFunctions<E extends Contract> = {
-	onData: (data: StreamData<E>) => void;
-	onError: (error: ApiClientError<E>) => void;
+export type UndeclaredClientResponse = {
+	declared: false;
+	status: number;
+	body: unknown;
 };
 
-export type SubscribeFn<E extends Contract> = (
-	...args: ContractRequest<E> extends never
-		? [callbacks: SubscribeCallbackFunctions<E>]
-		: [request: ContractRequest<E>, callbacks: SubscribeCallbackFunctions<E>]
-) => () => void;
+export type DeclaredClientResponse<E extends Contract> = ContractResponse<E> & {
+	declared: true;
+};
+
+export type ClientResponse<E extends Contract> =
+	| DeclaredClientResponse<E>
+	| UndeclaredClientResponse;
+
+export type FetchResponseFn<E extends Contract> = (
+	...args: FetchArgs<E>
+) => Promise<ClientResponse<E>>;
 
 export type ConnectArgs<E extends Contract = Contract> =
 	ContractRequest<E> extends never ? [] : [request: ContractRequest<E>];
@@ -95,60 +89,38 @@ export type ConnectFn<E extends Contract> = (
 	...args: ConnectArgs<E>
 ) => E extends WebSocketContract ? ContractWebSocket<E> : never;
 
-export type ApiClientResult<E extends Contract, TData> =
-	| { success: true; data: TData }
-	| { success: false; error: ApiClientError<E> };
-
-export type ApiResult<E extends Contract> = ApiClientResult<
-	E,
-	ContractResponse<E>
->;
-
-export type TryFetchFn<E extends Contract> = (
-	...args: FetchArgs<E>
-) => Promise<ApiResult<E>>;
-
-export type TryStreamFn<E extends Contract> = (
-	...args: FetchArgs<E>
-) => Promise<ApiResult<E>>;
-
-export type TrySubscribeFn<E extends Contract> = (
-	...args: Parameters<SubscribeFn<E>>
-) => E extends StreamContract ? ApiClientResult<E, () => void> : never;
-
 export type TryConnectFn<E extends Contract> = (
 	...args: ConnectArgs<E>
 ) => E extends WebSocketContract
-	? ApiClientResult<E, ContractWebSocket<E>>
+	?
+			| { success: true; data: ContractWebSocket<E> }
+			| { success: false; error: unknown }
 	: never;
 
-export type ApiClientJsonContractValue<E extends Contract = Contract> = {
-	fetch: FetchFn<E>;
-	tryFetch: TryFetchFn<E>;
-	$contract: E;
+type ApiClientProtocolContractValue<E extends Contract> = {
+	fetchResponse: FetchResponseFn<E>;
 };
 
-export type ApiClientStreamContractValue<E extends Contract = Contract> = {
-	stream: StreamFn<E>;
-	tryStream: TryStreamFn<E>;
-	subscribe: SubscribeFn<E>;
-	trySubscribe: TrySubscribeFn<E>;
-	$contract: E;
+type ApiClientHappyPathContractValue<E extends Contract> = {
+	fetch: FetchFn<E>;
+	fetchResponse: FetchResponseFn<E>;
 };
+
+export type ApiClientHttpContractValue<E extends Contract = Contract> =
+	ContractSingleSuccessfulResponseBody<E> extends never
+		? ApiClientProtocolContractValue<E>
+		: ApiClientHappyPathContractValue<E>;
 
 export type ApiClientWebSocketContractValue<E extends Contract = Contract> = {
 	connect: ConnectFn<E>;
 	tryConnect: TryConnectFn<E>;
-	$contract: E;
 };
 
 export type ApiClientContractValue<E extends Contract = Contract> =
 	E extends Contract
-		? IsStreamContract<E> extends true
-			? ApiClientStreamContractValue<E>
-			: IsWebSocketContract<E> extends true
-				? ApiClientWebSocketContractValue<E>
-				: ApiClientJsonContractValue<E>
+		? IsWebSocketContract<E> extends true
+			? ApiClientWebSocketContractValue<E>
+			: ApiClientHttpContractValue<E>
 		: never;
 
 export type ApiClientTree<T extends ContractTree = ContractTree> =
@@ -158,10 +130,10 @@ export type ApiClientTree<T extends ContractTree = ContractTree> =
 				[K in keyof T]: T[K] extends ContractTree ? ApiClientTree<T[K]> : never;
 			};
 
-export type ApiClientOptions<TTree extends ContractTree> = {
+export type ApiClientOptions = {
 	baseUrl: string;
-	contracts: TTree;
 	fetchOptions?: ApiClientFetchOptions;
+	getHeaders?: GetHeadersFn;
 	timeoutMs?: number;
 };
 
@@ -172,11 +144,7 @@ const isApiClientContractNode = (
 ): value is ApiClientContractValue =>
 	typeof value === "object" &&
 	value !== null &&
-	"$contract" in value &&
-	("fetch" in value || "stream" in value || "connect" in value);
-
-const isStreamContractNode = (contract: Contract): contract is StreamContract =>
-	contract.options?.mode === "stream";
+	("fetchResponse" in value || "connect" in value);
 
 const isRawRequestContractNode = (
 	contract: Contract,
@@ -185,6 +153,17 @@ const isRawRequestContractNode = (
 const isWebSocketContractNode = (
 	contract: Contract,
 ): contract is WebSocketContract => contract.options?.mode === "websocket";
+
+const isSuccessStatus = (status: number) => status >= 200 && status < 300;
+
+const getSuccessfulResponseStatuses = (contract: Contract) => {
+	if (!("responses" in contract)) return [];
+
+	return Object.keys(contract.responses).map(Number).filter(isSuccessStatus);
+};
+
+const hasSingleSuccessfulResponse = (contract: Contract) =>
+	getSuccessfulResponseStatuses(contract).length === 1;
 
 const createRequestSignal = (
 	signal: RequestInit["signal"],
@@ -216,7 +195,7 @@ export const mapApiClientTree = (
 ) => mapObjectValues(tree, isApiClientContractNode, mappingFn);
 
 export class ApiClient<TTree extends ContractTree = ContractTree> {
-	api: ApiClientTree<TTree>;
+	readonly api: ApiClientTree<TTree>;
 
 	private baseUrl: string;
 	private contracts: TTree;
@@ -224,14 +203,11 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 	private getHeaders?: GetHeadersFn;
 	private timeoutMs?: number;
 
-	setHeaders = (getHeaders: GetHeadersFn) => {
-		this.getHeaders = getHeaders;
-	};
-
-	constructor(options: ApiClientOptions<TTree>) {
+	constructor(contracts: TTree, options: ApiClientOptions) {
 		this.baseUrl = options.baseUrl;
-		this.contracts = options.contracts;
+		this.contracts = contracts;
 		this.fetchOptions = options.fetchOptions;
+		this.getHeaders = options.getHeaders;
 		this.timeoutMs = options.timeoutMs;
 
 		this.api = this.buildApiClient();
@@ -322,15 +298,6 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		};
 	}
 
-	private extractSubscribeArgs(contract: Contract, args: unknown[]) {
-		const requestArgs = takesRequestInput(contract) ? args[0] : undefined;
-		const callbacks = requestArgs ? args[1] : args[0];
-		return { requestArgs, callbacks } as {
-			requestArgs?: unknown;
-			callbacks: SubscribeCallbackFunctions<Contract>;
-		};
-	}
-
 	private async request<E extends Contract>(
 		contract: E,
 		...args: FetchArgs<E>
@@ -359,19 +326,6 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 				signal: signalState?.signal ?? options?.signal,
 			});
 
-			if (!rawResponse.ok) {
-				const errorPayload = await rawResponse.json().catch(() => null);
-				for (const schema of [contract.errors ?? []].flat()) {
-					const result = schema.safeParse(errorPayload);
-					if (result.success) throw result.data;
-				}
-				throw {
-					code: "unknown",
-					status: rawResponse.status,
-					message: errorPayload?.message ?? rawResponse.statusText,
-				};
-			}
-
 			return {
 				rawResponse,
 				cleanup: () => signalState?.cleanup(),
@@ -382,56 +336,86 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		}
 	}
 
-	private async fetch<E extends JsonContract | RawRequestContract>(
+	private getResponseSchema(
+		contract: Contract,
+		status: number,
+	): ResponseBodySchema | undefined {
+		if (!("responses" in contract)) return undefined;
+		const entry = Object.entries(contract.responses).find(
+			([declaredStatus]) => Number(declaredStatus) === status,
+		);
+		return entry?.[1];
+	}
+
+	private async readUnknownBody(rawResponse: Response) {
+		const text = await rawResponse.text();
+		if (!text) return undefined;
+
+		try {
+			return JSON.parse(text) as unknown;
+		} catch {
+			return text;
+		}
+	}
+
+	private async readDeclaredBody(
+		schema: ResponseBodySchema,
+		rawResponse: Response,
+	) {
+		if (isNoBodyResponse(schema)) return undefined;
+
+		if (isStreamResponse(schema)) {
+			if (!rawResponse.body) {
+				throw new Error("Backend returned an empty stream response");
+			}
+
+			return this.parseNdjsonStream(schema, rawResponse.body);
+		}
+
+		return schema.parse(await rawResponse.json());
+	}
+
+	private async fetchResponse<E extends Contract>(
 		contract: E,
 		...args: FetchArgs<E>
-	): Promise<ContractResponse<E>> {
+	): Promise<ClientResponse<E>> {
 		const { rawResponse, cleanup } = await this.request(contract, ...args);
 
 		try {
-			if (!contract.response) {
-				return undefined as ContractResponse<E>;
-			}
-			const response = await rawResponse.json().catch(() => null);
-
-			const parsedResponse = contract.response.safeParse(response);
-			if (!parsedResponse.success) {
-				throw {
-					code: "unknown",
-					message: "Backend returned its response in an unexpected format",
-				};
+			const schema = this.getResponseSchema(contract, rawResponse.status);
+			if (!schema) {
+				return {
+					declared: false,
+					status: rawResponse.status,
+					body: await this.readUnknownBody(rawResponse),
+				} as ClientResponse<E>;
 			}
 
-			return parsedResponse.data as ContractResponse<E>;
+			return {
+				declared: true,
+				status: rawResponse.status,
+				body: await this.readDeclaredBody(schema, rawResponse),
+			} as ClientResponse<E>;
 		} finally {
 			cleanup();
 		}
 	}
 
-	private async stream<E extends StreamContract>(
+	private async fetch<E extends Contract>(
 		contract: E,
 		...args: FetchArgs<E>
-	): Promise<ContractResponse<E>> {
-		const { rawResponse, cleanup } = await this.request(contract, ...args);
+	): Promise<ContractSingleSuccessfulResponseBody<E>> {
+		const response = await this.fetchResponse(contract, ...args);
 
-		if (!rawResponse.body) {
-			cleanup();
-			throw {
-				code: "unknown",
-				status: rawResponse.status,
-				message: "Backend returned an empty stream response",
-			};
+		if (!response.declared || !isSuccessStatus(response.status)) {
+			throw new Error("Request did not return a declared success response");
 		}
 
-		cleanup();
-		return this.parseNdjsonStream(
-			contract,
-			rawResponse.body,
-		) as unknown as ContractResponse<E>;
+		return response.body as ContractSingleSuccessfulResponseBody<E>;
 	}
 
 	private async *parseNdjsonStream(
-		contract: StreamContract,
+		response: StreamResponse,
 		body: ReadableStream<Uint8Array>,
 	): AsyncIterable<unknown> {
 		const reader = body.getReader();
@@ -449,78 +433,16 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 
 				for (const line of lines) {
 					if (!line.trim()) continue;
-					yield this.parseStreamLine(contract, line);
+					yield response.schema.parse(JSON.parse(line));
 				}
 			}
 
 			buffer += decoder.decode();
 			if (buffer.trim()) {
-				yield this.parseStreamLine(contract, buffer);
+				yield response.schema.parse(JSON.parse(buffer));
 			}
 		} finally {
 			reader.releaseLock();
-		}
-	}
-
-	private parseStreamLine(contract: StreamContract, line: string) {
-		try {
-			return contract.response.parse(JSON.parse(line));
-		} catch {
-			throw {
-				code: "unknown",
-				message: "Backend returned a stream chunk in an unexpected format",
-			};
-		}
-	}
-
-	private subscribe<E extends StreamContract>(
-		contract: E,
-		...args: Parameters<SubscribeFn<E>>
-	) {
-		const { requestArgs, callbacks } = this.extractSubscribeArgs(
-			contract,
-			args,
-		);
-		const controller = new AbortController();
-
-		const streamArgs = (takesRequestInput(contract)
-			? [requestArgs, { signal: controller.signal }]
-			: [{ signal: controller.signal }]) as unknown as FetchArgs<E>;
-
-		void this.consumeStream(contract, callbacks, controller.signal, streamArgs);
-
-		return () => controller.abort();
-	}
-
-	private trySubscribe<E extends StreamContract>(
-		contract: E,
-		...args: Parameters<SubscribeFn<E>>
-	): ApiClientResult<E, () => void> {
-		try {
-			const data = this.subscribe(contract, ...args);
-			return { success: true, data };
-		} catch (error) {
-			return { success: false, error: error as ApiClientError<E> };
-		}
-	}
-
-	private async consumeStream<E extends StreamContract>(
-		contract: E,
-		callbacks: SubscribeCallbackFunctions<E>,
-		signal: AbortSignal,
-		args: unknown[],
-	) {
-		try {
-			const stream = (await this.stream(
-				contract,
-				...(args as FetchArgs<E>),
-			)) as unknown as AsyncIterable<unknown>;
-			for await (const data of stream) {
-				callbacks.onData(data as StreamData<E>);
-			}
-		} catch (error) {
-			if (signal.aborted) return;
-			callbacks.onError(error as ApiClientError<E>);
 		}
 	}
 
@@ -534,10 +456,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		...args: ConnectArgs<E>
 	): ContractWebSocket<E> {
 		if (typeof WebSocket === "undefined") {
-			throw {
-				code: "unknown",
-				message: "WebSocket is not available in this runtime",
-			};
+			throw new Error("WebSocket is not available in this runtime");
 		}
 
 		const requestArgs = takesRequestInput(contract) ? args[0] : undefined;
@@ -566,10 +485,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 
 		socket.send = (message: ContractClientMessage<E>) => {
 			if (socket.readyState !== WebSocket.OPEN) {
-				throw {
-					code: "unknown",
-					message: "WebSocket is not open",
-				};
+				throw new Error("WebSocket is not open");
 			}
 
 			rawSend(JSON.stringify(message));
@@ -604,39 +520,15 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		return socket;
 	}
 
-	private async tryFetch<E extends JsonContract | RawRequestContract>(
-		contract: E,
-		...args: FetchArgs<E>
-	): Promise<ApiResult<E>> {
-		try {
-			const data = await this.fetch(contract, ...args);
-			return { success: true, data };
-		} catch (error) {
-			return { success: false, error: error as ApiClientError<E> };
-		}
-	}
-
-	private async tryStream<E extends StreamContract>(
-		contract: E,
-		...args: FetchArgs<E>
-	): Promise<ApiResult<E>> {
-		try {
-			const data = await this.stream(contract, ...args);
-			return { success: true, data };
-		} catch (error) {
-			return { success: false, error: error as ApiClientError<E> };
-		}
-	}
-
 	private tryConnect<E extends WebSocketContract>(
 		contract: E,
 		...args: ConnectArgs<E>
-	): ApiClientResult<E, ContractWebSocket<E>> {
+	) {
 		try {
 			const data = this.connect(contract, ...args);
-			return { success: true, data };
+			return { success: true, data } as const;
 		} catch (error) {
-			return { success: false, error: error as ApiClientError<E> };
+			return { success: false, error } as const;
 		}
 	}
 
@@ -644,7 +536,6 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		mapContractTree(this.contracts, (node) => {
 			if (isWebSocketContractNode(node)) {
 				return {
-					$contract: node,
 					connect: (...args: ConnectArgs<typeof node>) =>
 						this.connect(node, ...args),
 					tryConnect: (...args: ConnectArgs<typeof node>) =>
@@ -652,25 +543,24 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 				};
 			}
 
-			if (isStreamContractNode(node)) {
+			const fetchResponse = (...args: FetchArgs<typeof node>) =>
+				this.fetchResponse(node, ...args);
+
+			if (!hasSingleSuccessfulResponse(node)) {
 				return {
-					$contract: node,
-					stream: (...args: FetchArgs<typeof node>) =>
-						this.stream(node, ...args),
-					tryStream: (...args: FetchArgs<typeof node>) =>
-						this.tryStream(node, ...args),
-					subscribe: (...args: Parameters<SubscribeFn<typeof node>>) =>
-						this.subscribe(node, ...args),
-					trySubscribe: (...args: Parameters<SubscribeFn<typeof node>>) =>
-						this.trySubscribe(node, ...args),
+					fetchResponse,
 				};
 			}
 
 			return {
-				$contract: node,
 				fetch: (...args: FetchArgs<typeof node>) => this.fetch(node, ...args),
-				tryFetch: (...args: FetchArgs<typeof node>) =>
-					this.tryFetch(node, ...args),
+				fetchResponse,
 			};
 		}) as ApiClientTree<TTree>;
 }
+
+export const initClient = <TTree extends ContractTree>(
+	contracts: TTree,
+	options: ApiClientOptions,
+): ApiClientTree<TTree> =>
+	new ApiClient(contracts, options).api;

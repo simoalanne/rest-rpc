@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { stream } from "@contract-first-api/core";
 import z from "zod";
 import { createOpenApiDocument } from "./openapi.ts";
 
@@ -17,15 +18,15 @@ describe("createOpenApiDocument", () => {
 						}),
 						body: z.object({ title: z.string().min(1) }),
 					},
-					response: z.object({
-						id: z.string(),
-						title: z.string(),
-					}),
-					successStatusCode: 202,
-					errors: z.object({
-						code: z.literal("TITLE_ALREADY_EXISTS"),
-						status: z.literal(409),
-					}),
+					responses: {
+						202: z.object({
+							id: z.string(),
+							title: z.string(),
+						}),
+						409: z.object({
+							code: z.literal("TITLE_ALREADY_EXISTS"),
+						}),
+					},
 					meta: {
 						auth: true,
 					},
@@ -33,10 +34,13 @@ describe("createOpenApiDocument", () => {
 				events: {
 					path: "/todos/events",
 					method: "GET",
-					options: { mode: "stream" },
-					response: z.object({
-						type: z.string(),
-					}),
+					responses: {
+						200: stream(
+							z.object({
+								type: z.string(),
+							}),
+						),
+					},
 				},
 				socket: {
 					path: "/todos/socket",
@@ -58,9 +62,7 @@ describe("createOpenApiDocument", () => {
 			servers: [{ url: "http://localhost:3000" }],
 			transformOperation: ({ contract, operation }) => ({
 				...operation,
-				...(contract.meta?.auth
-					? { security: [{ bearerAuth: [] }] }
-					: {}),
+				...(contract.meta?.auth ? { security: [{ bearerAuth: [] }] } : {}),
 			}),
 			transformDocument: (document) => ({
 				...document,
@@ -76,9 +78,7 @@ describe("createOpenApiDocument", () => {
 		});
 
 		assert.equal(document.openapi, "3.1.0");
-		assert.deepStrictEqual(Object.keys(document.paths).sort(), [
-			"/todos/{id}",
-		]);
+		assert.deepStrictEqual(Object.keys(document.paths).sort(), ["/todos/{id}"]);
 
 		const updateOperation = document.paths["/todos/{id}"]?.post;
 		assert.ok(updateOperation);

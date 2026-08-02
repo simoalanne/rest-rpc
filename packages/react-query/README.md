@@ -1,13 +1,10 @@
 # @contract-first-api/react-query
 
-Wrap a typed `ApiClient` tree with React Query hooks and cache helpers.
+Create a contract-backed API client shaped for TanStack Query.
 
-This package does not define contracts or make a client by itself. It consumes
-the `client.api` tree from `@contract-first-api/api-client`, keeps the same
-shape, and replaces each contract node with React Query-friendly helpers. JSON
-contracts become query/mutation helpers, raw request contracts expose direct
-fetch helpers, stream contracts expose stream helpers, and websocket contracts
-expose connect helpers.
+The setup is the same as the core client: pass the shared contract tree and the
+same client options such as `baseUrl`, headers, and timeouts. React Query also
+needs a `queryClient`, and the returned API exposes hooks and cache helpers.
 
 ## Install
 
@@ -15,25 +12,23 @@ expose connect helpers.
 pnpm add @contract-first-api/react-query @tanstack/react-query
 ```
 
-## Create The API Adapter
-
-Create the base API client, create a React Query `QueryClient`, then wrap
-`client.api` with `createAdapter()`.
+## Create The React Query Client
 
 ```ts
 // api.ts
-import { ApiClient } from "@contract-first-api/api-client";
-import createAdapter from "@contract-first-api/react-query";
+import { initReactQueryClient } from "@contract-first-api/react-query";
 import { contracts } from "@example/shared";
 import { QueryClient } from "@tanstack/react-query";
 
-const client = new ApiClient({
-	baseUrl: import.meta.env.VITE_API_BASE_URL,
-	contracts,
-});
-
 export const queryClient = new QueryClient();
-export const api = createAdapter(client.api, queryClient);
+
+export const api = initReactQueryClient(contracts, {
+	queryClient,
+	baseUrl: import.meta.env.VITE_API_BASE_URL,
+	getHeaders: () => ({
+		Authorization: `Bearer ${getAuthToken()}`,
+	}),
+});
 ```
 
 ## Add The Provider
@@ -57,7 +52,7 @@ ReactDOM.createRoot(document.querySelector("#app")!).render(
 );
 ```
 
-After that, import the adapted `api` object inside components.
+After that, import the generated `api` object inside components.
 
 ## Queries
 
@@ -74,13 +69,17 @@ export const TodoList = () => {
 
 	return (
 		<ul>
-			{todos.data?.items.map((todo) => (
+			{todos.data?.body.items.map((todo) => (
 				<li key={todo.id}>{todo.title}</li>
 			))}
 		</ul>
 	);
 };
 ```
+
+Hook data is the successful response envelope, not only the body. That means
+you can still narrow on `data.status` when a contract declares multiple
+successful responses.
 
 For contracts with request schemas, pass the typed request object first:
 
@@ -91,7 +90,7 @@ const todo = api.todos.get.useQuery({
 });
 ```
 
-For request-based queries, you can pass falsy value as an alternative to options.enabled: false when you don't want the query to run:
+For request-based queries, pass a falsy value when you want to skip execution:
 
 ```tsx
 const search = api.todos.find.useQuery(
@@ -99,7 +98,7 @@ const search = api.todos.find.useQuery(
 );
 ```
 
-Use `useSuspenseQuery()` if you're already using Suspense in your app and want to throw promises instead of handling loading and error states manually.
+Use `useSuspenseQuery()` if your app already uses Suspense:
 
 ```tsx
 const health = api.health.get.useSuspenseQuery();
@@ -107,16 +106,15 @@ const health = api.health.get.useSuspenseQuery();
 
 ## Normal React Query Options
 
-The generated hooks are thin wrappers around TanStack Query. You use the same
-options you would pass to `useQuery`, `useSuspenseQuery`, and `useMutation`; the
-adapter only supplies the `queryKey`, `queryFn`, and `mutationFn` from the
-contract.
+The generated hooks accept the same options you would pass to `useQuery`,
+`useSuspenseQuery`, and `useMutation`. Query keys and fetch functions come from
+the contract.
 
 ```tsx
 const todos = api.todos.list.useQuery({
 	staleTime: 30_000,
 	refetchOnWindowFocus: false,
-	select: (data) => data.items,
+	select: (response) => response.body.items,
 });
 
 const createTodo = api.todos.create.useMutation({
@@ -126,29 +124,17 @@ const createTodo = api.todos.create.useMutation({
 });
 ```
 
-You can also use TanStack Query directly whenever that is a better fit. The
-adapter exposes `$getKey()` and `$fetch()` so custom query code can still share
-the same contract-derived key and fetch behavior.
-
-When it comes to questions like which hook to use, which options to pass, how to handle loading and error states, etc., use the official Tanstack Query documentation and community resources. The adapter does not change how React Query works, it just allows to use syntax that is consistent with the contract definitions and API client.
-
-```tsx
-import { useQuery } from "@tanstack/react-query";
-
-const todos = useQuery({
-	queryKey: api.todos.list.$getKey(),
-	queryFn: () => api.todos.list.$fetch(),
-	staleTime: 30_000,
-});
-```
-
 ## Mutations
 
-Use `useMutation()` for mutations.
+Use `useMutation()` for writes.
 
 ```tsx
 const createTodo = api.todos.create.useMutation({
-	onSuccess: async () => {
+	onSuccess: async (response) => {
+		if (response.status === 201) {
+			console.log(response.body.id);
+		}
+
 		await api.todos.list.invalidate();
 	},
 });
@@ -159,23 +145,30 @@ await createTodo.mutateAsync({
 ```
 
 The mutation input is inferred from the contract request schema. The mutation
-result is inferred from the contract response schema.
+result is inferred from the contract's successful response entries.
 
 ## Cache Helpers
 
-Each wrapped JSON contract exposes cache helpers tied to the same query key
-format used by its hooks.
+Each HTTP contract exposes cache helpers tied to the same query key format used
+by its hooks.
 
 ```ts
 await api.todos.list.invalidate();
 
-api.todos.list.setData((current) => ({
-	items: current?.items ?? [],
-}));
+api.todos.list.setData((current) =>
+	current
+		? {
+				...current,
+				body: {
+					items: current.body.items,
+				},
+			}
+		: current,
+);
 
 api.todos.list.clear();
 
-const key = api.todos.list.$getKey();
+const key = api.todos.list.getKey();
 ```
 
 For request-based queries, pass the same request object:
@@ -184,140 +177,50 @@ For request-based queries, pass the same request object:
 await api.todos.get.invalidate({ id: "todo_1" });
 
 api.todos.get.setData({ id: "todo_1" }, (current) =>
-	current ? { ...current, title: "Updated locally" } : current,
+	current && current.status === 200
+		? {
+				...current,
+				body: {
+					...current.body,
+					title: "Updated locally",
+				},
+			}
+		: current,
 );
 ```
 
 The generated query key is based on the contract path inside the contract tree,
 plus the request object when one exists.
 
-## Direct Calls
+## Errors
 
-Wrapped JSON contracts also expose direct calls to the underlying API client.
+Hook errors are one of:
 
-```ts
-const health = await api.health.get.$fetch();
-
-const result = await api.todos.create.$tryFetch({
-	title: "Write docs",
-});
-```
-
-`$fetch()` accepts the same request and fetch-options arguments as the API
-client.
-
-```ts
-await api.health.get.$fetch({ cache: "no-store" });
-
-await api.todos.create.$fetch(
-	{ title: "Write docs" },
-	{ signal: abortController.signal },
-);
-```
-
-## Raw Request Contracts
-
-Raw request contracts are not wrapped as React Query queries or mutations. They
-expose:
-
-- `$contract`
-- `$fetch`
-- `$tryFetch`
-
-Use them directly when you need to pass an untyped `rawBody` payload:
-
-```ts
-const result = await api.images.inspect.$fetch({
-	rawBody: file,
-});
-```
-
-## Streaming Contracts
-
-Streaming contracts are not wrapped as React Query queries. They expose the
-stream helpers from the API client with `$` prefixes.
+- a declared non-successful response envelope from the contract
+- an undeclared response envelope from the core client
+- a normal `Error`
 
 ```tsx
-import { useEffect } from "react";
-
-useEffect(() => {
-	return api.todos.events.$subscribe({
-		onData(event) {
-			console.log(event);
-		},
-		onError(error) {
-			console.error(error);
-		},
-	});
-}, []);
+const createTodo = api.todos.create.useMutation({
+	onError(error) {
+		if ("status" in error && error.status === 409) {
+			console.log(error.body.code);
+		}
+	},
+});
 ```
-
-Stream contract nodes expose:
-
-- `$contract`
-- `$stream`
-- `$subscribe`
 
 ## WebSocket Contracts
 
-WebSocket contracts are not wrapped as React Query queries. They expose the
-connect helper from the API client with a `$` prefix.
-
-```tsx
-import { useEffect, useRef } from "react";
-
-export const Discussion = () => {
-	const socketRef = useRef<ReturnType<typeof api.discuss.room.$connect> | null>(
-		null,
-	);
-
-	useEffect(() => {
-		const socket = api.discuss.room.$connect();
-		socketRef.current = socket;
-
-		const offMessage = socket.onMessage((result) => {
-			if (!result.success) {
-				return;
-			}
-
-			console.log(result.data);
-		});
-
-		return () => {
-			offMessage();
-			socket.close();
-			socketRef.current = null;
-		};
-	}, []);
-
-	return (
-		<button
-			type="button"
-			onClick={() => {
-				socketRef.current?.send({
-					type: "message",
-					text: "Hello",
-				});
-			}}
-		>
-			Send
-		</button>
-	);
-};
-```
-
-WebSocket contract nodes expose:
-
-- `$contract`
-- `$connect`
+WebSocket contracts are omitted from the React Query tree. Use the core client
+directly for websocket connections.
 
 ## How It Connects
 
 - Define contracts with `@contract-first-api/core`.
-- Create `new ApiClient({ baseUrl, contracts })` with
-  `@contract-first-api/api-client`.
-- Wrap `client.api` with `createAdapter(client.api, queryClient)`.
+- Create a `QueryClient`.
+- Call `initReactQueryClient(contracts, { queryClient, baseUrl })`.
 - Render your app inside React Query's `QueryClientProvider`.
 
-This package is only needed for React apps that want React Query integration.
-You can use `@contract-first-api/api-client` directly without it.
+This package is only needed for React apps that want TanStack Query integration.
+Use `initClient()` from `@contract-first-api/core` for direct client calls.

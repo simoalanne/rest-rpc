@@ -1,16 +1,19 @@
 import type { Server as HttpServer } from "node:http";
 import {
 	type Contract,
-	type ContractError,
 	type ContractMetaOf,
 	type ContractRequest,
-	type RawRequestBody,
-	type RawRequestContract,
 	type ContractResponse,
+	type ContractSingleSuccessfulResponseBody,
 	type ContractTree,
 	flattenContractTree,
 	type GetByPath,
 	type HttpMethod,
+	isNoBodyResponse,
+	isStreamResponse,
+	type RawRequestBody,
+	type RawRequestContract,
+	type ResponseBodySchema,
 	type WebSocketContract,
 } from "@contract-first-api/core/contracts";
 import type {
@@ -56,9 +59,7 @@ export type RequestWithContract<TMeta = unknown> = Omit<Request, "contract"> & {
 
 type HandlerResult<E extends Contract> = E extends WebSocketContract
 	? MaybePromise<void>
-	: ContractResponse<E> extends undefined
-		? MaybePromise<void>
-		: MaybePromise<ContractResponse<E>>;
+	: MaybePromise<ContractResponse<E> | ContractSingleSuccessfulResponseBody<E>>;
 
 export type ServiceRequest<
 	E extends Contract,
@@ -70,10 +71,9 @@ export type ServiceRequest<
 		>
 	: E extends RawRequestContract
 		? Merge<
-				RequestValue<E> &
-					ContextValue<TContext> & { rawBody: RawRequestBody }
+				RequestValue<E> & ContextValue<TContext> & { rawBody: RawRequestBody }
 			>
-	: Merge<RequestValue<E> & ContextValue<TContext>>;
+		: Merge<RequestValue<E> & ContextValue<TContext>>;
 
 export type ServiceResponse<E extends Contract> = ContractResponse<E>;
 
@@ -157,12 +157,6 @@ export type CreateRouterOptions<
 	) => TContext | Promise<TContext>;
 };
 
-type AllKnownErrors<T extends ContractTree> = T extends Contract
-	? ContractError<T>
-	: {
-			[K in keyof T]: T[K] extends ContractTree ? AllKnownErrors<T[K]> : never;
-		}[keyof T];
-
 export type ServerTools<
 	TContracts extends ContractTree,
 	TContext = EmptyObject,
@@ -176,7 +170,6 @@ export type ServerTools<
 	createRouter: (
 		options: CreateRouterOptions<TContracts, TContext, TMeta>,
 	) => Application;
-	throwKnownError: (error: AllKnownErrors<TContracts>) => never;
 };
 
 export type ContractModeMiddlewareOptions = {
@@ -187,13 +180,18 @@ export type ContractModeMiddlewareOptions = {
 };
 
 class KnownContractError extends Error {
+	readonly response: { status: number; body: unknown };
 	readonly error: Record<string, unknown>;
 	readonly status: number;
 
-	constructor(error: Record<string, unknown>) {
+	constructor(response: { status: number; body: unknown }) {
 		super("Known contract error");
-		this.error = error;
-		this.status = Number(error.status) || 400;
+		this.response = response;
+		this.error =
+			response.body && typeof response.body === "object"
+				? (response.body as Record<string, unknown>)
+				: {};
+		this.status = response.status;
 	}
 }
 
@@ -450,16 +448,6 @@ const getRouteHandler = (services: unknown, path: string[]) =>
 		request: Record<string, unknown>,
 	) => unknown | Promise<unknown>;
 
-const getSuccessStatusCode = (contract: Contract, hasResponse: boolean) => {
-	if ("successStatusCode" in contract && contract.successStatusCode) {
-		return contract.successStatusCode;
-	}
-
-	if (contract.method === "POST") return 201;
-	if (!hasResponse) return 204;
-	return 200;
-};
-
 const writeStreamResponse = async (
 	result: unknown,
 	res: Response,
@@ -473,6 +461,57 @@ const writeStreamResponse = async (
 	}
 
 	res.end();
+};
+
+const getResponseSchema = (
+	contract: Contract,
+	status: number,
+): ResponseBodySchema | undefined => {
+	if (!("responses" in contract)) return undefined;
+	const entry = Object.entries(contract.responses).find(
+		([declaredStatus]) => Number(declaredStatus) === status,
+	);
+	return entry?.[1];
+};
+
+const getSingleSuccessfulStatus = (contract: Contract): number | undefined => {
+	if (!("responses" in contract)) return undefined;
+
+	const statuses = Object.keys(contract.responses)
+		.map(Number)
+		.filter((status) => status >= 200 && status < 300);
+
+	return statuses.length === 1 ? statuses[0] : undefined;
+};
+
+const hasDeclaredStatus = (contract: Contract, status: number) =>
+	Boolean(getResponseSchema(contract, status));
+
+const normalizeHandlerResult = (
+	contract: Contract,
+	result: unknown,
+): { status: number; body: unknown } => {
+	if (
+		result &&
+		typeof result === "object" &&
+		"status" in result &&
+		typeof result.status === "number" &&
+		hasDeclaredStatus(contract, result.status)
+	) {
+		return result as { status: number; body: unknown };
+	}
+
+	const status = getSingleSuccessfulStatus(contract);
+	if (status === undefined) {
+		throw new Error(
+			`Service for "${contract.method} ${contract.path}" must return a declared response object.`,
+		);
+	}
+
+	return {
+		status,
+		body: result,
+	};
 };
 
 const createRouter = <
@@ -519,12 +558,12 @@ const createRouter = <
 	for (const route of routes) {
 		if (isWebSocketContract(route)) continue;
 
-			const method = route.method.toLowerCase() as Lowercase<HttpMethod>;
-			const handler = getRouteHandler(services, route.keySegments);
-			const requestPreparationMiddleware = prepareRequest(route);
-			const registeredMiddlewares = middlewares as Array<
-				(req: Request, res: Response, next: NextFunction) => unknown
-			>;
+		const method = route.method.toLowerCase() as Lowercase<HttpMethod>;
+		const handler = getRouteHandler(services, route.keySegments);
+		const requestPreparationMiddleware = prepareRequest(route);
+		const registeredMiddlewares = middlewares as Array<
+			(req: Request, res: Response, next: NextFunction) => unknown
+		>;
 
 		const serviceHandler = async (req: Request, res: Response) => {
 			const input = req.validatedRequest;
@@ -534,41 +573,47 @@ const createRouter = <
 				)) || {};
 
 			try {
-				const result = await handler({
+				const handlerResult = await handler({
 					...input,
 					context,
 					...(isRawRequestContract(route)
 						? { rawBody: req.body as RawRequestBody }
 						: {}),
 				});
-				const hasResponse = "response" in route && Boolean(route.response);
-				const statusCode = getSuccessStatusCode(route, hasResponse);
+				const result = normalizeHandlerResult(route, handlerResult);
+				const schema = getResponseSchema(route, result.status);
 
-				if (!hasResponse) {
-					res.sendStatus(statusCode);
+				if (schema && isNoBodyResponse(schema)) {
+					res.sendStatus(result.status);
 					return;
 				}
 
-				if (route.options?.mode === "stream") {
-					await writeStreamResponse(result, res, statusCode);
+				if (schema && isStreamResponse(schema)) {
+					await writeStreamResponse(result.body, res, result.status);
 					return;
 				}
 
-				res.status(statusCode).json(result);
+				res.status(result.status).json(result.body);
 			} catch (error) {
 				if (error instanceof KnownContractError) {
-					res.status(error.status).json(error.error);
+					const schema = getResponseSchema(route, error.status);
+					if (schema && isNoBodyResponse(schema)) {
+						res.sendStatus(error.status);
+						return;
+					}
+
+					res.status(error.status).json(error.response.body);
 					return;
 				}
 				throw error;
 			}
 		};
 
-			app[method](
-				route.routePath,
-				requestPreparationMiddleware,
-				...registeredMiddlewares,
-				serviceHandler,
+		app[method](
+			route.routePath,
+			requestPreparationMiddleware,
+			...registeredMiddlewares,
+			serviceHandler,
 		);
 	}
 
@@ -582,9 +627,7 @@ export const initServer = <
 >(): ServerTools<TContracts, TContext, TMeta> => ({
 	defineService: (_path, service) => service,
 	defineMiddleware: (middleware) => middleware,
-	createContractModeMiddleware: (options) => createContractModeMiddleware(options),
+	createContractModeMiddleware: (options) =>
+		createContractModeMiddleware(options),
 	createRouter: (options) => createRouter<TContracts, TContext, TMeta>(options),
-	throwKnownError: (error) => {
-		throw new KnownContractError(error);
-	},
 });

@@ -11,8 +11,8 @@ Use this skill for tasks in repositories that use `contract-first-api`.
 
 - Creating or updating shared contract trees with `@contract-first-api/core`
 - Wiring contract trees into Express with `@contract-first-api/express`
-- Building typed clients with `@contract-first-api/api-client`
-- Using the React Query adapter from `@contract-first-api/react-query`
+- Building typed clients with `initClient()` from `@contract-first-api/core`
+- Using the React Query helpers from `@contract-first-api/react-query`
 - Generating OpenAPI documents with `@contract-first-api/openapi`
 - Debugging how these packages fit together across backend, frontend, and shared code
 
@@ -44,8 +44,8 @@ Use this skill for tasks in repositories that use `contract-first-api`.
 
 - Use `core.md` for defining contracts, contract modes, metadata, and helper types.
 - Use `express.md` for route registration, request validation, middleware, raw body handling, context creation, streams, and websockets on the server.
-- Use `api-client.md` for request shape, base URL rules, headers, timeouts, and error handling.
-- Use `react-query.md` for hook usage, cache helpers, and how the adapter wraps the API client.
+- Use `api-client.md` for core client request shape, base URL rules, headers, timeouts, and response handling.
+- Use `react-query.md` for hook usage, cache helpers, and how the React Query client uses contracts and core client options.
 - Use `openapi.md` for JSON contract export, transform hooks, and document customization.
 
 ## Invariants
@@ -55,7 +55,7 @@ Use this skill for tasks in repositories that use `contract-first-api`.
 - Contract mode changes behavior across integrations:
   - `json` is the default
   - `raw` does not define a contract-managed request body
-  - `stream` models NDJSON responses
+  - `stream(schema)` models NDJSON responses
   - `websocket` models bidirectional messages
 - `@contract-first-api/openapi` only documents JSON contracts.
 - Backend route prefixes and client base URLs must stay aligned.

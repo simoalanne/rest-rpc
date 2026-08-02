@@ -36,7 +36,6 @@
 		"test": "node --test src/**/*.test.ts"
 	},
 	"dependencies": {
-		"@contract-first-api/api-client": "workspace:^",
 		"@contract-first-api/core": "workspace:^"
 	},
 	"peerDependencies": {

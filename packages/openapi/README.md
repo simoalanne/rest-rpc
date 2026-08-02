@@ -2,11 +2,9 @@
 
 Generate an OpenAPI document from a shared contract tree.
 
-This package consumes contracts from `@contract-first-api/core` and turns them
-into a plain OpenAPI document object. It does not write files, register routes,
-serve Swagger UI, or choose a documentation frontend. You decide whether to
-write the document to disk, expose it from your backend, or pass it to another
-tool.
+This package consumes contracts from `@contract-first-api/core` and turns JSON
+HTTP contracts into a plain OpenAPI document object. It does not write files,
+register routes, serve Swagger UI, or choose a documentation frontend.
 
 ## Install
 
@@ -48,19 +46,18 @@ app.get("/openapi.json", (_req, res) => {
 
 ## Contract Mapping
 
-The generator walks the contract tree and creates one OpenAPI operation for
-each JSON contract.
+The generator creates one OpenAPI operation for each JSON HTTP contract.
 
 - `path` values like `/todos/:id` become `/todos/{id}`
 - `method` becomes the OpenAPI operation method
 - `request.params` becomes path parameters
 - `request.query` becomes query parameters
 - `request.body` becomes a JSON request body
-- `response` becomes the success response schema
-- `successStatusCode` becomes the success response status when provided
-- `errors` become additional response entries
+- each `responses` entry becomes an OpenAPI response for that status
+- `noBody` responses are emitted without JSON content
 
-Only JSON contracts are included in the generated document.
+Raw request contracts, websocket contracts, and contracts with streaming
+responses are not included in the generated document.
 
 ## Zod JSON Schema
 

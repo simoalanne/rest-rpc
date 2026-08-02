@@ -1,8 +1,36 @@
 export type {
-	ContractApiError,
+	Contract,
 	ContractApiRequest,
 	ContractApiResponse,
+	ContractNonSuccessfulResponse,
+	ContractRequest,
+	ContractResponse,
+	ContractSuccessfulResponse,
+	ContractTree,
 	DotPaths,
+	InferResponseBody,
+	NoBodyResponse,
+	ResponseBodySchema,
+	StreamResponse,
 } from "./contracts.ts";
 
-export { initContracts } from "./contracts.ts";
+export type {
+	ApiClientFetchOptions,
+	ApiClientOptions,
+	ApiClientTree,
+	ClientResponse,
+	ConnectArgs,
+	ConnectFn,
+	ContractWebSocket,
+	DeclaredClientResponse,
+	FetchArgs,
+	FetchFn,
+	FetchOptions,
+	FetchResponseFn,
+	TryConnectFn,
+	UndeclaredClientResponse,
+	WebSocketMessageResult,
+} from "./client.ts";
+
+export { initClient } from "./client.ts";
+export { initContracts, noBody, stream } from "./contracts.ts";

@@ -4,6 +4,42 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import esmock from "esmock";
 
+const contracts = {
+	items: {
+		list: {
+			method: "GET",
+			path: "/items",
+			responses: { 200: {} },
+		},
+		byId: {
+			method: "GET",
+			path: "/items/:id",
+			request: { params: { shape: { id: true } } },
+			responses: { 200: {} },
+		},
+		create: {
+			method: "POST",
+			path: "/items",
+			request: { body: { shape: { name: true } } },
+			responses: { 201: {}, 409: {} },
+		},
+		failing: {
+			method: "GET",
+			path: "/items/failing",
+			responses: { 200: {}, 409: {} },
+		},
+		socket: {
+			method: "GET",
+			path: "/items/socket",
+			options: { mode: "websocket" },
+			messages: {
+				client: {},
+				server: {},
+			},
+		},
+	},
+} as any;
+
 const createQueryClientMock = () => ({
 	invalidateQueries: async (...args: unknown[]) => {
 		invalidateQueriesCalls.push(args);
@@ -22,6 +58,7 @@ const createQueryClientMock = () => ({
 	},
 });
 
+let initClientCalls: unknown[][] = [];
 let invalidateQueriesCalls: unknown[][] = [];
 let cancelQueriesCalls: unknown[][] = [];
 let removeQueriesCalls: unknown[][] = [];
@@ -30,12 +67,83 @@ let setQueriesDataCalls: unknown[][] = [];
 let useQueryCalls: unknown[] = [];
 let useSuspenseQueryCalls: unknown[] = [];
 let useMutationCalls: unknown[] = [];
+let listFetchResponseCalls: unknown[][] = [];
+let byIdFetchResponseCalls: unknown[][] = [];
+let createFetchResponseCalls: unknown[][] = [];
+let failingFetchResponseCalls: unknown[][] = [];
 
-let mutateCalls: unknown[][] = [];
-let mutateAsyncCalls: unknown[][] = [];
+const resetState = () => {
+	initClientCalls = [];
+	invalidateQueriesCalls = [];
+	cancelQueriesCalls = [];
+	removeQueriesCalls = [];
+	setQueryDataCalls = [];
+	setQueriesDataCalls = [];
+	useQueryCalls = [];
+	useSuspenseQueryCalls = [];
+	useMutationCalls = [];
+	listFetchResponseCalls = [];
+	byIdFetchResponseCalls = [];
+	createFetchResponseCalls = [];
+	failingFetchResponseCalls = [];
+};
 
-const getCreateAdapter = async () => {
+const createApiTree = () => ({
+	items: {
+		list: {
+			fetchResponse: async (...args: unknown[]) => {
+				listFetchResponseCalls.push(args);
+				return {
+					declared: true,
+					status: 200,
+					body: { items: ["carrot"] },
+				};
+			},
+		},
+		byId: {
+			fetchResponse: async (...args: unknown[]) => {
+				byIdFetchResponseCalls.push(args);
+				return {
+					declared: true,
+					status: 200,
+					body: { id: "item-1" },
+				};
+			},
+		},
+		create: {
+			fetchResponse: async (...args: unknown[]) => {
+				createFetchResponseCalls.push(args);
+				return {
+					declared: true,
+					status: 201,
+					body: { id: "item-2" },
+				};
+			},
+		},
+		failing: {
+			fetchResponse: async (...args: unknown[]) => {
+				failingFetchResponseCalls.push(args);
+				return {
+					declared: true,
+					status: 409,
+					body: { code: "ITEM_EXISTS" },
+				};
+			},
+		},
+		socket: {
+			connect: () => ({}),
+		},
+	},
+});
+
+const getInitReactQueryClient = async () => {
 	const module = await esmock("./createAdapter.ts", {
+		"@contract-first-api/core": {
+			initClient: (...args: unknown[]) => {
+				initClientCalls.push(args);
+				return createApiTree();
+			},
+		},
 		"@tanstack/react-query": {
 			useQuery: ((options: unknown) => {
 				useQueryCalls.push(options);
@@ -49,16 +157,8 @@ const getCreateAdapter = async () => {
 				useMutationCalls.push(options);
 				return {
 					status: "idle",
-					mutate: (...args: unknown[]) => {
-						mutateCalls.push(args);
-					},
-					mutateAsync: async (...args: unknown[]) => {
-						mutateAsyncCalls.push(args);
-						return {
-							ok: true,
-							args,
-						};
-					},
+					mutate: () => {},
+					mutateAsync: async () => undefined,
 				};
 			}) as any,
 		},
@@ -67,176 +167,49 @@ const getCreateAdapter = async () => {
 	return module.default;
 };
 
-const createNode = (
-	$contract: Record<string, unknown>,
-	fetch: (...args: unknown[]) => Promise<unknown>,
-) => ({
-	$contract,
-	fetch,
-	tryFetch: async (...args: unknown[]) => {
-		try {
-			const data = await fetch(...args);
-			return { success: true, data };
-		} catch (error) {
-			return { success: false, error };
-		}
-	},
-});
-
-const createApiTree = () =>
-	({
-		items: {
-			list: createNode(
-				{ method: "GET", path: "/items" },
-				async (...args: unknown[]) => {
-					listFetchCalls.push(args);
-					return { items: ["carrot"] };
-				},
-			),
-			byId: createNode(
-				{
-					method: "GET",
-					path: "/items/:id",
-					request: { params: { shape: { id: true } } },
-				},
-				async (...args: unknown[]) => {
-					byIdFetchCalls.push(args);
-					return { id: "item-1" };
-				},
-			),
-			create: createNode(
-				{
-					method: "POST",
-					path: "/items",
-					request: { body: { shape: { name: true } } },
-				},
-				async (...args: unknown[]) => {
-					createFetchCalls.push(args);
-					return { created: true };
-				},
-			),
-			refresh: createNode(
-				{ method: "POST", path: "/items/refresh" },
-				async (...args: unknown[]) => {
-					refreshFetchCalls.push(args);
-					return { refreshed: true };
-				},
-			),
-			upload: createNode(
-				{
-					method: "POST",
-					path: "/items/upload",
-					options: { mode: "raw" },
-				},
-				async (...args: unknown[]) => {
-					uploadFetchCalls.push(args);
-					return { uploaded: true };
-				},
-			),
-			failing: createNode(
-				{ method: "GET", path: "/items/failing" },
-				async (...args: unknown[]) => {
-					failingFetchCalls.push(args);
-					throw failingError;
-				},
-			),
-			events: {
-				$contract: {
-					method: "GET",
-					path: "/items/events",
-					options: { mode: "stream" },
-				},
-				stream: async () => [],
-				subscribe: () => () => {},
-			},
-			socket: {
-				$contract: {
-					method: "GET",
-					path: "/items/socket",
-					options: { mode: "websocket" },
-				},
-				connect: () => ({
-					socket: {},
-					send: () => {},
-					subscribe: () => () => {},
-					close: () => {},
-				}),
-			},
-		},
-	}) as any;
-
-let listFetchCalls: unknown[][] = [];
-let byIdFetchCalls: unknown[][] = [];
-let createFetchCalls: unknown[][] = [];
-let refreshFetchCalls: unknown[][] = [];
-let uploadFetchCalls: unknown[][] = [];
-let failingFetchCalls: unknown[][] = [];
-const failingError = new Error("boom");
-
-const resetState = () => {
-	invalidateQueriesCalls = [];
-	cancelQueriesCalls = [];
-	removeQueriesCalls = [];
-	setQueryDataCalls = [];
-	setQueriesDataCalls = [];
-	useQueryCalls = [];
-	useSuspenseQueryCalls = [];
-	useMutationCalls = [];
-	mutateCalls = [];
-	mutateAsyncCalls = [];
-	listFetchCalls = [];
-	byIdFetchCalls = [];
-	createFetchCalls = [];
-	refreshFetchCalls = [];
-	uploadFetchCalls = [];
-	failingFetchCalls = [];
-};
-
-describe("createAdapter", () => {
-	it("should preserve the API tree shape and expose GET helpers", async () => {
+describe("initReactQueryClient", () => {
+	it("should create a core client and expose HTTP helpers", async () => {
 		resetState();
 
-		const createAdapter = await getCreateAdapter();
-		const wrapped = createAdapter(
-			createApiTree(),
-			createQueryClientMock() as any,
-		);
+		const initReactQueryClient = await getInitReactQueryClient();
+		const queryClient = createQueryClientMock();
+		const api = initReactQueryClient(contracts, {
+			queryClient,
+			baseUrl: "http://localhost:3001/api",
+			timeoutMs: 1000,
+		} as any);
 
-		assert.equal(typeof wrapped.items.list.useQuery, "function");
-		assert.equal(typeof wrapped.items.list.useSuspenseQuery, "function");
-		assert.equal(typeof wrapped.items.list.$fetch, "function");
-		assert.equal(typeof wrapped.items.list.$tryFetch, "function");
-		assert.equal(typeof wrapped.items.list.$getKey, "function");
-		assert.equal(typeof wrapped.items.list.$contract, "object");
-		assert.equal(typeof wrapped.items.list.invalidate, "function");
-		assert.equal(typeof wrapped.items.list.clear, "function");
-		assert.equal(typeof wrapped.items.list.setData, "function");
-		assert.equal("$reactQueryApi" in wrapped.items.list, false);
-		assert.equal(typeof wrapped.items.upload.$fetch, "function");
-		assert.equal(typeof wrapped.items.upload.$tryFetch, "function");
-		assert.equal("useQuery" in wrapped.items.upload, false);
-		assert.equal("useMutation" in wrapped.items.upload, false);
-		assert.equal(wrapped.items.events.$contract.path, "/items/events");
-		assert.equal(typeof wrapped.items.events.$stream, "function");
-		assert.equal(typeof wrapped.items.events.$subscribe, "function");
-		assert.equal("stream" in wrapped.items.events, false);
-		assert.equal("subscribe" in wrapped.items.events, false);
-		assert.equal(wrapped.items.socket.$contract.path, "/items/socket");
-		assert.equal(typeof wrapped.items.socket.$connect, "function");
-		assert.equal("connect" in wrapped.items.socket, false);
+		assert.deepStrictEqual(initClientCalls, [
+			[
+				contracts,
+				{
+					baseUrl: "http://localhost:3001/api",
+					timeoutMs: 1000,
+				},
+			],
+		]);
+		assert.equal(typeof api.items.list.useQuery, "function");
+		assert.equal(typeof api.items.list.useSuspenseQuery, "function");
+		assert.equal(typeof api.items.list.useMutation, "function");
+		assert.equal(typeof api.items.list.invalidate, "function");
+		assert.equal(typeof api.items.list.clear, "function");
+		assert.equal(typeof api.items.list.setData, "function");
+		assert.equal(typeof api.items.list.getKey, "function");
+		assert.deepStrictEqual(api.items.socket, {});
 	});
 
-	it("should configure useQuery with request-aware key, enabled flag and query function", async () => {
+	it("should configure useQuery with request-aware keys and fetchResponse", async () => {
 		resetState();
 
-		const createAdapter = await getCreateAdapter();
-		const wrapped = createAdapter(
-			createApiTree(),
-			createQueryClientMock() as any,
-		);
+		const initReactQueryClient = await getInitReactQueryClient();
+		const api = initReactQueryClient(contracts, {
+			queryClient: createQueryClientMock(),
+			baseUrl: "http://localhost:3001/api",
+		} as any);
 		const request = { id: "item-1" };
-		const options = { staleTime: 1234 };
-		const result = wrapped.items.byId.useQuery(request, options as any) as any;
+		const result = api.items.byId.useQuery(request, {
+			staleTime: 123,
+		} as any) as any;
 
 		assert.equal(result.source, "useQuery");
 		assert.equal(useQueryCalls.length, 1);
@@ -244,39 +217,44 @@ describe("createAdapter", () => {
 		const queryOptions = useQueryCalls[0] as any;
 		assert.deepStrictEqual(queryOptions.queryKey, ["items", "byId", request]);
 		assert.equal(queryOptions.enabled, true);
-		assert.equal(queryOptions.staleTime, 1234);
+		assert.equal(queryOptions.staleTime, 123);
 
 		const queryResult = await queryOptions.queryFn({ signal: "signal-value" });
-		assert.deepStrictEqual(queryResult, { id: "item-1" });
-		assert.deepStrictEqual(byIdFetchCalls, [
+		assert.deepStrictEqual(queryResult, {
+			status: 200,
+			body: { id: "item-1" },
+		});
+		assert.deepStrictEqual(byIdFetchResponseCalls, [
 			[request, { signal: "signal-value" }],
 		]);
 	});
 
-	it("should not enable request-based queries when request is missing", async () => {
+	it("should disable request-based queries when request input is falsy", async () => {
 		resetState();
 
-		const createAdapter = await getCreateAdapter();
-		const wrapped = createAdapter(
-			createApiTree(),
-			createQueryClientMock() as any,
-		);
-		wrapped.items.byId.useQuery(undefined as any);
+		const initReactQueryClient = await getInitReactQueryClient();
+		const api = initReactQueryClient(contracts, {
+			queryClient: createQueryClientMock(),
+			baseUrl: "http://localhost:3001/api",
+		} as any);
+
+		api.items.byId.useQuery("" as any);
 
 		const queryOptions = useQueryCalls[0] as any;
 		assert.equal(queryOptions.enabled, false);
 		assert.deepStrictEqual(queryOptions.queryKey, ["items", "byId"]);
 	});
 
-	it("should treat first argument as options for GET contracts without request", async () => {
+	it("should treat the first argument as options for contracts without request input", async () => {
 		resetState();
 
-		const createAdapter = await getCreateAdapter();
-		const wrapped = createAdapter(
-			createApiTree(),
-			createQueryClientMock() as any,
-		);
-		wrapped.items.list.useQuery({ gcTime: 50 } as any);
+		const initReactQueryClient = await getInitReactQueryClient();
+		const api = initReactQueryClient(contracts, {
+			queryClient: createQueryClientMock(),
+			baseUrl: "http://localhost:3001/api",
+		} as any);
+
+		api.items.list.useQuery({ gcTime: 50 } as any);
 
 		const queryOptions = useQueryCalls[0] as any;
 		assert.equal(queryOptions.enabled, true);
@@ -284,19 +262,22 @@ describe("createAdapter", () => {
 		assert.deepStrictEqual(queryOptions.queryKey, ["items", "list"]);
 
 		await queryOptions.queryFn({ signal: "list-signal" });
-		assert.deepStrictEqual(listFetchCalls, [[{ signal: "list-signal" }]]);
+		assert.deepStrictEqual(listFetchResponseCalls, [
+			[{ signal: "list-signal" }],
+		]);
 	});
 
 	it("should configure useSuspenseQuery with the same request forwarding behavior", async () => {
 		resetState();
 
-		const createAdapter = await getCreateAdapter();
-		const wrapped = createAdapter(
-			createApiTree(),
-			createQueryClientMock() as any,
-		);
+		const initReactQueryClient = await getInitReactQueryClient();
+		const api = initReactQueryClient(contracts, {
+			queryClient: createQueryClientMock(),
+			baseUrl: "http://localhost:3001/api",
+		} as any);
 		const request = { id: "item-2" };
-		wrapped.items.byId.useSuspenseQuery(request, { retry: false } as any);
+
+		api.items.byId.useSuspenseQuery(request, { retry: false } as any);
 
 		const suspenseOptions = useSuspenseQueryCalls[0] as any;
 		assert.deepStrictEqual(suspenseOptions.queryKey, [
@@ -307,89 +288,80 @@ describe("createAdapter", () => {
 		assert.equal(suspenseOptions.retry, false);
 
 		await suspenseOptions.queryFn({ signal: "suspense-signal" });
-		assert.deepStrictEqual(byIdFetchCalls, [
+		assert.deepStrictEqual(byIdFetchResponseCalls, [
 			[request, { signal: "suspense-signal" }],
 		]);
 	});
 
-	it("should expose fetch helpers that forward request and fetch options correctly", async () => {
+	it("should configure mutations with response envelopes", async () => {
 		resetState();
 
-		const createAdapter = await getCreateAdapter();
-		const wrapped = createAdapter(
-			createApiTree(),
-			createQueryClientMock() as any,
-		);
-		const request = { id: "item-3" };
-		const fetchOptions = { signal: "fetch-signal" };
+		const initReactQueryClient = await getInitReactQueryClient();
+		const api = initReactQueryClient(contracts, {
+			queryClient: createQueryClientMock(),
+			baseUrl: "http://localhost:3001/api",
+		} as any);
 
-		await wrapped.items.byId.$fetch(request as any, fetchOptions as any);
-		await wrapped.items.list.$fetch(fetchOptions as any);
+		api.items.create.useMutation({ retry: false } as any);
 
-		assert.deepStrictEqual(byIdFetchCalls, [[request, fetchOptions]]);
-		assert.deepStrictEqual(listFetchCalls, [[fetchOptions]]);
-	});
+		const mutationOptions = useMutationCalls[0] as any;
+		assert.equal(mutationOptions.retry, false);
 
-	it("should treat raw contracts as fetch-only wrappers", async () => {
-		resetState();
-
-		const createAdapter = await getCreateAdapter();
-		const wrapped = createAdapter(
-			createApiTree(),
-			createQueryClientMock() as any,
-		);
-
-		await wrapped.items.upload.$fetch({ rawBody: "payload" } as any);
-
-		assert.deepStrictEqual(uploadFetchCalls, [[{ rawBody: "payload" }, undefined]]);
-		assert.equal(useMutationCalls.length, 0);
-		assert.equal(useQueryCalls.length, 0);
-	});
-
-	it("should return success and failure results from tryFetch", async () => {
-		resetState();
-
-		const createAdapter = await getCreateAdapter();
-		const wrapped = createAdapter(
-			createApiTree(),
-			createQueryClientMock() as any,
-		);
-
-		const successResult = await wrapped.items.list.$tryFetch();
-		const failureResult = await wrapped.items.failing.$tryFetch();
-
-		assert.deepStrictEqual(successResult, {
-			success: true,
-			data: { items: ["carrot"] },
+		const request = { name: "Potato" };
+		const result = await mutationOptions.mutationFn(request);
+		assert.deepStrictEqual(result, {
+			status: 201,
+			body: { id: "item-2" },
 		});
-		assert.deepStrictEqual(failureResult, {
-			success: false,
-			error: failingError,
-		});
+		assert.deepStrictEqual(createFetchResponseCalls, [[request, undefined]]);
 	});
 
-	it("should expose cache helper methods that use the contract path as query key", async () => {
+	it("should throw declared non-success responses as hook errors", async () => {
 		resetState();
 
-		const createAdapter = await getCreateAdapter();
-		const wrapped = createAdapter(
-			createApiTree(),
-			createQueryClientMock() as any,
+		const initReactQueryClient = await getInitReactQueryClient();
+		const api = initReactQueryClient(contracts, {
+			queryClient: createQueryClientMock(),
+			baseUrl: "http://localhost:3001/api",
+		} as any);
+
+		api.items.failing.useQuery();
+
+		const queryOptions = useQueryCalls[0] as any;
+		await assert.rejects(
+			() => queryOptions.queryFn({ signal: "failing-signal" }),
+			{
+				status: 409,
+				body: { code: "ITEM_EXISTS" },
+			},
 		);
+		assert.deepStrictEqual(failingFetchResponseCalls, [
+			[{ signal: "failing-signal" }],
+		]);
+	});
+
+	it("should expose cache helpers that use contract path keys", async () => {
+		resetState();
+
+		const initReactQueryClient = await getInitReactQueryClient();
+		const api = initReactQueryClient(contracts, {
+			queryClient: createQueryClientMock(),
+			baseUrl: "http://localhost:3001/api",
+		} as any);
 		const request = { id: "item-4" };
 		const updater = (current: unknown) => current;
 
-		assert.deepStrictEqual(wrapped.items.byId.$getKey(request as any), [
+		assert.deepStrictEqual(api.items.byId.getKey(request as any), [
 			"items",
 			"byId",
 			request,
 		]);
-		assert.deepStrictEqual(wrapped.items.list.$getKey(), ["items", "list"]);
+		assert.deepStrictEqual(api.items.list.getKey(), ["items", "list"]);
 
-		await wrapped.items.byId.invalidate(request as any);
-		wrapped.items.byId.clear(request as any);
-		wrapped.items.byId.setData(request as any, updater);
-		wrapped.items.list.setData(updater);
+		await api.items.byId.invalidate(request as any);
+		api.items.byId.clear(request as any);
+		api.items.byId.setData(request as any, updater);
+		api.items.list.setData(updater);
 
 		assert.deepStrictEqual(invalidateQueriesCalls, [
 			[{ queryKey: ["items", "byId", request] }],
@@ -406,81 +378,5 @@ describe("createAdapter", () => {
 		assert.deepStrictEqual(setQueriesDataCalls, [
 			[{ queryKey: ["items", "list"] }, updater],
 		]);
-	});
-
-	it("should wrap POST contracts with useMutation and forward mutate arguments", async () => {
-		resetState();
-
-		const createAdapter = await getCreateAdapter();
-		const wrapped = createAdapter(
-			createApiTree(),
-			createQueryClientMock() as any,
-		);
-		const mutation = wrapped.items.create.useMutation({
-			retry: false,
-		} as any) as any;
-		const request = { name: "Potato" };
-		const hookOptions = { onSuccess: () => {} };
-
-		assert.equal(useMutationCalls.length, 1);
-		const mutationOptions = useMutationCalls[0] as any;
-		assert.equal(mutationOptions.retry, false);
-
-		const mutationFnResult = await mutationOptions.mutationFn(request);
-		assert.deepStrictEqual(mutationFnResult, { created: true });
-		assert.deepStrictEqual(createFetchCalls, [[request, undefined]]);
-
-		mutation.mutate(request as any, hookOptions as any);
-		const mutateAsyncResult = await mutation.mutateAsync(
-			request as any,
-			hookOptions as any,
-		);
-
-		assert.deepStrictEqual(mutateCalls, [[request, hookOptions]]);
-		assert.deepStrictEqual(mutateAsyncCalls, [[request, hookOptions]]);
-		assert.deepStrictEqual(mutateAsyncResult, {
-			ok: true,
-			args: [request, hookOptions],
-		});
-	});
-
-	it("should call mutation fetchers without variables for POST contracts that do not take a request", async () => {
-		resetState();
-
-		const createAdapter = await getCreateAdapter();
-		const wrapped = createAdapter(
-			createApiTree(),
-			createQueryClientMock() as any,
-		);
-		const mutation = wrapped.items.refresh.useMutation() as any;
-		const mutationOptions = useMutationCalls[0] as any;
-		const hookOptions = { onSuccess: () => {} };
-
-		await mutationOptions.mutationFn("ignored-variable");
-		mutation.mutate(hookOptions as any);
-		await mutation.mutateAsync(hookOptions as any);
-
-		assert.deepStrictEqual(refreshFetchCalls, [[undefined]]);
-		assert.deepStrictEqual(mutateCalls, [[undefined, hookOptions]]);
-		assert.equal(mutateAsyncCalls.length, 1);
-		assert.equal(mutateAsyncCalls[0][0], undefined);
-		assert.equal(mutateAsyncCalls[0][1], hookOptions);
-	});
-
-	it("should expose query and mutation helpers for every JSON contract", async () => {
-		resetState();
-
-		const createAdapter = await getCreateAdapter();
-		const wrapped = createAdapter(
-			createApiTree(),
-			createQueryClientMock() as any,
-		);
-
-		assert.equal(typeof wrapped.items.list.useQuery, "function");
-		assert.equal(typeof wrapped.items.list.useMutation, "function");
-		assert.equal(typeof wrapped.items.create.useMutation, "function");
-		assert.equal(typeof wrapped.items.create.useQuery, "function");
-		assert.equal(typeof wrapped.items.create.invalidate, "function");
-		assert.equal(typeof wrapped.items.create.setData, "function");
 	});
 });

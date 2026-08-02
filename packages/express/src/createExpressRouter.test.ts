@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { initContracts } from "@contract-first-api/core";
+import { initContracts, noBody, stream } from "@contract-first-api/core";
 import z from "zod";
 import { initServer } from "./initServer.ts";
 
@@ -122,11 +122,13 @@ describe("initServer", () => {
 						params: z.object({ id: z.string() }),
 						query: z.object({ includePosts: z.coerce.boolean().optional() }),
 					},
-					response: z.object({
-						id: z.string(),
-						viewerId: z.string(),
-						includePosts: z.boolean().optional(),
-					}),
+					responses: {
+						200: z.object({
+							id: z.string(),
+							viewerId: z.string(),
+							includePosts: z.boolean().optional(),
+						}),
+					},
 				},
 			},
 		});
@@ -144,9 +146,12 @@ describe("initServer", () => {
 				async getById(request) {
 					seenRequest = request;
 					return {
-						id: request.id,
-						viewerId: request.context.viewerId,
-						includePosts: request.includePosts,
+						status: 200,
+						body: {
+							id: request.id,
+							viewerId: request.context.viewerId,
+							includePosts: request.includePosts,
+						},
 					};
 				},
 			}),
@@ -212,11 +217,14 @@ describe("initServer", () => {
 				stream: {
 					method: "GET",
 					path: "/events",
-					response: z.object({
-						type: z.string(),
-						payload: z.string(),
-					}),
-					options: { mode: "stream" },
+					responses: {
+						200: stream(
+							z.object({
+								type: z.string(),
+								payload: z.string(),
+							}),
+						),
+					},
 				},
 			},
 		});
@@ -224,9 +232,11 @@ describe("initServer", () => {
 		const { createRouter, defineService } = initServer<typeof contracts>();
 		const services = {
 			events: defineService("events", {
-				async *stream() {
-					yield { type: "joined", payload: "Ada" };
-					yield { type: "left", payload: "Linus" };
+				stream() {
+					return (async function* () {
+						yield { type: "joined", payload: "Ada" };
+						yield { type: "left", payload: "Linus" };
+					})();
 				},
 			}),
 		};
@@ -279,9 +289,11 @@ describe("initServer", () => {
 							title: z.string().min(1),
 						}),
 					},
-					response: z.object({
-						id: z.string(),
-					}),
+					responses: {
+						201: z.object({
+							id: z.string(),
+						}),
+					},
 				},
 			},
 		});
@@ -294,7 +306,10 @@ describe("initServer", () => {
 			posts: defineService("posts", {
 				async create() {
 					serviceCalled = true;
-					return { id: "1" };
+					return {
+						status: 201,
+						body: { id: "1" },
+					};
 				},
 			}),
 		};
@@ -365,11 +380,13 @@ describe("initServer", () => {
 							title: z.string().min(1),
 						}),
 					},
-					response: z.object({
-						id: z.string(),
-						title: z.string(),
-						viewerId: z.string(),
-					}),
+					responses: {
+						201: z.object({
+							id: z.string(),
+							title: z.string(),
+							viewerId: z.string(),
+						}),
+					},
 				},
 			},
 		});
@@ -401,9 +418,12 @@ describe("initServer", () => {
 				create({ title, context }) {
 					seen.viewerIdInService = context.viewerId;
 					return {
-						id: "post-1",
-						title,
-						viewerId: context.viewerId,
+						status: 201,
+						body: {
+							id: "post-1",
+							title,
+							viewerId: context.viewerId,
+						},
 					};
 				},
 			}),
@@ -472,6 +492,9 @@ describe("initServer", () => {
 					request: {
 						params: z.object({ id: z.string() }),
 					},
+					responses: {
+						204: noBody,
+					},
 				},
 			},
 		});
@@ -484,7 +507,12 @@ describe("initServer", () => {
 			contracts,
 			services: {
 				posts: defineService("posts", {
-					delete() {},
+					delete() {
+						return {
+							status: 204,
+							body: undefined,
+						};
+					},
 				}),
 			},
 		});
@@ -515,15 +543,16 @@ describe("initServer", () => {
 		});
 	});
 
-	it("should use custom success status codes when provided", async () => {
+	it("should use declared success status codes", async () => {
 		const { defineContractTree } = initContracts();
 		const contracts = defineContractTree({
 			posts: {
 				create: {
 					method: "POST",
 					path: "/posts",
-					successStatusCode: 202,
-					response: z.object({ id: z.string() }),
+					responses: {
+						202: z.object({ id: z.string() }),
+					},
 				},
 			},
 		});
@@ -537,7 +566,10 @@ describe("initServer", () => {
 			services: {
 				posts: defineService("posts", {
 					create() {
-						return { id: "post-1" };
+						return {
+							status: 202,
+							body: { id: "post-1" },
+						};
 					},
 				}),
 			},
@@ -567,7 +599,9 @@ describe("initServer", () => {
 			health: {
 				method: "GET",
 				path: "/health",
-				response: z.literal("ok"),
+				responses: {
+					200: z.literal("ok"),
+				},
 			},
 		});
 
@@ -601,7 +635,7 @@ describe("initServer", () => {
 		assert.equal(response.read().jsonBody, undefined);
 	});
 
-	it("should return known contract errors as flat JSON", async () => {
+	it("should return non-success contract responses as flat JSON", async () => {
 		const { defineContractTree } = initContracts();
 		const contracts = defineContractTree({
 			todos: {
@@ -611,16 +645,17 @@ describe("initServer", () => {
 					request: {
 						body: z.object({ title: z.string() }),
 					},
-					response: z.object({ id: z.string() }),
-					errors: z.object({
-						code: z.literal("TITLE_ALREADY_EXISTS"),
-					}),
+					responses: {
+						201: z.object({ id: z.string() }),
+						409: z.object({
+							code: z.literal("TITLE_ALREADY_EXISTS"),
+						}),
+					},
 				},
 			},
 		});
 
-		const { createRouter, defineService, throwKnownError } =
-			initServer<typeof contracts>();
+		const { createRouter, defineService } = initServer<typeof contracts>();
 		const target = createRouteTargetDouble();
 		const knownError = { code: "TITLE_ALREADY_EXISTS" };
 		createRouter({
@@ -629,7 +664,10 @@ describe("initServer", () => {
 			services: {
 				todos: defineService("todos", {
 					create() {
-						throwKnownError(knownError);
+						return {
+							status: 409,
+							body: knownError,
+						};
 					},
 				}),
 			},
@@ -655,7 +693,7 @@ describe("initServer", () => {
 
 		assert.equal(nextError, undefined);
 		assert.deepStrictEqual(response.read(), {
-			statusCode: 400,
+			statusCode: 409,
 			jsonBody: knownError,
 			writableEnded: true,
 		});
@@ -672,6 +710,9 @@ describe("initServer", () => {
 						params: z.object({ id: z.string() }),
 					},
 					options: { mode: "raw" },
+					responses: {
+						204: noBody,
+					},
 				},
 			},
 		});
@@ -714,6 +755,9 @@ describe("initServer", () => {
 					request: {
 						body: z.object({ title: z.string() }),
 					},
+					responses: {
+						204: noBody,
+					},
 				},
 			},
 		});
@@ -752,6 +796,9 @@ describe("initServer", () => {
 					method: "POST",
 					path: "/uploads",
 					options: { mode: "raw" },
+					responses: {
+						204: noBody,
+					},
 				},
 			},
 			posts: {
@@ -760,6 +807,9 @@ describe("initServer", () => {
 					path: "/posts",
 					request: {
 						body: z.object({ title: z.string() }),
+					},
+					responses: {
+						204: noBody,
 					},
 				},
 			},
@@ -808,12 +858,18 @@ describe("initServer", () => {
 					method: "POST",
 					path: "/uploads/:id",
 					options: { mode: "raw" },
+					responses: {
+						204: noBody,
+					},
 				},
 				static: {
 					method: "POST",
 					path: "/uploads/static",
 					request: {
 						body: z.object({ title: z.string() }),
+					},
+					responses: {
+						204: noBody,
 					},
 				},
 			},
@@ -855,6 +911,9 @@ describe("initServer", () => {
 					path: "/posts",
 					request: {
 						body: z.object({ title: z.string() }),
+					},
+					responses: {
+						204: noBody,
 					},
 				},
 			},

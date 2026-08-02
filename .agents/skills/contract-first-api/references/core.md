@@ -1,20 +1,17 @@
 # @contract-first-api/core
 
-Use this reference for defining contract trees and reasoning about shared
-contract behavior.
+Use this reference for defining contract trees, deriving shared types, and
+creating typed clients.
 
 ## Purpose
 
-`@contract-first-api/core` defines shared API contracts and helper types. It
-does not mount routes or make HTTP requests.
+`@contract-first-api/core` defines shared API contracts, helper types, response
+helpers, and the runtime client.
 
 ## Main API
 
 Start with `initContracts()`, optionally with a metadata shape, then create the
 tree with `defineContractTree()`.
-
-Avoid circular dependencies by declaring `initContracts()` once per repository
-outside the main `index.ts` entry point.
 
 ```ts
 import { initContracts } from "@contract-first-api/core";
@@ -29,61 +26,16 @@ export const contracts = defineContractTree({
 		list: {
 			method: "GET",
 			path: "/todos",
-			response: z.object({
-				items: z.array(
-					z.object({
-						id: z.string(),
-						title: z.string(),
-					}),
-				),
-			}),
-		},
-	},
-});
-```
-
-Common JSON route:
-
-```ts
-export const contracts = defineContractTree({
-	todos: {
-		get: {
-			method: "GET",
-			path: "/todos/:id",
-			request: {
-				params: z.object({
-					id: z.string(),
+			responses: {
+				200: z.object({
+					items: z.array(
+						z.object({
+							id: z.string(),
+							title: z.string(),
+						}),
+					),
 				}),
 			},
-			response: z.object({
-				id: z.string(),
-				title: z.string(),
-			}),
-		},
-	},
-});
-```
-
-Route with metadata:
-
-```ts
-export const contracts = defineContractTree({
-	todos: {
-		create: {
-			method: "POST",
-			path: "/todos",
-			meta: {
-				requiresAuth: true,
-			},
-			request: {
-				body: z.object({
-					title: z.string().min(1),
-				}),
-			},
-			response: z.object({
-				id: z.string(),
-				title: z.string(),
-			}),
 		},
 	},
 });
@@ -91,80 +43,103 @@ export const contracts = defineContractTree({
 
 ## Contract Fields
 
-Common fields:
+Common HTTP contract fields:
 
 - `method`
 - `path`
 - `request.body`
 - `request.query`
 - `request.params`
-- `response`
-- `successStatusCode`
-- `errors`
+- `responses`
 - `options`
-- `messages`
 - `meta`
+
+WebSocket contracts use `messages.client` and `messages.server` instead of
+`responses`.
+
+## Responses
+
+HTTP contracts declare all known status codes in `responses`.
+
+```ts
+import { noBody, stream } from "@contract-first-api/core";
+
+export const contracts = defineContractTree({
+	todos: {
+		create: {
+			method: "POST",
+			path: "/todos",
+			request: {
+				body: z.object({
+					title: z.string().min(1),
+				}),
+			},
+			responses: {
+				201: z.object({
+					id: z.string(),
+					title: z.string(),
+				}),
+				409: z.object({
+					code: z.literal("TITLE_ALREADY_EXISTS"),
+				}),
+			},
+		},
+		remove: {
+			method: "DELETE",
+			path: "/todos/:id",
+			request: {
+				params: z.object({ id: z.string() }),
+			},
+			responses: {
+				204: noBody,
+			},
+		},
+		events: {
+			method: "GET",
+			path: "/todos/events",
+			responses: {
+				200: stream(z.object({ type: z.string() })),
+			},
+		},
+	},
+});
+```
+
+There is no separate `response`, `successStatusCode`, or `errors` field. Status
+codes are the keys in `responses`; non-2xx responses are typed error cases.
 
 ## Contract Modes
 
 - `json`
-  Default mode. Supports request schemas, optional response schema, known
-  errors, and metadata.
+  Default mode. Supports request schemas, responses, and metadata.
 - `raw`
-  Uses `options: { mode: "raw" }`. Can define `query`, `params`, response, and
-  errors, but not a contract-managed request body.
-- `stream`
-  Uses `options: { mode: "stream" }`. Must define a response chunk schema.
+  Uses `options: { mode: "raw" }`. Can define `query`, `params`, responses,
+  and metadata, but not a contract-managed request body.
+- streaming
+  Use `stream(schema)` as the successful response value. A stream response
+  cannot be mixed with multiple successful status codes.
 - `websocket`
   Uses `options: { mode: "websocket" }`. Must use `GET` and define
   `messages.client` and `messages.server`.
 
-Mode examples:
+## Client
+
+Use `initClient(contracts, options)` from core.
 
 ```ts
-export const rawContracts = defineContractTree({
-	uploadImage: {
-		method: "POST",
-		path: "/images/:imageId",
-		request: {
-			params: z.object({
-				imageId: z.string(),
-			}),
-		},
-		options: { mode: "raw" },
-		response: z.object({
-			ok: z.boolean(),
-		}),
-	},
+const api = initClient(contracts, {
+	baseUrl: "http://localhost:3001/api",
+	getHeaders: () => ({
+		Authorization: `Bearer ${getAuthToken()}`,
+	}),
+	timeoutMs: 10_000,
 });
 ```
 
-```ts
-export const streamContracts = defineContractTree({
-	watchEvents: {
-		method: "GET",
-		path: "/events",
-		options: { mode: "stream" },
-		response: z.object({
-			type: z.string(),
-		}),
-	},
-});
-```
-
-```ts
-export const websocketContracts = defineContractTree({
-	chat: {
-		method: "GET",
-		path: "/chat",
-		options: { mode: "websocket" },
-		messages: {
-			client: z.object({ text: z.string() }),
-			server: z.object({ text: z.string() }),
-		},
-	},
-});
-```
+- `fetchResponse()` returns declared or undeclared response envelopes.
+- `fetch()` exists only when the contract has exactly one successful response
+  and returns that success body directly.
+- websocket contracts expose `connect()` and `tryConnect()`.
 
 ## Invariants
 
@@ -172,14 +147,13 @@ export const websocketContracts = defineContractTree({
   and integrations.
 - Request field names must be unique across `body`, `query`, and `params` for
   one contract.
+- Every HTTP contract must declare at least one successful response.
 - Contracts are plain objects and can be organized across files with normal
   object composition.
-- `defineContractTree()` performs runtime validation for structural mistakes
-  that TypeScript alone cannot enforce.
 
 ## Use This Package When
 
 - adding or changing routes at the contract level
 - introducing metadata used by middleware or integrations
-- changing contract mode between `json`, `raw`, `stream`, or `websocket`
-- deriving shared request, response, or error types
+- deriving shared request and response types
+- creating typed runtime clients

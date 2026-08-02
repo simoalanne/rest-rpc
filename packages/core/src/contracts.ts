@@ -12,17 +12,44 @@ export type RequestSchema = {
 
 export type RawRequestBody = unknown;
 
-export type KnownErrorSchema = z.ZodObject<{
-	code: z.ZodLiteral<string>;
-	status?: z.ZodLiteral<number>;
-}>;
-export type KnownErrors = KnownErrorSchema | readonly KnownErrorSchema[];
-
 export type ResponseSchema = z.ZodType;
+export const noBody = Symbol("NoBodyResponse");
+
+export type NoBodyResponse = typeof noBody;
+
+export type StreamResponse<TSchema extends z.ZodType = z.ZodType> = {
+	kind: "stream";
+	schema: TSchema;
+};
+
+export type ResponseBodySchema =
+	| ResponseSchema
+	| NoBodyResponse
+	| StreamResponse;
+
+export type ContractResponses = Record<number, ResponseBodySchema>;
+
+export const stream = <const TSchema extends z.ZodType>(
+	schema: TSchema,
+): StreamResponse<TSchema> => ({
+	kind: "stream",
+	schema,
+});
+
+export const isNoBodyResponse = (
+	response: ResponseBodySchema,
+): response is NoBodyResponse => response === noBody;
+
+export const isStreamResponse = (
+	response: ResponseBodySchema,
+): response is StreamResponse =>
+	typeof response === "object" &&
+	response !== null &&
+	"kind" in response &&
+	response.kind === "stream";
 
 export type ContractOptions = {
-	mode?: "json" | "raw" | "stream" | "websocket";
-	streamFormat?: "ndjson";
+	mode?: "json" | "raw" | "websocket";
 };
 
 export type BaseContract<TMeta = unknown> = {
@@ -34,25 +61,14 @@ export type BaseContract<TMeta = unknown> = {
 };
 
 export type JsonContract<TMeta = unknown> = BaseContract<TMeta> & {
-	response?: ResponseSchema;
-	successStatusCode?: number;
-	errors?: KnownErrors;
+	responses: ContractResponses;
 	options?: { mode?: "json" };
 };
 
 export type RawRequestContract<TMeta = unknown> = BaseContract<TMeta> & {
-	response?: ResponseSchema;
+	responses: ContractResponses;
 	request?: Omit<RequestSchema, "body">;
-	successStatusCode?: number;
-	errors?: KnownErrors;
 	options: { mode: "raw" };
-};
-
-export type StreamContract<TMeta = unknown> = BaseContract<TMeta> & {
-	response: ResponseSchema;
-	successStatusCode?: number;
-	errors?: KnownErrors;
-	options: { mode: "stream"; streamFormat?: "ndjson" };
 };
 
 export type WebSocketContract<TMeta = unknown> = BaseContract<TMeta> & {
@@ -62,13 +78,11 @@ export type WebSocketContract<TMeta = unknown> = BaseContract<TMeta> & {
 		client: z.ZodType;
 		server: z.ZodType;
 	};
-	errors?: never;
 };
 
 export type Contract<TMeta = unknown> =
 	| JsonContract<TMeta>
 	| RawRequestContract<TMeta>
-	| StreamContract<TMeta>
 	| WebSocketContract<TMeta>;
 
 export type ContractTree<TMeta = unknown> =
@@ -106,7 +120,7 @@ const isContractDefinition = <TMeta = unknown>(
 
 export const mapContractTree = <TMeta = unknown>(
 	tree: ContractTree<TMeta>,
-	mappingFn: (contract: Contract<TMeta>) => unknown,
+	mappingFn: (contract: Contract<TMeta>, path: string[]) => unknown,
 ) => mapObjectValues(tree, isContractDefinition, mappingFn);
 
 export type FlattenedContract<TMeta = unknown> = Contract<TMeta> & {
@@ -139,21 +153,98 @@ export const flattenContractTree = <
 	return result;
 };
 
-export type ContractResponse<E extends Contract> = E extends {
-	response: infer R;
-}
-	? R extends z.ZodType
-		? IsStreamContract<E> extends true
-			? AsyncIterable<z.infer<R>>
-			: z.infer<R>
-		: never
-	: undefined;
+export type InferResponseBody<TResponse> = TResponse extends z.ZodType
+	? z.infer<TResponse>
+	: TResponse extends NoBodyResponse
+		? undefined
+		: TResponse extends StreamResponse<infer TSchema>
+			? AsyncIterable<z.infer<TSchema>>
+			: never;
 
-export type IsStreamContract<E extends Contract> = E extends {
-	options: { mode: "stream" };
-}
+type ResponseEntry<TStatus extends number, TResponse> = {
+	status: TStatus;
+	body: InferResponseBody<TResponse>;
+};
+
+type ResponseKey = number | `${number}`;
+
+type ResponseStatus<TStatus> = TStatus extends number
+	? TStatus
+	: TStatus extends `${infer TNumber extends number}`
+		? TNumber
+		: never;
+
+export type IsUnion<T, U = T> = [T] extends [never]
+	? false
+	: T extends unknown
+		? [U] extends [T]
+			? false
+			: true
+		: false;
+
+export type SuccessfulResponseKeys<TResponses> = {
+	[TKeys in keyof TResponses]: TKeys extends ResponseKey
+		? `${ResponseStatus<TKeys>}` extends `2${string}`
+			? TKeys
+			: never
+		: never;
+}[keyof TResponses];
+
+export type HasSuccessfulResponse<TResponses> = [
+	SuccessfulResponseKeys<TResponses>,
+] extends [never]
+	? false
+	: true;
+
+export type HasMultipleSuccessfulResponses<TResponses> = IsUnion<
+	SuccessfulResponseKeys<TResponses>
+>;
+
+export type HasStreamResponse<TResponses> = true extends {
+	[TKeys in keyof TResponses]: TResponses[TKeys] extends StreamResponse
+		? true
+		: false;
+}[keyof TResponses]
 	? true
 	: false;
+
+export type ContractResponse<E extends Contract> = E extends {
+	responses: infer TResponses;
+}
+	? {
+		  [TKeys in keyof TResponses]: TKeys extends ResponseKey
+			  ? ResponseEntry<ResponseStatus<TKeys>, TResponses[TKeys]>
+			  : never;
+	  }[keyof TResponses]
+	: never;
+
+export type ContractSuccessfulResponse<E extends Contract> = E extends {
+	responses: infer TResponses;
+}
+	? {
+		  [TKeys in keyof TResponses]: TKeys extends ResponseKey
+			  ? TKeys extends SuccessfulResponseKeys<TResponses>
+				  ? ResponseEntry<ResponseStatus<TKeys>, TResponses[TKeys]>
+				  : never
+			  : never;
+	  }[keyof TResponses]
+	: never;
+
+export type ContractSingleSuccessfulResponseBody<E extends Contract> =
+	ContractSuccessfulResponse<E> extends infer TResponse extends {
+		body: unknown;
+	}
+		? [TResponse] extends [never]
+			? never
+			: IsUnion<TResponse> extends true
+				? never
+				: TResponse["body"]
+		: never;
+
+export type ContractNonSuccessfulResponse<E extends Contract> = Exclude<
+	ContractResponse<E>,
+	ContractSuccessfulResponse<E>
+>;
 
 export type IsRawRequestContract<E extends Contract> = E extends {
 	options: { mode: "raw" };
@@ -210,16 +301,6 @@ export type ContractRequest<E extends Contract> =
 			: R
 		: never;
 
-export type ContractError<E extends Contract> = E extends {
-	errors: infer Errors;
-}
-	? Errors extends KnownErrorSchema
-		? z.infer<Errors>
-		: Errors extends readonly KnownErrorSchema[]
-			? z.infer<Errors[number]>
-			: never
-	: never;
-
 export type GetByPath<
 	T,
 	P extends string,
@@ -256,11 +337,6 @@ export type ContractApiResponse<
 	P extends DotPaths<T>,
 > = ContractResponse<ContractAtPath<T, P>>;
 
-export type ContractApiError<
-	T extends ContractTree,
-	P extends DotPaths<T>,
-> = ContractError<ContractAtPath<T, P>>;
-
 type WithMetaMarker<T, TMeta> =
 	T extends Contract<TMeta>
 		? T & { $meta?: TMeta }
@@ -269,6 +345,30 @@ type WithMetaMarker<T, TMeta> =
 					? WithMetaMarker<T[K], TMeta>
 					: never;
 			};
+
+type MissingSuccessfulResponseError = {
+	readonly __contract_error__: "Contract must declare at least one successful response.";
+};
+
+type StreamResponseStatusError = {
+	readonly __contract_error__: "Contracts with a stream response cannot define more than one successful status code.";
+};
+
+type ValidateResponseStatuses<T> = T extends Contract
+	? T extends { responses: infer TResponses }
+		? HasSuccessfulResponse<TResponses> extends false
+			? MissingSuccessfulResponseError
+			: HasStreamResponse<TResponses> extends true
+				? HasMultipleSuccessfulResponses<TResponses> extends true
+					? StreamResponseStatusError
+					: unknown
+				: unknown
+		: unknown
+	: T extends object
+		? {
+				[K in keyof T]: ValidateResponseStatuses<T[K]>;
+			}
+		: unknown;
 
 const getRequestSchemaKeys = (
 	schema: RequestBodySchema | z.ZodObject | undefined,
@@ -310,27 +410,12 @@ const validateContractTree = (tree: ContractTree) => {
 				);
 			}
 		}
-
-		if (Array.isArray(contract.errors)) {
-			const codes = new Set(
-				Array.from(contract.errors, (error) => {
-					const [code] = error.shape.code.values;
-					return code;
-				}),
-			);
-
-			if (codes.size !== contract.errors.length) {
-				throw new Error(
-					`Contract at path "${contract.path}" has duplicate error codes in its "errors" definition.`,
-				);
-			}
-		}
 	}
 };
 
 type ContractTools<TMeta> = {
 	defineContractTree: <const TContract extends ContractTree<TMeta>>(
-		contract: TContract,
+		contract: TContract & ValidateResponseStatuses<TContract>,
 	) => WithMetaMarker<TContract, TMeta>;
 };
 

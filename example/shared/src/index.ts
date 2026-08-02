@@ -1,10 +1,9 @@
 import type {
-	ContractApiError,
 	ContractApiRequest,
 	ContractApiResponse,
 	DotPaths,
 } from "@contract-first-api/core";
-import { initContracts } from "@contract-first-api/core";
+import { initContracts, stream } from "@contract-first-api/core";
 import z from "zod";
 
 export type ExampleContractMeta = {
@@ -71,10 +70,12 @@ export const healthContract = defineContractTree({
 			meta: {
 				auditLabel: "health.get",
 			},
-			response: z.object({
-				status: z.literal("ok"),
-				requestId: z.string(),
-			}),
+			responses: {
+				200: z.object({
+					status: z.literal("ok"),
+					requestId: z.string(),
+				}),
+			},
 		},
 	},
 });
@@ -84,9 +85,11 @@ export const todoContracts = defineContractTree({
 		list: {
 			method: "GET",
 			path: "/todos",
-			response: z.object({
-				items: z.array(todoSchema),
-			}),
+			responses: {
+				200: z.object({
+					items: z.array(todoSchema),
+				}),
+			},
 		},
 		create: {
 			method: "POST",
@@ -100,10 +103,15 @@ export const todoContracts = defineContractTree({
 					title: z.string().min(1),
 				}),
 			},
-			errors: z.object({
-				code: z.literal("TITLE_ALREADY_EXISTS"),
-			}),
-			response: todoSchema,
+			responses: {
+				201: todoSchema,
+				202: z.object({
+					requestId: z.string(),
+				}),
+				409: z.object({
+					code: z.literal("TITLE_ALREADY_EXISTS"),
+				}),
+			},
 		},
 		find: {
 			method: "POST",
@@ -113,13 +121,16 @@ export const todoContracts = defineContractTree({
 					query: z.string().min(1),
 				}),
 			},
-			response: z.array(todoSchema),
+			responses: {
+				200: z.array(todoSchema),
+			},
 		},
 		events: {
 			method: "GET",
 			path: "/todos/events",
-			response: todoEventSchema,
-			options: { mode: "stream" },
+			responses: {
+				200: stream(todoEventSchema),
+			},
 		},
 	},
 });
@@ -144,10 +155,12 @@ export const imageContracts = defineContractTree({
 			method: "POST",
 			path: "/images/inspect",
 			options: { mode: "raw" },
-			response: z.object({
-				width: z.number(),
-				height: z.number(),
-			}),
+			responses: {
+				200: z.object({
+					width: z.number(),
+					height: z.number(),
+				}),
+			},
 		},
 	},
 });
@@ -172,12 +185,10 @@ export type ApiResponse<P extends ApiPath> = ContractApiResponse<
 	P
 >;
 
-export type ApiError<P extends ApiPath> = ContractApiError<ExampleContracts, P>;
-
 export type HealthResponse = ApiResponse<"health.get">;
 export type ListTodosResponse = ApiResponse<"todos.list">;
 export type CreateTodoRequest = ApiRequest<"todos.create">;
-export type Todo = ApiResponse<"todos.create">;
+export type Todo = z.infer<typeof todoSchema>;
 export type TodoEvent = z.infer<typeof todoEventSchema>;
 export type FindTodosRequest = ApiRequest<"todos.find">;
 export type FindTodosResponse = ApiResponse<"todos.find">;

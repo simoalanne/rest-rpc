@@ -4,9 +4,8 @@ Mount a shared contract tree on an Express app with request validation, typed
 service handlers, middleware hooks, typed request context, streaming responses,
 and websocket routes.
 
-This package is the backend integration for `contract-first-api`. It consumes
-contracts from `@contract-first-api/core`; it does not define contracts itself
-and it does not require the API client packages.
+This package consumes contracts from `@contract-first-api/core`; it does not
+define contracts itself.
 
 ## Install
 
@@ -24,7 +23,9 @@ pnpm add -D @types/ws
 
 ## Basic Setup
 
-Start by calling `initServer()` to get the helper functions. Add middlewares with `defineMiddleware()`, define your service handlers with `defineService()`, then call `createRouter()` to register routes for every contract implementation.
+Start by calling `initServer()` to get helper functions. Add middlewares with
+`defineMiddleware()`, define service handlers with `defineService()`, then call
+`createRouter()` to register routes for every contract.
 
 ```ts
 import { initServer } from "@contract-first-api/express";
@@ -36,9 +37,6 @@ type RequestContext = {
 };
 
 const app = express();
-
-// JSON parsing middleware must be registered before createRouter(). See below how
-// to handle body parsing when you have mixed raw and non-raw contracts.
 app.use(express.json());
 
 const { createRouter, defineMiddleware, defineService } = initServer<
@@ -49,46 +47,44 @@ const { createRouter, defineMiddleware, defineService } = initServer<
 declare global {
 	namespace Express {
 		interface Request {
-			// .contract: Contract; Added by the library automatically.
-			// .validatedRequest // Also added by the library automatically.
 			userId?: string;
 		}
 	}
 }
 
 const authMiddleware = defineMiddleware((req, res, next) => {
-	// if you use the defineMiddleware helper .meta is typed correctly, otherwise it's unknown type.
 	if (!req.contract.meta?.requiresAuth) {
 		next();
 		return;
 	}
 
-	// headers are not typed but contain exactly what was sent by the client.
 	const token = req.headers.authorization?.replace("Bearer ", "");
 	if (!token) {
 		res.sendStatus(401);
 		return;
 	}
 
-	const userId = verifyAuthToken(token);
-
-	if (!userId) {
-		res.sendStatus(401);
-		return;
-	}
-
-	req.userId = userId;
+	req.userId = verifyAuthToken(token);
 	next();
 });
 
 const services = {
 	todos: defineService("todos", {
 		async list() {
-			return await getTodos();
+			return {
+				status: 200,
+				body: {
+					items: await getTodos(),
+				},
+			};
 		},
 		async create({ title, context }) {
-			const newTodo = await createTodo({ title, ownerId: context.userId });
-			return newTodo;
+			const todo = await createTodo({ title, ownerId: context.userId });
+
+			return {
+				status: 201,
+				body: todo,
+			};
 		},
 	}),
 };
@@ -98,114 +94,155 @@ createRouter({
 	contracts,
 	services,
 	routePrefix: "/api",
-	// provided middlewares run after request is validated
 	middlewares: [authMiddleware],
-	// createContext runs after all middlewares have run
 	createContext: (req) => ({
 		userId: req.userId,
 	}),
 });
 ```
 
-If your contract tree includes raw request body contracts, you can use
-`createContractModeMiddleware()` from `initServer()` to choose different
-body-parsing middleware for raw and non-raw routes without hardcoding paths:
+## Service Responses
+
+HTTP service handlers return a declared response envelope:
 
 ```ts
-import express from "express";
-import { initServer } from "@contract-first-api/express";
-import { contracts } from "@example/shared";
-
-const app = express();
-const { createContractModeMiddleware, createRouter } = initServer<typeof contracts>();
-
-// Non-contract raw routes can be mounted before contract-aware parsing.
-app.use("/some-raw-route", someRawRouteHandler);
-
-// createContractModeMiddleware looks at the contract tree to decide which body parser to run.
-// If all contract routes use the same body format, you can use express.json() or express.raw() directly and skip
-// createContractModeMiddleware().
-app.use(
-	createContractModeMiddleware({
-		contracts,
-		nonRaw: express.json(),
-		raw: express.raw({
-			type: ["image/png", "image/jpeg", "image/gif"],
-		}),
-		routePrefix: "/api",
-	}),
-);
-
-createRouter({
-	app,
-	contracts,
-	services,
-	routePrefix: "/api",
-});
-
-// Non-contract JSON routes can still opt into JSON parsing afterwards.
-app.use(express.json());
-app.use("/some-json-route", someJsonRouteHandler);
+return {
+	status: 200,
+	body: {
+		items,
+	},
+};
 ```
 
-`createContractModeMiddleware()` only looks at routes in the provided contract
-tree:
-
-- if the request matches a contract route with `options: { mode: "raw" }`, it runs `raw`
-- if the request matches any other contract route, it runs `nonRaw`
-- if the request does not match any contract route, it runs neither middleware and calls `next()`
-
-Route matching uses the same specificity rules as `createRouter()`, so more
-specific contract paths win over parameterized ones.
-
-For caller-owned routes outside the contract tree, mount whatever body parser
-they need directly on those routes. If you want those routes to stay completely
-independent from contract-aware body parsing, register them separately and do
-not rely on `createContractModeMiddleware()` to handle them.
-
-## Services
-
-The `services` object must match the contract tree. Each leaf is a service created with `defineService()`. The first argument is the contract subtree key, and the second is an object of service handlers.
+The `status` must be one of the contract's `responses` keys, and `body` must
+match the schema declared for that status. Non-2xx responses are normal typed
+responses:
 
 ```ts
 const services = {
 	todos: defineService("todos", {
-		get({ id, includeCompleted, context }) {
+		create({ title }) {
+			if (todoExists(title)) {
+				return {
+					status: 409,
+					body: {
+						code: "TITLE_ALREADY_EXISTS",
+					},
+				};
+			}
+
 			return {
-				id,
-				title: "Try contract-first-api",
-				includeCompleted,
-				viewerId: context.userId,
+				status: 201,
+				body: createTodo(title),
 			};
 		},
 	}),
 };
 ```
 
-Service handlers receive one object:
+For `noBody` responses, return `body: undefined`:
 
-- validated request fields from `body`, `query`, and `params`
-- `context` returned by `createContext`
+```ts
+return {
+	status: 204,
+	body: undefined,
+};
+```
 
-Handler return types are inferred from the contract response schema. If a
-contract does not define `response`, the handler should return nothing and the route responds with `204`.
+Unexpected service errors are not swallowed; they continue to the Express
+global error handler.
 
-For websocket contracts, the service handler receives a typed `socket` instead
-of returning a response body.
+When a contract declares exactly one successful status, the handler may return
+that successful body directly:
 
-## Request Validation
+```ts
+const services = {
+	todos: defineService("todos", {
+		async list() {
+			return {
+				items: await getTodos(),
+			};
+		},
+	}),
+};
+```
 
-For each registered route, Express receives a validation middleware before your
-custom middlewares and service handler.
+## Request Flow
 
-The validation middleware:
+For each contract route:
 
-- attaches the current contract to `req.contract`
-- validates `req.body`, `req.query`, and `req.params`
-- merges validated values into `req.validatedRequest`
-- returns `400` JSON when validation fails
+1. request validation runs first
+2. custom middlewares run after validation
+3. `createContext` runs after middlewares
+4. the service handler runs last
 
-If validation fails, custom middlewares, `createContext`, and the service handler DO NOT run. you can be sure that if a service handler or your custom middleware runs, the request is valid according to the contract.
+If validation fails, middleware, context creation, and the service handler do
+not run.
+
+## Validated Request Shape
+
+Handlers receive one flattened request object:
+
+- fields from `params`
+- fields from `query`
+- fields from `body`
+- `context`
+
+```ts
+const services = {
+	todos: defineService("todos", {
+		async get({ id, includeCompleted, context }) {
+			const todo = await loadTodo({
+				id,
+				includeCompleted,
+				userId: context.userId,
+			});
+
+			return {
+				status: 200,
+				body: todo,
+			};
+		},
+	}),
+};
+```
+
+Request field names must be unique across locations in a single contract.
+
+## Raw Body Handling
+
+If the contract tree mixes raw and non-raw routes, prefer
+`createContractModeMiddleware()` so parsing is chosen from the contract tree
+instead of hardcoded route paths.
+
+```ts
+app.use(
+	createContractModeMiddleware({
+		contracts,
+		routePrefix: "/api",
+		nonRaw: express.json(),
+		raw: express.raw({
+			type: ["image/png", "image/jpeg"],
+		}),
+	}),
+);
+```
+
+Raw service handlers receive `rawBody` in addition to typed params, query, and
+context:
+
+```ts
+const services = {
+	images: defineService("images", {
+		inspect({ rawBody }) {
+			return {
+				status: 200,
+				body: inspectImage(rawBody),
+			};
+		},
+	}),
+};
+```
 
 ## Middleware
 
@@ -218,13 +255,11 @@ const authMiddleware = defineMiddleware((req, res, next) => {
 		return;
 	}
 
-	const token = req.get("authorization");
-	if (!token) {
+	if (!req.headers.authorization) {
 		res.sendStatus(401);
 		return;
 	}
 
-	req.userId = "user_123";
 	next();
 });
 ```
@@ -234,121 +269,32 @@ That means middleware can read `req.contract`, inspect validated request data,
 and attach values to the Express request for `createContext` to use.
 
 For middleware declared outside `defineMiddleware()`, the package exports
-`RequestWithContract`:
-
-```ts
-import type { RequestWithContract } from "@contract-first-api/express";
-import type { NextFunction, Response } from "express";
-
-type ContractMeta = {
-	requiresAuth?: boolean;
-};
-
-const authMiddleware = (
-	req: RequestWithContract<ContractMeta>,
-	res: Response,
-	next: NextFunction,
-) => {
-	if (!req.contract.meta?.requiresAuth) {
-		next();
-		return;
-	}
-
-	res.sendStatus(401);
-};
-```
-
-## Context
-
-Use `createContext` to build the typed `context` value passed to every service
-handler.
-
-```ts
-type RequestContext = {
-	userId?: string;
-	requestId: string;
-};
-
-const { createRouter, defineService } = initServer<
-	typeof contracts,
-	RequestContext
->();
-
-createRouter({
-	app,
-	contracts,
-	services,
-	createContext: (req) => ({
-		userId: req.userId,
-		requestId: crypto.randomUUID(),
-	}),
-});
-```
-
-`createContext` runs after validation and custom middlewares. It can read
-`req.contract`, `req.validatedRequest`, and anything earlier Express middleware
-attached to the request.
-
-## Known Errors
-
-If a contract defines known errors, `throwKnownError()` only accepts errors from
-that contract tree.
-
-```ts
-const { createRouter, defineService, throwKnownError } =
-	initServer<typeof contracts>();
-
-const services = {
-	todos: defineService("todos", {
-		create({ title }) {
-			if (title === "Already exists") {
-				throwKnownError({
-					code: "TITLE_ALREADY_EXISTS",
-					status: 409,
-				});
-			}
-
-			return {
-				id: crypto.randomUUID(),
-				title,
-			};
-		},
-	}),
-};
-```
-
-Known errors are returned as JSON. If the error payload has a numeric `status`,
-that status code is used. Otherwise the route responds with `400`.
-
-Unexpected service errors are not swallowed; they continue to Express global error handler.
+`RequestWithContract`.
 
 ## Streaming Responses
 
-For contracts with `options: { mode: "stream" }`, service handlers must return an
-async iterable. The route writes each yielded value as an NDJSON chunk.
+Streaming responses are declared with `stream(schema)` in the contract. Service
+handlers can return the async iterable directly when the contract has one
+successful status.
 
 ```ts
 const services = {
 	todos: defineService("todos", {
-		async *events() {
-			yield {
-				type: "created",
-				id: "todo_1",
-				title: "Try streams",
-			};
+		events() {
+			return readTodoEvents();
 		},
 	}),
 };
 ```
 
-Streaming responses use `content-type: application/x-ndjson`.
+The route writes each yielded value as NDJSON with
+`content-type: application/x-ndjson`.
 
 ## WebSocket Routes
 
 For contracts with `options: { mode: "websocket" }`, `createRouter()` registers
-an upgrade handler on the provided HTTP server. Express still handles normal
-HTTP routes, but websocket upgrades happen on the underlying Node server, so
-the `server` option is required when websocket contracts are present.
+an upgrade handler on the provided HTTP server. The `server` option is required
+when websocket contracts are present.
 
 ```ts
 import { initServer } from "@contract-first-api/express";
@@ -363,25 +309,19 @@ const { createRouter, defineService } = initServer<typeof contracts>();
 
 const services = {
 	discuss: defineService("discuss", {
-		room({ socket }) {
+		connect({ socket }) {
 			socket.send({
 				type: "history",
 				messages: [],
 			});
 
 			socket.onMessage((result) => {
-				if (!result.success) {
-					return;
-				}
+				if (!result.success) return;
 
 				socket.send({
 					type: "message",
 					text: result.data.text,
 				});
-			});
-
-			socket.onClose(() => {
-				// clean up app-level connection state here
 			});
 		},
 	}),
@@ -398,24 +338,12 @@ createRouter({
 server.listen(3001);
 ```
 
-The websocket service socket is an augmented `ws` socket:
-
-- `send(message)`: send a JSON message matching `messages.server`
-- `onMessage(callback)`: receive parsed `messages.client` results
-- `onClose(callback)`: subscribe to close events and return an unsubscribe
-  function
-
 Invalid incoming websocket messages call `onMessage` with `{ success: false }`.
 The library does not decide what that means for your application.
 
-WebSocket request validation happens before the upgrade. Since the upgrade
-request has no JSON body, websocket routes validate `query` and `params`
-schemas. If validation or context creation fails before the upgrade, the server
-responds with an HTTP error instead of opening the websocket.
-
 ## Route Registration
 
-`createRouter()` registers one Express route for every JSON and stream contract
+`createRouter()` registers one Express route for every non-websocket contract
 leaf. WebSocket contracts are registered on the underlying HTTP server's
 upgrade event.
 
@@ -431,22 +359,13 @@ createRouter({
 The registered path is `routePrefix + contract.path`. Static routes are ordered
 before parameter routes when paths overlap.
 
-Default success status codes are:
-
-- `201` for `POST`
-- `204` for contracts without a `response` schema
-- `200` for other successful responses
-
-Set `successStatusCode` on a JSON or stream contract when a route should use a
-different successful status code.
-
 ## How It Connects
 
 - Define contracts with `@contract-first-api/core`.
 - Import the same contracts into your backend.
 - Register them with `initServer()` and `createRouter()`.
-- Use `@contract-first-api/api-client` on the frontend with the same contract
-  tree and matching `baseUrl`.
+- Use `initClient()` from `@contract-first-api/core` on the frontend with the
+  same contract tree and matching `baseUrl`.
 
-This package stays on the server side. The API client and React Query packages
-are optional consumers of the same contracts.
+This package stays on the server side. The core client, React Query adapter,
+and OpenAPI generator are optional consumers of the same contracts.

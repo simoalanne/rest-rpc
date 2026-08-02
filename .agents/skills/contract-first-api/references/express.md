@@ -17,10 +17,9 @@ Use `initServer()` to get helpers, then:
    needed
 3. define handlers with `defineService()`
 4. register routes with `createRouter()`
-5. use `throwKnownError()` for known error shapes declared in the contract tree
 
 ```ts
-const { createRouter, defineMiddleware, defineService, throwKnownError } = initServer<
+const { createRouter, defineMiddleware, defineService } = initServer<
 	typeof contracts,
 	RequestContext
 >();
@@ -40,23 +39,46 @@ createRouter({
 });
 ```
 
-Typed service example:
+## Typed Service Responses
+
+HTTP service handlers return declared response envelopes. When a contract has
+exactly one successful status, handlers may return the successful body directly.
 
 ```ts
 const services = {
 	todos: defineService("todos", {
 		async list() {
-			return await getTodos();
+			return {
+				status: 200,
+				body: {
+					items: await getTodos(),
+				},
+			};
 		},
 		async create({ title, context }) {
-			return await createTodo({
-				title,
-				ownerId: context.userId,
-			});
+			if (await todoExists(title)) {
+				return {
+					status: 409,
+					body: {
+						code: "TITLE_ALREADY_EXISTS",
+					},
+				};
+			}
+
+			return {
+				status: 201,
+				body: await createTodo({
+					title,
+					ownerId: context.userId,
+				}),
+			};
 		},
 	}),
 };
 ```
+
+The `status` must be one of the contract's `responses` keys. Non-2xx statuses
+are typed response cases.
 
 ## Request Flow
 
@@ -86,11 +108,14 @@ contract.
 const services = {
 	todos: defineService("todos", {
 		async get({ id, includeCompleted, context }) {
-			return await loadTodo({
-				id,
-				includeCompleted,
-				userId: context.userId,
-			});
+			return {
+				status: 200,
+				body: await loadTodo({
+					id,
+					includeCompleted,
+					userId: context.userId,
+				}),
+			};
 		},
 	}),
 };
@@ -101,9 +126,6 @@ const services = {
 If the contract tree mixes raw and non-raw routes, prefer
 `createContractModeMiddleware()` so parsing is chosen from the contract tree
 rather than hardcoded route paths.
-
-Use raw mode when the request body should pass through unvalidated while
-keeping typed params, query, response, and known errors.
 
 ```ts
 app.use(
@@ -118,24 +140,14 @@ app.use(
 );
 ```
 
-## Throwing Known Errors
+Use raw mode when the request body should pass through unvalidated while
+keeping typed params, query, and responses. Raw service handlers receive a
+`rawBody` field.
 
-Use `throwKnownError()` when the contract defines a known error and you want
-type-safe error handling.
+## Middleware
 
-```ts
-if (!someResource) {
-	// Return the call so TypeScript narrows control flow correctly.
-	return throwKnownError({
-		code: "SOME_KNOWN_ERROR",
-		someCustomField: "value",
-	});
-}
-
-doSomething(someResource);
-```
-
-Middleware using typed metadata:
+Use `defineMiddleware()` when middleware logic depends on typed contract
+metadata like `meta.requiresAuth`.
 
 ```ts
 const authMiddleware = defineMiddleware((req, res, next) => {
@@ -153,15 +165,34 @@ const authMiddleware = defineMiddleware((req, res, next) => {
 });
 ```
 
-Websocket service example:
+## Streaming Responses
+
+Streaming responses are declared with `stream(schema)`. Service handlers return
+the async iterable body directly when the contract has one successful status.
+
+```ts
+const services = {
+	todos: defineService("todos", {
+		events() {
+			return readEvents();
+		},
+	}),
+};
+```
+
+## WebSocket Services
+
+WebSocket services receive a typed socket instead of returning a response.
 
 ```ts
 const services = {
 	chat: defineService("chat", {
 		connect({ socket }) {
-			socket.onMessage((message) => {
+			socket.onMessage((result) => {
+				if (!result.success) return;
+
 				socket.send({
-					text: `echo: ${message.text}`,
+					text: `echo: ${result.data.text}`,
 				});
 			});
 		},
@@ -173,11 +204,12 @@ const services = {
 
 - Register JSON parsing before `createRouter()` when routes use JSON bodies.
 - Keep `routePrefix` aligned with the client `baseUrl`.
-- Use `defineMiddleware()` when middleware logic depends on typed contract
-  metadata like `meta.requiresAuth`.
-- For contracts without a `response` schema, handlers should return nothing and
-  the route responds with `204`.
-- Websocket contracts use typed socket handling instead of returning a normal
+- Return `{ status, body }` for non-2xx responses and for contracts with
+  multiple successful statuses.
+- Return the body directly when a contract has one successful status and the
+  status code is clear from the contract.
+- Use `body: undefined` for `noBody` responses.
+- WebSocket contracts use typed socket handling instead of returning a normal
   response body.
 
 ## Use This Package When

@@ -10,27 +10,9 @@ handlers, typed clients, optional React Query hooks, and OpenAPI documents.
 
 `contract-first-api` is a small TypeScript toolkit for keeping JSON APIs,
 raw-request endpoints, streams, and websockets aligned across your stack. You
-describe each endpoint as a plain contract object, then the rest of the
-packages use that same contract tree to validate requests, type server
-handlers, build a runtime client, and wrap that client with React Query or
-generate OpenAPI docs.
-
-The goal is to keep normal HTTP semantics while getting the developer
-experience people usually reach for RPC libraries to get: typed handlers, typed
-client calls, inferred request and response shapes, and no duplicated DTOs.
-
-## Why It Exists
-
-Most TypeScript API stacks end up choosing between a few awkward tradeoffs:
-
-- manually duplicate request and response types between backend and frontend
-- generate a client from a schema compiler and fit your workflow around it
-- adopt an RPC-style framework and let it shape your backend structure
-- keep runtime validation separate from the types users actually consume
-
-This library takes a smaller route. Contracts are plain TypeScript objects with
-Zod schemas, sort of like a mini DSL. They are decoupled from your route implementation, so you can keep
-your own project structure, Express setup, middleware, and HTTP route design.
+describe endpoints as plain contract objects, then reuse the same contract tree
+for request validation, typed service handlers, typed clients, React Query, and
+OpenAPI output.
 
 ## Core Idea
 
@@ -52,10 +34,15 @@ export const contracts = defineContractTree({
 					title: z.string().min(1),
 				}),
 			},
-			response: z.object({
-				id: z.string(),
-				title: z.string(),
-			}),
+			responses: {
+				201: z.object({
+					id: z.string(),
+					title: z.string(),
+				}),
+				409: z.object({
+					code: z.literal("TITLE_ALREADY_EXISTS"),
+				}),
+			},
 		},
 	},
 });
@@ -64,60 +51,35 @@ export const contracts = defineContractTree({
 From that tree:
 
 - `@contract-first-api/express` validates incoming requests and types services
-- `@contract-first-api/api-client` builds a typed runtime client
-- `@contract-first-api/react-query` wraps the client with typed hooks and cache helpers
+- `@contract-first-api/core` builds a typed runtime client with `initClient`
+- `@contract-first-api/react-query` creates typed hooks and cache helpers
 - `@contract-first-api/openapi` generates an OpenAPI document from JSON contracts
-- your shared package can expose path-based request, response, and error types
-
-## Features
-
-- **Shared contracts:** define `body`, `query`, `params`, responses, and known
-  errors with Zod schemas.
-- **Typed server handlers:** Express services receive validated request fields
-  and typed context inferred from your setup.
-- **Typed client:** the client mirrors your contract tree and validates backend
-  JSON responses, stream chunks, and websocket messages at runtime.
-- **Metadata extension points:** attach route metadata for things like auth
-  requirements, then read it from middleware or context creation.
-- **Known errors:** describe expected error payloads in the contract and handle
-  them with typed client errors.
-- **Raw request routes:** opt into passthrough request bodies while keeping
-  typed params, query, responses, and known errors.
-- **Streaming:** model NDJSON endpoints with fetch streams.
-- **WebSockets:** model bidirectional JSON messages without leaving the
-  contract tree.
-- **React Query adapter:** optionally turn the typed client into hooks and cache
-  helpers.
-- **OpenAPI generator:** optionally turn JSON contracts into a plain OpenAPI
-  document object.
-- **No code generation:** contracts are plain objects and regular TypeScript
-  inference does the work.
+- shared packages can expose path-based request and response helper types
 
 ## Packages
 
 | Package | Role |
 | --- | --- |
-| [`@contract-first-api/core`](./packages/core/README.md) | Define contracts and derive shared helper types. |
+| [`@contract-first-api/core`](./packages/core/README.md) | Define contracts, derive shared types, and create typed clients. |
 | [`@contract-first-api/express`](./packages/express/README.md) | Mount contracts on an Express app with validation and typed services. |
-| [`@contract-first-api/api-client`](./packages/api-client/README.md) | Create a typed runtime client from the contract tree. |
-| [`@contract-first-api/react-query`](./packages/react-query/README.md) | Wrap the API client with React Query hooks and cache helpers. |
+| [`@contract-first-api/react-query`](./packages/react-query/README.md) | Create React Query hooks and cache helpers from contracts. |
 | [`@contract-first-api/openapi`](./packages/openapi/README.md) | Generate an OpenAPI document from JSON contracts. |
 
 ## Install
 
-Install the core package wherever you define shared contracts:
+Install the core package wherever you define contracts or create typed clients:
 
 ```bash
-pnpm add @contract-first-api/core
+pnpm add @contract-first-api/core zod
 ```
 
 Then add the integration packages you need:
 
 ```bash
-pnpm add @contract-first-api/express @contract-first-api/api-client @contract-first-api/react-query @contract-first-api/openapi
+pnpm add @contract-first-api/express @contract-first-api/react-query @contract-first-api/openapi
 ```
 
-If your backend uses websocket contracts with the Express adapter, install
+If your backend uses websocket contracts with the Express adapter, also install
 `ws` in that backend package:
 
 ```bash
@@ -125,287 +87,155 @@ pnpm add ws
 pnpm add -D @types/ws
 ```
 
-## Quick Flow
+## Contract Responses
 
-Define contracts in a shared package:
+Every HTTP contract declares a `responses` map keyed by HTTP status code. Each
+entry can be a Zod schema, `noBody`, or a `stream(schema)` response.
 
 ```ts
-import { initContracts } from "@contract-first-api/core";
+import { initContracts, noBody, stream } from "@contract-first-api/core";
 import z from "zod";
 
-const { defineContractTree } = initContracts<{
-	requiresAuth?: boolean;
-}>();
+const { defineContractTree } = initContracts();
 
 export const contracts = defineContractTree({
 	todos: {
 		list: {
 			method: "GET",
 			path: "/todos",
-			response: z.object({
-				items: z.array(
-					z.object({
-						id: z.string(),
-						title: z.string(),
-					}),
-				),
-			}),
-		},
-		create: {
-			method: "POST",
-			path: "/todos",
-			meta: {
-				requiresAuth: true,
-			},
-			request: {
-				body: z.object({
-					title: z.string().min(1),
+			responses: {
+				200: z.object({
+					items: z.array(todoSchema),
 				}),
 			},
-			response: z.object({
-				id: z.string(),
-				title: z.string(),
-				ownerId: z.string().optional(),
-			}),
 		},
-	},
-});
-```
-
-## Contract Types
-
-Each contract is one of four shapes:
-
-- **JSON contracts** are the default. They can define request schemas, an
-  optional response schema, and known errors.
-- **Raw request contracts** use `options: { mode: "raw" }`. They can define
-  `query` and `params`, but not a contract-defined request `body`. They are
-  useful when the request body should be passed through as-is while the
-  response stays typed.
-- **Stream contracts** use `options: { mode: "stream" }`. They must define a
-  `response` schema, which describes each NDJSON chunk.
-- **WebSocket contracts** use `options: { mode: "websocket" }`. They use `GET`,
-  define `messages.client` and `messages.server`, and do not define a
-  `response` schema because communication happens after the connection opens.
-
-```ts
-export const contracts = defineContractTree({
-	discuss: {
-		connect: {
+		remove: {
+			method: "DELETE",
+			path: "/todos/:id",
+			request: {
+				params: z.object({ id: z.string() }),
+			},
+			responses: {
+				204: noBody,
+				404: z.object({ code: z.literal("TODO_NOT_FOUND") }),
+			},
+		},
+		events: {
 			method: "GET",
-			path: "/discuss",
-			options: { mode: "websocket" },
-			messages: {
-				client: z.object({
-					type: z.literal("message"),
-					text: z.string().min(1),
-				}),
-				server: z.object({
-					type: z.literal("message"),
-					text: z.string(),
-				}),
+			path: "/todos/events",
+			responses: {
+				200: stream(todoEventSchema),
 			},
 		},
 	},
 });
 ```
 
-Raw request contracts keep typed params, query, responses, and known errors,
-but leave the request body as an explicit escape hatch:
+Server handlers return typed response cases declared by the contract:
 
 ```ts
-export const contracts = defineContractTree({
-	images: {
-		analyze: {
-			method: "POST",
-			path: "/images/:imageId/analyze",
-			request: {
-				params: z.object({
-					imageId: z.string(),
-				}),
-				query: z.object({
-					profile: z.enum(["fast", "accurate"]).optional(),
-				}),
-			},
-			options: { mode: "raw" },
-			response: z.object({
-				width: z.number(),
-				height: z.number(),
-				format: z.string(),
-			}),
-		},
-	},
-});
-```
-
-Mount them on Express:
-
-```ts
-import { initServer } from "@contract-first-api/express";
-import { contracts } from "@example/shared";
-import express from "express";
-
-type RequestContext = {
-	userId?: string;
-};
-
-const app = express();
-app.use(express.json());
-
-const { createRouter, defineMiddleware, defineService } = initServer<
-	typeof contracts,
-	RequestContext
->();
-
-declare global {
-	namespace Express {
-		interface Request {
-			// .contract: Contract; Added by the library automatically.
-			// .validatedRequest: Record<string, unknown>; Also added by the library automatically.
-			userId?: string;
-		}
-	}
-}
-
-const authMiddleware = defineMiddleware((req, res, next) => {
-	// if you use the defineMiddleware helper .meta is typed correctly. 
-	// otherwise it's unknown type.
-	if (!req.contract.meta?.requiresAuth) {
-		next();
-		return;
-	}
-
-	// headers are not typed but contain exactly what was sent by the client.
-	const token = req.headers.authorization?.replace("Bearer ", "");
-	if (!token) {
-		res.sendStatus(401);
-		return;
-	}
-
-	const userId = verifyAuthToken(token);
-
-	if (!userId) {
-		res.sendStatus(401);
-		return;
-	}
-
-	req.userId = userId;
-	next();
-});
-
 const services = {
 	todos: defineService("todos", {
-		async list() {
-			return await getTodos();
-		},
-		async create({ title, context }) {
-			const newTodo = await createTodo({ title, ownerId: context.userId });
-			return newTodo;
+		create({ title }) {
+			if (todoExists(title)) {
+				return {
+					status: 409,
+					body: { code: "TITLE_ALREADY_EXISTS" },
+				};
+			}
+
+			return {
+				status: 201,
+				body: createTodo(title),
+			};
 		},
 	}),
 };
-
-createRouter({
-	app,
-	contracts,
-	services,
-	routePrefix: "/api",
-	// provided middlewares run after request is validated
-	middlewares: [authMiddleware],
-	// createContext runs after all middlewares have run
-	createContext: (req) => ({
-		userId: req.userId,
-	}),
-});
 ```
 
-For websocket contracts, pass the underlying HTTP server to `createRouter()` so
-the Express adapter can handle upgrade requests:
+## Client
+
+Create a typed client from `@contract-first-api/core`:
 
 ```ts
-import { createServer } from "node:http";
-
-const app = express();
-const server = createServer(app);
-
-createRouter({
-	app,
-	server,
-	contracts,
-	services,
-});
-
-server.listen(3001);
-```
-
-Create a typed client wherever you need to call the API:
-
-```ts
-import { ApiClient } from "@contract-first-api/api-client";
+import { initClient } from "@contract-first-api/core";
 import { contracts } from "@example/shared";
 
-const client = new ApiClient({
-	baseUrl: process.env.API_BASE_URL,
-	contracts,
-	fetchOptions: {
-		cache: "no-store",
-	},
+export const api = initClient(contracts, {
+	baseUrl: "http://localhost:3001/api",
+	getHeaders: () => ({
+		Authorization: `Bearer ${getAuthToken()}`,
+	}),
+	timeoutMs: 10_000,
 });
+```
 
-// headers are not typed but are passed through to fetch as usual.
-client.setHeaders(() => ({
-	Authorization: `Bearer ${getAuthToken()}`,
-}));
+`fetchResponse()` returns a declared or undeclared response envelope:
 
-const todos = await client.api.todos.list.fetch();
-const created = await client.api.todos.create.fetch({
+```ts
+const response = await api.todos.create.fetchResponse({
 	title: "Write the README",
 });
+
+if (response.declared && response.status === 201) {
+	console.log(response.body.id);
+}
 ```
 
-WebSocket contracts expose `connect()` instead of `fetch()`:
+When a contract has exactly one successful response, the client also exposes
+`fetch()`, which returns that success body directly:
 
 ```ts
-const socket = client.api.discuss.connect.connect();
+const todos = await api.todos.list.fetch();
+console.log(todos.items);
+```
+
+WebSocket contracts expose `connect()`:
+
+```ts
+const socket = api.discuss.connect.connect();
 
 socket.onMessage((result) => {
-	if (!result.success) return;
-	console.log(result.data);
-});
-
-socket.send({
-	type: "message",
-	text: "Hello",
+	if (result.success) console.log(result.data);
 });
 ```
 
-Optionally wrap it with React Query if you're in a React app:
+## React Query
+
+React apps can create hooks directly from contracts and client options:
 
 ```ts
-import createAdapter from "@contract-first-api/react-query";
+import { initReactQueryClient } from "@contract-first-api/react-query";
 import { QueryClient } from "@tanstack/react-query";
 
-const queryClient = new QueryClient();
-export const api = createAdapter(client.api, queryClient);
+export const queryClient = new QueryClient();
+export const api = initReactQueryClient(contracts, {
+	queryClient,
+	baseUrl: "http://localhost:3001/api",
+});
 ```
 
 ```tsx
 const todos = api.todos.list.useQuery();
-const createTodo = api.todos.create.useMutation();
+const createTodo = api.todos.create.useMutation({
+	onSuccess: async () => {
+		await api.todos.list.invalidate();
+	},
+});
 ```
+
+Hook data uses the typed response envelope, so response bodies live at
+`data.body`.
 
 ## Recommended Setup
 
-Typically you want to have your contract definitions in a separate workspace package used by your backend and frontend(s). For example:
+Typically, keep contract definitions in a shared workspace package used by your
+backend and frontend:
 
-- `shared` exports the contract tree
+- `shared` exports the contract tree and helper types
 - `backend` imports the contracts and registers Express routes
-- `frontend` imports the contracts and creates an API client
+- `frontend` imports the contracts and creates a core client or React Query client
 - app-specific helper types can live beside the contracts
-
-This keeps the contract definition independent from the backend route
-implementation. You can organize services, middleware, context, and frontend
-data fetching however your app already wants to.
 
 ## Non-Goals
 
@@ -416,25 +246,11 @@ This library is intentionally small. It is not trying to be:
 - a replacement for Express, fetch, Zod, or React Query
 - an RPC framework that owns your route structure
 - a project structure or architecture mandate
-- a solution for every possible API edge case
-
-The aim is to cover common JSON API workflows with low ceremony, while keeping
-streaming and websocket routes inside the same end-to-end type-safe contract
-model when your application needs them.
-
-## Design Principles
-
-- Public API is small and easy to learn.
-- Type inference does the heavy lifting
-- Runtime behavior is straightforward and easy to debug.
-- Contracts should be plain objects, not generated artifacts.
-- Framework integrations should stay separate and optional.
 
 ## Docs
 
 - [Core package](./packages/core/README.md)
 - [Express package](./packages/express/README.md)
-- [API client package](./packages/api-client/README.md)
 - [React Query package](./packages/react-query/README.md)
 - [OpenAPI package](./packages/openapi/README.md)
 - [Example project](./example/README.md)

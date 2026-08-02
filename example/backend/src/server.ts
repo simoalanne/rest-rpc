@@ -1,15 +1,9 @@
+import { createServer } from "node:http";
 import type { ContractWebSocket } from "@contract-first-api/express";
 import { initServer } from "@contract-first-api/express";
-import { createOpenApiDocument } from "@contract-first-api/openapi";
-import type {
-	ApiResponse,
-	DiscussMessage,
-	ExampleContractMeta,
-} from "@example/shared";
+import type { DiscussMessage, Todo } from "@example/shared";
 import { allContracts } from "@example/shared";
-import { apiReference } from "@scalar/express-api-reference";
 import express from "express";
-import { createServer } from "node:http";
 
 type RequestContext = {
 	requestId: string;
@@ -41,10 +35,7 @@ const inspectImageBuffer = (buffer: Buffer) => {
 	}
 
 	// GIF: logical screen width/height are little-endian at bytes 6-9.
-	if (
-		buffer.length >= 10 &&
-		buffer.toString("ascii", 0, 3) === "GIF"
-	) {
+	if (buffer.length >= 10 && buffer.toString("ascii", 0, 3) === "GIF") {
 		return {
 			width: buffer.readUInt16LE(6),
 			height: buffer.readUInt16LE(8),
@@ -70,8 +61,10 @@ const inspectImageBuffer = (buffer: Buffer) => {
 
 			const blockLength = buffer.readUInt16BE(offset + 2);
 			if (
-				[0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd,
-					0xce, 0xcf].includes(marker)
+				[
+					0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd,
+					0xce, 0xcf,
+				].includes(marker)
 			) {
 				return {
 					height: buffer.readUInt16BE(offset + 5),
@@ -83,10 +76,12 @@ const inspectImageBuffer = (buffer: Buffer) => {
 		}
 	}
 
-	throw new Error("Only PNG, JPEG, and GIF images are supported in the example.");
+	throw new Error(
+		"Only PNG, JPEG, and GIF images are supported in the example.",
+	);
 };
 
-const todos: ApiResponse<"todos.create">[] = [
+const todos: Todo[] = [
 	{
 		id: "todo-1",
 		title: "Try the contract-first example",
@@ -115,42 +110,13 @@ const broadcastDiscussMessage = (message: DiscussMessage) => {
 	}
 };
 
-const serverTools = initServer<
-	typeof allContracts,
-	RequestContext
->();
+const serverTools = initServer<typeof allContracts, RequestContext>();
 const {
 	defineService,
 	defineMiddleware,
 	createContractModeMiddleware,
 	createRouter,
 } = serverTools;
-
-const openApiDocument = createOpenApiDocument<ExampleContractMeta>(allContracts, {
-	info: {
-		title: "Contract First API Example",
-		version: "1.0.0",
-	},
-	servers: [{ url: `http://localhost:${port}/api` }],
-	transformOperation: ({ contract, operation }) => ({
-		...operation,
-		...(contract.meta?.requiresAuth
-			? { security: [{ bearerAuth: [] }] }
-			: {}),
-	}),
-	transformDocument: (document) => ({
-		...document,
-		components: {
-			...document.components,
-			securitySchemes: {
-				bearerAuth: {
-					type: "http",
-					scheme: "bearer",
-				},
-			},
-		},
-	}),
-});
 
 declare global {
 	namespace Express {
@@ -185,15 +151,21 @@ const services = {
 		async get({ context }) {
 			await sleep(900);
 			return {
-				status: "ok",
-				requestId: context.requestId,
+				status: 200,
+				body: {
+					status: "ok",
+					requestId: context.requestId,
+				},
 			};
 		},
 	}),
 	todos: defineService("todos", {
 		list() {
 			return {
-				items: todos,
+				status: 200,
+				body: {
+					items: todos,
+				},
 			};
 		},
 		create({ title }) {
@@ -204,13 +176,31 @@ const services = {
 			};
 
 			todos.push(todo);
-			return todo;
+
+			const requiresProcessing = Math.random() < 0.5;
+
+			if (requiresProcessing) {
+				return {
+					status: 202,
+					body: {
+						requestId: `request-${crypto.randomUUID()}`,
+					},
+				};
+			}
+			return {
+				status: 201,
+				body: todo,
+			};
 		},
 		find({ query }) {
-			return todos.filter((todo) =>
-				todo.title.toLowerCase().includes(query.toLowerCase()),
-			);
+			return {
+				status: 200,
+				body: todos.filter((todo) =>
+					todo.title.toLowerCase().includes(query.toLowerCase()),
+				),
+			};
 		},
+
 		async *events() {
 			for (const todo of todos) {
 				yield {
@@ -244,7 +234,10 @@ const services = {
 				);
 			}
 
-			return inspectImageBuffer(rawBody);
+			return {
+				status: 200,
+				body: inspectImageBuffer(rawBody),
+			};
 		},
 	}),
 	discuss: defineService("discuss", {
@@ -285,15 +278,6 @@ app.use(
 			limit: "10mb",
 		}),
 		routePrefix: "/api",
-	}),
-);
-app.get("/openapi.json", (_req, res) => {
-	res.json(openApiDocument);
-});
-app.use(
-	"/docs",
-	apiReference({
-		url: "/openapi.json",
 	}),
 );
 app.use((req, res, next) => {

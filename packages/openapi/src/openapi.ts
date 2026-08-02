@@ -1,10 +1,14 @@
 import type {
-	Contract,
 	ContractTree,
 	FlattenedContract,
 	JsonContract,
+	ResponseBodySchema,
 } from "@contract-first-api/core/contracts";
-import { flattenContractTree } from "@contract-first-api/core/contracts";
+import {
+	flattenContractTree,
+	isNoBodyResponse,
+	isStreamResponse,
+} from "@contract-first-api/core/contracts";
 import z from "zod";
 
 export type OpenApiSchema = Record<string, unknown>;
@@ -91,43 +95,20 @@ const JSON_CONTENT_TYPE = "application/json";
 const isOpenApiContract = <TMeta>(
 	contract: FlattenedContract<TMeta>,
 ): contract is OpenApiContract<TMeta> =>
-	!contract.options || contract.options.mode === "json";
+	(!contract.options || contract.options.mode === "json") &&
+	"responses" in contract &&
+	!Object.values(contract.responses).some((response) =>
+		isStreamResponse(response),
+	);
 
 const toOpenApiPath = (path: string) =>
 	path.replace(/:([A-Za-z0-9_]+)/g, "{$1}");
-
-const getSuccessStatusCode = (contract: JsonContract) => {
-	if (contract.successStatusCode) return String(contract.successStatusCode);
-	if (contract.method === "POST") return "201";
-	if (!("response" in contract) || !contract.response) return "204";
-	return "200";
-};
 
 const getSchemaProperties = (schema: OpenApiSchema) =>
 	(schema.properties ?? {}) as Record<string, OpenApiSchema>;
 
 const getRequiredSchemaKeys = (schema: OpenApiSchema) =>
 	new Set(Array.isArray(schema.required) ? schema.required : []);
-
-const getLiteralValue = (schema: z.ZodType): unknown => {
-	if ("values" in schema && schema.values instanceof Set) {
-		return [...schema.values][0];
-	}
-
-	return undefined;
-};
-
-const getKnownErrorStatus = (schema: z.ZodObject): string => {
-	const statusSchema = schema.shape.status;
-	if (!statusSchema) return "400";
-	const status = getLiteralValue(statusSchema);
-	return typeof status === "number" ? String(status) : "400";
-};
-
-const getKnownErrorCode = (schema: z.ZodObject) => {
-	const code = getLiteralValue(schema.shape.code);
-	return typeof code === "string" ? code : undefined;
-};
 
 const toJsonSchema = (
 	schema: z.ZodType,
@@ -178,33 +159,31 @@ const createRequestBody = (
 
 const createJsonResponse = (
 	description: string,
-	schema: z.ZodType | undefined,
+	schema: ResponseBodySchema,
 	options: SchemaConversionOptions | undefined,
 ): OpenApiResponse => {
-	if (!schema) return { description };
+	if (isNoBodyResponse(schema)) return { description };
 
 	return {
 		description,
 		content: {
 			[JSON_CONTENT_TYPE]: {
-				schema: toJsonSchema(schema, "output", options),
+				schema: toJsonSchema(schema as z.ZodType, "output", options),
 			},
 		},
 	};
 };
 
-const createErrorResponses = (
-	contract: Contract,
+const createResponses = (
+	contract: JsonContract,
 	options: SchemaConversionOptions | undefined,
 ) => {
 	const responses: Record<string, OpenApiResponse> = {};
 
-	for (const errorSchema of [contract.errors ?? []].flat()) {
-		const status = getKnownErrorStatus(errorSchema);
-		const code = getKnownErrorCode(errorSchema);
+	for (const [status, schema] of Object.entries(contract.responses)) {
 		responses[status] = createJsonResponse(
-			code ? `${code} error` : "Known error",
-			errorSchema,
+			Number(status) >= 200 && Number(status) < 300 ? "Success" : "Error",
+			schema,
 			options,
 		);
 	}
@@ -220,23 +199,11 @@ const createOperation = <TMeta>(
 		...createParameters(contract.request?.params, "path", options.schema),
 		...createParameters(contract.request?.query, "query", options.schema),
 	];
-	const requestBody = createRequestBody(
-		contract.request?.body,
-		options.schema,
-	);
-	const status = getSuccessStatusCode(contract);
-	const response = createJsonResponse(
-		"Success",
-		contract.response,
-		options.schema,
-	);
+	const requestBody = createRequestBody(contract.request?.body, options.schema);
 	const operation: OpenApiOperation = {
 		...(parameters.length > 0 ? { parameters } : {}),
 		...(requestBody ? { requestBody } : {}),
-		responses: {
-			[status]: response,
-			...createErrorResponses(contract, options.schema),
-		},
+		responses: createResponses(contract, options.schema),
 	};
 
 	return options.transformOperation?.({ contract, operation }) ?? operation;

@@ -54,12 +54,12 @@ Key mappings:
 - `request.params` becomes path parameters
 - `request.query` becomes query parameters
 - `request.body` becomes a JSON request body
-- `response` becomes the success response schema
-- `successStatusCode` becomes the success response status
-- `errors` become additional response entries
+- each `responses` entry becomes an OpenAPI response for that status
+- `noBody` responses are emitted without JSON content
 
-Only JSON contracts are included. Raw, stream, and websocket contracts are not
-part of the generated OpenAPI document.
+Only JSON HTTP contracts are included. Raw request contracts, websocket
+contracts, and contracts with streaming responses are not part of the generated
+OpenAPI document.
 
 ## Schema Conversion
 

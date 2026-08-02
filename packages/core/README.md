@@ -1,12 +1,7 @@
 # @contract-first-api/core
 
-Define shared API contracts and derive path-based request, response, and error
-types from them.
-
-This is the package every other `contract-first-api` package builds on. It does
-not mount routes or make HTTP requests by itself. Its job is to give your app a
-single contract tree that can be imported by backend, frontend, tests, and
-shared helper types.
+Define shared API contracts, derive path-based helper types, and create typed
+runtime clients from the same contract tree.
 
 ## Install
 
@@ -16,10 +11,8 @@ pnpm add @contract-first-api/core zod
 
 ## Define Contracts
 
-Start by calling `initContracts()` optionally with the metadata shape, then define a contract
-tree with `defineContractTree()`.
-
-The helper exists because it allows the metadata type to flow though the stack instead of needing to be imported separately in each package. Additionally `defineContractTree()` performs some runtime validation to catch common mistakes that can't be enforced at compile time and makes sure the object type does not widen and is correctly defined without you having to add annotations like `as const satisfies Contract<MetaShape>` for every contract tree.
+Start with `initContracts()`, optionally with a metadata shape, then define a
+plain contract tree with `defineContractTree()`.
 
 ```ts
 import { initContracts } from "@contract-first-api/core";
@@ -34,14 +27,16 @@ export const contracts = defineContractTree({
 		list: {
 			method: "GET",
 			path: "/todos",
-			response: z.object({
-				items: z.array(
-					z.object({
-						id: z.string(),
-						title: z.string(),
-					}),
-				),
-			}),
+			responses: {
+				200: z.object({
+					items: z.array(
+						z.object({
+							id: z.string(),
+							title: z.string(),
+						}),
+					),
+				}),
+			},
 		},
 		create: {
 			method: "POST",
@@ -54,10 +49,15 @@ export const contracts = defineContractTree({
 					title: z.string().min(1),
 				}),
 			},
-			response: z.object({
-				id: z.string(),
-				title: z.string(),
-			}),
+			responses: {
+				201: z.object({
+					id: z.string(),
+					title: z.string(),
+				}),
+				409: z.object({
+					code: z.literal("TITLE_ALREADY_EXISTS"),
+				}),
+			},
 		},
 	},
 });
@@ -66,65 +66,88 @@ export const contracts = defineContractTree({
 The keys around each contract, like `todos.create`, become the path names used
 by helper types and integration packages.
 
-## Merging Contract Trees
-
-There is no special merging function but because contracts are just plain objects you can just use regular object spread and organize your contract tree across multiple files however you like.
-
-```ts
-// contracts/index.ts
-import { defineContractTree } from "@contract-first-api/core";
-
-// contracts defined using defineContractTree in separate files.
-import { userContracts } from "./user-contracts";
-import { todoContracts } from "./todo-contracts";
-
-export default {
-	...userContracts,
-	...todoContracts,
-};
-```
-
-
 ## Contract Fields
 
-Each contract can define:
+Each HTTP contract can define:
 
 | Field | Purpose |
 | --- | --- |
 | `method` | HTTP method: `GET`, `POST`, `PUT`, `DELETE`, or `PATCH`. |
 | `path` | HTTP path, with params using `:paramValue` syntax. |
 | `request` | Optional Zod schemas for `body`, `query`, and `params`. Raw request contracts can only define `query` and `params`. |
-| `response` | Optional Zod schema for the successful JSON response body, or required stream chunk schema for stream contracts. |
-| `successStatusCode` | Optional successful HTTP status code override for JSON and stream contracts. |
-| `errors` | Optional known error schema or array of known error schemas for JSON and stream contracts. |
-| `options` | Optional contract behavior, such as stream or websocket mode. |
+| `responses` | Required map of status codes to response schemas. At least one status must be 2xx. |
+| `options` | Optional contract behavior, currently `raw` or `websocket`. |
 | `messages` | WebSocket client and server message schemas. |
 | `meta` | Optional app-defined metadata for integrations and middleware. |
 
-Contracts are plain objects. The package validates a few structural rules that cannot be enforced at compile time when
-you call `defineContractTree()`, but it does not require code generation or a
-separate schema compiler step.
+`defineContractTree()` validates structural rules that TypeScript cannot fully
+enforce at runtime, such as duplicate request field names across `body`,
+`query`, and `params`.
 
-## Contract Types
+## Responses
 
-Contracts have four explicit shapes:
+Use `responses` for both successful and non-successful status codes. Values can
+be Zod schemas, `noBody`, or `stream(schema)`.
 
-- **JSON contracts** are the default. `options` can be omitted or set to
-  `{ mode: "json" }`. They can define request schemas, an optional `response`
-  schema, known errors, and metadata.
+```ts
+import { noBody, stream } from "@contract-first-api/core";
+
+export const contracts = defineContractTree({
+	todos: {
+		remove: {
+			method: "DELETE",
+			path: "/todos/:id",
+			request: {
+				params: z.object({
+					id: z.string(),
+				}),
+			},
+			responses: {
+				204: noBody,
+				404: z.object({
+					code: z.literal("TODO_NOT_FOUND"),
+				}),
+			},
+		},
+		events: {
+			method: "GET",
+			path: "/todos/events",
+			responses: {
+				200: stream(
+					z.discriminatedUnion("type", [
+						z.object({
+							type: z.literal("created"),
+							id: z.string(),
+							title: z.string(),
+						}),
+						z.object({
+							type: z.literal("completed"),
+							id: z.string(),
+						}),
+					]),
+				),
+			},
+		},
+	},
+});
+```
+
+Non-2xx entries are the typed error cases. There is no separate `errors` field.
+Status codes are declared directly in `responses`.
+
+## Contract Modes
+
+- **JSON contracts** are the default. They can define request schemas,
+  responses, and metadata.
 - **Raw request contracts** use `options: { mode: "raw" }`. They can define
-  `query`, `params`, an optional `response`, known errors, and metadata, but
-  they do not define a contract-managed request `body` schema.
-- **Stream contracts** use `options: { mode: "stream" }`. They must define a
-  `response` schema, which describes each NDJSON chunk.
+  `query`, `params`, responses, and metadata, but not a contract-managed request
+  `body` schema.
+- **Streaming contracts** are HTTP contracts whose successful response is
+  declared with `stream(schema)`. A stream response cannot be mixed with
+  multiple successful status codes.
 - **WebSocket contracts** use `options: { mode: "websocket" }`. They must use
-  `method: "GET"` and define `messages.client` and `messages.server`. They do
-  not define `response` or `errors`, because communication after the upgrade
-  happens through websocket messages and close events.
-
-The integration packages use the contract mode to expose the right API. JSON
-and raw request contracts expose fetch helpers, stream contracts expose stream
-helpers, and websocket contracts expose connect helpers.
+  `method: "GET"` and define `messages.client` and `messages.server` instead of
+  `responses`.
 
 ## Request Schemas
 
@@ -144,40 +167,25 @@ const contracts = defineContractTree({
 					includeCompleted: z.coerce.boolean().optional(),
 				}),
 			},
-			response: z.object({
-				id: z.string(),
-				title: z.string(),
-			}),
-		},
-		create: {
-			method: "POST",
-			path: "/todos",
-			request: {
-				body: z.object({
-					title: z.string().min(1),
+			responses: {
+				200: z.object({
+					id: z.string(),
+					title: z.string(),
 				}),
 			},
-			response: z.object({
-				id: z.string(),
-				title: z.string(),
-			}),
 		},
 	},
 });
 ```
 
-The integration packages expose this as one flat request object. For example,
-`params.id`, `query.includeCompleted`, and `body.title` become regular fields
-on typed service/client inputs.
-
-Request field names must be unique across `body`, `query`, and `params` for a
-single contract. This avoids ambiguous flat inputs.
+Integrations expose this as one flat request object. For example, `params.id`,
+`query.includeCompleted`, and `body.title` become regular fields on typed
+service and client inputs.
 
 ## Raw Request Contracts
 
-Raw request contracts are useful when the request body should be passed through
-without contract-level validation, but you still want typed params, query,
-responses, and known errors.
+Raw request contracts pass the request body through without contract-level Zod
+validation while keeping typed params, query, and responses.
 
 ```ts
 const contracts = defineContractTree({
@@ -194,101 +202,23 @@ const contracts = defineContractTree({
 				}),
 			},
 			options: { mode: "raw" },
-			response: z.object({
-				width: z.number(),
-				height: z.number(),
-				format: z.string(),
-			}),
-		},
-	},
-});
-```
-
-The integration packages still expose a flat request shape for `params` and
-`query`. The raw request body itself is an explicit escape hatch handled by the
-integration packages rather than by a Zod body schema.
-
-## Responses
-
-If a contract has a `response` schema, server handlers must return that shape
-and clients receive that inferred type.
-
-If a contract omits `response`, then there simply is no typed response body.
-
-## Known Errors
-
-Use `errors` for error payloads your application intentionally returns and wants
-to handle as typed cases.
-
-```ts
-const contracts = defineContractTree({
-	todos: {
-		create: {
-			method: "POST",
-			path: "/todos",
-			request: {
-				body: z.object({
-					title: z.string().min(1),
+			responses: {
+				200: z.object({
+					width: z.number(),
+					height: z.number(),
+					format: z.string(),
 				}),
 			},
-			errors: [
-				z.object({
-					code: z.literal("TITLE_ALREADY_EXISTS"),
-					existingTodoId: z.string(),
-				}),
-				z.object({
-					code: z.literal("TODO_LIMIT_REACHED"),
-					status: z.literal(400),
-					maxLimit: z.int(),
-					currentCount: z.int(),
-				}),
-			],
-			response: z.object({
-				id: z.string(),
-				title: z.string(),
-			}),
 		},
 	},
 });
 ```
 
-Each known error schema must include a literal `code`. It may also include a
-literal `status` which can be used by the backend to set the HTTP status code. You can also add any other fields you want on the error payload.
-
-## Streaming Contracts
-
-Streaming contracts use `options: { mode: "stream" }`. The `response` schema
-describes each stream chunk.
-
-```ts
-const contracts = defineContractTree({
-	todos: {
-		events: {
-			method: "GET",
-			path: "/todos/events",
-			options: { mode: "stream" },
-			response: z.discriminatedUnion("type", [
-				z.object({
-					type: z.literal("created"),
-					id: z.string(),
-					title: z.string(),
-				}),
-				z.object({
-					type: z.literal("completed"),
-					id: z.string(),
-				}),
-			]),
-		},
-	},
-});
-```
-
-Stream contracts must define a `response` schema because the client validates each chunk.
+Client calls add the raw payload through an explicit `rawBody` field.
 
 ## WebSocket Contracts
 
-WebSocket contracts use `options: { mode: "websocket" }`. They define the JSON
-message shape each side is allowed to send.
+WebSocket contracts define the JSON message shape each side is allowed to send.
 
 ```ts
 const contracts = defineContractTree({
@@ -302,74 +232,64 @@ const contracts = defineContractTree({
 					type: z.literal("message"),
 					text: z.string().min(1),
 				}),
-				server: z.discriminatedUnion("type", [
-					z.object({
-						type: z.literal("history"),
-						messages: z.array(z.string()),
-					}),
-					z.object({
-						type: z.literal("message"),
-						text: z.string(),
-					}),
-				]),
-			},
-		},
-	},
-});
-```
-
-The client message schema is used for messages sent by the API client to the
-backend. The server message schema is used for messages sent by the backend to
-the API client. Incoming websocket messages are parsed and exposed as a result
-object so application code can decide how to handle invalid messages.
-
-## Metadata
-
-Use `meta` for app-specific information that integrations can read at runtime.
-For example, Express middleware can check whether a route requires auth before
-the service handler runs.
-
-```ts
-const { defineContractTree } = initContracts<{
-	requiresAuth?: boolean;
-}>();
-
-export const contracts = defineContractTree({
-	todos: {
-		create: {
-			method: "POST",
-			path: "/todos",
-			meta: {
-				requiresAuth: true,
-			},
-			request: {
-				body: z.object({
-					title: z.string().min(1),
+				server: z.object({
+					type: z.literal("message"),
+					text: z.string(),
 				}),
 			},
-			response: z.object({
-				id: z.string(),
-				title: z.string(),
-			}),
 		},
 	},
 });
 ```
 
-Metadata is intentionally open-ended. It is useful for things like auth flags,
-required permissions, rate-limit groups, or feature gates.
+Incoming websocket messages are parsed and exposed as result objects so
+application code can decide how to handle invalid messages.
+
+## Typed Client
+
+Use `initClient()` when you need a runtime client.
+
+```ts
+import { initClient } from "@contract-first-api/core";
+
+const api = initClient(contracts, {
+	baseUrl: "http://localhost:3001/api",
+	getHeaders: () => ({
+		Authorization: `Bearer ${getAuthToken()}`,
+	}),
+	timeoutMs: 10_000,
+});
+```
+
+Every HTTP contract exposes `fetchResponse()`, which returns either a declared
+response envelope or an undeclared response:
+
+```ts
+const response = await api.todos.create.fetchResponse({
+	title: "Write docs",
+});
+
+if (response.declared && response.status === 201) {
+	console.log(response.body.id);
+}
+```
+
+Contracts with exactly one successful response also expose `fetch()`, which
+returns the success body directly:
+
+```ts
+const todos = await api.todos.list.fetch();
+console.log(todos.items);
+```
+
+WebSocket contracts expose `connect()` and `tryConnect()`.
 
 ## Shared Helper Types
 
-Most app code should not need to import the internal contract machinery. The
-core package exposes path-based helper types for shared packages that want
-friendly aliases.
-
-This allows your shared package to export helper types like this:
+Shared packages can export friendly path-based helper types:
 
 ```ts
 import type {
-	ContractApiError,
 	ContractApiRequest,
 	ContractApiResponse,
 	DotPaths,
@@ -387,25 +307,16 @@ export type ApiResponse<P extends ApiPath> = ContractApiResponse<
 	AppContracts,
 	P
 >;
-
-export type ApiError<P extends ApiPath> = ContractApiError<AppContracts, P>;
 ```
 
-Then your backend and frontend can work with easier to work with types and don't need to import contracts themeselves:
+`ContractApiResponse` is the declared response envelope union for that path,
+such as `{ status: 201; body: CreatedTodo } | { status: 409; body: Conflict }`.
 
-```ts
-type CreateTodoInput = ApiRequest<"todos.create">;
-type CreatedTodo = ApiResponse<"todos.create">;
-type CreateTodoError = ApiError<"todos.create">;
-```
-
-## How the core package connects to other packages
+## How Core Connects To Other Packages
 
 - `@contract-first-api/express` imports the same contract tree to register
   routes, validate requests, and type service handlers.
-- `@contract-first-api/api-client` imports the same contract tree to create a
-  typed runtime client.
-- `@contract-first-api/react-query` wraps the API client tree with hooks and
-  cache helpers.
+- `@contract-first-api/react-query` creates hook and cache helpers from the
+  contract tree and core client options.
 - `@contract-first-api/openapi` imports the same contract tree to generate a
   plain OpenAPI document object from JSON contracts.
