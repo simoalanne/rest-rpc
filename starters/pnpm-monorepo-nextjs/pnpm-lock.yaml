@@ -20,12 +20,12 @@ importers:
 
   apps/backend:
     dependencies:
+      '@contract-first-api/core':
+        specifier: ^4.4.0
+        version: 4.4.0
       '@contract-first-api/express':
         specifier: ^4.3.0
         version: 4.3.0(express@5.2.1)(ws@8.21.0)
-      '@contract-first-api/openapi':
-        specifier: ^1.0.1
-        version: 1.0.1
       '@packages/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -170,14 +170,14 @@ packages:
   '@contract-first-api/core@4.3.0':
     resolution: {integrity: sha512-54V3CkaqxuCJ8QJT4Psdp5l7qkaJ56IkJBu5fjkq+V2r7RSytzWapl66BhR1BoXp6ItwSy6C4GFLFH9Eh+5VhQ==}
 
+  '@contract-first-api/core@4.4.0':
+    resolution: {integrity: sha512-+Pup6zZfeY2U55MwPnhjp7A+spTMWoYHOFcezpiScncf3EHRwJDk83WeYBEDcN/B9+it6bPsDy9LSa3TRCcXGw==}
+
   '@contract-first-api/express@4.3.0':
     resolution: {integrity: sha512-zzkwJdrVRTEyMcT/RfVtCu8d8DieK69wtJNzO1c1SRTNfkD5LUhjKZVlb5yd4nv6IlvJ2DPuvlnZ41zpsMZosA==}
     peerDependencies:
       express: ^5.0.0
       ws: ^8.21.0
-
-  '@contract-first-api/openapi@1.0.1':
-    resolution: {integrity: sha512-tJr7e1RXKhqOg69ove6ihMXHq0JQE4scP4Qp084okVF1mzx/2BZ+LPGcVBxxlgyMg0LPRZpOLyTMJYU0VEKf0Q==}
 
   '@contract-first-api/react-query@4.3.0':
     resolution: {integrity: sha512-UZ4h2y2bRAJBfjw/s73WiJw6oRuC4QbMELRZoTXB1k/bFCK1FwTwWfq4XzpYlqzBcHw+LVSklcyCa0Tc8v0k9w==}
@@ -967,16 +967,15 @@ snapshots:
     dependencies:
       zod: 4.4.3
 
+  '@contract-first-api/core@4.4.0':
+    dependencies:
+      zod: 4.4.3
+
   '@contract-first-api/express@4.3.0(express@5.2.1)(ws@8.21.0)':
     dependencies:
       '@contract-first-api/core': 4.3.0
       express: 5.2.1
       ws: 8.21.0
-
-  '@contract-first-api/openapi@1.0.1':
-    dependencies:
-      '@contract-first-api/core': 4.3.0
-      zod: 4.4.3
 
   '@contract-first-api/react-query@4.3.0(@tanstack/react-query@5.101.0(react@19.2.4))':
     dependencies:

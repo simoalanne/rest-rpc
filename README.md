@@ -52,18 +52,17 @@ From that tree:
 
 - `@contract-first-api/express` validates incoming requests and types services
 - `@contract-first-api/core` builds a typed runtime client with `initClient`
+  and generates OpenAPI documents from JSON contracts
 - `@contract-first-api/react-query` creates typed hooks and cache helpers
-- `@contract-first-api/openapi` generates an OpenAPI document from JSON contracts
 - shared packages can expose path-based request and response helper types
 
 ## Packages
 
 | Package | Role |
 | --- | --- |
-| [`@contract-first-api/core`](./packages/core/README.md) | Define contracts, derive shared types, and create typed clients. |
+| [`@contract-first-api/core`](./packages/core/README.md) | Define contracts, derive shared types, create typed clients, and generate OpenAPI documents. |
 | [`@contract-first-api/express`](./packages/express/README.md) | Mount contracts on an Express app with validation and typed services. |
 | [`@contract-first-api/react-query`](./packages/react-query/README.md) | Create React Query hooks and cache helpers from contracts. |
-| [`@contract-first-api/openapi`](./packages/openapi/README.md) | Generate an OpenAPI document from JSON contracts. |
 
 ## Install
 
@@ -76,7 +75,7 @@ pnpm add @contract-first-api/core zod
 Then add the integration packages you need:
 
 ```bash
-pnpm add @contract-first-api/express @contract-first-api/react-query @contract-first-api/openapi
+pnpm add @contract-first-api/express @contract-first-api/react-query
 ```
 
 If your backend uses websocket contracts with the Express adapter, also install
@@ -252,7 +251,6 @@ This library is intentionally small. It is not trying to be:
 - [Core package](./packages/core/README.md)
 - [Express package](./packages/express/README.md)
 - [React Query package](./packages/react-query/README.md)
-- [OpenAPI package](./packages/openapi/README.md)
 - [Example project](./example/README.md)
 
 ## License

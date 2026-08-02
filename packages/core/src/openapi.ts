@@ -3,12 +3,12 @@ import type {
 	FlattenedContract,
 	JsonContract,
 	ResponseBodySchema,
-} from "@contract-first-api/core/contracts";
+} from "./contracts.ts";
 import {
 	flattenContractTree,
 	isNoBodyResponse,
 	isStreamResponse,
-} from "@contract-first-api/core/contracts";
+} from "./contracts.ts";
 import z from "zod";
 
 export type OpenApiSchema = Record<string, unknown>;

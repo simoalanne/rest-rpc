@@ -312,11 +312,29 @@ export type ApiResponse<P extends ApiPath> = ContractApiResponse<
 `ContractApiResponse` is the declared response envelope union for that path,
 such as `{ status: 201; body: CreatedTodo } | { status: 409; body: Conflict }`.
 
+## OpenAPI Documents
+
+Core can generate a plain OpenAPI document object from JSON HTTP contracts:
+
+```ts
+import { createOpenApiDocument } from "@contract-first-api/core";
+import { contracts } from "@example/shared";
+
+export const openApiDocument = createOpenApiDocument(contracts, {
+	info: {
+		title: "Todo API",
+		version: "1.0.0",
+	},
+	servers: [{ url: "http://localhost:3000/api" }],
+});
+```
+
+Raw request contracts, websocket contracts, and contracts with streaming
+responses are not included in the generated document.
+
 ## How Core Connects To Other Packages
 
 - `@contract-first-api/express` imports the same contract tree to register
   routes, validate requests, and type service handlers.
 - `@contract-first-api/react-query` creates hook and cache helpers from the
   contract tree and core client options.
-- `@contract-first-api/openapi` imports the same contract tree to generate a
-  plain OpenAPI document object from JSON contracts.

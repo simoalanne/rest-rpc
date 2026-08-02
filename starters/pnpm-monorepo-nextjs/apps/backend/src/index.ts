@@ -1,10 +1,10 @@
 import express from "express";
 import { contracts } from "@packages/contracts";
+import { createOpenApiDocument } from "@contract-first-api/core";
 import {
 	initServer,
 	type ContractWebSocket,
 } from "@contract-first-api/express";
-import { createOpenApiDocument } from "@contract-first-api/openapi";
 import { apiReference } from "@scalar/express-api-reference";
 import { createServer } from "node:http";
 

@@ -32,5 +32,11 @@ export type {
 	WebSocketMessageResult,
 } from "./client.ts";
 
+export type {
+	CreateOpenApiDocumentOptions,
+	OpenApiDocument,
+} from "./openapi.ts";
+
 export { initClient } from "./client.ts";
 export { initContracts, noBody, stream } from "./contracts.ts";
+export { createOpenApiDocument } from "./openapi.ts";

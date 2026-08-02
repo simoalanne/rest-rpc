@@ -8,8 +8,8 @@
 		"typecheck": "tsc -p tsconfig.json"
 	},
 	"dependencies": {
+		"@contract-first-api/core": "^4.4.0",
 		"@contract-first-api/express": "^4.3.0",
-		"@contract-first-api/openapi": "^1.0.1",
 		"@packages/contracts": "workspace:*",
 		"@scalar/express-api-reference": "^0.10.0",
 		"dotenv": "^17.4.2",

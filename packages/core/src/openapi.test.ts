@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { stream } from "@contract-first-api/core";
+import { stream } from "./contracts.ts";
 import z from "zod";
 import { createOpenApiDocument } from "./openapi.ts";
 

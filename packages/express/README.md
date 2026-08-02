@@ -368,4 +368,4 @@ before parameter routes when paths overlap.
   same contract tree and matching `baseUrl`.
 
 This package stays on the server side. The core client, React Query adapter,
-and OpenAPI generator are optional consumers of the same contracts.
+and core OpenAPI generator are optional consumers of the same contracts.
