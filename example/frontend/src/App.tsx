@@ -42,6 +42,10 @@ const renderCreateTodoError = (error: CreateTodoError) => {
 			return "A todo with that title already exists.";
 		}
 
+		if (error.status === 401) {
+			return "You are not authorized to create todos. Please provide a valid auth token.";
+		}
+
 		return `Request failed with HTTP ${error.status}.`;
 	}
 

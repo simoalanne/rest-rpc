@@ -227,6 +227,21 @@ const regularMiddleware = (
 	next();
 };
 
+const authMiddleware = (
+	req: express.Request,
+	res: express.Response,
+	next: express.NextFunction,
+) => {
+	const matched = matchRoute(apiContract, req);
+	const authTokenExists = Math.random() < 0.5;
+	if (matched?.metadata?.auth === "required" && !authTokenExists) {
+		console.log(`Unauthorized request for ${req.path}`);
+		return res.status(401).json({ error: "Unauthorized" });
+	}
+	console.log(`Authorized request for ${req.path}`);
+	next();
+};
+
 const implementations = [
 	implementContract(apiContract.health).handlers({
 		async get({ context }) {
@@ -322,7 +337,7 @@ app.use((req, res, next) => {
 
 	return bodyParser(req, res, next);
 });
-app.use(middleware, regularMiddleware);
+
 app.use((req, res, next) => {
 	res.setHeader("Access-Control-Allow-Origin", "*");
 	res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -335,6 +350,8 @@ app.use((req, res, next) => {
 
 	next();
 });
+
+app.use(middleware, regularMiddleware, authMiddleware);
 
 createRouter({
 	app,

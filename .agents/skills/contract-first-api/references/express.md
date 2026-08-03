@@ -160,14 +160,14 @@ middleware needs to know which contract route matched, call `matchRoute()`.
 const authMiddleware: express.RequestHandler = (req, res, next) => {
 	const matched = matchRoute(contract, req);
 
-	if (!matched?.path.startsWith("/api/todos")) {
+	if (matched?.metadata?.auth === "required") {
+		const user = gerUserFromAuthHeader(req.headers.authorization);
+		if (!user) {
+			res.status(401).json({ error: "Unauthorized" });
+			return;
+		}
+		req.user = user;
 		next();
-		return;
-	}
-
-	if (!req.headers.authorization) {
-		res.sendStatus(401);
-		return;
 	}
 
 	next();

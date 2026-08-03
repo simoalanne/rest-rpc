@@ -28,6 +28,7 @@ export type ResponseBodySchema =
 	| StreamResponse;
 
 export type RouteResponses = Record<number, ResponseBodySchema>;
+type RouteMetadata = Record<string, unknown>;
 
 export const stream = <const TSchema extends z.ZodType>(
 	schema: TSchema,
@@ -56,6 +57,7 @@ export type BaseRouteDeclaration = {
 	path: string;
 	method: HttpMethod;
 	request?: RequestSchema;
+	metadata?: RouteMetadata;
 };
 
 export type JsonRouteDeclaration = BaseRouteDeclaration & {
@@ -331,6 +333,7 @@ const getRequestSchemaKeySet = (
 
 type CommonContractOptions = {
 	pathPrefix?: string;
+	metadata?: RouteMetadata;
 };
 
 const joinPathPrefix = (prefix: string, path: string) => {
@@ -351,6 +354,11 @@ const validateContract = (
 		if (commonOptions?.pathPrefix) {
 			route.path = joinPathPrefix(commonOptions.pathPrefix, route.path);
 		}
+
+		route.metadata = {
+			...commonOptions?.metadata,
+			...route.metadata,
+		};
 
 		if (route.request) {
 			const requestKeySets = [

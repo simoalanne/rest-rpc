@@ -93,6 +93,7 @@ export const todoContract = defineContract({
 					title: z.string().min(1),
 				}),
 			},
+			metadata: { auth: "required" },
 			responses: {
 				201: todoSchema,
 				202: z.object({

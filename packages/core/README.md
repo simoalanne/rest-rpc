@@ -71,10 +71,39 @@ Each HTTP route declaration can define:
 | `responses` | Required map of status codes to response schemas. At least one status must be 2xx. |
 | `options` | Optional route behavior, currently `raw` or `websocket`. |
 | `messages` | WebSocket client and server message schemas. |
+| `metadata` | Optional application metadata escape hatch. `defineContract()` populates `{}` when omitted. |
 
 `defineContract()` validates structural rules that TypeScript cannot fully
 enforce at runtime, such as duplicate request field names across `body`,
 `query`, and `params`.
+
+Shared metadata can be passed as a `defineContract()` option and is shallow
+merged with route metadata. Route metadata wins on key conflicts.
+
+```ts
+export const apiContract = defineContract(
+	{
+		todos: {
+			list: {
+				method: "GET",
+				path: "/todos",
+				metadata: { auth: "optional" },
+				responses: {
+					200: z.array(
+						z.object({
+							id: z.string(),
+							title: z.string(),
+						}),
+					),
+				},
+			},
+		},
+	},
+	{
+		metadata: { auth: "required" },
+	},
+);
+```
 
 ## Responses
 
