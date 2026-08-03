@@ -186,12 +186,8 @@ const createDiscussMessage = (
 });
 
 const serverTools = initServer<typeof apiContract, RequestContext>();
-const {
-	implementContract,
-	defineMiddleware,
-	createRouteModeMiddleware,
-	createRouter,
-} = serverTools;
+const { implementContract, createRouteModeMiddleware, createRouter } =
+	serverTools;
 
 declare global {
 	namespace Express {
@@ -201,10 +197,10 @@ declare global {
 	}
 }
 
-const middleware = defineMiddleware((req, _res, next) => {
+const middleware: express.RequestHandler = (req, _res, next) => {
 	req.viewerId = "viewer-123";
 	next();
-});
+};
 
 const regularMiddleware = (
 	req: express.Request,

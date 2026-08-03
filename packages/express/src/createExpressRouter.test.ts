@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { initContracts, noBody, stream } from "@contract-first-api/core";
+import type { RequestHandler } from "express";
 import z from "zod";
 import { initServer } from "./initServer.ts";
 
@@ -386,7 +387,7 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, defineMiddleware, implementContract } = initServer<
+		const { createRouter, implementContract } = initServer<
 			typeof apiContract,
 			{ viewerId: string }
 		>();
@@ -398,13 +399,13 @@ describe("initServer", () => {
 			contractPath?: string;
 		} = {};
 
-		const authMiddleware = defineMiddleware(async (req, _res, next) => {
+		const authMiddleware: RequestHandler = async (req, _res, next) => {
 			const enrichedReq = req as typeof req & { viewerId?: string };
 			seen.inputTitle = String(req.validatedRequest.title);
 			seen.contractPath = req.contract.path;
 			enrichedReq.viewerId = "viewer-123";
 			next();
-		});
+		};
 
 		const implementations = [
 			implementContract(apiContract.posts).handlers({

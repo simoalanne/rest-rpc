@@ -23,10 +23,11 @@ pnpm add -D @types/ws
 
 ## Basic Setup
 
-Start by calling `initServer()` to get helper functions. Add middlewares with
-`defineMiddleware()`, implement contract fragments or single route declarations
-with `implementContract()`, then call `createRouter()` to register those
-implementations.
+Start by calling `initServer()` to get helper functions. Implement contract
+fragments or single route declarations with `implementContract()`, then call
+`createRouter()` to register those implementations. Pass regular Express
+middlewares to `createRouter()` when they need to run after contract request
+validation.
 
 ```ts
 import { initServer } from "@contract-first-api/express";
@@ -40,7 +41,7 @@ type RequestContext = {
 const app = express();
 app.use(express.json());
 
-const { createRouter, defineMiddleware, implementContract } = initServer<
+const { createRouter, implementContract } = initServer<
 	typeof apiContract,
 	RequestContext
 >();
@@ -53,8 +54,8 @@ declare global {
 	}
 }
 
-const authMiddleware = defineMiddleware((req, res, next) => {
-	if (!req.contract.meta?.requiresAuth) {
+const authMiddleware: express.RequestHandler = (req, res, next) => {
+	if (req.contract.path !== "/todos") {
 		next();
 		return;
 	}
@@ -67,7 +68,7 @@ const authMiddleware = defineMiddleware((req, res, next) => {
 
 	req.userId = verifyAuthToken(token);
 	next();
-});
+};
 
 const todoImplementations = implementContract(apiContract.todos).handlers({
 	async list() {
@@ -291,11 +292,12 @@ const imageImplementations = implementContract(apiContract.images).handlers({
 
 ## Middleware
 
-Use `defineMiddleware()` when middleware needs typed contract metadata.
+Pass regular Express middleware to `createRouter()` when middleware needs the
+validated request or matched contract route before context creation.
 
 ```ts
-const authMiddleware = defineMiddleware((req, res, next) => {
-	if (!req.contract.meta?.requiresAuth) {
+const authMiddleware: express.RequestHandler = (req, res, next) => {
+	if (req.contract.path !== "/todos") {
 		next();
 		return;
 	}
@@ -306,15 +308,12 @@ const authMiddleware = defineMiddleware((req, res, next) => {
 	}
 
 	next();
-});
+};
 ```
 
 Custom middlewares run after request validation and before `createContext`.
 That means middleware can read `req.contract`, inspect validated request data,
 and attach values to the Express request for `createContext` to use.
-
-For middleware declared outside `defineMiddleware()`, the package exports
-`RequestWithContract`.
 
 ## Streaming Responses
 

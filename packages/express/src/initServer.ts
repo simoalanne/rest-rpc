@@ -58,10 +58,6 @@ export type {
 	InferRouteServerSocket,
 };
 
-export type RequestWithContract = Omit<Request, "contract"> & {
-	contract: RouteDeclaration;
-};
-
 type HandlerResult<E extends RouteDeclaration> =
 	E extends WebSocketRouteDeclaration
 		? MaybePromise<void>
@@ -128,22 +124,6 @@ type ImplementContract<TContext = EmptyObject> = <TNode extends Contract>(
 			) => RouteImplementation[];
 		};
 
-type DefineMiddleware = <
-	TMiddleware extends (
-		req: RequestWithContract,
-		res: Response,
-		next: NextFunction,
-	) => MaybePromise<unknown>,
->(
-	middleware: TMiddleware,
-) => TMiddleware;
-
-type MiddlewareFunction = (
-	req: RequestWithContract,
-	res: Response,
-	next: NextFunction,
-) => unknown;
-
 export type ValidationIssue = {
 	code: string;
 	message: string;
@@ -162,7 +142,7 @@ export type CreateRouterOptions<
 	server?: HttpServer;
 	contract?: TContract;
 	implementations: ImplementationInput;
-	middlewares?: MiddlewareFunction[];
+	middlewares?: RequestHandler[];
 	routePrefix?: string;
 	createContext?: (
 		req: Request & { contract: RouteDeclaration },
@@ -174,7 +154,6 @@ export type ServerTools<
 	TContext = EmptyObject,
 > = {
 	implementContract: ImplementContract<TContext>;
-	defineMiddleware: DefineMiddleware;
 	createRouteModeMiddleware: (
 		options: RouteModeMiddlewareOptions & { contract: TContract },
 	) => RequestHandler;
@@ -601,9 +580,6 @@ const createRouter = <TContract extends Contract, TContext = EmptyObject>({
 			request: Record<string, unknown>,
 		) => unknown | Promise<unknown>;
 		const requestPreparationMiddleware = prepareRequest(route);
-		const registeredMiddlewares = middlewares as Array<
-			(req: Request, res: Response, next: NextFunction) => unknown
-		>;
 
 		const serviceHandler = async (req: Request, res: Response) => {
 			const input = req.validatedRequest;
@@ -652,7 +628,7 @@ const createRouter = <TContract extends Contract, TContext = EmptyObject>({
 		app[method](
 			route.routePath,
 			requestPreparationMiddleware,
-			...registeredMiddlewares,
+			...middlewares,
 			serviceHandler,
 		);
 	}
@@ -665,7 +641,6 @@ export const initServer = <
 	TContext = EmptyObject,
 >(): ServerTools<TContract, TContext> => ({
 	implementContract: implementContract as ImplementContract<TContext>,
-	defineMiddleware: (middleware) => middleware,
 	createRouteModeMiddleware: (options) => createRouteModeMiddleware(options),
 	createRouter: (options) => createRouter<TContract, TContext>(options),
 });

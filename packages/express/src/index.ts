@@ -7,7 +7,6 @@ export type {
 	InferRouteServiceHandler,
 	InferRouteServiceRequest,
 	InferRouteServiceResponse,
-	RequestWithContract,
 	RouteImplementation,
 	RouteModeMiddlewareOptions,
 } from "./initServer.ts";
