@@ -38,16 +38,16 @@ type KnownContractErrorShape = Error & {
 	readonly status: number;
 };
 
-type WebSocketRoute<TMeta> = WebSocketRouteDeclaration<TMeta> & {
+type WebSocketRoute = WebSocketRouteDeclaration & {
 	handler: (request: unknown) => unknown | Promise<unknown>;
 };
 
-type RegisterWebSocketRoutesOptions<TMeta, TContext> = {
+type RegisterWebSocketRoutesOptions<TContext> = {
 	server: HttpServer;
-	routes: Array<WebSocketRoute<TMeta>>;
+	routes: WebSocketRoute[];
 	routePrefix?: string;
 	createContext?: (
-		req: Request & { contract: RouteDeclaration<TMeta> },
+		req: Request & { contract: RouteDeclaration },
 	) => TContext | Promise<TContext>;
 	buildRoutePath: (routePrefix: string | undefined, path: string) => string;
 	createPathMatcher: (
@@ -149,7 +149,7 @@ const runWebSocketServiceHandler = (
 		});
 };
 
-export const registerWebSocketRoutes = <TMeta, TContext>({
+export const registerWebSocketRoutes = <TContext>({
 	server,
 	routes,
 	routePrefix,
@@ -158,7 +158,7 @@ export const registerWebSocketRoutes = <TMeta, TContext>({
 	createPathMatcher,
 	validateRequestSegments,
 	isKnownContractError,
-}: RegisterWebSocketRoutesOptions<TMeta, TContext>) => {
+}: RegisterWebSocketRoutesOptions<TContext>) => {
 	if (routes.length === 0) return;
 
 	const webSocketServer = new WebSocketServer({ noServer: true });
@@ -194,7 +194,7 @@ export const registerWebSocketRoutes = <TMeta, TContext>({
 		}
 
 		const upgradeRequest = req as IncomingMessage & {
-			contract: RouteDeclaration<TMeta>;
+			contract: RouteDeclaration;
 			validatedRequest: Record<string, unknown>;
 		};
 		upgradeRequest.contract = matchedRoute.route;
@@ -205,7 +205,7 @@ export const registerWebSocketRoutes = <TMeta, TContext>({
 			context =
 				(await createContext?.(
 					upgradeRequest as unknown as Request & {
-						contract: RouteDeclaration<TMeta>;
+						contract: RouteDeclaration;
 					},
 				)) || {};
 		} catch (error) {

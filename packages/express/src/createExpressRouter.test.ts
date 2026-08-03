@@ -364,19 +364,12 @@ describe("initServer", () => {
 	});
 
 	it("should run typed middlewares before createContext and service calls", async () => {
-		type ContractMeta = {
-			requiresAuth?: boolean;
-		};
-
-		const { defineContract } = initContracts<ContractMeta>();
+		const { defineContract } = initContracts();
 		const apiContract = defineContract({
 			posts: {
 				create: {
 					method: "POST",
 					path: "/posts",
-					meta: {
-						requiresAuth: true,
-					},
 					request: {
 						body: z.object({
 							title: z.string().min(1),
@@ -400,7 +393,6 @@ describe("initServer", () => {
 
 		const seen: {
 			inputTitle?: string;
-			requiresAuth?: boolean;
 			viewerIdFromMiddleware?: string;
 			viewerIdInService?: string;
 			contractPath?: string;
@@ -409,7 +401,6 @@ describe("initServer", () => {
 		const authMiddleware = defineMiddleware(async (req, _res, next) => {
 			const enrichedReq = req as typeof req & { viewerId?: string };
 			seen.inputTitle = String(req.validatedRequest.title);
-			seen.requiresAuth = req.contract.meta?.requiresAuth;
 			seen.contractPath = req.contract.path;
 			enrichedReq.viewerId = "viewer-123";
 			next();
@@ -468,7 +459,6 @@ describe("initServer", () => {
 		assert.equal(nextError, undefined);
 		assert.deepStrictEqual(seen, {
 			inputTitle: "Hello",
-			requiresAuth: true,
 			contractPath: "/posts",
 			viewerIdFromMiddleware: "viewer-123",
 			viewerIdInService: "viewer-123",

@@ -1,7 +1,6 @@
 import type { Server as HttpServer } from "node:http";
 import {
 	type Contract,
-	type ContractMetaOf,
 	flattenContractRoutes,
 	type HttpMethod,
 	type InferRouteRequest,
@@ -59,8 +58,8 @@ export type {
 	InferRouteServerSocket,
 };
 
-export type RequestWithContract<TMeta = unknown> = Omit<Request, "contract"> & {
-	contract: RouteDeclaration<TMeta>;
+export type RequestWithContract = Omit<Request, "contract"> & {
+	contract: RouteDeclaration;
 };
 
 type HandlerResult<E extends RouteDeclaration> =
@@ -129,9 +128,9 @@ type ImplementContract<TContext = EmptyObject> = <TNode extends Contract>(
 			) => RouteImplementation[];
 		};
 
-type DefineMiddleware<TMeta> = <
+type DefineMiddleware = <
 	TMiddleware extends (
-		req: RequestWithContract<TMeta>,
+		req: RequestWithContract,
 		res: Response,
 		next: NextFunction,
 	) => MaybePromise<unknown>,
@@ -139,8 +138,8 @@ type DefineMiddleware<TMeta> = <
 	middleware: TMiddleware,
 ) => TMiddleware;
 
-type MiddlewareFunction<TMeta = unknown> = (
-	req: RequestWithContract<TMeta>,
+type MiddlewareFunction = (
+	req: RequestWithContract,
 	res: Response,
 	next: NextFunction,
 ) => unknown;
@@ -158,31 +157,29 @@ export type ValidationResult =
 export type CreateRouterOptions<
 	TContract extends Contract = Contract,
 	TContext = EmptyObject,
-	TMeta = ContractMetaOf<TContract>,
 > = {
 	app: Application;
 	server?: HttpServer;
 	contract?: TContract;
 	implementations: ImplementationInput;
-	middlewares?: (MiddlewareFunction | MiddlewareFunction<TMeta>)[];
+	middlewares?: MiddlewareFunction[];
 	routePrefix?: string;
 	createContext?: (
-		req: Request & { contract: RouteDeclaration<TMeta> },
+		req: Request & { contract: RouteDeclaration },
 	) => TContext | Promise<TContext>;
 };
 
 export type ServerTools<
 	TContract extends Contract = Contract,
 	TContext = EmptyObject,
-	TMeta = ContractMetaOf<TContract>,
 > = {
 	implementContract: ImplementContract<TContext>;
-	defineMiddleware: DefineMiddleware<TMeta>;
+	defineMiddleware: DefineMiddleware;
 	createRouteModeMiddleware: (
 		options: RouteModeMiddlewareOptions & { contract: TContract },
 	) => RequestHandler;
 	createRouter: (
-		options: CreateRouterOptions<TContract, TContext, TMeta>,
+		options: CreateRouterOptions<TContract, TContext>,
 	) => Application;
 };
 
@@ -415,22 +412,19 @@ const buildRoutePath = (routePrefix: string | undefined, path: string) => {
 	return `${normalizedPrefix}${path}`;
 };
 
-type ResolvedContractRoute<TMeta = unknown> = RouteDeclaration<TMeta> & {
+type ResolvedContractRoute = RouteDeclaration & {
 	keySegments: string[];
 	matchPath: ReturnType<typeof createPathMatcher>;
 	routePath: string;
 };
 
-type ResolvedImplementationRoute<TMeta = unknown> = RouteDeclaration<TMeta> & {
+type ResolvedImplementationRoute = RouteDeclaration & {
 	matchPath: ReturnType<typeof createPathMatcher>;
 	routePath: string;
 	handler: unknown;
 };
 
-const resolveContractRoutes = <TMeta = unknown>(
-	contract: Contract<TMeta>,
-	routePrefix?: string,
-) =>
+const resolveContractRoutes = (contract: Contract, routePrefix?: string) =>
 	flattenContractRoutes(contract)
 		.sort(compareRouteSpecificity)
 		.map((route) => {
@@ -440,7 +434,7 @@ const resolveContractRoutes = <TMeta = unknown>(
 				routePath,
 				matchPath: createPathMatcher(routePath),
 			};
-		}) as Array<ResolvedContractRoute<TMeta>>;
+		}) as ResolvedContractRoute[];
 
 const createRouteModeMiddleware = <TContract extends Contract>(
 	options: RouteModeMiddlewareOptions & { contract: TContract },
@@ -548,18 +542,14 @@ const normalizeHandlerResult = (
 	};
 };
 
-const createRouter = <
-	TContract extends Contract,
-	TContext = EmptyObject,
-	TMeta = ContractMetaOf<TContract>,
->({
+const createRouter = <TContract extends Contract, TContext = EmptyObject>({
 	app,
 	server,
 	implementations,
 	routePrefix,
 	createContext,
 	middlewares = [],
-}: CreateRouterOptions<TContract, TContext, TMeta>) => {
+}: CreateRouterOptions<TContract, TContext>) => {
 	const resolvedImplementations = implementations.flatMap((implementation) =>
 		Array.isArray(implementation) ? implementation : [implementation],
 	);
@@ -567,18 +557,18 @@ const createRouter = <
 		resolvedImplementations.map(({ contract, handler }) => {
 			const routePath = buildRoutePath(routePrefix, contract.path);
 			return {
-				...(contract as RouteDeclaration<TMeta>),
+				...(contract as RouteDeclaration),
 				routePath,
 				matchPath: createPathMatcher(routePath),
 				handler,
 			};
-		}) satisfies ResolvedImplementationRoute<TMeta>[]
+		}) satisfies ResolvedImplementationRoute[]
 	).sort(compareRouteSpecificity);
 	const webSocketRoutes = routes.filter(
 		(
 			route,
-		): route is ResolvedImplementationRoute<TMeta> &
-			WebSocketRouteDeclaration<TMeta> & {
+		): route is ResolvedImplementationRoute &
+			WebSocketRouteDeclaration & {
 				handler: (request: unknown) => unknown | Promise<unknown>;
 			} => isWebSocketRoute(route),
 	);
@@ -619,7 +609,7 @@ const createRouter = <
 			const input = req.validatedRequest;
 			const context =
 				(await createContext?.(
-					req as Request & { contract: RouteDeclaration<TMeta> },
+					req as Request & { contract: RouteDeclaration },
 				)) || {};
 
 			try {
@@ -673,10 +663,9 @@ const createRouter = <
 export const initServer = <
 	TContract extends Contract = Contract,
 	TContext = EmptyObject,
-	TMeta = ContractMetaOf<TContract>,
->(): ServerTools<TContract, TContext, TMeta> => ({
+>(): ServerTools<TContract, TContext> => ({
 	implementContract: implementContract as ImplementContract<TContext>,
 	defineMiddleware: (middleware) => middleware,
 	createRouteModeMiddleware: (options) => createRouteModeMiddleware(options),
-	createRouter: (options) => createRouter<TContract, TContext, TMeta>(options),
+	createRouter: (options) => createRouter<TContract, TContext>(options),
 });

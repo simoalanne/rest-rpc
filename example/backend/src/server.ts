@@ -202,11 +202,7 @@ declare global {
 }
 
 const middleware = defineMiddleware((req, _res, next) => {
-	const request = req;
-	if (request.contract.meta?.requiresAuth) {
-		request.viewerId = "viewer-123";
-	}
-
+	req.viewerId = "viewer-123";
 	next();
 });
 
@@ -215,8 +211,6 @@ const regularMiddleware = (
 	_res: express.Response,
 	next: express.NextFunction,
 ) => {
-	// @ts-expect-error - meta is unknown in regular middleware but still exists at runtime and can be casted to the correct type if needed
-	req.contract.meta?.auditLabel;
 	console.log(`Received request for ${req.path}`);
 	next();
 };
@@ -335,11 +329,10 @@ createRouter({
 	routePrefix: "/api",
 	middlewares: [middleware, regularMiddleware],
 	createContext: (req) => {
+		const routeLabel = `${req.contract.method} ${req.contract.path}`;
 		return {
-			requestId: `${req.contract.meta?.auditLabel ?? "route"}:${crypto.randomUUID()}`,
-			auditLabel: req.viewerId
-				? `${req.contract.meta?.auditLabel ?? "route"}:${req.viewerId}`
-				: req.contract.meta?.auditLabel,
+			requestId: `${routeLabel}:${crypto.randomUUID()}`,
+			auditLabel: req.viewerId ? `${routeLabel}:${req.viewerId}` : routeLabel,
 		};
 	},
 });

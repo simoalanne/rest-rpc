@@ -10,12 +10,7 @@ import type {
 import { initContracts, stream } from "@contract-first-api/core";
 import z from "zod";
 
-export type ExampleContractMeta = {
-	requiresAuth?: boolean;
-	auditLabel?: string;
-};
-
-const { defineContract } = initContracts<ExampleContractMeta>();
+const { defineContract } = initContracts();
 
 export const todoSchema = z.object({
 	id: z.string(),
@@ -71,9 +66,6 @@ export const healthContract = defineContract({
 		get: {
 			method: "GET",
 			path: "/health",
-			meta: {
-				auditLabel: "health.get",
-			},
 			responses: {
 				200: z.object({
 					status: z.literal("ok"),
@@ -98,10 +90,6 @@ export const todoContract = defineContract({
 		create: {
 			method: "POST",
 			path: "/todos",
-			meta: {
-				requiresAuth: true,
-				auditLabel: "todos.create",
-			},
 			request: {
 				body: z.object({
 					title: z.string().min(1),

@@ -52,27 +52,24 @@ export type ContractOptions = {
 	mode?: "json" | "raw" | "websocket";
 };
 
-export type BaseContract<TMeta = unknown> = {
+export type BaseRouteDeclaration = {
 	path: string;
 	method: HttpMethod;
 	request?: RequestSchema;
-	meta?: TMeta;
-	$meta?: TMeta;
 };
 
-export type JsonRouteDeclaration<TMeta = unknown> = BaseContract<TMeta> & {
+export type JsonRouteDeclaration = BaseRouteDeclaration & {
 	responses: RouteResponses;
 	options?: { mode?: "json" };
 };
 
-export type RawRequestRouteDeclaration<TMeta = unknown> =
-	BaseContract<TMeta> & {
-		responses: RouteResponses;
-		request?: Omit<RequestSchema, "body">;
-		options: { mode: "raw" };
-	};
+export type RawRequestRouteDeclaration = BaseRouteDeclaration & {
+	responses: RouteResponses;
+	request?: Omit<RequestSchema, "body">;
+	options: { mode: "raw" };
+};
 
-export type WebSocketRouteDeclaration<TMeta = unknown> = BaseContract<TMeta> & {
+export type WebSocketRouteDeclaration = BaseRouteDeclaration & {
 	method: "GET";
 	options: { mode: "websocket" };
 	messages: {
@@ -81,14 +78,12 @@ export type WebSocketRouteDeclaration<TMeta = unknown> = BaseContract<TMeta> & {
 	};
 };
 
-export type RouteDeclaration<TMeta = unknown> =
-	| JsonRouteDeclaration<TMeta>
-	| RawRequestRouteDeclaration<TMeta>
-	| WebSocketRouteDeclaration<TMeta>;
+export type RouteDeclaration =
+	| JsonRouteDeclaration
+	| RawRequestRouteDeclaration
+	| WebSocketRouteDeclaration;
 
-export type Contract<TMeta = unknown> =
-	| RouteDeclaration<TMeta>
-	| { [k: string]: Contract<TMeta> };
+export type Contract = RouteDeclaration | { [k: string]: Contract };
 
 type Tree<T> = Record<string, unknown> | T;
 
@@ -111,33 +106,28 @@ export const mapObjectValues = <TLeaf>(
 				{} as Record<string, unknown>,
 			);
 
-const isContractDefinition = <TMeta = unknown>(
-	value: unknown,
-): value is RouteDeclaration<TMeta> =>
+const isContractDefinition = (value: unknown): value is RouteDeclaration =>
 	typeof value === "object" &&
 	value !== null &&
 	"path" in value &&
 	"method" in value;
 
-export const mapContractRoutes = <TMeta = unknown>(
-	contract: Contract<TMeta>,
-	mappingFn: (route: RouteDeclaration<TMeta>, path: string[]) => unknown,
+export const mapContractRoutes = (
+	contract: Contract,
+	mappingFn: (route: RouteDeclaration, path: string[]) => unknown,
 ) => mapObjectValues(contract, isContractDefinition, mappingFn);
 
-export type ContractRoute<TMeta = unknown> = RouteDeclaration<TMeta> & {
+export type ContractRoute = RouteDeclaration & {
 	keySegments: string[];
 };
 
-export const flattenContractRoutes = <
-	TMeta = unknown,
-	TContract extends Contract<TMeta> = Contract<TMeta>,
->(
+export const flattenContractRoutes = <TContract extends Contract = Contract>(
 	contract: TContract,
-): ContractRoute<TMeta>[] => {
-	const result: ContractRoute<TMeta>[] = [];
+): ContractRoute[] => {
+	const result: ContractRoute[] = [];
 
-	const visit = (node: Contract<TMeta>, keySegments: string[]) => {
-		if (isContractDefinition<TMeta>(node)) {
+	const visit = (node: Contract, keySegments: string[]) => {
+		if (isContractDefinition(node)) {
 			result.push({
 				...node,
 				keySegments,
@@ -146,11 +136,11 @@ export const flattenContractRoutes = <
 		}
 
 		Object.entries(node).forEach(([key, child]) => {
-			visit(child as Contract<TMeta>, [...keySegments, key]);
+			visit(child as Contract, [...keySegments, key]);
 		});
 	};
 
-	visit(contract as Contract<TMeta>, []);
+	visit(contract as Contract, []);
 	return result;
 };
 
@@ -287,29 +277,12 @@ type RawRequest<E extends RouteDeclaration> = E extends {
 
 type Merge<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
 
-export type ContractMetaOf<T> = T extends { $meta?: infer TMeta }
-	? TMeta
-	: T extends object
-		? {
-				[K in keyof T]: ContractMetaOf<T[K]>;
-			}[keyof T]
-		: unknown;
-
 export type InferRouteRequest<E extends RouteDeclaration> =
 	RawRequest<E> extends infer R
 		? R extends { body?: infer B; query?: infer Q; params?: infer P }
 			? Merge<B & Q & P>
 			: R
 		: never;
-
-type WithMetaMarker<T, TMeta> =
-	T extends RouteDeclaration<TMeta>
-		? T & { $meta?: TMeta }
-		: {
-				[K in keyof T]: T[K] extends Contract<TMeta>
-					? WithMetaMarker<T[K], TMeta>
-					: never;
-			};
 
 type MissingSuccessfulResponseError = {
 	readonly __contract_error__: "Contract must declare at least one successful response.";
@@ -378,15 +351,15 @@ const validateContract = (contract: Contract) => {
 	}
 };
 
-type ContractTools<TMeta> = {
-	defineContract: <const TContract extends Contract<TMeta>>(
+type ContractTools = {
+	defineContract: <const TContract extends Contract>(
 		contract: TContract & ValidateResponseStatuses<TContract>,
-	) => WithMetaMarker<TContract, TMeta>;
+	) => TContract;
 };
 
-export const initContracts = <TMeta = unknown>(): ContractTools<TMeta> => ({
+export const initContracts = (): ContractTools => ({
 	defineContract: (contract) => {
 		validateContract(contract);
-		return contract as never;
+		return contract;
 	},
 });

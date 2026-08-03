@@ -68,33 +68,31 @@ type SchemaConversionOptions = {
 	reused?: "ref" | "inline";
 };
 
-type OperationTransformContext<TMeta> = {
-	contract: OpenApiRouteDeclaration<TMeta>;
+type OperationTransformContext = {
+	contract: OpenApiRouteDeclaration;
 	operation: OpenApiOperation;
 };
 
-type OpenApiRouteDeclaration<TMeta> = JsonRouteDeclaration<TMeta> & {
+type OpenApiRouteDeclaration = JsonRouteDeclaration & {
 	keySegments: string[];
 };
 
-export type CreateOpenApiDocumentOptions<TMeta = unknown> = {
+export type CreateOpenApiDocumentOptions = {
 	openapi?: string;
 	info: OpenApiDocument["info"];
 	servers?: OpenApiDocument["servers"];
 	components?: OpenApiDocument["components"];
 	tags?: OpenApiDocument["tags"];
 	schema?: SchemaConversionOptions;
-	transformOperation?: (
-		context: OperationTransformContext<TMeta>,
-	) => OpenApiOperation;
+	transformOperation?: (context: OperationTransformContext) => OpenApiOperation;
 	transformDocument?: (document: OpenApiDocument) => OpenApiDocument;
 };
 
 const JSON_CONTENT_TYPE = "application/json";
 
-const isOpenApiContract = <TMeta>(
-	route: ContractRoute<TMeta>,
-): route is OpenApiRouteDeclaration<TMeta> =>
+const isOpenApiContract = (
+	route: ContractRoute,
+): route is OpenApiRouteDeclaration =>
 	(!route.options || route.options.mode === "json") &&
 	"responses" in route &&
 	!Object.values(route.responses).some((response) =>
@@ -191,9 +189,9 @@ const createResponses = (
 	return responses;
 };
 
-const createOperation = <TMeta>(
-	contract: OpenApiRouteDeclaration<TMeta>,
-	options: CreateOpenApiDocumentOptions<TMeta>,
+const createOperation = (
+	contract: OpenApiRouteDeclaration,
+	options: CreateOpenApiDocumentOptions,
 ): OpenApiOperation => {
 	const parameters = [
 		...createParameters(contract.request?.params, "path", options.schema),
@@ -209,9 +207,9 @@ const createOperation = <TMeta>(
 	return options.transformOperation?.({ contract, operation }) ?? operation;
 };
 
-export const createOpenApiDocument = <TMeta = unknown>(
-	contract: Contract<TMeta>,
-	options: CreateOpenApiDocumentOptions<TMeta>,
+export const createOpenApiDocument = (
+	contract: Contract,
+	options: CreateOpenApiDocumentOptions,
 ): OpenApiDocument => {
 	const document: OpenApiDocument = {
 		openapi: options.openapi ?? "3.1.0",
@@ -222,7 +220,7 @@ export const createOpenApiDocument = <TMeta = unknown>(
 		paths: {},
 	};
 
-	for (const route of flattenContractRoutes<TMeta>(contract)) {
+	for (const route of flattenContractRoutes(contract)) {
 		if (!isOpenApiContract(route)) continue;
 
 		const path = toOpenApiPath(route.path);

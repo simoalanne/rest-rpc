@@ -27,9 +27,6 @@ describe("createOpenApiDocument", () => {
 							code: z.literal("TITLE_ALREADY_EXISTS"),
 						}),
 					},
-					meta: {
-						auth: true,
-					},
 				},
 				events: {
 					path: "/todos/events",
@@ -62,7 +59,7 @@ describe("createOpenApiDocument", () => {
 			servers: [{ url: "http://localhost:3000" }],
 			transformOperation: ({ contract, operation }) => ({
 				...operation,
-				...(contract.meta?.auth ? { security: [{ bearerAuth: [] }] } : {}),
+				operationId: contract.keySegments.join("."),
 			}),
 			transformDocument: (document) => ({
 				...document,
@@ -82,7 +79,7 @@ describe("createOpenApiDocument", () => {
 
 		const updateOperation = document.paths["/todos/{id}"]?.post;
 		assert.ok(updateOperation);
-		assert.deepStrictEqual(updateOperation.security, [{ bearerAuth: [] }]);
+		assert.equal(updateOperation.operationId, "todos.update");
 		assert.deepStrictEqual(
 			updateOperation.parameters?.map((parameter) => ({
 				name: parameter.name,
