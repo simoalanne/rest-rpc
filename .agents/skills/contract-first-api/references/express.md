@@ -5,8 +5,8 @@ Use this reference for backend integration with Express.
 ## Purpose
 
 `@contract-first-api/express` mounts a shared contract tree on an Express app
-with request validation, typed service handlers, middleware hooks, streaming
-support, and websocket routes.
+with request validation, typed service handlers, route matching helpers,
+streaming support, and websocket routes.
 
 ## Main Setup
 
@@ -14,9 +14,7 @@ Use `initServer()` to get helpers, then:
 
 1. register body parsing middleware
 2. define handlers with `implementContract()`
-3. pass regular Express middlewares to `createRouter()` when they need to run
-   after contract request validation
-4. register routes with `createRouter()`
+3. register routes with `createRouter()`
 
 ```ts
 const { createRouter, implementContract } = initServer<
@@ -33,9 +31,7 @@ app.use(express.json());
 
 createRouter({
 	app,
-	contract,
 	implementations,
-	routePrefix: "/api",
 });
 ```
 
@@ -85,12 +81,10 @@ are typed response cases.
 For each contract route:
 
 1. request validation runs first
-2. custom middlewares run after validation
-3. `createContext` runs after middlewares
-4. the service handler runs last
+2. `createContext` runs
+3. the service handler runs last
 
-If validation fails, middleware, context creation, and the service handler do
-not run.
+If validation fails, context creation and the service handler do not run.
 
 ## Validated Request Shape
 
@@ -123,21 +117,22 @@ const implementations = [
 
 ## Raw Body Handling
 
-If the contract tree mixes raw and non-raw routes, prefer
-`createContractModeMiddleware()` so parsing is chosen from the contract tree
-rather than hardcoded route paths.
+If the contract contains both JSON and raw body routes, you can use `matchRoute()` 
+helper to determine which body parser to use for each request.
 
 ```ts
-app.use(
-	createContractModeMiddleware({
-		contract,
-		routePrefix: "/api",
-		nonRaw: express.json(),
-		raw: express.raw({
-			type: ["image/png", "image/jpeg"],
-		}),
-	}),
-);
+const jsonBodyParser = express.json();
+const rawBodyParser = express.raw({
+	type: ["image/png", "image/jpeg"],
+});
+
+app.use((req, res, next) => {
+	const matched = matchRoute({ contract, req });
+	const bodyParser =
+		matched?.route.options?.mode === "raw" ? rawBodyParser : jsonBodyParser;
+
+	return bodyParser(req, res, next);
+});
 ```
 
 Use raw mode when the request body should pass through unvalidated while
@@ -146,12 +141,14 @@ keeping typed params, query, and responses. Raw service handlers receive a
 
 ## Middleware
 
-Pass regular Express middleware to `createRouter()` when middleware logic needs
-the validated request or matched contract route before context creation.
+Use regular Express middleware for application-specific request handling. When
+middleware needs to know which contract route matched, call `matchRoute()`.
 
 ```ts
 const authMiddleware: express.RequestHandler = (req, res, next) => {
-	if (req.contract.path !== "/todos") {
+	const matched = matchRoute({ contract, req });
+
+	if (!matched?.route.path.startsWith("/api/todos")) {
 		next();
 		return;
 	}
@@ -203,7 +200,8 @@ const implementations = [
 ## Important Rules
 
 - Register JSON parsing before `createRouter()` when routes use JSON bodies.
-- Keep `routePrefix` aligned with the client `baseUrl`.
+- Use `defineContract(..., { pathPrefix: "/api" })` when every route should
+  share a common path prefix.
 - Return `{ status, body }` for non-2xx responses and for routes with
   multiple successful statuses.
 - Return the body directly when a route has one successful status and the

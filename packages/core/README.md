@@ -245,7 +245,7 @@ Use `initClient()` when you need a runtime client.
 import { initClient } from "@contract-first-api/core";
 
 const api = initClient(apiContract, {
-	baseUrl: "http://localhost:3001/api",
+	baseUrl: "http://localhost:3001",
 	getHeaders: () => ({
 		Authorization: `Bearer ${getAuthToken()}`,
 	}),
@@ -347,7 +347,7 @@ export const openApiDocument = createOpenApiDocument(apiContract, {
 		title: "Todo API",
 		version: "1.0.0",
 	},
-	servers: [{ url: "http://localhost:3000/api" }],
+	servers: [{ url: "http://localhost:3000" }],
 });
 ```
 

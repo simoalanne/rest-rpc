@@ -134,39 +134,30 @@ export type ValidationResult =
 	| { success: true; data: Record<string, unknown> }
 	| { success: false; errors: ValidationIssue[] };
 
-export type CreateRouterOptions<
-	TContract extends Contract = Contract,
-	TContext = EmptyObject,
-> = {
+export type CreateRouterOptions<TContext = EmptyObject> = {
 	app: Application;
 	server?: HttpServer;
-	contract?: TContract;
 	implementations: ImplementationInput;
 	middlewares?: RequestHandler[];
-	routePrefix?: string;
 	createContext?: (
 		req: Request & { route: RouteDeclaration },
 	) => TContext | Promise<TContext>;
 };
 
-export type ServerTools<
-	TContract extends Contract = Contract,
-	TContext = EmptyObject,
-> = {
+export type ServerTools<TContext = EmptyObject> = {
 	implementContract: ImplementContract<TContext>;
-	createRouteModeMiddleware: (
-		options: RouteModeMiddlewareOptions & { contract: TContract },
-	) => RequestHandler;
-	createRouter: (
-		options: CreateRouterOptions<TContract, TContext>,
-	) => Application;
+	createRouter: (options: CreateRouterOptions<TContext>) => Application;
 };
 
-export type RouteModeMiddlewareOptions = {
-	contract: Contract;
-	routePrefix?: string;
-	raw?: RequestHandler;
-	nonRaw?: RequestHandler;
+export type MatchRouteOptions<TContract extends Contract = Contract> = {
+	contract: TContract;
+	req: Request;
+};
+
+export type MatchedRoute = {
+	route: RouteDeclaration;
+	params: Record<string, string>;
+	routePath: string;
 };
 
 class KnownContractError extends Error {
@@ -380,16 +371,14 @@ const createPathMatcher = (path: string) => {
 	};
 };
 
-const buildRoutePath = (routePrefix: string | undefined, path: string) => {
-	if (!routePrefix) return path;
-	const normalizedPrefix = routePrefix.endsWith("/")
-		? routePrefix.slice(0, -1)
-		: routePrefix;
-	return `${normalizedPrefix}${path}`;
-};
+const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
+	typeof value === "object" &&
+	value !== null &&
+	"path" in value &&
+	"method" in value;
 
-type ResolvedContractRoute = RouteDeclaration & {
-	keySegments: string[];
+type ResolvedContractRoute = {
+	route: RouteDeclaration;
 	matchPath: ReturnType<typeof createPathMatcher>;
 	routePath: string;
 };
@@ -400,42 +389,42 @@ type ResolvedImplementationRoute = RouteDeclaration & {
 	handler: unknown;
 };
 
-const resolveContractRoutes = (contract: Contract, routePrefix?: string) =>
-	flattenContractRoutes(contract)
-		.sort(compareRouteSpecificity)
-		.map((route) => {
-			const routePath = buildRoutePath(routePrefix, route.path);
-			return {
-				...route,
-				routePath,
-				matchPath: createPathMatcher(routePath),
-			};
-		}) as ResolvedContractRoute[];
+const resolveContractRoutes = (contract: Contract) => {
+	const routes: RouteDeclaration[] = [];
 
-const createRouteModeMiddleware = <TContract extends Contract>(
-	options: RouteModeMiddlewareOptions & { contract: TContract },
-): RequestHandler => {
-	const routes = resolveContractRoutes(options.contract, options.routePrefix);
-
-	return (req, res, next) => {
-		const pathname = req.path;
-		const matchedRoute = routes.find(
-			(route) =>
-				route.method === req.method && route.matchPath(pathname) !== null,
-		);
-		const middleware = matchedRoute
-			? isRawRequestRoute(matchedRoute)
-				? options.raw
-				: options.nonRaw
-			: null;
-
-		if (!middleware) {
-			next();
+	const visit = (node: Contract) => {
+		if (isRouteDeclaration(node)) {
+			routes.push(node);
 			return;
 		}
 
-		return middleware(req, res, next);
+		Object.values(node).forEach((child) => {
+			visit(child as Contract);
+		});
 	};
+
+	visit(contract);
+
+	return routes.sort(compareRouteSpecificity).map((route) => {
+		return {
+			route,
+			routePath: route.path,
+			matchPath: createPathMatcher(route.path),
+		};
+	}) satisfies ResolvedContractRoute[];
+};
+
+export const matchRoute = (
+	contract: Contract,
+	req: Request,
+): RouteDeclaration | null => {
+	const pathname = req.path;
+	const matchedRoute = resolveContractRoutes(contract).find((route) => {
+		const params = route.matchPath(pathname);
+		return route.route.method === req.method && params !== null;
+	});
+
+	return matchedRoute ? matchedRoute.route : null;
 };
 
 const implementContract = ((contract: Contract) => ({
@@ -518,24 +507,22 @@ const normalizeHandlerResult = (
 	};
 };
 
-const createRouter = <TContract extends Contract, TContext = EmptyObject>({
+const createRouter = <TContext = EmptyObject>({
 	app,
 	server,
 	implementations,
-	routePrefix,
 	createContext,
 	middlewares = [],
-}: CreateRouterOptions<TContract, TContext>) => {
+}: CreateRouterOptions<TContext>) => {
 	const resolvedImplementations = implementations.flatMap((implementation) =>
 		Array.isArray(implementation) ? implementation : [implementation],
 	);
 	const routes = (
 		resolvedImplementations.map(({ route, handler }) => {
-			const routePath = buildRoutePath(routePrefix, route.path);
 			return {
 				...(route as RouteDeclaration),
-				routePath,
-				matchPath: createPathMatcher(routePath),
+				routePath: route.path,
+				matchPath: createPathMatcher(route.path),
 				handler,
 			};
 		}) satisfies ResolvedImplementationRoute[]
@@ -559,9 +546,7 @@ const createRouter = <TContract extends Contract, TContext = EmptyObject>({
 		registerWebSocketRoutes({
 			server,
 			routes: webSocketRoutes,
-			routePrefix,
 			createContext,
-			buildRoutePath,
 			createPathMatcher,
 			validateRequestSegments,
 			isKnownContractError: (error): error is KnownContractError =>
@@ -581,9 +566,8 @@ const createRouter = <TContract extends Contract, TContext = EmptyObject>({
 		const serviceHandler = async (req: Request, res: Response) => {
 			const input = req.validatedRequest;
 			const context =
-				(await createContext?.(
-					req as Request & { route: RouteDeclaration },
-				)) || {};
+				(await createContext?.(req as Request & { route: RouteDeclaration })) ||
+				{};
 
 			try {
 				const handlerResult = await handler({
@@ -634,10 +618,8 @@ const createRouter = <TContract extends Contract, TContext = EmptyObject>({
 };
 
 export const initServer = <
-	TContract extends Contract = Contract,
 	TContext = EmptyObject,
->(): ServerTools<TContract, TContext> => ({
+>(): ServerTools<TContext> => ({
 	implementContract: implementContract as ImplementContract<TContext>,
-	createRouteModeMiddleware: (options) => createRouteModeMiddleware(options),
-	createRouter: (options) => createRouter<TContract, TContext>(options),
+	createRouter: (options) => createRouter<TContext>(options),
 });

@@ -25,5 +25,5 @@ Run the frontend:
 pnpm --filter @example/frontend dev
 ```
 
-The frontend expects the backend at `http://localhost:3001/api` by default.
+The frontend expects the backend at `http://localhost:3001` by default.
 Override it with `VITE_API_URL` when needed.

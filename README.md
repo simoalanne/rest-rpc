@@ -158,7 +158,7 @@ import { initClient } from "@contract-first-api/core";
 import { apiContract } from "@example/shared";
 
 export const api = initClient(apiContract, {
-	baseUrl: "http://localhost:3001/api",
+	baseUrl: "http://localhost:3001",
 	getHeaders: () => ({
 		Authorization: `Bearer ${getAuthToken()}`,
 	}),
@@ -207,7 +207,7 @@ import { QueryClient } from "@tanstack/react-query";
 export const queryClient = new QueryClient();
 export const api = initReactQueryClient(apiContract, {
 	queryClient,
-	baseUrl: "http://localhost:3001/api",
+	baseUrl: "http://localhost:3001",
 });
 ```
 

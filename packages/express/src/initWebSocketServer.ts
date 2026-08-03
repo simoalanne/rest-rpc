@@ -45,11 +45,9 @@ type WebSocketRoute = WebSocketRouteDeclaration & {
 type RegisterWebSocketRoutesOptions<TContext> = {
 	server: HttpServer;
 	routes: WebSocketRoute[];
-	routePrefix?: string;
 	createContext?: (
 		req: Request & { route: RouteDeclaration },
 	) => TContext | Promise<TContext>;
-	buildRoutePath: (routePrefix: string | undefined, path: string) => string;
 	createPathMatcher: (
 		path: string,
 	) => (pathname: string) => Record<string, string> | null;
@@ -152,9 +150,7 @@ const runWebSocketServiceHandler = (
 export const registerWebSocketRoutes = <TContext>({
 	server,
 	routes,
-	routePrefix,
 	createContext,
-	buildRoutePath,
 	createPathMatcher,
 	validateRequestSegments,
 	isKnownContractError,
@@ -164,7 +160,7 @@ export const registerWebSocketRoutes = <TContext>({
 	const webSocketServer = new WebSocketServer({ noServer: true });
 	const routeMatchers = routes.map((route) => ({
 		route,
-		match: createPathMatcher(buildRoutePath(routePrefix, route.path)),
+		match: createPathMatcher(route.path),
 		handler: route.handler,
 	}));
 

@@ -7,7 +7,8 @@ export type {
 	InferRouteServiceHandler,
 	InferRouteServiceRequest,
 	InferRouteServiceResponse,
+	MatchedRoute,
+	MatchRouteOptions,
 	RouteImplementation,
-	RouteModeMiddlewareOptions,
 } from "./initServer.ts";
-export { initServer } from "./initServer.ts";
+export { initServer, matchRoute } from "./initServer.ts";

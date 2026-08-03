@@ -162,6 +162,8 @@ export const apiContract = {
 	...imageContract,
 };
 
+defineContract(apiContract, { pathPrefix: "/api" });
+
 export type ExampleContract = typeof apiContract;
 export type HealthResponse = InferRouteResponse<typeof apiContract.health.get>;
 export type HealthSuccessResponse = InferRouteSuccessResponse<

@@ -186,8 +186,7 @@ const createDiscussMessage = (
 });
 
 const serverTools = initServer<typeof apiContract, RequestContext>();
-const { implementContract, createRouteModeMiddleware, createRouter } =
-	serverTools;
+const { implementContract, matchRoute, createRouter } = serverTools;
 
 declare global {
 	namespace Express {
@@ -293,17 +292,20 @@ const implementations = [
 	}),
 ];
 
-app.use(
-	createRouteModeMiddleware({
-		contract: apiContract,
-		nonRaw: express.json(),
-		raw: express.raw({
-			type: ["image/png", "image/jpeg", "image/gif"],
-			limit: "10mb",
-		}),
-		routePrefix: "/api",
-	}),
-);
+const jsonBodyParser = express.json();
+const rawBodyParser = express.raw({
+	type: ["image/png", "image/jpeg", "image/gif"],
+	limit: "10mb",
+});
+
+app.use((req, res, next) => {
+	const matched = matchRoute({ contract: apiContract, req });
+	const bodyParser =
+		matched?.route.options?.mode === "raw" ? rawBodyParser : jsonBodyParser;
+
+	return bodyParser(req, res, next);
+});
+app.use(middleware, regularMiddleware);
 app.use((req, res, next) => {
 	res.setHeader("Access-Control-Allow-Origin", "*");
 	res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -320,10 +322,7 @@ app.use((req, res, next) => {
 createRouter({
 	app,
 	server,
-	contract: apiContract,
 	implementations,
-	routePrefix: "/api",
-	middlewares: [middleware, regularMiddleware],
 	createContext: (req) => {
 		const routeLabel = `${req.route.method} ${req.route.path}`;
 		return {

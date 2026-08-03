@@ -122,7 +122,7 @@ Use `initClient(apiContract, options)` from core.
 
 ```ts
 const api = initClient(apiContract, {
-	baseUrl: "http://localhost:3001/api",
+	baseUrl: "http://localhost:3001",
 	getHeaders: () => ({
 		Authorization: `Bearer ${getAuthToken()}`,
 	}),

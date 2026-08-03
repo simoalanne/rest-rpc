@@ -63,6 +63,5 @@ These modes affect how every integration package behaves.
 - Keep one shared API contract in a shared package or shared module.
 - Let integrations derive behavior from the API contract instead of
   duplicating DTOs.
-- Keep backend route prefixes and client base URLs aligned.
 - When debugging, check both the package README and the package source/tests if
   behavior is unclear.

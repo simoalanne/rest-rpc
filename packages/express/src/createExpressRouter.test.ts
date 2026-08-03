@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { defineContract, noBody, stream } from "@contract-first-api/core";
 import type { RequestHandler } from "express";
 import z from "zod";
-import { initServer } from "./initServer.ts";
+import { initServer, matchRoute } from "./initServer.ts";
 
 const chainHandlers = (handlers: ((...args: any[]) => unknown)[]) => {
 	return async (
@@ -113,25 +113,28 @@ const createResponseDouble = () => {
 
 describe("initServer", () => {
 	it("should validate input, attach route to req, create context, and call service", async () => {
-		const apiContract = defineContract({
-			users: {
-				getById: {
-					method: "GET",
-					path: "/users/:id",
-					request: {
-						params: z.object({ id: z.string() }),
-						query: z.object({ includePosts: z.coerce.boolean().optional() }),
-					},
-					responses: {
-						200: z.object({
-							id: z.string(),
-							viewerId: z.string(),
-							includePosts: z.boolean().optional(),
-						}),
+		const apiContract = defineContract(
+			{
+				users: {
+					getById: {
+						method: "GET",
+						path: "/users/:id",
+						request: {
+							params: z.object({ id: z.string() }),
+							query: z.object({ includePosts: z.coerce.boolean().optional() }),
+						},
+						responses: {
+							200: z.object({
+								id: z.string(),
+								viewerId: z.string(),
+								includePosts: z.boolean().optional(),
+							}),
+						},
 					},
 				},
 			},
-		});
+			{ pathPrefix: "/api" },
+		);
 
 		const { createRouter, implementContract } = initServer<
 			typeof apiContract,
@@ -161,9 +164,7 @@ describe("initServer", () => {
 
 		createRouter({
 			app: target.app,
-			contract: apiContract,
 			implementations,
-			routePrefix: "/api",
 			createContext: (req) => {
 				routePathInCreateContext = req.route.path;
 				const validatedReq = req.validatedRequest as { id?: string };
@@ -191,7 +192,7 @@ describe("initServer", () => {
 		);
 
 		assert.equal(nextError, undefined);
-		assert.equal(routePathInCreateContext, "/users/:id");
+		assert.equal(routePathInCreateContext, "/api/users/:id");
 		assert.deepStrictEqual(seenRequest, {
 			id: "123",
 			includePosts: true,
@@ -244,7 +245,6 @@ describe("initServer", () => {
 		const target = createRouteTargetDouble();
 		createRouter({
 			app: target.app,
-			contract: apiContract,
 			implementations,
 		});
 
@@ -318,7 +318,6 @@ describe("initServer", () => {
 
 		createRouter({
 			app: target.app,
-			contract: apiContract,
 			implementations,
 			createContext: () => {
 				createContextCalled = true;
@@ -423,7 +422,6 @@ describe("initServer", () => {
 
 		createRouter({
 			app: target.app,
-			contract: apiContract,
 			implementations,
 			middlewares: [authMiddleware],
 			createContext: (req) => {
@@ -493,7 +491,6 @@ describe("initServer", () => {
 
 		createRouter({
 			app: target.app,
-			contract: apiContract,
 			implementations: [
 				implementContract(apiContract.posts).handlers({
 					delete() {
@@ -551,7 +548,6 @@ describe("initServer", () => {
 
 		createRouter({
 			app: target.app,
-			contract: apiContract,
 			implementations: [
 				implementContract(apiContract.posts).handlers({
 					create() {
@@ -601,7 +597,6 @@ describe("initServer", () => {
 
 		createRouter({
 			app: target.app,
-			contract: apiContract,
 			implementations: [
 				implementContract(apiContract.health).handler(async () => {
 					throw serviceError;
@@ -648,7 +643,6 @@ describe("initServer", () => {
 		const knownError = { code: "TITLE_ALREADY_EXISTS" };
 		createRouter({
 			app: target.app,
-			contract: apiContract,
 			implementations: [
 				implementContract(apiContract.todos).handlers({
 					create() {
@@ -687,52 +681,67 @@ describe("initServer", () => {
 		});
 	});
 
-	it("should not run nonRaw middleware for raw request routes", async () => {
-		const apiContract = defineContract({
-			uploads: {
-				create: {
-					method: "POST",
-					path: "/uploads/:id",
-					request: {
-						params: z.object({ id: z.string() }),
-					},
-					options: { mode: "raw" },
-					responses: {
-						204: noBody,
+	it("should match routes with normalized contract paths", () => {
+		const apiContract = defineContract(
+			{
+				uploads: {
+					create: {
+						method: "POST",
+						path: "/uploads/:id",
+						request: {
+							params: z.object({ id: z.string() }),
+						},
+						options: { mode: "raw" },
+						responses: {
+							204: noBody,
+						},
 					},
 				},
 			},
-		});
-
-		const { createRouteModeMiddleware } = initServer<typeof apiContract>();
-		let middlewareCalls = 0;
-		const wrappedMiddleware = createRouteModeMiddleware({
-			contract: apiContract,
-			nonRaw: (req, _res, next) => {
-				middlewareCalls += 1;
-				(req as typeof req & { parsedByJson?: boolean }).parsedByJson = true;
-				next();
-			},
-			routePrefix: "/api",
-		});
-
-		let nextCalled = false;
-		await wrappedMiddleware(
-			{
-				method: "POST",
-				path: "/api/uploads/file-1",
-			} as never,
-			{} as never,
-			() => {
-				nextCalled = true;
-			},
+			{ pathPrefix: "/api" },
 		);
 
-		assert.equal(nextCalled, true);
-		assert.equal(middlewareCalls, 0);
+		const req = { method: "POST", path: "/api/uploads/file-1" } as never;
+		const matched = matchRoute(apiContract, req);
+
+		assert.equal(matched, apiContract.uploads.create);
 	});
 
-	it("should run nonRaw middleware for non-raw routes", async () => {
+	it("should prefer the most specific route when matching", () => {
+		const apiContract = defineContract(
+			{
+				uploads: {
+					byId: {
+						method: "POST",
+						path: "/uploads/:id",
+						options: { mode: "raw" },
+						responses: {
+							204: noBody,
+						},
+					},
+					static: {
+						method: "POST",
+						path: "/uploads/static",
+						request: {
+							body: z.object({ title: z.string() }),
+						},
+						responses: {
+							204: noBody,
+						},
+					},
+				},
+			},
+			{ pathPrefix: "/api" },
+		);
+
+		const req = { method: "POST", path: "/api/uploads/static" } as never;
+
+		const matched = matchRoute(apiContract, req);
+
+		assert.equal(matched, apiContract.uploads.static);
+	});
+
+	it("should return null when matching misses the contract", () => {
 		const apiContract = defineContract({
 			posts: {
 				create: {
@@ -748,187 +757,13 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouteModeMiddleware } = initServer<typeof apiContract>();
-		let middlewareCalls = 0;
-		const wrappedMiddleware = createRouteModeMiddleware({
-			contract: apiContract,
-			nonRaw: (_req, _res, next) => {
-				middlewareCalls += 1;
-				next();
-			},
-		});
+		const req = {
+			method: "POST",
+			path: "/custom-upload",
+		} as never;
 
-		let nextCalled = false;
-		await wrappedMiddleware(
-			{
-				method: "POST",
-				path: "/posts",
-			} as never,
-			{} as never,
-			() => {
-				nextCalled = true;
-			},
-		);
+		const matched = matchRoute(apiContract, req);
 
-		assert.equal(nextCalled, true);
-		assert.equal(middlewareCalls, 1);
-	});
-
-	it("should route requests to raw and non-raw middlewares based on route mode", async () => {
-		const apiContract = defineContract({
-			uploads: {
-				create: {
-					method: "POST",
-					path: "/uploads",
-					options: { mode: "raw" },
-					responses: {
-						204: noBody,
-					},
-				},
-			},
-			posts: {
-				create: {
-					method: "POST",
-					path: "/posts",
-					request: {
-						body: z.object({ title: z.string() }),
-					},
-					responses: {
-						204: noBody,
-					},
-				},
-			},
-		});
-
-		const { createRouteModeMiddleware } = initServer<typeof apiContract>();
-		const seenCalls: string[] = [];
-		const middleware = createRouteModeMiddleware({
-			contract: apiContract,
-			raw: (_req, _res, next) => {
-				seenCalls.push("raw");
-				next();
-			},
-			nonRaw: (_req, _res, next) => {
-				seenCalls.push("nonRaw");
-				next();
-			},
-			routePrefix: "/api",
-		});
-
-		await middleware(
-			{
-				method: "POST",
-				path: "/api/uploads",
-			} as never,
-			{} as never,
-			() => {},
-		);
-		await middleware(
-			{
-				method: "POST",
-				path: "/api/posts",
-			} as never,
-			{} as never,
-			() => {},
-		);
-
-		assert.deepStrictEqual(seenCalls, ["raw", "nonRaw"]);
-	});
-
-	it("should prefer the most specific matching route when selecting middleware", async () => {
-		const apiContract = defineContract({
-			uploads: {
-				byId: {
-					method: "POST",
-					path: "/uploads/:id",
-					options: { mode: "raw" },
-					responses: {
-						204: noBody,
-					},
-				},
-				static: {
-					method: "POST",
-					path: "/uploads/static",
-					request: {
-						body: z.object({ title: z.string() }),
-					},
-					responses: {
-						204: noBody,
-					},
-				},
-			},
-		});
-
-		const { createRouteModeMiddleware } = initServer<typeof apiContract>();
-		const seenCalls: string[] = [];
-		const middleware = createRouteModeMiddleware({
-			contract: apiContract,
-			raw: (_req, _res, next) => {
-				seenCalls.push("raw");
-				next();
-			},
-			nonRaw: (_req, _res, next) => {
-				seenCalls.push("nonRaw");
-				next();
-			},
-			routePrefix: "/api",
-		});
-
-		await middleware(
-			{
-				method: "POST",
-				path: "/api/uploads/static",
-			} as never,
-			{} as never,
-			() => {},
-		);
-
-		assert.deepStrictEqual(seenCalls, ["nonRaw"]);
-	});
-
-	it("should skip both middlewares when the request does not match a route", async () => {
-		const apiContract = defineContract({
-			posts: {
-				create: {
-					method: "POST",
-					path: "/posts",
-					request: {
-						body: z.object({ title: z.string() }),
-					},
-					responses: {
-						204: noBody,
-					},
-				},
-			},
-		});
-
-		const { createRouteModeMiddleware } = initServer<typeof apiContract>();
-		const seenCalls: string[] = [];
-		const middleware = createRouteModeMiddleware({
-			contract: apiContract,
-			raw: (_req, _res, next) => {
-				seenCalls.push("raw");
-				next();
-			},
-			nonRaw: (_req, _res, next) => {
-				seenCalls.push("nonRaw");
-				next();
-			},
-		});
-
-		let nextCalled = false;
-		await middleware(
-			{
-				method: "POST",
-				path: "/custom-upload",
-			} as never,
-			{} as never,
-			() => {
-				nextCalled = true;
-			},
-		);
-
-		assert.equal(nextCalled, true);
-		assert.deepStrictEqual(seenCalls, []);
+		assert.equal(matched, null);
 	});
 });

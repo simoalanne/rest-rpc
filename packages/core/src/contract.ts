@@ -326,8 +326,36 @@ const getRequestSchemaKeySet = (
 	schema: RequestBodySchema | z.ZodObject | undefined,
 ) => new Set(getRequestSchemaKeys(schema));
 
-const validateContract = (contract: Contract) => {
-	for (const route of flattenContractRoutes(contract)) {
+type CommonContractOptions = {
+	pathPrefix?: string;
+};
+
+const joinPathPrefix = (prefix: string, path: string) => {
+	const normalizedPrefix = prefix.replace(/\/+$/, "");
+	const normalizedPath = path.replace(/^\/+/, "");
+
+	if (!normalizedPrefix) return normalizedPath ? `/${normalizedPath}` : "/";
+	if (!normalizedPath) return normalizedPrefix;
+
+	return `${normalizedPrefix}/${normalizedPath}`;
+};
+
+const validateContract = (
+	contract: Contract,
+	commonOptions?: CommonContractOptions,
+) => {
+	const visit = (node: Contract) => {
+		if (!isRouteDeclaration(node)) {
+			Object.values(node).forEach((child) => visit(child as Contract));
+			return;
+		}
+
+		const route = node;
+
+		if (commonOptions?.pathPrefix) {
+			route.path = joinPathPrefix(commonOptions.pathPrefix, route.path);
+		}
+
 		if (route.request) {
 			const requestKeySets = [
 				getRequestSchemaKeySet(route.request.body),
@@ -348,12 +376,16 @@ const validateContract = (contract: Contract) => {
 				);
 			}
 		}
-	}
+	};
+
+	visit(contract);
+
+	return contract;
 };
 
 export const defineContract = <const TContract extends Contract>(
 	contract: TContract & ValidateResponseStatuses<TContract>,
+	commonOptions?: CommonContractOptions,
 ): TContract => {
-	validateContract(contract);
-	return contract;
+	return validateContract(contract, commonOptions) as TContract;
 };

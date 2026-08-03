@@ -58,7 +58,8 @@ Use this skill for tasks in repositories that use `contract-first-api`.
   - `stream(schema)` models NDJSON responses
   - `websocket` models bidirectional messages
 - `@contract-first-api/openapi` only documents JSON routes.
-- Backend route prefixes and client base URLs must stay aligned.
+- Shared path prefixes belong in the contract so adapters and clients consume
+  the same normalized route paths.
 
 ## Output Style
 

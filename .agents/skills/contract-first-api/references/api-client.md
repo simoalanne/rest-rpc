@@ -27,9 +27,9 @@ const api = initClient(contract, {
 
 ## Base URL Rule
 
-The client `baseUrl` must include the same route prefix used by the backend. If
-the server uses `routePrefix: "/api"`, the client base URL should point to that
-`/api` root.
+The client `baseUrl` should point to the deployment origin. Shared path
+prefixes belong in the API contract with `defineContract(..., { pathPrefix })`,
+so clients and servers consume the same normalized route paths.
 
 ## Request Shape
 

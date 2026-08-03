@@ -19,7 +19,7 @@ const openApiDocument = createOpenApiDocument(contract, {
 		title: "Todo API",
 		version: "1.0.0",
 	},
-	servers: [{ url: "http://localhost:3000/api" }], // if the backend uses a route prefix, include it here
+	servers: [{ url: "http://localhost:3000" }],
 });
 ```
 

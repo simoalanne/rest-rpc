@@ -1,8 +1,8 @@
 # @contract-first-api/express
 
 Mount a shared API contract on an Express app with request validation, typed
-service handlers, middleware hooks, typed request context, streaming responses,
-and WebSocket routes.
+service handlers, typed request context, route matching helpers, streaming
+responses, and WebSocket routes.
 
 This package consumes the API contract from `@contract-first-api/core`; it does
 not define the contract itself.
@@ -26,11 +26,11 @@ pnpm add -D @types/ws
 Start by calling `initServer()` to get helper functions. Implement contract
 fragments or single route declarations with `implementContract()`, then call
 `createRouter()` to register those implementations. Pass regular Express
-middlewares to `createRouter()` when they need to run after contract request
-validation.
+middleware to the Express app when you need application-specific request
+handling.
 
 ```ts
-import { initServer } from "@contract-first-api/express";
+import { initServer, matchRoute } from "@contract-first-api/express";
 import { apiContract } from "@example/shared";
 import express from "express";
 
@@ -55,7 +55,9 @@ declare global {
 }
 
 const authMiddleware: express.RequestHandler = (req, res, next) => {
-	if (req.route.path !== "/todos") {
+	const matched = matchRoute({ contract: apiContract, req });
+
+	if (!matched?.route.path.startsWith("/api/todos")) {
 		next();
 		return;
 	}
@@ -69,6 +71,8 @@ const authMiddleware: express.RequestHandler = (req, res, next) => {
 	req.userId = verifyAuthToken(token);
 	next();
 };
+
+app.use(authMiddleware);
 
 const todoImplementations = implementContract(apiContract.todos).handlers({
 	async list() {
@@ -91,10 +95,7 @@ const todoImplementations = implementContract(apiContract.todos).handlers({
 
 createRouter({
 	app,
-	contract: apiContract,
 	implementations: [todoImplementations],
-	routePrefix: "/api",
-	middlewares: [authMiddleware],
 	createContext: (req) => ({
 		userId: req.userId,
 	}),
@@ -259,21 +260,22 @@ type OutgoingDiscussMessage = InferRouteServerSendMessage<
 
 ## Raw Body Handling
 
-If the API contract mixes raw and non-raw routes, prefer
-`createRouteModeMiddleware()` so parsing is chosen from the API contract
-instead of hardcoded route paths.
+If the contract contains both JSON and raw body routes, you can use `matchRoute()` 
+helper to determine which body parser to use for each request.
 
 ```ts
-app.use(
-	createRouteModeMiddleware({
-		contract: apiContract,
-		routePrefix: "/api",
-		nonRaw: express.json(),
-		raw: express.raw({
-			type: ["image/png", "image/jpeg"],
-		}),
-	}),
-);
+const jsonBodyParser = express.json();
+const rawBodyParser = express.raw({
+	type: ["image/png", "image/jpeg"],
+});
+
+app.use((req, res, next) => {
+	const matched = matchRoute({ contract, req });
+	const bodyParser =
+		matched?.route.options?.mode === "raw" ? rawBodyParser : jsonBodyParser;
+
+	return bodyParser(req, res, next);
+});
 ```
 
 Raw service handlers receive `rawBody` in addition to typed params, query, and
@@ -292,12 +294,14 @@ const imageImplementations = implementContract(apiContract.images).handlers({
 
 ## Middleware
 
-Pass regular Express middleware to `createRouter()` when middleware needs the
-validated request or matched route before context creation.
+Use regular Express middleware for application-specific request handling. When
+middleware needs to know which contract route matched, call `matchRoute()`.
 
 ```ts
 const authMiddleware: express.RequestHandler = (req, res, next) => {
-	if (req.route.path !== "/todos") {
+	const matched = matchRoute({ contract: apiContract, req });
+
+	if (!matched?.route.path.startsWith("/api/todos")) {
 		next();
 		return;
 	}
@@ -311,9 +315,9 @@ const authMiddleware: express.RequestHandler = (req, res, next) => {
 };
 ```
 
-Custom middlewares run after request validation and before `createContext`.
-That means middleware can read `req.route`, inspect validated request data,
-and attach values to the Express request for `createContext` to use.
+The library does not manage an application middleware phase. Middleware can
+attach values to the Express request however your app chooses, and
+`createContext` can read those values.
 
 ## Streaming Responses
 
@@ -370,9 +374,7 @@ const discussImplementations = implementContract(apiContract.discuss).handlers({
 createRouter({
 	app,
 	server,
-	contract: apiContract,
 	implementations: [discussImplementations],
-	routePrefix: "/api",
 });
 
 server.listen(3001);
@@ -390,14 +392,14 @@ upgrade event.
 ```ts
 createRouter({
 	app,
-	contract: apiContract,
 	implementations,
-	routePrefix: "/api",
 });
 ```
 
-The registered path is `routePrefix + route.path`. Static routes are ordered
-before parameter routes when paths overlap.
+The registered path is the route declaration's `path`. Use
+`defineContract(..., { pathPrefix: "/api" })` when every route should share a
+common path prefix. Static routes are ordered before parameter routes when paths
+overlap.
 
 ## How It Connects
 
@@ -405,7 +407,7 @@ before parameter routes when paths overlap.
 - Import the same contract into your backend.
 - Register it with `initServer()` and `createRouter()`.
 - Use `initClient()` from `@contract-first-api/core` on the frontend with the
-  same API contract and matching `baseUrl`.
+  same API contract and a deployment `baseUrl`.
 
 This package stays on the server side. The core client, React Query adapter,
 and core OpenAPI generator are optional consumers of the same contract.
