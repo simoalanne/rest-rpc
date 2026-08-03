@@ -133,23 +133,21 @@ export const contracts = defineContractTree({
 Server handlers return typed response cases declared by the contract:
 
 ```ts
-const services = {
-	todos: defineService("todos", {
-		create({ title }) {
-			if (todoExists(title)) {
-				return {
-					status: 409,
-					body: { code: "TITLE_ALREADY_EXISTS" },
-				};
-			}
-
+const createTodoImplementation = implementContract(contracts.todos.create).handler(
+	({ title }) => {
+		if (todoExists(title)) {
 			return {
-				status: 201,
-				body: createTodo(title),
+				status: 409,
+				body: { code: "TITLE_ALREADY_EXISTS" },
 			};
-		},
-	}),
-};
+		}
+
+		return {
+			status: 201,
+			body: createTodo(title),
+		};
+	},
+);
 ```
 
 ## Client

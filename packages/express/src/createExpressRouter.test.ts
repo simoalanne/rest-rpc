@@ -133,7 +133,7 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, defineService } = initServer<
+		const { createRouter, implementContract } = initServer<
 			typeof contracts,
 			{ viewerId: string }
 		>();
@@ -141,8 +141,8 @@ describe("initServer", () => {
 		let seenRequest: unknown;
 		let contractPathInCreateContext: string | undefined;
 
-		const services = {
-			users: defineService("users", {
+		const implementations = [
+			implementContract(contracts.users).handlers({
 				async getById(request) {
 					seenRequest = request;
 					return {
@@ -155,14 +155,14 @@ describe("initServer", () => {
 					};
 				},
 			}),
-		};
+		];
 
 		const target = createRouteTargetDouble();
 
 		createRouter({
 			app: target.app,
 			contracts,
-			services,
+			implementations,
 			routePrefix: "/api",
 			createContext: (req) => {
 				contractPathInCreateContext = req.contract.path;
@@ -229,9 +229,9 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, defineService } = initServer<typeof contracts>();
-		const services = {
-			events: defineService("events", {
+		const { createRouter, implementContract } = initServer<typeof contracts>();
+		const implementations = [
+			implementContract(contracts.events).handlers({
 				stream() {
 					return (async function* () {
 						yield { type: "joined", payload: "Ada" };
@@ -239,13 +239,13 @@ describe("initServer", () => {
 					})();
 				},
 			}),
-		};
+		];
 
 		const target = createRouteTargetDouble();
 		createRouter({
 			app: target.app,
 			contracts,
-			services,
+			implementations,
 		});
 
 		const response = createResponseDouble();
@@ -298,12 +298,12 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, defineService } = initServer<typeof contracts>();
+		const { createRouter, implementContract } = initServer<typeof contracts>();
 		let createContextCalled = false;
 		let serviceCalled = false;
 
-		const services = {
-			posts: defineService("posts", {
+		const implementations = [
+			implementContract(contracts.posts).handlers({
 				async create() {
 					serviceCalled = true;
 					return {
@@ -312,14 +312,14 @@ describe("initServer", () => {
 					};
 				},
 			}),
-		};
+		];
 
 		const target = createRouteTargetDouble();
 
 		createRouter({
 			app: target.app,
 			contracts,
-			services,
+			implementations,
 			createContext: () => {
 				createContextCalled = true;
 				return {};
@@ -391,7 +391,7 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, defineMiddleware, defineService } = initServer<
+		const { createRouter, defineMiddleware, implementContract } = initServer<
 			typeof contracts,
 			{ viewerId: string }
 		>();
@@ -413,8 +413,8 @@ describe("initServer", () => {
 			next();
 		});
 
-		const services = {
-			posts: defineService("posts", {
+		const implementations = [
+			implementContract(contracts.posts).handlers({
 				create({ title, context }) {
 					seen.viewerIdInService = context.viewerId;
 					return {
@@ -427,14 +427,14 @@ describe("initServer", () => {
 					};
 				},
 			}),
-		};
+		];
 
 		const target = createRouteTargetDouble();
 
 		createRouter({
 			app: target.app,
 			contracts,
-			services,
+			implementations,
 			middlewares: [authMiddleware],
 			createContext: (req) => {
 				const enrichedReq = req as typeof req & { viewerId?: string };
@@ -499,14 +499,14 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, defineService } = initServer<typeof contracts>();
+		const { createRouter, implementContract } = initServer<typeof contracts>();
 		const target = createRouteTargetDouble();
 
 		createRouter({
 			app: target.app,
 			contracts,
-			services: {
-				posts: defineService("posts", {
+			implementations: [
+				implementContract(contracts.posts).handlers({
 					delete() {
 						return {
 							status: 204,
@@ -514,7 +514,7 @@ describe("initServer", () => {
 						};
 					},
 				}),
-			},
+			],
 		});
 
 		const handler = target.routes["DELETE /posts/:id"];
@@ -557,14 +557,14 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, defineService } = initServer<typeof contracts>();
+		const { createRouter, implementContract } = initServer<typeof contracts>();
 		const target = createRouteTargetDouble();
 
 		createRouter({
 			app: target.app,
 			contracts,
-			services: {
-				posts: defineService("posts", {
+			implementations: [
+				implementContract(contracts.posts).handlers({
 					create() {
 						return {
 							status: 202,
@@ -572,7 +572,7 @@ describe("initServer", () => {
 						};
 					},
 				}),
-			},
+			],
 		});
 
 		const handler = target.routes["POST /posts"];
@@ -605,7 +605,7 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, defineService } = initServer<typeof contracts>();
+		const { createRouter, implementContract } = initServer<typeof contracts>();
 		const serviceError = new Error("boom");
 
 		const target = createRouteTargetDouble();
@@ -613,13 +613,12 @@ describe("initServer", () => {
 		createRouter({
 			app: target.app,
 			contracts,
-			services: {
-				health: async () => {
+			implementations: [
+				implementContract(contracts.health).handler(async () => {
 					throw serviceError;
-				},
-			},
+				}),
+			],
 		});
-		void defineService;
 
 		const handler = target.routes["GET /health"];
 		assert.ok(handler);
@@ -655,14 +654,14 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, defineService } = initServer<typeof contracts>();
+		const { createRouter, implementContract } = initServer<typeof contracts>();
 		const target = createRouteTargetDouble();
 		const knownError = { code: "TITLE_ALREADY_EXISTS" };
 		createRouter({
 			app: target.app,
 			contracts,
-			services: {
-				todos: defineService("todos", {
+			implementations: [
+				implementContract(contracts.todos).handlers({
 					create() {
 						return {
 							status: 409,
@@ -670,7 +669,7 @@ describe("initServer", () => {
 						};
 					},
 				}),
-			},
+			],
 		});
 
 		const handler = target.routes["POST /todos"];

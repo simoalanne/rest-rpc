@@ -7,7 +7,6 @@ import {
 	type ContractSingleSuccessfulResponseBody,
 	type ContractTree,
 	flattenContractTree,
-	type GetByPath,
 	type HttpMethod,
 	isNoBodyResponse,
 	isStreamResponse,
@@ -81,39 +80,40 @@ export type ServiceHandler<E extends Contract, TContext = EmptyObject> = (
 	...args: [request: ServiceRequest<E, TContext>]
 ) => HandlerResult<E>;
 
-export type ServiceTree<
+export type RouteImplementation = {
+	contract: Contract;
+	handler: (request: unknown) => unknown | Promise<unknown>;
+};
+
+export type ImplementationInput = readonly (
+	| RouteImplementation
+	| readonly RouteImplementation[]
+)[];
+
+type ImplementationTree<
 	T extends ContractTree,
 	TContext = EmptyObject,
 > = T extends Contract
 	? ServiceHandler<T, TContext>
 	: {
 			[K in keyof T]: T[K] extends ContractTree
-				? ServiceTree<T[K], TContext>
+				? ImplementationTree<T[K], TContext>
 				: never;
 		};
 
-type ServiceGroupPaths<T extends ContractTree> = T extends Contract
-	? never
+type ImplementContract<TContext = EmptyObject> = <TNode extends ContractTree>(
+	contract: TNode,
+) => TNode extends Contract
+	? {
+			handler: (
+				handler: ServiceHandler<TNode, TContext>,
+			) => RouteImplementation;
+		}
 	: {
-			[K in keyof T & string]: T[K] extends Contract
-				? never
-				: T[K] extends ContractTree
-					? K | `${K}.${ServiceGroupPaths<T[K]>}`
-					: never;
-		}[keyof T & string];
-
-type ServiceAtPath<
-	T extends ContractTree,
-	P extends ServiceGroupPaths<T>,
-	TContext = EmptyObject,
-> = ServiceTree<Extract<GetByPath<T, P>, ContractTree>, TContext>;
-
-type DefineService<T extends ContractTree, TContext = EmptyObject> = <
-	P extends ServiceGroupPaths<T>,
->(
-	path: P,
-	service: ServiceAtPath<T, P, TContext>,
-) => ServiceAtPath<T, P, TContext>;
+			handlers: (
+				handlers: ImplementationTree<TNode, TContext>,
+			) => RouteImplementation[];
+		};
 
 type DefineMiddleware<TMeta> = <
 	TMiddleware extends (
@@ -142,14 +142,14 @@ export type ValidationResult =
 	| { success: false; errors: ValidationIssue[] };
 
 export type CreateRouterOptions<
-	TContracts extends ContractTree,
+	TContracts extends ContractTree = ContractTree,
 	TContext = EmptyObject,
 	TMeta = ContractMetaOf<TContracts>,
 > = {
 	app: Application;
 	server?: HttpServer;
-	contracts: TContracts;
-	services: ServiceTree<TContracts, TContext>;
+	contracts?: TContracts;
+	implementations: ImplementationInput;
 	middlewares?: (MiddlewareFunction | MiddlewareFunction<TMeta>)[];
 	routePrefix?: string;
 	createContext?: (
@@ -158,11 +158,11 @@ export type CreateRouterOptions<
 };
 
 export type ServerTools<
-	TContracts extends ContractTree,
+	TContracts extends ContractTree = ContractTree,
 	TContext = EmptyObject,
 	TMeta = ContractMetaOf<TContracts>,
 > = {
-	defineService: DefineService<TContracts, TContext>;
+	implementContract: ImplementContract<TContext>;
 	defineMiddleware: DefineMiddleware<TMeta>;
 	createContractModeMiddleware: (
 		options: ContractModeMiddlewareOptions & { contracts: TContracts },
@@ -402,6 +402,12 @@ type ResolvedContractRoute<TMeta = unknown> = Contract<TMeta> & {
 	routePath: string;
 };
 
+type ResolvedImplementationRoute<TMeta = unknown> = Contract<TMeta> & {
+	matchPath: ReturnType<typeof createPathMatcher>;
+	routePath: string;
+	handler: unknown;
+};
+
 const resolveContractRoutes = <TMeta = unknown>(
 	contracts: ContractTree<TMeta>,
 	routePrefix?: string,
@@ -443,10 +449,17 @@ const createContractModeMiddleware = <TContracts extends ContractTree>(
 	};
 };
 
-const getRouteHandler = (services: unknown, path: string[]) =>
-	resolveHandlerAtPath(services, path) as (
-		request: Record<string, unknown>,
-	) => unknown | Promise<unknown>;
+const implementContract = ((contract: ContractTree) => ({
+	handler: (handler: RouteImplementation["handler"]) => ({
+		contract,
+		handler,
+	}),
+	handlers: (handlers: unknown) =>
+		flattenContractTree(contract).map((route) => ({
+			contract: route,
+			handler: resolveHandlerAtPath(handlers, route.keySegments),
+		})),
+})) as ImplementContract<unknown>;
 
 const writeStreamResponse = async (
 	result: unknown,
@@ -521,16 +534,32 @@ const createRouter = <
 >({
 	app,
 	server,
-	contracts,
-	services,
+	implementations,
 	routePrefix,
 	createContext,
 	middlewares = [],
 }: CreateRouterOptions<TContracts, TContext, TMeta>) => {
-	const routes = resolveContractRoutes(contracts, routePrefix);
+	const resolvedImplementations = implementations.flatMap((implementation) =>
+		Array.isArray(implementation) ? implementation : [implementation],
+	);
+	const routes = (
+		resolvedImplementations.map(({ contract, handler }) => {
+			const routePath = buildRoutePath(routePrefix, contract.path);
+			return {
+				...(contract as Contract<TMeta>),
+				routePath,
+				matchPath: createPathMatcher(routePath),
+				handler,
+			};
+		}) satisfies ResolvedImplementationRoute<TMeta>[]
+	).sort(compareRouteSpecificity);
 	const webSocketRoutes = routes.filter(
-		(route): route is ResolvedContractRoute<TMeta> & WebSocketContract<TMeta> =>
-			isWebSocketContract(route),
+		(
+			route,
+		): route is ResolvedImplementationRoute<TMeta> &
+			WebSocketContract<TMeta> & {
+				handler: (request: unknown) => unknown | Promise<unknown>;
+			} => isWebSocketContract(route),
 	);
 
 	if (webSocketRoutes.length > 0) {
@@ -543,12 +572,10 @@ const createRouter = <
 		registerWebSocketRoutes({
 			server,
 			routes: webSocketRoutes,
-			services,
 			routePrefix,
 			createContext,
 			buildRoutePath,
 			createPathMatcher,
-			resolveHandlerAtPath,
 			validateRequestSegments,
 			isKnownContractError: (error): error is KnownContractError =>
 				error instanceof KnownContractError,
@@ -559,7 +586,9 @@ const createRouter = <
 		if (isWebSocketContract(route)) continue;
 
 		const method = route.method.toLowerCase() as Lowercase<HttpMethod>;
-		const handler = getRouteHandler(services, route.keySegments);
+		const handler = route.handler as (
+			request: Record<string, unknown>,
+		) => unknown | Promise<unknown>;
 		const requestPreparationMiddleware = prepareRequest(route);
 		const registeredMiddlewares = middlewares as Array<
 			(req: Request, res: Response, next: NextFunction) => unknown
@@ -621,11 +650,11 @@ const createRouter = <
 };
 
 export const initServer = <
-	TContracts extends ContractTree,
+	TContracts extends ContractTree = ContractTree,
 	TContext = EmptyObject,
 	TMeta = ContractMetaOf<TContracts>,
 >(): ServerTools<TContracts, TContext, TMeta> => ({
-	defineService: (_path, service) => service,
+	implementContract: implementContract as ImplementContract<TContext>,
 	defineMiddleware: (middleware) => middleware,
 	createContractModeMiddleware: (options) =>
 		createContractModeMiddleware(options),

@@ -24,8 +24,9 @@ pnpm add -D @types/ws
 ## Basic Setup
 
 Start by calling `initServer()` to get helper functions. Add middlewares with
-`defineMiddleware()`, define service handlers with `defineService()`, then call
-`createRouter()` to register routes for every contract.
+`defineMiddleware()`, implement contract groups or single contracts with
+`implementContract()`, then call `createRouter()` to register those
+implementations.
 
 ```ts
 import { initServer } from "@contract-first-api/express";
@@ -39,7 +40,7 @@ type RequestContext = {
 const app = express();
 app.use(express.json());
 
-const { createRouter, defineMiddleware, defineService } = initServer<
+const { createRouter, defineMiddleware, implementContract } = initServer<
 	typeof contracts,
 	RequestContext
 >();
@@ -68,31 +69,29 @@ const authMiddleware = defineMiddleware((req, res, next) => {
 	next();
 });
 
-const services = {
-	todos: defineService("todos", {
-		async list() {
-			return {
-				status: 200,
-				body: {
-					items: await getTodos(),
-				},
-			};
-		},
-		async create({ title, context }) {
-			const todo = await createTodo({ title, ownerId: context.userId });
+const todoImplementations = implementContract(contracts.todos).handlers({
+	async list() {
+		return {
+			status: 200,
+			body: {
+				items: await getTodos(),
+			},
+		};
+	},
+	async create({ title, context }) {
+		const todo = await createTodo({ title, ownerId: context.userId });
 
-			return {
-				status: 201,
-				body: todo,
-			};
-		},
-	}),
-};
+		return {
+			status: 201,
+			body: todo,
+		};
+	},
+});
 
 createRouter({
 	app,
 	contracts,
-	services,
+	implementations: [todoImplementations],
 	routePrefix: "/api",
 	middlewares: [authMiddleware],
 	createContext: (req) => ({
@@ -119,25 +118,23 @@ match the schema declared for that status. Non-2xx responses are normal typed
 responses:
 
 ```ts
-const services = {
-	todos: defineService("todos", {
-		create({ title }) {
-			if (todoExists(title)) {
-				return {
-					status: 409,
-					body: {
-						code: "TITLE_ALREADY_EXISTS",
-					},
-				};
-			}
-
+const createTodoImplementation = implementContract(contracts.todos.create).handler(
+	({ title }) => {
+		if (todoExists(title)) {
 			return {
-				status: 201,
-				body: createTodo(title),
+				status: 409,
+				body: {
+					code: "TITLE_ALREADY_EXISTS",
+				},
 			};
-		},
-	}),
-};
+		}
+
+		return {
+			status: 201,
+			body: createTodo(title),
+		};
+	},
+);
 ```
 
 For `noBody` responses, return `body: undefined`:
@@ -156,15 +153,13 @@ When a contract declares exactly one successful status, the handler may return
 that successful body directly:
 
 ```ts
-const services = {
-	todos: defineService("todos", {
-		async list() {
-			return {
-				items: await getTodos(),
-			};
-		},
-	}),
-};
+const todoImplementations = implementContract(contracts.todos).handlers({
+	async list() {
+		return {
+			items: await getTodos(),
+		};
+	},
+});
 ```
 
 ## Request Flow
@@ -189,22 +184,20 @@ Handlers receive one flattened request object:
 - `context`
 
 ```ts
-const services = {
-	todos: defineService("todos", {
-		async get({ id, includeCompleted, context }) {
-			const todo = await loadTodo({
-				id,
-				includeCompleted,
-				userId: context.userId,
-			});
+const todoImplementations = implementContract(contracts.todos).handlers({
+	async get({ id, includeCompleted, context }) {
+		const todo = await loadTodo({
+			id,
+			includeCompleted,
+			userId: context.userId,
+		});
 
-			return {
-				status: 200,
-				body: todo,
-			};
-		},
-	}),
-};
+		return {
+			status: 200,
+			body: todo,
+		};
+	},
+});
 ```
 
 Request field names must be unique across locations in a single contract.
@@ -232,16 +225,14 @@ Raw service handlers receive `rawBody` in addition to typed params, query, and
 context:
 
 ```ts
-const services = {
-	images: defineService("images", {
-		inspect({ rawBody }) {
-			return {
-				status: 200,
-				body: inspectImage(rawBody),
-			};
-		},
-	}),
-};
+const imageImplementations = implementContract(contracts.images).handlers({
+	inspect({ rawBody }) {
+		return {
+			status: 200,
+			body: inspectImage(rawBody),
+		};
+	},
+});
 ```
 
 ## Middleware
@@ -278,13 +269,11 @@ handlers can return the async iterable directly when the contract has one
 successful status.
 
 ```ts
-const services = {
-	todos: defineService("todos", {
-		events() {
-			return readTodoEvents();
-		},
-	}),
-};
+const todoImplementations = implementContract(contracts.todos).handlers({
+	events() {
+		return readTodoEvents();
+	},
+});
 ```
 
 The route writes each yielded value as NDJSON with
@@ -305,33 +294,31 @@ import { createServer } from "node:http";
 const app = express();
 const server = createServer(app);
 
-const { createRouter, defineService } = initServer<typeof contracts>();
+const { createRouter, implementContract } = initServer<typeof contracts>();
 
-const services = {
-	discuss: defineService("discuss", {
-		connect({ socket }) {
+const discussImplementations = implementContract(contracts.discuss).handlers({
+	connect({ socket }) {
+		socket.send({
+			type: "history",
+			messages: [],
+		});
+
+		socket.onMessage((result) => {
+			if (!result.success) return;
+
 			socket.send({
-				type: "history",
-				messages: [],
+				type: "message",
+				text: result.data.text,
 			});
-
-			socket.onMessage((result) => {
-				if (!result.success) return;
-
-				socket.send({
-					type: "message",
-					text: result.data.text,
-				});
-			});
-		},
-	}),
-};
+		});
+	},
+});
 
 createRouter({
 	app,
 	server,
 	contracts,
-	services,
+	implementations: [discussImplementations],
 	routePrefix: "/api",
 });
 
@@ -351,7 +338,7 @@ upgrade event.
 createRouter({
 	app,
 	contracts,
-	services,
+	implementations,
 	routePrefix: "/api",
 });
 ```

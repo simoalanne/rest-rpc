@@ -112,7 +112,7 @@ const broadcastDiscussMessage = (message: DiscussMessage) => {
 
 const serverTools = initServer<typeof allContracts, RequestContext>();
 const {
-	defineService,
+	implementContract,
 	defineMiddleware,
 	createContractModeMiddleware,
 	createRouter,
@@ -146,8 +146,8 @@ const regularMiddleware = (
 	next();
 };
 
-const services = {
-	health: defineService("health", {
+const implementations = [
+	implementContract(allContracts.health).handlers({
 		async get({ context }) {
 			await sleep(900);
 			return {
@@ -159,7 +159,7 @@ const services = {
 			};
 		},
 	}),
-	todos: defineService("todos", {
+	implementContract(allContracts.todos).handlers({
 		list() {
 			return {
 				status: 200,
@@ -226,7 +226,7 @@ const services = {
 			};
 		},
 	}),
-	images: defineService("images", {
+	implementContract(allContracts.images).handlers({
 		inspect({ rawBody }) {
 			if (!Buffer.isBuffer(rawBody)) {
 				throw new Error(
@@ -240,7 +240,7 @@ const services = {
 			};
 		},
 	}),
-	discuss: defineService("discuss", {
+	implementContract(allContracts.discuss).handlers({
 		connect({ socket }) {
 			discussSockets.add(socket);
 			socket.send({
@@ -267,7 +267,7 @@ const services = {
 			});
 		},
 	}),
-};
+];
 
 app.use(
 	createContractModeMiddleware({
@@ -297,7 +297,7 @@ createRouter({
 	app,
 	server,
 	contracts: allContracts,
-	services,
+	implementations,
 	routePrefix: "/api",
 	middlewares: [middleware, regularMiddleware],
 	createContext: (req) => {
