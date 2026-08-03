@@ -42,7 +42,7 @@ Use this skill for tasks in repositories that use `contract-first-api`.
 
 ## Package Selection
 
-- Use `core.md` for defining contracts, contract modes, metadata, and helper types.
+- Use `core.md` for defining contracts, contract modes, and helper types.
 - Use `express.md` for route registration, request validation, middleware, raw body handling, context creation, streams, and websockets on the server.
 - Use `api-client.md` for core client request shape, base URL rules, headers, timeouts, and response handling.
 - Use `react-query.md` for hook usage, cache helpers, and how the React Query client uses contracts and core client options.

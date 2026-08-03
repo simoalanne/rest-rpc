@@ -11,16 +11,14 @@ pnpm add @contract-first-api/core zod
 
 ## Define A Contract
 
-Start with `initContracts()`, optionally with a metadata shape, then define a
-plain API contract with `defineContract()`.
+Start with `initContracts()`, then define a plain API contract with
+`defineContract()`.
 
 ```ts
 import { initContracts } from "@contract-first-api/core";
 import z from "zod";
 
-const { defineContract } = initContracts<{
-	requiresAuth?: boolean;
-}>();
+const { defineContract } = initContracts();
 
 export const apiContract = defineContract({
 	todos: {
@@ -41,9 +39,6 @@ export const apiContract = defineContract({
 		create: {
 			method: "POST",
 			path: "/todos",
-			meta: {
-				requiresAuth: true,
-			},
 			request: {
 				body: z.object({
 					title: z.string().min(1),
@@ -79,7 +74,6 @@ Each HTTP route declaration can define:
 | `responses` | Required map of status codes to response schemas. At least one status must be 2xx. |
 | `options` | Optional route behavior, currently `raw` or `websocket`. |
 | `messages` | WebSocket client and server message schemas. |
-| `meta` | Optional app-defined metadata for integrations and middleware. |
 
 `defineContract()` validates structural rules that TypeScript cannot fully
 enforce at runtime, such as duplicate request field names across `body`,
@@ -138,11 +132,11 @@ Status codes are declared directly in `responses`.
 
 ## Route Modes
 
-- **JSON routes** are the default. They can define request schemas,
-  responses, and metadata.
+- **JSON routes** are the default. They can define request schemas and
+  responses.
 - **Raw request routes** use `options: { mode: "raw" }`. They can define
-  `query`, `params`, responses, and metadata, but not a contract-managed request
-  `body` schema.
+  `query`, `params`, and responses, but not a contract-managed request `body`
+  schema.
 - **Streaming routes** are HTTP routes whose successful response is
   declared with `stream(schema)`. A stream response cannot be mixed with
   multiple successful status codes.

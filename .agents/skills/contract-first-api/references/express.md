@@ -13,13 +13,13 @@ support, and websocket routes.
 Use `initServer()` to get helpers, then:
 
 1. register body parsing middleware
-2. define middleware with `defineMiddleware()` when typed contract metadata is
-   needed
-3. define handlers with `defineService()`
+2. define handlers with `implementContract()`
+3. pass regular Express middlewares to `createRouter()` when they need to run
+   after contract request validation
 4. register routes with `createRouter()`
 
 ```ts
-const { createRouter, defineMiddleware, defineService } = initServer<
+const { createRouter, implementContract } = initServer<
 	typeof contracts,
 	RequestContext
 >();
@@ -33,8 +33,8 @@ app.use(express.json());
 
 createRouter({
 	app,
-	contracts,
-	services,
+	contract: contracts,
+	implementations,
 	routePrefix: "/api",
 });
 ```
@@ -45,8 +45,8 @@ HTTP service handlers return declared response envelopes. When a contract has
 exactly one successful status, handlers may return the successful body directly.
 
 ```ts
-const services = {
-	todos: defineService("todos", {
+const implementations = [
+	implementContract(contracts.todos).handlers({
 		async list() {
 			return {
 				status: 200,
@@ -74,7 +74,7 @@ const services = {
 			};
 		},
 	}),
-};
+];
 ```
 
 The `status` must be one of the contract's `responses` keys. Non-2xx statuses
@@ -105,8 +105,8 @@ This depends on request field names being unique across locations in the
 contract.
 
 ```ts
-const services = {
-	todos: defineService("todos", {
+const implementations = [
+	implementContract(contracts.todos).handlers({
 		async get({ id, includeCompleted, context }) {
 			return {
 				status: 200,
@@ -118,7 +118,7 @@ const services = {
 			};
 		},
 	}),
-};
+];
 ```
 
 ## Raw Body Handling
@@ -146,12 +146,12 @@ keeping typed params, query, and responses. Raw service handlers receive a
 
 ## Middleware
 
-Use `defineMiddleware()` when middleware logic depends on typed contract
-metadata like `meta.requiresAuth`.
+Pass regular Express middleware to `createRouter()` when middleware logic needs
+the validated request or matched contract route before context creation.
 
 ```ts
-const authMiddleware = defineMiddleware((req, res, next) => {
-	if (!req.contract.meta?.requiresAuth) {
+const authMiddleware: express.RequestHandler = (req, res, next) => {
+	if (req.contract.path !== "/todos") {
 		next();
 		return;
 	}
@@ -162,7 +162,7 @@ const authMiddleware = defineMiddleware((req, res, next) => {
 	}
 
 	next();
-});
+};
 ```
 
 ## Streaming Responses
@@ -171,13 +171,13 @@ Streaming responses are declared with `stream(schema)`. Service handlers return
 the async iterable body directly when the contract has one successful status.
 
 ```ts
-const services = {
-	todos: defineService("todos", {
+const implementations = [
+	implementContract(contracts.todos).handlers({
 		events() {
 			return readEvents();
 		},
 	}),
-};
+];
 ```
 
 ## WebSocket Services
@@ -185,8 +185,8 @@ const services = {
 WebSocket services receive a typed socket instead of returning a response.
 
 ```ts
-const services = {
-	chat: defineService("chat", {
+const implementations = [
+	implementContract(contracts.chat).handlers({
 		connect({ socket }) {
 			socket.onMessage((result) => {
 				if (!result.success) return;
@@ -197,7 +197,7 @@ const services = {
 			});
 		},
 	}),
-};
+];
 ```
 
 ## Important Rules
@@ -215,6 +215,5 @@ const services = {
 ## Use This Package When
 
 - mounting contracts on an Express app
-- adding middleware that depends on contract metadata
 - implementing raw body, stream, or websocket routes
 - debugging validation order or service input shape

@@ -10,18 +10,15 @@ helpers, and the runtime client.
 
 ## Main API
 
-Start with `initContracts()`, optionally with a metadata shape, then create the
-tree with `defineContractTree()`.
+Start with `initContracts()`, then create the tree with `defineContract()`.
 
 ```ts
 import { initContracts } from "@contract-first-api/core";
 import z from "zod";
 
-const { defineContractTree } = initContracts<{
-	requiresAuth?: boolean;
-}>();
+const { defineContract } = initContracts();
 
-export const contracts = defineContractTree({
+export const contracts = defineContract({
 	todos: {
 		list: {
 			method: "GET",
@@ -52,7 +49,6 @@ Common HTTP contract fields:
 - `request.params`
 - `responses`
 - `options`
-- `meta`
 
 WebSocket contracts use `messages.client` and `messages.server` instead of
 `responses`.
@@ -64,7 +60,7 @@ HTTP contracts declare all known status codes in `responses`.
 ```ts
 import { noBody, stream } from "@contract-first-api/core";
 
-export const contracts = defineContractTree({
+export const contracts = defineContract({
 	todos: {
 		create: {
 			method: "POST",
@@ -111,10 +107,10 @@ codes are the keys in `responses`; non-2xx responses are typed error cases.
 ## Contract Modes
 
 - `json`
-  Default mode. Supports request schemas, responses, and metadata.
+  Default mode. Supports request schemas and responses.
 - `raw`
-  Uses `options: { mode: "raw" }`. Can define `query`, `params`, responses,
-  and metadata, but not a contract-managed request body.
+  Uses `options: { mode: "raw" }`. Can define `query`, `params`, and
+  responses, but not a contract-managed request body.
 - streaming
   Use `stream(schema)` as the successful response value. A stream response
   cannot be mixed with multiple successful status codes.
@@ -154,6 +150,5 @@ const api = initClient(contracts, {
 ## Use This Package When
 
 - adding or changing routes at the contract level
-- introducing metadata used by middleware or integrations
 - deriving shared request and response types
 - creating typed runtime clients

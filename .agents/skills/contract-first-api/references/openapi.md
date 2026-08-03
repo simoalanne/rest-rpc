@@ -11,7 +11,7 @@ It does not write files, register routes, or serve documentation UIs.
 
 ## Main Setup
 
-Use `createOpenApiDocument()` with the shared contracts and document metadata.
+Use `createOpenApiDocument()` with the shared contracts and document options.
 
 ```ts
 const openApiDocument = createOpenApiDocument(contracts, {
@@ -102,9 +102,7 @@ const document = createOpenApiDocument(contracts, {
 	},
 	transformOperation: ({ contract, operation }) => ({
 		...operation,
-		...(contract.meta?.requiresAuth
-			? { security: [{ bearerAuth: [] }] }
-			: {}),
+		operationId: contract.keySegments.join("."),
 	}),
 });
 ```
@@ -135,5 +133,5 @@ const document = createOpenApiDocument(contracts, {
 ## Use This Package When
 
 - exporting an OpenAPI document from shared contracts
-- adding route-level summaries, tags, or security metadata
+- adding route-level summaries, tags, or security settings
 - adding top-level components or shared document customization
