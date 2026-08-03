@@ -1,7 +1,7 @@
 # @contract-first-api/core
 
-Define shared API contracts, derive path-based helper types, and create typed
-runtime clients from the same contract tree.
+Define a shared API contract, derive path-based helper types, and create typed
+runtime clients from the same API contract.
 
 ## Install
 
@@ -9,20 +9,20 @@ runtime clients from the same contract tree.
 pnpm add @contract-first-api/core zod
 ```
 
-## Define Contracts
+## Define A Contract
 
 Start with `initContracts()`, optionally with a metadata shape, then define a
-plain contract tree with `defineContractTree()`.
+plain API contract with `defineContract()`.
 
 ```ts
 import { initContracts } from "@contract-first-api/core";
 import z from "zod";
 
-const { defineContractTree } = initContracts<{
+const { defineContract } = initContracts<{
 	requiresAuth?: boolean;
 }>();
 
-export const contracts = defineContractTree({
+export const apiContract = defineContract({
 	todos: {
 		list: {
 			method: "GET",
@@ -63,24 +63,25 @@ export const contracts = defineContractTree({
 });
 ```
 
-The keys around each contract, like `todos.create`, become the path names used
-by helper types and integration packages.
+The keys around each route declaration, like `todos.create`, become stable path
+names used by helper types and integration packages. The grouping is for your
+application; routing is driven by each route declaration's `method` and `path`.
 
 ## Contract Fields
 
-Each HTTP contract can define:
+Each HTTP route declaration can define:
 
 | Field | Purpose |
 | --- | --- |
 | `method` | HTTP method: `GET`, `POST`, `PUT`, `DELETE`, or `PATCH`. |
 | `path` | HTTP path, with params using `:paramValue` syntax. |
-| `request` | Optional Zod schemas for `body`, `query`, and `params`. Raw request contracts can only define `query` and `params`. |
+| `request` | Optional Zod schemas for `body`, `query`, and `params`. Raw request routes can only define `query` and `params`. |
 | `responses` | Required map of status codes to response schemas. At least one status must be 2xx. |
-| `options` | Optional contract behavior, currently `raw` or `websocket`. |
+| `options` | Optional route behavior, currently `raw` or `websocket`. |
 | `messages` | WebSocket client and server message schemas. |
 | `meta` | Optional app-defined metadata for integrations and middleware. |
 
-`defineContractTree()` validates structural rules that TypeScript cannot fully
+`defineContract()` validates structural rules that TypeScript cannot fully
 enforce at runtime, such as duplicate request field names across `body`,
 `query`, and `params`.
 
@@ -92,7 +93,7 @@ be Zod schemas, `noBody`, or `stream(schema)`.
 ```ts
 import { noBody, stream } from "@contract-first-api/core";
 
-export const contracts = defineContractTree({
+export const apiContract = defineContract({
 	todos: {
 		remove: {
 			method: "DELETE",
@@ -135,17 +136,17 @@ export const contracts = defineContractTree({
 Non-2xx entries are the typed error cases. There is no separate `errors` field.
 Status codes are declared directly in `responses`.
 
-## Contract Modes
+## Route Modes
 
-- **JSON contracts** are the default. They can define request schemas,
+- **JSON routes** are the default. They can define request schemas,
   responses, and metadata.
-- **Raw request contracts** use `options: { mode: "raw" }`. They can define
+- **Raw request routes** use `options: { mode: "raw" }`. They can define
   `query`, `params`, responses, and metadata, but not a contract-managed request
   `body` schema.
-- **Streaming contracts** are HTTP contracts whose successful response is
+- **Streaming routes** are HTTP routes whose successful response is
   declared with `stream(schema)`. A stream response cannot be mixed with
   multiple successful status codes.
-- **WebSocket contracts** use `options: { mode: "websocket" }`. They must use
+- **WebSocket routes** use `options: { mode: "websocket" }`. They must use
   `method: "GET"` and define `messages.client` and `messages.server` instead of
   `responses`.
 
@@ -154,7 +155,7 @@ Status codes are declared directly in `responses`.
 Requests are split into the same HTTP locations your backend receives:
 
 ```ts
-const contracts = defineContractTree({
+const apiContract = defineContract({
 	todos: {
 		get: {
 			method: "GET",
@@ -182,13 +183,13 @@ Integrations expose this as one flat request object. For example, `params.id`,
 `query.includeCompleted`, and `body.title` become regular fields on typed
 service and client inputs.
 
-## Raw Request Contracts
+## Raw Request Routes
 
-Raw request contracts pass the request body through without contract-level Zod
+Raw request routes pass the request body through without contract-level Zod
 validation while keeping typed params, query, and responses.
 
 ```ts
-const contracts = defineContractTree({
+const apiContract = defineContract({
 	images: {
 		analyze: {
 			method: "POST",
@@ -216,12 +217,12 @@ const contracts = defineContractTree({
 
 Client calls add the raw payload through an explicit `rawBody` field.
 
-## WebSocket Contracts
+## WebSocket Routes
 
-WebSocket contracts define the JSON message shape each side is allowed to send.
+WebSocket routes define the JSON message shape each side is allowed to send.
 
 ```ts
-const contracts = defineContractTree({
+const apiContract = defineContract({
 	discuss: {
 		connect: {
 			method: "GET",
@@ -252,7 +253,7 @@ Use `initClient()` when you need a runtime client.
 ```ts
 import { initClient } from "@contract-first-api/core";
 
-const api = initClient(contracts, {
+const api = initClient(apiContract, {
 	baseUrl: "http://localhost:3001/api",
 	getHeaders: () => ({
 		Authorization: `Bearer ${getAuthToken()}`,
@@ -261,8 +262,8 @@ const api = initClient(contracts, {
 });
 ```
 
-Every HTTP contract exposes `fetchResponse()`, which returns either a declared
-response envelope or an undeclared response:
+Every HTTP route declaration exposes `fetchResponse()`, which returns either a
+declared response envelope or an undeclared response:
 
 ```ts
 const response = await api.todos.create.fetchResponse({
@@ -274,7 +275,7 @@ if (response.declared && response.status === 201) {
 }
 ```
 
-Contracts with exactly one successful response also expose `fetch()`, which
+Routes with exactly one successful response also expose `fetch()`, which
 returns the success body directly:
 
 ```ts
@@ -282,7 +283,7 @@ const todos = await api.todos.list.fetch();
 console.log(todos.items);
 ```
 
-WebSocket contracts expose `connect()` and `tryConnect()`.
+WebSocket routes expose `connect()` and `tryConnect()`.
 
 ## Shared Helper Types
 
@@ -295,16 +296,16 @@ import type {
 	DotPaths,
 } from "@contract-first-api/core";
 
-export type AppContracts = typeof contracts;
-export type ApiPath = DotPaths<AppContracts>;
+export type AppContract = typeof apiContract;
+export type ApiPath = DotPaths<AppContract>;
 
 export type ApiRequest<P extends ApiPath> = ContractApiRequest<
-	AppContracts,
+	AppContract,
 	P
 >;
 
 export type ApiResponse<P extends ApiPath> = ContractApiResponse<
-	AppContracts,
+	AppContract,
 	P
 >;
 ```
@@ -314,13 +315,14 @@ such as `{ status: 201; body: CreatedTodo } | { status: 409; body: Conflict }`.
 
 ## OpenAPI Documents
 
-Core can generate a plain OpenAPI document object from JSON HTTP contracts:
+Core can generate a plain OpenAPI document object from JSON HTTP route
+declarations:
 
 ```ts
 import { createOpenApiDocument } from "@contract-first-api/core";
-import { contracts } from "@example/shared";
+import { apiContract } from "@example/shared";
 
-export const openApiDocument = createOpenApiDocument(contracts, {
+export const openApiDocument = createOpenApiDocument(apiContract, {
 	info: {
 		title: "Todo API",
 		version: "1.0.0",
@@ -329,12 +331,12 @@ export const openApiDocument = createOpenApiDocument(contracts, {
 });
 ```
 
-Raw request contracts, websocket contracts, and contracts with streaming
-responses are not included in the generated document.
+Raw request routes, WebSocket routes, and routes with streaming responses are
+not included in the generated document.
 
 ## How Core Connects To Other Packages
 
-- `@contract-first-api/express` imports the same contract tree to register
+- `@contract-first-api/express` imports the same API contract to register
   routes, validate requests, and type service handlers.
 - `@contract-first-api/react-query` creates hook and cache helpers from the
-  contract tree and core client options.
+  API contract and core client options.

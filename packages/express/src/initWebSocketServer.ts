@@ -1,21 +1,21 @@
 import type { Server as HttpServer, IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import type {
-	Contract,
 	ContractClientMessage,
 	ContractServerMessage,
-	WebSocketContract,
+	RouteDeclaration,
+	WebSocketRouteDeclaration,
 } from "@contract-first-api/core/contracts";
 import type { Request } from "express";
 import type WebSocket from "ws";
 import { WebSocketServer } from "ws";
 import type { EmptyObject, ValidationResult } from "./initServer.ts";
 
-export type WebSocketMessageResult<E extends WebSocketContract> =
+export type WebSocketMessageResult<E extends WebSocketRouteDeclaration> =
 	| { success: true; data: ContractClientMessage<E> }
 	| { success: false };
 
-export type ContractWebSocket<E extends WebSocketContract> = Omit<
+export type ContractWebSocket<E extends WebSocketRouteDeclaration> = Omit<
 	WebSocket,
 	"send" | "on" | "off"
 > & {
@@ -31,7 +31,7 @@ type KnownContractErrorShape = Error & {
 	readonly status: number;
 };
 
-type WebSocketRoute<TMeta> = WebSocketContract<TMeta> & {
+type WebSocketRoute<TMeta> = WebSocketRouteDeclaration<TMeta> & {
 	handler: (request: unknown) => unknown | Promise<unknown>;
 };
 
@@ -40,14 +40,14 @@ type RegisterWebSocketRoutesOptions<TMeta, TContext> = {
 	routes: Array<WebSocketRoute<TMeta>>;
 	routePrefix?: string;
 	createContext?: (
-		req: Request & { contract: Contract<TMeta> },
+		req: Request & { contract: RouteDeclaration<TMeta> },
 	) => TContext | Promise<TContext>;
 	buildRoutePath: (routePrefix: string | undefined, path: string) => string;
 	createPathMatcher: (
 		path: string,
 	) => (pathname: string) => Record<string, string> | null;
 	validateRequestSegments: (
-		contract: Contract,
+		contract: RouteDeclaration,
 		segments: {
 			body?: unknown;
 			query?: unknown;
@@ -77,7 +77,7 @@ const sendUpgradeError = (
 	socket.destroy();
 };
 
-const createContractWebSocket = <E extends WebSocketContract>(
+const createContractWebSocket = <E extends WebSocketRouteDeclaration>(
 	socket: WebSocket,
 	contract: E,
 ): ContractWebSocket<E> => {
@@ -185,7 +185,7 @@ export const registerWebSocketRoutes = <TMeta, TContext>({
 		}
 
 		const upgradeRequest = req as IncomingMessage & {
-			contract: Contract<TMeta>;
+			contract: RouteDeclaration<TMeta>;
 			validatedRequest: Record<string, unknown>;
 		};
 		upgradeRequest.contract = matchedRoute.route;
@@ -196,7 +196,7 @@ export const registerWebSocketRoutes = <TMeta, TContext>({
 			context =
 				(await createContext?.(
 					upgradeRequest as unknown as Request & {
-						contract: Contract<TMeta>;
+						contract: RouteDeclaration<TMeta>;
 					},
 				)) || {};
 		} catch (error) {

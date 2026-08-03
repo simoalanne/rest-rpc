@@ -1,8 +1,8 @@
 export type {
-	ContractModeMiddlewareOptions,
 	ContractWebSocket,
 	ImplementationInput,
 	RequestWithContract,
+	RouteModeMiddlewareOptions,
 	RouteImplementation,
 	WebSocketMessageResult,
 } from "./initServer.ts";

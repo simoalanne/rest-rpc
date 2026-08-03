@@ -1,11 +1,11 @@
 import type {
-	ContractTree,
-	FlattenedContract,
-	JsonContract,
+	Contract,
+	ContractRoute,
+	JsonRouteDeclaration,
 	ResponseBodySchema,
 } from "./contracts.ts";
 import {
-	flattenContractTree,
+	flattenContractRoutes,
 	isNoBodyResponse,
 	isStreamResponse,
 } from "./contracts.ts";
@@ -69,11 +69,11 @@ type SchemaConversionOptions = {
 };
 
 type OperationTransformContext<TMeta> = {
-	contract: OpenApiContract<TMeta>;
+	contract: OpenApiRouteDeclaration<TMeta>;
 	operation: OpenApiOperation;
 };
 
-type OpenApiContract<TMeta> = JsonContract<TMeta> & {
+type OpenApiRouteDeclaration<TMeta> = JsonRouteDeclaration<TMeta> & {
 	keySegments: string[];
 };
 
@@ -93,11 +93,11 @@ export type CreateOpenApiDocumentOptions<TMeta = unknown> = {
 const JSON_CONTENT_TYPE = "application/json";
 
 const isOpenApiContract = <TMeta>(
-	contract: FlattenedContract<TMeta>,
-): contract is OpenApiContract<TMeta> =>
-	(!contract.options || contract.options.mode === "json") &&
-	"responses" in contract &&
-	!Object.values(contract.responses).some((response) =>
+	route: ContractRoute<TMeta>,
+): route is OpenApiRouteDeclaration<TMeta> =>
+	(!route.options || route.options.mode === "json") &&
+	"responses" in route &&
+	!Object.values(route.responses).some((response) =>
 		isStreamResponse(response),
 	);
 
@@ -175,12 +175,12 @@ const createJsonResponse = (
 };
 
 const createResponses = (
-	contract: JsonContract,
+	route: JsonRouteDeclaration,
 	options: SchemaConversionOptions | undefined,
 ) => {
 	const responses: Record<string, OpenApiResponse> = {};
 
-	for (const [status, schema] of Object.entries(contract.responses)) {
+	for (const [status, schema] of Object.entries(route.responses)) {
 		responses[status] = createJsonResponse(
 			Number(status) >= 200 && Number(status) < 300 ? "Success" : "Error",
 			schema,
@@ -192,7 +192,7 @@ const createResponses = (
 };
 
 const createOperation = <TMeta>(
-	contract: OpenApiContract<TMeta>,
+	contract: OpenApiRouteDeclaration<TMeta>,
 	options: CreateOpenApiDocumentOptions<TMeta>,
 ): OpenApiOperation => {
 	const parameters = [
@@ -210,7 +210,7 @@ const createOperation = <TMeta>(
 };
 
 export const createOpenApiDocument = <TMeta = unknown>(
-	contracts: ContractTree<TMeta>,
+	contract: Contract<TMeta>,
 	options: CreateOpenApiDocumentOptions<TMeta>,
 ): OpenApiDocument => {
 	const document: OpenApiDocument = {
@@ -222,13 +222,13 @@ export const createOpenApiDocument = <TMeta = unknown>(
 		paths: {},
 	};
 
-	for (const contract of flattenContractTree<TMeta>(contracts)) {
-		if (!isOpenApiContract(contract)) continue;
+	for (const route of flattenContractRoutes<TMeta>(contract)) {
+		if (!isOpenApiContract(route)) continue;
 
-		const path = toOpenApiPath(contract.path);
-		const method = contract.method.toLowerCase() as keyof OpenApiPathItem;
+		const path = toOpenApiPath(route.path);
+		const method = route.method.toLowerCase() as keyof OpenApiPathItem;
 		document.paths[path] ??= {};
-		document.paths[path][method] = createOperation(contract, options);
+		document.paths[path][method] = createOperation(route, options);
 	}
 
 	return options.transformDocument?.(document) ?? document;

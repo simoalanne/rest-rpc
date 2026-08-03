@@ -11,10 +11,10 @@ import type {
 	Contract,
 	ContractNonSuccessfulResponse,
 	ContractSuccessfulResponse,
-	ContractTree,
-	WebSocketContract,
+	RouteDeclaration,
+	WebSocketRouteDeclaration,
 } from "@contract-first-api/core/contracts";
-import { mapContractTree } from "@contract-first-api/core/contracts";
+import { mapContractRoutes } from "@contract-first-api/core/contracts";
 import {
 	type QueryClient,
 	type QueryKey,
@@ -30,34 +30,34 @@ import {
 	useSuspenseQuery,
 } from "@tanstack/react-query";
 
-type QueryData<E extends Contract> = ContractSuccessfulResponse<E>;
+type QueryData<E extends RouteDeclaration> = ContractSuccessfulResponse<E>;
 
-export type ReactQueryApiError<E extends Contract> =
+export type ReactQueryApiError<E extends RouteDeclaration> =
 	| ContractNonSuccessfulResponse<E>
 	| UndeclaredClientResponse
 	| Error;
 
-type QueryOptionsFor<E extends Contract, TData = QueryData<E>> = Omit<
+type QueryOptionsFor<E extends RouteDeclaration, TData = QueryData<E>> = Omit<
 	UseQueryOptions<QueryData<E>, ReactQueryApiError<E>, TData>,
 	"queryKey" | "queryFn"
 >;
 
 type SuspenseQueryOptionsFor<
-	E extends Contract,
+	E extends RouteDeclaration,
 	TData = QueryData<E>,
 > = Omit<
 	UseSuspenseQueryOptions<QueryData<E>, ReactQueryApiError<E>, TData>,
 	"queryKey" | "queryFn"
 >;
 
-type MutationOptionsFor<E extends Contract> = Omit<
+type MutationOptionsFor<E extends RouteDeclaration> = Omit<
 	UseMutationOptions<QueryData<E>, ReactQueryApiError<E>, RequestInput<E>>,
 	"mutationFn"
 >;
 
 type QueryDisabled = false | null | undefined | "" | 0;
 
-type UseQueryArgs<E extends Contract, TData = QueryData<E>> =
+type UseQueryArgs<E extends RouteDeclaration, TData = QueryData<E>> =
 	ClientRequest<E> extends never
 		? [options?: QueryOptionsFor<E, TData>]
 		: [
@@ -65,19 +65,19 @@ type UseQueryArgs<E extends Contract, TData = QueryData<E>> =
 				options?: QueryOptionsFor<E, TData>,
 			];
 
-type UseSuspenseQueryArgs<E extends Contract, TData = QueryData<E>> =
+type UseSuspenseQueryArgs<E extends RouteDeclaration, TData = QueryData<E>> =
 	ClientRequest<E> extends never
 		? [options?: SuspenseQueryOptionsFor<E, TData>]
 		: [request: ClientRequest<E>, options?: SuspenseQueryOptionsFor<E, TData>];
 
-type SetDataArgs<E extends Contract> =
+type SetDataArgs<E extends RouteDeclaration> =
 	| [
 			request: ClientRequest<E>,
 			updater: Updater<QueryData<E> | undefined, QueryData<E> | undefined>,
 	  ]
 	| [updater: Updater<QueryData<E> | undefined, QueryData<E> | undefined>];
 
-type ReactQueryContractValue<E extends Contract> = {
+type ReactQueryRouteValue<E extends RouteDeclaration> = {
 	useMutation: (
 		options?: MutationOptionsFor<E>,
 	) => UseMutationResult<QueryData<E>, ReactQueryApiError<E>, RequestInput<E>>;
@@ -93,13 +93,13 @@ type ReactQueryContractValue<E extends Contract> = {
 	getKey: (request?: ClientRequest<E>) => QueryKey;
 };
 
-export type ReactQueryApiTree<T extends ContractTree> = T extends WebSocketContract
+export type ReactQueryApiFor<T extends Contract> = T extends WebSocketRouteDeclaration
 	? Record<never, never>
-	: T extends Contract
-		? ReactQueryContractValue<T>
+	: T extends RouteDeclaration
+		? ReactQueryRouteValue<T>
 		: {
-				[K in keyof T]: T[K] extends ContractTree
-					? ReactQueryApiTree<T[K]>
+				[K in keyof T]: T[K] extends Contract
+					? ReactQueryApiFor<T[K]>
 					: never;
 			};
 
@@ -107,23 +107,25 @@ export type ReactQueryClientOptions = ApiClientOptions & {
 	queryClient: QueryClient;
 };
 
-export type ReactQueryClient<TContracts extends ContractTree> =
-	ReactQueryApiTree<TContracts>;
+export type ReactQueryClient<TContract extends Contract> =
+	ReactQueryApiFor<TContract>;
 
 type RequestArgs = unknown[];
 
 const isSuccessStatus = (status: number) => status >= 200 && status < 300;
 
-const isWebSocketContract = (contract: Contract): contract is WebSocketContract =>
+const isWebSocketRoute = (
+	contract: RouteDeclaration,
+): contract is WebSocketRouteDeclaration =>
 	contract.options?.mode === "websocket";
 
-const takesRequestInput = (contract: Contract) =>
+const takesRequestInput = (contract: RouteDeclaration) =>
 	Boolean(contract.request) || contract.options?.mode === "raw";
 
-const readRequestArg = (contract: Contract, args: RequestArgs) =>
+const readRequestArg = (contract: RouteDeclaration, args: RequestArgs) =>
 	takesRequestInput(contract) ? args[0] : undefined;
 
-const readHookOptionsArg = (contract: Contract, args: RequestArgs) =>
+const readHookOptionsArg = (contract: RouteDeclaration, args: RequestArgs) =>
 	(takesRequestInput(contract) ? args[1] : args[0] || {}) as Record<
 		string,
 		unknown
@@ -157,7 +159,7 @@ const getQueryKey = (request: unknown, path: string[]) =>
 const getByPath = (tree: unknown, path: string[]) =>
 	path.reduce((node, key) => (node as Record<string, unknown>)[key], tree);
 
-const fetchQueryData = async <E extends Contract>(
+const fetchQueryData = async <E extends RouteDeclaration>(
 	fetchResponse: FetchResponseFn<E>,
 	contract: E,
 	request: unknown,
@@ -193,12 +195,12 @@ const fetchQueryData = async <E extends Contract>(
 	}
 };
 
-const wrapContractNode = <E extends Contract>(
+const wrapRouteNode = <E extends RouteDeclaration>(
 	contract: E,
 	fetchResponse: FetchResponseFn<E>,
 	path: string[],
 	queryClient: QueryClient,
-): ReactQueryContractValue<E> => {
+): ReactQueryRouteValue<E> => {
 	const getKey = (request?: unknown) => getQueryKey(request, path);
 
 	return {
@@ -254,24 +256,24 @@ const wrapContractNode = <E extends Contract>(
 	};
 };
 
-export const initReactQueryClient = <TContracts extends ContractTree>(
-	contracts: TContracts,
+export const initReactQueryClient = <TContract extends Contract>(
+	contract: TContract,
 	options: ReactQueryClientOptions,
-): ReactQueryClient<TContracts> => {
+): ReactQueryClient<TContract> => {
 	const { queryClient, ...clientOptions } = options;
-	const client = initClient(contracts, clientOptions);
+	const client = initClient(contract, clientOptions);
 
-	return mapContractTree(contracts, (contract, path) => {
-		if (isWebSocketContract(contract)) {
+	return mapContractRoutes(contract, (route, path) => {
+		if (isWebSocketRoute(route)) {
 			return {};
 		}
 
 		const apiNode = getByPath(client, path) as {
-			fetchResponse: FetchResponseFn<typeof contract>;
+			fetchResponse: FetchResponseFn<typeof route>;
 		};
 
-		return wrapContractNode(contract, apiNode.fetchResponse, path, queryClient);
-	}) as ReactQueryApiTree<TContracts>;
+		return wrapRouteNode(route, apiNode.fetchResponse, path, queryClient);
+	}) as ReactQueryApiFor<TContract>;
 };
 
 export default initReactQueryClient;

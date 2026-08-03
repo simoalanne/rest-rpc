@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import esmock from "esmock";
 
-const contracts = {
+const apiContract = {
 	items: {
 		list: {
 			method: "GET",
@@ -173,7 +173,7 @@ describe("initReactQueryClient", () => {
 
 		const initReactQueryClient = await getInitReactQueryClient();
 		const queryClient = createQueryClientMock();
-		const api = initReactQueryClient(contracts, {
+		const api = initReactQueryClient(apiContract, {
 			queryClient,
 			baseUrl: "http://localhost:3001/api",
 			timeoutMs: 1000,
@@ -181,7 +181,7 @@ describe("initReactQueryClient", () => {
 
 		assert.deepStrictEqual(initClientCalls, [
 			[
-				contracts,
+				apiContract,
 				{
 					baseUrl: "http://localhost:3001/api",
 					timeoutMs: 1000,
@@ -202,7 +202,7 @@ describe("initReactQueryClient", () => {
 		resetState();
 
 		const initReactQueryClient = await getInitReactQueryClient();
-		const api = initReactQueryClient(contracts, {
+		const api = initReactQueryClient(apiContract, {
 			queryClient: createQueryClientMock(),
 			baseUrl: "http://localhost:3001/api",
 		} as any);
@@ -233,7 +233,7 @@ describe("initReactQueryClient", () => {
 		resetState();
 
 		const initReactQueryClient = await getInitReactQueryClient();
-		const api = initReactQueryClient(contracts, {
+		const api = initReactQueryClient(apiContract, {
 			queryClient: createQueryClientMock(),
 			baseUrl: "http://localhost:3001/api",
 		} as any);
@@ -245,11 +245,11 @@ describe("initReactQueryClient", () => {
 		assert.deepStrictEqual(queryOptions.queryKey, ["items", "byId"]);
 	});
 
-	it("should treat the first argument as options for contracts without request input", async () => {
+	it("should treat the first argument as options for routes without request input", async () => {
 		resetState();
 
 		const initReactQueryClient = await getInitReactQueryClient();
-		const api = initReactQueryClient(contracts, {
+		const api = initReactQueryClient(apiContract, {
 			queryClient: createQueryClientMock(),
 			baseUrl: "http://localhost:3001/api",
 		} as any);
@@ -271,7 +271,7 @@ describe("initReactQueryClient", () => {
 		resetState();
 
 		const initReactQueryClient = await getInitReactQueryClient();
-		const api = initReactQueryClient(contracts, {
+		const api = initReactQueryClient(apiContract, {
 			queryClient: createQueryClientMock(),
 			baseUrl: "http://localhost:3001/api",
 		} as any);
@@ -297,7 +297,7 @@ describe("initReactQueryClient", () => {
 		resetState();
 
 		const initReactQueryClient = await getInitReactQueryClient();
-		const api = initReactQueryClient(contracts, {
+		const api = initReactQueryClient(apiContract, {
 			queryClient: createQueryClientMock(),
 			baseUrl: "http://localhost:3001/api",
 		} as any);
@@ -320,7 +320,7 @@ describe("initReactQueryClient", () => {
 		resetState();
 
 		const initReactQueryClient = await getInitReactQueryClient();
-		const api = initReactQueryClient(contracts, {
+		const api = initReactQueryClient(apiContract, {
 			queryClient: createQueryClientMock(),
 			baseUrl: "http://localhost:3001/api",
 		} as any);
@@ -340,11 +340,11 @@ describe("initReactQueryClient", () => {
 		]);
 	});
 
-	it("should expose cache helpers that use contract path keys", async () => {
+	it("should expose cache helpers that use contract key paths", async () => {
 		resetState();
 
 		const initReactQueryClient = await getInitReactQueryClient();
-		const api = initReactQueryClient(contracts, {
+		const api = initReactQueryClient(apiContract, {
 			queryClient: createQueryClientMock(),
 			baseUrl: "http://localhost:3001/api",
 		} as any);

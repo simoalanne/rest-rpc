@@ -11,7 +11,7 @@ export type ExampleContractMeta = {
 	auditLabel?: string;
 };
 
-const { defineContractTree } = initContracts<ExampleContractMeta>();
+const { defineContract } = initContracts<ExampleContractMeta>();
 
 export const todoSchema = z.object({
 	id: z.string(),
@@ -62,7 +62,7 @@ export const discussServerMessageSchema = z.discriminatedUnion("type", [
 	}),
 ]);
 
-export const healthContract = defineContractTree({
+export const healthContract = defineContract({
 	health: {
 		get: {
 			method: "GET",
@@ -80,7 +80,7 @@ export const healthContract = defineContractTree({
 	},
 });
 
-export const todoContracts = defineContractTree({
+export const todoContract = defineContract({
 	todos: {
 		list: {
 			method: "GET",
@@ -135,7 +135,7 @@ export const todoContracts = defineContractTree({
 	},
 });
 
-export const discussContracts = defineContractTree({
+export const discussContract = defineContract({
 	discuss: {
 		connect: {
 			method: "GET",
@@ -149,7 +149,7 @@ export const discussContracts = defineContractTree({
 	},
 });
 
-export const imageContracts = defineContractTree({
+export const imageContract = defineContract({
 	images: {
 		inspect: {
 			method: "POST",
@@ -165,23 +165,23 @@ export const imageContracts = defineContractTree({
 	},
 });
 
-export const allContracts = {
+export const apiContract = {
 	...healthContract,
-	...todoContracts,
-	...discussContracts,
-	...imageContracts,
+	...todoContract,
+	...discussContract,
+	...imageContract,
 };
 
-export type ExampleContracts = typeof allContracts;
-export type ApiPath = DotPaths<ExampleContracts>;
+export type ExampleContract = typeof apiContract;
+export type ApiPath = DotPaths<ExampleContract>;
 
 export type ApiRequest<P extends ApiPath> = ContractApiRequest<
-	ExampleContracts,
+	ExampleContract,
 	P
 >;
 
 export type ApiResponse<P extends ApiPath> = ContractApiResponse<
-	ExampleContracts,
+	ExampleContract,
 	P
 >;
 

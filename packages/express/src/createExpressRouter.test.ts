@@ -112,8 +112,8 @@ const createResponseDouble = () => {
 
 describe("initServer", () => {
 	it("should validate input, attach contract to req, create context, and call service", async () => {
-		const { defineContractTree } = initContracts();
-		const contracts = defineContractTree({
+		const { defineContract } = initContracts();
+		const apiContract = defineContract({
 			users: {
 				getById: {
 					method: "GET",
@@ -134,7 +134,7 @@ describe("initServer", () => {
 		});
 
 		const { createRouter, implementContract } = initServer<
-			typeof contracts,
+			typeof apiContract,
 			{ viewerId: string }
 		>();
 
@@ -142,7 +142,7 @@ describe("initServer", () => {
 		let contractPathInCreateContext: string | undefined;
 
 		const implementations = [
-			implementContract(contracts.users).handlers({
+			implementContract(apiContract.users).handlers({
 				async getById(request) {
 					seenRequest = request;
 					return {
@@ -161,7 +161,7 @@ describe("initServer", () => {
 
 		createRouter({
 			app: target.app,
-			contracts,
+			contract: apiContract,
 			implementations,
 			routePrefix: "/api",
 			createContext: (req) => {
@@ -210,9 +210,9 @@ describe("initServer", () => {
 		});
 	});
 
-	it("should write stream contracts as ndjson chunks", async () => {
-		const { defineContractTree } = initContracts();
-		const contracts = defineContractTree({
+	it("should write streaming routes as ndjson chunks", async () => {
+		const { defineContract } = initContracts();
+		const apiContract = defineContract({
 			events: {
 				stream: {
 					method: "GET",
@@ -229,9 +229,9 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, implementContract } = initServer<typeof contracts>();
+		const { createRouter, implementContract } = initServer<typeof apiContract>();
 		const implementations = [
-			implementContract(contracts.events).handlers({
+			implementContract(apiContract.events).handlers({
 				stream() {
 					return (async function* () {
 						yield { type: "joined", payload: "Ada" };
@@ -244,7 +244,7 @@ describe("initServer", () => {
 		const target = createRouteTargetDouble();
 		createRouter({
 			app: target.app,
-			contracts,
+			contract: apiContract,
 			implementations,
 		});
 
@@ -278,8 +278,8 @@ describe("initServer", () => {
 	});
 
 	it("should return validation errors as JSON and skip service work", async () => {
-		const { defineContractTree } = initContracts();
-		const contracts = defineContractTree({
+		const { defineContract } = initContracts();
+		const apiContract = defineContract({
 			posts: {
 				create: {
 					method: "POST",
@@ -298,12 +298,12 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, implementContract } = initServer<typeof contracts>();
+		const { createRouter, implementContract } = initServer<typeof apiContract>();
 		let createContextCalled = false;
 		let serviceCalled = false;
 
 		const implementations = [
-			implementContract(contracts.posts).handlers({
+			implementContract(apiContract.posts).handlers({
 				async create() {
 					serviceCalled = true;
 					return {
@@ -318,7 +318,7 @@ describe("initServer", () => {
 
 		createRouter({
 			app: target.app,
-			contracts,
+			contract: apiContract,
 			implementations,
 			createContext: () => {
 				createContextCalled = true;
@@ -366,8 +366,8 @@ describe("initServer", () => {
 			requiresAuth?: boolean;
 		};
 
-		const { defineContractTree } = initContracts<ContractMeta>();
-		const contracts = defineContractTree({
+		const { defineContract } = initContracts<ContractMeta>();
+		const apiContract = defineContract({
 			posts: {
 				create: {
 					method: "POST",
@@ -392,7 +392,7 @@ describe("initServer", () => {
 		});
 
 		const { createRouter, defineMiddleware, implementContract } = initServer<
-			typeof contracts,
+			typeof apiContract,
 			{ viewerId: string }
 		>();
 
@@ -414,7 +414,7 @@ describe("initServer", () => {
 		});
 
 		const implementations = [
-			implementContract(contracts.posts).handlers({
+			implementContract(apiContract.posts).handlers({
 				create({ title, context }) {
 					seen.viewerIdInService = context.viewerId;
 					return {
@@ -433,7 +433,7 @@ describe("initServer", () => {
 
 		createRouter({
 			app: target.app,
-			contracts,
+			contract: apiContract,
 			implementations,
 			middlewares: [authMiddleware],
 			createContext: (req) => {
@@ -483,8 +483,8 @@ describe("initServer", () => {
 	});
 
 	it("should return 204 for routes without response schemas", async () => {
-		const { defineContractTree } = initContracts();
-		const contracts = defineContractTree({
+		const { defineContract } = initContracts();
+		const apiContract = defineContract({
 			posts: {
 				delete: {
 					method: "DELETE",
@@ -499,14 +499,14 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, implementContract } = initServer<typeof contracts>();
+		const { createRouter, implementContract } = initServer<typeof apiContract>();
 		const target = createRouteTargetDouble();
 
 		createRouter({
 			app: target.app,
-			contracts,
+			contract: apiContract,
 			implementations: [
-				implementContract(contracts.posts).handlers({
+				implementContract(apiContract.posts).handlers({
 					delete() {
 						return {
 							status: 204,
@@ -544,8 +544,8 @@ describe("initServer", () => {
 	});
 
 	it("should use declared success status codes", async () => {
-		const { defineContractTree } = initContracts();
-		const contracts = defineContractTree({
+		const { defineContract } = initContracts();
+		const apiContract = defineContract({
 			posts: {
 				create: {
 					method: "POST",
@@ -557,14 +557,14 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, implementContract } = initServer<typeof contracts>();
+		const { createRouter, implementContract } = initServer<typeof apiContract>();
 		const target = createRouteTargetDouble();
 
 		createRouter({
 			app: target.app,
-			contracts,
+			contract: apiContract,
 			implementations: [
-				implementContract(contracts.posts).handlers({
+				implementContract(apiContract.posts).handlers({
 					create() {
 						return {
 							status: 202,
@@ -594,8 +594,8 @@ describe("initServer", () => {
 	});
 
 	it("should pass service errors to the next error handler", async () => {
-		const { defineContractTree } = initContracts();
-		const contracts = defineContractTree({
+		const { defineContract } = initContracts();
+		const apiContract = defineContract({
 			health: {
 				method: "GET",
 				path: "/health",
@@ -605,16 +605,16 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, implementContract } = initServer<typeof contracts>();
+		const { createRouter, implementContract } = initServer<typeof apiContract>();
 		const serviceError = new Error("boom");
 
 		const target = createRouteTargetDouble();
 
 		createRouter({
 			app: target.app,
-			contracts,
+			contract: apiContract,
 			implementations: [
-				implementContract(contracts.health).handler(async () => {
+				implementContract(apiContract.health).handler(async () => {
 					throw serviceError;
 				}),
 			],
@@ -634,9 +634,9 @@ describe("initServer", () => {
 		assert.equal(response.read().jsonBody, undefined);
 	});
 
-	it("should return non-success contract responses as flat JSON", async () => {
-		const { defineContractTree } = initContracts();
-		const contracts = defineContractTree({
+	it("should return non-success route responses as flat JSON", async () => {
+		const { defineContract } = initContracts();
+		const apiContract = defineContract({
 			todos: {
 				create: {
 					method: "POST",
@@ -654,14 +654,14 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, implementContract } = initServer<typeof contracts>();
+		const { createRouter, implementContract } = initServer<typeof apiContract>();
 		const target = createRouteTargetDouble();
 		const knownError = { code: "TITLE_ALREADY_EXISTS" };
 		createRouter({
 			app: target.app,
-			contracts,
+			contract: apiContract,
 			implementations: [
-				implementContract(contracts.todos).handlers({
+				implementContract(apiContract.todos).handlers({
 					create() {
 						return {
 							status: 409,
@@ -698,9 +698,9 @@ describe("initServer", () => {
 		});
 	});
 
-	it("should not run nonRaw middleware for raw request contracts", async () => {
-		const { defineContractTree } = initContracts();
-		const contracts = defineContractTree({
+	it("should not run nonRaw middleware for raw request routes", async () => {
+		const { defineContract } = initContracts();
+		const apiContract = defineContract({
 			uploads: {
 				create: {
 					method: "POST",
@@ -716,10 +716,10 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createContractModeMiddleware } = initServer<typeof contracts>();
+		const { createRouteModeMiddleware } = initServer<typeof apiContract>();
 		let middlewareCalls = 0;
-		const wrappedMiddleware = createContractModeMiddleware({
-			contracts,
+		const wrappedMiddleware = createRouteModeMiddleware({
+			contract: apiContract,
 			nonRaw: (req, _res, next) => {
 				middlewareCalls += 1;
 				(req as typeof req & { parsedByJson?: boolean }).parsedByJson = true;
@@ -744,9 +744,9 @@ describe("initServer", () => {
 		assert.equal(middlewareCalls, 0);
 	});
 
-	it("should run nonRaw middleware for non-raw contracts", async () => {
-		const { defineContractTree } = initContracts();
-		const contracts = defineContractTree({
+	it("should run nonRaw middleware for non-raw routes", async () => {
+		const { defineContract } = initContracts();
+		const apiContract = defineContract({
 			posts: {
 				create: {
 					method: "POST",
@@ -761,10 +761,10 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createContractModeMiddleware } = initServer<typeof contracts>();
+		const { createRouteModeMiddleware } = initServer<typeof apiContract>();
 		let middlewareCalls = 0;
-		const wrappedMiddleware = createContractModeMiddleware({
-			contracts,
+		const wrappedMiddleware = createRouteModeMiddleware({
+			contract: apiContract,
 			nonRaw: (_req, _res, next) => {
 				middlewareCalls += 1;
 				next();
@@ -787,9 +787,9 @@ describe("initServer", () => {
 		assert.equal(middlewareCalls, 1);
 	});
 
-	it("should route requests to raw and non-raw middlewares based on contract mode", async () => {
-		const { defineContractTree } = initContracts();
-		const contracts = defineContractTree({
+	it("should route requests to raw and non-raw middlewares based on route mode", async () => {
+		const { defineContract } = initContracts();
+		const apiContract = defineContract({
 			uploads: {
 				create: {
 					method: "POST",
@@ -814,10 +814,10 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createContractModeMiddleware } = initServer<typeof contracts>();
+		const { createRouteModeMiddleware } = initServer<typeof apiContract>();
 		const seenCalls: string[] = [];
-		const middleware = createContractModeMiddleware({
-			contracts,
+		const middleware = createRouteModeMiddleware({
+			contract: apiContract,
 			raw: (_req, _res, next) => {
 				seenCalls.push("raw");
 				next();
@@ -849,9 +849,9 @@ describe("initServer", () => {
 		assert.deepStrictEqual(seenCalls, ["raw", "nonRaw"]);
 	});
 
-	it("should prefer the most specific matching contract when selecting middleware", async () => {
-		const { defineContractTree } = initContracts();
-		const contracts = defineContractTree({
+	it("should prefer the most specific matching route when selecting middleware", async () => {
+		const { defineContract } = initContracts();
+		const apiContract = defineContract({
 			uploads: {
 				byId: {
 					method: "POST",
@@ -874,10 +874,10 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createContractModeMiddleware } = initServer<typeof contracts>();
+		const { createRouteModeMiddleware } = initServer<typeof apiContract>();
 		const seenCalls: string[] = [];
-		const middleware = createContractModeMiddleware({
-			contracts,
+		const middleware = createRouteModeMiddleware({
+			contract: apiContract,
 			raw: (_req, _res, next) => {
 				seenCalls.push("raw");
 				next();
@@ -901,9 +901,9 @@ describe("initServer", () => {
 		assert.deepStrictEqual(seenCalls, ["nonRaw"]);
 	});
 
-	it("should skip both middlewares when the request does not match a contract route", async () => {
-		const { defineContractTree } = initContracts();
-		const contracts = defineContractTree({
+	it("should skip both middlewares when the request does not match a route", async () => {
+		const { defineContract } = initContracts();
+		const apiContract = defineContract({
 			posts: {
 				create: {
 					method: "POST",
@@ -918,10 +918,10 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createContractModeMiddleware } = initServer<typeof contracts>();
+		const { createRouteModeMiddleware } = initServer<typeof apiContract>();
 		const seenCalls: string[] = [];
-		const middleware = createContractModeMiddleware({
-			contracts,
+		const middleware = createRouteModeMiddleware({
+			contract: apiContract,
 			raw: (_req, _res, next) => {
 				seenCalls.push("raw");
 				next();

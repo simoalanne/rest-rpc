@@ -5,8 +5,8 @@ import z from "zod";
 import { createOpenApiDocument } from "./openapi.ts";
 
 describe("createOpenApiDocument", () => {
-	it("maps contracts to OpenAPI paths, operations and schemas", () => {
-		const contracts = {
+	it("maps an API contract to OpenAPI paths, operations and schemas", () => {
+		const apiContract = {
 			todos: {
 				update: {
 					path: "/todos/:id",
@@ -54,7 +54,7 @@ describe("createOpenApiDocument", () => {
 			},
 		} as const;
 
-		const document = createOpenApiDocument(contracts, {
+		const document = createOpenApiDocument(apiContract, {
 			info: {
 				title: "Todo API",
 				version: "1.0.0",

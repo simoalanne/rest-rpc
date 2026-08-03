@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import type { ContractWebSocket } from "@contract-first-api/express";
 import { initServer } from "@contract-first-api/express";
 import type { DiscussMessage, Todo } from "@example/shared";
-import { allContracts } from "@example/shared";
+import { apiContract } from "@example/shared";
 import express from "express";
 
 type RequestContext = {
@@ -89,7 +89,7 @@ const todos: Todo[] = [
 	},
 ];
 
-type DiscussSocket = ContractWebSocket<typeof allContracts.discuss.connect>;
+type DiscussSocket = ContractWebSocket<typeof apiContract.discuss.connect>;
 
 const discussMessages: DiscussMessage[] = [
 	{
@@ -110,11 +110,11 @@ const broadcastDiscussMessage = (message: DiscussMessage) => {
 	}
 };
 
-const serverTools = initServer<typeof allContracts, RequestContext>();
+const serverTools = initServer<typeof apiContract, RequestContext>();
 const {
 	implementContract,
 	defineMiddleware,
-	createContractModeMiddleware,
+	createRouteModeMiddleware,
 	createRouter,
 } = serverTools;
 
@@ -147,7 +147,7 @@ const regularMiddleware = (
 };
 
 const implementations = [
-	implementContract(allContracts.health).handlers({
+	implementContract(apiContract.health).handlers({
 		async get({ context }) {
 			await sleep(900);
 			return {
@@ -159,7 +159,7 @@ const implementations = [
 			};
 		},
 	}),
-	implementContract(allContracts.todos).handlers({
+	implementContract(apiContract.todos).handlers({
 		list() {
 			return {
 				status: 200,
@@ -226,7 +226,7 @@ const implementations = [
 			};
 		},
 	}),
-	implementContract(allContracts.images).handlers({
+	implementContract(apiContract.images).handlers({
 		inspect({ rawBody }) {
 			if (!Buffer.isBuffer(rawBody)) {
 				throw new Error(
@@ -240,7 +240,7 @@ const implementations = [
 			};
 		},
 	}),
-	implementContract(allContracts.discuss).handlers({
+	implementContract(apiContract.discuss).handlers({
 		connect({ socket }) {
 			discussSockets.add(socket);
 			socket.send({
@@ -270,8 +270,8 @@ const implementations = [
 ];
 
 app.use(
-	createContractModeMiddleware({
-		contracts: allContracts,
+	createRouteModeMiddleware({
+		contract: apiContract,
 		nonRaw: express.json(),
 		raw: express.raw({
 			type: ["image/png", "image/jpeg", "image/gif"],
@@ -296,7 +296,7 @@ app.use((req, res, next) => {
 createRouter({
 	app,
 	server,
-	contracts: allContracts,
+	contract: apiContract,
 	implementations,
 	routePrefix: "/api",
 	middlewares: [middleware, regularMiddleware],

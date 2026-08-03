@@ -1,11 +1,11 @@
 # @contract-first-api/express
 
-Mount a shared contract tree on an Express app with request validation, typed
+Mount a shared API contract on an Express app with request validation, typed
 service handlers, middleware hooks, typed request context, streaming responses,
-and websocket routes.
+and WebSocket routes.
 
-This package consumes contracts from `@contract-first-api/core`; it does not
-define contracts itself.
+This package consumes the API contract from `@contract-first-api/core`; it does
+not define the contract itself.
 
 ## Install
 
@@ -13,7 +13,7 @@ define contracts itself.
 pnpm add @contract-first-api/express express
 ```
 
-If your contract tree includes websocket routes, also install `ws` and its
+If your API contract includes WebSocket routes, also install `ws` and its
 types:
 
 ```bash
@@ -24,13 +24,13 @@ pnpm add -D @types/ws
 ## Basic Setup
 
 Start by calling `initServer()` to get helper functions. Add middlewares with
-`defineMiddleware()`, implement contract groups or single contracts with
-`implementContract()`, then call `createRouter()` to register those
+`defineMiddleware()`, implement contract fragments or single route declarations
+with `implementContract()`, then call `createRouter()` to register those
 implementations.
 
 ```ts
 import { initServer } from "@contract-first-api/express";
-import { contracts } from "@example/shared";
+import { apiContract } from "@example/shared";
 import express from "express";
 
 type RequestContext = {
@@ -41,7 +41,7 @@ const app = express();
 app.use(express.json());
 
 const { createRouter, defineMiddleware, implementContract } = initServer<
-	typeof contracts,
+	typeof apiContract,
 	RequestContext
 >();
 
@@ -69,7 +69,7 @@ const authMiddleware = defineMiddleware((req, res, next) => {
 	next();
 });
 
-const todoImplementations = implementContract(contracts.todos).handlers({
+const todoImplementations = implementContract(apiContract.todos).handlers({
 	async list() {
 		return {
 			status: 200,
@@ -90,7 +90,7 @@ const todoImplementations = implementContract(contracts.todos).handlers({
 
 createRouter({
 	app,
-	contracts,
+	contract: apiContract,
 	implementations: [todoImplementations],
 	routePrefix: "/api",
 	middlewares: [authMiddleware],
@@ -113,12 +113,12 @@ return {
 };
 ```
 
-The `status` must be one of the contract's `responses` keys, and `body` must
+The `status` must be one of the route declaration's `responses` keys, and `body` must
 match the schema declared for that status. Non-2xx responses are normal typed
 responses:
 
 ```ts
-const createTodoImplementation = implementContract(contracts.todos.create).handler(
+const createTodoImplementation = implementContract(apiContract.todos.create).handler(
 	({ title }) => {
 		if (todoExists(title)) {
 			return {
@@ -149,11 +149,11 @@ return {
 Unexpected service errors are not swallowed; they continue to the Express
 global error handler.
 
-When a contract declares exactly one successful status, the handler may return
-that successful body directly:
+When a route declaration declares exactly one successful status, the handler may
+return that successful body directly:
 
 ```ts
-const todoImplementations = implementContract(contracts.todos).handlers({
+const todoImplementations = implementContract(apiContract.todos).handlers({
 	async list() {
 		return {
 			items: await getTodos(),
@@ -164,7 +164,7 @@ const todoImplementations = implementContract(contracts.todos).handlers({
 
 ## Request Flow
 
-For each contract route:
+For each route declaration:
 
 1. request validation runs first
 2. custom middlewares run after validation
@@ -184,7 +184,7 @@ Handlers receive one flattened request object:
 - `context`
 
 ```ts
-const todoImplementations = implementContract(contracts.todos).handlers({
+const todoImplementations = implementContract(apiContract.todos).handlers({
 	async get({ id, includeCompleted, context }) {
 		const todo = await loadTodo({
 			id,
@@ -200,18 +200,19 @@ const todoImplementations = implementContract(contracts.todos).handlers({
 });
 ```
 
-Request field names must be unique across locations in a single contract.
+Request field names must be unique across locations in a single route
+declaration.
 
 ## Raw Body Handling
 
-If the contract tree mixes raw and non-raw routes, prefer
-`createContractModeMiddleware()` so parsing is chosen from the contract tree
+If the API contract mixes raw and non-raw routes, prefer
+`createRouteModeMiddleware()` so parsing is chosen from the API contract
 instead of hardcoded route paths.
 
 ```ts
 app.use(
-	createContractModeMiddleware({
-		contracts,
+	createRouteModeMiddleware({
+		contract: apiContract,
 		routePrefix: "/api",
 		nonRaw: express.json(),
 		raw: express.raw({
@@ -225,7 +226,7 @@ Raw service handlers receive `rawBody` in addition to typed params, query, and
 context:
 
 ```ts
-const imageImplementations = implementContract(contracts.images).handlers({
+const imageImplementations = implementContract(apiContract.images).handlers({
 	inspect({ rawBody }) {
 		return {
 			status: 200,
@@ -264,12 +265,12 @@ For middleware declared outside `defineMiddleware()`, the package exports
 
 ## Streaming Responses
 
-Streaming responses are declared with `stream(schema)` in the contract. Service
-handlers can return the async iterable directly when the contract has one
-successful status.
+Streaming responses are declared with `stream(schema)` in the route declaration.
+Service handlers can return the async iterable directly when the route
+declaration has one successful status.
 
 ```ts
-const todoImplementations = implementContract(contracts.todos).handlers({
+const todoImplementations = implementContract(apiContract.todos).handlers({
 	events() {
 		return readTodoEvents();
 	},
@@ -281,22 +282,22 @@ The route writes each yielded value as NDJSON with
 
 ## WebSocket Routes
 
-For contracts with `options: { mode: "websocket" }`, `createRouter()` registers
-an upgrade handler on the provided HTTP server. The `server` option is required
-when websocket contracts are present.
+For routes with `options: { mode: "websocket" }`, `createRouter()` registers an
+upgrade handler on the provided HTTP server. The `server` option is required
+when WebSocket routes are present.
 
 ```ts
 import { initServer } from "@contract-first-api/express";
-import { contracts } from "@example/shared";
+import { apiContract } from "@example/shared";
 import express from "express";
 import { createServer } from "node:http";
 
 const app = express();
 const server = createServer(app);
 
-const { createRouter, implementContract } = initServer<typeof contracts>();
+const { createRouter, implementContract } = initServer<typeof apiContract>();
 
-const discussImplementations = implementContract(contracts.discuss).handlers({
+const discussImplementations = implementContract(apiContract.discuss).handlers({
 	connect({ socket }) {
 		socket.send({
 			type: "history",
@@ -317,7 +318,7 @@ const discussImplementations = implementContract(contracts.discuss).handlers({
 createRouter({
 	app,
 	server,
-	contracts,
+	contract: apiContract,
 	implementations: [discussImplementations],
 	routePrefix: "/api",
 });
@@ -330,29 +331,29 @@ The library does not decide what that means for your application.
 
 ## Route Registration
 
-`createRouter()` registers one Express route for every non-websocket contract
-leaf. WebSocket contracts are registered on the underlying HTTP server's
+`createRouter()` registers one Express route for every non-WebSocket route
+declaration. WebSocket routes are registered on the underlying HTTP server's
 upgrade event.
 
 ```ts
 createRouter({
 	app,
-	contracts,
+	contract: apiContract,
 	implementations,
 	routePrefix: "/api",
 });
 ```
 
-The registered path is `routePrefix + contract.path`. Static routes are ordered
+The registered path is `routePrefix + route.path`. Static routes are ordered
 before parameter routes when paths overlap.
 
 ## How It Connects
 
-- Define contracts with `@contract-first-api/core`.
-- Import the same contracts into your backend.
-- Register them with `initServer()` and `createRouter()`.
+- Define `apiContract` with `@contract-first-api/core`.
+- Import the same contract into your backend.
+- Register it with `initServer()` and `createRouter()`.
 - Use `initClient()` from `@contract-first-api/core` on the frontend with the
-  same contract tree and matching `baseUrl`.
+  same API contract and matching `baseUrl`.
 
 This package stays on the server side. The core client, React Query adapter,
-and core OpenAPI generator are optional consumers of the same contracts.
+and core OpenAPI generator are optional consumers of the same contract.

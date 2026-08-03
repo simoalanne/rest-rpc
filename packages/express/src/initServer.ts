@@ -5,15 +5,15 @@ import {
 	type ContractRequest,
 	type ContractResponse,
 	type ContractSingleSuccessfulResponseBody,
-	type ContractTree,
-	flattenContractTree,
+	type RouteDeclaration,
+	flattenContractRoutes,
 	type HttpMethod,
 	isNoBodyResponse,
 	isStreamResponse,
 	type RawRequestBody,
-	type RawRequestContract,
+	type RawRequestRouteDeclaration,
 	type ResponseBodySchema,
-	type WebSocketContract,
+	type WebSocketRouteDeclaration,
 } from "@contract-first-api/core/contracts";
 import type {
 	Application,
@@ -32,7 +32,7 @@ declare global {
 	namespace Express {
 		interface Request {
 			validatedRequest: Record<string, unknown>;
-			contract: Contract;
+			contract: RouteDeclaration;
 		}
 	}
 }
@@ -47,41 +47,45 @@ type ContextValue<TContext> = {
 	context: TContext;
 };
 
-type RequestValue<E extends Contract> =
+type RequestValue<E extends RouteDeclaration> =
 	ContractRequest<E> extends never ? EmptyObject : ContractRequest<E>;
 
 export type { ContractWebSocket, WebSocketMessageResult };
 
 export type RequestWithContract<TMeta = unknown> = Omit<Request, "contract"> & {
-	contract: Contract<TMeta>;
+	contract: RouteDeclaration<TMeta>;
 };
 
-type HandlerResult<E extends Contract> = E extends WebSocketContract
+type HandlerResult<E extends RouteDeclaration> =
+	E extends WebSocketRouteDeclaration
 	? MaybePromise<void>
 	: MaybePromise<ContractResponse<E> | ContractSingleSuccessfulResponseBody<E>>;
 
 export type ServiceRequest<
-	E extends Contract,
+	E extends RouteDeclaration,
 	TContext = EmptyObject,
-> = E extends WebSocketContract
+> = E extends WebSocketRouteDeclaration
 	? Merge<
 			RequestValue<E> &
 				ContextValue<TContext> & { socket: ContractWebSocket<E> }
 		>
-	: E extends RawRequestContract
+	: E extends RawRequestRouteDeclaration
 		? Merge<
 				RequestValue<E> & ContextValue<TContext> & { rawBody: RawRequestBody }
 			>
 		: Merge<RequestValue<E> & ContextValue<TContext>>;
 
-export type ServiceResponse<E extends Contract> = ContractResponse<E>;
+export type ServiceResponse<E extends RouteDeclaration> = ContractResponse<E>;
 
-export type ServiceHandler<E extends Contract, TContext = EmptyObject> = (
+export type ServiceHandler<
+	E extends RouteDeclaration,
+	TContext = EmptyObject,
+> = (
 	...args: [request: ServiceRequest<E, TContext>]
 ) => HandlerResult<E>;
 
 export type RouteImplementation = {
-	contract: Contract;
+	contract: RouteDeclaration;
 	handler: (request: unknown) => unknown | Promise<unknown>;
 };
 
@@ -90,20 +94,22 @@ export type ImplementationInput = readonly (
 	| readonly RouteImplementation[]
 )[];
 
-type ImplementationTree<
-	T extends ContractTree,
+type ImplementationShape<
+	T extends Contract,
 	TContext = EmptyObject,
 > = T extends Contract
-	? ServiceHandler<T, TContext>
-	: {
-			[K in keyof T]: T[K] extends ContractTree
-				? ImplementationTree<T[K], TContext>
-				: never;
-		};
+	? T extends RouteDeclaration
+		? ServiceHandler<T, TContext>
+		: {
+				[K in keyof T]: T[K] extends Contract
+					? ImplementationShape<T[K], TContext>
+					: never;
+			}
+	: never;
 
-type ImplementContract<TContext = EmptyObject> = <TNode extends ContractTree>(
+type ImplementContract<TContext = EmptyObject> = <TNode extends Contract>(
 	contract: TNode,
-) => TNode extends Contract
+) => TNode extends RouteDeclaration
 	? {
 			handler: (
 				handler: ServiceHandler<TNode, TContext>,
@@ -111,7 +117,7 @@ type ImplementContract<TContext = EmptyObject> = <TNode extends ContractTree>(
 		}
 	: {
 			handlers: (
-				handlers: ImplementationTree<TNode, TContext>,
+				handlers: ImplementationShape<TNode, TContext>,
 			) => RouteImplementation[];
 		};
 
@@ -142,38 +148,38 @@ export type ValidationResult =
 	| { success: false; errors: ValidationIssue[] };
 
 export type CreateRouterOptions<
-	TContracts extends ContractTree = ContractTree,
+	TContract extends Contract = Contract,
 	TContext = EmptyObject,
-	TMeta = ContractMetaOf<TContracts>,
+	TMeta = ContractMetaOf<TContract>,
 > = {
 	app: Application;
 	server?: HttpServer;
-	contracts?: TContracts;
+	contract?: TContract;
 	implementations: ImplementationInput;
 	middlewares?: (MiddlewareFunction | MiddlewareFunction<TMeta>)[];
 	routePrefix?: string;
 	createContext?: (
-		req: Request & { contract: Contract<TMeta> },
+		req: Request & { contract: RouteDeclaration<TMeta> },
 	) => TContext | Promise<TContext>;
 };
 
 export type ServerTools<
-	TContracts extends ContractTree = ContractTree,
+	TContract extends Contract = Contract,
 	TContext = EmptyObject,
-	TMeta = ContractMetaOf<TContracts>,
+	TMeta = ContractMetaOf<TContract>,
 > = {
 	implementContract: ImplementContract<TContext>;
 	defineMiddleware: DefineMiddleware<TMeta>;
-	createContractModeMiddleware: (
-		options: ContractModeMiddlewareOptions & { contracts: TContracts },
+	createRouteModeMiddleware: (
+		options: RouteModeMiddlewareOptions & { contract: TContract },
 	) => RequestHandler;
 	createRouter: (
-		options: CreateRouterOptions<TContracts, TContext, TMeta>,
+		options: CreateRouterOptions<TContract, TContext, TMeta>,
 	) => Application;
 };
 
-export type ContractModeMiddlewareOptions = {
-	contracts: ContractTree;
+export type RouteModeMiddlewareOptions = {
+	contract: Contract;
 	routePrefix?: string;
 	raw?: RequestHandler;
 	nonRaw?: RequestHandler;
@@ -198,7 +204,10 @@ class KnownContractError extends Error {
 const splitPath = (path: string) => path.split("/").filter(Boolean);
 const isParamSegment = (segment: string) => segment.startsWith(":");
 
-const compareRouteSpecificity = (left: Contract, right: Contract) => {
+const compareRouteSpecificity = (
+	left: RouteDeclaration,
+	right: RouteDeclaration,
+) => {
 	const leftSegments = splitPath(left.path);
 	const rightSegments = splitPath(right.path);
 	const maxLength = Math.max(leftSegments.length, rightSegments.length);
@@ -234,7 +243,7 @@ const resolveHandlerAtPath = <THandler extends (...args: unknown[]) => unknown>(
 	for (const segment of keySegments) {
 		if (!current || typeof current !== "object") {
 			throw new Error(
-				`Invalid service tree while resolving "${keySegments.join(".")}"`,
+				`Invalid implementation while resolving "${keySegments.join(".")}"`,
 			);
 		}
 
@@ -262,7 +271,8 @@ const resolveHandlerAtPath = <THandler extends (...args: unknown[]) => unknown>(
 };
 
 const prepareRequest =
-	(contract: Contract) => (req: Request, res: Response, next: NextFunction) => {
+	(contract: RouteDeclaration) =>
+	(req: Request, res: Response, next: NextFunction) => {
 		req.contract = contract;
 		req.validatedRequest = {};
 		const result = validateRequestSegments(contract, {
@@ -285,7 +295,7 @@ const prepareRequest =
 	};
 
 const validateRequestSegments = (
-	contract: Contract,
+	contract: RouteDeclaration,
 	segments: {
 		body?: unknown;
 		query?: unknown;
@@ -348,13 +358,14 @@ const validateRequestSegments = (
 	};
 };
 
-const isWebSocketContract = (
-	contract: Contract,
-): contract is WebSocketContract => contract.options?.mode === "websocket";
+const isWebSocketRoute = (
+	contract: RouteDeclaration,
+): contract is WebSocketRouteDeclaration =>
+	contract.options?.mode === "websocket";
 
-const isRawRequestContract = (
-	contract: Contract,
-): contract is RawRequestContract => contract.options?.mode === "raw";
+const isRawRequestRoute = (
+	contract: RouteDeclaration,
+): contract is RawRequestRouteDeclaration => contract.options?.mode === "raw";
 
 const escapeRegExp = (value: string) =>
 	value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -396,23 +407,23 @@ const buildRoutePath = (routePrefix: string | undefined, path: string) => {
 	return `${normalizedPrefix}${path}`;
 };
 
-type ResolvedContractRoute<TMeta = unknown> = Contract<TMeta> & {
+type ResolvedContractRoute<TMeta = unknown> = RouteDeclaration<TMeta> & {
 	keySegments: string[];
 	matchPath: ReturnType<typeof createPathMatcher>;
 	routePath: string;
 };
 
-type ResolvedImplementationRoute<TMeta = unknown> = Contract<TMeta> & {
+type ResolvedImplementationRoute<TMeta = unknown> = RouteDeclaration<TMeta> & {
 	matchPath: ReturnType<typeof createPathMatcher>;
 	routePath: string;
 	handler: unknown;
 };
 
 const resolveContractRoutes = <TMeta = unknown>(
-	contracts: ContractTree<TMeta>,
+	contract: Contract<TMeta>,
 	routePrefix?: string,
 ) =>
-	flattenContractTree(contracts)
+	flattenContractRoutes(contract)
 		.sort(compareRouteSpecificity)
 		.map((route) => {
 			const routePath = buildRoutePath(routePrefix, route.path);
@@ -423,10 +434,10 @@ const resolveContractRoutes = <TMeta = unknown>(
 			};
 		}) as Array<ResolvedContractRoute<TMeta>>;
 
-const createContractModeMiddleware = <TContracts extends ContractTree>(
-	options: ContractModeMiddlewareOptions & { contracts: TContracts },
+const createRouteModeMiddleware = <TContract extends Contract>(
+	options: RouteModeMiddlewareOptions & { contract: TContract },
 ): RequestHandler => {
-	const routes = resolveContractRoutes(options.contracts, options.routePrefix);
+	const routes = resolveContractRoutes(options.contract, options.routePrefix);
 
 	return (req, res, next) => {
 		const pathname = req.path;
@@ -435,7 +446,7 @@ const createContractModeMiddleware = <TContracts extends ContractTree>(
 				route.method === req.method && route.matchPath(pathname) !== null,
 		);
 		const middleware = matchedRoute
-			? isRawRequestContract(matchedRoute)
+			? isRawRequestRoute(matchedRoute)
 				? options.raw
 				: options.nonRaw
 			: null;
@@ -449,13 +460,13 @@ const createContractModeMiddleware = <TContracts extends ContractTree>(
 	};
 };
 
-const implementContract = ((contract: ContractTree) => ({
+const implementContract = ((contract: Contract) => ({
 	handler: (handler: RouteImplementation["handler"]) => ({
 		contract,
 		handler,
 	}),
 	handlers: (handlers: unknown) =>
-		flattenContractTree(contract).map((route) => ({
+		flattenContractRoutes(contract).map((route) => ({
 			contract: route,
 			handler: resolveHandlerAtPath(handlers, route.keySegments),
 		})),
@@ -477,7 +488,7 @@ const writeStreamResponse = async (
 };
 
 const getResponseSchema = (
-	contract: Contract,
+	contract: RouteDeclaration,
 	status: number,
 ): ResponseBodySchema | undefined => {
 	if (!("responses" in contract)) return undefined;
@@ -487,7 +498,9 @@ const getResponseSchema = (
 	return entry?.[1];
 };
 
-const getSingleSuccessfulStatus = (contract: Contract): number | undefined => {
+const getSingleSuccessfulStatus = (
+	contract: RouteDeclaration,
+): number | undefined => {
 	if (!("responses" in contract)) return undefined;
 
 	const statuses = Object.keys(contract.responses)
@@ -497,11 +510,11 @@ const getSingleSuccessfulStatus = (contract: Contract): number | undefined => {
 	return statuses.length === 1 ? statuses[0] : undefined;
 };
 
-const hasDeclaredStatus = (contract: Contract, status: number) =>
+const hasDeclaredStatus = (contract: RouteDeclaration, status: number) =>
 	Boolean(getResponseSchema(contract, status));
 
 const normalizeHandlerResult = (
-	contract: Contract,
+	contract: RouteDeclaration,
 	result: unknown,
 ): { status: number; body: unknown } => {
 	if (
@@ -528,9 +541,9 @@ const normalizeHandlerResult = (
 };
 
 const createRouter = <
-	TContracts extends ContractTree,
+	TContract extends Contract,
 	TContext = EmptyObject,
-	TMeta = ContractMetaOf<TContracts>,
+	TMeta = ContractMetaOf<TContract>,
 >({
 	app,
 	server,
@@ -538,7 +551,7 @@ const createRouter = <
 	routePrefix,
 	createContext,
 	middlewares = [],
-}: CreateRouterOptions<TContracts, TContext, TMeta>) => {
+}: CreateRouterOptions<TContract, TContext, TMeta>) => {
 	const resolvedImplementations = implementations.flatMap((implementation) =>
 		Array.isArray(implementation) ? implementation : [implementation],
 	);
@@ -546,7 +559,7 @@ const createRouter = <
 		resolvedImplementations.map(({ contract, handler }) => {
 			const routePath = buildRoutePath(routePrefix, contract.path);
 			return {
-				...(contract as Contract<TMeta>),
+				...(contract as RouteDeclaration<TMeta>),
 				routePath,
 				matchPath: createPathMatcher(routePath),
 				handler,
@@ -557,15 +570,15 @@ const createRouter = <
 		(
 			route,
 		): route is ResolvedImplementationRoute<TMeta> &
-			WebSocketContract<TMeta> & {
+			WebSocketRouteDeclaration<TMeta> & {
 				handler: (request: unknown) => unknown | Promise<unknown>;
-			} => isWebSocketContract(route),
+			} => isWebSocketRoute(route),
 	);
 
 	if (webSocketRoutes.length > 0) {
 		if (!server) {
 			throw new Error(
-				"createRouter() requires a server when contracts include WebSocket routes.",
+				"createRouter() requires a server when the contract includes WebSocket routes.",
 			);
 		}
 
@@ -583,7 +596,7 @@ const createRouter = <
 	}
 
 	for (const route of routes) {
-		if (isWebSocketContract(route)) continue;
+		if (isWebSocketRoute(route)) continue;
 
 		const method = route.method.toLowerCase() as Lowercase<HttpMethod>;
 		const handler = route.handler as (
@@ -596,16 +609,16 @@ const createRouter = <
 
 		const serviceHandler = async (req: Request, res: Response) => {
 			const input = req.validatedRequest;
-			const context =
-				(await createContext?.(
-					req as Request & { contract: Contract<TMeta> },
+				const context =
+					(await createContext?.(
+					req as Request & { contract: RouteDeclaration<TMeta> },
 				)) || {};
 
 			try {
 				const handlerResult = await handler({
 					...input,
 					context,
-					...(isRawRequestContract(route)
+					...(isRawRequestRoute(route)
 						? { rawBody: req.body as RawRequestBody }
 						: {}),
 				});
@@ -650,13 +663,13 @@ const createRouter = <
 };
 
 export const initServer = <
-	TContracts extends ContractTree = ContractTree,
+	TContract extends Contract = Contract,
 	TContext = EmptyObject,
-	TMeta = ContractMetaOf<TContracts>,
->(): ServerTools<TContracts, TContext, TMeta> => ({
+	TMeta = ContractMetaOf<TContract>,
+>(): ServerTools<TContract, TContext, TMeta> => ({
 	implementContract: implementContract as ImplementContract<TContext>,
 	defineMiddleware: (middleware) => middleware,
-	createContractModeMiddleware: (options) =>
-		createContractModeMiddleware(options),
-	createRouter: (options) => createRouter<TContracts, TContext, TMeta>(options),
+	createRouteModeMiddleware: (options) =>
+		createRouteModeMiddleware(options),
+	createRouter: (options) => createRouter<TContract, TContext, TMeta>(options),
 });

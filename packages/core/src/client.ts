@@ -5,18 +5,18 @@ import type {
 	ContractResponse,
 	ContractServerMessage,
 	ContractSingleSuccessfulResponseBody,
-	ContractTree,
-	IsWebSocketContract,
+	RouteDeclaration,
+	IsWebSocketRoute,
 	RawRequestBody,
-	RawRequestContract,
+	RawRequestRouteDeclaration,
 	ResponseBodySchema,
 	StreamResponse,
-	WebSocketContract,
+	WebSocketRouteDeclaration,
 } from "./contracts.ts";
 import {
 	isNoBodyResponse,
 	isStreamResponse,
-	mapContractTree,
+	mapContractRoutes,
 	mapObjectValues,
 } from "./contracts.ts";
 
@@ -25,7 +25,8 @@ export type ApiClientFetchOptions = Omit<FetchOptions, "signal">;
 
 export type Merge<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
 
-export type ClientRequest<E extends Contract> = E extends RawRequestContract
+export type ClientRequest<E extends RouteDeclaration> =
+	E extends RawRequestRouteDeclaration
 	? Merge<
 			(ContractRequest<E> extends never
 				? Record<never, never>
@@ -35,15 +36,15 @@ export type ClientRequest<E extends Contract> = E extends RawRequestContract
 		>
 	: ContractRequest<E>;
 
-export type RequestInput<E extends Contract> =
+export type RequestInput<E extends RouteDeclaration> =
 	ClientRequest<E> extends never ? void : ClientRequest<E>;
 
-export type FetchArgs<E extends Contract = Contract> =
+export type FetchArgs<E extends RouteDeclaration = RouteDeclaration> =
 	ClientRequest<E> extends never
 		? [options?: FetchOptions]
 		: [request: ClientRequest<E>, options?: FetchOptions];
 
-export type FetchFn<E extends Contract> = (
+export type FetchFn<E extends RouteDeclaration> = (
 	...args: FetchArgs<E>
 ) => Promise<ContractSingleSuccessfulResponseBody<E>>;
 
@@ -53,22 +54,23 @@ export type UndeclaredClientResponse = {
 	body: unknown;
 };
 
-export type DeclaredClientResponse<E extends Contract> = ContractResponse<E> & {
+export type DeclaredClientResponse<E extends RouteDeclaration> =
+	ContractResponse<E> & {
 	declared: true;
 };
 
-export type ClientResponse<E extends Contract> =
+export type ClientResponse<E extends RouteDeclaration> =
 	| DeclaredClientResponse<E>
 	| UndeclaredClientResponse;
 
-export type FetchResponseFn<E extends Contract> = (
+export type FetchResponseFn<E extends RouteDeclaration> = (
 	...args: FetchArgs<E>
 ) => Promise<ClientResponse<E>>;
 
-export type ConnectArgs<E extends Contract = Contract> =
+export type ConnectArgs<E extends RouteDeclaration = RouteDeclaration> =
 	ContractRequest<E> extends never ? [] : [request: ContractRequest<E>];
 
-export type ContractWebSocket<E extends WebSocketContract> = Omit<
+export type ContractWebSocket<E extends WebSocketRouteDeclaration> = Omit<
 	WebSocket,
 	"send"
 > & {
@@ -81,53 +83,59 @@ export type ContractWebSocket<E extends WebSocketContract> = Omit<
 	onClose: (callback: (event: CloseEvent) => void) => () => void;
 };
 
-export type WebSocketMessageResult<E extends WebSocketContract> =
+export type WebSocketMessageResult<E extends WebSocketRouteDeclaration> =
 	| { success: true; data: ContractServerMessage<E> }
 	| { success: false };
 
-export type ConnectFn<E extends Contract> = (
+export type ConnectFn<E extends RouteDeclaration> = (
 	...args: ConnectArgs<E>
-) => E extends WebSocketContract ? ContractWebSocket<E> : never;
+) => E extends WebSocketRouteDeclaration ? ContractWebSocket<E> : never;
 
-export type TryConnectFn<E extends Contract> = (
+export type TryConnectFn<E extends RouteDeclaration> = (
 	...args: ConnectArgs<E>
-) => E extends WebSocketContract
+) => E extends WebSocketRouteDeclaration
 	?
 			| { success: true; data: ContractWebSocket<E> }
 			| { success: false; error: unknown }
 	: never;
 
-type ApiClientProtocolContractValue<E extends Contract> = {
+type ApiClientProtocolRouteValue<E extends RouteDeclaration> = {
 	fetchResponse: FetchResponseFn<E>;
 };
 
-type ApiClientHappyPathContractValue<E extends Contract> = {
+type ApiClientHappyPathRouteValue<E extends RouteDeclaration> = {
 	fetch: FetchFn<E>;
 	fetchResponse: FetchResponseFn<E>;
 };
 
-export type ApiClientHttpContractValue<E extends Contract = Contract> =
+export type ApiClientHttpRouteValue<
+	E extends RouteDeclaration = RouteDeclaration,
+> =
 	ContractSingleSuccessfulResponseBody<E> extends never
-		? ApiClientProtocolContractValue<E>
-		: ApiClientHappyPathContractValue<E>;
+		? ApiClientProtocolRouteValue<E>
+		: ApiClientHappyPathRouteValue<E>;
 
-export type ApiClientWebSocketContractValue<E extends Contract = Contract> = {
+export type ApiClientWebSocketRouteValue<
+	E extends RouteDeclaration = RouteDeclaration,
+> = {
 	connect: ConnectFn<E>;
 	tryConnect: TryConnectFn<E>;
 };
 
-export type ApiClientContractValue<E extends Contract = Contract> =
-	E extends Contract
-		? IsWebSocketContract<E> extends true
-			? ApiClientWebSocketContractValue<E>
-			: ApiClientHttpContractValue<E>
+export type ApiClientRouteValue<
+	E extends RouteDeclaration = RouteDeclaration,
+> =
+	E extends RouteDeclaration
+		? IsWebSocketRoute<E> extends true
+			? ApiClientWebSocketRouteValue<E>
+			: ApiClientHttpRouteValue<E>
 		: never;
 
-export type ApiClientTree<T extends ContractTree = ContractTree> =
-	T extends Contract
-		? ApiClientContractValue<T>
+export type ApiClientFor<T extends Contract = Contract> =
+	T extends RouteDeclaration
+		? ApiClientRouteValue<T>
 		: {
-				[K in keyof T]: T[K] extends ContractTree ? ApiClientTree<T[K]> : never;
+				[K in keyof T]: T[K] extends Contract ? ApiClientFor<T[K]> : never;
 			};
 
 export type ApiClientOptions = {
@@ -139,31 +147,31 @@ export type ApiClientOptions = {
 
 type RuntimeArgs = Record<string, unknown>;
 
-const isApiClientContractNode = (
+const isApiClientRouteNode = (
 	value: unknown,
-): value is ApiClientContractValue =>
+): value is ApiClientRouteValue =>
 	typeof value === "object" &&
 	value !== null &&
 	("fetchResponse" in value || "connect" in value);
 
-const isRawRequestContractNode = (
-	contract: Contract,
-): contract is RawRequestContract => contract.options?.mode === "raw";
+const isRawRequestRouteNode = (
+	route: RouteDeclaration,
+): route is RawRequestRouteDeclaration => route.options?.mode === "raw";
 
-const isWebSocketContractNode = (
-	contract: Contract,
-): contract is WebSocketContract => contract.options?.mode === "websocket";
+const isWebSocketRouteNode = (
+	route: RouteDeclaration,
+): route is WebSocketRouteDeclaration => route.options?.mode === "websocket";
 
 const isSuccessStatus = (status: number) => status >= 200 && status < 300;
 
-const getSuccessfulResponseStatuses = (contract: Contract) => {
-	if (!("responses" in contract)) return [];
+const getSuccessfulResponseStatuses = (route: RouteDeclaration) => {
+	if (!("responses" in route)) return [];
 
-	return Object.keys(contract.responses).map(Number).filter(isSuccessStatus);
+	return Object.keys(route.responses).map(Number).filter(isSuccessStatus);
 };
 
-const hasSingleSuccessfulResponse = (contract: Contract) =>
-	getSuccessfulResponseStatuses(contract).length === 1;
+const hasSingleSuccessfulResponse = (route: RouteDeclaration) =>
+	getSuccessfulResponseStatuses(route).length === 1;
 
 const createRequestSignal = (
 	signal: RequestInit["signal"],
@@ -182,30 +190,30 @@ const createRequestSignal = (
 	};
 };
 
-const takesRequestInput = (contract: Contract) =>
-	Boolean(contract.request) || isRawRequestContractNode(contract);
+const takesRequestInput = (route: RouteDeclaration) =>
+	Boolean(route.request) || isRawRequestRouteNode(route);
 
 type GetHeadersFn = () =>
 	| Record<string, string>
 	| Promise<Record<string, string>>;
 
-export const mapApiClientTree = (
-	tree: ApiClientTree<ContractTree>,
-	mappingFn: (leaf: ApiClientContractValue, path: string[]) => unknown,
-) => mapObjectValues(tree, isApiClientContractNode, mappingFn);
+export const mapApiClientContract = (
+	apiClient: ApiClientFor<Contract>,
+	mappingFn: (leaf: ApiClientRouteValue, path: string[]) => unknown,
+) => mapObjectValues(apiClient, isApiClientRouteNode, mappingFn);
 
-export class ApiClient<TTree extends ContractTree = ContractTree> {
-	readonly api: ApiClientTree<TTree>;
+export class ApiClient<TContract extends Contract = Contract> {
+	readonly api: ApiClientFor<TContract>;
 
 	private baseUrl: string;
-	private contracts: TTree;
+	private contract: TContract;
 	private fetchOptions?: ApiClientFetchOptions;
 	private getHeaders?: GetHeadersFn;
 	private timeoutMs?: number;
 
-	constructor(contracts: TTree, options: ApiClientOptions) {
+	constructor(contract: TContract, options: ApiClientOptions) {
 		this.baseUrl = options.baseUrl;
-		this.contracts = contracts;
+		this.contract = contract;
 		this.fetchOptions = options.fetchOptions;
 		this.getHeaders = options.getHeaders;
 		this.timeoutMs = options.timeoutMs;
@@ -213,7 +221,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		this.api = this.buildApiClient();
 	}
 
-	private groupKeysToRequest(args: RuntimeArgs, contract: Contract) {
+	private groupKeysToRequest(args: RuntimeArgs, contract: RouteDeclaration) {
 		const keyMap = new Map<string, "query" | "params">();
 		(["query", "params"] as const).forEach((type) => {
 			const keys = Object.keys(contract.request?.[type]?.shape ?? {});
@@ -253,7 +261,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 	}
 
 	private constructBaseRequest(
-		contract: Contract,
+		contract: RouteDeclaration,
 		args?: RuntimeArgs,
 	): { url: string; body?: BodyInit | null } {
 		let urlBase = `${this.baseUrl}${contract.path}`;
@@ -279,7 +287,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 			urlBase += `?${new URLSearchParams(query as Record<string, string>)}`;
 		}
 
-		if (isRawRequestContractNode(contract)) {
+		if (isRawRequestRouteNode(contract)) {
 			return { url: urlBase, body: rawBody as BodyInit | null | undefined };
 		}
 
@@ -289,7 +297,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		};
 	}
 
-	private extractArgs(contract: Contract, args: unknown[]) {
+	private extractArgs(contract: RouteDeclaration, args: unknown[]) {
 		const requestArgs = takesRequestInput(contract) ? args[0] : undefined;
 		const options = requestArgs ? args[1] : args[0];
 		return { requestArgs, options } as {
@@ -298,7 +306,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		};
 	}
 
-	private async request<E extends Contract>(
+	private async request<E extends RouteDeclaration>(
 		contract: E,
 		...args: FetchArgs<E>
 	): Promise<{ rawResponse: Response; cleanup: () => void }> {
@@ -319,7 +327,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 				body,
 				headers: {
 					...headers,
-					...(body && !isRawRequestContractNode(contract)
+					...(body && !isRawRequestRouteNode(contract)
 						? { "Content-Type": "application/json" }
 						: {}),
 				},
@@ -337,7 +345,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 	}
 
 	private getResponseSchema(
-		contract: Contract,
+		contract: RouteDeclaration,
 		status: number,
 	): ResponseBodySchema | undefined {
 		if (!("responses" in contract)) return undefined;
@@ -375,7 +383,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		return schema.parse(await rawResponse.json());
 	}
 
-	private async fetchResponse<E extends Contract>(
+	private async fetchResponse<E extends RouteDeclaration>(
 		contract: E,
 		...args: FetchArgs<E>
 	): Promise<ClientResponse<E>> {
@@ -401,7 +409,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		}
 	}
 
-	private async fetch<E extends Contract>(
+	private async fetch<E extends RouteDeclaration>(
 		contract: E,
 		...args: FetchArgs<E>
 	): Promise<ContractSingleSuccessfulResponseBody<E>> {
@@ -451,7 +459,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		return url.replace("https:", "wss:");
 	}
 
-	private connect<E extends WebSocketContract>(
+	private connect<E extends WebSocketRouteDeclaration>(
 		contract: E,
 		...args: ConnectArgs<E>
 	): ContractWebSocket<E> {
@@ -520,7 +528,7 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 		return socket;
 	}
 
-	private tryConnect<E extends WebSocketContract>(
+	private tryConnect<E extends WebSocketRouteDeclaration>(
 		contract: E,
 		...args: ConnectArgs<E>
 	) {
@@ -533,8 +541,8 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 	}
 
 	private buildApiClient = () =>
-		mapContractTree(this.contracts, (node) => {
-			if (isWebSocketContractNode(node)) {
+		mapContractRoutes(this.contract, (node) => {
+			if (isWebSocketRouteNode(node)) {
 				return {
 					connect: (...args: ConnectArgs<typeof node>) =>
 						this.connect(node, ...args),
@@ -556,11 +564,11 @@ export class ApiClient<TTree extends ContractTree = ContractTree> {
 				fetch: (...args: FetchArgs<typeof node>) => this.fetch(node, ...args),
 				fetchResponse,
 			};
-		}) as ApiClientTree<TTree>;
+		}) as ApiClientFor<TContract>;
 }
 
-export const initClient = <TTree extends ContractTree>(
-	contracts: TTree,
+export const initClient = <TContract extends Contract>(
+	contract: TContract,
 	options: ApiClientOptions,
-): ApiClientTree<TTree> =>
-	new ApiClient(contracts, options).api;
+): ApiClientFor<TContract> =>
+	new ApiClient(contract, options).api;

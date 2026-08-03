@@ -1,6 +1,6 @@
 import { initClient } from "@contract-first-api/core";
 import { initReactQueryClient } from "@contract-first-api/react-query";
-import { allContracts } from "@example/shared";
+import { apiContract } from "@example/shared";
 import { QueryClient } from "@tanstack/react-query";
 
 const baseUrl = `${
@@ -10,11 +10,11 @@ const baseUrl = `${
 
 export const queryClient = new QueryClient();
 
-export const client = initClient(allContracts, {
+export const client = initClient(apiContract, {
 	baseUrl,
 });
 
-export const api = initReactQueryClient(allContracts, {
+export const rqClient = initReactQueryClient(apiContract, {
 	queryClient,
 	baseUrl,
 });

@@ -1,7 +1,7 @@
 import type { DiscussMessage, TodoEvent } from "@example/shared";
 import type { ChangeEvent, FormEvent } from "react";
 import { useEffect, useRef, useState } from "react";
-import { api, client } from "./api.ts";
+import { rqClient, client } from "./api.ts";
 
 const renderJson = (value: unknown) => JSON.stringify(value, null, 2);
 const renderError = (error: unknown) =>
@@ -40,18 +40,18 @@ export const App = () => {
 		typeof client.discuss.connect.connect
 	> | null>(null);
 
-	const health = api.health.get.useQuery();
-	const todos = api.todos.list.useQuery();
-	const todoSearch = api.todos.find.useQuery(
+	const health = rqClient.health.get.useQuery();
+	const todos = rqClient.todos.list.useQuery();
+	const todoSearch = rqClient.todos.find.useQuery(
 		searchQuery ? { query: searchQuery } : "",
 	);
-	const createTodo = api.todos.create.useMutation({
+	const createTodo = rqClient.todos.create.useMutation({
 		onSuccess: async () => {
 			setTitle("");
-			await api.todos.list.invalidate();
+			await rqClient.todos.list.invalidate();
 		},
 	});
-	const inspectImage = api.images.inspect.useMutation();
+	const inspectImage = rqClient.images.inspect.useMutation();
 
 	useEffect(() => {
 		const controller = new AbortController();
@@ -185,8 +185,8 @@ export const App = () => {
 				<p className="eyebrow">Example Workspace</p>
 				<h1>Contract-First API</h1>
 				<p className="lede">
-					A tiny React app using shared contracts, React Query hooks, streaming
-					events, raw uploads, and websocket messages.
+					A tiny React app using a shared API contract, React Query hooks,
+					streaming events, raw uploads, and websocket messages.
 				</p>
 			</header>
 
@@ -290,7 +290,7 @@ export const App = () => {
 					<button
 						type="button"
 						onClick={() => {
-							void api.todos.list.invalidate();
+							void rqClient.todos.list.invalidate();
 						}}
 					>
 						Refresh

@@ -2,7 +2,7 @@
 
 Create a contract-backed API client shaped for TanStack Query.
 
-The setup is the same as the core client: pass the shared contract tree and the
+The setup is the same as the core client: pass the shared API contract and the
 same client options such as `baseUrl`, headers, and timeouts. React Query also
 needs a `queryClient`, and the returned API exposes hooks and cache helpers.
 
@@ -17,12 +17,12 @@ pnpm add @contract-first-api/react-query @tanstack/react-query
 ```ts
 // api.ts
 import { initReactQueryClient } from "@contract-first-api/react-query";
-import { contracts } from "@example/shared";
+import { apiContract } from "@example/shared";
 import { QueryClient } from "@tanstack/react-query";
 
 export const queryClient = new QueryClient();
 
-export const api = initReactQueryClient(contracts, {
+export const api = initReactQueryClient(apiContract, {
 	queryClient,
 	baseUrl: import.meta.env.VITE_API_BASE_URL,
 	getHeaders: () => ({
@@ -78,10 +78,10 @@ export const TodoList = () => {
 ```
 
 Hook data is the successful response envelope, not only the body. That means
-you can still narrow on `data.status` when a contract declares multiple
+you can still narrow on `data.status` when a route declaration declares multiple
 successful responses.
 
-For contracts with request schemas, pass the typed request object first:
+For routes with request schemas, pass the typed request object first:
 
 ```tsx
 const todo = api.todos.get.useQuery({
@@ -108,7 +108,7 @@ const health = api.health.get.useSuspenseQuery();
 
 The generated hooks accept the same options you would pass to `useQuery`,
 `useSuspenseQuery`, and `useMutation`. Query keys and fetch functions come from
-the contract.
+the API contract.
 
 ```tsx
 const todos = api.todos.list.useQuery({
@@ -144,13 +144,13 @@ await createTodo.mutateAsync({
 });
 ```
 
-The mutation input is inferred from the contract request schema. The mutation
-result is inferred from the contract's successful response entries.
+The mutation input is inferred from the route request schema. The mutation
+result is inferred from the route's successful response entries.
 
 ## Cache Helpers
 
-Each HTTP contract exposes cache helpers tied to the same query key format used
-by its hooks.
+Each HTTP route declaration exposes cache helpers tied to the same query key
+format used by its hooks.
 
 ```ts
 await api.todos.list.invalidate();
@@ -189,14 +189,14 @@ api.todos.get.setData({ id: "todo_1" }, (current) =>
 );
 ```
 
-The generated query key is based on the contract path inside the contract tree,
+The generated query key is based on the contract key path inside the API contract,
 plus the request object when one exists.
 
 ## Errors
 
 Hook errors are one of:
 
-- a declared non-successful response envelope from the contract
+- a declared non-successful response envelope from the route
 - an undeclared response envelope from the core client
 - a normal `Error`
 
@@ -210,16 +210,16 @@ const createTodo = api.todos.create.useMutation({
 });
 ```
 
-## WebSocket Contracts
+## WebSocket Routes
 
-WebSocket contracts are omitted from the React Query tree. Use the core client
+WebSocket routes are omitted from the React Query API. Use the core client
 directly for websocket connections.
 
 ## How It Connects
 
-- Define contracts with `@contract-first-api/core`.
+- Define `apiContract` with `@contract-first-api/core`.
 - Create a `QueryClient`.
-- Call `initReactQueryClient(contracts, { queryClient, baseUrl })`.
+- Call `initReactQueryClient(apiContract, { queryClient, baseUrl })`.
 - Render your app inside React Query's `QueryClientProvider`.
 
 This package is only needed for React apps that want TanStack Query integration.
