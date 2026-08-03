@@ -61,7 +61,7 @@ From that contract:
 | Package | Role |
 | --- | --- |
 | [`@contract-first-api/core`](./packages/core/README.md) | Define an API contract, derive shared types, create typed clients, and generate OpenAPI documents. |
-| [`@contract-first-api/express`](./packages/express/README.md) | Mount a contract or contract fragment on an Express app with validation and typed services. |
+| [`@contract-first-api/express`](./packages/express/README.md) | Mount an API contract or route group on an Express app with validation and typed services. |
 | [`@contract-first-api/react-query`](./packages/react-query/README.md) | Create React Query hooks and cache helpers from an API contract. |
 
 ## Install
@@ -226,7 +226,7 @@ Hook data uses the typed response envelope, so response bodies live at
 ## Recommended Setup
 
 Typically, keep the API contract in a shared workspace package used by your
-backend and frontend. Large APIs can define contract fragments in feature
+backend and frontend. Large APIs can define route groups in feature
 modules and compose them into one exported `apiContract`.
 
 - `shared` exports `apiContract` and helper types

@@ -4,12 +4,12 @@ import type {
 	ContractRoute,
 	JsonRouteDeclaration,
 	ResponseBodySchema,
-} from "./contracts.ts";
+} from "./contract.ts";
 import {
 	flattenContractRoutes,
 	isNoBodyResponse,
 	isStreamResponse,
-} from "./contracts.ts";
+} from "./contract.ts";
 
 export type OpenApiSchema = Record<string, unknown>;
 
@@ -69,7 +69,7 @@ type SchemaConversionOptions = {
 };
 
 type OperationTransformContext = {
-	contract: OpenApiRouteDeclaration;
+	route: OpenApiRouteDeclaration;
 	operation: OpenApiOperation;
 };
 
@@ -190,21 +190,21 @@ const createResponses = (
 };
 
 const createOperation = (
-	contract: OpenApiRouteDeclaration,
+	route: OpenApiRouteDeclaration,
 	options: CreateOpenApiDocumentOptions,
 ): OpenApiOperation => {
 	const parameters = [
-		...createParameters(contract.request?.params, "path", options.schema),
-		...createParameters(contract.request?.query, "query", options.schema),
+		...createParameters(route.request?.params, "path", options.schema),
+		...createParameters(route.request?.query, "query", options.schema),
 	];
-	const requestBody = createRequestBody(contract.request?.body, options.schema);
+	const requestBody = createRequestBody(route.request?.body, options.schema);
 	const operation: OpenApiOperation = {
 		...(parameters.length > 0 ? { parameters } : {}),
 		...(requestBody ? { requestBody } : {}),
-		responses: createResponses(contract, options.schema),
+		responses: createResponses(route, options.schema),
 	};
 
-	return options.transformOperation?.({ contract, operation }) ?? operation;
+	return options.transformOperation?.({ route, operation }) ?? operation;
 };
 
 export const createOpenApiDocument = (

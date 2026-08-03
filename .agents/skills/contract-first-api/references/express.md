@@ -20,7 +20,7 @@ Use `initServer()` to get helpers, then:
 
 ```ts
 const { createRouter, implementContract } = initServer<
-	typeof contracts,
+	typeof contract,
 	RequestContext
 >();
 ```
@@ -33,7 +33,7 @@ app.use(express.json());
 
 createRouter({
 	app,
-	contract: contracts,
+	contract,
 	implementations,
 	routePrefix: "/api",
 });
@@ -46,7 +46,7 @@ exactly one successful status, handlers may return the successful body directly.
 
 ```ts
 const implementations = [
-	implementContract(contracts.todos).handlers({
+	implementContract(contract.todos).handlers({
 		async list() {
 			return {
 				status: 200,
@@ -106,7 +106,7 @@ contract.
 
 ```ts
 const implementations = [
-	implementContract(contracts.todos).handlers({
+	implementContract(contract.todos).handlers({
 		async get({ id, includeCompleted, context }) {
 			return {
 				status: 200,
@@ -130,7 +130,7 @@ rather than hardcoded route paths.
 ```ts
 app.use(
 	createContractModeMiddleware({
-		contracts,
+		contract,
 		routePrefix: "/api",
 		nonRaw: express.json(),
 		raw: express.raw({
@@ -172,7 +172,7 @@ the async iterable body directly when the contract has one successful status.
 
 ```ts
 const implementations = [
-	implementContract(contracts.todos).handlers({
+	implementContract(contract.todos).handlers({
 		events() {
 			return readEvents();
 		},
@@ -186,7 +186,7 @@ WebSocket services receive a typed socket instead of returning a response.
 
 ```ts
 const implementations = [
-	implementContract(contracts.chat).handlers({
+	implementContract(contract.chat).handlers({
 		connect({ socket }) {
 			socket.onMessage((result) => {
 				if (!result.success) return;
@@ -204,16 +204,16 @@ const implementations = [
 
 - Register JSON parsing before `createRouter()` when routes use JSON bodies.
 - Keep `routePrefix` aligned with the client `baseUrl`.
-- Return `{ status, body }` for non-2xx responses and for contracts with
+- Return `{ status, body }` for non-2xx responses and for routes with
   multiple successful statuses.
-- Return the body directly when a contract has one successful status and the
-  status code is clear from the contract.
+- Return the body directly when a route has one successful status and the
+  status code is clear from the route.
 - Use `body: undefined` for `noBody` responses.
-- WebSocket contracts use typed socket handling instead of returning a normal
+- WebSocket routes use typed socket handling instead of returning a normal
   response body.
 
 ## Use This Package When
 
-- mounting contracts on an Express app
+- mounting routes on an Express app
 - implementing raw body, stream, or websocket routes
 - debugging validation order or service input shape

@@ -11,10 +11,10 @@ It does not write files, register routes, or serve documentation UIs.
 
 ## Main Setup
 
-Use `createOpenApiDocument()` with the shared contracts and document options.
+Use `createOpenApiDocument()` with the shared contract and document options.
 
 ```ts
-const openApiDocument = createOpenApiDocument(contracts, {
+const openApiDocument = createOpenApiDocument(contract, {
 	info: {
 		title: "Todo API",
 		version: "1.0.0",
@@ -45,7 +45,7 @@ app.get("/openapi.json", (_req, res) => {
 
 ## Contract Mapping
 
-The generator creates one OpenAPI operation per JSON contract.
+The generator creates one OpenAPI operation per JSON route.
 
 Key mappings:
 
@@ -57,8 +57,8 @@ Key mappings:
 - each `responses` entry becomes an OpenAPI response for that status
 - `noBody` responses are emitted without JSON content
 
-Only JSON HTTP contracts are included. Raw request contracts, websocket
-contracts, and contracts with streaming responses are not part of the generated
+Only JSON HTTP routes are included. Raw request routes, websocket
+routes, and routes with streaming responses are not part of the generated
 OpenAPI document.
 
 ## Schema Conversion
@@ -72,7 +72,7 @@ By default, unrepresentable schemas throw during generation. If needed, schema
 behavior can be relaxed with the `schema.unrepresentable` option.
 
 ```ts
-const document = createOpenApiDocument(contracts, {
+const document = createOpenApiDocument(contract, {
 	info: {
 		title: "Todo API",
 		version: "1.0.0",
@@ -95,7 +95,7 @@ const document = createOpenApiDocument(contracts, {
 Route-level customization:
 
 ```ts
-const document = createOpenApiDocument(contracts, {
+const document = createOpenApiDocument(contract, {
 	info: {
 		title: "Todo API",
 		version: "1.0.0",
@@ -110,7 +110,7 @@ const document = createOpenApiDocument(contracts, {
 Top-level customization:
 
 ```ts
-const document = createOpenApiDocument(contracts, {
+const document = createOpenApiDocument(contract, {
 	info: {
 		title: "Todo API",
 		version: "1.0.0",
@@ -132,6 +132,6 @@ const document = createOpenApiDocument(contracts, {
 
 ## Use This Package When
 
-- exporting an OpenAPI document from shared contracts
+- exporting an OpenAPI document from shared API contract.
 - adding route-level summaries, tags, or security settings
 - adding top-level components or shared document customization

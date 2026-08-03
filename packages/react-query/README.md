@@ -1,6 +1,6 @@
 # @contract-first-api/react-query
 
-Create a contract-backed API client shaped for TanStack Query.
+Create API-contract-backed client shaped for TanStack Query.
 
 The setup is the same as the core client: pass the shared API contract and the
 same client options such as `baseUrl`, headers, and timeouts. React Query also
@@ -215,7 +215,7 @@ api.todos.get.setData({ id: "todo_1" }, (current) =>
 );
 ```
 
-The generated query key is based on the contract key path inside the API contract,
+The generated query key is based on the route key path inside the API contract,
 plus the request object when one exists.
 
 ## Errors

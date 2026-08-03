@@ -325,7 +325,7 @@ createRouter({
 	routePrefix: "/api",
 	middlewares: [middleware, regularMiddleware],
 	createContext: (req) => {
-		const routeLabel = `${req.contract.method} ${req.contract.path}`;
+		const routeLabel = `${req.route.method} ${req.route.path}`;
 		return {
 			requestId: `${routeLabel}:${crypto.randomUUID()}`,
 			auditLabel: req.viewerId ? `${routeLabel}:${req.viewerId}` : routeLabel,

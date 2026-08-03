@@ -13,7 +13,7 @@ tree.
 ```ts
 import { initClient } from "@contract-first-api/core";
 
-const api = initClient(contracts, {
+const api = initClient(contract, {
 	baseUrl: process.env.API_BASE_URL,
 	fetchOptions: {
 		cache: "no-store",
@@ -46,7 +46,7 @@ const todo = await api.todos.get.fetch({
 });
 ```
 
-Raw contracts keep the same flat `params` and `query` fields, but use an
+Raw routes keep the same flat `params` and `query` fields, but use an
 explicit `rawBody` field for the request payload.
 
 ```ts
@@ -88,12 +88,12 @@ const todos = await api.todos.list.fetch();
 console.log(todos.items);
 ```
 
-Contracts with multiple successful responses only expose `fetchResponse()` so
+Routes with multiple successful responses only expose `fetchResponse()` so
 callers must handle the status.
 
-## WebSocket Contracts
+## WebSocket Routes
 
-WebSocket contracts expose `connect()` and `tryConnect()`.
+WebSocket routes expose `connect()` and `tryConnect()`.
 
 ```ts
 const socket = api.chat.connect.connect();

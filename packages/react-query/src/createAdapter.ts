@@ -13,8 +13,8 @@ import type {
 	InferRouteSuccessResponse,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
-} from "@contract-first-api/core/contracts";
-import { mapContractRoutes } from "@contract-first-api/core/contracts";
+} from "@contract-first-api/core/contract";
+import { mapContractRoutes } from "@contract-first-api/core/contract";
 import {
 	type QueryClient,
 	type QueryKey,
@@ -149,18 +149,17 @@ type RequestArgs = unknown[];
 const isSuccessStatus = (status: number) => status >= 200 && status < 300;
 
 const isWebSocketRoute = (
-	contract: RouteDeclaration,
-): contract is WebSocketRouteDeclaration =>
-	contract.options?.mode === "websocket";
+	route: RouteDeclaration,
+): route is WebSocketRouteDeclaration => route.options?.mode === "websocket";
 
-const takesRequestInput = (contract: RouteDeclaration) =>
-	Boolean(contract.request) || contract.options?.mode === "raw";
+const takesRequestInput = (route: RouteDeclaration) =>
+	Boolean(route.request) || route.options?.mode === "raw";
 
-const readRequestArg = (contract: RouteDeclaration, args: RequestArgs) =>
-	takesRequestInput(contract) ? args[0] : undefined;
+const readRequestArg = (route: RouteDeclaration, args: RequestArgs) =>
+	takesRequestInput(route) ? args[0] : undefined;
 
-const readHookOptionsArg = (contract: RouteDeclaration, args: RequestArgs) =>
-	(takesRequestInput(contract) ? args[1] : args[0] || {}) as Record<
+const readHookOptionsArg = (route: RouteDeclaration, args: RequestArgs) =>
+	(takesRequestInput(route) ? args[1] : args[0] || {}) as Record<
 		string,
 		unknown
 	>;
@@ -195,7 +194,7 @@ const getByPath = (tree: unknown, path: string[]) =>
 
 const fetchQueryData = async <E extends RouteDeclaration>(
 	fetchResponse: FetchResponseFn<E>,
-	contract: E,
+	route: E,
 	request: unknown,
 	options?: FetchOptions,
 ): Promise<InferRouteQueryData<E>> => {
@@ -204,7 +203,7 @@ const fetchQueryData = async <E extends RouteDeclaration>(
 			...args: unknown[]
 		) => ReturnType<FetchResponseFn<E>>;
 		const response = (
-			takesRequestInput(contract)
+			takesRequestInput(route)
 				? await callFetchResponse(request, options)
 				: await callFetchResponse(options)
 		) as Awaited<ReturnType<FetchResponseFn<E>>>;
@@ -230,7 +229,7 @@ const fetchQueryData = async <E extends RouteDeclaration>(
 };
 
 const wrapRouteNode = <E extends RouteDeclaration>(
-	contract: E,
+	route: E,
 	fetchResponse: FetchResponseFn<E>,
 	path: string[],
 	queryClient: QueryClient,
@@ -241,30 +240,30 @@ const wrapRouteNode = <E extends RouteDeclaration>(
 		useMutation: (options) =>
 			useMutation({
 				mutationFn: (request) =>
-					fetchQueryData(fetchResponse, contract, request, undefined),
+					fetchQueryData(fetchResponse, route, request, undefined),
 				...options,
 			}),
 		useQuery: (...args: RequestArgs) => {
-			const request = readRequestArg(contract, args);
-			const options = readHookOptionsArg(contract, args);
-			const enabled = takesRequestInput(contract) ? Boolean(request) : true;
+			const request = readRequestArg(route, args);
+			const options = readHookOptionsArg(route, args);
+			const enabled = takesRequestInput(route) ? Boolean(request) : true;
 
 			return useQuery({
 				queryKey: getKey(request),
 				queryFn: ({ signal }) =>
-					fetchQueryData(fetchResponse, contract, request, { signal }),
+					fetchQueryData(fetchResponse, route, request, { signal }),
 				enabled,
 				...options,
 			});
 		},
 		useSuspenseQuery: (...args: RequestArgs) => {
-			const request = readRequestArg(contract, args);
-			const options = readHookOptionsArg(contract, args);
+			const request = readRequestArg(route, args);
+			const options = readHookOptionsArg(route, args);
 
 			return useSuspenseQuery({
 				queryKey: getKey(request),
 				queryFn: ({ signal }) =>
-					fetchQueryData(fetchResponse, contract, request, { signal }),
+					fetchQueryData(fetchResponse, route, request, { signal }),
 				...options,
 			});
 		},

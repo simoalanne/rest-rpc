@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
-import { stream } from "./contracts.ts";
+import { stream } from "./contract.ts";
 import { createOpenApiDocument } from "./openapi.ts";
 
 describe("createOpenApiDocument", () => {
@@ -57,9 +57,9 @@ describe("createOpenApiDocument", () => {
 				version: "1.0.0",
 			},
 			servers: [{ url: "http://localhost:3000" }],
-			transformOperation: ({ contract, operation }) => ({
+			transformOperation: ({ route, operation }) => ({
 				...operation,
-				operationId: contract.keySegments.join("."),
+				operationId: route.keySegments.join("."),
 			}),
 			transformDocument: (document) => ({
 				...document,

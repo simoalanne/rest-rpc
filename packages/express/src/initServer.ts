@@ -13,7 +13,7 @@ import {
 	type ResponseBodySchema,
 	type RouteDeclaration,
 	type WebSocketRouteDeclaration,
-} from "@contract-first-api/core/contracts";
+} from "@contract-first-api/core/contract";
 import type {
 	Application,
 	NextFunction,
@@ -33,7 +33,7 @@ declare global {
 	namespace Express {
 		interface Request {
 			validatedRequest: Record<string, unknown>;
-			contract: RouteDeclaration;
+			route: RouteDeclaration;
 		}
 	}
 }
@@ -88,7 +88,7 @@ export type InferRouteServiceHandler<
 ) => HandlerResult<E>;
 
 export type RouteImplementation = {
-	contract: RouteDeclaration;
+	route: RouteDeclaration;
 	handler: (request: unknown) => unknown | Promise<unknown>;
 };
 
@@ -145,7 +145,7 @@ export type CreateRouterOptions<
 	middlewares?: RequestHandler[];
 	routePrefix?: string;
 	createContext?: (
-		req: Request & { contract: RouteDeclaration },
+		req: Request & { route: RouteDeclaration },
 	) => TContext | Promise<TContext>;
 };
 
@@ -235,9 +235,7 @@ const resolveHandlerAtPath = <THandler extends (...args: unknown[]) => unknown>(
 		current = (current as Record<string, unknown>)[segment];
 
 		if (current === undefined) {
-			throw new Error(
-				`Missing service for contract "${keySegments.join(".")}"`,
-			);
+			throw new Error(`Missing service for route "${keySegments.join(".")}"`);
 		}
 	}
 
@@ -255,11 +253,11 @@ const resolveHandlerAtPath = <THandler extends (...args: unknown[]) => unknown>(
 };
 
 const prepareRequest =
-	(contract: RouteDeclaration) =>
+	(route: RouteDeclaration) =>
 	(req: Request, res: Response, next: NextFunction) => {
-		req.contract = contract;
+		req.route = route;
 		req.validatedRequest = {};
-		const result = validateRequestSegments(contract, {
+		const result = validateRequestSegments(route, {
 			body: req.body,
 			query: req.query,
 			params: req.params,
@@ -279,7 +277,7 @@ const prepareRequest =
 	};
 
 const validateRequestSegments = (
-	contract: RouteDeclaration,
+	route: RouteDeclaration,
 	segments: {
 		body?: unknown;
 		query?: unknown;
@@ -298,7 +296,7 @@ const validateRequestSegments = (
 		params: {},
 	};
 
-	const requestSchema = contract.request;
+	const requestSchema = route.request;
 
 	if (!requestSchema) {
 		return { success: true, data: {} };
@@ -343,13 +341,12 @@ const validateRequestSegments = (
 };
 
 const isWebSocketRoute = (
-	contract: RouteDeclaration,
-): contract is WebSocketRouteDeclaration =>
-	contract.options?.mode === "websocket";
+	route: RouteDeclaration,
+): route is WebSocketRouteDeclaration => route.options?.mode === "websocket";
 
 const isRawRequestRoute = (
-	contract: RouteDeclaration,
-): contract is RawRequestRouteDeclaration => contract.options?.mode === "raw";
+	route: RouteDeclaration,
+): route is RawRequestRouteDeclaration => route.options?.mode === "raw";
 
 const escapeRegExp = (value: string) =>
 	value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -443,12 +440,12 @@ const createRouteModeMiddleware = <TContract extends Contract>(
 
 const implementContract = ((contract: Contract) => ({
 	handler: (handler: RouteImplementation["handler"]) => ({
-		contract,
+		route: contract as RouteDeclaration,
 		handler,
 	}),
 	handlers: (handlers: unknown) =>
 		flattenContractRoutes(contract).map((route) => ({
-			contract: route,
+			route,
 			handler: resolveHandlerAtPath(handlers, route.keySegments),
 		})),
 })) as ImplementContract<unknown>;
@@ -469,33 +466,33 @@ const writeStreamResponse = async (
 };
 
 const getResponseSchema = (
-	contract: RouteDeclaration,
+	route: RouteDeclaration,
 	status: number,
 ): ResponseBodySchema | undefined => {
-	if (!("responses" in contract)) return undefined;
-	const entry = Object.entries(contract.responses).find(
+	if (!("responses" in route)) return undefined;
+	const entry = Object.entries(route.responses).find(
 		([declaredStatus]) => Number(declaredStatus) === status,
 	);
 	return entry?.[1];
 };
 
 const getSingleSuccessfulStatus = (
-	contract: RouteDeclaration,
+	route: RouteDeclaration,
 ): number | undefined => {
-	if (!("responses" in contract)) return undefined;
+	if (!("responses" in route)) return undefined;
 
-	const statuses = Object.keys(contract.responses)
+	const statuses = Object.keys(route.responses)
 		.map(Number)
 		.filter((status) => status >= 200 && status < 300);
 
 	return statuses.length === 1 ? statuses[0] : undefined;
 };
 
-const hasDeclaredStatus = (contract: RouteDeclaration, status: number) =>
-	Boolean(getResponseSchema(contract, status));
+const hasDeclaredStatus = (route: RouteDeclaration, status: number) =>
+	Boolean(getResponseSchema(route, status));
 
 const normalizeHandlerResult = (
-	contract: RouteDeclaration,
+	route: RouteDeclaration,
 	result: unknown,
 ): { status: number; body: unknown } => {
 	if (
@@ -503,15 +500,15 @@ const normalizeHandlerResult = (
 		typeof result === "object" &&
 		"status" in result &&
 		typeof result.status === "number" &&
-		hasDeclaredStatus(contract, result.status)
+		hasDeclaredStatus(route, result.status)
 	) {
 		return result as { status: number; body: unknown };
 	}
 
-	const status = getSingleSuccessfulStatus(contract);
+	const status = getSingleSuccessfulStatus(route);
 	if (status === undefined) {
 		throw new Error(
-			`Service for "${contract.method} ${contract.path}" must return a declared response object.`,
+			`Service for "${route.method} ${route.path}" must return a declared response object.`,
 		);
 	}
 
@@ -533,10 +530,10 @@ const createRouter = <TContract extends Contract, TContext = EmptyObject>({
 		Array.isArray(implementation) ? implementation : [implementation],
 	);
 	const routes = (
-		resolvedImplementations.map(({ contract, handler }) => {
-			const routePath = buildRoutePath(routePrefix, contract.path);
+		resolvedImplementations.map(({ route, handler }) => {
+			const routePath = buildRoutePath(routePrefix, route.path);
 			return {
-				...(contract as RouteDeclaration),
+				...(route as RouteDeclaration),
 				routePath,
 				matchPath: createPathMatcher(routePath),
 				handler,
@@ -585,7 +582,7 @@ const createRouter = <TContract extends Contract, TContext = EmptyObject>({
 			const input = req.validatedRequest;
 			const context =
 				(await createContext?.(
-					req as Request & { contract: RouteDeclaration },
+					req as Request & { route: RouteDeclaration },
 				)) || {};
 
 			try {

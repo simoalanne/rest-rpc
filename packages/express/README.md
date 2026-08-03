@@ -55,7 +55,7 @@ declare global {
 }
 
 const authMiddleware: express.RequestHandler = (req, res, next) => {
-	if (req.contract.path !== "/todos") {
+	if (req.route.path !== "/todos") {
 		next();
 		return;
 	}
@@ -293,11 +293,11 @@ const imageImplementations = implementContract(apiContract.images).handlers({
 ## Middleware
 
 Pass regular Express middleware to `createRouter()` when middleware needs the
-validated request or matched contract route before context creation.
+validated request or matched route before context creation.
 
 ```ts
 const authMiddleware: express.RequestHandler = (req, res, next) => {
-	if (req.contract.path !== "/todos") {
+	if (req.route.path !== "/todos") {
 		next();
 		return;
 	}
@@ -312,7 +312,7 @@ const authMiddleware: express.RequestHandler = (req, res, next) => {
 ```
 
 Custom middlewares run after request validation and before `createContext`.
-That means middleware can read `req.contract`, inspect validated request data,
+That means middleware can read `req.route`, inspect validated request data,
 and attach values to the Express request for `createContext` to use.
 
 ## Streaming Responses

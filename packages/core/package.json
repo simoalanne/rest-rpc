@@ -2,14 +2,13 @@
 	"name": "@contract-first-api/core",
 	"version": "4.4.0",
 	"type": "module",
-	"description": "Define shared API contracts and derive typed request and response helpers from Zod schemas.",
+	"description": "Define shared API contract and derive typed request and response helpers from Zod schemas.",
 	"keywords": [
 		"contract-first",
 		"api",
 		"typescript",
 		"zod",
-		"schema",
-		"contracts"
+		"schema"
 	],
 	"license": "MIT",
 	"repository": {
@@ -24,9 +23,9 @@
 			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js"
 		},
-		"./contracts": {
-			"types": "./dist/contracts.d.ts",
-			"import": "./dist/contracts.js"
+		"./contract": {
+			"types": "./dist/contract.d.ts",
+			"import": "./dist/contract.js"
 		},
 		"./client": {
 			"types": "./dist/client.d.ts",

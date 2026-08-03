@@ -2,7 +2,7 @@
 	"name": "@contract-first-api/express",
 	"version": "4.4.0",
 	"type": "module",
-	"description": "Mount shared API contracts on an Express app with typed handlers and request validation.",
+	"description": "Mount shared API contract on an Express app with typed handlers and request validation.",
 	"keywords": [
 		"contract-first",
 		"express",

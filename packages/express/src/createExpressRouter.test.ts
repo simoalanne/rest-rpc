@@ -112,7 +112,7 @@ const createResponseDouble = () => {
 };
 
 describe("initServer", () => {
-	it("should validate input, attach contract to req, create context, and call service", async () => {
+	it("should validate input, attach route to req, create context, and call service", async () => {
 		const apiContract = defineContract({
 			users: {
 				getById: {
@@ -139,7 +139,7 @@ describe("initServer", () => {
 		>();
 
 		let seenRequest: unknown;
-		let contractPathInCreateContext: string | undefined;
+		let routePathInCreateContext: string | undefined;
 
 		const implementations = [
 			implementContract(apiContract.users).handlers({
@@ -165,7 +165,7 @@ describe("initServer", () => {
 			implementations,
 			routePrefix: "/api",
 			createContext: (req) => {
-				contractPathInCreateContext = req.contract.path;
+				routePathInCreateContext = req.route.path;
 				const validatedReq = req.validatedRequest as { id?: string };
 				return {
 					viewerId: `viewer:${String(validatedReq.id)}`,
@@ -191,7 +191,7 @@ describe("initServer", () => {
 		);
 
 		assert.equal(nextError, undefined);
-		assert.equal(contractPathInCreateContext, "/users/:id");
+		assert.equal(routePathInCreateContext, "/users/:id");
 		assert.deepStrictEqual(seenRequest, {
 			id: "123",
 			includePosts: true,
@@ -392,13 +392,13 @@ describe("initServer", () => {
 			inputTitle?: string;
 			viewerIdFromMiddleware?: string;
 			viewerIdInService?: string;
-			contractPath?: string;
+			routePath?: string;
 		} = {};
 
 		const authMiddleware: RequestHandler = async (req, _res, next) => {
 			const enrichedReq = req as typeof req & { viewerId?: string };
 			seen.inputTitle = String(req.validatedRequest.title);
-			seen.contractPath = req.contract.path;
+			seen.routePath = req.route.path;
 			enrichedReq.viewerId = "viewer-123";
 			next();
 		};
@@ -456,7 +456,7 @@ describe("initServer", () => {
 		assert.equal(nextError, undefined);
 		assert.deepStrictEqual(seen, {
 			inputTitle: "Hello",
-			contractPath: "/posts",
+			routePath: "/posts",
 			viewerIdFromMiddleware: "viewer-123",
 			viewerIdInService: "viewer-123",
 		});

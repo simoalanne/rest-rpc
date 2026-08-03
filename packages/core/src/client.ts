@@ -12,13 +12,13 @@ import type {
 	RouteDeclaration,
 	StreamResponse,
 	WebSocketRouteDeclaration,
-} from "./contracts.ts";
+} from "./contract.ts";
 import {
 	isNoBodyResponse,
 	isStreamResponse,
 	mapContractRoutes,
 	mapObjectValues,
-} from "./contracts.ts";
+} from "./contract.ts";
 
 export type FetchOptions = Omit<RequestInit, "method" | "body" | "headers">;
 export type ApiClientFetchOptions = Omit<FetchOptions, "signal">;
@@ -226,10 +226,10 @@ export class ApiClient<TContract extends Contract = Contract> {
 		this.api = this.buildApiClient();
 	}
 
-	private groupKeysToRequest(args: RuntimeArgs, contract: RouteDeclaration) {
+	private groupKeysToRequest(args: RuntimeArgs, route: RouteDeclaration) {
 		const keyMap = new Map<string, "query" | "params">();
 		(["query", "params"] as const).forEach((type) => {
-			const keys = Object.keys(contract.request?.[type]?.shape ?? {});
+			const keys = Object.keys(route.request?.[type]?.shape ?? {});
 			keys.forEach((key) => {
 				keyMap.set(key, type);
 			});
@@ -249,7 +249,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 					return acc;
 				}
 
-				if (contract.request?.body) {
+				if (route.request?.body) {
 					if (!acc.body) acc.body = {};
 					acc.body[k] = v;
 				}
@@ -266,15 +266,15 @@ export class ApiClient<TContract extends Contract = Contract> {
 	}
 
 	private constructBaseRequest(
-		contract: RouteDeclaration,
+		route: RouteDeclaration,
 		args?: RuntimeArgs,
 	): { url: string; body?: BodyInit | null } {
-		let urlBase = `${this.baseUrl}${contract.path}`;
+		let urlBase = `${this.baseUrl}${route.path}`;
 		if (!args) return { url: urlBase };
 
 		const { body, query, params, rawBody } = this.groupKeysToRequest(
 			args,
-			contract,
+			route,
 		);
 		if (params) {
 			for (const [k, v] of Object.entries(params)) {
@@ -292,7 +292,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 			urlBase += `?${new URLSearchParams(query as Record<string, string>)}`;
 		}
 
-		if (isRawRequestRouteNode(contract)) {
+		if (isRawRequestRouteNode(route)) {
 			return { url: urlBase, body: rawBody as BodyInit | null | undefined };
 		}
 
@@ -302,8 +302,8 @@ export class ApiClient<TContract extends Contract = Contract> {
 		};
 	}
 
-	private extractArgs(contract: RouteDeclaration, args: unknown[]) {
-		const requestArgs = takesRequestInput(contract) ? args[0] : undefined;
+	private extractArgs(route: RouteDeclaration, args: unknown[]) {
+		const requestArgs = takesRequestInput(route) ? args[0] : undefined;
 		const options = requestArgs ? args[1] : args[0];
 		return { requestArgs, options } as {
 			requestArgs?: unknown;
@@ -312,12 +312,12 @@ export class ApiClient<TContract extends Contract = Contract> {
 	}
 
 	private async request<E extends RouteDeclaration>(
-		contract: E,
+		route: E,
 		...args: FetchArgs<E>
 	): Promise<{ rawResponse: Response; cleanup: () => void }> {
-		const { requestArgs, options } = this.extractArgs(contract, args);
+		const { requestArgs, options } = this.extractArgs(route, args);
 		const { url, body } = this.constructBaseRequest(
-			contract,
+			route,
 			requestArgs as RuntimeArgs,
 		);
 
@@ -328,11 +328,11 @@ export class ApiClient<TContract extends Contract = Contract> {
 			const rawResponse = await fetch(url, {
 				...this.fetchOptions,
 				...options,
-				method: contract.method,
+				method: route.method,
 				body,
 				headers: {
 					...headers,
-					...(body && !isRawRequestRouteNode(contract)
+					...(body && !isRawRequestRouteNode(route)
 						? { "Content-Type": "application/json" }
 						: {}),
 				},
@@ -350,11 +350,11 @@ export class ApiClient<TContract extends Contract = Contract> {
 	}
 
 	private getResponseSchema(
-		contract: RouteDeclaration,
+		route: RouteDeclaration,
 		status: number,
 	): ResponseBodySchema | undefined {
-		if (!("responses" in contract)) return undefined;
-		const entry = Object.entries(contract.responses).find(
+		if (!("responses" in route)) return undefined;
+		const entry = Object.entries(route.responses).find(
 			([declaredStatus]) => Number(declaredStatus) === status,
 		);
 		return entry?.[1];
@@ -389,13 +389,13 @@ export class ApiClient<TContract extends Contract = Contract> {
 	}
 
 	private async fetchResponse<E extends RouteDeclaration>(
-		contract: E,
+		route: E,
 		...args: FetchArgs<E>
 	): Promise<InferRouteClientResponse<E>> {
-		const { rawResponse, cleanup } = await this.request(contract, ...args);
+		const { rawResponse, cleanup } = await this.request(route, ...args);
 
 		try {
-			const schema = this.getResponseSchema(contract, rawResponse.status);
+			const schema = this.getResponseSchema(route, rawResponse.status);
 			if (!schema) {
 				return {
 					declared: false,
@@ -415,10 +415,10 @@ export class ApiClient<TContract extends Contract = Contract> {
 	}
 
 	private async fetch<E extends RouteDeclaration>(
-		contract: E,
+		route: E,
 		...args: FetchArgs<E>
 	): Promise<InferRouteSuccessBody<E>> {
-		const response = await this.fetchResponse(contract, ...args);
+		const response = await this.fetchResponse(route, ...args);
 
 		if (!response.declared || !isSuccessStatus(response.status)) {
 			throw new Error("Request did not return a declared success response");
@@ -465,16 +465,16 @@ export class ApiClient<TContract extends Contract = Contract> {
 	}
 
 	private connect<E extends WebSocketRouteDeclaration>(
-		contract: E,
+		route: E,
 		...args: ConnectArgs<E>
 	): InferRouteClientSocket<E> {
 		if (typeof WebSocket === "undefined") {
 			throw new Error("WebSocket is not available in this runtime");
 		}
 
-		const requestArgs = takesRequestInput(contract) ? args[0] : undefined;
+		const requestArgs = takesRequestInput(route) ? args[0] : undefined;
 		const { url } = this.constructBaseRequest(
-			contract,
+			route,
 			requestArgs as RuntimeArgs,
 		);
 		const rawSocket = new WebSocket(this.buildWebSocketUrl(url));
@@ -487,7 +487,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 			try {
 				return {
 					success: true,
-					data: contract.messages.server.parse(
+					data: route.messages.server.parse(
 						JSON.parse(data as string),
 					) as InferRouteServerMessage<E>,
 				};
@@ -536,11 +536,11 @@ export class ApiClient<TContract extends Contract = Contract> {
 	}
 
 	private tryConnect<E extends WebSocketRouteDeclaration>(
-		contract: E,
+		route: E,
 		...args: ConnectArgs<E>
 	) {
 		try {
-			const data = this.connect(contract, ...args);
+			const data = this.connect(route, ...args);
 			return { success: true, data } as const;
 		} catch (error) {
 			return { success: false, error } as const;

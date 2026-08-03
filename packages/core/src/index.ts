@@ -38,8 +38,8 @@ export type {
 	RouteDeclaration,
 	StreamResponse,
 	WebSocketRouteDeclaration,
-} from "./contracts.ts";
-export { defineContract, noBody, stream } from "./contracts.ts";
+} from "./contract.ts";
+export { defineContract, noBody, stream } from "./contract.ts";
 export type {
 	CreateOpenApiDocumentOptions,
 	OpenApiDocument,

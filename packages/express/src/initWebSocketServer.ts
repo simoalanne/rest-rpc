@@ -5,7 +5,7 @@ import type {
 	InferRouteServerMessage,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
-} from "@contract-first-api/core/contracts";
+} from "@contract-first-api/core/contract";
 import type { Request } from "express";
 import type WebSocket from "ws";
 import { WebSocketServer } from "ws";
@@ -47,14 +47,14 @@ type RegisterWebSocketRoutesOptions<TContext> = {
 	routes: WebSocketRoute[];
 	routePrefix?: string;
 	createContext?: (
-		req: Request & { contract: RouteDeclaration },
+		req: Request & { route: RouteDeclaration },
 	) => TContext | Promise<TContext>;
 	buildRoutePath: (routePrefix: string | undefined, path: string) => string;
 	createPathMatcher: (
 		path: string,
 	) => (pathname: string) => Record<string, string> | null;
 	validateRequestSegments: (
-		contract: RouteDeclaration,
+		route: RouteDeclaration,
 		segments: {
 			body?: unknown;
 			query?: unknown;
@@ -84,12 +84,12 @@ const sendUpgradeError = (
 	socket.destroy();
 };
 
-const createContractWebSocket = <E extends WebSocketRouteDeclaration>(
+const createRouteWebSocket = <E extends WebSocketRouteDeclaration>(
 	socket: WebSocket,
-	contract: E,
+	route: E,
 ): InferRouteServerSocket<E> => {
 	const rawSend = socket.send.bind(socket);
-	const contractSocket = socket as unknown as InferRouteServerSocket<E>;
+	const routeSocket = socket as unknown as InferRouteServerSocket<E>;
 
 	const parseIncomingMessage = (
 		data: unknown,
@@ -97,7 +97,7 @@ const createContractWebSocket = <E extends WebSocketRouteDeclaration>(
 		try {
 			return {
 				success: true,
-				data: contract.messages.client.parse(
+				data: route.messages.client.parse(
 					JSON.parse(String(data)),
 				) as InferRouteClientMessage<E>,
 			};
@@ -106,11 +106,11 @@ const createContractWebSocket = <E extends WebSocketRouteDeclaration>(
 		}
 	};
 
-	contractSocket.send = (message: InferRouteServerSendMessage<E>) => {
+	routeSocket.send = (message: InferRouteServerSendMessage<E>) => {
 		rawSend(JSON.stringify(message));
 	};
 
-	contractSocket.onMessage = (callback) => {
+	routeSocket.onMessage = (callback) => {
 		const onMessage = (data: WebSocket.RawData) => {
 			void Promise.resolve()
 				.then(() => callback(parseIncomingMessage(data)))
@@ -123,7 +123,7 @@ const createContractWebSocket = <E extends WebSocketRouteDeclaration>(
 		return () => socket.off("message", onMessage);
 	};
 
-	contractSocket.onClose = (callback) => {
+	routeSocket.onClose = (callback) => {
 		const onClose = (code: number, reason: Buffer) => {
 			void Promise.resolve()
 				.then(() => callback(code, reason))
@@ -134,7 +134,7 @@ const createContractWebSocket = <E extends WebSocketRouteDeclaration>(
 		return () => socket.off("close", onClose);
 	};
 
-	return contractSocket;
+	return routeSocket;
 };
 
 const runWebSocketServiceHandler = (
@@ -194,10 +194,10 @@ export const registerWebSocketRoutes = <TContext>({
 		}
 
 		const upgradeRequest = req as IncomingMessage & {
-			contract: RouteDeclaration;
+			route: RouteDeclaration;
 			validatedRequest: Record<string, unknown>;
 		};
-		upgradeRequest.contract = matchedRoute.route;
+		upgradeRequest.route = matchedRoute.route;
 		upgradeRequest.validatedRequest = validation.data;
 
 		let context: TContext | EmptyObject = {};
@@ -205,7 +205,7 @@ export const registerWebSocketRoutes = <TContext>({
 			context =
 				(await createContext?.(
 					upgradeRequest as unknown as Request & {
-						contract: RouteDeclaration;
+						route: RouteDeclaration;
 					},
 				)) || {};
 		} catch (error) {
@@ -221,7 +221,7 @@ export const registerWebSocketRoutes = <TContext>({
 		}
 
 		webSocketServer.handleUpgrade(req, socket, head, (rawSocket) => {
-			const contractSocket = createContractWebSocket(
+			const routeSocket = createRouteWebSocket(
 				rawSocket,
 				matchedRoute.route,
 			);
@@ -230,9 +230,9 @@ export const registerWebSocketRoutes = <TContext>({
 				{
 					...validation.data,
 					context,
-					socket: contractSocket,
+					socket: routeSocket,
 				},
-				contractSocket,
+				routeSocket,
 			);
 		});
 	});

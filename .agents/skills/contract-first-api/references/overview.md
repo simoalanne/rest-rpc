@@ -5,7 +5,7 @@ library's overall mental model.
 
 ## Purpose
 
-`contract-first-api` is a TypeScript toolkit for defining API contracts once
+`contract-first-api` is a TypeScript toolkit for defining an API contract once
 and reusing them across:
 
 - runtime validation
@@ -17,7 +17,7 @@ and reusing them across:
 The library is designed to keep normal HTTP semantics while avoiding duplicate
 request and response typing across backend and frontend.
 
-It has less features than larger contract first or RPC frameworks, but is more lightweight and less opinionated. It is intended for teams that want to keep their own HTTP stack and only need a shared contract tree with runtime validation and type inference.
+It has fewer features than larger contract-first or RPC frameworks, but is more lightweight and less opinionated. It is intended for teams that want to keep their own HTTP stack and only need one shared API contract with runtime validation and type inference.
 
 
 ## Compared to Other Libraries
@@ -26,30 +26,31 @@ It has less features than larger contract first or RPC frameworks, but is more l
 
 ## Core Model
 
-One shared contract tree is the source of truth.
+One shared API contract is the source of truth.
 
-Contracts are plain TypeScript objects with Zod schemas. Integration packages
-consume that tree instead of generating a second representation.
+The API contract is a plain TypeScript object with route declarations and Zod
+schemas. Integration packages consume that object instead of generating a second
+representation.
 
 Typical package roles:
 
 - `@contract-first-api/core`
-  Defines contracts, shared types, response helpers, and the typed client.
+  Defines the API contract, shared types, response helpers, and the typed client.
 - `@contract-first-api/express`
-  Mounts contracts on an Express app with validation and typed services.
+  Mounts the API contract on an Express app with validation and typed services.
 - `@contract-first-api/react-query`
-  Creates React Query hooks and cache helpers from contracts.
+  Creates React Query hooks and cache helpers from the API contract.
 - `@contract-first-api/openapi`
-  Generates a plain OpenAPI document object from JSON contracts.
+  Generates a plain OpenAPI document object from JSON routes.
 
-## Contract Shapes
+## Route Shapes
 
-Each contract is one of four modes:
+Each route is one of four modes:
 
 - `json`
-  Default request and response contract with status-keyed `responses`.
+  Default request and response route with status-keyed `responses`.
 - `raw`
-  Validated `params` and `query`, but no contract-managed request body.
+  Validated `params` and `query`, but no API-contract-managed request body.
 - streaming
   NDJSON streaming response declared with `stream(schema)`.
 - `websocket`
@@ -59,8 +60,8 @@ These modes affect how every integration package behaves.
 
 ## Practical Rules
 
-- Keep one shared contract tree in a shared package or shared module.
-- Let integrations derive behavior from the contract tree instead of
+- Keep one shared API contract in a shared package or shared module.
+- Let integrations derive behavior from the API contract instead of
   duplicating DTOs.
 - Keep backend route prefixes and client base URLs aligned.
 - When debugging, check both the package README and the package source/tests if

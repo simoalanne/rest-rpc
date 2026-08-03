@@ -132,7 +132,7 @@ Status codes are declared directly in `responses`.
 - **JSON routes** are the default. They can define request schemas and
   responses.
 - **Raw request routes** use `options: { mode: "raw" }`. They can define
-  `query`, `params`, and responses, but not a contract-managed request `body`
+  `query`, `params`, and responses, but not a API-contract-managed request `body`
   schema.
 - **Streaming routes** are HTTP routes whose successful response is
   declared with `stream(schema)`. A stream response cannot be mixed with
@@ -176,7 +176,7 @@ service and client inputs.
 
 ## Raw Request Routes
 
-Raw request routes pass the request body through without contract-level Zod
+Raw request routes pass the request body through without API-contract-level Zod
 validation while keeping typed params, query, and responses.
 
 ```ts

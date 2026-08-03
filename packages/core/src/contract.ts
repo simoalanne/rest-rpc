@@ -106,7 +106,7 @@ export const mapObjectValues = <TLeaf>(
 				{} as Record<string, unknown>,
 			);
 
-const isContractDefinition = (value: unknown): value is RouteDeclaration =>
+const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
 	typeof value === "object" &&
 	value !== null &&
 	"path" in value &&
@@ -115,7 +115,7 @@ const isContractDefinition = (value: unknown): value is RouteDeclaration =>
 export const mapContractRoutes = (
 	contract: Contract,
 	mappingFn: (route: RouteDeclaration, path: string[]) => unknown,
-) => mapObjectValues(contract, isContractDefinition, mappingFn);
+) => mapObjectValues(contract, isRouteDeclaration, mappingFn);
 
 export type ContractRoute = RouteDeclaration & {
 	keySegments: string[];
@@ -127,7 +127,7 @@ export const flattenContractRoutes = <TContract extends Contract = Contract>(
 	const result: ContractRoute[] = [];
 
 	const visit = (node: Contract, keySegments: string[]) => {
-		if (isContractDefinition(node)) {
+		if (isRouteDeclaration(node)) {
 			result.push({
 				...node,
 				keySegments,
@@ -285,11 +285,11 @@ export type InferRouteRequest<E extends RouteDeclaration> =
 		: never;
 
 type MissingSuccessfulResponseError = {
-	readonly __contract_error__: "Contract must declare at least one successful response.";
+	readonly __route_error__: "Route must declare at least one successful response.";
 };
 
 type StreamResponseStatusError = {
-	readonly __contract_error__: "Contracts with a stream response cannot define more than one successful status code.";
+	readonly __route_error__: "Routes with a stream response cannot define more than one successful status code.";
 };
 
 type ValidateResponseStatuses<T> = T extends RouteDeclaration

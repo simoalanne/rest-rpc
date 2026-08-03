@@ -1,6 +1,6 @@
 # @contract-first-api/react-query
 
-Use this reference for React Query integration built from shared contracts.
+Use this reference for React Query integration built from shared API contract.
 
 ## Purpose
 
@@ -11,7 +11,7 @@ client, plus a React Query `queryClient`.
 ## Main Setup
 
 1. Create a React Query `QueryClient`.
-2. Call `initReactQueryClient(contracts, { queryClient, baseUrl })`.
+2. Call `initReactQueryClient(contract, { queryClient, baseUrl })`.
 3. Render the app inside `QueryClientProvider`.
 
 ```ts
@@ -20,7 +20,7 @@ import { QueryClient } from "@tanstack/react-query";
 
 export const queryClient = new QueryClient();
 
-export const api = initReactQueryClient(contracts, {
+export const api = initReactQueryClient(contract, {
 	queryClient,
 	baseUrl: import.meta.env.VITE_API_BASE_URL,
 });
@@ -36,14 +36,12 @@ Provider setup:
 
 ## Behavior
 
-- HTTP contracts expose `useQuery()`, `useSuspenseQuery()`, `useMutation()`,
+- JSON routes expose `useQuery()`, `useSuspenseQuery()`, `useMutation()`,
   `setData()`, `invalidate()`, `clear()`, and `getKey()`.
 - Hook data is the successful response envelope, so response bodies are under
   `data.body`.
 - Hook errors can be declared non-success responses, undeclared client
   responses, or normal `Error` objects.
-- WebSocket contracts are omitted from the React Query tree; use the core client
-  directly for websocket connections.
 
 ## Common Usage
 
