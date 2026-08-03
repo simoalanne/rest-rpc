@@ -203,6 +203,59 @@ const todoImplementations = implementContract(apiContract.todos).handlers({
 Request field names must be unique across locations in a single route
 declaration.
 
+## Helper Types
+
+Inline handlers usually get their types from inference. When handlers move into
+separate files, use the route helper types to keep the same request, response,
+context, and websocket message types.
+
+```ts
+import type {
+	InferRouteServerReceivedMessage,
+	InferRouteServerSendMessage,
+	InferRouteServerSocket,
+	InferRouteServiceHandler,
+	InferRouteServiceRequest,
+	InferRouteServiceResponse,
+} from "@contract-first-api/express";
+import { apiContract } from "@example/shared";
+
+type CreateTodoHandler = InferRouteServiceHandler<
+	typeof apiContract.todos.create,
+	RequestContext
+>;
+
+export const createTodo: CreateTodoHandler = async ({ title, context }) => {
+	const todo = await context.todos.create({ title });
+
+	return {
+		status: 201,
+		body: todo,
+	};
+};
+
+type InspectImageRequest = InferRouteServiceRequest<
+	typeof apiContract.images.inspect,
+	RequestContext
+>;
+
+type TodoListResponse = InferRouteServiceResponse<
+	typeof apiContract.todos.list
+>;
+
+type DiscussSocket = InferRouteServerSocket<
+	typeof apiContract.discuss.connect
+>;
+
+type IncomingDiscussMessage = InferRouteServerReceivedMessage<
+	typeof apiContract.discuss.connect
+>;
+
+type OutgoingDiscussMessage = InferRouteServerSendMessage<
+	typeof apiContract.discuss.connect
+>;
+```
+
 ## Raw Body Handling
 
 If the API contract mixes raw and non-raw routes, prefer

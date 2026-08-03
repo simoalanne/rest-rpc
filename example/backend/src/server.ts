@@ -1,5 +1,12 @@
 import { createServer } from "node:http";
-import type { ContractWebSocket } from "@contract-first-api/express";
+import type {
+	InferRouteServerMessageResult,
+	InferRouteServerReceivedMessage,
+	InferRouteServerSendMessage,
+	InferRouteServerSocket,
+	InferRouteServiceHandler,
+	InferRouteServiceRequest,
+} from "@contract-first-api/express";
 import { initServer } from "@contract-first-api/express";
 import type { DiscussMessage, Todo } from "@example/shared";
 import { apiContract } from "@example/shared";
@@ -89,7 +96,24 @@ const todos: Todo[] = [
 	},
 ];
 
-type DiscussSocket = ContractWebSocket<typeof apiContract.discuss.connect>;
+type DiscussSocket = InferRouteServerSocket<typeof apiContract.discuss.connect>;
+type DiscussIncomingMessage = InferRouteServerReceivedMessage<
+	typeof apiContract.discuss.connect
+>;
+type DiscussOutgoingMessage = InferRouteServerSendMessage<
+	typeof apiContract.discuss.connect
+>;
+type DiscussMessageResult = InferRouteServerMessageResult<
+	typeof apiContract.discuss.connect
+>;
+type CreateTodoHandler = InferRouteServiceHandler<
+	typeof apiContract.todos.create,
+	RequestContext
+>;
+type InspectImageRequest = InferRouteServiceRequest<
+	typeof apiContract.images.inspect,
+	RequestContext
+>;
 
 const discussMessages: DiscussMessage[] = [
 	{
@@ -101,14 +125,65 @@ const discussMessages: DiscussMessage[] = [
 ];
 const discussSockets = new Set<DiscussSocket>();
 
-const broadcastDiscussMessage = (message: DiscussMessage) => {
+const broadcastDiscussMessage = (message: DiscussOutgoingMessage) => {
 	for (const socket of discussSockets) {
-		socket.send({
-			type: "message",
-			message,
-		});
+		socket.send(message);
 	}
 };
+
+const listTodos = () => ({
+	status: 200 as const,
+	body: {
+		items: todos,
+	},
+});
+
+const createTodo: CreateTodoHandler = ({ title }) => {
+	const todo = {
+		id: `todo-${todos.length + 1}`,
+		title,
+		createdAt: new Date().toISOString(),
+	};
+
+	todos.push(todo);
+
+	const requiresProcessing = Math.random() < 0.5;
+
+	if (requiresProcessing) {
+		return {
+			status: 202,
+			body: {
+				requestId: `request-${crypto.randomUUID()}`,
+			},
+		};
+	}
+	return {
+		status: 201,
+		body: todo,
+	};
+};
+
+const inspectImage = ({ rawBody }: InspectImageRequest) => {
+	if (!Buffer.isBuffer(rawBody)) {
+		throw new Error(
+			"Expected a parsed raw request body. Add express.raw() middleware for image uploads.",
+		);
+	}
+
+	return {
+		status: 200 as const,
+		body: inspectImageBuffer(rawBody),
+	};
+};
+
+const createDiscussMessage = (
+	data: DiscussIncomingMessage,
+): DiscussMessage => ({
+	id: `message-${crypto.randomUUID()}`,
+	author: data.author.trim(),
+	text: data.text.trim(),
+	createdAt: new Date().toISOString(),
+});
 
 const serverTools = initServer<typeof apiContract, RequestContext>();
 const {
@@ -160,38 +235,8 @@ const implementations = [
 		},
 	}),
 	implementContract(apiContract.todos).handlers({
-		list() {
-			return {
-				status: 200,
-				body: {
-					items: todos,
-				},
-			};
-		},
-		create({ title }) {
-			const todo = {
-				id: `todo-${todos.length + 1}`,
-				title,
-				createdAt: new Date().toISOString(),
-			};
-
-			todos.push(todo);
-
-			const requiresProcessing = Math.random() < 0.5;
-
-			if (requiresProcessing) {
-				return {
-					status: 202,
-					body: {
-						requestId: `request-${crypto.randomUUID()}`,
-					},
-				};
-			}
-			return {
-				status: 201,
-				body: todo,
-			};
-		},
+		list: listTodos,
+		create: createTodo,
 		find({ query }) {
 			return {
 				status: 200,
@@ -227,18 +272,7 @@ const implementations = [
 		},
 	}),
 	implementContract(apiContract.images).handlers({
-		inspect({ rawBody }) {
-			if (!Buffer.isBuffer(rawBody)) {
-				throw new Error(
-					"Expected a parsed raw request body. Add express.raw() middleware for image uploads.",
-				);
-			}
-
-			return {
-				status: 200,
-				body: inspectImageBuffer(rawBody),
-			};
-		},
+		inspect: inspectImage,
 	}),
 	implementContract(apiContract.discuss).handlers({
 		connect({ socket }) {
@@ -248,19 +282,19 @@ const implementations = [
 				messages: discussMessages,
 			});
 
-			socket.onMessage((result) => {
+			const onMessage = (result: DiscussMessageResult) => {
 				if (!result.success) return;
 
-				const message = {
-					id: `message-${crypto.randomUUID()}`,
-					author: result.data.author.trim(),
-					text: result.data.text.trim(),
-					createdAt: new Date().toISOString(),
-				};
+				const message = createDiscussMessage(result.data);
 
 				discussMessages.push(message);
-				broadcastDiscussMessage(message);
-			});
+				broadcastDiscussMessage({
+					type: "message",
+					message,
+				});
+			};
+
+			socket.onMessage(onMessage);
 
 			socket.onClose(() => {
 				discussSockets.delete(socket);

@@ -1,7 +1,9 @@
 export type {
+	InferRouteMutationVariables,
+	InferRouteQueryData,
+	InferRouteQueryError,
+	ReactQueryApiFor,
 	ReactQueryClient,
 	ReactQueryClientOptions,
-	ReactQueryApiError,
-	ReactQueryApiFor,
 } from "./createAdapter.ts";
-export { initReactQueryClient, default } from "./createAdapter.ts";
+export { default, initReactQueryClient } from "./createAdapter.ts";

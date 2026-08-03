@@ -1,8 +1,8 @@
 import type { Server as HttpServer, IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import type {
-	ContractClientMessage,
-	ContractServerMessage,
+	InferRouteClientMessage,
+	InferRouteServerMessage,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
 } from "@contract-first-api/core/contracts";
@@ -11,17 +11,24 @@ import type WebSocket from "ws";
 import { WebSocketServer } from "ws";
 import type { EmptyObject, ValidationResult } from "./initServer.ts";
 
-export type WebSocketMessageResult<E extends WebSocketRouteDeclaration> =
-	| { success: true; data: ContractClientMessage<E> }
+export type InferRouteServerMessageResult<E extends WebSocketRouteDeclaration> =
+	| { success: true; data: InferRouteServerReceivedMessage<E> }
 	| { success: false };
 
-export type ContractWebSocket<E extends WebSocketRouteDeclaration> = Omit<
+export type InferRouteServerReceivedMessage<
+	E extends WebSocketRouteDeclaration,
+> = InferRouteClientMessage<E>;
+
+export type InferRouteServerSendMessage<E extends WebSocketRouteDeclaration> =
+	InferRouteServerMessage<E>;
+
+export type InferRouteServerSocket<E extends WebSocketRouteDeclaration> = Omit<
 	WebSocket,
 	"send" | "on" | "off"
 > & {
-	send: (message: ContractServerMessage<E>) => void;
+	send: (message: InferRouteServerSendMessage<E>) => void;
 	onMessage: (
-		callback: (result: WebSocketMessageResult<E>) => void,
+		callback: (result: InferRouteServerMessageResult<E>) => void,
 	) => () => void;
 	onClose: (callback: (code: number, reason: Buffer) => void) => () => void;
 };
@@ -80,24 +87,26 @@ const sendUpgradeError = (
 const createContractWebSocket = <E extends WebSocketRouteDeclaration>(
 	socket: WebSocket,
 	contract: E,
-): ContractWebSocket<E> => {
+): InferRouteServerSocket<E> => {
 	const rawSend = socket.send.bind(socket);
-	const contractSocket = socket as unknown as ContractWebSocket<E>;
+	const contractSocket = socket as unknown as InferRouteServerSocket<E>;
 
-	const parseIncomingMessage = (data: unknown): WebSocketMessageResult<E> => {
+	const parseIncomingMessage = (
+		data: unknown,
+	): InferRouteServerMessageResult<E> => {
 		try {
 			return {
 				success: true,
 				data: contract.messages.client.parse(
 					JSON.parse(String(data)),
-				) as ContractClientMessage<E>,
+				) as InferRouteClientMessage<E>,
 			};
 		} catch {
 			return { success: false };
 		}
 	};
 
-	contractSocket.send = (message: ContractServerMessage<E>) => {
+	contractSocket.send = (message: InferRouteServerSendMessage<E>) => {
 		rawSend(JSON.stringify(message));
 	};
 

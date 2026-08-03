@@ -1,15 +1,15 @@
 import type {
 	Contract,
-	ContractClientMessage,
-	ContractRequest,
-	ContractResponse,
-	ContractServerMessage,
-	ContractSingleSuccessfulResponseBody,
-	RouteDeclaration,
+	InferRouteClientMessage,
+	InferRouteRequest,
+	InferRouteResponse,
+	InferRouteServerMessage,
+	InferRouteSuccessBody,
 	IsWebSocketRoute,
 	RawRequestBody,
 	RawRequestRouteDeclaration,
 	ResponseBodySchema,
+	RouteDeclaration,
 	StreamResponse,
 	WebSocketRouteDeclaration,
 } from "./contracts.ts";
@@ -25,77 +25,86 @@ export type ApiClientFetchOptions = Omit<FetchOptions, "signal">;
 
 export type Merge<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
 
-export type ClientRequest<E extends RouteDeclaration> =
+export type InferRouteClientRequest<E extends RouteDeclaration> =
 	E extends RawRequestRouteDeclaration
-	? Merge<
-			(ContractRequest<E> extends never
-				? Record<never, never>
-				: ContractRequest<E>) & {
-				rawBody: RawRequestBody;
-			}
-		>
-	: ContractRequest<E>;
+		? Merge<
+				(InferRouteRequest<E> extends never
+					? Record<never, never>
+					: InferRouteRequest<E>) & {
+					rawBody: RawRequestBody;
+				}
+			>
+		: InferRouteRequest<E>;
 
-export type RequestInput<E extends RouteDeclaration> =
-	ClientRequest<E> extends never ? void : ClientRequest<E>;
+export type InferRouteClientRequestInput<E extends RouteDeclaration> =
+	InferRouteClientRequest<E> extends never
+		? undefined
+		: InferRouteClientRequest<E>;
 
 export type FetchArgs<E extends RouteDeclaration = RouteDeclaration> =
-	ClientRequest<E> extends never
+	InferRouteClientRequest<E> extends never
 		? [options?: FetchOptions]
-		: [request: ClientRequest<E>, options?: FetchOptions];
+		: [request: InferRouteClientRequest<E>, options?: FetchOptions];
 
 export type FetchFn<E extends RouteDeclaration> = (
 	...args: FetchArgs<E>
-) => Promise<ContractSingleSuccessfulResponseBody<E>>;
+) => Promise<InferRouteSuccessBody<E>>;
 
-export type UndeclaredClientResponse = {
+export type UndeclaredRouteClientResponse = {
 	declared: false;
 	status: number;
 	body: unknown;
 };
 
-export type DeclaredClientResponse<E extends RouteDeclaration> =
-	ContractResponse<E> & {
-	declared: true;
-};
+export type DeclaredRouteClientResponse<E extends RouteDeclaration> =
+	InferRouteResponse<E> & {
+		declared: true;
+	};
 
-export type ClientResponse<E extends RouteDeclaration> =
-	| DeclaredClientResponse<E>
-	| UndeclaredClientResponse;
+export type InferRouteClientResponse<E extends RouteDeclaration> =
+	| DeclaredRouteClientResponse<E>
+	| UndeclaredRouteClientResponse;
 
 export type FetchResponseFn<E extends RouteDeclaration> = (
 	...args: FetchArgs<E>
-) => Promise<ClientResponse<E>>;
+) => Promise<InferRouteClientResponse<E>>;
 
 export type ConnectArgs<E extends RouteDeclaration = RouteDeclaration> =
-	ContractRequest<E> extends never ? [] : [request: ContractRequest<E>];
+	InferRouteRequest<E> extends never ? [] : [request: InferRouteRequest<E>];
 
-export type ContractWebSocket<E extends WebSocketRouteDeclaration> = Omit<
+export type InferRouteClientSendMessage<E extends WebSocketRouteDeclaration> =
+	InferRouteClientMessage<E>;
+
+export type InferRouteClientReceivedMessage<
+	E extends WebSocketRouteDeclaration,
+> = InferRouteServerMessage<E>;
+
+export type InferRouteClientSocket<E extends WebSocketRouteDeclaration> = Omit<
 	WebSocket,
 	"send"
 > & {
-	send: (message: ContractClientMessage<E>) => void;
+	send: (message: InferRouteClientSendMessage<E>) => void;
 	onOpen: (callback: (event: Event) => void) => () => void;
 	onMessage: (
-		callback: (result: WebSocketMessageResult<E>) => void,
+		callback: (result: InferRouteClientMessageResult<E>) => void,
 	) => () => void;
 	onError: (callback: (event: Event) => void) => () => void;
 	onClose: (callback: (event: CloseEvent) => void) => () => void;
 };
 
-export type WebSocketMessageResult<E extends WebSocketRouteDeclaration> =
-	| { success: true; data: ContractServerMessage<E> }
+export type InferRouteClientMessageResult<E extends WebSocketRouteDeclaration> =
+	| { success: true; data: InferRouteClientReceivedMessage<E> }
 	| { success: false };
 
 export type ConnectFn<E extends RouteDeclaration> = (
 	...args: ConnectArgs<E>
-) => E extends WebSocketRouteDeclaration ? ContractWebSocket<E> : never;
+) => E extends WebSocketRouteDeclaration ? InferRouteClientSocket<E> : never;
 
 export type TryConnectFn<E extends RouteDeclaration> = (
 	...args: ConnectArgs<E>
 ) => E extends WebSocketRouteDeclaration
 	?
-			| { success: true; data: ContractWebSocket<E> }
+			| { success: true; data: InferRouteClientSocket<E> }
 			| { success: false; error: unknown }
 	: never;
 
@@ -111,7 +120,7 @@ type ApiClientHappyPathRouteValue<E extends RouteDeclaration> = {
 export type ApiClientHttpRouteValue<
 	E extends RouteDeclaration = RouteDeclaration,
 > =
-	ContractSingleSuccessfulResponseBody<E> extends never
+	InferRouteSuccessBody<E> extends never
 		? ApiClientProtocolRouteValue<E>
 		: ApiClientHappyPathRouteValue<E>;
 
@@ -122,9 +131,7 @@ export type ApiClientWebSocketRouteValue<
 	tryConnect: TryConnectFn<E>;
 };
 
-export type ApiClientRouteValue<
-	E extends RouteDeclaration = RouteDeclaration,
-> =
+export type ApiClientRouteValue<E extends RouteDeclaration = RouteDeclaration> =
 	E extends RouteDeclaration
 		? IsWebSocketRoute<E> extends true
 			? ApiClientWebSocketRouteValue<E>
@@ -147,9 +154,7 @@ export type ApiClientOptions = {
 
 type RuntimeArgs = Record<string, unknown>;
 
-const isApiClientRouteNode = (
-	value: unknown,
-): value is ApiClientRouteValue =>
+const isApiClientRouteNode = (value: unknown): value is ApiClientRouteValue =>
 	typeof value === "object" &&
 	value !== null &&
 	("fetchResponse" in value || "connect" in value);
@@ -386,7 +391,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 	private async fetchResponse<E extends RouteDeclaration>(
 		contract: E,
 		...args: FetchArgs<E>
-	): Promise<ClientResponse<E>> {
+	): Promise<InferRouteClientResponse<E>> {
 		const { rawResponse, cleanup } = await this.request(contract, ...args);
 
 		try {
@@ -396,14 +401,14 @@ export class ApiClient<TContract extends Contract = Contract> {
 					declared: false,
 					status: rawResponse.status,
 					body: await this.readUnknownBody(rawResponse),
-				} as ClientResponse<E>;
+				} as InferRouteClientResponse<E>;
 			}
 
 			return {
 				declared: true,
 				status: rawResponse.status,
 				body: await this.readDeclaredBody(schema, rawResponse),
-			} as ClientResponse<E>;
+			} as InferRouteClientResponse<E>;
 		} finally {
 			cleanup();
 		}
@@ -412,14 +417,14 @@ export class ApiClient<TContract extends Contract = Contract> {
 	private async fetch<E extends RouteDeclaration>(
 		contract: E,
 		...args: FetchArgs<E>
-	): Promise<ContractSingleSuccessfulResponseBody<E>> {
+	): Promise<InferRouteSuccessBody<E>> {
 		const response = await this.fetchResponse(contract, ...args);
 
 		if (!response.declared || !isSuccessStatus(response.status)) {
 			throw new Error("Request did not return a declared success response");
 		}
 
-		return response.body as ContractSingleSuccessfulResponseBody<E>;
+		return response.body as InferRouteSuccessBody<E>;
 	}
 
 	private async *parseNdjsonStream(
@@ -462,7 +467,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 	private connect<E extends WebSocketRouteDeclaration>(
 		contract: E,
 		...args: ConnectArgs<E>
-	): ContractWebSocket<E> {
+	): InferRouteClientSocket<E> {
 		if (typeof WebSocket === "undefined") {
 			throw new Error("WebSocket is not available in this runtime");
 		}
@@ -474,15 +479,17 @@ export class ApiClient<TContract extends Contract = Contract> {
 		);
 		const rawSocket = new WebSocket(this.buildWebSocketUrl(url));
 		const rawSend = rawSocket.send.bind(rawSocket);
-		const socket = rawSocket as ContractWebSocket<E>;
+		const socket = rawSocket as InferRouteClientSocket<E>;
 
-		const parseIncomingMessage = (data: unknown): WebSocketMessageResult<E> => {
+		const parseIncomingMessage = (
+			data: unknown,
+		): InferRouteClientMessageResult<E> => {
 			try {
 				return {
 					success: true,
 					data: contract.messages.server.parse(
 						JSON.parse(data as string),
-					) as ContractServerMessage<E>,
+					) as InferRouteServerMessage<E>,
 				};
 			} catch {
 				return {
@@ -491,7 +498,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 			}
 		};
 
-		socket.send = (message: ContractClientMessage<E>) => {
+		socket.send = (message: InferRouteClientMessage<E>) => {
 			if (socket.readyState !== WebSocket.OPEN) {
 				throw new Error("WebSocket is not open");
 			}
@@ -515,7 +522,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 		};
 
 		socket.onMessage = (
-			callback: (result: WebSocketMessageResult<E>) => void,
+			callback: (result: InferRouteClientMessageResult<E>) => void,
 		) => {
 			const onMessage = (event: MessageEvent) => {
 				callback(parseIncomingMessage(event.data));
@@ -570,5 +577,4 @@ export class ApiClient<TContract extends Contract = Contract> {
 export const initClient = <TContract extends Contract>(
 	contract: TContract,
 	options: ApiClientOptions,
-): ApiClientFor<TContract> =>
-	new ApiClient(contract, options).api;
+): ApiClientFor<TContract> => new ApiClient(contract, options).api;

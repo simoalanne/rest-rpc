@@ -229,7 +229,8 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, implementContract } = initServer<typeof apiContract>();
+		const { createRouter, implementContract } =
+			initServer<typeof apiContract>();
 		const implementations = [
 			implementContract(apiContract.events).handlers({
 				stream() {
@@ -298,7 +299,8 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, implementContract } = initServer<typeof apiContract>();
+		const { createRouter, implementContract } =
+			initServer<typeof apiContract>();
 		let createContextCalled = false;
 		let serviceCalled = false;
 
@@ -499,7 +501,8 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, implementContract } = initServer<typeof apiContract>();
+		const { createRouter, implementContract } =
+			initServer<typeof apiContract>();
 		const target = createRouteTargetDouble();
 
 		createRouter({
@@ -557,7 +560,8 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, implementContract } = initServer<typeof apiContract>();
+		const { createRouter, implementContract } =
+			initServer<typeof apiContract>();
 		const target = createRouteTargetDouble();
 
 		createRouter({
@@ -605,7 +609,8 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, implementContract } = initServer<typeof apiContract>();
+		const { createRouter, implementContract } =
+			initServer<typeof apiContract>();
 		const serviceError = new Error("boom");
 
 		const target = createRouteTargetDouble();
@@ -654,7 +659,8 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, implementContract } = initServer<typeof apiContract>();
+		const { createRouter, implementContract } =
+			initServer<typeof apiContract>();
 		const target = createRouteTargetDouble();
 		const knownError = { code: "TITLE_ALREADY_EXISTS" };
 		createRouter({

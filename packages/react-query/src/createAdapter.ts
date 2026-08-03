@@ -1,16 +1,16 @@
-import type {
-	ApiClientOptions,
-	ClientRequest,
-	FetchOptions,
-	FetchResponseFn,
-	RequestInput,
-	UndeclaredClientResponse,
-} from "@contract-first-api/core/client";
 import { initClient } from "@contract-first-api/core";
 import type {
+	ApiClientOptions,
+	FetchOptions,
+	FetchResponseFn,
+	InferRouteClientRequest,
+	InferRouteClientRequestInput,
+	UndeclaredRouteClientResponse,
+} from "@contract-first-api/core/client";
+import type {
 	Contract,
-	ContractNonSuccessfulResponse,
-	ContractSuccessfulResponse,
+	InferRouteErrors,
+	InferRouteSuccessResponse,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
 } from "@contract-first-api/core/contracts";
@@ -30,78 +30,112 @@ import {
 	useSuspenseQuery,
 } from "@tanstack/react-query";
 
-type QueryData<E extends RouteDeclaration> = ContractSuccessfulResponse<E>;
+export type InferRouteQueryData<E extends RouteDeclaration> =
+	InferRouteSuccessResponse<E>;
 
-export type ReactQueryApiError<E extends RouteDeclaration> =
-	| ContractNonSuccessfulResponse<E>
-	| UndeclaredClientResponse
+export type InferRouteQueryError<E extends RouteDeclaration> =
+	| InferRouteErrors<E>
+	| UndeclaredRouteClientResponse
 	| Error;
 
-type QueryOptionsFor<E extends RouteDeclaration, TData = QueryData<E>> = Omit<
-	UseQueryOptions<QueryData<E>, ReactQueryApiError<E>, TData>,
+export type InferRouteMutationVariables<E extends RouteDeclaration> =
+	InferRouteClientRequestInput<E>;
+
+type QueryOptionsFor<
+	E extends RouteDeclaration,
+	TData = InferRouteQueryData<E>,
+> = Omit<
+	UseQueryOptions<InferRouteQueryData<E>, InferRouteQueryError<E>, TData>,
 	"queryKey" | "queryFn"
 >;
 
 type SuspenseQueryOptionsFor<
 	E extends RouteDeclaration,
-	TData = QueryData<E>,
+	TData = InferRouteQueryData<E>,
 > = Omit<
-	UseSuspenseQueryOptions<QueryData<E>, ReactQueryApiError<E>, TData>,
+	UseSuspenseQueryOptions<
+		InferRouteQueryData<E>,
+		InferRouteQueryError<E>,
+		TData
+	>,
 	"queryKey" | "queryFn"
 >;
 
 type MutationOptionsFor<E extends RouteDeclaration> = Omit<
-	UseMutationOptions<QueryData<E>, ReactQueryApiError<E>, RequestInput<E>>,
+	UseMutationOptions<
+		InferRouteQueryData<E>,
+		InferRouteQueryError<E>,
+		InferRouteMutationVariables<E>
+	>,
 	"mutationFn"
 >;
 
 type QueryDisabled = false | null | undefined | "" | 0;
 
-type UseQueryArgs<E extends RouteDeclaration, TData = QueryData<E>> =
-	ClientRequest<E> extends never
+type UseQueryArgs<E extends RouteDeclaration, TData = InferRouteQueryData<E>> =
+	InferRouteClientRequest<E> extends never
 		? [options?: QueryOptionsFor<E, TData>]
 		: [
-				request: ClientRequest<E> | QueryDisabled,
+				request: InferRouteClientRequest<E> | QueryDisabled,
 				options?: QueryOptionsFor<E, TData>,
 			];
 
-type UseSuspenseQueryArgs<E extends RouteDeclaration, TData = QueryData<E>> =
-	ClientRequest<E> extends never
+type UseSuspenseQueryArgs<
+	E extends RouteDeclaration,
+	TData = InferRouteQueryData<E>,
+> =
+	InferRouteClientRequest<E> extends never
 		? [options?: SuspenseQueryOptionsFor<E, TData>]
-		: [request: ClientRequest<E>, options?: SuspenseQueryOptionsFor<E, TData>];
+		: [
+				request: InferRouteClientRequest<E>,
+				options?: SuspenseQueryOptionsFor<E, TData>,
+			];
 
 type SetDataArgs<E extends RouteDeclaration> =
 	| [
-			request: ClientRequest<E>,
-			updater: Updater<QueryData<E> | undefined, QueryData<E> | undefined>,
+			request: InferRouteClientRequest<E>,
+			updater: Updater<
+				InferRouteQueryData<E> | undefined,
+				InferRouteQueryData<E> | undefined
+			>,
 	  ]
-	| [updater: Updater<QueryData<E> | undefined, QueryData<E> | undefined>];
+	| [
+			updater: Updater<
+				InferRouteQueryData<E> | undefined,
+				InferRouteQueryData<E> | undefined
+			>,
+	  ];
 
 type ReactQueryRouteValue<E extends RouteDeclaration> = {
 	useMutation: (
 		options?: MutationOptionsFor<E>,
-	) => UseMutationResult<QueryData<E>, ReactQueryApiError<E>, RequestInput<E>>;
-	useQuery: <TData = QueryData<E>>(
+	) => UseMutationResult<
+		InferRouteQueryData<E>,
+		InferRouteQueryError<E>,
+		InferRouteMutationVariables<E>
+	>;
+	useQuery: <TData = InferRouteQueryData<E>>(
 		...args: UseQueryArgs<E, TData>
-	) => QueryObserverResult<TData, ReactQueryApiError<E>>;
-	useSuspenseQuery: <TData = QueryData<E>>(
+	) => QueryObserverResult<TData, InferRouteQueryError<E>>;
+	useSuspenseQuery: <TData = InferRouteQueryData<E>>(
 		...args: UseSuspenseQueryArgs<E, TData>
-	) => UseSuspenseQueryResult<TData, ReactQueryApiError<E>>;
+	) => UseSuspenseQueryResult<TData, InferRouteQueryError<E>>;
 	setData: (...args: SetDataArgs<E>) => void;
-	invalidate: (request?: ClientRequest<E>) => Promise<void>;
-	clear: (request?: ClientRequest<E>) => void;
-	getKey: (request?: ClientRequest<E>) => QueryKey;
+	invalidate: (request?: InferRouteClientRequest<E>) => Promise<void>;
+	clear: (request?: InferRouteClientRequest<E>) => void;
+	getKey: (request?: InferRouteClientRequest<E>) => QueryKey;
 };
 
-export type ReactQueryApiFor<T extends Contract> = T extends WebSocketRouteDeclaration
-	? Record<never, never>
-	: T extends RouteDeclaration
-		? ReactQueryRouteValue<T>
-		: {
-				[K in keyof T]: T[K] extends Contract
-					? ReactQueryApiFor<T[K]>
-					: never;
-			};
+export type ReactQueryApiFor<T extends Contract> =
+	T extends WebSocketRouteDeclaration
+		? Record<never, never>
+		: T extends RouteDeclaration
+			? ReactQueryRouteValue<T>
+			: {
+					[K in keyof T]: T[K] extends Contract
+						? ReactQueryApiFor<T[K]>
+						: never;
+				};
 
 export type ReactQueryClientOptions = ApiClientOptions & {
 	queryClient: QueryClient;
@@ -136,9 +170,9 @@ const normalizeError = (error: unknown) =>
 		? error
 		: new Error("API request failed", { cause: error });
 
-const isUndeclaredClientResponse = (
+const isUndeclaredRouteClientResponse = (
 	value: unknown,
-): value is UndeclaredClientResponse =>
+): value is UndeclaredRouteClientResponse =>
 	typeof value === "object" &&
 	value !== null &&
 	"declared" in value &&
@@ -164,16 +198,16 @@ const fetchQueryData = async <E extends RouteDeclaration>(
 	contract: E,
 	request: unknown,
 	options?: FetchOptions,
-): Promise<QueryData<E>> => {
+): Promise<InferRouteQueryData<E>> => {
 	try {
 		const callFetchResponse = fetchResponse as (
 			...args: unknown[]
 		) => ReturnType<FetchResponseFn<E>>;
-		const response = (takesRequestInput(contract)
-			? await callFetchResponse(request, options)
-			: await callFetchResponse(options)) as Awaited<
-			ReturnType<FetchResponseFn<E>>
-		>;
+		const response = (
+			takesRequestInput(contract)
+				? await callFetchResponse(request, options)
+				: await callFetchResponse(options)
+		) as Awaited<ReturnType<FetchResponseFn<E>>>;
 
 		if (!response.declared) {
 			throw response;
@@ -185,9 +219,9 @@ const fetchQueryData = async <E extends RouteDeclaration>(
 			throw declaredResponse;
 		}
 
-		return declaredResponse as QueryData<E>;
+		return declaredResponse as InferRouteQueryData<E>;
 	} catch (error) {
-		if (isUndeclaredClientResponse(error) || isDeclaredResponse(error)) {
+		if (isUndeclaredRouteClientResponse(error) || isDeclaredResponse(error)) {
 			throw error;
 		}
 

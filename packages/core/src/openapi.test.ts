@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { stream } from "./contracts.ts";
 import z from "zod";
+import { stream } from "./contracts.ts";
 import { createOpenApiDocument } from "./openapi.ts";
 
 describe("createOpenApiDocument", () => {

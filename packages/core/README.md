@@ -285,33 +285,62 @@ console.log(todos.items);
 
 WebSocket routes expose `connect()` and `tryConnect()`.
 
-## Shared Helper Types
+## Types Across Boundaries
 
-Shared packages can export friendly path-based helper types:
+Most APIs infer request, response, and message types directly from the contract
+route at the call site. Use route helper types when a type needs to cross a
+function, file, package, or module boundary.
 
 ```ts
 import type {
-	ContractApiRequest,
-	ContractApiResponse,
-	DotPaths,
+	InferRouteClientReceivedMessage,
+	InferRouteClientRequest,
+	InferRouteClientResponse,
+	InferRouteClientSendMessage,
+	InferRouteErrors,
+	InferRouteRequest,
+	InferRouteResponse,
+	InferRouteSuccessBody,
 } from "@contract-first-api/core";
+import { apiContract } from "./contract";
 
-export type AppContract = typeof apiContract;
-export type ApiPath = DotPaths<AppContract>;
-
-export type ApiRequest<P extends ApiPath> = ContractApiRequest<
-	AppContract,
-	P
+export type CreateTodoRequest = InferRouteRequest<
+	typeof apiContract.todos.create
 >;
 
-export type ApiResponse<P extends ApiPath> = ContractApiResponse<
-	AppContract,
-	P
+export type CreateTodoResponse = InferRouteResponse<
+	typeof apiContract.todos.create
+>;
+
+export type CreateTodoErrors = InferRouteErrors<
+	typeof apiContract.todos.create
+>;
+
+export type TodoListBody = InferRouteSuccessBody<
+	typeof apiContract.todos.list
+>;
+
+export type UploadImageRequest = InferRouteClientRequest<
+	typeof apiContract.images.inspect
+>;
+
+export type FindTodosClientResponse = InferRouteClientResponse<
+	typeof apiContract.todos.find
+>;
+
+export type DiscussClientMessage = InferRouteClientSendMessage<
+	typeof apiContract.discuss.connect
+>;
+
+export type DiscussServerMessage = InferRouteClientReceivedMessage<
+	typeof apiContract.discuss.connect
 >;
 ```
 
-`ContractApiResponse` is the declared response envelope union for that path,
-such as `{ status: 201; body: CreatedTodo } | { status: 409; body: Conflict }`.
+`InferRouteRequest` is the flattened contract request shape. Client request
+helpers use the same shape, except raw request routes include `rawBody`.
+`InferRouteResponse` is the declared `{ status, body }` response union, and
+`InferRouteErrors` is the declared non-2xx response union.
 
 ## OpenAPI Documents
 

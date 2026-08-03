@@ -2,17 +2,17 @@ import type { Server as HttpServer } from "node:http";
 import {
 	type Contract,
 	type ContractMetaOf,
-	type ContractRequest,
-	type ContractResponse,
-	type ContractSingleSuccessfulResponseBody,
-	type RouteDeclaration,
 	flattenContractRoutes,
 	type HttpMethod,
+	type InferRouteRequest,
+	type InferRouteResponse,
+	type InferRouteSuccessBody,
 	isNoBodyResponse,
 	isStreamResponse,
 	type RawRequestBody,
 	type RawRequestRouteDeclaration,
 	type ResponseBodySchema,
+	type RouteDeclaration,
 	type WebSocketRouteDeclaration,
 } from "@contract-first-api/core/contracts";
 import type {
@@ -23,9 +23,11 @@ import type {
 	Response,
 } from "express";
 import {
-	type ContractWebSocket,
+	type InferRouteServerMessageResult,
+	type InferRouteServerReceivedMessage,
+	type InferRouteServerSendMessage,
+	type InferRouteServerSocket,
 	registerWebSocketRoutes,
-	type WebSocketMessageResult,
 } from "./initWebSocketServer.ts";
 
 declare global {
@@ -48,9 +50,14 @@ type ContextValue<TContext> = {
 };
 
 type RequestValue<E extends RouteDeclaration> =
-	ContractRequest<E> extends never ? EmptyObject : ContractRequest<E>;
+	InferRouteRequest<E> extends never ? EmptyObject : InferRouteRequest<E>;
 
-export type { ContractWebSocket, WebSocketMessageResult };
+export type {
+	InferRouteServerMessageResult,
+	InferRouteServerReceivedMessage,
+	InferRouteServerSendMessage,
+	InferRouteServerSocket,
+};
 
 export type RequestWithContract<TMeta = unknown> = Omit<Request, "contract"> & {
 	contract: RouteDeclaration<TMeta>;
@@ -58,16 +65,16 @@ export type RequestWithContract<TMeta = unknown> = Omit<Request, "contract"> & {
 
 type HandlerResult<E extends RouteDeclaration> =
 	E extends WebSocketRouteDeclaration
-	? MaybePromise<void>
-	: MaybePromise<ContractResponse<E> | ContractSingleSuccessfulResponseBody<E>>;
+		? MaybePromise<void>
+		: MaybePromise<InferRouteResponse<E> | InferRouteSuccessBody<E>>;
 
-export type ServiceRequest<
+export type InferRouteServiceRequest<
 	E extends RouteDeclaration,
 	TContext = EmptyObject,
 > = E extends WebSocketRouteDeclaration
 	? Merge<
 			RequestValue<E> &
-				ContextValue<TContext> & { socket: ContractWebSocket<E> }
+				ContextValue<TContext> & { socket: InferRouteServerSocket<E> }
 		>
 	: E extends RawRequestRouteDeclaration
 		? Merge<
@@ -75,13 +82,14 @@ export type ServiceRequest<
 			>
 		: Merge<RequestValue<E> & ContextValue<TContext>>;
 
-export type ServiceResponse<E extends RouteDeclaration> = ContractResponse<E>;
+export type InferRouteServiceResponse<E extends RouteDeclaration> =
+	InferRouteResponse<E>;
 
-export type ServiceHandler<
+export type InferRouteServiceHandler<
 	E extends RouteDeclaration,
 	TContext = EmptyObject,
 > = (
-	...args: [request: ServiceRequest<E, TContext>]
+	...args: [request: InferRouteServiceRequest<E, TContext>]
 ) => HandlerResult<E>;
 
 export type RouteImplementation = {
@@ -99,7 +107,7 @@ type ImplementationShape<
 	TContext = EmptyObject,
 > = T extends Contract
 	? T extends RouteDeclaration
-		? ServiceHandler<T, TContext>
+		? InferRouteServiceHandler<T, TContext>
 		: {
 				[K in keyof T]: T[K] extends Contract
 					? ImplementationShape<T[K], TContext>
@@ -112,7 +120,7 @@ type ImplementContract<TContext = EmptyObject> = <TNode extends Contract>(
 ) => TNode extends RouteDeclaration
 	? {
 			handler: (
-				handler: ServiceHandler<TNode, TContext>,
+				handler: InferRouteServiceHandler<TNode, TContext>,
 			) => RouteImplementation;
 		}
 	: {
@@ -609,8 +617,8 @@ const createRouter = <
 
 		const serviceHandler = async (req: Request, res: Response) => {
 			const input = req.validatedRequest;
-				const context =
-					(await createContext?.(
+			const context =
+				(await createContext?.(
 					req as Request & { contract: RouteDeclaration<TMeta> },
 				)) || {};
 
@@ -669,7 +677,6 @@ export const initServer = <
 >(): ServerTools<TContract, TContext, TMeta> => ({
 	implementContract: implementContract as ImplementContract<TContext>,
 	defineMiddleware: (middleware) => middleware,
-	createRouteModeMiddleware: (options) =>
-		createRouteModeMiddleware(options),
+	createRouteModeMiddleware: (options) => createRouteModeMiddleware(options),
 	createRouter: (options) => createRouter<TContract, TContext, TMeta>(options),
 });

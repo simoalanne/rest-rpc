@@ -147,6 +147,32 @@ await createTodo.mutateAsync({
 The mutation input is inferred from the route request schema. The mutation
 result is inferred from the route's successful response entries.
 
+## Helper Types
+
+Hooks infer their types in components. Use route helper types when data, errors,
+or mutation variables need to cross component, hook, test, or module boundaries.
+
+```ts
+import type {
+	InferRouteMutationVariables,
+	InferRouteQueryData,
+	InferRouteQueryError,
+} from "@contract-first-api/react-query";
+import { apiContract } from "@example/shared";
+
+export type TodoListData = InferRouteQueryData<
+	typeof apiContract.todos.list
+>;
+
+export type CreateTodoVariables = InferRouteMutationVariables<
+	typeof apiContract.todos.create
+>;
+
+export type CreateTodoError = InferRouteQueryError<
+	typeof apiContract.todos.create
+>;
+```
+
 ## Cache Helpers
 
 Each HTTP route declaration exposes cache helpers tied to the same query key

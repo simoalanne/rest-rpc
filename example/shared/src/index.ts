@@ -1,7 +1,11 @@
 import type {
-	ContractApiRequest,
-	ContractApiResponse,
-	DotPaths,
+	InferRouteClientMessage,
+	InferRouteErrors,
+	InferRouteRequest,
+	InferRouteResponse,
+	InferRouteServerMessage,
+	InferRouteSuccessBody,
+	InferRouteSuccessResponse,
 } from "@contract-first-api/core";
 import { initContracts, stream } from "@contract-first-api/core";
 import z from "zod";
@@ -173,26 +177,35 @@ export const apiContract = {
 };
 
 export type ExampleContract = typeof apiContract;
-export type ApiPath = DotPaths<ExampleContract>;
-
-export type ApiRequest<P extends ApiPath> = ContractApiRequest<
-	ExampleContract,
-	P
+export type HealthResponse = InferRouteResponse<typeof apiContract.health.get>;
+export type HealthSuccessResponse = InferRouteSuccessResponse<
+	typeof apiContract.health.get
 >;
-
-export type ApiResponse<P extends ApiPath> = ContractApiResponse<
-	ExampleContract,
-	P
+export type ListTodosResponse = InferRouteResponse<
+	typeof apiContract.todos.list
 >;
-
-export type HealthResponse = ApiResponse<"health.get">;
-export type ListTodosResponse = ApiResponse<"todos.list">;
-export type CreateTodoRequest = ApiRequest<"todos.create">;
+export type ListTodosBody = InferRouteSuccessBody<
+	typeof apiContract.todos.list
+>;
+export type CreateTodoRequest = InferRouteRequest<
+	typeof apiContract.todos.create
+>;
+export type CreateTodoErrors = InferRouteErrors<
+	typeof apiContract.todos.create
+>;
 export type Todo = z.infer<typeof todoSchema>;
 export type TodoEvent = z.infer<typeof todoEventSchema>;
-export type FindTodosRequest = ApiRequest<"todos.find">;
-export type FindTodosResponse = ApiResponse<"todos.find">;
+export type FindTodosRequest = InferRouteRequest<typeof apiContract.todos.find>;
+export type FindTodosResponse = InferRouteResponse<
+	typeof apiContract.todos.find
+>;
 export type DiscussMessage = z.infer<typeof discussMessageSchema>;
-export type DiscussClientMessage = z.infer<typeof discussClientMessageSchema>;
-export type DiscussServerMessage = z.infer<typeof discussServerMessageSchema>;
-export type InspectImageResponse = ApiResponse<"images.inspect">;
+export type DiscussClientMessage = InferRouteClientMessage<
+	typeof apiContract.discuss.connect
+>;
+export type DiscussServerMessage = InferRouteServerMessage<
+	typeof apiContract.discuss.connect
+>;
+export type InspectImageResponse = InferRouteResponse<
+	typeof apiContract.images.inspect
+>;

@@ -27,7 +27,7 @@ export type ResponseBodySchema =
 	| NoBodyResponse
 	| StreamResponse;
 
-export type ContractResponses = Record<number, ResponseBodySchema>;
+export type RouteResponses = Record<number, ResponseBodySchema>;
 
 export const stream = <const TSchema extends z.ZodType>(
 	schema: TSchema,
@@ -61,15 +61,16 @@ export type BaseContract<TMeta = unknown> = {
 };
 
 export type JsonRouteDeclaration<TMeta = unknown> = BaseContract<TMeta> & {
-	responses: ContractResponses;
+	responses: RouteResponses;
 	options?: { mode?: "json" };
 };
 
-export type RawRequestRouteDeclaration<TMeta = unknown> = BaseContract<TMeta> & {
-	responses: ContractResponses;
-	request?: Omit<RequestSchema, "body">;
-	options: { mode: "raw" };
-};
+export type RawRequestRouteDeclaration<TMeta = unknown> =
+	BaseContract<TMeta> & {
+		responses: RouteResponses;
+		request?: Omit<RequestSchema, "body">;
+		options: { mode: "raw" };
+	};
 
 export type WebSocketRouteDeclaration<TMeta = unknown> = BaseContract<TMeta> & {
 	method: "GET";
@@ -120,10 +121,7 @@ const isContractDefinition = <TMeta = unknown>(
 
 export const mapContractRoutes = <TMeta = unknown>(
 	contract: Contract<TMeta>,
-	mappingFn: (
-		route: RouteDeclaration<TMeta>,
-		path: string[],
-	) => unknown,
+	mappingFn: (route: RouteDeclaration<TMeta>, path: string[]) => unknown,
 ) => mapObjectValues(contract, isContractDefinition, mappingFn);
 
 export type ContractRoute<TMeta = unknown> = RouteDeclaration<TMeta> & {
@@ -211,30 +209,30 @@ export type HasStreamResponse<TResponses> = true extends {
 	? true
 	: false;
 
-export type ContractResponse<E extends RouteDeclaration> = E extends {
+export type InferRouteResponse<E extends RouteDeclaration> = E extends {
 	responses: infer TResponses;
 }
 	? {
-		  [TKeys in keyof TResponses]: TKeys extends ResponseKey
-			  ? ResponseEntry<ResponseStatus<TKeys>, TResponses[TKeys]>
-			  : never;
-	  }[keyof TResponses]
+			[TKeys in keyof TResponses]: TKeys extends ResponseKey
+				? ResponseEntry<ResponseStatus<TKeys>, TResponses[TKeys]>
+				: never;
+		}[keyof TResponses]
 	: never;
 
-export type ContractSuccessfulResponse<E extends RouteDeclaration> = E extends {
+export type InferRouteSuccessResponse<E extends RouteDeclaration> = E extends {
 	responses: infer TResponses;
 }
 	? {
-		  [TKeys in keyof TResponses]: TKeys extends ResponseKey
-			  ? TKeys extends SuccessfulResponseKeys<TResponses>
-				  ? ResponseEntry<ResponseStatus<TKeys>, TResponses[TKeys]>
-				  : never
-			  : never;
-	  }[keyof TResponses]
+			[TKeys in keyof TResponses]: TKeys extends ResponseKey
+				? TKeys extends SuccessfulResponseKeys<TResponses>
+					? ResponseEntry<ResponseStatus<TKeys>, TResponses[TKeys]>
+					: never
+				: never;
+		}[keyof TResponses]
 	: never;
 
-export type ContractSingleSuccessfulResponseBody<E extends RouteDeclaration> =
-	ContractSuccessfulResponse<E> extends infer TResponse extends {
+export type InferRouteSuccessBody<E extends RouteDeclaration> =
+	InferRouteSuccessResponse<E> extends infer TResponse extends {
 		body: unknown;
 	}
 		? [TResponse] extends [never]
@@ -244,9 +242,9 @@ export type ContractSingleSuccessfulResponseBody<E extends RouteDeclaration> =
 				: TResponse["body"]
 		: never;
 
-export type ContractNonSuccessfulResponse<E extends RouteDeclaration> = Exclude<
-	ContractResponse<E>,
-	ContractSuccessfulResponse<E>
+export type InferRouteErrors<E extends RouteDeclaration> = Exclude<
+	InferRouteResponse<E>,
+	InferRouteSuccessResponse<E>
 >;
 
 export type IsRawRequestRoute<E extends RouteDeclaration> = E extends {
@@ -261,7 +259,7 @@ export type IsWebSocketRoute<E extends RouteDeclaration> = E extends {
 	? true
 	: false;
 
-export type ContractClientMessage<E extends RouteDeclaration> = E extends {
+export type InferRouteClientMessage<E extends RouteDeclaration> = E extends {
 	messages: { client: infer R };
 }
 	? R extends z.ZodType
@@ -269,7 +267,7 @@ export type ContractClientMessage<E extends RouteDeclaration> = E extends {
 		: never
 	: never;
 
-export type ContractServerMessage<E extends RouteDeclaration> = E extends {
+export type InferRouteServerMessage<E extends RouteDeclaration> = E extends {
 	messages: { server: infer R };
 }
 	? R extends z.ZodType
@@ -297,48 +295,12 @@ export type ContractMetaOf<T> = T extends { $meta?: infer TMeta }
 			}[keyof T]
 		: unknown;
 
-export type ContractRequest<E extends RouteDeclaration> =
+export type InferRouteRequest<E extends RouteDeclaration> =
 	RawRequest<E> extends infer R
 		? R extends { body?: infer B; query?: infer Q; params?: infer P }
 			? Merge<B & Q & P>
 			: R
 		: never;
-
-export type GetByPath<
-	T,
-	P extends string,
-> = P extends `${infer Head}.${infer Tail}`
-	? Head extends keyof T
-		? GetByPath<T[Head], Tail>
-		: never
-	: P extends keyof T
-		? T[P]
-		: never;
-
-type ContractAtPath<T extends Contract, P extends DotPaths<T>> = Extract<
-	GetByPath<T, P>,
-	RouteDeclaration
->;
-
-export type DotPaths<T> = T extends RouteDeclaration
-	? never
-	: {
-			[K in Extract<keyof T, string>]: T[K] extends RouteDeclaration
-				? K
-				: T[K] extends Contract
-					? `${K}.${DotPaths<T[K]>}`
-					: never;
-	  }[Extract<keyof T, string>];
-
-export type ContractApiRequest<
-	T extends Contract,
-	P extends DotPaths<T>,
-> = ContractRequest<ContractAtPath<T, P>>;
-
-export type ContractApiResponse<
-	T extends Contract,
-	P extends DotPaths<T>,
-> = ContractResponse<ContractAtPath<T, P>>;
 
 type WithMetaMarker<T, TMeta> =
 	T extends RouteDeclaration<TMeta>

@@ -1,7 +1,22 @@
-import type { DiscussMessage, TodoEvent } from "@example/shared";
+import type {
+	InferRouteClientReceivedMessage,
+	InferRouteClientSendMessage,
+	InferRouteClientSocket,
+} from "@contract-first-api/core";
+import type { InferRouteQueryError } from "@contract-first-api/react-query";
+import type { apiContract, DiscussMessage, TodoEvent } from "@example/shared";
 import type { ChangeEvent, FormEvent } from "react";
 import { useEffect, useRef, useState } from "react";
-import { rqClient, client } from "./api.ts";
+import { client, rqClient } from "./api.ts";
+
+type DiscussSocket = InferRouteClientSocket<typeof apiContract.discuss.connect>;
+type DiscussOutgoingMessage = InferRouteClientSendMessage<
+	typeof apiContract.discuss.connect
+>;
+type DiscussIncomingMessage = InferRouteClientReceivedMessage<
+	typeof apiContract.discuss.connect
+>;
+type CreateTodoError = InferRouteQueryError<typeof apiContract.todos.create>;
 
 const renderJson = (value: unknown) => JSON.stringify(value, null, 2);
 const renderError = (error: unknown) =>
@@ -21,6 +36,18 @@ const renderTodoEvent = (event: TodoEvent) => {
 	return event.message;
 };
 
+const renderCreateTodoError = (error: CreateTodoError) => renderError(error);
+
+const readDiscussMessages = (
+	message: DiscussIncomingMessage,
+): DiscussMessage[] => {
+	if (message.type === "history") {
+		return message.messages;
+	}
+
+	return [message.message];
+};
+
 export const App = () => {
 	const [title, setTitle] = useState("");
 	const [searchInput, setSearchInput] = useState("");
@@ -36,9 +63,7 @@ export const App = () => {
 	const [discussMessages, setDiscussMessages] = useState<DiscussMessage[]>([]);
 	const [discussConnected, setDiscussConnected] = useState(false);
 	const [discussParseError, setDiscussParseError] = useState(false);
-	const discussSocket = useRef<ReturnType<
-		typeof client.discuss.connect.connect
-	> | null>(null);
+	const discussSocket = useRef<DiscussSocket | null>(null);
 
 	const health = rqClient.health.get.useQuery();
 	const todos = rqClient.todos.list.useQuery();
@@ -96,12 +121,14 @@ export const App = () => {
 			}
 
 			if (result.data.type === "history") {
-				setDiscussMessages(result.data.messages);
+				setDiscussMessages(readDiscussMessages(result.data));
 				return;
 			}
 
-			const { message } = result.data;
-			setDiscussMessages((current) => [...current, message]);
+			setDiscussMessages((current) => [
+				...current,
+				...readDiscussMessages(result.data),
+			]);
 		});
 
 		return () => {
@@ -171,11 +198,13 @@ export const App = () => {
 			return;
 		}
 
-		discussSocket.current.send({
+		const message: DiscussOutgoingMessage = {
 			type: "message",
 			author,
 			text,
-		});
+		};
+
+		discussSocket.current.send(message);
 		setDiscussText("");
 	};
 
@@ -214,7 +243,7 @@ export const App = () => {
 					</button>
 				</form>
 				{createTodo.error ? (
-					<p className="error">{renderError(createTodo.error)}</p>
+					<p className="error">{renderCreateTodoError(createTodo.error)}</p>
 				) : null}
 			</section>
 

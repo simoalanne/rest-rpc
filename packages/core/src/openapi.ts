@@ -1,3 +1,4 @@
+import z from "zod";
 import type {
 	Contract,
 	ContractRoute,
@@ -9,7 +10,6 @@ import {
 	isNoBodyResponse,
 	isStreamResponse,
 } from "./contracts.ts";
-import z from "zod";
 
 export type OpenApiSchema = Record<string, unknown>;
 

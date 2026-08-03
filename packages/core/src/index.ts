@@ -1,46 +1,47 @@
 export type {
-	Contract,
-	ContractRoute,
-	ContractApiRequest,
-	ContractApiResponse,
-	RouteDeclaration,
-	ContractNonSuccessfulResponse,
-	ContractRequest,
-	ContractResponse,
-	ContractSuccessfulResponse,
-	DotPaths,
-	InferResponseBody,
-	JsonRouteDeclaration,
-	NoBodyResponse,
-	RawRequestRouteDeclaration,
-	ResponseBodySchema,
-	StreamResponse,
-	WebSocketRouteDeclaration,
-} from "./contracts.ts";
-
-export type {
 	ApiClientFetchOptions,
 	ApiClientFor,
 	ApiClientOptions,
-	ClientResponse,
 	ConnectArgs,
 	ConnectFn,
-	ContractWebSocket,
-	DeclaredClientResponse,
+	DeclaredRouteClientResponse,
 	FetchArgs,
 	FetchFn,
 	FetchOptions,
 	FetchResponseFn,
+	InferRouteClientMessageResult,
+	InferRouteClientReceivedMessage,
+	InferRouteClientRequest,
+	InferRouteClientRequestInput,
+	InferRouteClientResponse,
+	InferRouteClientSendMessage,
+	InferRouteClientSocket,
 	TryConnectFn,
-	UndeclaredClientResponse,
-	WebSocketMessageResult,
+	UndeclaredRouteClientResponse,
 } from "./client.ts";
-
+export { initClient } from "./client.ts";
+export type {
+	Contract,
+	ContractRoute,
+	InferResponseBody,
+	InferRouteClientMessage,
+	InferRouteErrors,
+	InferRouteRequest,
+	InferRouteResponse,
+	InferRouteServerMessage,
+	InferRouteSuccessBody,
+	InferRouteSuccessResponse,
+	JsonRouteDeclaration,
+	NoBodyResponse,
+	RawRequestRouteDeclaration,
+	ResponseBodySchema,
+	RouteDeclaration,
+	StreamResponse,
+	WebSocketRouteDeclaration,
+} from "./contracts.ts";
+export { initContracts, noBody, stream } from "./contracts.ts";
 export type {
 	CreateOpenApiDocumentOptions,
 	OpenApiDocument,
 } from "./openapi.ts";
-
-export { initClient } from "./client.ts";
-export { initContracts, noBody, stream } from "./contracts.ts";
 export { createOpenApiDocument } from "./openapi.ts";
