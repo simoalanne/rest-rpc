@@ -22,7 +22,6 @@ export type {
 export { initClient } from "./client.ts";
 export type {
 	Contract,
-	ContractRoute,
 	InferResponseBody,
 	InferRouteClientMessage,
 	InferRouteErrors,

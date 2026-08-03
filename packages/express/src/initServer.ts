@@ -149,17 +149,6 @@ export type ServerTools<TContext = EmptyObject> = {
 	createRouter: (options: CreateRouterOptions<TContext>) => Application;
 };
 
-export type MatchRouteOptions<TContract extends Contract = Contract> = {
-	contract: TContract;
-	req: Request;
-};
-
-export type MatchedRoute = {
-	route: RouteDeclaration;
-	params: Record<string, string>;
-	routePath: string;
-};
-
 class KnownContractError extends Error {
 	readonly response: { status: number; body: unknown };
 	readonly error: Record<string, unknown>;
@@ -206,41 +195,6 @@ const compareRouteSpecificity = (
 	}
 
 	return left.method.localeCompare(right.method);
-};
-
-const resolveHandlerAtPath = <THandler extends (...args: unknown[]) => unknown>(
-	handlers: unknown,
-	keySegments: string[],
-): THandler => {
-	let current: unknown = handlers;
-	let parent: unknown;
-
-	for (const segment of keySegments) {
-		if (!current || typeof current !== "object") {
-			throw new Error(
-				`Invalid implementation while resolving "${keySegments.join(".")}"`,
-			);
-		}
-
-		parent = current;
-		current = (current as Record<string, unknown>)[segment];
-
-		if (current === undefined) {
-			throw new Error(`Missing service for route "${keySegments.join(".")}"`);
-		}
-	}
-
-	if (typeof current !== "function") {
-		throw new Error(
-			`Resolved service for "${keySegments.join(".")}" is not a function`,
-		);
-	}
-
-	if (parent && typeof parent === "object") {
-		return (current as THandler).bind(parent) as THandler;
-	}
-
-	return current as THandler;
 };
 
 const prepareRequest =
@@ -390,28 +344,15 @@ type ResolvedImplementationRoute = RouteDeclaration & {
 };
 
 const resolveContractRoutes = (contract: Contract) => {
-	const routes: RouteDeclaration[] = [];
-
-	const visit = (node: Contract) => {
-		if (isRouteDeclaration(node)) {
-			routes.push(node);
-			return;
-		}
-
-		Object.values(node).forEach((child) => {
-			visit(child as Contract);
-		});
-	};
-
-	visit(contract);
-
-	return routes.sort(compareRouteSpecificity).map((route) => {
-		return {
-			route,
-			routePath: route.path,
-			matchPath: createPathMatcher(route.path),
-		};
-	}) satisfies ResolvedContractRoute[];
+	return flattenContractRoutes(contract)
+		.sort(compareRouteSpecificity)
+		.map((route) => {
+			return {
+				route,
+				routePath: route.path,
+				matchPath: createPathMatcher(route.path),
+			};
+		}) satisfies ResolvedContractRoute[];
 };
 
 export const matchRoute = (
@@ -427,16 +368,57 @@ export const matchRoute = (
 	return matchedRoute ? matchedRoute.route : null;
 };
 
+const collectImplementations = (
+	contract: Contract,
+	handlers: unknown,
+	path: string[] = [],
+	parent?: unknown,
+): RouteImplementation[] => {
+	const routeName = path.join(".");
+
+	if (isRouteDeclaration(contract)) {
+		if (typeof handlers !== "function") {
+			throw new Error(`Resolved service for "${routeName}" is not a function`);
+		}
+
+		return [
+			{
+				route: contract,
+				handler:
+					parent && typeof parent === "object"
+						? handlers.bind(parent)
+						: handlers,
+			},
+		];
+	}
+
+	if (!handlers || typeof handlers !== "object") {
+		throw new Error(`Invalid implementation while resolving "${routeName}"`);
+	}
+
+	return Object.entries(contract).flatMap(([key, childContract]) => {
+		const childHandlers = (handlers as Record<string, unknown>)[key];
+		const childPath = [...path, key];
+
+		if (childHandlers === undefined) {
+			throw new Error(`Missing service for route "${childPath.join(".")}"`);
+		}
+
+		return collectImplementations(
+			childContract as Contract,
+			childHandlers,
+			childPath,
+			handlers,
+		);
+	});
+};
+
 const implementContract = ((contract: Contract) => ({
 	handler: (handler: RouteImplementation["handler"]) => ({
 		route: contract as RouteDeclaration,
 		handler,
 	}),
-	handlers: (handlers: unknown) =>
-		flattenContractRoutes(contract).map((route) => ({
-			route,
-			handler: resolveHandlerAtPath(handlers, route.keySegments),
-		})),
+	handlers: (handlers: unknown) => collectImplementations(contract, handlers),
 })) as ImplementContract<unknown>;
 
 const writeStreamResponse = async (

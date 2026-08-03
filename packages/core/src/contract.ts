@@ -117,30 +117,33 @@ export const mapContractRoutes = (
 	mappingFn: (route: RouteDeclaration, path: string[]) => unknown,
 ) => mapObjectValues(contract, isRouteDeclaration, mappingFn);
 
-export type ContractRoute = RouteDeclaration & {
-	keySegments: string[];
+const forEachContractRoute = (
+	contract: Contract,
+	visitRoute: (route: RouteDeclaration) => void,
+) => {
+	const visit = (node: Contract) => {
+		if (isRouteDeclaration(node)) {
+			visitRoute(node);
+			return;
+		}
+
+		Object.values(node).forEach((child) => {
+			visit(child as Contract);
+		});
+	};
+
+	visit(contract);
 };
 
 export const flattenContractRoutes = <TContract extends Contract = Contract>(
 	contract: TContract,
-): ContractRoute[] => {
-	const result: ContractRoute[] = [];
+): RouteDeclaration[] => {
+	const result: RouteDeclaration[] = [];
 
-	const visit = (node: Contract, keySegments: string[]) => {
-		if (isRouteDeclaration(node)) {
-			result.push({
-				...node,
-				keySegments,
-			});
-			return;
-		}
+	forEachContractRoute(contract as Contract, (route) => {
+		result.push(route);
+	});
 
-		Object.entries(node).forEach(([key, child]) => {
-			visit(child as Contract, [...keySegments, key]);
-		});
-	};
-
-	visit(contract as Contract, []);
 	return result;
 };
 
@@ -344,14 +347,7 @@ const validateContract = (
 	contract: Contract,
 	commonOptions?: CommonContractOptions,
 ) => {
-	const visit = (node: Contract) => {
-		if (!isRouteDeclaration(node)) {
-			Object.values(node).forEach((child) => visit(child as Contract));
-			return;
-		}
-
-		const route = node;
-
+	forEachContractRoute(contract, (route) => {
 		if (commonOptions?.pathPrefix) {
 			route.path = joinPathPrefix(commonOptions.pathPrefix, route.path);
 		}
@@ -376,9 +372,7 @@ const validateContract = (
 				);
 			}
 		}
-	};
-
-	visit(contract);
+	});
 
 	return contract;
 };

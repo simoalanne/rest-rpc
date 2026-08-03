@@ -1,9 +1,9 @@
 import z from "zod";
 import type {
 	Contract,
-	ContractRoute,
 	JsonRouteDeclaration,
 	ResponseBodySchema,
+	RouteDeclaration,
 } from "./contract.ts";
 import {
 	flattenContractRoutes,
@@ -73,9 +73,7 @@ type OperationTransformContext = {
 	operation: OpenApiOperation;
 };
 
-type OpenApiRouteDeclaration = JsonRouteDeclaration & {
-	keySegments: string[];
-};
+type OpenApiRouteDeclaration = JsonRouteDeclaration;
 
 export type CreateOpenApiDocumentOptions = {
 	openapi?: string;
@@ -91,7 +89,7 @@ export type CreateOpenApiDocumentOptions = {
 const JSON_CONTENT_TYPE = "application/json";
 
 const isOpenApiContract = (
-	route: ContractRoute,
+	route: RouteDeclaration,
 ): route is OpenApiRouteDeclaration =>
 	(!route.options || route.options.mode === "json") &&
 	"responses" in route &&

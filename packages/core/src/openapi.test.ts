@@ -59,7 +59,7 @@ describe("createOpenApiDocument", () => {
 			servers: [{ url: "http://localhost:3000" }],
 			transformOperation: ({ route, operation }) => ({
 				...operation,
-				operationId: route.keySegments.join("."),
+				operationId: `${route.method} ${route.path}`,
 			}),
 			transformDocument: (document) => ({
 				...document,
@@ -79,7 +79,7 @@ describe("createOpenApiDocument", () => {
 
 		const updateOperation = document.paths["/todos/{id}"]?.post;
 		assert.ok(updateOperation);
-		assert.equal(updateOperation.operationId, "todos.update");
+		assert.equal(updateOperation.operationId, "POST /todos/:id");
 		assert.deepStrictEqual(
 			updateOperation.parameters?.map((parameter) => ({
 				name: parameter.name,

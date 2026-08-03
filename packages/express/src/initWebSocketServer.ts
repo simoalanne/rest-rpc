@@ -217,10 +217,7 @@ export const registerWebSocketRoutes = <TContext>({
 		}
 
 		webSocketServer.handleUpgrade(req, socket, head, (rawSocket) => {
-			const routeSocket = createRouteWebSocket(
-				rawSocket,
-				matchedRoute.route,
-			);
+			const routeSocket = createRouteWebSocket(rawSocket, matchedRoute.route);
 			runWebSocketServiceHandler(
 				matchedRoute.handler,
 				{
