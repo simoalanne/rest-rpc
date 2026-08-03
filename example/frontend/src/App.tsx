@@ -36,7 +36,17 @@ const renderTodoEvent = (event: TodoEvent) => {
 	return event.message;
 };
 
-const renderCreateTodoError = (error: CreateTodoError) => renderError(error);
+const renderCreateTodoError = (error: CreateTodoError) => {
+	if ("status" in error) {
+		if (error.status === 409) {
+			return "A todo with that title already exists.";
+		}
+
+		return `Request failed with HTTP ${error.status}.`;
+	}
+
+	return renderError(error);
+};
 
 const readDiscussMessages = (
 	message: DiscussIncomingMessage,

@@ -9,4 +9,8 @@ export type {
 	InferRouteServiceResponse,
 	RouteImplementation,
 } from "./initServer.ts";
-export { initServer, matchRoute } from "./initServer.ts";
+export {
+	ContractResponseError,
+	initServer,
+	matchRoute,
+} from "./initServer.ts";

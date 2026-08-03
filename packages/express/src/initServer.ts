@@ -3,6 +3,7 @@ import {
 	type Contract,
 	flattenContractRoutes,
 	type HttpMethod,
+	type InferRouteErrors,
 	type InferRouteRequest,
 	type InferRouteResponse,
 	type InferRouteSuccessBody,
@@ -149,19 +150,21 @@ export type ServerTools<TContext = EmptyObject> = {
 	createRouter: (options: CreateRouterOptions<TContext>) => Application;
 };
 
-class KnownContractError extends Error {
-	readonly response: { status: number; body: unknown };
-	readonly error: Record<string, unknown>;
+export class ContractResponseError<
+	E extends RouteDeclaration = RouteDeclaration,
+> extends Error {
+	readonly response: InferRouteErrors<E>;
 	readonly status: number;
+	readonly body: unknown;
+	readonly route: E;
 
-	constructor(response: { status: number; body: unknown }) {
-		super("Known contract error");
+	constructor(route: E, response: InferRouteErrors<E>) {
+		super("Contract response error");
+		const responseFields = response as { status: number; body: unknown };
 		this.response = response;
-		this.error =
-			response.body && typeof response.body === "object"
-				? (response.body as Record<string, unknown>)
-				: {};
-		this.status = response.status;
+		this.status = responseFields.status;
+		this.body = responseFields.body;
+		this.route = route;
 	}
 }
 
@@ -531,8 +534,6 @@ const createRouter = <TContext = EmptyObject>({
 			createContext,
 			createPathMatcher,
 			validateRequestSegments,
-			isKnownContractError: (error): error is KnownContractError =>
-				error instanceof KnownContractError,
 		});
 	}
 
@@ -574,14 +575,14 @@ const createRouter = <TContext = EmptyObject>({
 
 				res.status(result.status).json(result.body);
 			} catch (error) {
-				if (error instanceof KnownContractError) {
+				if (error instanceof ContractResponseError) {
 					const schema = getResponseSchema(route, error.status);
 					if (schema && isNoBodyResponse(schema)) {
 						res.sendStatus(error.status);
 						return;
 					}
 
-					res.status(error.status).json(error.response.body);
+					res.status(error.status).json(error.body);
 					return;
 				}
 				throw error;

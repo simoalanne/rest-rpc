@@ -17,10 +17,7 @@ Use `initServer()` to get helpers, then:
 3. register routes with `createRouter()`
 
 ```ts
-const { createRouter, implementContract } = initServer<
-	typeof contract,
-	RequestContext
->();
+const { createRouter, implementContract } = initServer<RequestContext>();
 ```
 
 Minimal setup:
@@ -76,6 +73,21 @@ const implementations = [
 The `status` must be one of the contract's `responses` keys. Non-2xx statuses
 are typed response cases.
 
+Handlers can also throw `ContractResponseError` when returning a declared error
+response would make service flow awkward:
+
+```ts
+throw new ContractResponseError(contract.todos.get, {
+	status: 404,
+	body: {
+		code: "TODO_NOT_FOUND",
+	},
+});
+```
+
+The response must match a non-2xx response declared by that route. Other thrown
+errors continue to the Express global error handler.
+
 ## Request Flow
 
 For each contract route:
@@ -127,9 +139,9 @@ const rawBodyParser = express.raw({
 });
 
 app.use((req, res, next) => {
-	const matched = matchRoute({ contract, req });
+	const matched = matchRoute(contract, req);
 	const bodyParser =
-		matched?.route.options?.mode === "raw" ? rawBodyParser : jsonBodyParser;
+		matched?.options?.mode === "raw" ? rawBodyParser : jsonBodyParser;
 
 	return bodyParser(req, res, next);
 });
@@ -146,9 +158,9 @@ middleware needs to know which contract route matched, call `matchRoute()`.
 
 ```ts
 const authMiddleware: express.RequestHandler = (req, res, next) => {
-	const matched = matchRoute({ contract, req });
+	const matched = matchRoute(contract, req);
 
-	if (!matched?.route.path.startsWith("/api/todos")) {
+	if (!matched?.path.startsWith("/api/todos")) {
 		next();
 		return;
 	}

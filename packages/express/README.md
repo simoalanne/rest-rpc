@@ -41,10 +41,7 @@ type RequestContext = {
 const app = express();
 app.use(express.json());
 
-const { createRouter, implementContract } = initServer<
-	typeof apiContract,
-	RequestContext
->();
+const { createRouter, implementContract } = initServer<RequestContext>();
 
 declare global {
 	namespace Express {
@@ -55,9 +52,9 @@ declare global {
 }
 
 const authMiddleware: express.RequestHandler = (req, res, next) => {
-	const matched = matchRoute({ contract: apiContract, req });
+	const matched = matchRoute(apiContract, req);
 
-	if (!matched?.route.path.startsWith("/api/todos")) {
+	if (!matched?.path.startsWith("/api/todos")) {
 		next();
 		return;
 	}
@@ -150,6 +147,25 @@ return {
 
 Unexpected service errors are not swallowed; they continue to the Express
 global error handler.
+
+Handlers can also throw `ContractResponseError` when returning a declared error
+response would make service flow awkward:
+
+```ts
+import { ContractResponseError } from "@contract-first-api/express";
+
+throw new ContractResponseError(apiContract.todos.get, {
+	status: 404,
+	body: {
+		code: "TODO_NOT_FOUND",
+	},
+});
+```
+
+The response must match a non-2xx response declared by that route. The Express
+adapter serializes `ContractResponseError` automatically. Application-specific
+error classes still pass through to the Express global error handler, where you
+can implement your own global error handling.
 
 When a route declaration declares exactly one successful status, the handler may
 return that successful body directly:
@@ -270,9 +286,9 @@ const rawBodyParser = express.raw({
 });
 
 app.use((req, res, next) => {
-	const matched = matchRoute({ contract, req });
+	const matched = matchRoute(contract, req);
 	const bodyParser =
-		matched?.route.options?.mode === "raw" ? rawBodyParser : jsonBodyParser;
+		matched?.options?.mode === "raw" ? rawBodyParser : jsonBodyParser;
 
 	return bodyParser(req, res, next);
 });
@@ -299,9 +315,9 @@ middleware needs to know which contract route matched, call `matchRoute()`.
 
 ```ts
 const authMiddleware: express.RequestHandler = (req, res, next) => {
-	const matched = matchRoute({ contract: apiContract, req });
+	const matched = matchRoute(apiContract, req);
 
-	if (!matched?.route.path.startsWith("/api/todos")) {
+	if (!matched?.path.startsWith("/api/todos")) {
 		next();
 		return;
 	}
@@ -351,7 +367,7 @@ import { createServer } from "node:http";
 const app = express();
 const server = createServer(app);
 
-const { createRouter, implementContract } = initServer<typeof apiContract>();
+const { createRouter, implementContract } = initServer();
 
 const discussImplementations = implementContract(apiContract.discuss).handlers({
 	connect({ socket }) {

@@ -33,11 +33,6 @@ export type InferRouteServerSocket<E extends WebSocketRouteDeclaration> = Omit<
 	onClose: (callback: (code: number, reason: Buffer) => void) => () => void;
 };
 
-type KnownContractErrorShape = Error & {
-	readonly error: Record<string, unknown>;
-	readonly status: number;
-};
-
 type WebSocketRoute = WebSocketRouteDeclaration & {
 	handler: (request: unknown) => unknown | Promise<unknown>;
 };
@@ -60,7 +55,6 @@ type RegisterWebSocketRoutesOptions<TContext> = {
 		},
 		segmentNames?: Array<"body" | "query" | "params">,
 	) => ValidationResult;
-	isKnownContractError: (error: unknown) => error is KnownContractErrorShape;
 };
 
 const sendUpgradeError = (
@@ -153,7 +147,6 @@ export const registerWebSocketRoutes = <TContext>({
 	createContext,
 	createPathMatcher,
 	validateRequestSegments,
-	isKnownContractError,
 }: RegisterWebSocketRoutesOptions<TContext>) => {
 	if (routes.length === 0) return;
 
@@ -204,11 +197,7 @@ export const registerWebSocketRoutes = <TContext>({
 						route: RouteDeclaration;
 					},
 				)) || {};
-		} catch (error) {
-			if (isKnownContractError(error)) {
-				sendUpgradeError(socket, error.status, error.error);
-				return;
-			}
+		} catch {
 			sendUpgradeError(socket, 500, {
 				code: "unknown",
 				message: "WebSocket context creation failed.",

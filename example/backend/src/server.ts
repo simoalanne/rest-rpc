@@ -7,7 +7,11 @@ import type {
 	InferRouteServiceHandler,
 	InferRouteServiceRequest,
 } from "@contract-first-api/express";
-import { initServer } from "@contract-first-api/express";
+import {
+	ContractResponseError,
+	initServer,
+	matchRoute,
+} from "@contract-first-api/express";
 import type { DiscussMessage, Todo } from "@example/shared";
 import { apiContract } from "@example/shared";
 import express from "express";
@@ -139,9 +143,22 @@ const listTodos = () => ({
 });
 
 const createTodo: CreateTodoHandler = ({ title }) => {
+	if (
+		todos.some(
+			(todo) => todo.title.toLowerCase() === title.trim().toLowerCase(),
+		)
+	) {
+		throw new ContractResponseError(apiContract.todos.create, {
+			status: 409,
+			body: {
+				code: "TITLE_ALREADY_EXISTS",
+			},
+		});
+	}
+
 	const todo = {
 		id: `todo-${todos.length + 1}`,
-		title,
+		title: title.trim(),
 		createdAt: new Date().toISOString(),
 	};
 
@@ -185,8 +202,8 @@ const createDiscussMessage = (
 	createdAt: new Date().toISOString(),
 });
 
-const serverTools = initServer<typeof apiContract, RequestContext>();
-const { implementContract, matchRoute, createRouter } = serverTools;
+const serverTools = initServer<RequestContext>();
+const { implementContract, createRouter } = serverTools;
 
 declare global {
 	namespace Express {
@@ -299,9 +316,9 @@ const rawBodyParser = express.raw({
 });
 
 app.use((req, res, next) => {
-	const matched = matchRoute({ contract: apiContract, req });
+	const matched = matchRoute(apiContract, req);
 	const bodyParser =
-		matched?.route.options?.mode === "raw" ? rawBodyParser : jsonBodyParser;
+		matched?.options?.mode === "raw" ? rawBodyParser : jsonBodyParser;
 
 	return bodyParser(req, res, next);
 });
