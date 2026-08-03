@@ -11,14 +11,11 @@ pnpm add @contract-first-api/core zod
 
 ## Define A Contract
 
-Start with `initContracts()`, then define a plain API contract with
-`defineContract()`.
+Define a plain API contract with `defineContract()`.
 
 ```ts
-import { initContracts } from "@contract-first-api/core";
+import { defineContract } from "@contract-first-api/core";
 import z from "zod";
-
-const { defineContract } = initContracts();
 
 export const apiContract = defineContract({
 	todos: {

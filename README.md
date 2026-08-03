@@ -21,10 +21,8 @@ declarations naturally for your codebase; each terminal declaration provides the
 HTTP or WebSocket semantics.
 
 ```ts
-import { initContracts } from "@contract-first-api/core";
+import { defineContract } from "@contract-first-api/core";
 import z from "zod";
-
-const { defineContract } = initContracts();
 
 export const apiContract = defineContract({
 	todos: {
@@ -95,10 +93,8 @@ Every HTTP route declaration declares a `responses` map keyed by HTTP status
 code. Each entry can be a Zod schema, `noBody`, or a `stream(schema)` response.
 
 ```ts
-import { initContracts, noBody, stream } from "@contract-first-api/core";
+import { defineContract, noBody, stream } from "@contract-first-api/core";
 import z from "zod";
-
-const { defineContract } = initContracts();
 
 export const apiContract = defineContract({
 	todos: {

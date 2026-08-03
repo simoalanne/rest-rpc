@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { initContracts, noBody, stream } from "@contract-first-api/core";
+import { defineContract, noBody, stream } from "@contract-first-api/core";
 import type { RequestHandler } from "express";
 import z from "zod";
 import { initServer } from "./initServer.ts";
@@ -113,7 +113,6 @@ const createResponseDouble = () => {
 
 describe("initServer", () => {
 	it("should validate input, attach contract to req, create context, and call service", async () => {
-		const { defineContract } = initContracts();
 		const apiContract = defineContract({
 			users: {
 				getById: {
@@ -212,7 +211,6 @@ describe("initServer", () => {
 	});
 
 	it("should write streaming routes as ndjson chunks", async () => {
-		const { defineContract } = initContracts();
 		const apiContract = defineContract({
 			events: {
 				stream: {
@@ -280,7 +278,6 @@ describe("initServer", () => {
 	});
 
 	it("should return validation errors as JSON and skip service work", async () => {
-		const { defineContract } = initContracts();
 		const apiContract = defineContract({
 			posts: {
 				create: {
@@ -365,7 +362,6 @@ describe("initServer", () => {
 	});
 
 	it("should run typed middlewares before createContext and service calls", async () => {
-		const { defineContract } = initContracts();
 		const apiContract = defineContract({
 			posts: {
 				create: {
@@ -476,7 +472,6 @@ describe("initServer", () => {
 	});
 
 	it("should return 204 for routes without response schemas", async () => {
-		const { defineContract } = initContracts();
 		const apiContract = defineContract({
 			posts: {
 				delete: {
@@ -538,7 +533,6 @@ describe("initServer", () => {
 	});
 
 	it("should use declared success status codes", async () => {
-		const { defineContract } = initContracts();
 		const apiContract = defineContract({
 			posts: {
 				create: {
@@ -589,7 +583,6 @@ describe("initServer", () => {
 	});
 
 	it("should pass service errors to the next error handler", async () => {
-		const { defineContract } = initContracts();
 		const apiContract = defineContract({
 			health: {
 				method: "GET",
@@ -631,7 +624,6 @@ describe("initServer", () => {
 	});
 
 	it("should return non-success route responses as flat JSON", async () => {
-		const { defineContract } = initContracts();
 		const apiContract = defineContract({
 			todos: {
 				create: {
@@ -696,7 +688,6 @@ describe("initServer", () => {
 	});
 
 	it("should not run nonRaw middleware for raw request routes", async () => {
-		const { defineContract } = initContracts();
 		const apiContract = defineContract({
 			uploads: {
 				create: {
@@ -742,7 +733,6 @@ describe("initServer", () => {
 	});
 
 	it("should run nonRaw middleware for non-raw routes", async () => {
-		const { defineContract } = initContracts();
 		const apiContract = defineContract({
 			posts: {
 				create: {
@@ -785,7 +775,6 @@ describe("initServer", () => {
 	});
 
 	it("should route requests to raw and non-raw middlewares based on route mode", async () => {
-		const { defineContract } = initContracts();
 		const apiContract = defineContract({
 			uploads: {
 				create: {
@@ -847,7 +836,6 @@ describe("initServer", () => {
 	});
 
 	it("should prefer the most specific matching route when selecting middleware", async () => {
-		const { defineContract } = initContracts();
 		const apiContract = defineContract({
 			uploads: {
 				byId: {
@@ -899,7 +887,6 @@ describe("initServer", () => {
 	});
 
 	it("should skip both middlewares when the request does not match a route", async () => {
-		const { defineContract } = initContracts();
 		const apiContract = defineContract({
 			posts: {
 				create: {

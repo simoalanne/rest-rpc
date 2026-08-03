@@ -39,7 +39,7 @@ export type {
 	StreamResponse,
 	WebSocketRouteDeclaration,
 } from "./contracts.ts";
-export { initContracts, noBody, stream } from "./contracts.ts";
+export { defineContract, noBody, stream } from "./contracts.ts";
 export type {
 	CreateOpenApiDocumentOptions,
 	OpenApiDocument,

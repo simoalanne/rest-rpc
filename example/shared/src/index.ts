@@ -7,10 +7,8 @@ import type {
 	InferRouteSuccessBody,
 	InferRouteSuccessResponse,
 } from "@contract-first-api/core";
-import { initContracts, stream } from "@contract-first-api/core";
+import { defineContract, stream } from "@contract-first-api/core";
 import z from "zod";
-
-const { defineContract } = initContracts();
 
 export const todoSchema = z.object({
 	id: z.string(),

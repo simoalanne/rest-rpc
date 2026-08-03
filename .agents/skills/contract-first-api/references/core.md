@@ -10,13 +10,11 @@ helpers, and the runtime client.
 
 ## Main API
 
-Start with `initContracts()`, then create the tree with `defineContract()`.
+Create the tree with `defineContract()`.
 
 ```ts
-import { initContracts } from "@contract-first-api/core";
+import { defineContract } from "@contract-first-api/core";
 import z from "zod";
-
-const { defineContract } = initContracts();
 
 export const contracts = defineContract({
 	todos: {

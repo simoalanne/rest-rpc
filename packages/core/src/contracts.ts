@@ -351,15 +351,9 @@ const validateContract = (contract: Contract) => {
 	}
 };
 
-type ContractTools = {
-	defineContract: <const TContract extends Contract>(
-		contract: TContract & ValidateResponseStatuses<TContract>,
-	) => TContract;
+export const defineContract = <const TContract extends Contract>(
+	contract: TContract & ValidateResponseStatuses<TContract>,
+): TContract => {
+	validateContract(contract);
+	return contract;
 };
-
-export const initContracts = (): ContractTools => ({
-	defineContract: (contract) => {
-		validateContract(contract);
-		return contract;
-	},
-});
