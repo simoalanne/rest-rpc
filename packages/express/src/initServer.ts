@@ -9,19 +9,14 @@ import {
 	type InferRouteSuccessBody,
 	isNoBodyResponse,
 	isStreamResponse,
+	type JsonRouteDeclaration,
 	type RawRequestBody,
 	type RawRequestRouteDeclaration,
 	type ResponseBodySchema,
 	type RouteDeclaration,
 	type WebSocketRouteDeclaration,
 } from "@contract-first-api/core/contract";
-import type {
-	Application,
-	NextFunction,
-	Request,
-	RequestHandler,
-	Response,
-} from "express";
+import type { Application, Request, Response } from "express";
 import {
 	type InferRouteServerMessageResult,
 	type InferRouteServerReceivedMessage,
@@ -29,15 +24,6 @@ import {
 	type InferRouteServerSocket,
 	registerWebSocketRoutes,
 } from "./initWebSocketServer.ts";
-
-declare global {
-	namespace Express {
-		interface Request {
-			validatedRequest: Record<string, unknown>;
-			route: RouteDeclaration;
-		}
-	}
-}
 
 export type EmptyObject = Record<never, never>;
 type MaybePromise<T> = T | Promise<T>;
@@ -51,6 +37,7 @@ type ContextValue<TContext> = {
 
 type RequestValue<E extends RouteDeclaration> =
 	InferRouteRequest<E> extends never ? EmptyObject : InferRouteRequest<E>;
+type HttpRouteDeclaration = JsonRouteDeclaration | RawRequestRouteDeclaration;
 
 export type {
 	InferRouteServerMessageResult,
@@ -68,10 +55,7 @@ export type InferRouteServiceRequest<
 	E extends RouteDeclaration,
 	TContext = EmptyObject,
 > = E extends WebSocketRouteDeclaration
-	? Merge<
-			RequestValue<E> &
-				ContextValue<TContext> & { socket: InferRouteServerSocket<E> }
-		>
+	? Merge<RequestValue<E> & { socket: InferRouteServerSocket<E> }>
 	: E extends RawRequestRouteDeclaration
 		? Merge<
 				RequestValue<E> & ContextValue<TContext> & { rawBody: RawRequestBody }
@@ -135,14 +119,17 @@ export type ValidationResult =
 	| { success: true; data: Record<string, unknown> }
 	| { success: false; errors: ValidationIssue[] };
 
+export type CreateContextArgs = {
+	req: Request;
+	route: HttpRouteDeclaration;
+	input: Record<string, unknown>;
+};
+
 export type CreateRouterOptions<TContext = EmptyObject> = {
 	app: Application;
 	server?: HttpServer;
 	implementations: ImplementationInput;
-	middlewares?: RequestHandler[];
-	createContext?: (
-		req: Request & { route: RouteDeclaration },
-	) => TContext | Promise<TContext>;
+	createContext?: (args: CreateContextArgs) => TContext | Promise<TContext>;
 };
 
 export type ServerTools<TContext = EmptyObject> = {
@@ -199,30 +186,6 @@ const compareRouteSpecificity = (
 
 	return left.method.localeCompare(right.method);
 };
-
-const prepareRequest =
-	(route: RouteDeclaration) =>
-	(req: Request, res: Response, next: NextFunction) => {
-		req.route = route;
-		req.validatedRequest = {};
-		const result = validateRequestSegments(route, {
-			body: req.body,
-			query: req.query,
-			params: req.params,
-		});
-
-		if (!result.success) {
-			res.status(400).json({
-				message:
-					"Request validation failed. Check the validationErrors field for details.",
-				validationErrors: result.errors,
-			});
-			return;
-		}
-
-		req.validatedRequest = result.data;
-		next();
-	};
 
 const validateRequestSegments = (
 	route: RouteDeclaration,
@@ -497,7 +460,6 @@ const createRouter = <TContext = EmptyObject>({
 	server,
 	implementations,
 	createContext,
-	middlewares = [],
 }: CreateRouterOptions<TContext>) => {
 	const resolvedImplementations = implementations.flatMap((implementation) =>
 		Array.isArray(implementation) ? implementation : [implementation],
@@ -531,7 +493,6 @@ const createRouter = <TContext = EmptyObject>({
 		registerWebSocketRoutes({
 			server,
 			routes: webSocketRoutes,
-			createContext,
 			createPathMatcher,
 			validateRequestSegments,
 		});
@@ -540,17 +501,31 @@ const createRouter = <TContext = EmptyObject>({
 	for (const route of routes) {
 		if (isWebSocketRoute(route)) continue;
 
+		const httpRoute = route as HttpRouteDeclaration;
 		const method = route.method.toLowerCase() as Lowercase<HttpMethod>;
 		const handler = route.handler as (
 			request: Record<string, unknown>,
 		) => unknown | Promise<unknown>;
-		const requestPreparationMiddleware = prepareRequest(route);
 
 		const serviceHandler = async (req: Request, res: Response) => {
-			const input = req.validatedRequest;
+			const validation = validateRequestSegments(route, {
+				body: req.body,
+				query: req.query,
+				params: req.params,
+			});
+
+			if (!validation.success) {
+				res.status(400).json({
+					message:
+						"Request validation failed. Check the validationErrors field for details.",
+					validationErrors: validation.errors,
+				});
+				return;
+			}
+
+			const input = validation.data;
 			const context =
-				(await createContext?.(req as Request & { route: RouteDeclaration })) ||
-				{};
+				(await createContext?.({ req, route: httpRoute, input })) || {};
 
 			try {
 				const handlerResult = await handler({
@@ -589,12 +564,7 @@ const createRouter = <TContext = EmptyObject>({
 			}
 		};
 
-		app[method](
-			route.routePath,
-			requestPreparationMiddleware,
-			...middlewares,
-			serviceHandler,
-		);
+		app[method](route.routePath, serviceHandler);
 	}
 
 	return app;

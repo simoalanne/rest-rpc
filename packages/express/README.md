@@ -93,7 +93,7 @@ const todoImplementations = implementContract(apiContract.todos).handlers({
 createRouter({
 	app,
 	implementations: [todoImplementations],
-	createContext: (req) => ({
+	createContext: ({ req }) => ({
 		userId: req.userId,
 	}),
 });
@@ -182,15 +182,13 @@ const todoImplementations = implementContract(apiContract.todos).handlers({
 
 ## Request Flow
 
-For each route declaration:
+For each HTTP route declaration:
 
 1. request validation runs first
-2. custom middlewares run after validation
-3. `createContext` runs after middlewares
-4. the service handler runs last
+2. `createContext` runs
+3. the service handler runs last
 
-If validation fails, middleware, context creation, and the service handler do
-not run.
+If validation fails, context creation and the service handler do not run.
 
 ## Validated Request Shape
 
@@ -225,7 +223,7 @@ declaration.
 
 Inline handlers usually get their types from inference. When handlers move into
 separate files, use the route helper types to keep the same request, response,
-context, and websocket message types.
+HTTP context, and websocket message types.
 
 ```ts
 import type {
@@ -333,7 +331,7 @@ const authMiddleware: express.RequestHandler = (req, res, next) => {
 
 The library does not manage an application middleware phase. Middleware can
 attach values to the Express request however your app chooses, and
-`createContext` can read those values.
+`createContext` can read those values from its `req` argument.
 
 ## Streaming Responses
 

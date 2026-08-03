@@ -357,8 +357,8 @@ createRouter({
 	app,
 	server,
 	implementations,
-	createContext: (req) => {
-		const routeLabel = `${req.route.method} ${req.route.path}`;
+	createContext: ({ req, route }) => {
+		const routeLabel = `${route.method} ${route.path}`;
 		return {
 			requestId: `${routeLabel}:${crypto.randomUUID()}`,
 			auditLabel: req.viewerId ? `${routeLabel}:${req.viewerId}` : routeLabel,

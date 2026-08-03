@@ -1,4 +1,4 @@
-import type { Server as HttpServer, IncomingMessage } from "node:http";
+import type { Server as HttpServer } from "node:http";
 import type { Duplex } from "node:stream";
 import type {
 	InferRouteClientMessage,
@@ -6,10 +6,9 @@ import type {
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
 } from "@contract-first-api/core/contract";
-import type { Request } from "express";
 import type WebSocket from "ws";
 import { WebSocketServer } from "ws";
-import type { EmptyObject, ValidationResult } from "./initServer.ts";
+import type { ValidationResult } from "./initServer.ts";
 
 export type InferRouteServerMessageResult<E extends WebSocketRouteDeclaration> =
 	| { success: true; data: InferRouteServerReceivedMessage<E> }
@@ -37,12 +36,9 @@ type WebSocketRoute = WebSocketRouteDeclaration & {
 	handler: (request: unknown) => unknown | Promise<unknown>;
 };
 
-type RegisterWebSocketRoutesOptions<TContext> = {
+type RegisterWebSocketRoutesOptions = {
 	server: HttpServer;
 	routes: WebSocketRoute[];
-	createContext?: (
-		req: Request & { route: RouteDeclaration },
-	) => TContext | Promise<TContext>;
 	createPathMatcher: (
 		path: string,
 	) => (pathname: string) => Record<string, string> | null;
@@ -141,13 +137,12 @@ const runWebSocketServiceHandler = (
 		});
 };
 
-export const registerWebSocketRoutes = <TContext>({
+export const registerWebSocketRoutes = ({
 	server,
 	routes,
-	createContext,
 	createPathMatcher,
 	validateRequestSegments,
-}: RegisterWebSocketRoutesOptions<TContext>) => {
+}: RegisterWebSocketRoutesOptions) => {
 	if (routes.length === 0) return;
 
 	const webSocketServer = new WebSocketServer({ noServer: true });
@@ -182,36 +177,12 @@ export const registerWebSocketRoutes = <TContext>({
 			return;
 		}
 
-		const upgradeRequest = req as IncomingMessage & {
-			route: RouteDeclaration;
-			validatedRequest: Record<string, unknown>;
-		};
-		upgradeRequest.route = matchedRoute.route;
-		upgradeRequest.validatedRequest = validation.data;
-
-		let context: TContext | EmptyObject = {};
-		try {
-			context =
-				(await createContext?.(
-					upgradeRequest as unknown as Request & {
-						route: RouteDeclaration;
-					},
-				)) || {};
-		} catch {
-			sendUpgradeError(socket, 500, {
-				code: "unknown",
-				message: "WebSocket context creation failed.",
-			});
-			return;
-		}
-
 		webSocketServer.handleUpgrade(req, socket, head, (rawSocket) => {
 			const routeSocket = createRouteWebSocket(rawSocket, matchedRoute.route);
 			runWebSocketServiceHandler(
 				matchedRoute.handler,
 				{
 					...validation.data,
-					context,
 					socket: routeSocket,
 				},
 				routeSocket,

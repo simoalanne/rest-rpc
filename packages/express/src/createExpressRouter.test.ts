@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { defineContract, noBody, stream } from "@contract-first-api/core";
-import type { RequestHandler } from "express";
 import z from "zod";
 import { initServer, matchRoute } from "./initServer.ts";
 
@@ -112,7 +111,7 @@ const createResponseDouble = () => {
 };
 
 describe("initServer", () => {
-	it("should validate input, attach route to req, create context, and call service", async () => {
+	it("should validate input, pass route and input to createContext, and call service", async () => {
 		const apiContract = defineContract(
 			{
 				users: {
@@ -165,9 +164,9 @@ describe("initServer", () => {
 		createRouter({
 			app: target.app,
 			implementations,
-			createContext: (req) => {
-				routePathInCreateContext = req.route.path;
-				const validatedReq = req.validatedRequest as { id?: string };
+			createContext: ({ route, input }) => {
+				routePathInCreateContext = route.path;
+				const validatedReq = input as { id?: string };
 				return {
 					viewerId: `viewer:${String(validatedReq.id)}`,
 				};
@@ -357,115 +356,6 @@ describe("initServer", () => {
 					path: ["title"],
 				},
 			],
-		});
-	});
-
-	it("should run typed middlewares before createContext and service calls", async () => {
-		const apiContract = defineContract({
-			posts: {
-				create: {
-					method: "POST",
-					path: "/posts",
-					request: {
-						body: z.object({
-							title: z.string().min(1),
-						}),
-					},
-					responses: {
-						201: z.object({
-							id: z.string(),
-							title: z.string(),
-							viewerId: z.string(),
-						}),
-					},
-				},
-			},
-		});
-
-		const { createRouter, implementContract } = initServer<
-			typeof apiContract,
-			{ viewerId: string }
-		>();
-
-		const seen: {
-			inputTitle?: string;
-			viewerIdFromMiddleware?: string;
-			viewerIdInService?: string;
-			routePath?: string;
-		} = {};
-
-		const authMiddleware: RequestHandler = async (req, _res, next) => {
-			const enrichedReq = req as typeof req & { viewerId?: string };
-			seen.inputTitle = String(req.validatedRequest.title);
-			seen.routePath = req.route.path;
-			enrichedReq.viewerId = "viewer-123";
-			next();
-		};
-
-		const implementations = [
-			implementContract(apiContract.posts).handlers({
-				create({ title, context }) {
-					seen.viewerIdInService = context.viewerId;
-					return {
-						status: 201,
-						body: {
-							id: "post-1",
-							title,
-							viewerId: context.viewerId,
-						},
-					};
-				},
-			}),
-		];
-
-		const target = createRouteTargetDouble();
-
-		createRouter({
-			app: target.app,
-			implementations,
-			middlewares: [authMiddleware],
-			createContext: (req) => {
-				const enrichedReq = req as typeof req & { viewerId?: string };
-				seen.viewerIdFromMiddleware = String(enrichedReq.viewerId);
-				return {
-					viewerId: String(enrichedReq.viewerId),
-				};
-			},
-		});
-
-		const handler = target.routes["POST /posts"];
-		assert.ok(handler);
-
-		const response = createResponseDouble();
-		let nextError: unknown;
-
-		await handler(
-			{
-				body: {
-					title: "Hello",
-				},
-			},
-			response.res,
-			(error) => {
-				nextError = error;
-			},
-		);
-
-		assert.equal(nextError, undefined);
-		assert.deepStrictEqual(seen, {
-			inputTitle: "Hello",
-			routePath: "/posts",
-			viewerIdFromMiddleware: "viewer-123",
-			viewerIdInService: "viewer-123",
-		});
-		assert.deepStrictEqual(response.read(), {
-			statusCode: 201,
-			jsonBody: {
-				id: "post-1",
-				title: "Hello",
-				viewerId: "viewer-123",
-			},
-			writableEnded: true,
 		});
 	});
 
