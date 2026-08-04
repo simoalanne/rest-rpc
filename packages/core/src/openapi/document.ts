@@ -1,0 +1,34 @@
+import type { Contract } from "../contract/route.ts";
+import { contractRoutes } from "../contract/traversal.ts";
+import { createOperation } from "./operation.ts";
+import { isOpenApiRoute, toOpenApiPath } from "./routes.ts";
+import type {
+	CreateOpenApiDocumentOptions,
+	OpenApiDocument,
+	OpenApiPathItem,
+} from "./types.ts";
+
+export const createOpenApiDocument = (
+	contract: Contract,
+	options: CreateOpenApiDocumentOptions,
+): OpenApiDocument => {
+	const document: OpenApiDocument = {
+		openapi: options.openapi ?? "3.1.0",
+		info: options.info,
+		...(options.servers ? { servers: options.servers } : {}),
+		...(options.components ? { components: options.components } : {}),
+		...(options.tags ? { tags: options.tags } : {}),
+		paths: {},
+	};
+
+	for (const route of contractRoutes(contract)) {
+		if (!isOpenApiRoute(route)) continue;
+
+		const path = toOpenApiPath(route.path);
+		const method = route.method.toLowerCase() as keyof OpenApiPathItem;
+		document.paths[path] ??= {};
+		document.paths[path][method] = createOperation(route, options);
+	}
+
+	return options.transformDocument?.(document) ?? document;
+};

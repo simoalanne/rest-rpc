@@ -49,7 +49,7 @@ export {
 export type {
 	CreateOpenApiDocumentOptions,
 	OpenApiDocument,
-} from "./openapi.ts";
-export { createOpenApiDocument } from "./openapi.ts";
+} from "./openapi/index.ts";
+export { createOpenApiDocument } from "./openapi/index.ts";
 export type { StandardSchemaV1 } from "./standardSchema.ts";
 export { validateStandardSchemaSync } from "./standardSchema.ts";
