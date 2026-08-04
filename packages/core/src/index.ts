@@ -18,8 +18,8 @@ export type {
 	InferRouteClientSocket,
 	TryConnectFn,
 	UndeclaredRouteClientResponse,
-} from "./client.ts";
-export { initClient } from "./client.ts";
+} from "./client/index.ts";
+export { initClient } from "./client/index.ts";
 export type {
 	Contract,
 	CustomBody,
