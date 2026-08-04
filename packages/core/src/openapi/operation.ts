@@ -3,7 +3,7 @@ import type {
 	ResponseBodySchema,
 } from "../contract/route.ts";
 import { isCustomBody, isNoBodyResponse } from "../contract/route.ts";
-import type { StandardSchemaV1 } from "../standardSchema.ts";
+import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import {
 	convertSchema,
 	getRequiredSchemaKeys,

@@ -4,7 +4,7 @@ import type {
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
 } from "../contract/route.ts";
-import { validateStandardSchemaSync } from "../standardSchema.ts";
+import { validateStandardSchemaSync } from "../standard-schema/index.ts";
 import { constructBaseRequest, takesRequestInput } from "./request.ts";
 import type {
 	ConnectArgs,

@@ -1,4 +1,4 @@
-import type { StandardSchemaV1 } from "../standardSchema.ts";
+import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { OpenApiSchema, SchemaConverter, SchemaIo } from "./types.ts";
 
 export const getSchemaProperties = (schema: OpenApiSchema) =>

@@ -1,4 +1,4 @@
-import type { StandardSchemaV1 } from "../standardSchema.ts";
+import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 
 const isThenable = (value: unknown): value is PromiseLike<unknown> =>
 	(typeof value === "object" || typeof value === "function") &&

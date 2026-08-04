@@ -1,4 +1,4 @@
-import type { StandardSchemaV1 } from "../standardSchema.ts";
+import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 export type RequestSegment = "body" | "query" | "params";

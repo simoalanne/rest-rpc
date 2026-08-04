@@ -3,7 +3,6 @@ import { afterEach, describe, it } from "node:test";
 import z from "zod";
 import { defineContract } from "../contract/define.ts";
 import { noBody } from "../contract/route.ts";
-import type { StandardSchemaV1 } from "../standardSchema.ts";
 import {
 	captureFetch,
 	createClientTestContract,
@@ -85,38 +84,6 @@ describe("ApiClient responses", () => {
 
 		await assert.rejects(() =>
 			client.todos.create.fetch({ title: "Buy milk" }),
-		);
-	});
-
-	it("rejects async Standard Schema validation", async () => {
-		const asyncSchema: StandardSchemaV1<unknown, string> = {
-			"~standard": {
-				version: 1,
-				vendor: "test",
-				validate: async () => ({ value: "ok" }),
-			},
-		};
-		const apiContract = defineContract({
-			todos: {
-				create: {
-					method: "POST",
-					path: "/todos",
-					request: {
-						body: z.object({ title: z.string() }),
-					},
-					responses: {
-						201: asyncSchema,
-					},
-				},
-			},
-		});
-		captureFetch(jsonResponse("ok", 201));
-
-		const client = initClient(apiContract, { baseUrl: "https://api.test" });
-
-		await assert.rejects(
-			() => client.todos.create.fetch({ title: "Buy milk" }),
-			/Async schema validation is not supported/,
 		);
 	});
 

@@ -4,7 +4,7 @@ import type {
 	RouteDeclaration,
 } from "../contract/route.ts";
 import { isNoBodyResponse, isStreamResponse } from "../contract/route.ts";
-import { validateStandardSchemaSync } from "../standardSchema.ts";
+import { validateStandardSchemaSync } from "../standard-schema/index.ts";
 import { isHttpRouteNode, isSuccessStatus } from "./routes.ts";
 import { parseNdjsonStream } from "./stream.ts";
 import type { FetchArgs, InferRouteClientResponse } from "./types.ts";

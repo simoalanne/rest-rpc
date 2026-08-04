@@ -1,5 +1,5 @@
 import type { StreamResponse } from "../contract/route.ts";
-import { validateStandardSchemaSync } from "../standardSchema.ts";
+import { validateStandardSchemaSync } from "../standard-schema/index.ts";
 
 export async function* parseNdjsonStream(
 	response: StreamResponse,

@@ -1,5 +1,5 @@
 import type { HttpRouteDeclaration } from "../contract/route.ts";
-import type { StandardSchemaV1 } from "../standardSchema.ts";
+import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 
 export type OpenApiSchema = Record<string, unknown>;
 
