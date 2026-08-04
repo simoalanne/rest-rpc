@@ -1,5 +1,6 @@
 import type { Server as HttpServer } from "node:http";
 import type { Duplex } from "node:stream";
+import { validateStandardSchemaSync } from "@contract-first-api/core";
 import type {
 	InferRouteClientMessage,
 	InferRouteServerMessage,
@@ -83,11 +84,15 @@ const createRouteWebSocket = <E extends WebSocketRouteDeclaration>(
 		data: unknown,
 	): InferRouteServerMessageResult<E> => {
 		try {
+			const result = validateStandardSchemaSync(
+				route.messages.client,
+				JSON.parse(String(data)),
+			);
+			if (result.issues) throw result.issues;
+
 			return {
 				success: true,
-				data: route.messages.client.parse(
-					JSON.parse(String(data)),
-				) as InferRouteClientMessage<E>,
+				data: result.value as InferRouteClientMessage<E>,
 			};
 		} catch {
 			return { success: false };

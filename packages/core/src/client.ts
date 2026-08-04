@@ -10,14 +10,14 @@ import type {
 	RouteDeclaration,
 	StreamResponse,
 	WebSocketRouteDeclaration,
-} from "./contract.ts";
+} from "./contract/route.ts";
 import {
-	isNoBodyResponse,
 	isCustomBody,
+	isNoBodyResponse,
 	isStreamResponse,
-	mapContractRoutes,
-	mapObjectValues,
-} from "./contract.ts";
+} from "./contract/route.ts";
+import { mapContractRoutes, mapObjectValues } from "./contract/traversal.ts";
+import { validateStandardSchemaSync } from "./standardSchema.ts";
 
 export type FetchOptions = Omit<RequestInit, "method" | "body" | "headers">;
 export type ApiClientFetchOptions = Omit<FetchOptions, "signal">;
@@ -141,6 +141,7 @@ export type ApiClientOptions = {
 	fetchOptions?: ApiClientFetchOptions;
 	getHeaders?: GetHeadersFn;
 	timeoutMs?: number;
+	unknownRequestKeys?: "throw" | "strip";
 };
 
 type RuntimeArgs = Record<string, unknown>;
@@ -218,6 +219,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 	private fetchOptions?: ApiClientFetchOptions;
 	private getHeaders?: GetHeadersFn;
 	private timeoutMs?: number;
+	private unknownRequestKeys: "throw" | "strip";
 
 	constructor(contract: TContract, options: ApiClientOptions) {
 		this.baseUrl = options.baseUrl;
@@ -225,19 +227,20 @@ export class ApiClient<TContract extends Contract = Contract> {
 		this.fetchOptions = options.fetchOptions;
 		this.getHeaders = options.getHeaders;
 		this.timeoutMs = options.timeoutMs;
+		this.unknownRequestKeys = options.unknownRequestKeys ?? "throw";
 
 		this.api = this.buildApiClient();
 	}
 
 	private groupKeysToRequest(args: RuntimeArgs, route: RouteDeclaration) {
-		const keyMap = new Map<string, "query" | "params">();
 		const isCustomRequestBody = isCustomBody(route.request?.body);
-		(["query", "params"] as const).forEach((type) => {
-			const keys = Object.keys(route.request?.[type]?.shape ?? {});
-			keys.forEach((key) => {
-				keyMap.set(key, type);
-			});
-		});
+		const requestKeys = route.request?.requestKeys;
+
+		if (!requestKeys && route.request) {
+			throw new Error(
+				`Missing request key metadata for ${route.method} ${route.path}. Call defineContract() or provide request.requestKeys before initializing the client.`,
+			);
+		}
 
 		return Object.entries(args).reduce(
 			(acc, [k, v]) => {
@@ -246,19 +249,20 @@ export class ApiClient<TContract extends Contract = Contract> {
 					return acc;
 				}
 
-				const bucket = keyMap.get(k);
+				const bucket = requestKeys?.[k];
 				if (bucket) {
 					if (!acc[bucket]) acc[bucket] = {};
-					acc[bucket][k] = v;
+					(acc[bucket] as Record<string, unknown>)[k] = v;
 					return acc;
 				}
 
-				if (route.request?.body && !isCustomRequestBody) {
-					if (!acc.body) acc.body = {};
-					(acc.body as Record<string, unknown>)[k] = v;
+				if (this.unknownRequestKeys === "strip") {
+					return acc;
 				}
 
-				return acc;
+				throw new Error(
+					`Unknown request key "${k}" for ${route.method} ${route.path}.`,
+				);
 			},
 			{} as {
 				body?: unknown;
@@ -396,7 +400,9 @@ export class ApiClient<TContract extends Contract = Contract> {
 			return this.parseNdjsonStream(schema, rawResponse.body);
 		}
 
-		return schema.parse(await rawResponse.json());
+		const result = validateStandardSchemaSync(schema, await rawResponse.json());
+		if (result.issues) throw result.issues;
+		return result.value;
 	}
 
 	private async fetchResponse<E extends RouteDeclaration>(
@@ -457,13 +463,23 @@ export class ApiClient<TContract extends Contract = Contract> {
 
 				for (const line of lines) {
 					if (!line.trim()) continue;
-					yield response.schema.parse(JSON.parse(line));
+					const result = validateStandardSchemaSync(
+						response.schema,
+						JSON.parse(line),
+					);
+					if (result.issues) throw result.issues;
+					yield result.value;
 				}
 			}
 
 			buffer += decoder.decode();
 			if (buffer.trim()) {
-				yield response.schema.parse(JSON.parse(buffer));
+				const result = validateStandardSchemaSync(
+					response.schema,
+					JSON.parse(buffer),
+				);
+				if (result.issues) throw result.issues;
+				yield result.value;
 			}
 		} finally {
 			reader.releaseLock();
@@ -496,11 +512,15 @@ export class ApiClient<TContract extends Contract = Contract> {
 			data: unknown,
 		): InferRouteClientMessageResult<E> => {
 			try {
+				const result = validateStandardSchemaSync(
+					route.messages.server,
+					JSON.parse(data as string),
+				);
+				if (result.issues) throw result.issues;
+
 				return {
 					success: true,
-					data: route.messages.server.parse(
-						JSON.parse(data as string),
-					) as InferRouteServerMessage<E>,
+					data: result.value as InferRouteServerMessage<E>,
 				};
 			} catch {
 				return {

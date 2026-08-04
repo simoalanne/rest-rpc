@@ -28,9 +28,9 @@ It has fewer features than larger contract-first or RPC frameworks, but is more 
 
 One shared API contract is the source of truth.
 
-The API contract is a plain TypeScript object with route declarations and Zod
-schemas. Integration packages consume that object instead of generating a second
-representation.
+The API contract is a plain TypeScript object with route declarations and
+Standard Schema-compatible schemas. Integration packages consume that object
+instead of generating a second representation.
 
 Typical package roles:
 
@@ -42,6 +42,11 @@ Typical package roles:
   Creates React Query hooks and cache helpers from the API contract.
 - `@contract-first-api/openapi`
   Generates a plain OpenAPI document object from JSON routes.
+
+Runtime validation works with synchronous Standard Schema-compatible schemas.
+Request key inference is built in for common object schemas from Zod, Valibot,
+and ArkType. Other Standard Schema libraries can be used by providing
+`request.requestKeys` or `resolveRequestKeys(schema)`.
 
 ## Route Shapes
 

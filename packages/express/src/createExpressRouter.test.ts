@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+	customBody,
 	defineContract,
 	noBody,
-	customBody,
 	stream,
 } from "@contract-first-api/core";
 import z from "zod";
@@ -357,6 +357,7 @@ describe("initServer", () => {
 			validationErrors: [
 				{
 					code: "invalid_type",
+					expected: "string",
 					message: "Invalid input: expected string, received undefined",
 					path: ["title"],
 				},
@@ -711,7 +712,7 @@ describe("initServer", () => {
 					},
 				},
 			},
-			{ pathPrefix: "/api" },
+			{ pathPrefix: "/api", validate: false },
 		);
 
 		const req = { method: "POST", path: "/api/uploads/static" } as never;

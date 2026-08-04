@@ -2,12 +2,15 @@
 	"name": "@contract-first-api/core",
 	"version": "4.4.0",
 	"type": "module",
-	"description": "Define shared API contract and derive typed request and response helpers from Zod schemas.",
+	"description": "Define shared API contracts and derive typed request and response helpers from Standard Schema-compatible schemas.",
 	"keywords": [
 		"contract-first",
 		"api",
 		"typescript",
+		"standard-schema",
 		"zod",
+		"valibot",
+		"arktype",
 		"schema"
 	],
 	"license": "MIT",
@@ -23,13 +26,13 @@
 			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js"
 		},
-		"./contract": {
-			"types": "./dist/contract.d.ts",
-			"import": "./dist/contract.js"
-		},
 		"./client": {
 			"types": "./dist/client.d.ts",
 			"import": "./dist/client.js"
+		},
+		"./contract": {
+			"types": "./dist/contract/index.d.ts",
+			"import": "./dist/contract/index.js"
 		},
 		"./openapi": {
 			"types": "./dist/openapi.d.ts",
@@ -46,7 +49,9 @@
 		"typecheck": "tsc -p tsconfig.json",
 		"test": "node --test src/*.test.ts src/**/*.test.ts"
 	},
-	"dependencies": {
-		"zod": "^4.3.6"
+	"devDependencies": {
+		"zod": "^4.4.3",
+		"valibot": "^1.4.2",
+		"arktype": "^2.2.3"
 	}
 }

@@ -4,7 +4,7 @@ Define an API contract once, then reuse it for runtime validation, typed Express
 handlers, typed clients, optional React Query hooks, and OpenAPI documents.
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Zod](https://img.shields.io/badge/Zod-4.3-3E67B1?logo=zod&logoColor=white)](https://zod.dev/)
+[![Standard Schema](https://img.shields.io/badge/Standard_Schema-1.0-4B5563)](https://standardschema.dev/)
 [![Express](https://img.shields.io/badge/Express-5.0-000000?logo=express&logoColor=white)](https://expressjs.com/)
 [![TanStack Query](https://img.shields.io/badge/TanStack_Query-5.0-FF4154?logo=reactquery&logoColor=white)](https://tanstack.com/query)
 
@@ -67,11 +67,19 @@ From that contract:
 ## Install
 
 Install the core package wherever you define the API contract or create typed
-clients:
+clients, plus a Standard Schema-compatible validation library:
 
 ```bash
 pnpm add @contract-first-api/core zod
 ```
+
+Zod is only one option. Any synchronous Standard Schema-compatible library can
+validate request bodies, query, params, responses, streams, and WebSocket
+messages. The core package includes built-in request key inference for common
+object schemas from Zod, Valibot, and ArkType. Other Standard Schema libraries
+can still be used by providing `request.requestKeys` on routes or a
+`resolveRequestKeys(schema)` callback to `defineContract()` or
+`defineContractAsync()`.
 
 Then add the integration packages you need:
 
@@ -90,7 +98,8 @@ pnpm add -D @types/ws
 ## Contract Responses
 
 Every HTTP route declaration declares a `responses` map keyed by HTTP status
-code. Each entry can be a Zod schema, `noBody`, or a `stream(schema)` response.
+code. Each entry can be a Standard Schema-compatible schema, `noBody`, or a
+`stream(schema)` response.
 
 ```ts
 import { defineContract, noBody, stream } from "@contract-first-api/core";
@@ -240,7 +249,7 @@ This library is intentionally small. It is not trying to be:
 
 - a code generator or schema compiler
 - a full backend framework
-- a replacement for Express, fetch, Zod, or React Query
+- a replacement for Express, fetch, your schema library, or React Query
 - an RPC framework that owns your route structure
 - a project structure or architecture mandate
 

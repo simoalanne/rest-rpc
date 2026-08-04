@@ -64,25 +64,30 @@ of the generated OpenAPI document.
 
 ## Schema Conversion
 
-Zod schemas are converted using Zod 4 `z.toJSONSchema()`.
+Standard Schema defines validation, not JSON Schema conversion. OpenAPI
+generation requires a `schemaConverter` option for the project's schema
+library.
 
 - request schemas use input mode
 - response schemas use output mode
 
-By default, unrepresentable schemas throw during generation. If needed, schema
-behavior can be relaxed with the `schema.unrepresentable` option.
+Example with Zod:
 
 ```ts
+import z from "zod";
+
 const document = createOpenApiDocument(contract, {
 	info: {
 		title: "Todo API",
 		version: "1.0.0",
 	},
-	schema: {
-		unrepresentable: "any",
-	},
+	schemaConverter: (schema, { io }) =>
+		z.toJSONSchema(schema as z.ZodType, { io }),
 });
 ```
+
+Use the matching converter for Valibot, ArkType, or another Standard
+Schema-compatible library.
 
 ## Customization Hooks
 

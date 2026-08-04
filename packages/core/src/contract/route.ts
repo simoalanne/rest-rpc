@@ -1,25 +1,26 @@
-import type z from "zod";
+import type { StandardSchemaV1 } from "../standardSchema.ts";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+export type RequestSegment = "body" | "query" | "params";
+export type RequestKeys = Record<string, RequestSegment>;
 
-export type RequestBodySchema =
-	| z.ZodObject
-	| z.ZodDiscriminatedUnion
-	| CustomBody
-	| undefined;
+export type RequestBodySchema = StandardSchemaV1 | CustomBody | undefined;
 
 export type RequestSchema = {
 	body?: RequestBodySchema;
-	query?: z.ZodObject;
-	params?: z.ZodObject;
+	query?: StandardSchemaV1;
+	params?: StandardSchemaV1;
+	requestKeys?: RequestKeys;
 };
 
-export type ResponseSchema = z.ZodType;
+export type ResponseSchema = StandardSchemaV1;
 export const noBody = Symbol("NoBodyResponse");
 
 export type NoBodyResponse = typeof noBody;
 
-export type StreamResponse<TSchema extends z.ZodType = z.ZodType> = {
+export type StreamResponse<
+	TSchema extends StandardSchemaV1 = StandardSchemaV1,
+> = {
 	kind: "stream";
 	schema: TSchema;
 };
@@ -30,22 +31,22 @@ export type ResponseBodySchema =
 	| StreamResponse;
 
 export type RouteResponses = Record<number, ResponseBodySchema>;
-type RouteMetadata = Record<string, unknown>;
+export type RouteMetadata = Record<string, unknown>;
 
-export const stream = <const TSchema extends z.ZodType>(
+export const stream = <const TSchema extends StandardSchemaV1>(
 	schema: TSchema,
 ): StreamResponse<TSchema> => ({
 	kind: "stream",
 	schema,
 });
 
-export type CustomBody<TSchema extends z.ZodType = z.ZodType> = {
+export type CustomBody<TSchema extends StandardSchemaV1 = StandardSchemaV1> = {
 	kind: "customBody";
 	schema: TSchema;
 	contentType: string;
 };
 
-export const customBody = <const TSchema extends z.ZodType>(input: {
+export const customBody = <const TSchema extends StandardSchemaV1>(input: {
 	schema: TSchema;
 	contentType: string;
 }): CustomBody<TSchema> => ({
@@ -66,9 +67,7 @@ export const isStreamResponse = (
 	"kind" in response &&
 	response.kind === "stream";
 
-export const isCustomBody = (
-	schema: RequestBodySchema,
-): schema is CustomBody =>
+export const isCustomBody = (schema: RequestBodySchema): schema is CustomBody =>
 	typeof schema === "object" &&
 	schema !== null &&
 	"kind" in schema &&
@@ -95,8 +94,8 @@ export type WebSocketRouteDeclaration = BaseRouteDeclaration & {
 	method: "GET";
 	options: { mode: "websocket" };
 	messages: {
-		client: z.ZodType;
-		server: z.ZodType;
+		client: StandardSchemaV1;
+		server: StandardSchemaV1;
 	};
 	responses?: never;
 };
@@ -105,74 +104,18 @@ export type RouteDeclaration = HttpRouteDeclaration | WebSocketRouteDeclaration;
 
 export type Contract = RouteDeclaration | { [k: string]: Contract };
 
-type Tree<T> = Record<string, unknown> | T;
-
-export const mapObjectValues = <TLeaf>(
-	tree: Tree<TLeaf>,
-	isLeaf: (value: unknown) => value is TLeaf,
-	mappingFn: (value: TLeaf, path: string[]) => unknown,
-	path: string[] = [],
-): unknown =>
-	isLeaf(tree)
-		? mappingFn(tree, path)
-		: Object.entries(tree).reduce(
-				(acc, [k, v]) => {
-					acc[k] = mapObjectValues(v as Tree<TLeaf>, isLeaf, mappingFn, [
-						...path,
-						k,
-					]);
-					return acc;
-				},
-				{} as Record<string, unknown>,
-			);
-
-const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
+export const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
 	typeof value === "object" &&
 	value !== null &&
 	"path" in value &&
 	"method" in value;
 
-export const mapContractRoutes = (
-	contract: Contract,
-	mappingFn: (route: RouteDeclaration, path: string[]) => unknown,
-) => mapObjectValues(contract, isRouteDeclaration, mappingFn);
-
-const forEachContractRoute = (
-	contract: Contract,
-	visitRoute: (route: RouteDeclaration) => void,
-) => {
-	const visit = (node: Contract) => {
-		if (isRouteDeclaration(node)) {
-			visitRoute(node);
-			return;
-		}
-
-		Object.values(node).forEach((child) => {
-			visit(child as Contract);
-		});
-	};
-
-	visit(contract);
-};
-
-export const flattenContractRoutes = <TContract extends Contract = Contract>(
-	contract: TContract,
-): RouteDeclaration[] => {
-	const result: RouteDeclaration[] = [];
-
-	forEachContractRoute(contract as Contract, (route) => {
-		result.push(route);
-	});
-
-	return result;
-};
-
-export type InferResponseBody<TResponse> = TResponse extends z.ZodType
-	? z.infer<TResponse>
+export type InferResponseBody<TResponse> = TResponse extends StandardSchemaV1
+	? StandardSchemaV1.InferOutput<TResponse>
 	: TResponse extends NoBodyResponse
 		? undefined
 		: TResponse extends StreamResponse<infer TSchema>
-			? AsyncIterable<z.infer<TSchema>>
+			? AsyncIterable<StandardSchemaV1.InferOutput<TSchema>>
 			: never;
 
 type ResponseEntry<TStatus extends number, TResponse> = {
@@ -269,32 +212,34 @@ export type IsWebSocketRoute<E extends RouteDeclaration> = E extends {
 export type InferRouteClientMessage<E extends RouteDeclaration> = E extends {
 	messages: { client: infer R };
 }
-	? R extends z.ZodType
-		? z.infer<R>
+	? R extends StandardSchemaV1
+		? StandardSchemaV1.InferOutput<R>
 		: never
 	: never;
 
 export type InferRouteServerMessage<E extends RouteDeclaration> = E extends {
 	messages: { server: infer R };
 }
-	? R extends z.ZodType
-		? z.infer<R>
+	? R extends StandardSchemaV1
+		? StandardSchemaV1.InferOutput<R>
 		: never
 	: never;
 
 type InferRequestBody<TBody> =
 	TBody extends CustomBody<infer TSchema>
-		? { body: z.infer<TSchema> }
-		: TBody extends z.ZodType
-			? z.infer<TBody>
+		? { body: StandardSchemaV1.InferOutput<TSchema> }
+		: TBody extends StandardSchemaV1
+			? StandardSchemaV1.InferOutput<TBody>
 			: never;
 
 type InferRequest<R> = {
 	[K in keyof R]: K extends "body"
 		? InferRequestBody<R[K]>
-		: R[K] extends z.ZodType
-			? z.infer<R[K]>
-			: never;
+		: K extends "requestKeys"
+			? never
+			: R[K] extends StandardSchemaV1
+				? StandardSchemaV1.InferOutput<R[K]>
+				: never;
 };
 
 type RouteRequest<E extends RouteDeclaration> = E extends {
@@ -320,7 +265,7 @@ type StreamResponseStatusError = {
 	readonly __route_error__: "Routes with a stream response cannot define more than one successful status code.";
 };
 
-type ValidateResponseStatuses<T> = T extends RouteDeclaration
+export type ValidateResponseStatuses<T> = T extends RouteDeclaration
 	? T extends { responses: infer TResponses }
 		? HasSuccessfulResponse<TResponses> extends false
 			? MissingSuccessfulResponseError
@@ -335,91 +280,3 @@ type ValidateResponseStatuses<T> = T extends RouteDeclaration
 				[K in keyof T]: ValidateResponseStatuses<T[K]>;
 			}
 		: unknown;
-
-const getRequestSchemaKeys = (
-	schema: z.ZodDiscriminatedUnion | z.ZodObject | undefined,
-) => {
-	if (!schema) return new Set<string>();
-
-	if ("options" in schema) {
-		return new Set(
-			schema.options.flatMap((option) =>
-				Object.keys((option as z.ZodObject).shape),
-			),
-		);
-	}
-
-	return new Set(Object.keys(schema.shape));
-};
-
-type CommonContractOptions = {
-	pathPrefix?: string;
-	metadata?: RouteMetadata;
-};
-
-const joinPathPrefix = (prefix: string, path: string) => {
-	const normalizedPrefix = prefix.replace(/\/+$/, "");
-	const normalizedPath = path.replace(/^\/+/, "");
-
-	if (!normalizedPrefix) return normalizedPath ? `/${normalizedPath}` : "/";
-	if (!normalizedPath) return normalizedPrefix;
-
-	return `${normalizedPrefix}/${normalizedPath}`;
-};
-
-const validateContract = (
-	contract: Contract,
-	commonOptions?: CommonContractOptions,
-) => {
-	forEachContractRoute(contract, (route) => {
-		if (commonOptions?.pathPrefix) {
-			route.path = joinPathPrefix(commonOptions.pathPrefix, route.path);
-		}
-
-		route.metadata = {
-			...commonOptions?.metadata,
-			...route.metadata,
-		};
-
-		if (route.request) {
-			const toBeFlattenedBodySchema = isCustomBody(route.request.body)
-				? undefined
-				: route.request.body;
-			const requestKeySets = [
-				getRequestSchemaKeys(toBeFlattenedBodySchema),
-				getRequestSchemaKeys(route.request.query),
-				getRequestSchemaKeys(route.request.params),
-			];
-			const requestKeyCount = requestKeySets.reduce(
-				(count, keys) => count + keys.size,
-				0,
-			);
-			const uniqueRequestKeys = new Set(
-				requestKeySets.flatMap((keys) => [...keys]),
-			);
-
-			if (uniqueRequestKeys.size !== requestKeyCount) {
-				throw new Error(
-					`Route declaration at path "${route.path}" has duplicate request keys across its "body", "query" and "params" definitions.`,
-				);
-			}
-
-			if (isCustomBody(route.request.body)) {
-				if (uniqueRequestKeys.has("body")) {
-					throw new Error(
-						`Route declaration at path "${route.path}" has a "body" key in query or params. Rename it to avoid conflict with the request body.`,
-					);
-				}
-			}
-		}
-	});
-
-	return contract;
-};
-
-export const defineContract = <const TContract extends Contract>(
-	contract: TContract & ValidateResponseStatuses<TContract>,
-	commonOptions?: CommonContractOptions,
-): TContract => {
-	return validateContract(contract, commonOptions) as TContract;
-};

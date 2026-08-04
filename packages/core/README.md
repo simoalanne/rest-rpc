@@ -9,6 +9,10 @@ runtime clients from the same API contract.
 pnpm add @contract-first-api/core zod
 ```
 
+Install any synchronous Standard Schema-compatible validation library alongside
+core. Zod is used in these examples, but the contract API accepts Standard
+Schema-compatible schemas.
+
 ## Define A Contract
 
 Define a plain API contract with `defineContract()`.
@@ -67,7 +71,7 @@ Each HTTP route declaration can define:
 | --- | --- |
 | `method` | HTTP method: `GET`, `POST`, `PUT`, `DELETE`, or `PATCH`. |
 | `path` | HTTP path, with params using `:paramValue` syntax. |
-| `request` | Optional Zod schemas for `body`, `query`, and `params`. `body` can also use `customBody({ schema, contentType })` to model the whole request body as one value. |
+| `request` | Optional Standard Schema-compatible schemas for `body`, `query`, and `params`. `body` can also use `customBody({ schema, contentType })` to model the whole request body as one value. |
 | `responses` | Required map of status codes to response schemas. At least one status must be 2xx. |
 | `options` | Optional route behavior, currently `http` or `websocket`. HTTP routes are the default. |
 | `messages` | WebSocket client and server message schemas. |
@@ -76,6 +80,26 @@ Each HTTP route declaration can define:
 `defineContract()` validates structural rules that TypeScript cannot fully
 enforce at runtime, such as duplicate request field names across `body`,
 `query`, and `params`.
+
+## Schema Libraries
+
+Contract schemas use the Standard Schema interface. Runtime validation works
+with synchronous Standard Schema-compatible schemas for request bodies, query,
+params, responses, stream chunks, and WebSocket messages.
+
+Request key inference is built in for common object schemas from:
+
+- Zod
+- Valibot
+- ArkType
+
+Other Standard Schema libraries can still be used. For request schemas, provide
+`request.requestKeys` manually or pass `resolveRequestKeys(schema)` to
+`defineContract()` or `defineContractAsync()` when the library cannot be
+introspected automatically.
+
+Async validation is not supported in API contracts. Schemas must return a
+Standard Schema result synchronously.
 
 Shared metadata can be passed as a `defineContract()` option and is shallow
 merged with route metadata. Route metadata wins on key conflicts.
@@ -108,7 +132,7 @@ export const apiContract = defineContract(
 ## Responses
 
 Use `responses` for both successful and non-successful status codes. Values can
-be Zod schemas, `noBody`, or `stream(schema)`.
+be Standard Schema-compatible schemas, `noBody`, or `stream(schema)`.
 
 ```ts
 import { noBody, stream } from "@contract-first-api/core";
@@ -377,6 +401,7 @@ declarations:
 ```ts
 import { createOpenApiDocument } from "@contract-first-api/core";
 import { apiContract } from "@example/shared";
+import z from "zod";
 
 export const openApiDocument = createOpenApiDocument(apiContract, {
 	info: {
@@ -384,12 +409,18 @@ export const openApiDocument = createOpenApiDocument(apiContract, {
 		version: "1.0.0",
 	},
 	servers: [{ url: "http://localhost:3000" }],
+	schemaConverter: (schema, { io }) =>
+		z.toJSONSchema(schema as z.ZodType, { io }),
 });
 ```
 
 Custom request bodies are included with their declared content type. WebSocket
 routes and routes with streaming responses are not included in the generated
 document.
+
+Standard Schema defines validation, not JSON Schema conversion. OpenAPI
+generation requires a `schemaConverter` option so each project can use the
+converter that matches its schema library.
 
 ## How Core Connects To Other Packages
 

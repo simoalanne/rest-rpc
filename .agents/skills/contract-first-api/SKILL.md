@@ -69,6 +69,13 @@ Use this skill for tasks in repositories that use `contract-first-api`.
   type.
 - Shared path prefixes belong in the contract so adapters and clients consume
   the same normalized route paths.
+- Contract schemas use Standard Schema. Runtime validation works with
+  synchronous Standard Schema-compatible schemas.
+- Built-in request key inference exists for common object schemas from Zod,
+  Valibot, and ArkType. Other Standard Schema libraries need
+  `request.requestKeys` or `resolveRequestKeys(schema)` for request schemas.
+- OpenAPI schema output requires a project-provided schema converter; Standard
+  Schema itself does not define JSON Schema conversion.
 
 ## Output Style
 

@@ -1,5 +1,9 @@
 import type { Server as HttpServer } from "node:http";
 import {
+	type StandardSchemaV1,
+	validateStandardSchemaSync,
+} from "@contract-first-api/core";
+import {
 	type Contract,
 	flattenContractRoutes,
 	type HttpMethod,
@@ -8,15 +12,14 @@ import {
 	type InferRouteRequest,
 	type InferRouteResponse,
 	type InferRouteSuccessBody,
-	isNoBodyResponse,
 	isCustomBody,
+	isNoBodyResponse,
 	isStreamResponse,
 	type ResponseBodySchema,
 	type RouteDeclaration,
 	type WebSocketRouteDeclaration,
 } from "@contract-first-api/core/contract";
 import type { Application, Request, Response } from "express";
-import type z from "zod";
 import {
 	type InferRouteServerMessageResult,
 	type InferRouteServerReceivedMessage,
@@ -104,11 +107,7 @@ type ImplementContract<TContext = EmptyObject> = <TNode extends Contract>(
 			) => RouteImplementation[];
 		};
 
-export type ValidationIssue = {
-	code: string;
-	message: string;
-	path: PropertyKey[];
-};
+export type ValidationIssue = StandardSchemaV1.Issue;
 
 export type ValidationResult =
 	| { success: true; data: Record<string, unknown> }
@@ -217,26 +216,22 @@ const validateRequestSegments = (
 		const declaredSchema = requestSchema[segment];
 		const isCustomRequestBody =
 			segment === "body" && isCustomBody(declaredSchema);
-		const schema = (
-			isCustomRequestBody ? declaredSchema.schema : declaredSchema
-		) as z.ZodType | undefined;
+		const schema: StandardSchemaV1 | undefined = isCustomRequestBody
+			? declaredSchema.schema
+			: isCustomBody(declaredSchema)
+				? undefined
+				: declaredSchema;
 		if (!schema) continue;
 
-		const result = schema.safeParse(rawValue);
-		if (!result.success) {
-			errors.push(
-				...result.error.issues.map((issue) => ({
-					code: issue.code,
-					message: issue.message,
-					path: issue.path,
-				})),
-			);
+		const result = validateStandardSchemaSync(schema, rawValue);
+		if (result.issues) {
+			errors.push(...result.issues);
 			continue;
 		}
 
 		validatedSegments[segment] = isCustomRequestBody
-			? ({ body: result.data } as Record<string, unknown>)
-			: (result.data as Record<string, unknown>);
+			? ({ body: result.value } as Record<string, unknown>)
+			: (result.value as Record<string, unknown>);
 	}
 
 	if (errors.length > 0) {

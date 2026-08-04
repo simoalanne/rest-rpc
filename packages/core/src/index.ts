@@ -22,6 +22,7 @@ export type {
 export { initClient } from "./client.ts";
 export type {
 	Contract,
+	CustomBody,
 	HttpRouteDeclaration,
 	InferResponseBody,
 	InferRouteClientMessage,
@@ -32,21 +33,23 @@ export type {
 	InferRouteSuccessBody,
 	InferRouteSuccessResponse,
 	NoBodyResponse,
-	CustomBody,
 	ResponseBodySchema,
 	RouteDeclaration,
 	StreamResponse,
 	WebSocketRouteDeclaration,
-} from "./contract.ts";
+} from "./contract/index.ts";
 export {
-	defineContract,
 	customBody,
+	defineContract,
+	defineContractAsync,
 	isCustomBody,
 	noBody,
 	stream,
-} from "./contract.ts";
+} from "./contract/index.ts";
 export type {
 	CreateOpenApiDocumentOptions,
 	OpenApiDocument,
 } from "./openapi.ts";
 export { createOpenApiDocument } from "./openapi.ts";
+export type { StandardSchemaV1 } from "./standardSchema.ts";
+export { validateStandardSchemaSync } from "./standardSchema.ts";

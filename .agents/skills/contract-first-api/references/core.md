@@ -8,6 +8,9 @@ creating typed clients.
 `@contract-first-api/core` defines a shared API contract, helper types, response
 helpers, and the runtime client.
 
+Contracts accept Standard Schema-compatible schemas. Zod is used in examples,
+but it is not required.
+
 ## Main API
 
 Create the API contract with `defineContract()`.
@@ -50,6 +53,17 @@ Common HTTP route fields:
 
 WebSocket routes use `messages.client` and `messages.server` instead of
 `responses`.
+
+## Schema Libraries
+
+- Runtime validation uses Standard Schema.
+- Schemas must validate synchronously.
+- Built-in request key inference supports common object schemas from Zod,
+  Valibot, and ArkType.
+- Other Standard Schema libraries can be used by providing
+  `request.requestKeys` or `resolveRequestKeys(schema)` when request keys cannot
+  be inferred automatically.
+- OpenAPI generation requires a schema converter for the chosen schema library.
 
 ## Responses
 

@@ -1,17 +1,17 @@
-import z from "zod";
 import type {
 	Contract,
 	HttpRouteDeclaration,
 	RequestBodySchema,
 	ResponseBodySchema,
 	RouteDeclaration,
-} from "./contract.ts";
+} from "./contract/route.ts";
 import {
-	flattenContractRoutes,
-	isNoBodyResponse,
 	isCustomBody,
+	isNoBodyResponse,
 	isStreamResponse,
-} from "./contract.ts";
+} from "./contract/route.ts";
+import { contractRoutes } from "./contract/traversal.ts";
+import type { StandardSchemaV1 } from "./standardSchema.ts";
 
 export type OpenApiSchema = Record<string, unknown>;
 
@@ -65,10 +65,16 @@ export type OpenApiDocument = {
 	[key: `x-${string}`]: unknown;
 };
 
-type SchemaConversionOptions = {
-	unrepresentable?: "throw" | "any";
-	reused?: "ref" | "inline";
+type SchemaIo = "input" | "output";
+
+type SchemaConversionContext = {
+	io: SchemaIo;
 };
+
+type SchemaConverter = (
+	schema: StandardSchemaV1,
+	context: SchemaConversionContext,
+) => OpenApiSchema;
 
 type OperationTransformContext = {
 	route: OpenApiRouteDeclaration;
@@ -83,7 +89,7 @@ export type CreateOpenApiDocumentOptions = {
 	servers?: OpenApiDocument["servers"];
 	components?: OpenApiDocument["components"];
 	tags?: OpenApiDocument["tags"];
-	schema?: SchemaConversionOptions;
+	schemaConverter?: SchemaConverter;
 	transformOperation?: (context: OperationTransformContext) => OpenApiOperation;
 	transformDocument?: (document: OpenApiDocument) => OpenApiDocument;
 };
@@ -108,26 +114,28 @@ const getSchemaProperties = (schema: OpenApiSchema) =>
 const getRequiredSchemaKeys = (schema: OpenApiSchema) =>
 	new Set(Array.isArray(schema.required) ? schema.required : []);
 
-const toJsonSchema = (
-	schema: z.ZodType,
-	io: "input" | "output",
-	options: SchemaConversionOptions | undefined,
-): OpenApiSchema =>
-	z.toJSONSchema(schema, {
-		target: "openapi-3.0",
-		io,
-		unrepresentable: options?.unrepresentable ?? "throw",
-		reused: options?.reused ?? "inline",
-	}) as OpenApiSchema;
+const convertSchema = (
+	schema: StandardSchemaV1,
+	io: SchemaIo,
+	converter: SchemaConverter | undefined,
+): OpenApiSchema => {
+	if (!converter) {
+		throw new Error(
+			"createOpenApiDocument() requires a schemaConverter option to emit schemas from Standard Schema contracts.",
+		);
+	}
+
+	return converter(schema, { io });
+};
 
 const createParameters = (
-	schema: z.ZodObject | undefined,
+	schema: StandardSchemaV1 | undefined,
 	location: "path" | "query",
-	options: SchemaConversionOptions | undefined,
+	converter: SchemaConverter | undefined,
 ): OpenApiParameter[] => {
 	if (!schema) return [];
 
-	const jsonSchema = toJsonSchema(schema, "input", options);
+	const jsonSchema = convertSchema(schema, "input", converter);
 	const properties = getSchemaProperties(jsonSchema);
 	const requiredKeys = getRequiredSchemaKeys(jsonSchema);
 
@@ -141,7 +149,7 @@ const createParameters = (
 
 const createRequestBody = (
 	schema: RequestBodySchema,
-	options: SchemaConversionOptions | undefined,
+	converter: SchemaConverter | undefined,
 ): OpenApiRequestBody | undefined => {
 	if (!schema) return undefined;
 	const contentType = isCustomBody(schema)
@@ -153,7 +161,7 @@ const createRequestBody = (
 		required: true,
 		content: {
 			[contentType]: {
-				schema: toJsonSchema(bodySchema, "input", options),
+				schema: convertSchema(bodySchema, "input", converter),
 			},
 		},
 	};
@@ -162,7 +170,7 @@ const createRequestBody = (
 const createJsonResponse = (
 	description: string,
 	schema: ResponseBodySchema,
-	options: SchemaConversionOptions | undefined,
+	converter: SchemaConverter | undefined,
 ): OpenApiResponse => {
 	if (isNoBodyResponse(schema)) return { description };
 
@@ -170,7 +178,7 @@ const createJsonResponse = (
 		description,
 		content: {
 			[JSON_CONTENT_TYPE]: {
-				schema: toJsonSchema(schema as z.ZodType, "output", options),
+				schema: convertSchema(schema as StandardSchemaV1, "output", converter),
 			},
 		},
 	};
@@ -178,7 +186,7 @@ const createJsonResponse = (
 
 const createResponses = (
 	route: OpenApiRouteDeclaration,
-	options: SchemaConversionOptions | undefined,
+	converter: SchemaConverter | undefined,
 ) => {
 	const responses: Record<string, OpenApiResponse> = {};
 
@@ -186,7 +194,7 @@ const createResponses = (
 		responses[status] = createJsonResponse(
 			Number(status) >= 200 && Number(status) < 300 ? "Success" : "Error",
 			schema,
-			options,
+			converter,
 		);
 	}
 
@@ -198,14 +206,17 @@ const createOperation = (
 	options: CreateOpenApiDocumentOptions,
 ): OpenApiOperation => {
 	const parameters = [
-		...createParameters(route.request?.params, "path", options.schema),
-		...createParameters(route.request?.query, "query", options.schema),
+		...createParameters(route.request?.params, "path", options.schemaConverter),
+		...createParameters(route.request?.query, "query", options.schemaConverter),
 	];
-	const requestBody = createRequestBody(route.request?.body, options.schema);
+	const requestBody = createRequestBody(
+		route.request?.body,
+		options.schemaConverter,
+	);
 	const operation: OpenApiOperation = {
 		...(parameters.length > 0 ? { parameters } : {}),
 		...(requestBody ? { requestBody } : {}),
-		responses: createResponses(route, options.schema),
+		responses: createResponses(route, options.schemaConverter),
 	};
 
 	return options.transformOperation?.({ route, operation }) ?? operation;
@@ -224,7 +235,7 @@ export const createOpenApiDocument = (
 		paths: {},
 	};
 
-	for (const route of flattenContractRoutes(contract)) {
+	for (const route of contractRoutes(contract)) {
 		if (!isOpenApiContract(route)) continue;
 
 		const path = toOpenApiPath(route.path);

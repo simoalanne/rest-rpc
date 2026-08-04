@@ -8,6 +8,8 @@ import type {
 	InferRouteSuccessResponse,
 } from "@contract-first-api/core";
 import { customBody, defineContract, stream } from "@contract-first-api/core";
+import { type } from "arktype";
+import * as v from "valibot";
 import z from "zod";
 
 export const todoSchema = z.object({
@@ -65,9 +67,9 @@ export const healthContract = defineContract({
 			method: "GET",
 			path: "/health",
 			responses: {
-				200: z.object({
-					status: z.literal("ok"),
-					requestId: z.string(),
+				200: v.object({
+					status: v.literal("ok"),
+					requestId: v.string(),
 				}),
 			},
 		},
@@ -89,8 +91,8 @@ export const todoContract = defineContract({
 			method: "POST",
 			path: "/todos",
 			request: {
-				body: z.object({
-					title: z.string().min(1),
+				body: v.object({
+					title: v.pipe(v.string(), v.minLength(1)),
 				}),
 			},
 			metadata: { auth: "required" },
@@ -108,8 +110,8 @@ export const todoContract = defineContract({
 			method: "POST",
 			path: "/todos/find",
 			request: {
-				body: z.object({
-					query: z.string().min(1),
+				body: type({
+					query: "string",
 				}),
 			},
 			responses: {
@@ -154,9 +156,9 @@ export const imageContract = defineContract({
 				}),
 			},
 			responses: {
-				200: z.object({
-					width: z.number(),
-					height: z.number(),
+				200: type({
+					width: "number",
+					height: "number",
 				}),
 			},
 		},

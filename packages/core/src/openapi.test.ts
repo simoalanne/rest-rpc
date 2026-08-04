@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
-import { customBody, noBody, stream } from "./contract.ts";
+import { customBody, noBody, stream } from "./contract/route.ts";
 import { createOpenApiDocument } from "./openapi.ts";
 
 describe("createOpenApiDocument", () => {
@@ -70,6 +70,13 @@ describe("createOpenApiDocument", () => {
 				version: "1.0.0",
 			},
 			servers: [{ url: "http://localhost:3000" }],
+			schemaConverter: (schema, { io }) =>
+				z.toJSONSchema(schema as z.ZodType, {
+					target: "openapi-3.0",
+					io,
+					unrepresentable: "throw",
+					reused: "inline",
+				}) as Record<string, unknown>,
 			transformOperation: ({ route, operation }) => ({
 				...operation,
 				operationId: `${route.method} ${route.path}`,
