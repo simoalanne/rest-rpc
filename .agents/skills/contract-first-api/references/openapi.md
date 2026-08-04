@@ -53,13 +53,14 @@ Key mappings:
 - `method` becomes the operation method
 - `request.params` becomes path parameters
 - `request.query` becomes query parameters
-- `request.body` becomes a JSON request body
+- `request.body` becomes a JSON request body, or the declared custom body
+  content type when using `customBody(...)`
 - each `responses` entry becomes an OpenAPI response for that status
 - `noBody` responses are emitted without JSON content
 
-Only JSON HTTP routes are included. Raw request routes, websocket
-routes, and routes with streaming responses are not part of the generated
-OpenAPI document.
+HTTP routes are included. Custom bodies are documented with their declared
+content type. WebSocket routes and routes with streaming responses are not part
+of the generated OpenAPI document.
 
 ## Schema Conversion
 

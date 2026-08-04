@@ -9,7 +9,7 @@ handlers, typed clients, optional React Query hooks, and OpenAPI documents.
 [![TanStack Query](https://img.shields.io/badge/TanStack_Query-5.0-FF4154?logo=reactquery&logoColor=white)](https://tanstack.com/query)
 
 `contract-first-api` is a small TypeScript toolkit for keeping JSON APIs,
-raw-request routes, streams, and websockets aligned across your stack. You
+custom request bodies, streams, and websockets aligned across your stack. You
 define one API contract as a plain TypeScript object, then reuse it for request
 validation, typed service handlers, typed clients, React Query, and OpenAPI
 output.

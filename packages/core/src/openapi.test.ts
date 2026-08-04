@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
-import { stream } from "./contract.ts";
+import { customBody, noBody, stream } from "./contract.ts";
 import { createOpenApiDocument } from "./openapi.ts";
 
 describe("createOpenApiDocument", () => {
@@ -48,6 +48,19 @@ describe("createOpenApiDocument", () => {
 						server: z.object({ type: z.literal("pong") }),
 					},
 				},
+				import: {
+					path: "/todos/import",
+					method: "POST",
+					request: {
+						body: customBody({
+							schema: z.string(),
+							contentType: "text/csv",
+						}),
+					},
+					responses: {
+						204: noBody,
+					},
+				},
 			},
 		} as const;
 
@@ -75,7 +88,10 @@ describe("createOpenApiDocument", () => {
 		});
 
 		assert.equal(document.openapi, "3.1.0");
-		assert.deepStrictEqual(Object.keys(document.paths).sort(), ["/todos/{id}"]);
+		assert.deepStrictEqual(Object.keys(document.paths).sort(), [
+			"/todos/import",
+			"/todos/{id}",
+		]);
 
 		const updateOperation = document.paths["/todos/{id}"]?.post;
 		assert.ok(updateOperation);
@@ -104,6 +120,13 @@ describe("createOpenApiDocument", () => {
 			updateOperation.responses["409"].content?.["application/json"].schema
 				.type,
 			"object",
+		);
+
+		const importOperation = document.paths["/todos/import"]?.post;
+		assert.ok(importOperation);
+		assert.equal(
+			importOperation.requestBody?.content["text/csv"].schema.type,
+			"string",
 		);
 
 		assert.deepStrictEqual(document.components, {

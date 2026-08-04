@@ -6,8 +6,6 @@ import type {
 	InferRouteServerMessage,
 	InferRouteSuccessBody,
 	IsWebSocketRoute,
-	RawRequestBody,
-	RawRequestRouteDeclaration,
 	ResponseBodySchema,
 	RouteDeclaration,
 	StreamResponse,
@@ -15,6 +13,7 @@ import type {
 } from "./contract.ts";
 import {
 	isNoBodyResponse,
+	isCustomBody,
 	isStreamResponse,
 	mapContractRoutes,
 	mapObjectValues,
@@ -26,15 +25,7 @@ export type ApiClientFetchOptions = Omit<FetchOptions, "signal">;
 export type Merge<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
 
 export type InferRouteClientRequest<E extends RouteDeclaration> =
-	E extends RawRequestRouteDeclaration
-		? Merge<
-				(InferRouteRequest<E> extends never
-					? Record<never, never>
-					: InferRouteRequest<E>) & {
-					rawBody: RawRequestBody;
-				}
-			>
-		: InferRouteRequest<E>;
+	InferRouteRequest<E>;
 
 export type InferRouteClientRequestInput<E extends RouteDeclaration> =
 	InferRouteClientRequest<E> extends never
@@ -159,18 +150,17 @@ const isApiClientRouteNode = (value: unknown): value is ApiClientRouteValue =>
 	value !== null &&
 	("fetchResponse" in value || "connect" in value);
 
-const isRawRequestRouteNode = (
-	route: RouteDeclaration,
-): route is RawRequestRouteDeclaration => route.options?.mode === "raw";
-
 const isWebSocketRouteNode = (
 	route: RouteDeclaration,
 ): route is WebSocketRouteDeclaration => route.options?.mode === "websocket";
 
+const isHttpRouteNode = (route: RouteDeclaration) =>
+	!isWebSocketRouteNode(route);
+
 const isSuccessStatus = (status: number) => status >= 200 && status < 300;
 
 const getSuccessfulResponseStatuses = (route: RouteDeclaration) => {
-	if (!("responses" in route)) return [];
+	if (!isHttpRouteNode(route)) return [];
 
 	return Object.keys(route.responses).map(Number).filter(isSuccessStatus);
 };
@@ -195,12 +185,25 @@ const createRequestSignal = (
 	};
 };
 
-const takesRequestInput = (route: RouteDeclaration) =>
-	Boolean(route.request) || isRawRequestRouteNode(route);
+const takesRequestInput = (route: RouteDeclaration) => Boolean(route.request);
 
 type GetHeadersFn = () =>
 	| Record<string, string>
 	| Promise<Record<string, string>>;
+
+const hasHeader = (headers: Record<string, string>, name: string) =>
+	Object.keys(headers).some((header) => header.toLowerCase() === name);
+
+const assertNoContentTypeHeader = (headers: Record<string, string>) => {
+	if (hasHeader(headers, "content-type")) {
+		throw new Error(
+			'ApiClient getHeaders() must not return a "content-type" header. Use customBody({ contentType }) on the route declaration instead.',
+		);
+	}
+};
+
+const isJsonContentType = (contentType: string) =>
+	contentType.split(";")[0]?.trim().toLowerCase() === "application/json";
 
 export const mapApiClientContract = (
 	apiClient: ApiClientFor<Contract>,
@@ -228,6 +231,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 
 	private groupKeysToRequest(args: RuntimeArgs, route: RouteDeclaration) {
 		const keyMap = new Map<string, "query" | "params">();
+		const isCustomRequestBody = isCustomBody(route.request?.body);
 		(["query", "params"] as const).forEach((type) => {
 			const keys = Object.keys(route.request?.[type]?.shape ?? {});
 			keys.forEach((key) => {
@@ -237,8 +241,8 @@ export class ApiClient<TContract extends Contract = Contract> {
 
 		return Object.entries(args).reduce(
 			(acc, [k, v]) => {
-				if (k === "rawBody") {
-					acc.rawBody = v as RawRequestBody;
+				if (k === "body" && isCustomRequestBody) {
+					acc.body = v;
 					return acc;
 				}
 
@@ -249,33 +253,35 @@ export class ApiClient<TContract extends Contract = Contract> {
 					return acc;
 				}
 
-				if (route.request?.body) {
+				if (route.request?.body && !isCustomRequestBody) {
 					if (!acc.body) acc.body = {};
-					acc.body[k] = v;
+					(acc.body as Record<string, unknown>)[k] = v;
 				}
 
 				return acc;
 			},
 			{} as {
-				body?: Record<string, unknown>;
+				body?: unknown;
 				query?: Record<string, unknown>;
 				params?: Record<string, unknown>;
-				rawBody?: RawRequestBody;
 			},
 		);
+	}
+
+	private serializeCustomBody(body: unknown, contentType: string) {
+		return isJsonContentType(contentType)
+			? JSON.stringify(body)
+			: (body as BodyInit | null | undefined);
 	}
 
 	private constructBaseRequest(
 		route: RouteDeclaration,
 		args?: RuntimeArgs,
-	): { url: string; body?: BodyInit | null } {
+	): { url: string; body?: BodyInit | null; contentType?: string } {
 		let urlBase = `${this.baseUrl}${route.path}`;
 		if (!args) return { url: urlBase };
 
-		const { body, query, params, rawBody } = this.groupKeysToRequest(
-			args,
-			route,
-		);
+		const { body, query, params } = this.groupKeysToRequest(args, route);
 		if (params) {
 			for (const [k, v] of Object.entries(params)) {
 				urlBase = urlBase.replace(`:${k}`, encodeURIComponent(String(v)));
@@ -292,13 +298,19 @@ export class ApiClient<TContract extends Contract = Contract> {
 			urlBase += `?${new URLSearchParams(query as Record<string, string>)}`;
 		}
 
-		if (isRawRequestRouteNode(route)) {
-			return { url: urlBase, body: rawBody as BodyInit | null | undefined };
+		if (isCustomBody(route.request?.body)) {
+			const contentType = route.request.body.contentType;
+			return {
+				url: urlBase,
+				body: this.serializeCustomBody(body, contentType),
+				contentType,
+			};
 		}
 
 		return {
 			url: urlBase,
 			body: body ? JSON.stringify(body) : undefined,
+			contentType: body ? "application/json" : undefined,
 		};
 	}
 
@@ -316,13 +328,14 @@ export class ApiClient<TContract extends Contract = Contract> {
 		...args: FetchArgs<E>
 	): Promise<{ rawResponse: Response; cleanup: () => void }> {
 		const { requestArgs, options } = this.extractArgs(route, args);
-		const { url, body } = this.constructBaseRequest(
+		const { url, body, contentType } = this.constructBaseRequest(
 			route,
 			requestArgs as RuntimeArgs,
 		);
 
 		const signalState = createRequestSignal(options?.signal, this.timeoutMs);
 		const headers = (await this.getHeaders?.()) ?? {};
+		assertNoContentTypeHeader(headers);
 
 		try {
 			const rawResponse = await fetch(url, {
@@ -332,9 +345,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 				body,
 				headers: {
 					...headers,
-					...(body && !isRawRequestRouteNode(route)
-						? { "Content-Type": "application/json" }
-						: {}),
+					...(contentType ? { "Content-Type": contentType } : {}),
 				},
 				signal: signalState?.signal ?? options?.signal,
 			});
@@ -353,7 +364,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 		route: RouteDeclaration,
 		status: number,
 	): ResponseBodySchema | undefined {
-		if (!("responses" in route)) return undefined;
+		if (!isHttpRouteNode(route)) return undefined;
 		const entry = Object.entries(route.responses).find(
 			([declaredStatus]) => Number(declaredStatus) === status,
 		);

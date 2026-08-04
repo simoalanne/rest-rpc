@@ -37,7 +37,7 @@ The client tree mirrors the contract tree. Requests use one flat object:
 
 - `params` replace path segments
 - `query` becomes URL search params
-- `body` becomes JSON
+- `body` becomes JSON unless it is declared with `customBody(...)`
 
 ```ts
 const todo = await api.todos.get.fetch({
@@ -46,13 +46,15 @@ const todo = await api.todos.get.fetch({
 });
 ```
 
-Raw routes keep the same flat `params` and `query` fields, but use an
-explicit `rawBody` field for the request payload.
+Custom bodies keep the same flat `params` and `query` fields, but send the
+whole request body through the `body` field. The client sets the declared
+`Content-Type`. For `application/json` custom bodies, it stringifies the body;
+other body values are passed to `fetch` as-is.
 
 ```ts
 const response = await api.images.inspect.fetchResponse({
 	imageId: "img_1",
-	rawBody: file,
+	body: file,
 });
 ```
 

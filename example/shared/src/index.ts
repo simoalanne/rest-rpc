@@ -7,7 +7,7 @@ import type {
 	InferRouteSuccessBody,
 	InferRouteSuccessResponse,
 } from "@contract-first-api/core";
-import { defineContract, stream } from "@contract-first-api/core";
+import { customBody, defineContract, stream } from "@contract-first-api/core";
 import z from "zod";
 
 export const todoSchema = z.object({
@@ -145,7 +145,14 @@ export const imageContract = defineContract({
 		inspect: {
 			method: "POST",
 			path: "/images/inspect",
-			options: { mode: "raw" },
+			request: {
+				body: customBody({
+					schema: z.custom<Blob | Uint8Array>(
+						(value) => value instanceof Blob || value instanceof Uint8Array,
+					),
+					contentType: "application/octet-stream",
+				}),
+			},
 			responses: {
 				200: z.object({
 					width: z.number(),

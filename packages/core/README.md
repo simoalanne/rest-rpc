@@ -67,9 +67,9 @@ Each HTTP route declaration can define:
 | --- | --- |
 | `method` | HTTP method: `GET`, `POST`, `PUT`, `DELETE`, or `PATCH`. |
 | `path` | HTTP path, with params using `:paramValue` syntax. |
-| `request` | Optional Zod schemas for `body`, `query`, and `params`. Raw request routes can only define `query` and `params`. |
+| `request` | Optional Zod schemas for `body`, `query`, and `params`. `body` can also use `customBody({ schema, contentType })` to model the whole request body as one value. |
 | `responses` | Required map of status codes to response schemas. At least one status must be 2xx. |
-| `options` | Optional route behavior, currently `raw` or `websocket`. |
+| `options` | Optional route behavior, currently `http` or `websocket`. HTTP routes are the default. |
 | `messages` | WebSocket client and server message schemas. |
 | `metadata` | Optional application metadata escape hatch. `defineContract()` populates `{}` when omitted. |
 
@@ -158,11 +158,12 @@ Status codes are declared directly in `responses`.
 
 ## Route Modes
 
-- **JSON routes** are the default. They can define request schemas and
-  responses.
-- **Raw request routes** use `options: { mode: "raw" }`. They can define
-  `query`, `params`, and responses, but not a API-contract-managed request `body`
-  schema.
+- **HTTP routes** are the default. They can define request schemas and
+  responses. By default, request body schemas are treated as JSON objects whose
+  keys are flattened into client and service inputs.
+- **Custom request bodies** use `customBody({ schema, contentType })` when the
+  request body should be treated as one whole value instead of a flattened JSON
+  object.
 - **Streaming routes** are HTTP routes whose successful response is
   declared with `stream(schema)`. A stream response cannot be mixed with
   multiple successful status codes.
@@ -203,10 +204,11 @@ Integrations expose this as one flat request object. For example, `params.id`,
 `query.includeCompleted`, and `body.title` become regular fields on typed
 service and client inputs.
 
-## Raw Request Routes
+## Custom Request Bodies
 
-Raw request routes pass the request body through without API-contract-level Zod
-validation while keeping typed params, query, and responses.
+Custom request bodies keep the request body as one `body` value while keeping
+typed params, query, and responses. The parsed body is validated with the
+custom body schema.
 
 ```ts
 const apiContract = defineContract({
@@ -221,8 +223,11 @@ const apiContract = defineContract({
 				query: z.object({
 					profile: z.enum(["fast", "accurate"]).optional(),
 				}),
+				body: customBody({
+					schema: z.instanceof(Blob),
+					contentType: "image/png",
+				}),
 			},
-			options: { mode: "raw" },
 			responses: {
 				200: z.object({
 					width: z.number(),
@@ -235,7 +240,9 @@ const apiContract = defineContract({
 });
 ```
 
-Client calls add the raw payload through an explicit `rawBody` field.
+Client calls send the custom body through the `body` field. The client sets the
+declared `Content-Type`. For `application/json` bodies it stringifies the body;
+other custom body values are passed to `fetch` as-is.
 
 ## WebSocket Routes
 
@@ -357,8 +364,8 @@ export type DiscussServerMessage = InferRouteClientReceivedMessage<
 >;
 ```
 
-`InferRouteRequest` is the flattened contract request shape. Client request
-helpers use the same shape, except raw request routes include `rawBody`.
+`InferRouteRequest` is the flattened contract request shape. Custom request
+bodies are exposed as a single `body` field.
 `InferRouteResponse` is the declared `{ status, body }` response union, and
 `InferRouteErrors` is the declared non-2xx response union.
 
@@ -380,8 +387,9 @@ export const openApiDocument = createOpenApiDocument(apiContract, {
 });
 ```
 
-Raw request routes, WebSocket routes, and routes with streaming responses are
-not included in the generated document.
+Custom request bodies are included with their declared content type. WebSocket
+routes and routes with streaming responses are not included in the generated
+document.
 
 ## How Core Connects To Other Packages
 

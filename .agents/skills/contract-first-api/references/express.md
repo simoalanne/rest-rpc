@@ -127,29 +127,43 @@ const implementations = [
 ];
 ```
 
-## Raw Body Handling
+## Custom Body Handling
 
-If the contract contains both JSON and raw body routes, you can use `matchRoute()` 
-helper to determine which body parser to use for each request.
+If the contract contains both default JSON bodies and custom bodies, use
+`matchRoute()` and `isCustomBody()` to determine which body parser to use for
+each request. Express still owns parser choice, limits, and middleware order.
 
 ```ts
+import { isCustomBody, matchRoute } from "@contract-first-api/express";
+
 const jsonBodyParser = express.json();
-const rawBodyParser = express.raw({
-	type: ["image/png", "image/jpeg"],
-});
+
+const getCustomBodyParser = (contentType: string) => {
+	switch (contentType) {
+		case "application/octet-stream":
+			return express.raw({ type: contentType });
+		case "application/json":
+			return express.json({ type: contentType });
+		default:
+			throw new Error(`Unsupported custom body content type: ${contentType}`);
+	}
+};
 
 app.use((req, res, next) => {
 	const matched = matchRoute(contract, req);
-	const bodyParser =
-		matched?.options?.mode === "raw" ? rawBodyParser : jsonBodyParser;
+	const body = matched?.request?.body;
+	const bodyParser = isCustomBody(body)
+		? getCustomBodyParser(body.contentType)
+		: jsonBodyParser;
 
 	return bodyParser(req, res, next);
 });
 ```
 
-Use raw mode when the request body should pass through unvalidated while
-keeping typed params, query, and responses. Raw service handlers receive a
-`rawBody` field.
+Use `customBody({ schema, contentType })` when the request body should be
+treated as one whole `body` value while keeping typed params, query, context,
+and responses. The Express adapter validates the already-parsed `req.body`
+against the custom body schema.
 
 ## Middleware
 
@@ -225,5 +239,5 @@ const implementations = [
 ## Use This Package When
 
 - mounting routes on an Express app
-- implementing raw body, stream, or websocket routes
+- implementing custom body, stream, or websocket routes
 - debugging validation order or service input shape

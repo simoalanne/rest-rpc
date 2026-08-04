@@ -2,15 +2,17 @@ import type z from "zod";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
-export type RequestBodySchema = z.ZodObject | z.ZodDiscriminatedUnion;
+export type RequestBodySchema =
+	| z.ZodObject
+	| z.ZodDiscriminatedUnion
+	| CustomBody
+	| undefined;
 
 export type RequestSchema = {
 	body?: RequestBodySchema;
 	query?: z.ZodObject;
 	params?: z.ZodObject;
 };
-
-export type RawRequestBody = unknown;
 
 export type ResponseSchema = z.ZodType;
 export const noBody = Symbol("NoBodyResponse");
@@ -37,6 +39,21 @@ export const stream = <const TSchema extends z.ZodType>(
 	schema,
 });
 
+export type CustomBody<TSchema extends z.ZodType = z.ZodType> = {
+	kind: "customBody";
+	schema: TSchema;
+	contentType: string;
+};
+
+export const customBody = <const TSchema extends z.ZodType>(input: {
+	schema: TSchema;
+	contentType: string;
+}): CustomBody<TSchema> => ({
+	kind: "customBody",
+	schema: input.schema,
+	contentType: input.contentType,
+});
+
 export const isNoBodyResponse = (
 	response: ResponseBodySchema,
 ): response is NoBodyResponse => response === noBody;
@@ -49,8 +66,16 @@ export const isStreamResponse = (
 	"kind" in response &&
 	response.kind === "stream";
 
+export const isCustomBody = (
+	schema: RequestBodySchema,
+): schema is CustomBody =>
+	typeof schema === "object" &&
+	schema !== null &&
+	"kind" in schema &&
+	schema.kind === "customBody";
+
 export type ContractOptions = {
-	mode?: "json" | "raw" | "websocket";
+	mode?: "http" | "websocket";
 };
 
 export type BaseRouteDeclaration = {
@@ -60,15 +85,10 @@ export type BaseRouteDeclaration = {
 	metadata?: RouteMetadata;
 };
 
-export type JsonRouteDeclaration = BaseRouteDeclaration & {
+export type HttpRouteDeclaration = BaseRouteDeclaration & {
 	responses: RouteResponses;
-	options?: { mode?: "json" };
-};
-
-export type RawRequestRouteDeclaration = BaseRouteDeclaration & {
-	responses: RouteResponses;
-	request?: Omit<RequestSchema, "body">;
-	options: { mode: "raw" };
+	options?: { mode?: "http" };
+	messages?: never;
 };
 
 export type WebSocketRouteDeclaration = BaseRouteDeclaration & {
@@ -78,12 +98,10 @@ export type WebSocketRouteDeclaration = BaseRouteDeclaration & {
 		client: z.ZodType;
 		server: z.ZodType;
 	};
+	responses?: never;
 };
 
-export type RouteDeclaration =
-	| JsonRouteDeclaration
-	| RawRequestRouteDeclaration
-	| WebSocketRouteDeclaration;
+export type RouteDeclaration = HttpRouteDeclaration | WebSocketRouteDeclaration;
 
 export type Contract = RouteDeclaration | { [k: string]: Contract };
 
@@ -242,12 +260,6 @@ export type InferRouteErrors<E extends RouteDeclaration> = Exclude<
 	InferRouteSuccessResponse<E>
 >;
 
-export type IsRawRequestRoute<E extends RouteDeclaration> = E extends {
-	options: { mode: "raw" };
-}
-	? true
-	: false;
-
 export type IsWebSocketRoute<E extends RouteDeclaration> = E extends {
 	options: { mode: "websocket" };
 }
@@ -270,11 +282,22 @@ export type InferRouteServerMessage<E extends RouteDeclaration> = E extends {
 		: never
 	: never;
 
+type InferRequestBody<TBody> =
+	TBody extends CustomBody<infer TSchema>
+		? { body: z.infer<TSchema> }
+		: TBody extends z.ZodType
+			? z.infer<TBody>
+			: never;
+
 type InferRequest<R> = {
-	[K in keyof R]: R[K] extends z.ZodType ? z.infer<R[K]> : never;
+	[K in keyof R]: K extends "body"
+		? InferRequestBody<R[K]>
+		: R[K] extends z.ZodType
+			? z.infer<R[K]>
+			: never;
 };
 
-type RawRequest<E extends RouteDeclaration> = E extends {
+type RouteRequest<E extends RouteDeclaration> = E extends {
 	request: infer R;
 }
 	? InferRequest<R>
@@ -283,7 +306,7 @@ type RawRequest<E extends RouteDeclaration> = E extends {
 type Merge<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
 
 export type InferRouteRequest<E extends RouteDeclaration> =
-	RawRequest<E> extends infer R
+	RouteRequest<E> extends infer R
 		? R extends { body?: infer B; query?: infer Q; params?: infer P }
 			? Merge<B & Q & P>
 			: R
@@ -314,22 +337,20 @@ type ValidateResponseStatuses<T> = T extends RouteDeclaration
 		: unknown;
 
 const getRequestSchemaKeys = (
-	schema: RequestBodySchema | z.ZodObject | undefined,
+	schema: z.ZodDiscriminatedUnion | z.ZodObject | undefined,
 ) => {
-	if (!schema) return [];
+	if (!schema) return new Set<string>();
 
 	if ("options" in schema) {
-		return schema.options.flatMap((option) =>
-			Object.keys((option as z.ZodObject).shape),
+		return new Set(
+			schema.options.flatMap((option) =>
+				Object.keys((option as z.ZodObject).shape),
+			),
 		);
 	}
 
-	return Object.keys(schema.shape);
+	return new Set(Object.keys(schema.shape));
 };
-
-const getRequestSchemaKeySet = (
-	schema: RequestBodySchema | z.ZodObject | undefined,
-) => new Set(getRequestSchemaKeys(schema));
 
 type CommonContractOptions = {
 	pathPrefix?: string;
@@ -361,10 +382,13 @@ const validateContract = (
 		};
 
 		if (route.request) {
+			const toBeFlattenedBodySchema = isCustomBody(route.request.body)
+				? undefined
+				: route.request.body;
 			const requestKeySets = [
-				getRequestSchemaKeySet(route.request.body),
-				getRequestSchemaKeySet(route.request.query),
-				getRequestSchemaKeySet(route.request.params),
+				getRequestSchemaKeys(toBeFlattenedBodySchema),
+				getRequestSchemaKeys(route.request.query),
+				getRequestSchemaKeys(route.request.params),
 			];
 			const requestKeyCount = requestKeySets.reduce(
 				(count, keys) => count + keys.size,
@@ -378,6 +402,14 @@ const validateContract = (
 				throw new Error(
 					`Route declaration at path "${route.path}" has duplicate request keys across its "body", "query" and "params" definitions.`,
 				);
+			}
+
+			if (isCustomBody(route.request.body)) {
+				if (uniqueRequestKeys.has("body")) {
+					throw new Error(
+						`Route declaration at path "${route.path}" has a "body" key in query or params. Rename it to avoid conflict with the request body.`,
+					);
+				}
 			}
 		}
 	});

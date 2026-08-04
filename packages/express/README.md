@@ -272,35 +272,47 @@ type OutgoingDiscussMessage = InferRouteServerSendMessage<
 >;
 ```
 
-## Raw Body Handling
+## Custom Body Handling
 
-If the contract contains both JSON and raw body routes, you can use `matchRoute()` 
-helper to determine which body parser to use for each request.
+If the contract contains both default JSON bodies and custom bodies, you can use
+`matchRoute()` to determine which body parser to use for each request.
 
 ```ts
+import { isCustomBody, matchRoute } from "@contract-first-api/express";
+
 const jsonBodyParser = express.json();
-const rawBodyParser = express.raw({
-	type: ["image/png", "image/jpeg"],
-});
+
+const getCustomBodyParser = (contentType: string) => {
+	switch (contentType) {
+		case "application/octet-stream":
+			return express.raw({ type: contentType });
+		case "application/json":
+			return express.json({ type: contentType });
+		default:
+			throw new Error(`Unsupported custom body content type: ${contentType}`);
+	}
+};
 
 app.use((req, res, next) => {
 	const matched = matchRoute(contract, req);
-	const bodyParser =
-		matched?.options?.mode === "raw" ? rawBodyParser : jsonBodyParser;
+	const body = matched?.request?.body;
+	const bodyParser = isCustomBody(body)
+		? getCustomBodyParser(body.contentType)
+		: jsonBodyParser;
 
 	return bodyParser(req, res, next);
 });
 ```
 
-Raw service handlers receive `rawBody` in addition to typed params, query, and
-context:
+Custom body service handlers receive the parsed request body as `body` in addition
+to typed params, query, and context:
 
 ```ts
 const imageImplementations = implementContract(apiContract.images).handlers({
-	inspect({ rawBody }) {
+	inspect({ body }) {
 		return {
 			status: 200,
-			body: inspectImage(rawBody),
+			body: inspectImage(body),
 		};
 	},
 });

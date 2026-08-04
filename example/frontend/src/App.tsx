@@ -199,7 +199,7 @@ export const App = () => {
 		}
 
 		inspectImage.mutate({
-			rawBody: selectedImage,
+			body: selectedImage,
 		});
 	};
 
@@ -307,7 +307,7 @@ export const App = () => {
 					</p>
 				) : (
 					<p className="helper-copy">
-						Choose a PNG, JPEG, or GIF to POST as a raw request body.
+						Choose a PNG, JPEG, or GIF to POST as a custom request body.
 					</p>
 				)}
 				{selectedImagePreviewUrl ? (

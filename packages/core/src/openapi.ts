@@ -1,13 +1,15 @@
 import z from "zod";
 import type {
 	Contract,
-	JsonRouteDeclaration,
+	HttpRouteDeclaration,
+	RequestBodySchema,
 	ResponseBodySchema,
 	RouteDeclaration,
 } from "./contract.ts";
 import {
 	flattenContractRoutes,
 	isNoBodyResponse,
+	isCustomBody,
 	isStreamResponse,
 } from "./contract.ts";
 
@@ -73,7 +75,7 @@ type OperationTransformContext = {
 	operation: OpenApiOperation;
 };
 
-type OpenApiRouteDeclaration = JsonRouteDeclaration;
+type OpenApiRouteDeclaration = HttpRouteDeclaration;
 
 export type CreateOpenApiDocumentOptions = {
 	openapi?: string;
@@ -91,8 +93,8 @@ const JSON_CONTENT_TYPE = "application/json";
 const isOpenApiContract = (
 	route: RouteDeclaration,
 ): route is OpenApiRouteDeclaration =>
-	(!route.options || route.options.mode === "json") &&
-	"responses" in route &&
+	(!route.options || route.options.mode === "http") &&
+	route.responses !== undefined &&
 	!Object.values(route.responses).some((response) =>
 		isStreamResponse(response),
 	);
@@ -138,16 +140,20 @@ const createParameters = (
 };
 
 const createRequestBody = (
-	schema: z.ZodType | undefined,
+	schema: RequestBodySchema,
 	options: SchemaConversionOptions | undefined,
 ): OpenApiRequestBody | undefined => {
 	if (!schema) return undefined;
+	const contentType = isCustomBody(schema)
+		? schema.contentType
+		: JSON_CONTENT_TYPE;
+	const bodySchema = isCustomBody(schema) ? schema.schema : schema;
 
 	return {
 		required: true,
 		content: {
-			[JSON_CONTENT_TYPE]: {
-				schema: toJsonSchema(schema, "input", options),
+			[contentType]: {
+				schema: toJsonSchema(bodySchema, "input", options),
 			},
 		},
 	};
@@ -171,7 +177,7 @@ const createJsonResponse = (
 };
 
 const createResponses = (
-	route: JsonRouteDeclaration,
+	route: OpenApiRouteDeclaration,
 	options: SchemaConversionOptions | undefined,
 ) => {
 	const responses: Record<string, OpenApiResponse> = {};

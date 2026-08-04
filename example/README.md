@@ -6,7 +6,7 @@ workflow across the packages.
 Packages:
 
 - `shared`: defines `apiContract` with `@contract-first-api/core`, including
-  status-keyed `responses`, a raw request route, a stream response, and a
+  status-keyed `responses`, a custom request body, a stream response, and a
   WebSocket route.
 - `backend`: mounts the API contract with `initServer`, uses route-aware
   middleware, builds request context, and returns route-typed responses.

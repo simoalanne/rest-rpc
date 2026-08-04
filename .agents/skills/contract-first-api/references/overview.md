@@ -45,18 +45,20 @@ Typical package roles:
 
 ## Route Shapes
 
-Each route is one of four modes:
+Each route is one of the main shapes below:
 
-- `json`
-  Default request and response route with status-keyed `responses`.
-- `raw`
-  Validated `params` and `query`, but no API-contract-managed request body.
+- HTTP
+  Default request and response route with status-keyed `responses`. JSON object
+  request bodies are flattened into client and service inputs.
+- custom body
+  Use `customBody({ schema, contentType })` in `request.body` when the request
+  body should be treated as one whole `body` value instead of flattened fields.
 - streaming
   NDJSON streaming response declared with `stream(schema)`.
 - `websocket`
   Bidirectional message schemas instead of a normal response body.
 
-These modes affect how every integration package behaves.
+These shapes affect how every integration package behaves.
 
 ## Practical Rules
 

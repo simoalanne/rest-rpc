@@ -27,37 +27,46 @@ Use this skill for tasks in repositories that use `contract-first-api`.
 
 1. Identify which package or packages the task touches.
 2. Search the local codebase for existing `contract-first-api` usage and follow clear established patterns first.
-3. Read [references/overview.md](references/overview.md) only when the task spans multiple packages or the overall architecture is unclear.
-4. Read only the package reference files needed for the task when local examples are missing, inconsistent, or too narrow:
+3. When using this library from another project, treat the reference files as
+   consumer-facing API guidance.
+4. When editing this library's own source code, treat the reference files only
+   as quick documented-behavior context. Prefer the package source, tests,
+   examples, and READMEs as the source of truth before making implementation
+   changes.
+5. Read [references/overview.md](references/overview.md) only when the task spans multiple packages or the overall architecture is unclear.
+6. Read only the package reference files needed for the task when local examples are missing, inconsistent, or too narrow:
    - [references/core.md](references/core.md)
    - [references/express.md](references/express.md)
    - [references/api-client.md](references/api-client.md)
    - [references/react-query.md](references/react-query.md)
    - [references/openapi.md](references/openapi.md)
-5. Preserve the library's contract-first model:
+7. Preserve the library's contract-first model:
    - one shared API contract is the source of truth
    - integrations consume the API contract rather than redefining request and response types
    - request fields are flattened for service and client usage
-6. Prefer narrow changes that match the package's documented API and examples already present in the repository.
+8. Prefer narrow changes that match the package's documented API and examples already present in the repository.
 
 ## Package Selection
 
-- Use `core.md` for defining the API contract, route modes, and helper types.
-- Use `express.md` for route registration, request validation, middleware, raw body handling, context creation, streams, and websockets on the server.
+- Use `core.md` for defining the API contract, route shapes, and helper types.
+- Use `express.md` for route registration, request validation, middleware, custom body parser selection, context creation, streams, and websockets on the server.
 - Use `api-client.md` for core client request shape, base URL rules, headers, timeouts, and response handling.
 - Use `react-query.md` for hook usage, cache helpers, and how the React Query client uses the API contract and core client options.
-- Use `openapi.md` for JSON routes export, transform hooks, and document customization.
+- Use `openapi.md` for OpenAPI export, transform hooks, and document customization.
 
 ## Invariants
 
 - The API contract is a plain TypeScript object defined once and shared across packages.
 - Request field names must be unique across `body`, `query`, and `params` within one route.
-- Route mode changes behavior across integrations:
-  - `json` is the default
-  - `raw` does not define an API-contract-managed request body
+- Route behavior changes across integrations:
+  - HTTP routes are the default and use status-keyed `responses`
+  - JSON object request bodies are flattened into client and service inputs
+  - `customBody({ schema, contentType })` models a whole request body value
   - `stream(schema)` models NDJSON responses
   - `websocket` models bidirectional messages
-- `@contract-first-api/openapi` only documents JSON routes.
+- OpenAPI output includes HTTP routes except websocket routes and routes with
+  streaming responses. Custom bodies are documented with their declared content
+  type.
 - Shared path prefixes belong in the contract so adapters and clients consume
   the same normalized route paths.
 

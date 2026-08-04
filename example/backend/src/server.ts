@@ -10,10 +10,12 @@ import type {
 import {
 	ContractResponseError,
 	initServer,
+	isCustomBody,
 	matchRoute,
 } from "@contract-first-api/express";
 import type { DiscussMessage, Todo } from "@example/shared";
 import { apiContract } from "@example/shared";
+import type { RequestHandler } from "express";
 import express from "express";
 
 type RequestContext = {
@@ -180,16 +182,16 @@ const createTodo: CreateTodoHandler = ({ title }) => {
 	};
 };
 
-const inspectImage = ({ rawBody }: InspectImageRequest) => {
-	if (!Buffer.isBuffer(rawBody)) {
+const inspectImage = ({ body }: InspectImageRequest) => {
+	if (!Buffer.isBuffer(body)) {
 		throw new Error(
-			"Expected a parsed raw request body. Add express.raw() middleware for image uploads.",
+			"Expected a parsed request body. Add express.raw() middleware for image uploads.",
 		);
 	}
 
 	return {
 		status: 200 as const,
-		body: inspectImageBuffer(rawBody),
+		body: inspectImageBuffer(body),
 	};
 };
 
@@ -325,15 +327,33 @@ const implementations = [
 ];
 
 const jsonBodyParser = express.json();
-const rawBodyParser = express.raw({
-	type: ["image/png", "image/jpeg", "image/gif"],
-	limit: "10mb",
-});
+const customBodyParsers = new Map<string, RequestHandler>();
+
+const getCustomBodyParser = (contentType: string) => {
+	const cached = customBodyParsers.get(contentType);
+	if (cached) return cached;
+
+	const parser = (() => {
+		switch (contentType) {
+			case "application/octet-stream":
+				return express.raw({ type: contentType, limit: "10mb" });
+			case "application/json":
+				return express.json({ type: contentType, limit: "1mb" });
+			default:
+				throw new Error(`Unsupported custom body content type: ${contentType}`);
+		}
+	})();
+
+	customBodyParsers.set(contentType, parser);
+	return parser;
+};
 
 app.use((req, res, next) => {
 	const matched = matchRoute(apiContract, req);
-	const bodyParser =
-		matched?.options?.mode === "raw" ? rawBodyParser : jsonBodyParser;
+	const body = matched?.request?.body;
+	const bodyParser = isCustomBody(body)
+		? getCustomBodyParser(body.contentType)
+		: jsonBodyParser;
 
 	return bodyParser(req, res, next);
 });

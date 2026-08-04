@@ -102,13 +102,14 @@ export const apiContract = defineContract({
 There is no separate `response`, `successStatusCode`, or `errors` field. Status
 codes are the keys in `responses`; non-2xx responses are typed error cases.
 
-## Route Modes
+## Route Shapes
 
-- `json`
-  Default mode. Supports request schemas and responses.
-- `raw`
-  Uses `options: { mode: "raw" }`. Can define `query`, `params`, and
-  responses, but not an API-contract-managed request body.
+- HTTP
+  Default mode. Supports request schemas and status-keyed responses. JSON object
+  body schemas are flattened into client and service inputs.
+- custom body
+  Use `customBody({ schema, contentType })` in `request.body` when the request
+  body should be treated as one whole `body` value instead of flattened fields.
 - streaming
   Use `stream(schema)` as the successful response value. A stream response
   cannot be mixed with multiple successful status codes.

@@ -1,3 +1,4 @@
+export { isCustomBody } from "@contract-first-api/core/contract";
 export type {
 	CreateContextArgs,
 	ImplementationInput,

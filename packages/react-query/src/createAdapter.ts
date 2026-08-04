@@ -152,8 +152,7 @@ const isWebSocketRoute = (
 	route: RouteDeclaration,
 ): route is WebSocketRouteDeclaration => route.options?.mode === "websocket";
 
-const takesRequestInput = (route: RouteDeclaration) =>
-	Boolean(route.request) || route.options?.mode === "raw";
+const takesRequestInput = (route: RouteDeclaration) => Boolean(route.request);
 
 const readRequestArg = (route: RouteDeclaration, args: RequestArgs) =>
 	takesRequestInput(route) ? args[0] : undefined;

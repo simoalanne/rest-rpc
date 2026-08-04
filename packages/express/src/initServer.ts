@@ -3,20 +3,20 @@ import {
 	type Contract,
 	flattenContractRoutes,
 	type HttpMethod,
+	type HttpRouteDeclaration,
 	type InferRouteErrors,
 	type InferRouteRequest,
 	type InferRouteResponse,
 	type InferRouteSuccessBody,
 	isNoBodyResponse,
+	isCustomBody,
 	isStreamResponse,
-	type JsonRouteDeclaration,
-	type RawRequestBody,
-	type RawRequestRouteDeclaration,
 	type ResponseBodySchema,
 	type RouteDeclaration,
 	type WebSocketRouteDeclaration,
 } from "@contract-first-api/core/contract";
 import type { Application, Request, Response } from "express";
+import type z from "zod";
 import {
 	type InferRouteServerMessageResult,
 	type InferRouteServerReceivedMessage,
@@ -37,7 +37,6 @@ type ContextValue<TContext> = {
 
 type RequestValue<E extends RouteDeclaration> =
 	InferRouteRequest<E> extends never ? EmptyObject : InferRouteRequest<E>;
-type HttpRouteDeclaration = JsonRouteDeclaration | RawRequestRouteDeclaration;
 
 export type {
 	InferRouteServerMessageResult,
@@ -56,11 +55,7 @@ export type InferRouteServiceRequest<
 	TContext = EmptyObject,
 > = E extends WebSocketRouteDeclaration
 	? Merge<RequestValue<E> & { socket: InferRouteServerSocket<E> }>
-	: E extends RawRequestRouteDeclaration
-		? Merge<
-				RequestValue<E> & ContextValue<TContext> & { rawBody: RawRequestBody }
-			>
-		: Merge<RequestValue<E> & ContextValue<TContext>>;
+	: Merge<RequestValue<E> & ContextValue<TContext>>;
 
 export type InferRouteServiceResponse<E extends RouteDeclaration> =
 	InferRouteResponse<E>;
@@ -219,7 +214,12 @@ const validateRequestSegments = (
 	]) as Array<["body" | "query" | "params", unknown]>;
 
 	for (const [segment, rawValue] of segmentEntries) {
-		const schema = requestSchema[segment];
+		const declaredSchema = requestSchema[segment];
+		const isCustomRequestBody =
+			segment === "body" && isCustomBody(declaredSchema);
+		const schema = (
+			isCustomRequestBody ? declaredSchema.schema : declaredSchema
+		) as z.ZodType | undefined;
 		if (!schema) continue;
 
 		const result = schema.safeParse(rawValue);
@@ -234,7 +234,9 @@ const validateRequestSegments = (
 			continue;
 		}
 
-		validatedSegments[segment] = result.data as Record<string, unknown>;
+		validatedSegments[segment] = isCustomRequestBody
+			? ({ body: result.data } as Record<string, unknown>)
+			: (result.data as Record<string, unknown>);
 	}
 
 	if (errors.length > 0) {
@@ -255,9 +257,8 @@ const isWebSocketRoute = (
 	route: RouteDeclaration,
 ): route is WebSocketRouteDeclaration => route.options?.mode === "websocket";
 
-const isRawRequestRoute = (
-	route: RouteDeclaration,
-): route is RawRequestRouteDeclaration => route.options?.mode === "raw";
+const isHttpRoute = (route: RouteDeclaration): route is HttpRouteDeclaration =>
+	!isWebSocketRoute(route);
 
 const escapeRegExp = (value: string) =>
 	value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -406,7 +407,7 @@ const getResponseSchema = (
 	route: RouteDeclaration,
 	status: number,
 ): ResponseBodySchema | undefined => {
-	if (!("responses" in route)) return undefined;
+	if (!isHttpRoute(route)) return undefined;
 	const entry = Object.entries(route.responses).find(
 		([declaredStatus]) => Number(declaredStatus) === status,
 	);
@@ -416,7 +417,7 @@ const getResponseSchema = (
 const getSingleSuccessfulStatus = (
 	route: RouteDeclaration,
 ): number | undefined => {
-	if (!("responses" in route)) return undefined;
+	if (!isHttpRoute(route)) return undefined;
 
 	const statuses = Object.keys(route.responses)
 		.map(Number)
@@ -531,9 +532,6 @@ const createRouter = <TContext = EmptyObject>({
 				const handlerResult = await handler({
 					...input,
 					context,
-					...(isRawRequestRoute(route)
-						? { rawBody: req.body as RawRequestBody }
-						: {}),
 				});
 				const result = normalizeHandlerResult(route, handlerResult);
 				const schema = getResponseSchema(route, result.status);

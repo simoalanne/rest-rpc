@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { defineContract, noBody, stream } from "@contract-first-api/core";
+import {
+	defineContract,
+	noBody,
+	customBody,
+	stream,
+} from "@contract-first-api/core";
 import z from "zod";
 import { initServer, matchRoute } from "./initServer.ts";
 
@@ -359,6 +364,93 @@ describe("initServer", () => {
 		});
 	});
 
+	it("should validate custom bodies and pass them to service handlers as body", async () => {
+		const apiContract = defineContract({
+			uploads: {
+				inspect: {
+					method: "POST",
+					path: "/uploads/:id",
+					request: {
+						params: z.object({ id: z.string() }),
+						query: z.object({
+							profile: z.enum(["fast", "accurate"]).optional(),
+						}),
+						body: customBody({
+							schema: z.instanceof(Buffer),
+							contentType: "application/octet-stream",
+						}),
+					},
+					responses: {
+						200: z.object({
+							id: z.string(),
+							profile: z.enum(["fast", "accurate"]).optional(),
+							size: z.number(),
+						}),
+					},
+				},
+			},
+		});
+
+		const { createRouter, implementContract } =
+			initServer<typeof apiContract>();
+		let seenRequest: unknown;
+
+		const implementations = [
+			implementContract(apiContract.uploads).handlers({
+				inspect(request) {
+					seenRequest = request;
+					return {
+						status: 200,
+						body: {
+							id: request.id,
+							profile: request.profile,
+							size: request.body.byteLength,
+						},
+					};
+				},
+			}),
+		];
+
+		const target = createRouteTargetDouble();
+		createRouter({
+			app: target.app,
+			implementations,
+		});
+
+		const response = createResponseDouble();
+		const body = Buffer.from("image-bytes");
+		let nextError: unknown;
+
+		await target.routes["POST /uploads/:id"](
+			{
+				body,
+				params: { id: "file-1" },
+				query: { profile: "fast" },
+			},
+			response.res,
+			(error?: unknown) => {
+				nextError = error;
+			},
+		);
+
+		assert.equal(nextError, undefined);
+		assert.deepStrictEqual(seenRequest, {
+			id: "file-1",
+			profile: "fast",
+			body,
+			context: {},
+		});
+		assert.deepStrictEqual(response.read(), {
+			statusCode: 200,
+			jsonBody: {
+				id: "file-1",
+				profile: "fast",
+				size: body.byteLength,
+			},
+			writableEnded: true,
+		});
+	});
+
 	it("should return 204 for routes without response schemas", async () => {
 		const apiContract = defineContract({
 			posts: {
@@ -581,7 +673,6 @@ describe("initServer", () => {
 						request: {
 							params: z.object({ id: z.string() }),
 						},
-						options: { mode: "raw" },
 						responses: {
 							204: noBody,
 						},
@@ -604,7 +695,6 @@ describe("initServer", () => {
 					byId: {
 						method: "POST",
 						path: "/uploads/:id",
-						options: { mode: "raw" },
 						responses: {
 							204: noBody,
 						},
