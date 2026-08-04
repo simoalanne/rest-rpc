@@ -40,8 +40,10 @@ export type {
 } from "./contract/index.ts";
 export {
 	customBody,
-	defineContract,
-	defineContractAsync,
+	route,
+	routeAsync,
+	router,
+	routerAsync,
 	isCustomBody,
 	noBody,
 	stream,

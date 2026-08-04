@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import z from "zod";
-import { defineContract } from "../contract/define.ts";
+import { router } from "../contract/define.ts";
 import { noBody } from "../contract/route.ts";
 import {
 	captureFetch,
@@ -88,7 +88,7 @@ describe("ApiClient responses", () => {
 	});
 
 	it("reads noBody responses as undefined", async () => {
-		const apiContract = defineContract({
+		const apiContract = router({
 			todos: {
 				remove: {
 					method: "DELETE",

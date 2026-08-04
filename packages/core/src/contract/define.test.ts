@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
-import { defineContract, defineContractAsync } from "./define.ts";
+import { router, routerAsync } from "./define.ts";
 import { testContract } from "./factories.ts";
 
-describe("defineContract", () => {
+describe("router", () => {
 	it("normalizes and validates contracts", () => {
-		const contract = defineContract(
+		const contract = router(
 			testContract({
 				path: "/search/:id",
 				request: {
@@ -25,7 +25,7 @@ describe("defineContract", () => {
 	it("rejects async request key resolution", () => {
 		assert.throws(
 			() =>
-				defineContract(
+				router(
 					testContract({
 						request: {
 							query: z.string(),
@@ -35,12 +35,12 @@ describe("defineContract", () => {
 						resolveRequestKeys: async () => ["q"],
 					},
 				),
-			/use defineContractAsync/i,
+			/use routerAsync/i,
 		);
 	});
 
 	it("allows validation to be deferred to a parent contract", () => {
-		const child = defineContract(
+		const child = router(
 			{
 				find: testContract({
 					request: {
@@ -51,7 +51,7 @@ describe("defineContract", () => {
 			{ validate: false },
 		);
 
-		const contract = defineContract(
+		const contract = router(
 			{ search: child },
 			{
 				resolveRequestKeys: () => ["q"],
@@ -64,9 +64,9 @@ describe("defineContract", () => {
 	});
 });
 
-describe("defineContractAsync", () => {
+describe("routerAsync", () => {
 	it("normalizes and validates contracts with async request key resolution", async () => {
-		const contract = await defineContractAsync(
+		const contract = await routerAsync(
 			testContract({
 				request: {
 					query: z.string(),

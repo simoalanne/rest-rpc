@@ -7,7 +7,7 @@ import type {
 	InferRouteSuccessBody,
 	InferRouteSuccessResponse,
 } from "@contract-first-api/core";
-import { customBody, defineContract, stream } from "@contract-first-api/core";
+import { customBody, router, stream } from "@contract-first-api/core";
 import { type } from "arktype";
 import * as v from "valibot";
 import z from "zod";
@@ -61,7 +61,7 @@ export const discussServerMessageSchema = z.discriminatedUnion("type", [
 	}),
 ]);
 
-export const healthContract = defineContract({
+export const healthContract = router({
 	health: {
 		get: {
 			method: "GET",
@@ -76,7 +76,7 @@ export const healthContract = defineContract({
 	},
 });
 
-export const todoContract = defineContract({
+export const todoContract = router({
 	todos: {
 		list: {
 			method: "GET",
@@ -128,7 +128,7 @@ export const todoContract = defineContract({
 	},
 });
 
-export const discussContract = defineContract({
+export const discussContract = router({
 	discuss: {
 		connect: {
 			method: "GET",
@@ -142,7 +142,7 @@ export const discussContract = defineContract({
 	},
 });
 
-export const imageContract = defineContract({
+export const imageContract = router({
 	images: {
 		inspect: {
 			method: "POST",
@@ -172,7 +172,7 @@ export const apiContract = {
 	...imageContract,
 };
 
-defineContract(apiContract, { pathPrefix: "/api" });
+router(apiContract, { pathPrefix: "/api" });
 
 export type ExampleContract = typeof apiContract;
 export type HealthResponse = InferRouteResponse<typeof apiContract.health.get>;

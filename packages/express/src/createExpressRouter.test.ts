@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
 	customBody,
-	defineContract,
+	router,
 	noBody,
 	stream,
 } from "@contract-first-api/core";
@@ -122,7 +122,7 @@ const createResponseDouble = () => {
 
 describe("createRouter", () => {
 	it("should validate input, pass route and input to implementation context, and call service", async () => {
-		const apiContract = defineContract(
+		const apiContract = router(
 			{
 				users: {
 					getById: {
@@ -219,7 +219,7 @@ describe("createRouter", () => {
 	});
 
 	it("should write streaming routes as ndjson chunks", async () => {
-		const apiContract = defineContract({
+		const apiContract = router({
 			events: {
 				stream: {
 					method: "GET",
@@ -283,7 +283,7 @@ describe("createRouter", () => {
 	});
 
 	it("should return validation errors as JSON and skip service work", async () => {
-		const apiContract = defineContract({
+		const apiContract = router({
 			posts: {
 				create: {
 					method: "POST",
@@ -367,7 +367,7 @@ describe("createRouter", () => {
 	});
 
 	it("should reject contexts for websocket routes", () => {
-		const apiContract = defineContract({
+		const apiContract = router({
 			discuss: {
 				connect: {
 					method: "GET",
@@ -401,7 +401,7 @@ describe("createRouter", () => {
 	});
 
 	it("should validate custom bodies and pass them to service handlers as body", async () => {
-		const apiContract = defineContract({
+		const apiContract = router({
 			uploads: {
 				inspect: {
 					method: "POST",
@@ -485,7 +485,7 @@ describe("createRouter", () => {
 	});
 
 	it("should return 204 for routes without response schemas", async () => {
-		const apiContract = defineContract({
+		const apiContract = router({
 			posts: {
 				delete: {
 					method: "DELETE",
@@ -543,7 +543,7 @@ describe("createRouter", () => {
 	});
 
 	it("should use declared success status codes", async () => {
-		const apiContract = defineContract({
+		const apiContract = router({
 			posts: {
 				create: {
 					method: "POST",
@@ -590,7 +590,7 @@ describe("createRouter", () => {
 	});
 
 	it("should pass service errors to the next error handler", async () => {
-		const apiContract = defineContract({
+		const apiContract = router({
 			health: {
 				method: "GET",
 				path: "/health",
@@ -628,7 +628,7 @@ describe("createRouter", () => {
 	});
 
 	it("should return non-success route responses as flat JSON", async () => {
-		const apiContract = defineContract({
+		const apiContract = router({
 			todos: {
 				create: {
 					method: "POST",
@@ -689,7 +689,7 @@ describe("createRouter", () => {
 	});
 
 	it("should match routes with normalized contract paths", () => {
-		const apiContract = defineContract(
+		const apiContract = router(
 			{
 				uploads: {
 					create: {
@@ -714,7 +714,7 @@ describe("createRouter", () => {
 	});
 
 	it("should prefer the most specific route when matching", () => {
-		const apiContract = defineContract(
+		const apiContract = router(
 			{
 				uploads: {
 					byId: {
@@ -747,7 +747,7 @@ describe("createRouter", () => {
 	});
 
 	it("should return null when matching misses the contract", () => {
-		const apiContract = defineContract({
+		const apiContract = router({
 			posts: {
 				create: {
 					method: "POST",

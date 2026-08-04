@@ -478,7 +478,7 @@ createRouter({
 ```
 
 The registered path is the route declaration's `path`. Use
-`defineContract(..., { pathPrefix: "/api" })` when every route should share a
+`router(..., { pathPrefix: "/api" })` when every route should share a
 common path prefix. Static routes are ordered before parameter routes when paths
 overlap.
 

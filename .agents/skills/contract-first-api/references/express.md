@@ -226,7 +226,7 @@ const implementations = [
 ## Important Rules
 
 - Register JSON parsing before `createRouter()` when routes use JSON bodies.
-- Use `defineContract(..., { pathPrefix: "/api" })` when every route should
+- Use `router(..., { pathPrefix: "/api" })` when every route should
   share a common path prefix.
 - Return `{ status, body }` for non-2xx responses and for routes with
   multiple successful statuses.

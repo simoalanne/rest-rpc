@@ -114,7 +114,7 @@ export const resolveSchemaKeysSync = (
 	const resolved = options?.resolveRequestKeys?.(schema);
 	if (isThenable(resolved)) {
 		throw new Error(
-			"defineContract() received an async request key resolver result. Use defineContractAsync() for async request key resolution.",
+			"router() received an async request key resolver result. Use routerAsync() for async request key resolution.",
 		);
 	}
 

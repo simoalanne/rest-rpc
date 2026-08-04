@@ -1,6 +1,8 @@
 export {
-	defineContract,
-	defineContractAsync,
+	route,
+	routeAsync,
+	router,
+	routerAsync,
 } from "./define.ts";
 export type {
 	Contract,

@@ -15,13 +15,13 @@ Schema-compatible schemas.
 
 ## Define A Contract
 
-Define a plain API contract with `defineContract()`.
+Define a plain API contract with `router()`.
 
 ```ts
-import { defineContract } from "@contract-first-api/core";
+import { router } from "@contract-first-api/core";
 import z from "zod";
 
-export const apiContract = defineContract({
+export const apiContract = router({
 	todos: {
 		list: {
 			method: "GET",
@@ -75,9 +75,9 @@ Each HTTP route declaration can define:
 | `responses` | Required map of status codes to response schemas. At least one status must be 2xx. |
 | `options` | Optional route behavior, currently `http` or `websocket`. HTTP routes are the default. |
 | `messages` | WebSocket client and server message schemas. |
-| `metadata` | Optional application metadata escape hatch. `defineContract()` populates `{}` when omitted. |
+| `metadata` | Optional application metadata escape hatch. `router()` populates `{}` when omitted. |
 
-`defineContract()` validates structural rules that TypeScript cannot fully
+`router()` validates structural rules that TypeScript cannot fully
 enforce at runtime, such as duplicate request field names across `body`,
 `query`, and `params`.
 
@@ -95,17 +95,17 @@ Request key inference is built in for common object schemas from:
 
 Other Standard Schema libraries can still be used. For request schemas, provide
 `request.requestKeys` manually or pass `resolveRequestKeys(schema)` to
-`defineContract()` or `defineContractAsync()` when the library cannot be
+`router()` or `routerAsync()` when the library cannot be
 introspected automatically.
 
 Async validation is not supported in API contracts. Schemas must return a
 Standard Schema result synchronously.
 
-Shared metadata can be passed as a `defineContract()` option and is shallow
+Shared metadata can be passed as a `router()` option and is shallow
 merged with route metadata. Route metadata wins on key conflicts.
 
 ```ts
-export const apiContract = defineContract(
+export const apiContract = router(
 	{
 		todos: {
 			list: {
@@ -137,7 +137,7 @@ be Standard Schema-compatible schemas, `noBody`, or `stream(schema)`.
 ```ts
 import { noBody, stream } from "@contract-first-api/core";
 
-export const apiContract = defineContract({
+export const apiContract = router({
 	todos: {
 		remove: {
 			method: "DELETE",
@@ -200,7 +200,7 @@ Status codes are declared directly in `responses`.
 Requests are split into the same HTTP locations your backend receives:
 
 ```ts
-const apiContract = defineContract({
+const apiContract = router({
 	todos: {
 		get: {
 			method: "GET",
@@ -235,7 +235,7 @@ typed params, query, and responses. The parsed body is validated with the
 custom body schema.
 
 ```ts
-const apiContract = defineContract({
+const apiContract = router({
 	images: {
 		analyze: {
 			method: "POST",
@@ -273,7 +273,7 @@ other custom body values are passed to `fetch` as-is.
 WebSocket routes define the JSON message shape each side is allowed to send.
 
 ```ts
-const apiContract = defineContract({
+const apiContract = router({
 	discuss: {
 		connect: {
 			method: "GET",

@@ -13,13 +13,13 @@ but it is not required.
 
 ## Main API
 
-Create the API contract with `defineContract()`.
+Create the API contract with `router()`.
 
 ```ts
-import { defineContract } from "@contract-first-api/core";
+import { router } from "@contract-first-api/core";
 import z from "zod";
 
-export const apiContract = defineContract({
+export const apiContract = router({
 	todos: {
 		list: {
 			method: "GET",
@@ -72,7 +72,7 @@ HTTP routes declare all known status codes in `responses`.
 ```ts
 import { noBody, stream } from "@contract-first-api/core";
 
-export const apiContract = defineContract({
+export const apiContract = router({
 	todos: {
 		create: {
 			method: "POST",

@@ -21,10 +21,10 @@ declarations naturally for your codebase; each terminal declaration provides the
 HTTP or WebSocket semantics.
 
 ```ts
-import { defineContract } from "@contract-first-api/core";
+import { router } from "@contract-first-api/core";
 import z from "zod";
 
-export const apiContract = defineContract({
+export const apiContract = router({
 	todos: {
 		create: {
 			method: "POST",
@@ -78,8 +78,8 @@ validate request bodies, query, params, responses, streams, and WebSocket
 messages. The core package includes built-in request key inference for common
 object schemas from Zod, Valibot, and ArkType. Other Standard Schema libraries
 can still be used by providing `request.requestKeys` on routes or a
-`resolveRequestKeys(schema)` callback to `defineContract()` or
-`defineContractAsync()`.
+`resolveRequestKeys(schema)` callback to `router()` or
+`routerAsync()`.
 
 Then add the integration packages you need:
 
@@ -102,10 +102,10 @@ code. Each entry can be a Standard Schema-compatible schema, `noBody`, or a
 `stream(schema)` response.
 
 ```ts
-import { defineContract, noBody, stream } from "@contract-first-api/core";
+import { router, noBody, stream } from "@contract-first-api/core";
 import z from "zod";
 
-export const apiContract = defineContract({
+export const apiContract = router({
 	todos: {
 		list: {
 			method: "GET",

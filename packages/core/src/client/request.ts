@@ -52,7 +52,7 @@ export const groupKeysToRequest = (
 
 	if (!requestKeys && route.request) {
 		throw new Error(
-			`Missing request key metadata for ${route.method} ${route.path}. Call defineContract() or provide request.requestKeys before initializing the client.`,
+			`Missing request key metadata for ${route.method} ${route.path}. Call router() or provide request.requestKeys before initializing the client.`,
 		);
 	}
 

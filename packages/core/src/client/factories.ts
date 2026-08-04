@@ -1,9 +1,9 @@
 import z from "zod";
-import { defineContract } from "../contract/define.ts";
+import { router } from "../contract/define.ts";
 import { customBody, noBody, stream } from "../contract/route.ts";
 
 export const createClientTestContract = () =>
-	defineContract({
+	router({
 		todos: {
 			list: {
 				method: "GET",

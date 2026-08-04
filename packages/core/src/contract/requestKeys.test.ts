@@ -104,7 +104,7 @@ describe("request key resolution", () => {
 				resolveSchemaKeysSync(z.string(), {
 					resolveRequestKeys: async () => ["q"],
 				}),
-			/use defineContractAsync/i,
+			/use routerAsync/i,
 		);
 	});
 
