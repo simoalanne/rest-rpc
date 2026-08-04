@@ -23,25 +23,28 @@ pnpm add -D @types/ws
 
 ## Basic Setup
 
-Start by calling `initServer()` to get helper functions. Implement contract
-fragments or single route declarations with `implementContract()`, then call
-`createRouter()` to register those implementations. Pass regular Express
-middleware to the Express app when you need application-specific request
-handling.
+Implement contract fragments or single route declarations with
+`implementContract()`, then call `createRouter()` to register those
+implementations. Use `.withContext()` when a route fragment needs request-local
+dependencies. Pass regular Express middleware to the Express app when you need
+application-specific request handling.
 
 ```ts
-import { initServer, matchRoute } from "@contract-first-api/express";
+import {
+	createRouter,
+	implementContract,
+	matchRoute,
+	type CreateContextArgs,
+} from "@contract-first-api/express";
 import { apiContract } from "@example/shared";
 import express from "express";
 
-type RequestContext = {
+type TodoContext = {
 	userId?: string;
 };
 
 const app = express();
 app.use(express.json());
-
-const { createRouter, implementContract } = initServer<RequestContext>();
 
 declare global {
 	namespace Express {
@@ -71,31 +74,34 @@ const authMiddleware: express.RequestHandler = (req, res, next) => {
 
 app.use(authMiddleware);
 
-const todoImplementations = implementContract(apiContract.todos).handlers({
-	async list() {
-		return {
-			status: 200,
-			body: {
-				items: await getTodos(),
-			},
-		};
-	},
-	async create({ title, context }) {
-		const todo = await createTodo({ title, ownerId: context.userId });
-
-		return {
-			status: 201,
-			body: todo,
-		};
-	},
+const createTodoContext = ({ req }: CreateContextArgs): TodoContext => ({
+	userId: req.userId,
 });
+
+const todoImplementations = implementContract(apiContract.todos)
+	.withContext(createTodoContext)
+	.handlers({
+		async list() {
+			return {
+				status: 200,
+				body: {
+					items: await getTodos(),
+				},
+			};
+		},
+		async create({ title, context }) {
+			const todo = await createTodo({ title, ownerId: context.userId });
+
+			return {
+				status: 201,
+				body: todo,
+			};
+		},
+	});
 
 createRouter({
 	app,
 	implementations: [todoImplementations],
-	createContext: ({ req }) => ({
-		userId: req.userId,
-	}),
 });
 ```
 
@@ -185,7 +191,7 @@ const todoImplementations = implementContract(apiContract.todos).handlers({
 For each HTTP route declaration:
 
 1. request validation runs first
-2. `createContext` runs
+2. the implementation context factory runs, if `.withContext()` was used
 3. the service handler runs last
 
 If validation fails, context creation and the service handler do not run.
@@ -197,33 +203,78 @@ Handlers receive one flattened request object:
 - fields from `params`
 - fields from `query`
 - fields from `body`
-- `context`
+- `context`, only when the implementation uses `.withContext()`
 
 ```ts
-const todoImplementations = implementContract(apiContract.todos).handlers({
-	async get({ id, includeCompleted, context }) {
-		const todo = await loadTodo({
-			id,
-			includeCompleted,
-			userId: context.userId,
-		});
+const todoImplementations = implementContract(apiContract.todos)
+	.withContext(createTodoContext)
+	.handlers({
+		async get({ id, includeCompleted, context }) {
+			const todo = await loadTodo({
+				id,
+				includeCompleted,
+				userId: context.userId,
+			});
 
-		return {
-			status: 200,
-			body: todo,
-		};
-	},
-});
+			return {
+				status: 200,
+				body: todo,
+			};
+		},
+	});
 ```
 
 Request field names must be unique across locations in a single route
-declaration.
+declaration. For implementations that use `.withContext()`, `context` is also
+reserved for the context value.
+
+## Implementation Context
+
+Use `.withContext()` when an HTTP route implementation needs request-local
+dependencies or facts prepared by middleware:
+
+```ts
+const createTodoContext = ({ req }: CreateContextArgs) => ({
+	userId: req.userId,
+	todos: makeTodoService(req.db),
+});
+
+const todoImplementations = implementContract(apiContract.todos)
+	.withContext(createTodoContext)
+	.handlers(todoHandlers);
+```
+
+The context factory receives the Express request, the matched route declaration,
+and loosely typed validated input as `Record<string, unknown>`. If it throws or
+rejects, Express handles the error like any other async route failure.
+
+`.withContext()` is intentionally single-use and only supports HTTP routes. If a
+contract subtree mixes HTTP and WebSocket routes, split the implementation into
+HTTP and WebSocket fragments:
+
+```ts
+const todoHttpImplementations = implementContract({
+	list: apiContract.todos.list,
+	create: apiContract.todos.create,
+})
+	.withContext(createTodoContext)
+	.handlers({
+		list,
+		create,
+	});
+
+const todoSocketImplementation = implementContract(apiContract.todos.updates)
+	.handler(handleTodoUpdates);
+```
 
 ## Helper Types
 
 Inline handlers usually get their types from inference. When handlers move into
 separate files, use the route helper types to keep the same request, response,
-HTTP context, and websocket message types.
+HTTP context, and websocket message types. Pass a context type only for handlers
+registered behind `.withContext()`. `InferRouteServiceRequest` describes the
+route request fields only; add `& { context: YourContext }` if you want a
+standalone contextual request type.
 
 ```ts
 import type {
@@ -235,6 +286,12 @@ import type {
 	InferRouteServiceResponse,
 } from "@contract-first-api/express";
 import { apiContract } from "@example/shared";
+
+type RequestContext = {
+	todos: {
+		create(input: { title: string }): Promise<unknown>;
+	};
+};
 
 type CreateTodoHandler = InferRouteServiceHandler<
 	typeof apiContract.todos.create,
@@ -251,8 +308,7 @@ export const createTodo: CreateTodoHandler = async ({ title, context }) => {
 };
 
 type InspectImageRequest = InferRouteServiceRequest<
-	typeof apiContract.images.inspect,
-	RequestContext
+	typeof apiContract.images.inspect
 >;
 
 type TodoListResponse = InferRouteServiceResponse<
@@ -304,8 +360,8 @@ app.use((req, res, next) => {
 });
 ```
 
-Custom body service handlers receive the parsed request body as `body` in addition
-to typed params, query, and context:
+Custom body service handlers receive the parsed request body as `body` in
+addition to typed params and query fields:
 
 ```ts
 const imageImplementations = implementContract(apiContract.images).handlers({
@@ -343,7 +399,8 @@ const authMiddleware: express.RequestHandler = (req, res, next) => {
 
 The library does not manage an application middleware phase. Middleware can
 attach values to the Express request however your app chooses, and
-`createContext` can read those values from its `req` argument.
+`.withContext()` context factories can read those values from their `req`
+argument.
 
 ## Streaming Responses
 
@@ -369,15 +426,13 @@ upgrade handler on the provided HTTP server. The `server` option is required
 when WebSocket routes are present.
 
 ```ts
-import { initServer } from "@contract-first-api/express";
+import { createRouter, implementContract } from "@contract-first-api/express";
 import { apiContract } from "@example/shared";
 import express from "express";
 import { createServer } from "node:http";
 
 const app = express();
 const server = createServer(app);
-
-const { createRouter, implementContract } = initServer();
 
 const discussImplementations = implementContract(apiContract.discuss).handlers({
 	connect({ socket }) {
@@ -431,7 +486,7 @@ overlap.
 
 - Define `apiContract` with `@contract-first-api/core`.
 - Import the same contract into your backend.
-- Register it with `initServer()` and `createRouter()`.
+- Register it with `implementContract()` and `createRouter()`.
 - Use `initClient()` from `@contract-first-api/core` on the frontend with the
   same API contract and a deployment `baseUrl`.
 

@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import type {
+	CreateContextArgs,
 	InferRouteServerMessageResult,
 	InferRouteServerReceivedMessage,
 	InferRouteServerSendMessage,
@@ -9,7 +10,8 @@ import type {
 } from "@contract-first-api/express";
 import {
 	ContractResponseError,
-	initServer,
+	createRouter,
+	implementContract,
 	isCustomBody,
 	matchRoute,
 } from "@contract-first-api/express";
@@ -18,9 +20,8 @@ import { apiContract } from "@example/shared";
 import type { RequestHandler } from "express";
 import express from "express";
 
-type RequestContext = {
+type HealthContext = {
 	requestId: string;
-	auditLabel?: string;
 };
 
 const app = express();
@@ -113,12 +114,10 @@ type DiscussMessageResult = InferRouteServerMessageResult<
 	typeof apiContract.discuss.connect
 >;
 type CreateTodoHandler = InferRouteServiceHandler<
-	typeof apiContract.todos.create,
-	RequestContext
+	typeof apiContract.todos.create
 >;
 type InspectImageRequest = InferRouteServiceRequest<
-	typeof apiContract.images.inspect,
-	RequestContext
+	typeof apiContract.images.inspect
 >;
 
 const discussMessages: DiscussMessage[] = [
@@ -204,9 +203,6 @@ const createDiscussMessage = (
 	createdAt: new Date().toISOString(),
 });
 
-const serverTools = initServer<RequestContext>();
-const { implementContract, createRouter } = serverTools;
-
 declare global {
 	namespace Express {
 		interface Request {
@@ -244,19 +240,31 @@ const authMiddleware = (
 	next();
 };
 
+const createHealthContext = ({
+	req,
+	route,
+}: CreateContextArgs): HealthContext => {
+	const routeLabel = `${route.method} ${route.path}`;
+	return {
+		requestId: req.viewerId ? `${routeLabel}:${req.viewerId}` : routeLabel,
+	};
+};
+
 const implementations = [
-	implementContract(apiContract.health).handlers({
-		async get({ context }) {
-			await sleep(900);
-			return {
-				status: 200,
-				body: {
-					status: "ok",
-					requestId: context.requestId,
-				},
-			};
-		},
-	}),
+	implementContract(apiContract.health)
+		.withContext(createHealthContext)
+		.handlers({
+			async get({ context }) {
+				await sleep(900);
+				return {
+					status: 200,
+					body: {
+						status: "ok",
+						requestId: context.requestId,
+					},
+				};
+			},
+		}),
 	implementContract(apiContract.todos).handlers({
 		list: listTodos,
 		create: createTodo,
@@ -294,35 +302,31 @@ const implementations = [
 			};
 		},
 	}),
-	implementContract(apiContract.images).handlers({
-		inspect: inspectImage,
-	}),
-	implementContract(apiContract.discuss).handlers({
-		connect({ socket }) {
-			discussSockets.add(socket);
-			socket.send({
-				type: "history",
-				messages: discussMessages,
+	implementContract(apiContract.images.inspect).handler(inspectImage),
+	implementContract(apiContract.discuss.connect).handler(({ socket }) => {
+		discussSockets.add(socket);
+		socket.send({
+			type: "history",
+			messages: discussMessages,
+		});
+
+		const onMessage = (result: DiscussMessageResult) => {
+			if (!result.success) return;
+
+			const message = createDiscussMessage(result.data);
+
+			discussMessages.push(message);
+			broadcastDiscussMessage({
+				type: "message",
+				message,
 			});
+		};
 
-			const onMessage = (result: DiscussMessageResult) => {
-				if (!result.success) return;
+		socket.onMessage(onMessage);
 
-				const message = createDiscussMessage(result.data);
-
-				discussMessages.push(message);
-				broadcastDiscussMessage({
-					type: "message",
-					message,
-				});
-			};
-
-			socket.onMessage(onMessage);
-
-			socket.onClose(() => {
-				discussSockets.delete(socket);
-			});
-		},
+		socket.onClose(() => {
+			discussSockets.delete(socket);
+		});
 	}),
 ];
 
@@ -377,13 +381,6 @@ createRouter({
 	app,
 	server,
 	implementations,
-	createContext: ({ req, route }) => {
-		const routeLabel = `${route.method} ${route.path}`;
-		return {
-			requestId: `${routeLabel}:${crypto.randomUUID()}`,
-			auditLabel: req.viewerId ? `${routeLabel}:${req.viewerId}` : routeLabel,
-		};
-	},
 });
 
 server.listen(port, () => {

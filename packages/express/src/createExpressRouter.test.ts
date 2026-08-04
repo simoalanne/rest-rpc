@@ -7,7 +7,12 @@ import {
 	stream,
 } from "@contract-first-api/core";
 import z from "zod";
-import { initServer, matchRoute } from "./initServer.ts";
+import {
+	type CreateContextArgs,
+	createRouter,
+	implementContract,
+	matchRoute,
+} from "./initServer.ts";
 
 const chainHandlers = (handlers: ((...args: any[]) => unknown)[]) => {
 	return async (
@@ -115,8 +120,8 @@ const createResponseDouble = () => {
 	};
 };
 
-describe("initServer", () => {
-	it("should validate input, pass route and input to createContext, and call service", async () => {
+describe("createRouter", () => {
+	it("should validate input, pass route and input to implementation context, and call service", async () => {
 		const apiContract = defineContract(
 			{
 				users: {
@@ -140,28 +145,33 @@ describe("initServer", () => {
 			{ pathPrefix: "/api" },
 		);
 
-		const { createRouter, implementContract } = initServer<
-			typeof apiContract,
-			{ viewerId: string }
-		>();
-
 		let seenRequest: unknown;
 		let routePathInCreateContext: string | undefined;
 
+		const createContext = ({ route, input }: CreateContextArgs) => {
+			routePathInCreateContext = route.path;
+			const validatedReq = input as { id?: string };
+			return {
+				viewerId: `viewer:${String(validatedReq.id)}`,
+			};
+		};
+
 		const implementations = [
-			implementContract(apiContract.users).handlers({
-				async getById(request) {
-					seenRequest = request;
-					return {
-						status: 200,
-						body: {
-							id: request.id,
-							viewerId: request.context.viewerId,
-							includePosts: request.includePosts,
-						},
-					};
-				},
-			}),
+			implementContract(apiContract.users)
+				.withContext(createContext)
+				.handlers({
+					async getById(request) {
+						seenRequest = request;
+						return {
+							status: 200,
+							body: {
+								id: request.id,
+								viewerId: request.context.viewerId,
+								includePosts: request.includePosts,
+							},
+						};
+					},
+				}),
 		];
 
 		const target = createRouteTargetDouble();
@@ -169,13 +179,6 @@ describe("initServer", () => {
 		createRouter({
 			app: target.app,
 			implementations,
-			createContext: ({ route, input }) => {
-				routePathInCreateContext = route.path;
-				const validatedReq = input as { id?: string };
-				return {
-					viewerId: `viewer:${String(validatedReq.id)}`,
-				};
-			},
 		});
 
 		const handler = target.routes["GET /api/users/:id"];
@@ -233,8 +236,6 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, implementContract } =
-			initServer<typeof apiContract>();
 		const implementations = [
 			implementContract(apiContract.events).handlers({
 				stream() {
@@ -301,21 +302,25 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, implementContract } =
-			initServer<typeof apiContract>();
 		let createContextCalled = false;
 		let serviceCalled = false;
+		const createContext = () => {
+			createContextCalled = true;
+			return {};
+		};
 
 		const implementations = [
-			implementContract(apiContract.posts).handlers({
-				async create() {
-					serviceCalled = true;
-					return {
-						status: 201,
-						body: { id: "1" },
-					};
-				},
-			}),
+			implementContract(apiContract.posts)
+				.withContext(createContext)
+				.handlers({
+					async create() {
+						serviceCalled = true;
+						return {
+							status: 201,
+							body: { id: "1" },
+						};
+					},
+				}),
 		];
 
 		const target = createRouteTargetDouble();
@@ -323,10 +328,6 @@ describe("initServer", () => {
 		createRouter({
 			app: target.app,
 			implementations,
-			createContext: () => {
-				createContextCalled = true;
-				return {};
-			},
 		});
 
 		const handler = target.routes["POST /posts"];
@@ -365,6 +366,40 @@ describe("initServer", () => {
 		});
 	});
 
+	it("should reject contexts for websocket routes", () => {
+		const apiContract = defineContract({
+			discuss: {
+				connect: {
+					method: "GET",
+					path: "/discuss",
+					options: { mode: "websocket" },
+					messages: {
+						client: z.object({ text: z.string() }),
+						server: z.object({ text: z.string() }),
+					},
+				},
+			},
+		});
+
+		assert.throws(
+			() =>
+				(
+					implementContract(apiContract.discuss) as {
+						withContext: (createContext: () => unknown) => {
+							handlers: (handlers: unknown) => unknown;
+						};
+					}
+				)
+					.withContext(() => ({
+						requestId: "request-1",
+					}))
+					.handlers({
+						connect() {},
+					}),
+			/\.withContext\(\) only supports HTTP routes\. The selected contract contains websocket route "connect"\./,
+		);
+	});
+
 	it("should validate custom bodies and pass them to service handlers as body", async () => {
 		const apiContract = defineContract({
 			uploads: {
@@ -392,8 +427,6 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, implementContract } =
-			initServer<typeof apiContract>();
 		let seenRequest: unknown;
 
 		const implementations = [
@@ -439,7 +472,6 @@ describe("initServer", () => {
 			id: "file-1",
 			profile: "fast",
 			body,
-			context: {},
 		});
 		assert.deepStrictEqual(response.read(), {
 			statusCode: 200,
@@ -468,8 +500,6 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, implementContract } =
-			initServer<typeof apiContract>();
 		const target = createRouteTargetDouble();
 
 		createRouter({
@@ -525,8 +555,6 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, implementContract } =
-			initServer<typeof apiContract>();
 		const target = createRouteTargetDouble();
 
 		createRouter({
@@ -572,8 +600,6 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, implementContract } =
-			initServer<typeof apiContract>();
 		const serviceError = new Error("boom");
 
 		const target = createRouteTargetDouble();
@@ -620,8 +646,6 @@ describe("initServer", () => {
 			},
 		});
 
-		const { createRouter, implementContract } =
-			initServer<typeof apiContract>();
 		const target = createRouteTargetDouble();
 		const knownError = { code: "TITLE_ALREADY_EXISTS" };
 		createRouter({

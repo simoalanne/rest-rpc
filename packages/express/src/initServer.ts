@@ -27,20 +27,6 @@ import {
 	type InferRouteServerSocket,
 	registerWebSocketRoutes,
 } from "./initWebSocketServer.ts";
-
-export type EmptyObject = Record<never, never>;
-type MaybePromise<T> = T | Promise<T>;
-type Merge<T> = {
-	[K in keyof T]: T[K];
-};
-
-type ContextValue<TContext> = {
-	context: TContext;
-};
-
-type RequestValue<E extends RouteDeclaration> =
-	InferRouteRequest<E> extends never ? EmptyObject : InferRouteRequest<E>;
-
 export type {
 	InferRouteServerMessageResult,
 	InferRouteServerReceivedMessage,
@@ -48,31 +34,50 @@ export type {
 	InferRouteServerSocket,
 };
 
+export type EmptyObject = Record<never, never>;
+type MaybePromise<T> = T | Promise<T>;
+type Merge<T> = {
+	[K in keyof T]: T[K];
+};
+
+type RequestValue<E extends RouteDeclaration> =
+	InferRouteRequest<E> extends never ? EmptyObject : InferRouteRequest<E>;
+
+type ContextRequestValue<TContext> = [TContext] extends [never]
+	? EmptyObject
+	: { context: TContext };
+
 type HandlerResult<E extends RouteDeclaration> =
 	E extends WebSocketRouteDeclaration
 		? MaybePromise<void>
 		: MaybePromise<InferRouteResponse<E> | InferRouteSuccessBody<E>>;
 
-export type InferRouteServiceRequest<
-	E extends RouteDeclaration,
-	TContext = EmptyObject,
-> = E extends WebSocketRouteDeclaration
-	? Merge<RequestValue<E> & { socket: InferRouteServerSocket<E> }>
-	: Merge<RequestValue<E> & ContextValue<TContext>>;
+export type InferRouteServiceRequest<E extends RouteDeclaration> =
+	E extends WebSocketRouteDeclaration
+		? Merge<RequestValue<E> & { socket: InferRouteServerSocket<E> }>
+		: Merge<RequestValue<E>>;
 
 export type InferRouteServiceResponse<E extends RouteDeclaration> =
 	InferRouteResponse<E>;
 
+type InferRouteServiceHandlerRequest<
+	E extends RouteDeclaration,
+	TContext = never,
+> = E extends WebSocketRouteDeclaration
+	? InferRouteServiceRequest<E>
+	: Merge<InferRouteServiceRequest<E> & ContextRequestValue<TContext>>;
+
 export type InferRouteServiceHandler<
 	E extends RouteDeclaration,
-	TContext = EmptyObject,
+	TContext = never,
 > = (
-	...args: [request: InferRouteServiceRequest<E, TContext>]
+	...args: [request: InferRouteServiceHandlerRequest<E, TContext>]
 ) => HandlerResult<E>;
 
 export type RouteImplementation = {
 	route: RouteDeclaration;
 	handler: (request: unknown) => unknown | Promise<unknown>;
+	createContext?: (args: CreateContextArgs) => unknown | Promise<unknown>;
 };
 
 export type ImplementationInput = readonly (
@@ -82,7 +87,7 @@ export type ImplementationInput = readonly (
 
 type ImplementationShape<
 	T extends Contract,
-	TContext = EmptyObject,
+	TContext = never,
 > = T extends Contract
 	? T extends RouteDeclaration
 		? InferRouteServiceHandler<T, TContext>
@@ -93,9 +98,23 @@ type ImplementationShape<
 			}
 	: never;
 
-type ImplementContract<TContext = EmptyObject> = <TNode extends Contract>(
-	contract: TNode,
-) => TNode extends RouteDeclaration
+type ContainsWebSocketRoute<T extends Contract> =
+	T extends WebSocketRouteDeclaration
+		? true
+		: T extends RouteDeclaration
+			? false
+			: true extends {
+						[K in keyof T]: T[K] extends Contract
+							? ContainsWebSocketRoute<T[K]>
+							: false;
+					}[keyof T]
+				? true
+				: false;
+
+type HandlerBuilder<
+	TNode extends Contract,
+	TContext = never,
+> = TNode extends RouteDeclaration
 	? {
 			handler: (
 				handler: InferRouteServiceHandler<TNode, TContext>,
@@ -106,6 +125,22 @@ type ImplementContract<TContext = EmptyObject> = <TNode extends Contract>(
 				handlers: ImplementationShape<TNode, TContext>,
 			) => RouteImplementation[];
 		};
+
+type ContextableBuilder<
+	TNode extends Contract,
+	TContext = never,
+> = HandlerBuilder<TNode, TContext> &
+	(ContainsWebSocketRoute<TNode> extends true
+		? EmptyObject
+		: {
+				withContext: <TNextContext>(
+					createContext: CreateContext<TNextContext>,
+				) => HandlerBuilder<TNode, Awaited<TNextContext>>;
+			});
+
+type ImplementContract = <TNode extends Contract>(
+	contract: TNode,
+) => ContextableBuilder<TNode>;
 
 export type ValidationIssue = StandardSchemaV1.Issue;
 
@@ -119,16 +154,14 @@ export type CreateContextArgs = {
 	input: Record<string, unknown>;
 };
 
-export type CreateRouterOptions<TContext = EmptyObject> = {
+export type CreateContext<TContext> = (
+	args: CreateContextArgs,
+) => TContext | Promise<TContext>;
+
+export type CreateRouterOptions = {
 	app: Application;
 	server?: HttpServer;
 	implementations: ImplementationInput;
-	createContext?: (args: CreateContextArgs) => TContext | Promise<TContext>;
-};
-
-export type ServerTools<TContext = EmptyObject> = {
-	implementContract: ImplementContract<TContext>;
-	createRouter: (options: CreateRouterOptions<TContext>) => Application;
 };
 
 export class ContractResponseError<
@@ -303,6 +336,7 @@ type ResolvedImplementationRoute = RouteDeclaration & {
 	matchPath: ReturnType<typeof createPathMatcher>;
 	routePath: string;
 	handler: unknown;
+	createContext?: CreateContext<unknown>;
 };
 
 const resolveContractRoutes = (contract: Contract) => {
@@ -333,12 +367,19 @@ export const matchRoute = (
 const collectImplementations = (
 	contract: Contract,
 	handlers: unknown,
+	createContext?: CreateContext<unknown>,
 	path: string[] = [],
 	parent?: unknown,
 ): RouteImplementation[] => {
 	const routeName = path.join(".");
 
 	if (isRouteDeclaration(contract)) {
+		if (createContext && isWebSocketRoute(contract)) {
+			throw new Error(
+				`.withContext() only supports HTTP routes. The selected contract contains websocket route "${routeName || contract.path}".`,
+			);
+		}
+
 		if (typeof handlers !== "function") {
 			throw new Error(`Resolved service for "${routeName}" is not a function`);
 		}
@@ -350,6 +391,7 @@ const collectImplementations = (
 					parent && typeof parent === "object"
 						? handlers.bind(parent)
 						: handlers,
+				createContext,
 			},
 		];
 	}
@@ -369,19 +411,34 @@ const collectImplementations = (
 		return collectImplementations(
 			childContract as Contract,
 			childHandlers,
+			createContext,
 			childPath,
 			handlers,
 		);
 	});
 };
 
-const implementContract = ((contract: Contract) => ({
+const createImplementationBuilder = (
+	contract: Contract,
+	createContext?: CreateContext<unknown>,
+) => ({
 	handler: (handler: RouteImplementation["handler"]) => ({
 		route: contract as RouteDeclaration,
 		handler,
+		createContext,
 	}),
-	handlers: (handlers: unknown) => collectImplementations(contract, handlers),
-})) as ImplementContract<unknown>;
+	handlers: (handlers: unknown) =>
+		collectImplementations(contract, handlers, createContext),
+});
+
+const createContextableImplementationBuilder = (contract: Contract) => ({
+	...createImplementationBuilder(contract),
+	withContext: (nextCreateContext: CreateContext<unknown>) =>
+		createImplementationBuilder(contract, nextCreateContext),
+});
+
+export const implementContract =
+	createContextableImplementationBuilder as ImplementContract;
 
 const writeStreamResponse = async (
 	result: unknown,
@@ -451,25 +508,28 @@ const normalizeHandlerResult = (
 	};
 };
 
-const createRouter = <TContext = EmptyObject>({
+export const createRouter = ({
 	app,
 	server,
 	implementations,
-	createContext,
-}: CreateRouterOptions<TContext>) => {
+}: CreateRouterOptions) => {
 	const resolvedImplementations = implementations.flatMap((implementation) =>
 		Array.isArray(implementation) ? implementation : [implementation],
 	);
-	const routes = (
-		resolvedImplementations.map(({ route, handler }) => {
-			return {
+	const routes: ResolvedImplementationRoute[] = resolvedImplementations
+		.map(({ route, handler, createContext }) => {
+			const resolvedRoute: ResolvedImplementationRoute = {
 				...(route as RouteDeclaration),
 				routePath: route.path,
 				matchPath: createPathMatcher(route.path),
 				handler,
 			};
-		}) satisfies ResolvedImplementationRoute[]
-	).sort(compareRouteSpecificity);
+			if (createContext) {
+				resolvedRoute.createContext = createContext;
+			}
+			return resolvedRoute;
+		})
+		.sort(compareRouteSpecificity);
 	const webSocketRoutes = routes.filter(
 		(
 			route,
@@ -520,14 +580,19 @@ const createRouter = <TContext = EmptyObject>({
 			}
 
 			const input = validation.data;
-			const context =
-				(await createContext?.({ req, route: httpRoute, input })) || {};
+			const request = route.createContext
+				? {
+						...input,
+						context: await route.createContext({
+							req,
+							route: httpRoute,
+							input,
+						}),
+					}
+				: input;
 
 			try {
-				const handlerResult = await handler({
-					...input,
-					context,
-				});
+				const handlerResult = await handler(request);
 				const result = normalizeHandlerResult(route, handlerResult);
 				const schema = getResponseSchema(route, result.status);
 
@@ -562,10 +627,3 @@ const createRouter = <TContext = EmptyObject>({
 
 	return app;
 };
-
-export const initServer = <
-	TContext = EmptyObject,
->(): ServerTools<TContext> => ({
-	implementContract: implementContract as ImplementContract<TContext>,
-	createRouter: (options) => createRouter<TContext>(options),
-});

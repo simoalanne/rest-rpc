@@ -1,6 +1,8 @@
 export { isCustomBody } from "@contract-first-api/core/contract";
 export type {
+	CreateContext,
 	CreateContextArgs,
+	CreateRouterOptions,
 	ImplementationInput,
 	InferRouteServerMessageResult,
 	InferRouteServerReceivedMessage,
@@ -13,6 +15,7 @@ export type {
 } from "./initServer.ts";
 export {
 	ContractResponseError,
-	initServer,
+	createRouter,
+	implementContract,
 	matchRoute,
 } from "./initServer.ts";
