@@ -1,6 +1,7 @@
 import { initClient } from "@contract-first-api/core";
 import type {
 	ApiClientOptions,
+	ApiClientFetchOptions,
 	FetchResponseFn,
 	InferRouteClientRequest,
 	InferRouteClientRequestInput,
@@ -38,34 +39,40 @@ export type InferRouteQueryError<E extends RouteDeclaration> =
 export type InferRouteMutationVariables<E extends RouteDeclaration> =
 	InferRouteClientRequestInput<E>;
 
+export type ReactQueryFetchOptions = ApiClientFetchOptions;
+
+type WithFetchOptions<T> = T & {
+	fetchOptions?: ReactQueryFetchOptions;
+};
+
 type QueryOptionsFor<
 	E extends RouteDeclaration,
 	TData = InferRouteQueryData<E>,
-> = Omit<
+> = WithFetchOptions<Omit<
 	UseQueryOptions<InferRouteQueryData<E>, InferRouteQueryError<E>, TData>,
 	"queryKey" | "queryFn"
->;
+>>;
 
 type SuspenseQueryOptionsFor<
 	E extends RouteDeclaration,
 	TData = InferRouteQueryData<E>,
-> = Omit<
+> = WithFetchOptions<Omit<
 	UseSuspenseQueryOptions<
 		InferRouteQueryData<E>,
 		InferRouteQueryError<E>,
 		TData
 	>,
 	"queryKey" | "queryFn"
->;
+>>;
 
-type MutationOptionsFor<E extends RouteDeclaration> = Omit<
+type MutationOptionsFor<E extends RouteDeclaration> = WithFetchOptions<Omit<
 	UseMutationOptions<
 		InferRouteQueryData<E>,
 		InferRouteQueryError<E>,
 		InferRouteMutationVariables<E>
 	>,
 	"mutationFn"
->;
+>>;
 
 type QueryDisabled = false | null | undefined | "" | 0;
 

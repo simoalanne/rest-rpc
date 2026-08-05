@@ -77,6 +77,7 @@ describe("createRouteHooks", () => {
 		assert.deepEqual(options.queryKey, ["items", "byId", request]);
 		assert.equal(options.enabled, true);
 		assert.equal(options.staleTime, 123);
+		assert.equal(options.fetchOptions, undefined);
 
 		assert.deepEqual(await options.queryFn({ signal: "signal-value" }), {
 			status: 200,
@@ -84,6 +85,53 @@ describe("createRouteHooks", () => {
 		});
 		assert.deepEqual(fetchResponseCalls, [
 			[request, { signal: "signal-value" }],
+		]);
+	});
+
+	it("forwards query fetch options to fetchResponse without passing them to React Query", async () => {
+		const calls = {
+			useQueryCalls: [] as unknown[],
+			useSuspenseQueryCalls: [] as unknown[],
+			useMutationCalls: [] as unknown[],
+		};
+		const fetchResponseCalls: unknown[][] = [];
+		const createRouteHooks = await getCreateRouteHooks(calls);
+		const queryClient = createQueryClientMock();
+		resetQueryClientMock(queryClient);
+		const hooks = createRouteHooks(
+			routeWithRequest,
+			async (...args) => {
+				fetchResponseCalls.push(args);
+				return {
+					declared: true,
+					status: 200,
+					body: { id: "item-1" },
+				};
+			},
+			["items", "byId"],
+			queryClient.queryClient as any,
+		);
+		const request = { id: "item-1" };
+
+		hooks.useQuery(request, {
+			fetchOptions: { credentials: "include", cache: "no-store" },
+			retry: false,
+		});
+
+		const options = calls.useQueryCalls[0] as any;
+		assert.equal(options.retry, false);
+		assert.equal(options.fetchOptions, undefined);
+
+		await options.queryFn({ signal: "query-signal" });
+		assert.deepEqual(fetchResponseCalls, [
+			[
+				request,
+				{
+					credentials: "include",
+					cache: "no-store",
+					signal: "query-signal",
+				},
+			],
 		]);
 	});
 
@@ -139,6 +187,7 @@ describe("createRouteHooks", () => {
 		const options = calls.useQueryCalls[0] as any;
 		assert.equal(options.enabled, true);
 		assert.equal(options.gcTime, 50);
+		assert.equal(options.fetchOptions, undefined);
 		assert.deepEqual(options.queryKey, ["items", "list"]);
 
 		await options.queryFn({ signal: "list-signal" });
@@ -170,12 +219,16 @@ describe("createRouteHooks", () => {
 		);
 		const request = { name: "Potato" };
 
-		hooks.useSuspenseQuery(request, { retry: false });
+		hooks.useSuspenseQuery(request, {
+			retry: false,
+			fetchOptions: { credentials: "omit" },
+		});
 		hooks.useMutation({ retry: false });
 
 		const suspenseOptions = calls.useSuspenseQueryCalls[0] as any;
 		assert.deepEqual(suspenseOptions.queryKey, ["items", "create", request]);
 		assert.equal(suspenseOptions.retry, false);
+		assert.equal(suspenseOptions.fetchOptions, undefined);
 		await suspenseOptions.queryFn({ signal: "suspense-signal" });
 
 		const mutationOptions = calls.useMutationCalls[0] as any;
@@ -185,8 +238,47 @@ describe("createRouteHooks", () => {
 			body: { id: "item-2" },
 		});
 		assert.deepEqual(fetchResponseCalls, [
-			[request, { signal: "suspense-signal" }],
+			[request, { credentials: "omit", signal: "suspense-signal" }],
 			[request, undefined],
+		]);
+	});
+
+	it("forwards useMutation fetch options to fetchResponse", async () => {
+		const calls = {
+			useQueryCalls: [] as unknown[],
+			useSuspenseQueryCalls: [] as unknown[],
+			useMutationCalls: [] as unknown[],
+		};
+		const fetchResponseCalls: unknown[][] = [];
+		const createRouteHooks = await getCreateRouteHooks(calls);
+		const queryClient = createQueryClientMock();
+		resetQueryClientMock(queryClient);
+		const hooks = createRouteHooks(
+			routeWithRequest,
+			async (...args) => {
+				fetchResponseCalls.push(args);
+				return {
+					declared: true,
+					status: 201,
+					body: { id: "item-2" },
+				};
+			},
+			["items", "create"],
+			queryClient.queryClient as any,
+		);
+		const request = { name: "Potato" };
+		hooks.useMutation({
+			fetchOptions: { credentials: "include", cache: "no-store" },
+			retry: false,
+		});
+		const mutationOptions = calls.useMutationCalls[0] as any;
+
+		assert.equal(mutationOptions.retry, false);
+		assert.equal(mutationOptions.fetchOptions, undefined);
+		await mutationOptions.mutationFn(request);
+
+		assert.deepEqual(fetchResponseCalls, [
+			[request, { credentials: "include", cache: "no-store" }],
 		]);
 	});
 

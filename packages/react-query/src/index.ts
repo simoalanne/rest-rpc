@@ -5,5 +5,6 @@ export type {
 	ReactQueryApiFor,
 	ReactQueryClient,
 	ReactQueryClientOptions,
+	ReactQueryFetchOptions,
 } from "./reactQueryClient.ts";
 export { default, initReactQueryClient } from "./reactQueryClient.ts";

@@ -1,4 +1,7 @@
-import type { FetchOptions } from "@contract-first-api/core/client";
+import type {
+	ApiClientFetchOptions,
+	FetchOptions,
+} from "@contract-first-api/core/client";
 import type { RouteDeclaration } from "@contract-first-api/core/contract";
 import {
 	type QueryClient,
@@ -14,6 +17,9 @@ import {
 } from "./queryData.ts";
 
 type RequestArgs = unknown[];
+type OptionsWithFetchOptions = Record<string, unknown> & {
+	fetchOptions?: ApiClientFetchOptions;
+};
 
 export type RouteHooks = {
 	useMutation: (options?: Record<string, unknown>) => unknown;
@@ -37,6 +43,17 @@ const readHookOptionsArg = (route: RouteDeclaration, args: RequestArgs) =>
 export const getQueryKey = (request: unknown, path: string[]) =>
 	request ? [...path, request] : path;
 
+const splitFetchOptions = <TOptions extends Record<string, unknown> | undefined>(
+	options: TOptions,
+) => {
+	const { fetchOptions, ...reactQueryOptions } =
+		(options ?? {}) as OptionsWithFetchOptions;
+	return {
+		fetchOptions,
+		reactQueryOptions,
+	};
+};
+
 export const createRouteHooks = (
 	route: RouteDeclaration,
 	fetchResponse: FetchResponse,
@@ -46,34 +63,46 @@ export const createRouteHooks = (
 	const getKey = (request?: unknown) => getQueryKey(request, path);
 
 	return {
-		useMutation: (options) =>
-			useMutation({
+		useMutation: (options) => {
+			const { fetchOptions, reactQueryOptions } = splitFetchOptions(options);
+			return useMutation({
 				mutationFn: (request: unknown) =>
-					fetchQueryData(fetchResponse, route, request, undefined),
-				...options,
-			}),
+					fetchQueryData(fetchResponse, route, request, fetchOptions),
+				...reactQueryOptions,
+			});
+		},
 		useQuery: (...args: RequestArgs) => {
 			const request = readRequestArg(route, args);
-			const options = readHookOptionsArg(route, args);
+			const { fetchOptions, reactQueryOptions } = splitFetchOptions(
+				readHookOptionsArg(route, args),
+			);
 			const enabled = takesRequestInput(route) ? Boolean(request) : true;
 
 			return useQuery({
 				queryKey: getKey(request),
 				queryFn: ({ signal }: { signal?: FetchOptions["signal"] }) =>
-					fetchQueryData(fetchResponse, route, request, { signal }),
+					fetchQueryData(fetchResponse, route, request, {
+						...fetchOptions,
+						signal,
+					}),
 				enabled,
-				...options,
+				...reactQueryOptions,
 			});
 		},
 		useSuspenseQuery: (...args: RequestArgs) => {
 			const request = readRequestArg(route, args);
-			const options = readHookOptionsArg(route, args);
+			const { fetchOptions, reactQueryOptions } = splitFetchOptions(
+				readHookOptionsArg(route, args),
+			);
 
 			return useSuspenseQuery({
 				queryKey: getKey(request),
 				queryFn: ({ signal }: { signal?: FetchOptions["signal"] }) =>
-					fetchQueryData(fetchResponse, route, request, { signal }),
-				...options,
+					fetchQueryData(fetchResponse, route, request, {
+						...fetchOptions,
+						signal,
+					}),
+				...reactQueryOptions,
 			});
 		},
 		setData: (...args: RequestArgs) => {
