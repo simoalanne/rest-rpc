@@ -14,10 +14,7 @@ describe("ApiClient route tree", () => {
 			"fetchResponse",
 		]);
 		assert.deepEqual(Object.keys(client.todos.publish), ["fetchResponse"]);
-		assert.deepEqual(Object.keys(client.socket.join), [
-			"connect",
-			"tryConnect",
-		]);
+		assert.deepEqual(Object.keys(client.socket.join), ["openConnection"]);
 	});
 
 	it("maps API client route leaves", () => {

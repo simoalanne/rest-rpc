@@ -8,10 +8,10 @@ import { mapContractRoutes } from "../contract/traversal.ts";
 import { hasSingleSuccessfulResponse, isWebSocketRouteNode } from "./routes.ts";
 import type {
 	ApiClientFor,
-	ConnectArgs,
 	FetchArgs,
 	InferRouteClientResponse,
 	InferRouteClientSocket,
+	OpenConnectionArgs,
 } from "./types.ts";
 
 export type ApiClientRouteHandlers = {
@@ -23,16 +23,10 @@ export type ApiClientRouteHandlers = {
 		route: E,
 		...args: FetchArgs<E>
 	) => Promise<InferRouteSuccessBody<E>>;
-	connect: <E extends WebSocketRouteDeclaration>(
+	openConnection: <E extends WebSocketRouteDeclaration>(
 		route: E,
-		...args: ConnectArgs<E>
+		...args: OpenConnectionArgs<E>
 	) => InferRouteClientSocket<E>;
-	tryConnect: <E extends WebSocketRouteDeclaration>(
-		route: E,
-		...args: ConnectArgs<E>
-	) =>
-		| { success: true; data: InferRouteClientSocket<E> }
-		| { success: false; error: unknown };
 };
 
 export const buildApiClient = <TContract extends Contract>(
@@ -42,10 +36,8 @@ export const buildApiClient = <TContract extends Contract>(
 	mapContractRoutes(contract, (node) => {
 		if (isWebSocketRouteNode(node)) {
 			return {
-				connect: (...args: ConnectArgs<typeof node>) =>
-					handlers.connect(node, ...args),
-				tryConnect: (...args: ConnectArgs<typeof node>) =>
-					handlers.tryConnect(node, ...args),
+				openConnection: (...args: OpenConnectionArgs<typeof node>) =>
+					handlers.openConnection(node, ...args),
 			};
 		}
 

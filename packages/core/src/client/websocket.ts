@@ -7,9 +7,8 @@ import type {
 import { validateStandardSchemaSync } from "../standard-schema/index.ts";
 import { constructBaseRequest, takesRequestInput } from "./request.ts";
 import type {
-	ConnectArgs,
-	InferRouteClientMessageResult,
 	InferRouteClientSocket,
+	OpenConnectionArgs,
 	RuntimeArgs,
 } from "./types.ts";
 
@@ -23,10 +22,10 @@ export type WebSocketConnectionOptions = {
 	unknownRequestKeys: "throw" | "strip";
 };
 
-export const connect = <E extends WebSocketRouteDeclaration>(
+export const openConnection = <E extends WebSocketRouteDeclaration>(
 	route: E,
 	options: WebSocketConnectionOptions,
-	...args: ConnectArgs<E>
+	...args: OpenConnectionArgs<E>
 ): InferRouteClientSocket<E> => {
 	if (typeof WebSocket === "undefined") {
 		throw new Error("WebSocket is not available in this runtime");
@@ -43,24 +42,18 @@ export const connect = <E extends WebSocketRouteDeclaration>(
 	const rawSend = rawSocket.send.bind(rawSocket);
 	const socket = rawSocket as InferRouteClientSocket<E>;
 
-	const parseIncomingMessage = (
-		data: unknown,
-	): InferRouteClientMessageResult<E> => {
+	const parseIncomingMessage = (data: unknown): InferRouteServerMessage<E> => {
 		try {
 			const result = validateStandardSchemaSync(
 				route.messages.server,
-				JSON.parse(data as string),
+				JSON.parse(String(data)),
 			);
 			if (result.issues) throw result.issues;
 
-			return {
-				success: true,
-				data: result.value as InferRouteServerMessage<E>,
-			};
+			return result.value as InferRouteServerMessage<E>;
 		} catch {
-			return {
-				success: false,
-			};
+			rawSocket.close(1007, "Invalid WebSocket message.");
+			throw new Error("Invalid WebSocket message.");
 		}
 	};
 
@@ -88,10 +81,17 @@ export const connect = <E extends WebSocketRouteDeclaration>(
 	};
 
 	socket.onMessage = (
-		callback: (result: InferRouteClientMessageResult<E>) => void,
+		callback: (message: InferRouteServerMessage<E>) => void,
 	) => {
 		const onMessage = (event: MessageEvent) => {
-			callback(parseIncomingMessage(event.data));
+			let message: InferRouteServerMessage<E>;
+			try {
+				message = parseIncomingMessage(event.data);
+			} catch {
+				return;
+			}
+
+			callback(message);
 		};
 
 		socket.addEventListener("message", onMessage);
@@ -99,19 +99,6 @@ export const connect = <E extends WebSocketRouteDeclaration>(
 	};
 
 	return socket;
-};
-
-export const tryConnect = <E extends WebSocketRouteDeclaration>(
-	route: E,
-	options: WebSocketConnectionOptions,
-	...args: ConnectArgs<E>
-) => {
-	try {
-		const data = connect(route, options, ...args);
-		return { success: true, data } as const;
-	} catch (error) {
-		return { success: false, error } as const;
-	}
 };
 
 export const assertWebSocketRoute = (

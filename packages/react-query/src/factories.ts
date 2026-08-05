@@ -109,7 +109,7 @@ export const createApiTree = (calls: {
 			},
 		},
 		socket: {
-			connect: () => ({}),
+			openConnection: () => ({}),
 		},
 	},
 });

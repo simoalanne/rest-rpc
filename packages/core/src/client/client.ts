@@ -12,14 +12,11 @@ import {
 import type {
 	ApiClientFor,
 	ApiClientOptions,
-	ConnectArgs,
 	FetchArgs,
 	InferRouteClientResponse,
+	OpenConnectionArgs,
 } from "./types.ts";
-import {
-	connect as connectRoute,
-	tryConnect as tryConnectRoute,
-} from "./websocket.ts";
+import { openConnection as openRouteConnection } from "./websocket.ts";
 
 export class ApiClient<TContract extends Contract = Contract> {
 	readonly api: ApiClientFor<TContract>;
@@ -42,8 +39,8 @@ export class ApiClient<TContract extends Contract = Contract> {
 		this.api = buildApiClient(this.contract, {
 			fetchResponse: (route, ...args) => this.fetchResponse(route, ...args),
 			fetch: (route, ...args) => this.fetch(route, ...args),
-			connect: (route, ...args) => this.connect(route, ...args),
-			tryConnect: (route, ...args) => this.tryConnect(route, ...args),
+			openConnection: (route, ...args) =>
+				this.openConnection(route, ...args),
 		});
 	}
 
@@ -70,11 +67,11 @@ export class ApiClient<TContract extends Contract = Contract> {
 		...args: FetchArgs<E>
 	) => fetchSuccess(this.fetchResponse, route, ...args);
 
-	private connect = <E extends WebSocketRouteDeclaration>(
+	private openConnection = <E extends WebSocketRouteDeclaration>(
 		route: E,
-		...args: ConnectArgs<E>
+		...args: OpenConnectionArgs<E>
 	) =>
-		connectRoute(
+		openRouteConnection(
 			route,
 			{
 				baseUrl: this.baseUrl,
@@ -83,18 +80,6 @@ export class ApiClient<TContract extends Contract = Contract> {
 			...args,
 		);
 
-	private tryConnect = <E extends WebSocketRouteDeclaration>(
-		route: E,
-		...args: ConnectArgs<E>
-	) =>
-		tryConnectRoute(
-			route,
-			{
-				baseUrl: this.baseUrl,
-				unknownRequestKeys: this.unknownRequestKeys,
-			},
-			...args,
-		);
 }
 
 export const initClient = <TContract extends Contract>(

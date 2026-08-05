@@ -76,7 +76,6 @@ export const App = () => {
 	const [discussText, setDiscussText] = useState("");
 	const [discussMessages, setDiscussMessages] = useState<DiscussMessage[]>([]);
 	const [discussConnected, setDiscussConnected] = useState(false);
-	const [discussParseError, setDiscussParseError] = useState(false);
 	const discussSocket = useRef<DiscussSocket | null>(null);
 
 	const health = rqClient.health.get.useQuery();
@@ -118,7 +117,7 @@ export const App = () => {
 	}, []);
 
 	useEffect(() => {
-		const socket = client.discuss.connect.connect();
+		const socket = client.discuss.connect.openConnection();
 		discussSocket.current = socket;
 
 		const offOpen = socket.onOpen(() => {
@@ -128,20 +127,15 @@ export const App = () => {
 			setDiscussConnected(false);
 			discussSocket.current = null;
 		});
-		const offMessage = socket.onMessage((result) => {
-			if (!result.success) {
-				setDiscussParseError(true);
-				return;
-			}
-
-			if (result.data.type === "history") {
-				setDiscussMessages(readDiscussMessages(result.data));
+		const offMessage = socket.onMessage((message) => {
+			if (message.type === "history") {
+				setDiscussMessages(readDiscussMessages(message));
 				return;
 			}
 
 			setDiscussMessages((current) => [
 				...current,
-				...readDiscussMessages(result.data),
+				...readDiscussMessages(message),
 			]);
 		});
 
@@ -392,11 +386,6 @@ export const App = () => {
 						Send
 					</button>
 				</form>
-				{discussParseError ? (
-					<p className="error">
-						A websocket message did not match the contract.
-					</p>
-				) : null}
 				<ul className="discussion-list">
 					{discussMessages.map((message) => (
 						<li key={message.id}>

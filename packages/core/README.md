@@ -294,8 +294,9 @@ const apiContract = router({
 });
 ```
 
-Incoming websocket messages are parsed and exposed as result objects so
-application code can decide how to handle invalid messages.
+Incoming websocket messages are parsed before delivery. Messages that are not
+valid JSON or do not match the declared incoming message schema close the
+connection and are not delivered to `onMessage` callbacks.
 
 ## Typed Client
 
@@ -334,7 +335,7 @@ const todos = await api.todos.list.fetch();
 console.log(todos.items);
 ```
 
-WebSocket routes expose `connect()` and `tryConnect()`.
+WebSocket routes expose `openConnection()`.
 
 ## Types Across Boundaries
 

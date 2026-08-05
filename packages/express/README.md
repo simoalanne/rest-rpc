@@ -315,12 +315,10 @@ const socketRoutes = webSocketRoutes(socketContract, {
 				messages: [],
 			});
 
-			context.socket.onMessage((result) => {
-				if (!result.success) return;
-
+			context.socket.onMessage((message) => {
 				context.socket.send({
 					type: "message",
-					text: result.data.text,
+					text: message.text,
 				});
 			});
 		}),
@@ -330,9 +328,9 @@ const socketRoutes = webSocketRoutes(socketContract, {
 registerWebSocketRoutes(server, socketRoutes);
 ```
 
-Invalid incoming WebSocket messages call `onMessage` with
-`{ success: false }`. The library does not decide what that means for your
-application.
+Incoming WebSocket messages are delivered to `onMessage` only after they parse
+as JSON and match the declared incoming message schema. Invalid incoming
+messages close the connection.
 
 ## How It Connects
 

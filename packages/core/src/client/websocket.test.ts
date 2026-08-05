@@ -40,7 +40,7 @@ describe("ApiClient websockets", () => {
 			baseUrl: "https://api.test",
 		});
 
-		client.socket.join.connect({ roomId: "room 1" });
+		client.socket.join.openConnection({ roomId: "room 1" });
 
 		assert.equal(instances[0]?.url, "wss://api.test/rooms/room%201");
 	});
@@ -50,7 +50,7 @@ describe("ApiClient websockets", () => {
 		const client = initClient(createClientTestContract(), {
 			baseUrl: "http://api.test",
 		});
-		const socket = client.socket.join.connect({ roomId: "general" });
+		const socket = client.socket.join.openConnection({ roomId: "general" });
 		instances[0].readyState = FakeWebSocket.OPEN;
 
 		socket.send({ text: "hello" });
@@ -64,7 +64,7 @@ describe("ApiClient websockets", () => {
 		const client = initClient(createClientTestContract(), {
 			baseUrl: "https://api.test",
 		});
-		const socket = client.socket.join.connect({ roomId: "general" });
+		const socket = client.socket.join.openConnection({ roomId: "general" });
 
 		assert.throws(
 			() => socket.send({ text: "hello" }),
@@ -72,36 +72,20 @@ describe("ApiClient websockets", () => {
 		);
 	});
 
-	it("parses valid and invalid incoming messages", () => {
+	it("delivers valid incoming messages", () => {
 		globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
 		const client = initClient(createClientTestContract(), {
 			baseUrl: "https://api.test",
 		});
-		const socket = client.socket.join.connect({ roomId: "general" });
+		const socket = client.socket.join.openConnection({ roomId: "general" });
 		const messages: unknown[] = [];
 		socket.onMessage((message) => messages.push(message));
 
 		instances[0].dispatchEvent(
 			new MessageEvent("message", { data: '{"text":"hello"}' }),
 		);
-		instances[0].dispatchEvent(
-			new MessageEvent("message", { data: '{"text":123}' }),
-		);
 
-		assert.deepEqual(messages, [
-			{ success: true, data: { text: "hello" } },
-			{ success: false },
-		]);
+		assert.deepEqual(messages, [{ text: "hello" }]);
 	});
 
-	it("returns failed tryConnect results when WebSocket is unavailable", () => {
-		globalThis.WebSocket = undefined as unknown as typeof WebSocket;
-		const client = initClient(createClientTestContract(), {
-			baseUrl: "https://api.test",
-		});
-
-		const result = client.socket.join.tryConnect({ roomId: "general" });
-
-		assert.equal(result.success, false);
-	});
 });

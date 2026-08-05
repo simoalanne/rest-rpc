@@ -193,13 +193,13 @@ const todos = await api.todos.list.fetch();
 console.log(todos.items);
 ```
 
-WebSocket route declarations expose `connect()`:
+WebSocket route declarations expose `openConnection()`:
 
 ```ts
-const socket = api.discuss.connect.connect();
+const socket = api.discuss.connect.openConnection();
 
-socket.onMessage((result) => {
-	if (result.success) console.log(result.data);
+socket.onMessage((message) => {
+	console.log(message);
 });
 ```
 

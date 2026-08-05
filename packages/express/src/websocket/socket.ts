@@ -6,10 +6,6 @@ import type {
 } from "@contract-first-api/core/contract";
 import type WebSocket from "ws";
 
-export type InferRouteServerMessageResult<E extends WebSocketRouteDeclaration> =
-	| { success: true; data: InferRouteServerReceivedMessage<E> }
-	| { success: false };
-
 export type InferRouteServerReceivedMessage<
 	E extends WebSocketRouteDeclaration,
 > = InferRouteClientMessage<E>;
@@ -23,7 +19,7 @@ export type InferRouteServerSocket<E extends WebSocketRouteDeclaration> = Omit<
 > & {
 	send: (message: InferRouteServerSendMessage<E>) => void;
 	onMessage: (
-		callback: (result: InferRouteServerMessageResult<E>) => void,
+		callback: (message: InferRouteServerReceivedMessage<E>) => void,
 	) => () => void;
 	onClose: (callback: (code: number, reason: Buffer) => void) => () => void;
 };
@@ -35,9 +31,7 @@ export const createRouteWebSocket = <E extends WebSocketRouteDeclaration>(
 	const rawSend = socket.send.bind(socket);
 	const routeSocket = socket as unknown as InferRouteServerSocket<E>;
 
-	const parseIncomingMessage = (
-		data: unknown,
-	): InferRouteServerMessageResult<E> => {
+	const parseIncomingMessage = (data: unknown): InferRouteClientMessage<E> => {
 		try {
 			const result = validateStandardSchemaSync(
 				route.messages.client,
@@ -45,12 +39,10 @@ export const createRouteWebSocket = <E extends WebSocketRouteDeclaration>(
 			);
 			if (result.issues) throw result.issues;
 
-			return {
-				success: true,
-				data: result.value as InferRouteClientMessage<E>,
-			};
+			return result.value as InferRouteClientMessage<E>;
 		} catch {
-			return { success: false };
+			socket.close(1007, "Invalid WebSocket message.");
+			throw new Error("Invalid WebSocket message.");
 		}
 	};
 
@@ -60,8 +52,15 @@ export const createRouteWebSocket = <E extends WebSocketRouteDeclaration>(
 
 	routeSocket.onMessage = (callback) => {
 		const onMessage = (data: WebSocket.RawData) => {
+			let message: InferRouteClientMessage<E>;
+			try {
+				message = parseIncomingMessage(data);
+			} catch {
+				return;
+			}
+
 			void Promise.resolve()
-				.then(() => callback(parseIncomingMessage(data)))
+				.then(() => callback(message))
 				.catch(() => {
 					socket.close(1011, "WebSocket message handler failed.");
 				});

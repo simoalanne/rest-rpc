@@ -49,7 +49,7 @@ export type FetchResponseFn<E extends RouteDeclaration> = (
 	...args: FetchArgs<E>
 ) => Promise<InferRouteClientResponse<E>>;
 
-export type ConnectArgs<E extends RouteDeclaration = RouteDeclaration> =
+export type OpenConnectionArgs<E extends RouteDeclaration = RouteDeclaration> =
 	InferRouteRequest<E> extends never ? [] : [request: InferRouteRequest<E>];
 
 export type InferRouteClientSendMessage<E extends WebSocketRouteDeclaration> =
@@ -66,27 +66,15 @@ export type InferRouteClientSocket<E extends WebSocketRouteDeclaration> = Omit<
 	send: (message: InferRouteClientSendMessage<E>) => void;
 	onOpen: (callback: (event: Event) => void) => () => void;
 	onMessage: (
-		callback: (result: InferRouteClientMessageResult<E>) => void,
+		callback: (message: InferRouteClientReceivedMessage<E>) => void,
 	) => () => void;
 	onError: (callback: (event: Event) => void) => () => void;
 	onClose: (callback: (event: CloseEvent) => void) => () => void;
 };
 
-export type InferRouteClientMessageResult<E extends WebSocketRouteDeclaration> =
-	| { success: true; data: InferRouteClientReceivedMessage<E> }
-	| { success: false };
-
-export type ConnectFn<E extends RouteDeclaration> = (
-	...args: ConnectArgs<E>
+export type OpenConnectionFn<E extends RouteDeclaration> = (
+	...args: OpenConnectionArgs<E>
 ) => E extends WebSocketRouteDeclaration ? InferRouteClientSocket<E> : never;
-
-export type TryConnectFn<E extends RouteDeclaration> = (
-	...args: ConnectArgs<E>
-) => E extends WebSocketRouteDeclaration
-	?
-			| { success: true; data: InferRouteClientSocket<E> }
-			| { success: false; error: unknown }
-	: never;
 
 type ApiClientProtocolRouteValue<E extends RouteDeclaration> = {
 	fetchResponse: FetchResponseFn<E>;
@@ -107,8 +95,7 @@ export type ApiClientHttpRouteValue<
 export type ApiClientWebSocketRouteValue<
 	E extends RouteDeclaration = RouteDeclaration,
 > = {
-	connect: ConnectFn<E>;
-	tryConnect: TryConnectFn<E>;
+	openConnection: OpenConnectionFn<E>;
 };
 
 export type ApiClientRouteValue<E extends RouteDeclaration = RouteDeclaration> =

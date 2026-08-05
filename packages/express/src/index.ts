@@ -14,7 +14,6 @@ export {
 	routes,
 } from "./express/index.ts";
 export type {
-	InferRouteServerMessageResult,
 	InferRouteServerReceivedMessage,
 	InferRouteServerSendMessage,
 	InferRouteServerSocket,

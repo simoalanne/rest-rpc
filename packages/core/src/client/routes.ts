@@ -10,7 +10,7 @@ export const isApiClientRouteNode = (
 ): value is ApiClientRouteValue =>
 	typeof value === "object" &&
 	value !== null &&
-	("fetchResponse" in value || "connect" in value);
+	("fetchResponse" in value || "openConnection" in value);
 
 export const isWebSocketRouteNode = (
 	route: RouteDeclaration,

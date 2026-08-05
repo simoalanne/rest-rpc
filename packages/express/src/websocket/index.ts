@@ -6,7 +6,6 @@ export type {
 } from "./route.ts";
 export { webSocketRoute, webSocketRouter, webSocketRoutes } from "./route.ts";
 export type {
-	InferRouteServerMessageResult,
 	InferRouteServerReceivedMessage,
 	InferRouteServerSendMessage,
 	InferRouteServerSocket,

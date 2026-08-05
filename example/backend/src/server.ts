@@ -1,7 +1,6 @@
 import { createServer } from "node:http";
 import type {
 	InferRouteHandlerRequest,
-	InferRouteServerMessageResult,
 	InferRouteServerReceivedMessage,
 	InferRouteServerSendMessage,
 	InferRouteServerSocket,
@@ -108,9 +107,6 @@ type DiscussIncomingMessage = InferRouteServerReceivedMessage<
 	typeof apiContract.discuss.connect
 >;
 type DiscussOutgoingMessage = InferRouteServerSendMessage<
-	typeof apiContract.discuss.connect
->;
-type DiscussMessageResult = InferRouteServerMessageResult<
 	typeof apiContract.discuss.connect
 >;
 type CreateTodoHandler = RouteHandler<typeof apiContract.todos.create>;
@@ -314,10 +310,8 @@ const socketRoutes = webSocketRoutes(socketContract, {
 					messages: discussMessages,
 				});
 
-				const onMessage = (result: DiscussMessageResult) => {
-					if (!result.success) return;
-
-					const message = createDiscussMessage(result.data);
+				const onMessage = (data: DiscussIncomingMessage) => {
+					const message = createDiscussMessage(data);
 
 					discussMessages.push(message);
 					broadcastDiscussMessage({
