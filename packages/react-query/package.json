@@ -32,8 +32,11 @@
 		"build": "tsc -p tsconfig.build.json",
 		"prepack": "pnpm run build",
 		"prepublishOnly": "node ../../scripts/ensure-pnpm-publish.cjs",
-		"typecheck": "tsc -p tsconfig.json",
+		"typecheck": "tsc -p tsconfig.json && tsd",
 		"test": "node --test src/**/*.test.ts"
+	},
+	"tsd": {
+		"directory": "test-d"
 	},
 	"dependencies": {
 		"@contract-first-api/core": "workspace:^"
