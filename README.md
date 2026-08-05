@@ -141,21 +141,19 @@ export const apiContract = router({
 Server handlers return typed response cases declared by the route:
 
 ```ts
-const createTodoImplementation = implementContract(apiContract.todos.create).handler(
-	({ title }) => {
-		if (todoExists(title)) {
-			return {
-				status: 409,
-				body: { code: "TITLE_ALREADY_EXISTS" },
-			};
-		}
-
+const createTodoRoute = route(apiContract.todos.create, ({ title }) => {
+	if (todoExists(title)) {
 		return {
-			status: 201,
-			body: createTodo(title),
+			status: 409,
+			body: { code: "TITLE_ALREADY_EXISTS" },
 		};
-	},
-);
+	}
+
+	return {
+		status: 201,
+		body: createTodo(title),
+	};
+});
 ```
 
 ## Client

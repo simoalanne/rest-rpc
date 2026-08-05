@@ -8,8 +8,8 @@ Packages:
 - `shared`: defines `apiContract` with `@contract-first-api/core`, including
   status-keyed `responses`, a custom request body, a stream response, and a
   WebSocket route.
-- `backend`: mounts the API contract with `createRouter`, uses route-aware
-  middleware, builds request context, and returns route-typed responses.
+- `backend`: mounts the API contract with `registerRoutes`, uses route-aware
+  middleware, and registers WebSocket routes separately.
 - `frontend`: uses the React Query adapter for cacheable HTTP routes and the
   core client for streams and websockets.
 

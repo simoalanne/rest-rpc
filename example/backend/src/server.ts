@@ -1,28 +1,28 @@
 import { createServer } from "node:http";
 import type {
-	CreateContextArgs,
+	InferRouteHandlerRequest,
 	InferRouteServerMessageResult,
 	InferRouteServerReceivedMessage,
 	InferRouteServerSendMessage,
 	InferRouteServerSocket,
-	InferRouteServiceHandler,
-	InferRouteServiceRequest,
+	RouteHandler,
 } from "@contract-first-api/express";
 import {
 	ContractResponseError,
-	createRouter,
-	implementContract,
 	isCustomBody,
 	matchRoute,
+	registerRoutes,
+	registerWebSocketRoutes,
+	route,
+	router,
+	routes,
+	webSocketRoute,
+	webSocketRoutes,
 } from "@contract-first-api/express";
 import type { DiscussMessage, Todo } from "@example/shared";
 import { apiContract } from "@example/shared";
 import type { RequestHandler } from "express";
 import express from "express";
-
-type HealthContext = {
-	requestId: string;
-};
 
 const app = express();
 const server = createServer(app);
@@ -113,10 +113,8 @@ type DiscussOutgoingMessage = InferRouteServerSendMessage<
 type DiscussMessageResult = InferRouteServerMessageResult<
 	typeof apiContract.discuss.connect
 >;
-type CreateTodoHandler = InferRouteServiceHandler<
-	typeof apiContract.todos.create
->;
-type InspectImageRequest = InferRouteServiceRequest<
+type CreateTodoHandler = RouteHandler<typeof apiContract.todos.create>;
+type InspectImageRequest = InferRouteHandlerRequest<
 	typeof apiContract.images.inspect
 >;
 
@@ -240,32 +238,30 @@ const authMiddleware = (
 	next();
 };
 
-const createHealthContext = ({
-	req,
-	route,
-}: CreateContextArgs): HealthContext => {
-	const routeLabel = `${route.method} ${route.path}`;
-	return {
-		requestId: req.viewerId ? `${routeLabel}:${req.viewerId}` : routeLabel,
-	};
-};
+const httpContract = {
+	health: apiContract.health,
+	todos: apiContract.todos,
+	images: apiContract.images,
+} as const;
 
-const implementations = [
-	implementContract(apiContract.health)
-		.withContext(createHealthContext)
-		.handlers({
-			async get({ context }) {
-				await sleep(900);
-				return {
-					status: 200,
-					body: {
-						status: "ok",
-						requestId: context.requestId,
-					},
-				};
-			},
-		}),
-	implementContract(apiContract.todos).handlers({
+const socketContract = {
+	discuss: apiContract.discuss,
+} as const;
+
+const httpRoutes = routes(httpContract, {
+	health: router(httpContract.health, {
+		async get() {
+			await sleep(900);
+			return {
+				status: 200,
+				body: {
+					status: "ok",
+					requestId: `${httpContract.health.get.method} ${httpContract.health.get.path}`,
+				},
+			};
+		},
+	}),
+	todos: router(httpContract.todos, {
 		list: listTodos,
 		create: createTodo,
 		find({ query }) {
@@ -302,33 +298,43 @@ const implementations = [
 			};
 		},
 	}),
-	implementContract(apiContract.images.inspect).handler(inspectImage),
-	implementContract(apiContract.discuss.connect).handler(({ socket }) => {
-		discussSockets.add(socket);
-		socket.send({
-			type: "history",
-			messages: discussMessages,
-		});
+	images: {
+		inspect: route(httpContract.images.inspect, inspectImage),
+	},
+});
 
-		const onMessage = (result: DiscussMessageResult) => {
-			if (!result.success) return;
+const socketRoutes = webSocketRoutes(socketContract, {
+	discuss: {
+		connect: webSocketRoute(
+			socketContract.discuss.connect,
+			({ context: { socket } }) => {
+				discussSockets.add(socket);
+				socket.send({
+					type: "history",
+					messages: discussMessages,
+				});
 
-			const message = createDiscussMessage(result.data);
+				const onMessage = (result: DiscussMessageResult) => {
+					if (!result.success) return;
 
-			discussMessages.push(message);
-			broadcastDiscussMessage({
-				type: "message",
-				message,
-			});
-		};
+					const message = createDiscussMessage(result.data);
 
-		socket.onMessage(onMessage);
+					discussMessages.push(message);
+					broadcastDiscussMessage({
+						type: "message",
+						message,
+					});
+				};
 
-		socket.onClose(() => {
-			discussSockets.delete(socket);
-		});
-	}),
-];
+				socket.onMessage(onMessage);
+
+				socket.onClose(() => {
+					discussSockets.delete(socket);
+				});
+			},
+		),
+	},
+});
 
 const jsonBodyParser = express.json();
 const customBodyParsers = new Map<string, RequestHandler>();
@@ -377,11 +383,8 @@ app.use((req, res, next) => {
 
 app.use(middleware, regularMiddleware, authMiddleware);
 
-createRouter({
-	app,
-	server,
-	implementations,
-});
+registerRoutes(app, httpRoutes);
+registerWebSocketRoutes(server, socketRoutes);
 
 server.listen(port, () => {
 	console.log(`Example backend listening on http://localhost:${port}`);
