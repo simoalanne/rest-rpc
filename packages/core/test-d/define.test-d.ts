@@ -87,26 +87,82 @@ const prefixed = router(
 	{
 		pathPrefix: "/api",
 		metadata: { auth: "required" },
-	},
-);
-
-// Current return types preserve the input route shape; runtime normalization is not
-// reflected yet.
-expectType<"/todos">(prefixed.todos.list.path);
-expectError(prefixed.todos.list.metadata);
-
-const singleRoute = route(
-	{
-		method: "GET",
-		path: "/health",
-		responses: {
-			204: noBody(),
+		commonResponses: {
+			401: errorSchema,
 		},
 	},
-	{ pathPrefix: "/api" },
 );
 
-expectType<"/health">(singleRoute.path);
+// Router common options are reflected in the returned route type.
+expectType<"/api/todos">(prefixed.todos.list.path);
+expectType<"required">(prefixed.todos.list.metadata.auth);
+expectType<200 | 401>(
+	null as unknown as keyof typeof prefixed.todos.list.responses,
+);
+
+const metadataOverride = router(
+	{
+		todos: {
+			list: {
+				method: "GET",
+				path: "/todos",
+				metadata: { auth: "optional", audit: true },
+				responses: {
+					200: z.array(todoSchema),
+				},
+			},
+		},
+	},
+	{
+		metadata: { auth: "required", source: "api" },
+	},
+);
+
+// Route metadata wins over common metadata on key conflicts.
+expectType<"optional">(metadataOverride.todos.list.metadata.auth);
+expectType<true>(metadataOverride.todos.list.metadata.audit);
+expectType<"api">(metadataOverride.todos.list.metadata.source);
+
+const commonSuccess = router(
+	{
+		todos: {
+			get: {
+				method: "GET",
+				path: "/todos/:id",
+				responses: {
+					404: errorSchema,
+				},
+			},
+		},
+	},
+	{
+		commonResponses: {
+			200: todoSchema,
+		},
+	},
+);
+
+// Common responses participate in the same response inference as route responses.
+expectType<200 | 404>(
+	null as unknown as InferRouteResponse<
+		typeof commonSuccess.todos.get
+	>["status"],
+);
+
+// Single-route options are processing-only; route-shaped common fields belong on
+// router().
+expectError(
+	route(
+		{
+			method: "GET",
+			path: "/health",
+			responses: {
+				204: noBody(),
+			},
+		},
+		{ pathPrefix: "/api" },
+	),
+);
 
 // A route must declare at least one successful response.
 expectError(
@@ -133,4 +189,24 @@ expectError(
 			},
 		},
 	}),
+);
+
+// The stream response rule sees the route after common response merging.
+expectError(
+	router(
+		{
+			stream: {
+				method: "GET",
+				path: "/stream",
+				responses: {
+					200: streamBody(todoSchema),
+				},
+			},
+		},
+		{
+			commonResponses: {
+				201: todoSchema,
+			},
+		},
+	),
 );

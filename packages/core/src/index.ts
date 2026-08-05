@@ -34,6 +34,8 @@ export type {
 	NoBody,
 	ResponseBodySchema,
 	RouteDeclaration,
+	RouteMetadata,
+	RouteResponses,
 	StreamBody,
 	WebSocketRouteDeclaration,
 } from "./contract/index.ts";

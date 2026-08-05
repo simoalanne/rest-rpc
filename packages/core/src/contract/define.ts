@@ -4,57 +4,169 @@ import type {
 	Contract,
 	RouteDeclaration,
 	RouteMetadata,
+	RouteResponses,
 	ValidateResponseStatuses,
 } from "./route.ts";
 import { validateContractAsync, validateContractSync } from "./validate.ts";
 
-export type CommonContractOptions = {
-	pathPrefix?: string;
-	metadata?: RouteMetadata;
+export type RouteContractOptions = {
 	resolveRequestKeys?: ResolveRequestSchemaKeys;
 	validate?: boolean;
 };
 
+export type RouterContractOptions = RouteContractOptions & {
+	pathPrefix?: string;
+	metadata?: RouteMetadata;
+	commonResponses?: RouteResponses;
+};
+
+type Merge<T> = {
+	[K in keyof T]: T[K];
+};
+type EmptyObject = Record<never, never>;
+
+type TrimTrailingSlashes<T extends string> = T extends `${infer TRest}/`
+	? TrimTrailingSlashes<TRest>
+	: T;
+
+type TrimLeadingSlashes<T extends string> = T extends `/${infer TRest}`
+	? TrimLeadingSlashes<TRest>
+	: T;
+
+type JoinPathPrefix<
+	TPrefix extends string,
+	TPath extends string,
+> = string extends TPrefix | TPath
+	? string
+	: TrimTrailingSlashes<TPrefix> extends infer TNormalizedPrefix extends string
+		? TrimLeadingSlashes<TPath> extends infer TNormalizedPath extends string
+			? TNormalizedPrefix extends ""
+				? TNormalizedPath extends ""
+					? "/"
+					: `/${TNormalizedPath}`
+				: TNormalizedPath extends ""
+					? TNormalizedPrefix
+					: `${TNormalizedPrefix}/${TNormalizedPath}`
+			: never
+		: never;
+
+type ApplyPathPrefix<TPath, TOptions> = TPath extends string
+	? TOptions extends { pathPrefix: infer TPrefix extends string }
+		? TPrefix extends ""
+			? TPath
+			: JoinPathPrefix<TPrefix, TPath>
+		: TPath
+	: TPath;
+
+type CommonMetadata<TOptions> = TOptions extends {
+	metadata: infer TMetadata extends RouteMetadata;
+}
+	? TMetadata
+	: EmptyObject;
+
+type RouteMetadataFor<TRoute> = TRoute extends {
+	metadata: infer TMetadata extends RouteMetadata;
+}
+	? TMetadata
+	: EmptyObject;
+
+type MergeMetadata<TCommon, TRoute> = Merge<
+	Omit<TCommon, keyof TRoute> & TRoute
+>;
+
+type CommonResponses<TOptions> = TOptions extends {
+	commonResponses: infer TResponses extends RouteResponses;
+}
+	? TResponses
+	: EmptyObject;
+
+type MergeResponses<TCommon, TRoute> = Merge<
+	Omit<TCommon, keyof TRoute> & TRoute
+>;
+
+type ApplyRouterOptionsToRoute<
+	TRoute extends RouteDeclaration,
+	TOptions,
+> = TRoute extends { responses: infer TResponses extends RouteResponses }
+	? Merge<
+			Omit<TRoute, "path" | "metadata" | "responses"> & {
+				path: ApplyPathPrefix<TRoute["path"], TOptions>;
+				metadata: MergeMetadata<
+					CommonMetadata<TOptions>,
+					RouteMetadataFor<TRoute>
+				>;
+				responses: MergeResponses<CommonResponses<TOptions>, TResponses>;
+			}
+		>
+	: Merge<
+			Omit<TRoute, "path" | "metadata"> & {
+				path: ApplyPathPrefix<TRoute["path"], TOptions>;
+				metadata: MergeMetadata<
+					CommonMetadata<TOptions>,
+					RouteMetadataFor<TRoute>
+				>;
+			}
+		>;
+
+export type ApplyRouterOptions<
+	TContract extends Contract,
+	TOptions,
+> = TContract extends RouteDeclaration
+	? ApplyRouterOptionsToRoute<TContract, TOptions>
+	: {
+			[K in keyof TContract]: TContract[K] extends Contract
+				? ApplyRouterOptions<TContract[K], TOptions>
+				: never;
+		};
+
 export const route = <const TRoute extends RouteDeclaration>(
 	route: TRoute & ValidateResponseStatuses<TRoute>,
-	commonOptions?: CommonContractOptions,
+	options?: RouteContractOptions,
 ): TRoute => {
-	normalizeContract(route, commonOptions);
-	if (commonOptions?.validate !== false) {
-		validateContractSync(route, commonOptions);
+	normalizeContract(route);
+	if (options?.validate !== false) {
+		validateContractSync(route, options);
 	}
 	return route as TRoute;
 };
 
 export const routeAsync = async <const TRoute extends RouteDeclaration>(
 	route: TRoute & ValidateResponseStatuses<TRoute>,
-	commonOptions?: CommonContractOptions,
+	options?: RouteContractOptions,
 ): Promise<TRoute> => {
-	normalizeContract(route, commonOptions);
-	if (commonOptions?.validate !== false) {
-		await validateContractAsync(route, commonOptions);
+	normalizeContract(route);
+	if (options?.validate !== false) {
+		await validateContractAsync(route, options);
 	}
 	return route as TRoute;
 };
 
-export const router = <const TContract extends Contract>(
-	contract: TContract & ValidateResponseStatuses<TContract>,
-	commonOptions?: CommonContractOptions,
-): TContract => {
+export const router = <
+	const TContract extends Contract,
+	const TOptions extends RouterContractOptions | undefined = undefined,
+>(
+	contract: TContract &
+		ValidateResponseStatuses<ApplyRouterOptions<TContract, TOptions>>,
+	commonOptions?: TOptions,
+): ApplyRouterOptions<TContract, TOptions> => {
 	normalizeContract(contract, commonOptions);
 	if (commonOptions?.validate !== false) {
 		validateContractSync(contract, commonOptions);
 	}
-	return contract as TContract;
+	return contract as ApplyRouterOptions<TContract, TOptions>;
 };
 
-export const routerAsync = async <const TContract extends Contract>(
-	contract: TContract & ValidateResponseStatuses<TContract>,
-	commonOptions?: CommonContractOptions,
-): Promise<TContract> => {
+export const routerAsync = async <
+	const TContract extends Contract,
+	const TOptions extends RouterContractOptions | undefined = undefined,
+>(
+	contract: TContract &
+		ValidateResponseStatuses<ApplyRouterOptions<TContract, TOptions>>,
+	commonOptions?: TOptions,
+): Promise<ApplyRouterOptions<TContract, TOptions>> => {
 	normalizeContract(contract, commonOptions);
 	if (commonOptions?.validate !== false) {
 		await validateContractAsync(contract, commonOptions);
 	}
-	return contract as TContract;
+	return contract as ApplyRouterOptions<TContract, TOptions>;
 };

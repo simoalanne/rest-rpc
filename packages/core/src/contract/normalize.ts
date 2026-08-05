@@ -1,9 +1,10 @@
-import type { Contract, RouteMetadata } from "./route.ts";
+import type { Contract, RouteMetadata, RouteResponses } from "./route.ts";
 import { contractRoutes } from "./traversal.ts";
 
 export type NormalizeContractOptions = {
 	pathPrefix?: string;
 	metadata?: RouteMetadata;
+	commonResponses?: RouteResponses;
 };
 
 export const joinPathPrefix = (prefix: string, path: string) => {
@@ -30,6 +31,13 @@ export const normalizeContract = <TContract extends Contract>(
 			...options?.metadata,
 			...route.metadata,
 		};
+
+		if (route.responses !== undefined) {
+			route.responses = {
+				...options?.commonResponses,
+				...route.responses,
+			};
+		}
 	}
 
 	return contract;

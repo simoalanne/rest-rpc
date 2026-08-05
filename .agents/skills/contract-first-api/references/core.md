@@ -54,6 +54,13 @@ Common HTTP route fields:
 WebSocket routes use `messages.client` and `messages.server` instead of
 `responses`.
 
+`router()` accepts shared route fields for a contract tree. Use `pathPrefix` to
+join a common path prefix onto every route, `metadata` for shallow shared
+metadata, and `commonResponses` for common HTTP responses. Route declarations
+win on key conflicts. `route()` is a single-route convenience helper whose
+options are limited to processing controls like `validate` and
+`resolveRequestKeys`.
+
 ## Schema Libraries
 
 - Runtime validation uses Standard Schema.

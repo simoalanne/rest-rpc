@@ -66,4 +66,42 @@ describe("normalizeContract", () => {
 			source: "api",
 		});
 	});
+
+	it("merges shared responses with route responses", () => {
+		const contract = normalizeContract(
+			{
+				todos: {
+					get: testRoute({
+						responses: {
+							200: {},
+							404: { name: "route not found" },
+						},
+					}),
+					create: testRoute({
+						method: "POST",
+						responses: {
+							201: {},
+						},
+					}),
+				},
+			},
+			{
+				commonResponses: {
+					401: { name: "unauthorized" },
+					404: { name: "common not found" },
+				},
+			},
+		);
+
+		assert.deepEqual(contract.todos.get.responses, {
+			200: {},
+			401: { name: "unauthorized" },
+			404: { name: "route not found" },
+		});
+		assert.deepEqual(contract.todos.create.responses, {
+			201: {},
+			401: { name: "unauthorized" },
+			404: { name: "common not found" },
+		});
+	});
 });

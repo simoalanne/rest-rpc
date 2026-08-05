@@ -1,3 +1,8 @@
+export type {
+	ApplyRouterOptions,
+	RouteContractOptions,
+	RouterContractOptions,
+} from "./define.ts";
 export {
 	route,
 	routeAsync,
@@ -20,6 +25,8 @@ export type {
 	NoBody,
 	ResponseBodySchema,
 	RouteDeclaration,
+	RouteMetadata,
+	RouteResponses,
 	StreamBody,
 	WebSocketRouteDeclaration,
 } from "./route.ts";

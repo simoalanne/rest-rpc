@@ -101,8 +101,10 @@ introspected automatically.
 Async validation is not supported in API contracts. Schemas must return a
 Standard Schema result synchronously.
 
-Shared metadata can be passed as a `router()` option and is shallow
-merged with route metadata. Route metadata wins on key conflicts.
+Shared route fields can be passed as `router()` options and are shallow merged
+into every route. `pathPrefix` joins onto each route path, `metadata` merges
+with route metadata, and `commonResponses` merges with HTTP route responses.
+Route fields win on key conflicts.
 
 ```ts
 export const apiContract = router(
@@ -125,9 +127,18 @@ export const apiContract = router(
 	},
 	{
 		metadata: { auth: "required" },
+		commonResponses: {
+			401: z.object({
+				message: z.string(),
+			}),
+		},
 	},
 );
 ```
+
+`route()` is a single-route convenience helper. Its options are limited to
+processing controls like `validate` and `resolveRequestKeys`; put `path`,
+`metadata`, and `responses` directly on the route declaration.
 
 ## Responses
 

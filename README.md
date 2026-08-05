@@ -56,6 +56,10 @@ From that contract:
 - `@contract-first-api/react-query` creates typed hooks and cache helpers
 - shared packages can expose path-based request and response helper types
 
+`router()` can also apply shared route fields across a contract tree. For
+example, `pathPrefix`, `metadata`, and `commonResponses` are merged into each
+route before adapters and clients consume the contract.
+
 ## Packages
 
 | Package | Role |
