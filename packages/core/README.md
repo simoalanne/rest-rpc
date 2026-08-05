@@ -132,10 +132,10 @@ export const apiContract = router(
 ## Responses
 
 Use `responses` for both successful and non-successful status codes. Values can
-be Standard Schema-compatible schemas, `noBody`, or `stream(schema)`.
+be Standard Schema-compatible schemas, `noBody()`, or `streamBody(schema)`.
 
 ```ts
-import { noBody, stream } from "@contract-first-api/core";
+import { noBody, streamBody } from "@contract-first-api/core";
 
 export const apiContract = router({
 	todos: {
@@ -148,7 +148,7 @@ export const apiContract = router({
 				}),
 			},
 			responses: {
-				204: noBody,
+				204: noBody(),
 				404: z.object({
 					code: z.literal("TODO_NOT_FOUND"),
 				}),
@@ -158,7 +158,7 @@ export const apiContract = router({
 			method: "GET",
 			path: "/todos/events",
 			responses: {
-				200: stream(
+				200: streamBody(
 					z.discriminatedUnion("type", [
 						z.object({
 							type: z.literal("created"),
@@ -189,7 +189,7 @@ Status codes are declared directly in `responses`.
   request body should be treated as one whole value instead of a flattened JSON
   object.
 - **Streaming routes** are HTTP routes whose successful response is
-  declared with `stream(schema)`. A stream response cannot be mixed with
+  declared with `streamBody(schema)`. A stream response cannot be mixed with
   multiple successful status codes.
 - **WebSocket routes** use `options: { mode: "websocket" }`. They must use
   `method: "GET"` and define `messages.client` and `messages.server` instead of
@@ -226,7 +226,8 @@ const apiContract = router({
 
 Integrations expose this as one flat request object. For example, `params.id`,
 `query.includeCompleted`, and `body.title` become regular fields on typed
-service and client inputs.
+service and client inputs. Omitting `request.body` is shorthand for no request
+body; use `body: noBody()` when you want to declare that explicitly.
 
 ## Custom Request Bodies
 

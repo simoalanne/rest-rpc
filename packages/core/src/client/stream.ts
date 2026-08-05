@@ -1,8 +1,8 @@
-import type { StreamResponse } from "../contract/route.ts";
+import type { StreamBody } from "../contract/route.ts";
 import { validateStandardSchemaSync } from "../standard-schema/index.ts";
 
 export async function* parseNdjsonStream(
-	response: StreamResponse,
+	response: StreamBody,
 	body: ReadableStream<Uint8Array>,
 ): AsyncIterable<unknown> {
 	const reader = body.getReader();

@@ -1,5 +1,5 @@
 import type { RouteDeclaration } from "../contract/route.ts";
-import { isCustomBody } from "../contract/route.ts";
+import { isCustomBody, isNoBody } from "../contract/route.ts";
 import { validateStandardSchemaSync } from "../standard-schema/index.ts";
 import type {
 	ApiClientFetchOptions,
@@ -27,8 +27,12 @@ export const createRequestSignal = (
 	};
 };
 
-export const takesRequestInput = (route: RouteDeclaration) =>
-	Boolean(route.request);
+export const takesRequestInput = (route: RouteDeclaration) => {
+	if (!route.request) return false;
+	if (route.request.query || route.request.params) return true;
+	if (isCustomBody(route.request.body)) return true;
+	return Boolean(route.request.body && !isNoBody(route.request.body));
+};
 
 const hasHeader = (headers: Record<string, string>, name: string) =>
 	Object.keys(headers).some((header) => header.toLowerCase() === name);
@@ -99,6 +103,7 @@ const validateOutgoingRequestSegment = (
 	value: unknown,
 ) => {
 	const declaredSchema = route.request?.[segment];
+	if (isNoBody(declaredSchema)) return;
 	const isCustomRequestBody = isCustomBody(declaredSchema);
 	const schema = isCustomRequestBody ? declaredSchema.schema : declaredSchema;
 	if (!schema) return;
@@ -130,11 +135,7 @@ export const constructBaseRequest = (
 	let urlBase = `${baseUrl}${route.path}`;
 	if (!args) return { url: urlBase };
 
-	const request = groupKeysToRequest(
-		args,
-		route,
-		unknownRequestKeys,
-	);
+	const request = groupKeysToRequest(args, route, unknownRequestKeys);
 	const { body, query, params } = request;
 
 	if (validation === "incoming-and-outgoing") {

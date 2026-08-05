@@ -13,7 +13,7 @@ describe("createOpenApiDocument", () => {
 					path: "/health",
 					method: "GET",
 					responses: {
-						204: noBody,
+						204: noBody(),
 					},
 				},
 			},
@@ -79,7 +79,7 @@ describe("createOpenApiDocument", () => {
 							params: z.object({ id: z.string() }),
 						},
 						responses: {
-							204: noBody,
+							204: noBody(),
 						},
 					},
 				},

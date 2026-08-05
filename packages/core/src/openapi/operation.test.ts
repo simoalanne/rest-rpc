@@ -58,8 +58,12 @@ describe("OpenAPI operations", () => {
 		assert.equal(custom?.content["text/csv"].schema.type, "string");
 	});
 
+	it("omits explicit no-body request bodies", () => {
+		assert.equal(createRequestBody(noBody(), schemaConverter), undefined);
+	});
+
 	it("creates no-body and JSON responses", () => {
-		const empty = createResponse("Success", noBody, schemaConverter);
+		const empty = createResponse("Success", noBody(), schemaConverter);
 		const json = createResponse(
 			"Error",
 			z.object({ code: z.string() }),
@@ -102,7 +106,7 @@ describe("OpenAPI operations", () => {
 			path: "/todos",
 			method: "GET",
 			responses: {
-				204: noBody,
+				204: noBody(),
 			},
 		};
 
@@ -118,7 +122,7 @@ describe("OpenAPI operations", () => {
 	});
 
 	it("requires a schema converter only when schemas need conversion", () => {
-		assert.doesNotThrow(() => createResponse("Success", noBody, undefined));
+		assert.doesNotThrow(() => createResponse("Success", noBody(), undefined));
 		assert.throws(
 			() => createRequestBody(z.string(), undefined),
 			/requires a schemaConverter option/,

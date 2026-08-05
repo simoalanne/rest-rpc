@@ -9,7 +9,7 @@ import type {
 	RequestSchema,
 	RouteDeclaration,
 } from "./route.ts";
-import { isCustomBody } from "./route.ts";
+import { isCustomBody, isNoBody } from "./route.ts";
 import { contractRoutes } from "./traversal.ts";
 
 export type ValidateContractOptions = RequestKeyResolverOptions;
@@ -54,7 +54,12 @@ const assertPathParamsResolved = (route: RouteDeclaration) => {
 
 const requestSchemas = (request: RequestSchema) =>
 	[
-		["body", isCustomBody(request.body) ? undefined : request.body],
+		[
+			"body",
+			isCustomBody(request.body) || isNoBody(request.body)
+				? undefined
+				: request.body,
+		],
 		["query", request.query],
 		["params", request.params],
 	] as const;

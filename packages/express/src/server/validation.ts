@@ -4,6 +4,7 @@ import {
 } from "@contract-first-api/core";
 import {
 	isCustomBody,
+	isNoBody,
 	type RouteDeclaration,
 } from "@contract-first-api/core/contract";
 
@@ -33,6 +34,7 @@ export const validateRequestSegments = (
 		[keyof RequestSegments, unknown]
 	>) {
 		const declaredSchema = requestSchema[segment];
+		if (isNoBody(declaredSchema)) continue;
 		const isCustomRequestBody = isCustomBody(declaredSchema);
 		const schema: StandardSchemaV1 | undefined = isCustomRequestBody
 			? declaredSchema.schema

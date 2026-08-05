@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import z from "zod";
 import { router, routerAsync } from "./define.ts";
 import { testContract } from "./factories.ts";
+import { noBody } from "./route.ts";
 
 describe("router", () => {
 	it("normalizes and validates contracts", () => {
@@ -61,6 +62,23 @@ describe("router", () => {
 		assert.deepEqual(contract.search.find.request.requestKeys, {
 			q: "query",
 		});
+	});
+
+	it("allows explicit no-body request declarations", () => {
+		const contract = router({
+			ping: {
+				method: "POST",
+				path: "/ping",
+				request: {
+					body: noBody(),
+				},
+				responses: {
+					204: noBody(),
+				},
+			},
+		});
+
+		assert.deepEqual(contract.ping.request.requestKeys, {});
 	});
 });
 

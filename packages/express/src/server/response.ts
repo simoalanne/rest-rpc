@@ -4,10 +4,7 @@ import type {
 	ResponseBodySchema,
 	RouteDeclaration,
 } from "@contract-first-api/core/contract";
-import {
-	isNoBodyResponse,
-	isStreamResponse,
-} from "@contract-first-api/core/contract";
+import { isNoBody, isStreamBody } from "@contract-first-api/core/contract";
 import { isHttpRoute } from "./router.ts";
 
 export class ContractResponseError<
@@ -81,8 +78,8 @@ export const normalizeHandlerResult = (
 	};
 };
 
-export const isEmptyResponseSchema = isNoBodyResponse;
-export const isStreamingResponseSchema = isStreamResponse;
+export const isEmptyResponseSchema = isNoBody;
+export const isStreamingResponseSchema = isStreamBody;
 
 export type NormalizedHandlerResponse<E extends RouteDeclaration> =
 	InferRouteResponse<E>;

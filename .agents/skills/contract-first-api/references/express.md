@@ -190,7 +190,7 @@ const authMiddleware: express.RequestHandler = (req, res, next) => {
 
 ## Streaming Responses
 
-Streaming responses are declared with `stream(schema)`. Service handlers return
+Streaming responses are declared with `streamBody(schema)`. Service handlers return
 the async iterable body directly when the contract has one successful status.
 
 ```ts
@@ -232,7 +232,8 @@ const implementations = [
   multiple successful statuses.
 - Return the body directly when a route has one successful status and the
   status code is clear from the route.
-- Use `body: undefined` for `noBody` responses.
+- Declare bodyless responses with `noBody()` and use `body: undefined` when
+  returning an explicit `{ status, body }` envelope for them.
 - WebSocket routes use typed socket handling instead of returning a normal
   response body.
 

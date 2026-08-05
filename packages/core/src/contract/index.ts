@@ -17,18 +17,18 @@ export type {
 	InferRouteServerMessage,
 	InferRouteSuccessBody,
 	InferRouteSuccessResponse,
-	NoBodyResponse,
+	NoBody,
 	ResponseBodySchema,
 	RouteDeclaration,
-	StreamResponse,
+	StreamBody,
 	WebSocketRouteDeclaration,
 } from "./route.ts";
 export {
 	customBody,
 	isCustomBody,
-	isNoBodyResponse,
-	isStreamResponse,
+	isNoBody,
+	isStreamBody,
 	noBody,
-	stream,
+	streamBody,
 } from "./route.ts";
 export { flattenContractRoutes, mapContractRoutes } from "./traversal.ts";

@@ -2,7 +2,7 @@ import type {
 	RequestBodySchema,
 	ResponseBodySchema,
 } from "../contract/route.ts";
-import { isCustomBody, isNoBodyResponse } from "../contract/route.ts";
+import { isCustomBody, isNoBody } from "../contract/route.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import {
 	convertSchema,
@@ -45,6 +45,7 @@ export const createRequestBody = (
 	converter: SchemaConverter | undefined,
 ): OpenApiRequestBody | undefined => {
 	if (!schema) return undefined;
+	if (isNoBody(schema)) return undefined;
 	const contentType = isCustomBody(schema)
 		? schema.contentType
 		: JSON_CONTENT_TYPE;
@@ -65,7 +66,7 @@ export const createResponse = (
 	schema: ResponseBodySchema,
 	converter: SchemaConverter | undefined,
 ): OpenApiResponse => {
-	if (isNoBodyResponse(schema)) return { description };
+	if (isNoBody(schema)) return { description };
 
 	return {
 		description,

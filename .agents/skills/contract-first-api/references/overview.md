@@ -58,8 +58,11 @@ Each route is one of the main shapes below:
 - custom body
   Use `customBody({ schema, contentType })` in `request.body` when the request
   body should be treated as one whole `body` value instead of flattened fields.
+- no body
+  Omit `request.body` as shorthand for no request body, or use `body: noBody()`
+  to declare it explicitly. Use `noBody()` for responses without a body.
 - streaming
-  NDJSON streaming response declared with `stream(schema)`.
+  NDJSON streaming response body declared with `streamBody(schema)`.
 - `websocket`
   Bidirectional message schemas instead of a normal response body.
 

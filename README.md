@@ -98,11 +98,11 @@ pnpm add -D @types/ws
 ## Contract Responses
 
 Every HTTP route declaration declares a `responses` map keyed by HTTP status
-code. Each entry can be a Standard Schema-compatible schema, `noBody`, or a
-`stream(schema)` response.
+code. Each entry can be a Standard Schema-compatible schema, `noBody()`, or a
+`streamBody(schema)` response.
 
 ```ts
-import { router, noBody, stream } from "@contract-first-api/core";
+import { router, noBody, streamBody } from "@contract-first-api/core";
 import z from "zod";
 
 export const apiContract = router({
@@ -123,7 +123,7 @@ export const apiContract = router({
 				params: z.object({ id: z.string() }),
 			},
 			responses: {
-				204: noBody,
+				204: noBody(),
 				404: z.object({ code: z.literal("TODO_NOT_FOUND") }),
 			},
 		},
@@ -131,12 +131,15 @@ export const apiContract = router({
 			method: "GET",
 			path: "/todos/events",
 			responses: {
-				200: stream(todoEventSchema),
+				200: streamBody(todoEventSchema),
 			},
 		},
 	},
 });
 ```
+
+Omitting `request.body` is shorthand for no request body. Use
+`body: noBody()` when you want to declare that explicitly.
 
 Server handlers return typed response cases declared by the route:
 

@@ -61,8 +61,10 @@ Use this skill for tasks in repositories that use `contract-first-api`.
 - Route behavior changes across integrations:
   - HTTP routes are the default and use status-keyed `responses`
   - JSON object request bodies are flattened into client and service inputs
+  - `noBody()` explicitly declares no request or response body; omitting
+    `request.body` is shorthand for no request body
   - `customBody({ schema, contentType })` models a whole request body value
-  - `stream(schema)` models NDJSON responses
+  - `streamBody(schema)` models NDJSON response bodies
   - `websocket` models bidirectional messages
 - OpenAPI output includes HTTP routes except websocket routes and routes with
   streaming responses. Custom bodies are documented with their declared content

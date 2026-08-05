@@ -9,8 +9,8 @@ import { constructBaseRequest, takesRequestInput } from "./request.ts";
 import type {
 	InferRouteClientSocket,
 	OpenConnectionArgs,
-	RuntimeValidation,
 	RuntimeArgs,
+	RuntimeValidation,
 } from "./types.ts";
 
 export const buildWebSocketUrl = (url: string) => {
@@ -37,7 +37,7 @@ export const openConnection = <E extends WebSocketRouteDeclaration>(
 	const { url } = constructBaseRequest(
 		options.baseUrl,
 		route,
-		requestArgs as RuntimeArgs,
+		requestArgs as RuntimeArgs | undefined,
 		options.unknownRequestKeys,
 		options.validation,
 	);

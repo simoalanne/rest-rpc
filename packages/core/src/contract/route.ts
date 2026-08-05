@@ -4,7 +4,15 @@ export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 export type RequestSegment = "body" | "query" | "params";
 export type RequestKeys = Record<string, RequestSegment>;
 
-export type RequestBodySchema = StandardSchemaV1 | CustomBody | undefined;
+export type NoBody = {
+	kind: "noBody";
+};
+
+export type RequestBodySchema =
+	| StandardSchemaV1
+	| CustomBody
+	| NoBody
+	| undefined;
 
 export type RequestSchema = {
 	body?: RequestBodySchema;
@@ -14,29 +22,25 @@ export type RequestSchema = {
 };
 
 export type ResponseSchema = StandardSchemaV1;
-export const noBody = Symbol("NoBodyResponse");
 
-export type NoBodyResponse = typeof noBody;
+export const noBody = (): NoBody => ({
+	kind: "noBody",
+});
 
-export type StreamResponse<
-	TSchema extends StandardSchemaV1 = StandardSchemaV1,
-> = {
-	kind: "stream";
+export type StreamBody<TSchema extends StandardSchemaV1 = StandardSchemaV1> = {
+	kind: "streamBody";
 	schema: TSchema;
 };
 
-export type ResponseBodySchema =
-	| ResponseSchema
-	| NoBodyResponse
-	| StreamResponse;
+export type ResponseBodySchema = ResponseSchema | NoBody | StreamBody;
 
 export type RouteResponses = Record<number, ResponseBodySchema>;
 export type RouteMetadata = Record<string, unknown>;
 
-export const stream = <const TSchema extends StandardSchemaV1>(
+export const streamBody = <const TSchema extends StandardSchemaV1>(
 	schema: TSchema,
-): StreamResponse<TSchema> => ({
-	kind: "stream",
+): StreamBody<TSchema> => ({
+	kind: "streamBody",
 	schema,
 });
 
@@ -55,17 +59,21 @@ export const customBody = <const TSchema extends StandardSchemaV1>(input: {
 	contentType: input.contentType,
 });
 
-export const isNoBodyResponse = (
-	response: ResponseBodySchema,
-): response is NoBodyResponse => response === noBody;
+export const isNoBody = (
+	body: RequestBodySchema | ResponseBodySchema,
+): body is NoBody =>
+	typeof body === "object" &&
+	body !== null &&
+	"kind" in body &&
+	body.kind === "noBody";
 
-export const isStreamResponse = (
+export const isStreamBody = (
 	response: ResponseBodySchema,
-): response is StreamResponse =>
+): response is StreamBody =>
 	typeof response === "object" &&
 	response !== null &&
 	"kind" in response &&
-	response.kind === "stream";
+	response.kind === "streamBody";
 
 export const isCustomBody = (schema: RequestBodySchema): schema is CustomBody =>
 	typeof schema === "object" &&
@@ -112,9 +120,9 @@ export const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
 
 export type InferResponseBody<TResponse> = TResponse extends StandardSchemaV1
 	? StandardSchemaV1.InferOutput<TResponse>
-	: TResponse extends NoBodyResponse
+	: TResponse extends NoBody
 		? undefined
-		: TResponse extends StreamResponse<infer TSchema>
+		: TResponse extends StreamBody<infer TSchema>
 			? AsyncIterable<StandardSchemaV1.InferOutput<TSchema>>
 			: never;
 
@@ -157,8 +165,8 @@ export type HasMultipleSuccessfulResponses<TResponses> = IsUnion<
 	SuccessfulResponseKeys<TResponses>
 >;
 
-export type HasStreamResponse<TResponses> = true extends {
-	[TKeys in keyof TResponses]: TResponses[TKeys] extends StreamResponse
+export type HasStreamBody<TResponses> = true extends {
+	[TKeys in keyof TResponses]: TResponses[TKeys] extends StreamBody
 		? true
 		: false;
 }[keyof TResponses]
@@ -225,43 +233,62 @@ export type InferRouteServerMessage<E extends RouteDeclaration> = E extends {
 		: never
 	: never;
 
-type InferRequestBody<TBody> =
-	TBody extends CustomBody<infer TSchema>
+type InferRequestBody<TBody> = TBody extends NoBody
+	? never
+	: TBody extends CustomBody<infer TSchema>
 		? { body: StandardSchemaV1.InferOutput<TSchema> }
 		: TBody extends StandardSchemaV1
 			? StandardSchemaV1.InferOutput<TBody>
 			: never;
 
-type InferRequest<R> = {
-	[K in keyof R]: K extends "body"
-		? InferRequestBody<R[K]>
-		: K extends "requestKeys"
-			? never
-			: R[K] extends StandardSchemaV1
-				? StandardSchemaV1.InferOutput<R[K]>
-				: never;
+type InferRequestSegments<R> = {
+	body: R extends { body: infer TBody } ? InferRequestBody<TBody> : never;
+	query: R extends { query: infer TQuery }
+		? TQuery extends StandardSchemaV1
+			? StandardSchemaV1.InferOutput<TQuery>
+			: never
+		: never;
+	params: R extends { params: infer TParams }
+		? TParams extends StandardSchemaV1
+			? StandardSchemaV1.InferOutput<TParams>
+			: never
+		: never;
 };
 
 type RouteRequest<E extends RouteDeclaration> = E extends {
 	request: infer R;
 }
-	? InferRequest<R>
+	? InferRequestSegments<R>
 	: never;
 
 type Merge<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
+type MergeSegment<T> = [T] extends [never] ? unknown : T;
+type HasRequestInput<TRequest> = [
+	TRequest extends {
+		body: infer TBody;
+		query: infer TQuery;
+		params: infer TParams;
+	}
+		? TBody | TQuery | TParams
+		: never,
+] extends [never]
+	? false
+	: true;
 
 export type InferRouteRequest<E extends RouteDeclaration> =
 	RouteRequest<E> extends infer R
-		? R extends { body?: infer B; query?: infer Q; params?: infer P }
-			? Merge<B & Q & P>
-			: R
+		? R extends { body: infer B; query: infer Q; params: infer P }
+			? HasRequestInput<R> extends true
+				? Merge<MergeSegment<B> & MergeSegment<Q> & MergeSegment<P>>
+				: never
+			: never
 		: never;
 
 type MissingSuccessfulResponseError = {
 	readonly __route_error__: "Route must declare at least one successful response.";
 };
 
-type StreamResponseStatusError = {
+type StreamBodyStatusError = {
 	readonly __route_error__: "Routes with a stream response cannot define more than one successful status code.";
 };
 
@@ -269,9 +296,9 @@ export type ValidateResponseStatuses<T> = T extends RouteDeclaration
 	? T extends { responses: infer TResponses }
 		? HasSuccessfulResponse<TResponses> extends false
 			? MissingSuccessfulResponseError
-			: HasStreamResponse<TResponses> extends true
+			: HasStreamBody<TResponses> extends true
 				? HasMultipleSuccessfulResponses<TResponses> extends true
-					? StreamResponseStatusError
+					? StreamBodyStatusError
 					: unknown
 				: unknown
 		: unknown

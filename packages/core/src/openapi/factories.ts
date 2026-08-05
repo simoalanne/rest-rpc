@@ -1,5 +1,5 @@
 import z from "zod";
-import { customBody, noBody, stream } from "../contract/route.ts";
+import { customBody, noBody, streamBody } from "../contract/route.ts";
 import type { SchemaConverter } from "./types.ts";
 
 export const schemaConverter: SchemaConverter = (schema, { io }) =>
@@ -50,14 +50,14 @@ export const createOpenApiTestContract = () =>
 					params: z.object({ id: z.string() }),
 				},
 				responses: {
-					204: noBody,
+					204: noBody(),
 				},
 			},
 			events: {
 				path: "/todos/events",
 				method: "GET",
 				responses: {
-					200: stream(
+					200: streamBody(
 						z.object({
 							type: z.string(),
 						}),
@@ -83,7 +83,7 @@ export const createOpenApiTestContract = () =>
 					}),
 				},
 				responses: {
-					204: noBody,
+					204: noBody(),
 				},
 			},
 		},

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import z from "zod";
+import { router } from "../contract/define.ts";
 import { noBody } from "../contract/route.ts";
 import {
 	captureFetch,
@@ -80,6 +81,33 @@ describe("ApiClient requests", () => {
 		assert.equal(calls[0]?.init?.body, '{"type":"created"}');
 	});
 
+	it("treats explicit no-body request declarations as options-only routes", async () => {
+		const apiContract = router({
+			ping: {
+				method: "POST",
+				path: "/ping",
+				request: {
+					body: noBody(),
+				},
+				responses: {
+					204: noBody(),
+				},
+			},
+		});
+		const calls = captureFetch();
+		const controller = new AbortController();
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+		});
+
+		await client.ping.fetch({ signal: controller.signal });
+
+		assert.equal(calls[0]?.url, "https://api.test/ping");
+		assert.equal(calls[0]?.init?.body, undefined);
+		assert.deepEqual(calls[0]?.init?.headers, {});
+		assert.equal(calls[0]?.init?.signal, controller.signal);
+	});
+
 	it("merges global fetch options and per-call options", async () => {
 		const calls = captureFetch(jsonResponse([]));
 		const client = initClient(createClientTestContract(), {
@@ -154,7 +182,7 @@ describe("ApiClient requests", () => {
 						query: z.object({ search: z.string() }),
 					},
 					responses: {
-						204: noBody,
+						204: noBody(),
 					},
 				},
 			},

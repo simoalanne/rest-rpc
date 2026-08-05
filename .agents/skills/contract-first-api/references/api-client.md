@@ -39,6 +39,10 @@ The client tree mirrors the contract tree. Requests use one flat object:
 - `query` becomes URL search params
 - `body` becomes JSON unless it is declared with `customBody(...)`
 
+Omitting `request.body` is shorthand for no request body. If a route declares
+`request.body: noBody()` and has no params or query, client calls are
+options-only, the same as routes without a `request` block.
+
 ```ts
 const todo = await api.todos.get.fetch({
 	id: "todo_1",
@@ -95,10 +99,10 @@ callers must handle the status.
 
 ## WebSocket Routes
 
-WebSocket routes expose `connect()` and `tryConnect()`.
+WebSocket routes expose `openConnection()`.
 
 ```ts
-const socket = api.chat.connect.connect();
+const socket = api.chat.connect.openConnection();
 
 socket.send({
 	text: "hello",

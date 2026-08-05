@@ -1,7 +1,7 @@
 import { validateStandardSchemaSync } from "@contract-first-api/core";
 import {
+	isStreamBody,
 	type ResponseBodySchema,
-	isStreamResponse,
 } from "@contract-first-api/core/contract";
 import type { Response } from "express";
 
@@ -15,7 +15,7 @@ export const writeStreamResponse = async (
 	res.setHeader("content-type", "application/x-ndjson");
 
 	for await (const chunk of result as AsyncIterable<unknown>) {
-		if (schema && isStreamResponse(schema)) {
+		if (schema && isStreamBody(schema)) {
 			const validation = validateStandardSchemaSync(schema.schema, chunk);
 			if (validation.issues) throw validation.issues;
 		}

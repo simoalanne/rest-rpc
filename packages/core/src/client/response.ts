@@ -3,7 +3,7 @@ import type {
 	ResponseBodySchema,
 	RouteDeclaration,
 } from "../contract/route.ts";
-import { isNoBodyResponse, isStreamResponse } from "../contract/route.ts";
+import { isNoBody, isStreamBody } from "../contract/route.ts";
 import { validateStandardSchemaSync } from "../standard-schema/index.ts";
 import { isHttpRouteNode, isSuccessStatus } from "./routes.ts";
 import { parseNdjsonStream } from "./stream.ts";
@@ -35,9 +35,9 @@ export const readDeclaredBody = async (
 	schema: ResponseBodySchema,
 	rawResponse: Response,
 ) => {
-	if (isNoBodyResponse(schema)) return undefined;
+	if (isNoBody(schema)) return undefined;
 
-	if (isStreamResponse(schema)) {
+	if (isStreamBody(schema)) {
 		if (!rawResponse.body) {
 			throw new Error("Backend returned an empty stream response");
 		}

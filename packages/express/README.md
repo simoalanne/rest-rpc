@@ -282,7 +282,7 @@ addition to typed params and query fields.
 
 ## Streaming Responses
 
-Streaming responses are declared with `stream(schema)` in the route declaration.
+Streaming responses are declared with `streamBody(schema)` in the route declaration.
 Service handlers can return the async iterable directly when the route
 declaration has one successful status.
 

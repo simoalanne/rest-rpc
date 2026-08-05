@@ -7,7 +7,7 @@ import type {
 	InferRouteSuccessBody,
 	InferRouteSuccessResponse,
 } from "@contract-first-api/core";
-import { customBody, router, stream } from "@contract-first-api/core";
+import { customBody, router, streamBody } from "@contract-first-api/core";
 import { type } from "arktype";
 import * as v from "valibot";
 import z from "zod";
@@ -122,7 +122,7 @@ export const todoContract = router({
 			method: "GET",
 			path: "/todos/events",
 			responses: {
-				200: stream(todoEventSchema),
+				200: streamBody(todoEventSchema),
 			},
 		},
 	},

@@ -97,7 +97,7 @@ describe("ApiClient responses", () => {
 						params: z.object({ id: z.string() }),
 					},
 					responses: {
-						204: noBody,
+						204: noBody(),
 					},
 				},
 			},

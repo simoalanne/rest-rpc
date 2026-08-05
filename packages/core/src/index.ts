@@ -31,21 +31,21 @@ export type {
 	InferRouteServerMessage,
 	InferRouteSuccessBody,
 	InferRouteSuccessResponse,
-	NoBodyResponse,
+	NoBody,
 	ResponseBodySchema,
 	RouteDeclaration,
-	StreamResponse,
+	StreamBody,
 	WebSocketRouteDeclaration,
 } from "./contract/index.ts";
 export {
 	customBody,
+	isCustomBody,
+	noBody,
 	route,
 	routeAsync,
 	router,
 	routerAsync,
-	isCustomBody,
-	noBody,
-	stream,
+	streamBody,
 } from "./contract/index.ts";
 export type {
 	CreateOpenApiDocumentOptions,

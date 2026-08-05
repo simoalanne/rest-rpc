@@ -70,7 +70,7 @@ WebSocket routes use `messages.client` and `messages.server` instead of
 HTTP routes declare all known status codes in `responses`.
 
 ```ts
-import { noBody, stream } from "@contract-first-api/core";
+import { noBody, streamBody } from "@contract-first-api/core";
 
 export const apiContract = router({
 	todos: {
@@ -99,14 +99,14 @@ export const apiContract = router({
 				params: z.object({ id: z.string() }),
 			},
 			responses: {
-				204: noBody,
+				204: noBody(),
 			},
 		},
 		events: {
 			method: "GET",
 			path: "/todos/events",
 			responses: {
-				200: stream(z.object({ type: z.string() })),
+				200: streamBody(z.object({ type: z.string() })),
 			},
 		},
 	},
@@ -121,11 +121,15 @@ codes are the keys in `responses`; non-2xx responses are typed error cases.
 - HTTP
   Default mode. Supports request schemas and status-keyed responses. JSON object
   body schemas are flattened into client and service inputs.
+- no body
+  Omit `request.body` as shorthand for no request body, or use `body: noBody()`
+  to declare it explicitly. Use `noBody()` in `responses` for response statuses
+  that have no body.
 - custom body
   Use `customBody({ schema, contentType })` in `request.body` when the request
   body should be treated as one whole `body` value instead of flattened fields.
 - streaming
-  Use `stream(schema)` as the successful response value. A stream response
+  Use `streamBody(schema)` as the successful response value. A stream response
   cannot be mixed with multiple successful status codes.
 - `websocket`
   Uses `options: { mode: "websocket" }`. Must use `GET` and define
@@ -148,7 +152,7 @@ const api = initClient(apiContract, {
 - `fetchResponse()` returns declared or undeclared response envelopes.
 - `fetch()` exists only when the route has exactly one successful response
   and returns that success body directly.
-- WebSocket routes expose `connect()` and `tryConnect()`.
+- WebSocket routes expose `openConnection()`.
 
 ## Invariants
 
