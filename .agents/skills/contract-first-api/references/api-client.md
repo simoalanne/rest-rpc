@@ -37,6 +37,7 @@ The client tree mirrors the contract tree. Requests use one flat object:
 
 - `params` replace path segments
 - `query` becomes URL search params
+- `headers` become request headers
 - `body` becomes JSON unless it is declared with `customBody(...)`
 
 Omitting `request.body` is shorthand for no request body. If a route declares
@@ -118,6 +119,8 @@ socket.onMessage((result) => {
 ## Headers And Timeout
 
 - `getHeaders` adds headers to every request.
+- Declared request headers are flattened into the request object, stringified
+  before sending, and override `getHeaders` on key conflicts.
 - `timeoutMs` aborts slow requests.
 - Per-call fetch options can pass `signal` and other `fetch` options.
 

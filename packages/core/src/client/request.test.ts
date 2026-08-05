@@ -128,6 +128,60 @@ describe("ApiClient requests", () => {
 		});
 	});
 
+	it("sends declared request headers over global headers", async () => {
+		const apiContract = router(
+			{
+				todos: {
+					list: {
+						method: "GET",
+						path: "/todos",
+						request: {
+							query: z.object({ search: z.string() }),
+							headers: {
+								"x-route": z.string(),
+								"x-shared": z.string(),
+							},
+						},
+						responses: {
+							200: z.array(z.object({ id: z.string(), title: z.string() })),
+						},
+					},
+				},
+			},
+			{
+				commonHeaders: {
+					"x-common": z.number(),
+					"x-shared": z.number(),
+				},
+			},
+		);
+		const calls = captureFetch(jsonResponse([]));
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+			getHeaders: () => ({
+				"x-common": "from global",
+				"x-global": "global",
+				"x-route": "from global",
+				"x-shared": "from global",
+			}),
+		});
+
+		await client.todos.list.fetch({
+			search: "milk",
+			"x-common": 123,
+			"x-route": "route",
+			"x-shared": "route shared",
+		});
+
+		assert.equal(calls[0]?.url, "https://api.test/todos?search=milk");
+		assert.deepEqual(calls[0]?.init?.headers, {
+			"x-common": "123",
+			"x-global": "global",
+			"x-route": "route",
+			"x-shared": "route shared",
+		});
+	});
+
 	it("rejects global content-type headers", async () => {
 		captureFetch();
 		const client = initClient(createClientTestContract(), {

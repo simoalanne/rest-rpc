@@ -57,8 +57,8 @@ From that contract:
 - shared packages can expose path-based request and response helper types
 
 `router()` can also apply shared route fields across a contract tree. For
-example, `pathPrefix`, `metadata`, and `commonResponses` are merged into each
-route before adapters and clients consume the contract.
+example, `pathPrefix`, `metadata`, `commonResponses`, and `commonHeaders` are
+merged into each route before adapters and clients consume the contract.
 
 ## Packages
 
@@ -78,7 +78,7 @@ pnpm add @contract-first-api/core zod
 ```
 
 Zod is only one option. Any synchronous Standard Schema-compatible library can
-validate request bodies, query, params, responses, streams, and WebSocket
+validate request bodies, query, params, headers, responses, streams, and WebSocket
 messages. The core package includes built-in request key inference for common
 object schemas from Zod, Valibot, and ArkType. Other Standard Schema libraries
 can still be used by providing `request.requestKeys` on routes or a
@@ -144,6 +144,8 @@ export const apiContract = router({
 
 Omitting `request.body` is shorthand for no request body. Use
 `body: noBody()` when you want to declare that explicitly.
+Request `headers` are also flattened into service and client inputs. Declared
+request headers override headers returned by client `getHeaders()`.
 
 Server handlers return typed response cases declared by the route:
 

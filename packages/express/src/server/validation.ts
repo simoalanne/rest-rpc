@@ -18,6 +18,7 @@ type RequestSegments = {
 	body?: unknown;
 	query?: unknown;
 	params?: unknown;
+	headers?: unknown;
 };
 
 export const validateRequestSegments = (
@@ -33,6 +34,24 @@ export const validateRequestSegments = (
 	for (const [segment, rawValue] of Object.entries(segments) as Array<
 		[keyof RequestSegments, unknown]
 	>) {
+		if (segment === "headers") {
+			const declaredSchema = requestSchema.headers;
+			if (!declaredSchema) continue;
+			const rawHeaders = rawValue as Record<string, unknown> | undefined;
+			for (const [headerName, schema] of Object.entries(declaredSchema)) {
+				const result = validateStandardSchemaSync(
+					schema,
+					rawHeaders?.[headerName],
+				);
+				if (result.issues) {
+					errors.push(...result.issues);
+					continue;
+				}
+				data[headerName] = result.value;
+			}
+			continue;
+		}
+
 		const declaredSchema = requestSchema[segment];
 		if (isNoBody(declaredSchema)) continue;
 		const isCustomRequestBody = isCustomBody(declaredSchema);

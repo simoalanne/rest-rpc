@@ -1,7 +1,7 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
-export type RequestSegment = "body" | "query" | "params";
+export type RequestSegment = "body" | "query" | "params" | "headers";
 export type RequestKeys = Record<string, RequestSegment>;
 
 export type NoBody = {
@@ -18,6 +18,7 @@ export type RequestSchema = {
 	body?: RequestBodySchema;
 	query?: StandardSchemaV1;
 	params?: StandardSchemaV1;
+	headers?: Record<string, StandardSchemaV1>;
 	requestKeys?: RequestKeys;
 };
 
@@ -241,6 +242,28 @@ type InferRequestBody<TBody> = TBody extends NoBody
 			? StandardSchemaV1.InferOutput<TBody>
 			: never;
 
+type InferHeaderValue<TSchema> = TSchema extends StandardSchemaV1
+	? StandardSchemaV1.InferOutput<TSchema>
+	: never;
+
+type OptionalHeaderKeys<THeaders extends Record<string, StandardSchemaV1>> = {
+	[K in keyof THeaders]: undefined extends InferHeaderValue<THeaders[K]>
+		? K
+		: never;
+}[keyof THeaders];
+
+type RequiredHeaderKeys<THeaders extends Record<string, StandardSchemaV1>> =
+	Exclude<keyof THeaders, OptionalHeaderKeys<THeaders>>;
+
+type InferRequestHeaders<THeaders extends Record<string, StandardSchemaV1>> =
+	Merge<
+		{
+			[K in RequiredHeaderKeys<THeaders>]: InferHeaderValue<THeaders[K]>;
+		} & {
+			[K in OptionalHeaderKeys<THeaders>]?: InferHeaderValue<THeaders[K]>;
+		}
+	>;
+
 type InferRequestSegments<R> = {
 	body: R extends { body: infer TBody } ? InferRequestBody<TBody> : never;
 	query: R extends { query: infer TQuery }
@@ -251,6 +274,11 @@ type InferRequestSegments<R> = {
 	params: R extends { params: infer TParams }
 		? TParams extends StandardSchemaV1
 			? StandardSchemaV1.InferOutput<TParams>
+			: never
+		: never;
+	headers: R extends { headers: infer THeaders }
+		? THeaders extends Record<string, StandardSchemaV1>
+			? InferRequestHeaders<THeaders>
 			: never
 		: never;
 };
@@ -268,8 +296,9 @@ type HasRequestInput<TRequest> = [
 		body: infer TBody;
 		query: infer TQuery;
 		params: infer TParams;
+		headers: infer THeaders;
 	}
-		? TBody | TQuery | TParams
+		? TBody | TQuery | TParams | THeaders
 		: never,
 ] extends [never]
 	? false
@@ -277,9 +306,19 @@ type HasRequestInput<TRequest> = [
 
 export type InferRouteRequest<E extends RouteDeclaration> =
 	RouteRequest<E> extends infer R
-		? R extends { body: infer B; query: infer Q; params: infer P }
+		? R extends {
+				body: infer B;
+				query: infer Q;
+				params: infer P;
+				headers: infer H;
+			}
 			? HasRequestInput<R> extends true
-				? Merge<MergeSegment<B> & MergeSegment<Q> & MergeSegment<P>>
+				? Merge<
+						MergeSegment<B> &
+							MergeSegment<Q> &
+							MergeSegment<P> &
+							MergeSegment<H>
+					>
 				: never
 			: never
 		: never;

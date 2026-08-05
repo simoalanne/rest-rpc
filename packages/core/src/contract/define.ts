@@ -1,7 +1,9 @@
+import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { normalizeContract } from "./normalize.ts";
 import type { ResolveRequestSchemaKeys } from "./requestKeys.ts";
 import type {
 	Contract,
+	RequestSchema,
 	RouteDeclaration,
 	RouteMetadata,
 	RouteResponses,
@@ -18,6 +20,7 @@ export type RouterContractOptions = RouteContractOptions & {
 	pathPrefix?: string;
 	metadata?: RouteMetadata;
 	commonResponses?: RouteResponses;
+	commonHeaders?: Record<string, StandardSchemaV1>;
 };
 
 type Merge<T> = {
@@ -84,29 +87,75 @@ type MergeResponses<TCommon, TRoute> = Merge<
 	Omit<TCommon, keyof TRoute> & TRoute
 >;
 
-type ApplyRouterOptionsToRoute<
-	TRoute extends RouteDeclaration,
-	TOptions,
-> = TRoute extends { responses: infer TResponses extends RouteResponses }
-	? Merge<
-			Omit<TRoute, "path" | "metadata" | "responses"> & {
-				path: ApplyPathPrefix<TRoute["path"], TOptions>;
-				metadata: MergeMetadata<
-					CommonMetadata<TOptions>,
-					RouteMetadataFor<TRoute>
-				>;
-				responses: MergeResponses<CommonResponses<TOptions>, TResponses>;
-			}
-		>
-	: Merge<
-			Omit<TRoute, "path" | "metadata"> & {
-				path: ApplyPathPrefix<TRoute["path"], TOptions>;
-				metadata: MergeMetadata<
-					CommonMetadata<TOptions>,
-					RouteMetadataFor<TRoute>
-				>;
-			}
-		>;
+type CommonHeaders<TOptions> = TOptions extends {
+	commonHeaders: infer THeaders extends Record<string, StandardSchemaV1>;
+}
+	? THeaders
+	: EmptyObject;
+
+type RouteHeadersFor<TRequest> = TRequest extends {
+	headers: infer THeaders extends Record<string, StandardSchemaV1>;
+}
+	? THeaders
+	: EmptyObject;
+
+type MergeHeaders<TCommon, TRoute> = Merge<
+	Omit<TCommon, keyof TRoute> & TRoute
+>;
+
+type ApplyCommonHeadersToRequest<TRequest, TOptions> =
+	keyof CommonHeaders<TOptions> extends never
+		? TRequest
+		: Merge<
+				(TRequest extends RequestSchema
+					? Omit<TRequest, "headers">
+					: EmptyObject) & {
+					headers: MergeHeaders<
+						CommonHeaders<TOptions>,
+						RouteHeadersFor<TRequest>
+					>;
+				}
+			>;
+
+type ApplyCommonHeadersToRoute<TRoute, TOptions> =
+	keyof CommonHeaders<TOptions> extends never
+		? TRoute
+		: Merge<
+				Omit<TRoute, "request"> & {
+					request: ApplyCommonHeadersToRequest<
+						TRoute extends { request: infer TRequest } ? TRequest : EmptyObject,
+						TOptions
+					>;
+				}
+			>;
+
+type ApplyRouterOptionsToRoute<TRoute extends RouteDeclaration, TOptions> =
+	ApplyCommonHeadersToRoute<TRoute, TOptions> extends infer TRouteWithHeaders
+		? TRouteWithHeaders extends RouteDeclaration
+			? TRouteWithHeaders extends {
+					responses: infer TResponses extends RouteResponses;
+				}
+				? Merge<
+						Omit<TRouteWithHeaders, "path" | "metadata" | "responses"> & {
+							path: ApplyPathPrefix<TRoute["path"], TOptions>;
+							metadata: MergeMetadata<
+								CommonMetadata<TOptions>,
+								RouteMetadataFor<TRoute>
+							>;
+							responses: MergeResponses<CommonResponses<TOptions>, TResponses>;
+						}
+					>
+				: Merge<
+						Omit<TRouteWithHeaders, "path" | "metadata"> & {
+							path: ApplyPathPrefix<TRoute["path"], TOptions>;
+							metadata: MergeMetadata<
+								CommonMetadata<TOptions>,
+								RouteMetadataFor<TRoute>
+							>;
+						}
+					>
+			: never
+		: never;
 
 export type ApplyRouterOptions<
 	TContract extends Contract,

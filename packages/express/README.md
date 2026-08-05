@@ -78,7 +78,7 @@ registerRoutes(app, appRoutes, {
 ```
 
 Runtime validation defaults to `"incoming"` for performance. Express validates
-HTTP request bodies, query values, params, WebSocket upgrade input, and
+HTTP request bodies, query values, params, headers, WebSocket upgrade input, and
 WebSocket messages received from clients before calling service handlers. Set
 `validation: "incoming-and-outgoing"` when you also want handler responses,
 stream chunks, and server WebSocket messages validated before they are sent.
@@ -119,8 +119,8 @@ const httpContract = {
 ```
 
 Handlers receive one flattened request object containing fields from `params`,
-`query`, and `body`. The same object also includes `context`, which contains
-the Express request.
+`query`, `headers`, and `body`. The same object also includes `context`, which
+contains the Express request.
 
 ```ts
 const healthRoutes = router(apiContract.health, {
@@ -225,7 +225,7 @@ For each HTTP route declaration:
 2. the service handler runs last
 
 Handlers receive one flattened request object containing fields from `params`,
-`query`, and `body`.
+`query`, `headers`, and `body`.
 
 ## Helper Types
 

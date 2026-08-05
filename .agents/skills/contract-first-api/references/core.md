@@ -48,6 +48,7 @@ Common HTTP route fields:
 - `request.body`
 - `request.query`
 - `request.params`
+- `request.headers`
 - `responses`
 - `options`
 
@@ -56,10 +57,10 @@ WebSocket routes use `messages.client` and `messages.server` instead of
 
 `router()` accepts shared route fields for a contract tree. Use `pathPrefix` to
 join a common path prefix onto every route, `metadata` for shallow shared
-metadata, and `commonResponses` for common HTTP responses. Route declarations
-win on key conflicts. `route()` is a single-route convenience helper whose
-options are limited to processing controls like `validate` and
-`resolveRequestKeys`.
+metadata, and `commonResponses` for common HTTP responses. Use `commonHeaders`
+for headers shared by every route. Route declarations win on key conflicts.
+`route()` is a single-route convenience helper whose options are limited to
+processing controls like `validate` and `resolveRequestKeys`.
 
 ## Schema Libraries
 
@@ -128,6 +129,10 @@ codes are the keys in `responses`; non-2xx responses are typed error cases.
 - HTTP
   Default mode. Supports request schemas and status-keyed responses. JSON object
   body schemas are flattened into client and service inputs.
+- headers
+  Use `request.headers` as a record of header names to schemas. Header fields
+  are flattened into client and service inputs like params, query, and body
+  fields.
 - no body
   Omit `request.body` as shorthand for no request body, or use `body: noBody()`
   to declare it explicitly. Use `noBody()` in `responses` for response statuses
@@ -165,8 +170,8 @@ const api = initClient(apiContract, {
 
 - Contract keys like `todos.create` become stable path names for helper types
   and integrations.
-- Request field names must be unique across `body`, `query`, and `params` for
-  one route.
+- Request field names must be unique across `body`, `query`, `params`, and
+  `headers` for one route.
 - Every HTTP route must declare at least one successful response.
 - The API contract is a plain object and can be organized across files with
   normal object composition.

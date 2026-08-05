@@ -71,7 +71,7 @@ Each HTTP route declaration can define:
 | --- | --- |
 | `method` | HTTP method: `GET`, `POST`, `PUT`, `DELETE`, or `PATCH`. |
 | `path` | HTTP path, with params using `:paramValue` syntax. |
-| `request` | Optional Standard Schema-compatible schemas for `body`, `query`, and `params`. `body` can also use `customBody({ schema, contentType })` to model the whole request body as one value. |
+| `request` | Optional Standard Schema-compatible schemas for `body`, `query`, `params`, and `headers`. `body` can also use `customBody({ schema, contentType })` to model the whole request body as one value. |
 | `responses` | Required map of status codes to response schemas. At least one status must be 2xx. |
 | `options` | Optional route behavior, currently `http` or `websocket`. HTTP routes are the default. |
 | `messages` | WebSocket client and server message schemas. |
@@ -79,13 +79,13 @@ Each HTTP route declaration can define:
 
 `router()` validates structural rules that TypeScript cannot fully
 enforce at runtime, such as duplicate request field names across `body`,
-`query`, and `params`.
+`query`, `params`, and `headers`.
 
 ## Schema Libraries
 
 Contract schemas use the Standard Schema interface. Runtime validation works
 with synchronous Standard Schema-compatible schemas for request bodies, query,
-params, responses, stream chunks, and WebSocket messages.
+params, headers, responses, stream chunks, and WebSocket messages.
 
 Request key inference is built in for common object schemas from:
 
@@ -103,8 +103,8 @@ Standard Schema result synchronously.
 
 Shared route fields can be passed as `router()` options and are shallow merged
 into every route. `pathPrefix` joins onto each route path, `metadata` merges
-with route metadata, and `commonResponses` merges with HTTP route responses.
-Route fields win on key conflicts.
+with route metadata, `commonResponses` merges with HTTP route responses, and
+`commonHeaders` merges with request headers. Route fields win on key conflicts.
 
 ```ts
 export const apiContract = router(
@@ -127,6 +127,9 @@ export const apiContract = router(
 	},
 	{
 		metadata: { auth: "required" },
+		commonHeaders: {
+			"x-request-id": z.string().optional(),
+		},
 		commonResponses: {
 			401: z.object({
 				message: z.string(),
@@ -236,9 +239,10 @@ const apiContract = router({
 ```
 
 Integrations expose this as one flat request object. For example, `params.id`,
-`query.includeCompleted`, and `body.title` become regular fields on typed
-service and client inputs. Omitting `request.body` is shorthand for no request
-body; use `body: noBody()` when you want to declare that explicitly.
+`query.includeCompleted`, `headers["x-request-id"]`, and `body.title` become
+regular fields on typed service and client inputs. Omitting `request.body` is
+shorthand for no request body; use `body: noBody()` when you want to declare
+that explicitly.
 
 ## Custom Request Bodies
 
@@ -329,7 +333,9 @@ const api = initClient(apiContract, {
 
 Runtime validation defaults to `"incoming"` for performance. The client
 validates declared HTTP responses, stream chunks, and WebSocket messages
-received from the server before delivery. Set
+received from the server before delivery. It stringifies declared request
+header values and sends them after `getHeaders()`, so declared request headers
+win on conflicts. Set
 `validation: "incoming-and-outgoing"` when you also want to validate the
 client's own HTTP requests and WebSocket messages before sending them. This is
 useful in development, tests, and high-safety integration boundaries where
@@ -438,9 +444,9 @@ export const openApiDocument = createOpenApiDocument(apiContract, {
 });
 ```
 
-Custom request bodies are included with their declared content type. WebSocket
-routes and routes with streaming responses are not included in the generated
-document.
+Custom request bodies are included with their declared content type, and
+declared request headers are included as header parameters. WebSocket routes
+and routes with streaming responses are not included in the generated document.
 
 Standard Schema defines validation, not JSON Schema conversion. OpenAPI
 generation requires a `schemaConverter` option so each project can use the

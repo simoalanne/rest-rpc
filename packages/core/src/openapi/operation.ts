@@ -40,6 +40,19 @@ export const createParameters = (
 	}));
 };
 
+export const createHeaderParameters = (
+	headers: Record<string, StandardSchemaV1> | undefined,
+	converter: SchemaConverter | undefined,
+): OpenApiParameter[] => {
+	if (!headers) return [];
+
+	return Object.entries(headers).map(([name, schema]) => ({
+		name,
+		in: "header",
+		schema: convertSchema(schema, "input", converter),
+	}));
+};
+
 export const createRequestBody = (
 	schema: RequestBodySchema,
 	converter: SchemaConverter | undefined,
@@ -102,6 +115,7 @@ export const createOperation = (
 	const parameters = [
 		...createParameters(route.request?.params, "path", options.schemaConverter),
 		...createParameters(route.request?.query, "query", options.schemaConverter),
+		...createHeaderParameters(route.request?.headers, options.schemaConverter),
 	];
 	const requestBody = createRequestBody(
 		route.request?.body,

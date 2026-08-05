@@ -110,6 +110,9 @@ export const todoContract = router({
 			method: "POST",
 			path: "/todos/find",
 			request: {
+				headers: {
+					"x-demo-client": z.string().optional(),
+				},
 				body: type({
 					query: "string",
 				}),

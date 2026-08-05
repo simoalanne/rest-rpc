@@ -21,7 +21,7 @@ const assertNoDuplicateKeys = (
 	if (keys.length === new Set(keys).size) return;
 
 	throw new Error(
-		`Route declaration at path "${route.path}" has duplicate request keys across its "body", "query" and "params" definitions.`,
+		`Route declaration at path "${route.path}" has duplicate request keys across its "body", "query", "params" and "headers" definitions.`,
 	);
 };
 
@@ -64,7 +64,22 @@ const requestSchemas = (request: RequestSchema) =>
 		["params", request.params],
 	] as const;
 
+const applyHeaderRequestKeys = (route: RouteDeclaration) => {
+	const headers = route.request?.headers;
+	const requestKeys = route.request?.requestKeys;
+	if (!headers || !requestKeys) return;
+
+	for (const key of Object.keys(headers)) {
+		const existingSegment = requestKeys[key];
+		if (existingSegment && existingSegment !== "headers") {
+			assertNoDuplicateKeys(route, [key, key]);
+		}
+		requestKeys[key] = "headers";
+	}
+};
+
 export const validateResolvedRequestKeys = (route: RouteDeclaration) => {
+	applyHeaderRequestKeys(route);
 	const keys = Object.keys(route.request?.requestKeys ?? {});
 	assertNoDuplicateKeys(route, keys);
 
@@ -103,6 +118,10 @@ export const validateContractSync = <TContract extends Contract>(
 			assertNoDuplicateKeys(route, [...Object.keys(requestKeys), ...keys]);
 			for (const key of keys) requestKeys[key] = segment;
 		}
+		for (const key of Object.keys(route.request.headers ?? {})) {
+			assertNoDuplicateKeys(route, [...Object.keys(requestKeys), key]);
+			requestKeys[key] = "headers";
+		}
 		route.request.requestKeys = requestKeys;
 		validateResolvedRequestKeys(route);
 	}
@@ -135,6 +154,10 @@ export const validateContractAsync = async <TContract extends Contract>(
 			}
 			assertNoDuplicateKeys(route, [...Object.keys(requestKeys), ...keys]);
 			for (const key of keys) requestKeys[key] = segment;
+		}
+		for (const key of Object.keys(route.request.headers ?? {})) {
+			assertNoDuplicateKeys(route, [...Object.keys(requestKeys), key]);
+			requestKeys[key] = "headers";
 		}
 		route.request.requestKeys = requestKeys;
 		validateResolvedRequestKeys(route);

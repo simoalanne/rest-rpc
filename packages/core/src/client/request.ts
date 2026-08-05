@@ -29,7 +29,9 @@ export const createRequestSignal = (
 
 export const takesRequestInput = (route: RouteDeclaration) => {
 	if (!route.request) return false;
-	if (route.request.query || route.request.params) return true;
+	if (route.request.query || route.request.params || route.request.headers) {
+		return true;
+	}
 	if (isCustomBody(route.request.body)) return true;
 	return Boolean(route.request.body && !isNoBody(route.request.body));
 };
@@ -88,6 +90,7 @@ export const groupKeysToRequest = (
 			body?: unknown;
 			query?: Record<string, unknown>;
 			params?: Record<string, unknown>;
+			headers?: Record<string, unknown>;
 		},
 	);
 };
@@ -99,9 +102,20 @@ export const serializeCustomBody = (body: unknown, contentType: string) =>
 
 const validateOutgoingRequestSegment = (
 	route: RouteDeclaration,
-	segment: "body" | "query" | "params",
+	segment: "body" | "query" | "params" | "headers",
 	value: unknown,
 ) => {
+	if (segment === "headers") {
+		const declaredSchema = route.request?.headers;
+		if (!declaredSchema) return;
+		const headers = value as Record<string, unknown> | undefined;
+		for (const [headerName, schema] of Object.entries(declaredSchema)) {
+			const result = validateStandardSchemaSync(schema, headers?.[headerName]);
+			if (result.issues) throw result.issues;
+		}
+		return;
+	}
+
 	const declaredSchema = route.request?.[segment];
 	if (isNoBody(declaredSchema)) return;
 	const isCustomRequestBody = isCustomBody(declaredSchema);
@@ -118,12 +132,19 @@ const validateOutgoingRequest = (
 		body?: unknown;
 		query?: Record<string, unknown>;
 		params?: Record<string, unknown>;
+		headers?: Record<string, unknown>;
 	},
 ) => {
 	validateOutgoingRequestSegment(route, "body", request.body);
 	validateOutgoingRequestSegment(route, "query", request.query);
 	validateOutgoingRequestSegment(route, "params", request.params);
+	validateOutgoingRequestSegment(route, "headers", request.headers);
 };
+
+const stringifyHeaders = (headers: Record<string, unknown> | undefined) =>
+	Object.fromEntries(
+		Object.entries(headers ?? {}).map(([key, value]) => [key, String(value)]),
+	);
 
 export const constructBaseRequest = (
 	baseUrl: string,
@@ -131,12 +152,17 @@ export const constructBaseRequest = (
 	args: RuntimeArgs | undefined,
 	unknownRequestKeys: "throw" | "strip",
 	validation: RuntimeValidation,
-): { url: string; body?: BodyInit | null; contentType?: string } => {
+): {
+	url: string;
+	body?: BodyInit | null;
+	contentType?: string;
+	headers?: Record<string, string>;
+} => {
 	let urlBase = `${baseUrl}${route.path}`;
 	if (!args) return { url: urlBase };
 
 	const request = groupKeysToRequest(args, route, unknownRequestKeys);
-	const { body, query, params } = request;
+	const { body, query, params, headers } = request;
 
 	if (validation === "incoming-and-outgoing") {
 		validateOutgoingRequest(route, request);
@@ -164,6 +190,7 @@ export const constructBaseRequest = (
 			url: urlBase,
 			body: serializeCustomBody(body, contentType),
 			contentType,
+			headers: stringifyHeaders(headers),
 		};
 	}
 
@@ -171,6 +198,7 @@ export const constructBaseRequest = (
 		url: urlBase,
 		body: body ? JSON.stringify(body) : undefined,
 		contentType: body ? "application/json" : undefined,
+		headers: stringifyHeaders(headers),
 	};
 };
 
@@ -198,7 +226,12 @@ export const executeRequest = async <E extends RouteDeclaration>(
 	options: ExecuteRequestOptions,
 ): Promise<{ rawResponse: Response; cleanup: () => void }> => {
 	const { requestArgs, options: fetchOptions } = extractArgs(route, args);
-	const { url, body, contentType } = constructBaseRequest(
+	const {
+		url,
+		body,
+		contentType,
+		headers: requestHeaders,
+	} = constructBaseRequest(
 		options.baseUrl,
 		route,
 		requestArgs as RuntimeArgs,
@@ -221,6 +254,7 @@ export const executeRequest = async <E extends RouteDeclaration>(
 			body,
 			headers: {
 				...headers,
+				...requestHeaders,
 				...(contentType ? { "Content-Type": contentType } : {}),
 			},
 			signal: signalState?.signal ?? fetchOptions?.signal,

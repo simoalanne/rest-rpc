@@ -4,6 +4,7 @@ import z from "zod";
 import { customBody, noBody } from "../contract/route.ts";
 import { schemaConverter } from "./factories.ts";
 import {
+	createHeaderParameters,
 	createOperation,
 	createParameters,
 	createRequestBody,
@@ -39,6 +40,25 @@ describe("OpenAPI operations", () => {
 				{ name: "includeCompleted", in: "query", required: false },
 			],
 		);
+	});
+
+	it("creates request header parameters", () => {
+		const headers = createHeaderParameters(
+			{
+				"x-api-key": z.string(),
+			},
+			schemaConverter,
+		);
+
+		assert.deepEqual(headers, [
+			{
+				name: "x-api-key",
+				in: "header",
+				schema: {
+					type: "string",
+				},
+			},
+		]);
 	});
 
 	it("creates JSON and custom request bodies", () => {
@@ -86,6 +106,7 @@ describe("OpenAPI operations", () => {
 			method: "POST",
 			request: {
 				params: z.object({ id: z.string() }),
+				headers: { "x-api-key": z.string() },
 				body: z.object({ title: z.string() }),
 			},
 			responses: {
@@ -98,7 +119,7 @@ describe("OpenAPI operations", () => {
 			schemaConverter: converter,
 		});
 
-		assert.deepEqual(ios, ["input", "input", "output"]);
+		assert.deepEqual(ios, ["input", "input", "input", "output"]);
 	});
 
 	it("applies operation transforms", () => {

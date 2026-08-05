@@ -53,6 +53,7 @@ Key mappings:
 - `method` becomes the operation method
 - `request.params` becomes path parameters
 - `request.query` becomes query parameters
+- `request.headers` becomes header parameters
 - `request.body` becomes a JSON request body, the declared custom body content
   type when using `customBody(...)`, or no request body when using `noBody()`
 - each `responses` entry becomes an OpenAPI response for that status

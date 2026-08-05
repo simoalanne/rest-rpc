@@ -8,7 +8,7 @@ import {
 	router,
 	streamBody,
 } from "@contract-first-api/core/contract";
-import { expectError, expectType } from "tsd";
+import { expectAssignable, expectError, expectType } from "tsd";
 import { z } from "zod";
 
 const todoSchema = z.object({
@@ -148,6 +148,48 @@ expectType<200 | 404>(
 		typeof commonSuccess.todos.get
 	>["status"],
 );
+
+const headerMerged = router(
+	{
+		todos: {
+			list: {
+				method: "GET",
+				path: "/todos",
+				request: {
+					query: z.object({ search: z.string() }),
+					headers: {
+						"x-optional": z.string().optional(),
+						"x-route": z.literal("route"),
+						"x-shared": z.literal("route"),
+					},
+				},
+				responses: {
+					200: z.array(todoSchema),
+				},
+			},
+		},
+	},
+	{
+		commonHeaders: {
+			"x-common": z.number(),
+			"x-shared": z.literal("common"),
+		},
+	},
+);
+
+type HeaderMergedRequest = InferRouteRequest<typeof headerMerged.todos.list>;
+declare const headerMergedRequest: HeaderMergedRequest;
+expectType<string>(headerMergedRequest.search);
+expectType<number>(headerMergedRequest["x-common"]);
+expectType<string | undefined>(headerMergedRequest["x-optional"]);
+expectType<"route">(headerMergedRequest["x-route"]);
+expectType<"route">(headerMergedRequest["x-shared"]);
+expectAssignable<HeaderMergedRequest>({
+	search: "todos",
+	"x-common": 1,
+	"x-route": "route",
+	"x-shared": "route",
+});
 
 // Single-route options are processing-only; route-shaped common fields belong on
 // router().

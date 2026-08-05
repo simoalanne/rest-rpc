@@ -94,6 +94,7 @@ Handlers receive one flattened request object:
 
 - fields from `params`
 - fields from `query`
+- fields from `headers`
 - fields from `body`
 - `context`
 
@@ -217,8 +218,8 @@ const implementations = [
 
 - Register JSON parsing before `createRouter()` when routes use JSON bodies.
 - Use `router(..., { pathPrefix: "/api" })` when every route should
-  share a common path prefix; common `metadata` and `commonResponses` can be
-  merged the same way.
+  share a common path prefix; common `metadata`, `commonResponses`, and
+  `commonHeaders` can be merged the same way.
 - Return `{ status, body }` for non-2xx responses and for routes with
   multiple successful statuses.
 - Return the body directly when a route has one successful status and the
