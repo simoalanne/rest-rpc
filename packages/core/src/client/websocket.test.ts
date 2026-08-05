@@ -87,5 +87,4 @@ describe("ApiClient websockets", () => {
 
 		assert.deepEqual(messages, [{ text: "hello" }]);
 	});
-
 });

@@ -43,11 +43,13 @@ const readHookOptionsArg = (route: RouteDeclaration, args: RequestArgs) =>
 export const getQueryKey = (request: unknown, path: string[]) =>
 	request ? [...path, request] : path;
 
-const splitFetchOptions = <TOptions extends Record<string, unknown> | undefined>(
+const splitFetchOptions = <
+	TOptions extends Record<string, unknown> | undefined,
+>(
 	options: TOptions,
 ) => {
-	const { fetchOptions, ...reactQueryOptions } =
-		(options ?? {}) as OptionsWithFetchOptions;
+	const { fetchOptions, ...reactQueryOptions } = (options ??
+		{}) as OptionsWithFetchOptions;
 	return {
 		fetchOptions,
 		reactQueryOptions,

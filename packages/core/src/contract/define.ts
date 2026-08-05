@@ -25,7 +25,7 @@ export const route = <const TRoute extends RouteDeclaration>(
 		validateContractSync(route, commonOptions);
 	}
 	return route as TRoute;
-}
+};
 
 export const routeAsync = async <const TRoute extends RouteDeclaration>(
 	route: TRoute & ValidateResponseStatuses<TRoute>,

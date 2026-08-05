@@ -1,7 +1,7 @@
 import { initClient } from "@contract-first-api/core";
 import type {
-	ApiClientOptions,
 	ApiClientFetchOptions,
+	ApiClientOptions,
 	FetchResponseFn,
 	InferRouteClientRequest,
 	InferRouteClientRequestInput,
@@ -48,31 +48,37 @@ type WithFetchOptions<T> = T & {
 type QueryOptionsFor<
 	E extends RouteDeclaration,
 	TData = InferRouteQueryData<E>,
-> = WithFetchOptions<Omit<
-	UseQueryOptions<InferRouteQueryData<E>, InferRouteQueryError<E>, TData>,
-	"queryKey" | "queryFn"
->>;
+> = WithFetchOptions<
+	Omit<
+		UseQueryOptions<InferRouteQueryData<E>, InferRouteQueryError<E>, TData>,
+		"queryKey" | "queryFn"
+	>
+>;
 
 type SuspenseQueryOptionsFor<
 	E extends RouteDeclaration,
 	TData = InferRouteQueryData<E>,
-> = WithFetchOptions<Omit<
-	UseSuspenseQueryOptions<
-		InferRouteQueryData<E>,
-		InferRouteQueryError<E>,
-		TData
-	>,
-	"queryKey" | "queryFn"
->>;
+> = WithFetchOptions<
+	Omit<
+		UseSuspenseQueryOptions<
+			InferRouteQueryData<E>,
+			InferRouteQueryError<E>,
+			TData
+		>,
+		"queryKey" | "queryFn"
+	>
+>;
 
-type MutationOptionsFor<E extends RouteDeclaration> = WithFetchOptions<Omit<
-	UseMutationOptions<
-		InferRouteQueryData<E>,
-		InferRouteQueryError<E>,
-		InferRouteMutationVariables<E>
-	>,
-	"mutationFn"
->>;
+type MutationOptionsFor<E extends RouteDeclaration> = WithFetchOptions<
+	Omit<
+		UseMutationOptions<
+			InferRouteQueryData<E>,
+			InferRouteQueryError<E>,
+			InferRouteMutationVariables<E>
+		>,
+		"mutationFn"
+	>
+>;
 
 type QueryDisabled = false | null | undefined | "" | 0;
 

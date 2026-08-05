@@ -42,8 +42,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 		this.api = buildApiClient(this.contract, {
 			fetchResponse: (route, ...args) => this.fetchResponse(route, ...args),
 			fetch: (route, ...args) => this.fetch(route, ...args),
-			openConnection: (route, ...args) =>
-				this.openConnection(route, ...args),
+			openConnection: (route, ...args) => this.openConnection(route, ...args),
 		});
 	}
 
@@ -84,7 +83,6 @@ export class ApiClient<TContract extends Contract = Contract> {
 			},
 			...args,
 		);
-
 }
 
 export const initClient = <TContract extends Contract>(

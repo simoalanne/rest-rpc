@@ -1,6 +1,8 @@
 pre-commit:
+  parallel: false
   commands:
     lint:
-      run: pnpm lint
-    typecheck:
-      run: pnpm typecheck
+      run: pnpm run lint:write
+      stage_fixed: true
+    check:
+      run: pnpm run check
