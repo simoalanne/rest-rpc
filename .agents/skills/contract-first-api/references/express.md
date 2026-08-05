@@ -10,15 +10,11 @@ streaming support, and websocket routes.
 
 ## Main Setup
 
-Use `initServer()` to get helpers, then:
+Use the Express helpers directly:
 
 1. register body parsing middleware
-2. define handlers with `implementContract()`
-3. register routes with `createRouter()`
-
-```ts
-const { createRouter, implementContract } = initServer<RequestContext>();
-```
+2. bind handlers with `router()` or `route()`
+3. register route implementations with `registerRoutes()`
 
 Minimal setup:
 
@@ -26,10 +22,7 @@ Minimal setup:
 const app = express();
 app.use(express.json());
 
-createRouter({
-	app,
-	implementations,
-});
+registerRoutes(app, implementations);
 ```
 
 ## Typed Service Responses
@@ -38,36 +31,34 @@ HTTP service handlers return declared response envelopes. When a contract has
 exactly one successful status, handlers may return the successful body directly.
 
 ```ts
-const implementations = [
-	implementContract(contract.todos).handlers({
-		async list() {
+const implementations = router(contract.todos, {
+	async list() {
+		return {
+			status: 200,
+			body: {
+				items: await getTodos(),
+			},
+		};
+	},
+	async create({ title, context }) {
+		if (await todoExists(title)) {
 			return {
-				status: 200,
+				status: 409,
 				body: {
-					items: await getTodos(),
+					code: "TITLE_ALREADY_EXISTS",
 				},
 			};
-		},
-		async create({ title, context }) {
-			if (await todoExists(title)) {
-				return {
-					status: 409,
-					body: {
-						code: "TITLE_ALREADY_EXISTS",
-					},
-				};
-			}
+		}
 
-			return {
-				status: 201,
-				body: await createTodo({
-					title,
-					ownerId: context.userId,
-				}),
-			};
-		},
-	}),
-];
+		return {
+			status: 201,
+			body: await createTodo({
+				title,
+				ownerId: context.req.user.id,
+			}),
+		};
+	},
+});
 ```
 
 The `status` must be one of the contract's `responses` keys. Non-2xx statuses
@@ -102,20 +93,18 @@ This depends on request field names being unique across locations in the
 contract.
 
 ```ts
-const implementations = [
-	implementContract(contract.todos).handlers({
-		async get({ id, includeCompleted, context }) {
-			return {
-				status: 200,
-				body: await loadTodo({
-					id,
-					includeCompleted,
-					userId: context.req.userId,
-				}),
-			};
-		},
-	}),
-];
+const implementations = router(contract.todos, {
+	async get({ id, includeCompleted, context }) {
+		return {
+			status: 200,
+			body: await loadTodo({
+				id,
+				includeCompleted,
+				userId: context.req.user.id,
+			}),
+		};
+	},
+});
 ```
 
 ## Custom Body Handling
@@ -166,7 +155,7 @@ const authMiddleware: express.RequestHandler = (req, res, next) => {
 	const matched = matchRoute(contract, req);
 
 	if (matched?.metadata?.auth === "required") {
-		const user = gerUserFromAuthHeader(req.headers.authorization);
+		const user = getUserFromAuthHeader(req.headers.authorization);
 		if (!user) {
 			res.status(401).json({ error: "Unauthorized" });
 			return;
@@ -185,13 +174,11 @@ Streaming responses are declared with `streamBody(schema)`. Service handlers ret
 the async iterable body directly when the contract has one successful status.
 
 ```ts
-const implementations = [
-	implementContract(contract.todos).handlers({
-		events() {
-			return readEvents();
-		},
-	}),
-];
+const implementations = router(contract.todos, {
+	events() {
+		return readEvents();
+	},
+});
 ```
 
 ## WebSocket Services
@@ -199,24 +186,22 @@ const implementations = [
 WebSocket services receive a typed socket instead of returning a response.
 
 ```ts
-const implementations = [
-	implementContract(contract.chat).handlers({
-		connect({ socket }) {
-			socket.onMessage((result) => {
-				if (!result.success) return;
+const implementations = webSocketRouter(contract.chat, {
+	connect({ context }) {
+		context.socket.onMessage((result) => {
+			if (!result.success) return;
 
-				socket.send({
-					text: `echo: ${result.data.text}`,
-				});
+			context.socket.send({
+				text: `echo: ${result.data.text}`,
 			});
-		},
-	}),
-];
+		});
+	},
+});
 ```
 
 ## Important Rules
 
-- Register JSON parsing before `createRouter()` when routes use JSON bodies.
+- Register JSON parsing before `registerRoutes()` when routes use JSON bodies.
 - Use `router(..., { pathPrefix: "/api" })` when every route should
   share a common path prefix; common `metadata`, `commonResponses`, and
   `commonHeaders` can be merged the same way.
