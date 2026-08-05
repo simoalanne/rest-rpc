@@ -82,8 +82,8 @@ if (response.declared && response.status === 409) {
 
 `fetchResponse()` returns:
 
-- `{ declared: true, status, body }` for a response declared in the contract
-- `{ declared: false, status, body }` for an undeclared backend response
+- `{ declared: true, status, body, headers }` for a response declared in the contract
+- `{ declared: false, status, body, headers }` for an undeclared backend response
 
 If a contract has exactly one successful response, it also exposes `fetch()`.
 `fetch()` returns the successful body directly and throws when the request does

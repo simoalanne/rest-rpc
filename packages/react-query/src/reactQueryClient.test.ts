@@ -52,7 +52,8 @@ describe("initReactQueryClient", () => {
 		assert.deepEqual(api.items.list, { source: "routeHooks" });
 		assert.deepEqual(api.items.byId, { source: "routeHooks" });
 		assert.deepEqual(api.items.create, { source: "routeHooks" });
-		assert.deepEqual(api.items.socket, {});
+		assert.equal("socket" in api.items, false);
+		assert.equal("discuss" in api, false);
 		assert.equal(routeHookCalls.length, 3);
 		assert.deepEqual(
 			routeHookCalls.map((call) => call[2]),

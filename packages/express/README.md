@@ -120,7 +120,7 @@ const httpContract = {
 
 Handlers receive one flattened request object containing fields from `params`,
 `query`, and `body`. The same object also includes `context`, which contains
-the Express request and response.
+the Express request.
 
 ```ts
 const healthRoutes = router(apiContract.health, {
@@ -198,6 +198,24 @@ throw new ContractResponseError(apiContract.todos.get, {
 
 When a route declaration declares exactly one successful status, the handler may
 return that successful body directly.
+
+### With Custom Headers
+
+You can also return custom headers in the response envelope. The headers will be
+set on the Express response before sending the body. The header value comes from
+nodes `OutgoingHttpHeader` type.
+
+```ts
+return {
+	status: 200,
+	body: {
+		items,
+	},
+	headers: {
+		"x-total-count": items.length
+	},
+};
+```
 
 ## Request Flow
 

@@ -26,7 +26,7 @@ const isUndeclaredRouteClientResponse = (
 
 const isDeclaredResponse = (
 	value: unknown,
-): value is { status: number; body: unknown } =>
+): value is { status: number; headers?: Headers; body: unknown } =>
 	typeof value === "object" &&
 	value !== null &&
 	"status" in value &&
@@ -44,7 +44,12 @@ export const fetchQueryData = async (
 			takesRequestInput(route)
 				? await fetchResponse(request, options)
 				: await fetchResponse(options)
-		) as { declared: boolean; status: number; body: unknown };
+		) as {
+			declared: boolean;
+			status: number;
+			headers?: Headers;
+			body: unknown;
+		};
 
 		if (!response.declared) {
 			throw response;

@@ -9,12 +9,12 @@ import type {
 } from "@contract-first-api/core/client";
 import type {
 	Contract,
+	HttpRouteDeclaration,
 	InferRouteErrors,
 	InferRouteSuccessResponse,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
 } from "@contract-first-api/core/contract";
-import { mapContractRoutes } from "@contract-first-api/core/contract";
 import type {
 	QueryClient,
 	QueryKey,
@@ -29,10 +29,12 @@ import type {
 import { createRouteHooks } from "./routeHooks.ts";
 
 export type InferRouteQueryData<E extends RouteDeclaration> =
-	InferRouteSuccessResponse<E>;
+	InferRouteSuccessResponse<E> & {
+		headers: Headers;
+	};
 
 export type InferRouteQueryError<E extends RouteDeclaration> =
-	| InferRouteErrors<E>
+	| (InferRouteErrors<E> & { headers: Headers })
 	| UndeclaredRouteClientResponse
 	| Error;
 
@@ -136,16 +138,22 @@ type ReactQueryRouteValue<E extends RouteDeclaration> = {
 	getKey: (request?: InferRouteClientRequest<E>) => QueryKey;
 };
 
+type ReactQueryTreeFor<T extends Contract> = {
+	[K in keyof T as T[K] extends Contract
+		? ReactQueryApiFor<T[K]> extends never
+			? never
+			: keyof ReactQueryApiFor<T[K]> extends never
+				? never
+				: K
+		: never]: T[K] extends Contract ? ReactQueryApiFor<T[K]> : never;
+};
+
 export type ReactQueryApiFor<T extends Contract> =
 	T extends WebSocketRouteDeclaration
-		? Record<never, never>
-		: T extends RouteDeclaration
+		? never
+		: T extends HttpRouteDeclaration
 			? ReactQueryRouteValue<T>
-			: {
-					[K in keyof T]: T[K] extends Contract
-						? ReactQueryApiFor<T[K]>
-						: never;
-				};
+			: ReactQueryTreeFor<T>;
 
 export type ReactQueryClientOptions = ApiClientOptions & {
 	queryClient: QueryClient;
@@ -158,6 +166,12 @@ const isWebSocketRoute = (
 	route: RouteDeclaration,
 ): route is WebSocketRouteDeclaration => route.options?.mode === "websocket";
 
+const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
+	typeof value === "object" &&
+	value !== null &&
+	"path" in value &&
+	"method" in value;
+
 const getByPath = (tree: unknown, path: string[]) =>
 	path.reduce((node, key) => (node as Record<string, unknown>)[key], tree);
 
@@ -168,22 +182,34 @@ export const initReactQueryClient = <TContract extends Contract>(
 	const { queryClient, ...clientOptions } = options;
 	const client = initClient(contract, clientOptions);
 
-	return mapContractRoutes(contract, (route, path) => {
-		if (isWebSocketRoute(route)) {
-			return {};
+	const mapHttpRoutes = (node: Contract, path: string[] = []): unknown => {
+		if (isRouteDeclaration(node)) {
+			if (isWebSocketRoute(node)) return undefined;
+
+			const apiNode = getByPath(client, path) as {
+				fetchResponse: FetchResponseFn<typeof node>;
+			};
+
+			return createRouteHooks(
+				node,
+				apiNode.fetchResponse as (...args: unknown[]) => Promise<unknown>,
+				path,
+				queryClient,
+			);
 		}
 
-		const apiNode = getByPath(client, path) as {
-			fetchResponse: FetchResponseFn<typeof route>;
-		};
+		const entries = Object.entries(node)
+			.map(([key, value]) => [key, mapHttpRoutes(value, [...path, key])])
+			.filter((entry): entry is [string, unknown] => entry[1] !== undefined);
 
-		return createRouteHooks(
-			route,
-			apiNode.fetchResponse as (...args: unknown[]) => Promise<unknown>,
-			path,
-			queryClient,
-		);
-	}) as ReactQueryApiFor<TContract>;
+		if (entries.length === 0 && path.length > 0) {
+			return undefined;
+		}
+
+		return Object.fromEntries(entries);
+	};
+
+	return mapHttpRoutes(contract) as ReactQueryApiFor<TContract>;
 };
 
 export default initReactQueryClient;

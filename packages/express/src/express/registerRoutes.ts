@@ -74,11 +74,18 @@ export const registerRoutes = (
 					...requestValidation.data,
 					context: {
 						req,
-						res,
 					},
 				});
 				const result = normalizeHandlerResult(route, handlerResult);
 				const schema = getResponseSchema(route, result.status);
+
+				if (result.headers) {
+					for (const [headerName, headerValue] of Object.entries(
+						result.headers,
+					)) {
+						res.setHeader(headerName, headerValue);
+					}
+				}
 
 				if (schema && isEmptyResponseSchema(schema)) {
 					res.sendStatus(result.status);

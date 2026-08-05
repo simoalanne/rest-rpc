@@ -327,7 +327,7 @@ work. There is no disabled validation mode because incoming validation is the
 runtime contract boundary.
 
 Every HTTP route declaration exposes `fetchResponse()`, which returns either a
-declared response envelope or an undeclared response:
+declared response envelope or an undeclared response. Envelope consists of `status`, `body`, and `headers`.
 
 ```ts
 const response = await api.todos.create.fetchResponse({

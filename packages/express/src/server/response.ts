@@ -1,3 +1,4 @@
+import type { OutgoingHttpHeader } from "node:http";
 import type {
 	InferRouteErrors,
 	InferRouteResponse,
@@ -56,7 +57,11 @@ const hasDeclaredStatus = (route: RouteDeclaration, status: number) =>
 export const normalizeHandlerResult = (
 	route: RouteDeclaration,
 	result: unknown,
-): { status: number; body: unknown } => {
+): {
+	status: number;
+	body: unknown;
+	headers?: Record<string, OutgoingHttpHeader>;
+} => {
 	if (
 		result &&
 		typeof result === "object" &&

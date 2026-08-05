@@ -34,11 +34,13 @@ export type UndeclaredRouteClientResponse = {
 	declared: false;
 	status: number;
 	body: unknown;
+	headers: Headers;
 };
 
 export type DeclaredRouteClientResponse<E extends RouteDeclaration> =
 	InferRouteResponse<E> & {
 		declared: true;
+		headers: Headers;
 	};
 
 export type InferRouteClientResponse<E extends RouteDeclaration> =

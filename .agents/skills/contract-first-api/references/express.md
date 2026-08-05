@@ -88,16 +88,6 @@ throw new ContractResponseError(contract.todos.get, {
 The response must match a non-2xx response declared by that route. Other thrown
 errors continue to the Express global error handler.
 
-## Request Flow
-
-For each contract route:
-
-1. request validation runs first
-2. `createContext` runs
-3. the service handler runs last
-
-If validation fails, context creation and the service handler do not run.
-
 ## Validated Request Shape
 
 Handlers receive one flattened request object:
@@ -119,7 +109,7 @@ const implementations = [
 				body: await loadTodo({
 					id,
 					includeCompleted,
-					userId: context.userId,
+					userId: context.req.userId,
 				}),
 			};
 		},

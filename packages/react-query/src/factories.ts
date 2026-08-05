@@ -27,6 +27,17 @@ export const apiContract = {
 			},
 		},
 	},
+	discuss: {
+		connect: {
+			method: "GET",
+			path: "/discuss",
+			options: { mode: "websocket" },
+			messages: {
+				client: {},
+				server: {},
+			},
+		},
+	},
 } as any;
 
 export const createQueryClientMock = () => ({
