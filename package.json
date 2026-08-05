@@ -23,10 +23,13 @@
 		"typecheck": "pnpm run build:packages && pnpm run typecheck:workspace",
 		"typecheck:workspace": "pnpm -r --parallel --no-bail typecheck",
 		"test": "pnpm -r --parallel --no-bail --if-present test",
-		"lint": "biome check .",
-		"lint:write": "biome check --write --staged --no-errors-on-unmatched",
+		"lint": "biome check --write .",
+		"lint:verify": "biome check .",
+		"lint:staged": "biome check --write --staged --no-errors-on-unmatched",
+		"lint:write": "pnpm run lint:staged",
 		"lint:unsafe": "biome check --write --unsafe --staged --no-errors-on-unmatched",
-		"check": "pnpm run typecheck && pnpm run lint && pnpm run test"
+		"check": "pnpm run lint && pnpm run typecheck && pnpm run test",
+		"check:verify": "pnpm run lint:verify && pnpm run typecheck && pnpm run test"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.11",

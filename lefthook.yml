@@ -1,8 +1,8 @@
 pre-commit:
   parallel: false
-  commands:
-    lint:
-      run: pnpm run lint:write
+  jobs:
+    - name: lint
+      run: pnpm run lint:staged
       stage_fixed: true
-    check:
-      run: pnpm run check
+    - name: check
+      run: pnpm run check:verify
