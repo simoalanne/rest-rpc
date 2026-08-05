@@ -116,12 +116,15 @@ export type GetHeadersFn = () =>
 	| Record<string, string>
 	| Promise<Record<string, string>>;
 
+export type RuntimeValidation = "incoming" | "incoming-and-outgoing";
+
 export type ApiClientOptions = {
 	baseUrl: string;
 	fetchOptions?: ApiClientFetchOptions;
 	getHeaders?: GetHeadersFn;
 	timeoutMs?: number;
 	unknownRequestKeys?: "throw" | "strip";
+	validation?: RuntimeValidation;
 };
 
 export type RuntimeArgs = Record<string, unknown>;

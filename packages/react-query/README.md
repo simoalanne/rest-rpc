@@ -28,8 +28,15 @@ export const api = initReactQueryClient(apiContract, {
 	getHeaders: () => ({
 		Authorization: `Bearer ${getAuthToken()}`,
 	}),
+	validation: "incoming",
 });
 ```
+
+Runtime validation uses the same options as `initClient()`. It defaults to
+`"incoming"` for performance, validating declared HTTP responses before React
+Query receives them. Use `"incoming-and-outgoing"` when you also want outgoing
+HTTP requests validated before sending them. There is no disabled validation
+mode because incoming validation is the runtime contract boundary.
 
 ## Add The Provider
 

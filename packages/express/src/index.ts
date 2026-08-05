@@ -2,6 +2,7 @@ export type {
 	HttpRouteHandlerContext,
 	InferRouteHandlerRequest,
 	InferRouteHandlerResponse,
+	RegisterRoutesOptions,
 	RouteHandler,
 } from "./express/index.ts";
 export {
@@ -18,6 +19,7 @@ export type {
 	InferRouteServerSendMessage,
 	InferRouteServerSocket,
 	InferWebSocketRouteHandlerRequest,
+	RegisterWebSocketRoutesOptions,
 	WebSocketRouteHandler,
 	WebSocketRouteHandlerContext,
 } from "./websocket/index.ts";

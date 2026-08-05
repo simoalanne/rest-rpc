@@ -1,11 +1,13 @@
 import type { RouteDeclaration } from "../contract/route.ts";
 import { isCustomBody } from "../contract/route.ts";
+import { validateStandardSchemaSync } from "../standard-schema/index.ts";
 import type {
 	ApiClientFetchOptions,
 	FetchArgs,
 	FetchOptions,
 	GetHeadersFn,
 	RuntimeArgs,
+	RuntimeValidation,
 } from "./types.ts";
 
 export const createRequestSignal = (
@@ -91,20 +93,54 @@ export const serializeCustomBody = (body: unknown, contentType: string) =>
 		? JSON.stringify(body)
 		: (body as BodyInit | null | undefined);
 
+const validateOutgoingRequestSegment = (
+	route: RouteDeclaration,
+	segment: "body" | "query" | "params",
+	value: unknown,
+) => {
+	const declaredSchema = route.request?.[segment];
+	const isCustomRequestBody = isCustomBody(declaredSchema);
+	const schema = isCustomRequestBody ? declaredSchema.schema : declaredSchema;
+	if (!schema) return;
+
+	const result = validateStandardSchemaSync(schema, value);
+	if (result.issues) throw result.issues;
+};
+
+const validateOutgoingRequest = (
+	route: RouteDeclaration,
+	request: {
+		body?: unknown;
+		query?: Record<string, unknown>;
+		params?: Record<string, unknown>;
+	},
+) => {
+	validateOutgoingRequestSegment(route, "body", request.body);
+	validateOutgoingRequestSegment(route, "query", request.query);
+	validateOutgoingRequestSegment(route, "params", request.params);
+};
+
 export const constructBaseRequest = (
 	baseUrl: string,
 	route: RouteDeclaration,
 	args: RuntimeArgs | undefined,
 	unknownRequestKeys: "throw" | "strip",
+	validation: RuntimeValidation,
 ): { url: string; body?: BodyInit | null; contentType?: string } => {
 	let urlBase = `${baseUrl}${route.path}`;
 	if (!args) return { url: urlBase };
 
-	const { body, query, params } = groupKeysToRequest(
+	const request = groupKeysToRequest(
 		args,
 		route,
 		unknownRequestKeys,
 	);
+	const { body, query, params } = request;
+
+	if (validation === "incoming-and-outgoing") {
+		validateOutgoingRequest(route, request);
+	}
+
 	if (params) {
 		for (const [k, v] of Object.entries(params)) {
 			urlBase = urlBase.replace(`:${k}`, encodeURIComponent(String(v)));
@@ -152,6 +188,7 @@ export type ExecuteRequestOptions = {
 	getHeaders?: GetHeadersFn;
 	timeoutMs?: number;
 	unknownRequestKeys: "throw" | "strip";
+	validation: RuntimeValidation;
 };
 
 export const executeRequest = async <E extends RouteDeclaration>(
@@ -165,6 +202,7 @@ export const executeRequest = async <E extends RouteDeclaration>(
 		route,
 		requestArgs as RuntimeArgs,
 		options.unknownRequestKeys,
+		options.validation,
 	);
 
 	const signalState = createRequestSignal(

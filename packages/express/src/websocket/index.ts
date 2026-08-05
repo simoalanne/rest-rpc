@@ -1,4 +1,5 @@
 export { registerWebSocketRoutes } from "./registerWebSocketRoutes.ts";
+export type { RegisterWebSocketRoutesOptions } from "./registerWebSocketRoutes.ts";
 export type {
 	InferWebSocketRouteHandlerRequest,
 	WebSocketRouteHandler,
@@ -9,4 +10,5 @@ export type {
 	InferRouteServerReceivedMessage,
 	InferRouteServerSendMessage,
 	InferRouteServerSocket,
+	RouteWebSocketOptions,
 } from "./socket.ts";

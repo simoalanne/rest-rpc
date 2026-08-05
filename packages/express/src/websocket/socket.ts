@@ -24,9 +24,16 @@ export type InferRouteServerSocket<E extends WebSocketRouteDeclaration> = Omit<
 	onClose: (callback: (code: number, reason: Buffer) => void) => () => void;
 };
 
+type RuntimeValidation = "incoming" | "incoming-and-outgoing";
+
+export type RouteWebSocketOptions = {
+	validation: RuntimeValidation;
+};
+
 export const createRouteWebSocket = <E extends WebSocketRouteDeclaration>(
 	socket: WebSocket,
 	route: E,
+	options: RouteWebSocketOptions,
 ): InferRouteServerSocket<E> => {
 	const rawSend = socket.send.bind(socket);
 	const routeSocket = socket as unknown as InferRouteServerSocket<E>;
@@ -47,6 +54,11 @@ export const createRouteWebSocket = <E extends WebSocketRouteDeclaration>(
 	};
 
 	routeSocket.send = (message: InferRouteServerSendMessage<E>) => {
+		if (options.validation === "incoming-and-outgoing") {
+			const result = validateStandardSchemaSync(route.messages.server, message);
+			if (result.issues) throw result.issues;
+		}
+
 		rawSend(JSON.stringify(message));
 	};
 

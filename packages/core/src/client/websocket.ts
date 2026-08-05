@@ -9,6 +9,7 @@ import { constructBaseRequest, takesRequestInput } from "./request.ts";
 import type {
 	InferRouteClientSocket,
 	OpenConnectionArgs,
+	RuntimeValidation,
 	RuntimeArgs,
 } from "./types.ts";
 
@@ -20,6 +21,7 @@ export const buildWebSocketUrl = (url: string) => {
 export type WebSocketConnectionOptions = {
 	baseUrl: string;
 	unknownRequestKeys: "throw" | "strip";
+	validation: RuntimeValidation;
 };
 
 export const openConnection = <E extends WebSocketRouteDeclaration>(
@@ -37,6 +39,7 @@ export const openConnection = <E extends WebSocketRouteDeclaration>(
 		route,
 		requestArgs as RuntimeArgs,
 		options.unknownRequestKeys,
+		options.validation,
 	);
 	const rawSocket = new WebSocket(buildWebSocketUrl(url));
 	const rawSend = rawSocket.send.bind(rawSocket);
@@ -60,6 +63,11 @@ export const openConnection = <E extends WebSocketRouteDeclaration>(
 	socket.send = (message: InferRouteClientMessage<E>) => {
 		if (socket.readyState !== WebSocket.OPEN) {
 			throw new Error("WebSocket is not open");
+		}
+
+		if (options.validation === "incoming-and-outgoing") {
+			const result = validateStandardSchemaSync(route.messages.client, message);
+			if (result.issues) throw result.issues;
 		}
 
 		rawSend(JSON.stringify(message));

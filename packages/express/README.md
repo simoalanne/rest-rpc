@@ -72,8 +72,20 @@ const appRoutes = routes(httpContract, {
 	},
 });
 
-registerRoutes(app, appRoutes);
+registerRoutes(app, appRoutes, {
+	validation: "incoming",
+});
 ```
+
+Runtime validation defaults to `"incoming"` for performance. Express validates
+HTTP request bodies, query values, params, WebSocket upgrade input, and
+WebSocket messages received from clients before calling service handlers. Set
+`validation: "incoming-and-outgoing"` when you also want handler responses,
+stream chunks, and server WebSocket messages validated before they are sent.
+This is useful in development, tests, and high-safety integration boundaries
+where catching service-side contract drift matters more than avoiding the extra
+validation work. There is no disabled validation mode because incoming
+validation is the runtime contract boundary.
 
 You can also bind a whole subtree directly from plain handlers:
 
@@ -325,7 +337,9 @@ const socketRoutes = webSocketRoutes(socketContract, {
 	},
 });
 
-registerWebSocketRoutes(server, socketRoutes);
+registerWebSocketRoutes(server, socketRoutes, {
+	validation: "incoming",
+});
 ```
 
 Incoming WebSocket messages are delivered to `onMessage` only after they parse

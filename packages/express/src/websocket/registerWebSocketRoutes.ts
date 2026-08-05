@@ -8,6 +8,12 @@ import { validateRequestSegments } from "../server/validation.ts";
 import type { WebSocketImplementationTree } from "./route.ts";
 import { createRouteWebSocket } from "./socket.ts";
 
+type RuntimeValidation = "incoming" | "incoming-and-outgoing";
+
+export type RegisterWebSocketRoutesOptions = {
+	validation?: RuntimeValidation;
+};
+
 const sendUpgradeError = (
 	socket: Duplex,
 	statusCode: number,
@@ -42,7 +48,9 @@ const runWebSocketHandler = (
 export const registerWebSocketRoutes = (
 	server: HttpServer,
 	implementations: WebSocketImplementationTree,
+	options: RegisterWebSocketRoutesOptions = {},
 ) => {
+	const validationMode = options.validation ?? "incoming";
 	const routes = flattenWebSocketImplementationTree(implementations);
 	if (routes.length === 0) return;
 
@@ -60,26 +68,28 @@ export const registerWebSocketRoutes = (
 
 		const params = matchedRoute.match(url.pathname) ?? {};
 		const query = Object.fromEntries(url.searchParams);
-		const validation = validateRequestSegments(matchedRoute.route, {
+		const requestValidation = validateRequestSegments(matchedRoute.route, {
 			query,
 			params,
 		});
 
-		if (!validation.success) {
+		if (!requestValidation.success) {
 			sendUpgradeError(socket, 400, {
 				message:
 					"Request validation failed. Check the validationErrors field for details.",
-				validationErrors: validation.errors,
+				validationErrors: requestValidation.errors,
 			});
 			return;
 		}
 
 		webSocketServer.handleUpgrade(req, socket, head, (rawSocket) => {
-			const routeSocket = createRouteWebSocket(rawSocket, matchedRoute.route);
+			const routeSocket = createRouteWebSocket(rawSocket, matchedRoute.route, {
+				validation: validationMode,
+			});
 			runWebSocketHandler(
 				matchedRoute.handler,
 				{
-					...validation.data,
+					...requestValidation.data,
 					context: {
 						req,
 						socket: routeSocket,

@@ -9,3 +9,4 @@ export type {
 } from "../server/router.ts";
 export { route, router, routes } from "../server/router.ts";
 export { registerRoutes } from "./registerRoutes.ts";
+export type { RegisterRoutesOptions } from "./registerRoutes.ts";

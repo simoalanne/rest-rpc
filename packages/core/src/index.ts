@@ -15,6 +15,7 @@ export type {
 	InferRouteClientSocket,
 	OpenConnectionArgs,
 	OpenConnectionFn,
+	RuntimeValidation,
 	UndeclaredRouteClientResponse,
 } from "./client/index.ts";
 export { initClient } from "./client/index.ts";

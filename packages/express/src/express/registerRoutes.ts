@@ -1,6 +1,8 @@
+import { validateStandardSchemaSync } from "@contract-first-api/core";
 import type {
 	HttpMethod,
 	HttpRouteDeclaration,
+	ResponseBodySchema,
 } from "@contract-first-api/core/contract";
 import type { Application, Request, Response } from "express";
 import {
@@ -18,10 +20,34 @@ import {
 import { validateRequestSegments } from "../server/validation.ts";
 import { writeStreamResponse } from "./response.ts";
 
+type RuntimeValidation = "incoming" | "incoming-and-outgoing";
+
+export type RegisterRoutesOptions = {
+	validation?: RuntimeValidation;
+};
+
+const validateOutgoingResponse = (
+	schema: ResponseBodySchema | undefined,
+	body: unknown,
+) => {
+	if (
+		!schema ||
+		isEmptyResponseSchema(schema) ||
+		isStreamingResponseSchema(schema)
+	) {
+		return;
+	}
+
+	const validation = validateStandardSchemaSync(schema, body);
+	if (validation.issues) throw validation.issues;
+};
+
 export const registerRoutes = (
 	app: Application,
 	implementations: ImplementationTree,
+	options: RegisterRoutesOptions = {},
 ) => {
+	const validationMode = options.validation ?? "incoming";
 	const routes = sortImplementations(
 		flattenImplementationTree(implementations),
 	);
@@ -32,20 +58,20 @@ export const registerRoutes = (
 		const handler = implementation.handler;
 
 		const serviceHandler = async (req: Request, res: Response) => {
-			const validation = validateRequestSegments(route, req);
+			const requestValidation = validateRequestSegments(route, req);
 
-			if (!validation.success) {
+			if (!requestValidation.success) {
 				res.status(400).json({
 					message:
 						"Request validation failed. Check the validationErrors field for details.",
-					validationErrors: validation.errors,
+					validationErrors: requestValidation.errors,
 				});
 				return;
 			}
 
 			try {
 				const handlerResult = await handler({
-					...validation.data,
+					...requestValidation.data,
 					context: {
 						req,
 						res,
@@ -60,8 +86,17 @@ export const registerRoutes = (
 				}
 
 				if (schema && isStreamingResponseSchema(schema)) {
-					await writeStreamResponse(result.body, res, result.status);
+					await writeStreamResponse(
+						result.body,
+						res,
+						result.status,
+						validationMode === "incoming-and-outgoing" ? schema : undefined,
+					);
 					return;
+				}
+
+				if (validationMode === "incoming-and-outgoing") {
+					validateOutgoingResponse(schema, result.body);
 				}
 
 				res.status(result.status).json(result.body);
@@ -71,6 +106,10 @@ export const registerRoutes = (
 					if (schema && isEmptyResponseSchema(schema)) {
 						res.sendStatus(error.status);
 						return;
+					}
+
+					if (validationMode === "incoming-and-outgoing") {
+						validateOutgoingResponse(schema, error.body);
 					}
 
 					res.status(error.status).json(error.body);

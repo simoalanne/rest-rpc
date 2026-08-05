@@ -311,8 +311,19 @@ const api = initClient(apiContract, {
 		Authorization: `Bearer ${getAuthToken()}`,
 	}),
 	timeoutMs: 10_000,
+	validation: "incoming",
 });
 ```
+
+Runtime validation defaults to `"incoming"` for performance. The client
+validates declared HTTP responses, stream chunks, and WebSocket messages
+received from the server before delivery. Set
+`validation: "incoming-and-outgoing"` when you also want to validate the
+client's own HTTP requests and WebSocket messages before sending them. This is
+useful in development, tests, and high-safety integration boundaries where
+catching local contract drift matters more than avoiding the extra validation
+work. There is no disabled validation mode because incoming validation is the
+runtime contract boundary.
 
 Every HTTP route declaration exposes `fetchResponse()`, which returns either a
 declared response envelope or an undeclared response:
