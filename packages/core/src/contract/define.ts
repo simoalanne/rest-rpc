@@ -10,7 +10,6 @@ import { validateContractAsync, validateContractSync } from "./validate.ts";
 
 export type CommonContractOptions = {
 	pathPrefix?: string;
-	prefix?: string;
 	metadata?: RouteMetadata;
 	resolveRequestKeys?: ResolveRequestSchemaKeys;
 	validate?: boolean;

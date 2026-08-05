@@ -3,7 +3,6 @@ import { contractRoutes } from "./traversal.ts";
 
 export type NormalizeContractOptions = {
 	pathPrefix?: string;
-	prefix?: string;
 	metadata?: RouteMetadata;
 };
 
@@ -22,7 +21,7 @@ export const normalizeContract = <TContract extends Contract>(
 	options?: NormalizeContractOptions,
 ): TContract => {
 	for (const route of contractRoutes(contract)) {
-		const pathPrefix = options?.prefix ?? options?.pathPrefix;
+		const pathPrefix = options?.pathPrefix;
 		if (pathPrefix) {
 			route.path = joinPathPrefix(pathPrefix, route.path);
 		}
