@@ -131,6 +131,27 @@ describe("router", () => {
 			/duplicate header keys that differ only by case/,
 		);
 	});
+
+	it("rejects OpenAPI response descriptions without matching responses", () => {
+		assert.throws(
+			() =>
+				router({
+					ping: {
+						method: "GET",
+						path: "/ping",
+						openApi: {
+							responseDescriptions: {
+								200: "Pong.",
+							},
+						},
+						responses: {
+							204: noBody(),
+						},
+					},
+				}),
+			/response description for status 200 without a matching response schema/,
+		);
+	});
 });
 
 describe("routerAsync", () => {

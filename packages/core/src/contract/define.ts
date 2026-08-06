@@ -2,7 +2,9 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { normalizeContract } from "./normalize.ts";
 import type { ResolveRequestSchemaKeys } from "./requestKeys.ts";
 import type {
+	CommonOpenApiRouteOptions,
 	Contract,
+	OpenApiRouteOptions,
 	RequestSchema,
 	RouteDeclaration,
 	RouteMetadata,
@@ -24,6 +26,7 @@ export type RouterContractOptions = RouteContractOptions & {
 	metadata?: RouteMetadata;
 	commonResponses?: RouteResponses;
 	commonHeaders?: Record<string, StandardSchemaV1>;
+	commonOpenApi?: CommonOpenApiRouteOptions;
 };
 
 type Merge<T> = {
@@ -106,6 +109,21 @@ type MergeHeaders<TCommon, TRoute> = Merge<
 	Omit<TCommon, keyof TRoute> & TRoute
 >;
 
+type CommonOpenApi<TOptions> = TOptions extends {
+	commonOpenApi: CommonOpenApiRouteOptions;
+}
+	? OpenApiRouteOptions
+	: EmptyObject;
+
+type ApplyCommonOpenApiToRoute<TRoute, TOptions> =
+	keyof CommonOpenApi<TOptions> extends never
+		? TRoute
+		: Merge<
+				Omit<TRoute, "openApi"> & {
+					openApi: OpenApiRouteOptions;
+				}
+			>;
+
 type ApplyCommonHeadersToRequest<TRequest, TOptions> =
 	keyof CommonHeaders<TOptions> extends never
 		? TRequest
@@ -133,7 +151,10 @@ type ApplyCommonHeadersToRoute<TRoute, TOptions> =
 			>;
 
 type ApplyRouterOptionsToRoute<TRoute extends RouteDeclaration, TOptions> =
-	ApplyCommonHeadersToRoute<TRoute, TOptions> extends infer TRouteWithHeaders
+	ApplyCommonOpenApiToRoute<
+		ApplyCommonHeadersToRoute<TRoute, TOptions>,
+		TOptions
+	> extends infer TRouteWithHeaders
 		? TRouteWithHeaders extends RouteDeclaration
 			? TRouteWithHeaders extends {
 					responses: infer TResponses extends RouteResponses;

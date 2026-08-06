@@ -169,7 +169,7 @@ export const createResponses = (
 
 	for (const [status, schema] of Object.entries(route.responses)) {
 		responses[status] = createResponse(
-			Number(status) >= 200 && Number(status) < 300 ? "Success" : "Error",
+			route.openApi?.responseDescriptions?.[Number(status)] ?? "",
 			schema,
 			converter,
 		);
@@ -196,7 +196,10 @@ export const createOperation = (
 		route.request?.body,
 		options.schemaConverter,
 	);
+	const { extensions, ...openApi } = route.openApi ?? {};
 	const operation: OpenApiOperation = {
+		...openApi,
+		...extensions,
 		...(parameters.length > 0 ? { parameters } : {}),
 		...(requestBody ? { requestBody } : {}),
 		responses: createResponses(route, options.schemaConverter),

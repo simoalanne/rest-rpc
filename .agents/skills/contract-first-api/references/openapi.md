@@ -58,6 +58,12 @@ Key mappings:
   type when using `customBody(...)`, or no request body when using `noBody()`
 - each `responses` entry becomes an OpenAPI response for that status
 - `noBody()` responses are emitted without JSON content
+- route `openApi` fields become operation fields
+
+The generator only emits required OpenAPI structure, contract-derived schemas,
+and OpenAPI fields provided by the contract or transform hooks. Response
+descriptions come from `openApi.responseDescriptions` and otherwise default to
+an empty string because OpenAPI requires the field.
 
 HTTP routes are included. Custom bodies are documented with their declared
 content type. WebSocket routes and routes with streaming responses are not part
@@ -108,11 +114,51 @@ const document = createOpenApiDocument(contract, {
 Use the matching converter for Valibot, ArkType, or another Standard
 Schema-compatible library.
 
+## Route OpenAPI Hints
+
+Use route `openApi` for common operation fields:
+
+```ts
+const contract = router(
+	{
+		todos: {
+			list: {
+				method: "GET",
+				path: "/todos",
+				openApi: {
+					summary: "List todos",
+					operationId: "listTodos",
+					tags: ["Todos"],
+					responseDescriptions: {
+						200: "Todos returned.",
+					},
+				},
+				responses: {
+					200: todoListSchema,
+				},
+			},
+		},
+	},
+	{
+		commonOpenApi: {
+			tags: ["Todos"],
+			security: [{ bearerAuth: [] }],
+			responseDescriptions: {
+				401: "Authentication is required.",
+			},
+		},
+	},
+);
+```
+
+`commonOpenApi` is for shared operation hints such as `tags`, `deprecated`,
+`security`, `externalDocs`, `responseDescriptions`, and `extensions`.
+
 ## Customization Hooks
 
 - `transformOperation`
-  Use for route-level OpenAPI fields such as `summary`, `tags`, `security`, or
-  vendor extensions.
+  Use for OpenAPI fields not modeled directly by route `openApi`, often using
+  route `metadata` as the input.
 - `transformDocument`
   Use for top-level document fields and shared components such as security
   schemes.
@@ -125,9 +171,9 @@ const document = createOpenApiDocument(contract, {
 		title: "Todo API",
 		version: "1.0.0",
 	},
-	transformOperation: ({ contract, operation }) => ({
+	transformOperation: ({ route, operation }) => ({
 		...operation,
-		operationId: contract.keySegments.join("."),
+		"x-auth": route.metadata.auth,
 	}),
 });
 ```

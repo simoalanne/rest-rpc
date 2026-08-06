@@ -60,6 +60,8 @@ Use this skill for tasks in repositories that use `contract-first-api`.
 - Request field names must be unique across `body`, `query`, and `params` within one route.
 - Route behavior changes across integrations:
   - HTTP routes are the default and use status-keyed `responses`
+  - route `openApi` fields provide common OpenAPI operation hints, and
+    `commonOpenApi` applies shared hints through `router()`/`routerAsync()`
   - JSON object request bodies are flattened into client and service inputs
   - `noBody()` explicitly declares no request or response body; omitting
     `request.body` is shorthand for no request body
@@ -68,7 +70,8 @@ Use this skill for tasks in repositories that use `contract-first-api`.
   - `websocket` models bidirectional messages
 - OpenAPI output includes HTTP routes except websocket routes and routes with
   streaming responses. Custom bodies are documented with their declared content
-  type.
+  type. Advanced OpenAPI needs can use route `metadata` with
+  `transformOperation` or `transformDocument`.
 - Shared path prefixes belong in the contract so adapters and clients consume
   the same normalized route paths.
 - Contract schemas use Standard Schema. Runtime validation works with

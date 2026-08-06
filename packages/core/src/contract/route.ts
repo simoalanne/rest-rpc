@@ -43,6 +43,21 @@ export type ResponseBodySchema = ResponseSchema | NoBody | StreamBody;
 
 export type RouteResponses = Record<number, ResponseBodySchema>;
 export type RouteMetadata = Record<string, unknown>;
+export type OpenApiRouteOptions = {
+	summary?: string;
+	description?: string;
+	operationId?: string;
+	tags?: string[];
+	deprecated?: boolean;
+	security?: Array<Record<string, string[]>>;
+	externalDocs?: { url: string; description?: string };
+	responseDescriptions?: Record<number, string>;
+	extensions?: Record<`x-${string}`, unknown>;
+};
+export type CommonOpenApiRouteOptions = Omit<
+	OpenApiRouteOptions,
+	"summary" | "description" | "operationId"
+>;
 
 export const streamBody = <const TSchema extends StandardSchemaV1>(
 	schema: TSchema,
@@ -97,6 +112,7 @@ export type BaseRouteDeclaration = {
 	method: HttpMethod;
 	request?: RequestSchema;
 	metadata?: RouteMetadata;
+	openApi?: OpenApiRouteOptions;
 };
 
 export type HttpRouteDeclaration = BaseRouteDeclaration & {

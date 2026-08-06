@@ -15,6 +15,7 @@ export {
 	routerAsync,
 } from "./define.ts";
 export type {
+	CommonOpenApiRouteOptions,
 	Contract,
 	CustomBody,
 	HttpMethod,
@@ -36,6 +37,7 @@ export type {
 	InferServerSuccessBody,
 	InferServerSuccessResponse,
 	NoBody,
+	OpenApiRouteOptions,
 	ResponseBodySchema,
 	RouteDeclaration,
 	RouteMetadata,

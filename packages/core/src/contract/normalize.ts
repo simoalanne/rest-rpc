@@ -1,5 +1,11 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import type { Contract, RouteMetadata, RouteResponses } from "./route.ts";
+import type {
+	CommonOpenApiRouteOptions,
+	Contract,
+	OpenApiRouteOptions,
+	RouteMetadata,
+	RouteResponses,
+} from "./route.ts";
 import { contractRoutes } from "./traversal.ts";
 
 export type NormalizeContractOptions = {
@@ -7,6 +13,7 @@ export type NormalizeContractOptions = {
 	metadata?: RouteMetadata;
 	commonResponses?: RouteResponses;
 	commonHeaders?: Record<string, StandardSchemaV1>;
+	commonOpenApi?: CommonOpenApiRouteOptions;
 };
 
 export const joinPathPrefix = (prefix: string, path: string) => {
@@ -17,6 +24,41 @@ export const joinPathPrefix = (prefix: string, path: string) => {
 	if (!normalizedPath) return normalizedPrefix;
 
 	return `${normalizedPrefix}/${normalizedPath}`;
+};
+
+const mergeUnique = (common: string[] = [], route: string[] = []) => [
+	...new Set([...common, ...route]),
+];
+
+const mergeOpenApi = (
+	common: CommonOpenApiRouteOptions | undefined,
+	route: OpenApiRouteOptions | undefined,
+): OpenApiRouteOptions | undefined => {
+	if (!common && !route) return undefined;
+
+	return {
+		...common,
+		...route,
+		...(common?.tags || route?.tags
+			? { tags: mergeUnique(common?.tags, route?.tags) }
+			: {}),
+		...(common?.extensions || route?.extensions
+			? {
+					extensions: {
+						...common?.extensions,
+						...route?.extensions,
+					},
+				}
+			: {}),
+		...(common?.responseDescriptions || route?.responseDescriptions
+			? {
+					responseDescriptions: {
+						...common?.responseDescriptions,
+						...route?.responseDescriptions,
+					},
+				}
+			: {}),
+	};
 };
 
 export const normalizeContract = <TContract extends Contract>(
@@ -33,6 +75,8 @@ export const normalizeContract = <TContract extends Contract>(
 			...options?.metadata,
 			...route.metadata,
 		};
+
+		route.openApi = mergeOpenApi(options?.commonOpenApi, route.openApi);
 
 		if (route.responses !== undefined) {
 			route.responses = {

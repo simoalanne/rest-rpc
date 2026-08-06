@@ -22,6 +22,11 @@ export type OpenApiResponse = {
 	content?: Record<string, { schema: OpenApiSchema }>;
 };
 
+export type OpenApiExternalDocs = {
+	url: string;
+	description?: string;
+};
+
 export type OpenApiOperation = {
 	operationId?: string;
 	summary?: string;
@@ -32,6 +37,7 @@ export type OpenApiOperation = {
 	requestBody?: OpenApiRequestBody;
 	responses: Record<string, OpenApiResponse>;
 	security?: Array<Record<string, string[]>>;
+	externalDocs?: OpenApiExternalDocs;
 	[key: `x-${string}`]: unknown;
 };
 

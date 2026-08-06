@@ -163,15 +163,15 @@ describe("OpenAPI operations", () => {
 	});
 
 	it("creates no-body and JSON responses", () => {
-		const empty = createResponse("Success", noBody(), schemaConverter);
+		const empty = createResponse("", noBody(), schemaConverter);
 		const json = createResponse(
-			"Error",
+			"",
 			z.object({ code: z.string() }),
 			schemaConverter,
 		);
 
-		assert.deepEqual(empty, { description: "Success" });
-		assert.equal(json.description, "Error");
+		assert.deepEqual(empty, { description: "" });
+		assert.equal(json.description, "");
 		assert.equal(json.content?.["application/json"].schema.type, "object");
 	});
 
@@ -223,9 +223,51 @@ describe("OpenAPI operations", () => {
 		assert.equal(operation.operationId, "GET /todos");
 	});
 
+	it("applies explicit route OpenAPI options", () => {
+		const route: OpenApiRouteDeclaration = {
+			path: "/todos",
+			method: "GET",
+			openApi: {
+				summary: "List todos",
+				description: "Returns visible todos.",
+				operationId: "listTodos",
+				tags: ["Todos"],
+				deprecated: true,
+				security: [{ bearerAuth: [] }],
+				externalDocs: { url: "https://example.com/docs/todos" },
+				responseDescriptions: {
+					200: "Todos returned.",
+				},
+				extensions: {
+					"x-feature": "todos",
+				},
+			},
+			responses: {
+				200: z.array(z.object({ id: z.string() })),
+			},
+		};
+
+		const operation = createOperation(route, {
+			info: { title: "Todo API", version: "1.0.0" },
+			schemaConverter,
+		});
+
+		assert.equal(operation.summary, "List todos");
+		assert.equal(operation.description, "Returns visible todos.");
+		assert.equal(operation.operationId, "listTodos");
+		assert.deepEqual(operation.tags, ["Todos"]);
+		assert.equal(operation.deprecated, true);
+		assert.deepEqual(operation.security, [{ bearerAuth: [] }]);
+		assert.deepEqual(operation.externalDocs, {
+			url: "https://example.com/docs/todos",
+		});
+		assert.equal(operation.responses["200"].description, "Todos returned.");
+		assert.equal(operation["x-feature"], "todos");
+	});
+
 	it("omits explicit no-body responses after receiving the required converter", () => {
-		assert.deepEqual(createResponse("Success", noBody(), schemaConverter), {
-			description: "Success",
+		assert.deepEqual(createResponse("", noBody(), schemaConverter), {
+			description: "",
 		});
 	});
 });

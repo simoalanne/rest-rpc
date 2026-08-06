@@ -104,4 +104,70 @@ describe("normalizeContract", () => {
 			404: { name: "common not found" },
 		});
 	});
+
+	it("merges shared OpenAPI options with route OpenAPI options", () => {
+		const contract = normalizeContract(
+			{
+				todos: {
+					list: testRoute({
+						openApi: {
+							summary: "List todos",
+							tags: ["Todos", "Read"],
+							deprecated: false,
+							responseDescriptions: {
+								200: "Todos returned.",
+							},
+							extensions: {
+								"x-route": true,
+							},
+						},
+					}),
+					create: testRoute(),
+				},
+			},
+			{
+				commonOpenApi: {
+					tags: ["Todos"],
+					deprecated: true,
+					security: [{ bearerAuth: [] }],
+					responseDescriptions: {
+						200: "Success.",
+						401: "Authentication is required.",
+					},
+					extensions: {
+						"x-common": true,
+						"x-route": false,
+					},
+				},
+			},
+		);
+
+		assert.deepEqual(contract.todos.list.openApi, {
+			summary: "List todos",
+			tags: ["Todos", "Read"],
+			deprecated: false,
+			security: [{ bearerAuth: [] }],
+			responseDescriptions: {
+				200: "Todos returned.",
+				401: "Authentication is required.",
+			},
+			extensions: {
+				"x-common": true,
+				"x-route": true,
+			},
+		});
+		assert.deepEqual(contract.todos.create.openApi, {
+			tags: ["Todos"],
+			deprecated: true,
+			security: [{ bearerAuth: [] }],
+			responseDescriptions: {
+				200: "Success.",
+				401: "Authentication is required.",
+			},
+			extensions: {
+				"x-common": true,
+				"x-route": false,
+			},
+		});
+	});
 });

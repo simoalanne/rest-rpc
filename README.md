@@ -57,8 +57,9 @@ From that contract:
 - shared packages can expose path-based request and response helper types
 
 `router()` can also apply shared route fields across a contract tree. For
-example, `pathPrefix`, `metadata`, `commonResponses`, and `commonHeaders` are
-merged into each route before adapters and clients consume the contract.
+example, `pathPrefix`, `metadata`, `commonResponses`, `commonHeaders`, and
+`commonOpenApi` are merged into each route before adapters and clients consume
+the contract.
 
 ## Packages
 

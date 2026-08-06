@@ -73,6 +73,7 @@ Each HTTP route declaration can define:
 | `path` | HTTP path, with params using `:paramValue` syntax. |
 | `request` | Optional Standard Schema-compatible schemas for `body`, `query`, `params`, and `headers`. `body` can also use `customBody({ schema, contentType })` to model the whole request body as one value. |
 | `responses` | Required map of status codes to response schemas. At least one status must be 2xx. |
+| `openApi` | Optional OpenAPI operation hints such as `summary`, `description`, `operationId`, `tags`, `deprecated`, `security`, `externalDocs`, `responseDescriptions`, and `extensions`. |
 | `options` | Optional route behavior, currently `http` or `websocket`. HTTP routes are the default. |
 | `messages` | WebSocket client and server message schemas. |
 | `metadata` | Optional application metadata escape hatch. `router()` populates `{}` when omitted. |
@@ -123,10 +124,11 @@ export const apiContract = router({
 Async validation is not supported in API contracts. Schemas must return a
 Standard Schema result synchronously.
 
-Shared route fields can be passed as `router()` options and are shallow merged
-into every route. `pathPrefix` joins onto each route path, `metadata` merges
-with route metadata, `commonResponses` merges with HTTP route responses, and
-`commonHeaders` merges with request headers. Route fields win on key conflicts.
+Shared route fields can be passed as `router()` options and are merged into
+every route. `pathPrefix` joins onto each route path, `metadata` merges with
+route metadata, `commonResponses` merges with HTTP route responses,
+`commonHeaders` merges with request headers, and `commonOpenApi` merges with
+route OpenAPI hints. Route fields win on key conflicts.
 
 ```ts
 export const apiContract = router(
@@ -157,13 +159,20 @@ export const apiContract = router(
 				message: z.string(),
 			}),
 		},
+		commonOpenApi: {
+			tags: ["Todos"],
+			security: [{ bearerAuth: [] }],
+			responseDescriptions: {
+				401: "Authentication is required.",
+			},
+		},
 	},
 );
 ```
 
 `route()` is a single-route convenience helper. Its options are limited to
 processing controls like `validate` and `resolveRequestKeys`; put `path`,
-`metadata`, and `responses` directly on the route declaration.
+`metadata`, `openApi`, and `responses` directly on the route declaration.
 
 ## Responses
 
@@ -473,6 +482,12 @@ export const openApiDocument = createOpenApiDocument(apiContract, {
 Custom request bodies are included with their declared content type, and
 declared request headers are included as header parameters. WebSocket routes
 and routes with streaming responses are not included in the generated document.
+Operation fields are emitted from route `openApi` declarations and inherited
+`commonOpenApi` options; other OpenAPI customization can be added with
+`metadata` plus `transformOperation` or `transformDocument`.
+Use `openApi.responseDescriptions` to document response statuses. Each key must
+match a status declared in the route `responses` map after common responses are
+merged.
 
 Standard Schema defines validation, not JSON Schema conversion. OpenAPI
 generation requires a `schemaConverter` option so each project can use the

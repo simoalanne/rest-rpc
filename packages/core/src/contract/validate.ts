@@ -119,6 +119,21 @@ const assertPathParamsResolved = (route: RouteDeclaration) => {
 	}
 };
 
+const assertOpenApiResponseDescriptionsMatchResponses = (
+	route: RouteDeclaration,
+) => {
+	if (!route.responses || !route.openApi?.responseDescriptions) return;
+
+	const responseStatuses = new Set(Object.keys(route.responses));
+	for (const status of Object.keys(route.openApi.responseDescriptions)) {
+		if (responseStatuses.has(status)) continue;
+
+		throw new Error(
+			`Route declaration at path "${route.path}" has an OpenAPI response description for status ${status} without a matching response schema.`,
+		);
+	}
+};
+
 const requestSchemas = (request: RequestSchema) =>
 	[
 		[
@@ -146,6 +161,7 @@ const applyHeaderRequestKeys = (route: RouteDeclaration) => {
 };
 
 export const validateResolvedRequestKeys = (route: RouteDeclaration) => {
+	assertOpenApiResponseDescriptionsMatchResponses(route);
 	applyHeaderRequestKeys(route);
 	const keys = Object.keys(route.request?.requestKeys ?? {});
 	assertNoDuplicateKeys(route, keys);

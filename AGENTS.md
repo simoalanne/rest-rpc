@@ -16,3 +16,10 @@
 - `pnpm run lint` - Run Biome to fix formatting and import ordering automatically. Don't spend time manually fixing mechanical formatting/import issues. Focus on real typecheck/test failures instead that cannot be fixed deterministically.
 - `pnpm run test` - Run tests.
 - `pnpm run check` - Runs `lint`, `typecheck`, and `test` in sequence. Use this as the broad all-in-one pass.
+
+### Verification and reporting
+- Run the smallest useful verification for the change. Prefer package-scoped tests/typechecks when a change is limited to one package.
+- Do not run extra commands just to be ceremonially thorough. In particular, if `pnpm run lint` only applies Biome's safe formatting/import fixes after tests or typechecks have already passed, do not rerun tests or typechecks solely because of those safe fixes.
+- Run `pnpm run build:packages` after exported package API changes so dependent package declaration builds are refreshed. This is separate from formatting and does not imply that tests need to be rerun afterward.
+- Report command results that are relevant to the task or confidence in the change. Do not mention unrelated warnings, suggestions, or pre-existing issues unless they block the requested work, change the interpretation of verification, or require a user decision.
+- If a command produces both relevant failures and unrelated warnings, summarize only the relevant failure and say unrelated output was omitted if that avoids confusion.
