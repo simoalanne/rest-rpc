@@ -7,18 +7,17 @@ import type {
 	RouteDeclaration,
 } from "@contract-first-api/core/contract";
 import { REQUEST_CONTEXT_KEY } from "@contract-first-api/core/contract";
-import type { Request } from "express";
 
 export type EmptyObject = Record<never, never>;
 type MaybePromise<T> = T | Promise<T>;
 type Merge<T> = {
 	[K in keyof T]: T[K];
 };
-export type HttpRouteHandlerContext = {
-	req: Request;
-};
+export type HttpRouteHandlerContext = Record<string, unknown>;
 
-type RuntimeRouteHandler = (request: unknown) => unknown | Promise<unknown>;
+export type RuntimeRouteHandler = (
+	request: unknown,
+) => unknown | Promise<unknown>;
 type AnyImplementationTree = ImplementationTree<RouteDeclaration>;
 
 type RequestValue<E extends RouteDeclaration> =
@@ -29,15 +28,19 @@ type HandlerResult<E extends HttpRouteDeclaration> = MaybePromise<
 	| InferServerSuccessBody<E>
 >;
 
-export type InferRouteHandlerRequest<E extends HttpRouteDeclaration> = Merge<
-	RequestValue<E> & { [REQUEST_CONTEXT_KEY]: HttpRouteHandlerContext }
->;
+export type InferRouteHandlerRequest<
+	E extends HttpRouteDeclaration,
+	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
+> = Merge<RequestValue<E> & { [REQUEST_CONTEXT_KEY]: TContext }>;
 
 export type InferRouteHandlerResponse<E extends HttpRouteDeclaration> =
 	InferServerResponse<E>;
 
-export type RouteHandler<E extends HttpRouteDeclaration> = (
-	...args: [request: InferRouteHandlerRequest<E>]
+export type RouteHandler<
+	E extends HttpRouteDeclaration,
+	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
+> = (
+	...args: [request: InferRouteHandlerRequest<E, TContext>]
 ) => HandlerResult<E>;
 
 export type Contract<TRoute extends RouteDeclaration = HttpRouteDeclaration> =
@@ -68,14 +71,16 @@ export type ImplementationTreeFor<
 				: never;
 		};
 
-export type ImplementationShape<TNode extends Contract<HttpRouteDeclaration>> =
-	TNode extends HttpRouteDeclaration
-		? RouteHandler<TNode>
-		: {
-				[K in keyof TNode]: TNode[K] extends Contract<HttpRouteDeclaration>
-					? ImplementationShape<TNode[K]>
-					: never;
-			};
+export type ImplementationShape<
+	TNode extends Contract<HttpRouteDeclaration>,
+	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
+> = TNode extends HttpRouteDeclaration
+	? RouteHandler<TNode, TContext>
+	: {
+			[K in keyof TNode]: TNode[K] extends Contract<HttpRouteDeclaration>
+				? ImplementationShape<TNode[K], TContext>
+				: never;
+		};
 
 export const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
 	typeof value === "object" &&
@@ -289,18 +294,24 @@ const httpRouterBuilders = createRouterBuilders((route, routeName) => {
 	}
 }, "router");
 
-export const route = <const TNode extends HttpRouteDeclaration>(
+export const route = <
+	const TNode extends HttpRouteDeclaration,
+	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
+>(
 	contract: TNode,
-	handler: RouteHandler<TNode>,
+	handler: RouteHandler<TNode, TContext>,
 ): RouteImplementation<TNode> =>
 	httpRouterBuilders.route(
 		contract,
 		handler as RuntimeRouteHandler,
 	) as RouteImplementation<TNode>;
 
-export const router = <const TNode extends Contract<HttpRouteDeclaration>>(
+export const router = <
+	const TNode extends Contract<HttpRouteDeclaration>,
+	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
+>(
 	contract: TNode,
-	handlers: ImplementationShape<TNode>,
+	handlers: ImplementationShape<TNode, TContext>,
 ): ImplementationTreeFor<TNode, HttpRouteDeclaration> =>
 	httpRouterBuilders.router(contract, handlers) as ImplementationTreeFor<
 		TNode,

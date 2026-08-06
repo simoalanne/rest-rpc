@@ -1,20 +1,51 @@
 import { initClient } from "@contract-first-api/core";
 import { initReactQueryClient } from "@contract-first-api/react-query";
-import { apiContract } from "@example/shared";
+import { apiContract, healthContract, imageContract } from "@example/shared";
 import { QueryClient } from "@tanstack/react-query";
 
-const baseUrl = `${
+const expressBaseUrl = `${
+	(import.meta.env.VITE_EXPRESS_API_URL as string | undefined) ??
 	(import.meta.env.VITE_API_URL as string | undefined) ??
 	"http://localhost:3001"
 }`;
+const honoBaseUrl = `${
+	(import.meta.env.VITE_HONO_API_URL as string | undefined) ??
+	"http://localhost:3002"
+}`;
+
+const honoContract = {
+	...healthContract,
+	...imageContract,
+} as const;
 
 export const queryClient = new QueryClient();
 
-export const client = initClient(apiContract, {
-	baseUrl,
+const expressClient = initClient(apiContract, {
+	baseUrl: expressBaseUrl,
 });
 
-export const rqClient = initReactQueryClient(apiContract, {
-	queryClient,
-	baseUrl,
+const honoClient = initClient(honoContract, {
+	baseUrl: honoBaseUrl,
 });
+
+export const client = {
+	...expressClient,
+	health: honoClient.health,
+	images: honoClient.images,
+};
+
+const expressRqClient = initReactQueryClient(apiContract, {
+	queryClient,
+	baseUrl: expressBaseUrl,
+});
+
+const honoRqClient = initReactQueryClient(honoContract, {
+	queryClient,
+	baseUrl: honoBaseUrl,
+});
+
+export const rqClient = {
+	...expressRqClient,
+	health: honoRqClient.health,
+	images: honoRqClient.images,
+};

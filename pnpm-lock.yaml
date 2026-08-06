@@ -26,12 +26,18 @@ importers:
       '@contract-first-api/express':
         specifier: workspace:*
         version: link:../../packages/express
+      '@contract-first-api/hono':
+        specifier: workspace:*
+        version: link:../../packages/hono
       '@example/shared':
         specifier: workspace:*
         version: link:../shared
       express:
         specifier: ^5.1.0
         version: 5.2.1
+      hono:
+        specifier: ^4.13.0
+        version: 4.13.0
       ws:
         specifier: ^8.21.0
         version: 8.21.0
@@ -131,6 +137,18 @@ importers:
       zod:
         specifier: ^4.3.6
         version: 4.3.6
+
+  packages/hono:
+    dependencies:
+      '@contract-first-api/core':
+        specifier: workspace:^
+        version: link:../core
+      '@contract-first-api/express':
+        specifier: workspace:^
+        version: link:../express
+      hono:
+        specifier: ^4.0.0
+        version: 4.13.0
 
   packages/react-query:
     dependencies:
@@ -1001,6 +1019,10 @@ packages:
   hasown@2.0.4:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
+
+  hono@4.13.0:
+    resolution: {integrity: sha512-jhunvfHWxd7J5EFfSgH4xsYJzSe/lfqbUCxiyyeaQasUsXeEHXtzVid+7EOGByc5JnFa23SSFL3Y2RV/z1T+eQ==}
+    engines: {node: '>=16.9.0'}
 
   hosted-git-info@2.8.9:
     resolution: {integrity: sha512-mxIDAb9Lsm6DoOJ7xH+5+X4y1LU/4Hi50L9C5sIswK3JzULS4bwk1FvjdBgvYR4bzT4tuUQiC15FE2f5HbLvYw==}
@@ -2412,6 +2434,8 @@ snapshots:
   hasown@2.0.4:
     dependencies:
       function-bind: 1.1.2
+
+  hono@4.13.0: {}
 
   hosted-git-info@2.8.9: {}
 

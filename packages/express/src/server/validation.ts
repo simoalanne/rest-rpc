@@ -11,7 +11,7 @@ export type ValidationResult =
 	| { success: true; data: Record<string, unknown> }
 	| { success: false; errors: ValidationIssue[] };
 
-type RequestSegments = {
+export type RequestSegments = {
 	body?: unknown;
 	query?: unknown;
 	params?: unknown;
