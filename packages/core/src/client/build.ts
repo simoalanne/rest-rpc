@@ -1,6 +1,6 @@
 import type {
 	Contract,
-	InferRouteSuccessBody,
+	InferClientSuccessBody,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
 } from "../contract/route.ts";
@@ -9,7 +9,7 @@ import { hasSingleSuccessfulResponse, isWebSocketRouteNode } from "./routes.ts";
 import type {
 	ApiClientFor,
 	FetchArgs,
-	InferRouteClientResponse,
+	InferClientFetchResponse,
 	InferRouteClientSocket,
 	OpenConnectionArgs,
 } from "./types.ts";
@@ -18,11 +18,11 @@ export type ApiClientRouteHandlers = {
 	fetchResponse: <E extends RouteDeclaration>(
 		route: E,
 		...args: FetchArgs<E>
-	) => Promise<InferRouteClientResponse<E>>;
+	) => Promise<InferClientFetchResponse<E>>;
 	fetch: <E extends RouteDeclaration>(
 		route: E,
 		...args: FetchArgs<E>
-	) => Promise<InferRouteSuccessBody<E>>;
+	) => Promise<InferClientSuccessBody<E>>;
 	openConnection: <E extends WebSocketRouteDeclaration>(
 		route: E,
 		...args: OpenConnectionArgs<E>

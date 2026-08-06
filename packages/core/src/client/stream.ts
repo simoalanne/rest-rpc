@@ -4,6 +4,7 @@ import { validateStandardSchemaSync } from "../standard-schema/index.ts";
 export async function* parseNdjsonStream(
 	response: StreamBody,
 	body: ReadableStream<Uint8Array>,
+	validate: boolean,
 ): AsyncIterable<unknown> {
 	const reader = body.getReader();
 	const decoder = new TextDecoder();
@@ -20,10 +21,12 @@ export async function* parseNdjsonStream(
 
 			for (const line of lines) {
 				if (!line.trim()) continue;
-				const result = validateStandardSchemaSync(
-					response.schema,
-					JSON.parse(line),
-				);
+				const value = JSON.parse(line);
+				if (!validate) {
+					yield value;
+					continue;
+				}
+				const result = validateStandardSchemaSync(response.schema, value);
 				if (result.issues) throw result.issues;
 				yield result.value;
 			}
@@ -31,10 +34,12 @@ export async function* parseNdjsonStream(
 
 		buffer += decoder.decode();
 		if (buffer.trim()) {
-			const result = validateStandardSchemaSync(
-				response.schema,
-				JSON.parse(buffer),
-			);
+			const value = JSON.parse(buffer);
+			if (!validate) {
+				yield value;
+				return;
+			}
+			const result = validateStandardSchemaSync(response.schema, value);
 			if (result.issues) throw result.issues;
 			yield result.value;
 		}

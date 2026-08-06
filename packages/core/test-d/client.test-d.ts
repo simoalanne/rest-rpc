@@ -1,5 +1,5 @@
 import {
-	type InferRouteClientRequestInput,
+	type InferClientRequestInput,
 	initClient,
 	router,
 	type as schemaType,
@@ -53,6 +53,24 @@ const api = router({
 				201: todoSchema,
 			},
 		},
+		transform: {
+			method: "POST",
+			path: "/todos/:id/transform",
+			request: {
+				params: z.object({ id: z.string() }).transform(({ id }) => ({
+					id: Number(id),
+				})),
+				body: z.object({ title: z.string() }).transform(({ title }) => ({
+					title: title.trim(),
+					slug: title.toLowerCase(),
+				})),
+			},
+			responses: {
+				200: z.object({ id: z.number() }).transform(({ id }) => ({
+					id: String(id),
+				})),
+			},
+		},
 	},
 });
 
@@ -70,6 +88,17 @@ expectType<Promise<{ id: string; title: string }>>(
 expectType<Promise<{ id: string; title: string }>>(
 	client.todos.create.fetch({ title: "Write type tests" }),
 );
+expectType<Promise<{ id: string }>>(
+	client.todos.transform.fetch({ id: "1", title: "Write type tests" }),
+);
+expectError(client.todos.transform.fetch({ id: 1, title: "wrong id input" }));
+expectError(
+	client.todos.transform.fetch({
+		id: "1",
+		title: "Write type tests",
+		slug: "server-output-only",
+	}),
+);
 
 // Routes with request input require that flattened input object.
 expectError(client.todos.get.fetch());
@@ -77,5 +106,5 @@ expectError(client.todos.get.fetch({ title: "wrong segment" }));
 // Routes without request input treat the first argument as fetch options.
 expectError(client.todos.list.fetch({ id: "todo-1" }));
 
-type CreateTodoInput = InferRouteClientRequestInput<typeof api.todos.create>;
+type CreateTodoInput = InferClientRequestInput<typeof api.todos.create>;
 expectType<{ title: string }>(null as unknown as CreateTodoInput);

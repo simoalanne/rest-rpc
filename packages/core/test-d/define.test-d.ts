@@ -1,8 +1,11 @@
 import {
-	type InferRouteErrors,
-	type InferRouteRequest,
-	type InferRouteResponse,
-	type InferRouteSuccessBody,
+	type InferClientErrors,
+	type InferClientRequest,
+	type InferClientResponse,
+	type InferClientSuccessBody,
+	type InferServerRequest,
+	type InferServerResponse,
+	type InferServerSuccessBody,
 	noBody,
 	route,
 	router,
@@ -52,25 +55,25 @@ const api = router({
 expectType<"/todos/:id">(api.todos.get.path);
 expectType<"optional">(api.todos.get.metadata.auth);
 
-type GetTodoRequest = InferRouteRequest<typeof api.todos.get>;
+type GetTodoRequest = InferServerRequest<typeof api.todos.get>;
 declare const getTodoRequest: GetTodoRequest;
 expectType<string>(getTodoRequest.id);
 expectType<boolean | undefined>(getTodoRequest.includeDone);
 
-type GetTodoResponse = InferRouteResponse<typeof api.todos.get>;
+type GetTodoResponse = InferClientResponse<typeof api.todos.get>;
 declare const getTodoResponse: GetTodoResponse;
 expectType<200 | 404>(getTodoResponse.status);
 expectType<{ id: string; title: string } | { message: string }>(
 	getTodoResponse.body,
 );
 
-type GetTodoErrors = InferRouteErrors<typeof api.todos.get>;
+type GetTodoErrors = InferClientErrors<typeof api.todos.get>;
 declare const getTodoError: GetTodoErrors;
 expectType<404>(getTodoError.status);
 expectType<{ message: string }>(getTodoError.body);
 
 expectType<{ id: string; title: string }>(
-	null as unknown as InferRouteSuccessBody<typeof api.todos.get>,
+	null as unknown as InferClientSuccessBody<typeof api.todos.get>,
 );
 
 const typeOnlyResponse = route({
@@ -82,7 +85,7 @@ const typeOnlyResponse = route({
 });
 
 expectType<{ id: string; tags: string[] }>(
-	null as unknown as InferRouteSuccessBody<typeof typeOnlyResponse>,
+	null as unknown as InferClientSuccessBody<typeof typeOnlyResponse>,
 );
 
 const prefixed = router(
@@ -157,7 +160,7 @@ const commonSuccess = router(
 
 // Common responses participate in the same response inference as route responses.
 expectType<200 | 404>(
-	null as unknown as InferRouteResponse<
+	null as unknown as InferClientResponse<
 		typeof commonSuccess.todos.get
 	>["status"],
 );
@@ -190,7 +193,7 @@ const headerMerged = router(
 	},
 );
 
-type HeaderMergedRequest = InferRouteRequest<typeof headerMerged.todos.list>;
+type HeaderMergedRequest = InferServerRequest<typeof headerMerged.todos.list>;
 declare const headerMergedRequest: HeaderMergedRequest;
 expectType<string>(headerMergedRequest.search);
 expectType<number>(headerMergedRequest["x-common"]);
@@ -218,7 +221,7 @@ const objectUnionRequest = route({
 	},
 });
 
-type ObjectUnionRequest = InferRouteRequest<typeof objectUnionRequest>;
+type ObjectUnionRequest = InferServerRequest<typeof objectUnionRequest>;
 expectAssignable<ObjectUnionRequest>({ q: "todos" });
 expectAssignable<ObjectUnionRequest>({ page: 1 });
 
@@ -246,7 +249,7 @@ const schemaRecordRequest = route({
 	},
 });
 
-type SchemaRecordRequest = InferRouteRequest<typeof schemaRecordRequest>;
+type SchemaRecordRequest = InferServerRequest<typeof schemaRecordRequest>;
 declare const schemaRecordRequestInput: SchemaRecordRequest;
 expectType<string>(schemaRecordRequestInput.id);
 expectType<string>(schemaRecordRequestInput.title);
@@ -259,6 +262,53 @@ expectAssignable<SchemaRecordRequest>({
 	title: "Typed todo",
 	"x-request-id": "req-1",
 });
+
+const transformed = route({
+	method: "POST",
+	path: "/transformed/:id",
+	request: {
+		params: z.object({ id: z.string() }).transform(({ id }) => ({
+			id: Number(id),
+		})),
+		body: z.object({ title: z.string() }).transform(({ title }) => ({
+			title: title.trim(),
+			slug: title.toLowerCase(),
+		})),
+	},
+	responses: {
+		200: z.object({ id: z.number() }).transform(({ id }) => ({
+			id: String(id),
+		})),
+	},
+});
+
+type TransformedClientRequest = InferClientRequest<typeof transformed>;
+declare const transformedClientRequest: TransformedClientRequest;
+expectType<string>(transformedClientRequest.id);
+expectType<string>(transformedClientRequest.title);
+expectError(transformedClientRequest.slug);
+
+type TransformedServerRequest = InferServerRequest<typeof transformed>;
+declare const transformedServerRequest: TransformedServerRequest;
+expectType<number>(transformedServerRequest.id);
+expectType<string>(transformedServerRequest.title);
+expectType<string>(transformedServerRequest.slug);
+
+type TransformedServerResponse = InferServerResponse<typeof transformed>;
+declare const transformedServerResponse: TransformedServerResponse;
+expectType<200>(transformedServerResponse.status);
+expectType<{ id: number }>(transformedServerResponse.body);
+
+type TransformedClientResponse = InferClientResponse<typeof transformed>;
+declare const transformedClientResponse: TransformedClientResponse;
+expectType<200>(transformedClientResponse.status);
+expectType<{ id: string }>(transformedClientResponse.body);
+expectType<{ id: number }>(
+	null as unknown as InferServerSuccessBody<typeof transformed>,
+);
+expectType<{ id: string }>(
+	null as unknown as InferClientSuccessBody<typeof transformed>,
+);
 
 expectError(
 	route({

@@ -76,10 +76,22 @@ describe("ApiClient responses", () => {
 		assert.equal(emptyResponse.body, undefined);
 	});
 
-	it("validates declared response bodies through Standard Schema", async () => {
+	it("trusts declared response bodies by default", async () => {
 		captureFetch(jsonResponse({ id: 123 }, 201));
 		const client = initClient(createClientTestContract(), {
 			baseUrl: "https://api.test",
+		});
+
+		const response = await client.todos.create.fetch({ title: "Buy milk" });
+
+		assert.deepEqual(response, { id: 123 });
+	});
+
+	it("validates declared response bodies when configured", async () => {
+		captureFetch(jsonResponse({ id: 123 }, 201));
+		const client = initClient(createClientTestContract(), {
+			baseUrl: "https://api.test",
+			validateResponses: true,
 		});
 
 		await assert.rejects(() =>

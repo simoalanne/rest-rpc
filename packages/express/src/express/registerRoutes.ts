@@ -20,11 +20,7 @@ import {
 import { validateRequestSegments } from "../server/validation.ts";
 import { writeStreamResponse } from "./response.ts";
 
-type RuntimeValidation = "incoming" | "incoming-and-outgoing";
-
-export type RegisterRoutesOptions = {
-	validation?: RuntimeValidation;
-};
+export type RegisterRoutesOptions = Record<never, never>;
 
 const validateOutgoingResponse = (
 	schema: ResponseBodySchema | undefined,
@@ -35,19 +31,19 @@ const validateOutgoingResponse = (
 		isEmptyResponseSchema(schema) ||
 		isStreamingResponseSchema(schema)
 	) {
-		return;
+		return body;
 	}
 
 	const validation = validateStandardSchemaSync(schema, body);
 	if (validation.issues) throw validation.issues;
+	return validation.value;
 };
 
 export const registerRoutes = (
 	app: Application,
 	implementations: ImplementationTree,
-	options: RegisterRoutesOptions = {},
+	_options: RegisterRoutesOptions = {},
 ) => {
-	const validationMode = options.validation ?? "incoming";
 	const routes = sortImplementations(
 		flattenImplementationTree(implementations),
 	);
@@ -93,20 +89,13 @@ export const registerRoutes = (
 				}
 
 				if (schema && isStreamingResponseSchema(schema)) {
-					await writeStreamResponse(
-						result.body,
-						res,
-						result.status,
-						validationMode === "incoming-and-outgoing" ? schema : undefined,
-					);
+					await writeStreamResponse(result.body, res, result.status, schema);
 					return;
 				}
 
-				if (validationMode === "incoming-and-outgoing") {
-					validateOutgoingResponse(schema, result.body);
-				}
-
-				res.status(result.status).json(result.body);
+				res
+					.status(result.status)
+					.json(validateOutgoingResponse(schema, result.body));
 			} catch (error) {
 				if (error instanceof ContractResponseError) {
 					const schema = getResponseSchema(route, error.status);
@@ -115,11 +104,9 @@ export const registerRoutes = (
 						return;
 					}
 
-					if (validationMode === "incoming-and-outgoing") {
-						validateOutgoingResponse(schema, error.body);
-					}
-
-					res.status(error.status).json(error.body);
+					res
+						.status(error.status)
+						.json(validateOutgoingResponse(schema, error.body));
 					return;
 				}
 

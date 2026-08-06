@@ -347,21 +347,16 @@ const api = initClient(apiContract, {
 		Authorization: `Bearer ${getAuthToken()}`,
 	}),
 	timeoutMs: 10_000,
-	validation: "incoming",
 });
 ```
 
-Runtime validation defaults to `"incoming"` for performance. The client
-validates declared HTTP responses, stream chunks, and WebSocket messages
-received from the server before delivery. It stringifies declared request
-header values and sends them after `getHeaders()`, so declared request headers
-win on conflicts. Set
-`validation: "incoming-and-outgoing"` when you also want to validate the
-client's own HTTP requests and WebSocket messages before sending them. This is
-useful in development, tests, and high-safety integration boundaries where
-catching local contract drift matters more than avoiding the extra validation
-work. There is no disabled validation mode because incoming validation is the
-runtime contract boundary.
+The client serializes typed request input and parses declared server responses
+as the contract's response output type. It stringifies declared request header
+values and sends them after `getHeaders()`, so declared request headers win on
+conflicts. Response validation is normally enforced on the server before data is
+sent; set `validateResponses: true` when you want the client to additionally
+validate declared HTTP responses, stream chunks, and WebSocket messages received
+from the server.
 
 Every HTTP route declaration exposes `fetchResponse()`, which returns either a
 declared response envelope or an undeclared response. Envelope consists of `status`, `body`, and `headers`.
@@ -394,54 +389,51 @@ function, file, package, or module boundary.
 
 ```ts
 import type {
-	InferRouteClientReceivedMessage,
-	InferRouteClientRequest,
-	InferRouteClientResponse,
-	InferRouteClientSendMessage,
-	InferRouteErrors,
-	InferRouteRequest,
-	InferRouteResponse,
-	InferRouteSuccessBody,
+	InferClientErrors,
+	InferClientRequest,
+	InferClientResponse,
+	InferClientSuccessBody,
+	InferServerRequest,
+	InferServerResponse,
+	InferServerSuccessBody,
 } from "@contract-first-api/core";
 import { apiContract } from "./contract";
 
-export type CreateTodoRequest = InferRouteRequest<
+export type CreateTodoClientRequest = InferClientRequest<
 	typeof apiContract.todos.create
 >;
 
-export type CreateTodoResponse = InferRouteResponse<
+export type CreateTodoServerRequest = InferServerRequest<
 	typeof apiContract.todos.create
 >;
 
-export type CreateTodoErrors = InferRouteErrors<
+export type CreateTodoClientResponse = InferClientResponse<
 	typeof apiContract.todos.create
 >;
 
-export type TodoListBody = InferRouteSuccessBody<
+export type CreateTodoServerResponse = InferServerResponse<
+	typeof apiContract.todos.create
+>;
+
+export type CreateTodoErrors = InferClientErrors<
+	typeof apiContract.todos.create
+>;
+
+export type TodoListClientBody = InferClientSuccessBody<
 	typeof apiContract.todos.list
 >;
 
-export type UploadImageRequest = InferRouteClientRequest<
-	typeof apiContract.images.inspect
->;
-
-export type FindTodosClientResponse = InferRouteClientResponse<
-	typeof apiContract.todos.find
->;
-
-export type DiscussClientMessage = InferRouteClientSendMessage<
-	typeof apiContract.discuss.connect
->;
-
-export type DiscussServerMessage = InferRouteClientReceivedMessage<
-	typeof apiContract.discuss.connect
+export type TodoListServerBody = InferServerSuccessBody<
+	typeof apiContract.todos.list
 >;
 ```
 
-`InferRouteRequest` is the flattened contract request shape. Custom request
-bodies are exposed as a single `body` field.
-`InferRouteResponse` is the declared `{ status, body }` response union, and
-`InferRouteErrors` is the declared non-2xx response union.
+`InferClientRequest` is the flattened request input shape passed to the client.
+`InferServerRequest` is the flattened validated request output received by
+server handlers. `InferServerResponse` is the declared `{ status, body }`
+response input shape returned by handlers, while `InferClientResponse` is the
+declared response output shape received by clients. Custom request bodies are
+exposed as a single `body` field.
 
 ## OpenAPI Documents
 

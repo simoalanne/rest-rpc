@@ -8,11 +8,7 @@ import { validateRequestSegments } from "../server/validation.ts";
 import type { WebSocketImplementationTree } from "./route.ts";
 import { createRouteWebSocket } from "./socket.ts";
 
-type RuntimeValidation = "incoming" | "incoming-and-outgoing";
-
-export type RegisterWebSocketRoutesOptions = {
-	validation?: RuntimeValidation;
-};
+export type RegisterWebSocketRoutesOptions = Record<never, never>;
 
 const sendUpgradeError = (
 	socket: Duplex,
@@ -48,9 +44,8 @@ const runWebSocketHandler = (
 export const registerWebSocketRoutes = (
 	server: HttpServer,
 	implementations: WebSocketImplementationTree,
-	options: RegisterWebSocketRoutesOptions = {},
+	_options: RegisterWebSocketRoutesOptions = {},
 ) => {
-	const validationMode = options.validation ?? "incoming";
 	const routes = flattenWebSocketImplementationTree(implementations);
 	if (routes.length === 0) return;
 
@@ -83,9 +78,7 @@ export const registerWebSocketRoutes = (
 		}
 
 		webSocketServer.handleUpgrade(req, socket, head, (rawSocket) => {
-			const routeSocket = createRouteWebSocket(rawSocket, matchedRoute.route, {
-				validation: validationMode,
-			});
+			const routeSocket = createRouteWebSocket(rawSocket, matchedRoute.route);
 			runWebSocketHandler(
 				matchedRoute.handler,
 				{

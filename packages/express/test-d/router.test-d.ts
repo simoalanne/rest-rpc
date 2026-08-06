@@ -25,6 +25,24 @@ const api = defineRouter({
 				201: todoSchema,
 			},
 		},
+		transform: {
+			method: "POST",
+			path: "/todos/:id/transform",
+			request: {
+				params: z.object({ id: z.string() }).transform(({ id }) => ({
+					id: Number(id),
+				})),
+				body: z.object({ title: z.string() }).transform(({ title }) => ({
+					title: title.trim(),
+					slug: title.toLowerCase(),
+				})),
+			},
+			responses: {
+				200: z.object({ id: z.number() }).transform(({ id }) => ({
+					id: String(id),
+				})),
+			},
+		},
 	},
 });
 
@@ -48,11 +66,39 @@ const createImplementation = route(api.todos.create, ({ title, context }) => {
 
 expectType<typeof api.todos.create>(createImplementation.route);
 
+route(api.todos.transform, ({ id, title, slug }) => {
+	expectType<number>(id);
+	expectType<string>(title);
+	expectType<string>(slug);
+
+	return {
+		status: 200 as const,
+		body: {
+			id: 1,
+		},
+	};
+});
+
+expectError(
+	route(api.todos.transform, () => ({
+		status: 200 as const,
+		body: {
+			id: "client-output-shape",
+		},
+	})),
+);
+
 const implementations = router(api, {
 	todos: {
 		create: ({ title }) => ({
 			id: "todo-1",
 			title,
+		}),
+		transform: ({ id }) => ({
+			status: 200 as const,
+			body: {
+				id,
+			},
 		}),
 	},
 });

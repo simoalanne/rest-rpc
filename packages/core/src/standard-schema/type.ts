@@ -2,7 +2,7 @@ import type { StandardSchemaV1 } from "./index.ts";
 
 const TYPE_ONLY_SCHEMA_VENDOR = "contract-first-api";
 
-export const type = <T>(): StandardSchemaV1<unknown, T> => ({
+export const type = <T>(): StandardSchemaV1<T, T> => ({
 	"~standard": {
 		version: 1,
 		vendor: TYPE_ONLY_SCHEMA_VENDOR,

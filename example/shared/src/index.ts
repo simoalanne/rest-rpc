@@ -1,11 +1,11 @@
 import type {
-	InferRouteClientMessage,
-	InferRouteErrors,
-	InferRouteRequest,
-	InferRouteResponse,
-	InferRouteServerMessage,
-	InferRouteSuccessBody,
-	InferRouteSuccessResponse,
+	InferClientErrors,
+	InferClientMessage,
+	InferClientRequest,
+	InferClientResponse,
+	InferClientSuccessBody,
+	InferClientSuccessResponse,
+	InferServerMessage,
 } from "@contract-first-api/core";
 import { customBody, router, streamBody } from "@contract-first-api/core";
 import { type } from "arktype";
@@ -178,35 +178,37 @@ export const apiContract = {
 router(apiContract, { pathPrefix: "/api" });
 
 export type ExampleContract = typeof apiContract;
-export type HealthResponse = InferRouteResponse<typeof apiContract.health.get>;
-export type HealthSuccessResponse = InferRouteSuccessResponse<
+export type HealthResponse = InferClientResponse<typeof apiContract.health.get>;
+export type HealthSuccessResponse = InferClientSuccessResponse<
 	typeof apiContract.health.get
 >;
-export type ListTodosResponse = InferRouteResponse<
+export type ListTodosResponse = InferClientResponse<
 	typeof apiContract.todos.list
 >;
-export type ListTodosBody = InferRouteSuccessBody<
+export type ListTodosBody = InferClientSuccessBody<
 	typeof apiContract.todos.list
 >;
-export type CreateTodoRequest = InferRouteRequest<
+export type CreateTodoRequest = InferClientRequest<
 	typeof apiContract.todos.create
 >;
-export type CreateTodoErrors = InferRouteErrors<
+export type CreateTodoErrors = InferClientErrors<
 	typeof apiContract.todos.create
 >;
 export type Todo = z.infer<typeof todoSchema>;
 export type TodoEvent = z.infer<typeof todoEventSchema>;
-export type FindTodosRequest = InferRouteRequest<typeof apiContract.todos.find>;
-export type FindTodosResponse = InferRouteResponse<
+export type FindTodosRequest = InferClientRequest<
+	typeof apiContract.todos.find
+>;
+export type FindTodosResponse = InferClientResponse<
 	typeof apiContract.todos.find
 >;
 export type DiscussMessage = z.infer<typeof discussMessageSchema>;
-export type DiscussClientMessage = InferRouteClientMessage<
+export type DiscussClientMessage = InferClientMessage<
 	typeof apiContract.discuss.connect
 >;
-export type DiscussServerMessage = InferRouteServerMessage<
+export type DiscussServerMessage = InferServerMessage<
 	typeof apiContract.discuss.connect
 >;
-export type InspectImageResponse = InferRouteResponse<
+export type InspectImageResponse = InferClientResponse<
 	typeof apiContract.images.inspect
 >;

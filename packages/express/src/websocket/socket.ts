@@ -1,17 +1,17 @@
 import { validateStandardSchemaSync } from "@contract-first-api/core";
 import type {
-	InferRouteClientMessage,
-	InferRouteServerMessage,
+	InferReceivedClientMessage,
+	InferServerMessage,
 	WebSocketRouteDeclaration,
 } from "@contract-first-api/core/contract";
 import type WebSocket from "ws";
 
 export type InferRouteServerReceivedMessage<
 	E extends WebSocketRouteDeclaration,
-> = InferRouteClientMessage<E>;
+> = InferReceivedClientMessage<E>;
 
 export type InferRouteServerSendMessage<E extends WebSocketRouteDeclaration> =
-	InferRouteServerMessage<E>;
+	InferServerMessage<E>;
 
 export type InferRouteServerSocket<E extends WebSocketRouteDeclaration> = Omit<
 	WebSocket,
@@ -24,21 +24,16 @@ export type InferRouteServerSocket<E extends WebSocketRouteDeclaration> = Omit<
 	onClose: (callback: (code: number, reason: Buffer) => void) => () => void;
 };
 
-type RuntimeValidation = "incoming" | "incoming-and-outgoing";
-
-export type RouteWebSocketOptions = {
-	validation: RuntimeValidation;
-};
-
 export const createRouteWebSocket = <E extends WebSocketRouteDeclaration>(
 	socket: WebSocket,
 	route: E,
-	options: RouteWebSocketOptions,
 ): InferRouteServerSocket<E> => {
 	const rawSend = socket.send.bind(socket);
 	const routeSocket = socket as unknown as InferRouteServerSocket<E>;
 
-	const parseIncomingMessage = (data: unknown): InferRouteClientMessage<E> => {
+	const parseIncomingMessage = (
+		data: unknown,
+	): InferReceivedClientMessage<E> => {
 		try {
 			const result = validateStandardSchemaSync(
 				route.messages.client,
@@ -46,7 +41,7 @@ export const createRouteWebSocket = <E extends WebSocketRouteDeclaration>(
 			);
 			if (result.issues) throw result.issues;
 
-			return result.value as InferRouteClientMessage<E>;
+			return result.value as InferReceivedClientMessage<E>;
 		} catch {
 			socket.close(1007, "Invalid WebSocket message.");
 			throw new Error("Invalid WebSocket message.");
@@ -54,17 +49,15 @@ export const createRouteWebSocket = <E extends WebSocketRouteDeclaration>(
 	};
 
 	routeSocket.send = (message: InferRouteServerSendMessage<E>) => {
-		if (options.validation === "incoming-and-outgoing") {
-			const result = validateStandardSchemaSync(route.messages.server, message);
-			if (result.issues) throw result.issues;
-		}
+		const result = validateStandardSchemaSync(route.messages.server, message);
+		if (result.issues) throw result.issues;
 
-		rawSend(JSON.stringify(message));
+		rawSend(JSON.stringify(result.value));
 	};
 
 	routeSocket.onMessage = (callback) => {
 		const onMessage = (data: WebSocket.RawData) => {
-			let message: InferRouteClientMessage<E>;
+			let message: InferReceivedClientMessage<E>;
 			try {
 				message = parseIncomingMessage(data);
 			} catch {

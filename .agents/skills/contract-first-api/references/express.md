@@ -172,6 +172,8 @@ const authMiddleware: express.RequestHandler = (req, res, next) => {
 
 Streaming responses are declared with `streamBody(schema)`. Service handlers return
 the async iterable body directly when the contract has one successful status.
+Each chunk is validated before it is sent, and the validated output value is
+written to the response stream.
 
 ```ts
 const implementations = router(contract.todos, {
@@ -184,6 +186,9 @@ const implementations = router(contract.todos, {
 ## WebSocket Services
 
 WebSocket services receive a typed socket instead of returning a response.
+Incoming client messages are validated before `onMessage` callbacks receive
+them. Messages sent with `context.socket.send()` are validated before they are
+written to the socket.
 
 ```ts
 const implementations = webSocketRouter(contract.chat, {

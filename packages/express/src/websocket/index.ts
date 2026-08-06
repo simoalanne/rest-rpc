@@ -10,5 +10,4 @@ export type {
 	InferRouteServerReceivedMessage,
 	InferRouteServerSendMessage,
 	InferRouteServerSocket,
-	RouteWebSocketOptions,
 } from "./socket.ts";

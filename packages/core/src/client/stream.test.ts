@@ -38,10 +38,25 @@ describe("ApiClient streams", () => {
 		assert.deepEqual(events, [{ id: "one" }, { id: "two" }, { id: "three" }]);
 	});
 
-	it("validates streamed items", async () => {
+	it("trusts streamed items by default", async () => {
 		globalThis.fetch = async () => ndjsonResponse(['{"id":123}\n']);
 		const client = initClient(createClientTestContract(), {
 			baseUrl: "https://api.test",
+		});
+
+		const events = await client.events.stream.fetch();
+		const parsed = [];
+
+		for await (const event of events) parsed.push(event);
+
+		assert.deepEqual(parsed, [{ id: 123 }]);
+	});
+
+	it("validates streamed items when configured", async () => {
+		globalThis.fetch = async () => ndjsonResponse(['{"id":123}\n']);
+		const client = initClient(createClientTestContract(), {
+			baseUrl: "https://api.test",
+			validateResponses: true,
 		});
 
 		const events = await client.events.stream.fetch();

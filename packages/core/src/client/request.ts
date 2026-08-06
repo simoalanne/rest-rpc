@@ -1,16 +1,12 @@
 import type { RouteDeclaration } from "../contract/route.ts";
 import { isCustomBody, isNoBody } from "../contract/route.ts";
-import {
-	groupRequestInput,
-	validateFlatRequestInput,
-} from "../contract/validate.ts";
+import { groupRequestInput } from "../contract/validate.ts";
 import type {
 	ApiClientFetchOptions,
 	FetchArgs,
 	FetchOptions,
 	GetHeadersFn,
 	RuntimeArgs,
-	RuntimeValidation,
 } from "./types.ts";
 
 export const createRequestSignal = (
@@ -68,7 +64,6 @@ export const constructBaseRequest = (
 	route: RouteDeclaration,
 	args: RuntimeArgs | undefined,
 	unknownRequestKeys: "throw" | "strip",
-	validation: RuntimeValidation,
 ): {
 	url: string;
 	body?: BodyInit | null;
@@ -78,21 +73,7 @@ export const constructBaseRequest = (
 	let urlBase = `${baseUrl}${route.path}`;
 	if (!args) return { url: urlBase };
 
-	let requestInput = args;
-
-	if (validation === "incoming-and-outgoing") {
-		if (unknownRequestKeys === "throw") {
-			groupRequestInput(route, args, { unknownRequestKeys });
-		}
-		const validationResult = validateFlatRequestInput(route, args);
-		if (!validationResult.success) throw validationResult.errors;
-		requestInput = validationResult.data as RuntimeArgs;
-	}
-
-	const request = groupRequestInput(route, requestInput, {
-		unknownRequestKeys:
-			validation === "incoming-and-outgoing" ? "strip" : unknownRequestKeys,
-	});
+	const request = groupRequestInput(route, args, { unknownRequestKeys });
 	const { body, query, params, headers } = request;
 
 	if (params) {
@@ -144,7 +125,6 @@ export type ExecuteRequestOptions = {
 	getHeaders?: GetHeadersFn;
 	timeoutMs?: number;
 	unknownRequestKeys: "throw" | "strip";
-	validation: RuntimeValidation;
 };
 
 export const executeRequest = async <E extends RouteDeclaration>(
@@ -163,7 +143,6 @@ export const executeRequest = async <E extends RouteDeclaration>(
 		route,
 		requestArgs as RuntimeArgs,
 		options.unknownRequestKeys,
-		options.validation,
 	);
 
 	const signalState = createRequestSignal(

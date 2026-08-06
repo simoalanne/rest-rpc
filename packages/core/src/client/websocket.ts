@@ -1,6 +1,6 @@
 import type {
-	InferRouteClientMessage,
-	InferRouteServerMessage,
+	InferClientMessage,
+	InferReceivedServerMessage,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
 } from "../contract/route.ts";
@@ -10,7 +10,6 @@ import type {
 	InferRouteClientSocket,
 	OpenConnectionArgs,
 	RuntimeArgs,
-	RuntimeValidation,
 } from "./types.ts";
 
 export const buildWebSocketUrl = (url: string) => {
@@ -21,7 +20,7 @@ export const buildWebSocketUrl = (url: string) => {
 export type WebSocketConnectionOptions = {
 	baseUrl: string;
 	unknownRequestKeys: "throw" | "strip";
-	validation: RuntimeValidation;
+	validateIncomingMessages: boolean;
 };
 
 export const openConnection = <E extends WebSocketRouteDeclaration>(
@@ -39,35 +38,32 @@ export const openConnection = <E extends WebSocketRouteDeclaration>(
 		route,
 		requestArgs as RuntimeArgs | undefined,
 		options.unknownRequestKeys,
-		options.validation,
 	);
 	const rawSocket = new WebSocket(buildWebSocketUrl(url));
 	const rawSend = rawSocket.send.bind(rawSocket);
 	const socket = rawSocket as InferRouteClientSocket<E>;
 
-	const parseIncomingMessage = (data: unknown): InferRouteServerMessage<E> => {
+	const parseIncomingMessage = (
+		data: unknown,
+	): InferReceivedServerMessage<E> => {
 		try {
-			const result = validateStandardSchemaSync(
-				route.messages.server,
-				JSON.parse(String(data)),
-			);
+			const value = JSON.parse(String(data));
+			if (!options.validateIncomingMessages) {
+				return value as InferReceivedServerMessage<E>;
+			}
+			const result = validateStandardSchemaSync(route.messages.server, value);
 			if (result.issues) throw result.issues;
 
-			return result.value as InferRouteServerMessage<E>;
+			return result.value as InferReceivedServerMessage<E>;
 		} catch {
 			rawSocket.close(1007, "Invalid WebSocket message.");
 			throw new Error("Invalid WebSocket message.");
 		}
 	};
 
-	socket.send = (message: InferRouteClientMessage<E>) => {
+	socket.send = (message: InferClientMessage<E>) => {
 		if (socket.readyState !== WebSocket.OPEN) {
 			throw new Error("WebSocket is not open");
-		}
-
-		if (options.validation === "incoming-and-outgoing") {
-			const result = validateStandardSchemaSync(route.messages.client, message);
-			if (result.issues) throw result.issues;
 		}
 
 		rawSend(JSON.stringify(message));
@@ -89,10 +85,10 @@ export const openConnection = <E extends WebSocketRouteDeclaration>(
 	};
 
 	socket.onMessage = (
-		callback: (message: InferRouteServerMessage<E>) => void,
+		callback: (message: InferReceivedServerMessage<E>) => void,
 	) => {
 		const onMessage = (event: MessageEvent) => {
-			let message: InferRouteServerMessage<E>;
+			let message: InferReceivedServerMessage<E>;
 			try {
 				message = parseIncomingMessage(event.data);
 			} catch {

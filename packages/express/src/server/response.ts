@@ -1,7 +1,7 @@
 import type { OutgoingHttpHeader } from "node:http";
 import type {
-	InferRouteErrors,
-	InferRouteResponse,
+	InferServerErrors,
+	InferServerResponse,
 	NoBody,
 	ResponseBodySchema,
 	RouteDeclaration,
@@ -13,12 +13,12 @@ import { isHttpRoute } from "./router.ts";
 export class ContractResponseError<
 	E extends RouteDeclaration = RouteDeclaration,
 > extends Error {
-	readonly response: InferRouteErrors<E>;
+	readonly response: InferServerErrors<E>;
 	readonly status: number;
 	readonly body: unknown;
 	readonly route: E;
 
-	constructor(route: E, response: InferRouteErrors<E>) {
+	constructor(route: E, response: InferServerErrors<E>) {
 		super("Contract response error");
 		const responseFields = response as { status: number; body: unknown };
 		this.response = response;
@@ -94,4 +94,4 @@ export const isStreamingResponseSchema = (
 ): schema is StreamBody => isStreamBody(schema);
 
 export type NormalizedHandlerResponse<E extends RouteDeclaration> =
-	InferRouteResponse<E>;
+	InferServerResponse<E>;

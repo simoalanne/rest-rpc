@@ -1,6 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import type {
-	InferRouteRequest,
+	InferServerRequest,
 	WebSocketRouteDeclaration,
 } from "@contract-first-api/core/contract";
 import {
@@ -19,7 +19,7 @@ type Merge<T> = {
 };
 
 type RequestValue<E extends WebSocketRouteDeclaration> =
-	InferRouteRequest<E> extends never ? EmptyObject : InferRouteRequest<E>;
+	InferServerRequest<E> extends never ? EmptyObject : InferServerRequest<E>;
 
 export type InferWebSocketRouteHandlerRequest<
 	E extends WebSocketRouteDeclaration,

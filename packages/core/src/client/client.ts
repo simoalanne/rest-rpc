@@ -13,9 +13,8 @@ import type {
 	ApiClientFor,
 	ApiClientOptions,
 	FetchArgs,
-	InferRouteClientResponse,
+	InferClientFetchResponse,
 	OpenConnectionArgs,
-	RuntimeValidation,
 } from "./types.ts";
 import { openConnection as openRouteConnection } from "./websocket.ts";
 
@@ -28,7 +27,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 	private getHeaders?: ApiClientOptions["getHeaders"];
 	private timeoutMs?: number;
 	private unknownRequestKeys: "throw" | "strip";
-	private validation: RuntimeValidation;
+	private validateResponses: boolean;
 
 	constructor(contract: TContract, options: ApiClientOptions) {
 		this.baseUrl = options.baseUrl;
@@ -37,7 +36,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 		this.getHeaders = options.getHeaders;
 		this.timeoutMs = options.timeoutMs;
 		this.unknownRequestKeys = options.unknownRequestKeys ?? "throw";
-		this.validation = options.validation ?? "incoming";
+		this.validateResponses = options.validateResponses ?? false;
 
 		this.api = buildApiClient(this.contract, {
 			fetchResponse: (route, ...args) => this.fetchResponse(route, ...args),
@@ -56,14 +55,13 @@ export class ApiClient<TContract extends Contract = Contract> {
 			getHeaders: this.getHeaders,
 			timeoutMs: this.timeoutMs,
 			unknownRequestKeys: this.unknownRequestKeys,
-			validation: this.validation,
 		});
 
 	private fetchResponse = <E extends RouteDeclaration>(
 		route: E,
 		...args: FetchArgs<E>
-	): Promise<InferRouteClientResponse<E>> =>
-		fetchRouteResponse(this.request, route, ...args);
+	): Promise<InferClientFetchResponse<E>> =>
+		fetchRouteResponse(this.request, this.validateResponses, route, ...args);
 
 	private fetch = <E extends RouteDeclaration>(
 		route: E,
@@ -79,7 +77,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 			{
 				baseUrl: this.baseUrl,
 				unknownRequestKeys: this.unknownRequestKeys,
-				validation: this.validation,
+				validateIncomingMessages: this.validateResponses,
 			},
 			...args,
 		);

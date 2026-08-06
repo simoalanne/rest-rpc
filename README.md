@@ -187,17 +187,14 @@ export const api = initClient(apiContract, {
 		Authorization: `Bearer ${getAuthToken()}`,
 	}),
 	timeoutMs: 10_000,
-	validation: "incoming",
 });
 ```
 
-Runtime validation defaults to `"incoming"` for performance. Clients validate
-declared HTTP responses, stream chunks, and WebSocket messages received from the
-server before delivering them to application code. Use
-`"incoming-and-outgoing"` when you also want the client to validate its own HTTP
-requests and WebSocket messages before sending them, for example in development,
-tests, or high-safety integration boundaries. There is no disabled validation
-mode because incoming validation is the runtime contract boundary.
+Clients serialize typed request input and parse declared server responses as the
+contract's response output type. Response validation is normally enforced on the
+server before data is sent; set `validateResponses: true` when you want the
+client to additionally validate declared HTTP responses, stream chunks, and
+WebSocket messages received from the server.
 
 `fetchResponse()` returns a declared or undeclared response envelope:
 
@@ -241,7 +238,6 @@ export const queryClient = new QueryClient();
 export const api = initReactQueryClient(apiContract, {
 	queryClient,
 	baseUrl: "http://localhost:3001",
-	validation: "incoming",
 });
 ```
 

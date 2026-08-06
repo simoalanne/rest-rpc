@@ -3,15 +3,15 @@ import type {
 	ApiClientFetchOptions,
 	ApiClientOptions,
 	FetchResponseFn,
-	InferRouteClientRequest,
-	InferRouteClientRequestInput,
+	InferClientRequestInput,
 	UndeclaredRouteClientResponse,
 } from "@contract-first-api/core/client";
 import type {
 	Contract,
 	HttpRouteDeclaration,
-	InferRouteErrors,
-	InferRouteSuccessResponse,
+	InferClientErrors,
+	InferClientRequest,
+	InferClientSuccessResponse,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
 } from "@contract-first-api/core/contract";
@@ -29,17 +29,17 @@ import type {
 import { createRouteHooks } from "./routeHooks.ts";
 
 export type InferRouteQueryData<E extends RouteDeclaration> =
-	InferRouteSuccessResponse<E> & {
+	InferClientSuccessResponse<E> & {
 		headers: Headers;
 	};
 
 export type InferRouteQueryError<E extends RouteDeclaration> =
-	| (InferRouteErrors<E> & { headers: Headers })
+	| (InferClientErrors<E> & { headers: Headers })
 	| UndeclaredRouteClientResponse
 	| Error;
 
 export type InferRouteMutationVariables<E extends RouteDeclaration> =
-	InferRouteClientRequestInput<E>;
+	InferClientRequestInput<E>;
 
 export type ReactQueryFetchOptions = ApiClientFetchOptions;
 
@@ -85,10 +85,10 @@ type MutationOptionsFor<E extends RouteDeclaration> = WithFetchOptions<
 type QueryDisabled = false | null | undefined | "" | 0;
 
 type UseQueryArgs<E extends RouteDeclaration, TData = InferRouteQueryData<E>> =
-	InferRouteClientRequest<E> extends never
+	InferClientRequest<E> extends never
 		? [options?: QueryOptionsFor<E, TData>]
 		: [
-				request: InferRouteClientRequest<E> | QueryDisabled,
+				request: InferClientRequest<E> | QueryDisabled,
 				options?: QueryOptionsFor<E, TData>,
 			];
 
@@ -96,16 +96,16 @@ type UseSuspenseQueryArgs<
 	E extends RouteDeclaration,
 	TData = InferRouteQueryData<E>,
 > =
-	InferRouteClientRequest<E> extends never
+	InferClientRequest<E> extends never
 		? [options?: SuspenseQueryOptionsFor<E, TData>]
 		: [
-				request: InferRouteClientRequest<E>,
+				request: InferClientRequest<E>,
 				options?: SuspenseQueryOptionsFor<E, TData>,
 			];
 
 type SetDataArgs<E extends RouteDeclaration> =
 	| [
-			request: InferRouteClientRequest<E>,
+			request: InferClientRequest<E>,
 			updater: Updater<
 				InferRouteQueryData<E> | undefined,
 				InferRouteQueryData<E> | undefined
@@ -133,9 +133,9 @@ type ReactQueryRouteValue<E extends RouteDeclaration> = {
 		...args: UseSuspenseQueryArgs<E, TData>
 	) => UseSuspenseQueryResult<TData, InferRouteQueryError<E>>;
 	setData: (...args: SetDataArgs<E>) => void;
-	invalidate: (request?: InferRouteClientRequest<E>) => Promise<void>;
-	clear: (request?: InferRouteClientRequest<E>) => void;
-	getKey: (request?: InferRouteClientRequest<E>) => QueryKey;
+	invalidate: (request?: InferClientRequest<E>) => Promise<void>;
+	clear: (request?: InferClientRequest<E>) => void;
+	getKey: (request?: InferClientRequest<E>) => QueryKey;
 };
 
 type ReactQueryTreeFor<T extends Contract> = {

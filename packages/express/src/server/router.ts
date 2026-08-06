@@ -1,9 +1,9 @@
 import type { OutgoingHttpHeader } from "node:http";
 import type {
 	HttpRouteDeclaration,
-	InferRouteRequest,
-	InferRouteResponse,
-	InferRouteSuccessBody,
+	InferServerRequest,
+	InferServerResponse,
+	InferServerSuccessBody,
 	RouteDeclaration,
 } from "@contract-first-api/core/contract";
 import type { Request } from "express";
@@ -21,11 +21,11 @@ type RuntimeRouteHandler = (request: unknown) => unknown | Promise<unknown>;
 type AnyImplementationTree = ImplementationTree<RouteDeclaration>;
 
 type RequestValue<E extends RouteDeclaration> =
-	InferRouteRequest<E> extends never ? EmptyObject : InferRouteRequest<E>;
+	InferServerRequest<E> extends never ? EmptyObject : InferServerRequest<E>;
 
 type HandlerResult<E extends HttpRouteDeclaration> = MaybePromise<
-	| (InferRouteResponse<E> & { headers?: Record<string, OutgoingHttpHeader> })
-	| InferRouteSuccessBody<E>
+	| (InferServerResponse<E> & { headers?: Record<string, OutgoingHttpHeader> })
+	| InferServerSuccessBody<E>
 >;
 
 export type InferRouteHandlerRequest<E extends HttpRouteDeclaration> = Merge<
@@ -33,7 +33,7 @@ export type InferRouteHandlerRequest<E extends HttpRouteDeclaration> = Merge<
 >;
 
 export type InferRouteHandlerResponse<E extends HttpRouteDeclaration> =
-	InferRouteResponse<E>;
+	InferServerResponse<E>;
 
 export type RouteHandler<E extends HttpRouteDeclaration> = (
 	...args: [request: InferRouteHandlerRequest<E>]

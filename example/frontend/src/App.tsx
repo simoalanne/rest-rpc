@@ -1,6 +1,6 @@
 import type {
-	InferRouteClientReceivedMessage,
-	InferRouteClientSendMessage,
+	InferClientMessage,
+	InferReceivedServerMessage,
 	InferRouteClientSocket,
 } from "@contract-first-api/core";
 import type { InferRouteQueryError } from "@contract-first-api/react-query";
@@ -10,10 +10,10 @@ import { useEffect, useRef, useState } from "react";
 import { client, rqClient } from "./api.ts";
 
 type DiscussSocket = InferRouteClientSocket<typeof apiContract.discuss.connect>;
-type DiscussOutgoingMessage = InferRouteClientSendMessage<
+type DiscussOutgoingMessage = InferClientMessage<
 	typeof apiContract.discuss.connect
 >;
-type DiscussIncomingMessage = InferRouteClientReceivedMessage<
+type DiscussIncomingMessage = InferReceivedServerMessage<
 	typeof apiContract.discuss.connect
 >;
 type CreateTodoError = InferRouteQueryError<typeof apiContract.todos.create>;

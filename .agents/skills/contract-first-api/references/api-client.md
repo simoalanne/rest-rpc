@@ -98,6 +98,12 @@ console.log(todos.items);
 Routes with multiple successful responses only expose `fetchResponse()` so
 callers must handle the status.
 
+The client parses declared responses as the contract's response output type.
+Runtime response validation is normally enforced by the server before data is
+sent. Set `validateResponses: true` in `initClient()` options when client-side
+validation of declared HTTP responses, stream chunks, and WebSocket messages is
+needed for debugging or integration hardening.
+
 ## WebSocket Routes
 
 WebSocket routes expose `openConnection()`.

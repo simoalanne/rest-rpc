@@ -134,17 +134,27 @@ export const isRequestSchemaRecord = (
 	!isCustomBody(value as RequestBodySchema) &&
 	!isNoBody(value as RequestBodySchema);
 
-export type InferResponseBody<TResponse> = TResponse extends StandardSchemaV1
-	? StandardSchemaV1.InferOutput<TResponse>
-	: TResponse extends NoBody
-		? undefined
-		: TResponse extends StreamBody<infer TSchema>
-			? AsyncIterable<StandardSchemaV1.InferOutput<TSchema>>
-			: never;
+export type InferClientResponseBody<TResponse> =
+	TResponse extends StandardSchemaV1
+		? StandardSchemaV1.InferOutput<TResponse>
+		: TResponse extends NoBody
+			? undefined
+			: TResponse extends StreamBody<infer TSchema>
+				? AsyncIterable<StandardSchemaV1.InferOutput<TSchema>>
+				: never;
 
-type ResponseEntry<TStatus extends number, TResponse> = {
+export type InferServerResponseBody<TResponse> =
+	TResponse extends StandardSchemaV1
+		? StandardSchemaV1.InferInput<TResponse>
+		: TResponse extends NoBody
+			? undefined
+			: TResponse extends StreamBody<infer TSchema>
+				? AsyncIterable<StandardSchemaV1.InferInput<TSchema>>
+				: never;
+
+type ResponseEntry<TStatus extends number, TBody> = {
 	status: TStatus;
-	body: InferResponseBody<TResponse>;
+	body: TBody;
 };
 
 type ResponseKey = number | `${number}`;
@@ -189,42 +199,86 @@ export type HasStreamBody<TResponses> = true extends {
 	? true
 	: false;
 
-export type InferRouteResponse<E extends RouteDeclaration> = E extends {
+export type InferClientResponse<E extends RouteDeclaration> = E extends {
 	responses: infer TResponses;
 }
 	? {
 			[TKeys in keyof TResponses]: TKeys extends ResponseKey
-				? ResponseEntry<ResponseStatus<TKeys>, TResponses[TKeys]>
+				? ResponseEntry<
+						ResponseStatus<TKeys>,
+						InferClientResponseBody<TResponses[TKeys]>
+					>
 				: never;
 		}[keyof TResponses]
 	: never;
 
-export type InferRouteSuccessResponse<E extends RouteDeclaration> = E extends {
+export type InferServerResponse<E extends RouteDeclaration> = E extends {
+	responses: infer TResponses;
+}
+	? {
+			[TKeys in keyof TResponses]: TKeys extends ResponseKey
+				? ResponseEntry<
+						ResponseStatus<TKeys>,
+						InferServerResponseBody<TResponses[TKeys]>
+					>
+				: never;
+		}[keyof TResponses]
+	: never;
+
+export type InferClientSuccessResponse<E extends RouteDeclaration> = E extends {
 	responses: infer TResponses;
 }
 	? {
 			[TKeys in keyof TResponses]: TKeys extends ResponseKey
 				? TKeys extends SuccessfulResponseKeys<TResponses>
-					? ResponseEntry<ResponseStatus<TKeys>, TResponses[TKeys]>
+					? ResponseEntry<
+							ResponseStatus<TKeys>,
+							InferClientResponseBody<TResponses[TKeys]>
+						>
 					: never
 				: never;
 		}[keyof TResponses]
 	: never;
 
-export type InferRouteSuccessBody<E extends RouteDeclaration> =
-	InferRouteSuccessResponse<E> extends infer TResponse extends {
-		body: unknown;
-	}
-		? [TResponse] extends [never]
-			? never
-			: IsUnion<TResponse> extends true
-				? never
-				: TResponse["body"]
-		: never;
+export type InferServerSuccessResponse<E extends RouteDeclaration> = E extends {
+	responses: infer TResponses;
+}
+	? {
+			[TKeys in keyof TResponses]: TKeys extends ResponseKey
+				? TKeys extends SuccessfulResponseKeys<TResponses>
+					? ResponseEntry<
+							ResponseStatus<TKeys>,
+							InferServerResponseBody<TResponses[TKeys]>
+						>
+					: never
+				: never;
+		}[keyof TResponses]
+	: never;
 
-export type InferRouteErrors<E extends RouteDeclaration> = Exclude<
-	InferRouteResponse<E>,
-	InferRouteSuccessResponse<E>
+type InferSingleResponseBody<TResponse> = TResponse extends {
+	body: unknown;
+}
+	? [TResponse] extends [never]
+		? never
+		: IsUnion<TResponse> extends true
+			? never
+			: TResponse["body"]
+	: never;
+
+export type InferClientSuccessBody<E extends RouteDeclaration> =
+	InferSingleResponseBody<InferClientSuccessResponse<E>>;
+
+export type InferServerSuccessBody<E extends RouteDeclaration> =
+	InferSingleResponseBody<InferServerSuccessResponse<E>>;
+
+export type InferClientErrors<E extends RouteDeclaration> = Exclude<
+	InferClientResponse<E>,
+	InferClientSuccessResponse<E>
+>;
+
+export type InferServerErrors<E extends RouteDeclaration> = Exclude<
+	InferServerResponse<E>,
+	InferServerSuccessResponse<E>
 >;
 
 export type IsWebSocketRoute<E extends RouteDeclaration> = E extends {
@@ -233,7 +287,15 @@ export type IsWebSocketRoute<E extends RouteDeclaration> = E extends {
 	? true
 	: false;
 
-export type InferRouteClientMessage<E extends RouteDeclaration> = E extends {
+export type InferClientMessage<E extends RouteDeclaration> = E extends {
+	messages: { client: infer R };
+}
+	? R extends StandardSchemaV1
+		? StandardSchemaV1.InferInput<R>
+		: never
+	: never;
+
+export type InferReceivedClientMessage<E extends RouteDeclaration> = E extends {
 	messages: { client: infer R };
 }
 	? R extends StandardSchemaV1
@@ -241,7 +303,15 @@ export type InferRouteClientMessage<E extends RouteDeclaration> = E extends {
 		: never
 	: never;
 
-export type InferRouteServerMessage<E extends RouteDeclaration> = E extends {
+export type InferServerMessage<E extends RouteDeclaration> = E extends {
+	messages: { server: infer R };
+}
+	? R extends StandardSchemaV1
+		? StandardSchemaV1.InferInput<R>
+		: never
+	: never;
+
+export type InferReceivedServerMessage<E extends RouteDeclaration> = E extends {
 	messages: { server: infer R };
 }
 	? R extends StandardSchemaV1
@@ -249,43 +319,74 @@ export type InferRouteServerMessage<E extends RouteDeclaration> = E extends {
 		: never
 	: never;
 
-type InferRequestBody<TBody> = TBody extends NoBody
+type InferRequestBody<
+	TBody,
+	TIO extends "input" | "output",
+> = TBody extends NoBody
 	? never
 	: TBody extends CustomBody<infer TSchema>
-		? { body: StandardSchemaV1.InferOutput<TSchema> }
+		? {
+				body: TIO extends "input"
+					? StandardSchemaV1.InferInput<TSchema>
+					: StandardSchemaV1.InferOutput<TSchema>;
+			}
 		: TBody extends StandardSchemaV1
-			? StandardSchemaV1.InferOutput<TBody>
+			? TIO extends "input"
+				? StandardSchemaV1.InferInput<TBody>
+				: StandardSchemaV1.InferOutput<TBody>
 			: TBody extends RequestSchemaRecord
-				? InferRequestSchemaRecord<TBody>
+				? InferRequestSchemaRecord<TBody, TIO>
 				: never;
 
-type InferSchemaValue<TSchema> = TSchema extends StandardSchemaV1
-	? StandardSchemaV1.InferOutput<TSchema>
+type InferSchemaValue<
+	TSchema,
+	TIO extends "input" | "output",
+> = TSchema extends StandardSchemaV1
+	? TIO extends "input"
+		? StandardSchemaV1.InferInput<TSchema>
+		: StandardSchemaV1.InferOutput<TSchema>
 	: never;
 
-type OptionalSchemaRecordKeys<TRecord extends RequestSchemaRecord> = {
-	[K in keyof TRecord]: undefined extends InferSchemaValue<TRecord[K]>
+type OptionalSchemaRecordKeys<
+	TRecord extends RequestSchemaRecord,
+	TIO extends "input" | "output",
+> = {
+	[K in keyof TRecord]: undefined extends InferSchemaValue<TRecord[K], TIO>
 		? K
 		: never;
 }[keyof TRecord];
 
-type RequiredSchemaRecordKeys<TRecord extends RequestSchemaRecord> = Exclude<
-	keyof TRecord,
-	OptionalSchemaRecordKeys<TRecord>
->;
+type RequiredSchemaRecordKeys<
+	TRecord extends RequestSchemaRecord,
+	TIO extends "input" | "output",
+> = Exclude<keyof TRecord, OptionalSchemaRecordKeys<TRecord, TIO>>;
 
-type InferRequestSchemaRecord<TRecord extends RequestSchemaRecord> = Merge<
+type InferRequestSchemaRecord<
+	TRecord extends RequestSchemaRecord,
+	TIO extends "input" | "output",
+> = Merge<
 	{
-		[K in RequiredSchemaRecordKeys<TRecord>]: InferSchemaValue<TRecord[K]>;
+		[K in RequiredSchemaRecordKeys<TRecord, TIO>]: InferSchemaValue<
+			TRecord[K],
+			TIO
+		>;
 	} & {
-		[K in OptionalSchemaRecordKeys<TRecord>]?: InferSchemaValue<TRecord[K]>;
+		[K in OptionalSchemaRecordKeys<TRecord, TIO>]?: InferSchemaValue<
+			TRecord[K],
+			TIO
+		>;
 	}
 >;
 
-type InferRequestObjectSegment<TSegment> = TSegment extends StandardSchemaV1
-	? StandardSchemaV1.InferOutput<TSegment>
+type InferRequestObjectSegment<
+	TSegment,
+	TIO extends "input" | "output",
+> = TSegment extends StandardSchemaV1
+	? TIO extends "input"
+		? StandardSchemaV1.InferInput<TSegment>
+		: StandardSchemaV1.InferOutput<TSegment>
 	: TSegment extends RequestSchemaRecord
-		? InferRequestSchemaRecord<TSegment>
+		? InferRequestSchemaRecord<TSegment, TIO>
 		: never;
 
 type HeaderValue = string | number | boolean | undefined;
@@ -299,10 +400,10 @@ type RequestSchemaObjectError<TSegment extends RequestSegment> = {
 	readonly __route_error__: `${TSegment} schema must output an object, or a union where every branch outputs an object. Use customBody() for non-object request bodies.`;
 };
 
-type SchemaOutputsOnly<TSchema, TValue> = [
+type SchemaInputsOnly<TSchema, TValue> = [
 	Exclude<
 		TSchema extends StandardSchemaV1
-			? StandardSchemaV1.InferOutput<TSchema>
+			? StandardSchemaV1.InferInput<TSchema>
 			: never,
 		TValue
 	>,
@@ -311,10 +412,7 @@ type SchemaOutputsOnly<TSchema, TValue> = [
 	: false;
 
 type InvalidHeaderKeys<THeaders extends RequestSchemaRecord> = {
-	[K in keyof THeaders]: SchemaOutputsOnly<
-		THeaders[K],
-		HeaderValue
-	> extends true
+	[K in keyof THeaders]: SchemaInputsOnly<THeaders[K], HeaderValue> extends true
 		? never
 		: K;
 }[keyof THeaders];
@@ -329,30 +427,33 @@ type ValidateRequestObjectSchema<
 	TSchema,
 	TSegment extends RequestSegment,
 > = TSchema extends StandardSchemaV1
-	? SchemaOutputsOnly<TSchema, RequestObjectValue> extends true
+	? SchemaInputsOnly<TSchema, RequestObjectValue> extends true
 		? unknown
 		: RequestSchemaObjectError<TSegment>
 	: unknown;
 
-type InferRequestSegments<R> = {
-	body: R extends { body: infer TBody } ? InferRequestBody<TBody> : never;
+type InferRequestSegments<R, TIO extends "input" | "output"> = {
+	body: R extends { body: infer TBody } ? InferRequestBody<TBody, TIO> : never;
 	query: R extends { query: infer TQuery }
-		? InferRequestObjectSegment<TQuery>
+		? InferRequestObjectSegment<TQuery, TIO>
 		: never;
 	params: R extends { params: infer TParams }
-		? InferRequestObjectSegment<TParams>
+		? InferRequestObjectSegment<TParams, TIO>
 		: never;
 	headers: R extends { headers: infer THeaders }
 		? THeaders extends RequestSchemaRecord
-			? InferRequestSchemaRecord<THeaders>
+			? InferRequestSchemaRecord<THeaders, TIO>
 			: never
 		: never;
 };
 
-type RouteRequest<E extends RouteDeclaration> = E extends {
+type RouteRequest<
+	E extends RouteDeclaration,
+	TIO extends "input" | "output",
+> = E extends {
 	request: infer R;
 }
-	? InferRequestSegments<R>
+	? InferRequestSegments<R, TIO>
 	: never;
 
 type Merge<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
@@ -370,8 +471,11 @@ type HasRequestInput<TRequest> = [
 	? false
 	: true;
 
-export type InferRouteRequest<E extends RouteDeclaration> =
-	RouteRequest<E> extends infer R
+type InferRequestFor<
+	E extends RouteDeclaration,
+	TIO extends "input" | "output",
+> =
+	RouteRequest<E, TIO> extends infer R
 		? R extends {
 				body: infer B;
 				query: infer Q;
@@ -388,6 +492,16 @@ export type InferRouteRequest<E extends RouteDeclaration> =
 				: never
 			: never
 		: never;
+
+export type InferClientRequest<E extends RouteDeclaration> = InferRequestFor<
+	E,
+	"input"
+>;
+
+export type InferServerRequest<E extends RouteDeclaration> = InferRequestFor<
+	E,
+	"output"
+>;
 
 type MissingSuccessfulResponseError = {
 	readonly __route_error__: "Route must declare at least one successful response.";
