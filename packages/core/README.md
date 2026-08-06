@@ -98,6 +98,26 @@ Other Standard Schema libraries can still be used. For request schemas, provide
 `router()` or `routerAsync()` when the library cannot be
 introspected automatically.
 
+Use `type<T>()` for type-only schemas when runtime validation is unnecessary or
+handled elsewhere. It implements Standard Schema as a no-op validator and
+returns the input value as `T`.
+
+```ts
+import { router, type } from "@contract-first-api/core";
+
+export const apiContract = router({
+	health: {
+		get: {
+			method: "GET",
+			path: "/health",
+			responses: {
+				200: type<{ status: "ok" }>(),
+			},
+		},
+	},
+});
+```
+
 Async validation is not supported in API contracts. Schemas must return a
 Standard Schema result synchronously.
 

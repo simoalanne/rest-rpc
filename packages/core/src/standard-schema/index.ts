@@ -76,3 +76,4 @@ export declare namespace StandardSchemaV1 {
 }
 
 export { validateStandardSchemaSync } from "./standardSchemaValidator.ts";
+export { type } from "./type.ts";

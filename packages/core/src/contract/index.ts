@@ -1,3 +1,4 @@
+export { type } from "../standard-schema/index.ts";
 export type {
 	ApplyRouterOptions,
 	RouteContractOptions,

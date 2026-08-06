@@ -83,7 +83,8 @@ messages. The core package includes built-in request key inference for common
 object schemas from Zod, Valibot, and ArkType. Other Standard Schema libraries
 can still be used by providing `request.requestKeys` on routes or a
 `resolveRequestKeys(schema)` callback to `router()` or
-`routerAsync()`.
+`routerAsync()`. For type-only contracts, use `type<T>()`; it is a no-op
+Standard Schema helper that returns the input value as `T` without validating it.
 
 Then add the integration packages you need:
 
@@ -102,11 +103,11 @@ pnpm add -D @types/ws
 ## Contract Responses
 
 Every HTTP route declaration declares a `responses` map keyed by HTTP status
-code. Each entry can be a Standard Schema-compatible schema, `noBody()`, or a
-`streamBody(schema)` response.
+code. Each entry can be a Standard Schema-compatible schema, `type<T>()`,
+`noBody()`, or a `streamBody(schema)` response.
 
 ```ts
-import { router, noBody, streamBody } from "@contract-first-api/core";
+import { noBody, router, streamBody, type } from "@contract-first-api/core";
 import z from "zod";
 
 export const apiContract = router({
@@ -136,6 +137,13 @@ export const apiContract = router({
 			path: "/todos/events",
 			responses: {
 				200: streamBody(todoEventSchema),
+			},
+		},
+		stats: {
+			method: "GET",
+			path: "/todos/stats",
+			responses: {
+				200: type<{ total: number }>(),
 			},
 		},
 	},

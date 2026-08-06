@@ -71,6 +71,9 @@ processing controls like `validate` and `resolveRequestKeys`.
 - Other Standard Schema libraries can be used by providing
   `request.requestKeys` or `resolveRequestKeys(schema)` when request keys cannot
   be inferred automatically.
+- Use `type<T>()` for type-only schemas when runtime validation is unnecessary
+  or handled elsewhere. It is a Standard Schema-compatible no-op validator that
+  returns the input value as `T`.
 - OpenAPI generation requires a schema converter for the chosen schema library.
 
 ## Responses

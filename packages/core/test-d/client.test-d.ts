@@ -2,6 +2,7 @@ import {
 	type InferRouteClientRequestInput,
 	initClient,
 	router,
+	type as schemaType,
 } from "@contract-first-api/core";
 import { expectError, expectType } from "tsd";
 import { z } from "zod";
@@ -22,6 +23,13 @@ const api = router({
 			path: "/todos",
 			responses: {
 				200: z.array(todoSchema),
+			},
+		},
+		stats: {
+			method: "GET",
+			path: "/todos/stats",
+			responses: {
+				200: schemaType<{ total: number }>(),
 			},
 		},
 		get: {
@@ -55,6 +63,7 @@ const client = initClient(api, {
 expectType<Promise<Array<{ id: string; title: string }>>>(
 	client.todos.list.fetch(),
 );
+expectType<Promise<{ total: number }>>(client.todos.stats.fetch());
 expectType<Promise<{ id: string; title: string }>>(
 	client.todos.get.fetch({ id: "todo-1" }),
 );

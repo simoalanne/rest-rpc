@@ -6,6 +6,7 @@ import {
 	noBody,
 	route,
 	router,
+	type as schemaType,
 	streamBody,
 } from "@contract-first-api/core/contract";
 import { expectAssignable, expectError, expectType } from "tsd";
@@ -70,6 +71,18 @@ expectType<{ message: string }>(getTodoError.body);
 
 expectType<{ id: string; title: string }>(
 	null as unknown as InferRouteSuccessBody<typeof api.todos.get>,
+);
+
+const typeOnlyResponse = route({
+	method: "GET",
+	path: "/type-only",
+	responses: {
+		200: schemaType<{ id: string; tags: string[] }>(),
+	},
+});
+
+expectType<{ id: string; tags: string[] }>(
+	null as unknown as InferRouteSuccessBody<typeof typeOnlyResponse>,
 );
 
 const prefixed = router(

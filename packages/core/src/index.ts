@@ -55,4 +55,4 @@ export type {
 } from "./openapi/index.ts";
 export { createOpenApiDocument } from "./openapi/index.ts";
 export type { StandardSchemaV1 } from "./standard-schema/index.ts";
-export { validateStandardSchemaSync } from "./standard-schema/index.ts";
+export { type, validateStandardSchemaSync } from "./standard-schema/index.ts";
