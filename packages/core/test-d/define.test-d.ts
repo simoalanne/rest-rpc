@@ -378,6 +378,36 @@ expectError(
 );
 
 expectError(
+	route({
+		method: "GET",
+		path: "/invalid-query",
+		request: {
+			query: {
+				filter: z.object({ status: z.string() }),
+			},
+		},
+		responses: {
+			200: todoSchema,
+		},
+	}),
+);
+
+expectError(
+	route({
+		method: "GET",
+		path: "/invalid-params/:id",
+		request: {
+			params: {
+				id: z.string().optional(),
+			},
+		},
+		responses: {
+			200: todoSchema,
+		},
+	}),
+);
+
+expectError(
 	router(
 		{
 			todos: {

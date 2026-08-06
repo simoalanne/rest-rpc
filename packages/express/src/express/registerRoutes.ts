@@ -4,6 +4,7 @@ import type {
 	HttpRouteDeclaration,
 	ResponseBodySchema,
 } from "@contract-first-api/core/contract";
+import { REQUEST_CONTEXT_KEY } from "@contract-first-api/core/contract";
 import type { Application, Request, Response } from "express";
 import {
 	ContractResponseError,
@@ -68,7 +69,7 @@ export const registerRoutes = (
 			try {
 				const handlerResult = await handler({
 					...requestValidation.data,
-					context: {
+					[REQUEST_CONTEXT_KEY]: {
 						req,
 					},
 				});

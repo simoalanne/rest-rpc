@@ -1,5 +1,6 @@
 import type { Server as HttpServer } from "node:http";
 import type { Duplex } from "node:stream";
+import { REQUEST_CONTEXT_KEY } from "@contract-first-api/core/contract";
 import type WebSocket from "ws";
 import { WebSocketServer } from "ws";
 import { createPathMatcher } from "../server/match.ts";
@@ -83,7 +84,7 @@ export const registerWebSocketRoutes = (
 				matchedRoute.handler,
 				{
 					...requestValidation.data,
-					context: {
+					[REQUEST_CONTEXT_KEY]: {
 						req,
 						socket: routeSocket,
 					},

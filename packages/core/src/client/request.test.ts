@@ -9,6 +9,7 @@ import {
 	jsonResponse,
 } from "./factories.ts";
 import { initClient } from "./index.ts";
+import { constructBaseRequest } from "./request.ts";
 
 const originalFetch = globalThis.fetch;
 
@@ -28,7 +29,7 @@ describe("ApiClient requests", () => {
 		});
 
 		await client.todos.get.fetch({ id: "todo 1" });
-		await client.todos.list.fetch({ search: "milk", empty: null });
+		await client.todos.list.fetch({ search: "milk", empty: undefined });
 
 		assert.equal(calls[0]?.url, "https://api.test/todos/todo%201");
 		assert.equal(calls[1]?.url, "https://api.test/todos?search=milk");
@@ -77,9 +78,232 @@ describe("ApiClient requests", () => {
 		assert.equal(calls[0]?.url, "https://api.test/todos/todo-1?page=2");
 		assert.equal(calls[0]?.init?.body, '{"title":"Updated"}');
 		assert.deepEqual(calls[0]?.init?.headers, {
-			"Content-Type": "application/json",
+			"content-type": "application/json",
 			"x-request-id": "123",
 		});
+	});
+
+	it("serializes finite number and boolean params, query, and headers", async () => {
+		const apiContract = router({
+			items: {
+				get: {
+					method: "GET",
+					path: "/items/:id/:visible",
+					request: {
+						params: {
+							id: z.number(),
+							visible: z.boolean(),
+						},
+						query: {
+							page: z.number(),
+							includeArchived: z.boolean(),
+						},
+						headers: {
+							"x-page": z.number(),
+							"x-visible": z.boolean(),
+						},
+					},
+					responses: {
+						204: noBody(),
+					},
+				},
+			},
+		});
+		const request = constructBaseRequest(
+			"https://api.test",
+			apiContract.items.get,
+			{
+				id: 12,
+				visible: false,
+				page: 2,
+				includeArchived: true,
+				"x-page": 2,
+				"x-visible": false,
+			},
+			"throw",
+		);
+
+		assert.equal(
+			request.url,
+			"https://api.test/items/12/false?page=2&includeArchived=true",
+		);
+		assert.deepEqual(request.headers, {
+			"x-page": "2",
+			"x-visible": "false",
+		});
+	});
+
+	it("serializes path params by matching full path placeholders", () => {
+		const apiContract = router({
+			items: {
+				get: {
+					method: "GET",
+					path: "/items/:id/:id2",
+					request: {
+						params: {
+							id: z.string(),
+							id2: z.string(),
+						},
+					},
+					responses: {
+						204: noBody(),
+					},
+				},
+			},
+		});
+		const request = constructBaseRequest(
+			"https://api.test",
+			apiContract.items.get,
+			{
+				id: "one/two",
+				id2: "three",
+			},
+			"throw",
+		);
+
+		assert.equal(request.url, "https://api.test/items/one%2Ftwo/three");
+	});
+
+	it("omits undefined query and header values", async () => {
+		const apiContract = router({
+			items: {
+				list: {
+					method: "GET",
+					path: "/items",
+					request: {
+						query: {
+							search: z.string().optional(),
+						},
+						headers: {
+							"x-request-id": z.string().optional(),
+						},
+					},
+					responses: {
+						204: noBody(),
+					},
+				},
+			},
+		});
+		const request = constructBaseRequest(
+			"https://api.test",
+			apiContract.items.list,
+			{
+				search: undefined,
+				"x-request-id": undefined,
+			},
+			"throw",
+		);
+
+		assert.equal(request.url, "https://api.test/items");
+		assert.deepEqual(request.headers, {});
+	});
+
+	it("rejects missing and undefined params before building the request URL", () => {
+		const apiContract = createClientTestContract();
+
+		assert.throws(
+			() =>
+				constructBaseRequest(
+					"https://api.test",
+					apiContract.todos.get,
+					{} as never,
+					"throw",
+				),
+			/Invalid params key "id" for GET \/todos\/:id/,
+		);
+		assert.throws(
+			() =>
+				constructBaseRequest(
+					"https://api.test",
+					apiContract.todos.get,
+					{ id: undefined } as never,
+					"throw",
+				),
+			/Invalid params key "id" for GET \/todos\/:id/,
+		);
+	});
+
+	it("rejects non-scalar query and header values before fetch", () => {
+		const apiContract = router({
+			items: {
+				list: {
+					method: "GET",
+					path: "/items",
+					request: {
+						query: {
+							search: z.string().optional(),
+						},
+						headers: {
+							"x-request-id": z.string().optional(),
+						},
+					},
+					responses: {
+						204: noBody(),
+					},
+				},
+			},
+		});
+
+		assert.throws(
+			() =>
+				constructBaseRequest(
+					"https://api.test",
+					apiContract.items.list,
+					{ search: null } as never,
+					"throw",
+				),
+			/Invalid query key "search" for GET \/items/,
+		);
+		assert.throws(
+			() =>
+				constructBaseRequest(
+					"https://api.test",
+					apiContract.items.list,
+					{ search: { q: "milk" } } as never,
+					"throw",
+				),
+			/Invalid query key "search" for GET \/items/,
+		);
+		assert.throws(
+			() =>
+				constructBaseRequest(
+					"https://api.test",
+					apiContract.items.list,
+					{ "x-request-id": [] } as never,
+					"throw",
+				),
+			/Invalid headers key "x-request-id" for GET \/items/,
+		);
+	});
+
+	it("rejects non-finite number query values before fetch", () => {
+		const apiContract = router({
+			items: {
+				list: {
+					method: "GET",
+					path: "/items",
+					request: {
+						query: {
+							page: z.number(),
+						},
+					},
+					responses: {
+						204: noBody(),
+					},
+				},
+			},
+		});
+
+		assert.throws(
+			() =>
+				constructBaseRequest(
+					"https://api.test",
+					apiContract.items.list,
+					{ page: Number.NaN } as never,
+					"throw",
+				),
+			/Invalid query key "page" for GET \/items/,
+		);
 	});
 
 	it("sends JSON request bodies with generated content type", async () => {
@@ -94,7 +318,7 @@ describe("ApiClient requests", () => {
 
 		assert.equal(calls[0]?.init?.body, '{"title":"Buy milk"}');
 		assert.deepEqual(calls[0]?.init?.headers, {
-			"Content-Type": "application/json",
+			"content-type": "application/json",
 		});
 	});
 
@@ -112,7 +336,7 @@ describe("ApiClient requests", () => {
 		assert.equal(calls[0]?.url, "https://api.test/uploads/file%201");
 		assert.equal(calls[0]?.init?.body, "hello");
 		assert.deepEqual(calls[0]?.init?.headers, {
-			"Content-Type": "text/plain",
+			"content-type": "text/plain",
 		});
 	});
 
@@ -172,11 +396,11 @@ describe("ApiClient requests", () => {
 		assert.equal(calls[0]?.init?.cache, "no-store");
 		assert.equal(calls[0]?.init?.credentials, "omit");
 		assert.deepEqual(calls[0]?.init?.headers, {
-			Authorization: "Bearer token",
+			authorization: "Bearer token",
 		});
 	});
 
-	it("sends declared request headers over global headers", async () => {
+	it("normalizes merged headers and lets declared request headers win", async () => {
 		const apiContract = router(
 			{
 				todos: {
@@ -186,7 +410,7 @@ describe("ApiClient requests", () => {
 						request: {
 							query: z.object({ search: z.string() }),
 							headers: {
-								"x-route": z.string(),
+								"X-Route": z.string(),
 								"x-shared": z.string(),
 							},
 						},
@@ -207,17 +431,16 @@ describe("ApiClient requests", () => {
 		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 			getHeaders: () => ({
-				"x-common": "from global",
-				"x-global": "global",
-				"x-route": "from global",
-				"x-shared": "from global",
+				"X-Global": "global",
+				"X-Route": "from global",
+				"X-Shared": "from global",
 			}),
 		});
 
 		await client.todos.list.fetch({
 			search: "milk",
 			"x-common": 123,
-			"x-route": "route",
+			"X-Route": "route",
 			"x-shared": "route shared",
 		});
 

@@ -17,6 +17,7 @@ import {
 	isNoBody,
 	isRequestSchemaRecord,
 	isStandardSchema,
+	REQUEST_CONTEXT_KEY,
 } from "./route.ts";
 import { contractRoutes } from "./traversal.ts";
 
@@ -40,6 +41,7 @@ export type RequestValidationResult =
 	| { success: false; errors: StandardSchemaV1.Issue[] };
 
 const requestSegments = ["body", "query", "params", "headers"] as const;
+export const pathParamPattern = /:([A-Za-z0-9_]+)/g;
 
 const assertNoDuplicateKeys = (
 	route: RouteDeclaration,
@@ -52,10 +54,48 @@ const assertNoDuplicateKeys = (
 	);
 };
 
-const getPathParams = (route: RouteDeclaration) =>
-	[...route.path.matchAll(/:([A-Za-z0-9_]+)/g)].map(
-		(match) => match[1] as string,
+const assertNoReservedRequestKeys = (route: RouteDeclaration) => {
+	if (route.request?.requestKeys?.[REQUEST_CONTEXT_KEY] === undefined) return;
+
+	throw new Error(
+		`Route declaration at path "${route.path}" has a reserved request key "${REQUEST_CONTEXT_KEY}". Rename it to avoid conflict with the route handler context.`,
 	);
+};
+
+const getHeaderRequestKeys = (route: RouteDeclaration) => [
+	...new Set([
+		...Object.keys(route.request?.headers ?? {}),
+		...Object.entries(route.request?.requestKeys ?? {})
+			.filter(([, segment]) => segment === "headers")
+			.map(([key]) => key),
+	]),
+];
+
+const assertNoReservedHeaderKeys = (route: RouteDeclaration) => {
+	for (const key of getHeaderRequestKeys(route)) {
+		if (key.toLowerCase() !== "content-type") continue;
+
+		throw new Error(
+			`Route declaration at path "${route.path}" has a reserved header key "${key}". Use customBody({ contentType }) to declare request content type instead.`,
+		);
+	}
+};
+
+const assertNoCaseInsensitiveHeaderDuplicates = (route: RouteDeclaration) => {
+	const normalized = new Set<string>();
+	for (const key of getHeaderRequestKeys(route)) {
+		const normalizedKey = key.toLowerCase();
+		if (normalized.has(normalizedKey)) {
+			throw new Error(
+				`Route declaration at path "${route.path}" has duplicate header keys that differ only by case.`,
+			);
+		}
+		normalized.add(normalizedKey);
+	}
+};
+
+const getPathParams = (route: RouteDeclaration) =>
+	[...route.path.matchAll(pathParamPattern)].map((match) => match[1] as string);
 
 const assertPathParamsResolved = (route: RouteDeclaration) => {
 	const pathParams = getPathParams(route);
@@ -109,6 +149,9 @@ export const validateResolvedRequestKeys = (route: RouteDeclaration) => {
 	applyHeaderRequestKeys(route);
 	const keys = Object.keys(route.request?.requestKeys ?? {});
 	assertNoDuplicateKeys(route, keys);
+	assertNoReservedRequestKeys(route);
+	assertNoReservedHeaderKeys(route);
+	assertNoCaseInsensitiveHeaderDuplicates(route);
 
 	if (isCustomBody(route.request?.body) && route.request?.requestKeys?.body) {
 		throw new Error(

@@ -77,9 +77,11 @@ Each HTTP route declaration can define:
 | `messages` | WebSocket client and server message schemas. |
 | `metadata` | Optional application metadata escape hatch. `router()` populates `{}` when omitted. |
 
-`router()` validates structural rules that TypeScript cannot fully
-enforce at runtime, such as duplicate request field names across `body`,
-`query`, `params`, and `headers`.
+`router()` validates structural rules that TypeScript cannot fully enforce at
+runtime, such as duplicate request field names across `body`, `query`, `params`,
+and `headers`. The flattened request key `context` is reserved for adapter
+handler context, and request header declarations cannot use `content-type` or
+duplicate another header name with different casing.
 
 ## Schema Libraries
 

@@ -155,6 +155,86 @@ describe("validateContractSync", () => {
 		);
 	});
 
+	it("rejects reserved context request keys", () => {
+		assert.throws(
+			() =>
+				validateContractSync(
+					testContract({
+						request: {
+							query: z.object({ context: z.string() }),
+						},
+					}),
+				),
+			/reserved request key "context"/,
+		);
+	});
+
+	it("rejects reserved content-type header keys", () => {
+		assert.throws(
+			() =>
+				validateContractSync(
+					testContract({
+						request: {
+							headers: {
+								"Content-Type": z.string(),
+							},
+						},
+					}),
+				),
+			/reserved header key "Content-Type"/,
+		);
+	});
+
+	it("rejects header keys that differ only by case", () => {
+		assert.throws(
+			() =>
+				validateContractSync(
+					testContract({
+						request: {
+							headers: {
+								"x-request-id": z.string(),
+								"X-Request-ID": z.string(),
+							},
+						},
+					}),
+				),
+			/duplicate header keys that differ only by case/,
+		);
+	});
+
+	it("rejects reserved content-type header request keys", () => {
+		assert.throws(
+			() =>
+				validateContractSync(
+					testContract({
+						request: {
+							requestKeys: {
+								"content-type": "headers",
+							},
+						},
+					}),
+				),
+			/reserved header key "content-type"/,
+		);
+	});
+
+	it("rejects header request keys that differ only by case", () => {
+		assert.throws(
+			() =>
+				validateContractSync(
+					testContract({
+						request: {
+							requestKeys: {
+								"x-request-id": "headers",
+								"X-Request-ID": "headers",
+							},
+						},
+					}),
+				),
+			/duplicate header keys that differ only by case/,
+		);
+	});
+
 	it("rejects body keys in query or params for custom request bodies", () => {
 		assert.throws(
 			() =>

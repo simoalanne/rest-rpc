@@ -58,7 +58,9 @@ WebSocket routes use `messages.client` and `messages.server` instead of
 `router()` accepts shared route fields for a contract tree. Use `pathPrefix` to
 join a common path prefix onto every route, `metadata` for shallow shared
 metadata, and `commonResponses` for common HTTP responses. Use `commonHeaders`
-for headers shared by every route. Route declarations win on key conflicts.
+for headers shared by every route. Route declarations win on exact key
+conflicts. Header declarations are validated case-insensitively, and
+`content-type` is reserved for body handling.
 `route()` is a single-route convenience helper whose options are limited to
 processing controls like `validate` and `resolveRequestKeys`.
 
@@ -75,6 +77,8 @@ processing controls like `validate` and `resolveRequestKeys`.
   or handled elsewhere. It is a Standard Schema-compatible no-op validator that
   returns the input value as `T`.
 - OpenAPI generation requires a schema converter for the chosen schema library.
+- Flattened request keys are unique across `body`, `query`, `params`, and
+  `headers`. The `context` key is reserved for adapter handler context.
 
 ## Responses
 

@@ -222,7 +222,8 @@ api.todos.get.setData({ id: "todo_1" }, (current) =>
 ```
 
 The generated query key is based on the route key path inside the API contract,
-plus the request object when one exists.
+plus the request object when one exists. Request fields with `undefined` values
+are omitted from generated keys.
 
 ## Errors
 

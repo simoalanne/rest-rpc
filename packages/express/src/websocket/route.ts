@@ -3,6 +3,7 @@ import type {
 	InferServerRequest,
 	WebSocketRouteDeclaration,
 } from "@contract-first-api/core/contract";
+import { REQUEST_CONTEXT_KEY } from "@contract-first-api/core/contract";
 import {
 	type Contract,
 	createRouterBuilders,
@@ -23,7 +24,9 @@ type RequestValue<E extends WebSocketRouteDeclaration> =
 
 export type InferWebSocketRouteHandlerRequest<
 	E extends WebSocketRouteDeclaration,
-> = Merge<RequestValue<E> & { context: WebSocketRouteHandlerContext<E> }>;
+> = Merge<
+	RequestValue<E> & { [REQUEST_CONTEXT_KEY]: WebSocketRouteHandlerContext<E> }
+>;
 
 export type WebSocketRouteHandlerContext<
 	E extends WebSocketRouteDeclaration = WebSocketRouteDeclaration,

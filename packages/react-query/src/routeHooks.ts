@@ -40,8 +40,16 @@ const readHookOptionsArg = (route: RouteDeclaration, args: RequestArgs) =>
 		unknown
 	>;
 
+const omitUndefinedFields = (request: unknown) => {
+	if (typeof request !== "object" || request === null) return request;
+
+	return Object.fromEntries(
+		Object.entries(request).filter(([, value]) => value !== undefined),
+	);
+};
+
 export const getQueryKey = (request: unknown, path: string[]) =>
-	request ? [...path, request] : path;
+	request ? [...path, omitUndefinedFields(request)] : path;
 
 const splitFetchOptions = <
 	TOptions extends Record<string, unknown> | undefined,

@@ -51,6 +51,7 @@ export {
 	isStandardSchema,
 	isStreamBody,
 	noBody,
+	REQUEST_CONTEXT_KEY,
 	streamBody,
 } from "./route.ts";
 export { flattenContractRoutes, mapContractRoutes } from "./traversal.ts";

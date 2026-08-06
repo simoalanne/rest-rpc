@@ -9,6 +9,7 @@ import type {
 	RouteResponses,
 	ValidateHeaderSchemas,
 	ValidateRequestObjectSchemas,
+	ValidateRequestValueSchemas,
 	ValidateResponseStatuses,
 } from "./route.ts";
 import { validateContractAsync, validateContractSync } from "./validate.ts";
@@ -172,9 +173,10 @@ export type ApplyRouterOptions<
 
 export const route = <const TRoute extends RouteDeclaration>(
 	route: TRoute &
-		ValidateResponseStatuses<TRoute> &
-		ValidateHeaderSchemas<TRoute> &
-		ValidateRequestObjectSchemas<TRoute>,
+		ValidateResponseStatuses<NoInfer<TRoute>> &
+		ValidateHeaderSchemas<NoInfer<TRoute>> &
+		ValidateRequestValueSchemas<NoInfer<TRoute>> &
+		ValidateRequestObjectSchemas<NoInfer<TRoute>>,
 	options?: RouteContractOptions,
 ): TRoute => {
 	normalizeContract(route);
@@ -186,9 +188,10 @@ export const route = <const TRoute extends RouteDeclaration>(
 
 export const routeAsync = async <const TRoute extends RouteDeclaration>(
 	route: TRoute &
-		ValidateResponseStatuses<TRoute> &
-		ValidateHeaderSchemas<TRoute> &
-		ValidateRequestObjectSchemas<TRoute>,
+		ValidateResponseStatuses<NoInfer<TRoute>> &
+		ValidateHeaderSchemas<NoInfer<TRoute>> &
+		ValidateRequestValueSchemas<NoInfer<TRoute>> &
+		ValidateRequestObjectSchemas<NoInfer<TRoute>>,
 	options?: RouteContractOptions,
 ): Promise<TRoute> => {
 	normalizeContract(route);
@@ -203,9 +206,14 @@ export const router = <
 	const TOptions extends RouterContractOptions | undefined = undefined,
 >(
 	contract: TContract &
-		ValidateResponseStatuses<ApplyRouterOptions<TContract, TOptions>> &
-		ValidateHeaderSchemas<ApplyRouterOptions<TContract, TOptions>> &
-		ValidateRequestObjectSchemas<ApplyRouterOptions<TContract, TOptions>>,
+		ValidateResponseStatuses<NoInfer<ApplyRouterOptions<TContract, TOptions>>> &
+		ValidateHeaderSchemas<NoInfer<ApplyRouterOptions<TContract, TOptions>>> &
+		ValidateRequestValueSchemas<
+			NoInfer<ApplyRouterOptions<TContract, TOptions>>
+		> &
+		ValidateRequestObjectSchemas<
+			NoInfer<ApplyRouterOptions<TContract, TOptions>>
+		>,
 	commonOptions?: TOptions,
 ): ApplyRouterOptions<TContract, TOptions> => {
 	normalizeContract(contract, commonOptions);
@@ -220,9 +228,14 @@ export const routerAsync = async <
 	const TOptions extends RouterContractOptions | undefined = undefined,
 >(
 	contract: TContract &
-		ValidateResponseStatuses<ApplyRouterOptions<TContract, TOptions>> &
-		ValidateHeaderSchemas<ApplyRouterOptions<TContract, TOptions>> &
-		ValidateRequestObjectSchemas<ApplyRouterOptions<TContract, TOptions>>,
+		ValidateResponseStatuses<NoInfer<ApplyRouterOptions<TContract, TOptions>>> &
+		ValidateHeaderSchemas<NoInfer<ApplyRouterOptions<TContract, TOptions>>> &
+		ValidateRequestValueSchemas<
+			NoInfer<ApplyRouterOptions<TContract, TOptions>>
+		> &
+		ValidateRequestObjectSchemas<
+			NoInfer<ApplyRouterOptions<TContract, TOptions>>
+		>,
 	commonOptions?: TOptions,
 ): Promise<ApplyRouterOptions<TContract, TOptions>> => {
 	normalizeContract(contract, commonOptions);

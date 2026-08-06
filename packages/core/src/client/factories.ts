@@ -11,7 +11,7 @@ export const createClientTestContract = () =>
 				request: {
 					query: z.object({
 						search: z.string().optional(),
-						empty: z.string().optional().nullable(),
+						empty: z.string().optional(),
 					}),
 				},
 				responses: {

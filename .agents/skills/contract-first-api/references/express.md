@@ -90,7 +90,7 @@ Handlers receive one flattened request object:
 - `context`
 
 This depends on request field names being unique across locations in the
-contract.
+contract. Core reserves `context` for adapter handler context.
 
 ```ts
 const implementations = router(contract.todos, {

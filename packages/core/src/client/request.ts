@@ -1,6 +1,6 @@
 import type { RouteDeclaration } from "../contract/route.ts";
 import { isCustomBody, isNoBody } from "../contract/route.ts";
-import { groupRequestInput } from "../contract/validate.ts";
+import { groupRequestInput, pathParamPattern } from "../contract/validate.ts";
 import type {
 	ApiClientFetchOptions,
 	FetchArgs,
@@ -35,8 +35,19 @@ export const takesRequestInput = (route: RouteDeclaration) => {
 	return Boolean(route.request.body && !isNoBody(route.request.body));
 };
 
+const findHeader = (headers: Record<string, string>, name: string) =>
+	Object.keys(headers).find((header) => header.toLowerCase() === name);
+
 const hasHeader = (headers: Record<string, string>, name: string) =>
-	Object.keys(headers).some((header) => header.toLowerCase() === name);
+	findHeader(headers, name) !== undefined;
+
+const normalizeHeaders = (headers: Record<string, string> | undefined) =>
+	Object.fromEntries(
+		Object.entries(headers ?? {}).map(([key, value]) => [
+			key.toLowerCase(),
+			value,
+		]),
+	);
 
 export const assertNoContentTypeHeader = (headers: Record<string, string>) => {
 	if (hasHeader(headers, "content-type")) {
@@ -54,10 +65,70 @@ export const serializeCustomBody = (body: unknown, contentType: string) =>
 		? JSON.stringify(body)
 		: (body as BodyInit | null | undefined);
 
-const stringifyHeaders = (headers: Record<string, unknown> | undefined) =>
-	Object.fromEntries(
-		Object.entries(headers ?? {}).map(([key, value]) => [key, String(value)]),
+const isSerializablePrimitive = (value: unknown) =>
+	typeof value === "string" ||
+	typeof value === "boolean" ||
+	(typeof value === "number" && Number.isFinite(value));
+
+const stringifyRequestValue = (
+	route: RouteDeclaration,
+	segment: "params" | "query" | "headers",
+	key: string,
+	value: unknown,
+	optional = false,
+) => {
+	if (value === undefined && optional) return undefined;
+	if (isSerializablePrimitive(value)) return String(value);
+
+	throw new Error(
+		`Invalid ${segment} key "${key}" for ${route.method} ${route.path}. Expected string, number, or boolean.`,
 	);
+};
+
+const stringifyHeaders = (
+	route: RouteDeclaration,
+	headers: Record<string, unknown> | undefined,
+) =>
+	Object.fromEntries(
+		Object.entries(headers ?? {}).flatMap(([key, value]) => {
+			const stringValue = stringifyRequestValue(
+				route,
+				"headers",
+				key,
+				value,
+				true,
+			);
+			return stringValue === undefined ? [] : [[key, stringValue]];
+		}),
+	);
+
+const serializeParams = (
+	route: RouteDeclaration,
+	params: Record<string, unknown> | undefined,
+) => {
+	return route.path.replace(pathParamPattern, (_, key: string) => {
+		const value = stringifyRequestValue(route, "params", key, params?.[key]);
+		if (value === undefined) {
+			throw new Error(
+				`Invalid params key "${key}" for ${route.method} ${route.path}. Expected string, number, or boolean.`,
+			);
+		}
+		return encodeURIComponent(value);
+	});
+};
+
+const serializeQuery = (
+	route: RouteDeclaration,
+	query: Record<string, unknown> | undefined,
+) => {
+	const entries = Object.entries(query ?? {}).flatMap(([key, value]) => {
+		const stringValue = stringifyRequestValue(route, "query", key, value, true);
+		return stringValue === undefined ? [] : [[key, stringValue]];
+	});
+
+	const search = new URLSearchParams(entries).toString();
+	return search ? `?${search}` : "";
+};
 
 export const constructBaseRequest = (
 	baseUrl: string,
@@ -76,21 +147,7 @@ export const constructBaseRequest = (
 	const request = groupRequestInput(route, args, { unknownRequestKeys });
 	const { body, query, params, headers } = request;
 
-	if (params) {
-		for (const [k, v] of Object.entries(params)) {
-			urlBase = urlBase.replace(`:${k}`, encodeURIComponent(String(v)));
-		}
-	}
-
-	if (query) {
-		Object.entries(query).forEach(([k, v]) => {
-			if (v === undefined || v === null) {
-				delete query[k];
-			}
-		});
-
-		urlBase += `?${new URLSearchParams(query as Record<string, string>)}`;
-	}
+	urlBase = `${baseUrl}${serializeParams(route, params)}${serializeQuery(route, query)}`;
 
 	if (isCustomBody(route.request?.body)) {
 		const contentType = route.request.body.contentType;
@@ -98,7 +155,7 @@ export const constructBaseRequest = (
 			url: urlBase,
 			body: serializeCustomBody(body, contentType),
 			contentType,
-			headers: stringifyHeaders(headers),
+			headers: stringifyHeaders(route, headers),
 		};
 	}
 
@@ -106,7 +163,7 @@ export const constructBaseRequest = (
 		url: urlBase,
 		body: body ? JSON.stringify(body) : undefined,
 		contentType: body ? "application/json" : undefined,
-		headers: stringifyHeaders(headers),
+		headers: stringifyHeaders(route, headers),
 	};
 };
 
@@ -159,9 +216,9 @@ export const executeRequest = async <E extends RouteDeclaration>(
 			method: route.method,
 			body,
 			headers: {
-				...headers,
-				...requestHeaders,
-				...(contentType ? { "Content-Type": contentType } : {}),
+				...normalizeHeaders(headers),
+				...normalizeHeaders(requestHeaders),
+				...(contentType ? { "content-type": contentType } : {}),
 			},
 			signal: signalState?.signal ?? fetchOptions?.signal,
 		});

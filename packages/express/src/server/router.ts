@@ -6,6 +6,7 @@ import type {
 	InferServerSuccessBody,
 	RouteDeclaration,
 } from "@contract-first-api/core/contract";
+import { REQUEST_CONTEXT_KEY } from "@contract-first-api/core/contract";
 import type { Request } from "express";
 
 export type EmptyObject = Record<never, never>;
@@ -29,7 +30,7 @@ type HandlerResult<E extends HttpRouteDeclaration> = MaybePromise<
 >;
 
 export type InferRouteHandlerRequest<E extends HttpRouteDeclaration> = Merge<
-	RequestValue<E> & { context: HttpRouteHandlerContext }
+	RequestValue<E> & { [REQUEST_CONTEXT_KEY]: HttpRouteHandlerContext }
 >;
 
 export type InferRouteHandlerResponse<E extends HttpRouteDeclaration> =

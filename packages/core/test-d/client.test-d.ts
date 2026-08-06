@@ -43,6 +43,20 @@ const api = router({
 				404: errorSchema,
 			},
 		},
+		search: {
+			method: "GET",
+			path: "/todos/search",
+			request: {
+				query: z.object({
+					includeDone: z.boolean().optional(),
+					page: z.number(),
+					search: z.string(),
+				}),
+			},
+			responses: {
+				200: z.array(todoSchema),
+			},
+		},
 		create: {
 			method: "POST",
 			path: "/todos",
@@ -84,6 +98,13 @@ expectType<Promise<Array<{ id: string; title: string }>>>(
 expectType<Promise<{ total: number }>>(client.todos.stats.fetch());
 expectType<Promise<{ id: string; title: string }>>(
 	client.todos.get.fetch({ id: "todo-1" }),
+);
+expectType<Promise<Array<{ id: string; title: string }>>>(
+	client.todos.search.fetch({
+		includeDone: false,
+		page: 1,
+		search: "milk",
+	}),
 );
 expectType<Promise<{ id: string; title: string }>>(
 	client.todos.create.fetch({ title: "Write type tests" }),

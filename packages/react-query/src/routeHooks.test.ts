@@ -291,7 +291,8 @@ describe("createRouteHooks", () => {
 		const createRouteHooks = await getCreateRouteHooks(calls);
 		const queryClient = createQueryClientMock();
 		resetQueryClientMock(queryClient);
-		const request = { id: "item-4" };
+		const request = { id: "item-4", optional: undefined };
+		const requestKey = { id: "item-4" };
 		const updater = (current: unknown) => current;
 		const hooks = createRouteHooks(
 			routeWithRequest,
@@ -306,7 +307,7 @@ describe("createRouteHooks", () => {
 			queryClient.queryClient as any,
 		);
 
-		assert.deepEqual(hooks.getKey(request), ["items", "byId", request]);
+		assert.deepEqual(hooks.getKey(request), ["items", "byId", requestKey]);
 		assert.deepEqual(listHooks.getKey(), ["items", "list"]);
 
 		await hooks.invalidate(request);
@@ -315,16 +316,16 @@ describe("createRouteHooks", () => {
 		listHooks.setData(updater);
 
 		assert.deepEqual(queryClient.invalidateQueriesCalls, [
-			[{ queryKey: ["items", "byId", request] }],
+			[{ queryKey: ["items", "byId", requestKey] }],
 		]);
 		assert.deepEqual(queryClient.cancelQueriesCalls, [
-			[{ queryKey: ["items", "byId", request] }],
+			[{ queryKey: ["items", "byId", requestKey] }],
 		]);
 		assert.deepEqual(queryClient.removeQueriesCalls, [
-			[{ queryKey: ["items", "byId", request] }],
+			[{ queryKey: ["items", "byId", requestKey] }],
 		]);
 		assert.deepEqual(queryClient.setQueryDataCalls, [
-			[["items", "byId", request], updater],
+			[["items", "byId", requestKey], updater],
 		]);
 		assert.deepEqual(queryClient.setQueriesDataCalls, [
 			[{ queryKey: ["items", "list"] }, updater],

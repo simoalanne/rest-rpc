@@ -3,6 +3,9 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 export type RequestSegment = "body" | "query" | "params" | "headers";
 export type RequestKeys = Record<string, RequestSegment>;
+export const REQUEST_CONTEXT_KEY = "context";
+type RequestPrimitive = string | number | boolean;
+type OptionalRequestPrimitive = RequestPrimitive | undefined;
 
 export type NoBody = {
 	kind: "noBody";
@@ -389,11 +392,18 @@ type InferRequestObjectSegment<
 		? InferRequestSchemaRecord<TSegment, TIO>
 		: never;
 
-type HeaderValue = string | number | boolean | undefined;
 type RequestObjectValue = Record<string, unknown>;
 
 type HeaderSchemaValueError = {
-	readonly __route_error__: "Header schema must output string, number, boolean, or undefined.";
+	readonly __route_error__: "Header schema must input string, number, boolean, or undefined.";
+};
+
+type QuerySchemaValueError = {
+	readonly __route_error__: "Query schema values must input string, number, boolean, or undefined.";
+};
+
+type ParamsSchemaValueError = {
+	readonly __route_error__: "Params schema values must input string, number, or boolean.";
 };
 
 type RequestSchemaObjectError<TSegment extends RequestSegment> = {
@@ -411,17 +421,36 @@ type SchemaInputsOnly<TSchema, TValue> = [
 	? true
 	: false;
 
-type InvalidHeaderKeys<THeaders extends RequestSchemaRecord> = {
-	[K in keyof THeaders]: SchemaInputsOnly<THeaders[K], HeaderValue> extends true
+type InvalidRequestRecordKeys<TRecord extends RequestSchemaRecord, TValue> = {
+	[K in keyof TRecord]: SchemaInputsOnly<TRecord[K], TValue> extends true
 		? never
 		: K;
-}[keyof THeaders];
+}[keyof TRecord];
 
-type ValidateHeaderRecord<THeaders extends RequestSchemaRecord> = [
-	InvalidHeaderKeys<THeaders>,
-] extends [never]
+type ValidateRequestRecord<
+	TRecord extends RequestSchemaRecord,
+	TValue,
+	TError,
+> = [InvalidRequestRecordKeys<TRecord, TValue>] extends [never]
 	? unknown
-	: HeaderSchemaValueError;
+	: TError;
+
+type ValidateHeaderRecord<THeaders extends RequestSchemaRecord> =
+	ValidateRequestRecord<
+		THeaders,
+		OptionalRequestPrimitive,
+		HeaderSchemaValueError
+	>;
+
+type ValidateQueryRecord<TQuery extends RequestSchemaRecord> =
+	ValidateRequestRecord<
+		TQuery,
+		OptionalRequestPrimitive,
+		QuerySchemaValueError
+	>;
+
+type ValidateParamsRecord<TParams extends RequestSchemaRecord> =
+	ValidateRequestRecord<TParams, RequestPrimitive, ParamsSchemaValueError>;
 
 type ValidateRequestObjectSchema<
 	TSchema,
@@ -541,6 +570,23 @@ export type ValidateHeaderSchemas<T> = T extends RouteDeclaration
 			}
 		: unknown;
 
+export type ValidateRequestValueSchemas<T> = T extends RouteDeclaration
+	? T extends {
+			request: infer TRequest;
+		}
+		? (TRequest extends { query: infer TQuery extends RequestSchemaRecord }
+				? ValidateQueryRecord<TQuery>
+				: unknown) &
+				(TRequest extends { params: infer TParams extends RequestSchemaRecord }
+					? ValidateParamsRecord<TParams>
+					: unknown)
+		: unknown
+	: T extends object
+		? {
+				[K in keyof T]: ValidateRequestValueSchemas<T[K]>;
+			}
+		: unknown;
+
 export type ValidateRequestObjectSchemas<T> = T extends RouteDeclaration
 	? T extends {
 			request: infer TRequest;
@@ -548,11 +594,11 @@ export type ValidateRequestObjectSchemas<T> = T extends RouteDeclaration
 		? (TRequest extends { body: infer TBody }
 				? ValidateRequestObjectSchema<TBody, "body">
 				: unknown) &
-				(TRequest extends { query: infer TQuery }
-					? ValidateRequestObjectSchema<TQuery, "query">
-					: unknown) &
 				(TRequest extends { params: infer TParams }
 					? ValidateRequestObjectSchema<TParams, "params">
+					: unknown) &
+				(TRequest extends { query: infer TQuery }
+					? ValidateRequestObjectSchema<TQuery, "query">
 					: unknown)
 		: unknown
 	: T extends object

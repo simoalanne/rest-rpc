@@ -80,6 +80,57 @@ describe("router", () => {
 
 		assert.deepEqual(contract.ping.request.requestKeys, {});
 	});
+
+	it("rejects reserved common content-type headers", () => {
+		assert.throws(
+			() =>
+				router(
+					{
+						ping: {
+							method: "GET",
+							path: "/ping",
+							responses: {
+								204: noBody(),
+							},
+						},
+					},
+					{
+						commonHeaders: {
+							"content-type": z.string(),
+						},
+					},
+				),
+			/reserved header key "content-type"/,
+		);
+	});
+
+	it("rejects common and route headers that differ only by case", () => {
+		assert.throws(
+			() =>
+				router(
+					{
+						ping: {
+							method: "GET",
+							path: "/ping",
+							request: {
+								headers: {
+									"X-Trace-ID": z.string(),
+								},
+							},
+							responses: {
+								204: noBody(),
+							},
+						},
+					},
+					{
+						commonHeaders: {
+							"x-trace-id": z.string(),
+						},
+					},
+				),
+			/duplicate header keys that differ only by case/,
+		);
+	});
 });
 
 describe("routerAsync", () => {
