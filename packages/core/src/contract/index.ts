@@ -35,6 +35,7 @@ export {
 	customBody,
 	isCustomBody,
 	isNoBody,
+	isRequestSchemaRecord,
 	isStandardSchema,
 	isStreamBody,
 	noBody,

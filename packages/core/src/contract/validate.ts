@@ -12,7 +12,12 @@ import type {
 	RequestSegment,
 	RouteDeclaration,
 } from "./route.ts";
-import { isCustomBody, isNoBody, isStandardSchema } from "./route.ts";
+import {
+	isCustomBody,
+	isNoBody,
+	isRequestSchemaRecord,
+	isStandardSchema,
+} from "./route.ts";
 import { contractRoutes } from "./traversal.ts";
 
 export type ValidateContractOptions = RequestKeyResolverOptions;
@@ -80,12 +85,10 @@ const requestSchemas = (request: RequestSchema) =>
 			"body",
 			isCustomBody(request.body) || isNoBody(request.body)
 				? undefined
-				: isStandardSchema(request.body)
-					? request.body
-					: undefined,
+				: request.body,
 		],
-		["query", isStandardSchema(request.query) ? request.query : undefined],
-		["params", isStandardSchema(request.params) ? request.params : undefined],
+		["query", request.query],
+		["params", request.params],
 	] as const;
 
 const applyHeaderRequestKeys = (route: RouteDeclaration) => {
@@ -152,15 +155,6 @@ export const groupRequestInput = (
 	}, {} as GroupedRequestInput);
 };
 
-const isSchemaRecord = (
-	value: unknown,
-): value is Record<string, StandardSchemaV1> =>
-	typeof value === "object" &&
-	value !== null &&
-	!isStandardSchema(value) &&
-	!isCustomBody(value as RequestSchema["body"]) &&
-	!isNoBody(value as RequestSchema["body"]);
-
 const assignFlatObject = (data: FlatRequestInput, value: unknown) => {
 	if (typeof value === "object" && value !== null) {
 		Object.assign(data, value);
@@ -214,9 +208,43 @@ const validateFlatRequestSegment = (
 		return;
 	}
 
-	if (isSchemaRecord(declaration)) {
+	if (isRequestSchemaRecord(declaration)) {
 		validateSchemaRecord(declaration, grouped[segment], data, errors);
 	}
+};
+
+const resolveRequestKeysForSchemaSync = (
+	route: RouteDeclaration,
+	segment: "body" | "query" | "params",
+	schema: StandardSchemaV1 | Record<string, StandardSchemaV1>,
+	options?: ValidateContractOptions,
+) => {
+	if (isRequestSchemaRecord(schema)) return Object.keys(schema);
+
+	const keys = resolveSchemaKeysSync(schema, options);
+	if (!keys) {
+		throw new Error(
+			`Could not resolve request keys for ${segment} schema on ${route.method} ${route.path}. Provide request.requestKeys or a resolveRequestKeys option.`,
+		);
+	}
+	return keys;
+};
+
+const resolveRequestKeysForSchemaAsync = async (
+	route: RouteDeclaration,
+	segment: "body" | "query" | "params",
+	schema: StandardSchemaV1 | Record<string, StandardSchemaV1>,
+	options?: ValidateContractOptions,
+) => {
+	if (isRequestSchemaRecord(schema)) return Object.keys(schema);
+
+	const keys = await resolveSchemaKeysAsync(schema, options);
+	if (!keys) {
+		throw new Error(
+			`Could not resolve request keys for ${segment} schema on ${route.method} ${route.path}. Provide request.requestKeys or a resolveRequestKeys option.`,
+		);
+	}
+	return keys;
 };
 
 export const validateFlatRequestInput = (
@@ -257,12 +285,12 @@ export const validateContractSync = <TContract extends Contract>(
 		const requestKeys: RequestKeys = {};
 		for (const [segment, schema] of requestSchemas(route.request)) {
 			if (!schema) continue;
-			const keys = resolveSchemaKeysSync(schema, options);
-			if (!keys) {
-				throw new Error(
-					`Could not resolve request keys for ${segment} schema on ${route.method} ${route.path}. Provide request.requestKeys or a resolveRequestKeys option.`,
-				);
-			}
+			const keys = resolveRequestKeysForSchemaSync(
+				route,
+				segment,
+				schema,
+				options,
+			);
 			assertNoDuplicateKeys(route, [...Object.keys(requestKeys), ...keys]);
 			for (const key of keys) requestKeys[key] = segment;
 		}
@@ -294,12 +322,12 @@ export const validateContractAsync = async <TContract extends Contract>(
 		const requestKeys: RequestKeys = {};
 		for (const [segment, schema] of requestSchemas(route.request)) {
 			if (!schema) continue;
-			const keys = await resolveSchemaKeysAsync(schema, options);
-			if (!keys) {
-				throw new Error(
-					`Could not resolve request keys for ${segment} schema on ${route.method} ${route.path}. Provide request.requestKeys or a resolveRequestKeys option.`,
-				);
-			}
+			const keys = await resolveRequestKeysForSchemaAsync(
+				route,
+				segment,
+				schema,
+				options,
+			);
 			assertNoDuplicateKeys(route, [...Object.keys(requestKeys), ...keys]);
 			for (const key of keys) requestKeys[key] = segment;
 		}

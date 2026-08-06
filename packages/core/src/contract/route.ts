@@ -125,6 +125,15 @@ export const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
 export const isStandardSchema = (value: unknown): value is StandardSchemaV1 =>
 	typeof value === "object" && value !== null && "~standard" in value;
 
+export const isRequestSchemaRecord = (
+	value: unknown,
+): value is RequestSchemaRecord =>
+	typeof value === "object" &&
+	value !== null &&
+	!isStandardSchema(value) &&
+	!isCustomBody(value as RequestBodySchema) &&
+	!isNoBody(value as RequestBodySchema);
+
 export type InferResponseBody<TResponse> = TResponse extends StandardSchemaV1
 	? StandardSchemaV1.InferOutput<TResponse>
 	: TResponse extends NoBody

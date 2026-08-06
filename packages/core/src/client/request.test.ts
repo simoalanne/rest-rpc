@@ -34,6 +34,54 @@ describe("ApiClient requests", () => {
 		assert.equal(calls[1]?.url, "https://api.test/todos?search=milk");
 	});
 
+	it("builds requests from schema record request declarations", async () => {
+		const apiContract = router({
+			todos: {
+				update: {
+					method: "POST",
+					path: "/todos/:id",
+					request: {
+						params: {
+							id: z.string(),
+						},
+						query: {
+							page: z.number(),
+						},
+						body: {
+							title: z.string(),
+						},
+						headers: {
+							"x-request-id": z.number(),
+						},
+					},
+					responses: {
+						200: z.object({ id: z.string(), title: z.string() }),
+					},
+				},
+			},
+		});
+		const calls = captureFetch(
+			jsonResponse({ id: "todo-1", title: "Updated" }),
+		);
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+		});
+
+		await client.todos.update.fetch({
+			id: "todo-1",
+			page: 2,
+			title: "Updated",
+			"x-request-id": 123,
+		});
+
+		assert.equal(calls[0]?.url, "https://api.test/todos/todo-1?page=2");
+		assert.equal(calls[0]?.init?.body, '{"title":"Updated"}');
+		assert.deepEqual(calls[0]?.init?.headers, {
+			"Content-Type": "application/json",
+			"x-request-id": "123",
+		});
+	});
+
 	it("sends JSON request bodies with generated content type", async () => {
 		const calls = captureFetch(
 			jsonResponse({ id: "todo-1", title: "Buy milk" }, 201),

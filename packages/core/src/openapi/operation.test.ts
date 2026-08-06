@@ -42,6 +42,36 @@ describe("OpenAPI operations", () => {
 		);
 	});
 
+	it("creates request parameters from schema records", () => {
+		const params = createParameters(
+			{ id: z.string() },
+			"path",
+			schemaConverter,
+		);
+		const query = createParameters(
+			{
+				search: z.string(),
+				page: z.number(),
+			},
+			"query",
+			schemaConverter,
+		);
+
+		assert.deepEqual(
+			[...params, ...query].map((parameter) => ({
+				name: parameter.name,
+				in: parameter.in,
+				required: parameter.required,
+				type: parameter.schema?.type,
+			})),
+			[
+				{ name: "id", in: "path", required: true, type: "string" },
+				{ name: "search", in: "query", required: undefined, type: "string" },
+				{ name: "page", in: "query", required: undefined, type: "number" },
+			],
+		);
+	});
+
 	it("creates request header parameters", () => {
 		const headers = createHeaderParameters(
 			{
@@ -78,6 +108,31 @@ describe("OpenAPI operations", () => {
 		assert.equal(custom?.content["text/csv"].schema.type, "string");
 	});
 
+	it("creates JSON request bodies from schema records", () => {
+		const body = createRequestBody(
+			{
+				title: z.string(),
+				priority: z.number(),
+			},
+			schemaConverter,
+		);
+
+		assert.deepEqual(body, {
+			required: true,
+			content: {
+				"application/json": {
+					schema: {
+						type: "object",
+						properties: {
+							title: { type: "string" },
+							priority: { type: "number" },
+						},
+					},
+				},
+			},
+		});
+	});
+
 	it("omits explicit no-body request bodies", () => {
 		assert.equal(createRequestBody(noBody(), schemaConverter), undefined);
 	});
@@ -105,9 +160,9 @@ describe("OpenAPI operations", () => {
 			path: "/todos/:id",
 			method: "POST",
 			request: {
-				params: z.object({ id: z.string() }),
+				params: { id: z.string() },
 				headers: { "x-api-key": z.string() },
-				body: z.object({ title: z.string() }),
+				body: { title: z.string() },
 			},
 			responses: {
 				201: z.object({ id: z.string() }),

@@ -6,6 +6,7 @@ import { testContract } from "./factories.ts";
 import { customBody } from "./route.ts";
 import {
 	groupRequestInput,
+	validateContractAsync,
 	validateContractSync,
 	validateFlatRequestInput,
 } from "./validate.ts";
@@ -48,6 +49,56 @@ describe("validateContractSync", () => {
 			id: "params",
 			q: "query",
 			title: "body",
+		});
+	});
+
+	it("populates request keys from schema record request declarations", () => {
+		const contract = validateContractSync(
+			testContract({
+				path: "/search/:id",
+				request: {
+					params: {
+						id: z.string(),
+					},
+					query: {
+						q: z.string().optional(),
+					},
+					body: {
+						title: z.string(),
+					},
+					headers: {
+						"x-request-id": z.string(),
+					},
+				},
+			}),
+		);
+
+		assert.deepEqual(contract.search.find.request.requestKeys, {
+			id: "params",
+			q: "query",
+			title: "body",
+			"x-request-id": "headers",
+		});
+	});
+
+	it("populates async request keys from schema record request declarations", async () => {
+		const contract = await validateContractAsync(
+			testContract({
+				path: "/search/:id",
+				request: {
+					params: {
+						id: z.string(),
+					},
+					query: {
+						q: z.string().optional(),
+					},
+				},
+			}),
+		);
+
+		assert.deepEqual(contract.search.find.request.requestKeys, {
+			id: "params",
+			q: "query",
 		});
 	});
 

@@ -3,7 +3,12 @@ import type {
 	RequestSchemaRecord,
 	ResponseBodySchema,
 } from "../contract/route.ts";
-import { isCustomBody, isNoBody, isStandardSchema } from "../contract/route.ts";
+import {
+	isCustomBody,
+	isNoBody,
+	isRequestSchemaRecord,
+	isStandardSchema,
+} from "../contract/route.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import {
 	convertSchema,
@@ -22,12 +27,34 @@ import type {
 
 export const JSON_CONTENT_TYPE = "application/json";
 
+const createSchemaRecordObject = (
+	schemas: RequestSchemaRecord,
+	converter: SchemaConverter | undefined,
+) => ({
+	type: "object",
+	properties: Object.fromEntries(
+		Object.entries(schemas).map(([name, schema]) => [
+			name,
+			convertSchema(schema, "input", converter),
+		]),
+	),
+});
+
 export const createParameters = (
 	schema: StandardSchemaV1 | RequestSchemaRecord | undefined,
 	location: "path" | "query",
 	converter: SchemaConverter | undefined,
 ): OpenApiParameter[] => {
-	if (!isStandardSchema(schema)) return [];
+	if (!schema) return [];
+
+	if (isRequestSchemaRecord(schema)) {
+		return Object.entries(schema).map(([name, fieldSchema]) => ({
+			name,
+			in: location,
+			required: location === "path" ? true : undefined,
+			schema: convertSchema(fieldSchema, "input", converter),
+		}));
+	}
 
 	const jsonSchema = convertSchema(schema, "input", converter);
 	const properties = getSchemaProperties(jsonSchema);
@@ -64,13 +91,18 @@ export const createRequestBody = (
 		? schema.contentType
 		: JSON_CONTENT_TYPE;
 	const bodySchema = isCustomBody(schema) ? schema.schema : schema;
-	if (!isStandardSchema(bodySchema)) return undefined;
+	const openApiSchema = isRequestSchemaRecord(bodySchema)
+		? createSchemaRecordObject(bodySchema, converter)
+		: isStandardSchema(bodySchema)
+			? convertSchema(bodySchema, "input", converter)
+			: undefined;
+	if (!openApiSchema) return undefined;
 
 	return {
 		required: true,
 		content: {
 			[contentType]: {
-				schema: convertSchema(bodySchema, "input", converter),
+				schema: openApiSchema,
 			},
 		},
 	};
