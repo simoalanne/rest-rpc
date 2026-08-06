@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { router as defineRouter } from "@contract-first-api/core/contract";
+import { router } from "@contract-first-api/server";
 import type { Application, Request, Response } from "express";
 import z from "zod";
-import { router } from "../server/router.ts";
 import { registerRoutes } from "./registerRoutes.ts";
 
 type RegisteredHandler = (req: Request, res: Response) => Promise<void>;

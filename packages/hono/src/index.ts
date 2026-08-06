@@ -14,7 +14,7 @@ import {
 	router as serverRouter,
 	routes as serverRoutes,
 	sortImplementations,
-} from "@contract-first-api/express/server";
+} from "@contract-first-api/server";
 import type { Context, Hono } from "hono";
 import type { Env } from "hono/types";
 

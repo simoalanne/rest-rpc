@@ -10,7 +10,7 @@ import {
 	type ImplementationTree,
 	type ImplementationTreeFor,
 	type RouteImplementation,
-} from "../server/router.ts";
+} from "@contract-first-api/server";
 import type { InferRouteServerSocket } from "./socket.ts";
 
 type EmptyObject = Record<never, never>;

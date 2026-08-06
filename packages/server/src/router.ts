@@ -1,4 +1,3 @@
-import type { OutgoingHttpHeader } from "node:http";
 import type {
 	HttpRouteDeclaration,
 	InferServerRequest,
@@ -7,6 +6,7 @@ import type {
 	RouteDeclaration,
 } from "@contract-first-api/core/contract";
 import { REQUEST_CONTEXT_KEY } from "@contract-first-api/core/contract";
+import type { HttpHeaders } from "./headers.ts";
 
 export type EmptyObject = Record<never, never>;
 type MaybePromise<T> = T | Promise<T>;
@@ -24,7 +24,7 @@ type RequestValue<E extends RouteDeclaration> =
 	InferServerRequest<E> extends never ? EmptyObject : InferServerRequest<E>;
 
 type HandlerResult<E extends HttpRouteDeclaration> = MaybePromise<
-	| (InferServerResponse<E> & { headers?: Record<string, OutgoingHttpHeader> })
+	| (InferServerResponse<E> & { headers?: HttpHeaders })
 	| InferServerSuccessBody<E>
 >;
 

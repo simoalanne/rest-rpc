@@ -3,7 +3,8 @@ export type {
 	HttpRouteResult,
 } from "./handleHttpRoute.ts";
 export { handleHttpRoute } from "./handleHttpRoute.ts";
-export { matchRoute } from "./match.ts";
+export type { HttpHeaders, HttpHeaderValue } from "./headers.ts";
+export { createPathMatcher, matchRoute } from "./match.ts";
 export {
 	ContractResponseError,
 	getResponseSchema,
@@ -23,7 +24,7 @@ export type {
 	RouteImplementation,
 	RuntimeRouteHandler,
 } from "./router.ts";
-export { route, router, routes } from "./router.ts";
+export { createRouterBuilders, route, router, routes } from "./router.ts";
 export {
 	flattenImplementationTree,
 	sortImplementations,

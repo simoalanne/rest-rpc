@@ -1,24 +1,26 @@
 export { isCustomBody } from "@contract-first-api/core/contract";
 
 import type { HttpRouteDeclaration } from "@contract-first-api/core/contract";
-import type { Request } from "express";
 import {
 	type Contract,
+	ContractResponseError,
 	type ImplementationShape,
 	type ImplementationTreeFor,
+	type InferRouteHandlerResponse,
+	matchRoute,
 	type RouteImplementation,
 	type InferRouteHandlerRequest as ServerInferRouteHandlerRequest,
 	type RouteHandler as ServerRouteHandler,
 	route as serverRoute,
 	router as serverRouter,
 	routes as serverRoutes,
-} from "../server/router.ts";
+} from "@contract-first-api/server";
+import type { Request } from "express";
 
-export { matchRoute } from "../server/match.ts";
-export { ContractResponseError } from "../server/response.ts";
-export type { InferRouteHandlerResponse } from "../server/router.ts";
 export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
+export type { InferRouteHandlerResponse };
+export { ContractResponseError, matchRoute };
 
 export type HttpRouteHandlerContext = {
 	req: Request;

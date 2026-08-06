@@ -1,0 +1,40 @@
+{
+	"name": "@contract-first-api/server",
+	"version": "4.4.0",
+	"type": "module",
+	"description": "Shared server-side route validation, handler typing, and response normalization for contract-first-api adapters.",
+	"keywords": [
+		"contract-first",
+		"api",
+		"typescript",
+		"standard-schema",
+		"backend"
+	],
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/simoalanne/contract-first-api.git"
+	},
+	"homepage": "https://github.com/simoalanne/contract-first-api#readme",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"prepack": "pnpm run build",
+		"prepublishOnly": "node ../../scripts/ensure-pnpm-publish.cjs",
+		"typecheck": "tsc -p tsconfig.json",
+		"test": "node --test src/**/*.test.ts"
+	},
+	"dependencies": {
+		"@contract-first-api/core": "workspace:^"
+	}
+}

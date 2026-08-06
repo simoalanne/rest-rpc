@@ -1,10 +1,10 @@
-import type { OutgoingHttpHeader } from "node:http";
 import { validateStandardSchemaSync } from "@contract-first-api/core";
 import type {
 	HttpRouteDeclaration,
 	ResponseBodySchema,
 } from "@contract-first-api/core/contract";
 import { REQUEST_CONTEXT_KEY } from "@contract-first-api/core/contract";
+import type { HttpHeaders } from "./headers.ts";
 import {
 	ContractResponseError,
 	getResponseSchema,
@@ -21,7 +21,7 @@ import {
 
 type HttpRouteResultBase = {
 	status: number;
-	headers?: Record<string, OutgoingHttpHeader>;
+	headers?: HttpHeaders;
 };
 
 export type HttpRouteResult =
@@ -84,7 +84,7 @@ const normalizeResponseResult = (
 	result: {
 		status: number;
 		body: unknown;
-		headers?: Record<string, OutgoingHttpHeader>;
+		headers?: HttpHeaders;
 	},
 ): HttpRouteResult => {
 	const schema = getResponseSchema(route, result.status);

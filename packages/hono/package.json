@@ -15,7 +15,7 @@
 		"dist"
 	],
 	"scripts": {
-		"build": "pnpm --filter @contract-first-api/express build && tsc -p tsconfig.build.json",
+		"build": "pnpm --filter @contract-first-api/server build && tsc -p tsconfig.build.json",
 		"prepack": "pnpm run build",
 		"prepublishOnly": "node ../../scripts/ensure-pnpm-publish.cjs",
 		"typecheck": "pnpm run build && tsc -p tsconfig.json",
@@ -23,7 +23,7 @@
 	},
 	"dependencies": {
 		"@contract-first-api/core": "workspace:^",
-		"@contract-first-api/express": "workspace:^"
+		"@contract-first-api/server": "workspace:^"
 	},
 	"peerDependencies": {
 		"hono": "^4.0.0"

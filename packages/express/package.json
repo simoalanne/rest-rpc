@@ -23,10 +23,6 @@
 		".": {
 			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js"
-		},
-		"./server": {
-			"types": "./dist/server/index.d.ts",
-			"import": "./dist/server/index.js"
 		}
 	},
 	"files": [
@@ -37,13 +33,14 @@
 		"prepack": "pnpm run build",
 		"prepublishOnly": "node ../../scripts/ensure-pnpm-publish.cjs",
 		"typecheck": "tsc -p tsconfig.json && tsd",
-		"test": "node --test src/**/*.test.ts"
+		"test": "pnpm --filter @contract-first-api/server build && node --test src/**/*.test.ts"
 	},
 	"tsd": {
 		"directory": "test-d"
 	},
 	"dependencies": {
-		"@contract-first-api/core": "workspace:^"
+		"@contract-first-api/core": "workspace:^",
+		"@contract-first-api/server": "workspace:^"
 	},
 	"devDependencies": {
 		"@types/express": "^5.0.1",

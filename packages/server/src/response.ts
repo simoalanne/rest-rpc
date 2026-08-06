@@ -1,4 +1,3 @@
-import type { OutgoingHttpHeader } from "node:http";
 import type {
 	InferServerErrors,
 	InferServerResponse,
@@ -8,6 +7,7 @@ import type {
 	StreamBody,
 } from "@contract-first-api/core/contract";
 import { isNoBody, isStreamBody } from "@contract-first-api/core/contract";
+import type { HttpHeaders } from "./headers.ts";
 import { isHttpRoute } from "./router.ts";
 
 export class ContractResponseError<
@@ -60,7 +60,7 @@ export const normalizeHandlerResult = (
 ): {
 	status: number;
 	body: unknown;
-	headers?: Record<string, OutgoingHttpHeader>;
+	headers?: HttpHeaders;
 } => {
 	if (
 		result &&

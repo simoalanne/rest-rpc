@@ -2,13 +2,13 @@ import type {
 	HttpMethod,
 	HttpRouteDeclaration,
 } from "@contract-first-api/core/contract";
-import type { Application, Request, Response } from "express";
-import { handleHttpRoute } from "../server/handleHttpRoute.ts";
-import type { ImplementationTree } from "../server/router.ts";
 import {
 	flattenImplementationTree,
+	handleHttpRoute,
+	type ImplementationTree,
 	sortImplementations,
-} from "../server/routeTree.ts";
+} from "@contract-first-api/server";
+import type { Application, Request, Response } from "express";
 import { writeStreamResponse } from "./response.ts";
 
 export type RegisterRoutesOptions = Record<never, never>;
@@ -37,6 +37,7 @@ export const registerRoutes = (
 				for (const [headerName, headerValue] of Object.entries(
 					result.headers,
 				)) {
+					if (headerValue === undefined) continue;
 					res.setHeader(headerName, headerValue);
 				}
 			}
