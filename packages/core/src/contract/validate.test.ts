@@ -1,9 +1,35 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
+import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { testContract } from "./factories.ts";
 import { customBody } from "./route.ts";
-import { validateContractSync } from "./validate.ts";
+import {
+	groupRequestInput,
+	validateContractSync,
+	validateFlatRequestInput,
+} from "./validate.ts";
+
+const transformSchema = <TOutput>(
+	transform: (value: unknown) => TOutput,
+): StandardSchemaV1<unknown, TOutput> => ({
+	"~standard": {
+		version: 1,
+		vendor: "test",
+		validate: (value) => ({ value: transform(value) }),
+	},
+});
+
+const issueSchema = (message: string): StandardSchemaV1 => ({
+	"~standard": {
+		version: 1,
+		vendor: "test",
+		validate: () => ({ issues: [{ message }] }),
+	},
+});
+
+const recordValue = (value: unknown, key: string) =>
+	(value as Record<string, unknown>)[key];
 
 describe("validateContractSync", () => {
 	it("populates request keys from request schemas", () => {
@@ -152,5 +178,216 @@ describe("validateContractSync", () => {
 				),
 			/without a matching path param/,
 		);
+	});
+});
+
+describe("groupRequestInput", () => {
+	it("groups flattened request input from request key metadata", () => {
+		const route = testContract({
+			path: "/search/:id",
+			request: {
+				body: z.object({ title: z.string() }),
+				query: z.object({ q: z.string() }),
+				params: z.object({ id: z.string() }),
+				headers: { "x-request-id": z.string() },
+				requestKeys: {
+					id: "params",
+					q: "query",
+					title: "body",
+					"x-request-id": "headers",
+				},
+			},
+		}).search.find;
+
+		assert.deepEqual(
+			groupRequestInput(route, {
+				id: "todo-1",
+				q: "milk",
+				title: "Buy milk",
+				"x-request-id": "req-1",
+			}),
+			{
+				params: { id: "todo-1" },
+				query: { q: "milk" },
+				body: { title: "Buy milk" },
+				headers: { "x-request-id": "req-1" },
+			},
+		);
+	});
+
+	it("throws or strips unknown request keys based on options", () => {
+		const route = testContract({
+			request: {
+				query: z.object({ q: z.string() }),
+				requestKeys: { q: "query" },
+			},
+		}).search.find;
+
+		assert.throws(
+			() => groupRequestInput(route, { q: "milk", extra: true }),
+			/Unknown request key "extra"/,
+		);
+		assert.deepEqual(
+			groupRequestInput(
+				route,
+				{ q: "milk", extra: true },
+				{ unknownRequestKeys: "strip" },
+			),
+			{ query: { q: "milk" } },
+		);
+	});
+
+	it("assigns the body key as a custom request body", () => {
+		const route = testContract({
+			path: "/uploads/:id",
+			request: {
+				body: customBody({
+					schema: z.string(),
+					contentType: "text/plain",
+				}),
+				params: z.object({ id: z.string() }),
+				requestKeys: { id: "params" },
+			},
+		}).search.find;
+
+		assert.deepEqual(
+			groupRequestInput(route, { id: "file-1", body: "hello" }),
+			{
+				params: { id: "file-1" },
+				body: "hello",
+			},
+		);
+	});
+});
+
+describe("validateFlatRequestInput", () => {
+	it("validates whole segment schemas and returns parsed flat data", () => {
+		const route = testContract({
+			path: "/search/:id",
+			request: {
+				params: transformSchema((value) => ({
+					id: `params:${recordValue(value, "id")}`,
+				})),
+				query: transformSchema((value) => ({
+					q: `query:${recordValue(value, "q")}`,
+				})),
+				body: transformSchema((value) => ({
+					title: `body:${recordValue(value, "title")}`,
+				})),
+				requestKeys: {
+					id: "params",
+					q: "query",
+					title: "body",
+				},
+			},
+		}).search.find;
+
+		assert.deepEqual(
+			validateFlatRequestInput(route, {
+				id: "123",
+				q: " milk ",
+				title: " Buy milk ",
+				extra: "ignored",
+			}),
+			{
+				success: true,
+				data: {
+					id: "params:123",
+					q: "query: milk ",
+					title: "body: Buy milk ",
+				},
+			},
+		);
+	});
+
+	it("validates schema record segments and headers by field", () => {
+		const route = testContract({
+			path: "/todos/:id",
+			request: {
+				params: {
+					id: transformSchema((value) => `params:${value}`),
+				},
+				query: {
+					page: transformSchema((value) => `query:${value}`),
+				},
+				body: {
+					title: transformSchema((value) => `body:${value}`),
+				},
+				headers: {
+					"x-request-id": transformSchema((value) => `header:${value}`),
+				},
+				requestKeys: {
+					id: "params",
+					page: "query",
+					title: "body",
+					"x-request-id": "headers",
+				},
+			},
+		}).search.find;
+
+		assert.deepEqual(
+			validateFlatRequestInput(route, {
+				id: "123",
+				page: "2",
+				title: " Buy milk ",
+				"x-request-id": " req-1 ",
+			}),
+			{
+				success: true,
+				data: {
+					id: "params:123",
+					page: "query:2",
+					title: "body: Buy milk ",
+					"x-request-id": "header: req-1 ",
+				},
+			},
+		);
+	});
+
+	it("validates custom request bodies and returns the parsed body key", () => {
+		const route = testContract({
+			request: {
+				body: customBody({
+					schema: transformSchema((value) => `body:${value}`),
+					contentType: "text/plain",
+				}),
+				requestKeys: {},
+			},
+		}).search.find;
+
+		assert.deepEqual(validateFlatRequestInput(route, { body: " hello " }), {
+			success: true,
+			data: { body: "body: hello " },
+		});
+	});
+
+	it("returns accumulated validation errors", () => {
+		const route = testContract({
+			path: "/todos/:id",
+			request: {
+				params: {
+					id: issueSchema("invalid id"),
+				},
+				headers: {
+					"x-request-id": issueSchema("missing request id"),
+				},
+				requestKeys: {
+					id: "params",
+					"x-request-id": "headers",
+				},
+			},
+		}).search.find;
+
+		const result = validateFlatRequestInput(route, {
+			id: "not-a-number",
+		});
+
+		assert.equal(result.success, false);
+		if (!result.success) {
+			assert.deepEqual(
+				result.errors.map((error) => error.message),
+				["invalid id", "missing request id"],
+			);
+		}
 	});
 });

@@ -1,8 +1,9 @@
 import type {
 	RequestBodySchema,
+	RequestSchemaRecord,
 	ResponseBodySchema,
 } from "../contract/route.ts";
-import { isCustomBody, isNoBody } from "../contract/route.ts";
+import { isCustomBody, isNoBody, isStandardSchema } from "../contract/route.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import {
 	convertSchema,
@@ -22,11 +23,11 @@ import type {
 export const JSON_CONTENT_TYPE = "application/json";
 
 export const createParameters = (
-	schema: StandardSchemaV1 | undefined,
+	schema: StandardSchemaV1 | RequestSchemaRecord | undefined,
 	location: "path" | "query",
 	converter: SchemaConverter | undefined,
 ): OpenApiParameter[] => {
-	if (!schema) return [];
+	if (!isStandardSchema(schema)) return [];
 
 	const jsonSchema = convertSchema(schema, "input", converter);
 	const properties = getSchemaProperties(jsonSchema);
@@ -63,6 +64,7 @@ export const createRequestBody = (
 		? schema.contentType
 		: JSON_CONTENT_TYPE;
 	const bodySchema = isCustomBody(schema) ? schema.schema : schema;
+	if (!isStandardSchema(bodySchema)) return undefined;
 
 	return {
 		required: true,

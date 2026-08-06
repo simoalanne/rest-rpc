@@ -1,6 +1,9 @@
 import type { RouteDeclaration } from "../contract/route.ts";
 import { isCustomBody, isNoBody } from "../contract/route.ts";
-import { validateStandardSchemaSync } from "../standard-schema/index.ts";
+import {
+	groupRequestInput,
+	validateFlatRequestInput,
+} from "../contract/validate.ts";
 import type {
 	ApiClientFetchOptions,
 	FetchArgs,
@@ -50,96 +53,10 @@ export const assertNoContentTypeHeader = (headers: Record<string, string>) => {
 export const isJsonContentType = (contentType: string) =>
 	contentType.split(";")[0]?.trim().toLowerCase() === "application/json";
 
-export const groupKeysToRequest = (
-	args: RuntimeArgs,
-	route: RouteDeclaration,
-	unknownRequestKeys: "throw" | "strip",
-) => {
-	const isCustomRequestBody = isCustomBody(route.request?.body);
-	const requestKeys = route.request?.requestKeys;
-
-	if (!requestKeys && route.request) {
-		throw new Error(
-			`Missing request key metadata for ${route.method} ${route.path}. Call router() or provide request.requestKeys before initializing the client.`,
-		);
-	}
-
-	return Object.entries(args).reduce(
-		(acc, [k, v]) => {
-			if (k === "body" && isCustomRequestBody) {
-				acc.body = v;
-				return acc;
-			}
-
-			const bucket = requestKeys?.[k];
-			if (bucket) {
-				if (!acc[bucket]) acc[bucket] = {};
-				(acc[bucket] as Record<string, unknown>)[k] = v;
-				return acc;
-			}
-
-			if (unknownRequestKeys === "strip") {
-				return acc;
-			}
-
-			throw new Error(
-				`Unknown request key "${k}" for ${route.method} ${route.path}.`,
-			);
-		},
-		{} as {
-			body?: unknown;
-			query?: Record<string, unknown>;
-			params?: Record<string, unknown>;
-			headers?: Record<string, unknown>;
-		},
-	);
-};
-
 export const serializeCustomBody = (body: unknown, contentType: string) =>
 	isJsonContentType(contentType)
 		? JSON.stringify(body)
 		: (body as BodyInit | null | undefined);
-
-const validateOutgoingRequestSegment = (
-	route: RouteDeclaration,
-	segment: "body" | "query" | "params" | "headers",
-	value: unknown,
-) => {
-	if (segment === "headers") {
-		const declaredSchema = route.request?.headers;
-		if (!declaredSchema) return;
-		const headers = value as Record<string, unknown> | undefined;
-		for (const [headerName, schema] of Object.entries(declaredSchema)) {
-			const result = validateStandardSchemaSync(schema, headers?.[headerName]);
-			if (result.issues) throw result.issues;
-		}
-		return;
-	}
-
-	const declaredSchema = route.request?.[segment];
-	if (isNoBody(declaredSchema)) return;
-	const isCustomRequestBody = isCustomBody(declaredSchema);
-	const schema = isCustomRequestBody ? declaredSchema.schema : declaredSchema;
-	if (!schema) return;
-
-	const result = validateStandardSchemaSync(schema, value);
-	if (result.issues) throw result.issues;
-};
-
-const validateOutgoingRequest = (
-	route: RouteDeclaration,
-	request: {
-		body?: unknown;
-		query?: Record<string, unknown>;
-		params?: Record<string, unknown>;
-		headers?: Record<string, unknown>;
-	},
-) => {
-	validateOutgoingRequestSegment(route, "body", request.body);
-	validateOutgoingRequestSegment(route, "query", request.query);
-	validateOutgoingRequestSegment(route, "params", request.params);
-	validateOutgoingRequestSegment(route, "headers", request.headers);
-};
 
 const stringifyHeaders = (headers: Record<string, unknown> | undefined) =>
 	Object.fromEntries(
@@ -161,12 +78,22 @@ export const constructBaseRequest = (
 	let urlBase = `${baseUrl}${route.path}`;
 	if (!args) return { url: urlBase };
 
-	const request = groupKeysToRequest(args, route, unknownRequestKeys);
-	const { body, query, params, headers } = request;
+	let requestInput = args;
 
 	if (validation === "incoming-and-outgoing") {
-		validateOutgoingRequest(route, request);
+		if (unknownRequestKeys === "throw") {
+			groupRequestInput(route, args, { unknownRequestKeys });
+		}
+		const validationResult = validateFlatRequestInput(route, args);
+		if (!validationResult.success) throw validationResult.errors;
+		requestInput = validationResult.data as RuntimeArgs;
 	}
+
+	const request = groupRequestInput(route, requestInput, {
+		unknownRequestKeys:
+			validation === "incoming-and-outgoing" ? "strip" : unknownRequestKeys,
+	});
+	const { body, query, params, headers } = request;
 
 	if (params) {
 		for (const [k, v] of Object.entries(params)) {

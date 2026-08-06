@@ -8,17 +8,20 @@ export type NoBody = {
 	kind: "noBody";
 };
 
+export type RequestSchemaRecord = Record<string, StandardSchemaV1>;
+
 export type RequestBodySchema =
 	| StandardSchemaV1
+	| RequestSchemaRecord
 	| CustomBody
 	| NoBody
 	| undefined;
 
 export type RequestSchema = {
 	body?: RequestBodySchema;
-	query?: StandardSchemaV1;
-	params?: StandardSchemaV1;
-	headers?: Record<string, StandardSchemaV1>;
+	query?: StandardSchemaV1 | RequestSchemaRecord;
+	params?: StandardSchemaV1 | RequestSchemaRecord;
+	headers?: RequestSchemaRecord;
 	requestKeys?: RequestKeys;
 };
 
@@ -118,6 +121,9 @@ export const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
 	value !== null &&
 	"path" in value &&
 	"method" in value;
+
+export const isStandardSchema = (value: unknown): value is StandardSchemaV1 =>
+	typeof value === "object" && value !== null && "~standard" in value;
 
 export type InferResponseBody<TResponse> = TResponse extends StandardSchemaV1
 	? StandardSchemaV1.InferOutput<TResponse>
@@ -240,45 +246,96 @@ type InferRequestBody<TBody> = TBody extends NoBody
 		? { body: StandardSchemaV1.InferOutput<TSchema> }
 		: TBody extends StandardSchemaV1
 			? StandardSchemaV1.InferOutput<TBody>
-			: never;
+			: TBody extends RequestSchemaRecord
+				? InferRequestSchemaRecord<TBody>
+				: never;
 
-type InferHeaderValue<TSchema> = TSchema extends StandardSchemaV1
+type InferSchemaValue<TSchema> = TSchema extends StandardSchemaV1
 	? StandardSchemaV1.InferOutput<TSchema>
 	: never;
 
-type OptionalHeaderKeys<THeaders extends Record<string, StandardSchemaV1>> = {
-	[K in keyof THeaders]: undefined extends InferHeaderValue<THeaders[K]>
+type OptionalSchemaRecordKeys<TRecord extends RequestSchemaRecord> = {
+	[K in keyof TRecord]: undefined extends InferSchemaValue<TRecord[K]>
 		? K
 		: never;
+}[keyof TRecord];
+
+type RequiredSchemaRecordKeys<TRecord extends RequestSchemaRecord> = Exclude<
+	keyof TRecord,
+	OptionalSchemaRecordKeys<TRecord>
+>;
+
+type InferRequestSchemaRecord<TRecord extends RequestSchemaRecord> = Merge<
+	{
+		[K in RequiredSchemaRecordKeys<TRecord>]: InferSchemaValue<TRecord[K]>;
+	} & {
+		[K in OptionalSchemaRecordKeys<TRecord>]?: InferSchemaValue<TRecord[K]>;
+	}
+>;
+
+type InferRequestObjectSegment<TSegment> = TSegment extends StandardSchemaV1
+	? StandardSchemaV1.InferOutput<TSegment>
+	: TSegment extends RequestSchemaRecord
+		? InferRequestSchemaRecord<TSegment>
+		: never;
+
+type HeaderValue = string | number | boolean | undefined;
+type RequestObjectValue = Record<string, unknown>;
+
+type HeaderSchemaValueError = {
+	readonly __route_error__: "Header schema must output string, number, boolean, or undefined.";
+};
+
+type RequestSchemaObjectError<TSegment extends RequestSegment> = {
+	readonly __route_error__: `${TSegment} schema must output an object, or a union where every branch outputs an object. Use customBody() for non-object request bodies.`;
+};
+
+type SchemaOutputsOnly<TSchema, TValue> = [
+	Exclude<
+		TSchema extends StandardSchemaV1
+			? StandardSchemaV1.InferOutput<TSchema>
+			: never,
+		TValue
+	>,
+] extends [never]
+	? true
+	: false;
+
+type InvalidHeaderKeys<THeaders extends RequestSchemaRecord> = {
+	[K in keyof THeaders]: SchemaOutputsOnly<
+		THeaders[K],
+		HeaderValue
+	> extends true
+		? never
+		: K;
 }[keyof THeaders];
 
-type RequiredHeaderKeys<THeaders extends Record<string, StandardSchemaV1>> =
-	Exclude<keyof THeaders, OptionalHeaderKeys<THeaders>>;
+type ValidateHeaderRecord<THeaders extends RequestSchemaRecord> = [
+	InvalidHeaderKeys<THeaders>,
+] extends [never]
+	? unknown
+	: HeaderSchemaValueError;
 
-type InferRequestHeaders<THeaders extends Record<string, StandardSchemaV1>> =
-	Merge<
-		{
-			[K in RequiredHeaderKeys<THeaders>]: InferHeaderValue<THeaders[K]>;
-		} & {
-			[K in OptionalHeaderKeys<THeaders>]?: InferHeaderValue<THeaders[K]>;
-		}
-	>;
+type ValidateRequestObjectSchema<
+	TSchema,
+	TSegment extends RequestSegment,
+> = TSchema extends StandardSchemaV1
+	? SchemaOutputsOnly<TSchema, RequestObjectValue> extends true
+		? unknown
+		: RequestSchemaObjectError<TSegment>
+	: unknown;
 
 type InferRequestSegments<R> = {
 	body: R extends { body: infer TBody } ? InferRequestBody<TBody> : never;
 	query: R extends { query: infer TQuery }
-		? TQuery extends StandardSchemaV1
-			? StandardSchemaV1.InferOutput<TQuery>
-			: never
+		? InferRequestObjectSegment<TQuery>
 		: never;
 	params: R extends { params: infer TParams }
-		? TParams extends StandardSchemaV1
-			? StandardSchemaV1.InferOutput<TParams>
-			: never
+		? InferRequestObjectSegment<TParams>
 		: never;
 	headers: R extends { headers: infer THeaders }
-		? THeaders extends Record<string, StandardSchemaV1>
-			? InferRequestHeaders<THeaders>
+		? THeaders extends RequestSchemaRecord
+			? InferRequestSchemaRecord<THeaders>
 			: never
 		: never;
 };
@@ -344,5 +401,39 @@ export type ValidateResponseStatuses<T> = T extends RouteDeclaration
 	: T extends object
 		? {
 				[K in keyof T]: ValidateResponseStatuses<T[K]>;
+			}
+		: unknown;
+
+export type ValidateHeaderSchemas<T> = T extends RouteDeclaration
+	? T extends {
+			request: {
+				headers: infer THeaders extends RequestSchemaRecord;
+			};
+		}
+		? ValidateHeaderRecord<THeaders>
+		: unknown
+	: T extends object
+		? {
+				[K in keyof T]: ValidateHeaderSchemas<T[K]>;
+			}
+		: unknown;
+
+export type ValidateRequestObjectSchemas<T> = T extends RouteDeclaration
+	? T extends {
+			request: infer TRequest;
+		}
+		? (TRequest extends { body: infer TBody }
+				? ValidateRequestObjectSchema<TBody, "body">
+				: unknown) &
+				(TRequest extends { query: infer TQuery }
+					? ValidateRequestObjectSchema<TQuery, "query">
+					: unknown) &
+				(TRequest extends { params: infer TParams }
+					? ValidateRequestObjectSchema<TParams, "params">
+					: unknown)
+		: unknown
+	: T extends object
+		? {
+				[K in keyof T]: ValidateRequestObjectSchemas<T[K]>;
 			}
 		: unknown;

@@ -41,13 +41,16 @@ export type {
 } from "./contract/index.ts";
 export {
 	customBody,
+	groupRequestInput,
 	isCustomBody,
+	isStandardSchema,
 	noBody,
 	route,
 	routeAsync,
 	router,
 	routerAsync,
 	streamBody,
+	validateFlatRequestInput,
 } from "./contract/index.ts";
 export type {
 	CreateOpenApiDocumentOptions,

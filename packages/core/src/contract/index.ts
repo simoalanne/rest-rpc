@@ -35,8 +35,13 @@ export {
 	customBody,
 	isCustomBody,
 	isNoBody,
+	isStandardSchema,
 	isStreamBody,
 	noBody,
 	streamBody,
 } from "./route.ts";
 export { flattenContractRoutes, mapContractRoutes } from "./traversal.ts";
+export {
+	groupRequestInput,
+	validateFlatRequestInput,
+} from "./validate.ts";

@@ -204,6 +204,150 @@ expectAssignable<HeaderMergedRequest>({
 	"x-shared": "route",
 });
 
+const objectUnionRequest = route({
+	method: "GET",
+	path: "/object-union",
+	request: {
+		query: z.union([
+			z.object({ q: z.string() }),
+			z.object({ page: z.number() }),
+		]),
+	},
+	responses: {
+		200: todoSchema,
+	},
+});
+
+type ObjectUnionRequest = InferRouteRequest<typeof objectUnionRequest>;
+expectAssignable<ObjectUnionRequest>({ q: "todos" });
+expectAssignable<ObjectUnionRequest>({ page: 1 });
+
+const schemaRecordRequest = route({
+	method: "POST",
+	path: "/todos/:id",
+	request: {
+		params: {
+			id: schemaType<string>(),
+		},
+		query: {
+			includeDone: schemaType<boolean | undefined>(),
+			search: z.string().optional(),
+		},
+		body: {
+			title: schemaType<string>(),
+			priority: schemaType<number | undefined>(),
+		},
+		headers: {
+			"x-request-id": schemaType<string>(),
+		},
+	},
+	responses: {
+		200: todoSchema,
+	},
+});
+
+type SchemaRecordRequest = InferRouteRequest<typeof schemaRecordRequest>;
+declare const schemaRecordRequestInput: SchemaRecordRequest;
+expectType<string>(schemaRecordRequestInput.id);
+expectType<string>(schemaRecordRequestInput.title);
+expectType<string>(schemaRecordRequestInput["x-request-id"]);
+expectType<boolean | undefined>(schemaRecordRequestInput.includeDone);
+expectType<string | undefined>(schemaRecordRequestInput.search);
+expectType<number | undefined>(schemaRecordRequestInput.priority);
+expectAssignable<SchemaRecordRequest>({
+	id: "todo-1",
+	title: "Typed todo",
+	"x-request-id": "req-1",
+});
+
+expectError(
+	route({
+		method: "GET",
+		path: "/scalar-body",
+		request: {
+			body: z.string(),
+		},
+		responses: {
+			200: todoSchema,
+		},
+	}),
+);
+
+expectError(
+	route({
+		method: "GET",
+		path: "/scalar-query",
+		request: {
+			query: z.string(),
+		},
+		responses: {
+			200: todoSchema,
+		},
+	}),
+);
+
+expectError(
+	route({
+		method: "GET",
+		path: "/mixed-query-union",
+		request: {
+			query: z.union([z.object({ q: z.string() }), z.string()]),
+		},
+		responses: {
+			200: todoSchema,
+		},
+	}),
+);
+
+expectError(
+	route({
+		method: "GET",
+		path: "/scalar-params/:id",
+		request: {
+			params: z.string(),
+		},
+		responses: {
+			200: todoSchema,
+		},
+	}),
+);
+
+expectError(
+	route({
+		method: "GET",
+		path: "/invalid-header",
+		request: {
+			headers: {
+				"x-object": z.object({ id: z.string() }),
+			},
+		},
+		responses: {
+			200: todoSchema,
+		},
+	}),
+);
+
+expectError(
+	router(
+		{
+			todos: {
+				list: {
+					method: "GET",
+					path: "/todos",
+					responses: {
+						200: z.array(todoSchema),
+					},
+				},
+			},
+		},
+		{
+			commonHeaders: {
+				"x-nullable": z.string().nullable(),
+			},
+		},
+	),
+);
+
 // Single-route options are processing-only; route-shaped common fields belong on
 // router().
 expectError(
