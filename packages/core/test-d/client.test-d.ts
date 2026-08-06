@@ -1,8 +1,11 @@
 import {
+	type InferClientFetchResponse,
 	type InferClientRequestInput,
 	initClient,
+	noBody,
 	router,
 	type as schemaType,
+	streamBody,
 } from "@contract-first-api/core";
 import { expectError, expectType } from "tsd";
 import { z } from "zod";
@@ -85,6 +88,15 @@ const api = router({
 				})),
 			},
 		},
+		events: {
+			method: "GET",
+			path: "/todos/events",
+			responses: {
+				200: streamBody(todoSchema),
+				202: todoSchema,
+				204: noBody(),
+			},
+		},
 	},
 });
 
@@ -120,6 +132,10 @@ expectError(
 		slug: "server-output-only",
 	}),
 );
+expectType<Promise<InferClientFetchResponse<typeof api.todos.events>>>(
+	client.todos.events.fetchResponse(),
+);
+expectError(client.todos.events.fetch());
 
 // Routes with request input require that flattened input object.
 expectError(client.todos.get.fetch());

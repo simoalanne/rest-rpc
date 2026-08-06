@@ -456,36 +456,46 @@ expectError(
 	}),
 );
 
-// Stream responses cannot share a route with multiple successful statuses.
-expectError(
-	router({
+const mixedStreamResponses = router({
+	stream: {
+		method: "GET",
+		path: "/stream",
+		responses: {
+			200: streamBody(todoSchema),
+			201: todoSchema,
+			204: noBody(),
+		},
+	},
+});
+
+expectAssignable<
+	| { status: 200; body: AsyncIterable<{ id: string; title: string }> }
+	| { status: 201; body: { id: string; title: string } }
+	| { status: 204; body: undefined }
+>(null as unknown as InferClientResponse<typeof mixedStreamResponses.stream>);
+
+const mixedStreamCommonResponses = router(
+	{
 		stream: {
 			method: "GET",
 			path: "/stream",
 			responses: {
 				200: streamBody(todoSchema),
-				201: todoSchema,
 			},
 		},
-	}),
+	},
+	{
+		commonResponses: {
+			201: todoSchema,
+		},
+	},
 );
 
-// The stream response rule sees the route after common response merging.
-expectError(
-	router(
-		{
-			stream: {
-				method: "GET",
-				path: "/stream",
-				responses: {
-					200: streamBody(todoSchema),
-				},
-			},
-		},
-		{
-			commonResponses: {
-				201: todoSchema,
-			},
-		},
-	),
+expectAssignable<
+	| { status: 200; body: AsyncIterable<{ id: string; title: string }> }
+	| { status: 201; body: { id: string; title: string } }
+>(
+	null as unknown as InferClientResponse<
+		typeof mixedStreamCommonResponses.stream
+	>,
 );

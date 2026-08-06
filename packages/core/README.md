@@ -233,9 +233,9 @@ Status codes are declared directly in `responses`.
 - **Custom request bodies** use `customBody({ schema, contentType })` when the
   request body should be treated as one whole value instead of a flattened JSON
   object.
-- **Streaming routes** are HTTP routes whose successful response is
-  declared with `streamBody(schema)`. A stream response cannot be mixed with
-  multiple successful status codes.
+- **Streaming responses** use `streamBody(schema)` for any status that returns
+  NDJSON chunks. Routes with multiple successful statuses expose
+  `fetchResponse()` so callers can branch by status before reading the body.
 - **WebSocket routes** use `options: { mode: "websocket" }`. They must use
   `method: "GET"` and define `messages.client` and `messages.server` instead of
   `responses`.

@@ -148,8 +148,9 @@ codes are the keys in `responses`; non-2xx responses are typed error cases.
   Use `customBody({ schema, contentType })` in `request.body` when the request
   body should be treated as one whole `body` value instead of flattened fields.
 - streaming
-  Use `streamBody(schema)` as the successful response value. A stream response
-  cannot be mixed with multiple successful status codes.
+  Use `streamBody(schema)` for any response status that returns NDJSON chunks.
+  Routes with multiple successful statuses expose `fetchResponse()` so callers
+  can branch by status before reading the body.
 - `websocket`
   Uses `options: { mode: "websocket" }`. Must use `GET` and define
   `messages.client` and `messages.server`.

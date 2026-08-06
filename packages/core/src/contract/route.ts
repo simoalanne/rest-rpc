@@ -210,14 +210,6 @@ export type HasMultipleSuccessfulResponses<TResponses> = IsUnion<
 	SuccessfulResponseKeys<TResponses>
 >;
 
-export type HasStreamBody<TResponses> = true extends {
-	[TKeys in keyof TResponses]: TResponses[TKeys] extends StreamBody
-		? true
-		: false;
-}[keyof TResponses]
-	? true
-	: false;
-
 export type InferClientResponse<E extends RouteDeclaration> = E extends {
 	responses: infer TResponses;
 }
@@ -274,15 +266,13 @@ export type InferServerSuccessResponse<E extends RouteDeclaration> = E extends {
 		}[keyof TResponses]
 	: never;
 
-type InferSingleResponseBody<TResponse> = TResponse extends {
-	body: unknown;
-}
-	? [TResponse] extends [never]
+type InferSingleResponseBody<TResponse> = [TResponse] extends [never]
+	? never
+	: IsUnion<TResponse> extends true
 		? never
-		: IsUnion<TResponse> extends true
-			? never
-			: TResponse["body"]
-	: never;
+		: TResponse extends { body: infer TBody }
+			? TBody
+			: never;
 
 export type InferClientSuccessBody<E extends RouteDeclaration> =
 	InferSingleResponseBody<InferClientSuccessResponse<E>>;
@@ -552,19 +542,11 @@ type MissingSuccessfulResponseError = {
 	readonly __route_error__: "Route must declare at least one successful response.";
 };
 
-type StreamBodyStatusError = {
-	readonly __route_error__: "Routes with a stream response cannot define more than one successful status code.";
-};
-
 export type ValidateResponseStatuses<T> = T extends RouteDeclaration
 	? T extends { responses: infer TResponses }
 		? HasSuccessfulResponse<TResponses> extends false
 			? MissingSuccessfulResponseError
-			: HasStreamBody<TResponses> extends true
-				? HasMultipleSuccessfulResponses<TResponses> extends true
-					? StreamBodyStatusError
-					: unknown
-				: unknown
+			: unknown
 		: unknown
 	: T extends object
 		? {
