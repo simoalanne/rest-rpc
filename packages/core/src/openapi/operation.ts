@@ -14,6 +14,7 @@ import {
 	convertSchema,
 	getRequiredSchemaKeys,
 	getSchemaProperties,
+	isSchemaOptional,
 } from "./schemas.ts";
 import type {
 	CreateOpenApiDocumentOptions,
@@ -29,61 +30,96 @@ export const JSON_CONTENT_TYPE = "application/json";
 
 const createSchemaRecordObject = (
 	schemas: RequestSchemaRecord,
-	converter: SchemaConverter | undefined,
-) => ({
-	type: "object",
-	properties: Object.fromEntries(
-		Object.entries(schemas).map(([name, schema]) => [
-			name,
-			convertSchema(schema, "input", converter),
-		]),
-	),
-});
+	converter: SchemaConverter,
+) => {
+	const required = Object.entries(schemas)
+		.filter(([, schema]) => !isSchemaOptional(schema))
+		.map(([name]) => name);
+
+	return {
+		type: "object",
+		properties: Object.fromEntries(
+			Object.entries(schemas).map(([name, schema]) => [
+				name,
+				convertSchema(schema, "input", converter),
+			]),
+		),
+		...(required.length > 0 ? { required } : {}),
+	};
+};
+
+const assertRequiredPathParameter = (
+	name: string,
+	routePath: string | undefined,
+	isRequired: boolean,
+) => {
+	if (!isRequired) {
+		throw new Error(
+			`OpenAPI path parameter "${name}"${routePath ? ` on ${routePath}` : ""} must be required. Make the params schema require this field.`,
+		);
+	}
+};
 
 export const createParameters = (
 	schema: StandardSchemaV1 | RequestSchemaRecord | undefined,
 	location: "path" | "query",
-	converter: SchemaConverter | undefined,
+	converter: SchemaConverter,
+	routePath?: string,
 ): OpenApiParameter[] => {
 	if (!schema) return [];
 
 	if (isRequestSchemaRecord(schema)) {
-		return Object.entries(schema).map(([name, fieldSchema]) => ({
-			name,
-			in: location,
-			required: location === "path" ? true : undefined,
-			schema: convertSchema(fieldSchema, "input", converter),
-		}));
+		return Object.entries(schema).map(([name, fieldSchema]) => {
+			const isRequired = !isSchemaOptional(fieldSchema);
+			if (location === "path") {
+				assertRequiredPathParameter(name, routePath, isRequired);
+			}
+
+			return {
+				name,
+				in: location,
+				required: isRequired,
+				schema: convertSchema(fieldSchema, "input", converter),
+			};
+		});
 	}
 
 	const jsonSchema = convertSchema(schema, "input", converter);
 	const properties = getSchemaProperties(jsonSchema);
 	const requiredKeys = getRequiredSchemaKeys(jsonSchema);
 
-	return Object.entries(properties).map(([name, propertySchema]) => ({
-		name,
-		in: location,
-		required: location === "path" ? true : requiredKeys.has(name),
-		schema: propertySchema,
-	}));
+	return Object.entries(properties).map(([name, propertySchema]) => {
+		const isRequired = requiredKeys.has(name);
+		if (location === "path") {
+			assertRequiredPathParameter(name, routePath, isRequired);
+		}
+
+		return {
+			name,
+			in: location,
+			required: isRequired,
+			schema: propertySchema,
+		};
+	});
 };
 
 export const createHeaderParameters = (
 	headers: Record<string, StandardSchemaV1> | undefined,
-	converter: SchemaConverter | undefined,
+	converter: SchemaConverter,
 ): OpenApiParameter[] => {
 	if (!headers) return [];
 
 	return Object.entries(headers).map(([name, schema]) => ({
 		name,
 		in: "header",
+		required: !isSchemaOptional(schema),
 		schema: convertSchema(schema, "input", converter),
 	}));
 };
 
 export const createRequestBody = (
 	schema: RequestBodySchema,
-	converter: SchemaConverter | undefined,
+	converter: SchemaConverter,
 ): OpenApiRequestBody | undefined => {
 	if (!schema) return undefined;
 	if (isNoBody(schema)) return undefined;
@@ -111,7 +147,7 @@ export const createRequestBody = (
 export const createResponse = (
 	description: string,
 	schema: ResponseBodySchema,
-	converter: SchemaConverter | undefined,
+	converter: SchemaConverter,
 ): OpenApiResponse => {
 	if (isNoBody(schema)) return { description };
 
@@ -127,7 +163,7 @@ export const createResponse = (
 
 export const createResponses = (
 	route: OpenApiRouteDeclaration,
-	converter: SchemaConverter | undefined,
+	converter: SchemaConverter,
 ) => {
 	const responses: Record<string, OpenApiResponse> = {};
 
@@ -147,7 +183,12 @@ export const createOperation = (
 	options: CreateOpenApiDocumentOptions,
 ): OpenApiOperation => {
 	const parameters = [
-		...createParameters(route.request?.params, "path", options.schemaConverter),
+		...createParameters(
+			route.request?.params,
+			"path",
+			options.schemaConverter,
+			route.path,
+		),
 		...createParameters(route.request?.query, "query", options.schemaConverter),
 		...createHeaderParameters(route.request?.headers, options.schemaConverter),
 	];

@@ -77,7 +77,7 @@ export type CreateOpenApiDocumentOptions = {
 	servers?: OpenApiDocument["servers"];
 	components?: OpenApiDocument["components"];
 	tags?: OpenApiDocument["tags"];
-	schemaConverter?: SchemaConverter;
+	schemaConverter: SchemaConverter;
 	transformOperation?: (context: OperationTransformContext) => OpenApiOperation;
 	transformDocument?: (document: OpenApiDocument) => OpenApiDocument;
 };

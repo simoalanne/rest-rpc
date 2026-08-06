@@ -71,10 +71,20 @@ library.
 
 - request schemas use input mode
 - response schemas use output mode
+- if no JSON Schema converter exists, skip OpenAPI generation for faithful docs
+  or provide an intentionally loose converter that returns broad schemas such
+  as `{}`
+- use `isTypeOnlySchema()` to detect core `type<T>()` schemas and
+  `looseJsonSchema()` to return a broad `{}` schema
+- schema-record field requiredness is based on whether each field schema
+  accepts `undefined`
+- path parameters must be required; optional path parameter schemas fail
+  OpenAPI generation
 
 Example with Zod:
 
 ```ts
+import { isTypeOnlySchema, looseJsonSchema } from "@contract-first-api/core";
 import z from "zod";
 
 const document = createOpenApiDocument(contract, {
@@ -82,8 +92,16 @@ const document = createOpenApiDocument(contract, {
 		title: "Todo API",
 		version: "1.0.0",
 	},
-	schemaConverter: (schema, { io }) =>
-		z.toJSONSchema(schema as z.ZodType, { io }),
+	schemaConverter: (schema, { io }) => {
+		if (isTypeOnlySchema(schema)) return looseJsonSchema(schema);
+
+		switch (schema["~standard"].vendor) {
+			case "zod":
+				return z.toJSONSchema(schema as z.ZodType, { io });
+			default:
+				return looseJsonSchema(schema);
+		}
+	},
 });
 ```
 

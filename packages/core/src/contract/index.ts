@@ -1,4 +1,8 @@
-export { type } from "../standard-schema/index.ts";
+export {
+	isTypeOnlySchema,
+	looseJsonSchema,
+	type,
+} from "../standard-schema/index.ts";
 export type {
 	ApplyRouterOptions,
 	RouteContractOptions,

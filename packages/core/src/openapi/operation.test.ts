@@ -15,7 +15,7 @@ import type { OpenApiRouteDeclaration, SchemaConverter } from "./types.ts";
 describe("OpenAPI operations", () => {
 	it("creates required path params and schema-required query params", () => {
 		const params = createParameters(
-			z.object({ id: z.string().optional() }),
+			z.object({ id: z.string() }),
 			"path",
 			schemaConverter,
 		);
@@ -51,7 +51,7 @@ describe("OpenAPI operations", () => {
 		const query = createParameters(
 			{
 				search: z.string(),
-				page: z.number(),
+				page: z.number().optional(),
 			},
 			"query",
 			schemaConverter,
@@ -66,9 +66,32 @@ describe("OpenAPI operations", () => {
 			})),
 			[
 				{ name: "id", in: "path", required: true, type: "string" },
-				{ name: "search", in: "query", required: undefined, type: "string" },
-				{ name: "page", in: "query", required: undefined, type: "number" },
+				{ name: "search", in: "query", required: true, type: "string" },
+				{ name: "page", in: "query", required: false, type: "number" },
 			],
+		);
+	});
+
+	it("rejects optional path params instead of documenting them as required", () => {
+		assert.throws(
+			() =>
+				createParameters(
+					z.object({ id: z.string().optional() }),
+					"path",
+					schemaConverter,
+					"/todos/:id",
+				),
+			/path parameter "id" on \/todos\/:id must be required/,
+		);
+		assert.throws(
+			() =>
+				createParameters(
+					{ id: z.string().optional() },
+					"path",
+					schemaConverter,
+					"/todos/:id",
+				),
+			/path parameter "id" on \/todos\/:id must be required/,
 		);
 	});
 
@@ -84,6 +107,7 @@ describe("OpenAPI operations", () => {
 			{
 				name: "x-api-key",
 				in: "header",
+				required: true,
 				schema: {
 					type: "string",
 				},
@@ -112,7 +136,7 @@ describe("OpenAPI operations", () => {
 		const body = createRequestBody(
 			{
 				title: z.string(),
-				priority: z.number(),
+				priority: z.number().optional(),
 			},
 			schemaConverter,
 		);
@@ -127,6 +151,7 @@ describe("OpenAPI operations", () => {
 							title: { type: "string" },
 							priority: { type: "number" },
 						},
+						required: ["title"],
 					},
 				},
 			},
@@ -188,6 +213,7 @@ describe("OpenAPI operations", () => {
 
 		const operation = createOperation(route, {
 			info: { title: "Todo API", version: "1.0.0" },
+			schemaConverter,
 			transformOperation: ({ route, operation }) => ({
 				...operation,
 				operationId: `${route.method} ${route.path}`,
@@ -197,11 +223,9 @@ describe("OpenAPI operations", () => {
 		assert.equal(operation.operationId, "GET /todos");
 	});
 
-	it("requires a schema converter only when schemas need conversion", () => {
-		assert.doesNotThrow(() => createResponse("Success", noBody(), undefined));
-		assert.throws(
-			() => createRequestBody(z.string(), undefined),
-			/requires a schemaConverter option/,
-		);
+	it("omits explicit no-body responses after receiving the required converter", () => {
+		assert.deepEqual(createResponse("Success", noBody(), schemaConverter), {
+			description: "Success",
+		});
 	});
 });

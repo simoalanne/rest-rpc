@@ -33,6 +33,7 @@ describe("createOpenApiDocument", () => {
 					},
 				},
 				tags: [{ name: "todos" }],
+				schemaConverter,
 				transformDocument: (document) => ({
 					...document,
 					"x-generated-by": "contract-first-api",

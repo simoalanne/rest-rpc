@@ -449,7 +449,11 @@ Core can generate a plain OpenAPI document object from JSON HTTP route
 declarations:
 
 ```ts
-import { createOpenApiDocument } from "@contract-first-api/core";
+import {
+	createOpenApiDocument,
+	isTypeOnlySchema,
+	looseJsonSchema,
+} from "@contract-first-api/core";
 import { apiContract } from "@example/shared";
 import z from "zod";
 
@@ -459,8 +463,16 @@ export const openApiDocument = createOpenApiDocument(apiContract, {
 		version: "1.0.0",
 	},
 	servers: [{ url: "http://localhost:3000" }],
-	schemaConverter: (schema, { io }) =>
-		z.toJSONSchema(schema as z.ZodType, { io }),
+	schemaConverter: (schema, { io }) => {
+		if (isTypeOnlySchema(schema)) return looseJsonSchema(schema);
+
+		switch (schema["~standard"].vendor) {
+			case "zod":
+				return z.toJSONSchema(schema as z.ZodType, { io });
+			default:
+				return looseJsonSchema(schema);
+		}
+	},
 });
 ```
 
@@ -471,6 +483,23 @@ and routes with streaming responses are not included in the generated document.
 Standard Schema defines validation, not JSON Schema conversion. OpenAPI
 generation requires a `schemaConverter` option so each project can use the
 converter that matches its schema library.
+
+If your schema library cannot produce JSON Schema, do not use the OpenAPI
+generator for faithful API documentation. For intentionally loose documents,
+provide a converter that returns a broad schema such as `{}` for unsupported
+schemas, or selectively converts known schemas and returns broad schemas for
+the rest. That fallback is explicit project policy, not behavior inferred by
+core.
+
+Core exports `isTypeOnlySchema()` for detecting schemas created with
+`type<T>()`, and `looseJsonSchema()` for returning a broad `{}` schema. Use
+them when a contract intentionally carries TypeScript types without runtime
+validation or detailed schema metadata.
+
+Required parameters and schema-record body fields are derived from whether
+their schemas accept `undefined`. Path parameters must be required; OpenAPI
+generation throws if a path parameter schema is optional instead of documenting
+that mismatch as required.
 
 ## How Core Connects To Other Packages
 
