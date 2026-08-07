@@ -3,7 +3,10 @@ import type {
 	HttpRouteDeclaration,
 	ResponseBodySchema,
 } from "@contract-first-api/core/contract";
-import { REQUEST_CONTEXT_KEY } from "@contract-first-api/core/contract";
+import {
+	isCustomBody,
+	REQUEST_CONTEXT_KEY,
+} from "@contract-first-api/core/contract";
 import type { HttpHeaders } from "./headers.ts";
 import {
 	ContractResponseError,
@@ -23,7 +26,16 @@ type HttpRouteResultBase = {
 export type HttpRouteResult =
 	| (HttpRouteResultBase & { kind: "empty" })
 	| (HttpRouteResultBase & { kind: "json"; body: unknown })
-	| (HttpRouteResultBase & { kind: "stream"; body: AsyncIterable<unknown> });
+	| (HttpRouteResultBase & {
+			kind: "custom";
+			body: unknown;
+			contentType: string;
+	  })
+	| (HttpRouteResultBase & {
+			kind: "stream";
+			body: AsyncIterable<unknown>;
+			contentType?: string;
+	  });
 
 export type HandleHttpRouteOptions<TContext extends HttpRouteHandlerContext> = {
 	request: RequestSegments;
@@ -42,6 +54,12 @@ const validateOutgoingResponse = (
 		return body;
 	}
 
+	if (isCustomBody(schema)) {
+		const validation = validateStandardSchemaSync(schema.schema, body);
+		if (validation.issues) throw validation.issues;
+		return validation.value;
+	}
+
 	const validation = validateStandardSchemaSync(schema, body);
 	if (validation.issues) throw validation.issues;
 	return validation.value;
@@ -57,7 +75,10 @@ async function* validateStreamChunks(
 	}
 
 	for await (const chunk of body) {
-		const validation = validateStandardSchemaSync(schema.schema, chunk);
+		const chunkSchema = isCustomBody(schema.schema)
+			? schema.schema.schema
+			: schema.schema;
+		const validation = validateStandardSchemaSync(chunkSchema, chunk);
 		if (validation.issues) throw validation.issues;
 		yield validation.value;
 	}
@@ -82,11 +103,34 @@ const normalizeResponseResult = (
 	}
 
 	if (schema && isStreamingResponseSchema(schema)) {
+		if (isCustomBody(schema.schema)) {
+			return {
+				kind: "stream",
+				status: result.status,
+				headers: result.headers,
+				contentType: schema.schema.contentType,
+				body: validateStreamChunks(
+					result.body as AsyncIterable<unknown>,
+					schema,
+				),
+			};
+		}
+
 		return {
 			kind: "stream",
 			status: result.status,
 			headers: result.headers,
 			body: validateStreamChunks(result.body as AsyncIterable<unknown>, schema),
+		};
+	}
+
+	if (schema && isCustomBody(schema)) {
+		return {
+			kind: "custom",
+			status: result.status,
+			headers: result.headers,
+			contentType: schema.contentType,
+			body: validateOutgoingResponse(schema, result.body),
 		};
 	}
 

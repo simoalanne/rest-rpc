@@ -1,6 +1,6 @@
 import z from "zod";
 import { router } from "../contract/define.ts";
-import { customBody, noBody, streamBody } from "../contract/route.ts";
+import { customBody, noBody, stream } from "../contract/route.ts";
 
 export const createClientTestContract = () =>
 	router({
@@ -95,7 +95,7 @@ export const createClientTestContract = () =>
 				method: "GET",
 				path: "/events",
 				responses: {
-					200: streamBody(z.object({ id: z.string() })),
+					200: stream(z.object({ id: z.string() })),
 				},
 			},
 		},

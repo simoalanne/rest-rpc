@@ -42,7 +42,7 @@ export type {
 	RouteDeclaration,
 	RouteMetadata,
 	RouteResponses,
-	StreamBody,
+	Stream,
 	WebSocketRouteDeclaration,
 } from "./contract/index.ts";
 export {
@@ -56,7 +56,7 @@ export {
 	routeAsync,
 	router,
 	routerAsync,
-	streamBody,
+	stream,
 	validateFlatRequestInput,
 } from "./contract/index.ts";
 export type {

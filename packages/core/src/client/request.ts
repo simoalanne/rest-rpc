@@ -52,7 +52,7 @@ const normalizeHeaders = (headers: Record<string, string> | undefined) =>
 export const assertNoContentTypeHeader = (headers: Record<string, string>) => {
 	if (hasHeader(headers, "content-type")) {
 		throw new Error(
-			'ApiClient getHeaders() must not return a "content-type" header. Use customBody({ contentType }) on the route declaration instead.',
+			'ApiClient getHeaders() must not return a "content-type" header. Use customBody({ schema, contentType }) on the route declaration instead.',
 		);
 	}
 };

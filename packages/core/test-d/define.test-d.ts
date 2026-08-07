@@ -1,4 +1,5 @@
 import {
+	customBody,
 	type InferClientErrors,
 	type InferClientRequest,
 	type InferClientResponse,
@@ -10,7 +11,7 @@ import {
 	route,
 	router,
 	type as schemaType,
-	streamBody,
+	stream,
 } from "@contract-first-api/core/contract";
 import { expectAssignable, expectError, expectType } from "tsd";
 import { z } from "zod";
@@ -461,7 +462,7 @@ const mixedStreamResponses = router({
 		method: "GET",
 		path: "/stream",
 		responses: {
-			200: streamBody(todoSchema),
+			200: stream(todoSchema),
 			201: todoSchema,
 			204: noBody(),
 		},
@@ -480,7 +481,7 @@ const mixedStreamCommonResponses = router(
 			method: "GET",
 			path: "/stream",
 			responses: {
-				200: streamBody(todoSchema),
+				200: stream(todoSchema),
 			},
 		},
 	},
@@ -498,4 +499,42 @@ expectAssignable<
 	null as unknown as InferClientResponse<
 		typeof mixedStreamCommonResponses.stream
 	>,
+);
+
+const customSingleResponse = route({
+	method: "GET",
+	path: "/report.csv",
+	responses: {
+		200: customBody({
+			contentType: "text/csv",
+			schema: z.string(),
+		}),
+	},
+});
+
+expectType<Response>(
+	null as unknown as InferClientSuccessBody<typeof customSingleResponse>,
+);
+expectType<string>(
+	null as unknown as InferServerSuccessBody<typeof customSingleResponse>,
+);
+
+const customStreamResponse = route({
+	method: "GET",
+	path: "/report-stream.csv",
+	responses: {
+		200: stream(
+			customBody({
+				contentType: "text/csv",
+				schema: z.string(),
+			}),
+		),
+	},
+});
+
+expectType<Response>(
+	null as unknown as InferClientSuccessBody<typeof customStreamResponse>,
+);
+expectType<AsyncIterable<string>>(
+	null as unknown as InferServerSuccessBody<typeof customStreamResponse>,
 );

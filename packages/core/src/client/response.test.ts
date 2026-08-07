@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import z from "zod";
 import { router } from "../contract/define.ts";
-import { noBody } from "../contract/route.ts";
+import { customBody, noBody, stream } from "../contract/route.ts";
 import {
 	captureFetch,
 	createClientTestContract,
@@ -120,5 +120,64 @@ describe("ApiClient responses", () => {
 		const response = await client.todos.remove.fetch({ id: "todo-1" });
 
 		assert.equal(response, undefined);
+	});
+
+	it("returns declared custom responses as native Response objects", async () => {
+		const apiContract = router({
+			reports: {
+				csv: {
+					method: "GET",
+					path: "/reports.csv",
+					responses: {
+						200: customBody({
+							contentType: "text/csv",
+							schema: z.string(),
+						}),
+					},
+				},
+			},
+		});
+		captureFetch(
+			new Response("id,title\n1,First\n", {
+				status: 200,
+				headers: { "content-type": "text/csv" },
+			}),
+		);
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+			validateResponses: true,
+		});
+
+		const response = await client.reports.csv.fetch();
+
+		assert.ok(response instanceof Response);
+		assert.equal(response.headers.get("content-type"), "text/csv");
+		assert.equal(await response.text(), "id,title\n1,First\n");
+	});
+
+	it("returns declared custom stream responses as native Response objects", async () => {
+		const apiContract = router({
+			reports: {
+				csv: {
+					method: "GET",
+					path: "/reports.csv",
+					responses: {
+						200: stream(
+							customBody({
+								contentType: "text/csv",
+								schema: z.string(),
+							}),
+						),
+					},
+				},
+			},
+		});
+		captureFetch(new Response("id,title\n1,First\n", { status: 200 }));
+		const client = initClient(apiContract, { baseUrl: "https://api.test" });
+
+		const response = await client.reports.csv.fetch();
+
+		assert.ok(response instanceof Response);
+		assert.equal(await response.text(), "id,title\n1,First\n");
 	});
 });

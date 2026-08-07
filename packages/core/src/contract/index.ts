@@ -42,7 +42,7 @@ export type {
 	RouteDeclaration,
 	RouteMetadata,
 	RouteResponses,
-	StreamBody,
+	Stream,
 	WebSocketRouteDeclaration,
 } from "./route.ts";
 export {
@@ -51,10 +51,10 @@ export {
 	isNoBody,
 	isRequestSchemaRecord,
 	isStandardSchema,
-	isStreamBody,
+	isStream,
 	noBody,
 	REQUEST_CONTEXT_KEY,
-	streamBody,
+	stream,
 } from "./route.ts";
 export { flattenContractRoutes, mapContractRoutes } from "./traversal.ts";
 export {

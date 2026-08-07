@@ -34,12 +34,20 @@ export const noBody = (): NoBody => ({
 	kind: "noBody",
 });
 
-export type StreamBody<TSchema extends StandardSchemaV1 = StandardSchemaV1> = {
-	kind: "streamBody";
+export type CustomBody<TSchema extends StandardSchemaV1 = StandardSchemaV1> = {
+	kind: "customBody";
 	schema: TSchema;
+	contentType: string;
 };
 
-export type ResponseBodySchema = ResponseSchema | NoBody | StreamBody;
+export type Stream<
+	TBody extends ResponseSchema | CustomBody = ResponseSchema | CustomBody,
+> = {
+	kind: "stream";
+	schema: TBody;
+};
+
+export type ResponseBodySchema = ResponseSchema | NoBody | CustomBody | Stream;
 
 export type RouteResponses = Record<number, ResponseBodySchema>;
 export type RouteMetadata = Record<string, unknown>;
@@ -59,18 +67,12 @@ export type CommonOpenApiRouteOptions = Omit<
 	"summary" | "description" | "operationId"
 >;
 
-export const streamBody = <const TSchema extends StandardSchemaV1>(
-	schema: TSchema,
-): StreamBody<TSchema> => ({
-	kind: "streamBody",
+export const stream = <const TBody extends ResponseSchema | CustomBody>(
+	schema: TBody,
+): Stream<TBody> => ({
+	kind: "stream",
 	schema,
 });
-
-export type CustomBody<TSchema extends StandardSchemaV1 = StandardSchemaV1> = {
-	kind: "customBody";
-	schema: TSchema;
-	contentType: string;
-};
 
 export const customBody = <const TSchema extends StandardSchemaV1>(input: {
 	schema: TSchema;
@@ -89,15 +91,13 @@ export const isNoBody = (
 	"kind" in body &&
 	body.kind === "noBody";
 
-export const isStreamBody = (
-	response: ResponseBodySchema,
-): response is StreamBody =>
+export const isStream = (response: ResponseBodySchema): response is Stream =>
 	typeof response === "object" &&
 	response !== null &&
 	"kind" in response &&
-	response.kind === "streamBody";
+	response.kind === "stream";
 
-export const isCustomBody = (schema: RequestBodySchema): schema is CustomBody =>
+export const isCustomBody = (schema: unknown): schema is CustomBody =>
 	typeof schema === "object" &&
 	schema !== null &&
 	"kind" in schema &&
@@ -153,23 +153,42 @@ export const isRequestSchemaRecord = (
 	!isCustomBody(value as RequestBodySchema) &&
 	!isNoBody(value as RequestBodySchema);
 
+type InferCustomBody<TResponse, TIO extends "input" | "output"> =
+	TResponse extends CustomBody<infer TSchema>
+		? TIO extends "input"
+			? StandardSchemaV1.InferInput<TSchema>
+			: StandardSchemaV1.InferOutput<TSchema>
+		: never;
+
 export type InferClientResponseBody<TResponse> =
 	TResponse extends StandardSchemaV1
 		? StandardSchemaV1.InferOutput<TResponse>
 		: TResponse extends NoBody
 			? undefined
-			: TResponse extends StreamBody<infer TSchema>
-				? AsyncIterable<StandardSchemaV1.InferOutput<TSchema>>
-				: never;
+			: TResponse extends CustomBody
+				? Response
+				: TResponse extends Stream<infer TBody>
+					? TBody extends CustomBody
+						? Response
+						: TBody extends StandardSchemaV1
+							? AsyncIterable<StandardSchemaV1.InferOutput<TBody>>
+							: never
+					: never;
 
 export type InferServerResponseBody<TResponse> =
 	TResponse extends StandardSchemaV1
 		? StandardSchemaV1.InferInput<TResponse>
 		: TResponse extends NoBody
 			? undefined
-			: TResponse extends StreamBody<infer TSchema>
-				? AsyncIterable<StandardSchemaV1.InferInput<TSchema>>
-				: never;
+			: TResponse extends CustomBody
+				? InferCustomBody<TResponse, "input">
+				: TResponse extends Stream<infer TBody>
+					? TBody extends CustomBody
+						? AsyncIterable<InferCustomBody<TBody, "input">>
+						: TBody extends StandardSchemaV1
+							? AsyncIterable<StandardSchemaV1.InferInput<TBody>>
+							: never
+					: never;
 
 type ResponseEntry<TStatus extends number, TBody> = {
 	status: TStatus;
@@ -333,11 +352,9 @@ type InferRequestBody<
 	TIO extends "input" | "output",
 > = TBody extends NoBody
 	? never
-	: TBody extends CustomBody<infer TSchema>
+	: TBody extends CustomBody
 		? {
-				body: TIO extends "input"
-					? StandardSchemaV1.InferInput<TSchema>
-					: StandardSchemaV1.InferOutput<TSchema>;
+				body: InferCustomBody<TBody, TIO>;
 			}
 		: TBody extends StandardSchemaV1
 			? TIO extends "input"

@@ -1,8 +1,8 @@
-import type { StreamBody } from "../contract/route.ts";
+import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { validateStandardSchemaSync } from "../standard-schema/index.ts";
 
 export async function* parseNdjsonStream(
-	response: StreamBody,
+	schema: StandardSchemaV1,
 	body: ReadableStream<Uint8Array>,
 	validate: boolean,
 ): AsyncIterable<unknown> {
@@ -26,7 +26,7 @@ export async function* parseNdjsonStream(
 					yield value;
 					continue;
 				}
-				const result = validateStandardSchemaSync(response.schema, value);
+				const result = validateStandardSchemaSync(schema, value);
 				if (result.issues) throw result.issues;
 				yield result.value;
 			}
@@ -39,7 +39,7 @@ export async function* parseNdjsonStream(
 				yield value;
 				return;
 			}
-			const result = validateStandardSchemaSync(response.schema, value);
+			const result = validateStandardSchemaSync(schema, value);
 			if (result.issues) throw result.issues;
 			yield result.value;
 		}

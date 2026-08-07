@@ -14,12 +14,12 @@ export type OpenApiParameter = {
 export type OpenApiRequestBody = {
 	required?: boolean;
 	description?: string;
-	content: Record<string, { schema: OpenApiSchema }>;
+	content: Record<string, { schema?: OpenApiSchema }>;
 };
 
 export type OpenApiResponse = {
 	description: string;
-	content?: Record<string, { schema: OpenApiSchema }>;
+	content?: Record<string, { schema?: OpenApiSchema }>;
 };
 
 export type OpenApiExternalDocs = {

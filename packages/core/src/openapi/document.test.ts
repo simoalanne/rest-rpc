@@ -111,6 +111,7 @@ describe("createOpenApiDocument", () => {
 		assert.equal(document.openapi, "3.1.0");
 		assert.deepEqual(Object.keys(document.paths).sort(), [
 			"/todos",
+			"/todos/events",
 			"/todos/import",
 			"/todos/{id}",
 		]);
@@ -133,6 +134,13 @@ describe("createOpenApiDocument", () => {
 		assert.equal(
 			importOperation.requestBody?.content["text/csv"].schema.type,
 			"string",
+		);
+
+		const eventsOperation = document.paths["/todos/events"]?.get;
+		assert.ok(eventsOperation);
+		assert.deepEqual(
+			eventsOperation.responses["200"].content?.["application/x-ndjson"].schema,
+			{ type: "string" },
 		);
 	});
 });

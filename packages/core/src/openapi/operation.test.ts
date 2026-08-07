@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
-import { customBody, noBody } from "../contract/route.ts";
+import { customBody, noBody, stream } from "../contract/route.ts";
 import { schemaConverter } from "./factories.ts";
 import {
 	createHeaderParameters,
@@ -173,6 +173,61 @@ describe("OpenAPI operations", () => {
 		assert.deepEqual(empty, { description: "" });
 		assert.equal(json.description, "");
 		assert.equal(json.content?.["application/json"].schema.type, "object");
+	});
+
+	it("creates custom responses with declared content types", () => {
+		const response = createResponse(
+			"",
+			customBody({
+				contentType: "text/csv",
+				schema: z.string(),
+			}),
+			schemaConverter,
+		);
+
+		assert.equal(response.content?.["text/csv"].schema?.type, "string");
+		assert.equal(response.content?.["application/json"], undefined);
+	});
+
+	it("creates NDJSON stream responses as text wire bodies", () => {
+		const response = createResponse(
+			"",
+			stream(z.object({ id: z.string() })),
+			schemaConverter,
+		);
+
+		assert.deepEqual(response.content?.["application/x-ndjson"].schema, {
+			type: "string",
+		});
+	});
+
+	it("creates custom stream responses with wire-level schemas", () => {
+		const csv = createResponse(
+			"",
+			stream(
+				customBody({
+					contentType: "text/csv",
+					schema: z.number(),
+				}),
+			),
+			schemaConverter,
+		);
+		const binary = createResponse(
+			"",
+			stream(
+				customBody({
+					contentType: "application/octet-stream",
+					schema: z.number(),
+				}),
+			),
+			schemaConverter,
+		);
+
+		assert.deepEqual(csv.content?.["text/csv"].schema, { type: "string" });
+		assert.deepEqual(binary.content?.["application/octet-stream"].schema, {
+			type: "string",
+			format: "binary",
+		});
 	});
 
 	it("uses input schemas for requests and output schemas for responses", () => {

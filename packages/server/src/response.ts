@@ -4,9 +4,9 @@ import type {
 	NoBody,
 	ResponseBodySchema,
 	RouteDeclaration,
-	StreamBody,
+	Stream,
 } from "@contract-first-api/core/contract";
-import { isNoBody, isStreamBody } from "@contract-first-api/core/contract";
+import { isNoBody, isStream } from "@contract-first-api/core/contract";
 import type { HttpHeaders } from "./headers.ts";
 import { isHttpRoute } from "./router.ts";
 
@@ -91,7 +91,7 @@ export const isEmptyResponseSchema = (
 
 export const isStreamingResponseSchema = (
 	schema: ResponseBodySchema,
-): schema is StreamBody => isStreamBody(schema);
+): schema is Stream => isStream(schema);
 
 export type NormalizedHandlerResponse<E extends RouteDeclaration> =
 	InferServerResponse<E>;

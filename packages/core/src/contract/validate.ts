@@ -76,7 +76,7 @@ const assertNoReservedHeaderKeys = (route: RouteDeclaration) => {
 		if (key.toLowerCase() !== "content-type") continue;
 
 		throw new Error(
-			`Route declaration at path "${route.path}" has a reserved header key "${key}". Use customBody({ contentType }) to declare request content type instead.`,
+			`Route declaration at path "${route.path}" has a reserved header key "${key}". Use customBody({ schema, contentType }) to declare request content type instead.`,
 		);
 	}
 };

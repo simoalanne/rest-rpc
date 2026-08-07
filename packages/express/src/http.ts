@@ -17,12 +17,14 @@ const writeStreamResponse = async (
 	result: AsyncIterable<unknown>,
 	res: Response,
 	statusCode: number,
+	contentType = "application/x-ndjson",
+	mode: "ndjson" | "raw" = "ndjson",
 ) => {
 	res.status(statusCode);
-	res.setHeader("content-type", "application/x-ndjson");
+	res.setHeader("content-type", contentType);
 
 	for await (const chunk of result) {
-		res.write(`${JSON.stringify(chunk)}\n`);
+		res.write(mode === "ndjson" ? `${JSON.stringify(chunk)}\n` : chunk);
 	}
 
 	res.end();
@@ -58,7 +60,19 @@ export const registerExpressHttpRoutes = (
 			}
 
 			if (result.kind === "stream") {
-				await writeStreamResponse(result.body, res, result.status);
+				await writeStreamResponse(
+					result.body,
+					res,
+					result.status,
+					result.contentType,
+					result.contentType ? "raw" : "ndjson",
+				);
+				return;
+			}
+
+			if (result.kind === "custom") {
+				res.setHeader("content-type", result.contentType);
+				res.status(result.status).send(result.body);
 				return;
 			}
 

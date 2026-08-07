@@ -12,7 +12,7 @@ describe("OpenAPI route helpers", () => {
 		);
 	});
 
-	it("includes HTTP routes and skips streaming and websocket routes", () => {
+	it("includes HTTP routes and skips websocket routes", () => {
 		const routes = [...contractRoutes(createOpenApiTestContract())];
 		const openApiPaths = routes
 			.filter(isOpenApiRoute)
@@ -23,6 +23,7 @@ describe("OpenAPI route helpers", () => {
 			"/todos",
 			"/todos/:id",
 			"/todos/:id",
+			"/todos/events",
 			"/todos/import",
 		]);
 	});

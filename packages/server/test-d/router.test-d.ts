@@ -1,4 +1,8 @@
-import { router as defineRouter } from "@contract-first-api/core/contract";
+import {
+	customBody,
+	router as defineRouter,
+	stream,
+} from "@contract-first-api/core/contract";
 import {
 	type InferRouteHandlerRequest,
 	route,
@@ -44,6 +48,30 @@ const api = defineRouter({
 				200: z.object({ id: z.number() }).transform(({ id }) => ({
 					id: String(id),
 				})),
+			},
+		},
+	},
+	reports: {
+		csv: {
+			method: "GET",
+			path: "/reports.csv",
+			responses: {
+				200: customBody({
+					contentType: "text/csv",
+					schema: z.string(),
+				}),
+			},
+		},
+		csvStream: {
+			method: "GET",
+			path: "/reports-stream.csv",
+			responses: {
+				200: stream(
+					customBody({
+						contentType: "text/csv",
+						schema: z.string(),
+					}),
+				),
 			},
 		},
 	},
@@ -94,6 +122,28 @@ expectError(
 	})),
 );
 
+route(api.reports.csv, () => ({
+	status: 200 as const,
+	body: "id,title\n1,First\n",
+}));
+
+async function* csvRows() {
+	yield "id,title\n";
+	yield "1,First\n";
+}
+
+route(api.reports.csvStream, () => ({
+	status: 200 as const,
+	body: csvRows(),
+}));
+
+expectError(
+	route(api.reports.csvStream, () => ({
+		status: 200 as const,
+		body: "id,title\n1,First\n",
+	})),
+);
+
 const implementations = router(api, {
 	todos: {
 		create: ({ title }) => ({
@@ -105,6 +155,16 @@ const implementations = router(api, {
 			body: {
 				id,
 			},
+		}),
+	},
+	reports: {
+		csv: () => ({
+			status: 200 as const,
+			body: "id,title\n1,First\n",
+		}),
+		csvStream: () => ({
+			status: 200 as const,
+			body: csvRows(),
 		}),
 	},
 });

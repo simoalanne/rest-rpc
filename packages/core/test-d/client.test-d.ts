@@ -1,11 +1,12 @@
 import {
+	customBody,
 	type InferClientFetchResponse,
 	type InferClientRequestInput,
 	initClient,
 	noBody,
 	router,
 	type as schemaType,
-	streamBody,
+	stream,
 } from "@contract-first-api/core";
 import { expectError, expectType } from "tsd";
 import { z } from "zod";
@@ -92,9 +93,31 @@ const api = router({
 			method: "GET",
 			path: "/todos/events",
 			responses: {
-				200: streamBody(todoSchema),
+				200: stream(todoSchema),
 				202: todoSchema,
 				204: noBody(),
+			},
+		},
+		exportCsv: {
+			method: "GET",
+			path: "/todos.csv",
+			responses: {
+				200: customBody({
+					contentType: "text/csv",
+					schema: z.string(),
+				}),
+			},
+		},
+		exportCsvStream: {
+			method: "GET",
+			path: "/todos-stream.csv",
+			responses: {
+				200: stream(
+					customBody({
+						contentType: "text/csv",
+						schema: z.string(),
+					}),
+				),
 			},
 		},
 	},
@@ -136,6 +159,8 @@ expectType<Promise<InferClientFetchResponse<typeof api.todos.events>>>(
 	client.todos.events.fetchResponse(),
 );
 expectError(client.todos.events.fetch());
+expectType<Promise<Response>>(client.todos.exportCsv.fetch());
+expectType<Promise<Response>>(client.todos.exportCsvStream.fetch());
 
 // Routes with request input require that flattened input object.
 expectError(client.todos.get.fetch());

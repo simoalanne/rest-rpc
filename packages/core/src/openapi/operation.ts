@@ -8,6 +8,7 @@ import {
 	isNoBody,
 	isRequestSchemaRecord,
 	isStandardSchema,
+	isStream,
 } from "../contract/route.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import {
@@ -27,6 +28,7 @@ import type {
 } from "./types.ts";
 
 export const JSON_CONTENT_TYPE = "application/json";
+export const NDJSON_CONTENT_TYPE = "application/x-ndjson";
 
 const createSchemaRecordObject = (
 	schemas: RequestSchemaRecord,
@@ -132,13 +134,12 @@ export const createRequestBody = (
 		: isStandardSchema(bodySchema)
 			? convertSchema(bodySchema, "input", converter)
 			: undefined;
-	if (!openApiSchema) return undefined;
 
 	return {
 		required: true,
 		content: {
 			[contentType]: {
-				schema: openApiSchema,
+				...(openApiSchema ? { schema: openApiSchema } : {}),
 			},
 		},
 	};
@@ -151,15 +152,43 @@ export const createResponse = (
 ): OpenApiResponse => {
 	if (isNoBody(schema)) return { description };
 
+	if (isStream(schema)) {
+		const contentType = isCustomBody(schema.schema)
+			? schema.schema.contentType
+			: NDJSON_CONTENT_TYPE;
+
+		return {
+			description,
+			content: {
+				[contentType]: {
+					schema: createStreamWireSchema(contentType),
+				},
+			},
+		};
+	}
+
+	const contentType = isCustomBody(schema)
+		? schema.contentType
+		: JSON_CONTENT_TYPE;
+	const bodySchema = isCustomBody(schema) ? schema.schema : schema;
+	const openApiSchema = isStandardSchema(bodySchema)
+		? convertSchema(bodySchema, "output", converter)
+		: undefined;
+
 	return {
 		description,
 		content: {
-			[JSON_CONTENT_TYPE]: {
-				schema: convertSchema(schema as StandardSchemaV1, "output", converter),
+			[contentType]: {
+				...(openApiSchema ? { schema: openApiSchema } : {}),
 			},
 		},
 	};
 };
+
+const createStreamWireSchema = (contentType: string) =>
+	contentType.split(";")[0]?.trim().toLowerCase() === "application/octet-stream"
+		? { type: "string", format: "binary" }
+		: { type: "string" };
 
 export const createResponses = (
 	route: OpenApiRouteDeclaration,

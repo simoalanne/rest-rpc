@@ -40,14 +40,23 @@ const createStreamResponse = (
 	body: AsyncIterable<unknown>,
 	status: number,
 	headers: Headers,
+	contentType = "application/x-ndjson",
+	mode: "ndjson" | "raw" = "ndjson",
 ) => {
-	headers.set("content-type", "application/x-ndjson");
+	headers.set("content-type", contentType);
 	const encoder = new TextEncoder();
 
 	const stream = new ReadableStream({
 		async start(controller) {
 			for await (const chunk of body) {
-				controller.enqueue(encoder.encode(`${JSON.stringify(chunk)}\n`));
+				if (mode === "ndjson") {
+					controller.enqueue(encoder.encode(`${JSON.stringify(chunk)}\n`));
+					continue;
+				}
+
+				controller.enqueue(
+					typeof chunk === "string" ? encoder.encode(chunk) : chunk,
+				);
 			}
 			controller.close();
 		},
@@ -103,7 +112,21 @@ export const registerHonoHttpRoutes = <TEnv extends Env>(
 			}
 
 			if (result.kind === "stream") {
-				return createStreamResponse(result.body, result.status, headers);
+				return createStreamResponse(
+					result.body,
+					result.status,
+					headers,
+					result.contentType,
+					result.contentType ? "raw" : "ndjson",
+				);
+			}
+
+			if (result.kind === "custom") {
+				headers.set("content-type", result.contentType);
+				return new Response(result.body as BodyInit | null, {
+					status: result.status,
+					headers,
+				});
 			}
 
 			headers.set("content-type", "application/json");

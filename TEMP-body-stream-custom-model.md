@@ -15,15 +15,15 @@ The common JSON case should remain the shortest syntax.
 responses: {
 	200: UserSchema;
 	204: noBody(); // server sends only status/headers, no body
-	200: custom({ contentType: "text/csv", schema: CsvSchema }); // arbitrary single body from server to client
+	200: customBody({ contentType: "text/csv", schema: CsvSchema }); // arbitrary single body from server to client
 	200: stream(EventSchema); // NDJSON/message stream from server to client. server yields each message and validates against EventSchema
-	200: stream(custom({ contentType: "application/octet-stream" })); // arbitrary stream from server to client.
+	200: stream(customBody({ contentType: "application/octet-stream" })); // arbitrary stream from server to client.
 }
 
 request: {
   body: UserSchema;
   body: noBody();
-  body: custom({ contentType: "text/csv", schema: CsvSchema }); // arbitrary single body from client to server
+  body: customBody({ contentType: "text/csv", schema: CsvSchema }); // arbitrary single body from client to server
 }
 ```
 
@@ -31,11 +31,11 @@ Meanings:
 
 - plain Standard Schema means a single JSON body
 - `noBody()` means no body
-- `custom(...)` means a single custom body with a required content type and
+- `customBody(...)` means a single custom body with a required content type and
   optional schema
 - `stream(schema)` means an NDJSON/message stream where each item is validated
   by the schema
-- `stream(custom(...))` means a custom/raw stream; schema, if present, validates
+- `stream(customBody(...))` means a custom/raw stream; schema, if present, validates
   each yielded item/chunk rather than the completed stream
 
 An optional `json(schema)` helper can exist as identity/readability sugar, but

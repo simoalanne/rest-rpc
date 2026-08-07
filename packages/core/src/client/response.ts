@@ -3,7 +3,12 @@ import type {
 	ResponseBodySchema,
 	RouteDeclaration,
 } from "../contract/route.ts";
-import { isNoBody, isStreamBody } from "../contract/route.ts";
+import {
+	isCustomBody,
+	isNoBody,
+	isStandardSchema,
+	isStream,
+} from "../contract/route.ts";
 import { validateStandardSchemaSync } from "../standard-schema/index.ts";
 import { isHttpRouteNode, isSuccessStatus } from "./routes.ts";
 import { parseNdjsonStream } from "./stream.ts";
@@ -38,12 +43,19 @@ export const readDeclaredBody = async (
 ) => {
 	if (isNoBody(schema)) return undefined;
 
-	if (isStreamBody(schema)) {
+	if (isCustomBody(schema)) return rawResponse;
+
+	if (isStream(schema)) {
+		if (isCustomBody(schema.schema)) return rawResponse;
+		if (!isStandardSchema(schema.schema)) {
+			throw new Error("Backend returned an unsupported stream response");
+		}
+
 		if (!rawResponse.body) {
 			throw new Error("Backend returned an empty stream response");
 		}
 
-		return parseNdjsonStream(schema, rawResponse.body, validate);
+		return parseNdjsonStream(schema.schema, rawResponse.body, validate);
 	}
 
 	const value = await rawResponse.json();
