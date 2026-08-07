@@ -54,9 +54,6 @@ importers:
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
-      zod:
-        specifier: ^4.3.6
-        version: 4.3.6
 
   packages/hono:
     dependencies:
@@ -88,6 +85,10 @@ importers:
       '@contract-first-api/core':
         specifier: workspace:^
         version: link:../core
+    devDependencies:
+      zod:
+        specifier: ^4.3.6
+        version: 4.4.3
 
 packages:
 
@@ -988,9 +989,6 @@ packages:
     resolution: {integrity: sha512-y11nGElTIV+CT3Zv9t7VKl+Q3hTQoT9a1Qzezhhl6Rp21gJ/IVTW7Z3y9EWXhuUBC2Shnf+DX0antecpAwSP8w==}
     engines: {node: '>=10'}
 
-  zod@4.3.6:
-    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
-
   zod@4.4.3:
     resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
@@ -1865,7 +1863,5 @@ snapshots:
   yallist@4.0.0: {}
 
   yargs-parser@20.2.9: {}
-
-  zod@4.3.6: {}
 
   zod@4.4.3: {}

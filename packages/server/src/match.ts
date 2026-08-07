@@ -1,8 +1,4 @@
-import type {
-	Contract,
-	RouteDeclaration,
-} from "@contract-first-api/core/contract";
-import { flattenContractRoutes } from "@contract-first-api/core/contract";
+import type { RouteDeclaration } from "@contract-first-api/core/contract";
 
 const splitPath = (path: string) => path.split("/").filter(Boolean);
 const isParamSegment = (segment: string) => segment.startsWith(":");
@@ -39,7 +35,9 @@ export const compareRouteSpecificity = (
 const escapeRegExp = (value: string) =>
 	value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-export const createPathMatcher = (path: string) => {
+export type PathMatcher = (pathname: string) => Record<string, string> | null;
+
+export const createPathMatcher = (path: string): PathMatcher => {
 	const keys: string[] = [];
 	const segments = splitPath(path);
 	const pattern =
@@ -68,31 +66,56 @@ export const createPathMatcher = (path: string) => {
 	};
 };
 
-const resolveContractRoutes = (contract: Contract) => {
-	return flattenContractRoutes(contract)
-		.sort(compareRouteSpecificity)
-		.map((route) => {
-			return {
-				route,
-				matchPath: createPathMatcher(route.path),
-			};
-		});
-};
-
 export type MatchableRequest = {
 	path: string;
 	method: string;
 };
 
-export const matchRoute = (
-	contract: Contract,
-	req: MatchableRequest,
-): RouteDeclaration | null => {
-	const pathname = req.path;
-	const matchedRoute = resolveContractRoutes(contract).find((route) => {
-		const params = route.matchPath(pathname);
-		return route.route.method === req.method && params !== null;
-	});
+export type RouteMatcher<TRoute extends RouteDeclaration = RouteDeclaration> = {
+	route: TRoute;
+	matchPath: PathMatcher;
+};
 
-	return matchedRoute ? matchedRoute.route : null;
+type RouteMatcherSource<TRoute extends RouteDeclaration> =
+	| TRoute
+	| { route: TRoute };
+
+const getRoute = <TRoute extends RouteDeclaration>(
+	source: RouteMatcherSource<TRoute>,
+): TRoute => ("route" in source ? source.route : source);
+
+export type RouteMatch<TRoute extends RouteDeclaration = RouteDeclaration> = {
+	route: TRoute;
+	params: Record<string, string>;
+};
+
+export const createRouteMatchers = <
+	const TRoute extends RouteDeclaration = RouteDeclaration,
+>(
+	sources: readonly RouteMatcherSource<TRoute>[],
+): RouteMatcher<TRoute>[] =>
+	sources
+		.map(getRoute)
+		.sort(compareRouteSpecificity)
+		.map((route) => ({
+			route,
+			matchPath: createPathMatcher(route.path),
+		}));
+
+export const matchRoute = (
+	matchers: readonly RouteMatcher[],
+	req: MatchableRequest,
+): RouteMatch | null => {
+	const pathname = req.path;
+	for (const route of matchers) {
+		const params = route.matchPath(pathname);
+		if (route.route.method === req.method && params !== null) {
+			return {
+				route: route.route,
+				params,
+			};
+		}
+	}
+
+	return null;
 };

@@ -3,31 +3,41 @@ import type {
 	HttpRouteDeclaration,
 } from "@contract-first-api/core/contract";
 import {
-	flattenImplementationTree,
 	handleHttpRoute,
-	type ImplementationTree,
-	sortImplementations,
+	type RouteImplementation,
 } from "@contract-first-api/server";
-import type { Application, Request, Response } from "express";
-import { writeStreamResponse } from "./response.ts";
+import type {
+	Application,
+	Response as ExpressResponse,
+	Request,
+	Response,
+} from "express";
 
-export type RegisterRoutesOptions = Record<never, never>;
-
-export const registerRoutes = (
-	app: Application,
-	implementations: ImplementationTree,
-	_options: RegisterRoutesOptions = {},
+const writeStreamResponse = async (
+	result: AsyncIterable<unknown>,
+	res: Response,
+	statusCode: number,
 ) => {
-	const routes = sortImplementations(
-		flattenImplementationTree(implementations),
-	);
+	res.status(statusCode);
+	res.setHeader("content-type", "application/x-ndjson");
 
+	for await (const chunk of result) {
+		res.write(`${JSON.stringify(chunk)}\n`);
+	}
+
+	res.end();
+};
+
+export const registerExpressHttpRoutes = (
+	app: Application,
+	routes: RouteImplementation<HttpRouteDeclaration>[],
+) => {
 	for (const implementation of routes) {
 		const route: HttpRouteDeclaration = implementation.route;
 		const method = route.method.toLowerCase() as Lowercase<HttpMethod>;
 		const handler = implementation.handler;
 
-		const serviceHandler = async (req: Request, res: Response) => {
+		const serviceHandler = async (req: Request, res: ExpressResponse) => {
 			const result = await handleHttpRoute(route, handler, {
 				request: req,
 				context: { req },

@@ -4,7 +4,13 @@ export type {
 } from "./handleHttpRoute.ts";
 export { handleHttpRoute } from "./handleHttpRoute.ts";
 export type { HttpHeaders, HttpHeaderValue } from "./headers.ts";
-export { createPathMatcher, matchRoute } from "./match.ts";
+export type {
+	MatchableRequest,
+	PathMatcher,
+	RouteMatch,
+	RouteMatcher,
+} from "./match.ts";
+export { createPathMatcher, createRouteMatchers, matchRoute } from "./match.ts";
 export {
 	ContractResponseError,
 	getResponseSchema,
@@ -13,25 +19,39 @@ export {
 	normalizeHandlerResult,
 } from "./response.ts";
 export type {
+	CloseEventLike,
 	Contract,
+	ContractWebSocket,
 	HttpRouteHandlerContext,
 	ImplementationShape,
 	ImplementationTree,
 	ImplementationTreeFor,
 	InferRouteHandlerRequest,
 	InferRouteHandlerResponse,
+	InferWebSocketRouteHandlerRequest,
 	RouteHandler,
+	RouteHandlerFor,
 	RouteImplementation,
 	RuntimeRouteHandler,
+	WebSocketRouteHandler,
+	WebSocketRouteHandlerContext,
 } from "./router.ts";
 export { createRouterBuilders, route, router, routes } from "./router.ts";
 export {
+	flattenAndSortImplementationTree,
 	flattenImplementationTree,
 	sortImplementations,
 } from "./routeTree.ts";
 export type {
 	RequestSegments,
+	RequestValidationFailure,
+	RequestValidationResponse,
 	ValidationIssue,
-	ValidationResult,
 } from "./validation.ts";
-export { validateRequestSegments } from "./validation.ts";
+export { validateRequest } from "./validation.ts";
+export type {
+	RawWebSocket,
+	UpgradeRejection,
+	WebSocketRouteResult,
+} from "./websocket.ts";
+export { createContractWebSocket, handleWebSocketRoute } from "./websocket.ts";

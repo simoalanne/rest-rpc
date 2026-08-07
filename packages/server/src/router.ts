@@ -1,9 +1,12 @@
 import type {
 	HttpRouteDeclaration,
+	InferReceivedClientMessage,
+	InferServerMessage,
 	InferServerRequest,
 	InferServerResponse,
 	InferServerSuccessBody,
 	RouteDeclaration,
+	WebSocketRouteDeclaration,
 } from "@contract-first-api/core/contract";
 import { REQUEST_CONTEXT_KEY } from "@contract-first-api/core/contract";
 import type { HttpHeaders } from "./headers.ts";
@@ -14,6 +17,7 @@ type Merge<T> = {
 	[K in keyof T]: T[K];
 };
 export type HttpRouteHandlerContext = Record<string, unknown>;
+export type WebSocketRouteHandlerContext = Record<string, unknown>;
 
 export type RuntimeRouteHandler = (
 	request: unknown,
@@ -28,10 +32,38 @@ type HandlerResult<E extends HttpRouteDeclaration> = MaybePromise<
 	| InferServerSuccessBody<E>
 >;
 
+export type ContractWebSocket<Send, Receive> = {
+	send(message: Send): void;
+	onMessage(callback: (message: Receive) => void | Promise<void>): () => void;
+	onClose(
+		callback: (event: CloseEventLike) => void | Promise<void>,
+	): () => void;
+	close(code?: number, reason?: string): void;
+};
+
+export type CloseEventLike = {
+	code: number;
+	reason?: string;
+};
+
 export type InferRouteHandlerRequest<
 	E extends HttpRouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
 > = Merge<RequestValue<E> & { [REQUEST_CONTEXT_KEY]: TContext }>;
+
+export type InferWebSocketRouteHandlerRequest<
+	E extends WebSocketRouteDeclaration,
+	TContext extends WebSocketRouteHandlerContext = WebSocketRouteHandlerContext,
+> = Merge<
+	RequestValue<E> & {
+		[REQUEST_CONTEXT_KEY]: TContext & {
+			socket: ContractWebSocket<
+				InferServerMessage<E>,
+				InferReceivedClientMessage<E>
+			>;
+		};
+	}
+>;
 
 export type InferRouteHandlerResponse<E extends HttpRouteDeclaration> =
 	InferServerResponse<E>;
@@ -43,26 +75,33 @@ export type RouteHandler<
 	...args: [request: InferRouteHandlerRequest<E, TContext>]
 ) => HandlerResult<E>;
 
-export type Contract<TRoute extends RouteDeclaration = HttpRouteDeclaration> =
+export type WebSocketRouteHandler<
+	E extends WebSocketRouteDeclaration,
+	TContext extends WebSocketRouteHandlerContext = WebSocketRouteHandlerContext,
+> = (
+	...args: [request: InferWebSocketRouteHandlerRequest<E, TContext>]
+) => MaybePromise<void>;
+
+export type Contract<TRoute extends RouteDeclaration = RouteDeclaration> =
 	| TRoute
 	| { [key: string]: Contract<TRoute> };
 
 export type RouteImplementation<
-	TRoute extends RouteDeclaration = HttpRouteDeclaration,
+	TRoute extends RouteDeclaration = RouteDeclaration,
 > = {
 	route: TRoute;
 	handler: RuntimeRouteHandler;
 };
 
 export type ImplementationTree<
-	TRoute extends RouteDeclaration = HttpRouteDeclaration,
+	TRoute extends RouteDeclaration = RouteDeclaration,
 > =
 	| RouteImplementation<TRoute>
 	| { readonly [key: string]: ImplementationTree<TRoute> };
 
 export type ImplementationTreeFor<
 	TNode extends Contract<TRoute>,
-	TRoute extends RouteDeclaration = HttpRouteDeclaration,
+	TRoute extends RouteDeclaration = RouteDeclaration,
 > = TNode extends TRoute
 	? RouteImplementation<TNode>
 	: {
@@ -71,14 +110,27 @@ export type ImplementationTreeFor<
 				: never;
 		};
 
-export type ImplementationShape<
-	TNode extends Contract<HttpRouteDeclaration>,
+export type RouteHandlerFor<
+	E extends RouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
-> = TNode extends HttpRouteDeclaration
-	? RouteHandler<TNode, TContext>
+	TWebSocketContext extends
+		WebSocketRouteHandlerContext = WebSocketRouteHandlerContext,
+> = E extends HttpRouteDeclaration
+	? RouteHandler<E, TContext>
+	: E extends WebSocketRouteDeclaration
+		? WebSocketRouteHandler<E, TWebSocketContext>
+		: never;
+
+export type ImplementationShape<
+	TNode extends Contract<RouteDeclaration>,
+	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
+	TWebSocketContext extends
+		WebSocketRouteHandlerContext = WebSocketRouteHandlerContext,
+> = TNode extends RouteDeclaration
+	? RouteHandlerFor<TNode, TContext, TWebSocketContext>
 	: {
-			[K in keyof TNode]: TNode[K] extends Contract<HttpRouteDeclaration>
-				? ImplementationShape<TNode[K], TContext>
+			[K in keyof TNode]: TNode[K] extends Contract<RouteDeclaration>
+				? ImplementationShape<TNode[K], TContext, TWebSocketContext>
 				: never;
 		};
 
@@ -91,6 +143,10 @@ export const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
 export const isHttpRoute = (
 	route: RouteDeclaration,
 ): route is HttpRouteDeclaration => "responses" in route;
+
+export const isWebSocketRoute = (
+	route: RouteDeclaration,
+): route is WebSocketRouteDeclaration => route.options?.mode === "websocket";
 
 export const isRouteImplementation = (
 	value: unknown,
@@ -286,43 +342,41 @@ export const createRouterBuilders = (
 	},
 });
 
-const httpRouterBuilders = createRouterBuilders((route, routeName) => {
-	if (!isHttpRoute(route)) {
-		throw new Error(
-			`HTTP route builders only support HTTP routes. Received non-HTTP route "${routeName || route.path}".`,
-		);
-	}
-}, "router");
+const routerBuilders = createRouterBuilders(() => {}, "router");
 
 export const route = <
-	const TNode extends HttpRouteDeclaration,
+	const TNode extends RouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
+	TWebSocketContext extends
+		WebSocketRouteHandlerContext = WebSocketRouteHandlerContext,
 >(
 	contract: TNode,
-	handler: RouteHandler<TNode, TContext>,
+	handler: RouteHandlerFor<TNode, TContext, TWebSocketContext>,
 ): RouteImplementation<TNode> =>
-	httpRouterBuilders.route(
+	routerBuilders.route(
 		contract,
 		handler as RuntimeRouteHandler,
 	) as RouteImplementation<TNode>;
 
 export const router = <
-	const TNode extends Contract<HttpRouteDeclaration>,
+	const TNode extends Contract<RouteDeclaration>,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
+	TWebSocketContext extends
+		WebSocketRouteHandlerContext = WebSocketRouteHandlerContext,
 >(
 	contract: TNode,
-	handlers: ImplementationShape<TNode, TContext>,
-): ImplementationTreeFor<TNode, HttpRouteDeclaration> =>
-	httpRouterBuilders.router(contract, handlers) as ImplementationTreeFor<
+	handlers: ImplementationShape<TNode, TContext, TWebSocketContext>,
+): ImplementationTreeFor<TNode, RouteDeclaration> =>
+	routerBuilders.router(contract, handlers) as ImplementationTreeFor<
 		TNode,
-		HttpRouteDeclaration
+		RouteDeclaration
 	>;
 
-export const routes = <const TNode extends Contract<HttpRouteDeclaration>>(
+export const routes = <const TNode extends Contract<RouteDeclaration>>(
 	contract: TNode,
-	implementations: ImplementationTreeFor<TNode, HttpRouteDeclaration>,
-): ImplementationTreeFor<TNode, HttpRouteDeclaration> =>
-	httpRouterBuilders.routes(contract, implementations) as ImplementationTreeFor<
+	implementations: ImplementationTreeFor<TNode, RouteDeclaration>,
+): ImplementationTreeFor<TNode, RouteDeclaration> =>
+	routerBuilders.routes(contract, implementations) as ImplementationTreeFor<
 		TNode,
-		HttpRouteDeclaration
+		RouteDeclaration
 	>;

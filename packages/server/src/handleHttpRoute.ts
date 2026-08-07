@@ -13,11 +13,7 @@ import {
 	normalizeHandlerResult,
 } from "./response.ts";
 import type { HttpRouteHandlerContext, RuntimeRouteHandler } from "./router.ts";
-import {
-	type RequestSegments,
-	type ValidationIssue,
-	validateRequestSegments,
-} from "./validation.ts";
+import { type RequestSegments, validateRequest } from "./validation.ts";
 
 type HttpRouteResultBase = {
 	status: number;
@@ -33,18 +29,6 @@ export type HandleHttpRouteOptions<TContext extends HttpRouteHandlerContext> = {
 	request: RequestSegments;
 	context: TContext;
 };
-
-const requestValidationErrorResult = (
-	errors: ValidationIssue[],
-): HttpRouteResult => ({
-	kind: "json",
-	status: 400,
-	body: {
-		message:
-			"Request validation failed. Check the validationErrors field for details.",
-		validationErrors: errors,
-	},
-});
 
 const validateOutgoingResponse = (
 	schema: ResponseBodySchema | undefined,
@@ -122,10 +106,13 @@ export const handleHttpRoute = async <
 	handler: RuntimeRouteHandler,
 	options: HandleHttpRouteOptions<TContext>,
 ): Promise<HttpRouteResult> => {
-	const requestValidation = validateRequestSegments(route, options.request);
+	const requestValidation = validateRequest(route, options.request);
 
 	if (!requestValidation.success) {
-		return requestValidationErrorResult(requestValidation.errors);
+		return {
+			kind: "json",
+			...requestValidation.response,
+		};
 	}
 
 	try {

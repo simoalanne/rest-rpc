@@ -7,9 +7,17 @@ import {
 
 export type ValidationIssue = StandardSchemaV1.Issue;
 
-export type ValidationResult =
+export type RequestValidationFailure = {
+	status: 400;
+	body: {
+		message: string;
+		validationErrors: ValidationIssue[];
+	};
+};
+
+export type RequestValidationResponse =
 	| { success: true; data: Record<string, unknown> }
-	| { success: false; errors: ValidationIssue[] };
+	| { success: false; response: RequestValidationFailure };
 
 export type RequestSegments = {
 	body?: unknown;
@@ -43,12 +51,26 @@ const flattenRequestSegments = (
 	return input;
 };
 
-export const validateRequestSegments = (
+export const validateRequest = (
 	route: RouteDeclaration,
 	segments: RequestSegments,
-): ValidationResult => {
-	return validateFlatRequestInput(
+): RequestValidationResponse => {
+	const result = validateFlatRequestInput(
 		route,
 		flattenRequestSegments(route, segments),
 	);
+
+	if (result.success) return result;
+
+	return {
+		success: false,
+		response: {
+			status: 400,
+			body: {
+				message:
+					"Request validation failed. Check the validationErrors field for details.",
+				validationErrors: result.errors,
+			},
+		},
+	};
 };

@@ -1,12 +1,15 @@
 import { router as defineRouter } from "@contract-first-api/core/contract";
 import {
-	type HttpRouteHandlerContext,
 	type InferRouteHandlerRequest,
 	route,
 	router,
-} from "@contract-first-api/express";
+} from "@contract-first-api/server";
 import { expectError, expectType } from "tsd";
 import { z } from "zod";
+
+type TestRouteHandlerContext = {
+	userId: string;
+};
 
 const todoSchema = z.object({
 	id: z.string(),
@@ -46,14 +49,17 @@ const api = defineRouter({
 	},
 });
 
-type CreateTodoRequest = InferRouteHandlerRequest<typeof api.todos.create>;
+type CreateTodoRequest = InferRouteHandlerRequest<
+	typeof api.todos.create,
+	TestRouteHandlerContext
+>;
 declare const createTodoRequest: CreateTodoRequest;
 expectType<string>(createTodoRequest.title);
-expectType<HttpRouteHandlerContext>(createTodoRequest.context);
+expectType<TestRouteHandlerContext>(createTodoRequest.context);
 
 const createImplementation = route(api.todos.create, ({ title, context }) => {
 	expectType<string>(title);
-	expectType<HttpRouteHandlerContext>(context);
+	expectType<Record<string, unknown>>(context);
 
 	return {
 		status: 201 as const,
