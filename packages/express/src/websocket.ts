@@ -4,7 +4,7 @@ import {
 	STATUS_CODES,
 } from "node:http";
 import type { Duplex } from "node:stream";
-import type { WebSocketRouteDeclaration } from "@contract-first-api/core/contract";
+import type { WebSocketRouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	createPathMatcher,
 	handleWebSocketRoute,
@@ -13,7 +13,7 @@ import {
 	type RouteImplementation,
 	type UpgradeRejection,
 	validateRequest,
-} from "@contract-first-api/server";
+} from "@rest-rpc/server";
 import type WebSocket from "ws";
 import type { WebSocketServer } from "ws";
 

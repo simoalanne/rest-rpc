@@ -1,8 +1,8 @@
 import type {
 	ApiClientFetchOptions,
 	FetchOptions,
-} from "@contract-first-api/core/client";
-import type { RouteDeclaration } from "@contract-first-api/core/contract";
+} from "@rest-rpc/core/client";
+import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	type QueryClient,
 	type QueryKey,

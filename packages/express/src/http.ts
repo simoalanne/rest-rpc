@@ -1,11 +1,5 @@
-import type {
-	HttpMethod,
-	HttpRouteDeclaration,
-} from "@contract-first-api/core/contract";
-import {
-	handleHttpRoute,
-	type RouteImplementation,
-} from "@contract-first-api/server";
+import type { HttpMethod, HttpRouteDeclaration } from "@rest-rpc/core/contract";
+import { handleHttpRoute, type RouteImplementation } from "@rest-rpc/server";
 import type {
 	Application,
 	Response as ExpressResponse,

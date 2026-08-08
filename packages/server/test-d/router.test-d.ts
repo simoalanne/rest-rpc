@@ -2,12 +2,8 @@ import {
 	customBody,
 	router as defineRouter,
 	stream,
-} from "@contract-first-api/core/contract";
-import {
-	type InferRouteHandlerRequest,
-	route,
-	router,
-} from "@contract-first-api/server";
+} from "@rest-rpc/core/contract";
+import { type InferRouteHandlerRequest, route, router } from "@rest-rpc/server";
 import { expectError, expectType } from "tsd";
 import { z } from "zod";
 

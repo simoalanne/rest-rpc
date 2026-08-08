@@ -1,9 +1,6 @@
-import type { HttpRouteDeclaration } from "@contract-first-api/core/contract";
-import { isNoBody } from "@contract-first-api/core/contract";
-import {
-	handleHttpRoute,
-	type RouteImplementation,
-} from "@contract-first-api/server";
+import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
+import { isNoBody } from "@rest-rpc/core/contract";
+import { handleHttpRoute, type RouteImplementation } from "@rest-rpc/server";
 import type { Context } from "hono";
 import type { Env } from "hono/types";
 import type { HonoApp, HonoParseBody } from "./types.ts";

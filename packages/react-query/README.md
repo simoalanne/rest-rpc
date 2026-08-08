@@ -1,4 +1,4 @@
-# @contract-first-api/react-query
+# @rest-rpc/react-query
 
 Create API-contract-backed client shaped for TanStack Query.
 
@@ -9,14 +9,14 @@ needs a `queryClient`, and the returned API exposes hooks and cache helpers.
 ## Install
 
 ```bash
-pnpm add @contract-first-api/react-query @tanstack/react-query
+pnpm add @rest-rpc/react-query @tanstack/react-query
 ```
 
 ## Create The React Query Client
 
 ```ts
 // api.ts
-import { initReactQueryClient } from "@contract-first-api/react-query";
+import { initReactQueryClient } from "@rest-rpc/react-query";
 import { apiContract } from "@example/shared";
 import { QueryClient } from "@tanstack/react-query";
 
@@ -163,7 +163,7 @@ import type {
 	InferRouteMutationVariables,
 	InferRouteQueryData,
 	InferRouteQueryError,
-} from "@contract-first-api/react-query";
+} from "@rest-rpc/react-query";
 import { apiContract } from "@example/shared";
 
 export type TodoListData = InferRouteQueryData<
@@ -250,10 +250,10 @@ directly for websocket connections.
 
 ## How It Connects
 
-- Define `apiContract` with `@contract-first-api/core`.
+- Define `apiContract` with `@rest-rpc/core`.
 - Create a `QueryClient`.
 - Call `initReactQueryClient(apiContract, { queryClient, baseUrl })`.
 - Render your app inside React Query's `QueryClientProvider`.
 
 This package is only needed for React apps that want TanStack Query integration.
-Use `initClient()` from `@contract-first-api/core` for direct client calls.
+Use `initClient()` from `@rest-rpc/core` for direct client calls.

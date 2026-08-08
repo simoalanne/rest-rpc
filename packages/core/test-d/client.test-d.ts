@@ -7,7 +7,7 @@ import {
 	router,
 	type as schemaType,
 	stream,
-} from "@contract-first-api/core";
+} from "@rest-rpc/core";
 import { expectError, expectType } from "tsd";
 import { z } from "zod";
 

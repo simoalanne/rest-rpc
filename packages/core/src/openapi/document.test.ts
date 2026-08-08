@@ -36,7 +36,7 @@ describe("createOpenApiDocument", () => {
 				schemaConverter,
 				transformDocument: (document) => ({
 					...document,
-					"x-generated-by": "contract-first-api",
+					"x-generated-by": "rest-rpc",
 				}),
 			},
 		);
@@ -56,7 +56,7 @@ describe("createOpenApiDocument", () => {
 				},
 			},
 		});
-		assert.equal(document["x-generated-by"], "contract-first-api");
+		assert.equal(document["x-generated-by"], "rest-rpc");
 	});
 
 	it("groups multiple methods under the same OpenAPI path", () => {

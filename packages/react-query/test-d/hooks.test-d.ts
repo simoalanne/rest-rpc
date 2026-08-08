@@ -1,10 +1,10 @@
-import type { StandardSchemaV1 } from "@contract-first-api/core";
-import { router } from "@contract-first-api/core/contract";
+import type { StandardSchemaV1 } from "@rest-rpc/core";
+import { router } from "@rest-rpc/core/contract";
 import {
 	type InferRouteMutationVariables,
 	type InferRouteQueryData,
 	initReactQueryClient,
-} from "@contract-first-api/react-query";
+} from "@rest-rpc/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 import { expectAssignable, expectError, expectType } from "tsd";
 

@@ -38,7 +38,7 @@ export const apiContract = {
 			},
 		},
 	},
-} as any;
+};
 
 export const createQueryClientMock = () => ({
 	invalidateQueriesCalls: [] as unknown[][],

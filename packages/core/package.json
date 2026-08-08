@@ -1,24 +1,13 @@
 {
-	"name": "@contract-first-api/core",
-	"version": "4.4.0",
+	"name": "@rest-rpc/core",
+	"version": "0.0.0",
 	"type": "module",
-	"description": "Define shared API contracts and derive typed request and response helpers from Standard Schema-compatible schemas.",
-	"keywords": [
-		"contract-first",
-		"api",
-		"typescript",
-		"standard-schema",
-		"zod",
-		"valibot",
-		"arktype",
-		"schema"
-	],
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/simoalanne/contract-first-api.git"
+		"url": "git+https://github.com/rest-rpc/rest-rpc.git"
 	},
-	"homepage": "https://github.com/simoalanne/contract-first-api#readme",
+	"homepage": "https://github.com/rest-rpc/rest-rpc#readme",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {

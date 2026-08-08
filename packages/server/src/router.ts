@@ -7,8 +7,8 @@ import type {
 	InferServerSuccessBody,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
-} from "@contract-first-api/core/contract";
-import { REQUEST_CONTEXT_KEY } from "@contract-first-api/core/contract";
+} from "@rest-rpc/core/contract";
+import { REQUEST_CONTEXT_KEY } from "@rest-rpc/core/contract";
 import type { HttpHeaders } from "./headers.ts";
 
 export type EmptyObject = Record<never, never>;

@@ -1,21 +1,13 @@
 {
-	"name": "@contract-first-api/server",
-	"version": "4.4.0",
+	"name": "@rest-rpc/server",
+	"version": "0.0.0",
 	"type": "module",
-	"description": "Shared server-side route validation, handler typing, and response normalization for contract-first-api adapters.",
-	"keywords": [
-		"contract-first",
-		"api",
-		"typescript",
-		"standard-schema",
-		"backend"
-	],
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/simoalanne/contract-first-api.git"
+		"url": "git+https://github.com/rest-rpc/rest-rpc.git"
 	},
-	"homepage": "https://github.com/simoalanne/contract-first-api#readme",
+	"homepage": "https://github.com/rest-rpc/rest-rpc#readme",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
@@ -38,7 +30,7 @@
 		"directory": "test-d"
 	},
 	"dependencies": {
-		"@contract-first-api/core": "workspace:^"
+		"@rest-rpc/core": "workspace:^"
 	},
 	"devDependencies": {
 		"zod": "^4.3.6"

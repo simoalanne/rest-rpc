@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { customBody, stream } from "@contract-first-api/core/contract";
+import { customBody, stream } from "@rest-rpc/core/contract";
 import z from "zod";
 import { handleHttpRoute } from "./handleHttpRoute.ts";
 

@@ -1,7 +1,7 @@
 import type {
 	HttpRouteDeclaration,
 	WebSocketRouteDeclaration,
-} from "@contract-first-api/core/contract";
+} from "@rest-rpc/core/contract";
 import type { Context, Hono } from "hono";
 import type { Env } from "hono/types";
 import type { UpgradeWebSocket } from "hono/ws";

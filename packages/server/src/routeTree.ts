@@ -1,4 +1,4 @@
-import type { RouteDeclaration } from "@contract-first-api/core/contract";
+import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import { compareRouteSpecificity } from "./match.ts";
 import type { ImplementationTree, RouteImplementation } from "./router.ts";
 import { isRouteImplementation } from "./router.ts";

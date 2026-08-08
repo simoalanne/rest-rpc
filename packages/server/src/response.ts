@@ -5,8 +5,8 @@ import type {
 	ResponseBodySchema,
 	RouteDeclaration,
 	Stream,
-} from "@contract-first-api/core/contract";
-import { isNoBody, isStream } from "@contract-first-api/core/contract";
+} from "@rest-rpc/core/contract";
+import { isNoBody, isStream } from "@rest-rpc/core/contract";
 import type { HttpHeaders } from "./headers.ts";
 import { isHttpRoute } from "./router.ts";
 

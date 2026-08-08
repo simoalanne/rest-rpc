@@ -1,11 +1,11 @@
-import type { WebSocketRouteDeclaration } from "@contract-first-api/core/contract";
+import type { WebSocketRouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	type CloseEventLike,
 	handleWebSocketRoute,
 	type RawWebSocket,
 	type RouteImplementation,
 	validateRequest,
-} from "@contract-first-api/server";
+} from "@rest-rpc/server";
 import type { Context } from "hono";
 import type { Env } from "hono/types";
 import type { UpgradeWebSocket, WSContext, WSEvents } from "hono/ws";

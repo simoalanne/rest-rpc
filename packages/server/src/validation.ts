@@ -1,9 +1,9 @@
-import type { StandardSchemaV1 } from "@contract-first-api/core";
+import type { StandardSchemaV1 } from "@rest-rpc/core";
 import {
 	isCustomBody,
 	type RouteDeclaration,
 	validateFlatRequestInput,
-} from "@contract-first-api/core/contract";
+} from "@rest-rpc/core/contract";
 
 export type ValidationIssue = StandardSchemaV1.Issue;
 

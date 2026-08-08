@@ -1,6 +1,6 @@
 {
-	"name": "@contract-first-api/hono",
-	"version": "4.4.0",
+	"name": "@rest-rpc/hono",
+	"version": "0.0.0",
 	"type": "module",
 	"license": "MIT",
 	"main": "./dist/index.js",
@@ -22,8 +22,8 @@
 		"test": "pnpm run build && node --test src/**/*.test.ts"
 	},
 	"dependencies": {
-		"@contract-first-api/core": "workspace:^",
-		"@contract-first-api/server": "workspace:^"
+		"@rest-rpc/core": "workspace:^",
+		"@rest-rpc/server": "workspace:^"
 	},
 	"peerDependencies": {
 		"hono": "^4.0.0"

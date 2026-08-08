@@ -2,7 +2,7 @@ import type {
 	HttpRouteDeclaration,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
-} from "@contract-first-api/core/contract";
+} from "@rest-rpc/core/contract";
 import {
 	type Contract,
 	type ImplementationShape,
@@ -16,7 +16,7 @@ import {
 	route as serverRoute,
 	router as serverRouter,
 	routes as serverRoutes,
-} from "@contract-first-api/server";
+} from "@rest-rpc/server";
 import type { Context } from "hono";
 import type { Env } from "hono/types";
 

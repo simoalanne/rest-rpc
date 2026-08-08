@@ -1,10 +1,10 @@
-import { validateStandardSchemaSync } from "@contract-first-api/core";
+import { validateStandardSchemaSync } from "@rest-rpc/core";
 import type {
 	InferReceivedClientMessage,
 	InferServerMessage,
 	WebSocketRouteDeclaration,
-} from "@contract-first-api/core/contract";
-import { REQUEST_CONTEXT_KEY } from "@contract-first-api/core/contract";
+} from "@rest-rpc/core/contract";
+import { REQUEST_CONTEXT_KEY } from "@rest-rpc/core/contract";
 import type { HttpHeaders } from "./headers.ts";
 import type {
 	CloseEventLike,

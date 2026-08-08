@@ -1,11 +1,11 @@
-export { isCustomBody } from "@contract-first-api/core/contract";
+export { isCustomBody } from "@rest-rpc/core/contract";
 
 import type { IncomingMessage } from "node:http";
 import type {
 	HttpRouteDeclaration,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
-} from "@contract-first-api/core/contract";
+} from "@rest-rpc/core/contract";
 import {
 	type Contract,
 	ContractResponseError,
@@ -22,7 +22,7 @@ import {
 	route as serverRoute,
 	router as serverRouter,
 	routes as serverRoutes,
-} from "@contract-first-api/server";
+} from "@rest-rpc/server";
 import type { Request } from "express";
 
 export type { RegisterRoutesOptions } from "./registerRoutes.ts";

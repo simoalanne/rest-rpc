@@ -1,22 +1,13 @@
 {
-	"name": "@contract-first-api/express",
-	"version": "4.4.0",
+	"name": "@rest-rpc/express",
+	"version": "0.0.0",
 	"type": "module",
-	"description": "Mount shared API contract on an Express app with typed handlers and request validation.",
-	"keywords": [
-		"contract-first",
-		"express",
-		"api",
-		"typescript",
-		"zod",
-		"backend"
-	],
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/simoalanne/contract-first-api.git"
+		"url": "git+https://github.com/rest-rpc/rest-rpc.git"
 	},
-	"homepage": "https://github.com/simoalanne/contract-first-api#readme",
+	"homepage": "https://github.com/rest-rpc/rest-rpc#readme",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
@@ -33,11 +24,11 @@
 		"prepack": "pnpm run build",
 		"prepublishOnly": "node ../../scripts/ensure-pnpm-publish.cjs",
 		"typecheck": "tsc -p tsconfig.json",
-		"test": "pnpm --filter @contract-first-api/server build && node --test src/**/*.test.ts"
+		"test": "pnpm --filter @rest-rpc/server build && node --test src/**/*.test.ts"
 	},
 	"dependencies": {
-		"@contract-first-api/core": "workspace:^",
-		"@contract-first-api/server": "workspace:^"
+		"@rest-rpc/core": "workspace:^",
+		"@rest-rpc/server": "workspace:^"
 	},
 	"devDependencies": {
 		"@types/express": "^5.0.1",

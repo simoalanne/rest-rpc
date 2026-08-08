@@ -2,12 +2,12 @@ import type {
 	HttpRouteDeclaration,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
-} from "@contract-first-api/core/contract";
+} from "@rest-rpc/core/contract";
 import {
 	flattenAndSortImplementationTree,
 	type ImplementationTree,
 	type RouteImplementation,
-} from "@contract-first-api/server";
+} from "@rest-rpc/server";
 import type { Application } from "express";
 import { registerExpressHttpRoutes } from "./http.ts";
 import {

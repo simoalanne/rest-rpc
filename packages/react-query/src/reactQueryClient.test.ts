@@ -18,7 +18,7 @@ describe("initReactQueryClient", () => {
 			createFetchResponseCalls: [] as unknown[][],
 		};
 		const module = await esmock("./reactQueryClient.ts", {
-			"@contract-first-api/core": {
+			"@rest-rpc/core": {
 				initClient: (...args: unknown[]) => {
 					initClientCalls.push(args);
 					return createApiTree(fetchCalls);

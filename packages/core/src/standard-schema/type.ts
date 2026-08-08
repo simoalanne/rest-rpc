@@ -1,6 +1,6 @@
 import type { StandardSchemaV1 } from "./index.ts";
 
-const TYPE_ONLY_SCHEMA_VENDOR = "contract-first-api";
+const TYPE_ONLY_SCHEMA_VENDOR = "rest-rpc";
 
 export const type = <T>(): StandardSchemaV1<T, T> => ({
 	"~standard": {

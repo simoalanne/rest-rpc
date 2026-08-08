@@ -1,11 +1,11 @@
-import { initClient } from "@contract-first-api/core";
+import { initClient } from "@rest-rpc/core";
 import type {
 	ApiClientFetchOptions,
 	ApiClientOptions,
 	FetchResponseFn,
 	InferClientRequestInput,
 	UndeclaredRouteClientResponse,
-} from "@contract-first-api/core/client";
+} from "@rest-rpc/core/client";
 import type {
 	Contract,
 	HttpRouteDeclaration,
@@ -14,7 +14,7 @@ import type {
 	InferClientSuccessResponse,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
-} from "@contract-first-api/core/contract";
+} from "@rest-rpc/core/contract";
 import type {
 	QueryClient,
 	QueryKey,

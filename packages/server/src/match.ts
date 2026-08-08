@@ -1,4 +1,4 @@
-import type { RouteDeclaration } from "@contract-first-api/core/contract";
+import type { RouteDeclaration } from "@rest-rpc/core/contract";
 
 const splitPath = (path: string) => path.split("/").filter(Boolean);
 const isParamSegment = (segment: string) => segment.startsWith(":");
