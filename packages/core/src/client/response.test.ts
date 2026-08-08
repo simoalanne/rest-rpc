@@ -28,6 +28,7 @@ describe("ApiClient responses", () => {
 		assert.deepEqual(response, {
 			declared: true,
 			status: 404,
+			headers: new Headers(),
 			body: { code: "not_found" },
 		});
 	});
@@ -55,6 +56,7 @@ describe("ApiClient responses", () => {
 		assert.deepEqual(response, {
 			declared: false,
 			status: 418,
+			headers: new Headers(),
 			body: { code: "teapot" },
 		});
 	});

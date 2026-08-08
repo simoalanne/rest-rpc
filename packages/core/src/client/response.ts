@@ -86,6 +86,7 @@ export const fetchResponse = async <E extends RouteDeclaration>(
 				declared: false,
 				status: rawResponse.status,
 				body: await readUnknownBody(rawResponse),
+				headers: rawResponse.headers,
 			} as InferClientFetchResponse<E>;
 		}
 
@@ -93,6 +94,7 @@ export const fetchResponse = async <E extends RouteDeclaration>(
 			declared: true,
 			status: rawResponse.status,
 			body: await readDeclaredBody(schema, rawResponse, validateResponse),
+			headers: rawResponse.headers,
 		} as InferClientFetchResponse<E>;
 	} finally {
 		cleanup();
