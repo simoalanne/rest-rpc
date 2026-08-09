@@ -85,6 +85,16 @@ success body directly.
 ```ts
 return todo;
 ```
+You can also use `ContractResponseError` to throw a declared error response when that's more convenient.
+
+```ts
+throw new ContractResponseError(api.todos.get, {
+	status: 404,
+	body: {
+		code: "TODO_NOT_FOUND",
+	},
+});
+```
 
 ## Middleware
 
