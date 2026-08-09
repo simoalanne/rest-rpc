@@ -138,6 +138,39 @@ rq.todos.get.setData({ id: "todo_1" }, (current) =>
 Query keys are based on the route path in the contract plus request input.
 Request fields with `undefined` values are omitted from generated keys.
 
+Pass `queryKey` in query options when a hook needs a custom cache key.
+
+```tsx
+const todoKey = ["todos", "detail", "todo_1"];
+
+const todo = rq.todos.get.useQuery(
+	{ id: "todo_1" },
+	{
+		queryKey: todoKey,
+	},
+);
+```
+
+Pass the same key to cache helpers when they need to target a custom-keyed
+query.
+
+```tsx
+await rq.todos.get.invalidate(
+	{ id: "todo_1" },
+	{
+		queryKey: todoKey,
+	},
+);
+
+rq.todos.get.setData(
+	{ id: "todo_1" },
+	(current) => current,
+	{
+		queryKey: todoKey,
+	},
+);
+```
+
 ## Fetch Options
 
 Hook options accept normal TanStack Query options plus `fetchOptions`.

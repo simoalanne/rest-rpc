@@ -135,6 +135,32 @@ describe("createRouteHooks", () => {
 		]);
 	});
 
+	it("allows query hooks to override generated query keys", async () => {
+		const calls = {
+			useQueryCalls: [] as unknown[],
+			useSuspenseQueryCalls: [] as unknown[],
+			useMutationCalls: [] as unknown[],
+		};
+		const createRouteHooks = await getCreateRouteHooks(calls);
+		const queryClient = createQueryClientMock();
+		resetQueryClientMock(queryClient);
+		const hooks = createRouteHooks(
+			routeWithRequest,
+			async () => ({ declared: true, status: 200, body: {} }),
+			["items", "byId"],
+			queryClient.queryClient as any,
+		);
+		const request = { id: "item-1" };
+
+		hooks.useQuery(request, { queryKey: ["custom", request] });
+		hooks.useSuspenseQuery(request, { queryKey: ["custom-suspense", request] });
+
+		const queryOptions = calls.useQueryCalls[0] as any;
+		const suspenseOptions = calls.useSuspenseQueryCalls[0] as any;
+		assert.deepEqual(queryOptions.queryKey, ["custom", request]);
+		assert.deepEqual(suspenseOptions.queryKey, ["custom-suspense", request]);
+	});
+
 	it("disables request-based queries when request input is falsy", async () => {
 		const calls = {
 			useQueryCalls: [] as unknown[],
@@ -330,5 +356,59 @@ describe("createRouteHooks", () => {
 		assert.deepEqual(queryClient.setQueriesDataCalls, [
 			[{ queryKey: ["items", "list"] }, updater],
 		]);
+	});
+
+	it("allows cache helpers to target custom query keys", async () => {
+		const calls = {
+			useQueryCalls: [] as unknown[],
+			useSuspenseQueryCalls: [] as unknown[],
+			useMutationCalls: [] as unknown[],
+		};
+		const createRouteHooks = await getCreateRouteHooks(calls);
+		const queryClient = createQueryClientMock();
+		resetQueryClientMock(queryClient);
+		const request = { id: "item-4" };
+		const updater = (current: unknown) => current;
+		const hooks = createRouteHooks(
+			routeWithRequest,
+			async () => ({ declared: true, status: 200, body: {} }),
+			["items", "byId"],
+			queryClient.queryClient as any,
+		);
+		const listHooks = createRouteHooks(
+			routeWithoutRequest,
+			async () => ({ declared: true, status: 200, body: {} }),
+			["items", "list"],
+			queryClient.queryClient as any,
+		);
+
+		assert.deepEqual(hooks.getKey(request, { queryKey: ["custom", request] }), [
+			"custom",
+			request,
+		]);
+		assert.deepEqual(listHooks.getKey({ queryKey: ["custom", "list"] }), [
+			"custom",
+			"list",
+		]);
+
+		await hooks.invalidate(request, { queryKey: ["custom", "invalidate"] });
+		hooks.clear(request, { queryKey: ["custom", "clear"] });
+		hooks.setData(request, updater, { queryKey: ["custom", "set"] });
+		listHooks.setData(updater, { queryKey: ["custom", "list-set"] });
+
+		assert.deepEqual(queryClient.invalidateQueriesCalls, [
+			[{ queryKey: ["custom", "invalidate"] }],
+		]);
+		assert.deepEqual(queryClient.cancelQueriesCalls, [
+			[{ queryKey: ["custom", "clear"] }],
+		]);
+		assert.deepEqual(queryClient.removeQueriesCalls, [
+			[{ queryKey: ["custom", "clear"] }],
+		]);
+		assert.deepEqual(queryClient.setQueryDataCalls, [
+			[["custom", "set"], updater],
+			[["custom", "list-set"], updater],
+		]);
+		assert.deepEqual(queryClient.setQueriesDataCalls, []);
 	});
 });

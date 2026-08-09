@@ -54,7 +54,9 @@ type QueryOptionsFor<
 	Omit<
 		UseQueryOptions<InferRouteQueryData<E>, InferRouteQueryError<E>, TData>,
 		"queryKey" | "queryFn"
-	>
+	> & {
+		queryKey?: QueryKey;
+	}
 >;
 
 type SuspenseQueryOptionsFor<
@@ -68,7 +70,9 @@ type SuspenseQueryOptionsFor<
 			TData
 		>,
 		"queryKey" | "queryFn"
-	>
+	> & {
+		queryKey?: QueryKey;
+	}
 >;
 
 type MutationOptionsFor<E extends RouteDeclaration> = WithFetchOptions<
@@ -83,6 +87,9 @@ type MutationOptionsFor<E extends RouteDeclaration> = WithFetchOptions<
 >;
 
 type QueryDisabled = false | null | undefined | "" | 0;
+type CacheHelperOptions = {
+	queryKey?: QueryKey;
+};
 
 type UseQueryArgs<E extends RouteDeclaration, TData = InferRouteQueryData<E>> =
 	InferClientRequest<E> extends never
@@ -105,18 +112,27 @@ type UseSuspenseQueryArgs<
 
 type SetDataArgs<E extends RouteDeclaration> =
 	| [
-			request: InferClientRequest<E>,
 			updater: Updater<
 				InferRouteQueryData<E> | undefined,
 				InferRouteQueryData<E> | undefined
 			>,
+			options?: CacheHelperOptions,
 	  ]
-	| [
-			updater: Updater<
-				InferRouteQueryData<E> | undefined,
-				InferRouteQueryData<E> | undefined
-			>,
-	  ];
+	| (InferClientRequest<E> extends never
+			? never
+			: [
+					request: InferClientRequest<E>,
+					updater: Updater<
+						InferRouteQueryData<E> | undefined,
+						InferRouteQueryData<E> | undefined
+					>,
+					options?: CacheHelperOptions,
+				]);
+
+type CacheHelperArgs<E extends RouteDeclaration> =
+	InferClientRequest<E> extends never
+		? [options?: CacheHelperOptions]
+		: [request?: InferClientRequest<E>, options?: CacheHelperOptions];
 
 type ReactQueryRouteValue<E extends RouteDeclaration> = {
 	useMutation: (
@@ -133,9 +149,9 @@ type ReactQueryRouteValue<E extends RouteDeclaration> = {
 		...args: UseSuspenseQueryArgs<E, TData>
 	) => UseSuspenseQueryResult<TData, InferRouteQueryError<E>>;
 	setData: (...args: SetDataArgs<E>) => void;
-	invalidate: (request?: InferClientRequest<E>) => Promise<void>;
-	clear: (request?: InferClientRequest<E>) => void;
-	getKey: (request?: InferClientRequest<E>) => QueryKey;
+	invalidate: (...args: CacheHelperArgs<E>) => Promise<void>;
+	clear: (...args: CacheHelperArgs<E>) => void;
+	getKey: (...args: CacheHelperArgs<E>) => QueryKey;
 };
 
 type ReactQueryTreeFor<T extends Contract> = {

@@ -88,9 +88,13 @@ expectAssignable<
 >(getResult.data);
 
 rq.todos.list.useQuery({ staleTime: 100 });
+rq.todos.list.useQuery({ queryKey: ["todos", "custom"] });
 // useQuery accepts falsy request input to disable request-based queries.
-rq.todos.get.useQuery("", { staleTime: 100 });
-rq.todos.get.useSuspenseQuery({ id: "todo-1" });
+rq.todos.get.useQuery("", { queryKey: ["todos", "disabled"], staleTime: 100 });
+rq.todos.get.useSuspenseQuery(
+	{ id: "todo-1" },
+	{ queryKey: ["todos", "todo-1"] },
+);
 rq.todos.create.useMutation({
 	onSuccess(data, variables) {
 		expectAssignable<{
@@ -101,6 +105,16 @@ rq.todos.create.useMutation({
 		expectType<{ title: string }>(variables);
 	},
 });
+rq.todos.get.getKey({ id: "todo-1" }, { queryKey: ["todos", "todo-1"] });
+rq.todos.get.invalidate({ id: "todo-1" }, { queryKey: ["todos", "todo-1"] });
+rq.todos.get.clear({ id: "todo-1" }, { queryKey: ["todos", "todo-1"] });
+rq.todos.get.setData({ id: "todo-1" }, (current) => current, {
+	queryKey: ["todos", "todo-1"],
+});
+rq.todos.list.getKey({ queryKey: ["todos", "list"] });
+rq.todos.list.invalidate({ queryKey: ["todos", "list"] });
+rq.todos.list.clear({ queryKey: ["todos", "list"] });
+rq.todos.list.setData((current) => current, { queryKey: ["todos", "list"] });
 
 // Suspense queries cannot be disabled with falsy request input.
 expectError(rq.todos.get.useQuery());
