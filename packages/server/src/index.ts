@@ -4,13 +4,7 @@ export type {
 } from "./handleHttpRoute.ts";
 export { handleHttpRoute } from "./handleHttpRoute.ts";
 export type { HttpHeaders, HttpHeaderValue } from "./headers.ts";
-export type {
-	MatchableRequest,
-	PathMatcher,
-	RouteMatch,
-	RouteMatcher,
-} from "./match.ts";
-export { createPathMatcher, createRouteMatchers, matchRoute } from "./match.ts";
+export { createRouteMatcher } from "./match.ts";
 export {
 	ContractResponseError,
 	getResponseSchema,

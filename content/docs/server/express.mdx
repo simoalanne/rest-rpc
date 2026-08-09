@@ -86,6 +86,55 @@ success body directly.
 return todo;
 ```
 
+## Middleware
+
+`rest-rpc` does not own middleware. Use Express middleware the same way you
+would in any Express app.
+
+When middleware needs to behave differently for different contract routes, use
+`createRouteMatcher` to match the incoming request back to the contract route.
+
+```ts
+import { createRouteMatcher } from "@rest-rpc/express";
+
+const matchContractRoute = createRouteMatcher(api);
+
+app.use(async (req, res, next) => {
+	const match = matchContractRoute({
+		method: req.method,
+		path: req.path,
+	});
+
+	if (!match?.route.metadata?.requiresAuth) {
+		return next();
+	}
+
+	const session = await loadSession(req.header("authorization"));
+
+	if (!session) {
+		return res.status(401).json({ code: "UNAUTHORIZED" });
+	}
+
+	req.session = session;
+	return next();
+});
+```
+
+Handlers can read values added by middleware through `context.req`.
+
+```ts
+const routes = router(api, {
+	todos: {
+		get({ id, context }) {
+			return loadTodoForSession({
+				id,
+				session: context.req.session,
+			});
+		},
+	},
+});
+```
+
 ## Body Parsing
 
 The Express adapter does not own body parsing.
@@ -96,26 +145,8 @@ For normal JSON routes, use Express middleware.
 app.use(express.json());
 ```
 
-For non-JSON bodies, choose parsing middleware in your app. `matchRoute()` and
-`isCustomBody()` can help connect framework-native parsing to the contract.
-
-```ts
-import { isCustomBody, matchRoute } from "@rest-rpc/express";
-
-const jsonParser = express.json();
-const pngParser = express.raw({ type: "image/png" });
-
-app.use((req, res, next) => {
-	const matched = matchRoute(api, req);
-	const body = matched?.request?.body;
-
-	if (isCustomBody(body) && body.contentType === "image/png") {
-		return pngParser(req, res, next);
-	}
-
-	return jsonParser(req, res, next);
-});
-```
+For non-JSON bodies, choose parsing middleware in your app. See
+[Custom Bodies](/advanced/custom-bodies/) for an example.
 
 ## WebSockets
 

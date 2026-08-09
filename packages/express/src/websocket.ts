@@ -4,11 +4,13 @@ import {
 	STATUS_CODES,
 } from "node:http";
 import type { Duplex } from "node:stream";
-import type { WebSocketRouteDeclaration } from "@rest-rpc/core/contract";
+import type {
+	RouteDeclaration,
+	WebSocketRouteDeclaration,
+} from "@rest-rpc/core/contract";
 import {
-	createPathMatcher,
+	createRouteMatcher,
 	handleWebSocketRoute,
-	type MatchableRequest,
 	type RawWebSocket,
 	type RouteImplementation,
 	type UpgradeRejection,
@@ -40,11 +42,6 @@ export type ExpressWebSocketRegistration = {
 	webSocketServer: WebSocketServer;
 	options: ExpressWebSocketOptions;
 };
-
-type PreparedExpressWebSocketRoute =
-	RouteImplementation<WebSocketRouteDeclaration> & {
-		matchPath: (path: string) => Record<string, string> | null;
-	};
 
 export const expressWebSocket = (
 	server: HttpServer,
@@ -123,49 +120,41 @@ const adaptWebSocket = (socket: WebSocket): RawWebSocket => ({
 	},
 });
 
-const matchUpgradeRoute = (
-	matchers: PreparedExpressWebSocketRoute[],
-	req: MatchableRequest,
-) => {
-	for (const matcher of matchers) {
-		const params = matcher.matchPath(req.path);
-		if (matcher.route.method === req.method && params !== null) {
-			return {
-				route: matcher.route,
-				params,
-				handler: matcher.handler,
-			};
-		}
-	}
-
-	return null;
-};
-
 export const registerExpressWebSocketRoutes = (
 	registration: ExpressWebSocketRegistration,
 	routes: RouteImplementation<WebSocketRouteDeclaration>[],
 ) => {
 	if (routes.length === 0) return;
 
-	const routeMatchers = routes.map((implementation) => ({
-		...implementation,
-		matchPath: createPathMatcher(implementation.route.path),
-	}));
+	const routeContract = Object.fromEntries(
+		routes.map((implementation, index) => [
+			String(index),
+			implementation.route,
+		]),
+	);
+	const matchContractRoute = createRouteMatcher(routeContract);
+	const implementationsByRoute = new Map<
+		RouteDeclaration,
+		RouteImplementation<WebSocketRouteDeclaration>
+	>(routes.map((implementation) => [implementation.route, implementation]));
 
 	registration.server.on("upgrade", async (req, socket, head) => {
 		const url = new URL(req.url ?? "/", "http://localhost");
-		const matchedRoute = matchUpgradeRoute(routeMatchers, {
+		const matchedRoute = matchContractRoute({
 			method: req.method ?? "GET",
 			path: url.pathname,
 		});
 		if (!matchedRoute) return;
+
+		const implementation = implementationsByRoute.get(matchedRoute.route);
+		if (!implementation) return;
 
 		const request = {
 			query: Object.fromEntries(url.searchParams),
 			params: matchedRoute.params,
 			headers: req.headers,
 		};
-		const requestValidation = validateRequest(matchedRoute.route, request);
+		const requestValidation = validateRequest(implementation.route, request);
 
 		if (!requestValidation.success) {
 			sendUpgradeRejection(socket, requestValidation.response);
@@ -174,7 +163,7 @@ export const registerExpressWebSocketRoutes = (
 
 		const rejection = await registration.options.beforeUpgrade?.({
 			req,
-			route: matchedRoute.route,
+			route: implementation.route,
 			request,
 		});
 
@@ -189,8 +178,8 @@ export const registerExpressWebSocketRoutes = (
 			head,
 			(rawSocket) => {
 				const result = handleWebSocketRoute(
-					matchedRoute.route,
-					matchedRoute.handler,
+					implementation.route,
+					implementation.handler,
 					{
 						request,
 						context: { req },

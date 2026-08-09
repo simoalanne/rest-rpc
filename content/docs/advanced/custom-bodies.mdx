@@ -112,14 +112,19 @@ Server adapters do not infer your intended body parsing.
 For Express, choose middleware before route execution.
 
 ```ts
-import { isCustomBody, matchRoute } from "@rest-rpc/express";
+import { createRouteMatcher, isCustomBody } from "@rest-rpc/express";
+
+const matchContractRoute = createRouteMatcher(api);
 
 const jsonParser = express.json();
 const pngParser = express.raw({ type: "image/png" });
 
 app.use((req, res, next) => {
-	const matched = matchRoute(api, req);
-	const body = matched?.request?.body;
+	const match = matchContractRoute({
+		method: req.method,
+		path: req.path,
+	});
+	const body = match?.route.request?.body;
 
 	if (isCustomBody(body) && body.contentType === "image/png") {
 		return pngParser(req, res, next);

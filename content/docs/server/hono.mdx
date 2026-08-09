@@ -84,6 +84,52 @@ success body directly.
 return todo;
 ```
 
+## Middleware
+
+`rest-rpc` does not own middleware. Use Hono middleware the same way you would
+in any Hono app.
+
+When middleware needs to behave differently for different contract routes, use
+`createRouteMatcher` to match the incoming request back to the contract route.
+
+const matchContractRoute = createRouteMatcher(api);
+
+app.use(async (c, next) => {
+	const match = matchContractRoute({
+		method: c.req.method,
+		path: c.req.path,
+	});
+
+	if (!match?.route.metadata?.requiresAuth) {
+		return next();
+	}
+
+	const session = await loadSession(c.req.header("authorization"));
+
+	if (!session) {
+		return c.json({ code: "UNAUTHORIZED" }, 401);
+	}
+
+	c.set("session", session);
+	return next();
+});
+```
+
+Handlers can read values added by middleware through `context.c`.
+
+```ts
+const routes = router(api, {
+	todos: {
+		get({ id, context }) {
+			return loadTodoForSession({
+				id,
+				session: context.c.get("session"),
+			});
+		},
+	},
+});
+```
+
 ## Body Parsing
 
 For normal JSON routes, the adapter can read JSON request bodies through Hono's

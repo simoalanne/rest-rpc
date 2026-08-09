@@ -5,6 +5,7 @@ import type {
 } from "@rest-rpc/core/contract";
 import {
 	type Contract,
+	createRouteMatcher,
 	type ImplementationShape,
 	type ImplementationTreeFor,
 	type RouteHandlerFor,
@@ -30,6 +31,7 @@ export type {
 	HonoWebSocketRegistration,
 } from "./types.ts";
 export { honoWebSocket } from "./websocket.ts";
+export { createRouteMatcher };
 
 export type HttpRouteHandlerContext<E extends Env = Env> = {
 	c: Context<E>;

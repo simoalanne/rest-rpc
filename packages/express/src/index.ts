@@ -9,10 +9,10 @@ import type {
 import {
 	type Contract,
 	ContractResponseError,
+	createRouteMatcher,
 	type ImplementationShape,
 	type ImplementationTreeFor,
 	type InferRouteHandlerResponse,
-	matchRoute,
 	type RouteHandlerFor,
 	type RouteImplementation,
 	type InferRouteHandlerRequest as ServerInferRouteHandlerRequest,
@@ -33,7 +33,7 @@ export type {
 } from "./websocket.ts";
 export { expressWebSocket } from "./websocket.ts";
 export type { InferRouteHandlerResponse };
-export { ContractResponseError, matchRoute };
+export { ContractResponseError, createRouteMatcher };
 
 export type HttpRouteHandlerContext = {
 	req: Request;

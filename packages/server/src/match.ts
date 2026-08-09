@@ -1,4 +1,8 @@
-import type { RouteDeclaration } from "@rest-rpc/core/contract";
+import {
+	type Contract,
+	flattenContractRoutes,
+	type RouteDeclaration,
+} from "@rest-rpc/core/contract";
 
 const splitPath = (path: string) => path.split("/").filter(Boolean);
 const isParamSegment = (segment: string) => segment.startsWith(":");
@@ -35,9 +39,7 @@ export const compareRouteSpecificity = (
 const escapeRegExp = (value: string) =>
 	value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-export type PathMatcher = (pathname: string) => Record<string, string> | null;
-
-export const createPathMatcher = (path: string): PathMatcher => {
+const createPathMatcher = (path: string) => {
 	const keys: string[] = [];
 	const segments = splitPath(path);
 	const pattern =
@@ -66,56 +68,25 @@ export const createPathMatcher = (path: string): PathMatcher => {
 	};
 };
 
-export type MatchableRequest = {
-	path: string;
-	method: string;
-};
-
-export type RouteMatcher<TRoute extends RouteDeclaration = RouteDeclaration> = {
-	route: TRoute;
-	matchPath: PathMatcher;
-};
-
-type RouteMatcherSource<TRoute extends RouteDeclaration> =
-	| TRoute
-	| { route: TRoute };
-
-const getRoute = <TRoute extends RouteDeclaration>(
-	source: RouteMatcherSource<TRoute>,
-): TRoute => ("route" in source ? source.route : source);
-
-export type RouteMatch<TRoute extends RouteDeclaration = RouteDeclaration> = {
-	route: TRoute;
-	params: Record<string, string>;
-};
-
-export const createRouteMatchers = <
-	const TRoute extends RouteDeclaration = RouteDeclaration,
->(
-	sources: readonly RouteMatcherSource<TRoute>[],
-): RouteMatcher<TRoute>[] =>
-	sources
-		.map(getRoute)
+export const createRouteMatcher = (contract: Contract) => {
+	const matchers = flattenContractRoutes(contract)
 		.sort(compareRouteSpecificity)
 		.map((route) => ({
 			route,
 			matchPath: createPathMatcher(route.path),
 		}));
 
-export const matchRoute = (
-	matchers: readonly RouteMatcher[],
-	req: MatchableRequest,
-): RouteMatch | null => {
-	const pathname = req.path;
-	for (const route of matchers) {
-		const params = route.matchPath(pathname);
-		if (route.route.method === req.method && params !== null) {
-			return {
-				route: route.route,
-				params,
-			};
+	return (req: { path: string; method: string }) => {
+		for (const matcher of matchers) {
+			const params = matcher.matchPath(req.path);
+			if (matcher.route.method === req.method && params !== null) {
+				return {
+					route: matcher.route,
+					params,
+				};
+			}
 		}
-	}
 
-	return null;
+		return null;
+	};
 };
