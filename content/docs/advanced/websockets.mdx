@@ -92,6 +92,7 @@ Incoming messages are parsed and validated before delivery. Invalid incoming
 messages close the connection.
 
 Outgoing server messages are validated before being sent.
+They are sent as JSON, so schema output must still make sense as a JSON message.
 
 ## Client
 
@@ -114,6 +115,12 @@ socket.send({
 	type: "ping",
 });
 ```
+
+By default, incoming server messages are JSON-parsed but trusted by the client.
+If the client enables `validateResponses`, incoming server messages are also
+validated on the client. See
+[HTTP and Schema I/O gotchas](/advanced/http-and-schema-io-gotchas/) before
+using that option with transformed server message schemas.
 
 ## Registration
 

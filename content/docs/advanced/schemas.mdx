@@ -8,36 +8,22 @@ The contract accepts Standard Schema-compatible schemas.
 Zod, Valibot, and ArkType are common choices. Other Standard Schema-compatible
 libraries can be used when the request key shape is known or provided.
 
-## Runtime Schemas
+## How schemas are used
 
-Runtime schemas validate incoming server requests and outgoing server responses. They can also validate client
-responses when `validateResponses` is enabled in case server responses are not trusted or don't use `rest-rpc`.
+`rest-rpc` uses schemas for request validation and response validation.
 
-```ts
-import { router } from "@rest-rpc/core";
-import { z } from "zod";
+At runtime:
+- Server validates request input and returns schema output to a handler.
+- Server validates handler output and returns schema output to the client.
+- Client can optionally enable response validation to validate schema output from the server.
 
-export const api = router({
-	todos: {
-		create: {
-			method: "POST",
-			path: "/todos",
-			request: {
-				body: {
-					title: z.string().min(1),
-				},
-			},
-			responses: {
-				201: z.object({
-					id: z.string(),
-					title: z.string(),
-					completed: z.boolean(),
-				}),
-			},
-		},
-	},
-});
-```
+For typescript:
+- Fetch client request input is schema input.
+- Fetch client response output is schema output.
+- Server handler input is schema output.
+- Server handler output is schema input.
+
+For further details, see [HTTP and Schema I/O gotchas](/advanced/http-and-schema-io-gotchas/).
 
 ## Type-Only Schemas
 

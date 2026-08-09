@@ -1,0 +1,186 @@
+---
+title: HTTP and Schema I/O gotchas
+description: Avoid common HTTP wire format and schema input/output mistakes.
+---
+
+`rest-rpc` validates schemas at the server boundary, but it cannot change how
+HTTP transport formats or schema input/output work.
+
+Default request and response bodies use JSON. WebSocket messages use JSON.
+Params, query, and headers use HTTP strings.
+
+## Request Serialization
+
+✅ Good
+
+```ts
+request: {
+	body: z.object({
+		createdAt: z.string().datetime().transform((value) => new Date(value)),
+	}),
+}
+```
+
+Client sends a string. The handler receives a `Date`.
+
+❌ Bad
+
+```ts
+request: {
+	body: z.object({
+		createdAt: z.date(),
+	}),
+}
+```
+
+Client sends a `Date`. JSON serialization converts it to a string.
+Validation fails because it expects a `Date` but receives a string.
+
+## Request Params and Query Serialization
+
+✅ Good
+
+```ts
+request: {
+	params: {
+		id: z.coerce.number(),
+	},
+	query: {
+		published: z.enum(["true", "false"]).transform((value) => value === "true"),
+	},
+}
+```
+
+Client can send a number or string for `id` and a string for `published`. The
+handler receives a number and a boolean.
+
+❌ Bad
+
+```ts
+request: {
+	params: {
+		id: z.number(),
+	},
+	query: {
+		published: z.boolean(),
+	},
+}
+```
+
+Client can send a number for `id` and a boolean for `published`. URL path params
+and query parameters are always strings.
+Validation fails because it expects a number and a boolean but receives strings.
+
+## Response Serialization
+
+✅ Good
+
+```ts
+responses: {
+	200: z.object({
+		id: z.string(),
+		createdAt: z.date().transform((value) => value.toISOString()),
+	}),
+}
+```
+
+Server sends a string. The client receives a valid date string and can transform
+it to a `Date` if needed outside of the client.
+
+❌ Bad
+
+```ts
+responses: {
+	200: z.object({
+		id: z.string(),
+		createdAt: z.date(),
+	}),
+}
+```
+
+Server sends a `Date`. JSON serialization converts it to a string.
+If client enables response validation, it fails because it expects a `Date` but receives a string.
+If the client does not enable response validation, it receives a string instead of a `Date` but TypeScript type will incorrectly indicate that it is a `Date`.
+This can lead to runtime errors when the client code tries to use the value as a `Date`.
+
+## Response Transforms
+
+✅ Good (but with caveats)
+
+```ts
+responses: {
+	200: z.object({
+		id: z.string(),
+		name: z.object({
+			first: z.string(),
+			last: z.string(),
+		}).transform(({ first, last }) => `${first} ${last}`),
+	}),
+}
+```
+
+Server handler can return data in a different shape than the client receives.
+The transform is applied on the server before serialization.
+
+However, if the client enables response validation, it will fail validation
+because the runtime code will try to validate the transformed output against its
+original schema.
+
+❓ Confusing
+
+```ts
+responses: {
+	200: z.object({
+		id: z.string(),
+		createdAt: z.iso.datetime().transform((value) => new Date(value)),
+	}),
+}
+```
+
+Server handler returns a string. Server applies the transform and sends a `Date`.
+JSON serialization converts it to a string.
+If the client enables response validation, the serialized string is transformed to a `Date` which will work fine.
+If the client does not enable response validation, it receives a string instead of a `Date` but TypeScript type will incorrectly indicate that it is a `Date`.
+In both cases, generated OpenAPI output can be misleading if the response schema
+output is not a JSON shape.
+
+## WebSocket Messages
+
+WebSocket messages have the same schema input/output and JSON serialization
+gotchas as request and response bodies.
+
+✅ Good
+
+```ts
+messages: {
+	client: z.object({
+		createdAt: z.string().datetime().transform((value) => new Date(value)),
+	}),
+	server: z.object({
+		createdAt: z.date().transform((value) => value.toISOString()),
+	}),
+}
+```
+
+Client messages arrive as JSON and are validated on the server. Server messages
+are validated on the server before being sent as JSON.
+
+❌ Bad
+
+```ts
+messages: {
+	client: z.object({
+		createdAt: z.date(),
+	}),
+	server: z.object({
+		createdAt: z.date(),
+	}),
+}
+```
+
+The client message `Date` becomes a string before the server validates it. The
+server message `Date` becomes a string before the client receives it.
+
+If the client enables `validateResponses`, incoming WebSocket server messages
+are validated on the client too. That can fail for transformed server message
+outputs that no longer match the original schema input.

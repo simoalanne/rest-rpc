@@ -101,6 +101,243 @@ describe("ApiClient responses", () => {
 		);
 	});
 
+	it("returns transformed response output when validation is disabled", async () => {
+		const responseSchema = z.object({
+			id: z.string(),
+			name: z
+				.object({
+					first: z.string(),
+					last: z.string(),
+				})
+				.transform(({ first, last }) => `${first} ${last}`),
+		});
+		const apiContract = router({
+			todos: {
+				get: {
+					method: "GET",
+					path: "/todos/:id",
+					request: {
+						params: z.object({ id: z.string() }),
+					},
+					responses: {
+						200: responseSchema,
+					},
+				},
+			},
+		});
+		const serverOutput = responseSchema.parse({
+			id: "todo-1",
+			name: {
+				first: "Ada",
+				last: "Lovelace",
+			},
+		});
+		const wireBody = JSON.parse(JSON.stringify(serverOutput));
+
+		captureFetch(jsonResponse(wireBody, 200));
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+		});
+
+		const response = await client.todos.get.fetch({ id: "todo-1" });
+
+		assert.deepEqual(response, {
+			id: "todo-1",
+			name: "Ada Lovelace",
+		});
+	});
+
+	it("rejects transformed response output that no longer matches response input when validation is enabled", async () => {
+		const responseSchema = z.object({
+			id: z.string(),
+			name: z
+				.object({
+					first: z.string(),
+					last: z.string(),
+				})
+				.transform(({ first, last }) => `${first} ${last}`),
+		});
+		const apiContract = router({
+			todos: {
+				get: {
+					method: "GET",
+					path: "/todos/:id",
+					request: {
+						params: z.object({ id: z.string() }),
+					},
+					responses: {
+						200: responseSchema,
+					},
+				},
+			},
+		});
+		const serverOutput = responseSchema.parse({
+			id: "todo-1",
+			name: {
+				first: "Ada",
+				last: "Lovelace",
+			},
+		});
+		const wireBody = JSON.parse(JSON.stringify(serverOutput));
+
+		captureFetch(jsonResponse(wireBody, 200));
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+			validateResponses: true,
+		});
+
+		await assert.rejects(() => client.todos.get.fetch({ id: "todo-1" }));
+	});
+
+	it("returns serialized Date transform output when validation is disabled", async () => {
+		const responseSchema = z.object({
+			createdAt: z
+				.string()
+				.datetime()
+				.transform((value) => new Date(value)),
+		});
+		const apiContract = router({
+			todos: {
+				get: {
+					method: "GET",
+					path: "/todos/:id",
+					request: {
+						params: z.object({ id: z.string() }),
+					},
+					responses: {
+						200: responseSchema,
+					},
+				},
+			},
+		});
+		const serverOutput = responseSchema.parse({
+			createdAt: "2026-08-10T00:00:00.000Z",
+		});
+		const wireBody = JSON.parse(JSON.stringify(serverOutput));
+
+		captureFetch(jsonResponse(wireBody, 200));
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+		});
+		const response = await client.todos.get.fetch({ id: "todo-1" });
+
+		assert.equal(response.createdAt, "2026-08-10T00:00:00.000Z");
+	});
+
+	it("parses serialized Date transform output when validation is enabled", async () => {
+		const responseSchema = z.object({
+			createdAt: z
+				.string()
+				.datetime()
+				.transform((value) => new Date(value)),
+		});
+		const apiContract = router({
+			todos: {
+				get: {
+					method: "GET",
+					path: "/todos/:id",
+					request: {
+						params: z.object({ id: z.string() }),
+					},
+					responses: {
+						200: responseSchema,
+					},
+				},
+			},
+		});
+		const serverOutput = responseSchema.parse({
+			createdAt: "2026-08-10T00:00:00.000Z",
+		});
+		const wireBody = JSON.parse(JSON.stringify(serverOutput));
+
+		captureFetch(jsonResponse(wireBody, 200));
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+			validateResponses: true,
+		});
+		const response = await client.todos.get.fetch({ id: "todo-1" });
+
+		assert.ok(response.createdAt instanceof Date);
+		assert.equal(response.createdAt.toISOString(), "2026-08-10T00:00:00.000Z");
+	});
+
+	it("returns string response output when a Date response schema serializes to JSON", async () => {
+		const responseSchema = z.object({
+			id: z.string(),
+			createdAt: z.date().transform((value) => value.toISOString()),
+		});
+		const apiContract = router({
+			todos: {
+				get: {
+					method: "GET",
+					path: "/todos/:id",
+					request: {
+						params: z.object({ id: z.string() }),
+					},
+					responses: {
+						200: responseSchema,
+					},
+				},
+			},
+		});
+		const serverOutput = responseSchema.parse({
+			id: "todo-1",
+			createdAt: new Date("2026-08-10T00:00:00.000Z"),
+		});
+		const wireBody = JSON.parse(JSON.stringify(serverOutput));
+
+		captureFetch(jsonResponse(wireBody, 200));
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+		});
+		const response = await client.todos.get.fetch({ id: "todo-1" });
+
+		assert.deepEqual(response, {
+			id: "todo-1",
+			createdAt: "2026-08-10T00:00:00.000Z",
+		});
+	});
+
+	it("returns serialized Date response output by default but rejects it when validation is enabled", async () => {
+		const responseSchema = z.object({ createdAt: z.date() });
+		const apiContract = router({
+			todos: {
+				get: {
+					method: "GET",
+					path: "/todos/:id",
+					request: {
+						params: z.object({ id: z.string() }),
+					},
+					responses: {
+						200: responseSchema,
+					},
+				},
+			},
+		});
+		const serverOutput = responseSchema.parse({
+			createdAt: new Date("2026-08-10T00:00:00.000Z"),
+		});
+		const wireBody = JSON.parse(JSON.stringify(serverOutput));
+
+		captureFetch(jsonResponse(wireBody, 200));
+		const trustingClient = initClient(apiContract, {
+			baseUrl: "https://api.test",
+		});
+		const trusted = await trustingClient.todos.get.fetch({ id: "todo-1" });
+
+		assert.equal(trusted.createdAt, "2026-08-10T00:00:00.000Z");
+
+		captureFetch(jsonResponse(wireBody, 200));
+		const validatingClient = initClient(apiContract, {
+			baseUrl: "https://api.test",
+			validateResponses: true,
+		});
+
+		await assert.rejects(() =>
+			validatingClient.todos.get.fetch({ id: "todo-1" }),
+		);
+	});
+
 	it("reads noBody responses as undefined", async () => {
 		const apiContract = router({
 			todos: {

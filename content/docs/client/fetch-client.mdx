@@ -122,9 +122,10 @@ const client = initClient(api, {
 });
 ```
 
-## Response Validation
+## Response Validation on the Client
 
-Set `validateResponses` to validate declared response bodies on the client.
+It is possible to enable server output validation on the client by enabling `validateResponses`.
+For understanding the implications of this option, please read [HTTP and Schema I/O gotchas](/advanced/http-and-schema-io-gotchas/) first.
 
 ```ts
 const client = initClient(api, {
@@ -133,7 +134,7 @@ const client = initClient(api, {
 });
 ```
 
-Response validation is off by default.
+This option also validates incoming WebSocket server messages on the client.
 
 ## WebSocket Routes
 
