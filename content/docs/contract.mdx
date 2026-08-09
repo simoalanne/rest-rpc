@@ -1,0 +1,192 @@
+---
+title: Contract
+description: Define REST-shaped routes in a shared TypeScript contract.
+---
+
+A contract is a plain TypeScript object passed through `router()`.
+
+```ts
+import { router } from "@rest-rpc/core";
+import { z } from "zod";
+
+export const api = router({
+	todos: {
+		get: {
+			method: "GET",
+			path: "/todos/:id",
+			request: {
+				params: {
+					id: z.string(),
+				},
+			},
+			responses: {
+				200: todoSchema,
+				404: z.object({
+					code: z.literal("TODO_NOT_FOUND"),
+				}),
+			},
+		},
+	},
+});
+```
+
+The contract is used at runtime and at type level. It can drive server handlers,
+clients, React Query helpers, and OpenAPI generation.
+
+## Route Fields
+
+HTTP routes use these fields:
+
+- `method`: `GET`, `POST`, `PUT`, `DELETE`, or `PATCH`.
+- `path`: HTTP path with `:param` segments.
+- `request`: optional request declarations.
+- `responses`: status-keyed response body declarations.
+- `metadata`: application-defined route metadata.
+- `openApi`: OpenAPI operation hints.
+- `options`: route options.
+
+## Request
+
+Request data is declared by HTTP location.
+
+```ts
+request: {
+	params: {
+		id: z.string(),
+	},
+	query: {
+		includeCompleted: z.coerce.boolean().optional(),
+	},
+	headers: {
+		"x-request-id": z.string().optional(),
+	},
+	body: {
+		title: z.string(),
+	},
+}
+```
+
+Those locations remain part of the contract. Handlers and clients receive one
+flattened input object.
+
+```ts
+await api.todos.update.fetch({
+	id: "todo_1",
+	includeCompleted: true,
+	"x-request-id": "req_1",
+	title: "Write docs",
+});
+```
+
+## Responses
+
+Every HTTP route declares `responses`.
+
+```ts
+responses: {
+	200: todoSchema,
+	404: z.object({
+		code: z.literal("TODO_NOT_FOUND"),
+	}),
+}
+```
+
+Non-2xx statuses are declared the same way as 2xx statuses.
+
+## Shared Router Options
+
+`router()` can apply shared fields to every route in a tree.
+
+```ts
+export const api = router(
+	{
+		todos: {
+			list: {
+				method: "GET",
+				path: "/todos",
+				responses: {
+					200: z.object({
+						items: z.array(todoSchema),
+					}),
+				},
+				openApi: {
+					summary: "List todos",
+				},
+			},
+		},
+	},
+	{
+		pathPrefix: "/api",
+		metadata: {
+			auth: "required",
+		},
+		commonHeaders: {
+			"x-request-id": z.string().optional(),
+		},
+		commonResponses: {
+			401: z.object({
+				code: z.literal("UNAUTHORIZED"),
+			}),
+		},
+		commonOpenApi: {
+			tags: ["Todos"],
+			security: [{ bearerAuth: [] }],
+			responseDescriptions: {
+				401: "Authentication is required.",
+			},
+		},
+	},
+);
+```
+
+The route above is normalized to `GET /api/todos`, includes the common header,
+includes the common `401` response, and keeps the route-specific OpenAPI summary.
+
+## Single Routes
+
+Use `route()` for one route declaration.
+
+```ts
+import { route } from "@rest-rpc/core";
+
+export const getTodo = route({
+	method: "GET",
+	path: "/todos/:id",
+	request: {
+		params: {
+			id: z.string(),
+		},
+	},
+	responses: {
+		200: todoSchema,
+	},
+});
+```
+
+`routerAsync()` and `routeAsync()` exist for async request key resolution.
+Most projects should start with `router()` and `route()`.
+
+## WebSocket Routes
+
+WebSocket routes also live in the contract tree.
+
+```ts
+watch: {
+	method: "GET",
+	path: "/todos/:id/watch",
+	options: {
+		mode: "websocket",
+	},
+	request: {
+		params: {
+			id: z.string(),
+		},
+	},
+	messages: {
+		client: clientMessageSchema,
+		server: serverMessageSchema,
+	},
+}
+```
+
+See [WebSockets](/advanced/websockets/) for the full shape.

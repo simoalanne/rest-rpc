@@ -1,0 +1,144 @@
+---
+title: Custom Bodies
+description: Model non-JSON request and response bodies.
+---
+
+Default JSON object request bodies are flattened into handler and client input.
+
+Use `customBody()` when the body should be treated as one whole value instead or when the body is not JSON.
+
+```ts
+import { customBody } from "@rest-rpc/core";
+
+request: {
+	params: {
+		id: z.string(),
+	},
+	body: customBody({
+		contentType: "image/png",
+		schema: z.instanceof(Uint8Array),
+	}),
+}
+```
+
+The handler and client shape is:
+
+```ts
+{
+	id: string;
+	body: Uint8Array;
+}
+```
+
+## Request Bodies
+
+```ts
+export const api = router({
+	images: {
+		upload: {
+			method: "PUT",
+			path: "/images/:id",
+			request: {
+				params: {
+					id: z.string(),
+				},
+				body: customBody({
+					contentType: "image/png",
+					schema: z.instanceof(Uint8Array),
+				}),
+			},
+			responses: {
+				204: noBody(),
+			},
+		},
+	},
+});
+```
+
+```ts
+upload({ id, body }) {
+	saveImage(id, body);
+	return undefined;
+}
+```
+
+```ts
+await client.images.upload.fetch({
+	id: "image_1",
+	body: new Uint8Array(await file.arrayBuffer()),
+});
+```
+
+## Response Bodies
+
+Use `customBody()` in `responses` when the response body has a specific content
+type.
+
+```ts
+download: {
+	method: "GET",
+	path: "/images/:id",
+	request: {
+		params: {
+			id: z.string(),
+		},
+	},
+	responses: {
+		200: customBody({
+			contentType: "image/png",
+			schema: z.instanceof(Uint8Array),
+		}),
+		404: z.object({
+			code: z.literal("IMAGE_NOT_FOUND"),
+		}),
+	},
+}
+```
+
+On the client, a custom response body exposes the raw `Response` object.
+
+```ts
+const response = await client.images.download.fetch({
+	id: "image_1",
+});
+
+const bytes = await response.arrayBuffer();
+```
+
+## Body Parsing
+
+Server adapters do not infer your intended body parsing.
+
+For Express, choose middleware before route execution.
+
+```ts
+import { isCustomBody, matchRoute } from "@rest-rpc/express";
+
+const jsonParser = express.json();
+const pngParser = express.raw({ type: "image/png" });
+
+app.use((req, res, next) => {
+	const matched = matchRoute(api, req);
+	const body = matched?.request?.body;
+
+	if (isCustomBody(body) && body.contentType === "image/png") {
+		return pngParser(req, res, next);
+	}
+
+	return jsonParser(req, res, next);
+});
+```
+
+For Hono, use `parseBody`.
+
+```ts
+registerRoutes(app, routes, {
+	parseBody: async ({ c, body }) => {
+		if (isCustomBody(body)) {
+			return c.req.arrayBuffer();
+		}
+
+		return c.req.json();
+	},
+});
+```

@@ -1,0 +1,149 @@
+---
+title: Fetch Client
+description: Create a typed client from the contract.
+---
+
+`initClient()` creates a typed fetch client from a contract.
+
+```ts
+import { initClient } from "@rest-rpc/core";
+import { api } from "./contract";
+
+const client = initClient(api, {
+	baseUrl: "https://api.example.com",
+});
+```
+
+The client has the same route tree shape as the contract.
+
+```ts
+const todo = await client.todos.get.fetch({ id: "todo_1" });
+```
+
+## `fetch()`
+
+Routes with one successful response expose `fetch()`.
+
+```ts
+const todo = await client.todos.get.fetch({
+	id: "todo_1",
+});
+```
+
+`fetch()` returns the successful response body directly.
+
+It throws when the response is undeclared or is not a declared success response.
+
+Use it when non-success responses should use the error path.
+
+## `fetchResponse()`
+
+Every HTTP route exposes `fetchResponse()`.
+
+```ts
+const response = await client.todos.get.fetchResponse({
+	id: "todo_1",
+});
+```
+
+`fetchResponse()` returns declared and undeclared responses as values.
+
+```ts
+if (response.declared && response.status === 200) {
+	return response.body;
+}
+
+if (response.declared && response.status === 404) {
+	return undefined;
+}
+
+throw new Error(`Unexpected response: ${response.status}`);
+```
+
+Use it when HTTP status is part of normal control flow.
+
+## Client Options
+
+```ts
+const client = initClient(api, {
+	baseUrl: "https://api.example.com",
+	getHeaders: () => ({
+		authorization: `Bearer ${readToken()}`,
+	}),
+	timeoutMs: 10_000,
+	fetchOptions: {
+		credentials: "include",
+	},
+});
+```
+
+Options include:
+
+- `baseUrl`
+- `fetchOptions`
+- `getHeaders`
+- `timeoutMs`
+- `unknownRequestKeys`
+- `validateResponses`
+
+## Per-Call Fetch Options
+
+Pass fetch options as the second argument.
+
+```ts
+const todo = await client.todos.get.fetch(
+	{
+		id: "todo_1",
+		"x-request-id": "req_1",
+	},
+	{
+		cache: "no-store",
+	},
+);
+```
+
+## Unknown Request Keys
+
+By default, unknown request keys are rejected.
+
+```ts
+const client = initClient(api, {
+	baseUrl: "/api",
+	unknownRequestKeys: "throw",
+});
+```
+
+Use `"strip"` when extra keys should be ignored before building the HTTP request.
+
+```ts
+const client = initClient(api, {
+	baseUrl: "/api",
+	unknownRequestKeys: "strip",
+});
+```
+
+## Response Validation
+
+Set `validateResponses` to validate declared response bodies on the client.
+
+```ts
+const client = initClient(api, {
+	baseUrl: "/api",
+	validateResponses: true,
+});
+```
+
+Response validation is off by default.
+
+## WebSocket Routes
+
+WebSocket routes expose `openConnection()` instead of `fetch()` and
+`fetchResponse()`.
+
+```ts
+const socket = client.todos.watch.openConnection({
+	id: "todo_1",
+});
+```
+
+See [WebSockets](/advanced/websockets/) for details.

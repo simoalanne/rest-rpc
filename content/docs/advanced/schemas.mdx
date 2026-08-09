@@ -1,0 +1,160 @@
+---
+title: Schemas
+description: Use Standard Schema-compatible libraries or type-only contracts.
+---
+
+The contract accepts Standard Schema-compatible schemas.
+
+Zod, Valibot, and ArkType are common choices. Other Standard Schema-compatible
+libraries can be used when the request key shape is known or provided.
+
+## Runtime Schemas
+
+Runtime schemas validate incoming server requests and outgoing server responses. They can also validate client
+responses when `validateResponses` is enabled in case server responses are not trusted or don't use `rest-rpc`.
+
+```ts
+import { router } from "@rest-rpc/core";
+import { z } from "zod";
+
+export const api = router({
+	todos: {
+		create: {
+			method: "POST",
+			path: "/todos",
+			request: {
+				body: {
+					title: z.string().min(1),
+				},
+			},
+			responses: {
+				201: z.object({
+					id: z.string(),
+					title: z.string(),
+					completed: z.boolean(),
+				}),
+			},
+		},
+	},
+});
+```
+
+## Type-Only Schemas
+
+Use build-in `type<T>()` when the contract should carry TypeScript types but runtime
+validation is unnecessary or handled elsewhere.
+
+```ts
+import { router, type } from "@rest-rpc/core";
+
+export const api = router({
+	todos: {
+		get: {
+			method: "GET",
+			path: "/todos/:id",
+			request: {
+				params: {
+					id: type<string>(),
+				},
+			},
+			responses: {
+				200: type<{
+					id: string;
+					title: string;
+					completed: boolean;
+				}>(),
+			},
+		},
+	},
+});
+```
+
+## Request Key Inference
+
+Flattened handler and client input requires `rest-rpc` to know the request keys.
+
+The library includes built-in request key inference for common object schemas
+from Zod, Valibot, and ArkType.
+
+```ts
+request: {
+	params: z.object({
+		id: z.string(),
+	}),
+	query: z.object({
+		includeCompleted: z.boolean().optional(),
+	}),
+}
+```
+
+When the key shape is not inferable, use a record-shaped request declaration.
+
+```ts
+request: {
+	query: {
+		includeCompleted: type<boolean | undefined>(),
+	},
+}
+```
+
+As a last resort, provide `requestKeys`.
+
+```ts
+request: {
+	body: type<{
+		title: string;
+	}>(),
+	requestKeys: {
+		title: "body",
+	},
+}
+```
+
+Most routes should not need manual request keys.
+
+## Request Key Constraints
+
+Flattened keys must be unambiguous.
+
+This route is invalid:
+
+```ts
+request: {
+	params: {
+		id: z.string(),
+	},
+	body: {
+		id: z.string(),
+	},
+}
+```
+
+Both fields would flatten to `id`.
+
+Important constraints:
+
+- Duplicate flattened keys across `body`, `query`, `params`, and `headers` are invalid.
+- `context` is reserved for server handler context.
+- Header keys are checked case-insensitively for duplicates.
+- `content-type` is reserved as a request header.
+- Path params in the URL must have matching `params` schema keys.
+- `params` schema keys must correspond to actual path params.
+- When using `customBody()`, the flattened `body` key is reserved for the custom body value.
+
+## Request Value Constraints
+
+Request body fields can be normal JSON-like values.
+
+Query values, params, and headers are serialized into HTTP fields, so their
+runtime values should be scalar request values (string, number, boolean).
+
+```ts
+await api.todos.search.fetch({
+	query: "docs",
+	limit: 20,
+	includeCompleted: false,
+	"x-request-id": "req_1",
+});
+```
+
+Nested values usually belong in the JSON body or in a custom body.

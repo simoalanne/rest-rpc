@@ -1,0 +1,101 @@
+---
+title: Introduction
+description: REST-shaped APIs with function-shaped TypeScript.
+---
+
+`rest-rpc` lets you define HTTP routes in a shared TypeScript contract, then use
+that contract to derive typed server handlers, typed fetch clients, React Query
+helpers, and OpenAPI documents.
+
+The API stays REST-shaped. Everyday application code can feel like function
+calls.
+
+```ts
+const todo = await api.todos.get.fetch({ id: "todo_1" });
+```
+
+That call is still a normal HTTP request:
+
+```http
+GET /todos/todo_1
+```
+
+## The Shape
+
+HTTP details live in the contract.
+
+```ts
+export const api = router({
+	todos: {
+		get: {
+			method: "GET",
+			path: "/todos/:id",
+			request: {
+				params: {
+					id: z.string(),
+				},
+			},
+			responses: {
+				200: todoSchema,
+				404: z.object({
+					code: z.literal("TODO_NOT_FOUND"),
+				}),
+			},
+		},
+	},
+});
+```
+
+Handlers and clients use the route tree as typed functions.
+
+```ts
+const routes = router(api, {
+	todos: {
+		get({ id }) {
+			const todo = todos.get(id);
+
+			if (!todo) {
+				return {
+					status: 404,
+					body: { code: "TODO_NOT_FOUND" },
+				};
+			}
+
+			return todo;
+		},
+	},
+});
+```
+
+```ts
+const todo = await client.todos.get.fetch({ id: "todo_1" });
+```
+
+## Why rest-rpc?
+
+- Contract-first REST without tying the API to one server framework.
+- Elegant RPC-style calls and handlers without losing REST semantics.
+- Flatter handler and client calls because request locations live in the contract.
+- Typed status responses when you need them, and direct response bodies when you don't.
+- Runtime validation through Standard Schema-compatible libraries.
+- Thin Express and Hono adapters for typed server handlers.
+- Typed React Query hooks over the same contract when using TanStack Query already.
+- OpenAPI document generation.
+
+## Small By Design
+
+`rest-rpc` focuses on the API boundary: routes, request validation, typed
+handlers, typed clients, status-aware responses, React Query helpers, and OpenAPI
+document generation.
+
+It does not replace middleware, authentication, dependency injection, database
+access, file storage, OpenAPI UI, deployment, or frontend state management.
+Those concerns stay in your application and framework code the way you already know them.
+
+## Start Here
+
+- [Quickstart](/quickstart/) builds the first route end to end.
+- [Concepts](/concepts/) explains the mental model.
+- [Contract](/contract/) covers route declarations.
+- [Responses](/responses/) covers status-keyed responses.
+- [OpenAPI](/openapi/) covers document generation.

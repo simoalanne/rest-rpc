@@ -1,0 +1,118 @@
+---
+title: Hono
+description: Register contract handlers in a Hono app.
+---
+
+Use `@rest-rpc/hono` to implement and register contract routes in a Hono app.
+
+The adapter registers routes by HTTP method and path, then delegates validation
+and response handling to the shared server layer.
+
+## Install
+
+```sh
+pnpm add @rest-rpc/core @rest-rpc/hono hono
+```
+
+## Basic Setup
+
+```ts
+import { registerRoutes, router } from "@rest-rpc/hono";
+import { Hono } from "hono";
+import { api } from "./contract";
+
+const app = new Hono();
+
+const routes = router(api, {
+	todos: {
+		get({ id, context }) {
+			const userAgent = context.c.req.header("user-agent");
+			void userAgent;
+
+			const todo = todos.get(id);
+
+			if (!todo) {
+				return {
+					status: 404,
+					body: {
+						code: "TODO_NOT_FOUND",
+					},
+				};
+			}
+
+			return todo;
+		},
+	},
+});
+
+registerRoutes(app, routes);
+
+export default app;
+```
+
+## Handler Input
+
+Handlers receive flattened request input where `context` contains the Hono context object.
+
+```ts
+get({ id, "x-request-id": requestId, context }) {
+	return loadTodo({
+		id,
+		requestId,
+		c: context.c,
+	});
+}
+```
+
+## Handler Returns
+
+Handlers can always return an explicit response envelope.
+
+```ts
+return {
+	status: 404,
+	body: {
+		code: "TODO_NOT_FOUND",
+	},
+};
+```
+
+If a route has exactly one successful response, the handler can return the
+success body directly.
+
+```ts
+return todo;
+```
+
+## Body Parsing
+
+For normal JSON routes, the adapter can read JSON request bodies through Hono's
+request APIs.
+
+Use `parseBody` when your app needs custom body parsing.
+
+```ts
+import { isCustomBody } from "@rest-rpc/core";
+
+registerRoutes(app, routes, {
+	parseBody: async ({ c, body }) => {
+		if (isCustomBody(body)) {
+			return c.req.arrayBuffer();
+		}
+
+		return c.req.json();
+	},
+});
+```
+
+## WebSockets
+
+WebSocket routes are registered with an explicit WebSocket registration object.
+
+```ts
+registerRoutes(app, routes, {
+	webSocket: honoWebSocket(options),
+});
+```
+
+See [WebSockets](/advanced/websockets/) for the contract and handler model.

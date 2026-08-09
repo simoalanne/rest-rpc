@@ -1,0 +1,287 @@
+---
+title: Quickstart
+description: Define a contract, implement it on the server, and call it from a client.
+---
+
+This guide builds one `todos` API from a shared contract.
+
+The same contract is used by the server and the client. HTTP method, path, and
+request locations are explicit in the contract. The handler and client call use a
+flatter function-shaped input.
+
+## Install
+
+For an Express server with Zod:
+
+```sh
+pnpm add @rest-rpc/core @rest-rpc/express zod
+```
+
+For a Hono server with Zod:
+
+```sh
+pnpm add @rest-rpc/core @rest-rpc/hono zod
+```
+
+For a client-only package:
+
+```sh
+pnpm add @rest-rpc/core
+```
+
+For React Query:
+
+```sh
+pnpm add @rest-rpc/core @rest-rpc/react-query @tanstack/react-query
+```
+
+## Define A Contract
+
+Create a shared contract file.
+
+```ts
+import { router } from "@rest-rpc/core";
+import { z } from "zod";
+
+const todoSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+	completed: z.boolean(),
+});
+
+export const api = router({
+	todos: {
+		get: {
+			method: "GET",
+			path: "/todos/:id",
+			request: {
+				params: {
+					id: z.string(),
+				},
+			},
+			responses: {
+				200: todoSchema,
+				404: z.object({
+					code: z.literal("TODO_NOT_FOUND"),
+				}),
+			},
+		},
+		create: {
+			method: "POST",
+			path: "/todos",
+			request: {
+				body: {
+					title: z.string().min(1),
+				},
+			},
+			responses: {
+				201: todoSchema,
+			},
+		},
+	},
+});
+```
+
+## Schema Variants
+
+`rest-rpc` accepts Standard Schema-compatible schemas. Zod, Valibot, and ArkType
+can be used for runtime validation.
+
+The contract can also use type-only schemas when runtime validation is handled
+elsewhere.
+
+```ts
+import { router, type } from "@rest-rpc/core";
+
+export const api = router({
+	todos: {
+		get: {
+			method: "GET",
+			path: "/todos/:id",
+			request: {
+				params: {
+					id: type<string>(),
+				},
+			},
+			responses: {
+				200: type<{
+					id: string;
+					title: string;
+					completed: boolean;
+				}>(),
+			},
+		},
+	},
+});
+```
+
+Type-only schemas are useful when the contract should carry TypeScript types but
+runtime validation is unnecessary or belongs somewhere else.
+
+## Implement With Express
+
+```ts
+import { router, registerRoutes } from "@rest-rpc/express";
+import express from "express";
+import { api } from "./contract";
+
+const app = express();
+app.use(express.json());
+
+const todos = new Map([
+	["todo_1", { id: "todo_1", title: "Write docs", completed: false }],
+]);
+
+const routes = router(api, {
+	todos: {
+		get({ id }) {
+			const todo = todos.get(id);
+
+			if (!todo) {
+				return {
+					status: 404,
+					body: { code: "TODO_NOT_FOUND" },
+				};
+			}
+
+			return todo;
+		},
+		create({ title }) {
+			const todo = {
+				id: crypto.randomUUID(),
+				title,
+				completed: false,
+			};
+
+			todos.set(todo.id, todo);
+
+			return {
+				status: 201,
+				body: todo,
+			};
+		},
+	},
+});
+
+registerRoutes(app, routes);
+
+app.listen(3000);
+```
+
+## Implement With Hono
+
+```ts
+import { registerRoutes, router } from "@rest-rpc/hono";
+import { Hono } from "hono";
+import { api } from "./contract";
+
+const app = new Hono();
+
+const todos = new Map([
+	["todo_1", { id: "todo_1", title: "Write docs", completed: false }],
+]);
+
+const routes = router(api, {
+	todos: {
+		get({ id }) {
+			const todo = todos.get(id);
+
+			if (!todo) {
+				return {
+					status: 404,
+					body: { code: "TODO_NOT_FOUND" },
+				};
+			}
+
+			return todo;
+		},
+		create({ title }) {
+			const todo = {
+				id: crypto.randomUUID(),
+				title,
+				completed: false,
+			};
+
+			todos.set(todo.id, todo);
+
+			return {
+				status: 201,
+				body: todo,
+			};
+		},
+	},
+});
+
+registerRoutes(app, routes);
+
+export default app;
+```
+
+## Call With The Fetch Client
+
+```ts
+import { initClient } from "@rest-rpc/core";
+import { api } from "./contract";
+
+const client = initClient(api, {
+	baseUrl: "http://localhost:3000",
+});
+
+const todo = await client.todos.get.fetch({ id: "todo_1" });
+
+const created = await client.todos.create.fetch({
+	title: "Ship v1",
+});
+```
+
+`fetch()` returns the successful response body directly. It throws if the server
+does not return a declared success response.
+
+Use `fetchResponse()` when the status is part of normal control flow.
+
+```ts
+const response = await client.todos.get.fetchResponse({ id: "todo_1" });
+
+if (response.declared && response.status === 200) {
+	console.log(response.body.title);
+}
+
+if (response.declared && response.status === 404) {
+	console.log(response.body.code);
+}
+```
+
+## Call With React Query
+
+```tsx
+import { initReactQueryClient } from "@rest-rpc/react-query";
+import { QueryClient } from "@tanstack/react-query";
+import { api } from "./contract";
+
+export const queryClient = new QueryClient();
+
+export const rq = initReactQueryClient(api, {
+	queryClient,
+	baseUrl: "http://localhost:3000",
+});
+```
+
+```tsx
+const todo = rq.todos.get.useQuery({ id: "todo_1" });
+
+const createTodo = rq.todos.create.useMutation({
+	onSuccess(created) {
+		console.log(created.body.id);
+	},
+});
+```
+
+React Query follows React Query's success and error channels. Declared 2xx
+responses become data. Declared non-2xx responses become errors.
+
+## Next
+
+- [Concepts](/concepts/) explains why the contract and call shapes differ.
+- [Express](/server/express/) and [Hono](/server/hono/) cover adapter details.
+- [Fetch Client](/client/fetch-client/) and [React Query](/client/react-query/)
+  cover client behavior.

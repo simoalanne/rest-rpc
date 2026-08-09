@@ -1,0 +1,130 @@
+---
+title: Express
+description: Register contract handlers in an Express app.
+---
+
+Use `@rest-rpc/express` to implement and register contract routes in an Express
+app.
+
+The adapter registers routes by HTTP method and path, then delegates validation
+and response handling to the shared server layer.
+
+## Install
+
+```sh
+pnpm add @rest-rpc/core @rest-rpc/express express
+```
+
+## Basic Setup
+
+```ts
+import { registerRoutes, router } from "@rest-rpc/express";
+import express from "express";
+import { api } from "./contract";
+
+const app = express();
+app.use(express.json());
+
+const routes = router(api, {
+	todos: {
+		get({ id, context }) {
+			const userAgent = context.req.header("user-agent");
+			void userAgent;
+
+			const todo = todos.get(id);
+
+			if (!todo) {
+				return {
+					status: 404,
+					body: {
+						code: "TODO_NOT_FOUND",
+					},
+				};
+			}
+
+			return todo;
+		},
+	},
+});
+
+registerRoutes(app, routes);
+
+app.listen(3000);
+```
+
+## Handler Input
+
+Handlers receive flattened request input where `context` contains the Express request object.
+
+```ts
+get({ id, "x-request-id": requestId, context }) {
+	return loadTodo({
+		id,
+		requestId,
+		req: context.req,
+	});
+}
+```
+
+## Handler Returns
+
+Handlers can always return an explicit response envelope.
+
+```ts
+return {
+	status: 404,
+	body: {
+		code: "TODO_NOT_FOUND",
+	},
+};
+```
+
+If a route has exactly one successful response, the handler can return the
+success body directly.
+
+```ts
+return todo;
+```
+
+## Body Parsing
+
+The Express adapter does not own body parsing.
+
+For normal JSON routes, use Express middleware.
+
+```ts
+app.use(express.json());
+```
+
+For non-JSON bodies, choose parsing middleware in your app. `matchRoute()` and
+`isCustomBody()` can help connect framework-native parsing to the contract.
+
+```ts
+import { isCustomBody, matchRoute } from "@rest-rpc/express";
+
+const jsonParser = express.json();
+const pngParser = express.raw({ type: "image/png" });
+
+app.use((req, res, next) => {
+	const matched = matchRoute(api, req);
+	const body = matched?.request?.body;
+
+	if (isCustomBody(body) && body.contentType === "image/png") {
+		return pngParser(req, res, next);
+	}
+
+	return jsonParser(req, res, next);
+});
+```
+
+## WebSockets
+
+WebSocket routes are registered with an explicit WebSocket registration object.
+
+```ts
+registerRoutes(app, routes, {
+	webSocket: expressWebSocket(options),
+});
+```
+
+See [WebSockets](/advanced/websockets/) for the contract and handler model.

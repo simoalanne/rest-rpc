@@ -1,0 +1,134 @@
+---
+title: WebSockets
+description: Declare typed WebSocket routes in the contract.
+---
+
+WebSocket routes use the same contract tree as HTTP routes.
+
+They must use `method: "GET"` and `options: { mode: "websocket" }`.
+
+```ts
+watch: {
+	method: "GET",
+	path: "/todos/:id/watch",
+	options: {
+		mode: "websocket",
+	},
+	request: {
+		params: {
+			id: z.string(),
+		},
+	},
+	messages: {
+		client: clientMessageSchema,
+		server: serverMessageSchema,
+	},
+}
+```
+
+## Contract
+
+```ts
+export const api = router({
+	todos: {
+		watch: {
+			method: "GET",
+			path: "/todos/:id/watch",
+			options: {
+				mode: "websocket",
+			},
+			request: {
+				params: {
+					id: z.string(),
+				},
+			},
+			messages: {
+				client: z.object({
+					type: z.literal("ping"),
+				}),
+				server: z.discriminatedUnion("type", [
+					z.object({
+						type: z.literal("changed"),
+						id: z.string(),
+						completed: z.boolean(),
+					}),
+					z.object({
+						type: z.literal("pong"),
+					}),
+				]),
+			},
+		},
+	},
+});
+```
+
+## Server Handler
+
+Server handlers receive typed socket context.
+
+```ts
+const routes = router(api, {
+	todos: {
+		watch({ id, context }) {
+			context.socket.send({
+				type: "changed",
+				id,
+				completed: false,
+			});
+
+			context.socket.onMessage((message) => {
+				if (message.type === "ping") {
+					context.socket.send({
+						type: "pong",
+					});
+				}
+			});
+		},
+	},
+});
+```
+
+Incoming messages are parsed and validated before delivery. Invalid incoming
+messages close the connection.
+
+Outgoing server messages are validated before being sent.
+
+## Client
+
+WebSocket client routes expose `openConnection()`.
+
+```ts
+const socket = client.todos.watch.openConnection({
+	id: "todo_1",
+});
+```
+
+```ts
+socket.onMessage((message) => {
+	if (message.type === "changed") {
+		console.log(message.completed);
+	}
+});
+
+socket.send({
+	type: "ping",
+});
+```
+
+## Registration
+
+Adapters register WebSocket routes with explicit WebSocket registration options.
+
+```ts
+registerRoutes(app, routes, {
+	webSocket: expressWebSocket(options),
+});
+```
+
+```ts
+registerRoutes(app, routes, {
+	webSocket: honoWebSocket(options),
+});
+```
+
+The exact WebSocket setup remains framework-specific.

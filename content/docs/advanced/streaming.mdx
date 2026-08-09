@@ -1,0 +1,136 @@
+---
+title: Streaming
+description: Declar streaming HTTP responses.
+---
+
+Use `stream(schema)` for NDJSON-style streaming responses.
+
+```ts
+import { stream } from "@rest-rpc/core";
+
+responses: {
+	200: stream(todoEventSchema),
+}
+```
+
+The handler returns an async iterable. The client receives an async iterable.
+
+The JSON stream content type is automatically set to `application/x-ndjson`.
+Handler yields are serialized to JSON with a newline after each item.
+
+## Contract
+
+```ts
+const todoEventSchema = z.discriminatedUnion("type", [
+	z.object({
+		type: z.literal("created"),
+		id: z.string(),
+		title: z.string(),
+	}),
+	z.object({
+		type: z.literal("completed"),
+		id: z.string(),
+	}),
+]);
+
+export const api = router({
+	todos: {
+		events: {
+			method: "GET",
+			path: "/todos/events",
+			responses: {
+				200: stream(todoEventSchema),
+			},
+		},
+	},
+});
+```
+
+## Server
+
+```ts
+async function* readTodoEvents() {
+	yield {
+		type: "created" as const,
+		id: "todo_1",
+		title: "Write docs",
+	};
+
+	yield {
+		type: "completed" as const,
+		id: "todo_1",
+	};
+}
+```
+
+```ts
+const routes = router(api, {
+	todos: {
+		events() {
+			return readTodoEvents();
+		},
+	},
+});
+```
+
+## Client
+
+```ts
+const events = await client.todos.events.fetch();
+
+for await (const event of events) {
+	if (event.type === "created") {
+		console.log(event.title);
+	}
+}
+```
+
+## Custom Stream Bodies
+
+Use `stream(customBody(...))` for custom stream content types.
+
+```ts
+responses: {
+	200: stream(
+		customBody({
+			contentType: "text/csv",
+			schema: type<string>(),
+		}),
+	),
+}
+```
+
+The client receives the raw `Response` for custom stream bodies. Server handler returns chunks of the custom body type.
+
+```ts
+async function* readCsv() {
+	yield "id,title\n";
+	yield "todo_1,Write docs\n";
+	yield "todo_2,Write more docs\n";
+}
+
+const routes = router(api, {
+	todos: {
+		events() {
+			return readCsv();
+		},
+	},
+});
+```
+
+```ts
+const response = await client.todos.events.fetchResponse();
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+let done = false;
+
+while (!done) {
+	const { value, done: readerDone } = await reader.read();
+	done = readerDone;
+
+	if (value) {
+		console.log(decoder.decode(value));
+	}
+}
+```
+

@@ -1,0 +1,147 @@
+---
+title: OpenAPI
+description: Generate OpenAPI document from the contract.
+---
+
+`createOpenApiDocument()` generates OpenAPI document object from HTTP
+route declarations.
+
+```ts
+import { createOpenApiDocument } from "@rest-rpc/core";
+
+const document = createOpenApiDocument(api, {
+	info: {
+		title: "Todo API",
+		version: "1.0.0",
+	},
+	servers: [{ url: "https://api.example.com" }],
+	schemaConverter,
+});
+```
+
+## What Is Included
+
+OpenAPI generation includes HTTP routes.
+
+It maps:
+
+- route methods and paths
+- path params
+- query params
+- request headers
+- request bodies
+- status-keyed responses
+- custom body content types
+- route `openApi` metadata
+- shared `commonOpenApi` metadata
+
+WebSocket routes are skipped as there is no faithful mapping to OpenAPI.
+
+## Schema Conversion
+
+Standard Schema defines validation behavior, not JSON Schema conversion.
+
+OpenAPI generation needs a project-provided `schemaConverter`.
+
+```ts
+import {
+	createOpenApiDocument,
+	isTypeOnlySchema,
+	looseJsonSchema,
+} from "@rest-rpc/core";
+import { z } from "zod";
+
+const document = createOpenApiDocument(api, {
+	info: {
+		title: "Todo API",
+		version: "1.0.0",
+	},
+	schemaConverter: (schema, { io }) => {
+		if (isTypeOnlySchema(schema)) {
+			return looseJsonSchema(schema);
+		}
+
+		if (schema["~standard"].vendor === "zod") {
+			return z.toJSONSchema(schema as z.ZodType, { io });
+		}
+
+		return looseJsonSchema(schema);
+	},
+});
+```
+
+Use a precise converter when your schema library supports JSON Schema output.
+Use `looseJsonSchema()` when a loose OpenAPI shape is acceptable. If you have single validation library, you can just pass the library's JSON Schema converter directly.
+
+## Route Metadata
+
+Use `openApi` on a route for operation metadata.
+
+```ts
+create: {
+	method: "POST",
+	path: "/todos",
+	request: {
+		body: {
+			title: z.string().min(1),
+		},
+	},
+	responses: {
+		201: todoSchema,
+		409: z.object({
+			code: z.literal("TODO_ALREADY_EXISTS"),
+		}),
+	},
+	openApi: {
+		summary: "Create a todo",
+		operationId: "createTodo",
+		responseDescriptions: {
+			201: "Todo created.",
+			409: "A todo with the same title already exists.",
+		},
+	},
+}
+```
+
+`responseDescriptions` must match declared response statuses.
+
+## Shared Metadata
+
+Use `commonOpenApi` on `router()` options to apply metadata across a tree.
+
+```ts
+export const api = router(routes, {
+	commonOpenApi: {
+		tags: ["Todos"],
+		security: [{ bearerAuth: [] }],
+		responseDescriptions: {
+			401: "Authentication is required.",
+		},
+	},
+});
+```
+
+## Transform Hooks
+
+Use `transformOperation` and `transformDocument` when generated output needs
+project-specific changes.
+
+```ts
+const document = createOpenApiDocument(api, {
+	info: {
+		title: "Todo API",
+		version: "1.0.0",
+	},
+	schemaConverter,
+	transformOperation: ({ route, operation }) => {
+		if (route.metadata.auth === "required") {
+			return {
+				...operation,
+				security: [{ bearerAuth: [] }],
+			};
+		}
+
+		return operation;
+	},
+});
+```

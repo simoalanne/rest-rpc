@@ -1,0 +1,143 @@
+---
+title: Responses
+description: Declare status-keyed responses and choose the right return shape.
+---
+
+HTTP routes declare responses by status code.
+
+```ts
+responses: {
+	200: todoSchema,
+	404: z.object({
+		code: z.literal("TODO_NOT_FOUND"),
+	}),
+}
+```
+
+There is no separate `errors` field. Declared non-2xx responses are part of the
+route contract.
+
+## Response Schemas
+
+Response body declarations can be Standard Schema-compatible schemas.
+
+```ts
+responses: {
+	200: z.object({
+		id: z.string(),
+		title: z.string(),
+		completed: z.boolean(),
+	}),
+}
+```
+
+Use `noBody()` for statuses without a body.
+
+```ts
+import { noBody } from "@rest-rpc/core";
+
+responses: {
+	204: noBody(),
+}
+```
+
+Custom and streaming bodies are covered in advanced docs.
+
+## Handler Returns
+
+Handlers can always return an explicit response envelope.
+
+```ts
+return {
+	status: 404,
+	body: {
+		code: "TODO_NOT_FOUND",
+	},
+};
+```
+
+If a route has exactly one successful response, the handler can return the
+success body directly.
+
+```ts
+return {
+	id: "todo_1",
+	title: "Write docs",
+	completed: false,
+};
+```
+
+That shortcut is only valid because the success status is unambiguous.
+
+## Explicit Success
+
+Use an envelope when the status is part of the result.
+
+```ts
+create({ title }) {
+	return {
+		status: 201,
+		body: createTodo({ title }),
+	};
+}
+```
+
+## Declared Error Responses
+
+Declared non-2xx responses need an explicit envelope.
+
+```ts
+get({ id }) {
+	const todo = todos.get(id);
+
+	if (!todo) {
+		return {
+			status: 404,
+			body: {
+				code: "TODO_NOT_FOUND",
+			},
+		};
+	}
+
+	return todo;
+}
+```
+
+## Client Responses
+
+Every HTTP route exposes `fetchResponse()`.
+
+```ts
+const response = await api.todos.get.fetchResponse({
+	id: "todo_1",
+});
+```
+
+It returns declared responses as values.
+
+```ts
+if (response.declared && response.status === 200) {
+	response.body;
+}
+
+if (response.declared && response.status === 404) {
+	response.body.code;
+}
+```
+
+It also exposes undeclared responses.
+
+```ts
+if (!response.declared) {
+	throw new Error(`Unexpected response: ${response.status}`);
+}
+```
+
+Routes with one successful response also expose `fetch()`.
+
+```ts
+const todo = await api.todos.get.fetch({ id: "todo_1" });
+```
+
+`fetch()` returns the successful response body directly. It throws when the
+response is undeclared or is not a declared success response. Use it when you don't care about the status and just want the success body.
