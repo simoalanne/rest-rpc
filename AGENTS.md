@@ -11,6 +11,7 @@ This repo is `rest-rpc`, a TypeScript library for defining one shared API contra
 - `@rest-rpc/express` - express server adapter
 - `@rest-rpc/hono` - hono server adapter
 - `@rest-rpc/react-query` - tanstack react-query client adapter
+- `content/` contains documentation for the library and its packages. documentation is written in mdx and uses https://useblume.dev/.
 
 ### Commands
 - `pnpm run build:packages` - Packages depend on each other through declaration files. After changing exported package APIs, run this to refresh dependents or when something appears stale or fails mysteriously.
@@ -18,3 +19,7 @@ This repo is `rest-rpc`, a TypeScript library for defining one shared API contra
 - `pnpm run lint` - Run Biome to fix formatting and import ordering automatically.
 - `pnpm run test` - Run tests
 - `pnpm run check` - Run `lint`, `typecheck`, and `test` in sequence. Use this as the broad all-in-one pass.
+
+### Notes
+For documentation related tasks:
+- README.md is shared across root and all packages. It's sole purpose is to link to the actual documentation in `content/docs/`. Updating documentation means updating the mdx files in `content/docs/`, not updating the README.md files.
