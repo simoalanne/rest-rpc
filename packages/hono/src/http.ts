@@ -1,12 +1,21 @@
 import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import { isNoBody } from "@rest-rpc/core/contract";
 import { handleHttpRoute, type RouteImplementation } from "@rest-rpc/server";
-import type { Context } from "hono";
+import type { Context, Hono } from "hono";
 import type { Env } from "hono/types";
-import type { HonoApp, HonoParseBody } from "./types.ts";
 
 type HeaderValue = string | number | readonly string[] | undefined;
 type RequestBodySchema = NonNullable<HttpRouteDeclaration["request"]>["body"];
+
+export type HonoParseBodyInput<TEnv extends Env = Env> = {
+	c: Context<TEnv>;
+	route: HttpRouteDeclaration;
+	body: RequestBodySchema;
+};
+
+export type HonoParseBody<TEnv extends Env = Env> = (
+	input: HonoParseBodyInput<TEnv>,
+) => unknown | Promise<unknown>;
 
 const setHeader = (headers: Headers, name: string, value: HeaderValue) => {
 	if (Array.isArray(value)) {
@@ -62,23 +71,22 @@ const createStreamResponse = (
 	return new Response(stream, { status, headers });
 };
 
-const defaultParseBody = <TEnv extends Env>({ c }: { c: Context<TEnv> }) =>
-	c.req.json();
+const defaultParseBody = ({ c }: { c: Context }) => c.req.json();
 
-const parseRequestBody = async <TEnv extends Env>(
-	c: Context<TEnv>,
+const parseRequestBody = async (
+	c: Context,
 	route: HttpRouteDeclaration,
 	body: RequestBodySchema,
-	parseBody: HonoParseBody<TEnv>,
+	parseBody: HonoParseBody,
 ): Promise<unknown> => {
 	if (!body || isNoBody(body)) return undefined;
 	return parseBody({ c, route, body });
 };
 
-export const registerHonoHttpRoutes = <TEnv extends Env>(
-	app: HonoApp<TEnv>,
+export const registerHonoHttpRoutes = (
+	app: Hono,
 	routes: RouteImplementation<HttpRouteDeclaration>[],
-	parseBody: HonoParseBody<TEnv> = defaultParseBody,
+	parseBody: HonoParseBody = defaultParseBody,
 ) => {
 	for (const implementation of routes) {
 		const route: HttpRouteDeclaration = implementation.route;

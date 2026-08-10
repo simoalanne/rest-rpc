@@ -51,7 +51,7 @@ importers:
         specifier: ^5.0.0
         version: 5.2.1
       ws:
-        specifier: ^8.21.0
+        specifier: ^8.0.0
         version: 8.21.3
     devDependencies:
       '@types/express':

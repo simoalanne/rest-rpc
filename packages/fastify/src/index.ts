@@ -25,12 +25,7 @@ import {
 import type { FastifyRequest } from "fastify";
 
 export { registerRoutes } from "./registerRoutes.ts";
-export type {
-	FastifyBeforeUpgradeInput,
-	FastifyWebSocketOptions,
-	FastifyWebSocketRegistration,
-} from "./types.ts";
-export { fastifyWebSocket } from "./websocket.ts";
+export type { FastifyWebSocketOptions } from "./websocket.ts";
 export type { InferRouteHandlerResponse };
 export { ContractResponseError, createRouteMatcher };
 

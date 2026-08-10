@@ -26,11 +26,7 @@ import {
 import type { Request } from "express";
 
 export { registerRoutes } from "./registerRoutes.ts";
-export type {
-	ExpressWebSocketOptions,
-	ExpressWebSocketRegistration,
-} from "./websocket.ts";
-export { expressWebSocket } from "./websocket.ts";
+export type { ExpressWebSocketOptions } from "./websocket.ts";
 export type { InferRouteHandlerResponse };
 export { ContractResponseError, createRouteMatcher };
 

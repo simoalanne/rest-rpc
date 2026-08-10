@@ -165,11 +165,31 @@ registerRoutes(app, routes, {
 
 ## WebSockets
 
-WebSocket routes are registered with an explicit WebSocket registration object.
+Hono gets `upgradeWebSocket` from the Hono runtime adapter. Create the Hono app
+normally, import `upgradeWebSocket` from your runtime, then pass both to
+`registerRoutes`.
+
+`beforeUpgrade` runs after request validation and before the socket is accepted.
+Return an upgrade rejection to deny the connection, or read and attach data to
+`context.c` for the WebSocket handler.
 
 ```ts
-registerRoutes(app, routes, {
-	webSocket: honoWebSocket(options),
+import { Hono } from "hono";
+import { upgradeWebSocket } from "hono/cloudflare-workers";
+import { registerRoutes } from "@rest-rpc/hono";
+
+const honoApp = new Hono();
+
+registerRoutes(honoApp, routes, {
+	webSocket: {
+		upgradeWebSocket,
+		beforeUpgrade({ context, route, request }) {
+			context.c;
+			route;
+			request;
+			return undefined;
+		},
+	},
 });
 ```
 

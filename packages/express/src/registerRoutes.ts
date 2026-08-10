@@ -8,14 +8,14 @@ import {
 import type { Application } from "express";
 import { registerExpressHttpRoutes } from "./http.ts";
 import {
-	type ExpressWebSocketRegistration,
+	type ExpressWebSocketOptions,
 	registerExpressWebSocketRoutes,
 } from "./websocket.ts";
 
 export const registerRoutes = (
 	app: Application,
 	implementations: ImplementationTree<RouteDeclaration>,
-	options: { webSocket?: ExpressWebSocketRegistration } = {},
+	options: { webSocket?: ExpressWebSocketOptions } = {},
 ) => {
 	const implementationsList = flattenAndSortImplementationTree(implementations);
 	const routes = implementationsList.filter(isHttpRouteImplementation);

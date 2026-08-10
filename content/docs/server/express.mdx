@@ -160,12 +160,44 @@ For non-JSON bodies, choose parsing middleware in your app. See
 
 ## WebSockets
 
-WebSocket routes are registered with an explicit WebSocket registration object.
+Install `ws` when using WebSocket routes.
+
+```sh
+pnpm add ws
+```
+
+Express uses a Node HTTP server for the upgrade event and a `ws` WebSocket
+server to accept sockets. Create the Node server from the Express app, then pass
+both servers in `webSocket`.
+
+`beforeUpgrade` runs after request validation and before the socket is accepted.
+Return an upgrade rejection to deny the connection, or read and attach data to
+`context.req` for the WebSocket handler.
 
 ```ts
-registerRoutes(app, routes, {
-	webSocket: expressWebSocket(options),
+import { createServer } from "node:http";
+import express from "express";
+import { WebSocketServer } from "ws";
+import { registerRoutes } from "@rest-rpc/express";
+
+const expressApp = express();
+const nodeServer = createServer(expressApp);
+const webSocketServer = new WebSocketServer({ noServer: true });
+
+registerRoutes(expressApp, routes, {
+	webSocket: {
+		server: nodeServer,
+		webSocketServer,
+		beforeUpgrade({ context, route, request }) {
+			context.req;
+			route;
+			request;
+			return undefined;
+		},
+	},
 });
+
+nodeServer.listen(3000);
 ```
 
 See [WebSockets](/advanced/websockets/) for the contract and handler model.

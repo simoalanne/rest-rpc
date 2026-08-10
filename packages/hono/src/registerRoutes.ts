@@ -5,22 +5,21 @@ import {
 	isHttpRouteImplementation,
 	isWebSocketRouteImplementation,
 } from "@rest-rpc/server";
+import type { Hono } from "hono";
 import type { Env } from "hono/types";
-import { registerHonoHttpRoutes } from "./http.ts";
-import type {
-	HonoApp,
-	HonoParseBody,
-	HonoWebSocketRegistration,
-} from "./types.ts";
-import { registerHonoWebSocketRoutes } from "./websocket.ts";
+import { type HonoParseBody, registerHonoHttpRoutes } from "./http.ts";
+import {
+	type HonoWebSocketOptions,
+	registerHonoWebSocketRoutes,
+} from "./websocket.ts";
 
 export type RegisterRoutesOptions<TEnv extends Env = Env> = {
 	parseBody?: HonoParseBody<TEnv>;
-	webSocket?: HonoWebSocketRegistration<TEnv>;
+	webSocket?: HonoWebSocketOptions<TEnv>;
 };
 
 export const registerRoutes = <TEnv extends Env = Env>(
-	app: HonoApp<TEnv>,
+	app: Hono<TEnv>,
 	implementations: ImplementationTree<RouteDeclaration>,
 	options: RegisterRoutesOptions<TEnv> = {},
 ) => {
@@ -30,9 +29,19 @@ export const registerRoutes = <TEnv extends Env = Env>(
 		isWebSocketRouteImplementation,
 	);
 
-	registerHonoHttpRoutes(app, routes, options.parseBody);
+	const internalApp = app as unknown as Hono;
+
+	registerHonoHttpRoutes(
+		internalApp,
+		routes,
+		options.parseBody as HonoParseBody | undefined,
+	);
 
 	if (options.webSocket) {
-		registerHonoWebSocketRoutes(app, options.webSocket, webSocketRoutes);
+		registerHonoWebSocketRoutes(
+			internalApp,
+			options.webSocket as unknown as HonoWebSocketOptions,
+			webSocketRoutes,
+		);
 	}
 };

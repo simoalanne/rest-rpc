@@ -124,18 +124,119 @@ using that option with transformed server message schemas.
 
 ## Registration
 
-Adapters register WebSocket routes with explicit WebSocket registration options.
+Adapters register WebSocket routes with explicit WebSocket options.
+
+<Tabs inline param="server">
+<Tab title="Express">
+
+Install `ws` when using WebSocket routes.
+
+```sh
+pnpm add ws
+```
+
+Express uses a Node HTTP server for the upgrade event and a `ws` WebSocket
+server to accept sockets. Create the Node server from the Express app, then pass
+both servers in `webSocket`.
+
+`beforeUpgrade` runs after request validation and before the socket is accepted.
+Return an upgrade rejection to deny the connection, or read and attach data to
+`context.req` for the WebSocket handler.
 
 ```ts
-registerRoutes(app, routes, {
-	webSocket: expressWebSocket(options),
+import { createServer } from "node:http";
+import express from "express";
+import { WebSocketServer } from "ws";
+import { registerRoutes } from "@rest-rpc/express";
+
+const expressApp = express();
+const nodeServer = createServer(expressApp);
+const webSocketServer = new WebSocketServer({ noServer: true });
+
+registerRoutes(expressApp, routes, {
+	webSocket: {
+		server: nodeServer,
+		webSocketServer,
+		beforeUpgrade({ context, route, request }) {
+			context.req;
+			route;
+			request;
+			return undefined;
+		},
+	},
+});
+
+nodeServer.listen(3000);
+```
+
+</Tab>
+<Tab title="Hono">
+
+Hono gets `upgradeWebSocket` from the Hono runtime adapter. Create the Hono app
+normally, import `upgradeWebSocket` from your runtime, then pass both to
+`registerRoutes`.
+
+`beforeUpgrade` runs after request validation and before the socket is accepted.
+Return an upgrade rejection to deny the connection, or read and attach data to
+`context.c` for the WebSocket handler.
+
+```ts
+import { Hono } from "hono";
+import { upgradeWebSocket } from "hono/cloudflare-workers";
+import { registerRoutes } from "@rest-rpc/hono";
+
+const honoApp = new Hono();
+
+registerRoutes(honoApp, routes, {
+	webSocket: {
+		upgradeWebSocket,
+		beforeUpgrade({ context, route, request }) {
+			context.c;
+			route;
+			request;
+			return undefined;
+		},
+	},
 });
 ```
 
+</Tab>
+<Tab title="Fastify">
+
+Install `@fastify/websocket` when using WebSocket routes.
+
+```sh
+pnpm add @fastify/websocket
+```
+
+Fastify requires `@fastify/websocket`. Create the Fastify app, register the
+plugin before registering routes, then pass WebSocket options to
+`registerRoutes`.
+
+`beforeUpgrade` runs after request validation and before the socket is accepted.
+Return an upgrade rejection to deny the connection, or read and attach data to
+`context.req` for the WebSocket handler.
+
 ```ts
-registerRoutes(app, routes, {
-	webSocket: honoWebSocket(options),
+import websocket from "@fastify/websocket";
+import Fastify from "fastify";
+import { registerRoutes } from "@rest-rpc/fastify";
+
+const fastifyApp = Fastify();
+
+await fastifyApp.register(websocket);
+
+registerRoutes(fastifyApp, routes, {
+	webSocket: {
+		beforeUpgrade({ context, route, request }) {
+			context.req;
+			route;
+			request;
+			return undefined;
+		},
+	},
 });
 ```
 
-The exact WebSocket setup remains framework-specific.
+</Tab>
+</Tabs>

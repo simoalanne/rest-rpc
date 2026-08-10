@@ -9,6 +9,7 @@ import type {
 	WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
 import {
+	type BeforeWebSocketUpgrade,
 	createRouteMatcher,
 	handleWebSocketRoute,
 	type RawWebSocket,
@@ -19,35 +20,11 @@ import {
 import type WebSocket from "ws";
 import type { WebSocketServer } from "ws";
 
-type ExpressBeforeUpgradeInput = {
-	req: IncomingMessage;
-	route: WebSocketRouteDeclaration;
-	request: Record<string, unknown>;
-};
-
-type ExpressBeforeUpgradeResult = undefined | UpgradeRejection;
-
 export type ExpressWebSocketOptions = {
-	beforeUpgrade?: (
-		input: ExpressBeforeUpgradeInput,
-	) => ExpressBeforeUpgradeResult | Promise<ExpressBeforeUpgradeResult>;
-};
-
-export type ExpressWebSocketRegistration = {
 	server: HttpServer;
 	webSocketServer: WebSocketServer;
-	options: ExpressWebSocketOptions;
+	beforeUpgrade?: BeforeWebSocketUpgrade<{ req: IncomingMessage }>;
 };
-
-export const expressWebSocket = (
-	server: HttpServer,
-	webSocketServer: WebSocketServer,
-	options: ExpressWebSocketOptions = {},
-): ExpressWebSocketRegistration => ({
-	server,
-	webSocketServer,
-	options,
-});
 
 const serializeUpgradeBody = (body: unknown) => {
 	if (body === undefined) {
@@ -117,7 +94,7 @@ const adaptWebSocket = (socket: WebSocket): RawWebSocket => ({
 });
 
 export const registerExpressWebSocketRoutes = (
-	registration: ExpressWebSocketRegistration,
+	options: ExpressWebSocketOptions,
 	routes: RouteImplementation<WebSocketRouteDeclaration>[],
 ) => {
 	if (routes.length === 0) return;
@@ -134,7 +111,7 @@ export const registerExpressWebSocketRoutes = (
 		RouteImplementation<WebSocketRouteDeclaration>
 	>(routes.map((implementation) => [implementation.route, implementation]));
 
-	registration.server.on("upgrade", async (req, socket, head) => {
+	options.server.on("upgrade", async (req, socket, head) => {
 		const url = new URL(req.url ?? "/", "http://localhost");
 		const matchedRoute = matchContractRoute({
 			method: req.method ?? "GET",
@@ -157,10 +134,10 @@ export const registerExpressWebSocketRoutes = (
 			return;
 		}
 
-		const rejection = await registration.options.beforeUpgrade?.({
-			req,
+		const rejection = await options.beforeUpgrade?.({
 			route: implementation.route,
 			request: requestValidation.data,
+			context: { req },
 		});
 
 		if (rejection) {
@@ -168,17 +145,12 @@ export const registerExpressWebSocketRoutes = (
 			return;
 		}
 
-		registration.webSocketServer.handleUpgrade(
-			req,
-			socket,
-			head,
-			(rawSocket) => {
-				handleWebSocketRoute(implementation.route, implementation.handler, {
-					request: requestValidation.data,
-					context: { req },
-					socket: adaptWebSocket(rawSocket),
-				});
-			},
-		);
+		options.webSocketServer.handleUpgrade(req, socket, head, (rawSocket) => {
+			handleWebSocketRoute(implementation.route, implementation.handler, {
+				request: requestValidation.data,
+				context: { req },
+				socket: adaptWebSocket(rawSocket),
+			});
+		});
 	});
 };

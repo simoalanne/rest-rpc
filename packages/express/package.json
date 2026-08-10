@@ -36,7 +36,7 @@
 	},
 	"peerDependencies": {
 		"express": "^5.0.0",
-		"ws": "^8.21.0"
+		"ws": "^8.0.0"
 	},
 	"peerDependenciesMeta": {
 		"ws": {

@@ -50,5 +50,11 @@ export type {
 	ValidationIssue,
 } from "./validation.ts";
 export { validateRequest } from "./validation.ts";
-export type { RawWebSocket, UpgradeRejection } from "./websocket.ts";
+export type {
+	BeforeWebSocketUpgrade,
+	RawWebSocket,
+	UpgradeRejection,
+	WebSocketUpgradeInput,
+	WebSocketUpgradeResult,
+} from "./websocket.ts";
 export { createContractWebSocket, handleWebSocketRoute } from "./websocket.ts";

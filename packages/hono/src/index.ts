@@ -22,16 +22,10 @@ import {
 import type { Context } from "hono";
 import type { Env } from "hono/types";
 
+export type { HonoParseBody, HonoParseBodyInput } from "./http.ts";
 export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
-export type {
-	HonoBeforeUpgradeInput,
-	HonoParseBody,
-	HonoParseBodyInput,
-	HonoWebSocketOptions,
-	HonoWebSocketRegistration,
-} from "./types.ts";
-export { honoWebSocket } from "./websocket.ts";
+export type { HonoWebSocketOptions } from "./websocket.ts";
 export { ContractResponseError, createRouteMatcher };
 
 export type HttpRouteHandlerContext<E extends Env = Env> = {

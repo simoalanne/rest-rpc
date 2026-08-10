@@ -26,21 +26,20 @@ export type UpgradeRejection = {
 	body?: unknown;
 };
 
-export type BeforeWebSocketUpgradeInput<
-	TContext extends Record<string, unknown>,
-> = TContext & {
+export type WebSocketUpgradeInput<TContext extends Record<string, unknown>> = {
 	route: WebSocketRouteDeclaration;
 	request: Record<string, unknown>;
+	context: TContext;
 };
 
-export type BeforeWebSocketUpgradeResult =
+export type WebSocketUpgradeResult =
 	| UpgradeRejection
 	| undefined
 	| Promise<UpgradeRejection | undefined>;
 
 export type BeforeWebSocketUpgrade<TContext extends Record<string, unknown>> = (
-	input: BeforeWebSocketUpgradeInput<TContext>,
-) => BeforeWebSocketUpgradeResult;
+	input: WebSocketUpgradeInput<TContext>,
+) => WebSocketUpgradeResult;
 
 export const createContractWebSocket = <E extends WebSocketRouteDeclaration>(
 	route: E,

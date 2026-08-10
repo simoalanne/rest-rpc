@@ -7,13 +7,15 @@ import {
 } from "@rest-rpc/server";
 import type { FastifyInstance } from "fastify";
 import { registerFastifyHttpRoutes } from "./http.ts";
-import type { FastifyWebSocketRegistration } from "./types.ts";
-import { registerFastifyWebSocketRoutes } from "./websocket.ts";
+import {
+	type FastifyWebSocketOptions,
+	registerFastifyWebSocketRoutes,
+} from "./websocket.ts";
 
 export const registerRoutes = (
 	app: FastifyInstance,
 	implementations: ImplementationTree<RouteDeclaration>,
-	options: { webSocket?: FastifyWebSocketRegistration } = {},
+	options: { webSocket?: FastifyWebSocketOptions } = {},
 ) => {
 	const implementationsList = flattenAndSortImplementationTree(implementations);
 	const routes = implementationsList.filter(isHttpRouteImplementation);

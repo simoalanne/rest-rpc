@@ -1,6 +1,7 @@
 import type { WebSocket as FastifyWebSocket } from "@fastify/websocket";
 import type { WebSocketRouteDeclaration } from "@rest-rpc/core/contract";
 import {
+	type BeforeWebSocketUpgrade,
 	handleWebSocketRoute,
 	type RawWebSocket,
 	type RouteImplementation,
@@ -8,16 +9,10 @@ import {
 	validateRequest,
 } from "@rest-rpc/server";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type {
-	FastifyWebSocketOptions,
-	FastifyWebSocketRegistration,
-} from "./types.ts";
 
-export const fastifyWebSocket = (
-	options: FastifyWebSocketOptions = {},
-): FastifyWebSocketRegistration => ({
-	options,
-});
+export type FastifyWebSocketOptions = {
+	beforeUpgrade?: BeforeWebSocketUpgrade<{ req: FastifyRequest }>;
+};
 
 const adaptWebSocket = (socket: FastifyWebSocket): RawWebSocket => ({
 	send(data) {
@@ -57,7 +52,7 @@ type ExtendedFastifyRequest = FastifyRequest & {
 
 export const registerFastifyWebSocketRoutes = (
 	app: FastifyInstance,
-	registration: FastifyWebSocketRegistration,
+	options: FastifyWebSocketOptions,
 	routes: RouteImplementation<WebSocketRouteDeclaration>[],
 ) => {
 	for (const implementation of routes) {
@@ -81,10 +76,10 @@ export const registerFastifyWebSocketRoutes = (
 						return;
 					}
 
-					const rejection = await registration.options.beforeUpgrade?.({
-						req,
+					const rejection = await options.beforeUpgrade?.({
 						route: implementation.route,
-						request,
+						request: requestValidation.data,
+						context: { req },
 					});
 
 					if (rejection) {

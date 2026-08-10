@@ -169,22 +169,38 @@ body value against that schema.
 
 ## WebSockets
 
-WebSocket routes require `@fastify/websocket`.
+Install `@fastify/websocket` when using WebSocket routes.
 
 ```sh
 pnpm add @fastify/websocket
 ```
 
-Register the plugin before registering routes.
+Fastify requires `@fastify/websocket`. Create the Fastify app, register the
+plugin before registering routes, then pass WebSocket options to
+`registerRoutes`.
+
+`beforeUpgrade` runs after request validation and before the socket is accepted.
+Return an upgrade rejection to deny the connection, or read and attach data to
+`context.req` for the WebSocket handler.
 
 ```ts
 import websocket from "@fastify/websocket";
-import { fastifyWebSocket, registerRoutes } from "@rest-rpc/fastify";
+import Fastify from "fastify";
+import { registerRoutes } from "@rest-rpc/fastify";
 
-await app.register(websocket);
+const fastifyApp = Fastify();
 
-registerRoutes(app, routes, {
-	webSocket: fastifyWebSocket(),
+await fastifyApp.register(websocket);
+
+registerRoutes(fastifyApp, routes, {
+	webSocket: {
+		beforeUpgrade({ context, route, request }) {
+			context.req;
+			route;
+			request;
+			return undefined;
+		},
+	},
 });
 ```
 
