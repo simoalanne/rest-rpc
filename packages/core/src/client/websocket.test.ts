@@ -3,7 +3,9 @@ import { afterEach, describe, it } from "node:test";
 import z from "zod";
 import { createClientTestContract } from "../../test/factories/client.ts";
 import { router } from "../contract/define.ts";
+import { noBody } from "../contract/route.ts";
 import { initClient } from "./index.ts";
+import { assertWebSocketRoute, buildWebSocketUrl } from "./websocket.ts";
 
 const OriginalWebSocket = globalThis.WebSocket;
 
@@ -44,6 +46,23 @@ afterEach(() => {
 });
 
 describe("ApiClient websockets", () => {
+	it("converts HTTP URLs to WebSocket URLs", () => {
+		assert.equal(buildWebSocketUrl("http://api.test"), "ws://api.test");
+		assert.equal(buildWebSocketUrl("https://api.test"), "wss://api.test");
+	});
+
+	it("rejects opening connections when WebSocket is unavailable", () => {
+		globalThis.WebSocket = undefined as unknown as typeof WebSocket;
+		const client = initClient(createClientTestContract(), {
+			baseUrl: "https://api.test",
+		});
+
+		assert.throws(
+			() => client.socket.join.openConnection({ roomId: "general" }),
+			/WebSocket is not available in this runtime/,
+		);
+	});
+
 	it("builds websocket URLs from route params", () => {
 		globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
 		const client = initClient(createClientTestContract(), {
@@ -96,6 +115,43 @@ describe("ApiClient websockets", () => {
 		);
 
 		assert.deepEqual(messages, [{ text: "hello" }]);
+	});
+
+	it("removes event listeners with unsubscribe callbacks", () => {
+		globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+		const client = initClient(createClientTestContract(), {
+			baseUrl: "https://api.test",
+		});
+		const socket = client.socket.join.openConnection({ roomId: "general" });
+		let openCount = 0;
+		let errorCount = 0;
+		let closeCount = 0;
+
+		const unsubscribeOpen = socket.onOpen(() => {
+			openCount += 1;
+		});
+		const unsubscribeError = socket.onError(() => {
+			errorCount += 1;
+		});
+		const unsubscribeClose = socket.onClose(() => {
+			closeCount += 1;
+		});
+		unsubscribeOpen();
+		unsubscribeError();
+		unsubscribeClose();
+
+		instances[0].dispatchEvent(new Event("open"));
+		instances[0].dispatchEvent(new Event("error"));
+		instances[0].dispatchEvent(new CloseEvent("close"));
+
+		assert.deepEqual(
+			{ openCount, errorCount, closeCount },
+			{
+				openCount: 0,
+				errorCount: 0,
+				closeCount: 0,
+			},
+		);
 	});
 
 	it("delivers transformed server message output when validation is disabled", () => {
@@ -271,6 +327,28 @@ describe("ApiClient websockets", () => {
 		assert.equal(
 			messages[0]?.createdAt.toISOString(),
 			"2026-08-10T00:00:00.000Z",
+		);
+	});
+});
+
+describe("assertWebSocketRoute", () => {
+	it("accepts websocket route declarations", () => {
+		assert.doesNotThrow(() =>
+			assertWebSocketRoute(createClientTestContract().socket.join),
+		);
+	});
+
+	it("rejects HTTP route declarations", () => {
+		assert.throws(
+			() =>
+				assertWebSocketRoute({
+					method: "GET",
+					path: "/todos",
+					responses: {
+						204: noBody(),
+					},
+				}),
+			/Expected a websocket route/,
 		);
 	});
 });

@@ -5,8 +5,8 @@ Temporary working checklist for getting `rest-rpc` ready for a v1 release.
 ## Must Be Done
 
 - Freeze feature scope for v1 unless a change fixes a real release blocker.
-- Add focused missing `@rest-rpc/server` unit tests for route matching, router implementation validation, HTTP response normalization, `ContractResponseError`, and websocket lifecycle behavior.
-- Add focused missing `@rest-rpc/core` unit tests that are lacking coverage.
+- [x] Add focused missing `@rest-rpc/server` unit tests for route matching, router implementation validation, HTTP response normalization, `ContractResponseError`, and websocket lifecycle behavior.
+- [x] Add focused missing `@rest-rpc/core` unit tests that are lacking coverage.
 - Add a shared real-HTTP integration suite for server adapters using the real `@rest-rpc/core` fetch client against real listening servers where practical.
 - Cover Express, Hono, Fastify, and the Next server handler boundary with the shared integration scenarios.
 - Audit public package exports and decide which names are part of the supported v1 API.
@@ -44,3 +44,6 @@ Temporary working checklist for getting `rest-rpc` ready for a v1 release.
 - Additional features that are not needed for v1.
 - Advanced release automation beyond the basic reliable CI/CD publish path.
 - Extra docs polish after the core guides and reference pages are accurate.
+
+## Done work
+- Added focused unit test coverage. Now only practical gap is server adapter unit tests which don't add value alone because a reusable integration suite covers the same behaviour much better without testing that mocks work.

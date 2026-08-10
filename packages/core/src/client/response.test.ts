@@ -9,6 +9,7 @@ import {
 import { router } from "../contract/define.ts";
 import { customBody, noBody, stream } from "../contract/route.ts";
 import { initClient } from "./index.ts";
+import { fetchResponse } from "./response.ts";
 
 const originalFetch = globalThis.fetch;
 
@@ -418,5 +419,29 @@ describe("ApiClient responses", () => {
 
 		assert.ok(response instanceof Response);
 		assert.equal(await response.text(), "id,title\n1,First\n");
+	});
+
+	it("runs request cleanup when reading a declared response fails", async () => {
+		let cleanedUp = false;
+		const apiContract = createClientTestContract();
+
+		await assert.rejects(() =>
+			fetchResponse(
+				async () => ({
+					rawResponse: new Response("not json", {
+						status: 200,
+						headers: { "content-type": "application/json" },
+					}),
+					cleanup: () => {
+						cleanedUp = true;
+					},
+				}),
+				false,
+				apiContract.todos.get,
+				{ id: "todo-1" },
+			),
+		);
+
+		assert.equal(cleanedUp, true);
 	});
 });

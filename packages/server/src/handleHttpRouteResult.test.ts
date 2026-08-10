@@ -74,6 +74,39 @@ describe("handleHttpRouteResult", () => {
 			},
 		);
 	});
+
+	it("sets custom response content-type before sending custom bodies", async () => {
+		const headers: Record<string, unknown> = {};
+		let sent: unknown;
+
+		await handleHttpRouteResult(
+			{
+				kind: "custom",
+				status: 200,
+				contentType: "text/csv",
+				body: "id\n1\n",
+			},
+			{
+				setHeader: (name, value) => {
+					headers[name] = value;
+				},
+				sendEmpty: () => undefined,
+				sendJson: () => undefined,
+				sendCustom: (status, body) => {
+					sent = { status, body };
+				},
+				sendStream: () => undefined,
+			},
+		);
+
+		assert.deepEqual(headers, {
+			"content-type": "text/csv",
+		});
+		assert.deepEqual(sent, {
+			status: 200,
+			body: "id\n1\n",
+		});
+	});
 });
 
 describe("createWebResponse", () => {
@@ -142,5 +175,17 @@ describe("createWebResponse", () => {
 
 		assert.equal(response.headers.get("content-type"), "text/plain");
 		assert.equal(await response.text(), "ab");
+	});
+
+	it("appends array header values on web responses", async () => {
+		const response = await createWebResponse({
+			kind: "empty",
+			status: 204,
+			headers: {
+				"set-cookie": ["a=1", "b=2"],
+			},
+		});
+
+		assert.equal(response.headers.get("set-cookie"), "a=1, b=2");
 	});
 });

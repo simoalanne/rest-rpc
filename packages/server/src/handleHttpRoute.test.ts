@@ -1,8 +1,149 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { customBody, stream } from "@rest-rpc/core/contract";
+import { customBody, noBody, stream } from "@rest-rpc/core/contract";
 import z from "zod";
+import { ContractResponseError } from "./contractResponseError.ts";
 import { handleHttpRoute } from "./handleHttpRoute.ts";
+
+const routeWithDeclaredErrorResponse = {
+	method: "GET",
+	path: "/todos/:id",
+	responses: {
+		200: z.object({ id: z.string() }),
+		404: z.object({ code: z.literal("not_found") }),
+	},
+} as const;
+
+describe("handleHttpRoute", () => {
+	it("passes validated request data and context to the handler", async () => {
+		const result = await handleHttpRoute(
+			{
+				method: "GET",
+				path: "/todos/:id",
+				request: {
+					params: {
+						id: z.coerce.number(),
+					},
+					requestKeys: {
+						id: "params",
+					},
+				},
+				responses: {
+					200: z.object({ id: z.number() }),
+				},
+			},
+			(request) => {
+				assert.deepEqual(request, {
+					id: 123,
+					context: { requestId: "request-1" },
+				});
+
+				return { id: request.id };
+			},
+			{
+				request: {
+					params: { id: "123" },
+				},
+				context: { requestId: "request-1" },
+			},
+		);
+
+		assert.deepEqual(result, {
+			kind: "json",
+			status: 200,
+			headers: undefined,
+			body: { id: 123 },
+		});
+	});
+
+	it("returns request validation errors without calling the handler", async () => {
+		let called = false;
+		const result = await handleHttpRoute(
+			{
+				method: "GET",
+				path: "/todos/:id",
+				request: {
+					params: {
+						id: z.number(),
+					},
+					requestKeys: {
+						id: "params",
+					},
+				},
+				responses: {
+					204: noBody(),
+				},
+			},
+			() => {
+				called = true;
+			},
+			{
+				request: {
+					params: { id: "123" },
+				},
+				context: {},
+			},
+		);
+
+		assert.equal(called, false);
+		assert.equal(result.kind, "json");
+		assert.equal(result.status, 400);
+	});
+
+	it("requires explicit response objects when a route has multiple success statuses", async () => {
+		await assert.rejects(
+			() =>
+				handleHttpRoute(
+					{
+						method: "POST",
+						path: "/todos",
+						responses: {
+							200: z.object({ id: z.string() }),
+							202: z.object({ id: z.string() }),
+						},
+					},
+					() => ({ id: "todo-1" }),
+					{ request: {}, context: {} },
+				),
+			/must return a declared response object/,
+		);
+	});
+
+	it("normalizes declared ContractResponseError responses", async () => {
+		const result = await handleHttpRoute(
+			routeWithDeclaredErrorResponse,
+			() => {
+				throw new ContractResponseError(routeWithDeclaredErrorResponse, {
+					status: 404,
+					body: { code: "not_found" },
+				});
+			},
+			{ request: {}, context: {} },
+		);
+
+		assert.deepEqual(result, {
+			kind: "json",
+			status: 404,
+			headers: undefined,
+			body: { code: "not_found" },
+		});
+	});
+
+	it("validates ContractResponseError response bodies during normalization", async () => {
+		await assert.rejects(() =>
+			handleHttpRoute(
+				routeWithDeclaredErrorResponse,
+				() => {
+					throw new ContractResponseError(routeWithDeclaredErrorResponse, {
+						status: 404,
+						body: { code: "gone" },
+					} as never);
+				},
+				{ request: {}, context: {} },
+			),
+		);
+	});
+});
 
 describe("handleHttpRoute custom responses", () => {
 	it("normalizes custom single bodies after validating without serializing them", async () => {

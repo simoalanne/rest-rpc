@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { setImmediate } from "node:timers/promises";
 import z from "zod";
 import {
 	createContractWebSocket,
+	handleWebSocketRoute,
 	prepareWebSocketUpgrade,
 	type RawWebSocket,
 } from "./websocket.ts";
@@ -170,6 +172,45 @@ describe("createContractWebSocket", () => {
 			'{"createdAt":"2026-08-10T00:00:00.000Z"}',
 		]);
 	});
+
+	it("stops receiving messages after unsubscribing", async () => {
+		const rawSocket = new FakeRawWebSocket();
+		const socket = createContractWebSocket(
+			websocketRoute({
+				client: z.object({ text: z.string() }),
+				server: z.object({ text: z.string() }),
+			}),
+			rawSocket,
+		);
+		const messages: Array<{ text: string }> = [];
+
+		const unsubscribe = socket.onMessage((message) => messages.push(message));
+		unsubscribe();
+		rawSocket.receive(JSON.stringify({ text: "hello" }));
+		await Promise.resolve();
+
+		assert.deepEqual(messages, []);
+	});
+
+	it("closes when an async message handler rejects", async () => {
+		const rawSocket = new FakeRawWebSocket();
+		const socket = createContractWebSocket(
+			websocketRoute({
+				client: z.object({ text: z.string() }),
+				server: z.object({ text: z.string() }),
+			}),
+			rawSocket,
+		);
+
+		socket.onMessage(async () => {
+			throw new Error("boom");
+		});
+		rawSocket.receive(JSON.stringify({ text: "hello" }));
+		await setImmediate();
+
+		assert.equal(rawSocket.closeCode, 1011);
+		assert.equal(rawSocket.closeReason, "WebSocket message handler failed.");
+	});
 });
 
 describe("prepareWebSocketUpgrade", () => {
@@ -246,5 +287,56 @@ describe("prepareWebSocketUpgrade", () => {
 				body: { message: "Denied" },
 			},
 		});
+	});
+});
+
+describe("handleWebSocketRoute", () => {
+	it("passes validated request context and contract socket to the handler", async () => {
+		const rawSocket = new FakeRawWebSocket();
+		const route = websocketRoute({
+			client: z.object({ text: z.string() }),
+			server: z.object({ text: z.string() }),
+		});
+
+		handleWebSocketRoute(
+			route,
+			(request) => {
+				assert.equal(request.roomId, "room-1");
+				assert.equal(request.context.userId, "user-1");
+				request.context.socket.send({ text: "ready" });
+			},
+			{
+				request: { roomId: "room-1" },
+				context: { userId: "user-1" },
+				socket: rawSocket,
+			},
+		);
+		await setImmediate();
+
+		assert.deepEqual(rawSocket.sent, ['{"text":"ready"}']);
+	});
+
+	it("closes when the websocket handler rejects", async () => {
+		const rawSocket = new FakeRawWebSocket();
+		const route = websocketRoute({
+			client: z.object({ text: z.string() }),
+			server: z.object({ text: z.string() }),
+		});
+
+		handleWebSocketRoute(
+			route,
+			async () => {
+				throw new Error("boom");
+			},
+			{
+				request: { roomId: "room-1" },
+				context: {},
+				socket: rawSocket,
+			},
+		);
+		await setImmediate();
+
+		assert.equal(rawSocket.closeCode, 1011);
+		assert.equal(rawSocket.closeReason, "WebSocket service failed.");
 	});
 });

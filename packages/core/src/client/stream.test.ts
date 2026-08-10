@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { createClientTestContract } from "../../test/factories/client.ts";
+import { type } from "../standard-schema/type.ts";
 import { initClient } from "./index.ts";
+import { parseNdjsonStream } from "./stream.ts";
 
 const originalFetch = globalThis.fetch;
 
@@ -81,5 +83,34 @@ describe("ApiClient streams", () => {
 			() => client.events.stream.fetch(),
 			/empty stream response/,
 		);
+	});
+
+	it("skips blank NDJSON lines", async () => {
+		const events = [];
+
+		for await (const event of parseNdjsonStream(
+			type<{ id: string }>(),
+			ndjsonResponse(["\n", '{"id":"one"}\n\n'])
+				.body as ReadableStream<Uint8Array>,
+			false,
+		)) {
+			events.push(event);
+		}
+
+		assert.deepEqual(events, [{ id: "one" }]);
+	});
+
+	it("releases the stream reader when parsing fails", async () => {
+		const body = ndjsonResponse(["not json\n"])
+			.body as ReadableStream<Uint8Array>;
+		const events = parseNdjsonStream(type<{ id: string }>(), body, false);
+
+		await assert.rejects(async () => {
+			for await (const _event of events) {
+				_event;
+			}
+		});
+
+		assert.equal(body.locked, false);
 	});
 });

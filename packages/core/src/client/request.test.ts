@@ -9,7 +9,7 @@ import {
 import { router } from "../contract/define.ts";
 import { noBody } from "../contract/route.ts";
 import { initClient } from "./index.ts";
-import { constructBaseRequest } from "./request.ts";
+import { constructBaseRequest, createRequestSignal } from "./request.ts";
 
 const originalFetch = globalThis.fetch;
 
@@ -400,6 +400,33 @@ describe("ApiClient requests", () => {
 		});
 	});
 
+	it("lets prepareFetch inspect and replace the final request init", async () => {
+		const calls = captureFetch(jsonResponse([]));
+		const client = initClient(createClientTestContract(), {
+			baseUrl: "https://api.test",
+			prepareFetch: ({ route, request, url, init }) => {
+				assert.equal(route.path, "/todos");
+				assert.deepEqual(request, { search: "milk" });
+				assert.equal(url, "https://api.test/todos?search=milk");
+				assert.equal(init.method, "GET");
+
+				return {
+					...init,
+					headers: {
+						...(init.headers as Record<string, string>),
+						"x-prepared": "true",
+					},
+				};
+			},
+		});
+
+		await client.todos.list.fetch({ search: "milk" });
+
+		assert.deepEqual(calls[0]?.init?.headers, {
+			"x-prepared": "true",
+		});
+	});
+
 	it("normalizes merged headers and lets declared request headers win", async () => {
 		const apiContract = router(
 			{
@@ -538,5 +565,25 @@ describe("ApiClient requests", () => {
 		await new Promise((resolve) => setTimeout(resolve, 15));
 
 		assert.equal(abortEventCount, 0);
+	});
+
+	it("creates timeout signals that abort and can be cleaned up", async () => {
+		const signalState = createRequestSignal(undefined, 5);
+		assert.ok(signalState);
+
+		let aborted = false;
+		signalState.signal.addEventListener("abort", () => {
+			aborted = true;
+		});
+		await new Promise((resolve) => setTimeout(resolve, 15));
+
+		assert.equal(aborted, true);
+
+		const cleanedUpSignalState = createRequestSignal(undefined, 20);
+		assert.ok(cleanedUpSignalState);
+		cleanedUpSignalState.cleanup();
+		await new Promise((resolve) => setTimeout(resolve, 30));
+
+		assert.equal(cleanedUpSignalState.signal.aborted, false);
 	});
 });
