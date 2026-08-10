@@ -5,9 +5,8 @@ import type {
 import { isCustomBody, isNoBody } from "@rest-rpc/core/contract";
 import {
 	createRouteMatcher,
-	type HttpHeaders,
+	createWebResponse,
 	type HttpRouteHandlerContext,
-	type HttpRouteResult,
 	handleHttpRoute,
 	type InferRouteHandlerResponse,
 	type RouteHandler,
@@ -39,8 +38,6 @@ export type CreateRouteHandlerOptions = {
 	parseBody?: NextRouteParseBody;
 };
 
-type HeaderValue = HttpHeaders[string];
-
 export const route = <
 	const TNode extends HttpRouteDeclaration,
 	TContext extends NextRouteHandlerContext = NextRouteHandlerContext,
@@ -54,90 +51,6 @@ export const route = <
 
 const isJsonContentType = (contentType: string) =>
 	contentType.split(";")[0]?.trim().toLowerCase() === "application/json";
-
-const setHeader = (headers: Headers, name: string, value: HeaderValue) => {
-	if (Array.isArray(value)) {
-		for (const entry of value) headers.append(name, String(entry));
-		return;
-	}
-
-	if (value !== undefined) {
-		headers.set(name, String(value));
-	}
-};
-
-const createResponseHeaders = (source: HttpHeaders | undefined) => {
-	const headers = new Headers();
-
-	if (!source) return headers;
-
-	for (const [name, value] of Object.entries(source)) {
-		setHeader(headers, name, value);
-	}
-
-	return headers;
-};
-
-const createStreamResponse = (
-	body: AsyncIterable<unknown>,
-	status: number,
-	headers: Headers,
-	contentType = "application/x-ndjson",
-	mode: "ndjson" | "raw" = "ndjson",
-) => {
-	headers.set("content-type", contentType);
-	const encoder = new TextEncoder();
-
-	const stream = new ReadableStream({
-		async start(controller) {
-			for await (const chunk of body) {
-				if (mode === "ndjson") {
-					controller.enqueue(encoder.encode(`${JSON.stringify(chunk)}\n`));
-					continue;
-				}
-
-				controller.enqueue(
-					typeof chunk === "string" ? encoder.encode(chunk) : chunk,
-				);
-			}
-			controller.close();
-		},
-	});
-
-	return new Response(stream, { status, headers });
-};
-
-const createResponse = (result: HttpRouteResult) => {
-	const headers = createResponseHeaders(result.headers);
-
-	if (result.kind === "empty") {
-		return new Response(null, { status: result.status, headers });
-	}
-
-	if (result.kind === "stream") {
-		return createStreamResponse(
-			result.body,
-			result.status,
-			headers,
-			result.contentType,
-			result.contentType ? "raw" : "ndjson",
-		);
-	}
-
-	if (result.kind === "custom") {
-		headers.set("content-type", result.contentType);
-		return new Response(result.body as BodyInit | null, {
-			status: result.status,
-			headers,
-		});
-	}
-
-	headers.set("content-type", "application/json");
-	return new Response(JSON.stringify(result.body), {
-		status: result.status,
-		headers,
-	});
-};
 
 const readQuery = (url: URL) => Object.fromEntries(url.searchParams.entries());
 
@@ -199,7 +112,7 @@ const createNextRouteHandler = <E extends HttpRouteDeclaration>(
 			context: { request },
 		});
 
-		return createResponse(result);
+		return createWebResponse(result);
 	};
 
 	return {

@@ -328,32 +328,6 @@ const isImplementationTree = (
 	);
 };
 
-export const createRouterBuilders = (
-	validateRoute: RouteValidator,
-	routerName: string,
-) => ({
-	route: (contract: RouteDeclaration, handler: RuntimeRouteHandler) => {
-		validateRoute(contract, contract.path);
-		return {
-			route: contract,
-			handler,
-		};
-	},
-	router: (contract: Contract<RouteDeclaration>, handlers: unknown) =>
-		collectImplementations(contract, handlers, validateRoute),
-	routes: (contract: Contract<RouteDeclaration>, implementations: unknown) => {
-		if (!isImplementationTree(implementations, validateRoute)) {
-			throw new Error(
-				`${routerName}() requires an implementation tree to validate.`,
-			);
-		}
-
-		return validateImplementations(contract, implementations, validateRoute);
-	},
-});
-
-const routerBuilders = createRouterBuilders(() => {}, "router");
-
 export const route = <
 	const TNode extends RouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
@@ -362,11 +336,10 @@ export const route = <
 >(
 	contract: TNode,
 	handler: RouteHandlerFor<TNode, TContext, TWebSocketContext>,
-): RouteImplementation<TNode> =>
-	routerBuilders.route(
-		contract,
-		handler as RuntimeRouteHandler,
-	) as RouteImplementation<TNode>;
+): RouteImplementation<TNode> => ({
+	route: contract,
+	handler: handler as RuntimeRouteHandler,
+});
 
 export const router = <
 	const TNode extends Contract<RouteDeclaration>,
@@ -377,7 +350,7 @@ export const router = <
 	contract: TNode,
 	handlers: ImplementationShape<TNode, TContext, TWebSocketContext>,
 ): ImplementationTreeFor<TNode, RouteDeclaration> =>
-	routerBuilders.router(contract, handlers) as ImplementationTreeFor<
+	collectImplementations(contract, handlers, () => {}) as ImplementationTreeFor<
 		TNode,
 		RouteDeclaration
 	>;
@@ -385,8 +358,14 @@ export const router = <
 export const routes = <const TNode extends Contract<RouteDeclaration>>(
 	contract: TNode,
 	implementations: ImplementationTreeFor<TNode, RouteDeclaration>,
-): ImplementationTreeFor<TNode, RouteDeclaration> =>
-	routerBuilders.routes(contract, implementations) as ImplementationTreeFor<
-		TNode,
-		RouteDeclaration
-	>;
+): ImplementationTreeFor<TNode, RouteDeclaration> => {
+	if (!isImplementationTree(implementations, () => {})) {
+		throw new Error("router() requires an implementation tree to validate.");
+	}
+
+	return validateImplementations(
+		contract,
+		implementations,
+		() => {},
+	) as ImplementationTreeFor<TNode, RouteDeclaration>;
+};

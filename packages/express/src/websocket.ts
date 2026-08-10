@@ -12,10 +12,10 @@ import {
 	type BeforeWebSocketUpgrade,
 	createRouteMatcher,
 	handleWebSocketRoute,
+	prepareWebSocketUpgrade,
 	type RawWebSocket,
 	type RouteImplementation,
 	type UpgradeRejection,
-	validateRequest,
 } from "@rest-rpc/server";
 import type WebSocket from "ws";
 import type { WebSocketServer } from "ws";
@@ -127,27 +127,21 @@ export const registerExpressWebSocketRoutes = (
 			params: matchedRoute.params,
 			headers: req.headers,
 		};
-		const requestValidation = validateRequest(implementation.route, request);
-
-		if (!requestValidation.success) {
-			sendUpgradeRejection(socket, requestValidation.response);
-			return;
-		}
-
-		const rejection = await options.beforeUpgrade?.({
-			route: implementation.route,
-			request: requestValidation.data,
+		const upgrade = await prepareWebSocketUpgrade({
+			implementation,
+			request,
 			context: { req },
+			beforeUpgrade: options.beforeUpgrade,
 		});
 
-		if (rejection) {
-			sendUpgradeRejection(socket, rejection);
+		if (!upgrade.ok) {
+			sendUpgradeRejection(socket, upgrade.rejection);
 			return;
 		}
 
 		options.webSocketServer.handleUpgrade(req, socket, head, (rawSocket) => {
 			handleWebSocketRoute(implementation.route, implementation.handler, {
-				request: requestValidation.data,
+				request: upgrade.request,
 				context: { req },
 				socket: adaptWebSocket(rawSocket),
 			});

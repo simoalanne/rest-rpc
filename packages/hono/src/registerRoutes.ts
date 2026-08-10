@@ -1,9 +1,7 @@
 import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import {
-	flattenAndSortImplementationTree,
 	type ImplementationTree,
-	isHttpRouteImplementation,
-	isWebSocketRouteImplementation,
+	registerRouteImplementations,
 } from "@rest-rpc/server";
 import type { Hono } from "hono";
 import type { Env } from "hono/types";
@@ -22,26 +20,13 @@ export const registerRoutes = <TEnv extends Env = Env>(
 	app: Hono<TEnv>,
 	implementations: ImplementationTree<RouteDeclaration>,
 	options: RegisterRoutesOptions<TEnv> = {},
-) => {
-	const implementationsList = flattenAndSortImplementationTree(implementations);
-	const routes = implementationsList.filter(isHttpRouteImplementation);
-	const webSocketRoutes = implementationsList.filter(
-		isWebSocketRouteImplementation,
+) =>
+	registerRouteImplementations(
+		implementations,
+		(routes) => registerHonoHttpRoutes(app, routes, options.parseBody),
+		(routes) => {
+			if (options.webSocket) {
+				registerHonoWebSocketRoutes(app, options.webSocket, routes);
+			}
+		},
 	);
-
-	const internalApp = app as unknown as Hono;
-
-	registerHonoHttpRoutes(
-		internalApp,
-		routes,
-		options.parseBody as HonoParseBody | undefined,
-	);
-
-	if (options.webSocket) {
-		registerHonoWebSocketRoutes(
-			internalApp,
-			options.webSocket as unknown as HonoWebSocketOptions,
-			webSocketRoutes,
-		);
-	}
-};

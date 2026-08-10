@@ -1,5 +1,9 @@
 import type { HttpMethod, HttpRouteDeclaration } from "@rest-rpc/core/contract";
-import { handleHttpRoute, type RouteImplementation } from "@rest-rpc/server";
+import {
+	handleHttpRoute,
+	handleHttpRouteResult,
+	type RouteImplementation,
+} from "@rest-rpc/server";
 import type {
 	Application,
 	Response as ExpressResponse,
@@ -39,38 +43,22 @@ export const registerExpressHttpRoutes = (
 				context: { req },
 			});
 
-			if (result.headers) {
-				for (const [headerName, headerValue] of Object.entries(
-					result.headers,
-				)) {
-					if (headerValue === undefined) continue;
-					res.setHeader(headerName, headerValue);
-				}
-			}
-
-			if (result.kind === "empty") {
-				res.sendStatus(result.status);
-				return;
-			}
-
-			if (result.kind === "stream") {
-				await writeStreamResponse(
-					result.body,
-					res,
-					result.status,
-					result.contentType,
-					result.contentType ? "raw" : "ndjson",
-				);
-				return;
-			}
-
-			if (result.kind === "custom") {
-				res.setHeader("content-type", result.contentType);
-				res.status(result.status).send(result.body);
-				return;
-			}
-
-			res.status(result.status).json(result.body);
+			return handleHttpRouteResult(result, {
+				setHeader: (name, value) => {
+					if (value !== undefined) res.setHeader(name, value);
+				},
+				sendEmpty: (status) => {
+					res.sendStatus(status);
+				},
+				sendJson: (status, body) => {
+					res.status(status).json(body);
+				},
+				sendCustom: (status, body) => {
+					res.status(status).send(body);
+				},
+				sendStream: ({ body, status, contentType, mode }) =>
+					writeStreamResponse(body, res, status, contentType, mode),
+			});
 		};
 
 		app[method](route.path, serviceHandler);

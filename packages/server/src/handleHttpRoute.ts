@@ -3,15 +3,14 @@ import type {
 	HttpRouteDeclaration,
 	ResponseBodySchema,
 } from "@rest-rpc/core/contract";
-import { isCustomBody, REQUEST_CONTEXT_KEY } from "@rest-rpc/core/contract";
-import type { HttpHeaders } from "./headers.ts";
 import {
-	ContractResponseError,
-	getResponseSchema,
-	isEmptyResponseSchema,
-	isStreamingResponseSchema,
-	normalizeHandlerResult,
-} from "./response.ts";
+	isCustomBody,
+	isNoBody,
+	isStream,
+	REQUEST_CONTEXT_KEY,
+} from "@rest-rpc/core/contract";
+import { ContractResponseError } from "./contractResponseError.ts";
+import type { HttpHeaders } from "./headers.ts";
 import type { HttpRouteHandlerContext, RuntimeRouteHandler } from "./router.ts";
 import { type RequestSegments, validateRequest } from "./validation.ts";
 
@@ -39,15 +38,65 @@ export type HandleHttpRouteOptions<TContext extends HttpRouteHandlerContext> = {
 	context: TContext;
 };
 
+const getResponseSchema = (
+	route: HttpRouteDeclaration,
+	status: number,
+): ResponseBodySchema | undefined => {
+	const entry = Object.entries(route.responses).find(
+		([declaredStatus]) => Number(declaredStatus) === status,
+	);
+	return entry?.[1];
+};
+
+const getSingleSuccessfulStatus = (
+	route: HttpRouteDeclaration,
+): number | undefined => {
+	const statuses = Object.keys(route.responses)
+		.map(Number)
+		.filter((status) => status >= 200 && status < 300);
+
+	return statuses.length === 1 ? statuses[0] : undefined;
+};
+
+const hasDeclaredStatus = (route: HttpRouteDeclaration, status: number) =>
+	Boolean(getResponseSchema(route, status));
+
+const normalizeHandlerResult = (
+	route: HttpRouteDeclaration,
+	result: unknown,
+): {
+	status: number;
+	body: unknown;
+	headers?: HttpHeaders;
+} => {
+	if (
+		result &&
+		typeof result === "object" &&
+		"status" in result &&
+		typeof result.status === "number" &&
+		hasDeclaredStatus(route, result.status)
+	) {
+		return result as { status: number; body: unknown };
+	}
+
+	const status = getSingleSuccessfulStatus(route);
+	if (status === undefined) {
+		throw new Error(
+			`Service for "${route.method} ${route.path}" must return a declared response object.`,
+		);
+	}
+
+	return {
+		status,
+		body: result,
+	};
+};
+
 const validateOutgoingResponse = (
 	schema: ResponseBodySchema | undefined,
 	body: unknown,
 ) => {
-	if (
-		!schema ||
-		isEmptyResponseSchema(schema) ||
-		isStreamingResponseSchema(schema)
-	) {
+	if (!schema || isNoBody(schema) || isStream(schema)) {
 		return body;
 	}
 
@@ -66,7 +115,7 @@ async function* validateStreamChunks(
 	body: AsyncIterable<unknown>,
 	schema: ResponseBodySchema,
 ) {
-	if (!isStreamingResponseSchema(schema)) {
+	if (!isStream(schema)) {
 		yield* body;
 		return;
 	}
@@ -91,7 +140,7 @@ const normalizeResponseResult = (
 ): HttpRouteResult => {
 	const schema = getResponseSchema(route, result.status);
 
-	if (schema && isEmptyResponseSchema(schema)) {
+	if (schema && isNoBody(schema)) {
 		return {
 			kind: "empty",
 			status: result.status,
@@ -99,7 +148,7 @@ const normalizeResponseResult = (
 		};
 	}
 
-	if (schema && isStreamingResponseSchema(schema)) {
+	if (schema && isStream(schema)) {
 		if (isCustomBody(schema.schema)) {
 			return {
 				kind: "stream",

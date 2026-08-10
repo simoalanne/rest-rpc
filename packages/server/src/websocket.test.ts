@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
-import { createContractWebSocket, type RawWebSocket } from "./websocket.ts";
+import {
+	createContractWebSocket,
+	prepareWebSocketUpgrade,
+	type RawWebSocket,
+} from "./websocket.ts";
 
 class FakeRawWebSocket implements RawWebSocket {
 	sent: string[] = [];
@@ -50,6 +54,14 @@ const websocketRoute = (
 	({
 		method: "GET",
 		path: "/rooms/:roomId",
+		request: {
+			params: {
+				roomId: z.string(),
+			},
+			requestKeys: {
+				roomId: "params",
+			},
+		},
 		options: { mode: "websocket" },
 		messages,
 	}) as const;
@@ -157,5 +169,82 @@ describe("createContractWebSocket", () => {
 		assert.deepEqual(rawSocket.sent, [
 			'{"createdAt":"2026-08-10T00:00:00.000Z"}',
 		]);
+	});
+});
+
+describe("prepareWebSocketUpgrade", () => {
+	it("validates requests before accepting upgrades", async () => {
+		const route = websocketRoute({
+			client: z.object({ text: z.string() }),
+			server: z.object({ text: z.string() }),
+		});
+		const implementation = { route, handler: () => undefined };
+
+		const result = await prepareWebSocketUpgrade({
+			implementation,
+			request: {
+				params: { roomId: "room-1" },
+			},
+			context: {},
+		});
+
+		assert.equal(result.ok, true);
+		if (result.ok) {
+			assert.deepEqual(result.request, { roomId: "room-1" });
+		}
+	});
+
+	it("returns validation rejections", async () => {
+		const route = websocketRoute({
+			client: z.object({ text: z.string() }),
+			server: z.object({ text: z.string() }),
+		});
+		const implementation = { route, handler: () => undefined };
+
+		const result = await prepareWebSocketUpgrade({
+			implementation,
+			request: {},
+			context: {},
+		});
+
+		assert.equal(result.ok, false);
+		if (!result.ok) {
+			assert.equal(result.rejection.status, 400);
+		}
+	});
+
+	it("returns beforeUpgrade rejections after validation", async () => {
+		const route = websocketRoute({
+			client: z.object({ text: z.string() }),
+			server: z.object({ text: z.string() }),
+		});
+		const implementation = { route, handler: () => undefined };
+
+		const result = await prepareWebSocketUpgrade({
+			implementation,
+			request: {
+				params: { roomId: "room-1" },
+			},
+			context: { req: "request" },
+			beforeUpgrade: ({ request, context }) => {
+				assert.deepEqual(request, { roomId: "room-1" });
+				assert.deepEqual(context, { req: "request" });
+
+				return {
+					status: 403,
+					headers: { "x-denied": "true" },
+					body: { message: "Denied" },
+				};
+			},
+		});
+
+		assert.deepEqual(result, {
+			ok: false,
+			rejection: {
+				status: 403,
+				headers: { "x-denied": "true" },
+				body: { message: "Denied" },
+			},
+		});
 	});
 });

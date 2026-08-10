@@ -3,10 +3,10 @@ import {
 	type BeforeWebSocketUpgrade,
 	type CloseEventLike,
 	handleWebSocketRoute,
+	prepareWebSocketUpgrade,
 	type RawWebSocket,
 	type RouteImplementation,
 	type UpgradeRejection,
-	validateRequest,
 } from "@rest-rpc/server";
 import type { Context, Hono } from "hono";
 import type { Env } from "hono/types";
@@ -17,9 +17,9 @@ export type HonoWebSocketOptions<TEnv extends Env = Env> = {
 	beforeUpgrade?: BeforeWebSocketUpgrade<{ c: Context<TEnv> }>;
 };
 
-type HonoUpgradeWebSocketMiddleware = (
-	createEvents: (c: Context) => WSEvents | Promise<WSEvents>,
-) => (c: Context) => Response | Promise<Response>;
+type HonoUpgradeWebSocketMiddleware<TEnv extends Env = Env> = (
+	createEvents: (c: Context<TEnv>) => WSEvents | Promise<WSEvents>,
+) => (c: Context<TEnv>) => Response | Promise<Response>;
 
 const createHonoRawWebSocket = (
 	getSocket: () => WSContext | undefined,
@@ -74,9 +74,9 @@ const sendUpgradeRejection = (rejection: UpgradeRejection) =>
 		headers: createUpgradeRejectionHeaders(rejection),
 	});
 
-export const registerHonoWebSocketRoutes = (
-	app: Hono,
-	options: HonoWebSocketOptions,
+export const registerHonoWebSocketRoutes = <TEnv extends Env = Env>(
+	app: Hono<TEnv>,
+	options: HonoWebSocketOptions<TEnv>,
 	routes: RouteImplementation<WebSocketRouteDeclaration>[],
 ) => {
 	for (const implementation of routes) {
@@ -86,24 +86,17 @@ export const registerHonoWebSocketRoutes = (
 				params: c.req.param(),
 				headers: c.req.header(),
 			};
-			const requestValidation = validateRequest(implementation.route, request);
-
-			if (!requestValidation.success) {
-				return Response.json(requestValidation.response.body, {
-					status: requestValidation.response.status,
-				});
-			}
-
-			const rejection = await options.beforeUpgrade?.({
-				route: implementation.route,
-				request: requestValidation.data,
+			const upgrade = await prepareWebSocketUpgrade({
+				implementation,
+				request,
 				context: { c },
+				beforeUpgrade: options.beforeUpgrade,
 			});
 
-			if (rejection) return sendUpgradeRejection(rejection);
+			if (!upgrade.ok) return sendUpgradeRejection(upgrade.rejection);
 
 			const upgradeWebSocket =
-				options.upgradeWebSocket as unknown as HonoUpgradeWebSocketMiddleware;
+				options.upgradeWebSocket as unknown as HonoUpgradeWebSocketMiddleware<TEnv>;
 
 			return upgradeWebSocket((): WSEvents => {
 				let peer: WSContext | undefined;
@@ -113,7 +106,7 @@ export const registerHonoWebSocketRoutes = (
 					onOpen(_event, socket) {
 						peer = socket;
 						handleWebSocketRoute(implementation.route, implementation.handler, {
-							request: requestValidation.data,
+							request: upgrade.request,
 							context: { c },
 							socket: rawSocket,
 						});

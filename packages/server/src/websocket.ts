@@ -9,9 +9,12 @@ import type { HttpHeaders } from "./headers.ts";
 import type {
 	CloseEventLike,
 	ContractWebSocket,
+	RouteImplementation,
 	RuntimeRouteHandler,
 	WebSocketRouteHandlerContext,
 } from "./router.ts";
+import type { RequestSegments } from "./validation.ts";
+import { validateRequest } from "./validation.ts";
 
 export type RawWebSocket = {
 	send(data: string): void;
@@ -40,6 +43,44 @@ export type WebSocketUpgradeResult =
 export type BeforeWebSocketUpgrade<TContext extends Record<string, unknown>> = (
 	input: WebSocketUpgradeInput<TContext>,
 ) => WebSocketUpgradeResult;
+
+type PrepareWebSocketUpgradeOptions<
+	TContext extends Record<string, unknown> = Record<string, unknown>,
+> = {
+	implementation: RouteImplementation<WebSocketRouteDeclaration>;
+	request: RequestSegments;
+	context: TContext;
+	beforeUpgrade?: BeforeWebSocketUpgrade<TContext>;
+};
+
+type PrepareWebSocketUpgradeResult =
+	| { ok: true; request: Record<string, unknown> }
+	| { ok: false; rejection: UpgradeRejection };
+
+export const prepareWebSocketUpgrade = async <
+	TContext extends Record<string, unknown> = Record<string, unknown>,
+>({
+	implementation,
+	request,
+	context,
+	beforeUpgrade,
+}: PrepareWebSocketUpgradeOptions<TContext>): Promise<PrepareWebSocketUpgradeResult> => {
+	const requestValidation = validateRequest(implementation.route, request);
+
+	if (!requestValidation.success) {
+		return { ok: false, rejection: requestValidation.response };
+	}
+
+	const rejection = await beforeUpgrade?.({
+		route: implementation.route,
+		request: requestValidation.data,
+		context,
+	});
+
+	if (rejection) return { ok: false, rejection };
+
+	return { ok: true, request: requestValidation.data };
+};
 
 export const createContractWebSocket = <E extends WebSocketRouteDeclaration>(
 	route: E,

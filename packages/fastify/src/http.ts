@@ -1,6 +1,10 @@
 import { Readable } from "node:stream";
 import type { HttpMethod, HttpRouteDeclaration } from "@rest-rpc/core/contract";
-import { handleHttpRoute, type RouteImplementation } from "@rest-rpc/server";
+import {
+	handleHttpRoute,
+	handleHttpRouteResult,
+	type RouteImplementation,
+} from "@rest-rpc/server";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 const toStream = (
@@ -14,15 +18,6 @@ const toStream = (
 			}
 		})(),
 	);
-
-const setHeaders = (
-	reply: FastifyReply,
-	headers: Record<string, string | number | readonly string[] | undefined>,
-) => {
-	for (const [name, value] of Object.entries(headers)) {
-		if (value !== undefined) reply.header(name, value);
-	}
-};
 
 export const registerFastifyHttpRoutes = (
 	app: FastifyInstance,
@@ -46,27 +41,14 @@ export const registerFastifyHttpRoutes = (
 					context: { req },
 				});
 
-				if (result.headers) setHeaders(reply, result.headers);
-
-				if (result.kind === "empty") {
-					return reply.status(result.status).send();
-				}
-
-				if (result.kind === "stream") {
-					return reply
-						.status(result.status)
-						.type(result.contentType ?? "application/x-ndjson")
-						.send(toStream(result.body, result.contentType ? "raw" : "ndjson"));
-				}
-
-				if (result.kind === "custom") {
-					return reply
-						.status(result.status)
-						.type(result.contentType)
-						.send(result.body);
-				}
-
-				return reply.status(result.status).send(result.body);
+				return handleHttpRouteResult(result, {
+					setHeader: (name, value) => reply.header(name, value),
+					sendEmpty: (status) => reply.status(status).send(),
+					sendJson: (status, body) => reply.status(status).send(body),
+					sendCustom: (status, body) => reply.status(status).send(body),
+					sendStream: ({ body, status, contentType, mode }) =>
+						reply.status(status).type(contentType).send(toStream(body, mode)),
+				});
 			},
 		);
 	}

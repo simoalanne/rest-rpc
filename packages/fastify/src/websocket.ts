@@ -3,10 +3,10 @@ import type { WebSocketRouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	type BeforeWebSocketUpgrade,
 	handleWebSocketRoute,
+	prepareWebSocketUpgrade,
 	type RawWebSocket,
 	type RouteImplementation,
 	type UpgradeRejection,
-	validateRequest,
 } from "@rest-rpc/server";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
@@ -66,28 +66,19 @@ export const registerFastifyWebSocketRoutes = (
 						params: req.params,
 						headers: req.headers,
 					};
-					const requestValidation = validateRequest(
-						implementation.route,
+					const upgrade = await prepareWebSocketUpgrade({
+						implementation,
 						request,
-					);
-
-					if (!requestValidation.success) {
-						await sendUpgradeRejection(reply, requestValidation.response);
-						return;
-					}
-
-					const rejection = await options.beforeUpgrade?.({
-						route: implementation.route,
-						request: requestValidation.data,
 						context: { req },
+						beforeUpgrade: options.beforeUpgrade,
 					});
 
-					if (rejection) {
-						await sendUpgradeRejection(reply, rejection);
+					if (!upgrade.ok) {
+						await sendUpgradeRejection(reply, upgrade.rejection);
 						return;
 					}
 					(req as ExtendedFastifyRequest)[validatedWebSocketRequest] =
-						requestValidation.data;
+						upgrade.request;
 				},
 			},
 			(socket: FastifyWebSocket, req: FastifyRequest) => {
