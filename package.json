@@ -19,6 +19,7 @@
 		"lint:staged": "biome check --write --staged --no-errors-on-unmatched",
 		"lint:write": "pnpm run lint:staged",
 		"lint:unsafe": "biome check --write --unsafe --staged --no-errors-on-unmatched",
+		"bench:typecheck": "pnpm --filter @rest-rpc/core build && pnpm --filter @rest-rpc/benchmarks bench:typecheck",
 		"readme:sync": "node scripts/sync-readmes.cjs",
 		"check": "pnpm run lint && pnpm run typecheck && pnpm run test",
 		"check:verify": "pnpm run lint:verify && pnpm run typecheck && pnpm run test"

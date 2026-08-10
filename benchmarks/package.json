@@ -1,0 +1,22 @@
+{
+	"name": "@rest-rpc/benchmarks",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"bench:typecheck": "node scripts/generate-type-fixtures.mjs && node scripts/run-typecheck.mjs",
+		"generate:type-fixtures": "node scripts/generate-type-fixtures.mjs"
+	},
+	"dependencies": {
+		"@rest-rpc/core": "workspace:^"
+	},
+	"peerDependencies": {
+		"arktype": "^2.2.3",
+		"valibot": "^1.4.2",
+		"zod": "^4.4.3"
+	},
+	"devDependencies": {
+		"arktype": "^2.2.3",
+		"valibot": "^1.4.2",
+		"zod": "^4.4.3"
+	}
+}
