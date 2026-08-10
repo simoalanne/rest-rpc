@@ -24,6 +24,7 @@ GET /todos/todo_1
 - `@rest-rpc/core`: contracts, fetch client, OpenAPI generation, core helpers.
 - `@rest-rpc/express`: Express server adapter.
 - `@rest-rpc/hono`: Hono server adapter.
+- `@rest-rpc/fastify`: Fastify server adapter.
 - `@rest-rpc/react-query`: TanStack Query client adapter.
 
 `@rest-rpc/server` contains shared adapter infrastructure and is mainly useful
@@ -40,4 +41,3 @@ for adapter authors.
 ## Documentation
 
 Full documentation will live at [rest-rpc.dev](https://rest-rpc.dev).
-

@@ -1,0 +1,191 @@
+---
+title: Fastify
+description: Register contract handlers in a Fastify app.
+---
+
+Use `@rest-rpc/fastify` to implement and register contract routes in a Fastify
+app.
+
+The adapter registers routes by HTTP method and path, then delegates validation
+and response handling to the shared server layer.
+
+## Install
+
+```sh
+pnpm add @rest-rpc/core @rest-rpc/fastify fastify
+```
+
+## Basic Setup
+
+```ts
+import { registerRoutes, router } from "@rest-rpc/fastify";
+import Fastify from "fastify";
+import { api } from "./contract";
+
+const app = Fastify();
+
+const routes = router(api, {
+	todos: {
+		get({ id, context }) {
+			const userAgent = context.req.headers["user-agent"];
+			void userAgent;
+
+			const todo = todos.get(id);
+
+			if (!todo) {
+				return {
+					status: 404,
+					body: {
+						code: "TODO_NOT_FOUND",
+					},
+				};
+			}
+
+			return todo;
+		},
+	},
+});
+
+registerRoutes(app, routes);
+
+await app.listen({ port: 3000 });
+```
+
+## Handler Input
+
+Handlers receive flattened request input where `context` contains the Fastify
+request object.
+
+```ts
+get({ id, "x-request-id": requestId, context }) {
+	return loadTodo({
+		id,
+		requestId,
+		req: context.req,
+	});
+}
+```
+
+## Handler Returns
+
+Handlers can always return an explicit response envelope.
+
+```ts
+return {
+	status: 404,
+	body: {
+		code: "TODO_NOT_FOUND",
+	},
+};
+```
+
+If a route has exactly one successful response, the handler can return the
+success body directly.
+
+```ts
+return todo;
+```
+
+You can also use `ContractResponseError` to throw a declared error response when
+that's more convenient.
+
+```ts
+throw new ContractResponseError(api.todos.get, {
+	status: 404,
+	body: {
+		code: "TODO_NOT_FOUND",
+	},
+});
+```
+
+## Hooks
+
+`rest-rpc` does not own middleware. Use Fastify hooks and plugin scopes the same
+way you would in any Fastify app.
+
+When hooks need to behave differently for different contract routes, use
+`createRouteMatcher` to match the incoming request back to the contract route.
+
+```ts
+import { createRouteMatcher } from "@rest-rpc/fastify";
+
+const matchContractRoute = createRouteMatcher(api);
+
+app.addHook("preHandler", async (req, reply) => {
+	const match = matchContractRoute({
+		method: req.method,
+		path: req.url.split("?")[0] ?? req.url,
+	});
+
+	if (!match?.route.metadata?.requiresAuth) {
+		return;
+	}
+
+	const session = await loadSession(req.headers.authorization);
+
+	if (!session) {
+		return reply.status(401).send({ code: "UNAUTHORIZED" });
+	}
+
+	req.session = session;
+});
+```
+
+Handlers can read values added by hooks through `context.req`.
+
+```ts
+const routes = router(api, {
+	todos: {
+		get({ id, context }) {
+			return loadTodoForSession({
+				id,
+				session: context.req.session,
+			});
+		},
+	},
+});
+```
+
+## Body Parsing
+
+Fastify parses `application/json` and `text/plain` request bodies before the
+route handler runs. The adapter reads `req.body` directly.
+
+For custom request body content types, register a Fastify content type parser in
+the same scope as your routes.
+
+```ts
+app.addContentTypeParser(
+	"application/octet-stream",
+	{ parseAs: "buffer" },
+	(_req, body, done) => {
+		done(null, body);
+	},
+);
+```
+
+Then declare the route with `customBody(...)`; `rest-rpc` validates the parsed
+body value against that schema.
+
+## WebSockets
+
+WebSocket routes require `@fastify/websocket`.
+
+```sh
+pnpm add @fastify/websocket
+```
+
+Register the plugin before registering routes.
+
+```ts
+import websocket from "@fastify/websocket";
+import { fastifyWebSocket, registerRoutes } from "@rest-rpc/fastify";
+
+await app.register(websocket);
+
+registerRoutes(app, routes, {
+	webSocket: fastifyWebSocket(),
+});
+```
+
+See [WebSockets](/advanced/websockets/) for the contract and handler model.

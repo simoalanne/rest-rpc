@@ -11,17 +11,31 @@ flatter function-shaped input.
 
 ## Install
 
-For an Express server with Zod:
+For a server with Zod:
+
+<Tabs inline param="server">
+<Tab title="Express">
 
 ```sh
-pnpm add @rest-rpc/core @rest-rpc/express zod
+pnpm add @rest-rpc/core @rest-rpc/express express zod
 ```
 
-For a Hono server with Zod:
+</Tab>
+<Tab title="Hono">
 
 ```sh
 pnpm add @rest-rpc/core @rest-rpc/hono zod
 ```
+
+</Tab>
+<Tab title="Fastify">
+
+```sh
+pnpm add @rest-rpc/core @rest-rpc/fastify fastify zod
+```
+
+</Tab>
+</Tabs>
 
 For a client-only package:
 
@@ -118,10 +132,13 @@ export const api = router({
 Type-only schemas are useful when the contract should carry TypeScript types but
 runtime validation is unnecessary or belongs somewhere else.
 
-## Implement With Express
+## Implement The Server
+
+<Tabs inline param="server">
+<Tab title="Express">
 
 ```ts
-import { router, registerRoutes } from "@rest-rpc/express";
+import { registerRoutes, router } from "@rest-rpc/express";
 import express from "express";
 import { api } from "./contract";
 
@@ -168,7 +185,8 @@ registerRoutes(app, routes);
 app.listen(3000);
 ```
 
-## Implement With Hono
+</Tab>
+<Tab title="Hono">
 
 ```ts
 import { registerRoutes, router } from "@rest-rpc/hono";
@@ -216,6 +234,63 @@ registerRoutes(app, routes);
 
 export default app;
 ```
+
+</Tab>
+<Tab title="Fastify">
+
+```ts
+import { registerRoutes, router } from "@rest-rpc/fastify";
+import Fastify from "fastify";
+import { api } from "./contract";
+
+const app = Fastify();
+
+const todos = new Map([
+	["todo_1", { id: "todo_1", title: "Write docs", completed: false }],
+]);
+
+const routes = router(api, {
+	todos: {
+		get({ id }) {
+			const todo = todos.get(id);
+
+			if (!todo) {
+				return {
+					status: 404,
+					body: { code: "TODO_NOT_FOUND" },
+				};
+			}
+
+			return todo;
+		},
+		create({ title }) {
+			const todo = {
+				id: crypto.randomUUID(),
+				title,
+				completed: false,
+			};
+
+			todos.set(todo.id, todo);
+
+			return {
+				status: 201,
+				body: todo,
+			};
+		},
+	},
+});
+
+registerRoutes(app, routes);
+
+await app.listen({ port: 3000 });
+```
+
+</Tab>
+</Tabs>
+
+Handlers receive flattened request input. The contract says `id` comes from
+route params and `title` comes from the request body, so the handler can read
+them directly.
 
 ## Call With The Fetch Client
 
@@ -282,6 +357,6 @@ responses become data. Declared non-2xx responses become errors.
 ## Next
 
 - [Concepts](/concepts/) explains why the contract and call shapes differ.
-- [Express](/server/express/) and [Hono](/server/hono/) cover adapter details.
+- [Server adapters](/server/express/) cover framework-specific setup.
 - [Fetch Client](/client/fetch-client/) and [React Query](/client/react-query/)
   cover client behavior.
