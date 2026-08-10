@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { testContract, testRoute } from "./factories.ts";
+import { testContract, testRoute } from "../../test/factories/contract.ts";
 import { normalizeContract } from "./normalize.ts";
 
 describe("normalizeContract", () => {

@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import z from "zod";
-import { router } from "../contract/define.ts";
-import { customBody, noBody, stream } from "../contract/route.ts";
 import {
 	captureFetch,
 	createClientTestContract,
 	jsonResponse,
-} from "./factories.ts";
+} from "../../test/factories/client.ts";
+import { router } from "../contract/define.ts";
+import { customBody, noBody, stream } from "../contract/route.ts";
 import { initClient } from "./index.ts";
 
 const originalFetch = globalThis.fetch;

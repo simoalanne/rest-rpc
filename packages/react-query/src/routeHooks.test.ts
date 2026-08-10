@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import esmock from "esmock";
-import { createQueryClientMock, resetQueryClientMock } from "./factories.ts";
+import {
+	createQueryClientMock,
+	resetQueryClientMock,
+} from "../test/factories.ts";
 
 const routeWithoutRequest = {
 	method: "GET",

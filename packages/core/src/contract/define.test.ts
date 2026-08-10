@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
+import { testContract } from "../../test/factories/contract.ts";
 import { router, routerAsync } from "./define.ts";
-import { testContract } from "./factories.ts";
 import { noBody } from "./route.ts";
 
 describe("router", () => {

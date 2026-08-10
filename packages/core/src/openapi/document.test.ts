@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
+import {
+	createOpenApiTestContract,
+	schemaConverter,
+} from "../../test/factories/openapi.ts";
 import { noBody } from "../contract/route.ts";
 import { createOpenApiDocument } from "./document.ts";
-import { createOpenApiTestContract, schemaConverter } from "./factories.ts";
 
 describe("createOpenApiDocument", () => {
 	it("builds base document fields and applies document transforms", () => {

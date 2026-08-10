@@ -1,6 +1,6 @@
 import z from "zod";
-import { customBody, noBody, stream } from "../contract/route.ts";
-import type { SchemaConverter } from "./types.ts";
+import { customBody, noBody, stream } from "../../src/contract/route.ts";
+import type { SchemaConverter } from "../../src/openapi/types.ts";
 
 export const schemaConverter: SchemaConverter = (schema, { io }) =>
 	z.toJSONSchema(schema as z.ZodType, {

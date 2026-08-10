@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { createOpenApiTestContract } from "../../test/factories/openapi.ts";
 import { contractRoutes } from "../contract/traversal.ts";
-import { createOpenApiTestContract } from "./factories.ts";
 import { isOpenApiRoute, toOpenApiPath } from "./routes.ts";
 
 describe("OpenAPI route helpers", () => {

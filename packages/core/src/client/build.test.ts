@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createClientTestContract } from "./factories.ts";
+import { createClientTestContract } from "../../test/factories/client.ts";
 import { initClient, mapApiClientContract } from "./index.ts";
 
 describe("ApiClient route tree", () => {

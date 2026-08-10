@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
+import { testContract } from "../../test/factories/contract.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import { testContract } from "./factories.ts";
 import { customBody } from "./route.ts";
 import {
 	groupRequestInput,

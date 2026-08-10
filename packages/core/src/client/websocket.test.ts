@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import z from "zod";
+import { createClientTestContract } from "../../test/factories/client.ts";
 import { router } from "../contract/define.ts";
-import { createClientTestContract } from "./factories.ts";
 import { initClient } from "./index.ts";
 
 const OriginalWebSocket = globalThis.WebSocket;

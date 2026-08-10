@@ -6,7 +6,7 @@ import {
 	createApiTree,
 	createQueryClientMock,
 	resetQueryClientMock,
-} from "./factories.ts";
+} from "../test/factories.ts";
 
 describe("initReactQueryClient", () => {
 	it("creates a core client and maps HTTP routes to route hooks", async () => {
