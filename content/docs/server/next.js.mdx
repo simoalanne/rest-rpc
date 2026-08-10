@@ -1,0 +1,104 @@
+---
+title: Next.js
+description: Register single contract routes in Next.js App Router route handlers.
+---
+
+Use `@rest-rpc/next` to create route handlers for a single contract route in Next.js App Router
+
+## Install
+
+```sh
+pnpm add @rest-rpc/core @rest-rpc/next
+```
+
+## Basic Setup
+
+Contract path: `/api/todos/:id`
+App router route: `app/api/todos/[id]/route.ts`
+
+```ts
+import { createRouteHandler } from "@rest-rpc/next";
+import { api } from "@/contract";
+
+export const { GET } = createRouteHandler(api.todos.get, ({ id, context }) => {
+	const userAgent = context.request.headers.get("user-agent");
+	void userAgent;
+
+	const todo = todos.get(id);
+
+	if (!todo) {
+		return {
+			status: 404,
+			body: {
+				code: "TODO_NOT_FOUND",
+			},
+		};
+	}
+
+	return todo;
+});
+```
+
+Handlers receive flattened request input where `context.request` contains the
+native `Request`.
+
+```ts
+get({ id, context }) {
+	return loadTodo({
+		id,
+		authorization: context.request.headers.get("authorization"),
+	});
+}
+```
+
+## Handling Multiple Methods
+
+If you have routes that share the same path but have different methods, you can create multiple handlers in the same file.
+`createRouteHandler()` returns an object with the route's method as the key and the handler as the value.
+
+```ts
+export const { POST } = createRouteHandler(api.todos.create, async ({ title }) => {
+	const todo = await createTodo({ title });
+
+	return {
+		status: 201,
+		body: todo,
+	};
+});
+
+export const { GET } = createRouteHandler(api.todos.get, ({ id }) => {
+	const todo = todos.get(id);
+
+	if (!todo) {
+		return {
+			status: 404,
+			body: {
+				code: "TODO_NOT_FOUND",
+			},
+		};
+	}
+
+	return todo;
+});
+```
+
+## Catch-all Routes
+
+Catch-all routes are not supported natively. `@rest-rpc/next` is designed around
+Next.js App Router route boundaries, so the route's path must match the
+`route.ts` file path.
+
+A catch-all router can provide stronger whole-contract implementation checks,
+but it also makes the library own runtime path matching inside one Next.js route
+module. Next route handlers use module exports such as `runtime`, `dynamic`, and
+`revalidate` to define route-level behavior. With a catch-all route, those
+settings apply to every contract route mounted under that file.
+
+Prefer colocating contract routes with their matching App Router `route.ts`
+files. Use another server adapter when you want one router registration point
+for the whole contract.
+
+## WebSocket Support
+
+Websocket routes are not supported in Next.js route handlers because Next does not itself support WebSocket connections. 
+If you need WebSocket support, use a different server adapter that supports WebSockets.

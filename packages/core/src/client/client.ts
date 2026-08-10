@@ -25,6 +25,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 	private contract: TContract;
 	private fetchOptions?: ApiClientOptions["fetchOptions"];
 	private getHeaders?: ApiClientOptions["getHeaders"];
+	private prepareFetch?: ApiClientOptions["prepareFetch"];
 	private timeoutMs?: number;
 	private unknownRequestKeys: "throw" | "strip";
 	private validateResponses: boolean;
@@ -34,6 +35,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 		this.contract = contract;
 		this.fetchOptions = options.fetchOptions;
 		this.getHeaders = options.getHeaders;
+		this.prepareFetch = options.prepareFetch;
 		this.timeoutMs = options.timeoutMs;
 		this.unknownRequestKeys = options.unknownRequestKeys ?? "throw";
 		this.validateResponses = options.validateResponses ?? false;
@@ -53,6 +55,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 			baseUrl: this.baseUrl,
 			fetchOptions: this.fetchOptions,
 			getHeaders: this.getHeaders,
+			prepareFetch: this.prepareFetch,
 			timeoutMs: this.timeoutMs,
 			unknownRequestKeys: this.unknownRequestKeys,
 		});

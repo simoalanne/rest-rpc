@@ -106,10 +106,22 @@ export type GetHeadersFn = () =>
 	| Record<string, string>
 	| Promise<Record<string, string>>;
 
+export type PrepareFetchInput = {
+	route: RouteDeclaration;
+	request?: RuntimeArgs;
+	url: string;
+	init: RequestInit;
+};
+
+export type PrepareFetchFn = (
+	input: PrepareFetchInput,
+) => RequestInit | undefined | Promise<RequestInit | undefined>;
+
 export type ApiClientOptions = {
 	baseUrl: string;
 	fetchOptions?: ApiClientFetchOptions;
 	getHeaders?: GetHeadersFn;
+	prepareFetch?: PrepareFetchFn;
 	timeoutMs?: number;
 	unknownRequestKeys?: "throw" | "strip";
 	validateResponses?: boolean;

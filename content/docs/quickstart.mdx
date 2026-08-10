@@ -35,6 +35,13 @@ pnpm add @rest-rpc/core @rest-rpc/fastify fastify zod
 ```
 
 </Tab>
+<Tab title="Next">
+
+```sh
+pnpm add @rest-rpc/core @rest-rpc/next zod
+```
+
+</Tab>
 </Tabs>
 
 For a client-only package:
@@ -286,6 +293,57 @@ await app.listen({ port: 3000 });
 ```
 
 </Tab>
+<Tab title="Next">
+
+Next.js App Router route handlers are file-based. Put each handler in the route
+file that matches the contract path.
+
+```ts
+// app/todos/[id]/route.ts
+import { createRouteHandler } from "@rest-rpc/next";
+import { api } from "@/contract";
+import { todos } from "@/todos-store";
+
+export const { GET } = createRouteHandler(api.todos.get, ({ id }) => {
+	const todo = todos.get(id);
+
+	if (!todo) {
+		return {
+			status: 404,
+			body: { code: "TODO_NOT_FOUND" },
+		};
+	}
+
+	return todo;
+});
+```
+
+```ts
+// app/todos/route.ts
+import { createRouteHandler } from "@rest-rpc/next";
+import { api } from "@/contract";
+import { todos } from "@/todos-store";
+
+export const { POST } = createRouteHandler(api.todos.create, ({ title }) => {
+	const todo = {
+		id: crypto.randomUUID(),
+		title,
+		completed: false,
+	};
+
+	todos.set(todo.id, todo);
+
+	return {
+		status: 201,
+		body: todo,
+	};
+});
+```
+
+If you place route handlers under `app/api`, include `/api` in the contract
+paths, because the Next adapter matches the full incoming pathname.
+
+</Tab>
 </Tabs>
 
 Handlers receive flattened request input. The contract says `id` comes from
@@ -354,9 +412,12 @@ const createTodo = rq.todos.create.useMutation({
 React Query follows React Query's success and error channels. Declared 2xx
 responses become data. Declared non-2xx responses become errors.
 
-## Next
+## Next Steps
 
 - [Concepts](/concepts/) explains why the contract and call shapes differ.
-- [Server adapters](/server/express/) cover framework-specific setup.
+- [Server adapters](/server/express/) cover framework-specific setup, including
+  [Next.js App Router route handlers](/server/next/).
 - [Fetch Client](/client/fetch-client/) and [React Query](/client/react-query/)
   cover client behavior.
+- [Fetch Client With Next](/client/fetch-client-with-next/) covers automatic
+  Next.js cache tags.

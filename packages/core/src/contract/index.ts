@@ -38,6 +38,7 @@ export type {
 	InferServerSuccessResponse,
 	NoBody,
 	OpenApiRouteOptions,
+	RequestBodySchema,
 	ResponseBodySchema,
 	RouteDeclaration,
 	RouteMetadata,

@@ -12,9 +12,15 @@ export type {
 	InferRouteClientSocket,
 	OpenConnectionArgs,
 	OpenConnectionFn,
+	PrepareFetchFn,
+	PrepareFetchInput,
 	UndeclaredRouteClientResponse,
 } from "./client/index.ts";
-export { initClient } from "./client/index.ts";
+export {
+	constructBaseRequest,
+	getRouteCacheTags,
+	initClient,
+} from "./client/index.ts";
 export type {
 	CommonOpenApiRouteOptions,
 	Contract,
@@ -38,6 +44,7 @@ export type {
 	InferServerSuccessResponse,
 	NoBody,
 	OpenApiRouteOptions,
+	RequestBodySchema,
 	ResponseBodySchema,
 	RouteDeclaration,
 	RouteMetadata,

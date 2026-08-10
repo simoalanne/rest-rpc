@@ -1,4 +1,6 @@
+export { getRouteCacheTags } from "./cacheTags.ts";
 export { ApiClient, initClient } from "./client.ts";
+export { constructBaseRequest } from "./request.ts";
 export { mapApiClientContract } from "./routes.ts";
 export type {
 	ApiClientFetchOptions,
@@ -14,5 +16,7 @@ export type {
 	InferRouteClientSocket,
 	OpenConnectionArgs,
 	OpenConnectionFn,
+	PrepareFetchFn,
+	PrepareFetchInput,
 	UndeclaredRouteClientResponse,
 } from "./types.ts";

@@ -6,6 +6,7 @@ import type {
 	FetchArgs,
 	FetchOptions,
 	GetHeadersFn,
+	PrepareFetchFn,
 	RuntimeArgs,
 } from "./types.ts";
 
@@ -180,6 +181,7 @@ export type ExecuteRequestOptions = {
 	baseUrl: string;
 	fetchOptions?: ApiClientFetchOptions;
 	getHeaders?: GetHeadersFn;
+	prepareFetch?: PrepareFetchFn;
 	timeoutMs?: number;
 	unknownRequestKeys: "throw" | "strip";
 };
@@ -210,7 +212,7 @@ export const executeRequest = async <E extends RouteDeclaration>(
 	assertNoContentTypeHeader(headers);
 
 	try {
-		const rawResponse = await fetch(url, {
+		const init: RequestInit = {
 			...options.fetchOptions,
 			...fetchOptions,
 			method: route.method,
@@ -221,7 +223,15 @@ export const executeRequest = async <E extends RouteDeclaration>(
 				...(contentType ? { "content-type": contentType } : {}),
 			},
 			signal: signalState?.signal ?? fetchOptions?.signal,
-		});
+		};
+		const preparedInit =
+			(await options.prepareFetch?.({
+				route,
+				request: requestArgs as RuntimeArgs | undefined,
+				url,
+				init,
+			})) ?? init;
+		const rawResponse = await fetch(url, preparedInit);
 
 		return {
 			rawResponse,
