@@ -1,8 +1,7 @@
 import { Readable } from "node:stream";
 import type { HttpMethod, HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import { handleHttpRoute, type RouteImplementation } from "@rest-rpc/server";
-import type { FastifyReply, FastifyRequest } from "fastify";
-import type { FastifyApp } from "./types.ts";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 const toStream = (
 	body: AsyncIterable<unknown>,
@@ -26,7 +25,7 @@ const setHeaders = (
 };
 
 export const registerFastifyHttpRoutes = (
-	app: FastifyApp,
+	app: FastifyInstance,
 	routes: RouteImplementation<HttpRouteDeclaration>[],
 ) => {
 	for (const implementation of routes) {

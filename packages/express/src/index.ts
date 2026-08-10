@@ -25,7 +25,6 @@ import {
 } from "@rest-rpc/server";
 import type { Request } from "express";
 
-export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
 export type {
 	ExpressWebSocketOptions,

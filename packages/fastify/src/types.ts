@@ -1,11 +1,6 @@
 import type { WebSocketRouteDeclaration } from "@rest-rpc/core/contract";
 import type { UpgradeRejection } from "@rest-rpc/server";
-import type { FastifyInstance, FastifyRequest } from "fastify";
-
-export type FastifyApp = Pick<
-	FastifyInstance,
-	"get" | "post" | "put" | "delete" | "patch" | "route"
->;
+import type { FastifyRequest } from "fastify";
 
 export type FastifyBeforeUpgradeInput = {
 	req: FastifyRequest;

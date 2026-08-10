@@ -1,12 +1,9 @@
-import type {
-	HttpRouteDeclaration,
-	RouteDeclaration,
-	WebSocketRouteDeclaration,
-} from "@rest-rpc/core/contract";
+import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	flattenAndSortImplementationTree,
 	type ImplementationTree,
-	type RouteImplementation,
+	isHttpRouteImplementation,
+	isWebSocketRouteImplementation,
 } from "@rest-rpc/server";
 import type { Env } from "hono/types";
 import { registerHonoHttpRoutes } from "./http.ts";
@@ -16,16 +13,6 @@ import type {
 	HonoWebSocketRegistration,
 } from "./types.ts";
 import { registerHonoWebSocketRoutes } from "./websocket.ts";
-
-const isHttpRouteImplementation = (
-	implementation: RouteImplementation,
-): implementation is RouteImplementation<HttpRouteDeclaration> =>
-	"responses" in implementation.route;
-
-const isWebSocketRouteImplementation = (
-	implementation: RouteImplementation,
-): implementation is RouteImplementation<WebSocketRouteDeclaration> =>
-	implementation.route.options?.mode === "websocket";
 
 export type RegisterRoutesOptions<TEnv extends Env = Env> = {
 	parseBody?: HonoParseBody<TEnv>;

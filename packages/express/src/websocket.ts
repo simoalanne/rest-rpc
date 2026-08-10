@@ -22,11 +22,7 @@ import type { WebSocketServer } from "ws";
 type ExpressBeforeUpgradeInput = {
 	req: IncomingMessage;
 	route: WebSocketRouteDeclaration;
-	request: {
-		query: Record<string, string>;
-		params: Record<string, string>;
-		headers: IncomingMessage["headers"];
-	};
+	request: Record<string, unknown>;
 };
 
 type ExpressBeforeUpgradeResult = undefined | UpgradeRejection;
@@ -164,7 +160,7 @@ export const registerExpressWebSocketRoutes = (
 		const rejection = await registration.options.beforeUpgrade?.({
 			req,
 			route: implementation.route,
-			request,
+			request: requestValidation.data,
 		});
 
 		if (rejection) {
@@ -177,19 +173,11 @@ export const registerExpressWebSocketRoutes = (
 			socket,
 			head,
 			(rawSocket) => {
-				const result = handleWebSocketRoute(
-					implementation.route,
-					implementation.handler,
-					{
-						request,
-						context: { req },
-						socket: adaptWebSocket(rawSocket),
-					},
-				);
-
-				if (!result.ok) {
-					rawSocket.close(1008, "WebSocket upgrade validation failed.");
-				}
+				handleWebSocketRoute(implementation.route, implementation.handler, {
+					request: requestValidation.data,
+					context: { req },
+					socket: adaptWebSocket(rawSocket),
+				});
 			},
 		);
 	});

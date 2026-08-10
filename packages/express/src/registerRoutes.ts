@@ -1,12 +1,9 @@
-import type {
-	HttpRouteDeclaration,
-	RouteDeclaration,
-	WebSocketRouteDeclaration,
-} from "@rest-rpc/core/contract";
+import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	flattenAndSortImplementationTree,
 	type ImplementationTree,
-	type RouteImplementation,
+	isHttpRouteImplementation,
+	isWebSocketRouteImplementation,
 } from "@rest-rpc/server";
 import type { Application } from "express";
 import { registerExpressHttpRoutes } from "./http.ts";
@@ -15,24 +12,10 @@ import {
 	registerExpressWebSocketRoutes,
 } from "./websocket.ts";
 
-const isHttpRouteImplementation = (
-	implementation: RouteImplementation,
-): implementation is RouteImplementation<HttpRouteDeclaration> =>
-	"responses" in implementation.route;
-
-const isWebSocketRouteImplementation = (
-	implementation: RouteImplementation,
-): implementation is RouteImplementation<WebSocketRouteDeclaration> =>
-	implementation.route.options?.mode === "websocket";
-
-export type RegisterRoutesOptions = {
-	webSocket?: ExpressWebSocketRegistration;
-};
-
 export const registerRoutes = (
 	app: Application,
 	implementations: ImplementationTree<RouteDeclaration>,
-	options: RegisterRoutesOptions = {},
+	options: { webSocket?: ExpressWebSocketRegistration } = {},
 ) => {
 	const implementationsList = flattenAndSortImplementationTree(implementations);
 	const routes = implementationsList.filter(isHttpRouteImplementation);

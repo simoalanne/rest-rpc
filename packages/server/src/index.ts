@@ -30,7 +30,14 @@ export type {
 	WebSocketRouteHandler,
 	WebSocketRouteHandlerContext,
 } from "./router.ts";
-export { createRouterBuilders, route, router, routes } from "./router.ts";
+export {
+	createRouterBuilders,
+	isHttpRouteImplementation,
+	isWebSocketRouteImplementation,
+	route,
+	router,
+	routes,
+} from "./router.ts";
 export {
 	flattenAndSortImplementationTree,
 	flattenImplementationTree,
@@ -43,9 +50,5 @@ export type {
 	ValidationIssue,
 } from "./validation.ts";
 export { validateRequest } from "./validation.ts";
-export type {
-	RawWebSocket,
-	UpgradeRejection,
-	WebSocketRouteResult,
-} from "./websocket.ts";
+export type { RawWebSocket, UpgradeRejection } from "./websocket.ts";
 export { createContractWebSocket, handleWebSocketRoute } from "./websocket.ts";

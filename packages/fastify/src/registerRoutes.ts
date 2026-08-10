@@ -1,35 +1,19 @@
-import type {
-	HttpRouteDeclaration,
-	RouteDeclaration,
-	WebSocketRouteDeclaration,
-} from "@rest-rpc/core/contract";
+import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	flattenAndSortImplementationTree,
 	type ImplementationTree,
-	type RouteImplementation,
+	isHttpRouteImplementation,
+	isWebSocketRouteImplementation,
 } from "@rest-rpc/server";
+import type { FastifyInstance } from "fastify";
 import { registerFastifyHttpRoutes } from "./http.ts";
-import type { FastifyApp, FastifyWebSocketRegistration } from "./types.ts";
+import type { FastifyWebSocketRegistration } from "./types.ts";
 import { registerFastifyWebSocketRoutes } from "./websocket.ts";
 
-const isHttpRouteImplementation = (
-	implementation: RouteImplementation,
-): implementation is RouteImplementation<HttpRouteDeclaration> =>
-	"responses" in implementation.route;
-
-const isWebSocketRouteImplementation = (
-	implementation: RouteImplementation,
-): implementation is RouteImplementation<WebSocketRouteDeclaration> =>
-	implementation.route.options?.mode === "websocket";
-
-export type RegisterRoutesOptions = {
-	webSocket?: FastifyWebSocketRegistration;
-};
-
 export const registerRoutes = (
-	app: FastifyApp,
+	app: FastifyInstance,
 	implementations: ImplementationTree<RouteDeclaration>,
-	options: RegisterRoutesOptions = {},
+	options: { webSocket?: FastifyWebSocketRegistration } = {},
 ) => {
 	const implementationsList = flattenAndSortImplementationTree(implementations);
 	const routes = implementationsList.filter(isHttpRouteImplementation);

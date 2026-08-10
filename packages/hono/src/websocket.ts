@@ -94,18 +94,11 @@ export const registerHonoWebSocketRoutes = <TEnv extends Env>(
 				return {
 					onOpen(_event, socket) {
 						peer = socket;
-						const result = handleWebSocketRoute(
-							implementation.route,
-							implementation.handler,
-							{
-								request,
-								context: { c },
-								socket: rawSocket,
-							},
-						);
-						if (!result.ok) {
-							socket.close(1008, "WebSocket upgrade validation failed.");
-						}
+						handleWebSocketRoute(implementation.route, implementation.handler, {
+							request: requestValidation.data,
+							context: { c },
+							socket: rawSocket,
+						});
 					},
 					onMessage(event) {
 						rawSocket.emitMessage(event.data);

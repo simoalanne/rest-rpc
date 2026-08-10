@@ -7,9 +7,8 @@ import {
 	type UpgradeRejection,
 	validateRequest,
 } from "@rest-rpc/server";
-import type { FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type {
-	FastifyApp,
 	FastifyWebSocketOptions,
 	FastifyWebSocketRegistration,
 } from "./types.ts";
@@ -50,67 +49,63 @@ const sendUpgradeRejection = (
 	return reply.status(rejection.status).send(rejection.body);
 };
 
+const validatedWebSocketRequest = Symbol("validatedWebSocketRequest");
+
+type ExtendedFastifyRequest = FastifyRequest & {
+	[validatedWebSocketRequest]: Record<string, unknown>;
+};
+
 export const registerFastifyWebSocketRoutes = (
-	app: FastifyApp,
+	app: FastifyInstance,
 	registration: FastifyWebSocketRegistration,
 	routes: RouteImplementation<WebSocketRouteDeclaration>[],
 ) => {
 	for (const implementation of routes) {
-		app.route({
-			method: "GET",
-			url: implementation.route.path,
-			websocket: true,
-			async preValidation(req: FastifyRequest, reply: FastifyReply) {
-				const request = {
-					query: req.query,
-					params: req.params,
-					headers: req.headers,
-				};
-				const requestValidation = validateRequest(
-					implementation.route,
-					request,
-				);
-
-				if (!requestValidation.success) {
-					await sendUpgradeRejection(reply, requestValidation.response);
-					return;
-				}
-
-				const rejection = await registration.options.beforeUpgrade?.({
-					req,
-					route: implementation.route,
-					request,
-				});
-
-				if (rejection) {
-					await sendUpgradeRejection(reply, rejection);
-				}
-			},
-			handler(_req: FastifyRequest, reply: FastifyReply) {
-				return reply.status(426).send({
-					message: "Expected WebSocket upgrade.",
-				});
-			},
-			wsHandler(socket: FastifyWebSocket, req: FastifyRequest) {
-				const request = {
-					query: req.query,
-					params: req.params,
-					headers: req.headers,
-				};
-				const result = handleWebSocketRoute(
-					implementation.route,
-					implementation.handler,
-					{
+		app.get(
+			implementation.route.path,
+			{
+				websocket: true,
+				async preValidation(req: FastifyRequest, reply: FastifyReply) {
+					const request = {
+						query: req.query,
+						params: req.params,
+						headers: req.headers,
+					};
+					const requestValidation = validateRequest(
+						implementation.route,
 						request,
-						context: { req },
-						socket: adaptWebSocket(socket),
-					},
-				);
+					);
 
-				if (!result.ok) {
-					socket.close(1008, "WebSocket upgrade validation failed.");
-				}
+					if (!requestValidation.success) {
+						await sendUpgradeRejection(reply, requestValidation.response);
+						return;
+					}
+
+					const rejection = await registration.options.beforeUpgrade?.({
+						req,
+						route: implementation.route,
+						request,
+					});
+
+					if (rejection) {
+						await sendUpgradeRejection(reply, rejection);
+						return;
+					}
+					(req as ExtendedFastifyRequest)[validatedWebSocketRequest] =
+						requestValidation.data;
+				},
 			},
-		});
+			(socket: FastifyWebSocket, req: FastifyRequest) => {
+				const validatedRequest = (req as ExtendedFastifyRequest)[
+					validatedWebSocketRequest
+				];
+
+				handleWebSocketRoute(implementation.route, implementation.handler, {
+					request: validatedRequest,
+					context: { req },
+					socket: adaptWebSocket(socket),
+				});
+			},
+		);
 	}
 };

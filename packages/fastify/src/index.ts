@@ -24,7 +24,6 @@ import {
 } from "@rest-rpc/server";
 import type { FastifyRequest } from "fastify";
 
-export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
 export type {
 	FastifyBeforeUpgradeInput,

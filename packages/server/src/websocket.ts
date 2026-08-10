@@ -12,7 +12,6 @@ import type {
 	RuntimeRouteHandler,
 	WebSocketRouteHandlerContext,
 } from "./router.ts";
-import { type RequestSegments, validateRequest } from "./validation.ts";
 
 export type RawWebSocket = {
 	send(data: string): void;
@@ -27,17 +26,21 @@ export type UpgradeRejection = {
 	body?: unknown;
 };
 
-export type WebSocketRouteResult =
-	| { ok: true }
-	| { ok: false; rejection: UpgradeRejection };
-
-export type HandleWebSocketRouteOptions<
-	TContext extends WebSocketRouteHandlerContext,
-> = {
-	request: RequestSegments;
-	context: TContext;
-	socket: RawWebSocket;
+export type BeforeWebSocketUpgradeInput<
+	TContext extends Record<string, unknown>,
+> = TContext & {
+	route: WebSocketRouteDeclaration;
+	request: Record<string, unknown>;
 };
+
+export type BeforeWebSocketUpgradeResult =
+	| UpgradeRejection
+	| undefined
+	| Promise<UpgradeRejection | undefined>;
+
+export type BeforeWebSocketUpgrade<TContext extends Record<string, unknown>> = (
+	input: BeforeWebSocketUpgradeInput<TContext>,
+) => BeforeWebSocketUpgradeResult;
 
 export const createContractWebSocket = <E extends WebSocketRouteDeclaration>(
 	route: E,
@@ -102,23 +105,18 @@ export const handleWebSocketRoute = <
 >(
 	route: E,
 	handler: RuntimeRouteHandler,
-	options: HandleWebSocketRouteOptions<TContext>,
-): WebSocketRouteResult => {
-	const requestValidation = validateRequest(route, options.request);
-
-	if (!requestValidation.success) {
-		return {
-			ok: false,
-			rejection: requestValidation.response,
-		};
-	}
-
+	options: {
+		request: Record<string, unknown>;
+		context: TContext;
+		socket: RawWebSocket;
+	},
+) => {
 	const socket = createContractWebSocket(route, options.socket);
 
 	void Promise.resolve()
 		.then(() =>
 			handler({
-				...requestValidation.data,
+				...options.request,
 				[REQUEST_CONTEXT_KEY]: {
 					...options.context,
 					socket,
@@ -128,6 +126,4 @@ export const handleWebSocketRoute = <
 		.catch(() => {
 			socket.close(1011, "WebSocket service failed.");
 		});
-
-	return { ok: true };
 };
