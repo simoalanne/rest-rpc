@@ -2,3 +2,4 @@ packages:
   - "packages/*"
   - "benchmarks/"
   - "content/"
+  - "integration-tests/"

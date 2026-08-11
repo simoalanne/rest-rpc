@@ -43,6 +43,82 @@ importers:
         specifier: ^1.4.0
         version: 1.4.0(@astrojs/markdown-remark@7.2.2)(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@shikijs/themes@4.4.2)(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(@vercel/functions@3.9.1(ws@8.21.3))(csstype@3.2.3)(esbuild@0.28.2)(next@16.3.0(@babel/core@7.29.7)(@types/node@26.2.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(prettier@3.9.6)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0))(ws@8.21.3)(yaml@2.9.0)
 
+  integration-tests:
+    dependencies:
+      '@rest-rpc/core':
+        specifier: workspace:^
+        version: link:../packages/core
+      '@rest-rpc/express':
+        specifier: workspace:^
+        version: link:../packages/express
+      '@rest-rpc/fastify':
+        specifier: workspace:^
+        version: link:../packages/fastify
+      '@rest-rpc/hono':
+        specifier: workspace:^
+        version: link:../packages/hono
+      '@rest-rpc/next':
+        specifier: workspace:^
+        version: link:../packages/next
+      '@rest-rpc/server':
+        specifier: workspace:^
+        version: link:../packages/server
+      '@rest-rpc/tanstack-query':
+        specifier: workspace:^
+        version: link:../packages/tanstack-query
+      '@rest-rpc/web':
+        specifier: workspace:^
+        version: link:../packages/web
+    devDependencies:
+      '@fastify/websocket':
+        specifier: ^11.3.0
+        version: 11.3.0
+      '@hono/node-server':
+        specifier: ^2.1.0
+        version: 2.1.0(hono@4.13.1)
+      '@hono/node-ws':
+        specifier: ^1.3.1
+        version: 1.3.1(@hono/node-server@2.1.0(hono@4.13.1))(hono@4.13.1)
+      '@tanstack/query-core':
+        specifier: ^5.0.0
+        version: 5.101.4
+      '@types/express':
+        specifier: ^5.0.1
+        version: 5.0.6
+      '@types/react':
+        specifier: ^19.2.18
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.4
+        version: 19.2.4(@types/react@19.2.18)
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
+      express:
+        specifier: ^5.0.0
+        version: 5.2.1
+      fastify:
+        specifier: ^5.0.0
+        version: 5.11.3
+      hono:
+        specifier: ^4.0.0
+        version: 4.13.1
+      next:
+        specifier: ^16.3.0
+        version: 16.3.0(@babel/core@7.29.7)(@types/node@26.2.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
+      ws:
+        specifier: ^8.21.3
+        version: 8.21.3
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+
   packages/core:
     devDependencies:
       arktype:
@@ -104,82 +180,6 @@ importers:
       hono:
         specifier: ^4.0.0
         version: 4.13.1
-
-  packages/integration-tests:
-    dependencies:
-      '@rest-rpc/core':
-        specifier: workspace:^
-        version: link:../core
-      '@rest-rpc/express':
-        specifier: workspace:^
-        version: link:../express
-      '@rest-rpc/fastify':
-        specifier: workspace:^
-        version: link:../fastify
-      '@rest-rpc/hono':
-        specifier: workspace:^
-        version: link:../hono
-      '@rest-rpc/next':
-        specifier: workspace:^
-        version: link:../next
-      '@rest-rpc/server':
-        specifier: workspace:^
-        version: link:../server
-      '@rest-rpc/tanstack-query':
-        specifier: workspace:^
-        version: link:../tanstack-query
-      '@rest-rpc/web':
-        specifier: workspace:^
-        version: link:../web
-    devDependencies:
-      '@fastify/websocket':
-        specifier: ^11.3.0
-        version: 11.3.0
-      '@hono/node-server':
-        specifier: ^2.1.0
-        version: 2.1.0(hono@4.13.1)
-      '@hono/node-ws':
-        specifier: ^1.3.1
-        version: 1.3.1(@hono/node-server@2.1.0(hono@4.13.1))(hono@4.13.1)
-      '@tanstack/query-core':
-        specifier: ^5.0.0
-        version: 5.101.4
-      '@types/express':
-        specifier: ^5.0.1
-        version: 5.0.6
-      '@types/react':
-        specifier: ^19.2.18
-        version: 19.2.18
-      '@types/react-dom':
-        specifier: ^19.2.4
-        version: 19.2.4(@types/react@19.2.18)
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.1
-      express:
-        specifier: ^5.0.0
-        version: 5.2.1
-      fastify:
-        specifier: ^5.0.0
-        version: 5.11.3
-      hono:
-        specifier: ^4.0.0
-        version: 4.13.1
-      next:
-        specifier: ^16.3.0
-        version: 16.3.0(@babel/core@7.29.7)(@types/node@26.2.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-      react-dom:
-        specifier: ^19.2.8
-        version: 19.2.8(react@19.2.8)
-      ws:
-        specifier: ^8.21.3
-        version: 8.21.3
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
 
   packages/next:
     dependencies:

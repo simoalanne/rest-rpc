@@ -12,10 +12,10 @@
 	"scripts": {
 		"build:packages": "pnpm -r --filter './packages/**' build",
 		"typecheck": "pnpm run build:packages && pnpm run typecheck:workspace",
-		"typecheck:workspace": "pnpm -r --parallel --no-bail --filter './packages/**' --filter '!@rest-rpc/integration-tests' typecheck",
+		"typecheck:workspace": "pnpm -r --parallel --no-bail --filter './packages/**' --filter '!integration-tests' typecheck",
 		"test": "pnpm run test:unit && pnpm run test:integration",
-		"test:unit": "pnpm -r --parallel --no-bail --if-present --filter './packages/**' --filter '!@rest-rpc/integration-tests' test",
-		"test:integration": "pnpm --filter @rest-rpc/integration-tests test",
+		"test:unit": "pnpm -r --parallel --no-bail --if-present --filter './packages/**' --filter '!integration-tests' test",
+		"test:integration": "pnpm --filter integration-tests test",
 		"lint": "biome check --write .",
 		"lint:verify": "biome check .",
 		"lint:staged": "biome check --write --staged --no-errors-on-unmatched",
