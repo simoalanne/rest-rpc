@@ -1,5 +1,3 @@
-export { isCustomBody } from "@rest-rpc/core/contract";
-
 import type { IncomingMessage } from "node:http";
 import type {
 	HttpRouteDeclaration,
@@ -12,33 +10,21 @@ import {
 	createRouteMatcher,
 	type ImplementationShape,
 	type ImplementationTreeFor,
-	type InferRouteHandlerResponse,
-	type RequestValidationErrorInput,
 	type RouteHandlerFor,
 	type RouteImplementation,
-	type ServerErrorHandlers,
-	type ServerErrorResponse,
 	type InferRouteHandlerRequest as ServerInferRouteHandlerRequest,
+	type InferRouteHandlerResponse as ServerInferRouteHandlerResponse,
 	type InferWebSocketRouteHandlerRequest as ServerInferWebSocketRouteHandlerRequest,
 	type RouteHandler as ServerRouteHandler,
 	type WebSocketRouteHandler as ServerWebSocketRouteHandler,
 	route as serverRoute,
 	router as serverRouter,
 	routes as serverRoutes,
-	type UnhandledErrorInput,
 } from "@rest-rpc/server";
 import type { Request } from "express";
 
 export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
-export type { ExpressWebSocketOptions } from "./websocket.ts";
-export type {
-	InferRouteHandlerResponse,
-	RequestValidationErrorInput,
-	ServerErrorHandlers,
-	ServerErrorResponse,
-	UnhandledErrorInput,
-};
 export { ContractResponseError, createRouteMatcher };
 
 export type HttpRouteHandlerContext = {
@@ -49,12 +35,14 @@ export type WebSocketRouteHandlerContext = {
 	req: IncomingMessage;
 };
 
-export type InferRouteHandlerRequest<E extends HttpRouteDeclaration> =
+export type RouteRequest<E extends HttpRouteDeclaration> =
 	ServerInferRouteHandlerRequest<E, HttpRouteHandlerContext>;
 
-export type InferWebSocketRouteHandlerRequest<
-	E extends WebSocketRouteDeclaration,
-> = ServerInferWebSocketRouteHandlerRequest<E, WebSocketRouteHandlerContext>;
+export type WebSocketRequest<E extends WebSocketRouteDeclaration> =
+	ServerInferWebSocketRouteHandlerRequest<E, WebSocketRouteHandlerContext>;
+
+export type RouteResponse<E extends HttpRouteDeclaration> =
+	ServerInferRouteHandlerResponse<E>;
 
 export type RouteHandler<E extends HttpRouteDeclaration> = ServerRouteHandler<
 	E,
@@ -62,6 +50,8 @@ export type RouteHandler<E extends HttpRouteDeclaration> = ServerRouteHandler<
 >;
 
 export type WebSocketRouteHandler<E extends WebSocketRouteDeclaration> =
+	ServerWebSocketRouteHandler<E, WebSocketRouteHandlerContext>;
+export type WebSocketHandler<E extends WebSocketRouteDeclaration> =
 	ServerWebSocketRouteHandler<E, WebSocketRouteHandlerContext>;
 
 export const route = <const TNode extends RouteDeclaration>(

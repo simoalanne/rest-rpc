@@ -1,9 +1,9 @@
 import type { StandardSchemaV1 } from "@rest-rpc/core";
 import { router } from "@rest-rpc/core/contract";
 import {
-	type InferRouteMutationVariables,
-	type InferRouteQueryData,
 	initTanstackQuery,
+	type RouteMutationVariables,
+	type RouteQueryData,
 } from "@rest-rpc/tanstack-query";
 import {
 	type InfiniteData,
@@ -174,10 +174,10 @@ const selectedListOptions = tq.todos.list.queryOptions({
 		return data.body.map((todo) => todo.title);
 	},
 });
-expectAssignable<
-	(data: InferRouteQueryData<typeof api.todos.list>) => string[]
->(selectedListOptions.select as NonNullable<typeof selectedListOptions.select>);
-expectAssignable<Promise<InferRouteQueryData<typeof api.todos.list>>>(
+expectAssignable<(data: RouteQueryData<typeof api.todos.list>) => string[]>(
+	selectedListOptions.select as NonNullable<typeof selectedListOptions.select>,
+);
+expectAssignable<Promise<RouteQueryData<typeof api.todos.list>>>(
 	queryClient.fetchQuery(selectedListOptions),
 );
 
@@ -333,13 +333,13 @@ expectError(
 // WebSocket routes are intentionally omitted from the TanStack Query client.
 expectError(tq.events);
 
-type GetTodoData = InferRouteQueryData<typeof api.todos.get>;
+type GetTodoData = RouteQueryData<typeof api.todos.get>;
 expectAssignable<{
 	status: 200;
 	body: { id: string; title: string };
 	headers: Headers;
 }>(null as unknown as GetTodoData);
 
-type CreateTodoVariables = InferRouteMutationVariables<typeof api.todos.create>;
+type CreateTodoVariables = RouteMutationVariables<typeof api.todos.create>;
 expectType<{ title: string }>(null as unknown as CreateTodoVariables);
 expectNotAssignable<{ id: string }>(null as unknown as CreateTodoVariables);

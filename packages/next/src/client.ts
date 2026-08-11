@@ -87,5 +87,3 @@ export const getGeneratedTagsForRoute = (
 		request: options?.request,
 		prefix: options?.tagPrefix,
 	});
-
-export { getRouteCacheTags };

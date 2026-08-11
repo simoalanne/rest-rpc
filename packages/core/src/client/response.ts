@@ -1,5 +1,5 @@
 import type {
-	InferClientSuccessBody,
+	ClientSuccessBody,
 	ResponseBodySchema,
 	RouteDeclaration,
 } from "../contract/route.ts";
@@ -12,7 +12,7 @@ import {
 import { validateStandardSchemaSync } from "../standard-schema/index.ts";
 import { isHttpRouteNode, isSuccessStatus } from "./routes.ts";
 import { parseNdjsonStream } from "./stream.ts";
-import type { FetchArgs, InferClientFetchResponse } from "./types.ts";
+import type { ClientFetchResponse, FetchArgs } from "./types.ts";
 
 export const getResponseSchema = (
 	route: RouteDeclaration,
@@ -76,7 +76,7 @@ export const fetchResponse = async <E extends RouteDeclaration>(
 	validateResponse: boolean,
 	route: E,
 	...args: FetchArgs<E>
-): Promise<InferClientFetchResponse<E>> => {
+): Promise<ClientFetchResponse<E>> => {
 	const { rawResponse, cleanup } = await request(route, ...args);
 
 	try {
@@ -87,7 +87,7 @@ export const fetchResponse = async <E extends RouteDeclaration>(
 				status: rawResponse.status,
 				body: await readUnknownBody(rawResponse),
 				headers: rawResponse.headers,
-			} as InferClientFetchResponse<E>;
+			} as ClientFetchResponse<E>;
 		}
 
 		return {
@@ -95,7 +95,7 @@ export const fetchResponse = async <E extends RouteDeclaration>(
 			status: rawResponse.status,
 			body: await readDeclaredBody(schema, rawResponse, validateResponse),
 			headers: rawResponse.headers,
-		} as InferClientFetchResponse<E>;
+		} as ClientFetchResponse<E>;
 	} finally {
 		cleanup();
 	}
@@ -105,15 +105,15 @@ export const fetchSuccess = async <E extends RouteDeclaration>(
 	fetchRouteResponse: (
 		route: E,
 		...args: FetchArgs<E>
-	) => Promise<InferClientFetchResponse<E>>,
+	) => Promise<ClientFetchResponse<E>>,
 	route: E,
 	...args: FetchArgs<E>
-): Promise<InferClientSuccessBody<E>> => {
+): Promise<ClientSuccessBody<E>> => {
 	const response = await fetchRouteResponse(route, ...args);
 
 	if (!response.declared || !isSuccessStatus(response.status)) {
 		throw new Error("Request did not return a declared success response");
 	}
 
-	return response.body as InferClientSuccessBody<E>;
+	return response.body as ClientSuccessBody<E>;
 };

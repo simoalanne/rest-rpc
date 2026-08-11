@@ -2,16 +2,16 @@ import { initClient } from "@rest-rpc/core";
 import type {
 	ApiClientFetchOptions,
 	ApiClientOptions,
+	ClientRequestInput,
 	FetchResponseFn,
-	InferClientRequestInput,
 	UndeclaredRouteClientResponse,
 } from "@rest-rpc/core/client";
 import type {
+	ClientErrors,
+	ClientRequest,
+	ClientSuccessResponse,
 	Contract,
 	HttpRouteDeclaration,
-	InferClientErrors,
-	InferClientRequest,
-	InferClientSuccessResponse,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
@@ -27,17 +27,17 @@ import type {
 import { createRouteApi } from "./routeApi.ts";
 
 export type InferRouteQueryData<E extends RouteDeclaration> =
-	InferClientSuccessResponse<E> & {
+	ClientSuccessResponse<E> & {
 		headers: Headers;
 	};
 
 export type InferRouteQueryError<E extends RouteDeclaration> =
-	| (InferClientErrors<E> & { headers: Headers })
+	| (ClientErrors<E> & { headers: Headers })
 	| UndeclaredRouteClientResponse
 	| Error;
 
 export type InferRouteMutationVariables<E extends RouteDeclaration> =
-	InferClientRequestInput<E>;
+	ClientRequestInput<E>;
 
 export type TanstackQueryFetchOptions = ApiClientFetchOptions;
 
@@ -85,7 +85,7 @@ type MutationOptionsFor<E extends RouteDeclaration> = WithFetchOptions<
 
 type InfiniteQueryOptionsFor<
 	E extends RouteDeclaration,
-	TData = InfiniteData<InferRouteQueryData<E>, InferClientRequest<E>>,
+	TData = InfiniteData<InferRouteQueryData<E>, ClientRequest<E>>,
 > = WithFetchOptions<
 	Omit<
 		InfiniteQueryObserverOptions<
@@ -93,28 +93,28 @@ type InfiniteQueryOptionsFor<
 			InferRouteQueryError<E>,
 			TData,
 			QueryKey,
-			InferClientRequest<E>
+			ClientRequest<E>
 		>,
 		"queryFn" | "queryKey" | "initialPageParam"
 	> & {
 		queryKey: QueryKey;
-		initialPageParam: InferClientRequest<E>;
+		initialPageParam: ClientRequest<E>;
 	}
 >;
 
 type InfiniteQueryOptionsResultFor<
 	E extends RouteDeclaration,
-	TData = InfiniteData<InferRouteQueryData<E>, InferClientRequest<E>>,
+	TData = InfiniteData<InferRouteQueryData<E>, ClientRequest<E>>,
 > = InfiniteQueryObserverOptions<
 	InferRouteQueryData<E>,
 	InferRouteQueryError<E>,
 	TData,
 	QueryKey,
-	InferClientRequest<E>
+	ClientRequest<E>
 > & {
 	queryKey: DataTag<
 		QueryKey,
-		InfiniteData<InferRouteQueryData<E>, InferClientRequest<E>>,
+		InfiniteData<InferRouteQueryData<E>, ClientRequest<E>>,
 		InferRouteQueryError<E>
 	>;
 };
@@ -122,15 +122,15 @@ type InfiniteQueryOptionsResultFor<
 type QueryDisabled = false | null | undefined | "" | 0;
 
 type UseQueryArgs<E extends RouteDeclaration, TData = InferRouteQueryData<E>> =
-	InferClientRequest<E> extends never
+	ClientRequest<E> extends never
 		? [options?: QueryOptionsFor<E, TData>]
 		: [
-				request: InferClientRequest<E> | QueryDisabled | SkipToken,
+				request: ClientRequest<E> | QueryDisabled | SkipToken,
 				options?: QueryOptionsFor<E, TData>,
 			];
 
 type GetKeyArgs<E extends RouteDeclaration> =
-	InferClientRequest<E> extends never ? [] : [request: InferClientRequest<E>];
+	ClientRequest<E> extends never ? [] : [request: ClientRequest<E>];
 
 type TanstackQueryRouteValue<E extends RouteDeclaration> = {
 	mutationOptions: (
@@ -144,7 +144,7 @@ type TanstackQueryRouteValue<E extends RouteDeclaration> = {
 		...args: UseQueryArgs<E, TData>
 	) => QueryOptionsResultFor<E, TData>;
 	infiniteQueryOptions: <
-		TData = InfiniteData<InferRouteQueryData<E>, InferClientRequest<E>>,
+		TData = InfiniteData<InferRouteQueryData<E>, ClientRequest<E>>,
 	>(
 		options: InfiniteQueryOptionsFor<E, TData>,
 	) => InfiniteQueryOptionsResultFor<E, TData>;

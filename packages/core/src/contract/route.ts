@@ -160,35 +160,33 @@ type InferCustomBody<TResponse, TIO extends "input" | "output"> =
 			: StandardSchemaV1.InferOutput<TSchema>
 		: never;
 
-export type InferClientResponseBody<TResponse> =
-	TResponse extends StandardSchemaV1
-		? StandardSchemaV1.InferOutput<TResponse>
-		: TResponse extends NoBody
-			? undefined
-			: TResponse extends CustomBody
-				? Response
-				: TResponse extends Stream<infer TBody>
-					? TBody extends CustomBody
-						? Response
-						: TBody extends StandardSchemaV1
-							? AsyncIterable<StandardSchemaV1.InferOutput<TBody>>
-							: never
-					: never;
+export type ClientResponseBody<TResponse> = TResponse extends StandardSchemaV1
+	? StandardSchemaV1.InferOutput<TResponse>
+	: TResponse extends NoBody
+		? undefined
+		: TResponse extends CustomBody
+			? Response
+			: TResponse extends Stream<infer TBody>
+				? TBody extends CustomBody
+					? Response
+					: TBody extends StandardSchemaV1
+						? AsyncIterable<StandardSchemaV1.InferOutput<TBody>>
+						: never
+				: never;
 
-export type InferServerResponseBody<TResponse> =
-	TResponse extends StandardSchemaV1
-		? StandardSchemaV1.InferInput<TResponse>
-		: TResponse extends NoBody
-			? undefined
-			: TResponse extends CustomBody
-				? InferCustomBody<TResponse, "input">
-				: TResponse extends Stream<infer TBody>
-					? TBody extends CustomBody
-						? AsyncIterable<InferCustomBody<TBody, "input">>
-						: TBody extends StandardSchemaV1
-							? AsyncIterable<StandardSchemaV1.InferInput<TBody>>
-							: never
-					: never;
+export type ServerResponseBody<TResponse> = TResponse extends StandardSchemaV1
+	? StandardSchemaV1.InferInput<TResponse>
+	: TResponse extends NoBody
+		? undefined
+		: TResponse extends CustomBody
+			? InferCustomBody<TResponse, "input">
+			: TResponse extends Stream<infer TBody>
+				? TBody extends CustomBody
+					? AsyncIterable<InferCustomBody<TBody, "input">>
+					: TBody extends StandardSchemaV1
+						? AsyncIterable<StandardSchemaV1.InferInput<TBody>>
+						: never
+				: never;
 
 type ResponseEntry<TStatus extends number, TBody> = {
 	status: TStatus;
@@ -229,33 +227,33 @@ export type HasMultipleSuccessfulResponses<TResponses> = IsUnion<
 	SuccessfulResponseKeys<TResponses>
 >;
 
-export type InferClientResponse<E extends RouteDeclaration> = E extends {
+export type ClientResponse<E extends RouteDeclaration> = E extends {
 	responses: infer TResponses;
 }
 	? {
 			[TKeys in keyof TResponses]: TKeys extends ResponseKey
 				? ResponseEntry<
 						ResponseStatus<TKeys>,
-						InferClientResponseBody<TResponses[TKeys]>
+						ClientResponseBody<TResponses[TKeys]>
 					>
 				: never;
 		}[keyof TResponses]
 	: never;
 
-export type InferServerResponse<E extends RouteDeclaration> = E extends {
+export type ServerResponse<E extends RouteDeclaration> = E extends {
 	responses: infer TResponses;
 }
 	? {
 			[TKeys in keyof TResponses]: TKeys extends ResponseKey
 				? ResponseEntry<
 						ResponseStatus<TKeys>,
-						InferServerResponseBody<TResponses[TKeys]>
+						ServerResponseBody<TResponses[TKeys]>
 					>
 				: never;
 		}[keyof TResponses]
 	: never;
 
-export type InferClientSuccessResponse<E extends RouteDeclaration> = E extends {
+export type ClientSuccessResponse<E extends RouteDeclaration> = E extends {
 	responses: infer TResponses;
 }
 	? {
@@ -263,14 +261,14 @@ export type InferClientSuccessResponse<E extends RouteDeclaration> = E extends {
 				? TKeys extends SuccessfulResponseKeys<TResponses>
 					? ResponseEntry<
 							ResponseStatus<TKeys>,
-							InferClientResponseBody<TResponses[TKeys]>
+							ClientResponseBody<TResponses[TKeys]>
 						>
 					: never
 				: never;
 		}[keyof TResponses]
 	: never;
 
-export type InferServerSuccessResponse<E extends RouteDeclaration> = E extends {
+export type ServerSuccessResponse<E extends RouteDeclaration> = E extends {
 	responses: infer TResponses;
 }
 	? {
@@ -278,7 +276,7 @@ export type InferServerSuccessResponse<E extends RouteDeclaration> = E extends {
 				? TKeys extends SuccessfulResponseKeys<TResponses>
 					? ResponseEntry<
 							ResponseStatus<TKeys>,
-							InferServerResponseBody<TResponses[TKeys]>
+							ServerResponseBody<TResponses[TKeys]>
 						>
 					: never
 				: never;
@@ -293,20 +291,20 @@ type InferSingleResponseBody<TResponse> = [TResponse] extends [never]
 			? TBody
 			: never;
 
-export type InferClientSuccessBody<E extends RouteDeclaration> =
-	InferSingleResponseBody<InferClientSuccessResponse<E>>;
+export type ClientSuccessBody<E extends RouteDeclaration> =
+	InferSingleResponseBody<ClientSuccessResponse<E>>;
 
-export type InferServerSuccessBody<E extends RouteDeclaration> =
-	InferSingleResponseBody<InferServerSuccessResponse<E>>;
+export type ServerSuccessBody<E extends RouteDeclaration> =
+	InferSingleResponseBody<ServerSuccessResponse<E>>;
 
-export type InferClientErrors<E extends RouteDeclaration> = Exclude<
-	InferClientResponse<E>,
-	InferClientSuccessResponse<E>
+export type ClientErrors<E extends RouteDeclaration> = Exclude<
+	ClientResponse<E>,
+	ClientSuccessResponse<E>
 >;
 
-export type InferServerErrors<E extends RouteDeclaration> = Exclude<
-	InferServerResponse<E>,
-	InferServerSuccessResponse<E>
+export type ServerErrors<E extends RouteDeclaration> = Exclude<
+	ServerResponse<E>,
+	ServerSuccessResponse<E>
 >;
 
 export type IsWebSocketRoute<E extends RouteDeclaration> = E extends {
@@ -315,7 +313,7 @@ export type IsWebSocketRoute<E extends RouteDeclaration> = E extends {
 	? true
 	: false;
 
-export type InferClientMessage<E extends RouteDeclaration> = E extends {
+export type ClientSent<E extends RouteDeclaration> = E extends {
 	messages: { client: infer R };
 }
 	? R extends StandardSchemaV1
@@ -323,7 +321,7 @@ export type InferClientMessage<E extends RouteDeclaration> = E extends {
 		: never
 	: never;
 
-export type InferReceivedClientMessage<E extends RouteDeclaration> = E extends {
+export type ServerReceived<E extends RouteDeclaration> = E extends {
 	messages: { client: infer R };
 }
 	? R extends StandardSchemaV1
@@ -331,7 +329,7 @@ export type InferReceivedClientMessage<E extends RouteDeclaration> = E extends {
 		: never
 	: never;
 
-export type InferServerMessage<E extends RouteDeclaration> = E extends {
+export type ServerSent<E extends RouteDeclaration> = E extends {
 	messages: { server: infer R };
 }
 	? R extends StandardSchemaV1
@@ -339,7 +337,7 @@ export type InferServerMessage<E extends RouteDeclaration> = E extends {
 		: never
 	: never;
 
-export type InferReceivedServerMessage<E extends RouteDeclaration> = E extends {
+export type ClientReceived<E extends RouteDeclaration> = E extends {
 	messages: { server: infer R };
 }
 	? R extends StandardSchemaV1
@@ -545,12 +543,12 @@ type InferRequestFor<
 			: never
 		: never;
 
-export type InferClientRequest<E extends RouteDeclaration> = InferRequestFor<
+export type ClientRequest<E extends RouteDeclaration> = InferRequestFor<
 	E,
 	"input"
 >;
 
-export type InferServerRequest<E extends RouteDeclaration> = InferRequestFor<
+export type ServerRequest<E extends RouteDeclaration> = InferRequestFor<
 	E,
 	"output"
 >;

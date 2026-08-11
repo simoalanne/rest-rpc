@@ -1,10 +1,7 @@
 export type {
-	InferRouteMutationVariables,
-	InferRouteQueryData,
-	InferRouteQueryError,
+	InferRouteMutationVariables as RouteMutationVariables,
+	InferRouteQueryData as RouteQueryData,
+	InferRouteQueryError as RouteQueryError,
 	TanstackQuery,
-	TanstackQueryApiFor,
-	TanstackQueryFetchOptions,
-	TanstackQueryOptions,
 } from "./tanstackQuery.ts";
-export { default, initTanstackQuery } from "./tanstackQuery.ts";
+export { initTanstackQuery } from "./tanstackQuery.ts";

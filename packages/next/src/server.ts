@@ -4,15 +4,24 @@ import type {
 	RequestBodySchema,
 } from "@rest-rpc/core/contract";
 import {
-	type InferRouteHandlerResponse,
+	type CreateWebHandlerOptions,
 	initWeb,
-	type RouteHandler,
-	type ServerErrorHandlers,
-	type WebContract,
-	type WebRequestHandler,
+	type RouteHandler as WebRouteHandler,
 	type WebRouteParseBodyInput,
-	type WebRouterHandlers,
+	type RouteRequest as WebRouteRequest,
+	type RouteResponse as WebRouteResponse,
 } from "@rest-rpc/web";
+
+type WebContract = HttpRouteDeclaration | { [key: string]: WebContract };
+type WebRequestHandler = (request: Request) => Promise<Response>;
+type WebRouterHandlers<TContract extends WebContract> =
+	TContract extends HttpRouteDeclaration
+		? RouteHandler<TContract>
+		: {
+				[K in keyof TContract]: TContract[K] extends WebContract
+					? WebRouterHandlers<TContract[K]>
+					: never;
+			};
 
 type RouteHandlerMap<E extends HttpRouteDeclaration> = {
 	[K in E["method"]]: WebRequestHandler;
@@ -26,6 +35,18 @@ export type NextRouteHandlerContext = {
 	request: Request;
 };
 
+export type RouteRequest<E extends HttpRouteDeclaration> = WebRouteRequest<
+	E,
+	NextRouteHandlerContext
+>;
+
+export type RouteResponse<E extends HttpRouteDeclaration> = WebRouteResponse<E>;
+
+export type RouteHandler<E extends HttpRouteDeclaration> = WebRouteHandler<
+	E,
+	NextRouteHandlerContext
+>;
+
 export type NextRouteParseBodyInput = WebRouteParseBodyInput;
 
 export type NextRouteParseBody = (
@@ -33,13 +54,13 @@ export type NextRouteParseBody = (
 ) => unknown | Promise<unknown>;
 
 export type CreateRouteHandlerOptions = {
-	errorHandlers?: ServerErrorHandlers<NextRouteHandlerContext>;
+	errorHandlers?: CreateWebHandlerOptions<NextRouteHandlerContext>["errorHandlers"];
 	parseBody?: NextRouteParseBody;
 };
 
 export function createRouteHandler<E extends HttpRouteDeclaration>(
 	route: E,
-	handler: RouteHandler<E, NextRouteHandlerContext>,
+	handler: RouteHandler<E>,
 	options?: CreateRouteHandlerOptions,
 ): RouteHandlerMap<E> {
 	const web = initWeb<NextRouteHandlerContext>();
@@ -55,11 +76,11 @@ export function createRouteHandler<E extends HttpRouteDeclaration>(
 
 export const createRouterHandler = <const TContract extends WebContract>(
 	contract: TContract,
-	handlers: WebRouterHandlers<TContract, NextRouteHandlerContext>,
+	handlers: WebRouterHandlers<TContract>,
 	options?: CreateRouteHandlerOptions,
 ): RouterHandlerMap => {
 	const web = initWeb<NextRouteHandlerContext>();
-	const handle = web.createHandler(web.router(contract, handlers), {
+	const handle = web.createHandler(web.router(contract, handlers as never), {
 		errorHandlers: options?.errorHandlers,
 		parseBody: options?.parseBody,
 	});
@@ -75,4 +96,4 @@ export const createRouterHandler = <const TContract extends WebContract>(
 	};
 };
 
-export type { InferRouteHandlerResponse, RequestBodySchema };
+export type { RequestBodySchema };

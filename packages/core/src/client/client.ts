@@ -12,8 +12,8 @@ import {
 import type {
 	ApiClientFor,
 	ApiClientOptions,
+	ClientFetchResponse,
 	FetchArgs,
-	InferClientFetchResponse,
 	OpenConnectionArgs,
 } from "./types.ts";
 import { openConnection as openRouteConnection } from "./websocket.ts";
@@ -82,7 +82,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 	private fetchResponse = <E extends RouteDeclaration>(
 		route: E,
 		...args: FetchArgs<E>
-	): Promise<InferClientFetchResponse<E>> =>
+	): Promise<ClientFetchResponse<E>> =>
 		fetchRouteResponse(this.request, this.validateResponses, route, ...args);
 
 	private fetch = <E extends RouteDeclaration>(

@@ -26,6 +26,10 @@
 		"./openapi": {
 			"types": "./dist/openapi/index.d.ts",
 			"import": "./dist/openapi/index.js"
+		},
+		"./standard-schema": {
+			"types": "./dist/standard-schema/index.d.ts",
+			"import": "./dist/standard-schema/index.js"
 		}
 	},
 	"files": [

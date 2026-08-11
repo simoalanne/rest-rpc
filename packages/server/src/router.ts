@@ -1,11 +1,11 @@
 import type {
 	HttpRouteDeclaration,
-	InferReceivedClientMessage,
-	InferServerMessage,
-	InferServerRequest,
-	InferServerResponse,
-	InferServerSuccessBody,
 	RouteDeclaration,
+	ServerReceived,
+	ServerRequest,
+	ServerResponse,
+	ServerSent,
+	ServerSuccessBody,
 	WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
 import { REQUEST_CONTEXT_KEY } from "@rest-rpc/core/contract";
@@ -25,11 +25,10 @@ export type RuntimeRouteHandler = (
 type AnyImplementationTree = ImplementationTree<RouteDeclaration>;
 
 type RequestValue<E extends RouteDeclaration> =
-	InferServerRequest<E> extends never ? EmptyObject : InferServerRequest<E>;
+	ServerRequest<E> extends never ? EmptyObject : ServerRequest<E>;
 
 type HandlerResult<E extends HttpRouteDeclaration> = MaybePromise<
-	| (InferServerResponse<E> & { headers?: HttpHeaders })
-	| InferServerSuccessBody<E>
+	(ServerResponse<E> & { headers?: HttpHeaders }) | ServerSuccessBody<E>
 >;
 
 export type ContractWebSocket<Send, Receive> = {
@@ -57,16 +56,13 @@ export type InferWebSocketRouteHandlerRequest<
 > = Merge<
 	RequestValue<E> & {
 		[REQUEST_CONTEXT_KEY]: TContext & {
-			socket: ContractWebSocket<
-				InferServerMessage<E>,
-				InferReceivedClientMessage<E>
-			>;
+			socket: ContractWebSocket<ServerSent<E>, ServerReceived<E>>;
 		};
 	}
 >;
 
 export type InferRouteHandlerResponse<E extends HttpRouteDeclaration> =
-	InferServerResponse<E>;
+	ServerResponse<E>;
 
 export type RouteHandler<
 	E extends HttpRouteDeclaration,

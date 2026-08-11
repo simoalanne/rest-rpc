@@ -1,7 +1,7 @@
 import {
+	type ClientFetchResponse,
+	type ClientRequestInput,
 	customBody,
-	type InferClientFetchResponse,
-	type InferClientRequestInput,
 	initClient,
 	noBody,
 	router,
@@ -155,7 +155,7 @@ expectError(
 		slug: "server-output-only",
 	}),
 );
-expectType<Promise<InferClientFetchResponse<typeof api.todos.events>>>(
+expectType<Promise<ClientFetchResponse<typeof api.todos.events>>>(
 	client.todos.events.fetchResponse(),
 );
 expectError(client.todos.events.fetch());
@@ -168,5 +168,5 @@ expectError(client.todos.get.fetch({ title: "wrong segment" }));
 // Routes without request input treat the first argument as fetch options.
 expectError(client.todos.list.fetch({ id: "todo-1" }));
 
-type CreateTodoInput = InferClientRequestInput<typeof api.todos.create>;
+type CreateTodoInput = ClientRequestInput<typeof api.todos.create>;
 expectType<{ title: string }>(null as unknown as CreateTodoInput);

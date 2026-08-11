@@ -97,7 +97,7 @@ webhook needs to invalidate data loaded through the fetch client.
 "use server";
 
 import { revalidateTag } from "next/cache";
-import { getRouteCacheTags } from "@rest-rpc/next";
+import { getRouteCacheTags } from "@rest-rpc/core";
 import { api } from "./contract";
 import { client } from "./client";
 
@@ -110,5 +110,5 @@ export async function renameTodo(id: string, title: string) {
 }
 ```
 
-`getRouteCacheTags()` is also exported from `@rest-rpc/core`, so non-Next
-backends can generate the same invalidation tags for webhooks or queues.
+`getRouteCacheTags()` is exported from `@rest-rpc/core`, so non-Next backends
+can generate the same invalidation tags for webhooks or queues.

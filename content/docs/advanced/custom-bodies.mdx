@@ -112,7 +112,8 @@ Server adapters do not infer your intended body parsing.
 For Express, choose middleware before route execution.
 
 ```ts
-import { createRouteMatcher, isCustomBody } from "@rest-rpc/express";
+import { isCustomBody } from "@rest-rpc/core";
+import { createRouteMatcher } from "@rest-rpc/express";
 
 const matchContractRoute = createRouteMatcher(api);
 

@@ -1,17 +1,14 @@
-import type {
-	InferServerErrors,
-	RouteDeclaration,
-} from "@rest-rpc/core/contract";
+import type { RouteDeclaration, ServerErrors } from "@rest-rpc/core/contract";
 
 export class ContractResponseError<
 	E extends RouteDeclaration = RouteDeclaration,
 > extends Error {
-	readonly response: InferServerErrors<E>;
+	readonly response: ServerErrors<E>;
 	readonly status: number;
 	readonly body: unknown;
 	readonly route: E;
 
-	constructor(route: E, response: InferServerErrors<E>) {
+	constructor(route: E, response: ServerErrors<E>) {
 		super("Contract response error");
 		const responseFields = response as { status: number; body: unknown };
 		this.response = response;

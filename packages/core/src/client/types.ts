@@ -1,10 +1,10 @@
 import type {
+	ClientReceived,
+	ClientRequest,
+	ClientResponse,
+	ClientSent,
+	ClientSuccessBody,
 	Contract,
-	InferClientMessage,
-	InferClientRequest,
-	InferClientSuccessBody,
-	InferClientResponse as InferDeclaredClientResponse,
-	InferReceivedServerMessage,
 	IsWebSocketRoute,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
@@ -17,17 +17,17 @@ export type FetchLike = (
 	init?: RequestInit,
 ) => Promise<Response>;
 
-export type InferClientRequestInput<E extends RouteDeclaration> =
-	InferClientRequest<E> extends never ? undefined : InferClientRequest<E>;
+export type ClientRequestInput<E extends RouteDeclaration> =
+	ClientRequest<E> extends never ? undefined : ClientRequest<E>;
 
 export type FetchArgs<E extends RouteDeclaration = RouteDeclaration> =
-	InferClientRequest<E> extends never
+	ClientRequest<E> extends never
 		? [options?: FetchOptions]
-		: [request: InferClientRequest<E>, options?: FetchOptions];
+		: [request: ClientRequest<E>, options?: FetchOptions];
 
 export type FetchFn<E extends RouteDeclaration> = (
 	...args: FetchArgs<E>
-) => Promise<InferClientSuccessBody<E>>;
+) => Promise<ClientSuccessBody<E>>;
 
 export type UndeclaredRouteClientResponse = {
 	declared: false;
@@ -37,38 +37,36 @@ export type UndeclaredRouteClientResponse = {
 };
 
 export type DeclaredRouteClientResponse<E extends RouteDeclaration> =
-	InferDeclaredClientResponse<E> & {
+	ClientResponse<E> & {
 		declared: true;
 		headers: Headers;
 	};
 
-export type InferClientFetchResponse<E extends RouteDeclaration> =
+export type ClientFetchResponse<E extends RouteDeclaration> =
 	| DeclaredRouteClientResponse<E>
 	| UndeclaredRouteClientResponse;
 
 export type FetchResponseFn<E extends RouteDeclaration> = (
 	...args: FetchArgs<E>
-) => Promise<InferClientFetchResponse<E>>;
+) => Promise<ClientFetchResponse<E>>;
 
 export type OpenConnectionArgs<E extends RouteDeclaration = RouteDeclaration> =
-	InferClientRequest<E> extends never ? [] : [request: InferClientRequest<E>];
+	ClientRequest<E> extends never ? [] : [request: ClientRequest<E>];
 
-export type InferRouteClientSocket<E extends WebSocketRouteDeclaration> = Omit<
+export type ClientSocket<E extends WebSocketRouteDeclaration> = Omit<
 	WebSocket,
 	"send"
 > & {
-	send: (message: InferClientMessage<E>) => void;
+	send: (message: ClientSent<E>) => void;
 	onOpen: (callback: (event: Event) => void) => () => void;
-	onMessage: (
-		callback: (message: InferReceivedServerMessage<E>) => void,
-	) => () => void;
+	onMessage: (callback: (message: ClientReceived<E>) => void) => () => void;
 	onError: (callback: (event: Event) => void) => () => void;
 	onClose: (callback: (event: CloseEvent) => void) => () => void;
 };
 
 export type OpenConnectionFn<E extends RouteDeclaration> = (
 	...args: OpenConnectionArgs<E>
-) => E extends WebSocketRouteDeclaration ? InferRouteClientSocket<E> : never;
+) => E extends WebSocketRouteDeclaration ? ClientSocket<E> : never;
 
 type ApiClientProtocolRouteValue<E extends RouteDeclaration> = {
 	fetchResponse: FetchResponseFn<E>;
@@ -82,7 +80,7 @@ type ApiClientHappyPathRouteValue<E extends RouteDeclaration> = {
 export type ApiClientHttpRouteValue<
 	E extends RouteDeclaration = RouteDeclaration,
 > =
-	InferClientSuccessBody<E> extends never
+	ClientSuccessBody<E> extends never
 		? ApiClientProtocolRouteValue<E>
 		: ApiClientHappyPathRouteValue<E>;
 

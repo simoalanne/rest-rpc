@@ -9,19 +9,16 @@ import {
 	createRouteMatcher,
 	type ImplementationShape,
 	type ImplementationTreeFor,
-	type RequestValidationErrorInput,
 	type RouteHandlerFor,
 	type RouteImplementation,
-	type ServerErrorHandlers,
-	type ServerErrorResponse,
 	type InferRouteHandlerRequest as ServerInferRouteHandlerRequest,
+	type InferRouteHandlerResponse as ServerInferRouteHandlerResponse,
 	type InferWebSocketRouteHandlerRequest as ServerInferWebSocketRouteHandlerRequest,
 	type RouteHandler as ServerRouteHandler,
 	type WebSocketRouteHandler as ServerWebSocketRouteHandler,
 	route as serverRoute,
 	router as serverRouter,
 	routes as serverRoutes,
-	type UnhandledErrorInput,
 } from "@rest-rpc/server";
 import type { Context } from "hono";
 import type { Env } from "hono/types";
@@ -29,13 +26,6 @@ import type { Env } from "hono/types";
 export type { HonoParseBody, HonoParseBodyInput } from "./http.ts";
 export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
-export type { HonoWebSocketOptions } from "./websocket.ts";
-export type {
-	RequestValidationErrorInput,
-	ServerErrorHandlers,
-	ServerErrorResponse,
-	UnhandledErrorInput,
-};
 export { ContractResponseError, createRouteMatcher };
 
 export type HttpRouteHandlerContext<E extends Env = Env> = {
@@ -46,12 +36,15 @@ export type WebSocketRouteHandlerContext<E extends Env = Env> = {
 	c: Context<E>;
 };
 
-export type InferRouteHandlerRequest<
+export type RouteRequest<
 	E extends HttpRouteDeclaration,
 	TEnv extends Env = Env,
 > = ServerInferRouteHandlerRequest<E, HttpRouteHandlerContext<TEnv>>;
 
-export type InferWebSocketRouteHandlerRequest<
+export type RouteResponse<E extends HttpRouteDeclaration> =
+	ServerInferRouteHandlerResponse<E>;
+
+export type WebSocketRequest<
 	E extends WebSocketRouteDeclaration,
 	TEnv extends Env = Env,
 > = ServerInferWebSocketRouteHandlerRequest<
@@ -65,6 +58,10 @@ export type RouteHandler<
 > = ServerRouteHandler<E, HttpRouteHandlerContext<TEnv>>;
 
 export type WebSocketRouteHandler<
+	E extends WebSocketRouteDeclaration,
+	TEnv extends Env = Env,
+> = ServerWebSocketRouteHandler<E, WebSocketRouteHandlerContext<TEnv>>;
+export type WebSocketHandler<
 	E extends WebSocketRouteDeclaration,
 	TEnv extends Env = Env,
 > = ServerWebSocketRouteHandler<E, WebSocketRouteHandlerContext<TEnv>>;

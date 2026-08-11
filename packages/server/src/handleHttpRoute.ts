@@ -1,4 +1,3 @@
-import { validateStandardSchemaSync } from "@rest-rpc/core";
 import type {
 	HttpRouteDeclaration,
 	ResponseBodySchema,
@@ -9,6 +8,7 @@ import {
 	isStream,
 	REQUEST_CONTEXT_KEY,
 } from "@rest-rpc/core/contract";
+import { validateStandardSchemaSync } from "@rest-rpc/core/standard-schema";
 import { ContractResponseError } from "./contractResponseError.ts";
 import type {
 	ServerErrorHandlers,

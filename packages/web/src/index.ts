@@ -5,18 +5,14 @@ import {
 	type ImplementationShape,
 	type ImplementationTree,
 	type ImplementationTreeFor,
-	type InferRouteHandlerRequest,
-	type InferRouteHandlerResponse,
-	type RequestValidationErrorInput,
 	type RouteHandler,
 	type RouteHandlerFor,
 	type RouteImplementation,
-	type ServerErrorHandlers,
-	type ServerErrorResponse,
+	type InferRouteHandlerRequest as ServerInferRouteHandlerRequest,
+	type InferRouteHandlerResponse as ServerInferRouteHandlerResponse,
 	route as serverRoute,
 	router as serverRouter,
 	routes as serverRoutes,
-	type UnhandledErrorInput,
 } from "@rest-rpc/server";
 import {
 	type CreateWebHandlerOptions,
@@ -29,29 +25,22 @@ import { createWebRouteMatcher } from "./match.ts";
 
 export type {
 	CreateWebHandlerOptions,
-	WebHandler,
-	WebRequestHandler,
 	WebRouteHandlerContext,
 	WebRouteParseBody,
 	WebRouteParseBodyInput,
 } from "./http.ts";
-export type {
-	InferRouteHandlerRequest,
-	InferRouteHandlerResponse,
-	RequestValidationErrorInput,
-	RouteHandler,
-	ServerErrorHandlers,
-	ServerErrorResponse,
-	UnhandledErrorInput,
-};
+export type { RouteHandler };
 export { ContractResponseError };
 
-export type WebContract = Contract<HttpRouteDeclaration>;
+type WebContract = Contract<HttpRouteDeclaration>;
 
-export type WebRouterHandlers<
-	TContract extends WebContract,
+export type RouteRequest<
+	E extends HttpRouteDeclaration,
 	TContext extends WebRouteHandlerContext = WebRouteHandlerContext,
-> = ImplementationShape<TContract, TContext>;
+> = ServerInferRouteHandlerRequest<E, TContext>;
+
+export type RouteResponse<E extends HttpRouteDeclaration> =
+	ServerInferRouteHandlerResponse<E>;
 
 export const route = <
 	const TRoute extends HttpRouteDeclaration,
