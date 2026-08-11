@@ -12,7 +12,7 @@ describe("initTanstackQuery", () => {
 			byIdFetchResponseCalls: [] as unknown[][],
 			createFetchResponseCalls: [] as unknown[][],
 		};
-		const module = await esmock("./tanstackQueryClient.ts", {
+		const module = await esmock("./tanstackQuery.ts", {
 			"@rest-rpc/core": {
 				initClient: (...args: unknown[]) => {
 					initClientCalls.push(args);

@@ -6,5 +6,5 @@ export type {
 	TanstackQueryApiFor,
 	TanstackQueryFetchOptions,
 	TanstackQueryOptions,
-} from "./tanstackQueryClient.ts";
-export { default, initTanstackQuery } from "./tanstackQueryClient.ts";
+} from "./tanstackQuery.ts";
+export { default, initTanstackQuery } from "./tanstackQuery.ts";
