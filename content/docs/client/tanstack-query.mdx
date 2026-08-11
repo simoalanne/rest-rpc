@@ -1,0 +1,248 @@
+---
+title: TanStack Query
+description: Build typed TanStack Query options and keys from a contract.
+---
+
+## Install
+
+```sh
+pnpm add @rest-rpc/core @rest-rpc/tanstack-query @tanstack/query-core
+```
+
+Install the TanStack Query framework adapter you use separately, such as
+`@tanstack/react-query`, `@tanstack/vue-query`, or `@tanstack/solid-query`.
+
+## What It Is
+
+`@rest-rpc/tanstack-query` maps your contract to typed TanStack Query options
+and query keys.
+
+It does not provide hooks, components, providers, or cache helper methods. Your
+app uses TanStack Query directly; rest-rpc only supplies the typed inputs.
+
+Each HTTP route exposes four helpers:
+
+```ts
+api.todos.get.queryOptions(...)
+api.todos.page.infiniteQueryOptions(...)
+api.todos.create.mutationOptions(...)
+api.todos.get.getKey(...)
+```
+
+Use this package when you want rest-rpc to own the route typing, generated
+fetchers, response data, error typing, and contract-based keys while TanStack
+Query remains the runtime API.
+
+## Setup
+
+```ts
+import { initTanstackQuery } from "@rest-rpc/tanstack-query";
+import { api } from "./contract";
+
+export const tq = initTanstackQuery(api, {
+	origin: "https://api.example.com",
+	getGlobalHeaders: () => ({
+		authorization: `Bearer ${readToken()}`,
+	}),
+});
+```
+
+The returned object mirrors the HTTP routes in the contract.
+
+## Queries
+
+Pass generated options to the TanStack Query API for your framework.
+
+```tsx
+import { useQuery } from "@tanstack/react-query";
+
+const todo = useQuery(
+	tq.todos.get.queryOptions({
+		id: "todo_1",
+	}),
+);
+```
+
+Routes without request input can be called with only options.
+
+```tsx
+const todos = useQuery(
+	tq.todos.list.queryOptions({
+		staleTime: 30_000,
+	}),
+);
+```
+
+For request-based routes, falsy request values and TanStack Query's `skipToken`
+disable the query function.
+
+```tsx
+const todo = useQuery(tq.todos.get.queryOptions(selectedId && { id: selectedId }));
+```
+
+```tsx
+import { skipToken } from "@tanstack/query-core";
+
+const todo = useQuery(
+	tq.todos.get.queryOptions(
+		selectedId ? { id: selectedId } : skipToken,
+	),
+);
+```
+
+You can pass normal TanStack Query options.
+
+```tsx
+const todo = useQuery(
+	tq.todos.get.queryOptions(
+		{ id: "todo_1" },
+		{
+			enabled: isReady,
+			select: (response) => response.body,
+		},
+	),
+);
+```
+
+## Mutations
+
+```tsx
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+
+const queryClient = useQueryClient();
+
+const createTodo = useMutation(
+	tq.todos.create.mutationOptions({
+		onSuccess: async () => {
+			await queryClient.invalidateQueries({
+				queryKey: tq.todos.list.getKey(),
+			});
+		},
+		onError(error) {
+			if ("status" in error && error.status === 409) {
+				console.log(error.body.code);
+			}
+		},
+	}),
+);
+```
+
+```tsx
+createTodo.mutate({
+	title: "Write docs",
+});
+```
+
+## Infinite Queries
+
+Use `infiniteQueryOptions()` when route request input should be used as the page
+parameter.
+
+```tsx
+import { useInfiniteQuery } from "@tanstack/react-query";
+
+const todos = useInfiniteQuery(
+	tq.todos.page.infiniteQueryOptions({
+		queryKey: ["todos", "page", "open"],
+		initialPageParam: {
+			status: "open",
+			limit: 50,
+		},
+		getNextPageParam(lastPage, _allPages, lastRequest) {
+			return lastPage.body.nextCursor
+				? { ...lastRequest, cursor: lastPage.body.nextCursor }
+				: undefined;
+		},
+	}),
+);
+```
+
+## Query Keys
+
+Use `getKey()` when you want the contract-generated key outside an options
+object.
+
+```ts
+tq.todos.get.getKey({ id: "todo_1" });
+tq.todos.list.getKey();
+```
+
+Query keys are based on the route path in the contract plus request input.
+Request fields with `undefined` values are omitted from generated keys.
+
+The returned key is typed for TanStack Query APIs.
+
+```ts
+const todoKey = tq.todos.get.getKey({ id: "todo_1" });
+
+const todo = queryClient.getQueryData(todoKey);
+
+queryClient.setQueryData(todoKey, (current) =>
+	current && current.status === 200
+		? {
+				...current,
+				body: {
+					...current.body,
+					completed: true,
+				},
+			}
+		: current,
+);
+
+await queryClient.invalidateQueries({
+	queryKey: todoKey,
+});
+```
+
+Pass `queryKey` in options when a query needs a custom key.
+
+```tsx
+const todo = useQuery(
+	tq.todos.get.queryOptions(
+		{ id: "todo_1" },
+		{
+			queryKey: ["todos", "detail", "todo_1"],
+		},
+	),
+);
+```
+
+Use the same custom key with TanStack Query cache APIs.
+
+```ts
+await queryClient.invalidateQueries({
+	queryKey: ["todos", "detail", "todo_1"],
+});
+```
+
+## Fetch Options
+
+Generated options accept normal TanStack Query options plus `fetchOptions`.
+
+```tsx
+const todo = useQuery(
+	tq.todos.get.queryOptions(
+		{ id: "todo_1" },
+		{
+			fetchOptions: {
+				cache: "no-store",
+			},
+		},
+	),
+);
+```
+
+The adapter passes TanStack Query cancellation signals through fetch options.
+
+## Error Model
+
+TanStack Query uses success and error channels.
+
+Declared 2xx responses become `data`.
+
+Declared non-2xx responses become `error`.
+
+Undeclared responses and runtime errors also become `error`.
+
+This differs from `fetchResponse()`, which exposes declared non-2xx responses as
+values.

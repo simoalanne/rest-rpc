@@ -6,7 +6,7 @@ description: Name inferred route, client, and handler types when you need them.
 Most `rest-rpc` types are inferred through normal usage.
 
 Use helper types when your application needs to name inferred request, response,
-handler, client, or React Query types.
+handler, client, TanStack Query, or React Query types.
 
 This page covers common helper categories. The exact export surface should be
 checked during the v1 API audit.
@@ -77,23 +77,24 @@ type GetTodoErrors = InferClientErrors<typeof api.todos.get>;
 Use these when app code wants to handle a route response outside the generated
 client call.
 
-## React Query Helpers
+## TanStack Query Helpers
 
-React Query helper types live in `@rest-rpc/react-query`.
+TanStack Query helper types live in `@rest-rpc/tanstack-query`.
 
 ```ts
 import type {
 	InferRouteMutationVariables,
 	InferRouteQueryData,
 	InferRouteQueryError,
-} from "@rest-rpc/react-query";
+} from "@rest-rpc/tanstack-query";
 
 type GetTodoData = InferRouteQueryData<typeof api.todos.get>;
 type GetTodoError = InferRouteQueryError<typeof api.todos.get>;
 type CreateTodoVariables = InferRouteMutationVariables<typeof api.todos.create>;
 ```
 
-These are useful when extracting options, callbacks, or component props.
+These are useful when extracting options, callbacks, component props, or local
+TanStack Query wrappers.
 
 ## Keep Helpers Close To The Need
 

@@ -4,8 +4,8 @@ description: REST-shaped APIs with function-shaped TypeScript.
 ---
 
 `rest-rpc` lets you define HTTP routes in a shared TypeScript contract, then use
-that contract to derive typed server handlers, typed fetch clients, React Query
-helpers, and OpenAPI documents.
+that contract to derive typed server handlers, typed fetch clients, TanStack
+Query options, and OpenAPI documents.
 
 The API stays REST-shaped. Everyday application code can feel like function
 calls.
@@ -79,14 +79,14 @@ const todo = await client.todos.get.fetch({ id: "todo_1" });
 - Typed status responses when you need them, and direct response bodies when you don't.
 - Runtime validation through Standard Schema-compatible libraries.
 - Thin Express, Hono, and Fastify adapters for typed server handlers.
-- Typed React Query hooks over the same contract when using TanStack Query already.
+- Typed TanStack Query options and query keys over the same contract.
 - OpenAPI document generation.
 
 ## Small By Design
 
 `rest-rpc` focuses on the API boundary: routes, request validation, typed
-handlers, typed clients, status-aware responses, React Query helpers, and OpenAPI
-document generation.
+handlers, typed clients, status-aware responses, TanStack Query options, and
+OpenAPI document generation.
 
 It does not replace middleware, authentication, dependency injection, database
 access, file storage, OpenAPI UI, deployment, or frontend state management.

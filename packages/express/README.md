@@ -3,8 +3,8 @@
 REST-shaped APIs with function-shaped TypeScript.
 
 `rest-rpc` lets you define HTTP routes in a shared TypeScript contract, then use
-that contract to derive typed server handlers, typed fetch clients, React Query
-helpers, and OpenAPI documents.
+that contract to derive typed server handlers, typed fetch clients, TanStack Query
+options, and OpenAPI documents.
 
 The API stays REST-shaped. Everyday application code can feel like function
 calls.
@@ -27,7 +27,7 @@ GET /todos/todo_1
 - `@rest-rpc/fastify`: Fastify server adapter.
 - `@rest-rpc/web`: Web `Request`/`Response` HTTP handler adapter.
 - `@rest-rpc/next`: Next.js server/client adapter.
-- `@rest-rpc/react-query`: TanStack Query client adapter.
+- `@rest-rpc/tanstack-query`: TanStack Query options and key helpers.
 
 `@rest-rpc/server` contains shared adapter infrastructure and is mainly useful
 for adapter authors.

@@ -1,5 +1,5 @@
 {
-	"name": "@rest-rpc/react-query",
+	"name": "@rest-rpc/tanstack-query",
 	"version": "0.0.0",
 	"type": "module",
 	"license": "MIT",
@@ -33,7 +33,7 @@
 		"@rest-rpc/core": "workspace:^"
 	},
 	"peerDependencies": {
-		"@tanstack/react-query": "^5.0.0"
+		"@tanstack/query-core": "^5.0.0"
 	},
 	"devDependencies": {
 		"esmock": "^2.7.3"

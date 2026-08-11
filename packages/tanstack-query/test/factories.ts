@@ -40,49 +40,6 @@ export const apiContract = {
 	},
 };
 
-export const createQueryClientMock = () => ({
-	invalidateQueriesCalls: [] as unknown[][],
-	cancelQueriesCalls: [] as unknown[][],
-	removeQueriesCalls: [] as unknown[][],
-	setQueryDataCalls: [] as unknown[][],
-	setQueriesDataCalls: [] as unknown[][],
-	queryClient: {
-		invalidateQueries: async (...args: unknown[]) => {
-			state.invalidateQueriesCalls.push(args);
-		},
-		cancelQueries: (...args: unknown[]) => {
-			state.cancelQueriesCalls.push(args);
-		},
-		removeQueries: (...args: unknown[]) => {
-			state.removeQueriesCalls.push(args);
-		},
-		setQueryData: (...args: unknown[]) => {
-			state.setQueryDataCalls.push(args);
-		},
-		setQueriesData: (...args: unknown[]) => {
-			state.setQueriesDataCalls.push(args);
-		},
-	},
-});
-
-export type QueryClientMock = ReturnType<typeof createQueryClientMock>;
-
-const state = {
-	invalidateQueriesCalls: [] as unknown[][],
-	cancelQueriesCalls: [] as unknown[][],
-	removeQueriesCalls: [] as unknown[][],
-	setQueryDataCalls: [] as unknown[][],
-	setQueriesDataCalls: [] as unknown[][],
-};
-
-export const resetQueryClientMock = (mock: QueryClientMock) => {
-	state.invalidateQueriesCalls = mock.invalidateQueriesCalls;
-	state.cancelQueriesCalls = mock.cancelQueriesCalls;
-	state.removeQueriesCalls = mock.removeQueriesCalls;
-	state.setQueryDataCalls = mock.setQueryDataCalls;
-	state.setQueriesDataCalls = mock.setQueriesDataCalls;
-};
-
 export const createApiTree = (calls: {
 	listFetchResponseCalls: unknown[][];
 	byIdFetchResponseCalls: unknown[][];

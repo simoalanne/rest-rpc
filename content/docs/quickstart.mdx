@@ -57,10 +57,10 @@ For a client-only package:
 pnpm add @rest-rpc/core
 ```
 
-For React Query:
+For TanStack Query:
 
 ```sh
-pnpm add @rest-rpc/core @rest-rpc/react-query @tanstack/react-query
+pnpm add @rest-rpc/core @rest-rpc/tanstack-query @tanstack/query-core
 ```
 
 ## Define A Contract
@@ -454,37 +454,38 @@ if (response.declared && response.status === 404) {
 }
 ```
 
-## Call With React Query
+## Call With TanStack Query
 
 ```tsx
-import { initReactQueryClient } from "@rest-rpc/react-query";
+import { initTanstackQuery } from "@rest-rpc/tanstack-query";
 import { QueryClient } from "@tanstack/react-query";
 import { api } from "./contract";
 
 export const queryClient = new QueryClient();
 
-export const rq = initReactQueryClient(api, {
-	queryClient,
+export const tq = initTanstackQuery(api, {
 	origin: "http://localhost:3000",
 });
 ```
 
 ```tsx
-const todo = rq.todos.get.useQuery({ id: "todo_1" });
+import { useMutation, useQuery } from "@tanstack/react-query";
 
-const createTodo = rq.todos.create.useMutation({
+const todo = useQuery(tq.todos.get.queryOptions({ id: "todo_1" }));
+
+const createTodo = useMutation(tq.todos.create.mutationOptions({
 	onSuccess(created) {
 		console.log(created.body.id);
 	},
-});
+}));
 ```
 
-React Query follows React Query's success and error channels. Declared 2xx
+TanStack Query follows its normal success and error channels. Declared 2xx
 responses become data. Declared non-2xx responses become errors.
 
 ## Next Steps
 
 - [Concepts](/concepts/) explains why the contract and call shapes differ.
 - [Server adapters](/server/express/) cover framework-specific setup.
-- [Fetch Client](/client/fetch-client/) and [React Query](/client/react-query/)
+- [Fetch Client](/client/fetch-client/) and [TanStack Query](/client/tanstack-query/)
   cover client behavior.
