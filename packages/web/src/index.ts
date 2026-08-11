@@ -95,6 +95,9 @@ export const createHandler = <
 	return (async (request: Request, context?: TContext) => {
 		const match = matchRoute(request);
 		if (!match) return new Response(null, { status: 404 });
+		if (match.type === "methodNotAllowed") {
+			return new Response(null, { status: 405 });
+		}
 
 		return handleWebRoute(
 			request,

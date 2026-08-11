@@ -16,6 +16,11 @@ export type {
 } from "./handleHttpRouteResult.ts";
 export { handleHttpRouteResult } from "./handleHttpRouteResult.ts";
 export type { HttpHeaders, HttpHeaderValue } from "./headers.ts";
+export type {
+	RouteMatcherMatch,
+	RouteMatcherMethodNotAllowed,
+	RouteMatcherResult,
+} from "./match.ts";
 export { createRouteMatcher } from "./match.ts";
 export {
 	flattenRouteImplementations,

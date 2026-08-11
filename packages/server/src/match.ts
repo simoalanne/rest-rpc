@@ -68,6 +68,22 @@ const createPathMatcher = (path: string) => {
 	};
 };
 
+export type RouteMatcherMatch = {
+	type: "match";
+	route: RouteDeclaration;
+	params: Record<string, string>;
+};
+
+export type RouteMatcherMethodNotAllowed = {
+	type: "methodNotAllowed";
+	allowedMethods: string[];
+};
+
+export type RouteMatcherResult =
+	| RouteMatcherMatch
+	| RouteMatcherMethodNotAllowed
+	| null;
+
 export const createRouteMatcher = (contract: Contract) => {
 	const matchers = flattenContractRoutes(contract)
 		.sort(compareRouteSpecificity)
@@ -76,15 +92,29 @@ export const createRouteMatcher = (contract: Contract) => {
 			matchPath: createPathMatcher(route.path),
 		}));
 
-	return (req: { path: string; method: string }) => {
+	return (req: { path: string; method: string }): RouteMatcherResult => {
+		const allowedMethods = new Set<string>();
+
 		for (const matcher of matchers) {
 			const params = matcher.matchPath(req.path);
-			if (matcher.route.method === req.method && params !== null) {
+			if (params === null) continue;
+
+			allowedMethods.add(matcher.route.method);
+
+			if (matcher.route.method === req.method) {
 				return {
+					type: "match",
 					route: matcher.route,
 					params,
 				};
 			}
+		}
+
+		if (allowedMethods.size > 0) {
+			return {
+				type: "methodNotAllowed",
+				allowedMethods: Array.from(allowedMethods),
+			};
 		}
 
 		return null;

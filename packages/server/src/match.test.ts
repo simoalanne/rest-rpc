@@ -22,10 +22,12 @@ describe("createRouteMatcher", () => {
 		});
 
 		assert.deepEqual(matchRoute({ method: "GET", path: "/todos/new" }), {
+			type: "match",
 			route: route("GET", "/todos/new"),
 			params: {},
 		});
 		assert.deepEqual(matchRoute({ method: "GET", path: "/todos/one%20two" }), {
+			type: "match",
 			route: route("GET", "/todos/:id"),
 			params: { id: "one two" },
 		});
@@ -38,10 +40,14 @@ describe("createRouteMatcher", () => {
 		});
 
 		assert.deepEqual(matchRoute({ method: "POST", path: "/todos/todo-1/" }), {
+			type: "match",
 			route: route("POST", "/todos/:id"),
 			params: { id: "todo-1" },
 		});
-		assert.equal(matchRoute({ method: "DELETE", path: "/todos/todo-1" }), null);
+		assert.deepEqual(matchRoute({ method: "DELETE", path: "/todos/todo-1" }), {
+			type: "methodNotAllowed",
+			allowedMethods: ["GET", "POST"],
+		});
 	});
 
 	it("escapes literal route characters before matching paths", () => {
@@ -50,6 +56,7 @@ describe("createRouteMatcher", () => {
 		});
 
 		assert.deepEqual(matchRoute({ method: "GET", path: "/files/index.json" }), {
+			type: "match",
 			route: route("GET", "/files/index.json"),
 			params: {},
 		});
