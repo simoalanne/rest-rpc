@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { afterEach, describe, it } from "node:test";
+import { describe, it } from "node:test";
+import type { FetchLike } from "@rest-rpc/core";
 import { noBody, router, type } from "@rest-rpc/core";
 import { initNextClient } from "./client.ts";
 
@@ -15,21 +16,15 @@ type NextFetchInit = RequestInit & {
 	};
 };
 
-const originalFetch = globalThis.fetch;
-
-afterEach(() => {
-	globalThis.fetch = originalFetch;
-});
-
 const captureFetch = () => {
 	const calls: FetchCall[] = [];
 
-	globalThis.fetch = async (url, init) => {
+	const fetch: FetchLike = async (url, init) => {
 		calls.push({ url: String(url), init });
 		return new Response(null, { status: 204 });
 	};
 
-	return calls;
+	return { calls, fetch };
 };
 
 const createTestContract = () =>
@@ -37,7 +32,7 @@ const createTestContract = () =>
 		todos: {
 			list: {
 				method: "GET",
-				path: "/todos/:id",
+				path: "/api/todos/:id",
 				request: {
 					params: { id: type<string>() },
 					query: { filter: type<string>() },
@@ -52,7 +47,7 @@ const createTestContract = () =>
 			},
 			create: {
 				method: "POST",
-				path: "/todos",
+				path: "/api/todos",
 				responses: {
 					204: noBody(),
 				},
@@ -63,73 +58,62 @@ const createTestContract = () =>
 describe("Next client", () => {
 	it("adds automatic tags to GET fetches while preserving prepared Next options", async () => {
 		const apiContract = createTestContract();
-		const calls = captureFetch();
+		const { calls, fetch } = captureFetch();
 		const client = initNextClient(apiContract, {
-			baseUrl: "https://api.test",
-			automaticFetchTags: {
-				enabled: true,
-				tagPrefix: "api",
-			},
-			prepareFetch: ({ init }) => ({
-				...init,
-				headers: {
-					...init.headers,
-					"x-request-id": "request-1",
-				},
+			origin: "https://api.test",
+			fetch,
+			fetchOptions: {
 				next: {
 					revalidate: 60,
 					tags: ["manual"],
 				},
-			}),
+			},
+			automaticFetchTags: {
+				enabled: true,
+				tagPrefix: "api",
+			},
 		});
 
 		await client.todos.list.fetch({ id: "todo 1", filter: "open" });
 
 		const init = calls[0]?.init as NextFetchInit | undefined;
 
-		assert.equal(calls[0]?.url, "https://api.test/todos/todo%201?filter=open");
-		assert.deepEqual(init?.headers, {
-			"x-request-id": "request-1",
-		});
+		assert.equal(
+			calls[0]?.url,
+			"https://api.test/api/todos/todo%201?filter=open",
+		);
 		assert.deepEqual(init?.next, {
 			revalidate: 60,
 			tags: [
 				"manual",
-				"api:/todos/todo%201?filter=open",
-				"api:/todos/todo%201",
+				"api:/api/todos/todo%201?filter=open",
+				"api:/api/todos/todo%201",
 			],
 		});
 	});
 
 	it("does not tag non-GET fetches and still preserves prepared init", async () => {
 		const apiContract = createTestContract();
-		const calls = captureFetch();
+		const { calls, fetch } = captureFetch();
 		const client = initNextClient(apiContract, {
-			baseUrl: "https://api.test",
-			automaticFetchTags: {
-				enabled: true,
-			},
-			prepareFetch: ({ init }) => ({
-				...init,
-				headers: {
-					...init.headers,
-					"x-request-id": "request-1",
-				},
+			origin: "https://api.test",
+			fetch,
+			fetchOptions: {
 				next: {
 					revalidate: 60,
 					tags: ["manual"],
 				},
-			}),
+			},
+			automaticFetchTags: {
+				enabled: true,
+			},
 		});
 
 		await client.todos.create.fetch();
 
 		const init = calls[0]?.init as NextFetchInit | undefined;
 
-		assert.equal(calls[0]?.url, "https://api.test/todos");
-		assert.deepEqual(init?.headers, {
-			"x-request-id": "request-1",
-		});
+		assert.equal(calls[0]?.url, "https://api.test/api/todos");
 		assert.deepEqual(init?.next, {
 			revalidate: 60,
 			tags: ["manual"],

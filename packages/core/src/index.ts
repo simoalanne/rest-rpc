@@ -5,6 +5,7 @@ export type {
 	DeclaredRouteClientResponse,
 	FetchArgs,
 	FetchFn,
+	FetchLike,
 	FetchOptions,
 	FetchResponseFn,
 	InferClientFetchResponse,
@@ -12,8 +13,6 @@ export type {
 	InferRouteClientSocket,
 	OpenConnectionArgs,
 	OpenConnectionFn,
-	PrepareFetchFn,
-	PrepareFetchInput,
 	UndeclaredRouteClientResponse,
 } from "./client/index.ts";
 export {

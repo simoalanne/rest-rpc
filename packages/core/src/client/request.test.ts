@@ -25,7 +25,7 @@ describe("ApiClient requests", () => {
 				: jsonResponse([]),
 		);
 		const client = initClient(createClientTestContract(), {
-			baseUrl: "https://api.test",
+			origin: "https://api.test",
 		});
 
 		await client.todos.get.fetch({ id: "todo 1" });
@@ -65,7 +65,7 @@ describe("ApiClient requests", () => {
 			jsonResponse({ id: "todo-1", title: "Updated" }),
 		);
 		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
+			origin: "https://api.test",
 		});
 
 		await client.todos.update.fetch({
@@ -311,7 +311,7 @@ describe("ApiClient requests", () => {
 			jsonResponse({ id: "todo-1", title: "Buy milk" }, 201),
 		);
 		const client = initClient(createClientTestContract(), {
-			baseUrl: "https://api.test",
+			origin: "https://api.test",
 		});
 
 		await client.todos.create.fetch({ title: "Buy milk" });
@@ -325,7 +325,7 @@ describe("ApiClient requests", () => {
 	it("sends custom bodies with their declared content type", async () => {
 		const calls = captureFetch();
 		const client = initClient(createClientTestContract(), {
-			baseUrl: "https://api.test",
+			origin: "https://api.test",
 		});
 
 		await client.uploads.create.fetch({
@@ -343,7 +343,7 @@ describe("ApiClient requests", () => {
 	it("stringifies application/json custom bodies", async () => {
 		const calls = captureFetch();
 		const client = initClient(createClientTestContract(), {
-			baseUrl: "https://api.test",
+			origin: "https://api.test",
 		});
 
 		await client.uploads.json.fetch({
@@ -369,7 +369,7 @@ describe("ApiClient requests", () => {
 		const calls = captureFetch();
 		const controller = new AbortController();
 		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
+			origin: "https://api.test",
 		});
 
 		await client.ping.fetch({ signal: controller.signal });
@@ -383,12 +383,12 @@ describe("ApiClient requests", () => {
 	it("merges global fetch options and per-call options", async () => {
 		const calls = captureFetch(jsonResponse([]));
 		const client = initClient(createClientTestContract(), {
-			baseUrl: "https://api.test",
+			origin: "https://api.test",
 			fetchOptions: {
 				cache: "no-store",
 				credentials: "include",
 			},
-			getHeaders: () => ({ Authorization: "Bearer token" }),
+			getGlobalHeaders: () => ({ Authorization: "Bearer token" }),
 		});
 
 		await client.todos.list.fetch({ search: "milk" }, { credentials: "omit" });
@@ -400,30 +400,31 @@ describe("ApiClient requests", () => {
 		});
 	});
 
-	it("lets prepareFetch inspect and replace the final request init", async () => {
-		const calls = captureFetch(jsonResponse([]));
+	it("lets custom fetch inspect and replace the final request init", async () => {
+		const calls: Array<{ url: string; init?: RequestInit }> = [];
 		const client = initClient(createClientTestContract(), {
-			baseUrl: "https://api.test",
-			prepareFetch: ({ route, request, url, init }) => {
-				assert.equal(route.path, "/todos");
-				assert.deepEqual(request, { search: "milk" });
+			origin: "https://api.test",
+			fetch: async (url, init) => {
 				assert.equal(url, "https://api.test/todos?search=milk");
-				assert.equal(init.method, "GET");
+				assert.equal(init?.method, "GET");
 
-				return {
+				const preparedInit = {
 					...init,
 					headers: {
-						...(init.headers as Record<string, string>),
-						"x-prepared": "true",
+						...(init?.headers as Record<string, string>),
+						"x-custom-fetch": "true",
 					},
 				};
+
+				calls.push({ url: String(url), init: preparedInit });
+				return jsonResponse([]);
 			},
 		});
 
 		await client.todos.list.fetch({ search: "milk" });
 
 		assert.deepEqual(calls[0]?.init?.headers, {
-			"x-prepared": "true",
+			"x-custom-fetch": "true",
 		});
 	});
 
@@ -456,8 +457,8 @@ describe("ApiClient requests", () => {
 		);
 		const calls = captureFetch(jsonResponse([]));
 		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-			getHeaders: () => ({
+			origin: "https://api.test",
+			getGlobalHeaders: () => ({
 				"X-Global": "global",
 				"X-Route": "from global",
 				"X-Shared": "from global",
@@ -483,20 +484,20 @@ describe("ApiClient requests", () => {
 	it("rejects global content-type headers", async () => {
 		captureFetch();
 		const client = initClient(createClientTestContract(), {
-			baseUrl: "https://api.test",
-			getHeaders: () => ({ "content-type": "text/plain" }),
+			origin: "https://api.test",
+			getGlobalHeaders: () => ({ "content-type": "text/plain" }),
 		});
 
 		await assert.rejects(
 			() => client.todos.create.fetch({ title: "created" }),
-			/getHeaders\(\) must not return a "content-type" header/,
+			/getGlobalHeaders\(\) must not return a "content-type" header/,
 		);
 	});
 
 	it("rejects unknown flattened request keys by default", async () => {
 		captureFetch();
 		const client = initClient(createClientTestContract(), {
-			baseUrl: "https://api.test",
+			origin: "https://api.test",
 		});
 
 		await assert.rejects(
@@ -512,7 +513,7 @@ describe("ApiClient requests", () => {
 	it("strips unknown flattened request keys when configured", async () => {
 		const calls = captureFetch(jsonResponse([]));
 		const client = initClient(createClientTestContract(), {
-			baseUrl: "https://api.test",
+			origin: "https://api.test",
 			unknownRequestKeys: "strip",
 		});
 
@@ -540,7 +541,7 @@ describe("ApiClient requests", () => {
 			},
 		} as const;
 		captureFetch();
-		const client = initClient(apiContract, { baseUrl: "https://api.test" });
+		const client = initClient(apiContract, { origin: "https://api.test" });
 
 		await assert.rejects(
 			() => client.todos.list.fetch({ search: "milk" }),
@@ -557,7 +558,7 @@ describe("ApiClient requests", () => {
 			throw new Error("network down");
 		};
 		const client = initClient(createClientTestContract(), {
-			baseUrl: "https://api.test",
+			origin: "https://api.test",
 			timeoutMs: 5,
 		});
 

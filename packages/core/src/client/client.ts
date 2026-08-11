@@ -18,24 +18,43 @@ import type {
 } from "./types.ts";
 import { openConnection as openRouteConnection } from "./websocket.ts";
 
+export const normalizeOrigin = (origin: string) => {
+	let url: URL;
+	try {
+		url = new URL(origin);
+	} catch {
+		throw new Error(
+			"ApiClient origin must be an absolute URL origin without a path, search, or hash. Put API path prefixes in route.path instead.",
+		);
+	}
+
+	if (url.pathname !== "/" || url.search || url.hash) {
+		throw new Error(
+			"ApiClient origin must be an absolute URL origin without a path, search, or hash. Put API path prefixes in route.path instead.",
+		);
+	}
+
+	return url.origin;
+};
+
 export class ApiClient<TContract extends Contract = Contract> {
 	readonly api: ApiClientFor<TContract>;
 
-	private baseUrl: string;
+	private origin: string;
 	private contract: TContract;
+	private fetchImpl?: ApiClientOptions["fetch"];
 	private fetchOptions?: ApiClientOptions["fetchOptions"];
-	private getHeaders?: ApiClientOptions["getHeaders"];
-	private prepareFetch?: ApiClientOptions["prepareFetch"];
+	private getGlobalHeaders?: ApiClientOptions["getGlobalHeaders"];
 	private timeoutMs?: number;
 	private unknownRequestKeys: "throw" | "strip";
 	private validateResponses: boolean;
 
 	constructor(contract: TContract, options: ApiClientOptions) {
-		this.baseUrl = options.baseUrl;
+		this.origin = normalizeOrigin(options.origin);
 		this.contract = contract;
+		this.fetchImpl = options.fetch;
 		this.fetchOptions = options.fetchOptions;
-		this.getHeaders = options.getHeaders;
-		this.prepareFetch = options.prepareFetch;
+		this.getGlobalHeaders = options.getGlobalHeaders;
 		this.timeoutMs = options.timeoutMs;
 		this.unknownRequestKeys = options.unknownRequestKeys ?? "throw";
 		this.validateResponses = options.validateResponses ?? false;
@@ -52,10 +71,10 @@ export class ApiClient<TContract extends Contract = Contract> {
 		...args: FetchArgs<E>
 	) =>
 		executeRequest(route, args, {
-			baseUrl: this.baseUrl,
+			origin: this.origin,
+			fetch: this.fetchImpl,
 			fetchOptions: this.fetchOptions,
-			getHeaders: this.getHeaders,
-			prepareFetch: this.prepareFetch,
+			getGlobalHeaders: this.getGlobalHeaders,
 			timeoutMs: this.timeoutMs,
 			unknownRequestKeys: this.unknownRequestKeys,
 		});
@@ -78,7 +97,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 		openRouteConnection(
 			route,
 			{
-				baseUrl: this.baseUrl,
+				origin: this.origin,
 				unknownRequestKeys: this.unknownRequestKeys,
 				validateIncomingMessages: this.validateResponses,
 			},

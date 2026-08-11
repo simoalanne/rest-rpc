@@ -77,7 +77,7 @@ const api = router({
 declare const queryClient: QueryClient;
 
 const rq = initReactQueryClient(api, {
-	baseUrl: "https://example.test",
+	origin: "https://example.test",
 	queryClient,
 });
 

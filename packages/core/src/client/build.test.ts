@@ -6,7 +6,7 @@ import { initClient, mapApiClientContract } from "./index.ts";
 describe("ApiClient route tree", () => {
 	it("creates route helpers that match route capabilities", () => {
 		const client = initClient(createClientTestContract(), {
-			baseUrl: "https://api.test",
+			origin: "https://api.test",
 		});
 
 		assert.deepEqual(Object.keys(client.todos.list), [
@@ -19,7 +19,7 @@ describe("ApiClient route tree", () => {
 
 	it("maps API client route leaves", () => {
 		const client = initClient(createClientTestContract(), {
-			baseUrl: "https://api.test",
+			origin: "https://api.test",
 		});
 
 		const mapped = mapApiClientContract(client, (_route, path) =>

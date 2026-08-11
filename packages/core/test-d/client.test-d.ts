@@ -124,7 +124,7 @@ const api = router({
 });
 
 const client = initClient(api, {
-	baseUrl: "https://example.test",
+	origin: "https://example.test",
 });
 
 expectType<Promise<Array<{ id: string; title: string }>>>(

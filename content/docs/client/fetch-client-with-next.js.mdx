@@ -23,7 +23,7 @@ import { initNextClient } from "@rest-rpc/next";
 import { api } from "./contract";
 
 export const client = initNextClient(api, {
-	baseUrl: process.env.API_BASE_URL!,
+	origin: process.env.API_BASE_URL!,
 	automaticFetchTags: {
 		enabled: true,
 	},
@@ -80,7 +80,7 @@ Use `tagPrefix` when one Next app talks to multiple APIs.
 
 ```ts
 export const client = initNextClient(api, {
-	baseUrl: process.env.API_BASE_URL!,
+	origin: process.env.API_BASE_URL!,
 	automaticFetchTags: {
 		enabled: true,
 		tagPrefix: "admin-api",

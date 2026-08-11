@@ -36,7 +36,7 @@ describe("initReactQueryClient", () => {
 
 		const api = module.initReactQueryClient(apiContract, {
 			queryClient: queryClient.queryClient,
-			baseUrl: "http://localhost:3001/api",
+			origin: "http://localhost:3001",
 			timeoutMs: 1000,
 		});
 
@@ -44,7 +44,7 @@ describe("initReactQueryClient", () => {
 			[
 				apiContract,
 				{
-					baseUrl: "http://localhost:3001/api",
+					origin: "http://localhost:3001",
 					timeoutMs: 1000,
 				},
 			],

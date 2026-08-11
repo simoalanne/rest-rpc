@@ -29,7 +29,7 @@ describe("ApiClient streams", () => {
 		globalThis.fetch = async () =>
 			ndjsonResponse(['{"id":"one"}\n{"id"', ':"two"}\n', '{"id":"three"}']);
 		const client = initClient(createClientTestContract(), {
-			baseUrl: "https://api.test",
+			origin: "https://api.test",
 		});
 
 		const events = [];
@@ -43,7 +43,7 @@ describe("ApiClient streams", () => {
 	it("trusts streamed items by default", async () => {
 		globalThis.fetch = async () => ndjsonResponse(['{"id":123}\n']);
 		const client = initClient(createClientTestContract(), {
-			baseUrl: "https://api.test",
+			origin: "https://api.test",
 		});
 
 		const events = await client.events.stream.fetch();
@@ -57,7 +57,7 @@ describe("ApiClient streams", () => {
 	it("validates streamed items when configured", async () => {
 		globalThis.fetch = async () => ndjsonResponse(['{"id":123}\n']);
 		const client = initClient(createClientTestContract(), {
-			baseUrl: "https://api.test",
+			origin: "https://api.test",
 			validateResponses: true,
 		});
 
@@ -76,7 +76,7 @@ describe("ApiClient streams", () => {
 				status: 200,
 			});
 		const client = initClient(createClientTestContract(), {
-			baseUrl: "https://api.test",
+			origin: "https://api.test",
 		});
 
 		await assert.rejects(

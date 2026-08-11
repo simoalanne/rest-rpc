@@ -4,9 +4,9 @@ import { groupRequestInput, pathParamPattern } from "../contract/validate.ts";
 import type {
 	ApiClientFetchOptions,
 	FetchArgs,
+	FetchLike,
 	FetchOptions,
 	GetHeadersFn,
-	PrepareFetchFn,
 	RuntimeArgs,
 } from "./types.ts";
 
@@ -53,7 +53,7 @@ const normalizeHeaders = (headers: Record<string, string> | undefined) =>
 export const assertNoContentTypeHeader = (headers: Record<string, string>) => {
 	if (hasHeader(headers, "content-type")) {
 		throw new Error(
-			'ApiClient getHeaders() must not return a "content-type" header. Use customBody({ schema, contentType }) on the route declaration instead.',
+			'ApiClient getGlobalHeaders() must not return a "content-type" header. Use customBody({ schema, contentType }) on the route declaration instead.',
 		);
 	}
 };
@@ -132,7 +132,7 @@ const serializeQuery = (
 };
 
 export const constructBaseRequest = (
-	baseUrl: string,
+	origin: string,
 	route: RouteDeclaration,
 	args: RuntimeArgs | undefined,
 	unknownRequestKeys: "throw" | "strip",
@@ -142,13 +142,13 @@ export const constructBaseRequest = (
 	contentType?: string;
 	headers?: Record<string, string>;
 } => {
-	let urlBase = `${baseUrl}${route.path}`;
+	let urlBase = `${origin}${route.path}`;
 	if (!args) return { url: urlBase };
 
 	const request = groupRequestInput(route, args, { unknownRequestKeys });
 	const { body, query, params, headers } = request;
 
-	urlBase = `${baseUrl}${serializeParams(route, params)}${serializeQuery(route, query)}`;
+	urlBase = `${origin}${serializeParams(route, params)}${serializeQuery(route, query)}`;
 
 	if (isCustomBody(route.request?.body)) {
 		const contentType = route.request.body.contentType;
@@ -178,10 +178,10 @@ export const extractArgs = (route: RouteDeclaration, args: unknown[]) => {
 };
 
 export type ExecuteRequestOptions = {
-	baseUrl: string;
+	origin: string;
+	fetch?: FetchLike;
 	fetchOptions?: ApiClientFetchOptions;
-	getHeaders?: GetHeadersFn;
-	prepareFetch?: PrepareFetchFn;
+	getGlobalHeaders?: GetHeadersFn;
 	timeoutMs?: number;
 	unknownRequestKeys: "throw" | "strip";
 };
@@ -198,7 +198,7 @@ export const executeRequest = async <E extends RouteDeclaration>(
 		contentType,
 		headers: requestHeaders,
 	} = constructBaseRequest(
-		options.baseUrl,
+		options.origin,
 		route,
 		requestArgs as RuntimeArgs,
 		options.unknownRequestKeys,
@@ -208,7 +208,7 @@ export const executeRequest = async <E extends RouteDeclaration>(
 		fetchOptions?.signal,
 		options.timeoutMs,
 	);
-	const headers = (await options.getHeaders?.()) ?? {};
+	const headers = (await options.getGlobalHeaders?.()) ?? {};
 	assertNoContentTypeHeader(headers);
 
 	try {
@@ -224,14 +224,9 @@ export const executeRequest = async <E extends RouteDeclaration>(
 			},
 			signal: signalState?.signal ?? fetchOptions?.signal,
 		};
-		const preparedInit =
-			(await options.prepareFetch?.({
-				route,
-				request: requestArgs as RuntimeArgs | undefined,
-				url,
-				init,
-			})) ?? init;
-		const rawResponse = await fetch(url, preparedInit);
+		const fetchImpl =
+			options.fetch ?? ((input, init) => globalThis.fetch(input, init));
+		const rawResponse = await fetchImpl(url, init);
 
 		return {
 			rawResponse,

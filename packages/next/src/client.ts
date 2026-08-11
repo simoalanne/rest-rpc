@@ -2,7 +2,7 @@ import type {
 	ApiClientFor,
 	ApiClientOptions,
 	Contract,
-	PrepareFetchInput,
+	FetchLike,
 } from "@rest-rpc/core";
 import { getRouteCacheTags, initClient } from "@rest-rpc/core";
 import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
@@ -14,38 +14,50 @@ type NextFetchOptions = RequestInit & {
 	};
 };
 
-export type NextClientOptions = ApiClientOptions & {
+export type NextClientFetchOptions = Omit<
+	NextFetchOptions,
+	"method" | "body" | "headers" | "signal"
+>;
+
+export type NextClientOptions = Omit<ApiClientOptions, "fetchOptions"> & {
 	automaticFetchTags?: {
 		enabled: boolean;
 		tagPrefix?: string;
 	};
+	fetchOptions?: NextClientFetchOptions;
 };
 
-const isHttpRoute = (route: {
-	responses?: unknown;
-}): route is HttpRouteDeclaration => "responses" in route;
-
-const prepareFetchWithTags = (
-	{ route, request, init }: PrepareFetchInput,
-	tagPrefix?: string,
+const createRouteCacheTagsForUrl = (
+	url: string | URL | Request,
+	prefix?: string,
 ) => {
-	if (!isHttpRoute(route)) return init;
-	if (route.method !== "GET") return init;
+	const parsed = new URL(url instanceof Request ? url.url : String(url));
 
-	const nextInit = init as NextFetchOptions;
+	return Array.from(
+		new Set([
+			`${prefix ?? "rest-rpc"}:${parsed.pathname}${parsed.search}`,
+			`${prefix ?? "rest-rpc"}:${parsed.pathname}`,
+		]),
+	);
+};
 
-	return {
-		...nextInit,
-		next: {
-			...nextInit.next,
-			tags: [
-				...(nextInit.next?.tags ?? []),
-				...getRouteCacheTags(route, {
-					request,
-					prefix: tagPrefix,
-				}),
-			],
-		},
+const fetchWithTags = (fetchImpl: FetchLike, tagPrefix?: string): FetchLike => {
+	return (url, init) => {
+		if (init?.method !== "GET") return fetchImpl(url, init);
+
+		const nextInit = init as NextFetchOptions;
+		const taggedInit: NextFetchOptions = {
+			...nextInit,
+			next: {
+				...nextInit.next,
+				tags: [
+					...(nextInit.next?.tags ?? []),
+					...createRouteCacheTagsForUrl(url, tagPrefix),
+				],
+			},
+		};
+
+		return fetchImpl(url, taggedInit);
 	};
 };
 
@@ -53,24 +65,17 @@ export const initNextClient = <TContract extends Contract>(
 	contract: TContract,
 	options: NextClientOptions,
 ): ApiClientFor<TContract> => {
-	const { automaticFetchTags, prepareFetch, ...clientOptions } = options;
+	const { automaticFetchTags, fetch, ...clientOptions } = options;
 
 	if (!automaticFetchTags?.enabled) {
 		return initClient(contract, options);
 	}
 
+	const fetchImpl = fetch ?? ((url, init) => globalThis.fetch(url, init));
+
 	return initClient(contract, {
 		...clientOptions,
-		prepareFetch: async (input) => {
-			const prepared = (await prepareFetch?.(input)) ?? input.init;
-			return prepareFetchWithTags(
-				{
-					...input,
-					init: prepared,
-				},
-				automaticFetchTags.tagPrefix,
-			);
-		},
+		fetch: fetchWithTags(fetchImpl, automaticFetchTags.tagPrefix),
 	});
 };
 

@@ -20,8 +20,8 @@ export const queryClient = new QueryClient();
 
 export const rq = initReactQueryClient(api, {
 	queryClient,
-	baseUrl: "/api",
-	getHeaders: () => ({
+	origin: "https://api.example.com",
+	getGlobalHeaders: () => ({
 		authorization: `Bearer ${readToken()}`,
 	}),
 });
