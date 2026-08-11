@@ -26,19 +26,25 @@ const createStreamResponse = (
 	headers.set("content-type", contentType);
 	const encoder = new TextEncoder();
 
-	const stream = new ReadableStream({
+	const stream = new ReadableStream<Uint8Array>({
 		async start(controller) {
-			for await (const chunk of body) {
-				if (mode === "ndjson") {
-					controller.enqueue(encoder.encode(`${JSON.stringify(chunk)}\n`));
-					continue;
-				}
+			try {
+				for await (const chunk of body) {
+					if (mode === "ndjson") {
+						controller.enqueue(encoder.encode(`${JSON.stringify(chunk)}\n`));
+						continue;
+					}
 
-				controller.enqueue(
-					typeof chunk === "string" ? encoder.encode(chunk) : chunk,
-				);
+					controller.enqueue(
+						typeof chunk === "string"
+							? encoder.encode(chunk)
+							: (chunk as Uint8Array),
+					);
+				}
+				controller.close();
+			} catch (error) {
+				controller.error(error);
 			}
-			controller.close();
 		},
 	});
 

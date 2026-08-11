@@ -130,7 +130,11 @@ async function* validateStreamChunks(
 			? schema.schema.schema
 			: schema.schema;
 		const validation = validateStandardSchemaSync(chunkSchema, chunk);
-		if (validation.issues) throw validation.issues;
+		if (validation.issues) {
+			throw new Error("Stream response validation failed.", {
+				cause: validation.issues,
+			});
+		}
 		yield validation.value;
 	}
 }

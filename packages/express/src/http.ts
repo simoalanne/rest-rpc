@@ -23,11 +23,15 @@ const writeStreamResponse = async (
 	res.status(statusCode);
 	res.setHeader("content-type", contentType);
 
-	for await (const chunk of result) {
-		res.write(mode === "ndjson" ? `${JSON.stringify(chunk)}\n` : chunk);
-	}
+	try {
+		for await (const chunk of result) {
+			res.write(mode === "ndjson" ? `${JSON.stringify(chunk)}\n` : chunk);
+		}
 
-	res.end();
+		res.end();
+	} catch (error) {
+		res.destroy(error instanceof Error ? error : undefined);
+	}
 };
 
 export const registerExpressHttpRoutes = (

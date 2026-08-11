@@ -37,13 +37,23 @@ export const createWebAdapter = (
 						: (Readable.toWeb(req) as ReadableStream),
 					duplex: "half",
 				} as RequestInit & { duplex: "half" });
-				const response = await handler(request, context);
+				let response: Response;
+				try {
+					response = await handler(request, context);
+				} catch (error) {
+					res.destroy(error instanceof Error ? error : undefined);
+					return;
+				}
 
 				res.writeHead(response.status, Object.fromEntries(response.headers));
-				if (response.body) {
-					for await (const chunk of response.body) res.write(chunk);
+				try {
+					if (response.body) {
+						for await (const chunk of response.body) res.write(chunk);
+					}
+					res.end();
+				} catch (error) {
+					res.destroy(error instanceof Error ? error : undefined);
 				}
-				res.end();
 			}),
 		);
 	},
