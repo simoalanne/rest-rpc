@@ -15,6 +15,7 @@ This repo is `rest-rpc`, a TypeScript library for defining one shared API contra
 - `@rest-rpc/next` - next.js server/client adapter
 - `@rest-rpc/tanstack-query` - TanStack Query options and key helpers
 - `content/` contains documentation for the library and its packages. documentation is written in mdx and uses https://useblume.dev/.
+- `integration-tests/` contains a shared integration test suite that runs real HTTP requests against server adapters. It is used to verify that the generated code works as expected across all supported server adapters.
 
 ### Commands
 - `pnpm run build:packages` - Packages depend on each other through declaration files. After changing exported package APIs, run this to refresh dependents or when something appears stale or fails mysteriously.
