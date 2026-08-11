@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import type { IntegrationAdapter } from "../adapters/types.ts";
-import { createIntegrationClient } from "../fixtures/client.ts";
-import type { StartedServer } from "../fixtures/listen.ts";
+import { initClient } from "@rest-rpc/core";
+import type { StartedServer } from "../harness/listen.ts";
+import { integrationContract } from "./contract.ts";
 
-type IntegrationClient = ReturnType<typeof createIntegrationClient>;
+type IntegrationClient = ReturnType<
+	typeof initClient<typeof integrationContract>
+>;
+
+type ClientHttpSuiteAdapter = {
+	name: string;
+	start(): Promise<StartedServer>;
+};
 
 type ResponseBody = Response & {
 	headers: {
@@ -26,14 +33,14 @@ function assertResponseBody(body: unknown): asserts body is ResponseBody {
 	assert.equal(typeof (body as ResponseBody).headers?.get, "function");
 }
 
-export const runClientHttpSuite = (adapter: IntegrationAdapter) => {
+export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 	describe(`${adapter.name} generated fetch client`, () => {
 		let server: StartedServer;
 		let client: IntegrationClient;
 
 		before(async () => {
 			server = await adapter.start();
-			client = createIntegrationClient(server.origin);
+			client = initClient(integrationContract, { origin: server.origin });
 		});
 
 		after(async () => {

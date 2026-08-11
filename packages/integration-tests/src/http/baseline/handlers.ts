@@ -1,5 +1,5 @@
-import type { ImplementationShape } from "@rest-rpc/server";
-import { readHandlerContext } from "./context.ts";
+import { type ImplementationShape, router } from "@rest-rpc/server";
+import { readHandlerContext } from "../harness/context.ts";
 import { type IntegrationContract, integrationContract } from "./contract.ts";
 
 export type IntegrationHandlers = ImplementationShape<IntegrationContract>;
@@ -84,11 +84,5 @@ export const createIntegrationHandlers = (): IntegrationHandlers => ({
 	},
 });
 
-export const createIntegrationImplementations = <
-	TImplementationTree extends object,
->(
-	router: (
-		contract: IntegrationContract,
-		handlers: IntegrationHandlers,
-	) => TImplementationTree,
-) => router(integrationContract, createIntegrationHandlers());
+export const createIntegrationImplementations = () =>
+	router(integrationContract, createIntegrationHandlers());
