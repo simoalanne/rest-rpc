@@ -7,12 +7,16 @@ import {
 	type ImplementationTreeFor,
 	type InferRouteHandlerRequest,
 	type InferRouteHandlerResponse,
+	type RequestValidationErrorInput,
 	type RouteHandler,
 	type RouteHandlerFor,
 	type RouteImplementation,
+	type ServerErrorHandlers,
+	type ServerErrorResponse,
 	route as serverRoute,
 	router as serverRouter,
 	routes as serverRoutes,
+	type UnhandledErrorInput,
 } from "@rest-rpc/server";
 import {
 	type CreateWebHandlerOptions,
@@ -34,7 +38,11 @@ export type {
 export type {
 	InferRouteHandlerRequest,
 	InferRouteHandlerResponse,
+	RequestValidationErrorInput,
 	RouteHandler,
+	ServerErrorHandlers,
+	ServerErrorResponse,
+	UnhandledErrorInput,
 };
 export { ContractResponseError };
 
@@ -79,7 +87,7 @@ export const createHandler = <
 	TContext extends WebRouteHandlerContext = WebRouteHandlerContext,
 >(
 	implementations: ImplementationTree<HttpRouteDeclaration>,
-	options: CreateWebHandlerOptions = {},
+	options: CreateWebHandlerOptions<TContext> = {},
 ): WebHandler<TContext> => {
 	const matchRoute = createWebRouteMatcher(implementations);
 	const parseBody = options.parseBody ?? defaultParseBody;
@@ -94,6 +102,7 @@ export const createHandler = <
 			match.implementation,
 			match.params,
 			parseBody,
+			options.errorHandlers,
 		);
 	}) as WebHandler<TContext>;
 };
@@ -113,7 +122,7 @@ export const initWeb = <
 		routes,
 		createHandler: (
 			implementations: ImplementationTree<HttpRouteDeclaration>,
-			options?: CreateWebHandlerOptions,
+			options?: CreateWebHandlerOptions<TContext>,
 		) => createHandler<TContext>(implementations, options),
 	};
 };

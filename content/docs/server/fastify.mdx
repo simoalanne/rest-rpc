@@ -98,6 +98,27 @@ throw new ContractResponseError(api.todos.get, {
 });
 ```
 
+## Error Handling
+
+Use `errorHandlers` to customize server-generated error responses. Declared
+responses returned from handlers, including `ContractResponseError`, do not run
+through these hooks.
+
+```ts
+registerRoutes(app, routes, {
+	errorHandlers: {
+		onRequestValidationError: ({ issues }) => ({
+			status: 422,
+			body: { code: "VALIDATION_ERROR", issues },
+		}),
+		onUnhandledError: () => ({
+			status: 500,
+			body: { code: "INTERNAL_SERVER_ERROR" },
+		}),
+	},
+});
+```
+
 ## Hooks
 
 `rest-rpc` does not own middleware. Use Fastify hooks and plugin scopes the same

@@ -4,6 +4,7 @@ import {
 	createWebResponse,
 	handleHttpRoute,
 	type RouteImplementation,
+	type ServerErrorHandlers,
 } from "@rest-rpc/server";
 import type { Context, Hono } from "hono";
 import type { Env } from "hono/types";
@@ -38,6 +39,7 @@ export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 	app: Hono<TEnv>,
 	routes: RouteImplementation<HttpRouteDeclaration>[],
 	parseBody: HonoParseBody<TEnv> = defaultParseBody,
+	errorHandlers?: ServerErrorHandlers<{ c: Context<TEnv> }>,
 ) => {
 	for (const implementation of routes) {
 		const route: HttpRouteDeclaration = implementation.route;
@@ -60,6 +62,7 @@ export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 					headers: c.req.header(),
 				},
 				context: { c },
+				errorHandlers,
 			});
 
 			return createWebResponse(result);

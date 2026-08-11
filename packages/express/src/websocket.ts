@@ -15,15 +15,20 @@ import {
 	prepareWebSocketUpgrade,
 	type RawWebSocket,
 	type RouteImplementation,
+	type ServerErrorHandlers,
 	type UpgradeRejection,
 } from "@rest-rpc/server";
+import type { Request } from "express";
 import type WebSocket from "ws";
 import type { WebSocketServer } from "ws";
 
 export type ExpressWebSocketOptions = {
 	server: HttpServer;
 	webSocketServer: WebSocketServer;
-	beforeUpgrade?: BeforeWebSocketUpgrade<{ req: IncomingMessage }>;
+	beforeUpgrade?: BeforeWebSocketUpgrade<{
+		kind: "websocket";
+		req: IncomingMessage;
+	}>;
 };
 
 const serializeUpgradeBody = (body: unknown) => {
@@ -96,6 +101,16 @@ const adaptWebSocket = (socket: WebSocket): RawWebSocket => ({
 export const registerExpressWebSocketRoutes = (
 	options: ExpressWebSocketOptions,
 	routes: RouteImplementation<WebSocketRouteDeclaration>[],
+	errorHandlers?: ServerErrorHandlers<
+		| {
+				kind: "http";
+				req: Request;
+		  }
+		| {
+				kind: "websocket";
+				req: IncomingMessage;
+		  }
+	>,
 ) => {
 	if (routes.length === 0) return;
 
@@ -127,11 +142,23 @@ export const registerExpressWebSocketRoutes = (
 			params: matchedRoute.params,
 			headers: req.headers,
 		};
-		const upgrade = await prepareWebSocketUpgrade({
+		const upgrade = await prepareWebSocketUpgrade<{
+			kind: "websocket";
+			req: IncomingMessage;
+		}>({
 			implementation,
 			request,
-			context: { req },
+			context: { kind: "websocket", req },
 			beforeUpgrade: options.beforeUpgrade,
+			errorHandlers: errorHandlers as
+				| Pick<
+						ServerErrorHandlers<{
+							kind: "websocket";
+							req: IncomingMessage;
+						}>,
+						"onRequestValidationError"
+				  >
+				| undefined,
 		});
 
 		if (!upgrade.ok) {
@@ -142,7 +169,7 @@ export const registerExpressWebSocketRoutes = (
 		options.webSocketServer.handleUpgrade(req, socket, head, (rawSocket) => {
 			handleWebSocketRoute(implementation.route, implementation.handler, {
 				request: upgrade.request,
-				context: { req },
+				context: { kind: "websocket", req },
 				socket: adaptWebSocket(rawSocket),
 			});
 		});

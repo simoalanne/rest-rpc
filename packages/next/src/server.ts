@@ -7,6 +7,7 @@ import {
 	type InferRouteHandlerResponse,
 	initWeb,
 	type RouteHandler,
+	type ServerErrorHandlers,
 	type WebContract,
 	type WebRequestHandler,
 	type WebRouteParseBodyInput,
@@ -32,6 +33,7 @@ export type NextRouteParseBody = (
 ) => unknown | Promise<unknown>;
 
 export type CreateRouteHandlerOptions = {
+	errorHandlers?: ServerErrorHandlers<NextRouteHandlerContext>;
 	parseBody?: NextRouteParseBody;
 };
 
@@ -42,6 +44,7 @@ export function createRouteHandler<E extends HttpRouteDeclaration>(
 ): RouteHandlerMap<E> {
 	const web = initWeb<NextRouteHandlerContext>();
 	const handle = web.createHandler(web.route(route, handler), {
+		errorHandlers: options?.errorHandlers,
 		parseBody: options?.parseBody,
 	});
 
@@ -57,6 +60,7 @@ export const createRouterHandler = <const TContract extends WebContract>(
 ): RouterHandlerMap => {
 	const web = initWeb<NextRouteHandlerContext>();
 	const handle = web.createHandler(web.router(contract, handlers), {
+		errorHandlers: options?.errorHandlers,
 		parseBody: options?.parseBody,
 	});
 	const nextHandler: WebRequestHandler = (request) =>

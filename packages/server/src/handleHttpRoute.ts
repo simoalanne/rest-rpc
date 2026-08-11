@@ -10,6 +10,10 @@ import {
 	REQUEST_CONTEXT_KEY,
 } from "@rest-rpc/core/contract";
 import { ContractResponseError } from "./contractResponseError.ts";
+import type {
+	ServerErrorHandlers,
+	ServerErrorResponse,
+} from "./errorHandlers.ts";
 import type { HttpHeaders } from "./headers.ts";
 import type { HttpRouteHandlerContext, RuntimeRouteHandler } from "./router.ts";
 import { type RequestSegments, validateRequest } from "./validation.ts";
@@ -36,6 +40,7 @@ export type HttpRouteResult =
 export type HandleHttpRouteOptions<TContext extends HttpRouteHandlerContext> = {
 	request: RequestSegments;
 	context: TContext;
+	errorHandlers?: ServerErrorHandlers<TContext>;
 };
 
 const getResponseSchema = (
@@ -188,6 +193,25 @@ const normalizeResponseResult = (
 	};
 };
 
+const normalizeServerErrorResponse = (
+	response: ServerErrorResponse,
+): HttpRouteResult => {
+	if (response.body === undefined) {
+		return {
+			kind: "empty",
+			status: response.status,
+			headers: response.headers,
+		};
+	}
+
+	return {
+		kind: "json",
+		status: response.status,
+		headers: response.headers,
+		body: response.body,
+	};
+};
+
 export const handleHttpRoute = async <
 	E extends HttpRouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
@@ -199,10 +223,15 @@ export const handleHttpRoute = async <
 	const requestValidation = validateRequest(route, options.request);
 
 	if (!requestValidation.success) {
-		return {
-			kind: "json",
-			...requestValidation.response,
-		};
+		const response =
+			(await options.errorHandlers?.onRequestValidationError?.({
+				route,
+				request: options.request,
+				context: options.context,
+				issues: requestValidation.response.body.validationErrors,
+			})) ?? requestValidation.response;
+
+		return normalizeServerErrorResponse(response);
 	}
 
 	try {
@@ -221,6 +250,14 @@ export const handleHttpRoute = async <
 				body: error.body,
 			});
 		}
+
+		const response = await options.errorHandlers?.onUnhandledError?.({
+			route,
+			request: options.request,
+			context: options.context,
+			error,
+		});
+		if (response) return normalizeServerErrorResponse(response);
 
 		throw error;
 	}

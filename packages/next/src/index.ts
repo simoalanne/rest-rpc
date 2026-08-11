@@ -1,7 +1,11 @@
 export type {
 	InferRouteHandlerRequest,
 	InferRouteHandlerResponse,
+	RequestValidationErrorInput,
 	RouteHandler,
+	ServerErrorHandlers,
+	ServerErrorResponse,
+	UnhandledErrorInput,
 } from "@rest-rpc/web";
 export { ContractResponseError } from "@rest-rpc/web";
 export type { NextClientOptions } from "./client.ts";

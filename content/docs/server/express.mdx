@@ -96,6 +96,32 @@ throw new ContractResponseError(api.todos.get, {
 });
 ```
 
+## Error Handling
+
+Use `errorHandlers` to customize server-generated error responses. Declared
+responses returned from handlers, including `ContractResponseError`, do not run
+through these hooks. For Express, `context.kind` is `"http"` for HTTP routes and
+`"websocket"` for WebSocket upgrade validation.
+
+```ts
+registerRoutes(app, routes, {
+	errorHandlers: {
+		onRequestValidationError: ({ context, issues }) => ({
+			status: 422,
+			body: {
+				code: "VALIDATION_ERROR",
+				kind: context.kind,
+				issues,
+			},
+		}),
+		onUnhandledError: () => ({
+			status: 500,
+			body: { code: "INTERNAL_SERVER_ERROR" },
+		}),
+	},
+});
+```
+
 ## Middleware
 
 `rest-rpc` does not own middleware. Use Express middleware the same way you

@@ -7,6 +7,7 @@ import {
 	createWebResponse,
 	handleHttpRoute,
 	type RouteImplementation,
+	type ServerErrorHandlers,
 } from "@rest-rpc/server";
 
 export type WebRouteHandlerContext = Record<string, unknown>;
@@ -35,7 +36,10 @@ export type WebRouteParseBody = (
 	input: WebRouteParseBodyInput,
 ) => unknown | Promise<unknown>;
 
-export type CreateWebHandlerOptions = {
+export type CreateWebHandlerOptions<
+	TContext extends WebRouteHandlerContext = WebRouteHandlerContext,
+> = {
+	errorHandlers?: ServerErrorHandlers<TContext>;
 	parseBody?: WebRouteParseBody;
 };
 
@@ -62,6 +66,7 @@ export const handleWebRoute = async <TContext extends WebRouteHandlerContext>(
 	implementation: RouteImplementation<HttpRouteDeclaration>,
 	params: Record<string, string>,
 	parseBody: WebRouteParseBody,
+	errorHandlers: ServerErrorHandlers<TContext> | undefined,
 ) => {
 	const url = new URL(request.url);
 	const result = await handleHttpRoute(
@@ -79,6 +84,7 @@ export const handleWebRoute = async <TContext extends WebRouteHandlerContext>(
 				headers: readHeaders(request.headers),
 			},
 			context,
+			errorHandlers,
 		},
 	);
 

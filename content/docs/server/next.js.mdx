@@ -87,6 +87,27 @@ Next route handlers use module exports such as `runtime`, `dynamic`, and
 `revalidate` to define route-level behavior. With a catch-all route, those
 settings apply to every contract route mounted under that file.
 
+## Error Handling
+
+Use `errorHandlers` to customize server-generated error responses. Declared
+responses returned from handlers, including `ContractResponseError`, do not run
+through these hooks.
+
+```ts
+export const { GET, POST } = createRouterHandler(api, handlers, {
+	errorHandlers: {
+		onRequestValidationError: ({ issues }) => ({
+			status: 422,
+			body: { code: "VALIDATION_ERROR", issues },
+		}),
+		onUnhandledError: () => ({
+			status: 500,
+			body: { code: "INTERNAL_SERVER_ERROR" },
+		}),
+	},
+});
+```
+
 ## WebSocket Support
 
 Websocket routes are not supported in Next.js route handlers because Next does not itself support WebSocket connections. 

@@ -254,6 +254,41 @@ describe("prepareWebSocketUpgrade", () => {
 		}
 	});
 
+	it("uses custom request validation error rejections", async () => {
+		const route = websocketRoute({
+			client: z.object({ text: z.string() }),
+			server: z.object({ text: z.string() }),
+		});
+		const implementation = { route, handler: () => undefined };
+
+		const result = await prepareWebSocketUpgrade({
+			implementation,
+			request: {},
+			context: { req: "request" },
+			errorHandlers: {
+				onRequestValidationError({ context, issues, route }) {
+					assert.deepEqual(context, { req: "request" });
+					assert.equal(route.path, "/rooms/:roomId");
+
+					return {
+						status: 422,
+						headers: { "x-error": "validation" },
+						body: { issueCount: issues.length },
+					};
+				},
+			},
+		});
+
+		assert.deepEqual(result, {
+			ok: false,
+			rejection: {
+				status: 422,
+				headers: { "x-error": "validation" },
+				body: { issueCount: 1 },
+			},
+		});
+	});
+
 	it("returns beforeUpgrade rejections after validation", async () => {
 		const route = websocketRoute({
 			client: z.object({ text: z.string() }),

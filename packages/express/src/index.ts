@@ -13,8 +13,11 @@ import {
 	type ImplementationShape,
 	type ImplementationTreeFor,
 	type InferRouteHandlerResponse,
+	type RequestValidationErrorInput,
 	type RouteHandlerFor,
 	type RouteImplementation,
+	type ServerErrorHandlers,
+	type ServerErrorResponse,
 	type InferRouteHandlerRequest as ServerInferRouteHandlerRequest,
 	type InferWebSocketRouteHandlerRequest as ServerInferWebSocketRouteHandlerRequest,
 	type RouteHandler as ServerRouteHandler,
@@ -22,19 +25,29 @@ import {
 	route as serverRoute,
 	router as serverRouter,
 	routes as serverRoutes,
+	type UnhandledErrorInput,
 } from "@rest-rpc/server";
 import type { Request } from "express";
 
+export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
 export type { ExpressWebSocketOptions } from "./websocket.ts";
-export type { InferRouteHandlerResponse };
+export type {
+	InferRouteHandlerResponse,
+	RequestValidationErrorInput,
+	ServerErrorHandlers,
+	ServerErrorResponse,
+	UnhandledErrorInput,
+};
 export { ContractResponseError, createRouteMatcher };
 
 export type HttpRouteHandlerContext = {
+	kind: "http";
 	req: Request;
 };
 
 export type WebSocketRouteHandlerContext = {
+	kind: "websocket";
 	req: IncomingMessage;
 };
 

@@ -90,6 +90,123 @@ describe("handleHttpRoute", () => {
 		assert.equal(result.status, 400);
 	});
 
+	it("uses custom request validation error responses", async () => {
+		const result = await handleHttpRoute(
+			{
+				method: "GET",
+				path: "/todos/:id",
+				request: {
+					params: {
+						id: z.number(),
+					},
+					requestKeys: {
+						id: "params",
+					},
+				},
+				responses: {
+					204: noBody(),
+				},
+			},
+			() => undefined,
+			{
+				request: {
+					params: { id: "123" },
+				},
+				context: { requestId: "request-1" },
+				errorHandlers: {
+					onRequestValidationError({ context, issues, request, route }) {
+						assert.equal(context.requestId, "request-1");
+						assert.deepEqual(request.params, { id: "123" });
+						assert.equal(route.path, "/todos/:id");
+
+						return {
+							status: 422,
+							headers: { "x-error": "validation" },
+							body: {
+								code: "VALIDATION_ERROR",
+								issueCount: issues.length,
+							},
+						};
+					},
+				},
+			},
+		);
+
+		assert.deepEqual(result, {
+			kind: "json",
+			status: 422,
+			headers: { "x-error": "validation" },
+			body: {
+				code: "VALIDATION_ERROR",
+				issueCount: 1,
+			},
+		});
+	});
+
+	it("uses custom unhandled error responses", async () => {
+		const result = await handleHttpRoute(
+			{
+				method: "GET",
+				path: "/todos",
+				responses: {
+					200: z.object({ id: z.string() }),
+				},
+			},
+			() => {
+				throw new Error("boom");
+			},
+			{
+				request: {},
+				context: { requestId: "request-1" },
+				errorHandlers: {
+					onUnhandledError({ context, error, route }) {
+						assert.equal(context.requestId, "request-1");
+						assert.equal(route.path, "/todos");
+						assert.ok(error instanceof Error);
+
+						return {
+							status: 500,
+							body: { code: "INTERNAL_SERVER_ERROR" },
+						};
+					},
+				},
+			},
+		);
+
+		assert.deepEqual(result, {
+			kind: "json",
+			status: 500,
+			headers: undefined,
+			body: { code: "INTERNAL_SERVER_ERROR" },
+		});
+	});
+
+	it("rethrows unhandled errors when the custom handler returns undefined", async () => {
+		await assert.rejects(
+			() =>
+				handleHttpRoute(
+					{
+						method: "GET",
+						path: "/todos",
+						responses: {
+							200: z.object({ id: z.string() }),
+						},
+					},
+					() => {
+						throw new Error("boom");
+					},
+					{
+						request: {},
+						context: {},
+						errorHandlers: {
+							onUnhandledError: () => undefined,
+						},
+					},
+				),
+			/boom/,
+		);
+	});
+
 	it("requires explicit response objects when a route has multiple success statuses", async () => {
 		await assert.rejects(
 			() =>
@@ -110,6 +227,7 @@ describe("handleHttpRoute", () => {
 	});
 
 	it("normalizes declared ContractResponseError responses", async () => {
+		let called = false;
 		const result = await handleHttpRoute(
 			routeWithDeclaredErrorResponse,
 			() => {
@@ -118,9 +236,19 @@ describe("handleHttpRoute", () => {
 					body: { code: "not_found" },
 				});
 			},
-			{ request: {}, context: {} },
+			{
+				request: {},
+				context: {},
+				errorHandlers: {
+					onUnhandledError: () => {
+						called = true;
+						return { status: 500 };
+					},
+				},
+			},
 		);
 
+		assert.equal(called, false);
 		assert.deepEqual(result, {
 			kind: "json",
 			status: 404,

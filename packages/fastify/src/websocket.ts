@@ -6,12 +6,17 @@ import {
 	prepareWebSocketUpgrade,
 	type RawWebSocket,
 	type RouteImplementation,
+	type ServerErrorHandlers,
 	type UpgradeRejection,
 } from "@rest-rpc/server";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 export type FastifyWebSocketOptions = {
 	beforeUpgrade?: BeforeWebSocketUpgrade<{ req: FastifyRequest }>;
+	errorHandlers?: Pick<
+		ServerErrorHandlers<{ req: FastifyRequest }>,
+		"onRequestValidationError"
+	>;
 };
 
 const adaptWebSocket = (socket: FastifyWebSocket): RawWebSocket => ({
@@ -71,6 +76,7 @@ export const registerFastifyWebSocketRoutes = (
 						request,
 						context: { req },
 						beforeUpgrade: options.beforeUpgrade,
+						errorHandlers: options.errorHandlers,
 					});
 
 					if (!upgrade.ok) {

@@ -9,8 +9,11 @@ import {
 	createRouteMatcher,
 	type ImplementationShape,
 	type ImplementationTreeFor,
+	type RequestValidationErrorInput,
 	type RouteHandlerFor,
 	type RouteImplementation,
+	type ServerErrorHandlers,
+	type ServerErrorResponse,
 	type InferRouteHandlerRequest as ServerInferRouteHandlerRequest,
 	type InferWebSocketRouteHandlerRequest as ServerInferWebSocketRouteHandlerRequest,
 	type RouteHandler as ServerRouteHandler,
@@ -18,6 +21,7 @@ import {
 	route as serverRoute,
 	router as serverRouter,
 	routes as serverRoutes,
+	type UnhandledErrorInput,
 } from "@rest-rpc/server";
 import type { Context } from "hono";
 import type { Env } from "hono/types";
@@ -26,6 +30,12 @@ export type { HonoParseBody, HonoParseBodyInput } from "./http.ts";
 export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
 export type { HonoWebSocketOptions } from "./websocket.ts";
+export type {
+	RequestValidationErrorInput,
+	ServerErrorHandlers,
+	ServerErrorResponse,
+	UnhandledErrorInput,
+};
 export { ContractResponseError, createRouteMatcher };
 
 export type HttpRouteHandlerContext<E extends Env = Env> = {

@@ -6,6 +6,7 @@ import {
 	prepareWebSocketUpgrade,
 	type RawWebSocket,
 	type RouteImplementation,
+	type ServerErrorHandlers,
 	type UpgradeRejection,
 } from "@rest-rpc/server";
 import type { Context, Hono } from "hono";
@@ -15,6 +16,10 @@ import type { UpgradeWebSocket, WSContext, WSEvents } from "hono/ws";
 export type HonoWebSocketOptions<TEnv extends Env = Env> = {
 	upgradeWebSocket: UpgradeWebSocket;
 	beforeUpgrade?: BeforeWebSocketUpgrade<{ c: Context<TEnv> }>;
+	errorHandlers?: Pick<
+		ServerErrorHandlers<{ c: Context<TEnv> }>,
+		"onRequestValidationError"
+	>;
 };
 
 type HonoUpgradeWebSocketMiddleware<TEnv extends Env = Env> = (
@@ -91,6 +96,7 @@ export const registerHonoWebSocketRoutes = <TEnv extends Env = Env>(
 				request,
 				context: { c },
 				beforeUpgrade: options.beforeUpgrade,
+				errorHandlers: options.errorHandlers,
 			});
 
 			if (!upgrade.ok) return sendUpgradeRejection(upgrade.rejection);

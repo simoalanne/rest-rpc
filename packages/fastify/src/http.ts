@@ -4,6 +4,7 @@ import {
 	handleHttpRoute,
 	handleHttpRouteResult,
 	type RouteImplementation,
+	type ServerErrorHandlers,
 } from "@rest-rpc/server";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
@@ -22,6 +23,7 @@ const toStream = (
 export const registerFastifyHttpRoutes = (
 	app: FastifyInstance,
 	routes: RouteImplementation<HttpRouteDeclaration>[],
+	errorHandlers?: ServerErrorHandlers<{ req: FastifyRequest }>,
 ) => {
 	for (const implementation of routes) {
 		const route: HttpRouteDeclaration = implementation.route;
@@ -39,6 +41,7 @@ export const registerFastifyHttpRoutes = (
 						headers: req.headers,
 					},
 					context: { req },
+					errorHandlers,
 				});
 
 				return handleHttpRouteResult(result, {

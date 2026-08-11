@@ -1,5 +1,11 @@
 export { ContractResponseError } from "./contractResponseError.ts";
 export type {
+	RequestValidationErrorInput,
+	ServerErrorHandlers,
+	ServerErrorResponse,
+	UnhandledErrorInput,
+} from "./errorHandlers.ts";
+export type {
 	HandleHttpRouteOptions,
 	HttpRouteResult,
 } from "./handleHttpRoute.ts";

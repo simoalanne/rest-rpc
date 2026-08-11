@@ -5,6 +5,7 @@ import type {
 	WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
 import { REQUEST_CONTEXT_KEY } from "@rest-rpc/core/contract";
+import type { ServerErrorHandlers } from "./errorHandlers.ts";
 import type { HttpHeaders } from "./headers.ts";
 import type {
 	CloseEventLike,
@@ -51,6 +52,10 @@ type PrepareWebSocketUpgradeOptions<
 	request: RequestSegments;
 	context: TContext;
 	beforeUpgrade?: BeforeWebSocketUpgrade<TContext>;
+	errorHandlers?: Pick<
+		ServerErrorHandlers<TContext>,
+		"onRequestValidationError"
+	>;
 };
 
 type PrepareWebSocketUpgradeResult =
@@ -64,11 +69,20 @@ export const prepareWebSocketUpgrade = async <
 	request,
 	context,
 	beforeUpgrade,
+	errorHandlers,
 }: PrepareWebSocketUpgradeOptions<TContext>): Promise<PrepareWebSocketUpgradeResult> => {
 	const requestValidation = validateRequest(implementation.route, request);
 
 	if (!requestValidation.success) {
-		return { ok: false, rejection: requestValidation.response };
+		const rejection =
+			(await errorHandlers?.onRequestValidationError?.({
+				route: implementation.route,
+				request,
+				context,
+				issues: requestValidation.response.body.validationErrors,
+			})) ?? requestValidation.response;
+
+		return { ok: false, rejection };
 	}
 
 	const rejection = await beforeUpgrade?.({

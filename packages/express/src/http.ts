@@ -1,8 +1,10 @@
+import type { IncomingMessage } from "node:http";
 import type { HttpMethod, HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	handleHttpRoute,
 	handleHttpRouteResult,
 	type RouteImplementation,
+	type ServerErrorHandlers,
 } from "@rest-rpc/server";
 import type {
 	Application,
@@ -31,6 +33,9 @@ const writeStreamResponse = async (
 export const registerExpressHttpRoutes = (
 	app: Application,
 	routes: RouteImplementation<HttpRouteDeclaration>[],
+	errorHandlers?: ServerErrorHandlers<
+		{ kind: "http"; req: Request } | { kind: "websocket"; req: IncomingMessage }
+	>,
 ) => {
 	for (const implementation of routes) {
 		const route: HttpRouteDeclaration = implementation.route;
@@ -40,7 +45,10 @@ export const registerExpressHttpRoutes = (
 		const serviceHandler = async (req: Request, res: ExpressResponse) => {
 			const result = await handleHttpRoute(route, handler, {
 				request: req,
-				context: { req },
+				context: { kind: "http", req },
+				errorHandlers: errorHandlers as
+					| ServerErrorHandlers<{ kind: "http"; req: Request }>
+					| undefined,
 			});
 
 			return handleHttpRouteResult(result, {
