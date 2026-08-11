@@ -25,6 +25,7 @@ GET /todos/todo_1
 - `@rest-rpc/express`: Express server adapter.
 - `@rest-rpc/hono`: Hono server adapter.
 - `@rest-rpc/fastify`: Fastify server adapter.
+- `@rest-rpc/web`: Web `Request`/`Response` HTTP handler adapter.
 - `@rest-rpc/next`: Next.js server/client adapter.
 - `@rest-rpc/react-query`: TanStack Query client adapter.
 

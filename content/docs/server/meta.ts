@@ -1,6 +1,6 @@
 import { defineMeta } from "blume";
 
 export default defineMeta({
-	pages: ["express", "hono", "fastify", "next.js"],
+	pages: ["web", "express", "hono", "fastify", "next.js"],
 	title: "Server",
 });

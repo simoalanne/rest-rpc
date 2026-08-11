@@ -23,6 +23,6 @@
 	},
 	"dependencies": {
 		"@rest-rpc/core": "workspace:^",
-		"@rest-rpc/server": "workspace:^"
+		"@rest-rpc/web": "workspace:^"
 	}
 }

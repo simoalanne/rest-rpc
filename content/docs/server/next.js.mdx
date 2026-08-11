@@ -1,9 +1,9 @@
 ---
 title: Next.js
-description: Register single contract routes in Next.js App Router route handlers.
+description: Register contract routes in Next.js App Router route handlers.
 ---
 
-Use `@rest-rpc/next` to create route handlers for a single contract route in Next.js App Router
+Use `@rest-rpc/next` to create route handlers for Next.js App Router.
 
 ## Install
 
@@ -11,7 +11,7 @@ Use `@rest-rpc/next` to create route handlers for a single contract route in Nex
 pnpm add @rest-rpc/core @rest-rpc/next
 ```
 
-## Basic Setup
+## Single Route Handler
 
 Contract path: `/api/todos/:id`
 App router route: `app/api/todos/[id]/route.ts`
@@ -51,52 +51,41 @@ get({ id, context }) {
 }
 ```
 
-## Handling Multiple Methods
+## Catch-all Routes
 
-If you have routes that share the same path but have different methods, you can create multiple handlers in the same file.
-`createRouteHandler()` returns an object with the route's method as the key and the handler as the value.
+Contract path: `/api/*`
+App router route: `app/api/[...rest]/route.ts`
 
 ```ts
-export const { POST } = createRouteHandler(api.todos.create, async ({ title }) => {
-	const todo = await createTodo({ title });
+import { createRouterHandler } from "@rest-rpc/next";
+import { api } from "@/contract";
 
-	return {
-		status: 201,
-		body: todo,
-	};
-});
+export const { GET, POST } = createRouterHandler(api, {
+	todos: {
+		list: async ({ context }) => {
+			const userAgent = context.request.headers.get("user-agent");
+			void userAgent;
 
-export const { GET } = createRouteHandler(api.todos.get, ({ id }) => {
-	const todo = todos.get(id);
+			return todos.list();
+		},
+		create: async ({ title }) => {
+			const todo = await todos.create({ title });
 
-	if (!todo) {
-		return {
-			status: 404,
-			body: {
-				code: "TODO_NOT_FOUND",
-			},
-		};
-	}
-
-	return todo;
+			return {
+				status: 201,
+				body: todo,
+			};
+		},
+	},
 });
 ```
 
-## Catch-all Routes
+With a catch-all route, `@rest-rpc/next` owns path matching inside that route
+module. Requests that do not match the contract return `404`.
 
-Catch-all routes are not supported natively. `@rest-rpc/next` is designed around
-Next.js App Router route boundaries, so the route's path must match the
-`route.ts` file path.
-
-A catch-all router can provide stronger whole-contract implementation checks,
-but it also makes the library own runtime path matching inside one Next.js route
-module. Next route handlers use module exports such as `runtime`, `dynamic`, and
+Next route handlers use module exports such as `runtime`, `dynamic`, and
 `revalidate` to define route-level behavior. With a catch-all route, those
 settings apply to every contract route mounted under that file.
-
-Prefer colocating contract routes with their matching App Router `route.ts`
-files. Use another server adapter when you want one router registration point
-for the whole contract.
 
 ## WebSocket Support
 

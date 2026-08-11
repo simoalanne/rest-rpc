@@ -11,7 +11,10 @@ export type {
 export { handleHttpRouteResult } from "./handleHttpRouteResult.ts";
 export type { HttpHeaders, HttpHeaderValue } from "./headers.ts";
 export { createRouteMatcher } from "./match.ts";
-export { registerRoutes as registerRouteImplementations } from "./registerRoutes.ts";
+export {
+	flattenRouteImplementations,
+	registerRoutes as registerRouteImplementations,
+} from "./registerRoutes.ts";
 export type {
 	CloseEventLike,
 	Contract,

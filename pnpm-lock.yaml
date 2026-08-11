@@ -110,9 +110,9 @@ importers:
       '@rest-rpc/core':
         specifier: workspace:^
         version: link:../core
-      '@rest-rpc/server':
+      '@rest-rpc/web':
         specifier: workspace:^
-        version: link:../server
+        version: link:../web
 
   packages/react-query:
     dependencies:
@@ -136,6 +136,15 @@ importers:
       zod:
         specifier: ^4.3.6
         version: 4.4.3
+
+  packages/web:
+    dependencies:
+      '@rest-rpc/core':
+        specifier: workspace:^
+        version: link:../core
+      '@rest-rpc/server':
+        specifier: workspace:^
+        version: link:../server
 
 packages:
 

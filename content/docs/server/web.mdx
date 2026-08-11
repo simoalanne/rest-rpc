@@ -1,0 +1,100 @@
+---
+title: Web
+description: Create HTTP handlers for runtimes that use standard Request and Response.
+---
+
+Use `@rest-rpc/web` when your server runtime or framework route gives you a
+standard `Request` and expects a standard `Response`.
+
+`@rest-rpc/web` creates handlers. It does not register routes with a framework
+router, and it only supports HTTP routes.
+
+## Install
+
+```sh
+pnpm add @rest-rpc/core @rest-rpc/web
+```
+
+## Catch-all Handler
+
+Use `createHandler()` when one route or runtime entrypoint should serve a
+contract tree.
+
+```ts
+import { initWeb } from "@rest-rpc/web";
+import { api } from "./contract";
+
+type Context = {
+	env: Env;
+	ctx: ExecutionContext;
+};
+
+const web = initWeb<Context>();
+
+const todoRoutes = web.routes(api.todos, {
+	list: web.route(api.todos.list, async ({ context }) => {
+		return listTodos(context.env.DB);
+	}),
+	create: web.route(api.todos.create, async ({ title, context }) => {
+		return createTodo(context.env.DB, title);
+	}),
+});
+
+const apiRoutes = web.routes(api, {
+	todos: todoRoutes,
+});
+
+const handleApiRequest = web.createHandler(apiRoutes);
+
+export default {
+	fetch(request, env, ctx) {
+		return handleApiRequest(request, { env, ctx });
+	},
+};
+```
+
+Requests that do not match the contract return `404`.
+
+## Single Route Handler
+
+Use `createHandler()` with `route()` when the surrounding runtime or framework
+route already picked the route.
+
+```ts
+import { initWeb } from "@rest-rpc/web";
+import { api } from "./contract";
+
+const web = initWeb<{ request: Request }>();
+
+const handleGetTodo = web.createHandler(
+	web.route(api.todos.get, ({ id, context }) => {
+		const authorization = context.request.headers.get("authorization");
+		void authorization;
+
+		return getTodo(id);
+	}),
+);
+
+export const GET = (request: Request) => {
+	return handleGetTodo(request, { request });
+};
+```
+
+Requests that do not match the route return `404`.
+
+## Custom Body Parsing
+
+By default, JSON request bodies are parsed with `request.json()`. Custom body
+schemas use `request.json()` for `application/json` and `request.text()` for
+other content types.
+
+Use `parseBody` when a route needs a different Web API body reader.
+
+```ts
+const handleUpload = web.createHandler(
+	web.route(api.uploads.create, createUpload),
+	{
+		parseBody: ({ request }) => request.formData(),
+	},
+);
+```

@@ -35,6 +35,13 @@ pnpm add @rest-rpc/core @rest-rpc/fastify fastify zod
 ```
 
 </Tab>
+<Tab title="Web">
+
+```sh
+pnpm add @rest-rpc/core @rest-rpc/web zod
+```
+
+</Tab>
 <Tab title="Next">
 
 ```sh
@@ -293,10 +300,60 @@ await app.listen({ port: 3000 });
 ```
 
 </Tab>
-<Tab title="Next">
+<Tab title="Web">
 
-Next.js App Router route handlers are file-based. Put each handler in the route
-file that matches the contract path.
+```ts
+import { initWeb } from "@rest-rpc/web";
+import { api } from "./contract";
+
+const todos = new Map([
+	["todo_1", { id: "todo_1", title: "Write docs", completed: false }],
+]);
+
+const web = initWeb();
+
+const routes = web.routes(api, {
+	todos: {
+		get: web.route(api.todos.get, ({ id }) => {
+			const todo = todos.get(id);
+
+			if (!todo) {
+				return {
+					status: 404,
+					body: { code: "TODO_NOT_FOUND" },
+				};
+			}
+
+			return todo;
+		}),
+		create: web.route(api.todos.create, ({ title }) => {
+			const todo = {
+				id: crypto.randomUUID(),
+				title,
+				completed: false,
+			};
+
+			todos.set(todo.id, todo);
+
+			return {
+				status: 201,
+				body: todo,
+			};
+		}),
+	},
+});
+
+const handleApiRequest = web.createHandler(routes);
+
+export default {
+	fetch(request: Request) {
+		return handleApiRequest(request, {});
+	},
+};
+```
+
+</Tab>
+<Tab title="Next">
 
 ```ts
 // app/todos/[id]/route.ts
@@ -319,29 +376,42 @@ export const { GET } = createRouteHandler(api.todos.get, ({ id }) => {
 ```
 
 ```ts
-// app/todos/route.ts
-import { createRouteHandler } from "@rest-rpc/next";
+// app/[...rest]/route.ts
+import { createRouterHandler } from "@rest-rpc/next";
 import { api } from "@/contract";
 import { todos } from "@/todos-store";
 
-export const { POST } = createRouteHandler(api.todos.create, ({ title }) => {
-	const todo = {
-		id: crypto.randomUUID(),
-		title,
-		completed: false,
-	};
+export const { GET, POST } = createRouterHandler(api, {
+	todos: {
+		get: ({ id }) => {
+			const todo = todos.get(id);
 
-	todos.set(todo.id, todo);
+			if (!todo) {
+				return {
+					status: 404,
+					body: { code: "TODO_NOT_FOUND" },
+				};
+			}
 
-	return {
-		status: 201,
-		body: todo,
-	};
+			return todo;
+		},
+		create: ({ title }) => {
+			const todo = {
+				id: crypto.randomUUID(),
+				title,
+				completed: false,
+			};
+
+			todos.set(todo.id, todo);
+
+			return {
+				status: 201,
+				body: todo,
+			};
+		},
+	},
 });
 ```
-
-If you place route handlers under `app/api`, include `/api` in the contract
-paths, because the Next adapter matches the full incoming pathname.
 
 </Tab>
 </Tabs>
@@ -415,9 +485,6 @@ responses become data. Declared non-2xx responses become errors.
 ## Next Steps
 
 - [Concepts](/concepts/) explains why the contract and call shapes differ.
-- [Server adapters](/server/express/) cover framework-specific setup, including
-  [Next.js App Router route handlers](/server/next/).
+- [Server adapters](/server/express/) cover framework-specific setup.
 - [Fetch Client](/client/fetch-client/) and [React Query](/client/react-query/)
   cover client behavior.
-- [Fetch Client With Next](/client/fetch-client-with-next/) covers automatic
-  Next.js cache tags.

@@ -11,17 +11,17 @@ import {
 	isWebSocketRouteImplementation,
 } from "./router.ts";
 
-const flattenImplementationTree = (
-	implementation: ImplementationTree<RouteDeclaration>,
-): RouteImplementation[] => {
+const flattenImplementationTree = <TRoute extends RouteDeclaration>(
+	implementation: ImplementationTree<TRoute>,
+): RouteImplementation<TRoute>[] => {
 	if (isRouteImplementation(implementation)) return [implementation];
 
 	return Object.values(implementation).flatMap(flattenImplementationTree);
 };
 
-const flattenAndSortImplementationTree = (
-	implementation: ImplementationTree<RouteDeclaration>,
-): RouteImplementation[] =>
+export const flattenRouteImplementations = <TRoute extends RouteDeclaration>(
+	implementation: ImplementationTree<TRoute>,
+): RouteImplementation<TRoute>[] =>
 	flattenImplementationTree(implementation).sort((left, right) =>
 		compareRouteSpecificity(left.route, right.route),
 	);
@@ -35,7 +35,7 @@ export const registerRoutes = (
 		routes: RouteImplementation<WebSocketRouteDeclaration>[],
 	) => void,
 ) => {
-	const implementationsList = flattenAndSortImplementationTree(implementations);
+	const implementationsList = flattenRouteImplementations(implementations);
 	const routes = implementationsList.filter(isHttpRouteImplementation);
 	const webSocketRoutes = implementationsList.filter(
 		isWebSocketRouteImplementation,
