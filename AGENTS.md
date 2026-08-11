@@ -20,7 +20,9 @@ This repo is `rest-rpc`, a TypeScript library for defining one shared API contra
 - `pnpm run build:packages` - Packages depend on each other through declaration files. After changing exported package APIs, run this to refresh dependents or when something appears stale or fails mysteriously.
 - `pnpm run typecheck` - Run declaration builds and workspace typechecking.
 - `pnpm run lint` - Run Biome to fix formatting and import ordering automatically.
-- `pnpm run test` - Run tests
+- `pnpm run test:unit` - Run package unit tests.
+- `pnpm run test:integration` - Run the shared real HTTP integration suite.
+- `pnpm run test` - Run both unit and integration tests. Prefer running the relevant test command for verification after code changes.
 - `pnpm run check` - Run `lint`, `typecheck`, and `test` in sequence. Use this as the broad all-in-one pass.
 
 ### Notes

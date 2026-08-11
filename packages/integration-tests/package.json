@@ -1,0 +1,28 @@
+{
+	"name": "@rest-rpc/integration-tests",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"typecheck": "tsc -p tsconfig.json",
+		"test": "node --test src/**/*.test.ts"
+	},
+	"dependencies": {
+		"@rest-rpc/core": "workspace:^",
+		"@rest-rpc/express": "workspace:^",
+		"@rest-rpc/fastify": "workspace:^",
+		"@rest-rpc/hono": "workspace:^",
+		"@rest-rpc/server": "workspace:^",
+		"@rest-rpc/tanstack-query": "workspace:^",
+		"@rest-rpc/web": "workspace:^"
+	},
+	"devDependencies": {
+		"@hono/node-server": "^2.1.0",
+		"@tanstack/query-core": "^5.0.0",
+		"@types/express": "^5.0.1",
+		"express": "^5.0.0",
+		"fastify": "^5.0.0",
+		"hono": "^4.0.0",
+		"zod": "^4.4.3"
+	}
+}

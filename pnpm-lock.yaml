@@ -105,6 +105,52 @@ importers:
         specifier: ^4.0.0
         version: 4.13.1
 
+  packages/integration-tests:
+    dependencies:
+      '@rest-rpc/core':
+        specifier: workspace:^
+        version: link:../core
+      '@rest-rpc/express':
+        specifier: workspace:^
+        version: link:../express
+      '@rest-rpc/fastify':
+        specifier: workspace:^
+        version: link:../fastify
+      '@rest-rpc/hono':
+        specifier: workspace:^
+        version: link:../hono
+      '@rest-rpc/server':
+        specifier: workspace:^
+        version: link:../server
+      '@rest-rpc/tanstack-query':
+        specifier: workspace:^
+        version: link:../tanstack-query
+      '@rest-rpc/web':
+        specifier: workspace:^
+        version: link:../web
+    devDependencies:
+      '@hono/node-server':
+        specifier: ^2.1.0
+        version: 2.1.0(hono@4.13.1)
+      '@tanstack/query-core':
+        specifier: ^5.0.0
+        version: 5.101.4
+      '@types/express':
+        specifier: ^5.0.1
+        version: 5.0.6
+      express:
+        specifier: ^5.0.0
+        version: 5.2.1
+      fastify:
+        specifier: ^5.0.0
+        version: 5.11.3
+      hono:
+        specifier: ^4.0.0
+        version: 4.13.1
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+
   packages/next:
     dependencies:
       '@rest-rpc/core':
