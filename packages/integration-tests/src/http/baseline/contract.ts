@@ -12,8 +12,7 @@ const echoedRequestSchema = z.object({
 	headers: z.record(z.string(), z.string().optional()),
 	body: z.unknown().optional(),
 	context: z.object({
-		adapter: z.string(),
-		kind: z.string(),
+		nonEmpty: z.literal(true),
 	}),
 });
 

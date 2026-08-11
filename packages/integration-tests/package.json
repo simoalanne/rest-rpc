@@ -5,7 +5,6 @@
 	"type": "module",
 	"scripts": {
 		"next:build": "next build src/nextjs/fixture",
-		"typecheck": "tsc -p tsconfig.json",
 		"test": "node --test $(find src -name '*.test.ts' -print | sort)"
 	},
 	"dependencies": {

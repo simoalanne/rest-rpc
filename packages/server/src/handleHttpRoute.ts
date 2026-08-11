@@ -40,6 +40,7 @@ export type HttpRouteResult =
 export type HandleHttpRouteOptions<TContext extends HttpRouteHandlerContext> = {
 	request: RequestSegments;
 	context: TContext;
+	errorContext?: Record<string, unknown>;
 	errorHandlers?: ServerErrorHandlers<TContext>;
 };
 
@@ -225,13 +226,14 @@ export const handleHttpRoute = async <
 	options: HandleHttpRouteOptions<TContext>,
 ): Promise<HttpRouteResult> => {
 	const requestValidation = validateRequest(route, options.request);
+	const errorContext = (options.errorContext ?? options.context) as TContext;
 
 	if (!requestValidation.success) {
 		const response =
 			(await options.errorHandlers?.onRequestValidationError?.({
 				route,
 				request: options.request,
-				context: options.context,
+				context: errorContext,
 				issues: requestValidation.response.body.validationErrors,
 			})) ?? requestValidation.response;
 
@@ -258,7 +260,7 @@ export const handleHttpRoute = async <
 		const response = await options.errorHandlers?.onUnhandledError?.({
 			route,
 			request: options.request,
-			context: options.context,
+			context: errorContext,
 			error,
 		});
 		if (response) return normalizeServerErrorResponse(response);

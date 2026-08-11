@@ -1,5 +1,5 @@
+import { REQUEST_CONTEXT_KEY } from "@rest-rpc/core/contract";
 import { type ImplementationShape, router } from "@rest-rpc/server";
-import { readHandlerContext } from "../harness/context.ts";
 import { type IntegrationContract, integrationContract } from "./contract.ts";
 
 export type IntegrationHandlers = ImplementationShape<IntegrationContract>;
@@ -16,6 +16,7 @@ export const createIntegrationHandlers = (): IntegrationHandlers => ({
 			if (request["x-test-token"] !== undefined) {
 				headers["x-test-token"] = request["x-test-token"];
 			}
+			const context = request[REQUEST_CONTEXT_KEY];
 
 			return {
 				params: { id: request.id },
@@ -25,7 +26,12 @@ export const createIntegrationHandlers = (): IntegrationHandlers => ({
 					title: request.title,
 					count: request.count,
 				},
-				context: readHandlerContext(request),
+				context: {
+					nonEmpty:
+						typeof context === "object" &&
+						context !== null &&
+						Object.keys(context).length > 0,
+				},
 			};
 		},
 		text: (request) => request.body,

@@ -173,7 +173,7 @@ export const registerExpressWebSocketRoutes = (
 		options.webSocketServer.handleUpgrade(req, socket, head, (rawSocket) => {
 			handleWebSocketRoute(implementation.route, implementation.handler, {
 				request: upgrade.request,
-				context: { kind: "websocket", req },
+				context: { req },
 				socket: adaptWebSocket(rawSocket),
 			});
 		});

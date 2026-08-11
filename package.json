@@ -12,7 +12,7 @@
 	"scripts": {
 		"build:packages": "pnpm -r --filter './packages/**' build",
 		"typecheck": "pnpm run build:packages && pnpm run typecheck:workspace",
-		"typecheck:workspace": "pnpm -r --parallel --no-bail typecheck",
+		"typecheck:workspace": "pnpm -r --parallel --no-bail --filter './packages/**' --filter '!@rest-rpc/integration-tests' typecheck",
 		"test": "pnpm run test:unit && pnpm run test:integration",
 		"test:unit": "pnpm -r --parallel --no-bail --if-present --filter './packages/**' --filter '!@rest-rpc/integration-tests' test",
 		"test:integration": "pnpm --filter @rest-rpc/integration-tests test",

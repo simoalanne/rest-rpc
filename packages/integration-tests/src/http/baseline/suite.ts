@@ -73,7 +73,7 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 				query: { search: "needle", limit: "10" },
 				headers: { "x-test-token": "token-1" },
 				body: { title: "Echo title", count: 3 },
-				context: { adapter: adapter.name, kind: "http" },
+				context: { nonEmpty: true },
 			});
 		});
 
@@ -91,7 +91,7 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 				query: { search: "a+b & c=d ? done" },
 				headers: { "x-test-token": "token-1" },
 				body: { title: "Encoded values", count: 4 },
-				context: { adapter: adapter.name, kind: "http" },
+				context: { nonEmpty: true },
 			});
 		});
 

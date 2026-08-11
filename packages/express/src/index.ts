@@ -42,12 +42,10 @@ export type {
 export { ContractResponseError, createRouteMatcher };
 
 export type HttpRouteHandlerContext = {
-	kind: "http";
 	req: Request;
 };
 
 export type WebSocketRouteHandlerContext = {
-	kind: "websocket";
 	req: IncomingMessage;
 };
 
