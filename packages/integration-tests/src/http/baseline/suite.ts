@@ -77,6 +77,24 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 			});
 		});
 
+		it("round trips encoded path params and reserved query characters", async () => {
+			const body = await client.echo.json.fetch({
+				id: "encoded id/with slash",
+				search: "a+b & c=d ? done",
+				"x-test-token": "token-1",
+				title: "Encoded values",
+				count: 4,
+			});
+
+			assert.deepEqual(body, {
+				params: { id: "encoded id/with slash" },
+				query: { search: "a+b & c=d ? done" },
+				headers: { "x-test-token": "token-1" },
+				body: { title: "Encoded values", count: 4 },
+				context: { adapter: adapter.name, kind: "http" },
+			});
+		});
+
 		it("receives declared 404 responses through fetchResponse", async () => {
 			const response = await client.items.get.fetchResponse({ id: "missing" });
 

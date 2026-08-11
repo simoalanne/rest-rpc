@@ -33,9 +33,35 @@ export const streamsContract = router({
 			),
 		},
 	},
+	rawBytes: {
+		method: "GET",
+		path: "/streams/raw-bytes",
+		responses: {
+			200: stream(
+				customBody({
+					contentType: "application/octet-stream",
+					schema: z.instanceof(Uint8Array),
+				}),
+			),
+		},
+	},
 	invalid: {
 		method: "GET",
 		path: "/streams/invalid",
+		responses: {
+			200: stream(eventSchema),
+		},
+	},
+	throwsBeforeFirstChunk: {
+		method: "GET",
+		path: "/streams/throws-before-first-chunk",
+		responses: {
+			200: stream(eventSchema),
+		},
+	},
+	throwsAfterChunks: {
+		method: "GET",
+		path: "/streams/throws-after-chunks",
 		responses: {
 			200: stream(eventSchema),
 		},

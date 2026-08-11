@@ -17,6 +17,21 @@ const collectAsyncIterable = async <T>(iterable: AsyncIterable<T>) => {
 	return items;
 };
 
+const assertFetchOrFirstIterationRejects = async <T>(
+	fetchStream: () => Promise<AsyncIterable<T>>,
+) => {
+	let stream: AsyncIterable<T>;
+	try {
+		stream = await fetchStream();
+	} catch (error) {
+		assert.ok(error);
+		return;
+	}
+
+	const iterator = stream[Symbol.asyncIterator]();
+	await assert.rejects(() => iterator.next());
+};
+
 export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 	describe(`${adapter.name} streams integration`, () => {
 		let server: StartedServer;
@@ -63,6 +78,21 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 			assert.equal(await response.body.text(), '{"not":"ndjson"}\nplain tail');
 		});
 
+		it("streams raw binary custom chunks without text encoding", async () => {
+			const response = await client.rawBytes.fetchResponse();
+
+			assert.equal(response.declared, true);
+			assert.equal(response.status, 200);
+			assert.match(
+				response.body.headers.get("content-type") ?? "",
+				/^application\/octet-stream/,
+			);
+			assert.deepEqual(
+				Array.from(new Uint8Array(await response.body.arrayBuffer())),
+				[0, 1, 127, 128, 255],
+			);
+		});
+
 		it("surfaces invalid streamed chunks while continuing client iteration", async () => {
 			const stream = await client.invalid.fetch();
 			const iterator = stream[Symbol.asyncIterator]();
@@ -70,6 +100,27 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 			assert.deepEqual(await iterator.next(), {
 				done: false,
 				value: { id: "event-1", index: 1 },
+			});
+			await assert.rejects(() => iterator.next());
+		});
+
+		it("surfaces stream failures before the first chunk", async () => {
+			await assertFetchOrFirstIterationRejects(() =>
+				client.throwsBeforeFirstChunk.fetch(),
+			);
+		});
+
+		it("surfaces stream failures after delivered chunks", async () => {
+			const stream = await client.throwsAfterChunks.fetch();
+			const iterator = stream[Symbol.asyncIterator]();
+
+			assert.deepEqual(await iterator.next(), {
+				done: false,
+				value: { id: "event-1", index: 1 },
+			});
+			assert.deepEqual(await iterator.next(), {
+				done: false,
+				value: { id: "event-2", index: 2 },
 			});
 			await assert.rejects(() => iterator.next());
 		});
