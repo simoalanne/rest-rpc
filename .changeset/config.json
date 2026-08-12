@@ -1,0 +1,23 @@
+{
+	"$schema": "https://unpkg.com/@changesets/config@4.0.0/schema.json",
+	"baseBranch": "main",
+	"access": "public",
+	"format": "auto",
+	"changelog": "@changesets/cli/changelog",
+	"commit": false,
+	"ignore": [],
+	"fixed": [
+		[
+			"@rest-rpc/core",
+			"@rest-rpc/express",
+			"@rest-rpc/fastify",
+			"@rest-rpc/hono",
+			"@rest-rpc/next",
+			"@rest-rpc/web",
+			"@rest-rpc/server",
+			"@rest-rpc/tanstack-query"
+		]
+	],
+	"linked": [],
+	"updateInternalDependencies": "patch"
+}
