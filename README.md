@@ -42,4 +42,4 @@ for adapter authors.
 
 ## Documentation
 
-Full documentation will live at [rest-rpc.dev](https://rest-rpc.dev).
+[rest-rpc.dev](https://rest-rpc.dev)
