@@ -1,0 +1,27 @@
+/* Twoslash hover popups need to escape the code block and the tab frame. */
+.prose blume-tabs:has(pre.twoslash),
+.prose blume-tabs:has(pre.twoslash) [data-blume-tab-content],
+.prose blume-tabs:has(pre.twoslash) [data-blume-tab-panel],
+.prose pre.twoslash,
+.prose pre.twoslash code {
+	overflow: visible !important;
+}
+
+.prose pre.twoslash .twoslash-popup-container {
+	z-index: 50;
+	width: max-content;
+	max-width: min(90vw, 42rem);
+}
+
+.prose pre.twoslash .twoslash-hover:not(:hover) > .twoslash-popup-container,
+.prose
+	pre.twoslash
+	.twoslash-error-hover:not(:hover)
+	> .twoslash-popup-container {
+	display: none;
+}
+
+.prose pre.twoslash .twoslash-hover:hover > .twoslash-popup-container,
+.prose pre.twoslash .twoslash-error-hover:hover > .twoslash-popup-container {
+	display: inline-flex;
+}

@@ -1,73 +1,22 @@
 ---
 title: Quickstart
-description: Define a contract, implement it on the server, and call it from a client.
+description: Define one contract, implement it on the server, and call it from a client.
 ---
 
-This guide builds one `todos` API from a shared contract.
+This guide builds one `todos.create` route from a shared contract.
 
-The same contract is used by the server and the client. HTTP method, path, and
-request locations are explicit in the contract. The handler and client call use a
-flatter function-shaped input.
-
-## Install
-
-For a server with Zod:
-
-<Tabs inline param="server">
-<Tab title="Express">
-
-```sh
-pnpm add @rest-rpc/core @rest-rpc/express express zod
-```
-
-</Tab>
-<Tab title="Hono">
-
-```sh
-pnpm add @rest-rpc/core @rest-rpc/hono zod
-```
-
-</Tab>
-<Tab title="Fastify">
-
-```sh
-pnpm add @rest-rpc/core @rest-rpc/fastify fastify zod
-```
-
-</Tab>
-<Tab title="Web">
-
-```sh
-pnpm add @rest-rpc/core @rest-rpc/web zod
-```
-
-</Tab>
-<Tab title="Next">
-
-```sh
-pnpm add @rest-rpc/core @rest-rpc/next zod
-```
-
-</Tab>
-</Tabs>
-
-For a client-only package:
-
-```sh
-pnpm add @rest-rpc/core
-```
-
-For TanStack Query:
-
-```sh
-pnpm add @rest-rpc/core @rest-rpc/tanstack-query @tanstack/query-core
-```
+The contract declares the HTTP method, path, request body, and response body once.
+The server handler and client call are inferred from that declaration.
 
 ## Define A Contract
 
-Create a shared contract file.
+Create a shared contract file. Put it somewhere both your server and client can
+import.
 
-```ts
+<Tabs>
+<Tab title="Zod">
+
+```ts contract.ts
 import { router } from "@rest-rpc/core";
 import { z } from "zod";
 
@@ -79,21 +28,6 @@ const todoSchema = z.object({
 
 export const api = router({
 	todos: {
-		get: {
-			method: "GET",
-			path: "/todos/:id",
-			request: {
-				params: {
-					id: z.string(),
-				},
-			},
-			responses: {
-				200: todoSchema,
-				404: z.object({
-					code: z.literal("TODO_NOT_FOUND"),
-				}),
-			},
-		},
 		create: {
 			method: "POST",
 			path: "/todos",
@@ -110,48 +44,139 @@ export const api = router({
 });
 ```
 
-## Schema Variants
+</Tab>
+<Tab title="Valibot">
 
-`rest-rpc` accepts Standard Schema-compatible schemas. Zod, Valibot, and ArkType
-can be used for runtime validation.
+```ts contract.ts
+import { router } from "@rest-rpc/core";
+import * as v from "valibot";
 
-The contract can also use type-only schemas when runtime validation is handled
-elsewhere.
-
-```ts
-import { router, type } from "@rest-rpc/core";
+const todoSchema = v.object({
+	id: v.string(),
+	title: v.string(),
+	completed: v.boolean(),
+});
 
 export const api = router({
 	todos: {
-		get: {
-			method: "GET",
-			path: "/todos/:id",
+		create: {
+			method: "POST",
+			path: "/todos",
 			request: {
-				params: {
-					id: type<string>(),
+				body: {
+					title: v.pipe(v.string(), v.minLength(1)),
 				},
 			},
 			responses: {
-				200: type<{
-					id: string;
-					title: string;
-					completed: boolean;
-				}>(),
+				201: todoSchema,
 			},
 		},
 	},
 });
 ```
 
-Type-only schemas are useful when the contract should carry TypeScript types but
-runtime validation is unnecessary or belongs somewhere else.
+</Tab>
+<Tab title="ArkType">
 
-## Implement The Server
+```ts contract.ts
+import { router } from "@rest-rpc/core";
+import { type } from "arktype";
 
-<Tabs inline param="server">
+const todoSchema = type({
+	id: "string",
+	title: "string",
+	completed: "boolean",
+});
+
+export const api = router({
+	todos: {
+		create: {
+			method: "POST",
+			path: "/todos",
+			request: {
+				body: {
+					title: type("string>0"),
+				},
+			},
+			responses: {
+				201: todoSchema,
+			},
+		},
+	},
+});
+```
+
+</Tab>
+
+<Tab title="None">
+
+```ts contract.ts
+import { router, type } from "@rest-rpc/core";
+
+const todoSchema = {
+	id: type<string>(),
+	title: type<string>(),
+	completed: type<boolean>(),
+};
+
+export const api = router({
+	todos: {
+		create: {
+			method: "POST",
+			path: "/todos",
+			request: {
+				body: {
+					title: type("string>0"),
+				},
+			},
+			responses: {
+				201: todoSchema,
+			},
+		},
+	},
+});
+```
+</Tab>
+</Tabs>
+
+## Server implementation
+
+Implement the contract on the server with the framework of your choice.
+
+<Tabs param="server">
 <Tab title="Express">
 
-```ts
+```ts twoslash
+// ---cut-start---
+// @filename: contract.ts
+import { router } from "@rest-rpc/core";
+import { z } from "zod";
+
+const todoSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+	completed: z.boolean(),
+});
+
+export const api = router({
+	todos: {
+		create: {
+			method: "POST",
+			path: "/todos",
+			request: {
+				body: {
+					title: z.string().min(1),
+				},
+			},
+			responses: {
+				201: todoSchema,
+			},
+		},
+	},
+});
+
+// @filename: server.ts
+// ---cut-end---
 import { registerRoutes, router } from "@rest-rpc/express";
 import express from "express";
 import { api } from "./contract";
@@ -159,24 +184,14 @@ import { api } from "./contract";
 const app = express();
 app.use(express.json());
 
-const todos = new Map([
-	["todo_1", { id: "todo_1", title: "Write docs", completed: false }],
-]);
+const todos = new Map<string, {
+	id: string;
+	title: string;
+	completed: boolean;
+}>();
 
 const routes = router(api, {
 	todos: {
-		get({ id }) {
-			const todo = todos.get(id);
-
-			if (!todo) {
-				return {
-					status: 404,
-					body: { code: "TODO_NOT_FOUND" },
-				};
-			}
-
-			return todo;
-		},
 		create({ title }) {
 			const todo = {
 				id: crypto.randomUUID(),
@@ -200,83 +215,54 @@ app.listen(3000);
 ```
 
 </Tab>
-<Tab title="Hono">
 
-```ts
-import { registerRoutes, router } from "@rest-rpc/hono";
-import { Hono } from "hono";
-import { api } from "./contract";
+<Tab title="Fastify">
 
-const app = new Hono();
+```ts twoslash
+// ---cut-start---
+// @filename: contract.ts
+import { router } from "@rest-rpc/core";
+import { z } from "zod";
 
-const todos = new Map([
-	["todo_1", { id: "todo_1", title: "Write docs", completed: false }],
-]);
+const todoSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+	completed: z.boolean(),
+});
 
-const routes = router(api, {
+export const api = router({
 	todos: {
-		get({ id }) {
-			const todo = todos.get(id);
-
-			if (!todo) {
-				return {
-					status: 404,
-					body: { code: "TODO_NOT_FOUND" },
-				};
-			}
-
-			return todo;
-		},
-		create({ title }) {
-			const todo = {
-				id: crypto.randomUUID(),
-				title,
-				completed: false,
-			};
-
-			todos.set(todo.id, todo);
-
-			return {
-				status: 201,
-				body: todo,
-			};
+		create: {
+			method: "POST",
+			path: "/todos",
+			request: {
+				body: {
+					title: z.string().min(1),
+				},
+			},
+			responses: {
+				201: todoSchema,
+			},
 		},
 	},
 });
 
-registerRoutes(app, routes);
-
-export default app;
-```
-
-</Tab>
-<Tab title="Fastify">
-
-```ts
+// @filename: server.ts
+// ---cut-end---
 import { registerRoutes, router } from "@rest-rpc/fastify";
 import Fastify from "fastify";
 import { api } from "./contract";
 
 const app = Fastify();
 
-const todos = new Map([
-	["todo_1", { id: "todo_1", title: "Write docs", completed: false }],
-]);
+const todos = new Map<string, {
+	id: string;
+	title: string;
+	completed: boolean;
+}>();
 
 const routes = router(api, {
 	todos: {
-		get({ id }) {
-			const todo = todos.get(id);
-
-			if (!todo) {
-				return {
-					status: 404,
-					body: { code: "TODO_NOT_FOUND" },
-				};
-			}
-
-			return todo;
-		},
 		create({ title }) {
 			const todo = {
 				id: crypto.randomUUID(),
@@ -300,33 +286,55 @@ await app.listen({ port: 3000 });
 ```
 
 </Tab>
-<Tab title="Web">
 
-```ts
-import { initWeb } from "@rest-rpc/web";
+<Tab title="Hono">
+
+```ts twoslash
+// ---cut-start---
+// @filename: contract.ts
+import { router } from "@rest-rpc/core";
+import { z } from "zod";
+
+const todoSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+	completed: z.boolean(),
+});
+
+export const api = router({
+	todos: {
+		create: {
+			method: "POST",
+			path: "/todos",
+			request: {
+				body: {
+					title: z.string().min(1),
+				},
+			},
+			responses: {
+				201: todoSchema,
+			},
+		},
+	},
+});
+
+// @filename: server.ts
+// ---cut-end---
+import { registerRoutes, router } from "@rest-rpc/hono";
+import { Hono } from "hono";
 import { api } from "./contract";
 
-const todos = new Map([
-	["todo_1", { id: "todo_1", title: "Write docs", completed: false }],
-]);
+const app = new Hono();
 
-const web = initWeb();
+const todos = new Map<string, {
+	id: string;
+	title: string;
+	completed: boolean;
+}>();
 
-const routes = web.routes(api, {
+const routes = router(api, {
 	todos: {
-		get: web.route(api.todos.get, ({ id }) => {
-			const todo = todos.get(id);
-
-			if (!todo) {
-				return {
-					status: 404,
-					body: { code: "TODO_NOT_FOUND" },
-				};
-			}
-
-			return todo;
-		}),
-		create: web.route(api.todos.create, ({ title }) => {
+		create({ title }) {
 			const todo = {
 				id: crypto.randomUUID(),
 				title,
@@ -339,63 +347,62 @@ const routes = web.routes(api, {
 				status: 201,
 				body: todo,
 			};
-		}),
+		},
 	},
 });
 
-const handleApiRequest = web.createHandler(routes);
+registerRoutes(app, routes);
 
-export default {
-	fetch(request: Request) {
-		return handleApiRequest(request, {});
-	},
-};
+export default app;
 ```
 
 </Tab>
-<Tab title="Next">
 
-```ts
-// app/todos/[id]/route.ts
-import { createRouteHandler } from "@rest-rpc/next";
-import { api } from "@/contract";
-import { todos } from "@/todos-store";
+<Tab title="Next.js">
 
-export const { GET } = createRouteHandler(api.todos.get, ({ id }) => {
-	const todo = todos.get(id);
+```ts twoslash
+// ---cut-start---
+// @filename: contract.ts
+import { router } from "@rest-rpc/core";
+import { z } from "zod";
 
-	if (!todo) {
-		return {
-			status: 404,
-			body: { code: "TODO_NOT_FOUND" },
-		};
-	}
-
-	return todo;
+const todoSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+	completed: z.boolean(),
 });
-```
 
-```ts
-// app/[...rest]/route.ts
-import { createRouterHandler } from "@rest-rpc/next";
-import { api } from "@/contract";
-import { todos } from "@/todos-store";
-
-export const { GET, POST } = createRouterHandler(api, {
+export const api = router({
 	todos: {
-		get: ({ id }) => {
-			const todo = todos.get(id);
-
-			if (!todo) {
-				return {
-					status: 404,
-					body: { code: "TODO_NOT_FOUND" },
-				};
-			}
-
-			return todo;
+		create: {
+			method: "POST",
+			path: "/todos",
+			request: {
+				body: {
+					title: z.string().min(1),
+				},
+			},
+			responses: {
+				201: todoSchema,
+			},
 		},
-		create: ({ title }) => {
+	},
+});
+
+// @filename: route.ts
+// ---cut-end---
+import { createRouterHandler } from "@rest-rpc/next";
+import { api } from "./contract";
+
+const todos = new Map<string, {
+	id: string;
+	title: string;
+	completed: boolean;
+}>();
+
+export const { POST } = createRouterHandler(api, {
+	todos: {
+		create({ title }) {
 			const todo = {
 				id: crypto.randomUUID(),
 				title,
@@ -416,13 +423,44 @@ export const { GET, POST } = createRouterHandler(api, {
 </Tab>
 </Tabs>
 
-Handlers receive flattened request input. The contract says `id` comes from
-route params and `title` comes from the request body, so the handler can read
-them directly.
+## Client implementation
 
-## Call With The Fetch Client
+Use the same contract to create a typed client.
 
-```ts
+<Tabs>
+<Tab title="Fetch Client">
+
+```ts twoslash
+// ---cut-start---
+// @filename: contract.ts
+import { router } from "@rest-rpc/core";
+import { z } from "zod";
+
+const todoSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+	completed: z.boolean(),
+});
+
+export const api = router({
+	todos: {
+		create: {
+			method: "POST",
+			path: "/todos",
+			request: {
+				body: {
+					title: z.string().min(1),
+				},
+			},
+			responses: {
+				201: todoSchema,
+			},
+		},
+	},
+});
+
+// @filename: client.ts
+// ---cut-end---
 import { initClient } from "@rest-rpc/core";
 import { api } from "./contract";
 
@@ -430,62 +468,72 @@ const client = initClient(api, {
 	origin: "http://localhost:3000",
 });
 
-const todo = await client.todos.get.fetch({ id: "todo_1" });
-
-const created = await client.todos.create.fetch({
+const todo = await client.todos.create.fetch({
 	title: "Ship v1",
 });
 ```
 
-`fetch()` returns the successful response body directly. It throws if the server
-does not return a declared success response.
+</Tab>
+<Tab title="TanStack Query">
 
-Use `fetchResponse()` when the status is part of normal control flow.
+```tsx twoslash
+// ---cut-start---
+// @filename: contract.ts
+import { router } from "@rest-rpc/core";
+import { z } from "zod";
 
-```ts
-const response = await client.todos.get.fetchResponse({ id: "todo_1" });
+const todoSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+	completed: z.boolean(),
+});
 
-if (response.declared && response.status === 200) {
-	console.log(response.body.title);
-}
+export const api = router({
+	todos: {
+		create: {
+			method: "POST",
+			path: "/todos",
+			request: {
+				body: {
+					title: z.string().min(1),
+				},
+			},
+			responses: {
+				201: todoSchema,
+			},
+		},
+	},
+});
 
-if (response.declared && response.status === 404) {
-	console.log(response.body.code);
-}
-```
-
-## Call With TanStack Query
-
-```tsx
+// @filename: client.tsx
+// ---cut-end---
 import { initTanstackQuery } from "@rest-rpc/tanstack-query";
-import { QueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { api } from "./contract";
 
-export const queryClient = new QueryClient();
-
-export const tq = initTanstackQuery(api, {
+const tq = initTanstackQuery(api, {
 	origin: "http://localhost:3000",
+});
+
+const createTodo = useMutation(
+	tq.todos.create.mutationOptions({
+		onSuccess(response) {
+			console.log(response.body.id);
+		},
+	}),
+);
+
+createTodo.mutate({
+	title: "Ship v1",
 });
 ```
 
-```tsx
-import { useMutation, useQuery } from "@tanstack/react-query";
-
-const todo = useQuery(tq.todos.get.queryOptions({ id: "todo_1" }));
-
-const createTodo = useMutation(tq.todos.create.mutationOptions({
-	onSuccess(created) {
-		console.log(created.body.id);
-	},
-}));
-```
-
-TanStack Query follows its normal success and error channels. Declared 2xx
-responses become data. Declared non-2xx responses become errors.
+</Tab>
+</Tabs>
 
 ## Next Steps
 
-- [Concepts](/concepts/) explains why the contract and call shapes differ.
+- [Contract](/contract/) explains the route declaration shape.
 - [Server adapters](/server/express/) cover framework-specific setup.
 - [Fetch Client](/client/fetch-client/) and [TanStack Query](/client/tanstack-query/)
-  cover client behavior.
+  cover client behavior in more detail.

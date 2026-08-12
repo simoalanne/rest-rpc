@@ -39,9 +39,51 @@ importers:
 
   content:
     dependencies:
+      '@rest-rpc/core':
+        specifier: workspace:*
+        version: link:../packages/core
+      '@rest-rpc/express':
+        specifier: workspace:*
+        version: link:../packages/express
+      '@rest-rpc/fastify':
+        specifier: workspace:*
+        version: link:../packages/fastify
+      '@rest-rpc/hono':
+        specifier: workspace:*
+        version: link:../packages/hono
+      '@rest-rpc/next':
+        specifier: workspace:*
+        version: link:../packages/next
+      '@rest-rpc/tanstack-query':
+        specifier: workspace:*
+        version: link:../packages/tanstack-query
+      '@rest-rpc/web':
+        specifier: workspace:*
+        version: link:../packages/web
+      '@tanstack/query-core':
+        specifier: ^5.101.4
+        version: 5.101.4
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      '@types/express':
+        specifier: 5.0.6
+        version: 5.0.6
       blume:
         specifier: ^1.4.0
         version: 1.4.0(@astrojs/markdown-remark@7.2.2)(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@shikijs/themes@4.4.2)(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(@vercel/functions@3.9.1(ws@8.21.3))(csstype@3.2.3)(esbuild@0.28.2)(next@16.3.0(@babel/core@7.29.7)(@types/node@26.2.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(prettier@3.9.6)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0))(ws@8.21.3)(yaml@2.9.0)
+      express:
+        specifier: 5.2.1
+        version: 5.2.1
+      fastify:
+        specifier: 5.11.3
+        version: 5.11.3
+      hono:
+        specifier: 4.13.1
+        version: 4.13.1
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
   integration-tests:
     dependencies:
@@ -1566,6 +1608,11 @@ packages:
 
   '@tanstack/query-core@5.101.4':
     resolution: {integrity: sha512-gNwcvOJcRbLWPOLG/2OBm+zM+Yv+MKsXKEOWC57USuZDEsI71hEErQsiEGx5wX9rzWWkfwM0fVSPoiIFSsxfiw==}
+
+  '@tanstack/react-query@5.101.4':
+    resolution: {integrity: sha512-yRg2pfOCxIs4ZJW3XYYHU/WgtD04FHSnfHlpRT7h7pR77hwkdRG4wxbKe4aq6P0RvXUTBSQpQeadS1SUYUe+KA==}
+    peerDependencies:
+      react: ^18 || ^19
 
   '@tsd/typescript@5.9.3':
     resolution: {integrity: sha512-JSSdNiS0wgd8GHhBwnMAI18Y8XPhLVN+dNelPfZCXFhy9Lb3NbnFyp9JKxxr54jSUkEJPk3cidvCoHducSaRMQ==}
@@ -6437,6 +6484,11 @@ snapshots:
       - react
 
   '@tanstack/query-core@5.101.4': {}
+
+  '@tanstack/react-query@5.101.4(react@19.2.8)':
+    dependencies:
+      '@tanstack/query-core': 5.101.4
+      react: 19.2.8
 
   '@tsd/typescript@5.9.3': {}
 
