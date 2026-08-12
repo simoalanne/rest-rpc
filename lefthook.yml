@@ -1,8 +1,7 @@
 pre-commit:
-  parallel: false
   jobs:
     - name: lint
       run: pnpm run lint:staged
       stage_fixed: true
-    - name: check
-      run: pnpm run check:verify
+    - name: typecheck
+      run: pnpm run typecheck

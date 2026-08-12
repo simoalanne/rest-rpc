@@ -15,7 +15,7 @@
 		"typecheck:workspace": "pnpm -r --parallel --no-bail --filter './packages/**' --filter '!integration-tests' typecheck",
 		"test": "pnpm run test:unit && pnpm run test:integration",
 		"test:unit": "pnpm -r --parallel --no-bail --if-present --filter './packages/**' --filter '!integration-tests' test",
-		"test:integration": "pnpm --filter integration-tests test",
+		"test:integration": "pnpm run build:packages && pnpm --filter integration-tests test",
 		"lint": "biome check --write .",
 		"lint:verify": "biome check .",
 		"lint:staged": "biome check --write --staged --no-errors-on-unmatched",

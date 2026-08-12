@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"next:build": "next build src/nextjs/fixture",
-		"test": "node --test $(find src -name '*.test.ts' -print | sort)"
+		"test": "pnpm run next:build && node --test $(find src -name '*.test.ts' -print | sort)"
 	},
 	"dependencies": {
 		"@rest-rpc/core": "workspace:^",

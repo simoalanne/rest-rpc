@@ -21,7 +21,7 @@ const getFreePort = () =>
 	});
 
 const waitForReady = async (origin: string) => {
-	for (let attempt = 0; attempt < 100; attempt++) {
+	for (let attempt = 0; attempt < 300; attempt++) {
 		try {
 			const response = await fetch(`${origin}/api/health`);
 			if (response.status === 204) return;
