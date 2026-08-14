@@ -1,5 +1,7 @@
 # @rest-rpc/fastify
 
+## 0.1.0-beta.1
+
 ## 0.1.0-beta.0
 
 ### Minor Changes
