@@ -29,7 +29,8 @@
 		"check": "pnpm run lint && pnpm run typecheck && pnpm run test",
 		"check:verify": "pnpm run lint:verify && pnpm run typecheck && pnpm run test",
 		"docs:dev": "pnpm run build:packages && pnpm --filter content dev",
-		"docs:build": "pnpm run build:packages && pnpm --filter content build"
+		"docs:build": "pnpm run build:packages && pnpm --filter content build",
+		"docs:preview": "pnpm run build:packages && pnpm --filter content preview"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.11",
