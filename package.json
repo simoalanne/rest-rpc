@@ -22,7 +22,7 @@
 		"lint:write": "pnpm run lint:staged",
 		"lint:unsafe": "biome check --write --unsafe --staged --no-errors-on-unmatched",
 		"changeset:version": "changeset version && pnpm install --lockfile-only --no-frozen-lockfile",
-		"release": "pnpm run build:packages && changeset publish --no-git-tag",
+		"release": "pnpm run build:packages && changeset publish",
 		"release:github:notes": "node scripts/create-github-release.ts --notes",
 		"bench:typecheck": "pnpm --filter @rest-rpc/core build && pnpm --filter @rest-rpc/benchmarks bench:typecheck",
 		"readme:sync": "node scripts/sync-readmes.cjs",
