@@ -94,6 +94,12 @@ messages close the connection.
 Outgoing server messages are validated before being sent.
 They are sent as JSON, so schema output must still make sense as a JSON message.
 
+WebSocket message schemas must validate synchronously. Standard Schema allows
+validators to return promises, but `socket.send()` and message dispatch are
+synchronous APIs. If `messages.client` or `messages.server` returns a promise
+during validation, `rest-rpc` rejects the message at runtime. Put async checks in
+the route handler or `socket.onMessage(async message => { ... })` instead.
+
 ## Client
 
 WebSocket client routes expose `openConnection()`.

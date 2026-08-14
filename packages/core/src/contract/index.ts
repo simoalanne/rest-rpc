@@ -10,9 +10,7 @@ export type {
 } from "./define.ts";
 export {
 	route,
-	routeAsync,
 	router,
-	routerAsync,
 } from "./define.ts";
 export type {
 	ClientErrors,

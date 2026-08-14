@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
 import { testContract } from "../../test/factories/contract.ts";
-import { router, routerAsync } from "./define.ts";
+import { router } from "./define.ts";
 import { noBody } from "./route.ts";
 
 describe("router", () => {
@@ -21,23 +21,6 @@ describe("router", () => {
 		assert.deepEqual(contract.search.find.request.requestKeys, {
 			id: "params",
 		});
-	});
-
-	it("rejects async request key resolution", () => {
-		assert.throws(
-			() =>
-				router(
-					testContract({
-						request: {
-							query: z.string(),
-						},
-					}),
-					{
-						resolveRequestKeys: async () => ["q"],
-					},
-				),
-			/use routerAsync/i,
-		);
 	});
 
 	it("allows validation to be deferred to a parent contract", () => {
@@ -151,26 +134,5 @@ describe("router", () => {
 				}),
 			/response description for status 200 without a matching response schema/,
 		);
-	});
-});
-
-describe("routerAsync", () => {
-	it("normalizes and validates contracts with async request key resolution", async () => {
-		const contract = await routerAsync(
-			testContract({
-				request: {
-					query: z.string(),
-				},
-			}),
-			{
-				pathPrefix: "/api",
-				resolveRequestKeys: async () => ["q"],
-			},
-		);
-
-		assert.equal(contract.search.find.path, "/api/search");
-		assert.deepEqual(contract.search.find.request.requestKeys, {
-			q: "query",
-		});
 	});
 });

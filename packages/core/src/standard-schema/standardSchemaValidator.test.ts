@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { type StandardSchemaV1, validateStandardSchemaSync } from "./index.ts";
+import {
+	type StandardSchemaV1,
+	validateStandardSchema,
+	validateStandardSchemaSync,
+} from "./index.ts";
 
-describe("validateStandardSchemaSync", () => {
-	it("returns synchronous validation results", () => {
+describe("validateStandardSchema", () => {
+	it("returns synchronous validation results", async () => {
 		const schema: StandardSchemaV1<unknown, string> = {
 			"~standard": {
 				version: 1,
@@ -12,11 +16,13 @@ describe("validateStandardSchemaSync", () => {
 			},
 		};
 
-		assert.deepEqual(validateStandardSchemaSync(schema, "input"), {
+		assert.deepEqual(await validateStandardSchema(schema, "input"), {
 			value: "ok",
 		});
 	});
+});
 
+describe("validateStandardSchemaSync", () => {
 	it("rejects async validation results", () => {
 		const schema: StandardSchemaV1<unknown, string> = {
 			"~standard": {

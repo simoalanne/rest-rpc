@@ -8,7 +8,7 @@ import {
 	isStream,
 	REQUEST_CONTEXT_KEY,
 } from "@rest-rpc/core/contract";
-import { validateStandardSchemaSync } from "@rest-rpc/core/standard-schema";
+import { validateStandardSchema } from "@rest-rpc/core/standard-schema";
 import { ContractResponseError } from "./contractResponseError.ts";
 import type {
 	ServerErrorHandlers,
@@ -98,21 +98,21 @@ const normalizeHandlerResult = (
 	};
 };
 
-const validateOutgoingResponse = (
+const validateOutgoingResponse = async (
 	schema: ResponseBodySchema | undefined,
 	body: unknown,
-) => {
+): Promise<unknown> => {
 	if (!schema || isNoBody(schema) || isStream(schema)) {
 		return body;
 	}
 
 	if (isCustomBody(schema)) {
-		const validation = validateStandardSchemaSync(schema.schema, body);
+		const validation = await validateStandardSchema(schema.schema, body);
 		if (validation.issues) throw validation.issues;
 		return validation.value;
 	}
 
-	const validation = validateStandardSchemaSync(schema, body);
+	const validation = await validateStandardSchema(schema, body);
 	if (validation.issues) throw validation.issues;
 	return validation.value;
 };
@@ -130,7 +130,7 @@ async function* validateStreamChunks(
 		const chunkSchema = isCustomBody(schema.schema)
 			? schema.schema.schema
 			: schema.schema;
-		const validation = validateStandardSchemaSync(chunkSchema, chunk);
+		const validation = await validateStandardSchema(chunkSchema, chunk);
 		if (validation.issues) {
 			throw new Error("Stream response validation failed.", {
 				cause: validation.issues,
@@ -140,14 +140,14 @@ async function* validateStreamChunks(
 	}
 }
 
-const normalizeResponseResult = (
+const normalizeResponseResult = async (
 	route: HttpRouteDeclaration,
 	result: {
 		status: number;
 		body: unknown;
 		headers?: HttpHeaders;
 	},
-): HttpRouteResult => {
+): Promise<HttpRouteResult> => {
 	const schema = getResponseSchema(route, result.status);
 
 	if (schema && isNoBody(schema)) {
@@ -186,7 +186,7 @@ const normalizeResponseResult = (
 			status: result.status,
 			headers: result.headers,
 			contentType: schema.contentType,
-			body: validateOutgoingResponse(schema, result.body),
+			body: await validateOutgoingResponse(schema, result.body),
 		};
 	}
 
@@ -194,7 +194,7 @@ const normalizeResponseResult = (
 		kind: "json",
 		status: result.status,
 		headers: result.headers,
-		body: validateOutgoingResponse(schema, result.body),
+		body: await validateOutgoingResponse(schema, result.body),
 	};
 };
 
@@ -225,7 +225,7 @@ export const handleHttpRoute = async <
 	handler: RuntimeRouteHandler,
 	options: HandleHttpRouteOptions<TContext>,
 ): Promise<HttpRouteResult> => {
-	const requestValidation = validateRequest(route, options.request);
+	const requestValidation = await validateRequest(route, options.request);
 	const errorContext = (options.errorContext ?? options.context) as TContext;
 
 	if (!requestValidation.success) {
@@ -245,13 +245,13 @@ export const handleHttpRoute = async <
 			...requestValidation.data,
 			[REQUEST_CONTEXT_KEY]: options.context,
 		});
-		return normalizeResponseResult(
+		return await normalizeResponseResult(
 			route,
 			normalizeHandlerResult(route, handlerResult),
 		);
 	} catch (error) {
 		if (error instanceof ContractResponseError) {
-			return normalizeResponseResult(route, {
+			return await normalizeResponseResult(route, {
 				status: error.status,
 				body: error.body,
 			});

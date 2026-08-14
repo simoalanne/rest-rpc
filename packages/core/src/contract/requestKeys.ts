@@ -1,14 +1,8 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 
-const isThenable = (value: unknown): value is PromiseLike<unknown> =>
-	(typeof value === "object" || typeof value === "function") &&
-	value !== null &&
-	"then" in value &&
-	typeof value.then === "function";
-
 export type ResolveRequestSchemaKeys = (
 	schema: StandardSchemaV1,
-) => readonly string[] | undefined | Promise<readonly string[] | undefined>;
+) => readonly string[] | undefined;
 
 export type RequestKeyResolverOptions = {
 	resolveRequestKeys?: ResolveRequestSchemaKeys;
@@ -107,24 +101,11 @@ export const resolveBuiltInRequestKeys = (
 	}
 };
 
-export const resolveSchemaKeysSync = (
+export const resolveSchemaKeys = (
 	schema: StandardSchemaV1,
 	options: RequestKeyResolverOptions | undefined,
 ) => {
 	const resolved = options?.resolveRequestKeys?.(schema);
-	if (isThenable(resolved)) {
-		throw new Error(
-			"router() received an async request key resolver result. Use routerAsync() for async request key resolution.",
-		);
-	}
 
-	return resolved ?? resolveBuiltInRequestKeys(schema);
-};
-
-export const resolveSchemaKeysAsync = async (
-	schema: StandardSchemaV1,
-	options: RequestKeyResolverOptions | undefined,
-) => {
-	const resolved = await options?.resolveRequestKeys?.(schema);
 	return resolved ?? resolveBuiltInRequestKeys(schema);
 };

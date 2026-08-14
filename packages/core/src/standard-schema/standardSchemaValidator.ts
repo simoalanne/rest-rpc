@@ -22,3 +22,11 @@ export const validateStandardSchemaSync = <TSchema extends StandardSchemaV1>(
 		StandardSchemaV1.InferOutput<TSchema>
 	>;
 };
+
+export const validateStandardSchema = async <TSchema extends StandardSchemaV1>(
+	schema: TSchema,
+	value: unknown,
+): Promise<StandardSchemaV1.Result<StandardSchemaV1.InferOutput<TSchema>>> =>
+	schema["~standard"].validate(value) as
+		| StandardSchemaV1.Result<StandardSchemaV1.InferOutput<TSchema>>
+		| Promise<StandardSchemaV1.Result<StandardSchemaV1.InferOutput<TSchema>>>;
