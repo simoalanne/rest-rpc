@@ -8,6 +8,6 @@ type Changeset = {
 
 export default {
 	getReleaseLine: (changeset: Changeset) =>
-		`- ${changeset.commit}: ${changeset.summary}`,
+		`- ${changeset.commit?.slice(0, 7) ?? ""}: ${changeset.summary}`,
 	getDependencyReleaseLine: () => "",
 };
