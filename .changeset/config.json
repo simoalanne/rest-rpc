@@ -3,8 +3,8 @@
 	"baseBranch": "main",
 	"access": "public",
 	"format": "auto",
-	"changelog": "@changesets/cli/changelog",
-	"commit": false,
+	"changelog": "./changelog-generator.ts",
+	"commit": true,
 	"ignore": [],
 	"fixed": [
 		[
