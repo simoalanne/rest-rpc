@@ -14,7 +14,7 @@ import type {
 	ValidateRequestValueSchemas,
 	ValidateResponseStatuses,
 } from "./route.ts";
-import { validateContractAsync, validateContractSync } from "./validate.ts";
+import { validateContractSync } from "./validate.ts";
 
 export type RouteContractOptions = {
 	resolveRequestKeys?: ResolveRequestSchemaKeys;
@@ -207,21 +207,6 @@ export const route = <const TRoute extends RouteDeclaration>(
 	return route as TRoute;
 };
 
-export const routeAsync = async <const TRoute extends RouteDeclaration>(
-	route: TRoute &
-		ValidateResponseStatuses<NoInfer<TRoute>> &
-		ValidateHeaderSchemas<NoInfer<TRoute>> &
-		ValidateRequestValueSchemas<NoInfer<TRoute>> &
-		ValidateRequestObjectSchemas<NoInfer<TRoute>>,
-	options?: RouteContractOptions,
-): Promise<TRoute> => {
-	normalizeContract(route);
-	if (options?.validate !== false) {
-		await validateContractAsync(route, options);
-	}
-	return route as TRoute;
-};
-
 export const router = <
 	const TContract extends Contract,
 	const TOptions extends RouterContractOptions | undefined = undefined,
@@ -240,28 +225,6 @@ export const router = <
 	normalizeContract(contract, commonOptions);
 	if (commonOptions?.validate !== false) {
 		validateContractSync(contract, commonOptions);
-	}
-	return contract as ApplyRouterOptions<TContract, TOptions>;
-};
-
-export const routerAsync = async <
-	const TContract extends Contract,
-	const TOptions extends RouterContractOptions | undefined = undefined,
->(
-	contract: TContract &
-		ValidateResponseStatuses<NoInfer<ApplyRouterOptions<TContract, TOptions>>> &
-		ValidateHeaderSchemas<NoInfer<ApplyRouterOptions<TContract, TOptions>>> &
-		ValidateRequestValueSchemas<
-			NoInfer<ApplyRouterOptions<TContract, TOptions>>
-		> &
-		ValidateRequestObjectSchemas<
-			NoInfer<ApplyRouterOptions<TContract, TOptions>>
-		>,
-	commonOptions?: TOptions,
-): Promise<ApplyRouterOptions<TContract, TOptions>> => {
-	normalizeContract(contract, commonOptions);
-	if (commonOptions?.validate !== false) {
-		await validateContractAsync(contract, commonOptions);
 	}
 	return contract as ApplyRouterOptions<TContract, TOptions>;
 };

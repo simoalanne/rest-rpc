@@ -9,7 +9,7 @@ import {
 	isStandardSchema,
 	isStream,
 } from "../contract/route.ts";
-import { validateStandardSchemaSync } from "../standard-schema/index.ts";
+import { validateStandardSchema } from "../standard-schema/index.ts";
 import { isHttpRouteNode, isSuccessStatus } from "./routes.ts";
 import { parseNdjsonStream } from "./stream.ts";
 import type { ClientFetchResponse, FetchArgs } from "./types.ts";
@@ -61,7 +61,7 @@ export const readDeclaredBody = async (
 	const value = await rawResponse.json();
 	if (!validate) return value;
 
-	const result = validateStandardSchemaSync(schema, value);
+	const result = await validateStandardSchema(schema, value);
 	if (result.issues) throw result.issues;
 	return result.value;
 };

@@ -71,7 +71,10 @@ export const prepareWebSocketUpgrade = async <
 	beforeUpgrade,
 	errorHandlers,
 }: PrepareWebSocketUpgradeOptions<TContext>): Promise<PrepareWebSocketUpgradeResult> => {
-	const requestValidation = validateRequest(implementation.route, request);
+	const requestValidation = await validateRequest(
+		implementation.route,
+		request,
+	);
 
 	if (!requestValidation.success) {
 		const rejection =

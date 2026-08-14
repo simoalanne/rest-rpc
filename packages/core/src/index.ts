@@ -35,9 +35,7 @@ export {
 	isCustomBody,
 	noBody,
 	route,
-	routeAsync,
 	router,
-	routerAsync,
 	stream,
 } from "./contract/index.ts";
 export type {

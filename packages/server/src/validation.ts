@@ -51,11 +51,11 @@ const flattenRequestSegments = (
 	return input;
 };
 
-export const validateRequest = (
+export const validateRequest = async (
 	route: RouteDeclaration,
 	segments: RequestSegments,
-): RequestValidationResponse => {
-	const result = validateFlatRequestInput(
+): Promise<RequestValidationResponse> => {
+	const result = await validateFlatRequestInput(
 		route,
 		flattenRequestSegments(route, segments),
 	);

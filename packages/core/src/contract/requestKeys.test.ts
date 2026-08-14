@@ -3,11 +3,7 @@ import { describe, it } from "node:test";
 import { type } from "arktype";
 import * as v from "valibot";
 import z from "zod";
-import {
-	resolveBuiltInRequestKeys,
-	resolveSchemaKeysAsync,
-	resolveSchemaKeysSync,
-} from "./requestKeys.ts";
+import { resolveBuiltInRequestKeys, resolveSchemaKeys } from "./requestKeys.ts";
 
 const sorted = (keys: readonly string[] | undefined) =>
 	[...(keys ?? [])].sort();
@@ -79,7 +75,7 @@ describe("request key resolution", () => {
 
 	it("falls back to built-in resolvers when custom resolver returns undefined", () => {
 		assert.deepEqual(
-			resolveSchemaKeysSync(z.object({ id: z.string() }), {
+			resolveSchemaKeys(z.object({ id: z.string() }), {
 				resolveRequestKeys: () => undefined,
 			}),
 			["id"],
@@ -90,28 +86,9 @@ describe("request key resolution", () => {
 		const schema = z.string();
 
 		assert.deepEqual(
-			resolveSchemaKeysSync(schema, {
+			resolveSchemaKeys(schema, {
 				resolveRequestKeys: (candidate) =>
 					candidate === schema ? ["q"] : undefined,
-			}),
-			["q"],
-		);
-	});
-
-	it("rejects async custom resolver results in sync resolution", () => {
-		assert.throws(
-			() =>
-				resolveSchemaKeysSync(z.string(), {
-					resolveRequestKeys: async () => ["q"],
-				}),
-			/use routerAsync/i,
-		);
-	});
-
-	it("accepts async custom resolver results in async resolution", async () => {
-		assert.deepEqual(
-			await resolveSchemaKeysAsync(z.string(), {
-				resolveRequestKeys: async () => ["q"],
 			}),
 			["q"],
 		);

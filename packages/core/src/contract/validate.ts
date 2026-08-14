@@ -1,9 +1,8 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import { validateStandardSchemaSync } from "../standard-schema/index.ts";
+import { validateStandardSchema } from "../standard-schema/index.ts";
 import {
 	type RequestKeyResolverOptions,
-	resolveSchemaKeysAsync,
-	resolveSchemaKeysSync,
+	resolveSchemaKeys,
 } from "./requestKeys.ts";
 import type {
 	Contract,
@@ -220,15 +219,15 @@ const assignFlatObject = (data: FlatRequestInput, value: unknown) => {
 	}
 };
 
-const validateSchemaRecord = (
+const validateSchemaRecord = async (
 	schemas: Record<string, StandardSchemaV1>,
 	value: unknown,
 	data: FlatRequestInput,
 	errors: StandardSchemaV1.Issue[],
-) => {
+): Promise<void> => {
 	const input = value as Record<string, unknown> | undefined;
 	for (const [key, schema] of Object.entries(schemas)) {
-		const result = validateStandardSchemaSync(schema, input?.[key]);
+		const result = await validateStandardSchema(schema, input?.[key]);
 		if (result.issues) {
 			errors.push(...result.issues);
 			continue;
@@ -237,18 +236,21 @@ const validateSchemaRecord = (
 	}
 };
 
-const validateFlatRequestSegment = (
+const validateFlatRequestSegment = async (
 	route: RouteDeclaration,
 	segment: RequestSegment,
 	grouped: GroupedRequestInput,
 	data: FlatRequestInput,
 	errors: StandardSchemaV1.Issue[],
-) => {
+): Promise<void> => {
 	const declaration = route.request?.[segment];
 	if (!declaration || isNoBody(declaration)) return;
 
 	if (isCustomBody(declaration)) {
-		const result = validateStandardSchemaSync(declaration.schema, grouped.body);
+		const result = await validateStandardSchema(
+			declaration.schema,
+			grouped.body,
+		);
 		if (result.issues) {
 			errors.push(...result.issues);
 			return;
@@ -258,7 +260,7 @@ const validateFlatRequestSegment = (
 	}
 
 	if (isStandardSchema(declaration)) {
-		const result = validateStandardSchemaSync(declaration, grouped[segment]);
+		const result = await validateStandardSchema(declaration, grouped[segment]);
 		if (result.issues) {
 			errors.push(...result.issues);
 			return;
@@ -268,7 +270,7 @@ const validateFlatRequestSegment = (
 	}
 
 	if (isRequestSchemaRecord(declaration)) {
-		validateSchemaRecord(declaration, grouped[segment], data, errors);
+		await validateSchemaRecord(declaration, grouped[segment], data, errors);
 	}
 };
 
@@ -280,7 +282,7 @@ const resolveRequestKeysForSchemaSync = (
 ) => {
 	if (isRequestSchemaRecord(schema)) return Object.keys(schema);
 
-	const keys = resolveSchemaKeysSync(schema, options);
+	const keys = resolveSchemaKeys(schema, options);
 	if (!keys) {
 		throw new Error(
 			`Could not resolve request keys for ${segment} schema on ${route.method} ${route.path}. Provide request.requestKeys or a resolveRequestKeys option.`,
@@ -289,27 +291,10 @@ const resolveRequestKeysForSchemaSync = (
 	return keys;
 };
 
-const resolveRequestKeysForSchemaAsync = async (
-	route: RouteDeclaration,
-	segment: "body" | "query" | "params",
-	schema: StandardSchemaV1 | Record<string, StandardSchemaV1>,
-	options?: ValidateContractOptions,
-) => {
-	if (isRequestSchemaRecord(schema)) return Object.keys(schema);
-
-	const keys = await resolveSchemaKeysAsync(schema, options);
-	if (!keys) {
-		throw new Error(
-			`Could not resolve request keys for ${segment} schema on ${route.method} ${route.path}. Provide request.requestKeys or a resolveRequestKeys option.`,
-		);
-	}
-	return keys;
-};
-
-export const validateFlatRequestInput = (
+export const validateFlatRequestInput = async (
 	route: RouteDeclaration,
 	input: FlatRequestInput,
-): RequestValidationResult => {
+): Promise<RequestValidationResult> => {
 	const data: FlatRequestInput = {};
 	const errors: StandardSchemaV1.Issue[] = [];
 	const grouped = groupRequestInput(route, input, {
@@ -317,7 +302,7 @@ export const validateFlatRequestInput = (
 	});
 
 	for (const segment of requestSegments) {
-		validateFlatRequestSegment(route, segment, grouped, data, errors);
+		await validateFlatRequestSegment(route, segment, grouped, data, errors);
 	}
 
 	if (errors.length > 0) {
@@ -345,43 +330,6 @@ export const validateContractSync = <TContract extends Contract>(
 		for (const [segment, schema] of requestSchemas(route.request)) {
 			if (!schema) continue;
 			const keys = resolveRequestKeysForSchemaSync(
-				route,
-				segment,
-				schema,
-				options,
-			);
-			assertNoDuplicateKeys(route, [...Object.keys(requestKeys), ...keys]);
-			for (const key of keys) requestKeys[key] = segment;
-		}
-		for (const key of Object.keys(route.request.headers ?? {})) {
-			assertNoDuplicateKeys(route, [...Object.keys(requestKeys), key]);
-			requestKeys[key] = "headers";
-		}
-		route.request.requestKeys = requestKeys;
-		validateResolvedRequestKeys(route);
-	}
-
-	return contract;
-};
-
-export const validateContractAsync = async <TContract extends Contract>(
-	contract: TContract,
-	options?: ValidateContractOptions,
-): Promise<TContract> => {
-	for (const route of contractRoutes(contract)) {
-		if (!route.request) {
-			validateResolvedRequestKeys(route);
-			continue;
-		}
-		if (route.request.requestKeys) {
-			validateResolvedRequestKeys(route);
-			continue;
-		}
-
-		const requestKeys: RequestKeys = {};
-		for (const [segment, schema] of requestSchemas(route.request)) {
-			if (!schema) continue;
-			const keys = await resolveRequestKeysForSchemaAsync(
 				route,
 				segment,
 				schema,

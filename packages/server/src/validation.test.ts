@@ -4,8 +4,8 @@ import z from "zod";
 import { validateRequest } from "./validation.ts";
 
 describe("validateRequest", () => {
-	it("parses JSON date strings with request body transforms", () => {
-		const result = validateRequest(
+	it("parses JSON date strings with request body transforms", async () => {
+		const result = await validateRequest(
 			{
 				method: "POST",
 				path: "/todos",
@@ -30,12 +30,12 @@ describe("validateRequest", () => {
 		}
 	});
 
-	it("rejects Date request bodies received as JSON strings", () => {
+	it("rejects Date request bodies received as JSON strings", async () => {
 		const wireBody = JSON.parse(
 			JSON.stringify({ createdAt: new Date("2026-08-10T00:00:00.000Z") }),
 		);
 
-		const result = validateRequest(
+		const result = await validateRequest(
 			{
 				method: "POST",
 				path: "/todos",
@@ -60,8 +60,8 @@ describe("validateRequest", () => {
 		}
 	});
 
-	it("parses string params and query with coercion or transforms", () => {
-		const result = validateRequest(
+	it("parses string params and query with coercion or transforms", async () => {
+		const result = await validateRequest(
 			{
 				method: "GET",
 				path: "/todos/:id",
@@ -96,8 +96,8 @@ describe("validateRequest", () => {
 		}
 	});
 
-	it("rejects numeric and boolean params or query without coercion", () => {
-		const result = validateRequest(
+	it("rejects numeric and boolean params or query without coercion", async () => {
+		const result = await validateRequest(
 			{
 				method: "GET",
 				path: "/todos/:id",

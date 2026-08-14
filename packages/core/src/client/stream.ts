@@ -1,5 +1,5 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import { validateStandardSchemaSync } from "../standard-schema/index.ts";
+import { validateStandardSchema } from "../standard-schema/index.ts";
 
 export async function* parseNdjsonStream(
 	schema: StandardSchemaV1,
@@ -26,7 +26,7 @@ export async function* parseNdjsonStream(
 					yield value;
 					continue;
 				}
-				const result = validateStandardSchemaSync(schema, value);
+				const result = await validateStandardSchema(schema, value);
 				if (result.issues) throw result.issues;
 				yield result.value;
 			}
@@ -39,7 +39,7 @@ export async function* parseNdjsonStream(
 				yield value;
 				return;
 			}
-			const result = validateStandardSchemaSync(schema, value);
+			const result = await validateStandardSchema(schema, value);
 			if (result.issues) throw result.issues;
 			yield result.value;
 		}

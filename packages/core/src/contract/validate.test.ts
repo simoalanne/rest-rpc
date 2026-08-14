@@ -6,7 +6,6 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { customBody } from "./route.ts";
 import {
 	groupRequestInput,
-	validateContractAsync,
 	validateContractSync,
 	validateFlatRequestInput,
 } from "./validate.ts";
@@ -78,27 +77,6 @@ describe("validateContractSync", () => {
 			q: "query",
 			title: "body",
 			"x-request-id": "headers",
-		});
-	});
-
-	it("populates async request keys from schema record request declarations", async () => {
-		const contract = await validateContractAsync(
-			testContract({
-				path: "/search/:id",
-				request: {
-					params: {
-						id: z.string(),
-					},
-					query: {
-						q: z.string().optional(),
-					},
-				},
-			}),
-		);
-
-		assert.deepEqual(contract.search.find.request.requestKeys, {
-			id: "params",
-			q: "query",
 		});
 	});
 
@@ -392,7 +370,7 @@ describe("groupRequestInput", () => {
 });
 
 describe("validateFlatRequestInput", () => {
-	it("validates whole segment schemas and returns parsed flat data", () => {
+	it("validates whole segment schemas and returns parsed flat data", async () => {
 		const route = testContract({
 			path: "/search/:id",
 			request: {
@@ -414,7 +392,7 @@ describe("validateFlatRequestInput", () => {
 		}).search.find;
 
 		assert.deepEqual(
-			validateFlatRequestInput(route, {
+			await validateFlatRequestInput(route, {
 				id: "123",
 				q: " milk ",
 				title: " Buy milk ",
@@ -431,7 +409,7 @@ describe("validateFlatRequestInput", () => {
 		);
 	});
 
-	it("validates schema record segments and headers by field", () => {
+	it("validates schema record segments and headers by field", async () => {
 		const route = testContract({
 			path: "/todos/:id",
 			request: {
@@ -457,7 +435,7 @@ describe("validateFlatRequestInput", () => {
 		}).search.find;
 
 		assert.deepEqual(
-			validateFlatRequestInput(route, {
+			await validateFlatRequestInput(route, {
 				id: "123",
 				page: "2",
 				title: " Buy milk ",
@@ -475,7 +453,7 @@ describe("validateFlatRequestInput", () => {
 		);
 	});
 
-	it("validates custom request bodies and returns the parsed body key", () => {
+	it("validates custom request bodies and returns the parsed body key", async () => {
 		const route = testContract({
 			request: {
 				body: customBody({
@@ -486,13 +464,16 @@ describe("validateFlatRequestInput", () => {
 			},
 		}).search.find;
 
-		assert.deepEqual(validateFlatRequestInput(route, { body: " hello " }), {
-			success: true,
-			data: { body: "body: hello " },
-		});
+		assert.deepEqual(
+			await validateFlatRequestInput(route, { body: " hello " }),
+			{
+				success: true,
+				data: { body: "body: hello " },
+			},
+		);
 	});
 
-	it("returns accumulated validation errors", () => {
+	it("returns accumulated validation errors", async () => {
 		const route = testContract({
 			path: "/todos/:id",
 			request: {
@@ -509,7 +490,7 @@ describe("validateFlatRequestInput", () => {
 			},
 		}).search.find;
 
-		const result = validateFlatRequestInput(route, {
+		const result = await validateFlatRequestInput(route, {
 			id: "not-a-number",
 		});
 

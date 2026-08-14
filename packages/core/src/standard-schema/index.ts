@@ -75,5 +75,8 @@ export declare namespace StandardSchemaV1 {
 	>["output"];
 }
 
-export { validateStandardSchemaSync } from "./standardSchemaValidator.ts";
+export {
+	validateStandardSchema,
+	validateStandardSchemaSync,
+} from "./standardSchemaValidator.ts";
 export { isTypeOnlySchema, looseJsonSchema, type } from "./type.ts";
