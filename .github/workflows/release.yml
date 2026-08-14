@@ -49,6 +49,55 @@ jobs:
           create-github-releases: false
           push-git-tags: false
 
-      - name: Preview GitHub tag and release notes
+      - name: Generate GitHub release notes
         if: steps.changesets.outputs.published == 'true'
-        run: pnpm run release:github
+        id: github_release
+        run: |
+          version="$(node -p "require('./packages/core/package.json').version")"
+          tag="v$version"
+          prerelease=false
+
+          if [[ "$version" == *-* ]]; then
+            prerelease=true
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          pnpm --silent run release:github:notes > release-notes.md
+
+      - name: Push GitHub tag
+        if: steps.changesets.outputs.published == 'true'
+        run: |
+          tag="${{ steps.github_release.outputs.tag }}"
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag"; then
+            echo "Tag $tag already exists on origin."
+          else
+            git tag "$tag" "$GITHUB_SHA"
+            git push origin "refs/tags/$tag"
+          fi
+
+      - name: Create GitHub release
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ steps.github_release.outputs.tag }}"
+          prerelease="${{ steps.github_release.outputs.prerelease }}"
+          prerelease_args=()
+
+          if [ "$prerelease" = "true" ]; then
+            prerelease_args=(--prerelease)
+          fi
+
+          if gh release view "$tag" > /dev/null 2>&1; then
+            gh release edit "$tag" \
+              --title "$tag" \
+              --notes-file release-notes.md \
+              "${prerelease_args[@]}"
+          else
+            gh release create "$tag" \
+              --title "$tag" \
+              --notes-file release-notes.md \
+              "${prerelease_args[@]}"
+          fi

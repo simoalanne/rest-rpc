@@ -1,7 +1,5 @@
-import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
 import corePackage from "../packages/core/package.json" with { type: "json" };
 
 type ChangelogEntry = {
@@ -10,19 +8,8 @@ type ChangelogEntry = {
 	text: string;
 };
 
-type ReleasePayload = {
-	body: string;
-	draft: boolean;
-	name: string;
-	prerelease: boolean;
-	tag_name: string;
-	target_commitish: string;
-};
-
-const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const version = corePackage.version;
-const tagName = `v${version}`;
 const repoUrl = `https://github.com/rest-rpc/rest-rpc`;
 
 const packages = [
@@ -35,16 +22,6 @@ const packages = [
 	["tanstack-query", "packages/tanstack-query/CHANGELOG.md"],
 	["web", "packages/web/CHANGELOG.md"],
 ] as const;
-
-if (!process.argv.includes("--dry-run")) {
-	throw new Error("Only dry-run mode is implemented right now.");
-}
-
-const targetCommitish =
-	process.env.GITHUB_SHA ??
-	(
-		await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: repoRoot })
-	).stdout.trim();
 
 const changelogs = await Promise.all(
 	packages.map(async ([displayName, changelogPath]) => ({
@@ -112,7 +89,9 @@ if (entries.length === 0) {
 
 for (const entry of entries) {
 	const packageList = [...entry.packages].sort().join(", ");
-	const commitLink = ` ([${entry.commit}](${repoUrl}/commit/${entry.commit}))`;
+	const commitLink = entry.commit
+		? ` ([${entry.commit}](${repoUrl}/commit/${entry.commit}))`
+		: "";
 
 	bodyLines.push(`${packageList}:`);
 	bodyLines.push(`- ${entry.text}${commitLink}`);
@@ -120,22 +99,4 @@ for (const entry of entries) {
 }
 
 const body = bodyLines.join("\n").trimEnd();
-const payload: ReleasePayload = {
-	body,
-	draft: false,
-	name: tagName,
-	prerelease: version.includes("-"),
-	tag_name: tagName,
-	target_commitish: targetCommitish,
-};
-
-console.log("GitHub release dry run");
-console.log("");
-console.log("Tag that would be created:");
-console.log(tagName);
-console.log("");
-console.log("Release payload that would be sent:");
-console.log(JSON.stringify(payload, null, 2));
-console.log("");
-console.log("Rendered release body:");
 console.log(body);
