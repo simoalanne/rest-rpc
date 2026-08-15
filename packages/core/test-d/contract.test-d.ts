@@ -85,6 +85,39 @@ expectType<{ id: string; tags: string[] }>(
 	null as unknown as ClientSuccessBody<typeof typeOnlyResponse>,
 );
 
+const inferredPathParams = router({
+	get: {
+		method: "GET",
+		path: "/orgs/{orgId}/todos/:id/invalid-{segment}/other:invalid/:probably:invalid",
+		query: z.object({ includeDone: z.boolean().optional() }),
+		responses: {
+			200: todoSchema,
+		},
+	},
+});
+
+type InferredPathParamsClientRequest = ClientRequest<
+	typeof inferredPathParams.get
+>;
+declare const inferredPathParamsClientRequest: InferredPathParamsClientRequest;
+expectType<string>(inferredPathParamsClientRequest.id);
+expectType<string>(inferredPathParamsClientRequest.orgId);
+expectType<boolean | undefined>(inferredPathParamsClientRequest.includeDone);
+expectAssignable<InferredPathParamsClientRequest>({
+	id: "todo-1",
+	includeDone: true,
+	orgId: "org-1",
+	"probably:invalid": "value",
+});
+
+type InferredPathParamsServerRequest = ServerRequest<
+	typeof inferredPathParams.get
+>;
+declare const inferredPathParamsServerRequest: InferredPathParamsServerRequest;
+expectType<string>(inferredPathParamsServerRequest.id);
+expectType<string>(inferredPathParamsServerRequest.orgId);
+expectType<boolean | undefined>(inferredPathParamsServerRequest.includeDone);
+
 const prefixed = router(
 	{
 		todos: {

@@ -15,6 +15,9 @@ describe("path helpers", () => {
 			"orgId",
 			"todo_id",
 		]);
+		assert.deepEqual(getPathParamNames("/orgs/org-{orgId}/todos/{todo_id}"), [
+			"todo_id",
+		]);
 	});
 
 	it("recognizes full dynamic path segments", () => {

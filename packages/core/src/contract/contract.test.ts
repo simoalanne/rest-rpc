@@ -21,6 +21,54 @@ describe("router", () => {
 		});
 	});
 
+	it("infers missing path param declarations from route paths", () => {
+		const contract = router({
+			todos: {
+				get: {
+					method: "GET",
+					path: "/orgs/{orgId}/todos/:id/something/:other",
+					query: z.object({ includeDone: z.boolean().optional() }),
+					responses: {
+						204: noBody(),
+					},
+				},
+			},
+		});
+
+		assert.deepEqual(contract.todos.get.requestKeys, {
+			id: "pathParams",
+			includeDone: "query",
+			orgId: "pathParams",
+			other: "pathParams",
+		});
+		assert.equal(typeof contract.todos.get.pathParams, "object");
+		assert.equal(
+			contract.todos.get.pathParams?.id?.["~standard"].vendor,
+			"rest-rpc",
+		);
+	});
+
+	it("rejects path params in router path prefixes", () => {
+		assert.throws(
+			() =>
+				router(
+					{
+						todos: {
+							list: {
+								method: "GET",
+								path: "/todos",
+								responses: {
+									204: noBody(),
+								},
+							},
+						},
+					},
+					{ pathPrefix: "/orgs/:orgId" },
+				),
+			/pathPrefix cannot include path params/,
+		);
+	});
+
 	it("allows validation to be deferred to a parent contract", () => {
 		const child = router(
 			{

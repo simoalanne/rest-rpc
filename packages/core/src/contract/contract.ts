@@ -89,6 +89,39 @@ type Merge<T> = {
 };
 type EmptyObject = Record<never, never>;
 
+type PathSegmentParamName<TSegment extends string> =
+	TSegment extends `:${infer TName}`
+		? TName extends ""
+			? never
+			: TName
+		: TSegment extends `{${infer TName}}`
+			? TName extends ""
+				? never
+				: TName
+			: never;
+
+type PathParamNames<TPath extends string> = string extends TPath
+	? never
+	: TPath extends `${infer TSegment}/${infer TRest}`
+		? PathSegmentParamName<TSegment> | PathParamNames<TRest>
+		: PathSegmentParamName<TPath>;
+
+type InferredPathParamSchemaRecord<TPath extends string> = {
+	[K in PathParamNames<TPath>]: StandardSchemaV1<string, string>;
+};
+
+type ApplyInferredPathParamsToRoute<TRoute> = "pathParams" extends keyof TRoute
+	? TRoute
+	: TRoute extends { path: infer TPath extends string }
+		? [PathParamNames<TPath>] extends [never]
+			? TRoute
+			: Merge<
+					Omit<TRoute, "pathParams"> & {
+						pathParams: InferredPathParamSchemaRecord<TPath>;
+					}
+				>
+		: TRoute;
+
 type CommonResponses<TOptions> = TOptions extends {
 	commonResponses: infer TResponses extends RouteResponses;
 }
@@ -136,7 +169,10 @@ type ApplyCommonHeadersToRoute<TRoute, TOptions> =
 			>;
 
 type ApplyRouterOptionsToRoute<TRoute extends RouteDeclaration, TOptions> =
-	ApplyCommonHeadersToRoute<TRoute, TOptions> extends infer TRouteWithHeaders
+	ApplyCommonHeadersToRoute<
+		ApplyInferredPathParamsToRoute<TRoute>,
+		TOptions
+	> extends infer TRouteWithHeaders
 		? TRouteWithHeaders extends RouteDeclaration
 			? TRouteWithHeaders extends {
 					responses: infer TResponses extends RouteResponses;
@@ -176,12 +212,12 @@ export type ApplyRouterOptions<
 export const route = <const TRoute extends RouteDeclaration>(
 	route: TRoute,
 	options?: RouteContractOptions,
-): TRoute => {
+): ApplyInferredPathParamsToRoute<TRoute> => {
 	normalizeContract(route);
 	if (options?.validate !== false) {
 		validateContractSync(route, options);
 	}
-	return route as TRoute;
+	return route as ApplyInferredPathParamsToRoute<TRoute>;
 };
 
 export const router = <

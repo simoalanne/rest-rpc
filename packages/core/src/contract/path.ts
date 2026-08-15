@@ -1,6 +1,6 @@
-export const pathParamPattern = /:([A-Za-z0-9_]+)|\{([A-Za-z0-9_]+)\}/g;
+export const pathParamPattern = /(?:^|\/)(?::([^/]+)|\{([^/]+)\})(?=\/|$)/g;
 
-const pathParamSegmentPattern = /^(?::([A-Za-z0-9_]+)|\{([A-Za-z0-9_]+)\})$/;
+const pathParamSegmentPattern = /^(?::([^/]+)|\{([^/]+)\})$/;
 
 const pathParamNameFromCaptures = (
 	colonName: string | undefined,
@@ -14,9 +14,10 @@ const pathParamNameFromCaptures = (
 };
 
 export const getPathParamNames = (path: string) =>
-	[...path.matchAll(pathParamPattern)].map((match) =>
-		pathParamNameFromCaptures(match[1], match[2]),
-	);
+	path
+		.split("/")
+		.map(getPathParamSegmentName)
+		.filter((name): name is string => name !== undefined);
 
 export const getPathParamSegmentName = (segment: string) => {
 	const match = pathParamSegmentPattern.exec(segment);
@@ -31,9 +32,13 @@ export const replacePathParams = (
 	path: string,
 	replace: (name: string) => string,
 ) =>
-	path.replace(pathParamPattern, (_match, colonName, openApiName) =>
-		replace(pathParamNameFromCaptures(colonName, openApiName)),
-	);
+	path
+		.split("/")
+		.map((segment) => {
+			const name = getPathParamSegmentName(segment);
+			return name === undefined ? segment : replace(name);
+		})
+		.join("/");
 
 export const toColonPath = (path: string) =>
 	replacePathParams(path, (name) => `:${name}`);

@@ -1,10 +1,12 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
+import { type as schemaType } from "../standard-schema/index.ts";
 import type {
 	CommonOpenApiRouteOptions,
 	Contract,
 	OpenApiRouteOptions,
 	RouteMetadata,
 } from "./contract.ts";
+import { getPathParamNames } from "./path.ts";
 import type { RouteResponses } from "./response.ts";
 import { contractRouteEntries } from "./traversal.ts";
 
@@ -61,11 +63,33 @@ const mergeOpenApi = (
 	};
 };
 
+const assertStaticPathPrefix = (pathPrefix: string | undefined) => {
+	if (!pathPrefix) return;
+	const pathParams = getPathParamNames(pathPrefix);
+	if (pathParams.length === 0) return;
+
+	throw new Error("Router pathPrefix cannot include path params.");
+};
+
 export const normalizeContract = <TContract extends Contract>(
 	contract: TContract,
 	options?: NormalizeContractOptions,
 ): TContract => {
+	assertStaticPathPrefix(options?.pathPrefix);
+
 	for (const { route, path } of contractRouteEntries(contract)) {
+		const pathParams = getPathParamNames(route.path);
+		if (!route.pathParams && pathParams.length > 0) {
+			route.pathParams = Object.fromEntries(
+				pathParams.map((key) => [key, schemaType<string>()] as const),
+			);
+			if (route.requestKeys) {
+				for (const key of pathParams) {
+					route.requestKeys[key] = "pathParams";
+				}
+			}
+		}
+
 		const pathPrefix = options?.pathPrefix;
 		if (pathPrefix) {
 			route.path = joinPathPrefix(pathPrefix, route.path);
