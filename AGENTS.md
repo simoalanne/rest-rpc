@@ -19,14 +19,19 @@ This repo is `rest-rpc`, a TypeScript library for defining one shared API contra
 - `benchmarks/` contains generated benchmark fixtures that exercise the library as a downstream consumer. It is used to measure TypeScript checker cost for contract declaration across the built-in type-only schema helper and the main supported validation libraries.
 
 ### Commands
-- `pnpm run build:packages` - Packages depend on each other through declaration files. After changing exported package APIs, run this to refresh dependents or when something appears stale or fails mysteriously.
-- `pnpm run typecheck` - Run declaration builds and workspace typechecking.
+- `pnpm run typecheck` - Run workspace typechecking.
 - `pnpm run bench:typecheck -- "<message>"` - Build packages first, then run the generated downstream typecheck benchmark against package `dist` declarations.
-- `pnpm run lint` - Run Biome to fix formatting and import ordering automatically.
+- `pnpm run lint` - Run lint verification.
 - `pnpm run test:unit` - Run package unit tests.
 - `pnpm run test:integration` - Run the shared real HTTP integration suite.
 - `pnpm run test` - Run both unit and integration tests. Prefer running the relevant test command for verification after code changes.
 - `pnpm run check` - Run `lint`, `typecheck`, and `test` in sequence. Use this as the broad all-in-one pass.
+
+### Formatting
+Formatting is automated by commit hooks. Do not run formatting tools or make formatting-only edits unless the user explicitly asks.
+
+### Tool Output
+A command that exits successfully is successful. Do not report warnings from successful commands.
 
 ### Notes
 For documentation related tasks:
