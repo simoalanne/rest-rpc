@@ -7,7 +7,12 @@ import {
 	isStandardSchema,
 } from "../contract/request.ts";
 import type { ResponseBodySchema } from "../contract/response.ts";
-import { isCustomBody, isNoBody, isStream } from "../contract/response.ts";
+import {
+	getRouteResponses,
+	isCustomBody,
+	isNoBody,
+	isStream,
+} from "../contract/response.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import {
 	convertSchema,
@@ -194,7 +199,7 @@ export const createResponses = (
 ) => {
 	const responses: Record<string, OpenApiResponse> = {};
 
-	for (const [status, schema] of Object.entries(route.responses)) {
+	for (const [status, schema] of Object.entries(getRouteResponses(route))) {
 		responses[status] = createResponse(
 			route.openApi?.responseDescriptions?.[Number(status)] ?? "",
 			schema,

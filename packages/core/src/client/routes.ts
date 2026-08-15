@@ -2,6 +2,7 @@ import type {
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
 } from "../contract/contract.ts";
+import { getRouteResponses } from "../contract/response.ts";
 import { mapObjectValues } from "../contract/traversal.ts";
 import type { ApiClientFor, ApiClientRouteValue } from "./types.ts";
 
@@ -25,7 +26,9 @@ export const isSuccessStatus = (status: number) =>
 export const getSuccessfulResponseStatuses = (route: RouteDeclaration) => {
 	if (!isHttpRouteNode(route)) return [];
 
-	return Object.keys(route.responses).map(Number).filter(isSuccessStatus);
+	return Object.keys(getRouteResponses(route))
+		.map(Number)
+		.filter(isSuccessStatus);
 };
 
 export const hasSingleSuccessfulResponse = (route: RouteDeclaration) =>

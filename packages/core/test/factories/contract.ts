@@ -2,6 +2,7 @@ import type {
 	HttpRouteDeclaration,
 	RouteMetadata,
 } from "../../src/contract/contract.ts";
+import { noBody } from "../../src/contract/response.ts";
 
 type RouteOverrides = Partial<HttpRouteDeclaration> & {
 	metadata?: RouteMetadata;
@@ -12,7 +13,9 @@ export const testRoute = (
 ): HttpRouteDeclaration => ({
 	method: "GET",
 	path: "/search",
-	responses: {},
+	responses: {
+		204: noBody(),
+	},
 	...overrides,
 });
 

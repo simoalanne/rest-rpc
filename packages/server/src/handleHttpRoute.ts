@@ -3,6 +3,7 @@ import type {
 	ResponseBodySchema,
 } from "@rest-rpc/core/contract";
 import {
+	getRouteResponses,
 	isCustomBody,
 	isNoBody,
 	isStream,
@@ -48,7 +49,7 @@ const getResponseSchema = (
 	route: HttpRouteDeclaration,
 	status: number,
 ): ResponseBodySchema | undefined => {
-	const entry = Object.entries(route.responses).find(
+	const entry = Object.entries(getRouteResponses(route)).find(
 		([declaredStatus]) => Number(declaredStatus) === status,
 	);
 	return entry?.[1];
@@ -57,7 +58,7 @@ const getResponseSchema = (
 const getSingleSuccessfulStatus = (
 	route: HttpRouteDeclaration,
 ): number | undefined => {
-	const statuses = Object.keys(route.responses)
+	const statuses = Object.keys(getRouteResponses(route))
 		.map(Number)
 		.filter((status) => status >= 200 && status < 300);
 

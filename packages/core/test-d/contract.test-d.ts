@@ -73,6 +73,79 @@ expectType<{ id: string; title: string }>(
 	null as unknown as ClientSuccessBody<typeof api.todos.get>,
 );
 
+const singleResponseShorthand = route({
+	method: "POST",
+	path: "/todos",
+	body: z.object({ title: z.string() }),
+	response: todoSchema,
+});
+
+expectType<201>(
+	null as unknown as ClientResponse<typeof singleResponseShorthand>["status"],
+);
+expectType<{ id: string; title: string }>(
+	null as unknown as ClientSuccessBody<typeof singleResponseShorthand>,
+);
+
+const deleteResponseShorthand = route({
+	method: "DELETE",
+	path: "/todos/:id",
+	response: todoSchema,
+});
+
+expectType<200>(
+	null as unknown as ClientResponse<typeof deleteResponseShorthand>["status"],
+);
+expectType<{ id: string; title: string }>(
+	null as unknown as ClientSuccessBody<typeof deleteResponseShorthand>,
+);
+
+const omittedResponseShorthand = route({
+	method: "DELETE",
+	path: "/todos/:id",
+});
+
+expectType<204>(
+	null as unknown as ClientResponse<typeof omittedResponseShorthand>["status"],
+);
+expectType<undefined>(
+	null as unknown as ClientSuccessBody<typeof omittedResponseShorthand>,
+);
+
+const shorthandWithCommonResponses = router(
+	{
+		todos: {
+			create: {
+				method: "POST",
+				path: "/todos",
+				response: todoSchema,
+			},
+		},
+	},
+	{
+		commonResponses: {
+			401: errorSchema,
+		},
+	},
+);
+
+expectType<201 | 401>(
+	null as unknown as ClientResponse<
+		typeof shorthandWithCommonResponses.todos.create
+	>["status"],
+);
+
+expectError(
+	route({
+		method: "GET",
+		path: "/both-response-fields",
+		response: todoSchema,
+		responses: {
+			200: todoSchema,
+		},
+	}),
+);
+
 const typeOnlyResponse = route({
 	method: "GET",
 	path: "/type-only",

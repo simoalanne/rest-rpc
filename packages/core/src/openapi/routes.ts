@@ -4,5 +4,4 @@ import type { OpenApiRouteDeclaration } from "./types.ts";
 export const isOpenApiRoute = (
 	route: RouteDeclaration,
 ): route is OpenApiRouteDeclaration =>
-	(!route.options || route.options.mode === "http") &&
-	route.responses !== undefined;
+	!route.options || route.options.mode === "http";

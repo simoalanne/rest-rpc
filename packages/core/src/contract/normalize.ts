@@ -7,7 +7,11 @@ import type {
 	RouteMetadata,
 } from "./contract.ts";
 import { getPathParamNames } from "./path.ts";
-import type { RouteResponses } from "./response.ts";
+import {
+	getRouteResponses,
+	type RouteResponses,
+	resolveRouteResponses,
+} from "./response.ts";
 import { contractRouteEntries } from "./traversal.ts";
 
 export type NormalizeContractOptions = {
@@ -102,12 +106,16 @@ export const normalizeContract = <TContract extends Contract>(
 
 		route.openApi = mergeOpenApi(options?.commonOpenApi, route.openApi);
 
-		if (route.responses !== undefined) {
+		if (route.options?.mode !== "websocket") {
 			route.cacheKey ??= path;
 			route.responses = {
 				...options?.commonResponses,
-				...route.responses,
+				...resolveRouteResponses(route),
 			};
+			getRouteResponses(route);
+			if ("response" in route) {
+				delete route.response;
+			}
 		}
 
 		if (options?.commonHeaders) {

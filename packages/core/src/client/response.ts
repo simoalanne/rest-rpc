@@ -4,7 +4,12 @@ import type {
 	ClientSuccessBody,
 	ResponseBodySchema,
 } from "../contract/response.ts";
-import { isCustomBody, isNoBody, isStream } from "../contract/response.ts";
+import {
+	getRouteResponses,
+	isCustomBody,
+	isNoBody,
+	isStream,
+} from "../contract/response.ts";
 import { validateStandardSchema } from "../standard-schema/index.ts";
 import { isHttpRouteNode, isSuccessStatus } from "./routes.ts";
 import { parseNdjsonStream } from "./stream.ts";
@@ -15,7 +20,7 @@ export const getResponseSchema = (
 	status: number,
 ): ResponseBodySchema | undefined => {
 	if (!isHttpRouteNode(route)) return undefined;
-	const entry = Object.entries(route.responses).find(
+	const entry = Object.entries(getRouteResponses(route)).find(
 		([declaredStatus]) => Number(declaredStatus) === status,
 	);
 	return entry?.[1];

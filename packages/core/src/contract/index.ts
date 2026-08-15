@@ -65,6 +65,7 @@ export type {
 } from "./response.ts";
 export {
 	customBody,
+	getRouteResponses,
 	isCustomBody,
 	isNoBody,
 	isStream,

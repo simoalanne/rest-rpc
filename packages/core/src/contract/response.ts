@@ -1,5 +1,5 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import type { RouteDeclaration } from "./contract.ts";
+import type { HttpMethod, RouteDeclaration } from "./contract.ts";
 
 export type NoBody = {
 	kind: "noBody";
@@ -27,6 +27,17 @@ export type Stream<
 export type ResponseBodySchema = ResponseSchema | NoBody | CustomBody | Stream;
 
 export type RouteResponses = Record<number, ResponseBodySchema>;
+
+export type DefaultBodyResponseStatusForMethod<TMethod extends HttpMethod> =
+	TMethod extends "POST" ? 201 : 200;
+
+export type DefaultNoBodyResponseStatusForMethod<TMethod extends HttpMethod> =
+	TMethod extends "POST" ? 201 : TMethod extends "DELETE" ? 204 : 200;
+
+export type RouteResponseInput =
+	| { responses: RouteResponses; response?: never }
+	| { response: ResponseBodySchema; responses?: never }
+	| { response?: never; responses?: never };
 
 export const stream = <const TBody extends ResponseSchema | CustomBody>(
 	schema: TBody,
@@ -61,6 +72,70 @@ export const isCustomBody = (schema: unknown): schema is CustomBody =>
 	schema !== null &&
 	"kind" in schema &&
 	schema.kind === "customBody";
+
+export const defaultBodyResponseStatusForMethod = (
+	method: HttpMethod,
+): DefaultBodyResponseStatusForMethod<typeof method> => {
+	switch (method) {
+		case "POST":
+			return 201;
+		default:
+			return 200;
+	}
+};
+
+export const defaultNoBodyResponseStatusForMethod = (
+	method: HttpMethod,
+): DefaultNoBodyResponseStatusForMethod<typeof method> => {
+	switch (method) {
+		case "POST":
+			return 201;
+		case "DELETE":
+			return 204;
+		default:
+			return 200;
+	}
+};
+
+export const getRouteResponses = (route: {
+	path: string;
+	responses?: RouteResponses;
+}): RouteResponses => {
+	if (route.responses === undefined) {
+		throw new Error(
+			`Route declaration at path "${route.path}" is missing responses.`,
+		);
+	}
+
+	if (Object.keys(route.responses).length === 0) {
+		throw new Error(
+			`Route declaration at path "${route.path}" must declare at least one response schema.`,
+		);
+	}
+
+	return route.responses;
+};
+
+export const resolveRouteResponses = (route: {
+	method: HttpMethod;
+	path: string;
+	response?: ResponseBodySchema;
+	responses?: RouteResponses;
+}): RouteResponses => {
+	if (route.responses !== undefined) {
+		return route.responses;
+	}
+
+	if (route.response !== undefined) {
+		return {
+			[defaultBodyResponseStatusForMethod(route.method)]: route.response,
+		};
+	}
+
+	return {
+		[defaultNoBodyResponseStatusForMethod(route.method)]: noBody(),
+	};
+};
 
 export type InferCustomBody<TResponse, TIO extends "input" | "output"> =
 	TResponse extends CustomBody<infer TSchema>

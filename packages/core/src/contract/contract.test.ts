@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import z from "zod";
 import { testContract } from "../../test/factories/contract.ts";
 import { router } from "./contract.ts";
-import { noBody } from "./response.ts";
+import { isNoBody, noBody } from "./response.ts";
 
 describe("router", () => {
 	it("normalizes and validates contracts", () => {
@@ -82,6 +82,103 @@ describe("router", () => {
 		});
 
 		assert.deepEqual(contract.ping.requestKeys, {});
+	});
+
+	it("expands single response shorthands using the method default status", () => {
+		const response = z.object({ id: z.string() });
+		const contract = router({
+			todos: {
+				create: {
+					method: "POST",
+					path: "/todos",
+					response,
+				},
+			},
+		});
+
+		assert.deepEqual(contract.todos.create.responses, {
+			201: response,
+		});
+		assert.equal("response" in contract.todos.create, false);
+	});
+
+	it("uses a body-safe default status for DELETE response shorthands", () => {
+		const response = z.object({ id: z.string() });
+		const contract = router({
+			todos: {
+				delete: {
+					method: "DELETE",
+					path: "/todos/:id",
+					response,
+				},
+			},
+		});
+
+		assert.deepEqual(contract.todos.delete.responses, {
+			200: response,
+		});
+	});
+
+	it("defaults omitted HTTP responses to noBody using the method default status", () => {
+		const contract = router({
+			todos: {
+				delete: {
+					method: "DELETE",
+					path: "/todos/:id",
+				},
+			},
+		});
+
+		assert.deepEqual(Object.keys(contract.todos.delete.responses), ["204"]);
+		assert.equal(isNoBody(contract.todos.delete.responses[204]), true);
+	});
+
+	it("fills empty route response records from common responses", () => {
+		const response = z.object({ ok: z.boolean() });
+		const contract = router(
+			{
+				ping: {
+					method: "GET",
+					path: "/ping",
+					responses: {},
+				},
+			},
+			{
+				commonResponses: {
+					200: response,
+				},
+			},
+		);
+
+		assert.deepEqual(contract.ping.responses, {
+			200: response,
+		});
+	});
+
+	it("merges common responses with response shorthands", () => {
+		const created = z.object({ id: z.string() });
+		const error = z.object({ message: z.string() });
+		const contract = router(
+			{
+				todos: {
+					create: {
+						method: "POST",
+						path: "/todos",
+						response: created,
+					},
+				},
+			},
+			{
+				commonResponses: {
+					401: error,
+				},
+			},
+		);
+
+		assert.deepEqual(contract.todos.create.responses, {
+			201: created,
+			401: error,
+		});
 	});
 
 	it("rejects reserved common content-type headers", () => {

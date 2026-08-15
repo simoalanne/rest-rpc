@@ -6,7 +6,14 @@ import type {
 	RequestSchemaRecord,
 } from "./request.ts";
 import type { ResolveRequestSchemaKeys } from "./requestKeys.ts";
-import type { RouteResponses } from "./response.ts";
+import type {
+	DefaultBodyResponseStatusForMethod,
+	DefaultNoBodyResponseStatusForMethod,
+	NoBody,
+	ResponseBodySchema,
+	RouteResponseInput,
+	RouteResponses,
+} from "./response.ts";
 import { validateContractSync } from "./validate.ts";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
@@ -45,11 +52,11 @@ export type BaseRouteDeclaration = {
 	openApi?: OpenApiRouteOptions;
 };
 
-export type HttpRouteDeclaration = BaseRouteDeclaration & {
-	responses: RouteResponses;
-	options?: { mode?: "http" };
-	messages?: never;
-};
+export type HttpRouteDeclaration = BaseRouteDeclaration &
+	RouteResponseInput & {
+		options?: { mode?: "http" };
+		messages?: never;
+	};
 
 export type WebSocketRouteDeclaration = BaseRouteDeclaration & {
 	method: "GET";
@@ -131,6 +138,36 @@ type MergeResponses<TCommon, TRoute> = Merge<
 	Omit<TCommon, keyof TRoute> & TRoute
 >;
 
+type RouteResponsesFor<TRoute> = TRoute extends {
+	responses: infer TResponses extends RouteResponses;
+}
+	? TResponses
+	: TRoute extends {
+				response: infer TResponse;
+				method: infer TMethod extends HttpMethod;
+			}
+		? {
+				[K in DefaultBodyResponseStatusForMethod<TMethod>]: TResponse &
+					ResponseBodySchema;
+			}
+		: TRoute extends { method: infer TMethod extends HttpMethod }
+			? {
+					[K in DefaultNoBodyResponseStatusForMethod<TMethod>]: NoBody;
+				}
+			: never;
+
+type ApplyResponseShorthandToRoute<TRoute> = TRoute extends {
+	options: { mode: "websocket" };
+}
+	? TRoute
+	: TRoute extends { method: HttpMethod }
+		? Merge<
+				Omit<TRoute, "response" | "responses"> & {
+					responses: RouteResponsesFor<TRoute>;
+				}
+			>
+		: TRoute;
+
 type CommonHeaders<TOptions> = TOptions extends {
 	commonHeaders: infer THeaders extends Record<string, StandardSchemaV1>;
 }
@@ -169,7 +206,7 @@ type ApplyCommonHeadersToRoute<TRoute, TOptions> =
 
 type ApplyRouterOptionsToRoute<TRoute extends RouteDeclaration, TOptions> =
 	ApplyCommonHeadersToRoute<
-		ApplyInferredPathParamsToRoute<TRoute>,
+		ApplyInferredPathParamsToRoute<ApplyResponseShorthandToRoute<TRoute>>,
 		TOptions
 	> extends infer TRouteWithHeaders
 		? TRouteWithHeaders extends RouteDeclaration
@@ -211,10 +248,12 @@ export type ApplyRouterOptions<
 export const route = <const TRoute extends RouteDeclaration>(
 	route: TRoute,
 	options?: RouteContractOptions,
-): ApplyInferredPathParamsToRoute<TRoute> => {
+): ApplyInferredPathParamsToRoute<ApplyResponseShorthandToRoute<TRoute>> => {
 	normalizeContract(route);
 	validateContractSync(route, options);
-	return route as ApplyInferredPathParamsToRoute<TRoute>;
+	return route as ApplyInferredPathParamsToRoute<
+		ApplyResponseShorthandToRoute<TRoute>
+	>;
 };
 
 export const router = <
