@@ -73,7 +73,6 @@ export const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
 
 export type RouteContractOptions = {
 	resolveRequestKeys?: ResolveRequestSchemaKeys;
-	validate?: boolean;
 };
 
 export type RouterContractOptions = RouteContractOptions & {
@@ -214,9 +213,7 @@ export const route = <const TRoute extends RouteDeclaration>(
 	options?: RouteContractOptions,
 ): ApplyInferredPathParamsToRoute<TRoute> => {
 	normalizeContract(route);
-	if (options?.validate !== false) {
-		validateContractSync(route, options);
-	}
+	validateContractSync(route, options);
 	return route as ApplyInferredPathParamsToRoute<TRoute>;
 };
 
@@ -228,8 +225,6 @@ export const router = <
 	commonOptions?: TOptions,
 ): ApplyRouterOptions<TContract, TOptions> => {
 	normalizeContract(contract, commonOptions);
-	if (commonOptions?.validate !== false) {
-		validateContractSync(contract, commonOptions);
-	}
+	validateContractSync(contract, commonOptions);
 	return contract as ApplyRouterOptions<TContract, TOptions>;
 };

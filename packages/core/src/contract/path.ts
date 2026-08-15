@@ -1,5 +1,3 @@
-export const pathParamPattern = /(?:^|\/)(?::([^/]+)|\{([^/]+)\})(?=\/|$)/g;
-
 const pathParamSegmentPattern = /^(?::([^/]+)|\{([^/]+)\})$/;
 
 const pathParamNameFromCaptures = (

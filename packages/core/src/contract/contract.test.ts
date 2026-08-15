@@ -69,28 +69,6 @@ describe("router", () => {
 		);
 	});
 
-	it("allows validation to be deferred to a parent contract", () => {
-		const child = router(
-			{
-				find: testContract({
-					query: z.string(),
-				}).search.find,
-			},
-			{ validate: false },
-		);
-
-		const contract = router(
-			{ search: child },
-			{
-				resolveRequestKeys: () => ["q"],
-			},
-		);
-
-		assert.deepEqual(contract.search.find.requestKeys, {
-			q: "query",
-		});
-	});
-
 	it("allows explicit no-body request declarations", () => {
 		const contract = router({
 			ping: {

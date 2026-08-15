@@ -25,7 +25,6 @@ export {
 	getPathParamNames,
 	getPathParamSegmentName,
 	isPathParamSegment,
-	pathParamPattern,
 	replacePathParams,
 	toColonPath,
 	toOpenApiPath,
