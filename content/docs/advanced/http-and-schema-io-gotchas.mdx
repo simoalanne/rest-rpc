@@ -14,11 +14,10 @@ Params, query, and headers use HTTP strings.
 ✅ Good
 
 ```ts
-request: {
 	body: z.object({
-		createdAt: z.string().datetime().transform((value) => new Date(value)),
+	createdAt: z.string().datetime().transform((value) => new Date(value)),
 	}),
-}
+
 ```
 
 Client sends a string. The handler receives a `Date`.
@@ -26,11 +25,10 @@ Client sends a string. The handler receives a `Date`.
 ❌ Bad
 
 ```ts
-request: {
 	body: z.object({
-		createdAt: z.date(),
+	createdAt: z.date(),
 	}),
-}
+
 ```
 
 Client sends a `Date`. JSON serialization converts it to a string.
@@ -41,14 +39,13 @@ Validation fails because it expects a `Date` but receives a string.
 ✅ Good
 
 ```ts
-request: {
-	params: {
-		id: z.coerce.number(),
+	pathParams: {
+	id: z.coerce.number(),
 	},
 	query: {
-		published: z.enum(["true", "false"]).transform((value) => value === "true"),
+	published: z.enum(["true", "false"]).transform((value) => value === "true"),
 	},
-}
+
 ```
 
 Client can send a number or string for `id` and a string for `published`. The
@@ -57,14 +54,13 @@ handler receives a number and a boolean.
 ❌ Bad
 
 ```ts
-request: {
-	params: {
-		id: z.number(),
+	pathParams: {
+	id: z.number(),
 	},
 	query: {
-		published: z.boolean(),
+	published: z.boolean(),
 	},
-}
+
 ```
 
 Client can send a number for `id` and a boolean for `published`. URL path params

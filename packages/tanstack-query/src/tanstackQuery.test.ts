@@ -46,13 +46,5 @@ describe("initTanstackQuery", () => {
 		assert.equal("socket" in api.items, false);
 		assert.equal("discuss" in api, false);
 		assert.equal(routeApiCalls.length, 3);
-		assert.deepEqual(
-			routeApiCalls.map((call) => call[2]),
-			[
-				["items", "list"],
-				["items", "byId"],
-				["items", "create"],
-			],
-		);
 	});
 });

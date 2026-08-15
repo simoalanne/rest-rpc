@@ -1,4 +1,4 @@
-import { initNextClient } from "@rest-rpc/next";
+import { initClient } from "@rest-rpc/core";
 import { upstreamContract } from "../../../../upstreamContract";
 
 export const dynamic = "force-dynamic";
@@ -17,12 +17,12 @@ export async function GET(
 	{ params }: { params: Promise<{ id: string }> },
 ) {
 	const { id } = await params;
-	const client = initNextClient(upstreamContract, {
+	const client = initClient(upstreamContract, {
 		origin: readUpstreamOrigin(),
 		fetchOptions: {
 			cache: "force-cache",
 		},
-		automaticFetchTags: {
+		nextFetchTags: {
 			enabled: true,
 			tagPrefix: "next-fixture",
 		},

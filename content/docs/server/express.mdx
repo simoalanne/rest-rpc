@@ -36,9 +36,9 @@ const routes = router(api, {
 			if (!todo) {
 				return {
 					status: 404,
-					body: {
-						code: "TODO_NOT_FOUND",
-					},
+				body: {
+					code: "TODO_NOT_FOUND",
+				},
 				};
 			}
 
@@ -74,7 +74,7 @@ Handlers can always return an explicit response envelope.
 return {
 	status: 404,
 	body: {
-		code: "TODO_NOT_FOUND",
+	code: "TODO_NOT_FOUND",
 	},
 };
 ```
@@ -91,7 +91,7 @@ You can also use `ContractResponseError` to throw a declared error response when
 throw new ContractResponseError(api.todos.get, {
 	status: 404,
 	body: {
-		code: "TODO_NOT_FOUND",
+	code: "TODO_NOT_FOUND",
 	},
 });
 ```
@@ -108,15 +108,15 @@ registerRoutes(app, routes, {
 	errorHandlers: {
 		onRequestValidationError: ({ context, issues }) => ({
 			status: 422,
-			body: {
-				code: "VALIDATION_ERROR",
-				kind: context.kind,
-				issues,
-			},
+		body: {
+			code: "VALIDATION_ERROR",
+			kind: context.kind,
+			issues,
+		},
 		}),
 		onUnhandledError: () => ({
 			status: 500,
-			body: { code: "INTERNAL_SERVER_ERROR" },
+		body: { code: "INTERNAL_SERVER_ERROR" },
 		}),
 	},
 });

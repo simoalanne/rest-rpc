@@ -34,14 +34,12 @@ export const websocketContract = router({
 		method: "GET",
 		path: "/ws/:roomId",
 		options: { mode: "websocket" },
-		request: {
-			params: z.object({
-				roomId: z.string().min(1),
-			}),
-			query: z.object({
-				mode: z.enum(["fast", "slow"]),
-			}),
-		},
+		pathParams: z.object({
+			roomId: z.string().min(1),
+		}),
+		query: z.object({
+			mode: z.enum(["fast", "slow"]),
+		}),
 		messages: {
 			client: clientMessageSchema,
 			server: serverMessageSchema,

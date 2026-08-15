@@ -5,8 +5,9 @@ export type {
 	ClientRequestInput,
 	ClientSocket,
 	FetchLike,
+	NextFetchTagsOptions,
 } from "./client/index.ts";
-export { getRouteCacheTags, initClient } from "./client/index.ts";
+export { getNextFetchTags, initClient } from "./client/index.ts";
 export type {
 	ClientErrors,
 	ClientReceived,

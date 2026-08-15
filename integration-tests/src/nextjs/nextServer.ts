@@ -67,7 +67,21 @@ export const startNextFixture = async (
 	return {
 		origin,
 		close: async () => {
-			child.kill();
+			if (child.exitCode !== null) return;
+
+			await new Promise<void>((resolve) => {
+				const forceKillTimeout = setTimeout(() => {
+					child.kill("SIGKILL");
+					resolve();
+				}, 2000);
+
+				child.once("exit", () => {
+					clearTimeout(forceKillTimeout);
+					resolve();
+				});
+
+				child.kill("SIGTERM");
+			});
 		},
 	};
 };

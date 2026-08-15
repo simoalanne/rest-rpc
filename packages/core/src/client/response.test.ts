@@ -6,8 +6,8 @@ import {
 	createClientTestContract,
 	jsonResponse,
 } from "../../test/factories/client.ts";
-import { router } from "../contract/define.ts";
-import { customBody, noBody, stream } from "../contract/route.ts";
+import { router } from "../contract/contract.ts";
+import { customBody, noBody, stream } from "../contract/response.ts";
 import { initClient } from "./index.ts";
 import { fetchResponse } from "./response.ts";
 
@@ -117,9 +117,7 @@ describe("ApiClient responses", () => {
 				get: {
 					method: "GET",
 					path: "/todos/:id",
-					request: {
-						params: z.object({ id: z.string() }),
-					},
+					pathParams: z.object({ id: z.string() }),
 					responses: {
 						200: responseSchema,
 					},
@@ -163,9 +161,7 @@ describe("ApiClient responses", () => {
 				get: {
 					method: "GET",
 					path: "/todos/:id",
-					request: {
-						params: z.object({ id: z.string() }),
-					},
+					pathParams: z.object({ id: z.string() }),
 					responses: {
 						200: responseSchema,
 					},
@@ -202,9 +198,7 @@ describe("ApiClient responses", () => {
 				get: {
 					method: "GET",
 					path: "/todos/:id",
-					request: {
-						params: z.object({ id: z.string() }),
-					},
+					pathParams: z.object({ id: z.string() }),
 					responses: {
 						200: responseSchema,
 					},
@@ -237,9 +231,7 @@ describe("ApiClient responses", () => {
 				get: {
 					method: "GET",
 					path: "/todos/:id",
-					request: {
-						params: z.object({ id: z.string() }),
-					},
+					pathParams: z.object({ id: z.string() }),
 					responses: {
 						200: responseSchema,
 					},
@@ -272,9 +264,7 @@ describe("ApiClient responses", () => {
 				get: {
 					method: "GET",
 					path: "/todos/:id",
-					request: {
-						params: z.object({ id: z.string() }),
-					},
+					pathParams: z.object({ id: z.string() }),
 					responses: {
 						200: responseSchema,
 					},
@@ -306,9 +296,7 @@ describe("ApiClient responses", () => {
 				get: {
 					method: "GET",
 					path: "/todos/:id",
-					request: {
-						params: z.object({ id: z.string() }),
-					},
+					pathParams: z.object({ id: z.string() }),
 					responses: {
 						200: responseSchema,
 					},
@@ -345,9 +333,7 @@ describe("ApiClient responses", () => {
 				remove: {
 					method: "DELETE",
 					path: "/todos/:id",
-					request: {
-						params: z.object({ id: z.string() }),
-					},
+					pathParams: z.object({ id: z.string() }),
 					responses: {
 						204: noBody(),
 					},

@@ -8,13 +8,13 @@ export const apiContract = {
 		byId: {
 			method: "GET",
 			path: "/items/:id",
-			request: { params: { shape: { id: true } } },
+			pathParams: { shape: { id: true } },
 			responses: { 200: {} },
 		},
 		create: {
 			method: "POST",
 			path: "/items",
-			request: { body: { shape: { name: true } } },
+			body: { shape: { name: true } },
 			responses: { 201: {}, 409: {} },
 		},
 		socket: {

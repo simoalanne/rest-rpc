@@ -18,10 +18,8 @@ Routes are still normal HTTP routes.
 get: {
 	method: "GET",
 	path: "/todos/:id",
-	request: {
-		params: {
-			id: z.string(),
-		},
+	pathParams: {
+		id: z.string(),
 	},
 	responses: {
 		200: todoSchema,
@@ -70,7 +68,7 @@ HTTP routing is still driven by `method` and `path`.
 
 HTTP separates request data into locations:
 
-- `params`
+- `pathParams`
 - `query`
 - `headers`
 - `body`
@@ -79,20 +77,19 @@ HTTP separates request data into locations:
 handler and client usage.
 
 ```ts
-request: {
-	params: {
-		id: z.string(),
+	pathParams: {
+	id: z.string(),
 	},
 	query: {
-		includeCompleted: z.coerce.boolean().optional(),
+	includeCompleted: z.coerce.boolean().optional(),
 	},
 	headers: {
-		"x-request-id": z.string().optional(),
+	"x-request-id": z.string().optional(),
 	},
 	body: {
-		title: z.string(),
+	title: z.string(),
 	},
-}
+
 ```
 
 The handler and client input is:

@@ -1,7 +1,11 @@
-import type { Contract, RouteDeclaration } from "./route.ts";
-import { isRouteDeclaration } from "./route.ts";
+import type { Contract, RouteDeclaration } from "./contract.ts";
+import { isRouteDeclaration } from "./contract.ts";
 
 type Tree<T> = Record<string, unknown> | T;
+export type ContractRouteEntry = {
+	route: RouteDeclaration;
+	path: string[];
+};
 
 export const mapObjectValues = <TLeaf>(
 	tree: Tree<TLeaf>,
@@ -27,16 +31,23 @@ export const mapContractRoutes = (
 	mappingFn: (route: RouteDeclaration, path: string[]) => unknown,
 ) => mapObjectValues(contract, isRouteDeclaration, mappingFn);
 
-export function* contractRoutes(
+export function* contractRouteEntries(
 	contract: Contract,
-): Generator<RouteDeclaration> {
+	path: string[] = [],
+): Generator<ContractRouteEntry> {
 	if (isRouteDeclaration(contract)) {
-		yield contract;
+		yield { route: contract, path };
 		return;
 	}
 
-	for (const child of Object.values(contract)) {
-		yield* contractRoutes(child);
+	for (const [key, child] of Object.entries(contract)) {
+		yield* contractRouteEntries(child, [...path, key]);
+	}
+}
+
+export function* contractRoutes(contract: Contract) {
+	for (const { route } of contractRouteEntries(contract)) {
+		yield route;
 	}
 }
 

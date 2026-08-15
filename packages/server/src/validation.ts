@@ -22,7 +22,7 @@ export type RequestValidationResponse =
 export type RequestSegments = {
 	body?: unknown;
 	query?: unknown;
-	params?: unknown;
+	pathParams?: unknown;
 	headers?: unknown;
 };
 
@@ -38,14 +38,14 @@ const flattenRequestSegments = (
 ) => {
 	const input: Record<string, unknown> = {};
 
-	if (isCustomBody(route.request?.body) && segments.body !== undefined) {
+	if (isCustomBody(route.body) && segments.body !== undefined) {
 		input.body = segments.body;
 	} else {
 		assignObject(input, segments.body);
 	}
 
 	assignObject(input, segments.query);
-	assignObject(input, segments.params);
+	assignObject(input, segments.pathParams);
 	assignObject(input, segments.headers);
 
 	return input;

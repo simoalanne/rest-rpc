@@ -48,7 +48,7 @@ const readQueryOptionsArg = (route: RouteDeclaration, args: RequestArgs) =>
 		unknown
 	>;
 
-const omitUndefinedFields = (request: unknown) => {
+const stripUndefinedFields = (request: unknown) => {
 	if (typeof request !== "object" || request === null) return request;
 
 	return Object.fromEntries(
@@ -56,8 +56,16 @@ const omitUndefinedFields = (request: unknown) => {
 	);
 };
 
-export const getQueryKey = (request: unknown, path: string[]) =>
-	request ? [...path, omitUndefinedFields(request)] : path;
+const getQueryKey = (route: RouteDeclaration, request: unknown) => {
+	const cacheKey = route.cacheKey ?? [];
+	const normalizedRequest = stripUndefinedFields(request);
+
+	return normalizedRequest &&
+		typeof normalizedRequest === "object" &&
+		Object.keys(normalizedRequest).length > 0
+		? [...cacheKey, normalizedRequest]
+		: cacheKey;
+};
 
 const splitFetchOptions = <
 	TOptions extends Record<string, unknown> | undefined,
@@ -75,9 +83,8 @@ const splitFetchOptions = <
 export const createRouteApi = (
 	route: RouteDeclaration,
 	fetchResponse: FetchResponse,
-	path: string[],
 ): RouteApi => {
-	const getKey = (request?: unknown) => getQueryKey(request, path);
+	const getKey = (request?: unknown) => getQueryKey(route, request);
 
 	return {
 		mutationOptions: (options) => {

@@ -77,10 +77,10 @@ export const handleWebRoute = async <TContext extends WebRouteHandlerContext>(
 				body: await parseBody({
 					request,
 					route: implementation.route,
-					body: implementation.route.request?.body,
+					body: implementation.route.body,
 				}),
 				query: readQuery(url),
-				params,
+				pathParams: params,
 				headers: readHeaders(request.headers),
 			},
 			context,

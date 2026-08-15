@@ -1,9 +1,9 @@
 import type {
-	ClientSuccessBody,
 	Contract,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
-} from "../contract/route.ts";
+} from "../contract/contract.ts";
+import type { ClientSuccessBody } from "../contract/response.ts";
 import { mapContractRoutes } from "../contract/traversal.ts";
 import { hasSingleSuccessfulResponse, isWebSocketRouteNode } from "./routes.ts";
 import type {

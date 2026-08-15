@@ -1,23 +1,18 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { validateStandardSchema } from "../standard-schema/index.ts";
+import type { Contract, RouteDeclaration } from "./contract.ts";
+import { getPathParamNames } from "./path.ts";
+import type { RequestKeys, RequestSegment } from "./request.ts";
+import {
+	isRequestSchemaRecord,
+	isStandardSchema,
+	REQUEST_CONTEXT_KEY,
+} from "./request.ts";
 import {
 	type RequestKeyResolverOptions,
 	resolveSchemaKeys,
 } from "./requestKeys.ts";
-import type {
-	Contract,
-	RequestKeys,
-	RequestSchema,
-	RequestSegment,
-	RouteDeclaration,
-} from "./route.ts";
-import {
-	isCustomBody,
-	isNoBody,
-	isRequestSchemaRecord,
-	isStandardSchema,
-	REQUEST_CONTEXT_KEY,
-} from "./route.ts";
+import { isCustomBody, isNoBody } from "./response.ts";
 import { contractRoutes } from "./traversal.ts";
 
 export type ValidateContractOptions = RequestKeyResolverOptions;
@@ -27,7 +22,7 @@ export type FlatRequestInput = Record<string, unknown>;
 export type GroupedRequestInput = {
 	body?: unknown;
 	query?: Record<string, unknown>;
-	params?: Record<string, unknown>;
+	pathParams?: Record<string, unknown>;
 	headers?: Record<string, unknown>;
 };
 
@@ -39,8 +34,10 @@ export type RequestValidationResult =
 	| { success: true; data: FlatRequestInput }
 	| { success: false; errors: StandardSchemaV1.Issue[] };
 
-const requestSegments = ["body", "query", "params", "headers"] as const;
-export const pathParamPattern = /:([A-Za-z0-9_]+)/g;
+const requestSegments = ["body", "query", "pathParams", "headers"] as const;
+
+const takesRouteInput = (route: RouteDeclaration) =>
+	Boolean(route.body || route.query || route.pathParams || route.headers);
 
 const assertNoDuplicateKeys = (
 	route: RouteDeclaration,
@@ -49,12 +46,12 @@ const assertNoDuplicateKeys = (
 	if (keys.length === new Set(keys).size) return;
 
 	throw new Error(
-		`Route declaration at path "${route.path}" has duplicate request keys across its "body", "query", "params" and "headers" definitions.`,
+		`Route declaration at path "${route.path}" has duplicate request keys across its "body", "query", "pathParams" and "headers" definitions.`,
 	);
 };
 
 const assertNoReservedRequestKeys = (route: RouteDeclaration) => {
-	if (route.request?.requestKeys?.[REQUEST_CONTEXT_KEY] === undefined) return;
+	if (route.requestKeys?.[REQUEST_CONTEXT_KEY] === undefined) return;
 
 	throw new Error(
 		`Route declaration at path "${route.path}" has a reserved request key "${REQUEST_CONTEXT_KEY}". Rename it to avoid conflict with the route handler context.`,
@@ -63,8 +60,8 @@ const assertNoReservedRequestKeys = (route: RouteDeclaration) => {
 
 const getHeaderRequestKeys = (route: RouteDeclaration) => [
 	...new Set([
-		...Object.keys(route.request?.headers ?? {}),
-		...Object.entries(route.request?.requestKeys ?? {})
+		...Object.keys(route.headers ?? {}),
+		...Object.entries(route.requestKeys ?? {})
 			.filter(([, segment]) => segment === "headers")
 			.map(([key]) => key),
 	]),
@@ -93,26 +90,21 @@ const assertNoCaseInsensitiveHeaderDuplicates = (route: RouteDeclaration) => {
 	}
 };
 
-const getPathParams = (route: RouteDeclaration) =>
-	[...route.path.matchAll(pathParamPattern)].map((match) => match[1] as string);
-
 const assertPathParamsResolved = (route: RouteDeclaration) => {
-	const pathParams = getPathParams(route);
+	const pathParams = getPathParamNames(route.path);
 	for (const key of pathParams) {
-		if (route.request?.requestKeys?.[key] !== "params") {
+		if (route.requestKeys?.[key] !== "pathParams") {
 			throw new Error(
-				`Route declaration at path "${route.path}" has a path param "${key}" without a matching params schema key.`,
+				`Route declaration at path "${route.path}" has a path param "${key}" without a matching pathParams schema key.`,
 			);
 		}
 	}
 
 	const pathParamSet = new Set(pathParams);
-	for (const [key, segment] of Object.entries(
-		route.request?.requestKeys ?? {},
-	)) {
-		if (segment === "params" && !pathParamSet.has(key)) {
+	for (const [key, segment] of Object.entries(route.requestKeys ?? {})) {
+		if (segment === "pathParams" && !pathParamSet.has(key)) {
 			throw new Error(
-				`Route declaration at path "${route.path}" has a params request key "${key}" without a matching path param.`,
+				`Route declaration at path "${route.path}" has a pathParams request key "${key}" without a matching path param.`,
 			);
 		}
 	}
@@ -133,21 +125,19 @@ const assertOpenApiResponseDescriptionsMatchResponses = (
 	}
 };
 
-const requestSchemas = (request: RequestSchema) =>
+const requestSchemas = (route: RouteDeclaration) =>
 	[
 		[
 			"body",
-			isCustomBody(request.body) || isNoBody(request.body)
-				? undefined
-				: request.body,
+			isCustomBody(route.body) || isNoBody(route.body) ? undefined : route.body,
 		],
-		["query", request.query],
-		["params", request.params],
+		["query", route.query],
+		["pathParams", route.pathParams],
 	] as const;
 
 const applyHeaderRequestKeys = (route: RouteDeclaration) => {
-	const headers = route.request?.headers;
-	const requestKeys = route.request?.requestKeys;
+	const headers = route.headers;
+	const requestKeys = route.requestKeys;
 	if (!headers || !requestKeys) return;
 
 	for (const key of Object.keys(headers)) {
@@ -162,15 +152,15 @@ const applyHeaderRequestKeys = (route: RouteDeclaration) => {
 export const validateResolvedRequestKeys = (route: RouteDeclaration) => {
 	assertOpenApiResponseDescriptionsMatchResponses(route);
 	applyHeaderRequestKeys(route);
-	const keys = Object.keys(route.request?.requestKeys ?? {});
+	const keys = Object.keys(route.requestKeys ?? {});
 	assertNoDuplicateKeys(route, keys);
 	assertNoReservedRequestKeys(route);
 	assertNoReservedHeaderKeys(route);
 	assertNoCaseInsensitiveHeaderDuplicates(route);
 
-	if (isCustomBody(route.request?.body) && route.request?.requestKeys?.body) {
+	if (isCustomBody(route.body) && route.requestKeys?.body) {
 		throw new Error(
-			`Route declaration at path "${route.path}" has a "body" key in query or params. Rename it to avoid conflict with the request body.`,
+			`Route declaration at path "${route.path}" has a "body" key in query or pathParams. Rename it to avoid conflict with the request body.`,
 		);
 	}
 
@@ -183,12 +173,12 @@ export const groupRequestInput = (
 	options: GroupRequestInputOptions = {},
 ): GroupedRequestInput => {
 	const unknownRequestKeys = options.unknownRequestKeys ?? "throw";
-	const isCustomRequestBody = isCustomBody(route.request?.body);
-	const requestKeys = route.request?.requestKeys;
+	const isCustomRequestBody = isCustomBody(route.body);
+	const requestKeys = route.requestKeys;
 
-	if (!requestKeys && route.request) {
+	if (!requestKeys && takesRouteInput(route)) {
 		throw new Error(
-			`Missing request key metadata for ${route.method} ${route.path}. Call router() or provide request.requestKeys before grouping request input.`,
+			`Missing request key metadata for ${route.method} ${route.path}. Call router() or provide requestKeys before grouping request input.`,
 		);
 	}
 
@@ -243,7 +233,7 @@ const validateFlatRequestSegment = async (
 	data: FlatRequestInput,
 	errors: StandardSchemaV1.Issue[],
 ): Promise<void> => {
-	const declaration = route.request?.[segment];
+	const declaration = route[segment];
 	if (!declaration || isNoBody(declaration)) return;
 
 	if (isCustomBody(declaration)) {
@@ -276,7 +266,7 @@ const validateFlatRequestSegment = async (
 
 const resolveRequestKeysForSchemaSync = (
 	route: RouteDeclaration,
-	segment: "body" | "query" | "params",
+	segment: "body" | "query" | "pathParams",
 	schema: StandardSchemaV1 | Record<string, StandardSchemaV1>,
 	options?: ValidateContractOptions,
 ) => {
@@ -285,7 +275,7 @@ const resolveRequestKeysForSchemaSync = (
 	const keys = resolveSchemaKeys(schema, options);
 	if (!keys) {
 		throw new Error(
-			`Could not resolve request keys for ${segment} schema on ${route.method} ${route.path}. Provide request.requestKeys or a resolveRequestKeys option.`,
+			`Could not resolve request keys for ${segment} schema on ${route.method} ${route.path}. Provide requestKeys or a resolveRequestKeys option.`,
 		);
 	}
 	return keys;
@@ -317,17 +307,17 @@ export const validateContractSync = <TContract extends Contract>(
 	options?: ValidateContractOptions,
 ): TContract => {
 	for (const route of contractRoutes(contract)) {
-		if (!route.request) {
+		if (!takesRouteInput(route)) {
 			validateResolvedRequestKeys(route);
 			continue;
 		}
-		if (route.request.requestKeys) {
+		if (route.requestKeys) {
 			validateResolvedRequestKeys(route);
 			continue;
 		}
 
 		const requestKeys: RequestKeys = {};
-		for (const [segment, schema] of requestSchemas(route.request)) {
+		for (const [segment, schema] of requestSchemas(route)) {
 			if (!schema) continue;
 			const keys = resolveRequestKeysForSchemaSync(
 				route,
@@ -338,11 +328,11 @@ export const validateContractSync = <TContract extends Contract>(
 			assertNoDuplicateKeys(route, [...Object.keys(requestKeys), ...keys]);
 			for (const key of keys) requestKeys[key] = segment;
 		}
-		for (const key of Object.keys(route.request.headers ?? {})) {
+		for (const key of Object.keys(route.headers ?? {})) {
 			assertNoDuplicateKeys(route, [...Object.keys(requestKeys), key]);
 			requestKeys[key] = "headers";
 		}
-		route.request.requestKeys = requestKeys;
+		route.requestKeys = requestKeys;
 		validateResolvedRequestKeys(route);
 	}
 

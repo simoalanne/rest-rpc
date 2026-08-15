@@ -1,7 +1,7 @@
 import type {
 	HttpRouteDeclaration,
 	RouteMetadata,
-} from "../../src/contract/route.ts";
+} from "../../src/contract/contract.ts";
 
 type RouteOverrides = Partial<HttpRouteDeclaration> & {
 	metadata?: RouteMetadata;

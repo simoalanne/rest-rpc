@@ -1,5 +1,5 @@
 import z from "zod";
-import { customBody, noBody, stream } from "../../src/contract/route.ts";
+import { customBody, noBody, stream } from "../../src/contract/response.ts";
 import type { SchemaConverter } from "../../src/openapi/types.ts";
 
 export const schemaConverter: SchemaConverter = (schema, { io }) =>
@@ -16,12 +16,10 @@ export const createOpenApiTestContract = () =>
 			list: {
 				path: "/todos",
 				method: "GET",
-				request: {
-					query: z.object({
-						search: z.string(),
-						includeCompleted: z.boolean().optional(),
-					}),
-				},
+				query: z.object({
+					search: z.string(),
+					includeCompleted: z.boolean().optional(),
+				}),
 				responses: {
 					200: z.array(z.object({ id: z.string(), title: z.string() })),
 				},
@@ -29,10 +27,8 @@ export const createOpenApiTestContract = () =>
 			update: {
 				path: "/todos/:id",
 				method: "POST",
-				request: {
-					params: z.object({ id: z.string() }),
-					body: z.object({ title: z.string().min(1) }),
-				},
+				pathParams: z.object({ id: z.string() }),
+				body: z.object({ title: z.string().min(1) }),
 				responses: {
 					202: z.object({
 						id: z.string(),
@@ -46,9 +42,7 @@ export const createOpenApiTestContract = () =>
 			remove: {
 				path: "/todos/:id",
 				method: "DELETE",
-				request: {
-					params: z.object({ id: z.string() }),
-				},
+				pathParams: z.object({ id: z.string() }),
 				responses: {
 					204: noBody(),
 				},
@@ -76,12 +70,10 @@ export const createOpenApiTestContract = () =>
 			import: {
 				path: "/todos/import",
 				method: "POST",
-				request: {
-					body: customBody({
-						schema: z.string(),
-						contentType: "text/csv",
-					}),
-				},
+				body: customBody({
+					schema: z.string(),
+					contentType: "text/csv",
+				}),
 				responses: {
 					204: noBody(),
 				},

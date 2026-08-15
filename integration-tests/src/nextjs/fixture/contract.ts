@@ -18,9 +18,7 @@ export const nextFixtureContract = router({
 		get: {
 			method: "GET",
 			path: "/api/items/:id",
-			request: {
-				params: z.object({ id: z.string() }),
-			},
+			pathParams: z.object({ id: z.string() }),
 			responses: {
 				200: itemSchema,
 			},
@@ -28,9 +26,7 @@ export const nextFixtureContract = router({
 		create: {
 			method: "POST",
 			path: "/api/items",
-			request: {
-				body: z.object({ title: z.string() }),
-			},
+			body: z.object({ title: z.string() }),
 			responses: {
 				201: itemSchema,
 			},
@@ -40,9 +36,7 @@ export const nextFixtureContract = router({
 		get: {
 			method: "GET",
 			path: "/api/targeted/items/:id",
-			request: {
-				params: z.object({ id: z.string() }),
-			},
+			pathParams: z.object({ id: z.string() }),
 			responses: {
 				200: itemSchema,
 			},

@@ -143,7 +143,7 @@ export const registerExpressWebSocketRoutes = (
 
 		const request = {
 			query: Object.fromEntries(url.searchParams),
-			params: matchedRoute.params,
+			pathParams: matchedRoute.params,
 			headers: req.headers,
 		};
 		const upgrade = await prepareWebSocketUpgrade<{

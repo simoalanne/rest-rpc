@@ -98,9 +98,9 @@ const routeSource = (index) => {
 						title: stringSchema,
 						done: booleanSchema,
 					},`;
-	const params = path.includes(":id")
+	const pathParams = path.includes(":id")
 		? `
-					params: {
+					pathParams: {
 						id: stringSchema,
 					},`
 		: "";
@@ -108,15 +108,14 @@ const routeSource = (index) => {
 	return `route${index}: {
 				path: "${path}",
 				method: "${method}",
-				request: {${params}
-					query: {
+${pathParams}
+				query: {
 						search: optionalStringSchema,
 						limit: numberSchema,
 					},${body}
-					headers: {
+				headers: {
 						"x-feature": optionalStringSchema,
 					},
-				},
 				responses: {
 					200: todoSchema,
 					400: errorSchema,

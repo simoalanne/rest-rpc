@@ -21,9 +21,7 @@ const api = defineRouter({
 		create: {
 			method: "POST",
 			path: "/todos",
-			request: {
-				body: z.object({ title: z.string() }),
-			},
+			body: z.object({ title: z.string() }),
 			responses: {
 				201: todoSchema,
 			},
@@ -31,15 +29,13 @@ const api = defineRouter({
 		transform: {
 			method: "POST",
 			path: "/todos/:id/transform",
-			request: {
-				params: z.object({ id: z.string() }).transform(({ id }) => ({
-					id: Number(id),
-				})),
-				body: z.object({ title: z.string() }).transform(({ title }) => ({
-					title: title.trim(),
-					slug: title.toLowerCase(),
-				})),
-			},
+			pathParams: z.object({ id: z.string() }).transform(({ id }) => ({
+				id: Number(id),
+			})),
+			body: z.object({ title: z.string() }).transform(({ title }) => ({
+				title: title.trim(),
+				slug: title.toLowerCase(),
+			})),
 			responses: {
 				200: z.object({ id: z.number() }).transform(({ id }) => ({
 					id: String(id),

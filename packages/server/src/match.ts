@@ -1,11 +1,12 @@
 import {
 	type Contract,
 	flattenContractRoutes,
+	getPathParamSegmentName,
+	isPathParamSegment,
 	type RouteDeclaration,
 } from "@rest-rpc/core/contract";
 
 const splitPath = (path: string) => path.split("/").filter(Boolean);
-const isParamSegment = (segment: string) => segment.startsWith(":");
 
 export const compareRouteSpecificity = (
 	left: RouteDeclaration,
@@ -23,8 +24,8 @@ export const compareRouteSpecificity = (
 		if (leftSegment === undefined) return 1;
 		if (rightSegment === undefined) return -1;
 
-		const leftIsParam = isParamSegment(leftSegment);
-		const rightIsParam = isParamSegment(rightSegment);
+		const leftIsParam = isPathParamSegment(leftSegment);
+		const rightIsParam = isPathParamSegment(rightSegment);
 
 		if (leftIsParam !== rightIsParam) {
 			return leftIsParam ? 1 : -1;
@@ -47,8 +48,9 @@ const createPathMatcher = (path: string) => {
 			? "/"
 			: `/${segments
 					.map((segment) => {
-						if (!isParamSegment(segment)) return escapeRegExp(segment);
-						keys.push(segment.slice(1));
+						const paramName = getPathParamSegmentName(segment);
+						if (!paramName) return escapeRegExp(segment);
+						keys.push(paramName);
 						return "([^/]+)";
 					})
 					.join("/")}`;

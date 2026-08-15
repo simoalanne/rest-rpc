@@ -1,14 +1,10 @@
+import type { RouteDeclaration } from "../contract/contract.ts";
+import { isStandardSchema } from "../contract/request.ts";
 import type {
 	ClientSuccessBody,
 	ResponseBodySchema,
-	RouteDeclaration,
-} from "../contract/route.ts";
-import {
-	isCustomBody,
-	isNoBody,
-	isStandardSchema,
-	isStream,
-} from "../contract/route.ts";
+} from "../contract/response.ts";
+import { isCustomBody, isNoBody, isStream } from "../contract/response.ts";
 import { validateStandardSchema } from "../standard-schema/index.ts";
 import { isHttpRouteNode, isSuccessStatus } from "./routes.ts";
 import { parseNdjsonStream } from "./stream.ts";

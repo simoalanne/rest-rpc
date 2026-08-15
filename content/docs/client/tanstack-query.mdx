@@ -181,10 +181,10 @@ queryClient.setQueryData(todoKey, (current) =>
 	current && current.status === 200
 		? {
 				...current,
-				body: {
-					...current.body,
-					completed: true,
-				},
+			body: {
+				...current.body,
+				completed: true,
+			},
 			}
 		: current,
 );

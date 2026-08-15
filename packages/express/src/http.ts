@@ -1,5 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import type { HttpMethod, HttpRouteDeclaration } from "@rest-rpc/core/contract";
+import { toColonPath } from "@rest-rpc/core/contract";
 import {
 	handleHttpRoute,
 	handleHttpRouteResult,
@@ -48,7 +49,12 @@ export const registerExpressHttpRoutes = (
 
 		const serviceHandler = async (req: Request, res: ExpressResponse) => {
 			const result = await handleHttpRoute(route, handler, {
-				request: req,
+				request: {
+					body: req.body,
+					query: req.query,
+					pathParams: req.params,
+					headers: req.headers,
+				},
 				context: { req },
 				errorContext: { kind: "http", req },
 				errorHandlers: errorHandlers as
@@ -74,6 +80,6 @@ export const registerExpressHttpRoutes = (
 			});
 		};
 
-		app[method](route.path, serviceHandler);
+		app[method](toColonPath(route.path), serviceHandler);
 	}
 };

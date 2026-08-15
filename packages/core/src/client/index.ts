@@ -1,5 +1,5 @@
-export { getRouteCacheTags } from "./cacheTags.ts";
 export { ApiClient, initClient } from "./client.ts";
+export { getNextFetchTags } from "./nextFetchTags.ts";
 export { constructBaseRequest } from "./request.ts";
 export { mapApiClientContract } from "./routes.ts";
 export type {
@@ -15,6 +15,7 @@ export type {
 	FetchLike,
 	FetchOptions,
 	FetchResponseFn,
+	NextFetchTagsOptions,
 	OpenConnectionArgs,
 	OpenConnectionFn,
 	UndeclaredRouteClientResponse,

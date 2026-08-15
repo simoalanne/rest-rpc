@@ -9,7 +9,7 @@ export type FetchResponse = (...args: unknown[]) => Promise<unknown>;
 const isSuccessStatus = (status: number) => status >= 200 && status < 300;
 
 export const takesRequestInput = (route: RouteDeclaration) =>
-	Boolean(route.request);
+	Boolean(route.body || route.query || route.pathParams || route.headers);
 
 const normalizeError = (error: unknown) =>
 	error instanceof Error

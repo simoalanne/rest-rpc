@@ -30,10 +30,8 @@ export const api = router({
 		get: {
 			method: "GET",
 			path: "/todos/:id",
-			request: {
-				params: {
-					id: z.string(),
-				},
+			pathParams: {
+				id: z.string(),
 			},
 			responses: {
 				200: todoSchema,
@@ -57,7 +55,7 @@ const routes = router(api, {
 			if (!todo) {
 				return {
 					status: 404,
-					body: { code: "TODO_NOT_FOUND" },
+				body: { code: "TODO_NOT_FOUND" },
 				};
 			}
 

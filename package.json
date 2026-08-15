@@ -24,7 +24,7 @@
 		"changeset:version": "changeset version && pnpm install --lockfile-only --no-frozen-lockfile",
 		"release": "pnpm run build:packages && changeset publish",
 		"release:github:notes": "node scripts/create-github-release.ts --notes",
-		"bench:typecheck": "pnpm --filter @rest-rpc/core build && pnpm --filter @rest-rpc/benchmarks bench:typecheck",
+		"bench:typecheck": "pnpm run build:packages && pnpm --filter benchmarks bench:typecheck",
 		"readme:sync": "node scripts/sync-readmes.cjs",
 		"check": "pnpm run lint && pnpm run typecheck && pnpm run test",
 		"check:verify": "pnpm run lint:verify && pnpm run typecheck && pnpm run test",

@@ -5,7 +5,7 @@ import {
 	createOpenApiTestContract,
 	schemaConverter,
 } from "../../test/factories/openapi.ts";
-import { noBody } from "../contract/route.ts";
+import { noBody } from "../contract/response.ts";
 import { createOpenApiDocument } from "./document.ts";
 
 describe("createOpenApiDocument", () => {
@@ -69,9 +69,7 @@ describe("createOpenApiDocument", () => {
 					get: {
 						path: "/todos/:id",
 						method: "GET",
-						request: {
-							params: z.object({ id: z.string() }),
-						},
+						pathParams: z.object({ id: z.string() }),
 						responses: {
 							200: z.object({ id: z.string() }),
 						},
@@ -79,9 +77,7 @@ describe("createOpenApiDocument", () => {
 					remove: {
 						path: "/todos/:id",
 						method: "DELETE",
-						request: {
-							params: z.object({ id: z.string() }),
-						},
+						pathParams: z.object({ id: z.string() }),
 						responses: {
 							204: noBody(),
 						},

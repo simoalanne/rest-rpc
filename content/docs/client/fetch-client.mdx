@@ -191,6 +191,77 @@ const client = initClient(api, {
 
 This option also validates incoming WebSocket server messages on the client.
 
+## Use in Next.js
+
+When using the core fetch client with Next.js, the client can automatically add deterministic tags to GET
+requests through Next's `fetch` options.
+
+```ts
+import { initClient } from "@rest-rpc/core";
+import { api } from "./contract";
+
+export const client = initClient(api, {
+	origin: "https://api.example.com",
+	nextFetchTags: {
+		enabled: true,
+		tagPrefix: "api",
+	},
+	fetchOptions: {
+		next: {
+			revalidate: 60,
+			tags: ["your-custom-tag"],
+		},
+	},
+});
+```
+
+For `client.todos.get.fetch({ id: "todo_1" })`, the client attaches both the
+exact request tag and the broader route tag.
+
+```ts
+["api:todos.get:id:todo_1", "api:todos.get"];
+```
+
+Use the route-level tag for broad invalidation. Use the exact request tag when
+the request identifies a stable cache variant.
+
+Automatic tags only include path params and query params. Request bodies are not
+included because body-based requests generally should not be cached as GET
+fetches. Headers are also excluded because they commonly contain sensitive data,
+such as authorization or session values.
+
+You can still pass Next.js fetch options normally through `fetchOptions`.
+Generated tags are merged with any tags you provide.
+
+```ts
+await client.todos.get.fetch(
+	{ id: "todo_1" },
+	{
+		next: {
+			revalidate: 60,
+			tags: ["todos"],
+		},
+	},
+);
+```
+
+```ts
+"use server";
+
+import { revalidateTag } from "next/cache";
+import { getNextFetchTags } from "@rest-rpc/core";
+import { api } from "./contract";
+import { client } from "./client";
+
+export async function renameTodo(id: string, title: string) {
+	await client.todos.update.fetch({ id, title });
+
+	for (const tag of getNextFetchTags(api.todos.get, { id }, { tagPrefix: "api" })) {
+		revalidateTag(tag);
+	}
+}
+```
+
 ## WebSocket Routes
 
 WebSocket routes expose `openConnection()` instead of `fetch()` and

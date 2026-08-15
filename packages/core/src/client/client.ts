@@ -2,7 +2,7 @@ import type {
 	Contract,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
-} from "../contract/route.ts";
+} from "../contract/contract.ts";
 import { buildApiClient } from "./build.ts";
 import { executeRequest } from "./request.ts";
 import {
@@ -45,6 +45,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 	private fetchImpl?: ApiClientOptions["fetch"];
 	private fetchOptions?: ApiClientOptions["fetchOptions"];
 	private getGlobalHeaders?: ApiClientOptions["getGlobalHeaders"];
+	private nextFetchTags?: ApiClientOptions["nextFetchTags"];
 	private timeoutMs?: number;
 	private unknownRequestKeys: "throw" | "strip";
 	private validateResponses: boolean;
@@ -55,6 +56,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 		this.fetchImpl = options.fetch;
 		this.fetchOptions = options.fetchOptions;
 		this.getGlobalHeaders = options.getGlobalHeaders;
+		this.nextFetchTags = options.nextFetchTags;
 		this.timeoutMs = options.timeoutMs;
 		this.unknownRequestKeys = options.unknownRequestKeys ?? "throw";
 		this.validateResponses = options.validateResponses ?? false;
@@ -75,6 +77,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 			fetch: this.fetchImpl,
 			fetchOptions: this.fetchOptions,
 			getGlobalHeaders: this.getGlobalHeaders,
+			nextFetchTags: this.nextFetchTags,
 			timeoutMs: this.timeoutMs,
 			unknownRequestKeys: this.unknownRequestKeys,
 		});

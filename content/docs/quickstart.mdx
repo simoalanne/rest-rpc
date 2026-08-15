@@ -31,10 +31,8 @@ export const api = router({
 		create: {
 			method: "POST",
 			path: "/todos",
-			request: {
-				body: {
-					title: z.string().min(1),
-				},
+			body: {
+				title: z.string().min(1),
 			},
 			responses: {
 				201: todoSchema,
@@ -62,10 +60,8 @@ export const api = router({
 		create: {
 			method: "POST",
 			path: "/todos",
-			request: {
-				body: {
-					title: v.pipe(v.string(), v.minLength(1)),
-				},
+			body: {
+				title: v.pipe(v.string(), v.minLength(1)),
 			},
 			responses: {
 				201: todoSchema,
@@ -93,10 +89,8 @@ export const api = router({
 		create: {
 			method: "POST",
 			path: "/todos",
-			request: {
-				body: {
-					title: type("string>0"),
-				},
+			body: {
+				title: type("string>0"),
 			},
 			responses: {
 				201: todoSchema,
@@ -124,10 +118,8 @@ export const api = router({
 		create: {
 			method: "POST",
 			path: "/todos",
-			request: {
-				body: {
-					title: type("string>0"),
-				},
+			body: {
+				title: type("string>0"),
 			},
 			responses: {
 				201: todoSchema,
@@ -163,10 +155,8 @@ export const api = router({
 		create: {
 			method: "POST",
 			path: "/todos",
-			request: {
-				body: {
-					title: z.string().min(1),
-				},
+			body: {
+				title: z.string().min(1),
 			},
 			responses: {
 				201: todoSchema,
@@ -203,7 +193,7 @@ const routes = router(api, {
 
 			return {
 				status: 201,
-				body: todo,
+			body: todo,
 			};
 		},
 	},
@@ -235,10 +225,8 @@ export const api = router({
 		create: {
 			method: "POST",
 			path: "/todos",
-			request: {
-				body: {
-					title: z.string().min(1),
-				},
+			body: {
+				title: z.string().min(1),
 			},
 			responses: {
 				201: todoSchema,
@@ -274,7 +262,7 @@ const routes = router(api, {
 
 			return {
 				status: 201,
-				body: todo,
+			body: todo,
 			};
 		},
 	},
@@ -306,10 +294,8 @@ export const api = router({
 		create: {
 			method: "POST",
 			path: "/todos",
-			request: {
-				body: {
-					title: z.string().min(1),
-				},
+			body: {
+				title: z.string().min(1),
 			},
 			responses: {
 				201: todoSchema,
@@ -345,7 +331,7 @@ const routes = router(api, {
 
 			return {
 				status: 201,
-				body: todo,
+			body: todo,
 			};
 		},
 	},
@@ -377,10 +363,8 @@ export const api = router({
 		create: {
 			method: "POST",
 			path: "/todos",
-			request: {
-				body: {
-					title: z.string().min(1),
-				},
+			body: {
+				title: z.string().min(1),
 			},
 			responses: {
 				201: todoSchema,
@@ -413,7 +397,7 @@ export const { POST } = createRouterHandler(api, {
 
 			return {
 				status: 201,
-				body: todo,
+			body: todo,
 			};
 		},
 	},
@@ -447,10 +431,8 @@ export const api = router({
 		create: {
 			method: "POST",
 			path: "/todos",
-			request: {
-				body: {
-					title: z.string().min(1),
-				},
+			body: {
+				title: z.string().min(1),
 			},
 			responses: {
 				201: todoSchema,
@@ -493,10 +475,8 @@ export const api = router({
 		create: {
 			method: "POST",
 			path: "/todos",
-			request: {
-				body: {
-					title: z.string().min(1),
-				},
+			body: {
+				title: z.string().min(1),
 			},
 			responses: {
 				201: todoSchema,

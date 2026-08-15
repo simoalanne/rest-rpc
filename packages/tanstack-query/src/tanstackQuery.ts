@@ -205,7 +205,6 @@ export const initTanstackQuery = <TContract extends Contract>(
 			return createRouteApi(
 				node,
 				apiNode.fetchResponse as (...args: unknown[]) => Promise<unknown>,
-				path,
 			);
 		}
 

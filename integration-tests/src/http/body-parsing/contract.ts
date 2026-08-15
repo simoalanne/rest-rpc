@@ -5,12 +5,10 @@ export const bodyParsingContract = router({
 	json: {
 		method: "POST",
 		path: "/body-parsing/json",
-		request: {
-			body: z.object({
-				count: z.number(),
-				title: z.string(),
-			}),
-		},
+		body: z.object({
+			count: z.number(),
+			title: z.string(),
+		}),
 		responses: {
 			200: z.object({
 				count: z.number(),
@@ -21,12 +19,10 @@ export const bodyParsingContract = router({
 	text: {
 		method: "POST",
 		path: "/body-parsing/text",
-		request: {
-			body: customBody({
-				contentType: "text/plain",
-				schema: z.string(),
-			}),
-		},
+		body: customBody({
+			contentType: "text/plain",
+			schema: z.string(),
+		}),
 		responses: {
 			200: z.object({
 				body: z.string(),
@@ -36,17 +32,15 @@ export const bodyParsingContract = router({
 	customJson: {
 		method: "POST",
 		path: "/body-parsing/custom-json",
-		request: {
-			body: customBody({
-				contentType: "application/json; charset=utf-8",
-				schema: z.object({
-					count: z.number(),
-					nested: z.object({
-						ok: z.boolean(),
-					}),
+		body: customBody({
+			contentType: "application/json; charset=utf-8",
+			schema: z.object({
+				count: z.number(),
+				nested: z.object({
+					ok: z.boolean(),
 				}),
 			}),
-		},
+		}),
 		responses: {
 			200: z.object({
 				count: z.number(),
@@ -57,12 +51,10 @@ export const bodyParsingContract = router({
 	binary: {
 		method: "POST",
 		path: "/body-parsing/binary",
-		request: {
-			body: customBody({
-				contentType: "application/octet-stream",
-				schema: z.instanceof(Uint8Array),
-			}),
-		},
+		body: customBody({
+			contentType: "application/octet-stream",
+			schema: z.instanceof(Uint8Array),
+		}),
 		responses: {
 			200: z.object({
 				byteLength: z.number(),
@@ -73,9 +65,7 @@ export const bodyParsingContract = router({
 	deleteNoBody: {
 		method: "DELETE",
 		path: "/body-parsing/no-body",
-		request: {
-			body: noBody(),
-		},
+		body: noBody(),
 		responses: {
 			204: noBody(),
 		},

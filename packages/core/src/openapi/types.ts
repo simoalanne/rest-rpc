@@ -1,4 +1,4 @@
-import type { HttpRouteDeclaration } from "../contract/route.ts";
+import type { HttpRouteDeclaration } from "../contract/contract.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 
 export type OpenApiSchema = Record<string, unknown>;

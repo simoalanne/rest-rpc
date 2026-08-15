@@ -9,13 +9,11 @@ describe("validateRequest", () => {
 			{
 				method: "POST",
 				path: "/todos",
-				request: {
-					body: z.object({
-						createdAt: z.iso.datetime().transform((value) => new Date(value)),
-					}),
-					requestKeys: {
-						createdAt: "body",
-					},
+				body: z.object({
+					createdAt: z.iso.datetime().transform((value) => new Date(value)),
+				}),
+				requestKeys: {
+					createdAt: "body",
 				},
 				responses: {},
 			},
@@ -39,13 +37,11 @@ describe("validateRequest", () => {
 			{
 				method: "POST",
 				path: "/todos",
-				request: {
-					body: z.object({
-						createdAt: z.date(),
-					}),
-					requestKeys: {
-						createdAt: "body",
-					},
+				body: z.object({
+					createdAt: z.date(),
+				}),
+				requestKeys: {
+					createdAt: "body",
 				},
 				responses: {},
 			},
@@ -65,24 +61,22 @@ describe("validateRequest", () => {
 			{
 				method: "GET",
 				path: "/todos/:id",
-				request: {
-					params: {
-						id: z.coerce.number(),
-					},
-					query: {
-						published: z
-							.enum(["true", "false"])
-							.transform((value) => value === "true"),
-					},
-					requestKeys: {
-						id: "params",
-						published: "query",
-					},
+				pathParams: {
+					id: z.coerce.number(),
+				},
+				query: {
+					published: z
+						.enum(["true", "false"])
+						.transform((value) => value === "true"),
+				},
+				requestKeys: {
+					id: "pathParams",
+					published: "query",
 				},
 				responses: {},
 			},
 			{
-				params: { id: "123" },
+				pathParams: { id: "123" },
 				query: { published: "false" },
 			},
 		);
@@ -101,22 +95,20 @@ describe("validateRequest", () => {
 			{
 				method: "GET",
 				path: "/todos/:id",
-				request: {
-					params: {
-						id: z.number(),
-					},
-					query: {
-						published: z.boolean(),
-					},
-					requestKeys: {
-						id: "params",
-						published: "query",
-					},
+				pathParams: {
+					id: z.number(),
+				},
+				query: {
+					published: z.boolean(),
+				},
+				requestKeys: {
+					id: "pathParams",
+					published: "query",
 				},
 				responses: {},
 			},
 			{
-				params: { id: "123" },
+				pathParams: { id: "123" },
 				query: { published: "true" },
 			},
 		);

@@ -5,11 +5,9 @@ export const errorHandlersContract = router({
 	validation: {
 		method: "GET",
 		path: "/error-handlers/validation",
-		request: {
-			query: z.object({
-				page: z.number(),
-			}),
-		},
+		query: z.object({
+			page: z.number(),
+		}),
 		responses: {
 			200: z.object({ reached: z.literal(true) }),
 		},

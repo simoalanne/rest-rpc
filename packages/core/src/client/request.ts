@@ -1,13 +1,16 @@
-import type { RouteDeclaration } from "../contract/route.ts";
-import { isCustomBody, isNoBody } from "../contract/route.ts";
-import { groupRequestInput, pathParamPattern } from "../contract/validate.ts";
+import type { RouteDeclaration } from "../contract/contract.ts";
+import { replacePathParams } from "../contract/path.ts";
+import { isCustomBody, isNoBody } from "../contract/response.ts";
+import type { FlatRequestInput } from "../contract/validate.ts";
+import { groupRequestInput } from "../contract/validate.ts";
+import { getNextFetchTags } from "./nextFetchTags.ts";
 import type {
 	ApiClientFetchOptions,
 	FetchArgs,
 	FetchLike,
 	FetchOptions,
 	GetHeadersFn,
-	RuntimeArgs,
+	NextFetchTagsOptions,
 } from "./types.ts";
 
 export const createRequestSignal = (
@@ -28,12 +31,11 @@ export const createRequestSignal = (
 };
 
 export const takesRequestInput = (route: RouteDeclaration) => {
-	if (!route.request) return false;
-	if (route.request.query || route.request.params || route.request.headers) {
+	if (route.query || route.pathParams || route.headers) {
 		return true;
 	}
-	if (isCustomBody(route.request.body)) return true;
-	return Boolean(route.request.body && !isNoBody(route.request.body));
+	if (isCustomBody(route.body)) return true;
+	return Boolean(route.body && !isNoBody(route.body));
 };
 
 const findHeader = (headers: Record<string, string>, name: string) =>
@@ -73,7 +75,7 @@ const isSerializablePrimitive = (value: unknown) =>
 
 const stringifyRequestValue = (
 	route: RouteDeclaration,
-	segment: "params" | "query" | "headers",
+	segment: "pathParams" | "query" | "headers",
 	key: string,
 	value: unknown,
 	optional = false,
@@ -105,13 +107,18 @@ const stringifyHeaders = (
 
 const serializeParams = (
 	route: RouteDeclaration,
-	params: Record<string, unknown> | undefined,
+	pathParams: Record<string, unknown> | undefined,
 ) => {
-	return route.path.replace(pathParamPattern, (_, key: string) => {
-		const value = stringifyRequestValue(route, "params", key, params?.[key]);
+	return replacePathParams(route.path, (key) => {
+		const value = stringifyRequestValue(
+			route,
+			"pathParams",
+			key,
+			pathParams?.[key],
+		);
 		if (value === undefined) {
 			throw new Error(
-				`Invalid params key "${key}" for ${route.method} ${route.path}. Expected string, number, or boolean.`,
+				`Invalid pathParams key "${key}" for ${route.method} ${route.path}. Expected string, number, or boolean.`,
 			);
 		}
 		return encodeURIComponent(value);
@@ -134,7 +141,7 @@ const serializeQuery = (
 export const constructBaseRequest = (
 	origin: string,
 	route: RouteDeclaration,
-	args: RuntimeArgs | undefined,
+	args: FlatRequestInput | undefined,
 	unknownRequestKeys: "throw" | "strip",
 ): {
 	url: string;
@@ -146,12 +153,12 @@ export const constructBaseRequest = (
 	if (!args) return { url: urlBase };
 
 	const request = groupRequestInput(route, args, { unknownRequestKeys });
-	const { body, query, params, headers } = request;
+	const { body, query, pathParams, headers } = request;
 
-	urlBase = `${origin}${serializeParams(route, params)}${serializeQuery(route, query)}`;
+	urlBase = `${origin}${serializeParams(route, pathParams)}${serializeQuery(route, query)}`;
 
-	if (isCustomBody(route.request?.body)) {
-		const contentType = route.request.body.contentType;
+	if (isCustomBody(route.body)) {
+		const contentType = route.body.contentType;
 		return {
 			url: urlBase,
 			body: serializeCustomBody(body, contentType),
@@ -169,10 +176,12 @@ export const constructBaseRequest = (
 };
 
 export const extractArgs = (route: RouteDeclaration, args: unknown[]) => {
-	const requestArgs = takesRequestInput(route) ? args[0] : undefined;
+	const requestArgs = takesRequestInput(route)
+		? (args[0] as FlatRequestInput)
+		: undefined;
 	const options = requestArgs ? args[1] : args[0];
 	return { requestArgs, options } as {
-		requestArgs?: unknown;
+		requestArgs?: FlatRequestInput;
 		options?: FetchOptions;
 	};
 };
@@ -182,8 +191,38 @@ export type ExecuteRequestOptions = {
 	fetch?: FetchLike;
 	fetchOptions?: ApiClientFetchOptions;
 	getGlobalHeaders?: GetHeadersFn;
+	nextFetchTags?: NextFetchTagsOptions;
 	timeoutMs?: number;
 	unknownRequestKeys: "throw" | "strip";
+};
+
+const addNextFetchTags = (
+	init: RequestInit,
+	route: RouteDeclaration,
+	request: FlatRequestInput | undefined,
+	options: NextFetchTagsOptions | undefined,
+) => {
+	if (!options?.enabled || route.method !== "GET") return init;
+
+	const nextInit = init as RequestInit & {
+		next?: {
+			tags?: string[];
+			[key: string]: unknown;
+		};
+	};
+
+	return {
+		...nextInit,
+		next: {
+			...nextInit.next,
+			tags: [
+				...(nextInit.next?.tags ?? []),
+				...getNextFetchTags(route, request, {
+					tagPrefix: options.tagPrefix,
+				}),
+			],
+		},
+	};
 };
 
 export const executeRequest = async <E extends RouteDeclaration>(
@@ -200,7 +239,7 @@ export const executeRequest = async <E extends RouteDeclaration>(
 	} = constructBaseRequest(
 		options.origin,
 		route,
-		requestArgs as RuntimeArgs,
+		requestArgs,
 		options.unknownRequestKeys,
 	);
 
@@ -212,18 +251,23 @@ export const executeRequest = async <E extends RouteDeclaration>(
 	assertNoContentTypeHeader(headers);
 
 	try {
-		const init: RequestInit = {
-			...options.fetchOptions,
-			...fetchOptions,
-			method: route.method,
-			body,
-			headers: {
-				...normalizeHeaders(headers),
-				...normalizeHeaders(requestHeaders),
-				...(contentType ? { "content-type": contentType } : {}),
+		const init = addNextFetchTags(
+			{
+				...options.fetchOptions,
+				...fetchOptions,
+				method: route.method,
+				body,
+				headers: {
+					...normalizeHeaders(headers),
+					...normalizeHeaders(requestHeaders),
+					...(contentType ? { "content-type": contentType } : {}),
+				},
+				signal: signalState?.signal ?? fetchOptions?.signal,
 			},
-			signal: signalState?.signal ?? fetchOptions?.signal,
-		};
+			route,
+			requestArgs,
+			options.nextFetchTags,
+		);
 		const fetchImpl =
 			options.fetch ?? ((input, init) => globalThis.fetch(input, init));
 		const rawResponse = await fetchImpl(url, init);

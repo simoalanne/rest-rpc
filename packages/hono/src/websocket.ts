@@ -1,4 +1,5 @@
 import type { WebSocketRouteDeclaration } from "@rest-rpc/core/contract";
+import { toColonPath } from "@rest-rpc/core/contract";
 import {
 	type BeforeWebSocketUpgrade,
 	type CloseEventLike,
@@ -85,10 +86,10 @@ export const registerHonoWebSocketRoutes = <TEnv extends Env = Env>(
 	routes: RouteImplementation<WebSocketRouteDeclaration>[],
 ) => {
 	for (const implementation of routes) {
-		app.get(implementation.route.path, async (c) => {
+		app.get(toColonPath(implementation.route.path), async (c) => {
 			const request = {
 				query: c.req.query(),
-				params: c.req.param(),
+				pathParams: c.req.param(),
 				headers: c.req.header(),
 			};
 			const upgrade = await prepareWebSocketUpgrade({

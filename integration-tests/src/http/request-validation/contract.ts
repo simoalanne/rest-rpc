@@ -5,16 +5,14 @@ export const requestValidationContract = router({
 	coerce: {
 		method: "GET",
 		path: "/request-validation/coerce/:id",
-		request: {
-			params: z.object({ id: z.coerce.number() }),
-			query: z.object({
-				published: z
-					.enum(["true", "false"])
-					.transform((value) => value === "true"),
-			}),
-			headers: {
-				"x-page": z.string().pipe(z.coerce.number()),
-			},
+		pathParams: z.object({ id: z.coerce.number() }),
+		query: z.object({
+			published: z
+				.enum(["true", "false"])
+				.transform((value) => value === "true"),
+		}),
+		headers: {
+			"x-page": z.string().pipe(z.coerce.number()),
 		},
 		responses: {
 			200: z.object({
@@ -27,9 +25,7 @@ export const requestValidationContract = router({
 	params: {
 		method: "GET",
 		path: "/request-validation/params/:id",
-		request: {
-			params: z.object({ id: z.number() }),
-		},
+		pathParams: z.object({ id: z.number() }),
 		responses: {
 			200: z.object({ reached: z.literal(true) }),
 		},
@@ -37,9 +33,7 @@ export const requestValidationContract = router({
 	query: {
 		method: "GET",
 		path: "/request-validation/query",
-		request: {
-			query: z.object({ page: z.number() }),
-		},
+		query: z.object({ page: z.number() }),
 		responses: {
 			200: z.object({ reached: z.literal(true) }),
 		},
@@ -47,10 +41,8 @@ export const requestValidationContract = router({
 	headers: {
 		method: "GET",
 		path: "/request-validation/headers",
-		request: {
-			headers: {
-				"x-required": z.string().min(1),
-			},
+		headers: {
+			"x-required": z.string().min(1),
 		},
 		responses: {
 			200: z.object({ reached: z.literal(true) }),
@@ -59,11 +51,9 @@ export const requestValidationContract = router({
 	body: {
 		method: "POST",
 		path: "/request-validation/body",
-		request: {
-			body: z.object({
-				count: z.number(),
-			}),
-		},
+		body: z.object({
+			count: z.number(),
+		}),
 		responses: {
 			200: z.object({ reached: z.literal(true) }),
 		},
@@ -71,11 +61,9 @@ export const requestValidationContract = router({
 	emptyQuery: {
 		method: "GET",
 		path: "/request-validation/empty-query",
-		request: {
-			query: z.object({
-				value: z.literal(""),
-			}),
-		},
+		query: z.object({
+			value: z.literal(""),
+		}),
 		responses: {
 			200: z.object({ value: z.literal("") }),
 		},

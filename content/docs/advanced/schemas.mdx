@@ -38,10 +38,8 @@ export const api = router({
 		get: {
 			method: "GET",
 			path: "/todos/:id",
-			request: {
-				params: {
-					id: type<string>(),
-				},
+			pathParams: {
+				id: type<string>(),
 			},
 			responses: {
 				200: type<{
@@ -63,37 +61,34 @@ The library includes built-in request key inference for common object schemas
 from Zod, Valibot, and ArkType.
 
 ```ts
-request: {
-	params: z.object({
-		id: z.string(),
+	pathParams: z.object({
+	id: z.string(),
 	}),
 	query: z.object({
-		includeCompleted: z.boolean().optional(),
+	includeCompleted: z.boolean().optional(),
 	}),
-}
+
 ```
 
 When the key shape is not inferable, use a record-shaped request declaration.
 
 ```ts
-request: {
 	query: {
-		includeCompleted: type<boolean | undefined>(),
+	includeCompleted: type<boolean | undefined>(),
 	},
-}
+
 ```
 
 As a last resort, provide `requestKeys`.
 
 ```ts
-request: {
 	body: type<{
-		title: string;
+	title: string;
 	}>(),
 	requestKeys: {
-		title: "body",
+	title: "body",
 	},
-}
+
 ```
 
 Most routes should not need manual request keys.
@@ -105,33 +100,32 @@ Flattened keys must be unambiguous.
 This route is invalid:
 
 ```ts
-request: {
-	params: {
-		id: z.string(),
+	pathParams: {
+	id: z.string(),
 	},
 	body: {
-		id: z.string(),
+	id: z.string(),
 	},
-}
+
 ```
 
 Both fields would flatten to `id`.
 
 Important constraints:
 
-- Duplicate flattened keys across `body`, `query`, `params`, and `headers` are invalid.
+- Duplicate flattened keys across `body`, `query`, `pathParams`, and `headers` are invalid.
 - `context` is reserved for server handler context.
 - Header keys are checked case-insensitively for duplicates.
 - `content-type` is reserved as a request header.
-- Path params in the URL must have matching `params` schema keys.
-- `params` schema keys must correspond to actual path params.
+- Path params in the URL must have matching `pathParams` schema keys.
+- `pathParams` schema keys must correspond to actual path params.
 - When using `customBody()`, the flattened `body` key is reserved for the custom body value.
 
 ## Request Value Constraints
 
 Request body fields can be normal JSON-like values.
 
-Query values, params, and headers are serialized into HTTP fields, so their
+Query values, path params, and headers are serialized into HTTP fields, so their
 runtime values should be scalar request values (string, number, boolean).
 
 ```ts

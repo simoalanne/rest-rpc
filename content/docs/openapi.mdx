@@ -81,10 +81,8 @@ Use `openApi` on a route for operation metadata.
 create: {
 	method: "POST",
 	path: "/todos",
-	request: {
-		body: {
-			title: z.string().min(1),
-		},
+	body: {
+		title: z.string().min(1),
 	},
 	responses: {
 		201: todoSchema,

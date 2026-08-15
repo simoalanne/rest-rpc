@@ -2,24 +2,22 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
 import { testContract } from "../../test/factories/contract.ts";
-import { router } from "./define.ts";
-import { noBody } from "./route.ts";
+import { router } from "./contract.ts";
+import { noBody } from "./response.ts";
 
 describe("router", () => {
 	it("normalizes and validates contracts", () => {
 		const contract = router(
 			testContract({
 				path: "/search/:id",
-				request: {
-					params: z.object({ id: z.string() }),
-				},
+				pathParams: z.object({ id: z.string() }),
 			}),
 			{ pathPrefix: "/api" },
 		);
 
 		assert.equal(contract.search.find.path, "/api/search/:id");
-		assert.deepEqual(contract.search.find.request.requestKeys, {
-			id: "params",
+		assert.deepEqual(contract.search.find.requestKeys, {
+			id: "pathParams",
 		});
 	});
 
@@ -27,9 +25,7 @@ describe("router", () => {
 		const child = router(
 			{
 				find: testContract({
-					request: {
-						query: z.string(),
-					},
+					query: z.string(),
 				}).search.find,
 			},
 			{ validate: false },
@@ -42,7 +38,7 @@ describe("router", () => {
 			},
 		);
 
-		assert.deepEqual(contract.search.find.request.requestKeys, {
+		assert.deepEqual(contract.search.find.requestKeys, {
 			q: "query",
 		});
 	});
@@ -52,16 +48,14 @@ describe("router", () => {
 			ping: {
 				method: "POST",
 				path: "/ping",
-				request: {
-					body: noBody(),
-				},
+				body: noBody(),
 				responses: {
 					204: noBody(),
 				},
 			},
 		});
 
-		assert.deepEqual(contract.ping.request.requestKeys, {});
+		assert.deepEqual(contract.ping.requestKeys, {});
 	});
 
 	it("rejects reserved common content-type headers", () => {
@@ -95,10 +89,8 @@ describe("router", () => {
 						ping: {
 							method: "GET",
 							path: "/ping",
-							request: {
-								headers: {
-									"X-Trace-ID": z.string(),
-								},
+							headers: {
+								"X-Trace-ID": z.string(),
 							},
 							responses: {
 								204: noBody(),

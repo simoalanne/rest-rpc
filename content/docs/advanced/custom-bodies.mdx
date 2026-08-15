@@ -9,16 +9,14 @@ Use `customBody()` when the body should be treated as one whole value instead or
 
 ```ts
 import { customBody } from "@rest-rpc/core";
-
-request: {
-	params: {
-		id: z.string(),
+	pathParams: {
+	id: z.string(),
 	},
 	body: customBody({
-		contentType: "image/png",
-		schema: z.instanceof(Uint8Array),
+	contentType: "image/png",
+	schema: z.instanceof(Uint8Array),
 	}),
-}
+
 ```
 
 The handler and client shape is:
@@ -38,15 +36,13 @@ export const api = router({
 		upload: {
 			method: "PUT",
 			path: "/images/:id",
-			request: {
-				params: {
-					id: z.string(),
-				},
-				body: customBody({
-					contentType: "image/png",
-					schema: z.instanceof(Uint8Array),
-				}),
+			pathParams: {
+				id: z.string(),
 			},
+			body: customBody({
+				contentType: "image/png",
+				schema: z.instanceof(Uint8Array),
+			}),
 			responses: {
 				204: noBody(),
 			},
@@ -78,10 +74,8 @@ type.
 download: {
 	method: "GET",
 	path: "/images/:id",
-	request: {
-		params: {
-			id: z.string(),
-		},
+	pathParams: {
+		id: z.string(),
 	},
 	responses: {
 		200: customBody({
@@ -125,7 +119,7 @@ app.use((req, res, next) => {
 		method: req.method,
 		path: req.path,
 	});
-	const body = match?.route.request?.body;
+	const body = match?.route.body;
 
 	if (isCustomBody(body) && body.contentType === "image/png") {
 		return pngParser(req, res, next);

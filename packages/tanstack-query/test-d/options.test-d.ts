@@ -62,9 +62,7 @@ const api = router({
 		get: {
 			method: "GET",
 			path: "/todos/:id",
-			request: {
-				params: todoParamsSchema,
-			},
+			pathParams: todoParamsSchema,
 			responses: {
 				200: todoSchema,
 			},
@@ -72,9 +70,7 @@ const api = router({
 		create: {
 			method: "POST",
 			path: "/todos",
-			request: {
-				body: createTodoSchema,
-			},
+			body: createTodoSchema,
 			responses: {
 				201: todoSchema,
 			},
@@ -82,9 +78,7 @@ const api = router({
 		page: {
 			method: "GET",
 			path: "/todos/page",
-			request: {
-				query: todoPageParamsSchema,
-			},
+			query: todoPageParamsSchema,
 			responses: {
 				200: todoPageSchema,
 			},

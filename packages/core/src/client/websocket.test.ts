@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import z from "zod";
 import { createClientTestContract } from "../../test/factories/client.ts";
-import { router } from "../contract/define.ts";
-import { noBody } from "../contract/route.ts";
+import { router } from "../contract/contract.ts";
+import { noBody } from "../contract/response.ts";
 import { initClient } from "./index.ts";
 import { assertWebSocketRoute, buildWebSocketUrl } from "./websocket.ts";
 
@@ -169,9 +169,7 @@ describe("ApiClient websockets", () => {
 				join: {
 					method: "GET",
 					path: "/rooms/:roomId",
-					request: {
-						params: z.object({ roomId: z.string() }),
-					},
+					pathParams: z.object({ roomId: z.string() }),
 					options: { mode: "websocket" },
 					messages: {
 						client: z.object({ text: z.string() }),
@@ -212,9 +210,7 @@ describe("ApiClient websockets", () => {
 				join: {
 					method: "GET",
 					path: "/rooms/:roomId",
-					request: {
-						params: z.object({ roomId: z.string() }),
-					},
+					pathParams: z.object({ roomId: z.string() }),
 					options: { mode: "websocket" },
 					messages: {
 						client: z.object({ text: z.string() }),
@@ -256,9 +252,7 @@ describe("ApiClient websockets", () => {
 				join: {
 					method: "GET",
 					path: "/rooms/:roomId",
-					request: {
-						params: z.object({ roomId: z.string() }),
-					},
+					pathParams: z.object({ roomId: z.string() }),
 					options: { mode: "websocket" },
 					messages: {
 						client: z.object({ text: z.string() }),
@@ -297,9 +291,7 @@ describe("ApiClient websockets", () => {
 				join: {
 					method: "GET",
 					path: "/rooms/:roomId",
-					request: {
-						params: z.object({ roomId: z.string() }),
-					},
+					pathParams: z.object({ roomId: z.string() }),
 					options: { mode: "websocket" },
 					messages: {
 						client: z.object({ text: z.string() }),

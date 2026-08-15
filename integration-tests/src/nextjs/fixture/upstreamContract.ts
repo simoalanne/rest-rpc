@@ -6,9 +6,7 @@ export const upstreamContract = router({
 		get: {
 			method: "GET",
 			path: "/counter/:id",
-			request: {
-				params: z.object({ id: z.string() }),
-			},
+			pathParams: z.object({ id: z.string() }),
 			responses: {
 				200: z.object({
 					id: z.string(),

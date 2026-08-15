@@ -22,9 +22,7 @@ export const tanstackQueryContract = router({
 		get: {
 			method: "GET",
 			path: "/projects/:id",
-			request: {
-				params: z.object({ id: z.string() }),
-			},
+			pathParams: z.object({ id: z.string() }),
 			responses: {
 				200: projectSchema,
 				404: z.object({
@@ -36,12 +34,10 @@ export const tanstackQueryContract = router({
 		search: {
 			method: "GET",
 			path: "/project-search",
-			request: {
-				query: z.object({
-					q: z.string().optional(),
-					status: z.enum(["active", "archived"]).optional(),
-				}),
-			},
+			query: z.object({
+				q: z.string().optional(),
+				status: z.enum(["active", "archived"]).optional(),
+			}),
 			responses: {
 				200: z.object({
 					projects: z.array(projectSchema),
@@ -51,15 +47,13 @@ export const tanstackQueryContract = router({
 		create: {
 			method: "POST",
 			path: "/projects",
-			request: {
-				headers: {
-					"x-test-tenant": z.string().optional(),
-				},
-				body: z.object({
-					name: z.string(),
-					status: z.enum(["active", "archived"]).optional(),
-				}),
+			headers: {
+				"x-test-tenant": z.string().optional(),
 			},
+			body: z.object({
+				name: z.string(),
+				status: z.enum(["active", "archived"]).optional(),
+			}),
 			responses: {
 				201: projectSchema.extend({
 					tenant: z.string().optional(),
@@ -69,10 +63,8 @@ export const tanstackQueryContract = router({
 		rename: {
 			method: "PATCH",
 			path: "/projects/:id",
-			request: {
-				params: z.object({ id: z.string() }),
-				body: z.object({ name: z.string() }),
-			},
+			pathParams: z.object({ id: z.string() }),
+			body: z.object({ name: z.string() }),
 			responses: {
 				200: projectSchema,
 				409: z.object({
@@ -84,12 +76,10 @@ export const tanstackQueryContract = router({
 		page: {
 			method: "GET",
 			path: "/project-page",
-			request: {
-				query: z.object({
-					cursor: z.string().optional(),
-					limit: z.coerce.number(),
-				}),
-			},
+			query: z.object({
+				cursor: z.string().optional(),
+				limit: z.coerce.number(),
+			}),
 			responses: {
 				200: z.object({
 					projects: z.array(projectSchema),
@@ -100,9 +90,7 @@ export const tanstackQueryContract = router({
 		slow: {
 			method: "GET",
 			path: "/slow-projects/:id",
-			request: {
-				params: z.object({ id: z.string() }),
-			},
+			pathParams: z.object({ id: z.string() }),
 			responses: {
 				200: projectSchema,
 			},

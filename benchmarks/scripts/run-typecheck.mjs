@@ -1,16 +1,23 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const repoRoot = dirname(root);
 const generatedRoot = join(root, "generated", "contract-only");
+const resultsRoot = join(root, "results", "typecheck");
 const tscBin = join(repoRoot, "node_modules", ".bin", "tsc");
+const args = process.argv.slice(2);
+if (args[0] === "--") args.shift();
+const message = args.join(" ").trim();
+if (!message) {
+	throw new Error(
+		'Missing benchmark message. Example: pnpm run run:benchmark -- "Test with all validations present"',
+	);
+}
 
 const metrics = [
-	"Files",
-	"Lines of TypeScript",
 	"Identifiers",
 	"Symbols",
 	"Types",
@@ -31,6 +38,25 @@ const parseDiagnostics = (output) => {
 	return result;
 };
 
+const safeSlug = (value) =>
+	value
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-|-$/g, "")
+		.slice(0, 80);
+
+const gitShortCommit = () => {
+	try {
+		return execFileSync("git", ["rev-parse", "--short", "HEAD"], {
+			cwd: repoRoot,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "ignore"],
+		}).trim();
+	} catch {
+		return undefined;
+	}
+};
+
 if (!existsSync(generatedRoot)) {
 	throw new Error(
 		`Missing generated fixtures at ${generatedRoot}. Run generate:type-fixtures first.`,
@@ -48,7 +74,7 @@ const schemaLibraryNames = readdirSync(generatedRoot, { withFileTypes: true })
 	.map((entry) => entry.name)
 	.sort();
 
-const rows = [];
+const tableRows = [];
 
 for (const schemaLibrary of schemaLibraryNames) {
 	const schemaLibraryDir = join(generatedRoot, schemaLibrary);
@@ -71,30 +97,67 @@ for (const schemaLibrary of schemaLibraryNames) {
 		);
 
 		const diagnostics = parseDiagnostics(output);
-		rows.push({
-			caseName,
-			schemaLibrary,
+		tableRows.push({
+			schema: schemaLibrary,
 			routes: caseName.replace("routes-", ""),
-			tsconfig: relative(repoRoot, tsconfig),
-			...diagnostics,
+			types: diagnostics.Types,
+			instantiations: diagnostics.Instantiations,
+			memory: diagnostics["Memory used"],
+			check: diagnostics["Check time"],
+			total: diagnostics["Total time"],
 		});
 	}
 }
 
 console.log("\nContract declaration typecheck benchmark\n");
-console.table(
-	rows.map((row) => ({
-		schema: row.schemaLibrary,
-		routes: row.routes,
-		files: row.Files,
-		lines: row["Lines of TypeScript"],
-		types: row.Types,
-		instantiations: row.Instantiations,
-		memory: row["Memory used"],
-		check: row["Check time"],
-		total: row["Total time"],
-	})),
-);
+console.table(tableRows);
+
+const createdAt = new Date();
+const createdAtLabel = new Intl.DateTimeFormat("en", {
+	year: "numeric",
+	month: "short",
+	day: "numeric",
+	hour: "numeric",
+	minute: "2-digit",
+	second: "2-digit",
+	timeZoneName: "short",
+}).format(createdAt);
+const fileSlug = safeSlug(message);
+const resultPath = join(resultsRoot, `${fileSlug}.md`);
+const latestPath = join(resultsRoot, "latest.md");
+
+const markdownTable = (items) => {
+	const headers = [
+		"schema",
+		"routes",
+		"types",
+		"instantiations",
+		"memory",
+		"check",
+		"total",
+	];
+	const header = `| ${headers.join(" | ")} |`;
+	const separator = `| ${headers.map(() => "---").join(" | ")} |`;
+	const body = items.map(
+		(row) => `| ${headers.map((key) => row[key] ?? "").join(" | ")} |`,
+	);
+	return [header, separator, ...body].join("\n");
+};
+
+mkdirSync(resultsRoot, { recursive: true });
+const commit = gitShortCommit();
+const result = `# ${message}
+
+Created: ${createdAtLabel}
+${commit ? `Commit: ${commit}\n` : ""}
+
+${markdownTable(tableRows)}
+`;
+
+writeFileSync(resultPath, result);
+writeFileSync(latestPath, result);
+
+console.log(`\nSaved results to ${relative(repoRoot, resultPath)}`);
 console.log(
 	"\nRaw fixtures live under benchmarks/generated/contract-only/ after generation.",
 );

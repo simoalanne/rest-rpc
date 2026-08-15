@@ -1,5 +1,5 @@
 import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
-import { isNoBody } from "@rest-rpc/core/contract";
+import { isNoBody, toColonPath } from "@rest-rpc/core/contract";
 import {
 	createWebResponse,
 	handleHttpRoute,
@@ -9,7 +9,7 @@ import {
 import type { Context, Hono } from "hono";
 import type { Env } from "hono/types";
 
-type RequestBodySchema = NonNullable<HttpRouteDeclaration["request"]>["body"];
+type RequestBodySchema = HttpRouteDeclaration["body"];
 
 export type HonoParseBodyInput<TEnv extends Env = Env> = {
 	c: Context<TEnv>;
@@ -48,17 +48,12 @@ export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 		>;
 		const handler = implementation.handler;
 
-		app[method](route.path, async (c) => {
+		app[method](toColonPath(route.path), async (c) => {
 			const result = await handleHttpRoute(route, handler, {
 				request: {
-					body: await parseRequestBody(
-						c,
-						route,
-						route.request?.body,
-						parseBody,
-					),
+					body: await parseRequestBody(c, route, route.body, parseBody),
 					query: c.req.query(),
-					params: c.req.param(),
+					pathParams: c.req.param(),
 					headers: c.req.header(),
 				},
 				context: { c },

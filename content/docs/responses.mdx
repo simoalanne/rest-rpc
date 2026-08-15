@@ -51,7 +51,7 @@ Handlers can always return an explicit response envelope.
 return {
 	status: 404,
 	body: {
-		code: "TODO_NOT_FOUND",
+	code: "TODO_NOT_FOUND",
 	},
 };
 ```
@@ -77,7 +77,7 @@ Use an envelope when the status is part of the result.
 create({ title }) {
 	return {
 		status: 201,
-		body: createTodo({ title }),
+	body: createTodo({ title }),
 	};
 }
 ```
@@ -93,9 +93,9 @@ get({ id }) {
 	if (!todo) {
 		return {
 			status: 404,
-			body: {
-				code: "TODO_NOT_FOUND",
-			},
+		body: {
+			code: "TODO_NOT_FOUND",
+		},
 		};
 	}
 
@@ -109,7 +109,7 @@ You can also use `ContractResponseError` to throw a declared error response when
 throw new ContractResponseError(api.todos.get, {
 	status: 404,
 	body: {
-		code: "TODO_NOT_FOUND",
+	code: "TODO_NOT_FOUND",
 	},
 });
 ```

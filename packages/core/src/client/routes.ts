@@ -1,7 +1,7 @@
 import type {
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
-} from "../contract/route.ts";
+} from "../contract/contract.ts";
 import { mapObjectValues } from "../contract/traversal.ts";
 import type { ApiClientFor, ApiClientRouteValue } from "./types.ts";
 

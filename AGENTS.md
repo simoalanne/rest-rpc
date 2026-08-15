@@ -16,10 +16,12 @@ This repo is `rest-rpc`, a TypeScript library for defining one shared API contra
 - `@rest-rpc/tanstack-query` - TanStack Query options and key helpers
 - `content/` contains documentation for the library and its packages. documentation is written in mdx and uses https://useblume.dev/.
 - `integration-tests/` contains a shared integration test suite that runs real HTTP requests against server adapters. It is used to verify that the generated code works as expected across all supported server adapters.
+- `benchmarks/` contains generated benchmark fixtures that exercise the library as a downstream consumer. It is used to measure TypeScript checker cost for contract declaration across the built-in type-only schema helper and the main supported validation libraries.
 
 ### Commands
 - `pnpm run build:packages` - Packages depend on each other through declaration files. After changing exported package APIs, run this to refresh dependents or when something appears stale or fails mysteriously.
 - `pnpm run typecheck` - Run declaration builds and workspace typechecking.
+- `pnpm run bench:typecheck -- "<message>"` - Build packages first, then run the generated downstream typecheck benchmark against package `dist` declarations.
 - `pnpm run lint` - Run Biome to fix formatting and import ordering automatically.
 - `pnpm run test:unit` - Run package unit tests.
 - `pnpm run test:integration` - Run the shared real HTTP integration suite.

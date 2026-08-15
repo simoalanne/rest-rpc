@@ -1,15 +1,13 @@
 import type {
 	RequestBodySchema,
 	RequestSchemaRecord,
-	ResponseBodySchema,
-} from "../contract/route.ts";
+} from "../contract/request.ts";
 import {
-	isCustomBody,
-	isNoBody,
 	isRequestSchemaRecord,
 	isStandardSchema,
-	isStream,
-} from "../contract/route.ts";
+} from "../contract/request.ts";
+import type { ResponseBodySchema } from "../contract/response.ts";
+import { isCustomBody, isNoBody, isStream } from "../contract/response.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import {
 	convertSchema,
@@ -57,7 +55,7 @@ const assertRequiredPathParameter = (
 ) => {
 	if (!isRequired) {
 		throw new Error(
-			`OpenAPI path parameter "${name}"${routePath ? ` on ${routePath}` : ""} must be required. Make the params schema require this field.`,
+			`OpenAPI path parameter "${name}"${routePath ? ` on ${routePath}` : ""} must be required. Make the pathParams schema require this field.`,
 		);
 	}
 };
@@ -213,18 +211,15 @@ export const createOperation = (
 ): OpenApiOperation => {
 	const parameters = [
 		...createParameters(
-			route.request?.params,
+			route.pathParams,
 			"path",
 			options.schemaConverter,
 			route.path,
 		),
-		...createParameters(route.request?.query, "query", options.schemaConverter),
-		...createHeaderParameters(route.request?.headers, options.schemaConverter),
+		...createParameters(route.query, "query", options.schemaConverter),
+		...createHeaderParameters(route.headers, options.schemaConverter),
 	];
-	const requestBody = createRequestBody(
-		route.request?.body,
-		options.schemaConverter,
-	);
+	const requestBody = createRequestBody(route.body, options.schemaConverter);
 	const { extensions, ...openApi } = route.openApi ?? {};
 	const operation: OpenApiOperation = {
 		...openApi,

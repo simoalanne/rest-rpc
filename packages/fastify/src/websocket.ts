@@ -1,5 +1,6 @@
 import type { WebSocket as FastifyWebSocket } from "@fastify/websocket";
 import type { WebSocketRouteDeclaration } from "@rest-rpc/core/contract";
+import { toColonPath } from "@rest-rpc/core/contract";
 import {
 	type BeforeWebSocketUpgrade,
 	handleWebSocketRoute,
@@ -62,13 +63,13 @@ export const registerFastifyWebSocketRoutes = (
 ) => {
 	for (const implementation of routes) {
 		app.get(
-			implementation.route.path,
+			toColonPath(implementation.route.path),
 			{
 				websocket: true,
 				async preValidation(req: FastifyRequest, reply: FastifyReply) {
 					const request = {
 						query: req.query,
-						params: req.params,
+						pathParams: req.params,
 						headers: req.headers,
 					};
 					const upgrade = await prepareWebSocketUpgrade({

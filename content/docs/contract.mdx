@@ -14,10 +14,8 @@ export const api = router({
 		get: {
 			method: "GET",
 			path: "/todos/:id",
-			request: {
-				params: {
-					id: z.string(),
-				},
+			pathParams: {
+				id: z.string(),
 			},
 			responses: {
 				200: todoSchema,
@@ -50,20 +48,19 @@ HTTP routes use these fields:
 Request data is declared by HTTP location.
 
 ```ts
-request: {
-	params: {
-		id: z.string(),
+	pathParams: {
+	id: z.string(),
 	},
 	query: {
-		includeCompleted: z.coerce.boolean().optional(),
+	includeCompleted: z.coerce.boolean().optional(),
 	},
 	headers: {
-		"x-request-id": z.string().optional(),
+	"x-request-id": z.string().optional(),
 	},
 	body: {
-		title: z.string(),
+	title: z.string(),
 	},
-}
+
 ```
 
 Those locations remain part of the contract. Handlers and clients receive one
@@ -152,10 +149,8 @@ import { route } from "@rest-rpc/core";
 export const getTodo = route({
 	method: "GET",
 	path: "/todos/:id",
-	request: {
-		params: {
-			id: z.string(),
-		},
+	pathParams: {
+		id: z.string(),
 	},
 	responses: {
 		200: todoSchema,
@@ -174,10 +169,8 @@ watch: {
 	options: {
 		mode: "websocket",
 	},
-	request: {
-		params: {
-			id: z.string(),
-		},
+	pathParams: {
+		id: z.string(),
 	},
 	messages: {
 		client: clientMessageSchema,

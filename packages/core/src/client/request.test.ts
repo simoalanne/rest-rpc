@@ -6,8 +6,8 @@ import {
 	createClientTestContract,
 	jsonResponse,
 } from "../../test/factories/client.ts";
-import { router } from "../contract/define.ts";
-import { noBody } from "../contract/route.ts";
+import { router } from "../contract/contract.ts";
+import { noBody } from "../contract/response.ts";
 import { initClient } from "./index.ts";
 import { constructBaseRequest, createRequestSignal } from "./request.ts";
 
@@ -41,19 +41,17 @@ describe("ApiClient requests", () => {
 				update: {
 					method: "POST",
 					path: "/todos/:id",
-					request: {
-						params: {
-							id: z.string(),
-						},
-						query: {
-							page: z.number(),
-						},
-						body: {
-							title: z.string(),
-						},
-						headers: {
-							"x-request-id": z.number(),
-						},
+					pathParams: {
+						id: z.string(),
+					},
+					query: {
+						page: z.number(),
+					},
+					body: {
+						title: z.string(),
+					},
+					headers: {
+						"x-request-id": z.number(),
 					},
 					responses: {
 						200: z.object({ id: z.string(), title: z.string() }),
@@ -89,19 +87,17 @@ describe("ApiClient requests", () => {
 				get: {
 					method: "GET",
 					path: "/items/:id/:visible",
-					request: {
-						params: {
-							id: z.number(),
-							visible: z.boolean(),
-						},
-						query: {
-							page: z.number(),
-							includeArchived: z.boolean(),
-						},
-						headers: {
-							"x-page": z.number(),
-							"x-visible": z.boolean(),
-						},
+					pathParams: {
+						id: z.number(),
+						visible: z.boolean(),
+					},
+					query: {
+						page: z.number(),
+						includeArchived: z.boolean(),
+					},
+					headers: {
+						"x-page": z.number(),
+						"x-visible": z.boolean(),
 					},
 					responses: {
 						204: noBody(),
@@ -139,11 +135,9 @@ describe("ApiClient requests", () => {
 				get: {
 					method: "GET",
 					path: "/items/:id/:id2",
-					request: {
-						params: {
-							id: z.string(),
-							id2: z.string(),
-						},
+					pathParams: {
+						id: z.string(),
+						id2: z.string(),
 					},
 					responses: {
 						204: noBody(),
@@ -170,13 +164,11 @@ describe("ApiClient requests", () => {
 				list: {
 					method: "GET",
 					path: "/items",
-					request: {
-						query: {
-							search: z.string().optional(),
-						},
-						headers: {
-							"x-request-id": z.string().optional(),
-						},
+					query: {
+						search: z.string().optional(),
+					},
+					headers: {
+						"x-request-id": z.string().optional(),
 					},
 					responses: {
 						204: noBody(),
@@ -209,7 +201,7 @@ describe("ApiClient requests", () => {
 					{} as never,
 					"throw",
 				),
-			/Invalid params key "id" for GET \/todos\/:id/,
+			/Invalid pathParams key "id" for GET \/todos\/:id/,
 		);
 		assert.throws(
 			() =>
@@ -219,7 +211,7 @@ describe("ApiClient requests", () => {
 					{ id: undefined } as never,
 					"throw",
 				),
-			/Invalid params key "id" for GET \/todos\/:id/,
+			/Invalid pathParams key "id" for GET \/todos\/:id/,
 		);
 	});
 
@@ -229,13 +221,11 @@ describe("ApiClient requests", () => {
 				list: {
 					method: "GET",
 					path: "/items",
-					request: {
-						query: {
-							search: z.string().optional(),
-						},
-						headers: {
-							"x-request-id": z.string().optional(),
-						},
+					query: {
+						search: z.string().optional(),
+					},
+					headers: {
+						"x-request-id": z.string().optional(),
 					},
 					responses: {
 						204: noBody(),
@@ -282,10 +272,8 @@ describe("ApiClient requests", () => {
 				list: {
 					method: "GET",
 					path: "/items",
-					request: {
-						query: {
-							page: z.number(),
-						},
+					query: {
+						page: z.number(),
 					},
 					responses: {
 						204: noBody(),
@@ -358,9 +346,7 @@ describe("ApiClient requests", () => {
 			ping: {
 				method: "POST",
 				path: "/ping",
-				request: {
-					body: noBody(),
-				},
+				body: noBody(),
 				responses: {
 					204: noBody(),
 				},
@@ -400,6 +386,39 @@ describe("ApiClient requests", () => {
 		});
 	});
 
+	it("adds Next fetch tags to GET requests when enabled", async () => {
+		const calls = captureFetch((url) =>
+			String(url).includes("/todos?search=milk")
+				? jsonResponse([])
+				: jsonResponse({ id: "todo-1", title: "Buy milk" }, 201),
+		);
+		const client = initClient(createClientTestContract(), {
+			origin: "https://api.test",
+			fetchOptions: {
+				next: {
+					revalidate: 60,
+					tags: ["manual"],
+				},
+			} as RequestInit,
+			nextFetchTags: {
+				enabled: true,
+				tagPrefix: "api",
+			},
+		});
+
+		await client.todos.list.fetch({ search: "milk" });
+		await client.todos.create.fetch({ title: "Buy milk" });
+
+		assert.deepEqual(calls[0]?.init?.next, {
+			revalidate: 60,
+			tags: ["manual", "api:todos.list:search:milk", "api:todos.list"],
+		});
+		assert.deepEqual(calls[1]?.init?.next, {
+			revalidate: 60,
+			tags: ["manual"],
+		});
+	});
+
 	it("lets custom fetch inspect and replace the final request init", async () => {
 		const calls: Array<{ url: string; init?: RequestInit }> = [];
 		const client = initClient(createClientTestContract(), {
@@ -435,12 +454,10 @@ describe("ApiClient requests", () => {
 					list: {
 						method: "GET",
 						path: "/todos",
-						request: {
-							query: z.object({ search: z.string() }),
-							headers: {
-								"X-Route": z.string(),
-								"x-shared": z.string(),
-							},
+						query: z.object({ search: z.string() }),
+						headers: {
+							"X-Route": z.string(),
+							"x-shared": z.string(),
 						},
 						responses: {
 							200: z.array(z.object({ id: z.string(), title: z.string() })),
@@ -531,9 +548,7 @@ describe("ApiClient requests", () => {
 				list: {
 					method: "GET",
 					path: "/todos",
-					request: {
-						query: z.object({ search: z.string() }),
-					},
+					query: z.object({ search: z.string() }),
 					responses: {
 						204: noBody(),
 					},

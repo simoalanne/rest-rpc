@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
 import { schemaConverter } from "../../test/factories/openapi.ts";
-import { customBody, noBody, stream } from "../contract/route.ts";
+import { customBody, noBody, stream } from "../contract/response.ts";
 import {
 	createHeaderParameters,
 	createOperation,
@@ -239,11 +239,9 @@ describe("OpenAPI operations", () => {
 		const route: OpenApiRouteDeclaration = {
 			path: "/todos/:id",
 			method: "POST",
-			request: {
-				params: { id: z.string() },
-				headers: { "x-api-key": z.string() },
-				body: { title: z.string() },
-			},
+			pathParams: { id: z.string() },
+			headers: { "x-api-key": z.string() },
+			body: { title: z.string() },
 			responses: {
 				201: z.object({ id: z.string() }),
 			},
