@@ -61,7 +61,7 @@ export const createOpenApiTestContract = () =>
 			socket: {
 				path: "/todos/socket",
 				method: "GET",
-				options: { mode: "websocket" },
+				mode: "webSocket",
 				messages: {
 					client: z.object({ type: z.literal("ping") }),
 					server: z.object({ type: z.literal("pong") }),

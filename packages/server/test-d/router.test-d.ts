@@ -3,8 +3,14 @@ import {
 	router as defineRouter,
 	jsonQuery,
 	stream,
+	webSocketMessages,
 } from "@rest-rpc/core/contract";
-import { type InferRouteHandlerRequest, route, router } from "@rest-rpc/server";
+import {
+	type InferRouteHandlerRequest,
+	type InferWebSocketRouteHandlerRequest,
+	route,
+	router,
+} from "@rest-rpc/server";
 import { expectError, expectType } from "tsd";
 import { z } from "zod";
 
@@ -89,6 +95,31 @@ const api = defineRouter({
 			},
 		},
 	},
+	socket: {
+		room: {
+			method: "GET",
+			path: "/rooms/:roomId",
+			pathParams: z.object({ roomId: z.string() }),
+			mode: "webSocket",
+			messages: {
+				client: {
+					discriminator: "action",
+					schemas: {
+						echo: z.object({ text: z.string() }),
+						count: z.object({
+							value: z.string().transform((value) => Number(value)),
+						}),
+					},
+				},
+				server: webSocketMessages("type", {
+					ready: z.object({ roomId: z.string() }),
+					counted: z.object({
+						value: z.string().transform((value) => Number(value)),
+					}),
+				}),
+			},
+		},
+	},
 });
 
 type CreateTodoRequest = InferRouteHandlerRequest<
@@ -114,6 +145,18 @@ const createImplementation = route(api.todos.create, ({ title, context }) => {
 
 expectType<typeof api.todos.create>(createImplementation.route);
 
+type SocketRequest = InferWebSocketRouteHandlerRequest<
+	typeof api.socket.room,
+	TestRouteHandlerContext
+>;
+declare const socketRequest: SocketRequest;
+expectType<string>(socketRequest.roomId);
+expectType<string>(socketRequest.context.userId);
+socketRequest.context.socket.send({
+	type: "ready",
+	message: { roomId: "room-1" },
+});
+
 route(api.todos.transform, ({ id, title, slug }) => {
 	expectType<number>(id);
 	expectType<string>(title);
@@ -125,6 +168,24 @@ route(api.todos.transform, ({ id, title, slug }) => {
 			id: 1,
 		},
 	};
+});
+
+route(api.socket.room, ({ roomId, context }) => {
+	expectType<string>(roomId);
+
+	context.socket.send({ type: "ready", message: { roomId } });
+	context.socket.send({ type: "counted", message: { value: "1" } });
+	expectError(context.socket.send({ type: "counted", message: { value: 1 } }));
+	expectError(context.socket.send({ type: "missing", message: {} }));
+
+	context.socket.onMessage((message) => {
+		if (message.action === "echo") {
+			expectType<string>(message.message.text);
+		} else {
+			expectType<"count">(message.action);
+			expectType<number>(message.message.value);
+		}
+	});
 });
 
 route(api.todos.jsonSearch, ({ query }) => {
@@ -207,6 +268,14 @@ const implementations = router(api, {
 			status: 200 as const,
 			body: csvRows(),
 		}),
+	},
+	socket: {
+		room: ({ context }) => {
+			context.socket.send({
+				type: "ready",
+				message: { roomId: "room-1" },
+			});
+		},
 	},
 });
 

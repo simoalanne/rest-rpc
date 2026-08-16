@@ -3,8 +3,10 @@ import type {
 	ServerSent,
 	WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
-import { REQUEST_CONTEXT_KEY } from "@rest-rpc/core/contract";
-import { validateStandardSchemaSync } from "@rest-rpc/core/standard-schema";
+import {
+	REQUEST_CONTEXT_KEY,
+	validateWebSocketMessageSync,
+} from "@rest-rpc/core/contract";
 import type { ServerErrorHandlers } from "./errorHandlers.ts";
 import type { HttpHeaders } from "./headers.ts";
 import type {
@@ -105,7 +107,7 @@ export const createContractWebSocket = <E extends WebSocketRouteDeclaration>(
 ): ContractWebSocket<ServerSent<E>, ServerReceived<E>> => {
 	const parseIncomingMessage = (data: unknown): ServerReceived<E> => {
 		try {
-			const result = validateStandardSchemaSync(
+			const result = validateWebSocketMessageSync(
 				route.messages.client,
 				JSON.parse(String(data)),
 			);
@@ -120,7 +122,10 @@ export const createContractWebSocket = <E extends WebSocketRouteDeclaration>(
 
 	return {
 		send(message) {
-			const result = validateStandardSchemaSync(route.messages.server, message);
+			const result = validateWebSocketMessageSync(
+				route.messages.server,
+				message,
+			);
 			if (result.issues) throw result.issues;
 
 			socket.send(JSON.stringify(result.value));

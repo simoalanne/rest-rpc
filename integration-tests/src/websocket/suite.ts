@@ -97,9 +97,11 @@ export const runWebSocketSuite = (adapter: WebSocketSuiteAdapter) => {
 
 				assert.deepEqual(await waitForMessage(socket), {
 					type: "welcome",
-					roomId: "room 1/encoded",
-					mode: "fast",
-					adapter: adapter.name,
+					message: {
+						roomId: "room 1/encoded",
+						mode: "fast",
+						adapter: adapter.name,
+					},
 				});
 			} finally {
 				closeSocket(socket);
@@ -116,13 +118,18 @@ export const runWebSocketSuite = (adapter: WebSocketSuiteAdapter) => {
 				await waitForOpen(socket);
 				await waitForMessage(socket);
 
-				socket.send({ action: "echo", text: "hello over websocket" });
+				socket.send({
+					action: "echo",
+					message: { text: "hello over websocket" },
+				});
 
 				assert.deepEqual(await waitForMessage(socket), {
 					type: "echo",
-					text: "hello over websocket",
-					roomId: "echo-room",
-					mode: "slow",
+					message: {
+						text: "hello over websocket",
+						roomId: "echo-room",
+						mode: "slow",
+					},
 				});
 			} finally {
 				closeSocket(socket);
@@ -159,7 +166,7 @@ export const runWebSocketSuite = (adapter: WebSocketSuiteAdapter) => {
 				await waitForOpen(socket);
 				await waitForMessage(socket);
 
-				socket.send({ action: "fail" });
+				socket.send({ action: "fail", message: undefined });
 				const close = await waitForClose(socket);
 
 				assert.equal(close.code, 1011);

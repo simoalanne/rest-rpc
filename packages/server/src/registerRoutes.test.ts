@@ -27,7 +27,7 @@ const createRoute: HttpRouteDeclaration = {
 const socketRoute: WebSocketRouteDeclaration = {
 	method: "GET",
 	path: "/todos/:id/events",
-	options: { mode: "websocket" },
+	mode: "webSocket",
 	messages: {
 		client: z.object({ action: z.string() }),
 		server: z.object({ id: z.string() }),

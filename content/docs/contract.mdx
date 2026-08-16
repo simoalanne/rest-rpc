@@ -227,15 +227,23 @@ export const getTodo = route({
 WebSocket routes also live in the contract tree.
 
 ```ts
+import { webSocketMessages } from "@rest-rpc/core";
+
 watch: {
 	method: "GET",
 	path: "/todos/:id/watch",
-	options: {
-		mode: "websocket",
-	},
+	mode: "webSocket",
 	messages: {
-		client: clientMessageSchema,
-		server: serverMessageSchema,
+		client: webSocketMessages("type", {
+			ping: z.object({}),
+		}),
+		server: webSocketMessages("type", {
+			changed: z.object({
+				id: z.string(),
+				completed: z.boolean(),
+			}),
+			pong: z.object({}),
+		}),
 	},
 }
 ```

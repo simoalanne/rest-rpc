@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { setImmediate } from "node:timers/promises";
+import { webSocketMessages } from "@rest-rpc/core/contract";
 import z from "zod";
 import {
 	createContractWebSocket,
@@ -62,7 +63,7 @@ const websocketRoute = (
 		requestKeys: {
 			roomId: "pathParams",
 		},
-		options: { mode: "websocket" },
+		mode: "webSocket",
 		messages,
 	}) as const;
 
@@ -168,6 +169,81 @@ describe("createContractWebSocket", () => {
 
 		assert.deepEqual(rawSocket.sent, [
 			'{"createdAt":"2026-08-10T00:00:00.000Z"}',
+		]);
+	});
+
+	it("parses discriminated client message payloads with transforms", async () => {
+		const rawSocket = new FakeRawWebSocket();
+		const socket = createContractWebSocket(
+			websocketRoute({
+				client: {
+					discriminator: "action",
+					schemas: {
+						count: z.object({
+							value: z.string().transform((value) => Number(value)),
+						}),
+					},
+				},
+				server: z.object({ text: z.string() }),
+			}),
+			rawSocket,
+		);
+		const messages: unknown[] = [];
+		socket.onMessage((message) => messages.push(message));
+
+		rawSocket.receive(
+			JSON.stringify({ action: "count", message: { value: "2" } }),
+		);
+		await Promise.resolve();
+
+		assert.deepEqual(messages, [{ action: "count", message: { value: 2 } }]);
+	});
+
+	it("closes discriminated client messages with unknown discriminator values", async () => {
+		const rawSocket = new FakeRawWebSocket();
+		const socket = createContractWebSocket(
+			websocketRoute({
+				client: webSocketMessages("action", {
+					count: z.object({ value: z.number() }),
+				}),
+				server: z.object({ text: z.string() }),
+			}),
+			rawSocket,
+		);
+		const messages: unknown[] = [];
+		socket.onMessage((message) => messages.push(message));
+
+		rawSocket.receive(
+			JSON.stringify({ action: "missing", message: { value: 2 } }),
+		);
+		await Promise.resolve();
+
+		assert.deepEqual(messages, []);
+		assert.equal(rawSocket.closeCode, 1007);
+		assert.equal(rawSocket.closeReason, "Invalid WebSocket message.");
+	});
+
+	it("validates and serializes discriminated server message payloads", () => {
+		const rawSocket = new FakeRawWebSocket();
+		const socket = createContractWebSocket(
+			websocketRoute({
+				client: z.object({ text: z.string() }),
+				server: {
+					discriminator: "type",
+					schemas: {
+						count: z.object({
+							value: z.string().transform((value) => Number(value)),
+						}),
+					},
+				},
+			}),
+			rawSocket,
+		);
+
+		socket.send({ type: "count", message: { value: "2" } });
+
+		assert.deepEqual(rawSocket.sent, [
+			'{"type":"count","message":{"value":2}}',
 		]);
 	});
 

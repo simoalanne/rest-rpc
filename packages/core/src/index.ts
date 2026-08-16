@@ -22,6 +22,7 @@ export type {
 	JsonQuery,
 	NoBody,
 	RouteDeclaration,
+	RouteMode,
 	ServerErrors,
 	ServerReceived,
 	ServerRequest,
@@ -30,6 +31,7 @@ export type {
 	ServerSuccessBody,
 	ServerSuccessResponse,
 	Stream,
+	WebSocketMessageSchemas,
 	WebSocketRouteDeclaration,
 } from "./contract/index.ts";
 export {
@@ -41,6 +43,7 @@ export {
 	route,
 	router,
 	stream,
+	webSocketMessages,
 } from "./contract/index.ts";
 export type {
 	CreateOpenApiDocumentOptions,

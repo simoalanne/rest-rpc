@@ -142,7 +142,7 @@ export const isHttpRoute = (
 
 export const isWebSocketRoute = (
 	route: RouteDeclaration,
-): route is WebSocketRouteDeclaration => route.options?.mode === "websocket";
+): route is WebSocketRouteDeclaration => route.mode === "webSocket";
 
 export const isHttpRouteImplementation = (
 	implementation: RouteImplementation,

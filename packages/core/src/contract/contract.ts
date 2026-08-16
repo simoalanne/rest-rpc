@@ -16,6 +16,7 @@ import type {
 	RouteResponses,
 } from "./response.ts";
 import { validateContractSync } from "./validate.ts";
+import type { WebSocketMessageDeclaration } from "./websocketMessages.ts";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
@@ -36,13 +37,16 @@ export type CommonOpenApiRouteOptions = Omit<
 	"summary" | "description" | "operationId"
 >;
 
+export type RouteMode = "http" | "webSocket";
+
 export type ContractOptions = {
-	mode?: "http" | "websocket";
+	mode?: RouteMode;
 };
 
 export type BaseRouteDeclaration = {
 	path: string;
 	method: HttpMethod;
+	mode?: RouteMode;
 	cacheKey?: readonly string[];
 	body?: RequestBodySchema;
 	query?: StandardSchemaV1 | RequestSchemaRecord | JsonQuery;
@@ -55,16 +59,16 @@ export type BaseRouteDeclaration = {
 
 export type HttpRouteDeclaration = BaseRouteDeclaration &
 	RouteResponseInput & {
-		options?: { mode?: "http" };
+		mode?: "http";
 		messages?: never;
 	};
 
 export type WebSocketRouteDeclaration = BaseRouteDeclaration & {
 	method: "GET";
-	options: { mode: "websocket" };
+	mode: "webSocket";
 	messages: {
-		client: StandardSchemaV1;
-		server: StandardSchemaV1;
+		client: WebSocketMessageDeclaration;
+		server: WebSocketMessageDeclaration;
 	};
 	responses?: never;
 };
@@ -158,7 +162,7 @@ type RouteResponsesFor<TRoute> = TRoute extends {
 			: never;
 
 type ApplyResponseShorthandToRoute<TRoute> = TRoute extends {
-	options: { mode: "websocket" };
+	mode: "webSocket";
 }
 	? TRoute
 	: TRoute extends { method: HttpMethod }

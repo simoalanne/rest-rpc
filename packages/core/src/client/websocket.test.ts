@@ -4,6 +4,7 @@ import z from "zod";
 import { createClientTestContract } from "../../test/factories/client.ts";
 import { router } from "../contract/contract.ts";
 import { noBody } from "../contract/response.ts";
+import { webSocketMessages } from "../contract/websocketMessages.ts";
 import { initClient } from "./index.ts";
 import { assertWebSocketRoute, buildWebSocketUrl } from "./websocket.ts";
 
@@ -170,7 +171,7 @@ describe("ApiClient websockets", () => {
 					method: "GET",
 					path: "/rooms/:roomId",
 					pathParams: z.object({ roomId: z.string() }),
-					options: { mode: "websocket" },
+					mode: "webSocket",
 					messages: {
 						client: z.object({ text: z.string() }),
 						server: serverMessageSchema,
@@ -211,7 +212,7 @@ describe("ApiClient websockets", () => {
 					method: "GET",
 					path: "/rooms/:roomId",
 					pathParams: z.object({ roomId: z.string() }),
-					options: { mode: "websocket" },
+					mode: "webSocket",
 					messages: {
 						client: z.object({ text: z.string() }),
 						server: serverMessageSchema,
@@ -253,7 +254,7 @@ describe("ApiClient websockets", () => {
 					method: "GET",
 					path: "/rooms/:roomId",
 					pathParams: z.object({ roomId: z.string() }),
-					options: { mode: "websocket" },
+					mode: "webSocket",
 					messages: {
 						client: z.object({ text: z.string() }),
 						server: serverMessageSchema,
@@ -292,7 +293,7 @@ describe("ApiClient websockets", () => {
 					method: "GET",
 					path: "/rooms/:roomId",
 					pathParams: z.object({ roomId: z.string() }),
-					options: { mode: "websocket" },
+					mode: "webSocket",
 					messages: {
 						client: z.object({ text: z.string() }),
 						server: serverMessageSchema,
@@ -320,6 +321,83 @@ describe("ApiClient websockets", () => {
 			messages[0]?.createdAt.toISOString(),
 			"2026-08-10T00:00:00.000Z",
 		);
+	});
+
+	it("validates discriminated incoming server message payloads", () => {
+		globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+		const apiContract = router({
+			socket: {
+				join: {
+					method: "GET",
+					path: "/rooms/:roomId",
+					pathParams: z.object({ roomId: z.string() }),
+					mode: "webSocket",
+					messages: {
+						client: z.object({ text: z.string() }),
+						server: {
+							discriminator: "type",
+							schemas: {
+								count: z.object({
+									value: z.string().transform((value) => Number(value)),
+								}),
+							},
+						},
+					},
+				},
+			},
+		});
+		const client = initClient(apiContract, {
+			origin: "https://api.test",
+			validateResponses: true,
+		});
+		const socket = client.socket.join.openConnection({ roomId: "general" });
+		const messages: unknown[] = [];
+		socket.onMessage((message) => messages.push(message));
+
+		instances[0].dispatchEvent(
+			new MessageEvent("message", {
+				data: JSON.stringify({ type: "count", message: { value: "2" } }),
+			}),
+		);
+
+		assert.deepEqual(messages, [{ type: "count", message: { value: 2 } }]);
+	});
+
+	it("closes invalid discriminated incoming server messages", () => {
+		globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+		const apiContract = router({
+			socket: {
+				join: {
+					method: "GET",
+					path: "/rooms/:roomId",
+					pathParams: z.object({ roomId: z.string() }),
+					mode: "webSocket",
+					messages: {
+						client: z.object({ text: z.string() }),
+						server: webSocketMessages("type", {
+							count: z.object({ value: z.number() }),
+						}),
+					},
+				},
+			},
+		});
+		const client = initClient(apiContract, {
+			origin: "https://api.test",
+			validateResponses: true,
+		});
+		const socket = client.socket.join.openConnection({ roomId: "general" });
+		const messages: unknown[] = [];
+		socket.onMessage((message) => messages.push(message));
+
+		instances[0].dispatchEvent(
+			new MessageEvent("message", {
+				data: JSON.stringify({ type: "missing", message: { value: 2 } }),
+			}),
+		);
+
+		assert.deepEqual(messages, []);
+		assert.equal(instances[0].closeCode, 1007);
+		assert.equal(instances[0].closeReason, "Invalid WebSocket message.");
 	});
 });
 

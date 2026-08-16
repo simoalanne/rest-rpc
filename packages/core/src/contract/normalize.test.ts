@@ -47,7 +47,7 @@ describe("normalizeContract", () => {
 			socket: {
 				method: "GET",
 				path: "/socket",
-				options: { mode: "websocket" },
+				mode: "webSocket",
 				messages: {
 					client: {},
 					server: {},

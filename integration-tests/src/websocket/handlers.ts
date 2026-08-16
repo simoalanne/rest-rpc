@@ -20,9 +20,11 @@ export const createWebSocketHandlers = (
 
 		socket.send({
 			type: "welcome",
-			roomId: request.roomId,
-			mode: request.mode,
-			adapter,
+			message: {
+				roomId: request.roomId,
+				mode: request.mode,
+				adapter,
+			},
 		});
 
 		socket.onMessage(async (message) => {
@@ -37,9 +39,11 @@ export const createWebSocketHandlers = (
 
 			socket.send({
 				type: "echo",
-				text: message.text,
-				roomId: request.roomId,
-				mode: request.mode,
+				message: {
+					text: message.message.text,
+					roomId: request.roomId,
+					mode: request.mode,
+				},
 			});
 		});
 	},

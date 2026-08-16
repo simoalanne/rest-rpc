@@ -3,5 +3,4 @@ import type { OpenApiRouteDeclaration } from "./types.ts";
 
 export const isOpenApiRoute = (
 	route: RouteDeclaration,
-): route is OpenApiRouteDeclaration =>
-	!route.options || route.options.mode === "http";
+): route is OpenApiRouteDeclaration => route.mode !== "webSocket";

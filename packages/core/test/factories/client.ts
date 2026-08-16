@@ -90,7 +90,7 @@ export const createClientTestContract = () =>
 				method: "GET",
 				path: "/rooms/:roomId",
 				pathParams: z.object({ roomId: z.string() }),
-				options: { mode: "websocket" },
+				mode: "webSocket",
 				messages: {
 					client: z.object({ text: z.string() }),
 					server: z.object({ text: z.string() }),

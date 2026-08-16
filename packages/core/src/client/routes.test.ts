@@ -23,7 +23,7 @@ const httpRoute = {
 const websocketRoute = {
 	method: "GET",
 	path: "/rooms/:roomId",
-	options: { mode: "websocket" },
+	mode: "webSocket",
 	messages: {
 		client: noBody(),
 		server: noBody(),

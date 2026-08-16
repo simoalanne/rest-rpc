@@ -87,7 +87,7 @@ const api = router({
 	events: {
 		method: "GET",
 		path: "/events",
-		options: { mode: "websocket" },
+		mode: "webSocket",
 		messages: {
 			client: clientMessageSchema,
 			server: serverMessageSchema,

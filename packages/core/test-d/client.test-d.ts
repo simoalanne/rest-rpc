@@ -8,6 +8,7 @@ import {
 	router,
 	type as schemaType,
 	stream,
+	webSocketMessages,
 } from "@rest-rpc/core";
 import { expectError, expectType } from "tsd";
 import { z } from "zod";
@@ -134,6 +135,31 @@ const api = router({
 				),
 			},
 		},
+		socket: {
+			method: "GET",
+			path: "/todos/socket",
+			mode: "webSocket",
+			messages: {
+				client: webSocketMessages("action", {
+					echo: z.object({ text: z.string() }),
+					count: z.object({
+						value: z.string().transform((value) => Number(value)),
+					}),
+				}),
+				server: {
+					discriminator: "type",
+					schemas: {
+						ready: z.object({
+							createdAt: z
+								.string()
+								.datetime()
+								.transform((value) => new Date(value)),
+						}),
+						event: z.string(),
+					},
+				},
+			},
+		},
 	},
 });
 
@@ -199,3 +225,18 @@ expectError(client.todos.list.fetch({ id: "todo-1" }));
 
 type CreateTodoInput = ClientRequestInput<typeof api.todos.create>;
 expectType<{ title: string }>(null as unknown as CreateTodoInput);
+
+const socket = client.todos.socket.openConnection();
+socket.send({ action: "echo", message: { text: "hello" } });
+socket.send({ action: "count", message: { value: "1" } });
+expectError(socket.send({ action: "count", message: { value: 1 } }));
+expectError(socket.send({ action: "missing", message: {} }));
+
+socket.onMessage((message) => {
+	if (message.type === "ready") {
+		expectType<Date>(message.message.createdAt);
+	} else {
+		expectType<"event">(message.type);
+		expectType<string>(message.message);
+	}
+});

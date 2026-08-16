@@ -15,7 +15,7 @@ export const isApiClientRouteNode = (
 
 export const isWebSocketRouteNode = (
 	route: RouteDeclaration,
-): route is WebSocketRouteDeclaration => route.options?.mode === "websocket";
+): route is WebSocketRouteDeclaration => route.mode === "webSocket";
 
 export const isHttpRouteNode = (route: RouteDeclaration) =>
 	!isWebSocketRouteNode(route);

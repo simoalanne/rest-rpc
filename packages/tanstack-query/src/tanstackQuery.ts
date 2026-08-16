@@ -177,7 +177,7 @@ export type TanstackQuery<TContract extends Contract> =
 
 const isWebSocketRoute = (
 	route: RouteDeclaration,
-): route is WebSocketRouteDeclaration => route.options?.mode === "websocket";
+): route is WebSocketRouteDeclaration => route.mode === "webSocket";
 
 const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
 	typeof value === "object" &&

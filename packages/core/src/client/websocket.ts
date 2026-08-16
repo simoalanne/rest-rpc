@@ -3,7 +3,7 @@ import type {
 	WebSocketRouteDeclaration,
 } from "../contract/contract.ts";
 import type { ClientReceived, ClientSent } from "../contract/request.ts";
-import { validateStandardSchemaSync } from "../standard-schema/index.ts";
+import { validateWebSocketMessageSync } from "../contract/websocketMessages.ts";
 import { constructBaseRequest, takesRequestInput } from "./request.ts";
 import type { ClientSocket, OpenConnectionArgs } from "./types.ts";
 
@@ -44,7 +44,7 @@ export const openConnection = <E extends WebSocketRouteDeclaration>(
 			if (!options.validateIncomingMessages) {
 				return value as ClientReceived<E>;
 			}
-			const result = validateStandardSchemaSync(route.messages.server, value);
+			const result = validateWebSocketMessageSync(route.messages.server, value);
 			if (result.issues) throw result.issues;
 
 			return result.value as ClientReceived<E>;
@@ -99,7 +99,7 @@ export const openConnection = <E extends WebSocketRouteDeclaration>(
 export const assertWebSocketRoute = (
 	route: RouteDeclaration,
 ): asserts route is WebSocketRouteDeclaration => {
-	if (route.options?.mode !== "websocket") {
+	if (route.mode !== "webSocket") {
 		throw new Error("Expected a websocket route");
 	}
 };

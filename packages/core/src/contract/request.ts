@@ -2,6 +2,7 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { RouteDeclaration } from "./contract.ts";
 import type { CustomBody, InferCustomBody, NoBody } from "./response.ts";
 import { isCustomBody, isNoBody } from "./response.ts";
+import type { WebSocketMessages } from "./websocketMessages.ts";
 
 export type RequestSegment = "body" | "query" | "pathParams" | "headers";
 export type RequestKeys = Record<string, RequestSegment>;
@@ -194,39 +195,58 @@ export type ServerRequest<E extends RouteDeclaration> = InferRequestFor<
 >;
 
 export type IsWebSocketRoute<E extends RouteDeclaration> = E extends {
-	options: { mode: "websocket" };
+	mode: "webSocket";
 }
 	? true
 	: false;
 
+type InferDiscriminatedWebSocketMessage<
+	TDeclaration extends WebSocketMessages,
+	TIO extends "input" | "output",
+> =
+	TDeclaration extends WebSocketMessages<infer TDiscriminator, infer TSchemas>
+		? {
+				[TKey in keyof TSchemas & string]: {
+					[TDiscriminatorKey in TDiscriminator]: TKey;
+				} & {
+					message: TIO extends "input"
+						? StandardSchemaV1.InferInput<TSchemas[TKey]>
+						: StandardSchemaV1.InferOutput<TSchemas[TKey]>;
+				};
+			}[keyof TSchemas & string]
+		: never;
+
+type InferWebSocketMessage<
+	TMessage,
+	TIO extends "input" | "output",
+> = TMessage extends StandardSchemaV1
+	? TIO extends "input"
+		? StandardSchemaV1.InferInput<TMessage>
+		: StandardSchemaV1.InferOutput<TMessage>
+	: TMessage extends WebSocketMessages
+		? InferDiscriminatedWebSocketMessage<TMessage, TIO>
+		: never;
+
 export type ClientSent<E extends RouteDeclaration> = E extends {
 	messages: { client: infer R };
 }
-	? R extends StandardSchemaV1
-		? StandardSchemaV1.InferInput<R>
-		: never
+	? InferWebSocketMessage<R, "input">
 	: never;
 
 export type ServerReceived<E extends RouteDeclaration> = E extends {
 	messages: { client: infer R };
 }
-	? R extends StandardSchemaV1
-		? StandardSchemaV1.InferOutput<R>
-		: never
+	? InferWebSocketMessage<R, "output">
 	: never;
 
 export type ServerSent<E extends RouteDeclaration> = E extends {
 	messages: { server: infer R };
 }
-	? R extends StandardSchemaV1
-		? StandardSchemaV1.InferInput<R>
-		: never
+	? InferWebSocketMessage<R, "input">
 	: never;
 
 export type ClientReceived<E extends RouteDeclaration> = E extends {
 	messages: { server: infer R };
 }
-	? R extends StandardSchemaV1
-		? StandardSchemaV1.InferOutput<R>
-		: never
+	? InferWebSocketMessage<R, "output">
 	: never;

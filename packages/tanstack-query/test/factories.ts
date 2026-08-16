@@ -20,7 +20,7 @@ export const apiContract = {
 		socket: {
 			method: "GET",
 			path: "/items/socket",
-			options: { mode: "websocket" },
+			mode: "webSocket",
 			messages: {
 				client: {},
 				server: {},
@@ -31,7 +31,7 @@ export const apiContract = {
 		connect: {
 			method: "GET",
 			path: "/discuss",
-			options: { mode: "websocket" },
+			mode: "webSocket",
 			messages: {
 				client: {},
 				server: {},

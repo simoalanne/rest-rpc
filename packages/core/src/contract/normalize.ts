@@ -106,7 +106,7 @@ export const normalizeContract = <TContract extends Contract>(
 
 		route.openApi = mergeOpenApi(options?.commonOpenApi, route.openApi);
 
-		if (route.options?.mode !== "websocket") {
+		if (route.mode !== "webSocket") {
 			route.cacheKey ??= path;
 			route.responses = {
 				...options?.commonResponses,

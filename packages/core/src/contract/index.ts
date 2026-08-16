@@ -13,6 +13,7 @@ export type {
 	RouteContractOptions,
 	RouteDeclaration,
 	RouteMetadata,
+	RouteMode,
 	RouterContractOptions,
 	WebSocketRouteDeclaration,
 } from "./contract.ts";
@@ -86,3 +87,12 @@ export {
 	groupRequestInput,
 	validateFlatRequestInput,
 } from "./validate.ts";
+export type {
+	WebSocketMessageDeclaration,
+	WebSocketMessageSchemas,
+	WebSocketMessages,
+} from "./websocketMessages.ts";
+export {
+	validateWebSocketMessageSync,
+	webSocketMessages,
+} from "./websocketMessages.ts";
