@@ -16,6 +16,25 @@ export const responsesContract = router({
 			200: z.object({ ok: z.literal(true) }),
 		},
 	},
+	cookies: {
+		issue: {
+			method: "GET",
+			path: "/responses/cookies/issue",
+			responses: {
+				200: z.object({ ok: z.literal(true) }),
+			},
+		},
+		read: {
+			method: "GET",
+			path: "/responses/cookies/read",
+			headers: {
+				cookie: z.string().optional(),
+			},
+			responses: {
+				200: z.object({ cookie: z.string().nullable() }),
+			},
+		},
+	},
 	undeclared: {
 		method: "GET",
 		path: "/responses/undeclared",

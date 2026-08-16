@@ -19,6 +19,7 @@ const parseTextOrJsonBody: HonoParseBody = ({ body, c }) =>
 		: c.req.json();
 
 export type HonoAdapterOptions = {
+	configureApp?: (app: Hono) => void;
 	registerRoutesOptions?: RegisterRoutesOptions;
 };
 
@@ -29,6 +30,7 @@ export const createHonoAdapter = (
 	name: "hono",
 	start: async () => {
 		const app = new Hono();
+		options.configureApp?.(app);
 		registerRoutes(app, implementations, {
 			parseBody: parseTextOrJsonBody,
 			...options.registerRoutesOptions,
