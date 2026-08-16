@@ -84,6 +84,26 @@ create: {
 	body: {
 		title: z.string().min(1),
 	},
+	response: todoSchema,
+	openApi: {
+		summary: "Create a todo",
+		operationId: "createTodo",
+		responseDescriptions: {
+			201: "Todo created.",
+		},
+	},
+}
+```
+
+Status-keyed `responses` produce status-keyed OpenAPI responses.
+
+```ts
+create: {
+	method: "POST",
+	path: "/todos",
+	body: {
+		title: z.string().min(1),
+	},
 	responses: {
 		201: todoSchema,
 		409: z.object({

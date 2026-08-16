@@ -14,15 +14,7 @@ export const api = router({
 		get: {
 			method: "GET",
 			path: "/todos/:id",
-			pathParams: {
-				id: z.string(),
-			},
-			responses: {
-				200: todoSchema,
-				404: z.object({
-					code: z.literal("TODO_NOT_FOUND"),
-				}),
-			},
+			response: todoSchema,
 		},
 	},
 });
@@ -36,8 +28,9 @@ clients, TanStack Query options, and OpenAPI generation.
 HTTP routes use these fields:
 
 - `method`: `GET`, `POST`, `PUT`, `DELETE`, or `PATCH`.
-- `path`: HTTP path with `:param` segments.
+- `path`: HTTP path with static segments and full dynamic `:param` or `{param}` segments.
 - `request`: optional request declarations.
+- `response`: one successful response body, with status inferred from `method`.
 - `responses`: status-keyed response body declarations.
 - `metadata`: application-defined route metadata.
 - `openApi`: OpenAPI operation hints.
@@ -48,19 +41,18 @@ HTTP routes use these fields:
 Request data is declared by HTTP location.
 
 ```ts
-	pathParams: {
+pathParams: {
 	id: z.string(),
-	},
-	query: {
+},
+query: {
 	includeCompleted: z.coerce.boolean().optional(),
-	},
-	headers: {
+},
+headers: {
 	"x-request-id": z.string().optional(),
-	},
-	body: {
+},
+body: {
 	title: z.string(),
-	},
-
+},
 ```
 
 Those locations remain part of the contract. Handlers and clients receive one
@@ -75,9 +67,45 @@ await api.todos.update.fetch({
 });
 ```
 
+Full dynamic path segments infer string path params. In this route, `:id`
+contributes an `id: string` input:
+
+```ts
+get: {
+	method: "GET",
+	path: "/todos/:id",
+	response: todoSchema,
+}
+```
+
+An explicit `pathParams` declaration replaces the inferred string schema for the
+same param:
+
+```ts
+pathParams: {
+	id: z.string().uuid(),
+}
+```
+
 ## Responses
 
-Every HTTP route declares `responses`.
+The `response` field declares one successful response body.
+
+```ts
+create: {
+	method: "POST",
+	path: "/todos",
+	body: {
+		title: z.string().min(1),
+	},
+	response: todoSchema,
+}
+```
+
+`rest-rpc` assigns the status from the HTTP method: `POST` uses `201`, and other
+methods use `200`.
+
+The `responses` field declares response bodies by status code.
 
 ```ts
 responses: {
@@ -90,6 +118,9 @@ responses: {
 
 Non-2xx statuses are declared the same way as 2xx statuses.
 
+Routes with no `response` or `responses` default to a no-body response. `DELETE`
+uses `204`, `POST` uses `201`, and other methods use `200`.
+
 ## Shared Router Options
 
 `router()` can apply shared fields to every route in a tree.
@@ -101,11 +132,9 @@ export const api = router(
 			list: {
 				method: "GET",
 				path: "/todos",
-				responses: {
-					200: z.object({
-						items: z.array(todoSchema),
-					}),
-				},
+				response: z.object({
+					items: z.array(todoSchema),
+				}),
 				openApi: {
 					summary: "List todos",
 				},
@@ -149,12 +178,7 @@ import { route } from "@rest-rpc/core";
 export const getTodo = route({
 	method: "GET",
 	path: "/todos/:id",
-	pathParams: {
-		id: z.string(),
-	},
-	responses: {
-		200: todoSchema,
-	},
+	response: todoSchema,
 });
 ```
 
@@ -168,9 +192,6 @@ watch: {
 	path: "/todos/:id/watch",
 	options: {
 		mode: "websocket",
-	},
-	pathParams: {
-		id: z.string(),
 	},
 	messages: {
 		client: clientMessageSchema,

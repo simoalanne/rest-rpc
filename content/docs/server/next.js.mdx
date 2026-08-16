@@ -29,9 +29,9 @@ export const { GET } = createRouteHandler(api.todos.get, ({ id, context }) => {
 	if (!todo) {
 		return {
 			status: 404,
-		body: {
-			code: "TODO_NOT_FOUND",
-		},
+			body: {
+				code: "TODO_NOT_FOUND",
+			},
 		};
 	}
 
@@ -71,10 +71,7 @@ export const { GET, POST } = createRouterHandler(api, {
 		create: async ({ title }) => {
 			const todo = await todos.create({ title });
 
-			return {
-				status: 201,
-			body: todo,
-			};
+			return todo;
 		},
 	},
 });
@@ -98,11 +95,11 @@ export const { GET, POST } = createRouterHandler(api, handlers, {
 	errorHandlers: {
 		onRequestValidationError: ({ issues }) => ({
 			status: 422,
-		body: { code: "VALIDATION_ERROR", issues },
+			body: { code: "VALIDATION_ERROR", issues },
 		}),
 		onUnhandledError: () => ({
 			status: 500,
-		body: { code: "INTERNAL_SERVER_ERROR" },
+			body: { code: "INTERNAL_SERVER_ERROR" },
 		}),
 	},
 });

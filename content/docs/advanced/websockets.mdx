@@ -14,9 +14,6 @@ watch: {
 	options: {
 		mode: "websocket",
 	},
-	pathParams: {
-		id: z.string(),
-	},
 	messages: {
 		client: clientMessageSchema,
 		server: serverMessageSchema,
@@ -34,9 +31,6 @@ export const api = router({
 			path: "/todos/:id/watch",
 			options: {
 				mode: "websocket",
-			},
-			pathParams: {
-				id: z.string(),
 			},
 			messages: {
 				client: z.object({

@@ -34,9 +34,7 @@ export const api = router({
 			body: {
 				title: z.string().min(1),
 			},
-			responses: {
-				201: todoSchema,
-			},
+			response: todoSchema,
 		},
 	},
 });
@@ -63,9 +61,7 @@ export const api = router({
 			body: {
 				title: v.pipe(v.string(), v.minLength(1)),
 			},
-			responses: {
-				201: todoSchema,
-			},
+			response: todoSchema,
 		},
 	},
 });
@@ -92,9 +88,7 @@ export const api = router({
 			body: {
 				title: type("string>0"),
 			},
-			responses: {
-				201: todoSchema,
-			},
+			response: todoSchema,
 		},
 	},
 });
@@ -121,9 +115,7 @@ export const api = router({
 			body: {
 				title: type("string>0"),
 			},
-			responses: {
-				201: todoSchema,
-			},
+			response: todoSchema,
 		},
 	},
 });
@@ -158,9 +150,7 @@ export const api = router({
 			body: {
 				title: z.string().min(1),
 			},
-			responses: {
-				201: todoSchema,
-			},
+			response: todoSchema,
 		},
 	},
 });
@@ -191,10 +181,7 @@ const routes = router(api, {
 
 			todos.set(todo.id, todo);
 
-			return {
-				status: 201,
-			body: todo,
-			};
+			return todo;
 		},
 	},
 });
@@ -228,9 +215,7 @@ export const api = router({
 			body: {
 				title: z.string().min(1),
 			},
-			responses: {
-				201: todoSchema,
-			},
+			response: todoSchema,
 		},
 	},
 });
@@ -260,10 +245,7 @@ const routes = router(api, {
 
 			todos.set(todo.id, todo);
 
-			return {
-				status: 201,
-			body: todo,
-			};
+			return todo;
 		},
 	},
 });
@@ -297,9 +279,7 @@ export const api = router({
 			body: {
 				title: z.string().min(1),
 			},
-			responses: {
-				201: todoSchema,
-			},
+			response: todoSchema,
 		},
 	},
 });
@@ -329,10 +309,7 @@ const routes = router(api, {
 
 			todos.set(todo.id, todo);
 
-			return {
-				status: 201,
-			body: todo,
-			};
+			return todo;
 		},
 	},
 });
@@ -366,9 +343,7 @@ export const api = router({
 			body: {
 				title: z.string().min(1),
 			},
-			responses: {
-				201: todoSchema,
-			},
+			response: todoSchema,
 		},
 	},
 });
@@ -395,10 +370,7 @@ export const { POST } = createRouterHandler(api, {
 
 			todos.set(todo.id, todo);
 
-			return {
-				status: 201,
-			body: todo,
-			};
+			return todo;
 		},
 	},
 });
@@ -434,9 +406,7 @@ export const api = router({
 			body: {
 				title: z.string().min(1),
 			},
-			responses: {
-				201: todoSchema,
-			},
+			response: todoSchema,
 		},
 	},
 });
@@ -478,9 +448,7 @@ export const api = router({
 			body: {
 				title: z.string().min(1),
 			},
-			responses: {
-				201: todoSchema,
-			},
+			response: todoSchema,
 		},
 	},
 });

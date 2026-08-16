@@ -30,15 +30,7 @@ export const api = router({
 		get: {
 			method: "GET",
 			path: "/todos/:id",
-			pathParams: {
-				id: z.string(),
-			},
-			responses: {
-				200: todoSchema,
-				404: z.object({
-					code: z.literal("TODO_NOT_FOUND"),
-				}),
-			},
+			response: todoSchema,
 		},
 	},
 });
@@ -50,16 +42,7 @@ Handlers and clients use the route tree as typed functions.
 const routes = router(api, {
 	todos: {
 		get({ id }) {
-			const todo = todos.get(id);
-
-			if (!todo) {
-				return {
-					status: 404,
-				body: { code: "TODO_NOT_FOUND" },
-				};
-			}
-
-			return todo;
+			return getTodo(id);
 		},
 	},
 });
@@ -98,4 +81,3 @@ Those concerns stay in your application and framework code the way you already k
 - [Contract](/contract/) covers route declarations.
 - [Responses](/responses/) covers status-keyed responses.
 - [OpenAPI](/openapi/) covers document generation.
-

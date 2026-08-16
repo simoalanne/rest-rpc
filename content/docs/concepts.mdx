@@ -18,13 +18,7 @@ Routes are still normal HTTP routes.
 get: {
 	method: "GET",
 	path: "/todos/:id",
-	pathParams: {
-		id: z.string(),
-	},
-	responses: {
-		200: todoSchema,
-		404: notFoundSchema,
-	},
+	response: todoSchema,
 }
 ```
 
@@ -74,22 +68,22 @@ HTTP separates request data into locations:
 - `body`
 
 `rest-rpc` keeps those locations explicit in the contract, then flattens them for
-handler and client usage.
+handler and client usage. Path params are inferred from full dynamic path
+segments, so `path: "/todos/:id"` already contributes an `id: string` input.
 
 ```ts
-	pathParams: {
+pathParams: {
 	id: z.string(),
-	},
-	query: {
+},
+query: {
 	includeCompleted: z.coerce.boolean().optional(),
-	},
-	headers: {
+},
+headers: {
 	"x-request-id": z.string().optional(),
-	},
-	body: {
+},
+body: {
 	title: z.string(),
-	},
-
+},
 ```
 
 The handler and client input is:
@@ -108,7 +102,16 @@ Each key must be unique across all request locations to ensure clarity and preve
 
 ## Status-Keyed Responses
 
-Responses are declared by HTTP status code.
+The `response` field represents one successful body.
+
+```ts
+response: todoSchema
+```
+
+`rest-rpc` infers the status from the method: `POST` uses `201`; methods with a
+body otherwise use `200`.
+
+The `responses` field represents status-keyed response shapes.
 
 ```ts
 responses: {
@@ -122,15 +125,13 @@ responses: {
 There is no separate `errors` field. Declared non-2xx responses are normal
 declared API responses.
 
-Use `fetch()` when a route has one successful response and the status is not part
-of normal control flow.
+`fetch()` is available when a route has one successful response.
 
-Use `fetchResponse()` when the status matters.
+`fetchResponse()` returns the status and body as a value.
 
-## Shortcuts Are Limited
+## Inference Is Limited
 
-Shortcuts exist only when the contract makes the missing HTTP detail
-unambiguous.
+Inference requires an unambiguous HTTP detail in the contract.
 
 If a route has exactly one successful response, a handler can return the success
 body directly.

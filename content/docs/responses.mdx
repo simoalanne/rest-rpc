@@ -1,9 +1,25 @@
 ---
 title: Responses
-description: Declare status-keyed responses and choose the right return shape.
+description: Declare inferred or status-keyed HTTP response shapes.
 ---
 
-HTTP routes declare responses by status code.
+The `response` field declares one successful response body.
+
+```ts
+create: {
+	method: "POST",
+	path: "/todos",
+	body: {
+		title: z.string().min(1),
+	},
+	response: todoSchema,
+}
+```
+
+The status is inferred from the method. `POST` uses `201`; `GET`, `PUT`,
+`PATCH`, and `DELETE` use `200` when a body is declared with `response`.
+
+The `responses` field declares response bodies by status code.
 
 ```ts
 responses: {
@@ -17,21 +33,19 @@ responses: {
 There is no separate `errors` field. Declared non-2xx responses are part of the
 route contract.
 
-## Response Schemas
+## Response Bodies
 
 Response body declarations can be Standard Schema-compatible schemas.
 
 ```ts
-responses: {
-	200: z.object({
-		id: z.string(),
-		title: z.string(),
-		completed: z.boolean(),
-	}),
-}
+response: z.object({
+	id: z.string(),
+	title: z.string(),
+	completed: z.boolean(),
+})
 ```
 
-Use `noBody()` for statuses without a body.
+`noBody()` marks a status as having no response body.
 
 ```ts
 import { noBody } from "@rest-rpc/core";
@@ -41,20 +55,42 @@ responses: {
 }
 ```
 
-Custom and streaming bodies are covered in advanced docs.
-
-## Handler Returns
-
-Handlers can always return an explicit response envelope.
+When a route omits both `response` and `responses`, the route has an inferred
+no-body response. `DELETE` uses `204`, `POST` uses `201`, and `GET`, `PUT`, and
+`PATCH` use `200`.
 
 ```ts
-return {
-	status: 404,
-	body: {
-	code: "TODO_NOT_FOUND",
-	},
-};
+remove: {
+	method: "DELETE",
+	path: "/todos/:id",
+}
 ```
+
+Custom and streaming bodies are covered in advanced docs.
+
+## Response Resolution Rules
+
+Each HTTP route uses exactly one of these shapes:
+
+- `response`: one response body, with status inferred from the method.
+- `responses`: an explicit status-keyed response map.
+- neither: one inferred no-body response.
+
+A route declaration cannot include both `response` and `responses`.
+
+Status inference:
+
+- `response` with `POST` becomes `201`.
+- `response` with `GET`, `PUT`, `PATCH`, or `DELETE` becomes `200`.
+- omitted responses with `DELETE` become `204`.
+- omitted responses with `POST` become `201`.
+- omitted responses with `GET`, `PUT`, or `PATCH` become `200`.
+
+`commonResponses` are merged into the resolved route responses. Route statuses
+override common statuses. An explicit empty `responses: {}` resolves from
+`commonResponses`.
+
+## Handler Returns
 
 If a route has exactly one successful response, the handler can return the
 success body directly.
@@ -67,17 +103,29 @@ return {
 };
 ```
 
-That shortcut is only valid because the success status is unambiguous.
+Handlers can always return an explicit response envelope.
+
+```ts
+return {
+	status: 404,
+	body: {
+		code: "TODO_NOT_FOUND",
+	},
+};
+```
+
+The direct body shortcut is only valid because the success status is
+unambiguous.
 
 ## Explicit Success
 
-Use an envelope when the status is part of the result.
+An explicit response envelope includes the status in the handler result.
 
 ```ts
 create({ title }) {
 	return {
 		status: 201,
-	body: createTodo({ title }),
+		body: createTodo({ title }),
 	};
 }
 ```
@@ -93,9 +141,9 @@ get({ id }) {
 	if (!todo) {
 		return {
 			status: 404,
-		body: {
-			code: "TODO_NOT_FOUND",
-		},
+			body: {
+				code: "TODO_NOT_FOUND",
+			},
 		};
 	}
 
@@ -109,7 +157,7 @@ You can also use `ContractResponseError` to throw a declared error response when
 throw new ContractResponseError(api.todos.get, {
 	status: 404,
 	body: {
-	code: "TODO_NOT_FOUND",
+		code: "TODO_NOT_FOUND",
 	},
 });
 ```
@@ -151,4 +199,4 @@ const todo = await api.todos.get.fetch({ id: "todo_1" });
 ```
 
 `fetch()` returns the successful response body directly. It throws when the
-response is undeclared or is not a declared success response. Use it when you don't care about the status and just want the success body.
+response is undeclared or is not a declared success response.
