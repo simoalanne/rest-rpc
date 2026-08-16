@@ -117,6 +117,75 @@ return {
 The direct body shortcut is only valid when the success status is unambiguous and
 the response does not need declared `responseHeaders`.
 
+## Raw Headers
+
+Handlers can return raw HTTP headers from the response envelope.
+
+```ts
+return {
+	status: 200,
+	headers: {
+		"cache-control": "no-store",
+		"x-request-id": requestId,
+	},
+	body: {
+		ok: true,
+	},
+};
+```
+
+Header values can be strings, numbers, arrays of strings, or `undefined`.
+`undefined` values are skipped. Array values are appended as multiple header
+values.
+
+## Cookies
+
+`setCookie` and `clearCookie` create `set-cookie` header values.
+
+```ts
+import { setCookie } from "@rest-rpc/express";
+
+return {
+	status: 200,
+	headers: {
+		"set-cookie": setCookie("session", sessionId, {
+			httpOnly: true,
+			secure: true,
+			sameSite: "lax",
+			path: "/",
+		}),
+		"cache-control": "no-store",
+	},
+	body: {
+		ok: true,
+	},
+};
+```
+
+Use an array to send multiple cookies.
+
+```ts
+import { clearCookie, setCookie } from "@rest-rpc/hono";
+
+return {
+	status: 200,
+	headers: {
+		"set-cookie": [
+			clearCookie("old_session", { path: "/" }),
+			setCookie("session", sessionId, {
+				httpOnly: true,
+				secure: true,
+				sameSite: "lax",
+				path: "/",
+			}),
+		],
+	},
+	body: {
+		ok: true,
+	},
+};
+```
+
 ## Explicit Success
 
 An explicit response envelope includes the status in the handler result.

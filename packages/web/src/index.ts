@@ -2,6 +2,7 @@ import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	type Contract,
 	ContractResponseError,
+	clearCookie,
 	type ImplementationShape,
 	type ImplementationTree,
 	type ImplementationTreeFor,
@@ -13,6 +14,7 @@ import {
 	route as serverRoute,
 	router as serverRouter,
 	routes as serverRoutes,
+	setCookie,
 } from "@rest-rpc/server";
 import {
 	type CreateWebHandlerOptions,
@@ -24,13 +26,19 @@ import {
 import { createWebRouteMatcher } from "./match.ts";
 
 export type {
+	ClearCookieOptions,
+	CookiePriority,
+	SameSite,
+	SetCookieOptions,
+} from "@rest-rpc/server";
+export type {
 	CreateWebHandlerOptions,
 	WebRouteHandlerContext,
 	WebRouteParseBody,
 	WebRouteParseBodyInput,
 } from "./http.ts";
 export type { RouteHandler };
-export { ContractResponseError };
+export { ContractResponseError, clearCookie, setCookie };
 
 type WebContract = Contract<HttpRouteDeclaration>;
 

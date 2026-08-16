@@ -1,5 +1,12 @@
 export { ContractResponseError } from "./contractResponseError.ts";
 export type {
+	ClearCookieOptions,
+	CookiePriority,
+	SameSite,
+	SetCookieOptions,
+} from "./cookies.ts";
+export { clearCookie, setCookie } from "./cookies.ts";
+export type {
 	RequestValidationErrorInput,
 	ServerErrorHandlers,
 	ServerErrorResponse,

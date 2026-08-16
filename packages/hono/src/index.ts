@@ -6,6 +6,7 @@ import type {
 import {
 	type Contract,
 	ContractResponseError,
+	clearCookie,
 	createRouteMatcher,
 	type ImplementationShape,
 	type ImplementationTreeFor,
@@ -19,14 +20,21 @@ import {
 	route as serverRoute,
 	router as serverRouter,
 	routes as serverRoutes,
+	setCookie,
 } from "@rest-rpc/server";
 import type { Context } from "hono";
 import type { Env } from "hono/types";
 
+export type {
+	ClearCookieOptions,
+	CookiePriority,
+	SameSite,
+	SetCookieOptions,
+} from "@rest-rpc/server";
 export type { HonoParseBody, HonoParseBodyInput } from "./http.ts";
 export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
-export { ContractResponseError, createRouteMatcher };
+export { ContractResponseError, clearCookie, createRouteMatcher, setCookie };
 
 export type HttpRouteHandlerContext<E extends Env = Env> = {
 	c: Context<E>;

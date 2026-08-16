@@ -1,4 +1,4 @@
-import { type ImplementationShape, router } from "@rest-rpc/server";
+import { type ImplementationShape, router, setCookie } from "@rest-rpc/server";
 import { type ResponsesContract, responsesContract } from "./contract.ts";
 
 export type ResponsesHandlers = ImplementationShape<ResponsesContract>;
@@ -25,8 +25,15 @@ export const createResponsesHandlers = (): ResponsesHandlers => ({
 			status: 200 as const,
 			headers: {
 				"set-cookie": [
-					"rest_rpc_session=session-1; Path=/; HttpOnly; SameSite=Lax",
-					"rest_rpc_theme=dark; Path=/; SameSite=Lax",
+					setCookie("rest_rpc_session", "session-1", {
+						path: "/",
+						httpOnly: true,
+						sameSite: "lax",
+					}),
+					setCookie("rest_rpc_theme", "dark", {
+						path: "/",
+						sameSite: "lax",
+					}),
 				],
 			},
 			body: { ok: true as const },

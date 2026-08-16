@@ -7,6 +7,7 @@ import type {
 import {
 	type Contract,
 	ContractResponseError,
+	clearCookie,
 	createRouteMatcher,
 	type ImplementationShape,
 	type ImplementationTreeFor,
@@ -20,12 +21,19 @@ import {
 	route as serverRoute,
 	router as serverRouter,
 	routes as serverRoutes,
+	setCookie,
 } from "@rest-rpc/server";
 import type { Request } from "express";
 
+export type {
+	ClearCookieOptions,
+	CookiePriority,
+	SameSite,
+	SetCookieOptions,
+} from "@rest-rpc/server";
 export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
-export { ContractResponseError, createRouteMatcher };
+export { ContractResponseError, clearCookie, createRouteMatcher, setCookie };
 
 export type HttpRouteHandlerContext = {
 	req: Request;
