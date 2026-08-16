@@ -4,7 +4,7 @@
 	"access": "public",
 	"format": "auto",
 	"changelog": "./changelog-generator.ts",
-	"commit": true,
+	"commit": false,
 	"ignore": [],
 	"fixed": [
 		[
