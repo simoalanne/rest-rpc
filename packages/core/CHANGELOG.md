@@ -10,7 +10,6 @@
 ### Patch Changes
 
 - 2ca9817: remove undocumented 'validate' option + undocumented regex export
-- 2ca9817: remove undocumented '
 
 ## 0.1.0-beta.2
 
