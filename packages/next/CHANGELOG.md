@@ -1,5 +1,7 @@
 # @rest-rpc/next
 
+## 0.1.0-beta.4
+
 ## 0.1.0-beta.3
 
 ## 0.1.0-beta.2

@@ -1,5 +1,12 @@
 # @rest-rpc/server
 
+## 0.1.0-beta.4
+
+### Minor Changes
+
+- fefc87e: add natural support for multiple websocket messages instead of only relying on schema libraries discriminated union types
+- ebae920: Add jsonQuery support for complex query input.
+
 ## 0.1.0-beta.3
 
 ### Minor Changes
