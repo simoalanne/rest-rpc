@@ -36,3 +36,4 @@ A command that exits successfully is successful. Do not report warnings from suc
 ### Notes
 For documentation related tasks:
 - README.md is shared across root and all packages. It's sole purpose is to link to the actual documentation in `content/docs/`. Updating documentation means updating the mdx files in `content/docs/`, not updating the README.md files.
+- Integration tests require network access. From sandboxed environments, they will fail with EPERM unless run with elevated permissions.
