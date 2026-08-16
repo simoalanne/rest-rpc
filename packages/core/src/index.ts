@@ -19,6 +19,7 @@ export type {
 	Contract,
 	CustomBody,
 	HttpRouteDeclaration,
+	JsonQuery,
 	NoBody,
 	RouteDeclaration,
 	ServerErrors,
@@ -34,6 +35,8 @@ export type {
 export {
 	customBody,
 	isCustomBody,
+	isJsonQuery,
+	jsonQuery,
 	noBody,
 	route,
 	router,

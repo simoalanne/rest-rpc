@@ -1,4 +1,4 @@
-import { router } from "@rest-rpc/core/contract";
+import { jsonQuery, router } from "@rest-rpc/core/contract";
 import z from "zod";
 
 export const requestValidationContract = router({
@@ -66,6 +66,26 @@ export const requestValidationContract = router({
 		}),
 		responses: {
 			200: z.object({ value: z.literal("") }),
+		},
+	},
+	jsonQuery: {
+		method: "GET",
+		path: "/request-validation/json-query",
+		query: jsonQuery(
+			z.object({
+				page: z.number(),
+				includeArchived: z.boolean(),
+				filters: z.object({
+					tags: z.array(z.string()),
+				}),
+			}),
+		),
+		responses: {
+			200: z.object({
+				page: z.number(),
+				includeArchived: z.boolean(),
+				tags: z.array(z.string()),
+			}),
 		},
 	},
 });

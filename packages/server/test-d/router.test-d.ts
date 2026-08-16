@@ -1,6 +1,7 @@
 import {
 	customBody,
 	router as defineRouter,
+	jsonQuery,
 	stream,
 } from "@rest-rpc/core/contract";
 import { type InferRouteHandlerRequest, route, router } from "@rest-rpc/server";
@@ -40,6 +41,27 @@ const api = defineRouter({
 				200: z.object({ id: z.number() }).transform(({ id }) => ({
 					id: String(id),
 				})),
+			},
+		},
+		jsonSearch: {
+			method: "GET",
+			path: "/todos/json-search",
+			query: jsonQuery(
+				z.object({
+					page: z.string().transform((value) => Number(value)),
+					filters: z.object({ tags: z.array(z.string()) }),
+				}),
+			),
+			responses: {
+				200: z.array(todoSchema),
+			},
+		},
+		optionalJsonSearch: {
+			method: "GET",
+			path: "/todos/optional-json-search",
+			query: jsonQuery(z.object({ page: z.number() }).optional()),
+			responses: {
+				200: z.array(todoSchema),
 			},
 		},
 	},
@@ -105,6 +127,22 @@ route(api.todos.transform, ({ id, title, slug }) => {
 	};
 });
 
+route(api.todos.jsonSearch, ({ query }) => {
+	expectType<number>(query.page);
+	expectType<string[]>(query.filters.tags);
+
+	return [];
+});
+
+route(api.todos.optionalJsonSearch, ({ query }) => {
+	expectType<{ page: number } | undefined>(query);
+	if (query) {
+		expectType<number>(query.page);
+	}
+
+	return [];
+});
+
 expectError(
 	route(api.todos.transform, () => ({
 		status: 200 as const,
@@ -148,6 +186,17 @@ const implementations = router(api, {
 				id,
 			},
 		}),
+		jsonSearch: ({ query }) => {
+			expectType<number>(query.page);
+			expectType<string[]>(query.filters.tags);
+
+			return [];
+		},
+		optionalJsonSearch: ({ query }) => {
+			expectType<{ page: number } | undefined>(query);
+
+			return [];
+		},
 	},
 	reports: {
 		csv: () => ({

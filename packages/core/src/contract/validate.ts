@@ -4,6 +4,7 @@ import type { Contract, RouteDeclaration } from "./contract.ts";
 import { getPathParamNames } from "./path.ts";
 import type { RequestKeys, RequestSegment } from "./request.ts";
 import {
+	isJsonQuery,
 	isRequestSchemaRecord,
 	isStandardSchema,
 	REQUEST_CONTEXT_KEY,
@@ -21,7 +22,7 @@ export type FlatRequestInput = Record<string, unknown>;
 
 export type GroupedRequestInput = {
 	body?: unknown;
-	query?: Record<string, unknown>;
+	query?: unknown;
 	pathParams?: Record<string, unknown>;
 	headers?: Record<string, unknown>;
 };
@@ -131,7 +132,7 @@ const requestSchemas = (route: RouteDeclaration) =>
 			"body",
 			isCustomBody(route.body) || isNoBody(route.body) ? undefined : route.body,
 		],
-		["query", route.query],
+		["query", isJsonQuery(route.query) ? undefined : route.query],
 		["pathParams", route.pathParams],
 	] as const;
 
@@ -164,6 +165,12 @@ export const validateResolvedRequestKeys = (route: RouteDeclaration) => {
 		);
 	}
 
+	if (isJsonQuery(route.query) && route.requestKeys?.query) {
+		throw new Error(
+			`Route declaration at path "${route.path}" has a "query" key in body, pathParams or headers. Rename it to avoid conflict with the JSON query value.`,
+		);
+	}
+
 	assertPathParamsResolved(route);
 };
 
@@ -174,6 +181,7 @@ export const groupRequestInput = (
 ): GroupedRequestInput => {
 	const unknownRequestKeys = options.unknownRequestKeys ?? "throw";
 	const isCustomRequestBody = isCustomBody(route.body);
+	const isJsonQueryRequest = isJsonQuery(route.query);
 	const requestKeys = route.requestKeys;
 
 	if (!requestKeys && takesRouteInput(route)) {
@@ -185,6 +193,11 @@ export const groupRequestInput = (
 	return Object.entries(input).reduce((grouped, [key, value]) => {
 		if (key === "body" && isCustomRequestBody) {
 			grouped.body = value;
+			return grouped;
+		}
+
+		if (key === "query" && isJsonQueryRequest) {
+			grouped.query = value;
 			return grouped;
 		}
 
@@ -246,6 +259,19 @@ const validateFlatRequestSegment = async (
 			return;
 		}
 		data.body = result.value;
+		return;
+	}
+
+	if (isJsonQuery(declaration)) {
+		const result = await validateStandardSchema(
+			declaration.schema,
+			grouped.query,
+		);
+		if (result.issues) {
+			errors.push(...result.issues);
+			return;
+		}
+		data.query = result.value;
 		return;
 	}
 

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { jsonQuery } from "@rest-rpc/core/contract";
 import z from "zod";
 import { validateRequest } from "./validation.ts";
 
@@ -116,6 +117,81 @@ describe("validateRequest", () => {
 		assert.equal(result.success, false);
 		if (!result.success) {
 			assert.equal(result.response.body.validationErrors.length, 2);
+		}
+	});
+
+	it("parses JSON query values before schema validation", async () => {
+		const result = await validateRequest(
+			{
+				method: "GET",
+				path: "/todos",
+				query: jsonQuery(
+					z.object({
+						page: z.number(),
+						filters: z.object({ tags: z.array(z.string()) }),
+					}),
+				),
+				requestKeys: {},
+				responses: {},
+			},
+			{
+				query: {
+					query: JSON.stringify({
+						page: 2,
+						filters: { tags: ["api", "typescript"] },
+					}),
+				},
+			},
+		);
+
+		assert.equal(result.success, true);
+		if (result.success) {
+			assert.deepEqual(result.data, {
+				query: {
+					page: 2,
+					filters: { tags: ["api", "typescript"] },
+				},
+			});
+		}
+	});
+
+	it("allows omitted optional JSON query values", async () => {
+		const result = await validateRequest(
+			{
+				method: "GET",
+				path: "/todos",
+				query: jsonQuery(z.object({ page: z.number() }).optional()),
+				requestKeys: {},
+				responses: {},
+			},
+			{},
+		);
+
+		assert.equal(result.success, true);
+		if (result.success) {
+			assert.deepEqual(result.data, { query: undefined });
+		}
+	});
+
+	it("rejects malformed JSON query values as request validation errors", async () => {
+		const result = await validateRequest(
+			{
+				method: "GET",
+				path: "/todos",
+				query: jsonQuery(z.object({ page: z.number() })),
+				requestKeys: {},
+				responses: {},
+			},
+			{
+				query: { query: "{" },
+			},
+		);
+
+		assert.equal(result.success, false);
+		if (!result.success) {
+			assert.deepEqual(result.response.body.validationErrors, [
+				{ message: 'Invalid JSON query parameter "query".' },
+			]);
 		}
 	});
 });

@@ -1,8 +1,10 @@
 import type {
+	JsonQuery,
 	RequestBodySchema,
 	RequestSchemaRecord,
 } from "../contract/request.ts";
 import {
+	isJsonQuery,
 	isRequestSchemaRecord,
 	isStandardSchema,
 } from "../contract/request.ts";
@@ -66,12 +68,27 @@ const assertRequiredPathParameter = (
 };
 
 export const createParameters = (
-	schema: StandardSchemaV1 | RequestSchemaRecord | undefined,
+	schema: StandardSchemaV1 | RequestSchemaRecord | JsonQuery | undefined,
 	location: "path" | "query",
 	converter: SchemaConverter,
 	routePath?: string,
 ): OpenApiParameter[] => {
 	if (!schema) return [];
+
+	if (isJsonQuery(schema)) {
+		return [
+			{
+				name: "query",
+				in: "query",
+				required: !isSchemaOptional(schema.schema),
+				content: {
+					[JSON_CONTENT_TYPE]: {
+						schema: convertSchema(schema.schema, "input", converter),
+					},
+				},
+			},
+		];
+	}
 
 	if (isRequestSchemaRecord(schema)) {
 		return Object.entries(schema).map(([name, fieldSchema]) => {

@@ -33,6 +33,7 @@ export type {
 	ClientReceived,
 	ClientRequest,
 	ClientSent,
+	JsonQuery,
 	RequestBodySchema,
 	RequestKeys,
 	RequestSchemaRecord,
@@ -42,8 +43,10 @@ export type {
 	ServerSent,
 } from "./request.ts";
 export {
+	isJsonQuery,
 	isRequestSchemaRecord,
 	isStandardSchema,
+	jsonQuery,
 	REQUEST_CONTEXT_KEY,
 } from "./request.ts";
 export type {

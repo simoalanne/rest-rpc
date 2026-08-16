@@ -87,6 +87,46 @@ pathParams: {
 }
 ```
 
+## JSON Query
+
+You can use `jsonQuery()` for JSON-shaped query input.
+
+```ts
+import { jsonQuery, router } from "@rest-rpc/core";
+
+const api = router({
+	search: {
+		method: "GET",
+		path: "/search",
+		query: jsonQuery(
+			z.object({
+				page: z.number(),
+				includeArchived: z.boolean(),
+				filters: z.object({
+					tags: z.array(z.string()),
+				}),
+			}),
+		),
+		response: z.object({ results: z.array(z.string()) }),
+	},
+});
+```
+
+The client and handler use a top-level `query` value:
+
+```ts
+await client.search.fetch({
+	query: {
+		page: 2,
+		includeArchived: false,
+		filters: { tags: ["docs", "api"] },
+	},
+});
+```
+
+`rest-rpc` transports that value in the URL query parameter named `query`,
+parses it on the server, and validates it with the wrapped schema.
+
 ## Responses
 
 The `response` field declares one successful response body.

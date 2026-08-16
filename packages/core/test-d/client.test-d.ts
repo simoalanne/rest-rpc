@@ -3,6 +3,7 @@ import {
 	type ClientRequestInput,
 	customBody,
 	initClient,
+	jsonQuery,
 	noBody,
 	router,
 	type as schemaType,
@@ -53,6 +54,27 @@ const api = router({
 				page: z.number(),
 				search: z.string(),
 			}),
+			responses: {
+				200: z.array(todoSchema),
+			},
+		},
+		jsonSearch: {
+			method: "GET",
+			path: "/todos/json-search",
+			query: jsonQuery(
+				z.object({
+					page: z.string().transform((value) => Number(value)),
+					filters: z.object({ tags: z.array(z.string()) }),
+				}),
+			),
+			responses: {
+				200: z.array(todoSchema),
+			},
+		},
+		optionalJsonSearch: {
+			method: "GET",
+			path: "/todos/optional-json-search",
+			query: jsonQuery(z.object({ page: z.number() }).optional()),
 			responses: {
 				200: z.array(todoSchema),
 			},
@@ -133,6 +155,21 @@ expectType<Promise<Array<{ id: string; title: string }>>>(
 		search: "milk",
 	}),
 );
+expectType<Promise<Array<{ id: string; title: string }>>>(
+	client.todos.jsonSearch.fetch({
+		query: {
+			page: "1",
+			filters: { tags: ["api"] },
+		},
+	}),
+);
+expectError(client.todos.jsonSearch.fetch({ page: "1" }));
+expectError(client.todos.jsonSearch.fetch());
+expectType<Promise<Array<{ id: string; title: string }>>>(
+	client.todos.optionalJsonSearch.fetch({ query: undefined }),
+);
+expectError(client.todos.optionalJsonSearch.fetch({}));
+expectError(client.todos.optionalJsonSearch.fetch());
 expectType<Promise<{ id: string; title: string }>>(
 	client.todos.create.fetch({ title: "Write type tests" }),
 );

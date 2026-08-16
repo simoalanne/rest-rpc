@@ -1,5 +1,6 @@
 import type { RouteDeclaration } from "../contract/contract.ts";
 import { replacePathParams } from "../contract/path.ts";
+import { isJsonQuery } from "../contract/request.ts";
 import { isCustomBody, isNoBody } from "../contract/response.ts";
 import type { FlatRequestInput } from "../contract/validate.ts";
 import { groupRequestInput } from "../contract/validate.ts";
@@ -125,10 +126,23 @@ const serializeParams = (
 	});
 };
 
-const serializeQuery = (
-	route: RouteDeclaration,
-	query: Record<string, unknown> | undefined,
-) => {
+const serializeQuery = (route: RouteDeclaration, query: unknown) => {
+	if (isJsonQuery(route.query)) {
+		if (query === undefined) return "";
+		let encoded: string;
+		try {
+			const json = JSON.stringify(query);
+			if (json === undefined) return "";
+			encoded = json;
+		} catch (error) {
+			throw new Error(
+				`Invalid JSON query for ${route.method} ${route.path}. Expected a JSON-serializable value.`,
+				{ cause: error },
+			);
+		}
+		return `?${new URLSearchParams([["query", encoded]]).toString()}`;
+	}
+
 	const entries = Object.entries(query ?? {}).flatMap(([key, value]) => {
 		const stringValue = stringifyRequestValue(route, "query", key, value, true);
 		return stringValue === undefined ? [] : [[key, stringValue]];

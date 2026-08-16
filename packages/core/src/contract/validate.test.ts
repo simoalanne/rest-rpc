@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import z from "zod";
 import { testContract } from "../../test/factories/contract.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
+import { jsonQuery } from "./request.ts";
 import { customBody } from "./response.ts";
 import {
 	groupRequestInput,
@@ -47,6 +48,21 @@ describe("validateContractSync", () => {
 			q: "query",
 			title: "body",
 		});
+	});
+
+	it("does not flatten jsonQuery schema keys into request keys", () => {
+		const contract = validateContractSync(
+			testContract({
+				query: jsonQuery(
+					z.object({
+						page: z.number(),
+						filters: z.object({ tag: z.string() }),
+					}),
+				),
+			}),
+		);
+
+		assert.deepEqual(contract.search.find.requestKeys, {});
 	});
 
 	it("populates request keys from schema record request declarations", () => {
@@ -210,6 +226,20 @@ describe("validateContractSync", () => {
 		);
 	});
 
+	it("rejects query keys in other segments for JSON query values", () => {
+		assert.throws(
+			() =>
+				validateContractSync(
+					testContract({
+						path: "/search/:query",
+						pathParams: z.object({ query: z.string() }),
+						query: jsonQuery(z.object({ page: z.number() })),
+					}),
+				),
+			/has a "query" key in body, pathParams or headers/,
+		);
+	});
+
 	it("allows body keys in query or pathParams without custom request bodies", () => {
 		const contract = validateContractSync(
 			testContract({
@@ -333,6 +363,27 @@ describe("groupRequestInput", () => {
 			},
 		);
 	});
+
+	it("assigns the query key as a JSON query value", () => {
+		const route = testContract({
+			query: jsonQuery(
+				z.object({
+					page: z.number(),
+					filters: z.object({ tag: z.string() }),
+				}),
+			),
+			requestKeys: {},
+		}).search.find;
+
+		assert.deepEqual(
+			groupRequestInput(route, {
+				query: { page: 2, filters: { tag: "typescript" } },
+			}),
+			{
+				query: { page: 2, filters: { tag: "typescript" } },
+			},
+		);
+	});
 });
 
 describe("validateFlatRequestInput", () => {
@@ -431,6 +482,40 @@ describe("validateFlatRequestInput", () => {
 				data: { body: "body: hello " },
 			},
 		);
+	});
+
+	it("validates JSON query values and returns the parsed query key", async () => {
+		const route = testContract({
+			query: jsonQuery(
+				z.object({
+					page: z.number(),
+					filters: z.object({ tag: z.string() }),
+				}),
+			),
+			requestKeys: {},
+		}).search.find;
+
+		assert.deepEqual(
+			await validateFlatRequestInput(route, {
+				query: { page: 2, filters: { tag: "typescript" } },
+			}),
+			{
+				success: true,
+				data: { query: { page: 2, filters: { tag: "typescript" } } },
+			},
+		);
+	});
+
+	it("validates omitted optional JSON query values", async () => {
+		const route = testContract({
+			query: jsonQuery(z.object({ page: z.number() }).optional()),
+			requestKeys: {},
+		}).search.find;
+
+		assert.deepEqual(await validateFlatRequestInput(route, {}), {
+			success: true,
+			data: { query: undefined },
+		});
 	});
 
 	it("returns accumulated validation errors", async () => {

@@ -9,6 +9,7 @@ export type OpenApiParameter = {
 	required?: boolean;
 	description?: string;
 	schema?: OpenApiSchema;
+	content?: Record<string, { schema?: OpenApiSchema }>;
 };
 
 export type OpenApiRequestBody = {

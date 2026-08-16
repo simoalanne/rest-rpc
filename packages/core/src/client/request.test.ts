@@ -7,6 +7,7 @@ import {
 	jsonResponse,
 } from "../../test/factories/client.ts";
 import { router } from "../contract/contract.ts";
+import { jsonQuery } from "../contract/request.ts";
 import { noBody } from "../contract/response.ts";
 import { initClient } from "./index.ts";
 import { constructBaseRequest, createRequestSignal } from "./request.ts";
@@ -188,6 +189,71 @@ describe("ApiClient requests", () => {
 
 		assert.equal(request.url, "https://api.test/items");
 		assert.deepEqual(request.headers, {});
+	});
+
+	it("serializes JSON query values into the query parameter", () => {
+		const apiContract = router({
+			items: {
+				search: {
+					method: "GET",
+					path: "/items",
+					query: jsonQuery(
+						z.object({
+							page: z.number(),
+							filters: z.object({ tags: z.array(z.string()) }),
+						}),
+					),
+					responses: {
+						204: noBody(),
+					},
+				},
+			},
+		});
+		const request = constructBaseRequest(
+			"https://api.test",
+			apiContract.items.search,
+			{
+				query: {
+					page: 2,
+					filters: { tags: ["api", "typescript"] },
+				},
+			},
+			"throw",
+		);
+
+		assert.equal(
+			request.url,
+			"https://api.test/items?query=%7B%22page%22%3A2%2C%22filters%22%3A%7B%22tags%22%3A%5B%22api%22%2C%22typescript%22%5D%7D%7D",
+		);
+	});
+
+	it("omits optional JSON query values when the query key is not provided", () => {
+		const apiContract = router({
+			items: {
+				search: {
+					method: "GET",
+					path: "/items",
+					query: jsonQuery(
+						z
+							.object({
+								page: z.number(),
+							})
+							.optional(),
+					),
+					responses: {
+						204: noBody(),
+					},
+				},
+			},
+		});
+		const request = constructBaseRequest(
+			"https://api.test",
+			apiContract.items.search,
+			{},
+			"throw",
+		);
+
+		assert.equal(request.url, "https://api.test/items");
 	});
 
 	it("rejects missing and undefined params before building the request URL", () => {

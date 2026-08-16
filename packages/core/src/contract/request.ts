@@ -9,6 +9,24 @@ export const REQUEST_CONTEXT_KEY = "context";
 
 export type RequestSchemaRecord = Record<string, StandardSchemaV1>;
 
+export type JsonQuery<TSchema extends StandardSchemaV1 = StandardSchemaV1> = {
+	kind: "jsonQuery";
+	schema: TSchema;
+};
+
+export const jsonQuery = <const TSchema extends StandardSchemaV1>(
+	schema: TSchema,
+): JsonQuery<TSchema> => ({
+	kind: "jsonQuery",
+	schema,
+});
+
+export const isJsonQuery = (schema: unknown): schema is JsonQuery =>
+	typeof schema === "object" &&
+	schema !== null &&
+	"kind" in schema &&
+	schema.kind === "jsonQuery";
+
 export type RequestBodySchema =
 	| StandardSchemaV1
 	| RequestSchemaRecord
@@ -25,6 +43,7 @@ export const isRequestSchemaRecord = (
 	typeof value === "object" &&
 	value !== null &&
 	!isStandardSchema(value) &&
+	!isJsonQuery(value) &&
 	!isCustomBody(value) &&
 	!isNoBody(value);
 
@@ -44,6 +63,15 @@ type InferRequestBody<
 			: TBody extends RequestSchemaRecord
 				? InferRequestSchemaRecord<TBody, TIO>
 				: never;
+
+type InferJsonQuery<TQuery, TIO extends "input" | "output"> =
+	TQuery extends JsonQuery<infer TSchema>
+		? {
+				query: TIO extends "input"
+					? StandardSchemaV1.InferInput<TSchema>
+					: StandardSchemaV1.InferOutput<TSchema>;
+			}
+		: never;
 
 type InferSchemaValue<
 	TSchema,
@@ -88,13 +116,15 @@ type InferRequestSchemaRecord<
 type InferRequestObjectSegment<
 	TSegment,
 	TIO extends "input" | "output",
-> = TSegment extends StandardSchemaV1
-	? TIO extends "input"
-		? StandardSchemaV1.InferInput<TSegment>
-		: StandardSchemaV1.InferOutput<TSegment>
-	: TSegment extends RequestSchemaRecord
-		? InferRequestSchemaRecord<TSegment, TIO>
-		: never;
+> = TSegment extends JsonQuery
+	? InferJsonQuery<TSegment, TIO>
+	: TSegment extends StandardSchemaV1
+		? TIO extends "input"
+			? StandardSchemaV1.InferInput<TSegment>
+			: StandardSchemaV1.InferOutput<TSegment>
+		: TSegment extends RequestSchemaRecord
+			? InferRequestSchemaRecord<TSegment, TIO>
+			: never;
 
 type InferRequestSegments<R, TIO extends "input" | "output"> = {
 	body: R extends { body: infer TBody } ? InferRequestBody<TBody, TIO> : never;

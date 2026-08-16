@@ -19,6 +19,11 @@ export const createRequestValidationHandlers =
 		headers: () => ({ reached: true as const }),
 		body: () => ({ reached: true as const }),
 		emptyQuery: (request) => ({ value: request.value }),
+		jsonQuery: (request) => ({
+			page: request.query.page,
+			includeArchived: request.query.includeArchived,
+			tags: request.query.filters.tags,
+		}),
 	});
 
 export const createRequestValidationImplementations = () =>

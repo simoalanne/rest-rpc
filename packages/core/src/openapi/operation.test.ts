@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
 import { schemaConverter } from "../../test/factories/openapi.ts";
+import { jsonQuery } from "../contract/request.ts";
 import { customBody, noBody, stream } from "../contract/response.ts";
 import {
 	createHeaderParameters,
@@ -69,6 +70,65 @@ describe("OpenAPI operations", () => {
 				{ name: "search", in: "query", required: true, type: "string" },
 				{ name: "page", in: "query", required: false, type: "number" },
 			],
+		);
+	});
+
+	it("creates one JSON query parameter for jsonQuery schemas", () => {
+		const parameters = createParameters(
+			jsonQuery(
+				z.object({
+					page: z.number(),
+					filters: z.object({ tags: z.array(z.string()) }),
+				}),
+			),
+			"query",
+			schemaConverter,
+		);
+
+		assert.deepEqual(parameters, [
+			{
+				name: "query",
+				in: "query",
+				required: true,
+				content: {
+					"application/json": {
+						schema: {
+							type: "object",
+							properties: {
+								page: { type: "number" },
+								filters: {
+									type: "object",
+									properties: {
+										tags: {
+											type: "array",
+											items: { type: "string" },
+										},
+									},
+									required: ["tags"],
+								},
+							},
+							required: ["page", "filters"],
+						},
+					},
+				},
+			},
+		]);
+	});
+
+	it("marks optional jsonQuery schemas as optional query parameters", () => {
+		const parameters = createParameters(
+			jsonQuery(z.object({ page: z.number() }).optional()),
+			"query",
+			schemaConverter,
+		);
+
+		assert.deepEqual(
+			parameters.map((parameter) => ({
+				name: parameter.name,
+				in: parameter.in,
+				required: parameter.required,
+			})),
+			[{ name: "query", in: "query", required: false }],
 		);
 	});
 

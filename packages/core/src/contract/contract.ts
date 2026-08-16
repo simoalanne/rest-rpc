@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { normalizeContract } from "./normalize.ts";
 import type {
+	JsonQuery,
 	RequestBodySchema,
 	RequestKeys,
 	RequestSchemaRecord,
@@ -44,7 +45,7 @@ export type BaseRouteDeclaration = {
 	method: HttpMethod;
 	cacheKey?: readonly string[];
 	body?: RequestBodySchema;
-	query?: StandardSchemaV1 | RequestSchemaRecord;
+	query?: StandardSchemaV1 | RequestSchemaRecord | JsonQuery;
 	pathParams?: StandardSchemaV1 | RequestSchemaRecord;
 	headers?: RequestSchemaRecord;
 	requestKeys?: RequestKeys;

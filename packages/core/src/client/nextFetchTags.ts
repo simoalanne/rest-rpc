@@ -1,4 +1,5 @@
 import type { RouteDeclaration } from "../contract/contract.ts";
+import { isJsonQuery } from "../contract/request.ts";
 import { groupRequestInput } from "../contract/validate.ts";
 
 const DEFAULT_NEXT_FETCH_TAG_PREFIX = "rest-rpc";
@@ -40,7 +41,9 @@ const getNextFetchTagRequest = (
 
 	return {
 		...grouped.pathParams,
-		...grouped.query,
+		...(isJsonQuery(route.query)
+			? { query: JSON.stringify(grouped.query) }
+			: (grouped.query as Record<string, unknown> | undefined)),
 	};
 };
 

@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "@rest-rpc/core";
 import {
 	isCustomBody,
+	isJsonQuery,
 	type RouteDeclaration,
 	validateFlatRequestInput,
 } from "@rest-rpc/core/contract";
@@ -32,6 +33,13 @@ const assignObject = (target: Record<string, unknown>, value: unknown) => {
 	}
 };
 
+const parseJsonQuery = (value: unknown) => {
+	if (Array.isArray(value)) value = value[0];
+	if (value === undefined) return undefined;
+	if (typeof value !== "string") return value;
+	return JSON.parse(value);
+};
+
 const flattenRequestSegments = (
 	route: RouteDeclaration,
 	segments: RequestSegments,
@@ -44,7 +52,13 @@ const flattenRequestSegments = (
 		assignObject(input, segments.body);
 	}
 
-	assignObject(input, segments.query);
+	if (isJsonQuery(route.query)) {
+		input.query = parseJsonQuery(
+			(segments.query as Record<string, unknown> | undefined)?.query,
+		);
+	} else {
+		assignObject(input, segments.query);
+	}
 	assignObject(input, segments.pathParams);
 	assignObject(input, segments.headers);
 
@@ -55,10 +69,26 @@ export const validateRequest = async (
 	route: RouteDeclaration,
 	segments: RequestSegments,
 ): Promise<RequestValidationResponse> => {
-	const result = await validateFlatRequestInput(
-		route,
-		flattenRequestSegments(route, segments),
-	);
+	let input: Record<string, unknown>;
+	try {
+		input = flattenRequestSegments(route, segments);
+	} catch {
+		return {
+			success: false,
+			response: {
+				status: 400,
+				body: {
+					message:
+						"Request validation failed. Check the validationErrors field for details.",
+					validationErrors: [
+						{ message: 'Invalid JSON query parameter "query".' },
+					],
+				},
+			},
+		};
+	}
+
+	const result = await validateFlatRequestInput(route, input);
 
 	if (result.success) return result;
 
