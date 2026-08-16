@@ -18,11 +18,10 @@ const todoSchema = z.object({
 	title: z.string(),
 });
 
-const errorSchema = z.object({
-	message: z.string(),
-});
+// client route types
 
-const api = router({
+// should infer fetch return bodies for routes without request input
+const noInputApi = router({
 	todos: {
 		list: {
 			method: "GET",
@@ -38,15 +37,44 @@ const api = router({
 				200: schemaType<{ total: number }>(),
 			},
 		},
+	},
+});
+
+const noInputClient = initClient(noInputApi, {
+	origin: "https://example.test",
+});
+
+expectType<Promise<Array<{ id: string; title: string }>>>(
+	noInputClient.todos.list.fetch(),
+);
+
+expectType<Promise<{ total: number }>>(noInputClient.todos.stats.fetch());
+
+// should infer fetch return bodies for path params
+const pathParamApi = router({
+	todos: {
 		get: {
 			method: "GET",
 			path: "/todos/:id",
 			pathParams: z.object({ id: z.string() }),
 			responses: {
 				200: todoSchema,
-				404: errorSchema,
 			},
 		},
+	},
+});
+
+const pathParamClient = initClient(pathParamApi, {
+	origin: "https://example.test",
+});
+
+expectType<Promise<{ id: string; title: string }>>(
+	pathParamClient.todos.get.fetch({ id: "todo-1" }),
+);
+
+// should infer fetch return bodies for flat query input
+const flatQueryApi = router({
+	todos: {
 		search: {
 			method: "GET",
 			path: "/todos/search",
@@ -59,6 +87,24 @@ const api = router({
 				200: z.array(todoSchema),
 			},
 		},
+	},
+});
+
+const flatQueryClient = initClient(flatQueryApi, {
+	origin: "https://example.test",
+});
+
+expectType<Promise<Array<{ id: string; title: string }>>>(
+	flatQueryClient.todos.search.fetch({
+		includeDone: false,
+		page: 1,
+		search: "milk",
+	}),
+);
+
+// should infer fetch return bodies and request input for JSON query routes
+const jsonQueryApi = router({
+	todos: {
 		jsonSearch: {
 			method: "GET",
 			path: "/todos/json-search",
@@ -80,6 +126,35 @@ const api = router({
 				200: z.array(todoSchema),
 			},
 		},
+	},
+});
+
+const jsonQueryClient = initClient(jsonQueryApi, {
+	origin: "https://example.test",
+});
+
+expectType<Promise<Array<{ id: string; title: string }>>>(
+	jsonQueryClient.todos.jsonSearch.fetch({
+		query: {
+			page: "1",
+			filters: { tags: ["api"] },
+		},
+	}),
+);
+
+expectError(jsonQueryClient.todos.jsonSearch.fetch({ page: "1" }));
+expectError(jsonQueryClient.todos.jsonSearch.fetch());
+
+expectType<Promise<Array<{ id: string; title: string }>>>(
+	jsonQueryClient.todos.optionalJsonSearch.fetch({ query: undefined }),
+);
+
+expectError(jsonQueryClient.todos.optionalJsonSearch.fetch({}));
+expectError(jsonQueryClient.todos.optionalJsonSearch.fetch());
+
+// should infer declared response envelopes and headers from fetchResponse
+const responseApi = router({
+	todos: {
 		create: {
 			method: "POST",
 			path: "/todos",
@@ -94,6 +169,32 @@ const api = router({
 				},
 			},
 		},
+	},
+});
+
+const responseClient = initClient(responseApi, {
+	origin: "https://example.test",
+});
+
+expectType<Promise<{ id: string; title: string }>>(
+	responseClient.todos.create.fetch({ title: "Write type tests" }),
+);
+
+responseClient.todos.create
+	.fetchResponse({ title: "Write type tests" })
+	.then((response) => {
+		if (response.declared) {
+			expectType<201>(response.status);
+			expectType<{ id: string; title: string }>(response.body);
+			expectType<string>(response.responseHeaders.location);
+			expectType<string | undefined>(response.responseHeaders["x-next-cursor"]);
+			expectType<Headers>(response.headers);
+		}
+	});
+
+// should use schema input for requests and schema output for responses
+const transformedApi = router({
+	todos: {
 		transform: {
 			method: "POST",
 			path: "/todos/:id/transform",
@@ -110,6 +211,35 @@ const api = router({
 				})),
 			},
 		},
+	},
+});
+
+const transformedClient = initClient(transformedApi, {
+	origin: "https://example.test",
+});
+
+expectType<Promise<{ id: string }>>(
+	transformedClient.todos.transform.fetch({
+		id: "1",
+		title: "Write type tests",
+	}),
+);
+
+expectError(
+	transformedClient.todos.transform.fetch({ id: 1, title: "wrong id input" }),
+);
+
+expectError(
+	transformedClient.todos.transform.fetch({
+		id: "1",
+		title: "Write type tests",
+		slug: "server-output-only",
+	}),
+);
+
+// should keep stream and custom response routes on fetchResponse or Response bodies
+const streamResponseApi = router({
+	todos: {
 		events: {
 			method: "GET",
 			path: "/todos/events",
@@ -119,6 +249,21 @@ const api = router({
 				204: noBody(),
 			},
 		},
+	},
+});
+
+const streamResponseClient = initClient(streamResponseApi, {
+	origin: "https://example.test",
+});
+
+expectType<Promise<ClientFetchResponse<typeof streamResponseApi.todos.events>>>(
+	streamResponseClient.todos.events.fetchResponse(),
+);
+
+expectError(streamResponseClient.todos.events.fetch());
+
+const csvResponseApi = router({
+	todos: {
 		exportCsv: {
 			method: "GET",
 			path: "/todos.csv",
@@ -141,6 +286,26 @@ const api = router({
 				),
 			},
 		},
+	},
+});
+
+const csvResponseClient = initClient(csvResponseApi, {
+	origin: "https://example.test",
+});
+
+expectType<Promise<Response>>(csvResponseClient.todos.exportCsv.fetch());
+
+csvResponseClient.todos.exportCsv.fetchResponse().then((response) => {
+	if (response.declared) {
+		expectType<"text/csv">(response.contentType);
+		expectType<Response>(response.body);
+	}
+});
+
+expectType<Promise<Response>>(csvResponseClient.todos.exportCsvStream.fetch());
+
+const imageResponseApi = router({
+	todos: {
 		exportImage: {
 			method: "GET",
 			path: "/todos/image",
@@ -151,6 +316,25 @@ const api = router({
 				}),
 			},
 		},
+	},
+});
+
+const imageResponseClient = initClient(imageResponseApi, {
+	origin: "https://example.test",
+});
+
+expectType<Promise<Response>>(imageResponseClient.todos.exportImage.fetch());
+
+imageResponseClient.todos.exportImage.fetchResponse().then((response) => {
+	if (response.declared) {
+		expectType<"image/png" | "image/jpeg">(response.contentType);
+		expectType<Response>(response.body);
+	}
+});
+
+// should type custom request bodies by selected content type and payload
+const customRequestApi = router({
+	todos: {
 		uploadImage: {
 			method: "POST",
 			path: "/todos/:id/image",
@@ -163,6 +347,79 @@ const api = router({
 				204: noBody(),
 			},
 		},
+	},
+});
+
+const customRequestClient = initClient(customRequestApi, {
+	origin: "https://example.test",
+});
+
+expectType<Promise<undefined>>(
+	customRequestClient.todos.uploadImage.fetch({
+		id: "todo-1",
+		body: {
+			contentType: "image/png",
+			payload: new Uint8Array(),
+		},
+	}),
+);
+
+expectError(
+	customRequestClient.todos.uploadImage.fetch({
+		id: "todo-1",
+		body: {
+			contentType: "image/webp",
+			payload: new Uint8Array(),
+		},
+	}),
+);
+
+// should reject invalid request argument positions and flattened input
+const requestArgumentApi = router({
+	todos: {
+		list: {
+			method: "GET",
+			path: "/todos",
+			responses: {
+				200: z.array(todoSchema),
+			},
+		},
+		get: {
+			method: "GET",
+			path: "/todos/:id",
+			pathParams: z.object({ id: z.string() }),
+			responses: {
+				200: todoSchema,
+			},
+		},
+		create: {
+			method: "POST",
+			path: "/todos",
+			body: z.object({ title: z.string() }),
+			responses: {
+				201: todoSchema,
+			},
+		},
+	},
+});
+
+const requestArgumentClient = initClient(requestArgumentApi, {
+	origin: "https://example.test",
+});
+
+expectError(requestArgumentClient.todos.get.fetch());
+expectError(requestArgumentClient.todos.get.fetch({ title: "wrong segment" }));
+
+expectError(requestArgumentClient.todos.list.fetch({ id: "todo-1" }));
+
+type CreateTodoInput = ClientRequestInput<
+	typeof requestArgumentApi.todos.create
+>;
+expectType<{ title: string }>(null as unknown as CreateTodoInput);
+
+// should type websocket send and receive message payloads
+const websocketApi = router({
+	todos: {
 		socket: {
 			method: "GET",
 			path: "/todos/socket",
@@ -191,114 +448,15 @@ const api = router({
 	},
 });
 
-const client = initClient(api, {
+const websocketClient = initClient(websocketApi, {
 	origin: "https://example.test",
 });
 
-expectType<Promise<Array<{ id: string; title: string }>>>(
-	client.todos.list.fetch(),
-);
-expectType<Promise<{ total: number }>>(client.todos.stats.fetch());
-expectType<Promise<{ id: string; title: string }>>(
-	client.todos.get.fetch({ id: "todo-1" }),
-);
-expectType<Promise<Array<{ id: string; title: string }>>>(
-	client.todos.search.fetch({
-		includeDone: false,
-		page: 1,
-		search: "milk",
-	}),
-);
-expectType<Promise<Array<{ id: string; title: string }>>>(
-	client.todos.jsonSearch.fetch({
-		query: {
-			page: "1",
-			filters: { tags: ["api"] },
-		},
-	}),
-);
-expectError(client.todos.jsonSearch.fetch({ page: "1" }));
-expectError(client.todos.jsonSearch.fetch());
-expectType<Promise<Array<{ id: string; title: string }>>>(
-	client.todos.optionalJsonSearch.fetch({ query: undefined }),
-);
-expectError(client.todos.optionalJsonSearch.fetch({}));
-expectError(client.todos.optionalJsonSearch.fetch());
-expectType<Promise<{ id: string; title: string }>>(
-	client.todos.create.fetch({ title: "Write type tests" }),
-);
-client.todos.create
-	.fetchResponse({ title: "Write type tests" })
-	.then((response) => {
-		if (response.declared) {
-			expectType<201>(response.status);
-			expectType<{ id: string; title: string }>(response.body);
-			expectType<string>(response.responseHeaders.location);
-			expectType<string | undefined>(response.responseHeaders["x-next-cursor"]);
-			expectType<Headers>(response.headers);
-		}
-	});
-expectType<Promise<{ id: string }>>(
-	client.todos.transform.fetch({ id: "1", title: "Write type tests" }),
-);
-expectError(client.todos.transform.fetch({ id: 1, title: "wrong id input" }));
-expectError(
-	client.todos.transform.fetch({
-		id: "1",
-		title: "Write type tests",
-		slug: "server-output-only",
-	}),
-);
-expectType<Promise<ClientFetchResponse<typeof api.todos.events>>>(
-	client.todos.events.fetchResponse(),
-);
-expectError(client.todos.events.fetch());
-expectType<Promise<Response>>(client.todos.exportCsv.fetch());
-client.todos.exportCsv.fetchResponse().then((response) => {
-	if (response.declared) {
-		expectType<"text/csv">(response.contentType);
-		expectType<Response>(response.body);
-	}
-});
-expectType<Promise<Response>>(client.todos.exportCsvStream.fetch());
-expectType<Promise<Response>>(client.todos.exportImage.fetch());
-client.todos.exportImage.fetchResponse().then((response) => {
-	if (response.declared) {
-		expectType<"image/png" | "image/jpeg">(response.contentType);
-		expectType<Response>(response.body);
-	}
-});
-expectType<Promise<undefined>>(
-	client.todos.uploadImage.fetch({
-		id: "todo-1",
-		body: {
-			contentType: "image/png",
-			payload: new Uint8Array(),
-		},
-	}),
-);
-expectError(
-	client.todos.uploadImage.fetch({
-		id: "todo-1",
-		body: {
-			contentType: "image/webp",
-			payload: new Uint8Array(),
-		},
-	}),
-);
+const socket = websocketClient.todos.socket.openConnection();
 
-// Routes with request input require that flattened input object.
-expectError(client.todos.get.fetch());
-expectError(client.todos.get.fetch({ title: "wrong segment" }));
-// Routes without request input treat the first argument as fetch options.
-expectError(client.todos.list.fetch({ id: "todo-1" }));
-
-type CreateTodoInput = ClientRequestInput<typeof api.todos.create>;
-expectType<{ title: string }>(null as unknown as CreateTodoInput);
-
-const socket = client.todos.socket.openConnection();
 socket.send({ action: "echo", message: { text: "hello" } });
 socket.send({ action: "count", message: { value: "1" } });
+
 expectError(socket.send({ action: "count", message: { value: 1 } }));
 expectError(socket.send({ action: "missing", message: {} }));
 

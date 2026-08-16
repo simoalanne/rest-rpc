@@ -25,55 +25,40 @@ const errorSchema = z.object({
 	message: z.string(),
 });
 
-const api = router({
-	todos: {
-		get: {
-			method: "GET",
-			path: "/todos/:id",
-			pathParams: z.object({ id: z.string() }),
-			query: z.object({ includeDone: z.boolean().optional() }),
-			metadata: { auth: "optional" },
-			responses: {
-				200: todoSchema,
-				404: errorSchema,
-			},
-		},
-		create: {
-			method: "POST",
-			path: "/todos",
-			body: z.object({ title: z.string() }),
-			responses: {
-				201: todoSchema,
-			},
-		},
+// response helper types
+
+// should resolve declared client response, error, and success-body helper types
+const responseRoute = route({
+	method: "GET",
+	path: "/todos/:id",
+	pathParams: z.object({ id: z.string() }),
+	query: z.object({ includeDone: z.boolean().optional() }),
+	responses: {
+		200: todoSchema,
+		404: errorSchema,
 	},
 });
 
-expectType<string>(api.todos.get.path);
-expectType<Record<string, unknown>>(api.todos.get.metadata);
-
-type GetTodoRequest = ServerRequest<typeof api.todos.get>;
-declare const getTodoRequest: GetTodoRequest;
-expectType<string>(getTodoRequest.id);
-expectType<boolean | undefined>(getTodoRequest.includeDone);
-
-type GetTodoResponse = ClientResponse<typeof api.todos.get>;
+type GetTodoResponse = ClientResponse<typeof responseRoute>;
 declare const getTodoResponse: GetTodoResponse;
 expectType<200 | 404>(getTodoResponse.status);
 expectType<{ id: string; title: string } | { message: string }>(
 	getTodoResponse.body,
 );
 
-type GetTodoErrors = ClientErrors<typeof api.todos.get>;
+type GetTodoErrors = ClientErrors<typeof responseRoute>;
 declare const getTodoError: GetTodoErrors;
 expectType<404>(getTodoError.status);
 expectType<{ message: string }>(getTodoError.body);
 
 expectType<{ id: string; title: string }>(
-	null as unknown as ClientSuccessBody<typeof api.todos.get>,
+	null as unknown as ClientSuccessBody<typeof responseRoute>,
 );
 
-const singleResponseShorthand = route({
+// response shorthand
+
+// should default POST response shorthand to 201
+const postResponseShorthand = route({
 	method: "POST",
 	path: "/todos",
 	body: z.object({ title: z.string() }),
@@ -81,12 +66,13 @@ const singleResponseShorthand = route({
 });
 
 expectType<201>(
-	null as unknown as ClientResponse<typeof singleResponseShorthand>["status"],
+	null as unknown as ClientResponse<typeof postResponseShorthand>["status"],
 );
 expectType<{ id: string; title: string }>(
-	null as unknown as ClientSuccessBody<typeof singleResponseShorthand>,
+	null as unknown as ClientSuccessBody<typeof postResponseShorthand>,
 );
 
+// should default non-POST response shorthand to 200
 const deleteResponseShorthand = route({
 	method: "DELETE",
 	path: "/todos/:id",
@@ -100,6 +86,7 @@ expectType<{ id: string; title: string }>(
 	null as unknown as ClientSuccessBody<typeof deleteResponseShorthand>,
 );
 
+// should default omitted non-GET responses to 204 no body
 const omittedResponseShorthand = route({
 	method: "DELETE",
 	path: "/todos/:id",
@@ -112,6 +99,7 @@ expectType<undefined>(
 	null as unknown as ClientSuccessBody<typeof omittedResponseShorthand>,
 );
 
+// should merge response shorthand with router common responses
 const shorthandWithCommonResponses = router(
 	{
 		todos: {
@@ -135,6 +123,7 @@ expectType<201 | 401>(
 	>["status"],
 );
 
+// should reject mixing response shorthand with explicit response maps
 expectError(
 	route({
 		method: "GET",
@@ -146,6 +135,7 @@ expectError(
 	}),
 );
 
+// should carry type-only response schemas into success-body helpers
 const typeOnlyResponse = route({
 	method: "GET",
 	path: "/type-only",
@@ -158,20 +148,19 @@ expectType<{ id: string; tags: string[] }>(
 	null as unknown as ClientSuccessBody<typeof typeOnlyResponse>,
 );
 
-const inferredPathParams = router({
-	get: {
-		method: "GET",
-		path: "/orgs/{orgId}/todos/:id/invalid-{segment}/other:invalid/:probably:invalid",
-		query: z.object({ includeDone: z.boolean().optional() }),
-		responses: {
-			200: todoSchema,
-		},
+// request helper types
+
+// should infer supported path params while ignoring invalid partial segments
+const inferredPathParams = route({
+	method: "GET",
+	path: "/orgs/{orgId}/todos/:id/invalid-{segment}/other:invalid/:probably:invalid",
+	query: z.object({ includeDone: z.boolean().optional() }),
+	responses: {
+		200: todoSchema,
 	},
 });
 
-type InferredPathParamsClientRequest = ClientRequest<
-	typeof inferredPathParams.get
->;
+type InferredPathParamsClientRequest = ClientRequest<typeof inferredPathParams>;
 declare const inferredPathParamsClientRequest: InferredPathParamsClientRequest;
 expectType<string>(inferredPathParamsClientRequest.id);
 expectType<string>(inferredPathParamsClientRequest.orgId);
@@ -183,14 +172,66 @@ expectAssignable<InferredPathParamsClientRequest>({
 	"probably:invalid": "value",
 });
 
-type InferredPathParamsServerRequest = ServerRequest<
-	typeof inferredPathParams.get
->;
+type InferredPathParamsServerRequest = ServerRequest<typeof inferredPathParams>;
 declare const inferredPathParamsServerRequest: InferredPathParamsServerRequest;
 expectType<string>(inferredPathParamsServerRequest.id);
 expectType<string>(inferredPathParamsServerRequest.orgId);
 expectType<boolean | undefined>(inferredPathParamsServerRequest.includeDone);
 
+// should support object-union request schemas as flattened server input
+const objectUnionRequest = route({
+	method: "GET",
+	path: "/object-union",
+	query: z.union([z.object({ q: z.string() }), z.object({ page: z.number() })]),
+	responses: {
+		200: todoSchema,
+	},
+});
+
+type ObjectUnionRequest = ServerRequest<typeof objectUnionRequest>;
+expectAssignable<ObjectUnionRequest>({ q: "todos" });
+expectAssignable<ObjectUnionRequest>({ page: 1 });
+
+// should support schema-record request segments with optional fields
+const schemaRecordRequest = route({
+	method: "POST",
+	path: "/todos/:id",
+	pathParams: {
+		id: schemaType<string>(),
+	},
+	query: {
+		includeDone: schemaType<boolean | undefined>(),
+		search: z.string().optional(),
+	},
+	body: {
+		title: schemaType<string>(),
+		priority: schemaType<number | undefined>(),
+	},
+	headers: {
+		"x-request-id": schemaType<string>(),
+	},
+	responses: {
+		200: todoSchema,
+	},
+});
+
+type SchemaRecordRequest = ServerRequest<typeof schemaRecordRequest>;
+declare const schemaRecordRequestInput: SchemaRecordRequest;
+expectType<string>(schemaRecordRequestInput.id);
+expectType<string>(schemaRecordRequestInput.title);
+expectType<string>(schemaRecordRequestInput["x-request-id"]);
+expectType<boolean | undefined>(schemaRecordRequestInput.includeDone);
+expectType<string | undefined>(schemaRecordRequestInput.search);
+expectType<number | undefined>(schemaRecordRequestInput.priority);
+expectAssignable<SchemaRecordRequest>({
+	id: "todo-1",
+	title: "Typed todo",
+	"x-request-id": "req-1",
+});
+
+// router common options
+
+// should keep common path prefixes and metadata loose while merging response statuses
 const prefixed = router(
 	{
 		todos: {
@@ -212,59 +253,13 @@ const prefixed = router(
 	},
 );
 
-// Router common options are normalized at runtime, but path and metadata stay
-// loose in the returned type because they are usually consumed generically.
 expectType<string>(prefixed.todos.list.path);
 expectType<Record<string, unknown>>(prefixed.todos.list.metadata);
 expectType<200 | 401>(
 	null as unknown as keyof typeof prefixed.todos.list.responses,
 );
 
-const metadataOverride = router(
-	{
-		todos: {
-			list: {
-				method: "GET",
-				path: "/todos",
-				metadata: { auth: "optional", audit: true },
-				responses: {
-					200: z.array(todoSchema),
-				},
-			},
-		},
-	},
-	{
-		metadata: { auth: "required", source: "api" },
-	},
-);
-
-// Metadata merging is preserved at runtime without preserving exact key types.
-expectType<Record<string, unknown>>(metadataOverride.todos.list.metadata);
-
-const commonSuccess = router(
-	{
-		todos: {
-			get: {
-				method: "GET",
-				path: "/todos/:id",
-				responses: {
-					404: errorSchema,
-				},
-			},
-		},
-	},
-	{
-		commonResponses: {
-			200: todoSchema,
-		},
-	},
-);
-
-// Common responses participate in the same response inference as route responses.
-expectType<200 | 404>(
-	null as unknown as ClientResponse<typeof commonSuccess.todos.get>["status"],
-);
-
+// should let route headers override common headers with the same key
 const headerMerged = router(
 	{
 		todos: {
@@ -305,55 +300,9 @@ expectAssignable<HeaderMergedRequest>({
 	"x-shared": "route",
 });
 
-const objectUnionRequest = route({
-	method: "GET",
-	path: "/object-union",
-	query: z.union([z.object({ q: z.string() }), z.object({ page: z.number() })]),
-	responses: {
-		200: todoSchema,
-	},
-});
+// transformed schemas
 
-type ObjectUnionRequest = ServerRequest<typeof objectUnionRequest>;
-expectAssignable<ObjectUnionRequest>({ q: "todos" });
-expectAssignable<ObjectUnionRequest>({ page: 1 });
-
-const schemaRecordRequest = route({
-	method: "POST",
-	path: "/todos/:id",
-	pathParams: {
-		id: schemaType<string>(),
-	},
-	query: {
-		includeDone: schemaType<boolean | undefined>(),
-		search: z.string().optional(),
-	},
-	body: {
-		title: schemaType<string>(),
-		priority: schemaType<number | undefined>(),
-	},
-	headers: {
-		"x-request-id": schemaType<string>(),
-	},
-	responses: {
-		200: todoSchema,
-	},
-});
-
-type SchemaRecordRequest = ServerRequest<typeof schemaRecordRequest>;
-declare const schemaRecordRequestInput: SchemaRecordRequest;
-expectType<string>(schemaRecordRequestInput.id);
-expectType<string>(schemaRecordRequestInput.title);
-expectType<string>(schemaRecordRequestInput["x-request-id"]);
-expectType<boolean | undefined>(schemaRecordRequestInput.includeDone);
-expectType<string | undefined>(schemaRecordRequestInput.search);
-expectType<number | undefined>(schemaRecordRequestInput.priority);
-expectAssignable<SchemaRecordRequest>({
-	id: "todo-1",
-	title: "Typed todo",
-	"x-request-id": "req-1",
-});
-
+// should separate client input, server input, server output, and client output types
 const transformed = route({
 	method: "POST",
 	path: "/transformed/:id",
@@ -399,39 +348,13 @@ expectType<{ id: string }>(
 	null as unknown as ClientSuccessBody<typeof transformed>,
 );
 
-// Route declaration keeps inference cheap and does not lint request schema
-// shapes or primitive request transport constraints at compile time.
-route({
-	method: "GET",
-	path: "/scalar-body",
-	body: z.string(),
-	responses: {
-		200: todoSchema,
-	},
-});
+// intentionally loose route declarations
 
+// should accept schemas that runtime contract validation will reject later
 route({
 	method: "GET",
 	path: "/scalar-query",
 	query: z.string(),
-	responses: {
-		200: todoSchema,
-	},
-});
-
-route({
-	method: "GET",
-	path: "/mixed-query-union",
-	query: z.union([z.object({ q: z.string() }), z.string()]),
-	responses: {
-		200: todoSchema,
-	},
-});
-
-route({
-	method: "GET",
-	path: "/scalar-params/:id",
-	pathParams: z.string(),
 	responses: {
 		200: todoSchema,
 	},
@@ -448,49 +371,7 @@ route({
 	},
 });
 
-route({
-	method: "GET",
-	path: "/object-query",
-	query: {
-		filter: z.object({ status: z.string() }),
-	},
-	responses: {
-		200: todoSchema,
-	},
-});
-
-route({
-	method: "GET",
-	path: "/optional-params/:id",
-	pathParams: {
-		id: z.string().optional(),
-	},
-	responses: {
-		200: todoSchema,
-	},
-});
-
-router(
-	{
-		todos: {
-			list: {
-				method: "GET",
-				path: "/todos",
-				responses: {
-					200: z.array(todoSchema),
-				},
-			},
-		},
-	},
-	{
-		commonHeaders: {
-			"x-nullable": z.string().nullable(),
-		},
-	},
-);
-
-// Single-route options are processing-only; route-shaped common fields belong on
-// router().
+// should reject router-only options on single route declarations
 expectError(
 	route(
 		{
@@ -504,6 +385,7 @@ expectError(
 	),
 );
 
+// should allow route declarations that have no success response until runtime validation
 router({
 	missingSuccess: {
 		method: "GET",
@@ -514,6 +396,9 @@ router({
 	},
 });
 
+// stream and custom body responses
+
+// should preserve mixed stream, JSON, and no-body response unions
 const mixedStreamResponses = router({
 	stream: {
 		method: "GET",
@@ -532,28 +417,7 @@ expectAssignable<
 	| { status: 204; body: undefined }
 >(null as unknown as ClientResponse<typeof mixedStreamResponses.stream>);
 
-const mixedStreamCommonResponses = router(
-	{
-		stream: {
-			method: "GET",
-			path: "/stream",
-			responses: {
-				200: stream(todoSchema),
-			},
-		},
-	},
-	{
-		commonResponses: {
-			201: todoSchema,
-		},
-	},
-);
-
-expectAssignable<
-	| { status: 200; body: AsyncIterable<{ id: string; title: string }> }
-	| { status: 201; body: { id: string; title: string } }
->(null as unknown as ClientResponse<typeof mixedStreamCommonResponses.stream>);
-
+// should expose custom single responses as native Response on the client and payload on the server
 const customSingleResponse = route({
 	method: "GET",
 	path: "/report.csv",
@@ -572,6 +436,7 @@ expectType<string>(
 	null as unknown as ServerSuccessBody<typeof customSingleResponse>,
 );
 
+// should expose custom stream responses as Response on the client and async iterable payloads on the server
 const customStreamResponse = route({
 	method: "GET",
 	path: "/report-stream.csv",

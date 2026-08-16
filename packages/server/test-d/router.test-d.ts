@@ -24,7 +24,10 @@ const todoSchema = z.object({
 	title: z.string(),
 });
 
-const api = defineRouter({
+// route handler request inference
+
+// should expose flattened request fields and adapter context to route handlers
+const createApi = defineRouter({
 	todos: {
 		create: {
 			method: "POST",
@@ -40,80 +43,43 @@ const api = defineRouter({
 				},
 			},
 		},
-		transform: {
-			method: "POST",
-			path: "/todos/:id/transform",
-			pathParams: z.object({ id: z.string() }).transform(({ id }) => ({
-				id: Number(id),
-			})),
-			body: z.object({ title: z.string() }).transform(({ title }) => ({
-				title: title.trim(),
-				slug: title.toLowerCase(),
-			})),
-			responses: {
-				200: z.object({ id: z.number() }).transform(({ id }) => ({
-					id: String(id),
-				})),
-			},
-		},
-		jsonSearch: {
-			method: "GET",
-			path: "/todos/json-search",
-			query: jsonQuery(
-				z.object({
-					page: z.string().transform((value) => Number(value)),
-					filters: z.object({ tags: z.array(z.string()) }),
-				}),
-			),
-			responses: {
-				200: z.array(todoSchema),
-			},
-		},
-		optionalJsonSearch: {
-			method: "GET",
-			path: "/todos/optional-json-search",
-			query: jsonQuery(z.object({ page: z.number() }).optional()),
-			responses: {
-				200: z.array(todoSchema),
-			},
-		},
-		uploadImage: {
-			method: "POST",
-			path: "/todos/:id/image",
-			pathParams: z.object({ id: z.string() }),
-			body: customBody({
-				contentType: ["image/png", "image/jpeg"],
-				schema: z.instanceof(Uint8Array),
-			}),
-			responses: {
-				204: noBody(),
-			},
-		},
 	},
-	reports: {
-		csv: {
-			method: "GET",
-			path: "/reports.csv",
-			responses: {
-				200: customBody({
-					contentType: "text/csv",
-					schema: z.string(),
-				}),
+});
+
+type CreateTodoRequest = InferRouteHandlerRequest<
+	typeof createApi.todos.create,
+	TestRouteHandlerContext
+>;
+declare const createTodoRequest: CreateTodoRequest;
+expectType<string>(createTodoRequest.title);
+expectType<TestRouteHandlerContext>(createTodoRequest.context);
+
+// should infer route handler parameters and declared success response envelopes
+const createImplementation = route(
+	createApi.todos.create,
+	({ title, context }) => {
+		expectType<string>(title);
+		expectType<Record<string, unknown>>(context);
+
+		return {
+			status: 201 as const,
+			body: {
+				id: "todo-1",
+				title,
 			},
-		},
-		csvStream: {
-			method: "GET",
-			path: "/reports-stream.csv",
-			responses: {
-				200: stream(
-					customBody({
-						contentType: "text/csv",
-						schema: z.string(),
-					}),
-				),
+			responseHeaders: {
+				location: "/todos/todo-1",
 			},
-		},
+		};
 	},
+);
+
+expectType<typeof createApi.todos.create>(createImplementation.route);
+
+// websocket handler request inference
+
+// should expose path params, context, and typed outbound messages to websocket handlers
+const socketApi = defineRouter({
 	socket: {
 		room: {
 			method: "GET",
@@ -141,34 +107,8 @@ const api = defineRouter({
 	},
 });
 
-type CreateTodoRequest = InferRouteHandlerRequest<
-	typeof api.todos.create,
-	TestRouteHandlerContext
->;
-declare const createTodoRequest: CreateTodoRequest;
-expectType<string>(createTodoRequest.title);
-expectType<TestRouteHandlerContext>(createTodoRequest.context);
-
-const createImplementation = route(api.todos.create, ({ title, context }) => {
-	expectType<string>(title);
-	expectType<Record<string, unknown>>(context);
-
-	return {
-		status: 201 as const,
-		body: {
-			id: "todo-1",
-			title,
-		},
-		responseHeaders: {
-			location: "/todos/todo-1",
-		},
-	};
-});
-
-expectType<typeof api.todos.create>(createImplementation.route);
-
 type SocketRequest = InferWebSocketRouteHandlerRequest<
-	typeof api.socket.room,
+	typeof socketApi.socket.room,
 	TestRouteHandlerContext
 >;
 declare const socketRequest: SocketRequest;
@@ -179,7 +119,31 @@ socketRequest.context.socket.send({
 	message: { roomId: "room-1" },
 });
 
-route(api.todos.transform, ({ id, title, slug }) => {
+// route handler input and output coverage
+
+// should use server-side transformed schema output as handler input
+const transformedApi = defineRouter({
+	todos: {
+		transform: {
+			method: "POST",
+			path: "/todos/:id/transform",
+			pathParams: z.object({ id: z.string() }).transform(({ id }) => ({
+				id: Number(id),
+			})),
+			body: z.object({ title: z.string() }).transform(({ title }) => ({
+				title: title.trim(),
+				slug: title.toLowerCase(),
+			})),
+			responses: {
+				200: z.object({ id: z.number() }).transform(({ id }) => ({
+					id: String(id),
+				})),
+			},
+		},
+	},
+});
+
+route(transformedApi.todos.transform, ({ id, title, slug }) => {
 	expectType<number>(id);
 	expectType<string>(title);
 	expectType<string>(slug);
@@ -192,7 +156,25 @@ route(api.todos.transform, ({ id, title, slug }) => {
 	};
 });
 
-route(api.todos.uploadImage, ({ id, body }) => {
+// should expose selected custom body content type and payload to handlers
+const customRequestApi = defineRouter({
+	todos: {
+		uploadImage: {
+			method: "POST",
+			path: "/todos/:id/image",
+			pathParams: z.object({ id: z.string() }),
+			body: customBody({
+				contentType: ["image/png", "image/jpeg"],
+				schema: z.instanceof(Uint8Array),
+			}),
+			responses: {
+				204: noBody(),
+			},
+		},
+	},
+});
+
+route(customRequestApi.todos.uploadImage, ({ id, body }) => {
 	expectType<string>(id);
 	expectType<"image/png" | "image/jpeg">(body.contentType);
 	expectType<Uint8Array<ArrayBuffer>>(body.payload);
@@ -200,7 +182,8 @@ route(api.todos.uploadImage, ({ id, body }) => {
 	return undefined;
 });
 
-route(api.socket.room, ({ roomId, context }) => {
+// should type websocket send and receive messages by discriminator
+route(socketApi.socket.room, ({ roomId, context }) => {
 	expectType<string>(roomId);
 
 	context.socket.send({ type: "ready", message: { roomId } });
@@ -218,14 +201,42 @@ route(api.socket.room, ({ roomId, context }) => {
 	});
 });
 
-route(api.todos.jsonSearch, ({ query }) => {
+// should expose JSON query schemas as a single typed query field
+const jsonQueryApi = defineRouter({
+	todos: {
+		jsonSearch: {
+			method: "GET",
+			path: "/todos/json-search",
+			query: jsonQuery(
+				z.object({
+					page: z.string().transform((value) => Number(value)),
+					filters: z.object({ tags: z.array(z.string()) }),
+				}),
+			),
+			responses: {
+				200: z.array(todoSchema),
+			},
+		},
+		optionalJsonSearch: {
+			method: "GET",
+			path: "/todos/optional-json-search",
+			query: jsonQuery(z.object({ page: z.number() }).optional()),
+			responses: {
+				200: z.array(todoSchema),
+			},
+		},
+	},
+});
+
+route(jsonQueryApi.todos.jsonSearch, ({ query }) => {
 	expectType<number>(query.page);
 	expectType<string[]>(query.filters.tags);
 
 	return [];
 });
 
-route(api.todos.optionalJsonSearch, ({ query }) => {
+// should preserve optional JSON query input as undefined when omitted
+route(jsonQueryApi.todos.optionalJsonSearch, ({ query }) => {
 	expectType<{ page: number } | undefined>(query);
 	if (query) {
 		expectType<number>(query.page);
@@ -234,8 +245,9 @@ route(api.todos.optionalJsonSearch, ({ query }) => {
 	return [];
 });
 
+// should reject handlers that return the client-side transformed response output shape
 expectError(
-	route(api.todos.transform, () => ({
+	route(transformedApi.todos.transform, () => ({
 		status: 200 as const,
 		body: {
 			id: "client-output-shape",
@@ -243,7 +255,35 @@ expectError(
 	})),
 );
 
-route(api.reports.csv, () => ({
+// should accept native server payloads for custom responses
+const customResponseApi = defineRouter({
+	reports: {
+		csv: {
+			method: "GET",
+			path: "/reports.csv",
+			responses: {
+				200: customBody({
+					contentType: "text/csv",
+					schema: z.string(),
+				}),
+			},
+		},
+		csvStream: {
+			method: "GET",
+			path: "/reports-stream.csv",
+			responses: {
+				200: stream(
+					customBody({
+						contentType: "text/csv",
+						schema: z.string(),
+					}),
+				),
+			},
+		},
+	},
+});
+
+route(customResponseApi.reports.csv, () => ({
 	status: 200 as const,
 	body: "id,title\n1,First\n",
 }));
@@ -253,19 +293,40 @@ async function* csvRows() {
 	yield "1,First\n";
 }
 
-route(api.reports.csvStream, () => ({
+route(customResponseApi.reports.csvStream, () => ({
 	status: 200 as const,
 	body: csvRows(),
 }));
 
+// should reject non-iterable payloads for custom stream responses
 expectError(
-	route(api.reports.csvStream, () => ({
+	route(customResponseApi.reports.csvStream, () => ({
 		status: 200 as const,
 		body: "id,title\n1,First\n",
 	})),
 );
 
-const implementations = router(api, {
+// router implementation inference
+
+// should infer the complete nested implementation map from the contract
+const implementationApi = defineRouter({
+	todos: {
+		create: createApi.todos.create,
+		transform: transformedApi.todos.transform,
+		jsonSearch: jsonQueryApi.todos.jsonSearch,
+		optionalJsonSearch: jsonQueryApi.todos.optionalJsonSearch,
+		uploadImage: customRequestApi.todos.uploadImage,
+	},
+	reports: {
+		csv: customResponseApi.reports.csv,
+		csvStream: customResponseApi.reports.csvStream,
+	},
+	socket: {
+		room: socketApi.socket.room,
+	},
+});
+
+const implementations = router(implementationApi, {
 	todos: {
 		create: ({ title }) => ({
 			status: 201 as const,
@@ -317,17 +378,21 @@ const implementations = router(api, {
 	},
 });
 
-expectType<typeof api.todos.create>(implementations.todos.create.route);
+expectType<typeof implementationApi.todos.create>(
+	implementations.todos.create.route,
+);
 
+// should reject route handlers that omit the declared response envelope
 expectError(
-	route(api.todos.create, ({ title }) => ({
+	route(createApi.todos.create, ({ title }) => ({
 		id: "todo-1",
 		title,
 	})),
 );
 
+// should reject route handlers that omit required declared response headers
 expectError(
-	route(api.todos.create, ({ title }) => ({
+	route(createApi.todos.create, ({ title }) => ({
 		status: 201 as const,
 		body: {
 			id: "todo-1",
@@ -337,9 +402,9 @@ expectError(
 	})),
 );
 
-// Handler request input is derived from flattened route request segments.
+// should reject router implementations that read fields outside flattened request input
 expectError(
-	router(api, {
+	router(implementationApi, {
 		todos: {
 			create: ({ id }) => ({
 				id,

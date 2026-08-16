@@ -1,5 +1,4 @@
-import type { StandardSchemaV1 } from "@rest-rpc/core";
-import { router } from "@rest-rpc/core/contract";
+import { router, type as schemaType } from "@rest-rpc/core/contract";
 import {
 	initTanstackQuery,
 	type RouteMutationVariables,
@@ -17,91 +16,36 @@ import {
 	expectType,
 } from "tsd";
 
-declare const todoSchema: StandardSchemaV1<
-	{ id: string; title: string },
-	{ id: string; title: string }
->;
-declare const todoListSchema: StandardSchemaV1<
-	Array<{ id: string; title: string }>,
-	Array<{ id: string; title: string }>
->;
-declare const todoPageSchema: StandardSchemaV1<
-	{ items: Array<{ id: string; title: string }>; nextCursor?: string },
-	{ items: Array<{ id: string; title: string }>; nextCursor?: string }
->;
-declare const todoParamsSchema: StandardSchemaV1<
-	{ id: string },
-	{ id: string }
->;
-declare const todoPageParamsSchema: StandardSchemaV1<
-	{ cursor?: string; status: "open" | "done"; limit: number },
-	{ cursor?: string; status: "open" | "done"; limit: number }
->;
-declare const createTodoSchema: StandardSchemaV1<
-	{ title: string },
-	{ title: string }
->;
-declare const clientMessageSchema: StandardSchemaV1<
-	{ subscribe: boolean },
-	{ subscribe: boolean }
->;
-declare const serverMessageSchema: StandardSchemaV1<
-	{ id: string },
-	{ id: string }
->;
+declare const queryClient: QueryClient;
 
-const api = router({
+// query options
+
+// should create request-aware query options that carry typed data through QueryClient
+const queryApi = router({
 	todos: {
 		list: {
 			method: "GET",
 			path: "/todos",
 			responses: {
-				200: todoListSchema,
+				200: schemaType<Array<{ id: string; title: string }>>(),
 			},
 		},
 		get: {
 			method: "GET",
 			path: "/todos/:id",
-			pathParams: todoParamsSchema,
+			pathParams: schemaType<{ id: string }>(),
 			responses: {
-				200: todoSchema,
+				200: schemaType<{ id: string; title: string }>(),
 			},
-		},
-		create: {
-			method: "POST",
-			path: "/todos",
-			body: createTodoSchema,
-			responses: {
-				201: todoSchema,
-			},
-		},
-		page: {
-			method: "GET",
-			path: "/todos/page",
-			query: todoPageParamsSchema,
-			responses: {
-				200: todoPageSchema,
-			},
-		},
-	},
-	events: {
-		method: "GET",
-		path: "/events",
-		mode: "webSocket",
-		messages: {
-			client: clientMessageSchema,
-			server: serverMessageSchema,
 		},
 	},
 });
 
-declare const queryClient: QueryClient;
-
-const tq = initTanstackQuery(api, {
+const queryTq = initTanstackQuery(queryApi, {
 	origin: "https://example.test",
 });
 
-const getOptions = tq.todos.get.queryOptions({ id: "todo-1" });
+const getOptions = queryTq.todos.get.queryOptions({ id: "todo-1" });
 expectAssignable<readonly unknown[]>(getOptions.queryKey);
 expectAssignable<
 	Promise<{
@@ -130,7 +74,11 @@ queryClient.setQueryData(getOptions.queryKey, (current) => {
 	return current;
 });
 
-const selectedGetOptions = tq.todos.get.queryOptions(
+// select options
+
+// should preserve selected data callbacks while fetchQuery still resolves route data
+type GetTodoData = RouteQueryData<typeof queryApi.todos.get>;
+const selectedGetOptions = queryTq.todos.get.queryOptions(
 	{
 		id: "todo-1",
 	},
@@ -152,7 +100,8 @@ expectAssignable<Promise<GetTodoData>>(
 	queryClient.fetchQuery(selectedGetOptions),
 );
 
-const selectedListOptions = tq.todos.list.queryOptions({
+// should treat routes without request input as options-only query routes
+const selectedListOptions = queryTq.todos.list.queryOptions({
 	queryKey: ["todos", "custom"],
 	staleTime: 100,
 	fetchOptions: {
@@ -168,18 +117,20 @@ const selectedListOptions = tq.todos.list.queryOptions({
 		return data.body.map((todo) => todo.title);
 	},
 });
-expectAssignable<(data: RouteQueryData<typeof api.todos.list>) => string[]>(
-	selectedListOptions.select as NonNullable<typeof selectedListOptions.select>,
-);
-expectAssignable<Promise<RouteQueryData<typeof api.todos.list>>>(
+expectAssignable<
+	(data: RouteQueryData<typeof queryApi.todos.list>) => string[]
+>(selectedListOptions.select as NonNullable<typeof selectedListOptions.select>);
+expectAssignable<Promise<RouteQueryData<typeof queryApi.todos.list>>>(
 	queryClient.fetchQuery(selectedListOptions),
 );
 
+// conditional query input
+
+// should accept skipToken or falsy request values for conditional request input
 const optionalId: string | undefined = "todo-1";
 
-// queryOptions accepts skipToken or falsy request values for conditional request input.
 const maybeRequest = optionalId && { id: optionalId };
-const conditionalOptions = tq.todos.get.queryOptions(maybeRequest, {
+const conditionalOptions = queryTq.todos.get.queryOptions(maybeRequest, {
 	queryKey: ["todos", "conditional"],
 	staleTime: 100,
 });
@@ -187,7 +138,7 @@ expectAssignable<
 	typeof skipToken | NonNullable<typeof getOptions.queryFn> | undefined
 >(conditionalOptions.queryFn);
 
-const skippedOptions = tq.todos.get.queryOptions(
+const skippedOptions = queryTq.todos.get.queryOptions(
 	optionalId ? { id: optionalId } : skipToken,
 	{
 		queryKey: ["todos", "disabled"],
@@ -198,9 +149,11 @@ expectAssignable<
 	typeof skipToken | NonNullable<typeof getOptions.queryFn> | undefined
 >(skippedOptions.queryFn);
 
-// Request-based routes keep request input and options as separate arguments.
-tq.todos.get.queryOptions({ id: "todo-1" }, { retry: false });
-tq.todos.get.queryOptions(
+// request and fetch options
+
+// should keep request input and options as separate arguments for request-based routes
+queryTq.todos.get.queryOptions({ id: "todo-1" }, { retry: false });
+queryTq.todos.get.queryOptions(
 	{ id: "todo-1" },
 	{
 		fetchOptions: { cache: "reload", credentials: "same-origin" },
@@ -208,7 +161,27 @@ tq.todos.get.queryOptions(
 	},
 );
 
-tq.todos.create.mutationOptions({
+// mutation options
+
+// should create mutation options with typed data and variables callbacks
+const mutationApi = router({
+	todos: {
+		create: {
+			method: "POST",
+			path: "/todos",
+			body: schemaType<{ title: string }>(),
+			responses: {
+				201: schemaType<{ id: string; title: string }>(),
+			},
+		},
+	},
+});
+
+const mutationTq = initTanstackQuery(mutationApi, {
+	origin: "https://example.test",
+});
+
+mutationTq.todos.create.mutationOptions({
 	fetchOptions: {
 		cache: "no-store",
 	},
@@ -221,7 +194,35 @@ tq.todos.create.mutationOptions({
 		expectType<{ title: string }>(variables);
 	},
 });
-const infiniteOptions = tq.todos.page.infiniteQueryOptions({
+
+// infinite query options
+
+// should carry page response data and request page params through infinite queries
+const pageApi = router({
+	todos: {
+		page: {
+			method: "GET",
+			path: "/todos/page",
+			query: schemaType<{
+				cursor?: string;
+				status: "open" | "done";
+				limit: number;
+			}>(),
+			responses: {
+				200: schemaType<{
+					items: Array<{ id: string; title: string }>;
+					nextCursor?: string;
+				}>(),
+			},
+		},
+	},
+});
+
+const pageTq = initTanstackQuery(pageApi, {
+	origin: "https://example.test",
+});
+
+const infiniteOptions = pageTq.todos.page.infiniteQueryOptions({
 	queryKey: ["todos", { status: "open" }],
 	initialPageParam: { status: "open", limit: 50 },
 	fetchOptions: { cache: "no-store" },
@@ -273,7 +274,11 @@ expectAssignable<
 	  >
 	| undefined
 >(queryClient.getQueryData(infiniteOptions.queryKey));
-const getKey = tq.todos.get.getKey({ id: "todo-1" });
+
+// query keys
+
+// should generate reusable typed keys for QueryClient cache operations
+const getKey = queryTq.todos.get.getKey({ id: "todo-1" });
 expectAssignable<readonly unknown[]>(getKey);
 queryClient.invalidateQueries({ queryKey: getKey });
 queryClient.removeQueries({ queryKey: getKey });
@@ -288,52 +293,81 @@ queryClient.setQueryData(getKey, (current) => {
 	>(current);
 	return current;
 });
-const listKey = tq.todos.list.getKey();
+const listKey = queryTq.todos.list.getKey();
 queryClient.invalidateQueries({ queryKey: listKey });
 queryClient.setQueryData(listKey, (current) => current);
 
-expectError(tq.todos.get.queryOptions());
-expectError(tq.todos.get.queryOptions({ id: "todo-1", extra: true }));
+// invalid calls
+
+// should reject malformed request input, options placement, infinite options, and websocket routes
+const invalidApi = router({
+	todos: {
+		list: queryApi.todos.list,
+		get: queryApi.todos.get,
+		page: pageApi.todos.page,
+	},
+	events: {
+		method: "GET",
+		path: "/events",
+		mode: "webSocket",
+		messages: {
+			client: schemaType<{ subscribe: boolean }>(),
+			server: schemaType<{ id: string }>(),
+		},
+	},
+});
+
+const invalidTq = initTanstackQuery(invalidApi, {
+	origin: "https://example.test",
+});
+
+expectError(invalidTq.todos.get.queryOptions());
+expectError(invalidTq.todos.get.queryOptions({ id: "todo-1", extra: true }));
 expectError(
-	tq.todos.get.queryOptions({ id: "todo-1" }, { fetchOptions: { nope: true } }),
+	invalidTq.todos.get.queryOptions(
+		{ id: "todo-1" },
+		{ fetchOptions: { nope: true } },
+	),
 );
-expectError(tq.todos.get.queryOptions({ retry: false }));
-// Routes without request input treat the first argument as query options.
-expectError(tq.todos.list.queryOptions({ id: "todo-1" }));
-expectError(tq.todos.list.queryOptions(undefined, { retry: false }));
-expectError(tq.todos.list.queryOptions(skipToken));
-expectError(tq.todos.get.getKey());
-expectError(tq.todos.get.getKey({ id: "todo-1", extra: true }));
-expectError(tq.todos.list.getKey({ queryKey: ["todos", "list"] }));
+expectError(invalidTq.todos.get.queryOptions({ retry: false }));
+expectError(invalidTq.todos.list.queryOptions({ id: "todo-1" }));
+expectError(invalidTq.todos.list.queryOptions(undefined, { retry: false }));
+expectError(invalidTq.todos.list.queryOptions(skipToken));
+expectError(invalidTq.todos.get.getKey());
+expectError(invalidTq.todos.get.getKey({ id: "todo-1", extra: true }));
+expectError(invalidTq.todos.list.getKey({ queryKey: ["todos", "list"] }));
 expectError(
-	tq.todos.page.infiniteQueryOptions({
+	invalidTq.todos.page.infiniteQueryOptions({
 		initialPageParam: { status: "open", limit: 50 },
 		getNextPageParam: () => undefined,
 	}),
 );
 expectError(
-	tq.todos.page.infiniteQueryOptions({
+	invalidTq.todos.page.infiniteQueryOptions({
 		queryKey: ["todos"],
 		initialPageParam: { status: "open", limit: 50, extra: true },
 		getNextPageParam: () => undefined,
 	}),
 );
 expectError(
-	tq.todos.list.infiniteQueryOptions({
+	invalidTq.todos.list.infiniteQueryOptions({
 		queryKey: ["todos"],
 		getNextPageParam: () => undefined,
 	}),
 );
-// WebSocket routes are intentionally omitted from the TanStack Query client.
-expectError(tq.events);
+expectError(invalidTq.events);
 
-type GetTodoData = RouteQueryData<typeof api.todos.get>;
+// exported helper types
+
+// should resolve route query data and mutation variables for external consumers
 expectAssignable<{
 	status: 200;
 	body: { id: string; title: string };
 	headers: Headers;
 }>(null as unknown as GetTodoData);
 
-type CreateTodoVariables = RouteMutationVariables<typeof api.todos.create>;
+type CreateTodoVariables = RouteMutationVariables<
+	typeof mutationApi.todos.create
+>;
 expectType<{ title: string }>(null as unknown as CreateTodoVariables);
 expectNotAssignable<{ id: string }>(null as unknown as CreateTodoVariables);
