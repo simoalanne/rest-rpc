@@ -9,6 +9,8 @@ export type {
 	Contract,
 	HttpMethod,
 	HttpRouteDeclaration,
+	OpenApiResponseHeader,
+	OpenApiResponseOptions,
 	OpenApiRouteOptions,
 	RouteContractOptions,
 	RouteDeclaration,
@@ -59,6 +61,8 @@ export type {
 	CustomBody,
 	NoBody,
 	ResponseBodySchema,
+	ResponseDeclaration,
+	ResponseHeaders,
 	RouteResponses,
 	ServerErrors,
 	ServerResponse,
@@ -69,7 +73,10 @@ export type {
 } from "./response.ts";
 export {
 	customBody,
+	getResponseBody,
+	getResponseHeaders,
 	getRouteResponses,
+	hasResponseParts,
 	isCustomBody,
 	isNoBody,
 	isStream,

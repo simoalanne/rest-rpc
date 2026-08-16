@@ -29,8 +29,15 @@ export type Stream<
 };
 
 export type ResponseBodySchema = ResponseSchema | NoBody | CustomBody | Stream;
+export type ResponseHeaders = Record<string, StandardSchemaV1>;
+export type ResponseDeclaration =
+	| ResponseBodySchema
+	| {
+			body: ResponseBodySchema;
+			headers: ResponseHeaders;
+	  };
 
-export type RouteResponses = Record<number, ResponseBodySchema>;
+export type RouteResponses = Record<number, ResponseDeclaration>;
 
 export type DefaultBodyResponseStatusForMethod<TMethod extends HttpMethod> =
 	TMethod extends "POST" ? 201 : 200;
@@ -40,7 +47,7 @@ export type DefaultNoBodyResponseStatusForMethod<TMethod extends HttpMethod> =
 
 export type RouteResponseInput =
 	| { responses: RouteResponses; response?: never }
-	| { response: ResponseBodySchema; responses?: never }
+	| { response: ResponseDeclaration; responses?: never }
 	| { response?: never; responses?: never };
 
 export const stream = <const TBody extends ResponseSchema | CustomBody>(
@@ -79,6 +86,21 @@ export const isCustomBody = (schema: unknown): schema is CustomBody =>
 	schema !== null &&
 	"kind" in schema &&
 	schema.kind === "customBody";
+
+export const hasResponseParts = (
+	response: ResponseDeclaration,
+): response is Extract<ResponseDeclaration, { body: ResponseBodySchema }> =>
+	typeof response === "object" && response !== null && "headers" in response;
+
+export const getResponseBody = (
+	response: ResponseDeclaration,
+): ResponseBodySchema =>
+	hasResponseParts(response) ? response.body : response;
+
+export const getResponseHeaders = (
+	response: ResponseDeclaration,
+): ResponseHeaders | undefined =>
+	hasResponseParts(response) ? response.headers : undefined;
 
 export const defaultBodyResponseStatusForMethod = (
 	method: HttpMethod,
@@ -126,7 +148,7 @@ export const getRouteResponses = (route: {
 export const resolveRouteResponses = (route: {
 	method: HttpMethod;
 	path: string;
-	response?: ResponseBodySchema;
+	response?: ResponseDeclaration;
 	responses?: RouteResponses;
 }): RouteResponses => {
 	if (route.responses !== undefined) {
@@ -213,6 +235,65 @@ type ClientResponseMetadata<TResponse> =
 		? CustomBodyClientResponseMetadata<TBody>
 		: CustomBodyClientResponseMetadata<TResponse>;
 
+type ResponseBody<TResponse> = TResponse extends { headers: ResponseHeaders }
+	? TResponse extends { body: infer TBody }
+		? TBody
+		: TResponse
+	: TResponse;
+
+type ResponseHeadersFor<TResponse> = TResponse extends {
+	headers: infer THeaders extends ResponseHeaders;
+}
+	? THeaders
+	: never;
+
+type InferHeaderSchema<
+	TSchema,
+	TIO extends "input" | "output",
+> = TSchema extends StandardSchemaV1
+	? TIO extends "input"
+		? StandardSchemaV1.InferInput<TSchema>
+		: StandardSchemaV1.InferOutput<TSchema>
+	: never;
+
+type ResponseHeaderRequiredKeys<THeaders, TIO extends "input" | "output"> = {
+	[TKey in keyof THeaders]: undefined extends InferHeaderSchema<
+		THeaders[TKey],
+		TIO
+	>
+		? never
+		: TKey;
+}[keyof THeaders];
+
+type ResponseHeaderOptionalKeys<THeaders, TIO extends "input" | "output"> = {
+	[TKey in keyof THeaders]: undefined extends InferHeaderSchema<
+		THeaders[TKey],
+		TIO
+	>
+		? TKey
+		: never;
+}[keyof THeaders];
+
+type ResponseHeaderValues<THeaders, TIO extends "input" | "output"> = {
+	[TKey in ResponseHeaderRequiredKeys<THeaders, TIO>]: InferHeaderSchema<
+		THeaders[TKey],
+		TIO
+	>;
+} & {
+	[TKey in ResponseHeaderOptionalKeys<THeaders, TIO>]?: InferHeaderSchema<
+		THeaders[TKey],
+		TIO
+	>;
+};
+
+type ResponseHeadersMetadata<TResponse, TIO extends "input" | "output"> = [
+	ResponseHeadersFor<TResponse>,
+] extends [never]
+	? Record<never, never>
+	: {
+			responseHeaders: ResponseHeaderValues<ResponseHeadersFor<TResponse>, TIO>;
+		};
+
 type ResponseEntry<TStatus extends number, TBody> = {
 	status: TStatus;
 	body: TBody;
@@ -220,9 +301,10 @@ type ResponseEntry<TStatus extends number, TBody> = {
 
 type ClientResponseEntry<TStatus extends number, TResponse> = ResponseEntry<
 	TStatus,
-	ClientResponseBody<TResponse>
+	ClientResponseBody<ResponseBody<TResponse>>
 > &
-	ClientResponseMetadata<TResponse>;
+	ClientResponseMetadata<ResponseBody<TResponse>> &
+	ResponseHeadersMetadata<TResponse, "output">;
 
 type ResponseKey = number | `${number}`;
 
@@ -275,8 +357,9 @@ export type ServerResponse<E extends RouteDeclaration> = E extends {
 			[TKeys in keyof TResponses]: TKeys extends ResponseKey
 				? ResponseEntry<
 						ResponseStatus<TKeys>,
-						ServerResponseBody<TResponses[TKeys]>
-					>
+						ServerResponseBody<ResponseBody<TResponses[TKeys]>>
+					> &
+						ResponseHeadersMetadata<TResponses[TKeys], "input">
 				: never;
 		}[keyof TResponses]
 	: never;
@@ -301,8 +384,9 @@ export type ServerSuccessResponse<E extends RouteDeclaration> = E extends {
 				? TKeys extends SuccessfulResponseKeys<TResponses>
 					? ResponseEntry<
 							ResponseStatus<TKeys>,
-							ServerResponseBody<TResponses[TKeys]>
-						>
+							ServerResponseBody<ResponseBody<TResponses[TKeys]>>
+						> &
+							ResponseHeadersMetadata<TResponses[TKeys], "input">
 					: never
 				: never;
 		}[keyof TResponses]
@@ -316,11 +400,21 @@ type InferSingleResponseBody<TResponse> = [TResponse] extends [never]
 			? TBody
 			: never;
 
+type InferSingleServerResponseBody<TResponse> = [TResponse] extends [never]
+	? never
+	: IsUnion<TResponse> extends true
+		? never
+		: TResponse extends { responseHeaders: unknown }
+			? never
+			: TResponse extends { body: infer TBody }
+				? TBody
+				: never;
+
 export type ClientSuccessBody<E extends RouteDeclaration> =
 	InferSingleResponseBody<ClientSuccessResponse<E>>;
 
 export type ServerSuccessBody<E extends RouteDeclaration> =
-	InferSingleResponseBody<ServerSuccessResponse<E>>;
+	InferSingleServerResponseBody<ServerSuccessResponse<E>>;
 
 export type ClientErrors<E extends RouteDeclaration> = Exclude<
 	ClientResponse<E>,

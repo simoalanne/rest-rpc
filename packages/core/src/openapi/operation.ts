@@ -1,3 +1,4 @@
+import type { OpenApiResponseOptions } from "../contract/contract.ts";
 import type {
 	JsonQuery,
 	RequestBodySchema,
@@ -8,8 +9,13 @@ import {
 	isRequestSchemaRecord,
 	isStandardSchema,
 } from "../contract/request.ts";
-import type { ResponseBodySchema } from "../contract/response.ts";
+import type {
+	ResponseDeclaration,
+	ResponseHeaders,
+} from "../contract/response.ts";
 import {
+	getResponseBody,
+	getResponseHeaders,
 	getRouteResponses,
 	isCustomBody,
 	isNoBody,
@@ -176,10 +182,22 @@ export const createRequestBody = (
 
 export const createResponse = (
 	description: string,
-	schema: ResponseBodySchema,
+	responseDeclaration: ResponseDeclaration,
 	converter: SchemaConverter,
+	openApiResponse?: OpenApiResponseOptions,
 ): OpenApiResponse => {
-	if (isNoBody(schema)) return { description };
+	const schema = getResponseBody(responseDeclaration);
+	const headers = mergeResponseHeaders(
+		createOpenApiResponseHeaders(openApiResponse?.headers, converter),
+		createResponseHeaders(getResponseHeaders(responseDeclaration), converter),
+	);
+
+	if (isNoBody(schema)) {
+		return {
+			description: openApiResponse?.description ?? description,
+			...(headers ? { headers } : {}),
+		};
+	}
 
 	if (isStream(schema)) {
 		const contentTypes = isCustomBody(schema.schema)
@@ -187,11 +205,14 @@ export const createResponse = (
 			: [NDJSON_CONTENT_TYPE];
 
 		return {
-			description,
+			description: openApiResponse?.description ?? description,
+			...(headers ? { headers } : {}),
 			content: Object.fromEntries(
 				contentTypes.map((contentType) => [
 					contentType,
-					{ schema: createStreamWireSchema(contentType) },
+					{
+						schema: createStreamWireSchema(contentType),
+					},
 				]),
 			),
 		};
@@ -201,15 +222,65 @@ export const createResponse = (
 		? contentTypesForCustomBody(schema)
 		: [JSON_CONTENT_TYPE];
 	const bodySchema = isCustomBody(schema) ? schema.schema : schema;
-	const openApiSchema = isStandardSchema(bodySchema)
-		? convertSchema(bodySchema, "output", converter)
-		: undefined;
+	const openApiSchema = convertSchema(bodySchema, "output", converter);
 
 	return {
-		description,
+		description: openApiResponse?.description ?? description,
+		...(headers ? { headers } : {}),
 		content: createContent(contentTypes, {
 			...(openApiSchema ? { schema: openApiSchema } : {}),
 		}),
+	};
+};
+
+export const createResponseHeaders = (
+	headers: ResponseHeaders | undefined,
+	converter: SchemaConverter,
+): OpenApiResponse["headers"] | undefined => {
+	if (!headers) return undefined;
+
+	return Object.fromEntries(
+		Object.entries(headers).map(([name, schema]) => [
+			name,
+			{
+				schema: convertSchema(schema, "output", converter),
+			},
+		]),
+	);
+};
+
+export const createOpenApiResponseHeaders = (
+	headers: OpenApiResponseOptions["headers"] | undefined,
+	converter: SchemaConverter,
+): OpenApiResponse["headers"] | undefined => {
+	if (!headers) return undefined;
+
+	return Object.fromEntries(
+		Object.entries(headers).map(([name, header]) => {
+			const schema = isStandardSchema(header) ? header : header.schema;
+			const description = isStandardSchema(header)
+				? undefined
+				: header.description;
+
+			return [
+				name,
+				{
+					...(description ? { description } : {}),
+					schema: convertSchema(schema, "output", converter),
+				},
+			];
+		}),
+	);
+};
+
+const mergeResponseHeaders = (
+	openApiHeaders: OpenApiResponse["headers"] | undefined,
+	declaredHeaders: OpenApiResponse["headers"] | undefined,
+): OpenApiResponse["headers"] | undefined => {
+	if (!openApiHeaders && !declaredHeaders) return undefined;
+	return {
+		...openApiHeaders,
+		...declaredHeaders,
 	};
 };
 
@@ -225,10 +296,12 @@ export const createResponses = (
 	const responses: Record<string, OpenApiResponse> = {};
 
 	for (const [status, schema] of Object.entries(getRouteResponses(route))) {
+		const openApiResponse = route.openApi?.responses?.[Number(status)];
 		responses[status] = createResponse(
-			route.openApi?.responseDescriptions?.[Number(status)] ?? "",
+			openApiResponse?.description ?? "",
 			schema,
 			converter,
+			openApiResponse,
 		);
 	}
 

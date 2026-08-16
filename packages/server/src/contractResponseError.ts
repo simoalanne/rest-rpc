@@ -6,6 +6,7 @@ export class ContractResponseError<
 	readonly response: ServerErrors<E>;
 	readonly status: number;
 	readonly body: unknown;
+	readonly responseHeaders: Record<string, unknown> | undefined;
 	readonly route: E;
 
 	constructor(route: E, response: ServerErrors<E>) {
@@ -14,6 +15,9 @@ export class ContractResponseError<
 		this.response = response;
 		this.status = responseFields.status;
 		this.body = responseFields.body;
+		this.responseHeaders = (
+			response as { responseHeaders?: Record<string, unknown> }
+		).responseHeaders;
 		this.route = route;
 	}
 }

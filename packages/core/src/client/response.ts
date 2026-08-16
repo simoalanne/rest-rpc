@@ -4,8 +4,11 @@ import type {
 	ClientSuccessBody,
 	CustomBody,
 	ResponseBodySchema,
+	ResponseDeclaration,
 } from "../contract/response.ts";
 import {
+	getResponseBody,
+	getResponseHeaders,
 	getRouteResponses,
 	isCustomBody,
 	isNoBody,
@@ -19,7 +22,7 @@ import type { ClientFetchResponse, FetchArgs } from "./types.ts";
 export const getResponseSchema = (
 	route: RouteDeclaration,
 	status: number,
-): ResponseBodySchema | undefined => {
+): ResponseDeclaration | undefined => {
 	if (!isHttpRouteNode(route)) return undefined;
 	const entry = Object.entries(getRouteResponses(route)).find(
 		([declaredStatus]) => Number(declaredStatus) === status,
@@ -103,14 +106,42 @@ const customResponseMetadata = (schema: CustomBody, rawResponse: Response) => ({
 });
 
 const declaredResponseMetadata = (
-	schema: ResponseBodySchema,
+	schema: ResponseDeclaration,
 	rawResponse: Response,
 ) => {
-	if (isCustomBody(schema)) return customResponseMetadata(schema, rawResponse);
-	if (isStream(schema) && isCustomBody(schema.schema)) {
-		return customResponseMetadata(schema.schema, rawResponse);
+	const body = getResponseBody(schema);
+	if (isCustomBody(body)) return customResponseMetadata(body, rawResponse);
+	if (isStream(body) && isCustomBody(body.schema)) {
+		return customResponseMetadata(body.schema, rawResponse);
 	}
 	return {};
+};
+
+const readHeaderValue = (headers: Headers, name: string) =>
+	headers.get(name) ?? undefined;
+
+const readDeclaredHeaders = async (
+	schema: ResponseDeclaration,
+	rawResponse: Response,
+	validate: boolean,
+) => {
+	const headers = getResponseHeaders(schema);
+	if (!headers) return {};
+
+	const responseHeaders: Record<string, unknown> = {};
+	for (const [name, headerSchema] of Object.entries(headers)) {
+		const value = readHeaderValue(rawResponse.headers, name);
+		if (!validate) {
+			if (value !== undefined) responseHeaders[name] = value;
+			continue;
+		}
+
+		const result = await validateStandardSchema(headerSchema, value);
+		if (result.issues) throw result.issues;
+		if (result.value !== undefined) responseHeaders[name] = result.value;
+	}
+
+	return { responseHeaders };
 };
 
 export type RouteRequestFn = <E extends RouteDeclaration>(
@@ -140,8 +171,13 @@ export const fetchResponse = async <E extends RouteDeclaration>(
 		return {
 			declared: true,
 			status: rawResponse.status,
-			body: await readDeclaredBody(schema, rawResponse, validateResponse),
+			body: await readDeclaredBody(
+				getResponseBody(schema),
+				rawResponse,
+				validateResponse,
+			),
 			headers: rawResponse.headers,
+			...(await readDeclaredHeaders(schema, rawResponse, validateResponse)),
 			...declaredResponseMetadata(schema, rawResponse),
 		} as ClientFetchResponse<E>;
 	} finally {

@@ -113,7 +113,13 @@ export const integrationContract = router({
 			method: "GET",
 			path: "/responses/headers",
 			responses: {
-				200: z.object({ ok: z.literal(true) }),
+				200: {
+					body: z.object({ ok: z.literal(true) }),
+					headers: {
+						"x-declared-result": z.string(),
+						"x-optional-result": z.string().optional(),
+					},
+				},
 			},
 		},
 		text: {

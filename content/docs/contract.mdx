@@ -161,6 +161,25 @@ Non-2xx statuses are declared the same way as 2xx statuses.
 Routes with no `response` or `responses` default to a no-body response. `DELETE`
 uses `204`, `POST` uses `201`, and other methods use `200`.
 
+Route status specific response headers can be declared using `response` or `responses` with an object containing `body` and `headers`.
+
+```ts
+create: {
+	method: "POST",
+	path: "/todos",
+	body: {
+		title: z.string().min(1),
+	},
+	response: {
+		body: todoSchema,
+		headers: {
+			location: z.string(),
+			"x-next-cursor": z.string().optional(),
+		},
+	},
+}
+```
+
 ## Shared Router Options
 
 `router()` can apply shared fields to every route in a tree.
@@ -197,8 +216,15 @@ export const api = router(
 		commonOpenApi: {
 			tags: ["Todos"],
 			security: [{ bearerAuth: [] }],
-			responseDescriptions: {
-				401: "Authentication is required.",
+			responses: {
+				200: {
+					headers: {
+						"x-request-id": z.string(),
+					},
+				},
+				401: {
+					description: "Authentication is required.",
+				},
 			},
 		},
 	},
@@ -207,6 +233,9 @@ export const api = router(
 
 The route above is normalized to `GET /api/todos`, includes the common header,
 includes the common `401` response, and keeps the route-specific OpenAPI summary.
+The `commonOpenApi.responses` headers are documentation-only. They do not require
+handlers to return `responseHeaders`, add client `responseHeaders`, validate
+runtime responses, or send headers from the server.
 
 ## Single Routes
 

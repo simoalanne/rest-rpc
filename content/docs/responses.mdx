@@ -92,8 +92,8 @@ override common statuses. An explicit empty `responses: {}` resolves from
 
 ## Handler Returns
 
-If a route has exactly one successful response, the handler can return the
-success body directly.
+If a route has exactly one successful response and that response has no declared
+headers, the handler can return the success body directly.
 
 ```ts
 return {
@@ -114,8 +114,8 @@ return {
 };
 ```
 
-The direct body shortcut is only valid because the success status is
-unambiguous.
+The direct body shortcut is only valid when the success status is unambiguous and
+the response does not need declared `responseHeaders`.
 
 ## Explicit Success
 

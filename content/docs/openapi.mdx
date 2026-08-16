@@ -88,8 +88,10 @@ create: {
 	openApi: {
 		summary: "Create a todo",
 		operationId: "createTodo",
-		responseDescriptions: {
-			201: "Todo created.",
+		responses: {
+			201: {
+				description: "Todo created.",
+			},
 		},
 	},
 }
@@ -113,15 +115,41 @@ create: {
 	openApi: {
 		summary: "Create a todo",
 		operationId: "createTodo",
-		responseDescriptions: {
-			201: "Todo created.",
-			409: "A todo with the same title already exists.",
+		responses: {
+			201: {
+				description: "Todo created.",
+			},
+			409: {
+				description: "A todo with the same title already exists.",
+			},
 		},
 	},
 }
 ```
 
-`responseDescriptions` must match declared response statuses.
+`openApi.responses` only affects generated OpenAPI output. It does not change
+rest-rpc runtime behavior, handler return types, client response types,
+validation, or server headers. Metadata for statuses that a route does not
+declare is skipped.
+
+```ts
+openApi: {
+	responses: {
+		200: {
+			headers: {
+				"x-request-id": {
+					description: "Request correlation id.",
+					schema: z.string(),
+				},
+				"x-rate-limit": z.number(),
+			},
+		},
+	},
+}
+```
+
+Use route response `headers` instead when a handler-owned header is part of the
+typed rest-rpc contract.
 
 ## Shared Metadata
 
@@ -132,12 +160,24 @@ export const api = router(routes, {
 	commonOpenApi: {
 		tags: ["Todos"],
 		security: [{ bearerAuth: [] }],
-		responseDescriptions: {
-			401: "Authentication is required.",
+		responses: {
+			200: {
+				headers: {
+					"x-request-id": z.string(),
+				},
+			},
+			401: {
+				description: "Authentication is required.",
+			},
 		},
 	},
 });
 ```
+
+`commonOpenApi.responses` is merged into each route's `openApi.responses`.
+Route-level OpenAPI metadata overrides common metadata. Typed headers declared
+on a route response override OpenAPI-only headers with the same name in generated
+OpenAPI.
 
 ## Transform Hooks
 

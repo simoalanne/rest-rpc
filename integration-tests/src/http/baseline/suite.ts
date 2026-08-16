@@ -184,6 +184,11 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 			assert.equal(response.declared, true);
 			assert.equal(response.status, 200);
 			assert.deepEqual(response.body, { ok: true });
+			assert.deepEqual(response.responseHeaders, {
+				"x-declared-result": "declared-value",
+			});
+			assert.equal(response.headers.get("x-declared-result"), "declared-value");
+			assert.equal(response.headers.get("x-optional-result"), null);
 			assert.equal(
 				response.headers.get("x-integration-result"),
 				"header-value",

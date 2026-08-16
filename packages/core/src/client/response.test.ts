@@ -34,6 +34,51 @@ describe("ApiClient responses", () => {
 		});
 	});
 
+	it("returns declared response headers from fetchResponse", async () => {
+		captureFetch(
+			new Response(JSON.stringify({ id: "todo-1" }), {
+				status: 200,
+				headers: {
+					"content-type": "application/json",
+					etag: "todo-etag",
+					"x-count": "3",
+				},
+			}),
+		);
+		const apiContract = router({
+			todos: {
+				get: {
+					method: "GET",
+					path: "/todos/:id",
+					pathParams: z.object({ id: z.string() }),
+					responses: {
+						200: {
+							body: z.object({ id: z.string() }),
+							headers: {
+								etag: z.string(),
+								"x-count": z.coerce.number(),
+							},
+						},
+					},
+				},
+			},
+		});
+		const client = initClient(apiContract, {
+			origin: "https://api.test",
+			validateResponses: true,
+		});
+
+		const response = await client.todos.get.fetchResponse({ id: "todo-1" });
+
+		assert.equal(response.declared, true);
+		if (!response.declared) throw new Error("Expected declared response");
+		assert.deepEqual(response.responseHeaders, {
+			etag: "todo-etag",
+			"x-count": 3,
+		});
+		assert.equal(response.headers.get("etag"), "todo-etag");
+	});
+
 	it("rejects fetch when the response is not a declared success", async () => {
 		captureFetch(jsonResponse({ code: "not_found" }, 404));
 		const client = initClient(createClientTestContract(), {

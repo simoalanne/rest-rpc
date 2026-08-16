@@ -31,7 +31,13 @@ const api = defineRouter({
 			path: "/todos",
 			body: z.object({ title: z.string() }),
 			responses: {
-				201: todoSchema,
+				201: {
+					body: todoSchema,
+					headers: {
+						location: z.string(),
+						"x-next-cursor": z.string().optional(),
+					},
+				},
 			},
 		},
 		transform: {
@@ -153,6 +159,9 @@ const createImplementation = route(api.todos.create, ({ title, context }) => {
 			id: "todo-1",
 			title,
 		},
+		responseHeaders: {
+			location: "/todos/todo-1",
+		},
 	};
 });
 
@@ -259,8 +268,15 @@ expectError(
 const implementations = router(api, {
 	todos: {
 		create: ({ title }) => ({
-			id: "todo-1",
-			title,
+			status: 201 as const,
+			body: {
+				id: "todo-1",
+				title,
+			},
+			responseHeaders: {
+				location: "/todos/todo-1",
+				"x-next-cursor": undefined,
+			},
 		}),
 		transform: ({ id }) => ({
 			status: 200 as const,
@@ -302,6 +318,24 @@ const implementations = router(api, {
 });
 
 expectType<typeof api.todos.create>(implementations.todos.create.route);
+
+expectError(
+	route(api.todos.create, ({ title }) => ({
+		id: "todo-1",
+		title,
+	})),
+);
+
+expectError(
+	route(api.todos.create, ({ title }) => ({
+		status: 201 as const,
+		body: {
+			id: "todo-1",
+			title,
+		},
+		responseHeaders: {},
+	})),
+);
 
 // Handler request input is derived from flattened route request segments.
 expectError(

@@ -3,6 +3,7 @@ import { type as schemaType } from "../standard-schema/index.ts";
 import type {
 	CommonOpenApiRouteOptions,
 	Contract,
+	OpenApiResponseOptions,
 	OpenApiRouteOptions,
 	RouteMetadata,
 } from "./contract.ts";
@@ -36,6 +37,39 @@ const mergeUnique = (common: string[] = [], route: string[] = []) => [
 	...new Set([...common, ...route]),
 ];
 
+const mergeOpenApiResponse = (
+	common: OpenApiResponseOptions | undefined,
+	route: OpenApiResponseOptions | undefined,
+): OpenApiResponseOptions => ({
+	...common,
+	...route,
+	...(common?.headers || route?.headers
+		? {
+				headers: {
+					...common?.headers,
+					...route?.headers,
+				},
+			}
+		: {}),
+});
+
+const mergeOpenApiResponses = (
+	common: OpenApiRouteOptions["responses"],
+	route: OpenApiRouteOptions["responses"],
+) => {
+	const statuses = new Set([
+		...Object.keys(common ?? {}),
+		...Object.keys(route ?? {}),
+	]);
+
+	return Object.fromEntries(
+		[...statuses].map((status) => [
+			status,
+			mergeOpenApiResponse(common?.[Number(status)], route?.[Number(status)]),
+		]),
+	);
+};
+
 const mergeOpenApi = (
 	common: CommonOpenApiRouteOptions | undefined,
 	route: OpenApiRouteOptions | undefined,
@@ -56,12 +90,9 @@ const mergeOpenApi = (
 					},
 				}
 			: {}),
-		...(common?.responseDescriptions || route?.responseDescriptions
+		...(common?.responses || route?.responses
 			? {
-					responseDescriptions: {
-						...common?.responseDescriptions,
-						...route?.responseDescriptions,
-					},
+					responses: mergeOpenApiResponses(common?.responses, route?.responses),
 				}
 			: {}),
 	};

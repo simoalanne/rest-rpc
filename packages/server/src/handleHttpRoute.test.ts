@@ -220,6 +220,136 @@ describe("handleHttpRoute", () => {
 		);
 	});
 
+	it("normalizes declared response headers", async () => {
+		const result = await handleHttpRoute(
+			{
+				method: "GET",
+				path: "/todos",
+				responses: {
+					200: {
+						body: z.object({ id: z.string() }),
+						headers: {
+							etag: z.string(),
+							"x-optional": z.string().optional(),
+						},
+					},
+				},
+			},
+			() => ({
+				status: 200 as const,
+				body: { id: "todo-1" },
+				responseHeaders: {
+					etag: "todo-etag",
+					"x-optional": undefined,
+				},
+				headers: {
+					"cache-control": "private",
+				},
+			}),
+			{ request: {}, context: {} },
+		);
+
+		assert.deepEqual(result, {
+			kind: "json",
+			status: 200,
+			headers: {
+				"cache-control": "private",
+				etag: "todo-etag",
+			},
+			body: { id: "todo-1" },
+		});
+	});
+
+	it("rejects declared response header values that are not scalar", async () => {
+		await assert.rejects(
+			() =>
+				handleHttpRoute(
+					{
+						method: "GET",
+						path: "/todos",
+						responses: {
+							200: {
+								body: z.object({ id: z.string() }),
+								headers: {
+									"x-meta": z.object({ id: z.string() }),
+								},
+							},
+						},
+					},
+					() => ({
+						status: 200 as const,
+						body: { id: "todo-1" },
+						responseHeaders: {
+							"x-meta": { id: "meta-1" },
+						},
+					}),
+					{ request: {}, context: {} },
+				),
+			/Declared response header "x-meta" must resolve to a string or number/,
+		);
+	});
+
+	it("rejects array values for declared response headers", async () => {
+		await assert.rejects(
+			() =>
+				handleHttpRoute(
+					{
+						method: "GET",
+						path: "/todos",
+						responses: {
+							200: {
+								body: z.object({ id: z.string() }),
+								headers: {
+									"x-tags": z.array(z.string()),
+								},
+							},
+						},
+					},
+					() => ({
+						status: 200 as const,
+						body: { id: "todo-1" },
+						responseHeaders: {
+							"x-tags": ["alpha", "beta"],
+						},
+					}),
+					{ request: {}, context: {} },
+				),
+			/Declared response header "x-tags" must resolve to a string or number/,
+		);
+	});
+
+	it("rejects duplicate declared and raw response headers", async () => {
+		await assert.rejects(
+			() =>
+				handleHttpRoute(
+					{
+						method: "GET",
+						path: "/todos",
+						responses: {
+							200: {
+								body: z.object({ id: z.string() }),
+								headers: {
+									etag: z.string(),
+								},
+							},
+						},
+					},
+					() => ({
+						status: 200 as const,
+						body: { id: "todo-1" },
+						responseHeaders: {
+							etag: "declared",
+						},
+						headers: {
+							ETag: "raw",
+						},
+					}),
+					{ request: {}, context: {} },
+				),
+			/Response header "etag" was returned more than once/,
+		);
+	});
+
 	it("normalizes declared ContractResponseError responses", async () => {
 		let called = false;
 		const result = await handleHttpRoute(

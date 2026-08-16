@@ -13,7 +13,12 @@ import {
 	type RequestKeyResolverOptions,
 	resolveSchemaKeys,
 } from "./requestKeys.ts";
-import { isCustomBody, isNoBody } from "./response.ts";
+import {
+	getResponseHeaders,
+	getRouteResponses,
+	isCustomBody,
+	isNoBody,
+} from "./response.ts";
 import { contractRoutes } from "./traversal.ts";
 
 export type ValidateContractOptions = RequestKeyResolverOptions;
@@ -91,6 +96,41 @@ const assertNoCaseInsensitiveHeaderDuplicates = (route: RouteDeclaration) => {
 	}
 };
 
+const getResponseHeaderKeys = (route: RouteDeclaration) => [
+	...new Set(
+		Object.values(route.responses ?? {}).flatMap((response) =>
+			Object.keys(getResponseHeaders(response) ?? {}),
+		),
+	),
+];
+
+const assertNoReservedResponseHeaderKeys = (route: RouteDeclaration) => {
+	for (const key of getResponseHeaderKeys(route)) {
+		if (key.toLowerCase() !== "content-type") continue;
+
+		throw new Error(
+			`Route declaration at path "${route.path}" has a reserved response header key "${key}". Use customBody({ schema, contentType }) to declare response content type instead.`,
+		);
+	}
+};
+
+const assertNoCaseInsensitiveResponseHeaderDuplicates = (
+	route: RouteDeclaration,
+) => {
+	for (const response of Object.values(route.responses ?? {})) {
+		const normalized = new Set<string>();
+		for (const key of Object.keys(getResponseHeaders(response) ?? {})) {
+			const normalizedKey = key.toLowerCase();
+			if (normalized.has(normalizedKey)) {
+				throw new Error(
+					`Route declaration at path "${route.path}" has duplicate response header keys that differ only by case.`,
+				);
+			}
+			normalized.add(normalizedKey);
+		}
+	}
+};
+
 const assertPathParamsResolved = (route: RouteDeclaration) => {
 	const pathParams = getPathParamNames(route.path);
 	for (const key of pathParams) {
@@ -108,21 +148,6 @@ const assertPathParamsResolved = (route: RouteDeclaration) => {
 				`Route declaration at path "${route.path}" has a pathParams request key "${key}" without a matching path param.`,
 			);
 		}
-	}
-};
-
-const assertOpenApiResponseDescriptionsMatchResponses = (
-	route: RouteDeclaration,
-) => {
-	if (!route.responses || !route.openApi?.responseDescriptions) return;
-
-	const responseStatuses = new Set(Object.keys(route.responses));
-	for (const status of Object.keys(route.openApi.responseDescriptions)) {
-		if (responseStatuses.has(status)) continue;
-
-		throw new Error(
-			`Route declaration at path "${route.path}" has an OpenAPI response description for status ${status} without a matching response schema.`,
-		);
 	}
 };
 
@@ -151,13 +176,15 @@ const applyHeaderRequestKeys = (route: RouteDeclaration) => {
 };
 
 export const validateResolvedRequestKeys = (route: RouteDeclaration) => {
-	assertOpenApiResponseDescriptionsMatchResponses(route);
+	if (route.responses) getRouteResponses(route);
 	applyHeaderRequestKeys(route);
 	const keys = Object.keys(route.requestKeys ?? {});
 	assertNoDuplicateKeys(route, keys);
 	assertNoReservedRequestKeys(route);
 	assertNoReservedHeaderKeys(route);
 	assertNoCaseInsensitiveHeaderDuplicates(route);
+	assertNoReservedResponseHeaderKeys(route);
+	assertNoCaseInsensitiveResponseHeaderDuplicates(route);
 
 	if (isCustomBody(route.body) && route.requestKeys?.body) {
 		throw new Error(

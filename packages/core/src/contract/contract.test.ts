@@ -230,24 +230,67 @@ describe("router", () => {
 		);
 	});
 
-	it("rejects OpenAPI response descriptions without matching responses", () => {
+	it("rejects reserved response content-type headers", () => {
 		assert.throws(
 			() =>
 				router({
 					ping: {
 						method: "GET",
 						path: "/ping",
-						openApi: {
-							responseDescriptions: {
-								200: "Pong.",
-							},
-						},
 						responses: {
-							204: noBody(),
+							200: {
+								body: z.object({ ok: z.boolean() }),
+								headers: {
+									"content-type": z.string(),
+								},
+							},
 						},
 					},
 				}),
-			/response description for status 200 without a matching response schema/,
+			/reserved response header key "content-type"/,
+		);
+	});
+
+	it("rejects response headers that differ only by case", () => {
+		assert.throws(
+			() =>
+				router({
+					ping: {
+						method: "GET",
+						path: "/ping",
+						responses: {
+							200: {
+								body: z.object({ ok: z.boolean() }),
+								headers: {
+									"X-Trace-ID": z.string(),
+									"x-trace-id": z.string(),
+								},
+							},
+						},
+					},
+				}),
+			/duplicate response header keys that differ only by case/,
+		);
+	});
+
+	it("allows OpenAPI response metadata without matching responses", () => {
+		assert.doesNotThrow(() =>
+			router({
+				ping: {
+					method: "GET",
+					path: "/ping",
+					openApi: {
+						responses: {
+							200: {
+								description: "Pong.",
+							},
+						},
+					},
+					responses: {
+						204: noBody(),
+					},
+				},
+			}),
 		);
 	});
 });

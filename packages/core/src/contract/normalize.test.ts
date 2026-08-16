@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import z from "zod";
 import { testContract, testRoute } from "../../test/factories/contract.ts";
 import { normalizeContract } from "./normalize.ts";
 
@@ -131,6 +132,9 @@ describe("normalizeContract", () => {
 	});
 
 	it("merges shared OpenAPI options with route OpenAPI options", () => {
+		const commonRequestIdSchema = z.string();
+		const commonHeaderSchema = z.string();
+		const routeRequestIdSchema = z.string();
 		const contract = normalizeContract(
 			{
 				todos: {
@@ -139,8 +143,16 @@ describe("normalizeContract", () => {
 							summary: "List todos",
 							tags: ["Todos", "Read"],
 							deprecated: false,
-							responseDescriptions: {
-								200: "Todos returned.",
+							responses: {
+								200: {
+									description: "Todos returned.",
+									headers: {
+										"x-request-id": {
+											description: "Route request id.",
+											schema: routeRequestIdSchema,
+										},
+									},
+								},
 							},
 							extensions: {
 								"x-route": true,
@@ -155,9 +167,17 @@ describe("normalizeContract", () => {
 					tags: ["Todos"],
 					deprecated: true,
 					security: [{ bearerAuth: [] }],
-					responseDescriptions: {
-						200: "Success.",
-						401: "Authentication is required.",
+					responses: {
+						200: {
+							description: "Success.",
+							headers: {
+								"x-request-id": commonRequestIdSchema,
+								"x-common": commonHeaderSchema,
+							},
+						},
+						401: {
+							description: "Authentication is required.",
+						},
 					},
 					extensions: {
 						"x-common": true,
@@ -172,9 +192,20 @@ describe("normalizeContract", () => {
 			tags: ["Todos", "Read"],
 			deprecated: false,
 			security: [{ bearerAuth: [] }],
-			responseDescriptions: {
-				200: "Todos returned.",
-				401: "Authentication is required.",
+			responses: {
+				200: {
+					description: "Todos returned.",
+					headers: {
+						"x-request-id": {
+							description: "Route request id.",
+							schema: routeRequestIdSchema,
+						},
+						"x-common": commonHeaderSchema,
+					},
+				},
+				401: {
+					description: "Authentication is required.",
+				},
 			},
 			extensions: {
 				"x-common": true,
@@ -185,9 +216,17 @@ describe("normalizeContract", () => {
 			tags: ["Todos"],
 			deprecated: true,
 			security: [{ bearerAuth: [] }],
-			responseDescriptions: {
-				200: "Success.",
-				401: "Authentication is required.",
+			responses: {
+				200: {
+					description: "Success.",
+					headers: {
+						"x-request-id": commonRequestIdSchema,
+						"x-common": commonHeaderSchema,
+					},
+				},
+				401: {
+					description: "Authentication is required.",
+				},
 			},
 			extensions: {
 				"x-common": true,

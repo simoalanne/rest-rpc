@@ -17,6 +17,11 @@ export const createIntegrationHandlers = (): IntegrationHandlers => ({
 				headers["x-test-token"] = request["x-test-token"];
 			}
 			const context = request[REQUEST_CONTEXT_KEY];
+			const hasContext =
+				typeof context === "object" &&
+				context !== null &&
+				Object.keys(context).length > 0;
+			if (!hasContext) throw new Error("Expected non-empty request context");
 
 			return {
 				params: { id: request.id },
@@ -27,10 +32,7 @@ export const createIntegrationHandlers = (): IntegrationHandlers => ({
 					count: request.count,
 				},
 				context: {
-					nonEmpty:
-						typeof context === "object" &&
-						context !== null &&
-						Object.keys(context).length > 0,
+					nonEmpty: true as const,
 				},
 			};
 		},
@@ -68,6 +70,10 @@ export const createIntegrationHandlers = (): IntegrationHandlers => ({
 		headers: () => ({
 			status: 200,
 			body: { ok: true },
+			responseHeaders: {
+				"x-declared-result": "declared-value",
+				"x-optional-result": undefined,
+			},
 			headers: {
 				"x-integration-result": "header-value",
 			},

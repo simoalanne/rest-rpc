@@ -85,7 +85,13 @@ const api = router({
 			path: "/todos",
 			body: z.object({ title: z.string() }),
 			responses: {
-				201: todoSchema,
+				201: {
+					body: todoSchema,
+					headers: {
+						location: z.string(),
+						"x-next-cursor": z.string().optional(),
+					},
+				},
 			},
 		},
 		transform: {
@@ -221,6 +227,17 @@ expectError(client.todos.optionalJsonSearch.fetch());
 expectType<Promise<{ id: string; title: string }>>(
 	client.todos.create.fetch({ title: "Write type tests" }),
 );
+client.todos.create
+	.fetchResponse({ title: "Write type tests" })
+	.then((response) => {
+		if (response.declared) {
+			expectType<201>(response.status);
+			expectType<{ id: string; title: string }>(response.body);
+			expectType<string>(response.responseHeaders.location);
+			expectType<string | undefined>(response.responseHeaders["x-next-cursor"]);
+			expectType<Headers>(response.headers);
+		}
+	});
 expectType<Promise<{ id: string }>>(
 	client.todos.transform.fetch({ id: "1", title: "Write type tests" }),
 );

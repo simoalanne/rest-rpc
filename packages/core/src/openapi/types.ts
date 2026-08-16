@@ -20,6 +20,7 @@ export type OpenApiRequestBody = {
 
 export type OpenApiResponse = {
 	description: string;
+	headers?: Record<string, { description?: string; schema?: OpenApiSchema }>;
 	content?: Record<string, { schema?: OpenApiSchema }>;
 };
 

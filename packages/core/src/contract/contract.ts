@@ -12,6 +12,7 @@ import type {
 	DefaultNoBodyResponseStatusForMethod,
 	NoBody,
 	ResponseBodySchema,
+	ResponseDeclaration,
 	RouteResponseInput,
 	RouteResponses,
 } from "./response.ts";
@@ -21,6 +22,16 @@ import type { WebSocketMessageDeclaration } from "./websocketMessages.ts";
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
 export type RouteMetadata = Record<string, unknown>;
+export type OpenApiResponseHeader =
+	| StandardSchemaV1
+	| {
+			description?: string;
+			schema: StandardSchemaV1;
+	  };
+export type OpenApiResponseOptions = {
+	description?: string;
+	headers?: Record<string, OpenApiResponseHeader>;
+};
 export type OpenApiRouteOptions = {
 	summary?: string;
 	description?: string;
@@ -29,7 +40,7 @@ export type OpenApiRouteOptions = {
 	deprecated?: boolean;
 	security?: Array<Record<string, string[]>>;
 	externalDocs?: { url: string; description?: string };
-	responseDescriptions?: Record<number, string>;
+	responses?: Record<number, OpenApiResponseOptions>;
 	extensions?: Record<`x-${string}`, unknown>;
 };
 export type CommonOpenApiRouteOptions = Omit<
@@ -143,6 +154,12 @@ type MergeResponses<TCommon, TRoute> = Merge<
 	Omit<TCommon, keyof TRoute> & TRoute
 >;
 
+type RouteResponseDeclarationFor<TResponse> = TResponse extends {
+	headers: Record<string, StandardSchemaV1>;
+}
+	? TResponse & ResponseDeclaration
+	: TResponse & ResponseBodySchema;
+
 type RouteResponsesFor<TRoute> = TRoute extends {
 	responses: infer TResponses extends RouteResponses;
 }
@@ -152,8 +169,7 @@ type RouteResponsesFor<TRoute> = TRoute extends {
 				method: infer TMethod extends HttpMethod;
 			}
 		? {
-				[K in DefaultBodyResponseStatusForMethod<TMethod>]: TResponse &
-					ResponseBodySchema;
+				[K in DefaultBodyResponseStatusForMethod<TMethod>]: RouteResponseDeclarationFor<TResponse>;
 			}
 		: TRoute extends { method: infer TMethod extends HttpMethod }
 			? {
