@@ -4,7 +4,7 @@
 .prose blume-tabs:has(pre.twoslash) [data-blume-tab-panel],
 .prose pre.twoslash,
 .prose pre.twoslash code {
-	overflow: visible !important;
+	overflow: visible;
 }
 
 .prose pre.twoslash .twoslash-popup-container {
