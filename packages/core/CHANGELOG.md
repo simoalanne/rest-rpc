@@ -1,5 +1,11 @@
 # @rest-rpc/core
 
+## 0.1.0-beta.6
+
+### Minor Changes
+
+- fc89f34: add support for route status code specific response headers so important headers can be declared and must be returned from server handlers
+
 ## 0.1.0-beta.5
 
 ### Minor Changes
