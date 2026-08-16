@@ -2,6 +2,7 @@ import type { RouteDeclaration } from "../contract/contract.ts";
 import { isStandardSchema } from "../contract/request.ts";
 import type {
 	ClientSuccessBody,
+	CustomBody,
 	ResponseBodySchema,
 } from "../contract/response.ts";
 import {
@@ -67,6 +68,51 @@ export const readDeclaredBody = async (
 	return result.value;
 };
 
+const normalizeContentType = (contentType: string) =>
+	contentType.split(";")[0]?.trim().toLowerCase();
+
+const resolveDeclaredContentType = (
+	contentTypes: readonly string[],
+	rawResponse: Response,
+) => {
+	const responseContentType = rawResponse.headers.get("content-type");
+	const contentType =
+		responseContentType &&
+		contentTypes.find(
+			(value) =>
+				normalizeContentType(value) ===
+				normalizeContentType(responseContentType),
+		);
+
+	if (!contentType) {
+		throw new Error(
+			"Backend returned an unsupported custom response content-type.",
+		);
+	}
+
+	return contentType;
+};
+
+const customResponseMetadata = (schema: CustomBody, rawResponse: Response) => ({
+	contentType: resolveDeclaredContentType(
+		Array.isArray(schema.contentType)
+			? schema.contentType
+			: [schema.contentType as string],
+		rawResponse,
+	),
+});
+
+const declaredResponseMetadata = (
+	schema: ResponseBodySchema,
+	rawResponse: Response,
+) => {
+	if (isCustomBody(schema)) return customResponseMetadata(schema, rawResponse);
+	if (isStream(schema) && isCustomBody(schema.schema)) {
+		return customResponseMetadata(schema.schema, rawResponse);
+	}
+	return {};
+};
+
 export type RouteRequestFn = <E extends RouteDeclaration>(
 	route: E,
 	...args: FetchArgs<E>
@@ -96,6 +142,7 @@ export const fetchResponse = async <E extends RouteDeclaration>(
 			status: rawResponse.status,
 			body: await readDeclaredBody(schema, rawResponse, validateResponse),
 			headers: rawResponse.headers,
+			...declaredResponseMetadata(schema, rawResponse),
 		} as ClientFetchResponse<E>;
 	} finally {
 		cleanup();

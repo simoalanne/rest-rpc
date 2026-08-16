@@ -192,6 +192,20 @@ describe("OpenAPI operations", () => {
 		assert.equal(custom?.content["text/csv"].schema.type, "string");
 	});
 
+	it("creates custom request bodies with multiple declared content types", () => {
+		const body = createRequestBody(
+			customBody({
+				schema: z.string(),
+				contentType: ["image/png", "image/jpeg"],
+			}),
+			schemaConverter,
+		);
+
+		assert.equal(body?.content["image/png"].schema.type, "string");
+		assert.equal(body?.content["image/jpeg"].schema.type, "string");
+		assert.equal(body?.content["application/json"], undefined);
+	});
+
 	it("creates JSON request bodies from schema records", () => {
 		const body = createRequestBody(
 			{
@@ -247,6 +261,20 @@ describe("OpenAPI operations", () => {
 
 		assert.equal(response.content?.["text/csv"].schema?.type, "string");
 		assert.equal(response.content?.["application/json"], undefined);
+	});
+
+	it("creates custom responses with multiple declared content types", () => {
+		const response = createResponse(
+			"",
+			customBody({
+				contentType: ["image/png", "image/jpeg"],
+				schema: z.string(),
+			}),
+			schemaConverter,
+		);
+
+		assert.equal(response.content?.["image/png"].schema?.type, "string");
+		assert.equal(response.content?.["image/jpeg"].schema?.type, "string");
 	});
 
 	it("creates NDJSON stream responses as text wire bodies", () => {

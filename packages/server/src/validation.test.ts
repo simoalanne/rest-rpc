@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { jsonQuery } from "@rest-rpc/core/contract";
+import { customBody, jsonQuery } from "@rest-rpc/core/contract";
 import z from "zod";
 import { validateRequest } from "./validation.ts";
 
@@ -170,6 +170,37 @@ describe("validateRequest", () => {
 		assert.equal(result.success, true);
 		if (result.success) {
 			assert.deepEqual(result.data, { query: undefined });
+		}
+	});
+
+	it("wraps custom request bodies with selected content type", async () => {
+		const result = await validateRequest(
+			{
+				method: "POST",
+				path: "/images",
+				body: customBody({
+					contentType: ["image/png", "image/jpeg"],
+					schema: z.string().transform((value) => value.toUpperCase()),
+				}),
+				requestKeys: {},
+				responses: {},
+			},
+			{
+				body: "jpeg bytes",
+				headers: {
+					"content-type": "image/jpeg; charset=binary",
+				},
+			},
+		);
+
+		assert.equal(result.success, true);
+		if (result.success) {
+			assert.deepEqual(result.data, {
+				body: {
+					contentType: "image/jpeg",
+					payload: "JPEG BYTES",
+				},
+			});
 		}
 	});
 

@@ -29,6 +29,20 @@ export const bodyParsingContract = router({
 			}),
 		},
 	},
+	textVariant: {
+		method: "POST",
+		path: "/body-parsing/text-variant",
+		body: customBody({
+			contentType: ["text/plain", "text/markdown"],
+			schema: z.string(),
+		}),
+		responses: {
+			200: z.object({
+				contentType: z.string(),
+				body: z.string(),
+			}),
+		},
+	},
 	customJson: {
 		method: "POST",
 		path: "/body-parsing/custom-json",

@@ -2,6 +2,7 @@ import {
 	customBody,
 	router as defineRouter,
 	jsonQuery,
+	noBody,
 	stream,
 	webSocketMessages,
 } from "@rest-rpc/core/contract";
@@ -68,6 +69,18 @@ const api = defineRouter({
 			query: jsonQuery(z.object({ page: z.number() }).optional()),
 			responses: {
 				200: z.array(todoSchema),
+			},
+		},
+		uploadImage: {
+			method: "POST",
+			path: "/todos/:id/image",
+			pathParams: z.object({ id: z.string() }),
+			body: customBody({
+				contentType: ["image/png", "image/jpeg"],
+				schema: z.instanceof(Uint8Array),
+			}),
+			responses: {
+				204: noBody(),
 			},
 		},
 	},
@@ -170,6 +183,14 @@ route(api.todos.transform, ({ id, title, slug }) => {
 	};
 });
 
+route(api.todos.uploadImage, ({ id, body }) => {
+	expectType<string>(id);
+	expectType<"image/png" | "image/jpeg">(body.contentType);
+	expectType<Uint8Array<ArrayBuffer>>(body.payload);
+
+	return undefined;
+});
+
 route(api.socket.room, ({ roomId, context }) => {
 	expectType<string>(roomId);
 
@@ -258,6 +279,7 @@ const implementations = router(api, {
 
 			return [];
 		},
+		uploadImage: () => undefined,
 	},
 	reports: {
 		csv: () => ({

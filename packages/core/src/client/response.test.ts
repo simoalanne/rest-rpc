@@ -374,11 +374,74 @@ describe("ApiClient responses", () => {
 			validateResponses: true,
 		});
 
-		const response = await client.reports.csv.fetch();
+		const response = await client.reports.csv.fetchResponse();
 
-		assert.ok(response instanceof Response);
-		assert.equal(response.headers.get("content-type"), "text/csv");
-		assert.equal(await response.text(), "id,title\n1,First\n");
+		assert.equal(response.declared, true);
+		assert.equal(response.contentType, "text/csv");
+		assert.ok(response.body instanceof Response);
+		assert.equal(response.body.headers.get("content-type"), "text/csv");
+		assert.equal(await response.body.text(), "id,title\n1,First\n");
+	});
+
+	it("returns selected content type metadata for custom fetchResponse bodies", async () => {
+		const apiContract = router({
+			reports: {
+				image: {
+					method: "GET",
+					path: "/reports/image",
+					responses: {
+						200: customBody({
+							contentType: ["image/png", "image/jpeg"],
+							schema: z.instanceof(Uint8Array),
+						}),
+					},
+				},
+			},
+		});
+		captureFetch(
+			new Response("jpeg bytes", {
+				status: 200,
+				headers: { "content-type": "image/jpeg; charset=binary" },
+			}),
+		);
+		const client = initClient(apiContract, { origin: "https://api.test" });
+
+		const response = await client.reports.image.fetchResponse();
+
+		assert.equal(response.declared, true);
+		assert.equal(response.status, 200);
+		assert.equal(response.contentType, "image/jpeg");
+		assert.ok(response.body instanceof Response);
+		assert.equal(await response.body.text(), "jpeg bytes");
+	});
+
+	it("rejects custom fetchResponse bodies with mismatched content types", async () => {
+		const apiContract = router({
+			reports: {
+				csv: {
+					method: "GET",
+					path: "/reports.csv",
+					responses: {
+						200: customBody({
+							contentType: "text/csv",
+							schema: z.string(),
+						}),
+					},
+				},
+			},
+		});
+		captureFetch(
+			new Response("{}", {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			}),
+		);
+		const client = initClient(apiContract, { origin: "https://api.test" });
+
+		await assert.rejects(
+			() => client.reports.csv.fetchResponse(),
+			/unsupported custom response content-type/,
+		);
 	});
 
 	it("returns declared custom stream responses as native Response objects", async () => {
@@ -398,7 +461,12 @@ describe("ApiClient responses", () => {
 				},
 			},
 		});
-		captureFetch(new Response("id,title\n1,First\n", { status: 200 }));
+		captureFetch(
+			new Response("id,title\n1,First\n", {
+				status: 200,
+				headers: { "content-type": "text/csv" },
+			}),
+		);
 		const client = initClient(apiContract, { origin: "https://api.test" });
 
 		const response = await client.reports.csv.fetch();

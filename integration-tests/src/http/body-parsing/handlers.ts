@@ -9,6 +9,10 @@ export const createBodyParsingHandlers = (): BodyParsingHandlers => ({
 		title: request.title,
 	}),
 	text: (request) => ({ body: request.body }),
+	textVariant: (request) => ({
+		contentType: request.body.contentType,
+		body: request.body.payload,
+	}),
 	customJson: (request) => ({
 		count: request.body.count,
 		ok: request.body.nested.ok,

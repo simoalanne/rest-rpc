@@ -53,7 +53,12 @@ const readHeaders = (headers: Headers) => Object.fromEntries(headers.entries());
 export const defaultParseBody = ({ request, body }: WebRouteParseBodyInput) => {
 	if (!body || isNoBody(body)) return undefined;
 	if (isCustomBody(body)) {
-		return isJsonContentType(body.contentType)
+		const contentType =
+			request.headers.get("content-type") ??
+			(Array.isArray(body.contentType)
+				? body.contentType[0]
+				: body.contentType);
+		return contentType && isJsonContentType(contentType)
 			? request.json()
 			: request.text();
 	}

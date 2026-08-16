@@ -17,13 +17,14 @@ const parseBody: WebRouteParseBody = async ({ body, request }) => {
 			? request.json()
 			: undefined;
 	}
-	if (!contentType.startsWith(body.contentType.split(";")[0] ?? "")) {
-		return undefined;
-	}
-	if (body.contentType === "application/octet-stream") {
+	const declaredContentType = (
+		Array.isArray(body.contentType) ? body.contentType : [body.contentType]
+	).find((value) => contentType.startsWith(value.split(";")[0] ?? ""));
+	if (!declaredContentType) return undefined;
+	if (declaredContentType === "application/octet-stream") {
 		return new Uint8Array(await request.arrayBuffer());
 	}
-	if (body.contentType.startsWith("application/json")) return request.json();
+	if (declaredContentType.startsWith("application/json")) return request.json();
 	return request.text();
 };
 

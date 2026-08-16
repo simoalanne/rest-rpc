@@ -40,6 +40,19 @@ const parseJsonQuery = (value: unknown) => {
 	return JSON.parse(value);
 };
 
+const getHeaderValue = (headers: unknown, name: string): string | undefined => {
+	if (typeof headers !== "object" || headers === null) return undefined;
+
+	for (const [key, value] of Object.entries(headers)) {
+		if (key.toLowerCase() !== name) continue;
+		if (Array.isArray(value)) return String(value[0]);
+		if (value === undefined) return undefined;
+		return String(value);
+	}
+
+	return undefined;
+};
+
 const flattenRequestSegments = (
 	route: RouteDeclaration,
 	segments: RequestSegments,
@@ -47,7 +60,12 @@ const flattenRequestSegments = (
 	const input: Record<string, unknown> = {};
 
 	if (isCustomBody(route.body) && segments.body !== undefined) {
-		input.body = segments.body;
+		input.body = Array.isArray(route.body.contentType)
+			? {
+					contentType: getHeaderValue(segments.headers, "content-type"),
+					payload: segments.body,
+				}
+			: segments.body;
 	} else {
 		assignObject(input, segments.body);
 	}

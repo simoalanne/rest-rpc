@@ -20,6 +20,12 @@ runBodyParsingSuite({
 			express.text({ type: "text/plain" }),
 		);
 		app.use(
+			bodyParsingContract.textVariant.path,
+			express.text({
+				type: ["text/plain", "text/markdown", "application/xml"],
+			}),
+		);
+		app.use(
 			bodyParsingContract.json.path,
 			express.json({ type: "application/json" }),
 		);

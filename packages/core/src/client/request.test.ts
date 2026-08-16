@@ -8,7 +8,7 @@ import {
 } from "../../test/factories/client.ts";
 import { router } from "../contract/contract.ts";
 import { jsonQuery } from "../contract/request.ts";
-import { noBody } from "../contract/response.ts";
+import { customBody, noBody } from "../contract/response.ts";
 import { initClient } from "./index.ts";
 import { constructBaseRequest, createRequestSignal } from "./request.ts";
 
@@ -391,6 +391,43 @@ describe("ApiClient requests", () => {
 		assert.equal(calls[0]?.init?.body, "hello");
 		assert.deepEqual(calls[0]?.init?.headers, {
 			"content-type": "text/plain",
+		});
+	});
+
+	it("sends custom bodies with a selected declared content type", async () => {
+		const apiContract = router({
+			uploads: {
+				image: {
+					method: "POST",
+					path: "/uploads/:id/image",
+					pathParams: z.object({ id: z.string() }),
+					body: customBody({
+						contentType: ["image/png", "image/jpeg"],
+						schema: z.string(),
+					}),
+					responses: {
+						204: noBody(),
+					},
+				},
+			},
+		});
+		const calls = captureFetch();
+		const client = initClient(apiContract, {
+			origin: "https://api.test",
+		});
+
+		await client.uploads.image.fetch({
+			id: "file 1",
+			body: {
+				contentType: "image/jpeg",
+				payload: "jpeg bytes",
+			},
+		});
+
+		assert.equal(calls[0]?.url, "https://api.test/uploads/file%201/image");
+		assert.equal(calls[0]?.init?.body, "jpeg bytes");
+		assert.deepEqual(calls[0]?.init?.headers, {
+			"content-type": "image/jpeg",
 		});
 	});
 

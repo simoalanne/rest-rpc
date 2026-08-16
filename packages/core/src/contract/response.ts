@@ -6,15 +6,19 @@ export type NoBody = {
 };
 
 export type ResponseSchema = StandardSchemaV1;
+export type CustomBodyContentType = string | readonly string[];
 
 export const noBody = (): NoBody => ({
 	kind: "noBody",
 });
 
-export type CustomBody<TSchema extends StandardSchemaV1 = StandardSchemaV1> = {
+export type CustomBody<
+	TSchema extends StandardSchemaV1 = StandardSchemaV1,
+	TContentType extends CustomBodyContentType = CustomBodyContentType,
+> = {
 	kind: "customBody";
 	schema: TSchema;
-	contentType: string;
+	contentType: TContentType;
 };
 
 export type Stream<
@@ -46,10 +50,13 @@ export const stream = <const TBody extends ResponseSchema | CustomBody>(
 	schema,
 });
 
-export const customBody = <const TSchema extends StandardSchemaV1>(input: {
+export const customBody = <
+	const TSchema extends StandardSchemaV1,
+	const TContentType extends CustomBodyContentType,
+>(input: {
 	schema: TSchema;
-	contentType: string;
-}): CustomBody<TSchema> => ({
+	contentType: TContentType;
+}): CustomBody<TSchema, TContentType> => ({
 	kind: "customBody",
 	schema: input.schema,
 	contentType: input.contentType,
@@ -137,11 +144,33 @@ export const resolveRouteResponses = (route: {
 	};
 };
 
+type InferCustomBodyPayload<
+	TSchema,
+	TIO extends "input" | "output",
+> = TSchema extends StandardSchemaV1
+	? TIO extends "input"
+		? StandardSchemaV1.InferInput<TSchema>
+		: StandardSchemaV1.InferOutput<TSchema>
+	: never;
+
 export type InferCustomBody<TResponse, TIO extends "input" | "output"> =
-	TResponse extends CustomBody<infer TSchema>
-		? TIO extends "input"
-			? StandardSchemaV1.InferInput<TSchema>
-			: StandardSchemaV1.InferOutput<TSchema>
+	TResponse extends CustomBody<infer TSchema, infer TContentType>
+		? TContentType extends string
+			? InferCustomBodyPayload<TSchema, TIO>
+			: {
+					contentType: TContentType[number];
+					payload: InferCustomBodyPayload<TSchema, TIO>;
+				}
+		: never;
+
+type InferCustomStreamBody<TBody, TIO extends "input" | "output"> =
+	TBody extends CustomBody<infer TSchema, infer TContentType>
+		? TContentType extends string
+			? AsyncIterable<InferCustomBodyPayload<TSchema, TIO>>
+			: {
+					contentType: TContentType[number];
+					payload: AsyncIterable<InferCustomBodyPayload<TSchema, TIO>>;
+				}
 		: never;
 
 export type ClientResponseBody<TResponse> = TResponse extends StandardSchemaV1
@@ -166,16 +195,34 @@ export type ServerResponseBody<TResponse> = TResponse extends StandardSchemaV1
 			? InferCustomBody<TResponse, "input">
 			: TResponse extends Stream<infer TBody>
 				? TBody extends CustomBody
-					? AsyncIterable<InferCustomBody<TBody, "input">>
+					? InferCustomStreamBody<TBody, "input">
 					: TBody extends StandardSchemaV1
 						? AsyncIterable<StandardSchemaV1.InferInput<TBody>>
 						: never
 				: never;
 
+type CustomBodyClientResponseMetadata<TBody> =
+	TBody extends CustomBody<StandardSchemaV1, infer TContentType>
+		? TContentType extends string
+			? { contentType: TContentType }
+			: { contentType: TContentType[number] }
+		: Record<never, never>;
+
+type ClientResponseMetadata<TResponse> =
+	TResponse extends Stream<infer TBody>
+		? CustomBodyClientResponseMetadata<TBody>
+		: CustomBodyClientResponseMetadata<TResponse>;
+
 type ResponseEntry<TStatus extends number, TBody> = {
 	status: TStatus;
 	body: TBody;
 };
+
+type ClientResponseEntry<TStatus extends number, TResponse> = ResponseEntry<
+	TStatus,
+	ClientResponseBody<TResponse>
+> &
+	ClientResponseMetadata<TResponse>;
 
 type ResponseKey = number | `${number}`;
 
@@ -216,10 +263,7 @@ export type ClientResponse<E extends RouteDeclaration> = E extends {
 }
 	? {
 			[TKeys in keyof TResponses]: TKeys extends ResponseKey
-				? ResponseEntry<
-						ResponseStatus<TKeys>,
-						ClientResponseBody<TResponses[TKeys]>
-					>
+				? ClientResponseEntry<ResponseStatus<TKeys>, TResponses[TKeys]>
 				: never;
 		}[keyof TResponses]
 	: never;
@@ -243,10 +287,7 @@ export type ClientSuccessResponse<E extends RouteDeclaration> = E extends {
 	? {
 			[TKeys in keyof TResponses]: TKeys extends ResponseKey
 				? TKeys extends SuccessfulResponseKeys<TResponses>
-					? ResponseEntry<
-							ResponseStatus<TKeys>,
-							ClientResponseBody<TResponses[TKeys]>
-						>
+					? ClientResponseEntry<ResponseStatus<TKeys>, TResponses[TKeys]>
 					: never
 				: never;
 		}[keyof TResponses]

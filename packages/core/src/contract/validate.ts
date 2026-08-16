@@ -239,6 +239,56 @@ const validateSchemaRecord = async (
 	}
 };
 
+const normalizeContentType = (contentType: string) =>
+	contentType.split(";")[0]?.trim().toLowerCase();
+
+const getDeclaredContentType = (
+	contentTypes: readonly string[],
+	contentType: string,
+) => {
+	const normalized = normalizeContentType(contentType);
+	return contentTypes.find(
+		(value) => normalizeContentType(value) === normalized,
+	);
+};
+
+const validateCustomBodyPayload = async (
+	schema: StandardSchemaV1,
+	body: unknown,
+	data: FlatRequestInput,
+	errors: StandardSchemaV1.Issue[],
+	contentTypes: readonly string[] | undefined,
+) => {
+	const input = body as
+		| { contentType?: unknown; payload?: unknown }
+		| undefined;
+	const contentType =
+		contentTypes && typeof input?.contentType === "string"
+			? getDeclaredContentType(contentTypes, input.contentType)
+			: undefined;
+
+	if (contentTypes && !contentType) {
+		errors.push({ message: "Unsupported custom body contentType." });
+		return;
+	}
+
+	const result = await validateStandardSchema(
+		schema,
+		contentTypes ? input?.payload : body,
+	);
+	if (result.issues) {
+		errors.push(...result.issues);
+		return;
+	}
+
+	data.body = contentTypes
+		? {
+				contentType,
+				payload: result.value,
+			}
+		: result.value;
+};
+
 const validateFlatRequestSegment = async (
 	route: RouteDeclaration,
 	segment: RequestSegment,
@@ -250,15 +300,15 @@ const validateFlatRequestSegment = async (
 	if (!declaration || isNoBody(declaration)) return;
 
 	if (isCustomBody(declaration)) {
-		const result = await validateStandardSchema(
+		await validateCustomBodyPayload(
 			declaration.schema,
 			grouped.body,
+			data,
+			errors,
+			Array.isArray(declaration.contentType)
+				? declaration.contentType
+				: undefined,
 		);
-		if (result.issues) {
-			errors.push(...result.issues);
-			return;
-		}
-		data.body = result.value;
 		return;
 	}
 

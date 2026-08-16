@@ -35,6 +35,17 @@ import type {
 export const JSON_CONTENT_TYPE = "application/json";
 export const NDJSON_CONTENT_TYPE = "application/x-ndjson";
 
+const createContent = (
+	contentTypes: readonly string[],
+	value: Record<string, unknown>,
+) =>
+	Object.fromEntries(contentTypes.map((contentType) => [contentType, value]));
+
+const contentTypesForCustomBody = (schema: {
+	contentType: string | readonly string[];
+}) =>
+	Array.isArray(schema.contentType) ? schema.contentType : [schema.contentType];
+
 const createSchemaRecordObject = (
 	schemas: RequestSchemaRecord,
 	converter: SchemaConverter,
@@ -145,9 +156,9 @@ export const createRequestBody = (
 ): OpenApiRequestBody | undefined => {
 	if (!schema) return undefined;
 	if (isNoBody(schema)) return undefined;
-	const contentType = isCustomBody(schema)
-		? schema.contentType
-		: JSON_CONTENT_TYPE;
+	const contentTypes = isCustomBody(schema)
+		? contentTypesForCustomBody(schema)
+		: [JSON_CONTENT_TYPE];
 	const bodySchema = isCustomBody(schema) ? schema.schema : schema;
 	const openApiSchema = isRequestSchemaRecord(bodySchema)
 		? createSchemaRecordObject(bodySchema, converter)
@@ -157,11 +168,9 @@ export const createRequestBody = (
 
 	return {
 		required: true,
-		content: {
-			[contentType]: {
-				...(openApiSchema ? { schema: openApiSchema } : {}),
-			},
-		},
+		content: createContent(contentTypes, {
+			...(openApiSchema ? { schema: openApiSchema } : {}),
+		}),
 	};
 };
 
@@ -173,23 +182,24 @@ export const createResponse = (
 	if (isNoBody(schema)) return { description };
 
 	if (isStream(schema)) {
-		const contentType = isCustomBody(schema.schema)
-			? schema.schema.contentType
-			: NDJSON_CONTENT_TYPE;
+		const contentTypes = isCustomBody(schema.schema)
+			? contentTypesForCustomBody(schema.schema)
+			: [NDJSON_CONTENT_TYPE];
 
 		return {
 			description,
-			content: {
-				[contentType]: {
-					schema: createStreamWireSchema(contentType),
-				},
-			},
+			content: Object.fromEntries(
+				contentTypes.map((contentType) => [
+					contentType,
+					{ schema: createStreamWireSchema(contentType) },
+				]),
+			),
 		};
 	}
 
-	const contentType = isCustomBody(schema)
-		? schema.contentType
-		: JSON_CONTENT_TYPE;
+	const contentTypes = isCustomBody(schema)
+		? contentTypesForCustomBody(schema)
+		: [JSON_CONTENT_TYPE];
 	const bodySchema = isCustomBody(schema) ? schema.schema : schema;
 	const openApiSchema = isStandardSchema(bodySchema)
 		? convertSchema(bodySchema, "output", converter)
@@ -197,11 +207,9 @@ export const createResponse = (
 
 	return {
 		description,
-		content: {
-			[contentType]: {
-				...(openApiSchema ? { schema: openApiSchema } : {}),
-			},
-		},
+		content: createContent(contentTypes, {
+			...(openApiSchema ? { schema: openApiSchema } : {}),
+		}),
 	};
 };
 

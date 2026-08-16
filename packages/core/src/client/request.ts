@@ -172,10 +172,13 @@ export const constructBaseRequest = (
 	urlBase = `${origin}${serializeParams(route, pathParams)}${serializeQuery(route, query)}`;
 
 	if (isCustomBody(route.body)) {
-		const contentType = route.body.contentType;
+		const { contentType, payload } = Array.isArray(route.body.contentType)
+			? (body as { contentType: string; payload: unknown })
+			: { contentType: route.body.contentType as string, payload: body };
+
 		return {
 			url: urlBase,
-			body: serializeCustomBody(body, contentType),
+			body: serializeCustomBody(payload, contentType),
 			contentType,
 			headers: stringifyHeaders(route, headers),
 		};

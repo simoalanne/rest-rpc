@@ -135,6 +135,28 @@ const api = router({
 				),
 			},
 		},
+		exportImage: {
+			method: "GET",
+			path: "/todos/image",
+			responses: {
+				200: customBody({
+					contentType: ["image/png", "image/jpeg"],
+					schema: z.instanceof(Uint8Array),
+				}),
+			},
+		},
+		uploadImage: {
+			method: "POST",
+			path: "/todos/:id/image",
+			pathParams: z.object({ id: z.string() }),
+			body: customBody({
+				contentType: ["image/png", "image/jpeg"],
+				schema: z.instanceof(Uint8Array),
+			}),
+			responses: {
+				204: noBody(),
+			},
+		},
 		socket: {
 			method: "GET",
 			path: "/todos/socket",
@@ -215,7 +237,38 @@ expectType<Promise<ClientFetchResponse<typeof api.todos.events>>>(
 );
 expectError(client.todos.events.fetch());
 expectType<Promise<Response>>(client.todos.exportCsv.fetch());
+client.todos.exportCsv.fetchResponse().then((response) => {
+	if (response.declared) {
+		expectType<"text/csv">(response.contentType);
+		expectType<Response>(response.body);
+	}
+});
 expectType<Promise<Response>>(client.todos.exportCsvStream.fetch());
+expectType<Promise<Response>>(client.todos.exportImage.fetch());
+client.todos.exportImage.fetchResponse().then((response) => {
+	if (response.declared) {
+		expectType<"image/png" | "image/jpeg">(response.contentType);
+		expectType<Response>(response.body);
+	}
+});
+expectType<Promise<undefined>>(
+	client.todos.uploadImage.fetch({
+		id: "todo-1",
+		body: {
+			contentType: "image/png",
+			payload: new Uint8Array(),
+		},
+	}),
+);
+expectError(
+	client.todos.uploadImage.fetch({
+		id: "todo-1",
+		body: {
+			contentType: "image/webp",
+			payload: new Uint8Array(),
+		},
+	}),
+);
 
 // Routes with request input require that flattened input object.
 expectError(client.todos.get.fetch());

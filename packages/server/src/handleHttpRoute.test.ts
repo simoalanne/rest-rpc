@@ -309,6 +309,61 @@ describe("handleHttpRoute custom responses", () => {
 		);
 	});
 
+	it("normalizes custom response bodies with selected content types", async () => {
+		const result = await handleHttpRoute(
+			{
+				method: "GET",
+				path: "/images/:id",
+				responses: {
+					200: customBody({
+						contentType: ["image/png", "image/jpeg"],
+						schema: z.string(),
+					}),
+				},
+			},
+			() => ({
+				status: 200,
+				body: {
+					contentType: "image/jpeg",
+					payload: "jpeg bytes",
+				},
+			}),
+			{ request: {}, context: {} },
+		);
+
+		assert.equal(result.kind, "custom");
+		assert.equal(result.status, 200);
+		assert.equal(result.contentType, "image/jpeg");
+		assert.equal(result.body, "jpeg bytes");
+	});
+
+	it("rejects undeclared custom response content types", async () => {
+		await assert.rejects(
+			() =>
+				handleHttpRoute(
+					{
+						method: "GET",
+						path: "/images/:id",
+						responses: {
+							200: customBody({
+								contentType: ["image/png", "image/jpeg"],
+								schema: z.string(),
+							}),
+						},
+					},
+					() => ({
+						status: 200,
+						body: {
+							contentType: "image/webp",
+							payload: "webp bytes",
+						},
+					}),
+					{ request: {}, context: {} },
+				),
+			/Unsupported custom response body contentType/,
+		);
+	});
+
 	it("normalizes custom streamed bodies after validating without framing chunks", async () => {
 		async function* rows() {
 			yield "id,title\n";

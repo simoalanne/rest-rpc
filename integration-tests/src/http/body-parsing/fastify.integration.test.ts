@@ -14,6 +14,16 @@ runBodyParsingSuite({
 			(_request, body, done) => done(null, body),
 		);
 		app.addContentTypeParser(
+			"text/markdown",
+			{ parseAs: "string" },
+			(_request, body, done) => done(null, body),
+		);
+		app.addContentTypeParser(
+			"application/xml",
+			{ parseAs: "string" },
+			(_request, body, done) => done(null, body),
+		);
+		app.addContentTypeParser(
 			"application/octet-stream",
 			{ parseAs: "buffer" },
 			(_request, body, done) => done(null, body),

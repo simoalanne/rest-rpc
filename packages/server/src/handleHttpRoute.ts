@@ -1,4 +1,5 @@
 import type {
+	CustomBody,
 	HttpRouteDeclaration,
 	ResponseBodySchema,
 } from "@rest-rpc/core/contract";
@@ -118,6 +119,55 @@ const validateOutgoingResponse = async (
 	return validation.value;
 };
 
+const normalizeContentType = (contentType: string) =>
+	contentType.split(";")[0]?.trim().toLowerCase();
+
+const getDeclaredContentType = (
+	contentTypes: readonly string[],
+	contentType: string,
+) => {
+	const normalized = normalizeContentType(contentType);
+	return contentTypes.find(
+		(value) => normalizeContentType(value) === normalized,
+	);
+};
+
+const resolveCustomBodyResult = (
+	schema: CustomBody,
+	body: unknown,
+	errorMessage: string,
+): { contentType: string; payload: unknown } => {
+	if (!Array.isArray(schema.contentType)) {
+		return { contentType: schema.contentType as string, payload: body };
+	}
+
+	const input = body as { contentType?: unknown; payload?: unknown };
+	const contentType =
+		typeof input.contentType === "string"
+			? getDeclaredContentType(schema.contentType, input.contentType)
+			: undefined;
+
+	if (!contentType) throw new Error(errorMessage);
+
+	return {
+		contentType,
+		payload: input.payload,
+	};
+};
+
+const normalizeCustomBodyResult = async (schema: CustomBody, body: unknown) => {
+	const result = resolveCustomBodyResult(
+		schema,
+		body,
+		"Unsupported custom response body contentType.",
+	);
+
+	return {
+		contentType: result.contentType,
+		body: await validateOutgoingResponse(schema, result.payload),
+	};
+};
+
 async function* validateStreamChunks(
 	body: AsyncIterable<unknown>,
 	schema: ResponseBodySchema,
@@ -161,13 +211,19 @@ const normalizeResponseResult = async (
 
 	if (schema && isStream(schema)) {
 		if (isCustomBody(schema.schema)) {
+			const streamResult = resolveCustomBodyResult(
+				schema.schema,
+				result.body,
+				"Unsupported custom stream response contentType.",
+			);
+
 			return {
 				kind: "stream",
 				status: result.status,
 				headers: result.headers,
-				contentType: schema.schema.contentType,
+				contentType: streamResult.contentType,
 				body: validateStreamChunks(
-					result.body as AsyncIterable<unknown>,
+					streamResult.payload as AsyncIterable<unknown>,
 					schema,
 				),
 			};
@@ -182,12 +238,13 @@ const normalizeResponseResult = async (
 	}
 
 	if (schema && isCustomBody(schema)) {
+		const customResult = await normalizeCustomBodyResult(schema, result.body);
 		return {
 			kind: "custom",
 			status: result.status,
 			headers: result.headers,
-			contentType: schema.contentType,
-			body: await validateOutgoingResponse(schema, result.body),
+			contentType: customResult.contentType,
+			body: customResult.body,
 		};
 	}
 

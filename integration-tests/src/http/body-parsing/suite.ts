@@ -76,6 +76,40 @@ export const runBodyParsingSuite = (adapter: BodyParsingSuiteAdapter) => {
 			});
 		});
 
+		it("parses custom bodies with a selected declared content type", async () => {
+			const response = await fetch(
+				`${server.origin}/body-parsing/text-variant`,
+				{
+					method: "POST",
+					headers: {
+						"content-type": "text/markdown; charset=utf-8",
+					},
+					body: "# Parsed markdown",
+				},
+			);
+
+			assert.equal(response.status, 200);
+			assert.deepEqual(await readJson(response), {
+				contentType: "text/markdown",
+				body: "# Parsed markdown",
+			});
+		});
+
+		it("rejects undeclared custom body content types", async () => {
+			const response = await fetch(
+				`${server.origin}/body-parsing/text-variant`,
+				{
+					method: "POST",
+					headers: {
+						"content-type": "application/xml",
+					},
+					body: "<title>Wrong parser</title>",
+				},
+			);
+
+			await assertDefaultValidationErrorResponse(response);
+		});
+
 		it("parses custom JSON request bodies with content-type parameters", async () => {
 			const response = await fetch(
 				`${server.origin}/body-parsing/custom-json`,
