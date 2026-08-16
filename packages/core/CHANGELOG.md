@@ -1,5 +1,17 @@
 # @rest-rpc/core
 
+## 0.1.0-beta.3
+
+### Minor Changes
+
+- 5e6ddbd: Add shorthands where a single response may be provided with status code inferred from method or no response/responses may be provided and inferred as method status + noBody
+- 00a5d04: automatically infer path params schema from path string if not provided by user
+
+### Patch Changes
+
+- 2ca9817: remove undocumented 'validate' option + undocumented regex export
+- 2ca9817: remove undocumented '
+
 ## 0.1.0-beta.2
 
 ### Minor Changes

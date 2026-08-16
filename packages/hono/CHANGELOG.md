@@ -1,5 +1,7 @@
 # @rest-rpc/hono
 
+## 0.1.0-beta.3
+
 ## 0.1.0-beta.2
 
 ## 0.1.0-beta.1
