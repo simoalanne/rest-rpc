@@ -1,5 +1,11 @@
 # @rest-rpc/core
 
+## 0.1.0-beta.5
+
+### Minor Changes
+
+- 83d3fb8: add support for declaring multiple content types for a route
+
 ## 0.1.0-beta.4
 
 ### Minor Changes
