@@ -22,6 +22,7 @@ import {
 	handleWebRoute,
 	type WebHandler,
 	type WebRouteHandlerContext,
+	type WebRouteRuntimeContext,
 } from "./http.ts";
 import { createWebRouteMatcher } from "./match.ts";
 
@@ -36,6 +37,7 @@ export type {
 	WebRouteHandlerContext,
 	WebRouteParseBody,
 	WebRouteParseBodyInput,
+	WebRouteRuntimeContext,
 } from "./http.ts";
 export type { RouteHandler };
 export { ContractResponseError, clearCookie, setCookie };
@@ -45,7 +47,7 @@ type WebContract = Contract<HttpRouteDeclaration>;
 export type RouteRequest<
 	E extends HttpRouteDeclaration,
 	TContext extends WebRouteHandlerContext = WebRouteHandlerContext,
-> = ServerInferRouteHandlerRequest<E, TContext>;
+> = ServerInferRouteHandlerRequest<E, WebRouteRuntimeContext<TContext>>;
 
 export type RouteResponse<E extends HttpRouteDeclaration> =
 	ServerInferRouteHandlerResponse<E>;
@@ -55,7 +57,7 @@ export const route = <
 	TContext extends WebRouteHandlerContext = WebRouteHandlerContext,
 >(
 	contract: TRoute,
-	handler: RouteHandler<TRoute, TContext>,
+	handler: RouteHandler<TRoute, WebRouteRuntimeContext<TContext>>,
 ): RouteImplementation<TRoute> =>
 	serverRoute(contract, handler as RouteHandlerFor<TRoute, TContext, TContext>);
 
@@ -64,7 +66,7 @@ export const router = <
 	TContext extends WebRouteHandlerContext = WebRouteHandlerContext,
 >(
 	contract: TContract,
-	handlers: ImplementationShape<TContract, TContext>,
+	handlers: ImplementationShape<TContract, WebRouteRuntimeContext<TContext>>,
 ): ImplementationTreeFor<TContract, HttpRouteDeclaration> =>
 	serverRouter(contract, handlers) as ImplementationTreeFor<
 		TContract,
@@ -113,11 +115,14 @@ export const initWeb = <
 	return {
 		route: <const TRoute extends HttpRouteDeclaration>(
 			contract: TRoute,
-			handler: RouteHandler<TRoute, TContext>,
+			handler: RouteHandler<TRoute, WebRouteRuntimeContext<TContext>>,
 		) => route<TRoute, TContext>(contract, handler),
 		router: <const TContract extends WebContract>(
 			contract: TContract,
-			handlers: ImplementationShape<TContract, TContext>,
+			handlers: ImplementationShape<
+				TContract,
+				WebRouteRuntimeContext<TContext>
+			>,
 		) => router<TContract, TContext>(contract, handlers),
 		routes,
 		createHandler: (

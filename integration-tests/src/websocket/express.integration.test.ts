@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { registerRoutes } from "@rest-rpc/express";
 import express from "express";
@@ -18,6 +19,9 @@ runWebSocketSuite({
 			webSocket: {
 				server,
 				webSocketServer,
+				beforeUpgrade: ({ context }) => {
+					assert.ok(context.signal instanceof AbortSignal);
+				},
 			},
 		});
 

@@ -18,7 +18,6 @@ import {
 	type ServerErrorHandlers,
 	type UpgradeRejection,
 } from "@rest-rpc/server";
-import type { Request } from "express";
 import type WebSocket from "ws";
 import type { WebSocketServer } from "ws";
 
@@ -28,6 +27,7 @@ export type ExpressWebSocketOptions = {
 	beforeUpgrade?: BeforeWebSocketUpgrade<{
 		kind: "websocket";
 		req: IncomingMessage;
+		signal: AbortSignal;
 	}>;
 };
 
@@ -101,16 +101,11 @@ const adaptWebSocket = (socket: WebSocket): RawWebSocket => ({
 export const registerExpressWebSocketRoutes = (
 	options: ExpressWebSocketOptions,
 	routes: RouteImplementation<WebSocketRouteDeclaration>[],
-	errorHandlers?: ServerErrorHandlers<
-		| {
-				kind: "http";
-				req: Request;
-		  }
-		| {
-				kind: "websocket";
-				req: IncomingMessage;
-		  }
-	>,
+	errorHandlers?: ServerErrorHandlers<{
+		kind: "websocket";
+		req: IncomingMessage;
+		signal: AbortSignal;
+	}>,
 ) => {
 	if (routes.length === 0) return;
 
@@ -140,6 +135,10 @@ export const registerExpressWebSocketRoutes = (
 
 		const implementation = implementationsByRoute.get(matchedRoute.route);
 		if (!implementation) return;
+		const controller = new AbortController();
+		const abort = () => controller.abort();
+		req.once("aborted", abort);
+		socket.once("close", abort);
 
 		const request = {
 			query: Object.fromEntries(url.searchParams),
@@ -149,20 +148,13 @@ export const registerExpressWebSocketRoutes = (
 		const upgrade = await prepareWebSocketUpgrade<{
 			kind: "websocket";
 			req: IncomingMessage;
+			signal: AbortSignal;
 		}>({
 			implementation,
 			request,
-			context: { kind: "websocket", req },
+			context: { kind: "websocket", req, signal: controller.signal },
 			beforeUpgrade: options.beforeUpgrade,
-			errorHandlers: errorHandlers as
-				| Pick<
-						ServerErrorHandlers<{
-							kind: "websocket";
-							req: IncomingMessage;
-						}>,
-						"onRequestValidationError"
-				  >
-				| undefined,
+			errorHandlers,
 		});
 
 		if (!upgrade.ok) {

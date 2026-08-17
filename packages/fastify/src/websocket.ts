@@ -13,9 +13,12 @@ import {
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 export type FastifyWebSocketOptions = {
-	beforeUpgrade?: BeforeWebSocketUpgrade<{ req: FastifyRequest }>;
+	beforeUpgrade?: BeforeWebSocketUpgrade<{
+		req: FastifyRequest;
+		signal: AbortSignal;
+	}>;
 	errorHandlers?: Pick<
-		ServerErrorHandlers<{ req: FastifyRequest }>,
+		ServerErrorHandlers<{ req: FastifyRequest; signal: AbortSignal }>,
 		"onRequestValidationError"
 	>;
 };
@@ -67,6 +70,12 @@ export const registerFastifyWebSocketRoutes = (
 			{
 				websocket: true,
 				async preValidation(req: FastifyRequest, reply: FastifyReply) {
+					const controller = new AbortController();
+					const abort = () => controller.abort();
+					req.raw.once("aborted", abort);
+					reply.raw.once("close", () => {
+						if (!reply.raw.writableFinished) abort();
+					});
 					const request = {
 						query: req.query,
 						pathParams: req.params,
@@ -75,7 +84,7 @@ export const registerFastifyWebSocketRoutes = (
 					const upgrade = await prepareWebSocketUpgrade({
 						implementation,
 						request,
-						context: { req },
+						context: { req, signal: controller.signal },
 						beforeUpgrade: options.beforeUpgrade,
 						errorHandlers: options.errorHandlers,
 					});

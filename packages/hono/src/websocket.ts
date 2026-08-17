@@ -16,9 +16,12 @@ import type { UpgradeWebSocket, WSContext, WSEvents } from "hono/ws";
 
 export type HonoWebSocketOptions<TEnv extends Env = Env> = {
 	upgradeWebSocket: UpgradeWebSocket;
-	beforeUpgrade?: BeforeWebSocketUpgrade<{ c: Context<TEnv> }>;
+	beforeUpgrade?: BeforeWebSocketUpgrade<{
+		c: Context<TEnv>;
+		signal: AbortSignal;
+	}>;
 	errorHandlers?: Pick<
-		ServerErrorHandlers<{ c: Context<TEnv> }>,
+		ServerErrorHandlers<{ c: Context<TEnv>; signal: AbortSignal }>,
 		"onRequestValidationError"
 	>;
 };
@@ -95,7 +98,7 @@ export const registerHonoWebSocketRoutes = <TEnv extends Env = Env>(
 			const upgrade = await prepareWebSocketUpgrade({
 				implementation,
 				request,
-				context: { c },
+				context: { c, signal: c.req.raw.signal },
 				beforeUpgrade: options.beforeUpgrade,
 				errorHandlers: options.errorHandlers,
 			});

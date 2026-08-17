@@ -87,6 +87,12 @@ Options include:
 - `unknownRequestKeys`
 - `validateResponses`
 
+`timeoutMs` limits the time spent waiting for the configured `fetch` function to
+return a `Response`. It starts after `getGlobalHeaders()` resolves and is cleared
+as soon as the response is received. It does not include response body parsing,
+stream consumption, or other work before or after `fetch`. Pass an `AbortSignal`
+in a route call when you need to cancel later response or stream consumption.
+
 `origin` must be an absolute URL origin without a path, search, or hash. Put
 API path prefixes in route paths so the fetch client, server adapters, OpenAPI,
 and cache tags share the same route identity.

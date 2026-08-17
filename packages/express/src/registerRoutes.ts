@@ -11,10 +11,22 @@ import {
 
 export type RegisterRoutesOptions = {
 	errorHandlers?: ServerErrorHandlers<
-		{ kind: "http"; req: Request } | { kind: "websocket"; req: IncomingMessage }
+		| { kind: "http"; req: Request; signal: AbortSignal }
+		| { kind: "websocket"; req: IncomingMessage; signal: AbortSignal }
 	>;
 	webSocket?: ExpressWebSocketOptions;
 };
+
+type ExpressHttpErrorHandlers = ServerErrorHandlers<{
+	req: Request;
+	signal: AbortSignal;
+}>;
+
+type ExpressWebSocketErrorHandlers = ServerErrorHandlers<{
+	kind: "websocket";
+	req: IncomingMessage;
+	signal: AbortSignal;
+}>;
 
 export const registerRoutes = (
 	app: Application,
@@ -23,12 +35,17 @@ export const registerRoutes = (
 ) =>
 	registerRouteImplementations(
 		implementations,
-		(routes) => registerExpressHttpRoutes(app, routes, options.errorHandlers),
+		(routes) =>
+			registerExpressHttpRoutes(
+				app,
+				routes,
+				options.errorHandlers as ExpressHttpErrorHandlers | undefined,
+			),
 		(routes) =>
 			options.webSocket &&
 			registerExpressWebSocketRoutes(
 				options.webSocket,
 				routes,
-				options.errorHandlers,
+				options.errorHandlers as ExpressWebSocketErrorHandlers | undefined,
 			),
 	);

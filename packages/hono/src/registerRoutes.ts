@@ -13,7 +13,10 @@ import {
 } from "./websocket.ts";
 
 export type RegisterRoutesOptions<TEnv extends Env = Env> = {
-	errorHandlers?: ServerErrorHandlers<{ c: Context<TEnv> }>;
+	errorHandlers?: ServerErrorHandlers<{
+		c: Context<TEnv>;
+		signal: AbortSignal;
+	}>;
 	parseBody?: HonoParseBody<TEnv>;
 	webSocket?: HonoWebSocketOptions<TEnv>;
 };

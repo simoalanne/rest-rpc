@@ -246,7 +246,7 @@ export const executeRequest = async <E extends RouteDeclaration>(
 	route: E,
 	args: FetchArgs<E>,
 	options: ExecuteRequestOptions,
-): Promise<{ rawResponse: Response; cleanup: () => void }> => {
+): Promise<Response> => {
 	const { requestArgs, options: fetchOptions } = extractArgs(route, args);
 	const {
 		url,
@@ -260,12 +260,12 @@ export const executeRequest = async <E extends RouteDeclaration>(
 		options.unknownRequestKeys,
 	);
 
+	const headers = (await options.getGlobalHeaders?.()) ?? {};
+	assertNoContentTypeHeader(headers);
 	const signalState = createRequestSignal(
 		fetchOptions?.signal,
 		options.timeoutMs,
 	);
-	const headers = (await options.getGlobalHeaders?.()) ?? {};
-	assertNoContentTypeHeader(headers);
 
 	try {
 		const init = addNextFetchTags(
@@ -287,14 +287,8 @@ export const executeRequest = async <E extends RouteDeclaration>(
 		);
 		const fetchImpl =
 			options.fetch ?? ((input, init) => globalThis.fetch(input, init));
-		const rawResponse = await fetchImpl(url, init);
-
-		return {
-			rawResponse,
-			cleanup: () => signalState?.cleanup(),
-		};
-	} catch (error) {
+		return await fetchImpl(url, init);
+	} finally {
 		signalState?.cleanup();
-		throw error;
 	}
 };

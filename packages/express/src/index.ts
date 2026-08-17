@@ -37,6 +37,7 @@ export { ContractResponseError, clearCookie, createRouteMatcher, setCookie };
 
 export type HttpRouteHandlerContext = {
 	req: Request;
+	signal: AbortSignal;
 };
 
 export type WebSocketRouteHandlerContext = {

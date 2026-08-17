@@ -9,7 +9,10 @@ import {
 } from "./websocket.ts";
 
 export type RegisterRoutesOptions = {
-	errorHandlers?: ServerErrorHandlers<{ req: FastifyRequest }>;
+	errorHandlers?: ServerErrorHandlers<{
+		req: FastifyRequest;
+		signal: AbortSignal;
+	}>;
 	webSocket?: FastifyWebSocketOptions;
 };
 

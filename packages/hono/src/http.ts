@@ -39,7 +39,10 @@ export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 	app: Hono<TEnv>,
 	routes: RouteImplementation<HttpRouteDeclaration>[],
 	parseBody: HonoParseBody<TEnv> = defaultParseBody,
-	errorHandlers?: ServerErrorHandlers<{ c: Context<TEnv> }>,
+	errorHandlers?: ServerErrorHandlers<{
+		c: Context<TEnv>;
+		signal: AbortSignal;
+	}>,
 ) => {
 	for (const implementation of routes) {
 		const route: HttpRouteDeclaration = implementation.route;
@@ -56,7 +59,7 @@ export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 					pathParams: c.req.param(),
 					headers: c.req.header(),
 				},
-				context: { c },
+				context: { c, signal: c.req.raw.signal },
 				errorHandlers,
 			});
 

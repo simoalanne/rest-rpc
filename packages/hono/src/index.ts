@@ -38,6 +38,7 @@ export { ContractResponseError, clearCookie, createRouteMatcher, setCookie };
 
 export type HttpRouteHandlerContext<E extends Env = Env> = {
 	c: Context<E>;
+	signal: AbortSignal;
 };
 
 export type WebSocketRouteHandlerContext<E extends Env = Env> = {

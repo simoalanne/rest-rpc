@@ -113,4 +113,30 @@ describe("ApiClient streams", () => {
 
 		assert.equal(body.locked, false);
 	});
+
+	it("cancels the underlying stream when iteration ends early", async () => {
+		let cancelled = false;
+		const encoder = new TextEncoder();
+		const body = new ReadableStream<Uint8Array>({
+			start(controller) {
+				controller.enqueue(encoder.encode('{"id":"one"}\n'));
+				controller.enqueue(encoder.encode('{"id":"two"}\n'));
+			},
+			cancel() {
+				cancelled = true;
+			},
+		});
+
+		for await (const event of parseNdjsonStream(
+			type<{ id: string }>(),
+			body,
+			false,
+		)) {
+			assert.deepEqual(event, { id: "one" });
+			break;
+		}
+
+		assert.equal(cancelled, true);
+		assert.equal(body.locked, false);
+	});
 });

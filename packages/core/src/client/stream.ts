@@ -9,11 +9,15 @@ export async function* parseNdjsonStream(
 	const reader = body.getReader();
 	const decoder = new TextDecoder();
 	let buffer = "";
+	let completed = false;
 
 	try {
 		while (true) {
 			const { done, value } = await reader.read();
-			if (done) break;
+			if (done) {
+				completed = true;
+				break;
+			}
 
 			buffer += decoder.decode(value, { stream: true });
 			const lines = buffer.split("\n");
@@ -37,6 +41,7 @@ export async function* parseNdjsonStream(
 			const value = JSON.parse(buffer);
 			if (!validate) {
 				yield value;
+				completed = true;
 				return;
 			}
 			const result = await validateStandardSchema(schema, value);
@@ -44,6 +49,9 @@ export async function* parseNdjsonStream(
 			yield result.value;
 		}
 	} finally {
+		if (!completed) {
+			await reader.cancel().catch(() => undefined);
+		}
 		reader.releaseLock();
 	}
 }

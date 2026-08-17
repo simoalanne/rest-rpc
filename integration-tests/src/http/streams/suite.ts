@@ -3,12 +3,14 @@ import { after, before, describe, it } from "node:test";
 import { initClient } from "@rest-rpc/core";
 import type { StartedServer } from "../harness/listen.ts";
 import { streamsContract } from "./contract.ts";
+import type { StreamCancellationProbe } from "./handlers.ts";
 
 type StreamsClient = ReturnType<typeof initClient<typeof streamsContract>>;
 
 type StreamsSuiteAdapter = {
 	name: string;
 	start(): Promise<StartedServer>;
+	cancellationProbe?: StreamCancellationProbe;
 };
 
 const collectAsyncIterable = async <T>(iterable: AsyncIterable<T>) => {
@@ -64,6 +66,22 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 				await response.text(),
 				'{"id":"event-1","index":1}\n{"id":"event-2","index":2}\n',
 			);
+		});
+
+		it("propagates client NDJSON iterator cancellation to server stream producers", async () => {
+			if (!adapter.cancellationProbe) {
+				throw new Error("Streams suite adapter is missing cancellation probe");
+			}
+			adapter.cancellationProbe.reset();
+			const stream = await client.cancellable.fetch();
+
+			for await (const event of stream) {
+				assert.deepEqual(event, { id: "event-1", index: 1 });
+				break;
+			}
+
+			await adapter.cancellationProbe.waitForSignalAborted();
+			await adapter.cancellationProbe.waitForFinalized();
 		});
 
 		it("does not JSON-frame raw custom streams", async () => {

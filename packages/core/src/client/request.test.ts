@@ -686,6 +686,56 @@ describe("ApiClient requests", () => {
 		assert.equal(abortEventCount, 0);
 	});
 
+	it("does not start the request timeout when global headers reject", async (t) => {
+		const timeout = t.mock.method(
+			globalThis,
+			"setTimeout",
+			(() =>
+				0 as unknown as ReturnType<typeof setTimeout>) as typeof setTimeout,
+		);
+		const client = initClient(createClientTestContract(), {
+			origin: "https://api.test",
+			timeoutMs: 10_000,
+			getGlobalHeaders: async () => {
+				throw new Error("headers unavailable");
+			},
+		});
+
+		await assert.rejects(
+			() => client.todos.list.fetch({ search: "milk" }),
+			/headers unavailable/,
+		);
+
+		assert.equal(timeout.mock.callCount(), 0);
+	});
+
+	it("clears the request timeout before response parsing", async () => {
+		let requestSignal: AbortSignal | null | undefined;
+		globalThis.fetch = async (_url, init) => {
+			requestSignal = init?.signal;
+			return new Response(
+				new ReadableStream({
+					async start(controller) {
+						await new Promise((resolve) => setTimeout(resolve, 15));
+						controller.enqueue(
+							new TextEncoder().encode(JSON.stringify([{ id: "todo-1" }])),
+						);
+						controller.close();
+					},
+				}),
+				{ status: 200, headers: { "content-type": "application/json" } },
+			);
+		};
+		const client = initClient(createClientTestContract(), {
+			origin: "https://api.test",
+			timeoutMs: 5,
+		});
+
+		await client.todos.list.fetch({ search: "milk" });
+
+		assert.equal(requestSignal?.aborted, false);
+	});
+
 	it("creates timeout signals that abort and can be cleaned up", async () => {
 		const signalState = createRequestSignal(undefined, 5);
 		assert.ok(signalState);

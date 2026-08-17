@@ -21,10 +21,23 @@ const toStream = (
 		})(),
 	);
 
+const createRequestSignal = (req: FastifyRequest, reply: FastifyReply) => {
+	const controller = new AbortController();
+	const abort = () => controller.abort();
+	req.raw.once("aborted", abort);
+	reply.raw.once("close", () => {
+		if (!reply.raw.writableFinished) abort();
+	});
+	return controller.signal;
+};
+
 export const registerFastifyHttpRoutes = (
 	app: FastifyInstance,
 	routes: RouteImplementation<HttpRouteDeclaration>[],
-	errorHandlers?: ServerErrorHandlers<{ req: FastifyRequest }>,
+	errorHandlers?: ServerErrorHandlers<{
+		req: FastifyRequest;
+		signal: AbortSignal;
+	}>,
 ) => {
 	for (const implementation of routes) {
 		const route: HttpRouteDeclaration = implementation.route;
@@ -34,6 +47,7 @@ export const registerFastifyHttpRoutes = (
 		app[method](
 			toColonPath(route.path),
 			async (req: FastifyRequest, reply: FastifyReply) => {
+				const signal = createRequestSignal(req, reply);
 				const result = await handleHttpRoute(route, handler, {
 					request: {
 						body: req.body,
@@ -41,7 +55,7 @@ export const registerFastifyHttpRoutes = (
 						pathParams: req.params,
 						headers: req.headers,
 					},
-					context: { req },
+					context: { req, signal },
 					errorHandlers,
 				});
 

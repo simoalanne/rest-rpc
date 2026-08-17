@@ -147,7 +147,7 @@ const readDeclaredHeaders = async (
 export type RouteRequestFn = <E extends RouteDeclaration>(
 	route: E,
 	...args: FetchArgs<E>
-) => Promise<{ rawResponse: Response; cleanup: () => void }>;
+) => Promise<Response>;
 
 export const fetchResponse = async <E extends RouteDeclaration>(
 	request: RouteRequestFn,
@@ -155,34 +155,30 @@ export const fetchResponse = async <E extends RouteDeclaration>(
 	route: E,
 	...args: FetchArgs<E>
 ): Promise<ClientFetchResponse<E>> => {
-	const { rawResponse, cleanup } = await request(route, ...args);
+	const rawResponse = await request(route, ...args);
 
-	try {
-		const schema = getResponseSchema(route, rawResponse.status);
-		if (!schema) {
-			return {
-				declared: false,
-				status: rawResponse.status,
-				body: await readUnknownBody(rawResponse),
-				headers: rawResponse.headers,
-			} as ClientFetchResponse<E>;
-		}
-
+	const schema = getResponseSchema(route, rawResponse.status);
+	if (!schema) {
 		return {
-			declared: true,
+			declared: false,
 			status: rawResponse.status,
-			body: await readDeclaredBody(
-				getResponseBody(schema),
-				rawResponse,
-				validateResponse,
-			),
+			body: await readUnknownBody(rawResponse),
 			headers: rawResponse.headers,
-			...(await readDeclaredHeaders(schema, rawResponse, validateResponse)),
-			...declaredResponseMetadata(schema, rawResponse),
 		} as ClientFetchResponse<E>;
-	} finally {
-		cleanup();
 	}
+
+	return {
+		declared: true,
+		status: rawResponse.status,
+		body: await readDeclaredBody(
+			getResponseBody(schema),
+			rawResponse,
+			validateResponse,
+		),
+		headers: rawResponse.headers,
+		...(await readDeclaredHeaders(schema, rawResponse, validateResponse)),
+		...declaredResponseMetadata(schema, rawResponse),
+	} as ClientFetchResponse<E>;
 };
 
 export const fetchSuccess = async <E extends RouteDeclaration>(

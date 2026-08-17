@@ -40,9 +40,14 @@ export const createWebAdapter = (
 
 		return listen(
 			createServer(async (req, res) => {
+				const controller = new AbortController();
+				res.once("close", () => {
+					if (!res.writableFinished) controller.abort();
+				});
 				const request = new Request(`http://127.0.0.1${req.url}`, {
 					method: req.method,
 					headers: req.headers as HeadersInit,
+					signal: controller.signal,
 					body: withoutBody(req.method)
 						? undefined
 						: (Readable.toWeb(req) as ReadableStream),
@@ -60,7 +65,31 @@ export const createWebAdapter = (
 				res.writeHead(response.status, toNodeResponseHeaders(response.headers));
 				try {
 					if (response.body) {
-						for await (const chunk of response.body) res.write(chunk);
+						const iterator = response.body[Symbol.asyncIterator]();
+						let closed = false;
+						let finished = false;
+						const closeIterator = async () => {
+							try {
+								await iterator.return?.();
+							} catch {}
+						};
+						const onClose = () => {
+							if (finished) return;
+							closed = true;
+							void closeIterator();
+						};
+						res.on("close", onClose);
+						try {
+							while (!closed) {
+								const { done, value } = await iterator.next();
+								if (done || closed) break;
+								res.write(value);
+							}
+							finished = true;
+						} finally {
+							finished = true;
+							res.off("close", onClose);
+						}
 					}
 					res.end();
 				} catch (error) {

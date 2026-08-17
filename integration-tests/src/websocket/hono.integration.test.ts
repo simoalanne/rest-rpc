@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import type { Server } from "node:http";
 import { createAdaptorServer } from "@hono/node-server";
 import { createNodeWebSocket } from "@hono/node-ws";
@@ -18,6 +19,9 @@ runWebSocketSuite({
 		registerRoutes(app, createWebSocketImplementations("hono"), {
 			webSocket: {
 				upgradeWebSocket,
+				beforeUpgrade: ({ context }) => {
+					assert.ok(context.signal instanceof AbortSignal);
+				},
 			},
 		});
 

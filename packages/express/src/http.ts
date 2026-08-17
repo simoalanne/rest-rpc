@@ -1,4 +1,3 @@
-import type { IncomingMessage } from "node:http";
 import type { HttpMethod, HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import { toColonPath } from "@rest-rpc/core/contract";
 import {
@@ -23,24 +22,55 @@ const writeStreamResponse = async (
 ) => {
 	res.status(statusCode);
 	res.setHeader("content-type", contentType);
+	const iterator = result[Symbol.asyncIterator]();
+	let closed = false;
+	let finished = false;
+	const closeIterator = async () => {
+		try {
+			await iterator.return?.();
+		} catch {}
+	};
+	const onClose = () => {
+		if (finished) return;
+		closed = true;
+		void closeIterator();
+	};
+	res.on("close", onClose);
 
 	try {
-		for await (const chunk of result) {
+		while (!closed) {
+			const { done, value: chunk } = await iterator.next();
+			if (done || closed) break;
 			res.write(mode === "ndjson" ? `${JSON.stringify(chunk)}\n` : chunk);
 		}
 
-		res.end();
+		finished = true;
+		if (!closed) res.end();
 	} catch (error) {
 		res.destroy(error instanceof Error ? error : undefined);
+	} finally {
+		finished = true;
+		res.off("close", onClose);
 	}
+};
+
+const createRequestSignal = (req: Request, res: Response) => {
+	const controller = new AbortController();
+	const abort = () => controller.abort();
+	req.once("aborted", abort);
+	res.once("close", () => {
+		if (!res.writableFinished) abort();
+	});
+	return controller.signal;
 };
 
 export const registerExpressHttpRoutes = (
 	app: Application,
 	routes: RouteImplementation<HttpRouteDeclaration>[],
-	errorHandlers?: ServerErrorHandlers<
-		{ kind: "http"; req: Request } | { kind: "websocket"; req: IncomingMessage }
-	>,
+	errorHandlers?: ServerErrorHandlers<{
+		req: Request;
+		signal: AbortSignal;
+	}>,
 ) => {
 	for (const implementation of routes) {
 		const route: HttpRouteDeclaration = implementation.route;
@@ -48,6 +78,7 @@ export const registerExpressHttpRoutes = (
 		const handler = implementation.handler;
 
 		const serviceHandler = async (req: Request, res: ExpressResponse) => {
+			const signal = createRequestSignal(req, res);
 			const result = await handleHttpRoute(route, handler, {
 				request: {
 					body: req.body,
@@ -55,11 +86,9 @@ export const registerExpressHttpRoutes = (
 					pathParams: req.params,
 					headers: req.headers,
 				},
-				context: { req },
-				errorContext: { kind: "http", req },
-				errorHandlers: errorHandlers as
-					| ServerErrorHandlers<{ req: Request }>
-					| undefined,
+				context: { req, signal },
+				errorContext: { kind: "http", req, signal },
+				errorHandlers,
 			});
 
 			return handleHttpRouteResult(result, {

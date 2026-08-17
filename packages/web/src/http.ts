@@ -12,6 +12,11 @@ import {
 
 export type WebRouteHandlerContext = Record<string, unknown>;
 
+export type WebRouteRuntimeContext<TContext extends WebRouteHandlerContext> =
+	TContext & {
+		signal: AbortSignal;
+	};
+
 type IsOptionalWebContext<TContext extends WebRouteHandlerContext> =
 	keyof TContext extends never
 		? true
@@ -39,7 +44,7 @@ export type WebRouteParseBody = (
 export type CreateWebHandlerOptions<
 	TContext extends WebRouteHandlerContext = WebRouteHandlerContext,
 > = {
-	errorHandlers?: ServerErrorHandlers<TContext>;
+	errorHandlers?: ServerErrorHandlers<WebRouteRuntimeContext<TContext>>;
 	parseBody?: WebRouteParseBody;
 };
 
@@ -71,9 +76,15 @@ export const handleWebRoute = async <TContext extends WebRouteHandlerContext>(
 	implementation: RouteImplementation<HttpRouteDeclaration>,
 	params: Record<string, string>,
 	parseBody: WebRouteParseBody,
-	errorHandlers: ServerErrorHandlers<TContext> | undefined,
+	errorHandlers:
+		| ServerErrorHandlers<WebRouteRuntimeContext<TContext>>
+		| undefined,
 ) => {
 	const url = new URL(request.url);
+	const runtimeContext = {
+		...context,
+		signal: request.signal,
+	} as WebRouteRuntimeContext<TContext>;
 	const result = await handleHttpRoute(
 		implementation.route,
 		implementation.handler,
@@ -88,7 +99,7 @@ export const handleWebRoute = async <TContext extends WebRouteHandlerContext>(
 				pathParams: params,
 				headers: readHeaders(request.headers),
 			},
-			context,
+			context: runtimeContext,
 			errorHandlers,
 		},
 	);

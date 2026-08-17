@@ -21,6 +21,13 @@ export const streamsContract = router({
 			200: stream(eventSchema),
 		},
 	},
+	cancellable: {
+		method: "GET",
+		path: "/streams/cancellable",
+		responses: {
+			200: stream(eventSchema),
+		},
+	},
 	rawText: {
 		method: "GET",
 		path: "/streams/raw-text",

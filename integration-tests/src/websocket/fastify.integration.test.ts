@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import websocket from "@fastify/websocket";
 import { registerRoutes } from "@rest-rpc/fastify";
 import Fastify from "fastify";
@@ -11,7 +12,11 @@ runWebSocketSuite({
 		await app.register(websocket);
 
 		registerRoutes(app, createWebSocketImplementations("fastify"), {
-			webSocket: {},
+			webSocket: {
+				beforeUpgrade: ({ context }) => {
+					assert.ok(context.signal instanceof AbortSignal);
+				},
+			},
 		});
 
 		const origin = await app.listen({ host: "127.0.0.1", port: 0 });
