@@ -24,7 +24,7 @@ export const runResponsesSuite = (adapter: ResponsesSuiteAdapter) => {
 
 		before(async () => {
 			server = await adapter.start();
-			client = initClient(responsesContract, { origin: server.origin });
+			client = initClient(responsesContract, { baseUrl: server.origin });
 		});
 
 		after(async () => {

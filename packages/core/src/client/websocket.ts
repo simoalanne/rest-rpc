@@ -13,7 +13,7 @@ export const buildWebSocketUrl = (url: string) => {
 };
 
 export type WebSocketConnectionOptions = {
-	origin: string;
+	baseUrl: string;
 	unknownRequestKeys: "throw" | "strip";
 	validateIncomingMessages: boolean;
 };
@@ -29,7 +29,7 @@ export const openConnection = <E extends WebSocketRouteDeclaration>(
 
 	const requestArgs = takesRequestInput(route) ? args[0] : undefined;
 	const { url } = constructBaseRequest(
-		options.origin,
+		options.baseUrl,
 		route,
 		requestArgs,
 		options.unknownRequestKeys,

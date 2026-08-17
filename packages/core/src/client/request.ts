@@ -153,7 +153,7 @@ const serializeQuery = (route: RouteDeclaration, query: unknown) => {
 };
 
 export const constructBaseRequest = (
-	origin: string,
+	baseUrl: string,
 	route: RouteDeclaration,
 	args: FlatRequestInput | undefined,
 	unknownRequestKeys: "throw" | "strip",
@@ -163,13 +163,13 @@ export const constructBaseRequest = (
 	contentType?: string;
 	headers?: Record<string, string>;
 } => {
-	let urlBase = `${origin}${route.path}`;
+	let urlBase = `${baseUrl}${route.path}`;
 	if (!args) return { url: urlBase };
 
 	const request = groupRequestInput(route, args, { unknownRequestKeys });
 	const { body, query, pathParams, headers } = request;
 
-	urlBase = `${origin}${serializeParams(route, pathParams)}${serializeQuery(route, query)}`;
+	urlBase = `${baseUrl}${serializeParams(route, pathParams)}${serializeQuery(route, query)}`;
 
 	if (isCustomBody(route.body)) {
 		const { contentType, payload } = Array.isArray(route.body.contentType)
@@ -204,7 +204,7 @@ export const extractArgs = (route: RouteDeclaration, args: unknown[]) => {
 };
 
 export type ExecuteRequestOptions = {
-	origin: string;
+	baseUrl: string;
 	fetch?: FetchLike;
 	fetchOptions?: ApiClientFetchOptions;
 	getGlobalHeaders?: GetHeadersFn;
@@ -254,7 +254,7 @@ export const executeRequest = async <E extends RouteDeclaration>(
 		contentType,
 		headers: requestHeaders,
 	} = constructBaseRequest(
-		options.origin,
+		options.baseUrl,
 		route,
 		requestArgs,
 		options.unknownRequestKeys,

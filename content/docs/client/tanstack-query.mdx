@@ -30,7 +30,7 @@ import { initTanstackQuery } from "@rest-rpc/tanstack-query";
 import { api } from "./contract";
 
 export const tq = initTanstackQuery(api, {
-	origin: "https://api.example.com",
+	baseUrl: "https://api.example.com",
 	getGlobalHeaders: () => ({
 		authorization: `Bearer ${readToken()}`,
 	}),

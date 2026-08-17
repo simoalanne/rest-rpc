@@ -55,7 +55,7 @@ describe("ApiClient websockets", () => {
 	it("rejects opening connections when WebSocket is unavailable", () => {
 		globalThis.WebSocket = undefined as unknown as typeof WebSocket;
 		const client = initClient(createClientTestContract(), {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 		});
 
 		assert.throws(
@@ -67,7 +67,7 @@ describe("ApiClient websockets", () => {
 	it("builds websocket URLs from route params", () => {
 		globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
 		const client = initClient(createClientTestContract(), {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 		});
 
 		client.socket.join.openConnection({ roomId: "room 1" });
@@ -78,7 +78,7 @@ describe("ApiClient websockets", () => {
 	it("serializes sent messages when the socket is open", () => {
 		globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
 		const client = initClient(createClientTestContract(), {
-			origin: "http://api.test",
+			baseUrl: "http://api.test",
 		});
 		const socket = client.socket.join.openConnection({ roomId: "general" });
 		instances[0].readyState = FakeWebSocket.OPEN;
@@ -92,7 +92,7 @@ describe("ApiClient websockets", () => {
 	it("rejects sends before the socket is open", () => {
 		globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
 		const client = initClient(createClientTestContract(), {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 		});
 		const socket = client.socket.join.openConnection({ roomId: "general" });
 
@@ -105,7 +105,7 @@ describe("ApiClient websockets", () => {
 	it("delivers valid incoming messages", () => {
 		globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
 		const client = initClient(createClientTestContract(), {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 		});
 		const socket = client.socket.join.openConnection({ roomId: "general" });
 		const messages: unknown[] = [];
@@ -121,7 +121,7 @@ describe("ApiClient websockets", () => {
 	it("removes event listeners with unsubscribe callbacks", () => {
 		globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
 		const client = initClient(createClientTestContract(), {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 		});
 		const socket = client.socket.join.openConnection({ roomId: "general" });
 		let openCount = 0;
@@ -180,7 +180,7 @@ describe("ApiClient websockets", () => {
 			},
 		});
 		const client = initClient(apiContract, {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 		});
 		const socket = client.socket.join.openConnection({ roomId: "general" });
 		const messages: unknown[] = [];
@@ -221,7 +221,7 @@ describe("ApiClient websockets", () => {
 			},
 		});
 		const client = initClient(apiContract, {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 			validateResponses: true,
 		});
 		const socket = client.socket.join.openConnection({ roomId: "general" });
@@ -263,7 +263,7 @@ describe("ApiClient websockets", () => {
 			},
 		});
 		const client = initClient(apiContract, {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 		});
 		const socket = client.socket.join.openConnection({ roomId: "general" });
 		const messages: Array<{ createdAt: unknown }> = [];
@@ -302,7 +302,7 @@ describe("ApiClient websockets", () => {
 			},
 		});
 		const client = initClient(apiContract, {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 			validateResponses: true,
 		});
 		const socket = client.socket.join.openConnection({ roomId: "general" });
@@ -347,7 +347,7 @@ describe("ApiClient websockets", () => {
 			},
 		});
 		const client = initClient(apiContract, {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 			validateResponses: true,
 		});
 		const socket = client.socket.join.openConnection({ roomId: "general" });
@@ -382,7 +382,7 @@ describe("ApiClient websockets", () => {
 			},
 		});
 		const client = initClient(apiContract, {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 			validateResponses: true,
 		});
 		const socket = client.socket.join.openConnection({ roomId: "general" });

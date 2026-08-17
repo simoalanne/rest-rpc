@@ -20,7 +20,7 @@ describe("ApiClient responses", () => {
 	it("returns declared response metadata from fetchResponse", async () => {
 		captureFetch(jsonResponse({ code: "not_found" }, 404));
 		const client = initClient(createClientTestContract(), {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 		});
 
 		const response = await client.todos.get.fetchResponse({ id: "missing" });
@@ -63,7 +63,7 @@ describe("ApiClient responses", () => {
 			},
 		});
 		const client = initClient(apiContract, {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 			validateResponses: true,
 		});
 
@@ -81,7 +81,7 @@ describe("ApiClient responses", () => {
 	it("rejects fetch when the response is not a declared success", async () => {
 		captureFetch(jsonResponse({ code: "not_found" }, 404));
 		const client = initClient(createClientTestContract(), {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 		});
 
 		await assert.rejects(
@@ -93,7 +93,7 @@ describe("ApiClient responses", () => {
 	it("returns undeclared JSON response bodies", async () => {
 		captureFetch(jsonResponse({ code: "teapot" }, 418));
 		const client = initClient(createClientTestContract(), {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 		});
 
 		const response = await client.todos.get.fetchResponse({ id: "todo-1" });
@@ -113,7 +113,7 @@ describe("ApiClient responses", () => {
 				: new Response("plain error", { status: 418 }),
 		);
 		const client = initClient(createClientTestContract(), {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 		});
 
 		const textResponse = await client.todos.get.fetchResponse({ id: "text" });
@@ -126,7 +126,7 @@ describe("ApiClient responses", () => {
 	it("trusts declared response bodies by default", async () => {
 		captureFetch(jsonResponse({ id: 123 }, 201));
 		const client = initClient(createClientTestContract(), {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 		});
 
 		const response = await client.todos.create.fetch({ title: "Buy milk" });
@@ -137,7 +137,7 @@ describe("ApiClient responses", () => {
 	it("validates declared response bodies when configured", async () => {
 		captureFetch(jsonResponse({ id: 123 }, 201));
 		const client = initClient(createClientTestContract(), {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 			validateResponses: true,
 		});
 
@@ -179,7 +179,7 @@ describe("ApiClient responses", () => {
 
 		captureFetch(jsonResponse(wireBody, 200));
 		const client = initClient(apiContract, {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 		});
 
 		const response = await client.todos.get.fetch({ id: "todo-1" });
@@ -223,7 +223,7 @@ describe("ApiClient responses", () => {
 
 		captureFetch(jsonResponse(wireBody, 200));
 		const client = initClient(apiContract, {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 			validateResponses: true,
 		});
 
@@ -256,7 +256,7 @@ describe("ApiClient responses", () => {
 
 		captureFetch(jsonResponse(wireBody, 200));
 		const client = initClient(apiContract, {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 		});
 		const response = await client.todos.get.fetch({ id: "todo-1" });
 
@@ -289,7 +289,7 @@ describe("ApiClient responses", () => {
 
 		captureFetch(jsonResponse(wireBody, 200));
 		const client = initClient(apiContract, {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 			validateResponses: true,
 		});
 		const response = await client.todos.get.fetch({ id: "todo-1" });
@@ -323,7 +323,7 @@ describe("ApiClient responses", () => {
 
 		captureFetch(jsonResponse(wireBody, 200));
 		const client = initClient(apiContract, {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 		});
 		const response = await client.todos.get.fetch({ id: "todo-1" });
 
@@ -354,7 +354,7 @@ describe("ApiClient responses", () => {
 
 		captureFetch(jsonResponse(wireBody, 200));
 		const trustingClient = initClient(apiContract, {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 		});
 		const trusted = await trustingClient.todos.get.fetch({ id: "todo-1" });
 
@@ -362,7 +362,7 @@ describe("ApiClient responses", () => {
 
 		captureFetch(jsonResponse(wireBody, 200));
 		const validatingClient = initClient(apiContract, {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 			validateResponses: true,
 		});
 
@@ -385,7 +385,7 @@ describe("ApiClient responses", () => {
 			},
 		});
 		captureFetch(new Response(null, { status: 204 }));
-		const client = initClient(apiContract, { origin: "https://api.test" });
+		const client = initClient(apiContract, { baseUrl: "https://api.test" });
 
 		const response = await client.todos.remove.fetch({ id: "todo-1" });
 
@@ -414,7 +414,7 @@ describe("ApiClient responses", () => {
 			}),
 		);
 		const client = initClient(apiContract, {
-			origin: "https://api.test",
+			baseUrl: "https://api.test",
 			validateResponses: true,
 		});
 
@@ -448,7 +448,7 @@ describe("ApiClient responses", () => {
 				headers: { "content-type": "image/jpeg; charset=binary" },
 			}),
 		);
-		const client = initClient(apiContract, { origin: "https://api.test" });
+		const client = initClient(apiContract, { baseUrl: "https://api.test" });
 
 		const response = await client.reports.image.fetchResponse();
 
@@ -480,7 +480,7 @@ describe("ApiClient responses", () => {
 				headers: { "content-type": "application/json" },
 			}),
 		);
-		const client = initClient(apiContract, { origin: "https://api.test" });
+		const client = initClient(apiContract, { baseUrl: "https://api.test" });
 
 		await assert.rejects(
 			() => client.reports.csv.fetchResponse(),
@@ -511,7 +511,7 @@ describe("ApiClient responses", () => {
 				headers: { "content-type": "text/csv" },
 			}),
 		);
-		const client = initClient(apiContract, { origin: "https://api.test" });
+		const client = initClient(apiContract, { baseUrl: "https://api.test" });
 
 		const response = await client.reports.csv.fetch();
 

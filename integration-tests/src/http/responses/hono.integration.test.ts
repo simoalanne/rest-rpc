@@ -98,7 +98,7 @@ describe("hono response lifecycle integration", () => {
 				errorHandlers: responseErrorHandlers,
 			},
 		}).start();
-		client = initClient(lifecycleContract, { origin: server.origin });
+		client = initClient(lifecycleContract, { baseUrl: server.origin });
 	});
 
 	after(async () => {

@@ -27,7 +27,7 @@ describe("initTanstackQuery", () => {
 			},
 		});
 		const api = module.initTanstackQuery(apiContract, {
-			origin: "http://localhost:3001",
+			baseUrl: "http://localhost:3001",
 			timeoutMs: 1000,
 		});
 
@@ -35,7 +35,7 @@ describe("initTanstackQuery", () => {
 			[
 				apiContract,
 				{
-					origin: "http://localhost:3001",
+					baseUrl: "http://localhost:3001",
 					timeoutMs: 1000,
 				},
 			],

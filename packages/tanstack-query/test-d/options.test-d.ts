@@ -42,7 +42,7 @@ const queryApi = router({
 });
 
 const queryTq = initTanstackQuery(queryApi, {
-	origin: "https://example.test",
+	baseUrl: "https://example.test",
 });
 
 const getOptions = queryTq.todos.get.queryOptions({ id: "todo-1" });
@@ -140,7 +140,7 @@ const streamApi = router({
 });
 
 const streamTq = initTanstackQuery(streamApi, {
-	origin: "https://example.test",
+	baseUrl: "https://example.test",
 });
 
 const streamOptions = streamTq.events.list.queryOptions();
@@ -214,7 +214,7 @@ const mutationApi = router({
 });
 
 const mutationTq = initTanstackQuery(mutationApi, {
-	origin: "https://example.test",
+	baseUrl: "https://example.test",
 });
 
 mutationTq.todos.create.mutationOptions({
@@ -255,7 +255,7 @@ const pageApi = router({
 });
 
 const pageTq = initTanstackQuery(pageApi, {
-	origin: "https://example.test",
+	baseUrl: "https://example.test",
 });
 
 const infiniteOptions = pageTq.todos.page.infiniteQueryOptions({
@@ -354,7 +354,7 @@ const invalidApi = router({
 });
 
 const invalidTq = initTanstackQuery(invalidApi, {
-	origin: "https://example.test",
+	baseUrl: "https://example.test",
 });
 
 expectError(invalidTq.todos.get.queryOptions());

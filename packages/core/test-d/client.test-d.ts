@@ -41,7 +41,7 @@ const noInputApi = router({
 });
 
 const noInputClient = initClient(noInputApi, {
-	origin: "https://example.test",
+	baseUrl: "https://example.test",
 });
 
 expectType<Promise<Array<{ id: string; title: string }>>>(
@@ -65,7 +65,7 @@ const pathParamApi = router({
 });
 
 const pathParamClient = initClient(pathParamApi, {
-	origin: "https://example.test",
+	baseUrl: "https://example.test",
 });
 
 expectType<Promise<{ id: string; title: string }>>(
@@ -91,7 +91,7 @@ const flatQueryApi = router({
 });
 
 const flatQueryClient = initClient(flatQueryApi, {
-	origin: "https://example.test",
+	baseUrl: "https://example.test",
 });
 
 expectType<Promise<Array<{ id: string; title: string }>>>(
@@ -130,7 +130,7 @@ const jsonQueryApi = router({
 });
 
 const jsonQueryClient = initClient(jsonQueryApi, {
-	origin: "https://example.test",
+	baseUrl: "https://example.test",
 });
 
 expectType<Promise<Array<{ id: string; title: string }>>>(
@@ -173,7 +173,7 @@ const responseApi = router({
 });
 
 const responseClient = initClient(responseApi, {
-	origin: "https://example.test",
+	baseUrl: "https://example.test",
 });
 
 expectType<Promise<{ id: string; title: string }>>(
@@ -215,7 +215,7 @@ const transformedApi = router({
 });
 
 const transformedClient = initClient(transformedApi, {
-	origin: "https://example.test",
+	baseUrl: "https://example.test",
 });
 
 expectType<Promise<{ id: string }>>(
@@ -253,7 +253,7 @@ const streamResponseApi = router({
 });
 
 const streamResponseClient = initClient(streamResponseApi, {
-	origin: "https://example.test",
+	baseUrl: "https://example.test",
 });
 
 expectType<Promise<ClientFetchResponse<typeof streamResponseApi.todos.events>>>(
@@ -290,7 +290,7 @@ const csvResponseApi = router({
 });
 
 const csvResponseClient = initClient(csvResponseApi, {
-	origin: "https://example.test",
+	baseUrl: "https://example.test",
 });
 
 expectType<Promise<Response>>(csvResponseClient.todos.exportCsv.fetch());
@@ -320,7 +320,7 @@ const imageResponseApi = router({
 });
 
 const imageResponseClient = initClient(imageResponseApi, {
-	origin: "https://example.test",
+	baseUrl: "https://example.test",
 });
 
 expectType<Promise<Response>>(imageResponseClient.todos.exportImage.fetch());
@@ -351,7 +351,7 @@ const customRequestApi = router({
 });
 
 const customRequestClient = initClient(customRequestApi, {
-	origin: "https://example.test",
+	baseUrl: "https://example.test",
 });
 
 expectType<Promise<undefined>>(
@@ -404,7 +404,7 @@ const requestArgumentApi = router({
 });
 
 const requestArgumentClient = initClient(requestArgumentApi, {
-	origin: "https://example.test",
+	baseUrl: "https://example.test",
 });
 
 expectError(requestArgumentClient.todos.get.fetch());
@@ -449,7 +449,7 @@ const websocketApi = router({
 });
 
 const websocketClient = initClient(websocketApi, {
-	origin: "https://example.test",
+	baseUrl: "https://example.test",
 });
 
 const socket = websocketClient.todos.socket.openConnection();

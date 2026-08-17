@@ -40,7 +40,7 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 
 		before(async () => {
 			server = await adapter.start();
-			client = initClient(integrationContract, { origin: server.origin });
+			client = initClient(integrationContract, { baseUrl: server.origin });
 		});
 
 		after(async () => {

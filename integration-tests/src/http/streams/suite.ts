@@ -41,7 +41,7 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 
 		before(async () => {
 			server = await adapter.start();
-			client = initClient(streamsContract, { origin: server.origin });
+			client = initClient(streamsContract, { baseUrl: server.origin });
 		});
 
 		after(async () => {

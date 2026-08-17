@@ -27,7 +27,7 @@ export const createTrackedFetch = () => {
 };
 
 export const createTanstackQueryClient = (
-	origin: string,
+	baseUrl: string,
 	fetch: typeof globalThis.fetch,
 ): TanstackQuery<TanstackQueryContract> =>
-	initTanstackQuery(tanstackQueryContract, { origin, fetch });
+	initTanstackQuery(tanstackQueryContract, { baseUrl, fetch });

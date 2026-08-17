@@ -482,7 +482,7 @@ import { initClient } from "@rest-rpc/core";
 import { api } from "./contract";
 
 const client = initClient(api, {
-	origin: "http://localhost:3000",
+	baseUrl: "http://localhost:3000",
 });
 
 const todo = await client.todos.create.fetch({
@@ -525,7 +525,7 @@ import { useMutation } from "@tanstack/react-query";
 import { api } from "./contract";
 
 const tq = initTanstackQuery(api, {
-	origin: "http://localhost:3000",
+	baseUrl: "http://localhost:3000",
 });
 
 const createTodo = useMutation(

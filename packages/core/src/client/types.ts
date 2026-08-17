@@ -118,7 +118,7 @@ export type NextFetchTagsOptions = {
 };
 
 export type ApiClientOptions = {
-	origin: string;
+	baseUrl: string;
 	fetch?: FetchLike;
 	fetchOptions?: ApiClientFetchOptions;
 	getGlobalHeaders?: GetHeadersFn;

@@ -10,7 +10,7 @@ import { initClient } from "@rest-rpc/core";
 import { api } from "./contract";
 
 const client = initClient(api, {
-	origin: "https://api.example.com",
+	baseUrl: "https://api.example.com",
 });
 ```
 
@@ -66,7 +66,7 @@ Use it when HTTP status is part of normal control flow.
 
 ```ts
 const client = initClient(api, {
-	origin: "https://api.example.com",
+	baseUrl: "https://api.example.com",
 	getGlobalHeaders: () => ({
 		authorization: `Bearer ${readToken()}`,
 	}),
@@ -79,7 +79,7 @@ const client = initClient(api, {
 
 Options include:
 
-- `origin`
+- `baseUrl`
 - `fetch`
 - `fetchOptions`
 - `getGlobalHeaders`
@@ -93,48 +93,13 @@ as soon as the response is received. It does not include response body parsing,
 stream consumption, or other work before or after `fetch`. Pass an `AbortSignal`
 in a route call when you need to cancel later response or stream consumption.
 
-`origin` must be an absolute URL origin without a path, search, or hash. Put
-API path prefixes in route paths so the fetch client, server adapters, OpenAPI,
-and cache tags share the same route identity.
-
-Use `pathPrefix` when routes share a prefix.
-
-```ts
-const api = router(
-	{
-		todos: router(
-			{
-				get: route({
-					method: "GET",
-					path: "/todos/:id",
-					// ...
-				}),
-			},
-			{ pathPrefix: "/v1" },
-		),
-	},
-	{ pathPrefix: "/api" },
-);
-```
-
-The client still receives only the origin.
-
-```ts
-const client = initClient(api, {
-	origin: "https://api.example.com",
-});
-```
-
-The normalized route path includes the stacked prefixes:
-`api.todos.get.path === "/api/v1/todos/:id"`.
-
 ## Custom Fetch
 
 If you need to wrap the fetch client with custom logic, pass a `fetch` function.
 
 ```ts
 const client = initClient(api, {
-	origin: "https://api.example.com",
+	baseUrl: "https://api.example.com",
 	fetch: async (url, init) => {
 		const startedAt = performance.now();
 
@@ -169,7 +134,7 @@ By default, unknown request keys are rejected.
 
 ```ts
 const client = initClient(api, {
-	origin: "https://api.example.com",
+	baseUrl: "https://api.example.com",
 	unknownRequestKeys: "throw",
 });
 ```
@@ -178,7 +143,7 @@ Use `"strip"` when extra keys should be ignored before building the HTTP request
 
 ```ts
 const client = initClient(api, {
-	origin: "https://api.example.com",
+	baseUrl: "https://api.example.com",
 	unknownRequestKeys: "strip",
 });
 ```
@@ -190,7 +155,7 @@ For understanding the implications of this option, read [Schemas](/contract/sche
 
 ```ts
 const client = initClient(api, {
-	origin: "https://api.example.com",
+	baseUrl: "https://api.example.com",
 	validateResponses: true,
 });
 ```
@@ -207,7 +172,7 @@ import { initClient } from "@rest-rpc/core";
 import { api } from "./contract";
 
 export const client = initClient(api, {
-	origin: "https://api.example.com",
+	baseUrl: "https://api.example.com",
 	nextFetchTags: {
 		enabled: true,
 		tagPrefix: "api",

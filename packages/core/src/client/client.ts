@@ -18,29 +18,10 @@ import type {
 } from "./types.ts";
 import { openConnection as openRouteConnection } from "./websocket.ts";
 
-export const normalizeOrigin = (origin: string) => {
-	let url: URL;
-	try {
-		url = new URL(origin);
-	} catch {
-		throw new Error(
-			"ApiClient origin must be an absolute URL origin without a path, search, or hash. Put API path prefixes in route.path instead.",
-		);
-	}
-
-	if (url.pathname !== "/" || url.search || url.hash) {
-		throw new Error(
-			"ApiClient origin must be an absolute URL origin without a path, search, or hash. Put API path prefixes in route.path instead.",
-		);
-	}
-
-	return url.origin;
-};
-
 export class ApiClient<TContract extends Contract = Contract> {
 	readonly api: ApiClientFor<TContract>;
 
-	private origin: string;
+	private baseUrl: string;
 	private contract: TContract;
 	private fetchImpl?: ApiClientOptions["fetch"];
 	private fetchOptions?: ApiClientOptions["fetchOptions"];
@@ -51,7 +32,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 	private validateResponses: boolean;
 
 	constructor(contract: TContract, options: ApiClientOptions) {
-		this.origin = normalizeOrigin(options.origin);
+		this.baseUrl = options.baseUrl;
 		this.contract = contract;
 		this.fetchImpl = options.fetch;
 		this.fetchOptions = options.fetchOptions;
@@ -73,7 +54,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 		...args: FetchArgs<E>
 	) =>
 		executeRequest(route, args, {
-			origin: this.origin,
+			baseUrl: this.baseUrl,
 			fetch: this.fetchImpl,
 			fetchOptions: this.fetchOptions,
 			getGlobalHeaders: this.getGlobalHeaders,
@@ -100,7 +81,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 		openRouteConnection(
 			route,
 			{
-				origin: this.origin,
+				baseUrl: this.baseUrl,
 				unknownRequestKeys: this.unknownRequestKeys,
 				validateIncomingMessages: this.validateResponses,
 			},

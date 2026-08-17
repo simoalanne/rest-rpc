@@ -18,7 +18,7 @@ export async function GET(
 ) {
 	const { id } = await params;
 	const client = initClient(upstreamContract, {
-		origin: readUpstreamOrigin(),
+		baseUrl: readUpstreamOrigin(),
 		fetchOptions: {
 			cache: "force-cache",
 		},

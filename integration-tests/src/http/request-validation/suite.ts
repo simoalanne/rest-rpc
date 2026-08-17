@@ -47,7 +47,7 @@ export const runRequestValidationSuite = (
 		before(async () => {
 			server = await adapter.start();
 			client = initClient(requestValidationContract, {
-				origin: server.origin,
+				baseUrl: server.origin,
 			});
 		});
 

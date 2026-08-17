@@ -79,7 +79,7 @@ export const runWebSocketSuite = (adapter: WebSocketSuiteAdapter) => {
 
 		before(async () => {
 			server = await adapter.start();
-			client = initClient(websocketContract, { origin: server.origin });
+			client = initClient(websocketContract, { baseUrl: server.origin });
 		});
 
 		after(async () => {

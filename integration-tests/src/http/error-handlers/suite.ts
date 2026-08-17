@@ -21,7 +21,7 @@ export const runErrorHandlersSuite = (adapter: ErrorHandlersSuiteAdapter) => {
 		before(async () => {
 			server = await adapter.start();
 			client = initClient(errorHandlersContract, {
-				origin: server.origin,
+				baseUrl: server.origin,
 			});
 		});
 
