@@ -2,7 +2,7 @@ import type { IncomingMessage } from "node:http";
 import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import type { ImplementationTree, ServerErrorHandlers } from "@rest-rpc/server";
 import { registerRouteImplementations } from "@rest-rpc/server";
-import type { Application, Request } from "express";
+import type { IRouter, Request } from "express";
 import { registerExpressHttpRoutes } from "./http.ts";
 import {
 	type ExpressWebSocketOptions,
@@ -29,7 +29,7 @@ type ExpressWebSocketErrorHandlers = ServerErrorHandlers<{
 }>;
 
 export const registerRoutes = (
-	app: Application,
+	app: IRouter,
 	implementations: ImplementationTree<RouteDeclaration>,
 	options: RegisterRoutesOptions = {},
 ) =>

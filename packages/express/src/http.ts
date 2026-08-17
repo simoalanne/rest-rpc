@@ -7,8 +7,8 @@ import {
 	type ServerErrorHandlers,
 } from "@rest-rpc/server";
 import type {
-	Application,
 	Response as ExpressResponse,
+	IRouter,
 	Request,
 	Response,
 } from "express";
@@ -65,7 +65,7 @@ const createRequestSignal = (req: Request, res: Response) => {
 };
 
 export const registerExpressHttpRoutes = (
-	app: Application,
+	app: IRouter,
 	routes: RouteImplementation<HttpRouteDeclaration>[],
 	errorHandlers?: ServerErrorHandlers<{
 		req: Request;
