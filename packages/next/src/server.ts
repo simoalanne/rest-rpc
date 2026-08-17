@@ -10,6 +10,7 @@ import {
 	type WebRouteParseBodyInput,
 	type RouteRequest as WebRouteRequest,
 	type RouteResponse as WebRouteResponse,
+	type WebRouteRuntimeContext,
 } from "@rest-rpc/web";
 
 type WebContract = HttpRouteDeclaration | { [key: string]: WebContract };
@@ -31,13 +32,16 @@ type RouterHandlerMap = {
 	[K in HttpMethod]: WebRequestHandler;
 };
 
-export type NextRouteHandlerContext = {
+type NextRouteAdapterContext = {
 	request: Request;
 };
 
+export type NextRouteHandlerContext =
+	WebRouteRuntimeContext<NextRouteAdapterContext>;
+
 export type RouteRequest<E extends HttpRouteDeclaration> = WebRouteRequest<
 	E,
-	NextRouteHandlerContext
+	NextRouteAdapterContext
 >;
 
 export type RouteResponse<E extends HttpRouteDeclaration> = WebRouteResponse<E>;
@@ -54,7 +58,7 @@ export type NextRouteParseBody = (
 ) => unknown | Promise<unknown>;
 
 export type CreateRouteHandlerOptions = {
-	errorHandlers?: CreateWebHandlerOptions<NextRouteHandlerContext>["errorHandlers"];
+	errorHandlers?: CreateWebHandlerOptions<NextRouteAdapterContext>["errorHandlers"];
 	parseBody?: NextRouteParseBody;
 };
 
@@ -63,7 +67,7 @@ export function createRouteHandler<E extends HttpRouteDeclaration>(
 	handler: RouteHandler<E>,
 	options?: CreateRouteHandlerOptions,
 ): RouteHandlerMap<E> {
-	const web = initWeb<NextRouteHandlerContext>();
+	const web = initWeb<NextRouteAdapterContext>();
 	const handle = web.createHandler(web.route(route, handler), {
 		errorHandlers: options?.errorHandlers,
 		parseBody: options?.parseBody,
@@ -79,7 +83,7 @@ export const createRouterHandler = <const TContract extends WebContract>(
 	handlers: WebRouterHandlers<TContract>,
 	options?: CreateRouteHandlerOptions,
 ): RouterHandlerMap => {
-	const web = initWeb<NextRouteHandlerContext>();
+	const web = initWeb<NextRouteAdapterContext>();
 	const handle = web.createHandler(web.router(contract, handlers as never), {
 		errorHandlers: options?.errorHandlers,
 		parseBody: options?.parseBody,
