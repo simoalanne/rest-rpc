@@ -1,5 +1,7 @@
 # @rest-rpc/server
 
+## 0.1.0-beta.8
+
 ## 0.1.0-beta.7
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @rest-rpc/next
 
+## 0.1.0-beta.8
+
+### Patch Changes
+
+- 348f93c: fix NextRouteHandlerContext type to include signal
+
 ## 0.1.0-beta.7
 
 ## 0.1.0-beta.6
