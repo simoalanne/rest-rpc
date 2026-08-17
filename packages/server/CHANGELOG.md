@@ -4,13 +4,13 @@
 
 ### Minor Changes
 
-- d72a045: Add end-to-end HTTP cancellation for built-in NDJSON streams and handler `AbortSignal`s, and scope `timeoutMs` to waiting for `fetch` to return a `Response`.
+- 997c886: Add end-to-end HTTP cancellation for built-in NDJSON streams and handler `AbortSignal`s, and scope `timeoutMs` to waiting for `fetch` to return a `Response`.
 
 ## 0.1.0-beta.6
 
 ### Minor Changes
 
-- d72a045: convenience setCookie and clearCookie helpers for server adapters
+- c6dbcc9: convenience setCookie and clearCookie helpers for server adapters
 - fc89f34: add support for route status code specific response headers so important headers can be declared and must be returned from server handlers
 
 ## 0.1.0-beta.5

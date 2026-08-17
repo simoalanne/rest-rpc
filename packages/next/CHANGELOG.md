@@ -6,7 +6,7 @@
 
 ### Minor Changes
 
-- d72a045: convenience setCookie and clearCookie helpers for server adapters
+- c6dbcc9: convenience setCookie and clearCookie helpers for server adapters
 
 ## 0.1.0-beta.5
 
