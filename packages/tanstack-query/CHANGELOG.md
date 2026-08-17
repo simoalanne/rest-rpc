@@ -1,5 +1,7 @@
 # @rest-rpc/tanstack-query
 
+## 0.1.0-beta.7
+
 ## 0.1.0-beta.6
 
 ## 0.1.0-beta.5

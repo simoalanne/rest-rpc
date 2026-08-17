@@ -1,5 +1,11 @@
 # @rest-rpc/fastify
 
+## 0.1.0-beta.7
+
+### Minor Changes
+
+- d72a045: Add end-to-end HTTP cancellation for built-in NDJSON streams and handler `AbortSignal`s, and scope `timeoutMs` to waiting for `fetch` to return a `Response`.
+
 ## 0.1.0-beta.6
 
 ### Minor Changes
