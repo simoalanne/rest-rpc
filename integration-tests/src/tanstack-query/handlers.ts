@@ -124,6 +124,10 @@ export const createTanstackQueryHandlers = (): TanstackQueryHandlers => {
 					status: "active" as const,
 				};
 			},
+			events: async function* () {
+				yield { id: "project-1", event: "created" as const };
+				yield { id: "project-1", event: "renamed" as const };
+			},
 		},
 	};
 };

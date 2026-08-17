@@ -1,4 +1,4 @@
-import { router, type as schemaType } from "@rest-rpc/core/contract";
+import { router, type as schemaType, stream } from "@rest-rpc/core/contract";
 import {
 	initTanstackQuery,
 	type RouteMutationVariables,
@@ -123,6 +123,42 @@ expectAssignable<
 expectAssignable<Promise<RouteQueryData<typeof queryApi.todos.list>>>(
 	queryClient.fetchQuery(selectedListOptions),
 );
+
+// stream query options
+
+// should expose stream routes as regular query data with raw async iterable bodies
+const streamApi = router({
+	events: {
+		list: {
+			method: "GET",
+			path: "/events",
+			responses: {
+				200: stream(schemaType<{ id: string; message: string }>()),
+			},
+		},
+	},
+});
+
+const streamTq = initTanstackQuery(streamApi, {
+	origin: "https://example.test",
+});
+
+const streamOptions = streamTq.events.list.queryOptions();
+expectAssignable<
+	Promise<{
+		status: 200;
+		body: AsyncIterable<{ id: string; message: string }>;
+		headers: Headers;
+	}>
+>(queryClient.fetchQuery(streamOptions));
+expectAssignable<
+	| {
+			status: 200;
+			body: AsyncIterable<{ id: string; message: string }>;
+			headers: Headers;
+	  }
+	| undefined
+>(queryClient.getQueryData(streamOptions.queryKey));
 
 // conditional query input
 

@@ -1,10 +1,15 @@
-import { router } from "@rest-rpc/core/contract";
+import { router, stream } from "@rest-rpc/core/contract";
 import z from "zod";
 
 const projectSchema = z.object({
 	id: z.string(),
 	name: z.string(),
 	status: z.enum(["active", "archived"]),
+});
+
+const projectEventSchema = z.object({
+	id: z.string(),
+	event: z.enum(["created", "renamed"]),
 });
 
 export const tanstackQueryContract = router({
@@ -93,6 +98,13 @@ export const tanstackQueryContract = router({
 			pathParams: z.object({ id: z.string() }),
 			responses: {
 				200: projectSchema,
+			},
+		},
+		events: {
+			method: "GET",
+			path: "/project-events",
+			responses: {
+				200: stream(projectEventSchema),
 			},
 		},
 	},

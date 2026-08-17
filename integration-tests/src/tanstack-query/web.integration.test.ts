@@ -6,6 +6,7 @@ import {
 	QueryClient,
 	QueryObserver,
 	skipToken,
+	experimental_streamedQuery as streamedQuery,
 } from "@tanstack/query-core";
 import {
 	createTanstackQueryClient,
@@ -75,6 +76,12 @@ const assertEnvelope = (value: unknown, expected: FetchResponseBody) => {
 		expected,
 	);
 	assert.ok((value as { headers?: unknown }).headers instanceof Headers);
+};
+
+const collectAsyncIterable = async <T>(iterable: AsyncIterable<T>) => {
+	const items: T[] = [];
+	for await (const item of iterable) items.push(item);
+	return items;
 };
 
 describe("web TanStack Query integration", () => {
@@ -391,5 +398,55 @@ describe("web TanStack Query integration", () => {
 		await assert.rejects(() => promise);
 		assert.equal(tracked.calls.length, 1);
 		assert.equal(tracked.calls[0]?.signal?.aborted, true);
+	});
+
+	it("returns stream route bodies as raw async iterables from regular query options", async () => {
+		const tracked = createTrackedFetch();
+		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
+		const queryClient = createQueryClient();
+
+		const response = await queryClient.fetchQuery(
+			tq.projects.events.queryOptions(),
+		);
+
+		assert.equal(response.status, 200);
+		assert.equal(typeof response.body[Symbol.asyncIterator], "function");
+		assert.deepEqual(await collectAsyncIterable(response.body), [
+			{ id: "project-1", event: "created" },
+			{ id: "project-1", event: "renamed" },
+		]);
+		assert.strictEqual(
+			queryClient.getQueryData(tq.projects.events.getKey()),
+			response,
+		);
+		assert.equal(tracked.calls.length, 1);
+	});
+
+	it("can materialize rest-rpc stream route bodies with TanStack streamedQuery", async () => {
+		const tracked = createTrackedFetch();
+		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
+		const queryClient = createQueryClient();
+
+		const response = await queryClient.fetchQuery({
+			queryKey: ["projects", "events", "streamed-query"],
+			queryFn: streamedQuery({
+				streamFn: async () => {
+					const response = await queryClient.fetchQuery(
+						tq.projects.events.queryOptions(),
+					);
+					return response.body;
+				},
+			}),
+		});
+
+		assert.deepEqual(response, [
+			{ id: "project-1", event: "created" },
+			{ id: "project-1", event: "renamed" },
+		]);
+		assert.deepEqual(
+			queryClient.getQueryData(["projects", "events", "streamed-query"]),
+			response,
+		);
+		assert.equal(tracked.calls.length, 1);
 	});
 });
