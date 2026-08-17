@@ -1,21 +1,15 @@
 ---
 title: Express
-description: Register contract handlers in an Express app.
+description: Use rest-rpc with Express
 ---
-
-Use `@rest-rpc/express` to implement and register contract routes in an Express
-app.
-
-The adapter registers routes by HTTP method and path, then delegates validation
-and response handling to the shared server layer.
 
 ## Install
 
 ```sh
-pnpm add @rest-rpc/core @rest-rpc/express express
+pnpm add @rest-rpc/express
 ```
 
-## Basic Setup
+## Usage
 
 ```ts
 import { registerRoutes, router } from "@rest-rpc/express";
@@ -23,26 +17,20 @@ import express from "express";
 import { api } from "./contract";
 
 const app = express();
+
 app.use(express.json());
 
 const routes = router(api, {
 	todos: {
+		list() {
+			return listTodos();
+		},
 		get({ id, context }) {
-			const userAgent = context.req.header("user-agent");
-			void userAgent;
-
-			const todo = todos.get(id);
-
-			if (!todo) {
-				return {
-					status: 404,
-					body: {
-						code: "TODO_NOT_FOUND",
-					},
-				};
-			}
-
-			return todo;
+			const authorization = context.req.header("authorization");
+			return getTodo(id, { authorization });
+		},
+		create({ title }) {
+			return createTodo({ title });
 		},
 	},
 });
@@ -52,67 +40,39 @@ registerRoutes(app, routes);
 app.listen(3000);
 ```
 
-## Handler Input
-
-Handlers receive flattened request input where `context` contains the Express request object.
+## Framework Context
 
 ```ts
-get({ id, "x-request-id": requestId, context }) {
-	return loadTodo({
-		id,
-		requestId,
-		req: context.req,
-	});
-}
-```
+type HttpRouteHandlerContext = {
+	req: Request;
+	signal: AbortSignal;
+};
 
-## Handler Returns
-
-Handlers can always return an explicit response envelope.
-
-```ts
-return {
-	status: 404,
-	body: {
-		code: "TODO_NOT_FOUND",
-	},
+type WebSocketRouteHandlerContext = {
+	req: IncomingMessage;
 };
 ```
 
-If a route has exactly one successful response, the handler can return the
-success body directly.
+## Options
 
 ```ts
-return todo;
-```
-You can also use `ContractResponseError` to throw a declared error response when that's more convenient.
-
-```ts
-throw new ContractResponseError(api.todos.get, {
-	status: 404,
-	body: {
-		code: "TODO_NOT_FOUND",
-	},
-});
+type RegisterRoutesOptions = {
+	errorHandlers?: ServerErrorHandlers<
+		| { kind: "http"; req: Request; signal: AbortSignal }
+		| { kind: "websocket"; req: IncomingMessage; signal: AbortSignal }
+	>;
+	webSocket?: ExpressWebSocketOptions;
+};
 ```
 
-## Error Handling
-
-Use `errorHandlers` to customize server-generated error responses. Declared
-responses returned from handlers, including `ContractResponseError`, do not run
-through these hooks. For Express, `context.kind` is `"http"` for HTTP routes and
-`"websocket"` for WebSocket upgrade validation.
+### Error Handlers
 
 ```ts
 registerRoutes(app, routes, {
 	errorHandlers: {
-		onRequestValidationError: ({ context, issues }) => ({
+		onRequestValidationError: ({ issues }) => ({
 			status: 422,
-			body: {
-				code: "VALIDATION_ERROR",
-				kind: context.kind,
-				issues,
-			},
+			body: { code: "VALIDATION_ERROR", issues },
 		}),
 		onUnhandledError: () => ({
 			status: 500,
@@ -122,108 +82,25 @@ registerRoutes(app, routes, {
 });
 ```
 
-## Middleware
-
-`rest-rpc` does not own middleware. Use Express middleware the same way you
-would in any Express app.
-
-When middleware needs to behave differently for different contract routes, use
-`createRouteMatcher` to match the incoming request back to the contract route.
-
-```ts
-import { createRouteMatcher } from "@rest-rpc/express";
-
-const matchContractRoute = createRouteMatcher(api);
-
-app.use(async (req, res, next) => {
-	const match = matchContractRoute({
-		method: req.method,
-		path: req.path,
-	});
-
-	if (!match?.route.metadata?.requiresAuth) {
-		return next();
-	}
-
-	const session = await loadSession(req.header("authorization"));
-
-	if (!session) {
-		return res.status(401).json({ code: "UNAUTHORIZED" });
-	}
-
-	req.session = session;
-	return next();
-});
-```
-
-Handlers can read values added by middleware through `context.req`.
-
-```ts
-const routes = router(api, {
-	todos: {
-		get({ id, context }) {
-			return loadTodoForSession({
-				id,
-				session: context.req.session,
-			});
-		},
-	},
-});
-```
-
-## Body Parsing
-
-The Express adapter does not own body parsing.
-
-For normal JSON routes, use Express middleware.
-
-```ts
-app.use(express.json());
-```
-
-For non-JSON bodies, choose parsing middleware in your app. See
-[Custom Bodies](/advanced/custom-bodies/) for an example.
-
-## WebSockets
-
-Install `ws` when using WebSocket routes.
-
-```sh
-pnpm add ws
-```
-
-Express uses a Node HTTP server for the upgrade event and a `ws` WebSocket
-server to accept sockets. Create the Node server from the Express app, then pass
-both servers in `webSocket`.
-
-`beforeUpgrade` runs after request validation and before the socket is accepted.
-Return an upgrade rejection to deny the connection, or read and attach data to
-`context.req` for the WebSocket handler.
+### WebSocket
 
 ```ts
 import { createServer } from "node:http";
-import express from "express";
 import { WebSocketServer } from "ws";
-import { registerRoutes } from "@rest-rpc/express";
 
-const expressApp = express();
-const nodeServer = createServer(expressApp);
+const server = createServer(app);
 const webSocketServer = new WebSocketServer({ noServer: true });
 
-registerRoutes(expressApp, routes, {
+registerRoutes(app, routes, {
 	webSocket: {
-		server: nodeServer,
+		server,
 		webSocketServer,
-		beforeUpgrade({ context, route, request }) {
-			context.req;
-			route;
-			request;
-			return undefined;
+		beforeUpgrade: ({ context }) => {
+			const authorization = context.req.headers.authorization;
+			return authorization ? undefined : { status: 401 };
 		},
 	},
 });
 
-nodeServer.listen(3000);
+server.listen(3000);
 ```
-
-See [WebSockets](/advanced/websockets/) for the contract and handler model.

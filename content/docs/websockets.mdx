@@ -1,0 +1,140 @@
+---
+title: WebSockets
+description: Use rest-rpc with WebSockets
+---
+
+## Usage
+
+### Contract
+
+```ts
+
+export const api = router({
+	chat: {
+		room: {
+			method: "GET",
+			path: "/rooms/:roomId",
+			mode: "webSocket",
+			pathParams: z.object({
+				roomId: z.string().min(1),
+			}),
+			query: z.object({
+				name: z.string().min(1),
+			}),
+			messages: {
+				client: z.object({
+					text: z.string().min(1),
+				}),
+				server: webSocketMessages("type", {
+					joined: z.object({
+						roomId: z.string(),
+						name: z.string(),
+					}),
+					message: z.object({
+						roomId: z.string(),
+						name: z.string(),
+						text: z.string(),
+						sentAt: z.string(),
+					}),
+				}),
+			},
+		},
+	},
+});
+```
+
+### Server
+
+```ts
+
+export const routes = router(api, {
+	chat: {
+		room({ roomId, name, context }) {
+			const member = joinRoom(roomId, {
+				name,
+				socket: context.socket,
+			});
+
+			context.socket.send({
+				type: "joined",
+				message: { roomId, name },
+			});
+
+			context.socket.onMessage((message) => {
+				broadcastToRoom(roomId, {
+					type: "message",
+					message: {
+						roomId,
+						name,
+						text: message.text,
+						sentAt: new Date().toISOString(),
+					},
+				});
+			});
+
+			context.socket.onClose(() => {
+				leaveRoom(roomId, member);
+			});
+		},
+	},
+});
+```
+
+### Client
+
+```ts
+const socket = client.chat.room.openConnection({
+	roomId: "general",
+	name: "Ada",
+});
+
+socket.onMessage((message) => {
+	if (message.type === "joined") {
+		console.log(`Joined ${message.message.roomId}`);
+	}
+
+	if (message.type === "message") {
+		console.log(`${message.message.name}: ${message.message.text}`);
+	}
+});
+
+socket.send({
+	text: "Hello from rest-rpc",
+});
+```
+
+## Before Upgrade
+
+```ts
+registerRoutes(app, routes, {
+	webSocket: {
+		beforeUpgrade: ({ context, request }) => {
+			const user = getUserFromContext(context);
+
+			if (!user) {
+				return { status: 401 };
+			}
+
+			if (!canJoinRoom(user, request.roomId)) {
+				return { status: 403 };
+			}
+
+			return undefined;
+		},
+	},
+});
+```
+
+## Error Handling
+
+Request validation errors use `onRequestValidationError`. After upgrade:
+
+- invalid incoming messages close the connection
+- errors thrown from the route handler or message handler close the connection
+- invalid outgoing messages throw before they are sent
+
+## Supported Adapters
+
+- [Express](/server/express/#websocket)
+- [Hono](/server/hono/#websocket)
+- [Fastify](/server/fastify/#websocket)

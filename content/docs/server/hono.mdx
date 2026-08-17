@@ -1,20 +1,15 @@
 ---
 title: Hono
-description: Register contract handlers in a Hono app.
+description: Use rest-rpc with Hono
 ---
-
-Use `@rest-rpc/hono` to implement and register contract routes in a Hono app.
-
-The adapter registers routes by HTTP method and path, then delegates validation
-and response handling to the shared server layer.
 
 ## Install
 
 ```sh
-pnpm add @rest-rpc/core @rest-rpc/hono hono
+pnpm add @rest-rpc/hono
 ```
 
-## Basic Setup
+## Usage
 
 ```ts
 import { registerRoutes, router } from "@rest-rpc/hono";
@@ -25,22 +20,15 @@ const app = new Hono();
 
 const routes = router(api, {
 	todos: {
+		list() {
+			return listTodos();
+		},
 		get({ id, context }) {
-			const userAgent = context.c.req.header("user-agent");
-			void userAgent;
-
-			const todo = todos.get(id);
-
-			if (!todo) {
-				return {
-					status: 404,
-					body: {
-						code: "TODO_NOT_FOUND",
-					},
-				};
-			}
-
-			return todo;
+			const authorization = context.c.req.header("authorization");
+			return getTodo(id, { authorization });
+		},
+		create({ title }) {
+			return createTodo({ title });
 		},
 	},
 });
@@ -50,56 +38,33 @@ registerRoutes(app, routes);
 export default app;
 ```
 
-## Handler Input
-
-Handlers receive flattened request input where `context` contains the Hono context object.
+## Framework Context
 
 ```ts
-get({ id, "x-request-id": requestId, context }) {
-	return loadTodo({
-		id,
-		requestId,
-		c: context.c,
-	});
-}
-```
+type HttpRouteHandlerContext<E extends Env = Env> = {
+	c: Context<E>;
+	signal: AbortSignal;
+};
 
-## Handler Returns
-
-Handlers can always return an explicit response envelope.
-
-```ts
-return {
-	status: 404,
-	body: {
-		code: "TODO_NOT_FOUND",
-	},
+type WebSocketRouteHandlerContext<E extends Env = Env> = {
+	c: Context<E>;
 };
 ```
 
-If a route has exactly one successful response, the handler can return the
-success body directly.
+## Options
 
 ```ts
-return todo;
+type RegisterRoutesOptions<TEnv extends Env = Env> = {
+	errorHandlers?: ServerErrorHandlers<{
+		c: Context<TEnv>;
+		signal: AbortSignal;
+	}>;
+	parseBody?: HonoParseBody<TEnv>;
+	webSocket?: HonoWebSocketOptions<TEnv>;
+};
 ```
 
-You can also use `ContractResponseError` to throw a declared error response when that's more convenient.
-
-```ts
-throw new ContractResponseError(api.todos.get, {
-	status: 404,
-	body: {
-		code: "TODO_NOT_FOUND",
-	},
-});
-```
-
-## Error Handling
-
-Use `errorHandlers` to customize server-generated error responses. Declared
-responses returned from handlers, including `ContractResponseError`, do not run
-through these hooks.
+### Error Handlers
 
 ```ts
 registerRoutes(app, routes, {
@@ -116,102 +81,26 @@ registerRoutes(app, routes, {
 });
 ```
 
-## Middleware
-
-`rest-rpc` does not own middleware. Use Hono middleware the same way you would
-in any Hono app.
-
-When middleware needs to behave differently for different contract routes, use
-`createRouteMatcher` to match the incoming request back to the contract route.
-
-const matchContractRoute = createRouteMatcher(api);
+### Body Parsing
 
 ```ts
-app.use(async (c, next) => {
-	const match = matchContractRoute({
-		method: c.req.method,
-		path: c.req.path,
-	});
-
-	if (!match?.route.metadata?.requiresAuth) {
-		return next();
-	}
-
-	const session = await loadSession(c.req.header("authorization"));
-
-	if (!session) {
-		return c.json({ code: "UNAUTHORIZED" }, 401);
-	}
-
-	c.set("session", session);
-	return next();
+registerRoutes(app, routes, {
+	parseBody: ({ c }) => c.req.json(),
 });
 ```
 
-Handlers can read values added by middleware through `context.c`.
+### WebSocket
 
 ```ts
-const routes = router(api, {
-	todos: {
-		get({ id, context }) {
-			return loadTodoForSession({
-				id,
-				session: context.c.get("session"),
-			});
-		},
-	},
-});
-```
-
-## Body Parsing
-
-For normal JSON routes, the adapter can read JSON request bodies through Hono's
-request APIs.
-
-Use `parseBody` when your app needs custom body parsing.
-
-```ts
-import { isCustomBody } from "@rest-rpc/core";
+import { upgradeWebSocket } from "hono/cloudflare-workers";
 
 registerRoutes(app, routes, {
-	parseBody: async ({ c, body }) => {
-		if (isCustomBody(body)) {
-			return c.req.arrayBuffer();
-		}
-
-		return c.req.json();
-	},
-});
-```
-
-## WebSockets
-
-Hono gets `upgradeWebSocket` from the Hono runtime adapter. Create the Hono app
-normally, import `upgradeWebSocket` from your runtime, then pass both to
-`registerRoutes`.
-
-`beforeUpgrade` runs after request validation and before the socket is accepted.
-Return an upgrade rejection to deny the connection, or read and attach data to
-`context.c` for the WebSocket handler.
-
-```ts
-import { Hono } from "hono";
-import { upgradeWebSocket } from "hono/cloudflare-workers";
-import { registerRoutes } from "@rest-rpc/hono";
-
-const honoApp = new Hono();
-
-registerRoutes(honoApp, routes, {
 	webSocket: {
 		upgradeWebSocket,
-		beforeUpgrade({ context, route, request }) {
-			context.c;
-			route;
-			request;
-			return undefined;
+		beforeUpgrade: ({ context }) => {
+			const authorization = context.c.req.header("authorization");
+			return authorization ? undefined : { status: 401 };
 		},
 	},
 });
 ```
-
-See [WebSockets](/advanced/websockets/) for the contract and handler model.

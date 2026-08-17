@@ -1,6 +1,6 @@
 ---
-title: Contract
-description: Define REST-shaped routes in a shared TypeScript contract.
+title: Declaration
+description: Learn how to declare contracts with rest-rpc
 ---
 
 A contract is a plain TypeScript object passed through `router()`.
@@ -8,6 +8,12 @@ A contract is a plain TypeScript object passed through `router()`.
 ```ts
 import { router } from "@rest-rpc/core";
 import { z } from "zod";
+
+const todoSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+	completed: z.boolean(),
+});
 
 export const api = router({
 	todos: {
@@ -29,14 +35,17 @@ HTTP routes use these fields:
 
 - `method`: `GET`, `POST`, `PUT`, `DELETE`, or `PATCH`.
 - `path`: HTTP path with static segments and full dynamic `:param` or `{param}` segments.
-- `request`: optional request declarations.
+- `pathParams`: path parameter schemas.
+- `query`: query parameter schemas.
+- `headers`: request header schemas.
+- `body`: request body schema.
 - `response`: one successful response body, with status inferred from `method`.
 - `responses`: status-keyed response body declarations.
 - `metadata`: application-defined route metadata.
 - `openApi`: OpenAPI operation hints.
 - `options`: route options.
 
-## Request
+## Request Model
 
 Request data is declared by HTTP location.
 
@@ -55,17 +64,32 @@ body: {
 },
 ```
 
-Those locations remain part of the contract. Handlers and clients receive one
-flattened input object.
+Those locations remain part of the contract. Clients and server handlers receive
+one flattened request object.
 
 ```ts
-await api.todos.update.fetch({
+await client.todos.update.fetch({
 	id: "todo_1",
 	includeCompleted: true,
 	"x-request-id": "req_1",
 	title: "Write docs",
 });
 ```
+
+```ts
+const routes = router(api, {
+	todos: {
+		update({ id, includeCompleted, title, "x-request-id": requestId }) {
+			return updateTodo({ id, includeCompleted, title, requestId });
+		},
+	},
+});
+```
+
+The flattened shape is only the TypeScript and adapter API. `rest-rpc` still
+serializes each value to the HTTP location where it was declared.
+
+## Path Params
 
 Full dynamic path segments infer string path params. In this route, `:id`
 contributes an `id: string` input:
@@ -78,18 +102,53 @@ get: {
 }
 ```
 
-An explicit `pathParams` declaration replaces the inferred string schema for the
-same param:
+Explicit `pathParams` replace the inferred string schema for the same params.
 
 ```ts
-pathParams: {
-	id: z.string().uuid(),
+get: {
+	method: "GET",
+	path: "/todos/:id",
+	pathParams: {
+		id: z.string().uuid(),
+	},
+	response: todoSchema,
 }
 ```
 
+Path parameter rules:
+
+- Only full path segments are params: `:id` and `{id}` are params.
+- Partial segments are static: `/files/file-{id}` and `/todos/:id.json` do not declare params.
+- Inferred params are string schemas.
+- Explicit `pathParams` must match the path params exactly.
+- `pathPrefix` must be static and cannot include path params.
+
+## Flattened Key Collisions
+
+Every flattened request key must identify exactly one HTTP location. A route is
+invalid when the same key appears in multiple request locations.
+
+```ts
+pathParams: {
+	id: z.string(),
+},
+body: {
+	id: z.string(),
+},
+```
+
+Both fields would flatten to `id`, so `router()` rejects the contract.
+
+Other request key constraints:
+
+- `context` is reserved for the server handler context.
+- Header keys are checked case-insensitively, so `authorization` and `Authorization` collide.
+- Explicit path params in the URL must have matching `pathParams` schema keys.
+- Explicit `pathParams` schema keys must correspond to actual path params.
+
 ## JSON Query
 
-You can use `jsonQuery()` for JSON-shaped query input.
+`jsonQuery()` declares a JSON-shaped query value.
 
 ```ts
 import { jsonQuery, router } from "@rest-rpc/core";
@@ -161,7 +220,8 @@ Non-2xx statuses are declared the same way as 2xx statuses.
 Routes with no `response` or `responses` default to a no-body response. `DELETE`
 uses `204`, `POST` uses `201`, and other methods use `200`.
 
-Route status specific response headers can be declared using `response` or `responses` with an object containing `body` and `headers`.
+Route status specific response headers can be declared using `response` or
+`responses` with an object containing `body` and `headers`.
 
 ```ts
 create: {
@@ -239,7 +299,7 @@ runtime responses, or send headers from the server.
 
 ## Single Routes
 
-Use `route()` for one route declaration.
+`route()` declares one route.
 
 ```ts
 import { route } from "@rest-rpc/core";
@@ -251,30 +311,10 @@ export const getTodo = route({
 });
 ```
 
-## WebSocket Routes
+## Beyond JSON Contracts
 
-WebSocket routes also live in the contract tree.
+Advanced declarations are covered separately:
 
-```ts
-import { webSocketMessages } from "@rest-rpc/core";
-
-watch: {
-	method: "GET",
-	path: "/todos/:id/watch",
-	mode: "webSocket",
-	messages: {
-		client: webSocketMessages("type", {
-			ping: z.object({}),
-		}),
-		server: webSocketMessages("type", {
-			changed: z.object({
-				id: z.string(),
-				completed: z.boolean(),
-			}),
-			pong: z.object({}),
-		}),
-	},
-}
-```
-
-See [WebSockets](/advanced/websockets/) for the full shape.
+- [HTTP Requests](../http-requests.mdx)
+- [HTTP Responses](../http-responses.mdx)
+- [WebSockets](../websockets.mdx)

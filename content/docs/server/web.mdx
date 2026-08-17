@@ -1,24 +1,15 @@
 ---
 title: Web
-description: Create HTTP handlers for runtimes that use standard Request and Response.
+description: Use rest-rpc with Fetch runtimes
 ---
-
-Use `@rest-rpc/web` when your server runtime or framework route gives you a
-standard `Request` and expects a standard `Response`.
-
-`@rest-rpc/web` creates handlers. It does not register routes with a framework
-router, and it only supports HTTP routes.
 
 ## Install
 
 ```sh
-pnpm add @rest-rpc/core @rest-rpc/web
+pnpm add @rest-rpc/web
 ```
 
-## Catch-all Handler
-
-Use `createHandler()` when one route or runtime entrypoint should serve a
-contract tree.
+## Usage
 
 ```ts
 import { initWeb } from "@rest-rpc/web";
@@ -31,82 +22,53 @@ type Context = {
 
 const web = initWeb<Context>();
 
-const todoRoutes = web.routes(api.todos, {
-	list: web.route(api.todos.list, async ({ context }) => {
-		return listTodos(context.env.DB);
-	}),
-	create: web.route(api.todos.create, async ({ title, context }) => {
-		return createTodo(context.env.DB, title);
-	}),
+const routes = web.router(api, {
+	todos: {
+		list({ context }) {
+			return listTodos(context.env.DB);
+		},
+		get({ id, context }) {
+			return getTodo(context.env.DB, id);
+		},
+		create({ title, context }) {
+			return createTodo(context.env.DB, { title });
+		},
+	},
 });
 
-const apiRoutes = web.routes(api, {
-	todos: todoRoutes,
-});
-
-const handleApiRequest = web.createHandler(apiRoutes);
+const handleRequest = web.createHandler(routes);
 
 export default {
 	fetch(request, env, ctx) {
-		return handleApiRequest(request, { env, ctx });
+		return handleRequest(request, { env, ctx });
 	},
 };
 ```
 
-Requests that do not match the contract return `404`.
-
-## Single Route Handler
-
-Use `createHandler()` with `route()` when the surrounding runtime or framework
-route already picked the route.
+## Framework Context
 
 ```ts
-import { initWeb } from "@rest-rpc/web";
-import { api } from "./contract";
+type WebRouteRuntimeContext<TContext extends WebRouteHandlerContext> =
+	TContext & {
+		signal: AbortSignal;
+	};
+```
 
-const web = initWeb<{ request: Request }>();
+## Options
 
-const handleGetTodo = web.createHandler(
-	web.route(api.todos.get, ({ id, context }) => {
-		const authorization = context.request.headers.get("authorization");
-		void authorization;
-
-		return getTodo(id);
-	}),
-);
-
-export const GET = (request: Request) => {
-	return handleGetTodo(request, { request });
+```ts
+type CreateWebHandlerOptions<
+	TContext extends WebRouteHandlerContext = WebRouteHandlerContext,
+> = {
+	errorHandlers?: ServerErrorHandlers<WebRouteRuntimeContext<TContext>>;
+	parseBody?: WebRouteParseBody;
 };
 ```
 
-Requests that do not match the route return `404`.
-
-## Custom Body Parsing
-
-By default, JSON request bodies are parsed with `request.json()`. Custom body
-schemas use `request.json()` for `application/json` and `request.text()` for
-other content types.
-
-Use `parseBody` when a route needs a different Web API body reader.
+### Error Handlers
 
 ```ts
-const handleUpload = web.createHandler(
-	web.route(api.uploads.create, createUpload),
-	{
-		parseBody: ({ request }) => request.formData(),
-	},
-);
-```
-
-## Error Handling
-
-Use `errorHandlers` to customize server-generated error responses. Declared
-responses returned from handlers, including `ContractResponseError`, do not run
-through these hooks.
-
-```ts
-const handleApiRequest = web.createHandler(apiRoutes, {
+const handleRequest = web.createHandler(routes, {
 	errorHandlers: {
 		onRequestValidationError: ({ issues }) => ({
 			status: 422,
@@ -117,5 +79,13 @@ const handleApiRequest = web.createHandler(apiRoutes, {
 			body: { code: "INTERNAL_SERVER_ERROR" },
 		}),
 	},
+});
+```
+
+### Body Parsing
+
+```ts
+const handleUpload = web.createHandler(routes, {
+	parseBody: ({ request }) => request.formData(),
 });
 ```

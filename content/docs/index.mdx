@@ -1,83 +1,201 @@
 ---
-title: Introduction
+title: rest-rpc
 description: REST-shaped APIs with function-shaped TypeScript.
 ---
 
-`rest-rpc` lets you define HTTP routes in a shared TypeScript contract, then use
-that contract to derive typed server handlers, typed fetch clients, TanStack
-Query options, and OpenAPI documents.
+Define your HTTP API once as a shared TypeScript contract. Use that same
+contract to derive typed server handlers, fetch clients, TanStack Query helpers,
+and OpenAPI documents.
 
-The API stays REST-shaped. Everyday application code can feel like function
-calls.
+`rest-rpc` keeps the wire format REST-shaped while making application code feel
+like ordinary function calls.
 
-```ts
-const todo = await api.todos.get.fetch({ id: "todo_1" });
-```
+<CardGroup cols={2}>
+  <Card title="Start building" href="/quickstart/" icon="rocket" cta="Open the quickstart">
+    Define a route, implement it on a server adapter, and call it from a typed
+    client.
+  </Card>
+  <Card title="Compare the tradeoffs" href="/comparison/" icon="scale" cta="Read the comparison">
+    See where rest-rpc sits beside ts-rest, oRPC, and tRPC.
+  </Card>
+  <Card title="Learn the model" href="/concepts/" icon="map" cta="Explore concepts">
+    REST at the boundary, RPC-style usage at the call site, and one contract as
+    the source of truth.
+  </Card>
+  <Card title="Generate OpenAPI" href="/openapi/" icon="file-json" cta="View OpenAPI docs">
+    Turn your TypeScript contract into an OpenAPI document without maintaining a
+    separate schema.
+  </Card>
+</CardGroup>
 
-That call is still a normal HTTP request:
+## One Contract, Many Surfaces
 
-```http
-GET /todos/todo_1
-```
+HTTP details live in the contract, then clients and handlers use the route tree
+as typed functions.
 
-## The Shape
-
-HTTP details live in the contract.
+<Tabs>
+<Tab title="Contract">
 
 ```ts
 export const api = router({
 	todos: {
-		get: {
-			method: "GET",
+		update: {
+			method: "PATCH",
 			path: "/todos/:id",
+			query: {
+				notify: z.coerce.boolean().optional(),
+			},
+			headers: {
+				"x-request-id": z.string().optional(),
+			},
+			body: {
+				title: z.string().min(1),
+				completed: z.boolean().optional(),
+			},
 			response: todoSchema,
 		},
 	},
 });
 ```
 
-Handlers and clients use the route tree as typed functions.
+</Tab>
+<Tab title="Server">
 
 ```ts
 const routes = router(api, {
 	todos: {
-		get({ id }) {
-			return getTodo(id);
+		update({ id, title, completed, notify, "x-request-id": requestId }) {
+			return updateTodo({
+				id,
+				title,
+				completed,
+				notify,
+				requestId,
+			});
 		},
 	},
 });
 ```
 
+</Tab>
+<Tab title="Client">
+
 ```ts
-const todo = await client.todos.get.fetch({ id: "todo_1" });
+const todo = await client.todos.update.fetch({
+	id: "todo_1",
+	title: "Ship the docs",
+	completed: true,
+	notify: true,
+	"x-request-id": "req_123",
+});
 ```
 
-## Why rest-rpc?
+</Tab>
+<Tab title="curl">
 
-- Contract-first REST without tying the API to one server framework.
-- Elegant RPC-style calls and handlers without losing REST semantics.
-- Flatter handler and client calls because request locations live in the contract.
-- Typed status responses when you need them, and direct response bodies when you don't.
-- Runtime validation through Standard Schema-compatible libraries.
-- Thin Express, Hono, and Fastify adapters for typed server handlers.
-- Typed TanStack Query options and query keys over the same contract.
-- OpenAPI document generation.
+```bash
+curl -X PATCH "https://api.example.com/todos/todo_1?notify=true" \
+	-H "content-type: application/json" \
+	-H "x-request-id: req_123" \
+	-d '{"title":"Ship the docs","completed":true}'
+```
 
-## Small By Design
+</Tab>
+</Tabs>
 
-`rest-rpc` focuses on the API boundary: routes, request validation, typed
-handlers, typed clients, status-aware responses, TanStack Query options, and
-OpenAPI document generation.
+## What You Get
 
-It does not replace middleware, authentication, dependency injection, database
-access, file storage, OpenAPI UI, deployment, or frontend state management.
-Those concerns stay in your application and framework code the way you already know them.
+<CardGroup cols={2}>
+  <Card title="REST contract" icon="route" type="check">
+    Methods, paths, request locations, response bodies, and metadata are declared
+    once.
+  </Card>
+  <Card title="Function-shaped usage" icon="braces" type="check">
+    Call `client.todos.get.fetch({ id })` and implement `get({ id })` while the
+    contract keeps the HTTP shape explicit.
+  </Card>
+  <Card title="Server adapters" icon="plug" type="check">
+    Use Express, Hono, Fastify, Next.js, or fetch-native runtimes without moving
+    the contract into the framework.
+  </Card>
+  <Card title="Typed responses" icon="list-checks" type="check">
+    Return direct success bodies for simple routes, or status-keyed response
+    envelopes when the route has multiple expected outcomes.
+  </Card>
+  <Card title="Schema options" icon="shield-check" type="check">
+    Use Standard Schema-compatible libraries such as Zod, Valibot, or ArkType,
+    or built-in type-only helper when runtime validation is not needed.
+  </Card>
+  <Card title="Generated helpers" icon="layers" type="check">
+    Derive typed fetch clients, TanStack Query options, query keys, and OpenAPI
+    documents from the same route tree.
+  </Card>
+  <Card title="Typed real-time messaging" icon="bolt" type="check">
+    Define WebSocket routes in the same contract tree, including typed messages
+    for client and server helpers.
+  </Card>
+  <Card title="Beyond basic JSON" icon="wrench" type="check">
+    Use streaming, NDJSON streams, custom bodies, response headers, and content
+    types without leaving the contract or accepting hidden transport assumptions.
+  </Card>
+</CardGroup>
 
-## Start Here
+## What's Next
 
-- [Quickstart](/quickstart/) builds the first route end to end.
-- [Comparison](/comparison/) compares rest-rpc with other TypeScript REST/RPC libraries.
-- [Concepts](/concepts/) explains the mental model.
-- [Contract](/contract/) covers route declarations.
-- [Responses](/responses/) covers status-keyed responses.
-- [OpenAPI](/openapi/) covers document generation.
+<Steps>
+  <Step title="Build the first route" icon="rocket">
+    Start with the [Quickstart](/quickstart/) if you want the fastest end-to-end
+    example.
+  </Step>
+  <Step title="Shape the contract" icon="file-code">
+    Read [Contract Declaration](/contract/declaration/),
+    [Schemas](/contract/schemas/), [HTTP Requests](/http-requests/), and
+    [HTTP Responses](/http-responses/) when you are designing real routes.
+  </Step>
+  <Step title="Choose the runtime" icon="plug">
+    Wire the contract to [server adapters](/server/), the
+    [fetch client](/client/fetch-client/), or
+    [TanStack Query](/client/tanstack-query/).
+  </Step>
+  <Step title="Publish the contract" icon="share">
+    Generate an [OpenAPI document](/openapi/) without ceremony.
+  </Step>
+</Steps>
+
+:::tip[Small by design]
+`rest-rpc` stays focused on the API boundary so it can fit into code you already
+have. You keep using normal HTTP routes, your existing framework, middleware,
+authentication, database layer, and deployment model. The contract is just the
+shared description of that boundary, which makes adoption incremental and
+failures easier to trace back to a method, path, request shape, or response
+shape.
+:::
+
+## Common Questions
+
+<Accordion>
+  <AccordionItem title="Who is rest-rpc for?">
+    `rest-rpc` is for developers who want end-to-end type safety and
+    RPC-style, function-shaped usage without replacing familiar HTTP concepts.
+    You keep methods, paths, headers, bodies, status codes, and your existing
+    framework, while the shared contract connects the server and client types in ergonomic way.
+  </AccordionItem>
+  <AccordionItem title="Do I have to restructure my app?">
+    No. Keep your framework, middleware, authentication, database access, and
+    deployment model. Add the contract at the API boundary, then adopt the
+    server adapters, client, TanStack Query helpers, or OpenAPI generation as
+    they become useful.
+  </AccordionItem>
+  <AccordionItem title="Do I need to learn a new API model?">
+    Not really. The contract is still made of HTTP methods, paths, request
+    locations, status codes, headers, and response bodies. The generated client
+    and handlers make those routes nicer to call from TypeScript, but they do
+    not hide what goes over the wire.
+  </AccordionItem>
+  <AccordionItem title="What happens when something breaks?">
+    You debug the same boundary you would debug by hand: method, path, query,
+    headers, body, status, and response shape. Because those pieces live in one
+    contract, type errors and runtime validation errors point back to the route
+    declaration instead of a separate client or server type.
+  </AccordionItem>
+</Accordion>

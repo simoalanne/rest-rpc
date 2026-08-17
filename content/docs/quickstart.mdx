@@ -5,8 +5,73 @@ description: Define one contract, implement it on the server, and call it from a
 
 This guide builds one `todos.create` route from a shared contract.
 
-The contract declares the HTTP method, path, request body, and response body once.
-The server handler and client call are inferred from that declaration.
+<Steps>
+  <Step title="Install packages">
+    Add the core package, a schema library, and the adapter for the server
+    framework you want to use.
+  </Step>
+  <Step title="Define the contract">
+    Declare the HTTP method, path, request body, and response body once in a file
+    that both server and client code can import.
+  </Step>
+  <Step title="Implement the server route">
+    Use the same route tree to write a typed handler for Express, Fastify, Hono,
+    Next.js, or a fetch-native runtime.
+  </Step>
+  <Step title="Call it from the client">
+    Create a typed fetch client or TanStack Query helpers from the same contract.
+  </Step>
+</Steps>
+
+## Install Packages
+
+This guide uses Zod and Express by default. The same contract works with the
+other server tabs below.
+
+<Tabs>
+<Tab title="pnpm">
+
+```bash
+pnpm add @rest-rpc/core @rest-rpc/express express zod
+```
+
+</Tab>
+<Tab title="npm">
+
+```bash
+npm install @rest-rpc/core @rest-rpc/express express zod
+```
+
+</Tab>
+<Tab title="yarn">
+
+```bash
+yarn add @rest-rpc/core @rest-rpc/express express zod
+```
+
+</Tab>
+<Tab title="bun">
+
+```bash
+bun add @rest-rpc/core @rest-rpc/express express zod
+```
+
+</Tab>
+</Tabs>
+
+If you use another server tab, replace `@rest-rpc/express express` with the
+adapter and framework package you need:
+
+- Fastify: `@rest-rpc/fastify fastify`
+- Hono: `@rest-rpc/hono hono`
+- Next.js: `@rest-rpc/next`
+- Web `Request`/`Response`: `@rest-rpc/web`
+
+For the TanStack Query client example, also install:
+
+```bash
+pnpm add @rest-rpc/tanstack-query @tanstack/react-query
+```
 
 ## Define A Contract
 
@@ -481,7 +546,8 @@ createTodo.mutate({
 
 ## Next Steps
 
-- [Contract](/contract/) explains the route declaration shape.
+- [Contract Declaration](/contract/declaration/) explains the route declaration shape.
+- [Schemas](/contract/schemas/) explains validation and type-only schemas.
 - [Server adapters](/server/express/) cover framework-specific setup.
 - [Fetch Client](/client/fetch-client/) and [TanStack Query](/client/tanstack-query/)
   cover client behavior in more detail.

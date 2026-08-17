@@ -1,0 +1,506 @@
+---
+title: HTTP Responses
+description: Learn how to handle different types of HTTP responses with rest-rpc
+---
+
+## JSON Response
+
+```ts
+import { router } from "@rest-rpc/core";
+import z from "zod";
+
+const todoSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+});
+
+export const api = router({
+	todos: {
+		create: {
+			method: "POST",
+			path: "/todos",
+			body: z.object({
+				title: z.string().min(1),
+			}),
+			response: todoSchema,
+		},
+	},
+});
+```
+
+```ts
+export const routes = router(api, {
+	todos: {
+		create({ title }) {
+			return createTodo({ title });
+		},
+	},
+});
+```
+
+```ts
+const todo = await client.todos.create.fetch({
+	title: "Write docs",
+});
+```
+
+## Response With Multiple Status Codes
+
+Use `fetchResponse()` when the client needs to handle multiple declared statuses.
+
+```ts
+export const api = router({
+	todos: {
+		get: {
+			method: "GET",
+			path: "/todos/:id",
+			responses: {
+				200: todoSchema,
+				404: z.object({
+					code: z.literal("TODO_NOT_FOUND"),
+				}),
+			},
+		},
+	},
+});
+```
+
+```ts
+import { ContractResponseError } from "@rest-rpc/server";
+
+export const routes = router(api, {
+	todos: {
+		get({ id }) {
+			const todo = getTodo(id);
+
+			if (!todo) {
+				throw new ContractResponseError(api.todos.get, {
+					status: 404,
+					body: { code: "TODO_NOT_FOUND" },
+				});
+			}
+
+			return todo;
+		},
+	},
+});
+```
+
+```ts
+const response = await client.todos.get.fetchResponse({
+	id: "todo_1",
+});
+
+if (response.declared && response.status === 200) {
+	response.body.title;
+}
+
+if (response.declared && response.status === 404) {
+	response.body.code;
+}
+```
+
+## Response Without Body
+
+```ts
+import { noBody, router } from "@rest-rpc/core";
+
+export const api = router({
+	todos: {
+		remove: {
+			method: "DELETE",
+			path: "/todos/:id",
+			responses: {
+				204: noBody(),
+			},
+		},
+	},
+});
+```
+
+```ts
+export const routes = router(api, {
+	todos: {
+		remove({ id }) {
+			removeTodo(id);
+		},
+	},
+});
+```
+
+```ts
+await client.todos.remove.fetch({
+	id: "todo_1",
+});
+```
+
+## Response With Typed Headers
+
+Headers declared in the contract are returned from `responseHeaders`.
+
+```ts
+export const api = router({
+	todos: {
+		get: {
+			method: "GET",
+			path: "/todos/:id",
+			responses: {
+				200: {
+					body: todoSchema,
+					headers: {
+						etag: z.string(),
+						"x-next-cursor": z.string().optional(),
+					},
+				},
+			},
+		},
+	},
+});
+```
+
+```ts
+export const routes = router(api, {
+	todos: {
+		get({ id }) {
+			const todo = getTodo(id);
+
+			return {
+				status: 200,
+				body: todo,
+				responseHeaders: {
+					etag: todo.etag,
+					"x-next-cursor": todo.nextCursor,
+				},
+			};
+		},
+	},
+});
+```
+
+```ts
+const response = await client.todos.get.fetchResponse({
+	id: "todo_1",
+});
+
+if (response.declared && response.status === 200) {
+	response.responseHeaders.etag;
+	response.responseHeaders["x-next-cursor"];
+}
+```
+
+## Response With Undeclared Headers
+
+Undeclared headers are raw HTTP headers returned from `headers`.
+
+```ts
+export const api = router({
+	health: {
+		method: "GET",
+		path: "/health",
+		response: z.object({
+			ok: z.literal(true),
+		}),
+	},
+});
+```
+
+```ts
+export const routes = router(api, {
+	health() {
+		return {
+			status: 200,
+			body: { ok: true },
+			headers: {
+				"cache-control": "no-store",
+				"x-request-id": createRequestId(),
+			},
+		};
+	},
+});
+```
+
+```ts
+const response = await client.health.fetchResponse();
+
+if (response.declared) {
+	response.headers.get("cache-control");
+	response.headers.get("x-request-id");
+}
+```
+
+## Response with set-cookie Header
+
+```ts
+export const api = router({
+	sessions: {
+		create: {
+			method: "POST",
+			path: "/sessions",
+			body: z.object({
+				email: z.string().email(),
+				password: z.string(),
+			}),
+			response: z.object({
+				ok: z.literal(true),
+			}),
+		},
+	},
+});
+```
+
+```ts
+import { clearCookie, setCookie } from "@rest-rpc/server";
+
+export const routes = router(api, {
+	sessions: {
+		create({ email, password }) {
+			const sessionId = createSession({ email, password });
+
+			return {
+				status: 201,
+				body: { ok: true },
+				headers: {
+					"set-cookie": [
+						clearCookie("old_session", { path: "/" }),
+						setCookie("session", sessionId, {
+							httpOnly: true,
+							secure: true,
+							sameSite: "lax",
+							path: "/",
+						}),
+					],
+				},
+			};
+		},
+	},
+});
+```
+
+```ts
+await client.sessions.create.fetch({
+	email: "ada@example.com",
+	password: "password123",
+});
+```
+
+## Response With Custom Content Type
+
+```ts
+import { customBody, router } from "@rest-rpc/core";
+
+export const api = router({
+	reports: {
+		csv: {
+			method: "GET",
+			path: "/reports.csv",
+			responses: {
+				200: customBody({
+					contentType: "text/csv",
+					schema: z.string(),
+				}),
+			},
+		},
+	},
+});
+```
+
+```ts
+export const routes = router(api, {
+	reports: {
+		csv() {
+			return "id,title\n1,First\n";
+		},
+	},
+});
+```
+
+```ts
+const response = await client.reports.csv.fetch();
+
+await response.text();
+```
+
+## Response With Multiple Custom Content Types
+
+When multiple content types are declared, return the selected `contentType` with the response `payload`.
+
+```ts
+export const api = router({
+	images: {
+		download: {
+			method: "GET",
+			path: "/images/:id",
+			responses: {
+				200: customBody({
+					contentType: ["image/png", "image/jpeg"],
+					schema: z.instanceof(Uint8Array),
+				}),
+			},
+		},
+	},
+});
+```
+
+```ts
+export const routes = router(api, {
+	images: {
+		download({ id }) {
+			const image = getImage(id);
+
+			return {
+				status: 200,
+				body: {
+					contentType: image.type,
+					payload: image.bytes,
+				},
+			};
+		},
+	},
+});
+```
+
+```ts
+const response = await client.images.download.fetchResponse({
+	id: "image_1",
+});
+
+if (response.declared && response.status === 200) {
+	if (response.responseHeaders["content-type"] === "image/png") {
+		const pngBytes = await response.arrayBuffer();
+	} else {
+		const jpegBytes = await response.arrayBuffer();
+	}
+}
+```
+
+## Streaming NDJSON Responses
+
+`stream(schema)` sends newline-delimited JSON and the client reads parsed items.
+
+`request.context.signal` is aborted when the HTTP request is cancelled.
+
+```ts
+import { router, stream } from "@rest-rpc/core";
+
+const tokenSchema = z.object({
+	index: z.number(),
+	text: z.string(),
+});
+
+export const api = router({
+	ai: {
+		tokens: {
+			method: "GET",
+			path: "/ai/tokens",
+			query: z.object({
+				prompt: z.string().min(1),
+			}),
+			responses: {
+				200: stream(tokenSchema),
+			},
+		},
+	},
+});
+```
+
+```ts
+async function* streamTokens(prompt: string, signal: AbortSignal) {
+	for await (const token of llm.stream({ prompt, signal })) {
+		yield {
+			index: token.index,
+			text: token.text,
+		};
+	}
+}
+
+export const routes = router(api, {
+	ai: {
+		tokens(request) {
+			const { signal } = request.context;
+
+			return streamTokens(request.prompt, signal);
+		},
+	},
+});
+```
+
+```ts
+const controller = new AbortController();
+const tokens = await client.ai.tokens.fetch(
+	{ prompt: "Write a changelog entry" },
+	{ signal: controller.signal },
+);
+
+let fullText = "";
+for await (const token of tokens) {
+	fullText += token.text;
+
+	if (token.text.includes("</done>")) {
+		controller.abort();
+		break;
+	}
+}
+```
+
+## Streaming Responses With Custom Content Type
+
+`stream(customBody(...))` keeps the client response as a raw `Response` stream.
+
+```ts
+export const api = router({
+	files: {
+		download: {
+			method: "GET",
+			path: "/files/:id",
+			responses: {
+				200: stream(
+					customBody({
+						contentType: "application/octet-stream",
+						schema: z.instanceof(Uint8Array),
+					}),
+				),
+			},
+		},
+	},
+});
+```
+
+```ts
+export const routes = router(api, {
+	files: {
+		download(request) {
+			const { signal } = request.context;
+
+			return readLargeFile(request.id, signal);
+		},
+	},
+});
+```
+
+```ts
+const controller = new AbortController();
+const response = await client.files.download.fetch(
+	{ id: "file_1" },
+	{ signal: controller.signal },
+);
+const reader = response.body?.getReader();
+const file = await openWritableFile("archive.zip");
+let downloaded = 0;
+
+try {
+	while (reader) {
+		const { value, done } = await reader.read();
+		if (done) break;
+
+		downloaded += value.byteLength;
+		await file.write(value);
+
+		if (downloaded > maxDownloadBytes) {
+			controller.abort();
+			break;
+		}
+	}
+} finally {
+	await file.close();
+}
+```

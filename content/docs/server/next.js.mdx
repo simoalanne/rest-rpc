@@ -1,94 +1,70 @@
 ---
 title: Next.js
-description: Register contract routes in Next.js App Router route handlers.
+description: Use rest-rpc with Next.js
 ---
-
-Use `@rest-rpc/next` to create route handlers for Next.js App Router.
 
 ## Install
 
 ```sh
-pnpm add @rest-rpc/core @rest-rpc/next
+pnpm add @rest-rpc/next
 ```
 
-## Single Route Handler
+## Usage
 
-Contract path: `/api/todos/:id`
-App router route: `app/api/todos/[id]/route.ts`
+### Single Route Handler
 
 ```ts
+// app/api/todos/[id]/route.ts
 import { createRouteHandler } from "@rest-rpc/next";
 import { api } from "@/contract";
 
 export const { GET } = createRouteHandler(api.todos.get, ({ id, context }) => {
-	const userAgent = context.request.headers.get("user-agent");
-	void userAgent;
-
-	const todo = todos.get(id);
-
-	if (!todo) {
-		return {
-			status: 404,
-			body: {
-				code: "TODO_NOT_FOUND",
-			},
-		};
-	}
-
-	return todo;
+	const authorization = context.request.headers.get("authorization");
+	return getTodo(id, { authorization });
 });
 ```
 
-Handlers receive flattened request input where `context.request` contains the
-native `Request`.
+### Catch-all Route Handler
 
 ```ts
-get({ id, context }) {
-	return loadTodo({
-		id,
-		authorization: context.request.headers.get("authorization"),
-	});
-}
-```
-
-## Catch-all Routes
-
-Contract path: `/api/*`
-App router route: `app/api/[...rest]/route.ts`
-
-```ts
+// app/api/[...rest-rpc].ts
 import { createRouterHandler } from "@rest-rpc/next";
 import { api } from "@/contract";
 
 export const { GET, POST } = createRouterHandler(api, {
 	todos: {
-		list: async ({ context }) => {
-			const userAgent = context.request.headers.get("user-agent");
-			void userAgent;
-
-			return todos.list();
+		list() {
+			return listTodos();
 		},
-		create: async ({ title }) => {
-			const todo = await todos.create({ title });
-
-			return todo;
+		get({ id }) {
+			return getTodo(id);
+		},
+		create({ title }) {
+			return createTodo({ title });
 		},
 	},
 });
 ```
 
-With a catch-all route, `@rest-rpc/next` owns path matching inside that route
-module. Requests that do not match the contract return `404`.
+## Framework Context
 
-Next route handlers use module exports such as `runtime`, `dynamic`, and
-`revalidate` to define route-level behavior. With a catch-all route, those
-settings apply to every contract route mounted under that file.
+```ts
+type NextRouteHandlerContext = {
+	request: Request;
+	signal: AbortSignal;
+};
+```
 
-## Error Handling
+## Options
 
-Use `errorHandlers` to customize server-generated error responses. Declared
-responses returned from handlers, including `ContractResponseError`, do not run
-through these hooks.
+```ts
+type CreateRouteHandlerOptions = {
+	errorHandlers?: CreateWebHandlerOptions<NextRouteHandlerContext>["errorHandlers"];
+	parseBody?: NextRouteParseBody;
+};
+```
+
+### Error Handlers
 
 ```ts
 export const { GET, POST } = createRouterHandler(api, handlers, {
@@ -105,7 +81,10 @@ export const { GET, POST } = createRouterHandler(api, handlers, {
 });
 ```
 
-## WebSocket Support
+### Body Parsing
 
-Websocket routes are not supported in Next.js route handlers because Next does not itself support WebSocket connections. 
-If you need WebSocket support, use a different server adapter that supports WebSockets.
+```ts
+export const { POST } = createRouteHandler(api.uploads.create, createUpload, {
+	parseBody: ({ request }) => request.formData(),
+});
+```

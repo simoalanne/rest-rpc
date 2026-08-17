@@ -1,24 +1,18 @@
 ---
 title: TanStack Query
-description: Build typed TanStack Query options and keys from a contract.
+description: Use rest-rpc with Tanstack Query
 ---
 
 ## Install
 
 ```sh
-pnpm add @rest-rpc/core @rest-rpc/tanstack-query @tanstack/query-core
+pnpm add @rest-rpc/tanstack-query
 ```
-
-Install the TanStack Query framework adapter you use separately, such as
-`@tanstack/react-query`, `@tanstack/vue-query`, or `@tanstack/solid-query`.
 
 ## What It Is
 
 `@rest-rpc/tanstack-query` maps your contract to typed TanStack Query options
 and query keys.
-
-It does not provide hooks, components, providers, or cache helper methods. Your
-app uses TanStack Query directly; rest-rpc only supplies the typed inputs.
 
 Each HTTP route exposes four helpers:
 
@@ -28,10 +22,6 @@ api.todos.page.infiniteQueryOptions(...)
 api.todos.create.mutationOptions(...)
 api.todos.get.getKey(...)
 ```
-
-Use this package when you want rest-rpc to own the route typing, generated
-fetchers, response data, error typing, and contract-based keys while TanStack
-Query remains the runtime API.
 
 ## Setup
 

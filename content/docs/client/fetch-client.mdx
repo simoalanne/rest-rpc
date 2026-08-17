@@ -1,6 +1,6 @@
 ---
 title: Fetch Client
-description: Create a typed client from the contract.
+description: Use rest-rpc with Fetch
 ---
 
 `initClient()` creates a typed fetch client from a contract.
@@ -186,7 +186,7 @@ const client = initClient(api, {
 ## Response Validation on the Client
 
 It is possible to enable server output validation on the client by enabling `validateResponses`.
-For understanding the implications of this option, please read [HTTP and Schema I/O gotchas](/advanced/http-and-schema-io-gotchas/) first.
+For understanding the implications of this option, read [Schemas](/contract/schemas/) first.
 
 ```ts
 const client = initClient(api, {
@@ -279,4 +279,4 @@ const socket = client.todos.watch.openConnection({
 });
 ```
 
-See [WebSockets](/advanced/websockets/) for details.
+See [WebSockets](/websockets/) for details.

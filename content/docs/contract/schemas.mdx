@@ -1,0 +1,138 @@
+---
+title: Schemas
+description: Learn what kind of schemas rest-rpc supports
+---
+
+`rest-rpc` accepts schemas that implement the
+[Standard Schema](https://standardschema.dev/) spec.
+
+Zod, Valibot, and ArkType are supported Standard Schema libraries. The built-in
+`type<T>()` helper provides type-only schemas without runtime validation.
+
+## Request Schema Shapes
+
+Request locations are declared with schema records or whole-location schemas.
+
+A schema record maps flattened request keys to individual schemas.
+
+```ts
+pathParams: {
+	id: z.string().uuid(),
+},
+query: {
+	includeCompleted: z.coerce.boolean().optional(),
+},
+headers: {
+	"x-request-id": z.string().optional(),
+},
+body: {
+	title: z.string().min(1),
+},
+```
+
+Each record key becomes a key in the client and handler request object.
+
+```ts
+await client.todos.update.fetch({
+	id: "5f4c6e4e-3f7b-46c7-9fb7-a2e41df03695",
+	includeCompleted: true,
+	"x-request-id": "req_1",
+	title: "Ship docs",
+});
+```
+
+A whole-location schema validates the whole `body`, `query`, or `pathParams`
+object as one value.
+
+```ts
+body: z.object({
+	title: z.string().min(1),
+	priority: z.enum(["low", "normal", "high"]).default("normal"),
+}),
+```
+
+For Zod, Valibot, and ArkType, `rest-rpc` can resolve flattened request keys
+from more complex object schemas directly.
+
+```ts
+body: z.discriminatedUnion("kind", [
+	z.object({ kind: z.literal("text"), text: z.string() }),
+	z.object({ kind: z.literal("link"), url: z.string().url() }),
+]),
+query: z.union([
+	z.object({ q: z.string() }),
+	z.object({ page: z.coerce.number() }),
+]),
+```
+
+For other Standard Schema vendors, whole-location schemas need `requestKeys` or
+a `resolveRequestKeys` option so `rest-rpc` can map flattened keys back to HTTP
+locations.
+
+```ts
+body: type<{
+	title: string;
+}>(),
+requestKeys: {
+	title: "body",
+},
+```
+
+`headers` is always declared as a schema record.
+
+## Schema Input And Output
+
+Schemas have an input type and an output type.
+
+| Position | Type used |
+| --- | --- |
+| Fetch client request input | schema input |
+| Server handler input | schema output |
+| Server handler return value | schema input |
+| Fetch client response value | schema output |
+| WebSocket message send value | schema input |
+| WebSocket message receive value | schema output |
+
+Default HTTP bodies and WebSocket messages travel over JSON. Path params, query
+params, and headers travel through HTTP strings.
+
+## Validation
+
+Server adapters validate incoming request data before calling the handler. The
+handler receives schema output.
+
+```ts
+const routes = router(api, {
+	todos: {
+		get({ id }) {
+			return getTodo(id);
+		},
+	},
+});
+```
+
+Server adapters validate handler output before writing the HTTP response. The
+handler returns schema input.
+
+```ts
+const api = router({
+	todos: {
+		get: {
+			method: "GET",
+			path: "/todos/:id",
+			response: todoSchema,
+		},
+	},
+});
+```
+
+Fetch clients do not validate response bodies by default. With
+`validateResponses: true`, the client validates HTTP response bodies and
+incoming WebSocket server messages.
+
+```ts
+const client = initClient(api, {
+	origin: "https://api.example.com",
+	validateResponses: true,
+});
+```
