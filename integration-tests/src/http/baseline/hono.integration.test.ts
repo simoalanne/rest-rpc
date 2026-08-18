@@ -13,6 +13,33 @@ import { runClientHttpSuite } from "./suite.ts";
 
 runClientHttpSuite(createHonoAdapter(createIntegrationImplementations()));
 
+it("passes matched routes to Hono route middleware", async () => {
+	const seenRoutes: string[] = [];
+	const server = await createHonoAdapter(createIntegrationImplementations(), {
+		registerRoutesOptions: {
+			middleware: [
+				async (c, next, route) => {
+					seenRoutes.push(`${route.method} ${route.path}`);
+					await next();
+					c.header("x-route-middleware", route.path);
+				},
+			],
+		},
+	}).start();
+
+	try {
+		const client = initClient(integrationContract, {
+			baseUrl: server.origin,
+		});
+		const response = await client.items.get.fetchResponse({ id: "item-1" });
+
+		assert.equal(response.headers.get("x-route-middleware"), "/items/:id");
+		assert.deepEqual(seenRoutes, ["GET /items/:id"]);
+	} finally {
+		await server.close();
+	}
+});
+
 it("supports Hono sub-app scoped middleware with a prefixed client baseUrl", async () => {
 	const app = new Hono();
 	const api = new Hono();

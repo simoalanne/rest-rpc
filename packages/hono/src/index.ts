@@ -31,7 +31,11 @@ export type {
 	SameSite,
 	SetCookieOptions,
 } from "@rest-rpc/server";
-export type { HonoParseBody, HonoParseBodyInput } from "./http.ts";
+export type {
+	ExtendedHonoMiddleware,
+	HonoParseBody,
+	HonoParseBodyInput,
+} from "./http.ts";
 export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
 export { ContractResponseError, clearCookie, createRouteMatcher, setCookie };

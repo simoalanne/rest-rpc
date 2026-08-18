@@ -12,6 +12,36 @@ import { runClientHttpSuite } from "./suite.ts";
 
 runClientHttpSuite(createExpressAdapter(createIntegrationImplementations()));
 
+it("passes matched routes to Express route middleware", async () => {
+	const seenRoutes: string[] = [];
+	const server = await createExpressAdapter(
+		createIntegrationImplementations(),
+		{
+			registerRoutesOptions: {
+				middleware: [
+					(_req, res, next, route) => {
+						seenRoutes.push(`${route.method} ${route.path}`);
+						res.setHeader("x-route-middleware", route.path);
+						next();
+					},
+				],
+			},
+		},
+	).start();
+
+	try {
+		const client = initClient(integrationContract, {
+			baseUrl: server.origin,
+		});
+		const response = await client.items.get.fetchResponse({ id: "item-1" });
+
+		assert.equal(response.headers.get("x-route-middleware"), "/items/:id");
+		assert.deepEqual(seenRoutes, ["GET /items/:id"]);
+	} finally {
+		await server.close();
+	}
+});
+
 it("supports Express router scoped middleware with a prefixed client baseUrl", async () => {
 	const app = express();
 	const api = express.Router();

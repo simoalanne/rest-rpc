@@ -1,5 +1,9 @@
 import { Readable } from "node:stream";
-import type { HttpMethod, HttpRouteDeclaration } from "@rest-rpc/core/contract";
+import type {
+	HttpMethod,
+	HttpRouteDeclaration,
+	RouteDeclaration,
+} from "@rest-rpc/core/contract";
 import { toColonPath } from "@rest-rpc/core/contract";
 import {
 	handleHttpRoute,
@@ -8,6 +12,12 @@ import {
 	type ServerErrorHandlers,
 } from "@rest-rpc/server";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+
+export type ExtendedFastifyPreHandler = (
+	req: FastifyRequest,
+	reply: FastifyReply,
+	route: RouteDeclaration,
+) => unknown;
 
 const toStream = (
 	body: AsyncIterable<unknown>,
@@ -34,6 +44,7 @@ const createRequestSignal = (req: FastifyRequest, reply: FastifyReply) => {
 export const registerFastifyHttpRoutes = (
 	app: FastifyInstance,
 	routes: RouteImplementation<HttpRouteDeclaration>[],
+	preHandler: ExtendedFastifyPreHandler[] = [],
 	errorHandlers?: ServerErrorHandlers<{
 		req: FastifyRequest;
 		signal: AbortSignal;
@@ -46,6 +57,13 @@ export const registerFastifyHttpRoutes = (
 
 		app[method](
 			toColonPath(route.path),
+			{
+				preHandler: preHandler.map((handler) => {
+					return async (req: FastifyRequest, reply: FastifyReply) => {
+						await handler(req, reply, route);
+					};
+				}),
+			},
 			async (req: FastifyRequest, reply: FastifyReply) => {
 				const signal = createRequestSignal(req, reply);
 				const result = await handleHttpRoute(route, handler, {

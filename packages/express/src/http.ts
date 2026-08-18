@@ -9,9 +9,17 @@ import {
 import type {
 	Response as ExpressResponse,
 	IRouter,
+	NextFunction,
 	Request,
 	Response,
 } from "express";
+
+export type ExtendedExpressMiddleware = (
+	req: Request,
+	res: ExpressResponse,
+	next: NextFunction,
+	route: HttpRouteDeclaration,
+) => unknown;
 
 const writeStreamResponse = async (
 	result: AsyncIterable<unknown>,
@@ -67,6 +75,7 @@ const createRequestSignal = (req: Request, res: Response) => {
 export const registerExpressHttpRoutes = (
 	app: IRouter,
 	routes: RouteImplementation<HttpRouteDeclaration>[],
+	middleware: ExtendedExpressMiddleware[] = [],
 	errorHandlers?: ServerErrorHandlers<{
 		req: Request;
 		signal: AbortSignal;
@@ -109,6 +118,13 @@ export const registerExpressHttpRoutes = (
 			});
 		};
 
-		app[method](toColonPath(route.path), serviceHandler);
+		app[method](
+			toColonPath(route.path),
+			...middleware.map((handler) => {
+				return (req: Request, res: ExpressResponse, next: NextFunction) =>
+					handler(req, res, next, route);
+			}),
+			serviceHandler,
+		);
 	}
 };

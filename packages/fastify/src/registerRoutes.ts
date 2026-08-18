@@ -2,7 +2,10 @@ import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import type { ImplementationTree, ServerErrorHandlers } from "@rest-rpc/server";
 import { registerRouteImplementations } from "@rest-rpc/server";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { registerFastifyHttpRoutes } from "./http.ts";
+import {
+	type ExtendedFastifyPreHandler,
+	registerFastifyHttpRoutes,
+} from "./http.ts";
 import {
 	type FastifyWebSocketOptions,
 	registerFastifyWebSocketRoutes,
@@ -13,6 +16,7 @@ export type RegisterRoutesOptions = {
 		req: FastifyRequest;
 		signal: AbortSignal;
 	}>;
+	preHandler?: ExtendedFastifyPreHandler[];
 	webSocket?: FastifyWebSocketOptions;
 };
 
@@ -23,16 +27,20 @@ export const registerRoutes = (
 ) =>
 	registerRouteImplementations(
 		implementations,
-		(routes) => registerFastifyHttpRoutes(app, routes, options.errorHandlers),
+		(routes) =>
+			registerFastifyHttpRoutes(
+				app,
+				routes,
+				options.preHandler,
+				options.errorHandlers,
+			),
 		(routes) =>
 			options.webSocket &&
 			registerFastifyWebSocketRoutes(
 				app,
-				{
-					...options.webSocket,
-					errorHandlers:
-						options.webSocket.errorHandlers ?? options.errorHandlers,
-				},
+				options.webSocket,
 				routes,
+				options.preHandler,
+				options.errorHandlers,
 			),
 	);

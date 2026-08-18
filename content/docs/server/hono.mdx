@@ -61,6 +61,7 @@ type RegisterRoutesOptions<TEnv extends Env = Env> = {
 	}>;
 	parseBody?: HonoParseBody<TEnv>;
 	webSocket?: HonoWebSocketOptions<TEnv>;
+	middleware?: Array<(c: Context<TEnv>, next: Next, route: RouteDeclaration) => any>;
 };
 ```
 
@@ -104,3 +105,18 @@ registerRoutes(app, routes, {
 	},
 });
 ```
+
+### Middleware
+
+```ts
+registerRoutes(app, routes, {
+	middleware: [
+		async (c, next, route) => {
+			const authorization = c.req.header("authorization");
+			if (!authorization) {
+				return c.json({ code: "UNAUTHORIZED" }, 401);
+			}
+			await next();
+		},
+	],
+});

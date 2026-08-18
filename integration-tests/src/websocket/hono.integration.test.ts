@@ -12,15 +12,23 @@ runWebSocketSuite({
 	name: "hono",
 	start: async (): Promise<StartedServer> => {
 		const app = new Hono();
+		const seenRoutes: string[] = [];
 		const { injectWebSocket, upgradeWebSocket, wss } = createNodeWebSocket({
 			app,
 		});
 
 		registerRoutes(app, createWebSocketImplementations("hono"), {
+			middleware: [
+				async (_c, next, route) => {
+					seenRoutes.push(`${route.method} ${route.path}`);
+					await next();
+				},
+			],
 			webSocket: {
 				upgradeWebSocket,
 				beforeUpgrade: ({ context }) => {
 					assert.ok(context.signal instanceof AbortSignal);
+					assert.equal(seenRoutes.at(-1), "GET /ws/:roomId");
 				},
 			},
 		});

@@ -60,6 +60,7 @@ type RegisterRoutesOptions = {
 		signal: AbortSignal;
 	}>;
 	webSocket?: FastifyWebSocketOptions;
+	preHandler?: Array<(req: FastifyRequest, reply: FastifyReply, route: RouteDeclaration) => unknown>;
 };
 ```
 
@@ -96,3 +97,18 @@ registerRoutes(app, routes, {
 	},
 });
 ```
+
+### preHandler
+
+```ts
+registerRoutes(app, routes, {
+	preHandler: [
+		async (req, reply, route) => {
+			const authorization = req.headers.authorization;
+			if (!authorization) {
+				reply.status(401).send({ code: "UNAUTHORIZED" });
+			}
+		},
+	],
+});
+

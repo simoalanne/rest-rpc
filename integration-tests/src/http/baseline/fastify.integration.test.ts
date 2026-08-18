@@ -10,6 +10,35 @@ import { runClientHttpSuite } from "./suite.ts";
 
 runClientHttpSuite(createFastifyAdapter(createIntegrationImplementations()));
 
+it("passes matched routes to Fastify route preHandler", async () => {
+	const seenRoutes: string[] = [];
+	const server = await createFastifyAdapter(
+		createIntegrationImplementations(),
+		{
+			registerRoutesOptions: {
+				preHandler: [
+					async (_req, reply, route) => {
+						seenRoutes.push(`${route.method} ${route.path}`);
+						reply.header("x-route-prehandler", route.path);
+					},
+				],
+			},
+		},
+	).start();
+
+	try {
+		const client = initClient(integrationContract, {
+			baseUrl: server.origin,
+		});
+		const response = await client.items.get.fetchResponse({ id: "item-1" });
+
+		assert.equal(response.headers.get("x-route-prehandler"), "/items/:id");
+		assert.deepEqual(seenRoutes, ["GET /items/:id"]);
+	} finally {
+		await server.close();
+	}
+});
+
 it("supports Fastify scoped registration with a prefixed client baseUrl", async () => {
 	const app = Fastify();
 

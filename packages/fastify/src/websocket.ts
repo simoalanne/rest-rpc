@@ -11,16 +11,13 @@ import {
 	type UpgradeRejection,
 } from "@rest-rpc/server";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { ExtendedFastifyPreHandler } from "./http.ts";
 
 export type FastifyWebSocketOptions = {
 	beforeUpgrade?: BeforeWebSocketUpgrade<{
 		req: FastifyRequest;
 		signal: AbortSignal;
 	}>;
-	errorHandlers?: Pick<
-		ServerErrorHandlers<{ req: FastifyRequest; signal: AbortSignal }>,
-		"onRequestValidationError"
-	>;
 };
 
 const adaptWebSocket = (socket: FastifyWebSocket): RawWebSocket => ({
@@ -63,39 +60,51 @@ export const registerFastifyWebSocketRoutes = (
 	app: FastifyInstance,
 	options: FastifyWebSocketOptions,
 	routes: RouteImplementation<WebSocketRouteDeclaration>[],
+	preHandler: ExtendedFastifyPreHandler[] = [],
+	errorHandlers?: ServerErrorHandlers<{
+		req: FastifyRequest;
+		signal: AbortSignal;
+	}>,
 ) => {
 	for (const implementation of routes) {
 		app.get(
 			toColonPath(implementation.route.path),
 			{
 				websocket: true,
-				async preValidation(req: FastifyRequest, reply: FastifyReply) {
-					const controller = new AbortController();
-					const abort = () => controller.abort();
-					req.raw.once("aborted", abort);
-					reply.raw.once("close", () => {
-						if (!reply.raw.writableFinished) abort();
-					});
-					const request = {
-						query: req.query,
-						pathParams: req.params,
-						headers: req.headers,
-					};
-					const upgrade = await prepareWebSocketUpgrade({
-						implementation,
-						request,
-						context: { req, signal: controller.signal },
-						beforeUpgrade: options.beforeUpgrade,
-						errorHandlers: options.errorHandlers,
-					});
+				preValidation: [
+					...preHandler.map((handler) => {
+						return async (req: FastifyRequest, reply: FastifyReply) => {
+							await handler(req, reply, implementation.route);
+						};
+					}),
+					async (req: FastifyRequest, reply: FastifyReply) => {
+						const controller = new AbortController();
+						const abort = () => controller.abort();
+						req.raw.once("aborted", abort);
+						reply.raw.once("close", () => {
+							if (!reply.raw.writableFinished) abort();
+						});
+						const request = {
+							query: req.query,
+							pathParams: req.params,
+							headers: req.headers,
+						};
+						const upgrade = await prepareWebSocketUpgrade({
+							implementation,
+							request,
+							context: { req, signal: controller.signal },
+							beforeUpgrade: options.beforeUpgrade,
+							errorHandlers,
+						});
 
-					if (!upgrade.ok) {
-						await sendUpgradeRejection(reply, upgrade.rejection);
-						return;
-					}
-					(req as ExtendedFastifyRequest)[validatedWebSocketRequest] =
-						upgrade.request;
-				},
+						if (!upgrade.ok) {
+							await sendUpgradeRejection(reply, upgrade.rejection);
+							return;
+						}
+						(req as ExtendedFastifyRequest)[validatedWebSocketRequest] =
+							upgrade.request;
+					},
+				],
 			},
 			(socket: FastifyWebSocket, req: FastifyRequest) => {
 				const validatedRequest = (req as ExtendedFastifyRequest)[

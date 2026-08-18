@@ -3,7 +3,10 @@ import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import type { ImplementationTree, ServerErrorHandlers } from "@rest-rpc/server";
 import { registerRouteImplementations } from "@rest-rpc/server";
 import type { IRouter, Request } from "express";
-import { registerExpressHttpRoutes } from "./http.ts";
+import {
+	type ExtendedExpressMiddleware,
+	registerExpressHttpRoutes,
+} from "./http.ts";
 import {
 	type ExpressWebSocketOptions,
 	registerExpressWebSocketRoutes,
@@ -14,6 +17,7 @@ export type RegisterRoutesOptions = {
 		| { kind: "http"; req: Request; signal: AbortSignal }
 		| { kind: "websocket"; req: IncomingMessage; signal: AbortSignal }
 	>;
+	middleware?: ExtendedExpressMiddleware[];
 	webSocket?: ExpressWebSocketOptions;
 };
 
@@ -39,6 +43,7 @@ export const registerRoutes = (
 			registerExpressHttpRoutes(
 				app,
 				routes,
+				options.middleware,
 				options.errorHandlers as ExpressHttpErrorHandlers | undefined,
 			),
 		(routes) =>

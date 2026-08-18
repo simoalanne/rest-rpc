@@ -6,7 +6,11 @@ import {
 } from "@rest-rpc/server";
 import type { Context, Hono } from "hono";
 import type { Env } from "hono/types";
-import { type HonoParseBody, registerHonoHttpRoutes } from "./http.ts";
+import {
+	type ExtendedHonoMiddleware,
+	type HonoParseBody,
+	registerHonoHttpRoutes,
+} from "./http.ts";
 import {
 	type HonoWebSocketOptions,
 	registerHonoWebSocketRoutes,
@@ -17,6 +21,7 @@ export type RegisterRoutesOptions<TEnv extends Env = Env> = {
 		c: Context<TEnv>;
 		signal: AbortSignal;
 	}>;
+	middleware?: ExtendedHonoMiddleware<TEnv>[];
 	parseBody?: HonoParseBody<TEnv>;
 	webSocket?: HonoWebSocketOptions<TEnv>;
 };
@@ -33,18 +38,17 @@ export const registerRoutes = <TEnv extends Env = Env>(
 				app,
 				routes,
 				options.parseBody,
+				options.middleware,
 				options.errorHandlers,
 			),
 		(routes) => {
 			if (options.webSocket) {
 				registerHonoWebSocketRoutes(
 					app,
-					{
-						...options.webSocket,
-						errorHandlers:
-							options.webSocket.errorHandlers ?? options.errorHandlers,
-					},
+					options.webSocket,
 					routes,
+					options.middleware,
+					options.errorHandlers,
 				);
 			}
 		},

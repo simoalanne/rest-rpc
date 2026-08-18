@@ -62,6 +62,7 @@ type RegisterRoutesOptions = {
 		| { kind: "websocket"; req: IncomingMessage; signal: AbortSignal }
 	>;
 	webSocket?: ExpressWebSocketOptions;
+	middleware?: Array<(req: Request, res: Response, next: NextFunction, route: HttpRouteDeclaration) => unknown>;
 };
 ```
 
@@ -103,4 +104,26 @@ registerRoutes(app, routes, {
 });
 
 server.listen(3000);
+```
+
+### Middleware
+
+:::warning[Websocket middleware]
+WebSocket routes do not support middleware.
+You can use the `beforeUpgrade` option to implement middleware-like behavior for WebSocket routes.
+:::
+
+```ts
+registerRoutes(app, routes, {
+	middleware: [
+		(req, res, next, route) => {
+			const authorization = req.header("authorization");
+			if (!authorization) {
+				res.status(401).send({ code: "UNAUTHORIZED" });
+				return;
+			}
+			next();
+		},
+	],
+});
 ```

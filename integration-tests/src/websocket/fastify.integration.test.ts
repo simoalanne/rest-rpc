@@ -9,12 +9,19 @@ runWebSocketSuite({
 	name: "fastify",
 	start: async () => {
 		const app = Fastify();
+		const seenRoutes: string[] = [];
 		await app.register(websocket);
 
 		registerRoutes(app, createWebSocketImplementations("fastify"), {
+			preHandler: [
+				async (_req, _reply, route) => {
+					seenRoutes.push(`${route.method} ${route.path}`);
+				},
+			],
 			webSocket: {
 				beforeUpgrade: ({ context }) => {
 					assert.ok(context.signal instanceof AbortSignal);
+					assert.equal(seenRoutes.at(-1), "GET /ws/:roomId");
 				},
 			},
 		});
