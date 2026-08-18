@@ -2,9 +2,8 @@ import { defineMeta } from "blume";
 
 export default defineMeta({
 	pages: [
-		"index",
-		"comparison",
 		"quickstart",
+		"comparison",
 		"contract",
 		"http-requests",
 		"http-responses",

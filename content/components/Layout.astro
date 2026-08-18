@@ -1,0 +1,9 @@
+---
+import RootLayout from "blume/components/layout/RootLayout.astro";
+
+const contentLayout = Astro.props.page?.route === "/" ? "bare" : "default";
+---
+
+<RootLayout {...Astro.props} contentLayout={contentLayout}>
+	<slot />
+</RootLayout>

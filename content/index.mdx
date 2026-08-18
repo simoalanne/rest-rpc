@@ -1,6 +1,7 @@
 ---
 title: rest-rpc
 description: REST-shaped APIs with function-shaped TypeScript.
+slug: index
 ---
 
 Define your HTTP API once as a shared TypeScript contract. Use that same
@@ -11,18 +12,18 @@ and OpenAPI documents.
 like ordinary function calls.
 
 <CardGroup cols={2}>
-  <Card title="Start building" href="/quickstart/" icon="rocket" cta="Open the quickstart">
+  <Card title="Start building" href="/docs/quickstart/" icon="rocket" cta="Open the quickstart">
     Define a route, implement it on a server adapter, and call it from a typed
     client.
   </Card>
-  <Card title="Compare the tradeoffs" href="/comparison/" icon="scale" cta="Read the comparison">
+  <Card title="Compare the tradeoffs" href="/docs/comparison/" icon="scale" cta="Read the comparison">
     See where rest-rpc sits beside ts-rest, oRPC, and tRPC.
   </Card>
-  <Card title="Learn the model" href="/concepts/" icon="map" cta="Explore concepts">
+  <Card title="Learn the model" href="/docs/contract/declaration/" icon="map" cta="Explore the contract">
     REST at the boundary, RPC-style usage at the call site, and one contract as
     the source of truth.
   </Card>
-  <Card title="Generate OpenAPI" href="/openapi/" icon="file-json" cta="View OpenAPI docs">
+  <Card title="Generate OpenAPI" href="/docs/openapi/" icon="file-json" cta="View OpenAPI docs">
     Turn your TypeScript contract into an OpenAPI document without maintaining a
     separate schema.
   </Card>
@@ -144,21 +145,22 @@ curl -X PATCH "https://api.example.com/todos/todo_1?notify=true" \
 
 <Steps>
   <Step title="Build the first route" icon="rocket">
-    Start with the [Quickstart](/quickstart/) if you want the fastest end-to-end
+    Start with the [Quickstart](/docs/quickstart/) if you want the fastest end-to-end
     example.
   </Step>
   <Step title="Shape the contract" icon="file-code">
-    Read [Contract Declaration](/contract/declaration/),
-    [Schemas](/contract/schemas/), [HTTP Requests](/http-requests/), and
-    [HTTP Responses](/http-responses/) when you are designing real routes.
+    Read [Contract Declaration](/docs/contract/declaration/),
+    [Schemas](/docs/contract/schemas/), [HTTP Requests](/docs/http-requests/),
+    and [HTTP Responses](/docs/http-responses/) when you are designing real
+    routes.
   </Step>
   <Step title="Choose the runtime" icon="plug">
-    Wire the contract to [server adapters](/server/), the
-    [fetch client](/client/fetch-client/), or
-    [TanStack Query](/client/tanstack-query/).
+    Wire the contract to [server adapters](/docs/server/), the
+    [fetch client](/docs/client/fetch-client/), or
+    [TanStack Query](/docs/client/tanstack-query/).
   </Step>
   <Step title="Publish the contract" icon="share">
-    Generate an [OpenAPI document](/openapi/) without ceremony.
+    Generate an [OpenAPI document](/docs/openapi/) without ceremony.
   </Step>
 </Steps>
 
