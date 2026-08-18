@@ -1,0 +1,11 @@
+{
+	"version": 1,
+	"skills": {
+		"blume": {
+			"source": "haydenbleasel/blume",
+			"sourceType": "github",
+			"skillPath": "skills/blume/SKILL.md",
+			"computedHash": "bba88e2dccc4170e16220e21054b4978f37e6f52afaff072f7ad66e192821a40"
+		}
+	}
+}
