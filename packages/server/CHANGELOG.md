@@ -1,5 +1,11 @@
 # @rest-rpc/server
 
+## 0.1.0-beta.9
+
+### Patch Changes
+
+- 5676c02: update packages README.md file
+
 ## 0.1.0-beta.8
 
 ## 0.1.0-beta.7

@@ -1,5 +1,15 @@
 # @rest-rpc/tanstack-query
 
+## 0.1.0-beta.9
+
+### Minor Changes
+
+- d170b41: rename origin -> baseUrl and allow baseUrl to be any value
+
+### Patch Changes
+
+- 5676c02: update packages README.md file
+
 ## 0.1.0-beta.8
 
 ## 0.1.0-beta.7

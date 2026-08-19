@@ -1,5 +1,15 @@
 # @rest-rpc/fastify
 
+## 0.1.0-beta.9
+
+### Minor Changes
+
+- 9a3f3b9: add support for route-aware middleware/preHandler for express,hono,fastify
+
+### Patch Changes
+
+- 5676c02: update packages README.md file
+
 ## 0.1.0-beta.8
 
 ## 0.1.0-beta.7
