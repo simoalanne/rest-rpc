@@ -84,6 +84,14 @@ export const createStreamCancellationProbe = (): StreamCancellationProbe => {
 	};
 };
 
+type StreamRequestContext = {
+	request?: Request;
+	signal?: AbortSignal;
+};
+
+const getRequestSignal = (context: StreamRequestContext) =>
+	context.signal ?? context.request?.signal;
+
 export type StreamsHandlerOptions = {
 	cancellationProbe?: StreamCancellationProbe;
 };
@@ -98,8 +106,9 @@ export const createStreamsHandlers = (
 	},
 	cancellable: async function* (request) {
 		options.cancellationProbe?.markStarted();
-		const signal = (request[REQUEST_CONTEXT_KEY] as { signal?: AbortSignal })
-			.signal;
+		const signal = getRequestSignal(
+			request[REQUEST_CONTEXT_KEY] as StreamRequestContext,
+		);
 		signal?.addEventListener(
 			"abort",
 			() => options.cancellationProbe?.markSignalAborted(),
