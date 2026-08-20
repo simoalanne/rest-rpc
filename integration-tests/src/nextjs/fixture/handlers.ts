@@ -1,35 +1,44 @@
-import type { NextRouteHandlerContext } from "@rest-rpc/next";
-import type { RouteHandler } from "@rest-rpc/web";
-import type { nextFixtureContract } from "./contract";
+import { type NextRouteMiddleware, route, router } from "@rest-rpc/next";
+import { nextFixtureContract } from "./contract";
 
-export const getTargetedItem: RouteHandler<
-	typeof nextFixtureContract.targeted.get,
-	NextRouteHandlerContext
-> = ({ id, context }) => ({
-	id,
-	title: context.request.headers.get("x-next-fixture-title") ?? "Targeted item",
+const requestContext: NextRouteMiddleware<{ request: Request }> = ({
+	request,
+}) => ({
+	request,
 });
 
-export const nextFixtureHandlers = {
-	health: () => undefined,
-	items: {
-		get: ({ id, context }) => ({
-			id,
-			title: context.request.headers.get("x-next-fixture-title") ?? "Next item",
-		}),
-		create: ({ title }) => ({
-			status: 201,
-			body: {
-				id: "created-next-item",
-				title,
-			},
-		}),
-	},
-	targeted: {
-		get: getTargetedItem,
-	},
-} satisfies Parameters<
-	typeof import("@rest-rpc/next").createRouterHandler<
-		typeof nextFixtureContract
-	>
->[1];
+export const targetedItemRoute = route(nextFixtureContract.targeted.get)
+	.middleware(requestContext)
+	.handler(({ id, context }) => ({
+		id,
+		title:
+			context.request.headers.get("x-next-fixture-title") ?? "Targeted item",
+	}));
+
+export const nextFixtureRoutes = router(nextFixtureContract)
+	.middleware(requestContext)
+	.handlers({
+		health: () => undefined,
+		items: {
+			get: ({ id, context }) => ({
+				id,
+				title:
+					context.request.headers.get("x-next-fixture-title") ?? "Next item",
+			}),
+			create: ({ title }) => ({
+				status: 201,
+				body: {
+					id: "created-next-item",
+					title,
+				},
+			}),
+		},
+		targeted: {
+			get: ({ id, context }) => ({
+				id,
+				title:
+					context.request.headers.get("x-next-fixture-title") ??
+					"Targeted item",
+			}),
+		},
+	});

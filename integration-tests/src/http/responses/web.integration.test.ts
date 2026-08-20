@@ -2,10 +2,8 @@ import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { initClient } from "@rest-rpc/core";
 import { REQUEST_CONTEXT_KEY, router } from "@rest-rpc/core/contract";
-import {
-	router as createRouter,
-	type ImplementationShape,
-} from "@rest-rpc/server";
+import type { ImplementationShape } from "@rest-rpc/server";
+import { router as createWebRouter } from "@rest-rpc/web";
 import z from "zod";
 import type { StartedServer } from "../harness/listen.ts";
 import { createWebAdapter } from "../harness/web.ts";
@@ -79,7 +77,15 @@ const createLifecycleImplementations = () => {
 				}) as never,
 		};
 
-	return createRouter(lifecycleContract, handlers);
+	return createWebRouter(lifecycleContract)
+		.middleware(() => ({
+			adapter: "web" as const,
+			responseHeaders: new Headers(),
+			response: new Response(null, {
+				headers: { "x-initial-context-response": "ignored" },
+			}),
+		}))
+		.handlers(handlers);
 };
 
 describe("web response lifecycle integration", () => {
@@ -88,13 +94,6 @@ describe("web response lifecycle integration", () => {
 
 	before(async () => {
 		server = await createWebAdapter(createLifecycleImplementations(), {
-			context: {
-				adapter: "web",
-				responseHeaders: new Headers(),
-				response: new Response(null, {
-					headers: { "x-initial-context-response": "ignored" },
-				}),
-			},
 			createHandlerOptions: {
 				errorHandlers: responseErrorHandlers,
 			},

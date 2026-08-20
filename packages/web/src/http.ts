@@ -10,27 +10,6 @@ import {
 	type ServerErrorHandlers,
 } from "@rest-rpc/server";
 
-export type WebRouteHandlerContext = Record<string, unknown>;
-
-export type WebRouteRuntimeContext<TContext extends WebRouteHandlerContext> =
-	TContext & {
-		signal: AbortSignal;
-	};
-
-type IsOptionalWebContext<TContext extends WebRouteHandlerContext> =
-	keyof TContext extends never
-		? true
-		: string extends keyof TContext
-			? true
-			: false;
-
-export type WebHandler<TContext extends WebRouteHandlerContext> =
-	IsOptionalWebContext<TContext> extends true
-		? (request: Request, context?: TContext) => Promise<Response>
-		: (request: Request, context: TContext) => Promise<Response>;
-
-export type WebRequestHandler = (request: Request) => Promise<Response>;
-
 export type WebRouteParseBodyInput = {
 	request: Request;
 	route: HttpRouteDeclaration;
@@ -40,13 +19,6 @@ export type WebRouteParseBodyInput = {
 export type WebRouteParseBody = (
 	input: WebRouteParseBodyInput,
 ) => unknown | Promise<unknown>;
-
-export type CreateWebHandlerOptions<
-	TContext extends WebRouteHandlerContext = WebRouteHandlerContext,
-> = {
-	errorHandlers?: ServerErrorHandlers<WebRouteRuntimeContext<TContext>>;
-	parseBody?: WebRouteParseBody;
-};
 
 const isJsonContentType = (contentType: string) =>
 	contentType.split(";")[0]?.trim().toLowerCase() === "application/json";
@@ -70,21 +42,15 @@ export const defaultParseBody = ({ request, body }: WebRouteParseBodyInput) => {
 	return request.json();
 };
 
-export const handleWebRoute = async <TContext extends WebRouteHandlerContext>(
+export const handleWebRoute = async <TContext extends Record<string, unknown>>(
 	request: Request,
 	context: TContext,
 	implementation: RouteImplementation<HttpRouteDeclaration>,
 	params: Record<string, string>,
 	parseBody: WebRouteParseBody,
-	errorHandlers:
-		| ServerErrorHandlers<WebRouteRuntimeContext<TContext>>
-		| undefined,
+	errorHandlers: ServerErrorHandlers<Record<never, never>> | undefined,
 ) => {
 	const url = new URL(request.url);
-	const runtimeContext = {
-		...context,
-		signal: request.signal,
-	} as WebRouteRuntimeContext<TContext>;
 	const result = await handleHttpRoute(
 		implementation.route,
 		implementation.handler,
@@ -99,7 +65,7 @@ export const handleWebRoute = async <TContext extends WebRouteHandlerContext>(
 				pathParams: params,
 				headers: readHeaders(request.headers),
 			},
-			context: runtimeContext,
+			context,
 			errorHandlers,
 		},
 	);

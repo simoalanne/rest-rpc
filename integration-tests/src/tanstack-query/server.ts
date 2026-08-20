@@ -2,7 +2,7 @@ import type { Server } from "node:http";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { Readable } from "node:stream";
-import { createHandler, router } from "@rest-rpc/web";
+import { createRouteHandler, router } from "@rest-rpc/web";
 import { createTanstackQueryImplementations } from "./handlers.ts";
 
 export type StartedTanstackQueryServer = {
@@ -41,9 +41,9 @@ const withoutBody = (method: string | undefined) =>
 	method === "GET" || method === "HEAD";
 
 export const startTanstackQueryServer = async () => {
-	const handler = createHandler(
+	const handler = createRouteHandler(
 		createTanstackQueryImplementations((contract, handlers) =>
-			router(contract, handlers),
+			router(contract).handlers(handlers),
 		),
 	);
 
@@ -57,7 +57,7 @@ export const startTanstackQueryServer = async () => {
 					: (Readable.toWeb(req) as ReadableStream),
 				duplex: "half",
 			} as RequestInit & { duplex: "half" });
-			const response = await handler(request, { adapter: "web" });
+			const response = await handler(request, {});
 
 			res.writeHead(response.status, Object.fromEntries(response.headers));
 			if (response.body) {

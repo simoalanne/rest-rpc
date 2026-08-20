@@ -3,6 +3,7 @@ export {
 	ContractResponseError,
 	type CookiePriority,
 	clearCookie,
+	routes,
 	type SameSite,
 	type SetCookieOptions,
 	setCookie,
@@ -10,11 +11,9 @@ export {
 export {
 	type CreateRouteHandlerOptions,
 	createRouteHandler,
-	createRouterHandler,
-	type NextRouteHandlerContext,
-	type NextRouteParseBody,
-	type NextRouteParseBodyInput,
-	type RouteHandler,
+	type NextRouteMiddleware,
 	type RouteRequest,
 	type RouteResponse,
+	route,
+	router,
 } from "./server.ts";

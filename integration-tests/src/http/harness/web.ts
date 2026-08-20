@@ -3,7 +3,10 @@ import { createServer } from "node:http";
 import { Readable } from "node:stream";
 import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import type { ImplementationTree } from "@rest-rpc/server";
-import { type CreateWebHandlerOptions, createHandler } from "@rest-rpc/web";
+import {
+	type CreateWebHandlerOptions,
+	createRouteHandler,
+} from "@rest-rpc/web";
 import { listen } from "./listen.ts";
 
 const withoutBody = (method: string | undefined) =>
@@ -22,7 +25,7 @@ export type WebAdapterContext = { adapter: "web" };
 
 export type WebAdapterOptions = {
 	context?: WebAdapterContext;
-	createHandlerOptions?: CreateWebHandlerOptions<WebAdapterContext>;
+	createHandlerOptions?: CreateWebHandlerOptions;
 	transformResponse?: (response: Response) => Response | Promise<Response>;
 };
 
@@ -32,7 +35,7 @@ export const createWebAdapter = (
 ) => ({
 	name: "web",
 	start: async () => {
-		const handler = createHandler<WebAdapterContext>(
+		const handler = createRouteHandler(
 			implementations,
 			options.createHandlerOptions,
 		);

@@ -1,95 +1,54 @@
-import type {
-	HttpMethod,
-	HttpRouteDeclaration,
-	RequestBodySchema,
-} from "@rest-rpc/core/contract";
+import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	type CreateWebHandlerOptions,
-	initWeb,
-	type RouteHandler as WebRouteHandler,
+	createRouteHandler as createWebRouteHandler,
+	type WebContract,
+	type WebImplementationTree,
+	type WebRouteBuilder,
+	type WebRouteMiddleware,
 	type WebRouteParseBodyInput,
 	type RouteRequest as WebRouteRequest,
 	type RouteResponse as WebRouteResponse,
-	type WebRouteRuntimeContext,
+	type WebRouterBuilder,
+	route as webRoute,
+	router as webRouter,
 } from "@rest-rpc/web";
+import type { NextRequest } from "next/server.js";
 
-type WebContract = HttpRouteDeclaration | { [key: string]: WebContract };
-type WebRequestHandler = (request: Request) => Promise<Response>;
-type WebRouterHandlers<TContract extends WebContract> =
-	TContract extends HttpRouteDeclaration
-		? RouteHandler<TContract>
-		: {
-				[K in keyof TContract]: TContract[K] extends WebContract
-					? WebRouterHandlers<TContract[K]>
-					: never;
-			};
+export type NextRouteMiddleware<TContext extends Record<string, unknown>> =
+	WebRouteMiddleware<Record<never, never>, TContext, NextRequest>;
 
-type RouteHandlerMap<E extends HttpRouteDeclaration> = {
-	[K in E["method"]]: WebRequestHandler;
-};
-
-type RouterHandlerMap = {
-	[K in HttpMethod]: WebRequestHandler;
-};
-
-type NextRouteAdapterContext = {
-	request: Request;
-};
-
-export type NextRouteHandlerContext =
-	WebRouteRuntimeContext<NextRouteAdapterContext>;
-
-export type RouteRequest<E extends HttpRouteDeclaration> = WebRouteRequest<
-	E,
-	NextRouteAdapterContext
->;
+export type RouteRequest<
+	E extends HttpRouteDeclaration,
+	TContext extends Record<string, unknown> = Record<string, unknown>,
+> = WebRouteRequest<E, TContext, NextRequest>;
 
 export type RouteResponse<E extends HttpRouteDeclaration> = WebRouteResponse<E>;
 
-export type RouteHandler<E extends HttpRouteDeclaration> = WebRouteHandler<
-	E,
-	NextRouteHandlerContext
->;
-
-export type NextRouteParseBodyInput = WebRouteParseBodyInput;
-
-export type NextRouteParseBody = (
-	input: NextRouteParseBodyInput,
-) => unknown | Promise<unknown>;
-
 export type CreateRouteHandlerOptions = {
-	errorHandlers?: CreateWebHandlerOptions<NextRouteAdapterContext>["errorHandlers"];
-	parseBody?: NextRouteParseBody;
+	errorHandlers?: CreateWebHandlerOptions["errorHandlers"];
+	parseBody?: (input: WebRouteParseBodyInput) => unknown | Promise<unknown>;
 };
 
-export function createRouteHandler<E extends HttpRouteDeclaration>(
-	route: E,
-	handler: RouteHandler<E>,
-	options?: CreateRouteHandlerOptions,
-): RouteHandlerMap<E> {
-	const web = initWeb<NextRouteAdapterContext>();
-	const handle = web.createHandler(web.route(route, handler), {
-		errorHandlers: options?.errorHandlers,
-		parseBody: options?.parseBody,
-	});
+export const route = <const TRoute extends HttpRouteDeclaration>(
+	contract: TRoute,
+): WebRouteBuilder<TRoute, Record<never, never>, NextRequest> =>
+	webRoute<TRoute, Record<never, never>, NextRequest>(contract);
 
-	return {
-		[route.method]: (request: Request) => handle(request, { request }),
-	} as RouteHandlerMap<E>;
-}
-
-export const createRouterHandler = <const TContract extends WebContract>(
+export const router = <const TContract extends WebContract>(
 	contract: TContract,
-	handlers: WebRouterHandlers<TContract>,
+): WebRouterBuilder<TContract, Record<never, never>, NextRequest> =>
+	webRouter<TContract, Record<never, never>, NextRequest>(contract);
+
+export const createRouteHandler = (
+	implementations: WebImplementationTree,
 	options?: CreateRouteHandlerOptions,
-): RouterHandlerMap => {
-	const web = initWeb<NextRouteAdapterContext>();
-	const handle = web.createHandler(web.router(contract, handlers as never), {
+) => {
+	const handle = createWebRouteHandler(implementations, {
 		errorHandlers: options?.errorHandlers,
 		parseBody: options?.parseBody,
 	});
-	const nextHandler: WebRequestHandler = (request) =>
-		handle(request, { request });
+	const nextHandler = (request: Request) => handle(request, {});
 
 	return {
 		DELETE: nextHandler,
@@ -99,5 +58,3 @@ export const createRouterHandler = <const TContract extends WebContract>(
 		PUT: nextHandler,
 	};
 };
-
-export type { RequestBodySchema };

@@ -1,133 +1,141 @@
 import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import {
-	type Contract,
 	ContractResponseError,
 	clearCookie,
-	type ImplementationShape,
-	type ImplementationTree,
 	type ImplementationTreeFor,
-	type RouteHandler,
-	type RouteHandlerFor,
-	type RouteImplementation,
-	type InferRouteHandlerRequest as ServerInferRouteHandlerRequest,
-	type InferRouteHandlerResponse as ServerInferRouteHandlerResponse,
-	route as serverRoute,
-	router as serverRouter,
+	type ServerErrorHandlers,
 	routes as serverRoutes,
 	setCookie,
 } from "@rest-rpc/server";
 import {
-	type CreateWebHandlerOptions,
 	defaultParseBody,
 	handleWebRoute,
-	type WebHandler,
-	type WebRouteHandlerContext,
-	type WebRouteRuntimeContext,
+	type WebRouteParseBody,
 } from "./http.ts";
 import { createWebRouteMatcher } from "./match.ts";
+import {
+	createWebRouteBuilder,
+	createWebRouterBuilder,
+	type WebContract,
+	type WebImplementationTree,
+	type WebRouteBuilder,
+	type WebRouteImplementation,
+	type WebRouterBuilder,
+} from "./routeBuilder.ts";
 
 export type {
 	ClearCookieOptions,
 	CookiePriority,
+	RouteHandler,
 	SameSite,
 	SetCookieOptions,
 } from "@rest-rpc/server";
+export type { WebRouteParseBody, WebRouteParseBodyInput } from "./http.ts";
 export type {
-	CreateWebHandlerOptions,
-	WebRouteHandlerContext,
-	WebRouteParseBody,
-	WebRouteParseBodyInput,
-	WebRouteRuntimeContext,
-} from "./http.ts";
-export type { RouteHandler };
+	RouteRequest,
+	RouteResponse,
+	WebContract,
+	WebImplementationTree,
+	WebRouteBuilder,
+	WebRouteContext,
+	WebRouteMiddleware,
+	WebRouteMiddlewareInput,
+	WebRouteMiddlewareResult,
+	WebRouterBuilder,
+} from "./routeBuilder.ts";
 export { ContractResponseError, clearCookie, setCookie };
 
-type WebContract = Contract<HttpRouteDeclaration>;
-
-export type RouteRequest<
-	E extends HttpRouteDeclaration,
-	TContext extends WebRouteHandlerContext = WebRouteHandlerContext,
-> = ServerInferRouteHandlerRequest<E, WebRouteRuntimeContext<TContext>>;
-
-export type RouteResponse<E extends HttpRouteDeclaration> =
-	ServerInferRouteHandlerResponse<E>;
+export type CreateWebHandlerOptions = {
+	errorHandlers?: ServerErrorHandlers<Record<never, never>>;
+	parseBody?: WebRouteParseBody;
+};
 
 export const route = <
 	const TRoute extends HttpRouteDeclaration,
-	TContext extends WebRouteHandlerContext = WebRouteHandlerContext,
+	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
+	TRequest extends Request = Request,
 >(
 	contract: TRoute,
-	handler: RouteHandler<TRoute, WebRouteRuntimeContext<TContext>>,
-): RouteImplementation<TRoute> =>
-	serverRoute(contract, handler as RouteHandlerFor<TRoute, TContext, TContext>);
+): WebRouteBuilder<TRoute, TRuntimeContext, TRequest> =>
+	createWebRouteBuilder(contract);
 
 export const router = <
 	const TContract extends WebContract,
-	TContext extends WebRouteHandlerContext = WebRouteHandlerContext,
+	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
+	TRequest extends Request = Request,
 >(
 	contract: TContract,
-	handlers: ImplementationShape<TContract, WebRouteRuntimeContext<TContext>>,
-): ImplementationTreeFor<TContract, HttpRouteDeclaration> =>
-	serverRouter(contract, handlers) as ImplementationTreeFor<
-		TContract,
-		HttpRouteDeclaration
-	>;
+): WebRouterBuilder<TContract, TRuntimeContext, TRequest> =>
+	createWebRouterBuilder(contract);
 
 export const routes = <const TContract extends WebContract>(
 	contract: TContract,
 	implementations: ImplementationTreeFor<TContract, HttpRouteDeclaration>,
-): ImplementationTreeFor<TContract, HttpRouteDeclaration> =>
+): WebImplementationTree =>
 	serverRoutes(
 		contract,
 		implementations as ImplementationTreeFor<TContract>,
-	) as ImplementationTreeFor<TContract, HttpRouteDeclaration>;
+	) as WebImplementationTree;
 
-export const createHandler = <
-	TContext extends WebRouteHandlerContext = WebRouteHandlerContext,
+export const createRouteHandler = <
+	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
+	TContext extends Record<string, unknown> = Record<string, unknown>,
+	TRequest extends Request = Request,
 >(
-	implementations: ImplementationTree<HttpRouteDeclaration>,
-	options: CreateWebHandlerOptions<TContext> = {},
-): WebHandler<TContext> => {
+	implementations: WebImplementationTree,
+	options: CreateWebHandlerOptions = {},
+): ((request: TRequest, runtime: TRuntimeContext) => Promise<Response>) => {
 	const matchRoute = createWebRouteMatcher(implementations);
 	const parseBody = options.parseBody ?? defaultParseBody;
 
-	return (async (request: Request, context?: TContext) => {
+	return async (request: TRequest, runtime: TRuntimeContext) => {
 		const match = matchRoute(request);
-		if (!match) return new Response(null, { status: 404 });
-		if (match.type === "methodNotAllowed") {
-			return new Response(null, { status: 405 });
-		}
+		if (match instanceof Response) return match;
+		const implementation = match.implementation as WebRouteImplementation<
+			TRuntimeContext,
+			TContext,
+			TRequest
+		>;
+		const middlewareResult = await implementation.middleware?.({
+			request,
+			route: implementation.route,
+			runtime,
+		});
+		if (middlewareResult instanceof Response) return middlewareResult;
+
+		const context = {
+			...(middlewareResult ?? {}),
+			request,
+		};
 
 		return handleWebRoute(
 			request,
-			(context ?? {}) as TContext,
-			match.implementation,
+			context,
+			implementation,
 			match.params,
 			parseBody,
 			options.errorHandlers,
 		);
-	}) as WebHandler<TContext>;
+	};
 };
 
 export const initWeb = <
-	TContext extends WebRouteHandlerContext = WebRouteHandlerContext,
+	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
+	TRequest extends Request = Request,
 >() => {
 	return {
-		route: <const TRoute extends HttpRouteDeclaration>(
-			contract: TRoute,
-			handler: RouteHandler<TRoute, WebRouteRuntimeContext<TContext>>,
-		) => route<TRoute, TContext>(contract, handler),
-		router: <const TContract extends WebContract>(
-			contract: TContract,
-			handlers: ImplementationShape<
-				TContract,
-				WebRouteRuntimeContext<TContext>
-			>,
-		) => router<TContract, TContext>(contract, handlers),
+		route: <const TRoute extends HttpRouteDeclaration>(contract: TRoute) =>
+			route<TRoute, TRuntimeContext, TRequest>(contract),
+		router: <const TContract extends WebContract>(contract: TContract) =>
+			router<TContract, TRuntimeContext, TRequest>(contract),
 		routes,
-		createHandler: (
-			implementations: ImplementationTree<HttpRouteDeclaration>,
-			options?: CreateWebHandlerOptions<TContext>,
-		) => createHandler<TContext>(implementations, options),
+		createRouteHandler: <TContext extends Record<string, unknown>>(
+			implementations: WebImplementationTree,
+			options?: CreateWebHandlerOptions,
+		) =>
+			createRouteHandler<TRuntimeContext, TContext, TRequest>(
+				implementations,
+				options,
+			),
 	};
 };

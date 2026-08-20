@@ -27,15 +27,15 @@ export const createWebRouteMatcher = (
 			path: url.pathname,
 		});
 
-		if (!match) return undefined;
+		if (!match) return new Response(null, { status: 404 });
 		if (match.type === "methodNotAllowed") {
-			return match;
+			return new Response(null, { status: 405 });
 		}
 
 		const implementation = implementationsByRoute.get(
 			match.route as HttpRouteDeclaration,
 		);
-		if (!implementation) return undefined;
+		if (!implementation) return new Response(null, { status: 404 });
 
 		return {
 			type: "match" as const,

@@ -1,10 +1,6 @@
-import { createRouterHandler } from "@rest-rpc/next";
-import { nextFixtureContract } from "../../../contract";
-import { nextFixtureHandlers } from "../../../handlers";
+import { createRouteHandler } from "@rest-rpc/next";
+import { nextFixtureRoutes } from "../../../handlers";
 
 export const dynamic = "force-dynamic";
 
-export const { DELETE, GET, POST } = createRouterHandler(
-	nextFixtureContract,
-	nextFixtureHandlers,
-);
+export const { DELETE, GET, POST } = createRouteHandler(nextFixtureRoutes);

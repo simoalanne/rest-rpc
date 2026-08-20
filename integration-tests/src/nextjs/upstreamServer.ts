@@ -9,7 +9,7 @@ export const createNextUpstreamServer = () => {
 		counters,
 		start: () =>
 			createWebAdapter(
-				router(upstreamContract, {
+				router(upstreamContract).handlers({
 					counter: {
 						get: ({ id }) => {
 							const count = (counters.get(id) ?? 0) + 1;

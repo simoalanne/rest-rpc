@@ -15,43 +15,55 @@ pnpm add @rest-rpc/next
 
 ```ts
 // app/api/todos/[id]/route.ts
-import { createRouteHandler } from "@rest-rpc/next";
+import { createRouteHandler, route } from "@rest-rpc/next";
 import { api } from "@/contract";
 
-export const { GET } = createRouteHandler(api.todos.get, ({ id, context }) => {
-	const authorization = context.request.headers.get("authorization");
-	return getTodo(id, { authorization });
-});
+const getTodoRoute = route(api.todos.get)
+	.middleware(({ request }) => ({
+		authorization: request.headers.get("authorization"),
+	}))
+	.handler(({ id, context }) => {
+		return getTodo(id, { authorization: context.authorization });
+	});
+
+export const { GET } = createRouteHandler(getTodoRoute);
 ```
 
 ### Catch-all Route Handler
 
 ```ts
 // app/api/[...rest-rpc].ts
-import { createRouterHandler } from "@rest-rpc/next";
+import { createRouteHandler, router } from "@rest-rpc/next";
 import { api } from "@/contract";
 
-export const { GET, POST } = createRouterHandler(api, {
-	todos: {
-		list() {
-			return listTodos();
+const routes = router(api)
+	.middleware(({ request }) => ({
+		authorization: request.headers.get("authorization"),
+	}))
+	.handlers({
+		todos: {
+			list() {
+				return listTodos();
+			},
+			get({ id, context }) {
+				return getTodo(id, { authorization: context.authorization });
+			},
+			create({ title }) {
+				return createTodo({ title });
+			},
 		},
-		get({ id }) {
-			return getTodo(id);
-		},
-		create({ title }) {
-			return createTodo({ title });
-		},
-	},
-});
+	});
+
+export const { GET, POST } = createRouteHandler(routes);
 ```
 
 ## Framework Context
 
 ```ts
-type NextRouteHandlerContext = {
-	request: Request;
-	signal: AbortSignal;
+type MiddlewareInput = {
+	request: NextRequest;
+	route: HttpRouteDeclaration;
+	runtime: Record<never, never>;
 };
 ```
 
@@ -59,15 +71,15 @@ type NextRouteHandlerContext = {
 
 ```ts
 type CreateRouteHandlerOptions = {
-	errorHandlers?: CreateWebHandlerOptions<NextRouteHandlerContext>["errorHandlers"];
-	parseBody?: NextRouteParseBody;
+	errorHandlers?: CreateWebHandlerOptions["errorHandlers"];
+	parseBody?: (input: WebRouteParseBodyInput) => unknown | Promise<unknown>;
 };
 ```
 
 ### Error Handlers
 
 ```ts
-export const { GET, POST } = createRouterHandler(api, handlers, {
+export const { GET, POST } = createRouteHandler(routes, {
 	errorHandlers: {
 		onRequestValidationError: ({ issues }) => ({
 			status: 422,
@@ -84,7 +96,57 @@ export const { GET, POST } = createRouterHandler(api, handlers, {
 ### Body Parsing
 
 ```ts
-export const { POST } = createRouteHandler(api.uploads.create, createUpload, {
+const uploadRoute = route(api.uploads.create).handler(createUpload);
+
+export const { POST } = createRouteHandler(uploadRoute, {
 	parseBody: ({ request }) => request.formData(),
 });
+```
+
+## Custom Runtime Context
+
+`@rest-rpc/next` is a small wrapper around the [Web adapter](./web). It creates
+Next route handler exports and passes only the `NextRequest` to the middleware.
+
+Use `@rest-rpc/web` directly when middleware needs framework data that Next passes
+as the route handler context, or when you want to shape the runtime context
+yourself.
+
+```ts
+// app/api/[...rest-rpc]/route.ts
+import { initWeb } from "@rest-rpc/web";
+import type { NextRequest } from "next/server";
+import { api } from "@/contract";
+
+type Runtime = {
+	params: Promise<{ rest: string[] }>;
+};
+
+const web = initWeb<Runtime, NextRequest>();
+
+const routes = web
+	.router(api)
+	.middleware(async ({ request, runtime }) => {
+		const params = await runtime.params;
+
+		return {
+			pathname: request.nextUrl.pathname,
+			segments: params.rest,
+		};
+	})
+	.handlers({
+		todos: {
+			list({ context }) {
+				return listTodos({
+					pathname: context.pathname,
+					segments: context.segments,
+				});
+			},
+		},
+	});
+
+const handleRequest = web.createRouteHandler(routes);
+
+export const GET = (request: NextRequest, context: Runtime) =>
+	handleRequest(request, context);
 ```

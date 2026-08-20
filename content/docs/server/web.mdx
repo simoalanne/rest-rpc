@@ -22,21 +22,26 @@ type Context = {
 
 const web = initWeb<Context>();
 
-const routes = web.router(api, {
-	todos: {
-		list({ context }) {
-			return listTodos(context.env.DB);
+const routes = web
+	.router(api)
+	.middleware(({ runtime }) => ({
+		db: runtime.env.DB,
+	}))
+	.handlers({
+		todos: {
+			list({ context }) {
+				return listTodos(context.db);
+			},
+			get({ id, context }) {
+				return getTodo(context.db, id);
+			},
+			create({ title, context }) {
+				return createTodo(context.db, { title });
+			},
 		},
-		get({ id, context }) {
-			return getTodo(context.env.DB, id);
-		},
-		create({ title, context }) {
-			return createTodo(context.env.DB, { title });
-		},
-	},
-});
+	});
 
-const handleRequest = web.createHandler(routes);
+const handleRequest = web.createRouteHandler(routes);
 
 export default {
 	fetch(request, env, ctx) {
@@ -48,19 +53,21 @@ export default {
 ## Framework Context
 
 ```ts
-type WebRouteRuntimeContext<TContext extends WebRouteHandlerContext> =
-	TContext & {
-		signal: AbortSignal;
-	};
+type MiddlewareInput<Runtime> = {
+	request: Request;
+	route: HttpRouteDeclaration;
+	runtime: Runtime;
+};
 ```
+
+The runtime context passed to `handleRequest` is available to middleware. Route
+handlers receive the context returned by middleware with `request` added.
 
 ## Options
 
 ```ts
-type CreateWebHandlerOptions<
-	TContext extends WebRouteHandlerContext = WebRouteHandlerContext,
-> = {
-	errorHandlers?: ServerErrorHandlers<WebRouteRuntimeContext<TContext>>;
+type CreateWebHandlerOptions = {
+	errorHandlers?: ServerErrorHandlers<Record<never, never>>;
 	parseBody?: WebRouteParseBody;
 };
 ```
@@ -68,7 +75,7 @@ type CreateWebHandlerOptions<
 ### Error Handlers
 
 ```ts
-const handleRequest = web.createHandler(routes, {
+const handleRequest = web.createRouteHandler(routes, {
 	errorHandlers: {
 		onRequestValidationError: ({ issues }) => ({
 			status: 422,
@@ -85,7 +92,7 @@ const handleRequest = web.createHandler(routes, {
 ### Body Parsing
 
 ```ts
-const handleUpload = web.createHandler(routes, {
+const handleUpload = web.createRouteHandler(routes, {
 	parseBody: ({ request }) => request.formData(),
 });
 ```

@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { Readable } from "node:stream";
 import { isCustomBody, isNoBody } from "@rest-rpc/core/contract";
-import { createHandler, type WebRouteParseBody } from "@rest-rpc/web";
+import { createRouteHandler, type WebRouteParseBody } from "@rest-rpc/web";
 import { listen } from "../harness/listen.ts";
 import { createBodyParsingImplementations } from "./handlers.ts";
 import { runBodyParsingSuite } from "./suite.ts";
@@ -31,7 +31,7 @@ const parseBody: WebRouteParseBody = async ({ body, request }) => {
 runBodyParsingSuite({
 	name: "web",
 	start: async () => {
-		const handler = createHandler(createBodyParsingImplementations(), {
+		const handler = createRouteHandler(createBodyParsingImplementations(), {
 			parseBody,
 		});
 
@@ -43,7 +43,7 @@ runBodyParsingSuite({
 					body: withoutBody(req.method) ? undefined : Readable.toWeb(req),
 					duplex: "half",
 				} as RequestInit & { duplex: "half" });
-				const response = await handler(request);
+				const response = await handler(request, {});
 
 				res.writeHead(response.status, Object.fromEntries(response.headers));
 				if (response.body) {

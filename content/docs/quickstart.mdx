@@ -415,7 +415,7 @@ export const api = router({
 
 // @filename: route.ts
 // ---cut-end---
-import { createRouterHandler } from "@rest-rpc/next";
+import { createRouteHandler, router } from "@rest-rpc/next";
 import { api } from "./contract";
 
 const todos = new Map<string, {
@@ -424,7 +424,7 @@ const todos = new Map<string, {
 	completed: boolean;
 }>();
 
-export const { POST } = createRouterHandler(api, {
+const routes = router(api).handlers({
 	todos: {
 		create({ title }) {
 			const todo = {
@@ -439,6 +439,8 @@ export const { POST } = createRouterHandler(api, {
 		},
 	},
 });
+
+export const { POST } = createRouteHandler(routes);
 ```
 
 </Tab>
