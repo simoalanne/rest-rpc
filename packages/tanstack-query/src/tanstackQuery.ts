@@ -2,16 +2,16 @@ import { initClient } from "@rest-rpc/core";
 import type {
 	ApiClientFetchOptions,
 	ApiClientOptions,
+	ClientResponse,
 	FetchResponseFn,
-	UndeclaredRouteClientResponse,
 } from "@rest-rpc/core/client";
 import type {
-	ClientErrors,
 	ClientRequest,
-	ClientSuccessResponse,
 	Contract,
+	ErrorDeclaredClientResponse,
 	HttpRouteDeclaration,
 	RouteDeclaration,
+	SuccessfulDeclaredClientResponse,
 	WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
 import type {
@@ -25,14 +25,19 @@ import type {
 } from "@tanstack/query-core";
 import { createRouteApi } from "./routeApi.ts";
 
+type ClientUndeclaredResponse<E extends RouteDeclaration> = Extract<
+	ClientResponse<E>,
+	{ declared: false }
+>;
+
 export type RouteQueryData<E extends RouteDeclaration> =
-	ClientSuccessResponse<E> & {
+	SuccessfulDeclaredClientResponse<E> & {
 		headers: Headers;
 	};
 
 export type RouteQueryError<E extends RouteDeclaration> =
-	| (ClientErrors<E> & { headers: Headers })
-	| UndeclaredRouteClientResponse
+	| (ErrorDeclaredClientResponse<E> & { headers: Headers })
+	| ClientUndeclaredResponse<E>
 	| Error;
 
 export type RouteMutationVariables<E extends RouteDeclaration> =

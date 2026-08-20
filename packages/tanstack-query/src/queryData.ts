@@ -1,7 +1,4 @@
-import type {
-	FetchOptions,
-	UndeclaredRouteClientResponse,
-} from "@rest-rpc/core/client";
+import type { FetchOptions } from "@rest-rpc/core/client";
 import type { RouteDeclaration } from "@rest-rpc/core/contract";
 
 export type FetchResponse = (...args: unknown[]) => Promise<unknown>;
@@ -16,9 +13,14 @@ const normalizeError = (error: unknown) =>
 		? error
 		: new Error("API request failed", { cause: error });
 
-const isUndeclaredRouteClientResponse = (
+const isUndeclaredClientResponse = (
 	value: unknown,
-): value is UndeclaredRouteClientResponse =>
+): value is {
+	declared: false;
+	status: number;
+	body: unknown;
+	headers: Headers;
+} =>
 	typeof value === "object" &&
 	value !== null &&
 	"declared" in value &&
@@ -63,7 +65,7 @@ export const fetchQueryData = async (
 
 		return declaredResponse;
 	} catch (error) {
-		if (isUndeclaredRouteClientResponse(error) || isDeclaredResponse(error)) {
+		if (isUndeclaredClientResponse(error) || isDeclaredResponse(error)) {
 			throw error;
 		}
 

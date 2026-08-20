@@ -3,12 +3,12 @@ import type {
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
 } from "../contract/contract.ts";
-import type { ClientSuccessBody } from "../contract/response.ts";
+import type { ClientResponseBody } from "../contract/response.ts";
 import { mapContractRoutes } from "../contract/traversal.ts";
 import { hasSingleSuccessfulResponse, isWebSocketRouteNode } from "./routes.ts";
 import type {
 	ApiClientFor,
-	ClientFetchResponse,
+	ClientResponse,
 	ClientSocket,
 	FetchArgs,
 	OpenConnectionArgs,
@@ -18,11 +18,11 @@ export type ApiClientRouteHandlers = {
 	fetchResponse: <E extends RouteDeclaration>(
 		route: E,
 		...args: FetchArgs<E>
-	) => Promise<ClientFetchResponse<E>>;
+	) => Promise<ClientResponse<E>>;
 	fetch: <E extends RouteDeclaration>(
 		route: E,
 		...args: FetchArgs<E>
-	) => Promise<ClientSuccessBody<E>>;
+	) => Promise<ClientResponseBody<E>>;
 	openConnection: <E extends WebSocketRouteDeclaration>(
 		route: E,
 		...args: OpenConnectionArgs<E>

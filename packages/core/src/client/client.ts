@@ -12,7 +12,7 @@ import {
 import type {
 	ApiClientFor,
 	ApiClientOptions,
-	ClientFetchResponse,
+	ClientResponse,
 	FetchArgs,
 	OpenConnectionArgs,
 } from "./types.ts";
@@ -66,7 +66,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 	private fetchResponse = <E extends RouteDeclaration>(
 		route: E,
 		...args: FetchArgs<E>
-	): Promise<ClientFetchResponse<E>> =>
+	): Promise<ClientResponse<E>> =>
 		fetchRouteResponse(this.request, this.validateResponses, route, ...args);
 
 	private fetch = <E extends RouteDeclaration>(

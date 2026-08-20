@@ -53,12 +53,10 @@ export {
 	REQUEST_CONTEXT_KEY,
 } from "./request.ts";
 export type {
-	ClientErrors,
-	ClientResponse,
 	ClientResponseBody,
-	ClientSuccessBody,
-	ClientSuccessResponse,
 	CustomBody,
+	DeclaredClientResponse,
+	ErrorDeclaredClientResponse,
 	NoBody,
 	ResponseBodySchema,
 	ResponseDeclaration,
@@ -69,6 +67,7 @@ export type {
 	ServerResponseBody,
 	ServerSuccessBody,
 	Stream,
+	SuccessfulDeclaredClientResponse,
 } from "./response.ts";
 export {
 	customBody,

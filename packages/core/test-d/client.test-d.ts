@@ -1,5 +1,5 @@
 import {
-	type ClientFetchResponse,
+	type ClientResponse,
 	customBody,
 	initClient,
 	jsonQuery,
@@ -255,7 +255,7 @@ const streamResponseClient = initClient(streamResponseApi, {
 	baseUrl: "https://example.test",
 });
 
-expectType<Promise<ClientFetchResponse<typeof streamResponseApi.todos.events>>>(
+expectType<Promise<ClientResponse<typeof streamResponseApi.todos.events>>>(
 	streamResponseClient.todos.events.fetchResponse(),
 );
 

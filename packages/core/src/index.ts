@@ -1,20 +1,17 @@
 export type {
 	ApiClientFor,
 	ApiClientOptions,
-	ClientFetchResponse,
+	ClientResponse,
 	ClientSocket,
 	FetchLike,
 	NextFetchTagsOptions,
 } from "./client/index.ts";
 export { getNextFetchTags, initClient } from "./client/index.ts";
 export type {
-	ClientErrors,
 	ClientReceived,
 	ClientRequest,
-	ClientResponse,
+	ClientResponseBody,
 	ClientSent,
-	ClientSuccessBody,
-	ClientSuccessResponse,
 	Contract,
 	CustomBody,
 	HttpRouteDeclaration,

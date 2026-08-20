@@ -1,7 +1,7 @@
 import type { RouteDeclaration } from "../contract/contract.ts";
 import { isStandardSchema } from "../contract/request.ts";
 import type {
-	ClientSuccessBody,
+	ClientResponseBody,
 	CustomBody,
 	ResponseBodySchema,
 	ResponseDeclaration,
@@ -17,7 +17,7 @@ import {
 import { validateStandardSchema } from "../standard-schema/index.ts";
 import { isHttpRouteNode, isSuccessStatus } from "./routes.ts";
 import { parseNdjsonStream } from "./stream.ts";
-import type { ClientFetchResponse, FetchArgs } from "./types.ts";
+import type { ClientResponse, FetchArgs } from "./types.ts";
 
 export const getResponseSchema = (
 	route: RouteDeclaration,
@@ -154,7 +154,7 @@ export const fetchResponse = async <E extends RouteDeclaration>(
 	validateResponse: boolean,
 	route: E,
 	...args: FetchArgs<E>
-): Promise<ClientFetchResponse<E>> => {
+): Promise<ClientResponse<E>> => {
 	const rawResponse = await request(route, ...args);
 
 	const schema = getResponseSchema(route, rawResponse.status);
@@ -164,7 +164,7 @@ export const fetchResponse = async <E extends RouteDeclaration>(
 			status: rawResponse.status,
 			body: await readUnknownBody(rawResponse),
 			headers: rawResponse.headers,
-		} as ClientFetchResponse<E>;
+		} as ClientResponse<E>;
 	}
 
 	return {
@@ -178,22 +178,22 @@ export const fetchResponse = async <E extends RouteDeclaration>(
 		headers: rawResponse.headers,
 		...(await readDeclaredHeaders(schema, rawResponse, validateResponse)),
 		...declaredResponseMetadata(schema, rawResponse),
-	} as ClientFetchResponse<E>;
+	} as ClientResponse<E>;
 };
 
 export const fetchSuccess = async <E extends RouteDeclaration>(
 	fetchRouteResponse: (
 		route: E,
 		...args: FetchArgs<E>
-	) => Promise<ClientFetchResponse<E>>,
+	) => Promise<ClientResponse<E>>,
 	route: E,
 	...args: FetchArgs<E>
-): Promise<ClientSuccessBody<E>> => {
+): Promise<ClientResponseBody<E>> => {
 	const response = await fetchRouteResponse(route, ...args);
 
 	if (!response.declared || !isSuccessStatus(response.status)) {
 		throw new Error("Request did not return a declared success response");
 	}
 
-	return response.body as ClientSuccessBody<E>;
+	return response.body as ClientResponseBody<E>;
 };

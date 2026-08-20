@@ -1,8 +1,7 @@
+import type { ClientResponse } from "@rest-rpc/core/client";
 import {
-	type ClientErrors,
 	type ClientRequest,
-	type ClientResponse,
-	type ClientSuccessBody,
+	type ClientResponseBody,
 	customBody,
 	noBody,
 	route,
@@ -39,20 +38,23 @@ const responseRoute = route({
 	},
 });
 
-type GetTodoResponse = ClientResponse<typeof responseRoute>;
+type DeclaredClientResponse<T> = Extract<T, { declared: true }>;
+type GetTodoResponse = DeclaredClientResponse<
+	ClientResponse<typeof responseRoute>
+>;
 declare const getTodoResponse: GetTodoResponse;
 expectType<200 | 404>(getTodoResponse.status);
 expectType<{ id: string; title: string } | { message: string }>(
 	getTodoResponse.body,
 );
 
-type GetTodoErrors = ClientErrors<typeof responseRoute>;
+type GetTodoErrors = Extract<GetTodoResponse, { status: 404 }>;
 declare const getTodoError: GetTodoErrors;
 expectType<404>(getTodoError.status);
 expectType<{ message: string }>(getTodoError.body);
 
 expectType<{ id: string; title: string }>(
-	null as unknown as ClientSuccessBody<typeof responseRoute>,
+	null as unknown as ClientResponseBody<typeof responseRoute>,
 );
 
 // response shorthand
@@ -66,10 +68,12 @@ const postResponseShorthand = route({
 });
 
 expectType<201>(
-	null as unknown as ClientResponse<typeof postResponseShorthand>["status"],
+	null as unknown as DeclaredClientResponse<
+		ClientResponse<typeof postResponseShorthand>
+	>["status"],
 );
 expectType<{ id: string; title: string }>(
-	null as unknown as ClientSuccessBody<typeof postResponseShorthand>,
+	null as unknown as ClientResponseBody<typeof postResponseShorthand>,
 );
 
 // should default non-POST response shorthand to 200
@@ -80,10 +84,12 @@ const deleteResponseShorthand = route({
 });
 
 expectType<200>(
-	null as unknown as ClientResponse<typeof deleteResponseShorthand>["status"],
+	null as unknown as DeclaredClientResponse<
+		ClientResponse<typeof deleteResponseShorthand>
+	>["status"],
 );
 expectType<{ id: string; title: string }>(
-	null as unknown as ClientSuccessBody<typeof deleteResponseShorthand>,
+	null as unknown as ClientResponseBody<typeof deleteResponseShorthand>,
 );
 
 // should default omitted non-GET responses to 204 no body
@@ -93,10 +99,12 @@ const omittedResponseShorthand = route({
 });
 
 expectType<204>(
-	null as unknown as ClientResponse<typeof omittedResponseShorthand>["status"],
+	null as unknown as DeclaredClientResponse<
+		ClientResponse<typeof omittedResponseShorthand>
+	>["status"],
 );
 expectType<undefined>(
-	null as unknown as ClientSuccessBody<typeof omittedResponseShorthand>,
+	null as unknown as ClientResponseBody<typeof omittedResponseShorthand>,
 );
 
 // should merge response shorthand with router common responses
@@ -118,8 +126,8 @@ const shorthandWithCommonResponses = router(
 );
 
 expectType<201 | 401>(
-	null as unknown as ClientResponse<
-		typeof shorthandWithCommonResponses.todos.create
+	null as unknown as DeclaredClientResponse<
+		ClientResponse<typeof shorthandWithCommonResponses.todos.create>
 	>["status"],
 );
 
@@ -145,7 +153,7 @@ const typeOnlyResponse = route({
 });
 
 expectType<{ id: string; tags: string[] }>(
-	null as unknown as ClientSuccessBody<typeof typeOnlyResponse>,
+	null as unknown as ClientResponseBody<typeof typeOnlyResponse>,
 );
 
 // request helper types
@@ -338,14 +346,14 @@ expectType<200>(transformedServerResponse.status);
 expectType<{ id: number }>(transformedServerResponse.body);
 
 type TransformedClientResponse = ClientResponse<typeof transformed>;
-declare const transformedClientResponse: TransformedClientResponse;
+declare const transformedClientResponse: DeclaredClientResponse<TransformedClientResponse>;
 expectType<200>(transformedClientResponse.status);
 expectType<{ id: string }>(transformedClientResponse.body);
 expectType<{ id: number }>(
 	null as unknown as ServerSuccessBody<typeof transformed>,
 );
 expectType<{ id: string }>(
-	null as unknown as ClientSuccessBody<typeof transformed>,
+	null as unknown as ClientResponseBody<typeof transformed>,
 );
 
 // intentionally loose route declarations
@@ -415,7 +423,11 @@ expectAssignable<
 	| { status: 200; body: AsyncIterable<{ id: string; title: string }> }
 	| { status: 201; body: { id: string; title: string } }
 	| { status: 204; body: undefined }
->(null as unknown as ClientResponse<typeof mixedStreamResponses.stream>);
+>(
+	null as unknown as DeclaredClientResponse<
+		ClientResponse<typeof mixedStreamResponses.stream>
+	>,
+);
 
 // should expose custom single responses as native Response on the client and payload on the server
 const customSingleResponse = route({
@@ -430,7 +442,7 @@ const customSingleResponse = route({
 });
 
 expectType<Response>(
-	null as unknown as ClientSuccessBody<typeof customSingleResponse>,
+	null as unknown as ClientResponseBody<typeof customSingleResponse>,
 );
 expectType<string>(
 	null as unknown as ServerSuccessBody<typeof customSingleResponse>,
@@ -451,7 +463,7 @@ const customStreamResponse = route({
 });
 
 expectType<Response>(
-	null as unknown as ClientSuccessBody<typeof customStreamResponse>,
+	null as unknown as ClientResponseBody<typeof customStreamResponse>,
 );
 expectType<AsyncIterable<string>>(
 	null as unknown as ServerSuccessBody<typeof customStreamResponse>,

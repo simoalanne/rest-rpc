@@ -10,8 +10,8 @@ import type {
 	IsWebSocketRoute,
 } from "../contract/request.ts";
 import type {
-	ClientResponse,
-	ClientSuccessBody,
+	ClientResponseBody,
+	DeclaredClientResponse,
 } from "../contract/response.ts";
 
 export type FetchOptions = Omit<RequestInit, "method" | "body" | "headers">;
@@ -28,28 +28,28 @@ export type FetchArgs<E extends RouteDeclaration = RouteDeclaration> =
 
 export type FetchFn<E extends RouteDeclaration> = (
 	...args: FetchArgs<E>
-) => Promise<ClientSuccessBody<E>>;
+) => Promise<ClientResponseBody<E>>;
 
-export type UndeclaredRouteClientResponse = {
+type RouteDeclaredResponse<E extends RouteDeclaration> =
+	DeclaredClientResponse<E> & {
+		declared: true;
+		headers: Headers;
+	};
+
+type RouteUndeclaredResponse = {
 	declared: false;
 	status: number;
 	body: unknown;
 	headers: Headers;
 };
 
-export type DeclaredRouteClientResponse<E extends RouteDeclaration> =
-	ClientResponse<E> & {
-		declared: true;
-		headers: Headers;
-	};
-
-export type ClientFetchResponse<E extends RouteDeclaration> =
-	| DeclaredRouteClientResponse<E>
-	| UndeclaredRouteClientResponse;
+export type ClientResponse<E extends RouteDeclaration> =
+	| RouteDeclaredResponse<E>
+	| RouteUndeclaredResponse;
 
 export type FetchResponseFn<E extends RouteDeclaration> = (
 	...args: FetchArgs<E>
-) => Promise<ClientFetchResponse<E>>;
+) => Promise<ClientResponse<E>>;
 
 export type OpenConnectionArgs<E extends RouteDeclaration = RouteDeclaration> =
 	ClientRequest<E> extends never ? [] : [request: ClientRequest<E>];
@@ -80,7 +80,7 @@ type ApiClientSingleSuccessResponseRouteValue<E extends RouteDeclaration> = {
 };
 
 type ApiClientHttpRouteValue<E extends RouteDeclaration = RouteDeclaration> =
-	ClientSuccessBody<E> extends never
+	ClientResponseBody<E> extends never
 		? ApiClientMoreThanOneSuccessResponseRouteValue<E>
 		: ApiClientSingleSuccessResponseRouteValue<E>;
 

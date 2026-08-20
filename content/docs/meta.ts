@@ -9,6 +9,7 @@ export default defineMeta({
 		"http-responses",
 		"server",
 		"client",
+		"type-helpers",
 		"websockets",
 		"openapi",
 	],

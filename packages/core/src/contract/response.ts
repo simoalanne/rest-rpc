@@ -195,7 +195,7 @@ type InferCustomStreamBody<TBody, TIO extends "input" | "output"> =
 				}
 		: never;
 
-export type ClientResponseBody<TResponse> = TResponse extends StandardSchemaV1
+type InferClientResponseBody<TResponse> = TResponse extends StandardSchemaV1
 	? StandardSchemaV1.InferOutput<TResponse>
 	: TResponse extends NoBody
 		? undefined
@@ -301,7 +301,7 @@ type ResponseEntry<TStatus extends number, TBody> = {
 
 type ClientResponseEntry<TStatus extends number, TResponse> = ResponseEntry<
 	TStatus,
-	ClientResponseBody<ResponseBody<TResponse>>
+	InferClientResponseBody<ResponseBody<TResponse>>
 > &
 	ClientResponseMetadata<ResponseBody<TResponse>> &
 	ResponseHeadersMetadata<TResponse, "output">;
@@ -340,7 +340,7 @@ export type HasMultipleSuccessfulResponses<TResponses> = IsUnion<
 	SuccessfulResponseKeys<TResponses>
 >;
 
-export type ClientResponse<E extends RouteDeclaration> = E extends {
+export type DeclaredClientResponse<E extends RouteDeclaration> = E extends {
 	responses: infer TResponses;
 }
 	? {
@@ -364,17 +364,18 @@ export type ServerResponse<E extends RouteDeclaration> = E extends {
 		}[keyof TResponses]
 	: never;
 
-export type ClientSuccessResponse<E extends RouteDeclaration> = E extends {
-	responses: infer TResponses;
-}
-	? {
-			[TKeys in keyof TResponses]: TKeys extends ResponseKey
-				? TKeys extends SuccessfulResponseKeys<TResponses>
-					? ClientResponseEntry<ResponseStatus<TKeys>, TResponses[TKeys]>
-					: never
-				: never;
-		}[keyof TResponses]
-	: never;
+export type SuccessfulDeclaredClientResponse<E extends RouteDeclaration> =
+	E extends {
+		responses: infer TResponses;
+	}
+		? {
+				[TKeys in keyof TResponses]: TKeys extends ResponseKey
+					? TKeys extends SuccessfulResponseKeys<TResponses>
+						? ClientResponseEntry<ResponseStatus<TKeys>, TResponses[TKeys]>
+						: never
+					: never;
+			}[keyof TResponses]
+		: never;
 
 type ServerSuccessResponse<E extends RouteDeclaration> = E extends {
 	responses: infer TResponses;
@@ -410,15 +411,15 @@ type InferSingleServerResponseBody<TResponse> = [TResponse] extends [never]
 				? TBody
 				: never;
 
-export type ClientSuccessBody<E extends RouteDeclaration> =
-	InferSingleResponseBody<ClientSuccessResponse<E>>;
+export type ClientResponseBody<E extends RouteDeclaration> =
+	InferSingleResponseBody<SuccessfulDeclaredClientResponse<E>>;
 
 export type ServerSuccessBody<E extends RouteDeclaration> =
 	InferSingleServerResponseBody<ServerSuccessResponse<E>>;
 
-export type ClientErrors<E extends RouteDeclaration> = Exclude<
-	ClientResponse<E>,
-	ClientSuccessResponse<E>
+export type ErrorDeclaredClientResponse<E extends RouteDeclaration> = Exclude<
+	DeclaredClientResponse<E>,
+	SuccessfulDeclaredClientResponse<E>
 >;
 
 export type ServerErrors<E extends RouteDeclaration> = Exclude<

@@ -6,9 +6,8 @@ export type {
 	ApiClientFetchOptions,
 	ApiClientFor,
 	ApiClientOptions,
-	ClientFetchResponse,
+	ClientResponse,
 	ClientSocket,
-	DeclaredRouteClientResponse,
 	FetchArgs,
 	FetchFn,
 	FetchLike,
@@ -17,5 +16,4 @@ export type {
 	NextFetchTagsOptions,
 	OpenConnectionArgs,
 	OpenConnectionFn,
-	UndeclaredRouteClientResponse,
 } from "./types.ts";
