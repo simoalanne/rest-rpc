@@ -47,6 +47,7 @@ export type {
 	RouteHandler,
 	RouteHandlerFor,
 	RouteImplementation,
+	RouterImplementationInput,
 	RuntimeRouteHandler,
 	WebSocketRouteHandler,
 	WebSocketRouteHandlerContext,
@@ -56,7 +57,6 @@ export {
 	isWebSocketRouteImplementation,
 	route,
 	router,
-	routes,
 } from "./router.ts";
 export type {
 	RequestSegments,

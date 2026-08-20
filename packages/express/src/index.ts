@@ -9,10 +9,10 @@ import {
 	ContractResponseError,
 	clearCookie,
 	createRouteMatcher,
-	type ImplementationShape,
 	type ImplementationTreeFor,
 	type RouteHandlerFor,
 	type RouteImplementation,
+	type RouterImplementationInput,
 	type InferRouteHandlerRequest as ServerInferRouteHandlerRequest,
 	type InferRouteHandlerResponse as ServerInferRouteHandlerResponse,
 	type InferWebSocketRouteHandlerRequest as ServerInferWebSocketRouteHandlerRequest,
@@ -20,7 +20,6 @@ import {
 	type WebSocketRouteHandler as ServerWebSocketRouteHandler,
 	route as serverRoute,
 	router as serverRouter,
-	routes as serverRoutes,
 	setCookie,
 } from "@rest-rpc/server";
 import type { Request } from "express";
@@ -75,16 +74,10 @@ export const route = <const TNode extends RouteDeclaration>(
 
 export const router = <const TNode extends Contract<RouteDeclaration>>(
 	contract: TNode,
-	handlers: ImplementationShape<
+	handlers: RouterImplementationInput<
 		TNode,
 		HttpRouteHandlerContext,
 		WebSocketRouteHandlerContext
 	>,
 ): ImplementationTreeFor<TNode, RouteDeclaration> =>
 	serverRouter(contract, handlers);
-
-export const routes = <const TNode extends Contract<RouteDeclaration>>(
-	contract: TNode,
-	implementations: ImplementationTreeFor<TNode, RouteDeclaration>,
-): ImplementationTreeFor<TNode, RouteDeclaration> =>
-	serverRoutes(contract, implementations);

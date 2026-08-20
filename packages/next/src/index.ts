@@ -3,7 +3,6 @@ export {
 	ContractResponseError,
 	type CookiePriority,
 	clearCookie,
-	routes,
 	type SameSite,
 	type SetCookieOptions,
 	setCookie,

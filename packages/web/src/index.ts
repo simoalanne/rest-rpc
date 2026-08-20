@@ -2,9 +2,7 @@ import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	ContractResponseError,
 	clearCookie,
-	type ImplementationTreeFor,
 	type ServerErrorHandlers,
-	routes as serverRoutes,
 	setCookie,
 } from "@rest-rpc/server";
 import {
@@ -68,15 +66,6 @@ export const router = <
 ): WebRouterBuilder<TContract, TRuntimeContext, TRequest> =>
 	createWebRouterBuilder(contract);
 
-export const routes = <const TContract extends WebContract>(
-	contract: TContract,
-	implementations: ImplementationTreeFor<TContract, HttpRouteDeclaration>,
-): WebImplementationTree =>
-	serverRoutes(
-		contract,
-		implementations as ImplementationTreeFor<TContract>,
-	) as WebImplementationTree;
-
 export const createRouteHandler = <
 	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
 	TContext extends Record<string, unknown> = Record<string, unknown>,
@@ -128,7 +117,6 @@ export const initWeb = <
 			route<TRoute, TRuntimeContext, TRequest>(contract),
 		router: <const TContract extends WebContract>(contract: TContract) =>
 			router<TContract, TRuntimeContext, TRequest>(contract),
-		routes,
 		createRouteHandler: <TContext extends Record<string, unknown>>(
 			implementations: WebImplementationTree,
 			options?: CreateWebHandlerOptions,

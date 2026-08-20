@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { noBody } from "@rest-rpc/core/contract";
-import { route, router, routes } from "./router.ts";
+import { route, router } from "./router.ts";
 
 const getTodo = {
 	method: "GET",
@@ -80,11 +80,40 @@ describe("router", () => {
 			/Unexpected service for route "todos.delete"/,
 		);
 	});
-});
 
-describe("routes", () => {
-	it("validates an implementation tree against a contract", () => {
-		const implementation = routes(
+	it("leaves compiled route implementations unchanged", async () => {
+		const getImplementation = route(getTodo, () => "todo-1");
+
+		const implementation = router(
+			{
+				todos: {
+					get: getTodo,
+				},
+			},
+			{
+				todos: {
+					get: getImplementation,
+				},
+			},
+		);
+
+		assert.equal(implementation.todos.get, getImplementation);
+		assert.equal(await implementation.todos.get.handler({}), "todo-1");
+	});
+
+	it("composes nested compiled router implementations", async () => {
+		const todoRoutes = router(
+			{
+				get: getTodo,
+				create: createTodo,
+			},
+			{
+				get: route(getTodo, () => "todo-1"),
+				create: () => "created",
+			},
+		);
+
+		const implementation = router(
 			{
 				todos: {
 					get: getTodo,
@@ -92,20 +121,20 @@ describe("routes", () => {
 				},
 			},
 			{
-				todos: {
-					get: route(getTodo, () => undefined),
-					create: route(createTodo, () => undefined),
-				},
+				todos: todoRoutes,
 			},
 		);
 
-		assert.equal(implementation.todos.get.route.path, "/todos/:id");
+		assert.equal(implementation.todos.get, todoRoutes.get);
+		assert.equal(implementation.todos.create, todoRoutes.create);
+		assert.equal(await implementation.todos.get.handler({}), "todo-1");
+		assert.equal(await implementation.todos.create.handler({}), "created");
 	});
 
-	it("rejects mismatched route implementations", () => {
+	it("rejects compiled route implementations that do not match the contract route", () => {
 		assert.throws(
 			() =>
-				routes(
+				router(
 					{
 						todos: {
 							get: getTodo,
@@ -118,25 +147,6 @@ describe("routes", () => {
 					} as never,
 				),
 			/does not match the contract route/,
-		);
-	});
-
-	it("rejects non-implementation trees before validating shape", () => {
-		assert.throws(
-			() =>
-				routes(
-					{
-						todos: {
-							get: getTodo,
-						},
-					},
-					{
-						todos: {
-							get: () => undefined,
-						},
-					} as never,
-				),
-			/router\(\) requires an implementation tree to validate/,
 		);
 	});
 });

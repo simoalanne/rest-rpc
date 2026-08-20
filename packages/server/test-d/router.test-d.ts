@@ -382,6 +382,232 @@ expectType<typeof implementationApi.todos.create>(
 	implementations.todos.create.route,
 );
 
+// should accept composed routers and direct route implementations as router input
+const composedTodos = router(implementationApi.todos, {
+	create: route(implementationApi.todos.create, ({ title }) => ({
+		status: 201 as const,
+		body: {
+			id: "todo-1",
+			title,
+		},
+		responseHeaders: {
+			location: "/todos/todo-1",
+		},
+	})),
+	transform: ({ id }) => ({
+		status: 200 as const,
+		body: {
+			id,
+		},
+	}),
+	jsonSearch: ({ query }) => {
+		expectType<number>(query.page);
+		expectType<string[]>(query.filters.tags);
+
+		return [];
+	},
+	optionalJsonSearch: ({ query }) => {
+		expectType<{ page: number } | undefined>(query);
+
+		return [];
+	},
+	uploadImage: route(implementationApi.todos.uploadImage, () => undefined),
+});
+
+const composedReports = router(implementationApi.reports, {
+	csv: route(implementationApi.reports.csv, () => ({
+		status: 200 as const,
+		body: "id,title\n1,First\n",
+	})),
+	csvStream: () => ({
+		status: 200 as const,
+		body: csvRows(),
+	}),
+});
+
+const composedSocket = router(implementationApi.socket, {
+	room: route(implementationApi.socket.room, ({ context }) => {
+		context.socket.send({
+			type: "ready",
+			message: { roomId: "room-1" },
+		});
+	}),
+});
+
+const composedImplementations = router(implementationApi, {
+	todos: composedTodos,
+	reports: composedReports,
+	socket: composedSocket,
+});
+
+expectType<typeof implementationApi.todos.create>(
+	composedImplementations.todos.create.route,
+);
+expectType<typeof implementationApi.reports.csv>(
+	composedImplementations.reports.csv.route,
+);
+expectType<typeof implementationApi.socket.room>(
+	composedImplementations.socket.room.route,
+);
+
+// should preserve route types through deeper router/router/route stacking
+const stackedApi = defineRouter({
+	admin: {
+		v1: {
+			todos: {
+				create: implementationApi.todos.create,
+				transform: implementationApi.todos.transform,
+			},
+			reports: {
+				csv: implementationApi.reports.csv,
+			},
+		},
+	},
+	public: {
+		todos: {
+			jsonSearch: implementationApi.todos.jsonSearch,
+		},
+	},
+});
+
+const stackedTodoRoutes = router(stackedApi.admin.v1.todos, {
+	create: route(stackedApi.admin.v1.todos.create, ({ title }) => ({
+		status: 201 as const,
+		body: {
+			id: "todo-1",
+			title,
+		},
+		responseHeaders: {
+			location: "/todos/todo-1",
+		},
+	})),
+	transform: route(stackedApi.admin.v1.todos.transform, ({ id }) => ({
+		status: 200 as const,
+		body: {
+			id,
+		},
+	})),
+});
+
+const stackedV1Routes = router(stackedApi.admin.v1, {
+	todos: stackedTodoRoutes,
+	reports: {
+		csv: route(stackedApi.admin.v1.reports.csv, () => ({
+			status: 200 as const,
+			body: "id,title\n1,First\n",
+		})),
+	},
+});
+
+const stackedAdminRoutes = router(stackedApi.admin, {
+	v1: stackedV1Routes,
+});
+
+const stackedRoutes = router(stackedApi, {
+	admin: stackedAdminRoutes,
+	public: {
+		todos: {
+			jsonSearch: ({ query }) => {
+				expectType<number>(query.page);
+				expectType<string[]>(query.filters.tags);
+
+				return [];
+			},
+		},
+	},
+});
+
+expectType<typeof stackedApi.admin.v1.todos.create>(
+	stackedRoutes.admin.v1.todos.create.route,
+);
+expectType<typeof stackedApi.admin.v1.reports.csv>(
+	stackedRoutes.admin.v1.reports.csv.route,
+);
+expectType<typeof stackedApi.public.todos.jsonSearch>(
+	stackedRoutes.public.todos.jsonSearch.route,
+);
+
+// should accept a compiled route in one sibling while preserving contextual typing
+router(stackedApi.admin.v1.todos, {
+	create: route(stackedApi.admin.v1.todos.create, ({ title }) => ({
+		status: 201 as const,
+		body: {
+			id: "todo-1",
+			title,
+		},
+		responseHeaders: {
+			location: "/todos/todo-1",
+		},
+	})),
+	transform: ({ id, title, slug }) => {
+		expectType<number>(id);
+		expectType<string>(title);
+		expectType<string>(slug);
+
+		return {
+			status: 200 as const,
+			body: {
+				id,
+			},
+		};
+	},
+});
+
+// should reject composed route implementations that do not match their contract slot
+expectError(
+	router(implementationApi.todos, {
+		create: route(implementationApi.todos.transform, ({ id }) => ({
+			status: 200 as const,
+			body: {
+				id,
+			},
+		})),
+		transform: ({ id }) => ({
+			status: 200 as const,
+			body: {
+				id,
+			},
+		}),
+		jsonSearch: () => [],
+		optionalJsonSearch: () => [],
+		uploadImage: () => undefined,
+	}),
+);
+
+// should reject composed router subtrees that do not match their contract slot
+expectError(
+	router(stackedApi.admin.v1, {
+		todos: composedReports,
+		reports: {
+			csv: () => ({
+				status: 200 as const,
+				body: "id,title\n1,First\n",
+			}),
+		},
+	}),
+);
+
+// should reject extra keys in mixed inline and composed router trees
+expectError(
+	router(stackedApi.admin.v1, {
+		todos: stackedTodoRoutes,
+		reports: {
+			csv: () => ({
+				status: 200 as const,
+				body: "id,title\n1,First\n",
+			}),
+			unexpected: () => undefined,
+		},
+	}),
+);
+
+// should reject missing keys in mixed inline and composed router trees
+expectError(
+	router(stackedApi.admin.v1, {
+		todos: stackedTodoRoutes,
+	}),
+);
+
 // should reject route handlers that omit the declared response envelope
 expectError(
 	route(createApi.todos.create, ({ title }) => ({

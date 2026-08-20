@@ -130,6 +130,21 @@ export type ImplementationShape<
 				: never;
 		};
 
+export type RouterImplementationInput<
+	TNode extends Contract<RouteDeclaration>,
+	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
+	TWebSocketContext extends
+		WebSocketRouteHandlerContext = WebSocketRouteHandlerContext,
+> = TNode extends RouteDeclaration
+	?
+			| RouteHandlerFor<TNode, TContext, TWebSocketContext>
+			| RouteImplementation<TNode>
+	: {
+			[K in keyof TNode]: TNode[K] extends Contract<RouteDeclaration>
+				? RouterImplementationInput<TNode[K], TContext, TWebSocketContext>
+				: never;
+		};
+
 export const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
 	typeof value === "object" &&
 	value !== null &&
@@ -164,6 +179,18 @@ export const isRouteImplementation = (
 
 type RouteValidator = (route: RouteDeclaration, routeName: string) => void;
 
+const assertMatchingRoute = (
+	expected: RouteDeclaration,
+	actual: RouteDeclaration,
+	routeName: string,
+) => {
+	if (actual.method !== expected.method || actual.path !== expected.path) {
+		throw new Error(
+			`Implementation for route "${routeName}" does not match the contract route.`,
+		);
+	}
+};
+
 const collectImplementations = (
 	contract: Contract<RouteDeclaration>,
 	handlers: unknown,
@@ -175,6 +202,12 @@ const collectImplementations = (
 
 	if (isRouteDeclaration(contract)) {
 		validateRoute(contract, routeName || contract.path);
+
+		if (isRouteImplementation(handlers)) {
+			validateRoute(handlers.route, routeName || handlers.route.path);
+			assertMatchingRoute(contract, handlers.route, routeName || contract.path);
+			return handlers;
+		}
 
 		if (typeof handlers !== "function") {
 			throw new Error(`Resolved service for "${routeName}" is not a function`);
@@ -226,104 +259,6 @@ const collectImplementations = (
 	return tree;
 };
 
-const assertMatchingRoute = (
-	expected: RouteDeclaration,
-	actual: RouteDeclaration,
-	routeName: string,
-) => {
-	if (actual.method !== expected.method || actual.path !== expected.path) {
-		throw new Error(
-			`Implementation for route "${routeName}" does not match the contract route.`,
-		);
-	}
-};
-
-const validateImplementations = (
-	contract: Contract<RouteDeclaration>,
-	implementation: unknown,
-	validateRoute: RouteValidator,
-	path: string[] = [],
-): AnyImplementationTree => {
-	const routeName = path.join(".");
-
-	if (isRouteDeclaration(contract)) {
-		validateRoute(contract, routeName || contract.path);
-
-		if (!isRouteImplementation(implementation)) {
-			throw new Error(`Missing implementation for route "${routeName}"`);
-		}
-
-		validateRoute(implementation.route, routeName || implementation.route.path);
-		assertMatchingRoute(
-			contract,
-			implementation.route,
-			routeName || contract.path,
-		);
-		return implementation;
-	}
-
-	if (!implementation || typeof implementation !== "object") {
-		throw new Error(`Invalid implementation while resolving "${routeName}"`);
-	}
-
-	const entries = Object.entries(contract);
-	const implementationKeys = new Set(Object.keys(implementation));
-
-	const tree = Object.fromEntries(
-		entries.map(([key, childContract]) => {
-			const childImplementation = (implementation as Record<string, unknown>)[
-				key
-			];
-			const childPath = [...path, key];
-
-			if (childImplementation === undefined) {
-				throw new Error(
-					`Missing implementation for route "${childPath.join(".")}"`,
-				);
-			}
-
-			implementationKeys.delete(key);
-
-			return [
-				key,
-				validateImplementations(
-					childContract,
-					childImplementation,
-					validateRoute,
-					childPath,
-				),
-			];
-		}),
-	);
-
-	if (implementationKeys.size > 0) {
-		throw new Error(
-			`Unexpected implementation for route "${[
-				...path,
-				...implementationKeys,
-			].join(".")}"`,
-		);
-	}
-
-	return tree;
-};
-
-const isImplementationTree = (
-	node: unknown,
-	validateRoute: RouteValidator,
-): node is AnyImplementationTree => {
-	if (isRouteImplementation(node)) {
-		validateRoute(node.route, node.route.path);
-		return true;
-	}
-	if (!node || typeof node !== "object" || isRouteDeclaration(node)) {
-		return false;
-	}
-	return Object.values(node).every((child) =>
-		isImplementationTree(child, validateRoute),
-	);
-};
-
 export const route = <
 	const TNode extends RouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
@@ -344,24 +279,9 @@ export const router = <
 		WebSocketRouteHandlerContext = WebSocketRouteHandlerContext,
 >(
 	contract: TNode,
-	handlers: ImplementationShape<TNode, TContext, TWebSocketContext>,
+	handlers: RouterImplementationInput<TNode, TContext, TWebSocketContext>,
 ): ImplementationTreeFor<TNode, RouteDeclaration> =>
 	collectImplementations(contract, handlers, () => {}) as ImplementationTreeFor<
 		TNode,
 		RouteDeclaration
 	>;
-
-export const routes = <const TNode extends Contract<RouteDeclaration>>(
-	contract: TNode,
-	implementations: ImplementationTreeFor<TNode, RouteDeclaration>,
-): ImplementationTreeFor<TNode, RouteDeclaration> => {
-	if (!isImplementationTree(implementations, () => {})) {
-		throw new Error("router() requires an implementation tree to validate.");
-	}
-
-	return validateImplementations(
-		contract,
-		implementations,
-		() => {},
-	) as ImplementationTreeFor<TNode, RouteDeclaration>;
-};
