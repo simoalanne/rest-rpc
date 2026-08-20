@@ -1,0 +1,164 @@
+---
+title: Type Helpers
+description: Infer route types for clients, TanStack Query, and server handlers
+---
+
+Type helpers take a route declaration and infer the type used at a specific
+runtime boundary.
+
+```ts
+import { jsonQuery, route, router, webSocketMessages } from "@rest-rpc/core";
+import { z } from "zod";
+
+export const api = router({
+	todos: {
+		get: route({
+			method: "GET",
+			path: "/todos/:id",
+			pathParams: z.object({ id: z.string() }),
+			query: jsonQuery(z.object({ includeDone: z.boolean().optional() })),
+			responses: {
+				200: z.object({ id: z.string(), title: z.string() }),
+				404: z.object({ code: z.literal("NOT_FOUND") }),
+			},
+		}),
+		create: route({
+			method: "POST",
+			path: "/todos",
+			body: z.object({ title: z.string() }),
+			response: z.object({ id: z.string(), title: z.string() }),
+		}),
+		watch: route({
+			mode: "webSocket",
+			path: "/todos/:id/watch",
+			pathParams: z.object({ id: z.string() }),
+			messages: {
+				client: webSocketMessages("action", {
+					typing: z.object({ active: z.boolean() }),
+					rename: z.object({ title: z.string() }),
+				}),
+				server: z.object({ title: z.string() }),
+			},
+		}),
+	},
+});
+```
+
+## Fetch Client
+
+Import fetch client helpers from `@rest-rpc/core`.
+
+```ts
+import type {
+	ClientReceived,
+	ClientRequest,
+	ClientResponse,
+	ClientResponseBody,
+	ClientSent,
+	ClientSocket,
+} from "@rest-rpc/core";
+
+type GetTodoRequest = ClientRequest<typeof api.todos.get>;
+// { id: string; includeDone?: boolean }
+
+type GetTodoResponse = ClientResponse<typeof api.todos.get>;
+// | { declared: true; status: 200; body: { id: string; title: string }; headers: Headers }
+// | { declared: true; status: 404; body: { code: "NOT_FOUND" }; headers: Headers }
+// | { declared: false; status: number; body: unknown; headers: Headers }
+
+type GetTodoBody = ClientResponseBody<typeof api.todos.get>;
+// { id: string; title: string }
+
+type WatchSocket = ClientSocket<typeof api.todos.watch>;
+// {
+//   send(message: ClientSent<typeof api.todos.watch>): void;
+//   onMessage(callback: (message: ClientReceived<typeof api.todos.watch>) => void): () => void;
+// }
+
+type WatchSent = ClientSent<typeof api.todos.watch>;
+// | { action: "typing"; message: { active: boolean } }
+// | { action: "rename"; message: { title: string } }
+
+type WatchReceived = ClientReceived<typeof api.todos.watch>;
+// { title: string }
+```
+
+`ClientResponse` is the return value of `fetchResponse()`.
+`ClientResponseBody` is the return value of `fetch()` for routes with one
+successful response body.
+
+## TanStack Query
+
+Import TanStack Query helpers from `@rest-rpc/tanstack-query`.
+
+```ts
+import type {
+	RouteMutationVariables,
+	RouteQueryData,
+	RouteQueryError,
+} from "@rest-rpc/tanstack-query";
+
+type GetTodoData = RouteQueryData<typeof api.todos.get>;
+// { status: 200; body: { id: string; title: string }; headers: Headers }
+
+type GetTodoError = RouteQueryError<typeof api.todos.get>;
+// | { status: 404; body: { code: "NOT_FOUND" }; headers: Headers }
+// | { declared: false; status: number; body: unknown; headers: Headers }
+// | Error
+
+type CreateTodoVariables = RouteMutationVariables<typeof api.todos.create>;
+// { title: string }
+```
+
+TanStack Query helpers follow TanStack's data/error channels: declared 2xx
+responses become query data, and declared non-2xx responses become query errors.
+
+## Server
+
+Import server helpers from the server adapter you use. The adapter-specific
+`RouteRequest` includes that adapter's handler context.
+
+```ts
+import type {
+	RouteErrors,
+	RouteReceived,
+	RouteRequest,
+	RouteRequestData,
+	RouteResponse,
+	RouteResponseShorthand,
+	RouteSent,
+	RouteSocket,
+} from "@rest-rpc/express";
+
+type GetTodoRequest = RouteRequest<typeof api.todos.get>;
+// { id: string; includeDone?: boolean; context: HttpRouteHandlerContext }
+
+type GetTodoRequestData = RouteRequestData<typeof api.todos.get>;
+// { id: string; includeDone?: boolean }
+
+type GetTodoResponse = RouteResponse<typeof api.todos.get>;
+// | { status: 200; body: { id: string; title: string } }
+// | { status: 404; body: { code: "NOT_FOUND" } }
+
+type GetTodoErrors = RouteErrors<typeof api.todos.get>;
+// { status: 404; body: { code: "NOT_FOUND" } }
+
+type CreateTodoShorthand = RouteResponseShorthand<typeof api.todos.create>;
+// { id: string; title: string }
+
+type WatchSocket = RouteSocket<typeof api.todos.watch>;
+// {
+//   send(message: RouteSent<typeof api.todos.watch>): void;
+//   onMessage(callback: (message: RouteReceived<typeof api.todos.watch>) => void | Promise<void>): () => void;
+// }
+
+type WatchSent = RouteSent<typeof api.todos.watch>;
+// { title: string }
+
+type WatchReceived = RouteReceived<typeof api.todos.watch>;
+// | { action: "typing"; message: { active: boolean } }
+// | { action: "rename"; message: { title: string } }
+```
+
+Use `RouteResponse` when returning an explicit status and body. Use
+`RouteResponseShorthand` when returning the successful response body directly.
