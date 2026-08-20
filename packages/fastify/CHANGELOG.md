@@ -1,5 +1,11 @@
 # @rest-rpc/fastify
 
+## 0.1.0-beta.10
+
+### Minor Changes
+
+- bf4ad62: Remove routes function and replace it conseptually by allowing to stack router/route calls excluding web/next which cannot do that due to having different implementation
+
 ## 0.1.0-beta.9
 
 ### Minor Changes

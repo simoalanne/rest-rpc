@@ -1,5 +1,12 @@
 # @rest-rpc/next
 
+## 0.1.0-beta.10
+
+### Minor Changes
+
+- 48b395f: Add support for single middleware-like option for web/next package
+- bf4ad62: Remove routes function and replace it conseptually by allowing to stack router/route calls excluding web/next which cannot do that due to having different implementation
+
 ## 0.1.0-beta.9
 
 ### Patch Changes
