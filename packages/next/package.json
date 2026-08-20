@@ -29,8 +29,8 @@
 		"directory": "test-d"
 	},
 	"dependencies": {
-		"@rest-rpc/core": "workspace:^",
-		"@rest-rpc/web": "workspace:^"
+		"@rest-rpc/core": "workspace:*",
+		"@rest-rpc/web": "workspace:*"
 	},
 	"peerDependencies": {
 		"next": ">=15"

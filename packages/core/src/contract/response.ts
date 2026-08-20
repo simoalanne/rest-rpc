@@ -376,7 +376,7 @@ export type ClientSuccessResponse<E extends RouteDeclaration> = E extends {
 		}[keyof TResponses]
 	: never;
 
-export type ServerSuccessResponse<E extends RouteDeclaration> = E extends {
+type ServerSuccessResponse<E extends RouteDeclaration> = E extends {
 	responses: infer TResponses;
 }
 	? {

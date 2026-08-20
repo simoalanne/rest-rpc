@@ -1,6 +1,7 @@
 import type {
 	HttpRouteDeclaration,
 	RouteDeclaration,
+	ServerErrors,
 	ServerReceived,
 	ServerRequest,
 	ServerResponse,
@@ -24,16 +25,32 @@ export type RuntimeRouteHandler = (
 ) => unknown | Promise<unknown>;
 type AnyImplementationTree = ImplementationTree<RouteDeclaration>;
 
+export type RouteRequestData<E extends RouteDeclaration> = ServerRequest<E>;
+
+export type RouteSent<E extends WebSocketRouteDeclaration> = ServerSent<E>;
+
+export type RouteReceived<E extends WebSocketRouteDeclaration> =
+	ServerReceived<E>;
+
+export type RouteResponseShorthand<E extends HttpRouteDeclaration> =
+	ServerSuccessBody<E>;
+
+export type RouteErrors<E extends HttpRouteDeclaration> = ServerErrors<E>;
+
+export type RouteResponse<E extends HttpRouteDeclaration> = ServerResponse<E>;
+
 type RequestValue<E extends RouteDeclaration> =
-	ServerRequest<E> extends never ? EmptyObject : ServerRequest<E>;
+	RouteRequestData<E> extends never ? EmptyObject : RouteRequestData<E>;
 
 type HandlerResult<E extends HttpRouteDeclaration> = MaybePromise<
-	(ServerResponse<E> & { headers?: HttpHeaders }) | ServerSuccessBody<E>
+	(RouteResponse<E> & { headers?: HttpHeaders }) | RouteResponseShorthand<E>
 >;
 
-export type ContractWebSocket<Send, Receive> = {
-	send(message: Send): void;
-	onMessage(callback: (message: Receive) => void | Promise<void>): () => void;
+export type RouteSocket<E extends WebSocketRouteDeclaration> = {
+	send(message: RouteSent<E>): void;
+	onMessage(
+		callback: (message: RouteReceived<E>) => void | Promise<void>,
+	): () => void;
 	onClose(
 		callback: (event: CloseEventLike) => void | Promise<void>,
 	): () => void;
@@ -45,38 +62,51 @@ export type CloseEventLike = {
 	reason?: string;
 };
 
-export type InferRouteHandlerRequest<
+type HttpRouteRequest<
 	E extends HttpRouteDeclaration,
-	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
+	TContext extends HttpRouteHandlerContext,
 > = Merge<RequestValue<E> & { [REQUEST_CONTEXT_KEY]: TContext }>;
 
-export type InferWebSocketRouteHandlerRequest<
+type WebSocketRouteRequest<
 	E extends WebSocketRouteDeclaration,
-	TContext extends WebSocketRouteHandlerContext = WebSocketRouteHandlerContext,
+	TContext extends WebSocketRouteHandlerContext,
 > = Merge<
 	RequestValue<E> & {
 		[REQUEST_CONTEXT_KEY]: TContext & {
-			socket: ContractWebSocket<ServerSent<E>, ServerReceived<E>>;
+			socket: RouteSocket<E>;
 		};
 	}
 >;
 
-export type InferRouteHandlerResponse<E extends HttpRouteDeclaration> =
-	ServerResponse<E>;
+export type RouteRequest<
+	E extends RouteDeclaration,
+	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
+> = E extends HttpRouteDeclaration
+	? HttpRouteRequest<E, TContext>
+	: E extends WebSocketRouteDeclaration
+		? WebSocketRouteRequest<E, TContext>
+		: never;
+
+type HttpRouteHandler<
+	E extends HttpRouteDeclaration,
+	TContext extends HttpRouteHandlerContext,
+> = (...args: [request: HttpRouteRequest<E, TContext>]) => HandlerResult<E>;
+
+type WebSocketRouteHandler<
+	E extends WebSocketRouteDeclaration,
+	TContext extends WebSocketRouteHandlerContext,
+> = (
+	...args: [request: WebSocketRouteRequest<E, TContext>]
+) => MaybePromise<void>;
 
 export type RouteHandler<
-	E extends HttpRouteDeclaration,
+	E extends RouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
-> = (
-	...args: [request: InferRouteHandlerRequest<E, TContext>]
-) => HandlerResult<E>;
-
-export type WebSocketRouteHandler<
-	E extends WebSocketRouteDeclaration,
-	TContext extends WebSocketRouteHandlerContext = WebSocketRouteHandlerContext,
-> = (
-	...args: [request: InferWebSocketRouteHandlerRequest<E, TContext>]
-) => MaybePromise<void>;
+> = E extends HttpRouteDeclaration
+	? HttpRouteHandler<E, TContext>
+	: E extends WebSocketRouteDeclaration
+		? WebSocketRouteHandler<E, TContext>
+		: never;
 
 export type Contract<TRoute extends RouteDeclaration = RouteDeclaration> =
 	| TRoute
@@ -114,7 +144,7 @@ export type RouteHandlerFor<
 > = E extends HttpRouteDeclaration
 	? RouteHandler<E, TContext>
 	: E extends WebSocketRouteDeclaration
-		? WebSocketRouteHandler<E, TWebSocketContext>
+		? RouteHandler<E, TWebSocketContext>
 		: never;
 
 export type ImplementationShape<

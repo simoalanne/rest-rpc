@@ -68,7 +68,6 @@ export type {
 	ServerResponse,
 	ServerResponseBody,
 	ServerSuccessBody,
-	ServerSuccessResponse,
 	Stream,
 } from "./response.ts";
 export {

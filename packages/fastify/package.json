@@ -25,8 +25,8 @@
 		"typecheck": "pnpm run build && tsc -p tsconfig.json"
 	},
 	"dependencies": {
-		"@rest-rpc/core": "workspace:^",
-		"@rest-rpc/server": "workspace:^"
+		"@rest-rpc/core": "workspace:*",
+		"@rest-rpc/server": "workspace:*"
 	},
 	"devDependencies": {
 		"@fastify/websocket": "^11.0.0",

@@ -7,7 +7,7 @@
 		"generate:type-fixtures": "node scripts/generate-type-fixtures.mjs"
 	},
 	"dependencies": {
-		"@rest-rpc/core": "workspace:^"
+		"@rest-rpc/core": "workspace:*"
 	},
 	"peerDependencies": {
 		"arktype": "^2.2.3",

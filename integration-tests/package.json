@@ -8,14 +8,14 @@
 		"test": "pnpm run next:build && node --test $(find src -name '*.test.ts' -print | sort)"
 	},
 	"dependencies": {
-		"@rest-rpc/core": "workspace:^",
-		"@rest-rpc/express": "workspace:^",
-		"@rest-rpc/fastify": "workspace:^",
-		"@rest-rpc/hono": "workspace:^",
-		"@rest-rpc/next": "workspace:^",
-		"@rest-rpc/server": "workspace:^",
-		"@rest-rpc/tanstack-query": "workspace:^",
-		"@rest-rpc/web": "workspace:^"
+		"@rest-rpc/core": "workspace:*",
+		"@rest-rpc/express": "workspace:*",
+		"@rest-rpc/fastify": "workspace:*",
+		"@rest-rpc/hono": "workspace:*",
+		"@rest-rpc/next": "workspace:*",
+		"@rest-rpc/server": "workspace:*",
+		"@rest-rpc/tanstack-query": "workspace:*",
+		"@rest-rpc/web": "workspace:*"
 	},
 	"devDependencies": {
 		"@fastify/websocket": "^11.3.0",

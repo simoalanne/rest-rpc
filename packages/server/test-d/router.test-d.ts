@@ -7,8 +7,12 @@ import {
 	webSocketMessages,
 } from "@rest-rpc/core/contract";
 import {
-	type InferRouteHandlerRequest,
-	type InferWebSocketRouteHandlerRequest,
+	type RouteReceived,
+	type RouteRequest,
+	type RouteRequestData,
+	type RouteResponse,
+	type RouteSent,
+	type RouteSocket,
 	route,
 	router,
 } from "@rest-rpc/server";
@@ -46,13 +50,21 @@ const createApi = defineRouter({
 	},
 });
 
-type CreateTodoRequest = InferRouteHandlerRequest<
+type CreateTodoRequest = RouteRequest<
 	typeof createApi.todos.create,
 	TestRouteHandlerContext
 >;
 declare const createTodoRequest: CreateTodoRequest;
 expectType<string>(createTodoRequest.title);
 expectType<TestRouteHandlerContext>(createTodoRequest.context);
+
+type CreateTodoRequestData = RouteRequestData<typeof createApi.todos.create>;
+declare const createTodoRequestData: CreateTodoRequestData;
+expectType<string>(createTodoRequestData.title);
+
+type CreateTodoResponse = RouteResponse<typeof createApi.todos.create>;
+declare const createTodoResponse: CreateTodoResponse;
+expectType<201>(createTodoResponse.status);
 
 // should infer route handler parameters and declared success response envelopes
 const createImplementation = route(
@@ -107,16 +119,25 @@ const socketApi = defineRouter({
 	},
 });
 
-type SocketRequest = InferWebSocketRouteHandlerRequest<
+type SocketRequest = RouteRequest<
 	typeof socketApi.socket.room,
 	TestRouteHandlerContext
 >;
 declare const socketRequest: SocketRequest;
 expectType<string>(socketRequest.roomId);
 expectType<string>(socketRequest.context.userId);
+expectType<RouteSocket<typeof socketApi.socket.room>>(
+	socketRequest.context.socket,
+);
+expectType<RouteSent<typeof socketApi.socket.room>>(
+	null as unknown as Parameters<typeof socketRequest.context.socket.send>[0],
+);
 socketRequest.context.socket.send({
 	type: "ready",
 	message: { roomId: "room-1" },
+});
+socketRequest.context.socket.onMessage((message) => {
+	expectType<RouteReceived<typeof socketApi.socket.room>>(message);
 });
 
 // route handler input and output coverage

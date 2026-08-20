@@ -1,22 +1,17 @@
 import type {
-	HttpRouteDeclaration,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
 import {
 	type Contract,
-	ContractResponseError,
 	clearCookie,
-	createRouteMatcher,
 	type ImplementationTreeFor,
 	type RouteHandlerFor,
 	type RouteImplementation,
+	RouteResponseError,
 	type RouterImplementationInput,
-	type InferRouteHandlerRequest as ServerInferRouteHandlerRequest,
-	type InferRouteHandlerResponse as ServerInferRouteHandlerResponse,
-	type InferWebSocketRouteHandlerRequest as ServerInferWebSocketRouteHandlerRequest,
 	type RouteHandler as ServerRouteHandler,
-	type WebSocketRouteHandler as ServerWebSocketRouteHandler,
+	type RouteRequest as ServerRouteRequest,
 	route as serverRoute,
 	router as serverRouter,
 	setCookie,
@@ -26,8 +21,13 @@ import type { Env } from "hono/types";
 
 export type {
 	ClearCookieOptions,
-	CookiePriority,
-	SameSite,
+	RouteErrors,
+	RouteReceived,
+	RouteRequestData,
+	RouteResponse,
+	RouteResponseShorthand,
+	RouteSent,
+	RouteSocket,
 	SetCookieOptions,
 } from "@rest-rpc/server";
 export type {
@@ -37,7 +37,7 @@ export type {
 } from "./http.ts";
 export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
-export { ContractResponseError, clearCookie, createRouteMatcher, setCookie };
+export { clearCookie, RouteResponseError, setCookie };
 
 export type HttpRouteHandlerContext<E extends Env = Env> = {
 	c: Context<E>;
@@ -48,35 +48,22 @@ export type WebSocketRouteHandlerContext<E extends Env = Env> = {
 	c: Context<E>;
 };
 
+type RouteContext<
+	E extends RouteDeclaration,
+	TEnv extends Env,
+> = E extends WebSocketRouteDeclaration
+	? WebSocketRouteHandlerContext<TEnv>
+	: HttpRouteHandlerContext<TEnv>;
+
 export type RouteRequest<
-	E extends HttpRouteDeclaration,
+	E extends RouteDeclaration,
 	TEnv extends Env = Env,
-> = ServerInferRouteHandlerRequest<E, HttpRouteHandlerContext<TEnv>>;
-
-export type RouteResponse<E extends HttpRouteDeclaration> =
-	ServerInferRouteHandlerResponse<E>;
-
-export type WebSocketRequest<
-	E extends WebSocketRouteDeclaration,
-	TEnv extends Env = Env,
-> = ServerInferWebSocketRouteHandlerRequest<
-	E,
-	WebSocketRouteHandlerContext<TEnv>
->;
+> = ServerRouteRequest<E, RouteContext<E, TEnv>>;
 
 export type RouteHandler<
-	E extends HttpRouteDeclaration,
+	E extends RouteDeclaration,
 	TEnv extends Env = Env,
-> = ServerRouteHandler<E, HttpRouteHandlerContext<TEnv>>;
-
-export type WebSocketRouteHandler<
-	E extends WebSocketRouteDeclaration,
-	TEnv extends Env = Env,
-> = ServerWebSocketRouteHandler<E, WebSocketRouteHandlerContext<TEnv>>;
-export type WebSocketHandler<
-	E extends WebSocketRouteDeclaration,
-	TEnv extends Env = Env,
-> = ServerWebSocketRouteHandler<E, WebSocketRouteHandlerContext<TEnv>>;
+> = ServerRouteHandler<E, RouteContext<E, TEnv>>;
 
 export const route = <
 	const TNode extends RouteDeclaration,

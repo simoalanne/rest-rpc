@@ -117,7 +117,7 @@ describe("web response lifecycle integration", () => {
 		assert.deepEqual(response.body, { ok: true });
 	});
 
-	it("treats returned Response objects as invalid contract response bodies", async () => {
+	it("treats returned Response objects as invalid route response bodies", async () => {
 		const response = await client.returnResponse.fetchResponse();
 
 		assert.equal(response.declared, false);

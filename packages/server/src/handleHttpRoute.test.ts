@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { customBody, noBody, stream } from "@rest-rpc/core/contract";
 import z from "zod";
-import { ContractResponseError } from "./contractResponseError.ts";
 import { handleHttpRoute } from "./handleHttpRoute.ts";
+import { RouteResponseError } from "./routeResponseError.ts";
 
 const routeWithDeclaredErrorResponse = {
 	method: "GET",
@@ -350,12 +350,12 @@ describe("handleHttpRoute", () => {
 		);
 	});
 
-	it("normalizes declared ContractResponseError responses", async () => {
+	it("normalizes declared RouteResponseError responses", async () => {
 		let called = false;
 		const result = await handleHttpRoute(
 			routeWithDeclaredErrorResponse,
 			() => {
-				throw new ContractResponseError(routeWithDeclaredErrorResponse, {
+				throw new RouteResponseError(routeWithDeclaredErrorResponse, {
 					status: 404,
 					body: { code: "not_found" },
 				});
@@ -381,12 +381,12 @@ describe("handleHttpRoute", () => {
 		});
 	});
 
-	it("validates ContractResponseError response bodies during normalization", async () => {
+	it("validates RouteResponseError response bodies during normalization", async () => {
 		await assert.rejects(() =>
 			handleHttpRoute(
 				routeWithDeclaredErrorResponse,
 				() => {
-					throw new ContractResponseError(routeWithDeclaredErrorResponse, {
+					throw new RouteResponseError(routeWithDeclaredErrorResponse, {
 						status: 404,
 						body: { code: "gone" },
 					} as never);

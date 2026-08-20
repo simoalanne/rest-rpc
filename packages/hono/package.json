@@ -26,8 +26,8 @@
 		"test": "pnpm run build && node --test src/**/*.test.ts"
 	},
 	"dependencies": {
-		"@rest-rpc/core": "workspace:^",
-		"@rest-rpc/server": "workspace:^"
+		"@rest-rpc/core": "workspace:*",
+		"@rest-rpc/server": "workspace:*"
 	},
 	"peerDependencies": {
 		"hono": "^4.0.0"

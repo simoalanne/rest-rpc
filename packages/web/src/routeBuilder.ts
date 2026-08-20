@@ -7,8 +7,7 @@ import {
 	type RouteHandler,
 	type RouteHandlerFor,
 	type RouteImplementation,
-	type InferRouteHandlerRequest as ServerInferRouteHandlerRequest,
-	type InferRouteHandlerResponse as ServerInferRouteHandlerResponse,
+	type RouteRequest as ServerRouteRequest,
 	route as serverRoute,
 	router as serverRouter,
 } from "@rest-rpc/server";
@@ -60,10 +59,7 @@ export type RouteRequest<
 	E extends HttpRouteDeclaration,
 	TContext extends Record<string, unknown> = Record<string, unknown>,
 	TRequest extends Request = Request,
-> = ServerInferRouteHandlerRequest<E, WebRouteContext<TContext, TRequest>>;
-
-export type RouteResponse<E extends HttpRouteDeclaration> =
-	ServerInferRouteHandlerResponse<E>;
+> = ServerRouteRequest<E, WebRouteContext<TContext, TRequest>>;
 
 type WebRouteBuilderWithMiddleware<
 	TRoute extends HttpRouteDeclaration,
@@ -153,7 +149,11 @@ export const createWebRouteBuilder = <
 		createWebRouteBuilder(contract, middleware) as never,
 	handler: (handler) =>
 		attachMiddleware(
-			serverRoute(
+			serverRoute<
+				TRoute,
+				WebRouteContext<TContext, TRequest>,
+				Record<never, never>
+			>(
 				contract,
 				handler as RouteHandlerFor<TRoute, WebRouteContext<TContext, TRequest>>,
 			),
@@ -175,7 +175,11 @@ export const createWebRouterBuilder = <
 		createWebRouterBuilder(contract, middleware) as never,
 	handlers: (handlers) =>
 		attachMiddleware(
-			serverRouter(contract, handlers) as ImplementationTreeFor<
+			serverRouter<
+				TContract,
+				WebRouteContext<TContext, TRequest>,
+				Record<never, never>
+			>(contract, handlers) as ImplementationTreeFor<
 				TContract,
 				HttpRouteDeclaration
 			>,

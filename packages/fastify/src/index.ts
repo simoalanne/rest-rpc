@@ -1,22 +1,17 @@
 import type {
-	HttpRouteDeclaration,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
 import {
 	type Contract,
-	ContractResponseError,
 	clearCookie,
-	createRouteMatcher,
 	type ImplementationTreeFor,
 	type RouteHandlerFor,
 	type RouteImplementation,
+	RouteResponseError,
 	type RouterImplementationInput,
-	type InferRouteHandlerRequest as ServerInferRouteHandlerRequest,
-	type InferRouteHandlerResponse as ServerInferRouteHandlerResponse,
-	type InferWebSocketRouteHandlerRequest as ServerInferWebSocketRouteHandlerRequest,
 	type RouteHandler as ServerRouteHandler,
-	type WebSocketRouteHandler as ServerWebSocketRouteHandler,
+	type RouteRequest as ServerRouteRequest,
 	route as serverRoute,
 	router as serverRouter,
 	setCookie,
@@ -25,14 +20,19 @@ import type { FastifyRequest } from "fastify";
 
 export type {
 	ClearCookieOptions,
-	CookiePriority,
-	SameSite,
+	RouteErrors,
+	RouteReceived,
+	RouteRequestData,
+	RouteResponse,
+	RouteResponseShorthand,
+	RouteSent,
+	RouteSocket,
 	SetCookieOptions,
 } from "@rest-rpc/server";
 export type { ExtendedFastifyPreHandler } from "./http.ts";
 export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
-export { ContractResponseError, clearCookie, createRouteMatcher, setCookie };
+export { clearCookie, RouteResponseError, setCookie };
 
 export type HttpRouteHandlerContext = {
 	req: FastifyRequest;
@@ -43,22 +43,19 @@ export type WebSocketRouteHandlerContext = {
 	req: FastifyRequest;
 };
 
-export type RouteRequest<E extends HttpRouteDeclaration> =
-	ServerInferRouteHandlerRequest<E, HttpRouteHandlerContext>;
-export type RouteResponse<E extends HttpRouteDeclaration> =
-	ServerInferRouteHandlerResponse<E>;
-export type WebSocketRequest<E extends WebSocketRouteDeclaration> =
-	ServerInferWebSocketRouteHandlerRequest<E, WebSocketRouteHandlerContext>;
+type RouteContext<E extends RouteDeclaration> =
+	E extends WebSocketRouteDeclaration
+		? WebSocketRouteHandlerContext
+		: HttpRouteHandlerContext;
 
-export type RouteHandler<E extends HttpRouteDeclaration> = ServerRouteHandler<
+export type RouteRequest<E extends RouteDeclaration> = ServerRouteRequest<
 	E,
-	HttpRouteHandlerContext
+	RouteContext<E>
 >;
-
-export type WebSocketRouteHandler<E extends WebSocketRouteDeclaration> =
-	ServerWebSocketRouteHandler<E, WebSocketRouteHandlerContext>;
-export type WebSocketHandler<E extends WebSocketRouteDeclaration> =
-	ServerWebSocketRouteHandler<E, WebSocketRouteHandlerContext>;
+export type RouteHandler<E extends RouteDeclaration> = ServerRouteHandler<
+	E,
+	RouteContext<E>
+>;
 
 export const route = <const TNode extends RouteDeclaration>(
 	contract: TNode,

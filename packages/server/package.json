@@ -30,7 +30,7 @@
 		"directory": "test-d"
 	},
 	"dependencies": {
-		"@rest-rpc/core": "workspace:^"
+		"@rest-rpc/core": "workspace:*"
 	},
 	"devDependencies": {
 		"zod": "^4.3.6"

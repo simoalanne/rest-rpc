@@ -60,7 +60,7 @@ export const runErrorHandlersSuite = (adapter: ErrorHandlersSuiteAdapter) => {
 			});
 		});
 
-		it("does not pass ContractResponseError through the unhandled hook", async () => {
+		it("does not pass RouteResponseError through the unhandled hook", async () => {
 			const response = await client.contractResponse.fetchResponse();
 
 			assert.equal(response.declared, true);

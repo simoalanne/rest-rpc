@@ -1,6 +1,5 @@
 import {
 	type ClientFetchResponse,
-	type ClientRequestInput,
 	customBody,
 	initClient,
 	jsonQuery,
@@ -411,11 +410,6 @@ expectError(requestArgumentClient.todos.get.fetch());
 expectError(requestArgumentClient.todos.get.fetch({ title: "wrong segment" }));
 
 expectError(requestArgumentClient.todos.list.fetch({ id: "todo-1" }));
-
-type CreateTodoInput = ClientRequestInput<
-	typeof requestArgumentApi.todos.create
->;
-expectType<{ title: string }>(null as unknown as CreateTodoInput);
 
 // should type websocket send and receive message payloads
 const websocketApi = router({

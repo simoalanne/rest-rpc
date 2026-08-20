@@ -14,12 +14,12 @@ import {
 	REQUEST_CONTEXT_KEY,
 } from "@rest-rpc/core/contract";
 import { validateStandardSchema } from "@rest-rpc/core/standard-schema";
-import { ContractResponseError } from "./contractResponseError.ts";
 import type {
 	ServerErrorHandlers,
 	ServerErrorResponse,
 } from "./errorHandlers.ts";
 import type { HttpHeaders } from "./headers.ts";
+import { RouteResponseError } from "./routeResponseError.ts";
 import type { HttpRouteHandlerContext, RuntimeRouteHandler } from "./router.ts";
 import { type RequestSegments, validateRequest } from "./validation.ts";
 
@@ -389,7 +389,7 @@ export const handleHttpRoute = async <
 			normalizeHandlerResult(route, handlerResult),
 		);
 	} catch (error) {
-		if (error instanceof ContractResponseError) {
+		if (error instanceof RouteResponseError) {
 			return await normalizeResponseResult(route, {
 				status: error.status,
 				body: error.body,

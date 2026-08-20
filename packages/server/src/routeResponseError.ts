@@ -1,16 +1,17 @@
-import type { RouteDeclaration, ServerErrors } from "@rest-rpc/core/contract";
+import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
+import type { RouteErrors } from "./router.ts";
 
-export class ContractResponseError<
-	E extends RouteDeclaration = RouteDeclaration,
+export class RouteResponseError<
+	E extends HttpRouteDeclaration = HttpRouteDeclaration,
 > extends Error {
-	readonly response: ServerErrors<E>;
+	readonly response: RouteErrors<E>;
 	readonly status: number;
 	readonly body: unknown;
 	readonly responseHeaders: Record<string, unknown> | undefined;
 	readonly route: E;
 
-	constructor(route: E, response: ServerErrors<E>) {
-		super("Contract response error");
+	constructor(route: E, response: RouteErrors<E>) {
+		super("Route response error");
 		const responseFields = response as { status: number; body: unknown };
 		this.response = response;
 		this.status = responseFields.status;

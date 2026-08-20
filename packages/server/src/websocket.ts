@@ -1,8 +1,4 @@
-import type {
-	ServerReceived,
-	ServerSent,
-	WebSocketRouteDeclaration,
-} from "@rest-rpc/core/contract";
+import type { WebSocketRouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	REQUEST_CONTEXT_KEY,
 	validateWebSocketMessageSync,
@@ -11,8 +7,9 @@ import type { ServerErrorHandlers } from "./errorHandlers.ts";
 import type { HttpHeaders } from "./headers.ts";
 import type {
 	CloseEventLike,
-	ContractWebSocket,
 	RouteImplementation,
+	RouteReceived,
+	RouteSocket,
 	RuntimeRouteHandler,
 	WebSocketRouteHandlerContext,
 } from "./router.ts";
@@ -104,8 +101,8 @@ export const prepareWebSocketUpgrade = async <
 export const createContractWebSocket = <E extends WebSocketRouteDeclaration>(
 	route: E,
 	socket: RawWebSocket,
-): ContractWebSocket<ServerSent<E>, ServerReceived<E>> => {
-	const parseIncomingMessage = (data: unknown): ServerReceived<E> => {
+): RouteSocket<E> => {
+	const parseIncomingMessage = (data: unknown): RouteReceived<E> => {
 		try {
 			const result = validateWebSocketMessageSync(
 				route.messages.client,
@@ -113,7 +110,7 @@ export const createContractWebSocket = <E extends WebSocketRouteDeclaration>(
 			);
 			if (result.issues) throw result.issues;
 
-			return result.value as ServerReceived<E>;
+			return result.value as RouteReceived<E>;
 		} catch {
 			socket.close(1007, "Invalid WebSocket message.");
 			throw new Error("Invalid WebSocket message.");
@@ -132,7 +129,7 @@ export const createContractWebSocket = <E extends WebSocketRouteDeclaration>(
 		},
 		onMessage(callback) {
 			return socket.onMessage((data) => {
-				let message: ServerReceived<E>;
+				let message: RouteReceived<E>;
 				try {
 					message = parseIncomingMessage(data);
 				} catch {

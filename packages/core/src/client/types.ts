@@ -21,9 +21,6 @@ export type FetchLike = (
 	init?: RequestInit,
 ) => Promise<Response>;
 
-export type ClientRequestInput<E extends RouteDeclaration> =
-	ClientRequest<E> extends never ? undefined : ClientRequest<E>;
-
 export type FetchArgs<E extends RouteDeclaration = RouteDeclaration> =
 	ClientRequest<E> extends never
 		? [options?: FetchOptions]
@@ -72,23 +69,22 @@ export type OpenConnectionFn<E extends RouteDeclaration> = (
 	...args: OpenConnectionArgs<E>
 ) => E extends WebSocketRouteDeclaration ? ClientSocket<E> : never;
 
-type ApiClientProtocolRouteValue<E extends RouteDeclaration> = {
-	fetchResponse: FetchResponseFn<E>;
-};
+type ApiClientMoreThanOneSuccessResponseRouteValue<E extends RouteDeclaration> =
+	{
+		fetchResponse: FetchResponseFn<E>;
+	};
 
-type ApiClientHappyPathRouteValue<E extends RouteDeclaration> = {
+type ApiClientSingleSuccessResponseRouteValue<E extends RouteDeclaration> = {
 	fetch: FetchFn<E>;
 	fetchResponse: FetchResponseFn<E>;
 };
 
-export type ApiClientHttpRouteValue<
-	E extends RouteDeclaration = RouteDeclaration,
-> =
+type ApiClientHttpRouteValue<E extends RouteDeclaration = RouteDeclaration> =
 	ClientSuccessBody<E> extends never
-		? ApiClientProtocolRouteValue<E>
-		: ApiClientHappyPathRouteValue<E>;
+		? ApiClientMoreThanOneSuccessResponseRouteValue<E>
+		: ApiClientSingleSuccessResponseRouteValue<E>;
 
-export type ApiClientWebSocketRouteValue<
+type ApiClientWebSocketRouteValue<
 	E extends RouteDeclaration = RouteDeclaration,
 > = {
 	openConnection: OpenConnectionFn<E>;

@@ -27,8 +27,8 @@
 		"test": "pnpm --filter @rest-rpc/server build && node --test src/**/*.test.ts"
 	},
 	"dependencies": {
-		"@rest-rpc/core": "workspace:^",
-		"@rest-rpc/server": "workspace:^"
+		"@rest-rpc/core": "workspace:*",
+		"@rest-rpc/server": "workspace:*"
 	},
 	"devDependencies": {
 		"@types/express": "^5.0.1",

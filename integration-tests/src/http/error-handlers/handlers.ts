@@ -1,6 +1,6 @@
 import {
-	ContractResponseError,
 	type ImplementationShape,
+	RouteResponseError,
 	router,
 } from "@rest-rpc/server";
 import {
@@ -19,7 +19,7 @@ export const createErrorHandlersHandlers = (
 		throw new Error("boom from integration handler");
 	},
 	contractResponse: () => {
-		throw new ContractResponseError(errorHandlersContract.contractResponse, {
+		throw new RouteResponseError(errorHandlersContract.contractResponse, {
 			status: 409,
 			body: {
 				code: "conflict",

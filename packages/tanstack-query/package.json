@@ -30,7 +30,7 @@
 		"directory": "test-d"
 	},
 	"dependencies": {
-		"@rest-rpc/core": "workspace:^"
+		"@rest-rpc/core": "workspace:*"
 	},
 	"peerDependencies": {
 		"@tanstack/query-core": "^5.0.0"

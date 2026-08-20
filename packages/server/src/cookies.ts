@@ -1,5 +1,5 @@
-export type SameSite = "strict" | "lax" | "none";
-export type CookiePriority = "low" | "medium" | "high";
+type SameSite = "strict" | "lax" | "none";
+type CookiePriority = "low" | "medium" | "high";
 
 export type SetCookieOptions = {
 	domain?: string;
@@ -19,27 +19,8 @@ export type ClearCookieOptions = Omit<
 	"expires" | "maxAge" | "encode"
 >;
 
-const formatSameSite = (sameSite: SameSite): string => {
-	switch (sameSite) {
-		case "strict":
-			return "Strict";
-		case "lax":
-			return "Lax";
-		case "none":
-			return "None";
-	}
-};
-
-const formatPriority = (priority: CookiePriority): string => {
-	switch (priority) {
-		case "low":
-			return "Low";
-		case "medium":
-			return "Medium";
-		case "high":
-			return "High";
-	}
-};
+const capitalize = (str: string): string =>
+	str.charAt(0).toUpperCase() + str.slice(1);
 
 export const setCookie = (
 	name: string,
@@ -70,10 +51,10 @@ export const setCookie = (
 	if (options.secure) parts.push("Secure");
 	if (options.partitioned) parts.push("Partitioned");
 	if (options.priority !== undefined) {
-		parts.push(`Priority=${formatPriority(options.priority)}`);
+		parts.push(`Priority=${capitalize(options.priority)}`);
 	}
 	if (options.sameSite !== undefined) {
-		parts.push(`SameSite=${formatSameSite(options.sameSite)}`);
+		parts.push(`SameSite=${capitalize(options.sameSite)}`);
 	}
 
 	return parts.join("; ");

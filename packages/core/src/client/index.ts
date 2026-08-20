@@ -7,7 +7,6 @@ export type {
 	ApiClientFor,
 	ApiClientOptions,
 	ClientFetchResponse,
-	ClientRequestInput,
 	ClientSocket,
 	DeclaredRouteClientResponse,
 	FetchArgs,
