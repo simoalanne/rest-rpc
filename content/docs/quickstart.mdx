@@ -178,7 +178,7 @@ export const api = router({
 			method: "POST",
 			path: "/todos",
 			body: {
-				title: type("string>0"),
+				title: type<string>(),
 			},
 			response: todoSchema,
 		},

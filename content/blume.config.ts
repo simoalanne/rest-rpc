@@ -7,6 +7,9 @@ export default defineConfig({
 		image: "/icon.svg",
 		text: "rest-rpc",
 	},
+	deployment: {
+		site: "https://rest-rpc.dev",
+	},
 	content: {
 		root: ".",
 		sources: [
