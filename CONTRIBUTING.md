@@ -18,9 +18,10 @@ pnpm install
 ```
 
 4. Create a branch for your change.
-   ```sh
-   git checkout -b my-feature-branch
-   ```
+```sh
+git checkout -b my-feature-branch
+```
+
 5. Make your changes.
 6. Verify the relevant behavior:
 
