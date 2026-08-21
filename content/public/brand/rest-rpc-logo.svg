@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title">
+  <title>rest-rpc logo</title>
+  <rect width="1024" height="1024" rx="132" fill="#1F5C4A" />
+  <g fill="#FFFFFF">
+    <path id="r" fill-rule="evenodd" d="M169 285h225c66 0 119 53 119 119v34c0 66-53 119-119 119h-83l234 215H438L270 604h-22v168h-79V285Zm79 79v115h141c25 0 45-20 45-45v-25c0-25-20-45-45-45H248Z" clip-rule="evenodd" />
+    <use href="#r" transform="translate(390 0)" />
+  </g>
+</svg>

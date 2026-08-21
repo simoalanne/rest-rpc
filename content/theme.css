@@ -1,3 +1,9 @@
+/* Blume's default header mark is 20px; the RR tile reads better at 32px. */
+[data-blume-header] > a[href="/"] > span[aria-hidden="true"],
+[data-blume-header] > a[href="/"] > span[aria-hidden="true"] > svg {
+	height: 2rem;
+}
+
 /* Twoslash hover popups need to escape the code block and the tab frame. */
 .prose blume-tabs:has(pre.twoslash),
 .prose blume-tabs:has(pre.twoslash) [data-blume-tab-content],

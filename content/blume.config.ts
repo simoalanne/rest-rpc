@@ -3,6 +3,10 @@ import { defineConfig } from "blume";
 export default defineConfig({
 	title: "rest-rpc",
 	description: "REST-shaped APIs with function-shaped TypeScript",
+	logo: {
+		image: "/brand/rest-rpc-logo.svg",
+		text: "rest-rpc",
+	},
 	content: {
 		root: ".",
 		sources: [
@@ -29,5 +33,11 @@ export default defineConfig({
 			{ label: "Docs", path: "/docs", href: "/docs/quickstart" },
 			{ label: "Changelog", path: "/changelog", href: "/changelog" },
 		],
+	},
+	theme: {
+		accent: {
+			light: "#1F5C4A",
+			dark: "#27705B",
+		},
 	},
 });
