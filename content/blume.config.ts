@@ -4,7 +4,7 @@ export default defineConfig({
 	title: "rest-rpc",
 	description: "REST-shaped APIs with function-shaped TypeScript",
 	logo: {
-		image: "/brand/rest-rpc-logo.svg",
+		image: "/icon.svg",
 		text: "rest-rpc",
 	},
 	content: {
