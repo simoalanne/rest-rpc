@@ -76,6 +76,7 @@ export const createRouteHandler = <
 	options: CreateWebHandlerOptions = {},
 ): ((request: TRequest, runtime: TRuntimeContext) => Promise<Response>) => {
 	const matchRoute = createWebRouteMatcher(implementations);
+	const usesDefaultParseBody = options.parseBody === undefined;
 	const parseBody = options.parseBody ?? defaultParseBody;
 
 	return async (request: TRequest, runtime: TRuntimeContext) => {
@@ -104,6 +105,7 @@ export const createRouteHandler = <
 			implementation,
 			match.params,
 			parseBody,
+			usesDefaultParseBody,
 			options.errorHandlers,
 		);
 	};

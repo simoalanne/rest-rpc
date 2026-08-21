@@ -13,7 +13,10 @@ import type {
 	RuntimeRouteHandler,
 	WebSocketRouteHandlerContext,
 } from "./router.ts";
-import type { RequestSegments } from "./validation.ts";
+import type {
+	RequestSegments,
+	RequestValidationResponse,
+} from "./validation.ts";
 import { validateRequest } from "./validation.ts";
 
 export type RawWebSocket = {
@@ -53,7 +56,7 @@ type PrepareWebSocketUpgradeOptions<
 	beforeUpgrade?: BeforeWebSocketUpgrade<TContext>;
 	errorHandlers?: Pick<
 		ServerErrorHandlers<TContext>,
-		"onRequestValidationError"
+		"onRequestValidationError" | "onUnhandledError"
 	>;
 };
 
@@ -61,41 +64,117 @@ type PrepareWebSocketUpgradeResult =
 	| { ok: true; request: Record<string, unknown> }
 	| { ok: false; rejection: UpgradeRejection };
 
+type UpgradeRejectionResult = Extract<
+	PrepareWebSocketUpgradeResult,
+	{ ok: false }
+>;
+
+type UpgradeRequestValidationResult =
+	| { ok: true; validation: RequestValidationResponse }
+	| UpgradeRejectionResult;
+
+const defaultUnhandledUpgradeErrorRejection: UpgradeRejection = {
+	status: 500,
+	body: {
+		message: "WebSocket upgrade failed.",
+	},
+};
+
+const handleUnhandledUpgradeError = async <
+	TContext extends Record<string, unknown>,
+>(
+	error: unknown,
+	{
+		implementation,
+		request,
+		context,
+		errorHandlers,
+	}: PrepareWebSocketUpgradeOptions<TContext>,
+): Promise<UpgradeRejectionResult> => {
+	const rejection =
+		(await errorHandlers?.onUnhandledError?.({
+			route: implementation.route,
+			request,
+			context,
+			error,
+		})) ?? defaultUnhandledUpgradeErrorRejection;
+
+	return { ok: false, rejection };
+};
+
+const validateUpgradeRequest = async <TContext extends Record<string, unknown>>(
+	options: PrepareWebSocketUpgradeOptions<TContext>,
+): Promise<UpgradeRequestValidationResult> => {
+	try {
+		return {
+			ok: true,
+			validation: await validateRequest(
+				options.implementation.route,
+				options.request,
+			),
+		};
+	} catch (error) {
+		return handleUnhandledUpgradeError(error, options);
+	}
+};
+
+const rejectInvalidUpgradeRequest = async <
+	TContext extends Record<string, unknown>,
+>(
+	validation: Extract<RequestValidationResponse, { success: false }>,
+	{
+		implementation,
+		request,
+		context,
+		errorHandlers,
+	}: PrepareWebSocketUpgradeOptions<TContext>,
+): Promise<PrepareWebSocketUpgradeResult> => {
+	const rejection =
+		(await errorHandlers?.onRequestValidationError?.({
+			route: implementation.route,
+			request,
+			context,
+			issues: validation.response.body.validationErrors,
+		})) ?? validation.response;
+
+	return { ok: false, rejection };
+};
+
+const prepareAcceptedUpgrade = async <TContext extends Record<string, unknown>>(
+	request: Record<string, unknown>,
+	options: PrepareWebSocketUpgradeOptions<TContext>,
+): Promise<PrepareWebSocketUpgradeResult> => {
+	try {
+		const rejection = await options.beforeUpgrade?.({
+			route: options.implementation.route,
+			request,
+			context: options.context,
+		});
+
+		if (rejection) return { ok: false, rejection };
+		return { ok: true, request };
+	} catch (error) {
+		return handleUnhandledUpgradeError(error, {
+			...options,
+			request,
+		});
+	}
+};
+
 export const prepareWebSocketUpgrade = async <
 	TContext extends Record<string, unknown> = Record<string, unknown>,
->({
-	implementation,
-	request,
-	context,
-	beforeUpgrade,
-	errorHandlers,
-}: PrepareWebSocketUpgradeOptions<TContext>): Promise<PrepareWebSocketUpgradeResult> => {
-	const requestValidation = await validateRequest(
-		implementation.route,
-		request,
-	);
+>(
+	options: PrepareWebSocketUpgradeOptions<TContext>,
+): Promise<PrepareWebSocketUpgradeResult> => {
+	const requestValidation = await validateUpgradeRequest(options);
 
-	if (!requestValidation.success) {
-		const rejection =
-			(await errorHandlers?.onRequestValidationError?.({
-				route: implementation.route,
-				request,
-				context,
-				issues: requestValidation.response.body.validationErrors,
-			})) ?? requestValidation.response;
+	if (!requestValidation.ok) return requestValidation;
 
-		return { ok: false, rejection };
+	if (!requestValidation.validation.success) {
+		return rejectInvalidUpgradeRequest(requestValidation.validation, options);
 	}
 
-	const rejection = await beforeUpgrade?.({
-		route: implementation.route,
-		request: requestValidation.data,
-		context,
-	});
-
-	if (rejection) return { ok: false, rejection };
-
-	return { ok: true, request: requestValidation.data };
+	return prepareAcceptedUpgrade(requestValidation.validation.data, options);
 };
 
 export const createContractWebSocket = <E extends WebSocketRouteDeclaration>(

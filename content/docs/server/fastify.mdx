@@ -66,12 +66,21 @@ type RegisterRoutesOptions = {
 
 ### Error Handlers
 
+Request validation errors use `onRequestValidationError`. Response contract
+validation errors use `onResponseValidationError` and default to a generic 500
+response. Other unhandled route errors use `onUnhandledError`, or are re-thrown
+when that hook is omitted or returns `undefined`.
+
 ```ts
 registerRoutes(app, routes, {
 	errorHandlers: {
 		onRequestValidationError: ({ issues }) => ({
 			status: 422,
 			body: { code: "VALIDATION_ERROR", issues },
+		}),
+		onResponseValidationError: () => ({
+			status: 500,
+			body: { code: "INVALID_RESPONSE" },
 		}),
 		onUnhandledError: () => ({
 			status: 500,
@@ -111,4 +120,3 @@ registerRoutes(app, routes, {
 		},
 	],
 });
-

@@ -5,6 +5,7 @@ export type {
 export { clearCookie, setCookie } from "./cookies.ts";
 export type {
 	RequestValidationErrorInput,
+	ResponseValidationErrorInput,
 	ServerErrorHandlers,
 	ServerErrorResponse,
 	UnhandledErrorInput,
@@ -30,6 +31,7 @@ export {
 	flattenRouteImplementations,
 	registerRoutes as registerRouteImplementations,
 } from "./registerRoutes.ts";
+export { createRequestParsingErrorResponse } from "./requestParsingError.ts";
 export { RouteResponseError } from "./routeResponseError.ts";
 export type {
 	CloseEventLike,

@@ -87,7 +87,7 @@ export const runResponsesSuite = (adapter: ResponsesSuiteAdapter) => {
 			});
 		});
 
-		it("routes declared response validation failures through unhandled error hooks", async () => {
+		it("routes declared response validation failures through response validation error hooks", async () => {
 			const response = await client.invalidDeclared.fetchResponse();
 
 			assert.equal(response.declared, false);

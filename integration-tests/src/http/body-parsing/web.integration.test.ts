@@ -1,5 +1,7 @@
+import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { Readable } from "node:stream";
+import { describe, it } from "node:test";
 import { isCustomBody, isNoBody } from "@rest-rpc/core/contract";
 import { createRouteHandler, type WebRouteParseBody } from "@rest-rpc/web";
 import { listen } from "../harness/listen.ts";
@@ -53,4 +55,50 @@ runBodyParsingSuite({
 			}),
 		);
 	},
+});
+
+describe("web default body parser errors", () => {
+	it("returns a validation-style 400 when the default JSON parser fails", async () => {
+		const handler = createRouteHandler(createBodyParsingImplementations());
+		const response = await handler(
+			new Request("http://127.0.0.1/body-parsing/json", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: "{",
+			}),
+			{},
+		);
+
+		assert.equal(response.status, 400);
+		assert.match(
+			response.headers.get("content-type") ?? "",
+			/^application\/json/,
+		);
+		assert.deepEqual(await response.json(), {
+			message:
+				"Request validation failed. Check the validationErrors field for details.",
+			validationErrors: [{ message: "Request could not be parsed." }],
+		});
+	});
+
+	it("lets custom body parser errors propagate", async () => {
+		const handler = createRouteHandler(createBodyParsingImplementations(), {
+			parseBody: () => {
+				throw new Error("custom parser failed");
+			},
+		});
+
+		await assert.rejects(
+			() =>
+				handler(
+					new Request("http://127.0.0.1/body-parsing/json", {
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: "{}",
+					}),
+					{},
+				),
+			/custom parser failed/,
+		);
+	});
 });

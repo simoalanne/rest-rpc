@@ -72,7 +72,7 @@ const getSingleSuccessfulStatus = (
 const hasDeclaredStatus = (route: HttpRouteDeclaration, status: number) =>
 	Boolean(getResponseSchema(route, status));
 
-const normalizeHandlerResult = (
+const normalizeHandlerResultEnvelope = (
 	route: HttpRouteDeclaration,
 	result: unknown,
 ): {
@@ -356,6 +356,74 @@ const normalizeServerErrorResponse = (
 	};
 };
 
+const defaultResponseValidationErrorResponse: ServerErrorResponse = {
+	status: 500,
+	body: {
+		message: "Response validation failed.",
+	},
+};
+
+const handleResponseValidationError = async <
+	TContext extends HttpRouteHandlerContext,
+>(
+	error: unknown,
+	route: HttpRouteDeclaration,
+	options: HandleHttpRouteOptions<TContext>,
+	errorContext: TContext,
+) => {
+	const input = {
+		route,
+		request: options.request,
+		context: errorContext,
+		error,
+	};
+	const response =
+		(await options.errorHandlers?.onResponseValidationError?.(input)) ??
+		defaultResponseValidationErrorResponse;
+
+	return normalizeServerErrorResponse(response);
+};
+
+const normalizeHandlerResult = async <TContext extends HttpRouteHandlerContext>(
+	route: HttpRouteDeclaration,
+	result: unknown,
+	options: HandleHttpRouteOptions<TContext>,
+	errorContext: TContext,
+): Promise<HttpRouteResult> => {
+	try {
+		return await normalizeResponseResult(
+			route,
+			normalizeHandlerResultEnvelope(route, result),
+		);
+	} catch (error) {
+		return handleResponseValidationError(error, route, options, errorContext);
+	}
+};
+
+const normalizeRouteResponseError = async <
+	TContext extends HttpRouteHandlerContext,
+>(
+	route: HttpRouteDeclaration,
+	error: RouteResponseError,
+	options: HandleHttpRouteOptions<TContext>,
+	errorContext: TContext,
+): Promise<HttpRouteResult> => {
+	try {
+		return await normalizeResponseResult(route, {
+			status: error.status,
+			body: error.body,
+			responseHeaders: error.responseHeaders,
+		});
+	} catch (responseError) {
+		return handleResponseValidationError(
+			responseError,
+			route,
+			options,
+			errorContext,
+		);
+	}
+};
+
 export const handleHttpRoute = async <
 	E extends HttpRouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
@@ -384,26 +452,24 @@ export const handleHttpRoute = async <
 			...requestValidation.data,
 			[REQUEST_CONTEXT_KEY]: options.context,
 		});
-		return await normalizeResponseResult(
-			route,
-			normalizeHandlerResult(route, handlerResult),
-		);
+
+		return normalizeHandlerResult(route, handlerResult, options, errorContext);
 	} catch (error) {
 		if (error instanceof RouteResponseError) {
-			return await normalizeResponseResult(route, {
-				status: error.status,
-				body: error.body,
-				responseHeaders: error.responseHeaders,
-			});
+			return normalizeRouteResponseError(route, error, options, errorContext);
 		}
 
-		const response = await options.errorHandlers?.onUnhandledError?.({
-			route,
-			request: options.request,
-			context: errorContext,
-			error,
-		});
-		if (response) return normalizeServerErrorResponse(response);
+		const unhandledErrorResponse =
+			await options.errorHandlers?.onUnhandledError?.({
+				route,
+				request: options.request,
+				context: errorContext,
+				error,
+			});
+
+		if (unhandledErrorResponse) {
+			return normalizeServerErrorResponse(unhandledErrorResponse);
+		}
 
 		throw error;
 	}

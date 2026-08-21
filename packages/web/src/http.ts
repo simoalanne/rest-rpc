@@ -4,6 +4,7 @@ import type {
 } from "@rest-rpc/core/contract";
 import { isCustomBody, isNoBody } from "@rest-rpc/core/contract";
 import {
+	createRequestParsingErrorResponse,
 	createWebResponse,
 	handleHttpRoute,
 	type RouteImplementation,
@@ -48,19 +49,30 @@ export const handleWebRoute = async <TContext extends Record<string, unknown>>(
 	implementation: RouteImplementation<HttpRouteDeclaration>,
 	params: Record<string, string>,
 	parseBody: WebRouteParseBody,
+	usesDefaultParseBody: boolean,
 	errorHandlers: ServerErrorHandlers<Record<never, never>> | undefined,
 ) => {
 	const url = new URL(request.url);
+	let body: unknown;
+	try {
+		body = await parseBody({
+			request,
+			route: implementation.route,
+			body: implementation.route.body,
+		});
+	} catch (error) {
+		if (!usesDefaultParseBody) throw error;
+		return Response.json(createRequestParsingErrorResponse().body, {
+			status: 400,
+		});
+	}
+
 	const result = await handleHttpRoute(
 		implementation.route,
 		implementation.handler,
 		{
 			request: {
-				body: await parseBody({
-					request,
-					route: implementation.route,
-					body: implementation.route.body,
-				}),
+				body,
 				query: readQuery(url),
 				pathParams: params,
 				headers: readHeaders(request.headers),

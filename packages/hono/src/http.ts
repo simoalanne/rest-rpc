@@ -4,6 +4,7 @@ import type {
 } from "@rest-rpc/core/contract";
 import { isNoBody, toColonPath } from "@rest-rpc/core/contract";
 import {
+	createRequestParsingErrorResponse,
 	createWebResponse,
 	handleHttpRoute,
 	type RouteImplementation,
@@ -48,13 +49,16 @@ const parseRequestBody = async <TEnv extends Env = Env>(
 export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 	app: Hono<TEnv>,
 	routes: RouteImplementation<HttpRouteDeclaration>[],
-	parseBody: HonoParseBody<TEnv> = defaultParseBody,
+	parseBody: HonoParseBody<TEnv> | undefined = undefined,
 	middleware: ExtendedHonoMiddleware<TEnv>[] = [],
 	errorHandlers?: ServerErrorHandlers<{
 		c: Context<TEnv>;
 		signal: AbortSignal;
 	}>,
 ) => {
+	const usesDefaultParseBody = parseBody === undefined;
+	const parseRequestBodyOption = parseBody ?? defaultParseBody;
+
 	for (const implementation of routes) {
 		const route: HttpRouteDeclaration = implementation.route;
 		const method = route.method.toLowerCase() as Lowercase<
@@ -68,9 +72,22 @@ export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 				(mw) => (c: Context<TEnv>, next: Next) => mw(c, next, route),
 			),
 			async (c: Context<TEnv>) => {
+				let body: unknown;
+				try {
+					body = await parseRequestBody(
+						c,
+						route,
+						route.body,
+						parseRequestBodyOption,
+					);
+				} catch (error) {
+					if (!usesDefaultParseBody) throw error;
+					return c.json(createRequestParsingErrorResponse().body, 400);
+				}
+
 				const result = await handleHttpRoute(route, implementation.handler, {
 					request: {
-						body: await parseRequestBody(c, route, route.body, parseBody),
+						body,
 						query: c.req.query(),
 						pathParams: c.req.param(),
 						headers: c.req.header(),

@@ -201,23 +201,90 @@ describe("handleHttpRoute", () => {
 		);
 	});
 
-	it("requires explicit response objects when a route has multiple success statuses", async () => {
-		await assert.rejects(
-			() =>
-				handleHttpRoute(
-					{
-						method: "POST",
-						path: "/todos",
-						responses: {
-							200: z.object({ id: z.string() }),
-							202: z.object({ id: z.string() }),
-						},
+	it("uses custom response validation error responses", async () => {
+		let unhandledCalled = false;
+		const result = await handleHttpRoute(
+			{
+				method: "GET",
+				path: "/todos",
+				responses: {
+					200: z.object({ id: z.string() }),
+				},
+			},
+			() => ({ id: 123 }),
+			{
+				request: {},
+				context: { requestId: "request-1" },
+				errorHandlers: {
+					onResponseValidationError({ context, error, route }) {
+						assert.equal(context.requestId, "request-1");
+						assert.equal(route.path, "/todos");
+						assert.ok(error);
+
+						return {
+							status: 502,
+							headers: { "x-error": "response-validation" },
+							body: { code: "INVALID_RESPONSE" },
+						};
 					},
-					() => ({ id: "todo-1" }),
-					{ request: {}, context: {} },
-				),
-			/must return a declared response object/,
+					onUnhandledError: () => {
+						unhandledCalled = true;
+						return { status: 500 };
+					},
+				},
+			},
 		);
+
+		assert.equal(unhandledCalled, false);
+		assert.deepEqual(result, {
+			kind: "json",
+			status: 502,
+			headers: { "x-error": "response-validation" },
+			body: { code: "INVALID_RESPONSE" },
+		});
+	});
+
+	it("uses default response validation error responses", async () => {
+		const result = await handleHttpRoute(
+			{
+				method: "GET",
+				path: "/todos",
+				responses: {
+					200: z.object({ id: z.string() }),
+				},
+			},
+			() => ({ id: 123 }),
+			{ request: {}, context: {} },
+		);
+
+		assert.deepEqual(result, {
+			kind: "json",
+			status: 500,
+			headers: undefined,
+			body: {
+				message: "Response validation failed.",
+			},
+		});
+	});
+
+	it("requires explicit response objects when a route has multiple success statuses", async () => {
+		const result = await handleHttpRoute(
+			{
+				method: "POST",
+				path: "/todos",
+				responses: {
+					200: z.object({ id: z.string() }),
+					202: z.object({ id: z.string() }),
+				},
+			},
+			() => ({ id: "todo-1" }),
+			{ request: {}, context: {} },
+		);
+
+		assert.equal(result.status, 500);
+		assert.deepEqual(result.kind === "json" ? result.body : undefined, {
+			message: "Response validation failed.",
+		});
 	});
 
 	it("normalizes declared response headers", async () => {
@@ -261,93 +328,87 @@ describe("handleHttpRoute", () => {
 	});
 
 	it("rejects declared response header values that are not scalar", async () => {
-		await assert.rejects(
-			() =>
-				handleHttpRoute(
-					{
-						method: "GET",
-						path: "/todos",
-						responses: {
-							200: {
-								body: z.object({ id: z.string() }),
-								headers: {
-									"x-meta": z.object({ id: z.string() }),
-								},
-							},
+		const result = await handleHttpRoute(
+			{
+				method: "GET",
+				path: "/todos",
+				responses: {
+					200: {
+						body: z.object({ id: z.string() }),
+						headers: {
+							"x-meta": z.object({ id: z.string() }),
 						},
 					},
-					() => ({
-						status: 200 as const,
-						body: { id: "todo-1" },
-						responseHeaders: {
-							"x-meta": { id: "meta-1" },
-						},
-					}),
-					{ request: {}, context: {} },
-				),
-			/Declared response header "x-meta" must resolve to a string or number/,
+				},
+			},
+			() => ({
+				status: 200 as const,
+				body: { id: "todo-1" },
+				responseHeaders: {
+					"x-meta": { id: "meta-1" },
+				},
+			}),
+			{ request: {}, context: {} },
 		);
+
+		assert.equal(result.status, 500);
 	});
 
 	it("rejects array values for declared response headers", async () => {
-		await assert.rejects(
-			() =>
-				handleHttpRoute(
-					{
-						method: "GET",
-						path: "/todos",
-						responses: {
-							200: {
-								body: z.object({ id: z.string() }),
-								headers: {
-									"x-tags": z.array(z.string()),
-								},
-							},
+		const result = await handleHttpRoute(
+			{
+				method: "GET",
+				path: "/todos",
+				responses: {
+					200: {
+						body: z.object({ id: z.string() }),
+						headers: {
+							"x-tags": z.array(z.string()),
 						},
 					},
-					() => ({
-						status: 200 as const,
-						body: { id: "todo-1" },
-						responseHeaders: {
-							"x-tags": ["alpha", "beta"],
-						},
-					}),
-					{ request: {}, context: {} },
-				),
-			/Declared response header "x-tags" must resolve to a string or number/,
+				},
+			},
+			() => ({
+				status: 200 as const,
+				body: { id: "todo-1" },
+				responseHeaders: {
+					"x-tags": ["alpha", "beta"],
+				},
+			}),
+			{ request: {}, context: {} },
 		);
+
+		assert.equal(result.status, 500);
 	});
 
 	it("rejects duplicate declared and raw response headers", async () => {
-		await assert.rejects(
-			() =>
-				handleHttpRoute(
-					{
-						method: "GET",
-						path: "/todos",
-						responses: {
-							200: {
-								body: z.object({ id: z.string() }),
-								headers: {
-									etag: z.string(),
-								},
-							},
+		const result = await handleHttpRoute(
+			{
+				method: "GET",
+				path: "/todos",
+				responses: {
+					200: {
+						body: z.object({ id: z.string() }),
+						headers: {
+							etag: z.string(),
 						},
 					},
-					() => ({
-						status: 200 as const,
-						body: { id: "todo-1" },
-						responseHeaders: {
-							etag: "declared",
-						},
-						headers: {
-							ETag: "raw",
-						},
-					}),
-					{ request: {}, context: {} },
-				),
-			/Response header "etag" was returned more than once/,
+				},
+			},
+			() => ({
+				status: 200 as const,
+				body: { id: "todo-1" },
+				responseHeaders: {
+					etag: "declared",
+				},
+				headers: {
+					ETag: "raw",
+				},
+			}),
+			{ request: {}, context: {} },
 		);
+
+		assert.equal(result.status, 500);
 	});
 
 	it("normalizes declared RouteResponseError responses", async () => {
@@ -382,18 +443,25 @@ describe("handleHttpRoute", () => {
 	});
 
 	it("validates RouteResponseError response bodies during normalization", async () => {
-		await assert.rejects(() =>
-			handleHttpRoute(
-				routeWithDeclaredErrorResponse,
-				() => {
-					throw new RouteResponseError(routeWithDeclaredErrorResponse, {
-						status: 404,
-						body: { code: "gone" },
-					} as never);
-				},
-				{ request: {}, context: {} },
-			),
+		const result = await handleHttpRoute(
+			routeWithDeclaredErrorResponse,
+			() => {
+				throw new RouteResponseError(routeWithDeclaredErrorResponse, {
+					status: 404,
+					body: { code: "gone" },
+				} as never);
+			},
+			{ request: {}, context: {} },
 		);
+
+		assert.deepEqual(result, {
+			kind: "json",
+			status: 500,
+			headers: undefined,
+			body: {
+				message: "Response validation failed.",
+			},
+		});
 	});
 });
 
@@ -421,22 +489,22 @@ describe("handleHttpRoute custom responses", () => {
 	});
 
 	it("validates custom single response bodies", async () => {
-		await assert.rejects(() =>
-			handleHttpRoute(
-				{
-					method: "GET",
-					path: "/report.csv",
-					responses: {
-						200: customBody({
-							contentType: "text/csv",
-							schema: z.number(),
-						}),
-					},
+		const result = await handleHttpRoute(
+			{
+				method: "GET",
+				path: "/report.csv",
+				responses: {
+					200: customBody({
+						contentType: "text/csv",
+						schema: z.number(),
+					}),
 				},
-				() => ({ status: 200, body: "id,title\n1,First\n" }),
-				{ request: {}, context: {} },
-			),
+			},
+			() => ({ status: 200, body: "id,title\n1,First\n" }),
+			{ request: {}, context: {} },
 		);
+
+		assert.equal(result.status, 500);
 	});
 
 	it("normalizes custom response bodies with selected content types", async () => {
@@ -468,30 +536,31 @@ describe("handleHttpRoute custom responses", () => {
 	});
 
 	it("rejects undeclared custom response content types", async () => {
-		await assert.rejects(
-			() =>
-				handleHttpRoute(
-					{
-						method: "GET",
-						path: "/images/:id",
-						responses: {
-							200: customBody({
-								contentType: ["image/png", "image/jpeg"],
-								schema: z.string(),
-							}),
-						},
-					},
-					() => ({
-						status: 200,
-						body: {
-							contentType: "image/webp",
-							payload: "webp bytes",
-						},
+		const result = await handleHttpRoute(
+			{
+				method: "GET",
+				path: "/images/:id",
+				responses: {
+					200: customBody({
+						contentType: ["image/png", "image/jpeg"],
+						schema: z.string(),
 					}),
-					{ request: {}, context: {} },
-				),
-			/Unsupported custom response body contentType/,
+				},
+			},
+			() => ({
+				status: 200,
+				body: {
+					contentType: "image/webp",
+					payload: "webp bytes",
+				},
+			}),
+			{ request: {}, context: {} },
 		);
+
+		assert.deepEqual(result.kind === "json" ? result.body : undefined, {
+			message: "Response validation failed.",
+		});
+		assert.equal(result.status, 500);
 	});
 
 	it("normalizes custom streamed bodies after validating without framing chunks", async () => {

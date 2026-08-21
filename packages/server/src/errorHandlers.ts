@@ -23,7 +23,19 @@ export type RequestValidationErrorInput<
 	issues: ValidationIssue[];
 };
 
-export type UnhandledErrorInput<TContext extends Record<string, unknown>> = {
+export type UnhandledErrorInput<
+	TContext extends Record<string, unknown>,
+	TRoute extends RouteDeclaration = RouteDeclaration,
+> = {
+	route: TRoute;
+	request: RequestSegments;
+	context: TContext;
+	error: unknown;
+};
+
+export type ResponseValidationErrorInput<
+	TContext extends Record<string, unknown>,
+> = {
 	route: HttpRouteDeclaration;
 	request: RequestSegments;
 	context: TContext;
@@ -34,6 +46,9 @@ export type ServerErrorHandlers<TContext extends Record<string, unknown>> = {
 	onRequestValidationError?: (
 		input: RequestValidationErrorInput<TContext>,
 	) => MaybePromise<ServerErrorResponse>;
+	onResponseValidationError?: (
+		input: ResponseValidationErrorInput<TContext>,
+	) => MaybePromise<ServerErrorResponse | undefined>;
 	onUnhandledError?: (
 		input: UnhandledErrorInput<TContext>,
 	) => MaybePromise<ServerErrorResponse | undefined>;

@@ -10,6 +10,7 @@ import type {
 } from "@rest-rpc/core/contract";
 import {
 	type BeforeWebSocketUpgrade,
+	createRequestParsingErrorResponse,
 	createRouteMatcher,
 	handleWebSocketRoute,
 	prepareWebSocketUpgrade,
@@ -122,11 +123,19 @@ export const registerExpressWebSocketRoutes = (
 	>(routes.map((implementation) => [implementation.route, implementation]));
 
 	options.server.on("upgrade", async (req, socket, head) => {
-		const url = new URL(req.url ?? "/", "http://localhost");
-		const matchedRoute = matchContractRoute({
-			method: req.method ?? "GET",
-			path: url.pathname,
-		});
+		let url: URL;
+		let matchedRoute: ReturnType<typeof matchContractRoute>;
+		try {
+			url = new URL(req.url ?? "/", "http://localhost");
+			matchedRoute = matchContractRoute({
+				method: req.method ?? "GET",
+				path: url.pathname,
+			});
+		} catch {
+			sendUpgradeRejection(socket, createRequestParsingErrorResponse());
+			return;
+		}
+
 		if (!matchedRoute) return;
 		if (matchedRoute.type === "methodNotAllowed") {
 			sendUpgradeRejection(socket, { status: 405 });
@@ -145,11 +154,8 @@ export const registerExpressWebSocketRoutes = (
 			pathParams: matchedRoute.params,
 			headers: req.headers,
 		};
-		const upgrade = await prepareWebSocketUpgrade<{
-			kind: "websocket";
-			req: IncomingMessage;
-			signal: AbortSignal;
-		}>({
+
+		const upgrade = await prepareWebSocketUpgrade({
 			implementation,
 			request,
 			context: { kind: "websocket", req, signal: controller.signal },

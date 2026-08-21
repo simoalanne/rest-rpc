@@ -397,6 +397,77 @@ describe("prepareWebSocketUpgrade", () => {
 			},
 		});
 	});
+
+	it("returns default unhandled error rejections when beforeUpgrade throws", async () => {
+		const route = websocketRoute({
+			client: z.object({ text: z.string() }),
+			server: z.object({ text: z.string() }),
+		});
+		const implementation = { route, handler: () => undefined };
+
+		const result = await prepareWebSocketUpgrade({
+			implementation,
+			request: {
+				pathParams: { roomId: "room-1" },
+			},
+			context: {},
+			beforeUpgrade: () => {
+				throw new Error("boom");
+			},
+		});
+
+		assert.deepEqual(result, {
+			ok: false,
+			rejection: {
+				status: 500,
+				body: {
+					message: "WebSocket upgrade failed.",
+				},
+			},
+		});
+	});
+
+	it("uses custom unhandled error rejections when beforeUpgrade throws", async () => {
+		const route = websocketRoute({
+			client: z.object({ text: z.string() }),
+			server: z.object({ text: z.string() }),
+		});
+		const implementation = { route, handler: () => undefined };
+
+		const result = await prepareWebSocketUpgrade({
+			implementation,
+			request: {
+				pathParams: { roomId: "room-1" },
+			},
+			context: { req: "request" },
+			beforeUpgrade: () => {
+				throw new Error("boom");
+			},
+			errorHandlers: {
+				onUnhandledError({ context, error, request, route }) {
+					assert.deepEqual(context, { req: "request" });
+					assert.equal((error as Error).message, "boom");
+					assert.deepEqual(request, { roomId: "room-1" });
+					assert.equal(route.path, "/rooms/:roomId");
+
+					return {
+						status: 503,
+						headers: { "x-error": "upgrade" },
+						body: { code: "UPGRADE_FAILED" },
+					};
+				},
+			},
+		});
+
+		assert.deepEqual(result, {
+			ok: false,
+			rejection: {
+				status: 503,
+				headers: { "x-error": "upgrade" },
+				body: { code: "UPGRADE_FAILED" },
+			},
+		});
+	});
 });
 
 describe("handleWebSocketRoute", () => {

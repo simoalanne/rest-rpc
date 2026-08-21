@@ -13,7 +13,8 @@ export const responseErrorHandlers: ServerErrorHandlers<
 				},
 			};
 		}
-
+	},
+	onResponseValidationError: ({ route }) => {
 		return {
 			status: 500,
 			headers: {
