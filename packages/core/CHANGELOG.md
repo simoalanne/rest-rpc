@@ -5,7 +5,7 @@
 ### Minor Changes
 
 - 8851cf2: improved names for type helpers
-- d72a045: export changes
+- 4f8d7db: export changes
 
 ### Patch Changes
 
