@@ -1,5 +1,15 @@
 # @rest-rpc/express
 
+## 0.1.0-beta.11
+
+### Minor Changes
+
+- d72a045: export changes
+
+### Patch Changes
+
+- 5676c02: improve npm package metadata with descriptions, keywords, and repository directories.
+
 ## 0.1.0-beta.10
 
 ### Minor Changes

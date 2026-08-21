@@ -1,6 +1,6 @@
 {
 	"name": "@rest-rpc/server",
-	"version": "0.1.0-beta.10",
+	"version": "0.1.0-beta.11",
 	"type": "module",
 	"license": "MIT",
 	"description": "Shared rest-rpc server primitives for typed route handlers and adapter implementations.",

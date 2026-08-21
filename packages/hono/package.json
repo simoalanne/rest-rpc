@@ -1,6 +1,6 @@
 {
 	"name": "@rest-rpc/hono",
-	"version": "0.1.0-beta.10",
+	"version": "0.1.0-beta.11",
 	"type": "module",
 	"license": "MIT",
 	"description": "Hono adapter for serving rest-rpc contracts with typed HTTP and WebSocket routes.",
