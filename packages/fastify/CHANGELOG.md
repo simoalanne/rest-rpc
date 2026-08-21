@@ -4,7 +4,7 @@
 
 ### Minor Changes
 
-- d72a045: Harden server error handling for parser, response validation, and WebSocket upgrade failures
+- 0f23a31: Harden server error handling for parser, response validation, and WebSocket upgrade failures
 
 ## 0.1.0-beta.11
 
