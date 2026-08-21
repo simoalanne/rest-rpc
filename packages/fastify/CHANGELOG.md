@@ -1,5 +1,11 @@
 # @rest-rpc/fastify
 
+## 0.1.0-beta.12
+
+### Minor Changes
+
+- d72a045: Harden server error handling for parser, response validation, and WebSocket upgrade failures
+
 ## 0.1.0-beta.11
 
 ### Minor Changes

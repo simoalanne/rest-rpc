@@ -1,5 +1,7 @@
 # @rest-rpc/tanstack-query
 
+## 0.1.0-beta.12
+
 ## 0.1.0-beta.11
 
 ### Minor Changes
