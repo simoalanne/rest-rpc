@@ -3,9 +3,27 @@
 	"version": "0.1.0-beta.10",
 	"type": "module",
 	"license": "MIT",
+	"description": "Next.js adapter for serving and consuming rest-rpc contracts in App Router projects.",
+	"keywords": [
+		"rest-rpc",
+		"typescript",
+		"rpc",
+		"rest",
+		"api-contract",
+		"contract-first",
+		"type-safe-api",
+		"next",
+		"nextjs",
+		"app-router",
+		"route-handler",
+		"fetch",
+		"react",
+		"server-components"
+	],
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/rest-rpc/rest-rpc.git"
+		"url": "git+https://github.com/rest-rpc/rest-rpc.git",
+		"directory": "packages/next"
 	},
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",

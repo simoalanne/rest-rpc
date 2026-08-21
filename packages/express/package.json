@@ -3,9 +3,27 @@
 	"version": "0.1.0-beta.10",
 	"type": "module",
 	"license": "MIT",
+	"description": "Express adapter for serving rest-rpc contracts with typed HTTP and WebSocket routes.",
+	"keywords": [
+		"rest-rpc",
+		"typescript",
+		"rpc",
+		"rest",
+		"api-contract",
+		"contract-first",
+		"type-safe-api",
+		"express",
+		"expressjs",
+		"server",
+		"http",
+		"websocket",
+		"ws",
+		"middleware"
+	],
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/rest-rpc/rest-rpc.git"
+		"url": "git+https://github.com/rest-rpc/rest-rpc.git",
+		"directory": "packages/express"
 	},
 	"homepage": "https://github.com/rest-rpc/rest-rpc#readme",
 	"main": "./dist/index.js",
