@@ -56,7 +56,7 @@ export type CreateWebHandlerOptions = {
 };
 
 /**
- * Creates a fluent Web route builder for a single HTTP route.
+ * Creates a Web route implementation builder for a single HTTP route.
  *
  * @see {@link https://rest-rpc.dev/docs/server/web}
  */
@@ -69,7 +69,7 @@ export function route<
 }
 
 /**
- * Creates a fluent Web router builder for a contract tree.
+ * Creates a Web router implementation builder for a contract tree.
  *
  * @see {@link https://rest-rpc.dev/docs/server/web}
  */
@@ -88,7 +88,6 @@ export function router<
  */
 export function createRouteHandler<
 	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
-	TContext extends Record<string, unknown> = Record<string, unknown>,
 	TRequest extends Request = Request,
 >(
 	implementations: WebImplementationTree,
@@ -103,18 +102,25 @@ export function createRouteHandler<
 		if (match instanceof Response) return match;
 		const implementation = match.implementation as WebRouteImplementation<
 			TRuntimeContext,
-			TContext,
 			TRequest
 		>;
-		const middlewareResult = await implementation.middleware?.({
-			request,
-			route: implementation.route,
-			runtime,
-		});
-		if (middlewareResult instanceof Response) return middlewareResult;
+		let middlewareContext: Record<string, unknown> = {};
+		for (const middleware of implementation.middleware ?? []) {
+			const middlewareResult = await middleware({
+				context: middlewareContext,
+				request,
+				route: implementation.route,
+				runtime,
+			});
+			if (middlewareResult instanceof Response) return middlewareResult;
+			middlewareContext = {
+				...middlewareContext,
+				...middlewareResult,
+			};
+		}
 
 		const context = {
-			...(middlewareResult ?? {}),
+			...middlewareContext,
 			request,
 		};
 
@@ -144,13 +150,10 @@ export function initWeb<
 			route<TRoute, TRuntimeContext, TRequest>(contract),
 		router: <const TContract extends WebContract>(contract: TContract) =>
 			router<TContract, TRuntimeContext, TRequest>(contract),
-		createRouteHandler: <TContext extends Record<string, unknown>>(
+		createRouteHandler: (
 			implementations: WebImplementationTree,
 			options?: CreateWebHandlerOptions,
 		) =>
-			createRouteHandler<TRuntimeContext, TContext, TRequest>(
-				implementations,
-				options,
-			),
+			createRouteHandler<TRuntimeContext, TRequest>(implementations, options),
 	};
 }

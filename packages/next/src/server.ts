@@ -74,7 +74,7 @@ export type CreateRouteHandlerOptions = {
 };
 
 /**
- * Creates a fluent Next.js route builder for a single HTTP route.
+ * Creates a Next.js route implementation builder for a single HTTP route.
  *
  * @see {@link https://rest-rpc.dev/docs/server/next.js#single-route-handler}
  */
@@ -85,7 +85,7 @@ export function route<const TRoute extends HttpRouteDeclaration>(
 }
 
 /**
- * Creates a fluent Next.js router builder for a contract tree.
+ * Creates a Next.js router implementation builder for a contract tree.
  *
  * @see {@link https://rest-rpc.dev/docs/server/next.js#catch-all-route-handler}
  */

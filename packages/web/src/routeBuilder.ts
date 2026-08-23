@@ -13,6 +13,13 @@ import {
 } from "@rest-rpc/server";
 
 type MaybePromise<T> = T | Promise<T>;
+type Merge<T> = {
+	[K in keyof T]: T[K];
+};
+type MergeContext<
+	TContext extends Record<string, unknown>,
+	TNextContext extends Record<string, unknown>,
+> = Merge<Omit<TContext, keyof TNextContext> & TNextContext>;
 
 /**
  * A contract tree containing only HTTP routes for the Web adapter.
@@ -48,7 +55,9 @@ export type WebRouteContext<
 export type WebRouteMiddlewareInput<
 	TRuntimeContext extends Record<string, unknown>,
 	TRequest extends Request = Request,
+	TContext extends Record<string, unknown> = Record<never, never>,
 > = {
+	context: TContext;
 	request: TRequest;
 	route: HttpRouteDeclaration;
 	runtime: TRuntimeContext;
@@ -74,16 +83,21 @@ export type WebRouteMiddleware<
 	TRuntimeContext extends Record<string, unknown>,
 	TContext extends Record<string, unknown>,
 	TRequest extends Request = Request,
+	TInputContext extends Record<string, unknown> = Record<never, never>,
 > = (
-	input: WebRouteMiddlewareInput<TRuntimeContext, TRequest>,
+	input: WebRouteMiddlewareInput<TRuntimeContext, TRequest, TInputContext>,
 ) => MaybePromise<WebRouteMiddlewareResult<TContext>>;
 
 export type WebRouteImplementation<
 	TRuntimeContext extends Record<string, unknown>,
-	TContext extends Record<string, unknown>,
 	TRequest extends Request = Request,
 > = RouteImplementation<HttpRouteDeclaration> & {
-	middleware?: WebRouteMiddleware<TRuntimeContext, TContext, TRequest>;
+	middleware?: WebRouteMiddleware<
+		TRuntimeContext,
+		Record<string, unknown>,
+		TRequest,
+		Record<string, unknown>
+	>[];
 };
 
 /**
@@ -135,7 +149,7 @@ type WebRouteBuilderWithMiddleware<
 };
 
 /**
- * Fluent builder for a single Web adapter route implementation.
+ * Builder for a single Web adapter route implementation.
  *
  * @see {@link https://rest-rpc.dev/docs/server/web}
  */
@@ -143,11 +157,12 @@ export type WebRouteBuilder<
 	TRoute extends HttpRouteDeclaration,
 	TRuntimeContext extends Record<string, unknown>,
 	TRequest extends Request = Request,
-> = WebRouteBuilderWithMiddleware<TRoute, Record<never, never>, TRequest> & {
-	middleware<TContext extends Record<string, unknown>>(
-		middleware: WebRouteMiddleware<TRuntimeContext, TContext, TRequest>,
-	): WebRouteBuilderWithMiddleware<TRoute, TContext, TRequest>;
-};
+> = WebRouteBuilderWithStackedMiddleware<
+	TRoute,
+	TRuntimeContext,
+	Record<never, never>,
+	TRequest
+>;
 
 type WebRouterBuilderWithMiddleware<
 	TContract extends WebContract,
@@ -161,7 +176,7 @@ type WebRouterBuilderWithMiddleware<
 };
 
 /**
- * Fluent builder for a Web adapter implementation tree.
+ * Builder for a Web adapter implementation tree.
  *
  * @see {@link https://rest-rpc.dev/docs/server/web}
  */
@@ -169,25 +184,69 @@ export type WebRouterBuilder<
 	TContract extends WebContract,
 	TRuntimeContext extends Record<string, unknown>,
 	TRequest extends Request = Request,
-> = WebRouterBuilderWithMiddleware<
-	TContract,
-	Record<never, never>,
-	TRequest
-> & {
-	middleware<TContext extends Record<string, unknown>>(
-		middleware: WebRouteMiddleware<TRuntimeContext, TContext, TRequest>,
-	): WebRouterBuilderWithMiddleware<TContract, TContext, TRequest>;
+> = WebRouterBuilderWithMiddleware<TContract, Record<never, never>, TRequest> &
+	WebRouterBuilderWithStackedMiddleware<
+		TContract,
+		TRuntimeContext,
+		Record<never, never>,
+		TRequest
+	>;
+
+type WebRouteBuilderWithStackedMiddleware<
+	TRoute extends HttpRouteDeclaration,
+	TRuntimeContext extends Record<string, unknown>,
+	TContext extends Record<string, unknown>,
+	TRequest extends Request,
+> = WebRouteBuilderWithMiddleware<TRoute, TContext, TRequest> & {
+	middleware<TNextContext extends Record<string, unknown>>(
+		middleware: WebRouteMiddleware<
+			TRuntimeContext,
+			TNextContext,
+			TRequest,
+			TContext
+		>,
+	): WebRouteBuilderWithStackedMiddleware<
+		TRoute,
+		TRuntimeContext,
+		MergeContext<TContext, TNextContext>,
+		TRequest
+	>;
+};
+
+type WebRouterBuilderWithStackedMiddleware<
+	TContract extends WebContract,
+	TRuntimeContext extends Record<string, unknown>,
+	TContext extends Record<string, unknown>,
+	TRequest extends Request,
+> = WebRouterBuilderWithMiddleware<TContract, TContext, TRequest> & {
+	middleware<TNextContext extends Record<string, unknown>>(
+		middleware: WebRouteMiddleware<
+			TRuntimeContext,
+			TNextContext,
+			TRequest,
+			TContext
+		>,
+	): WebRouterBuilderWithStackedMiddleware<
+		TContract,
+		TRuntimeContext,
+		MergeContext<TContext, TNextContext>,
+		TRequest
+	>;
 };
 
 const attachMiddleware = <
 	TRuntimeContext extends Record<string, unknown>,
-	TContext extends Record<string, unknown>,
 	TRequest extends Request,
 	TImplementation extends WebImplementationTree,
 >(
 	implementation: TImplementation,
 	middleware:
-		| WebRouteMiddleware<TRuntimeContext, TContext, TRequest>
+		| WebRouteMiddleware<
+				TRuntimeContext,
+				Record<string, unknown>,
+				TRequest,
+				Record<string, unknown>
+		  >[]
 		| undefined,
 ): TImplementation => {
 	if ("route" in implementation && "handler" in implementation) {
@@ -212,11 +271,29 @@ export const createWebRouteBuilder = <
 	TContext extends Record<string, unknown> = Record<never, never>,
 >(
 	contract: TRoute,
-	middleware?: WebRouteMiddleware<TRuntimeContext, TContext, TRequest>,
+	middlewares: WebRouteMiddleware<
+		TRuntimeContext,
+		Record<string, unknown>,
+		TRequest,
+		Record<string, unknown>
+	>[] = [],
 ): WebRouteBuilder<TRoute, TRuntimeContext, TRequest> &
-	WebRouteBuilderWithMiddleware<TRoute, TContext, TRequest> => ({
-	middleware: (middleware) =>
-		createWebRouteBuilder(contract, middleware) as never,
+	WebRouteBuilderWithStackedMiddleware<
+		TRoute,
+		TRuntimeContext,
+		TContext,
+		TRequest
+	> => ({
+	middleware: (nextMiddleware) =>
+		createWebRouteBuilder(contract, [
+			...middlewares,
+			nextMiddleware as WebRouteMiddleware<
+				TRuntimeContext,
+				Record<string, unknown>,
+				TRequest,
+				Record<string, unknown>
+			>,
+		]) as never,
 	handler: (handler) =>
 		attachMiddleware(
 			serverRoute<
@@ -227,7 +304,7 @@ export const createWebRouteBuilder = <
 				contract,
 				handler as RouteHandlerFor<TRoute, WebRouteContext<TContext, TRequest>>,
 			),
-			middleware,
+			middlewares,
 		) as RouteImplementation<TRoute> & WebImplementationTree,
 });
 
@@ -238,22 +315,36 @@ export const createWebRouterBuilder = <
 	TContext extends Record<string, unknown> = Record<never, never>,
 >(
 	contract: TContract,
-	middleware?: WebRouteMiddleware<TRuntimeContext, TContext, TRequest>,
+	middlewares: WebRouteMiddleware<
+		TRuntimeContext,
+		Record<string, unknown>,
+		TRequest,
+		Record<string, unknown>
+	>[] = [],
 ): WebRouterBuilder<TContract, TRuntimeContext, TRequest> &
-	WebRouterBuilderWithMiddleware<TContract, TContext, TRequest> => ({
-	middleware: (middleware) =>
-		createWebRouterBuilder(contract, middleware) as never,
-	handlers: (handlers) =>
-		attachMiddleware(
-			serverRouter<
-				TContract,
-				WebRouteContext<TContext, TRequest>,
-				Record<never, never>
-			>(contract, handlers) as ImplementationTreeFor<
-				TContract,
-				HttpRouteDeclaration
+	WebRouterBuilderWithStackedMiddleware<
+		TContract,
+		TRuntimeContext,
+		TContext,
+		TRequest
+	> => ({
+	middleware: (nextMiddleware) =>
+		createWebRouterBuilder(contract, [
+			...middlewares,
+			nextMiddleware as WebRouteMiddleware<
+				TRuntimeContext,
+				Record<string, unknown>,
+				TRequest,
+				Record<string, unknown>
 			>,
-			middleware,
-		) as ImplementationTreeFor<TContract, HttpRouteDeclaration> &
+		]) as never,
+	handlers: (handlers) =>
+		serverRouter(contract, handlers as never, {
+			createRouteImplementation: ({ route, handler }) =>
+				attachMiddleware(
+					{ route: route as HttpRouteDeclaration, handler },
+					middlewares,
+				),
+		}) as ImplementationTreeFor<TContract, HttpRouteDeclaration> &
 			WebImplementationTree,
 });

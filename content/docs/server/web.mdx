@@ -50,10 +50,11 @@ export default {
 };
 ```
 
-## Framework Context
+## Middleware
 
 ```ts
 type MiddlewareInput<Runtime> = {
+	context: Record<string, unknown>;
 	request: Request;
 	route: HttpRouteDeclaration;
 	runtime: Runtime;
@@ -62,6 +63,64 @@ type MiddlewareInput<Runtime> = {
 
 The runtime context passed to `handleRequest` is available to middleware. Route
 handlers receive the context returned by middleware with `request` added.
+
+### Stacking Middleware
+
+Stacking middleware is supported. Middleware can add to the context, and the
+context is passed to the next middleware in the stack. The final context is passed to the route handler.
+
+```ts
+const routes = web
+	.router(api)
+	.middleware(({ runtime }) => ({
+		db: runtime.env.DB,
+	}))
+	.middleware(({ context }) => ({
+		todos: createTodoService(context.db),
+	}))
+	.handlers({
+		todos: {
+			list({ context }) {
+				return context.todos.list();
+			},
+		},
+	});
+```
+
+
+### Nested Routers
+
+:::warning[Note]
+Nested routers/routes do **not** inherit middleware from their parent router 
+and instead keep their existing middleware stack.
+:::
+
+```ts
+const adminRoutes = web
+	.router(api.admin)
+	.middleware(({ runtime }) => ({
+		adminDb: runtime.env.ADMIN_DB,
+	}))
+	.handlers({
+		users: {
+			list({ context }) {
+				return listAdminUsers(context.adminDb);
+			},
+		},
+	});
+
+const routes = web
+	.router(api)
+	.middleware(({ runtime }) => ({
+		db: runtime.env.DB,
+	}))
+	.handlers({
+		admin: adminRoutes, // uses adminDb, not db
+		health({ context }) {
+			return checkHealth(context.db);
+		},
+	});
+```
 
 ## Options
 

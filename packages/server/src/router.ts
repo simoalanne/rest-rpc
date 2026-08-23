@@ -32,10 +32,14 @@ export type HttpRouteHandlerContext = Record<string, unknown>;
  */
 export type WebSocketRouteHandlerContext = Record<string, unknown>;
 
+/**
+ * Untyped route handler shape stored in runtime route implementations.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registration-adapters}
+ */
 export type RuntimeRouteHandler = (
 	request: unknown,
 ) => unknown | Promise<unknown>;
-type AnyImplementationTree = ImplementationTree<RouteDeclaration>;
 
 /**
  * Infers the validated request data for a route declaration.
@@ -328,7 +332,19 @@ export const isRouteImplementation = (
 	"route" in value &&
 	"handler" in value;
 
-type RouteValidator = (route: RouteDeclaration, routeName: string) => void;
+type CreateRouteImplementationInput = {
+	route: RouteDeclaration;
+	handler: RuntimeRouteHandler;
+	routeName: string;
+};
+
+type CreateRouteImplementation = (
+	input: CreateRouteImplementationInput,
+) => RouteImplementation<RouteDeclaration>;
+
+type RouterOptions = {
+	createRouteImplementation?: CreateRouteImplementation;
+};
 
 const assertMatchingRoute = (
 	expected: RouteDeclaration,
@@ -345,17 +361,14 @@ const assertMatchingRoute = (
 const collectImplementations = (
 	contract: Contract<RouteDeclaration>,
 	handlers: unknown,
-	validateRoute: RouteValidator,
+	createRouteImplementation: CreateRouteImplementation,
 	path: string[] = [],
 	parent?: unknown,
-): AnyImplementationTree => {
+): ImplementationTree<RouteDeclaration> => {
 	const routeName = path.join(".");
 
 	if (isRouteDeclaration(contract)) {
-		validateRoute(contract, routeName || contract.path);
-
 		if (isRouteImplementation(handlers)) {
-			validateRoute(handlers.route, routeName || handlers.route.path);
 			assertMatchingRoute(contract, handlers.route, routeName || contract.path);
 			return handlers;
 		}
@@ -364,11 +377,12 @@ const collectImplementations = (
 			throw new Error(`Resolved service for "${routeName}" is not a function`);
 		}
 
-		return {
+		return createRouteImplementation({
 			route: contract,
 			handler:
 				parent && typeof parent === "object" ? handlers.bind(parent) : handlers,
-		};
+			routeName: routeName || contract.path,
+		});
 	}
 
 	if (!handlers || typeof handlers !== "object") {
@@ -389,7 +403,7 @@ const collectImplementations = (
 				collectImplementations(
 					childContract,
 					childHandlers,
-					validateRoute,
+					createRouteImplementation,
 					childPath,
 					handlers,
 				),
@@ -433,10 +447,15 @@ export function router<
 >(
 	contract: TNode,
 	handlers: RouteHandlers<TNode, TContext, TWebSocketContext>,
+	options: RouterOptions = {},
 ): ImplementationTreeFor<TNode, RouteDeclaration> {
 	return collectImplementations(
 		contract,
 		handlers,
-		() => {},
+		options.createRouteImplementation ??
+			(({ route, handler }) => ({
+				route,
+				handler,
+			})),
 	) as ImplementationTreeFor<TNode, RouteDeclaration>;
 }
