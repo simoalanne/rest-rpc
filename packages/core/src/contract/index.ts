@@ -88,10 +88,7 @@ export {
 	flattenContractRoutes,
 	mapContractRoutes,
 } from "./traversal.ts";
-export {
-	groupRequestInput,
-	validateFlatRequestInput,
-} from "./validate.ts";
+export { groupRequestInput } from "./validate.ts";
 export type {
 	WebSocketMessageDeclaration,
 	WebSocketMessageSchemas,

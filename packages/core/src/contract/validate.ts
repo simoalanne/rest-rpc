@@ -1,12 +1,10 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import { validateStandardSchema } from "../standard-schema/index.ts";
 import type { Contract, RouteDeclaration } from "./contract.ts";
 import { getPathParamNames } from "./path.ts";
-import type { RequestKeys, RequestSegment } from "./request.ts";
+import type { RequestKeys } from "./request.ts";
 import {
 	isJsonQuery,
 	isRequestSchemaRecord,
-	isStandardSchema,
 	REQUEST_CONTEXT_KEY,
 } from "./request.ts";
 import {
@@ -35,12 +33,6 @@ export type GroupedRequestInput = {
 export type GroupRequestInputOptions = {
 	strictRequestKeys?: boolean;
 };
-
-export type RequestValidationResult =
-	| { success: true; data: FlatRequestInput }
-	| { success: false; errors: StandardSchemaV1.Issue[] };
-
-const requestSegments = ["body", "query", "pathParams", "headers"] as const;
 
 const takesRouteInput = (route: RouteDeclaration) =>
 	Boolean(route.body || route.query || route.pathParams || route.headers);
@@ -243,130 +235,6 @@ export const groupRequestInput = (
 	}, {} as GroupedRequestInput);
 };
 
-const assignFlatObject = (data: FlatRequestInput, value: unknown) => {
-	if (typeof value === "object" && value !== null) {
-		Object.assign(data, value);
-	}
-};
-
-const validateSchemaRecord = async (
-	schemas: Record<string, StandardSchemaV1>,
-	value: unknown,
-	data: FlatRequestInput,
-	errors: StandardSchemaV1.Issue[],
-): Promise<void> => {
-	const input = value as Record<string, unknown> | undefined;
-	for (const [key, schema] of Object.entries(schemas)) {
-		const result = await validateStandardSchema(schema, input?.[key]);
-		if (result.issues) {
-			errors.push(...result.issues);
-			continue;
-		}
-		data[key] = result.value;
-	}
-};
-
-const normalizeContentType = (contentType: string) =>
-	contentType.split(";")[0]?.trim().toLowerCase();
-
-const getDeclaredContentType = (
-	contentTypes: readonly string[],
-	contentType: string,
-) => {
-	const normalized = normalizeContentType(contentType);
-	return contentTypes.find(
-		(value) => normalizeContentType(value) === normalized,
-	);
-};
-
-const validateCustomBodyPayload = async (
-	schema: StandardSchemaV1,
-	body: unknown,
-	data: FlatRequestInput,
-	errors: StandardSchemaV1.Issue[],
-	contentTypes: readonly string[] | undefined,
-) => {
-	const input = body as
-		| { contentType?: unknown; payload?: unknown }
-		| undefined;
-	const contentType =
-		contentTypes && typeof input?.contentType === "string"
-			? getDeclaredContentType(contentTypes, input.contentType)
-			: undefined;
-
-	if (contentTypes && !contentType) {
-		errors.push({ message: "Unsupported custom body contentType." });
-		return;
-	}
-
-	const result = await validateStandardSchema(
-		schema,
-		contentTypes ? input?.payload : body,
-	);
-	if (result.issues) {
-		errors.push(...result.issues);
-		return;
-	}
-
-	data.body = contentTypes
-		? {
-				contentType,
-				payload: result.value,
-			}
-		: result.value;
-};
-
-const validateFlatRequestSegment = async (
-	route: RouteDeclaration,
-	segment: RequestSegment,
-	grouped: GroupedRequestInput,
-	data: FlatRequestInput,
-	errors: StandardSchemaV1.Issue[],
-): Promise<void> => {
-	const declaration = route[segment];
-	if (!declaration || isNoBody(declaration)) return;
-
-	if (isCustomBody(declaration)) {
-		await validateCustomBodyPayload(
-			declaration.schema,
-			grouped.body,
-			data,
-			errors,
-			Array.isArray(declaration.contentType)
-				? declaration.contentType
-				: undefined,
-		);
-		return;
-	}
-
-	if (isJsonQuery(declaration)) {
-		const result = await validateStandardSchema(
-			declaration.schema,
-			grouped.query,
-		);
-		if (result.issues) {
-			errors.push(...result.issues);
-			return;
-		}
-		data.query = result.value;
-		return;
-	}
-
-	if (isStandardSchema(declaration)) {
-		const result = await validateStandardSchema(declaration, grouped[segment]);
-		if (result.issues) {
-			errors.push(...result.issues);
-			return;
-		}
-		assignFlatObject(data, result.value);
-		return;
-	}
-
-	if (isRequestSchemaRecord(declaration)) {
-		await validateSchemaRecord(declaration, grouped[segment], data, errors);
-	}
-};
-
 const resolveRequestKeysForSchemaSync = (
 	route: RouteDeclaration,
 	segment: "body" | "query" | "pathParams",
@@ -382,27 +250,6 @@ const resolveRequestKeysForSchemaSync = (
 		);
 	}
 	return keys;
-};
-
-export const validateFlatRequestInput = async (
-	route: RouteDeclaration,
-	input: FlatRequestInput,
-): Promise<RequestValidationResult> => {
-	const data: FlatRequestInput = {};
-	const errors: StandardSchemaV1.Issue[] = [];
-	const grouped = groupRequestInput(route, input, {
-		strictRequestKeys: false,
-	});
-
-	for (const segment of requestSegments) {
-		await validateFlatRequestSegment(route, segment, grouped, data, errors);
-	}
-
-	if (errors.length > 0) {
-		return { success: false, errors };
-	}
-
-	return { success: true, data };
 };
 
 export const validateContractSync = <TContract extends Contract>(

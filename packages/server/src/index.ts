@@ -61,11 +61,8 @@ export {
 } from "./router.ts";
 export type {
 	RequestSegments,
-	RequestValidationFailure,
-	RequestValidationResponse,
 	ValidationIssue,
 } from "./validation.ts";
-export { validateRequest } from "./validation.ts";
 export { createWebResponse } from "./webResponse.ts";
 export type {
 	BeforeWebSocketUpgrade,

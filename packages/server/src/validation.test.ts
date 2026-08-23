@@ -1,8 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { customBody, jsonQuery } from "@rest-rpc/core/contract";
+import { customBody, jsonQuery, stream } from "@rest-rpc/core/contract";
 import z from "zod";
-import { validateRequest } from "./validation.ts";
+import {
+	resolveCustomResponseBody,
+	validateRequest,
+	validateResponseBody,
+	validateResponseHeaders,
+	validateResponseStreamChunks,
+} from "./validation.ts";
 
 describe("validateRequest", () => {
 	it("parses JSON date strings with request body transforms", async () => {
@@ -224,5 +230,140 @@ describe("validateRequest", () => {
 				{ message: 'Invalid JSON query parameter "query".' },
 			]);
 		}
+	});
+});
+
+describe("validateResponseBody", () => {
+	it("validates custom response bodies", async () => {
+		await assert.rejects(
+			validateResponseBody(
+				customBody({
+					contentType: "text/csv",
+					schema: z.number(),
+				}),
+				"id,title\n1,First\n",
+			),
+		);
+	});
+});
+
+describe("validateResponseHeaders", () => {
+	it("normalizes declared response headers", async () => {
+		assert.deepEqual(
+			await validateResponseHeaders(
+				{
+					body: z.object({ id: z.string() }),
+					headers: {
+						etag: z.string(),
+						"x-optional": z.string().optional(),
+					},
+				},
+				{
+					etag: "todo-etag",
+					"x-optional": undefined,
+				},
+			),
+			{
+				etag: "todo-etag",
+			},
+		);
+	});
+
+	it("rejects declared response header values that are not scalar", async () => {
+		await assert.rejects(
+			validateResponseHeaders(
+				{
+					body: z.object({ id: z.string() }),
+					headers: {
+						"x-meta": z.object({ id: z.string() }),
+					},
+				},
+				{
+					"x-meta": { id: "meta-1" },
+				},
+			),
+			/Declared response header "x-meta" must resolve to a string or number/,
+		);
+	});
+
+	it("rejects array values for declared response headers", async () => {
+		await assert.rejects(
+			validateResponseHeaders(
+				{
+					body: z.object({ id: z.string() }),
+					headers: {
+						"x-tags": z.array(z.string()),
+					},
+				},
+				{
+					"x-tags": ["alpha", "beta"],
+				},
+			),
+			/Declared response header "x-tags" must resolve to a string or number/,
+		);
+	});
+});
+
+describe("resolveCustomResponseBody", () => {
+	it("resolves declared custom response content types", () => {
+		assert.deepEqual(
+			resolveCustomResponseBody(
+				customBody({
+					contentType: ["image/png", "image/jpeg"],
+					schema: z.string(),
+				}),
+				{
+					contentType: "image/jpeg",
+					payload: "jpeg bytes",
+				},
+				"Unsupported custom response body contentType.",
+			),
+			{
+				contentType: "image/jpeg",
+				payload: "jpeg bytes",
+			},
+		);
+	});
+
+	it("rejects undeclared custom response content types", () => {
+		assert.throws(
+			() =>
+				resolveCustomResponseBody(
+					customBody({
+						contentType: ["image/png", "image/jpeg"],
+						schema: z.string(),
+					}),
+					{
+						contentType: "image/webp",
+						payload: "webp bytes",
+					},
+					"Unsupported custom response body contentType.",
+				),
+			/Unsupported custom response body contentType/,
+		);
+	});
+});
+
+describe("validateResponseStreamChunks", () => {
+	it("validates streamed response chunks", async () => {
+		async function* rows() {
+			yield "id,title\n";
+		}
+
+		const chunks = validateResponseStreamChunks(
+			rows(),
+			stream(
+				customBody({
+					contentType: "text/csv",
+					schema: z.number(),
+				}),
+			),
+		);
+
+		await assert.rejects(async () => {
+			for await (const _chunk of chunks) {
+				_chunk;
+			}
+		}, /Stream response validation failed/);
 	});
 });

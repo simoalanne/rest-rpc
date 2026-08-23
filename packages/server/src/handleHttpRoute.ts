@@ -1,19 +1,16 @@
 import type {
 	CustomBody,
 	HttpRouteDeclaration,
-	ResponseBodySchema,
 	ResponseDeclaration,
 } from "@rest-rpc/core/contract";
 import {
 	getResponseBody,
-	getResponseHeaders,
 	getRouteResponses,
 	isCustomBody,
 	isNoBody,
 	isStream,
 	REQUEST_CONTEXT_KEY,
 } from "@rest-rpc/core/contract";
-import { validateStandardSchema } from "@rest-rpc/core/standard-schema";
 import type {
 	ServerErrorHandlers,
 	ServerErrorResponse,
@@ -21,7 +18,14 @@ import type {
 import type { HttpHeaders } from "./headers.ts";
 import { RouteResponseError } from "./routeResponseError.ts";
 import type { HttpRouteHandlerContext, RuntimeRouteHandler } from "./router.ts";
-import { type RequestSegments, validateRequest } from "./validation.ts";
+import {
+	type RequestSegments,
+	resolveCustomResponseBody,
+	validateRequest,
+	validateResponseBody,
+	validateResponseHeaders,
+	validateResponseStreamChunks,
+} from "./validation.ts";
 
 type HttpRouteResultBase = {
 	status: number;
@@ -119,32 +123,6 @@ const normalizeHandlerResultEnvelope = (
 	};
 };
 
-const validateOutgoingResponse = async (
-	schema: ResponseBodySchema | undefined,
-	body: unknown,
-): Promise<unknown> => {
-	if (!schema || isNoBody(schema) || isStream(schema)) {
-		return body;
-	}
-
-	if (isCustomBody(schema)) {
-		const validation = await validateStandardSchema(schema.schema, body);
-		if (validation.issues) throw validation.issues;
-		return validation.value;
-	}
-
-	const validation = await validateStandardSchema(schema, body);
-	if (validation.issues) throw validation.issues;
-	return validation.value;
-};
-
-type DeclaredResponseHeaderValue = string | number;
-
-const isDeclaredResponseHeaderValue = (
-	value: unknown,
-): value is DeclaredResponseHeaderValue =>
-	typeof value === "string" || typeof value === "number";
-
 const assertNoHeaderConflicts = (
 	declared: HttpHeaders,
 	raw: HttpHeaders | undefined,
@@ -161,33 +139,6 @@ const assertNoHeaderConflicts = (
 	}
 };
 
-const validateOutgoingResponseHeaders = async (
-	schema: ResponseDeclaration | undefined,
-	headers: Record<string, unknown> | undefined,
-): Promise<HttpHeaders | undefined> => {
-	if (!schema) return undefined;
-
-	const declaredHeaders = getResponseHeaders(schema);
-	if (!declaredHeaders) return undefined;
-
-	const normalized: HttpHeaders = {};
-	for (const [name, headerSchema] of Object.entries(declaredHeaders)) {
-		const result = await validateStandardSchema(headerSchema, headers?.[name]);
-		if (result.issues) throw result.issues;
-		if (result.value === undefined) continue;
-
-		if (!isDeclaredResponseHeaderValue(result.value)) {
-			throw new Error(
-				`Declared response header "${name}" must resolve to a string or number.`,
-			);
-		}
-
-		normalized[name] = result.value;
-	}
-
-	return normalized;
-};
-
 const mergeResponseHeaders = (
 	declared: HttpHeaders | undefined,
 	raw: HttpHeaders | undefined,
@@ -197,44 +148,8 @@ const mergeResponseHeaders = (
 	return { ...raw, ...declared };
 };
 
-const normalizeContentType = (contentType: string) =>
-	contentType.split(";")[0]?.trim().toLowerCase();
-
-const getDeclaredContentType = (
-	contentTypes: readonly string[],
-	contentType: string,
-) => {
-	const normalized = normalizeContentType(contentType);
-	return contentTypes.find(
-		(value) => normalizeContentType(value) === normalized,
-	);
-};
-
-const resolveCustomBodyResult = (
-	schema: CustomBody,
-	body: unknown,
-	errorMessage: string,
-): { contentType: string; payload: unknown } => {
-	if (!Array.isArray(schema.contentType)) {
-		return { contentType: schema.contentType as string, payload: body };
-	}
-
-	const input = body as { contentType?: unknown; payload?: unknown };
-	const contentType =
-		typeof input.contentType === "string"
-			? getDeclaredContentType(schema.contentType, input.contentType)
-			: undefined;
-
-	if (!contentType) throw new Error(errorMessage);
-
-	return {
-		contentType,
-		payload: input.payload,
-	};
-};
-
 const normalizeCustomBodyResult = async (schema: CustomBody, body: unknown) => {
-	const result = resolveCustomBodyResult(
+	const result = resolveCustomResponseBody(
 		schema,
 		body,
 		"Unsupported custom response body contentType.",
@@ -242,32 +157,9 @@ const normalizeCustomBodyResult = async (schema: CustomBody, body: unknown) => {
 
 	return {
 		contentType: result.contentType,
-		body: await validateOutgoingResponse(schema, result.payload),
+		body: await validateResponseBody(schema, result.payload),
 	};
 };
-
-async function* validateStreamChunks(
-	body: AsyncIterable<unknown>,
-	schema: ResponseBodySchema,
-) {
-	if (!isStream(schema)) {
-		yield* body;
-		return;
-	}
-
-	for await (const chunk of body) {
-		const chunkSchema = isCustomBody(schema.schema)
-			? schema.schema.schema
-			: schema.schema;
-		const validation = await validateStandardSchema(chunkSchema, chunk);
-		if (validation.issues) {
-			throw new Error("Stream response validation failed.", {
-				cause: validation.issues,
-			});
-		}
-		yield validation.value;
-	}
-}
 
 const normalizeResponseResult = async (
 	route: HttpRouteDeclaration,
@@ -280,7 +172,7 @@ const normalizeResponseResult = async (
 ): Promise<HttpRouteResult> => {
 	const schema = getResponseSchema(route, result.status);
 	const bodySchema = schema ? getResponseBody(schema) : undefined;
-	const declaredHeaders = await validateOutgoingResponseHeaders(
+	const declaredHeaders = await validateResponseHeaders(
 		schema,
 		result.responseHeaders,
 	);
@@ -296,7 +188,7 @@ const normalizeResponseResult = async (
 
 	if (bodySchema && isStream(bodySchema)) {
 		if (isCustomBody(bodySchema.schema)) {
-			const streamResult = resolveCustomBodyResult(
+			const streamResult = resolveCustomResponseBody(
 				bodySchema.schema,
 				result.body,
 				"Unsupported custom stream response contentType.",
@@ -307,7 +199,7 @@ const normalizeResponseResult = async (
 				status: result.status,
 				headers,
 				contentType: streamResult.contentType,
-				body: validateStreamChunks(
+				body: validateResponseStreamChunks(
 					streamResult.payload as AsyncIterable<unknown>,
 					bodySchema,
 				),
@@ -318,7 +210,7 @@ const normalizeResponseResult = async (
 			kind: "stream",
 			status: result.status,
 			headers,
-			body: validateStreamChunks(
+			body: validateResponseStreamChunks(
 				result.body as AsyncIterable<unknown>,
 				bodySchema,
 			),
@@ -343,7 +235,7 @@ const normalizeResponseResult = async (
 		kind: "json",
 		status: result.status,
 		headers,
-		body: await validateOutgoingResponse(bodySchema, result.body),
+		body: await validateResponseBody(bodySchema, result.body),
 	};
 };
 

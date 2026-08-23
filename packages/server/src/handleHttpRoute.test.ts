@@ -327,60 +327,6 @@ describe("handleHttpRoute", () => {
 		});
 	});
 
-	it("rejects declared response header values that are not scalar", async () => {
-		const result = await handleHttpRoute(
-			{
-				method: "GET",
-				path: "/todos",
-				responses: {
-					200: {
-						body: z.object({ id: z.string() }),
-						headers: {
-							"x-meta": z.object({ id: z.string() }),
-						},
-					},
-				},
-			},
-			() => ({
-				status: 200 as const,
-				body: { id: "todo-1" },
-				responseHeaders: {
-					"x-meta": { id: "meta-1" },
-				},
-			}),
-			{ request: {}, context: {} },
-		);
-
-		assert.equal(result.status, 500);
-	});
-
-	it("rejects array values for declared response headers", async () => {
-		const result = await handleHttpRoute(
-			{
-				method: "GET",
-				path: "/todos",
-				responses: {
-					200: {
-						body: z.object({ id: z.string() }),
-						headers: {
-							"x-tags": z.array(z.string()),
-						},
-					},
-				},
-			},
-			() => ({
-				status: 200 as const,
-				body: { id: "todo-1" },
-				responseHeaders: {
-					"x-tags": ["alpha", "beta"],
-				},
-			}),
-			{ request: {}, context: {} },
-		);
-
-		assert.equal(result.status, 500);
-	});
-
 	it("rejects duplicate declared and raw response headers", async () => {
 		const result = await handleHttpRoute(
 			{
@@ -488,25 +434,6 @@ describe("handleHttpRoute custom responses", () => {
 		assert.equal(result.body, "id,title\n1,First\n");
 	});
 
-	it("validates custom single response bodies", async () => {
-		const result = await handleHttpRoute(
-			{
-				method: "GET",
-				path: "/report.csv",
-				responses: {
-					200: customBody({
-						contentType: "text/csv",
-						schema: z.number(),
-					}),
-				},
-			},
-			() => ({ status: 200, body: "id,title\n1,First\n" }),
-			{ request: {}, context: {} },
-		);
-
-		assert.equal(result.status, 500);
-	});
-
 	it("normalizes custom response bodies with selected content types", async () => {
 		const result = await handleHttpRoute(
 			{
@@ -533,34 +460,6 @@ describe("handleHttpRoute custom responses", () => {
 		assert.equal(result.status, 200);
 		assert.equal(result.contentType, "image/jpeg");
 		assert.equal(result.body, "jpeg bytes");
-	});
-
-	it("rejects undeclared custom response content types", async () => {
-		const result = await handleHttpRoute(
-			{
-				method: "GET",
-				path: "/images/:id",
-				responses: {
-					200: customBody({
-						contentType: ["image/png", "image/jpeg"],
-						schema: z.string(),
-					}),
-				},
-			},
-			() => ({
-				status: 200,
-				body: {
-					contentType: "image/webp",
-					payload: "webp bytes",
-				},
-			}),
-			{ request: {}, context: {} },
-		);
-
-		assert.deepEqual(result.kind === "json" ? result.body : undefined, {
-			message: "Response validation failed.",
-		});
-		assert.equal(result.status, 500);
 	});
 
 	it("normalizes custom streamed bodies after validating without framing chunks", async () => {
@@ -594,35 +493,5 @@ describe("handleHttpRoute custom responses", () => {
 		for await (const chunk of result.body) chunks.push(chunk);
 
 		assert.deepEqual(chunks, ["id,title\n", "1,First\n"]);
-	});
-
-	it("validates custom streamed response chunks", async () => {
-		async function* rows() {
-			yield "id,title\n";
-		}
-
-		const result = await handleHttpRoute(
-			{
-				method: "GET",
-				path: "/report.csv",
-				responses: {
-					200: stream(
-						customBody({
-							contentType: "text/csv",
-							schema: z.number(),
-						}),
-					),
-				},
-			},
-			() => ({ status: 200, body: rows() }),
-			{ request: {}, context: {} },
-		);
-
-		assert.equal(result.kind, "stream");
-		await assert.rejects(async () => {
-			for await (const _chunk of result.body) {
-				_chunk;
-			}
-		});
 	});
 });
