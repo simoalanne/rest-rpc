@@ -44,25 +44,48 @@ await client.todos.update.fetch({
 A whole-location schema validates the whole `body`, `query`, or `pathParams`
 object as one value.
 
-```ts
-body: z.object({
-	title: z.string().min(1),
-	priority: z.enum(["low", "normal", "high"]).default("normal"),
-}),
-```
-
 For Zod, Valibot, and ArkType, `rest-rpc` can resolve flattened request keys
-from more complex object schemas directly.
+from object schemas and object-like unions directly.
+
+Zod supports object, union, and discriminated union schemas.
 
 ```ts
-body: z.discriminatedUnion("kind", [
-	z.object({ kind: z.literal("text"), text: z.string() }),
-	z.object({ kind: z.literal("link"), url: z.string().url() }),
-]),
+pathParams: z.object({
+	id: z.string().uuid(),
+}),
 query: z.union([
 	z.object({ q: z.string() }),
 	z.object({ page: z.coerce.number() }),
 ]),
+body: z.discriminatedUnion("kind", [
+	z.object({ kind: z.literal("text"), text: z.string() }),
+	z.object({ kind: z.literal("link"), url: z.string().url() }),
+]),
+```
+
+Valibot supports object, union, and variant schemas.
+
+```ts
+pathParams: v.object({
+	id: v.pipe(v.string(), v.uuid()),
+}),
+query: v.union([
+	v.object({ q: v.string() }),
+	v.object({ page: v.pipe(v.string(), v.transform(Number)) }),
+]),
+body: v.variant("kind", [
+	v.object({ kind: v.literal("text"), text: v.string() }),
+	v.object({ kind: v.literal("link"), url: v.pipe(v.string(), v.url()) }),
+]),
+```
+
+ArkType supports object and union schemas.
+
+```ts
+pathParams: type({
+	id: "string",
+}),
+query: type({ q: "string" }).or({ page: "string" }),
 ```
 
 For other Standard Schema vendors, whole-location schemas need `requestKeys` or

@@ -29,6 +29,20 @@ describe("request key resolution", () => {
 		);
 	});
 
+	it("resolves zod discriminated union branch keys", () => {
+		assert.deepEqual(
+			sorted(
+				resolveBuiltInRequestKeys(
+					z.discriminatedUnion("kind", [
+						z.object({ kind: z.literal("article"), title: z.string() }),
+						z.object({ kind: z.literal("page"), slug: z.string() }),
+					]),
+				),
+			),
+			["kind", "slug", "title"],
+		);
+	});
+
 	it("does not resolve zod unions with opaque branches", () => {
 		assert.equal(
 			resolveBuiltInRequestKeys(
@@ -55,6 +69,20 @@ describe("request key resolution", () => {
 				),
 			),
 			["slug", "title"],
+		);
+	});
+
+	it("resolves valibot discriminated union branch keys", () => {
+		assert.deepEqual(
+			sorted(
+				resolveBuiltInRequestKeys(
+					v.variant("kind", [
+						v.object({ kind: v.literal("article"), title: v.string() }),
+						v.object({ kind: v.literal("page"), slug: v.string() }),
+					]),
+				),
+			),
+			["kind", "slug", "title"],
 		);
 	});
 

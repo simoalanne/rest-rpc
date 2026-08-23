@@ -49,8 +49,12 @@ const resolveValibotKeys = (
 	schema: UnknownRecord,
 ): readonly string[] | undefined => {
 	if (schema.type === "object") return getStringKeys(schema.entries);
-	if (schema.type !== "union" || !Array.isArray(schema.options))
+	if (
+		(schema.type !== "union" && schema.type !== "variant") ||
+		!Array.isArray(schema.options)
+	) {
 		return undefined;
+	}
 
 	const branchKeys = schema.options.map((option) =>
 		(option as UnknownRecord).type === "object"
