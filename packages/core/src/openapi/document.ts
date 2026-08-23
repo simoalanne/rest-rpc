@@ -9,10 +9,10 @@ import type {
 	OpenApiPathItem,
 } from "./types.ts";
 
-export const createOpenApiDocument = (
+export function createOpenApiDocument(
 	contract: Contract,
 	options: CreateOpenApiDocumentOptions,
-): OpenApiDocument => {
+): OpenApiDocument {
 	const document: OpenApiDocument = {
 		openapi: options.openapi ?? "3.1.0",
 		info: options.info,
@@ -32,4 +32,4 @@ export const createOpenApiDocument = (
 	}
 
 	return options.transformDocument?.(document) ?? document;
-};
+}

@@ -59,21 +59,24 @@ export type RouteHandler<E extends RouteDeclaration> = ServerRouteHandler<
 	RouteContext<E>
 >;
 
-export const route = <const TNode extends RouteDeclaration>(
+export function route<const TNode extends RouteDeclaration>(
 	contract: TNode,
 	handler: RouteHandlerFor<
 		TNode,
 		HttpRouteHandlerContext,
 		WebSocketRouteHandlerContext
 	>,
-): RouteImplementation<TNode> => serverRoute(contract, handler);
+): RouteImplementation<TNode> {
+	return serverRoute(contract, handler);
+}
 
-export const router = <const TNode extends Contract<RouteDeclaration>>(
+export function router<const TNode extends Contract<RouteDeclaration>>(
 	contract: TNode,
 	handlers: RouterImplementationInput<
 		TNode,
 		HttpRouteHandlerContext,
 		WebSocketRouteHandlerContext
 	>,
-): ImplementationTreeFor<TNode, RouteDeclaration> =>
-	serverRouter(contract, handlers);
+): ImplementationTreeFor<TNode, RouteDeclaration> {
+	return serverRouter(contract, handlers);
+}

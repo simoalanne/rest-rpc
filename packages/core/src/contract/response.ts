@@ -8,9 +8,11 @@ export type NoBody = {
 export type ResponseSchema = StandardSchemaV1;
 export type CustomBodyContentType = string | readonly string[];
 
-export const noBody = (): NoBody => ({
-	kind: "noBody",
-});
+export function noBody(): NoBody {
+	return {
+		kind: "noBody",
+	};
+}
 
 export type CustomBody<
 	TSchema extends StandardSchemaV1 = StandardSchemaV1,
@@ -50,24 +52,28 @@ export type RouteResponseInput =
 	| { response: ResponseDeclaration; responses?: never }
 	| { response?: never; responses?: never };
 
-export const stream = <const TBody extends ResponseSchema | CustomBody>(
+export function stream<const TBody extends ResponseSchema | CustomBody>(
 	schema: TBody,
-): Stream<TBody> => ({
-	kind: "stream",
-	schema,
-});
+): Stream<TBody> {
+	return {
+		kind: "stream",
+		schema,
+	};
+}
 
-export const customBody = <
+export function customBody<
 	const TSchema extends StandardSchemaV1,
 	const TContentType extends CustomBodyContentType,
 >(input: {
 	schema: TSchema;
 	contentType: TContentType;
-}): CustomBody<TSchema, TContentType> => ({
-	kind: "customBody",
-	schema: input.schema,
-	contentType: input.contentType,
-});
+}): CustomBody<TSchema, TContentType> {
+	return {
+		kind: "customBody",
+		schema: input.schema,
+		contentType: input.contentType,
+	};
+}
 
 export const isNoBody = (body: unknown): body is NoBody =>
 	typeof body === "object" &&
@@ -81,11 +87,14 @@ export const isStream = (response: ResponseBodySchema): response is Stream =>
 	"kind" in response &&
 	response.kind === "stream";
 
-export const isCustomBody = (schema: unknown): schema is CustomBody =>
-	typeof schema === "object" &&
-	schema !== null &&
-	"kind" in schema &&
-	schema.kind === "customBody";
+export function isCustomBody(schema: unknown): schema is CustomBody {
+	return (
+		typeof schema === "object" &&
+		schema !== null &&
+		"kind" in schema &&
+		schema.kind === "customBody"
+	);
+}
 
 export const hasResponseParts = (
 	response: ResponseDeclaration,

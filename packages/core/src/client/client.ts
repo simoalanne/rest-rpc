@@ -89,7 +89,9 @@ export class ApiClient<TContract extends Contract = Contract> {
 		);
 }
 
-export const initClient = <TContract extends Contract>(
+export function initClient<TContract extends Contract>(
 	contract: TContract,
 	options: ApiClientOptions,
-): ApiClientFor<TContract> => new ApiClient(contract, options).api;
+): ApiClientFor<TContract> {
+	return new ApiClient(contract, options).api;
+}

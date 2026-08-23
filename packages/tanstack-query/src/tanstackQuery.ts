@@ -189,10 +189,10 @@ const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
 const getByPath = (tree: unknown, path: string[]) =>
 	path.reduce((node, key) => (node as Record<string, unknown>)[key], tree);
 
-export const initTanstackQuery = <TContract extends Contract>(
+export function initTanstackQuery<TContract extends Contract>(
 	contract: TContract,
 	options: TanstackQueryOptions,
-): TanstackQuery<TContract> => {
+): TanstackQuery<TContract> {
 	const client = initClient(contract, options);
 
 	const mapHttpRoutes = (node: Contract, path: string[] = []): unknown => {
@@ -221,6 +221,6 @@ export const initTanstackQuery = <TContract extends Contract>(
 	};
 
 	return mapHttpRoutes(contract) as TanstackQueryApiFor<TContract>;
-};
+}
 
 export default initTanstackQuery;

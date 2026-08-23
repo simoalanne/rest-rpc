@@ -1,10 +1,10 @@
-import type { StandardSchemaV1 } from "@rest-rpc/core";
 import {
 	isCustomBody,
 	isJsonQuery,
 	type RouteDeclaration,
 	validateFlatRequestInput,
 } from "@rest-rpc/core/contract";
+import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 
 export type ValidationIssue = StandardSchemaV1.Issue;
 
@@ -83,10 +83,10 @@ const flattenRequestSegments = (
 	return input;
 };
 
-export const validateRequest = async (
+export async function validateRequest(
 	route: RouteDeclaration,
 	segments: RequestSegments,
-): Promise<RequestValidationResponse> => {
+): Promise<RequestValidationResponse> {
 	let input: Record<string, unknown>;
 	try {
 		input = flattenRequestSegments(route, segments);
@@ -121,4 +121,4 @@ export const validateRequest = async (
 			},
 		},
 	};
-};
+}

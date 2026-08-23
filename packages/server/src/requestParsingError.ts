@@ -1,12 +1,14 @@
 import type { ServerErrorResponse } from "./errorHandlers.ts";
 
-export const createRequestParsingErrorResponse = (
+export function createRequestParsingErrorResponse(
 	message = "Request could not be parsed.",
-): ServerErrorResponse => ({
-	status: 400,
-	body: {
-		message:
-			"Request validation failed. Check the validationErrors field for details.",
-		validationErrors: [{ message }],
-	},
-});
+): ServerErrorResponse {
+	return {
+		status: 400,
+		body: {
+			message:
+				"Request validation failed. Check the validationErrors field for details.",
+			validationErrors: [{ message }],
+		},
+	};
+}

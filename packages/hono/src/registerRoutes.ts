@@ -26,12 +26,12 @@ export type RegisterRoutesOptions<TEnv extends Env = Env> = {
 	webSocket?: HonoWebSocketOptions<TEnv>;
 };
 
-export const registerRoutes = <TEnv extends Env = Env>(
+export function registerRoutes<TEnv extends Env = Env>(
 	app: Hono<TEnv>,
 	implementations: ImplementationTree<RouteDeclaration>,
 	options: RegisterRoutesOptions<TEnv> = {},
-) =>
-	registerRouteImplementations(
+) {
+	return registerRouteImplementations(
 		implementations,
 		(routes) =>
 			registerHonoHttpRoutes(
@@ -53,3 +53,4 @@ export const registerRoutes = <TEnv extends Env = Env>(
 			}
 		},
 	);
+}

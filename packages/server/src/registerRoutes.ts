@@ -19,14 +19,15 @@ const flattenImplementationTree = <TRoute extends RouteDeclaration>(
 	return Object.values(implementation).flatMap(flattenImplementationTree);
 };
 
-export const flattenRouteImplementations = <TRoute extends RouteDeclaration>(
+export function flattenRouteImplementations<TRoute extends RouteDeclaration>(
 	implementation: ImplementationTree<TRoute>,
-): RouteImplementation<TRoute>[] =>
-	flattenImplementationTree(implementation).sort((left, right) =>
+): RouteImplementation<TRoute>[] {
+	return flattenImplementationTree(implementation).sort((left, right) =>
 		compareRouteSpecificity(left.route, right.route),
 	);
+}
 
-export const registerRoutes = (
+export function registerRoutes(
 	implementations: ImplementationTree<RouteDeclaration>,
 	registerHttpRoutes: (
 		routes: RouteImplementation<HttpRouteDeclaration>[],
@@ -34,7 +35,7 @@ export const registerRoutes = (
 	registerWebSocketRoutes?: (
 		routes: RouteImplementation<WebSocketRouteDeclaration>[],
 	) => void,
-) => {
+) {
 	const implementationsList = flattenRouteImplementations(implementations);
 	const routes = implementationsList.filter(isHttpRouteImplementation);
 	const webSocketRoutes = implementationsList.filter(
@@ -43,4 +44,4 @@ export const registerRoutes = (
 
 	registerHttpRoutes(routes);
 	registerWebSocketRoutes?.(webSocketRoutes);
-};
+}

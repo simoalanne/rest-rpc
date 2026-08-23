@@ -65,7 +65,7 @@ export type RouteHandler<
 	TEnv extends Env = Env,
 > = ServerRouteHandler<E, RouteContext<E, TEnv>>;
 
-export const route = <
+export function route<
 	const TNode extends RouteDeclaration,
 	TEnv extends Env = Env,
 >(
@@ -75,9 +75,11 @@ export const route = <
 		HttpRouteHandlerContext<TEnv>,
 		WebSocketRouteHandlerContext<TEnv>
 	>,
-): RouteImplementation<TNode> => serverRoute(contract, handler);
+): RouteImplementation<TNode> {
+	return serverRoute(contract, handler);
+}
 
-export const router = <
+export function router<
 	const TNode extends Contract<RouteDeclaration>,
 	TEnv extends Env = Env,
 >(
@@ -87,5 +89,6 @@ export const router = <
 		HttpRouteHandlerContext<TEnv>,
 		WebSocketRouteHandlerContext<TEnv>
 	>,
-): ImplementationTreeFor<TNode, RouteDeclaration> =>
-	serverRouter(contract, handlers);
+): ImplementationTreeFor<TNode, RouteDeclaration> {
+	return serverRouter(contract, handlers);
+}

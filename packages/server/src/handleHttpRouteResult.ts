@@ -18,10 +18,10 @@ export type HttpRouteResultWriter<TResponse> = {
 	}): MaybePromise<TResponse>;
 };
 
-export const handleHttpRouteResult = async <TResponse>(
+export async function handleHttpRouteResult<TResponse>(
 	result: HttpRouteResult,
 	writer: HttpRouteResultWriter<TResponse>,
-): Promise<TResponse> => {
+): Promise<TResponse> {
 	for (const [name, value] of Object.entries(result.headers ?? {})) {
 		if (value !== undefined) writer.setHeader(name, value);
 	}
@@ -45,4 +45,4 @@ export const handleHttpRouteResult = async <TResponse>(
 	}
 
 	return writer.sendJson(result.status, result.body);
-};
+}

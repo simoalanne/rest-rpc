@@ -59,9 +59,7 @@ const createStreamResponse = (
 	return new Response(stream, { status, headers });
 };
 
-export const createWebResponse = (
-	result: HttpRouteResult,
-): Promise<Response> => {
+export function createWebResponse(result: HttpRouteResult): Promise<Response> {
 	const headers = new Headers();
 	const setHeaderIfUnset = (name: string, value: string) => {
 		if (!headers.has(name)) headers.set(name, value);
@@ -79,4 +77,4 @@ export const createWebResponse = (
 		sendStream: ({ status, body, contentType, mode }) =>
 			createStreamResponse(body, status, headers, contentType, mode),
 	});
-};
+}

@@ -49,32 +49,30 @@ export type CreateWebHandlerOptions = {
 	parseBody?: WebRouteParseBody;
 };
 
-export const route = <
+export function route<
 	const TRoute extends HttpRouteDeclaration,
 	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
 	TRequest extends Request = Request,
->(
-	contract: TRoute,
-): WebRouteBuilder<TRoute, TRuntimeContext, TRequest> =>
-	createWebRouteBuilder(contract);
+>(contract: TRoute): WebRouteBuilder<TRoute, TRuntimeContext, TRequest> {
+	return createWebRouteBuilder(contract);
+}
 
-export const router = <
+export function router<
 	const TContract extends WebContract,
 	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
 	TRequest extends Request = Request,
->(
-	contract: TContract,
-): WebRouterBuilder<TContract, TRuntimeContext, TRequest> =>
-	createWebRouterBuilder(contract);
+>(contract: TContract): WebRouterBuilder<TContract, TRuntimeContext, TRequest> {
+	return createWebRouterBuilder(contract);
+}
 
-export const createRouteHandler = <
+export function createRouteHandler<
 	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
 	TContext extends Record<string, unknown> = Record<string, unknown>,
 	TRequest extends Request = Request,
 >(
 	implementations: WebImplementationTree,
 	options: CreateWebHandlerOptions = {},
-): ((request: TRequest, runtime: TRuntimeContext) => Promise<Response>) => {
+): (request: TRequest, runtime: TRuntimeContext) => Promise<Response> {
 	const matchRoute = createWebRouteMatcher(implementations);
 	const usesDefaultParseBody = options.parseBody === undefined;
 	const parseBody = options.parseBody ?? defaultParseBody;
@@ -109,12 +107,12 @@ export const createRouteHandler = <
 			options.errorHandlers,
 		);
 	};
-};
+}
 
-export const initWeb = <
+export function initWeb<
 	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
 	TRequest extends Request = Request,
->() => {
+>() {
 	return {
 		route: <const TRoute extends HttpRouteDeclaration>(contract: TRoute) =>
 			route<TRoute, TRuntimeContext, TRequest>(contract),
@@ -129,4 +127,4 @@ export const initWeb = <
 				options,
 			),
 	};
-};
+}

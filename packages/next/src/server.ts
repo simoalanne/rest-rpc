@@ -30,20 +30,22 @@ export type CreateRouteHandlerOptions = {
 	parseBody?: (input: WebRouteParseBodyInput) => unknown | Promise<unknown>;
 };
 
-export const route = <const TRoute extends HttpRouteDeclaration>(
+export function route<const TRoute extends HttpRouteDeclaration>(
 	contract: TRoute,
-): WebRouteBuilder<TRoute, Record<never, never>, NextRequest> =>
-	webRoute<TRoute, Record<never, never>, NextRequest>(contract);
+): WebRouteBuilder<TRoute, Record<never, never>, NextRequest> {
+	return webRoute<TRoute, Record<never, never>, NextRequest>(contract);
+}
 
-export const router = <const TContract extends WebContract>(
+export function router<const TContract extends WebContract>(
 	contract: TContract,
-): WebRouterBuilder<TContract, Record<never, never>, NextRequest> =>
-	webRouter<TContract, Record<never, never>, NextRequest>(contract);
+): WebRouterBuilder<TContract, Record<never, never>, NextRequest> {
+	return webRouter<TContract, Record<never, never>, NextRequest>(contract);
+}
 
-export const createRouteHandler = (
+export function createRouteHandler(
 	implementations: WebImplementationTree,
 	options?: CreateRouteHandlerOptions,
-) => {
+) {
 	const handle = createWebRouteHandler(implementations, {
 		errorHandlers: options?.errorHandlers,
 		parseBody: options?.parseBody,
@@ -57,4 +59,4 @@ export const createRouteHandler = (
 		POST: nextHandler,
 		PUT: nextHandler,
 	};
-};
+}

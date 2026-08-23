@@ -86,7 +86,7 @@ export type RouteMatcherResult =
 	| RouteMatcherMethodNotAllowed
 	| null;
 
-export const createRouteMatcher = (contract: Contract) => {
+export function createRouteMatcher(contract: Contract) {
 	const matchers = flattenContractRoutes(contract)
 		.sort(compareRouteSpecificity)
 		.map((route) => ({
@@ -121,4 +121,4 @@ export const createRouteMatcher = (contract: Contract) => {
 
 		return null;
 	};
-};
+}

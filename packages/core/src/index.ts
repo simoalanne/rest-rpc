@@ -29,8 +29,6 @@ export type {
 } from "./contract/index.ts";
 export {
 	customBody,
-	isCustomBody,
-	isJsonQuery,
 	jsonQuery,
 	noBody,
 	route,
@@ -43,7 +41,6 @@ export type {
 	OpenApiDocument,
 } from "./openapi/index.ts";
 export { createOpenApiDocument } from "./openapi/index.ts";
-export type { StandardSchemaV1 } from "./standard-schema/index.ts";
 export {
 	isTypeOnlySchema,
 	looseJsonSchema,

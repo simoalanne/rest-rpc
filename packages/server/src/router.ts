@@ -189,15 +189,17 @@ export const isWebSocketRoute = (
 	route: RouteDeclaration,
 ): route is WebSocketRouteDeclaration => route.mode === "webSocket";
 
-export const isHttpRouteImplementation = (
+export function isHttpRouteImplementation(
 	implementation: RouteImplementation,
-): implementation is RouteImplementation<HttpRouteDeclaration> =>
-	isHttpRoute(implementation.route);
+): implementation is RouteImplementation<HttpRouteDeclaration> {
+	return isHttpRoute(implementation.route);
+}
 
-export const isWebSocketRouteImplementation = (
+export function isWebSocketRouteImplementation(
 	implementation: RouteImplementation,
-): implementation is RouteImplementation<WebSocketRouteDeclaration> =>
-	isWebSocketRoute(implementation.route);
+): implementation is RouteImplementation<WebSocketRouteDeclaration> {
+	return isWebSocketRoute(implementation.route);
+}
 
 export const isRouteImplementation = (
 	value: unknown,
@@ -289,7 +291,7 @@ const collectImplementations = (
 	return tree;
 };
 
-export const route = <
+export function route<
 	const TNode extends RouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
 	TWebSocketContext extends
@@ -297,12 +299,14 @@ export const route = <
 >(
 	contract: TNode,
 	handler: RouteHandlerFor<TNode, TContext, TWebSocketContext>,
-): RouteImplementation<TNode> => ({
-	route: contract,
-	handler: handler as RuntimeRouteHandler,
-});
+): RouteImplementation<TNode> {
+	return {
+		route: contract,
+		handler: handler as RuntimeRouteHandler,
+	};
+}
 
-export const router = <
+export function router<
 	const TNode extends Contract<RouteDeclaration>,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
 	TWebSocketContext extends
@@ -310,8 +314,10 @@ export const router = <
 >(
 	contract: TNode,
 	handlers: RouterImplementationInput<TNode, TContext, TWebSocketContext>,
-): ImplementationTreeFor<TNode, RouteDeclaration> =>
-	collectImplementations(contract, handlers, () => {}) as ImplementationTreeFor<
-		TNode,
-		RouteDeclaration
-	>;
+): ImplementationTreeFor<TNode, RouteDeclaration> {
+	return collectImplementations(
+		contract,
+		handlers,
+		() => {},
+	) as ImplementationTreeFor<TNode, RouteDeclaration>;
+}

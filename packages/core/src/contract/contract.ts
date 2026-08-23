@@ -266,25 +266,25 @@ export type ApplyRouterOptions<
 				: never;
 		};
 
-export const route = <const TRoute extends RouteDeclaration>(
+export function route<const TRoute extends RouteDeclaration>(
 	route: TRoute,
 	options?: RouteContractOptions,
-): ApplyInferredPathParamsToRoute<ApplyResponseShorthandToRoute<TRoute>> => {
+): ApplyInferredPathParamsToRoute<ApplyResponseShorthandToRoute<TRoute>> {
 	normalizeContract(route);
 	validateContractSync(route, options);
 	return route as ApplyInferredPathParamsToRoute<
 		ApplyResponseShorthandToRoute<TRoute>
 	>;
-};
+}
 
-export const router = <
+export function router<
 	const TContract extends Contract,
 	const TOptions extends RouterContractOptions | undefined = undefined,
 >(
 	contract: TContract,
 	commonOptions?: TOptions,
-): ApplyRouterOptions<TContract, TOptions> => {
+): ApplyRouterOptions<TContract, TOptions> {
 	normalizeContract(contract, commonOptions);
 	validateContractSync(contract, commonOptions);
 	return contract as ApplyRouterOptions<TContract, TOptions>;
-};
+}

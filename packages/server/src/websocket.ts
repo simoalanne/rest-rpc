@@ -161,11 +161,11 @@ const prepareAcceptedUpgrade = async <TContext extends Record<string, unknown>>(
 	}
 };
 
-export const prepareWebSocketUpgrade = async <
+export async function prepareWebSocketUpgrade<
 	TContext extends Record<string, unknown> = Record<string, unknown>,
 >(
 	options: PrepareWebSocketUpgradeOptions<TContext>,
-): Promise<PrepareWebSocketUpgradeResult> => {
+): Promise<PrepareWebSocketUpgradeResult> {
 	const requestValidation = await validateUpgradeRequest(options);
 
 	if (!requestValidation.ok) return requestValidation;
@@ -175,12 +175,12 @@ export const prepareWebSocketUpgrade = async <
 	}
 
 	return prepareAcceptedUpgrade(requestValidation.validation.data, options);
-};
+}
 
-export const createContractWebSocket = <E extends WebSocketRouteDeclaration>(
+export function createContractWebSocket<E extends WebSocketRouteDeclaration>(
 	route: E,
 	socket: WebSocketLike,
-): RouteSocket<E> => {
+): RouteSocket<E> {
 	const parseIncomingMessage = (data: unknown): RouteReceived<E> => {
 		try {
 			const result = validateWebSocketMessageSync(
@@ -233,9 +233,9 @@ export const createContractWebSocket = <E extends WebSocketRouteDeclaration>(
 			socket.close(code, reason);
 		},
 	};
-};
+}
 
-export const handleWebSocketRoute = <
+export function handleWebSocketRoute<
 	E extends WebSocketRouteDeclaration,
 	TContext extends WebSocketRouteHandlerContext = WebSocketRouteHandlerContext,
 >(
@@ -246,7 +246,7 @@ export const handleWebSocketRoute = <
 		context: TContext;
 		socket: WebSocketLike;
 	},
-) => {
+) {
 	const socket = createContractWebSocket(route, options.socket);
 
 	void Promise.resolve()
@@ -262,4 +262,4 @@ export const handleWebSocketRoute = <
 		.catch(() => {
 			socket.close(1011, "WebSocket service failed.");
 		});
-};
+}

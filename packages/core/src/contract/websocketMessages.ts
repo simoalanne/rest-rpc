@@ -14,16 +14,18 @@ export type WebSocketMessages<
 
 export type WebSocketMessageDeclaration = StandardSchemaV1 | WebSocketMessages;
 
-export const webSocketMessages = <
+export function webSocketMessages<
 	const TDiscriminator extends string,
 	const TSchemas extends WebSocketMessageSchemas,
 >(
 	discriminator: TDiscriminator,
 	schemas: TSchemas,
-): WebSocketMessages<TDiscriminator, TSchemas> => ({
-	discriminator,
-	schemas,
-});
+): WebSocketMessages<TDiscriminator, TSchemas> {
+	return {
+		discriminator,
+		schemas,
+	};
+}
 
 export const isWebSocketMessages = (
 	value: unknown,

@@ -424,14 +424,14 @@ const normalizeRouteResponseError = async <
 	}
 };
 
-export const handleHttpRoute = async <
+export async function handleHttpRoute<
 	E extends HttpRouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
 >(
 	route: E,
 	handler: RuntimeRouteHandler,
 	options: HandleHttpRouteOptions<TContext>,
-): Promise<HttpRouteResult> => {
+): Promise<HttpRouteResult> {
 	const requestValidation = await validateRequest(route, options.request);
 	const errorContext = (options.errorContext ?? options.context) as TContext;
 
@@ -473,4 +473,4 @@ export const handleHttpRoute = async <
 
 		throw error;
 	}
-};
+}

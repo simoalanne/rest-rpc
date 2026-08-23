@@ -20,12 +20,12 @@ export type RegisterRoutesOptions = {
 	webSocket?: FastifyWebSocketOptions;
 };
 
-export const registerRoutes = (
+export function registerRoutes(
 	app: FastifyInstance,
 	implementations: ImplementationTree<RouteDeclaration>,
 	options: RegisterRoutesOptions = {},
-) =>
-	registerRouteImplementations(
+) {
+	return registerRouteImplementations(
 		implementations,
 		(routes) =>
 			registerFastifyHttpRoutes(
@@ -44,3 +44,4 @@ export const registerRoutes = (
 				options.errorHandlers,
 			),
 	);
+}

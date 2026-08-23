@@ -15,18 +15,23 @@ export type JsonQuery<TSchema extends StandardSchemaV1 = StandardSchemaV1> = {
 	schema: TSchema;
 };
 
-export const jsonQuery = <const TSchema extends StandardSchemaV1>(
+export function jsonQuery<const TSchema extends StandardSchemaV1>(
 	schema: TSchema,
-): JsonQuery<TSchema> => ({
-	kind: "jsonQuery",
-	schema,
-});
+): JsonQuery<TSchema> {
+	return {
+		kind: "jsonQuery",
+		schema,
+	};
+}
 
-export const isJsonQuery = (schema: unknown): schema is JsonQuery =>
-	typeof schema === "object" &&
-	schema !== null &&
-	"kind" in schema &&
-	schema.kind === "jsonQuery";
+export function isJsonQuery(schema: unknown): schema is JsonQuery {
+	return (
+		typeof schema === "object" &&
+		schema !== null &&
+		"kind" in schema &&
+		schema.kind === "jsonQuery"
+	);
+}
 
 export type RequestBodySchema =
 	| StandardSchemaV1

@@ -32,12 +32,12 @@ type ExpressWebSocketErrorHandlers = ServerErrorHandlers<{
 	signal: AbortSignal;
 }>;
 
-export const registerRoutes = (
+export function registerRoutes(
 	app: IRouter,
 	implementations: ImplementationTree<RouteDeclaration>,
 	options: RegisterRoutesOptions = {},
-) =>
-	registerRouteImplementations(
+) {
+	return registerRouteImplementations(
 		implementations,
 		(routes) =>
 			registerExpressHttpRoutes(
@@ -54,3 +54,4 @@ export const registerRoutes = (
 				options.errorHandlers as ExpressWebSocketErrorHandlers | undefined,
 			),
 	);
+}

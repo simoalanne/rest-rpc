@@ -22,11 +22,11 @@ export type ClearCookieOptions = Omit<
 const capitalize = (str: string): string =>
 	str.charAt(0).toUpperCase() + str.slice(1);
 
-export const setCookie = (
+export function setCookie(
 	name: string,
 	value: string,
 	options: SetCookieOptions = {},
-): string => {
+): string {
 	const encode = options.encode ?? encodeURIComponent;
 	const encodedValue = encode(value);
 	const parts = [`${name}=${encodedValue}`];
@@ -58,14 +58,15 @@ export const setCookie = (
 	}
 
 	return parts.join("; ");
-};
+}
 
-export const clearCookie = (
+export function clearCookie(
 	name: string,
 	options: ClearCookieOptions = {},
-): string =>
-	setCookie(name, "", {
+): string {
+	return setCookie(name, "", {
 		...options,
 		expires: new Date(0),
 		maxAge: 0,
 	});
+}

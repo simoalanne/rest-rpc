@@ -57,15 +57,15 @@ const createNextFetchTag = (
 	return serializedRequest ? `${tag}:${serializedRequest}` : tag;
 };
 
-export const getNextFetchTags = (
+export function getNextFetchTags(
 	route: RouteDeclaration,
 	request?: NextFetchTagRequest,
 	options?: { tagPrefix?: string },
-): string[] => {
+): string[] {
 	const cacheKey = route.cacheKey ?? [];
 	const tagRequest = getNextFetchTagRequest(route, request);
 	const routeTag = createNextFetchTag(cacheKey, undefined, options?.tagPrefix);
 	const exactTag = createNextFetchTag(cacheKey, tagRequest, options?.tagPrefix);
 
 	return Array.from(new Set([exactTag, routeTag]));
-};
+}
