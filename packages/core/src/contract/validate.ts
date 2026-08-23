@@ -33,7 +33,7 @@ export type GroupedRequestInput = {
 };
 
 export type GroupRequestInputOptions = {
-	unknownRequestKeys?: "throw" | "strip";
+	strictRequestKeys?: boolean;
 };
 
 export type RequestValidationResult =
@@ -206,7 +206,7 @@ export const groupRequestInput = (
 	input: FlatRequestInput,
 	options: GroupRequestInputOptions = {},
 ): GroupedRequestInput => {
-	const unknownRequestKeys = options.unknownRequestKeys ?? "throw";
+	const strictRequestKeys = options.strictRequestKeys ?? true;
 	const isCustomRequestBody = isCustomBody(route.body);
 	const isJsonQueryRequest = isJsonQuery(route.query);
 	const requestKeys = route.requestKeys;
@@ -235,7 +235,7 @@ export const groupRequestInput = (
 			return grouped;
 		}
 
-		if (unknownRequestKeys === "strip") return grouped;
+		if (!strictRequestKeys) return grouped;
 
 		throw new Error(
 			`Unknown request key "${key}" for ${route.method} ${route.path}.`,
@@ -391,7 +391,7 @@ export const validateFlatRequestInput = async (
 	const data: FlatRequestInput = {};
 	const errors: StandardSchemaV1.Issue[] = [];
 	const grouped = groupRequestInput(route, input, {
-		unknownRequestKeys: "strip",
+		strictRequestKeys: false,
 	});
 
 	for (const segment of requestSegments) {

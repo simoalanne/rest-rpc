@@ -634,7 +634,7 @@ describe("ApiClient requests", () => {
 		const calls = captureFetch(jsonResponse([]));
 		const client = initClient(createClientTestContract(), {
 			baseUrl: "https://api.test",
-			unknownRequestKeys: "strip",
+			strictRequestKeys: false,
 		});
 
 		await client.todos.list.fetch({

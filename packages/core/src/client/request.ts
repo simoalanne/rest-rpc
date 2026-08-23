@@ -156,7 +156,7 @@ export const constructBaseRequest = (
 	baseUrl: string,
 	route: RouteDeclaration,
 	args: FlatRequestInput | undefined,
-	unknownRequestKeys: "throw" | "strip",
+	strictRequestKeys: boolean,
 ): {
 	url: string;
 	body?: BodyInit | null;
@@ -166,7 +166,7 @@ export const constructBaseRequest = (
 	let urlBase = `${baseUrl}${route.path}`;
 	if (!args) return { url: urlBase };
 
-	const request = groupRequestInput(route, args, { unknownRequestKeys });
+	const request = groupRequestInput(route, args, { strictRequestKeys });
 	const { body, query, pathParams, headers } = request;
 
 	urlBase = `${baseUrl}${serializeParams(route, pathParams)}${serializeQuery(route, query)}`;
@@ -210,7 +210,7 @@ export type ExecuteRequestOptions = {
 	getGlobalHeaders?: GetHeadersFn;
 	nextFetchTags?: NextFetchTagsOptions;
 	timeoutMs?: number;
-	unknownRequestKeys: "throw" | "strip";
+	strictRequestKeys: boolean;
 };
 
 const addNextFetchTags = (
@@ -257,7 +257,7 @@ export const executeRequest = async <E extends RouteDeclaration>(
 		options.baseUrl,
 		route,
 		requestArgs,
-		options.unknownRequestKeys,
+		options.strictRequestKeys,
 	);
 
 	const headers = (await options.getGlobalHeaders?.()) ?? {};

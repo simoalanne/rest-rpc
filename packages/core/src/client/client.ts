@@ -18,8 +18,12 @@ import type {
 } from "./types.ts";
 import { openConnection as openRouteConnection } from "./websocket.ts";
 
-export class ApiClient<TContract extends Contract = Contract> {
-	readonly api: ApiClientFor<TContract>;
+export class ApiClient<
+	TContract extends Contract = Contract,
+	TStrictStatusCodes extends boolean = false,
+	TGlobalHeaders extends Record<string, string> = Record<never, string>,
+> {
+	readonly api: ApiClientFor<TContract, TStrictStatusCodes, TGlobalHeaders>;
 
 	private baseUrl: string;
 	private contract: TContract;
@@ -27,26 +31,35 @@ export class ApiClient<TContract extends Contract = Contract> {
 	private fetchOptions?: ApiClientOptions["fetchOptions"];
 	private getGlobalHeaders?: ApiClientOptions["getGlobalHeaders"];
 	private nextFetchTags?: ApiClientOptions["nextFetchTags"];
+	private strictStatusCodes: boolean;
 	private timeoutMs?: number;
-	private unknownRequestKeys: "throw" | "strip";
+	private strictRequestKeys: boolean;
 	private validateResponses: boolean;
 
-	constructor(contract: TContract, options: ApiClientOptions) {
+	constructor(
+		contract: TContract,
+		options: ApiClientOptions<boolean, TGlobalHeaders>,
+	) {
 		this.baseUrl = options.baseUrl;
 		this.contract = contract;
 		this.fetchImpl = options.fetch;
 		this.fetchOptions = options.fetchOptions;
 		this.getGlobalHeaders = options.getGlobalHeaders;
 		this.nextFetchTags = options.nextFetchTags;
+		this.strictStatusCodes = options.strictStatusCodes ?? false;
 		this.timeoutMs = options.timeoutMs;
-		this.unknownRequestKeys = options.unknownRequestKeys ?? "throw";
+		this.strictRequestKeys = options.strictRequestKeys ?? true;
 		this.validateResponses = options.validateResponses ?? false;
 
 		this.api = buildApiClient(this.contract, {
 			fetchResponse: (route, ...args) => this.fetchResponse(route, ...args),
 			fetch: (route, ...args) => this.fetch(route, ...args),
 			openConnection: (route, ...args) => this.openConnection(route, ...args),
-		});
+		}) as unknown as ApiClientFor<
+			TContract,
+			TStrictStatusCodes,
+			TGlobalHeaders
+		>;
 	}
 
 	private request = <E extends RouteDeclaration>(
@@ -60,14 +73,20 @@ export class ApiClient<TContract extends Contract = Contract> {
 			getGlobalHeaders: this.getGlobalHeaders,
 			nextFetchTags: this.nextFetchTags,
 			timeoutMs: this.timeoutMs,
-			unknownRequestKeys: this.unknownRequestKeys,
+			strictRequestKeys: this.strictRequestKeys,
 		});
 
 	private fetchResponse = <E extends RouteDeclaration>(
 		route: E,
 		...args: FetchArgs<E>
 	): Promise<ClientResponse<E>> =>
-		fetchRouteResponse(this.request, this.validateResponses, route, ...args);
+		fetchRouteResponse(
+			this.request,
+			this.validateResponses,
+			this.strictStatusCodes,
+			route,
+			...args,
+		);
 
 	private fetch = <E extends RouteDeclaration>(
 		route: E,
@@ -82,7 +101,7 @@ export class ApiClient<TContract extends Contract = Contract> {
 			route,
 			{
 				baseUrl: this.baseUrl,
-				unknownRequestKeys: this.unknownRequestKeys,
+				strictRequestKeys: this.strictRequestKeys,
 				validateIncomingMessages: this.validateResponses,
 			},
 			...args,
@@ -94,9 +113,16 @@ export class ApiClient<TContract extends Contract = Contract> {
  *
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client}
  */
-export function initClient<TContract extends Contract>(
+export function initClient<
+	TContract extends Contract,
+	const TStrictStatusCodes extends boolean = false,
+	const TGlobalHeaders extends Record<string, string> = Record<never, string>,
+>(
 	contract: TContract,
-	options: ApiClientOptions,
-): ApiClientFor<TContract> {
-	return new ApiClient(contract, options).api;
+	options: ApiClientOptions<TStrictStatusCodes, TGlobalHeaders>,
+): ApiClientFor<TContract, TStrictStatusCodes, TGlobalHeaders> {
+	return new ApiClient<TContract, TStrictStatusCodes, TGlobalHeaders>(
+		contract,
+		options,
+	).api;
 }

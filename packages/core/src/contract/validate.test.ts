@@ -338,7 +338,7 @@ describe("groupRequestInput", () => {
 			groupRequestInput(
 				route,
 				{ q: "milk", extra: true },
-				{ unknownRequestKeys: "strip" },
+				{ strictRequestKeys: false },
 			),
 			{ query: { q: "milk" } },
 		);

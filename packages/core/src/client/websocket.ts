@@ -14,7 +14,7 @@ export const buildWebSocketUrl = (url: string) => {
 
 export type WebSocketConnectionOptions = {
 	baseUrl: string;
-	unknownRequestKeys: "throw" | "strip";
+	strictRequestKeys: boolean;
 	validateIncomingMessages: boolean;
 };
 
@@ -101,7 +101,7 @@ export const openConnection = <E extends WebSocketRouteDeclaration>(
 		options.baseUrl,
 		route,
 		requestArgs,
-		options.unknownRequestKeys,
+		options.strictRequestKeys,
 	);
 	const rawSocket = new WebSocket(buildWebSocketUrl(url));
 	return adaptWebSocket(route, rawSocket, options.validateIncomingMessages);

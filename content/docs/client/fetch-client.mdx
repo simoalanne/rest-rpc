@@ -62,6 +62,19 @@ throw new Error(`Unexpected response: ${response.status}`);
 
 Use it when HTTP status is part of normal control flow.
 
+Set `strictStatusCodes` to `true` when `fetchResponse()` should only return
+declared status codes.
+
+```ts
+const client = initClient(api, {
+	baseUrl: "https://api.example.com",
+	strictStatusCodes: true,
+});
+```
+
+With strict status codes enabled, undeclared statuses throw and the response type
+narrows to the declared status union.
+
 ## Client Options
 
 ```ts
@@ -77,21 +90,79 @@ const client = initClient(api, {
 });
 ```
 
-Options include:
+<TypeTable
+	type={{
+		baseUrl: {
+			type: "string",
+			required: true,
+			description: "Base URL used to build route requests.",
+		},
+		fetch: {
+			type: "FetchLike",
+			description: "Custom fetch-compatible function used to send requests.",
+		},
+		fetchOptions: {
+			type: "ApiClientFetchOptions",
+			description: "Default fetch options merged into every request.",
+		},
+		getGlobalHeaders: {
+			type: "() => Record<string, string> | Promise<Record<string, string>>",
+			description: "Returns headers added to every request.",
+		},
+		timeoutMs: {
+			type: "number",
+			description: "Aborts a request when fetch does not return in time.",
+		},
+		strictRequestKeys: {
+			type: "boolean",
+			default: "true",
+			description: "Rejects unknown request keys instead of stripping them.",
+		},
+		strictStatusCodes: {
+			type: "boolean",
+			default: "false",
+			description: "Throws when fetchResponse receives an undeclared status.",
+		},
+		validateResponses: {
+			type: "boolean",
+			default: "false",
+			description: "Validates declared response bodies and headers on the client.",
+		},
+	}}
+/>
 
-- `baseUrl`
-- `fetch`
-- `fetchOptions`
-- `getGlobalHeaders`
-- `timeoutMs`
-- `unknownRequestKeys`
-- `validateResponses`
+:::tip
+Headers provided by `getGlobalHeaders` make matching declared request headers
+optional for client calls. This way you can enforce that client should always
+send certain headers without requiring every call to provide them explicitly.
+:::
 
-`timeoutMs` limits the time spent waiting for the configured `fetch` function to
-return a `Response`. It starts after `getGlobalHeaders()` resolves and is cleared
-as soon as the response is received. It does not include response body parsing,
-stream consumption, or other work before or after `fetch`. Pass an `AbortSignal`
-in a route call when you need to cancel later response or stream consumption.
+```ts
+const api = router({
+	todos: {
+		list: {
+			method: "GET",
+			path: "/todos",
+			headers: {
+				authorization: z.string(),
+			},
+			responses: {
+				200: z.array(todoSchema),
+			},
+		},
+	},
+});
+
+const client = initClient(api, {
+	baseUrl: "https://api.example.com",
+	getGlobalHeaders: () => ({
+		authorization: `Bearer ${readToken()}`,
+	}),
+});
+
+await client.todos.list.fetch({});
+await client.todos.list.fetch({ authorization: "Bearer override" });
+```
 
 ## Custom Fetch
 
@@ -128,23 +199,24 @@ const todo = await client.todos.get.fetch(
 );
 ```
 
-## Unknown Request Keys
+## Strict Request Keys
 
 By default, unknown request keys are rejected.
 
 ```ts
 const client = initClient(api, {
 	baseUrl: "https://api.example.com",
-	unknownRequestKeys: "throw",
+	strictRequestKeys: true,
 });
 ```
 
-Use `"strip"` when extra keys should be ignored before building the HTTP request.
+Set `strictRequestKeys` to `false` when extra keys should be ignored before
+building the HTTP request.
 
 ```ts
 const client = initClient(api, {
 	baseUrl: "https://api.example.com",
-	unknownRequestKeys: "strip",
+	strictRequestKeys: false,
 });
 ```
 

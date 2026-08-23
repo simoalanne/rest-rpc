@@ -106,6 +106,55 @@ describe("ApiClient responses", () => {
 		});
 	});
 
+	it("rejects undeclared response statuses when strict status codes are enabled", async () => {
+		captureFetch(jsonResponse({ code: "teapot" }, 418));
+		const client = initClient(createClientTestContract(), {
+			baseUrl: "https://api.test",
+			strictStatusCodes: true,
+		});
+
+		await assert.rejects(
+			() => client.todos.get.fetchResponse({ id: "todo-1" }),
+			/declared response/,
+		);
+	});
+
+	it("returns declared responses without validating when strict status codes are enabled", async () => {
+		const apiContract = router({
+			todos: {
+				get: {
+					method: "GET",
+					path: "/todos/:id",
+					pathParams: z.object({ id: z.string() }),
+					responses: {
+						200: z.object({
+							id: z.string(),
+							createdAt: z
+								.string()
+								.datetime()
+								.transform((value) => new Date(value)),
+						}),
+					},
+				},
+			},
+		});
+		captureFetch(
+			jsonResponse(
+				{ id: "todo-1", createdAt: "2026-08-10T00:00:00.000Z" },
+				200,
+			),
+		);
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+			strictStatusCodes: true,
+		});
+
+		const response = await client.todos.get.fetchResponse({ id: "todo-1" });
+
+		assert.equal(response.status, 200);
+		assert.equal(response.body.createdAt, "2026-08-10T00:00:00.000Z");
+	});
+
 	it("returns undeclared text and empty response bodies", async () => {
 		captureFetch((url) =>
 			String(url).includes("empty")

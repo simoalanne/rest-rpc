@@ -199,15 +199,24 @@ type InferRequestFor<
 			: never
 		: never;
 
+type OptionalRequestKeys<T, TOptionalKeys extends PropertyKey> = [T] extends [
+	never,
+]
+	? never
+	: Merge<
+			Omit<T, Extract<keyof T, TOptionalKeys>> &
+				Partial<Pick<T, Extract<keyof T, TOptionalKeys>>>
+		>;
+
 /**
  * Infers the request type passed to a generated client route call.
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
  */
-export type ClientRequest<E extends RouteDeclaration> = InferRequestFor<
-	E,
-	"input"
->;
+export type ClientRequest<
+	E extends RouteDeclaration,
+	TOptionalKeys extends PropertyKey = never,
+> = OptionalRequestKeys<InferRequestFor<E, "input">, TOptionalKeys>;
 
 export type ServerRequest<E extends RouteDeclaration> = InferRequestFor<
 	E,

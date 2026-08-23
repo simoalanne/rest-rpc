@@ -36,7 +36,7 @@ const getNextFetchTagRequest = (
 	if (!request) return undefined;
 
 	const grouped = groupRequestInput(route, request, {
-		unknownRequestKeys: "strip",
+		strictRequestKeys: false,
 	});
 
 	return {

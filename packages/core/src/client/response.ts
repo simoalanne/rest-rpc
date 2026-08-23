@@ -152,6 +152,7 @@ export type RouteRequestFn = <E extends RouteDeclaration>(
 export const fetchResponse = async <E extends RouteDeclaration>(
 	request: RouteRequestFn,
 	validateResponse: boolean,
+	strictStatusCodes: boolean,
 	route: E,
 	...args: FetchArgs<E>
 ): Promise<ClientResponse<E>> => {
@@ -159,6 +160,10 @@ export const fetchResponse = async <E extends RouteDeclaration>(
 
 	const schema = getResponseSchema(route, rawResponse.status);
 	if (!schema) {
+		if (strictStatusCodes) {
+			throw new Error("Request did not return a declared response");
+		}
+
 		return {
 			declared: false,
 			status: rawResponse.status,

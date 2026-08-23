@@ -28,18 +28,50 @@ export type FetchLike = (
 	init?: RequestInit,
 ) => Promise<Response>;
 
-export type FetchArgs<E extends RouteDeclaration = RouteDeclaration> =
-	ClientRequest<E> extends never
-		? [options?: FetchOptions]
-		: [request: ClientRequest<E>, options?: FetchOptions];
+type HeaderRecord = Record<string, string>;
 
-export type FetchFn<E extends RouteDeclaration> = (
-	...args: FetchArgs<E>
-) => Promise<ClientResponseBody<E>>;
+export type GetHeadersFn<THeaders extends HeaderRecord = HeaderRecord> = () =>
+	| THeaders
+	| Promise<THeaders>;
+
+type LiteralKeys<T> = {
+	[K in keyof T]: string extends K
+		? never
+		: number extends K
+			? never
+			: symbol extends K
+				? never
+				: K;
+}[keyof T];
+
+type GlobalHeaderKeys<TGlobalHeaders extends HeaderRecord> = LiteralKeys<
+	Awaited<TGlobalHeaders>
+>;
+
+export type FetchArgs<
+	E extends RouteDeclaration = RouteDeclaration,
+	TGlobalHeaders extends HeaderRecord = Record<never, string>,
+> =
+	ClientRequest<E, GlobalHeaderKeys<TGlobalHeaders>> extends never
+		? [options?: FetchOptions]
+		: [
+				request: ClientRequest<E, GlobalHeaderKeys<TGlobalHeaders>>,
+				options?: FetchOptions,
+			];
+
+export type FetchFn<
+	E extends RouteDeclaration,
+	TGlobalHeaders extends HeaderRecord = Record<never, string>,
+> = (...args: FetchArgs<E, TGlobalHeaders>) => Promise<ClientResponseBody<E>>;
 
 type RouteDeclaredResponse<E extends RouteDeclaration> =
 	DeclaredClientResponse<E> & {
 		declared: true;
+		headers: Headers;
+	};
+
+type StrictRouteDeclaredResponse<E extends RouteDeclaration> =
+	DeclaredClientResponse<E> & {
 		headers: Headers;
 	};
 
@@ -55,16 +87,28 @@ type RouteUndeclaredResponse = {
  *
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#fetchresponse}
  */
-export type ClientResponse<E extends RouteDeclaration> =
-	| RouteDeclaredResponse<E>
-	| RouteUndeclaredResponse;
+export type ClientResponse<
+	E extends RouteDeclaration,
+	TStrictStatusCodes extends boolean = false,
+> = TStrictStatusCodes extends true
+	? StrictRouteDeclaredResponse<E>
+	: RouteDeclaredResponse<E> | RouteUndeclaredResponse;
 
-export type FetchResponseFn<E extends RouteDeclaration> = (
-	...args: FetchArgs<E>
-) => Promise<ClientResponse<E>>;
+export type FetchResponseFn<
+	E extends RouteDeclaration,
+	TStrictStatusCodes extends boolean = false,
+	TGlobalHeaders extends HeaderRecord = Record<never, string>,
+> = (
+	...args: FetchArgs<E, TGlobalHeaders>
+) => Promise<ClientResponse<E, TStrictStatusCodes>>;
 
-export type OpenConnectionArgs<E extends RouteDeclaration = RouteDeclaration> =
-	ClientRequest<E> extends never ? [] : [request: ClientRequest<E>];
+export type OpenConnectionArgs<
+	E extends RouteDeclaration = RouteDeclaration,
+	TGlobalHeaders extends HeaderRecord = Record<never, string>,
+> =
+	ClientRequest<E, GlobalHeaderKeys<TGlobalHeaders>> extends never
+		? []
+		: [request: ClientRequest<E, GlobalHeaderKeys<TGlobalHeaders>>];
 
 /**
  * The typed WebSocket client returned by a WebSocket route's `openConnection()`.
@@ -83,53 +127,80 @@ export type ClientSocket<E extends WebSocketRouteDeclaration> = Pick<
 	onClose: (callback: (event: CloseEvent) => void) => () => void;
 };
 
-export type OpenConnectionFn<E extends RouteDeclaration> = (
-	...args: OpenConnectionArgs<E>
+export type OpenConnectionFn<
+	E extends RouteDeclaration,
+	TGlobalHeaders extends HeaderRecord = Record<never, string>,
+> = (
+	...args: OpenConnectionArgs<E, TGlobalHeaders>
 ) => E extends WebSocketRouteDeclaration ? ClientSocket<E> : never;
 
-type ApiClientMoreThanOneSuccessResponseRouteValue<E extends RouteDeclaration> =
-	{
-		fetchResponse: FetchResponseFn<E>;
-	};
-
-type ApiClientSingleSuccessResponseRouteValue<E extends RouteDeclaration> = {
-	fetch: FetchFn<E>;
-	fetchResponse: FetchResponseFn<E>;
+type ApiClientMoreThanOneSuccessResponseRouteValue<
+	E extends RouteDeclaration,
+	TStrictStatusCodes extends boolean,
+	TGlobalHeaders extends HeaderRecord,
+> = {
+	fetchResponse: FetchResponseFn<E, TStrictStatusCodes, TGlobalHeaders>;
 };
 
-type ApiClientHttpRouteValue<E extends RouteDeclaration = RouteDeclaration> =
+type ApiClientSingleSuccessResponseRouteValue<
+	E extends RouteDeclaration,
+	TStrictStatusCodes extends boolean,
+	TGlobalHeaders extends HeaderRecord,
+> = {
+	fetch: FetchFn<E, TGlobalHeaders>;
+	fetchResponse: FetchResponseFn<E, TStrictStatusCodes, TGlobalHeaders>;
+};
+
+type ApiClientHttpRouteValue<
+	E extends RouteDeclaration = RouteDeclaration,
+	TStrictStatusCodes extends boolean = false,
+	TGlobalHeaders extends HeaderRecord = Record<never, string>,
+> =
 	ClientResponseBody<E> extends never
-		? ApiClientMoreThanOneSuccessResponseRouteValue<E>
-		: ApiClientSingleSuccessResponseRouteValue<E>;
+		? ApiClientMoreThanOneSuccessResponseRouteValue<
+				E,
+				TStrictStatusCodes,
+				TGlobalHeaders
+			>
+		: ApiClientSingleSuccessResponseRouteValue<
+				E,
+				TStrictStatusCodes,
+				TGlobalHeaders
+			>;
 
 type ApiClientWebSocketRouteValue<
 	E extends RouteDeclaration = RouteDeclaration,
+	TGlobalHeaders extends HeaderRecord = Record<never, string>,
 > = {
-	openConnection: OpenConnectionFn<E>;
+	openConnection: OpenConnectionFn<E, TGlobalHeaders>;
 };
 
-export type ApiClientRouteValue<E extends RouteDeclaration = RouteDeclaration> =
-	E extends RouteDeclaration
-		? IsWebSocketRoute<E> extends true
-			? ApiClientWebSocketRouteValue<E>
-			: ApiClientHttpRouteValue<E>
-		: never;
+export type ApiClientRouteValue<
+	E extends RouteDeclaration = RouteDeclaration,
+	TStrictStatusCodes extends boolean = false,
+	TGlobalHeaders extends HeaderRecord = Record<never, string>,
+> = E extends RouteDeclaration
+	? IsWebSocketRoute<E> extends true
+		? ApiClientWebSocketRouteValue<E, TGlobalHeaders>
+		: ApiClientHttpRouteValue<E, TStrictStatusCodes, TGlobalHeaders>
+	: never;
 
 /**
  * Infers the generated client tree for a contract.
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
  */
-export type ApiClientFor<T extends Contract = Contract> =
-	T extends RouteDeclaration
-		? ApiClientRouteValue<T>
-		: {
-				[K in keyof T]: T[K] extends Contract ? ApiClientFor<T[K]> : never;
-			};
-
-export type GetHeadersFn = () =>
-	| Record<string, string>
-	| Promise<Record<string, string>>;
+export type ApiClientFor<
+	T extends Contract = Contract,
+	TStrictStatusCodes extends boolean = false,
+	TGlobalHeaders extends HeaderRecord = Record<never, string>,
+> = T extends RouteDeclaration
+	? ApiClientRouteValue<T, TStrictStatusCodes, TGlobalHeaders>
+	: {
+			[K in keyof T]: T[K] extends Contract
+				? ApiClientFor<T[K], TStrictStatusCodes, TGlobalHeaders>
+				: never;
+		};
 
 /**
  * Enables deterministic Next.js fetch tags for generated GET requests.
@@ -146,13 +217,17 @@ export type NextFetchTagsOptions = {
  *
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#client-options}
  */
-export type ApiClientOptions = {
+export type ApiClientOptions<
+	TStrictStatusCodes extends boolean = false,
+	TGlobalHeaders extends HeaderRecord = Record<never, string>,
+> = {
 	baseUrl: string;
 	fetch?: FetchLike;
 	fetchOptions?: ApiClientFetchOptions;
-	getGlobalHeaders?: GetHeadersFn;
+	getGlobalHeaders?: GetHeadersFn<TGlobalHeaders>;
 	nextFetchTags?: NextFetchTagsOptions;
 	timeoutMs?: number;
-	unknownRequestKeys?: "throw" | "strip";
+	strictRequestKeys?: boolean;
+	strictStatusCodes?: TStrictStatusCodes;
 	validateResponses?: boolean;
 };

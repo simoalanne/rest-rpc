@@ -191,6 +191,39 @@ responseClient.todos.create
 		}
 	});
 
+const strictResponseApi = router({
+	todos: {
+		get: {
+			method: "GET",
+			path: "/todos/:id",
+			pathParams: z.object({ id: z.string() }),
+			responses: {
+				200: todoSchema,
+				404: z.object({ code: z.literal("not_found") }),
+			},
+		},
+	},
+});
+
+const strictResponseClient = initClient(strictResponseApi, {
+	baseUrl: "https://example.test",
+	strictStatusCodes: true,
+});
+
+strictResponseClient.todos.get
+	.fetchResponse({ id: "todo-1" })
+	.then((response) => {
+		expectType<200 | 404>(response.status);
+		expectType<Headers>(response.headers);
+		expectError(response.declared);
+
+		if (response.status === 200) {
+			expectType<{ id: string; title: string }>(response.body);
+		} else {
+			expectType<{ code: "not_found" }>(response.body);
+		}
+	});
+
 // should use schema input for requests and schema output for responses
 const transformedApi = router({
 	todos: {
@@ -410,6 +443,72 @@ expectError(requestArgumentClient.todos.get.fetch());
 expectError(requestArgumentClient.todos.get.fetch({ title: "wrong segment" }));
 
 expectError(requestArgumentClient.todos.list.fetch({ id: "todo-1" }));
+
+// should make request keys provided by global headers optional
+const globalHeadersApi = router({
+	todos: {
+		search: {
+			method: "GET",
+			path: "/todos/search",
+			query: z.object({ search: z.string() }),
+			headers: {
+				authorization: z.string(),
+				"x-request-id": z.string(),
+			},
+			responses: {
+				200: z.array(todoSchema),
+			},
+		},
+		secure: {
+			method: "GET",
+			path: "/todos/secure",
+			headers: {
+				authorization: z.string(),
+			},
+			responses: {
+				200: z.array(todoSchema),
+			},
+		},
+	},
+});
+
+const globalHeadersClient = initClient(globalHeadersApi, {
+	baseUrl: "https://example.test",
+	getGlobalHeaders: () => ({
+		authorization: "Bearer token",
+	}),
+});
+
+globalHeadersClient.todos.search.fetch({
+	search: "milk",
+	"x-request-id": "req-1",
+});
+
+globalHeadersClient.todos.search.fetch({
+	authorization: "Bearer override",
+	search: "milk",
+	"x-request-id": "req-1",
+});
+
+globalHeadersClient.todos.secure.fetch({});
+
+expectError(globalHeadersClient.todos.search.fetch({ search: "milk" }));
+expectError(
+	globalHeadersClient.todos.search.fetch({ "x-request-id": "req-1" }),
+);
+expectError(globalHeadersClient.todos.secure.fetch());
+
+// should not make request keys optional from loose global headers
+const looseGlobalHeadersClient = initClient(globalHeadersApi, {
+	baseUrl: "https://example.test",
+	getGlobalHeaders: (): Record<string, string> => ({
+		authorization: "Bearer token",
+	}),
+});
+
+expectError(looseGlobalHeadersClient.todos.search.fetch({}));
+expectError(looseGlobalHeadersClient.todos.search.fetch({ search: "milk" }));
+expectError(looseGlobalHeadersClient.todos.search.fetch());
 
 // should type websocket send and receive message payloads
 const websocketApi = router({
