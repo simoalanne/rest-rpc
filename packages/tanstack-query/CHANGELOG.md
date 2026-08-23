@@ -1,5 +1,16 @@
 # @rest-rpc/tanstack-query
 
+## 0.1.0-beta.13
+
+### Minor Changes
+
+- dd6b7c3: rename tanstack infiniteQueryOptions args to be more describing
+
+### Patch Changes
+
+- d643f76: improve generated API reference by changing exported arrow functions to regular functions and dropping unnecssary noisy exports
+- c6f7dcc: Add tsdoc comments for every package root export
+
 ## 0.1.0-beta.12
 
 ## 0.1.0-beta.11
