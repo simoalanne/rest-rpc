@@ -1,0 +1,166 @@
+---
+title: Server Adapter Design
+description: Understand the boundary between server adapters and @rest-rpc/server
+---
+
+Most applications should use one of the server packages directly. This page is
+for understanding why those packages exist, why `@rest-rpc/server` exists under
+them, and where custom integrations fit.
+
+## Adapter Boundary
+
+`rest-rpc` separates contract execution from framework integration.
+
+`@rest-rpc/server` handles the contract-side work:
+
+- preserving typed route implementation shapes
+- matching routes
+- validating incoming request data
+- normalizing and validating route responses
+- routing server error hooks
+- providing shared WebSocket helpers
+
+Framework adapters handle the framework-side work:
+
+- receiving a framework request
+- parsing request data into the shape expected by `rest-rpc`
+- creating the route handler context
+- calling the shared server primitives
+- writing the result back through the framework response API
+- connecting framework-specific middleware and WebSocket upgrade hooks
+
+Application code normally uses the framework adapter. Adapter code uses
+`@rest-rpc/server`.
+
+## Adapter Shapes
+
+Server integrations usually have one of two shapes.
+
+### Route Registration
+
+Many frameworks expose a router or application object and expect routes to be
+mounted into it.
+
+```ts
+registerRoutes(app, routes);
+```
+
+In this shape, the adapter walks the route implementations and registers each
+route with the host framework. `@rest-rpc/express`, `@rest-rpc/fastify`, and `@rest-rpc/hono` are built this way.
+
+Conceptually, the adapter does this:
+
+```ts
+const registerRoutes = (app, routes) => {
+	const implementations = flattenRouteImplementations(routes);
+
+	for (const implementation of implementations) {
+		app.route(implementation.route.method, implementation.route.path, async (req, res) => {
+			const request = await readFrameworkRequest(req);
+			const context = createFrameworkContext(req, res);
+
+			const result = await handleHttpRoute(implementation.route, implementation.handler, {
+				request,
+				context,
+				errorHandlers,
+			});
+
+			writeFrameworkResponse(res, result);
+		});
+	}
+};
+```
+
+### Request Dispatch
+
+When a framework does not expose a direct route registration surface, the adapter
+has to own the request dispatch. The adapter receives a request, matches it to a route,
+and executes the implementation. `@rest-rpc/web` and `@rest-rpc/next` are built this way.
+
+Conceptually, the adapter does this:
+
+```ts
+const createRouteHandler = (routes) => {
+	const matchRoute = createRouteMatcher(routes);
+
+	return async (runtimeRequest, runtimeContext) => {
+		const match = matchRoute(runtimeRequest);
+
+		if (!match) {
+			return createNotFoundResponse();
+		}
+
+		const request = await readRuntimeRequest(runtimeRequest, match.params);
+		const context = createRuntimeContext(runtimeRequest, runtimeContext);
+
+		const result = await handleHttpRoute(match.route, match.handler, {
+			request,
+			context,
+			errorHandlers,
+		});
+
+		return createRuntimeResponse(result);
+	};
+};
+```
+
+## First-Party Adapters
+
+The first-party adapters are not meant to cover every server framework. They
+cover the places where `rest-rpc` can add a small integration layer without
+becoming part of the framework's application architecture.
+
+That leaves three useful categories.
+
+Express and Fastify are popular Node frameworks with their own request and
+response objects. They are also unopinionated about how an application should be
+structured, so a contract can be mounted directly into the framework router.
+
+Hono is closer to Web standards, but a Hono route is not just a
+`Request -> Response` function. Handlers receive Hono's `Context`, and Hono's
+router, middleware, environment typing, and runtime-specific helpers are part of
+the application surface. A Hono adapter preserves that surface instead of making
+each application rebuild the same bridge around `@rest-rpc/web`.
+
+The Web adapter covers the case where HTTP integration is already expressed as
+one request handler. It does not need to register routes into a framework or
+preserve framework context. It only needs to match the incoming request, execute
+the contract route, and return a `Response`.
+
+Next.js is also request-dispatch shaped, but the application surface is not just
+an arbitrary handler function. Route handlers are expressed as method exports,
+and the request object is `NextRequest`. The Next.js adapter keeps those
+conventions at the edge while reusing the same underlying Web-style execution
+model.
+
+Some frameworks are deliberately outside this shape. When a framework expects
+routes to be expressed through its own controllers, modules, decorators, or
+application lifecycle, a first-party adapter would have to either hide
+the framework's model or leak too much of it. Those integrations can still be
+built locally, but they are less natural as small reusable packages.
+
+## WebSocket Tradeoffs
+
+WebSocket support follows the same adapter boundary, but the tradeoff is
+stricter. HTTP routes can usually be reduced to route registration or request
+dispatch. WebSocket upgrades include server-specific lifecycle details that do
+not collapse into one portable shape as cleanly.
+
+The supported adapters therefore use the WebSocket primitive that fits the host
+framework:
+
+- Express uses a Node HTTP server upgrade with `ws`
+- Fastify uses `@fastify/websocket`
+- Hono uses the framework's `upgradeWebSocket` API
+
+The Web adapter handles HTTP routes only. A standard `Request -> Response`
+handler describes the request and response, but not the full upgrade and socket
+lifecycle across runtimes. A runtime-specific adapter can still support
+WebSockets by using the lower-level helpers from `@rest-rpc/server`.
+
+WebSocket routes in `rest-rpc` are intended for typed message channels declared
+in the API contract. They validate route input and socket messages, then expose
+a typed socket to the route handler. Higher-level realtime concerns such as
+rooms, presence, acknowledgements, reconnect behavior, fallback transports, and
+distributed fanout are outside this abstraction and can live beside `rest-rpc`
+in a dedicated realtime layer.

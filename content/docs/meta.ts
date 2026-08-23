@@ -12,5 +12,6 @@ export default defineMeta({
 		"type-helpers",
 		"websockets",
 		"openapi",
+		"advanced",
 	],
 });
