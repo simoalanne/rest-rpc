@@ -9,8 +9,8 @@ import {
 	type RouteHandlerFor,
 	type RouteImplementation,
 	RouteResponseError,
-	type RouterImplementationInput,
 	type RouteHandler as ServerRouteHandler,
+	type RouteHandlers as ServerRouteHandlers,
 	type RouteRequest as ServerRouteRequest,
 	route as serverRoute,
 	router as serverRouter,
@@ -86,6 +86,32 @@ export type RouteHandler<
 > = ServerRouteHandler<E, RouteContext<E, TEnv>>;
 
 /**
+ * Handler tree accepted by `router()` when building a Hono implementation tree.
+ *
+ * @remarks Use this type with `implements` to check class-based route handler
+ * services against a contract tree.
+ *
+ * @example
+ * ```ts
+ * class TodoHandlers implements RouteHandlers<typeof api.todos> {
+ *   get(request: RouteRequest<typeof api.todos.get>) {
+ *     return { id: request.id };
+ *   }
+ * }
+ * ```
+ *
+ * @see {@link https://rest-rpc.dev/docs/recipes/class-handlers}
+ */
+export type RouteHandlers<
+	TNode extends Contract<RouteDeclaration>,
+	TEnv extends Env = Env,
+> = ServerRouteHandlers<
+	TNode,
+	HttpRouteHandlerContext<TEnv>,
+	WebSocketRouteHandlerContext<TEnv>
+>;
+
+/**
  * Builds a Hono route implementation for a single contract route.
  *
  * @see {@link https://rest-rpc.dev/docs/server/hono}
@@ -114,11 +140,7 @@ export function router<
 	TEnv extends Env = Env,
 >(
 	contract: TNode,
-	handlers: RouterImplementationInput<
-		TNode,
-		HttpRouteHandlerContext<TEnv>,
-		WebSocketRouteHandlerContext<TEnv>
-	>,
+	handlers: RouteHandlers<TNode, TEnv>,
 ): ImplementationTreeFor<TNode, RouteDeclaration> {
 	return serverRouter(contract, handlers);
 }

@@ -44,6 +44,149 @@ describe("router", () => {
 		assert.equal(await implementation.todos.get.handler({}), "todo-1");
 	});
 
+	it("supports class methods wrapped by a handler function", async () => {
+		class TodoService {
+			#prefix = "todo";
+
+			get(_request: unknown) {
+				return `${this.#prefix}-1`;
+			}
+		}
+
+		const service = new TodoService();
+		const implementation = router(
+			{
+				todos: {
+					get: getTodo,
+				},
+			},
+			{
+				todos: {
+					get: (request) => service.get(request),
+				},
+			},
+		);
+
+		assert.equal(await implementation.todos.get.handler({}), "todo-1");
+	});
+
+	it("supports explicitly bound class methods", async () => {
+		class TodoService {
+			#prefix = "todo";
+
+			get(_request: unknown) {
+				return `${this.#prefix}-1`;
+			}
+		}
+
+		const service = new TodoService();
+		const implementation = router(
+			{
+				todos: {
+					get: getTodo,
+				},
+			},
+			{
+				todos: {
+					get: service.get.bind(service),
+				},
+			},
+		);
+
+		assert.equal(await implementation.todos.get.handler({}), "todo-1");
+	});
+
+	it("binds class methods passed as router subtrees", async () => {
+		class TodoService {
+			#prefix = "todo";
+
+			get(_request: unknown) {
+				return `${this.#prefix}-1`;
+			}
+		}
+
+		const implementation = router(
+			{
+				todos: {
+					get: getTodo,
+				},
+			},
+			{
+				todos: new TodoService(),
+			},
+		);
+
+		assert.equal(await implementation.todos.get.handler({}), "todo-1");
+	});
+
+	it("allows class instances with public service fields", async () => {
+		class TodoService {
+			readonly prefix = "todo";
+
+			get(_request: unknown) {
+				return `${this.prefix}-1`;
+			}
+		}
+
+		const implementation = router(
+			{
+				todos: {
+					get: getTodo,
+				},
+			},
+			{
+				todos: new TodoService(),
+			},
+		);
+
+		assert.equal(await implementation.todos.get.handler({}), "todo-1");
+	});
+
+	it("does not bind class methods inside compiled route implementations", () => {
+		class TodoService {
+			#prefix = "todo";
+
+			get(_request: unknown) {
+				return `${this.#prefix}-1`;
+			}
+		}
+
+		const service = new TodoService();
+		const implementation = router(
+			{
+				todos: {
+					get: getTodo,
+				},
+			},
+			{
+				todos: {
+					get: route(getTodo, service.get),
+				},
+			},
+		);
+
+		assert.throws(() => implementation.todos.get.handler({}), TypeError);
+	});
+
+	it("rejects route services that resolve to non-functions", () => {
+		assert.throws(
+			() =>
+				router(
+					{
+						todos: {
+							get: getTodo,
+						},
+					},
+					{
+						todos: {
+							get: "todo",
+						},
+					} as never,
+				),
+			/Resolved service for "todos.get" is not a function/,
+		);
+	});
+
 	it("rejects missing route services", () => {
 		assert.throws(
 			() =>
@@ -58,26 +201,6 @@ describe("router", () => {
 					} as never,
 				),
 			/Missing service for route "todos.get"/,
-		);
-	});
-
-	it("rejects unexpected route services", () => {
-		assert.throws(
-			() =>
-				router(
-					{
-						todos: {
-							get: getTodo,
-						},
-					},
-					{
-						todos: {
-							get: () => undefined,
-							delete: () => undefined,
-						},
-					} as never,
-				),
-			/Unexpected service for route "todos.delete"/,
 		);
 	});
 

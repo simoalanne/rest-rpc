@@ -12,6 +12,7 @@ export {
 	type CreateRouteHandlerOptions,
 	createRouteHandler,
 	type NextRouteMiddleware,
+	type RouteHandlers,
 	type RouteRequest,
 	type RouteResponse,
 	route,

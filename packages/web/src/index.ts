@@ -32,6 +32,7 @@ export type {
 } from "@rest-rpc/server";
 export type { WebRouteParseBody, WebRouteParseBodyInput } from "./http.ts";
 export type {
+	RouteHandlers,
 	RouteRequest,
 	WebContract,
 	WebImplementationTree,

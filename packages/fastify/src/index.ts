@@ -9,8 +9,8 @@ import {
 	type RouteHandlerFor,
 	type RouteImplementation,
 	RouteResponseError,
-	type RouterImplementationInput,
 	type RouteHandler as ServerRouteHandler,
+	type RouteHandlers as ServerRouteHandlers,
 	type RouteRequest as ServerRouteRequest,
 	route as serverRoute,
 	router as serverRouter,
@@ -79,6 +79,30 @@ export type RouteHandler<E extends RouteDeclaration> = ServerRouteHandler<
 >;
 
 /**
+ * Handler tree accepted by `router()` when building a Fastify implementation tree.
+ *
+ * @remarks Use this type with `implements` to check class-based route handler
+ * services against a contract tree.
+ *
+ * @example
+ * ```ts
+ * class TodoHandlers implements RouteHandlers<typeof api.todos> {
+ *   get(request: RouteRequest<typeof api.todos.get>) {
+ *     return { id: request.id };
+ *   }
+ * }
+ * ```
+ *
+ * @see {@link https://rest-rpc.dev/docs/recipes/class-handlers}
+ */
+export type RouteHandlers<TNode extends Contract<RouteDeclaration>> =
+	ServerRouteHandlers<
+		TNode,
+		HttpRouteHandlerContext,
+		WebSocketRouteHandlerContext
+	>;
+
+/**
  * Builds a Fastify route implementation for a single contract route.
  *
  * @see {@link https://rest-rpc.dev/docs/server/fastify}
@@ -101,11 +125,7 @@ export function route<const TNode extends RouteDeclaration>(
  */
 export function router<const TNode extends Contract<RouteDeclaration>>(
 	contract: TNode,
-	handlers: RouterImplementationInput<
-		TNode,
-		HttpRouteHandlerContext,
-		WebSocketRouteHandlerContext
-	>,
+	handlers: RouteHandlers<TNode>,
 ): ImplementationTreeFor<TNode, RouteDeclaration> {
 	return serverRouter(contract, handlers);
 }

@@ -10,6 +10,7 @@ export default defineMeta({
 		"http-responses",
 		"server",
 		"client",
+		"recipes",
 		"type-helpers",
 		"websockets",
 		"openapi",

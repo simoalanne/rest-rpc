@@ -5,6 +5,7 @@ import {
 	type WebContract,
 	type WebImplementationTree,
 	type WebRouteBuilder,
+	type RouteHandlers as WebRouteHandlers,
 	type WebRouteMiddleware,
 	type WebRouteParseBodyInput,
 	type RouteRequest as WebRouteRequest,
@@ -39,6 +40,28 @@ export type RouteRequest<
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
  */
 export type RouteResponse<E extends HttpRouteDeclaration> = WebRouteResponse<E>;
+
+/**
+ * Handler tree accepted by `router().handlers()` when building a Next.js implementation tree.
+ *
+ * @remarks Use this type with `implements` to check class-based route handler
+ * services against a contract tree.
+ *
+ * @example
+ * ```ts
+ * class TodoHandlers implements RouteHandlers<typeof api.todos> {
+ *   get(request: RouteRequest<typeof api.todos.get>) {
+ *     return { id: request.id };
+ *   }
+ * }
+ * ```
+ *
+ * @see {@link https://rest-rpc.dev/docs/recipes/class-handlers}
+ */
+export type RouteHandlers<
+	TContract extends WebContract,
+	TContext extends Record<string, unknown> = Record<string, unknown>,
+> = WebRouteHandlers<TContract, TContext, NextRequest>;
 
 /**
  * Options for creating Next.js route handler exports.

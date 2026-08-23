@@ -1,12 +1,12 @@
 import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	type Contract,
-	type ImplementationShape,
 	type ImplementationTree,
 	type ImplementationTreeFor,
 	type RouteHandler,
 	type RouteHandlerFor,
 	type RouteImplementation,
+	type RouteHandlers as ServerRouteHandlers,
 	type RouteRequest as ServerRouteRequest,
 	route as serverRoute,
 	router as serverRouter,
@@ -97,6 +97,33 @@ export type RouteRequest<
 	TRequest extends Request = Request,
 > = ServerRouteRequest<E, WebRouteContext<TContext, TRequest>>;
 
+/**
+ * Handler tree accepted by `router().handlers()` when building a Web implementation tree.
+ *
+ * @remarks Use this type with `implements` to check class-based route handler
+ * services against a contract tree.
+ *
+ * @example
+ * ```ts
+ * class TodoHandlers implements RouteHandlers<typeof api.todos> {
+ *   get(request: RouteRequest<typeof api.todos.get>) {
+ *     return { id: request.id };
+ *   }
+ * }
+ * ```
+ *
+ * @see {@link https://rest-rpc.dev/docs/recipes/class-handlers}
+ */
+export type RouteHandlers<
+	TContract extends WebContract,
+	TContext extends Record<string, unknown> = Record<string, unknown>,
+	TRequest extends Request = Request,
+> = ServerRouteHandlers<
+	TContract,
+	WebRouteContext<TContext, TRequest>,
+	Record<never, never>
+>;
+
 type WebRouteBuilderWithMiddleware<
 	TRoute extends HttpRouteDeclaration,
 	TContext extends Record<string, unknown>,
@@ -128,10 +155,7 @@ type WebRouterBuilderWithMiddleware<
 	TRequest extends Request,
 > = {
 	handlers(
-		handlers: ImplementationShape<
-			TContract,
-			WebRouteContext<TContext, TRequest>
-		>,
+		handlers: RouteHandlers<TContract, TContext, TRequest>,
 	): ImplementationTreeFor<TContract, HttpRouteDeclaration> &
 		WebImplementationTree;
 };

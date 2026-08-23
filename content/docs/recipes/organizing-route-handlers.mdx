@@ -1,0 +1,126 @@
+---
+title: Organizing Route Handlers
+description: Learn how you can organize route handlers for larger apps.
+---
+
+`router()` is a type-safe controller factory. 
+Each handler receives a validated request with framework-specific 
+context and must return a response matching the contract.
+
+There are three common ways to structure handlers.
+
+## Inline handlers
+
+The simplest approach is to define the logic inline. 
+This gives you full type inference with very little ceremony and works well for small handlers. 
+
+```ts
+const routes = router(api, {
+	todos: {
+		async get(request) {
+			const todo = await store.get(request.id);
+
+			return {
+				status: 200,
+				body: todo,
+			};
+		},
+	},
+});
+```
+
+Once the amount of route handlers increases and logic becomes more complex, however, 
+a plain object of functions can become harder to organize, maintain, and test.
+
+## Handlers delegating to a service class
+
+Another option is to keep handlers thin and delegate to a separate service class.
+
+```ts
+const routes = router(api, {
+	todos: {
+		get: (request) => todoService.get(request),
+		create: todoService.create.bind(todoService),
+	},
+});
+```
+
+This separates the implementation, but when the service already follows the route contract, 
+these forwarding functions add little value and repeat the same interface.
+If you rely on `this` in your service class, you must also remember to bind each method, which can be error-prone.
+
+## Service classes as handlers
+
+For larger applications, using a service class to implmement set of route handlers can be easier to maintain and test.
+A service class can implement the route contract directly in type-safe way, keep dependencies explicit through constructor injection, 
+and be passed straight to `router()` without an extra forwarding layer.
+
+### Implementation
+
+```ts
+class TodoService implements RouteHandlers<typeof api.todos> {
+	constructor(private readonly store: TodoStore) {}
+
+	async get(request: RouteRequest<typeof api.todos.get>) {
+		const todo = await this.store.get(request.id);
+
+		return {
+			status: 200 as const,
+			body: todo,
+		};
+	}
+
+	async create(request: RouteRequest<typeof api.todos.create>) {
+		const todo = await this.store.create({ title: request.title });
+
+		return {
+			status: 201 as const,
+			body: todo,
+		};
+	}
+}
+
+const routes = router(api, {
+	todos: new TodoService(store),
+});
+```
+
+Using `RouteHandlers` as the implementation type ensures that the class
+implementes each required method correctly.
+
+### Request Type Inference
+
+Since TypeScript can't infer class method parameter types from the implements clause alone,
+you can use the `RouteRequest` type helper for each method to get the correct request type for that route.
+
+```ts
+class TodoService implements RouteHandlers<typeof api.todos> {
+	get(request: RouteRequest<typeof api.todos.get>) {
+		return this.store.get(request.id);
+	}
+}
+```
+
+### Automatic Method Binding
+
+When a class instance is passed as a handler subtree, `router()` automatically binds route
+methods to that instance. Any additional fields are ignored.
+
+```ts
+const routes = router(api, {
+	todos: new TodoService(store),
+});
+```
+
+```ts
+class TodoService implements RouteHandlers<typeof api.todos> {
+	readonly prefix = "todo";
+
+	get(request: RouteRequest<typeof api.todos.get>) {
+		return {
+			id: request.id,
+			title: `${this.prefix}-${request.id}`,
+		};
+	}
+}
+```

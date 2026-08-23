@@ -253,11 +253,23 @@ export type ImplementationShape<
 		};
 
 /**
- * Input accepted by `router()` when building an implementation tree.
+ * Handler tree accepted by `router()` when building an implementation tree.
  *
- * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registration-adapters}
+ * @remarks Use this type with `implements` to check class-based route handler
+ * services against a contract tree.
+ *
+ * @example
+ * ```ts
+ * class TodoHandlers implements RouteHandlers<typeof api.todos> {
+ *   get(request: RouteRequest<typeof api.todos.get>) {
+ *     return { id: request.id };
+ *   }
+ * }
+ * ```
+ *
+ * @see {@link https://rest-rpc.dev/docs/recipes/class-handlers}
  */
-export type RouterImplementationInput<
+export type RouteHandlers<
 	TNode extends Contract<RouteDeclaration>,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
 	TWebSocketContext extends
@@ -268,7 +280,7 @@ export type RouterImplementationInput<
 			| RouteImplementation<TNode>
 	: {
 			[K in keyof TNode]: TNode[K] extends Contract<RouteDeclaration>
-				? RouterImplementationInput<TNode[K], TContext, TWebSocketContext>
+				? RouteHandlers<TNode[K], TContext, TWebSocketContext>
 				: never;
 		};
 
@@ -363,8 +375,6 @@ const collectImplementations = (
 		throw new Error(`Invalid implementation while resolving "${routeName}"`);
 	}
 
-	const handlerKeys = new Set(Object.keys(handlers));
-
 	const tree = Object.fromEntries(
 		Object.entries(contract).map(([key, childContract]) => {
 			const childHandlers = (handlers as Record<string, unknown>)[key];
@@ -373,8 +383,6 @@ const collectImplementations = (
 			if (childHandlers === undefined) {
 				throw new Error(`Missing service for route "${childPath.join(".")}"`);
 			}
-
-			handlerKeys.delete(key);
 
 			return [
 				key,
@@ -388,12 +396,6 @@ const collectImplementations = (
 			];
 		}),
 	);
-
-	if (handlerKeys.size > 0) {
-		throw new Error(
-			`Unexpected service for route "${[...path, ...handlerKeys].join(".")}"`,
-		);
-	}
 
 	return tree;
 };
@@ -430,7 +432,7 @@ export function router<
 		WebSocketRouteHandlerContext = WebSocketRouteHandlerContext,
 >(
 	contract: TNode,
-	handlers: RouterImplementationInput<TNode, TContext, TWebSocketContext>,
+	handlers: RouteHandlers<TNode, TContext, TWebSocketContext>,
 ): ImplementationTreeFor<TNode, RouteDeclaration> {
 	return collectImplementations(
 		contract,

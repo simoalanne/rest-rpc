@@ -7,6 +7,7 @@ import {
 	webSocketMessages,
 } from "@rest-rpc/core/contract";
 import {
+	type RouteHandlers,
 	type RouteReceived,
 	type RouteRequest,
 	type RouteRequestData,
@@ -470,6 +471,91 @@ expectType<typeof implementationApi.reports.csv>(
 expectType<typeof implementationApi.socket.room>(
 	composedImplementations.socket.room.route,
 );
+
+// should reject class instances that do not implement required routes
+class MissingCreateTodoService {
+	readonly prefix = "todo";
+}
+
+expectError(router(createApi.todos, new MissingCreateTodoService()));
+
+// should reject class instances that return the wrong route response shape
+class WrongCreateTodoService {
+	create({ title }: RouteRequest<typeof createApi.todos.create>) {
+		return {
+			id: "todo-1",
+			title,
+		};
+	}
+}
+
+expectError(router(createApi.todos, new WrongCreateTodoService()));
+
+// should reject incomplete classes when using the router input helper
+// @ts-expect-error The class is missing the create route handler.
+class MissingCheckedCreateTodoService
+	implements RouteHandlers<typeof createApi.todos>
+{
+	readonly prefix = "todo";
+}
+
+expectError(router(createApi.todos, new MissingCheckedCreateTodoService()));
+
+// should reject invalid class implementation
+class WrongCheckedCreateTodoService
+	implements RouteHandlers<typeof createApi.todos>
+{
+	// @ts-expect-error The class method does not return the required response envelope.
+	create({ title }: RouteRequest<typeof createApi.todos.create>) {
+		return {
+			id: "todo-1",
+			title,
+		};
+	}
+}
+
+expectError(router(createApi.todos, new WrongCheckedCreateTodoService()));
+
+// should accept valid class implementation
+class CheckedCreateTodoService
+	implements RouteHandlers<typeof createApi.todos>
+{
+	readonly prefix = "todo";
+
+	create({ title }: RouteRequest<typeof createApi.todos.create>) {
+		return {
+			status: 201 as const,
+			body: {
+				id: `${this.prefix}-1`,
+				title,
+			},
+			responseHeaders: {
+				location: "/todos/todo-1",
+			},
+		};
+	}
+}
+
+router(createApi.todos, new CheckedCreateTodoService());
+
+// should expose that despite using implements, TypeScript does not contextually type class methods
+class _UnannotatedCheckedCreateTodoService
+	implements RouteHandlers<typeof createApi.todos>
+{
+	// @ts-expect-error Implements checks assignability after method inference.
+	create({ title }) {
+		return {
+			status: 201 as const,
+			body: {
+				id: "todo-1",
+				title,
+			},
+			responseHeaders: {
+				location: "/todos/todo-1",
+			},
+		};
+	}
+}
 
 // should preserve route types through deeper router/router/route stacking
 const stackedApi = defineRouter({
