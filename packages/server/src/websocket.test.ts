@@ -7,10 +7,10 @@ import {
 	createContractWebSocket,
 	handleWebSocketRoute,
 	prepareWebSocketUpgrade,
-	type RawWebSocket,
+	type WebSocketLike,
 } from "./websocket.ts";
 
-class FakeRawWebSocket implements RawWebSocket {
+class FakeWebSocketLike implements WebSocketLike {
 	sent: string[] = [];
 	closeCode?: number;
 	closeReason?: string;
@@ -69,7 +69,7 @@ const websocketRoute = (
 
 describe("createContractWebSocket", () => {
 	it("parses JSON client message strings with transforms", async () => {
-		const rawSocket = new FakeRawWebSocket();
+		const rawSocket = new FakeWebSocketLike();
 		const socket = createContractWebSocket(
 			websocketRoute({
 				client: z.object({
@@ -98,7 +98,7 @@ describe("createContractWebSocket", () => {
 	});
 
 	it("rejects Date client messages received as JSON strings", async () => {
-		const rawSocket = new FakeRawWebSocket();
+		const rawSocket = new FakeWebSocketLike();
 		const socket = createContractWebSocket(
 			websocketRoute({
 				client: z.object({
@@ -122,7 +122,7 @@ describe("createContractWebSocket", () => {
 	});
 
 	it("serializes transformed server message output", () => {
-		const rawSocket = new FakeRawWebSocket();
+		const rawSocket = new FakeWebSocketLike();
 		const socket = createContractWebSocket(
 			websocketRoute({
 				client: z.object({ text: z.string() }),
@@ -149,7 +149,7 @@ describe("createContractWebSocket", () => {
 	});
 
 	it("serializes Date server message output as JSON strings", () => {
-		const rawSocket = new FakeRawWebSocket();
+		const rawSocket = new FakeWebSocketLike();
 		const socket = createContractWebSocket(
 			websocketRoute({
 				client: z.object({ text: z.string() }),
@@ -173,7 +173,7 @@ describe("createContractWebSocket", () => {
 	});
 
 	it("parses discriminated client message payloads with transforms", async () => {
-		const rawSocket = new FakeRawWebSocket();
+		const rawSocket = new FakeWebSocketLike();
 		const socket = createContractWebSocket(
 			websocketRoute({
 				client: {
@@ -200,7 +200,7 @@ describe("createContractWebSocket", () => {
 	});
 
 	it("closes discriminated client messages with unknown discriminator values", async () => {
-		const rawSocket = new FakeRawWebSocket();
+		const rawSocket = new FakeWebSocketLike();
 		const socket = createContractWebSocket(
 			websocketRoute({
 				client: webSocketMessages("action", {
@@ -224,7 +224,7 @@ describe("createContractWebSocket", () => {
 	});
 
 	it("validates and serializes discriminated server message payloads", () => {
-		const rawSocket = new FakeRawWebSocket();
+		const rawSocket = new FakeWebSocketLike();
 		const socket = createContractWebSocket(
 			websocketRoute({
 				client: z.object({ text: z.string() }),
@@ -248,7 +248,7 @@ describe("createContractWebSocket", () => {
 	});
 
 	it("stops receiving messages after unsubscribing", async () => {
-		const rawSocket = new FakeRawWebSocket();
+		const rawSocket = new FakeWebSocketLike();
 		const socket = createContractWebSocket(
 			websocketRoute({
 				client: z.object({ text: z.string() }),
@@ -267,7 +267,7 @@ describe("createContractWebSocket", () => {
 	});
 
 	it("closes when an async message handler rejects", async () => {
-		const rawSocket = new FakeRawWebSocket();
+		const rawSocket = new FakeWebSocketLike();
 		const socket = createContractWebSocket(
 			websocketRoute({
 				client: z.object({ text: z.string() }),
@@ -472,7 +472,7 @@ describe("prepareWebSocketUpgrade", () => {
 
 describe("handleWebSocketRoute", () => {
 	it("passes validated request context and contract socket to the handler", async () => {
-		const rawSocket = new FakeRawWebSocket();
+		const rawSocket = new FakeWebSocketLike();
 		const route = websocketRoute({
 			client: z.object({ text: z.string() }),
 			server: z.object({ text: z.string() }),
@@ -497,7 +497,7 @@ describe("handleWebSocketRoute", () => {
 	});
 
 	it("closes when the websocket handler rejects", async () => {
-		const rawSocket = new FakeRawWebSocket();
+		const rawSocket = new FakeWebSocketLike();
 		const route = websocketRoute({
 			client: z.object({ text: z.string() }),
 			server: z.object({ text: z.string() }),

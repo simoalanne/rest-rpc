@@ -14,10 +14,10 @@ import {
 	createRouteMatcher,
 	handleWebSocketRoute,
 	prepareWebSocketUpgrade,
-	type RawWebSocket,
 	type RouteImplementation,
 	type ServerErrorHandlers,
 	type UpgradeRejection,
+	type WebSocketLike,
 } from "@rest-rpc/server";
 import type WebSocket from "ws";
 import type { WebSocketServer } from "ws";
@@ -79,7 +79,7 @@ const sendUpgradeRejection = (socket: Duplex, rejection: UpgradeRejection) => {
 	socket.destroy();
 };
 
-const adaptWebSocket = (socket: WebSocket): RawWebSocket => ({
+const adaptWebSocket = (socket: WebSocket): WebSocketLike => ({
 	send(data) {
 		socket.send(data);
 	},

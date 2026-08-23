@@ -71,8 +71,8 @@ export { validateRequest } from "./validation.ts";
 export { createWebResponse } from "./webResponse.ts";
 export type {
 	BeforeWebSocketUpgrade,
-	RawWebSocket,
 	UpgradeRejection,
+	WebSocketLike,
 	WebSocketUpgradeInput,
 	WebSocketUpgradeResult,
 } from "./websocket.ts";

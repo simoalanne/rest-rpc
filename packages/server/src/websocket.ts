@@ -19,7 +19,7 @@ import type {
 } from "./validation.ts";
 import { validateRequest } from "./validation.ts";
 
-export type RawWebSocket = {
+export type WebSocketLike = {
 	send(data: string): void;
 	close(code?: number, reason?: string): void;
 	onMessage(callback: (data: unknown) => void): () => void;
@@ -179,7 +179,7 @@ export const prepareWebSocketUpgrade = async <
 
 export const createContractWebSocket = <E extends WebSocketRouteDeclaration>(
 	route: E,
-	socket: RawWebSocket,
+	socket: WebSocketLike,
 ): RouteSocket<E> => {
 	const parseIncomingMessage = (data: unknown): RouteReceived<E> => {
 		try {
@@ -244,7 +244,7 @@ export const handleWebSocketRoute = <
 	options: {
 		request: Record<string, unknown>;
 		context: TContext;
-		socket: RawWebSocket;
+		socket: WebSocketLike;
 	},
 ) => {
 	const socket = createContractWebSocket(route, options.socket);

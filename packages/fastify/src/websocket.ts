@@ -5,10 +5,10 @@ import {
 	type BeforeWebSocketUpgrade,
 	handleWebSocketRoute,
 	prepareWebSocketUpgrade,
-	type RawWebSocket,
 	type RouteImplementation,
 	type ServerErrorHandlers,
 	type UpgradeRejection,
+	type WebSocketLike,
 } from "@rest-rpc/server";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { ExtendedFastifyPreHandler } from "./http.ts";
@@ -20,7 +20,7 @@ export type FastifyWebSocketOptions = {
 	}>;
 };
 
-const adaptWebSocket = (socket: FastifyWebSocket): RawWebSocket => ({
+const adaptWebSocket = (socket: FastifyWebSocket): WebSocketLike => ({
 	send(data) {
 		socket.send(data);
 	},

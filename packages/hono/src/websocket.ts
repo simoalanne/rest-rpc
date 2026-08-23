@@ -5,10 +5,10 @@ import {
 	type CloseEventLike,
 	handleWebSocketRoute,
 	prepareWebSocketUpgrade,
-	type RawWebSocket,
 	type RouteImplementation,
 	type ServerErrorHandlers,
 	type UpgradeRejection,
+	type WebSocketLike,
 } from "@rest-rpc/server";
 import type { Context, Hono, Next } from "hono";
 import type { Env } from "hono/types";
@@ -27,9 +27,9 @@ type HonoUpgradeWebSocketMiddleware<TEnv extends Env = Env> = (
 	createEvents: (c: Context<TEnv>) => WSEvents | Promise<WSEvents>,
 ) => (c: Context<TEnv>) => Response | Promise<Response>;
 
-const createHonoRawWebSocket = (
+const adaptWebSocket = (
 	getSocket: () => WSContext | undefined,
-): RawWebSocket & {
+): WebSocketLike & {
 	emitMessage(data: unknown): void;
 	emitClose(event: CloseEventLike): void;
 } => {
@@ -119,7 +119,7 @@ export const registerHonoWebSocketRoutes = <TEnv extends Env = Env>(
 
 				return upgradeWebSocket((): WSEvents => {
 					let peer: WSContext | undefined;
-					const rawSocket = createHonoRawWebSocket(() => peer);
+					const rawSocket = adaptWebSocket(() => peer);
 
 					return {
 						onOpen(_event, socket) {
