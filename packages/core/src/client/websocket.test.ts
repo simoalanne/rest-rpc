@@ -75,6 +75,31 @@ describe("ApiClient websockets", () => {
 		assert.equal(instances[0]?.url, "wss://api.test/rooms/room%201");
 	});
 
+	it("returns a wrapper without mutating the native websocket", () => {
+		globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+		const client = initClient(createClientTestContract(), {
+			baseUrl: "https://api.test",
+		});
+
+		const socket = client.socket.join.openConnection({ roomId: "general" });
+		const rawSocket = instances[0];
+
+		assert.notEqual(socket, rawSocket);
+		assert.equal(socket.raw, rawSocket);
+		assert.equal(Object.hasOwn(rawSocket, "send"), false);
+		assert.equal(Object.hasOwn(rawSocket, "onOpen"), false);
+		assert.equal(Object.hasOwn(rawSocket, "onClose"), false);
+		assert.equal(Object.hasOwn(rawSocket, "onError"), false);
+		assert.equal(Object.hasOwn(rawSocket, "onMessage"), false);
+
+		rawSocket.readyState = FakeWebSocket.OPEN;
+		assert.equal(socket.readyState, FakeWebSocket.OPEN);
+
+		socket.close(4000, "done");
+		assert.equal(rawSocket.closeCode, 4000);
+		assert.equal(rawSocket.closeReason, "done");
+	});
+
 	it("serializes sent messages when the socket is open", () => {
 		globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
 		const client = initClient(createClientTestContract(), {

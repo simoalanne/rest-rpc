@@ -71,10 +71,11 @@ export type OpenConnectionArgs<E extends RouteDeclaration = RouteDeclaration> =
  *
  * @see {@link https://rest-rpc.dev/docs/websockets#client}
  */
-export type ClientSocket<E extends WebSocketRouteDeclaration> = Omit<
+export type ClientSocket<E extends WebSocketRouteDeclaration> = Pick<
 	WebSocket,
-	"send"
+	"close" | "readyState" | "url"
 > & {
+	raw: WebSocket;
 	send: (message: ClientSent<E>) => void;
 	onOpen: (callback: (event: Event) => void) => () => void;
 	onMessage: (callback: (message: ClientReceived<E>) => void) => () => void;
