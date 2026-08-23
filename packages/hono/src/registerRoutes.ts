@@ -16,6 +16,11 @@ import {
 	registerHonoWebSocketRoutes,
 } from "./websocket.ts";
 
+/**
+ * Options for registering rest-rpc routes on a Hono app.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/hono#options}
+ */
 export type RegisterRoutesOptions<TEnv extends Env = Env> = {
 	errorHandlers?: ServerErrorHandlers<{
 		c: Context<TEnv>;
@@ -26,6 +31,11 @@ export type RegisterRoutesOptions<TEnv extends Env = Env> = {
 	webSocket?: HonoWebSocketOptions<TEnv>;
 };
 
+/**
+ * Registers HTTP and WebSocket route implementations on a Hono app.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/hono}
+ */
 export function registerRoutes<TEnv extends Env = Env>(
 	app: Hono<TEnv>,
 	implementations: ImplementationTree<RouteDeclaration>,

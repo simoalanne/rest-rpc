@@ -59,6 +59,11 @@ const createStreamResponse = (
 	return new Response(stream, { status, headers });
 };
 
+/**
+ * Converts a normalized HTTP route result into a Web `Response`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#dispatch-adapters}
+ */
 export function createWebResponse(result: HttpRouteResult): Promise<Response> {
 	const headers = new Headers();
 	const setHeaderIfUnset = (name: string, value: string) => {

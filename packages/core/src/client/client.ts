@@ -89,6 +89,11 @@ export class ApiClient<TContract extends Contract = Contract> {
 		);
 }
 
+/**
+ * Creates a typed fetch client from a contract.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client}
+ */
 export function initClient<TContract extends Contract>(
 	contract: TContract,
 	options: ApiClientOptions,

@@ -3,8 +3,18 @@ import type { HttpHeaderValue } from "./headers.ts";
 
 type MaybePromise<T> = T | Promise<T>;
 
+/**
+ * Identifies how a stream route result should be written by an adapter.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#writing-the-result}
+ */
 export type HttpRouteResultStreamMode = "ndjson" | "raw";
 
+/**
+ * Adapter callbacks used to write a normalized HTTP route result.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#writing-the-result}
+ */
 export type HttpRouteResultWriter<TResponse> = {
 	setHeader(name: string, value: HttpHeaderValue): void;
 	sendEmpty(status: number): MaybePromise<TResponse>;
@@ -18,6 +28,11 @@ export type HttpRouteResultWriter<TResponse> = {
 	}): MaybePromise<TResponse>;
 };
 
+/**
+ * Writes a normalized HTTP route result through an adapter-provided writer.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#writing-the-result}
+ */
 export async function handleHttpRouteResult<TResponse>(
 	result: HttpRouteResult,
 	writer: HttpRouteResultWriter<TResponse>,

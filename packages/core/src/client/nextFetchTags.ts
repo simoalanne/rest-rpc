@@ -57,6 +57,13 @@ const createNextFetchTag = (
 	return serializedRequest ? `${tag}:${serializedRequest}` : tag;
 };
 
+/**
+ * Returns the deterministic Next.js fetch tags for a route and request.
+ *
+ * @remarks Tags include path params and query params only; bodies and headers are
+ * intentionally excluded.
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#use-in-nextjs}
+ */
 export function getNextFetchTags(
 	route: RouteDeclaration,
 	request?: NextFetchTagRequest,

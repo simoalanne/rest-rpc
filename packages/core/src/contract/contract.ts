@@ -22,12 +22,25 @@ import type { WebSocketMessageDeclaration } from "./websocketMessages.ts";
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
 export type RouteMetadata = Record<string, unknown>;
+
+/**
+ * Declares one OpenAPI response header entry.
+ *
+ * @see {@link https://rest-rpc.dev/docs/openapi#route-metadata}
+ */
 export type OpenApiResponseHeader =
 	| StandardSchemaV1
 	| {
 			description?: string;
 			schema: StandardSchemaV1;
 	  };
+
+/**
+ * Adds OpenAPI-only metadata for one route response status.
+ *
+ * @remarks This does not affect rest-rpc validation, server return types, or client response types.
+ * @see {@link https://rest-rpc.dev/docs/openapi#route-metadata}
+ */
 export type OpenApiResponseOptions = {
 	description?: string;
 	headers?: Record<string, OpenApiResponseHeader>;
@@ -48,6 +61,11 @@ export type CommonOpenApiRouteOptions = Omit<
 	"summary" | "description" | "operationId"
 >;
 
+/**
+ * Selects whether a route is handled as HTTP or WebSocket.
+ *
+ * @see {@link https://rest-rpc.dev/docs/websockets}
+ */
 export type RouteMode = "http" | "webSocket";
 
 export type ContractOptions = {
@@ -68,12 +86,22 @@ export type BaseRouteDeclaration = {
 	openApi?: OpenApiRouteOptions;
 };
 
+/**
+ * A normalized HTTP route declaration.
+ *
+ * @see {@link https://rest-rpc.dev/docs/contract/declaration#route-fields}
+ */
 export type HttpRouteDeclaration = BaseRouteDeclaration &
 	RouteResponseInput & {
 		mode?: "http";
 		messages?: never;
 	};
 
+/**
+ * A normalized WebSocket route declaration.
+ *
+ * @see {@link https://rest-rpc.dev/docs/websockets#contract}
+ */
 export type WebSocketRouteDeclaration = BaseRouteDeclaration & {
 	method: "GET";
 	mode: "webSocket";
@@ -84,8 +112,18 @@ export type WebSocketRouteDeclaration = BaseRouteDeclaration & {
 	responses?: never;
 };
 
+/**
+ * Any normalized route declaration in a contract tree.
+ *
+ * @see {@link https://rest-rpc.dev/docs/contract/declaration#route-fields}
+ */
 export type RouteDeclaration = HttpRouteDeclaration | WebSocketRouteDeclaration;
 
+/**
+ * A route declaration or nested object tree of route declarations.
+ *
+ * @see {@link https://rest-rpc.dev/docs/contract/declaration}
+ */
 export type Contract = RouteDeclaration | { [k: string]: Contract };
 
 export const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
@@ -266,6 +304,12 @@ export type ApplyRouterOptions<
 				: never;
 		};
 
+/**
+ * Defines one route and applies route-level contract normalization.
+ *
+ * @remarks Path params can be inferred from `:name` or `{name}` path segments when `pathParams` is omitted.
+ * @see {@link https://rest-rpc.dev/docs/contract/declaration#single-routes}
+ */
 export function route<const TRoute extends RouteDeclaration>(
 	route: TRoute,
 	options?: RouteContractOptions,
@@ -277,6 +321,12 @@ export function route<const TRoute extends RouteDeclaration>(
 	>;
 }
 
+/**
+ * Defines a contract tree and applies shared router options.
+ *
+ * @remarks Shared options are applied to every route in the tree before validation.
+ * @see {@link https://rest-rpc.dev/docs/contract/declaration#shared-router-options}
+ */
 export function router<
 	const TContract extends Contract,
 	const TOptions extends RouterContractOptions | undefined = undefined,

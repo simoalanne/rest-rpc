@@ -11,6 +11,11 @@ import {
 	registerFastifyWebSocketRoutes,
 } from "./websocket.ts";
 
+/**
+ * Options for registering rest-rpc routes on a Fastify instance.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fastify#options}
+ */
 export type RegisterRoutesOptions = {
 	errorHandlers?: ServerErrorHandlers<{
 		req: FastifyRequest;
@@ -20,6 +25,11 @@ export type RegisterRoutesOptions = {
 	webSocket?: FastifyWebSocketOptions;
 };
 
+/**
+ * Registers HTTP and WebSocket route implementations on a Fastify instance.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fastify}
+ */
 export function registerRoutes(
 	app: FastifyInstance,
 	implementations: ImplementationTree<RouteDeclaration>,

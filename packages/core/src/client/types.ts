@@ -15,7 +15,14 @@ import type {
 } from "../contract/response.ts";
 
 export type FetchOptions = Omit<RequestInit, "method" | "body" | "headers">;
+
 export type ApiClientFetchOptions = Omit<FetchOptions, "signal">;
+
+/**
+ * The fetch-compatible function shape used by the core client.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#custom-fetch}
+ */
 export type FetchLike = (
 	input: string | URL | Request,
 	init?: RequestInit,
@@ -43,6 +50,11 @@ type RouteUndeclaredResponse = {
 	headers: Headers;
 };
 
+/**
+ * The response envelope returned by `fetchResponse()` for a route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#fetchresponse}
+ */
 export type ClientResponse<E extends RouteDeclaration> =
 	| RouteDeclaredResponse<E>
 	| RouteUndeclaredResponse;
@@ -54,6 +66,11 @@ export type FetchResponseFn<E extends RouteDeclaration> = (
 export type OpenConnectionArgs<E extends RouteDeclaration = RouteDeclaration> =
 	ClientRequest<E> extends never ? [] : [request: ClientRequest<E>];
 
+/**
+ * The typed WebSocket client returned by a WebSocket route's `openConnection()`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/websockets#client}
+ */
 export type ClientSocket<E extends WebSocketRouteDeclaration> = Omit<
 	WebSocket,
 	"send"
@@ -97,6 +114,11 @@ export type ApiClientRouteValue<E extends RouteDeclaration = RouteDeclaration> =
 			: ApiClientHttpRouteValue<E>
 		: never;
 
+/**
+ * Infers the generated client tree for a contract.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
+ */
 export type ApiClientFor<T extends Contract = Contract> =
 	T extends RouteDeclaration
 		? ApiClientRouteValue<T>
@@ -108,11 +130,21 @@ export type GetHeadersFn = () =>
 	| Record<string, string>
 	| Promise<Record<string, string>>;
 
+/**
+ * Enables deterministic Next.js fetch tags for generated GET requests.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#use-in-nextjs}
+ */
 export type NextFetchTagsOptions = {
 	enabled: boolean;
 	tagPrefix?: string;
 };
 
+/**
+ * Options used to create a typed fetch client.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#client-options}
+ */
 export type ApiClientOptions = {
 	baseUrl: string;
 	fetch?: FetchLike;

@@ -14,10 +14,25 @@ import {
 
 type MaybePromise<T> = T | Promise<T>;
 
+/**
+ * A contract tree containing only HTTP routes for the Web adapter.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/web}
+ */
 export type WebContract = Contract<HttpRouteDeclaration>;
 
+/**
+ * An HTTP-only implementation tree for the Web adapter.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/web}
+ */
 export type WebImplementationTree = ImplementationTree<HttpRouteDeclaration>;
 
+/**
+ * The context object passed to Web adapter route handlers.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/web#framework-context}
+ */
 export type WebRouteContext<
 	TContext extends Record<string, unknown>,
 	TRequest extends Request = Request,
@@ -25,6 +40,11 @@ export type WebRouteContext<
 	request: TRequest;
 };
 
+/**
+ * Input passed to Web adapter middleware.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/web#framework-context}
+ */
 export type WebRouteMiddlewareInput<
 	TRuntimeContext extends Record<string, unknown>,
 	TRequest extends Request = Request,
@@ -34,11 +54,22 @@ export type WebRouteMiddlewareInput<
 	runtime: TRuntimeContext;
 };
 
+/**
+ * Result returned by Web adapter middleware.
+ *
+ * @remarks Returning a `Response` short-circuits the route handler.
+ * @see {@link https://rest-rpc.dev/docs/server/web#framework-context}
+ */
 export type WebRouteMiddlewareResult<TContext extends Record<string, unknown>> =
 	| Response
 	| TContext
 	| undefined;
 
+/**
+ * Middleware function shape for Web adapter routes.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/web#framework-context}
+ */
 export type WebRouteMiddleware<
 	TRuntimeContext extends Record<string, unknown>,
 	TContext extends Record<string, unknown>,
@@ -55,6 +86,11 @@ export type WebRouteImplementation<
 	middleware?: WebRouteMiddleware<TRuntimeContext, TContext, TRequest>;
 };
 
+/**
+ * Infers the Web route handler request type for a route declaration.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ */
 export type RouteRequest<
 	E extends HttpRouteDeclaration,
 	TContext extends Record<string, unknown> = Record<string, unknown>,
@@ -71,6 +107,11 @@ type WebRouteBuilderWithMiddleware<
 	): RouteImplementation<TRoute> & WebImplementationTree;
 };
 
+/**
+ * Fluent builder for a single Web adapter route implementation.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/web}
+ */
 export type WebRouteBuilder<
 	TRoute extends HttpRouteDeclaration,
 	TRuntimeContext extends Record<string, unknown>,
@@ -95,6 +136,11 @@ type WebRouterBuilderWithMiddleware<
 		WebImplementationTree;
 };
 
+/**
+ * Fluent builder for a Web adapter implementation tree.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/web}
+ */
 export type WebRouterBuilder<
 	TContract extends WebContract,
 	TRuntimeContext extends Record<string, unknown>,

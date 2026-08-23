@@ -14,8 +14,9 @@
 		"typecheck": "pnpm run typecheck:workspace",
 		"typecheck:workspace": "pnpm run build:packages && pnpm -r --parallel --no-bail --filter './packages/**' --filter '!integration-tests' typecheck",
 		"test": "pnpm run test:unit && pnpm run test:integration",
-		"test:unit": "pnpm run build:packages && pnpm -r --parallel --no-bail --if-present --filter './packages/**' --filter '!integration-tests' test",
+		"test:unit": "pnpm run build:packages && pnpm run test:scripts && pnpm -r --parallel --no-bail --if-present --filter './packages/**' --filter '!integration-tests' test",
 		"test:integration": "pnpm run build:packages && pnpm --filter integration-tests test",
+		"test:scripts": "node --test scripts/*.test.mjs",
 		"lint": "biome lint .",
 		"lint:verify": "pnpm run lint",
 		"lint:staged": "biome check --write --staged --no-errors-on-unmatched",
@@ -25,9 +26,11 @@
 		"release": "pnpm run build:packages && changeset publish",
 		"release:github:notes": "node scripts/create-github-release.ts --notes",
 		"bench:typecheck": "pnpm run build:packages && pnpm --filter benchmarks bench:typecheck",
+		"api:docs": "pnpm run build:packages && pnpm run api:docs:verify",
+		"api:docs:verify": "node scripts/check-public-api-docs.mjs",
 		"readme:sync": "node scripts/sync-readmes.cjs",
-		"check": "pnpm run lint && pnpm run typecheck && pnpm run test",
-		"check:verify": "pnpm run lint:verify && pnpm run typecheck && pnpm run test",
+		"check": "pnpm run lint && pnpm run typecheck && pnpm run api:docs:verify && pnpm run test",
+		"check:verify": "pnpm run lint:verify && pnpm run typecheck && pnpm run api:docs:verify && pnpm run test",
 		"docs:dev": "pnpm run build:packages && pnpm --filter content dev",
 		"docs:build": "pnpm run build:packages && pnpm --filter content build",
 		"docs:preview": "pnpm run build:packages && pnpm --filter content preview"
@@ -37,6 +40,7 @@
 		"@changesets/cli": "^3.0.0",
 		"lefthook": "2.1.5",
 		"tsd": "^0.33.0",
-		"typescript": "^7.0.2"
+		"typescript": "^7.0.2",
+		"typescript-compiler-api": "npm:typescript@5.9.3"
 	}
 }

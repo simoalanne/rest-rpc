@@ -47,6 +47,11 @@ export type OpenApiPathItem = Partial<
 	Record<"get" | "post" | "put" | "delete" | "patch", OpenApiOperation>
 >;
 
+/**
+ * The OpenAPI document shape returned by `createOpenApiDocument()`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/openapi}
+ */
 export type OpenApiDocument = {
 	openapi: string;
 	info: {
@@ -79,6 +84,11 @@ export type OperationTransformContext = {
 	operation: OpenApiOperation;
 };
 
+/**
+ * Options for generating an OpenAPI document from a contract.
+ *
+ * @see {@link https://rest-rpc.dev/docs/openapi#schema-conversion}
+ */
 export type CreateOpenApiDocumentOptions = {
 	openapi?: string;
 	info: OpenApiDocument["info"];

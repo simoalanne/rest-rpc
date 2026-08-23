@@ -1,6 +1,11 @@
 type SameSite = "strict" | "lax" | "none";
 type CookiePriority = "low" | "medium" | "high";
 
+/**
+ * Options for serializing a `Set-Cookie` header value.
+ *
+ * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-set-cookie-header}
+ */
 export type SetCookieOptions = {
 	domain?: string;
 	expires?: Date;
@@ -14,6 +19,11 @@ export type SetCookieOptions = {
 	encode?: (value: string) => string;
 };
 
+/**
+ * Options for serializing a cookie-clearing `Set-Cookie` header value.
+ *
+ * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-set-cookie-header}
+ */
 export type ClearCookieOptions = Omit<
 	SetCookieOptions,
 	"expires" | "maxAge" | "encode"
@@ -22,6 +32,11 @@ export type ClearCookieOptions = Omit<
 const capitalize = (str: string): string =>
 	str.charAt(0).toUpperCase() + str.slice(1);
 
+/**
+ * Serializes a `Set-Cookie` header value.
+ *
+ * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-set-cookie-header}
+ */
 export function setCookie(
 	name: string,
 	value: string,
@@ -60,6 +75,11 @@ export function setCookie(
 	return parts.join("; ");
 }
 
+/**
+ * Serializes a `Set-Cookie` header value that clears a cookie.
+ *
+ * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-set-cookie-header}
+ */
 export function clearCookie(
 	name: string,
 	options: ClearCookieOptions = {},

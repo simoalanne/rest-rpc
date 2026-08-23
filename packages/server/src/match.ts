@@ -70,22 +70,42 @@ const createPathMatcher = (path: string) => {
 	};
 };
 
+/**
+ * A successful route match from `createRouteMatcher()`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#dispatch-adapters}
+ */
 export type RouteMatcherMatch = {
 	type: "match";
 	route: RouteDeclaration;
 	params: Record<string, string>;
 };
 
+/**
+ * A route match result for a path with no matching HTTP method.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#dispatch-adapters}
+ */
 export type RouteMatcherMethodNotAllowed = {
 	type: "methodNotAllowed";
 	allowedMethods: string[];
 };
 
+/**
+ * The result returned by a route matcher.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#dispatch-adapters}
+ */
 export type RouteMatcherResult =
 	| RouteMatcherMatch
 	| RouteMatcherMethodNotAllowed
 	| null;
 
+/**
+ * Creates a path and method matcher for a contract tree.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#dispatch-adapters}
+ */
 export function createRouteMatcher(contract: Contract) {
 	const matchers = flattenContractRoutes(contract)
 		.sort(compareRouteSpecificity)

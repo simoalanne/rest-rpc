@@ -7,12 +7,22 @@ import type { RequestSegments, ValidationIssue } from "./validation.ts";
 
 type MaybePromise<T> = T | Promise<T>;
 
+/**
+ * A response returned by server error handler hooks.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/express#error-handlers}
+ */
 export type ServerErrorResponse = {
 	status: number;
 	headers?: HttpHeaders;
 	body?: unknown;
 };
 
+/**
+ * Input passed to `onRequestValidationError`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/express#error-handlers}
+ */
 export type RequestValidationErrorInput<
 	TContext extends Record<string, unknown>,
 	TRoute extends RouteDeclaration = RouteDeclaration,
@@ -23,6 +33,11 @@ export type RequestValidationErrorInput<
 	issues: ValidationIssue[];
 };
 
+/**
+ * Input passed to `onUnhandledError`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/express#error-handlers}
+ */
 export type UnhandledErrorInput<
 	TContext extends Record<string, unknown>,
 	TRoute extends RouteDeclaration = RouteDeclaration,
@@ -33,6 +48,11 @@ export type UnhandledErrorInput<
 	error: unknown;
 };
 
+/**
+ * Input passed to `onResponseValidationError`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/express#error-handlers}
+ */
 export type ResponseValidationErrorInput<
 	TContext extends Record<string, unknown>,
 > = {
@@ -42,6 +62,11 @@ export type ResponseValidationErrorInput<
 	error: unknown;
 };
 
+/**
+ * Hooks for converting server validation and unhandled errors into responses.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/express#error-handlers}
+ */
 export type ServerErrorHandlers<TContext extends Record<string, unknown>> = {
 	onRequestValidationError?: (
 		input: RequestValidationErrorInput<TContext>,

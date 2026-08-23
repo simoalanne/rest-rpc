@@ -10,11 +10,21 @@ export const REQUEST_CONTEXT_KEY = "context";
 
 export type RequestSchemaRecord = Record<string, StandardSchemaV1>;
 
+/**
+ * Declares a query string field that carries a JSON-encoded object value.
+ *
+ * @see {@link https://rest-rpc.dev/docs/contract/declaration#json-query}
+ */
 export type JsonQuery<TSchema extends StandardSchemaV1 = StandardSchemaV1> = {
 	kind: "jsonQuery";
 	schema: TSchema;
 };
 
+/**
+ * Wraps a schema as a JSON query declaration.
+ *
+ * @see {@link https://rest-rpc.dev/docs/contract/declaration#json-query}
+ */
 export function jsonQuery<const TSchema extends StandardSchemaV1>(
 	schema: TSchema,
 ): JsonQuery<TSchema> {
@@ -189,6 +199,11 @@ type InferRequestFor<
 			: never
 		: never;
 
+/**
+ * Infers the request type passed to a generated client route call.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
+ */
 export type ClientRequest<E extends RouteDeclaration> = InferRequestFor<
 	E,
 	"input"
@@ -232,6 +247,11 @@ type InferWebSocketMessage<
 		? InferDiscriminatedWebSocketMessage<TMessage, TIO>
 		: never;
 
+/**
+ * Infers the message type a client can send on a WebSocket route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
+ */
 export type ClientSent<E extends RouteDeclaration> = E extends {
 	messages: { client: infer R };
 }
@@ -250,6 +270,11 @@ export type ServerSent<E extends RouteDeclaration> = E extends {
 	? InferWebSocketMessage<R, "input">
 	: never;
 
+/**
+ * Infers the message type a client receives from a WebSocket route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
+ */
 export type ClientReceived<E extends RouteDeclaration> = E extends {
 	messages: { server: infer R };
 }

@@ -34,11 +34,21 @@ export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
 export { clearCookie, RouteResponseError, setCookie };
 
+/**
+ * The context object passed to Fastify HTTP route handlers.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fastify#framework-context}
+ */
 export type HttpRouteHandlerContext = {
 	req: FastifyRequest;
 	signal: AbortSignal;
 };
 
+/**
+ * The context object passed to Fastify WebSocket route handlers.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fastify#framework-context}
+ */
 export type WebSocketRouteHandlerContext = {
 	req: FastifyRequest;
 };
@@ -48,15 +58,31 @@ type RouteContext<E extends RouteDeclaration> =
 		? WebSocketRouteHandlerContext
 		: HttpRouteHandlerContext;
 
+/**
+ * Infers the route handler request type for a given route declaration.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ */
 export type RouteRequest<E extends RouteDeclaration> = ServerRouteRequest<
 	E,
 	RouteContext<E>
 >;
+
+/**
+ * Infers the Fastify route handler type for a given route declaration.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ */
 export type RouteHandler<E extends RouteDeclaration> = ServerRouteHandler<
 	E,
 	RouteContext<E>
 >;
 
+/**
+ * Builds a Fastify route implementation for a single contract route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fastify}
+ */
 export function route<const TNode extends RouteDeclaration>(
 	contract: TNode,
 	handler: RouteHandlerFor<
@@ -68,6 +94,11 @@ export function route<const TNode extends RouteDeclaration>(
 	return serverRoute(contract, handler);
 }
 
+/**
+ * Builds a Fastify router implementation for a contract.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fastify}
+ */
 export function router<const TNode extends Contract<RouteDeclaration>>(
 	contract: TNode,
 	handlers: RouterImplementationInput<

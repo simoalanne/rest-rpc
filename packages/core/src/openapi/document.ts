@@ -9,6 +9,12 @@ import type {
 	OpenApiPathItem,
 } from "./types.ts";
 
+/**
+ * Generates an OpenAPI document object from HTTP routes in a contract.
+ *
+ * @remarks WebSocket routes are skipped because they do not map faithfully to OpenAPI.
+ * @see {@link https://rest-rpc.dev/docs/openapi}
+ */
 export function createOpenApiDocument(
 	contract: Contract,
 	options: CreateOpenApiDocumentOptions,

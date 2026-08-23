@@ -20,7 +20,6 @@ export type {
 	HttpRouteResultWriter,
 } from "./handleHttpRouteResult.ts";
 export { handleHttpRouteResult } from "./handleHttpRouteResult.ts";
-export type { HttpHeaders, HttpHeaderValue } from "./headers.ts";
 export type {
 	RouteMatcherMatch,
 	RouteMatcherMethodNotAllowed,
@@ -52,7 +51,6 @@ export type {
 	RouterImplementationInput,
 	RouteSent,
 	RouteSocket,
-	RuntimeRouteHandler,
 	WebSocketRouteHandlerContext,
 } from "./router.ts";
 export {

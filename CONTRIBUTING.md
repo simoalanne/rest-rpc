@@ -23,6 +23,18 @@ git checkout -b my-feature-branch
 ```
 
 5. Make your changes.
+
+## Public API
+
+The public API of each published package is its root entry point. Subpath-only exports are internal
+unless they are also re-exported from the package root.
+
+- Do not use wildcard exports from package root entry points. Export each public symbol explicitly.
+- Every package root export must have a TSDoc comment on the declaration itself, not on the re-export.
+- Root-exported functions must use regular function declarations so generated API references can identify them as functions.
+
+## Verification
+
 6. Verify the relevant behavior:
 
 ```sh
@@ -31,7 +43,7 @@ pnpm run typecheck
 pnpm run test
 ```
 
-1. If the change affects published package behavior, types, exports, or docs-visible functionality, add a changeset:
+7. If the change affects published package behavior, types, exports, or docs-visible functionality, add a changeset:
 
 ```sh
 pnpm changeset

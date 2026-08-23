@@ -39,11 +39,21 @@ export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
 export { clearCookie, RouteResponseError, setCookie };
 
+/**
+ * The context object passed to Hono HTTP route handlers.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/hono#framework-context}
+ */
 export type HttpRouteHandlerContext<E extends Env = Env> = {
 	c: Context<E>;
 	signal: AbortSignal;
 };
 
+/**
+ * The context object passed to Hono WebSocket route handlers.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/hono#framework-context}
+ */
 export type WebSocketRouteHandlerContext<E extends Env = Env> = {
 	c: Context<E>;
 };
@@ -55,16 +65,31 @@ type RouteContext<
 	? WebSocketRouteHandlerContext<TEnv>
 	: HttpRouteHandlerContext<TEnv>;
 
+/**
+ * Infers the route handler request type for a given route declaration.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ */
 export type RouteRequest<
 	E extends RouteDeclaration,
 	TEnv extends Env = Env,
 > = ServerRouteRequest<E, RouteContext<E, TEnv>>;
 
+/**
+ * Infers the Hono route handler type for a given route declaration.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ */
 export type RouteHandler<
 	E extends RouteDeclaration,
 	TEnv extends Env = Env,
 > = ServerRouteHandler<E, RouteContext<E, TEnv>>;
 
+/**
+ * Builds a Hono route implementation for a single contract route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/hono}
+ */
 export function route<
 	const TNode extends RouteDeclaration,
 	TEnv extends Env = Env,
@@ -79,6 +104,11 @@ export function route<
 	return serverRoute(contract, handler);
 }
 
+/**
+ * Builds a Hono router implementation for a contract.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/hono}
+ */
 export function router<
 	const TNode extends Contract<RouteDeclaration>,
 	TEnv extends Env = Env,

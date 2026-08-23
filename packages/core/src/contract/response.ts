@@ -1,6 +1,11 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { HttpMethod, RouteDeclaration } from "./contract.ts";
 
+/**
+ * Marks a request or response body as intentionally empty.
+ *
+ * @see {@link https://rest-rpc.dev/docs/http-responses#response-without-body}
+ */
 export type NoBody = {
 	kind: "noBody";
 };
@@ -8,12 +13,22 @@ export type NoBody = {
 export type ResponseSchema = StandardSchemaV1;
 export type CustomBodyContentType = string | readonly string[];
 
+/**
+ * Declares that a request or response has no body.
+ *
+ * @see {@link https://rest-rpc.dev/docs/http-responses#response-without-body}
+ */
 export function noBody(): NoBody {
 	return {
 		kind: "noBody",
 	};
 }
 
+/**
+ * Declares a body schema with one or more non-JSON content types.
+ *
+ * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-custom-content-type}
+ */
 export type CustomBody<
 	TSchema extends StandardSchemaV1 = StandardSchemaV1,
 	TContentType extends CustomBodyContentType = CustomBodyContentType,
@@ -23,6 +38,11 @@ export type CustomBody<
 	contentType: TContentType;
 };
 
+/**
+ * Declares a streaming response body.
+ *
+ * @see {@link https://rest-rpc.dev/docs/http-responses#streaming-ndjson-responses}
+ */
 export type Stream<
 	TBody extends ResponseSchema | CustomBody = ResponseSchema | CustomBody,
 > = {
@@ -31,7 +51,19 @@ export type Stream<
 };
 
 export type ResponseBodySchema = ResponseSchema | NoBody | CustomBody | Stream;
+
+/**
+ * Declares typed response headers by header name.
+ *
+ * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-typed-headers}
+ */
 export type ResponseHeaders = Record<string, StandardSchemaV1>;
+
+/**
+ * Declares a route response body, or a body plus typed response headers.
+ *
+ * @see {@link https://rest-rpc.dev/docs/http-responses}
+ */
 export type ResponseDeclaration =
 	| ResponseBodySchema
 	| {
@@ -52,6 +84,11 @@ export type RouteResponseInput =
 	| { response: ResponseDeclaration; responses?: never }
 	| { response?: never; responses?: never };
 
+/**
+ * Declares a streaming response body.
+ *
+ * @see {@link https://rest-rpc.dev/docs/http-responses#streaming-ndjson-responses}
+ */
 export function stream<const TBody extends ResponseSchema | CustomBody>(
 	schema: TBody,
 ): Stream<TBody> {
@@ -61,6 +98,11 @@ export function stream<const TBody extends ResponseSchema | CustomBody>(
 	};
 }
 
+/**
+ * Declares a body schema with one or more non-JSON content types.
+ *
+ * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-custom-content-type}
+ */
 export function customBody<
 	const TSchema extends StandardSchemaV1,
 	const TContentType extends CustomBodyContentType,
@@ -420,6 +462,11 @@ type InferSingleServerResponseBody<TResponse> = [TResponse] extends [never]
 				? TBody
 				: never;
 
+/**
+ * Infers the body returned by `fetch()` for routes with one successful response.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
+ */
 export type ClientResponseBody<E extends RouteDeclaration> =
 	InferSingleResponseBody<SuccessfulDeclaredClientResponse<E>>;
 

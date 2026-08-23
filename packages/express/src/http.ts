@@ -14,6 +14,11 @@ import type {
 	Response,
 } from "express";
 
+/**
+ * Express middleware that also receives the matched rest-rpc route declaration.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/express#middleware}
+ */
 export type ExtendedExpressMiddleware = (
 	req: Request,
 	res: ExpressResponse,

@@ -30,19 +30,39 @@ type ClientUndeclaredResponse<E extends RouteDeclaration> = Extract<
 	{ declared: false }
 >;
 
+/**
+ * Infers the successful query data returned for a route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#tanstack-query}
+ */
 export type RouteQueryData<E extends RouteDeclaration> =
 	SuccessfulDeclaredClientResponse<E> & {
 		headers: Headers;
 	};
 
+/**
+ * Infers the error value surfaced by generated TanStack Query options.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#tanstack-query}
+ */
 export type RouteQueryError<E extends RouteDeclaration> =
 	| (ErrorDeclaredClientResponse<E> & { headers: Headers })
 	| ClientUndeclaredResponse<E>
 	| Error;
 
+/**
+ * Infers mutation variables for a route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#tanstack-query}
+ */
 export type RouteMutationVariables<E extends RouteDeclaration> =
 	ClientRequest<E> extends never ? undefined : ClientRequest<E>;
 
+/**
+ * Infers infinite query data for a route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#tanstack-query}
+ */
 export type RouteInfiniteQueryData<E extends RouteDeclaration> = InfiniteData<
 	RouteQueryData<E>,
 	ClientRequest<E>
@@ -173,6 +193,11 @@ export type TanstackQueryApiFor<T extends Contract> =
 
 export type TanstackQueryOptions = ApiClientOptions;
 
+/**
+ * Infers the generated TanStack Query helper tree for a contract.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/tanstack-query}
+ */
 export type TanstackQuery<TContract extends Contract> =
 	TanstackQueryApiFor<TContract>;
 
@@ -189,6 +214,11 @@ const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
 const getByPath = (tree: unknown, path: string[]) =>
 	path.reduce((node, key) => (node as Record<string, unknown>)[key], tree);
 
+/**
+ * Creates TanStack Query option helpers from a contract.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#setup}
+ */
 export function initTanstackQuery<TContract extends Contract>(
 	contract: TContract,
 	options: TanstackQueryOptions,

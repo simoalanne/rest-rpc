@@ -12,6 +12,11 @@ import {
 	registerExpressWebSocketRoutes,
 } from "./websocket.ts";
 
+/**
+ * Options for registering rest-rpc routes on an Express router.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/express#options}
+ */
 export type RegisterRoutesOptions = {
 	errorHandlers?: ServerErrorHandlers<
 		| { kind: "http"; req: Request; signal: AbortSignal }
@@ -32,6 +37,11 @@ type ExpressWebSocketErrorHandlers = ServerErrorHandlers<{
 	signal: AbortSignal;
 }>;
 
+/**
+ * Registers HTTP and WebSocket route implementations on an Express router.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/express}
+ */
 export function registerRoutes(
 	app: IRouter,
 	implementations: ImplementationTree<RouteDeclaration>,

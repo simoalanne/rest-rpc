@@ -11,12 +11,22 @@ import {
 	type ServerErrorHandlers,
 } from "@rest-rpc/server";
 
+/**
+ * Input passed to a custom Web adapter request body parser.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/web#body-parsing}
+ */
 export type WebRouteParseBodyInput = {
 	request: Request;
 	route: HttpRouteDeclaration;
 	body: RequestBodySchema;
 };
 
+/**
+ * Custom request body parser for the Web adapter.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/web#body-parsing}
+ */
 export type WebRouteParseBody = (
 	input: WebRouteParseBodyInput,
 ) => unknown | Promise<unknown>;

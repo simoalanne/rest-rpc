@@ -28,6 +28,11 @@ type HttpRouteResultBase = {
 	headers?: HttpHeaders;
 };
 
+/**
+ * A normalized HTTP route result ready for an adapter-specific writer.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#writing-the-result}
+ */
 export type HttpRouteResult =
 	| (HttpRouteResultBase & { kind: "empty" })
 	| (HttpRouteResultBase & { kind: "json"; body: unknown })
@@ -42,6 +47,11 @@ export type HttpRouteResult =
 			contentType?: string;
 	  });
 
+/**
+ * Inputs needed to invoke and normalize one HTTP route handler.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registering-http-routes}
+ */
 export type HandleHttpRouteOptions<TContext extends HttpRouteHandlerContext> = {
 	request: RequestSegments;
 	context: TContext;
@@ -424,6 +434,11 @@ const normalizeRouteResponseError = async <
 	}
 };
 
+/**
+ * Validates an HTTP request, invokes a route handler, and normalizes its result.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registering-http-routes}
+ */
 export async function handleHttpRoute<
 	E extends HttpRouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,

@@ -44,11 +44,21 @@ export type {
 } from "./routeBuilder.ts";
 export { clearCookie, RouteResponseError, setCookie };
 
+/**
+ * Options for creating a Web `Request` to `Response` route handler.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/web#options}
+ */
 export type CreateWebHandlerOptions = {
 	errorHandlers?: ServerErrorHandlers<Record<never, never>>;
 	parseBody?: WebRouteParseBody;
 };
 
+/**
+ * Creates a fluent Web route builder for a single HTTP route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/web}
+ */
 export function route<
 	const TRoute extends HttpRouteDeclaration,
 	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
@@ -57,6 +67,11 @@ export function route<
 	return createWebRouteBuilder(contract);
 }
 
+/**
+ * Creates a fluent Web router builder for a contract tree.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/web}
+ */
 export function router<
 	const TContract extends WebContract,
 	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
@@ -65,6 +80,11 @@ export function router<
 	return createWebRouterBuilder(contract);
 }
 
+/**
+ * Creates a Web `Request` handler from route implementations.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/web}
+ */
 export function createRouteHandler<
 	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
 	TContext extends Record<string, unknown> = Record<string, unknown>,
@@ -109,6 +129,11 @@ export function createRouteHandler<
 	};
 }
 
+/**
+ * Creates typed Web adapter helpers with shared runtime context types.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/web}
+ */
 export function initWeb<
 	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
 	TRequest extends Request = Request,

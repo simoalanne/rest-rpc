@@ -19,6 +19,11 @@ const flattenImplementationTree = <TRoute extends RouteDeclaration>(
 	return Object.values(implementation).flatMap(flattenImplementationTree);
 };
 
+/**
+ * Flattens an implementation tree into route-specific implementations.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#splitting-implementations}
+ */
 export function flattenRouteImplementations<TRoute extends RouteDeclaration>(
 	implementation: ImplementationTree<TRoute>,
 ): RouteImplementation<TRoute>[] {
@@ -27,6 +32,11 @@ export function flattenRouteImplementations<TRoute extends RouteDeclaration>(
 	);
 }
 
+/**
+ * Splits implementations into HTTP and WebSocket groups for server adapters.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#splitting-implementations}
+ */
 export function registerRoutes(
 	implementations: ImplementationTree<RouteDeclaration>,
 	registerHttpRoutes: (

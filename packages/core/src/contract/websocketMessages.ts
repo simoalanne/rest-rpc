@@ -2,6 +2,11 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { validateStandardSchemaSync } from "../standard-schema/index.ts";
 import { isStandardSchema } from "./request.ts";
 
+/**
+ * Maps WebSocket message discriminator values to their schemas.
+ *
+ * @see {@link https://rest-rpc.dev/docs/websockets#contract}
+ */
 export type WebSocketMessageSchemas = Record<string, StandardSchemaV1>;
 
 export type WebSocketMessages<
@@ -14,6 +19,11 @@ export type WebSocketMessages<
 
 export type WebSocketMessageDeclaration = StandardSchemaV1 | WebSocketMessages;
 
+/**
+ * Declares discriminated WebSocket message schemas.
+ *
+ * @see {@link https://rest-rpc.dev/docs/websockets#contract}
+ */
 export function webSocketMessages<
 	const TDiscriminator extends string,
 	const TSchemas extends WebSocketMessageSchemas,

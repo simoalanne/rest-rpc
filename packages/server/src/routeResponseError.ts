@@ -1,6 +1,11 @@
 import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import type { RouteErrors } from "./router.ts";
 
+/**
+ * Throws a declared non-success response from a route handler.
+ *
+ * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-multiple-status-codes}
+ */
 export class RouteResponseError<
 	E extends HttpRouteDeclaration = HttpRouteDeclaration,
 > extends Error {

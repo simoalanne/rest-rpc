@@ -13,6 +13,11 @@ import {
 } from "@rest-rpc/server";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
+/**
+ * Fastify pre-handler that also receives the matched rest-rpc route declaration.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fastify#prehandler}
+ */
 export type ExtendedFastifyPreHandler = (
 	req: FastifyRequest,
 	reply: FastifyReply,

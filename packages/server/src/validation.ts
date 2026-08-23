@@ -6,8 +6,18 @@ import {
 } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 
+/**
+ * A Standard Schema validation issue surfaced by server request validation.
+ *
+ * @see {@link https://rest-rpc.dev/docs/contract/schemas#validation}
+ */
 export type ValidationIssue = StandardSchemaV1.Issue;
 
+/**
+ * The default 400 response body produced by failed request validation.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/express#error-handlers}
+ */
 export type RequestValidationFailure = {
 	status: 400;
 	body: {
@@ -16,10 +26,20 @@ export type RequestValidationFailure = {
 	};
 };
 
+/**
+ * The result of validating request segments for a route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registering-http-routes}
+ */
 export type RequestValidationResponse =
 	| { success: true; data: Record<string, unknown> }
 	| { success: false; response: RequestValidationFailure };
 
+/**
+ * Parsed request pieces passed into server request validation.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registering-http-routes}
+ */
 export type RequestSegments = {
 	body?: unknown;
 	query?: unknown;
@@ -83,6 +103,11 @@ const flattenRequestSegments = (
 	return input;
 };
 
+/**
+ * Validates parsed request segments against a route declaration.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registering-http-routes}
+ */
 export async function validateRequest(
 	route: RouteDeclaration,
 	segments: RequestSegments,

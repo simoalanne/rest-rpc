@@ -15,16 +15,31 @@ import type { Env } from "hono/types";
 
 type RequestBodySchema = HttpRouteDeclaration["body"];
 
+/**
+ * Input passed to a custom Hono request body parser.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/hono#body-parsing}
+ */
 export type HonoParseBodyInput<TEnv extends Env = Env> = {
 	c: Context<TEnv>;
 	route: HttpRouteDeclaration;
 	body: RequestBodySchema;
 };
 
+/**
+ * Custom Hono request body parser used during route registration.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/hono#body-parsing}
+ */
 export type HonoParseBody<TEnv extends Env = Env> = (
 	input: HonoParseBodyInput<TEnv>,
 ) => unknown | Promise<unknown>;
 
+/**
+ * Hono middleware that also receives the matched rest-rpc route declaration.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/hono#middleware}
+ */
 export type ExtendedHonoMiddleware<TEnv extends Env = Env> = (
 	c: Context<TEnv>,
 	next: Next,

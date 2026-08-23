@@ -19,6 +19,11 @@ import type {
 } from "./validation.ts";
 import { validateRequest } from "./validation.ts";
 
+/**
+ * Minimal WebSocket shape required by the shared WebSocket route handler.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#websocket-routes}
+ */
 export type WebSocketLike = {
 	send(data: string): void;
 	close(code?: number, reason?: string): void;
@@ -26,23 +31,43 @@ export type WebSocketLike = {
 	onClose(callback: (event: CloseEventLike) => void): () => void;
 };
 
+/**
+ * Response data used to reject a WebSocket upgrade before accepting it.
+ *
+ * @see {@link https://rest-rpc.dev/docs/websockets#before-upgrade}
+ */
 export type UpgradeRejection = {
 	status: number;
 	headers?: HttpHeaders;
 	body?: unknown;
 };
 
+/**
+ * Input passed to a `beforeUpgrade` hook.
+ *
+ * @see {@link https://rest-rpc.dev/docs/websockets#before-upgrade}
+ */
 export type WebSocketUpgradeInput<TContext extends Record<string, unknown>> = {
 	route: WebSocketRouteDeclaration;
 	request: Record<string, unknown>;
 	context: TContext;
 };
 
+/**
+ * Return value accepted from a `beforeUpgrade` hook.
+ *
+ * @see {@link https://rest-rpc.dev/docs/websockets#before-upgrade}
+ */
 export type WebSocketUpgradeResult =
 	| UpgradeRejection
 	| undefined
 	| Promise<UpgradeRejection | undefined>;
 
+/**
+ * Hook invoked after request validation and before accepting a WebSocket upgrade.
+ *
+ * @see {@link https://rest-rpc.dev/docs/websockets#before-upgrade}
+ */
 export type BeforeWebSocketUpgrade<TContext extends Record<string, unknown>> = (
 	input: WebSocketUpgradeInput<TContext>,
 ) => WebSocketUpgradeResult;
@@ -161,6 +186,12 @@ const prepareAcceptedUpgrade = async <TContext extends Record<string, unknown>>(
 	}
 };
 
+/**
+ * Validates and optionally rejects a WebSocket upgrade request.
+ *
+ * @remarks Call this before the runtime accepts the WebSocket upgrade.
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#websocket-routes}
+ */
 export async function prepareWebSocketUpgrade<
 	TContext extends Record<string, unknown> = Record<string, unknown>,
 >(
@@ -177,6 +208,11 @@ export async function prepareWebSocketUpgrade<
 	return prepareAcceptedUpgrade(requestValidation.validation.data, options);
 }
 
+/**
+ * Wraps a runtime WebSocket with typed rest-rpc send and receive helpers.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#websocket-routes}
+ */
 export function createContractWebSocket<E extends WebSocketRouteDeclaration>(
 	route: E,
 	socket: WebSocketLike,
@@ -235,6 +271,12 @@ export function createContractWebSocket<E extends WebSocketRouteDeclaration>(
 	};
 }
 
+/**
+ * Starts a typed WebSocket route handler on an accepted socket.
+ *
+ * @remarks Call this only after the runtime accepts the WebSocket connection.
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#websocket-routes}
+ */
 export function handleWebSocketRoute<
 	E extends WebSocketRouteDeclaration,
 	TContext extends WebSocketRouteHandlerContext = WebSocketRouteHandlerContext,
