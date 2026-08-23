@@ -118,7 +118,12 @@ export const createRouteApi = (
 		},
 		infiniteQueryOptions: (options) => {
 			const { fetchOptions, queryOptions } = splitFetchOptions(options);
+			const { initialRequest, getNextRequest, queryKey, ...tanstackOptions } =
+				queryOptions;
 			return {
+				queryKey: queryKey ?? getKey(),
+				initialPageParam: initialRequest,
+				getNextPageParam: getNextRequest,
 				queryFn: ({
 					pageParam,
 					signal,
@@ -130,7 +135,7 @@ export const createRouteApi = (
 						...fetchOptions,
 						signal,
 					}),
-				...queryOptions,
+				...tanstackOptions,
 			} as unknown as InfiniteQueryObserverOptions<unknown, unknown, unknown>;
 		},
 		getKey: (...args: RequestArgs) => getKey(readRequestArg(route, args)),

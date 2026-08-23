@@ -7,7 +7,7 @@ Type helpers take a route declaration and infer the type used at a specific
 runtime boundary.
 
 ```ts
-import { jsonQuery, route, router, webSocketMessages } from "@rest-rpc/core";
+import { route, router, webSocketMessages } from "@rest-rpc/core";
 import { z } from "zod";
 
 export const api = router({
@@ -16,10 +16,25 @@ export const api = router({
 			method: "GET",
 			path: "/todos/:id",
 			pathParams: z.object({ id: z.string() }),
-			query: jsonQuery(z.object({ includeDone: z.boolean().optional() })),
+			query: z.object({ includeDone: z.boolean().optional() }),
 			responses: {
 				200: z.object({ id: z.string(), title: z.string() }),
 				404: z.object({ code: z.literal("NOT_FOUND") }),
+			},
+		}),
+		page: route({
+			method: "GET",
+			path: "/todos/page",
+			query: z.object({
+				cursor: z.string().optional(),
+				status: z.enum(["open", "done"]),
+				limit: z.number(),
+			}),
+			responses: {
+				200: z.object({
+					items: z.array(z.object({ id: z.string(), title: z.string() })),
+					nextCursor: z.string().optional(),
+				}),
 			},
 		}),
 		create: route({
@@ -93,6 +108,7 @@ Import TanStack Query helpers from `@rest-rpc/tanstack-query`.
 
 ```ts
 import type {
+	RouteInfiniteQueryData,
 	RouteMutationVariables,
 	RouteQueryData,
 	RouteQueryError,
@@ -100,6 +116,23 @@ import type {
 
 type GetTodoData = RouteQueryData<typeof api.todos.get>;
 // { status: 200; body: { id: string; title: string }; headers: Headers }
+
+type TodoPagesData = RouteInfiniteQueryData<typeof api.todos.page>;
+// {
+//   pages: Array<{
+//     status: 200;
+//     body: {
+//       items: Array<{ id: string; title: string }>;
+//       nextCursor?: string;
+//     };
+//     headers: Headers;
+//   }>;
+//   pageParams: Array<{
+//     cursor?: string;
+//     status: "open" | "done";
+//     limit: number;
+//   }>;
+// }
 
 type GetTodoError = RouteQueryError<typeof api.todos.get>;
 // | { status: 404; body: { code: "NOT_FOUND" }; headers: Headers }
@@ -109,9 +142,6 @@ type GetTodoError = RouteQueryError<typeof api.todos.get>;
 type CreateTodoVariables = RouteMutationVariables<typeof api.todos.create>;
 // { title: string }
 ```
-
-TanStack Query helpers follow TanStack's data/error channels: declared 2xx
-responses become query data, and declared non-2xx responses become query errors.
 
 ## Server
 

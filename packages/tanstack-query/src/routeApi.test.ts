@@ -183,25 +183,24 @@ describe("createRouteApi", () => {
 				body: { items: [], nextCursor: "cursor-2" },
 			};
 		});
-		const initialPageParam = { cursor: undefined, limit: 20 };
-		const nextPageParam = { cursor: "cursor-2", limit: 20 };
+		const initialRequest = { cursor: undefined, limit: 20 };
+		const nextRequest = { cursor: "cursor-2", limit: 20 };
 
 		const options = routeApi.infiniteQueryOptions({
-			queryKey: ["items", "infinite"],
-			initialPageParam,
-			getNextPageParam: () => nextPageParam,
+			initialRequest,
+			getNextRequest: () => nextRequest,
 			fetchOptions: { credentials: "include" },
 			staleTime: 123,
 		}) as any;
 
-		assert.deepEqual(options.queryKey, ["items", "infinite"]);
-		assert.deepEqual(options.initialPageParam, initialPageParam);
-		assert.equal(options.getNextPageParam(), nextPageParam);
+		assert.deepEqual(options.queryKey, ["items", "byId"]);
+		assert.deepEqual(options.initialPageParam, initialRequest);
+		assert.equal(options.getNextPageParam(), nextRequest);
 		assert.equal(options.fetchOptions, undefined);
 		assert.equal(options.staleTime, 123);
 		assert.deepEqual(
 			await options.queryFn({
-				pageParam: nextPageParam,
+				pageParam: nextRequest,
 				signal: "page-signal",
 			}),
 			{
@@ -210,8 +209,24 @@ describe("createRouteApi", () => {
 			},
 		);
 		assert.deepEqual(fetchResponseCalls, [
-			[nextPageParam, { credentials: "include", signal: "page-signal" }],
+			[nextRequest, { credentials: "include", signal: "page-signal" }],
 		]);
+	});
+
+	it("allows custom infinite query keys", () => {
+		const routeApi = createRouteApi(routeWithRequest, async () => ({
+			declared: true,
+			status: 200,
+			body: {},
+		}));
+
+		const options = routeApi.infiniteQueryOptions({
+			queryKey: ["custom", "items"],
+			initialRequest: { limit: 20 },
+			getNextRequest: () => undefined,
+		}) as any;
+
+		assert.deepEqual(options.queryKey, ["custom", "items"]);
 	});
 
 	it("omits undefined request fields in generated keys", () => {

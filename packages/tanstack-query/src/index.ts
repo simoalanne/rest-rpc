@@ -1,4 +1,5 @@
 export type {
+	RouteInfiniteQueryData,
 	RouteMutationVariables,
 	RouteQueryData,
 	RouteQueryError,

@@ -1,14 +1,11 @@
 import { router, type as schemaType, stream } from "@rest-rpc/core/contract";
 import {
 	initTanstackQuery,
+	type RouteInfiniteQueryData,
 	type RouteMutationVariables,
 	type RouteQueryData,
 } from "@rest-rpc/tanstack-query";
-import {
-	type InfiniteData,
-	type QueryClient,
-	skipToken,
-} from "@tanstack/query-core";
+import { type QueryClient, skipToken } from "@tanstack/query-core";
 import {
 	expectAssignable,
 	expectError,
@@ -258,58 +255,50 @@ const pageTq = initTanstackQuery(pageApi, {
 	baseUrl: "https://example.test",
 });
 
+type TodoPageResponse = RouteQueryData<typeof pageApi.todos.page>;
+type TodoInfiniteData = RouteInfiniteQueryData<typeof pageApi.todos.page>;
+
+type TodoPageResponseShape = {
+	status: 200;
+	body: {
+		items: Array<{ id: string; title: string }>;
+		nextCursor?: string;
+	};
+	headers: Headers;
+};
+
+type TodoPageRequest = {
+	cursor?: string;
+	status: "open" | "done";
+	limit: number;
+};
+
 const infiniteOptions = pageTq.todos.page.infiniteQueryOptions({
-	queryKey: ["todos", { status: "open" }],
-	initialPageParam: { status: "open", limit: 50 },
+	initialRequest: { status: "open", limit: 50 },
 	fetchOptions: { cache: "no-store" },
-	getNextPageParam(lastPage, _allPages, lastRequest) {
-		expectAssignable<{
-			status: 200;
-			body: {
-				items: Array<{ id: string; title: string }>;
-				nextCursor?: string;
-			};
-			headers: Headers;
-		}>(lastPage);
-		expectType<{
-			cursor?: string;
-			status: "open" | "done";
-			limit: number;
-		}>(lastRequest);
+	getNextRequest(lastPage, _allPages, lastRequest) {
+		expectAssignable<TodoPageResponseShape>(lastPage);
+		expectType<TodoPageRequest>(lastRequest);
 		return lastPage.body.nextCursor
 			? { ...lastRequest, cursor: lastPage.body.nextCursor }
 			: undefined;
 	},
 });
-expectAssignable<
-	Promise<
-		InfiniteData<
-			{
-				status: 200;
-				body: {
-					items: Array<{ id: string; title: string }>;
-					nextCursor?: string;
-				};
-				headers: Headers;
-			},
-			{ cursor?: string; status: "open" | "done"; limit: number }
-		>
-	>
->(queryClient.fetchInfiniteQuery(infiniteOptions));
-expectAssignable<
-	| InfiniteData<
-			{
-				status: 200;
-				body: {
-					items: Array<{ id: string; title: string }>;
-					nextCursor?: string;
-				};
-				headers: Headers;
-			},
-			{ cursor?: string; status: "open" | "done"; limit: number }
-	  >
-	| undefined
->(queryClient.getQueryData(infiniteOptions.queryKey));
+
+queryClient.fetchInfiniteQuery(infiniteOptions).then((data) => {
+	expectType<TodoInfiniteData>(data);
+	expectType<Array<TodoPageResponse>>(data.pages);
+	expectType<Array<TodoPageRequest>>(data.pageParams);
+	expectAssignable<TodoPageResponseShape>(data.pages[0]);
+});
+
+const cachedInfiniteData = queryClient.getQueryData(infiniteOptions.queryKey);
+if (cachedInfiniteData) {
+	expectType<TodoInfiniteData>(cachedInfiniteData);
+	expectType<Array<TodoPageResponse>>(cachedInfiniteData.pages);
+	expectType<Array<TodoPageRequest>>(cachedInfiniteData.pageParams);
+	expectAssignable<TodoPageResponseShape>(cachedInfiniteData.pages[0]);
+}
 
 // query keys
 
@@ -375,20 +364,25 @@ expectError(invalidTq.todos.list.getKey({ queryKey: ["todos", "list"] }));
 expectError(
 	invalidTq.todos.page.infiniteQueryOptions({
 		initialPageParam: { status: "open", limit: 50 },
-		getNextPageParam: () => undefined,
+		getNextRequest: () => undefined,
 	}),
 );
 expectError(
 	invalidTq.todos.page.infiniteQueryOptions({
-		queryKey: ["todos"],
-		initialPageParam: { status: "open", limit: 50, extra: true },
+		initialRequest: { status: "open", limit: 50, extra: true },
+		getNextRequest: () => undefined,
+	}),
+);
+expectError(
+	invalidTq.todos.page.infiniteQueryOptions({
+		initialRequest: { status: "open", limit: 50 },
 		getNextPageParam: () => undefined,
 	}),
 );
 expectError(
 	invalidTq.todos.list.infiniteQueryOptions({
-		queryKey: ["todos"],
-		getNextPageParam: () => undefined,
+		initialRequest: {},
+		getNextRequest: () => undefined,
 	}),
 );
 expectError(invalidTq.events);

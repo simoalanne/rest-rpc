@@ -43,6 +43,11 @@ export type RouteQueryError<E extends RouteDeclaration> =
 export type RouteMutationVariables<E extends RouteDeclaration> =
 	ClientRequest<E> extends never ? undefined : ClientRequest<E>;
 
+export type RouteInfiniteQueryData<E extends RouteDeclaration> = InfiniteData<
+	RouteQueryData<E>,
+	ClientRequest<E>
+>;
+
 export type TanstackQueryFetchOptions = ApiClientFetchOptions;
 
 type WithFetchOptions<T> = T & {
@@ -81,7 +86,7 @@ type MutationOptionsFor<E extends RouteDeclaration> = WithFetchOptions<
 
 type InfiniteQueryOptionsFor<
 	E extends RouteDeclaration,
-	TData = InfiniteData<RouteQueryData<E>, ClientRequest<E>>,
+	TData = RouteInfiniteQueryData<E>,
 > = WithFetchOptions<
 	Omit<
 		InfiniteQueryObserverOptions<
@@ -91,16 +96,22 @@ type InfiniteQueryOptionsFor<
 			QueryKey,
 			ClientRequest<E>
 		>,
-		"queryFn" | "queryKey" | "initialPageParam"
+		"queryFn" | "queryKey" | "initialPageParam" | "getNextPageParam"
 	> & {
-		queryKey: QueryKey;
-		initialPageParam: ClientRequest<E>;
+		queryKey?: QueryKey;
+		initialRequest: ClientRequest<E>;
+		getNextRequest: (
+			lastPage: RouteQueryData<E>,
+			allPages: Array<RouteQueryData<E>>,
+			lastRequest: ClientRequest<E>,
+			allRequests: Array<ClientRequest<E>>,
+		) => ClientRequest<E> | undefined | null;
 	}
 >;
 
 type InfiniteQueryOptionsResultFor<
 	E extends RouteDeclaration,
-	TData = InfiniteData<RouteQueryData<E>, ClientRequest<E>>,
+	TData = RouteInfiniteQueryData<E>,
 > = InfiniteQueryObserverOptions<
 	RouteQueryData<E>,
 	RouteQueryError<E>,
@@ -108,11 +119,7 @@ type InfiniteQueryOptionsResultFor<
 	QueryKey,
 	ClientRequest<E>
 > & {
-	queryKey: DataTag<
-		QueryKey,
-		InfiniteData<RouteQueryData<E>, ClientRequest<E>>,
-		RouteQueryError<E>
-	>;
+	queryKey: DataTag<QueryKey, RouteInfiniteQueryData<E>, RouteQueryError<E>>;
 };
 
 type QueryDisabled = false | null | undefined | "" | 0;
@@ -139,9 +146,7 @@ type TanstackQueryRouteValue<E extends RouteDeclaration> = {
 	queryOptions: <TData = RouteQueryData<E>>(
 		...args: UseQueryArgs<E, TData>
 	) => QueryOptionsResultFor<E, TData>;
-	infiniteQueryOptions: <
-		TData = InfiniteData<RouteQueryData<E>, ClientRequest<E>>,
-	>(
+	infiniteQueryOptions: <TData = RouteInfiniteQueryData<E>>(
 		options: InfiniteQueryOptionsFor<E, TData>,
 	) => InfiniteQueryOptionsResultFor<E, TData>;
 	getKey: (

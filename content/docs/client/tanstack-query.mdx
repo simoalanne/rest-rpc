@@ -125,20 +125,25 @@ createTodo.mutate({
 
 ## Infinite Queries
 
-Use `infiniteQueryOptions()` when route request input should be used as the page
-parameter.
+Use `infiniteQueryOptions()` when each page should be fetched with route
+request input. The query key is inferred from the route and does not include the
+request, so every page for the route shares one infinite query cache entry.
+
+`initialRequest` and `getNextRequest` correspond to TanStack Query's
+`initialPageParam` and `getNextPageParam`. The rest-rpc helper renames them
+because each value must be the full route request input used for the
+API call to preserve the request shape.
 
 ```tsx
 import { useInfiniteQuery } from "@tanstack/react-query";
 
 const todos = useInfiniteQuery(
 	tq.todos.page.infiniteQueryOptions({
-		queryKey: ["todos", "page", "open"],
-		initialPageParam: {
+		initialRequest: {
 			status: "open",
 			limit: 50,
 		},
-		getNextPageParam(lastPage, _allPages, lastRequest) {
+		getNextRequest(lastPage, _allPages, lastRequest) {
 			return lastPage.body.nextCursor
 				? { ...lastRequest, cursor: lastPage.body.nextCursor }
 				: undefined;

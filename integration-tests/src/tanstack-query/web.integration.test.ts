@@ -235,9 +235,8 @@ describe("web TanStack Query integration", () => {
 		const observer = new InfiniteQueryObserver(
 			queryClient,
 			tq.projects.page.infiniteQueryOptions({
-				queryKey: ["projects", "pages"],
-				initialPageParam: { limit: 2 },
-				getNextPageParam: (lastPage) =>
+				initialRequest: { limit: 2 },
+				getNextRequest: (lastPage) =>
 					lastPage.body.nextCursor
 						? { cursor: lastPage.body.nextCursor, limit: 2 }
 						: undefined,
