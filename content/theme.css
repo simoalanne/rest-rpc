@@ -4,6 +4,16 @@
 	height: 2rem;
 }
 
+#blume-content .prose:has(> [data-home-page]) > h1:first-child {
+	margin-inline: auto;
+	max-width: 13ch;
+	text-align: center;
+}
+
+[data-home-page] {
+	display: none;
+}
+
 /* Twoslash hover popups need to escape the code block and the tab frame. */
 .prose blume-tabs:has(pre.twoslash),
 .prose blume-tabs:has(pre.twoslash) [data-blume-tab-content],
