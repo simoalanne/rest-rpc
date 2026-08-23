@@ -1,5 +1,13 @@
 # @rest-rpc/core
 
+## 0.1.0-beta.14
+
+### Patch Changes
+
+- a787af6: Add field raw to access the raw websocket instance in client WebSocket wrapper and stop mutating that instance
+- 751b957: add support for resolving request keys from valibot variant schema
+- b228897: add option to use strict responses, rename unknownRequestKeys option to strictRequestKeys for consistency, add type-level support that makes getGlobalHeaders returned header keys optional for each fetch call
+
 ## 0.1.0-beta.13
 
 ### Patch Changes

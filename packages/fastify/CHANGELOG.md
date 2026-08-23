@@ -1,5 +1,11 @@
 # @rest-rpc/fastify
 
+## 0.1.0-beta.14
+
+### Patch Changes
+
+- 5676c02: Add support for implementing handlers for router as a class
+
 ## 0.1.0-beta.13
 
 ### Patch Changes
