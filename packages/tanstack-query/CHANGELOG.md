@@ -4,7 +4,7 @@
 
 ### Minor Changes
 
-- dd6b7c3: rename tanstack infiniteQueryOptions args to be more describing
+- a226f2d: rename tanstack infiniteQueryOptions args to be more describing
 
 ### Patch Changes
 
