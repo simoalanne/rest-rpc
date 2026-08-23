@@ -1,0 +1,545 @@
+---
+title: Building Server Adapters
+description: Learn how first-party adapters use @rest-rpc/server and how you could build your own
+---
+
+Most applications should use a framework adapter such as `@rest-rpc/express`,
+`@rest-rpc/fastify`, `@rest-rpc/hono`, `@rest-rpc/next`, or `@rest-rpc/web`.
+The `@rest-rpc/server` package is for adapter authors or for cases where your
+application does not use a supported framework and you still want to use
+`@rest-rpc` on the server.
+
+This page walks through trimmed source from the first-party adapters. The goal
+is not to make a fake framework adapter from scratch. It is to show where the
+shared server primitives are used in real adapters, and which parts remain
+framework-specific.
+
+## Registration Adapters
+
+Express, Fastify, and Hono register each contract route with the host
+framework. The Express adapter is a useful reference because the boundary is
+explicit: Express owns the request and response objects, while
+`@rest-rpc/server` owns contract execution.
+
+### Public Entry
+
+The public Express entry point accepts a framework router, a typed
+implementation tree, and adapter options.
+
+```ts
+import type { IncomingMessage } from "node:http";
+import type { RouteDeclaration } from "@rest-rpc/core/contract";
+import type { ImplementationTree, ServerErrorHandlers } from "@rest-rpc/server";
+import { registerRouteImplementations } from "@rest-rpc/server";
+import type { IRouter, Request } from "express";
+
+export type RegisterRoutesOptions = {
+	errorHandlers?: ServerErrorHandlers<
+		| { kind: "http"; req: Request; signal: AbortSignal }
+		| { kind: "websocket"; req: IncomingMessage; signal: AbortSignal }
+	>;
+	middleware?: ExtendedExpressMiddleware[];
+	webSocket?: ExpressWebSocketOptions;
+};
+
+export const registerRoutes = (
+	app: IRouter,
+	implementations: ImplementationTree<RouteDeclaration>,
+	options: RegisterRoutesOptions = {},
+) =>
+	registerRouteImplementations(
+		implementations,
+		(routes) =>
+			registerExpressHttpRoutes(
+				app,
+				routes,
+				options.middleware,
+				options.errorHandlers,
+			),
+		(routes) =>
+			options.webSocket &&
+			registerExpressWebSocketRoutes(
+				options.webSocket,
+				routes,
+				options.errorHandlers,
+			),
+	);
+```
+
+This function does not execute any route. It delegates the implementation tree
+to `registerRouteImplementations` from `@rest-rpc/server`, then sends HTTP and
+WebSocket implementations to Express-specific registration functions.
+The options show both sides of the adapter boundary: `middleware` and
+`webSocket` are Express adapter features, while `errorHandlers` use the shared
+server error hook type.
+
+### Splitting Implementations
+
+The shared `registerRouteImplementations` helper flattens the implementation
+tree and splits route kinds.
+
+```ts
+import {
+	flattenRouteImplementations,
+	isHttpRouteImplementation,
+	isWebSocketRouteImplementation,
+} from "@rest-rpc/server";
+import type {
+	ImplementationTree,
+	RouteImplementation,
+} from "@rest-rpc/server";
+
+export const registerRoutes = (
+	implementations: ImplementationTree<RouteDeclaration>,
+	registerHttpRoutes: (
+		routes: RouteImplementation<HttpRouteDeclaration>[],
+	) => void,
+	registerWebSocketRoutes?: (
+		routes: RouteImplementation<WebSocketRouteDeclaration>[],
+	) => void,
+) => {
+	const implementationsList = flattenRouteImplementations(implementations);
+	const routes = implementationsList.filter(isHttpRouteImplementation);
+	const webSocketRoutes = implementationsList.filter(
+		isWebSocketRouteImplementation,
+	);
+
+	registerHttpRoutes(routes);
+	registerWebSocketRoutes?.(webSocketRoutes);
+};
+```
+
+This is still adapter-independent. It knows how to traverse `rest-rpc`
+implementation trees, but it does not know how Express, Fastify, Hono, or any
+other framework registers routes.
+
+## Registering HTTP Routes
+
+The Express-specific HTTP adapter receives a flat list of HTTP route
+implementations. It loops over them and registers each one with Express.
+
+```ts
+import {
+	handleHttpRoute,
+	handleHttpRouteResult,
+	type RouteImplementation,
+	type ServerErrorHandlers,
+} from "@rest-rpc/server";
+
+export const registerExpressHttpRoutes = (
+	app: IRouter,
+	routes: RouteImplementation<HttpRouteDeclaration>[],
+	middleware: ExtendedExpressMiddleware[] = [],
+	errorHandlers?: ServerErrorHandlers<{
+		req: Request;
+		signal: AbortSignal;
+	}>,
+) => {
+	for (const implementation of routes) {
+		const route: HttpRouteDeclaration = implementation.route;
+		const method = route.method.toLowerCase() as Lowercase<HttpMethod>;
+		const handler = implementation.handler;
+
+		const serviceHandler = async (req: Request, res: ExpressResponse) => {
+			const signal = createRequestSignal(req, res);
+			const result = await handleHttpRoute(route, handler, {
+				request: {
+					body: req.body,
+					query: req.query,
+					pathParams: req.params,
+					headers: req.headers,
+				},
+				context: { req, signal },
+				errorContext: { kind: "http", req, signal },
+				errorHandlers,
+			});
+
+			return handleHttpRouteResult(result, {
+				setHeader: (name, value) => {
+					if (value !== undefined) res.setHeader(name, value);
+				},
+				sendEmpty: (status) => {
+					res.sendStatus(status);
+				},
+				sendJson: (status, body) => {
+					res.status(status).json(body);
+				},
+				sendCustom: (status, body) => {
+					res.status(status).send(body);
+				},
+				sendStream: ({ body, status, contentType, mode }) =>
+					writeStreamResponse(body, res, status, contentType, mode),
+			});
+		};
+
+		app[method](
+			toColonPath(route.path),
+			...middleware.map((handler) => {
+				return (req: Request, res: ExpressResponse, next: NextFunction) =>
+					handler(req, res, next, route);
+			}),
+			serviceHandler,
+		);
+	}
+};
+```
+
+The route loop and `app[method](...)` call are Express integration. The call to
+`handleHttpRoute` is the handoff into `@rest-rpc/server`.
+
+Inside that handoff, the adapter provides four request segments:
+
+- `body` from Express body parsing middleware
+- `query` from `req.query`
+- `pathParams` from `req.params`
+- `headers` from `req.headers`
+
+The adapter also provides `context`. Route handlers can use this to access
+framework-specific values such as the raw request or an abort signal.
+
+## Writing The Result
+
+`handleHttpRoute` does not return an Express response. It returns a normalized
+`HttpRouteResult`. The adapter turns that result into framework output with
+`handleHttpRouteResult`.
+
+```ts
+import { handleHttpRouteResult } from "@rest-rpc/server";
+
+return handleHttpRouteResult(result, {
+	setHeader: (name, value) => {
+		if (value !== undefined) res.setHeader(name, value);
+	},
+	sendEmpty: (status) => {
+		res.sendStatus(status);
+	},
+	sendJson: (status, body) => {
+		res.status(status).json(body);
+	},
+	sendCustom: (status, body) => {
+		res.status(status).send(body);
+	},
+	sendStream: ({ body, status, contentType, mode }) =>
+		writeStreamResponse(body, res, status, contentType, mode),
+});
+```
+
+This is the other side of the adapter boundary. The shared server package has
+already validated the route response and normalized it into one of the supported
+result kinds. The adapter decides how to express each kind through the
+framework's response API.
+
+Streams are the least portable response kind. In Express, the adapter writes to
+the Node response object and closes the async iterator when the client
+disconnects. A different framework may have a different stream API, but it
+still receives the same `body`, `status`, `contentType`, and `mode`.
+
+## Dispatch Adapters
+
+Some integrations do not register each contract route with the framework.
+Instead, they receive every request through one handler and dispatch to the
+matching contract route themselves. `@rest-rpc/web` is the simplest first-party
+example.
+
+The Web adapter creates a matcher from the implementation tree once.
+
+```ts
+import {
+	createRouteMatcher,
+	flattenRouteImplementations,
+	type ImplementationTree,
+} from "@rest-rpc/server";
+
+export const createWebRouteMatcher = (
+	implementations: ImplementationTree<HttpRouteDeclaration>,
+) => {
+	const routes = flattenRouteImplementations(implementations);
+	const routeContract = Object.fromEntries(
+		routes.map((implementation, index) => [
+			String(index),
+			implementation.route,
+		]),
+	);
+	const matchRoute = createRouteMatcher(routeContract);
+	const implementationsByRoute = new Map(
+		routes.map((implementation) => [implementation.route, implementation]),
+	);
+
+	return (request: Request) => {
+		const url = new URL(request.url);
+		const match = matchRoute({
+			method: request.method,
+			path: url.pathname,
+		});
+
+		if (!match) return new Response(null, { status: 404 });
+		if (match.type === "methodNotAllowed") {
+			return new Response(null, { status: 405 });
+		}
+
+		const implementation = implementationsByRoute.get(
+			match.route as HttpRouteDeclaration,
+		);
+		if (!implementation) return new Response(null, { status: 404 });
+
+		return {
+			type: "match" as const,
+			implementation,
+			params: match.params,
+		};
+	};
+};
+```
+
+This replaces the framework router. Once a request is matched, the dispatch
+adapter has the same thing a registration adapter had inside its route handler:
+a route implementation and path params.
+
+The public `createRouteHandler` wires matching, middleware, context creation,
+and route execution together.
+
+```ts
+import type { ServerErrorHandlers } from "@rest-rpc/server";
+
+export type CreateWebHandlerOptions = {
+	errorHandlers?: ServerErrorHandlers<Record<never, never>>;
+	parseBody?: WebRouteParseBody;
+};
+
+export const createRouteHandler = <
+	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
+	TContext extends Record<string, unknown> = Record<string, unknown>,
+	TRequest extends Request = Request,
+>(
+	implementations: WebImplementationTree,
+	options: CreateWebHandlerOptions = {},
+): ((request: TRequest, runtime: TRuntimeContext) => Promise<Response>) => {
+	const matchRoute = createWebRouteMatcher(implementations);
+	const usesDefaultParseBody = options.parseBody === undefined;
+	const parseBody = options.parseBody ?? defaultParseBody;
+
+	return async (request: TRequest, runtime: TRuntimeContext) => {
+		const match = matchRoute(request);
+		if (match instanceof Response) return match;
+		const implementation = match.implementation;
+		const middlewareResult = await implementation.middleware?.({
+			request,
+			route: implementation.route,
+			runtime,
+		});
+		if (middlewareResult instanceof Response) return middlewareResult;
+
+		const context = {
+			...(middlewareResult ?? {}),
+			request,
+		};
+
+		return handleWebRoute(
+			request,
+			context,
+			implementation,
+			match.params,
+			parseBody,
+			usesDefaultParseBody,
+			options.errorHandlers,
+		);
+	};
+};
+```
+
+The dispatch-specific work is matching the request and building context from
+runtime input. After that, `handleWebRoute` uses the same HTTP execution
+primitive as the Express adapter.
+
+```ts
+import { createWebResponse, handleHttpRoute } from "@rest-rpc/server";
+
+const result = await handleHttpRoute(
+	implementation.route,
+	implementation.handler,
+	{
+		request: {
+			body,
+			query: readQuery(url),
+			pathParams: params,
+			headers: readHeaders(request.headers),
+		},
+		context,
+		errorHandlers,
+	},
+);
+
+return createWebResponse(result);
+```
+
+`createWebResponse` is a convenience for adapters that return the standard Web
+`Response` object. Frameworks with their own response API should usually use
+`handleHttpRouteResult` directly, like the Express adapter does.
+
+## WebSocket Routes
+
+WebSocket adapters have the same split: the framework owns the upgrade and
+socket lifecycle, while `@rest-rpc/server` owns contract validation and typed
+message handling.
+
+Fastify is a smaller reference than Express here because `@fastify/websocket`
+adds WebSocket support to route registration. The adapter does not need to
+listen to the raw Node HTTP `upgrade` event itself.
+
+The adapter option exposes the shared `beforeUpgrade` hook. The hook receives
+the already matched WebSocket route, the request data, and the adapter context.
+
+```ts
+import type { BeforeWebSocketUpgrade } from "@rest-rpc/server";
+
+export type FastifyWebSocketOptions = {
+	beforeUpgrade?: BeforeWebSocketUpgrade<{
+		req: FastifyRequest;
+		signal: AbortSignal;
+	}>;
+};
+```
+
+The framework socket is adapted to the small `WebSocketLike` interface expected
+by `@rest-rpc/server`.
+
+```ts
+import type { WebSocketLike } from "@rest-rpc/server";
+
+const adaptWebSocket = (socket: FastifyWebSocket): WebSocketLike => ({
+	send(data) {
+		socket.send(data);
+	},
+	close(code, reason) {
+		socket.close(code, reason);
+	},
+	onMessage(callback) {
+		const onMessage = (data: unknown) => callback(data);
+		socket.on("message", onMessage);
+		return () => socket.off("message", onMessage);
+	},
+	onClose(callback) {
+		const onClose = (code: number, reason: Buffer) =>
+			callback({ code, reason: reason.toString() });
+		socket.on("close", onClose);
+		return () => socket.off("close", onClose);
+	},
+});
+```
+
+The route registration has two server-package handoffs. `prepareWebSocketUpgrade`
+validates query, path params, and headers before the socket is accepted.
+`handleWebSocketRoute` starts the typed route handler after Fastify gives the
+adapter a socket.
+
+```ts
+import {
+	handleWebSocketRoute,
+	prepareWebSocketUpgrade,
+	type RouteImplementation,
+	type ServerErrorHandlers,
+} from "@rest-rpc/server";
+
+const validatedWebSocketRequest = Symbol("validatedWebSocketRequest");
+
+type ExtendedFastifyRequest = FastifyRequest & {
+	[validatedWebSocketRequest]: Record<string, unknown>;
+};
+
+export const registerFastifyWebSocketRoutes = (
+	app: FastifyInstance,
+	options: FastifyWebSocketOptions,
+	routes: RouteImplementation<WebSocketRouteDeclaration>[],
+	preHandler: ExtendedFastifyPreHandler[] = [],
+	errorHandlers?: ServerErrorHandlers<{
+		req: FastifyRequest;
+		signal: AbortSignal;
+	}>,
+) => {
+	for (const implementation of routes) {
+		app.get(
+			toColonPath(implementation.route.path),
+			{
+				websocket: true,
+				preValidation: [
+					...preHandler.map((handler) => {
+						return async (req: FastifyRequest, reply: FastifyReply) => {
+							await handler(req, reply, implementation.route);
+						};
+					}),
+					async (req: FastifyRequest, reply: FastifyReply) => {
+						const controller = new AbortController();
+						const abort = () => controller.abort();
+						req.raw.once("aborted", abort);
+						reply.raw.once("close", () => {
+							if (!reply.raw.writableFinished) abort();
+						});
+						const request = {
+							query: req.query,
+							pathParams: req.params,
+							headers: req.headers,
+						};
+						const upgrade = await prepareWebSocketUpgrade({
+							implementation,
+							request,
+							context: { req, signal: controller.signal },
+							beforeUpgrade: options.beforeUpgrade,
+							errorHandlers,
+						});
+
+						if (!upgrade.ok) {
+							await sendUpgradeRejection(reply, upgrade.rejection);
+							return;
+						}
+
+						req.validatedWebSocketRequest = upgrade.validatedRequest;
+					},
+				],
+			},
+			(socket: FastifyWebSocket, req: FastifyRequest) => {
+				const validatedRequest = req.validatedWebSocketRequest;
+
+				handleWebSocketRoute(implementation.route, implementation.handler, {
+					request: validatedRequest,
+					context: { req },
+					socket: adaptWebSocket(socket),
+				});
+			},
+		);
+	}
+};
+```
+
+Since `prepareWebSocketUpgrade` runs during
+Fastify's validation phase, but `handleWebSocketRoute` runs later when the
+socket handler receives the accepted socket. The adapter stores the validated
+request so the route handler receives parsed, validated request data rather than
+the raw framework request it would have to validate again.
+
+Once `handleWebSocketRoute` starts, incoming messages are parsed and validated
+against the client message schema. Outgoing messages sent through the route
+socket are validated against the server message schema before they are
+serialized.
+
+## TL;DR
+
+When building a local adapter, copy the shape rather than the whole file.
+
+- Use `router` or `route` from the server package when your adapter needs to
+  expose typed implementation helpers.
+- Use `registerRouteImplementations` when your framework registers routes and
+  you want the shared HTTP/WebSocket split.
+- Use `flattenRouteImplementations` and `createRouteMatcher` when your adapter
+  dispatches requests through one handler.
+- Use `handleHttpRoute` for HTTP validation, handler execution, response
+  validation, and error hooks.
+- Use `handleHttpRouteResult` when writing to framework response objects.
+- Use `createWebResponse` only when your adapter returns a standard Web
+  `Response`.
+- Use `prepareWebSocketUpgrade` before accepting a WebSocket route.
+- Use `handleWebSocketRoute` after the runtime gives your adapter an accepted
+  socket.
+
+The adapter-owned parts are request parsing, route registration or request
+matching, context construction, middleware integration, response writing, and
+runtime-specific WebSocket upgrade handling.
