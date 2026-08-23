@@ -50,6 +50,18 @@ describe("createRouteMatcher", () => {
 		});
 	});
 
+	it("reports allowed methods for the most specific matching path", () => {
+		const matchRoute = createRouteMatcher({
+			getTodo: route("GET", "/todos/:id"),
+			createNewTodo: route("POST", "/todos/new"),
+		});
+
+		assert.deepEqual(matchRoute({ method: "GET", path: "/todos/new" }), {
+			type: "methodNotAllowed",
+			allowedMethods: ["POST"],
+		});
+	});
+
 	it("escapes literal route characters before matching paths", () => {
 		const matchRoute = createRouteMatcher({
 			literal: route("GET", "/files/index.json"),

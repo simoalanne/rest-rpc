@@ -70,6 +70,53 @@ const createPathMatcher = (path: string) => {
 	};
 };
 
+type PathMatch = {
+	routes: Map<string, RouteDeclaration>;
+	params: Record<string, string>;
+};
+
+const createPathRouter = (routes: RouteDeclaration[]) => {
+	const matchers = routes.sort(compareRouteSpecificity).reduce(
+		(matchers, route) => {
+			const lastMatcher = matchers.at(-1);
+			if (lastMatcher?.path === route.path) {
+				if (!lastMatcher.routes.has(route.method)) {
+					lastMatcher.routes.set(route.method, route);
+				}
+				return matchers;
+			}
+
+			matchers.push({
+				path: route.path,
+				routes: new Map([[route.method, route]]),
+				matchPath: createPathMatcher(route.path),
+			});
+			return matchers;
+		},
+		[] as {
+			path: string;
+			routes: Map<string, RouteDeclaration>;
+			matchPath: (pathname: string) => Record<string, string> | null;
+		}[],
+	);
+
+	return {
+		matchPath(pathname: string): PathMatch | null {
+			for (const matcher of matchers) {
+				const params = matcher.matchPath(pathname);
+				if (params === null) continue;
+
+				return {
+					routes: matcher.routes,
+					params,
+				};
+			}
+
+			return null;
+		},
+	};
+};
+
 /**
  * A successful route match from `createRouteMatcher()`.
  *
@@ -107,38 +154,24 @@ export type RouteMatcherResult =
  * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#dispatch-adapters}
  */
 export function createRouteMatcher(contract: Contract) {
-	const matchers = flattenContractRoutes(contract)
-		.sort(compareRouteSpecificity)
-		.map((route) => ({
-			route,
-			matchPath: createPathMatcher(route.path),
-		}));
+	const pathRouter = createPathRouter(flattenContractRoutes(contract));
 
 	return (req: { path: string; method: string }): RouteMatcherResult => {
-		const allowedMethods = new Set<string>();
+		const match = pathRouter.matchPath(req.path);
+		if (!match) return null;
 
-		for (const matcher of matchers) {
-			const params = matcher.matchPath(req.path);
-			if (params === null) continue;
-
-			allowedMethods.add(matcher.route.method);
-
-			if (matcher.route.method === req.method) {
-				return {
-					type: "match",
-					route: matcher.route,
-					params,
-				};
-			}
-		}
-
-		if (allowedMethods.size > 0) {
+		const route = match.routes.get(req.method);
+		if (!route) {
 			return {
 				type: "methodNotAllowed",
-				allowedMethods: Array.from(allowedMethods),
+				allowedMethods: Array.from(match.routes.keys()),
 			};
 		}
 
-		return null;
+		return {
+			type: "match",
+			route,
+			params: match.params,
+		};
 	};
 }
