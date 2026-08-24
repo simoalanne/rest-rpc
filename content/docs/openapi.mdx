@@ -73,6 +73,33 @@ const document = createOpenApiDocument(api, {
 Use a precise converter when your schema library supports JSON Schema output.
 Use `looseJsonSchema()` when a loose OpenAPI shape is acceptable. If you have single validation library, you can just pass the library's JSON Schema converter directly.
 
+## Multipart Request Bodies
+
+`multipartBody()` produces an OpenAPI request body with the
+`multipart/form-data` content type. Each field schema is converted with the same
+project-provided `schemaConverter` used for other request schemas.
+
+```ts
+create: {
+	method: "POST",
+	path: "/uploads",
+	body: multipartBody({
+		fields: {
+			title: z.string(),
+			file: z.instanceof(File),
+			tags: z.array(z.string()).optional(),
+		},
+		arrayKeys: ["tags"],
+	}),
+	response: uploadSchema,
+}
+```
+
+Standard Schema defines validation behavior, so rest-rpc does not infer which
+multipart fields are file uploads. If generated OpenAPI needs binary field
+metadata such as `type: "string"` and `format: "binary"`, add it with
+`transformOperation`.
+
 ## Route Metadata
 
 Use `openApi` on a route for operation metadata.

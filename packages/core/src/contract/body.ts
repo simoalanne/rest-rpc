@@ -23,6 +23,22 @@ export type FormBody<
 };
 
 /**
+ * Declares a `multipart/form-data` request body.
+ */
+export type MultipartBody<
+	TFields extends Record<string, StandardSchemaV1> = Record<
+		string,
+		StandardSchemaV1
+	>,
+	TArrayKeys extends readonly (keyof TFields &
+		string)[] = readonly (keyof TFields & string)[],
+> = {
+	kind: "multipartBody";
+	fields: TFields;
+	arrayKeys: TArrayKeys;
+};
+
+/**
  * Declares one or more non-JSON media types for a custom body.
  */
 export type CustomBodyContentType = string | readonly string[];
@@ -83,6 +99,40 @@ export function formBody<
 		schema,
 		arrayKeys,
 	} as FormBody<TSchema>;
+}
+
+/**
+ * Declares a `multipart/form-data` request body.
+ *
+ * @remarks The generated client serializes the typed body object to
+ * `FormData` and lets `fetch()` set the content-type header, including the
+ * boundary. Server body parsers should pass a `FormData` instance to rest-rpc.
+ * Each scalar multipart key is validated as a string or `File`, or
+ * `undefined` when omitted. Multipart array keys are encoded and decoded as
+ * repeated form keys.
+ *
+ * @see {@link https://rest-rpc.dev/docs/http-requests#request-with-multipart-body}
+ */
+export function multipartBody<
+	const TFields extends Record<string, StandardSchemaV1>,
+	const TArrayKeys extends readonly (keyof TFields & string)[],
+>(input: {
+	fields: TFields;
+	arrayKeys: TArrayKeys & readonly (NoInfer<keyof TFields> & string)[];
+}): MultipartBody<TFields, TArrayKeys> {
+	for (const key of input.arrayKeys) {
+		if (!(key in input.fields)) {
+			throw new Error(
+				`Multipart body array key "${key}" does not have a matching field schema.`,
+			);
+		}
+	}
+
+	return {
+		kind: "multipartBody",
+		fields: input.fields,
+		arrayKeys: input.arrayKeys,
+	};
 }
 
 /**
@@ -191,6 +241,15 @@ export function isFormBody(body: unknown): body is FormBody {
 		body !== null &&
 		"kind" in body &&
 		body.kind === "formBody"
+	);
+}
+
+export function isMultipartBody(body: unknown): body is MultipartBody {
+	return (
+		typeof body === "object" &&
+		body !== null &&
+		"kind" in body &&
+		body.kind === "multipartBody"
 	);
 }
 

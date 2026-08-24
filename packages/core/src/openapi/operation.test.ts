@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
 import { schemaConverter } from "../../test/factories/openapi.ts";
-import { customBody, formBody, noBody, stream } from "../contract/body.ts";
+import {
+	customBody,
+	formBody,
+	multipartBody,
+	noBody,
+	stream,
+} from "../contract/body.ts";
 import { jsonQuery } from "../contract/request.ts";
 import {
 	createHeaderParameters,
@@ -226,6 +232,22 @@ describe("OpenAPI operations", () => {
 			body?.content["application/x-www-form-urlencoded"].schema.type,
 			"object",
 		);
+		assert.equal(body?.content["application/json"], undefined);
+	});
+
+	it("creates multipart request bodies", () => {
+		const body = createRequestBody(
+			multipartBody({
+				fields: {
+					title: z.string(),
+					file: z.string(),
+				},
+				arrayKeys: [],
+			}),
+			schemaConverter,
+		);
+
+		assert.equal(body?.content["multipart/form-data"].schema.type, "object");
 		assert.equal(body?.content["application/json"], undefined);
 	});
 

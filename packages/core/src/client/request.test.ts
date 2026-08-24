@@ -6,7 +6,12 @@ import {
 	createClientTestContract,
 	jsonResponse,
 } from "../../test/factories/client.ts";
-import { customBody, formBody, noBody } from "../contract/body.ts";
+import {
+	customBody,
+	formBody,
+	multipartBody,
+	noBody,
+} from "../contract/body.ts";
 import { router } from "../contract/contract.ts";
 import { jsonQuery } from "../contract/request.ts";
 import { initClient } from "./index.ts";
@@ -554,6 +559,81 @@ describe("ApiClient requests", () => {
 				},
 			}),
 			/declared form array key/,
+		);
+		assert.equal(calls.length, 0);
+	});
+
+	it("sends multipart bodies as FormData without generated content type", async () => {
+		const apiContract = router({
+			uploads: {
+				create: {
+					method: "POST",
+					path: "/uploads",
+					body: multipartBody({
+						fields: {
+							title: z.string(),
+							file: z.instanceof(Blob),
+							tags: z.array(z.string()).optional(),
+						},
+						arrayKeys: ["tags"],
+					}),
+					responses: {
+						204: noBody(),
+					},
+				},
+			},
+		});
+		const calls = captureFetch();
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+		});
+		const file = new Blob(["hello"], { type: "text/plain" });
+
+		await client.uploads.create.fetch({
+			body: {
+				title: "Write docs",
+				file,
+				tags: ["ts", "rpc"],
+			},
+		});
+
+		assert.ok(calls[0]?.init?.body instanceof FormData);
+		assert.equal(calls[0].init.body.get("title"), "Write docs");
+		assert.ok(calls[0].init.body.get("file") instanceof Blob);
+		assert.deepEqual(calls[0].init.body.getAll("tags"), ["ts", "rpc"]);
+		assert.deepEqual(calls[0]?.init?.headers, {});
+	});
+
+	it("rejects omitted explicit multipart array keys before sending requests", async () => {
+		const apiContract = router({
+			uploads: {
+				create: {
+					method: "POST",
+					path: "/uploads",
+					body: multipartBody({
+						fields: {
+							tags: z.array(z.string()),
+						},
+						arrayKeys: [],
+					}),
+					responses: {
+						204: noBody(),
+					},
+				},
+			},
+		});
+		const calls = captureFetch();
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+		});
+
+		await assert.rejects(
+			client.uploads.create.fetch({
+				body: {
+					tags: ["ts", "rpc"],
+				},
+			}),
+			/declared multipart array key/,
 		);
 		assert.equal(calls.length, 0);
 	});

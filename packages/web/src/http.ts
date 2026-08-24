@@ -2,7 +2,12 @@ import type {
 	HttpRouteDeclaration,
 	RequestBodySchema,
 } from "@rest-rpc/core/contract";
-import { isCustomBody, isFormBody, isNoBody } from "@rest-rpc/core/contract";
+import {
+	isCustomBody,
+	isFormBody,
+	isMultipartBody,
+	isNoBody,
+} from "@rest-rpc/core/contract";
 import {
 	createRequestParsingErrorResponse,
 	createWebResponse,
@@ -38,6 +43,9 @@ const isFormUrlEncodedContentType = (contentType: string) =>
 	contentType.split(";")[0]?.trim().toLowerCase() ===
 	"application/x-www-form-urlencoded";
 
+const isMultipartFormDataContentType = (contentType: string) =>
+	contentType.split(";")[0]?.trim().toLowerCase() === "multipart/form-data";
+
 const readQuery = (url: URL) => Object.fromEntries(url.searchParams.entries());
 
 const readHeaders = (headers: Headers) => Object.fromEntries(headers.entries());
@@ -48,6 +56,12 @@ export const defaultParseBody = ({ request, body }: WebRouteParseBodyInput) => {
 		const contentType = request.headers.get("content-type") ?? "";
 		return isFormUrlEncodedContentType(contentType)
 			? request.text().then((text) => new URLSearchParams(text))
+			: undefined;
+	}
+	if (isMultipartBody(body)) {
+		const contentType = request.headers.get("content-type") ?? "";
+		return isMultipartFormDataContentType(contentType)
+			? request.formData()
 			: undefined;
 	}
 	if (isCustomBody(body)) {

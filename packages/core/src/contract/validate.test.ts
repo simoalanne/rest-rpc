@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
 import { testContract } from "../../test/factories/contract.ts";
-import { customBody, formBody } from "./body.ts";
+import { customBody, formBody, multipartBody } from "./body.ts";
 import { jsonQuery } from "./request.ts";
 import { groupRequestInput, validateContract } from "./validate.ts";
 
@@ -197,6 +197,23 @@ describe("validateContract", () => {
 		);
 	});
 
+	it("rejects body keys in query or pathParams for multipart request bodies", () => {
+		assert.throws(
+			() =>
+				validateContract(
+					testContract({
+						path: "/uploads/:body",
+						pathParams: z.object({ body: z.string() }),
+						body: multipartBody({
+							fields: { title: z.string() },
+							arrayKeys: [],
+						}),
+					}),
+				),
+			/has a "body" key in query or pathParams/,
+		);
+	});
+
 	it("rejects query keys in other segments for JSON query values", () => {
 		assert.throws(
 			() =>
@@ -350,6 +367,23 @@ describe("groupRequestInput", () => {
 	it("assigns the body key as a form request body", () => {
 		const route = testContract({
 			body: formBody(z.object({ title: z.string() })),
+			requestKeys: {},
+		}).search.find;
+
+		assert.deepEqual(
+			groupRequestInput(route, { body: { title: "Write docs" } }),
+			{
+				body: { title: "Write docs" },
+			},
+		);
+	});
+
+	it("assigns the body key as a multipart request body", () => {
+		const route = testContract({
+			body: multipartBody({
+				fields: { title: z.string() },
+				arrayKeys: [],
+			}),
 			requestKeys: {},
 		}).search.find;
 

@@ -193,6 +193,63 @@ When the array keys cannot be inferred, you can declare them explicitly with the
 formBody({ schema: type<{ title: string; tags: string[] }>(), arrayKeys: ["tags"] })
 ```
 
+## Request With Multipart Body
+
+Use `multipartBody()` for `multipart/form-data` request bodies.
+Body is sent as `FormData` to the server and is then passed as a validated
+object to the handler.
+
+```ts
+import { multipartBody, router } from "@rest-rpc/core";
+
+export const api = router({
+	uploads: {
+		create: {
+			method: "POST",
+			path: "/uploads",
+			body: multipartBody({
+				fields: {
+					title: z.string(),
+					file: z.instanceof(File),
+					tags: z.array(z.string()).optional(),
+				},
+				arrayKeys: ["tags"],
+			}),
+			response: z.object({
+				title: z.string(),
+			}),
+		},
+	},
+});
+```
+
+```ts
+export const routes = router(api, {
+	uploads: {
+		create({ body }) {
+			return {
+				title: body.title,
+			};
+		},
+	},
+});
+```
+
+```ts
+const result = await client.uploads.create.fetch({
+	body: {
+		title: "Write docs",
+		file,
+		tags: ["typescript", "rpc"],
+	},
+});
+```
+
+Server body parsers should pass a `FormData` instance to rest-rpc for multipart
+bodies. Each scalar key is passed to its schema as a string or `File`; omitted
+keys are absent from the validation input. Array keys are explicit and are
+encoded or decoded as repeated form keys.
+
 ## Request With Fetch-Managed Content Type
 
 Omit `contentType` when the request body should be passed directly to `fetch`

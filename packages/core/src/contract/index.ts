@@ -7,6 +7,7 @@ export type {
 	CustomBody,
 	CustomBodyContentType,
 	FormBody,
+	MultipartBody,
 	NoBody,
 	Stream,
 } from "./body.ts";
@@ -15,8 +16,10 @@ export {
 	formBody,
 	isCustomBody,
 	isFormBody,
+	isMultipartBody,
 	isNoBody,
 	isStream,
+	multipartBody,
 	noBody,
 	stream,
 } from "./body.ts";

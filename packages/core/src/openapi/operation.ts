@@ -1,6 +1,7 @@
 import {
 	isCustomBody,
 	isFormBody,
+	isMultipartBody,
 	isNoBody,
 	isStream,
 } from "../contract/body.ts";
@@ -44,6 +45,7 @@ import type {
 export const JSON_CONTENT_TYPE = "application/json";
 export const NDJSON_CONTENT_TYPE = "application/x-ndjson";
 export const FORM_URLENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
+export const MULTIPART_FORM_DATA_CONTENT_TYPE = "multipart/form-data";
 
 const createContent = (
 	contentTypes: readonly string[],
@@ -172,12 +174,18 @@ export const createRequestBody = (
 	if (isNoBody(schema)) return undefined;
 	const contentTypes = isFormBody(schema)
 		? [FORM_URLENCODED_CONTENT_TYPE]
-		: isCustomBody(schema)
-			? contentTypesForCustomBody(schema)
-			: [JSON_CONTENT_TYPE];
+		: isMultipartBody(schema)
+			? [MULTIPART_FORM_DATA_CONTENT_TYPE]
+			: isCustomBody(schema)
+				? contentTypesForCustomBody(schema)
+				: [JSON_CONTENT_TYPE];
 	if (contentTypes.length === 0) return undefined;
 	const bodySchema =
-		isCustomBody(schema) || isFormBody(schema) ? schema.schema : schema;
+		isCustomBody(schema) || isFormBody(schema)
+			? schema.schema
+			: isMultipartBody(schema)
+				? schema.fields
+				: schema;
 	const openApiSchema = isRequestSchemaRecord(bodySchema)
 		? createSchemaRecordObject(bodySchema, converter)
 		: isStandardSchema(bodySchema)

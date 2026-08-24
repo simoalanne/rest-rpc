@@ -4,6 +4,7 @@ import {
 	customBody,
 	formBody,
 	jsonQuery,
+	multipartBody,
 	stream,
 } from "@rest-rpc/core/contract";
 import z from "zod";
@@ -308,6 +309,48 @@ describe("validateRequest", () => {
 					tags: ["ts", "rpc"],
 				},
 			});
+		}
+	});
+
+	it("validates multipart bodies from FormData", async () => {
+		const file = new Blob(["hello"], { type: "text/plain" });
+		const body = new FormData();
+		body.set("title", "Write docs");
+		body.set("count", "3");
+		body.set("file", file);
+		body.append("tags", "ts");
+		body.append("tags", "rpc");
+
+		const result = await validateRequest(
+			{
+				method: "POST",
+				path: "/uploads",
+				body: multipartBody({
+					fields: {
+						title: z.string(),
+						count: z.coerce.number(),
+						file: z.instanceof(Blob),
+						tags: z.array(z.string()),
+					},
+					arrayKeys: ["tags"],
+				}),
+				requestKeys: {},
+				responses: {},
+			},
+			{
+				body,
+				headers: {
+					"content-type": "multipart/form-data",
+				},
+			},
+		);
+
+		assert.equal(result.success, true);
+		if (result.success) {
+			assert.equal(result.data.body.title, "Write docs");
+			assert.equal(result.data.body.count, 3);
+			assert.ok(result.data.body.file instanceof Blob);
+			assert.deepEqual(result.data.body.tags, ["ts", "rpc"]);
 		}
 	});
 

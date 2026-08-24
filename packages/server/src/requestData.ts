@@ -1,5 +1,10 @@
 import type { RouteDeclaration } from "@rest-rpc/core/contract";
-import { isCustomBody, isFormBody, isJsonQuery } from "@rest-rpc/core/contract";
+import {
+	isCustomBody,
+	isFormBody,
+	isJsonQuery,
+	isMultipartBody,
+} from "@rest-rpc/core/contract";
 
 const flattenObjectSegment = (value: unknown) =>
 	value as Record<string, unknown> | undefined;
@@ -25,7 +30,9 @@ export const flattenRequestData = (
 
 	return {
 		...(route.mode !== "webSocket"
-			? isCustomBody(route.body) || isFormBody(route.body)
+			? isCustomBody(route.body) ||
+				isFormBody(route.body) ||
+				isMultipartBody(route.body)
 				? { body: request.body }
 				: flattenObjectSegment(request.body)
 			: {}),

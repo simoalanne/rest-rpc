@@ -1,4 +1,9 @@
-import { isCustomBody, isFormBody, isNoBody } from "../contract/body.ts";
+import {
+	isCustomBody,
+	isFormBody,
+	isMultipartBody,
+	isNoBody,
+} from "../contract/body.ts";
 import type { RouteDeclaration } from "../contract/contract.ts";
 import { replacePathParams } from "../contract/path.ts";
 import { isJsonQuery } from "../contract/request.ts";
@@ -39,6 +44,7 @@ export const takesRequestInput = (route: RouteDeclaration) => {
 		return true;
 	}
 	if (isFormBody(route.body)) return true;
+	if (isMultipartBody(route.body)) return true;
 	if (isCustomBody(route.body)) return true;
 	return Boolean(route.body && !isNoBody(route.body));
 };
@@ -131,6 +137,60 @@ const serializeFormBody = (
 	);
 };
 
+const isMultipartFileValue = (value: unknown): value is Blob =>
+	typeof Blob !== "undefined" && value instanceof Blob;
+
+const stringifyMultipartValue = (
+	route: RouteDeclaration,
+	key: string,
+	value: unknown,
+	optional = false,
+) => {
+	if (value === undefined && optional) return undefined;
+	if (isMultipartFileValue(value)) return value;
+	if (isSerializablePrimitive(value)) return String(value);
+
+	throw new Error(
+		`Invalid body key "${key}" for ${route.method} ${route.path}. Expected string, number, boolean, Blob, File, or an array for a declared multipart array key.`,
+	);
+};
+
+const serializeMultipartBody = (
+	route: RouteDeclaration,
+	body: Record<string, unknown> | undefined,
+) => {
+	const arrayKeys = new Set(
+		isMultipartBody(route.body) ? route.body.arrayKeys : [],
+	);
+	const formData = new FormData();
+
+	for (const [key, value] of Object.entries(body ?? {})) {
+		if (Array.isArray(value)) {
+			if (!arrayKeys.has(key)) {
+				throw new Error(
+					`Invalid body key "${key}" for ${route.method} ${route.path}. Expected string, number, boolean, Blob, File, or an array for a declared multipart array key.`,
+				);
+			}
+
+			for (const item of value) {
+				const formValue = stringifyMultipartValue(route, key, item);
+				if (formValue === undefined) {
+					throw new Error(
+						`Invalid body key "${key}" for ${route.method} ${route.path}. Expected string, number, boolean, Blob, File, or an array for a declared multipart array key.`,
+					);
+				}
+				formData.append(key, formValue);
+			}
+			continue;
+		}
+
+		const formValue = stringifyMultipartValue(route, key, value, true);
+		if (formValue !== undefined) formData.append(key, formValue);
+	}
+
+	return formData;
+};
+
 const stringifyHeaders = (
 	route: RouteDeclaration,
 	headers: Record<string, unknown> | undefined,
@@ -220,6 +280,17 @@ export const constructBaseRequest = (
 		return {
 			url: urlBase,
 			body: serializeFormBody(
+				route,
+				body as Record<string, unknown> | undefined,
+			),
+			headers: stringifyHeaders(route, headers),
+		};
+	}
+
+	if (isMultipartBody(route.body)) {
+		return {
+			url: urlBase,
+			body: serializeMultipartBody(
 				route,
 				body as Record<string, unknown> | undefined,
 			),

@@ -5,11 +5,13 @@ import {
 	isCustomBody,
 	isFormBody,
 	isJsonQuery,
+	isMultipartBody,
 	isNoBody,
 	isRequestSchemaRecord,
 	isStandardSchema,
 	isStream,
 	type JsonQuery,
+	type MultipartBody,
 	type ResponseBodySchema,
 	type ResponseDeclaration,
 	type RouteDeclaration,
@@ -222,6 +224,42 @@ const validateFormBody = async (
 	return { data: { body: result.value }, errors: [] };
 };
 
+const multipartBodyToObject = (
+	body: FormData,
+	arrayKeys: readonly string[],
+) => {
+	const data: Record<string, FormDataEntryValue | FormDataEntryValue[]> = {};
+	const arrayKeySet = new Set(arrayKeys);
+	for (const key of new Set(body.keys())) {
+		if (arrayKeySet.has(key)) {
+			data[key] = body.getAll(key);
+			continue;
+		}
+
+		const value = body.get(key);
+		if (value !== null) data[key] = value;
+	}
+	return data;
+};
+
+const validateMultipartBody = async (
+	declaration: MultipartBody,
+	body: unknown,
+): Promise<SegmentValidationResult> => {
+	if (!(body instanceof FormData)) {
+		return {
+			data: {},
+			errors: [{ message: "Expected FormData multipart body." }],
+		};
+	}
+
+	const result = await validateSchemaRecord(
+		declaration.fields,
+		multipartBodyToObject(body, declaration.arrayKeys),
+	);
+	return { data: { body: result.data }, errors: result.errors };
+};
+
 const validateJsonQuery = async (
 	declaration: JsonQuery,
 	query: unknown,
@@ -259,7 +297,9 @@ const getValidatedRequestData = (
 		...(route.body && !isNoBody(route.body)
 			? {
 					body:
-						isCustomBody(route.body) || isFormBody(route.body)
+						isCustomBody(route.body) ||
+						isFormBody(route.body) ||
+						isMultipartBody(route.body)
 							? body.data.body
 							: body.data,
 				}
@@ -280,7 +320,9 @@ export async function validateRequest(
 		? await validateCustomBody(route, segments.body, segments.headers)
 		: isFormBody(route.body)
 			? await validateFormBody(route.body, segments.body)
-			: await validateRequestObject(route.body, segments.body);
+			: isMultipartBody(route.body)
+				? await validateMultipartBody(route.body, segments.body)
+				: await validateRequestObject(route.body, segments.body);
 	const query = isJsonQuery(route.query)
 		? await validateJsonQuery(route.query, segments.query)
 		: await validateRequestObject(route.query, segments.query);

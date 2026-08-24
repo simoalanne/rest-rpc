@@ -1,5 +1,11 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import { isCustomBody, isFormBody, isNoBody, isStream } from "./body.ts";
+import {
+	isCustomBody,
+	isFormBody,
+	isMultipartBody,
+	isNoBody,
+	isStream,
+} from "./body.ts";
 import type { Contract, RouteDeclaration } from "./contract.ts";
 import { getPathParamNames } from "./path.ts";
 import type { RequestKeys } from "./request.ts";
@@ -158,7 +164,10 @@ const requestSchemas = (route: RouteDeclaration) =>
 	[
 		[
 			"body",
-			isCustomBody(route.body) || isFormBody(route.body) || isNoBody(route.body)
+			isCustomBody(route.body) ||
+			isFormBody(route.body) ||
+			isMultipartBody(route.body) ||
+			isNoBody(route.body)
 				? undefined
 				: route.body,
 		],
@@ -193,7 +202,9 @@ export const validateResolvedRequestKeys = (route: RouteDeclaration) => {
 	assertCustomResponsesDeclareContentType(route);
 
 	if (
-		(isCustomBody(route.body) || isFormBody(route.body)) &&
+		(isCustomBody(route.body) ||
+			isFormBody(route.body) ||
+			isMultipartBody(route.body)) &&
 		route.requestKeys?.body
 	) {
 		throw new Error(
@@ -217,7 +228,9 @@ export const groupRequestInput = (
 ): GroupedRequestInput => {
 	const strictRequestKeys = options.strictRequestKeys ?? true;
 	const isSpecialRequestBody =
-		isCustomBody(route.body) || isFormBody(route.body);
+		isCustomBody(route.body) ||
+		isFormBody(route.body) ||
+		isMultipartBody(route.body);
 	const isJsonQueryRequest = isJsonQuery(route.query);
 	const requestKeys = route.requestKeys;
 

@@ -6,6 +6,8 @@ import {
 	type FormBody,
 	formBody,
 	jsonQuery,
+	type MultipartBody,
+	multipartBody,
 	noBody,
 	route,
 	router,
@@ -188,6 +190,70 @@ expectType<readonly ["tags"]>(
 		}),
 		arrayKeys: ["tags"],
 	}).arrayKeys,
+);
+
+// should infer multipart request bodies as typed body objects
+const multipartRequestRoute = route({
+	method: "POST",
+	path: "/uploads",
+	body: multipartBody({
+		fields: {
+			title: z.string(),
+			count: z.coerce.number(),
+			file: z.instanceof(Blob),
+			tags: z.array(z.string()).optional(),
+		},
+		arrayKeys: ["tags"],
+	}),
+	responses: {
+		204: noBody(),
+	},
+});
+
+declare const multipartClientRequest: ClientRequest<
+	typeof multipartRequestRoute
+>;
+expectType<{
+	title: string;
+	count?: unknown;
+	file: Blob;
+	tags?: string[] | undefined;
+}>(multipartClientRequest.body);
+
+declare const multipartServerRequest: ServerRequest<
+	typeof multipartRequestRoute
+>;
+expectType<{
+	title: string;
+	count: number;
+	file: Blob;
+	tags?: string[] | undefined;
+}>(multipartServerRequest.body);
+
+// should accept explicit multipart body declarations
+expectAssignable<MultipartBody>(
+	multipartBody({
+		fields: {
+			title: z.string(),
+		},
+		arrayKeys: [],
+	}),
+);
+expectType<readonly ["attachments"]>(
+	multipartBody({
+		fields: {
+			attachments: z.array(z.instanceof(Blob)),
+		},
+		arrayKeys: ["attachments"],
+	}).arrayKeys,
+);
+expectError(
+	multipartBody({
+		fields: {
+			tags: z.array(z.string()),
+		},
+		arrayKeys: ["tagz"],
+	}),
 );
 
 // should carry type-only response schemas into success-body helpers
