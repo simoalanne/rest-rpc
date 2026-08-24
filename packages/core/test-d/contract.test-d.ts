@@ -3,6 +3,7 @@ import {
 	type ClientRequest,
 	type ClientResponseBody,
 	customBody,
+	formBody,
 	jsonQuery,
 	noBody,
 	route,
@@ -143,6 +144,33 @@ expectError(
 		},
 	}),
 );
+
+// should infer urlencoded form request bodies as typed body objects
+const formRequestRoute = route({
+	method: "POST",
+	path: "/forms",
+	body: formBody(
+		z.object({
+			title: z.string(),
+			count: z.coerce.number(),
+		}),
+	),
+	responses: {
+		204: noBody(),
+	},
+});
+
+declare const formClientRequest: ClientRequest<typeof formRequestRoute>;
+expectType<{
+	title: string;
+	count: unknown;
+}>(formClientRequest.body);
+
+declare const formServerRequest: ServerRequest<typeof formRequestRoute>;
+expectType<{
+	title: string;
+	count: number;
+}>(formServerRequest.body);
 
 // should carry type-only response schemas into success-body helpers
 const typeOnlyResponse = route({

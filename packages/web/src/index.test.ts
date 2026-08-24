@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { noBody } from "@rest-rpc/core/contract";
+import { formBody, noBody, type as schemaType } from "@rest-rpc/core/contract";
 import { createRouteHandler, route, router } from "./index.ts";
 
 const healthRoute = {
@@ -146,5 +146,34 @@ describe("createRouteHandler", () => {
 		);
 		assert.equal(plainResponse.status, 204);
 		assert.deepEqual(calls, ["parent middleware", "plain handler"]);
+	});
+
+	it("parses urlencoded form bodies with the default body parser", async () => {
+		const routes = router({
+			form: {
+				method: "POST",
+				path: "/forms",
+				body: formBody(schemaType<{ title: string }>()),
+				responses: {
+					200: schemaType<{ title: string }>(),
+				},
+			},
+		}).handlers({
+			form: ({ body }) => body,
+		});
+		const handle = createRouteHandler(routes);
+
+		const response = await handle(
+			new Request("https://example.com/forms", {
+				method: "POST",
+				body: new URLSearchParams({ title: "Write docs" }),
+			}),
+			{},
+		);
+
+		assert.equal(response.status, 200);
+		assert.deepEqual(await response.json(), {
+			title: "Write docs",
+		});
 	});
 });

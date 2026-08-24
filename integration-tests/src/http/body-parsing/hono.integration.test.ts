@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import type { Server } from "node:http";
 import { describe, it } from "node:test";
 import { createAdaptorServer } from "@hono/node-server";
-import { isCustomBody } from "@rest-rpc/core/contract";
+import { isCustomBody, isFormBody } from "@rest-rpc/core/contract";
 import { type HonoParseBody, registerRoutes } from "@rest-rpc/hono";
 import { Hono } from "hono";
 import { listen } from "../harness/listen.ts";
@@ -11,6 +11,11 @@ import { runBodyParsingSuite } from "./suite.ts";
 
 const parseBody: HonoParseBody = async ({ body, c }) => {
 	const contentType = c.req.header("content-type") ?? "";
+	if (isFormBody(body)) {
+		return contentType.startsWith("application/x-www-form-urlencoded")
+			? new URLSearchParams(await c.req.text())
+			: undefined;
+	}
 	if (!isCustomBody(body)) {
 		return contentType.startsWith("application/json")
 			? c.req.json()

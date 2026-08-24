@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
 import { testContract } from "../../test/factories/contract.ts";
-import { customBody } from "./body.ts";
+import { customBody, formBody } from "./body.ts";
 import { jsonQuery } from "./request.ts";
 import { groupRequestInput, validateContractSync } from "./validate.ts";
 
@@ -200,6 +200,20 @@ describe("validateContractSync", () => {
 		);
 	});
 
+	it("rejects body keys in query or pathParams for form request bodies", () => {
+		assert.throws(
+			() =>
+				validateContractSync(
+					testContract({
+						path: "/forms/:body",
+						pathParams: z.object({ body: z.string() }),
+						body: formBody(z.object({ title: z.string() })),
+					}),
+				),
+			/has a "body" key in query or pathParams/,
+		);
+	});
+
 	it("rejects query keys in other segments for JSON query values", () => {
 		assert.throws(
 			() =>
@@ -348,6 +362,20 @@ describe("groupRequestInput", () => {
 		assert.deepEqual(groupRequestInput(route, { body }), {
 			body,
 		});
+	});
+
+	it("assigns the body key as a form request body", () => {
+		const route = testContract({
+			body: formBody(z.object({ title: z.string() })),
+			requestKeys: {},
+		}).search.find;
+
+		assert.deepEqual(
+			groupRequestInput(route, { body: { title: "Write docs" } }),
+			{
+				body: { title: "Write docs" },
+			},
+		);
 	});
 
 	it("assigns the query key as a JSON query value", () => {

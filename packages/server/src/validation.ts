@@ -1,7 +1,9 @@
 import {
 	type CustomBody,
+	type FormBody,
 	getResponseHeaders,
 	isCustomBody,
+	isFormBody,
 	isJsonQuery,
 	isNoBody,
 	isRequestSchemaRecord,
@@ -180,6 +182,37 @@ const validateCustomBody = async (
 	};
 };
 
+const formBodyToObject = (body: URLSearchParams) => {
+	const data: Record<string, string> = {};
+	for (const key of new Set(body.keys())) {
+		const value = body.get(key);
+		if (value !== null) data[key] = value;
+	}
+	return data;
+};
+
+const validateFormBody = async (
+	declaration: FormBody,
+	body: unknown,
+): Promise<SegmentValidationResult> => {
+	if (!(body instanceof URLSearchParams)) {
+		return {
+			data: {},
+			errors: [{ message: "Expected URLSearchParams form body." }],
+		};
+	}
+
+	const result = await validateStandardSchema(
+		declaration.schema,
+		formBodyToObject(body),
+	);
+	if (result.issues) {
+		return { data: {}, errors: result.issues };
+	}
+
+	return { data: { body: result.value }, errors: [] };
+};
+
 const validateJsonQuery = async (
 	declaration: JsonQuery,
 	query: unknown,
@@ -215,7 +248,12 @@ const getValidatedRequestData = (
 ) => {
 	return {
 		...(route.body && !isNoBody(route.body)
-			? { body: isCustomBody(route.body) ? body.data.body : body.data }
+			? {
+					body:
+						isCustomBody(route.body) || isFormBody(route.body)
+							? body.data.body
+							: body.data,
+				}
 			: {}),
 		...(route.query
 			? { query: isJsonQuery(route.query) ? query.data.query : query.data }
@@ -231,7 +269,9 @@ export async function validateRequest(
 ): Promise<RequestValidationResponse> {
 	const body = isCustomBody(route.body)
 		? await validateCustomBody(route, segments.body, segments.headers)
-		: await validateRequestObject(route.body, segments.body);
+		: isFormBody(route.body)
+			? await validateFormBody(route.body, segments.body)
+			: await validateRequestObject(route.body, segments.body);
 	const query = isJsonQuery(route.query)
 		? await validateJsonQuery(route.query, segments.query)
 		: await validateRequestObject(route.query, segments.query);

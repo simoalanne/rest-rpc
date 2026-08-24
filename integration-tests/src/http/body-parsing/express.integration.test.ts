@@ -41,6 +41,14 @@ runBodyParsingSuite({
 				next();
 			},
 		);
+		app.use(
+			bodyParsingContract.formUrlEncoded.path,
+			express.text({ type: "application/x-www-form-urlencoded" }),
+			(req, _res, next) => {
+				req.body = new URLSearchParams(req.body);
+				next();
+			},
+		);
 
 		registerRoutes(app, createBodyParsingImplementations());
 

@@ -1,6 +1,6 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import type { CustomBody, NoBody } from "./body.ts";
-import { isCustomBody, isNoBody } from "./body.ts";
+import type { CustomBody, FormBody, NoBody } from "./body.ts";
+import { isCustomBody, isFormBody, isNoBody } from "./body.ts";
 import type { RouteDeclaration } from "./contract.ts";
 import type { InferCustomBody } from "./response.ts";
 import type { WebSocketMessages } from "./websocketMessages.ts";
@@ -48,6 +48,7 @@ export type RequestBodySchema =
 	| StandardSchemaV1
 	| RequestSchemaRecord
 	| CustomBody
+	| FormBody
 	| NoBody
 	| undefined;
 
@@ -62,6 +63,7 @@ export const isRequestSchemaRecord = (
 	!isStandardSchema(value) &&
 	!isJsonQuery(value) &&
 	!isCustomBody(value) &&
+	!isFormBody(value) &&
 	!isNoBody(value);
 
 type InferRequestBody<
@@ -73,13 +75,19 @@ type InferRequestBody<
 		? {
 				body: InferCustomBody<TBody, TIO>;
 			}
-		: TBody extends StandardSchemaV1
-			? TIO extends "input"
-				? StandardSchemaV1.InferInput<TBody>
-				: StandardSchemaV1.InferOutput<TBody>
-			: TBody extends RequestSchemaRecord
-				? InferRequestSchemaRecord<TBody, TIO>
-				: never;
+		: TBody extends FormBody<infer TSchema>
+			? {
+					body: TIO extends "input"
+						? StandardSchemaV1.InferInput<TSchema>
+						: StandardSchemaV1.InferOutput<TSchema>;
+				}
+			: TBody extends StandardSchemaV1
+				? TIO extends "input"
+					? StandardSchemaV1.InferInput<TBody>
+					: StandardSchemaV1.InferOutput<TBody>
+				: TBody extends RequestSchemaRecord
+					? InferRequestSchemaRecord<TBody, TIO>
+					: never;
 
 type InferGroupedRequestBody<
 	TBody,
@@ -88,13 +96,17 @@ type InferGroupedRequestBody<
 	? never
 	: TBody extends CustomBody
 		? InferCustomBody<TBody, TIO>
-		: TBody extends StandardSchemaV1
+		: TBody extends FormBody<infer TSchema>
 			? TIO extends "input"
-				? StandardSchemaV1.InferInput<TBody>
-				: StandardSchemaV1.InferOutput<TBody>
-			: TBody extends RequestSchemaRecord
-				? InferRequestSchemaRecord<TBody, TIO>
-				: never;
+				? StandardSchemaV1.InferInput<TSchema>
+				: StandardSchemaV1.InferOutput<TSchema>
+			: TBody extends StandardSchemaV1
+				? TIO extends "input"
+					? StandardSchemaV1.InferInput<TBody>
+					: StandardSchemaV1.InferOutput<TBody>
+				: TBody extends RequestSchemaRecord
+					? InferRequestSchemaRecord<TBody, TIO>
+					: never;
 
 type InferJsonQuery<TQuery, TIO extends "input" | "output"> =
 	TQuery extends JsonQuery<infer TSchema>

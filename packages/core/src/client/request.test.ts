@@ -6,7 +6,7 @@ import {
 	createClientTestContract,
 	jsonResponse,
 } from "../../test/factories/client.ts";
-import { customBody, noBody } from "../contract/body.ts";
+import { customBody, formBody, noBody } from "../contract/body.ts";
 import { router } from "../contract/contract.ts";
 import { jsonQuery } from "../contract/request.ts";
 import { initClient } from "./index.ts";
@@ -446,6 +446,44 @@ describe("ApiClient requests", () => {
 		await client.forms.submit.fetch({ body });
 
 		assert.equal(calls[0]?.init?.body, body);
+		assert.deepEqual(calls[0]?.init?.headers, {});
+	});
+
+	it("sends form bodies as URLSearchParams without generated content type", async () => {
+		const apiContract = router({
+			forms: {
+				submit: {
+					method: "POST",
+					path: "/forms",
+					body: formBody(
+						z.object({
+							title: z.string(),
+							remember: z.boolean().optional(),
+						}),
+					),
+					responses: {
+						204: noBody(),
+					},
+				},
+			},
+		});
+		const calls = captureFetch();
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+		});
+
+		await client.forms.submit.fetch({
+			body: {
+				title: "Write docs",
+				remember: true,
+			},
+		});
+
+		assert.ok(calls[0]?.init?.body instanceof URLSearchParams);
+		assert.equal(
+			calls[0].init.body.toString(),
+			"title=Write+docs&remember=true",
+		);
 		assert.deepEqual(calls[0]?.init?.headers, {});
 	});
 

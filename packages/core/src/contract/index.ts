@@ -6,12 +6,15 @@ export {
 export type {
 	CustomBody,
 	CustomBodyContentType,
+	FormBody,
 	NoBody,
 	Stream,
 } from "./body.ts";
 export {
 	customBody,
+	formBody,
 	isCustomBody,
+	isFormBody,
 	isNoBody,
 	isStream,
 	noBody,

@@ -21,6 +21,10 @@ export const createBodyParsingHandlers = (): BodyParsingHandlers => ({
 		title: request.body.get("title") ?? "",
 		remember: request.body.get("remember") ?? undefined,
 	}),
+	formUrlEncoded: (request) => ({
+		count: request.body.count,
+		title: request.body.title,
+	}),
 	binary: (request) => ({
 		byteLength: request.body.byteLength,
 		bytes: Array.from(request.body),

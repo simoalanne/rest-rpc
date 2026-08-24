@@ -1,6 +1,7 @@
 import {
 	customBody,
 	router as defineRouter,
+	formBody,
 	jsonQuery,
 	noBody,
 	stream,
@@ -221,6 +222,34 @@ route(omittedCustomRequestApi.todos.submitForm, ({ body }) => {
 	expectType<URLSearchParams>(body);
 	expectError(body.contentType);
 	expectError(body.payload);
+
+	return undefined;
+});
+
+// should expose validated urlencoded form bodies to handlers
+const formRequestApi = defineRouter({
+	todos: {
+		submitForm: {
+			method: "POST",
+			path: "/todos/form",
+			body: formBody(
+				z.object({
+					title: z.string(),
+					count: z.coerce.number(),
+				}),
+			),
+			responses: {
+				204: noBody(),
+			},
+		},
+	},
+});
+
+route(formRequestApi.todos.submitForm, ({ body }) => {
+	expectType<{
+		title: string;
+		count: number;
+	}>(body);
 
 	return undefined;
 });

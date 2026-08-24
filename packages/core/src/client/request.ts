@@ -1,4 +1,4 @@
-import { isCustomBody, isNoBody } from "../contract/body.ts";
+import { isCustomBody, isFormBody, isNoBody } from "../contract/body.ts";
 import type { RouteDeclaration } from "../contract/contract.ts";
 import { replacePathParams } from "../contract/path.ts";
 import { isJsonQuery } from "../contract/request.ts";
@@ -38,6 +38,7 @@ export const takesRequestInput = (route: RouteDeclaration) => {
 	if (route.query || route.pathParams || route.headers) {
 		return true;
 	}
+	if (isFormBody(route.body)) return true;
 	if (isCustomBody(route.body)) return true;
 	return Boolean(route.body && !isNoBody(route.body));
 };
@@ -79,7 +80,7 @@ const isSerializablePrimitive = (value: unknown) =>
 
 const stringifyRequestValue = (
 	route: RouteDeclaration,
-	segment: "pathParams" | "query" | "headers",
+	segment: "body" | "pathParams" | "query" | "headers",
 	key: string,
 	value: unknown,
 	optional = false,
@@ -91,6 +92,23 @@ const stringifyRequestValue = (
 		`Invalid ${segment} key "${key}" for ${route.method} ${route.path}. Expected string, number, or boolean.`,
 	);
 };
+
+const serializeFormBody = (
+	route: RouteDeclaration,
+	body: Record<string, unknown> | undefined,
+) =>
+	new URLSearchParams(
+		Object.entries(body ?? {}).flatMap(([key, value]) => {
+			const stringValue = stringifyRequestValue(
+				route,
+				"body",
+				key,
+				value,
+				true,
+			);
+			return stringValue === undefined ? [] : [[key, stringValue]];
+		}),
+	);
 
 const stringifyHeaders = (
 	route: RouteDeclaration,
@@ -176,6 +194,17 @@ export const constructBaseRequest = (
 	const { body, query, pathParams, headers } = request;
 
 	urlBase = `${baseUrl}${serializeParams(route, pathParams)}${serializeQuery(route, query)}`;
+
+	if (isFormBody(route.body)) {
+		return {
+			url: urlBase,
+			body: serializeFormBody(
+				route,
+				body as Record<string, unknown> | undefined,
+			),
+			headers: stringifyHeaders(route, headers),
+		};
+	}
 
 	if (isCustomBody(route.body)) {
 		const { contentType, payload } = Array.isArray(route.body.contentType)

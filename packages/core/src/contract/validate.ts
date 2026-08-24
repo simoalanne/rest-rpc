@@ -1,5 +1,5 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import { isCustomBody, isNoBody, isStream } from "./body.ts";
+import { isCustomBody, isFormBody, isNoBody, isStream } from "./body.ts";
 import type { Contract, RouteDeclaration } from "./contract.ts";
 import { getPathParamNames } from "./path.ts";
 import type { RequestKeys } from "./request.ts";
@@ -163,7 +163,9 @@ const requestSchemas = (route: RouteDeclaration) =>
 	[
 		[
 			"body",
-			isCustomBody(route.body) || isNoBody(route.body) ? undefined : route.body,
+			isCustomBody(route.body) || isFormBody(route.body) || isNoBody(route.body)
+				? undefined
+				: route.body,
 		],
 		["query", isJsonQuery(route.query) ? undefined : route.query],
 		["pathParams", route.pathParams],
@@ -195,7 +197,10 @@ export const validateResolvedRequestKeys = (route: RouteDeclaration) => {
 	assertNoCaseInsensitiveResponseHeaderDuplicates(route);
 	assertCustomResponsesDeclareContentType(route);
 
-	if (isCustomBody(route.body) && route.requestKeys?.body) {
+	if (
+		(isCustomBody(route.body) || isFormBody(route.body)) &&
+		route.requestKeys?.body
+	) {
 		throw new Error(
 			`Route declaration at path "${route.path}" has a "body" key in query or pathParams. Rename it to avoid conflict with the request body.`,
 		);
@@ -216,7 +221,8 @@ export const groupRequestInput = (
 	options: GroupRequestInputOptions = {},
 ): GroupedRequestInput => {
 	const strictRequestKeys = options.strictRequestKeys ?? true;
-	const isCustomRequestBody = isCustomBody(route.body);
+	const isSpecialRequestBody =
+		isCustomBody(route.body) || isFormBody(route.body);
 	const isJsonQueryRequest = isJsonQuery(route.query);
 	const requestKeys = route.requestKeys;
 
@@ -227,7 +233,7 @@ export const groupRequestInput = (
 	}
 
 	return Object.entries(input).reduce((grouped, [key, value]) => {
-		if (key === "body" && isCustomRequestBody) {
+		if (key === "body" && isSpecialRequestBody) {
 			grouped.body = value;
 			return grouped;
 		}

@@ -152,6 +152,24 @@ export const runBodyParsingSuite = (adapter: BodyParsingSuiteAdapter) => {
 			});
 		});
 
+		it("parses urlencoded form request bodies as validated objects", async () => {
+			const client = initClient(bodyParsingContract, {
+				baseUrl: server.origin,
+			});
+
+			const response = await client.formUrlEncoded.fetch({
+				body: {
+					count: 7,
+					title: "Typed form",
+				},
+			});
+
+			assert.deepEqual(response, {
+				count: 7,
+				title: "Typed form",
+			});
+		});
+
 		it("parses custom application/octet-stream bodies as bytes", async () => {
 			const response = await fetch(`${server.origin}/body-parsing/binary`, {
 				method: "POST",

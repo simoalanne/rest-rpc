@@ -15,6 +15,7 @@ export type {
 	Contract,
 	CustomBody,
 	CustomBodyContentType,
+	FormBody,
 	HttpRouteDeclaration,
 	JsonQuery,
 	NoBody,
@@ -30,6 +31,7 @@ export type {
 } from "./contract/index.ts";
 export {
 	customBody,
+	formBody,
 	jsonQuery,
 	noBody,
 	route,

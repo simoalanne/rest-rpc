@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
 import { schemaConverter } from "../../test/factories/openapi.ts";
-import { customBody, noBody, stream } from "../contract/body.ts";
+import { customBody, formBody, noBody, stream } from "../contract/body.ts";
 import { jsonQuery } from "../contract/request.ts";
 import {
 	createHeaderParameters,
@@ -210,6 +210,23 @@ describe("OpenAPI operations", () => {
 		const body = createRequestBody(customBody(z.string()), schemaConverter);
 
 		assert.equal(body, undefined);
+	});
+
+	it("creates urlencoded form request bodies", () => {
+		const body = createRequestBody(
+			formBody(
+				z.object({
+					title: z.string(),
+				}),
+			),
+			schemaConverter,
+		);
+
+		assert.equal(
+			body?.content["application/x-www-form-urlencoded"].schema.type,
+			"object",
+		);
+		assert.equal(body?.content["application/json"], undefined);
 	});
 
 	it("creates JSON request bodies from schema records", () => {

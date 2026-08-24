@@ -1,4 +1,4 @@
-import { customBody, noBody, router } from "@rest-rpc/core/contract";
+import { customBody, formBody, noBody, router } from "@rest-rpc/core/contract";
 import z from "zod";
 
 export const bodyParsingContract = router({
@@ -70,6 +70,22 @@ export const bodyParsingContract = router({
 			200: z.object({
 				title: z.string(),
 				remember: z.string().optional(),
+			}),
+		},
+	},
+	formUrlEncoded: {
+		method: "POST",
+		path: "/body-parsing/form-url-encoded",
+		body: formBody(
+			z.object({
+				count: z.coerce.number(),
+				title: z.string(),
+			}),
+		),
+		responses: {
+			200: z.object({
+				count: z.number(),
+				title: z.string(),
 			}),
 		},
 	},

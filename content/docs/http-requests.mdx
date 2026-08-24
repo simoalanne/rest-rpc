@@ -127,6 +127,63 @@ const result = await client.imports.csv.fetch({
 });
 ```
 
+## Request With Form Body
+
+Use `formBody()` for `application/x-www-form-urlencoded` request bodies.
+Body is sent as a `URLSearchParams` to server and is then passed as validated
+object to the handler.
+
+```ts
+import { formBody, router } from "@rest-rpc/core";
+
+export const api = router({
+	forms: {
+		submit: {
+			method: "POST",
+			path: "/forms",
+			body: formBody(
+				z.object({
+					title: z.string(),
+					count: z.coerce.number(),
+					remember: z.string().optional(),
+				}),
+			),
+			response: z.object({
+				title: z.string(),
+				count: z.number(),
+			}),
+		},
+	},
+});
+```
+
+```ts
+export const routes = router(api, {
+	forms: {
+		submit({ body }) {
+			return {
+				title: body.title,
+				count: body.count,
+			};
+		},
+	},
+});
+```
+
+```ts
+const result = await client.forms.submit.fetch({
+	body: {
+		title: "Write docs",
+		count: 3,
+	},
+});
+```
+
+Server body parsers should pass a `URLSearchParams` instance to rest-rpc for
+form bodies. Each present form key is passed to the schema as a string; omitted
+keys are absent from the validation input. Repeated form keys are not interpreted
+specially in this version.
+
 ## Request With Fetch-Managed Content Type
 
 Omit `contentType` when the request body should be passed directly to `fetch`

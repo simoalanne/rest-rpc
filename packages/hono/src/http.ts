@@ -2,7 +2,7 @@ import type {
 	HttpRouteDeclaration,
 	RouteDeclaration,
 } from "@rest-rpc/core/contract";
-import { isNoBody, toColonPath } from "@rest-rpc/core/contract";
+import { isFormBody, isNoBody, toColonPath } from "@rest-rpc/core/contract";
 import {
 	createRequestParsingErrorResponse,
 	createWebResponse,
@@ -47,9 +47,22 @@ export type ExtendedHonoMiddleware<TEnv extends Env = Env> = (
 	// biome-ignore lint/suspicious/noExplicitAny: hono itself accepts any for handler return type.
 ) => Promise<any> | any;
 
+const isFormUrlEncodedContentType = (contentType: string) =>
+	contentType.split(";")[0]?.trim().toLowerCase() ===
+	"application/x-www-form-urlencoded";
+
 const defaultParseBody = <TEnv extends Env = Env>({
+	body,
 	c,
-}: HonoParseBodyInput<TEnv>) => c.req.json();
+}: HonoParseBodyInput<TEnv>) => {
+	if (isFormBody(body)) {
+		const contentType = c.req.header("content-type") ?? "";
+		return isFormUrlEncodedContentType(contentType)
+			? c.req.text().then((text) => new URLSearchParams(text))
+			: undefined;
+	}
+	return c.req.json();
+};
 
 const parseRequestBody = async <TEnv extends Env = Env>(
 	c: Context<TEnv>,

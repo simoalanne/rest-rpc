@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { customBody, jsonQuery, stream } from "@rest-rpc/core/contract";
+import {
+	customBody,
+	formBody,
+	jsonQuery,
+	stream,
+} from "@rest-rpc/core/contract";
 import z from "zod";
 import {
 	resolveCustomResponseBody,
@@ -228,6 +233,43 @@ describe("validateRequest", () => {
 		if (result.success) {
 			assert.ok(result.data.body instanceof URLSearchParams);
 			assert.equal(result.data.body.get("title"), "Write docs");
+		}
+	});
+
+	it("validates urlencoded form bodies from URLSearchParams", async () => {
+		const result = await validateRequest(
+			{
+				method: "POST",
+				path: "/forms",
+				body: formBody(
+					z.object({
+						title: z.string(),
+						count: z.coerce.number(),
+						remember: z.string().optional(),
+					}),
+				),
+				requestKeys: {},
+				responses: {},
+			},
+			{
+				body: new URLSearchParams([
+					["title", "Write docs"],
+					["count", "3"],
+				]),
+				headers: {
+					"content-type": "application/x-www-form-urlencoded",
+				},
+			},
+		);
+
+		assert.equal(result.success, true);
+		if (result.success) {
+			assert.deepEqual(result.data, {
+				body: {
+					title: "Write docs",
+					count: 3,
+				},
+			});
 		}
 	});
 

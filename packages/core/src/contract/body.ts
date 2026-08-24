@@ -10,6 +10,14 @@ export type NoBody = {
 };
 
 /**
+ * Declares an `application/x-www-form-urlencoded` request body.
+ */
+export type FormBody<TSchema extends StandardSchemaV1 = StandardSchemaV1> = {
+	kind: "formBody";
+	schema: TSchema;
+};
+
+/**
  * Declares one or more non-JSON media types for a custom body.
  */
 export type CustomBodyContentType = string | readonly string[];
@@ -22,6 +30,25 @@ export type CustomBodyContentType = string | readonly string[];
 export function noBody(): NoBody {
 	return {
 		kind: "noBody",
+	};
+}
+
+/**
+ * Declares an `application/x-www-form-urlencoded` request body.
+ *
+ * @remarks The generated client serializes the typed body object to
+ * `URLSearchParams` and lets `fetch()` set the content-type header. Server
+ * body parsers should pass a `URLSearchParams` instance to rest-rpc; each form
+ * key is validated as a string, or `undefined` when omitted.
+ *
+ * @see {@link https://rest-rpc.dev/docs/http-requests#request-with-form-body}
+ */
+export function formBody<const TSchema extends StandardSchemaV1>(
+	schema: TSchema,
+): FormBody<TSchema> {
+	return {
+		kind: "formBody",
+		schema,
 	};
 }
 
@@ -116,9 +143,6 @@ export function customBody<const TSchema extends StandardSchemaV1>(
 	} as CustomBody<TSchema, CustomBodyContentType | undefined>;
 }
 
-/**
- * Checks whether a value is a no-body declaration.
- */
 export function isNoBody(body: unknown): body is NoBody {
 	return (
 		typeof body === "object" &&
@@ -128,9 +152,15 @@ export function isNoBody(body: unknown): body is NoBody {
 	);
 }
 
-/**
- * Checks whether a value is a stream body declaration.
- */
+export function isFormBody(body: unknown): body is FormBody {
+	return (
+		typeof body === "object" &&
+		body !== null &&
+		"kind" in body &&
+		body.kind === "formBody"
+	);
+}
+
 export function isStream(response: unknown): response is Stream {
 	return (
 		typeof response === "object" &&
@@ -140,9 +170,6 @@ export function isStream(response: unknown): response is Stream {
 	);
 }
 
-/**
- * Checks whether a value is a custom body declaration.
- */
 export function isCustomBody(schema: unknown): schema is CustomBody {
 	return (
 		typeof schema === "object" &&

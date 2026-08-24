@@ -1,4 +1,9 @@
-import { isCustomBody, isNoBody, isStream } from "../contract/body.ts";
+import {
+	isCustomBody,
+	isFormBody,
+	isNoBody,
+	isStream,
+} from "../contract/body.ts";
 import type { OpenApiResponseOptions } from "../contract/contract.ts";
 import type {
 	JsonQuery,
@@ -38,6 +43,7 @@ import type {
 
 export const JSON_CONTENT_TYPE = "application/json";
 export const NDJSON_CONTENT_TYPE = "application/x-ndjson";
+export const FORM_URLENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
 
 const createContent = (
 	contentTypes: readonly string[],
@@ -164,11 +170,14 @@ export const createRequestBody = (
 ): OpenApiRequestBody | undefined => {
 	if (!schema) return undefined;
 	if (isNoBody(schema)) return undefined;
-	const contentTypes = isCustomBody(schema)
-		? contentTypesForCustomBody(schema)
-		: [JSON_CONTENT_TYPE];
+	const contentTypes = isFormBody(schema)
+		? [FORM_URLENCODED_CONTENT_TYPE]
+		: isCustomBody(schema)
+			? contentTypesForCustomBody(schema)
+			: [JSON_CONTENT_TYPE];
 	if (contentTypes.length === 0) return undefined;
-	const bodySchema = isCustomBody(schema) ? schema.schema : schema;
+	const bodySchema =
+		isCustomBody(schema) || isFormBody(schema) ? schema.schema : schema;
 	const openApiSchema = isRequestSchemaRecord(bodySchema)
 		? createSchemaRecordObject(bodySchema, converter)
 		: isStandardSchema(bodySchema)

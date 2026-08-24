@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { Readable } from "node:stream";
 import { describe, it } from "node:test";
-import { isCustomBody, isNoBody } from "@rest-rpc/core/contract";
+import { isCustomBody, isFormBody, isNoBody } from "@rest-rpc/core/contract";
 import { createRouteHandler, type WebRouteParseBody } from "@rest-rpc/web";
 import { listen } from "../harness/listen.ts";
 import { createBodyParsingImplementations } from "./handlers.ts";
@@ -14,6 +14,11 @@ const withoutBody = (method: string | undefined) =>
 const parseBody: WebRouteParseBody = async ({ body, request }) => {
 	if (!body || isNoBody(body)) return undefined;
 	const contentType = request.headers.get("content-type") ?? "";
+	if (isFormBody(body)) {
+		return contentType.startsWith("application/x-www-form-urlencoded")
+			? new URLSearchParams(await request.text())
+			: undefined;
+	}
 	if (!isCustomBody(body)) {
 		return contentType.startsWith("application/json")
 			? request.json()
