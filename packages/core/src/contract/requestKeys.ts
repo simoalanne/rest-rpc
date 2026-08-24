@@ -1,18 +1,35 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 
-export type ResolveRequestSchemaKeys = (
-	schema: StandardSchemaV1,
-) => readonly string[] | undefined;
+type UnknownRecord = Record<string, unknown>;
+type RequestKeyInfo = Record<string, boolean>;
 
-export type RequestKeyResolverOptions = {
-	resolveRequestKeys?: ResolveRequestSchemaKeys;
+const entriesToKeyInfo = (
+	entries: readonly [string, unknown][],
+	isArrayInput: (value: unknown) => boolean,
+): RequestKeyInfo =>
+	Object.fromEntries(entries.map(([key, value]) => [key, isArrayInput(value)]));
+
+const mergeKeyInfo = (
+	values: readonly (RequestKeyInfo | undefined)[],
+): RequestKeyInfo | undefined => {
+	if (values.some((value) => value === undefined)) return undefined;
+
+	const keyInfo: RequestKeyInfo = {};
+	for (const value of values) {
+		for (const [key, isArray] of Object.entries(value ?? {})) {
+			keyInfo[key] = keyInfo[key] || isArray;
+		}
+	}
+	return keyInfo;
 };
 
-type UnknownRecord = Record<string, unknown>;
-
-const getStringKeys = (value: unknown): readonly string[] | undefined => {
-	if (!value || typeof value !== "object") return undefined;
-	return Object.keys(value);
+const isZodArrayInput = (value: unknown) => {
+	const record = value as UnknownRecord;
+	const innerType = (record.def as UnknownRecord | undefined)?.innerType;
+	return (
+		record.type === "array" ||
+		(innerType as UnknownRecord | undefined)?.type === "array"
+	);
 };
 
 const resolveZodObjectKeys = (schema: UnknownRecord) => {
@@ -25,12 +42,11 @@ const resolveZodObjectKeys = (schema: UnknownRecord) => {
 			: typeof schema.shape === "object"
 				? schema.shape
 				: undefined;
-	return getStringKeys(shape);
+	if (!shape || typeof shape !== "object") return undefined;
+	return entriesToKeyInfo(Object.entries(shape), isZodArrayInput);
 };
 
-const resolveZodKeys = (
-	schema: UnknownRecord,
-): readonly string[] | undefined => {
+const resolveZodKeys = (schema: UnknownRecord): RequestKeyInfo | undefined => {
 	const objectKeys = resolveZodObjectKeys(schema);
 	if (objectKeys) return objectKeys;
 
@@ -41,14 +57,25 @@ const resolveZodKeys = (
 	const branchKeys = options.map((option) =>
 		resolveZodObjectKeys(option as UnknownRecord),
 	);
-	if (branchKeys.some((keys) => keys === undefined)) return undefined;
-	return [...new Set(branchKeys.flatMap((keys) => keys ?? []))];
+	return mergeKeyInfo(branchKeys);
+};
+
+const isValibotArrayInput = (value: unknown) => {
+	const record = value as UnknownRecord;
+	return (
+		record.type === "array" ||
+		(record.wrapped as UnknownRecord | undefined)?.type === "array"
+	);
 };
 
 const resolveValibotKeys = (
 	schema: UnknownRecord,
-): readonly string[] | undefined => {
-	if (schema.type === "object") return getStringKeys(schema.entries);
+): RequestKeyInfo | undefined => {
+	if (schema.type === "object") {
+		const entries = schema.entries;
+		if (!entries || typeof entries !== "object") return undefined;
+		return entriesToKeyInfo(Object.entries(entries), isValibotArrayInput);
+	}
 	if (
 		(schema.type !== "union" && schema.type !== "variant") ||
 		!Array.isArray(schema.options)
@@ -58,40 +85,56 @@ const resolveValibotKeys = (
 
 	const branchKeys = schema.options.map((option) =>
 		(option as UnknownRecord).type === "object"
-			? getStringKeys((option as UnknownRecord).entries)
+			? resolveValibotKeys(option as UnknownRecord)
 			: undefined,
 	);
-	if (branchKeys.some((keys) => keys === undefined)) return undefined;
-	return [...new Set(branchKeys.flatMap((keys) => keys ?? []))];
+	return mergeKeyInfo(branchKeys);
+};
+
+const isArkTypeArrayInput = (value: unknown) => {
+	const record = value as UnknownRecord;
+	const json = record.json as UnknownRecord | undefined;
+	return json?.proto === "Array";
+};
+
+const resolveArkTypeObjectKeys = (
+	schema: UnknownRecord,
+): RequestKeyInfo | undefined => {
+	const structure = schema.structure as UnknownRecord | undefined;
+	const keys = Array.isArray(structure?.literalKeys)
+		? (structure.literalKeys as readonly string[])
+		: undefined;
+	if (!keys) return undefined;
+
+	const propsByKey = structure?.propsByKey as UnknownRecord | undefined;
+	return Object.fromEntries(
+		keys.map((key) => {
+			const prop = propsByKey?.[key] as UnknownRecord | undefined;
+			const inner = prop?.inner as UnknownRecord | undefined;
+			return [key, isArkTypeArrayInput(inner?.value)];
+		}),
+	);
 };
 
 const resolveArkTypeKeys = (
 	schema: UnknownRecord,
-): readonly string[] | undefined => {
-	const structure = schema.structure as UnknownRecord | undefined;
-	if (Array.isArray(structure?.literalKeys)) {
-		return structure.literalKeys as readonly string[];
-	}
+): RequestKeyInfo | undefined => {
+	const objectKeys = resolveArkTypeObjectKeys(schema);
+	if (objectKeys) return objectKeys;
 
 	if (schema.kind !== "union" || !Array.isArray(schema.branches)) {
 		return undefined;
 	}
 
 	const branchKeys = schema.branches.map((branch) => {
-		const branchStructure = (branch as UnknownRecord).structure as
-			| UnknownRecord
-			| undefined;
-		return Array.isArray(branchStructure?.literalKeys)
-			? (branchStructure.literalKeys as readonly string[])
-			: undefined;
+		return resolveArkTypeObjectKeys(branch as UnknownRecord);
 	});
-	if (branchKeys.some((keys) => keys === undefined)) return undefined;
-	return [...new Set(branchKeys.flatMap((keys) => keys ?? []))];
+	return mergeKeyInfo(branchKeys);
 };
 
 export const resolveBuiltInRequestKeys = (
 	schema: StandardSchemaV1,
-): readonly string[] | undefined => {
+): RequestKeyInfo | undefined => {
 	const schemaRecord = schema as unknown as UnknownRecord;
 	switch (schema["~standard"].vendor) {
 		case "zod":
@@ -103,13 +146,4 @@ export const resolveBuiltInRequestKeys = (
 		default:
 			return undefined;
 	}
-};
-
-export const resolveSchemaKeys = (
-	schema: StandardSchemaV1,
-	options: RequestKeyResolverOptions | undefined,
-) => {
-	const resolved = options?.resolveRequestKeys?.(schema);
-
-	return resolved ?? resolveBuiltInRequestKeys(schema);
 };

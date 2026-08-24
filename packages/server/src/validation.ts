@@ -182,9 +182,18 @@ const validateCustomBody = async (
 	};
 };
 
-const formBodyToObject = (body: URLSearchParams) => {
-	const data: Record<string, string> = {};
+const formBodyToObject = (
+	body: URLSearchParams,
+	arrayKeys: readonly string[],
+) => {
+	const data: Record<string, string | string[]> = {};
+	const arrayKeySet = new Set(arrayKeys);
 	for (const key of new Set(body.keys())) {
+		if (arrayKeySet.has(key)) {
+			data[key] = body.getAll(key);
+			continue;
+		}
+
 		const value = body.get(key);
 		if (value !== null) data[key] = value;
 	}
@@ -204,7 +213,7 @@ const validateFormBody = async (
 
 	const result = await validateStandardSchema(
 		declaration.schema,
-		formBodyToObject(body),
+		formBodyToObject(body, declaration.arrayKeys),
 	);
 	if (result.issues) {
 		return { data: {}, errors: result.issues };

@@ -96,9 +96,29 @@ const stringifyRequestValue = (
 const serializeFormBody = (
 	route: RouteDeclaration,
 	body: Record<string, unknown> | undefined,
-) =>
-	new URLSearchParams(
+) => {
+	const arrayKeys = new Set(isFormBody(route.body) ? route.body.arrayKeys : []);
+
+	return new URLSearchParams(
 		Object.entries(body ?? {}).flatMap(([key, value]) => {
+			if (Array.isArray(value)) {
+				if (!arrayKeys.has(key)) {
+					throw new Error(
+						`Invalid body key "${key}" for ${route.method} ${route.path}. Expected string, number, boolean, or an array for a declared form array key.`,
+					);
+				}
+
+				return value.map((item) => {
+					const stringValue = stringifyRequestValue(route, "body", key, item);
+					if (stringValue === undefined) {
+						throw new Error(
+							`Invalid body key "${key}" for ${route.method} ${route.path}. Expected string, number, boolean, or an array for a declared form array key.`,
+						);
+					}
+					return [key, stringValue];
+				});
+			}
+
 			const stringValue = stringifyRequestValue(
 				route,
 				"body",
@@ -109,6 +129,7 @@ const serializeFormBody = (
 			return stringValue === undefined ? [] : [[key, stringValue]];
 		}),
 	);
+};
 
 const stringifyHeaders = (
 	route: RouteDeclaration,

@@ -3,6 +3,7 @@ import {
 	type ClientRequest,
 	type ClientResponseBody,
 	customBody,
+	type FormBody,
 	formBody,
 	jsonQuery,
 	noBody,
@@ -171,6 +172,23 @@ expectType<{
 	title: string;
 	count: number;
 }>(formServerRequest.body);
+
+// should accept form body declarations with and without array keys
+expectAssignable<FormBody>(
+	formBody(
+		z.object({
+			title: z.string(),
+		}),
+	),
+);
+expectType<readonly ["tags"]>(
+	formBody({
+		schema: z.object({
+			tags: z.array(z.string()),
+		}),
+		arrayKeys: ["tags"],
+	}).arrayKeys,
+);
 
 // should carry type-only response schemas into success-body helpers
 const typeOnlyResponse = route({

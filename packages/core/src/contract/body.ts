@@ -1,4 +1,5 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
+import { resolveBuiltInRequestKeys } from "./requestKeys.ts";
 
 /**
  * Marks a request or response body as intentionally empty.
@@ -12,9 +13,13 @@ export type NoBody = {
 /**
  * Declares an `application/x-www-form-urlencoded` request body.
  */
-export type FormBody<TSchema extends StandardSchemaV1 = StandardSchemaV1> = {
+export type FormBody<
+	TSchema extends StandardSchemaV1 = StandardSchemaV1,
+	TArrayKeys extends readonly string[] = readonly string[],
+> = {
 	kind: "formBody";
 	schema: TSchema;
+	arrayKeys: TArrayKeys;
 };
 
 /**
@@ -38,18 +43,46 @@ export function noBody(): NoBody {
  *
  * @remarks The generated client serializes the typed body object to
  * `URLSearchParams` and lets `fetch()` set the content-type header. Server
- * body parsers should pass a `URLSearchParams` instance to rest-rpc; each form
- * key is validated as a string, or `undefined` when omitted.
+ * body parsers should pass a `URLSearchParams` instance to rest-rpc. Each
+ * scalar form key is validated as a string, or `undefined` when omitted. Form
+ * array keys are encoded and decoded as repeated form keys.
  *
  * @see {@link https://rest-rpc.dev/docs/http-requests#request-with-form-body}
  */
 export function formBody<const TSchema extends StandardSchemaV1>(
 	schema: TSchema,
+): FormBody<TSchema>;
+export function formBody<
+	const TSchema extends StandardSchemaV1,
+	const TArrayKeys extends readonly string[],
+>(input: {
+	schema: TSchema;
+	arrayKeys: TArrayKeys;
+}): FormBody<TSchema, TArrayKeys>;
+export function formBody<
+	const TSchema extends StandardSchemaV1,
+	const TArrayKeys extends readonly string[],
+>(
+	input:
+		| TSchema
+		| {
+				schema: TSchema;
+				arrayKeys: TArrayKeys;
+		  },
 ): FormBody<TSchema> {
+	const schema = "~standard" in input ? input : input.schema;
+	const arrayKeys =
+		"~standard" in input
+			? Object.entries(resolveBuiltInRequestKeys(input) ?? {})
+					.filter(([, isArray]) => isArray)
+					.map(([key]) => key)
+			: input.arrayKeys;
+
 	return {
 		kind: "formBody",
 		schema,
-	};
+		arrayKeys,
+	} as FormBody<TSchema>;
 }
 
 /**

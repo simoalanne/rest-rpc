@@ -94,9 +94,8 @@ pathParams: type({
 query: type({ q: "string" }).or({ page: "string" }),
 ```
 
-For other Standard Schema vendors, whole-location schemas need `requestKeys` or
-a `resolveRequestKeys` option so `rest-rpc` can map flattened keys back to HTTP
-locations.
+For other Standard Schema vendors, whole-location schemas needs explicit `requestKeys` 
+option so `rest-rpc` can map flattened keys back to HTTP locations.
 
 ```ts
 body: type<{

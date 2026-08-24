@@ -4,11 +4,11 @@ import z from "zod";
 import { testContract } from "../../test/factories/contract.ts";
 import { customBody, formBody } from "./body.ts";
 import { jsonQuery } from "./request.ts";
-import { groupRequestInput, validateContractSync } from "./validate.ts";
+import { groupRequestInput, validateContract } from "./validate.ts";
 
-describe("validateContractSync", () => {
+describe("validateContract", () => {
 	it("populates request keys from request schemas", () => {
-		const contract = validateContractSync(
+		const contract = validateContract(
 			testContract({
 				path: "/search/:id",
 				pathParams: z.object({ id: z.string() }),
@@ -25,7 +25,7 @@ describe("validateContractSync", () => {
 	});
 
 	it("does not flatten jsonQuery schema keys into request keys", () => {
-		const contract = validateContractSync(
+		const contract = validateContract(
 			testContract({
 				query: jsonQuery(
 					z.object({
@@ -40,7 +40,7 @@ describe("validateContractSync", () => {
 	});
 
 	it("populates request keys from schema record request declarations", () => {
-		const contract = validateContractSync(
+		const contract = validateContract(
 			testContract({
 				path: "/search/:id",
 				pathParams: {
@@ -67,7 +67,7 @@ describe("validateContractSync", () => {
 	});
 
 	it("preserves existing request keys", () => {
-		const contract = validateContractSync(
+		const contract = validateContract(
 			testContract({
 				path: "/search/:id",
 				pathParams: z.object({ id: z.string() }),
@@ -82,27 +82,10 @@ describe("validateContractSync", () => {
 		});
 	});
 
-	it("resolves unsupported schema request keys from a custom resolver", () => {
-		const schema = z.string();
-		const contract = validateContractSync(
-			testContract({
-				query: schema,
-			}),
-			{
-				resolveRequestKeys: (candidate) =>
-					candidate === schema ? ["q"] : undefined,
-			},
-		);
-
-		assert.deepEqual(contract.search.find.requestKeys, {
-			q: "query",
-		});
-	});
-
 	it("rejects duplicate flattened request keys", () => {
 		assert.throws(
 			() =>
-				validateContractSync(
+				validateContract(
 					testContract({
 						path: "/search/:id",
 						pathParams: z.object({ id: z.string() }),
@@ -116,7 +99,7 @@ describe("validateContractSync", () => {
 	it("rejects reserved context request keys", () => {
 		assert.throws(
 			() =>
-				validateContractSync(
+				validateContract(
 					testContract({
 						query: z.object({ context: z.string() }),
 					}),
@@ -128,7 +111,7 @@ describe("validateContractSync", () => {
 	it("rejects reserved content-type header keys", () => {
 		assert.throws(
 			() =>
-				validateContractSync(
+				validateContract(
 					testContract({
 						headers: {
 							"Content-Type": z.string(),
@@ -142,7 +125,7 @@ describe("validateContractSync", () => {
 	it("rejects header keys that differ only by case", () => {
 		assert.throws(
 			() =>
-				validateContractSync(
+				validateContract(
 					testContract({
 						headers: {
 							"x-request-id": z.string(),
@@ -157,7 +140,7 @@ describe("validateContractSync", () => {
 	it("rejects reserved content-type header request keys", () => {
 		assert.throws(
 			() =>
-				validateContractSync(
+				validateContract(
 					testContract({
 						requestKeys: {
 							"content-type": "headers",
@@ -171,7 +154,7 @@ describe("validateContractSync", () => {
 	it("rejects header request keys that differ only by case", () => {
 		assert.throws(
 			() =>
-				validateContractSync(
+				validateContract(
 					testContract({
 						requestKeys: {
 							"x-request-id": "headers",
@@ -186,7 +169,7 @@ describe("validateContractSync", () => {
 	it("rejects body keys in query or pathParams for custom request bodies", () => {
 		assert.throws(
 			() =>
-				validateContractSync(
+				validateContract(
 					testContract({
 						path: "/uploads/:body",
 						pathParams: z.object({ body: z.string() }),
@@ -203,7 +186,7 @@ describe("validateContractSync", () => {
 	it("rejects body keys in query or pathParams for form request bodies", () => {
 		assert.throws(
 			() =>
-				validateContractSync(
+				validateContract(
 					testContract({
 						path: "/forms/:body",
 						pathParams: z.object({ body: z.string() }),
@@ -217,7 +200,7 @@ describe("validateContractSync", () => {
 	it("rejects query keys in other segments for JSON query values", () => {
 		assert.throws(
 			() =>
-				validateContractSync(
+				validateContract(
 					testContract({
 						path: "/search/:query",
 						pathParams: z.object({ query: z.string() }),
@@ -229,7 +212,7 @@ describe("validateContractSync", () => {
 	});
 
 	it("allows body keys in query or pathParams without custom request bodies", () => {
-		const contract = validateContractSync(
+		const contract = validateContract(
 			testContract({
 				path: "/search/:body",
 				pathParams: z.object({ body: z.string() }),
@@ -244,7 +227,7 @@ describe("validateContractSync", () => {
 	it("rejects path params without pathParams request keys", () => {
 		assert.throws(
 			() =>
-				validateContractSync(
+				validateContract(
 					testContract({
 						path: "/search/:id",
 						query: z.object({ q: z.string() }),
@@ -257,7 +240,7 @@ describe("validateContractSync", () => {
 	it("rejects path params when no request is declared", () => {
 		assert.throws(
 			() =>
-				validateContractSync(
+				validateContract(
 					testContract({
 						path: "/search/:id",
 					}),
@@ -269,7 +252,7 @@ describe("validateContractSync", () => {
 	it("rejects pathParams request keys without matching path params", () => {
 		assert.throws(
 			() =>
-				validateContractSync(
+				validateContract(
 					testContract({
 						path: "/search",
 						pathParams: z.object({ id: z.string() }),

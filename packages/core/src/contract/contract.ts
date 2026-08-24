@@ -7,7 +7,6 @@ import type {
 	RequestKeys,
 	RequestSchemaRecord,
 } from "./request.ts";
-import type { ResolveRequestSchemaKeys } from "./requestKeys.ts";
 import type {
 	DefaultBodyResponseStatusForMethod,
 	DefaultNoBodyResponseStatusForMethod,
@@ -16,7 +15,7 @@ import type {
 	RouteResponseInput,
 	RouteResponses,
 } from "./response.ts";
-import { validateContractSync } from "./validate.ts";
+import { validateContract } from "./validate.ts";
 import type { WebSocketMessageDeclaration } from "./websocketMessages.ts";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
@@ -135,7 +134,6 @@ export const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
 
 export type RouteContractOptions = {
 	flattenRequestKeys?: boolean;
-	resolveRequestKeys?: ResolveRequestSchemaKeys;
 };
 
 export type RouterContractOptions = RouteContractOptions & {
@@ -364,7 +362,7 @@ export function route<
 	options?: TOptions,
 ): ApplyRouteOptionsToRoute<TRoute, TOptions> {
 	normalizeContract(route, options);
-	validateContractSync(route, options);
+	validateContract(route);
 	return route as ApplyRouteOptionsToRoute<TRoute, TOptions>;
 }
 
@@ -382,6 +380,6 @@ export function router<
 	commonOptions?: TOptions,
 ): ApplyRouterOptions<TContract, TOptions> {
 	normalizeContract(contract, commonOptions);
-	validateContractSync(contract, commonOptions);
+	validateContract(contract);
 	return contract as ApplyRouterOptions<TContract, TOptions>;
 }

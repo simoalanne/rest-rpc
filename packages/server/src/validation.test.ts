@@ -273,6 +273,44 @@ describe("validateRequest", () => {
 		}
 	});
 
+	it("validates inferred urlencoded form array keys from repeated values", async () => {
+		const result = await validateRequest(
+			{
+				method: "POST",
+				path: "/forms",
+				body: formBody(
+					z.object({
+						title: z.string(),
+						tags: z.array(z.string()),
+					}),
+				),
+				requestKeys: {},
+				responses: {},
+			},
+			{
+				body: new URLSearchParams([
+					["title", "First"],
+					["title", "Second"],
+					["tags", "ts"],
+					["tags", "rpc"],
+				]),
+				headers: {
+					"content-type": "application/x-www-form-urlencoded",
+				},
+			},
+		);
+
+		assert.equal(result.success, true);
+		if (result.success) {
+			assert.deepEqual(result.data, {
+				body: {
+					title: "First",
+					tags: ["ts", "rpc"],
+				},
+			});
+		}
+	});
+
 	it("rejects malformed JSON query values as request validation errors", async () => {
 		const result = await validateRequest(
 			{

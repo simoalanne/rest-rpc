@@ -146,6 +146,7 @@ export const api = router({
 					title: z.string(),
 					count: z.coerce.number(),
 					remember: z.string().optional(),
+					tags: z.array(z.string()).optional(),
 				}),
 			),
 			response: z.object({
@@ -175,14 +176,22 @@ const result = await client.forms.submit.fetch({
 	body: {
 		title: "Write docs",
 		count: 3,
+		tags: ["typescript", "rpc"],
 	},
 });
 ```
 
 Server body parsers should pass a `URLSearchParams` instance to rest-rpc for
 form bodies. Each present form key is passed to the schema as a string; omitted
-keys are absent from the validation input. Repeated form keys are not interpreted
-specially in this version.
+keys are absent from the validation input. Array fields are inferred from
+supported schemas and encoded or decoded as repeated form keys, such as
+`tags=typescript&tags=rpc`. 
+
+When the array keys cannot be inferred, you can declare them explicitly with the `arrayKeys` option.
+
+```ts
+formBody({ schema: type<{ title: string; tags: string[] }>(), arrayKeys: ["tags"] })
+```
 
 ## Request With Fetch-Managed Content Type
 

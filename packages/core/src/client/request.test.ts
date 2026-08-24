@@ -487,6 +487,77 @@ describe("ApiClient requests", () => {
 		assert.deepEqual(calls[0]?.init?.headers, {});
 	});
 
+	it("sends inferred form array keys as repeated URLSearchParams entries", async () => {
+		const apiContract = router({
+			forms: {
+				submit: {
+					method: "POST",
+					path: "/forms",
+					body: formBody(
+						z.object({
+							title: z.string(),
+							tags: z.array(z.string()),
+						}),
+					),
+					responses: {
+						204: noBody(),
+					},
+				},
+			},
+		});
+		const calls = captureFetch();
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+		});
+
+		await client.forms.submit.fetch({
+			body: {
+				title: "Write docs",
+				tags: ["ts", "rpc"],
+			},
+		});
+
+		assert.ok(calls[0]?.init?.body instanceof URLSearchParams);
+		assert.equal(
+			calls[0].init.body.toString(),
+			"title=Write+docs&tags=ts&tags=rpc",
+		);
+	});
+
+	it("rejects omitted explicit form array keys before sending requests", async () => {
+		const apiContract = router({
+			forms: {
+				submit: {
+					method: "POST",
+					path: "/forms",
+					body: formBody({
+						schema: z.object({
+							tags: z.array(z.string()),
+						}),
+						arrayKeys: [],
+					}),
+					responses: {
+						204: noBody(),
+					},
+				},
+			},
+		});
+		const calls = captureFetch();
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+		});
+
+		await assert.rejects(
+			client.forms.submit.fetch({
+				body: {
+					tags: ["ts", "rpc"],
+				},
+			}),
+			/declared form array key/,
+		);
+		assert.equal(calls.length, 0);
+	});
+
 	it("sends custom bodies with a selected declared content type", async () => {
 		const apiContract = router({
 			uploads: {

@@ -8,18 +8,13 @@ import {
 	isRequestSchemaRecord,
 	REQUEST_CONTEXT_KEY,
 } from "./request.ts";
-import {
-	type RequestKeyResolverOptions,
-	resolveSchemaKeys,
-} from "./requestKeys.ts";
+import { resolveBuiltInRequestKeys } from "./requestKeys.ts";
 import {
 	getResponseBody,
 	getResponseHeaders,
 	getRouteResponses,
 } from "./response.ts";
 import { contractRoutes } from "./traversal.ts";
-
-export type ValidateContractOptions = RequestKeyResolverOptions;
 
 export type FlatRequestInput = Record<string, unknown>;
 
@@ -258,26 +253,26 @@ export const groupRequestInput = (
 	}, {} as GroupedRequestInput);
 };
 
-const resolveRequestKeysForSchemaSync = (
+const resolveRequestKeysForSchema = (
 	route: RouteDeclaration,
 	segment: "body" | "query" | "pathParams",
 	schema: StandardSchemaV1 | Record<string, StandardSchemaV1>,
-	options?: ValidateContractOptions,
 ) => {
-	if (isRequestSchemaRecord(schema)) return Object.keys(schema);
+	if (isRequestSchemaRecord(schema)) {
+		return Object.fromEntries(Object.keys(schema).map((key) => [key, false]));
+	}
 
-	const keys = resolveSchemaKeys(schema, options);
-	if (!keys) {
+	const keyInfo = resolveBuiltInRequestKeys(schema);
+	if (!keyInfo) {
 		throw new Error(
-			`Could not resolve request keys for ${segment} schema on ${route.method} ${route.path}. Provide requestKeys or a resolveRequestKeys option.`,
+			`Could not resolve request keys for ${segment} schema on ${route.method} ${route.path}. Provide requestKeys or use a schema that supports automatic key resolution.`,
 		);
 	}
-	return keys;
+	return keyInfo;
 };
 
-export const validateContractSync = <TContract extends Contract>(
+export const validateContract = <TContract extends Contract>(
 	contract: TContract,
-	options?: ValidateContractOptions,
 ): TContract => {
 	for (const route of contractRoutes(contract)) {
 		if (
@@ -292,11 +287,8 @@ export const validateContractSync = <TContract extends Contract>(
 		const requestKeys: RequestKeys = {};
 		for (const [segment, schema] of requestSchemas(route)) {
 			if (!schema) continue;
-			const keys = resolveRequestKeysForSchemaSync(
-				route,
-				segment,
-				schema,
-				options,
+			const keys = Object.keys(
+				resolveRequestKeysForSchema(route, segment, schema),
 			);
 			assertNoDuplicateKeys(route, [...Object.keys(requestKeys), ...keys]);
 			for (const key of keys) requestKeys[key] = segment;

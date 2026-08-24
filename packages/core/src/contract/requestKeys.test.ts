@@ -3,16 +3,27 @@ import { describe, it } from "node:test";
 import { type } from "arktype";
 import * as v from "valibot";
 import z from "zod";
-import { resolveBuiltInRequestKeys, resolveSchemaKeys } from "./requestKeys.ts";
+import { resolveBuiltInRequestKeys } from "./requestKeys.ts";
 
-const sorted = (keys: readonly string[] | undefined) =>
-	[...(keys ?? [])].sort();
+const sorted = (keys: Record<string, boolean> | undefined) =>
+	Object.fromEntries(Object.entries(keys ?? {}).sort());
 
 describe("request key resolution", () => {
 	it("resolves zod object keys", () => {
-		assert.deepEqual(resolveBuiltInRequestKeys(z.object({ id: z.string() })), [
-			"id",
-		]);
+		assert.deepEqual(
+			resolveBuiltInRequestKeys(
+				z.object({
+					id: z.string(),
+					tags: z.array(z.string()),
+					optionalTags: z.array(z.string()).optional(),
+				}),
+			),
+			{
+				id: false,
+				tags: true,
+				optionalTags: true,
+			},
+		);
 	});
 
 	it("resolves zod object-like union branch keys", () => {
@@ -25,7 +36,10 @@ describe("request key resolution", () => {
 					]),
 				),
 			),
-			["slug", "title"],
+			{
+				slug: false,
+				title: false,
+			},
 		);
 	});
 
@@ -39,7 +53,11 @@ describe("request key resolution", () => {
 					]),
 				),
 			),
-			["kind", "slug", "title"],
+			{
+				kind: false,
+				slug: false,
+				title: false,
+			},
 		);
 	});
 
@@ -53,9 +71,20 @@ describe("request key resolution", () => {
 	});
 
 	it("resolves valibot object keys", () => {
-		assert.deepEqual(resolveBuiltInRequestKeys(v.object({ id: v.string() })), [
-			"id",
-		]);
+		assert.deepEqual(
+			resolveBuiltInRequestKeys(
+				v.object({
+					id: v.string(),
+					tags: v.array(v.string()),
+					optionalTags: v.optional(v.array(v.string())),
+				}),
+			),
+			{
+				id: false,
+				tags: true,
+				optionalTags: true,
+			},
+		);
 	});
 
 	it("resolves valibot object-like union branch keys", () => {
@@ -68,7 +97,10 @@ describe("request key resolution", () => {
 					]),
 				),
 			),
-			["slug", "title"],
+			{
+				slug: false,
+				title: false,
+			},
 		);
 	});
 
@@ -82,12 +114,29 @@ describe("request key resolution", () => {
 					]),
 				),
 			),
-			["kind", "slug", "title"],
+			{
+				kind: false,
+				slug: false,
+				title: false,
+			},
 		);
 	});
 
 	it("resolves arktype object keys", () => {
-		assert.deepEqual(resolveBuiltInRequestKeys(type({ id: "string" })), ["id"]);
+		assert.deepEqual(
+			resolveBuiltInRequestKeys(
+				type({
+					id: "string",
+					tags: "string[]",
+					"optionalTags?": "string[]",
+				}),
+			),
+			{
+				id: false,
+				tags: true,
+				optionalTags: true,
+			},
+		);
 	});
 
 	it("resolves arktype object-like union branch keys", () => {
@@ -97,28 +146,10 @@ describe("request key resolution", () => {
 					type({ title: "string" }).or({ slug: "string" }),
 				),
 			),
-			["slug", "title"],
-		);
-	});
-
-	it("falls back to built-in resolvers when custom resolver returns undefined", () => {
-		assert.deepEqual(
-			resolveSchemaKeys(z.object({ id: z.string() }), {
-				resolveRequestKeys: () => undefined,
-			}),
-			["id"],
-		);
-	});
-
-	it("uses custom resolver keys for unsupported schemas", () => {
-		const schema = z.string();
-
-		assert.deepEqual(
-			resolveSchemaKeys(schema, {
-				resolveRequestKeys: (candidate) =>
-					candidate === schema ? ["q"] : undefined,
-			}),
-			["q"],
+			{
+				slug: false,
+				title: false,
+			},
 		);
 	});
 });
