@@ -101,6 +101,22 @@ if (response.declared && response.status === 404) {
 
 ## Response Without Body
 
+Routes with no `response` or `responses` default to a no-body response.
+`DELETE` uses `204`, `POST` uses `201`, and other methods use `200`.
+
+```ts
+export const api = router({
+	todos: {
+		remove: {
+			method: "DELETE",
+			path: "/todos/:id",
+		},
+	},
+});
+```
+
+Use `noBody()` when you want the response status to be explicit.
+
 ```ts
 import { noBody, router } from "@rest-rpc/core";
 
@@ -227,7 +243,9 @@ if (response.declared) {
 }
 ```
 
-## Response with set-cookie Header
+## Cookie Response
+
+Writing `Set-Cookie` headers is simplified with `setCookie()` and `clearCookie()`.
 
 ```ts
 export const api = router({
@@ -248,6 +266,7 @@ export const api = router({
 ```
 
 ```ts
+import { clearCookie, setCookie } from "@rest-rpc/express";
 
 export const routes = router(api, {
 	sessions: {

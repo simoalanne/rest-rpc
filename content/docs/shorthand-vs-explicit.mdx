@@ -1,0 +1,672 @@
+---
+title: Shorthand vs Explicit
+description: See how rest-rpc convenience APIs relate to their explicit alternatives.
+---
+
+`rest-rpc` starts with a contract. Once the contract declares the HTTP method,
+path, request locations, and responses, the library can derive typed clients,
+server handlers, OpenAPI output, TanStack Query helpers, and useful call-site
+shorthands from that same source of truth.
+
+The docs mostly use the concise defaults because they keep normal routes easy to
+read. Those defaults are convenience layers, not lock-in. When explicit HTTP
+shape is clearer for a route or codebase, rest-rpc supports that too.
+
+## Request Shape
+
+By default, request fields from `pathParams`, `query`, JSON `body`, and
+`headers` are flattened into one request object.
+
+```ts
+const api = router({
+	todos: {
+		update: {
+			method: "PATCH",
+			path: "/todos/:id",
+			pathParams: z.object({ id: z.string() }),
+			query: z.object({ notify: z.boolean().optional() }),
+			body: z.object({ title: z.string() }),
+			headers: {
+				"x-request-id": z.string(),
+			},
+			response: todoSchema,
+		},
+	},
+});
+```
+
+```ts
+await client.todos.update.fetch({
+	id: "todo_1",
+	notify: true,
+	title: "Write docs",
+	"x-request-id": "req_1",
+});
+```
+
+Use `flattenRequestKeys: false` when you want the call site to keep the HTTP
+request locations visible.
+
+```ts
+const api = router(
+	{
+		todos: {
+			update: {
+				method: "PATCH",
+				path: "/todos/:id",
+				pathParams: z.object({ id: z.string() }),
+				query: z.object({ notify: z.boolean().optional() }),
+				body: z.object({ title: z.string() }),
+				headers: {
+					"x-request-id": z.string(),
+				},
+				response: todoSchema,
+			},
+		},
+	},
+	{
+		flattenRequestKeys: false,
+	},
+);
+```
+
+```ts
+await client.todos.update.fetch({
+	pathParams: { id: "todo_1" },
+	query: { notify: true },
+	body: { title: "Write docs" },
+	headers: { "x-request-id": "req_1" },
+});
+```
+
+Server handlers mirror the request shape the client uses.
+
+```ts
+// Flattened request keys
+update({ id, notify, title, "x-request-id": requestId }) {
+	return updateTodo({ id, notify, title, requestId });
+}
+```
+
+```ts
+// Explicit request segments
+update({ pathParams, query, body, headers }) {
+	return updateTodo({
+		id: pathParams.id,
+		notify: query.notify,
+		title: body.title,
+		requestId: headers["x-request-id"],
+	});
+}
+```
+
+You can set the default on a router and override individual routes.
+
+```ts
+const api = router(
+	{
+		todos: {
+			batchCreate: {
+				method: "POST",
+				path: "/todos/",
+				flattenRequestKeys: true,
+				body: z.array(z.object({ title: z.string() })),
+				response: todoSchema,
+			},
+		},
+	},
+	{
+		flattenRequestKeys: false,
+	},
+);
+```
+
+```ts
+await client.todos.batchCreate.fetch({
+	body: [
+		{ title: "Write docs" },
+		{ title: "Ship the docs" },
+	],
+});
+```
+
+## Inferred Path Params
+
+Full dynamic path segments infer string path params.
+
+```ts
+get: {
+	method: "GET",
+	path: "/todos/:id",
+	response: todoSchema,
+}
+```
+
+```ts
+await client.todos.get.fetch({ id: "todo_1" });
+```
+
+Declare `pathParams` explicitly when you want a schema other than the inferred
+string schema.
+
+```ts
+get: {
+	method: "GET",
+	path: "/todos/:id",
+	pathParams: z.object({
+		id: z.coerce.number().int().positive(),
+	}),
+	response: todoSchema,
+}
+```
+
+## Shared Router Options
+
+Use router options when many routes share the same contract details.
+
+```ts
+const api = router(routes, {
+	pathPrefix: "/api",
+	commonHeaders: {
+		"x-request-id": z.string().optional(),
+	},
+	commonResponses: {
+		401: z.object({ code: z.literal("UNAUTHORIZED") }),
+	},
+});
+```
+
+Declare the same fields on a route when only that route needs them.
+
+```ts
+get: {
+	method: "GET",
+	path: "/api/todos/:id",
+	headers: {
+		"x-request-id": z.string().optional(),
+	},
+	responses: {
+		200: todoSchema,
+		401: z.object({ code: z.literal("UNAUTHORIZED") }),
+	},
+}
+```
+
+## Custom Bodies
+
+Custom content types stay explicit even when request keys are flattened. The
+contract needs to know the full body payload and content type boundary.
+
+```ts
+csv: {
+	method: "POST",
+	path: "/imports.csv",
+	body: customBody({
+		contentType: "text/csv",
+		schema: z.string(),
+	}),
+	response: z.object({ imported: z.number() }),
+}
+```
+
+```ts
+await client.imports.csv.fetch({
+	body: "id,title\n1,Write docs\n",
+});
+```
+
+For multiple content types, `body` contains the chosen content type and payload.
+
+```ts
+await client.images.upload.fetch({
+	body: {
+		contentType: "image/png",
+		payload: bytes,
+	},
+});
+```
+
+## JSON Query
+
+Normal object query params flatten by default.
+
+```ts
+await client.todos.list.fetch({
+	status: "open",
+	limit: 50,
+});
+```
+
+`jsonQuery()` is intentionally explicit because the whole JSON value is
+transported as one query parameter named `query`.
+
+```ts
+search: {
+	method: "GET",
+	path: "/search",
+	query: jsonQuery(
+		z.object({
+			page: z.number(),
+			filters: z.object({ tags: z.array(z.string()) }),
+		}),
+	),
+	response: searchResultsSchema,
+}
+```
+
+```ts
+await client.search.fetch({
+	query: {
+		page: 2,
+		filters: { tags: ["docs"] },
+	},
+});
+```
+
+With grouped request segments, the JSON query value lives directly under the
+`query` segment rather than under `query.query`.
+
+```ts
+await client.search.fetch({
+	query: {
+		page: 2,
+		filters: { tags: ["docs"] },
+	},
+});
+```
+
+## Response Declarations
+
+Use `response` when a route has one successful response body. The success status
+is inferred from the HTTP method.
+
+```ts
+create: {
+	method: "POST",
+	path: "/todos",
+	body: z.object({ title: z.string() }),
+	response: todoSchema,
+}
+```
+
+That route has a `201` response. For non-`POST` methods, `response` uses `200`.
+
+Use `responses` when the status map is part of the contract.
+
+```ts
+get: {
+	method: "GET",
+	path: "/todos/:id",
+	responses: {
+		200: todoSchema,
+		404: z.object({ code: z.literal("TODO_NOT_FOUND") }),
+	},
+}
+```
+
+Omit both `response` and `responses` when the route returns no body and the
+default status is enough.
+
+```ts
+remove: {
+	method: "DELETE",
+	path: "/todos/:id",
+}
+```
+
+That route has a `204` no-body response. For omitted responses, `POST` uses
+`201` and other methods use `200`.
+
+Use `responses` with `noBody()` when you want the status to be explicit.
+
+```ts
+remove: {
+	method: "DELETE",
+	path: "/todos/:id",
+	responses: {
+		204: noBody(),
+	},
+}
+```
+
+## Handler Returns
+
+For a route with one successful response, a handler can return the body directly.
+
+```ts
+create({ title }) {
+	return createTodo({ title });
+}
+```
+
+Return an explicit response object when the handler chooses a status or when
+explicitness is clearer.
+
+```ts
+create({ title }) {
+	const todo = createTodo({ title });
+
+	return {
+		status: 201,
+		body: todo,
+	};
+}
+```
+
+## Client Responses
+
+Use `fetch()` when a successful response body is the normal result and
+non-success statuses should go through the error path.
+
+```ts
+const todo = await client.todos.get.fetch({ id: "todo_1" });
+```
+
+Use `fetchResponse()` when HTTP status is normal control flow.
+
+```ts
+const response = await client.todos.get.fetchResponse({ id: "todo_1" });
+
+if (response.declared && response.status === 200) {
+	response.body.title;
+}
+
+if (response.declared && response.status === 404) {
+	response.body.code;
+}
+```
+
+Use `strictStatusCodes: true` when undeclared statuses should throw instead of
+being returned as `{ declared: false }`. Then `fetchResponse()` narrows to the
+declared status union and you can switch on `status` directly.
+
+```ts
+const client = initClient(api, {
+	baseUrl: "https://api.example.com",
+	strictStatusCodes: true,
+});
+
+const response = await client.todos.get.fetchResponse({ id: "todo_1" });
+
+if (response.status === 200) {
+	response.body.title;
+}
+
+if (response.status === 404) {
+	response.body.code;
+}
+```
+
+## Empty Bodies
+
+Omitting `body` declares a request without a body.
+
+```ts
+list: {
+	method: "GET",
+	path: "/todos",
+	response: z.array(todoSchema),
+}
+```
+
+Use `noBody()` when you want that intent to be explicit.
+
+```ts
+remove: {
+	method: "DELETE",
+	path: "/todos/:id",
+	body: noBody(),
+	responses: {
+		204: noBody(),
+	},
+}
+```
+
+## Headers
+
+Pass declared request headers at the call site when they are route-specific.
+
+```ts
+await client.todos.list.fetch({
+	authorization: "Bearer token",
+});
+```
+
+Use `getGlobalHeaders` when the client should attach shared headers to every
+request. Matching declared request headers become optional at individual call
+sites.
+
+```ts
+const client = initClient(api, {
+	baseUrl: "https://api.example.com",
+	getGlobalHeaders: () => ({
+		authorization: `Bearer ${readToken()}`,
+	}),
+});
+
+await client.todos.list.fetch({});
+```
+
+## TanStack Query
+
+TanStack Query helpers derive options and keys from the route.
+
+```tsx
+const todo = useQuery(
+	tq.todos.get.queryOptions({
+		id: "todo_1",
+	}),
+);
+
+const key = tq.todos.get.getKey({ id: "todo_1" });
+```
+
+The same query can be written with TanStack Query primitives and the fetch
+client directly. This is more explicit, but you have to provide the query key,
+forward cancellation, and decide how non-success responses enter TanStack
+Query's error channel.
+
+```tsx
+import { initClient } from "@rest-rpc/core";
+import { queryOptions, useQuery } from "@tanstack/react-query";
+
+const client = initClient(api, {
+	baseUrl: "https://api.example.com",
+});
+
+const todo = useQuery(
+	queryOptions({
+		queryKey: ["todos", "get", { id: "todo_1" }],
+		async queryFn({ signal }) {
+			const response = await client.todos.get.fetchResponse(
+				{ id: "todo_1" },
+				{ signal },
+			);
+
+			if (response.declared && response.status === 200) {
+				return {
+					status: response.status,
+					body: response.body,
+					headers: response.headers,
+				};
+			}
+
+			throw response;
+		},
+	}),
+);
+```
+
+For request-based queries, pass a falsy request value to disable the query
+function without importing TanStack Query's `skipToken`.
+
+```tsx
+const todo = useQuery(
+	tq.todos.get.queryOptions(selectedId && { id: selectedId }),
+);
+```
+
+Use `skipToken` when you prefer the explicit TanStack Query primitive.
+
+```tsx
+import { skipToken } from "@tanstack/query-core";
+
+const todo = useQuery(
+	tq.todos.get.queryOptions(
+		selectedId ? { id: selectedId } : skipToken,
+	),
+);
+```
+
+Pass normal TanStack Query options when a query needs explicit behavior.
+
+```tsx
+const todo = useQuery(
+	tq.todos.get.queryOptions(
+		{ id: "todo_1" },
+		{
+			enabled: isReady,
+			queryKey: ["todos", "detail", "todo_1"],
+			select: (response) => response.body,
+		},
+	),
+);
+```
+
+For infinite queries, rest-rpc names the request callbacks after the route
+request they carry, while still mapping to TanStack Query's page params.
+
+```tsx
+const todos = useInfiniteQuery(
+	tq.todos.page.infiniteQueryOptions({
+		initialRequest: {
+			status: "open",
+			limit: 50,
+		},
+		getNextRequest(lastPage, _allPages, lastRequest) {
+			return lastPage.body.nextCursor
+				? { ...lastRequest, cursor: lastPage.body.nextCursor }
+				: undefined;
+		},
+	}),
+);
+```
+
+The same query can be written with TanStack Query primitives and the fetch
+client directly. This is more explicit, but you have to provide the query key,
+map request values to page params, forward cancellation, and decide how
+non-success responses enter TanStack Query's error channel.
+
+```tsx
+import { initClient } from "@rest-rpc/core";
+import { infiniteQueryOptions, useInfiniteQuery } from "@tanstack/react-query";
+
+const client = initClient(api, {
+	baseUrl: "https://api.example.com",
+});
+
+const todos = useInfiniteQuery(
+	infiniteQueryOptions({
+		queryKey: ["todos", "page"],
+		initialPageParam: {
+			status: "open",
+			limit: 50,
+		},
+		getNextPageParam(lastPage, _allPages, lastRequest) {
+			return lastPage.body.nextCursor
+				? { ...lastRequest, cursor: lastPage.body.nextCursor }
+				: undefined;
+		},
+		async queryFn({ pageParam, signal }) {
+			const response = await client.todos.page.fetchResponse(pageParam, {
+				signal,
+			});
+
+			if (response.declared && response.status === 200) {
+				return {
+					status: response.status,
+					body: response.body,
+					headers: response.headers,
+				};
+			}
+
+			throw response;
+		},
+	}),
+);
+```
+
+## WebSocket Messages
+
+WebSocket message declarations accept any schema. Use a plain schema when the
+message shape is simple or when your schema library already gives you the union
+shape you want.
+
+```ts
+chat: {
+	method: "GET",
+	path: "/rooms/:roomId",
+	mode: "webSocket",
+	messages: {
+		client: z.discriminatedUnion("action", [
+			z.object({
+				action: z.literal("typing"),
+				roomId: z.string(),
+			}),
+			z.object({
+				action: z.literal("send"),
+				text: z.string().min(1),
+			}),
+		]),
+		server: z.object({
+			connected: z.boolean(),
+		}),
+	},
+}
+```
+
+```ts
+socket.send({
+	action: "send",
+	text: "Hello from rest-rpc",
+});
+```
+
+Use `webSocketMessages()` when you want rest-rpc to build a discriminated
+message envelope from a map of payload schemas.
+
+```ts
+chat: {
+	method: "GET",
+	path: "/rooms/:roomId",
+	mode: "webSocket",
+	messages: {
+		client: webSocketMessages("action", {
+			typing: z.object({
+				roomId: z.string(),
+			}),
+			send: z.object({
+				text: z.string().min(1),
+			}),
+		}),
+		server: webSocketMessages("type", {
+			connected: z.object({
+				memberCount: z.number(),
+			}),
+			message: z.object({
+				text: z.string(),
+				sentAt: z.string(),
+			}),
+		}),
+	},
+}
+```
+
+```ts
+socket.send({
+	action: "send",
+	message: {
+		text: "Hello from rest-rpc",
+	},
+});
+```

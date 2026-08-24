@@ -13,6 +13,12 @@ Zod, Valibot, and ArkType are supported Standard Schema libraries. The built-in
 
 Request locations are declared with schema records or whole-location schemas.
 
+:::note
+This section describes the default flattened request shape. With
+`flattenRequestKeys: false`, clients and handlers receive grouped HTTP request
+segments, so whole-location schemas do not need flattened key metadata.
+:::
+
 A schema record maps flattened request keys to individual schemas.
 
 ```ts

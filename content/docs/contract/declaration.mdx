@@ -43,6 +43,7 @@ HTTP routes use these fields:
 - `responses`: status-keyed response body declarations.
 - `metadata`: application-defined route metadata.
 - `openApi`: OpenAPI operation hints.
+- `flattenRequestKeys`: whether clients and handlers use flattened request keys for this route.
 - `options`: route options.
 
 ## Request Model
@@ -64,8 +65,8 @@ body: {
 },
 ```
 
-Those locations remain part of the contract. Clients and server handlers receive
-one flattened request object.
+Those locations remain part of the contract. By default, clients and server
+handlers receive one flattened request object.
 
 ```ts
 await client.todos.update.fetch({
@@ -86,8 +87,56 @@ const routes = router(api, {
 });
 ```
 
-The flattened shape is only the TypeScript and adapter API. `rest-rpc` still
-serializes each value to the HTTP location where it was declared.
+The flattened shape is only the default TypeScript and adapter API. `rest-rpc`
+still serializes each value to the HTTP location where it was declared.
+
+Set `flattenRequestKeys: false` on the router when you want clients and handlers
+to receive explicit HTTP request segments.
+
+```ts
+export const api = router(
+	{
+		todos: {
+			update: {
+				method: "PATCH",
+				path: "/todos/:id",
+				pathParams: z.object({ id: z.string() }),
+				query: z.object({ includeCompleted: z.boolean().optional() }),
+				body: z.object({ title: z.string() }),
+				response: todoSchema,
+			},
+		},
+	},
+	{
+		flattenRequestKeys: false,
+	},
+);
+```
+
+```ts
+await client.todos.update.fetch({
+	pathParams: { id: "todo_1" },
+	query: { includeCompleted: true },
+	body: { title: "Write docs" },
+});
+```
+
+```ts
+const routes = router(api, {
+	todos: {
+		update({ pathParams, query, body }) {
+			return updateTodo({
+				id: pathParams.id,
+				includeCompleted: query.includeCompleted,
+				title: body.title,
+			});
+		},
+	},
+});
+```
+
+See [Shorthand vs Explicit](/docs/shorthand-vs-explicit/) for the broader
+design tradeoff.
 
 ## Path Params
 
@@ -124,6 +173,12 @@ Path parameter rules:
 - `pathPrefix` must be static and cannot include path params.
 
 ## Flattened Key Collisions
+
+:::note
+This section only applies when flattened request keys are enabled. With
+`flattenRequestKeys: false`, request fields stay under their explicit HTTP
+segments, so flattened key collisions do not apply.
+:::
 
 Every flattened request key must identify exactly one HTTP location. A route is
 invalid when the same key appears in multiple request locations.

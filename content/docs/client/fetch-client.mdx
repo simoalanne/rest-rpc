@@ -75,6 +75,20 @@ const client = initClient(api, {
 With strict status codes enabled, undeclared statuses throw and the response type
 narrows to the declared status union.
 
+```ts
+const response = await client.todos.get.fetchResponse({
+	id: "todo_1",
+});
+
+if (response.status === 200) {
+	return response.body;
+}
+
+if (response.status === 404) {
+	return undefined;
+}
+```
+
 ## Client Options
 
 ```ts
