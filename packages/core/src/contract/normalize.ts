@@ -16,6 +16,7 @@ import {
 import { contractRouteEntries } from "./traversal.ts";
 
 export type NormalizeContractOptions = {
+	flattenRequestKeys?: boolean;
 	pathPrefix?: string;
 	metadata?: RouteMetadata;
 	commonResponses?: RouteResponses;
@@ -113,12 +114,15 @@ export const normalizeContract = <TContract extends Contract>(
 	assertStaticPathPrefix(options?.pathPrefix);
 
 	for (const { route, path } of contractRouteEntries(contract)) {
+		route.flattenRequestKeys =
+			route.flattenRequestKeys ?? options?.flattenRequestKeys ?? true;
+
 		const pathParams = getPathParamNames(route.path);
 		if (!route.pathParams && pathParams.length > 0) {
 			route.pathParams = Object.fromEntries(
 				pathParams.map((key) => [key, schemaType<string>()] as const),
 			);
-			if (route.requestKeys) {
+			if (route.flattenRequestKeys && route.requestKeys) {
 				for (const key of pathParams) {
 					route.requestKeys[key] = "pathParams";
 				}

@@ -5,6 +5,7 @@ import {
 } from "@rest-rpc/core/contract";
 import type { ServerErrorHandlers } from "./errorHandlers.ts";
 import type { HttpHeaders } from "./headers.ts";
+import { flattenRequestData } from "./requestData.ts";
 import type {
 	CloseEventLike,
 	RouteImplementation,
@@ -205,7 +206,13 @@ export async function prepareWebSocketUpgrade<
 		return rejectInvalidUpgradeRequest(requestValidation.validation, options);
 	}
 
-	return prepareAcceptedUpgrade(requestValidation.validation.data, options);
+	return prepareAcceptedUpgrade(
+		flattenRequestData(
+			options.implementation.route,
+			requestValidation.validation.data,
+		),
+		options,
+	);
 }
 
 /**

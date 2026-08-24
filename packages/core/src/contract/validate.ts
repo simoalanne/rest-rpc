@@ -124,6 +124,8 @@ const assertNoCaseInsensitiveResponseHeaderDuplicates = (
 };
 
 const assertPathParamsResolved = (route: RouteDeclaration) => {
+	if (!route.requestKeys && route.flattenRequestKeys === false) return;
+
 	const pathParams = getPathParamNames(route.path);
 	for (const key of pathParams) {
 		if (route.requestKeys?.[key] !== "pathParams") {
@@ -257,11 +259,11 @@ export const validateContractSync = <TContract extends Contract>(
 	options?: ValidateContractOptions,
 ): TContract => {
 	for (const route of contractRoutes(contract)) {
-		if (!takesRouteInput(route)) {
-			validateResolvedRequestKeys(route);
-			continue;
-		}
-		if (route.requestKeys) {
+		if (
+			!takesRouteInput(route) ||
+			route.requestKeys ||
+			route.flattenRequestKeys === false
+		) {
 			validateResolvedRequestKeys(route);
 			continue;
 		}

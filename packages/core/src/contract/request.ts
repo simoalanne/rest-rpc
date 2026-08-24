@@ -80,6 +80,21 @@ type InferRequestBody<
 				? InferRequestSchemaRecord<TBody, TIO>
 				: never;
 
+type InferGroupedRequestBody<
+	TBody,
+	TIO extends "input" | "output",
+> = TBody extends NoBody
+	? never
+	: TBody extends CustomBody
+		? InferCustomBody<TBody, TIO>
+		: TBody extends StandardSchemaV1
+			? TIO extends "input"
+				? StandardSchemaV1.InferInput<TBody>
+				: StandardSchemaV1.InferOutput<TBody>
+			: TBody extends RequestSchemaRecord
+				? InferRequestSchemaRecord<TBody, TIO>
+				: never;
+
 type InferJsonQuery<TQuery, TIO extends "input" | "output"> =
 	TQuery extends JsonQuery<infer TSchema>
 		? {
@@ -87,6 +102,13 @@ type InferJsonQuery<TQuery, TIO extends "input" | "output"> =
 					? StandardSchemaV1.InferInput<TSchema>
 					: StandardSchemaV1.InferOutput<TSchema>;
 			}
+		: never;
+
+type InferGroupedJsonQuery<TQuery, TIO extends "input" | "output"> =
+	TQuery extends JsonQuery<infer TSchema>
+		? TIO extends "input"
+			? StandardSchemaV1.InferInput<TSchema>
+			: StandardSchemaV1.InferOutput<TSchema>
 		: never;
 
 type InferSchemaValue<
@@ -142,6 +164,13 @@ type InferRequestObjectSegment<
 			? InferRequestSchemaRecord<TSegment, TIO>
 			: never;
 
+type InferGroupedRequestObjectSegment<
+	TSegment,
+	TIO extends "input" | "output",
+> = TSegment extends JsonQuery
+	? InferGroupedJsonQuery<TSegment, TIO>
+	: InferRequestObjectSegment<TSegment, TIO>;
+
 type InferRequestSegments<R, TIO extends "input" | "output"> = {
 	body: R extends { body: infer TBody } ? InferRequestBody<TBody, TIO> : never;
 	query: R extends { query: infer TQuery }
@@ -157,12 +186,32 @@ type InferRequestSegments<R, TIO extends "input" | "output"> = {
 		: never;
 };
 
+type InferGroupedRequestSegments<R, TIO extends "input" | "output"> = {
+	body: R extends { body: infer TBody }
+		? InferGroupedRequestBody<TBody, TIO>
+		: never;
+	query: R extends { query: infer TQuery }
+		? InferGroupedRequestObjectSegment<TQuery, TIO>
+		: never;
+	pathParams: R extends { pathParams: infer TPathParams }
+		? InferGroupedRequestObjectSegment<TPathParams, TIO>
+		: never;
+	headers: R extends { headers: infer THeaders }
+		? THeaders extends RequestSchemaRecord
+			? InferRequestSchemaRecord<THeaders, TIO>
+			: never
+		: never;
+};
+
 type RouteRequest<
 	E extends RouteDeclaration,
 	TIO extends "input" | "output",
-> = InferRequestSegments<E, TIO>;
+> = E extends { flattenRequestKeys: false }
+	? InferGroupedRequestSegments<E, TIO>
+	: InferRequestSegments<E, TIO>;
 
 type Merge<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
+type EmptyObject = Record<never, never>;
 type MergeSegment<T> = [T] extends [never] ? unknown : T;
 type HasRequestInput<TRequest> = [
 	TRequest extends {
@@ -189,12 +238,19 @@ type InferRequestFor<
 				headers: infer H;
 			}
 			? HasRequestInput<R> extends true
-				? Merge<
-						MergeSegment<B> &
-							MergeSegment<Q> &
-							MergeSegment<P> &
-							MergeSegment<H>
-					>
+				? E extends { flattenRequestKeys: false }
+					? Merge<
+							([B] extends [never] ? EmptyObject : { body: B }) &
+								([Q] extends [never] ? EmptyObject : { query: Q }) &
+								([P] extends [never] ? EmptyObject : { pathParams: P }) &
+								([H] extends [never] ? EmptyObject : { headers: H })
+						>
+					: Merge<
+							MergeSegment<B> &
+								MergeSegment<Q> &
+								MergeSegment<P> &
+								MergeSegment<H>
+						>
 				: never
 			: never
 		: never;

@@ -82,6 +82,36 @@ describe("ApiClient requests", () => {
 		});
 	});
 
+	it("constructs requests from grouped segments when flattened request keys are disabled", () => {
+		const apiContract = router(
+			{
+				todos: {
+					get: {
+						method: "GET",
+						path: "/todos/:id",
+						pathParams: z.object({ id: z.string() }),
+						responses: {
+							204: noBody(),
+						},
+					},
+				},
+			},
+			{
+				flattenRequestKeys: false,
+			},
+		);
+		const request = constructBaseRequest(
+			"https://api.test",
+			apiContract.todos.get,
+			{
+				pathParams: { id: "todo 1" },
+			},
+			true,
+		);
+
+		assert.equal(request.url, "https://api.test/todos/todo%201");
+	});
+
 	it("serializes finite number and boolean params, query, and headers", async () => {
 		const apiContract = router({
 			items: {

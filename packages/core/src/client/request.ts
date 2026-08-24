@@ -2,7 +2,10 @@ import type { RouteDeclaration } from "../contract/contract.ts";
 import { replacePathParams } from "../contract/path.ts";
 import { isJsonQuery } from "../contract/request.ts";
 import { isCustomBody, isNoBody } from "../contract/response.ts";
-import type { FlatRequestInput } from "../contract/validate.ts";
+import type {
+	FlatRequestInput,
+	GroupedRequestInput,
+} from "../contract/validate.ts";
 import { groupRequestInput } from "../contract/validate.ts";
 import { getNextFetchTags } from "./nextFetchTags.ts";
 import type {
@@ -166,7 +169,10 @@ export const constructBaseRequest = (
 	let urlBase = `${baseUrl}${route.path}`;
 	if (!args) return { url: urlBase };
 
-	const request = groupRequestInput(route, args, { strictRequestKeys });
+	const request =
+		route.flattenRequestKeys === false
+			? (args as GroupedRequestInput)
+			: groupRequestInput(route, args, { strictRequestKeys });
 	const { body, query, pathParams, headers } = request;
 
 	urlBase = `${baseUrl}${serializeParams(route, pathParams)}${serializeQuery(route, query)}`;

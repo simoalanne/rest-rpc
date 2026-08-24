@@ -1,5 +1,4 @@
 import type { RouteDeclaration } from "../contract/contract.ts";
-import { isJsonQuery } from "../contract/request.ts";
 import { groupRequestInput } from "../contract/validate.ts";
 
 const DEFAULT_NEXT_FETCH_TAG_PREFIX = "rest-rpc";
@@ -16,6 +15,22 @@ const stripUndefinedFields = <TValue>(
 
 const encodeTagSegment = (value: unknown) => encodeURIComponent(String(value));
 
+const sortJsonValue = (value: unknown): unknown => {
+	if (Array.isArray(value)) return value.map(sortJsonValue);
+	if (typeof value !== "object" || value === null) return value;
+
+	return Object.fromEntries(
+		Object.entries(stripUndefinedFields(value as Record<string, unknown>) ?? {})
+			.sort(([left], [right]) => left.localeCompare(right))
+			.map(([key, entry]) => [key, sortJsonValue(entry)]),
+	);
+};
+
+const serializeTagValue = (value: unknown) =>
+	typeof value === "object" && value !== null
+		? JSON.stringify(sortJsonValue(value))
+		: String(value);
+
 const serializeCacheKey = (cacheKey: readonly string[]) =>
 	cacheKey.map(encodeTagSegment).join(".");
 
@@ -26,7 +41,10 @@ const serializeRequest = (request: NextFetchTagRequest | undefined) => {
 
 	if (entries.length === 0) return undefined;
 
-	return entries.flat().map(encodeTagSegment).join(":");
+	return entries
+		.flatMap(([key, value]) => [key, serializeTagValue(value)])
+		.map(encodeTagSegment)
+		.join(":");
 };
 
 const getNextFetchTagRequest = (
@@ -35,15 +53,20 @@ const getNextFetchTagRequest = (
 ) => {
 	if (!request) return undefined;
 
+	if (route.flattenRequestKeys === false) {
+		return {
+			pathParams: request.pathParams,
+			query: request.query,
+		};
+	}
+
 	const grouped = groupRequestInput(route, request, {
 		strictRequestKeys: false,
 	});
 
 	return {
-		...grouped.pathParams,
-		...(isJsonQuery(route.query)
-			? { query: JSON.stringify(grouped.query) }
-			: (grouped.query as Record<string, unknown> | undefined)),
+		...(grouped.pathParams as Record<string, unknown> | undefined),
+		...(grouped.query as Record<string, unknown> | undefined),
 	};
 };
 

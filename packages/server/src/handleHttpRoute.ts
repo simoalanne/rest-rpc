@@ -16,6 +16,7 @@ import type {
 	ServerErrorResponse,
 } from "./errorHandlers.ts";
 import type { HttpHeaders } from "./headers.ts";
+import { flattenRequestData } from "./requestData.ts";
 import { RouteResponseError } from "./routeResponseError.ts";
 import type { HttpRouteHandlerContext, RuntimeRouteHandler } from "./router.ts";
 import {
@@ -356,7 +357,7 @@ export async function handleHttpRoute<
 
 	try {
 		const handlerResult = await handler({
-			...requestValidation.data,
+			...flattenRequestData(route, requestValidation.data),
 			[REQUEST_CONTEXT_KEY]: options.context,
 		});
 

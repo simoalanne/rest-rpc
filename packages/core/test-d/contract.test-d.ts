@@ -3,6 +3,7 @@ import {
 	type ClientRequest,
 	type ClientResponseBody,
 	customBody,
+	jsonQuery,
 	noBody,
 	route,
 	router,
@@ -307,6 +308,106 @@ expectAssignable<HeaderMergedRequest>({
 	"x-route": "route",
 	"x-shared": "route",
 });
+
+// should infer grouped request segments when flattened request keys are disabled
+const groupedRequestApi = router(
+	{
+		todos: {
+			update: {
+				method: "PATCH",
+				path: "/todos/:id",
+				pathParams: z.object({ id: z.string() }),
+				query: z.object({ notify: z.boolean().optional() }),
+				body: z.object({ title: z.string() }),
+				headers: {
+					"x-request-id": z.string(),
+				},
+				responses: {
+					200: todoSchema,
+				},
+			},
+		},
+	},
+	{
+		flattenRequestKeys: false,
+	},
+);
+
+type GroupedClientRequest = ClientRequest<
+	typeof groupedRequestApi.todos.update
+>;
+declare const groupedClientRequest: GroupedClientRequest;
+expectType<string>(groupedClientRequest.pathParams.id);
+expectType<boolean | undefined>(groupedClientRequest.query.notify);
+expectType<string>(groupedClientRequest.body.title);
+expectType<string>(groupedClientRequest.headers["x-request-id"]);
+expectAssignable<GroupedClientRequest>({
+	pathParams: { id: "todo-1" },
+	query: {},
+	body: { title: "Typed todo" },
+	headers: { "x-request-id": "req-1" },
+});
+expectError(groupedClientRequest.id);
+expectError(groupedClientRequest.title);
+
+// should let route-level flattenRequestKeys override the router option
+const routeOverrideRequestApi = router(
+	{
+		todos: {
+			get: {
+				method: "GET",
+				path: "/todos/:id",
+				flattenRequestKeys: true,
+				pathParams: z.object({ id: z.string() }),
+				query: z.object({ preview: z.boolean().optional() }),
+				responses: {
+					200: todoSchema,
+				},
+			},
+		},
+	},
+	{
+		flattenRequestKeys: false,
+	},
+);
+
+type RouteOverrideClientRequest = ClientRequest<
+	typeof routeOverrideRequestApi.todos.get
+>;
+declare const routeOverrideClientRequest: RouteOverrideClientRequest;
+expectType<string>(routeOverrideClientRequest.id);
+expectType<boolean | undefined>(routeOverrideClientRequest.preview);
+expectError(routeOverrideClientRequest.pathParams);
+
+// customBody or jsonQuery should not become double-wrapped when flattenRequestKeys is false
+const streamOrJsonQueryApi = router(
+	{
+		todos: {
+			list: {
+				path: "/todos",
+				method: "GET",
+				body: customBody({
+					contentType: "application/json",
+					schema: z.object({ filter: z.string() }),
+				}),
+				query: jsonQuery(z.object({ page: z.number() })),
+				responses: {
+					200: stream(todoSchema),
+				},
+			},
+		},
+	},
+	{
+		flattenRequestKeys: false,
+	},
+);
+
+declare const streamOrJsonQueryRequest: ClientRequest<
+	typeof streamOrJsonQueryApi.todos.list
+>;
+expectType<string>(streamOrJsonQueryRequest.body.filter);
+expectType<number>(streamOrJsonQueryRequest.query.page);
+expectError(streamOrJsonQueryRequest.query.query);
 
 // transformed schemas
 

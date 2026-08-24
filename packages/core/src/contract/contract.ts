@@ -76,6 +76,7 @@ export type BaseRouteDeclaration = {
 	path: string;
 	method: HttpMethod;
 	mode?: RouteMode;
+	flattenRequestKeys?: boolean;
 	cacheKey?: readonly string[];
 	body?: RequestBodySchema;
 	query?: StandardSchemaV1 | RequestSchemaRecord | JsonQuery;
@@ -133,10 +134,12 @@ export const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
 	"method" in value;
 
 export type RouteContractOptions = {
+	flattenRequestKeys?: boolean;
 	resolveRequestKeys?: ResolveRequestSchemaKeys;
 };
 
 export type RouterContractOptions = RouteContractOptions & {
+	flattenRequestKeys?: boolean;
 	pathPrefix?: string;
 	metadata?: RouteMetadata;
 	commonResponses?: RouteResponses;
@@ -243,6 +246,18 @@ type MergeHeaders<TCommon, TRoute> = Merge<
 	Omit<TCommon, keyof TRoute> & TRoute
 >;
 
+type FlattenRequestKeys<TOptions> = TOptions extends {
+	flattenRequestKeys: infer TValue extends boolean;
+}
+	? TValue
+	: true;
+
+type RouteFlattenRequestKeys<TRoute, TOptions> = TRoute extends {
+	flattenRequestKeys: infer TValue extends boolean;
+}
+	? TValue
+	: FlattenRequestKeys<TOptions>;
+
 type ApplyCommonHeadersToRouteFields<TRoute, TOptions> =
 	keyof CommonHeaders<TOptions> extends never
 		? TRoute
@@ -275,21 +290,52 @@ type ApplyRouterOptionsToRoute<TRoute extends RouteDeclaration, TOptions> =
 				? Merge<
 						Omit<
 							TRouteWithHeaders,
-							"path" | "metadata" | "openApi" | "responses"
+							| "path"
+							| "flattenRequestKeys"
+							| "metadata"
+							| "openApi"
+							| "responses"
 						> & {
 							path: string;
+							flattenRequestKeys: RouteFlattenRequestKeys<
+								TRouteWithHeaders,
+								TOptions
+							>;
 							metadata: RouteMetadata;
 							openApi?: OpenApiRouteOptions;
 							responses: MergeResponses<CommonResponses<TOptions>, TResponses>;
 						}
 					>
 				: Merge<
-						Omit<TRouteWithHeaders, "path" | "metadata" | "openApi"> & {
+						Omit<
+							TRouteWithHeaders,
+							"path" | "flattenRequestKeys" | "metadata" | "openApi"
+						> & {
 							path: string;
+							flattenRequestKeys: RouteFlattenRequestKeys<
+								TRouteWithHeaders,
+								TOptions
+							>;
 							metadata: RouteMetadata;
 							openApi?: OpenApiRouteOptions;
 						}
 					>
+			: never
+		: never;
+
+type ApplyRouteOptionsToRoute<TRoute extends RouteDeclaration, TOptions> =
+	ApplyInferredPathParamsToRoute<
+		ApplyResponseShorthandToRoute<TRoute>
+	> extends infer TRouteWithDefaults
+		? TRouteWithDefaults extends RouteDeclaration
+			? Merge<
+					Omit<TRouteWithDefaults, "flattenRequestKeys"> & {
+						flattenRequestKeys: RouteFlattenRequestKeys<
+							TRouteWithDefaults,
+							TOptions
+						>;
+					}
+				>
 			: never
 		: never;
 
@@ -310,15 +356,16 @@ export type ApplyRouterOptions<
  * @remarks Path params can be inferred from `:name` or `{name}` path segments when `pathParams` is omitted.
  * @see {@link https://rest-rpc.dev/docs/contract/declaration#single-routes}
  */
-export function route<const TRoute extends RouteDeclaration>(
+export function route<
+	const TRoute extends RouteDeclaration,
+	const TOptions extends RouteContractOptions | undefined = undefined,
+>(
 	route: TRoute,
-	options?: RouteContractOptions,
-): ApplyInferredPathParamsToRoute<ApplyResponseShorthandToRoute<TRoute>> {
-	normalizeContract(route);
+	options?: TOptions,
+): ApplyRouteOptionsToRoute<TRoute, TOptions> {
+	normalizeContract(route, options);
 	validateContractSync(route, options);
-	return route as ApplyInferredPathParamsToRoute<
-		ApplyResponseShorthandToRoute<TRoute>
-	>;
+	return route as ApplyRouteOptionsToRoute<TRoute, TOptions>;
 }
 
 /**

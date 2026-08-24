@@ -54,6 +54,38 @@ describe("handleHttpRoute", () => {
 		});
 	});
 
+	it("passes grouped request data when flattened request keys are disabled", async () => {
+		const result = await handleHttpRoute(
+			{
+				method: "GET",
+				path: "/todos",
+				flattenRequestKeys: false,
+				query: z.object({ q: z.string() }),
+				responses: {
+					204: noBody(),
+				},
+			},
+			(request) => {
+				assert.deepEqual(request, {
+					query: { q: "todos" },
+					context: {},
+				});
+			},
+			{
+				request: {
+					query: { q: "todos" },
+				},
+				context: {},
+			},
+		);
+
+		assert.deepEqual(result, {
+			kind: "empty",
+			status: 204,
+			headers: undefined,
+		});
+	});
+
 	it("returns request validation errors without calling the handler", async () => {
 		let called = false;
 		const result = await handleHttpRoute(

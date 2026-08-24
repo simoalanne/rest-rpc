@@ -206,6 +206,25 @@ const validateJsonQuery = async (
 	return { data: { query: result.value }, errors: [] };
 };
 
+const getValidatedRequestData = (
+	route: RouteDeclaration,
+	body: SegmentValidationResult,
+	query: SegmentValidationResult,
+	pathParams: SegmentValidationResult,
+	headers: SegmentValidationResult,
+) => {
+	return {
+		...(route.body && !isNoBody(route.body)
+			? { body: isCustomBody(route.body) ? body.data.body : body.data }
+			: {}),
+		...(route.query
+			? { query: isJsonQuery(route.query) ? query.data.query : query.data }
+			: {}),
+		...(route.pathParams ? { pathParams: pathParams.data } : {}),
+		...(route.headers ? { headers: headers.data } : {}),
+	};
+};
+
 export async function validateRequest(
 	route: RouteDeclaration,
 	segments: RequestSegments,
@@ -231,12 +250,7 @@ export async function validateRequest(
 	if (errors.length === 0) {
 		return {
 			success: true,
-			data: {
-				...body.data,
-				...query.data,
-				...pathParams.data,
-				...headers.data,
-			},
+			data: getValidatedRequestData(route, body, query, pathParams, headers),
 		};
 	}
 

@@ -155,6 +155,31 @@ describe("router", () => {
 		});
 	});
 
+	it("allows duplicate request keys and infers path params when flattened request keys are disabled", () => {
+		const contract = router(
+			{
+				todos: {
+					get: {
+						method: "GET",
+						path: "/todos/:id",
+						query: z.object({ id: z.string() }),
+						body: z.object({ id: z.string() }),
+						responses: {
+							204: noBody(),
+						},
+					},
+				},
+			},
+			{
+				flattenRequestKeys: false,
+			},
+		);
+
+		assert.equal(contract.todos.get.flattenRequestKeys, false);
+		assert.equal(contract.todos.get.requestKeys, undefined);
+		assert.deepEqual(Object.keys(contract.todos.get.pathParams ?? {}), ["id"]);
+	});
+
 	it("merges common responses with response shorthands", () => {
 		const created = z.object({ id: z.string() });
 		const error = z.object({ message: z.string() });

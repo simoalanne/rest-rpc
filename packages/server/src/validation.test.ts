@@ -31,7 +31,7 @@ describe("validateRequest", () => {
 
 		assert.equal(result.success, true);
 		if (result.success) {
-			assert.ok(result.data.createdAt instanceof Date);
+			assert.ok(result.data.body.createdAt instanceof Date);
 		}
 	});
 
@@ -91,8 +91,8 @@ describe("validateRequest", () => {
 		assert.equal(result.success, true);
 		if (result.success) {
 			assert.deepEqual(result.data, {
-				id: 123,
-				published: false,
+				pathParams: { id: 123 },
+				query: { published: false },
 			});
 		}
 	});
@@ -153,10 +153,7 @@ describe("validateRequest", () => {
 		assert.equal(result.success, true);
 		if (result.success) {
 			assert.deepEqual(result.data, {
-				query: {
-					page: 2,
-					filters: { tags: ["api", "typescript"] },
-				},
+				query: { page: 2, filters: { tags: ["api", "typescript"] } },
 			});
 		}
 	});
