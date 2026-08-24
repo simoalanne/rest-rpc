@@ -62,6 +62,17 @@ export const bodyParsingContract = router({
 			}),
 		},
 	},
+	rawUrlEncoded: {
+		method: "POST",
+		path: "/body-parsing/raw-url-encoded",
+		body: customBody(z.instanceof(URLSearchParams)),
+		responses: {
+			200: z.object({
+				title: z.string(),
+				remember: z.string().optional(),
+			}),
+		},
+	},
 	binary: {
 		method: "POST",
 		path: "/body-parsing/binary",

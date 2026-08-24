@@ -5,7 +5,7 @@ import {
 	createOpenApiTestContract,
 	schemaConverter,
 } from "../../test/factories/openapi.ts";
-import { noBody } from "../contract/response.ts";
+import { noBody } from "../contract/body.ts";
 import { createOpenApiDocument } from "./document.ts";
 
 describe("createOpenApiDocument", () => {

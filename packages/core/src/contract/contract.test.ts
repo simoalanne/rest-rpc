@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
 import { testContract } from "../../test/factories/contract.ts";
+import { isNoBody, noBody } from "./body.ts";
 import { router } from "./contract.ts";
-import { isNoBody, noBody } from "./response.ts";
 
 describe("router", () => {
 	it("normalizes and validates contracts", () => {

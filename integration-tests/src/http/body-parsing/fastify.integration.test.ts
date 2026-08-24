@@ -24,6 +24,11 @@ runBodyParsingSuite({
 			(_request, body, done) => done(null, body),
 		);
 		app.addContentTypeParser(
+			"application/x-www-form-urlencoded",
+			{ parseAs: "string" },
+			(_request, body, done) => done(null, new URLSearchParams(body)),
+		);
+		app.addContentTypeParser(
 			"application/octet-stream",
 			{ parseAs: "buffer" },
 			(_request, body, done) => done(null, body),

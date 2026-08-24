@@ -1,7 +1,7 @@
+import { isCustomBody, isNoBody } from "../contract/body.ts";
 import type { RouteDeclaration } from "../contract/contract.ts";
 import { replacePathParams } from "../contract/path.ts";
 import { isJsonQuery } from "../contract/request.ts";
-import { isCustomBody, isNoBody } from "../contract/response.ts";
 import type {
 	FlatRequestInput,
 	GroupedRequestInput,
@@ -180,11 +180,16 @@ export const constructBaseRequest = (
 	if (isCustomBody(route.body)) {
 		const { contentType, payload } = Array.isArray(route.body.contentType)
 			? (body as { contentType: string; payload: unknown })
-			: { contentType: route.body.contentType as string, payload: body };
+			: {
+					contentType: route.body.contentType as string | undefined,
+					payload: body,
+				};
 
 		return {
 			url: urlBase,
-			body: serializeCustomBody(payload, contentType),
+			body: contentType
+				? serializeCustomBody(payload, contentType)
+				: (payload as BodyInit | null | undefined),
 			contentType,
 			headers: stringifyHeaders(route, headers),
 		};

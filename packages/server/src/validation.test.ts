@@ -207,6 +207,30 @@ describe("validateRequest", () => {
 		}
 	});
 
+	it("validates custom request bodies without content type as payloads", async () => {
+		const result = await validateRequest(
+			{
+				method: "POST",
+				path: "/forms",
+				body: customBody(z.instanceof(URLSearchParams)),
+				requestKeys: {},
+				responses: {},
+			},
+			{
+				body: new URLSearchParams([["title", "Write docs"]]),
+				headers: {
+					"content-type": "application/x-www-form-urlencoded",
+				},
+			},
+		);
+
+		assert.equal(result.success, true);
+		if (result.success) {
+			assert.ok(result.data.body instanceof URLSearchParams);
+			assert.equal(result.data.body.get("title"), "Write docs");
+		}
+	});
+
 	it("rejects malformed JSON query values as request validation errors", async () => {
 		const result = await validateRequest(
 			{

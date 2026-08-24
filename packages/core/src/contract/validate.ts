@@ -1,4 +1,5 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
+import { isCustomBody, isNoBody, isStream } from "./body.ts";
 import type { Contract, RouteDeclaration } from "./contract.ts";
 import { getPathParamNames } from "./path.ts";
 import type { RequestKeys } from "./request.ts";
@@ -12,10 +13,9 @@ import {
 	resolveSchemaKeys,
 } from "./requestKeys.ts";
 import {
+	getResponseBody,
 	getResponseHeaders,
 	getRouteResponses,
-	isCustomBody,
-	isNoBody,
 } from "./response.ts";
 import { contractRoutes } from "./traversal.ts";
 
@@ -123,6 +123,20 @@ const assertNoCaseInsensitiveResponseHeaderDuplicates = (
 	}
 };
 
+const assertCustomResponsesDeclareContentType = (route: RouteDeclaration) => {
+	for (const response of Object.values(route.responses ?? {})) {
+		const body = getResponseBody(response);
+		const customBody = isStream(body) ? body.schema : body;
+		if (!isCustomBody(customBody) || customBody.contentType !== undefined) {
+			continue;
+		}
+
+		throw new Error(
+			`Route declaration at path "${route.path}" has a custom response body without a contentType.`,
+		);
+	}
+};
+
 const assertPathParamsResolved = (route: RouteDeclaration) => {
 	if (!route.requestKeys && route.flattenRequestKeys === false) return;
 
@@ -179,6 +193,7 @@ export const validateResolvedRequestKeys = (route: RouteDeclaration) => {
 	assertNoCaseInsensitiveHeaderDuplicates(route);
 	assertNoReservedResponseHeaderKeys(route);
 	assertNoCaseInsensitiveResponseHeaderDuplicates(route);
+	assertCustomResponsesDeclareContentType(route);
 
 	if (isCustomBody(route.body) && route.requestKeys?.body) {
 		throw new Error(

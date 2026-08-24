@@ -1,4 +1,5 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
+import type { NoBody } from "./body.ts";
 import { normalizeContract } from "./normalize.ts";
 import type {
 	JsonQuery,
@@ -10,7 +11,6 @@ import type { ResolveRequestSchemaKeys } from "./requestKeys.ts";
 import type {
 	DefaultBodyResponseStatusForMethod,
 	DefaultNoBodyResponseStatusForMethod,
-	NoBody,
 	ResponseBodySchema,
 	ResponseDeclaration,
 	RouteResponseInput,

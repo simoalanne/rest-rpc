@@ -178,6 +178,53 @@ route(transformedApi.todos.transform, ({ id, title, slug }) => {
 	};
 });
 
+// should expose single custom body content types as payloads to handlers
+const singleCustomRequestApi = defineRouter({
+	todos: {
+		importCsv: {
+			method: "POST",
+			path: "/todos/import.csv",
+			body: customBody({
+				contentType: "text/csv",
+				schema: z.string(),
+			}),
+			responses: {
+				204: noBody(),
+			},
+		},
+	},
+});
+
+route(singleCustomRequestApi.todos.importCsv, ({ body }) => {
+	expectType<string>(body);
+	expectError(body.contentType);
+	expectError(body.payload);
+
+	return undefined;
+});
+
+// should expose omitted custom body content types as payloads to handlers
+const omittedCustomRequestApi = defineRouter({
+	todos: {
+		submitForm: {
+			method: "POST",
+			path: "/todos/form",
+			body: customBody(z.instanceof(URLSearchParams)),
+			responses: {
+				204: noBody(),
+			},
+		},
+	},
+});
+
+route(omittedCustomRequestApi.todos.submitForm, ({ body }) => {
+	expectType<URLSearchParams>(body);
+	expectError(body.contentType);
+	expectError(body.payload);
+
+	return undefined;
+});
+
 // should expose selected custom body content type and payload to handlers
 const customRequestApi = defineRouter({
 	todos: {

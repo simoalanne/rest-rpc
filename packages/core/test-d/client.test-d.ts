@@ -406,6 +406,36 @@ expectError(
 	}),
 );
 
+// should type custom request bodies without declared content types as payloads
+const rawCustomRequestApi = router({
+	todos: {
+		submitForm: {
+			method: "POST",
+			path: "/todos/form",
+			body: customBody(z.instanceof(URLSearchParams)),
+			responses: {
+				204: noBody(),
+			},
+		},
+	},
+});
+
+const rawCustomRequestClient = initClient(rawCustomRequestApi, {
+	baseUrl: "https://example.test",
+});
+
+expectType<Promise<undefined>>(
+	rawCustomRequestClient.todos.submitForm.fetch({
+		body: new URLSearchParams(),
+	}),
+);
+
+expectError(
+	rawCustomRequestClient.todos.submitForm.fetch({
+		body: "title=Write+docs",
+	}),
+);
+
 // should reject invalid request argument positions and flattened input
 const requestArgumentApi = router({
 	todos: {

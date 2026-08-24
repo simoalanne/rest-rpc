@@ -1,7 +1,8 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
+import type { CustomBody, NoBody } from "./body.ts";
+import { isCustomBody, isNoBody } from "./body.ts";
 import type { RouteDeclaration } from "./contract.ts";
-import type { CustomBody, InferCustomBody, NoBody } from "./response.ts";
-import { isCustomBody, isNoBody } from "./response.ts";
+import type { InferCustomBody } from "./response.ts";
 import type { WebSocketMessages } from "./websocketMessages.ts";
 
 export type RequestSegment = "body" | "query" | "pathParams" | "headers";

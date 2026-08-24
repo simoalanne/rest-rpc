@@ -33,6 +33,14 @@ runBodyParsingSuite({
 			bodyParsingContract.customJson.path,
 			express.json({ type: "application/json" }),
 		);
+		app.use(
+			bodyParsingContract.rawUrlEncoded.path,
+			express.text({ type: "application/x-www-form-urlencoded" }),
+			(req, _res, next) => {
+				req.body = new URLSearchParams(req.body);
+				next();
+			},
+		);
 
 		registerRoutes(app, createBodyParsingImplementations());
 

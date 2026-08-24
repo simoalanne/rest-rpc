@@ -1,3 +1,4 @@
+import { isCustomBody, isNoBody, isStream } from "../contract/body.ts";
 import type { OpenApiResponseOptions } from "../contract/contract.ts";
 import type {
 	JsonQuery,
@@ -17,9 +18,6 @@ import {
 	getResponseBody,
 	getResponseHeaders,
 	getRouteResponses,
-	isCustomBody,
-	isNoBody,
-	isStream,
 } from "../contract/response.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import {
@@ -48,9 +46,13 @@ const createContent = (
 	Object.fromEntries(contentTypes.map((contentType) => [contentType, value]));
 
 const contentTypesForCustomBody = (schema: {
-	contentType: string | readonly string[];
+	contentType?: string | readonly string[];
 }) =>
-	Array.isArray(schema.contentType) ? schema.contentType : [schema.contentType];
+	schema.contentType === undefined
+		? []
+		: Array.isArray(schema.contentType)
+			? schema.contentType
+			: [schema.contentType];
 
 const createSchemaRecordObject = (
 	schemas: RequestSchemaRecord,
@@ -165,6 +167,7 @@ export const createRequestBody = (
 	const contentTypes = isCustomBody(schema)
 		? contentTypesForCustomBody(schema)
 		: [JSON_CONTENT_TYPE];
+	if (contentTypes.length === 0) return undefined;
 	const bodySchema = isCustomBody(schema) ? schema.schema : schema;
 	const openApiSchema = isRequestSchemaRecord(bodySchema)
 		? createSchemaRecordObject(bodySchema, converter)

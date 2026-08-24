@@ -6,9 +6,9 @@ import {
 	createClientTestContract,
 	jsonResponse,
 } from "../../test/factories/client.ts";
+import { customBody, noBody } from "../contract/body.ts";
 import { router } from "../contract/contract.ts";
 import { jsonQuery } from "../contract/request.ts";
-import { customBody, noBody } from "../contract/response.ts";
 import { initClient } from "./index.ts";
 import { constructBaseRequest, createRequestSignal } from "./request.ts";
 
@@ -422,6 +422,31 @@ describe("ApiClient requests", () => {
 		assert.deepEqual(calls[0]?.init?.headers, {
 			"content-type": "text/plain",
 		});
+	});
+
+	it("sends custom bodies without declared content types as raw fetch bodies", async () => {
+		const apiContract = router({
+			forms: {
+				submit: {
+					method: "POST",
+					path: "/forms",
+					body: customBody(z.instanceof(URLSearchParams)),
+					responses: {
+						204: noBody(),
+					},
+				},
+			},
+		});
+		const calls = captureFetch();
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+		});
+		const body = new URLSearchParams([["title", "Write docs"]]);
+
+		await client.forms.submit.fetch({ body });
+
+		assert.equal(calls[0]?.init?.body, body);
+		assert.deepEqual(calls[0]?.init?.headers, {});
 	});
 
 	it("sends custom bodies with a selected declared content type", async () => {

@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
 import { schemaConverter } from "../../test/factories/openapi.ts";
+import { customBody, noBody, stream } from "../contract/body.ts";
 import { jsonQuery } from "../contract/request.ts";
-import { customBody, noBody, stream } from "../contract/response.ts";
 import {
 	createHeaderParameters,
 	createOperation,
@@ -204,6 +204,12 @@ describe("OpenAPI operations", () => {
 		assert.equal(body?.content["image/png"].schema.type, "string");
 		assert.equal(body?.content["image/jpeg"].schema.type, "string");
 		assert.equal(body?.content["application/json"], undefined);
+	});
+
+	it("omits custom request bodies without declared content types", () => {
+		const body = createRequestBody(customBody(z.string()), schemaConverter);
+
+		assert.equal(body, undefined);
 	});
 
 	it("creates JSON request bodies from schema records", () => {

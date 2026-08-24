@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { noBody } from "../contract/response.ts";
+import { noBody } from "../contract/body.ts";
 import {
 	getSuccessfulResponseStatuses,
 	hasSingleSuccessfulResponse,

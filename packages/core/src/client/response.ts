@@ -1,8 +1,9 @@
+import type { CustomBody } from "../contract/body.ts";
+import { isCustomBody, isNoBody, isStream } from "../contract/body.ts";
 import type { RouteDeclaration } from "../contract/contract.ts";
 import { isStandardSchema } from "../contract/request.ts";
 import type {
 	ClientResponseBody,
-	CustomBody,
 	ResponseBodySchema,
 	ResponseDeclaration,
 } from "../contract/response.ts";
@@ -10,9 +11,6 @@ import {
 	getResponseBody,
 	getResponseHeaders,
 	getRouteResponses,
-	isCustomBody,
-	isNoBody,
-	isStream,
 } from "../contract/response.ts";
 import { validateStandardSchema } from "../standard-schema/index.ts";
 import { isHttpRouteNode, isSuccessStatus } from "./routes.ts";
@@ -100,7 +98,9 @@ const customResponseMetadata = (schema: CustomBody, rawResponse: Response) => ({
 	contentType: resolveDeclaredContentType(
 		Array.isArray(schema.contentType)
 			? schema.contentType
-			: [schema.contentType as string],
+			: schema.contentType
+				? [schema.contentType]
+				: [],
 		rawResponse,
 	),
 });

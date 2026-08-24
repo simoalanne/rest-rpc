@@ -268,7 +268,7 @@ export async function validateRequest(
 }
 
 export const validateResponseBody = async (
-	schema: ResponseBodySchema | undefined,
+	schema: ResponseBodySchema | CustomBody | undefined,
 	body: unknown,
 ): Promise<unknown> => {
 	if (!schema || isNoBody(schema) || isStream(schema)) {
@@ -326,6 +326,7 @@ export const resolveCustomResponseBody = (
 	errorMessage: string,
 ): { contentType: string; payload: unknown } => {
 	if (!Array.isArray(schema.contentType)) {
+		if (!schema.contentType) throw new Error(errorMessage);
 		return { contentType: schema.contentType as string, payload: body };
 	}
 

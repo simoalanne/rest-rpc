@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
+import { initClient } from "@rest-rpc/core/client";
 import type { StartedServer } from "../harness/listen.ts";
+import { bodyParsingContract } from "./contract.ts";
 
 type BodyParsingSuiteAdapter = {
 	name: string;
@@ -129,6 +131,24 @@ export const runBodyParsingSuite = (adapter: BodyParsingSuiteAdapter) => {
 			assert.deepEqual(await readJson(response), {
 				count: 5,
 				ok: true,
+			});
+		});
+
+		it("passes raw custom bodies without declared content types through fetch", async () => {
+			const client = initClient(bodyParsingContract, {
+				baseUrl: server.origin,
+			});
+
+			const response = await client.rawUrlEncoded.fetch({
+				body: new URLSearchParams([
+					["title", "Encoded form"],
+					["remember", "true"],
+				]),
+			});
+
+			assert.deepEqual(response, {
+				title: "Encoded form",
+				remember: "true",
 			});
 		});
 

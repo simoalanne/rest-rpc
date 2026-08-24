@@ -16,6 +16,11 @@ const parseBody: HonoParseBody = async ({ body, c }) => {
 			? c.req.json()
 			: undefined;
 	}
+	if (body.contentType === undefined) {
+		return contentType.startsWith("application/x-www-form-urlencoded")
+			? new URLSearchParams(await c.req.text())
+			: undefined;
+	}
 	const declaredContentType = (
 		Array.isArray(body.contentType) ? body.contentType : [body.contentType]
 	).find((value) => contentType.startsWith(value.split(";")[0] ?? ""));

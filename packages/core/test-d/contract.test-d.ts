@@ -569,3 +569,27 @@ expectType<Response>(
 expectType<AsyncIterable<string>>(
 	null as unknown as ServerSuccessBody<typeof customStreamResponse>,
 );
+
+// should reject customBody without a contentType for responses,
+// because server-side must know how to serialize the response body
+expectError(
+	route({
+		method: "GET",
+		path: "/raw-report",
+		responses: {
+			200: customBody(z.string()),
+		},
+	}),
+);
+
+// should also reject customBody without a contentType for stream responses,
+// because server-side must know how to serialize the response body
+expectError(
+	route({
+		method: "GET",
+		path: "/raw-report-stream",
+		responses: {
+			200: stream(customBody(z.string())),
+		},
+	}),
+);

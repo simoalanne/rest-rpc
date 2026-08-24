@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { noBody } from "../contract/body.ts";
 import { router } from "../contract/contract.ts";
 import { jsonQuery } from "../contract/request.ts";
-import { noBody } from "../contract/response.ts";
 import { type } from "../standard-schema/type.ts";
 import { getNextFetchTags } from "./nextFetchTags.ts";
 

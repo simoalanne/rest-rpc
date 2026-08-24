@@ -6,8 +6,8 @@ import {
 	createClientTestContract,
 	jsonResponse,
 } from "../../test/factories/client.ts";
+import { customBody, noBody, stream } from "../contract/body.ts";
 import { router } from "../contract/contract.ts";
-import { customBody, noBody, stream } from "../contract/response.ts";
 import { initClient } from "./index.ts";
 
 const originalFetch = globalThis.fetch;

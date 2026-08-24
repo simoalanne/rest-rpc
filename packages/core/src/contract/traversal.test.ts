@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { noBody } from "./response.ts";
+import { noBody } from "./body.ts";
 import { contractRoutes, mapContractRoutes } from "./traversal.ts";
 
 const getTodo = {

@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
 import { testContract } from "../../test/factories/contract.ts";
+import { customBody } from "./body.ts";
 import { jsonQuery } from "./request.ts";
-import { customBody } from "./response.ts";
 import { groupRequestInput, validateContractSync } from "./validate.ts";
 
 describe("validateContractSync", () => {
@@ -336,6 +336,18 @@ describe("groupRequestInput", () => {
 				body: "hello",
 			},
 		);
+	});
+
+	it("assigns the body key as a custom request body without content type", () => {
+		const route = testContract({
+			body: customBody(z.instanceof(URLSearchParams)),
+			requestKeys: {},
+		}).search.find;
+		const body = new URLSearchParams([["title", "Write docs"]]);
+
+		assert.deepEqual(groupRequestInput(route, { body }), {
+			body,
+		});
 	});
 
 	it("assigns the query key as a JSON query value", () => {

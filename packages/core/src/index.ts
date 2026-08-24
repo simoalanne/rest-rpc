@@ -14,6 +14,7 @@ export type {
 	ClientSent,
 	Contract,
 	CustomBody,
+	CustomBodyContentType,
 	HttpRouteDeclaration,
 	JsonQuery,
 	NoBody,

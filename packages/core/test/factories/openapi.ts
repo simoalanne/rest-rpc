@@ -1,5 +1,5 @@
 import z from "zod";
-import { customBody, noBody, stream } from "../../src/contract/response.ts";
+import { customBody, noBody, stream } from "../../src/contract/body.ts";
 import type { SchemaConverter } from "../../src/openapi/types.ts";
 
 export const schemaConverter: SchemaConverter = (schema, { io }) =>

@@ -127,6 +127,46 @@ const result = await client.imports.csv.fetch({
 });
 ```
 
+## Request With Fetch-Managed Content Type
+
+Omit `contentType` when the request body should be passed directly to `fetch`
+and the runtime should decide the `content-type` header.
+
+```ts
+export const api = router({
+	forms: {
+		submit: {
+			method: "POST",
+			path: "/forms",
+			body: customBody(z.instanceof(URLSearchParams)),
+			response: z.object({
+				title: z.string(),
+			}),
+		},
+	},
+});
+```
+
+```ts
+export const routes = router(api, {
+	forms: {
+		submit({ body }) {
+			return {
+				title: body.get("title") ?? "",
+			};
+		},
+	},
+});
+```
+
+```ts
+const result = await client.forms.submit.fetch({
+	body: new URLSearchParams({
+		title: "Write docs",
+	}),
+});
+```
+
 ## Request With Multiple Custom Content Types
 
 Custom request bodies with multiple content types are declared with `customBody()` with an array of content types.

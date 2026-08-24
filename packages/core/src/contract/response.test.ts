@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { getRouteResponses, noBody } from "./response.ts";
+import { noBody } from "./body.ts";
+import { getRouteResponses } from "./response.ts";
 
 describe("getRouteResponses", () => {
 	it("returns non-empty route responses", () => {

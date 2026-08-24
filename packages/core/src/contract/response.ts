@@ -1,56 +1,15 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
+import type { CustomBody, CustomResponseBody, NoBody, Stream } from "./body.ts";
+import { noBody } from "./body.ts";
 import type { HttpMethod, RouteDeclaration } from "./contract.ts";
 
-/**
- * Marks a request or response body as intentionally empty.
- *
- * @see {@link https://rest-rpc.dev/docs/http-responses#response-without-body}
- */
-export type NoBody = {
-	kind: "noBody";
-};
-
 export type ResponseSchema = StandardSchemaV1;
-export type CustomBodyContentType = string | readonly string[];
 
-/**
- * Declares that a request or response has no body.
- *
- * @see {@link https://rest-rpc.dev/docs/http-responses#response-without-body}
- */
-export function noBody(): NoBody {
-	return {
-		kind: "noBody",
-	};
-}
-
-/**
- * Declares a body schema with one or more non-JSON content types.
- *
- * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-custom-content-type}
- */
-export type CustomBody<
-	TSchema extends StandardSchemaV1 = StandardSchemaV1,
-	TContentType extends CustomBodyContentType = CustomBodyContentType,
-> = {
-	kind: "customBody";
-	schema: TSchema;
-	contentType: TContentType;
-};
-
-/**
- * Declares a streaming response body.
- *
- * @see {@link https://rest-rpc.dev/docs/http-responses#streaming-ndjson-responses}
- */
-export type Stream<
-	TBody extends ResponseSchema | CustomBody = ResponseSchema | CustomBody,
-> = {
-	kind: "stream";
-	schema: TBody;
-};
-
-export type ResponseBodySchema = ResponseSchema | NoBody | CustomBody | Stream;
+export type ResponseBodySchema =
+	| ResponseSchema
+	| NoBody
+	| CustomResponseBody
+	| Stream;
 
 /**
  * Declares typed response headers by header name.
@@ -83,60 +42,6 @@ export type RouteResponseInput =
 	| { responses: RouteResponses; response?: never }
 	| { response: ResponseDeclaration; responses?: never }
 	| { response?: never; responses?: never };
-
-/**
- * Declares a streaming response body.
- *
- * @see {@link https://rest-rpc.dev/docs/http-responses#streaming-ndjson-responses}
- */
-export function stream<const TBody extends ResponseSchema | CustomBody>(
-	schema: TBody,
-): Stream<TBody> {
-	return {
-		kind: "stream",
-		schema,
-	};
-}
-
-/**
- * Declares a body schema with one or more non-JSON content types.
- *
- * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-custom-content-type}
- */
-export function customBody<
-	const TSchema extends StandardSchemaV1,
-	const TContentType extends CustomBodyContentType,
->(input: {
-	schema: TSchema;
-	contentType: TContentType;
-}): CustomBody<TSchema, TContentType> {
-	return {
-		kind: "customBody",
-		schema: input.schema,
-		contentType: input.contentType,
-	};
-}
-
-export const isNoBody = (body: unknown): body is NoBody =>
-	typeof body === "object" &&
-	body !== null &&
-	"kind" in body &&
-	body.kind === "noBody";
-
-export const isStream = (response: ResponseBodySchema): response is Stream =>
-	typeof response === "object" &&
-	response !== null &&
-	"kind" in response &&
-	response.kind === "stream";
-
-export function isCustomBody(schema: unknown): schema is CustomBody {
-	return (
-		typeof schema === "object" &&
-		schema !== null &&
-		"kind" in schema &&
-		schema.kind === "customBody"
-	);
-}
 
 export const hasResponseParts = (
 	response: ResponseDeclaration,
@@ -228,22 +133,22 @@ type InferCustomBodyPayload<
 
 export type InferCustomBody<TResponse, TIO extends "input" | "output"> =
 	TResponse extends CustomBody<infer TSchema, infer TContentType>
-		? TContentType extends string
-			? InferCustomBodyPayload<TSchema, TIO>
-			: {
+		? TContentType extends readonly string[]
+			? {
 					contentType: TContentType[number];
 					payload: InferCustomBodyPayload<TSchema, TIO>;
 				}
+			: InferCustomBodyPayload<TSchema, TIO>
 		: never;
 
 type InferCustomStreamBody<TBody, TIO extends "input" | "output"> =
 	TBody extends CustomBody<infer TSchema, infer TContentType>
-		? TContentType extends string
-			? AsyncIterable<InferCustomBodyPayload<TSchema, TIO>>
-			: {
+		? TContentType extends readonly string[]
+			? {
 					contentType: TContentType[number];
 					payload: AsyncIterable<InferCustomBodyPayload<TSchema, TIO>>;
 				}
+			: AsyncIterable<InferCustomBodyPayload<TSchema, TIO>>
 		: never;
 
 type InferClientResponseBody<TResponse> = TResponse extends StandardSchemaV1
@@ -276,9 +181,11 @@ export type ServerResponseBody<TResponse> = TResponse extends StandardSchemaV1
 
 type CustomBodyClientResponseMetadata<TBody> =
 	TBody extends CustomBody<StandardSchemaV1, infer TContentType>
-		? TContentType extends string
-			? { contentType: TContentType }
-			: { contentType: TContentType[number] }
+		? TContentType extends readonly string[]
+			? { contentType: TContentType[number] }
+			: TContentType extends string
+				? { contentType: TContentType }
+				: Record<never, never>
 		: Record<never, never>;
 
 type ClientResponseMetadata<TResponse> =
