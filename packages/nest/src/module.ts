@@ -10,22 +10,34 @@ import { RestRpcRouteInterceptor } from "./routeInterceptor.ts";
  * @remarks Augment this interface to set the route handler context across a
  * project.
  */
-export interface DefaultNestContext extends Record<string, unknown> {}
+// biome-ignore lint/suspicious/noEmptyInterface: this interface is augmented by consumers.
+export interface DefaultNestContext {}
+
+interface ContextShape {
+	// biome-ignore lint/suspicious/noExplicitAny: any allows named interfaces without leaking an index signature.
+	[key: string]: any;
+}
+
+type Merge<T> = {
+	[K in keyof T]: T[K];
+};
 
 /**
  * The context object passed to Nest adapter route handlers.
  */
 export type NestHandlerContext<
-	TContext extends Record<string, unknown> = DefaultNestContext,
-> = TContext & {
-	signal: AbortSignal;
-};
+	TContext extends ContextShape = DefaultNestContext,
+> = Merge<
+	TContext & {
+		signal: AbortSignal;
+	}
+>;
 
 /**
  * Options for configuring the rest-rpc Nest adapter.
  */
 export type RestRpcModuleOptions<
-	TContext extends Record<string, unknown> = DefaultNestContext,
+	TContext extends ContextShape = DefaultNestContext,
 > = {
 	createContext?: (context: ExecutionContext) => TContext | Promise<TContext>;
 	errorHandlers?: ServerErrorHandlers<NestHandlerContext<TContext>>;
@@ -39,7 +51,7 @@ export class RestRpcModule {
 	/**
 	 * Registers the global interceptor used by rest-rpc Nest route decorators.
 	 */
-	static forRoot<TContext extends Record<string, unknown> = DefaultNestContext>(
+	static forRoot<TContext extends ContextShape = DefaultNestContext>(
 		options: RestRpcModuleOptions<TContext> = {},
 	): DynamicModule {
 		const restRpcModuleOptions = Symbol.for("rest-rpc:nest-options");

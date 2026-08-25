@@ -63,7 +63,13 @@ export { clearCookie, RouteResponseError, setCookie };
  *
  * @see {@link https://rest-rpc.dev/docs/server/web#framework-context}
  */
-export interface DefaultRuntimeContext extends Record<string, unknown> {}
+// biome-ignore lint/suspicious/noEmptyInterface: this interface is augmented by consumers.
+export interface DefaultRuntimeContext {}
+
+interface ContextShape {
+	// biome-ignore lint/suspicious/noExplicitAny: any allows named interfaces without leaking an index signature.
+	[key: string]: any;
+}
 
 /**
  * Default request type passed to Web route handlers.
@@ -92,7 +98,7 @@ export type CreateWebHandlerOptions = {
  */
 export function route<
 	const TRoute extends HttpRouteDeclaration,
-	TRuntimeContext extends Record<string, unknown> = DefaultRuntimeContext,
+	TRuntimeContext extends ContextShape = DefaultRuntimeContext,
 	TRequest extends Request = DefaultRequest,
 >(contract: TRoute): WebRouteBuilder<TRoute, TRuntimeContext, TRequest> {
 	return createWebRouteBuilder(contract);
@@ -105,7 +111,7 @@ export function route<
  */
 export function router<
 	const TContract extends WebContract,
-	TRuntimeContext extends Record<string, unknown> = DefaultRuntimeContext,
+	TRuntimeContext extends ContextShape = DefaultRuntimeContext,
 	TRequest extends Request = DefaultRequest,
 >(contract: TContract): WebRouterBuilder<TContract, TRuntimeContext, TRequest> {
 	return createWebRouterBuilder(contract);
@@ -117,7 +123,7 @@ export function router<
  * @see {@link https://rest-rpc.dev/docs/server/web}
  */
 export function createRouteHandler<
-	TRuntimeContext extends Record<string, unknown> = DefaultRuntimeContext,
+	TRuntimeContext extends ContextShape = DefaultRuntimeContext,
 	TRequest extends Request = DefaultRequest,
 >(
 	implementations: WebImplementationTree,

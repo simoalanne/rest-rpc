@@ -44,6 +44,7 @@ const routes = router(api)
 		expectType<Request>(request);
 		expectType<HttpRouteDeclaration>(route);
 		expectType<string>(runtime.env.authToken);
+		expectError(runtime.unknownKey);
 
 		if (request.headers.get("authorization") !== runtime.env.authToken) {
 			return new Response(null, { status: 401 });

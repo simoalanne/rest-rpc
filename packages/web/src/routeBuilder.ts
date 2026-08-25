@@ -43,9 +43,11 @@ export type WebImplementationTree = ImplementationTree<HttpRouteDeclaration>;
 export type WebRouteContext<
 	TContext extends Record<string, unknown>,
 	TRequest extends Request = Request,
-> = TContext & {
-	request: TRequest;
-};
+> = Merge<
+	TContext & {
+		request: TRequest;
+	}
+>;
 
 /**
  * Input passed to Web adapter middleware.

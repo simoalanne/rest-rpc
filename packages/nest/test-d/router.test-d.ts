@@ -15,7 +15,7 @@ import {
 	router,
 } from "@rest-rpc/nest";
 import type { Request } from "express";
-import { expectAssignable, expectType } from "tsd";
+import { expectAssignable, expectError, expectType } from "tsd";
 
 type AppContext = {
 	request: Request;
@@ -81,7 +81,7 @@ router(
 	api.todos,
 	{
 		get: ({ id, context }) => {
-			expectType<unknown>(context.tenant);
+			expectError(context.tenant);
 
 			return {
 				id,
@@ -100,7 +100,7 @@ router(
 route(
 	api.todos.get,
 	({ id, context }) => {
-		expectType<unknown>(context.tenant);
+		expectError(context.tenant);
 
 		return {
 			id,
