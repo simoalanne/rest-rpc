@@ -20,6 +20,10 @@ import {
 } from "./httpPlatform.ts";
 import type { RestRpcModuleOptions } from "./module.ts";
 
+type NestRouteImplementationContext = {
+	context?: Record<string, unknown>;
+};
+
 const assertRouteImplementation = (
 	value: unknown,
 	route: HttpRouteDeclaration,
@@ -71,14 +75,15 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 		const res = http.getResponse<unknown>();
 		const { signal, reply } = createNestHttpPlatform(req, res);
 		const userContext = await this.options?.createContext?.(context);
-		const routeContext = {
-			...userContext,
-			signal,
-		};
 		const implementation = assertRouteImplementation(
 			await lastValueFrom(next.handle()),
 			metadata.route,
 		);
+		const routeContext = {
+			...userContext,
+			...(implementation as NestRouteImplementationContext).context,
+			signal,
+		};
 
 		const result = await handleHttpRoute(
 			metadata.route,

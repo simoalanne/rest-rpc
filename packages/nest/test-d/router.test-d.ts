@@ -76,6 +76,77 @@ const todoImplementations = router(api.todos, {
 } satisfies RouteHandlers<typeof api.todos>);
 expectType<typeof api.todos.get>(todoImplementations.get.route);
 
+// passing context to route handlers should not infer route-local handler context.
+router(
+	api.todos,
+	{
+		get: ({ id, context }) => {
+			expectType<unknown>(context.tenant);
+
+			return {
+				id,
+				title: "Typed todo",
+				userId: context.userId,
+			};
+		},
+	} satisfies RouteHandlers<typeof api.todos>,
+	{
+		context: {
+			tenant: "tenant-1",
+		},
+	},
+);
+
+route(
+	api.todos.get,
+	({ id, context }) => {
+		expectType<unknown>(context.tenant);
+
+		return {
+			id,
+			title: "Typed todo",
+			userId: context.userId,
+		};
+	},
+	{
+		context: {
+			tenant: "tenant-1",
+		},
+	},
+);
+
+route<typeof api.todos.get, { tenant: string }>(
+	api.todos.get,
+	({ id, context }) => {
+		expectType<string>(context.userId);
+		expectType<Request>(context.request);
+		expectType<string>(context.tenant);
+		expectAssignable<AbortSignal>(context.signal);
+
+		return {
+			id,
+			title: "Typed todo",
+			userId: context.userId,
+		};
+	},
+);
+
+class TenantTodoHandlers implements RouteHandlers<typeof api.todos> {
+	get({ id, context }: RouteRequest<typeof api.todos.get, { tenant: string }>) {
+		expectType<string>(context.userId);
+		expectType<Request>(context.request);
+		expectType<string>(context.tenant);
+		expectAssignable<AbortSignal>(context.signal);
+
+		return {
+			id,
+			title: "Typed todo",
+			userId: context.userId,
+		};
+	}
+}
+expectAssignable<RouteHandlers<typeof api.todos>>(new TenantTodoHandlers());
+
 // should expose Nest decorators and module context typing
 expectAssignable<MethodDecorator>(Route(api.todos.get));
 expectAssignable<MethodDecorator>(Router(api.todos));

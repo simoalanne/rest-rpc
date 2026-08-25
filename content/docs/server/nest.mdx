@@ -165,6 +165,8 @@ class TodoController {
 
 ## Framework Context
 
+### Global Context
+
 Nest route handlers receive the context returned by `createContext`, plus an
 adapter-supplied abort signal.
 
@@ -200,6 +202,60 @@ RestRpcModule.forRoot({
 	},
 });
 ```
+
+### Controller-Local Context
+
+Nest controller methods run at request time, so they can pass values resolved by
+Nest decorators into the route handler context without hiding that handoff in a
+guard, request mutation, or the global `createContext` hook.
+
+The `context` option to `router()` is merged with the context returned by the
+global `createContext` hook at runtime. It does not infer or change handler
+types.
+
+```ts
+import { Controller, Headers, Injectable } from "@nestjs/common";
+import {
+	type RouteHandlers,
+	type RouteRequest,
+	Router,
+	router,
+} from "@rest-rpc/nest";
+import { api } from "./contract";
+
+type TenantContext = {
+	tenant: string;
+};
+
+@Injectable()
+class TodoService implements RouteHandlers<typeof api.todos> {
+	constructor(private readonly todos: TodoRepository) {}
+
+	get({ id, context }: RouteRequest<typeof api.todos.get, TenantContext>) {
+		return this.todos.findForUser(id, context.tenant);
+	}
+}
+
+@Controller()
+class TodoController {
+	constructor(private readonly todos: TodoService) {}
+
+	@Router(api.todos)
+	todosRouter(@Headers("x-tenant") tenant: string) {
+		return router(api.todos, this.todos, {
+			context: { tenant },
+		});
+	}
+}
+```
+
+:::tip
+Keep `DefaultNestContext` aligned with the value returned by `createContext`.
+For values added only by specific controller methods, type those provider
+handler requests explicitly with the second generic argument to `RouteRequest`.
+That context is added to `DefaultNestContext`, which avoids putting
+route-specific values in the global context type.
+:::
 
 ## Options
 
