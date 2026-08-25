@@ -46,6 +46,36 @@ export type {
 export { clearCookie, RouteResponseError, setCookie };
 
 /**
+ * Default runtime context passed to Web route handlers.
+ *
+ * @remarks Augment this interface to set the runtime context for
+ * `createRouteHandler()`, `route()`, and `router()` across a project.
+ *
+ * @example
+ * ```ts
+ * declare module "@rest-rpc/web" {
+ *   interface DefaultRuntimeContext {
+ *     env: Env;
+ *     ctx: ExecutionContext;
+ *   }
+ * }
+ * ```
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/web#framework-context}
+ */
+export interface DefaultRuntimeContext extends Record<string, unknown> {}
+
+/**
+ * Default request type passed to Web route handlers.
+ *
+ * @remarks Augment this interface when using a `Request` subclass such as
+ * `NextRequest`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/web#framework-context}
+ */
+export interface DefaultRequest extends Request {}
+
+/**
  * Options for creating a Web `Request` to `Response` route handler.
  *
  * @see {@link https://rest-rpc.dev/docs/server/web#options}
@@ -62,8 +92,8 @@ export type CreateWebHandlerOptions = {
  */
 export function route<
 	const TRoute extends HttpRouteDeclaration,
-	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
-	TRequest extends Request = Request,
+	TRuntimeContext extends Record<string, unknown> = DefaultRuntimeContext,
+	TRequest extends Request = DefaultRequest,
 >(contract: TRoute): WebRouteBuilder<TRoute, TRuntimeContext, TRequest> {
 	return createWebRouteBuilder(contract);
 }
@@ -75,8 +105,8 @@ export function route<
  */
 export function router<
 	const TContract extends WebContract,
-	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
-	TRequest extends Request = Request,
+	TRuntimeContext extends Record<string, unknown> = DefaultRuntimeContext,
+	TRequest extends Request = DefaultRequest,
 >(contract: TContract): WebRouterBuilder<TContract, TRuntimeContext, TRequest> {
 	return createWebRouterBuilder(contract);
 }
@@ -87,8 +117,8 @@ export function router<
  * @see {@link https://rest-rpc.dev/docs/server/web}
  */
 export function createRouteHandler<
-	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
-	TRequest extends Request = Request,
+	TRuntimeContext extends Record<string, unknown> = DefaultRuntimeContext,
+	TRequest extends Request = DefaultRequest,
 >(
 	implementations: WebImplementationTree,
 	options: CreateWebHandlerOptions = {},
@@ -133,27 +163,5 @@ export function createRouteHandler<
 			usesDefaultParseBody,
 			options.errorHandlers,
 		);
-	};
-}
-
-/**
- * Creates typed Web adapter helpers with shared runtime context types.
- *
- * @see {@link https://rest-rpc.dev/docs/server/web}
- */
-export function initWeb<
-	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
-	TRequest extends Request = Request,
->() {
-	return {
-		route: <const TRoute extends HttpRouteDeclaration>(contract: TRoute) =>
-			route<TRoute, TRuntimeContext, TRequest>(contract),
-		router: <const TContract extends WebContract>(contract: TContract) =>
-			router<TContract, TRuntimeContext, TRequest>(contract),
-		createRouteHandler: (
-			implementations: WebImplementationTree,
-			options?: CreateWebHandlerOptions,
-		) =>
-			createRouteHandler<TRuntimeContext, TRequest>(implementations, options),
 	};
 }

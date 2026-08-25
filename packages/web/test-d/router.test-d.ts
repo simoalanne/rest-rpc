@@ -1,7 +1,7 @@
 import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import { router as defineRouter, noBody } from "@rest-rpc/core/contract";
 import { type as schemaType } from "@rest-rpc/core/standard-schema";
-import { createRouteHandler, initWeb, route, router } from "@rest-rpc/web";
+import { createRouteHandler, route, router } from "@rest-rpc/web";
 import { expectError, expectType } from "tsd";
 
 const todoSchema = schemaType<{ id: string }>();
@@ -34,11 +34,12 @@ type Runtime = {
 	};
 };
 
-const web = initWeb<Runtime>();
+declare module "@rest-rpc/web" {
+	interface DefaultRuntimeContext extends Runtime {}
+}
 
 // should infer runtime context and accumulated middleware context for router handlers
-const routes = web
-	.router(api)
+const routes = router(api)
 	.middleware(({ request, route, runtime }) => {
 		expectType<Request>(request);
 		expectType<HttpRouteDeclaration>(route);
@@ -73,7 +74,7 @@ const routes = web
 		health: () => undefined,
 	});
 
-const handle = web.createRouteHandler(routes);
+const handle = createRouteHandler(routes);
 expectType<Promise<Response>>(
 	handle(new Request("https://example.com/todos/todo-1"), {
 		env: { authToken: "secret" },
@@ -95,14 +96,13 @@ const publicRoutes = router(api).handlers({
 	health: () => undefined,
 });
 
-const publicHandle = createRouteHandler(publicRoutes);
+const publicHandle = createRouteHandler<Record<never, never>>(publicRoutes);
 expectType<Promise<Response>>(
 	publicHandle(new Request("https://example.com"), {}),
 );
 
 // should infer accumulated middleware context for single route handlers
-const getTodoRoute = web
-	.route(api.todos.get)
+const getTodoRoute = route(api.todos.get)
 	.middleware(({ runtime }) => ({
 		authToken: runtime.env.authToken,
 	}))
@@ -120,11 +120,10 @@ const getTodoRoute = web
 		return { id };
 	});
 
-web.createRouteHandler(getTodoRoute);
+createRouteHandler(getTodoRoute);
 
 // should replace overlapping middleware context keys with the last returned type
-web
-	.route(api.todos.get)
+route(api.todos.get)
 	.middleware(() => ({
 		value: "first" as const,
 	}))
@@ -143,8 +142,7 @@ web
 	});
 
 // should accept compiled routes without applying parent middleware context to them
-const compiledGetTodoRoute = web
-	.route(api.todos.get)
+const compiledGetTodoRoute = route(api.todos.get)
 	.middleware(() => ({
 		routeContext: "route",
 	}))
@@ -155,8 +153,7 @@ const compiledGetTodoRoute = web
 		return { id };
 	});
 
-web
-	.router(api)
+router(api)
 	.middleware(({ runtime }) => ({
 		authToken: runtime.env.authToken,
 	}))
@@ -171,8 +168,7 @@ web
 	});
 
 // should accept compiled router subtrees without applying parent middleware context to them
-const compiledTodoRoutes = web
-	.router(api.todos)
+const compiledTodoRoutes = router(api.todos)
 	.middleware(() => ({
 		routerContext: "router",
 	}))
@@ -185,8 +181,7 @@ const compiledTodoRoutes = web
 		},
 	});
 
-web
-	.router(api)
+router(api)
 	.middleware(({ runtime }) => ({
 		authToken: runtime.env.authToken,
 	}))

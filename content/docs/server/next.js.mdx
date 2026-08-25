@@ -184,7 +184,7 @@ yourself.
 
 ```ts
 // app/api/[...rest-rpc]/route.ts
-import { initWeb } from "@rest-rpc/web";
+import { createRouteHandler, router } from "@rest-rpc/web";
 import type { NextRequest } from "next/server";
 import { api } from "@/contract";
 
@@ -192,10 +192,12 @@ type Runtime = {
 	params: Promise<{ rest: string[] }>;
 };
 
-const web = initWeb<Runtime, NextRequest>();
+declare module "@rest-rpc/web" {
+	interface DefaultRuntimeContext extends Runtime {}
+	interface DefaultRequest extends NextRequest {}
+}
 
-const routes = web
-	.router(api)
+const routes = router(api)
 	.middleware(async ({ request, runtime }) => {
 		const params = await runtime.params;
 
@@ -215,7 +217,7 @@ const routes = web
 		},
 	});
 
-const handleRequest = web.createRouteHandler(routes);
+const handleRequest = createRouteHandler(routes);
 
 export const GET = (request: NextRequest, context: Runtime) =>
 	handleRequest(request, context);

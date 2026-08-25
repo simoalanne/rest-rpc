@@ -12,18 +12,18 @@ pnpm add @rest-rpc/web
 ## Usage
 
 ```ts
-import { initWeb } from "@rest-rpc/web";
+import { createRouteHandler, router } from "@rest-rpc/web";
 import { api } from "./contract";
 
-type Context = {
-	env: Env;
-	ctx: ExecutionContext;
-};
+declare module "@rest-rpc/web" {
+	interface DefaultRuntimeContext {
+		env: Env;
+		ctx: ExecutionContext;
+	}
+	interface DefaultRequest extends NextRequest {}
+}
 
-const web = initWeb<Context>();
-
-const routes = web
-	.router(api)
+const routes = router(api)
 	.middleware(({ runtime }) => ({
 		db: runtime.env.DB,
 	}))
@@ -41,7 +41,7 @@ const routes = web
 		},
 	});
 
-const handleRequest = web.createRouteHandler(routes);
+const handleRequest = createRouteHandler(routes);
 
 export default {
 	fetch(request, env, ctx) {
@@ -61,8 +61,11 @@ type MiddlewareInput<Runtime> = {
 };
 ```
 
-The runtime context passed to `handleRequest` is available to middleware. Route
-handlers receive the context returned by middleware with `request` added.
+Augment `DefaultRuntimeContext` to type the runtime context passed to
+`handleRequest`. That runtime is available to middleware. Route handlers receive
+the context returned by middleware with `request` added.
+
+You can also augment `DefaultRequest` if your runtime extends the default `Request` type.
 
 ### Stacking Middleware
 
@@ -70,8 +73,7 @@ Stacking middleware is supported. Middleware can add to the context, and the
 context is passed to the next middleware in the stack. The final context is passed to the route handler.
 
 ```ts
-const routes = web
-	.router(api)
+const routes = router(api)
 	.middleware(({ runtime }) => ({
 		db: runtime.env.DB,
 	}))
@@ -96,8 +98,7 @@ and instead keep their existing middleware stack.
 :::
 
 ```ts
-const adminRoutes = web
-	.router(api.admin)
+const adminRoutes = router(api.admin)
 	.middleware(({ runtime }) => ({
 		adminDb: runtime.env.ADMIN_DB,
 	}))
@@ -109,8 +110,7 @@ const adminRoutes = web
 		},
 	});
 
-const routes = web
-	.router(api)
+const routes = router(api)
 	.middleware(({ runtime }) => ({
 		db: runtime.env.DB,
 	}))
@@ -139,7 +139,7 @@ response. Other unhandled route errors use `onUnhandledError`, or are re-thrown
 when that hook is omitted or returns `undefined`.
 
 ```ts
-const handleRequest = web.createRouteHandler(routes, {
+const handleRequest = createRouteHandler(routes, {
 	errorHandlers: {
 		onRequestValidationError: ({ issues }) => ({
 			status: 422,
@@ -160,7 +160,7 @@ const handleRequest = web.createRouteHandler(routes, {
 ### Body Parsing
 
 ```ts
-const handleUpload = web.createRouteHandler(routes, {
+const handleUpload = createRouteHandler(routes, {
 	parseBody: ({ request }) => request.formData(),
 });
 ```
