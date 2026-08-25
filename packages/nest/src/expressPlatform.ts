@@ -12,9 +12,9 @@ type ExpressLikeRequest = {
 type ExpressLikeResponse = {
 	destroy?(error?: Error): unknown;
 	end(): unknown;
-	off?(event: string, listener: () => void): unknown;
-	on?(event: string, listener: () => void): unknown;
-	once?(event: string, listener: () => void): unknown;
+	off?(event: string, listener: (...args: unknown[]) => void): unknown;
+	on?(event: string, listener: (...args: unknown[]) => void): unknown;
+	once?(event: string, listener: (...args: unknown[]) => void): unknown;
 	send(body?: unknown): unknown;
 	setHeader(name: string, value: unknown): void;
 	status(code: number): ExpressLikeResponse;
@@ -63,11 +63,42 @@ const writeExpressStreamResponse = async (
 	res.on?.("close", onClose);
 	signal.addEventListener("abort", onClose, { once: true });
 
+	const waitForDrain = async () => {
+		if (!res.once) return;
+
+		await new Promise<void>((resolve, reject) => {
+			const cleanup = () => {
+				res.off?.("drain", onDrain);
+				res.off?.("close", onClose);
+				res.off?.("error", onError);
+			};
+			const onDrain = () => {
+				cleanup();
+				resolve();
+			};
+			const onClose = () => {
+				cleanup();
+				resolve();
+			};
+			const onError = (error: unknown) => {
+				cleanup();
+				reject(error);
+			};
+
+			res.once?.("drain", onDrain);
+			res.once?.("close", onClose);
+			res.once?.("error", onError);
+		});
+	};
+
 	try {
 		while (!closed) {
 			const { done, value: chunk } = await iterator.next();
 			if (done || closed) break;
-			res.write?.(mode === "ndjson" ? `${JSON.stringify(chunk)}\n` : chunk);
+			const canContinue = res.write?.(
+				mode === "ndjson" ? `${JSON.stringify(chunk)}\n` : chunk,
+			);
+			if (canContinue === false && !closed) await waitForDrain();
 		}
 
 		finished = true;

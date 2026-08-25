@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, it } from "node:test";
+import { setTimeout as delay } from "node:timers/promises";
 import {
 	Controller,
 	Headers,
@@ -23,6 +24,7 @@ import {
 	Router,
 	router,
 } from "@rest-rpc/nest";
+import type { NextFunction, Request, Response } from "express";
 import { of } from "rxjs";
 import "reflect-metadata";
 import { createNestAdapter } from "../harness/nest.ts";
@@ -33,6 +35,133 @@ import { runClientHttpSuite } from "./suite.ts";
 runClientHttpSuite(
 	createNestAdapter(integrationContract, createIntegrationHandlers()),
 );
+
+it("waits for Nest Express drain before pulling the next stream chunk", async () => {
+	let pulledChunks = 0;
+	let emitDrain: (() => void) | undefined;
+	const handlers = createIntegrationHandlers();
+	const server = await createNestAdapter(
+		integrationContract,
+		{
+			...handlers,
+			streams: {
+				...handlers.streams,
+				text: async function* () {
+					pulledChunks = 1;
+					yield "alpha\n";
+					pulledChunks = 2;
+					yield "beta\n";
+				},
+			},
+		},
+		{
+			configureApp: (app) => {
+				app.use(
+					"/streams/text",
+					(_req: Request, res: Response, next: NextFunction) => {
+						let writeCalls = 0;
+						const originalWrite = res.write.bind(res) as (
+							...args: unknown[]
+						) => boolean;
+						res.write = ((...args: unknown[]) => {
+							writeCalls += 1;
+							const result = originalWrite(...args);
+							if (writeCalls === 1) return false;
+							return result;
+						}) as typeof res.write;
+						emitDrain = () => {
+							res.emit("drain");
+						};
+						next();
+					},
+				);
+			},
+		},
+	).start();
+
+	try {
+		const response = await fetch(`${server.origin}/streams/text`);
+
+		await delay(25);
+		assert.equal(pulledChunks, 1);
+		assert.equal(typeof emitDrain, "function");
+
+		emitDrain();
+
+		assert.equal(await response.text(), "alpha\nbeta\n");
+		assert.equal(pulledChunks, 2);
+	} finally {
+		await server.close();
+	}
+});
+
+it("releases a Nest Express backpressure wait when the response closes before drain", async () => {
+	let pulledChunks = 0;
+	let returned = false;
+	let closeResponse: (() => void) | undefined;
+	const handlers = createIntegrationHandlers();
+	const server = await createNestAdapter(
+		integrationContract,
+		{
+			...handlers,
+			streams: {
+				...handlers.streams,
+				text: async function* () {
+					try {
+						pulledChunks = 1;
+						yield "alpha\n";
+						pulledChunks = 2;
+						yield "beta\n";
+					} finally {
+						returned = true;
+					}
+				},
+			},
+		},
+		{
+			configureApp: (app) => {
+				app.use(
+					"/streams/text",
+					(_req: Request, res: Response, next: NextFunction) => {
+						let writeCalls = 0;
+						const originalWrite = res.write.bind(res) as (
+							...args: unknown[]
+						) => boolean;
+						res.write = ((...args: unknown[]) => {
+							writeCalls += 1;
+							const result = originalWrite(...args);
+							if (writeCalls === 1) return false;
+							return result;
+						}) as typeof res.write;
+						closeResponse = () => {
+							res.destroy();
+						};
+						next();
+					},
+				);
+			},
+		},
+	).start();
+
+	try {
+		const request = fetch(`${server.origin}/streams/text`).catch(
+			() => undefined,
+		);
+
+		await delay(25);
+		assert.equal(pulledChunks, 1);
+		assert.equal(typeof closeResponse, "function");
+
+		closeResponse();
+		await delay(25);
+
+		assert.equal(pulledChunks, 1);
+		assert.equal(returned, true);
+		await request;
+	} finally {
+		await server.close();
+	}
+});
 
 it("combines Nest controller prefixes with contract route paths", async () => {
 	const server = await createNestAdapter(

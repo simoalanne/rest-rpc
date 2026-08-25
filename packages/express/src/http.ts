@@ -50,11 +50,40 @@ const writeStreamResponse = async (
 	};
 	res.on("close", onClose);
 
+	const waitForDrain = async () => {
+		await new Promise<void>((resolve, reject) => {
+			const cleanup = () => {
+				res.off("drain", onDrain);
+				res.off("close", onClose);
+				res.off("error", onError);
+			};
+			const onDrain = () => {
+				cleanup();
+				resolve();
+			};
+			const onClose = () => {
+				cleanup();
+				resolve();
+			};
+			const onError = (error: Error) => {
+				cleanup();
+				reject(error);
+			};
+
+			res.once("drain", onDrain);
+			res.once("close", onClose);
+			res.once("error", onError);
+		});
+	};
+
 	try {
 		while (!closed) {
 			const { done, value: chunk } = await iterator.next();
 			if (done || closed) break;
-			res.write(mode === "ndjson" ? `${JSON.stringify(chunk)}\n` : chunk);
+			const canContinue = res.write(
+				mode === "ndjson" ? `${JSON.stringify(chunk)}\n` : chunk,
+			);
+			if (canContinue === false && !closed) await waitForDrain();
 		}
 
 		finished = true;
