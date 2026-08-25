@@ -4,7 +4,8 @@ description: Learn how first-party adapters use @rest-rpc/server and how you cou
 ---
 
 Most applications should use a framework adapter such as `@rest-rpc/express`,
-`@rest-rpc/fastify`, `@rest-rpc/hono`, `@rest-rpc/next`, or `@rest-rpc/web`.
+`@rest-rpc/fastify`, `@rest-rpc/hono`, `@rest-rpc/nest`, `@rest-rpc/next`, or
+`@rest-rpc/web`.
 The `@rest-rpc/server` package is for adapter authors or for cases where your
 application does not use a supported framework and you still want to use
 `@rest-rpc` on the server.
@@ -110,8 +111,8 @@ export const registerRoutes = (
 ```
 
 This is still adapter-independent. It knows how to traverse `rest-rpc`
-implementation trees, but it does not know how Express, Fastify, Hono, or any
-other framework registers routes.
+implementation trees, but it does not know how Express, Fastify, Hono, NestJS,
+or any other framework registers routes.
 
 ## Registering HTTP Routes
 

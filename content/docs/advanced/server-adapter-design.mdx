@@ -46,7 +46,8 @@ registerRoutes(app, routes);
 ```
 
 In this shape, the adapter walks the route implementations and registers each
-route with the host framework. `@rest-rpc/express`, `@rest-rpc/fastify`, and `@rest-rpc/hono` are built this way.
+route with the host framework. `@rest-rpc/express`, `@rest-rpc/fastify`, and
+`@rest-rpc/hono` are built this way.
 
 Conceptually, the adapter does this:
 
@@ -68,6 +69,56 @@ const registerRoutes = (app, routes) => {
 			writeFrameworkResponse(res, result);
 		});
 	}
+};
+```
+
+### Controller Decorators
+
+Some frameworks own route registration through decorators and modules instead
+of an application router object. NestJS is built this way: controllers declare
+the HTTP boundary, while injectable providers usually own the implementation.
+
+Conceptually, the adapter does this:
+
+```ts
+const Router = (contract) => {
+	return (controllerPrototype, propertyKey, descriptor) => {
+		for (const { route, path } of flattenContractRoutes(contract)) {
+			const synthesizedMethod = function () {
+				const implementationTree = descriptor.value.call(this);
+				return readImplementationAtPath(implementationTree, path);
+			};
+
+			defineNestRouteMetadata(synthesizedMethod, route.method, route.path);
+			defineRestRpcRouteMetadata(synthesizedMethod, route);
+			addMethodToController(controllerPrototype, synthesizedMethod);
+		}
+	};
+};
+```
+
+Those synthesized methods are only an integration bridge. They let Nest discover
+one controller method per HTTP route, while application code can keep returning
+one contract-shaped router from `@Router()` and implement the handlers in normal
+Nest providers.
+
+When a request reaches one of those controller methods, the route interceptor
+does the shared server work:
+
+```ts
+const intercept = async (executionContext, next) => {
+	const route = readRestRpcRouteMetadata(executionContext.getHandler());
+	const implementation = await next.handle();
+	const request = readNestHttpRequest(executionContext);
+	const context = await createContext(executionContext);
+
+	const result = await handleHttpRoute(route, implementation.handler, {
+		request,
+		context,
+		errorHandlers,
+	});
+
+	return writeNestResponse(executionContext, result);
 };
 ```
 
@@ -133,11 +184,11 @@ and the request object is `NextRequest`. The Next.js adapter keeps those
 conventions at the edge while reusing the same underlying Web-style execution
 model.
 
-Some frameworks are deliberately outside this shape. When a framework expects
-routes to be expressed through its own controllers, modules, decorators, or
-application lifecycle, a first-party adapter would have to either hide
-the framework's model or leak too much of it. Those integrations can still be
-built locally, but they are less natural as small reusable packages.
+NestJS is controller-shaped. Routes are declared through decorators and modules,
+while implementations often live in injectable providers. The Nest adapter keeps
+that model intact: controllers expose the route boundary with `@Route()` or
+`@Router()`, and providers can implement contract-shaped handler trees with
+normal Nest dependency injection.
 
 ## WebSocket Tradeoffs
 

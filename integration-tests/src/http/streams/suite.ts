@@ -72,6 +72,7 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 			if (!adapter.cancellationProbe) {
 				throw new Error("Streams suite adapter is missing cancellation probe");
 			}
+
 			adapter.cancellationProbe.reset();
 			const stream = await client.cancellable.fetch();
 
@@ -119,6 +120,7 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 				done: false,
 				value: { id: "event-1", index: 1 },
 			});
+
 			await assert.rejects(() => iterator.next());
 		});
 
@@ -140,6 +142,7 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 				done: false,
 				value: { id: "event-2", index: 2 },
 			});
+
 			await assert.rejects(() => iterator.next());
 		});
 	});

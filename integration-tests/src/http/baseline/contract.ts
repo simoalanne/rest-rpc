@@ -109,6 +109,16 @@ export const integrationContract = router({
 		},
 	},
 	responses: {
+		binary: {
+			method: "GET",
+			path: "/responses/binary",
+			responses: {
+				200: customBody({
+					contentType: "application/octet-stream",
+					schema: z.instanceof(Uint8Array),
+				}),
+			},
+		},
 		headers: {
 			method: "GET",
 			path: "/responses/headers",

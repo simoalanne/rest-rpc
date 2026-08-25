@@ -16,7 +16,7 @@ This guide builds one `todos.create` route from a shared contract.
   </Step>
   <Step title="Implement the server route">
     Use the same route tree to write a typed handler for Express, Fastify, Hono,
-    Next.js, or a fetch-native runtime.
+    NestJS, Next.js, or a fetch-native runtime.
   </Step>
   <Step title="Call it from the client">
     Create a typed fetch client or TanStack Query helpers from the same contract.
@@ -64,6 +64,7 @@ adapter and framework package you need:
 
 - Fastify: `@rest-rpc/fastify fastify`
 - Hono: `@rest-rpc/hono hono`
+- NestJS: `@rest-rpc/nest @nestjs/common @nestjs/core @nestjs/platform-express reflect-metadata rxjs`
 - Next.js: `@rest-rpc/next`
 - Web `Request`/`Response`: `@rest-rpc/web`
 
@@ -382,6 +383,92 @@ const routes = router(api, {
 registerRoutes(app, routes);
 
 export default app;
+```
+
+</Tab>
+
+<Tab title="NestJS">
+
+```ts twoslash
+// @experimentalDecorators: true
+// ---cut-start---
+// @filename: contract.ts
+import { router } from "@rest-rpc/core";
+import { z } from "zod";
+
+const todoSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+	completed: z.boolean(),
+});
+
+export const api = router({
+	todos: {
+		create: {
+			method: "POST",
+			path: "/todos",
+			body: {
+				title: z.string().min(1),
+			},
+			response: todoSchema,
+		},
+	},
+});
+
+// @filename: server.ts
+// ---cut-end---
+import "reflect-metadata";
+import { Controller, Injectable, Module } from "@nestjs/common";
+import { NestFactory } from "@nestjs/core";
+import {
+	RestRpcModule,
+	Router,
+	type RouteHandlers,
+	type RouteRequest,
+	router,
+} from "@rest-rpc/nest";
+import { api } from "./contract";
+
+@Injectable()
+class TodoService implements RouteHandlers<typeof api.todos> {
+	private readonly todos = new Map<string, {
+		id: string;
+		title: string;
+		completed: boolean;
+	}>();
+
+	create({ title }: RouteRequest<typeof api.todos.create>) {
+		const todo = {
+			id: crypto.randomUUID(),
+			title,
+			completed: false,
+		};
+
+		this.todos.set(todo.id, todo);
+
+		return todo;
+	}
+}
+
+@Controller()
+class TodoController {
+	constructor(private readonly todos: TodoService) {}
+
+	@Router(api.todos)
+	todosRouter() {
+		return router(api.todos, this.todos);
+	}
+}
+
+@Module({
+	imports: [RestRpcModule.forRoot()],
+	controllers: [TodoController],
+	providers: [TodoService],
+})
+class AppModule {}
+
+const app = await NestFactory.create(AppModule);
+await app.listen(3000);
 ```
 
 </Tab>

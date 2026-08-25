@@ -67,6 +67,7 @@ export const createIntegrationHandlers = (): IntegrationHandlers => ({
 		remove: () => undefined,
 	},
 	responses: {
+		binary: () => new Uint8Array([0, 1, 127, 128, 255]),
 		headers: () => ({
 			status: 200,
 			body: { ok: true },

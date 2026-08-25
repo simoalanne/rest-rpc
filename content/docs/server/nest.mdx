@@ -1,0 +1,237 @@
+---
+title: NestJS
+description: Use rest-rpc with NestJS
+---
+
+## Install
+
+```sh
+pnpm add @rest-rpc/nest
+```
+
+## Usage
+
+The Nest adapter lets a contract router map to a normal Nest provider class.
+The controller declares the Nest route boundary, while the provider implements
+the contract.
+
+```ts
+import { Controller, Injectable, Module } from "@nestjs/common";
+import { NestFactory } from "@nestjs/core";
+import {
+	RestRpcModule,
+	RouteRequest,
+	RouteHandlers,
+	Router,
+	router,
+} from "@rest-rpc/nest";
+import type { Request } from "express";
+import { api } from "./contract";
+
+@Injectable()
+class TodoRepository {
+	findForUser(id: string, userId: string) {
+		return { id, title: "Write docs", userId };
+	}
+
+	createForUser(input: { title: string; userId: string }) {
+		return { id: "todo-1", title: input.title, userId: input.userId };
+	}
+}
+
+@Injectable()
+class TodoService implements RouteHandlers<typeof api.todos> {
+	constructor(private readonly todos: TodoRepository) {}
+
+	get({ id, context }: RouteRequest<typeof api.todos.get>) {
+		return this.todos.findForUser(id, context.userId);
+	}
+
+	create({ title, context }: RouteRequest<typeof api.todos.create>) {
+		return {
+			status: 201 as const,
+			body: this.todos.createForUser({ title, userId: context.userId }),
+		};
+	}
+}
+
+@Controller()
+class TodoController {
+	constructor(private readonly todos: TodoService) {}
+
+	@Router(api.todos)
+	todosRouter() {
+		return router(api.todos, this.todos);
+	}
+}
+
+declare module "@rest-rpc/nest" {
+	interface DefaultNestContext {
+		userId: string;
+		request: Request;
+	}
+}
+
+@Module({
+	imports: [
+		RestRpcModule.forRoot({
+			createContext: (context) => {
+				const req = context.switchToHttp().getRequest<Request>();
+				return {
+					userId: req.header("x-user-id") ?? "",
+					request: req,
+				};
+			},
+		}),
+	],
+	controllers: [TodoController],
+	providers: [TodoRepository, TodoService],
+})
+
+class AppModule {}
+
+const app = await NestFactory.create(AppModule);
+await app.listen(3000);
+```
+
+`@Router()` belongs on the controller because it tells Nest which HTTP routes to
+register. `router()` connects the contract router to the provider instance that
+implements it.
+
+The provider is a first-class Nest provider. It can use constructor injection,
+module ownership, scopes, lifecycle hooks, and testing overrides like any other
+service.
+
+## Single Routes
+
+Use `@Route()` when one endpoint needs custom glue, or when existing providers
+do not match the contract shape.
+
+```ts
+import { Controller } from "@nestjs/common";
+import { Route, route } from "@rest-rpc/nest";
+import { api } from "./contract";
+
+@Controller()
+class TodoController {
+	constructor(private readonly todos: TodoRepository) {}
+
+	@Route(api.todos.get)
+	getTodo() {
+		return route(api.todos.get, ({ id, context }) => {
+			return this.todos.findForUser(id, context.userId);
+		});
+	}
+}
+```
+
+## Inline Routers
+
+You can also define the handlers directly in the controller. This is
+useful when your providers expose their own application API instead of
+implementing `RouteHandlers`. The controller maps the typed contract request
+and values from Nest decorators into calls to those providers.
+
+```ts
+import { Controller, Headers, Injectable } from "@nestjs/common";
+
+@Injectable()
+class TodoService {
+	findForUser(id: string, userId: string) {
+		return { id, title: "Write docs", userId };
+	}
+
+	createForUser(title: string, userId: string) {
+		return { id: "todo-1", title, userId };
+	}
+}
+
+@Controller()
+class TodoController {
+	constructor(private readonly todos: TodoService) {}
+
+	@Router(api.todos)
+	todosRouter(@Headers("x-user-id") userId: string) {
+		return router(api.todos, {
+			get: ({ id }) => this.todos.findForUser(id, userId),
+			create: ({ title }) => ({
+				status: 201 as const,
+				body: this.todos.createForUser(title, userId),
+			}),
+		});
+	}
+}
+```
+
+## Framework Context
+
+Nest route handlers receive the context returned by `createContext`, plus an
+adapter-supplied abort signal.
+
+```ts
+type NestHandlerContext<TContext> =
+	TContext & {
+		signal: AbortSignal;
+	};
+```
+
+Augment `DefaultNestContext` to set the app context used by `RouteRequest`,
+`RouteHandler`, `RouteHandlers`, `route()`, and `router()`.
+
+```ts
+import type { Request } from "express";
+import { RestRpcModule } from "@rest-rpc/nest";
+
+declare module "@rest-rpc/nest" {
+	interface DefaultNestContext {
+		request: Request;
+		userId: string;
+	}
+}
+
+RestRpcModule.forRoot({
+	createContext: (context) => {
+		const request = context.switchToHttp().getRequest<Request>();
+
+		return {
+			request,
+			userId: request.header("x-user-id") ?? "",
+		};
+	},
+});
+```
+
+## Options
+
+```ts
+type RestRpcModuleOptions<TContext = DefaultNestContext> = {
+	createContext?: (context: ExecutionContext) => TContext | Promise<TContext>;
+	errorHandlers?: ServerErrorHandlers<TContext & { signal: AbortSignal }>;
+};
+```
+
+### Error Handlers
+
+Request validation errors use `onRequestValidationError`. Response contract
+validation errors use `onResponseValidationError` and default to a generic 500
+response. Other unhandled route errors use `onUnhandledError`, or are re-thrown
+when that hook is omitted or returns `undefined`.
+
+```ts
+RestRpcModule.forRoot({
+	errorHandlers: {
+		onRequestValidationError: ({ issues }) => ({
+			status: 422,
+			body: { code: "VALIDATION_ERROR", issues },
+		}),
+		onResponseValidationError: () => ({
+			status: 500,
+			body: { code: "INVALID_RESPONSE" },
+		}),
+		onUnhandledError: () => ({
+			status: 500,
+			body: { code: "INTERNAL_SERVER_ERROR" },
+		}),
+	},
+});
+```

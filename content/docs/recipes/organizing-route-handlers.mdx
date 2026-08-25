@@ -3,7 +3,7 @@ title: Organizing Route Handlers
 description: Learn different ways to organize route handlers
 ---
 
-`router()` is a type-safe controller factory. 
+`router()` is a type-safe route implementation factory.
 Each handler receives a validated request with framework-specific 
 context and must return a response matching the contract.
 
@@ -51,8 +51,8 @@ If you rely on `this` in your service class, you must also remember to bind each
 
 ## Service classes as handlers
 
-For larger applications, using a service class to implmement set of route handlers can be easier to maintain and test.
-A service class can implement the route contract directly in type-safe way, keep dependencies explicit through constructor injection, 
+For larger applications, using a service class to implement a set of route handlers can be easier to maintain and test.
+A service class can implement the route contract directly in a type-safe way
 and be passed straight to `router()` without an extra forwarding layer.
 
 ### Implementation
@@ -86,7 +86,37 @@ const routes = router(api, {
 ```
 
 Using `RouteHandlers` as the implementation type ensures that the class
-implementes each required method correctly.
+implements each required method correctly.
+
+This pattern is especially useful with adapters that have first-class provider
+or dependency injection concepts. With the NestJS adapter, for example, the
+contract-shaped implementation can be a normal Nest provider and keep the full
+Nest lifecycle.
+
+```ts
+@Injectable()
+class TodoService implements RouteHandlers<typeof api.todos> {
+	constructor(private readonly store: TodoStore) {}
+
+	get({ id }: RouteRequest<typeof api.todos.get>) {
+		return this.store.get(id);
+	}
+}
+
+@Controller()
+class TodoController {
+	constructor(private readonly todos: TodoService) {}
+
+	@Router(api.todos)
+	todosRouter() {
+		return router(api.todos, this.todos);
+	}
+}
+```
+
+Use an adapter object instead when the existing service has a different method
+shape and the route handler needs to translate between the contract request and
+the service API.
 
 ### Request Type Inference
 
