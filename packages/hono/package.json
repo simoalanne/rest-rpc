@@ -1,29 +1,32 @@
 {
 	"name": "@rest-rpc/hono",
 	"version": "0.1.0-beta.14",
-	"type": "module",
-	"license": "MIT",
 	"description": "Hono adapter for serving rest-rpc contracts with typed HTTP and WebSocket routes.",
 	"keywords": [
-		"rest-rpc",
-		"typescript",
-		"rpc",
-		"rest",
 		"api-contract",
 		"contract-first",
-		"type-safe-api",
-		"hono",
-		"server",
 		"edge",
+		"hono",
 		"http",
-		"websocket",
-		"middleware"
+		"middleware",
+		"rest",
+		"rest-rpc",
+		"rpc",
+		"server",
+		"type-safe-api",
+		"typescript",
+		"websocket"
 	],
+	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/rest-rpc/rest-rpc.git",
 		"directory": "packages/hono"
 	},
+	"files": [
+		"dist"
+	],
+	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
@@ -32,9 +35,6 @@
 			"import": "./dist/index.js"
 		}
 	},
-	"files": [
-		"dist"
-	],
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
 		"typecheck": "pnpm run build && tsc -p tsconfig.json",

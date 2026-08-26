@@ -87,7 +87,6 @@ declare module "@rest-rpc/nest" {
 	controllers: [TodoController],
 	providers: [TodoRepository, TodoService],
 })
-
 class AppModule {}
 
 const app = await NestFactory.create(AppModule);
@@ -171,10 +170,9 @@ Nest route handlers receive the context returned by `createContext`, plus an
 adapter-supplied abort signal.
 
 ```ts
-type NestHandlerContext<TContext> =
-	TContext & {
-		signal: AbortSignal;
-	};
+type NestHandlerContext<TContext> = TContext & {
+	signal: AbortSignal;
+};
 ```
 
 Augment `DefaultNestContext` to set the app context used by `RouteRequest`,

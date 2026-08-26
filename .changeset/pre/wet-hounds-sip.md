@@ -8,4 +8,3 @@
 ---
 
 Remove routes function and replace it conseptually by allowing to stack router/route calls excluding web/next which cannot do that due to having different implementation
-  

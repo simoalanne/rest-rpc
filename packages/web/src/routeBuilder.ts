@@ -71,10 +71,9 @@ export type WebRouteMiddlewareInput<
  * @remarks Returning a `Response` short-circuits the route handler.
  * @see {@link https://rest-rpc.dev/docs/server/web#framework-context}
  */
-export type WebRouteMiddlewareResult<TContext extends Record<string, unknown>> =
-	| Response
-	| TContext
-	| undefined;
+export type WebRouteMiddlewareResult<
+	TContext extends Record<string, unknown>,
+> = Response | TContext | undefined;
 
 /**
  * Middleware function shape for Web adapter routes.

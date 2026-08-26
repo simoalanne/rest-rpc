@@ -4,4 +4,3 @@
 ---
 
 Add support for using explicit http shape for http requests as alternative
-  

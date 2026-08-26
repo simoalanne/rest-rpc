@@ -1,30 +1,33 @@
 {
 	"name": "@rest-rpc/tanstack-query",
 	"version": "0.1.0-beta.14",
-	"type": "module",
-	"license": "MIT",
 	"description": "TanStack Query helpers for rest-rpc clients, query options, and stable query keys.",
 	"keywords": [
-		"rest-rpc",
-		"typescript",
-		"rpc",
-		"rest",
 		"api-contract",
 		"contract-first",
-		"type-safe-api",
-		"tanstack-query",
-		"react-query",
+		"data-fetching",
 		"query-client",
-		"query-options",
 		"query-keys",
-		"data-fetching"
+		"query-options",
+		"react-query",
+		"rest",
+		"rest-rpc",
+		"rpc",
+		"tanstack-query",
+		"type-safe-api",
+		"typescript"
 	],
+	"homepage": "https://github.com/rest-rpc/rest-rpc#readme",
+	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/rest-rpc/rest-rpc.git",
 		"directory": "packages/tanstack-query"
 	},
-	"homepage": "https://github.com/rest-rpc/rest-rpc#readme",
+	"files": [
+		"dist"
+	],
+	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
@@ -33,24 +36,21 @@
 			"import": "./dist/index.js"
 		}
 	},
-	"files": [
-		"dist"
-	],
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
 		"typecheck": "tsc -p tsconfig.json && tsd",
 		"test": "node --test src/**/*.test.ts"
 	},
-	"tsd": {
-		"directory": "test-d"
-	},
 	"dependencies": {
 		"@rest-rpc/core": "workspace:*"
+	},
+	"devDependencies": {
+		"esmock": "^2.7.3"
 	},
 	"peerDependencies": {
 		"@tanstack/query-core": "^5.0.0"
 	},
-	"devDependencies": {
-		"esmock": "^2.7.3"
+	"tsd": {
+		"directory": "test-d"
 	}
 }

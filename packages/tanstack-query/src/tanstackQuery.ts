@@ -175,13 +175,15 @@ type TanstackQueryRouteValue<E extends RouteDeclaration> = {
 };
 
 type TanstackQueryTreeFor<T extends Contract> = {
-	[K in keyof T as T[K] extends Contract
-		? TanstackQueryApiFor<T[K]> extends never
-			? never
-			: keyof TanstackQueryApiFor<T[K]> extends never
+	[
+		K in keyof T as T[K] extends Contract
+			? TanstackQueryApiFor<T[K]> extends never
 				? never
-				: K
-		: never]: T[K] extends Contract ? TanstackQueryApiFor<T[K]> : never;
+				: keyof TanstackQueryApiFor<T[K]> extends never
+					? never
+					: K
+			: never
+	]: T[K] extends Contract ? TanstackQueryApiFor<T[K]> : never;
 };
 
 export type TanstackQueryApiFor<T extends Contract> =

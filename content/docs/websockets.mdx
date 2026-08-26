@@ -8,7 +8,6 @@ description: Use rest-rpc with WebSockets
 ### Contract
 
 ```ts
-
 export const api = router({
 	chat: {
 		room: {
@@ -46,7 +45,6 @@ export const api = router({
 ### Server
 
 ```ts
-
 export const routes = router(api, {
 	chat: {
 		room({ roomId, name, context }) {

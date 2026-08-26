@@ -569,18 +569,18 @@ expectError(router(createApi.todos, new WrongCreateTodoService()));
 
 // should reject incomplete classes when using the router input helper
 // @ts-expect-error The class is missing the create route handler.
-class MissingCheckedCreateTodoService
-	implements RouteHandlers<typeof createApi.todos>
-{
+class MissingCheckedCreateTodoService implements RouteHandlers<
+	typeof createApi.todos
+> {
 	readonly prefix = "todo";
 }
 
 expectError(router(createApi.todos, new MissingCheckedCreateTodoService()));
 
 // should reject invalid class implementation
-class WrongCheckedCreateTodoService
-	implements RouteHandlers<typeof createApi.todos>
-{
+class WrongCheckedCreateTodoService implements RouteHandlers<
+	typeof createApi.todos
+> {
 	// @ts-expect-error The class method does not return the required response envelope.
 	create({ title }: RouteRequest<typeof createApi.todos.create>) {
 		return {
@@ -593,9 +593,9 @@ class WrongCheckedCreateTodoService
 expectError(router(createApi.todos, new WrongCheckedCreateTodoService()));
 
 // should accept valid class implementation
-class CheckedCreateTodoService
-	implements RouteHandlers<typeof createApi.todos>
-{
+class CheckedCreateTodoService implements RouteHandlers<
+	typeof createApi.todos
+> {
 	readonly prefix = "todo";
 
 	create({ title }: RouteRequest<typeof createApi.todos.create>) {
@@ -615,9 +615,9 @@ class CheckedCreateTodoService
 router(createApi.todos, new CheckedCreateTodoService());
 
 // should expose that despite using implements, TypeScript does not contextually type class methods
-class _UnannotatedCheckedCreateTodoService
-	implements RouteHandlers<typeof createApi.todos>
-{
+class _UnannotatedCheckedCreateTodoService implements RouteHandlers<
+	typeof createApi.todos
+> {
 	// @ts-expect-error Implements checks assignability after method inference.
 	create({ title }) {
 		return {

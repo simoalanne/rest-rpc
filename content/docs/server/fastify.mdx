@@ -60,7 +60,13 @@ type RegisterRoutesOptions = {
 		signal: AbortSignal;
 	}>;
 	webSocket?: FastifyWebSocketOptions;
-	preHandler?: Array<(req: FastifyRequest, reply: FastifyReply, route: RouteDeclaration) => unknown>;
+	preHandler?: Array<
+		(
+			req: FastifyRequest,
+			reply: FastifyReply,
+			route: RouteDeclaration,
+		) => unknown
+	>;
 };
 ```
 
@@ -120,3 +126,4 @@ registerRoutes(app, routes, {
 		},
 	],
 });
+```

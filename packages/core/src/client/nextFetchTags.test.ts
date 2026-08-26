@@ -122,9 +122,8 @@ describe("Next fetch tags", () => {
 					list: {
 						method: "GET",
 						path: "/items",
-						query: jsonQuery(
-							type<{ page: number; filters: { tag: string } }>(),
-						),
+						query:
+							jsonQuery(type<{ page: number; filters: { tag: string } }>()),
 						responses: {
 							204: noBody(),
 						},

@@ -1,7 +1,4 @@
-export type {
-	ClearCookieOptions,
-	SetCookieOptions,
-} from "./cookies.ts";
+export type { ClearCookieOptions, SetCookieOptions } from "./cookies.ts";
 export { clearCookie, setCookie } from "./cookies.ts";
 export type {
 	RequestValidationErrorInput,
@@ -59,10 +56,7 @@ export {
 	route,
 	router,
 } from "./router.ts";
-export type {
-	RequestSegments,
-	ValidationIssue,
-} from "./validation.ts";
+export type { RequestSegments, ValidationIssue } from "./validation.ts";
 export { createWebResponse } from "./webResponse.ts";
 export type {
 	BeforeWebSocketUpgrade,

@@ -206,9 +206,11 @@ type RouteResponsesFor<TRoute> = TRoute extends {
 	: TRoute extends {
 				response: infer TResponse;
 				method: infer TMethod extends HttpMethod;
-			}
+		  }
 		? {
-				[K in DefaultBodyResponseStatusForMethod<TMethod>]: RouteResponseDeclarationFor<TResponse>;
+				[
+					K in DefaultBodyResponseStatusForMethod<TMethod>
+				]: RouteResponseDeclarationFor<TResponse>;
 			}
 		: TRoute extends { method: infer TMethod extends HttpMethod }
 			? {

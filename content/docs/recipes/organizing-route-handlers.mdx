@@ -4,15 +4,15 @@ description: Learn different ways to organize route handlers
 ---
 
 `router()` is a type-safe route implementation factory.
-Each handler receives a validated request with framework-specific 
+Each handler receives a validated request with framework-specific
 context and must return a response matching the contract.
 
 There are three common ways to organize route handlers:
 
 ## Inline handlers
 
-The simplest approach is to define the logic inline. 
-This gives you full type inference with very little ceremony and works well for small handlers. 
+The simplest approach is to define the logic inline.
+This gives you full type inference with very little ceremony and works well for small handlers.
 
 ```ts
 const routes = router(api, {
@@ -29,7 +29,7 @@ const routes = router(api, {
 });
 ```
 
-Once the amount of route handlers increases and logic becomes more complex, however, 
+Once the amount of route handlers increases and logic becomes more complex, however,
 a plain object of functions can become harder to organize, maintain, and test.
 
 ## Handlers delegating to a service class
@@ -45,7 +45,7 @@ const routes = router(api, {
 });
 ```
 
-This separates the implementation, but when the service already follows the route contract, 
+This separates the implementation, but when the service already follows the route contract,
 these forwarding functions add little value and repeat the same interface.
 If you rely on `this` in your service class, you must also remember to bind each method, which can be error-prone.
 

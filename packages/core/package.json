@@ -1,31 +1,34 @@
 {
 	"name": "@rest-rpc/core",
 	"version": "0.1.0-beta.14",
-	"type": "module",
-	"license": "MIT",
 	"description": "Core rest-rpc contract, fetch client, schema, and OpenAPI utilities.",
 	"keywords": [
-		"rest-rpc",
-		"typescript",
-		"rpc",
-		"rest",
 		"api-contract",
+		"arktype",
 		"contract-first",
-		"type-safe-api",
 		"fetch-client",
 		"openapi",
+		"rest",
+		"rest-rpc",
+		"rpc",
 		"standard-schema",
-		"websocket",
-		"zod",
+		"type-safe-api",
+		"typescript",
 		"valibot",
-		"arktype"
+		"websocket",
+		"zod"
 	],
+	"homepage": "https://github.com/rest-rpc/rest-rpc#readme",
+	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/rest-rpc/rest-rpc.git",
 		"directory": "packages/core"
 	},
-	"homepage": "https://github.com/rest-rpc/rest-rpc#readme",
+	"files": [
+		"dist"
+	],
+	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
@@ -50,20 +53,17 @@
 			"import": "./dist/standard-schema/index.js"
 		}
 	},
-	"files": [
-		"dist"
-	],
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
 		"typecheck": "tsc -p tsconfig.json && tsd",
 		"test": "node --test src/*.test.ts src/**/*.test.ts"
 	},
+	"devDependencies": {
+		"arktype": "^2.2.3",
+		"valibot": "^1.4.2",
+		"zod": "^4.4.3"
+	},
 	"tsd": {
 		"directory": "test-d"
-	},
-	"devDependencies": {
-		"zod": "^4.4.3",
-		"valibot": "^1.4.2",
-		"arktype": "^2.2.3"
 	}
 }

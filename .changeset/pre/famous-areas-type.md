@@ -7,5 +7,4 @@
 "@rest-rpc/web": minor
 ---
 
- convenience setCookie and clearCookie helpers for server adapters
-  
+convenience setCookie and clearCookie helpers for server adapters

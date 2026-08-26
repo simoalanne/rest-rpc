@@ -94,7 +94,7 @@ pathParams: type({
 query: type({ q: "string" }).or({ page: "string" }),
 ```
 
-For other Standard Schema vendors, whole-location schemas needs explicit `requestKeys` 
+For other Standard Schema vendors, whole-location schemas needs explicit `requestKeys`
 option so `rest-rpc` can map flattened keys back to HTTP locations.
 
 ```ts
@@ -112,13 +112,13 @@ requestKeys: {
 
 Schemas have an input type and an output type.
 
-| Position | Type used |
-| --- | --- |
-| Fetch client request input | schema input |
-| Server handler input | schema output |
-| Server handler return value | schema input |
-| Fetch client response value | schema output |
-| WebSocket message send value | schema input |
+| Position                        | Type used     |
+| ------------------------------- | ------------- |
+| Fetch client request input      | schema input  |
+| Server handler input            | schema output |
+| Server handler return value     | schema input  |
+| Fetch client response value     | schema output |
+| WebSocket message send value    | schema input  |
 | WebSocket message receive value | schema output |
 
 Default HTTP bodies and WebSocket messages travel over JSON. Path params, query

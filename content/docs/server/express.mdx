@@ -62,7 +62,14 @@ type RegisterRoutesOptions = {
 		| { kind: "websocket"; req: IncomingMessage; signal: AbortSignal }
 	>;
 	webSocket?: ExpressWebSocketOptions;
-	middleware?: Array<(req: Request, res: Response, next: NextFunction, route: HttpRouteDeclaration) => unknown>;
+	middleware?: Array<
+		(
+			req: Request,
+			res: Response,
+			next: NextFunction,
+			route: HttpRouteDeclaration,
+		) => unknown
+	>;
 };
 ```
 

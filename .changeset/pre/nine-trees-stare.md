@@ -4,4 +4,3 @@
 ---
 
 rename origin -> baseUrl and allow baseUrl to be any value
-  

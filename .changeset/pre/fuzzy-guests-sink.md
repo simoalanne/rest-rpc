@@ -8,4 +8,3 @@
 ---
 
 Harden server error handling for parser, response validation, and WebSocket upgrade failures
-  

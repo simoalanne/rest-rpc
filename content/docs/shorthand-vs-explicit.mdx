@@ -123,10 +123,7 @@ const api = router(
 
 ```ts
 await client.todos.batchCreate.fetch({
-	body: [
-		{ title: "Write docs" },
-		{ title: "Ship the docs" },
-	],
+	body: [{ title: "Write docs" }, { title: "Ship the docs" }],
 });
 ```
 
@@ -512,9 +509,7 @@ Use `skipToken` when you prefer the explicit TanStack Query primitive.
 import { skipToken } from "@tanstack/query-core";
 
 const todo = useQuery(
-	tq.todos.get.queryOptions(
-		selectedId ? { id: selectedId } : skipToken,
-	),
+	tq.todos.get.queryOptions(selectedId ? { id: selectedId } : skipToken),
 );
 ```
 

@@ -230,8 +230,8 @@ export type ImplementationTreeFor<
 export type RouteHandlerFor<
 	E extends RouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
-	TWebSocketContext extends
-		WebSocketRouteHandlerContext = WebSocketRouteHandlerContext,
+	TWebSocketContext extends WebSocketRouteHandlerContext =
+		WebSocketRouteHandlerContext,
 > = E extends HttpRouteDeclaration
 	? RouteHandler<E, TContext>
 	: E extends WebSocketRouteDeclaration
@@ -246,8 +246,8 @@ export type RouteHandlerFor<
 export type ImplementationShape<
 	TNode extends Contract<RouteDeclaration>,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
-	TWebSocketContext extends
-		WebSocketRouteHandlerContext = WebSocketRouteHandlerContext,
+	TWebSocketContext extends WebSocketRouteHandlerContext =
+		WebSocketRouteHandlerContext,
 > = TNode extends RouteDeclaration
 	? RouteHandlerFor<TNode, TContext, TWebSocketContext>
 	: {
@@ -276,8 +276,8 @@ export type ImplementationShape<
 export type RouteHandlers<
 	TNode extends Contract<RouteDeclaration>,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
-	TWebSocketContext extends
-		WebSocketRouteHandlerContext = WebSocketRouteHandlerContext,
+	TWebSocketContext extends WebSocketRouteHandlerContext =
+		WebSocketRouteHandlerContext,
 > = TNode extends RouteDeclaration
 	?
 			| RouteHandlerFor<TNode, TContext, TWebSocketContext>
@@ -422,8 +422,8 @@ const collectImplementations = (
 export function route<
 	const TNode extends RouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
-	TWebSocketContext extends
-		WebSocketRouteHandlerContext = WebSocketRouteHandlerContext,
+	TWebSocketContext extends WebSocketRouteHandlerContext =
+		WebSocketRouteHandlerContext,
 >(
 	contract: TNode,
 	handler: RouteHandlerFor<TNode, TContext, TWebSocketContext>,
@@ -442,8 +442,8 @@ export function route<
 export function router<
 	const TNode extends Contract<RouteDeclaration>,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
-	TWebSocketContext extends
-		WebSocketRouteHandlerContext = WebSocketRouteHandlerContext,
+	TWebSocketContext extends WebSocketRouteHandlerContext =
+		WebSocketRouteHandlerContext,
 >(
 	contract: TNode,
 	handlers: RouteHandlers<TNode, TContext, TWebSocketContext>,

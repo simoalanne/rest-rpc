@@ -15,21 +15,41 @@ and OpenAPI documents.
 like ordinary function calls.
 
 <CardGroup cols={2}>
-  <Card title="Start building" href="/docs/quickstart/" icon="rocket" cta="Open the quickstart">
-    Define a route, implement it on a server adapter, and call it from a typed
-    client.
-  </Card>
-  <Card title="Compare the tradeoffs" href="/docs/comparison/" icon="scale" cta="Read the comparison">
-    See where rest-rpc sits beside ts-rest, oRPC, and tRPC.
-  </Card>
-  <Card title="Learn the model" href="/docs/contract/declaration/" icon="map" cta="Explore the contract">
-    REST at the boundary, RPC-style usage at the call site, and one contract as
-    the source of truth.
-  </Card>
-  <Card title="Generate OpenAPI" href="/docs/openapi/" icon="file-json" cta="View OpenAPI docs">
-    Turn your TypeScript contract into an OpenAPI document without maintaining a
-    separate schema.
-  </Card>
+	<Card
+		title="Start building"
+		href="/docs/quickstart/"
+		icon="rocket"
+		cta="Open the quickstart"
+	>
+		Define a route, implement it on a server adapter, and call it from a typed
+		client.
+	</Card>
+	<Card
+		title="Compare the tradeoffs"
+		href="/docs/comparison/"
+		icon="scale"
+		cta="Read the comparison"
+	>
+		See where rest-rpc sits beside ts-rest, oRPC, and tRPC.
+	</Card>
+	<Card
+		title="Learn the model"
+		href="/docs/contract/declaration/"
+		icon="map"
+		cta="Explore the contract"
+	>
+		REST at the boundary, RPC-style usage at the call site, and one contract as
+		the source of truth.
+	</Card>
+	<Card
+		title="Generate OpenAPI"
+		href="/docs/openapi/"
+		icon="file-json"
+		cta="View OpenAPI docs"
+	>
+		Turn your TypeScript contract into an OpenAPI document without maintaining a
+		separate schema.
+	</Card>
 </CardGroup>
 
 ```bash
@@ -119,61 +139,62 @@ Read [Shorthand vs Explicit](/docs/shorthand-vs-explicit/).
 ## What You Get
 
 <CardGroup cols={2}>
-  <Card title="REST contract" icon="route" type="check">
-    Methods, paths, request locations, response bodies, and metadata are declared
-    once.
-  </Card>
-  <Card title="Function-shaped usage" icon="braces" type="check">
-    Call `client.todos.get.fetch({ id })` and implement `get({ id })` while the
-    contract keeps the HTTP shape explicit.
-  </Card>
-  <Card title="Server adapters" icon="plug" type="check">
-    Use Express, Hono, Fastify, NestJS, Next.js, or fetch-native runtimes without
-    moving the contract into the framework.
-  </Card>
-  <Card title="Typed responses" icon="list-checks" type="check">
-    Return direct success bodies for simple routes, or status-keyed response
-    envelopes when the route has multiple expected outcomes.
-  </Card>
-  <Card title="Schema options" icon="shield-check" type="check">
-    Use Standard Schema-compatible libraries such as Zod, Valibot, or ArkType,
-    or built-in type-only helper when runtime validation is not needed.
-  </Card>
-  <Card title="Generated helpers" icon="layers" type="check">
-    Derive typed fetch clients, TanStack Query options, query keys, and OpenAPI
-    documents from the same route tree.
-  </Card>
-  <Card title="Typed real-time messaging" icon="bolt" type="check">
-    Define WebSocket routes in the same contract tree, including typed messages
-    for client and server helpers.
-  </Card>
-  <Card title="Beyond basic JSON" icon="wrench" type="check">
-    Use streaming, NDJSON streams, custom bodies, response headers, and content
-    types without leaving the contract or accepting hidden transport assumptions.
-  </Card>
+	<Card title="REST contract" icon="route" type="check">
+		Methods, paths, request locations, response bodies, and metadata are
+		declared once.
+	</Card>
+	<Card title="Function-shaped usage" icon="braces" type="check">
+		Call `client.todos.get.fetch({id})` and implement `get({id})` while the
+		contract keeps the HTTP shape explicit.
+	</Card>
+	<Card title="Server adapters" icon="plug" type="check">
+		Use Express, Hono, Fastify, NestJS, Next.js, or fetch-native runtimes
+		without moving the contract into the framework.
+	</Card>
+	<Card title="Typed responses" icon="list-checks" type="check">
+		Return direct success bodies for simple routes, or status-keyed response
+		envelopes when the route has multiple expected outcomes.
+	</Card>
+	<Card title="Schema options" icon="shield-check" type="check">
+		Use Standard Schema-compatible libraries such as Zod, Valibot, or ArkType,
+		or built-in type-only helper when runtime validation is not needed.
+	</Card>
+	<Card title="Generated helpers" icon="layers" type="check">
+		Derive typed fetch clients, TanStack Query options, query keys, and OpenAPI
+		documents from the same route tree.
+	</Card>
+	<Card title="Typed real-time messaging" icon="bolt" type="check">
+		Define WebSocket routes in the same contract tree, including typed messages
+		for client and server helpers.
+	</Card>
+	<Card title="Beyond basic JSON" icon="wrench" type="check">
+		Use streaming, NDJSON streams, custom bodies, response headers, and content
+		types without leaving the contract or accepting hidden transport
+		assumptions.
+	</Card>
 </CardGroup>
 
 ## What's Next
 
 <Steps>
-  <Step title="Build the first route" icon="rocket">
-    Start with the [Quickstart](/docs/quickstart/) if you want the fastest end-to-end
-    example.
-  </Step>
-  <Step title="Shape the contract" icon="file-code">
-    Read [Contract Declaration](/docs/contract/declaration/),
-    [Schemas](/docs/contract/schemas/), [HTTP Requests](/docs/http-requests/),
-    and [HTTP Responses](/docs/http-responses/) when you are designing real
-    routes.
-  </Step>
-  <Step title="Choose the runtime" icon="plug">
-    Wire the contract to [server adapters](/docs/server/express/), the
-    [fetch client](/docs/client/fetch-client/), or
-    [TanStack Query](/docs/client/tanstack-query/).
-  </Step>
-  <Step title="Publish the contract" icon="share">
-    Generate an [OpenAPI document](/docs/openapi/) without ceremony.
-  </Step>
+	<Step title="Build the first route" icon="rocket">
+		Start with the [Quickstart](/docs/quickstart/) if you want the fastest
+		end-to-end example.
+	</Step>
+	<Step title="Shape the contract" icon="file-code">
+		Read [Contract Declaration](/docs/contract/declaration/),
+		[Schemas](/docs/contract/schemas/), [HTTP Requests](/docs/http-requests/),
+		and [HTTP Responses](/docs/http-responses/) when you are designing real
+		routes.
+	</Step>
+	<Step title="Choose the runtime" icon="plug">
+		Wire the contract to [server adapters](/docs/server/express/), the [fetch
+		client](/docs/client/fetch-client/), or [TanStack
+		Query](/docs/client/tanstack-query/).
+	</Step>
+	<Step title="Publish the contract" icon="share">
+		Generate an [OpenAPI document](/docs/openapi/) without ceremony.
+	</Step>
 </Steps>
 
 :::tip[Small by design]
@@ -188,36 +209,37 @@ shape.
 ## Common Questions
 
 <Accordion>
-  <AccordionItem title="Who is rest-rpc for?">
-    `rest-rpc` is for developers who want end-to-end type safety and
-    RPC-style, function-shaped usage without replacing familiar HTTP concepts.
-    You keep methods, paths, headers, bodies, status codes, and your existing
-    framework, while the shared contract connects the server and client types in ergonomic way.
-  </AccordionItem>
-  <AccordionItem title="Do I have to restructure my app?">
-    No. Keep your framework, middleware, authentication, database access, and
-    deployment model. Add the contract at the API boundary, then adopt the
-    server adapters, client, TanStack Query helpers, or OpenAPI generation as
-    they become useful.
-  </AccordionItem>
-  <AccordionItem title="Do I need to learn a new API model?">
-    Not really. The contract is still made of HTTP methods, paths, request
-    locations, status codes, headers, and response bodies. The generated client
-    and handlers make those routes nicer to call from TypeScript, but they do
-    not hide what goes over the wire.
-  </AccordionItem>
-  <AccordionItem title="Why flatten request keys by default?">
-    The contract already declares the HTTP details, so rest-rpc can infer
-    the request keys from it. That makes the client and server handlers at
-    minimal ceremony, for the common case where you don't care from which
-    HTTP bucket the value came. This and other shorthand features are just
-    defaults; you can make them explicit if you want. 
-    Read [Shorthand vs Explicit](/docs/shorthand-vs-explicit/) to understand the design.
-  </AccordionItem>
-  <AccordionItem title="What happens when something breaks?">
-    You debug the same boundary you would debug by hand: method, path, query,
-    headers, body, status, and response shape. Because those pieces live in one
-    contract, type errors and runtime validation errors point back to the route
-    declaration instead of a separate client or server type.
-  </AccordionItem>
+	<AccordionItem title="Who is rest-rpc for?">
+		`rest-rpc` is for developers who want end-to-end type safety and RPC-style,
+		function-shaped usage without replacing familiar HTTP concepts. You keep
+		methods, paths, headers, bodies, status codes, and your existing framework,
+		while the shared contract connects the server and client types in ergonomic
+		way.
+	</AccordionItem>
+	<AccordionItem title="Do I have to restructure my app?">
+		No. Keep your framework, middleware, authentication, database access, and
+		deployment model. Add the contract at the API boundary, then adopt the
+		server adapters, client, TanStack Query helpers, or OpenAPI generation as
+		they become useful.
+	</AccordionItem>
+	<AccordionItem title="Do I need to learn a new API model?">
+		Not really. The contract is still made of HTTP methods, paths, request
+		locations, status codes, headers, and response bodies. The generated client
+		and handlers make those routes nicer to call from TypeScript, but they do
+		not hide what goes over the wire.
+	</AccordionItem>
+	<AccordionItem title="Why flatten request keys by default?">
+		The contract already declares the HTTP details, so rest-rpc can infer the
+		request keys from it. That makes the client and server handlers at minimal
+		ceremony, for the common case where you don't care from which HTTP bucket
+		the value came. This and other shorthand features are just defaults; you can
+		make them explicit if you want. Read [Shorthand vs
+		Explicit](/docs/shorthand-vs-explicit/) to understand the design.
+	</AccordionItem>
+	<AccordionItem title="What happens when something breaks?">
+		You debug the same boundary you would debug by hand: method, path, query,
+		headers, body, status, and response shape. Because those pieces live in one
+		contract, type errors and runtime validation errors point back to the route
+		declaration instead of a separate client or server type.
+	</AccordionItem>
 </Accordion>

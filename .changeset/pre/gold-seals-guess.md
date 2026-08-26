@@ -3,4 +3,3 @@
 ---
 
 rename tanstack infiniteQueryOptions args to be more describing
-  

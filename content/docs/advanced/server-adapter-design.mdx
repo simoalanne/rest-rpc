@@ -56,18 +56,26 @@ const registerRoutes = (app, routes) => {
 	const implementations = flattenRouteImplementations(routes);
 
 	for (const implementation of implementations) {
-		app.route(implementation.route.method, implementation.route.path, async (req, res) => {
-			const request = await readFrameworkRequest(req);
-			const context = createFrameworkContext(req, res);
+		app.route(
+			implementation.route.method,
+			implementation.route.path,
+			async (req, res) => {
+				const request = await readFrameworkRequest(req);
+				const context = createFrameworkContext(req, res);
 
-			const result = await handleHttpRoute(implementation.route, implementation.handler, {
-				request,
-				context,
-				errorHandlers,
-			});
+				const result = await handleHttpRoute(
+					implementation.route,
+					implementation.handler,
+					{
+						request,
+						context,
+						errorHandlers,
+					},
+				);
 
-			writeFrameworkResponse(res, result);
-		});
+				writeFrameworkResponse(res, result);
+			},
+		);
 	}
 };
 ```

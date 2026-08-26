@@ -1,29 +1,32 @@
 {
 	"name": "@rest-rpc/server",
 	"version": "0.1.0-beta.14",
-	"type": "module",
-	"license": "MIT",
 	"description": "Shared rest-rpc server primitives for typed route handlers and adapter implementations.",
 	"keywords": [
-		"rest-rpc",
-		"typescript",
-		"rpc",
-		"rest",
 		"api-contract",
 		"contract-first",
-		"type-safe-api",
-		"server",
-		"route-handlers",
 		"http",
-		"websocket",
-		"middleware"
+		"middleware",
+		"rest",
+		"rest-rpc",
+		"route-handlers",
+		"rpc",
+		"server",
+		"type-safe-api",
+		"typescript",
+		"websocket"
 	],
+	"homepage": "https://github.com/rest-rpc/rest-rpc#readme",
+	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/rest-rpc/rest-rpc.git",
 		"directory": "packages/server"
 	},
-	"homepage": "https://github.com/rest-rpc/rest-rpc#readme",
+	"files": [
+		"dist"
+	],
+	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
@@ -32,21 +35,18 @@
 			"import": "./dist/index.js"
 		}
 	},
-	"files": [
-		"dist"
-	],
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
 		"typecheck": "tsc -p tsconfig.json && tsd",
 		"test": "node --test src/**/*.test.ts"
-	},
-	"tsd": {
-		"directory": "test-d"
 	},
 	"dependencies": {
 		"@rest-rpc/core": "workspace:*"
 	},
 	"devDependencies": {
 		"zod": "^4.3.6"
+	},
+	"tsd": {
+		"directory": "test-d"
 	}
 }

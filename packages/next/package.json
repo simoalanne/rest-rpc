@@ -1,30 +1,33 @@
 {
 	"name": "@rest-rpc/next",
 	"version": "0.1.0-beta.14",
-	"type": "module",
-	"license": "MIT",
 	"description": "Next.js adapter for serving and consuming rest-rpc contracts in App Router projects.",
 	"keywords": [
-		"rest-rpc",
-		"typescript",
-		"rpc",
-		"rest",
 		"api-contract",
+		"app-router",
 		"contract-first",
-		"type-safe-api",
+		"fetch",
 		"next",
 		"nextjs",
-		"app-router",
-		"route-handler",
-		"fetch",
 		"react",
-		"server-components"
+		"rest",
+		"rest-rpc",
+		"route-handler",
+		"rpc",
+		"server-components",
+		"type-safe-api",
+		"typescript"
 	],
+	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/rest-rpc/rest-rpc.git",
 		"directory": "packages/next"
 	},
+	"files": [
+		"dist"
+	],
+	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
@@ -33,25 +36,22 @@
 			"import": "./dist/index.js"
 		}
 	},
-	"files": [
-		"dist"
-	],
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
 		"test": "node --test src/*.test.ts src/**/*.test.ts",
 		"typecheck": "pnpm run build && tsc -p tsconfig.json && tsd"
 	},
-	"tsd": {
-		"directory": "test-d"
-	},
 	"dependencies": {
 		"@rest-rpc/core": "workspace:*",
 		"@rest-rpc/web": "workspace:*"
 	},
+	"devDependencies": {
+		"next": "16.3.1"
+	},
 	"peerDependencies": {
 		"next": ">=15"
 	},
-	"devDependencies": {
-		"next": "16.3.1"
+	"tsd": {
+		"directory": "test-d"
 	}
 }

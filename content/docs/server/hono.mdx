@@ -61,7 +61,9 @@ type RegisterRoutesOptions<TEnv extends Env = Env> = {
 	}>;
 	parseBody?: HonoParseBody<TEnv>;
 	webSocket?: HonoWebSocketOptions<TEnv>;
-	middleware?: Array<(c: Context<TEnv>, next: Next, route: RouteDeclaration) => any>;
+	middleware?: Array<
+		(c: Context<TEnv>, next: Next, route: RouteDeclaration) => any
+	>;
 };
 ```
 
@@ -129,3 +131,4 @@ registerRoutes(app, routes, {
 		},
 	],
 });
+```

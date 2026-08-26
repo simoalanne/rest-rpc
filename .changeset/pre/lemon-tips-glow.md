@@ -4,4 +4,3 @@
 ---
 
 improved names for type helpers
-  

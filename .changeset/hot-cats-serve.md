@@ -4,4 +4,3 @@
 ---
 
 Add an option to omit content type for custom body and let fetch infer it
-  

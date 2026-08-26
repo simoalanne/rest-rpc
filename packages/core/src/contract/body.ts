@@ -30,8 +30,8 @@ export type MultipartBody<
 		string,
 		StandardSchemaV1
 	>,
-	TArrayKeys extends readonly (keyof TFields &
-		string)[] = readonly (keyof TFields & string)[],
+	TArrayKeys extends readonly (keyof TFields & string)[] =
+		readonly (keyof TFields & string)[],
 > = {
 	kind: "multipartBody";
 	fields: TFields;

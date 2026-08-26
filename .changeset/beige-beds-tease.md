@@ -4,4 +4,3 @@
 ---
 
 Restrict unknown key access for typescript for context types
-  

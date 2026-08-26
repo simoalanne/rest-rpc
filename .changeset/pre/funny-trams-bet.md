@@ -6,4 +6,3 @@
 ---
 
 rename RawWebSocket type to WebSocketLike
-  

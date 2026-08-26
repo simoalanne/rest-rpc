@@ -67,16 +67,16 @@ For request-based routes, falsy request values and TanStack Query's `skipToken`
 disable the query function.
 
 ```tsx
-const todo = useQuery(tq.todos.get.queryOptions(selectedId && { id: selectedId }));
+const todo = useQuery(
+	tq.todos.get.queryOptions(selectedId && { id: selectedId }),
+);
 ```
 
 ```tsx
 import { skipToken } from "@tanstack/query-core";
 
 const todo = useQuery(
-	tq.todos.get.queryOptions(
-		selectedId ? { id: selectedId } : skipToken,
-	),
+	tq.todos.get.queryOptions(selectedId ? { id: selectedId } : skipToken),
 );
 ```
 
@@ -176,10 +176,10 @@ queryClient.setQueryData(todoKey, (current) =>
 	current && current.status === 200
 		? {
 				...current,
-			body: {
-				...current.body,
-				completed: true,
-			},
+				body: {
+					...current.body,
+					completed: true,
+				},
 			}
 		: current,
 );

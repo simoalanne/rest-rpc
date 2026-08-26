@@ -8,4 +8,3 @@
 ---
 
 Add support for implementing handlers for router as a class
-  

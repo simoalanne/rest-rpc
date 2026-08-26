@@ -1,28 +1,31 @@
 {
 	"name": "@rest-rpc/nest",
 	"version": "0.1.0-beta.14",
-	"type": "module",
-	"license": "MIT",
 	"description": "NestJS adapter for serving rest-rpc contracts with typed HTTP routes.",
 	"keywords": [
-		"rest-rpc",
-		"typescript",
-		"rpc",
-		"rest",
 		"api-contract",
 		"contract-first",
-		"type-safe-api",
-		"nestjs",
+		"http",
 		"nest",
+		"nestjs",
+		"rest",
+		"rest-rpc",
+		"rpc",
 		"server",
-		"http"
+		"type-safe-api",
+		"typescript"
 	],
+	"homepage": "https://github.com/rest-rpc/rest-rpc#readme",
+	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/rest-rpc/rest-rpc.git",
 		"directory": "packages/nest"
 	},
-	"homepage": "https://github.com/rest-rpc/rest-rpc#readme",
+	"files": [
+		"dist"
+	],
+	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
@@ -31,15 +34,9 @@
 			"import": "./dist/index.js"
 		}
 	},
-	"files": [
-		"dist"
-	],
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
 		"typecheck": "pnpm run build && tsc -p tsconfig.json && tsd"
-	},
-	"tsd": {
-		"directory": "test-d"
 	},
 	"dependencies": {
 		"@rest-rpc/core": "workspace:*",
@@ -70,5 +67,8 @@
 		"@nestjs/platform-fastify": {
 			"optional": true
 		}
+	},
+	"tsd": {
+		"directory": "test-d"
 	}
 }

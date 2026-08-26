@@ -10,7 +10,7 @@ const todo = await client.todos.byId.fetch({ id: "1" });
 
 ## Request With JSON Body
 
-Regular JSON request bodies are declared with a schema. 
+Regular JSON request bodies are declared with a schema.
 The `body` key is flattened for client call and server handler.
 
 ```ts
@@ -88,7 +88,7 @@ export const routes = router(api, {
 
 ## Request With Custom Content Type
 
-Custom request bodies are declared with `customBody()`. 
+Custom request bodies are declared with `customBody()`.
 The `body` key is not flattened for client call and server handler.
 
 ```ts
@@ -185,12 +185,15 @@ Server body parsers should pass a `URLSearchParams` instance to rest-rpc for
 form bodies. Each present form key is passed to the schema as a string; omitted
 keys are absent from the validation input. Array fields are inferred from
 supported schemas and encoded or decoded as repeated form keys, such as
-`tags=typescript&tags=rpc`. 
+`tags=typescript&tags=rpc`.
 
 When the array keys cannot be inferred, you can declare them explicitly with the `arrayKeys` option.
 
 ```ts
-formBody({ schema: type<{ title: string; tags: string[] }>(), arrayKeys: ["tags"] })
+formBody({
+	schema: type<{ title: string; tags: string[] }>(),
+	arrayKeys: ["tags"],
+});
 ```
 
 ## Request With Multipart Body

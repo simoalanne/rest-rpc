@@ -4,4 +4,3 @@
 ---
 
 add support for route status code specific response headers so important headers can be declared and must be returned from server handlers
-  

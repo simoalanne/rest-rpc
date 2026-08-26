@@ -10,4 +10,3 @@
 ---
 
 Initial release of rest-rpc
-  

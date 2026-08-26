@@ -140,7 +140,8 @@ const client = initClient(api, {
 		validateResponses: {
 			type: "boolean",
 			default: "false",
-			description: "Validates declared response bodies and headers on the client.",
+			description:
+				"Validates declared response bodies and headers on the client.",
 		},
 	}}
 />
@@ -313,7 +314,11 @@ import { client } from "./client";
 export async function renameTodo(id: string, title: string) {
 	await client.todos.update.fetch({ id, title });
 
-	for (const tag of getNextFetchTags(api.todos.get, { id }, { tagPrefix: "api" })) {
+	for (const tag of getNextFetchTags(
+		api.todos.get,
+		{ id },
+		{ tagPrefix: "api" },
+	)) {
 		revalidateTag(tag);
 	}
 }

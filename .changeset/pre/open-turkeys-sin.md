@@ -4,4 +4,3 @@
 ---
 
 add support for declaring multiple content types for a route
-  
