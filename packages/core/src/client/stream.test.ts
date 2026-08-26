@@ -65,7 +65,7 @@ describe("ApiClient streams", () => {
 
 		await assert.rejects(async () => {
 			for await (const _event of events) {
-				_event;
+				void _event;
 			}
 		});
 	});
@@ -107,7 +107,7 @@ describe("ApiClient streams", () => {
 
 		await assert.rejects(async () => {
 			for await (const _event of events) {
-				_event;
+				void _event;
 			}
 		});
 

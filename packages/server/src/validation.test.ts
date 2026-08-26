@@ -506,7 +506,7 @@ describe("validateResponseStreamChunks", () => {
 
 		await assert.rejects(async () => {
 			for await (const _chunk of chunks) {
-				_chunk;
+				void _chunk;
 			}
 		}, /Stream response validation failed/);
 	});

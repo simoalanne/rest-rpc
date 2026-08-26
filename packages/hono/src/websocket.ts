@@ -92,7 +92,7 @@ export const registerHonoWebSocketRoutes = <TEnv extends Env = Env>(
 ) => {
 	for (const implementation of routes) {
 		app.get(
-			// biome-ignore lint/suspicious/noExplicitAny: hono's typings are too strict for this case
+			// oxlint-disable-next-line typescript/no-explicit-any -- Hono's typings are too strict for this case.
 			toColonPath(implementation.route.path) as any,
 			...middleware.map(
 				(mw) => (c: Context<TEnv>, next: Next) =>

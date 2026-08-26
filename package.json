@@ -1,14 +1,13 @@
 {
 	"name": "rest-rpc",
 	"private": true,
-	"type": "module",
+	"homepage": "https://github.com/rest-rpc/rest-rpc#readme",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/rest-rpc/rest-rpc.git"
 	},
-	"homepage": "https://github.com/rest-rpc/rest-rpc#readme",
-	"packageManager": "pnpm@10.32.1",
+	"type": "module",
 	"scripts": {
 		"build:packages": "pnpm -r --filter './packages/**' build",
 		"typecheck": "pnpm run typecheck:workspace",
@@ -17,11 +16,13 @@
 		"test:unit": "pnpm run build:packages && pnpm run test:scripts && pnpm -r --parallel --no-bail --if-present --filter './packages/**' --filter '!integration-tests' test",
 		"test:integration": "pnpm run build:packages && pnpm --filter integration-tests test",
 		"test:scripts": "node --test scripts/*.test.mjs",
-		"lint": "biome lint .",
+		"lint": "oxlint",
 		"lint:verify": "pnpm run lint",
-		"lint:staged": "biome check --write --staged --no-errors-on-unmatched",
+		"lint:staged": "lint-staged",
 		"lint:write": "pnpm run lint:staged",
-		"lint:unsafe": "biome check --write --unsafe --staged --no-errors-on-unmatched",
+		"lint:unsafe": "oxlint --fix-dangerously",
+		"fmt": "oxfmt",
+		"fmt:check": "oxfmt --check",
 		"changeset:version": "changeset version && pnpm install --lockfile-only --no-frozen-lockfile",
 		"release": "pnpm run build:packages && changeset publish",
 		"release:github:notes": "node scripts/create-github-release.ts --notes",
@@ -36,11 +37,18 @@
 		"docs:preview": "pnpm run build:packages && pnpm --filter content preview"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.4.11",
 		"@changesets/cli": "^3.0.0",
 		"lefthook": "2.1.5",
+		"lint-staged": "17.3.0",
+		"oxfmt": "0.65.0",
+		"oxlint": "1.80.0",
 		"tsd": "^0.33.0",
 		"typescript": "^7.0.2",
 		"typescript-compiler-api": "npm:typescript@5.9.3"
-	}
+	},
+	"lint-staged": {
+		"*": "oxfmt --no-error-on-unmatched-pattern",
+		"*.{js,jsx,ts,tsx,mjs,cjs}": "oxlint --fix --no-error-on-unmatched-pattern"
+	},
+	"packageManager": "pnpm@10.32.1"
 }

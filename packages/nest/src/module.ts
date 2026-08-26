@@ -13,11 +13,10 @@ import { RestRpcRouteInterceptor } from "./routeInterceptor.ts";
  *
  * @see {@link https://rest-rpc.dev/docs/server/nest#global-context}
  */
-// biome-ignore lint/suspicious/noEmptyInterface: this interface is augmented by consumers.
 export interface DefaultNestContext {}
 
 interface ContextShape {
-	// biome-ignore lint/suspicious/noExplicitAny: any allows named interfaces without leaking an index signature.
+	// oxlint-disable-next-line typescript/no-explicit-any -- `any` allows named interfaces without leaking an index signature.
 	[key: string]: any;
 }
 

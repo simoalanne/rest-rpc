@@ -49,7 +49,7 @@ export type ExtendedHonoMiddleware<TEnv extends Env = Env> = (
 	c: Context<TEnv>,
 	next: Next,
 	route: RouteDeclaration,
-	// biome-ignore lint/suspicious/noExplicitAny: hono itself accepts any for handler return type.
+	// oxlint-disable-next-line typescript/no-explicit-any -- Hono itself accepts `any` for handler return type.
 ) => Promise<any> | any;
 
 const isFormUrlEncodedContentType = (contentType: string) =>
@@ -108,7 +108,7 @@ export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 		>;
 
 		app[method](
-			// biome-ignore lint/suspicious/noExplicitAny: hono's typings are too strict for this case
+			// oxlint-disable-next-line typescript/no-explicit-any -- Hono's typings are too strict for this case.
 			toColonPath(route.path) as any,
 			...middleware.map(
 				(mw) => (c: Context<TEnv>, next: Next) => mw(c, next, route),

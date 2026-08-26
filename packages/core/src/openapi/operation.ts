@@ -194,9 +194,10 @@ export const createRequestBody = (
 
 	return {
 		required: true,
-		content: createContent(contentTypes, {
-			...(openApiSchema ? { schema: openApiSchema } : {}),
-		}),
+		content: createContent(
+			contentTypes,
+			openApiSchema ? { schema: openApiSchema } : {},
+		),
 	};
 };
 
@@ -247,9 +248,10 @@ export const createResponse = (
 	return {
 		description: openApiResponse?.description ?? description,
 		...(headers ? { headers } : {}),
-		content: createContent(contentTypes, {
-			...(openApiSchema ? { schema: openApiSchema } : {}),
-		}),
+		content: createContent(
+			contentTypes,
+			openApiSchema ? { schema: openApiSchema } : {},
+		),
 	};
 };
 

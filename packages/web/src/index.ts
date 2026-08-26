@@ -63,11 +63,10 @@ export { clearCookie, RouteResponseError, setCookie };
  *
  * @see {@link https://rest-rpc.dev/docs/server/web#framework-context}
  */
-// biome-ignore lint/suspicious/noEmptyInterface: this interface is augmented by consumers.
 export interface DefaultRuntimeContext {}
 
 interface ContextShape {
-	// biome-ignore lint/suspicious/noExplicitAny: any allows named interfaces without leaking an index signature.
+	// oxlint-disable-next-line typescript/no-explicit-any -- `any` allows named interfaces without leaking an index signature.
 	[key: string]: any;
 }
 
