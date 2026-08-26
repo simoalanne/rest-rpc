@@ -113,6 +113,12 @@ const createRouterRouteMethod = (
 
 /**
  * Binds a Nest controller method to a rest-rpc HTTP contract route.
+ *
+ * @remarks Use this decorator when a controller method returns the
+ * implementation for a single route. The method can still use Nest decorators
+ * and dependency injection before handing off to `route()`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/nest#single-routes}
  */
 export function Route(route: HttpRouteDeclaration): MethodDecorator {
 	return applyDecorators(createNestRouteDecorator(route));
@@ -120,6 +126,12 @@ export function Route(route: HttpRouteDeclaration): MethodDecorator {
 
 /**
  * Binds one Nest controller method to every HTTP route in a rest-rpc contract router.
+ *
+ * @remarks Use this decorator when one controller method returns a
+ * contract-shaped implementation tree from `router()`. The decorator registers
+ * each HTTP route with Nest while the returned tree provides the handlers.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/nest#usage}
  */
 export function Router(contract: Contract): MethodDecorator {
 	return (target, propertyKey, descriptor) => {

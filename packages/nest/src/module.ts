@@ -8,7 +8,10 @@ import { RestRpcRouteInterceptor } from "./routeInterceptor.ts";
  * Default application context passed to Nest route handlers.
  *
  * @remarks Augment this interface to set the route handler context across a
- * project.
+ * project. The augmented shape is used by `RouteRequest`, `RouteHandler`,
+ * `RouteHandlers`, `route()`, and `router()`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/nest#global-context}
  */
 // biome-ignore lint/suspicious/noEmptyInterface: this interface is augmented by consumers.
 export interface DefaultNestContext {}
@@ -24,6 +27,11 @@ type Merge<T> = {
 
 /**
  * The context object passed to Nest adapter route handlers.
+ *
+ * @remarks This combines the application context returned by `createContext`
+ * with the adapter-supplied `AbortSignal`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/nest#framework-context}
  */
 export type NestHandlerContext<
 	TContext extends ContextShape = DefaultNestContext,
@@ -35,6 +43,12 @@ export type NestHandlerContext<
 
 /**
  * Options for configuring the rest-rpc Nest adapter.
+ *
+ * @remarks Use `createContext` for request-scoped values shared by all
+ * rest-rpc Nest handlers, and `errorHandlers` to customize validation and
+ * unhandled error responses.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/nest#options}
  */
 export type RestRpcModuleOptions<
 	TContext extends ContextShape = DefaultNestContext,
@@ -45,11 +59,18 @@ export type RestRpcModuleOptions<
 
 /**
  * Configures rest-rpc route handling for Nest controllers.
+ *
+ * @remarks Import `RestRpcModule.forRoot()` once in a Nest module to register
+ * the global interceptor used by `@Route()` and `@Router()`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/nest#usage}
  */
 @Module({})
 export class RestRpcModule {
 	/**
 	 * Registers the global interceptor used by rest-rpc Nest route decorators.
+	 *
+	 * @see {@link https://rest-rpc.dev/docs/server/nest#options}
 	 */
 	static forRoot<TContext extends ContextShape = DefaultNestContext>(
 		options: RestRpcModuleOptions<TContext> = {},
