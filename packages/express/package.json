@@ -39,8 +39,6 @@
 	],
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
-		"prepack": "pnpm run build",
-		"prepublishOnly": "node ../../scripts/ensure-pnpm-publish.cjs",
 		"typecheck": "tsc -p tsconfig.json",
 		"test": "pnpm --filter @rest-rpc/server build && node --test src/**/*.test.ts"
 	},
