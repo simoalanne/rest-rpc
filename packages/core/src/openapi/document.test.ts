@@ -85,7 +85,7 @@ const openApiTestContract = router({
 });
 
 describe("createOpenApiDocument", () => {
-	it("builds base document fields and applies document transforms", () => {
+	it("builds base document fields", () => {
 		const document = createOpenApiDocument(
 			{
 				health: {
@@ -113,10 +113,6 @@ describe("createOpenApiDocument", () => {
 				},
 				tags: [{ name: "todos" }],
 				schemaConverter,
-				transformDocument: (document) => ({
-					...document,
-					"x-generated-by": "rest-rpc",
-				}),
 			},
 		);
 
@@ -135,7 +131,6 @@ describe("createOpenApiDocument", () => {
 				},
 			},
 		});
-		assert.equal(document["x-generated-by"], "rest-rpc");
 	});
 
 	it("groups multiple methods under the same OpenAPI path", () => {
@@ -177,9 +172,9 @@ describe("createOpenApiDocument", () => {
 				version: "1.0.0",
 			},
 			schemaConverter,
-			transformOperation: ({ route, operation }) => ({
+			transformOperation: ({ routePath, operation }) => ({
 				...operation,
-				operationId: `${route.method} ${route.path}`,
+				operationId: routePath.join("."),
 			}),
 		});
 
@@ -193,7 +188,7 @@ describe("createOpenApiDocument", () => {
 
 		const updateOperation = document.paths["/todos/{id}"]?.post;
 		assert.ok(updateOperation);
-		assert.equal(updateOperation.operationId, "POST /todos/:id");
+		assert.equal(updateOperation.operationId, "todos.update");
 		assert.equal(
 			updateOperation.requestBody?.content["application/json"].schema.type,
 			"object",

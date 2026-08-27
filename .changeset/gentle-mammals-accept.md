@@ -2,4 +2,4 @@
 "@rest-rpc/core": patch
 ---
 
-Add isSchemaRequired hook and make schemaConverter hook optional
+Make schemaConverter optional and add transform hooks for generated OpenAPI parameters and operations

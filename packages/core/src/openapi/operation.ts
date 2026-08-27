@@ -83,24 +83,24 @@ export type SchemaConverter = (
 	mode: "input" | "output",
 ) => OpenApiSchema | undefined;
 
-export type SchemaRequiredContext = {
-	schema: StandardSchemaV1;
-	jsonSchema: OpenApiSchema;
-};
-
-export type SchemaRequired = (context: SchemaRequiredContext) => boolean;
-
 export type OpenApiRouteDeclaration = HttpRouteDeclaration;
+
+export type ParameterTransformContext = {
+	route: OpenApiRouteDeclaration;
+	routePath: string[];
+	parameter: OpenApiParameter;
+};
 
 export type OperationTransformContext = {
 	route: OpenApiRouteDeclaration;
+	routePath: string[];
 	operation: OpenApiOperation;
 };
 
 type CreateOperationOptions = {
 	schemaConverter?: SchemaConverter;
+	transformParameter?: (context: ParameterTransformContext) => OpenApiParameter;
 	transformOperation?: (context: OperationTransformContext) => OpenApiOperation;
-	isSchemaRequired?: SchemaRequired;
 };
 
 const getSchemaProperties = (schema: OpenApiSchema) =>
@@ -161,16 +161,11 @@ export const createParameters = (
 
 	if (isJsonQuery(schema)) {
 		const jsonSchema = options.schemaConverter?.(schema.schema, "input") ?? {};
-		const isRequired = options.isSchemaRequired?.({
-			schema: schema.schema,
-			jsonSchema,
-		});
 
 		return [
 			{
 				name: "query",
 				in: "query",
-				...(isRequired === undefined ? {} : { required: isRequired }),
 				content: {
 					[JSON_CONTENT_TYPE]: {
 						schema: jsonSchema,
@@ -183,18 +178,11 @@ export const createParameters = (
 	if (isRequestSchemaRecord(schema)) {
 		return Object.entries(schema).map(([name, fieldSchema]) => {
 			const jsonSchema = options.schemaConverter?.(fieldSchema, "input") ?? {};
-			const isRequired =
-				location === "path"
-					? true
-					: options.isSchemaRequired?.({
-							schema: fieldSchema,
-							jsonSchema,
-						});
 
 			return {
 				name,
 				in: location,
-				...(isRequired === undefined ? {} : { required: isRequired }),
+				...(location === "path" ? { required: true } : {}),
 				schema: jsonSchema,
 			};
 		});
@@ -226,13 +214,11 @@ export const createHeaderParameters = (
 
 	return Object.entries(headers).map(([name, schema]) => {
 		const jsonSchema = options.schemaConverter?.(schema, "input") ?? {};
-		const isRequired = options.isSchemaRequired?.({ schema, jsonSchema });
 
 		return {
 			name,
 			in: "header" as const,
 			schema: jsonSchema,
-			...(isRequired === undefined ? {} : { required: isRequired }),
 		};
 	});
 };
@@ -412,12 +398,17 @@ export const createResponses = (
 export const createOperation = (
 	route: OpenApiRouteDeclaration,
 	options: CreateOperationOptions,
+	routePath: string[] = [],
 ): OpenApiOperation => {
 	const parameters = [
 		...createParameters(route.pathParams, "path", options),
 		...createParameters(route.query, "query", options),
 		...createHeaderParameters(route.headers, options),
-	];
+	].map(
+		(parameter) =>
+			options.transformParameter?.({ route, routePath, parameter }) ??
+			parameter,
+	);
 	const requestBody = createRequestBody(route.body, options.schemaConverter);
 	const { extensions, ...openApi } = route.openApi ?? {};
 	const operation: OpenApiOperation = {
@@ -428,5 +419,7 @@ export const createOperation = (
 		responses: createResponses(route, options.schemaConverter),
 	};
 
-	return options.transformOperation?.({ route, operation }) ?? operation;
+	return (
+		options.transformOperation?.({ route, routePath, operation }) ?? operation
+	);
 };

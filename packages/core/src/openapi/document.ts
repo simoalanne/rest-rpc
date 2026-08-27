@@ -4,12 +4,13 @@ import type {
 	RouteDeclaration,
 } from "../contract/contract.ts";
 import { toOpenApiPath } from "../contract/path.ts";
-import { contractRoutes } from "../contract/traversal.ts";
+import { contractRouteEntries } from "../contract/traversal.ts";
 import type {
+	OpenApiParameter,
 	OpenApiOperation,
 	OperationTransformContext,
+	ParameterTransformContext,
 	SchemaConverter,
-	SchemaRequired,
 } from "./operation.ts";
 import { createOperation } from "./operation.ts";
 
@@ -64,12 +65,10 @@ export type CreateOpenApiDocumentOptions = {
 	tags?: OpenApiDocument["tags"];
 	/** Converts Standard Schema declarations into OpenAPI Schema Objects. */
 	schemaConverter?: SchemaConverter;
-	/** Declares OpenAPI requiredness for schemas used outside object properties. */
-	isSchemaRequired?: SchemaRequired;
+	/** Allows project-specific changes to generated parameter objects. */
+	transformParameter?: (context: ParameterTransformContext) => OpenApiParameter;
 	/** Allows project-specific changes to each generated operation. */
 	transformOperation?: (context: OperationTransformContext) => OpenApiOperation;
-	/** Allows project-specific changes to the completed document. */
-	transformDocument?: (document: OpenApiDocument) => OpenApiDocument;
 };
 
 const isOpenApiCompatibleRoute = (
@@ -95,14 +94,14 @@ export function createOpenApiDocument(
 		paths: {},
 	};
 
-	for (const route of contractRoutes(contract)) {
+	for (const { route, path: routePath } of contractRouteEntries(contract)) {
 		if (!isOpenApiCompatibleRoute(route)) continue;
 
 		const path = toOpenApiPath(route.path);
 		const method = route.method.toLowerCase() as keyof OpenApiPathItem;
 		document.paths[path] ??= {};
-		document.paths[path][method] = createOperation(route, options);
+		document.paths[path][method] = createOperation(route, options, routePath);
 	}
 
-	return options.transformDocument?.(document) ?? document;
+	return document;
 }

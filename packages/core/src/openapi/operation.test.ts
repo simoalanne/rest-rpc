@@ -16,11 +16,7 @@ import {
 	createRequestBody,
 	createResponse,
 } from "./operation.ts";
-import type {
-	OpenApiRouteDeclaration,
-	OpenApiSchema,
-	SchemaConverter,
-} from "./operation.ts";
+import type { OpenApiRouteDeclaration, SchemaConverter } from "./operation.ts";
 
 const schemaConverter: SchemaConverter = (schema, mode) =>
 	z.toJSONSchema(schema as z.ZodType, {
@@ -30,11 +26,6 @@ const schemaConverter: SchemaConverter = (schema, mode) =>
 		reused: "inline",
 	}) as Record<string, unknown>;
 const operationOptions = { schemaConverter };
-
-const metadataRequired = (schema: OpenApiSchema) => {
-	const metadata = schema as { openApi?: { required?: boolean } } | undefined;
-	return metadata?.openApi?.required;
-};
 
 describe("OpenAPI operations", () => {
 	it("describes SSE responses as event streams", () => {
@@ -207,7 +198,7 @@ describe("OpenAPI operations", () => {
 		);
 	});
 
-	it("uses isSchemaRequired for optional schema-record values", () => {
+	it("applies parameter transforms", () => {
 		const route: OpenApiRouteDeclaration = {
 			path: "/todos/:id",
 			method: "GET",
@@ -233,24 +224,65 @@ describe("OpenAPI operations", () => {
 			},
 		};
 
-		const operation = createOperation(route, {
-			info: { title: "Todo API", version: "1.0.0" },
-			schemaConverter,
-			isSchemaRequired: ({ jsonSchema }) =>
-				metadataRequired(jsonSchema) ?? true,
-		});
+		const operation = createOperation(
+			route,
+			{
+				info: { title: "Todo API", version: "1.0.0" },
+				schemaConverter,
+				transformParameter: ({ route, routePath, parameter }) => {
+					const metadata = parameter.schema as
+						| { openApi?: { required?: boolean } }
+						| undefined;
+					const required = metadata?.openApi?.required;
+
+					return {
+						...parameter,
+						"x-route-path": route.path,
+						"x-contract-path": routePath.join("."),
+						...(typeof required === "boolean" ? { required } : {}),
+					};
+				},
+			},
+			["todos", "list"],
+		);
 
 		assert.deepEqual(
 			operation.parameters?.map((parameter) => ({
 				name: parameter.name,
 				in: parameter.in,
 				required: parameter.required,
+				routePath: parameter["x-route-path"],
+				contractPath: parameter["x-contract-path"],
 			})),
 			[
-				{ name: "id", in: "path", required: true },
-				{ name: "search", in: "query", required: true },
-				{ name: "cursor", in: "query", required: false },
-				{ name: "x-preview", in: "header", required: false },
+				{
+					name: "id",
+					in: "path",
+					required: true,
+					routePath: "/todos/:id",
+					contractPath: "todos.list",
+				},
+				{
+					name: "search",
+					in: "query",
+					required: true,
+					routePath: "/todos/:id",
+					contractPath: "todos.list",
+				},
+				{
+					name: "cursor",
+					in: "query",
+					required: false,
+					routePath: "/todos/:id",
+					contractPath: "todos.list",
+				},
+				{
+					name: "x-preview",
+					in: "header",
+					required: false,
+					routePath: "/todos/:id",
+					contractPath: "todos.list",
+				},
 			],
 		);
 	});
@@ -644,16 +676,20 @@ describe("OpenAPI operations", () => {
 			},
 		};
 
-		const operation = createOperation(route, {
-			info: { title: "Todo API", version: "1.0.0" },
-			schemaConverter,
-			transformOperation: ({ route, operation }) => ({
-				...operation,
-				operationId: `${route.method} ${route.path}`,
-			}),
-		});
+		const operation = createOperation(
+			route,
+			{
+				info: { title: "Todo API", version: "1.0.0" },
+				schemaConverter,
+				transformOperation: ({ route, routePath, operation }) => ({
+					...operation,
+					operationId: `${routePath.join(".")} ${route.method} ${route.path}`,
+				}),
+			},
+			["todos", "list"],
+		);
 
-		assert.equal(operation.operationId, "GET /todos");
+		assert.equal(operation.operationId, "todos.list GET /todos");
 	});
 
 	it("applies explicit route OpenAPI options", () => {

@@ -59,9 +59,11 @@ const document = createOpenApiDocument(api, {
 });
 ```
 
-For schema records, headers, and JSON query parameters, the converted JSON Schema
-does not always say whether the parameter itself is required. Use
-`isSchemaRequired` to read that from your schema library metadata.
+For object-shaped path and query schemas, rest-rpc reads top-level
+`properties` and `required` from the converted JSON Schema to create OpenAPI
+parameters. Schema records, headers, and JSON query parameters do not always
+carry parameter-level requiredness in the converted schema. Use
+`transformParameter` when generated parameters need project-specific metadata.
 
 ```ts
 const api = router({
@@ -91,11 +93,14 @@ const document = createOpenApiDocument(api, {
 	},
 	schemaConverter: (schema, mode) =>
 		z.toJSONSchema(schema as z.ZodType, { io: mode }),
-	isSchemaRequired: ({ jsonSchema }) => {
-		const metadata = jsonSchema as
+	transformParameter: ({ parameter }) => {
+		const metadata = parameter.schema as
 			{ openApi?: { required?: boolean } } | undefined;
+		const required = metadata?.openApi?.required;
 
-		return metadata?.openApi?.required ?? true;
+		return typeof required === "boolean"
+			? { ...parameter, required }
+			: parameter;
 	},
 });
 ```
@@ -235,8 +240,9 @@ OpenAPI.
 
 ## Transform Hooks
 
-Use `transformOperation` and `transformDocument` when generated output needs
-project-specific changes.
+Use `transformParameter` and `transformOperation` when generated output needs
+project-specific changes. Both transform contexts include `routePath`, the route
+key path from the contract tree.
 
 ```ts
 const document = createOpenApiDocument(api, {
@@ -245,10 +251,15 @@ const document = createOpenApiDocument(api, {
 		version: "1.0.0",
 	},
 	schemaConverter,
-	transformOperation: ({ route, operation }) => {
+	transformParameter: ({ parameter }) =>
+		parameter.name === "preview"
+			? { ...parameter, required: false }
+			: parameter,
+	transformOperation: ({ route, routePath, operation }) => {
 		if (route.metadata.auth === "required") {
 			return {
 				...operation,
+				operationId: routePath.join("."),
 				security: [{ bearerAuth: [] }],
 			};
 		}
