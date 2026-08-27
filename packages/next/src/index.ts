@@ -9,7 +9,7 @@ export {
 	setCookie,
 	type SseEvent,
 	sseEvent,
-} from "@rest-rpc/web";
+} from "@rest-rpc/fetch";
 export {
 	type CreateRouteHandlerOptions,
 	createRouteHandler,

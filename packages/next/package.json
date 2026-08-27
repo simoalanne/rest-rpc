@@ -43,7 +43,7 @@
 	},
 	"dependencies": {
 		"@rest-rpc/core": "workspace:*",
-		"@rest-rpc/web": "workspace:*"
+		"@rest-rpc/fetch": "workspace:*"
 	},
 	"devDependencies": {
 		"next": "16.3.1"

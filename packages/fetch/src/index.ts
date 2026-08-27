@@ -8,18 +8,18 @@ import {
 } from "@rest-rpc/server";
 import {
 	defaultParseBody,
-	handleWebRoute,
-	type WebRouteParseBody,
+	handleFetchRoute,
+	type FetchRouteParseBody,
 } from "./http.ts";
-import { createWebRouteMatcher } from "./match.ts";
+import { createFetchRouteMatcher } from "./match.ts";
 import {
-	createWebRouteBuilder,
-	createWebRouterBuilder,
-	type WebContract,
-	type WebImplementationTree,
-	type WebRouteBuilder,
-	type WebRouteImplementation,
-	type WebRouterBuilder,
+	createFetchRouteBuilder,
+	createFetchRouterBuilder,
+	type FetchContract,
+	type FetchImplementationTree,
+	type FetchRouteBuilder,
+	type FetchRouteImplementation,
+	type FetchRouterBuilder,
 } from "./routeBuilder.ts";
 
 export type {
@@ -32,30 +32,30 @@ export type {
 	SetCookieOptions,
 	SseEvent,
 } from "@rest-rpc/server";
-export type { WebRouteParseBody, WebRouteParseBodyInput } from "./http.ts";
+export type { FetchRouteParseBody, FetchRouteParseBodyInput } from "./http.ts";
 export type {
 	RouteHandlers,
 	RouteRequest,
-	WebContract,
-	WebImplementationTree,
-	WebRouteBuilder,
-	WebRouteContext,
-	WebRouteMiddleware,
-	WebRouteMiddlewareInput,
-	WebRouteMiddlewareResult,
-	WebRouterBuilder,
+	FetchContract,
+	FetchImplementationTree,
+	FetchRouteBuilder,
+	FetchRouteContext,
+	FetchRouteMiddleware,
+	FetchRouteMiddlewareInput,
+	FetchRouteMiddlewareResult,
+	FetchRouterBuilder,
 } from "./routeBuilder.ts";
 export { clearCookie, RouteResponseError, setCookie, sseEvent };
 
 /**
- * Default runtime context passed to Web route handlers.
+ * Default runtime context passed to Fetch runtime route handlers.
  *
  * @remarks Augment this interface to set the runtime context for
  * `createRouteHandler()`, `route()`, and `router()` across a project.
  *
  * @example
  * ```ts
- * declare module "@rest-rpc/web" {
+ * declare module "@rest-rpc/fetch" {
  *   interface DefaultRuntimeContext {
  *     env: Env;
  *     ctx: ExecutionContext;
@@ -63,7 +63,7 @@ export { clearCookie, RouteResponseError, setCookie, sseEvent };
  * }
  * ```
  *
- * @see {@link https://rest-rpc.dev/docs/server/web#framework-context}
+ * @see {@link https://rest-rpc.dev/docs/server/fetch#framework-context}
  */
 export interface DefaultRuntimeContext {}
 
@@ -73,71 +73,73 @@ interface ContextShape {
 }
 
 /**
- * Default request type passed to Web route handlers.
+ * Default request type passed to Fetch runtime route handlers.
  *
  * @remarks Augment this interface when using a `Request` subclass such as
  * `NextRequest`.
  *
- * @see {@link https://rest-rpc.dev/docs/server/web#framework-context}
+ * @see {@link https://rest-rpc.dev/docs/server/fetch#framework-context}
  */
 export interface DefaultRequest extends Request {}
 
 /**
- * Options for creating a Web `Request` to `Response` route handler.
+ * Options for creating a Fetch runtime `Request` to `Response` route handler.
  *
- * @see {@link https://rest-rpc.dev/docs/server/web#options}
+ * @see {@link https://rest-rpc.dev/docs/server/fetch#options}
  */
-export type CreateWebHandlerOptions = {
+export type CreateFetchHandlerOptions = {
 	errorHandlers?: ServerErrorHandlers<Record<never, never>>;
-	parseBody?: WebRouteParseBody;
+	parseBody?: FetchRouteParseBody;
 };
 
 /**
- * Creates a Web route implementation builder for a single HTTP route.
+ * Creates a Fetch runtime route implementation builder for a single HTTP route.
  *
- * @see {@link https://rest-rpc.dev/docs/server/web}
+ * @see {@link https://rest-rpc.dev/docs/server/fetch}
  */
 export function route<
 	const TRoute extends HttpRouteDeclaration,
 	TRuntimeContext extends ContextShape = DefaultRuntimeContext,
 	TRequest extends Request = DefaultRequest,
->(contract: TRoute): WebRouteBuilder<TRoute, TRuntimeContext, TRequest> {
-	return createWebRouteBuilder(contract);
+>(contract: TRoute): FetchRouteBuilder<TRoute, TRuntimeContext, TRequest> {
+	return createFetchRouteBuilder(contract);
 }
 
 /**
- * Creates a Web router implementation builder for a contract tree.
+ * Creates a Fetch runtime router implementation builder for a contract tree.
  *
- * @see {@link https://rest-rpc.dev/docs/server/web}
+ * @see {@link https://rest-rpc.dev/docs/server/fetch}
  */
 export function router<
-	const TContract extends WebContract,
+	const TContract extends FetchContract,
 	TRuntimeContext extends ContextShape = DefaultRuntimeContext,
 	TRequest extends Request = DefaultRequest,
->(contract: TContract): WebRouterBuilder<TContract, TRuntimeContext, TRequest> {
-	return createWebRouterBuilder(contract);
+>(
+	contract: TContract,
+): FetchRouterBuilder<TContract, TRuntimeContext, TRequest> {
+	return createFetchRouterBuilder(contract);
 }
 
 /**
- * Creates a Web `Request` handler from route implementations.
+ * Creates a Fetch runtime `Request` handler from route implementations.
  *
- * @see {@link https://rest-rpc.dev/docs/server/web}
+ * @see {@link https://rest-rpc.dev/docs/server/fetch}
  */
 export function createRouteHandler<
 	TRuntimeContext extends ContextShape = DefaultRuntimeContext,
 	TRequest extends Request = DefaultRequest,
 >(
-	implementations: WebImplementationTree,
-	options: CreateWebHandlerOptions = {},
+	implementations: FetchImplementationTree,
+	options: CreateFetchHandlerOptions = {},
 ): (request: TRequest, runtime: TRuntimeContext) => Promise<Response> {
-	const matchRoute = createWebRouteMatcher(implementations);
+	const matchRoute = createFetchRouteMatcher(implementations);
 	const usesDefaultParseBody = options.parseBody === undefined;
 	const parseBody = options.parseBody ?? defaultParseBody;
 
 	return async (request: TRequest, runtime: TRuntimeContext) => {
 		const match = matchRoute(request);
 		if (match instanceof Response) return match;
-		const implementation = match.implementation as WebRouteImplementation<
+		const implementation = match.implementation as FetchRouteImplementation<
 			TRuntimeContext,
 			TRequest
 		>;
@@ -161,7 +163,7 @@ export function createRouteHandler<
 			request,
 		};
 
-		return handleWebRoute(
+		return handleFetchRoute(
 			request,
 			context,
 			implementation,

@@ -1,4 +1,4 @@
-import { createWebAdapter } from "../harness/web.ts";
+import { createFetchAdapter } from "../harness/fetch.ts";
 import {
 	createStreamCancellationProbe,
 	createStreamsImplementations,
@@ -8,6 +8,6 @@ import { runStreamsSuite } from "./suite.ts";
 const cancellationProbe = createStreamCancellationProbe();
 
 runStreamsSuite({
-	...createWebAdapter(createStreamsImplementations({ cancellationProbe })),
+	...createFetchAdapter(createStreamsImplementations({ cancellationProbe })),
 	cancellationProbe,
 });

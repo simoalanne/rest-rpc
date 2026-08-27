@@ -10,30 +10,30 @@ import {
 } from "@rest-rpc/core/contract";
 import {
 	createRequestParsingErrorResponse,
-	createWebResponse,
+	createFetchResponse,
 	handleHttpRoute,
 	type RouteImplementation,
 	type ServerErrorHandlers,
 } from "@rest-rpc/server";
 
 /**
- * Input passed to a custom Web adapter request body parser.
+ * Input passed to a custom Fetch runtime request body parser.
  *
- * @see {@link https://rest-rpc.dev/docs/server/web#body-parsing}
+ * @see {@link https://rest-rpc.dev/docs/server/fetch#body-parsing}
  */
-export type WebRouteParseBodyInput = {
+export type FetchRouteParseBodyInput = {
 	request: Request;
 	route: HttpRouteDeclaration;
 	body: RequestBodySchema;
 };
 
 /**
- * Custom request body parser for the Web adapter.
+ * Custom request body parser for the Fetch runtime.
  *
- * @see {@link https://rest-rpc.dev/docs/server/web#body-parsing}
+ * @see {@link https://rest-rpc.dev/docs/server/fetch#body-parsing}
  */
-export type WebRouteParseBody = (
-	input: WebRouteParseBodyInput,
+export type FetchRouteParseBody = (
+	input: FetchRouteParseBodyInput,
 ) => unknown | Promise<unknown>;
 
 const isJsonContentType = (contentType: string) =>
@@ -50,7 +50,10 @@ const readQuery = (url: URL) => Object.fromEntries(url.searchParams.entries());
 
 const readHeaders = (headers: Headers) => Object.fromEntries(headers.entries());
 
-export const defaultParseBody = ({ request, body }: WebRouteParseBodyInput) => {
+export const defaultParseBody = ({
+	request,
+	body,
+}: FetchRouteParseBodyInput) => {
 	if (!body || isNoBody(body)) return undefined;
 	if (isFormBody(body)) {
 		const contentType = request.headers.get("content-type") ?? "";
@@ -77,12 +80,14 @@ export const defaultParseBody = ({ request, body }: WebRouteParseBodyInput) => {
 	return request.json();
 };
 
-export const handleWebRoute = async <TContext extends Record<string, unknown>>(
+export const handleFetchRoute = async <
+	TContext extends Record<string, unknown>,
+>(
 	request: Request,
 	context: TContext,
 	implementation: RouteImplementation<HttpRouteDeclaration>,
 	params: Record<string, string>,
-	parseBody: WebRouteParseBody,
+	parseBody: FetchRouteParseBody,
 	usesDefaultParseBody: boolean,
 	errorHandlers: ServerErrorHandlers<Record<never, never>> | undefined,
 ) => {
@@ -116,5 +121,5 @@ export const handleWebRoute = async <TContext extends Record<string, unknown>>(
 		},
 	);
 
-	return createWebResponse(result);
+	return createFetchResponse(result);
 };

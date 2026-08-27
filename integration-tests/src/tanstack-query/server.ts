@@ -2,7 +2,7 @@ import type { Server } from "node:http";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { Readable } from "node:stream";
-import { createRouteHandler, router } from "@rest-rpc/web";
+import { createRouteHandler, router } from "@rest-rpc/fetch";
 import { createTanstackQueryImplementations } from "./handlers.ts";
 
 export type StartedTanstackQueryServer = {

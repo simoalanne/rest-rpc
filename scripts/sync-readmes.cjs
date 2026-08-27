@@ -12,7 +12,7 @@ const targets = [
 	"packages/next/README.md",
 	"packages/server/README.md",
 	"packages/tanstack-query/README.md",
-	"packages/web/README.md",
+	"packages/fetch/README.md",
 ];
 
 for (const target of targets) {

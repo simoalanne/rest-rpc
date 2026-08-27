@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import type { HttpRouteResult } from "./handleHttpRoute.ts";
 import { handleHttpRouteResult } from "./handleHttpRouteResult.ts";
 import { sseEvent } from "./sse.ts";
-import { createWebResponse } from "./webResponse.ts";
+import { createFetchResponse } from "./fetchResponse.ts";
 
 describe("handleHttpRouteResult", () => {
 	it("applies headers and sends json responses", async () => {
@@ -110,9 +110,9 @@ describe("handleHttpRouteResult", () => {
 	});
 });
 
-describe("createWebResponse", () => {
+describe("createFetchResponse", () => {
 	it("creates json responses with headers", async () => {
-		const response = await createWebResponse({
+		const response = await createFetchResponse({
 			kind: "json",
 			status: 200,
 			headers: {
@@ -128,7 +128,7 @@ describe("createWebResponse", () => {
 	});
 
 	it("preserves explicit json content-type headers", async () => {
-		const response = await createWebResponse({
+		const response = await createFetchResponse({
 			kind: "json",
 			status: 200,
 			headers: {
@@ -150,7 +150,7 @@ describe("createWebResponse", () => {
 			yield { id: "todo-2" };
 		}
 
-		const response = await createWebResponse({
+		const response = await createFetchResponse({
 			kind: "stream",
 			status: 200,
 			body: body(),
@@ -167,7 +167,7 @@ describe("createWebResponse", () => {
 			yield "b";
 		}
 
-		const response = await createWebResponse({
+		const response = await createFetchResponse({
 			kind: "stream",
 			status: 200,
 			contentType: "text/plain",
@@ -184,7 +184,7 @@ describe("createWebResponse", () => {
 			yield sseEvent({ id: "event-2" });
 		}
 
-		const response = await createWebResponse({
+		const response = await createFetchResponse({
 			kind: "stream",
 			status: 200,
 			contentType: "text/event-stream",
@@ -199,8 +199,8 @@ describe("createWebResponse", () => {
 		);
 	});
 
-	it("appends array header values on web responses", async () => {
-		const response = await createWebResponse({
+	it("appends array header values on fetch responses", async () => {
+		const response = await createFetchResponse({
 			kind: "empty",
 			status: 204,
 			headers: {

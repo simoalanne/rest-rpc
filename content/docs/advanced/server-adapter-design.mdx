@@ -134,7 +134,7 @@ const intercept = async (executionContext, next) => {
 
 When a framework does not expose a direct route registration surface, the adapter
 has to own the request dispatch. The adapter receives a request, matches it to a route,
-and executes the implementation. `@rest-rpc/web` and `@rest-rpc/next` are built this way.
+and executes the implementation. `@rest-rpc/fetch` and `@rest-rpc/next` are built this way.
 
 Conceptually, the adapter does this:
 
@@ -175,13 +175,13 @@ Express and Fastify are popular Node frameworks with their own request and
 response objects. They are also unopinionated about how an application should be
 structured, so a contract can be mounted directly into the framework router.
 
-Hono is closer to Web standards, but a Hono route is not just a
+Hono is closer to Fetch runtime standards, but a Hono route is not just a
 `Request -> Response` function. Handlers receive Hono's `Context`, and Hono's
 router, middleware, environment typing, and runtime-specific helpers are part of
 the application surface. A Hono adapter preserves that surface instead of making
-each application rebuild the same bridge around `@rest-rpc/web`.
+each application rebuild the same bridge around `@rest-rpc/fetch`.
 
-The Web adapter covers the case where HTTP integration is already expressed as
+The Fetch runtime covers the case where HTTP integration is already expressed as
 one request handler. It does not need to register routes into a framework or
 preserve framework context. It only needs to match the incoming request, execute
 the contract route, and return a `Response`.
@@ -189,7 +189,7 @@ the contract route, and return a `Response`.
 Next.js is also request-dispatch shaped, but the application surface is not just
 an arbitrary handler function. Route handlers are expressed as method exports,
 and the request object is `NextRequest`. The Next.js adapter keeps those
-conventions at the edge while reusing the same underlying Web-style execution
+conventions at the edge while reusing the same underlying Fetch-style execution
 model.
 
 NestJS is controller-shaped. Routes are declared through decorators and modules,
@@ -212,7 +212,7 @@ framework:
 - Fastify uses `@fastify/websocket`
 - Hono uses the framework's `upgradeWebSocket` API
 
-The Web adapter handles HTTP routes only. A standard `Request -> Response`
+The Fetch runtime handles HTTP routes only. A standard `Request -> Response`
 handler describes the request and response, but not the full upgrade and socket
 lifecycle across runtimes. A runtime-specific adapter can still support
 WebSockets by using the lower-level helpers from `@rest-rpc/server`.

@@ -61,7 +61,7 @@ export {
 export type { SseEvent } from "./sse.ts";
 export { formatSseEvent, sseEvent } from "./sse.ts";
 export type { RequestSegments, ValidationIssue } from "./validation.ts";
-export { createWebResponse } from "./webResponse.ts";
+export { createFetchResponse } from "./fetchResponse.ts";
 export type {
 	BeforeWebSocketUpgrade,
 	UpgradeRejection,

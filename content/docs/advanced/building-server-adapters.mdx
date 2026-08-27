@@ -5,7 +5,7 @@ description: Learn how first-party adapters use @rest-rpc/server and how you cou
 
 Most applications should use a framework adapter such as `@rest-rpc/express`,
 `@rest-rpc/fastify`, `@rest-rpc/hono`, `@rest-rpc/nest`, `@rest-rpc/next`, or
-`@rest-rpc/web`.
+`@rest-rpc/fetch`.
 The `@rest-rpc/server` package is for adapter authors or for cases where your
 application does not use a supported framework and you still want to use
 `@rest-rpc` on the server.
@@ -236,10 +236,10 @@ still receives the same `body`, `status`, `contentType`, and `mode`.
 
 Some integrations do not register each contract route with the framework.
 Instead, they receive every request through one handler and dispatch to the
-matching contract route themselves. `@rest-rpc/web` is the simplest first-party
+matching contract route themselves. `@rest-rpc/fetch` is the simplest first-party
 example.
 
-The Web adapter creates a matcher from the implementation tree once.
+The Fetch runtime creates a matcher from the implementation tree once.
 
 ```ts
 import {
@@ -248,7 +248,7 @@ import {
 	type ImplementationTree,
 } from "@rest-rpc/server";
 
-export const createWebRouteMatcher = (
+export const createFetchRouteMatcher = (
 	implementations: ImplementationTree<HttpRouteDeclaration>,
 ) => {
 	const routes = flattenRouteImplementations(implementations);
@@ -299,9 +299,9 @@ and route execution together.
 ```ts
 import type { ServerErrorHandlers } from "@rest-rpc/server";
 
-export type CreateWebHandlerOptions = {
+export type CreateFetchHandlerOptions = {
 	errorHandlers?: ServerErrorHandlers<Record<never, never>>;
-	parseBody?: WebRouteParseBody;
+	parseBody?: FetchRouteParseBody;
 };
 
 export const createRouteHandler = <
@@ -309,10 +309,10 @@ export const createRouteHandler = <
 	TContext extends Record<string, unknown> = Record<string, unknown>,
 	TRequest extends Request = Request,
 >(
-	implementations: WebImplementationTree,
-	options: CreateWebHandlerOptions = {},
+	implementations: FetchImplementationTree,
+	options: CreateFetchHandlerOptions = {},
 ): ((request: TRequest, runtime: TRuntimeContext) => Promise<Response>) => {
-	const matchRoute = createWebRouteMatcher(implementations);
+	const matchRoute = createFetchRouteMatcher(implementations);
 	const usesDefaultParseBody = options.parseBody === undefined;
 	const parseBody = options.parseBody ?? defaultParseBody;
 
@@ -332,7 +332,7 @@ export const createRouteHandler = <
 			request,
 		};
 
-		return handleWebRoute(
+		return handleFetchRoute(
 			request,
 			context,
 			implementation,
@@ -346,11 +346,11 @@ export const createRouteHandler = <
 ```
 
 The dispatch-specific work is matching the request and building context from
-runtime input. After that, `handleWebRoute` uses the same HTTP execution
+runtime input. After that, `handleFetchRoute` uses the same HTTP execution
 primitive as the Express adapter.
 
 ```ts
-import { createWebResponse, handleHttpRoute } from "@rest-rpc/server";
+import { createFetchResponse, handleHttpRoute } from "@rest-rpc/server";
 
 const result = await handleHttpRoute(
 	implementation.route,
@@ -367,10 +367,10 @@ const result = await handleHttpRoute(
 	},
 );
 
-return createWebResponse(result);
+return createFetchResponse(result);
 ```
 
-`createWebResponse` is a convenience for adapters that return the standard Web
+`createFetchResponse` is a convenience for adapters that return the standard Fetch
 `Response` object. Frameworks with their own response API should usually use
 `handleHttpRouteResult` directly, like the Express adapter does.
 
@@ -532,7 +532,7 @@ When building a local adapter, copy the shape rather than the whole file.
 - Use `handleHttpRoute` for HTTP validation, handler execution, response
   validation, and error hooks.
 - Use `handleHttpRouteResult` when writing to framework response objects.
-- Use `createWebResponse` only when your adapter returns a standard Web
+- Use `createFetchResponse` only when your adapter returns a standard Fetch
   `Response`.
 - Use `prepareWebSocketUpgrade` before accepting a WebSocket route.
 - Use `handleWebSocketRoute` after the runtime gives your adapter an accepted

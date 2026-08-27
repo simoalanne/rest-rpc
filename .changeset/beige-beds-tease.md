@@ -1,6 +1,6 @@
 ---
 "@rest-rpc/nest": patch
-"@rest-rpc/web": patch
+"@rest-rpc/fetch": patch
 ---
 
 Restrict unknown key access for typescript for context types

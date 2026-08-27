@@ -4,7 +4,7 @@
 "@rest-rpc/hono": minor
 "@rest-rpc/next": minor
 "@rest-rpc/server": minor
-"@rest-rpc/web": minor
+"@rest-rpc/fetch": minor
 ---
 
 convenience setCookie and clearCookie helpers for server adapters

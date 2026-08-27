@@ -1,17 +1,19 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import type { StartedServer } from "../harness/listen.ts";
-import { createWebAdapter } from "../harness/web.ts";
+import { createFetchAdapter } from "../harness/fetch.ts";
 import { createIntegrationImplementations } from "./handlers.ts";
 import { runClientHttpSuite } from "./suite.ts";
 
-runClientHttpSuite(createWebAdapter(createIntegrationImplementations()));
+runClientHttpSuite(createFetchAdapter(createIntegrationImplementations()));
 
-describe("web route matching integration", () => {
+describe("fetch route matching integration", () => {
 	let server: StartedServer;
 
 	before(async () => {
-		server = await createWebAdapter(createIntegrationImplementations()).start();
+		server = await createFetchAdapter(
+			createIntegrationImplementations(),
+		).start();
 	});
 
 	after(async () => {

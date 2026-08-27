@@ -20,7 +20,7 @@ const packages = [
 	["next", "packages/next/CHANGELOG.md"],
 	["server", "packages/server/CHANGELOG.md"],
 	["tanstack-query", "packages/tanstack-query/CHANGELOG.md"],
-	["web", "packages/web/CHANGELOG.md"],
+	["fetch", "packages/fetch/CHANGELOG.md"],
 ] as const;
 
 const changelogs = await Promise.all(

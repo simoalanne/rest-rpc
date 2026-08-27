@@ -1,21 +1,21 @@
 ---
-title: Web
+title: Fetch Runtime
 description: Use rest-rpc with Fetch runtimes
 ---
 
 ## Install
 
 ```sh
-pnpm add @rest-rpc/web
+pnpm add @rest-rpc/fetch
 ```
 
 ## Usage
 
 ```ts
-import { createRouteHandler, router } from "@rest-rpc/web";
+import { createRouteHandler, router } from "@rest-rpc/fetch";
 import { api } from "./contract";
 
-declare module "@rest-rpc/web" {
+declare module "@rest-rpc/fetch" {
 	interface DefaultRuntimeContext {
 		env: Env;
 		ctx: ExecutionContext;
@@ -124,9 +124,9 @@ const routes = router(api)
 ## Options
 
 ```ts
-type CreateWebHandlerOptions = {
+type CreateFetchHandlerOptions = {
 	errorHandlers?: ServerErrorHandlers<Record<never, never>>;
-	parseBody?: WebRouteParseBody;
+	parseBody?: FetchRouteParseBody;
 };
 ```
 

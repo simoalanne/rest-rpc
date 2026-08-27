@@ -1,4 +1,4 @@
-# @rest-rpc/web
+# @rest-rpc/fetch
 
 ## 0.1.0-beta.14
 

@@ -6,7 +6,7 @@
 "@rest-rpc/next": patch
 "@rest-rpc/server": patch
 "@rest-rpc/tanstack-query": patch
-"@rest-rpc/web": patch
+"@rest-rpc/fetch": patch
 ---
 
 improve generated API reference by changing exported arrow functions to regular functions and dropping unnecssary noisy exports

@@ -1,4 +1,4 @@
-import { createWebAdapter } from "../harness/web.ts";
+import { createFetchAdapter } from "../harness/fetch.ts";
 import {
 	createErrorHandlerState,
 	createErrorHandlers,
@@ -9,7 +9,7 @@ import { runErrorHandlersSuite } from "./suite.ts";
 const state = createErrorHandlerState();
 
 runErrorHandlersSuite(
-	createWebAdapter(createErrorHandlersImplementations(state), {
+	createFetchAdapter(createErrorHandlersImplementations(state), {
 		createHandlerOptions: {
 			errorHandlers: createErrorHandlers(state),
 		},

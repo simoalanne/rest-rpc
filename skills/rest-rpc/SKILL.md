@@ -24,12 +24,12 @@ At a high level:
   Schema-compatible libraries such as Zod, Valibot, or ArkType, or use the
   built-in type-only helper when runtime validation is not needed.
 - Server adapters are available for Express, Fastify, Hono, Next.js, and
-  fetch-native Web `Request`/`Response` runtimes.
+  Fetch runtime `Request`/`Response` runtimes.
 - `@rest-rpc/core` contains the contract, client, and OpenAPI primitives.
 - `@rest-rpc/server` contains shared server-side behavior.
 - Adapter packages provide framework integration:
   `@rest-rpc/express`, `@rest-rpc/fastify`, `@rest-rpc/hono`,
-  `@rest-rpc/next`, and `@rest-rpc/web`.
+  `@rest-rpc/next`, and `@rest-rpc/fetch`.
 - `@rest-rpc/tanstack-query` derives query options, mutation options, and query
   keys from the same contract.
 

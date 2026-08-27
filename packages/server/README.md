@@ -78,5 +78,5 @@ Full documentation is available at [rest-rpc.dev](https://rest-rpc.dev)
 - [`@rest-rpc/hono`](https://npmx.dev/package/@rest-rpc/hono): Hono server adapter.
 - [`@rest-rpc/nest`](https://npmx.dev/package/@rest-rpc/nest): NestJS server adapter.
 - [`@rest-rpc/next`](https://npmx.dev/package/@rest-rpc/next): Next.js adapter.
-- [`@rest-rpc/web`](https://npmx.dev/package/@rest-rpc/web): Fetch runtime adapter
+- [`@rest-rpc/fetch`](https://npmx.dev/package/@rest-rpc/fetch): Fetch runtime adapter
 - [`@rest-rpc/tanstack-query`](https://npmx.dev/package/@rest-rpc/tanstack-query): TanStack Query adapter.

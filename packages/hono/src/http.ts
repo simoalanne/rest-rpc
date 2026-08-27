@@ -10,7 +10,7 @@ import {
 } from "@rest-rpc/core/contract";
 import {
 	createRequestParsingErrorResponse,
-	createWebResponse,
+	createFetchResponse,
 	handleHttpRoute,
 	type RouteImplementation,
 	type ServerErrorHandlers,
@@ -138,7 +138,7 @@ export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 					errorHandlers,
 				});
 
-				return createWebResponse(result);
+				return createFetchResponse(result);
 			},
 		);
 	}

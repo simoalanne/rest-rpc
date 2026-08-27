@@ -84,7 +84,7 @@ const collectAsyncIterable = async <T>(iterable: AsyncIterable<T>) => {
 	return items;
 };
 
-describe("web TanStack Query integration", () => {
+describe("fetch TanStack Query integration", () => {
 	let server: StartedTanstackQueryServer;
 
 	beforeEach(async () => {

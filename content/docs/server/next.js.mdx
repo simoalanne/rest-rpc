@@ -77,8 +77,7 @@ Stacking middleware is supported. Middleware can add to the context, and the
 context is passed to the next middleware in the stack. The final context is passed to the route handler.
 
 ```ts
-const routes = web
-	.router(api)
+const routes = router(api)
 	.middleware(({ runtime }) => ({
 		db: runtime.env.DB,
 	}))
@@ -102,8 +101,7 @@ and instead keep their existing middleware stack.
 :::
 
 ```ts
-const adminRoutes = web
-	.router(api.admin)
+const adminRoutes = router(api.admin)
 	.middleware(({ runtime }) => ({
 		adminDb: runtime.env.ADMIN_DB,
 	}))
@@ -115,8 +113,7 @@ const adminRoutes = web
 		},
 	});
 
-const routes = web
-	.router(api)
+const routes = router(api)
 	.middleware(({ runtime }) => ({
 		db: runtime.env.DB,
 	}))
@@ -132,8 +129,8 @@ const routes = web
 
 ```ts
 type CreateRouteHandlerOptions = {
-	errorHandlers?: CreateWebHandlerOptions["errorHandlers"];
-	parseBody?: (input: WebRouteParseBodyInput) => unknown | Promise<unknown>;
+	errorHandlers?: CreateFetchHandlerOptions["errorHandlers"];
+	parseBody?: (input: FetchRouteParseBodyInput) => unknown | Promise<unknown>;
 };
 ```
 
@@ -175,16 +172,16 @@ export const { POST } = createRouteHandler(uploadRoute, {
 
 ## Custom Runtime Context
 
-`@rest-rpc/next` is a small wrapper around the [Web adapter](./web). It creates
+`@rest-rpc/next` is a small wrapper around the [Fetch runtime](./fetch). It creates
 Next route handler exports and passes only the `NextRequest` to the middleware.
 
-Use `@rest-rpc/web` directly when middleware needs framework data that Next passes
+Use `@rest-rpc/fetch` directly when middleware needs framework data that Next passes
 as the route handler context, or when you want to shape the runtime context
 yourself.
 
 ```ts
 // app/api/[...rest-rpc]/route.ts
-import { createRouteHandler, router } from "@rest-rpc/web";
+import { createRouteHandler, router } from "@rest-rpc/fetch";
 import type { NextRequest } from "next/server";
 import { api } from "@/contract";
 
@@ -192,7 +189,7 @@ type Runtime = {
 	params: Promise<{ rest: string[] }>;
 };
 
-declare module "@rest-rpc/web" {
+declare module "@rest-rpc/fetch" {
 	interface DefaultRuntimeContext extends Runtime {}
 	interface DefaultRequest extends NextRequest {}
 }

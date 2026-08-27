@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { Readable } from "node:stream";
 import { describe, it } from "node:test";
 import { isCustomBody, isFormBody, isNoBody } from "@rest-rpc/core/contract";
-import { createRouteHandler, type WebRouteParseBody } from "@rest-rpc/web";
+import { createRouteHandler, type FetchRouteParseBody } from "@rest-rpc/fetch";
 import { listen } from "../harness/listen.ts";
 import { createBodyParsingImplementations } from "./handlers.ts";
 import { runBodyParsingSuite } from "./suite.ts";
@@ -11,7 +11,7 @@ import { runBodyParsingSuite } from "./suite.ts";
 const withoutBody = (method: string | undefined) =>
 	method === "GET" || method === "HEAD";
 
-const parseBody: WebRouteParseBody = async ({ body, request }) => {
+const parseBody: FetchRouteParseBody = async ({ body, request }) => {
 	if (!body || isNoBody(body)) return undefined;
 	const contentType = request.headers.get("content-type") ?? "";
 	if (isFormBody(body)) {
@@ -41,7 +41,7 @@ const parseBody: WebRouteParseBody = async ({ body, request }) => {
 };
 
 runBodyParsingSuite({
-	name: "web",
+	name: "fetch",
 	start: async () => {
 		const handler = createRouteHandler(createBodyParsingImplementations(), {
 			parseBody,
@@ -67,7 +67,7 @@ runBodyParsingSuite({
 	},
 });
 
-describe("web default body parser errors", () => {
+describe("fetch default body parser errors", () => {
 	it("returns a validation-style 400 when the default JSON parser fails", async () => {
 		const handler = createRouteHandler(createBodyParsingImplementations());
 		const response = await handler(

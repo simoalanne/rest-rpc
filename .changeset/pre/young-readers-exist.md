@@ -6,7 +6,7 @@
 "@rest-rpc/next": minor
 "@rest-rpc/server": minor
 "@rest-rpc/tanstack-query": minor
-"@rest-rpc/web": minor
+"@rest-rpc/fetch": minor
 ---
 
 export changes

@@ -22,25 +22,25 @@ type MergeContext<
 > = Merge<Omit<TContext, keyof TNextContext> & TNextContext>;
 
 /**
- * A contract tree containing only HTTP routes for the Web adapter.
+ * A contract tree containing only HTTP routes for the Fetch runtime.
  *
- * @see {@link https://rest-rpc.dev/docs/server/web}
+ * @see {@link https://rest-rpc.dev/docs/server/fetch}
  */
-export type WebContract = Contract<HttpRouteDeclaration>;
+export type FetchContract = Contract<HttpRouteDeclaration>;
 
 /**
- * An HTTP-only implementation tree for the Web adapter.
+ * An HTTP-only implementation tree for the Fetch runtime.
  *
- * @see {@link https://rest-rpc.dev/docs/server/web}
+ * @see {@link https://rest-rpc.dev/docs/server/fetch}
  */
-export type WebImplementationTree = ImplementationTree<HttpRouteDeclaration>;
+export type FetchImplementationTree = ImplementationTree<HttpRouteDeclaration>;
 
 /**
- * The context object passed to Web adapter route handlers.
+ * The context object passed to Fetch runtime route handlers.
  *
- * @see {@link https://rest-rpc.dev/docs/server/web#framework-context}
+ * @see {@link https://rest-rpc.dev/docs/server/fetch#framework-context}
  */
-export type WebRouteContext<
+export type FetchRouteContext<
 	TContext extends Record<string, unknown>,
 	TRequest extends Request = Request,
 > = Merge<
@@ -50,11 +50,11 @@ export type WebRouteContext<
 >;
 
 /**
- * Input passed to Web adapter middleware.
+ * Input passed to Fetch runtime middleware.
  *
- * @see {@link https://rest-rpc.dev/docs/server/web#framework-context}
+ * @see {@link https://rest-rpc.dev/docs/server/fetch#framework-context}
  */
-export type WebRouteMiddlewareInput<
+export type FetchRouteMiddlewareInput<
 	TRuntimeContext extends Record<string, unknown>,
 	TRequest extends Request = Request,
 	TContext extends Record<string, unknown> = Record<never, never>,
@@ -66,34 +66,34 @@ export type WebRouteMiddlewareInput<
 };
 
 /**
- * Result returned by Web adapter middleware.
+ * Result returned by Fetch runtime middleware.
  *
  * @remarks Returning a `Response` short-circuits the route handler.
- * @see {@link https://rest-rpc.dev/docs/server/web#framework-context}
+ * @see {@link https://rest-rpc.dev/docs/server/fetch#framework-context}
  */
-export type WebRouteMiddlewareResult<
+export type FetchRouteMiddlewareResult<
 	TContext extends Record<string, unknown>,
 > = Response | TContext | undefined;
 
 /**
- * Middleware function shape for Web adapter routes.
+ * Middleware function shape for Fetch runtime routes.
  *
- * @see {@link https://rest-rpc.dev/docs/server/web#framework-context}
+ * @see {@link https://rest-rpc.dev/docs/server/fetch#framework-context}
  */
-export type WebRouteMiddleware<
+export type FetchRouteMiddleware<
 	TRuntimeContext extends Record<string, unknown>,
 	TContext extends Record<string, unknown>,
 	TRequest extends Request = Request,
 	TInputContext extends Record<string, unknown> = Record<never, never>,
 > = (
-	input: WebRouteMiddlewareInput<TRuntimeContext, TRequest, TInputContext>,
-) => MaybePromise<WebRouteMiddlewareResult<TContext>>;
+	input: FetchRouteMiddlewareInput<TRuntimeContext, TRequest, TInputContext>,
+) => MaybePromise<FetchRouteMiddlewareResult<TContext>>;
 
-export type WebRouteImplementation<
+export type FetchRouteImplementation<
 	TRuntimeContext extends Record<string, unknown>,
 	TRequest extends Request = Request,
 > = RouteImplementation<HttpRouteDeclaration> & {
-	middleware?: WebRouteMiddleware<
+	middleware?: FetchRouteMiddleware<
 		TRuntimeContext,
 		Record<string, unknown>,
 		TRequest,
@@ -102,7 +102,7 @@ export type WebRouteImplementation<
 };
 
 /**
- * Infers the Web route handler request type for a route declaration.
+ * Infers the Fetch runtime route handler request type for a route declaration.
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
  */
@@ -110,10 +110,10 @@ export type RouteRequest<
 	E extends HttpRouteDeclaration,
 	TContext extends Record<string, unknown> = Record<string, unknown>,
 	TRequest extends Request = Request,
-> = ServerRouteRequest<E, WebRouteContext<TContext, TRequest>>;
+> = ServerRouteRequest<E, FetchRouteContext<TContext, TRequest>>;
 
 /**
- * Handler tree accepted by `router().handlers()` when building a Web implementation tree.
+ * Handler tree accepted by `router().handlers()` when building a Fetch runtime implementation tree.
  *
  * @remarks Use this type with `implements` to check class-based route handler
  * services against a contract tree.
@@ -130,83 +130,87 @@ export type RouteRequest<
  * @see {@link https://rest-rpc.dev/docs/recipes/class-handlers}
  */
 export type RouteHandlers<
-	TContract extends WebContract,
+	TContract extends FetchContract,
 	TContext extends Record<string, unknown> = Record<string, unknown>,
 	TRequest extends Request = Request,
 > = ServerRouteHandlers<
 	TContract,
-	WebRouteContext<TContext, TRequest>,
+	FetchRouteContext<TContext, TRequest>,
 	Record<never, never>
 >;
 
-type WebRouteBuilderWithMiddleware<
+type FetchRouteBuilderWithMiddleware<
 	TRoute extends HttpRouteDeclaration,
 	TContext extends Record<string, unknown>,
 	TRequest extends Request,
 > = {
 	handler(
-		handler: RouteHandler<TRoute, WebRouteContext<TContext, TRequest>>,
-	): RouteImplementation<TRoute> & WebImplementationTree;
+		handler: RouteHandler<TRoute, FetchRouteContext<TContext, TRequest>>,
+	): RouteImplementation<TRoute> & FetchImplementationTree;
 };
 
 /**
- * Builder for a single Web adapter route implementation.
+ * Builder for a single Fetch runtime route implementation.
  *
- * @see {@link https://rest-rpc.dev/docs/server/web}
+ * @see {@link https://rest-rpc.dev/docs/server/fetch}
  */
-export type WebRouteBuilder<
+export type FetchRouteBuilder<
 	TRoute extends HttpRouteDeclaration,
 	TRuntimeContext extends Record<string, unknown>,
 	TRequest extends Request = Request,
-> = WebRouteBuilderWithStackedMiddleware<
+> = FetchRouteBuilderWithStackedMiddleware<
 	TRoute,
 	TRuntimeContext,
 	Record<never, never>,
 	TRequest
 >;
 
-type WebRouterBuilderWithMiddleware<
-	TContract extends WebContract,
+type FetchRouterBuilderWithMiddleware<
+	TContract extends FetchContract,
 	TContext extends Record<string, unknown>,
 	TRequest extends Request,
 > = {
 	handlers(
 		handlers: RouteHandlers<TContract, TContext, TRequest>,
 	): ImplementationTreeFor<TContract, HttpRouteDeclaration> &
-		WebImplementationTree;
+		FetchImplementationTree;
 };
 
 /**
- * Builder for a Web adapter implementation tree.
+ * Builder for a Fetch runtime implementation tree.
  *
- * @see {@link https://rest-rpc.dev/docs/server/web}
+ * @see {@link https://rest-rpc.dev/docs/server/fetch}
  */
-export type WebRouterBuilder<
-	TContract extends WebContract,
+export type FetchRouterBuilder<
+	TContract extends FetchContract,
 	TRuntimeContext extends Record<string, unknown>,
 	TRequest extends Request = Request,
-> = WebRouterBuilderWithMiddleware<TContract, Record<never, never>, TRequest> &
-	WebRouterBuilderWithStackedMiddleware<
+> = FetchRouterBuilderWithMiddleware<
+	TContract,
+	Record<never, never>,
+	TRequest
+> &
+	FetchRouterBuilderWithStackedMiddleware<
 		TContract,
 		TRuntimeContext,
 		Record<never, never>,
 		TRequest
 	>;
 
-type WebRouteBuilderWithStackedMiddleware<
+type FetchRouteBuilderWithStackedMiddleware<
 	TRoute extends HttpRouteDeclaration,
 	TRuntimeContext extends Record<string, unknown>,
 	TContext extends Record<string, unknown>,
 	TRequest extends Request,
-> = WebRouteBuilderWithMiddleware<TRoute, TContext, TRequest> & {
+> = FetchRouteBuilderWithMiddleware<TRoute, TContext, TRequest> & {
 	middleware<TNextContext extends Record<string, unknown>>(
-		middleware: WebRouteMiddleware<
+		middleware: FetchRouteMiddleware<
 			TRuntimeContext,
 			TNextContext,
 			TRequest,
 			TContext
 		>,
-	): WebRouteBuilderWithStackedMiddleware<
+	): FetchRouteBuilderWithStackedMiddleware<
 		TRoute,
 		TRuntimeContext,
 		MergeContext<TContext, TNextContext>,
@@ -214,20 +218,20 @@ type WebRouteBuilderWithStackedMiddleware<
 	>;
 };
 
-type WebRouterBuilderWithStackedMiddleware<
-	TContract extends WebContract,
+type FetchRouterBuilderWithStackedMiddleware<
+	TContract extends FetchContract,
 	TRuntimeContext extends Record<string, unknown>,
 	TContext extends Record<string, unknown>,
 	TRequest extends Request,
-> = WebRouterBuilderWithMiddleware<TContract, TContext, TRequest> & {
+> = FetchRouterBuilderWithMiddleware<TContract, TContext, TRequest> & {
 	middleware<TNextContext extends Record<string, unknown>>(
-		middleware: WebRouteMiddleware<
+		middleware: FetchRouteMiddleware<
 			TRuntimeContext,
 			TNextContext,
 			TRequest,
 			TContext
 		>,
-	): WebRouterBuilderWithStackedMiddleware<
+	): FetchRouterBuilderWithStackedMiddleware<
 		TContract,
 		TRuntimeContext,
 		MergeContext<TContext, TNextContext>,
@@ -238,11 +242,11 @@ type WebRouterBuilderWithStackedMiddleware<
 const attachMiddleware = <
 	TRuntimeContext extends Record<string, unknown>,
 	TRequest extends Request,
-	TImplementation extends WebImplementationTree,
+	TImplementation extends FetchImplementationTree,
 >(
 	implementation: TImplementation,
 	middleware:
-		| WebRouteMiddleware<
+		| FetchRouteMiddleware<
 				TRuntimeContext,
 				Record<string, unknown>,
 				TRequest,
@@ -260,35 +264,35 @@ const attachMiddleware = <
 	return Object.fromEntries(
 		Object.entries(implementation).map(([key, child]) => [
 			key,
-			attachMiddleware(child as WebImplementationTree, middleware),
+			attachMiddleware(child as FetchImplementationTree, middleware),
 		]),
 	) as TImplementation;
 };
 
-export const createWebRouteBuilder = <
+export const createFetchRouteBuilder = <
 	const TRoute extends HttpRouteDeclaration,
 	TRuntimeContext extends Record<string, unknown>,
 	TRequest extends Request = Request,
 	TContext extends Record<string, unknown> = Record<never, never>,
 >(
 	contract: TRoute,
-	middlewares: WebRouteMiddleware<
+	middlewares: FetchRouteMiddleware<
 		TRuntimeContext,
 		Record<string, unknown>,
 		TRequest,
 		Record<string, unknown>
 	>[] = [],
-): WebRouteBuilder<TRoute, TRuntimeContext, TRequest> &
-	WebRouteBuilderWithStackedMiddleware<
+): FetchRouteBuilder<TRoute, TRuntimeContext, TRequest> &
+	FetchRouteBuilderWithStackedMiddleware<
 		TRoute,
 		TRuntimeContext,
 		TContext,
 		TRequest
 	> => ({
 	middleware: (nextMiddleware) =>
-		createWebRouteBuilder(contract, [
+		createFetchRouteBuilder(contract, [
 			...middlewares,
-			nextMiddleware as WebRouteMiddleware<
+			nextMiddleware as FetchRouteMiddleware<
 				TRuntimeContext,
 				Record<string, unknown>,
 				TRequest,
@@ -299,40 +303,43 @@ export const createWebRouteBuilder = <
 		attachMiddleware(
 			serverRoute<
 				TRoute,
-				WebRouteContext<TContext, TRequest>,
+				FetchRouteContext<TContext, TRequest>,
 				Record<never, never>
 			>(
 				contract,
-				handler as RouteHandlerFor<TRoute, WebRouteContext<TContext, TRequest>>,
+				handler as RouteHandlerFor<
+					TRoute,
+					FetchRouteContext<TContext, TRequest>
+				>,
 			),
 			middlewares,
-		) as RouteImplementation<TRoute> & WebImplementationTree,
+		) as RouteImplementation<TRoute> & FetchImplementationTree,
 });
 
-export const createWebRouterBuilder = <
-	const TContract extends WebContract,
+export const createFetchRouterBuilder = <
+	const TContract extends FetchContract,
 	TRuntimeContext extends Record<string, unknown>,
 	TRequest extends Request = Request,
 	TContext extends Record<string, unknown> = Record<never, never>,
 >(
 	contract: TContract,
-	middlewares: WebRouteMiddleware<
+	middlewares: FetchRouteMiddleware<
 		TRuntimeContext,
 		Record<string, unknown>,
 		TRequest,
 		Record<string, unknown>
 	>[] = [],
-): WebRouterBuilder<TContract, TRuntimeContext, TRequest> &
-	WebRouterBuilderWithStackedMiddleware<
+): FetchRouterBuilder<TContract, TRuntimeContext, TRequest> &
+	FetchRouterBuilderWithStackedMiddleware<
 		TContract,
 		TRuntimeContext,
 		TContext,
 		TRequest
 	> => ({
 	middleware: (nextMiddleware) =>
-		createWebRouterBuilder(contract, [
+		createFetchRouterBuilder(contract, [
 			...middlewares,
-			nextMiddleware as WebRouteMiddleware<
+			nextMiddleware as FetchRouteMiddleware<
 				TRuntimeContext,
 				Record<string, unknown>,
 				TRequest,
@@ -347,5 +354,5 @@ export const createWebRouterBuilder = <
 					middlewares,
 				),
 		}) as ImplementationTreeFor<TContract, HttpRouteDeclaration> &
-			WebImplementationTree,
+			FetchImplementationTree,
 });

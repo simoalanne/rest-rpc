@@ -5,7 +5,7 @@ import {
 	type ImplementationTree,
 } from "@rest-rpc/server";
 
-export const createWebRouteMatcher = (
+export const createFetchRouteMatcher = (
 	implementations: ImplementationTree<HttpRouteDeclaration>,
 ) => {
 	const routes = flattenRouteImplementations(implementations);

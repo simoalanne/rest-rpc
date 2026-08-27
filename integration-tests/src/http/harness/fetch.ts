@@ -4,9 +4,9 @@ import { Readable } from "node:stream";
 import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import type { ImplementationTree } from "@rest-rpc/server";
 import {
-	type CreateWebHandlerOptions,
+	type CreateFetchHandlerOptions,
 	createRouteHandler,
-} from "@rest-rpc/web";
+} from "@rest-rpc/fetch";
 import { listen } from "./listen.ts";
 
 const withoutBody = (method: string | undefined) =>
@@ -21,25 +21,25 @@ const toNodeResponseHeaders = (headers: Headers): OutgoingHttpHeaders => {
 	return responseHeaders;
 };
 
-export type WebAdapterContext = { adapter: "web" };
+export type FetchAdapterContext = { adapter: "fetch" };
 
-export type WebAdapterOptions = {
-	context?: WebAdapterContext;
-	createHandlerOptions?: CreateWebHandlerOptions;
+export type FetchAdapterOptions = {
+	context?: FetchAdapterContext;
+	createHandlerOptions?: CreateFetchHandlerOptions;
 	transformResponse?: (response: Response) => Response | Promise<Response>;
 };
 
-export const createWebAdapter = (
+export const createFetchAdapter = (
 	implementations: ImplementationTree<HttpRouteDeclaration>,
-	options: WebAdapterOptions = {},
+	options: FetchAdapterOptions = {},
 ) => ({
-	name: "web",
+	name: "fetch",
 	start: async () => {
 		const handler = createRouteHandler(
 			implementations,
 			options.createHandlerOptions,
 		);
-		const context = options.context ?? { adapter: "web" };
+		const context = options.context ?? { adapter: "fetch" };
 
 		return listen(
 			createServer(async (req, res) => {

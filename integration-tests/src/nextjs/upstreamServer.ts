@@ -1,5 +1,5 @@
-import { router } from "@rest-rpc/web";
-import { createWebAdapter } from "../http/harness/web.ts";
+import { router } from "@rest-rpc/fetch";
+import { createFetchAdapter } from "../http/harness/fetch.ts";
 import { upstreamContract } from "./fixture/upstreamContract.ts";
 
 export const createNextUpstreamServer = () => {
@@ -8,7 +8,7 @@ export const createNextUpstreamServer = () => {
 	return {
 		counters,
 		start: () =>
-			createWebAdapter(
+			createFetchAdapter(
 				router(upstreamContract).handlers({
 					counter: {
 						get: ({ id }) => {

@@ -69,6 +69,9 @@ importers:
       '@rest-rpc/fastify':
         specifier: workspace:*
         version: link:../packages/fastify
+      '@rest-rpc/fetch':
+        specifier: workspace:*
+        version: link:../packages/fetch
       '@rest-rpc/hono':
         specifier: workspace:*
         version: link:../packages/hono
@@ -81,9 +84,6 @@ importers:
       '@rest-rpc/tanstack-query':
         specifier: workspace:*
         version: link:../packages/tanstack-query
-      '@rest-rpc/web':
-        specifier: workspace:*
-        version: link:../packages/web
       '@tanstack/query-core':
         specifier: ^5.101.4
         version: 5.101.4
@@ -126,6 +126,9 @@ importers:
       '@rest-rpc/fastify':
         specifier: workspace:*
         version: link:../packages/fastify
+      '@rest-rpc/fetch':
+        specifier: workspace:*
+        version: link:../packages/fetch
       '@rest-rpc/hono':
         specifier: workspace:*
         version: link:../packages/hono
@@ -141,9 +144,6 @@ importers:
       '@rest-rpc/tanstack-query':
         specifier: workspace:*
         version: link:../packages/tanstack-query
-      '@rest-rpc/web':
-        specifier: workspace:*
-        version: link:../packages/web
     devDependencies:
       '@fastify/websocket':
         specifier: ^11.3.0
@@ -265,6 +265,15 @@ importers:
         specifier: ^5.0.0
         version: 5.11.3
 
+  packages/fetch:
+    dependencies:
+      '@rest-rpc/core':
+        specifier: workspace:*
+        version: link:../core
+      '@rest-rpc/server':
+        specifier: workspace:*
+        version: link:../server
+
   packages/hono:
     dependencies:
       '@rest-rpc/core':
@@ -316,9 +325,9 @@ importers:
       '@rest-rpc/core':
         specifier: workspace:*
         version: link:../core
-      '@rest-rpc/web':
+      '@rest-rpc/fetch':
         specifier: workspace:*
-        version: link:../web
+        version: link:../fetch
     devDependencies:
       next:
         specifier: 16.3.1
@@ -346,15 +355,6 @@ importers:
       esmock:
         specifier: ^2.7.3
         version: 2.7.6
-
-  packages/web:
-    dependencies:
-      '@rest-rpc/core':
-        specifier: workspace:*
-        version: link:../core
-      '@rest-rpc/server':
-        specifier: workspace:*
-        version: link:../server
 
 packages:
 
