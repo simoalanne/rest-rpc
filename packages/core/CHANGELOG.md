@@ -1,5 +1,21 @@
 # @rest-rpc/core
 
+## 0.1.0-beta.15
+
+### Minor Changes
+
+- 0ea9523: Add support for using explicit http shape for http requests as alternative
+
+### Patch Changes
+
+- 5676c02: Rename the Fetch runtime adapter package from `@rest-rpc/web` to `@rest-rpc/fetch` and rename public Web-prefixed adapter types to Fetch-prefixed names. Rename Server webResponse
+- 8ed8d40: Remove exports from server and core packages that were not any of use
+- 32758ad: Add an option to omit content type for custom body and let fetch infer it
+- ea61381: Add formBody() for typed application/x-www-form-urlencoded request bodies
+- f162fff: Add array field support to formBody()
+- ea61381: Add multipartBody() that provides type safe usage of multipart/form-data
+- 62ff0d2: Add a helper type StrictClientResponse<T> for inferring responses from api client configured with strict status codes
+
 ## 0.1.0-beta.14
 
 ### Patch Changes

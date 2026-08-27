@@ -1,5 +1,14 @@
 # @rest-rpc/fetch
 
+## 0.1.0-beta.15
+
+### Patch Changes
+
+- 90a28df: Restrict unknown key access for typescript for context types
+- 15d9aca: Remove initWeb<T>() api and replace it with documented module augmentation
+- ea61381: Add formBody() for typed application/x-www-form-urlencoded request bodies
+- ea61381: Add multipartBody() that provides type safe usage of multipart/form-data
+
 ## 0.1.0-beta.14
 
 ### Patch Changes

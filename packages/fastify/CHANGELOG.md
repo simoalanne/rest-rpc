@@ -1,5 +1,11 @@
 # @rest-rpc/fastify
 
+## 0.1.0-beta.15
+
+### Patch Changes
+
+- 5676c02: Rename the Fetch runtime adapter package from `@rest-rpc/web` to `@rest-rpc/fetch` and rename public Web-prefixed adapter types to Fetch-prefixed names. Rename Server webResponse
+
 ## 0.1.0-beta.14
 
 ### Patch Changes
