@@ -1,8 +1,4 @@
-export {
-	isTypeOnlySchema,
-	looseJsonSchema,
-	type,
-} from "../standard-schema/index.ts";
+export { type } from "../standard-schema/index.ts";
 export type {
 	CustomBody,
 	CustomBodyContentType,

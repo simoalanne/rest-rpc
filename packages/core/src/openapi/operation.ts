@@ -5,7 +5,10 @@ import {
 	isNoBody,
 	isStream,
 } from "../contract/body.ts";
-import type { OpenApiResponseOptions } from "../contract/contract.ts";
+import type {
+	HttpRouteDeclaration,
+	OpenApiResponseOptions,
+} from "../contract/contract.ts";
 import type {
 	JsonQuery,
 	RequestBodySchema,
@@ -26,27 +29,98 @@ import {
 	getRouteResponses,
 } from "../contract/response.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import {
-	convertSchema,
-	getRequiredSchemaKeys,
-	getSchemaProperties,
-	isSchemaOptional,
-} from "./schemas.ts";
-import type {
-	CreateOpenApiDocumentOptions,
-	OpenApiOperation,
-	OpenApiParameter,
-	OpenApiRequestBody,
-	OpenApiResponse,
-	OpenApiRouteDeclaration,
-	SchemaConverter,
-} from "./types.ts";
 
 export const JSON_CONTENT_TYPE = "application/json";
 export const SSE_CONTENT_TYPE = "text/event-stream";
 export const NDJSON_CONTENT_TYPE = "application/x-ndjson";
 export const FORM_URLENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
 export const MULTIPART_FORM_DATA_CONTENT_TYPE = "multipart/form-data";
+
+export type OpenApiSchema = Record<string, unknown>;
+
+export type OpenApiParameter = {
+	name: string;
+	in: "path" | "query" | "header" | "cookie";
+	required?: boolean;
+	description?: string;
+	schema?: OpenApiSchema;
+	content?: Record<string, { schema?: OpenApiSchema }>;
+};
+
+export type OpenApiRequestBody = {
+	required?: boolean;
+	description?: string;
+	content: Record<string, { schema?: OpenApiSchema }>;
+};
+
+export type OpenApiResponse = {
+	description: string;
+	headers?: Record<string, { description?: string; schema?: OpenApiSchema }>;
+	content?: Record<string, { schema?: OpenApiSchema }>;
+};
+
+export type OpenApiExternalDocs = {
+	url: string;
+	description?: string;
+};
+
+export type OpenApiOperation = {
+	operationId?: string;
+	summary?: string;
+	description?: string;
+	tags?: string[];
+	deprecated?: boolean;
+	parameters?: OpenApiParameter[];
+	requestBody?: OpenApiRequestBody;
+	responses: Record<string, OpenApiResponse>;
+	security?: Array<Record<string, string[]>>;
+	externalDocs?: OpenApiExternalDocs;
+	[key: `x-${string}`]: unknown;
+};
+
+export type SchemaConverter = (
+	schema: StandardSchemaV1,
+	mode: "input" | "output",
+) => OpenApiSchema | undefined;
+
+export type SchemaRequiredContext = {
+	schema: StandardSchemaV1;
+	jsonSchema: OpenApiSchema;
+};
+
+export type SchemaRequired = (context: SchemaRequiredContext) => boolean;
+
+export type OpenApiRouteDeclaration = HttpRouteDeclaration;
+
+export type OperationTransformContext = {
+	route: OpenApiRouteDeclaration;
+	operation: OpenApiOperation;
+};
+
+type CreateOperationOptions = {
+	schemaConverter?: SchemaConverter;
+	transformOperation?: (context: OperationTransformContext) => OpenApiOperation;
+	isSchemaRequired?: SchemaRequired;
+};
+
+const getSchemaProperties = (schema: OpenApiSchema) =>
+	(schema.properties ?? {}) as Record<string, OpenApiSchema>;
+
+type SchemaRequiredKeys =
+	| { type: "known"; keys: unknown[] }
+	| { type: "unknown" };
+
+const getRequiredSchemaKeys = (schema: OpenApiSchema): SchemaRequiredKeys => {
+	if (Array.isArray(schema.required)) {
+		return { type: "known", keys: schema.required };
+	}
+
+	if (schema.type === "object" || schema.properties) {
+		return { type: "known", keys: [] };
+	}
+
+	return { type: "unknown" };
+};
 
 const createContent = (
 	contentTypes: readonly string[],
@@ -65,53 +139,41 @@ const contentTypesForCustomBody = (schema: {
 
 const createSchemaRecordObject = (
 	schemas: RequestSchemaRecord,
-	converter: SchemaConverter,
+	converter: SchemaConverter | undefined,
 ) => {
-	const required = Object.entries(schemas)
-		.filter(([, schema]) => !isSchemaOptional(schema))
-		.map(([name]) => name);
-
 	return {
 		type: "object",
 		properties: Object.fromEntries(
 			Object.entries(schemas).map(([name, schema]) => [
 				name,
-				convertSchema(schema, "input", converter),
+				converter?.(schema, "input") ?? {},
 			]),
 		),
-		...(required.length > 0 ? { required } : {}),
 	};
-};
-
-const assertRequiredPathParameter = (
-	name: string,
-	routePath: string | undefined,
-	isRequired: boolean,
-) => {
-	if (!isRequired) {
-		throw new Error(
-			`OpenAPI path parameter "${name}"${routePath ? ` on ${routePath}` : ""} must be required. Make the pathParams schema require this field.`,
-		);
-	}
 };
 
 export const createParameters = (
 	schema: StandardSchemaV1 | RequestSchemaRecord | JsonQuery | undefined,
 	location: "path" | "query",
-	converter: SchemaConverter,
-	routePath?: string,
+	options: CreateOperationOptions,
 ): OpenApiParameter[] => {
 	if (!schema) return [];
 
 	if (isJsonQuery(schema)) {
+		const jsonSchema = options.schemaConverter?.(schema.schema, "input") ?? {};
+		const isRequired = options.isSchemaRequired?.({
+			schema: schema.schema,
+			jsonSchema,
+		});
+
 		return [
 			{
 				name: "query",
 				in: "query",
-				required: !isSchemaOptional(schema.schema),
+				...(isRequired === undefined ? {} : { required: isRequired }),
 				content: {
 					[JSON_CONTENT_TYPE]: {
-						schema: convertSchema(schema.schema, "input", converter),
+						schema: jsonSchema,
 					},
 				},
 			},
@@ -120,34 +182,37 @@ export const createParameters = (
 
 	if (isRequestSchemaRecord(schema)) {
 		return Object.entries(schema).map(([name, fieldSchema]) => {
-			const isRequired = !isSchemaOptional(fieldSchema);
-			if (location === "path") {
-				assertRequiredPathParameter(name, routePath, isRequired);
-			}
+			const jsonSchema = options.schemaConverter?.(fieldSchema, "input") ?? {};
+			const isRequired =
+				location === "path"
+					? true
+					: options.isSchemaRequired?.({
+							schema: fieldSchema,
+							jsonSchema,
+						});
 
 			return {
 				name,
 				in: location,
-				required: isRequired,
-				schema: convertSchema(fieldSchema, "input", converter),
+				...(isRequired === undefined ? {} : { required: isRequired }),
+				schema: jsonSchema,
 			};
 		});
 	}
 
-	const jsonSchema = convertSchema(schema, "input", converter);
+	const jsonSchema = options.schemaConverter?.(schema, "input") ?? {};
 	const properties = getSchemaProperties(jsonSchema);
 	const requiredKeys = getRequiredSchemaKeys(jsonSchema);
 
 	return Object.entries(properties).map(([name, propertySchema]) => {
-		const isRequired = requiredKeys.has(name);
-		if (location === "path") {
-			assertRequiredPathParameter(name, routePath, isRequired);
-		}
-
+		const isRequired =
+			requiredKeys.type === "known"
+				? requiredKeys.keys.includes(name)
+				: undefined;
 		return {
 			name,
 			in: location,
-			required: isRequired,
+			...(location === "path" ? { required: true } : { required: isRequired }),
 			schema: propertySchema,
 		};
 	});
@@ -155,21 +220,26 @@ export const createParameters = (
 
 export const createHeaderParameters = (
 	headers: Record<string, StandardSchemaV1> | undefined,
-	converter: SchemaConverter,
+	options: CreateOperationOptions,
 ): OpenApiParameter[] => {
 	if (!headers) return [];
 
-	return Object.entries(headers).map(([name, schema]) => ({
-		name,
-		in: "header",
-		required: !isSchemaOptional(schema),
-		schema: convertSchema(schema, "input", converter),
-	}));
+	return Object.entries(headers).map(([name, schema]) => {
+		const jsonSchema = options.schemaConverter?.(schema, "input") ?? {};
+		const isRequired = options.isSchemaRequired?.({ schema, jsonSchema });
+
+		return {
+			name,
+			in: "header" as const,
+			schema: jsonSchema,
+			...(isRequired === undefined ? {} : { required: isRequired }),
+		};
+	});
 };
 
 export const createRequestBody = (
 	schema: RequestBodySchema,
-	converter: SchemaConverter,
+	converter: SchemaConverter | undefined,
 ): OpenApiRequestBody | undefined => {
 	if (!schema) return undefined;
 	if (isNoBody(schema)) return undefined;
@@ -190,11 +260,10 @@ export const createRequestBody = (
 	const openApiSchema = isRequestSchemaRecord(bodySchema)
 		? createSchemaRecordObject(bodySchema, converter)
 		: isStandardSchema(bodySchema)
-			? convertSchema(bodySchema, "input", converter)
+			? (converter?.(bodySchema, "input") ?? {})
 			: undefined;
 
 	return {
-		required: true,
 		content: createContent(
 			contentTypes,
 			openApiSchema ? { schema: openApiSchema } : {},
@@ -205,7 +274,7 @@ export const createRequestBody = (
 export const createResponse = (
 	description: string,
 	responseDeclaration: ResponseDeclaration,
-	converter: SchemaConverter,
+	converter: SchemaConverter | undefined,
 	openApiResponse?: OpenApiResponseOptions,
 ): OpenApiResponse => {
 	const schema = getResponseBody(responseDeclaration);
@@ -244,7 +313,7 @@ export const createResponse = (
 		? contentTypesForCustomBody(schema)
 		: [JSON_CONTENT_TYPE];
 	const bodySchema = isCustomBody(schema) ? schema.schema : schema;
-	const openApiSchema = convertSchema(bodySchema, "output", converter);
+	const openApiSchema = converter?.(bodySchema, "output") ?? {};
 
 	return {
 		description: openApiResponse?.description ?? description,
@@ -258,7 +327,7 @@ export const createResponse = (
 
 export const createResponseHeaders = (
 	headers: ResponseHeaders | undefined,
-	converter: SchemaConverter,
+	converter: SchemaConverter | undefined,
 ): OpenApiResponse["headers"] | undefined => {
 	if (!headers) return undefined;
 
@@ -266,7 +335,7 @@ export const createResponseHeaders = (
 		Object.entries(headers).map(([name, schema]) => [
 			name,
 			{
-				schema: convertSchema(schema, "output", converter),
+				schema: converter?.(schema, "output") ?? {},
 			},
 		]),
 	);
@@ -274,7 +343,7 @@ export const createResponseHeaders = (
 
 export const createOpenApiResponseHeaders = (
 	headers: OpenApiResponseOptions["headers"] | undefined,
-	converter: SchemaConverter,
+	converter: SchemaConverter | undefined,
 ): OpenApiResponse["headers"] | undefined => {
 	if (!headers) return undefined;
 
@@ -289,7 +358,7 @@ export const createOpenApiResponseHeaders = (
 				name,
 				{
 					...(description ? { description } : {}),
-					schema: convertSchema(schema, "output", converter),
+					schema: converter?.(schema, "output") ?? {},
 				},
 			];
 		}),
@@ -314,7 +383,7 @@ const createStreamWireSchema = (contentType: string) =>
 
 export const createResponses = (
 	route: OpenApiRouteDeclaration,
-	converter: SchemaConverter,
+	converter: SchemaConverter | undefined,
 ) => {
 	const responses: Record<string, OpenApiResponse> = {};
 
@@ -342,17 +411,12 @@ export const createResponses = (
 
 export const createOperation = (
 	route: OpenApiRouteDeclaration,
-	options: CreateOpenApiDocumentOptions,
+	options: CreateOperationOptions,
 ): OpenApiOperation => {
 	const parameters = [
-		...createParameters(
-			route.pathParams,
-			"path",
-			options.schemaConverter,
-			route.path,
-		),
-		...createParameters(route.query, "query", options.schemaConverter),
-		...createHeaderParameters(route.headers, options.schemaConverter),
+		...createParameters(route.pathParams, "path", options),
+		...createParameters(route.query, "query", options),
+		...createHeaderParameters(route.headers, options),
 	];
 	const requestBody = createRequestBody(route.body, options.schemaConverter);
 	const { extensions, ...openApi } = route.openApi ?? {};

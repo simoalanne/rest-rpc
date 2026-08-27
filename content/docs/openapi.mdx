@@ -15,7 +15,6 @@ const document = createOpenApiDocument(api, {
 		version: "1.0.0",
 	},
 	servers: [{ url: "https://api.example.com" }],
-	schemaConverter,
 });
 ```
 
@@ -40,15 +39,11 @@ WebSocket routes are skipped as there is no faithful mapping to OpenAPI.
 ## Schema Conversion
 
 Standard Schema defines validation behavior, not JSON Schema conversion.
-
-OpenAPI generation needs a project-provided `schemaConverter`.
+When `schemaConverter` is omitted, or when it returns `undefined` for a
+particular schema, rest-rpc emits an empty OpenAPI Schema Object for that schema.
 
 ```ts
-import {
-	createOpenApiDocument,
-	isTypeOnlySchema,
-	looseJsonSchema,
-} from "@rest-rpc/core";
+import { createOpenApiDocument } from "@rest-rpc/core";
 import { z } from "zod";
 
 const document = createOpenApiDocument(api, {
@@ -56,28 +51,60 @@ const document = createOpenApiDocument(api, {
 		title: "Todo API",
 		version: "1.0.0",
 	},
-	schemaConverter: (schema, { io }) => {
-		if (isTypeOnlySchema(schema)) {
-			return looseJsonSchema(schema);
-		}
-
+	schemaConverter: (schema, mode) => {
 		if (schema["~standard"].vendor === "zod") {
-			return z.toJSONSchema(schema as z.ZodType, { io });
+			return z.toJSONSchema(schema as z.ZodType, { io: mode });
 		}
-
-		return looseJsonSchema(schema);
 	},
 });
 ```
 
-Use a precise converter when your schema library supports JSON Schema output.
-Use `looseJsonSchema()` when a loose OpenAPI shape is acceptable. If you have single validation library, you can just pass the library's JSON Schema converter directly.
+For schema records, headers, and JSON query parameters, the converted JSON Schema
+does not always say whether the parameter itself is required. Use
+`isSchemaRequired` to read that from your schema library metadata.
+
+```ts
+const api = router({
+	search: {
+		method: "GET",
+		path: "/search",
+		query: {
+			q: z
+				.string()
+				.min(1)
+				.meta({ openApi: { required: true } }),
+			cursor: z
+				.string()
+				.optional()
+				.meta({ openApi: { required: false } }),
+		},
+		responses: {
+			200: z.array(todoSchema),
+		},
+	},
+});
+
+const document = createOpenApiDocument(api, {
+	info: {
+		title: "Todo API",
+		version: "1.0.0",
+	},
+	schemaConverter: (schema, mode) =>
+		z.toJSONSchema(schema as z.ZodType, { io: mode }),
+	isSchemaRequired: ({ jsonSchema }) => {
+		const metadata = jsonSchema as
+			{ openApi?: { required?: boolean } } | undefined;
+
+		return metadata?.openApi?.required ?? true;
+	},
+});
+```
 
 ## Multipart Request Bodies
 
 `multipartBody()` produces an OpenAPI request body with the
-`multipart/form-data` content type. Each field schema is converted with the same
-project-provided `schemaConverter` used for other request schemas.
+`multipart/form-data` content type. Each field schema uses the same optional
+`schemaConverter` as other request schemas.
 
 ```ts
 create: {

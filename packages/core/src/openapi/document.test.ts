@@ -1,12 +1,88 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
-import {
-	createOpenApiTestContract,
-	schemaConverter,
-} from "../../test/factories/openapi.ts";
-import { noBody } from "../contract/body.ts";
+import { customBody, noBody, stream } from "../contract/body.ts";
+import { router } from "../contract/contract.ts";
 import { createOpenApiDocument } from "./document.ts";
+import type { SchemaConverter } from "./operation.ts";
+
+const schemaConverter: SchemaConverter = (schema, mode) =>
+	z.toJSONSchema(schema as z.ZodType, {
+		target: "openapi-3.0",
+		io: mode,
+		unrepresentable: "throw",
+		reused: "inline",
+	}) as Record<string, unknown>;
+
+const openApiTestContract = router({
+	todos: {
+		list: {
+			path: "/todos",
+			method: "GET",
+			query: z.object({
+				search: z.string(),
+				includeCompleted: z.boolean().optional(),
+			}),
+			responses: {
+				200: z.array(z.object({ id: z.string(), title: z.string() })),
+			},
+		},
+		update: {
+			path: "/todos/:id",
+			method: "POST",
+			pathParams: z.object({ id: z.string() }),
+			body: z.object({ title: z.string().min(1) }),
+			responses: {
+				202: z.object({
+					id: z.string(),
+					title: z.string(),
+				}),
+				409: z.object({
+					code: z.literal("TITLE_ALREADY_EXISTS"),
+				}),
+			},
+		},
+		remove: {
+			path: "/todos/:id",
+			method: "DELETE",
+			pathParams: z.object({ id: z.string() }),
+			responses: {
+				204: noBody(),
+			},
+		},
+		events: {
+			path: "/todos/events",
+			method: "GET",
+			responses: {
+				200: stream(
+					z.object({
+						type: z.string(),
+					}),
+				),
+			},
+		},
+		socket: {
+			path: "/todos/socket",
+			method: "GET",
+			mode: "webSocket",
+			messages: {
+				client: z.object({ type: z.literal("ping") }),
+				server: z.object({ type: z.literal("pong") }),
+			},
+		},
+		import: {
+			path: "/todos/import",
+			method: "POST",
+			body: customBody({
+				schema: z.string(),
+				contentType: "text/csv",
+			}),
+			responses: {
+				204: noBody(),
+			},
+		},
+	},
+});
 
 describe("createOpenApiDocument", () => {
 	it("builds base document fields and applies document transforms", () => {
@@ -95,7 +171,7 @@ describe("createOpenApiDocument", () => {
 	});
 
 	it("maps a representative API contract to paths, operations and schemas", () => {
-		const document = createOpenApiDocument(createOpenApiTestContract(), {
+		const document = createOpenApiDocument(openApiTestContract, {
 			info: {
 				title: "Todo API",
 				version: "1.0.0",

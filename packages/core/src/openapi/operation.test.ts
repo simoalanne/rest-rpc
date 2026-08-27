@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
-import { schemaConverter } from "../../test/factories/openapi.ts";
 import {
 	customBody,
 	formBody,
@@ -17,7 +16,25 @@ import {
 	createRequestBody,
 	createResponse,
 } from "./operation.ts";
-import type { OpenApiRouteDeclaration, SchemaConverter } from "./types.ts";
+import type {
+	OpenApiRouteDeclaration,
+	OpenApiSchema,
+	SchemaConverter,
+} from "./operation.ts";
+
+const schemaConverter: SchemaConverter = (schema, mode) =>
+	z.toJSONSchema(schema as z.ZodType, {
+		target: "openapi-3.0",
+		io: mode,
+		unrepresentable: "throw",
+		reused: "inline",
+	}) as Record<string, unknown>;
+const operationOptions = { schemaConverter };
+
+const metadataRequired = (schema: OpenApiSchema) => {
+	const metadata = schema as { openApi?: { required?: boolean } } | undefined;
+	return metadata?.openApi?.required;
+};
 
 describe("OpenAPI operations", () => {
 	it("describes SSE responses as event streams", () => {
@@ -43,7 +60,7 @@ describe("OpenAPI operations", () => {
 		const params = createParameters(
 			z.object({ id: z.string() }),
 			"path",
-			schemaConverter,
+			operationOptions,
 		);
 		const query = createParameters(
 			z.object({
@@ -51,7 +68,7 @@ describe("OpenAPI operations", () => {
 				includeCompleted: z.boolean().optional(),
 			}),
 			"query",
-			schemaConverter,
+			operationOptions,
 		);
 
 		assert.deepEqual(
@@ -68,11 +85,11 @@ describe("OpenAPI operations", () => {
 		);
 	});
 
-	it("creates request parameters from schema records", () => {
+	it("creates path params as required and query params without assumed requiredness from schema records", () => {
 		const params = createParameters(
 			{ id: z.string() },
 			"path",
-			schemaConverter,
+			operationOptions,
 		);
 		const query = createParameters(
 			{
@@ -80,7 +97,7 @@ describe("OpenAPI operations", () => {
 				page: z.number().optional(),
 			},
 			"query",
-			schemaConverter,
+			operationOptions,
 		);
 
 		assert.deepEqual(
@@ -92,8 +109,8 @@ describe("OpenAPI operations", () => {
 			})),
 			[
 				{ name: "id", in: "path", required: true, type: "string" },
-				{ name: "search", in: "query", required: true, type: "string" },
-				{ name: "page", in: "query", required: false, type: "number" },
+				{ name: "search", in: "query", required: undefined, type: "string" },
+				{ name: "page", in: "query", required: undefined, type: "number" },
 			],
 		);
 	});
@@ -107,14 +124,13 @@ describe("OpenAPI operations", () => {
 				}),
 			),
 			"query",
-			schemaConverter,
+			operationOptions,
 		);
 
 		assert.deepEqual(parameters, [
 			{
 				name: "query",
 				in: "query",
-				required: true,
 				content: {
 					"application/json": {
 						schema: {
@@ -140,11 +156,11 @@ describe("OpenAPI operations", () => {
 		]);
 	});
 
-	it("marks optional jsonQuery schemas as optional query parameters", () => {
+	it("does not assume jsonQuery parameters are required", () => {
 		const parameters = createParameters(
 			jsonQuery(z.object({ page: z.number() }).optional()),
 			"query",
-			schemaConverter,
+			operationOptions,
 		);
 
 		assert.deepEqual(
@@ -153,30 +169,89 @@ describe("OpenAPI operations", () => {
 				in: parameter.in,
 				required: parameter.required,
 			})),
-			[{ name: "query", in: "query", required: false }],
+			[{ name: "query", in: "query", required: undefined }],
 		);
 	});
 
-	it("rejects optional path params instead of documenting them as required", () => {
-		assert.throws(
-			() =>
-				createParameters(
-					z.object({ id: z.string().optional() }),
-					"path",
-					schemaConverter,
-					"/todos/:id",
-				),
-			/path parameter "id" on \/todos\/:id must be required/,
+	it("documents object-schema path params as required", () => {
+		const parameters = createParameters(
+			z.object({ id: z.string().optional() }),
+			"path",
+			operationOptions,
 		);
-		assert.throws(
-			() =>
-				createParameters(
-					{ id: z.string().optional() },
-					"path",
-					schemaConverter,
-					"/todos/:id",
-				),
-			/path parameter "id" on \/todos\/:id must be required/,
+
+		assert.deepEqual(
+			parameters.map((parameter) => ({
+				name: parameter.name,
+				in: parameter.in,
+				required: parameter.required,
+			})),
+			[{ name: "id", in: "path", required: true }],
+		);
+	});
+
+	it("documents schema-record path params as required", () => {
+		const parameters = createParameters(
+			{ id: z.string().optional() },
+			"path",
+			operationOptions,
+		);
+
+		assert.deepEqual(
+			parameters.map((parameter) => ({
+				name: parameter.name,
+				in: parameter.in,
+				required: parameter.required,
+			})),
+			[{ name: "id", in: "path", required: true }],
+		);
+	});
+
+	it("uses isSchemaRequired for optional schema-record values", () => {
+		const route: OpenApiRouteDeclaration = {
+			path: "/todos/:id",
+			method: "GET",
+			pathParams: z.object({ id: z.string() }),
+			query: {
+				search: z
+					.string()
+					.min(1)
+					.meta({ openApi: { required: true } }),
+				cursor: z
+					.string()
+					.optional()
+					.meta({ openApi: { required: false } }),
+			},
+			headers: {
+				"x-preview": z
+					.literal("1")
+					.optional()
+					.meta({ openApi: { required: false } }),
+			},
+			responses: {
+				200: z.array(z.object({ id: z.string() })),
+			},
+		};
+
+		const operation = createOperation(route, {
+			info: { title: "Todo API", version: "1.0.0" },
+			schemaConverter,
+			isSchemaRequired: ({ jsonSchema }) =>
+				metadataRequired(jsonSchema) ?? true,
+		});
+
+		assert.deepEqual(
+			operation.parameters?.map((parameter) => ({
+				name: parameter.name,
+				in: parameter.in,
+				required: parameter.required,
+			})),
+			[
+				{ name: "id", in: "path", required: true },
+				{ name: "search", in: "query", required: true },
+				{ name: "cursor", in: "query", required: false },
+				{ name: "x-preview", in: "header", required: false },
+			],
 		);
 	});
 
@@ -185,14 +260,13 @@ describe("OpenAPI operations", () => {
 			{
 				"x-api-key": z.string(),
 			},
-			schemaConverter,
+			operationOptions,
 		);
 
 		assert.deepEqual(headers, [
 			{
 				name: "x-api-key",
 				in: "header",
-				required: true,
 				schema: {
 					type: "string",
 				},
@@ -215,6 +289,21 @@ describe("OpenAPI operations", () => {
 
 		assert.equal(jsonBody?.content["application/json"].schema.type, "object");
 		assert.equal(custom?.content["text/csv"].schema.type, "string");
+	});
+
+	it("uses empty OpenAPI schemas when conversion is unavailable", () => {
+		const withoutConverter = createRequestBody(z.string(), undefined);
+		const withoutConvertedSchema = createRequestBody(
+			z.string(),
+			() => undefined,
+		);
+
+		assert.deepEqual(withoutConverter?.content["application/json"], {
+			schema: {},
+		});
+		assert.deepEqual(withoutConvertedSchema?.content["application/json"], {
+			schema: {},
+		});
 	});
 
 	it("creates custom request bodies with multiple declared content types", () => {
@@ -280,7 +369,6 @@ describe("OpenAPI operations", () => {
 		);
 
 		assert.deepEqual(body, {
-			required: true,
 			content: {
 				"application/json": {
 					schema: {
@@ -289,7 +377,6 @@ describe("OpenAPI operations", () => {
 							title: { type: "string" },
 							priority: { type: "number" },
 						},
-						required: ["title"],
 					},
 				},
 			},
@@ -524,9 +611,9 @@ describe("OpenAPI operations", () => {
 	});
 
 	it("uses input schemas for requests and output schemas for responses", () => {
-		const ios: string[] = [];
-		const converter: SchemaConverter = (_schema, { io }) => {
-			ios.push(io);
+		const modes: string[] = [];
+		const converter: SchemaConverter = (_schema, mode) => {
+			modes.push(mode);
 			return { type: "object", properties: {} };
 		};
 		const route: OpenApiRouteDeclaration = {
@@ -545,7 +632,7 @@ describe("OpenAPI operations", () => {
 			schemaConverter: converter,
 		});
 
-		assert.deepEqual(ios, ["input", "input", "input", "output"]);
+		assert.deepEqual(modes, ["input", "input", "input", "output"]);
 	});
 
 	it("applies operation transforms", () => {

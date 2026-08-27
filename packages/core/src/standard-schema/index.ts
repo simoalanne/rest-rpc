@@ -79,4 +79,4 @@ export {
 	validateStandardSchema,
 	validateStandardSchemaSync,
 } from "./standardSchemaValidator.ts";
-export { isTypeOnlySchema, looseJsonSchema, type } from "./type.ts";
+export { type } from "./type.ts";

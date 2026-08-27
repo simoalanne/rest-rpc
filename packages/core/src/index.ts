@@ -49,8 +49,4 @@ export type {
 	OpenApiDocument,
 } from "./openapi/index.ts";
 export { createOpenApiDocument } from "./openapi/index.ts";
-export {
-	isTypeOnlySchema,
-	looseJsonSchema,
-	type,
-} from "./standard-schema/index.ts";
+export { type } from "./standard-schema/index.ts";

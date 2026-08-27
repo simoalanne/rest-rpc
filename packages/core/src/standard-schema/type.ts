@@ -17,23 +17,3 @@ export function type<T>(): StandardSchemaV1<T, T> {
 		},
 	};
 }
-
-/**
- * Checks whether a schema was created by the type-only schema helper.
- *
- * @see {@link https://rest-rpc.dev/docs/openapi#schema-conversion}
- */
-export function isTypeOnlySchema(schema: StandardSchemaV1) {
-	return schema["~standard"].vendor === TYPE_ONLY_SCHEMA_VENDOR;
-}
-
-/**
- * Returns an empty JSON Schema for schemas that cannot be represented faithfully.
- *
- * @see {@link https://rest-rpc.dev/docs/openapi#schema-conversion}
- */
-export function looseJsonSchema(
-	_schema?: StandardSchemaV1,
-): Record<string, unknown> {
-	return {};
-}
