@@ -17,4 +17,5 @@ export type {
 	NextFetchTagsOptions,
 	OpenConnectionArgs,
 	OpenConnectionFn,
+	StrictClientResponse,
 } from "./types.ts";

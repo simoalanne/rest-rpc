@@ -6,6 +6,7 @@ export type {
 	ClientSocket,
 	FetchLike,
 	NextFetchTagsOptions,
+	StrictClientResponse,
 } from "./client/index.ts";
 export { getNextFetchTags, initClient } from "./client/index.ts";
 export type {

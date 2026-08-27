@@ -1,6 +1,7 @@
 import {
 	type ClientEventSource,
 	type ClientResponse,
+	type StrictClientResponse,
 	type ClientResponseBody,
 	type ClientSseReceived,
 	customBody,
@@ -226,6 +227,14 @@ strictResponseClient.todos.get
 			expectType<{ code: "not_found" }>(response.body);
 		}
 	});
+
+type StrictClientResponseType = StrictClientResponse<
+	typeof strictResponseApi.todos.get
+>;
+
+expectType<Promise<StrictClientResponseType>>(
+	strictResponseClient.todos.get.fetchResponse({ id: "todo-1" }),
+);
 
 // should use schema input for requests and schema output for responses
 const transformedApi = router({

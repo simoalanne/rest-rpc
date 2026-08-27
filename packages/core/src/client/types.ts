@@ -97,6 +97,18 @@ export type ClientResponse<
 		? StrictRouteDeclaredResponse<E>
 		: RouteDeclaredResponse<E> | RouteUndeclaredResponse;
 
+/**
+ * The response envelope returned by `fetchResponse()` for a route with strict status codes enabled.
+ *
+ * @remarks Unlike `ClientResponse`, this type guarantees that the response is always declared and has a known status code.
+ * This matches the behavior of `fetchResponse()` when `strictStatusCodes` is set to `true` in the client options.
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#fetchresponse}
+ */
+export type StrictClientResponse<E extends RouteDeclaration> = ClientResponse<
+	E,
+	true
+>;
+
 export type FetchResponseFn<
 	E extends RouteDeclaration,
 	TStrictStatusCodes extends boolean = false,

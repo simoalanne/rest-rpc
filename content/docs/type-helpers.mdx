@@ -74,6 +74,7 @@ import type {
 	ClientReceived,
 	ClientRequest,
 	ClientResponse,
+	StrictClientResponse,
 	ClientResponseBody,
 	ClientSent,
 	ClientSocket,
@@ -88,6 +89,10 @@ type GetTodoResponse = ClientResponse<typeof api.todos.get>;
 // | { declared: true; status: 200; body: { id: string; title: string }; headers: Headers }
 // | { declared: true; status: 404; body: { code: "NOT_FOUND" }; headers: Headers }
 // | { declared: false; status: number; body: unknown; headers: Headers }
+
+type StrictGetTodoResponse = StrictClientResponse<typeof api.todos.get>;
+// | { status: 200; body: { id: string; title: string };
+// | { status: 404; body: { code: "NOT_FOUND" } }
 
 type GetTodoBody = ClientResponseBody<typeof api.todos.get>;
 // { id: string; title: string }
