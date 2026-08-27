@@ -103,7 +103,7 @@ export type RouteHandler<
  * }
  * ```
  *
- * @see {@link https://rest-rpc.dev/docs/recipes/class-handlers}
+ * @see {@link https://rest-rpc.dev/docs/recipes/organizing-route-handlers#service-classes-as-handlers}
  */
 export type RouteHandlers<
 	TNode extends Contract<RouteDeclaration>,

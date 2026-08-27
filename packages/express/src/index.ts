@@ -97,7 +97,7 @@ export type RouteHandler<E extends RouteDeclaration> = ServerRouteHandler<
  * }
  * ```
  *
- * @see {@link https://rest-rpc.dev/docs/recipes/class-handlers}
+ * @see {@link https://rest-rpc.dev/docs/recipes/organizing-route-handlers#service-classes-as-handlers}
  */
 export type RouteHandlers<TNode extends Contract<RouteDeclaration>> =
 	ServerRouteHandlers<

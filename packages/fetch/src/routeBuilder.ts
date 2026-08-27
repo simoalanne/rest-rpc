@@ -127,7 +127,7 @@ export type RouteRequest<
  * }
  * ```
  *
- * @see {@link https://rest-rpc.dev/docs/recipes/class-handlers}
+ * @see {@link https://rest-rpc.dev/docs/recipes/organizing-route-handlers#service-classes-as-handlers}
  */
 export type RouteHandlers<
 	TContract extends FetchContract,
