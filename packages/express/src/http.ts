@@ -3,8 +3,11 @@ import { toColonPath } from "@rest-rpc/core/contract";
 import {
 	handleHttpRoute,
 	handleHttpRouteResult,
+	type HttpRouteResultStreamMode,
 	type RouteImplementation,
 	type ServerErrorHandlers,
+	formatSseEvent,
+	type SseEvent,
 } from "@rest-rpc/server";
 import type {
 	Response as ExpressResponse,
@@ -31,7 +34,7 @@ const writeStreamResponse = async (
 	res: Response,
 	statusCode: number,
 	contentType = "application/x-ndjson",
-	mode: "ndjson" | "raw" = "ndjson",
+	mode: HttpRouteResultStreamMode = "ndjson",
 ) => {
 	res.status(statusCode);
 	res.setHeader("content-type", contentType);
@@ -81,7 +84,11 @@ const writeStreamResponse = async (
 			const { done, value: chunk } = await iterator.next();
 			if (done || closed) break;
 			const canContinue = res.write(
-				mode === "ndjson" ? `${JSON.stringify(chunk)}\n` : chunk,
+				mode === "ndjson"
+					? `${JSON.stringify(chunk)}\n`
+					: mode === "sse"
+						? formatSseEvent(chunk as SseEvent<unknown>)
+						: chunk,
 			);
 			if (canContinue === false && !closed) await waitForDrain();
 		}

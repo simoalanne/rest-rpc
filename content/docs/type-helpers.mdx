@@ -43,6 +43,12 @@ export const api = router({
 			body: z.object({ title: z.string() }),
 			response: z.object({ id: z.string(), title: z.string() }),
 		}),
+		live: route({
+			method: "GET",
+			path: "/todos/live",
+			mode: "sse",
+			response: z.object({ id: z.string(), title: z.string() }),
+		}),
 		watch: route({
 			mode: "webSocket",
 			path: "/todos/:id/watch",
@@ -71,6 +77,8 @@ import type {
 	ClientResponseBody,
 	ClientSent,
 	ClientSocket,
+	ClientEventSource,
+	ClientSseReceived,
 } from "@rest-rpc/core";
 
 type GetTodoRequest = ClientRequest<typeof api.todos.get>;
@@ -96,6 +104,14 @@ type WatchSent = ClientSent<typeof api.todos.watch>;
 
 type WatchReceived = ClientReceived<typeof api.todos.watch>;
 // { title: string }
+
+type LiveEventSource = ClientEventSource<typeof api.todos.live>;
+// {
+//   onMessage(callback: (message: { id: string; title: string }) => void): () => void;
+// }
+
+type LiveReceived = ClientSseReceived<typeof api.todos.live>;
+// { id: string; title: string }
 ```
 
 `ClientResponse` is the return value of `fetchResponse()`.
@@ -158,6 +174,8 @@ import type {
 	RouteResponseShorthand,
 	RouteSent,
 	RouteSocket,
+	RouteSseSent,
+	SseEvent,
 } from "@rest-rpc/express";
 
 type GetTodoRequest = RouteRequest<typeof api.todos.get>;
@@ -188,6 +206,12 @@ type WatchSent = RouteSent<typeof api.todos.watch>;
 type WatchReceived = RouteReceived<typeof api.todos.watch>;
 // | { action: "typing"; message: { active: boolean } }
 // | { action: "rename"; message: { title: string } }
+
+type LiveSent = RouteSseSent<typeof api.todos.live>;
+// { id: string; title: string }
+
+type LiveEvent = SseEvent<LiveSent>;
+// { data: LiveSent; id?: string; retry?: number }
 ```
 
 Use `RouteResponse` when returning an explicit status and body. Use

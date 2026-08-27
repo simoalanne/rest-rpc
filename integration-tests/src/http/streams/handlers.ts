@@ -1,5 +1,5 @@
 import { REQUEST_CONTEXT_KEY } from "@rest-rpc/core/contract";
-import { type ImplementationShape, router } from "@rest-rpc/server";
+import { type ImplementationShape, router, sseEvent } from "@rest-rpc/server";
 import { type StreamsContract, streamsContract } from "./contract.ts";
 
 export type StreamsHandlers = ImplementationShape<StreamsContract>;
@@ -103,6 +103,17 @@ export const createStreamsHandlers = (
 	ndjson: async function* () {
 		yield { id: "event-1", index: 1 };
 		yield { id: "event-2", index: 2 };
+	},
+	sse: async function* (request) {
+		yield sseEvent(
+			{
+				id: "event-2",
+				index: 2,
+				resumedFrom: (request[REQUEST_CONTEXT_KEY] as { lastEventId?: string })
+					.lastEventId,
+			},
+			{ id: "event-2", retry: 1_000 },
+		);
 	},
 	cancellable: async function* (request) {
 		options.cancellationProbe?.markStarted();

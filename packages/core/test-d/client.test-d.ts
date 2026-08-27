@@ -1,5 +1,8 @@
 import {
+	type ClientEventSource,
 	type ClientResponse,
+	type ClientResponseBody,
+	type ClientSseReceived,
 	customBody,
 	initClient,
 	jsonQuery,
@@ -591,3 +594,60 @@ socket.onMessage((message) => {
 		expectType<string>(message.message);
 	}
 });
+
+// should expose typed EventSource connections for SSE routes
+const sseApi = router({
+	todos: {
+		events: {
+			method: "GET",
+			path: "/todos/:id/events",
+			mode: "sse",
+			pathParams: z.object({ id: z.string() }),
+			query: z.object({ includeDone: z.boolean().optional() }),
+			response: z.object({
+				id: z.string(),
+				createdAt: z.string().transform((value) => new Date(value)),
+			}),
+		},
+	},
+});
+
+const sseClient = initClient(sseApi, {
+	baseUrl: "https://example.test",
+});
+
+const events = sseClient.todos.events.openConnection({
+	id: "todo-1",
+	includeDone: false,
+});
+
+expectType<ClientEventSource<typeof sseApi.todos.events>>(events);
+expectType<EventSource>(events.raw);
+expectType<number>(events.readyState);
+expectType<string>(events.url);
+
+events.onMessage((message) => {
+	expectType<string>(message.id);
+	expectType<Date>(message.createdAt);
+});
+
+expectType<ClientSseReceived<typeof sseApi.todos.events>>({
+	id: "event-1",
+	createdAt: new Date(),
+});
+expectType<never>(
+	null as unknown as ClientResponseBody<typeof sseApi.todos.events>,
+);
+expectType<never>(
+	null as unknown as ClientResponse<typeof sseApi.todos.events>,
+);
+
+expectError(sseClient.todos.events.fetch());
+expectError(sseClient.todos.events.fetchResponse());
+expectError(sseClient.todos.events.openConnection());
+expectError(
+	sseClient.todos.events.openConnection({
+		id: "todo-1",
+		includeDone: "false",
+	}),
+);

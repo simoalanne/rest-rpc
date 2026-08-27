@@ -21,6 +21,14 @@ export const streamsContract = router({
 			200: stream(eventSchema),
 		},
 	},
+	sse: {
+		method: "GET",
+		path: "/streams/sse",
+		mode: "sse",
+		response: eventSchema.extend({
+			resumedFrom: z.string().optional(),
+		}),
+	},
 	cancellable: {
 		method: "GET",
 		path: "/streams/cancellable",

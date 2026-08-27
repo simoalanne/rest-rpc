@@ -10,6 +10,7 @@ import type {
 	IsWebSocketRoute,
 } from "../contract/request.ts";
 import type {
+	ClientSseReceived,
 	ClientResponseBody,
 	DeclaredClientResponse,
 } from "../contract/response.ts";
@@ -90,9 +91,11 @@ type RouteUndeclaredResponse = {
 export type ClientResponse<
 	E extends RouteDeclaration,
 	TStrictStatusCodes extends boolean = false,
-> = TStrictStatusCodes extends true
-	? StrictRouteDeclaredResponse<E>
-	: RouteDeclaredResponse<E> | RouteUndeclaredResponse;
+> = E extends { mode: "sse" }
+	? never
+	: TStrictStatusCodes extends true
+		? StrictRouteDeclaredResponse<E>
+		: RouteDeclaredResponse<E> | RouteUndeclaredResponse;
 
 export type FetchResponseFn<
 	E extends RouteDeclaration,
@@ -127,12 +130,31 @@ export type ClientSocket<E extends WebSocketRouteDeclaration> = Pick<
 	onClose: (callback: (event: CloseEvent) => void) => () => void;
 };
 
+/**
+ * The typed EventSource client returned by an SSE route's `openConnection()`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server-sent-events}
+ */
+export type ClientEventSource<E extends RouteDeclaration> = Pick<
+	EventSource,
+	"close" | "readyState" | "url"
+> & {
+	raw: EventSource;
+	onOpen: (callback: (event: Event) => void) => () => void;
+	onMessage: (callback: (message: ClientSseReceived<E>) => void) => () => void;
+	onError: (callback: (event: Event) => void) => () => void;
+};
+
 export type OpenConnectionFn<
 	E extends RouteDeclaration,
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
 > = (
 	...args: OpenConnectionArgs<E, TGlobalHeaders>
-) => E extends WebSocketRouteDeclaration ? ClientSocket<E> : never;
+) => E extends WebSocketRouteDeclaration
+	? ClientSocket<E>
+	: E extends { mode: "sse" }
+		? ClientEventSource<E>
+		: never;
 
 type ApiClientMoreThanOneSuccessResponseRouteValue<
 	E extends RouteDeclaration,
@@ -168,7 +190,7 @@ type ApiClientHttpRouteValue<
 				TGlobalHeaders
 			>;
 
-type ApiClientWebSocketRouteValue<
+type ApiClientOpenConnectionRouteValue<
 	E extends RouteDeclaration = RouteDeclaration,
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
 > = {
@@ -181,8 +203,10 @@ export type ApiClientRouteValue<
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
 > = E extends RouteDeclaration
 	? IsWebSocketRoute<E> extends true
-		? ApiClientWebSocketRouteValue<E, TGlobalHeaders>
-		: ApiClientHttpRouteValue<E, TStrictStatusCodes, TGlobalHeaders>
+		? ApiClientOpenConnectionRouteValue<E, TGlobalHeaders>
+		: E extends { mode: "sse" }
+			? ApiClientOpenConnectionRouteValue<E, TGlobalHeaders>
+			: ApiClientHttpRouteValue<E, TStrictStatusCodes, TGlobalHeaders>
 	: never;
 
 /**

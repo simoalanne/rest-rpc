@@ -65,7 +65,10 @@ const parseJsonQuery = (value: unknown) => {
 	return JSON.parse(value);
 };
 
-const getHeaderValue = (headers: unknown, name: string): string | undefined => {
+export const getHeaderValue = (
+	headers: unknown,
+	name: string,
+): string | undefined => {
 	if (typeof headers !== "object" || headers === null) return undefined;
 
 	for (const [key, value] of Object.entries(headers)) {
@@ -435,25 +438,31 @@ export const resolveCustomResponseBody = (
 	};
 };
 
+export const validateResponseStreamChunk = async (
+	schema: ResponseBodySchema | undefined,
+	chunk: unknown,
+) => {
+	if (!schema || !isStream(schema)) {
+		return validateResponseBody(schema, chunk);
+	}
+
+	const chunkSchema = isCustomBody(schema.schema)
+		? schema.schema.schema
+		: schema.schema;
+	const validation = await validateStandardSchema(chunkSchema, chunk);
+	if (validation.issues) {
+		throw new Error("Stream response validation failed.", {
+			cause: validation.issues,
+		});
+	}
+	return validation.value;
+};
+
 export async function* validateResponseStreamChunks(
 	body: AsyncIterable<unknown>,
 	schema: ResponseBodySchema,
 ) {
-	if (!isStream(schema)) {
-		yield* body;
-		return;
-	}
-
 	for await (const chunk of body) {
-		const chunkSchema = isCustomBody(schema.schema)
-			? schema.schema.schema
-			: schema.schema;
-		const validation = await validateStandardSchema(chunkSchema, chunk);
-		if (validation.issues) {
-			throw new Error("Stream response validation failed.", {
-				cause: validation.issues,
-			});
-		}
-		yield validation.value;
+		yield await validateResponseStreamChunk(schema, chunk);
 	}
 }

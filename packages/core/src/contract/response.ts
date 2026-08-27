@@ -369,16 +369,66 @@ type InferSingleServerResponseBody<TResponse> = [TResponse] extends [never]
 				? TBody
 				: never;
 
+type SseResponseDeclaration<E extends RouteDeclaration> = E extends {
+	response: infer TResponse;
+}
+	? TResponse
+	: never;
+
+type InferSseClientResponseBody<E extends RouteDeclaration> = [
+	SseResponseDeclaration<E>,
+] extends [never]
+	? InferSingleResponseBody<SuccessfulDeclaredClientResponse<E>>
+	: SseResponseDeclaration<E> extends ResponseDeclaration
+		? InferClientResponseBody<ResponseBody<SseResponseDeclaration<E>>>
+		: never;
+
+type InferSseServerResponseBody<E extends RouteDeclaration> = [
+	SseResponseDeclaration<E>,
+] extends [never]
+	? InferSingleServerResponseBody<ServerSuccessResponse<E>>
+	: SseResponseDeclaration<E> extends ResponseDeclaration
+		? ServerResponseBody<ResponseBody<SseResponseDeclaration<E>>>
+		: never;
+
 /**
  * Infers the body returned by `fetch()` for routes with one successful response.
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
  */
-export type ClientResponseBody<E extends RouteDeclaration> =
-	InferSingleResponseBody<SuccessfulDeclaredClientResponse<E>>;
+export type ClientResponseBody<E extends RouteDeclaration> = E extends {
+	mode: "sse";
+}
+	? never
+	: InferSingleResponseBody<SuccessfulDeclaredClientResponse<E>>;
 
-export type ServerSuccessBody<E extends RouteDeclaration> =
-	InferSingleServerResponseBody<ServerSuccessResponse<E>>;
+export type ServerSuccessBody<E extends RouteDeclaration> = E extends {
+	mode: "sse";
+}
+	? AsyncIterable<InferSseServerResponseBody<E>>
+	: InferSingleServerResponseBody<ServerSuccessResponse<E>>;
+
+/**
+ * Infers the event payload type a client receives from an SSE route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server-sent-events}
+ */
+export type ClientSseReceived<E extends RouteDeclaration> = E extends {
+	mode: "sse";
+}
+	? InferSseClientResponseBody<E>
+	: never;
+
+/**
+ * Infers the event payload type a server sends from an SSE route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server-sent-events}
+ */
+export type ServerSseSent<E extends RouteDeclaration> = E extends {
+	mode: "sse";
+}
+	? InferSseServerResponseBody<E>
+	: never;
 
 export type ErrorDeclaredClientResponse<E extends RouteDeclaration> = Exclude<
 	DeclaredClientResponse<E>,

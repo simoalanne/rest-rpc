@@ -191,6 +191,12 @@ const applyHeaderRequestKeys = (route: RouteDeclaration) => {
 
 export const validateResolvedRequestKeys = (route: RouteDeclaration) => {
 	if (route.responses) getRouteResponses(route);
+	const routePath = route.path;
+	if (route.mode === "sse" && route.headers !== undefined) {
+		throw new Error(
+			`SSE route declaration at path "${routePath}" cannot declare request headers. EventSource does not support custom request headers.`,
+		);
+	}
 	applyHeaderRequestKeys(route);
 	const keys = Object.keys(route.requestKeys ?? {});
 	assertNoDuplicateKeys(route, keys);

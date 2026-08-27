@@ -1,17 +1,14 @@
-import type {
-	Contract,
-	RouteDeclaration,
-	WebSocketRouteDeclaration,
-} from "../contract/contract.ts";
+import type { Contract, RouteDeclaration } from "../contract/contract.ts";
 import type { ClientResponseBody } from "../contract/response.ts";
 import { mapContractRoutes } from "../contract/traversal.ts";
 import { hasSingleSuccessfulResponse, isWebSocketRouteNode } from "./routes.ts";
+import { isSseRouteNode } from "./sse.ts";
 import type {
 	ApiClientFor,
 	ClientResponse,
-	ClientSocket,
 	FetchArgs,
 	OpenConnectionArgs,
+	OpenConnectionFn,
 } from "./types.ts";
 
 export type ApiClientRouteHandlers = {
@@ -23,10 +20,10 @@ export type ApiClientRouteHandlers = {
 		route: E,
 		...args: FetchArgs<E>
 	) => Promise<ClientResponseBody<E>>;
-	openConnection: <E extends WebSocketRouteDeclaration>(
+	openConnection: <E extends RouteDeclaration>(
 		route: E,
 		...args: OpenConnectionArgs<E>
-	) => ClientSocket<E>;
+	) => ReturnType<OpenConnectionFn<E>>;
 };
 
 export const buildApiClient = <TContract extends Contract>(
@@ -35,6 +32,13 @@ export const buildApiClient = <TContract extends Contract>(
 ): ApiClientFor<TContract> =>
 	mapContractRoutes(contract, (node) => {
 		if (isWebSocketRouteNode(node)) {
+			return {
+				openConnection: (...args: OpenConnectionArgs<typeof node>) =>
+					handlers.openConnection(node, ...args),
+			};
+		}
+
+		if (isSseRouteNode(node)) {
 			return {
 				openConnection: (...args: OpenConnectionArgs<typeof node>) =>
 					handlers.openConnection(node, ...args),

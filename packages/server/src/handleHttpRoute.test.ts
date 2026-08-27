@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { customBody, noBody, stream } from "@rest-rpc/core/contract";
+import {
+	customBody,
+	type HttpRouteDeclaration,
+	noBody,
+	stream,
+} from "@rest-rpc/core/contract";
 import z from "zod";
 import { handleHttpRoute } from "./handleHttpRoute.ts";
 import { RouteResponseError } from "./routeResponseError.ts";
+import { sseEvent } from "./sse.ts";
 
 const routeWithDeclaredErrorResponse = {
 	method: "GET",
@@ -13,6 +19,16 @@ const routeWithDeclaredErrorResponse = {
 		404: z.object({ code: z.literal("not_found") }),
 	},
 } as const;
+
+const normalizedSseRoute = (response: z.ZodType): HttpRouteDeclaration =>
+	({
+		method: "GET",
+		path: "/events",
+		mode: "sse",
+		responses: {
+			200: response,
+		},
+	}) as unknown as HttpRouteDeclaration;
 
 describe("handleHttpRoute", () => {
 	it("passes validated request data and context to the handler", async () => {
@@ -525,5 +541,45 @@ describe("handleHttpRoute custom responses", () => {
 		for await (const chunk of result.body) chunks.push(chunk);
 
 		assert.deepEqual(chunks, ["id,title\n", "1,First\n"]);
+	});
+});
+
+describe("handleHttpRoute SSE responses", () => {
+	it("normalizes SSE responses and exposes lastEventId in context", async () => {
+		const signal = new AbortController().signal;
+		const result = await handleHttpRoute(
+			normalizedSseRoute(z.object({ id: z.coerce.string() })),
+			async function* (request) {
+				assert.equal(request.context.requestId, "request-1");
+				assert.equal(request.context.signal, signal);
+				assert.equal(request.context.lastEventId, "event-1");
+
+				yield sseEvent({ id: 123 }, { id: "event-2", retry: 5_000 });
+			},
+			{
+				request: {
+					headers: {
+						"Last-Event-ID": "event-1",
+					},
+				},
+				context: { requestId: "request-1", signal },
+			},
+		);
+
+		assert.equal(result.kind, "stream");
+		assert.equal(result.status, 200);
+		assert.equal(result.contentType, "text/event-stream");
+		assert.equal(result.mode, "sse");
+		assert.deepEqual(result.headers, {
+			"cache-control": "no-cache",
+			"x-accel-buffering": "no",
+		});
+
+		const events = [];
+		for await (const event of result.body) events.push(event);
+
+		assert.deepEqual(events, [
+			sseEvent({ id: "123" }, { id: "event-2", retry: 5_000 }),
+		]);
 	});
 });

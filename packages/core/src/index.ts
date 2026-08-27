@@ -1,6 +1,7 @@
 export type {
 	ApiClientFor,
 	ApiClientOptions,
+	ClientEventSource,
 	ClientResponse,
 	ClientSocket,
 	FetchLike,
@@ -11,6 +12,7 @@ export type {
 	ClientReceived,
 	ClientRequest,
 	ClientResponseBody,
+	ClientSseReceived,
 	ClientSent,
 	Contract,
 	CustomBody,

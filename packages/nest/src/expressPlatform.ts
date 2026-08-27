@@ -1,3 +1,4 @@
+import { formatSseEvent, type SseEvent } from "@rest-rpc/server";
 import type {
 	NestHttpPlatform,
 	NestHttpReply,
@@ -95,9 +96,19 @@ const writeExpressStreamResponse = async (
 		while (!closed) {
 			const { done, value: chunk } = await iterator.next();
 			if (done || closed) break;
-			const canContinue = res.write?.(
-				mode === "ndjson" ? `${JSON.stringify(chunk)}\n` : chunk,
-			);
+			if (mode === "ndjson") {
+				const canContinue = res.write?.(`${JSON.stringify(chunk)}\n`);
+				if (canContinue === false && !closed) await waitForDrain();
+				continue;
+			}
+			if (mode === "sse") {
+				const canContinue = res.write?.(
+					formatSseEvent(chunk as SseEvent<unknown>),
+				);
+				if (canContinue === false && !closed) await waitForDrain();
+				continue;
+			}
+			const canContinue = res.write?.(chunk);
 			if (canContinue === false && !closed) await waitForDrain();
 		}
 

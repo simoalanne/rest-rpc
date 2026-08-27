@@ -7,6 +7,8 @@ export {
 	type RouteResponseShorthand,
 	type SetCookieOptions,
 	setCookie,
+	type SseEvent,
+	sseEvent,
 } from "@rest-rpc/web";
 export {
 	type CreateRouteHandlerOptions,

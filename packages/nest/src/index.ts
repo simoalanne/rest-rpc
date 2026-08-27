@@ -17,8 +17,14 @@ export type {
 	RouteResponse,
 	RouteResponseShorthand,
 	SetCookieOptions,
+	SseEvent,
 } from "@rest-rpc/server";
-export { clearCookie, RouteResponseError, setCookie } from "@rest-rpc/server";
+export {
+	clearCookie,
+	RouteResponseError,
+	setCookie,
+	sseEvent,
+} from "@rest-rpc/server";
 export { Route, Router } from "./decorators.ts";
 export type {
 	DefaultNestContext,

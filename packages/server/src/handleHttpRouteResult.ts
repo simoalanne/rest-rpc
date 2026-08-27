@@ -1,14 +1,12 @@
-import type { HttpRouteResult } from "./handleHttpRoute.ts";
+import type {
+	HttpRouteResult,
+	HttpRouteResultStreamMode,
+} from "./handleHttpRoute.ts";
 import type { HttpHeaderValue } from "./headers.ts";
 
 type MaybePromise<T> = T | Promise<T>;
 
-/**
- * Identifies how a stream route result should be written by an adapter.
- *
- * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#writing-the-result}
- */
-export type HttpRouteResultStreamMode = "ndjson" | "raw";
+export type { HttpRouteResultStreamMode } from "./handleHttpRoute.ts";
 
 /**
  * Adapter callbacks used to write a normalized HTTP route result.
@@ -50,7 +48,7 @@ export async function handleHttpRouteResult<TResponse>(
 			status: result.status,
 			body: result.body,
 			contentType: result.contentType ?? "application/x-ndjson",
-			mode: result.contentType ? "raw" : "ndjson",
+			mode: result.mode ?? (result.contentType ? "raw" : "ndjson"),
 		});
 	}
 

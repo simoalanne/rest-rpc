@@ -43,6 +43,7 @@ import type {
 } from "./types.ts";
 
 export const JSON_CONTENT_TYPE = "application/json";
+export const SSE_CONTENT_TYPE = "text/event-stream";
 export const NDJSON_CONTENT_TYPE = "application/x-ndjson";
 export const FORM_URLENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
 export const MULTIPART_FORM_DATA_CONTENT_TYPE = "multipart/form-data";
@@ -319,12 +320,21 @@ export const createResponses = (
 
 	for (const [status, schema] of Object.entries(getRouteResponses(route))) {
 		const openApiResponse = route.openApi?.responses?.[Number(status)];
-		responses[status] = createResponse(
+		const response = createResponse(
 			openApiResponse?.description ?? "",
 			schema,
 			converter,
 			openApiResponse,
 		);
+		responses[status] =
+			route.mode === "sse"
+				? {
+						...response,
+						content: {
+							[SSE_CONTENT_TYPE]: { schema: { type: "string" } },
+						},
+					}
+				: response;
 	}
 
 	return responses;

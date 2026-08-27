@@ -68,6 +68,24 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 			);
 		});
 
+		it("frames SSE chunks and passes Last-Event-ID to handlers", async () => {
+			const response = await fetch(`${server.origin}/streams/sse`, {
+				headers: {
+					"Last-Event-ID": "event-1",
+				},
+			});
+
+			assert.equal(response.status, 200);
+			assert.match(
+				response.headers.get("content-type") ?? "",
+				/^text\/event-stream/,
+			);
+			assert.equal(
+				await response.text(),
+				'id: event-2\nretry: 1000\ndata: {"id":"event-2","index":2,"resumedFrom":"event-1"}\n\n',
+			);
+		});
+
 		it("propagates client NDJSON iterator cancellation to server stream producers", async () => {
 			if (!adapter.cancellationProbe) {
 				throw new Error("Streams suite adapter is missing cancellation probe");

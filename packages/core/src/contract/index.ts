@@ -70,6 +70,7 @@ export {
 } from "./request.ts";
 export type {
 	ClientResponseBody,
+	ClientSseReceived,
 	DeclaredClientResponse,
 	ErrorDeclaredClientResponse,
 	ResponseBodySchema,
@@ -79,6 +80,7 @@ export type {
 	ServerErrors,
 	ServerResponse,
 	ServerResponseBody,
+	ServerSseSent,
 	ServerSuccessBody,
 	SuccessfulDeclaredClientResponse,
 } from "./response.ts";

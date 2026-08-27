@@ -4,6 +4,7 @@ import {
 	handleHttpRouteResult,
 } from "./handleHttpRouteResult.ts";
 import type { HttpHeaderValue } from "./headers.ts";
+import { formatSseEvent, type SseEvent } from "./sse.ts";
 
 const setHeader = (headers: Headers, name: string, value: HttpHeaderValue) => {
 	if (Array.isArray(value)) {
@@ -30,6 +31,9 @@ const createStreamResponse = (
 	const encodeChunk = (chunk: unknown) => {
 		if (mode === "ndjson") {
 			return encoder.encode(`${JSON.stringify(chunk)}\n`);
+		}
+		if (mode === "sse") {
+			return encoder.encode(formatSseEvent(chunk as SseEvent<unknown>));
 		}
 
 		return typeof chunk === "string"

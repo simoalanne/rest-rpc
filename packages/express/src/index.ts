@@ -5,17 +5,14 @@ import type {
 } from "@rest-rpc/core/contract";
 import {
 	type Contract,
-	clearCookie,
 	type ImplementationTreeFor,
 	type RouteHandlerFor,
 	type RouteImplementation,
-	RouteResponseError,
 	type RouteHandler as ServerRouteHandler,
 	type RouteHandlers as ServerRouteHandlers,
 	type RouteRequest as ServerRouteRequest,
 	route as serverRoute,
 	router as serverRouter,
-	setCookie,
 } from "@rest-rpc/server";
 import type { Request } from "express";
 
@@ -29,11 +26,17 @@ export type {
 	RouteSent,
 	RouteSocket,
 	SetCookieOptions,
+	SseEvent,
 } from "@rest-rpc/server";
 export type { ExtendedExpressMiddleware } from "./http.ts";
 export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
-export { clearCookie, RouteResponseError, setCookie };
+export {
+	clearCookie,
+	RouteResponseError,
+	setCookie,
+	sseEvent,
+} from "@rest-rpc/server";
 
 /**
  * The context object passed to Express HTTP route handlers.

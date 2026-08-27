@@ -4,6 +4,7 @@ import {
 	RouteResponseError,
 	type ServerErrorHandlers,
 	setCookie,
+	sseEvent,
 } from "@rest-rpc/server";
 import {
 	defaultParseBody,
@@ -29,6 +30,7 @@ export type {
 	RouteResponse,
 	RouteResponseShorthand,
 	SetCookieOptions,
+	SseEvent,
 } from "@rest-rpc/server";
 export type { WebRouteParseBody, WebRouteParseBodyInput } from "./http.ts";
 export type {
@@ -43,7 +45,7 @@ export type {
 	WebRouteMiddlewareResult,
 	WebRouterBuilder,
 } from "./routeBuilder.ts";
-export { clearCookie, RouteResponseError, setCookie };
+export { clearCookie, RouteResponseError, setCookie, sseEvent };
 
 /**
  * Default runtime context passed to Web route handlers.

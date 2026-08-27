@@ -5,6 +5,7 @@ import {
 	customBody,
 	type FormBody,
 	formBody,
+	type HttpRouteDeclaration,
 	jsonQuery,
 	type MultipartBody,
 	multipartBody,
@@ -17,7 +18,12 @@ import {
 	type as schemaType,
 	stream,
 } from "@rest-rpc/core/contract";
-import { expectAssignable, expectError, expectType } from "tsd";
+import {
+	expectAssignable,
+	expectError,
+	expectNotAssignable,
+	expectType,
+} from "tsd";
 import { z } from "zod";
 
 const todoSchema = z.object({
@@ -27,6 +33,15 @@ const todoSchema = z.object({
 
 const errorSchema = z.object({
 	message: z.string(),
+});
+
+// SSE routes cannot declare request headers because EventSource cannot send them
+expectNotAssignable<HttpRouteDeclaration>({
+	method: "GET",
+	path: "/events",
+	mode: "sse",
+	headers: { authorization: z.string() },
+	response: z.string(),
 });
 
 // response helper types

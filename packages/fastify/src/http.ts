@@ -8,8 +8,11 @@ import { toColonPath } from "@rest-rpc/core/contract";
 import {
 	handleHttpRoute,
 	handleHttpRouteResult,
+	type HttpRouteResultStreamMode,
 	type RouteImplementation,
 	type ServerErrorHandlers,
+	formatSseEvent,
+	type SseEvent,
 } from "@rest-rpc/server";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
@@ -26,12 +29,20 @@ export type ExtendedFastifyPreHandler = (
 
 const toStream = (
 	body: AsyncIterable<unknown>,
-	mode: "ndjson" | "raw" = "ndjson",
+	mode: HttpRouteResultStreamMode = "ndjson",
 ) =>
 	Readable.from(
 		(async function* () {
 			for await (const chunk of body) {
-				yield mode === "ndjson" ? `${JSON.stringify(chunk)}\n` : chunk;
+				if (mode === "ndjson") {
+					yield `${JSON.stringify(chunk)}\n`;
+					continue;
+				}
+				if (mode === "sse") {
+					yield formatSseEvent(chunk as SseEvent<unknown>);
+					continue;
+				}
+				yield chunk;
 			}
 		})(),
 	);

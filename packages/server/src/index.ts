@@ -48,6 +48,8 @@ export type {
 	RouteResponseShorthand,
 	RouteSent,
 	RouteSocket,
+	RouteSseSent,
+	SseRouteHandlerContext,
 	WebSocketRouteHandlerContext,
 } from "./router.ts";
 export {
@@ -56,6 +58,8 @@ export {
 	route,
 	router,
 } from "./router.ts";
+export type { SseEvent } from "./sse.ts";
+export { formatSseEvent, sseEvent } from "./sse.ts";
 export type { RequestSegments, ValidationIssue } from "./validation.ts";
 export { createWebResponse } from "./webResponse.ts";
 export type {

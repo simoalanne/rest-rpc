@@ -4,8 +4,7 @@ import type {
 } from "../contract/contract.ts";
 import type { ClientReceived } from "../contract/request.ts";
 import { validateWebSocketMessageSync } from "../contract/websocketMessages.ts";
-import { constructBaseRequest, takesRequestInput } from "./request.ts";
-import type { ClientSocket, OpenConnectionArgs } from "./types.ts";
+import type { ClientSocket } from "./types.ts";
 
 export const buildWebSocketUrl = (url: string) => {
 	if (url.startsWith("http:")) return url.replace("http:", "ws:");
@@ -13,8 +12,6 @@ export const buildWebSocketUrl = (url: string) => {
 };
 
 export type WebSocketConnectionOptions = {
-	baseUrl: string;
-	strictRequestKeys: boolean;
 	validateIncomingMessages: boolean;
 };
 
@@ -90,19 +87,12 @@ const adaptWebSocket = <E extends WebSocketRouteDeclaration>(
 export const openConnection = <E extends WebSocketRouteDeclaration>(
 	route: E,
 	options: WebSocketConnectionOptions,
-	...args: OpenConnectionArgs<E>
+	url: string,
 ): ClientSocket<E> => {
 	if (typeof WebSocket === "undefined") {
 		throw new Error("WebSocket is not available in this runtime");
 	}
 
-	const requestArgs = takesRequestInput(route) ? args[0] : undefined;
-	const { url } = constructBaseRequest(
-		options.baseUrl,
-		route,
-		requestArgs,
-		options.strictRequestKeys,
-	);
 	const rawSocket = new WebSocket(buildWebSocketUrl(url));
 	return adaptWebSocket(route, rawSocket, options.validateIncomingMessages);
 };

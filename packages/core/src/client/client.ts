@@ -1,10 +1,10 @@
-import type {
-	Contract,
-	RouteDeclaration,
-	WebSocketRouteDeclaration,
-} from "../contract/contract.ts";
+import type { Contract, RouteDeclaration } from "../contract/contract.ts";
 import { buildApiClient } from "./build.ts";
-import { executeRequest } from "./request.ts";
+import {
+	constructBaseRequest,
+	executeRequest,
+	takesRequestInput,
+} from "./request.ts";
 import {
 	fetchResponse as fetchRouteResponse,
 	fetchSuccess,
@@ -15,7 +15,9 @@ import type {
 	ClientResponse,
 	FetchArgs,
 	OpenConnectionArgs,
+	OpenConnectionFn,
 } from "./types.ts";
+import { openSseConnection } from "./sse.ts";
 import { openConnection as openRouteConnection } from "./websocket.ts";
 
 export class ApiClient<
@@ -93,19 +95,35 @@ export class ApiClient<
 		...args: FetchArgs<E>
 	) => fetchSuccess(this.fetchResponse, route, ...args);
 
-	private openConnection = <E extends WebSocketRouteDeclaration>(
+	private openConnection = <E extends RouteDeclaration>(
 		route: E,
 		...args: OpenConnectionArgs<E>
-	) =>
-		openRouteConnection(
+	): ReturnType<OpenConnectionFn<E>> => {
+		const requestArgs = takesRequestInput(route) ? args[0] : undefined;
+		const { url } = constructBaseRequest(
+			this.baseUrl,
 			route,
+			requestArgs,
+			this.strictRequestKeys,
+		);
+		const options = {
+			validateIncomingMessages: this.validateResponses,
+		};
+
+		if (route.mode === "sse") {
+			return openSseConnection(route, options, url) as ReturnType<
+				OpenConnectionFn<E>
+			>;
+		}
+
+		return openRouteConnection(
+			route as Extract<E, { mode: "webSocket" }>,
 			{
-				baseUrl: this.baseUrl,
-				strictRequestKeys: this.strictRequestKeys,
 				validateIncomingMessages: this.validateResponses,
 			},
-			...args,
-		);
+			url,
+		) as ReturnType<OpenConnectionFn<E>>;
+	};
 }
 
 /**

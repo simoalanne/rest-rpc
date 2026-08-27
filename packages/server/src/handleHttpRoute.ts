@@ -19,7 +19,9 @@ import type { HttpHeaders } from "./headers.ts";
 import { flattenRequestData } from "./requestData.ts";
 import { RouteResponseError } from "./routeResponseError.ts";
 import type { HttpRouteHandlerContext, RuntimeRouteHandler } from "./router.ts";
+import { validateSseEvents } from "./sse.ts";
 import {
+	getHeaderValue,
 	type RequestSegments,
 	resolveCustomResponseBody,
 	validateRequest,
@@ -32,6 +34,13 @@ type HttpRouteResultBase = {
 	status: number;
 	headers?: HttpHeaders;
 };
+
+/**
+ * Identifies how a stream route result should be written by an adapter.
+ *
+ * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#writing-the-result}
+ */
+export type HttpRouteResultStreamMode = "ndjson" | "raw" | "sse";
 
 /**
  * A normalized HTTP route result ready for an adapter-specific writer.
@@ -50,6 +59,7 @@ export type HttpRouteResult =
 			kind: "stream";
 			body: AsyncIterable<unknown>;
 			contentType?: string;
+			mode?: HttpRouteResultStreamMode;
 	  });
 
 /**
@@ -240,6 +250,33 @@ const normalizeResponseResult = async (
 	};
 };
 
+const normalizeSseResponseResult = (
+	route: HttpRouteDeclaration,
+	body: unknown,
+): HttpRouteResult => {
+	const status = getSingleSuccessfulStatus(route);
+	if (status === undefined) {
+		throw new Error(
+			`Service for "${route.method} ${route.path}" must return a declared response object.`,
+		);
+	}
+
+	const schema = getResponseSchema(route, status);
+	const bodySchema = schema ? getResponseBody(schema) : undefined;
+
+	return {
+		kind: "stream",
+		status,
+		headers: {
+			"cache-control": "no-cache",
+			"x-accel-buffering": "no",
+		},
+		contentType: "text/event-stream",
+		mode: "sse",
+		body: validateSseEvents(body as AsyncIterable<unknown>, bodySchema),
+	};
+};
+
 const normalizeServerErrorResponse = (
 	response: ServerErrorResponse,
 ): HttpRouteResult => {
@@ -294,6 +331,8 @@ const normalizeHandlerResult = async <TContext extends HttpRouteHandlerContext>(
 	errorContext: TContext,
 ): Promise<HttpRouteResult> => {
 	try {
+		if (route.mode === "sse") return normalizeSseResponseResult(route, result);
+
 		return await normalizeResponseResult(
 			route,
 			normalizeHandlerResultEnvelope(route, result),
@@ -358,7 +397,16 @@ export async function handleHttpRoute<
 	try {
 		const handlerResult = await handler({
 			...flattenRequestData(route, requestValidation.data),
-			[REQUEST_CONTEXT_KEY]: options.context,
+			[REQUEST_CONTEXT_KEY]:
+				route.mode === "sse"
+					? {
+							...options.context,
+							lastEventId: getHeaderValue(
+								options.request.headers,
+								"last-event-id",
+							),
+						}
+					: options.context,
 		});
 
 		return normalizeHandlerResult(route, handlerResult, options, errorContext);

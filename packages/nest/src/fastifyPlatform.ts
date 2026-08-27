@@ -1,4 +1,5 @@
 import { Readable } from "node:stream";
+import { formatSseEvent, type SseEvent } from "@rest-rpc/server";
 import type {
 	NestHttpPlatform,
 	NestHttpReply,
@@ -63,7 +64,15 @@ const toNodeStream = ({ body, mode }: NestStreamResponseInput) =>
 	Readable.from(
 		(async function* () {
 			for await (const chunk of body) {
-				yield mode === "ndjson" ? `${JSON.stringify(chunk)}\n` : chunk;
+				if (mode === "ndjson") {
+					yield `${JSON.stringify(chunk)}\n`;
+					continue;
+				}
+				if (mode === "sse") {
+					yield formatSseEvent(chunk as SseEvent<unknown>);
+					continue;
+				}
+				yield chunk;
 			}
 		})(),
 	);

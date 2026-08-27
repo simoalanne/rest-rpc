@@ -6,6 +6,7 @@ export type {
 	ApiClientFetchOptions,
 	ApiClientFor,
 	ApiClientOptions,
+	ClientEventSource,
 	ClientResponse,
 	ClientSocket,
 	FetchArgs,

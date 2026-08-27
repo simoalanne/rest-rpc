@@ -61,11 +61,11 @@ export type CommonOpenApiRouteOptions = Omit<
 >;
 
 /**
- * Selects whether a route is handled as HTTP or WebSocket.
+ * Selects whether a route is handled as HTTP, SSE, or WebSocket.
  *
  * @see {@link https://rest-rpc.dev/docs/websockets}
  */
-export type RouteMode = "http" | "webSocket";
+export type RouteMode = "http" | "sse" | "webSocket";
 
 export type ContractOptions = {
 	mode?: RouteMode;
@@ -86,16 +86,33 @@ export type BaseRouteDeclaration = {
 	openApi?: OpenApiRouteOptions;
 };
 
+type StandardHttpRouteDeclaration = BaseRouteDeclaration &
+	RouteResponseInput & {
+		mode?: "http";
+		messages?: never;
+	};
+
+type SseHttpRouteDeclaration = Omit<
+	BaseRouteDeclaration,
+	"body" | "headers" | "method" | "mode"
+> & {
+	method: "GET";
+	mode: "sse";
+	body?: never;
+	headers?: never;
+	response: StandardSchemaV1;
+	responses?: never;
+	messages?: never;
+};
+
 /**
  * A normalized HTTP route declaration.
  *
  * @see {@link https://rest-rpc.dev/docs/contract/declaration#route-fields}
  */
-export type HttpRouteDeclaration = BaseRouteDeclaration &
-	RouteResponseInput & {
-		mode?: "http";
-		messages?: never;
-	};
+export type HttpRouteDeclaration =
+	| StandardHttpRouteDeclaration
+	| SseHttpRouteDeclaration;
 
 /**
  * A normalized WebSocket route declaration.
@@ -222,13 +239,15 @@ type ApplyResponseShorthandToRoute<TRoute> = TRoute extends {
 	mode: "webSocket";
 }
 	? TRoute
-	: TRoute extends { method: HttpMethod }
-		? Merge<
-				Omit<TRoute, "response" | "responses"> & {
-					responses: RouteResponsesFor<TRoute>;
-				}
-			>
-		: TRoute;
+	: TRoute extends { mode: "sse" }
+		? TRoute
+		: TRoute extends { method: HttpMethod }
+			? Merge<
+					Omit<TRoute, "response" | "responses"> & {
+						responses: RouteResponsesFor<TRoute>;
+					}
+				>
+			: TRoute;
 
 type CommonHeaders<TOptions> = TOptions extends {
 	commonHeaders: infer THeaders extends Record<string, StandardSchemaV1>;

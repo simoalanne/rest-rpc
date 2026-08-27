@@ -6,11 +6,13 @@ import type {
 	ServerRequest,
 	ServerResponse,
 	ServerSent,
+	ServerSseSent,
 	ServerSuccessBody,
 	WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
 import { REQUEST_CONTEXT_KEY } from "@rest-rpc/core/contract";
 import type { HttpHeaders } from "./headers.ts";
+import type { SseEvent } from "./sse.ts";
 
 export type EmptyObject = Record<never, never>;
 type MaybePromise<T> = T | Promise<T>;
@@ -31,6 +33,15 @@ export type HttpRouteHandlerContext = Record<string, unknown>;
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
  */
 export type WebSocketRouteHandlerContext = Record<string, unknown>;
+
+/**
+ * Base context fields available to SSE route handlers.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ */
+export type SseRouteHandlerContext = {
+	lastEventId?: string;
+};
 
 /**
  * Untyped route handler shape stored in runtime route implementations.
@@ -85,12 +96,29 @@ export type RouteErrors<E extends HttpRouteDeclaration> = ServerErrors<E>;
  */
 export type RouteResponse<E extends HttpRouteDeclaration> = ServerResponse<E>;
 
+/**
+ * Infers the event payload type a server sends from an SSE route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server-sent-events}
+ */
+export type RouteSseSent<E extends HttpRouteDeclaration> = ServerSseSent<E>;
+
 type RequestValue<E extends RouteDeclaration> =
 	RouteRequestData<E> extends never ? EmptyObject : RouteRequestData<E>;
 
 type HandlerResult<E extends HttpRouteDeclaration> = MaybePromise<
 	(RouteResponse<E> & { headers?: HttpHeaders }) | RouteResponseShorthand<E>
 >;
+
+type SseHandlerResult<E extends HttpRouteDeclaration> = MaybePromise<
+	AsyncIterable<SseEvent<RouteSseSent<E>>>
+>;
+
+type RouteHandlerResult<E extends HttpRouteDeclaration> = E extends {
+	mode: "sse";
+}
+	? SseHandlerResult<E>
+	: HandlerResult<E>;
 
 /**
  * The typed socket available in a WebSocket route handler context.
@@ -121,7 +149,13 @@ export type CloseEventLike = {
 type HttpRouteRequest<
 	E extends HttpRouteDeclaration,
 	TContext extends HttpRouteHandlerContext,
-> = Merge<RequestValue<E> & { [REQUEST_CONTEXT_KEY]: TContext }>;
+> = Merge<
+	RequestValue<E> & {
+		[REQUEST_CONTEXT_KEY]: E extends { mode: "sse" }
+			? TContext & SseRouteHandlerContext
+			: TContext;
+	}
+>;
 
 type WebSocketRouteRequest<
 	E extends WebSocketRouteDeclaration,
@@ -151,7 +185,9 @@ export type RouteRequest<
 type HttpRouteHandler<
 	E extends HttpRouteDeclaration,
 	TContext extends HttpRouteHandlerContext,
-> = (...args: [request: HttpRouteRequest<E, TContext>]) => HandlerResult<E>;
+> = (
+	...args: [request: HttpRouteRequest<E, TContext>]
+) => RouteHandlerResult<E>;
 
 type WebSocketRouteHandler<
 	E extends WebSocketRouteDeclaration,

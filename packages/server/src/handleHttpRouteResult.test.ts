@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { HttpRouteResult } from "./handleHttpRoute.ts";
 import { handleHttpRouteResult } from "./handleHttpRouteResult.ts";
+import { sseEvent } from "./sse.ts";
 import { createWebResponse } from "./webResponse.ts";
 
 describe("handleHttpRouteResult", () => {
@@ -175,6 +176,27 @@ describe("createWebResponse", () => {
 
 		assert.equal(response.headers.get("content-type"), "text/plain");
 		assert.equal(await response.text(), "ab");
+	});
+
+	it("creates SSE stream responses", async () => {
+		async function* body() {
+			yield sseEvent({ id: "event-1" }, { id: "1", retry: 1_000 });
+			yield sseEvent({ id: "event-2" });
+		}
+
+		const response = await createWebResponse({
+			kind: "stream",
+			status: 200,
+			contentType: "text/event-stream",
+			mode: "sse",
+			body: body(),
+		} satisfies HttpRouteResult);
+
+		assert.equal(response.headers.get("content-type"), "text/event-stream");
+		assert.equal(
+			await response.text(),
+			'id: 1\nretry: 1000\ndata: {"id":"event-1"}\n\ndata: {"id":"event-2"}\n\n',
+		);
 	});
 
 	it("appends array header values on web responses", async () => {

@@ -20,6 +20,25 @@ import {
 import type { OpenApiRouteDeclaration, SchemaConverter } from "./types.ts";
 
 describe("OpenAPI operations", () => {
+	it("describes SSE responses as event streams", () => {
+		const operation = createOperation(
+			{
+				method: "GET",
+				path: "/events",
+				mode: "sse",
+				responses: { 200: z.object({ id: z.string() }) },
+			},
+			{
+				info: { title: "Test", version: "1" },
+				schemaConverter,
+			},
+		);
+
+		assert.deepEqual(operation.responses["200"].content, {
+			"text/event-stream": { schema: { type: "string" } },
+		});
+	});
+
 	it("creates required path params and schema-required query params", () => {
 		const params = createParameters(
 			z.object({ id: z.string() }),
