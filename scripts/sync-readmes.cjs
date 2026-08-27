@@ -10,6 +10,7 @@ const targets = [
 	"packages/fastify/README.md",
 	"packages/hono/README.md",
 	"packages/next/README.md",
+	"packages/nest/README.md",
 	"packages/server/README.md",
 	"packages/tanstack-query/README.md",
 	"packages/fetch/README.md",
