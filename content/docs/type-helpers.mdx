@@ -91,8 +91,8 @@ type GetTodoResponse = ClientResponse<typeof api.todos.get>;
 // | { declared: false; status: number; body: unknown; headers: Headers }
 
 type StrictGetTodoResponse = StrictClientResponse<typeof api.todos.get>;
-// | { status: 200; body: { id: string; title: string };
-// | { status: 404; body: { code: "NOT_FOUND" } }
+// | { status: 200; body: { id: string; title: string }; headers: Headers }
+// | { status: 404; body: { code: "NOT_FOUND" }; headers: Headers }
 
 type GetTodoBody = ClientResponseBody<typeof api.todos.get>;
 // { id: string; title: string }
