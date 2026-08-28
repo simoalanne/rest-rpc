@@ -26,10 +26,10 @@ api.todos.get.getKey(...)
 ## Setup
 
 ```ts
-import { initTanstackQuery } from "@rest-rpc/tanstack-query";
+import { createTanstackQueryHelpers } from "@rest-rpc/tanstack-query";
 import { api } from "./contract";
 
-export const tq = initTanstackQuery(api, {
+export const tq = createTanstackQueryHelpers(api, {
 	baseUrl: "https://api.example.com",
 	getGlobalHeaders: () => ({
 		authorization: `Bearer ${readToken()}`,

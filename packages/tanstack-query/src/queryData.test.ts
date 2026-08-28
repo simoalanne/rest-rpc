@@ -39,6 +39,22 @@ describe("fetchQueryData", () => {
 		assert.deepEqual(calls, [[{ id: "item-1" }, { signal: "signal-value" }]]);
 	});
 
+	it("returns strict declared success response envelopes", async () => {
+		const response = await fetchQueryData(
+			async () => ({
+				status: 200,
+				body: { id: "item-1" },
+			}),
+			routeWithoutRequest,
+			undefined,
+		);
+
+		assert.deepEqual(response, {
+			status: 200,
+			body: { id: "item-1" },
+		});
+	});
+
 	it("forwards options as the first argument for routes without request input", async () => {
 		const calls: unknown[][] = [];
 		await fetchQueryData(

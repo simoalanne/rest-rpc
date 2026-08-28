@@ -1,6 +1,8 @@
 import {
+	type ApiClientFor,
 	type ClientEventSource,
 	type ClientResponse,
+	type StrictApiClientFor,
 	type StrictClientResponse,
 	type ClientResponseBody,
 	type ClientSseReceived,
@@ -235,6 +237,8 @@ type StrictClientResponseType = StrictClientResponse<
 expectType<Promise<StrictClientResponseType>>(
 	strictResponseClient.todos.get.fetchResponse({ id: "todo-1" }),
 );
+expectType<ApiClientFor<typeof strictResponseApi, true>>(strictResponseClient);
+expectType<StrictApiClientFor<typeof strictResponseApi>>(strictResponseClient);
 
 // should use schema input for requests and schema output for responses
 const transformedApi = router({

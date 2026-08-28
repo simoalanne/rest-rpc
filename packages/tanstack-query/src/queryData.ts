@@ -47,13 +47,13 @@ export const fetchQueryData = async (
 				? await fetchResponse(request, options)
 				: await fetchResponse(options)
 		) as {
-			declared: boolean;
+			declared?: boolean;
 			status: number;
 			headers?: Headers;
 			body: unknown;
 		};
 
-		if (!response.declared) {
+		if (response.declared === false) {
 			throw response;
 		}
 

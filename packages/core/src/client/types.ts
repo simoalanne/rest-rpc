@@ -239,6 +239,17 @@ export type ApiClientFor<
 		};
 
 /**
+ * Infers the generated client tree for a contract with strict status codes enabled.
+ *
+ * @remarks This is useful when manually annotating the return value of `initClient()` configured with `strictStatusCodes: true`.
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
+ */
+export type StrictApiClientFor<
+	T extends Contract = Contract,
+	TGlobalHeaders extends HeaderRecord = Record<never, string>,
+> = ApiClientFor<T, true, TGlobalHeaders>;
+
+/**
  * Enables deterministic Next.js fetch tags for generated GET requests.
  *
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#use-in-nextjs}

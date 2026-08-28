@@ -626,11 +626,11 @@ export const api = router({
 
 // @filename: client.tsx
 // ---cut-end---
-import { initTanstackQuery } from "@rest-rpc/tanstack-query";
+import { createTanstackQueryHelpers } from "@rest-rpc/tanstack-query";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "./contract";
 
-const tq = initTanstackQuery(api, {
+const tq = createTanstackQueryHelpers(api, {
 	baseUrl: "http://localhost:3000",
 });
 

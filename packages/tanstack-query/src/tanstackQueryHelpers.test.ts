@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import esmock from "esmock";
 import { apiContract, createApiTree } from "../test/factories.ts";
 
-describe("initTanstackQuery", () => {
+describe("createTanstackQueryHelpers", () => {
 	it("creates a core client and maps HTTP routes to route APIs", async () => {
 		const initClientCalls: unknown[][] = [];
 		const routeApiCalls: unknown[][] = [];
@@ -26,7 +26,7 @@ describe("initTanstackQuery", () => {
 				},
 			},
 		});
-		const api = module.initTanstackQuery(apiContract, {
+		const api = module.createTanstackQueryHelpers(apiContract, {
 			baseUrl: "http://localhost:3001",
 			timeoutMs: 1000,
 		});

@@ -123,47 +123,6 @@ type LiveReceived = ClientSseReceived<typeof api.todos.live>;
 `ClientResponseBody` is the return value of `fetch()` for routes with one
 successful response body.
 
-## TanStack Query
-
-Import TanStack Query helpers from `@rest-rpc/tanstack-query`.
-
-```ts
-import type {
-	RouteInfiniteQueryData,
-	RouteMutationVariables,
-	RouteQueryData,
-	RouteQueryError,
-} from "@rest-rpc/tanstack-query";
-
-type GetTodoData = RouteQueryData<typeof api.todos.get>;
-// { status: 200; body: { id: string; title: string }; headers: Headers }
-
-type TodoPagesData = RouteInfiniteQueryData<typeof api.todos.page>;
-// {
-//   pages: Array<{
-//     status: 200;
-//     body: {
-//       items: Array<{ id: string; title: string }>;
-//       nextCursor?: string;
-//     };
-//     headers: Headers;
-//   }>;
-//   pageParams: Array<{
-//     cursor?: string;
-//     status: "open" | "done";
-//     limit: number;
-//   }>;
-// }
-
-type GetTodoError = RouteQueryError<typeof api.todos.get>;
-// | { status: 404; body: { code: "NOT_FOUND" }; headers: Headers }
-// | { declared: false; status: number; body: unknown; headers: Headers }
-// | Error
-
-type CreateTodoVariables = RouteMutationVariables<typeof api.todos.create>;
-// { title: string }
-```
-
 ## Server
 
 Import server helpers from the server adapter you use. The adapter-specific
@@ -221,3 +180,49 @@ type LiveEvent = SseEvent<LiveSent>;
 
 Use `RouteResponse` when returning an explicit status and body. Use
 `RouteResponseShorthand` when returning the successful response body directly.
+
+## TanStack Query
+
+Import TanStack Query helpers from `@rest-rpc/tanstack-query`.
+
+```ts
+import type {
+	RouteQueryData,
+	RouteInfiniteQueryData,
+	RouteQueryError,
+	StrictRouteQueryError,
+	RouteMutationVariables,
+} from "@rest-rpc/tanstack-query";
+
+type GetTodoData = RouteQueryData<typeof api.todos.get>;
+// { status: 200; body: { id: string; title: string }; headers: Headers }
+
+type TodoPagesData = RouteInfiniteQueryData<typeof api.todos.page>;
+// {
+//   pages: Array<{
+//     status: 200;
+//     body: {
+//       items: Array<{ id: string; title: string }>;
+//       nextCursor?: string;
+//     };
+//     headers: Headers;
+//   }>;
+//   pageParams: Array<{
+//     cursor?: string;
+//     status: "open" | "done";
+//     limit: number;
+//   }>;
+// }
+
+type GetTodoError = RouteQueryError<typeof api.todos.get>;
+// | { status: 404; body: { code: "NOT_FOUND" }; headers: Headers }
+// | { declared: false; status: number; body: unknown; headers: Headers }
+// | Error
+
+type StrictGetTodoError = StrictRouteQueryError<typeof api.todos.get>;
+// | { status: 404; body: { code: "NOT_FOUND" }; headers: Headers }
+// | Error
+
+type CreateTodoVariables = RouteMutationVariables<typeof api.todos.create>;
+// { title: string }
+```

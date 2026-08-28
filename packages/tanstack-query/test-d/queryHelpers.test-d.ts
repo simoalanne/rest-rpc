@@ -1,9 +1,14 @@
 import { router, type as schemaType, stream } from "@rest-rpc/core/contract";
 import {
-	initTanstackQuery,
+	createTanstackQueryHelpers,
+	type CreateTanstackQueryHelpersOptions,
 	type RouteInfiniteQueryData,
 	type RouteMutationVariables,
 	type RouteQueryData,
+	type RouteQueryError,
+	type StrictRouteQueryError,
+	type StrictTanstackQueryHelpersFor,
+	type TanstackQueryHelpersFor,
 } from "@rest-rpc/tanstack-query";
 import { type QueryClient, skipToken } from "@tanstack/query-core";
 import {
@@ -38,7 +43,11 @@ const queryApi = router({
 	},
 });
 
-const queryTq = initTanstackQuery(queryApi, {
+const queryTq = createTanstackQueryHelpers(queryApi, {
+	baseUrl: "https://example.test",
+});
+expectAssignable<TanstackQueryHelpersFor<typeof queryApi>>(queryTq);
+expectAssignable<CreateTanstackQueryHelpersOptions>({
 	baseUrl: "https://example.test",
 });
 
@@ -121,6 +130,66 @@ expectAssignable<Promise<RouteQueryData<typeof queryApi.todos.list>>>(
 	queryClient.fetchQuery(selectedListOptions),
 );
 
+expectAssignable<RouteQueryError<typeof queryApi.todos.get>>({
+	declared: false,
+	status: 500,
+	body: "server exploded",
+	headers: new Headers(),
+});
+
+// strict status code options
+
+// should allow strict status codes and remove undeclared responses from query errors
+const strictStatusApi = router({
+	todos: {
+		get: {
+			method: "GET",
+			path: "/todos/:id",
+			pathParams: schemaType<{ id: string }>(),
+			responses: {
+				200: schemaType<{ id: string; title: string }>(),
+				404: schemaType<{ code: "TODO_NOT_FOUND" }>(),
+			},
+		},
+	},
+});
+
+const strictStatusTq = createTanstackQueryHelpers(strictStatusApi, {
+	baseUrl: "https://example.test",
+	strictStatusCodes: true,
+});
+expectAssignable<StrictTanstackQueryHelpersFor<typeof strictStatusApi>>(
+	strictStatusTq,
+);
+
+const strictStatusOptions = strictStatusTq.todos.get.queryOptions({
+	id: "todo-1",
+});
+
+expectAssignable<
+	Promise<{
+		status: 200;
+		body: { id: string; title: string };
+		headers: Headers;
+	}>
+>(queryClient.fetchQuery(strictStatusOptions));
+expectAssignable<RouteQueryError<typeof strictStatusApi.todos.get, true>>({
+	status: 404,
+	body: { code: "TODO_NOT_FOUND" },
+	headers: new Headers(),
+});
+expectAssignable<StrictRouteQueryError<typeof strictStatusApi.todos.get>>({
+	status: 404,
+	body: { code: "TODO_NOT_FOUND" },
+	headers: new Headers(),
+});
+expectNotAssignable<StrictRouteQueryError<typeof strictStatusApi.todos.get>>({
+	declared: false,
+	status: 500,
+	body: "server exploded",
+	headers: new Headers(),
+});
+
 // stream query options
 
 // should expose stream routes as regular query data with raw async iterable bodies
@@ -136,7 +205,7 @@ const streamApi = router({
 	},
 });
 
-const streamTq = initTanstackQuery(streamApi, {
+const streamTq = createTanstackQueryHelpers(streamApi, {
 	baseUrl: "https://example.test",
 });
 
@@ -210,7 +279,7 @@ const mutationApi = router({
 	},
 });
 
-const mutationTq = initTanstackQuery(mutationApi, {
+const mutationTq = createTanstackQueryHelpers(mutationApi, {
 	baseUrl: "https://example.test",
 });
 
@@ -251,7 +320,7 @@ const pageApi = router({
 	},
 });
 
-const pageTq = initTanstackQuery(pageApi, {
+const pageTq = createTanstackQueryHelpers(pageApi, {
 	baseUrl: "https://example.test",
 });
 
@@ -342,7 +411,7 @@ const invalidApi = router({
 	},
 });
 
-const invalidTq = initTanstackQuery(invalidApi, {
+const invalidTq = createTanstackQueryHelpers(invalidApi, {
 	baseUrl: "https://example.test",
 });
 
