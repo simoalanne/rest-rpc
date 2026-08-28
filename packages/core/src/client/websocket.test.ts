@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import z from "zod";
-import { createClientTestContract } from "../../test/factories/client.ts";
 import { noBody } from "../contract/body.ts";
 import { router } from "../contract/contract.ts";
 import { webSocketMessages } from "../contract/websocketMessages.ts";
@@ -41,6 +40,21 @@ class FakeWebSocket extends EventTarget {
 
 const instances: FakeWebSocket[] = [];
 
+const apiContract = router({
+	socket: {
+		join: {
+			method: "GET",
+			path: "/rooms/:roomId",
+			pathParams: z.object({ roomId: z.string() }),
+			mode: "webSocket",
+			messages: {
+				client: z.object({ text: z.string() }),
+				server: z.object({ text: z.string() }),
+			},
+		},
+	},
+});
+
 afterEach(() => {
 	globalThis.WebSocket = OriginalWebSocket;
 	instances.length = 0;
@@ -54,7 +68,7 @@ describe("ApiClient websockets", () => {
 
 	it("rejects opening connections when WebSocket is unavailable", () => {
 		globalThis.WebSocket = undefined as unknown as typeof WebSocket;
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 		});
 
@@ -66,7 +80,7 @@ describe("ApiClient websockets", () => {
 
 	it("builds websocket URLs from route params", () => {
 		globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 		});
 
@@ -77,7 +91,7 @@ describe("ApiClient websockets", () => {
 
 	it("returns a wrapper without mutating the native websocket", () => {
 		globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 		});
 
@@ -102,7 +116,7 @@ describe("ApiClient websockets", () => {
 
 	it("serializes sent messages when the socket is open", () => {
 		globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(apiContract, {
 			baseUrl: "http://api.test",
 		});
 		const socket = client.socket.join.openConnection({ roomId: "general" });
@@ -116,7 +130,7 @@ describe("ApiClient websockets", () => {
 
 	it("rejects sends before the socket is open", () => {
 		globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 		});
 		const socket = client.socket.join.openConnection({ roomId: "general" });
@@ -129,7 +143,7 @@ describe("ApiClient websockets", () => {
 
 	it("delivers valid incoming messages", () => {
 		globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 		});
 		const socket = client.socket.join.openConnection({ roomId: "general" });
@@ -145,7 +159,7 @@ describe("ApiClient websockets", () => {
 
 	it("removes event listeners with unsubscribe callbacks", () => {
 		globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 		});
 		const socket = client.socket.join.openConnection({ roomId: "general" });
@@ -428,9 +442,7 @@ describe("ApiClient websockets", () => {
 
 describe("assertWebSocketRoute", () => {
 	it("accepts websocket route declarations", () => {
-		assert.doesNotThrow(() =>
-			assertWebSocketRoute(createClientTestContract().socket.join),
-		);
+		assert.doesNotThrow(() => assertWebSocketRoute(apiContract.socket.join));
 	});
 
 	it("rejects HTTP route declarations", () => {

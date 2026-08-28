@@ -1,8 +1,34 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
-import { testContract, testRoute } from "../../test/factories/contract.ts";
+import { noBody } from "./body.ts";
+import type { HttpRouteDeclaration, RouteMetadata } from "./contract.ts";
 import { normalizeContract } from "./normalize.ts";
+
+type RouteOverrides = Partial<HttpRouteDeclaration> & {
+	metadata?: RouteMetadata;
+};
+
+const testRoute = (overrides: RouteOverrides = {}): HttpRouteDeclaration => ({
+	method: "GET",
+	path: "/search",
+	responses: {
+		204: noBody(),
+	},
+	...overrides,
+});
+
+const testContract = (
+	routeOverrides: RouteOverrides = {},
+): {
+	search: {
+		find: HttpRouteDeclaration;
+	};
+} => ({
+	search: {
+		find: testRoute(routeOverrides),
+	},
+});
 
 describe("normalizeContract", () => {
 	it("normalizes shared path prefixes onto route declarations", () => {

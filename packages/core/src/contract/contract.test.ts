@@ -1,9 +1,32 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
-import { testContract } from "../../test/factories/contract.ts";
 import { isNoBody, noBody } from "./body.ts";
+import type { HttpRouteDeclaration, RouteMetadata } from "./contract.ts";
 import { router } from "./contract.ts";
+
+type RouteOverrides = Partial<HttpRouteDeclaration> & {
+	metadata?: RouteMetadata;
+};
+
+const testContract = (
+	routeOverrides: RouteOverrides = {},
+): {
+	search: {
+		find: HttpRouteDeclaration;
+	};
+} => ({
+	search: {
+		find: {
+			method: "GET",
+			path: "/search",
+			responses: {
+				204: noBody(),
+			},
+			...routeOverrides,
+		},
+	},
+});
 
 describe("router", () => {
 	it("normalizes and validates contracts", () => {

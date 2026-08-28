@@ -1,10 +1,33 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
-import { testContract } from "../../test/factories/contract.ts";
-import { customBody, formBody, multipartBody } from "./body.ts";
+import { customBody, formBody, multipartBody, noBody } from "./body.ts";
+import type { HttpRouteDeclaration, RouteMetadata } from "./contract.ts";
 import { jsonQuery } from "./request.ts";
 import { groupRequestInput, validateContract } from "./validate.ts";
+
+type RouteOverrides = Partial<HttpRouteDeclaration> & {
+	metadata?: RouteMetadata;
+};
+
+const testContract = (
+	routeOverrides: RouteOverrides = {},
+): {
+	search: {
+		find: HttpRouteDeclaration;
+	};
+} => ({
+	search: {
+		find: {
+			method: "GET",
+			path: "/search",
+			responses: {
+				204: noBody(),
+			},
+			...routeOverrides,
+		},
+	},
+});
 
 describe("validateContract", () => {
 	it("populates request keys from request schemas", () => {

@@ -2,11 +2,6 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import z from "zod";
 import {
-	captureFetch,
-	createClientTestContract,
-	jsonResponse,
-} from "../../test/factories/client.ts";
-import {
 	customBody,
 	formBody,
 	multipartBody,
@@ -23,6 +18,93 @@ afterEach(() => {
 	globalThis.fetch = originalFetch;
 });
 
+type FetchCall = {
+	url: string;
+	init?: RequestInit;
+};
+
+const createRequestTestContract = () =>
+	router({
+		todos: {
+			list: {
+				method: "GET",
+				path: "/todos",
+				query: z.object({
+					search: z.string().optional(),
+					empty: z.string().optional(),
+				}),
+				responses: {
+					200: z.array(z.object({ id: z.string(), title: z.string() })),
+				},
+			},
+			create: {
+				method: "POST",
+				path: "/todos",
+				body: z.object({ title: z.string() }),
+				responses: {
+					201: z.object({ id: z.string(), title: z.string() }),
+				},
+			},
+			get: {
+				method: "GET",
+				path: "/todos/:id",
+				pathParams: z.object({ id: z.string() }),
+				responses: {
+					200: z.object({ id: z.string(), title: z.string() }),
+				},
+			},
+		},
+		uploads: {
+			create: {
+				method: "POST",
+				path: "/uploads/:id",
+				pathParams: z.object({ id: z.string() }),
+				body: customBody({
+					schema: z.string(),
+					contentType: "text/plain",
+				}),
+				responses: {
+					204: noBody(),
+				},
+			},
+			json: {
+				method: "POST",
+				path: "/uploads/json",
+				body: customBody({
+					schema: z.object({ type: z.string() }),
+					contentType: "application/json",
+				}),
+				responses: {
+					204: noBody(),
+				},
+			},
+		},
+	});
+
+const jsonResponse = (body: unknown, status = 200) =>
+	new Response(JSON.stringify(body), {
+		status,
+		headers: { "Content-Type": "application/json" },
+	});
+
+const captureFetch = (
+	response:
+		| Response
+		| ((
+				url: URL | RequestInfo,
+				init?: RequestInit,
+		  ) => Response | Promise<Response>) = new Response(null, { status: 204 }),
+) => {
+	const calls: FetchCall[] = [];
+
+	globalThis.fetch = async (url, init) => {
+		calls.push({ url: String(url), init });
+		return typeof response === "function" ? response(url, init) : response;
+	};
+
+	return calls;
+};
+
 describe("ApiClient requests", () => {
 	it("builds URLs from params and query keys", async () => {
 		const calls = captureFetch((url) =>
@@ -30,7 +112,7 @@ describe("ApiClient requests", () => {
 				? jsonResponse({ id: "todo 1", title: "Buy milk" })
 				: jsonResponse([]),
 		);
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createRequestTestContract(), {
 			baseUrl: "https://api.test",
 		});
 
@@ -292,7 +374,7 @@ describe("ApiClient requests", () => {
 	});
 
 	it("rejects missing and undefined params before building the request URL", () => {
-		const apiContract = createClientTestContract();
+		const apiContract = createRequestTestContract();
 
 		assert.throws(
 			() =>
@@ -399,7 +481,7 @@ describe("ApiClient requests", () => {
 		const calls = captureFetch(
 			jsonResponse({ id: "todo-1", title: "Buy milk" }, 201),
 		);
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createRequestTestContract(), {
 			baseUrl: "https://api.test",
 		});
 
@@ -413,7 +495,7 @@ describe("ApiClient requests", () => {
 
 	it("sends custom bodies with their declared content type", async () => {
 		const calls = captureFetch();
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createRequestTestContract(), {
 			baseUrl: "https://api.test",
 		});
 
@@ -677,7 +759,7 @@ describe("ApiClient requests", () => {
 
 	it("stringifies application/json custom bodies", async () => {
 		const calls = captureFetch();
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createRequestTestContract(), {
 			baseUrl: "https://api.test",
 		});
 
@@ -715,7 +797,7 @@ describe("ApiClient requests", () => {
 
 	it("merges global fetch options and per-call options", async () => {
 		const calls = captureFetch(jsonResponse([]));
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createRequestTestContract(), {
 			baseUrl: "https://api.test",
 			fetchOptions: {
 				cache: "no-store",
@@ -739,7 +821,7 @@ describe("ApiClient requests", () => {
 				? jsonResponse([])
 				: jsonResponse({ id: "todo-1", title: "Buy milk" }, 201),
 		);
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createRequestTestContract(), {
 			baseUrl: "https://api.test",
 			fetchOptions: {
 				next: {
@@ -768,7 +850,7 @@ describe("ApiClient requests", () => {
 
 	it("lets custom fetch inspect and replace the final request init", async () => {
 		const calls: Array<{ url: string; init?: RequestInit }> = [];
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createRequestTestContract(), {
 			baseUrl: "https://api.test",
 			fetch: async (url, init) => {
 				assert.equal(url, "https://api.test/todos?search=milk");
@@ -847,7 +929,7 @@ describe("ApiClient requests", () => {
 
 	it("rejects global content-type headers", async () => {
 		captureFetch();
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createRequestTestContract(), {
 			baseUrl: "https://api.test",
 			getGlobalHeaders: () => ({ "content-type": "text/plain" }),
 		});
@@ -860,7 +942,7 @@ describe("ApiClient requests", () => {
 
 	it("rejects unknown flattened request keys by default", async () => {
 		captureFetch();
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createRequestTestContract(), {
 			baseUrl: "https://api.test",
 		});
 
@@ -876,7 +958,7 @@ describe("ApiClient requests", () => {
 
 	it("strips unknown flattened request keys when configured", async () => {
 		const calls = captureFetch(jsonResponse([]));
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createRequestTestContract(), {
 			baseUrl: "https://api.test",
 			strictRequestKeys: false,
 		});
@@ -919,7 +1001,7 @@ describe("ApiClient requests", () => {
 			});
 			throw new Error("network down");
 		};
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createRequestTestContract(), {
 			baseUrl: "https://api.test",
 			timeoutMs: 5,
 		});
@@ -937,7 +1019,7 @@ describe("ApiClient requests", () => {
 			(() =>
 				0 as unknown as ReturnType<typeof setTimeout>) as typeof setTimeout,
 		);
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createRequestTestContract(), {
 			baseUrl: "https://api.test",
 			timeoutMs: 10_000,
 			getGlobalHeaders: async () => {
@@ -970,7 +1052,7 @@ describe("ApiClient requests", () => {
 				{ status: 200, headers: { "content-type": "application/json" } },
 			);
 		};
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createRequestTestContract(), {
 			baseUrl: "https://api.test",
 			timeoutMs: 5,
 		});

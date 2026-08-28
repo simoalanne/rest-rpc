@@ -1,11 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import z from "zod";
-import {
-	captureFetch,
-	createClientTestContract,
-	jsonResponse,
-} from "../../test/factories/client.ts";
 import { customBody, noBody, stream } from "../contract/body.ts";
 import { router } from "../contract/contract.ts";
 import { initClient } from "./index.ts";
@@ -16,10 +11,62 @@ afterEach(() => {
 	globalThis.fetch = originalFetch;
 });
 
+type FetchCall = {
+	url: string;
+	init?: RequestInit;
+};
+
+const createResponseTestContract = () =>
+	router({
+		todos: {
+			create: {
+				method: "POST",
+				path: "/todos",
+				body: z.object({ title: z.string() }),
+				responses: {
+					201: z.object({ id: z.string(), title: z.string() }),
+				},
+			},
+			get: {
+				method: "GET",
+				path: "/todos/:id",
+				pathParams: z.object({ id: z.string() }),
+				responses: {
+					200: z.object({ id: z.string(), title: z.string() }),
+					404: z.object({ code: z.literal("not_found") }),
+				},
+			},
+		},
+	});
+
+const jsonResponse = (body: unknown, status = 200) =>
+	new Response(JSON.stringify(body), {
+		status,
+		headers: { "Content-Type": "application/json" },
+	});
+
+const captureFetch = (
+	response:
+		| Response
+		| ((
+				url: URL | RequestInfo,
+				init?: RequestInit,
+		  ) => Response | Promise<Response>),
+) => {
+	const calls: FetchCall[] = [];
+
+	globalThis.fetch = async (url, init) => {
+		calls.push({ url: String(url), init });
+		return typeof response === "function" ? response(url, init) : response;
+	};
+
+	return calls;
+};
+
 describe("ApiClient responses", () => {
 	it("returns declared response metadata from fetchResponse", async () => {
 		captureFetch(jsonResponse({ code: "not_found" }, 404));
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createResponseTestContract(), {
 			baseUrl: "https://api.test",
 		});
 
@@ -80,7 +127,7 @@ describe("ApiClient responses", () => {
 
 	it("rejects fetch when the response is not a declared success", async () => {
 		captureFetch(jsonResponse({ code: "not_found" }, 404));
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createResponseTestContract(), {
 			baseUrl: "https://api.test",
 		});
 
@@ -92,7 +139,7 @@ describe("ApiClient responses", () => {
 
 	it("returns undeclared JSON response bodies", async () => {
 		captureFetch(jsonResponse({ code: "teapot" }, 418));
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createResponseTestContract(), {
 			baseUrl: "https://api.test",
 		});
 
@@ -108,7 +155,7 @@ describe("ApiClient responses", () => {
 
 	it("rejects undeclared response statuses when strict status codes are enabled", async () => {
 		captureFetch(jsonResponse({ code: "teapot" }, 418));
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createResponseTestContract(), {
 			baseUrl: "https://api.test",
 			strictStatusCodes: true,
 		});
@@ -161,7 +208,7 @@ describe("ApiClient responses", () => {
 				? new Response(null, { status: 418 })
 				: new Response("plain error", { status: 418 }),
 		);
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createResponseTestContract(), {
 			baseUrl: "https://api.test",
 		});
 
@@ -174,7 +221,7 @@ describe("ApiClient responses", () => {
 
 	it("trusts declared response bodies by default", async () => {
 		captureFetch(jsonResponse({ id: 123 }, 201));
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createResponseTestContract(), {
 			baseUrl: "https://api.test",
 		});
 
@@ -185,7 +232,7 @@ describe("ApiClient responses", () => {
 
 	it("validates declared response bodies when configured", async () => {
 		captureFetch(jsonResponse({ id: 123 }, 201));
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(createResponseTestContract(), {
 			baseUrl: "https://api.test",
 			validateResponses: true,
 		});

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
-import { createClientTestContract } from "../../test/factories/client.ts";
+import z from "zod";
+import { stream } from "../contract/body.ts";
+import { router } from "../contract/contract.ts";
 import { type } from "../standard-schema/type.ts";
 import { initClient } from "./index.ts";
 import { parseNdjsonStream } from "./stream.ts";
@@ -9,6 +11,18 @@ const originalFetch = globalThis.fetch;
 
 afterEach(() => {
 	globalThis.fetch = originalFetch;
+});
+
+const apiContract = router({
+	events: {
+		stream: {
+			method: "GET",
+			path: "/events",
+			responses: {
+				200: stream(z.object({ id: z.string() })),
+			},
+		},
+	},
 });
 
 const ndjsonResponse = (chunks: string[]) => {
@@ -28,7 +42,7 @@ describe("ApiClient streams", () => {
 	it("parses NDJSON stream chunks and final lines without newlines", async () => {
 		globalThis.fetch = async () =>
 			ndjsonResponse(['{"id":"one"}\n{"id"', ':"two"}\n', '{"id":"three"}']);
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 		});
 
@@ -42,7 +56,7 @@ describe("ApiClient streams", () => {
 
 	it("trusts streamed items by default", async () => {
 		globalThis.fetch = async () => ndjsonResponse(['{"id":123}\n']);
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 		});
 
@@ -56,7 +70,7 @@ describe("ApiClient streams", () => {
 
 	it("validates streamed items when configured", async () => {
 		globalThis.fetch = async () => ndjsonResponse(['{"id":123}\n']);
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 			validateResponses: true,
 		});
@@ -75,7 +89,7 @@ describe("ApiClient streams", () => {
 			new Response(null, {
 				status: 200,
 			});
-		const client = initClient(createClientTestContract(), {
+		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 		});
 
