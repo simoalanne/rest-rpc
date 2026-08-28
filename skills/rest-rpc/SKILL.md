@@ -1,97 +1,97 @@
 ---
 name: rest-rpc
-description: Use rest-rpc in TypeScript applications by reading the hosted docs as the current source of truth.
+description: Use rest-rpc in TypeScript apps: contract-first API design, server adapters, typed clients, TanStack Query, OpenAPI, streaming, and monorepo architecture. Use hosted docs for current API details.
 ---
 
 # rest-rpc
 
-Use this skill when a task involves adding, using, explaining, or debugging
-`rest-rpc` in an application or service.
+Use this skill for `rest-rpc` work: setup, contracts, adapters, clients, TanStack Query, OpenAPI, streaming/WebSockets, migrations, debugging, and architecture.
 
-`rest-rpc` is a TypeScript library for defining one shared API contract and
-deriving strongly typed server and client surfaces from it.
+## Core Model
 
-At a high level:
+Keep the architecture contract-first:
 
-- The contract is the source of truth for an HTTP API.
-- Routes keep explicit REST details: method, path, query, headers, body,
-  response, status codes, metadata, and content types.
-- Application code gets RPC-shaped ergonomics: handlers and clients are called
-  through a typed route tree.
-- The same contract can power server handlers, fetch clients, TanStack Query
-  helpers, OpenAPI documents, and WebSocket helpers.
-- Runtime validation is schema-library friendly. Use Standard
-  Schema-compatible libraries such as Zod, Valibot, or ArkType, or use the
-  built-in type-only helper when runtime validation is not needed.
-- Server adapters are available for Express, Fastify, Hono, NestJS, Next.js, and
-  Fetch runtime `Request`/`Response` runtimes.
-- `@rest-rpc/core` contains the contract, client, and OpenAPI primitives.
-- `@rest-rpc/server` contains shared server-side behavior.
-- Adapter packages provide framework integration:
-  `@rest-rpc/express`, `@rest-rpc/fastify`, `@rest-rpc/hono`,
-  `@rest-rpc/nest`, `@rest-rpc/next`, and `@rest-rpc/fetch`.
-- `@rest-rpc/tanstack-query` derives query options, mutation options, and query
-  keys from the same contract.
+- The API contract is the source of truth.
+- Define each route once in the contract.
+- Preserve explicit HTTP semantics: method, path, params, query, headers, body, responses, status codes, content types, and metadata.
+- Derive server handlers, fetch clients, TanStack Query helpers, OpenAPI, and WebSocket helpers from the same contract.
+- Avoid duplicated client/server types when the contract can infer them.
+- Use `router` and `route` for contract declaration instead of untyped object literals.
+- Keep contracts modular, then compose routers where the full API surface is needed.
+- Use Standard Schema-compatible validators such as Zod, Valibot, or ArkType when runtime validation is needed.
+- Use the built-in type-only schema helper when runtime validation is unnecessary.
 
-## Common Tasks
+## Library Philosophy
 
-- Installing the right packages for the user's server framework.
-- Creating or updating a shared contract module.
-- Adding typed server handlers for an existing API.
-- Creating a typed fetch client.
-- Wiring TanStack Query helpers in a frontend.
-- Generating OpenAPI from the contract.
-- Modeling request params, query strings, headers, bodies, status-specific
-  responses, streams, or WebSocket messages.
-- Migrating hand-written HTTP client/server types to a shared contract.
-- Explaining how to structure shared contract code in a monorepo or app.
+`rest-rpc` is a type-safe bridge between an application's existing HTTP architecture and its shared API contract. It does not replace framework architecture: keep using the framework's routing, modules, plugins, middleware, dependency injection, auth, and deployment conventions. Use `rest-rpc` explicitly where it preserves the contract-to-runtime type link. Prefer its helpers over partial or ad-hoc usage when they provide type safety: core/server adapter `router` and `route`, `registerRoutes`, `createRouteHandler`, typed clients such as `fetch` and `fetchResponse`, TanStack Query `queryOptions`, streaming helpers such as `openConnection`, and exported helper types. At runtime much of the code may still be ordinary objects and functions; the value is that those objects and functions remain checked against the shared contract and the TypeScript type system.
 
-## Source Of Truth
+## Packages
 
-Prefer the hosted MCP server when the agent environment supports MCP. It gives
-the agent explicit documentation tools instead of relying on general web search tools
-or reading the source code for common tasks.
+Use only packages required by the detected stack:
 
-Recommended Codex setup:
+- `@rest-rpc/core`: contracts, clients, OpenAPI primitives
+- `@rest-rpc/tanstack-query`: TanStack Query integration
+- `@rest-rpc/express`: Express adapter
+- `@rest-rpc/fastify`: Fastify adapter
+- `@rest-rpc/hono`: Hono adapter
+- `@rest-rpc/nest`: NestJS adapter
+- `@rest-rpc/next`: Next.js adapter
+- `@rest-rpc/fetch`: Server adapter for fetch-based runtimes (Next.js, Deno, Bun, Cloudflare Workers, etc.)
+- `@rest-rpc/server`: Low-level server helpers. Ignore by default unless implementing a custom server adapter.
+
+## When To Read Docs
+
+The hosted docs are the source of truth for current APIs. Do not fetch docs for trivial architecture choices already covered here or on project's existing architecture. Do fetch docs before using unfamiliar exports, adding an integration, writing examples, or changing behavior that depends on exact package APIs.
+
+Prefer targeted retrieval:
+
+### Via MCP (Preferred)
+
+The full documentation is available via MCP tools.
+
+If tools are not installed they can be added using:
+
+For Codex:
 
 ```bash
 codex mcp add rest-rpc --url https://rest-rpc.dev/mcp
 ```
 
-Recommended Claude Code setup:
+For Claude Code:
 
 ```bash
 claude mcp add --transport http rest-rpc https://rest-rpc.dev/mcp
 ```
 
-After connecting the MCP server, use its tools as the primary lookup path:
+1. MCP `search_docs`
+2. MCP `get_page`
+3. MCP `list_pages` or `get_navigation` when discovery is needed
 
-- Start with `search_docs` to find relevant pages.
-- Then call `get_page` with a route from `search_docs` or `list_pages`.
-- Use `list_pages` when search is too narrow or when discovering available
-  docs sections.
-- Use `get_navigation` when the task depends on how the docs are organized.
+### Via fetching docs directly from the hosted site (only when MCP is unavailable)
 
-If MCP is unavailable, use the AI-friendly and raw Markdown endpoints:
+Useful indexes:
 
-- Agent readability index: `https://rest-rpc.dev/agent-readability.json`
-- Docs index for agents: `https://rest-rpc.dev/llms.txt`
-- Full agent context. This is large, avoid by default: `https://rest-rpc.dev/llms-full.txt`
-- Quickstart raw Markdown:
-  `https://rest-rpc.dev/docs/quickstart.md`
-- Any docs page as raw Markdown by appending `.md` to the canonical URL, for
-  example `https://rest-rpc.dev/docs/contract/declaration.md`
+- `https://rest-rpc.dev/agent-readability.json`
+- `https://rest-rpc.dev/llms.txt`
+
+### Via reading source code (when the documentation does not cover the needed details)
+
+Read the source code from the installed package location. Exact paths differ based on package manager,
+do not guess the install location and verify the path before reading. Each package ships `dist/` that contains
+the transpiled JavaScript files and the TypeScript type declaration files. Each exported symbol is documented with
+TSDoc comments. The source code is the ultimate source of truth for the current API, but it is not a substitute for the hosted docs.
 
 ## Project Workflow
 
-When applying `rest-rpc` in a project:
+For implementation tasks:
 
-- Inspect the app's package manager, TypeScript setup, server framework, client
-  framework, and existing API shape.
-- Install only the packages needed for that stack.
-- Put the contract somewhere both server and client can import it, such as a
-  shared package, workspace module, or app-local shared directory.
-- Keep examples contract-first: define the route once, implement it with a
-  server adapter, then call it from the generated client or TanStack Query
-  helpers.
-- Verify changes with the user's existing typecheck, tests, or build commands.
+1. Inspect package manager, TypeScript config, framework/runtime, existing API shape, validation library, workspace layout, and installed `rest-rpc` versions.
+2. Read targeted docs only when exact current API details are needed.
+3. Install missing `rest-rpc` packages with the detected package manager.
+4. Put shared contracts somewhere both server and client can import: a workspace package, shared app module, or app-local shared directory.
+5. Use the server adapter that matches the project framework. Prefer normal framework organization such as Express routers, Fastify plugins, Hono route modules, NestJS modules, or framework catch-all routes.
+6. Use adapter `router` and `route` for server implementation, and contract `router` and `route` for API declaration; they are related but not interchangeable.
+7. Use `registerRoutes` when registering with a framework router. Use `createRouteHandler` when a runtime needs a custom matcher or catch-all handler.
+8. Register routes in multiple modules when useful; neither contracts nor handlers need to be monolithic.
+9. Use typed client helpers for direct calls. Use `@rest-rpc/tanstack-query` for query/mutation options and keys when the app already uses TanStack Query.
+10. Let types infer from the contract. If inference is not enough, prefer exported helper types over new ad-hoc types.
