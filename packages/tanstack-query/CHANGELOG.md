@@ -1,5 +1,11 @@
 # @rest-rpc/tanstack-query
 
+## 0.1.0-beta.16
+
+### Patch Changes
+
+- 7d783af: Rename API surfaces. Add support for strictStatusCodes for tanstack-query helpers
+
 ## 0.1.0-beta.15
 
 ### Patch Changes

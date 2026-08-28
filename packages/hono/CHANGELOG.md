@@ -1,5 +1,12 @@
 # @rest-rpc/hono
 
+## 0.1.0-beta.16
+
+### Patch Changes
+
+- 52d0d20: rename server registerRoutes to splitRouteImplementations to decribe its role more accurately.
+  Allow onRequestValidationError hook to return undefined to match the consistency of the other hooks.
+
 ## 0.1.0-beta.15
 
 ### Patch Changes

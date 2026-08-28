@@ -1,5 +1,12 @@
 # @rest-rpc/core
 
+## 0.1.0-beta.16
+
+### Patch Changes
+
+- d92c809: Make schemaConverter optional and add transform hooks for generated OpenAPI parameters and operations
+- 7d783af: Rename API surfaces. Add support for strictStatusCodes for tanstack-query helpers
+
 ## 0.1.0-beta.15
 
 ### Minor Changes
