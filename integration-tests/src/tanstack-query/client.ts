@@ -1,5 +1,5 @@
-import type { TanstackQuery } from "@rest-rpc/tanstack-query";
-import { initTanstackQuery } from "@rest-rpc/tanstack-query";
+import type { TanstackQueryHelpersFor } from "@rest-rpc/tanstack-query";
+import { createTanstackQueryHelpers } from "@rest-rpc/tanstack-query";
 import {
 	type TanstackQueryContract,
 	tanstackQueryContract,
@@ -29,5 +29,5 @@ export const createTrackedFetch = () => {
 export const createTanstackQueryClient = (
 	baseUrl: string,
 	fetch: typeof globalThis.fetch,
-): TanstackQuery<TanstackQueryContract> =>
-	initTanstackQuery(tanstackQueryContract, { baseUrl, fetch });
+): TanstackQueryHelpersFor<TanstackQueryContract> =>
+	createTanstackQueryHelpers(tanstackQueryContract, { baseUrl, fetch });
