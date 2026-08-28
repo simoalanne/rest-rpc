@@ -25,8 +25,8 @@ export type {
 export { createRouteMatcher } from "./match.ts";
 export {
 	flattenRouteImplementations,
-	registerRoutes as registerRouteImplementations,
-} from "./registerRoutes.ts";
+	splitRouteImplementations,
+} from "./splitRouteImplementations.ts";
 export { createRequestParsingErrorResponse } from "./requestParsingError.ts";
 export { RouteResponseError } from "./routeResponseError.ts";
 export type {

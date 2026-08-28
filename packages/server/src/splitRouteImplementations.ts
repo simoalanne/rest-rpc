@@ -33,18 +33,20 @@ export function flattenRouteImplementations<TRoute extends RouteDeclaration>(
 }
 
 /**
- * Splits implementations into HTTP and WebSocket groups for server adapters.
+ * Splits route implementations into HTTP and WebSocket groups for server adapters.
  *
  * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#splitting-implementations}
  */
-export function registerRoutes(
+export function splitRouteImplementations(
 	implementations: ImplementationTree<RouteDeclaration>,
-	registerHttpRoutes: (
-		routes: RouteImplementation<HttpRouteDeclaration>[],
-	) => void,
-	registerWebSocketRoutes?: (
-		routes: RouteImplementation<WebSocketRouteDeclaration>[],
-	) => void,
+	handlers: {
+		handleHttpRoutes: (
+			routes: RouteImplementation<HttpRouteDeclaration>[],
+		) => void;
+		handleWebSocketRoutes?: (
+			routes: RouteImplementation<WebSocketRouteDeclaration>[],
+		) => void;
+	},
 ) {
 	const implementationsList = flattenRouteImplementations(implementations);
 	const routes = implementationsList.filter(isHttpRouteImplementation);
@@ -52,6 +54,6 @@ export function registerRoutes(
 		isWebSocketRouteImplementation,
 	);
 
-	registerHttpRoutes(routes);
-	registerWebSocketRoutes?.(webSocketRoutes);
+	handlers.handleHttpRoutes(routes);
+	handlers.handleWebSocketRoutes?.(webSocketRoutes);
 }

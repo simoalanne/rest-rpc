@@ -6,7 +6,7 @@ import type {
 } from "@rest-rpc/core/contract";
 import { noBody } from "@rest-rpc/core/contract";
 import z from "zod";
-import { registerRoutes } from "./registerRoutes.ts";
+import { splitRouteImplementations } from "./splitRouteImplementations.ts";
 
 const listRoute: HttpRouteDeclaration = {
 	method: "GET",
@@ -34,27 +34,29 @@ const socketRoute: WebSocketRouteDeclaration = {
 	},
 };
 
-describe("registerRoutes", () => {
+describe("splitRouteImplementations", () => {
 	it("sorts and splits route implementations before calling adapter hooks", () => {
 		const calls: unknown[] = [];
 
-		registerRoutes(
+		splitRouteImplementations(
 			{
 				socket: { route: socketRoute, handler: () => undefined },
 				create: { route: createRoute, handler: () => undefined },
 				list: { route: listRoute, handler: () => undefined },
 			},
-			(routes) => {
-				calls.push({
-					kind: "http",
-					paths: routes.map((route) => route.route.path),
-				});
-			},
-			(routes) => {
-				calls.push({
-					kind: "websocket",
-					paths: routes.map((route) => route.route.path),
-				});
+			{
+				handleHttpRoutes: (httpRoutes) => {
+					calls.push({
+						kind: "http",
+						paths: httpRoutes.map((route) => route.route.path),
+					});
+				},
+				handleWebSocketRoutes: (webSocketRoutes) => {
+					calls.push({
+						kind: "websocket",
+						paths: webSocketRoutes.map((route) => route.route.path),
+					});
+				},
 			},
 		);
 

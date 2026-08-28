@@ -1,7 +1,7 @@
 import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	type ImplementationTree,
-	registerRouteImplementations,
+	splitRouteImplementations,
 	type ServerErrorHandlers,
 } from "@rest-rpc/server";
 import type { Context, Hono } from "hono";
@@ -41,26 +41,23 @@ export function registerRoutes<TEnv extends Env = Env>(
 	implementations: ImplementationTree<RouteDeclaration>,
 	options: RegisterRoutesOptions<TEnv> = {},
 ) {
-	return registerRouteImplementations(
-		implementations,
-		(routes) =>
+	return splitRouteImplementations(implementations, {
+		handleHttpRoutes: (httpRoutes) =>
 			registerHonoHttpRoutes(
 				app,
-				routes,
+				httpRoutes,
 				options.parseBody,
 				options.middleware,
 				options.errorHandlers,
 			),
-		(routes) => {
-			if (options.webSocket) {
-				registerHonoWebSocketRoutes(
-					app,
-					options.webSocket,
-					routes,
-					options.middleware,
-					options.errorHandlers,
-				);
-			}
-		},
-	);
+		handleWebSocketRoutes: (webSocketRoutes) =>
+			options.webSocket &&
+			registerHonoWebSocketRoutes(
+				app,
+				options.webSocket,
+				webSocketRoutes,
+				options.middleware,
+				options.errorHandlers,
+			),
+	});
 }

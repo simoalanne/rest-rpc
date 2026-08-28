@@ -1,7 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import type { ImplementationTree, ServerErrorHandlers } from "@rest-rpc/server";
-import { registerRouteImplementations } from "@rest-rpc/server";
+import { splitRouteImplementations } from "@rest-rpc/server";
 import type { IRouter, Request } from "express";
 import {
 	type ExtendedExpressMiddleware,
@@ -47,21 +47,20 @@ export function registerRoutes(
 	implementations: ImplementationTree<RouteDeclaration>,
 	options: RegisterRoutesOptions = {},
 ) {
-	return registerRouteImplementations(
-		implementations,
-		(routes) =>
+	return splitRouteImplementations(implementations, {
+		handleHttpRoutes: (httpRoutes) =>
 			registerExpressHttpRoutes(
 				app,
-				routes,
+				httpRoutes,
 				options.middleware,
 				options.errorHandlers as ExpressHttpErrorHandlers | undefined,
 			),
-		(routes) =>
+		handleWebSocketRoutes: (webSocketRoutes) =>
 			options.webSocket &&
 			registerExpressWebSocketRoutes(
 				options.webSocket,
-				routes,
+				webSocketRoutes,
 				options.errorHandlers as ExpressWebSocketErrorHandlers | undefined,
 			),
-	);
+	});
 }

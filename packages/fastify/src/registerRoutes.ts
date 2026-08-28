@@ -1,6 +1,6 @@
 import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import type { ImplementationTree, ServerErrorHandlers } from "@rest-rpc/server";
-import { registerRouteImplementations } from "@rest-rpc/server";
+import { splitRouteImplementations } from "@rest-rpc/server";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
 	type ExtendedFastifyPreHandler,
@@ -35,23 +35,22 @@ export function registerRoutes(
 	implementations: ImplementationTree<RouteDeclaration>,
 	options: RegisterRoutesOptions = {},
 ) {
-	return registerRouteImplementations(
-		implementations,
-		(routes) =>
+	return splitRouteImplementations(implementations, {
+		handleHttpRoutes: (httpRoutes) =>
 			registerFastifyHttpRoutes(
 				app,
-				routes,
+				httpRoutes,
 				options.preHandler,
 				options.errorHandlers,
 			),
-		(routes) =>
+		handleWebSocketRoutes: (webSocketRoutes) =>
 			options.webSocket &&
 			registerFastifyWebSocketRoutes(
 				app,
 				options.webSocket,
-				routes,
+				webSocketRoutes,
 				options.preHandler,
 				options.errorHandlers,
 			),
-	);
+	});
 }

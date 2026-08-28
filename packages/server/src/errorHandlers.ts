@@ -50,8 +50,6 @@ export type UnhandledErrorInput<
 
 /**
  * Input passed to `onResponseValidationError`.
- *
- * @see {@link https://rest-rpc.dev/docs/server/express#error-handlers}
  */
 export type ResponseValidationErrorInput<
 	TContext extends Record<string, unknown>,
@@ -64,13 +62,11 @@ export type ResponseValidationErrorInput<
 
 /**
  * Hooks for converting server validation and unhandled errors into responses.
- *
- * @see {@link https://rest-rpc.dev/docs/server/express#error-handlers}
  */
 export type ServerErrorHandlers<TContext extends Record<string, unknown>> = {
 	onRequestValidationError?: (
 		input: RequestValidationErrorInput<TContext>,
-	) => MaybePromise<ServerErrorResponse>;
+	) => MaybePromise<ServerErrorResponse | undefined>;
 	onResponseValidationError?: (
 		input: ResponseValidationErrorInput<TContext>,
 	) => MaybePromise<ServerErrorResponse | undefined>;
