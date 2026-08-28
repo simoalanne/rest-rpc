@@ -1,4 +1,5 @@
 import type { Contract, RouteDeclaration } from "../contract/contract.ts";
+import { getRouteResponses } from "../contract/response.ts";
 import { mapContractRoutes } from "../contract/traversal.ts";
 import {
 	constructBaseRequest,
@@ -10,7 +11,6 @@ import {
 	fetchSuccess,
 	type RouteRequestFn,
 } from "./response.ts";
-import { hasSingleSuccessfulResponse, isWebSocketRouteNode } from "./routes.ts";
 import { isSseRouteNode, openSseConnection } from "./sse.ts";
 import type {
 	ApiClientFor,
@@ -19,6 +19,12 @@ import type {
 	OpenConnectionArgs,
 } from "./types.ts";
 import { openConnection as openRouteConnection } from "./websocket.ts";
+
+const hasSingleSuccessfulResponse = (route: RouteDeclaration) =>
+	Object.keys(getRouteResponses(route)).filter((status) => {
+		const statusCode = Number(status);
+		return statusCode >= 200 && statusCode < 300;
+	}).length === 1;
 
 /**
  * Creates a typed fetch client from a contract.
@@ -59,7 +65,7 @@ export function initClient<
 		);
 
 	return mapContractRoutes(contract, (node) => {
-		if (isWebSocketRouteNode(node) || isSseRouteNode(node)) {
+		if (node.mode === "webSocket" || isSseRouteNode(node)) {
 			return {
 				openConnection: (...args: OpenConnectionArgs) => {
 					const requestArgs = args.at(0);

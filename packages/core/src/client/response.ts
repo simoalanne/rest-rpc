@@ -13,15 +13,16 @@ import {
 	getRouteResponses,
 } from "../contract/response.ts";
 import { validateStandardSchema } from "../standard-schema/index.ts";
-import { isHttpRouteNode, isSuccessStatus } from "./routes.ts";
 import { parseNdjsonStream } from "./stream.ts";
 import type { ClientResponse, FetchArgs } from "./types.ts";
+
+const isSuccessStatus = (status: number) => status >= 200 && status < 300;
 
 export const getResponseSchema = (
 	route: RouteDeclaration,
 	status: number,
 ): ResponseDeclaration | undefined => {
-	if (!isHttpRouteNode(route)) return undefined;
+	if (route.mode === "webSocket") return undefined;
 	const entry = Object.entries(getRouteResponses(route)).find(
 		([declaredStatus]) => Number(declaredStatus) === status,
 	);

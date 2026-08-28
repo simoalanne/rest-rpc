@@ -3,7 +3,6 @@ import { afterEach, describe, it } from "node:test";
 import z from "zod";
 import { router } from "../contract/contract.ts";
 import { initClient } from "./initClient.ts";
-import { mapApiClientContract } from "./routes.ts";
 
 const originalFetch = globalThis.fetch;
 
@@ -81,19 +80,6 @@ describe("initClient", () => {
 		]);
 		assert.deepEqual(Object.keys(client.todos.publish), ["fetchResponse"]);
 		assert.deepEqual(Object.keys(client.socket.join), ["openConnection"]);
-	});
-
-	it("maps API client route leaves", () => {
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-
-		const mapped = mapApiClientContract(client, (_route, path) =>
-			path.join("."),
-		);
-
-		assert.equal(mapped.todos.list, "todos.list");
-		assert.equal(mapped.socket.join, "socket.join");
 	});
 
 	it("returns the API tree directly", async () => {
