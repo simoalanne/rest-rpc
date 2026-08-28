@@ -23,13 +23,13 @@ At a high level:
 - Runtime validation is schema-library friendly. Use Standard
   Schema-compatible libraries such as Zod, Valibot, or ArkType, or use the
   built-in type-only helper when runtime validation is not needed.
-- Server adapters are available for Express, Fastify, Hono, Next.js, and
+- Server adapters are available for Express, Fastify, Hono, NestJS, Next.js, and
   Fetch runtime `Request`/`Response` runtimes.
 - `@rest-rpc/core` contains the contract, client, and OpenAPI primitives.
 - `@rest-rpc/server` contains shared server-side behavior.
 - Adapter packages provide framework integration:
   `@rest-rpc/express`, `@rest-rpc/fastify`, `@rest-rpc/hono`,
-  `@rest-rpc/next`, and `@rest-rpc/fetch`.
+  `@rest-rpc/nest`, `@rest-rpc/next`, and `@rest-rpc/fetch`.
 - `@rest-rpc/tanstack-query` derives query options, mutation options, and query
   keys from the same contract.
 
@@ -48,22 +48,39 @@ At a high level:
 
 ## Source Of Truth
 
-Before giving implementation guidance, writing examples, or changing code, read
-the current hosted documentation from `https://rest-rpc.dev/`.
+Prefer the hosted MCP server when the agent environment supports MCP. It gives
+the agent explicit documentation tools instead of relying on general web search tools
+or reading the source code for common tasks.
 
-Prefer the AI-friendly and raw Markdown endpoints:
+Recommended Codex setup:
 
+```bash
+codex mcp add rest-rpc --url https://rest-rpc.dev/mcp
+```
+
+Recommended Claude Code setup:
+
+```bash
+claude mcp add --transport http rest-rpc https://rest-rpc.dev/mcp
+```
+
+After connecting the MCP server, use its tools as the primary lookup path:
+
+- Start with `search_docs` to find relevant pages.
+- Then call `get_page` with a route from `search_docs` or `list_pages`.
+- Use `list_pages` when search is too narrow or when discovering available
+  docs sections.
+- Use `get_navigation` when the task depends on how the docs are organized.
+
+If MCP is unavailable, use the AI-friendly and raw Markdown endpoints:
+
+- Agent readability index: `https://rest-rpc.dev/agent-readability.json`
 - Docs index for agents: `https://rest-rpc.dev/llms.txt`
-- Full agent context, when available: `https://rest-rpc.dev/llms-full.txt`
+- Full agent context. This is large, avoid by default: `https://rest-rpc.dev/llms-full.txt`
 - Quickstart raw Markdown:
   `https://rest-rpc.dev/docs/quickstart.md`
 - Any docs page as raw Markdown by appending `.md` to the canonical URL, for
   example `https://rest-rpc.dev/docs/contract/declaration.md`
-
-When a user asks for current behavior, package APIs, install commands, adapter
-usage, OpenAPI generation, WebSockets, or edge-case request/response handling,
-look up the relevant hosted docs page first. Then answer from those docs and the
-user's project context.
 
 ## Project Workflow
 

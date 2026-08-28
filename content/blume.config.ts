@@ -8,7 +8,17 @@ export default defineConfig({
 		text: "rest-rpc",
 	},
 	deployment: {
+		output: "server",
+		adapter: "vercel",
 		site: "https://rest-rpc.dev",
+	},
+	ai: {
+		mcp: {
+			enabled: true,
+			route: "/mcp",
+			instructions:
+				"Use this server to search and read the latest rest-rpc documentation. Start with search_docs, then read relevant pages with get_page before answering API usage questions.",
+		},
 	},
 	content: {
 		root: ".",
