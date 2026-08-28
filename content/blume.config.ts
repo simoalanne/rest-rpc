@@ -19,6 +19,7 @@ export default defineConfig({
 			instructions:
 				"Use this server to search and read the latest rest-rpc documentation. Start with search_docs, then read relevant pages with get_page before answering API usage questions.",
 		},
+		skills: "./skills",
 	},
 	content: {
 		root: ".",

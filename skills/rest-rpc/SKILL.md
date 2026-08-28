@@ -1,6 +1,6 @@
 ---
 name: rest-rpc
-description: Use rest-rpc in TypeScript apps: contract-first API design, server adapters, typed clients, TanStack Query, OpenAPI, streaming, and monorepo architecture. Use hosted docs for current API details.
+description: Use rest-rpc in TypeScript apps with contract-first API design, server adapters, typed clients, TanStack Query, OpenAPI, streaming, and monorepo architecture. Use hosted docs for current API details.
 ---
 
 # rest-rpc

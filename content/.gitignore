@@ -2,3 +2,4 @@ node_modules/
 .blume/
 dist/
 .blume-verify/
+.vercel/
