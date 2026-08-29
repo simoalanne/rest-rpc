@@ -16,6 +16,7 @@ import type {
 	Request,
 	Response,
 } from "express";
+import type { ExpressErrorContext } from "./registerRoutes.ts";
 
 /**
  * Express middleware that also receives the matched rest-rpc route declaration.
@@ -117,10 +118,7 @@ export const registerExpressHttpRoutes = (
 	app: IRouter,
 	routes: RouteImplementation<HttpRouteDeclaration>[],
 	middleware: ExtendedExpressMiddleware[] = [],
-	errorHandlers?: ServerErrorHandlers<{
-		req: Request;
-		signal: AbortSignal;
-	}>,
+	errorHandlers?: ServerErrorHandlers<ExpressErrorContext>,
 ) => {
 	for (const implementation of routes) {
 		const route: HttpRouteDeclaration = implementation.route;
@@ -136,7 +134,7 @@ export const registerExpressHttpRoutes = (
 					pathParams: req.params,
 					headers: req.headers,
 				},
-				context: { req, signal },
+				context: { kind: "http", req, signal },
 				errorContext: { kind: "http", req, signal },
 				errorHandlers,
 			});

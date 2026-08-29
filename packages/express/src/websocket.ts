@@ -21,6 +21,7 @@ import {
 } from "@rest-rpc/server";
 import type WebSocket from "ws";
 import type { WebSocketServer } from "ws";
+import type { ExpressErrorContext } from "./registerRoutes.ts";
 
 export type ExpressWebSocketOptions = {
 	server: HttpServer;
@@ -102,11 +103,7 @@ const adaptWebSocket = (socket: WebSocket): WebSocketLike => ({
 export const registerExpressWebSocketRoutes = (
 	options: ExpressWebSocketOptions,
 	routes: RouteImplementation<WebSocketRouteDeclaration>[],
-	errorHandlers?: ServerErrorHandlers<{
-		kind: "websocket";
-		req: IncomingMessage;
-		signal: AbortSignal;
-	}>,
+	errorHandlers?: ServerErrorHandlers<ExpressErrorContext>,
 ) => {
 	if (routes.length === 0) return;
 

@@ -12,30 +12,32 @@ import {
 	registerExpressWebSocketRoutes,
 } from "./websocket.ts";
 
+type ExpressHttpErrorContext = {
+	kind: "http";
+	req: Request;
+	signal: AbortSignal;
+};
+
+type ExpressWebSocketErrorContext = {
+	kind: "websocket";
+	req: IncomingMessage;
+	signal: AbortSignal;
+};
+
+export type ExpressErrorContext =
+	| ExpressHttpErrorContext
+	| ExpressWebSocketErrorContext;
+
 /**
  * Options for registering rest-rpc routes on an Express router.
  *
  * @see {@link https://rest-rpc.dev/docs/server/express#options}
  */
 export type RegisterRoutesOptions = {
-	errorHandlers?: ServerErrorHandlers<
-		| { kind: "http"; req: Request; signal: AbortSignal }
-		| { kind: "websocket"; req: IncomingMessage; signal: AbortSignal }
-	>;
+	errorHandlers?: ServerErrorHandlers<ExpressErrorContext>;
 	middleware?: ExtendedExpressMiddleware[];
 	webSocket?: ExpressWebSocketOptions;
 };
-
-type ExpressHttpErrorHandlers = ServerErrorHandlers<{
-	req: Request;
-	signal: AbortSignal;
-}>;
-
-type ExpressWebSocketErrorHandlers = ServerErrorHandlers<{
-	kind: "websocket";
-	req: IncomingMessage;
-	signal: AbortSignal;
-}>;
 
 /**
  * Registers HTTP and WebSocket route implementations on an Express router.
@@ -53,14 +55,14 @@ export function registerRoutes(
 				app,
 				httpRoutes,
 				options.middleware,
-				options.errorHandlers as ExpressHttpErrorHandlers | undefined,
+				options.errorHandlers,
 			),
 		handleWebSocketRoutes: (webSocketRoutes) =>
 			options.webSocket &&
 			registerExpressWebSocketRoutes(
 				options.webSocket,
 				webSocketRoutes,
-				options.errorHandlers as ExpressWebSocketErrorHandlers | undefined,
+				options.errorHandlers,
 			),
 	});
 }
