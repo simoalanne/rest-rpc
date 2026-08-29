@@ -652,11 +652,11 @@ describe("ApiClient requests", () => {
 					method: "POST",
 					path: "/uploads",
 					body: multipartBody({
-						fields: {
+						schema: z.object({
 							title: z.string(),
 							file: z.instanceof(Blob),
 							tags: z.array(z.string()).optional(),
-						},
+						}),
 						arrayKeys: ["tags"],
 					}),
 					responses: {
@@ -693,9 +693,9 @@ describe("ApiClient requests", () => {
 					method: "POST",
 					path: "/uploads",
 					body: multipartBody({
-						fields: {
+						schema: z.object({
 							tags: z.array(z.string()),
-						},
+						}),
 						arrayKeys: [],
 					}),
 					responses: {

@@ -1,4 +1,7 @@
-import type { StandardSchemaV1 } from "../standard-schema/index.ts";
+import {
+	isStandardSchema,
+	type StandardSchemaV1,
+} from "../standard-schema/index.ts";
 import type { CustomBody, FormBody, MultipartBody, NoBody } from "./body.ts";
 import { isCustomBody, isFormBody, isMultipartBody, isNoBody } from "./body.ts";
 import type { RouteDeclaration } from "./contract.ts";
@@ -53,9 +56,6 @@ export type RequestBodySchema =
 	| NoBody
 	| undefined;
 
-export const isStandardSchema = (value: unknown): value is StandardSchemaV1 =>
-	typeof value === "object" && value !== null && "~standard" in value;
-
 export const isRequestSchemaRecord = (
 	value: unknown,
 ): value is RequestSchemaRecord =>
@@ -83,9 +83,11 @@ type InferRequestBody<
 						? StandardSchemaV1.InferInput<TSchema>
 						: StandardSchemaV1.InferOutput<TSchema>;
 				}
-			: TBody extends MultipartBody<infer TFields>
+			: TBody extends MultipartBody<infer TSchema>
 				? {
-						body: InferRequestSchemaRecord<TFields, TIO>;
+						body: TIO extends "input"
+							? StandardSchemaV1.InferInput<TSchema>
+							: StandardSchemaV1.InferOutput<TSchema>;
 					}
 				: TBody extends StandardSchemaV1
 					? TIO extends "input"
@@ -106,8 +108,10 @@ type InferGroupedRequestBody<
 			? TIO extends "input"
 				? StandardSchemaV1.InferInput<TSchema>
 				: StandardSchemaV1.InferOutput<TSchema>
-			: TBody extends MultipartBody<infer TFields>
-				? InferRequestSchemaRecord<TFields, TIO>
+			: TBody extends MultipartBody<infer TSchema>
+				? TIO extends "input"
+					? StandardSchemaV1.InferInput<TSchema>
+					: StandardSchemaV1.InferOutput<TSchema>
 				: TBody extends StandardSchemaV1
 					? TIO extends "input"
 						? StandardSchemaV1.InferInput<TBody>

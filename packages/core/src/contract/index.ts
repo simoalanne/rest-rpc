@@ -60,7 +60,6 @@ export type {
 export {
 	isJsonQuery,
 	isRequestSchemaRecord,
-	isStandardSchema,
 	jsonQuery,
 	REQUEST_CONTEXT_KEY,
 } from "./request.ts";

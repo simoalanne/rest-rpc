@@ -1,7 +1,6 @@
 import type { CustomBody } from "../contract/body.ts";
 import { isCustomBody, isNoBody, isStream } from "../contract/body.ts";
 import type { RouteDeclaration } from "../contract/contract.ts";
-import { isStandardSchema } from "../contract/request.ts";
 import type {
 	ClientResponseBody,
 	ResponseBodySchema,
@@ -12,7 +11,10 @@ import {
 	getResponseHeaders,
 	getRouteResponses,
 } from "../contract/response.ts";
-import { validateStandardSchema } from "../standard-schema/index.ts";
+import {
+	isStandardSchema,
+	validateStandardSchema,
+} from "../standard-schema/index.ts";
 import { parseNdjsonStream } from "./stream.ts";
 import type { ClientResponse, FetchArgs } from "./types.ts";
 

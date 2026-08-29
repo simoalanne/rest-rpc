@@ -212,12 +212,12 @@ const multipartRequestRoute = route({
 	method: "POST",
 	path: "/uploads",
 	body: multipartBody({
-		fields: {
+		schema: z.object({
 			title: z.string(),
 			count: z.coerce.number(),
 			file: z.instanceof(Blob),
 			tags: z.array(z.string()).optional(),
-		},
+		}),
 		arrayKeys: ["tags"],
 	}),
 	responses: {
@@ -230,7 +230,7 @@ declare const multipartClientRequest: ClientRequest<
 >;
 expectType<{
 	title: string;
-	count?: unknown;
+	count: unknown;
 	file: Blob;
 	tags?: string[] | undefined;
 }>(multipartClientRequest.body);
@@ -247,26 +247,25 @@ expectType<{
 
 // should accept explicit multipart body declarations
 expectAssignable<MultipartBody>(
-	multipartBody({
-		fields: {
+	multipartBody(
+		z.object({
 			title: z.string(),
-		},
-		arrayKeys: [],
-	}),
+		}),
+	),
 );
 expectType<readonly ["attachments"]>(
 	multipartBody({
-		fields: {
+		schema: z.object({
 			attachments: z.array(z.instanceof(Blob)),
-		},
+		}),
 		arrayKeys: ["attachments"],
 	}).arrayKeys,
 );
-expectError(
+expectAssignable<MultipartBody>(
 	multipartBody({
-		fields: {
+		schema: z.object({
 			tags: z.array(z.string()),
-		},
+		}),
 		arrayKeys: ["tagz"],
 	}),
 );

@@ -1,4 +1,7 @@
-import type { StandardSchemaV1 } from "../standard-schema/index.ts";
+import {
+	isStandardSchema,
+	type StandardSchemaV1,
+} from "../standard-schema/index.ts";
 import { resolveBuiltInRequestKeys } from "./requestKeys.ts";
 
 /**
@@ -26,15 +29,11 @@ export type FormBody<
  * Declares a `multipart/form-data` request body.
  */
 export type MultipartBody<
-	TFields extends Record<string, StandardSchemaV1> = Record<
-		string,
-		StandardSchemaV1
-	>,
-	TArrayKeys extends readonly (keyof TFields & string)[] =
-		readonly (keyof TFields & string)[],
+	TSchema extends StandardSchemaV1 = StandardSchemaV1,
+	TArrayKeys extends readonly string[] = readonly string[],
 > = {
 	kind: "multipartBody";
-	fields: TFields;
+	schema: TSchema;
 	arrayKeys: TArrayKeys;
 };
 
@@ -42,6 +41,29 @@ export type MultipartBody<
  * Declares one or more non-JSON media types for a custom body.
  */
 export type CustomBodyContentType = string | readonly string[];
+
+type BodyWithArrayKeysInput =
+	| StandardSchemaV1
+	| {
+			schema: StandardSchemaV1;
+			arrayKeys: readonly string[];
+	  };
+
+export function resolveBodyWithArrayKeys(input: BodyWithArrayKeysInput): {
+	schema: StandardSchemaV1;
+	arrayKeys: readonly string[];
+} {
+	if (!isStandardSchema(input)) {
+		return input;
+	}
+
+	return {
+		schema: input,
+		arrayKeys: Object.entries(resolveBuiltInRequestKeys(input) ?? {})
+			.filter(([, isArray]) => isArray)
+			.map(([key]) => key),
+	};
+}
 
 /**
  * Declares that a request or response has no body.
@@ -86,13 +108,7 @@ export function formBody<
 				arrayKeys: TArrayKeys;
 		  },
 ): FormBody<TSchema> {
-	const schema = "~standard" in input ? input : input.schema;
-	const arrayKeys =
-		"~standard" in input
-			? Object.entries(resolveBuiltInRequestKeys(input) ?? {})
-					.filter(([, isArray]) => isArray)
-					.map(([key]) => key)
-			: input.arrayKeys;
+	const { schema, arrayKeys } = resolveBodyWithArrayKeys(input);
 
 	return {
 		kind: "formBody",
@@ -113,26 +129,34 @@ export function formBody<
  *
  * @see {@link https://rest-rpc.dev/docs/http-requests#request-with-multipart-body}
  */
+export function multipartBody<const TSchema extends StandardSchemaV1>(
+	schema: TSchema,
+): MultipartBody<TSchema>;
 export function multipartBody<
-	const TFields extends Record<string, StandardSchemaV1>,
-	const TArrayKeys extends readonly (keyof TFields & string)[],
+	const TSchema extends StandardSchemaV1,
+	const TArrayKeys extends readonly string[],
 >(input: {
-	fields: TFields;
-	arrayKeys: TArrayKeys & readonly (NoInfer<keyof TFields> & string)[];
-}): MultipartBody<TFields, TArrayKeys> {
-	for (const key of input.arrayKeys) {
-		if (!(key in input.fields)) {
-			throw new Error(
-				`Multipart body array key "${key}" does not have a matching field schema.`,
-			);
-		}
-	}
+	schema: TSchema;
+	arrayKeys: TArrayKeys;
+}): MultipartBody<TSchema, TArrayKeys>;
+export function multipartBody<
+	const TSchema extends StandardSchemaV1,
+	const TArrayKeys extends readonly string[],
+>(
+	input:
+		| TSchema
+		| {
+				schema: TSchema;
+				arrayKeys: TArrayKeys;
+		  },
+): MultipartBody<TSchema> {
+	const { schema, arrayKeys } = resolveBodyWithArrayKeys(input);
 
 	return {
 		kind: "multipartBody",
-		fields: input.fields,
-		arrayKeys: input.arrayKeys,
-	};
+		schema,
+		arrayKeys,
+	} as MultipartBody<TSchema>;
 }
 
 /**

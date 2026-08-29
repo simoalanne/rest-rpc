@@ -105,33 +105,6 @@ const document = createOpenApiDocument(api, {
 });
 ```
 
-## Multipart Request Bodies
-
-`multipartBody()` produces an OpenAPI request body with the
-`multipart/form-data` content type. Each field schema uses the same optional
-`schemaConverter` as other request schemas.
-
-```ts
-create: {
-	method: "POST",
-	path: "/uploads",
-	body: multipartBody({
-		fields: {
-			title: z.string(),
-			file: z.instanceof(File),
-			tags: z.array(z.string()).optional(),
-		},
-		arrayKeys: ["tags"],
-	}),
-	response: uploadSchema,
-}
-```
-
-Standard Schema defines validation behavior, so rest-rpc does not infer which
-multipart fields are file uploads. If generated OpenAPI needs binary field
-metadata such as `type: "string"` and `format: "binary"`, add it with
-`transformOperation`.
-
 ## Route Metadata
 
 Use `openApi` on a route for operation metadata.

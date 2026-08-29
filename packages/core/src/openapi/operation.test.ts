@@ -378,10 +378,10 @@ describe("OpenAPI operations", () => {
 	it("creates multipart request bodies", () => {
 		const body = createRequestBody(
 			multipartBody({
-				fields: {
+				schema: z.object({
 					title: z.string(),
 					file: z.string(),
-				},
+				}),
 				arrayKeys: [],
 			}),
 			schemaConverter,

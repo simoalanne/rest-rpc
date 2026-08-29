@@ -86,47 +86,6 @@ export const routes = router(api, {
 });
 ```
 
-## Request With Custom Content Type
-
-Custom request bodies are declared with `customBody()`.
-The `body` key is not flattened for client call and server handler.
-
-```ts
-import { customBody, router } from "@rest-rpc/core";
-
-export const api = router({
-	imports: {
-		csv: {
-			method: "POST",
-			path: "/imports.csv",
-			body: customBody({
-				contentType: "text/csv",
-				schema: z.string(),
-			}),
-			response: z.object({
-				imported: z.number(),
-			}),
-		},
-	},
-});
-```
-
-```ts
-export const routes = router(api, {
-	imports: {
-		csv({ body }) {
-			return importCsv(body);
-		},
-	},
-});
-```
-
-```ts
-const result = await client.imports.csv.fetch({
-	body: "id,title\n1,Write docs\n",
-});
-```
-
 ## Request With Form Body
 
 Use `formBody()` for `application/x-www-form-urlencoded` request bodies.
@@ -210,14 +169,13 @@ export const api = router({
 		create: {
 			method: "POST",
 			path: "/uploads",
-			body: multipartBody({
-				fields: {
+			body: multipartBody(
+				z.object({
 					title: z.string(),
 					file: z.instanceof(File),
 					tags: z.array(z.string()).optional(),
-				},
-				arrayKeys: ["tags"],
-			}),
+				}),
+			),
 			response: z.object({
 				title: z.string(),
 			}),
@@ -250,23 +208,38 @@ const result = await client.uploads.create.fetch({
 
 Server body parsers should pass a `FormData` instance to rest-rpc for multipart
 bodies. Each scalar key is passed to its schema as a string or `File`; omitted
-keys are absent from the validation input. Array keys are explicit and are
-encoded or decoded as repeated form keys.
+keys are absent from the validation input. Array fields are inferred from
+supported schemas and encoded or decoded as repeated form keys.
 
-## Request With Fetch-Managed Content Type
-
-Omit `contentType` when the request body should be passed directly to `fetch`
-and the runtime should decide the `content-type` header.
+When the array keys cannot be inferred, declare them explicitly with the
+`arrayKeys` option.
 
 ```ts
+multipartBody({
+	schema: type<{ title: string; file: File; tags: string[] }>(),
+	arrayKeys: ["tags"],
+});
+```
+
+## Request With Custom Content Type
+
+Custom request bodies are declared with `customBody()`.
+The `body` key is not flattened for client call and server handler.
+
+```ts
+import { customBody, router } from "@rest-rpc/core";
+
 export const api = router({
-	forms: {
-		submit: {
+	imports: {
+		csv: {
 			method: "POST",
-			path: "/forms",
-			body: customBody(z.instanceof(URLSearchParams)),
+			path: "/imports.csv",
+			body: customBody({
+				contentType: "text/csv",
+				schema: z.string(),
+			}),
 			response: z.object({
-				title: z.string(),
+				imported: z.number(),
 			}),
 		},
 	},
@@ -275,21 +248,17 @@ export const api = router({
 
 ```ts
 export const routes = router(api, {
-	forms: {
-		submit({ body }) {
-			return {
-				title: body.get("title") ?? "",
-			};
+	imports: {
+		csv({ body }) {
+			return importCsv(body);
 		},
 	},
 });
 ```
 
 ```ts
-const result = await client.forms.submit.fetch({
-	body: new URLSearchParams({
-		title: "Write docs",
-	}),
+const result = await client.imports.csv.fetch({
+	body: "id,title\n1,Write docs\n",
 });
 ```
 
@@ -335,5 +304,45 @@ const image = await client.images.upload.fetch({
 		contentType: "image/png",
 		payload: bytes,
 	},
+});
+```
+
+## Request With Fetch-Managed Content Type
+
+Omit `contentType` when the request body should be passed directly to `fetch`
+and the runtime should decide the `content-type` header.
+
+```ts
+export const api = router({
+	forms: {
+		submit: {
+			method: "POST",
+			path: "/forms",
+			body: customBody(z.instanceof(URLSearchParams)),
+			response: z.object({
+				title: z.string(),
+			}),
+		},
+	},
+});
+```
+
+```ts
+export const routes = router(api, {
+	forms: {
+		submit({ body }) {
+			return {
+				title: body.get("title") ?? "",
+			};
+		},
+	},
+});
+```
+
+```ts
+const result = await client.forms.submit.fetch({
+	body: new URLSearchParams({
+		title: "Write docs",
+	}),
 });
 ```

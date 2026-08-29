@@ -1,7 +1,9 @@
 import type { RouteDeclaration } from "../contract/contract.ts";
 import { getResponseBody } from "../contract/response.ts";
-import { isStandardSchema } from "../contract/request.ts";
-import { validateStandardSchemaSync } from "../standard-schema/index.ts";
+import {
+	isStandardSchema,
+	validateStandardSchemaSync,
+} from "../standard-schema/index.ts";
 import { getResponseSchema } from "./response.ts";
 import type { ClientEventSource } from "./types.ts";
 

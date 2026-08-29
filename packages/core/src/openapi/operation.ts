@@ -14,11 +14,7 @@ import type {
 	RequestBodySchema,
 	RequestSchemaRecord,
 } from "../contract/request.ts";
-import {
-	isJsonQuery,
-	isRequestSchemaRecord,
-	isStandardSchema,
-} from "../contract/request.ts";
+import { isJsonQuery, isRequestSchemaRecord } from "../contract/request.ts";
 import type {
 	ResponseDeclaration,
 	ResponseHeaders,
@@ -28,7 +24,10 @@ import {
 	getResponseHeaders,
 	getRouteResponses,
 } from "../contract/response.ts";
-import type { StandardSchemaV1 } from "../standard-schema/index.ts";
+import {
+	isStandardSchema,
+	type StandardSchemaV1,
+} from "../standard-schema/index.ts";
 
 export const JSON_CONTENT_TYPE = "application/json";
 export const SSE_CONTENT_TYPE = "text/event-stream";
@@ -238,11 +237,9 @@ export const createRequestBody = (
 				: [JSON_CONTENT_TYPE];
 	if (contentTypes.length === 0) return undefined;
 	const bodySchema =
-		isCustomBody(schema) || isFormBody(schema)
+		isCustomBody(schema) || isFormBody(schema) || isMultipartBody(schema)
 			? schema.schema
-			: isMultipartBody(schema)
-				? schema.fields
-				: schema;
+			: schema;
 	const openApiSchema = isRequestSchemaRecord(bodySchema)
 		? createSchemaRecordObject(bodySchema, converter)
 		: isStandardSchema(bodySchema)

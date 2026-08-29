@@ -8,7 +8,6 @@ import {
 	isMultipartBody,
 	isNoBody,
 	isRequestSchemaRecord,
-	isStandardSchema,
 	isStream,
 	type JsonQuery,
 	type MultipartBody,
@@ -16,8 +15,11 @@ import {
 	type ResponseDeclaration,
 	type RouteDeclaration,
 } from "@rest-rpc/core/contract";
-import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
-import { validateStandardSchema } from "@rest-rpc/core/standard-schema";
+import {
+	isStandardSchema,
+	type StandardSchemaV1,
+	validateStandardSchema,
+} from "@rest-rpc/core/standard-schema";
 import type { HttpHeaders } from "./headers.ts";
 
 /**
@@ -256,11 +258,15 @@ const validateMultipartBody = async (
 		};
 	}
 
-	const result = await validateSchemaRecord(
-		declaration.fields,
+	const result = await validateStandardSchema(
+		declaration.schema,
 		multipartBodyToObject(body, declaration.arrayKeys),
 	);
-	return { data: { body: result.data }, errors: result.errors };
+	if (result.issues) {
+		return { data: {}, errors: result.issues };
+	}
+
+	return { data: { body: result.value }, errors: [] };
 };
 
 const validateJsonQuery = async (

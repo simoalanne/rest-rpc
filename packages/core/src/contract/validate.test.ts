@@ -228,7 +228,7 @@ describe("validateContract", () => {
 						path: "/uploads/:body",
 						pathParams: z.object({ body: z.string() }),
 						body: multipartBody({
-							fields: { title: z.string() },
+							schema: z.object({ title: z.string() }),
 							arrayKeys: [],
 						}),
 					}),
@@ -404,7 +404,7 @@ describe("groupRequestInput", () => {
 	it("assigns the body key as a multipart request body", () => {
 		const route = testContract({
 			body: multipartBody({
-				fields: { title: z.string() },
+				schema: z.object({ title: z.string() }),
 				arrayKeys: [],
 			}),
 			requestKeys: {},

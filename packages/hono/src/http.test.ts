@@ -48,11 +48,11 @@ describe("registerRoutes", () => {
 				method: "POST",
 				path: "/uploads",
 				body: multipartBody({
-					fields: {
-						title: schemaType<string>(),
-						file: schemaType<Blob>(),
-						tags: schemaType<string[]>(),
-					},
+					schema: schemaType<{
+						title: string;
+						file: Blob;
+						tags: string[];
+					}>(),
 					arrayKeys: ["tags"],
 				}),
 				responses: {

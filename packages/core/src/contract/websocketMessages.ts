@@ -1,6 +1,8 @@
-import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import { validateStandardSchemaSync } from "../standard-schema/index.ts";
-import { isStandardSchema } from "./request.ts";
+import {
+	isStandardSchema,
+	type StandardSchemaV1,
+	validateStandardSchemaSync,
+} from "../standard-schema/index.ts";
 
 /**
  * Maps WebSocket message discriminator values to their schemas.

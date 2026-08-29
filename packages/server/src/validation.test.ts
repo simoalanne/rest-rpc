@@ -326,12 +326,12 @@ describe("validateRequest", () => {
 				method: "POST",
 				path: "/uploads",
 				body: multipartBody({
-					fields: {
+					schema: z.object({
 						title: z.string(),
 						count: z.coerce.number(),
 						file: z.instanceof(Blob),
 						tags: z.array(z.string()),
-					},
+					}),
 					arrayKeys: ["tags"],
 				}),
 				requestKeys: {},
