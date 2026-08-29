@@ -6,6 +6,7 @@ import {
 	type RouteMutationVariables,
 	type RouteQueryData,
 	type RouteQueryError,
+	type RouteStreamedQueryData,
 	type StrictRouteQueryError,
 	type StrictTanstackQueryHelpersFor,
 	type TanstackQueryHelpersFor,
@@ -226,6 +227,76 @@ expectAssignable<
 	| undefined
 >(queryClient.getQueryData(streamOptions.queryKey));
 
+const materializedStreamOptions = streamTq.events.list.streamedQueryOptions();
+expectAssignable<Promise<Array<{ id: string; message: string }>>>(
+	queryClient.fetchQuery(materializedStreamOptions),
+);
+expectAssignable<Array<{ id: string; message: string }> | undefined>(
+	queryClient.getQueryData(materializedStreamOptions.queryKey),
+);
+
+const selectedStreamOptions = streamTq.events.list.streamedQueryOptions({
+	select(events) {
+		expectType<Array<{ id: string; message: string }>>(events);
+		return events.length;
+	},
+});
+expectAssignable<Promise<Array<{ id: string; message: string }>>>(
+	queryClient.fetchQuery(selectedStreamOptions),
+);
+expectAssignable<Array<{ id: string; message: string }> | undefined>(
+	queryClient.getQueryData(selectedStreamOptions.queryKey),
+);
+
+const reducedStreamOptions = streamTq.events.list.streamedQueryOptions({
+	initialValue: "",
+	reducer: (text, chunk) => {
+		expectType<string>(text);
+		expectType<{ id: string; message: string }>(chunk);
+		return `${text}${chunk.message}`;
+	},
+});
+expectAssignable<Promise<string>>(queryClient.fetchQuery(reducedStreamOptions));
+expectAssignable<string | undefined>(
+	queryClient.getQueryData(reducedStreamOptions.queryKey),
+);
+
+const arrayReducedStreamOptions = streamTq.events.list.streamedQueryOptions({
+	initialValue: [] as Array<{ id: string; message: string }>,
+	reducer: (events, chunk) => {
+		expectType<Array<{ id: string; message: string }>>(events);
+		expectType<{ id: string; message: string }>(chunk);
+		return [...events, chunk];
+	},
+	refetchMode: "replace",
+});
+expectAssignable<Promise<Array<{ id: string; message: string }>>>(
+	queryClient.fetchQuery(arrayReducedStreamOptions),
+);
+expectAssignable<Array<{ id: string; message: string }> | undefined>(
+	queryClient.getQueryData(arrayReducedStreamOptions.queryKey),
+);
+
+const selectedReducedStreamOptions = streamTq.events.list.streamedQueryOptions({
+	initialValue: new Map<string, string>(),
+	reducer: (messages, chunk) => {
+		expectType<Map<string, string>>(messages);
+		expectType<{ id: string; message: string }>(chunk);
+		return new Map(messages).set(chunk.id, chunk.message);
+	},
+	refetchMode: "append",
+	select(messages) {
+		expectType<Map<string, string>>(messages);
+		return [...messages.values()];
+	},
+});
+expectAssignable<Promise<Map<string, string>>>(
+	queryClient.fetchQuery(selectedReducedStreamOptions),
+);
+expectAssignable<Map<string, string> | undefined>(
+	queryClient.getQueryData(selectedReducedStreamOptions.queryKey),
+);
+
 // conditional query input
 
 // should accept skipToken or falsy request values for conditional request input
@@ -393,12 +464,21 @@ queryClient.setQueryData(listKey, (current) => current);
 
 // invalid calls
 
-// should reject malformed request input, options placement, infinite options, and websocket routes
+// should reject malformed request input, options placement, infinite options, and websocket/sse routes
 const invalidApi = router({
 	todos: {
 		list: queryApi.todos.list,
 		get: queryApi.todos.get,
 		page: pageApi.todos.page,
+	},
+	normalStream: streamApi.events.list,
+	ambiguousStream: {
+		method: "GET",
+		path: "/ambiguous-stream",
+		responses: {
+			200: stream(schemaType<{ id: string; message: string }>()),
+			202: schemaType<{ pending: true }>(),
+		},
 	},
 	events: {
 		method: "GET",
@@ -408,6 +488,23 @@ const invalidApi = router({
 			client: schemaType<{ subscribe: boolean }>(),
 			server: schemaType<{ id: string }>(),
 		},
+	},
+	feeds: {
+		live: {
+			method: "GET",
+			path: "/feeds/live",
+			mode: "sse",
+			response: schemaType<{ id: string; message: string }>(),
+		},
+	},
+	mixed: {
+		live: {
+			method: "GET",
+			path: "/mixed/live",
+			mode: "sse",
+			response: schemaType<{ id: string; message: string }>(),
+		},
+		list: queryApi.todos.list,
 	},
 });
 
@@ -430,6 +527,9 @@ expectError(invalidTq.todos.list.queryOptions(skipToken));
 expectError(invalidTq.todos.get.getKey());
 expectError(invalidTq.todos.get.getKey({ id: "todo-1", extra: true }));
 expectError(invalidTq.todos.list.getKey({ queryKey: ["todos", "list"] }));
+expectError(invalidTq.todos.get.streamedQueryOptions({ id: "todo-1" }));
+invalidTq.normalStream.streamedQueryOptions();
+expectError(invalidTq.ambiguousStream.streamedQueryOptions());
 expectError(
 	invalidTq.todos.page.infiniteQueryOptions({
 		initialPageParam: { status: "open", limit: 50 },
@@ -455,6 +555,9 @@ expectError(
 	}),
 );
 expectError(invalidTq.events);
+expectError(invalidTq.feeds.live.queryOptions());
+expectError(invalidTq.mixed.live.queryOptions());
+invalidTq.mixed.list.queryOptions();
 
 // exported helper types
 
@@ -470,3 +573,16 @@ type CreateTodoVariables = RouteMutationVariables<
 >;
 expectType<{ title: string }>(null as unknown as CreateTodoVariables);
 expectNotAssignable<{ id: string }>(null as unknown as CreateTodoVariables);
+
+type ProjectEventsStreamedData = RouteStreamedQueryData<
+	typeof streamApi.events.list
+>;
+expectType<Array<{ id: string; message: string }>>(
+	null as unknown as ProjectEventsStreamedData,
+);
+expectType<never>(
+	null as unknown as RouteStreamedQueryData<typeof queryApi.todos.get>,
+);
+expectType<never>(
+	null as unknown as RouteStreamedQueryData<typeof invalidApi.ambiguousStream>,
+);

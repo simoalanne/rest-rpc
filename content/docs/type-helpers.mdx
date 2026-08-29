@@ -7,7 +7,7 @@ Type helpers take a route declaration and infer the type used at a specific
 runtime boundary.
 
 ```ts
-import { route, router, webSocketMessages } from "@rest-rpc/core";
+import { route, router, stream, webSocketMessages } from "@rest-rpc/core";
 import { z } from "zod";
 
 export const api = router({
@@ -48,6 +48,13 @@ export const api = router({
 			path: "/todos/live",
 			mode: "sse",
 			response: z.object({ id: z.string(), title: z.string() }),
+		}),
+		events: route({
+			method: "GET",
+			path: "/todos/events",
+			responses: {
+				200: stream(z.object({ id: z.string(), message: z.string() })),
+			},
 		}),
 		watch: route({
 			mode: "webSocket",
@@ -189,6 +196,7 @@ Import TanStack Query helpers from `@rest-rpc/tanstack-query`.
 import type {
 	RouteQueryData,
 	RouteInfiniteQueryData,
+	RouteStreamedQueryData,
 	RouteQueryError,
 	StrictRouteQueryError,
 	RouteMutationVariables,
@@ -213,6 +221,9 @@ type TodoPagesData = RouteInfiniteQueryData<typeof api.todos.page>;
 //     limit: number;
 //   }>;
 // }
+
+type TodoEventsData = RouteStreamedQueryData<typeof api.todos.events>;
+// Array<{ id: string; message: string }>
 
 type GetTodoError = RouteQueryError<typeof api.todos.get>;
 // | { status: 404; body: { code: "NOT_FOUND" }; headers: Headers }

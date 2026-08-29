@@ -14,7 +14,7 @@ pnpm add @rest-rpc/tanstack-query
 `@rest-rpc/tanstack-query` maps your contract to typed TanStack Query options
 and query keys.
 
-Each HTTP route exposes four helpers:
+Each standard HTTP route exposes four helpers:
 
 ```ts
 api.todos.get.queryOptions(...)
@@ -22,6 +22,9 @@ api.todos.page.infiniteQueryOptions(...)
 api.todos.create.mutationOptions(...)
 api.todos.get.getKey(...)
 ```
+
+Routes with one successful `stream(schema)` response also expose
+`streamedQueryOptions()`.
 
 ## Setup
 
@@ -151,6 +154,53 @@ const todos = useInfiniteQuery(
 	}),
 );
 ```
+
+## Streamed Queries
+
+Use `streamedQueryOptions()` for routes that declare one successful
+`stream(schema)` response. The helper passes the route's async iterable body to
+TanStack Query and stores the materialized stream data, not the rest-rpc response
+envelope.
+
+:::note
+`streamedQueryOptions()` is based on TanStack Query's experimental
+[`streamedQuery`](https://tanstack.com/query/latest/docs/reference/streamedQuery)
+API.
+:::
+
+```tsx
+import { useQuery } from "@tanstack/react-query";
+
+const events = useQuery(tq.todos.events.streamedQueryOptions());
+```
+
+By default, streamed chunks accumulate into an array.
+
+```ts
+events.data;
+// Array<{ id: string; message: string }> | undefined
+```
+
+Pass `initialValue` and `reducer` when you want a different accumulated data
+shape.
+
+```tsx
+const messages = useQuery(
+	tq.todos.events.streamedQueryOptions({
+		initialValue: "",
+		reducer: (text, event) => `${text}${event.message}`,
+	}),
+);
+
+messages.data;
+// string | undefined
+```
+
+`streamedQueryOptions()` is only generated for stream routes where rest-rpc can
+hide the response envelope honestly: the route must have exactly one successful
+response and that response body must be a standard `stream(schema)` body. Use
+`queryOptions()` when you need access to `status`, `headers`, or the raw async
+iterable response body.
 
 ## Query Keys
 

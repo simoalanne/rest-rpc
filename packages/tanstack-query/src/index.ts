@@ -4,6 +4,7 @@ export type {
 	RouteMutationVariables,
 	RouteQueryData,
 	RouteQueryError,
+	RouteStreamedQueryData,
 	StrictRouteQueryError,
 	StrictTanstackQueryHelpersFor,
 	TanstackQueryHelpersFor,

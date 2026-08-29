@@ -6,7 +6,6 @@ import {
 	QueryClient,
 	QueryObserver,
 	skipToken,
-	experimental_streamedQuery as streamedQuery,
 } from "@tanstack/query-core";
 import {
 	createTanstackQueryClient,
@@ -421,31 +420,21 @@ describe("fetch TanStack Query integration", () => {
 		assert.equal(tracked.calls.length, 1);
 	});
 
-	it("can materialize rest-rpc stream route bodies with TanStack streamedQuery", async () => {
+	it("materializes rest-rpc stream route bodies with stream query options", async () => {
 		const tracked = createTrackedFetch();
 		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
 
-		const response = await queryClient.fetchQuery({
+		const options = tq.projects.events.streamedQueryOptions({
 			queryKey: ["projects", "events", "streamed-query"],
-			queryFn: streamedQuery({
-				streamFn: async () => {
-					const response = await queryClient.fetchQuery(
-						tq.projects.events.queryOptions(),
-					);
-					return response.body;
-				},
-			}),
 		});
+		const response = await queryClient.fetchQuery(options);
 
 		assert.deepEqual(response, [
 			{ id: "project-1", event: "created" },
 			{ id: "project-1", event: "renamed" },
 		]);
-		assert.deepEqual(
-			queryClient.getQueryData(["projects", "events", "streamed-query"]),
-			response,
-		);
+		assert.deepEqual(queryClient.getQueryData(options.queryKey), response);
 		assert.equal(tracked.calls.length, 1);
 	});
 });

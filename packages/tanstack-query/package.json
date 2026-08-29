@@ -48,7 +48,7 @@
 		"esmock": "^2.7.3"
 	},
 	"peerDependencies": {
-		"@tanstack/query-core": "^5.0.0"
+		"@tanstack/query-core": ">=5.86.0 <6.0.0"
 	},
 	"tsd": {
 		"directory": "test-d"
