@@ -1,5 +1,11 @@
 # @rest-rpc/server
 
+## 0.1.0-beta.18
+
+### Minor Changes
+
+- ebae920: Align multipartBody() API with formBody() API.
+
 ## 0.1.0-beta.17
 
 ## 0.1.0-beta.16

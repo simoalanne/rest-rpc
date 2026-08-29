@@ -1,5 +1,15 @@
 # @rest-rpc/core
 
+## 0.1.0-beta.18
+
+### Minor Changes
+
+- ebae920: Align multipartBody() API with formBody() API.
+
+### Patch Changes
+
+- 1494193: flattenRequestKeys can now be overridden by parent router instead of silently defaulting to true when stacking route/router declarations
+
 ## 0.1.0-beta.17
 
 ### Patch Changes
