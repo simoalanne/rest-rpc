@@ -1,5 +1,11 @@
 # @rest-rpc/core
 
+## 0.1.0-beta.17
+
+### Patch Changes
+
+- b763439: fix a bug with tanstack query cache keys being empty when stacking route/router calls
+
 ## 0.1.0-beta.16
 
 ### Patch Changes
