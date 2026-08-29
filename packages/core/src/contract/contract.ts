@@ -7,6 +7,7 @@ import type {
 	RequestKeys,
 	RequestSchemaRecord,
 } from "./request.ts";
+import type { flattenRequestKeysWasExplicitlyDeclaredSymbol } from "./flattenRequestKeysDeclaration.ts";
 import type {
 	DefaultBodyResponseStatusForMethod,
 	DefaultNoBodyResponseStatusForMethod,
@@ -271,10 +272,23 @@ type FlattenRequestKeys<TOptions> = TOptions extends {
 	? TValue
 	: true;
 
+type RouteFlattenRequestKeysExplicit<TRoute, TOptions> = TRoute extends {
+	readonly [flattenRequestKeysWasExplicitlyDeclaredSymbol]: infer TExplicit extends
+		boolean;
+}
+	? TExplicit
+	: TRoute extends { flattenRequestKeys: boolean }
+		? true
+		: TOptions extends { flattenRequestKeys: boolean }
+			? true
+			: false;
+
 type RouteFlattenRequestKeys<TRoute, TOptions> = TRoute extends {
 	flattenRequestKeys: infer TValue extends boolean;
 }
-	? TValue
+	? RouteFlattenRequestKeysExplicit<TRoute, TOptions> extends true
+		? TValue
+		: FlattenRequestKeys<TOptions>
 	: FlattenRequestKeys<TOptions>;
 
 type ApplyCommonHeadersToRouteFields<TRoute, TOptions> =
@@ -320,6 +334,10 @@ type ApplyRouterOptionsToRoute<TRoute extends RouteDeclaration, TOptions> =
 								TRouteWithHeaders,
 								TOptions
 							>;
+							[flattenRequestKeysWasExplicitlyDeclaredSymbol]: RouteFlattenRequestKeysExplicit<
+								TRouteWithHeaders,
+								TOptions
+							>;
 							metadata: RouteMetadata;
 							openApi?: OpenApiRouteOptions;
 							responses: MergeResponses<CommonResponses<TOptions>, TResponses>;
@@ -332,6 +350,10 @@ type ApplyRouterOptionsToRoute<TRoute extends RouteDeclaration, TOptions> =
 						> & {
 							path: string;
 							flattenRequestKeys: RouteFlattenRequestKeys<
+								TRouteWithHeaders,
+								TOptions
+							>;
+							[flattenRequestKeysWasExplicitlyDeclaredSymbol]: RouteFlattenRequestKeysExplicit<
 								TRouteWithHeaders,
 								TOptions
 							>;
@@ -350,6 +372,10 @@ type ApplyRouteOptionsToRoute<TRoute extends RouteDeclaration, TOptions> =
 			? Merge<
 					Omit<TRouteWithDefaults, "flattenRequestKeys"> & {
 						flattenRequestKeys: RouteFlattenRequestKeys<
+							TRouteWithDefaults,
+							TOptions
+						>;
+						[flattenRequestKeysWasExplicitlyDeclaredSymbol]: RouteFlattenRequestKeysExplicit<
 							TRouteWithDefaults,
 							TOptions
 						>;

@@ -221,6 +221,85 @@ describe("router", () => {
 		assert.deepEqual(Object.keys(contract.todos.get.pathParams ?? {}), ["id"]);
 	});
 
+	it("lets composed parent routers override defaulted flattened request keys", () => {
+		const todos = router({
+			get: {
+				method: "GET",
+				path: "/todos/:id",
+				query: z.object({ preview: z.boolean().optional() }),
+				responses: {
+					204: noBody(),
+				},
+			},
+		});
+		assert.equal(todos.get.flattenRequestKeys, true);
+
+		const contract = router(
+			{
+				todos,
+			},
+			{
+				flattenRequestKeys: false,
+			},
+		);
+
+		assert.equal(contract.todos.get.flattenRequestKeys, false);
+	});
+
+	it("lets composed parent routers override defaulted route flattened request keys", () => {
+		const get = route({
+			method: "GET",
+			path: "/todos/:id",
+			query: z.object({ preview: z.boolean().optional() }),
+			responses: {
+				204: noBody(),
+			},
+		});
+		assert.equal(get.flattenRequestKeys, true);
+
+		const contract = router(
+			{
+				todos: {
+					get,
+				},
+			},
+			{
+				flattenRequestKeys: false,
+			},
+		);
+
+		assert.equal(contract.todos.get.flattenRequestKeys, false);
+	});
+
+	it("preserves explicit flattened request keys when composing routers", () => {
+		const todos = router(
+			{
+				get: {
+					method: "GET",
+					path: "/todos/:id",
+					query: z.object({ preview: z.boolean().optional() }),
+					responses: {
+						204: noBody(),
+					},
+				},
+			},
+			{
+				flattenRequestKeys: true,
+			},
+		);
+
+		const contract = router(
+			{
+				todos,
+			},
+			{
+				flattenRequestKeys: false,
+			},
+		);
+
+		assert.equal(contract.todos.get.flattenRequestKeys, true);
+	});
+
 	it("merges common responses with response shorthands", () => {
 		const created = z.object({ id: z.string() });
 		const error = z.object({ message: z.string() });

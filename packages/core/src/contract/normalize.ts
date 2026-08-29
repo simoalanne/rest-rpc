@@ -5,9 +5,14 @@ import type {
 	Contract,
 	OpenApiResponseOptions,
 	OpenApiRouteOptions,
+	RouteDeclaration,
 	RouteMetadata,
 } from "./contract.ts";
 import { getPathParamNames } from "./path.ts";
+import {
+	flattenRequestKeysWasExplicitlyDeclaredSymbol,
+	type RouteWithFlattenRequestKeysDeclaration,
+} from "./flattenRequestKeysDeclaration.ts";
 import {
 	getRouteResponses,
 	type RouteResponses,
@@ -112,12 +117,38 @@ export const normalizeContract = <TContract extends Contract>(
 	options?: NormalizeContractOptions,
 ): TContract => {
 	assertStaticPathPrefix(options?.pathPrefix);
+	const optionsFlattenRequestKeysIsExplicit =
+		typeof options?.flattenRequestKeys === "boolean";
 
 	for (const { route, path } of contractRouteEntries(contract)) {
 		route.routePath = path;
 
-		route.flattenRequestKeys =
-			route.flattenRequestKeys ?? options?.flattenRequestKeys ?? true;
+		const routeWithFlattenRequestKeysDeclaration = route as RouteDeclaration &
+			RouteWithFlattenRequestKeysDeclaration;
+		const flattenRequestKeysWasExplicit = Object.hasOwn(
+			routeWithFlattenRequestKeysDeclaration,
+			flattenRequestKeysWasExplicitlyDeclaredSymbol,
+		)
+			? routeWithFlattenRequestKeysDeclaration[
+					flattenRequestKeysWasExplicitlyDeclaredSymbol
+				]
+			: typeof route.flattenRequestKeys === "boolean" ||
+				optionsFlattenRequestKeysIsExplicit;
+		Object.defineProperty(
+			routeWithFlattenRequestKeysDeclaration,
+			flattenRequestKeysWasExplicitlyDeclaredSymbol,
+			{
+				configurable: true,
+				value: flattenRequestKeysWasExplicit,
+			},
+		);
+
+		if (!flattenRequestKeysWasExplicit) {
+			route.flattenRequestKeys = options?.flattenRequestKeys ?? true;
+		} else {
+			route.flattenRequestKeys =
+				route.flattenRequestKeys ?? options?.flattenRequestKeys ?? true;
+		}
 
 		const pathParams = getPathParamNames(route.path);
 		if (!route.pathParams && pathParams.length > 0) {
