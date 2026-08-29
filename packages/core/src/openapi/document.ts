@@ -4,7 +4,7 @@ import type {
 	RouteDeclaration,
 } from "../contract/contract.ts";
 import { toOpenApiPath } from "../contract/path.ts";
-import { contractRouteEntries } from "../contract/traversal.ts";
+import { contractRoutes } from "../contract/traversal.ts";
 import type {
 	OpenApiParameter,
 	OpenApiOperation,
@@ -94,13 +94,17 @@ export function createOpenApiDocument(
 		paths: {},
 	};
 
-	for (const { route, path: routePath } of contractRouteEntries(contract)) {
+	for (const route of contractRoutes(contract)) {
 		if (!isOpenApiCompatibleRoute(route)) continue;
 
 		const path = toOpenApiPath(route.path);
 		const method = route.method.toLowerCase() as keyof OpenApiPathItem;
 		document.paths[path] ??= {};
-		document.paths[path][method] = createOperation(route, options, routePath);
+		document.paths[path][method] = createOperation(
+			route,
+			options,
+			route.routePath ?? [],
+		);
 	}
 
 	return document;

@@ -31,8 +31,8 @@ const serializeTagValue = (value: unknown) =>
 		? JSON.stringify(sortJsonValue(value))
 		: String(value);
 
-const serializeCacheKey = (cacheKey: readonly string[]) =>
-	cacheKey.map(encodeTagSegment).join(".");
+const serializeRoutePath = (routePath: readonly string[]) =>
+	routePath.map(encodeTagSegment).join(".");
 
 const serializeRequest = (request: NextFetchTagRequest | undefined) => {
 	const entries = Object.entries(stripUndefinedFields(request) ?? {}).sort(
@@ -71,11 +71,11 @@ const getNextFetchTagRequest = (
 };
 
 const createNextFetchTag = (
-	cacheKey: readonly string[],
+	routePath: readonly string[],
 	request: NextFetchTagRequest | undefined,
 	tagPrefix?: string,
 ) => {
-	const tag = `${tagPrefix ?? DEFAULT_NEXT_FETCH_TAG_PREFIX}:${serializeCacheKey(cacheKey)}`;
+	const tag = `${tagPrefix ?? DEFAULT_NEXT_FETCH_TAG_PREFIX}:${serializeRoutePath(routePath)}`;
 	const serializedRequest = serializeRequest(request);
 	return serializedRequest ? `${tag}:${serializedRequest}` : tag;
 };
@@ -92,10 +92,14 @@ export function getNextFetchTags(
 	request?: NextFetchTagRequest,
 	options?: { tagPrefix?: string },
 ): string[] {
-	const cacheKey = route.cacheKey ?? [];
+	const routePath = route.routePath ?? [];
 	const tagRequest = getNextFetchTagRequest(route, request);
-	const routeTag = createNextFetchTag(cacheKey, undefined, options?.tagPrefix);
-	const exactTag = createNextFetchTag(cacheKey, tagRequest, options?.tagPrefix);
+	const routeTag = createNextFetchTag(routePath, undefined, options?.tagPrefix);
+	const exactTag = createNextFetchTag(
+		routePath,
+		tagRequest,
+		options?.tagPrefix,
+	);
 
 	return Array.from(new Set([exactTag, routeTag]));
 }

@@ -76,7 +76,7 @@ export type BaseRouteDeclaration = {
 	method: HttpMethod;
 	mode?: RouteMode;
 	flattenRequestKeys?: boolean;
-	cacheKey?: readonly string[];
+	routePath?: readonly string[];
 	body?: RequestBodySchema;
 	query?: StandardSchemaV1 | RequestSchemaRecord | JsonQuery;
 	pathParams?: StandardSchemaV1 | RequestSchemaRecord;

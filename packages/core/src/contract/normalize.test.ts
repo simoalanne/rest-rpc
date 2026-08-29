@@ -62,14 +62,10 @@ describe("normalizeContract", () => {
 		assert.deepEqual(contract.search.find.metadata, {});
 	});
 
-	it("normalizes route keys", () => {
+	it("normalizes route paths", () => {
 		const contract = normalizeContract({
 			todos: {
 				get: testRoute({ path: "/todos/:id" }),
-				custom: testRoute({
-					path: "/todos/:id",
-					cacheKey: ["todo", "detail"],
-				}),
 			},
 			socket: {
 				method: "GET",
@@ -82,9 +78,8 @@ describe("normalizeContract", () => {
 			},
 		} as const);
 
-		assert.deepEqual(contract.todos.get.cacheKey, ["todos", "get"]);
-		assert.deepEqual(contract.todos.custom.cacheKey, ["todo", "detail"]);
-		assert.equal("cacheKey" in contract.socket, false);
+		assert.deepEqual(contract.todos.get.routePath, ["todos", "get"]);
+		assert.deepEqual(contract.socket.routePath, ["socket"]);
 	});
 
 	it("merges shared metadata with route metadata", () => {

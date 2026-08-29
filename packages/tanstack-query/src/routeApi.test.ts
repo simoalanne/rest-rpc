@@ -6,14 +6,14 @@ import { createRouteApi } from "./routeApi.ts";
 const routeWithoutRequest = {
 	method: "GET",
 	path: "/items",
-	cacheKey: ["items", "list"],
+	routePath: ["items", "list"],
 	responses: { 200: {} },
 } as any;
 
 const routeWithRequest = {
 	method: "GET",
 	path: "/items/:id",
-	cacheKey: ["items", "byId"],
+	routePath: ["items", "byId"],
 	pathParams: {},
 	responses: { 200: {} },
 } as any;

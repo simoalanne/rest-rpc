@@ -114,6 +114,8 @@ export const normalizeContract = <TContract extends Contract>(
 	assertStaticPathPrefix(options?.pathPrefix);
 
 	for (const { route, path } of contractRouteEntries(contract)) {
+		route.routePath = path;
+
 		route.flattenRequestKeys =
 			route.flattenRequestKeys ?? options?.flattenRequestKeys ?? true;
 
@@ -142,7 +144,6 @@ export const normalizeContract = <TContract extends Contract>(
 		route.openApi = mergeOpenApi(options?.commonOpenApi, route.openApi);
 
 		if (route.mode !== "webSocket") {
-			route.cacheKey ??= path;
 			route.responses = {
 				...options?.commonResponses,
 				...resolveRouteResponses(route),

@@ -7,7 +7,7 @@ import { type } from "../standard-schema/type.ts";
 import { getNextFetchTags } from "./nextFetchTags.ts";
 
 describe("Next fetch tags", () => {
-	it("generates exact and route-level tags from the route cache key and request", () => {
+	it("generates exact and route-level tags from the route path and request", () => {
 		const apiContract = router({
 			items: {
 				list: {

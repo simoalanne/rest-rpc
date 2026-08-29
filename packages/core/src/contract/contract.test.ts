@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import z from "zod";
 import { isNoBody, noBody } from "./body.ts";
 import type { HttpRouteDeclaration, RouteMetadata } from "./contract.ts";
-import { router } from "./contract.ts";
+import { route, router } from "./contract.ts";
 
 type RouteOverrides = Partial<HttpRouteDeclaration> & {
 	metadata?: RouteMetadata;
@@ -42,6 +42,24 @@ describe("router", () => {
 		assert.deepEqual(contract.search.find.requestKeys, {
 			id: "pathParams",
 		});
+	});
+
+	it("updates route paths when composing routes and routers", () => {
+		const list = route({
+			method: "GET",
+			path: "/todos",
+			responses: {
+				204: noBody(),
+			},
+		});
+
+		assert.deepEqual(list.routePath, []);
+
+		const todos = router({ list });
+		assert.deepEqual(todos.list.routePath, ["list"]);
+
+		const contract = router({ todos });
+		assert.deepEqual(contract.todos.list.routePath, ["todos", "list"]);
 	});
 
 	it("infers missing path param declarations from route paths", () => {

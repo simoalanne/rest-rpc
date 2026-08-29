@@ -57,14 +57,14 @@ const stripUndefinedFields = (request: unknown) => {
 };
 
 const getQueryKey = (route: RouteDeclaration, request: unknown) => {
-	const cacheKey = route.cacheKey ?? [];
+	const routePath = route.routePath ?? [];
 	const normalizedRequest = stripUndefinedFields(request);
 
 	return normalizedRequest &&
 		typeof normalizedRequest === "object" &&
 		Object.keys(normalizedRequest).length > 0
-		? [...cacheKey, normalizedRequest]
-		: cacheKey;
+		? [...routePath, normalizedRequest]
+		: routePath;
 };
 
 const splitFetchOptions = <

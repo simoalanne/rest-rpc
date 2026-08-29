@@ -87,13 +87,13 @@ export type OpenApiRouteDeclaration = HttpRouteDeclaration;
 
 export type ParameterTransformContext = {
 	route: OpenApiRouteDeclaration;
-	routePath: string[];
+	routePath: readonly string[];
 	parameter: OpenApiParameter;
 };
 
 export type OperationTransformContext = {
 	route: OpenApiRouteDeclaration;
-	routePath: string[];
+	routePath: readonly string[];
 	operation: OpenApiOperation;
 };
 
@@ -398,7 +398,7 @@ export const createResponses = (
 export const createOperation = (
 	route: OpenApiRouteDeclaration,
 	options: CreateOperationOptions,
-	routePath: string[] = [],
+	routePath: readonly string[] = [],
 ): OpenApiOperation => {
 	const parameters = [
 		...createParameters(route.pathParams, "path", options),
