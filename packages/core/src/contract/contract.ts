@@ -7,7 +7,6 @@ import type {
 	RequestKeys,
 	RequestSchemaRecord,
 } from "./request.ts";
-import type { flattenRequestKeysWasExplicitlyDeclaredSymbol } from "./flattenRequestKeysDeclaration.ts";
 import type {
 	DefaultBodyResponseStatusForMethod,
 	DefaultNoBodyResponseStatusForMethod,
@@ -273,8 +272,10 @@ type FlattenRequestKeys<TOptions> = TOptions extends {
 	: true;
 
 type RouteFlattenRequestKeysExplicit<TRoute, TOptions> = TRoute extends {
-	readonly [flattenRequestKeysWasExplicitlyDeclaredSymbol]: infer TExplicit extends
-		boolean;
+	readonly _restrpc: {
+		readonly flattenRequestKeysWasExplicitlyDeclared: infer TExplicit extends
+			boolean;
+	};
 }
 	? TExplicit
 	: TRoute extends { flattenRequestKeys: boolean }
@@ -334,10 +335,12 @@ type ApplyRouterOptionsToRoute<TRoute extends RouteDeclaration, TOptions> =
 								TRouteWithHeaders,
 								TOptions
 							>;
-							[flattenRequestKeysWasExplicitlyDeclaredSymbol]: RouteFlattenRequestKeysExplicit<
-								TRouteWithHeaders,
-								TOptions
-							>;
+							_restrpc: {
+								flattenRequestKeysWasExplicitlyDeclared: RouteFlattenRequestKeysExplicit<
+									TRouteWithHeaders,
+									TOptions
+								>;
+							};
 							metadata: RouteMetadata;
 							openApi?: OpenApiRouteOptions;
 							responses: MergeResponses<CommonResponses<TOptions>, TResponses>;
@@ -353,10 +356,12 @@ type ApplyRouterOptionsToRoute<TRoute extends RouteDeclaration, TOptions> =
 								TRouteWithHeaders,
 								TOptions
 							>;
-							[flattenRequestKeysWasExplicitlyDeclaredSymbol]: RouteFlattenRequestKeysExplicit<
-								TRouteWithHeaders,
-								TOptions
-							>;
+							_restrpc: {
+								flattenRequestKeysWasExplicitlyDeclared: RouteFlattenRequestKeysExplicit<
+									TRouteWithHeaders,
+									TOptions
+								>;
+							};
 							metadata: RouteMetadata;
 							openApi?: OpenApiRouteOptions;
 						}
@@ -375,10 +380,12 @@ type ApplyRouteOptionsToRoute<TRoute extends RouteDeclaration, TOptions> =
 							TRouteWithDefaults,
 							TOptions
 						>;
-						[flattenRequestKeysWasExplicitlyDeclaredSymbol]: RouteFlattenRequestKeysExplicit<
-							TRouteWithDefaults,
-							TOptions
-						>;
+						_restrpc: {
+							flattenRequestKeysWasExplicitlyDeclared: RouteFlattenRequestKeysExplicit<
+								TRouteWithDefaults,
+								TOptions
+							>;
+						};
 					}
 				>
 			: never

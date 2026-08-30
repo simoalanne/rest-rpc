@@ -10,10 +10,6 @@ import type {
 } from "./contract.ts";
 import { getPathParamNames } from "./path.ts";
 import {
-	flattenRequestKeysWasExplicitlyDeclaredSymbol,
-	type RouteWithFlattenRequestKeysDeclaration,
-} from "./flattenRequestKeysDeclaration.ts";
-import {
 	getRouteResponses,
 	type RouteResponses,
 	resolveRouteResponses,
@@ -27,6 +23,12 @@ export type NormalizeContractOptions = {
 	commonResponses?: RouteResponses;
 	commonHeaders?: Record<string, StandardSchemaV1>;
 	commonOpenApi?: CommonOpenApiRouteOptions;
+};
+
+type RouteWithRestRpcMetadata = RouteDeclaration & {
+	_restrpc?: {
+		flattenRequestKeysWasExplicitlyDeclared?: boolean;
+	};
 };
 
 export const joinPathPrefix = (prefix: string, path: string) => {
@@ -123,25 +125,18 @@ export const normalizeContract = <TContract extends Contract>(
 	for (const { route, path } of contractRouteEntries(contract)) {
 		route.routePath = path;
 
-		const routeWithFlattenRequestKeysDeclaration = route as RouteDeclaration &
-			RouteWithFlattenRequestKeysDeclaration;
-		const flattenRequestKeysWasExplicit = Object.hasOwn(
-			routeWithFlattenRequestKeysDeclaration,
-			flattenRequestKeysWasExplicitlyDeclaredSymbol,
-		)
-			? routeWithFlattenRequestKeysDeclaration[
-					flattenRequestKeysWasExplicitlyDeclaredSymbol
-				]
-			: typeof route.flattenRequestKeys === "boolean" ||
-				optionsFlattenRequestKeysIsExplicit;
-		Object.defineProperty(
-			routeWithFlattenRequestKeysDeclaration,
-			flattenRequestKeysWasExplicitlyDeclaredSymbol,
-			{
-				configurable: true,
-				value: flattenRequestKeysWasExplicit,
-			},
-		);
+		const routeWithRestRpcMetadata = route as RouteWithRestRpcMetadata;
+		const flattenRequestKeysWasExplicit =
+			typeof routeWithRestRpcMetadata._restrpc
+				?.flattenRequestKeysWasExplicitlyDeclared === "boolean"
+				? routeWithRestRpcMetadata._restrpc
+						.flattenRequestKeysWasExplicitlyDeclared
+				: typeof route.flattenRequestKeys === "boolean" ||
+					optionsFlattenRequestKeysIsExplicit;
+		routeWithRestRpcMetadata._restrpc = {
+			...routeWithRestRpcMetadata._restrpc,
+			flattenRequestKeysWasExplicitlyDeclared: flattenRequestKeysWasExplicit,
+		};
 
 		if (!flattenRequestKeysWasExplicit) {
 			route.flattenRequestKeys = options?.flattenRequestKeys ?? true;
