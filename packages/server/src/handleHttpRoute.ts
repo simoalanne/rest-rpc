@@ -77,11 +77,17 @@ export type HandleHttpRouteOptions<TContext extends HttpRouteHandlerContext> = {
 const getResponseSchema = (
 	route: HttpRouteDeclaration,
 	status: number,
-): ResponseDeclaration | undefined => {
+): ResponseDeclaration => {
 	const entry = Object.entries(getRouteResponses(route)).find(
 		([declaredStatus]) => Number(declaredStatus) === status,
 	);
-	return entry?.[1];
+	if (!entry) {
+		throw new Error(
+			`Route response for "${route.method} ${route.path}" returned undeclared status ${status}.`,
+		);
+	}
+
+	return entry[1];
 };
 
 const getSingleSuccessfulStatus = (
@@ -94,10 +100,7 @@ const getSingleSuccessfulStatus = (
 	return statuses.length === 1 ? statuses[0] : undefined;
 };
 
-const hasDeclaredStatus = (route: HttpRouteDeclaration, status: number) =>
-	Boolean(getResponseSchema(route, status));
-
-const normalizeHandlerResultEnvelope = (
+const normalizeHandlerResultEnvelopeOrShorthand = (
 	route: HttpRouteDeclaration,
 	result: unknown,
 ): {
@@ -106,13 +109,7 @@ const normalizeHandlerResultEnvelope = (
 	headers?: HttpHeaders;
 	responseHeaders?: Record<string, unknown>;
 } => {
-	if (
-		result &&
-		typeof result === "object" &&
-		"status" in result &&
-		typeof result.status === "number" &&
-		hasDeclaredStatus(route, result.status)
-	) {
+	if (result && typeof result === "object" && "status" in result) {
 		return result as {
 			status: number;
 			body: unknown;
@@ -182,7 +179,7 @@ const normalizeResponseResult = async (
 	},
 ): Promise<HttpRouteResult> => {
 	const schema = getResponseSchema(route, result.status);
-	const bodySchema = schema ? getResponseBody(schema) : undefined;
+	const bodySchema = getResponseBody(schema);
 	const declaredHeaders = await validateResponseHeaders(
 		schema,
 		result.responseHeaders,
@@ -335,7 +332,7 @@ const normalizeHandlerResult = async <TContext extends HttpRouteHandlerContext>(
 
 		return await normalizeResponseResult(
 			route,
-			normalizeHandlerResultEnvelope(route, result),
+			normalizeHandlerResultEnvelopeOrShorthand(route, result),
 		);
 	} catch (error) {
 		return handleResponseValidationError(error, route, options, errorContext);

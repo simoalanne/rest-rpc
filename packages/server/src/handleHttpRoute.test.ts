@@ -335,6 +335,32 @@ describe("handleHttpRoute", () => {
 		});
 	});
 
+	it("treats returned status and body fields as an explicit response object", async () => {
+		const result = await handleHttpRoute(
+			{
+				method: "GET",
+				path: "/jobs/:id",
+				responses: {
+					200: z.object({
+						status: z.number(),
+						body: z.string(),
+					}),
+				},
+			},
+			() => ({ status: 123, body: "running" }),
+			{ request: {}, context: {} },
+		);
+
+		assert.deepEqual(result, {
+			kind: "json",
+			status: 500,
+			headers: undefined,
+			body: {
+				message: "Response validation failed.",
+			},
+		});
+	});
+
 	it("normalizes declared response headers", async () => {
 		const result = await handleHttpRoute(
 			{
@@ -444,6 +470,42 @@ describe("handleHttpRoute", () => {
 					status: 404,
 					body: { code: "gone" },
 				} as never);
+			},
+			{ request: {}, context: {} },
+		);
+
+		assert.deepEqual(result, {
+			kind: "json",
+			status: 500,
+			headers: undefined,
+			body: {
+				message: "Response validation failed.",
+			},
+		});
+	});
+
+	it("returns 500 error when RouteResponseError is used to return response not declared for the handled route", async () => {
+		const routes = {
+			todos: {
+				get: routeWithDeclaredErrorResponse,
+				create: {
+					method: "POST",
+					path: "/todos",
+					responses: {
+						201: z.object({ id: z.string() }),
+						409: z.object({ code: z.literal("already_exists") }),
+					},
+				},
+			},
+		} as const;
+
+		const result = await handleHttpRoute(
+			routes.todos.get,
+			() => {
+				throw new RouteResponseError(routes.todos, {
+					status: 409,
+					body: { code: "already_exists" },
+				});
 			},
 			{ request: {}, context: {} },
 		);

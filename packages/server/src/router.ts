@@ -106,8 +106,17 @@ export type RouteSseSent<E extends HttpRouteDeclaration> = ServerSseSent<E>;
 type RequestValue<E extends RouteDeclaration> =
 	RouteRequestData<E> extends never ? EmptyObject : RouteRequestData<E>;
 
+type ExcludeResponseEnvelopeLike<T> = T extends unknown
+	? T extends Record<string, unknown>
+		? "status" extends keyof T
+			? never
+			: T
+		: T
+	: never;
+
 type HandlerResult<E extends HttpRouteDeclaration> = MaybePromise<
-	(RouteResponse<E> & { headers?: HttpHeaders }) | RouteResponseShorthand<E>
+	| (RouteResponse<E> & { headers?: HttpHeaders })
+	| ExcludeResponseEnvelopeLike<RouteResponseShorthand<E>>
 >;
 
 type SseHandlerResult<E extends HttpRouteDeclaration> = MaybePromise<

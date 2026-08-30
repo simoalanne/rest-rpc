@@ -43,7 +43,10 @@ export const createTanstackQueryHandlers = (): TanstackQueryHandlers => {
 					};
 				}
 
-				return project;
+				return {
+					status: 200 as const,
+					body: project,
+				};
 			},
 			search: (request) => ({
 				projects: listProjects().filter((project) => {

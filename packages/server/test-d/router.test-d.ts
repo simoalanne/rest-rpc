@@ -17,6 +17,7 @@ import {
 	type RouteSocket,
 	type RouteSseSent,
 	type SseEvent,
+	RouteResponseError,
 	route,
 	router,
 	sseEvent,
@@ -75,6 +76,60 @@ type CreateTodoResponse = RouteResponse<typeof createApi.todos.create>;
 declare const createTodoResponse: CreateTodoResponse;
 expectType<201>(createTodoResponse.status);
 
+const errorApi = defineRouter({
+	todos: {
+		get: {
+			method: "GET",
+			path: "/todos/:id",
+			responses: {
+				200: todoSchema,
+				404: z.object({ code: z.literal("TODO_NOT_FOUND") }),
+			},
+		},
+		create: {
+			method: "POST",
+			path: "/todos",
+			body: z.object({ title: z.string() }),
+			responses: {
+				201: todoSchema,
+				409: z.object({ code: z.literal("TODO_ALREADY_EXISTS") }),
+			},
+		},
+	},
+});
+
+// should allow response envelope that's part of the route scope
+new RouteResponseError(errorApi, {
+	status: 404,
+	body: { code: "TODO_NOT_FOUND" },
+});
+new RouteResponseError(errorApi.todos, {
+	status: 404,
+	body: { code: "TODO_NOT_FOUND" },
+});
+
+// should allow response envelope that's declared for the route
+new RouteResponseError(errorApi.todos.create, {
+	status: 409,
+	body: { code: "TODO_ALREADY_EXISTS" },
+});
+
+// should not allow response envelope that's not declared for the route
+expectError(
+	new RouteResponseError(errorApi.todos.get, {
+		status: 409,
+		body: { code: "TODO_ALREADY_EXISTS" },
+	}),
+);
+
+// should not allow response envelope that's not declared for the route scope
+expectError(
+	new RouteResponseError(errorApi, {
+		status: 405,
+		body: { code: "TODO_ALREADY_EXISTS" },
+	}),
+);
+
 // should infer route handler parameters and declared success response envelopes
 const createImplementation = route(
 	createApi.todos.create,
@@ -96,6 +151,70 @@ const createImplementation = route(
 );
 
 expectType<typeof createApi.todos.create>(createImplementation.route);
+
+const responseEnvelopeBodyApi = defineRouter({
+	jobs: {
+		get: {
+			method: "GET",
+			path: "/jobs/:id",
+			responses: {
+				200: z.object({
+					status: z.number(),
+					body: z.string(),
+				}),
+			},
+		},
+	},
+});
+
+// Should not accept shorthand response when it's ambiguous
+expectError(
+	route(responseEnvelopeBodyApi.jobs.get, () => ({
+		status: 123,
+		body: "running",
+	})),
+);
+
+// Should still accept explicit response envelope
+route(responseEnvelopeBodyApi.jobs.get, () => ({
+	status: 200,
+	body: {
+		status: 123,
+		body: "running",
+	},
+}));
+
+const optionalStatusBodyApi = defineRouter({
+	jobs: {
+		get: {
+			method: "GET",
+			path: "/jobs/:id",
+			responses: {
+				200: z.object({
+					id: z.string(),
+					status: z.string().optional(),
+				}),
+			},
+		},
+	},
+});
+
+// Should not accept shorthand response when it may include a reserved envelope key
+expectError(
+	route(optionalStatusBodyApi.jobs.get, () => ({
+		id: "job-1",
+		status: "running",
+	})),
+);
+
+// Should still accept explicit response envelope for bodies with optional status
+route(optionalStatusBodyApi.jobs.get, () => ({
+	status: 200,
+	body: {
+		id: "job-1",
+		status: "running",
+	},
+}));
 
 // websocket handler request inference
 
