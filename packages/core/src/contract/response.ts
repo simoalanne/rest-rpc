@@ -151,6 +151,8 @@ type InferCustomStreamBody<TBody, TIO extends "input" | "output"> =
 			: AsyncIterable<InferCustomBodyPayload<TSchema, TIO>>
 		: never;
 
+type Simplify<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
+
 type InferClientResponseBody<TResponse> = TResponse extends StandardSchemaV1
 	? StandardSchemaV1.InferOutput<TResponse>
 	: TResponse extends NoBody
@@ -185,8 +187,8 @@ type CustomBodyClientResponseMetadata<TBody> =
 			? { contentType: TContentType[number] }
 			: TContentType extends string
 				? { contentType: TContentType }
-				: Record<never, never>
-		: Record<never, never>;
+				: unknown
+		: unknown;
 
 type ClientResponseMetadata<TResponse> =
 	TResponse extends Stream<infer TBody>
@@ -242,14 +244,18 @@ type ResponseHeaderValues<THeaders, TIO extends "input" | "output"> = {
 		THeaders[TKey],
 		TIO
 	>;
-};
+} extends infer THeaderValues
+	? Simplify<THeaderValues>
+	: never;
 
 type ResponseHeadersMetadata<TResponse, TIO extends "input" | "output"> = [
 	ResponseHeadersFor<TResponse>,
 ] extends [never]
-	? Record<never, never>
+	? unknown
 	: {
-			responseHeaders: ResponseHeaderValues<ResponseHeadersFor<TResponse>, TIO>;
+			responseHeaders: Simplify<
+				ResponseHeaderValues<ResponseHeadersFor<TResponse>, TIO>
+			>;
 		};
 
 type ResponseEntry<TStatus extends number, TBody> = {
@@ -262,7 +268,17 @@ type ClientResponseEntry<TStatus extends number, TResponse> = ResponseEntry<
 	InferClientResponseBody<ResponseBody<TResponse>>
 > &
 	ClientResponseMetadata<ResponseBody<TResponse>> &
-	ResponseHeadersMetadata<TResponse, "output">;
+	ResponseHeadersMetadata<TResponse, "output"> extends infer TEntry
+	? Simplify<TEntry>
+	: never;
+
+type ServerResponseEntry<TStatus extends number, TResponse> = ResponseEntry<
+	TStatus,
+	ServerResponseBody<ResponseBody<TResponse>>
+> &
+	ResponseHeadersMetadata<TResponse, "input"> extends infer TEntry
+	? Simplify<TEntry>
+	: never;
 
 type ResponseKey = number | `${number}`;
 
@@ -313,11 +329,7 @@ export type ServerResponse<E extends RouteDeclaration> = E extends {
 }
 	? {
 			[TKeys in keyof TResponses]: TKeys extends ResponseKey
-				? ResponseEntry<
-						ResponseStatus<TKeys>,
-						ServerResponseBody<ResponseBody<TResponses[TKeys]>>
-					> &
-						ResponseHeadersMetadata<TResponses[TKeys], "input">
+				? ServerResponseEntry<ResponseStatus<TKeys>, TResponses[TKeys]>
 				: never;
 		}[keyof TResponses]
 	: never;
@@ -341,11 +353,7 @@ type ServerSuccessResponse<E extends RouteDeclaration> = E extends {
 	? {
 			[TKeys in keyof TResponses]: TKeys extends ResponseKey
 				? TKeys extends SuccessfulResponseKeys<TResponses>
-					? ResponseEntry<
-							ResponseStatus<TKeys>,
-							ServerResponseBody<ResponseBody<TResponses[TKeys]>>
-						> &
-							ResponseHeadersMetadata<TResponses[TKeys], "input">
+					? ServerResponseEntry<ResponseStatus<TKeys>, TResponses[TKeys]>
 					: never
 				: never;
 		}[keyof TResponses]

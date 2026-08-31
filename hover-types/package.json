@@ -1,0 +1,14 @@
+{
+	"name": "hover-types",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"types:write": "node scripts/write-types.mjs"
+	},
+	"dependencies": {
+		"@rest-rpc/core": "workspace:*",
+		"@rest-rpc/express": "workspace:*",
+		"@rest-rpc/tanstack-query": "workspace:*",
+		"@tanstack/query-core": "^5.90.12"
+	}
+}

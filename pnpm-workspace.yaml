@@ -3,3 +3,4 @@ packages:
   - "benchmarks/"
   - "content/"
   - "integration-tests/"
+  - "hover-types/"

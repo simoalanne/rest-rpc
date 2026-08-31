@@ -65,16 +65,27 @@ export type FetchFn<
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
 > = (...args: FetchArgs<E, TGlobalHeaders>) => Promise<ClientResponseBody<E>>;
 
+type Simplify<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
+
+type WithDeclaredResponseMetadata<TResponse, TMetadata> =
+	TResponse extends unknown ? Simplify<TResponse & TMetadata> : never;
+
 type RouteDeclaredResponse<E extends RouteDeclaration> =
-	DeclaredClientResponse<E> & {
-		declared: true;
-		headers: Headers;
-	};
+	WithDeclaredResponseMetadata<
+		DeclaredClientResponse<E>,
+		{
+			declared: true;
+			headers: Headers;
+		}
+	>;
 
 type StrictRouteDeclaredResponse<E extends RouteDeclaration> =
-	DeclaredClientResponse<E> & {
-		headers: Headers;
-	};
+	WithDeclaredResponseMetadata<
+		DeclaredClientResponse<E>,
+		{
+			headers: Headers;
+		}
+	>;
 
 type RouteUndeclaredResponse = {
 	declared: false;
@@ -95,7 +106,7 @@ export type ClientResponse<
 	? never
 	: TStrictStatusCodes extends true
 		? StrictRouteDeclaredResponse<E>
-		: RouteDeclaredResponse<E> | RouteUndeclaredResponse;
+		: RouteDeclaredResponse<E> | Simplify<RouteUndeclaredResponse>;
 
 /**
  * The response envelope returned by `fetchResponse()` for a route with strict status codes enabled.

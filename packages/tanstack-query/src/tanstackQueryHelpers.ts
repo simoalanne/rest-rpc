@@ -25,20 +25,25 @@ import type {
 } from "@tanstack/query-core";
 import { createRouteApi } from "./routeApi.ts";
 
-type ClientUndeclaredResponse<E extends RouteDeclaration> = Extract<
-	ClientResponse<E, false>,
-	{ declared: false }
->;
+type ClientUndeclaredResponse<E extends RouteDeclaration> =
+	Extract<ClientResponse<E, false>, { declared: false }> extends infer TResponse
+		? Simplify<TResponse>
+		: never;
+
+type Simplify<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
+
+type WithHeaders<TResponse> = TResponse extends unknown
+	? Simplify<TResponse & { headers: Headers }>
+	: never;
 
 /**
  * Infers the successful query data returned for a route.
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#tanstack-query}
  */
-export type RouteQueryData<E extends RouteDeclaration> =
-	SuccessfulDeclaredClientResponse<E> & {
-		headers: Headers;
-	};
+export type RouteQueryData<E extends RouteDeclaration> = WithHeaders<
+	SuccessfulDeclaredClientResponse<E>
+>;
 
 /**
  * Infers the error value surfaced by generated TanStack Query options.
@@ -49,7 +54,7 @@ export type RouteQueryError<
 	E extends RouteDeclaration,
 	TStrictStatusCodes extends boolean = false,
 > =
-	| (ErrorDeclaredClientResponse<E> & { headers: Headers })
+	| WithHeaders<ErrorDeclaredClientResponse<E>>
 	| (TStrictStatusCodes extends true ? never : ClientUndeclaredResponse<E>)
 	| Error;
 

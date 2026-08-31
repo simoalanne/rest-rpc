@@ -127,6 +127,21 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
 
+  hover-types:
+    dependencies:
+      '@rest-rpc/core':
+        specifier: workspace:*
+        version: link:../packages/core
+      '@rest-rpc/express':
+        specifier: workspace:*
+        version: link:../packages/express
+      '@rest-rpc/tanstack-query':
+        specifier: workspace:*
+        version: link:../packages/tanstack-query
+      '@tanstack/query-core':
+        specifier: ^5.90.12
+        version: 5.101.4
+
   integration-tests:
     dependencies:
       '@rest-rpc/core':
