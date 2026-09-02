@@ -1,6 +1,6 @@
 {
 	"name": "@rest-rpc/next",
-	"version": "0.1.0-beta.18",
+	"version": "0.1.0-beta.19",
 	"description": "Next.js adapter for serving and consuming rest-rpc contracts in App Router projects.",
 	"keywords": [
 		"api-contract",
