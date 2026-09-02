@@ -33,13 +33,11 @@ const hasSingleSuccessfulResponse = (route: RouteDeclaration) =>
  */
 export function initClient<
 	TContract extends Contract,
-	const TStrictStatusCodes extends boolean = false,
 	const TGlobalHeaders extends Record<string, string> = Record<never, string>,
 >(
 	contract: TContract,
-	options: ApiClientOptions<TStrictStatusCodes, TGlobalHeaders>,
-): ApiClientFor<TContract, TStrictStatusCodes, TGlobalHeaders> {
-	const strictStatusCodes = options.strictStatusCodes ?? false;
+	options: ApiClientOptions<TGlobalHeaders>,
+): ApiClientFor<TContract, TGlobalHeaders> {
 	const strictRequestKeys = options.strictRequestKeys ?? true;
 	const validateResponses = options.validateResponses ?? false;
 	const requestOptions: ExecuteRequestOptions = {
@@ -52,19 +50,17 @@ export function initClient<
 		strictRequestKeys,
 	};
 
-	const request: RouteRequestFn = (route, ...args) =>
-		executeRequest(route, args, requestOptions);
+	const request: RouteRequestFn = (route, routePath, ...args) =>
+		executeRequest(route, routePath, args, requestOptions);
 
-	const fetchResponse = (route: RouteDeclaration, ...args: FetchArgs) =>
-		fetchRouteResponse(
-			request,
-			validateResponses,
-			strictStatusCodes,
-			route,
-			...args,
-		);
+	const fetchResponse = (
+		route: RouteDeclaration,
+		routePath: readonly string[],
+		...args: FetchArgs
+	) =>
+		fetchRouteResponse(request, validateResponses, route, routePath, ...args);
 
-	return mapContractRoutes(contract, (node) => {
+	return mapContractRoutes(contract, (node, routePath) => {
 		if (node.mode === "webSocket" || isSseRouteNode(node)) {
 			return {
 				openConnection: (...args: OpenConnectionArgs) => {
@@ -89,7 +85,7 @@ export function initClient<
 		}
 
 		const routeFetchResponse = (...args: FetchArgs) =>
-			fetchResponse(node, ...args);
+			fetchResponse(node, routePath, ...args);
 
 		if (!hasSingleSuccessfulResponse(node)) {
 			return {
@@ -98,8 +94,9 @@ export function initClient<
 		}
 
 		return {
-			fetch: (...args: FetchArgs) => fetchSuccess(fetchResponse, node, ...args),
+			fetch: (...args: FetchArgs) =>
+				fetchSuccess(fetchResponse, node, routePath, ...args),
 			fetchResponse: routeFetchResponse,
 		};
-	}) as ApiClientFor<TContract, TStrictStatusCodes, TGlobalHeaders>;
+	}) as ApiClientFor<TContract, TGlobalHeaders>;
 }

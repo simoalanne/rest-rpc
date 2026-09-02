@@ -101,7 +101,7 @@ export const registerHonoWebSocketRoutes = <TEnv extends Env = Env>(
 			async (c: Context<TEnv>) => {
 				const request = {
 					query: c.req.query(),
-					pathParams: c.req.param(),
+					params: c.req.param(),
 					headers: c.req.header(),
 				};
 				const upgrade = await prepareWebSocketUpgrade({

@@ -26,7 +26,7 @@ import type {
 import { createRouteApi } from "./routeApi.ts";
 
 type ClientUndeclaredResponse<E extends RouteDeclaration> =
-	Extract<ClientResponse<E, false>, { declared: false }> extends infer TResponse
+	Extract<ClientResponse<E>, { declared: false }> extends infer TResponse
 		? Simplify<TResponse>
 		: never;
 
@@ -50,25 +50,10 @@ export type RouteQueryData<E extends RouteDeclaration> = WithHeaders<
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#tanstack-query}
  */
-export type RouteQueryError<
-	E extends RouteDeclaration,
-	TStrictStatusCodes extends boolean = false,
-> =
+export type RouteQueryError<E extends RouteDeclaration> =
 	| WithHeaders<ErrorDeclaredClientResponse<E>>
-	| (TStrictStatusCodes extends true ? never : ClientUndeclaredResponse<E>)
+	| ClientUndeclaredResponse<E>
 	| Error;
-
-/**
- * Infers the error value surfaced by generated TanStack Query options with strict status codes enabled.
- *
- * @remarks Unlike `RouteQueryError`, this type excludes undeclared response envelopes.
- * This matches generated TanStack Query helpers when `strictStatusCodes` is set to `true`.
- * @see {@link https://rest-rpc.dev/docs/type-helpers#tanstack-query}
- */
-export type StrictRouteQueryError<E extends RouteDeclaration> = RouteQueryError<
-	E,
-	true
->;
 
 /**
  * Infers mutation variables for a route.
@@ -115,15 +100,10 @@ type WithFetchOptions<T> = T & {
 
 type QueryOptionsFor<
 	E extends RouteDeclaration,
-	TStrictStatusCodes extends boolean,
 	TData = RouteQueryData<E>,
 > = WithFetchOptions<
 	Omit<
-		QueryObserverOptions<
-			RouteQueryData<E>,
-			RouteQueryError<E, TStrictStatusCodes>,
-			TData
-		>,
+		QueryObserverOptions<RouteQueryData<E>, RouteQueryError<E>, TData>,
 		"queryKey" | "queryFn"
 	> & {
 		queryKey?: QueryKey;
@@ -132,28 +112,16 @@ type QueryOptionsFor<
 
 type QueryOptionsResultFor<
 	E extends RouteDeclaration,
-	TStrictStatusCodes extends boolean,
 	TData = RouteQueryData<E>,
-> = QueryObserverOptions<
-	RouteQueryData<E>,
-	RouteQueryError<E, TStrictStatusCodes>,
-	TData
-> & {
-	queryKey: DataTag<
-		QueryKey,
-		RouteQueryData<E>,
-		RouteQueryError<E, TStrictStatusCodes>
-	>;
+> = QueryObserverOptions<RouteQueryData<E>, RouteQueryError<E>, TData> & {
+	queryKey: DataTag<QueryKey, RouteQueryData<E>, RouteQueryError<E>>;
 };
 
-type MutationOptionsFor<
-	E extends RouteDeclaration,
-	TStrictStatusCodes extends boolean,
-> = WithFetchOptions<
+type MutationOptionsFor<E extends RouteDeclaration> = WithFetchOptions<
 	Omit<
 		MutationOptions<
 			RouteQueryData<E>,
-			RouteQueryError<E, TStrictStatusCodes>,
+			RouteQueryError<E>,
 			RouteMutationVariables<E>
 		>,
 		"mutationFn"
@@ -162,13 +130,12 @@ type MutationOptionsFor<
 
 type InfiniteQueryOptionsFor<
 	E extends RouteDeclaration,
-	TStrictStatusCodes extends boolean,
 	TData = RouteInfiniteQueryData<E>,
 > = WithFetchOptions<
 	Omit<
 		InfiniteQueryObserverOptions<
 			RouteQueryData<E>,
-			RouteQueryError<E, TStrictStatusCodes>,
+			RouteQueryError<E>,
 			TData,
 			QueryKey,
 			ClientRequest<E>
@@ -188,20 +155,15 @@ type InfiniteQueryOptionsFor<
 
 type InfiniteQueryOptionsResultFor<
 	E extends RouteDeclaration,
-	TStrictStatusCodes extends boolean,
 	TData = RouteInfiniteQueryData<E>,
 > = InfiniteQueryObserverOptions<
 	RouteQueryData<E>,
-	RouteQueryError<E, TStrictStatusCodes>,
+	RouteQueryError<E>,
 	TData,
 	QueryKey,
 	ClientRequest<E>
 > & {
-	queryKey: DataTag<
-		QueryKey,
-		RouteInfiniteQueryData<E>,
-		RouteQueryError<E, TStrictStatusCodes>
-	>;
+	queryKey: DataTag<QueryKey, RouteInfiniteQueryData<E>, RouteQueryError<E>>;
 };
 
 type StreamedQueryRefetchMode = "append" | "reset" | "replace";
@@ -212,7 +174,6 @@ type StreamedQueryBaseOptions = {
 
 type StreamedQuerySimpleOptions<
 	E extends RouteDeclaration,
-	TStrictStatusCodes extends boolean,
 	TSelectedData,
 > = StreamedQueryBaseOptions & {
 	reducer?: never;
@@ -222,7 +183,7 @@ type StreamedQuerySimpleOptions<
 } & Omit<
 		QueryObserverOptions<
 			RouteStreamedQueryData<E>,
-			RouteQueryError<E, TStrictStatusCodes>,
+			RouteQueryError<E>,
 			TSelectedData,
 			RouteStreamedQueryData<E>
 		>,
@@ -231,7 +192,6 @@ type StreamedQuerySimpleOptions<
 
 type StreamedQueryReducedOptions<
 	E extends RouteDeclaration,
-	TStrictStatusCodes extends boolean,
 	TData,
 	TSelectedData,
 > = StreamedQueryBaseOptions & {
@@ -240,94 +200,70 @@ type StreamedQueryReducedOptions<
 	streamFn?: never;
 	queryKey?: QueryKey;
 } & Omit<
-		QueryObserverOptions<
-			TData,
-			RouteQueryError<E, TStrictStatusCodes>,
-			TSelectedData,
-			TData
-		>,
+		QueryObserverOptions<TData, RouteQueryError<E>, TSelectedData, TData>,
 		"queryFn" | "queryKey"
 	>;
 
 type streamedQueryOptionsFor<
 	E extends RouteDeclaration,
-	TStrictStatusCodes extends boolean,
 	TData,
 	TSelectedData,
 > = WithFetchOptions<
 	[TData] extends [RouteStreamedQueryData<E>]
 		?
-				| StreamedQuerySimpleOptions<E, TStrictStatusCodes, TSelectedData>
-				| StreamedQueryReducedOptions<
-						E,
-						TStrictStatusCodes,
-						TData,
-						TSelectedData
-				  >
-		: StreamedQueryReducedOptions<E, TStrictStatusCodes, TData, TSelectedData>
+				| StreamedQuerySimpleOptions<E, TSelectedData>
+				| StreamedQueryReducedOptions<E, TData, TSelectedData>
+		: StreamedQueryReducedOptions<E, TData, TSelectedData>
 >;
 
 type streamedQueryOptionsResultFor<
 	E extends RouteDeclaration,
-	TStrictStatusCodes extends boolean,
 	TData,
 	TSelectedData,
-> = QueryObserverOptions<
-	TData,
-	RouteQueryError<E, TStrictStatusCodes>,
-	TSelectedData,
-	TData
-> & {
-	queryKey: DataTag<QueryKey, TData, RouteQueryError<E, TStrictStatusCodes>>;
+> = QueryObserverOptions<TData, RouteQueryError<E>, TSelectedData, TData> & {
+	queryKey: DataTag<QueryKey, TData, RouteQueryError<E>>;
 };
 
 type QueryDisabled = false | null | undefined | "" | 0;
 
-type UseQueryArgs<
-	E extends RouteDeclaration,
-	TStrictStatusCodes extends boolean,
-	TData = RouteQueryData<E>,
-> =
+type UseQueryArgs<E extends RouteDeclaration, TData = RouteQueryData<E>> =
 	ClientRequest<E> extends never
-		? [options?: QueryOptionsFor<E, TStrictStatusCodes, TData>]
+		? [options?: QueryOptionsFor<E, TData>]
 		: [
 				request: ClientRequest<E> | QueryDisabled | SkipToken,
-				options?: QueryOptionsFor<E, TStrictStatusCodes, TData>,
+				options?: QueryOptionsFor<E, TData>,
 			];
 
 type GetKeyArgs<E extends RouteDeclaration> =
 	ClientRequest<E> extends never ? [] : [request: ClientRequest<E>];
 
-type TanstackQueryBaseRouteValue<
-	E extends RouteDeclaration,
-	TStrictStatusCodes extends boolean,
-> = {
-	mutationOptions: (
-		options?: MutationOptionsFor<E, TStrictStatusCodes>,
-	) => MutationOptions<
-		RouteQueryData<E>,
-		RouteQueryError<E, TStrictStatusCodes>,
-		RouteMutationVariables<E>
-	>;
-	queryOptions: <TData = RouteQueryData<E>>(
-		...args: UseQueryArgs<E, TStrictStatusCodes, TData>
-	) => QueryOptionsResultFor<E, TStrictStatusCodes, TData>;
-	infiniteQueryOptions: <TData = RouteInfiniteQueryData<E>>(
-		options: InfiniteQueryOptionsFor<E, TStrictStatusCodes, TData>,
-	) => InfiniteQueryOptionsResultFor<E, TStrictStatusCodes, TData>;
-	getKey: (
-		...args: GetKeyArgs<E>
-	) => DataTag<
-		QueryKey,
-		RouteQueryData<E>,
-		RouteQueryError<E, TStrictStatusCodes>
-	>;
+/** Creates query options for a route, including disabled requests. */
+export type RouteQueryOptionsMethod<E extends RouteDeclaration> = {
+	<TData = RouteQueryData<E>>(
+		...args: UseQueryArgs<E, TData>
+	): QueryOptionsResultFor<E, TData>;
 };
 
-type TanstackQueryStreamRouteValue<
-	E extends RouteDeclaration,
-	TStrictStatusCodes extends boolean,
-> = [ClientResponseBody<E>] extends [never]
+type TanstackQueryBaseRouteValue<E extends RouteDeclaration> = {
+	mutationOptions: (
+		options?: MutationOptionsFor<E>,
+	) => MutationOptions<
+		RouteQueryData<E>,
+		RouteQueryError<E>,
+		RouteMutationVariables<E>
+	>;
+	queryOptions: RouteQueryOptionsMethod<E>;
+	infiniteQueryOptions: <TData = RouteInfiniteQueryData<E>>(
+		options: InfiniteQueryOptionsFor<E, TData>,
+	) => InfiniteQueryOptionsResultFor<E, TData>;
+	getKey: (
+		...args: GetKeyArgs<E>
+	) => DataTag<QueryKey, RouteQueryData<E>, RouteQueryError<E>>;
+};
+
+type TanstackQueryStreamRouteValue<E extends RouteDeclaration> = [
+	ClientResponseBody<E>,
+] extends [never]
 	? Record<never, never>
 	: ClientResponseBody<E> extends AsyncIterable<unknown>
 		? {
@@ -335,62 +271,33 @@ type TanstackQueryStreamRouteValue<
 					TData = RouteStreamedQueryData<E>,
 					TSelectedData = TData,
 				>(
-					...args: UseQueryArgs<
-						E,
-						TStrictStatusCodes,
-						TData
-					> extends infer TArgs
+					...args: UseQueryArgs<E, TData> extends infer TArgs
 						? TArgs extends [options?: unknown]
-							? [
-									options?: streamedQueryOptionsFor<
-										E,
-										TStrictStatusCodes,
-										TData,
-										TSelectedData
-									>,
-								]
+							? [options?: streamedQueryOptionsFor<E, TData, TSelectedData>]
 							: TArgs extends [request: infer TRequest, options?: unknown]
 								? [
 										request: TRequest,
-										options?: streamedQueryOptionsFor<
-											E,
-											TStrictStatusCodes,
-											TData,
-											TSelectedData
-										>,
+										options?: streamedQueryOptionsFor<E, TData, TSelectedData>,
 									]
 								: never
 						: never
-				) => streamedQueryOptionsResultFor<
-					E,
-					TStrictStatusCodes,
-					TData,
-					TSelectedData
-				>;
+				) => streamedQueryOptionsResultFor<E, TData, TSelectedData>;
 			}
 		: Record<never, never>;
 
-type TanstackQueryRouteValue<
-	E extends RouteDeclaration,
-	TStrictStatusCodes extends boolean,
-> = TanstackQueryBaseRouteValue<E, TStrictStatusCodes> &
-	TanstackQueryStreamRouteValue<E, TStrictStatusCodes>;
+type TanstackQueryRouteValue<E extends RouteDeclaration> =
+	TanstackQueryBaseRouteValue<E> & TanstackQueryStreamRouteValue<E>;
 
-type TanstackQueryTreeFor<
-	T extends Contract,
-	TStrictStatusCodes extends boolean,
-> = {
+type TanstackQueryTreeFor<T extends Contract> = {
 	[
 		K in keyof T as T[K] extends Contract
-			? TanstackQueryHelpersFor<T[K], TStrictStatusCodes> extends never
+			? TanstackQueryHelpersFor<T[K]> extends never
 				? never
-				: keyof TanstackQueryHelpersFor<T[K], TStrictStatusCodes> extends never
+				: keyof TanstackQueryHelpersFor<T[K]> extends never
 					? never
 					: K
 			: never
-	]: T[K] extends Contract
-		? TanstackQueryHelpersFor<T[K], TStrictStatusCodes>
-		: never;
+	]: T[K] extends Contract ? TanstackQueryHelpersFor<T[K]> : never;
 };
 
 /**
@@ -398,24 +305,14 @@ type TanstackQueryTreeFor<
  *
  * @see {@link https://rest-rpc.dev/docs/client/tanstack-query}
  */
-export type TanstackQueryHelpersFor<
-	T extends Contract,
-	TStrictStatusCodes extends boolean = false,
-> = T extends WebSocketRouteDeclaration
-	? never
-	: T extends { mode: "sse" }
+export type TanstackQueryHelpersFor<T extends Contract> =
+	T extends WebSocketRouteDeclaration
 		? never
-		: T extends HttpRouteDeclaration
-			? TanstackQueryRouteValue<T, TStrictStatusCodes>
-			: TanstackQueryTreeFor<T, TStrictStatusCodes>;
-
-/**
- * Infers the generated TanStack Query helper tree for a contract with strict status codes enabled.
- *
- * @see {@link https://rest-rpc.dev/docs/client/tanstack-query}
- */
-export type StrictTanstackQueryHelpersFor<TContract extends Contract> =
-	TanstackQueryHelpersFor<TContract, true>;
+		: T extends { mode: "sse" }
+			? never
+			: T extends HttpRouteDeclaration
+				? TanstackQueryRouteValue<T>
+				: TanstackQueryTreeFor<T>;
 
 /**
  * Options used to create TanStack Query helpers from a contract.
@@ -423,9 +320,8 @@ export type StrictTanstackQueryHelpersFor<TContract extends Contract> =
  * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#setup}
  */
 export type CreateTanstackQueryHelpersOptions<
-	TStrictStatusCodes extends boolean = false,
 	TGlobalHeaders extends Record<string, string> = Record<never, string>,
-> = ApiClientOptions<TStrictStatusCodes, TGlobalHeaders>;
+> = ApiClientOptions<TGlobalHeaders>;
 
 const isWebSocketRoute = (
 	route: RouteDeclaration,
@@ -449,15 +345,11 @@ const getByPath = (tree: unknown, path: string[]) =>
  */
 export function createTanstackQueryHelpers<
 	TContract extends Contract,
-	const TStrictStatusCodes extends boolean = false,
 	const TGlobalHeaders extends Record<string, string> = Record<never, string>,
 >(
 	contract: TContract,
-	options: CreateTanstackQueryHelpersOptions<
-		TStrictStatusCodes,
-		TGlobalHeaders
-	>,
-): TanstackQueryHelpersFor<TContract, TStrictStatusCodes> {
+	options: CreateTanstackQueryHelpersOptions<TGlobalHeaders>,
+): TanstackQueryHelpersFor<TContract> {
 	const client = initClient(contract, options);
 
 	const mapHttpRoutes = (node: Contract, path: string[] = []): unknown => {
@@ -465,15 +357,12 @@ export function createTanstackQueryHelpers<
 			if (isWebSocketRoute(node) || isSseRoute(node)) return undefined;
 
 			const apiNode = getByPath(client, path) as {
-				fetchResponse: FetchResponseFn<
-					typeof node,
-					TStrictStatusCodes,
-					TGlobalHeaders
-				>;
+				fetchResponse: FetchResponseFn<typeof node, TGlobalHeaders>;
 			};
 
 			return createRouteApi(
 				node,
+				path,
 				apiNode.fetchResponse as (...args: unknown[]) => Promise<unknown>,
 			);
 		}
@@ -489,8 +378,5 @@ export function createTanstackQueryHelpers<
 		return Object.fromEntries(entries);
 	};
 
-	return mapHttpRoutes(contract) as TanstackQueryHelpersFor<
-		TContract,
-		TStrictStatusCodes
-	>;
+	return mapHttpRoutes(contract) as TanstackQueryHelpersFor<TContract>;
 }

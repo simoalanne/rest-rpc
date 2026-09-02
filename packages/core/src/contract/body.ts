@@ -4,6 +4,27 @@ import {
 } from "../standard-schema/index.ts";
 import { resolveBuiltInRequestKeys } from "./requestKeys.ts";
 
+type BodyScalar = string | number | boolean;
+
+/** A form body schema whose input can be serialized as URL-encoded fields. */
+export type FormBodySchema = StandardSchemaV1<
+	Record<string, BodyScalar | readonly BodyScalar[] | undefined>,
+	unknown
+>;
+
+type MultipartBodyValue = BodyScalar | Blob;
+
+/** A multipart body schema whose input can be serialized as form-data fields. */
+export type MultipartBodySchema = StandardSchemaV1<
+	Record<
+		string,
+		MultipartBodyValue | readonly MultipartBodyValue[] | undefined
+	>,
+	unknown
+>;
+
+type BodyWithArrayKeysSchema = FormBodySchema | MultipartBodySchema;
+
 /**
  * Marks a request or response body as intentionally empty.
  *
@@ -17,7 +38,7 @@ export type NoBody = {
  * Declares an `application/x-www-form-urlencoded` request body.
  */
 export type FormBody<
-	TSchema extends StandardSchemaV1 = StandardSchemaV1,
+	TSchema extends FormBodySchema = FormBodySchema,
 	TArrayKeys extends readonly string[] = readonly string[],
 > = {
 	kind: "formBody";
@@ -29,7 +50,7 @@ export type FormBody<
  * Declares a `multipart/form-data` request body.
  */
 export type MultipartBody<
-	TSchema extends StandardSchemaV1 = StandardSchemaV1,
+	TSchema extends MultipartBodySchema = MultipartBodySchema,
 	TArrayKeys extends readonly string[] = readonly string[],
 > = {
 	kind: "multipartBody";
@@ -42,15 +63,27 @@ export type MultipartBody<
  */
 export type CustomBodyContentType = string | readonly string[];
 
-type BodyWithArrayKeysInput =
-	| StandardSchemaV1
-	| {
-			schema: StandardSchemaV1;
-			arrayKeys: readonly string[];
-	  };
+/** Options for a structured body whose selected fields are encoded as arrays. */
+export type BodyWithArrayKeysOptions<
+	TSchema extends BodyWithArrayKeysSchema = BodyWithArrayKeysSchema,
+	TArrayKeys extends readonly string[] = readonly string[],
+> = {
+	schema: TSchema;
+	arrayKeys: TArrayKeys;
+};
 
-export function resolveBodyWithArrayKeys(input: BodyWithArrayKeysInput): {
-	schema: StandardSchemaV1;
+export type BodyWithArrayKeysInput<
+	TSchema extends BodyWithArrayKeysSchema = BodyWithArrayKeysSchema,
+	TArrayKeys extends readonly string[] = readonly string[],
+> = TSchema | BodyWithArrayKeysOptions<TSchema, TArrayKeys>;
+
+export function resolveBodyWithArrayKeys<
+	const TSchema extends BodyWithArrayKeysSchema,
+	const TArrayKeys extends readonly string[] = readonly string[],
+>(
+	input: BodyWithArrayKeysInput<TSchema, TArrayKeys>,
+): {
+	schema: TSchema;
 	arrayKeys: readonly string[];
 } {
 	if (!isStandardSchema(input)) {
@@ -66,100 +99,6 @@ export function resolveBodyWithArrayKeys(input: BodyWithArrayKeysInput): {
 }
 
 /**
- * Declares that a request or response has no body.
- *
- * @see {@link https://rest-rpc.dev/docs/http-responses#response-without-body}
- */
-export function noBody(): NoBody {
-	return {
-		kind: "noBody",
-	};
-}
-
-/**
- * Declares an `application/x-www-form-urlencoded` request body.
- *
- * @remarks The generated client serializes the typed body object to
- * `URLSearchParams` and lets `fetch()` set the content-type header. Server
- * body parsers should pass a `URLSearchParams` instance to rest-rpc. Each
- * scalar form key is validated as a string, or `undefined` when omitted. Form
- * array keys are encoded and decoded as repeated form keys.
- *
- * @see {@link https://rest-rpc.dev/docs/http-requests#request-with-form-body}
- */
-export function formBody<const TSchema extends StandardSchemaV1>(
-	schema: TSchema,
-): FormBody<TSchema>;
-export function formBody<
-	const TSchema extends StandardSchemaV1,
-	const TArrayKeys extends readonly string[],
->(input: {
-	schema: TSchema;
-	arrayKeys: TArrayKeys;
-}): FormBody<TSchema, TArrayKeys>;
-export function formBody<
-	const TSchema extends StandardSchemaV1,
-	const TArrayKeys extends readonly string[],
->(
-	input:
-		| TSchema
-		| {
-				schema: TSchema;
-				arrayKeys: TArrayKeys;
-		  },
-): FormBody<TSchema> {
-	const { schema, arrayKeys } = resolveBodyWithArrayKeys(input);
-
-	return {
-		kind: "formBody",
-		schema,
-		arrayKeys,
-	} as FormBody<TSchema>;
-}
-
-/**
- * Declares a `multipart/form-data` request body.
- *
- * @remarks The generated client serializes the typed body object to
- * `FormData` and lets `fetch()` set the content-type header, including the
- * boundary. Server body parsers should pass a `FormData` instance to rest-rpc.
- * Each scalar multipart key is validated as a string or `File`, or
- * `undefined` when omitted. Multipart array keys are encoded and decoded as
- * repeated form keys.
- *
- * @see {@link https://rest-rpc.dev/docs/http-requests#request-with-multipart-body}
- */
-export function multipartBody<const TSchema extends StandardSchemaV1>(
-	schema: TSchema,
-): MultipartBody<TSchema>;
-export function multipartBody<
-	const TSchema extends StandardSchemaV1,
-	const TArrayKeys extends readonly string[],
->(input: {
-	schema: TSchema;
-	arrayKeys: TArrayKeys;
-}): MultipartBody<TSchema, TArrayKeys>;
-export function multipartBody<
-	const TSchema extends StandardSchemaV1,
-	const TArrayKeys extends readonly string[],
->(
-	input:
-		| TSchema
-		| {
-				schema: TSchema;
-				arrayKeys: TArrayKeys;
-		  },
-): MultipartBody<TSchema> {
-	const { schema, arrayKeys } = resolveBodyWithArrayKeys(input);
-
-	return {
-		kind: "multipartBody",
-		schema,
-		arrayKeys,
-	} as MultipartBody<TSchema>;
-}
-
-/**
  * Declares a body schema with one or more non-JSON content types.
  *
  * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-custom-content-type}
@@ -172,17 +111,37 @@ export type CustomBody<
 > = {
 	kind: "customBody";
 	schema: TSchema;
-} & (TContentType extends undefined
-	? { contentType?: undefined }
-	: { contentType: TContentType });
+} & ([TContentType] extends [CustomBodyContentType]
+	? { contentType: TContentType }
+	: { contentType?: Exclude<TContentType, undefined> });
 
 /**
- * A custom body declaration that is valid for responses.
+ * A response body declaration with an explicit content type.
+ *
+ * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-custom-content-type}
  */
-export type CustomResponseBody = CustomBody<
-	StandardSchemaV1,
-	CustomBodyContentType
->;
+export type CustomResponseBody<
+	TSchema extends StandardSchemaV1 = StandardSchemaV1,
+	TContentType extends CustomBodyContentType = CustomBodyContentType,
+> = {
+	kind: "customBody";
+	schema: TSchema;
+	contentType: TContentType;
+};
+
+/** Input accepted when declaring a response with a custom content type. */
+export type CustomResponseInput<
+	TSchema extends StandardSchemaV1 = StandardSchemaV1,
+	TContentType extends CustomBodyContentType = CustomBodyContentType,
+> = {
+	schema: TSchema;
+	contentType: TContentType;
+};
+
+export type CustomBodyInput<
+	TSchema extends StandardSchemaV1 = StandardSchemaV1,
+	TContentType extends CustomBodyContentType = CustomBodyContentType,
+> = TSchema | CustomResponseInput<TSchema, TContentType>;
 
 /**
  * Declares a streaming response body.
@@ -197,58 +156,6 @@ export type Stream<
 	kind: "stream";
 	schema: TBody;
 };
-
-/**
- * Declares a streaming response body.
- *
- * @see {@link https://rest-rpc.dev/docs/http-responses#streaming-ndjson-responses}
- */
-export function stream<
-	const TBody extends StandardSchemaV1 | CustomResponseBody,
->(schema: TBody): Stream<TBody> {
-	return {
-		kind: "stream",
-		schema,
-	};
-}
-
-/**
- * Declares a body schema with one or more non-JSON content types.
- *
- * @remarks Pass a schema directly when the generated client should pass the
- * request body to `fetch()` and let the runtime set the content-type header.
- * Response bodies must use the object form and declare `contentType` because
- * the server adapter needs a concrete media type to send.
- *
- * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-custom-content-type}
- */
-export function customBody<const TSchema extends StandardSchemaV1>(
-	schema: TSchema,
-): CustomBody<TSchema, undefined>;
-export function customBody<
-	const TSchema extends StandardSchemaV1,
-	const TContentType extends CustomBodyContentType,
->(input: {
-	schema: TSchema;
-	contentType: TContentType;
-}): CustomBody<TSchema, TContentType>;
-export function customBody<const TSchema extends StandardSchemaV1>(
-	input:
-		| TSchema
-		| {
-				schema: TSchema;
-				contentType: CustomBodyContentType;
-		  },
-): CustomBody<TSchema, CustomBodyContentType | undefined> {
-	const schema = "~standard" in input ? input : input.schema;
-	const contentType = "~standard" in input ? undefined : input.contentType;
-
-	return {
-		kind: "customBody",
-		schema,
-		contentType,
-	} as CustomBody<TSchema, CustomBodyContentType | undefined>;
-}
 
 export function isNoBody(body: unknown): body is NoBody {
 	return (

@@ -1,7 +1,4 @@
-import type {
-	HttpRouteDeclaration,
-	RequestBodySchema,
-} from "@rest-rpc/core/contract";
+import type { RequestBodySchema } from "@rest-rpc/core/contract";
 import {
 	isCustomBody,
 	isFormBody,
@@ -14,6 +11,7 @@ import {
 	handleHttpRoute,
 	type RouteImplementation,
 	type ServerErrorHandlers,
+	type ServerHttpRouteDeclaration,
 } from "@rest-rpc/server";
 
 /**
@@ -23,8 +21,8 @@ import {
  */
 export type FetchRouteParseBodyInput = {
 	request: Request;
-	route: HttpRouteDeclaration;
-	body: RequestBodySchema;
+	route: ServerHttpRouteDeclaration;
+	body?: RequestBodySchema;
 };
 
 /**
@@ -85,7 +83,7 @@ export const handleFetchRoute = async <
 >(
 	request: Request,
 	context: TContext,
-	implementation: RouteImplementation<HttpRouteDeclaration>,
+	implementation: RouteImplementation<ServerHttpRouteDeclaration>,
 	params: Record<string, string>,
 	parseBody: FetchRouteParseBody,
 	usesDefaultParseBody: boolean,
@@ -97,7 +95,7 @@ export const handleFetchRoute = async <
 		body = await parseBody({
 			request,
 			route: implementation.route,
-			body: implementation.route.body,
+			body: implementation.route.request?.body,
 		});
 	} catch (error) {
 		if (!usesDefaultParseBody) throw error;
@@ -113,7 +111,7 @@ export const handleFetchRoute = async <
 			request: {
 				body,
 				query: readQuery(url),
-				pathParams: params,
+				params: params,
 				headers: readHeaders(request.headers),
 			},
 			context,

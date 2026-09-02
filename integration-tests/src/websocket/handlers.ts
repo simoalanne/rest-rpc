@@ -28,11 +28,11 @@ export const createWebSocketHandlers = (
 		});
 
 		socket.onMessage(async (message) => {
-			if (message.action === "fail") {
+			if (message.type === "fail") {
 				throw new Error("boom from websocket message handler");
 			}
 
-			if (message.action === "close") {
+			if (message.type === "close") {
 				socket.close(4000, "closed by integration handler");
 				return;
 			}

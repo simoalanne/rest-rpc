@@ -1,9 +1,5 @@
 import { Readable } from "node:stream";
-import type {
-	HttpMethod,
-	HttpRouteDeclaration,
-	RouteDeclaration,
-} from "@rest-rpc/core/contract";
+import type { HttpMethod, RouteDeclaration } from "@rest-rpc/core/contract";
 import { toColonPath } from "@rest-rpc/core/contract";
 import {
 	handleHttpRoute,
@@ -11,6 +7,7 @@ import {
 	type HttpRouteResultStreamMode,
 	type RouteImplementation,
 	type ServerErrorHandlers,
+	type ServerHttpRouteDeclaration,
 	formatSseEvent,
 	type SseEvent,
 } from "@rest-rpc/server";
@@ -59,7 +56,7 @@ const createRequestSignal = (req: FastifyRequest, reply: FastifyReply) => {
 
 export const registerFastifyHttpRoutes = (
 	app: FastifyInstance,
-	routes: RouteImplementation<HttpRouteDeclaration>[],
+	routes: RouteImplementation<ServerHttpRouteDeclaration>[],
 	preHandler: ExtendedFastifyPreHandler[] = [],
 	errorHandlers?: ServerErrorHandlers<{
 		req: FastifyRequest;
@@ -67,7 +64,7 @@ export const registerFastifyHttpRoutes = (
 	}>,
 ) => {
 	for (const implementation of routes) {
-		const route: HttpRouteDeclaration = implementation.route;
+		const route: ServerHttpRouteDeclaration = implementation.route;
 		const method = route.method.toLowerCase() as Lowercase<HttpMethod>;
 		const handler = implementation.handler;
 
@@ -86,7 +83,7 @@ export const registerFastifyHttpRoutes = (
 					request: {
 						body: req.body,
 						query: req.query,
-						pathParams: req.params,
+						params: req.params,
 						headers: req.headers,
 					},
 					context: { req, signal },

@@ -7,69 +7,51 @@ Type helpers take a route declaration and infer the type used at a specific
 runtime boundary.
 
 ```ts
-import { route, router, stream, webSocketMessages } from "@rest-rpc/core";
+import { route } from "@rest-rpc/core";
 import { z } from "zod";
 
-export const api = router({
+export const api = {
 	todos: {
-		get: route({
-			method: "GET",
-			path: "/todos/:id",
-			pathParams: z.object({ id: z.string() }),
-			query: z.object({ includeDone: z.boolean().optional() }),
-			responses: {
-				200: z.object({ id: z.string(), title: z.string() }),
-				404: z.object({ code: z.literal("NOT_FOUND") }),
-			},
-		}),
-		page: route({
-			method: "GET",
-			path: "/todos/page",
-			query: z.object({
-				cursor: z.string().optional(),
-				status: z.enum(["open", "done"]),
-				limit: z.number(),
-			}),
-			responses: {
-				200: z.object({
+		get: route
+			.get("/todos/:id")
+			.params(z.object({ id: z.string() }))
+			.query(z.object({ includeDone: z.boolean().optional() }))
+			.response(200, z.object({ id: z.string(), title: z.string() }))
+			.response(404, z.object({ code: z.literal("NOT_FOUND") })),
+		page: route
+			.get("/todos/page")
+			.query(
+				z.object({
+					cursor: z.string().optional(),
+					status: z.enum(["open", "done"]),
+					limit: z.number(),
+				}),
+			)
+			.response(
+				200,
+				z.object({
 					items: z.array(z.object({ id: z.string(), title: z.string() })),
 					nextCursor: z.string().optional(),
 				}),
-			},
-		}),
-		create: route({
-			method: "POST",
-			path: "/todos",
-			body: z.object({ title: z.string() }),
-			response: z.object({ id: z.string(), title: z.string() }),
-		}),
-		live: route({
-			method: "GET",
-			path: "/todos/live",
-			mode: "sse",
-			response: z.object({ id: z.string(), title: z.string() }),
-		}),
-		events: route({
-			method: "GET",
-			path: "/todos/events",
-			responses: {
-				200: stream(z.object({ id: z.string(), message: z.string() })),
-			},
-		}),
-		watch: route({
-			mode: "webSocket",
-			path: "/todos/:id/watch",
-			pathParams: z.object({ id: z.string() }),
-			messages: {
-				client: webSocketMessages("action", {
-					typing: z.object({ active: z.boolean() }),
-					rename: z.object({ title: z.string() }),
-				}),
-				server: z.object({ title: z.string() }),
-			},
-		}),
+			),
+		create: route
+			.post("/todos")
+			.body(z.object({ title: z.string() }))
+			.response(201, z.object({ id: z.string(), title: z.string() })),
+		live: route
+			.sse("/todos/live")
+			.response(z.object({ id: z.string(), title: z.string() })),
+		events: route
+			.get("/todos/events")
+			.streamResponse(200, z.object({ id: z.string(), message: z.string() })),
+		watch: route
+			.ws("/todos/:id/watch")
+			.params(z.object({ id: z.string() }))
+			.clientMessage("typing", z.object({ active: z.boolean() }))
+			.clientMessage("rename", z.object({ title: z.string() }))
+			.serverMessage("title", z.object({ title: z.string() })),
 	},
-});
+};
 ```
 
 ## Fetch Client
@@ -111,11 +93,11 @@ type WatchSocket = ClientSocket<typeof api.todos.watch>;
 // }
 
 type WatchSent = ClientSent<typeof api.todos.watch>;
-// | { action: "typing"; message: { active: boolean } }
-// | { action: "rename"; message: { title: string } }
+// | { type: "typing"; message: { active: boolean } }
+// | { type: "rename"; message: { title: string } }
 
 type WatchReceived = ClientReceived<typeof api.todos.watch>;
-// { title: string }
+// { type: "title"; message: { title: string } }
 
 type LiveEventSource = ClientEventSource<typeof api.todos.live>;
 // {
@@ -172,11 +154,11 @@ type WatchSocket = RouteSocket<typeof api.todos.watch>;
 // }
 
 type WatchSent = RouteSent<typeof api.todos.watch>;
-// { title: string }
+// { type: "title"; message: { title: string } }
 
 type WatchReceived = RouteReceived<typeof api.todos.watch>;
-// | { action: "typing"; message: { active: boolean } }
-// | { action: "rename"; message: { title: string } }
+// | { type: "typing"; message: { active: boolean } }
+// | { type: "rename"; message: { title: string } }
 
 type LiveSent = RouteSseSent<typeof api.todos.live>;
 // { id: string; title: string }

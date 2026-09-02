@@ -226,6 +226,10 @@ export function createContractWebSocket<E extends WebSocketRouteDeclaration>(
 ): RouteSocket<E> {
 	const parseIncomingMessage = (data: unknown): RouteReceived<E> => {
 		try {
+			if (!route.messages.client) {
+				throw new Error("No client WebSocket messages are declared");
+			}
+
 			const result = validateWebSocketMessageSync(
 				route.messages.client,
 				JSON.parse(String(data)),
@@ -241,6 +245,10 @@ export function createContractWebSocket<E extends WebSocketRouteDeclaration>(
 
 	return {
 		send(message) {
+			if (!route.messages.server) {
+				throw new Error("No server WebSocket messages are declared");
+			}
+
 			const result = validateWebSocketMessageSync(
 				route.messages.server,
 				message,
@@ -250,6 +258,8 @@ export function createContractWebSocket<E extends WebSocketRouteDeclaration>(
 			socket.send(JSON.stringify(result.value));
 		},
 		onMessage(callback) {
+			if (!route.messages.client) return () => {};
+
 			return socket.onMessage((data) => {
 				let message: RouteReceived<E>;
 				try {

@@ -1,7 +1,7 @@
 import type {
 	CustomBody,
-	HttpRouteDeclaration,
 	ResponseDeclaration,
+	SseRouteDeclaration,
 } from "@rest-rpc/core/contract";
 import {
 	getResponseBody,
@@ -18,12 +18,16 @@ import type {
 import type { HttpHeaders } from "./headers.ts";
 import { flattenRequestData } from "./requestData.ts";
 import { RouteResponseError } from "./routeResponseError.ts";
-import type { HttpRouteHandlerContext, RuntimeRouteHandler } from "./router.ts";
+import type {
+	HttpRouteHandlerContext,
+	RuntimeRouteHandler,
+	ServerHttpRouteDeclaration,
+} from "./router.ts";
 import { validateSseEvents } from "./sse.ts";
 import {
 	getHeaderValue,
-	type RequestSegments,
 	resolveCustomResponseBody,
+	type RequestSegments,
 	validateRequest,
 	validateResponseBody,
 	validateResponseHeaders,
@@ -75,7 +79,7 @@ export type HandleHttpRouteOptions<TContext extends HttpRouteHandlerContext> = {
 };
 
 const getResponseSchema = (
-	route: HttpRouteDeclaration,
+	route: ServerHttpRouteDeclaration,
 	status: number,
 ): ResponseDeclaration => {
 	const entry = Object.entries(getRouteResponses(route)).find(
@@ -91,7 +95,7 @@ const getResponseSchema = (
 };
 
 const getSingleSuccessfulStatus = (
-	route: HttpRouteDeclaration,
+	route: ServerHttpRouteDeclaration,
 ): number | undefined => {
 	const statuses = Object.keys(getRouteResponses(route))
 		.map(Number)
@@ -101,7 +105,7 @@ const getSingleSuccessfulStatus = (
 };
 
 const normalizeHandlerResultEnvelopeOrShorthand = (
-	route: HttpRouteDeclaration,
+	route: ServerHttpRouteDeclaration,
 	result: unknown,
 ): {
 	status: number;
@@ -170,7 +174,7 @@ const normalizeCustomBodyResult = async (schema: CustomBody, body: unknown) => {
 };
 
 const normalizeResponseResult = async (
-	route: HttpRouteDeclaration,
+	route: ServerHttpRouteDeclaration,
 	result: {
 		status: number;
 		body: unknown;
@@ -248,7 +252,7 @@ const normalizeResponseResult = async (
 };
 
 const normalizeSseResponseResult = (
-	route: HttpRouteDeclaration,
+	route: SseRouteDeclaration,
 	body: unknown,
 ): HttpRouteResult => {
 	const status = getSingleSuccessfulStatus(route);
@@ -304,7 +308,7 @@ const handleResponseValidationError = async <
 	TContext extends HttpRouteHandlerContext,
 >(
 	error: unknown,
-	route: HttpRouteDeclaration,
+	route: ServerHttpRouteDeclaration,
 	options: HandleHttpRouteOptions<TContext>,
 	errorContext: TContext,
 ) => {
@@ -322,7 +326,7 @@ const handleResponseValidationError = async <
 };
 
 const normalizeHandlerResult = async <TContext extends HttpRouteHandlerContext>(
-	route: HttpRouteDeclaration,
+	route: ServerHttpRouteDeclaration,
 	result: unknown,
 	options: HandleHttpRouteOptions<TContext>,
 	errorContext: TContext,
@@ -342,7 +346,7 @@ const normalizeHandlerResult = async <TContext extends HttpRouteHandlerContext>(
 const normalizeRouteResponseError = async <
 	TContext extends HttpRouteHandlerContext,
 >(
-	route: HttpRouteDeclaration,
+	route: ServerHttpRouteDeclaration,
 	error: RouteResponseError,
 	options: HandleHttpRouteOptions<TContext>,
 	errorContext: TContext,
@@ -369,7 +373,7 @@ const normalizeRouteResponseError = async <
  * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registering-http-routes}
  */
 export async function handleHttpRoute<
-	E extends HttpRouteDeclaration,
+	E extends ServerHttpRouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
 >(
 	route: E,

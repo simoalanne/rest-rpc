@@ -14,25 +14,21 @@ shape is clearer for a route or codebase, rest-rpc supports that too.
 
 ## Request Shape
 
-By default, request fields from `pathParams`, `query`, JSON `body`, and
+By default, request fields from `params`, `query`, JSON `body`, and
 `headers` are flattened into one request object.
 
 ```ts
-const api = router({
+const api = {
 	todos: {
-		update: {
-			method: "PATCH",
-			path: "/todos/:id",
-			pathParams: z.object({ id: z.string() }),
-			query: z.object({ notify: z.boolean().optional() }),
-			body: z.object({ title: z.string() }),
-			headers: {
-				"x-request-id": z.string(),
-			},
-			response: todoSchema,
-		},
+		update: route
+			.patch("/todos/:id")
+			.params(z.object({ id: z.string() }))
+			.query(z.object({ notify: z.boolean().optional() }))
+			.body(z.object({ title: z.string() }))
+			.headers(z.object({ "x-request-id": z.string() }))
+			.response(200, todoSchema),
 	},
-});
+};
 ```
 
 ```ts
@@ -48,31 +44,24 @@ Use `flattenRequestKeys: false` when you want the call site to keep the HTTP
 request locations visible.
 
 ```ts
-const api = router(
-	{
-		todos: {
-			update: {
-				method: "PATCH",
-				path: "/todos/:id",
-				pathParams: z.object({ id: z.string() }),
-				query: z.object({ notify: z.boolean().optional() }),
-				body: z.object({ title: z.string() }),
-				headers: {
-					"x-request-id": z.string(),
-				},
-				response: todoSchema,
-			},
-		},
+const groupedRoute = route.with({ flattenRequestKeys: false });
+
+const api = {
+	todos: {
+		update: groupedRoute
+			.patch("/todos/:id")
+			.params(z.object({ id: z.string() }))
+			.query(z.object({ notify: z.boolean().optional() }))
+			.body(z.object({ title: z.string() }))
+			.headers(z.object({ "x-request-id": z.string() }))
+			.response(200, todoSchema),
 	},
-	{
-		flattenRequestKeys: false,
-	},
-);
+};
 ```
 
 ```ts
 await client.todos.update.fetch({
-	pathParams: { id: "todo_1" },
+	params: { id: "todo_1" },
 	query: { notify: true },
 	body: { title: "Write docs" },
 	headers: { "x-request-id": "req_1" },
@@ -90,9 +79,9 @@ update({ id, notify, title, "x-request-id": requestId }) {
 
 ```ts
 // Explicit request segments
-update({ pathParams, query, body, headers }) {
+update({ params, query, body, headers }) {
 	return updateTodo({
-		id: pathParams.id,
+		id: params.id,
 		notify: query.notify,
 		title: body.title,
 		requestId: headers["x-request-id"],
@@ -100,25 +89,25 @@ update({ pathParams, query, body, headers }) {
 }
 ```
 
-You can set the default on a router and override individual routes.
+Configured route factories are local values, so one contract can use different
+defaults for different routes.
 
 ```ts
-const api = router(
-	{
-		todos: {
-			batchCreate: {
-				method: "POST",
-				path: "/todos/",
-				flattenRequestKeys: true,
-				body: z.array(z.object({ title: z.string() })),
-				response: todoSchema,
-			},
-		},
+const groupedRoute = route.with({ flattenRequestKeys: false });
+
+const api = {
+	todos: {
+		update: groupedRoute
+			.patch("/todos/:id")
+			.params(z.object({ id: z.string() }))
+			.body(z.object({ title: z.string() }))
+			.response(200, todoSchema),
+		batchCreate: route
+			.post("/todos/batch")
+			.body(z.array(z.object({ title: z.string() })))
+			.response(201, z.array(todoSchema)),
 	},
-	{
-		flattenRequestKeys: false,
-	},
-);
+};
 ```
 
 ```ts
@@ -127,66 +116,67 @@ await client.todos.batchCreate.fetch({
 });
 ```
 
-## Inferred Path Params
+## Path Params
 
-Full dynamic path segments infer string path params.
+Declare dynamic path segments with `.params()` so their schema and input type
+stay explicit.
 
 ```ts
-get: {
-	method: "GET",
-	path: "/todos/:id",
-	response: todoSchema,
-}
+get: route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.response(200, todoSchema),
 ```
 
 ```ts
 await client.todos.get.fetch({ id: "todo_1" });
 ```
 
-Declare `pathParams` explicitly when you want a schema other than the inferred
-string schema.
+The schema can validate or transform the transport string when the handler
+needs a more specific value.
 
 ```ts
-get: {
-	method: "GET",
-	path: "/todos/:id",
-	pathParams: z.object({
-		id: z.coerce.number().int().positive(),
-	}),
-	response: todoSchema,
-}
+get: route
+	.get("/todos/:id")
+	.params(z.object({ id: z.coerce.number<number>().int().positive() }))
+	.response(200, todoSchema),
 ```
 
-## Shared Router Options
+## Shared Route Options
 
-Use router options when many routes share the same contract details.
+Use `route.with()` when many routes share the same contract details. It returns
+a configured route factory without changing the default `route` factory.
 
 ```ts
-const api = router(routes, {
+const apiRoute = route.with({
 	pathPrefix: "/api",
-	commonHeaders: {
+	headers: z.object({
 		"x-request-id": z.string().optional(),
-	},
-	commonResponses: {
+	}),
+	responses: {
 		401: z.object({ code: z.literal("UNAUTHORIZED") }),
 	},
 });
+
+const api = {
+	todos: {
+		get: apiRoute
+			.get("/todos/:id")
+			.params(z.object({ id: z.string() }))
+			.response(200, todoSchema),
+	},
+};
 ```
 
 Declare the same fields on a route when only that route needs them.
 
 ```ts
-get: {
-	method: "GET",
-	path: "/api/todos/:id",
-	headers: {
-		"x-request-id": z.string().optional(),
-	},
-	responses: {
-		200: todoSchema,
-		401: z.object({ code: z.literal("UNAUTHORIZED") }),
-	},
-}
+get: route
+	.get("/api/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.headers(z.object({ "x-request-id": z.string().optional() }))
+	.response(200, todoSchema)
+	.response(401, z.object({ code: z.literal("UNAUTHORIZED") })),
 ```
 
 ## Custom Bodies
@@ -195,15 +185,13 @@ Custom content types stay explicit even when request keys are flattened. The
 contract needs to know the full body payload and content type boundary.
 
 ```ts
-csv: {
-	method: "POST",
-	path: "/imports.csv",
-	body: customBody({
+csv: route
+	.post("/imports.csv")
+	.customBody({
 		contentType: "text/csv",
 		schema: z.string(),
-	}),
-	response: z.object({ imported: z.number() }),
-}
+	})
+	.response(201, z.object({ imported: z.number() })),
 ```
 
 ```ts
@@ -234,21 +222,19 @@ await client.todos.list.fetch({
 });
 ```
 
-`jsonQuery()` is intentionally explicit because the whole JSON value is
+`.jsonQuery()` is intentionally explicit because the whole JSON value is
 transported as one query parameter named `query`.
 
 ```ts
-search: {
-	method: "GET",
-	path: "/search",
-	query: jsonQuery(
+search: route
+	.get("/search")
+	.jsonQuery(
 		z.object({
 			page: z.number(),
 			filters: z.object({ tags: z.array(z.string()) }),
 		}),
-	),
-	response: searchResultsSchema,
-}
+	)
+	.response(200, searchResultsSchema),
 ```
 
 ```ts
@@ -274,56 +260,33 @@ await client.search.fetch({
 
 ## Response Declarations
 
-Use `response` when a route has one successful response body. The success status
-is inferred from the HTTP method.
+Call `.response(status, schema)` for every response body the route declares.
 
 ```ts
-create: {
-	method: "POST",
-	path: "/todos",
-	body: z.object({ title: z.string() }),
-	response: todoSchema,
-}
+create: route
+	.post("/todos")
+	.body(z.object({ title: z.string() }))
+	.response(201, todoSchema),
 ```
 
-That route has a `201` response. For non-`POST` methods, `response` uses `200`.
-
-Use `responses` when the status map is part of the contract.
+The explicit status stays visible beside its schema. Chain another `.response()`
+when the status union is part of the contract.
 
 ```ts
-get: {
-	method: "GET",
-	path: "/todos/:id",
-	responses: {
-		200: todoSchema,
-		404: z.object({ code: z.literal("TODO_NOT_FOUND") }),
-	},
-}
+get: route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.response(200, todoSchema)
+	.response(404, z.object({ code: z.literal("TODO_NOT_FOUND") })),
 ```
 
-Omit both `response` and `responses` when the route returns no body and the
-default status is enough.
+Call `.response(status)` without a schema to declare a response without a body.
 
 ```ts
-remove: {
-	method: "DELETE",
-	path: "/todos/:id",
-}
-```
-
-That route has a `204` no-body response. For omitted responses, `POST` uses
-`201` and other methods use `200`.
-
-Use `responses` with `noBody()` when you want the status to be explicit.
-
-```ts
-remove: {
-	method: "DELETE",
-	path: "/todos/:id",
-	responses: {
-		204: noBody(),
-	},
-}
+remove: route
+	.delete("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.response(204),
 ```
 
 ## Handler Returns
@@ -396,27 +359,20 @@ if (response.status === 404) {
 
 ## Empty Bodies
 
-Omitting `body` declares a request without a body.
+Omitting a body setter declares a request without a body.
 
 ```ts
-list: {
-	method: "GET",
-	path: "/todos",
-	response: z.array(todoSchema),
-}
+list: route.get("/todos").response(200, z.array(todoSchema)),
 ```
 
-Use `noBody()` when you want that intent to be explicit.
+For a no-body request, do not call a body setter. The response status remains
+explicit.
 
 ```ts
-remove: {
-	method: "DELETE",
-	path: "/todos/:id",
-	body: noBody(),
-	responses: {
-		204: noBody(),
-	},
-}
+remove: route
+	.delete("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.response(204),
 ```
 
 ## Headers
@@ -593,73 +549,47 @@ const todos = useInfiniteQuery(
 
 ## WebSocket Messages
 
-WebSocket message declarations accept any schema. Use a plain schema when the
-message shape is simple or when your schema library already gives you the union
-shape you want.
+WebSocket message declarations use a fixed `type` discriminator and wrap each
+payload in a `message` field.
 
 ```ts
-chat: {
-	method: "GET",
-	path: "/rooms/:roomId",
-	mode: "webSocket",
-	messages: {
-		client: z.discriminatedUnion("action", [
-			z.object({
-				action: z.literal("typing"),
-				roomId: z.string(),
-			}),
-			z.object({
-				action: z.literal("send"),
-				text: z.string().min(1),
-			}),
-		]),
-		server: z.object({
-			connected: z.boolean(),
-		}),
-	},
-}
+chat: route
+	.ws("/rooms/:roomId")
+	.params(z.object({ roomId: z.string() }))
+	.clientMessage("typing", z.object({ roomId: z.string() }))
+	.clientMessage("send", z.object({ text: z.string().min(1) }))
+	.serverMessage("connected", z.object({ connected: z.boolean() })),
 ```
 
 ```ts
 socket.send({
-	action: "send",
-	text: "Hello from rest-rpc",
+	type: "send",
+	message: { text: "Hello from rest-rpc" },
 });
 ```
 
-Use `webSocketMessages()` when you want rest-rpc to build a discriminated
-message envelope from a map of payload schemas.
+Add each message type with `.clientMessage()` or `.serverMessage()`. The builder
+keeps the direction visible and rejects duplicate message types.
 
 ```ts
-chat: {
-	method: "GET",
-	path: "/rooms/:roomId",
-	mode: "webSocket",
-	messages: {
-		client: webSocketMessages("action", {
-			typing: z.object({
-				roomId: z.string(),
-			}),
-			send: z.object({
-				text: z.string().min(1),
-			}),
+chat: route
+	.ws("/rooms/:roomId")
+	.params(z.object({ roomId: z.string() }))
+	.clientMessage("typing", z.object({ roomId: z.string() }))
+	.clientMessage("send", z.object({ text: z.string().min(1) }))
+	.serverMessage("connected", z.object({ memberCount: z.number() }))
+	.serverMessage(
+		"message",
+		z.object({
+			text: z.string(),
+			sentAt: z.string(),
 		}),
-		server: webSocketMessages("type", {
-			connected: z.object({
-				memberCount: z.number(),
-			}),
-			message: z.object({
-				text: z.string(),
-				sentAt: z.string(),
-			}),
-		}),
-	},
-}
+	),
 ```
 
 ```ts
 socket.send({
-	action: "send",
+	type: "send",
 	message: {
 		text: "Hello from rest-rpc",
 	},

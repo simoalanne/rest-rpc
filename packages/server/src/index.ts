@@ -49,6 +49,7 @@ export type {
 	RouteSent,
 	RouteSocket,
 	RouteSseSent,
+	ServerHttpRouteDeclaration,
 	SseRouteHandlerContext,
 	WebSocketRouteHandlerContext,
 } from "./router.ts";

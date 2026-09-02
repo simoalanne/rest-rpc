@@ -1,4 +1,4 @@
-import { router, stream } from "@rest-rpc/core/contract";
+import { route } from "@rest-rpc/core";
 import z from "zod";
 
 const projectSchema = z.object({
@@ -12,102 +12,82 @@ const projectEventSchema = z.object({
 	event: z.enum(["created", "renamed"]),
 });
 
-export const tanstackQueryContract = router({
+export const tanstackQueryContract = {
 	projects: {
-		list: {
-			method: "GET",
-			path: "/projects",
-			responses: {
-				200: z.object({
-					projects: z.array(projectSchema),
-					version: z.number(),
-				}),
-			},
-		},
-		get: {
-			method: "GET",
-			path: "/projects/:id",
-			pathParams: z.object({ id: z.string() }),
-			responses: {
-				200: projectSchema,
-				404: z.object({
+		list: route.get("/projects").response(
+			200,
+			z.object({
+				projects: z.array(projectSchema),
+				version: z.number(),
+			}),
+		),
+		get: route
+			.get("/projects/:id")
+			.params(z.object({ id: z.string() }))
+			.response(200, projectSchema)
+			.response(
+				404,
+				z.object({
 					code: z.literal("not_found"),
 					id: z.string(),
 				}),
-			},
-		},
-		search: {
-			method: "GET",
-			path: "/project-search",
-			query: z.object({
-				q: z.string().optional(),
-				status: z.enum(["active", "archived"]).optional(),
-			}),
-			responses: {
-				200: z.object({
+			),
+		search: route
+			.get("/project-search")
+			.query(
+				z.object({
+					q: z.string().optional(),
+					status: z.enum(["active", "archived"]).optional(),
+				}),
+			)
+			.response(
+				200,
+				z.object({
 					projects: z.array(projectSchema),
 				}),
-			},
-		},
-		create: {
-			method: "POST",
-			path: "/projects",
-			headers: {
-				"x-test-tenant": z.string().optional(),
-			},
-			body: z.object({
-				name: z.string(),
-				status: z.enum(["active", "archived"]).optional(),
-			}),
-			responses: {
-				201: projectSchema.extend({
-					tenant: z.string().optional(),
-				}),
-			},
-		},
-		rename: {
-			method: "PATCH",
-			path: "/projects/:id",
-			pathParams: z.object({ id: z.string() }),
-			body: z.object({ name: z.string() }),
-			responses: {
-				200: projectSchema,
-				409: z.object({
-					code: z.literal("name_conflict"),
+			),
+		create: route
+			.post("/projects")
+			.headers(z.object({ "x-test-tenant": z.string().optional() }))
+			.body(
+				z.object({
 					name: z.string(),
+					status: z.enum(["active", "archived"]).optional(),
 				}),
-			},
-		},
-		page: {
-			method: "GET",
-			path: "/project-page",
-			query: z.object({
-				cursor: z.string().optional(),
-				limit: z.coerce.number(),
-			}),
-			responses: {
-				200: z.object({
+			)
+			.response(201, projectSchema.extend({ tenant: z.string().optional() })),
+		rename: route
+			.patch("/projects/:id")
+			.params(z.object({ id: z.string() }))
+			.body(z.object({ name: z.string() }))
+			.response(200, projectSchema)
+			.response(
+				409,
+				z.object({ code: z.literal("name_conflict"), name: z.string() }),
+			),
+		page: route
+			.get("/project-page")
+			.query(
+				z.object({
+					cursor: z.string().optional(),
+					limit: z.coerce.number<number>(),
+				}),
+			)
+			.response(
+				200,
+				z.object({
 					projects: z.array(projectSchema),
 					nextCursor: z.string().optional(),
 				}),
-			},
-		},
-		slow: {
-			method: "GET",
-			path: "/slow-projects/:id",
-			pathParams: z.object({ id: z.string() }),
-			responses: {
-				200: projectSchema,
-			},
-		},
-		events: {
-			method: "GET",
-			path: "/project-events",
-			responses: {
-				200: stream(projectEventSchema),
-			},
-		},
+			),
+		slow: route
+			.get("/slow-projects/:id")
+			.params(z.object({ id: z.string() }))
+			.response(200, projectSchema),
+		events: route
+			.get("/project-events")
+			.streamResponse(200, projectEventSchema),
 	},
-});
+} as const;
 
 export type TanstackQueryContract = typeof tanstackQueryContract;

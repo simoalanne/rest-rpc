@@ -8,38 +8,39 @@ description: Use rest-rpc with WebSockets
 ### Contract
 
 ```ts
-export const api = router({
+export const api = {
 	chat: {
-		room: {
-			method: "GET",
-			path: "/rooms/:roomId",
-			mode: "webSocket",
-			pathParams: z.object({
-				roomId: z.string().min(1),
-			}),
-			query: z.object({
-				name: z.string().min(1),
-			}),
-			messages: {
-				client: z.object({
-					text: z.string().min(1),
+		room: route
+			.ws("/rooms/:roomId")
+			.params(
+				z.object({
+					roomId: z.string().min(1),
 				}),
-				server: webSocketMessages("type", {
-					joined: z.object({
-						roomId: z.string(),
-						name: z.string(),
-					}),
-					message: z.object({
-						roomId: z.string(),
-						name: z.string(),
-						text: z.string(),
-						sentAt: z.string(),
-					}),
+			)
+			.query(
+				z.object({
+					name: z.string().min(1),
 				}),
-			},
-		},
+			)
+			.clientMessage("send", z.object({ text: z.string().min(1) }))
+			.serverMessage(
+				"joined",
+				z.object({
+					roomId: z.string(),
+					name: z.string(),
+				}),
+			)
+			.serverMessage(
+				"message",
+				z.object({
+					roomId: z.string(),
+					name: z.string(),
+					text: z.string(),
+					sentAt: z.string(),
+				}),
+			),
 	},
-});
+};
 ```
 
 ### Server
@@ -58,13 +59,13 @@ export const routes = router(api, {
 				message: { roomId, name },
 			});
 
-			context.socket.onMessage((message) => {
+			context.socket.onMessage((event) => {
 				broadcastToRoom(roomId, {
 					type: "message",
 					message: {
 						roomId,
 						name,
-						text: message.text,
+						text: event.message.text,
 						sentAt: new Date().toISOString(),
 					},
 				});
@@ -97,7 +98,10 @@ socket.onMessage((message) => {
 });
 
 socket.send({
-	text: "Hello from rest-rpc",
+	type: "send",
+	message: {
+		text: "Hello from rest-rpc",
+	},
 });
 ```
 

@@ -120,9 +120,6 @@ const declaredResponseMetadata = (
 	return {};
 };
 
-const readHeaderValue = (headers: Headers, name: string) =>
-	headers.get(name) ?? undefined;
-
 const readDeclaredHeaders = async (
 	schema: ResponseDeclaration,
 	rawResponse: Response,
@@ -131,42 +128,34 @@ const readDeclaredHeaders = async (
 	const headers = getResponseHeaders(schema);
 	if (!headers) return {};
 
-	const responseHeaders: Record<string, unknown> = {};
-	for (const [name, headerSchema] of Object.entries(headers)) {
-		const value = readHeaderValue(rawResponse.headers, name);
-		if (!validate) {
-			if (value !== undefined) responseHeaders[name] = value;
-			continue;
-		}
+	const rawHeaders = Object.fromEntries(rawResponse.headers.entries());
+	if (!validate) return { responseHeaders: rawHeaders };
 
-		const result = await validateStandardSchema(headerSchema, value);
-		if (result.issues) throw result.issues;
-		if (result.value !== undefined) responseHeaders[name] = result.value;
-	}
-
-	return { responseHeaders };
+	const result = await validateStandardSchema(headers, rawHeaders);
+	if (result.issues) throw result.issues;
+	return { responseHeaders: result.value };
 };
 
 export type RouteRequestFn = <E extends RouteDeclaration>(
 	route: E,
+	routePath: readonly string[],
 	...args: FetchArgs<E>
 ) => Promise<Response>;
 
 export const fetchResponse = async <E extends RouteDeclaration>(
 	request: RouteRequestFn,
 	validateResponse: boolean,
-	strictStatusCodes: boolean,
 	route: E,
+	routePath: readonly string[],
 	...args: FetchArgs<E>
 ): Promise<ClientResponse<E>> => {
-	const rawResponse = await request(route, ...args);
+	const rawResponse = await request(route, routePath, ...args);
 
 	const schema = getResponseSchema(route, rawResponse.status);
 	if (!schema) {
-		if (strictStatusCodes) {
+		if (route.strictStatusCodes === true) {
 			throw new Error("Request did not return a declared response");
 		}
-
 		return {
 			declared: false,
 			status: rawResponse.status,
@@ -192,12 +181,14 @@ export const fetchResponse = async <E extends RouteDeclaration>(
 export const fetchSuccess = async <E extends RouteDeclaration>(
 	fetchRouteResponse: (
 		route: E,
+		routePath: readonly string[],
 		...args: FetchArgs<E>
 	) => Promise<ClientResponse<E>>,
 	route: E,
+	routePath: readonly string[],
 	...args: FetchArgs<E>
 ): Promise<ClientResponseBody<E>> => {
-	const response = await fetchRouteResponse(route, ...args);
+	const response = await fetchRouteResponse(route, routePath, ...args);
 
 	if (!response.declared || !isSuccessStatus(response.status)) {
 		throw new Error("Request did not return a declared success response");

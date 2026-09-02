@@ -1,0 +1,14 @@
+{
+	"name": "declaration-types",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"typecheck": "tsc -p tsconfig.json",
+		"generate:large-contract": "node scripts/generate-large-contract.mjs",
+		"find:object-limit": "node scripts/find-object-limit.mjs",
+		"find:route-limit": "node scripts/find-route-limit.mjs"
+	},
+	"dependencies": {
+		"@rest-rpc/core": "workspace:*"
+	}
+}

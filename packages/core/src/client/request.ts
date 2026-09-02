@@ -10,8 +10,8 @@ import { isJsonQuery } from "../contract/request.ts";
 import type {
 	FlatRequestInput,
 	GroupedRequestInput,
-} from "../contract/validate.ts";
-import { groupRequestInput } from "../contract/validate.ts";
+} from "./groupRequestInput.ts";
+import { groupRequestInput } from "./groupRequestInput.ts";
 import { getNextFetchTags } from "./nextFetchTags.ts";
 import type {
 	ApiClientFetchOptions,
@@ -40,13 +40,14 @@ export const createRequestSignal = (
 };
 
 export const takesRequestInput = (route: RouteDeclaration) => {
-	if (route.query || route.pathParams || route.headers) {
+	const request = route.request;
+	if (request?.query || request?.params || request?.headers) {
 		return true;
 	}
-	if (isFormBody(route.body)) return true;
-	if (isMultipartBody(route.body)) return true;
-	if (isCustomBody(route.body)) return true;
-	return Boolean(route.body && !isNoBody(route.body));
+	if (isFormBody(request?.body)) return true;
+	if (isMultipartBody(request?.body)) return true;
+	if (isCustomBody(request?.body)) return true;
+	return Boolean(request?.body && !isNoBody(request.body));
 };
 
 const findHeader = (headers: Record<string, string>, name: string) =>
@@ -79,34 +80,19 @@ export const serializeCustomBody = (body: unknown, contentType: string) =>
 		? JSON.stringify(body)
 		: (body as BodyInit | null | undefined);
 
-const isSerializablePrimitive = (value: unknown) =>
-	typeof value === "string" ||
-	typeof value === "boolean" ||
-	(typeof value === "number" && Number.isFinite(value));
-
-const stringifyRequestValue = (
-	route: RouteDeclaration,
-	segment: "body" | "pathParams" | "query" | "headers",
-	key: string,
-	value: unknown,
-	optional = false,
-) => {
-	if (value === undefined && optional) return undefined;
-	if (isSerializablePrimitive(value)) return String(value);
-
-	throw new Error(
-		`Invalid ${segment} key "${key}" for ${route.method} ${route.path}. Expected string, number, or boolean.`,
-	);
-};
-
 const serializeFormBody = (
 	route: RouteDeclaration,
 	body: Record<string, unknown> | undefined,
 ) => {
-	const arrayKeys = new Set(isFormBody(route.body) ? route.body.arrayKeys : []);
+	const routeBody = route.request?.body;
+	const arrayKeys = new Set(isFormBody(routeBody) ? routeBody.arrayKeys : []);
+	const formBody =
+		route.request?.flattenKeys === false
+			? body
+			: ((body?.body as Record<string, unknown> | undefined) ?? body);
 
 	return new URLSearchParams(
-		Object.entries(body ?? {}).flatMap(([key, value]) => {
+		Object.entries(formBody ?? {}).flatMap(([key, value]) => {
 			if (Array.isArray(value)) {
 				if (!arrayKeys.has(key)) {
 					throw new Error(
@@ -114,25 +100,10 @@ const serializeFormBody = (
 					);
 				}
 
-				return value.map((item) => {
-					const stringValue = stringifyRequestValue(route, "body", key, item);
-					if (stringValue === undefined) {
-						throw new Error(
-							`Invalid body key "${key}" for ${route.method} ${route.path}. Expected string, number, boolean, or an array for a declared form array key.`,
-						);
-					}
-					return [key, stringValue];
-				});
+				return value.map((item) => [key, String(item)]);
 			}
 
-			const stringValue = stringifyRequestValue(
-				route,
-				"body",
-				key,
-				value,
-				true,
-			);
-			return stringValue === undefined ? [] : [[key, stringValue]];
+			return value === undefined ? [] : [[key, String(value)]];
 		}),
 	);
 };
@@ -140,31 +111,26 @@ const serializeFormBody = (
 const isMultipartFileValue = (value: unknown): value is Blob =>
 	typeof Blob !== "undefined" && value instanceof Blob;
 
-const stringifyMultipartValue = (
-	route: RouteDeclaration,
-	key: string,
-	value: unknown,
-	optional = false,
-) => {
-	if (value === undefined && optional) return undefined;
+const stringifyMultipartValue = (value: unknown) => {
 	if (isMultipartFileValue(value)) return value;
-	if (isSerializablePrimitive(value)) return String(value);
-
-	throw new Error(
-		`Invalid body key "${key}" for ${route.method} ${route.path}. Expected string, number, boolean, Blob, File, or an array for a declared multipart array key.`,
-	);
+	return String(value);
 };
 
 const serializeMultipartBody = (
 	route: RouteDeclaration,
 	body: Record<string, unknown> | undefined,
 ) => {
+	const routeBody = route.request?.body;
 	const arrayKeys = new Set(
-		isMultipartBody(route.body) ? route.body.arrayKeys : [],
+		isMultipartBody(routeBody) ? routeBody.arrayKeys : [],
 	);
+	const multipartBody =
+		route.request?.flattenKeys === false
+			? body
+			: ((body?.body as Record<string, unknown> | undefined) ?? body);
 	const formData = new FormData();
 
-	for (const [key, value] of Object.entries(body ?? {})) {
+	for (const [key, value] of Object.entries(multipartBody ?? {})) {
 		if (Array.isArray(value)) {
 			if (!arrayKeys.has(key)) {
 				throw new Error(
@@ -173,19 +139,14 @@ const serializeMultipartBody = (
 			}
 
 			for (const item of value) {
-				const formValue = stringifyMultipartValue(route, key, item);
-				if (formValue === undefined) {
-					throw new Error(
-						`Invalid body key "${key}" for ${route.method} ${route.path}. Expected string, number, boolean, Blob, File, or an array for a declared multipart array key.`,
-					);
-				}
-				formData.append(key, formValue);
+				formData.append(key, stringifyMultipartValue(item));
 			}
 			continue;
 		}
 
-		const formValue = stringifyMultipartValue(route, key, value, true);
-		if (formValue !== undefined) formData.append(key, formValue);
+		if (value !== undefined) {
+			formData.append(key, stringifyMultipartValue(value));
+		}
 	}
 
 	return formData;
@@ -197,61 +158,52 @@ const stringifyHeaders = (
 ) =>
 	Object.fromEntries(
 		Object.entries(headers ?? {}).flatMap(([key, value]) => {
-			const stringValue = stringifyRequestValue(
-				route,
-				"headers",
-				key,
-				value,
-				true,
-			);
+			const stringValue = value === undefined ? undefined : String(value);
 			return stringValue === undefined ? [] : [[key, stringValue]];
 		}),
 	);
 
 const serializeParams = (
 	route: RouteDeclaration,
-	pathParams: Record<string, unknown> | undefined,
+	params: Record<string, unknown> | undefined,
 ) => {
 	return replacePathParams(route.path, (key) => {
-		const value = stringifyRequestValue(
-			route,
-			"pathParams",
-			key,
-			pathParams?.[key],
-		);
+		const value = params?.[key];
 		if (value === undefined) {
 			throw new Error(
-				`Invalid pathParams key "${key}" for ${route.method} ${route.path}. Expected string, number, or boolean.`,
+				`Missing path param "${key}" for ${route.method} ${route.path}.`,
 			);
 		}
-		return encodeURIComponent(value);
+		return encodeURIComponent(String(value));
 	});
 };
 
 const serializeQuery = (route: RouteDeclaration, query: unknown) => {
-	if (isJsonQuery(route.query)) {
-		if (query === undefined) return "";
-		let encoded: string;
-		try {
-			const json = JSON.stringify(query);
-			if (json === undefined) return "";
-			encoded = json;
-		} catch (error) {
-			throw new Error(
-				`Invalid JSON query for ${route.method} ${route.path}. Expected a JSON-serializable value.`,
-				{ cause: error },
-			);
-		}
-		return `?${new URLSearchParams([["query", encoded]]).toString()}`;
-	}
-
 	const entries = Object.entries(query ?? {}).flatMap(([key, value]) => {
-		const stringValue = stringifyRequestValue(route, "query", key, value, true);
+		const stringValue = isJsonQuery(route.request?.query)
+			? stringifyJsonQueryValue(route, value)
+			: value === undefined
+				? undefined
+				: String(value);
 		return stringValue === undefined ? [] : [[key, stringValue]];
 	});
 
 	const search = new URLSearchParams(entries).toString();
 	return search ? `?${search}` : "";
+};
+
+const stringifyJsonQueryValue = (route: RouteDeclaration, value: unknown) => {
+	if (value === undefined) return undefined;
+	try {
+		const json = JSON.stringify(value);
+		if (json === undefined) return undefined;
+		return json;
+	} catch (error) {
+		throw new Error(
+			`Invalid JSON query for ${route.method} ${route.path}. Expected a JSON-serializable value.`,
+			{ cause: error },
+		);
+	}
 };
 
 export const constructBaseRequest = (
@@ -269,14 +221,15 @@ export const constructBaseRequest = (
 	if (!args) return { url: urlBase };
 
 	const request =
-		route.flattenRequestKeys === false
+		route.request?.flattenKeys === false
 			? (args as GroupedRequestInput)
 			: groupRequestInput(route, args, { strictRequestKeys });
-	const { body, query, pathParams, headers } = request;
+	const { body, query, params, headers } = request;
+	const routeBody = route.request?.body;
 
-	urlBase = `${baseUrl}${serializeParams(route, pathParams)}${serializeQuery(route, query)}`;
+	urlBase = `${baseUrl}${serializeParams(route, params)}${serializeQuery(route, query)}`;
 
-	if (isFormBody(route.body)) {
+	if (isFormBody(routeBody)) {
 		return {
 			url: urlBase,
 			body: serializeFormBody(
@@ -287,7 +240,7 @@ export const constructBaseRequest = (
 		};
 	}
 
-	if (isMultipartBody(route.body)) {
+	if (isMultipartBody(routeBody)) {
 		return {
 			url: urlBase,
 			body: serializeMultipartBody(
@@ -298,12 +251,13 @@ export const constructBaseRequest = (
 		};
 	}
 
-	if (isCustomBody(route.body)) {
-		const { contentType, payload } = Array.isArray(route.body.contentType)
-			? (body as { contentType: string; payload: unknown })
+	if (isCustomBody(routeBody)) {
+		const bodyPayload = (body as Record<string, unknown> | undefined)?.body;
+		const { contentType, payload } = Array.isArray(routeBody.contentType)
+			? (bodyPayload as { contentType: string; payload: unknown })
 			: {
-					contentType: route.body.contentType as string | undefined,
-					payload: body,
+					contentType: routeBody.contentType as string | undefined,
+					payload: bodyPayload,
 				};
 
 		return {
@@ -348,6 +302,7 @@ export type ExecuteRequestOptions = {
 const addNextFetchTags = (
 	init: RequestInit,
 	route: RouteDeclaration,
+	routePath: readonly string[],
 	request: FlatRequestInput | undefined,
 	options: NextFetchTagsOptions | undefined,
 ) => {
@@ -366,7 +321,7 @@ const addNextFetchTags = (
 			...nextInit.next,
 			tags: [
 				...(nextInit.next?.tags ?? []),
-				...getNextFetchTags(route, request, {
+				...getNextFetchTags(route, routePath, request, {
 					tagPrefix: options.tagPrefix,
 				}),
 			],
@@ -376,6 +331,7 @@ const addNextFetchTags = (
 
 export const executeRequest = async <E extends RouteDeclaration>(
 	route: E,
+	routePath: readonly string[],
 	args: FetchArgs<E>,
 	options: ExecuteRequestOptions,
 ): Promise<Response> => {
@@ -414,6 +370,7 @@ export const executeRequest = async <E extends RouteDeclaration>(
 				signal: signalState?.signal ?? fetchOptions?.signal,
 			},
 			route,
+			routePath,
 			requestArgs,
 			options.nextFetchTags,
 		);

@@ -1,4 +1,4 @@
-import { router as defineRouter, noBody } from "@rest-rpc/core/contract";
+import { route as coreRoute } from "@rest-rpc/core";
 import { type as schemaType } from "@rest-rpc/core/standard-schema";
 import {
 	createRouteHandler,
@@ -12,27 +12,15 @@ import { expectAssignable, expectType } from "tsd";
 
 const todoSchema = schemaType<{ id: string }>();
 
-const api = defineRouter({
+const api = {
 	todos: {
-		get: {
-			method: "GET",
-			path: "/todos/:id",
-			pathParams: {
-				id: schemaType<string>(),
-			},
-			responses: {
-				200: todoSchema,
-			},
-		},
+		get: coreRoute
+			.get("/todos/:id")
+			.params(schemaType<{ id: string }>())
+			.response(200, todoSchema),
 	},
-	health: {
-		method: "GET",
-		path: "/health",
-		responses: {
-			204: noBody(),
-		},
-	},
-});
+	health: coreRoute.get("/health").response(204),
+} as const;
 
 const middleware: NextRouteMiddleware<{ userId: string }> = ({ request }) => {
 	expectType<string>(request.nextUrl.pathname);

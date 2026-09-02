@@ -16,14 +16,73 @@ Keep the architecture contract-first:
 - Preserve explicit HTTP semantics: method, path, params, query, headers, body, responses, status codes, content types, and metadata.
 - Derive server handlers, fetch clients, TanStack Query helpers, OpenAPI, and WebSocket helpers from the same contract.
 - Avoid duplicated client/server types when the contract can infer them.
-- Use `router` and `route` for contract declaration instead of untyped object literals.
-- Keep contracts modular, then compose routers where the full API surface is needed.
+- Declare contracts with the fluent `route` builder instead of untyped route
+  object literals.
+- Keep contracts modular, then compose contract objects where the full API
+  surface is needed.
 - Use Standard Schema-compatible validators such as Zod, Valibot, or ArkType when runtime validation is needed.
 - Use the built-in type-only schema helper when runtime validation is unnecessary.
 
 ## Library Philosophy
 
-`rest-rpc` is a type-safe bridge between an application's existing HTTP architecture and its shared API contract. It does not replace framework architecture: keep using the framework's routing, modules, plugins, middleware, dependency injection, auth, and deployment conventions. Use `rest-rpc` explicitly where it preserves the contract-to-runtime type link. Prefer its helpers over partial or ad-hoc usage when they provide type safety: core/server adapter `router` and `route`, `registerRoutes`, `createRouteHandler`, typed clients such as `fetch` and `fetchResponse`, TanStack Query `queryOptions`, streaming helpers such as `openConnection`, and exported helper types. At runtime much of the code may still be ordinary objects and functions; the value is that those objects and functions remain checked against the shared contract and the TypeScript type system.
+`rest-rpc` is a type-safe bridge between an application's existing HTTP architecture and its shared API contract. It does not replace framework architecture: keep using the framework's routing, modules, plugins, middleware, dependency injection, auth, and deployment conventions. Use `rest-rpc` explicitly where it preserves the contract-to-runtime type link. Prefer its helpers over partial or ad-hoc usage when they provide type safety: the core fluent `route` builder for declaration, server adapter `router` and `route` for implementations, `registerRoutes`, `createRouteHandler` for framework registration, `fetch` and `fetchResponse` for typed fetch API calls etc.
+
+## Minimal Example
+
+Contract declaration:
+
+```ts
+import { route } from "@rest-rpc/core";
+import { z } from "zod";
+
+const todo = z.object({ id: z.string(), title: z.string() });
+
+// reusable route factory with shared options applying to all routes using it
+const baseRoute = route.with({
+	pathPrefix: "/api",
+});
+
+export const api = {
+	todos: {
+		getById: baseRoute
+			.get("/todos/:id")
+			.params(z.object({ id: z.string() }))
+			.response(200, todo)
+			.response(404),
+	},
+};
+```
+
+Server implementation:
+
+```ts
+// router and registerRoutes are exported from the server adapter package matching the framework, e.g. @rest-rpc/express
+import { router, registerRoutes } from "@rest-rpc/express";
+import { api } from "./contract";
+
+const routes = router(api, {
+	todos: {
+		getById({ id }) {
+			return getTodo(id);
+		},
+	},
+});
+
+registerRoutes(app, routes, options);
+```
+
+Client usage:
+
+```ts
+import { initClient } from "@rest-rpc/core";
+import { api } from "./contract";
+
+const client = initClient(api, { baseUrl: "https://api.example.com" });
+// returns the 200 response body type, or throws on 404 or other errors
+const todoBody = await client.todos.getById.fetch({ id: "todo_1" });
+// returns a response envelope discriminated by status code, or throws on network errors
+const todoResponse = await client.todos.getById.fetchResponse({ id: "todo_1" });
+```
 
 ## Packages
 
@@ -90,8 +149,9 @@ For implementation tasks:
 3. Install missing `rest-rpc` packages with the detected package manager.
 4. Put shared contracts somewhere both server and client can import: a workspace package, shared app module, or app-local shared directory.
 5. Use the server adapter that matches the project framework. Prefer normal framework organization such as Express routers, Fastify plugins, Hono route modules, NestJS modules, or framework catch-all routes.
-6. Use adapter `router` and `route` for server implementation, and contract `router` and `route` for API declaration; they are related but not interchangeable.
-7. Use `registerRoutes` when registering with a framework router. Use `createRouteHandler` when a runtime needs a custom matcher or catch-all handler.
-8. Register routes in multiple modules when useful; neither contracts nor handlers need to be monolithic.
-9. Use typed client helpers for direct calls. Use `@rest-rpc/tanstack-query` for query/mutation options and keys when the app already uses TanStack Query.
-10. Let types infer from the contract. If inference is not enough, prefer exported helper types over new ad-hoc types.
+6. Declare the contract with the core fluent `route` builder.
+7. Use the server adapter's `router` and `route` helpers to implement that contract. server adapter's `route` is not the same as the core `route`.
+8. Use `registerRoutes` when registering with a framework router. Use `createRouteHandler` when a runtime needs a custom matcher or catch-all handler.
+9. Register routes in multiple modules when useful; neither contracts nor handlers need to be monolithic.
+10. Use typed client helpers for direct calls. Use `@rest-rpc/tanstack-query` for query/mutation options and keys when the app already uses TanStack Query.
+11. Let types infer from the contract. If inference is not enough, prefer exported helper types over new ad-hoc types.

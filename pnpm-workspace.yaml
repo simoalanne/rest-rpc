@@ -4,3 +4,4 @@ packages:
   - "content/"
   - "integration-tests/"
   - "hover-types/"
+  - "declaration-types/"

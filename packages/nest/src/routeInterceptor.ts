@@ -4,12 +4,12 @@ import {
 	Injectable,
 	type NestInterceptor,
 } from "@nestjs/common";
-import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	handleHttpRoute,
 	handleHttpRouteResult,
 	isHttpRouteImplementation,
 	type RouteImplementation,
+	type ServerHttpRouteDeclaration,
 } from "@rest-rpc/server";
 import type { Observable } from "rxjs";
 import { from, lastValueFrom } from "rxjs";
@@ -26,15 +26,16 @@ type NestRouteImplementationContext = {
 
 const assertRouteImplementation = (
 	value: unknown,
-	route: HttpRouteDeclaration,
-): RouteImplementation<HttpRouteDeclaration> => {
+	route: ServerHttpRouteDeclaration,
+): RouteImplementation<ServerHttpRouteDeclaration> => {
 	if (!isHttpRouteImplementation(value as RouteImplementation)) {
 		throw new Error(
 			`Controller method for "${route.method} ${route.path}" must return a rest-rpc route implementation.`,
 		);
 	}
 
-	const implementation = value as RouteImplementation<HttpRouteDeclaration>;
+	const implementation =
+		value as RouteImplementation<ServerHttpRouteDeclaration>;
 	if (
 		implementation.route.method !== route.method ||
 		implementation.route.path !== route.path
@@ -92,7 +93,7 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 				request: {
 					body: req.body,
 					query: req.query,
-					pathParams: req.params,
+					params: req.params,
 					headers: req.headers,
 				},
 				context: routeContext,

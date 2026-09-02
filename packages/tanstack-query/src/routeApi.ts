@@ -60,8 +60,7 @@ const stripUndefinedFields = (request: unknown) => {
 	);
 };
 
-const getQueryKey = (route: RouteDeclaration, request: unknown) => {
-	const routePath = route.routePath ?? [];
+const getQueryKey = (request: unknown, routePath: string[]) => {
 	const normalizedRequest = stripUndefinedFields(request);
 
 	return normalizedRequest &&
@@ -92,9 +91,10 @@ const isAsyncIterable = (value: unknown): value is AsyncIterable<unknown> =>
 
 export const createRouteApi = (
 	route: RouteDeclaration,
+	routePath: string[],
 	fetchResponse: FetchResponse,
 ): RouteApi => {
-	const getKey = (request?: unknown) => getQueryKey(route, request);
+	const getKey = (request?: unknown) => getQueryKey(request, routePath);
 
 	return {
 		mutationOptions: (options) => {

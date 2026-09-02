@@ -1,5 +1,5 @@
 import type {
-	HttpRouteDeclaration,
+	RequestBodySchema,
 	RouteDeclaration,
 } from "@rest-rpc/core/contract";
 import {
@@ -14,11 +14,10 @@ import {
 	handleHttpRoute,
 	type RouteImplementation,
 	type ServerErrorHandlers,
+	type ServerHttpRouteDeclaration,
 } from "@rest-rpc/server";
 import type { Context, Hono, Next } from "hono";
 import type { Env } from "hono/types";
-
-type RequestBodySchema = HttpRouteDeclaration["body"];
 
 /**
  * Input passed to a custom Hono request body parser.
@@ -27,7 +26,7 @@ type RequestBodySchema = HttpRouteDeclaration["body"];
  */
 export type HonoParseBodyInput<TEnv extends Env = Env> = {
 	c: Context<TEnv>;
-	route: HttpRouteDeclaration;
+	route: ServerHttpRouteDeclaration;
 	body: RequestBodySchema;
 };
 
@@ -80,8 +79,8 @@ const defaultParseBody = <TEnv extends Env = Env>({
 
 const parseRequestBody = async <TEnv extends Env = Env>(
 	c: Context<TEnv>,
-	route: HttpRouteDeclaration,
-	body: RequestBodySchema,
+	route: ServerHttpRouteDeclaration,
+	body: RequestBodySchema | undefined,
 	parseBody: HonoParseBody<TEnv>,
 ): Promise<unknown> => {
 	if (!body || isNoBody(body)) return undefined;
@@ -90,7 +89,7 @@ const parseRequestBody = async <TEnv extends Env = Env>(
 
 export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 	app: Hono<TEnv>,
-	routes: RouteImplementation<HttpRouteDeclaration>[],
+	routes: RouteImplementation<ServerHttpRouteDeclaration>[],
 	parseBody: HonoParseBody<TEnv> | undefined = undefined,
 	middleware: ExtendedHonoMiddleware<TEnv>[] = [],
 	errorHandlers?: ServerErrorHandlers<{
@@ -102,9 +101,9 @@ export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 	const parseRequestBodyOption = parseBody ?? defaultParseBody;
 
 	for (const implementation of routes) {
-		const route: HttpRouteDeclaration = implementation.route;
+		const route: ServerHttpRouteDeclaration = implementation.route;
 		const method = route.method.toLowerCase() as Lowercase<
-			HttpRouteDeclaration["method"]
+			ServerHttpRouteDeclaration["method"]
 		>;
 
 		app[method](
@@ -119,7 +118,7 @@ export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 					body = await parseRequestBody(
 						c,
 						route,
-						route.body,
+						route.request?.body,
 						parseRequestBodyOption,
 					);
 				} catch (error) {
@@ -131,7 +130,7 @@ export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 					request: {
 						body,
 						query: c.req.query(),
-						pathParams: c.req.param(),
+						params: c.req.param(),
 						headers: c.req.header(),
 					},
 					context: { c, signal: c.req.raw.signal },

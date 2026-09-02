@@ -1,7 +1,6 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { CustomBody, CustomResponseBody, NoBody, Stream } from "./body.ts";
-import { noBody } from "./body.ts";
-import type { HttpMethod, RouteDeclaration } from "./contract.ts";
+import type { BaseRouteDeclaration } from "./baseRouteDeclaration.ts";
 
 export type ResponseSchema = StandardSchemaV1;
 
@@ -12,11 +11,22 @@ export type ResponseBodySchema =
 	| Stream;
 
 /**
- * Declares typed response headers by header name.
+ * Declares a whole-object schema for typed response headers.
  *
  * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-typed-headers}
  */
-export type ResponseHeaders = Record<string, StandardSchemaV1>;
+export type ResponseHeaders = StandardSchemaV1<
+	unknown,
+	Record<string, string | number | undefined>
+>;
+
+/** Declares a standard-schema response body with optional typed headers. */
+export type RegularResponseDeclaration =
+	| ResponseSchema
+	| {
+			body: ResponseSchema;
+			headers: ResponseHeaders;
+	  };
 
 /**
  * Declares a route response body, or a body plus typed response headers.
@@ -31,12 +41,6 @@ export type ResponseDeclaration =
 	  };
 
 export type RouteResponses = Record<number, ResponseDeclaration>;
-
-export type DefaultBodyResponseStatusForMethod<TMethod extends HttpMethod> =
-	TMethod extends "POST" ? 201 : 200;
-
-export type DefaultNoBodyResponseStatusForMethod<TMethod extends HttpMethod> =
-	TMethod extends "POST" ? 201 : TMethod extends "DELETE" ? 204 : 200;
 
 export type RouteResponseInput =
 	| { responses: RouteResponses; response?: never }
@@ -58,30 +62,6 @@ export const getResponseHeaders = (
 ): ResponseHeaders | undefined =>
 	hasResponseParts(response) ? response.headers : undefined;
 
-export const defaultBodyResponseStatusForMethod = (
-	method: HttpMethod,
-): DefaultBodyResponseStatusForMethod<typeof method> => {
-	switch (method) {
-		case "POST":
-			return 201;
-		default:
-			return 200;
-	}
-};
-
-export const defaultNoBodyResponseStatusForMethod = (
-	method: HttpMethod,
-): DefaultNoBodyResponseStatusForMethod<typeof method> => {
-	switch (method) {
-		case "POST":
-			return 201;
-		case "DELETE":
-			return 204;
-		default:
-			return 200;
-	}
-};
-
 export const getRouteResponses = (route: {
 	path: string;
 	responses?: RouteResponses;
@@ -99,27 +79,6 @@ export const getRouteResponses = (route: {
 	}
 
 	return route.responses;
-};
-
-export const resolveRouteResponses = (route: {
-	method: HttpMethod;
-	path: string;
-	response?: ResponseDeclaration;
-	responses?: RouteResponses;
-}): RouteResponses => {
-	if (route.responses !== undefined) {
-		return route.responses;
-	}
-
-	if (route.response !== undefined) {
-		return {
-			[defaultBodyResponseStatusForMethod(route.method)]: route.response,
-		};
-	}
-
-	return {
-		[defaultNoBodyResponseStatusForMethod(route.method)]: noBody(),
-	};
 };
 
 type InferCustomBodyPayload<
@@ -207,45 +166,13 @@ type ResponseHeadersFor<TResponse> = TResponse extends {
 	? THeaders
 	: never;
 
-type InferHeaderSchema<
-	TSchema,
+type InferResponseHeaders<
+	THeaders,
 	TIO extends "input" | "output",
-> = TSchema extends StandardSchemaV1
+> = THeaders extends StandardSchemaV1
 	? TIO extends "input"
-		? StandardSchemaV1.InferInput<TSchema>
-		: StandardSchemaV1.InferOutput<TSchema>
-	: never;
-
-type ResponseHeaderRequiredKeys<THeaders, TIO extends "input" | "output"> = {
-	[TKey in keyof THeaders]: undefined extends InferHeaderSchema<
-		THeaders[TKey],
-		TIO
-	>
-		? never
-		: TKey;
-}[keyof THeaders];
-
-type ResponseHeaderOptionalKeys<THeaders, TIO extends "input" | "output"> = {
-	[TKey in keyof THeaders]: undefined extends InferHeaderSchema<
-		THeaders[TKey],
-		TIO
-	>
-		? TKey
-		: never;
-}[keyof THeaders];
-
-type ResponseHeaderValues<THeaders, TIO extends "input" | "output"> = {
-	[TKey in ResponseHeaderRequiredKeys<THeaders, TIO>]: InferHeaderSchema<
-		THeaders[TKey],
-		TIO
-	>;
-} & {
-	[TKey in ResponseHeaderOptionalKeys<THeaders, TIO>]?: InferHeaderSchema<
-		THeaders[TKey],
-		TIO
-	>;
-} extends infer THeaderValues
-	? Simplify<THeaderValues>
+		? StandardSchemaV1.InferInput<THeaders>
+		: StandardSchemaV1.InferOutput<THeaders>
 	: never;
 
 type ResponseHeadersMetadata<TResponse, TIO extends "input" | "output"> = [
@@ -253,9 +180,7 @@ type ResponseHeadersMetadata<TResponse, TIO extends "input" | "output"> = [
 ] extends [never]
 	? unknown
 	: {
-			responseHeaders: Simplify<
-				ResponseHeaderValues<ResponseHeadersFor<TResponse>, TIO>
-			>;
+			responseHeaders: InferResponseHeaders<ResponseHeadersFor<TResponse>, TIO>;
 		};
 
 type ResponseEntry<TStatus extends number, TBody> = {
@@ -314,7 +239,7 @@ export type HasMultipleSuccessfulResponses<TResponses> = IsUnion<
 	SuccessfulResponseKeys<TResponses>
 >;
 
-export type DeclaredClientResponse<E extends RouteDeclaration> = E extends {
+export type DeclaredClientResponse<E extends BaseRouteDeclaration> = E extends {
 	responses: infer TResponses;
 }
 	? {
@@ -324,7 +249,7 @@ export type DeclaredClientResponse<E extends RouteDeclaration> = E extends {
 		}[keyof TResponses]
 	: never;
 
-export type ServerResponse<E extends RouteDeclaration> = E extends {
+export type ServerResponse<E extends BaseRouteDeclaration> = E extends {
 	responses: infer TResponses;
 }
 	? {
@@ -334,7 +259,7 @@ export type ServerResponse<E extends RouteDeclaration> = E extends {
 		}[keyof TResponses]
 	: never;
 
-export type SuccessfulDeclaredClientResponse<E extends RouteDeclaration> =
+export type SuccessfulDeclaredClientResponse<E extends BaseRouteDeclaration> =
 	E extends {
 		responses: infer TResponses;
 	}
@@ -347,7 +272,7 @@ export type SuccessfulDeclaredClientResponse<E extends RouteDeclaration> =
 			}[keyof TResponses]
 		: never;
 
-type ServerSuccessResponse<E extends RouteDeclaration> = E extends {
+type ServerSuccessResponse<E extends BaseRouteDeclaration> = E extends {
 	responses: infer TResponses;
 }
 	? {
@@ -377,21 +302,13 @@ type InferSingleServerResponseBody<TResponse> = [TResponse] extends [never]
 				? TBody
 				: never;
 
-type SseResponseDeclaration<E extends RouteDeclaration> = E extends {
-	response: infer TResponse;
+type SseResponseDeclaration<E extends BaseRouteDeclaration> = E extends {
+	responses: { 200: infer TResponse };
 }
 	? TResponse
 	: never;
 
-type InferSseClientResponseBody<E extends RouteDeclaration> = [
-	SseResponseDeclaration<E>,
-] extends [never]
-	? InferSingleResponseBody<SuccessfulDeclaredClientResponse<E>>
-	: SseResponseDeclaration<E> extends ResponseDeclaration
-		? InferClientResponseBody<ResponseBody<SseResponseDeclaration<E>>>
-		: never;
-
-type InferSseServerResponseBody<E extends RouteDeclaration> = [
+type InferSseServerResponseBody<E extends BaseRouteDeclaration> = [
 	SseResponseDeclaration<E>,
 ] extends [never]
 	? InferSingleServerResponseBody<ServerSuccessResponse<E>>
@@ -404,46 +321,22 @@ type InferSseServerResponseBody<E extends RouteDeclaration> = [
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
  */
-export type ClientResponseBody<E extends RouteDeclaration> = E extends {
+export type ClientResponseBody<E extends BaseRouteDeclaration> = E extends {
 	mode: "sse";
 }
 	? never
 	: InferSingleResponseBody<SuccessfulDeclaredClientResponse<E>>;
 
-export type ServerSuccessBody<E extends RouteDeclaration> = E extends {
+export type ServerSuccessBody<E extends BaseRouteDeclaration> = E extends {
 	mode: "sse";
 }
 	? AsyncIterable<InferSseServerResponseBody<E>>
 	: InferSingleServerResponseBody<ServerSuccessResponse<E>>;
 
-/**
- * Infers the event payload type a client receives from an SSE route.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server-sent-events}
- */
-export type ClientSseReceived<E extends RouteDeclaration> = E extends {
-	mode: "sse";
-}
-	? InferSseClientResponseBody<E>
-	: never;
+export type ErrorDeclaredClientResponse<E extends BaseRouteDeclaration> =
+	Exclude<DeclaredClientResponse<E>, SuccessfulDeclaredClientResponse<E>>;
 
-/**
- * Infers the event payload type a server sends from an SSE route.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server-sent-events}
- */
-export type ServerSseSent<E extends RouteDeclaration> = E extends {
-	mode: "sse";
-}
-	? InferSseServerResponseBody<E>
-	: never;
-
-export type ErrorDeclaredClientResponse<E extends RouteDeclaration> = Exclude<
-	DeclaredClientResponse<E>,
-	SuccessfulDeclaredClientResponse<E>
->;
-
-export type ServerErrors<E extends RouteDeclaration> = Exclude<
+export type ServerErrors<E extends BaseRouteDeclaration> = Exclude<
 	ServerResponse<E>,
 	ServerSuccessResponse<E>
 >;

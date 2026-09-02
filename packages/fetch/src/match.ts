@@ -1,12 +1,12 @@
-import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	createRouteMatcher,
 	flattenRouteImplementations,
 	type ImplementationTree,
+	type ServerHttpRouteDeclaration,
 } from "@rest-rpc/server";
 
 export const createFetchRouteMatcher = (
-	implementations: ImplementationTree<HttpRouteDeclaration>,
+	implementations: ImplementationTree<ServerHttpRouteDeclaration>,
 ) => {
 	const routes = flattenRouteImplementations(implementations);
 	const routeContract = Object.fromEntries(
@@ -33,7 +33,7 @@ export const createFetchRouteMatcher = (
 		}
 
 		const implementation = implementationsByRoute.get(
-			match.route as HttpRouteDeclaration,
+			match.route as ServerHttpRouteDeclaration,
 		);
 		if (!implementation) return new Response(null, { status: 404 });
 

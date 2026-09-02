@@ -1,17 +1,8 @@
-import {
-	customBody,
-	initClient,
-	jsonQuery,
-	noBody,
-	router,
-	type as schemaType,
-	stream,
-} from "@rest-rpc/core";
+import { initClient, route, type as schemaType } from "@rest-rpc/core";
 import type {
 	ClientRequest,
 	ClientResponse,
 	ClientResponseBody,
-	StrictClientResponse,
 } from "@rest-rpc/core";
 import { route as expressRoute } from "@rest-rpc/express";
 import type {
@@ -29,83 +20,63 @@ import {
 	type RouteQueryData,
 	type RouteQueryError,
 	type RouteStreamedQueryData,
-	type StrictRouteQueryError,
 } from "@rest-rpc/tanstack-query";
 
-export const hoverApi = router({
+export const hoverApi = {
 	todos: {
-		get: {
-			method: "GET",
-			path: "/todos/:id",
-			pathParams: schemaType<{ id: string }>(),
-			query: schemaType<{ includeDone?: boolean }>(),
-			responses: {
-				200: schemaType<{ id: string; title: string }>(),
-				404: schemaType<{ code: "TODO_NOT_FOUND" }>(),
-			},
-		},
-		page: {
-			method: "GET",
-			path: "/todos/page",
-			query:
-				jsonQuery(
-					schemaType<{
-						cursor?: string;
-						status: "open" | "done";
-						limit: number;
-					}>(),
-				),
-			responses: {
-				200: schemaType<{
+		get: route
+			.get("/todos/:id")
+			.params(schemaType<{ id: string }>())
+			.query(schemaType<{ includeDone?: boolean }>())
+			.response(200, schemaType<{ id: string; title: string }>())
+			.response(404, schemaType<{ code: "TODO_NOT_FOUND" }>()),
+		page: route
+			.get("/todos/page")
+			.jsonQuery(
+				schemaType<{
+					cursor?: string;
+					status: "open" | "done";
+					limit: number;
+				}>(),
+			)
+			.response(
+				200,
+				schemaType<{
 					items: Array<{ id: string; title: string }>;
 					nextCursor?: string;
 				}>(),
-			},
-		},
-		create: {
-			method: "POST",
-			path: "/todos",
-			body: schemaType<{ title: string }>(),
-			responses: {
-				201: {
-					body: schemaType<{ id: string; title: string }>(),
-					headers: {
-						location: schemaType<string>(),
-						"x-next-cursor": schemaType<string | undefined>(),
-					},
-				},
-				400: schemaType<{ code: "INVALID_TODO" }>(),
-			},
-		},
-		download: {
-			method: "GET",
-			path: "/todos/:id/export",
-			pathParams: schemaType<{ id: string }>(),
-			responses: {
-				200: customBody({
-					schema: schemaType<Blob>(),
-					contentType: ["text/csv", "application/json"] as const,
-				}),
-			},
-		},
-		events: {
-			method: "GET",
-			path: "/todos/events",
-			responses: {
-				200: stream(schemaType<{ id: string; message: string }>()),
-			},
-		},
-		remove: {
-			method: "DELETE",
-			path: "/todos/:id",
-			pathParams: schemaType<{ id: string }>(),
-			responses: {
-				204: noBody(),
-				404: schemaType<{ code: "TODO_NOT_FOUND" }>(),
-			},
-		},
+			),
+		create: route
+			.post("/todos")
+			.body(schemaType<{ title: string }>())
+			.response(201, {
+				body: schemaType<{ id: string; title: string }>(),
+				headers: schemaType<{ location: string; "x-next-cursor"?: string }>(),
+			})
+			.response(400, schemaType<{ code: "INVALID_TODO" }>()),
+		download: route
+			.get("/todos/:id/export")
+			.params(schemaType<{ id: string }>())
+			.customResponse(200, {
+				schema: schemaType<Blob>(),
+				contentType: ["text/csv", "application/json"] as const,
+			}),
+		events: route
+			.get("/todos/events")
+			.streamResponse(200, schemaType<{ id: string; message: string }>()),
+		remove: route
+			.delete("/todos/:id")
+			.params(schemaType<{ id: string }>())
+			.response(204)
+			.response(404, schemaType<{ code: "TODO_NOT_FOUND" }>()),
+		sse: route
+			.sse("/todos/sse")
+			.response(schemaType<{ id: string; message: string }>()),
+		ws: route
+			.ws("/todos/ws")
+			.clientMessage("message", schemaType<{ id: string; message: string }>()),
 	},
-});
+};
 
 export const hoverClient = initClient(hoverApi, {
 	baseUrl: "https://example.test",
@@ -113,7 +84,6 @@ export const hoverClient = initClient(hoverApi, {
 
 export const strictHoverClient = initClient(hoverApi, {
 	baseUrl: "https://example.test",
-	strictStatusCodes: true,
 });
 
 export const hoverQuery = createTanstackQueryHelpers(hoverApi, {
@@ -122,7 +92,6 @@ export const hoverQuery = createTanstackQueryHelpers(hoverApi, {
 
 export const strictHoverQuery = createTanstackQueryHelpers(hoverApi, {
 	baseUrl: "https://example.test",
-	strictStatusCodes: true,
 });
 
 export const createTodoServerRoute = expressRoute(
@@ -195,7 +164,7 @@ export type PageClientRequest = ClientRequest<PageTodoRoute>;
 export type RemoveClientRequest = ClientRequest<RemoveTodoRoute>;
 
 export type CreateClientResponse = ClientResponse<CreateTodoRoute>;
-export type CreateStrictClientResponse = StrictClientResponse<CreateTodoRoute>;
+export type CreateStrictClientResponse = ClientResponse<CreateTodoRoute>;
 export type CreateClientResponseBody = ClientResponseBody<CreateTodoRoute>;
 
 export type CreateFetchParameters = Parameters<
@@ -243,8 +212,7 @@ export type CreateRouteMutationVariables =
 	RouteMutationVariables<CreateTodoRoute>;
 export type CreateRouteQueryData = RouteQueryData<CreateTodoRoute>;
 export type CreateRouteQueryError = RouteQueryError<CreateTodoRoute>;
-export type CreateStrictRouteQueryError =
-	StrictRouteQueryError<CreateTodoRoute>;
+export type CreateStrictRouteQueryError = RouteQueryError<CreateTodoRoute>;
 export type PageRouteInfiniteQueryData = RouteInfiniteQueryData<PageTodoRoute>;
 export type EventsRouteStreamedQueryData = RouteStreamedQueryData<EventsRoute>;
 

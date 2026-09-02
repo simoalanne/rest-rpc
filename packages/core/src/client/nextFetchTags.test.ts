@@ -1,45 +1,32 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { noBody } from "../contract/body.ts";
-import { router } from "../contract/contract.ts";
-import { jsonQuery } from "../contract/request.ts";
+import { route } from "../contract/routeFactory.ts";
 import { type } from "../standard-schema/type.ts";
 import { getNextFetchTags } from "./nextFetchTags.ts";
 
 describe("Next fetch tags", () => {
 	it("generates exact and route-level tags from the route path and request", () => {
-		const apiContract = router({
+		const apiContract = {
 			items: {
-				list: {
-					method: "GET",
-					path: "/items/:id",
-					body: {
-						ignoredBody: type<string>(),
-					},
-					headers: {
-						authorization: type<string>(),
-					},
-					pathParams: { id: type<string>() },
-					query: {
-						filter: type<string>(),
-						page: type<number>(),
-					},
-					requestKeys: {
-						id: "pathParams",
+				list: route
+					.get("/items/:id")
+					.requestKeys({
+						id: "params",
 						filter: "query",
 						page: "query",
 						authorization: "headers",
 						ignoredBody: "body",
-					},
-					responses: {
-						204: noBody(),
-					},
-				},
+					})
+					.body(type<{ ignoredBody: string }>())
+					.headers(type<{ authorization: string }>())
+					.params(type<{ id: string }>())
+					.query(type<{ filter: string; page: number }>())
+					.response(204),
 			},
-		});
+		};
 
 		assert.deepEqual(
-			getNextFetchTags(apiContract.items.list, {
+			getNextFetchTags(apiContract.items.list, ["items", "list"], {
 				id: "one/two",
 				filter: "open",
 				page: 2,
@@ -51,31 +38,29 @@ describe("Next fetch tags", () => {
 				"rest-rpc:items.list",
 			],
 		);
-		assert.deepEqual(getNextFetchTags(apiContract.items.list), [
-			"rest-rpc:items.list",
-		]);
+		assert.deepEqual(
+			getNextFetchTags(apiContract.items.list, ["items", "list"]),
+			["rest-rpc:items.list"],
+		);
 	});
 
 	it("uses a custom prefix and de-dupes routes without query params", () => {
-		const apiContract = router({
+		const apiContract = {
 			items: {
-				get: {
-					method: "GET",
-					path: "/items/:id",
-					pathParams: { id: type<string>() },
-					requestKeys: {
-						id: "pathParams",
-					},
-					responses: {
-						204: noBody(),
-					},
-				},
+				get: route
+					.get("/items/:id")
+					.params(type<{ id: string }>())
+					.requestKeys({
+						id: "params",
+					})
+					.response(204),
 			},
-		});
+		};
 
 		assert.deepEqual(
 			getNextFetchTags(
 				apiContract.items.get,
+				["items", "get"],
 				{ id: "one" },
 				{ tagPrefix: "api" },
 			),
@@ -84,59 +69,42 @@ describe("Next fetch tags", () => {
 	});
 
 	it("uses grouped request segments when flattened request keys are disabled", () => {
-		const apiContract = router(
-			{
-				items: {
-					list: {
-						method: "GET",
-						path: "/items/:id",
-						pathParams: { id: type<string>() },
-						query: { filter: type<string>() },
-						responses: {
-							204: noBody(),
-						},
-					},
-				},
+		const groupedRoute = route.with({ flattenRequestKeys: false });
+		const apiContract = {
+			items: {
+				list: groupedRoute
+					.get("/items/:id")
+					.params(type<{ id: string }>())
+					.query(type<{ filter: string }>())
+					.response(204),
 			},
-			{
-				flattenRequestKeys: false,
-			},
-		);
+		};
 
 		assert.deepEqual(
-			getNextFetchTags(apiContract.items.list, {
-				pathParams: { id: "one", unused: undefined },
+			getNextFetchTags(apiContract.items.list, ["items", "list"], {
+				params: { id: "one", unused: undefined },
 				query: { filter: "open" },
 			}),
 			[
-				"rest-rpc:items.list:pathParams:%7B%22id%22%3A%22one%22%7D:query:%7B%22filter%22%3A%22open%22%7D",
+				"rest-rpc:items.list:params:%7B%22id%22%3A%22one%22%7D:query:%7B%22filter%22%3A%22open%22%7D",
 				"rest-rpc:items.list",
 			],
 		);
 	});
 
 	it("serializes JSON query values in grouped request segments", () => {
-		const apiContract = router(
-			{
-				items: {
-					list: {
-						method: "GET",
-						path: "/items",
-						query:
-							jsonQuery(type<{ page: number; filters: { tag: string } }>()),
-						responses: {
-							204: noBody(),
-						},
-					},
-				},
+		const groupedRoute = route.with({ flattenRequestKeys: false });
+		const apiContract = {
+			items: {
+				list: groupedRoute
+					.get("/items")
+					.jsonQuery(type<{ page: number; filters: { tag: string } }>())
+					.response(204),
 			},
-			{
-				flattenRequestKeys: false,
-			},
-		);
+		};
 
 		assert.deepEqual(
-			getNextFetchTags(apiContract.items.list, {
+			getNextFetchTags(apiContract.items.list, ["items", "list"], {
 				query: {
 					page: 2,
 					filters: { tag: "open" },

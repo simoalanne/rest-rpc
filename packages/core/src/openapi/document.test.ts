@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
-import { customBody, noBody, stream } from "../contract/body.ts";
-import { router } from "../contract/contract.ts";
+import { route } from "../contract/routeFactory.ts";
 import { createOpenApiDocument } from "./document.ts";
 import type { SchemaConverter } from "./operation.ts";
 
@@ -14,88 +13,62 @@ const schemaConverter: SchemaConverter = (schema, mode) =>
 		reused: "inline",
 	}) as Record<string, unknown>;
 
-const openApiTestContract = router({
+const openApiTestContract = {
 	todos: {
-		list: {
-			path: "/todos",
-			method: "GET",
-			query: z.object({
-				search: z.string(),
-				includeCompleted: z.boolean().optional(),
-			}),
-			responses: {
-				200: z.array(z.object({ id: z.string(), title: z.string() })),
-			},
-		},
-		update: {
-			path: "/todos/:id",
-			method: "POST",
-			pathParams: z.object({ id: z.string() }),
-			body: z.object({ title: z.string().min(1) }),
-			responses: {
-				202: z.object({
+		list: route
+			.get("/todos")
+			.query(
+				z.object({
+					search: z.string(),
+					includeCompleted: z.boolean().optional(),
+				}),
+			)
+			.response(200, z.array(z.object({ id: z.string(), title: z.string() }))),
+		update: route
+			.post("/todos/:id")
+			.params(z.object({ id: z.string() }))
+			.body(z.object({ title: z.string().min(1) }))
+			.response(
+				202,
+				z.object({
 					id: z.string(),
 					title: z.string(),
 				}),
-				409: z.object({
+			)
+			.response(
+				409,
+				z.object({
 					code: z.literal("TITLE_ALREADY_EXISTS"),
 				}),
-			},
-		},
-		remove: {
-			path: "/todos/:id",
-			method: "DELETE",
-			pathParams: z.object({ id: z.string() }),
-			responses: {
-				204: noBody(),
-			},
-		},
-		events: {
-			path: "/todos/events",
-			method: "GET",
-			responses: {
-				200: stream(
-					z.object({
-						type: z.string(),
-					}),
-				),
-			},
-		},
-		socket: {
-			path: "/todos/socket",
-			method: "GET",
-			mode: "webSocket",
-			messages: {
-				client: z.object({ type: z.literal("ping") }),
-				server: z.object({ type: z.literal("pong") }),
-			},
-		},
-		import: {
-			path: "/todos/import",
-			method: "POST",
-			body: customBody({
+			),
+		remove: route
+			.delete("/todos/:id")
+			.params(z.object({ id: z.string() }))
+			.response(204),
+		events: route.get("/todos/events").streamResponse(
+			200,
+			z.object({
+				type: z.string(),
+			}),
+		),
+		socket: route
+			.ws("/todos/socket")
+			.clientMessage("ping", z.object({ type: z.literal("ping") }))
+			.serverMessage("pong", z.object({ type: z.literal("pong") })),
+		import: route
+			.post("/todos/import")
+			.customBody({
 				schema: z.string(),
 				contentType: "text/csv",
-			}),
-			responses: {
-				204: noBody(),
-			},
-		},
+			})
+			.response(204),
 	},
-});
+};
 
 describe("createOpenApiDocument", () => {
 	it("builds base document fields", () => {
 		const document = createOpenApiDocument(
-			{
-				health: {
-					path: "/health",
-					method: "GET",
-					responses: {
-						204: noBody(),
-					},
-				},
-			},
+			{ health: route.get("/health").response(204) },
 			{
 				openapi: "3.0.3",
 				info: {
@@ -137,22 +110,14 @@ describe("createOpenApiDocument", () => {
 		const document = createOpenApiDocument(
 			{
 				todos: {
-					get: {
-						path: "/todos/:id",
-						method: "GET",
-						pathParams: z.object({ id: z.string() }),
-						responses: {
-							200: z.object({ id: z.string() }),
-						},
-					},
-					remove: {
-						path: "/todos/:id",
-						method: "DELETE",
-						pathParams: z.object({ id: z.string() }),
-						responses: {
-							204: noBody(),
-						},
-					},
+					get: route
+						.get("/todos/:id")
+						.params(z.object({ id: z.string() }))
+						.response(200, z.object({ id: z.string() })),
+					remove: route
+						.delete("/todos/:id")
+						.params(z.object({ id: z.string() }))
+						.response(204),
 				},
 			},
 			{

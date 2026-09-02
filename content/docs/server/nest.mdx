@@ -11,7 +11,7 @@ pnpm add @rest-rpc/nest
 
 ## Usage
 
-The Nest adapter lets a contract router map to a normal Nest provider class.
+The Nest adapter lets a contract subtree map to a normal Nest provider class.
 The controller declares the Nest route boundary, while the provider implements
 the contract.
 
@@ -94,7 +94,7 @@ await app.listen(3000);
 ```
 
 `@Router()` belongs on the controller because it tells Nest which HTTP routes to
-register. `router()` connects the contract router to the provider instance that
+register. `router()` connects the contract subtree to the provider instance that
 implements it.
 
 The provider is a first-class Nest provider. It can use constructor injection,

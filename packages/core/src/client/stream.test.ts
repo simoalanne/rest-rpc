@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import z from "zod";
-import { stream } from "../contract/body.ts";
-import { router } from "../contract/contract.ts";
+import { route } from "../contract/routeFactory.ts";
 import { type } from "../standard-schema/type.ts";
 import { initClient } from "./index.ts";
 import { parseNdjsonStream } from "./stream.ts";
@@ -13,17 +12,13 @@ afterEach(() => {
 	globalThis.fetch = originalFetch;
 });
 
-const apiContract = router({
+const apiContract = {
 	events: {
-		stream: {
-			method: "GET",
-			path: "/events",
-			responses: {
-				200: stream(z.object({ id: z.string() })),
-			},
-		},
+		stream: route
+			.get("/events")
+			.streamResponse(200, z.object({ id: z.string() })),
 	},
-});
+};
 
 const ndjsonResponse = (chunks: string[]) => {
 	const encoder = new TextEncoder();

@@ -10,23 +10,23 @@ const todo = await client.todos.byId.fetch({ id: "1" });
 
 ## Request With JSON Body
 
-Regular JSON request bodies are declared with a schema.
-The `body` key is flattened for client call and server handler.
+Regular JSON request bodies are declared with `.body(schema)`. Fields from an
+object schema are flattened into the client call and server handler by default.
 
 ```ts
-export const api = router({
+export const api = {
 	todos: {
-		create: {
-			method: "POST",
-			path: "/todos",
-			body: z.object({
-				title: z.string().min(1),
-				labels: z.array(z.string()).optional(),
-			}),
-			response: todoSchema,
-		},
+		create: route
+			.post("/todos")
+			.body(
+				z.object({
+					title: z.string().min(1),
+					labels: z.array(z.string()).optional(),
+				}),
+			)
+			.response(201, todoSchema),
 	},
-});
+};
 ```
 
 ```ts
@@ -48,29 +48,25 @@ const todo = await client.todos.create.fetch({
 
 ## Request Without Body
 
-Request without a body can be declared by omitting the `body` key or by using `noBody()` explicitly.
+Declare a request without a body by omitting a body setter.
 
 ```ts
-import { noBody } from "@rest-rpc/core";
-
-export const api = router({
+export const api = {
 	todos: {
-		list: {
-			method: "GET",
-			path: "/todos",
-			query: z.object({
-				limit: z.number().optional(),
-			}),
-			response: z.array(todoSchema),
-		},
-		byId: {
-			method: "GET",
-			path: "/todos/:id",
-			body: noBody(),
-			response: todoSchema,
-		},
+		list: route
+			.get("/todos")
+			.query(
+				z.object({
+					limit: z.number().optional(),
+				}),
+			)
+			.response(200, z.array(todoSchema)),
+		byId: route
+			.get("/todos/:id")
+			.params(z.object({ id: z.string() }))
+			.response(200, todoSchema),
 	},
-});
+};
 ```
 
 ```ts
@@ -88,33 +84,34 @@ export const routes = router(api, {
 
 ## Request With Form Body
 
-Use `formBody()` for `application/x-www-form-urlencoded` request bodies.
-Body is sent as a `URLSearchParams` to server and is then passed as validated
-object to the handler.
+Use `.formBody()` for `application/x-www-form-urlencoded` request bodies.
+The body is sent as `URLSearchParams` and then passed to the handler as a
+validated object under `body`.
 
 ```ts
-import { formBody, router } from "@rest-rpc/core";
+import { route } from "@rest-rpc/core";
 
-export const api = router({
+export const api = {
 	forms: {
-		submit: {
-			method: "POST",
-			path: "/forms",
-			body: formBody(
+		submit: route
+			.post("/forms")
+			.formBody(
 				z.object({
 					title: z.string(),
-					count: z.coerce.number(),
+					count: z.coerce.number<number>(),
 					remember: z.string().optional(),
 					tags: z.array(z.string()).optional(),
 				}),
+			)
+			.response(
+				201,
+				z.object({
+					title: z.string(),
+					count: z.number(),
+				}),
 			),
-			response: z.object({
-				title: z.string(),
-				count: z.number(),
-			}),
-		},
 	},
-});
+};
 ```
 
 ```ts
@@ -146,42 +143,47 @@ keys are absent from the validation input. Array fields are inferred from
 supported schemas and encoded or decoded as repeated form keys, such as
 `tags=typescript&tags=rpc`.
 
-When the array keys cannot be inferred, you can declare them explicitly with the `arrayKeys` option.
+When the array keys cannot be inferred, declare them explicitly with the
+`arrayKeys` option.
 
 ```ts
-formBody({
-	schema: type<{ title: string; tags: string[] }>(),
-	arrayKeys: ["tags"],
-});
+route
+	.post("/forms")
+	.formBody({
+		schema: type<{ title: string; tags: string[] }>(),
+		arrayKeys: ["tags"],
+	})
+	.response(204);
 ```
 
 ## Request With Multipart Body
 
-Use `multipartBody()` for `multipart/form-data` request bodies.
-Body is sent as `FormData` to the server and is then passed as a validated
-object to the handler.
+Use `.multipartBody()` for `multipart/form-data` request bodies.
+The body is sent as `FormData` and then passed to the handler as a validated
+object under `body`.
 
 ```ts
-import { multipartBody, router } from "@rest-rpc/core";
+import { route } from "@rest-rpc/core";
 
-export const api = router({
+export const api = {
 	uploads: {
-		create: {
-			method: "POST",
-			path: "/uploads",
-			body: multipartBody(
+		create: route
+			.post("/uploads")
+			.multipartBody(
 				z.object({
 					title: z.string(),
 					file: z.instanceof(File),
 					tags: z.array(z.string()).optional(),
 				}),
+			)
+			.response(
+				201,
+				z.object({
+					title: z.string(),
+				}),
 			),
-			response: z.object({
-				title: z.string(),
-			}),
-		},
 	},
-});
+};
 ```
 
 ```ts
@@ -215,35 +217,39 @@ When the array keys cannot be inferred, declare them explicitly with the
 `arrayKeys` option.
 
 ```ts
-multipartBody({
-	schema: type<{ title: string; file: File; tags: string[] }>(),
-	arrayKeys: ["tags"],
-});
+route
+	.post("/uploads")
+	.multipartBody({
+		schema: type<{ title: string; file: File; tags: string[] }>(),
+		arrayKeys: ["tags"],
+	})
+	.response(204);
 ```
 
 ## Request With Custom Content Type
 
-Custom request bodies are declared with `customBody()`.
-The `body` key is not flattened for client call and server handler.
+Custom request bodies are declared with `.customBody()`. The complete payload
+is exposed under `body` at the client call and server handler.
 
 ```ts
-import { customBody, router } from "@rest-rpc/core";
+import { route } from "@rest-rpc/core";
 
-export const api = router({
+export const api = {
 	imports: {
-		csv: {
-			method: "POST",
-			path: "/imports.csv",
-			body: customBody({
+		csv: route
+			.post("/imports.csv")
+			.customBody({
 				contentType: "text/csv",
 				schema: z.string(),
-			}),
-			response: z.object({
-				imported: z.number(),
-			}),
-		},
+			})
+			.response(
+				201,
+				z.object({
+					imported: z.number(),
+				}),
+			),
 	},
-});
+};
 ```
 
 ```ts
@@ -264,25 +270,27 @@ const result = await client.imports.csv.fetch({
 
 ## Request With Multiple Custom Content Types
 
-Custom request bodies with multiple content types are declared with `customBody()` with an array of content types.
-The `body` key is not flattened for client call and server handler. It contains both the `contentType` and the `payload`.
+Pass an array of content types to `.customBody()` to declare multiple custom
+request content types.
+The `body` value contains both the selected `contentType` and the `payload`.
 
 ```ts
-export const api = router({
+export const api = {
 	images: {
-		upload: {
-			method: "POST",
-			path: "/images",
-			body: customBody({
+		upload: route
+			.post("/images")
+			.customBody({
 				contentType: ["image/png", "image/jpeg"],
 				schema: z.instanceof(Uint8Array),
-			}),
-			response: z.object({
-				id: z.string(),
-			}),
-		},
+			})
+			.response(
+				201,
+				z.object({
+					id: z.string(),
+				}),
+			),
 	},
-});
+};
 ```
 
 ```ts
@@ -313,18 +321,19 @@ Omit `contentType` when the request body should be passed directly to `fetch`
 and the runtime should decide the `content-type` header.
 
 ```ts
-export const api = router({
+export const api = {
 	forms: {
-		submit: {
-			method: "POST",
-			path: "/forms",
-			body: customBody(z.instanceof(URLSearchParams)),
-			response: z.object({
-				title: z.string(),
-			}),
-		},
+		submit: route
+			.post("/forms")
+			.customBody(z.instanceof(URLSearchParams))
+			.response(
+				201,
+				z.object({
+					title: z.string(),
+				}),
+			),
 	},
-});
+};
 ```
 
 ```ts

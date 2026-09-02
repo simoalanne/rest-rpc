@@ -3,16 +3,16 @@ import { METHOD_METADATA, PATH_METADATA } from "@nestjs/common/constants.js";
 import type {
 	Contract,
 	HttpMethod,
-	HttpRouteDeclaration,
 	RouteDeclaration,
 } from "@rest-rpc/core/contract";
 import { contractRouteEntries, toColonPath } from "@rest-rpc/core/contract";
+import type { ServerHttpRouteDeclaration } from "@rest-rpc/server";
 import "reflect-metadata";
 
 export const REST_RPC_ROUTE_METADATA = Symbol.for("rest-rpc:nest-route");
 
 export type RouteMetadata = {
-	route: HttpRouteDeclaration;
+	route: ServerHttpRouteDeclaration;
 };
 
 const methodMap: Record<HttpMethod, RequestMethod> = {
@@ -24,7 +24,7 @@ const methodMap: Record<HttpMethod, RequestMethod> = {
 };
 
 const createNestRouteDecorator =
-	(route: HttpRouteDeclaration): MethodDecorator =>
+	(route: ServerHttpRouteDeclaration): MethodDecorator =>
 	(_target, _propertyKey, descriptor) => {
 		if (!descriptor?.value) return;
 
@@ -47,7 +47,7 @@ const createNestRouteDecorator =
 
 const isHttpRouteDeclaration = (
 	route: RouteDeclaration,
-): route is HttpRouteDeclaration => "responses" in route;
+): route is ServerHttpRouteDeclaration => "responses" in route;
 
 const getImplementationAtPath = (tree: unknown, path: string[]) =>
 	path.reduce(
@@ -85,7 +85,7 @@ const createRouterRouteMethod = (
 	target: object,
 	propertyKey: string | symbol,
 	descriptor: PropertyDescriptor,
-	route: HttpRouteDeclaration,
+	route: ServerHttpRouteDeclaration,
 	path: string[],
 ) => {
 	const original = descriptor.value;
@@ -120,7 +120,7 @@ const createRouterRouteMethod = (
  *
  * @see {@link https://rest-rpc.dev/docs/server/nest#single-routes}
  */
-export function Route(route: HttpRouteDeclaration): MethodDecorator {
+export function Route(route: ServerHttpRouteDeclaration): MethodDecorator {
 	return applyDecorators(createNestRouteDecorator(route));
 }
 

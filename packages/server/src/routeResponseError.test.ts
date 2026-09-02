@@ -1,15 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { noBody } from "@rest-rpc/core/contract";
+import { route as coreRoute } from "@rest-rpc/core";
 import { RouteResponseError } from "./routeResponseError.ts";
 
-const route = {
-	method: "GET",
-	path: "/todos/:id",
-	responses: {
-		404: noBody(),
-	},
-} as const;
+const route = coreRoute.get("/todos/:id").response(404);
 
 describe("RouteResponseError", () => {
 	it("stores the route and response envelope fields", () => {

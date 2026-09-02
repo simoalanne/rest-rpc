@@ -11,7 +11,7 @@
 	"scripts": {
 		"build:packages": "pnpm -r --filter './packages/**' build",
 		"typecheck": "pnpm run typecheck:workspace",
-		"typecheck:workspace": "pnpm run build:packages && pnpm -r --parallel --no-bail --filter './packages/**' --filter '!integration-tests' typecheck",
+		"typecheck:workspace": "pnpm run build:packages && pnpm -r --parallel --no-bail --filter './packages/**' --filter './declaration-types/**' --filter '!integration-tests' typecheck",
 		"test": "pnpm run test:unit && pnpm run test:integration",
 		"test:unit": "pnpm run build:packages && pnpm run test:scripts && pnpm -r --parallel --no-bail --if-present --filter './packages/**' --filter '!integration-tests' test",
 		"test:integration": "pnpm run build:packages && pnpm --filter integration-tests test",

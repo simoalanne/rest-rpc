@@ -1,5 +1,5 @@
 import type { RouteDeclaration } from "../contract/contract.ts";
-import { groupRequestInput } from "../contract/validate.ts";
+import { groupRequestInput } from "./groupRequestInput.ts";
 
 const DEFAULT_NEXT_FETCH_TAG_PREFIX = "rest-rpc";
 type NextFetchTagRequest = Record<string, unknown>;
@@ -53,9 +53,9 @@ const getNextFetchTagRequest = (
 ) => {
 	if (!request) return undefined;
 
-	if (route.flattenRequestKeys === false) {
+	if (route.request?.flattenKeys === false) {
 		return {
-			pathParams: request.pathParams,
+			params: request.params,
 			query: request.query,
 		};
 	}
@@ -65,7 +65,7 @@ const getNextFetchTagRequest = (
 	});
 
 	return {
-		...(grouped.pathParams as Record<string, unknown> | undefined),
+		...(grouped.params as Record<string, unknown> | undefined),
 		...(grouped.query as Record<string, unknown> | undefined),
 	};
 };
@@ -89,10 +89,10 @@ const createNextFetchTag = (
  */
 export function getNextFetchTags(
 	route: RouteDeclaration,
+	routePath: readonly string[],
 	request?: NextFetchTagRequest,
 	options?: { tagPrefix?: string },
 ): string[] {
-	const routePath = route.routePath ?? [];
 	const tagRequest = getNextFetchTagRequest(route, request);
 	const routeTag = createNextFetchTag(routePath, undefined, options?.tagPrefix);
 	const exactTag = createNextFetchTag(

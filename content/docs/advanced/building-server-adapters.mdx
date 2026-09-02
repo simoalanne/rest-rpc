@@ -106,7 +106,7 @@ export const registerExpressHttpRoutes = (
 				request: {
 					body: req.body,
 					query: req.query,
-					pathParams: req.params,
+					params: req.params,
 					headers: req.headers,
 				},
 				context: { req, signal },
@@ -151,7 +151,7 @@ Inside that handoff, the adapter provides four request segments:
 
 - `body` from Express body parsing middleware
 - `query` from `req.query`
-- `pathParams` from `req.params`
+- `params` from `req.params`
 - `headers` from `req.headers`
 
 The adapter also provides `context`. Route handlers can use this to access
@@ -321,7 +321,7 @@ const result = await handleHttpRoute(
 		request: {
 			body,
 			query: readQuery(url),
-			pathParams: params,
+			params: params,
 			headers: readHeaders(request.headers),
 		},
 		context,
@@ -436,7 +436,7 @@ export const registerFastifyWebSocketRoutes = (
 						});
 						const request = {
 							query: req.query,
-							pathParams: req.params,
+							params: req.params,
 							headers: req.headers,
 						};
 						const upgrade = await prepareWebSocketUpgrade({

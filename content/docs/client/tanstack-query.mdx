@@ -23,8 +23,8 @@ api.todos.create.mutationOptions(...)
 api.todos.get.getKey(...)
 ```
 
-Routes with one successful `stream(schema)` response also expose
-`streamedQueryOptions()`.
+Routes with one successful `.streamResponse(status, schema)` response also
+expose `streamedQueryOptions()`.
 
 ## Setup
 
@@ -158,9 +158,9 @@ const todos = useInfiniteQuery(
 ## Streamed Queries
 
 Use `streamedQueryOptions()` for routes that declare one successful
-`stream(schema)` response. The helper passes the route's async iterable body to
-TanStack Query and stores the materialized stream data, not the rest-rpc response
-envelope.
+`.streamResponse(status, schema)` response. The helper passes the route's async
+iterable body to TanStack Query and stores the materialized stream data, not the
+rest-rpc response envelope.
 
 :::note
 `streamedQueryOptions()` is based on TanStack Query's experimental
@@ -198,7 +198,7 @@ messages.data;
 
 `streamedQueryOptions()` is only generated for stream routes where rest-rpc can
 hide the response envelope honestly: the route must have exactly one successful
-response and that response body must be a standard `stream(schema)` body. Use
+response and that response body must be declared with `.streamResponse()`. Use
 `queryOptions()` when you need access to `status`, `headers`, or the raw async
 iterable response body.
 

@@ -10,12 +10,7 @@ import {
 	Sse,
 } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
-import { initClient } from "@rest-rpc/core";
-import {
-	route as contractRoute,
-	router as contractRouter,
-	type as schemaType,
-} from "@rest-rpc/core/contract";
+import { initClient, route, type as schemaType } from "@rest-rpc/core";
 import {
 	RestRpcModule,
 	Route,
@@ -184,20 +179,12 @@ it("combines Nest controller prefixes with contract route paths", async () => {
 });
 
 it("registers router routes whose contract key paths would produce the same flattened name", async () => {
-	const collisionContract = contractRouter({
-		a_b: contractRoute({
-			method: "GET",
-			path: "/flat",
-			response: schemaType<{ source: string }>(),
-		}),
+	const collisionContract = {
+		a_b: route.get("/flat").response(200, schemaType<{ source: string }>()),
 		a: {
-			b: contractRoute({
-				method: "GET",
-				path: "/nested",
-				response: schemaType<{ source: string }>(),
-			}),
+			b: route.get("/nested").response(200, schemaType<{ source: string }>()),
 		},
-	});
+	} as const;
 	const server = await createNestAdapter(collisionContract, {
 		a_b: () => ({ source: "flat" }),
 		a: {
@@ -216,15 +203,14 @@ it("registers router routes whose contract key paths would produce the same flat
 });
 
 it("supports async routers that close over values from Nest parameter decorators", async () => {
-	const asyncContract = contractRouter({
-		get: contractRoute({
-			method: "GET",
-			path: "/async-items/:id",
-			pathParams: { id: schemaType<string>() },
-			headers: { "x-test-source": schemaType<string>() },
-			response: schemaType<{ id: string; title: string }>(),
-		}),
-	});
+	const asyncContract = {
+		get: route
+			.get("/async-items/:id")
+			.params(schemaType<{ id: string }>())
+			.headers(schemaType<{ "x-test-source": string }>())
+			.requestKeys({ "x-test-source": "headers" })
+			.response(200, schemaType<{ id: string; title: string }>()),
+	} as const;
 	@Injectable()
 	class AsyncItemService {
 		get(source: string, { id }: RouteRequest<typeof asyncContract.get>) {
@@ -307,15 +293,14 @@ it("passes non-rest-rpc Observable handlers through the global interceptor", asy
 	}
 });
 
-const classContract = contractRouter({
+const classContract = {
 	items: {
-		get: contractRoute({
-			method: "GET",
-			path: "/class-items/:id",
-			response: schemaType<{ id: string; title: string }>(),
-		}),
+		get: route
+			.get("/class-items/:id")
+			.params(schemaType<{ id: string }>())
+			.response(200, schemaType<{ id: string; title: string }>()),
 	},
-});
+} as const;
 
 it("serves a contract route implemented by a Nest provider class", async () => {
 	type AppContext = {

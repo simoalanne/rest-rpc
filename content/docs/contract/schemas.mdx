@@ -11,7 +11,7 @@ Zod, Valibot, and ArkType are supported Standard Schema libraries. The built-in
 
 ## Request Schema Shapes
 
-Request locations are declared with schema records or whole-location schemas.
+Request locations are declared with whole-location schemas.
 
 :::note
 This section describes the default flattened request shape. With
@@ -19,24 +19,21 @@ This section describes the default flattened request shape. With
 segments, so whole-location schemas do not need flattened key metadata.
 :::
 
-A schema record maps flattened request keys to individual schemas.
+A route builder receives one schema for `params`, `query`, `body`, and
+`.headers()`.
 
 ```ts
-pathParams: {
-	id: z.string().uuid(),
-},
-query: {
-	includeCompleted: z.coerce.boolean().optional(),
-},
-headers: {
-	"x-request-id": z.string().optional(),
-},
-body: {
-	title: z.string().min(1),
-},
+route
+	.patch("/todos/:id")
+	.params(z.object({ id: z.string().uuid() }))
+	.query(z.object({ includeCompleted: z.coerce.boolean<boolean>().optional() }))
+	.headers(z.object({ "x-request-id": z.string().optional() }))
+	.body(z.object({ title: z.string().min(1) }))
+	.response(200, todoSchema);
 ```
 
-Each record key becomes a key in the client and handler request object.
+Each top-level schema property becomes a key in the client and handler request
+object.
 
 ```ts
 await client.todos.update.fetch({
@@ -47,7 +44,7 @@ await client.todos.update.fetch({
 });
 ```
 
-A whole-location schema validates the whole `body`, `query`, or `pathParams`
+A whole-location schema validates the whole `body`, `query`, or `params`
 object as one value.
 
 For Zod, Valibot, and ArkType, `rest-rpc` can resolve flattened request keys
@@ -56,57 +53,72 @@ from object schemas and object-like unions directly.
 Zod supports object, union, and discriminated union schemas.
 
 ```ts
-pathParams: z.object({
-	id: z.string().uuid(),
-}),
-query: z.union([
-	z.object({ q: z.string() }),
-	z.object({ page: z.coerce.number() }),
-]),
-body: z.discriminatedUnion("kind", [
-	z.object({ kind: z.literal("text"), text: z.string() }),
-	z.object({ kind: z.literal("link"), url: z.string().url() }),
-]),
+route
+	.post("/items/:id")
+	.params(z.object({ id: z.string().uuid() }))
+	.query(
+		z.union([
+			z.object({ q: z.string() }),
+			z.object({ page: z.coerce.number<number>() }),
+		]),
+	)
+	.body(
+		z.discriminatedUnion("kind", [
+			z.object({ kind: z.literal("text"), text: z.string() }),
+			z.object({ kind: z.literal("link"), url: z.string().url() }),
+		]),
+	)
+	.response(204);
 ```
 
 Valibot supports object, union, and variant schemas.
 
 ```ts
-pathParams: v.object({
-	id: v.pipe(v.string(), v.uuid()),
-}),
-query: v.union([
-	v.object({ q: v.string() }),
-	v.object({ page: v.pipe(v.string(), v.transform(Number)) }),
-]),
-body: v.variant("kind", [
-	v.object({ kind: v.literal("text"), text: v.string() }),
-	v.object({ kind: v.literal("link"), url: v.pipe(v.string(), v.url()) }),
-]),
+route
+	.post("/items/:id")
+	.params(v.object({ id: v.pipe(v.string(), v.uuid()) }))
+	.query(
+		v.union([
+			v.object({ q: v.string() }),
+			v.object({ page: v.pipe(v.string(), v.transform(Number)) }),
+		]),
+	)
+	.body(
+		v.variant("kind", [
+			v.object({ kind: v.literal("text"), text: v.string() }),
+			v.object({ kind: v.literal("link"), url: v.pipe(v.string(), v.url()) }),
+		]),
+	)
+	.response(204);
 ```
 
 ArkType supports object and union schemas.
 
 ```ts
-pathParams: type({
-	id: "string",
-}),
-query: type({ q: "string" }).or({ page: "string" }),
+route
+	.get("/items/:id")
+	.params(type({ id: "string" }))
+	.query(type({ q: "string" }).or({ page: "string" }))
+	.response(204);
 ```
 
-For other Standard Schema vendors, whole-location schemas needs explicit `requestKeys`
-option so `rest-rpc` can map flattened keys back to HTTP locations.
+For other Standard Schema vendors, a whole-location schema needs
+`.requestKeys()` when rest-rpc cannot discover its flattened keys.
 
 ```ts
-body: type<{
-	title: string;
-}>(),
-requestKeys: {
-	title: "body",
-},
+route
+	.post("/todos")
+	.body(type<{ title: string }>())
+	.requestKeys({ title: "body" })
+	.response(204);
 ```
 
-`headers` is always declared as a schema record.
+Headers are declared as a whole-object schema with `.headers()`.
+
+Header schemas configured with `route.with()` are inherited. If a route also
+calls `.headers()`, both schemas validate the original header object and their
+validated outputs are shallow-merged. Route-local output properties win on a
+duplicate key, but the input must pass both schemas.
 
 ## Schema Input And Output
 
@@ -123,6 +135,23 @@ Schemas have an input type and an output type.
 
 Default HTTP bodies and WebSocket messages travel over JSON. Path params, query
 params, and headers travel through HTTP strings.
+
+Request schemas for HTTP string locations and form bodies must declare inputs
+that the generated client can serialize. Zod coercion schemas use `unknown` as
+their input by default, so specify the generated-client input explicitly:
+
+```ts
+route
+	.get("/items")
+	.query(z.object({ page: z.coerce.number<number>() }))
+	.response(204);
+```
+
+The `number` generic describes the value accepted by the generated client.
+The client serializes it as an HTTP string, and Zod still coerces that string
+back to a number when the server validates the request. An unparameterized
+`z.coerce.number()` is rejected because its `unknown` input does not guarantee
+that the client can safely serialize it.
 
 ## Validation
 
@@ -143,15 +172,14 @@ Server adapters validate handler output before writing the HTTP response. The
 handler returns schema input.
 
 ```ts
-const api = router({
+const api = {
 	todos: {
-		get: {
-			method: "GET",
-			path: "/todos/:id",
-			response: todoSchema,
-		},
+		get: route
+			.get("/todos/:id")
+			.params(z.object({ id: z.string() }))
+			.response(200, todoSchema),
 	},
-});
+};
 ```
 
 Fetch clients do not validate response bodies by default. With

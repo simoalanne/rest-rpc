@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import z from "zod";
-import { customBody, noBody, stream } from "../contract/body.ts";
-import { router } from "../contract/contract.ts";
+import { route } from "../contract/routeFactory.ts";
 import { initClient } from "./index.ts";
 
 const originalFetch = globalThis.fetch;
@@ -16,28 +15,19 @@ type FetchCall = {
 	init?: RequestInit;
 };
 
-const createResponseTestContract = () =>
-	router({
-		todos: {
-			create: {
-				method: "POST",
-				path: "/todos",
-				body: z.object({ title: z.string() }),
-				responses: {
-					201: z.object({ id: z.string(), title: z.string() }),
-				},
-			},
-			get: {
-				method: "GET",
-				path: "/todos/:id",
-				pathParams: z.object({ id: z.string() }),
-				responses: {
-					200: z.object({ id: z.string(), title: z.string() }),
-					404: z.object({ code: z.literal("not_found") }),
-				},
-			},
-		},
-	});
+const createResponseTestContract = () => ({
+	todos: {
+		create: route
+			.post("/todos")
+			.body(z.object({ title: z.string() }))
+			.response(201, z.object({ id: z.string(), title: z.string() })),
+		get: route
+			.get("/todos/:id")
+			.params(z.object({ id: z.string() }))
+			.response(200, z.object({ id: z.string(), title: z.string() }))
+			.response(404, z.object({ code: z.literal("not_found") })),
+	},
+});
 
 const jsonResponse = (body: unknown, status = 200) =>
 	new Response(JSON.stringify(body), {
@@ -91,24 +81,21 @@ describe("ApiClient responses", () => {
 				},
 			}),
 		);
-		const apiContract = router({
+		const apiContract = {
 			todos: {
-				get: {
-					method: "GET",
-					path: "/todos/:id",
-					pathParams: z.object({ id: z.string() }),
-					responses: {
-						200: {
-							body: z.object({ id: z.string() }),
-							headers: {
-								etag: z.string(),
-								"x-count": z.coerce.number(),
-							},
-						},
-					},
-				},
+				get: route
+					.with({ strictStatusCodes: true })
+					.get("/todos/:id")
+					.params(z.object({ id: z.string() }))
+					.response(200, {
+						body: z.object({ id: z.string() }),
+						headers: z.object({
+							etag: z.string(),
+							"x-count": z.coerce.number<number>(),
+						}),
+					}),
 			},
-		});
+		};
 		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 			validateResponses: true,
@@ -155,9 +142,18 @@ describe("ApiClient responses", () => {
 
 	it("rejects undeclared response statuses when strict status codes are enabled", async () => {
 		captureFetch(jsonResponse({ code: "teapot" }, 418));
-		const client = initClient(createResponseTestContract(), {
+		const apiContract = {
+			todos: {
+				get: route
+					.with({ strictStatusCodes: true })
+					.get("/todos/:id")
+					.params(z.object({ id: z.string() }))
+					.response(200, z.object({ id: z.string(), title: z.string() }))
+					.response(404, z.object({ code: z.literal("not_found") })),
+			},
+		};
+		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
-			strictStatusCodes: true,
 		});
 
 		await assert.rejects(
@@ -167,24 +163,24 @@ describe("ApiClient responses", () => {
 	});
 
 	it("returns declared responses without validating when strict status codes are enabled", async () => {
-		const apiContract = router({
+		const apiContract = {
 			todos: {
-				get: {
-					method: "GET",
-					path: "/todos/:id",
-					pathParams: z.object({ id: z.string() }),
-					responses: {
-						200: z.object({
+				get: route
+					.with({ strictStatusCodes: true })
+					.get("/todos/:id")
+					.params(z.object({ id: z.string() }))
+					.response(
+						200,
+						z.object({
 							id: z.string(),
 							createdAt: z
 								.string()
 								.datetime()
 								.transform((value) => new Date(value)),
 						}),
-					},
-				},
+					),
 			},
-		});
+		};
 		captureFetch(
 			jsonResponse(
 				{ id: "todo-1", createdAt: "2026-08-10T00:00:00.000Z" },
@@ -193,7 +189,6 @@ describe("ApiClient responses", () => {
 		);
 		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
-			strictStatusCodes: true,
 		});
 
 		const response = await client.todos.get.fetchResponse({ id: "todo-1" });
@@ -252,18 +247,14 @@ describe("ApiClient responses", () => {
 				})
 				.transform(({ first, last }) => `${first} ${last}`),
 		});
-		const apiContract = router({
+		const apiContract = {
 			todos: {
-				get: {
-					method: "GET",
-					path: "/todos/:id",
-					pathParams: z.object({ id: z.string() }),
-					responses: {
-						200: responseSchema,
-					},
-				},
+				get: route
+					.get("/todos/:id")
+					.params(z.object({ id: z.string() }))
+					.response(200, responseSchema),
 			},
-		});
+		};
 		const serverOutput = responseSchema.parse({
 			id: "todo-1",
 			name: {
@@ -296,18 +287,14 @@ describe("ApiClient responses", () => {
 				})
 				.transform(({ first, last }) => `${first} ${last}`),
 		});
-		const apiContract = router({
+		const apiContract = {
 			todos: {
-				get: {
-					method: "GET",
-					path: "/todos/:id",
-					pathParams: z.object({ id: z.string() }),
-					responses: {
-						200: responseSchema,
-					},
-				},
+				get: route
+					.get("/todos/:id")
+					.params(z.object({ id: z.string() }))
+					.response(200, responseSchema),
 			},
-		});
+		};
 		const serverOutput = responseSchema.parse({
 			id: "todo-1",
 			name: {
@@ -333,18 +320,14 @@ describe("ApiClient responses", () => {
 				.datetime()
 				.transform((value) => new Date(value)),
 		});
-		const apiContract = router({
+		const apiContract = {
 			todos: {
-				get: {
-					method: "GET",
-					path: "/todos/:id",
-					pathParams: z.object({ id: z.string() }),
-					responses: {
-						200: responseSchema,
-					},
-				},
+				get: route
+					.get("/todos/:id")
+					.params(z.object({ id: z.string() }))
+					.response(200, responseSchema),
 			},
-		});
+		};
 		const serverOutput = responseSchema.parse({
 			createdAt: "2026-08-10T00:00:00.000Z",
 		});
@@ -366,18 +349,14 @@ describe("ApiClient responses", () => {
 				.datetime()
 				.transform((value) => new Date(value)),
 		});
-		const apiContract = router({
+		const apiContract = {
 			todos: {
-				get: {
-					method: "GET",
-					path: "/todos/:id",
-					pathParams: z.object({ id: z.string() }),
-					responses: {
-						200: responseSchema,
-					},
-				},
+				get: route
+					.get("/todos/:id")
+					.params(z.object({ id: z.string() }))
+					.response(200, responseSchema),
 			},
-		});
+		};
 		const serverOutput = responseSchema.parse({
 			createdAt: "2026-08-10T00:00:00.000Z",
 		});
@@ -399,18 +378,14 @@ describe("ApiClient responses", () => {
 			id: z.string(),
 			createdAt: z.date().transform((value) => value.toISOString()),
 		});
-		const apiContract = router({
+		const apiContract = {
 			todos: {
-				get: {
-					method: "GET",
-					path: "/todos/:id",
-					pathParams: z.object({ id: z.string() }),
-					responses: {
-						200: responseSchema,
-					},
-				},
+				get: route
+					.get("/todos/:id")
+					.params(z.object({ id: z.string() }))
+					.response(200, responseSchema),
 			},
-		});
+		};
 		const serverOutput = responseSchema.parse({
 			id: "todo-1",
 			createdAt: new Date("2026-08-10T00:00:00.000Z"),
@@ -431,18 +406,14 @@ describe("ApiClient responses", () => {
 
 	it("returns serialized Date response output by default but rejects it when validation is enabled", async () => {
 		const responseSchema = z.object({ createdAt: z.date() });
-		const apiContract = router({
+		const apiContract = {
 			todos: {
-				get: {
-					method: "GET",
-					path: "/todos/:id",
-					pathParams: z.object({ id: z.string() }),
-					responses: {
-						200: responseSchema,
-					},
-				},
+				get: route
+					.get("/todos/:id")
+					.params(z.object({ id: z.string() }))
+					.response(200, responseSchema),
 			},
-		});
+		};
 		const serverOutput = responseSchema.parse({
 			createdAt: new Date("2026-08-10T00:00:00.000Z"),
 		});
@@ -468,18 +439,14 @@ describe("ApiClient responses", () => {
 	});
 
 	it("reads noBody responses as undefined", async () => {
-		const apiContract = router({
+		const apiContract = {
 			todos: {
-				remove: {
-					method: "DELETE",
-					path: "/todos/:id",
-					pathParams: z.object({ id: z.string() }),
-					responses: {
-						204: noBody(),
-					},
-				},
+				remove: route
+					.delete("/todos/:id")
+					.params(z.object({ id: z.string() }))
+					.response(204),
 			},
-		});
+		};
 		captureFetch(new Response(null, { status: 204 }));
 		const client = initClient(apiContract, { baseUrl: "https://api.test" });
 
@@ -489,20 +456,14 @@ describe("ApiClient responses", () => {
 	});
 
 	it("returns declared custom responses as native Response objects", async () => {
-		const apiContract = router({
+		const apiContract = {
 			reports: {
-				csv: {
-					method: "GET",
-					path: "/reports.csv",
-					responses: {
-						200: customBody({
-							contentType: "text/csv",
-							schema: z.string(),
-						}),
-					},
-				},
+				csv: route.get("/reports.csv").customResponse(200, {
+					contentType: "text/csv",
+					schema: z.string(),
+				}),
 			},
-		});
+		};
 		captureFetch(
 			new Response("id,title\n1,First\n", {
 				status: 200,
@@ -524,20 +485,14 @@ describe("ApiClient responses", () => {
 	});
 
 	it("returns selected content type metadata for custom fetchResponse bodies", async () => {
-		const apiContract = router({
+		const apiContract = {
 			reports: {
-				image: {
-					method: "GET",
-					path: "/reports/image",
-					responses: {
-						200: customBody({
-							contentType: ["image/png", "image/jpeg"],
-							schema: z.instanceof(Uint8Array),
-						}),
-					},
-				},
+				image: route.get("/reports/image").customResponse(200, {
+					contentType: ["image/png", "image/jpeg"],
+					schema: z.instanceof(Uint8Array),
+				}),
 			},
-		});
+		};
 		captureFetch(
 			new Response("jpeg bytes", {
 				status: 200,
@@ -556,20 +511,14 @@ describe("ApiClient responses", () => {
 	});
 
 	it("rejects custom fetchResponse bodies with mismatched content types", async () => {
-		const apiContract = router({
+		const apiContract = {
 			reports: {
-				csv: {
-					method: "GET",
-					path: "/reports.csv",
-					responses: {
-						200: customBody({
-							contentType: "text/csv",
-							schema: z.string(),
-						}),
-					},
-				},
+				csv: route.get("/reports.csv").customResponse(200, {
+					contentType: "text/csv",
+					schema: z.string(),
+				}),
 			},
-		});
+		};
 		captureFetch(
 			new Response("{}", {
 				status: 200,
@@ -585,22 +534,14 @@ describe("ApiClient responses", () => {
 	});
 
 	it("returns declared custom stream responses as native Response objects", async () => {
-		const apiContract = router({
+		const apiContract = {
 			reports: {
-				csv: {
-					method: "GET",
-					path: "/reports.csv",
-					responses: {
-						200: stream(
-							customBody({
-								contentType: "text/csv",
-								schema: z.string(),
-							}),
-						),
-					},
-				},
+				csv: route.get("/reports.csv").customStreamResponse(200, {
+					contentType: "text/csv",
+					schema: z.string(),
+				}),
 			},
-		});
+		};
 		captureFetch(
 			new Response("id,title\n1,First\n", {
 				status: 200,

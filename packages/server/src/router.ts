@@ -8,6 +8,7 @@ import type {
 	ServerSent,
 	ServerSseSent,
 	ServerSuccessBody,
+	SseRouteDeclaration,
 	WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
 import { REQUEST_CONTEXT_KEY } from "@rest-rpc/core/contract";
@@ -19,6 +20,16 @@ type MaybePromise<T> = T | Promise<T>;
 type Merge<T> = {
 	[K in keyof T]: T[K];
 };
+/**
+ * Routes registered through server HTTP adapters.
+ *
+ * @remarks This includes ordinary HTTP routes and server-sent event routes.
+ * Core models them as distinct route modes, but server adapters handle both
+ * through their HTTP registration path.
+ */
+export type ServerHttpRouteDeclaration =
+	| HttpRouteDeclaration
+	| SseRouteDeclaration;
 
 /**
  * Base context object accepted by HTTP route handlers.
@@ -79,7 +90,7 @@ export type RouteReceived<E extends WebSocketRouteDeclaration> =
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
  */
-export type RouteResponseShorthand<E extends HttpRouteDeclaration> =
+export type RouteResponseShorthand<E extends ServerHttpRouteDeclaration> =
 	ServerSuccessBody<E>;
 
 /**
@@ -87,21 +98,23 @@ export type RouteResponseShorthand<E extends HttpRouteDeclaration> =
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
  */
-export type RouteErrors<E extends HttpRouteDeclaration> = ServerErrors<E>;
+export type RouteErrors<E extends ServerHttpRouteDeclaration> = ServerErrors<E>;
 
 /**
  * Infers the explicit response union for an HTTP route.
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
  */
-export type RouteResponse<E extends HttpRouteDeclaration> = ServerResponse<E>;
+export type RouteResponse<E extends ServerHttpRouteDeclaration> =
+	ServerResponse<E>;
 
 /**
  * Infers the event payload type a server sends from an SSE route.
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server-sent-events}
  */
-export type RouteSseSent<E extends HttpRouteDeclaration> = ServerSseSent<E>;
+export type RouteSseSent<E extends ServerHttpRouteDeclaration> =
+	ServerSseSent<E>;
 
 type RequestValue<E extends RouteDeclaration> =
 	RouteRequestData<E> extends never ? EmptyObject : RouteRequestData<E>;
@@ -114,16 +127,16 @@ type ExcludeResponseEnvelopeLike<T> = T extends unknown
 		: T
 	: never;
 
-type HandlerResult<E extends HttpRouteDeclaration> = MaybePromise<
+type HandlerResult<E extends ServerHttpRouteDeclaration> = MaybePromise<
 	| (RouteResponse<E> & { headers?: HttpHeaders })
 	| ExcludeResponseEnvelopeLike<RouteResponseShorthand<E>>
 >;
 
-type SseHandlerResult<E extends HttpRouteDeclaration> = MaybePromise<
+type SseHandlerResult<E extends ServerHttpRouteDeclaration> = MaybePromise<
 	AsyncIterable<SseEvent<RouteSseSent<E>>>
 >;
 
-type RouteHandlerResult<E extends HttpRouteDeclaration> = E extends {
+type RouteHandlerResult<E extends ServerHttpRouteDeclaration> = E extends {
 	mode: "sse";
 }
 	? SseHandlerResult<E>
@@ -156,7 +169,7 @@ export type CloseEventLike = {
 };
 
 type HttpRouteRequest<
-	E extends HttpRouteDeclaration,
+	E extends ServerHttpRouteDeclaration,
 	TContext extends HttpRouteHandlerContext,
 > = Merge<
 	RequestValue<E> & {
@@ -185,14 +198,14 @@ type WebSocketRouteRequest<
 export type RouteRequest<
 	E extends RouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
-> = E extends HttpRouteDeclaration
+> = E extends ServerHttpRouteDeclaration
 	? HttpRouteRequest<E, TContext>
 	: E extends WebSocketRouteDeclaration
 		? WebSocketRouteRequest<E, TContext>
 		: never;
 
 type HttpRouteHandler<
-	E extends HttpRouteDeclaration,
+	E extends ServerHttpRouteDeclaration,
 	TContext extends HttpRouteHandlerContext,
 > = (
 	...args: [request: HttpRouteRequest<E, TContext>]
@@ -213,7 +226,7 @@ type WebSocketRouteHandler<
 export type RouteHandler<
 	E extends RouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
-> = E extends HttpRouteDeclaration
+> = E extends ServerHttpRouteDeclaration
 	? HttpRouteHandler<E, TContext>
 	: E extends WebSocketRouteDeclaration
 		? WebSocketRouteHandler<E, TContext>
@@ -277,7 +290,7 @@ export type RouteHandlerFor<
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
 	TWebSocketContext extends WebSocketRouteHandlerContext =
 		WebSocketRouteHandlerContext,
-> = E extends HttpRouteDeclaration
+> = E extends ServerHttpRouteDeclaration
 	? RouteHandler<E, TContext>
 	: E extends WebSocketRouteDeclaration
 		? RouteHandler<E, TWebSocketContext>
@@ -341,7 +354,7 @@ export const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
 
 export const isHttpRoute = (
 	route: RouteDeclaration,
-): route is HttpRouteDeclaration => "responses" in route;
+): route is ServerHttpRouteDeclaration => "responses" in route;
 
 export const isWebSocketRoute = (
 	route: RouteDeclaration,
@@ -354,7 +367,7 @@ export const isWebSocketRoute = (
  */
 export function isHttpRouteImplementation(
 	implementation: RouteImplementation,
-): implementation is RouteImplementation<HttpRouteDeclaration> {
+): implementation is RouteImplementation<ServerHttpRouteDeclaration> {
 	return isHttpRoute(implementation.route);
 }
 

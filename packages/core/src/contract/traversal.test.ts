@@ -1,23 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { noBody } from "./body.ts";
+import { route } from "./routeFactory.ts";
 import { contractRoutes, mapContractRoutes } from "./traversal.ts";
 
-const getTodo = {
-	method: "GET",
-	path: "/todos/:id",
-	responses: {
-		204: noBody(),
-	},
-} as const;
+const getTodo = route.get("/todos/:id").response(204);
 
-const listUsers = {
-	method: "GET",
-	path: "/users",
-	responses: {
-		204: noBody(),
-	},
-} as const;
+const listUsers = route.get("/users").response(204);
 
 describe("contract traversal", () => {
 	it("maps nested routes with their object path", () => {

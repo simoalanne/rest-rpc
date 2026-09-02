@@ -153,20 +153,14 @@ send certain headers without requiring every call to provide them explicitly.
 :::
 
 ```ts
-const api = router({
+const api = {
 	todos: {
-		list: {
-			method: "GET",
-			path: "/todos",
-			headers: {
-				authorization: z.string(),
-			},
-			responses: {
-				200: z.array(todoSchema),
-			},
-		},
+		list: route
+			.get("/todos")
+			.headers(z.object({ authorization: z.string() }))
+			.response(200, z.array(todoSchema)),
 	},
-});
+};
 
 const client = initClient(api, {
 	baseUrl: "https://api.example.com",

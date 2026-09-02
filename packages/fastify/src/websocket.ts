@@ -86,7 +86,7 @@ export const registerFastifyWebSocketRoutes = (
 						});
 						const request = {
 							query: req.query,
-							pathParams: req.params,
+							params: req.params,
 							headers: req.headers,
 						};
 						const upgrade = await prepareWebSocketUpgrade({

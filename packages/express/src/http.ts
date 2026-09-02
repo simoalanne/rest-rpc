@@ -1,4 +1,4 @@
-import type { HttpMethod, HttpRouteDeclaration } from "@rest-rpc/core/contract";
+import type { HttpMethod } from "@rest-rpc/core/contract";
 import { toColonPath } from "@rest-rpc/core/contract";
 import {
 	handleHttpRoute,
@@ -6,6 +6,7 @@ import {
 	type HttpRouteResultStreamMode,
 	type RouteImplementation,
 	type ServerErrorHandlers,
+	type ServerHttpRouteDeclaration,
 	formatSseEvent,
 	type SseEvent,
 } from "@rest-rpc/server";
@@ -27,7 +28,7 @@ export type ExtendedExpressMiddleware = (
 	req: Request,
 	res: ExpressResponse,
 	next: NextFunction,
-	route: HttpRouteDeclaration,
+	route: ServerHttpRouteDeclaration,
 ) => unknown;
 
 const writeStreamResponse = async (
@@ -116,12 +117,12 @@ const createRequestSignal = (req: Request, res: Response) => {
 
 export const registerExpressHttpRoutes = (
 	app: IRouter,
-	routes: RouteImplementation<HttpRouteDeclaration>[],
+	routes: RouteImplementation<ServerHttpRouteDeclaration>[],
 	middleware: ExtendedExpressMiddleware[] = [],
 	errorHandlers?: ServerErrorHandlers<ExpressErrorContext>,
 ) => {
 	for (const implementation of routes) {
-		const route: HttpRouteDeclaration = implementation.route;
+		const route: ServerHttpRouteDeclaration = implementation.route;
 		const method = route.method.toLowerCase() as Lowercase<HttpMethod>;
 		const handler = implementation.handler;
 
@@ -131,7 +132,7 @@ export const registerExpressHttpRoutes = (
 				request: {
 					body: req.body,
 					query: req.query,
-					pathParams: req.params,
+					params: req.params,
 					headers: req.headers,
 				},
 				context: { kind: "http", req, signal },

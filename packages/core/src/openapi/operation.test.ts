@@ -1,14 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { route as createRoute } from "../contract/routeFactory.ts";
 import z from "zod";
-import {
-	customBody,
-	formBody,
-	multipartBody,
-	noBody,
-	stream,
-} from "../contract/body.ts";
-import { jsonQuery } from "../contract/request.ts";
 import {
 	createHeaderParameters,
 	createOperation,
@@ -30,12 +23,7 @@ const operationOptions = { schemaConverter };
 describe("OpenAPI operations", () => {
 	it("describes SSE responses as event streams", () => {
 		const operation = createOperation(
-			{
-				method: "GET",
-				path: "/events",
-				mode: "sse",
-				responses: { 200: z.object({ id: z.string() }) },
-			},
+			createRoute.sse("/events").response(z.object({ id: z.string() })),
 			{
 				info: { title: "Test", version: "1" },
 				schemaConverter,
@@ -76,17 +64,14 @@ describe("OpenAPI operations", () => {
 		);
 	});
 
-	it("creates path params as required and query params without assumed requiredness from schema records", () => {
+	it("creates path params as required and query params from object schemas", () => {
 		const params = createParameters(
-			{ id: z.string() },
+			z.object({ id: z.string() }),
 			"path",
 			operationOptions,
 		);
 		const query = createParameters(
-			{
-				search: z.string(),
-				page: z.number().optional(),
-			},
+			z.object({ search: z.string(), page: z.number().optional() }),
 			"query",
 			operationOptions,
 		);
@@ -100,20 +85,21 @@ describe("OpenAPI operations", () => {
 			})),
 			[
 				{ name: "id", in: "path", required: true, type: "string" },
-				{ name: "search", in: "query", required: undefined, type: "string" },
-				{ name: "page", in: "query", required: undefined, type: "number" },
+				{ name: "search", in: "query", required: true, type: "string" },
+				{ name: "page", in: "query", required: false, type: "number" },
 			],
 		);
 	});
 
 	it("creates one JSON query parameter for jsonQuery schemas", () => {
 		const parameters = createParameters(
-			jsonQuery(
-				z.object({
+			{
+				kind: "jsonQuery",
+				schema: z.object({
 					page: z.number(),
 					filters: z.object({ tags: z.array(z.string()) }),
 				}),
-			),
+			},
 			"query",
 			operationOptions,
 		);
@@ -149,7 +135,7 @@ describe("OpenAPI operations", () => {
 
 	it("does not assume jsonQuery parameters are required", () => {
 		const parameters = createParameters(
-			jsonQuery(z.object({ page: z.number() }).optional()),
+			{ kind: "jsonQuery", schema: z.object({ page: z.number() }).optional() },
 			"query",
 			operationOptions,
 		);
@@ -181,9 +167,9 @@ describe("OpenAPI operations", () => {
 		);
 	});
 
-	it("documents schema-record path params as required", () => {
+	it("documents object-schema path params as required", () => {
 		const parameters = createParameters(
-			{ id: z.string().optional() },
+			z.object({ id: z.string().optional() }),
 			"path",
 			operationOptions,
 		);
@@ -199,30 +185,30 @@ describe("OpenAPI operations", () => {
 	});
 
 	it("applies parameter transforms", () => {
-		const route: OpenApiRouteDeclaration = {
-			path: "/todos/:id",
-			method: "GET",
-			pathParams: z.object({ id: z.string() }),
-			query: {
-				search: z
-					.string()
-					.min(1)
-					.meta({ openApi: { required: true } }),
-				cursor: z
-					.string()
-					.optional()
-					.meta({ openApi: { required: false } }),
-			},
-			headers: {
-				"x-preview": z
-					.literal("1")
-					.optional()
-					.meta({ openApi: { required: false } }),
-			},
-			responses: {
-				200: z.array(z.object({ id: z.string() })),
-			},
-		};
+		const route: OpenApiRouteDeclaration = createRoute
+			.get("/todos/:id")
+			.params(z.object({ id: z.string() }))
+			.query(
+				z.object({
+					search: z
+						.string()
+						.min(1)
+						.meta({ openApi: { required: true } }),
+					cursor: z
+						.string()
+						.optional()
+						.meta({ openApi: { required: false } }),
+				}),
+			)
+			.headers(
+				z.object({
+					"x-preview": z
+						.literal("1")
+						.optional()
+						.meta({ openApi: { required: false } }),
+				}),
+			)
+			.response(200, z.array(z.object({ id: z.string() })));
 
 		const operation = createOperation(
 			route,
@@ -290,7 +276,14 @@ describe("OpenAPI operations", () => {
 	it("creates request header parameters", () => {
 		const headers = createHeaderParameters(
 			{
-				"x-api-key": z.string(),
+				inherited: z.object({
+					"x-api-key": z.string(),
+					"x-shared": z.string(),
+				}),
+				local: z.object({
+					"x-request-id": z.string().optional(),
+					"x-shared": z.number(),
+				}),
 			},
 			operationOptions,
 		);
@@ -299,6 +292,23 @@ describe("OpenAPI operations", () => {
 			{
 				name: "x-api-key",
 				in: "header",
+				required: true,
+				schema: {
+					type: "string",
+				},
+			},
+			{
+				name: "x-shared",
+				in: "header",
+				required: true,
+				schema: {
+					type: "number",
+				},
+			},
+			{
+				name: "x-request-id",
+				in: "header",
+				required: false,
 				schema: {
 					type: "string",
 				},
@@ -312,10 +322,11 @@ describe("OpenAPI operations", () => {
 			schemaConverter,
 		);
 		const custom = createRequestBody(
-			customBody({
+			{
+				kind: "customBody",
 				schema: z.string(),
 				contentType: "text/csv",
-			}),
+			},
 			schemaConverter,
 		);
 
@@ -340,10 +351,11 @@ describe("OpenAPI operations", () => {
 
 	it("creates custom request bodies with multiple declared content types", () => {
 		const body = createRequestBody(
-			customBody({
+			{
+				kind: "customBody",
 				schema: z.string(),
 				contentType: ["image/png", "image/jpeg"],
-			}),
+			},
 			schemaConverter,
 		);
 
@@ -353,18 +365,23 @@ describe("OpenAPI operations", () => {
 	});
 
 	it("omits custom request bodies without declared content types", () => {
-		const body = createRequestBody(customBody(z.string()), schemaConverter);
+		const body = createRequestBody(
+			{ kind: "customBody", schema: z.string() },
+			schemaConverter,
+		);
 
 		assert.equal(body, undefined);
 	});
 
 	it("creates urlencoded form request bodies", () => {
 		const body = createRequestBody(
-			formBody(
-				z.object({
+			{
+				kind: "formBody",
+				schema: z.object({
 					title: z.string(),
 				}),
-			),
+				arrayKeys: [],
+			},
 			schemaConverter,
 		);
 
@@ -377,13 +394,14 @@ describe("OpenAPI operations", () => {
 
 	it("creates multipart request bodies", () => {
 		const body = createRequestBody(
-			multipartBody({
+			{
+				kind: "multipartBody",
 				schema: z.object({
 					title: z.string(),
 					file: z.string(),
 				}),
 				arrayKeys: [],
-			}),
+			},
 			schemaConverter,
 		);
 
@@ -391,12 +409,12 @@ describe("OpenAPI operations", () => {
 		assert.equal(body?.content["application/json"], undefined);
 	});
 
-	it("creates JSON request bodies from schema records", () => {
+	it("creates JSON request bodies from object schemas", () => {
 		const body = createRequestBody(
-			{
+			z.object({
 				title: z.string(),
 				priority: z.number().optional(),
-			},
+			}),
 			schemaConverter,
 		);
 
@@ -405,6 +423,7 @@ describe("OpenAPI operations", () => {
 				"application/json": {
 					schema: {
 						type: "object",
+						required: ["title"],
 						properties: {
 							title: { type: "string" },
 							priority: { type: "number" },
@@ -416,11 +435,14 @@ describe("OpenAPI operations", () => {
 	});
 
 	it("omits explicit no-body request bodies", () => {
-		assert.equal(createRequestBody(noBody(), schemaConverter), undefined);
+		assert.equal(
+			createRequestBody({ kind: "noBody" }, schemaConverter),
+			undefined,
+		);
 	});
 
 	it("creates no-body and JSON responses", () => {
-		const empty = createResponse("", noBody(), schemaConverter);
+		const empty = createResponse("", { kind: "noBody" }, schemaConverter);
 		const json = createResponse(
 			"",
 			z.object({ code: z.string() }),
@@ -437,10 +459,10 @@ describe("OpenAPI operations", () => {
 			"Created.",
 			{
 				body: z.object({ id: z.string() }),
-				headers: {
+				headers: z.object({
 					location: z.string(),
 					"x-next-cursor": z.string().optional(),
-				},
+				}),
 			},
 			schemaConverter,
 		);
@@ -464,10 +486,8 @@ describe("OpenAPI operations", () => {
 		const response = createResponse(
 			"",
 			{
-				body: noBody(),
-				headers: {
-					location: z.string(),
-				},
+				body: { kind: "noBody" },
+				headers: z.object({ location: z.string() }),
 			},
 			schemaConverter,
 		);
@@ -522,9 +542,7 @@ describe("OpenAPI operations", () => {
 			"",
 			{
 				body: z.object({ id: z.string() }),
-				headers: {
-					etag: z.string(),
-				},
+				headers: z.object({ etag: z.string() }),
 			},
 			schemaConverter,
 			{
@@ -546,10 +564,9 @@ describe("OpenAPI operations", () => {
 
 	it("skips OpenAPI response metadata for undeclared statuses", () => {
 		const operation = createOperation(
-			{
-				path: "/todos",
-				method: "GET",
-				openApi: {
+			createRoute
+				.get("/todos")
+				.withOpenApi({
 					responses: {
 						200: {
 							description: "Todos returned.",
@@ -558,11 +575,8 @@ describe("OpenAPI operations", () => {
 							description: "Authentication is required.",
 						},
 					},
-				},
-				responses: {
-					200: z.array(z.object({ id: z.string() })),
-				},
-			},
+				})
+				.response(200, z.array(z.object({ id: z.string() }))),
 			{
 				info: { title: "Todo API", version: "1.0.0" },
 				schemaConverter,
@@ -576,10 +590,11 @@ describe("OpenAPI operations", () => {
 	it("creates custom responses with declared content types", () => {
 		const response = createResponse(
 			"",
-			customBody({
+			{
+				kind: "customBody",
 				contentType: "text/csv",
 				schema: z.string(),
-			}),
+			},
 			schemaConverter,
 		);
 
@@ -590,10 +605,11 @@ describe("OpenAPI operations", () => {
 	it("creates custom responses with multiple declared content types", () => {
 		const response = createResponse(
 			"",
-			customBody({
+			{
+				kind: "customBody",
 				contentType: ["image/png", "image/jpeg"],
 				schema: z.string(),
-			}),
+			},
 			schemaConverter,
 		);
 
@@ -604,7 +620,7 @@ describe("OpenAPI operations", () => {
 	it("creates NDJSON stream responses as text wire bodies", () => {
 		const response = createResponse(
 			"",
-			stream(z.object({ id: z.string() })),
+			{ kind: "stream", schema: z.object({ id: z.string() }) },
 			schemaConverter,
 		);
 
@@ -616,22 +632,26 @@ describe("OpenAPI operations", () => {
 	it("creates custom stream responses with wire-level schemas", () => {
 		const csv = createResponse(
 			"",
-			stream(
-				customBody({
+			{
+				kind: "stream",
+				schema: {
+					kind: "customBody",
 					contentType: "text/csv",
 					schema: z.number(),
-				}),
-			),
+				},
+			},
 			schemaConverter,
 		);
 		const binary = createResponse(
 			"",
-			stream(
-				customBody({
+			{
+				kind: "stream",
+				schema: {
+					kind: "customBody",
 					contentType: "application/octet-stream",
 					schema: z.number(),
-				}),
-			),
+				},
+			},
 			schemaConverter,
 		);
 
@@ -648,16 +668,12 @@ describe("OpenAPI operations", () => {
 			modes.push(mode);
 			return { type: "object", properties: {} };
 		};
-		const route: OpenApiRouteDeclaration = {
-			path: "/todos/:id",
-			method: "POST",
-			pathParams: { id: z.string() },
-			headers: { "x-api-key": z.string() },
-			body: { title: z.string() },
-			responses: {
-				201: z.object({ id: z.string() }),
-			},
-		};
+		const route: OpenApiRouteDeclaration = createRoute
+			.post("/todos/:id")
+			.params(z.object({ id: z.string() }))
+			.headers(z.object({ "x-api-key": z.string() }))
+			.body(z.object({ title: z.string() }))
+			.response(201, z.object({ id: z.string() }));
 
 		createOperation(route, {
 			info: { title: "Todo API", version: "1.0.0" },
@@ -668,13 +684,9 @@ describe("OpenAPI operations", () => {
 	});
 
 	it("applies operation transforms", () => {
-		const route: OpenApiRouteDeclaration = {
-			path: "/todos",
-			method: "GET",
-			responses: {
-				204: noBody(),
-			},
-		};
+		const route: OpenApiRouteDeclaration = createRoute
+			.get("/todos")
+			.response(204);
 
 		const operation = createOperation(
 			route,
@@ -693,10 +705,9 @@ describe("OpenAPI operations", () => {
 	});
 
 	it("applies explicit route OpenAPI options", () => {
-		const route: OpenApiRouteDeclaration = {
-			path: "/todos",
-			method: "GET",
-			openApi: {
+		const route: OpenApiRouteDeclaration = createRoute
+			.get("/todos")
+			.withOpenApi({
 				summary: "List todos",
 				description: "Returns visible todos.",
 				operationId: "listTodos",
@@ -712,11 +723,8 @@ describe("OpenAPI operations", () => {
 				extensions: {
 					"x-feature": "todos",
 				},
-			},
-			responses: {
-				200: z.array(z.object({ id: z.string() })),
-			},
-		};
+			})
+			.response(200, z.array(z.object({ id: z.string() })));
 
 		const operation = createOperation(route, {
 			info: { title: "Todo API", version: "1.0.0" },
@@ -737,7 +745,7 @@ describe("OpenAPI operations", () => {
 	});
 
 	it("omits explicit no-body responses after receiving the required converter", () => {
-		assert.deepEqual(createResponse("", noBody(), schemaConverter), {
+		assert.deepEqual(createResponse("", { kind: "noBody" }, schemaConverter), {
 			description: "",
 		});
 	});

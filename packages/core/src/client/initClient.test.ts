@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import z from "zod";
-import { router } from "../contract/contract.ts";
+import { route } from "../contract/routeFactory.ts";
 import { initClient } from "./initClient.ts";
 
 const originalFetch = globalThis.fetch;
@@ -15,41 +15,30 @@ type FetchCall = {
 	init?: RequestInit;
 };
 
-const apiContract = router({
+const apiContract = {
 	todos: {
-		list: {
-			method: "GET",
-			path: "/todos",
-			query: z.object({
-				search: z.string().optional(),
-			}),
-			responses: {
-				200: z.array(z.object({ id: z.string() })),
-			},
-		},
-		publish: {
-			method: "POST",
-			path: "/todos/:id/publish",
-			pathParams: z.object({ id: z.string() }),
-			responses: {
-				200: z.object({ id: z.string() }),
-				202: z.object({ queued: z.literal(true) }),
-			},
-		},
+		list: route
+			.get("/todos")
+			.query(
+				z.object({
+					search: z.string().optional(),
+				}),
+			)
+			.response(200, z.array(z.object({ id: z.string() }))),
+		publish: route
+			.post("/todos/:id/publish")
+			.params(z.object({ id: z.string() }))
+			.response(200, z.object({ id: z.string() }))
+			.response(202, z.object({ queued: z.literal(true) })),
 	},
 	socket: {
-		join: {
-			method: "GET",
-			path: "/rooms/:roomId",
-			pathParams: z.object({ roomId: z.string() }),
-			mode: "webSocket",
-			messages: {
-				client: z.object({ text: z.string() }),
-				server: z.object({ text: z.string() }),
-			},
-		},
+		join: route
+			.ws("/rooms/:roomId")
+			.params(z.object({ roomId: z.string() }))
+			.clientMessage("message", z.object({ text: z.string() }))
+			.serverMessage("message", z.object({ text: z.string() })),
 	},
-});
+};
 
 const jsonResponse = (body: unknown, status = 200) =>
 	new Response(JSON.stringify(body), {

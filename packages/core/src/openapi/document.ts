@@ -1,10 +1,8 @@
-import type {
-	Contract,
-	HttpRouteDeclaration,
-	RouteDeclaration,
-} from "../contract/contract.ts";
+import type { Contract, RouteDeclaration } from "../contract/contract.ts";
+import type { HttpRouteDeclaration } from "../contract/httpRouteBuilder.ts";
+import type { SseRouteDeclaration } from "../contract/sseRouteBuilder.ts";
 import { toOpenApiPath } from "../contract/path.ts";
-import { contractRoutes } from "../contract/traversal.ts";
+import { contractRouteEntries } from "../contract/traversal.ts";
 import type {
 	OpenApiParameter,
 	OpenApiOperation,
@@ -73,7 +71,8 @@ export type CreateOpenApiDocumentOptions = {
 
 const isOpenApiCompatibleRoute = (
 	route: RouteDeclaration,
-): route is HttpRouteDeclaration => route.mode !== "webSocket";
+): route is HttpRouteDeclaration | SseRouteDeclaration =>
+	route.mode !== "webSocket";
 
 /**
  * Generates an OpenAPI document object from HTTP routes in a contract.
@@ -94,17 +93,13 @@ export function createOpenApiDocument(
 		paths: {},
 	};
 
-	for (const route of contractRoutes(contract)) {
+	for (const { route, path: routePath } of contractRouteEntries(contract)) {
 		if (!isOpenApiCompatibleRoute(route)) continue;
 
 		const path = toOpenApiPath(route.path);
 		const method = route.method.toLowerCase() as keyof OpenApiPathItem;
 		document.paths[path] ??= {};
-		document.paths[path][method] = createOperation(
-			route,
-			options,
-			route.routePath ?? [],
-		);
+		document.paths[path][method] = createOperation(route, options, routePath);
 	}
 
 	return document;

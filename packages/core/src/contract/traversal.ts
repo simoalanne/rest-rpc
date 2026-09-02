@@ -1,5 +1,4 @@
 import type { Contract, RouteDeclaration } from "./contract.ts";
-import { isRouteDeclaration } from "./contract.ts";
 
 type Tree<T> = Record<string, unknown> | T;
 export type ContractRouteEntry = {
@@ -25,6 +24,15 @@ export const mapObjectValues = <TLeaf>(
 				},
 				{} as Record<string, unknown>,
 			);
+
+const isRouteDeclaration = (value: unknown): value is RouteDeclaration => {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		"path" in value &&
+		"method" in value
+	);
+};
 
 export const mapContractRoutes = (
 	contract: Contract,

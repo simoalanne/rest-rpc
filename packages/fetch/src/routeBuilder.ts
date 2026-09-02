@@ -1,4 +1,3 @@
-import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	type Contract,
 	type ImplementationTree,
@@ -8,6 +7,7 @@ import {
 	type RouteImplementation,
 	type RouteHandlers as ServerRouteHandlers,
 	type RouteRequest as ServerRouteRequest,
+	type ServerHttpRouteDeclaration,
 	route as serverRoute,
 	router as serverRouter,
 } from "@rest-rpc/server";
@@ -22,18 +22,19 @@ type MergeContext<
 > = Merge<Omit<TContext, keyof TNextContext> & TNextContext>;
 
 /**
- * A contract tree containing only HTTP routes for the Fetch runtime.
+ * A contract tree containing Fetch runtime HTTP and SSE routes.
  *
  * @see {@link https://rest-rpc.dev/docs/server/fetch}
  */
-export type FetchContract = Contract<HttpRouteDeclaration>;
+export type FetchContract = Contract<ServerHttpRouteDeclaration>;
 
 /**
- * An HTTP-only implementation tree for the Fetch runtime.
+ * A Fetch runtime HTTP and SSE implementation tree.
  *
  * @see {@link https://rest-rpc.dev/docs/server/fetch}
  */
-export type FetchImplementationTree = ImplementationTree<HttpRouteDeclaration>;
+export type FetchImplementationTree =
+	ImplementationTree<ServerHttpRouteDeclaration>;
 
 /**
  * The context object passed to Fetch runtime route handlers.
@@ -61,7 +62,7 @@ export type FetchRouteMiddlewareInput<
 > = {
 	context: TContext;
 	request: TRequest;
-	route: HttpRouteDeclaration;
+	route: ServerHttpRouteDeclaration;
 	runtime: TRuntimeContext;
 };
 
@@ -92,7 +93,7 @@ export type FetchRouteMiddleware<
 export type FetchRouteImplementation<
 	TRuntimeContext extends Record<string, unknown>,
 	TRequest extends Request = Request,
-> = RouteImplementation<HttpRouteDeclaration> & {
+> = RouteImplementation<ServerHttpRouteDeclaration> & {
 	middleware?: FetchRouteMiddleware<
 		TRuntimeContext,
 		Record<string, unknown>,
@@ -107,7 +108,7 @@ export type FetchRouteImplementation<
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
  */
 export type RouteRequest<
-	E extends HttpRouteDeclaration,
+	E extends ServerHttpRouteDeclaration,
 	TContext extends Record<string, unknown> = Record<string, unknown>,
 	TRequest extends Request = Request,
 > = ServerRouteRequest<E, FetchRouteContext<TContext, TRequest>>;
@@ -140,7 +141,7 @@ export type RouteHandlers<
 >;
 
 type FetchRouteBuilderWithMiddleware<
-	TRoute extends HttpRouteDeclaration,
+	TRoute extends ServerHttpRouteDeclaration,
 	TContext extends Record<string, unknown>,
 	TRequest extends Request,
 > = {
@@ -155,7 +156,7 @@ type FetchRouteBuilderWithMiddleware<
  * @see {@link https://rest-rpc.dev/docs/server/fetch}
  */
 export type FetchRouteBuilder<
-	TRoute extends HttpRouteDeclaration,
+	TRoute extends ServerHttpRouteDeclaration,
 	TRuntimeContext extends Record<string, unknown>,
 	TRequest extends Request = Request,
 > = FetchRouteBuilderWithStackedMiddleware<
@@ -172,7 +173,7 @@ type FetchRouterBuilderWithMiddleware<
 > = {
 	handlers(
 		handlers: RouteHandlers<TContract, TContext, TRequest>,
-	): ImplementationTreeFor<TContract, HttpRouteDeclaration> &
+	): ImplementationTreeFor<TContract, ServerHttpRouteDeclaration> &
 		FetchImplementationTree;
 };
 
@@ -198,7 +199,7 @@ export type FetchRouterBuilder<
 	>;
 
 type FetchRouteBuilderWithStackedMiddleware<
-	TRoute extends HttpRouteDeclaration,
+	TRoute extends ServerHttpRouteDeclaration,
 	TRuntimeContext extends Record<string, unknown>,
 	TContext extends Record<string, unknown>,
 	TRequest extends Request,
@@ -270,7 +271,7 @@ const attachMiddleware = <
 };
 
 export const createFetchRouteBuilder = <
-	const TRoute extends HttpRouteDeclaration,
+	const TRoute extends ServerHttpRouteDeclaration,
 	TRuntimeContext extends Record<string, unknown>,
 	TRequest extends Request = Request,
 	TContext extends Record<string, unknown> = Record<never, never>,
@@ -350,9 +351,9 @@ export const createFetchRouterBuilder = <
 		serverRouter(contract, handlers as never, {
 			createRouteImplementation: ({ route, handler }) =>
 				attachMiddleware(
-					{ route: route as HttpRouteDeclaration, handler },
+					{ route: route as ServerHttpRouteDeclaration, handler },
 					middlewares,
 				),
-		}) as ImplementationTreeFor<TContract, HttpRouteDeclaration> &
+		}) as ImplementationTreeFor<TContract, ServerHttpRouteDeclaration> &
 			FetchImplementationTree,
 });

@@ -1,8 +1,6 @@
-import type {
-	HttpRouteDeclaration,
-	RouteDeclaration,
-} from "@rest-rpc/core/contract";
+import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import type { HttpHeaders } from "./headers.ts";
+import type { ServerHttpRouteDeclaration } from "./router.ts";
 import type { RequestSegments, ValidationIssue } from "./validation.ts";
 
 type MaybePromise<T> = T | Promise<T>;
@@ -54,7 +52,7 @@ export type UnhandledErrorInput<
 export type ResponseValidationErrorInput<
 	TContext extends Record<string, unknown>,
 > = {
-	route: HttpRouteDeclaration;
+	route: ServerHttpRouteDeclaration;
 	request: RequestSegments;
 	context: TContext;
 	error: unknown;

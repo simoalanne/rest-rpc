@@ -1,12 +1,4 @@
-import {
-	customBody,
-	router as defineRouter,
-	formBody,
-	jsonQuery,
-	noBody,
-	stream,
-	webSocketMessages,
-} from "@rest-rpc/core/contract";
+import { route as coreRoute } from "@rest-rpc/core";
 import {
 	type RouteHandlers,
 	type RouteReceived,
@@ -41,24 +33,35 @@ const todoSchema = z.object({
 // route handler request inference
 
 // should expose flattened request fields and adapter context to route handlers
-const createApi = defineRouter({
+const createApi = {
 	todos: {
-		create: {
-			method: "POST",
-			path: "/todos",
-			body: z.object({ title: z.string() }),
-			responses: {
-				201: {
-					body: todoSchema,
-					headers: {
-						location: z.string(),
-						"x-next-cursor": z.string().optional(),
-					},
-				},
-			},
-		},
+		create: coreRoute
+			.post("/todos")
+			.body(z.object({ title: z.string() }))
+			.response(201, {
+				body: todoSchema,
+				headers: z.object({
+					location: z.string(),
+					"x-next-cursor": z.string().optional(),
+				}),
+			}),
 	},
-});
+} as const;
+
+const transformedResponseHeadersApi = {
+	todos: {
+		get: coreRoute.get("/todos/transformed-headers").response(200, {
+			body: todoSchema,
+			headers: z.string().transform((value) => ({ etag: value })),
+		}),
+	},
+} as const;
+
+type TransformedResponseHeaders = RouteResponse<
+	typeof transformedResponseHeadersApi.todos.get
+>;
+declare const transformedResponse: TransformedResponseHeaders;
+expectType<string>(transformedResponse.responseHeaders);
 
 type CreateTodoRequest = RouteRequest<
 	typeof createApi.todos.create,
@@ -72,31 +75,48 @@ type CreateTodoRequestData = RouteRequestData<typeof createApi.todos.create>;
 declare const createTodoRequestData: CreateTodoRequestData;
 expectType<string>(createTodoRequestData.title);
 
+const composedHeadersApi = {
+	items: {
+		get: coreRoute
+			.with({
+				headers: z
+					.object({ authorization: z.string() })
+					.transform(() => ({ authenticated: true as const })),
+			})
+			.get("/items")
+			.headers(
+				z
+					.object({ "x-request-id": z.string() })
+					.transform(() => ({ traceId: "request-1" as const })),
+			)
+			.response(204),
+	},
+} as const;
+
+type ComposedHeadersRequest = RouteRequestData<
+	typeof composedHeadersApi.items.get
+>;
+declare const composedHeadersRequest: ComposedHeadersRequest;
+expectType<true>(composedHeadersRequest.authenticated);
+expectType<"request-1">(composedHeadersRequest.traceId);
+
 type CreateTodoResponse = RouteResponse<typeof createApi.todos.create>;
 declare const createTodoResponse: CreateTodoResponse;
 expectType<201>(createTodoResponse.status);
 
-const errorApi = defineRouter({
+const errorApi = {
 	todos: {
-		get: {
-			method: "GET",
-			path: "/todos/:id",
-			responses: {
-				200: todoSchema,
-				404: z.object({ code: z.literal("TODO_NOT_FOUND") }),
-			},
-		},
-		create: {
-			method: "POST",
-			path: "/todos",
-			body: z.object({ title: z.string() }),
-			responses: {
-				201: todoSchema,
-				409: z.object({ code: z.literal("TODO_ALREADY_EXISTS") }),
-			},
-		},
+		get: coreRoute
+			.get("/todos/:id")
+			.response(200, todoSchema)
+			.response(404, z.object({ code: z.literal("TODO_NOT_FOUND") })),
+		create: coreRoute
+			.post("/todos")
+			.body(z.object({ title: z.string() }))
+			.response(201, todoSchema)
+			.response(409, z.object({ code: z.literal("TODO_ALREADY_EXISTS") })),
 	},
-});
+} as const;
 
 // should allow response envelope that's part of the route scope
 new RouteResponseError(errorApi, {
@@ -152,20 +172,17 @@ const createImplementation = route(
 
 expectType<typeof createApi.todos.create>(createImplementation.route);
 
-const responseEnvelopeBodyApi = defineRouter({
+const responseEnvelopeBodyApi = {
 	jobs: {
-		get: {
-			method: "GET",
-			path: "/jobs/:id",
-			responses: {
-				200: z.object({
-					status: z.number(),
-					body: z.string(),
-				}),
-			},
-		},
+		get: coreRoute.get("/jobs/:id").response(
+			200,
+			z.object({
+				status: z.number(),
+				body: z.string(),
+			}),
+		),
 	},
-});
+} as const;
 
 // Should not accept shorthand response when it's ambiguous
 expectError(
@@ -184,20 +201,17 @@ route(responseEnvelopeBodyApi.jobs.get, () => ({
 	},
 }));
 
-const optionalStatusBodyApi = defineRouter({
+const optionalStatusBodyApi = {
 	jobs: {
-		get: {
-			method: "GET",
-			path: "/jobs/:id",
-			responses: {
-				200: z.object({
-					id: z.string(),
-					status: z.string().optional(),
-				}),
-			},
-		},
+		get: coreRoute.get("/jobs/:id").response(
+			200,
+			z.object({
+				id: z.string(),
+				status: z.string().optional(),
+			}),
+		),
 	},
-});
+} as const;
 
 // Should not accept shorthand response when it may include a reserved envelope key
 expectError(
@@ -219,33 +233,23 @@ route(optionalStatusBodyApi.jobs.get, () => ({
 // websocket handler request inference
 
 // should expose path params, context, and typed outbound messages to websocket handlers
-const socketApi = defineRouter({
+const socketApi = {
 	socket: {
-		room: {
-			method: "GET",
-			path: "/rooms/:roomId",
-			pathParams: z.object({ roomId: z.string() }),
-			mode: "webSocket",
-			messages: {
-				client: {
-					discriminator: "action",
-					schemas: {
-						echo: z.object({ text: z.string() }),
-						count: z.object({
-							value: z.string().transform((value) => Number(value)),
-						}),
-					},
-				},
-				server: webSocketMessages("type", {
-					ready: z.object({ roomId: z.string() }),
-					counted: z.object({
-						value: z.string().transform((value) => Number(value)),
-					}),
-				}),
-			},
-		},
+		room: coreRoute
+			.ws("/rooms/:roomId")
+			.params(z.object({ roomId: z.string() }))
+			.clientMessage("echo", z.object({ text: z.string() }))
+			.clientMessage(
+				"count",
+				z.object({ value: z.string().transform((value) => Number(value)) }),
+			)
+			.serverMessage("ready", z.object({ roomId: z.string() }))
+			.serverMessage(
+				"counted",
+				z.object({ value: z.string().transform((value) => Number(value)) }),
+			),
 	},
-});
+} as const;
 
 type SocketRequest = RouteRequest<
 	typeof socketApi.socket.room,
@@ -271,21 +275,20 @@ socketRequest.context.socket.onMessage((message) => {
 // sse handler request inference
 
 // should expose path params, context, and typed outbound events to sse handlers
-const sseApi = defineRouter({
+const sseApi = {
 	events: {
-		notifications: {
-			method: "GET",
-			path: "/events/:projectId",
-			mode: "sse",
-			pathParams: z.object({ projectId: z.string() }),
-			query: z.object({ includeDone: z.boolean().optional() }),
-			response: z.object({
-				id: z.string(),
-				createdAt: z.string().transform((value) => new Date(value)),
-			}),
-		},
+		notifications: coreRoute
+			.sse("/events/:projectId")
+			.params(z.object({ projectId: z.string() }))
+			.query(z.object({ includeDone: z.boolean().optional() }))
+			.response(
+				z.object({
+					id: z.string(),
+					createdAt: z.string().transform((value) => new Date(value)),
+				}),
+			),
 	},
-});
+} as const;
 
 type SseRequest = RouteRequest<
 	typeof sseApi.events.notifications,
@@ -374,26 +377,29 @@ expectError(
 // route handler input and output coverage
 
 // should use server-side transformed schema output as handler input
-const transformedApi = defineRouter({
+const transformedApi = {
 	todos: {
-		transform: {
-			method: "POST",
-			path: "/todos/:id/transform",
-			pathParams: z.object({ id: z.string() }).transform(({ id }) => ({
-				id: Number(id),
-			})),
-			body: z.object({ title: z.string() }).transform(({ title }) => ({
-				title: title.trim(),
-				slug: title.toLowerCase(),
-			})),
-			responses: {
-				200: z.object({ id: z.number() }).transform(({ id }) => ({
+		transform: coreRoute
+			.post("/todos/:id/transform")
+			.params(
+				z.object({ id: z.string() }).transform(({ id }) => ({
+					id: Number(id),
+				})),
+			)
+			.body(
+				z.object({ title: z.string() }).transform(({ title }) => ({
+					title: title.trim(),
+					slug: title.toLowerCase(),
+				})),
+			)
+			.response(
+				200,
+				z.object({ id: z.number() }).transform(({ id }) => ({
 					id: String(id),
 				})),
-			},
-		},
+			),
 	},
-});
+} as const;
 
 route(transformedApi.todos.transform, ({ id, title, slug }) => {
 	expectType<number>(id);
@@ -409,21 +415,14 @@ route(transformedApi.todos.transform, ({ id, title, slug }) => {
 });
 
 // should expose single custom body content types as payloads to handlers
-const singleCustomRequestApi = defineRouter({
+const singleCustomRequestApi = {
 	todos: {
-		importCsv: {
-			method: "POST",
-			path: "/todos/import.csv",
-			body: customBody({
-				contentType: "text/csv",
-				schema: z.string(),
-			}),
-			responses: {
-				204: noBody(),
-			},
-		},
+		importCsv: coreRoute
+			.post("/todos/import.csv")
+			.customBody({ contentType: "text/csv", schema: z.string() })
+			.response(204),
 	},
-});
+} as const;
 
 route(singleCustomRequestApi.todos.importCsv, ({ body }) => {
 	expectType<string>(body);
@@ -434,18 +433,14 @@ route(singleCustomRequestApi.todos.importCsv, ({ body }) => {
 });
 
 // should expose omitted custom body content types as payloads to handlers
-const omittedCustomRequestApi = defineRouter({
+const omittedCustomRequestApi = {
 	todos: {
-		submitForm: {
-			method: "POST",
-			path: "/todos/form",
-			body: customBody(z.instanceof(URLSearchParams)),
-			responses: {
-				204: noBody(),
-			},
-		},
+		submitForm: coreRoute
+			.post("/todos/form")
+			.customBody(z.instanceof(URLSearchParams))
+			.response(204),
 	},
-});
+} as const;
 
 route(omittedCustomRequestApi.todos.submitForm, ({ body }) => {
 	expectType<URLSearchParams>(body);
@@ -456,23 +451,19 @@ route(omittedCustomRequestApi.todos.submitForm, ({ body }) => {
 });
 
 // should expose validated urlencoded form bodies to handlers
-const formRequestApi = defineRouter({
+const formRequestApi = {
 	todos: {
-		submitForm: {
-			method: "POST",
-			path: "/todos/form",
-			body: formBody(
+		submitForm: coreRoute
+			.post("/todos/form")
+			.formBody(
 				z.object({
 					title: z.string(),
-					count: z.coerce.number(),
+					count: z.coerce.number<number>(),
 				}),
-			),
-			responses: {
-				204: noBody(),
-			},
-		},
+			)
+			.response(204),
 	},
-});
+} as const;
 
 route(formRequestApi.todos.submitForm, ({ body }) => {
 	expectType<{
@@ -484,22 +475,18 @@ route(formRequestApi.todos.submitForm, ({ body }) => {
 });
 
 // should expose selected custom body content type and payload to handlers
-const customRequestApi = defineRouter({
+const customRequestApi = {
 	todos: {
-		uploadImage: {
-			method: "POST",
-			path: "/todos/:id/image",
-			pathParams: z.object({ id: z.string() }),
-			body: customBody({
+		uploadImage: coreRoute
+			.post("/todos/:id/image")
+			.params(z.object({ id: z.string() }))
+			.customBody({
 				contentType: ["image/png", "image/jpeg"],
 				schema: z.instanceof(Uint8Array),
-			}),
-			responses: {
-				204: noBody(),
-			},
-		},
+			})
+			.response(204),
 	},
-});
+} as const;
 
 route(customRequestApi.todos.uploadImage, ({ id, body }) => {
 	expectType<string>(id);
@@ -519,41 +506,33 @@ route(socketApi.socket.room, ({ roomId, context }) => {
 	expectError(context.socket.send({ type: "missing", message: {} }));
 
 	context.socket.onMessage((message) => {
-		if (message.action === "echo") {
+		if (message.type === "echo") {
 			expectType<string>(message.message.text);
 		} else {
-			expectType<"count">(message.action);
+			expectType<"count">(message.type);
 			expectType<number>(message.message.value);
 		}
 	});
 });
 
 // should expose JSON query schemas as a single typed query field
-const jsonQueryApi = defineRouter({
+const jsonQueryApi = {
 	todos: {
-		jsonSearch: {
-			method: "GET",
-			path: "/todos/json-search",
-			query: jsonQuery(
+		jsonSearch: coreRoute
+			.get("/todos/json-search")
+			.jsonQuery(
 				z.object({
 					page: z.string().transform((value) => Number(value)),
 					filters: z.object({ tags: z.array(z.string()) }),
 				}),
-			),
-			responses: {
-				200: z.array(todoSchema),
-			},
-		},
-		optionalJsonSearch: {
-			method: "GET",
-			path: "/todos/optional-json-search",
-			query: jsonQuery(z.object({ page: z.number() }).optional()),
-			responses: {
-				200: z.array(todoSchema),
-			},
-		},
+			)
+			.response(200, z.array(todoSchema)),
+		optionalJsonSearch: coreRoute
+			.get("/todos/optional-json-search")
+			.jsonQuery(z.object({ page: z.number() }).optional())
+			.response(200, z.array(todoSchema)),
 	},
-});
+} as const;
 
 route(jsonQueryApi.todos.jsonSearch, ({ query }) => {
 	expectType<number>(query.page);
@@ -583,32 +562,17 @@ expectError(
 );
 
 // should accept native server payloads for custom responses
-const customResponseApi = defineRouter({
+const customResponseApi = {
 	reports: {
-		csv: {
-			method: "GET",
-			path: "/reports.csv",
-			responses: {
-				200: customBody({
-					contentType: "text/csv",
-					schema: z.string(),
-				}),
-			},
-		},
-		csvStream: {
-			method: "GET",
-			path: "/reports-stream.csv",
-			responses: {
-				200: stream(
-					customBody({
-						contentType: "text/csv",
-						schema: z.string(),
-					}),
-				),
-			},
-		},
+		csv: coreRoute
+			.get("/reports.csv")
+			.customResponse(200, { contentType: "text/csv", schema: z.string() }),
+		csvStream: coreRoute.get("/reports-stream.csv").customStreamResponse(200, {
+			contentType: "text/csv",
+			schema: z.string(),
+		}),
 	},
-});
+} as const;
 
 route(customResponseApi.reports.csv, () => ({
 	status: 200 as const,
@@ -636,7 +600,7 @@ expectError(
 // router implementation inference
 
 // should infer the complete nested implementation map from the contract
-const implementationApi = defineRouter({
+const implementationApi = {
 	todos: {
 		create: createApi.todos.create,
 		transform: transformedApi.todos.transform,
@@ -651,7 +615,7 @@ const implementationApi = defineRouter({
 	socket: {
 		room: socketApi.socket.room,
 	},
-});
+} as const;
 
 const implementations = router(implementationApi, {
 	todos: {
@@ -863,7 +827,7 @@ class _UnannotatedCheckedCreateTodoService implements RouteHandlers<
 }
 
 // should preserve route types through deeper router/router/route stacking
-const stackedApi = defineRouter({
+const stackedApi = {
 	admin: {
 		v1: {
 			todos: {
@@ -880,7 +844,7 @@ const stackedApi = defineRouter({
 			jsonSearch: implementationApi.todos.jsonSearch,
 		},
 	},
-});
+} as const;
 
 const stackedTodoRoutes = router(stackedApi.admin.v1.todos, {
 	create: route(stackedApi.admin.v1.todos.create, ({ title }) => ({

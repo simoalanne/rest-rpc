@@ -12,7 +12,9 @@ contract to derive typed server handlers, fetch clients, TanStack Query helpers,
 and OpenAPI documents.
 
 `rest-rpc` keeps the wire format REST-shaped while making application code feel
-like ordinary function calls.
+like ordinary function calls. Its route builders guide each declaration from
+method and path through request schemas, responses, metadata, and real-time
+messages, so the valid next steps stay discoverable in your editor.
 
 <CardGroup cols={2}>
 	<Card
@@ -65,25 +67,26 @@ as typed functions.
 <Tab title="Contract">
 
 ```ts
-export const api = router({
+export const api = {
 	todos: {
-		update: {
-			method: "PATCH",
-			path: "/todos/:id",
-			query: {
-				notify: z.coerce.boolean().optional(),
-			},
-			headers: {
-				"x-request-id": z.string().optional(),
-			},
-			body: {
-				title: z.string().min(1),
-				completed: z.boolean().optional(),
-			},
-			response: todoSchema,
-		},
+		update: route
+			.patch("/todos/:id")
+			.params(z.object({ id: z.string() }))
+			.query(
+				z.object({
+					notify: z.coerce.boolean<boolean>().optional(),
+				}),
+			)
+			.headers(z.object({ "x-request-id": z.string().optional() }))
+			.body(
+				z.object({
+					title: z.string().min(1),
+					completed: z.boolean().optional(),
+				}),
+			)
+			.response(200, todoSchema),
 	},
-});
+};
 ```
 
 </Tab>
@@ -140,8 +143,13 @@ Read [Shorthand vs Explicit](/docs/shorthand-vs-explicit/).
 
 <CardGroup cols={2}>
 	<Card title="REST contract" icon="route" type="check">
-		Methods, paths, request locations, response bodies, and metadata are
-		declared once.
+		Build methods, paths, request locations, response bodies, and metadata with
+		a fluent API that keeps invalid combinations out of the contract.
+	</Card>
+	<Card title="Composable route builders" icon="blocks" type="check">
+		Create configured factories with `route.with()` to share prefixes, headers,
+		responses, metadata, and OpenAPI details without wrapping the contract in a
+		global router.
 	</Card>
 	<Card title="Function-shaped usage" icon="braces" type="check">
 		Call `client.todos.get.fetch({id})` and implement `get({id})` while the
@@ -213,8 +221,8 @@ shape.
 		`rest-rpc` is for developers who want end-to-end type safety and RPC-style,
 		function-shaped usage without replacing familiar HTTP concepts. You keep
 		methods, paths, headers, bodies, status codes, and your existing framework,
-		while the shared contract connects the server and client types in ergonomic
-		way.
+		while the shared contract connects the server and client types in an
+		ergonomic way.
 	</AccordionItem>
 	<AccordionItem title="Do I have to restructure my app?">
 		No. Keep your framework, middleware, authentication, database access, and

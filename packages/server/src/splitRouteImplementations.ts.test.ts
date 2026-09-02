@@ -4,35 +4,22 @@ import type {
 	HttpRouteDeclaration,
 	WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
-import { noBody } from "@rest-rpc/core/contract";
+import { route as coreRoute } from "@rest-rpc/core";
 import z from "zod";
 import { splitRouteImplementations } from "./splitRouteImplementations.ts";
 
-const listRoute: HttpRouteDeclaration = {
-	method: "GET",
-	path: "/todos/:id",
-	responses: {
-		204: noBody(),
-	},
-};
+const listRoute: HttpRouteDeclaration = coreRoute
+	.get("/todos/:id")
+	.response(204);
 
-const createRoute: HttpRouteDeclaration = {
-	method: "POST",
-	path: "/todos/new",
-	responses: {
-		204: noBody(),
-	},
-};
+const createRoute: HttpRouteDeclaration = coreRoute
+	.post("/todos/new")
+	.response(204);
 
-const socketRoute: WebSocketRouteDeclaration = {
-	method: "GET",
-	path: "/todos/:id/events",
-	mode: "webSocket",
-	messages: {
-		client: z.object({ action: z.string() }),
-		server: z.object({ id: z.string() }),
-	},
-};
+const socketRoute: WebSocketRouteDeclaration = coreRoute
+	.ws("/todos/:id/events")
+	.clientMessage("message", z.object({ action: z.string() }))
+	.serverMessage("message", z.object({ id: z.string() }));
 
 describe("splitRouteImplementations", () => {
 	it("sorts and splits route implementations before calling adapter hooks", () => {

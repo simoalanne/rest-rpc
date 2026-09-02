@@ -1,16 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { noBody } from "@rest-rpc/core/contract";
+import { route as coreRoute } from "@rest-rpc/core";
 import { createRouteMatcher } from "./match.ts";
 
 const route = (method: "GET" | "POST", path: string) =>
-	({
-		method,
-		path,
-		responses: {
-			204: noBody(),
-		},
-	}) as const;
+	method === "GET"
+		? coreRoute.get(path).response(204)
+		: coreRoute.post(path).response(204);
 
 describe("createRouteMatcher", () => {
 	it("matches the most specific route and decodes path params", () => {

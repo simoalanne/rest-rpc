@@ -1,9 +1,9 @@
-import type {
-	RouteDeclaration,
-	WebSocketRouteDeclaration,
-} from "../contract/contract.ts";
-import type { ClientReceived } from "../contract/request.ts";
-import { validateWebSocketMessageSync } from "../contract/websocketMessages.ts";
+import type { RouteDeclaration } from "../contract/contract.ts";
+import {
+	type ClientReceived,
+	validateWebSocketMessageSync,
+	type WebSocketRouteDeclaration,
+} from "../contract/websocketRouteBuilder.ts";
 import type { ClientSocket } from "./types.ts";
 
 export const buildWebSocketUrl = (url: string) => {
@@ -22,6 +22,10 @@ const adaptWebSocket = <E extends WebSocketRouteDeclaration>(
 ): ClientSocket<E> => {
 	const parseIncomingMessage = (data: unknown): ClientReceived<E> => {
 		try {
+			if (!route.messages.server) {
+				throw new Error("No server WebSocket messages are declared");
+			}
+
 			const value = JSON.parse(String(data));
 			if (!validateIncomingMessages) {
 				return value as ClientReceived<E>;
@@ -48,6 +52,10 @@ const adaptWebSocket = <E extends WebSocketRouteDeclaration>(
 			rawSocket.close(code, reason);
 		},
 		send(message) {
+			if (!route.messages.client) {
+				throw new Error("No client WebSocket messages are declared");
+			}
+
 			if (rawSocket.readyState !== WebSocket.OPEN) {
 				throw new Error("WebSocket is not open");
 			}
@@ -67,6 +75,8 @@ const adaptWebSocket = <E extends WebSocketRouteDeclaration>(
 			return () => rawSocket.removeEventListener("error", callback);
 		},
 		onMessage(callback) {
+			if (!route.messages.server) return () => {};
+
 			const onMessage = (event: MessageEvent) => {
 				let message: ClientReceived<E>;
 				try {

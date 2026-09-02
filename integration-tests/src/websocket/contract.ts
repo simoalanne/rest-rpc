@@ -1,46 +1,38 @@
-import { router, webSocketMessages } from "@rest-rpc/core/contract";
+import { route } from "@rest-rpc/core";
 import z from "zod";
 
-const clientMessages = webSocketMessages("action", {
-	echo: z.object({
-		text: z.string(),
-	}),
-	fail: z.undefined(),
-	close: z.undefined(),
-});
-
-const serverMessages = {
-	discriminator: "type",
-	schemas: {
-		welcome: z.object({
+const room = route
+	.ws("/ws/:roomId")
+	.params(
+		z.object({
+			roomId: z.string().min(1),
+		}),
+	)
+	.query(
+		z.object({
+			mode: z.enum(["fast", "slow"]),
+		}),
+	)
+	.clientMessage("echo", z.object({ text: z.string() }))
+	.clientMessage("fail", z.undefined())
+	.clientMessage("close", z.undefined())
+	.serverMessage(
+		"welcome",
+		z.object({
 			roomId: z.string(),
 			mode: z.enum(["fast", "slow"]),
 			adapter: z.string(),
 		}),
-		echo: z.object({
+	)
+	.serverMessage(
+		"echo",
+		z.object({
 			text: z.string(),
 			roomId: z.string(),
 			mode: z.enum(["fast", "slow"]),
 		}),
-	},
-} as const;
+	);
 
-export const websocketContract = router({
-	room: {
-		method: "GET",
-		path: "/ws/:roomId",
-		mode: "webSocket",
-		pathParams: z.object({
-			roomId: z.string().min(1),
-		}),
-		query: z.object({
-			mode: z.enum(["fast", "slow"]),
-		}),
-		messages: {
-			client: clientMessages,
-			server: serverMessages,
-		},
-	},
-});
+export const websocketContract = { room } as const;
 
 export type WebSocketContract = typeof websocketContract;

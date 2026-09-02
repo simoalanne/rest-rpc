@@ -8,11 +8,14 @@ const routeCounts = [10, 100, 500, 1000];
 
 const schemaLibraries = {
 	"type-only": {
-		importSource: `import { router, type as schema } from "@rest-rpc/core";`,
-		schemas: `const stringSchema = schema<string>();
-const optionalStringSchema = schema<string | undefined>();
+		importSource: `import { route, type as schema } from "@rest-rpc/core";`,
+		schemas: `const requestHeadersSchema = schema<{ "x-request-id": string }>();
+const routeHeadersSchema = schema<{ "x-feature": string | undefined }>();
 const numberSchema = schema<number>();
 const booleanSchema = schema<boolean>();
+const querySchema = schema<{ search: string | undefined; limit: number }>();
+const paramsSchema = schema<{ id: string }>();
+const bodySchema = schema<{ title: string; done: boolean }>();
 const todoSchema = schema<{
 	id: string;
 	title: string;
@@ -25,12 +28,15 @@ const errorSchema = schema<{
 }>();`,
 	},
 	zod: {
-		importSource: `import { router } from "@rest-rpc/core";
+		importSource: `import { route } from "@rest-rpc/core";
 import z from "zod";`,
-		schemas: `const stringSchema = z.string();
-const optionalStringSchema = z.string().optional();
+		schemas: `const requestHeadersSchema = z.object({ "x-request-id": z.string() });
+const routeHeadersSchema = z.object({ "x-feature": z.string().optional() });
 const numberSchema = z.number();
 const booleanSchema = z.boolean();
+const querySchema = z.object({ search: z.string().optional(), limit: z.number() });
+const paramsSchema = z.object({ id: z.string() });
+const bodySchema = z.object({ title: z.string(), done: z.boolean() });
 const todoSchema = z.object({
 	id: z.string(),
 	title: z.string(),
@@ -43,12 +49,15 @@ const errorSchema = z.object({
 });`,
 	},
 	valibot: {
-		importSource: `import { router } from "@rest-rpc/core";
+		importSource: `import { route } from "@rest-rpc/core";
 import * as v from "valibot";`,
-		schemas: `const stringSchema = v.string();
-const optionalStringSchema = v.optional(v.string());
+		schemas: `const requestHeadersSchema = v.object({ "x-request-id": v.string() });
+const routeHeadersSchema = v.object({ "x-feature": v.optional(v.string()) });
 const numberSchema = v.number();
 const booleanSchema = v.boolean();
+const querySchema = v.object({ search: v.optional(v.string()), limit: v.number() });
+const paramsSchema = v.object({ id: v.string() });
+const bodySchema = v.object({ title: v.string(), done: v.boolean() });
 const todoSchema = v.object({
 	id: v.string(),
 	title: v.string(),
@@ -61,12 +70,15 @@ const errorSchema = v.object({
 });`,
 	},
 	arktype: {
-		importSource: `import { router } from "@rest-rpc/core";
+		importSource: `import { route } from "@rest-rpc/core";
 import { type } from "arktype";`,
-		schemas: `const stringSchema = type("string");
-const optionalStringSchema = type("string | undefined");
+		schemas: `const requestHeadersSchema = type({ "x-request-id": "string" });
+const routeHeadersSchema = type({ "x-feature": "string | undefined" });
 const numberSchema = type("number");
 const booleanSchema = type("boolean");
+const querySchema = type({ search: "string | undefined", limit: "number" });
+const paramsSchema = type({ id: "string" });
+const bodySchema = type({ title: "string", done: "boolean" });
 const todoSchema = type({
 	id: "string",
 	title: "string",
@@ -90,41 +102,20 @@ const routeSource = (index) => {
 		index % 2 === 0
 			? `/groups/${group}/items/:id/route-${index}`
 			: `/groups/${group}/items/route-${index}`;
-	const body =
-		method === "GET" || method === "DELETE"
-			? ""
-			: `
-					body: {
-						title: stringSchema,
-						done: booleanSchema,
-					},`;
-	const pathParams = path.includes(":id")
-		? `
-					pathParams: {
-						id: stringSchema,
-					},`
-		: "";
+	const builder = [`apiRoute.${method.toLowerCase()}("${path}")`];
+	if (path.includes(":id")) builder.push(".params(paramsSchema)");
+	builder.push(".query(querySchema)");
+	if (method !== "GET" && method !== "DELETE")
+		builder.push(".body(bodySchema)");
+	builder.push(
+		".headers(routeHeadersSchema)",
+		`.withMetadata({ feature: 'group-${group}' })`,
+		".response(200, todoSchema)",
+		".response(400, errorSchema)",
+		".response(404, errorSchema)",
+	);
 
-	return `route${index}: {
-				path: "${path}",
-				method: "${method}",
-${pathParams}
-				query: {
-						search: optionalStringSchema,
-						limit: numberSchema,
-					},${body}
-				headers: {
-						"x-feature": optionalStringSchema,
-					},
-				responses: {
-					200: todoSchema,
-					400: errorSchema,
-					404: errorSchema,
-				},
-				metadata: {
-					feature: "group-${group}",
-				},
-			}`;
+	return `route${index}: ${builder.join("\n\t\t\t")}`;
 };
 
 const contractSource = (routeCount, schemaLibrary) => {
@@ -148,24 +139,35 @@ const contractSource = (routeCount, schemaLibrary) => {
 
 ${schemaLibrary.schemas}
 
-export const api = router(
-	{
-		${groupEntries}
-	},
-	{
+const apiRoute = route.with({
 		pathPrefix: "/api",
 		metadata: {
 			benchmark: "contract-only",
 			schemaLibrary: "${schemaLibrary.name}",
 		},
-		commonHeaders: {
-			"x-request-id": stringSchema,
-		},
-		commonResponses: {
+		headers: requestHeadersSchema,
+		responses: {
 			500: errorSchema,
 		},
-	},
-);
+		flattenRequestKeys: false,
+		strictStatusCodes: true,
+});
+
+export const api = {
+	${groupEntries}
+};
+
+type BenchmarkRoute = typeof api.group0.route0;
+export type BenchmarkOptionTypes = {
+	request: BenchmarkRoute extends { request: infer TRequest }
+		? TRequest
+		: never;
+	strictStatusCodes: BenchmarkRoute extends {
+		strictStatusCodes: infer TStrictStatusCodes;
+	}
+		? TStrictStatusCodes
+		: never;
+};
 
 export type Api = typeof api;
 `;

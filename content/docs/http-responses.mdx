@@ -6,7 +6,7 @@ description: Learn how to handle different types of HTTP responses with rest-rpc
 ## JSON Response
 
 ```ts
-import { router } from "@rest-rpc/core";
+import { route } from "@rest-rpc/core";
 import z from "zod";
 
 const todoSchema = z.object({
@@ -14,18 +14,18 @@ const todoSchema = z.object({
 	title: z.string(),
 });
 
-export const api = router({
+export const api = {
 	todos: {
-		create: {
-			method: "POST",
-			path: "/todos",
-			body: z.object({
-				title: z.string().min(1),
-			}),
-			response: todoSchema,
-		},
+		create: route
+			.post("/todos")
+			.body(
+				z.object({
+					title: z.string().min(1),
+				}),
+			)
+			.response(201, todoSchema),
 	},
-});
+};
 ```
 
 ```ts
@@ -49,20 +49,20 @@ const todo = await client.todos.create.fetch({
 Use `fetchResponse()` when the client needs to handle multiple declared statuses.
 
 ```ts
-export const api = router({
+export const api = {
 	todos: {
-		get: {
-			method: "GET",
-			path: "/todos/:id",
-			responses: {
-				200: todoSchema,
-				404: z.object({
+		get: route
+			.get("/todos/:id")
+			.params(z.object({ id: z.string() }))
+			.response(200, todoSchema)
+			.response(
+				404,
+				z.object({
 					code: z.literal("TODO_NOT_FOUND"),
 				}),
-			},
-		},
+			),
 	},
-});
+};
 ```
 
 ```ts
@@ -100,36 +100,19 @@ if (response.declared && response.status === 404) {
 
 ## Response Without Body
 
-Routes with no `response` or `responses` default to a no-body response.
-`DELETE` uses `204`, `POST` uses `201`, and other methods use `200`.
+Call `.response(status)` without a schema to declare a response without a body.
 
 ```ts
-export const api = router({
+import { route } from "@rest-rpc/core";
+
+export const api = {
 	todos: {
-		remove: {
-			method: "DELETE",
-			path: "/todos/:id",
-		},
+		remove: route
+			.delete("/todos/:id")
+			.params(z.object({ id: z.string() }))
+			.response(204),
 	},
-});
-```
-
-Use `noBody()` when you want the response status to be explicit.
-
-```ts
-import { noBody, router } from "@rest-rpc/core";
-
-export const api = router({
-	todos: {
-		remove: {
-			method: "DELETE",
-			path: "/todos/:id",
-			responses: {
-				204: noBody(),
-			},
-		},
-	},
-});
+};
 ```
 
 ```ts
@@ -153,23 +136,20 @@ await client.todos.remove.fetch({
 Headers declared in the contract are returned from `responseHeaders`.
 
 ```ts
-export const api = router({
+export const api = {
 	todos: {
-		get: {
-			method: "GET",
-			path: "/todos/:id",
-			responses: {
-				200: {
-					body: todoSchema,
-					headers: {
-						etag: z.string(),
-						"x-next-cursor": z.string().optional(),
-					},
-				},
-			},
-		},
+		get: route
+			.get("/todos/:id")
+			.params(z.object({ id: z.string() }))
+			.response(200, {
+				body: todoSchema,
+				headers: z.object({
+					etag: z.string(),
+					"x-next-cursor": z.string().optional(),
+				}),
+			}),
 	},
-});
+};
 ```
 
 ```ts
@@ -207,15 +187,14 @@ if (response.declared && response.status === 200) {
 Undeclared headers are raw HTTP headers returned from `headers`.
 
 ```ts
-export const api = router({
-	health: {
-		method: "GET",
-		path: "/health",
-		response: z.object({
+export const api = {
+	health: route.get("/health").response(
+		200,
+		z.object({
 			ok: z.literal(true),
 		}),
-	},
-});
+	),
+};
 ```
 
 ```ts
@@ -247,21 +226,24 @@ if (response.declared) {
 Writing `Set-Cookie` headers is simplified with `setCookie()` and `clearCookie()`.
 
 ```ts
-export const api = router({
+export const api = {
 	sessions: {
-		create: {
-			method: "POST",
-			path: "/sessions",
-			body: z.object({
-				email: z.string().email(),
-				password: z.string(),
-			}),
-			response: z.object({
-				ok: z.literal(true),
-			}),
-		},
+		create: route
+			.post("/sessions")
+			.body(
+				z.object({
+					email: z.string().email(),
+					password: z.string(),
+				}),
+			)
+			.response(
+				201,
+				z.object({
+					ok: z.literal(true),
+				}),
+			),
 	},
-});
+};
 ```
 
 ```ts
@@ -302,22 +284,16 @@ await client.sessions.create.fetch({
 ## Response With Custom Content Type
 
 ```ts
-import { customBody, router } from "@rest-rpc/core";
+import { route } from "@rest-rpc/core";
 
-export const api = router({
+export const api = {
 	reports: {
-		csv: {
-			method: "GET",
-			path: "/reports.csv",
-			responses: {
-				200: customBody({
-					contentType: "text/csv",
-					schema: z.string(),
-				}),
-			},
-		},
+		csv: route.get("/reports.csv").customResponse(200, {
+			contentType: "text/csv",
+			schema: z.string(),
+		}),
 	},
-});
+};
 ```
 
 ```ts
@@ -341,20 +317,17 @@ await response.text();
 When multiple content types are declared, return the selected `contentType` with the response `payload`.
 
 ```ts
-export const api = router({
+export const api = {
 	images: {
-		download: {
-			method: "GET",
-			path: "/images/:id",
-			responses: {
-				200: customBody({
-					contentType: ["image/png", "image/jpeg"],
-					schema: z.instanceof(Uint8Array),
-				}),
-			},
-		},
+		download: route
+			.get("/images/:id")
+			.params(z.object({ id: z.string() }))
+			.customResponse(200, {
+				contentType: ["image/png", "image/jpeg"],
+				schema: z.instanceof(Uint8Array),
+			}),
 	},
-});
+};
 ```
 
 ```ts
@@ -391,10 +364,12 @@ if (response.declared && response.status === 200) {
 
 ## Server-Sent Event Responses
 
-Use `mode: "sse"` for a GET route that returns server-sent events. The route declares one event schema with `response`, and the server yields `sseEvent()` values.
+Start with `route.sse(path)` for a server-sent event route. The builder declares
+one event schema with `.response(schema)`, and the server yields `sseEvent()`
+values.
 
 ```ts
-import { router } from "@rest-rpc/core";
+import { route } from "@rest-rpc/core";
 import z from "zod";
 
 const notificationSchema = z.object({
@@ -402,16 +377,11 @@ const notificationSchema = z.object({
 	title: z.string(),
 });
 
-export const api = router({
+export const api = {
 	notifications: {
-		live: {
-			method: "GET",
-			path: "/notifications/live",
-			mode: "sse",
-			response: notificationSchema,
-		},
+		live: route.sse("/notifications/live").response(notificationSchema),
 	},
-});
+};
 ```
 
 ```ts
@@ -451,32 +421,31 @@ source.onError(() => {
 
 ## Streaming NDJSON Responses
 
-`stream(schema)` sends newline-delimited JSON and the client reads parsed items.
+`.streamResponse(status, schema)` sends newline-delimited JSON and the client
+reads parsed items.
 
 `request.context.signal` is aborted when the HTTP request is cancelled.
 
 ```ts
-import { router, stream } from "@rest-rpc/core";
+import { route } from "@rest-rpc/core";
 
 const tokenSchema = z.object({
 	index: z.number(),
 	text: z.string(),
 });
 
-export const api = router({
+export const api = {
 	ai: {
-		tokens: {
-			method: "GET",
-			path: "/ai/tokens",
-			query: z.object({
-				prompt: z.string().min(1),
-			}),
-			responses: {
-				200: stream(tokenSchema),
-			},
-		},
+		tokens: route
+			.get("/ai/tokens")
+			.query(
+				z.object({
+					prompt: z.string().min(1),
+				}),
+			)
+			.streamResponse(200, tokenSchema),
 	},
-});
+};
 ```
 
 ```ts
@@ -520,25 +489,21 @@ for await (const token of tokens) {
 
 ## Streaming Responses With Custom Content Type
 
-`stream(customBody(...))` keeps the client response as a raw `Response` stream.
+`.customStreamResponse()` keeps a custom-content response as a raw `Response`
+stream.
 
 ```ts
-export const api = router({
+export const api = {
 	files: {
-		download: {
-			method: "GET",
-			path: "/files/:id",
-			responses: {
-				200: stream(
-					customBody({
-						contentType: "application/octet-stream",
-						schema: z.instanceof(Uint8Array),
-					}),
-				),
-			},
-		},
+		download: route
+			.get("/files/:id")
+			.params(z.object({ id: z.string() }))
+			.customStreamResponse(200, {
+				contentType: "application/octet-stream",
+				schema: z.instanceof(Uint8Array),
+			}),
 	},
-});
+};
 ```
 
 ```ts

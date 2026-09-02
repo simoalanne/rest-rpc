@@ -148,7 +148,7 @@ export const registerExpressWebSocketRoutes = (
 
 		const request = {
 			query: Object.fromEntries(url.searchParams),
-			pathParams: matchedRoute.params,
+			params: matchedRoute.params,
 			headers: req.headers,
 		};
 

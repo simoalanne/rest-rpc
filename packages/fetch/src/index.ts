@@ -1,8 +1,8 @@
-import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	clearCookie,
 	RouteResponseError,
 	type ServerErrorHandlers,
+	type ServerHttpRouteDeclaration,
 	setCookie,
 	sseEvent,
 } from "@rest-rpc/server";
@@ -30,6 +30,7 @@ export type {
 	RouteResponse,
 	RouteResponseShorthand,
 	SetCookieOptions,
+	ServerHttpRouteDeclaration,
 	SseEvent,
 } from "@rest-rpc/server";
 export type { FetchRouteParseBody, FetchRouteParseBodyInput } from "./http.ts";
@@ -98,7 +99,7 @@ export type CreateFetchHandlerOptions = {
  * @see {@link https://rest-rpc.dev/docs/server/fetch}
  */
 export function route<
-	const TRoute extends HttpRouteDeclaration,
+	const TRoute extends ServerHttpRouteDeclaration,
 	TRuntimeContext extends ContextShape = DefaultRuntimeContext,
 	TRequest extends Request = DefaultRequest,
 >(contract: TRoute): FetchRouteBuilder<TRoute, TRuntimeContext, TRequest> {

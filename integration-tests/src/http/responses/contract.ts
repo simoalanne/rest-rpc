@@ -1,54 +1,28 @@
-import { router } from "@rest-rpc/core/contract";
+import { route } from "@rest-rpc/core";
 import z from "zod";
 
-export const responsesContract = router({
-	jsonContentType: {
-		method: "GET",
-		path: "/responses/json-content-type",
-		responses: {
-			200: z.object({ ok: z.literal(true) }),
-		},
-	},
-	headers: {
-		method: "GET",
-		path: "/responses/headers",
-		responses: {
-			200: z.object({ ok: z.literal(true) }),
-		},
-	},
+export const responsesContract = {
+	jsonContentType: route
+		.get("/responses/json-content-type")
+		.response(200, z.object({ ok: z.literal(true) })),
+	headers: route
+		.get("/responses/headers")
+		.response(200, z.object({ ok: z.literal(true) })),
 	cookies: {
-		issue: {
-			method: "GET",
-			path: "/responses/cookies/issue",
-			responses: {
-				200: z.object({ ok: z.literal(true) }),
-			},
-		},
-		read: {
-			method: "GET",
-			path: "/responses/cookies/read",
-			headers: {
-				cookie: z.string().optional(),
-			},
-			responses: {
-				200: z.object({ cookie: z.string().nullable() }),
-			},
-		},
+		issue: route
+			.get("/responses/cookies/issue")
+			.response(200, z.object({ ok: z.literal(true) })),
+		read: route
+			.get("/responses/cookies/read")
+			.headers(z.object({ cookie: z.string().optional() }))
+			.response(200, z.object({ cookie: z.string().nullable() })),
 	},
-	undeclared: {
-		method: "GET",
-		path: "/responses/undeclared",
-		responses: {
-			200: z.object({ ok: z.literal(true) }),
-		},
-	},
-	invalidDeclared: {
-		method: "GET",
-		path: "/responses/invalid-declared",
-		responses: {
-			200: z.object({ ok: z.boolean() }),
-		},
-	},
-});
+	undeclared: route
+		.get("/responses/undeclared")
+		.response(200, z.object({ ok: z.literal(true) })),
+	invalidDeclared: route
+		.get("/responses/invalid-declared")
+		.response(200, z.object({ ok: z.boolean() })),
+} as const;
 
 export type ResponsesContract = typeof responsesContract;

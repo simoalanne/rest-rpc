@@ -127,6 +127,12 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
 
+  declaration-types:
+    dependencies:
+      '@rest-rpc/core':
+        specifier: workspace:*
+        version: link:../packages/core
+
   hover-types:
     dependencies:
       '@rest-rpc/core':

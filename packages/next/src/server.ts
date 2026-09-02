@@ -1,4 +1,3 @@
-import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	type CreateFetchHandlerOptions,
 	createRouteHandler as createFetchRouteHandler,
@@ -10,6 +9,7 @@ import {
 	type FetchRouteParseBodyInput,
 	type RouteRequest as FetchRouteRequest,
 	type RouteResponse as FetchRouteResponse,
+	type ServerHttpRouteDeclaration,
 	type FetchRouterBuilder,
 	route as fetchRoute,
 	router as fetchRouter,
@@ -30,7 +30,7 @@ export type NextRouteMiddleware<TContext extends Record<string, unknown>> =
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
  */
 export type RouteRequest<
-	E extends HttpRouteDeclaration,
+	E extends ServerHttpRouteDeclaration,
 	TContext extends Record<string, unknown> = Record<string, unknown>,
 > = FetchRouteRequest<E, TContext, NextRequest>;
 
@@ -39,7 +39,7 @@ export type RouteRequest<
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
  */
-export type RouteResponse<E extends HttpRouteDeclaration> =
+export type RouteResponse<E extends ServerHttpRouteDeclaration> =
 	FetchRouteResponse<E>;
 
 /**
@@ -79,7 +79,7 @@ export type CreateRouteHandlerOptions = {
  *
  * @see {@link https://rest-rpc.dev/docs/server/next.js#single-route-handler}
  */
-export function route<const TRoute extends HttpRouteDeclaration>(
+export function route<const TRoute extends ServerHttpRouteDeclaration>(
 	contract: TRoute,
 ): FetchRouteBuilder<TRoute, Record<never, never>, NextRequest> {
 	return fetchRoute<TRoute, Record<never, never>, NextRequest>(contract);

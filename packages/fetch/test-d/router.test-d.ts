@@ -1,32 +1,24 @@
-import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
-import { router as defineRouter, noBody } from "@rest-rpc/core/contract";
+import { route as coreRoute } from "@rest-rpc/core";
 import { type as schemaType } from "@rest-rpc/core/standard-schema";
-import { createRouteHandler, route, router } from "@rest-rpc/fetch";
+import {
+	createRouteHandler,
+	route,
+	router,
+	type ServerHttpRouteDeclaration,
+} from "@rest-rpc/fetch";
 import { expectError, expectType } from "tsd";
 
 const todoSchema = schemaType<{ id: string }>();
 
-const api = defineRouter({
+const api = {
 	todos: {
-		get: {
-			method: "GET",
-			path: "/todos/:id",
-			pathParams: {
-				id: schemaType<string>(),
-			},
-			responses: {
-				200: todoSchema,
-			},
-		},
+		get: coreRoute
+			.get("/todos/:id")
+			.params(schemaType<{ id: string }>())
+			.response(200, todoSchema),
 	},
-	health: {
-		method: "GET",
-		path: "/health",
-		responses: {
-			204: noBody(),
-		},
-	},
-});
+	health: coreRoute.get("/health").response(204),
+} as const;
 
 type Runtime = {
 	env: {
@@ -42,7 +34,7 @@ declare module "@rest-rpc/fetch" {
 const routes = router(api)
 	.middleware(({ request, route, runtime }) => {
 		expectType<Request>(request);
-		expectType<HttpRouteDeclaration>(route);
+		expectType<ServerHttpRouteDeclaration>(route);
 		expectType<string>(runtime.env.authToken);
 		expectError(runtime.unknownKey);
 

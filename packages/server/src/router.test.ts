@@ -1,23 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { noBody } from "@rest-rpc/core/contract";
+import { route as coreRoute } from "@rest-rpc/core";
 import { route, router } from "./router.ts";
 
-const getTodo = {
-	method: "GET",
-	path: "/todos/:id",
-	responses: {
-		204: noBody(),
-	},
-} as const;
+const getTodo = coreRoute.get("/todos/:id").response(204);
 
-const createTodo = {
-	method: "POST",
-	path: "/todos",
-	responses: {
-		204: noBody(),
-	},
-} as const;
+const createTodo = coreRoute.post("/todos").response(204);
 
 describe("router", () => {
 	it("collects nested handler implementations and binds object methods", async () => {

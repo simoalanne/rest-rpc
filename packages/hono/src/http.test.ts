@@ -1,24 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-	formBody,
-	multipartBody,
-	type as schemaType,
-} from "@rest-rpc/core/contract";
+import { route, type as schemaType } from "@rest-rpc/core";
 import { Hono } from "hono";
 import { registerRoutes, router } from "./index.ts";
 
 describe("registerRoutes", () => {
 	it("parses urlencoded form bodies with the default body parser", async () => {
 		const contract = {
-			form: {
-				method: "POST",
-				path: "/forms",
-				body: formBody(schemaType<{ title: string }>()),
-				responses: {
-					200: schemaType<{ title: string }>(),
-				},
-			},
+			form: route
+				.post("/forms")
+				.formBody(schemaType<{ title: string }>())
+				.response(200, schemaType<{ title: string }>()),
 		} as const;
 		const app = new Hono();
 
@@ -44,25 +36,24 @@ describe("registerRoutes", () => {
 
 	it("parses multipart bodies with the default body parser", async () => {
 		const contract = {
-			upload: {
-				method: "POST",
-				path: "/uploads",
-				body: multipartBody({
+			upload: route
+				.post("/uploads")
+				.multipartBody({
 					schema: schemaType<{
 						title: string;
 						file: Blob;
 						tags: string[];
 					}>(),
 					arrayKeys: ["tags"],
-				}),
-				responses: {
-					200: schemaType<{
+				})
+				.response(
+					200,
+					schemaType<{
 						title: string;
 						tags: string[];
 						hasFile: boolean;
 					}>(),
-				},
-			},
+				),
 		} as const;
 		const app = new Hono();
 

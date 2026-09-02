@@ -60,7 +60,7 @@ bun add @rest-rpc/core @rest-rpc/express express zod
 </Tab>
 </Tabs>
 
-If you use another server tab, replace `@rest-rpc/express express` with the
+If you would like to use a different backend framework, replace `@rest-rpc/express express` with the
 adapter and framework package you need:
 
 - Fastify: `@rest-rpc/fastify fastify`
@@ -84,7 +84,7 @@ import.
 <Tab title="Zod">
 
 ```ts contract.ts
-import { router } from "@rest-rpc/core";
+import { route } from "@rest-rpc/core";
 import { z } from "zod";
 
 const todoSchema = z.object({
@@ -93,25 +93,25 @@ const todoSchema = z.object({
 	completed: z.boolean(),
 });
 
-export const api = router({
+export const api = {
 	todos: {
-		create: {
-			method: "POST",
-			path: "/todos",
-			body: {
-				title: z.string().min(1),
-			},
-			response: todoSchema,
-		},
+		create: route
+			.post("/todos")
+			.body(
+				z.object({
+					title: z.string().min(1),
+				}),
+			)
+			.response(201, todoSchema),
 	},
-});
+};
 ```
 
 </Tab>
 <Tab title="Valibot">
 
 ```ts contract.ts
-import { router } from "@rest-rpc/core";
+import { route } from "@rest-rpc/core";
 import * as v from "valibot";
 
 const todoSchema = v.object({
@@ -120,25 +120,25 @@ const todoSchema = v.object({
 	completed: v.boolean(),
 });
 
-export const api = router({
+export const api = {
 	todos: {
-		create: {
-			method: "POST",
-			path: "/todos",
-			body: {
-				title: v.pipe(v.string(), v.minLength(1)),
-			},
-			response: todoSchema,
-		},
+		create: route
+			.post("/todos")
+			.body(
+				v.object({
+					title: v.pipe(v.string(), v.minLength(1)),
+				}),
+			)
+			.response(201, todoSchema),
 	},
-});
+};
 ```
 
 </Tab>
 <Tab title="ArkType">
 
 ```ts contract.ts
-import { router } from "@rest-rpc/core";
+import { route } from "@rest-rpc/core";
 import { type } from "arktype";
 
 const todoSchema = type({
@@ -147,18 +147,18 @@ const todoSchema = type({
 	completed: "boolean",
 });
 
-export const api = router({
+export const api = {
 	todos: {
-		create: {
-			method: "POST",
-			path: "/todos",
-			body: {
-				title: type("string>0"),
-			},
-			response: todoSchema,
-		},
+		create: route
+			.post("/todos")
+			.body(
+				type({
+					title: type("string>0"),
+				}),
+			)
+			.response(201, todoSchema),
 	},
-});
+};
 ```
 
 </Tab>
@@ -166,26 +166,22 @@ export const api = router({
 <Tab title="None">
 
 ```ts contract.ts
-import { router, type } from "@rest-rpc/core";
+import { route, type } from "@rest-rpc/core";
 
-const todoSchema = {
-	id: type<string>(),
-	title: type<string>(),
-	completed: type<boolean>(),
-};
+const todoSchema = type<{
+	id: string;
+	title: string;
+	completed: boolean;
+}>();
 
-export const api = router({
+export const api = {
 	todos: {
-		create: {
-			method: "POST",
-			path: "/todos",
-			body: {
-				title: type<string>(),
-			},
-			response: todoSchema,
-		},
+		create: route
+			.post("/todos")
+			.body(type<{ title: string }>())
+			.response(201, todoSchema),
 	},
-});
+};
 ```
 
 </Tab>
@@ -201,7 +197,7 @@ Implement the contract on the server with the framework of your choice.
 ```ts twoslash
 // ---cut-start---
 // @filename: contract.ts
-import { router } from "@rest-rpc/core";
+import { route } from "@rest-rpc/core";
 import { z } from "zod";
 
 const todoSchema = z.object({
@@ -210,18 +206,18 @@ const todoSchema = z.object({
 	completed: z.boolean(),
 });
 
-export const api = router({
+export const api = {
 	todos: {
-		create: {
-			method: "POST",
-			path: "/todos",
-			body: {
-				title: z.string().min(1),
-			},
-			response: todoSchema,
-		},
+		create: route
+			.post("/todos")
+			.body(
+				z.object({
+					title: z.string().min(1),
+				}),
+			)
+			.response(201, todoSchema),
 	},
-});
+};
 
 // @filename: server.ts
 // ---cut-end---
@@ -269,7 +265,7 @@ app.listen(3000);
 ```ts twoslash
 // ---cut-start---
 // @filename: contract.ts
-import { router } from "@rest-rpc/core";
+import { route } from "@rest-rpc/core";
 import { z } from "zod";
 
 const todoSchema = z.object({
@@ -278,18 +274,18 @@ const todoSchema = z.object({
 	completed: z.boolean(),
 });
 
-export const api = router({
+export const api = {
 	todos: {
-		create: {
-			method: "POST",
-			path: "/todos",
-			body: {
-				title: z.string().min(1),
-			},
-			response: todoSchema,
-		},
+		create: route
+			.post("/todos")
+			.body(
+				z.object({
+					title: z.string().min(1),
+				}),
+			)
+			.response(201, todoSchema),
 	},
-});
+};
 
 // @filename: server.ts
 // ---cut-end---
@@ -336,7 +332,7 @@ await app.listen({ port: 3000 });
 ```ts twoslash
 // ---cut-start---
 // @filename: contract.ts
-import { router } from "@rest-rpc/core";
+import { route } from "@rest-rpc/core";
 import { z } from "zod";
 
 const todoSchema = z.object({
@@ -345,18 +341,18 @@ const todoSchema = z.object({
 	completed: z.boolean(),
 });
 
-export const api = router({
+export const api = {
 	todos: {
-		create: {
-			method: "POST",
-			path: "/todos",
-			body: {
-				title: z.string().min(1),
-			},
-			response: todoSchema,
-		},
+		create: route
+			.post("/todos")
+			.body(
+				z.object({
+					title: z.string().min(1),
+				}),
+			)
+			.response(201, todoSchema),
 	},
-});
+};
 
 // @filename: server.ts
 // ---cut-end---
@@ -404,7 +400,7 @@ export default app;
 // @experimentalDecorators: true
 // ---cut-start---
 // @filename: contract.ts
-import { router } from "@rest-rpc/core";
+import { route } from "@rest-rpc/core";
 import { z } from "zod";
 
 const todoSchema = z.object({
@@ -413,18 +409,18 @@ const todoSchema = z.object({
 	completed: z.boolean(),
 });
 
-export const api = router({
+export const api = {
 	todos: {
-		create: {
-			method: "POST",
-			path: "/todos",
-			body: {
-				title: z.string().min(1),
-			},
-			response: todoSchema,
-		},
+		create: route
+			.post("/todos")
+			.body(
+				z.object({
+					title: z.string().min(1),
+				}),
+			)
+			.response(201, todoSchema),
 	},
-});
+};
 
 // @filename: server.ts
 // ---cut-end---
@@ -492,7 +488,7 @@ await app.listen(3000);
 ```ts twoslash
 // ---cut-start---
 // @filename: contract.ts
-import { router } from "@rest-rpc/core";
+import { route } from "@rest-rpc/core";
 import { z } from "zod";
 
 const todoSchema = z.object({
@@ -501,18 +497,18 @@ const todoSchema = z.object({
 	completed: z.boolean(),
 });
 
-export const api = router({
+export const api = {
 	todos: {
-		create: {
-			method: "POST",
-			path: "/todos",
-			body: {
-				title: z.string().min(1),
-			},
-			response: todoSchema,
-		},
+		create: route
+			.post("/todos")
+			.body(
+				z.object({
+					title: z.string().min(1),
+				}),
+			)
+			.response(201, todoSchema),
 	},
-});
+};
 
 // @filename: route.ts
 // ---cut-end---
@@ -560,7 +556,7 @@ Use the same contract to create a typed client.
 ```ts twoslash
 // ---cut-start---
 // @filename: contract.ts
-import { router } from "@rest-rpc/core";
+import { route } from "@rest-rpc/core";
 import { z } from "zod";
 
 const todoSchema = z.object({
@@ -569,18 +565,18 @@ const todoSchema = z.object({
 	completed: z.boolean(),
 });
 
-export const api = router({
+export const api = {
 	todos: {
-		create: {
-			method: "POST",
-			path: "/todos",
-			body: {
-				title: z.string().min(1),
-			},
-			response: todoSchema,
-		},
+		create: route
+			.post("/todos")
+			.body(
+				z.object({
+					title: z.string().min(1),
+				}),
+			)
+			.response(201, todoSchema),
 	},
-});
+};
 
 // @filename: client.ts
 // ---cut-end---
@@ -602,7 +598,7 @@ const todo = await client.todos.create.fetch({
 ```tsx twoslash
 // ---cut-start---
 // @filename: contract.ts
-import { router } from "@rest-rpc/core";
+import { route } from "@rest-rpc/core";
 import { z } from "zod";
 
 const todoSchema = z.object({
@@ -611,18 +607,18 @@ const todoSchema = z.object({
 	completed: z.boolean(),
 });
 
-export const api = router({
+export const api = {
 	todos: {
-		create: {
-			method: "POST",
-			path: "/todos",
-			body: {
-				title: z.string().min(1),
-			},
-			response: todoSchema,
-		},
+		create: route
+			.post("/todos")
+			.body(
+				z.object({
+					title: z.string().min(1),
+				}),
+			)
+			.response(201, todoSchema),
 	},
-});
+};
 
 // @filename: client.tsx
 // ---cut-end---

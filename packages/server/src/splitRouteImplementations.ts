@@ -1,10 +1,13 @@
 import type {
-	HttpRouteDeclaration,
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
 import { compareRouteSpecificity } from "./match.ts";
-import type { ImplementationTree, RouteImplementation } from "./router.ts";
+import type {
+	ImplementationTree,
+	RouteImplementation,
+	ServerHttpRouteDeclaration,
+} from "./router.ts";
 import {
 	isHttpRouteImplementation,
 	isRouteImplementation,
@@ -41,7 +44,7 @@ export function splitRouteImplementations(
 	implementations: ImplementationTree<RouteDeclaration>,
 	handlers: {
 		handleHttpRoutes: (
-			routes: RouteImplementation<HttpRouteDeclaration>[],
+			routes: RouteImplementation<ServerHttpRouteDeclaration>[],
 		) => void;
 		handleWebSocketRoutes?: (
 			routes: RouteImplementation<WebSocketRouteDeclaration>[],

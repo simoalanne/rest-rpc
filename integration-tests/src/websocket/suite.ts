@@ -119,7 +119,7 @@ export const runWebSocketSuite = (adapter: WebSocketSuiteAdapter) => {
 				await waitForMessage(socket);
 
 				socket.send({
-					action: "echo",
+					type: "echo",
 					message: { text: "hello over websocket" },
 				});
 
@@ -146,7 +146,7 @@ export const runWebSocketSuite = (adapter: WebSocketSuiteAdapter) => {
 				await waitForOpen(socket);
 				await waitForMessage(socket);
 
-				socket.send({ action: "echo" } as never);
+				socket.send({ type: "echo" } as never);
 				const close = await waitForClose(socket);
 
 				assert.equal(close.code, 1007);
@@ -166,7 +166,7 @@ export const runWebSocketSuite = (adapter: WebSocketSuiteAdapter) => {
 				await waitForOpen(socket);
 				await waitForMessage(socket);
 
-				socket.send({ action: "fail", message: undefined });
+				socket.send({ type: "fail", message: undefined });
 				const close = await waitForClose(socket);
 
 				assert.equal(close.code, 1011);
