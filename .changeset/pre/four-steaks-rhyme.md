@@ -1,5 +1,4 @@
 ---
-"@rest-rpc/next": minor
 "@rest-rpc/fetch": minor
 ---
 

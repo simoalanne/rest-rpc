@@ -1,5 +1,4 @@
 ---
-"@rest-rpc/next": patch
 "@rest-rpc/server": patch
 "@rest-rpc/fetch": patch
 ---

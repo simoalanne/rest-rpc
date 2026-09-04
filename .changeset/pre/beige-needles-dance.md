@@ -5,7 +5,6 @@
 "@rest-rpc/fetch": minor
 "@rest-rpc/hono": minor
 "@rest-rpc/nest": minor
-"@rest-rpc/next": minor
 "@rest-rpc/server": minor
 "@rest-rpc/tanstack-query": minor
 ---
