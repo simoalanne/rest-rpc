@@ -18,12 +18,12 @@ describe("createRouteMatcher", () => {
 		});
 
 		assert.deepEqual(matchRoute({ method: "GET", path: "/todos/new" }), {
-			type: "match",
+			matched: true,
 			route: route("GET", "/todos/new"),
 			params: {},
 		});
 		assert.deepEqual(matchRoute({ method: "GET", path: "/todos/one%20two" }), {
-			type: "match",
+			matched: true,
 			route: route("GET", "/todos/:id"),
 			params: { id: "one two" },
 		});
@@ -36,25 +36,27 @@ describe("createRouteMatcher", () => {
 		});
 
 		assert.deepEqual(matchRoute({ method: "POST", path: "/todos/todo-1/" }), {
-			type: "match",
+			matched: true,
 			route: route("POST", "/todos/:id"),
 			params: { id: "todo-1" },
 		});
 		assert.deepEqual(matchRoute({ method: "DELETE", path: "/todos/todo-1" }), {
-			type: "methodNotAllowed",
-			allowedMethods: ["GET", "POST"],
+			matched: false,
+			route: undefined,
+			params: undefined,
 		});
 	});
 
-	it("reports allowed methods for the most specific matching path", () => {
+	it("matches route specificity within the requested method", () => {
 		const matchRoute = createRouteMatcher({
 			getTodo: route("GET", "/todos/:id"),
 			createNewTodo: route("POST", "/todos/new"),
 		});
 
 		assert.deepEqual(matchRoute({ method: "GET", path: "/todos/new" }), {
-			type: "methodNotAllowed",
-			allowedMethods: ["POST"],
+			matched: true,
+			route: route("GET", "/todos/:id"),
+			params: { id: "new" },
 		});
 	});
 
@@ -64,13 +66,14 @@ describe("createRouteMatcher", () => {
 		});
 
 		assert.deepEqual(matchRoute({ method: "GET", path: "/files/index.json" }), {
-			type: "match",
+			matched: true,
 			route: route("GET", "/files/index.json"),
 			params: {},
 		});
-		assert.equal(
-			matchRoute({ method: "GET", path: "/files/indexxjson" }),
-			null,
-		);
+		assert.deepEqual(matchRoute({ method: "GET", path: "/files/indexxjson" }), {
+			matched: false,
+			route: undefined,
+			params: undefined,
+		});
 	});
 });

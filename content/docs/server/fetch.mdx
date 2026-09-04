@@ -44,8 +44,14 @@ const routes = router(api)
 const handleRequest = createRouteHandler(routes);
 
 export default {
-	fetch(request, env, ctx) {
-		return handleRequest(request, { env, ctx });
+	async fetch(request, env, ctx) {
+		const { matched, response } = await handleRequest(request, { env, ctx });
+
+		if (matched) {
+			return response;
+		}
+
+		return new Response("Not found", { status: 404 });
 	},
 };
 ```

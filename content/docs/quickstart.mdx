@@ -16,7 +16,7 @@ This guide builds one `todos.create` route from a shared contract.
 	</Step>
 	<Step title="Implement the server route">
 		Use the same route tree to write a typed handler for Express, Fastify, Hono,
-		NestJS, Next.js, or a fetch-native runtime.
+		NestJS or a fetch-native runtime.
 	</Step>
 	<Step title="Call it from the client">
 		Create a typed fetch client or TanStack Query helpers from the same
@@ -66,7 +66,6 @@ adapter and framework package you need:
 - Fastify: `@rest-rpc/fastify fastify`
 - Hono: `@rest-rpc/hono hono`
 - NestJS: `@rest-rpc/nest @nestjs/common @nestjs/core @nestjs/platform-express reflect-metadata rxjs`
-- Next.js: `@rest-rpc/next`
 - Fetch runtime `Request`/`Response`: `@rest-rpc/fetch`
 
 For the TanStack Query client example, also install:
@@ -543,72 +542,16 @@ const routes = router(api).handlers({
 const handleRequest = createRouteHandler(routes);
 
 export default {
-	fetch(request: Request) {
-		return handleRequest(request, {});
+	async fetch(request: Request) {
+		const { matched, response } = await handleRequest(request);
+
+		if (matched) {
+			return response;
+		}
+
+		return new Response("Not found", { status: 404 });
 	},
 };
-```
-
-</Tab>
-
-<Tab title="Next.js">
-
-```ts twoslash
-// ---cut-start---
-// @filename: contract.ts
-import { route } from "@rest-rpc/core";
-import { z } from "zod";
-
-const todoSchema = z.object({
-	id: z.string(),
-	title: z.string(),
-	completed: z.boolean(),
-});
-
-export const api = {
-	todos: {
-		create: route
-			.post("/todos")
-			.body(
-				z.object({
-					title: z.string().min(1),
-				}),
-			)
-			.response(201, todoSchema),
-	},
-};
-
-// @filename: route.ts
-// ---cut-end---
-import { createRouteHandler, router } from "@rest-rpc/next";
-import { api } from "./contract";
-
-const todos = new Map<
-	string,
-	{
-		id: string;
-		title: string;
-		completed: boolean;
-	}
->();
-
-const routes = router(api).handlers({
-	todos: {
-		create({ title }) {
-			const todo = {
-				id: crypto.randomUUID(),
-				title,
-				completed: false,
-			};
-
-			todos.set(todo.id, todo);
-
-			return todo;
-		},
-	},
-});
-
-export const { POST } = createRouteHandler(routes);
 ```
 
 </Tab>

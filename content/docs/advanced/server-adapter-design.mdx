@@ -134,7 +134,7 @@ const intercept = async (executionContext, next) => {
 
 When a framework does not expose a direct route registration surface, the adapter
 has to own the request dispatch. The adapter receives a request, matches it to a route,
-and executes the implementation. `@rest-rpc/fetch` and `@rest-rpc/next` are built this way.
+and executes the implementation. `@rest-rpc/fetch` is build this way.
 
 Conceptually, the adapter does this:
 
@@ -145,8 +145,8 @@ const createRouteHandler = (routes) => {
 	return async (runtimeRequest, runtimeContext) => {
 		const match = matchRoute(runtimeRequest);
 
-		if (!match) {
-			return createNotFoundResponse();
+		if (!match.matched) {
+			return { matched: false, response: undefined };
 		}
 
 		const request = await readRuntimeRequest(runtimeRequest, match.params);
@@ -158,7 +158,10 @@ const createRouteHandler = (routes) => {
 			errorHandlers,
 		});
 
-		return createRuntimeResponse(result);
+		return {
+			matched: true,
+			response: createRuntimeResponse(result),
+		};
 	};
 };
 ```
@@ -185,12 +188,6 @@ The Fetch runtime covers the case where HTTP integration is already expressed as
 one request handler. It does not need to register routes into a framework or
 preserve framework context. It only needs to match the incoming request, execute
 the contract route, and return a `Response`.
-
-Next.js is also request-dispatch shaped, but the application surface is not just
-an arbitrary handler function. Route handlers are expressed as method exports,
-and the request object is `NextRequest`. The Next.js adapter keeps those
-conventions at the edge while reusing the same underlying Fetch-style execution
-model.
 
 NestJS is controller-shaped. Routes are declared through decorators and modules,
 while implementations often live in injectable providers. The Nest adapter keeps

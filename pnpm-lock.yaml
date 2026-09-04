@@ -84,9 +84,6 @@ importers:
       '@rest-rpc/nest':
         specifier: workspace:*
         version: link:../packages/nest
-      '@rest-rpc/next':
-        specifier: workspace:*
-        version: link:../packages/next
       '@rest-rpc/tanstack-query':
         specifier: workspace:*
         version: link:../packages/tanstack-query
@@ -168,9 +165,6 @@ importers:
       '@rest-rpc/nest':
         specifier: workspace:*
         version: link:../packages/nest
-      '@rest-rpc/next':
-        specifier: workspace:*
-        version: link:../packages/next
       '@rest-rpc/server':
         specifier: workspace:*
         version: link:../packages/server
@@ -352,19 +346,6 @@ importers:
       rxjs:
         specifier: ^7.8.0
         version: 7.8.2
-
-  packages/next:
-    dependencies:
-      '@rest-rpc/core':
-        specifier: workspace:*
-        version: link:../core
-      '@rest-rpc/fetch':
-        specifier: workspace:*
-        version: link:../fetch
-    devDependencies:
-      next:
-        specifier: 16.3.1
-        version: 16.3.1(@babel/core@7.29.7)(@types/node@26.3.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
 
   packages/server:
     dependencies:

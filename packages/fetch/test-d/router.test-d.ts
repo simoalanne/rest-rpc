@@ -4,6 +4,7 @@ import {
 	createRouteHandler,
 	route,
 	router,
+	type FetchRouteHandlerResult,
 	type ServerHttpRouteDeclaration,
 } from "@rest-rpc/fetch";
 import { expectError, expectType } from "tsd";
@@ -68,7 +69,7 @@ const routes = router(api)
 	});
 
 const handle = createRouteHandler(routes);
-expectType<Promise<Response>>(
+expectType<Promise<FetchRouteHandlerResult>>(
 	handle(new Request("https://example.com/todos/todo-1"), {
 		env: { authToken: "secret" },
 	}),
@@ -90,7 +91,10 @@ const publicRoutes = router(api).handlers({
 });
 
 const publicHandle = createRouteHandler<Record<never, never>>(publicRoutes);
-expectType<Promise<Response>>(
+expectType<Promise<FetchRouteHandlerResult>>(
+	publicHandle(new Request("https://example.com")),
+);
+expectType<Promise<FetchRouteHandlerResult>>(
 	publicHandle(new Request("https://example.com"), {}),
 );
 

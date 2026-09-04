@@ -13,7 +13,7 @@ Keep the architecture contract-first:
 
 - The API contract is the source of truth.
 - Define each route once in the contract.
-- Preserve explicit HTTP semantics: method, path, params, query, headers, body, responses, status codes, content types, and metadata.
+- Preserve explicit HTTP semantics: method, path, panrams, query, headers, body, responses, status codes, content types, and metadata.
 - Derive server handlers, fetch clients, TanStack Query helpers, OpenAPI, and WebSocket helpers from the same contract.
 - Avoid duplicated client/server types when the contract can infer them.
 - Declare contracts with the fluent `route` builder instead of untyped route
@@ -94,7 +94,6 @@ Use only packages required by the detected stack:
 - `@rest-rpc/fastify`: Fastify adapter
 - `@rest-rpc/hono`: Hono adapter
 - `@rest-rpc/nest`: NestJS adapter
-- `@rest-rpc/next`: Next.js adapter
 - `@rest-rpc/fetch`: Server adapter for fetch-based runtimes (Next.js, Deno, Bun, Cloudflare Workers, etc.)
 - `@rest-rpc/server`: Low-level server helpers. Ignore by default unless implementing a custom server adapter.
 

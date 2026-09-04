@@ -27,12 +27,12 @@ describe("fetch route matching integration", () => {
 		assert.equal(await response.text(), "");
 	});
 
-	it("returns an empty 405 response for unregistered methods on matched paths", async () => {
+	it("uses the adapter fallback for unregistered methods on matched paths", async () => {
 		const response = await fetch(`${server.origin}/health`, {
 			method: "POST",
 		});
 
-		assert.equal(response.status, 405);
+		assert.equal(response.status, 404);
 		assert.equal(await response.text(), "");
 	});
 });

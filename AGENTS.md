@@ -13,7 +13,6 @@ This repo is `rest-rpc`, a TypeScript library for defining one shared API contra
 - `@rest-rpc/fastify` - fastify server adapter
 - `@rest-rpc/nest` - NestJS server adapter
 - `@rest-rpc/fetch` - Fetch runtime `Request`/`Response` HTTP handler adapter for fetch-native runtimes and catch-all routes.
-- `@rest-rpc/next` - next.js server/client adapter
 - `@rest-rpc/tanstack-query` - TanStack Query options and key helpers
 - `content/` contains documentation for the library and its packages. documentation is written in mdx and uses https://useblume.dev/.
 - `integration-tests/` contains a shared integration test suite that runs real HTTP requests against server adapters. It is used to verify that the generated code works as expected across all supported server adapters.

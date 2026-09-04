@@ -55,7 +55,9 @@ runBodyParsingSuite({
 					body: withoutBody(req.method) ? undefined : Readable.toWeb(req),
 					duplex: "half",
 				} as RequestInit & { duplex: "half" });
-				const response = await handler(request, {});
+				const result = await handler(request);
+				assert(result.matched);
+				const response = result.response;
 
 				res.writeHead(response.status, Object.fromEntries(response.headers));
 				if (response.body) {
@@ -70,14 +72,15 @@ runBodyParsingSuite({
 describe("fetch default body parser errors", () => {
 	it("returns a validation-style 400 when the default JSON parser fails", async () => {
 		const handler = createRouteHandler(createBodyParsingImplementations());
-		const response = await handler(
+		const result = await handler(
 			new Request("http://127.0.0.1/body-parsing/json", {
 				method: "POST",
 				headers: { "content-type": "application/json" },
 				body: "{",
 			}),
-			{},
 		);
+		assert(result.matched);
+		const response = result.response;
 
 		assert.equal(response.status, 400);
 		assert.match(
@@ -106,7 +109,6 @@ describe("fetch default body parser errors", () => {
 						headers: { "content-type": "application/json" },
 						body: "{}",
 					}),
-					{},
 				),
 			/custom parser failed/,
 		);

@@ -17,11 +17,6 @@ export type {
 	HttpRouteResultWriter,
 } from "./handleHttpRouteResult.ts";
 export { handleHttpRouteResult } from "./handleHttpRouteResult.ts";
-export type {
-	RouteMatcherMatch,
-	RouteMatcherMethodNotAllowed,
-	RouteMatcherResult,
-} from "./match.ts";
 export { createRouteMatcher } from "./match.ts";
 export {
 	flattenRouteImplementations,

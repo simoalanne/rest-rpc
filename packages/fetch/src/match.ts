@@ -27,15 +27,12 @@ export const createFetchRouteMatcher = (
 			path: url.pathname,
 		});
 
-		if (!match) return new Response(null, { status: 404 });
-		if (match.type === "methodNotAllowed") {
-			return new Response(null, { status: 405 });
-		}
+		if (!match.matched) return undefined;
 
 		const implementation = implementationsByRoute.get(
 			match.route as ServerHttpRouteDeclaration,
 		);
-		if (!implementation) return new Response(null, { status: 404 });
+		if (!implementation) return undefined;
 
 		return {
 			type: "match" as const,

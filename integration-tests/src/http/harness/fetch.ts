@@ -58,7 +58,10 @@ export const createFetchAdapter = (
 				} as RequestInit & { duplex: "half" });
 				let response: Response;
 				try {
-					response = await handler(request, context);
+					const result = await handler(request, context);
+					response = result.matched
+						? result.response
+						: new Response(null, { status: 404 });
 					response = (await options.transformResponse?.(response)) ?? response;
 				} catch (error) {
 					res.destroy(error instanceof Error ? error : undefined);

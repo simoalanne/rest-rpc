@@ -94,6 +94,20 @@ export type CreateFetchHandlerOptions = {
 };
 
 /**
+ * Result of attempting to handle a request with a Fetch route handler.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fetch}
+ */
+export type FetchRouteHandlerResult =
+	| { matched: true; response: Response }
+	| { matched: false; response: undefined };
+
+type RuntimeArguments<TRuntimeContext extends ContextShape> =
+	keyof TRuntimeContext extends never
+		? [runtime?: TRuntimeContext]
+		: [runtime: TRuntimeContext];
+
+/**
  * Creates a Fetch runtime route implementation builder for a single HTTP route.
  *
  * @see {@link https://rest-rpc.dev/docs/server/fetch}
@@ -132,14 +146,21 @@ export function createRouteHandler<
 >(
 	implementations: FetchImplementationTree,
 	options: CreateFetchHandlerOptions = {},
-): (request: TRequest, runtime: TRuntimeContext) => Promise<Response> {
+): (
+	request: TRequest,
+	...runtimeArguments: RuntimeArguments<TRuntimeContext>
+) => Promise<FetchRouteHandlerResult> {
 	const matchRoute = createFetchRouteMatcher(implementations);
 	const usesDefaultParseBody = options.parseBody === undefined;
 	const parseBody = options.parseBody ?? defaultParseBody;
 
-	return async (request: TRequest, runtime: TRuntimeContext) => {
+	return async (
+		request: TRequest,
+		...runtimeArguments: RuntimeArguments<TRuntimeContext>
+	) => {
 		const match = matchRoute(request);
-		if (match instanceof Response) return match;
+		if (!match) return { matched: false, response: undefined } as const;
+		const runtime = (runtimeArguments[0] ?? {}) as TRuntimeContext;
 		const implementation = match.implementation as FetchRouteImplementation<
 			TRuntimeContext,
 			TRequest
@@ -152,7 +173,9 @@ export function createRouteHandler<
 				route: implementation.route,
 				runtime,
 			});
-			if (middlewareResult instanceof Response) return middlewareResult;
+			if (middlewareResult instanceof Response) {
+				return { matched: true, response: middlewareResult } as const;
+			}
 			middlewareContext = {
 				...middlewareContext,
 				...middlewareResult,
@@ -164,7 +187,7 @@ export function createRouteHandler<
 			request,
 		};
 
-		return handleFetchRoute(
+		const response = await handleFetchRoute(
 			request,
 			context,
 			implementation,
@@ -173,5 +196,7 @@ export function createRouteHandler<
 			usesDefaultParseBody,
 			options.errorHandlers,
 		);
+
+		return { matched: true, response } as const;
 	};
 }

@@ -232,15 +232,12 @@ export const createFetchRouteMatcher = (
 			path: url.pathname,
 		});
 
-		if (!match) return new Response(null, { status: 404 });
-		if (match.type === "methodNotAllowed") {
-			return new Response(null, { status: 405 });
-		}
+		if (!match.matched) return undefined;
 
 		const implementation = implementationsByRoute.get(
 			match.route as HttpRouteDeclaration,
 		);
-		if (!implementation) return new Response(null, { status: 404 });
+		if (!implementation) return undefined;
 
 		return {
 			type: "match" as const,
@@ -266,6 +263,15 @@ export type CreateFetchHandlerOptions = {
 	parseBody?: FetchRouteParseBody;
 };
 
+export type FetchRouteHandlerResult =
+	| { matched: true; response: Response }
+	| { matched: false; response: undefined };
+
+type RuntimeArguments<TRuntimeContext extends Record<string, unknown>> =
+	keyof TRuntimeContext extends never
+		? [runtime?: TRuntimeContext]
+		: [runtime: TRuntimeContext];
+
 export const createRouteHandler = <
 	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
 	TContext extends Record<string, unknown> = Record<string, unknown>,
@@ -273,28 +279,37 @@ export const createRouteHandler = <
 >(
 	implementations: FetchImplementationTree,
 	options: CreateFetchHandlerOptions = {},
-): ((request: TRequest, runtime: TRuntimeContext) => Promise<Response>) => {
+): ((
+	request: TRequest,
+	...runtimeArguments: RuntimeArguments<TRuntimeContext>
+) => Promise<FetchRouteHandlerResult>) => {
 	const matchRoute = createFetchRouteMatcher(implementations);
 	const usesDefaultParseBody = options.parseBody === undefined;
 	const parseBody = options.parseBody ?? defaultParseBody;
 
-	return async (request: TRequest, runtime: TRuntimeContext) => {
+	return async (
+		request: TRequest,
+		...runtimeArguments: RuntimeArguments<TRuntimeContext>
+	) => {
 		const match = matchRoute(request);
-		if (match instanceof Response) return match;
+		if (!match) return { matched: false, response: undefined };
+		const runtime = (runtimeArguments[0] ?? {}) as TRuntimeContext;
 		const implementation = match.implementation;
 		const middlewareResult = await implementation.middleware?.({
 			request,
 			route: implementation.route,
 			runtime,
 		});
-		if (middlewareResult instanceof Response) return middlewareResult;
+		if (middlewareResult instanceof Response) {
+			return { matched: true, response: middlewareResult };
+		}
 
 		const context = {
 			...(middlewareResult ?? {}),
 			request,
 		};
 
-		return handleFetchRoute(
+		const response = await handleFetchRoute(
 			request,
 			context,
 			implementation,
@@ -303,6 +318,8 @@ export const createRouteHandler = <
 			usesDefaultParseBody,
 			options.errorHandlers,
 		);
+
+		return { matched: true, response };
 	};
 };
 ```

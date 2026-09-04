@@ -12,7 +12,6 @@
 			"@rest-rpc/express",
 			"@rest-rpc/fastify",
 			"@rest-rpc/hono",
-			"@rest-rpc/next",
 			"@rest-rpc/fetch",
 			"@rest-rpc/server",
 			"@rest-rpc/tanstack-query"

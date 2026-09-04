@@ -39,10 +39,9 @@ describe("createRouteHandler", () => {
 			});
 
 		const handle = createRouteHandler(routes);
-		const response = await handle(
-			new Request("https://example.com/health"),
-			{},
-		);
+		const result = await handle(new Request("https://example.com/health"));
+		assert(result.matched);
+		const response = result.response;
 
 		assert.equal(response.status, 204);
 		assert.deepEqual(calls, ["first", "second", "handler"]);
@@ -69,10 +68,9 @@ describe("createRouteHandler", () => {
 			});
 
 		const handle = createRouteHandler(routes);
-		const response = await handle(
-			new Request("https://example.com/health"),
-			{},
-		);
+		const result = await handle(new Request("https://example.com/health"));
+		assert(result.matched);
+		const response = result.response;
 
 		assert.equal(response.status, 401);
 		assert.deepEqual(calls, ["first"]);
@@ -114,18 +112,18 @@ describe("createRouteHandler", () => {
 
 		const handle = createRouteHandler(routes);
 
-		const compiledResponse = await handle(
+		const compiledResult = await handle(
 			new Request("https://example.com/compiled"),
-			{},
 		);
+		assert(compiledResult.matched);
+		const compiledResponse = compiledResult.response;
 		assert.equal(compiledResponse.status, 204);
 		assert.deepEqual(calls, ["compiled middleware", "compiled handler"]);
 
 		calls.length = 0;
-		const plainResponse = await handle(
-			new Request("https://example.com/plain"),
-			{},
-		);
+		const plainResult = await handle(new Request("https://example.com/plain"));
+		assert(plainResult.matched);
+		const plainResponse = plainResult.response;
 		assert.equal(plainResponse.status, 204);
 		assert.deepEqual(calls, ["parent middleware", "plain handler"]);
 	});
@@ -141,13 +139,14 @@ describe("createRouteHandler", () => {
 		});
 		const handle = createRouteHandler(routes);
 
-		const response = await handle(
+		const result = await handle(
 			new Request("https://example.com/forms", {
 				method: "POST",
 				body: new URLSearchParams({ title: "Write docs" }),
 			}),
-			{},
 		);
+		assert(result.matched);
+		const response = result.response;
 
 		assert.equal(response.status, 200);
 		assert.deepEqual(await response.json(), {
@@ -189,13 +188,14 @@ describe("createRouteHandler", () => {
 		body.append("tags", "ts");
 		body.append("tags", "rpc");
 
-		const response = await handle(
+		const result = await handle(
 			new Request("https://example.com/uploads", {
 				method: "POST",
 				body,
 			}),
-			{},
 		);
+		assert(result.matched);
+		const response = result.response;
 
 		assert.equal(response.status, 200);
 		assert.deepEqual(await response.json(), {
@@ -203,5 +203,24 @@ describe("createRouteHandler", () => {
 			tags: ["ts", "rpc"],
 			hasFile: true,
 		});
+	});
+
+	it("returns an unmatched result for unknown paths and methods", async () => {
+		const handle = createRouteHandler(
+			router({ health: healthRoute }).handlers({
+				health: () => undefined,
+			}),
+		);
+
+		assert.deepEqual(await handle(new Request("https://example.com/unknown")), {
+			matched: false,
+			response: undefined,
+		});
+		assert.deepEqual(
+			await handle(
+				new Request("https://example.com/health", { method: "POST" }),
+			),
+			{ matched: false, response: undefined },
+		);
 	});
 });

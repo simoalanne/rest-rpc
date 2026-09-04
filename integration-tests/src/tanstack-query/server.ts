@@ -57,7 +57,10 @@ export const startTanstackQueryServer = async () => {
 					: (Readable.toWeb(req) as ReadableStream),
 				duplex: "half",
 			} as RequestInit & { duplex: "half" });
-			const response = await handler(request, {});
+			const result = await handler(request);
+			const response = result.matched
+				? result.response
+				: new Response(null, { status: 404 });
 
 			res.writeHead(response.status, Object.fromEntries(response.headers));
 			if (response.body) {

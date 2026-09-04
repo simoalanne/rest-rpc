@@ -70,83 +70,13 @@ const createPathMatcher = (path: string) => {
 	};
 };
 
-type PathMatch = {
-	routes: Map<string, RouteDeclaration>;
-	params: Record<string, string>;
-};
-
-const createPathRouter = (routes: RouteDeclaration[]) => {
-	const matchers = routes.sort(compareRouteSpecificity).reduce(
-		(matchers, route) => {
-			const lastMatcher = matchers.at(-1);
-			if (lastMatcher?.path === route.path) {
-				if (!lastMatcher.routes.has(route.method)) {
-					lastMatcher.routes.set(route.method, route);
-				}
-				return matchers;
-			}
-
-			matchers.push({
-				path: route.path,
-				routes: new Map([[route.method, route]]),
-				matchPath: createPathMatcher(route.path),
-			});
-			return matchers;
-		},
-		[] as {
-			path: string;
-			routes: Map<string, RouteDeclaration>;
-			matchPath: (pathname: string) => Record<string, string> | null;
-		}[],
-	);
-
-	return {
-		matchPath(pathname: string): PathMatch | null {
-			for (const matcher of matchers) {
-				const params = matcher.matchPath(pathname);
-				if (params === null) continue;
-
-				return {
-					routes: matcher.routes,
-					params,
-				};
-			}
-
-			return null;
-		},
-	};
-};
-
-/**
- * A successful route match from `createRouteMatcher()`.
- *
- * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#dispatch-adapters}
- */
-export type RouteMatcherMatch = {
-	type: "match";
-	route: RouteDeclaration;
-	params: Record<string, string>;
-};
-
-/**
- * A route match result for a path with no matching HTTP method.
- *
- * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#dispatch-adapters}
- */
-export type RouteMatcherMethodNotAllowed = {
-	type: "methodNotAllowed";
-	allowedMethods: string[];
-};
-
-/**
- * The result returned by a route matcher.
- *
- * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#dispatch-adapters}
- */
-export type RouteMatcherResult =
-	| RouteMatcherMatch
-	| RouteMatcherMethodNotAllowed
-	| null;
+type RouteMatcherResult =
+	| {
+			matched: true;
+			route: RouteDeclaration;
+			params: Record<string, string>;
+	  }
+	| { matched: false; route: undefined; params: undefined };
 
 /**
  * Creates a path and method matcher for a contract tree.
@@ -154,24 +84,23 @@ export type RouteMatcherResult =
  * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#dispatch-adapters}
  */
 export function createRouteMatcher(contract: Contract) {
-	const pathRouter = createPathRouter(flattenContractRoutes(contract));
+	const matchers = flattenContractRoutes(contract)
+		.sort(compareRouteSpecificity)
+		.map((route) => ({ route, matchPath: createPathMatcher(route.path) }));
 
 	return (req: { path: string; method: string }): RouteMatcherResult => {
-		const match = pathRouter.matchPath(req.path);
-		if (!match) return null;
+		for (const matcher of matchers) {
+			if (matcher.route.method !== req.method) continue;
+			const params = matcher.matchPath(req.path);
+			if (params === null) continue;
 
-		const route = match.routes.get(req.method);
-		if (!route) {
 			return {
-				type: "methodNotAllowed",
-				allowedMethods: Array.from(match.routes.keys()),
+				matched: true,
+				route: matcher.route,
+				params,
 			};
 		}
 
-		return {
-			type: "match",
-			route,
-			params: match.params,
-		};
+		return { matched: false, route: undefined, params: undefined };
 	};
 }

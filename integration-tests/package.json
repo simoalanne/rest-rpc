@@ -4,8 +4,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"next:build": "next build src/nextjs/fixture",
-		"test": "pnpm run next:build && tsx --test $(find src -name '*.test.ts' -print | sort)"
+		"test": "tsx --test $(find src -name '*.test.ts' -print | sort)"
 	},
 	"dependencies": {
 		"@rest-rpc/core": "workspace:*",
@@ -14,7 +13,6 @@
 		"@rest-rpc/fetch": "workspace:*",
 		"@rest-rpc/hono": "workspace:*",
 		"@rest-rpc/nest": "workspace:*",
-		"@rest-rpc/next": "workspace:*",
 		"@rest-rpc/server": "workspace:*",
 		"@rest-rpc/tanstack-query": "workspace:*"
 	},

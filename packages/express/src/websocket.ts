@@ -133,11 +133,7 @@ export const registerExpressWebSocketRoutes = (
 			return;
 		}
 
-		if (!matchedRoute) return;
-		if (matchedRoute.type === "methodNotAllowed") {
-			sendUpgradeRejection(socket, { status: 405 });
-			return;
-		}
+		if (!matchedRoute.matched) return;
 
 		const implementation = implementationsByRoute.get(matchedRoute.route);
 		if (!implementation) return;
