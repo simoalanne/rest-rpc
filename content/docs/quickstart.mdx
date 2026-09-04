@@ -483,6 +483,74 @@ await app.listen(3000);
 
 </Tab>
 
+<Tab title="Fetch API">
+
+```ts twoslash
+// ---cut-start---
+// @filename: contract.ts
+import { route } from "@rest-rpc/core";
+import { z } from "zod";
+
+const todoSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+	completed: z.boolean(),
+});
+
+export const api = {
+	todos: {
+		create: route
+			.post("/todos")
+			.body(
+				z.object({
+					title: z.string().min(1),
+				}),
+			)
+			.response(201, todoSchema),
+	},
+};
+
+// @filename: server.ts
+// ---cut-end---
+import { createRouteHandler, router } from "@rest-rpc/fetch";
+import { api } from "./contract";
+
+const todos = new Map<
+	string,
+	{
+		id: string;
+		title: string;
+		completed: boolean;
+	}
+>();
+
+const routes = router(api).handlers({
+	todos: {
+		create({ title }) {
+			const todo = {
+				id: crypto.randomUUID(),
+				title,
+				completed: false,
+			};
+
+			todos.set(todo.id, todo);
+
+			return todo;
+		},
+	},
+});
+
+const handleRequest = createRouteHandler(routes);
+
+export default {
+	fetch(request: Request) {
+		return handleRequest(request, {});
+	},
+};
+```
+
+</Tab>
+
 <Tab title="Next.js">
 
 ```ts twoslash
