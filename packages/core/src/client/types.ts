@@ -26,7 +26,7 @@ export type FetchLike = (
 	init?: RequestInit,
 ) => Promise<Response>;
 
-type HeaderRecord = Record<string, string>;
+export type HeaderRecord = Record<string, string>;
 
 export type GetHeadersFn<THeaders extends HeaderRecord = HeaderRecord> = () =>
 	| THeaders
@@ -196,6 +196,7 @@ type ApiClientOpenConnectionRouteValue<
 	openConnection: OpenConnectionFn<E, TGlobalHeaders>;
 };
 
+/** Client operations available for a single declared route. */
 export type ApiClientRouteValue<
 	E extends RouteDeclaration = RouteDeclaration,
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,

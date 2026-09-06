@@ -2,7 +2,7 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { validateStandardSchema } from "../standard-schema/index.ts";
 
 export async function* parseNdjsonStream(
-	schema: StandardSchemaV1,
+	schema: StandardSchemaV1 | undefined,
 	body: ReadableStream<Uint8Array>,
 	validate: boolean,
 ): AsyncIterable<unknown> {
@@ -26,7 +26,7 @@ export async function* parseNdjsonStream(
 			for (const line of lines) {
 				if (!line.trim()) continue;
 				const value = JSON.parse(line);
-				if (!validate) {
+				if (!validate || !schema) {
 					yield value;
 					continue;
 				}
@@ -39,7 +39,7 @@ export async function* parseNdjsonStream(
 		buffer += decoder.decode();
 		if (buffer.trim()) {
 			const value = JSON.parse(buffer);
-			if (!validate) {
+			if (!validate || !schema) {
 				yield value;
 				completed = true;
 				return;

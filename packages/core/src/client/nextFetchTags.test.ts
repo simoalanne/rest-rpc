@@ -68,6 +68,25 @@ describe("Next fetch tags", () => {
 		);
 	});
 
+	it("uses a method and path as an explicit route identity", () => {
+		const apiContract = {
+			items: route
+				.get("/items/:id")
+				.params(type<{ id: string }>())
+				.requestKeys({ id: "params" })
+				.response(204),
+		};
+
+		assert.deepEqual(
+			getNextFetchTags(
+				apiContract.items,
+				{ method: "GET", path: "/items/:id" },
+				{ id: "one" },
+			),
+			["rest-rpc:get:/items/:id:id:one", "rest-rpc:get:/items/:id"],
+		);
+	});
+
 	it("uses grouped request segments when flattened request keys are disabled", () => {
 		const groupedRoute = route.with({ flattenRequestKeys: false });
 		const apiContract = {

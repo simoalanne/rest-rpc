@@ -20,6 +20,72 @@ import type { ClientResponse, FetchArgs } from "./types.ts";
 
 const isSuccessStatus = (status: number) => status >= 200 && status < 300;
 
+/** Header used to describe bodies returned to server-first clients. */
+export const SERVER_FIRST_RESPONSE_KIND_HEADER = "X-Rest-Rpc-Response-Kind";
+
+type ServerFirstResponseKind =
+	| "empty"
+	| "json"
+	| "ndjson"
+	| "custom"
+	| "custom-stream";
+
+const serverFirstResponseKinds: readonly ServerFirstResponseKind[] = [
+	"empty",
+	"json",
+	"ndjson",
+	"custom",
+	"custom-stream",
+];
+
+const isServerFirstResponseKind = (
+	value: string | undefined,
+): value is ServerFirstResponseKind =>
+	value !== undefined &&
+	serverFirstResponseKinds.some((responseKind) => responseKind === value);
+
+const parseHeaderOptions = (header: string) => {
+	const options = new Map<string, string>();
+	for (const field of header.trim().split(/\s+/u)) {
+		const separatorIndex = field.indexOf("=");
+		if (separatorIndex <= 0 || separatorIndex !== field.lastIndexOf("=")) {
+			return undefined;
+		}
+
+		const name = field.slice(0, separatorIndex);
+		const value = field.slice(separatorIndex + 1);
+		if (!value || options.has(name)) return undefined;
+		options.set(name, value);
+	}
+	return options;
+};
+
+const getServerFirstResponseKind = (
+	rawResponse: Response,
+): ServerFirstResponseKind => {
+	const header = rawResponse.headers.get(SERVER_FIRST_RESPONSE_KIND_HEADER);
+	if (!header) {
+		throw new Error(
+			`Server response is missing required ${SERVER_FIRST_RESPONSE_KIND_HEADER} header to use server-first client.`,
+		);
+	}
+
+	const options = parseHeaderOptions(header);
+	const hasExpectedOptions =
+		options?.size === 2 && options.has("v") && options.has("kind");
+	const hasSupportedVersion = options?.get("v") === "1";
+	const kind = options?.get("kind");
+	if (
+		!hasExpectedOptions ||
+		!hasSupportedVersion ||
+		!isServerFirstResponseKind(kind)
+	) {
+		throw new Error("Server returned an invalid server-first response kind.");
+	}
+
+	return kind;
+};
+
 export const getResponseSchema = (
 	route: RouteDeclaration,
 	status: number,
@@ -42,6 +108,47 @@ export const readUnknownBody = async (rawResponse: Response) => {
 	}
 };
 
+/** Reads a response using server-first response-kind metadata. */
+export const readServerFirstResponse = async (rawResponse: Response) => {
+	const kind = getServerFirstResponseKind(rawResponse);
+	let body: unknown;
+	let contentType: string | undefined;
+
+	switch (kind) {
+		case "empty":
+			body = undefined;
+			break;
+		case "json":
+			body = await rawResponse.json();
+			break;
+		case "ndjson":
+			if (!rawResponse.body) {
+				throw new Error("Server returned an empty stream response");
+			}
+			body = parseNdjsonStream(undefined, rawResponse.body, false);
+			break;
+		case "custom":
+		case "custom-stream":
+			contentType = rawResponse.headers.get("content-type") ?? undefined;
+			if (!contentType) {
+				throw new Error(
+					"Server response is missing required Content-Type header for a custom response kind.",
+				);
+			}
+			body = rawResponse;
+			break;
+	}
+
+	return {
+		declared: true as const,
+		status: rawResponse.status,
+		body,
+		headers: rawResponse.headers,
+		responseHeaders: Object.fromEntries(rawResponse.headers.entries()),
+		...(contentType ? { contentType } : {}),
+	};
+};
+
 export const readDeclaredBody = async (
 	schema: ResponseBodySchema,
 	rawResponse: Response,
@@ -54,11 +161,11 @@ export const readDeclaredBody = async (
 	if (isStream(schema)) {
 		if (isCustomBody(schema.schema)) return rawResponse;
 		if (!isStandardSchema(schema.schema)) {
-			throw new Error("Backend returned an unsupported stream response");
+			throw new Error("Server returned an unsupported stream response");
 		}
 
 		if (!rawResponse.body) {
-			throw new Error("Backend returned an empty stream response");
+			throw new Error("Server returned an empty stream response");
 		}
 
 		return parseNdjsonStream(schema.schema, rawResponse.body, validate);
@@ -90,7 +197,7 @@ const resolveDeclaredContentType = (
 
 	if (!contentType) {
 		throw new Error(
-			"Backend returned an unsupported custom response content-type.",
+			"Server returned an unsupported custom response content-type.",
 		);
 	}
 

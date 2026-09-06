@@ -1,4 +1,4 @@
-import type { RouteDeclaration } from "../contract/contract.ts";
+import type { ClientRequestRoute } from "./requestRoute.ts";
 
 export type FlatRequestInput = Record<string, unknown>;
 
@@ -14,7 +14,7 @@ export type GroupRequestInputOptions = {
 };
 
 export const groupRequestInput = (
-	route: RouteDeclaration,
+	route: ClientRequestRoute,
 	input: FlatRequestInput,
 	options: GroupRequestInputOptions = {},
 ): GroupedRequestInput => {

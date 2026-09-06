@@ -1,5 +1,5 @@
-import type { RouteDeclaration } from "../contract/contract.ts";
 import { groupRequestInput } from "./groupRequestInput.ts";
+import type { ClientRequestRoute } from "./requestRoute.ts";
 
 const DEFAULT_NEXT_FETCH_TAG_PREFIX = "rest-rpc";
 type NextFetchTagRequest = Record<string, unknown>;
@@ -31,8 +31,12 @@ const serializeTagValue = (value: unknown) =>
 		? JSON.stringify(sortJsonValue(value))
 		: String(value);
 
-const serializeRoutePath = (routePath: readonly string[]) =>
-	routePath.map(encodeTagSegment).join(".");
+const serializeRouteIdentity = (
+	route: readonly string[] | Pick<ClientRequestRoute, "method" | "path">,
+) =>
+	"method" in route
+		? `${route.method.toLowerCase()}:${route.path}`
+		: route.map(encodeTagSegment).join(".");
 
 const serializeRequest = (request: NextFetchTagRequest | undefined) => {
 	const entries = Object.entries(stripUndefinedFields(request) ?? {}).sort(
@@ -48,7 +52,7 @@ const serializeRequest = (request: NextFetchTagRequest | undefined) => {
 };
 
 const getNextFetchTagRequest = (
-	route: RouteDeclaration,
+	route: ClientRequestRoute,
 	request: NextFetchTagRequest | undefined,
 ) => {
 	if (!request) return undefined;
@@ -71,11 +75,11 @@ const getNextFetchTagRequest = (
 };
 
 const createNextFetchTag = (
-	routePath: readonly string[],
+	routeIdentity: string,
 	request: NextFetchTagRequest | undefined,
 	tagPrefix?: string,
 ) => {
-	const tag = `${tagPrefix ?? DEFAULT_NEXT_FETCH_TAG_PREFIX}:${serializeRoutePath(routePath)}`;
+	const tag = `${tagPrefix ?? DEFAULT_NEXT_FETCH_TAG_PREFIX}:${routeIdentity}`;
 	const serializedRequest = serializeRequest(request);
 	return serializedRequest ? `${tag}:${serializedRequest}` : tag;
 };
@@ -88,15 +92,22 @@ const createNextFetchTag = (
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#use-in-nextjs}
  */
 export function getNextFetchTags(
-	route: RouteDeclaration,
-	routePath: readonly string[],
+	route: ClientRequestRoute,
+	routeIdentity:
+		| readonly string[]
+		| Pick<ClientRequestRoute, "method" | "path">,
 	request?: NextFetchTagRequest,
 	options?: { tagPrefix?: string },
 ): string[] {
 	const tagRequest = getNextFetchTagRequest(route, request);
-	const routeTag = createNextFetchTag(routePath, undefined, options?.tagPrefix);
+	const serializedRouteIdentity = serializeRouteIdentity(routeIdentity);
+	const routeTag = createNextFetchTag(
+		serializedRouteIdentity,
+		undefined,
+		options?.tagPrefix,
+	);
 	const exactTag = createNextFetchTag(
-		routePath,
+		serializedRouteIdentity,
 		tagRequest,
 		options?.tagPrefix,
 	);

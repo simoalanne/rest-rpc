@@ -13,6 +13,7 @@ import type {
 } from "./groupRequestInput.ts";
 import { groupRequestInput } from "./groupRequestInput.ts";
 import { getNextFetchTags } from "./nextFetchTags.ts";
+import type { ClientRequestRoute } from "./requestRoute.ts";
 import type {
 	ApiClientFetchOptions,
 	FetchArgs,
@@ -39,7 +40,7 @@ export const createRequestSignal = (
 	};
 };
 
-export const takesRequestInput = (route: RouteDeclaration) => {
+export const takesRequestInput = (route: ClientRequestRoute) => {
 	const request = route.request;
 	if (request?.query || request?.params || request?.headers) {
 		return true;
@@ -80,12 +81,30 @@ export const serializeCustomBody = (body: unknown, contentType: string) =>
 		? JSON.stringify(body)
 		: (body as BodyInit | null | undefined);
 
+const getDeclaredArrayKeys = (
+	body: unknown,
+	kind: "formBody" | "multipartBody",
+) => {
+	if (
+		typeof body !== "object" ||
+		body === null ||
+		!("kind" in body) ||
+		body.kind !== kind ||
+		!("arrayKeys" in body) ||
+		!Array.isArray(body.arrayKeys)
+	) {
+		return undefined;
+	}
+
+	return new Set(body.arrayKeys as string[]);
+};
+
 const serializeFormBody = (
-	route: RouteDeclaration,
+	route: ClientRequestRoute,
 	body: Record<string, unknown> | undefined,
 ) => {
 	const routeBody = route.request?.body;
-	const arrayKeys = new Set(isFormBody(routeBody) ? routeBody.arrayKeys : []);
+	const arrayKeys = getDeclaredArrayKeys(routeBody, "formBody");
 	const formBody =
 		route.request?.flattenKeys === false
 			? body
@@ -94,7 +113,7 @@ const serializeFormBody = (
 	return new URLSearchParams(
 		Object.entries(formBody ?? {}).flatMap(([key, value]) => {
 			if (Array.isArray(value)) {
-				if (!arrayKeys.has(key)) {
+				if (arrayKeys && !arrayKeys.has(key)) {
 					throw new Error(
 						`Invalid body key "${key}" for ${route.method} ${route.path}. Expected string, number, boolean, or an array for a declared form array key.`,
 					);
@@ -117,13 +136,11 @@ const stringifyMultipartValue = (value: unknown) => {
 };
 
 const serializeMultipartBody = (
-	route: RouteDeclaration,
+	route: ClientRequestRoute,
 	body: Record<string, unknown> | undefined,
 ) => {
 	const routeBody = route.request?.body;
-	const arrayKeys = new Set(
-		isMultipartBody(routeBody) ? routeBody.arrayKeys : [],
-	);
+	const arrayKeys = getDeclaredArrayKeys(routeBody, "multipartBody");
 	const multipartBody =
 		route.request?.flattenKeys === false
 			? body
@@ -132,7 +149,7 @@ const serializeMultipartBody = (
 
 	for (const [key, value] of Object.entries(multipartBody ?? {})) {
 		if (Array.isArray(value)) {
-			if (!arrayKeys.has(key)) {
+			if (arrayKeys && !arrayKeys.has(key)) {
 				throw new Error(
 					`Invalid body key "${key}" for ${route.method} ${route.path}. Expected string, number, boolean, Blob, File, or an array for a declared multipart array key.`,
 				);
@@ -153,7 +170,7 @@ const serializeMultipartBody = (
 };
 
 const stringifyHeaders = (
-	route: RouteDeclaration,
+	_route: ClientRequestRoute,
 	headers: Record<string, unknown> | undefined,
 ) =>
 	Object.fromEntries(
@@ -164,7 +181,7 @@ const stringifyHeaders = (
 	);
 
 const serializeParams = (
-	route: RouteDeclaration,
+	route: ClientRequestRoute,
 	params: Record<string, unknown> | undefined,
 ) => {
 	return replacePathParams(route.path, (key) => {
@@ -178,7 +195,7 @@ const serializeParams = (
 	});
 };
 
-const serializeQuery = (route: RouteDeclaration, query: unknown) => {
+const serializeQuery = (route: ClientRequestRoute, query: unknown) => {
 	const entries = Object.entries(query ?? {}).flatMap(([key, value]) => {
 		const stringValue = isJsonQuery(route.request?.query)
 			? stringifyJsonQueryValue(route, value)
@@ -192,7 +209,7 @@ const serializeQuery = (route: RouteDeclaration, query: unknown) => {
 	return search ? `?${search}` : "";
 };
 
-const stringifyJsonQueryValue = (route: RouteDeclaration, value: unknown) => {
+const stringifyJsonQueryValue = (route: ClientRequestRoute, value: unknown) => {
 	if (value === undefined) return undefined;
 	try {
 		const json = JSON.stringify(value);
@@ -208,7 +225,7 @@ const stringifyJsonQueryValue = (route: RouteDeclaration, value: unknown) => {
 
 export const constructBaseRequest = (
 	baseUrl: string,
-	route: RouteDeclaration,
+	route: ClientRequestRoute,
 	args: FlatRequestInput | undefined,
 	strictRequestKeys: boolean,
 ): {
@@ -278,7 +295,7 @@ export const constructBaseRequest = (
 	};
 };
 
-export const extractArgs = (route: RouteDeclaration, args: unknown[]) => {
+export const extractArgs = (route: ClientRequestRoute, args: unknown[]) => {
 	const requestArgs = takesRequestInput(route)
 		? (args[0] as FlatRequestInput)
 		: undefined;
@@ -301,10 +318,13 @@ export type ExecuteRequestOptions = {
 
 const addNextFetchTags = (
 	init: RequestInit,
-	route: RouteDeclaration,
-	routePath: readonly string[],
+	route: ClientRequestRoute,
+	routeIdentity:
+		| readonly string[]
+		| Pick<ClientRequestRoute, "method" | "path">,
 	request: FlatRequestInput | undefined,
 	options: NextFetchTagsOptions | undefined,
+	tagRequest: FlatRequestInput | undefined,
 ) => {
 	if (!options?.enabled || route.method !== "GET") return init;
 
@@ -321,7 +341,7 @@ const addNextFetchTags = (
 			...nextInit.next,
 			tags: [
 				...(nextInit.next?.tags ?? []),
-				...getNextFetchTags(route, routePath, request, {
+				...getNextFetchTags(route, routeIdentity, tagRequest ?? request, {
 					tagPrefix: options.tagPrefix,
 				}),
 			],
@@ -330,10 +350,13 @@ const addNextFetchTags = (
 };
 
 export const executeRequest = async <E extends RouteDeclaration>(
-	route: E,
-	routePath: readonly string[],
-	args: FetchArgs<E>,
+	route: E | ClientRequestRoute,
+	routeIdentity:
+		| readonly string[]
+		| Pick<ClientRequestRoute, "method" | "path">,
+	args: FetchArgs<E> | unknown[],
 	options: ExecuteRequestOptions,
+	tagRequest?: FlatRequestInput,
 ): Promise<Response> => {
 	const { requestArgs, options: fetchOptions } = extractArgs(route, args);
 	const {
@@ -370,9 +393,10 @@ export const executeRequest = async <E extends RouteDeclaration>(
 				signal: signalState?.signal ?? fetchOptions?.signal,
 			},
 			route,
-			routePath,
+			routeIdentity,
 			requestArgs,
 			options.nextFetchTags,
+			tagRequest,
 		);
 		const fetchImpl =
 			options.fetch ?? ((input, init) => globalThis.fetch(input, init));
