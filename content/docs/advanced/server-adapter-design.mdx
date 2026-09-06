@@ -143,7 +143,8 @@ handler envelope from `status`, `body`, and optional `contentType`.
 Always write normalized results through `handleHttpRouteResult`,
 `createFetchResponse`, or `writeNodeResponse`. Besides handling headers and body
 kinds consistently, these writers emit the versioned
-`X-Rest-Rpc-Response-Kind` metadata required by `initServerFirstClient`.
+`X-Rest-Rpc-Response-Kind` metadata required by the server-first `initClient`
+overload.
 Framework-generated validation/error responses opt out of that metadata, so a
 server-first client fails clearly instead of decoding an unexpected body as a
 declared route response.

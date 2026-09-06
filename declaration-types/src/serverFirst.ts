@@ -2,7 +2,7 @@
 // public server-first builder, implementation, handler, and client types.
 
 import {
-	initServerFirstClient,
+	initClient,
 	route as contractRoute,
 	type as schemaType,
 } from "@rest-rpc/core";
@@ -46,9 +46,9 @@ export const nodeRoutes = {
 
 export const fetchHandler = createFetchRouteHandler(fetchRoutes);
 export const nodeHandler = createNodeRouteHandler(nodeRoutes);
-export const fetchClient = initServerFirstClient<typeof fetchRoutes>({
+export const fetchClient = initClient<typeof fetchRoutes>({
 	baseUrl: "http://localhost",
 });
-export const nodeClient = initServerFirstClient<typeof nodeRoutes>({
+export const nodeClient = initClient<typeof nodeRoutes>({
 	baseUrl: "http://localhost",
 });

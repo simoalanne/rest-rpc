@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-	initServerFirstClient,
+	initClient,
 	request,
 	SERVER_FIRST_RESPONSE_KIND_HEADER,
 } from "./index.ts";
@@ -37,7 +37,7 @@ const createClient = (
 	options: { nextFetchTags?: { enabled: boolean; tagPrefix?: string } } = {},
 ) => {
 	const calls: FetchCall[] = [];
-	const client = initServerFirstClient<never>({
+	const client = initClient<never>({
 		baseUrl: "https://api.test",
 		fetch: async (url, init) => {
 			calls.push({ url: String(url), init });
@@ -49,7 +49,7 @@ const createClient = (
 	return { calls, client };
 };
 
-describe("initServerFirstClient", () => {
+describe("initClient server-first mode", () => {
 	it("selects a method and path and delegates ordinary requests to fetch", async () => {
 		const { calls, client } = createClient(() =>
 			response("json", JSON.stringify({ id: "todo-1" }), 201),

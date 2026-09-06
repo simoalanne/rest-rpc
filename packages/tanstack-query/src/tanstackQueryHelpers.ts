@@ -9,7 +9,6 @@ import type {
 	ServerFirstClientRouteFor,
 	ServerFirstClientSelector,
 } from "@rest-rpc/core/client";
-import { initServerFirstClient } from "@rest-rpc/core/client";
 import type {
 	ClientRequest,
 	Contract,
@@ -396,7 +395,7 @@ export function createTanstackQueryHelpers(
 	if (maybeOptions === undefined) {
 		const options =
 			contractOrOptions as CreateServerFirstTanstackQueryHelpersOptions;
-		const client = initServerFirstClient<unknown>(options) as Record<
+		const client = initClient<unknown>(options) as Record<
 			string,
 			(path: string) => {
 				fetchResponse: (...args: unknown[]) => Promise<unknown>;

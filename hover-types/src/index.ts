@@ -1,9 +1,4 @@
-import {
-	initClient,
-	initServerFirstClient,
-	route,
-	type as schemaType,
-} from "@rest-rpc/core";
+import { initClient, route, type as schemaType } from "@rest-rpc/core";
 import type {
 	ClientRequest,
 	ClientResponse,
@@ -281,9 +276,9 @@ export const nodeServerFirstHandler = createNodeRouteHandler(
 	nodeServerFirstRoutes,
 );
 
-export const serverFirstClient = initServerFirstClient<
-	typeof fetchServerFirstRoutes
->({ baseUrl: "https://example.test" });
+export const serverFirstClient = initClient<typeof fetchServerFirstRoutes>({
+	baseUrl: "https://example.test",
+});
 
 export const serverFirstCreatePromise = serverFirstClient
 	.post("/server-first/todos")

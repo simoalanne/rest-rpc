@@ -143,10 +143,10 @@ Import the route tree with `import type` so the server module and its runtime
 dependencies are not included in the client bundle.
 
 ```ts client.ts
-import { initServerFirstClient } from "@rest-rpc/core";
+import { initClient } from "@rest-rpc/core";
 import type { routes } from "./server";
 
-const client = initServerFirstClient<typeof routes>({
+const client = initClient<typeof routes>({
 	baseUrl: "https://api.example.com",
 });
 

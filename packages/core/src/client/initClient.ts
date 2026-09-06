@@ -12,6 +12,11 @@ import {
 	type RouteRequestFn,
 } from "./response.ts";
 import { isSseRouteNode, openSseConnection } from "./sse.ts";
+import {
+	createServerFirstClient,
+	type ServerFirstClientFor,
+	type ServerFirstClientOptions,
+} from "./serverFirstClient.ts";
 import type {
 	ApiClientFor,
 	ApiClientOptions,
@@ -26,18 +31,13 @@ const hasSingleSuccessfulResponse = (route: RouteDeclaration) =>
 		return statusCode >= 200 && statusCode < 300;
 	}).length === 1;
 
-/**
- * Creates a typed fetch client from a contract.
- *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client}
- */
-export function initClient<
+const createContractClient = <
 	TContract extends Contract,
 	const TGlobalHeaders extends Record<string, string> = Record<never, string>,
 >(
 	contract: TContract,
 	options: ApiClientOptions<TGlobalHeaders>,
-): ApiClientFor<TContract, TGlobalHeaders> {
+): ApiClientFor<TContract, TGlobalHeaders> => {
 	const strictRequestKeys = options.strictRequestKeys ?? true;
 	const validateResponses = options.validateResponses ?? false;
 	const requestOptions: ExecuteRequestOptions = {
@@ -99,4 +99,38 @@ export function initClient<
 			fetchResponse: routeFetchResponse,
 		};
 	}) as ApiClientFor<TContract, TGlobalHeaders>;
+};
+
+/**
+ * Creates a typed fetch client from a contract or server implementation tree.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client}
+ */
+export function initClient<
+	const TTree,
+	const TGlobalHeaders extends Record<string, string> = Record<never, string>,
+>(
+	options: ServerFirstClientOptions<TGlobalHeaders>,
+): ServerFirstClientFor<TTree, TGlobalHeaders>;
+
+/** Creates a typed fetch client from a contract. */
+export function initClient<
+	TContract extends Contract,
+	const TGlobalHeaders extends Record<string, string> = Record<never, string>,
+>(
+	contract: TContract,
+	options: ApiClientOptions<TGlobalHeaders>,
+): ApiClientFor<TContract, TGlobalHeaders>;
+
+export function initClient(
+	contractOrOptions: Contract | ServerFirstClientOptions,
+	maybeOptions?: ApiClientOptions,
+): unknown {
+	if (maybeOptions === undefined) {
+		return createServerFirstClient(
+			contractOrOptions as ServerFirstClientOptions,
+		);
+	}
+
+	return createContractClient(contractOrOptions as Contract, maybeOptions);
 }

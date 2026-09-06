@@ -200,14 +200,6 @@ export type ServerFirstClientFor<
 	>;
 };
 
-/** Type-level initializer shape for the server-first Fetch client. */
-export type ServerFirstClientInitializer = <
-	const TTree,
-	const TGlobalHeaders extends HeaderRecord = Record<never, string>,
->(
-	options: ServerFirstClientOptions<TGlobalHeaders>,
-) => ServerFirstClientFor<TTree, TGlobalHeaders>;
-
 /** Options used to create a server-first Fetch client. */
 export type ServerFirstClientOptions<
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
@@ -361,13 +353,12 @@ const selectorMethod = (selector: string): HttpMethod => {
 	throw new Error(`Unsupported server-first client selector "${selector}".`);
 };
 
-/** Creates a typed Fetch client from a server implementation tree. */
-export function initServerFirstClient<
+export const createServerFirstClient = <
 	const TTree,
 	const TGlobalHeaders extends HeaderRecord = Record<never, string>,
 >(
 	options: ServerFirstClientOptions<TGlobalHeaders>,
-): ServerFirstClientFor<TTree, TGlobalHeaders> {
+): ServerFirstClientFor<TTree, TGlobalHeaders> => {
 	const requestOptions: ExecuteRequestOptions = {
 		...options,
 		strictRequestKeys: true,
@@ -436,4 +427,4 @@ export function initServerFirstClient<
 			},
 		},
 	) as ServerFirstClientFor<TTree, TGlobalHeaders>;
-}
+};

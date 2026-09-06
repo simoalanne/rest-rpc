@@ -1,4 +1,4 @@
-import { initServerFirstClient, request } from "@rest-rpc/core";
+import { initClient, request } from "@rest-rpc/core";
 import type { ServerRouteFactory } from "@rest-rpc/server";
 import { sseEvent } from "@rest-rpc/server";
 import { expectError, expectType } from "tsd";
@@ -83,18 +83,18 @@ const routes = {
 		.handler(() => ({ status: 204 as const })),
 } as const;
 
-const client = initServerFirstClient<typeof routes>({
+const client = initClient<typeof routes>({
 	baseUrl: "https://example.test",
 });
 
 expectError(
-	initServerFirstClient<typeof routes>({
+	initClient<typeof routes>({
 		baseUrl: "https://example.test",
 		validateResponses: true,
 	}),
 );
 expectError(
-	initServerFirstClient<typeof routes>({
+	initClient<typeof routes>({
 		baseUrl: "https://example.test",
 		strictRequestKeys: false,
 	}),

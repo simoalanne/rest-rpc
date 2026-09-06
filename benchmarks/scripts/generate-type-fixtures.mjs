@@ -8,7 +8,7 @@ const routeCounts = [10, 100, 500, 1000];
 
 const schemaLibraries = {
 	"type-only": {
-		importSource: `import { initServerFirstClient, route, type as schema } from "@rest-rpc/core";
+		importSource: `import { initClient, route, type as schema } from "@rest-rpc/core";
 import { route as serverRoute } from "@rest-rpc/fetch";`,
 		schemas: `const requestHeadersSchema = schema<{ "x-request-id": string }>();
 const routeHeadersSchema = schema<{ "x-feature": string | undefined }>();
@@ -29,7 +29,7 @@ const errorSchema = schema<{
 }>();`,
 	},
 	zod: {
-		importSource: `import { initServerFirstClient, route } from "@rest-rpc/core";
+		importSource: `import { initClient, route } from "@rest-rpc/core";
 import { route as serverRoute } from "@rest-rpc/fetch";
 import z from "zod";`,
 		schemas: `const requestHeadersSchema = z.object({ "x-request-id": z.string() });
@@ -51,7 +51,7 @@ const errorSchema = z.object({
 });`,
 	},
 	valibot: {
-		importSource: `import { initServerFirstClient, route } from "@rest-rpc/core";
+		importSource: `import { initClient, route } from "@rest-rpc/core";
 import { route as serverRoute } from "@rest-rpc/fetch";
 import * as v from "valibot";`,
 		schemas: `const requestHeadersSchema = v.object({ "x-request-id": v.string() });
@@ -73,7 +73,7 @@ const errorSchema = v.object({
 });`,
 	},
 	arktype: {
-		importSource: `import { initServerFirstClient, route } from "@rest-rpc/core";
+		importSource: `import { initClient, route } from "@rest-rpc/core";
 import { route as serverRoute } from "@rest-rpc/fetch";
 import { type } from "arktype";`,
 		schemas: `const requestHeadersSchema = type({ "x-request-id": "string" });
@@ -224,7 +224,7 @@ export const serverFirstApi = {
 	${serverGroups}
 };
 
-export const serverFirstClient = initServerFirstClient<typeof serverFirstApi>({
+export const serverFirstClient = initClient<typeof serverFirstApi>({
 	baseUrl: "https://example.test",
 });
 
