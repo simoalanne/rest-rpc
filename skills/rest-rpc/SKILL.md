@@ -1,6 +1,6 @@
 ---
 name: rest-rpc
-description: Use rest-rpc in TypeScript apps with contract-first API design, server adapters, typed clients, TanStack Query, OpenAPI, streaming, and monorepo architecture. Use hosted docs for current API details.
+description: Use rest-rpc in TypeScript apps with contract-first or server-first API design, server adapters, typed clients, TanStack Query, OpenAPI, streaming, and monorepo architecture. Use hosted docs for current API details.
 ---
 
 # rest-rpc
@@ -9,12 +9,12 @@ Use this skill for `rest-rpc` work: setup, contracts, adapters, clients, TanStac
 
 ## Core Model
 
-Keep the architecture contract-first:
+Choose the architecture that matches the application:
 
-- The API contract is the source of truth.
-- Define each route once in the contract.
-- Preserve explicit HTTP semantics: method, path, panrams, query, headers, body, responses, status codes, content types, and metadata.
-- Derive server handlers, fetch clients, TanStack Query helpers, OpenAPI, and WebSocket helpers from the same contract.
+- In contract-first code, the shared API contract is the source of truth and each route is defined once in it.
+- In server-first code, the Node.js or Fetch implementation tree is the source of truth and each route ends with its `.handler(...)`.
+- Preserve explicit HTTP semantics: method, path, params, query, headers, body, responses, status codes, content types, and metadata.
+- Derive server handlers, fetch clients, TanStack Query helpers, OpenAPI, and WebSocket helpers from a contract, or infer a client from a server-first implementation tree.
 - Avoid duplicated client/server types when the contract can infer them.
 - Declare contracts with the fluent `route` builder instead of untyped route
   object literals.
@@ -25,7 +25,22 @@ Keep the architecture contract-first:
 
 ## Library Philosophy
 
-`rest-rpc` is a type-safe bridge between an application's existing HTTP architecture and its shared API contract. It does not replace framework architecture: keep using the framework's routing, modules, plugins, middleware, dependency injection, auth, and deployment conventions. Use `rest-rpc` explicitly where it preserves the contract-to-runtime type link. Prefer its helpers over partial or ad-hoc usage when they provide type safety: the core fluent `route` builder for declaration, server adapter `router` and `route` for implementations, `registerRoutes`, `createRouteHandler` for framework registration, `fetch` and `fetchResponse` for typed fetch API calls etc.
+`rest-rpc` is a type-safe bridge between an application's existing HTTP architecture and its API types. It does not replace framework architecture: keep using the framework's routing, modules, plugins, middleware, dependency injection, auth, and deployment conventions. Use `rest-rpc` explicitly where it preserves the contract-to-runtime type link. Prefer its helpers over partial or ad-hoc usage when they provide type safety: the core fluent `route` builder for contract-first declaration, server adapter `router`, `route`, or `implement` for implementations, `registerRoutes` or `createRouteHandler` for framework registration, and `fetch` or `fetchResponse` for typed fetch API calls.
+
+Choose contract-first when the contract is independently shared, must generate OpenAPI or TanStack Query helpers, or needs to run across framework adapters. Choose server-first when a Node.js or Fetch server owns the API and colocating the handler with its method, path, request schemas, and inferred response union is more valuable than a separately named contract. Server-first is currently supported only by `@rest-rpc/node` and `@rest-rpc/fetch`:
+
+```ts
+import { route } from "@rest-rpc/node";
+
+export const routes = {
+	getTodo: route.get("/todos/:id").handler(({ id }) => ({
+		status: 200 as const,
+		body: { id, title: "Example" },
+	})),
+};
+```
+
+Create its client with `initServerFirstClient<typeof routes>()`. Unlike a contract-first client such as `client.todos.get.fetch(...)`, a server-first client selects the wire route explicitly, such as `client.get("/todos/:id").fetch({ params: { id } })`. Keep the implementation tree's type importable by the client package; no server runtime import is required when using `import type`.
 
 ## Minimal Example
 
@@ -95,6 +110,7 @@ Use only packages required by the detected stack:
 - `@rest-rpc/hono`: Hono adapter
 - `@rest-rpc/nest`: NestJS adapter
 - `@rest-rpc/fetch`: Server adapter for fetch-based runtimes (Next.js, Deno, Bun, Cloudflare Workers, etc.)
+- `@rest-rpc/node`: Server adapter for Node.js `IncomingMessage`/`ServerResponse`, including direct Node HTTP servers and middleware integration
 - `@rest-rpc/server`: Low-level server helpers. Ignore by default unless implementing a custom server adapter.
 
 ## When To Read Docs

@@ -1,0 +1,198 @@
+---
+title: Server-first Quickstart
+description: Define handlers first with Node.js or Fetch, then derive a typed client from them.
+---
+
+Server-first keeps each route's HTTP shape, request schemas, and handler in one
+place. The handler's return type becomes the response type for a client derived
+from the server implementation, so you do not need a separate response contract.
+
+Server-first routes currently work with the Node.js HTTP and Fetch runtime
+adapters.
+
+<Steps>
+	<Step title="Install packages">
+		Add the core package, Zod, and either the Node.js or Fetch adapter.
+	</Step>
+	<Step title="Define and serve the routes">
+		Build each route through `.handler(...)`, export the implementation tree,
+		and pass it to the adapter's catch-all handler.
+	</Step>
+	<Step title="Derive the client">
+		Import only the implementation tree's type and create a client whose
+		methods, paths, inputs, and responses come from the server.
+	</Step>
+</Steps>
+
+## Install Packages
+
+Choose the adapter for your server runtime. The client uses `@rest-rpc/core` in
+both cases.
+
+<Tabs>
+<Tab title="pnpm">
+
+```bash
+pnpm add @rest-rpc/core @rest-rpc/node zod
+# or: pnpm add @rest-rpc/core @rest-rpc/fetch zod
+```
+
+</Tab>
+<Tab title="npm">
+
+```bash
+npm install @rest-rpc/core @rest-rpc/node zod
+# or: npm install @rest-rpc/core @rest-rpc/fetch zod
+```
+
+</Tab>
+<Tab title="yarn">
+
+```bash
+yarn add @rest-rpc/core @rest-rpc/node zod
+# or: yarn add @rest-rpc/core @rest-rpc/fetch zod
+```
+
+</Tab>
+<Tab title="bun">
+
+```bash
+bun add @rest-rpc/core @rest-rpc/node zod
+# or: bun add @rest-rpc/core @rest-rpc/fetch zod
+```
+
+</Tab>
+</Tabs>
+
+## Define And Serve The Routes
+
+Export the complete implementation tree from your server module. The server
+uses its values at runtime, while client code only needs `typeof routes`.
+
+<Tabs>
+<Tab title="Node.js HTTP">
+
+```ts server.ts
+import { createServer } from "node:http";
+import { createRouteHandler, route } from "@rest-rpc/node";
+import { z } from "zod";
+
+export const routes = {
+	todos: {
+		create: route
+			.post("/todos")
+			.body(z.object({ title: z.string().min(1) }))
+			.handler(({ title }) => ({
+				status: 201 as const,
+				body: { id: crypto.randomUUID(), title, completed: false },
+			})),
+	},
+};
+
+const handle = createRouteHandler(routes);
+
+createServer(async (request, response) => {
+	const { matched } = await handle(request, response);
+	if (!matched) {
+		response.writeHead(404).end("Not found");
+	}
+}).listen(3000);
+```
+
+</Tab>
+<Tab title="Fetch API">
+
+```ts server.ts
+import { createRouteHandler, route } from "@rest-rpc/fetch";
+import { z } from "zod";
+
+export const routes = {
+	todos: {
+		create: route
+			.post("/todos")
+			.body(z.object({ title: z.string().min(1) }))
+			.handler(({ title }) => ({
+				status: 201 as const,
+				body: { id: crypto.randomUUID(), title, completed: false },
+			})),
+	},
+};
+
+const handle = createRouteHandler(routes);
+
+export default {
+	async fetch(request: Request) {
+		const result = await handle(request);
+		return result.matched
+			? result.response
+			: new Response("Not found", { status: 404 });
+	},
+};
+```
+
+</Tab>
+</Tabs>
+
+The body schema validates incoming JSON. Inside the handler its fields are
+flattened into the argument, so this route receives `{ title }`. Returning a
+literal `status` and a `body` defines the response union exposed to the client.
+
+## Derive The Client
+
+Import the route tree with `import type` so the server module and its runtime
+dependencies are not included in the client bundle.
+
+```ts client.ts
+import { initServerFirstClient } from "@rest-rpc/core";
+import type { routes } from "./server";
+
+const client = initServerFirstClient<typeof routes>({
+	baseUrl: "https://api.example.com",
+});
+
+const todo = await client.post("/todos").fetch({
+	body: { title: "Ship the docs" },
+});
+
+todo.id;
+todo.completed;
+```
+
+The client selects the same HTTP method and literal path used by the server.
+TypeScript rejects method/path pairs that are not present in `routes`, validates
+the grouped request input, and infers `todo` from the handler response body.
+
+Use `.fetchResponse(...)` when the handler can return multiple statuses and the
+caller needs to branch on `response.status`. Use `.fetch(...)` when the route has
+one successful body and the caller only needs that body.
+
+## Server-first Or Contract-first?
+
+Server-first is usually preferable when one Node.js or Fetch application owns
+the API. It keeps the route and implementation together, avoids declaring a
+response schema separately, and lets changes flow directly from handler return
+types to the client.
+
+The syntax reflects that ownership:
+
+|                 | Server-first                        | Contract-first                                                           |
+| --------------- | ----------------------------------- | ------------------------------------------------------------------------ |
+| Definition      | Route chain ends in `.handler(...)` | Contract ends in `.response(...)`; implementation is attached separately |
+| Client call     | `client.post("/todos").fetch(...)`  | `client.todos.create.fetch(...)`                                         |
+| Response source | Inferred from handler returns       | Declared response schemas                                                |
+| Adapters        | Node.js HTTP and Fetch              | Express, Fastify, Hono, NestJS, Node.js HTTP, and Fetch                  |
+| Other outputs   | Typed Fetch client                  | Typed Fetch and TanStack Query clients, response validation, and OpenAPI |
+
+Choose [contract-first](/docs/quickstart/) when the contract must be shared
+independently of its implementation, when consumers benefit from named route-tree
+calls, or when you need response validation, OpenAPI, TanStack Query helpers, or
+framework portability.
+
+## Next Steps
+
+- Read [Node HTTP](/docs/server/node/) or [Fetch Runtime](/docs/server/fetch/)
+  for adapter options, context, body parsing, and error handling.
+- Read [HTTP Requests](/docs/http-requests/) for params, query, headers, and body
+  encodings supported by the route builder.
+- Read [HTTP Responses](/docs/http-responses/) for status/body envelopes,
+  streaming, and response helpers.
