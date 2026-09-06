@@ -55,8 +55,10 @@ const create = apiRoute
 	.response(201, todo);
 
 expectType<"POST">(create.method);
-expectType<string>(create.path);
-expectType<RouteMetadata>(create.metadata);
+expectType<"/api/todos">(create.path);
+expectType<{ readonly auth: true; readonly permission: "todos:create" }>(
+	create.metadata,
+);
 expectType<OpenApiRouteOptions>(create.openApi);
 expectType<typeof input>(create.request.body);
 expectType<typeof todo>(create.responses[201]);
@@ -83,6 +85,23 @@ const nonStrictRoute = route
 	.with({ strictStatusCodes: false })
 	.get("/non-strict");
 expectType<false>(nonStrictRoute.strictStatusCodes);
+
+// Preserves inherited metadata and lets local metadata override shared keys.
+const inheritedMetadata = route
+	.with({ metadata: { scope: "shared", authenticated: true } })
+	.get("/metadata");
+expectType<{
+	readonly scope: "shared";
+	readonly authenticated: true;
+}>(inheritedMetadata.metadata);
+const mergedMetadata = inheritedMetadata
+	.withMetadata({ scope: "local", operation: "read" })
+	.response(200);
+expectType<{
+	readonly authenticated: true;
+	readonly scope: "local";
+	readonly operation: "read";
+}>(mergedMetadata.metadata);
 
 // Preserves schema and array-key inference for form and multipart bodies.
 const importRoute = route
@@ -232,7 +251,7 @@ expectType<typeof input>(configuredAfterResponse.request.body);
 expectType<"jsonQuery">(configuredAfterResponse.request.query.kind);
 expectType<typeof todo>(configuredAfterResponse.responses[200].schema);
 expectType<typeof event>(configuredAfterResponse.responses[201].schema);
-expectType<RouteMetadata>(configuredAfterResponse.metadata);
+expectType<{ readonly auth: true }>(configuredAfterResponse.metadata);
 expectType<OpenApiRouteOptions>(configuredAfterResponse.openApi);
 expectAssignable<HttpRouteDeclaration>(configuredAfterResponse);
 
@@ -294,6 +313,7 @@ expectError(sseConfiguredBeforeResponse.withMetadata({ public: false }));
 expectError(sseConfiguredBeforeResponse.withOpenApi({ summary: "again" }));
 // Preserves protocol request configuration after response().
 const sseConfigured = sseConfiguredBeforeResponse.response(event);
+expectType<"/configured-events">(sseConfigured.path);
 expectType<false>(sseConfigured.request.flattenKeys);
 expectType<typeof input>(sseConfigured.request.query);
 expectType<typeof event>(sseConfigured.responses[200]);
@@ -314,7 +334,7 @@ const sseConfiguredAfterResponse = route
 	.withOpenApi({ summary: "events" });
 expectType<"jsonQuery">(sseConfiguredAfterResponse.request.query.kind);
 expectType<typeof input>(sseConfiguredAfterResponse.request.query.schema);
-expectType<RouteMetadata>(sseConfiguredAfterResponse.metadata);
+expectType<{ readonly public: true }>(sseConfiguredAfterResponse.metadata);
 expectType<OpenApiRouteOptions>(sseConfiguredAfterResponse.openApi);
 expectAssignable<SseRouteDeclaration>(sseConfiguredAfterResponse);
 expectAssignable<Contract>(sseConfiguredAfterResponse);
@@ -326,9 +346,10 @@ const sse = incompleteSse
 	.withMetadata({ public: true as const });
 
 expectType<"GET">(sse.method);
+expectType<"/events">(sse.path);
 expectType<"sse">(sse.mode);
 expectType<typeof event>(sse.responses[200]);
-expectType<RouteMetadata>(sse.metadata);
+expectType<{ readonly public: true }>(sse.metadata);
 expectAssignable<SseRouteDeclaration>(sse);
 expectAssignable<Contract>(sse);
 

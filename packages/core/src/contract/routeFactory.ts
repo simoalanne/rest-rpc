@@ -32,17 +32,27 @@ const assertStaticPathPrefix = (pathPrefix: string | undefined) => {
 
 type RouteFactory<TOptions = undefined> = {
 	/** Starts a `GET` route declaration. @see {@link https://rest-rpc.dev/docs/contract/declaration#route-builders} */
-	get(path: string): HttpBuilderFor<TOptions, "GET">;
+	get<const TPath extends string>(
+		path: TPath,
+	): HttpBuilderFor<TOptions, "GET", TPath>;
 	/** Starts a `POST` route declaration. @see {@link https://rest-rpc.dev/docs/contract/declaration#route-builders} */
-	post(path: string): HttpBuilderFor<TOptions, "POST">;
+	post<const TPath extends string>(
+		path: TPath,
+	): HttpBuilderFor<TOptions, "POST", TPath>;
 	/** Starts a `PUT` route declaration. @see {@link https://rest-rpc.dev/docs/contract/declaration#route-builders} */
-	put(path: string): HttpBuilderFor<TOptions, "PUT">;
+	put<const TPath extends string>(
+		path: TPath,
+	): HttpBuilderFor<TOptions, "PUT", TPath>;
 	/** Starts a `PATCH` route declaration. @see {@link https://rest-rpc.dev/docs/contract/declaration#route-builders} */
-	patch(path: string): HttpBuilderFor<TOptions, "PATCH">;
+	patch<const TPath extends string>(
+		path: TPath,
+	): HttpBuilderFor<TOptions, "PATCH", TPath>;
 	/** Starts a `DELETE` route declaration. @see {@link https://rest-rpc.dev/docs/contract/declaration#route-builders} */
-	delete(path: string): HttpBuilderFor<TOptions, "DELETE">;
+	delete<const TPath extends string>(
+		path: TPath,
+	): HttpBuilderFor<TOptions, "DELETE", TPath>;
 	/** Starts an SSE route declaration. @see {@link https://rest-rpc.dev/docs/http-responses#server-sent-event-responses} */
-	sse(path: string): SseBuilderFor<TOptions>;
+	sse<const TPath extends string>(path: TPath): SseBuilderFor<TOptions, TPath>;
 	/** Starts a WebSocket route declaration. @see {@link https://rest-rpc.dev/docs/websockets#contract} */
 	ws(path: string): WebSocketBuilderFor<TOptions>;
 };

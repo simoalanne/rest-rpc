@@ -1,5 +1,6 @@
 export type {
 	HttpBuilderFor,
+	RouteFactoryOptions,
 	RouteFactory,
 	SseBuilderFor,
 	WebSocketBuilderFor,
@@ -18,9 +19,15 @@ export type {
 	Stream,
 } from "./body.ts";
 export type {
+	ApplyBuilderExtension,
+	BuilderExtension,
+	BuilderMetadata,
+	BuilderMetadataFor,
+	BuilderReceiver,
 	BuilderState,
 	EmptyObject,
 	ProtocolRequestFor,
+	MergeBuilderMetadata,
 	UseBuilderMethod,
 	WhenUnused,
 	WithRequest,
@@ -33,16 +40,26 @@ export {
 	isStream,
 } from "./body.ts";
 export type {
+	BaseRouteDeclaration,
 	HttpMethod,
 	OpenApiRouteOptions,
 	RouteMetadata,
 } from "./baseRouteDeclaration.ts";
 export type { Contract, RouteDeclaration } from "./contract.ts";
-export type { HttpBuilder, HttpRouteDeclaration } from "./httpRouteBuilder.ts";
+export type {
+	HttpBuilder,
+	HttpBuilderAtPath,
+	HttpBuilderDeclaration,
+	HttpBuilderState,
+	HttpRouteDeclaration,
+} from "./httpRouteBuilder.ts";
 export type {
 	ClientSseReceived,
 	ServerSseSent,
 	SseBuilder,
+	SseBuilderAtPath,
+	SseBuilderDeclaration,
+	SseBuilderState,
 	SseRouteDeclaration,
 } from "./sseRouteBuilder.ts";
 export type {
