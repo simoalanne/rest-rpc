@@ -150,6 +150,14 @@ it("waits for Express drain before pulling the next stream chunk", async () => {
 
 it("releases an Express backpressure wait when the response closes before drain", async () => {
 	let pulledChunks = 0;
+	let firstWrite!: () => void;
+	const wrote = new Promise<void>((resolve) => {
+		firstWrite = resolve;
+	});
+	let finalized!: () => void;
+	const finished = new Promise<void>((resolve) => {
+		finalized = resolve;
+	});
 	let returned = false;
 	let closeResponse: (() => void) | undefined;
 	const handlers = createIntegrationHandlers();
@@ -166,6 +174,7 @@ it("releases an Express backpressure wait when the response closes before drain"
 						yield "beta\n";
 					} finally {
 						returned = true;
+						finalized();
 					}
 				},
 			},
@@ -182,7 +191,10 @@ it("releases an Express backpressure wait when the response closes before drain"
 						res.write = ((...args: unknown[]) => {
 							writeCalls += 1;
 							const result = originalWrite(...args);
-							if (writeCalls === 1) return false;
+							if (writeCalls === 1) {
+								firstWrite();
+								return false;
+							}
 							return result;
 						}) as typeof res.write;
 						closeResponse = () => {
@@ -200,12 +212,12 @@ it("releases an Express backpressure wait when the response closes before drain"
 			() => undefined,
 		);
 
-		await delay(25);
+		await wrote;
 		assert.equal(pulledChunks, 1);
 		assert.equal(typeof closeResponse, "function");
 
 		closeResponse();
-		await delay(25);
+		await finished;
 
 		assert.equal(pulledChunks, 1);
 		assert.equal(returned, true);

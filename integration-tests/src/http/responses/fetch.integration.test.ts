@@ -3,7 +3,7 @@ import { after, before, describe, it } from "node:test";
 import { initClient, route } from "@rest-rpc/core";
 import { REQUEST_CONTEXT_KEY } from "@rest-rpc/core/contract";
 import type { ImplementationShape } from "@rest-rpc/server";
-import { router as createFetchRouter } from "@rest-rpc/fetch";
+import { router } from "@rest-rpc/server";
 import z from "zod";
 import type { StartedServer } from "../harness/listen.ts";
 import { createFetchAdapter } from "../harness/fetch.ts";
@@ -71,15 +71,7 @@ const createLifecycleImplementations = () => {
 			}) as never,
 	};
 
-	return createFetchRouter(lifecycleContract)
-		.middleware(() => ({
-			adapter: "fetch" as const,
-			responseHeaders: new Headers(),
-			response: new Response(null, {
-				headers: { "x-initial-context-response": "ignored" },
-			}),
-		}))
-		.handlers(handlers);
+	return router(lifecycleContract, handlers);
 };
 
 describe("fetch response lifecycle integration", () => {
@@ -88,6 +80,11 @@ describe("fetch response lifecycle integration", () => {
 
 	before(async () => {
 		server = await createFetchAdapter(createLifecycleImplementations(), {
+			context: {
+				adapter: "fetch",
+				responseHeaders: new Headers(),
+				response: new Response(null),
+			},
 			createHandlerOptions: {
 				errorHandlers: responseErrorHandlers,
 			},
