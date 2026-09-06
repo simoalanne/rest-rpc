@@ -45,6 +45,7 @@
 		"@rest-rpc/core": "workspace:*"
 	},
 	"devDependencies": {
+		"@rest-rpc/server": "workspace:*",
 		"esmock": "^2.7.3"
 	},
 	"peerDependencies": {

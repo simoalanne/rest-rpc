@@ -45,10 +45,11 @@ export const fetchQueryData = async (
 	route: RouteDeclaration,
 	request: unknown,
 	options?: FetchOptions,
+	hasRequest = takesRequestInput(route),
 ) => {
 	try {
 		const response = (
-			takesRequestInput(route)
+			hasRequest
 				? await fetchResponse(request, options)
 				: await fetchResponse(options)
 		) as {

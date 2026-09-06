@@ -412,6 +412,9 @@ importers:
         specifier: '>=5.86.0 <6.0.0'
         version: 5.101.4
     devDependencies:
+      '@rest-rpc/server':
+        specifier: workspace:*
+        version: link:../server
       esmock:
         specifier: ^2.7.3
         version: 2.7.6

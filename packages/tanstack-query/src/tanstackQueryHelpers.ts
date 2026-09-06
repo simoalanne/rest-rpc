@@ -4,7 +4,12 @@ import type {
 	ApiClientOptions,
 	ClientResponse,
 	FetchResponseFn,
+	ServerFirstClientOptions,
+	ServerFirstClientPath,
+	ServerFirstClientRouteFor,
+	ServerFirstClientSelector,
 } from "@rest-rpc/core/client";
+import { initServerFirstClient } from "@rest-rpc/core/client";
 import type {
 	ClientRequest,
 	Contract,
@@ -315,6 +320,21 @@ export type TanstackQueryHelpersFor<T extends Contract> =
 				: TanstackQueryTreeFor<T>;
 
 /**
+ * Infers the method-and-path TanStack Query helpers for a server implementation tree.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#server-first}
+ */
+export type ServerFirstTanstackQueryHelpersFor<TTree> = {
+	[TSelector in Exclude<ServerFirstClientSelector<TTree>, "sse">]: <
+		const TPath extends ServerFirstClientPath<TTree, TSelector>,
+	>(
+		path: TPath,
+	) => TanstackQueryRouteValue<
+		ServerFirstClientRouteFor<TTree, TSelector, TPath>
+	>;
+};
+
+/**
  * Options used to create TanStack Query helpers from a contract.
  *
  * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#setup}
@@ -322,6 +342,15 @@ export type TanstackQueryHelpersFor<T extends Contract> =
 export type CreateTanstackQueryHelpersOptions<
 	TGlobalHeaders extends Record<string, string> = Record<never, string>,
 > = ApiClientOptions<TGlobalHeaders>;
+
+/**
+ * Options used to create TanStack Query helpers from a server implementation tree.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#server-first}
+ */
+export type CreateServerFirstTanstackQueryHelpersOptions<
+	TGlobalHeaders extends Record<string, string> = Record<never, string>,
+> = ServerFirstClientOptions<TGlobalHeaders>;
 
 const isWebSocketRoute = (
 	route: RouteDeclaration,
@@ -338,18 +367,65 @@ const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
 const getByPath = (tree: unknown, path: string[]) =>
 	path.reduce((node, key) => (node as Record<string, unknown>)[key], tree);
 
-/**
- * Creates TanStack Query option helpers from a contract.
- *
- * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#setup}
- */
+/** Creates TanStack Query option helpers from a server implementation tree. */
+export function createTanstackQueryHelpers<
+	const TTree,
+	const TGlobalHeaders extends Record<string, string> = Record<never, string>,
+>(
+	options: CreateServerFirstTanstackQueryHelpersOptions<TGlobalHeaders>,
+): ServerFirstTanstackQueryHelpersFor<TTree>;
+
+/** Creates TanStack Query option helpers from a contract. */
 export function createTanstackQueryHelpers<
 	TContract extends Contract,
 	const TGlobalHeaders extends Record<string, string> = Record<never, string>,
 >(
 	contract: TContract,
 	options: CreateTanstackQueryHelpersOptions<TGlobalHeaders>,
-): TanstackQueryHelpersFor<TContract> {
+): TanstackQueryHelpersFor<TContract>;
+
+/**
+ * Creates TanStack Query option helpers from a contract or server implementation tree.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#setup}
+ */
+export function createTanstackQueryHelpers(
+	contractOrOptions: Contract | CreateServerFirstTanstackQueryHelpersOptions,
+	maybeOptions?: CreateTanstackQueryHelpersOptions,
+): unknown {
+	if (maybeOptions === undefined) {
+		const options =
+			contractOrOptions as CreateServerFirstTanstackQueryHelpersOptions;
+		const client = initServerFirstClient<unknown>(options) as Record<
+			string,
+			(path: string) => {
+				fetchResponse: (...args: unknown[]) => Promise<unknown>;
+			}
+		>;
+
+		return new Proxy(
+			{},
+			{
+				get: (_target, selectorKey) => {
+					if (typeof selectorKey !== "string") return undefined;
+
+					return (path: string) =>
+						createRouteApi(
+							{
+								method: selectorKey.toUpperCase(),
+								path,
+							} as RouteDeclaration,
+							[selectorKey, path],
+							client[selectorKey](path).fetchResponse,
+							"serverFirst",
+						);
+				},
+			},
+		);
+	}
+
+	const contract = contractOrOptions as Contract;
+	const options = maybeOptions;
 	const client = initClient(contract, options);
 
 	const mapHttpRoutes = (node: Contract, path: string[] = []): unknown => {
@@ -357,7 +433,7 @@ export function createTanstackQueryHelpers<
 			if (isWebSocketRoute(node) || isSseRoute(node)) return undefined;
 
 			const apiNode = getByPath(client, path) as {
-				fetchResponse: FetchResponseFn<typeof node, TGlobalHeaders>;
+				fetchResponse: FetchResponseFn<typeof node>;
 			};
 
 			return createRouteApi(
@@ -378,5 +454,5 @@ export function createTanstackQueryHelpers<
 		return Object.fromEntries(entries);
 	};
 
-	return mapHttpRoutes(contract) as TanstackQueryHelpersFor<TContract>;
+	return mapHttpRoutes(contract) as TanstackQueryHelpersFor<Contract>;
 }

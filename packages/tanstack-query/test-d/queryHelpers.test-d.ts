@@ -7,8 +7,10 @@ import {
 	type RouteQueryData,
 	type RouteQueryError,
 	type RouteStreamedQueryData,
+	type ServerFirstTanstackQueryHelpersFor,
 	type TanstackQueryHelpersFor,
 } from "@rest-rpc/tanstack-query";
+import { sseEvent, type ServerRouteFactory } from "@rest-rpc/server";
 import { type QueryClient, skipToken } from "@tanstack/query-core";
 import {
 	expectAssignable,
@@ -558,6 +560,96 @@ type CreateTodoVariables = RouteMutationVariables<
 	typeof mutationApi.todos.create
 >;
 expectType<{ title: string }>(null as unknown as CreateTodoVariables);
+
+// server-first helpers
+
+declare const serverRoute: ServerRouteFactory;
+
+const serverRoutes = {
+	todos: {
+		get: serverRoute
+			.get("/server-first/todos/:id")
+			.params(schemaType<{ id: string }>())
+			.handler(({ id }) =>
+				id === "missing"
+					? { status: 404 as const, body: { code: "not_found" as const } }
+					: { status: 200 as const, body: { id, title: "Todo" } },
+			),
+		create: serverRoute
+			.post("/server-first/todos")
+			.body(schemaType<{ title: string }>())
+			.handler(({ title }) => ({
+				status: 201 as const,
+				body: { id: "todo-1", title },
+			})),
+		page: serverRoute
+			.get("/server-first/todos")
+			.query(schemaType<{ cursor?: string; limit: number }>())
+			.handler(({ cursor, limit }) => ({
+				status: 200 as const,
+				body: { cursor, limit },
+			})),
+		stream: serverRoute.get("/server-first/todos/stream").handler(() => ({
+			status: 200 as const,
+			body: (async function* () {
+				yield { id: "todo-1", title: "Todo" };
+			})(),
+		})),
+	},
+	events: serverRoute
+		.sse("/server-first/events")
+		.response(schemaType<{ id: string }>())
+		.handler(async function* () {
+			yield sseEvent({ id: "event-1" });
+		}),
+} as const;
+
+const serverTq = createTanstackQueryHelpers<typeof serverRoutes>({
+	baseUrl: "https://example.test",
+});
+expectAssignable<ServerFirstTanstackQueryHelpersFor<typeof serverRoutes>>(
+	serverTq,
+);
+
+const serverGetOptions = serverTq
+	.get("/server-first/todos/:id")
+	.queryOptions({ params: { id: "todo-1" } });
+expectAssignable<
+	Promise<{
+		status: 200;
+		body: { id: string; title: "Todo" };
+		headers: Headers;
+	}>
+>(queryClient.fetchQuery(serverGetOptions));
+
+serverTq.post("/server-first/todos").mutationOptions({
+	onSuccess(data, variables) {
+		expectType<201>(data.status);
+		expectType<{ body: { title: string } }>(variables);
+	},
+});
+
+serverTq.get("/server-first/todos").infiniteQueryOptions({
+	initialRequest: { query: { limit: 20 } },
+	getNextRequest(_lastPage, _allPages, lastRequest) {
+		expectType<{ query: { cursor?: string; limit: number } }>(lastRequest);
+		return { query: { cursor: "next", limit: 20 } };
+	},
+});
+
+const serverStreamOptions = serverTq
+	.get("/server-first/todos/stream")
+	.streamedQueryOptions();
+expectAssignable<Promise<Array<{ id: string; title: string }>>>(
+	queryClient.fetchQuery(serverStreamOptions),
+);
+
+expectError(serverTq.get("/server-first/missing"));
+expectError(serverTq.post("/server-first/todos/:id"));
+expectError(
+	serverTq.get("/server-first/todos/:id").queryOptions({ id: "todo-1" }),
+);
+expectError(serverTq.sse("/server-first/events"));
 expectNotAssignable<{ id: string }>(null as unknown as CreateTodoVariables);
 
 type ProjectEventsStreamedData = RouteStreamedQueryData<

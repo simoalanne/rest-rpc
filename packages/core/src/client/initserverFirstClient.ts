@@ -134,6 +134,17 @@ type SelectorPath<
 		: never
 	: never;
 
+/** Infers the available client selectors from a server implementation tree. */
+export type ServerFirstClientSelector<TTree> = SelectorName<
+	ImplementationUnion<TTree>
+>;
+
+/** Infers the paths available for a server-first client selector. */
+export type ServerFirstClientPath<
+	TTree,
+	TSelector extends string,
+> = SelectorPath<ImplementationUnion<TTree>, TSelector>;
+
 type SelectedImplementation<
 	TImplementation,
 	TSelector extends string,
@@ -165,25 +176,29 @@ type ClientRoute<TImplementation> = TImplementation extends {
 		: never
 	: never;
 
+/** Infers the normalized client route selected from a server implementation tree. */
+export type ServerFirstClientRouteFor<
+	TTree,
+	TSelector extends string,
+	TPath extends string,
+> = ClientRoute<
+	SelectedImplementation<ImplementationUnion<TTree>, TSelector, TPath>
+>;
+
 /** Infers the method-and-path client for a server implementation tree. */
 export type ServerFirstClientFor<
 	TTree,
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
-> =
-	ImplementationUnion<TTree> extends infer TImplementations
-		? {
-				[TSelector in SelectorName<TImplementations>]: <
-					const TPath extends SelectorPath<TImplementations, TSelector>,
-				>(
-					path: TPath,
-				) => ApiClientRouteValue<
-					ClientRoute<
-						SelectedImplementation<TImplementations, TSelector, TPath>
-					>,
-					TGlobalHeaders
-				>;
-			}
-		: never;
+> = {
+	[TSelector in ServerFirstClientSelector<TTree>]: <
+		const TPath extends ServerFirstClientPath<TTree, TSelector>,
+	>(
+		path: TPath,
+	) => ApiClientRouteValue<
+		ServerFirstClientRouteFor<TTree, TSelector, TPath>,
+		TGlobalHeaders
+	>;
+};
 
 /** Type-level initializer shape for the server-first Fetch client. */
 export type ServerFirstClientInitializer = <

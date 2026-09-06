@@ -7,6 +7,9 @@ export type {
 	ServerFirstClientFor,
 	ServerFirstClientInitializer,
 	ServerFirstClientOptions,
+	ServerFirstClientPath,
+	ServerFirstClientRouteFor,
+	ServerFirstClientSelector,
 } from "./initserverFirstClient.ts";
 export type {
 	ApiClientFetchOptions,
