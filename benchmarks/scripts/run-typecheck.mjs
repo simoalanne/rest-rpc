@@ -109,7 +109,7 @@ for (const schemaLibrary of schemaLibraryNames) {
 	}
 }
 
-console.log("\nContract declaration typecheck benchmark\n");
+console.log("\nContract-first and server-first typecheck benchmark\n");
 console.table(tableRows);
 
 const createdAt = new Date();

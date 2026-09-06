@@ -1,10 +1,19 @@
-import { initClient, route, type as schemaType } from "@rest-rpc/core";
+import {
+	initClient,
+	initServerFirstClient,
+	route,
+	type as schemaType,
+} from "@rest-rpc/core";
 import type {
 	ClientRequest,
 	ClientResponse,
 	ClientResponseBody,
 } from "@rest-rpc/core";
 import { route as expressRoute } from "@rest-rpc/express";
+import {
+	createRouteHandler as createFetchRouteHandler,
+	route as fetchRoute,
+} from "@rest-rpc/fetch";
 import type {
 	RouteErrors,
 	RouteHandler,
@@ -13,6 +22,10 @@ import type {
 	RouteResponse,
 	RouteResponseShorthand,
 } from "@rest-rpc/express";
+import {
+	createRouteHandler as createNodeRouteHandler,
+	route as nodeRoute,
+} from "@rest-rpc/node";
 import {
 	createTanstackQueryHelpers,
 	type RouteInfiniteQueryData,
@@ -235,3 +248,67 @@ export type DownloadClientResponse = ClientResponse<DownloadTodoRoute>;
 export type DownloadRouteQueryData = RouteQueryData<DownloadTodoRoute>;
 export type EventsClientResponseBody = ClientResponseBody<EventsRoute>;
 export type RemoveClientResponseBody = ClientResponseBody<RemoveTodoRoute>;
+
+export const fetchServerFirstRoutes = {
+	todos: {
+		create: fetchRoute
+			.post("/server-first/todos")
+			.body(schemaType<{ title: string }>())
+			.handler(({ title }) => ({
+				status: 201 as const,
+				body: { id: "todo-1", title },
+			})),
+	},
+};
+
+export const nodeServerFirstRoutes = {
+	todos: {
+		get: nodeRoute
+			.get("/server-first/todos/:id")
+			.params(schemaType<{ id: string }>())
+			.handler(({ id }) =>
+				id === "missing"
+					? { status: 404 as const, body: { code: "TODO_NOT_FOUND" as const } }
+					: { status: 200 as const, body: { id, title: "Todo" } },
+			),
+	},
+};
+
+export const fetchServerFirstHandler = createFetchRouteHandler(
+	fetchServerFirstRoutes,
+);
+export const nodeServerFirstHandler = createNodeRouteHandler(
+	nodeServerFirstRoutes,
+);
+
+export const serverFirstClient = initServerFirstClient<
+	typeof fetchServerFirstRoutes
+>({ baseUrl: "https://example.test" });
+
+export const serverFirstCreatePromise = serverFirstClient
+	.post("/server-first/todos")
+	.fetch({ body: { title: "Write hover tests" } });
+
+type ServerFirstCreateImplementation =
+	typeof fetchServerFirstRoutes.todos.create;
+type ServerFirstCreateClientRoute = ReturnType<
+	typeof serverFirstClient.post<"/server-first/todos">
+>;
+
+export type ServerFirstHandlerRequest = Parameters<
+	ServerFirstCreateImplementation["handler"]
+>[0];
+export type ServerFirstHandlerResponse = ReturnType<
+	ServerFirstCreateImplementation["handler"]
+>;
+export type ServerFirstClientFetchParameters = Parameters<
+	ServerFirstCreateClientRoute["fetch"]
+>;
+export type ServerFirstClientFetchReturn = ReturnType<
+	ServerFirstCreateClientRoute["fetch"]
+>;
+export type ServerFirstClientFetchResponseReturn = ReturnType<
+	ServerFirstCreateClientRoute["fetchResponse"]
+>;
+export type FetchServerFirstHandler = typeof fetchServerFirstHandler;
+export type NodeServerFirstHandler = typeof nodeServerFirstHandler;

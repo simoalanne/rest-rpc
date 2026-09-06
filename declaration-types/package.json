@@ -9,6 +9,8 @@
 		"find:route-limit": "node scripts/find-route-limit.mjs"
 	},
 	"dependencies": {
-		"@rest-rpc/core": "workspace:*"
+		"@rest-rpc/core": "workspace:*",
+		"@rest-rpc/fetch": "workspace:*",
+		"@rest-rpc/node": "workspace:*"
 	}
 }

@@ -8,6 +8,8 @@
 	"dependencies": {
 		"@rest-rpc/core": "workspace:*",
 		"@rest-rpc/express": "workspace:*",
+		"@rest-rpc/fetch": "workspace:*",
+		"@rest-rpc/node": "workspace:*",
 		"@rest-rpc/tanstack-query": "workspace:*",
 		"@tanstack/query-core": "^5.90.12"
 	}

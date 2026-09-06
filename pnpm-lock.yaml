@@ -38,6 +38,9 @@ importers:
       '@rest-rpc/core':
         specifier: workspace:*
         version: link:../packages/core
+      '@rest-rpc/fetch':
+        specifier: workspace:*
+        version: link:../packages/fetch
     devDependencies:
       arktype:
         specifier: ^2.2.3
@@ -132,6 +135,12 @@ importers:
       '@rest-rpc/core':
         specifier: workspace:*
         version: link:../packages/core
+      '@rest-rpc/fetch':
+        specifier: workspace:*
+        version: link:../packages/fetch
+      '@rest-rpc/node':
+        specifier: workspace:*
+        version: link:../packages/node
 
   hover-types:
     dependencies:
@@ -141,6 +150,12 @@ importers:
       '@rest-rpc/express':
         specifier: workspace:*
         version: link:../packages/express
+      '@rest-rpc/fetch':
+        specifier: workspace:*
+        version: link:../packages/fetch
+      '@rest-rpc/node':
+        specifier: workspace:*
+        version: link:../packages/node
       '@rest-rpc/tanstack-query':
         specifier: workspace:*
         version: link:../packages/tanstack-query

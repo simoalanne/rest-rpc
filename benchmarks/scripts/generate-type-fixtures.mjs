@@ -8,7 +8,8 @@ const routeCounts = [10, 100, 500, 1000];
 
 const schemaLibraries = {
 	"type-only": {
-		importSource: `import { route, type as schema } from "@rest-rpc/core";`,
+		importSource: `import { initServerFirstClient, route, type as schema } from "@rest-rpc/core";
+import { route as serverRoute } from "@rest-rpc/fetch";`,
 		schemas: `const requestHeadersSchema = schema<{ "x-request-id": string }>();
 const routeHeadersSchema = schema<{ "x-feature": string | undefined }>();
 const numberSchema = schema<number>();
@@ -28,7 +29,8 @@ const errorSchema = schema<{
 }>();`,
 	},
 	zod: {
-		importSource: `import { route } from "@rest-rpc/core";
+		importSource: `import { initServerFirstClient, route } from "@rest-rpc/core";
+import { route as serverRoute } from "@rest-rpc/fetch";
 import z from "zod";`,
 		schemas: `const requestHeadersSchema = z.object({ "x-request-id": z.string() });
 const routeHeadersSchema = z.object({ "x-feature": z.string().optional() });
@@ -49,7 +51,8 @@ const errorSchema = z.object({
 });`,
 	},
 	valibot: {
-		importSource: `import { route } from "@rest-rpc/core";
+		importSource: `import { initServerFirstClient, route } from "@rest-rpc/core";
+import { route as serverRoute } from "@rest-rpc/fetch";
 import * as v from "valibot";`,
 		schemas: `const requestHeadersSchema = v.object({ "x-request-id": v.string() });
 const routeHeadersSchema = v.object({ "x-feature": v.optional(v.string()) });
@@ -70,7 +73,8 @@ const errorSchema = v.object({
 });`,
 	},
 	arktype: {
-		importSource: `import { route } from "@rest-rpc/core";
+		importSource: `import { initServerFirstClient, route } from "@rest-rpc/core";
+import { route as serverRoute } from "@rest-rpc/fetch";
 import { type } from "arktype";`,
 		schemas: `const requestHeadersSchema = type({ "x-request-id": "string" });
 const routeHeadersSchema = type({ "x-feature": "string | undefined" });
@@ -118,27 +122,62 @@ const routeSource = (index) => {
 	return `route${index}: ${builder.join("\n\t\t\t")}`;
 };
 
-const contractSource = (routeCount, schemaLibrary) => {
+const serverRouteSource = (index) => {
+	const method = routeMethod(index);
+	const group = Math.floor(index / 10);
+	const path =
+		index % 2 === 0
+			? `/groups/${group}/items/:id/route-${index}`
+			: `/groups/${group}/items/route-${index}`;
+	const builder = [`apiServerRoute.${method.toLowerCase()}("${path}")`];
+	if (path.includes(":id")) builder.push(".params(paramsSchema)");
+	builder.push(".query(querySchema)");
+	if (method !== "GET" && method !== "DELETE")
+		builder.push(".body(bodySchema)");
+	builder.push(
+		".headers(routeHeadersSchema)",
+		`.withMetadata({ feature: 'group-${group}' })`,
+		`.handler(() => ({
+				status: 200 as const,
+				body: {
+					id: "todo-${index}",
+					title: "Todo ${index}",
+					done: false,
+					tags: [] as string[],
+				},
+			}))`,
+	);
+
+	return `route${index}: ${builder.join("\n\t\t\t")}`;
+};
+
+const groupEntries = (routeCount, source) => {
 	const groups = new Map();
 	for (let index = 0; index < routeCount; index += 1) {
 		const groupName = `group${Math.floor(index / 10)}`;
 		const routes = groups.get(groupName) ?? [];
-		routes.push(routeSource(index));
+		routes.push(source(index));
 		groups.set(groupName, routes);
 	}
 
-	const groupEntries = [...groups.entries()]
+	return [...groups.entries()]
 		.map(
 			([groupName, routes]) => `${groupName}: {
 			${routes.join(",\n")}
 		}`,
 		)
 		.join(",\n");
+};
+
+const contractSource = (routeCount, schemaLibrary) => {
+	const contractGroups = groupEntries(routeCount, routeSource);
+	const serverGroups = groupEntries(routeCount, serverRouteSource);
 
 	return `${schemaLibrary.importSource}
 
 ${schemaLibrary.schemas}
 
+// Contract-first declaration section.
 const apiRoute = route.with({
 		pathPrefix: "/api",
 		metadata: {
@@ -154,7 +193,7 @@ const apiRoute = route.with({
 });
 
 export const api = {
-	${groupEntries}
+	${contractGroups}
 };
 
 type BenchmarkRoute = typeof api.group0.route0;
@@ -170,6 +209,30 @@ export type BenchmarkOptionTypes = {
 };
 
 export type Api = typeof api;
+
+// Server-first implementation and client section.
+const apiServerRoute = serverRoute.with({
+	pathPrefix: "/api",
+	metadata: {
+		benchmark: "server-first",
+		schemaLibrary: "${schemaLibrary.name}",
+	},
+	headers: requestHeadersSchema,
+});
+
+export const serverFirstApi = {
+	${serverGroups}
+};
+
+export const serverFirstClient = initServerFirstClient<typeof serverFirstApi>({
+	baseUrl: "https://example.test",
+});
+
+const firstServerRoute = serverFirstClient.get(
+	"/api/groups/0/items/:id/route-0",
+);
+export type ServerFirstRequest = Parameters<typeof firstServerRoute.fetch>;
+export type ServerFirstResponse = ReturnType<typeof firstServerRoute.fetchResponse>;
 `;
 };
 
@@ -208,4 +271,6 @@ for (const routeCount of routeCounts) {
 	}
 }
 
-console.log(`Generated contract-only fixtures in ${generatedRoot}`);
+console.log(
+	`Generated contract-first and server-first fixtures in ${generatedRoot}`,
+);
