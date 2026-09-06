@@ -1,6 +1,6 @@
 ---
 title: Fetch Runtime
-description: Use rest-rpc with Fetch runtimes
+description: Use rest-rpc with Fetch Request and Response
 ---
 
 ## Install
@@ -11,140 +11,86 @@ pnpm add @rest-rpc/fetch
 
 ## Usage
 
+<Tabs>
+<Tab title="Contract-first approach">
+
 ```ts
-import { createRouteHandler, router } from "@rest-rpc/fetch";
+import { createRouteHandler, implement } from "@rest-rpc/fetch";
 import { api } from "./contract";
 
-declare module "@rest-rpc/fetch" {
-	interface DefaultRuntimeContext {
-		env: Env;
-		ctx: ExecutionContext;
-	}
-	interface DefaultRequest extends NextRequest {}
-}
+const routes = {
+	todos: {
+		get: implement(api).todos.get.handler(({ id }) => getTodo(id)),
+	},
+};
 
-const routes = router(api)
-	.middleware(({ runtime }) => ({
-		db: runtime.env.DB,
-	}))
-	.handlers({
-		todos: {
-			list({ context }) {
-				return listTodos(context.db);
-			},
-			get({ id, context }) {
-				return getTodo(context.db, id);
-			},
-			create({ title, context }) {
-				return createTodo(context.db, { title });
-			},
-		},
-	});
+const handle = createRouteHandler(routes);
+```
 
-const handleRequest = createRouteHandler(routes);
+</Tab>
+<Tab title="Server-first approach">
+
+```ts
+import { createRouteHandler, route } from "@rest-rpc/fetch";
+
+const routes = {
+	health: route.get("/health").handler(() => ({ status: 204 })),
+};
+
+const handle = createRouteHandler(routes);
 
 export default {
-	async fetch(request, env, ctx) {
-		const { matched, response } = await handleRequest(request, { env, ctx });
-
-		if (matched) {
-			return response;
-		}
-
-		return new Response("Not found", { status: 404 });
+	async fetch(request: Request) {
+		const result = await handle(request);
+		return result.matched
+			? result.response
+			: new Response("Not found", { status: 404 });
 	},
 };
 ```
 
-## Middleware
+</Tab>
+
+</Tabs>
+
+## Framework context
+
+Pass application context as the second argument to `handle`:
 
 ```ts
-type MiddlewareInput<Runtime> = {
-	context: Record<string, unknown>;
-	request: Request;
-	route: HttpRouteDeclaration;
-	runtime: Runtime;
-};
+declare module "@rest-rpc/fetch" {
+	interface DefaultContext {
+		user: { id: string };
+	}
+}
+
+const result = await handle(request, { user });
 ```
 
-Augment `DefaultRuntimeContext` to type the runtime context passed to
-`handleRequest`. That runtime is available to middleware. Route handlers receive
-the context returned by middleware with `request` added.
-
-You can also augment `DefaultRequest` if your runtime extends the default `Request` type.
-
-### Stacking Middleware
-
-Stacking middleware is supported. Middleware can add to the context, and the
-context is passed to the next middleware in the stack. The final context is passed to the route handler.
-
-```ts
-const routes = router(api)
-	.middleware(({ runtime }) => ({
-		db: runtime.env.DB,
-	}))
-	.middleware(({ context }) => ({
-		todos: createTodoService(context.db),
-	}))
-	.handlers({
-		todos: {
-			list({ context }) {
-				return context.todos.list();
-			},
-		},
-	});
-```
-
-### Nested Routers
-
-:::warning[Note]
-Nested routers/routes do **not** inherit middleware from their parent router
-and instead keep their existing middleware stack.
-:::
-
-```ts
-const adminRoutes = router(api.admin)
-	.middleware(({ runtime }) => ({
-		adminDb: runtime.env.ADMIN_DB,
-	}))
-	.handlers({
-		users: {
-			list({ context }) {
-				return listAdminUsers(context.adminDb);
-			},
-		},
-	});
-
-const routes = router(api)
-	.middleware(({ runtime }) => ({
-		db: runtime.env.DB,
-	}))
-	.handlers({
-		admin: adminRoutes, // uses adminDb, not db
-		health({ context }) {
-			return checkHealth(context.db);
-		},
-	});
-```
+Handlers also receive `context.signal`, taken from `request.signal`. Add the
+request or runtime-specific values to the context when handlers need them.
 
 ## Options
 
 ```ts
 type CreateFetchHandlerOptions = {
-	errorHandlers?: ServerErrorHandlers<Record<never, never>>;
 	parseBody?: FetchRouteParseBody;
+	errorHandlers?: ServerErrorHandlers<Record<string, unknown>>;
 };
 ```
 
-### Error Handlers
-
-Request validation errors use `onRequestValidationError`. Response contract
-validation errors use `onResponseValidationError` and default to a generic 500
-response. Other unhandled route errors use `onUnhandledError`, or are re-thrown
-when that hook is omitted or returns `undefined`.
+### Body parsing
 
 ```ts
-const handleRequest = createRouteHandler(routes, {
+const handle = createRouteHandler(routes, {
+	parseBody: ({ request }) => request.json(),
+});
+```
+
+### Error handlers
+
+```ts
+const handle = createRouteHandler(routes, {
 	errorHandlers: {
 		onRequestValidationError: ({ issues }) => ({
 			status: 422,
@@ -159,13 +105,5 @@ const handleRequest = createRouteHandler(routes, {
 			body: { code: "INTERNAL_SERVER_ERROR" },
 		}),
 	},
-});
-```
-
-### Body Parsing
-
-```ts
-const handleUpload = createRouteHandler(routes, {
-	parseBody: ({ request }) => request.formData(),
 });
 ```

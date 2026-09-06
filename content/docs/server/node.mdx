@@ -1,0 +1,179 @@
+---
+title: Node HTTP
+description: Use rest-rpc with Node.js HTTP API
+---
+
+## Install
+
+```sh
+pnpm add @rest-rpc/node
+```
+
+## Usage
+
+### Create a handler
+
+<Tabs>
+
+<Tab title="Contract-first approach">
+
+```ts
+import { createRouteHandler, implement } from "@rest-rpc/node";
+import { api } from "./contract";
+
+const routes = {
+	todos: {
+		get: implement(api).todos.get.handler(({ id }) => getTodo(id)),
+	},
+};
+
+const handle = createRouteHandler(routes);
+```
+
+</Tab>
+<Tab title="Server-first approach">
+
+```ts
+import { createServer } from "node:http";
+import { createRouteHandler, route } from "@rest-rpc/node";
+
+const routes = {
+	health: route.get("/health").handler(() => ({ status: 204 })),
+};
+const handle = createRouteHandler(routes);
+```
+
+</Tab>
+</Tabs>
+
+### Integrate with a framework
+
+<Tabs>
+
+<Tab title="Node HTTP">
+
+```ts
+import { createServer } from "node:http";
+import { createRouteHandler } from "@rest-rpc/node";
+import { routes } from "./routes";
+
+const handle = createRouteHandler(routes);
+
+const server = createServer(async (req, res) => {
+	const { matched } = await handle(req, res);
+
+	if (matched) {
+		return;
+	}
+
+	res.statusCode = 404;
+	res.end("Not found");
+});
+
+server.listen(3000);
+```
+
+</Tab>
+<Tab title="Express">
+
+```ts
+import express from "express";
+import { createRouteHandler } from "@rest-rpc/node";
+import { routes } from "./routes";
+
+const app = express();
+const handle = createRouteHandler(routes);
+
+app.use(async (req, res, next) => {
+	const { matched } = await handle(req, res);
+
+	if (matched) {
+		return;
+	}
+
+	next();
+});
+
+app.listen(3000);
+```
+
+</Tab>
+<Tab title="Koa">
+
+```ts
+import Koa from "koa";
+import { createRouteHandler } from "@rest-rpc/node";
+import { routes } from "./routes";
+
+const app = new Koa();
+const handle = createRouteHandler(routes);
+
+app.use(async (ctx, next) => {
+	ctx.respond = false;
+	const { matched } = await handle(ctx.req, ctx.res);
+	if (matched) {
+		return;
+	}
+	await next();
+});
+
+app.listen(3000);
+```
+
+</Tab>
+</Tabs>
+## Framework context
+
+Pass application context as the third argument to `handle`:
+
+```ts
+declare module "@rest-rpc/node" {
+	interface DefaultContext {
+		user: { id: string };
+	}
+}
+
+const result = await handle(req, res, { user });
+```
+
+Handlers also receive `context.signal`. It is aborted when the request aborts
+or the response closes prematurely. Add `req` or `res` to the context when
+handlers need the native objects.
+
+## Options
+
+```ts
+type CreateNodeHandlerOptions = {
+	parseBody?: NodeRouteParseBody;
+	errorHandlers?: ServerErrorHandlers<Record<string, unknown>>;
+};
+```
+
+### Body parsing
+
+```ts
+const handle = createRouteHandler(routes, {
+	parseBody: async ({ request }) => request.body,
+});
+```
+
+### Error handlers
+
+```ts
+const handle = createRouteHandler(routes, {
+	errorHandlers: {
+		onRequestValidationError: ({ issues }) => ({
+			status: 422,
+			body: { code: "VALIDATION_ERROR", issues },
+		}),
+		onResponseValidationError: () => ({
+			status: 500,
+			body: { code: "INVALID_RESPONSE" },
+		}),
+		onUnhandledError: () => ({
+			status: 500,
+			body: { code: "INTERNAL_SERVER_ERROR" },
+		}),
+	},
+});
+```
