@@ -1,0 +1,67 @@
+import type { IncomingMessage, ServerResponse } from "node:http";
+import {
+	createHttpDispatcher,
+	createImplementationMatcher,
+	type DispatchImplementationTree,
+	type ImplementationContextArguments,
+	type ServerErrorHandlers,
+} from "@rest-rpc/server";
+import type { NodeRouteHandlerResult } from "./index.ts";
+import { createRequestSignal } from "./lifecycle.ts";
+import {
+	defaultParseBody,
+	parseRequestTarget,
+	type NodeRouteParseBody,
+} from "./request.ts";
+import { writeNodeResponse } from "./response.ts";
+
+/** Options for the general Node HTTP catch-all handler. */
+export type CreateNodeHandlerOptions = {
+	parseBody?: NodeRouteParseBody;
+	errorHandlers?: ServerErrorHandlers<Record<string, unknown>>;
+};
+
+/** Creates a Node HTTP catch-all handler that leaves unmatched requests untouched. */
+export function createRouteHandler<
+	const TTree extends DispatchImplementationTree,
+>(
+	implementations: TTree,
+	options: CreateNodeHandlerOptions = {},
+): (
+	request: IncomingMessage,
+	response: ServerResponse,
+	...contextArguments: ImplementationContextArguments<TTree>
+) => Promise<NodeRouteHandlerResult> {
+	const dispatch = createHttpDispatcher(implementations);
+	const match = createImplementationMatcher(implementations);
+	const parseBody = options.parseBody ?? defaultParseBody;
+	return async (request, response, ...contextArguments) => {
+		const context = (contextArguments[0] ?? {}) as Record<string, unknown>;
+		const url = parseRequestTarget(request);
+		const target = { method: request.method ?? "GET", path: url.pathname };
+		const matched = match(target);
+		if (!matched || matched.implementation.route.mode === "webSocket")
+			return { matched: false };
+		const signal = createRequestSignal(request, response);
+		const result = await dispatch({
+			...target,
+			context,
+			signal,
+			catchParsingErrors: options.parseBody === undefined,
+			errorHandlers: options.errorHandlers,
+			decode: async ({ implementation, params }) => ({
+				params,
+				query: Object.fromEntries(url.searchParams),
+				headers: request.headers,
+				body: await parseBody({
+					request,
+					route: implementation.route,
+					body: implementation.route.request?.body,
+				}),
+			}),
+		});
+		if (result && !response.destroyed)
+			await writeNodeResponse(result, response);
+		return { matched: true };
+	};
+}

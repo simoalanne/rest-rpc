@@ -1,0 +1,53 @@
+{
+	"name": "@rest-rpc/node",
+	"version": "0.1.0-beta.19",
+	"description": "Node HTTP adapter for serving rest-rpc contracts with IncomingMessage and ServerResponse handlers.",
+	"keywords": [
+		"api-contract",
+		"contract-first",
+		"http",
+		"node",
+		"nodejs",
+		"request",
+		"response",
+		"rest",
+		"rest-rpc",
+		"rpc",
+		"server",
+		"type-safe-api",
+		"typescript"
+	],
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/rest-rpc/rest-rpc.git",
+		"directory": "packages/node"
+	},
+	"files": [
+		"dist"
+	],
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"typecheck": "pnpm run build && tsc -p tsconfig.json"
+	},
+	"dependencies": {
+		"@rest-rpc/core": "workspace:*",
+		"@rest-rpc/fetch": "workspace:*",
+		"@rest-rpc/server": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "26.3.0"
+	},
+	"tsd": {
+		"directory": "test-d"
+	}
+}

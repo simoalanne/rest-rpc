@@ -13,6 +13,7 @@
 			"@rest-rpc/fastify",
 			"@rest-rpc/hono",
 			"@rest-rpc/fetch",
+			"@rest-rpc/node",
 			"@rest-rpc/server",
 			"@rest-rpc/tanstack-query"
 		]
