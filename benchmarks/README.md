@@ -3,11 +3,10 @@
 This private workspace contains generated benchmark fixtures that exercise the
 library as a downstream consumer.
 
-The benchmark measures TypeScript checker cost for contract-first declarations
-and server-first implementations/clients across the built-in type-only schema
-helper and the main supported validation libraries. Both styles are sections in
-the same generated fixture so each row measures a realistic combined downstream
-package. Run it from the repository root:
+The benchmark independently measures TypeScript checker cost for contract-first
+declarations and server-first implementations across the built-in type-only
+schema helper and the main supported validation libraries. Run it from the
+repository root:
 
 ```sh
 pnpm bench:typecheck -- "Test with all validations present"
@@ -22,9 +21,11 @@ The message is required and is used as the result filename slug:
 benchmarks/results/typecheck/test-with-all-validations-present.md
 ```
 
-The scripts generate fixtures under `generated/` and run `tsc --noEmit
---extendedDiagnostics` for each schema library and route count. Every fixture
-contains the same number of contract-first routes and server-first routes.
+The scripts generate matching fixtures under `generated/contract-only/` and
+`generated/server-first/`, then run `tsc --noEmit --extendedDiagnostics` for
+each schema library and route count. The only meaningful fixture differences are
+the route import and the terminal `.response(...)` or `.handler(...)` calls.
+Console and Markdown output contain a separate table for each style.
 
 Results are written to Markdown files under `results/typecheck/`, with
 `results/typecheck/latest.md` updated to the most recent run.

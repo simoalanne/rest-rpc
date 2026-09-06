@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const repoRoot = dirname(root);
-const generatedRoot = join(root, "generated", "contract-only");
+const generatedRoot = join(root, "generated");
 const resultsRoot = join(root, "results", "typecheck");
 const tscBin = join(repoRoot, "node_modules", ".bin", "tsc");
 const args = process.argv.slice(2);
@@ -57,60 +57,68 @@ const gitShortCommit = () => {
 	}
 };
 
-if (!existsSync(generatedRoot)) {
-	throw new Error(
-		`Missing generated fixtures at ${generatedRoot}. Run generate:type-fixtures first.`,
-	);
-}
-
 const sortRouteCases = (left, right) => {
 	const leftRoutes = Number(left.replace("routes-", ""));
 	const rightRoutes = Number(right.replace("routes-", ""));
 	return leftRoutes - rightRoutes;
 };
 
-const schemaLibraryNames = readdirSync(generatedRoot, { withFileTypes: true })
-	.filter((entry) => entry.isDirectory())
-	.map((entry) => entry.name)
-	.sort();
+const benchmarkResults = [
+	{ name: "Contract-first", directory: "contract-only" },
+	{ name: "Server-first", directory: "server-first" },
+].map((benchmark) => {
+	const benchmarkRoot = join(generatedRoot, benchmark.directory);
+	if (!existsSync(benchmarkRoot)) {
+		throw new Error(
+			`Missing generated fixtures at ${benchmarkRoot}. Run generate:type-fixtures first.`,
+		);
+	}
 
-const tableRows = [];
-
-for (const schemaLibrary of schemaLibraryNames) {
-	const schemaLibraryDir = join(generatedRoot, schemaLibrary);
-	const cases = readdirSync(schemaLibraryDir, { withFileTypes: true })
+	const schemaLibraryNames = readdirSync(benchmarkRoot, {
+		withFileTypes: true,
+	})
 		.filter((entry) => entry.isDirectory())
 		.map((entry) => entry.name)
-		.sort(sortRouteCases);
+		.sort();
+	const rows = [];
 
-	for (const caseName of cases) {
-		const caseDir = join(schemaLibraryDir, caseName);
-		const tsconfig = join(caseDir, "tsconfig.json");
-		const output = execFileSync(
-			tscBin,
-			["-p", tsconfig, "--extendedDiagnostics", "--pretty", "false"],
-			{
-				cwd: repoRoot,
-				encoding: "utf8",
-				stdio: ["ignore", "pipe", "pipe"],
-			},
-		);
+	for (const schemaLibrary of schemaLibraryNames) {
+		const schemaLibraryDir = join(benchmarkRoot, schemaLibrary);
+		const cases = readdirSync(schemaLibraryDir, { withFileTypes: true })
+			.filter((entry) => entry.isDirectory())
+			.map((entry) => entry.name)
+			.sort(sortRouteCases);
 
-		const diagnostics = parseDiagnostics(output);
-		tableRows.push({
-			schema: schemaLibrary,
-			routes: caseName.replace("routes-", ""),
-			types: diagnostics.Types,
-			instantiations: diagnostics.Instantiations,
-			memory: diagnostics["Memory used"],
-			check: diagnostics["Check time"],
-			total: diagnostics["Total time"],
-		});
+		for (const caseName of cases) {
+			const caseDir = join(schemaLibraryDir, caseName);
+			const tsconfig = join(caseDir, "tsconfig.json");
+			const output = execFileSync(
+				tscBin,
+				["-p", tsconfig, "--extendedDiagnostics", "--pretty", "false"],
+				{
+					cwd: repoRoot,
+					encoding: "utf8",
+					stdio: ["ignore", "pipe", "pipe"],
+				},
+			);
+
+			const diagnostics = parseDiagnostics(output);
+			rows.push({
+				schema: schemaLibrary,
+				routes: caseName.replace("routes-", ""),
+				types: diagnostics.Types,
+				instantiations: diagnostics.Instantiations,
+				memory: diagnostics["Memory used"],
+				check: diagnostics["Check time"],
+				total: diagnostics["Total time"],
+			});
+		}
 	}
-}
 
-console.log("\nContract-first and server-first typecheck benchmark\n");
-console.table(tableRows);
+	console.log(`\n${benchmark.name} typecheck benchmark\n`);
+	console.table(rows);
+	return { ...benchmark, rows };
+});
 
 const createdAt = new Date();
 const createdAtLabel = new Intl.DateTimeFormat("en", {
@@ -146,12 +154,19 @@ const markdownTable = (items) => {
 
 mkdirSync(resultsRoot, { recursive: true });
 const commit = gitShortCommit();
+const sections = benchmarkResults
+	.map(
+		({ name, rows }) => `## ${name}
+
+${markdownTable(rows)}`,
+	)
+	.join("\n\n");
 const result = `# ${message}
 
 Created: ${createdAtLabel}
 ${commit ? `Commit: ${commit}\n` : ""}
 
-${markdownTable(tableRows)}
+${sections}
 `;
 
 writeFileSync(resultPath, result);
@@ -159,5 +174,5 @@ writeFileSync(latestPath, result);
 
 console.log(`\nSaved results to ${relative(repoRoot, resultPath)}`);
 console.log(
-	"\nRaw fixtures live under benchmarks/generated/contract-only/ after generation.",
+	"\nRaw fixtures live under benchmarks/generated/{contract-only,server-first}/ after generation.",
 );

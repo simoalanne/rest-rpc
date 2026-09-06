@@ -3,13 +3,14 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const generatedRoot = join(root, "generated", "contract-only");
+const generatedRoot = join(root, "generated");
 const routeCounts = [10, 100, 500, 1000];
 
 const schemaLibraries = {
 	"type-only": {
-		importSource: `import { initClient, route, type as schema } from "@rest-rpc/core";
-import { route as serverRoute } from "@rest-rpc/fetch";`,
+		importSource: `import { route, type as schema } from "@rest-rpc/core";`,
+		serverFirstImportSource: `import { type as schema } from "@rest-rpc/core";
+import { route } from "@rest-rpc/fetch";`,
 		schemas: `const requestHeadersSchema = schema<{ "x-request-id": string }>();
 const routeHeadersSchema = schema<{ "x-feature": string | undefined }>();
 const numberSchema = schema<number>();
@@ -29,8 +30,9 @@ const errorSchema = schema<{
 }>();`,
 	},
 	zod: {
-		importSource: `import { initClient, route } from "@rest-rpc/core";
-import { route as serverRoute } from "@rest-rpc/fetch";
+		importSource: `import { route } from "@rest-rpc/core";
+import z from "zod";`,
+		serverFirstImportSource: `import { route } from "@rest-rpc/fetch";
 import z from "zod";`,
 		schemas: `const requestHeadersSchema = z.object({ "x-request-id": z.string() });
 const routeHeadersSchema = z.object({ "x-feature": z.string().optional() });
@@ -51,8 +53,9 @@ const errorSchema = z.object({
 });`,
 	},
 	valibot: {
-		importSource: `import { initClient, route } from "@rest-rpc/core";
-import { route as serverRoute } from "@rest-rpc/fetch";
+		importSource: `import { route } from "@rest-rpc/core";
+import * as v from "valibot";`,
+		serverFirstImportSource: `import { route } from "@rest-rpc/fetch";
 import * as v from "valibot";`,
 		schemas: `const requestHeadersSchema = v.object({ "x-request-id": v.string() });
 const routeHeadersSchema = v.object({ "x-feature": v.optional(v.string()) });
@@ -73,8 +76,9 @@ const errorSchema = v.object({
 });`,
 	},
 	arktype: {
-		importSource: `import { initClient, route } from "@rest-rpc/core";
-import { route as serverRoute } from "@rest-rpc/fetch";
+		importSource: `import { route } from "@rest-rpc/core";
+import { type } from "arktype";`,
+		serverFirstImportSource: `import { route } from "@rest-rpc/fetch";
 import { type } from "arktype";`,
 		schemas: `const requestHeadersSchema = type({ "x-request-id": "string" });
 const routeHeadersSchema = type({ "x-feature": "string | undefined" });
@@ -99,7 +103,7 @@ const errorSchema = type({
 const routeMethod = (index) =>
 	["GET", "POST", "PUT", "PATCH", "DELETE"][index % 5];
 
-const routeSource = (index) => {
+const routeSource = (index, serverFirst) => {
 	const method = routeMethod(index);
 	const group = Math.floor(index / 10);
 	const path =
@@ -114,30 +118,9 @@ const routeSource = (index) => {
 	builder.push(
 		".headers(routeHeadersSchema)",
 		`.withMetadata({ feature: 'group-${group}' })`,
-		".response(200, todoSchema)",
-		".response(400, errorSchema)",
-		".response(404, errorSchema)",
 	);
-
-	return `route${index}: ${builder.join("\n\t\t\t")}`;
-};
-
-const serverRouteSource = (index) => {
-	const method = routeMethod(index);
-	const group = Math.floor(index / 10);
-	const path =
-		index % 2 === 0
-			? `/groups/${group}/items/:id/route-${index}`
-			: `/groups/${group}/items/route-${index}`;
-	const builder = [`apiServerRoute.${method.toLowerCase()}("${path}")`];
-	if (path.includes(":id")) builder.push(".params(paramsSchema)");
-	builder.push(".query(querySchema)");
-	if (method !== "GET" && method !== "DELETE")
-		builder.push(".body(bodySchema)");
-	builder.push(
-		".headers(routeHeadersSchema)",
-		`.withMetadata({ feature: 'group-${group}' })`,
-		`.handler(() => ({
+	if (serverFirst) {
+		builder.push(`.handler(() => ({
 				status: 200 as const,
 				body: {
 					id: "todo-${index}",
@@ -145,18 +128,24 @@ const serverRouteSource = (index) => {
 					done: false,
 					tags: [] as string[],
 				},
-			}))`,
-	);
+			}))`);
+	} else {
+		builder.push(
+			".response(200, todoSchema)",
+			".response(400, errorSchema)",
+			".response(404, errorSchema)",
+		);
+	}
 
 	return `route${index}: ${builder.join("\n\t\t\t")}`;
 };
 
-const groupEntries = (routeCount, source) => {
+const groupEntries = (routeCount, serverFirst) => {
 	const groups = new Map();
 	for (let index = 0; index < routeCount; index += 1) {
 		const groupName = `group${Math.floor(index / 10)}`;
 		const routes = groups.get(groupName) ?? [];
-		routes.push(source(index));
+		routes.push(routeSource(index, serverFirst));
 		groups.set(groupName, routes);
 	}
 
@@ -169,31 +158,33 @@ const groupEntries = (routeCount, source) => {
 		.join(",\n");
 };
 
-const contractSource = (routeCount, schemaLibrary) => {
-	const contractGroups = groupEntries(routeCount, routeSource);
-	const serverGroups = groupEntries(routeCount, serverRouteSource);
+const fixtureSource = (routeCount, schemaLibrary, serverFirst) => {
+	const groups = groupEntries(routeCount, serverFirst);
 
-	return `${schemaLibrary.importSource}
+	return `${serverFirst ? schemaLibrary.serverFirstImportSource : schemaLibrary.importSource}
 
 ${schemaLibrary.schemas}
 
-// Contract-first declaration section.
 const apiRoute = route.with({
 		pathPrefix: "/api",
 		metadata: {
 			benchmark: "contract-only",
 			schemaLibrary: "${schemaLibrary.name}",
-		},
-		headers: requestHeadersSchema,
-		responses: {
-			500: errorSchema,
-		},
-		flattenRequestKeys: false,
+	},
+	headers: requestHeadersSchema,
+	${
+		serverFirst
+			? ""
+			: `responses: {
+		500: errorSchema,
+	},`
+	}
+	flattenRequestKeys: false,
 		strictStatusCodes: true,
 });
 
 export const api = {
-	${contractGroups}
+	${groups}
 };
 
 type BenchmarkRoute = typeof api.group0.route0;
@@ -209,30 +200,6 @@ export type BenchmarkOptionTypes = {
 };
 
 export type Api = typeof api;
-
-// Server-first implementation and client section.
-const apiServerRoute = serverRoute.with({
-	pathPrefix: "/api",
-	metadata: {
-		benchmark: "server-first",
-		schemaLibrary: "${schemaLibrary.name}",
-	},
-	headers: requestHeadersSchema,
-});
-
-export const serverFirstApi = {
-	${serverGroups}
-};
-
-export const serverFirstClient = initClient<typeof serverFirstApi>({
-	baseUrl: "https://example.test",
-});
-
-const firstServerRoute = serverFirstClient.get(
-	"/api/groups/0/items/:id/route-0",
-);
-export type ServerFirstRequest = Parameters<typeof firstServerRoute.fetch>;
-export type ServerFirstResponse = ReturnType<typeof firstServerRoute.fetchResponse>;
 `;
 };
 
@@ -250,27 +217,37 @@ const tsconfigSource = (caseName) => `{
 }
 `;
 
-rmSync(generatedRoot, { recursive: true, force: true });
-mkdirSync(generatedRoot, { recursive: true });
+for (const [benchmarkName, serverFirst] of [
+	["contract-only", false],
+	["server-first", true],
+]) {
+	const benchmarkRoot = join(generatedRoot, benchmarkName);
+	rmSync(benchmarkRoot, { recursive: true, force: true });
+	mkdirSync(benchmarkRoot, { recursive: true });
 
-for (const routeCount of routeCounts) {
-	for (const [schemaLibraryName, schemaLibrary] of Object.entries(
-		schemaLibraries,
-	)) {
-		const caseName = `routes-${routeCount}`;
-		const caseDir = join(generatedRoot, schemaLibraryName, caseName);
-		mkdirSync(caseDir, { recursive: true });
-		writeFileSync(
-			join(caseDir, `${caseName}.ts`),
-			contractSource(routeCount, {
-				...schemaLibrary,
-				name: schemaLibraryName,
-			}),
-		);
-		writeFileSync(join(caseDir, "tsconfig.json"), tsconfigSource(caseName));
+	for (const routeCount of routeCounts) {
+		for (const [schemaLibraryName, schemaLibrary] of Object.entries(
+			schemaLibraries,
+		)) {
+			const caseName = `routes-${routeCount}`;
+			const caseDir = join(benchmarkRoot, schemaLibraryName, caseName);
+			mkdirSync(caseDir, { recursive: true });
+			writeFileSync(
+				join(caseDir, `${caseName}.ts`),
+				fixtureSource(
+					routeCount,
+					{
+						...schemaLibrary,
+						name: schemaLibraryName,
+					},
+					serverFirst,
+				),
+			);
+			writeFileSync(join(caseDir, "tsconfig.json"), tsconfigSource(caseName));
+		}
 	}
 }
 
 console.log(
-	`Generated contract-first and server-first fixtures in ${generatedRoot}`,
+	`Generated isolated contract-first and server-first fixtures in ${generatedRoot}`,
 );
