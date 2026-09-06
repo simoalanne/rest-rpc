@@ -1,8 +1,5 @@
 import type { ImplementationShape } from "@rest-rpc/server";
-import {
-	type TanstackQueryContract,
-	tanstackQueryContract,
-} from "./contract.ts";
+import type { TanstackQueryContract } from "./contract.ts";
 
 type Project = {
 	id: string;
@@ -106,7 +103,7 @@ export const createTanstackQueryHandlers = (): TanstackQueryHandlers => {
 				version += 1;
 				const renamed = { ...project, name: request.name };
 				projects.set(request.id, renamed);
-				return renamed;
+				return { status: 200 as const, body: renamed };
 			},
 			page: (request) => {
 				const start = request.cursor ? Number(request.cursor) : 0;
@@ -122,9 +119,12 @@ export const createTanstackQueryHandlers = (): TanstackQueryHandlers => {
 			slow: async (request) => {
 				await delay(1_000);
 				return {
-					id: request.id,
-					name: "Slow project",
-					status: "active" as const,
+					status: 200 as const,
+					body: {
+						id: request.id,
+						name: "Slow project",
+						status: "active" as const,
+					},
 				};
 			},
 			events: async function* () {
@@ -134,12 +134,3 @@ export const createTanstackQueryHandlers = (): TanstackQueryHandlers => {
 		},
 	};
 };
-
-export const createTanstackQueryImplementations = <
-	TImplementationTree extends object,
->(
-	router: (
-		contract: TanstackQueryContract,
-		handlers: TanstackQueryHandlers,
-	) => TImplementationTree,
-) => router(tanstackQueryContract, createTanstackQueryHandlers());
