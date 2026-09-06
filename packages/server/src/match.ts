@@ -1,4 +1,5 @@
 import {
+	type BaseRouteDeclaration,
 	type Contract,
 	flattenContractRoutes,
 	getPathParamSegmentName,
@@ -9,8 +10,8 @@ import {
 const splitPath = (path: string) => path.split("/").filter(Boolean);
 
 export const compareRouteSpecificity = (
-	left: RouteDeclaration,
-	right: RouteDeclaration,
+	left: BaseRouteDeclaration,
+	right: BaseRouteDeclaration,
 ) => {
 	const leftSegments = splitPath(left.path);
 	const rightSegments = splitPath(right.path);
@@ -40,7 +41,7 @@ export const compareRouteSpecificity = (
 const escapeRegExp = (value: string) =>
 	value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const createPathMatcher = (path: string) => {
+export const createPathMatcher = (path: string) => {
 	const keys: string[] = [];
 	const segments = splitPath(path);
 	const pattern =

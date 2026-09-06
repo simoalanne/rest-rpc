@@ -126,6 +126,7 @@ describe("handleHttpRoute", () => {
 
 		assert.deepEqual(result, {
 			kind: "json",
+			responseKindMetadata: false,
 			status: 422,
 			headers: { "x-error": "validation" },
 			body: {
@@ -161,6 +162,7 @@ describe("handleHttpRoute", () => {
 
 		assert.deepEqual(result, {
 			kind: "json",
+			responseKindMetadata: false,
 			status: 500,
 			headers: undefined,
 			body: { code: "INTERNAL_SERVER_ERROR" },
@@ -218,6 +220,7 @@ describe("handleHttpRoute", () => {
 		assert.equal(unhandledCalled, false);
 		assert.deepEqual(result, {
 			kind: "json",
+			responseKindMetadata: false,
 			status: 502,
 			headers: { "x-error": "response-validation" },
 			body: { code: "INVALID_RESPONSE" },
@@ -233,6 +236,7 @@ describe("handleHttpRoute", () => {
 
 		assert.deepEqual(result, {
 			kind: "json",
+			responseKindMetadata: false,
 			status: 500,
 			headers: undefined,
 			body: {
@@ -272,6 +276,7 @@ describe("handleHttpRoute", () => {
 
 		assert.deepEqual(result, {
 			kind: "json",
+			responseKindMetadata: false,
 			status: 500,
 			headers: undefined,
 			body: {
@@ -381,6 +386,7 @@ describe("handleHttpRoute", () => {
 
 		assert.deepEqual(result, {
 			kind: "json",
+			responseKindMetadata: false,
 			status: 500,
 			headers: undefined,
 			body: {
@@ -413,6 +419,7 @@ describe("handleHttpRoute", () => {
 
 		assert.deepEqual(result, {
 			kind: "json",
+			responseKindMetadata: false,
 			status: 500,
 			headers: undefined,
 			body: {

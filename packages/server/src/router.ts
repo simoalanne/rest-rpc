@@ -247,10 +247,11 @@ export type Contract<TRoute extends RouteDeclaration = RouteDeclaration> =
  * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registration-adapters}
  */
 export type RouteImplementation<
-	TRoute extends RouteDeclaration = RouteDeclaration,
+	TRoute = RouteDeclaration,
+	THandler = RuntimeRouteHandler,
 > = {
 	route: TRoute;
-	handler: RuntimeRouteHandler;
+	handler: THandler;
 };
 
 /**
@@ -354,7 +355,7 @@ export const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
 
 export const isHttpRoute = (
 	route: RouteDeclaration,
-): route is ServerHttpRouteDeclaration => "responses" in route;
+): route is ServerHttpRouteDeclaration => route.mode !== "webSocket";
 
 export const isWebSocketRoute = (
 	route: RouteDeclaration,

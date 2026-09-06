@@ -70,3 +70,35 @@ export {
 	handleWebSocketRoute,
 	prepareWebSocketUpgrade,
 } from "./websocket.ts";
+
+export {
+	createImplementationMatcher,
+	createHttpDispatcher,
+} from "./dispatch.ts";
+export type {
+	DispatchImplementationTree,
+	DispatchRequestOptions,
+	ImplementationMatch,
+} from "./dispatch.ts";
+
+export type {
+	ImplementationContext,
+	ImplementationContextArguments,
+} from "./dispatch.ts";
+
+export { implement, serverFirstRoute } from "./serverFirst.ts";
+export type {
+	Implement,
+	ImplicitResponseEnvelope,
+	ImplicitResponseKind,
+	InferredRouteResponse,
+	ImplementationBuildersFor,
+	ServerImplementationTree,
+	ServerContract,
+	ServerFirstResponseKind,
+	ServerFirstRouteResponseKind,
+	ServerHttpBuilderExtension,
+	ServerRouteFactory,
+	ServerRouteImplementation,
+	ServerSseBuilderExtension,
+} from "./serverFirst.ts";
