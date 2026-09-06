@@ -1,522 +1,280 @@
 ---
 title: Building Server Adapters
-description: Learn how first-party adapters use @rest-rpc/server and how you could build your own
+description: Build registration or catch-all adapters with the current @rest-rpc/server primitives
 ---
 
-Most applications should use a framework adapter such as `@rest-rpc/express`,
-`@rest-rpc/fastify`, `@rest-rpc/hono`, `@rest-rpc/nest` or
-`@rest-rpc/fetch`.
-The `@rest-rpc/server` package is for adapter authors or for cases where your
-application does not use a supported framework and you still want to use
-`@rest-rpc` on the server.
+Use a first-party adapter whenever one matches your runtime. Build an adapter
+when a framework needs native request/context integration that cannot be
+expressed cleanly with `@rest-rpc/fetch` or `@rest-rpc/node`.
 
-This page walks through trimmed source from the first-party adapters. The goal
-is not to make a fake framework adapter from scratch. It is to show where the
-shared server primitives are used in real adapters, and which parts remain
-framework-specific.
+This guide shows the current extension points. All shared server APIs are
+exported from the `@rest-rpc/server` package root; there are no Fetch or Node
+subpath adapters under that package.
 
-## Registration Adapters
+## Choose an adapter shape
 
-Express, Fastify, and Hono register each contract route with the host
-framework. The Express adapter is a useful reference because the boundary is
-explicit: Express owns the request and response objects, while
-`@rest-rpc/server` owns contract execution.
+Use a registration adapter when the framework exposes a router and should own
+method/path matching. Use a dispatch adapter when the runtime sends requests to
+one catch-all function.
 
-### Public Entry
+| Shape                  | First-party references | Shared entry points                                                     |
+| ---------------------- | ---------------------- | ----------------------------------------------------------------------- |
+| Route registration     | Express, Fastify, Hono | `splitRouteImplementations`, `handleHttpRoute`, `handleHttpRouteResult` |
+| Decorator registration | NestJS                 | `handleHttpRoute`, `handleHttpRouteResult` plus framework metadata      |
+| Catch-all dispatch     | Fetch, Node.js         | `createHttpDispatcher`, response writer helpers                         |
 
-The public Express entry point accepts a framework router, a typed
-implementation tree, and adapter options.
+## Expose implementation builders
+
+Framework registration adapters normally expose contract-first `route` and
+`router` wrappers typed with their framework context. See the Express, Fastify,
+or Hono package entry points for the complete pattern.
+
+A catch-all adapter can support both API styles. Re-export a server-first route
+factory bound to the adapter's default context, and wrap `implement` so an
+existing contract gets the same context:
 
 ```ts
-import type { IncomingMessage } from "node:http";
-import type { RouteDeclaration } from "@rest-rpc/core/contract";
-import type { ImplementationTree, ServerErrorHandlers } from "@rest-rpc/server";
-import { splitRouteImplementations } from "@rest-rpc/server";
-import type { IRouter, Request } from "express";
+import {
+	implement as serverImplement,
+	serverFirstRoute,
+	type ImplementationBuildersFor,
+	type ServerContract,
+	type ServerRouteFactory,
+} from "@rest-rpc/server";
 
-export type RegisterRoutesOptions = {
-	errorHandlers?: ServerErrorHandlers<
-		| { kind: "http"; req: Request; signal: AbortSignal }
-		| { kind: "websocket"; req: IncomingMessage; signal: AbortSignal }
+export interface DefaultContext {}
+
+export const route = serverFirstRoute as ServerRouteFactory<
+	{ flattenRequestKeys: true },
+	DefaultContext
+>;
+
+export function implement<const TNode extends ServerContract>(contract: TNode) {
+	return serverImplement(contract) as ImplementationBuildersFor<
+		TNode,
+		DefaultContext
 	>;
-	middleware?: ExtendedExpressMiddleware[];
-	webSocket?: ExpressWebSocketOptions;
-};
+}
+```
 
-export const registerRoutes = (
-	app: IRouter,
-	implementations: ImplementationTree<RouteDeclaration>,
-	options: RegisterRoutesOptions = {},
-) =>
-	splitRouteImplementations(implementations, {
-		handleHttpRoutes: (httpRoutes) =>
-			registerExpressHttpRoutes(
-				app,
-				routes,
-				options.middleware,
-				options.errorHandlers,
-			),
-		handleWebSocketRoutes: (webSocketRoutes) =>
-			options.webSocket &&
-			registerExpressWebSocketRoutes(
-				options.webSocket,
-				routes,
-				options.errorHandlers,
-			),
+Users can augment `DefaultContext`, build a server-first route ending in
+`.handler(...)`, or attach handlers to a contract with `implement(contract)`.
+Both produce an ordinary nested implementation tree accepted by shared
+dispatch.
+
+## Registration adapters
+
+### Splitting implementations
+
+`splitRouteImplementations` flattens a contract-first implementation tree,
+orders routes by specificity, and separates HTTP/SSE implementations from
+WebSocket implementations:
+
+```ts
+import { splitRouteImplementations } from "@rest-rpc/server";
+
+export function registerRoutes(app, implementations, options = {}) {
+	return splitRouteImplementations(implementations, {
+		handleHttpRoutes: (routes) =>
+			registerFrameworkHttpRoutes(app, routes, options),
+		handleWebSocketRoutes: (routes) =>
+			registerFrameworkWebSocketRoutes(app, routes, options),
 	});
+}
 ```
 
-This function does not execute any route. It delegates the implementation tree
-to `registerRoutes` from `@rest-rpc/server`, then sends HTTP and
-WebSocket implementations to Express-specific registration functions.
-The options show both sides of the adapter boundary: `middleware` and
-`webSocket` are Express adapter features, while `errorHandlers` use the shared
-server error hook type.
+There is no shared `registerRoutes` function: registration is framework-owned.
+The shared helper only prepares the two route lists.
 
-## Registering HTTP Routes
+### Registering HTTP routes
 
-The Express-specific HTTP adapter receives a flat list of HTTP route
-implementations. It loops over them and registers each one with Express.
+For each implementation, translate framework values into four request segments
+and construct a context containing an `AbortSignal`:
 
 ```ts
-import {
-	handleHttpRoute,
-	handleHttpRouteResult,
-	type RouteImplementation,
-	type ServerErrorHandlers,
-} from "@rest-rpc/server";
-
-export const registerExpressHttpRoutes = (
-	app: IRouter,
-	routes: RouteImplementation<HttpRouteDeclaration>[],
-	middleware: ExtendedExpressMiddleware[] = [],
-	errorHandlers?: ServerErrorHandlers<{
-		req: Request;
-		signal: AbortSignal;
-	}>,
-) => {
-	for (const implementation of routes) {
-		const route: HttpRouteDeclaration = implementation.route;
-		const method = route.method.toLowerCase() as Lowercase<HttpMethod>;
-		const handler = implementation.handler;
-
-		const serviceHandler = async (req: Request, res: ExpressResponse) => {
-			const signal = createRequestSignal(req, res);
-			const result = await handleHttpRoute(route, handler, {
-				request: {
-					body: req.body,
-					query: req.query,
-					params: req.params,
-					headers: req.headers,
-				},
-				context: { req, signal },
-				errorContext: { kind: "http", req, signal },
-				errorHandlers,
-			});
-
-			return handleHttpRouteResult(result, {
-				setHeader: (name, value) => {
-					if (value !== undefined) res.setHeader(name, value);
-				},
-				sendEmpty: (status) => {
-					res.sendStatus(status);
-				},
-				sendJson: (status, body) => {
-					res.status(status).json(body);
-				},
-				sendCustom: (status, body) => {
-					res.status(status).send(body);
-				},
-				sendStream: ({ body, status, contentType, mode }) =>
-					writeStreamResponse(body, res, status, contentType, mode),
-			});
-		};
-
-		app[method](
-			toColonPath(route.path),
-			...middleware.map((handler) => {
-				return (req: Request, res: ExpressResponse, next: NextFunction) =>
-					handler(req, res, next, route);
-			}),
-			serviceHandler,
-		);
-	}
-};
-```
-
-The route loop and `app[method](...)` call are Express integration. The call to
-`handleHttpRoute` is the handoff into `@rest-rpc/server`.
-
-Inside that handoff, the adapter provides four request segments:
-
-- `body` from Express body parsing middleware
-- `query` from `req.query`
-- `params` from `req.params`
-- `headers` from `req.headers`
-
-The adapter also provides `context`. Route handlers can use this to access
-framework-specific values such as the raw request or an abort signal.
-
-## Writing The Result
-
-`handleHttpRoute` does not return an Express response. It returns a normalized
-`HttpRouteResult`. The adapter turns that result into framework output with
-`handleHttpRouteResult`.
-
-```ts
-import { handleHttpRouteResult } from "@rest-rpc/server";
-
-return handleHttpRouteResult(result, {
-	setHeader: (name, value) => {
-		if (value !== undefined) res.setHeader(name, value);
-	},
-	sendEmpty: (status) => {
-		res.sendStatus(status);
-	},
-	sendJson: (status, body) => {
-		res.status(status).json(body);
-	},
-	sendCustom: (status, body) => {
-		res.status(status).send(body);
-	},
-	sendStream: ({ body, status, contentType, mode }) =>
-		writeStreamResponse(body, res, status, contentType, mode),
-});
-```
-
-This is the other side of the adapter boundary. The shared server package has
-already validated the route response and normalized it into one of the supported
-result kinds. The adapter decides how to express each kind through the
-framework's response API.
-
-Streams are the least portable response kind. In Express, the adapter writes to
-the Node response object and closes the async iterator when the client
-disconnects. A different framework may have a different stream API, but it
-still receives the same `body`, `status`, `contentType`, and `mode`.
-
-## Dispatch Adapters
-
-Some integrations do not register each contract route with the framework.
-Instead, they receive every request through one handler and dispatch to the
-matching contract route themselves. `@rest-rpc/fetch` is the simplest first-party
-example.
-
-The Fetch runtime creates a matcher from the implementation tree once.
-
-```ts
-import {
-	createRouteMatcher,
-	flattenRouteImplementations,
-	type ImplementationTree,
-} from "@rest-rpc/server";
-
-export const createFetchRouteMatcher = (
-	implementations: ImplementationTree<HttpRouteDeclaration>,
-) => {
-	const routes = flattenRouteImplementations(implementations);
-	const routeContract = Object.fromEntries(
-		routes.map((implementation, index) => [
-			String(index),
-			implementation.route,
-		]),
-	);
-	const matchRoute = createRouteMatcher(routeContract);
-	const implementationsByRoute = new Map(
-		routes.map((implementation) => [implementation.route, implementation]),
-	);
-
-	return (request: Request) => {
-		const url = new URL(request.url);
-		const match = matchRoute({
-			method: request.method,
-			path: url.pathname,
-		});
-
-		if (!match.matched) return undefined;
-
-		const implementation = implementationsByRoute.get(
-			match.route as HttpRouteDeclaration,
-		);
-		if (!implementation) return undefined;
-
-		return {
-			type: "match" as const,
-			implementation,
-			params: match.params,
-		};
-	};
-};
-```
-
-This replaces the framework router. Once a request is matched, the dispatch
-adapter has the same thing a registration adapter had inside its route handler:
-a route implementation and path params.
-
-The public `createRouteHandler` wires matching, middleware, context creation,
-and route execution together.
-
-```ts
-import type { ServerErrorHandlers } from "@rest-rpc/server";
-
-export type CreateFetchHandlerOptions = {
-	errorHandlers?: ServerErrorHandlers<Record<never, never>>;
-	parseBody?: FetchRouteParseBody;
-};
-
-export type FetchRouteHandlerResult =
-	| { matched: true; response: Response }
-	| { matched: false; response: undefined };
-
-type RuntimeArguments<TRuntimeContext extends Record<string, unknown>> =
-	keyof TRuntimeContext extends never
-		? [runtime?: TRuntimeContext]
-		: [runtime: TRuntimeContext];
-
-export const createRouteHandler = <
-	TRuntimeContext extends Record<string, unknown> = Record<never, never>,
-	TContext extends Record<string, unknown> = Record<string, unknown>,
-	TRequest extends Request = Request,
->(
-	implementations: FetchImplementationTree,
-	options: CreateFetchHandlerOptions = {},
-): ((
-	request: TRequest,
-	...runtimeArguments: RuntimeArguments<TRuntimeContext>
-) => Promise<FetchRouteHandlerResult>) => {
-	const matchRoute = createFetchRouteMatcher(implementations);
-	const usesDefaultParseBody = options.parseBody === undefined;
-	const parseBody = options.parseBody ?? defaultParseBody;
-
-	return async (
-		request: TRequest,
-		...runtimeArguments: RuntimeArguments<TRuntimeContext>
-	) => {
-		const match = matchRoute(request);
-		if (!match) return { matched: false, response: undefined };
-		const runtime = (runtimeArguments[0] ?? {}) as TRuntimeContext;
-		const implementation = match.implementation;
-		const middlewareResult = await implementation.middleware?.({
-			request,
-			route: implementation.route,
-			runtime,
-		});
-		if (middlewareResult instanceof Response) {
-			return { matched: true, response: middlewareResult };
-		}
-
-		const context = {
-			...(middlewareResult ?? {}),
-			request,
-		};
-
-		const response = await handleFetchRoute(
-			request,
-			context,
-			implementation,
-			match.params,
-			parseBody,
-			usesDefaultParseBody,
-			options.errorHandlers,
-		);
-
-		return { matched: true, response };
-	};
-};
-```
-
-The dispatch-specific work is matching the request and building context from
-runtime input. After that, `handleFetchRoute` uses the same HTTP execution
-primitive as the Express adapter.
-
-```ts
-import { createFetchResponse, handleHttpRoute } from "@rest-rpc/server";
+import { handleHttpRoute } from "@rest-rpc/server";
 
 const result = await handleHttpRoute(
 	implementation.route,
 	implementation.handler,
 	{
 		request: {
-			body,
-			query: readQuery(url),
-			params: params,
-			headers: readHeaders(request.headers),
+			body: readBody(req),
+			query: readQuery(req),
+			params: readParams(req),
+			headers: readHeaders(req),
 		},
-		context,
-		errorHandlers,
+		context: { req, signal },
+		errorContext: { req, signal },
+		errorHandlers: options.errorHandlers,
 	},
 );
-
-return createFetchResponse(result);
 ```
 
-`createFetchResponse` is a convenience for adapters that return the standard Fetch
-`Response` object. Frameworks with their own response API should usually use
-`handleHttpRouteResult` directly, like the Express adapter does.
+`handleHttpRoute` validates declared request segments, flattens or groups them
+according to the route, invokes the handler, applies error hooks, validates
+declared responses, and returns a normalized `HttpRouteResult`.
 
-## WebSocket Routes
+`errorContext` is optional. Provide it when error hooks need a different shape
+from the handler context.
 
-WebSocket adapters have the same split: the framework owns the upgrade and
-socket lifecycle, while `@rest-rpc/server` owns contract validation and typed
-message handling.
+### Writing the result
 
-Fastify is a smaller reference than Express here because `@fastify/websocket`
-adds WebSocket support to route registration. The adapter does not need to
-listen to the raw Node HTTP `upgrade` event itself.
-
-The adapter option exposes the shared `beforeUpgrade` hook. The hook receives
-the already matched WebSocket route, the request data, and the adapter context.
+Map `HttpRouteResult` to the framework response API with
+`handleHttpRouteResult`:
 
 ```ts
-import type { BeforeWebSocketUpgrade } from "@rest-rpc/server";
+import { handleHttpRouteResult } from "@rest-rpc/server";
 
-export type FastifyWebSocketOptions = {
-	beforeUpgrade?: BeforeWebSocketUpgrade<{
-		req: FastifyRequest;
-		signal: AbortSignal;
-	}>;
-};
-```
-
-The framework socket is adapted to the small `WebSocketLike` interface expected
-by `@rest-rpc/server`.
-
-```ts
-import type { WebSocketLike } from "@rest-rpc/server";
-
-const adaptWebSocket = (socket: FastifyWebSocket): WebSocketLike => ({
-	send(data) {
-		socket.send(data);
-	},
-	close(code, reason) {
-		socket.close(code, reason);
-	},
-	onMessage(callback) {
-		const onMessage = (data: unknown) => callback(data);
-		socket.on("message", onMessage);
-		return () => socket.off("message", onMessage);
-	},
-	onClose(callback) {
-		const onClose = (code: number, reason: Buffer) =>
-			callback({ code, reason: reason.toString() });
-		socket.on("close", onClose);
-		return () => socket.off("close", onClose);
-	},
+return handleHttpRouteResult(result, {
+	setHeader: (name, value) => response.setHeader(name, value),
+	sendEmpty: (status) => response.status(status).end(),
+	sendJson: (status, body) => response.status(status).json(body),
+	sendCustom: (status, body) => response.status(status).send(body),
+	sendStream: ({ status, body, contentType, mode }) =>
+		writeFrameworkStream({ response, status, body, contentType, mode }),
 });
 ```
 
-The route registration has two server-package handoffs. `prepareWebSocketUpgrade`
-validates query, path params, and headers before the socket is accepted.
-`handleWebSocketRoute` starts the typed route handler after Fastify gives the
-adapter a socket.
+The writer handles ordinary headers, content types, and the response-kind header
+used by server-first clients. Do not duplicate that logic in each response
+branch. A stream writer must also handle backpressure, close the response, and
+call the async iterator's `return()` when the client disconnects.
+
+If the framework returns standard Fetch responses, use
+`createFetchResponse(result)` from `@rest-rpc/fetch`. For Node
+`ServerResponse`, use `writeNodeResponse(result, response)` from
+`@rest-rpc/node`.
+
+## Dispatch adapters
+
+### Compile the implementation matcher once
+
+`createHttpDispatcher` accepts both contract-first and server-first nested
+implementation trees. Construct it when `createRouteHandler` is called, not for
+every request:
 
 ```ts
 import {
-	handleWebSocketRoute,
-	prepareWebSocketUpgrade,
-	type RouteImplementation,
+	createHttpDispatcher,
+	type DispatchImplementationTree,
+	type ImplementationContextArguments,
 	type ServerErrorHandlers,
 } from "@rest-rpc/server";
 
-const validatedWebSocketRequest = Symbol("validatedWebSocketRequest");
-
-type ExtendedFastifyRequest = FastifyRequest & {
-	[validatedWebSocketRequest]: Record<string, unknown>;
+type CreateHandlerOptions = {
+	parseBody?: RuntimeBodyParser;
+	errorHandlers?: ServerErrorHandlers<Record<string, unknown>>;
 };
 
-export const registerFastifyWebSocketRoutes = (
-	app: FastifyInstance,
-	options: FastifyWebSocketOptions,
-	routes: RouteImplementation<WebSocketRouteDeclaration>[],
-	preHandler: ExtendedFastifyPreHandler[] = [],
-	errorHandlers?: ServerErrorHandlers<{
-		req: FastifyRequest;
-		signal: AbortSignal;
-	}>,
-) => {
-	for (const implementation of routes) {
-		app.get(
-			toColonPath(implementation.route.path),
-			{
-				websocket: true,
-				preValidation: [
-					...preHandler.map((handler) => {
-						return async (req: FastifyRequest, reply: FastifyReply) => {
-							await handler(req, reply, implementation.route);
-						};
-					}),
-					async (req: FastifyRequest, reply: FastifyReply) => {
-						const controller = new AbortController();
-						const abort = () => controller.abort();
-						req.raw.once("aborted", abort);
-						reply.raw.once("close", () => {
-							if (!reply.raw.writableFinished) abort();
-						});
-						const request = {
-							query: req.query,
-							params: req.params,
-							headers: req.headers,
-						};
-						const upgrade = await prepareWebSocketUpgrade({
-							implementation,
-							request,
-							context: { req, signal: controller.signal },
-							beforeUpgrade: options.beforeUpgrade,
-							errorHandlers,
-						});
+export function createRouteHandler<
+	const TTree extends DispatchImplementationTree,
+>(implementations: TTree, options: CreateHandlerOptions = {}) {
+	const dispatch = createHttpDispatcher(implementations);
 
-						if (!upgrade.ok) {
-							await sendUpgradeRejection(reply, upgrade.rejection);
-							return;
-						}
+	return async (
+		request: RuntimeRequest,
+		...contextArguments: ImplementationContextArguments<TTree>
+	) => {
+		const context = (contextArguments[0] ?? {}) as Record<string, unknown>;
+		const target = readRequestTarget(request);
 
-						req.validatedWebSocketRequest = upgrade.validatedRequest;
-					},
-				],
-			},
-			(socket: FastifyWebSocket, req: FastifyRequest) => {
-				const validatedRequest = req.validatedWebSocketRequest;
+		const result = await dispatch({
+			method: target.method,
+			path: target.path,
+			context,
+			signal: requestSignal(request),
+			catchParsingErrors: options.parseBody === undefined,
+			errorHandlers: options.errorHandlers,
+			decode: async ({ implementation, params }) => ({
+				params,
+				query: readQuery(request),
+				headers: readHeaders(request),
+				body: await parseBody({
+					request,
+					route: implementation.route,
+					body: implementation.route.request?.body,
+				}),
+			}),
+		});
 
-				handleWebSocketRoute(implementation.route, implementation.handler, {
-					request: validatedRequest,
-					context: { req },
-					socket: adaptWebSocket(socket),
-				});
-			},
-		);
-	}
-};
+		if (result === undefined) return { matched: false as const };
+		return {
+			matched: true as const,
+			response: await writeRuntimeResponse(result),
+		};
+	};
+}
 ```
 
-Since `prepareWebSocketUpgrade` runs during
-Fastify's validation phase, but `handleWebSocketRoute` runs later when the
-socket handler receives the accepted socket. The adapter stores the validated
-request so the route handler receives parsed, validated request data rather than
-the raw framework request it would have to validate again.
+The dispatcher matches before calling `decode`, excludes WebSocket
+implementations, and returns `undefined` when nothing matches. Its matcher sorts
+static paths ahead of parameter paths.
 
-Once `handleWebSocketRoute` starts, incoming messages are parsed and validated
-against the client message schema. Outgoing messages sent through the route
-socket are validated against the server message schema before they are
-serialized.
+The generic `ImplementationContextArguments<TTree>` makes the handler context
+argument required only when at least one route requires application context.
+The adapter adds `signal` itself, so callers do not pass it.
 
-## TL;DR
+### When to use the matcher directly
 
-When building a local adapter, copy the shape rather than the whole file.
+Use `createImplementationMatcher` when the adapter must inspect a match before
+dispatch—for example, the Node adapter avoids installing request/response abort
+listeners until it knows a route matched. Otherwise prefer
+`createHttpDispatcher`, which keeps matching and execution together.
 
-- Use `router` or `route` from the server package when your adapter needs to
-  expose typed implementation helpers.
-- Use `registerRoutes` when your framework registers routes and
-  you want the shared HTTP/WebSocket split.
-- Use `flattenRouteImplementations` and `createRouteMatcher` when your adapter
-  dispatches requests through one handler.
-- Use `handleHttpRoute` for HTTP validation, handler execution, response
-  validation, and error hooks.
-- Use `handleHttpRouteResult` when writing to framework response objects.
-- Use `createFetchResponse` only when your adapter returns a standard Fetch
-  `Response`.
-- Use `prepareWebSocketUpgrade` before accepting a WebSocket route.
-- Use `handleWebSocketRoute` after the runtime gives your adapter an accepted
-  socket.
+`createRouteMatcher` is for a contract tree. It does not associate matched
+routes with implementation handlers and is therefore not the primary helper for
+catch-all adapters.
 
-The adapter-owned parts are request parsing, route registration or request
-matching, context construction, middleware integration, response writing, and
-runtime-specific WebSocket upgrade handling.
+### Parsing failures
+
+Default parsers should normally set `catchParsingErrors: true`; malformed bodies
+then become the shared 400 parsing response. If a user supplies a custom parser,
+set it to `false` so custom parser exceptions are not silently reinterpreted.
+
+Only parse a body when the matched route declares one. Preserve specialized
+body behavior—JSON, form, multipart, and custom content types—rather than
+assuming every request is JSON.
+
+## Server-first response compatibility
+
+A server-first route without `.response(...)` declarations returns an envelope
+such as `{ status, body, contentType? }`. `handleHttpRoute` classifies that
+envelope as empty, JSON, NDJSON, custom, or custom-stream output.
+
+The server-first client cannot infer the wire body's representation from HTTP
+headers alone. Its server writer must preserve the versioned
+`X-Rest-Rpc-Response-Kind` header emitted by `handleHttpRouteResult`. Using the
+first-party Fetch/Node response helpers satisfies this requirement. A custom
+writer built on `handleHttpRouteResult` does too.
+
+## WebSocket routes
+
+Registration adapters may support WebSockets with the runtime's native upgrade
+mechanism:
+
+1. Match the WebSocket implementation.
+2. Build query, params, headers, context, and an abort signal.
+3. Call `prepareWebSocketUpgrade` before accepting the socket.
+4. Return the rejection through the framework if validation or `beforeUpgrade`
+   fails.
+5. Adapt the accepted socket to `WebSocketLike`.
+6. Call `handleWebSocketRoute` with the previously validated request.
+
+Do not pass WebSocket implementations to `handleHttpRoute`; shared HTTP
+dispatch deliberately ignores them. The Fetch and Node.js catch-all handlers
+currently cover HTTP and SSE only.
+
+## Checklist
+
+- Expose only public, adapter-appropriate builders from your package root.
+- Keep framework routing when it provides meaningful middleware or context.
+- Use `splitRouteImplementations` for registration adapters.
+- Use `createHttpDispatcher` for catch-all HTTP/SSE adapters.
+- Decode request data only after a route matches.
+- Put `signal` and framework-native values in handler context.
+- Use `handleHttpRoute` for validation, execution, normalization, and error hooks.
+- Use `handleHttpRouteResult` or the Fetch/Node writer helpers for every result
+  kind and server-first response metadata.
+- Own backpressure and disconnect cancellation in runtime stream writers.
+- Own WebSocket upgrade and lifecycle behavior in the adapter.
