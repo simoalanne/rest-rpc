@@ -1,21 +1,18 @@
+import { createRequestSignal, writeStreamResponse } from "@rest-rpc/node";
 import type { HttpMethod } from "@rest-rpc/core/contract";
 import { toColonPath } from "@rest-rpc/core/contract";
 import {
 	handleHttpRoute,
 	handleHttpRouteResult,
-	type HttpRouteResultStreamMode,
 	type RouteImplementation,
 	type ServerErrorHandlers,
 	type ServerHttpRouteDeclaration,
-	formatSseEvent,
-	type SseEvent,
 } from "@rest-rpc/server";
 import type {
 	Response as ExpressResponse,
 	IRouter,
 	NextFunction,
 	Request,
-	Response,
 } from "express";
 import type { ExpressErrorContext } from "./registerRoutes.ts";
 
@@ -30,90 +27,6 @@ export type ExtendedExpressMiddleware = (
 	next: NextFunction,
 	route: ServerHttpRouteDeclaration,
 ) => unknown;
-
-const writeStreamResponse = async (
-	result: AsyncIterable<unknown>,
-	res: Response,
-	statusCode: number,
-	contentType = "application/x-ndjson",
-	mode: HttpRouteResultStreamMode = "ndjson",
-) => {
-	res.status(statusCode);
-	res.setHeader("content-type", contentType);
-	const iterator = result[Symbol.asyncIterator]();
-	let closed = false;
-	let finished = false;
-	const closeIterator = async () => {
-		try {
-			await iterator.return?.();
-		} catch {}
-	};
-	const onClose = () => {
-		if (finished) return;
-		closed = true;
-		void closeIterator();
-	};
-	res.on("close", onClose);
-
-	const waitForDrain = async () => {
-		await new Promise<void>((resolve, reject) => {
-			const cleanup = () => {
-				res.off("drain", onDrain);
-				res.off("close", onClose);
-				res.off("error", onError);
-			};
-			const onDrain = () => {
-				cleanup();
-				resolve();
-			};
-			const onClose = () => {
-				cleanup();
-				resolve();
-			};
-			const onError = (error: Error) => {
-				cleanup();
-				reject(error);
-			};
-
-			res.once("drain", onDrain);
-			res.once("close", onClose);
-			res.once("error", onError);
-		});
-	};
-
-	try {
-		while (!closed) {
-			const { done, value: chunk } = await iterator.next();
-			if (done || closed) break;
-			const canContinue = res.write(
-				mode === "ndjson"
-					? `${JSON.stringify(chunk)}\n`
-					: mode === "sse"
-						? formatSseEvent(chunk as SseEvent<unknown>)
-						: chunk,
-			);
-			if (canContinue === false && !closed) await waitForDrain();
-		}
-
-		finished = true;
-		if (!closed) res.end();
-	} catch (error) {
-		res.destroy(error instanceof Error ? error : undefined);
-	} finally {
-		finished = true;
-		res.off("close", onClose);
-	}
-};
-
-const createRequestSignal = (req: Request, res: Response) => {
-	const controller = new AbortController();
-	const abort = () => controller.abort();
-	req.once("aborted", abort);
-	res.once("close", () => {
-		if (!res.writableFinished) abort();
-	});
-	return controller.signal;
-};
 
 export const registerExpressHttpRoutes = (
 	app: IRouter,
