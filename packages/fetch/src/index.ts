@@ -1,202 +1,52 @@
+export { createFetchResponse } from "./response.ts";
 import {
-	clearCookie,
-	RouteResponseError,
-	type ServerErrorHandlers,
-	type ServerHttpRouteDeclaration,
-	setCookie,
-	sseEvent,
+	implement as serverImplement,
+	serverFirstRoute,
 } from "@rest-rpc/server";
-import {
-	defaultParseBody,
-	handleFetchRoute,
-	type FetchRouteParseBody,
-} from "./http.ts";
-import { createFetchRouteMatcher } from "./match.ts";
-import {
-	createFetchRouteBuilder,
-	createFetchRouterBuilder,
-	type FetchContract,
-	type FetchImplementationTree,
-	type FetchRouteBuilder,
-	type FetchRouteImplementation,
-	type FetchRouterBuilder,
-} from "./routeBuilder.ts";
+import type {
+	ImplementationBuildersFor,
+	ServerContract,
+	ServerRouteFactory,
+} from "@rest-rpc/server";
+
+/** Application context used by Fetch route handlers by default. */
+export interface DefaultContext {}
+
+/** Starts a server-first route builder chain */
+export const route = serverFirstRoute as ServerRouteFactory<
+	{ flattenRequestKeys: true },
+	DefaultContext
+>;
+
+/** Converts a contract-first route or route tree into a server route builder */
+export function implement<const TNode extends ServerContract>(
+	contract: TNode,
+): ImplementationBuildersFor<TNode, DefaultContext> {
+	return serverImplement(contract) as ImplementationBuildersFor<
+		TNode,
+		DefaultContext
+	>;
+}
 
 export type {
-	ClearCookieOptions,
-	RouteErrors,
-	RouteHandler,
-	RouteRequestData,
-	RouteResponse,
-	RouteResponseShorthand,
-	SetCookieOptions,
-	ServerHttpRouteDeclaration,
-	SseEvent,
+	Implement,
+	ImplicitResponseEnvelope,
+	ImplicitResponseKind,
+	InferredRouteResponse,
+	ImplementationBuildersFor,
+	ServerImplementationTree,
+	ServerFirstResponseKind,
+	ServerFirstRouteResponseKind,
+	ServerHttpBuilderExtension,
+	ServerRouteFactory,
+	ServerRouteImplementation,
+	ServerSseBuilderExtension,
 } from "@rest-rpc/server";
-export type { FetchRouteParseBody, FetchRouteParseBodyInput } from "./http.ts";
+
+export { defaultParseBody } from "./request.ts";
 export type {
-	RouteHandlers,
-	RouteRequest,
-	FetchContract,
-	FetchImplementationTree,
-	FetchRouteBuilder,
-	FetchRouteContext,
-	FetchRouteMiddleware,
-	FetchRouteMiddlewareInput,
-	FetchRouteMiddlewareResult,
-	FetchRouterBuilder,
-} from "./routeBuilder.ts";
-export { clearCookie, RouteResponseError, setCookie, sseEvent };
-
-/**
- * Default runtime context passed to Fetch runtime route handlers.
- *
- * @remarks Augment this interface to set the runtime context for
- * `createRouteHandler()`, `route()`, and `router()` across a project.
- *
- * @example
- * ```ts
- * declare module "@rest-rpc/fetch" {
- *   interface DefaultRuntimeContext {
- *     env: Env;
- *     ctx: ExecutionContext;
- *   }
- * }
- * ```
- *
- * @see {@link https://rest-rpc.dev/docs/server/fetch#framework-context}
- */
-export interface DefaultRuntimeContext {}
-
-interface ContextShape {
-	// oxlint-disable-next-line typescript/no-explicit-any -- `any` allows named interfaces without leaking an index signature.
-	[key: string]: any;
-}
-
-/**
- * Default request type passed to Fetch runtime route handlers.
- *
- * @remarks Augment this interface when using a `Request` subclass such as
- * `NextRequest`.
- *
- * @see {@link https://rest-rpc.dev/docs/server/fetch#framework-context}
- */
-export interface DefaultRequest extends Request {}
-
-/**
- * Options for creating a Fetch runtime `Request` to `Response` route handler.
- *
- * @see {@link https://rest-rpc.dev/docs/server/fetch#options}
- */
-export type CreateFetchHandlerOptions = {
-	errorHandlers?: ServerErrorHandlers<Record<never, never>>;
-	parseBody?: FetchRouteParseBody;
-};
-
-/**
- * Result of attempting to handle a request with a Fetch route handler.
- *
- * @see {@link https://rest-rpc.dev/docs/server/fetch}
- */
-export type FetchRouteHandlerResult =
-	| { matched: true; response: Response }
-	| { matched: false; response: undefined };
-
-type RuntimeArguments<TRuntimeContext extends ContextShape> =
-	keyof TRuntimeContext extends never
-		? [runtime?: TRuntimeContext]
-		: [runtime: TRuntimeContext];
-
-/**
- * Creates a Fetch runtime route implementation builder for a single HTTP route.
- *
- * @see {@link https://rest-rpc.dev/docs/server/fetch}
- */
-export function route<
-	const TRoute extends ServerHttpRouteDeclaration,
-	TRuntimeContext extends ContextShape = DefaultRuntimeContext,
-	TRequest extends Request = DefaultRequest,
->(contract: TRoute): FetchRouteBuilder<TRoute, TRuntimeContext, TRequest> {
-	return createFetchRouteBuilder(contract);
-}
-
-/**
- * Creates a Fetch runtime router implementation builder for a contract tree.
- *
- * @see {@link https://rest-rpc.dev/docs/server/fetch}
- */
-export function router<
-	const TContract extends FetchContract,
-	TRuntimeContext extends ContextShape = DefaultRuntimeContext,
-	TRequest extends Request = DefaultRequest,
->(
-	contract: TContract,
-): FetchRouterBuilder<TContract, TRuntimeContext, TRequest> {
-	return createFetchRouterBuilder(contract);
-}
-
-/**
- * Creates a Fetch runtime `Request` handler from route implementations.
- *
- * @see {@link https://rest-rpc.dev/docs/server/fetch}
- */
-export function createRouteHandler<
-	TRuntimeContext extends ContextShape = DefaultRuntimeContext,
-	TRequest extends Request = DefaultRequest,
->(
-	implementations: FetchImplementationTree,
-	options: CreateFetchHandlerOptions = {},
-): (
-	request: TRequest,
-	...runtimeArguments: RuntimeArguments<TRuntimeContext>
-) => Promise<FetchRouteHandlerResult> {
-	const matchRoute = createFetchRouteMatcher(implementations);
-	const usesDefaultParseBody = options.parseBody === undefined;
-	const parseBody = options.parseBody ?? defaultParseBody;
-
-	return async (
-		request: TRequest,
-		...runtimeArguments: RuntimeArguments<TRuntimeContext>
-	) => {
-		const match = matchRoute(request);
-		if (!match) return { matched: false, response: undefined } as const;
-		const runtime = (runtimeArguments[0] ?? {}) as TRuntimeContext;
-		const implementation = match.implementation as FetchRouteImplementation<
-			TRuntimeContext,
-			TRequest
-		>;
-		let middlewareContext: Record<string, unknown> = {};
-		for (const middleware of implementation.middleware ?? []) {
-			const middlewareResult = await middleware({
-				context: middlewareContext,
-				request,
-				route: implementation.route,
-				runtime,
-			});
-			if (middlewareResult instanceof Response) {
-				return { matched: true, response: middlewareResult } as const;
-			}
-			middlewareContext = {
-				...middlewareContext,
-				...middlewareResult,
-			};
-		}
-
-		const context = {
-			...middlewareContext,
-			request,
-		};
-
-		const response = await handleFetchRoute(
-			request,
-			context,
-			implementation,
-			match.params,
-			parseBody,
-			usesDefaultParseBody,
-			options.errorHandlers,
-		);
-
-		return { matched: true, response } as const;
-	};
-}
+	FetchRouteParseBody,
+	FetchRouteParseBodyInput,
+} from "./request.ts";
+export { createRouteHandler } from "./handler.ts";
+export type { CreateFetchHandlerOptions } from "./handler.ts";

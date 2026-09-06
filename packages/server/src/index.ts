@@ -1,5 +1,6 @@
 export type { ClearCookieOptions, SetCookieOptions } from "./cookies.ts";
 export { clearCookie, setCookie } from "./cookies.ts";
+
 export type {
 	RequestValidationErrorInput,
 	ResponseValidationErrorInput,
@@ -57,7 +58,6 @@ export {
 export type { SseEvent } from "./sse.ts";
 export { formatSseEvent, sseEvent } from "./sse.ts";
 export type { RequestSegments, ValidationIssue } from "./validation.ts";
-export { createFetchResponse } from "./fetchResponse.ts";
 export type {
 	BeforeWebSocketUpgrade,
 	UpgradeRejection,

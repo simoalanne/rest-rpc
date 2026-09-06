@@ -1,10 +1,12 @@
-import type { HttpRouteResult } from "./handleHttpRoute.ts";
 import {
+	formatSseEvent,
+	type HttpRouteResult,
 	type HttpRouteResultStreamMode,
 	handleHttpRouteResult,
-} from "./handleHttpRouteResult.ts";
-import type { HttpHeaderValue } from "./headers.ts";
-import { formatSseEvent, type SseEvent } from "./sse.ts";
+	type SseEvent,
+} from "@rest-rpc/server";
+
+type HttpHeaderValue = string | number | readonly string[] | undefined;
 
 const setHeader = (headers: Headers, name: string, value: HttpHeaderValue) => {
 	if (Array.isArray(value)) {

@@ -1,3 +1,4 @@
+import { createFetchResponse } from "@rest-rpc/fetch";
 import type {
 	RequestBodySchema,
 	RouteDeclaration,
@@ -10,7 +11,6 @@ import {
 } from "@rest-rpc/core/contract";
 import {
 	createRequestParsingErrorResponse,
-	createFetchResponse,
 	handleHttpRoute,
 	type RouteImplementation,
 	type ServerErrorHandlers,

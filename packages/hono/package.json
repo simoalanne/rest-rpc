@@ -42,6 +42,7 @@
 	},
 	"dependencies": {
 		"@rest-rpc/core": "workspace:*",
+		"@rest-rpc/fetch": "workspace:*",
 		"@rest-rpc/server": "workspace:*"
 	},
 	"peerDependencies": {
