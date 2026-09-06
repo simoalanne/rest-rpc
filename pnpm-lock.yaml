@@ -84,6 +84,9 @@ importers:
       '@rest-rpc/nest':
         specifier: workspace:*
         version: link:../packages/nest
+      '@rest-rpc/node':
+        specifier: workspace:*
+        version: link:../packages/node
       '@rest-rpc/tanstack-query':
         specifier: workspace:*
         version: link:../packages/tanstack-query
@@ -165,6 +168,9 @@ importers:
       '@rest-rpc/nest':
         specifier: workspace:*
         version: link:../packages/nest
+      '@rest-rpc/node':
+        specifier: workspace:*
+        version: link:../packages/node
       '@rest-rpc/server':
         specifier: workspace:*
         version: link:../packages/server
@@ -259,6 +265,9 @@ importers:
       '@rest-rpc/core':
         specifier: workspace:*
         version: link:../core
+      '@rest-rpc/node':
+        specifier: workspace:*
+        version: link:../node
       '@rest-rpc/server':
         specifier: workspace:*
         version: link:../server
@@ -306,6 +315,9 @@ importers:
       '@rest-rpc/core':
         specifier: workspace:*
         version: link:../core
+      '@rest-rpc/fetch':
+        specifier: workspace:*
+        version: link:../fetch
       '@rest-rpc/server':
         specifier: workspace:*
         version: link:../server
@@ -318,6 +330,9 @@ importers:
       '@rest-rpc/core':
         specifier: workspace:*
         version: link:../core
+      '@rest-rpc/node':
+        specifier: workspace:*
+        version: link:../node
       '@rest-rpc/server':
         specifier: workspace:*
         version: link:../server
@@ -346,6 +361,22 @@ importers:
       rxjs:
         specifier: ^7.8.0
         version: 7.8.2
+
+  packages/node:
+    dependencies:
+      '@rest-rpc/core':
+        specifier: workspace:*
+        version: link:../core
+      '@rest-rpc/fetch':
+        specifier: workspace:*
+        version: link:../fetch
+      '@rest-rpc/server':
+        specifier: workspace:*
+        version: link:../server
+    devDependencies:
+      '@types/node':
+        specifier: 26.3.0
+        version: 26.3.0
 
   packages/server:
     dependencies:
@@ -2324,9 +2355,6 @@ packages:
 
   '@types/nlcst@2.0.3':
     resolution: {integrity: sha512-vSYNSDe6Ix3q+6Z7ri9lyWqgGhJTmzRjZRqyq15N0Z/1/UnVsno9G/N40NBijoYx2seFDIl0+B2mgAb9mezUCA==}
-
-  '@types/node@26.2.0':
-    resolution: {integrity: sha512-5IviulTZeRNp2vAJ514cc/HUlY5nZ9fCbq9DMyC52BrhFZACo3nI0R7qBxhQmo/d27NFe96ur/b7Wwxklda+kg==}
 
   '@types/node@26.3.0':
     resolution: {integrity: sha512-L3fgrnchriRC2ExBflb8j4uZZURHZfQsmQeyVzhjcHW4kkwVyo8/0h1B2MVzMTrYUJYu6G7EWs14hW/L9putqw==}
@@ -8357,10 +8385,6 @@ snapshots:
     dependencies:
       '@types/unist': 3.0.3
 
-  '@types/node@26.2.0':
-    dependencies:
-      undici-types: 8.3.0
-
   '@types/node@26.3.0':
     dependencies:
       undici-types: 8.3.0
@@ -8399,7 +8423,7 @@ snapshots:
 
   '@types/ws@8.18.1':
     dependencies:
-      '@types/node': 26.2.0
+      '@types/node': 26.3.0
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     optional: true
