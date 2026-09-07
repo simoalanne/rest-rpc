@@ -1,5 +1,9 @@
-import { applyDecorators, RequestMethod } from "@nestjs/common";
-import { METHOD_METADATA, PATH_METADATA } from "@nestjs/common/constants.js";
+import {
+	applyDecorators,
+	RequestMapping,
+	RequestMethod,
+	SetMetadata,
+} from "@nestjs/common";
 import type {
 	Contract,
 	HttpMethod,
@@ -23,27 +27,18 @@ const methodMap: Record<HttpMethod, RequestMethod> = {
 	PUT: RequestMethod.PUT,
 };
 
-const createNestRouteDecorator =
-	(route: ServerHttpRouteDeclaration): MethodDecorator =>
-	(_target, _propertyKey, descriptor) => {
-		if (!descriptor?.value) return;
-
-		Reflect.defineMetadata(
-			PATH_METADATA,
-			toColonPath(route.path),
-			descriptor.value,
-		);
-		Reflect.defineMetadata(
-			METHOD_METADATA,
-			methodMap[route.method],
-			descriptor.value,
-		);
-		Reflect.defineMetadata(
-			REST_RPC_ROUTE_METADATA,
-			{ route } satisfies RouteMetadata,
-			descriptor.value,
-		);
-	};
+const createNestRouteDecorator = (
+	route: ServerHttpRouteDeclaration,
+): MethodDecorator =>
+	applyDecorators(
+		RequestMapping({
+			path: toColonPath(route.path),
+			method: methodMap[route.method],
+		}),
+		SetMetadata(REST_RPC_ROUTE_METADATA, {
+			route,
+		} satisfies RouteMetadata),
+	);
 
 const isHttpRouteDeclaration = (
 	route: RouteDeclaration,
@@ -121,7 +116,7 @@ const createRouterRouteMethod = (
  * @see {@link https://rest-rpc.dev/docs/server/nest#single-routes}
  */
 export function Route(route: ServerHttpRouteDeclaration): MethodDecorator {
-	return applyDecorators(createNestRouteDecorator(route));
+	return createNestRouteDecorator(route);
 }
 
 /**
