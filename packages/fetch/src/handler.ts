@@ -4,12 +4,12 @@ import {
 	type ImplementationContextArguments,
 	type ServerErrorHandlers,
 } from "@rest-rpc/server";
-import { defaultParseBody, type FetchRouteParseBody } from "./request.ts";
+import { defaultBodyParser, type FetchBodyParser } from "./request.ts";
 import { createFetchResponse } from "./response.ts";
 
 /** Options for the general Fetch catch-all handler. */
 export type CreateFetchHandlerOptions = {
-	parseBody?: FetchRouteParseBody;
+	bodyParser?: FetchBodyParser;
 	errorHandlers?: ServerErrorHandlers<Record<string, unknown>>;
 };
 
@@ -28,7 +28,7 @@ export function createRouteHandler<
 	...contextArguments: ImplementationContextArguments<TTree>
 ) => Promise<FetchRouteHandlerResult> {
 	const dispatch = createHttpDispatcher(implementations);
-	const parseBody = options.parseBody ?? defaultParseBody;
+	const bodyParser = options.bodyParser ?? defaultBodyParser;
 	return async (request, ...contextArguments) => {
 		const context = (contextArguments[0] ?? {}) as Record<string, unknown>;
 		const url = new URL(request.url);
@@ -37,17 +37,13 @@ export function createRouteHandler<
 			path: url.pathname,
 			context,
 			signal: request.signal,
-			catchParsingErrors: options.parseBody === undefined,
+			catchParsingErrors: options.bodyParser === undefined,
 			errorHandlers: options.errorHandlers,
-			decode: async ({ implementation, params }) => ({
+			decode: async ({ params }) => ({
 				params,
 				query: Object.fromEntries(url.searchParams),
 				headers: Object.fromEntries(request.headers),
-				body: await parseBody({
-					request,
-					route: implementation.route,
-					body: implementation.route.request?.body,
-				}),
+				body: await bodyParser(request),
 			}),
 		});
 		return result === undefined

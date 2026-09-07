@@ -163,7 +163,7 @@ import {
 } from "@rest-rpc/server";
 
 type CreateHandlerOptions = {
-	parseBody?: RuntimeBodyParser;
+	bodyParser?: RuntimeBodyParser;
 	errorHandlers?: ServerErrorHandlers<Record<string, unknown>>;
 };
 
@@ -184,17 +184,13 @@ export function createRouteHandler<
 			path: target.path,
 			context,
 			signal: requestSignal(request),
-			catchParsingErrors: options.parseBody === undefined,
+			catchParsingErrors: options.bodyParser === undefined,
 			errorHandlers: options.errorHandlers,
-			decode: async ({ implementation, params }) => ({
+			decode: async ({ params }) => ({
 				params,
 				query: readQuery(request),
 				headers: readHeaders(request),
-				body: await parseBody({
-					request,
-					route: implementation.route,
-					body: implementation.route.request?.body,
-				}),
+				body: await bodyParser(request),
 			}),
 		});
 
@@ -232,9 +228,10 @@ Default parsers should normally set `catchParsingErrors: true`; malformed bodies
 then become the shared 400 parsing response. If a user supplies a custom parser,
 set it to `false` so custom parser exceptions are not silently reinterpreted.
 
-Only parse a body when the matched route declares one. Preserve specialized
-body behavior—JSON, form, multipart, and custom content types—rather than
-assuming every request is JSON.
+The body parser should only inspect the runtime request. Use its `Content-Type`
+header to choose a representation without consulting the matched route or its
+contract. Contract validation separately checks the parsed value and enforces a
+content type when one was explicitly declared for a custom body.
 
 ## Server-first response compatibility
 

@@ -9,15 +9,15 @@ import {
 import type { NodeRouteHandlerResult } from "./index.ts";
 import { createRequestSignal } from "./lifecycle.ts";
 import {
-	defaultParseBody,
+	defaultBodyParser,
 	parseRequestTarget,
-	type NodeRouteParseBody,
+	type NodeBodyParser,
 } from "./request.ts";
 import { writeNodeResponse } from "./response.ts";
 
 /** Options for the general Node HTTP catch-all handler. */
 export type CreateNodeHandlerOptions = {
-	parseBody?: NodeRouteParseBody;
+	bodyParser?: NodeBodyParser;
 	errorHandlers?: ServerErrorHandlers<Record<string, unknown>>;
 };
 
@@ -34,7 +34,7 @@ export function createRouteHandler<
 ) => Promise<NodeRouteHandlerResult> {
 	const dispatch = createHttpDispatcher(implementations);
 	const match = createImplementationMatcher(implementations);
-	const parseBody = options.parseBody ?? defaultParseBody;
+	const bodyParser = options.bodyParser ?? defaultBodyParser;
 	return async (request, response, ...contextArguments) => {
 		const context = (contextArguments[0] ?? {}) as Record<string, unknown>;
 		const url = parseRequestTarget(request);
@@ -47,17 +47,13 @@ export function createRouteHandler<
 			...target,
 			context,
 			signal,
-			catchParsingErrors: options.parseBody === undefined,
+			catchParsingErrors: options.bodyParser === undefined,
 			errorHandlers: options.errorHandlers,
-			decode: async ({ implementation, params }) => ({
+			decode: async ({ params }) => ({
 				params,
 				query: Object.fromEntries(url.searchParams),
 				headers: request.headers,
-				body: await parseBody({
-					request,
-					route: implementation.route,
-					body: implementation.route.request?.body,
-				}),
+				body: await bodyParser(request),
 			}),
 		});
 		if (result && !response.destroyed)

@@ -2,8 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { Readable } from "node:stream";
 import { describe, it } from "node:test";
-import { isCustomBody, isFormBody, isNoBody } from "@rest-rpc/core/contract";
-import { createRouteHandler, type FetchRouteParseBody } from "@rest-rpc/fetch";
+import { createRouteHandler, defaultBodyParser } from "@rest-rpc/fetch";
 import { listen } from "../harness/listen.ts";
 import { createBodyParsingImplementations } from "./handlers.ts";
 import { runBodyParsingSuite } from "./suite.ts";
@@ -11,41 +10,10 @@ import { runBodyParsingSuite } from "./suite.ts";
 const withoutBody = (method: string | undefined) =>
 	method === "GET" || method === "HEAD";
 
-const parseBody: FetchRouteParseBody = async ({ body, request }) => {
-	if (!body || isNoBody(body)) return undefined;
-	const contentType = request.headers.get("content-type") ?? "";
-	if (isFormBody(body)) {
-		return contentType.startsWith("application/x-www-form-urlencoded")
-			? new URLSearchParams(await request.text())
-			: undefined;
-	}
-	if (!isCustomBody(body)) {
-		return contentType.startsWith("application/json")
-			? request.json()
-			: undefined;
-	}
-	if (body.contentType === undefined) {
-		return contentType.startsWith("application/x-www-form-urlencoded")
-			? new URLSearchParams(await request.text())
-			: undefined;
-	}
-	const declaredContentType = (
-		Array.isArray(body.contentType) ? body.contentType : [body.contentType]
-	).find((value) => contentType.startsWith(value.split(";")[0] ?? ""));
-	if (!declaredContentType) return undefined;
-	if (declaredContentType === "application/octet-stream") {
-		return new Uint8Array(await request.arrayBuffer());
-	}
-	if (declaredContentType.startsWith("application/json")) return request.json();
-	return request.text();
-};
-
 runBodyParsingSuite({
 	name: "fetch",
 	start: async () => {
-		const handler = createRouteHandler(createBodyParsingImplementations(), {
-			parseBody,
-		});
+		const handler = createRouteHandler(createBodyParsingImplementations());
 
 		return listen(
 			createServer(async (req, res) => {
@@ -96,7 +64,7 @@ describe("fetch default body parser errors", () => {
 
 	it("lets custom body parser errors propagate", async () => {
 		const handler = createRouteHandler(createBodyParsingImplementations(), {
-			parseBody: () => {
+			bodyParser: () => {
 				throw new Error("custom parser failed");
 			},
 		});
@@ -111,6 +79,40 @@ describe("fetch default body parser errors", () => {
 					}),
 				),
 			/custom parser failed/,
+		);
+	});
+});
+
+describe("fetch default body parser content types", () => {
+	it("parses structured JSON content types", async () => {
+		const request = new Request("http://127.0.0.1/body", {
+			method: "POST",
+			headers: { "content-type": "application/problem+json; charset=utf-8" },
+			body: JSON.stringify({ title: "Invalid request" }),
+		});
+
+		assert.deepEqual(await defaultBodyParser(request), {
+			title: "Invalid request",
+		});
+	});
+
+	it("uses bytes for unrecognized content types", async () => {
+		const request = new Request("http://127.0.0.1/body", {
+			method: "POST",
+			headers: { "content-type": "application/x-custom" },
+			body: new Uint8Array([0, 127, 255]),
+		});
+
+		assert.deepEqual(
+			await defaultBodyParser(request),
+			new Uint8Array([0, 127, 255]),
+		);
+	});
+
+	it("returns undefined when the request has no body", () => {
+		assert.equal(
+			defaultBodyParser(new Request("http://127.0.0.1/body")),
+			undefined,
 		);
 	});
 });

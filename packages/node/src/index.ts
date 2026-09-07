@@ -46,8 +46,8 @@ export type {
 export { createRouteHandler } from "./handler.ts";
 export type { CreateNodeHandlerOptions } from "./handler.ts";
 export { createRequestSignal } from "./lifecycle.ts";
-export { defaultParseBody, parseRequestTarget } from "./request.ts";
-export type { NodeRouteParseBody, NodeRouteParseBodyInput } from "./request.ts";
+export { defaultBodyParser, parseRequestTarget } from "./request.ts";
+export type { NodeBodyParser } from "./request.ts";
 export {
 	createNodeResponseStream,
 	writeNodeResponse,

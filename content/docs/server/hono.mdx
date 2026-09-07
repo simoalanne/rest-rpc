@@ -59,12 +59,20 @@ type RegisterRoutesOptions<TEnv extends Env = Env> = {
 		c: Context<TEnv>;
 		signal: AbortSignal;
 	}>;
-	parseBody?: HonoParseBody<TEnv>;
+	bodyParser?: HonoBodyParser;
 	webSocket?: HonoWebSocketOptions<TEnv>;
 	middleware?: Array<
 		(c: Context<TEnv>, next: Next, route: RouteDeclaration) => any
 	>;
 };
+```
+
+### Body Parsing
+
+```ts
+registerRoutes(app, routes, {
+	bodyParser: (request) => request.json(),
+});
 ```
 
 ### Error Handlers
@@ -90,14 +98,6 @@ registerRoutes(app, routes, {
 			body: { code: "INTERNAL_SERVER_ERROR" },
 		}),
 	},
-});
-```
-
-### Body Parsing
-
-```ts
-registerRoutes(app, routes, {
-	parseBody: ({ c }) => c.req.json(),
 });
 ```
 

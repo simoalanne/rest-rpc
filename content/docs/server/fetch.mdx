@@ -74,7 +74,7 @@ request or runtime-specific values to the context when handlers need them.
 
 ```ts
 type CreateFetchHandlerOptions = {
-	parseBody?: FetchRouteParseBody;
+	bodyParser?: FetchBodyParser;
 	errorHandlers?: ServerErrorHandlers<Record<string, unknown>>;
 };
 ```
@@ -83,7 +83,7 @@ type CreateFetchHandlerOptions = {
 
 ```ts
 const handle = createRouteHandler(routes, {
-	parseBody: ({ request }) => request.json(),
+	bodyParser: (request) => request.json(),
 });
 ```
 

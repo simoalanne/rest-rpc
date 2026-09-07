@@ -234,6 +234,26 @@ describe("validateRequest", () => {
 		}
 	});
 
+	it("enforces a single explicitly declared custom body content type", async () => {
+		const result = await validateRequest(
+			route
+				.post("/text")
+				.customBody({ contentType: "text/plain", schema: z.string() })
+				.response(204),
+			{
+				body: "valid text",
+				headers: { "content-type": "text/markdown" },
+			},
+		);
+
+		assert.equal(result.success, false);
+		if (!result.success) {
+			assert.deepEqual(result.response.body.validationErrors, [
+				{ message: "Unsupported custom body contentType." },
+			]);
+		}
+	});
+
 	it("validates custom request bodies without content type as payloads", async () => {
 		const result = await validateRequest(
 			route

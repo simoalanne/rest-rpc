@@ -43,10 +43,7 @@ export type {
 	ServerSseBuilderExtension,
 } from "@rest-rpc/server";
 
-export { defaultParseBody } from "./request.ts";
-export type {
-	FetchRouteParseBody,
-	FetchRouteParseBodyInput,
-} from "./request.ts";
+export { defaultBodyParser } from "./request.ts";
+export type { FetchBodyParser } from "./request.ts";
 export { createRouteHandler } from "./handler.ts";
 export type { CreateFetchHandlerOptions } from "./handler.ts";

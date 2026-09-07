@@ -28,11 +28,7 @@ export type {
 	SetCookieOptions,
 	SseEvent,
 } from "@rest-rpc/server";
-export type {
-	ExtendedHonoMiddleware,
-	HonoParseBody,
-	HonoParseBodyInput,
-} from "./http.ts";
+export type { ExtendedHonoMiddleware, HonoBodyParser } from "./http.ts";
 export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
 export {

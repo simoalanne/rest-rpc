@@ -114,11 +114,11 @@ const result = await dispatch({
 	signal,
 	catchParsingErrors: usesDefaultParser,
 	errorHandlers,
-	decode: async ({ implementation, params }) => ({
+	decode: async ({ params }) => ({
 		params,
 		query: readQuery(),
 		headers: readHeaders(),
-		body: await parseBody(implementation.route),
+		body: await bodyParser(request),
 	}),
 });
 ```

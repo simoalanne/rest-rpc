@@ -2,47 +2,18 @@ import assert from "node:assert/strict";
 import type { Server } from "node:http";
 import { describe, it } from "node:test";
 import { createAdaptorServer } from "@hono/node-server";
-import { isCustomBody, isFormBody } from "@rest-rpc/core/contract";
-import { type HonoParseBody, registerRoutes } from "@rest-rpc/hono";
+import { registerRoutes } from "@rest-rpc/hono";
 import { Hono } from "hono";
 import { listen } from "../harness/listen.ts";
 import { createBodyParsingImplementations } from "./handlers.ts";
 import { runBodyParsingSuite } from "./suite.ts";
-
-const parseBody: HonoParseBody = async ({ body, c }) => {
-	const contentType = c.req.header("content-type") ?? "";
-	if (isFormBody(body)) {
-		return contentType.startsWith("application/x-www-form-urlencoded")
-			? new URLSearchParams(await c.req.text())
-			: undefined;
-	}
-	if (!isCustomBody(body)) {
-		return contentType.startsWith("application/json")
-			? c.req.json()
-			: undefined;
-	}
-	if (body.contentType === undefined) {
-		return contentType.startsWith("application/x-www-form-urlencoded")
-			? new URLSearchParams(await c.req.text())
-			: undefined;
-	}
-	const declaredContentType = (
-		Array.isArray(body.contentType) ? body.contentType : [body.contentType]
-	).find((value) => contentType.startsWith(value.split(";")[0] ?? ""));
-	if (!declaredContentType) return undefined;
-	if (declaredContentType === "application/octet-stream") {
-		return new Uint8Array(await c.req.arrayBuffer());
-	}
-	if (declaredContentType.startsWith("application/json")) return c.req.json();
-	return c.req.text();
-};
 
 runBodyParsingSuite({
 	name: "hono",
 	start: async () => {
 		const app = new Hono();
 
-		registerRoutes(app, createBodyParsingImplementations(), { parseBody });
+		registerRoutes(app, createBodyParsingImplementations());
 
 		const server = createAdaptorServer({
 			fetch: app.fetch,
@@ -85,7 +56,7 @@ describe("hono default body parser errors", () => {
 			return new Response("custom error handler", { status: 599 });
 		});
 		registerRoutes(app, createBodyParsingImplementations(), {
-			parseBody: () => {
+			bodyParser: () => {
 				throw new Error("custom parser failed");
 			},
 		});

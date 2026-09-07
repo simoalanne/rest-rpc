@@ -1,12 +1,6 @@
-import {
-	createFetchResponse,
-	defaultParseBody as parseFetchBody,
-} from "@rest-rpc/fetch";
-import type {
-	RequestBodySchema,
-	RouteDeclaration,
-} from "@rest-rpc/core/contract";
-import { isNoBody, toColonPath } from "@rest-rpc/core/contract";
+import { createFetchResponse, defaultBodyParser } from "@rest-rpc/fetch";
+import type { RouteDeclaration } from "@rest-rpc/core/contract";
+import { toColonPath } from "@rest-rpc/core/contract";
 import {
 	createRequestParsingErrorResponse,
 	handleHttpRoute,
@@ -14,27 +8,16 @@ import {
 	type ServerErrorHandlers,
 	type ServerHttpRouteDeclaration,
 } from "@rest-rpc/server";
-import type { Context, Hono, Next } from "hono";
+import type { Context, Hono, HonoRequest, Next } from "hono";
 import type { Env } from "hono/types";
-
-/**
- * Input passed to a custom Hono request body parser.
- *
- * @see {@link https://rest-rpc.dev/docs/server/hono#body-parsing}
- */
-export type HonoParseBodyInput<TEnv extends Env = Env> = {
-	c: Context<TEnv>;
-	route: ServerHttpRouteDeclaration;
-	body: RequestBodySchema;
-};
 
 /**
  * Custom Hono request body parser used during route registration.
  *
  * @see {@link https://rest-rpc.dev/docs/server/hono#body-parsing}
  */
-export type HonoParseBody<TEnv extends Env = Env> = (
-	input: HonoParseBodyInput<TEnv>,
+export type HonoBodyParser = (
+	request: HonoRequest,
 ) => unknown | Promise<unknown>;
 
 /**
@@ -49,35 +32,17 @@ export type ExtendedHonoMiddleware<TEnv extends Env = Env> = (
 	// oxlint-disable-next-line typescript/no-explicit-any -- Hono itself accepts `any` for handler return type.
 ) => Promise<any> | any;
 
-const defaultParseBody = <TEnv extends Env = Env>({
-	body,
-	c,
-	route,
-}: HonoParseBodyInput<TEnv>) =>
-	parseFetchBody({ request: c.req.raw, route, body });
-
-const parseRequestBody = async <TEnv extends Env = Env>(
-	c: Context<TEnv>,
-	route: ServerHttpRouteDeclaration,
-	body: RequestBodySchema | undefined,
-	parseBody: HonoParseBody<TEnv>,
-): Promise<unknown> => {
-	if (!body || isNoBody(body)) return undefined;
-	return parseBody({ c, route, body });
-};
-
 export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 	app: Hono<TEnv>,
 	routes: RouteImplementation<ServerHttpRouteDeclaration>[],
-	parseBody: HonoParseBody<TEnv> | undefined = undefined,
+	bodyParser: HonoBodyParser | undefined = undefined,
 	middleware: ExtendedHonoMiddleware<TEnv>[] = [],
 	errorHandlers?: ServerErrorHandlers<{
 		c: Context<TEnv>;
 		signal: AbortSignal;
 	}>,
 ) => {
-	const usesDefaultParseBody = parseBody === undefined;
-	const parseRequestBodyOption = parseBody ?? defaultParseBody;
+	const usesDefaultBodyParser = bodyParser === undefined;
 
 	for (const implementation of routes) {
 		const route: ServerHttpRouteDeclaration = implementation.route;
@@ -94,14 +59,11 @@ export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 			async (c: Context<TEnv>) => {
 				let body: unknown;
 				try {
-					body = await parseRequestBody(
-						c,
-						route,
-						route.request?.body,
-						parseRequestBodyOption,
-					);
+					body = bodyParser
+						? await bodyParser(c.req)
+						: await defaultBodyParser(c.req.raw);
 				} catch (error) {
-					if (!usesDefaultParseBody) throw error;
+					if (!usesDefaultBodyParser) throw error;
 					return c.json(createRequestParsingErrorResponse().body, 400);
 				}
 

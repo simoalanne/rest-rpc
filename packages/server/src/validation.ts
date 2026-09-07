@@ -144,9 +144,12 @@ const validateCustomBody = async (
 ): Promise<SegmentValidationResult> => {
 	const declaration = route.request?.body;
 	if (!isCustomBody(declaration)) return { data: {}, errors: [] };
-	const contentTypes = Array.isArray(declaration.contentType)
-		? declaration.contentType
-		: undefined;
+	const contentTypes =
+		declaration.contentType === undefined
+			? undefined
+			: Array.isArray(declaration.contentType)
+				? declaration.contentType
+				: [declaration.contentType];
 	const contentType =
 		contentTypes && body !== undefined
 			? getHeaderValue(headers, "content-type")
@@ -170,7 +173,7 @@ const validateCustomBody = async (
 
 	return {
 		data: {
-			body: contentTypes
+			body: Array.isArray(declaration.contentType)
 				? {
 						contentType: declaredContentType,
 						payload: result.value,

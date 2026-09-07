@@ -8,7 +8,7 @@ import type { Context, Hono } from "hono";
 import type { Env } from "hono/types";
 import {
 	type ExtendedHonoMiddleware,
-	type HonoParseBody,
+	type HonoBodyParser,
 	registerHonoHttpRoutes,
 } from "./http.ts";
 import {
@@ -27,7 +27,7 @@ export type RegisterRoutesOptions<TEnv extends Env = Env> = {
 		signal: AbortSignal;
 	}>;
 	middleware?: ExtendedHonoMiddleware<TEnv>[];
-	parseBody?: HonoParseBody<TEnv>;
+	bodyParser?: HonoBodyParser;
 	webSocket?: HonoWebSocketOptions<TEnv>;
 };
 
@@ -46,7 +46,7 @@ export function registerRoutes<TEnv extends Env = Env>(
 			registerHonoHttpRoutes(
 				app,
 				httpRoutes,
-				options.parseBody,
+				options.bodyParser,
 				options.middleware,
 				options.errorHandlers,
 			),
