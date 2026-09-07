@@ -38,7 +38,7 @@ runBodyParsingSuite({
 });
 
 describe("fetch default body parser errors", () => {
-	it("returns a validation-style 400 when the default JSON parser fails", async () => {
+	it("returns a parsing 400 when the default JSON parser fails", async () => {
 		const handler = createRouteHandler(createBodyParsingImplementations());
 		const result = await handler(
 			new Request("http://127.0.0.1/body-parsing/json", {
@@ -56,9 +56,7 @@ describe("fetch default body parser errors", () => {
 			/^application\/json/,
 		);
 		assert.deepEqual(await response.json(), {
-			message:
-				"Request validation failed. Check the validationErrors field for details.",
-			validationErrors: [{ message: "Request could not be parsed." }],
+			message: "Invalid request body",
 		});
 	});
 
@@ -109,9 +107,9 @@ describe("fetch default body parser content types", () => {
 		);
 	});
 
-	it("returns undefined when the request has no body", () => {
+	it("returns undefined when the request has no body", async () => {
 		assert.equal(
-			defaultBodyParser(new Request("http://127.0.0.1/body")),
+			await defaultBodyParser(new Request("http://127.0.0.1/body")),
 			undefined,
 		);
 	});

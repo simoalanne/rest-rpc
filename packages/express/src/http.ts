@@ -1,9 +1,8 @@
-import { createRequestSignal, writeStreamResponse } from "@rest-rpc/node";
+import { createRequestSignal, writeNodeResponse } from "@rest-rpc/node";
 import type { HttpMethod } from "@rest-rpc/core/contract";
 import { toColonPath } from "@rest-rpc/core/contract";
 import {
 	handleHttpRoute,
-	handleHttpRouteResult,
 	type RouteImplementation,
 	type ServerErrorHandlers,
 	type ServerHttpRouteDeclaration,
@@ -53,26 +52,7 @@ export const registerExpressHttpRoutes = (
 				errorHandlers,
 			});
 
-			return handleHttpRouteResult(result, {
-				setHeader: (name, value) => {
-					if (value !== undefined) res.setHeader(name, value);
-				},
-				sendEmpty: (status) => {
-					res.sendStatus(status);
-				},
-				sendJson: (status, body) => {
-					res.status(status).json(body);
-				},
-				sendCustom: (status, body) => {
-					res
-						.status(status)
-						.send(
-							body instanceof Uint8Array ? Buffer.from(body) : String(body),
-						);
-				},
-				sendStream: ({ body, status, contentType, mode }) =>
-					writeStreamResponse(body, res, status, contentType, mode),
-			});
+			return writeNodeResponse(result, res);
 		};
 
 		app[method](

@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import type { DispatchImplementationTree } from "@rest-rpc/server";
+import type { RuntimeImplementationTree } from "@rest-rpc/server";
 import {
 	createRouteHandler,
 	type CreateNodeHandlerOptions,
@@ -7,7 +7,7 @@ import {
 import { listen } from "./listen.ts";
 
 export const createNodeAdapter = (
-	implementations: DispatchImplementationTree,
+	implementations: RuntimeImplementationTree,
 	options: { createHandlerOptions?: CreateNodeHandlerOptions } = {},
 ) => ({
 	name: "node",

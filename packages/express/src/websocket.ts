@@ -4,13 +4,9 @@ import {
 	STATUS_CODES,
 } from "node:http";
 import type { Duplex } from "node:stream";
-import type {
-	RouteDeclaration,
-	WebSocketRouteDeclaration,
-} from "@rest-rpc/core/contract";
+import type { WebSocketRouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	type BeforeWebSocketUpgrade,
-	createRequestParsingErrorResponse,
 	createRouteMatcher,
 	handleWebSocketRoute,
 	prepareWebSocketUpgrade,
@@ -108,36 +104,32 @@ export const registerExpressWebSocketRoutes = (
 ) => {
 	if (routes.length === 0) return;
 
-	const routeContract = Object.fromEntries(
-		routes.map((implementation, index) => [
-			String(index),
-			implementation.route,
-		]),
-	);
-	const matchContractRoute = createRouteMatcher(routeContract);
-	const implementationsByRoute = new Map<
-		RouteDeclaration,
-		RouteImplementation<WebSocketRouteDeclaration>
-	>(routes.map((implementation) => [implementation.route, implementation]));
+	const matchRoute = createRouteMatcher(routes);
 
 	options.server.on("upgrade", async (req, socket, head) => {
 		let url: URL;
-		let matchedRoute: ReturnType<typeof matchContractRoute>;
+		let matchedRoute: ReturnType<typeof matchRoute>;
 		try {
 			url = parseRequestTarget(req);
-			matchedRoute = matchContractRoute({
+			matchedRoute = matchRoute({
 				method: req.method ?? "GET",
 				path: url.pathname,
 			});
 		} catch {
-			sendUpgradeRejection(socket, createRequestParsingErrorResponse());
+			sendUpgradeRejection(socket, {
+				status: 400,
+				body: { message: "Invalid request URL" },
+			});
 			return;
 		}
 
-		if (!matchedRoute.matched) return;
+		if (!matchedRoute) {
+			return;
+		}
 
-		const implementation = implementationsByRoute.get(matchedRoute.route);
-		if (!implementation) return;
+		const implementation =
+			matchedRoute.implementation as RouteImplementation<WebSocketRouteDeclaration>;
+
 		const controller = new AbortController();
 		const abort = () => controller.abort();
 		req.once("aborted", abort);

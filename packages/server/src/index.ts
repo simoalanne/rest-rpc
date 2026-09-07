@@ -19,11 +19,8 @@ export type {
 } from "./handleHttpRouteResult.ts";
 export { handleHttpRouteResult } from "./handleHttpRouteResult.ts";
 export { createRouteMatcher } from "./match.ts";
-export {
-	flattenRouteImplementations,
-	splitRouteImplementations,
-} from "./splitRouteImplementations.ts";
-export { createRequestParsingErrorResponse } from "./requestParsingError.ts";
+export type { RouteMatch, RuntimeImplementationTree } from "./match.ts";
+export { splitRouteImplementations } from "./splitRouteImplementations.ts";
 export { RouteResponseError } from "./routeResponseError.ts";
 export type {
 	CloseEventLike,
@@ -70,21 +67,6 @@ export {
 	handleWebSocketRoute,
 	prepareWebSocketUpgrade,
 } from "./websocket.ts";
-
-export {
-	createImplementationMatcher,
-	createHttpDispatcher,
-} from "./dispatch.ts";
-export type {
-	DispatchImplementationTree,
-	DispatchRequestOptions,
-	ImplementationMatch,
-} from "./dispatch.ts";
-
-export type {
-	ImplementationContext,
-	ImplementationContextArguments,
-} from "./dispatch.ts";
 
 export { implement, serverFirstRoute } from "./serverFirst.ts";
 export type {

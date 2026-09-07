@@ -23,6 +23,7 @@ import type {
 	RuntimeRouteHandler,
 	ServerHttpRouteDeclaration,
 } from "./router.ts";
+import type { BaseRouteDeclaration } from "@rest-rpc/core/contract";
 import type { ImplicitResponseEnvelope } from "./serverFirst.ts";
 import { validateSseEvents } from "./sse.ts";
 import {
@@ -411,20 +412,23 @@ const normalizeRouteResponseError = async <
  * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registering-http-routes}
  */
 export async function handleHttpRoute<
-	E extends ServerHttpRouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
 >(
-	route: E,
+	route: BaseRouteDeclaration,
 	handler: RuntimeRouteHandler,
 	options: HandleHttpRouteOptions<TContext>,
 ): Promise<HttpRouteResult> {
-	const requestValidation = await validateRequest(route, options.request);
+	const declaredRoute = route as ServerHttpRouteDeclaration;
+	const requestValidation = await validateRequest(
+		declaredRoute,
+		options.request,
+	);
 	const errorContext = (options.errorContext ?? options.context) as TContext;
 
 	if (!requestValidation.success) {
 		const response =
 			(await options.errorHandlers?.onRequestValidationError?.({
-				route,
+				route: declaredRoute,
 				request: options.request,
 				context: errorContext,
 				issues: requestValidation.response.body.validationErrors,
@@ -435,9 +439,9 @@ export async function handleHttpRoute<
 
 	try {
 		const handlerResult = await handler({
-			...flattenRequestData(route, requestValidation.data),
+			...flattenRequestData(declaredRoute, requestValidation.data),
 			[REQUEST_CONTEXT_KEY]:
-				route.mode === "sse"
+				declaredRoute.mode === "sse"
 					? {
 							...options.context,
 							lastEventId: getHeaderValue(
@@ -448,21 +452,31 @@ export async function handleHttpRoute<
 					: options.context,
 		});
 
-		if (!("responses" in route)) {
+		if (!("responses" in declaredRoute)) {
 			return classifyImplicitResponse(
 				handlerResult as ImplicitResponseEnvelope,
 			);
 		}
 
-		return normalizeHandlerResult(route, handlerResult, options, errorContext);
+		return normalizeHandlerResult(
+			declaredRoute,
+			handlerResult,
+			options,
+			errorContext,
+		);
 	} catch (error) {
 		if (error instanceof RouteResponseError) {
-			return normalizeRouteResponseError(route, error, options, errorContext);
+			return normalizeRouteResponseError(
+				declaredRoute,
+				error,
+				options,
+				errorContext,
+			);
 		}
 
 		const unhandledErrorResponse =
 			await options.errorHandlers?.onUnhandledError?.({
-				route,
+				route: declaredRoute,
 				request: options.request,
 				context: errorContext,
 				error,

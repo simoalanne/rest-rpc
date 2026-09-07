@@ -1,10 +1,7 @@
 import {
 	type BaseRouteDeclaration,
-	type Contract,
-	flattenContractRoutes,
 	getPathParamSegmentName,
 	isPathParamSegment,
-	type RouteDeclaration,
 } from "@rest-rpc/core/contract";
 
 const splitPath = (path: string) => path.split("/").filter(Boolean);
@@ -71,37 +68,77 @@ export const createPathMatcher = (path: string) => {
 	};
 };
 
-type RouteMatcherResult =
-	| {
-			matched: true;
-			route: RouteDeclaration;
-			params: Record<string, string>;
-	  }
-	| { matched: false; route: undefined; params: undefined };
+export type RuntimeImplementation = {
+	route: BaseRouteDeclaration;
+	handler: (...args: never[]) => unknown;
+};
+
+/** An implementation or nested implementation tree consumed by runtime matchers. */
+export type RuntimeImplementationTree =
+	| RuntimeImplementation
+	| readonly RuntimeImplementation[]
+	| { readonly [key: string]: RuntimeImplementationTree };
+
+const isRuntimeImplementation = (
+	value: unknown,
+): value is RuntimeImplementation =>
+	typeof value === "object" &&
+	value !== null &&
+	"route" in value &&
+	"handler" in value;
+
+const flattenImplementationTree = (
+	implementation: RuntimeImplementationTree,
+): RuntimeImplementation[] => {
+	if (Array.isArray(implementation)) {
+		return implementation.flatMap(flattenImplementationTree);
+	}
+	if (isRuntimeImplementation(implementation)) return [implementation];
+
+	return Object.values(implementation).flatMap(flattenImplementationTree);
+};
+
+export const flattenRouteImplementations = (
+	implementation: RuntimeImplementationTree,
+): RuntimeImplementation[] =>
+	flattenImplementationTree(implementation).sort((left, right) =>
+		compareRouteSpecificity(left.route, right.route),
+	);
+
+/** A matched route implementation and its decoded URL parameters. */
+export type RouteMatch = {
+	implementation: RuntimeImplementation;
+	params: Record<string, string>;
+};
 
 /**
- * Creates a path and method matcher for a contract tree.
+ * Compiles route implementations into a method and path matcher.
  *
  * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#dispatch-adapters}
  */
-export function createRouteMatcher(contract: Contract) {
-	const matchers = flattenContractRoutes(contract)
-		.sort(compareRouteSpecificity)
-		.map((route) => ({ route, matchPath: createPathMatcher(route.path) }));
+export function createRouteMatcher(implementations: RuntimeImplementationTree) {
+	const matchers = flattenRouteImplementations(implementations).map(
+		(implementation) => ({
+			implementation,
+			matchPath: createPathMatcher(implementation.route.path),
+		}),
+	);
 
-	return (req: { path: string; method: string }): RouteMatcherResult => {
+	return (request: {
+		path: string;
+		method: string;
+	}): RouteMatch | undefined => {
 		for (const matcher of matchers) {
-			if (matcher.route.method !== req.method) continue;
-			const params = matcher.matchPath(req.path);
+			if (matcher.implementation.route.method !== request.method) continue;
+			const params = matcher.matchPath(request.path);
 			if (params === null) continue;
 
 			return {
-				matched: true,
-				route: matcher.route,
+				implementation: matcher.implementation,
 				params,
 			};
 		}
 
-		return { matched: false, route: undefined, params: undefined };
+		return undefined;
 	};
 }

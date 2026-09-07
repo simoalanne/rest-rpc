@@ -2,38 +2,25 @@ import type {
 	RouteDeclaration,
 	WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
-import { compareRouteSpecificity } from "./match.ts";
+import {
+	flattenRouteImplementations,
+	type RuntimeImplementation,
+} from "./match.ts";
 import type {
 	ImplementationTree,
 	RouteImplementation,
 	ServerHttpRouteDeclaration,
 } from "./router.ts";
-import {
-	isHttpRouteImplementation,
-	isRouteImplementation,
-	isWebSocketRouteImplementation,
-} from "./router.ts";
 
-const flattenImplementationTree = <TRoute extends RouteDeclaration>(
-	implementation: ImplementationTree<TRoute>,
-): RouteImplementation<TRoute>[] => {
-	if (isRouteImplementation(implementation)) return [implementation];
+const isHttpImplementation = (
+	implementation: RuntimeImplementation,
+): implementation is RouteImplementation<ServerHttpRouteDeclaration> =>
+	implementation.route.mode !== "webSocket";
 
-	return Object.values(implementation).flatMap(flattenImplementationTree);
-};
-
-/**
- * Flattens an implementation tree into route-specific implementations.
- *
- * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#splitting-implementations}
- */
-export function flattenRouteImplementations<TRoute extends RouteDeclaration>(
-	implementation: ImplementationTree<TRoute>,
-): RouteImplementation<TRoute>[] {
-	return flattenImplementationTree(implementation).sort((left, right) =>
-		compareRouteSpecificity(left.route, right.route),
-	);
-}
+const isWebSocketImplementation = (
+	implementation: RuntimeImplementation,
+): implementation is RouteImplementation<WebSocketRouteDeclaration> =>
+	implementation.route.mode === "webSocket";
 
 /**
  * Splits route implementations into HTTP and WebSocket groups for server adapters.
@@ -52,10 +39,8 @@ export function splitRouteImplementations(
 	},
 ) {
 	const implementationsList = flattenRouteImplementations(implementations);
-	const routes = implementationsList.filter(isHttpRouteImplementation);
-	const webSocketRoutes = implementationsList.filter(
-		isWebSocketRouteImplementation,
-	);
+	const routes = implementationsList.filter(isHttpImplementation);
+	const webSocketRoutes = implementationsList.filter(isWebSocketImplementation);
 
 	handlers.handleHttpRoutes(routes);
 	handlers.handleWebSocketRoutes?.(webSocketRoutes);

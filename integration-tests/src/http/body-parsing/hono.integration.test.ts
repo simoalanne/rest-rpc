@@ -24,7 +24,7 @@ runBodyParsingSuite({
 });
 
 describe("hono default body parser errors", () => {
-	it("returns a validation-style 400 when the default JSON parser fails", async () => {
+	it("returns a parsing 400 when the default JSON parser fails", async () => {
 		const app = new Hono();
 		registerRoutes(app, createBodyParsingImplementations());
 
@@ -42,9 +42,7 @@ describe("hono default body parser errors", () => {
 			/^application\/json/,
 		);
 		assert.deepEqual(await response.json(), {
-			message:
-				"Request validation failed. Check the validationErrors field for details.",
-			validationErrors: [{ message: "Request could not be parsed." }],
+			message: "Invalid request body",
 		});
 	});
 

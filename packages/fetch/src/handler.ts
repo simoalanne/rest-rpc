@@ -1,9 +1,10 @@
 import {
-	createHttpDispatcher,
-	type DispatchImplementationTree,
-	type ImplementationContextArguments,
+	createRouteMatcher,
+	handleHttpRoute,
+	type RuntimeImplementationTree,
 	type ServerErrorHandlers,
 } from "@rest-rpc/server";
+import type { DefaultContext } from "./index.ts";
 import { defaultBodyParser, type FetchBodyParser } from "./request.ts";
 import { createFetchResponse } from "./response.ts";
 
@@ -17,37 +18,64 @@ type FetchRouteHandlerResult =
 	| { matched: true; response: Response }
 	| { matched: false; response: undefined };
 
+type ContextArguments = {} extends DefaultContext
+	? [context?: DefaultContext]
+	: [context: DefaultContext];
+
 /** Creates a Fetch catch-all handler from an ordinary route implementation tree. */
-export function createRouteHandler<
-	const TTree extends DispatchImplementationTree,
->(
-	implementations: TTree,
+export function createRouteHandler(
+	implementations: RuntimeImplementationTree,
 	options: CreateFetchHandlerOptions = {},
 ): (
 	request: Request,
-	...contextArguments: ImplementationContextArguments<TTree>
+	...contextArguments: ContextArguments
 ) => Promise<FetchRouteHandlerResult> {
-	const dispatch = createHttpDispatcher(implementations);
+	const matchRoute = createRouteMatcher(implementations);
 	const bodyParser = options.bodyParser ?? defaultBodyParser;
+
 	return async (request, ...contextArguments) => {
-		const context = (contextArguments[0] ?? {}) as Record<string, unknown>;
 		const url = new URL(request.url);
-		const result = await dispatch({
+		const matched = matchRoute({
 			method: request.method,
 			path: url.pathname,
-			context,
-			signal: request.signal,
-			catchParsingErrors: options.bodyParser === undefined,
-			errorHandlers: options.errorHandlers,
-			decode: async ({ params }) => ({
-				params,
-				query: Object.fromEntries(url.searchParams),
-				headers: Object.fromEntries(request.headers),
-				body: await bodyParser(request),
-			}),
 		});
-		return result === undefined
-			? { matched: false, response: undefined }
-			: { matched: true, response: await createFetchResponse(result) };
+		if (!matched || matched.implementation.route.mode === "webSocket") {
+			return { matched: false, response: undefined };
+		}
+
+		let body: unknown;
+		try {
+			body = await bodyParser(request);
+		} catch (error) {
+			if (options.bodyParser !== undefined) throw error;
+			return {
+				matched: true,
+				response: Response.json(
+					{ message: "Invalid request body" },
+					{
+						status: 400,
+					},
+				),
+			};
+		}
+		const parsedRequest = {
+			params: matched.params,
+			query: Object.fromEntries(url.searchParams),
+			headers: Object.fromEntries(request.headers),
+			body,
+		};
+
+		const implementation = matched.implementation;
+		const result = await handleHttpRoute(
+			implementation.route,
+			implementation.handler as (request: unknown) => unknown,
+			{
+				request: parsedRequest,
+				context: { ...contextArguments[0], signal: request.signal },
+				errorHandlers: options.errorHandlers,
+			},
+		);
+
+		return { matched: true, response: await createFetchResponse(result) };
 	};
 }

@@ -1,12 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
-	createHttpDispatcher,
-	createImplementationMatcher,
-	type DispatchImplementationTree,
-	type ImplementationContextArguments,
+	createRouteMatcher,
+	handleHttpRoute,
+	type RuntimeImplementationTree,
 	type ServerErrorHandlers,
 } from "@rest-rpc/server";
-import type { NodeRouteHandlerResult } from "./index.ts";
+import type { DefaultContext, NodeRouteHandlerResult } from "./index.ts";
 import { createRequestSignal } from "./lifecycle.ts";
 import {
 	defaultBodyParser,
@@ -21,43 +20,63 @@ export type CreateNodeHandlerOptions = {
 	errorHandlers?: ServerErrorHandlers<Record<string, unknown>>;
 };
 
+type ContextArguments = {} extends DefaultContext
+	? [context?: DefaultContext]
+	: [context: DefaultContext];
+
 /** Creates a Node HTTP catch-all handler that leaves unmatched requests untouched. */
-export function createRouteHandler<
-	const TTree extends DispatchImplementationTree,
->(
-	implementations: TTree,
+export function createRouteHandler(
+	implementations: RuntimeImplementationTree,
 	options: CreateNodeHandlerOptions = {},
 ): (
 	request: IncomingMessage,
 	response: ServerResponse,
-	...contextArguments: ImplementationContextArguments<TTree>
+	...contextArguments: ContextArguments
 ) => Promise<NodeRouteHandlerResult> {
-	const dispatch = createHttpDispatcher(implementations);
-	const match = createImplementationMatcher(implementations);
+	const matchRoute = createRouteMatcher(implementations);
 	const bodyParser = options.bodyParser ?? defaultBodyParser;
+
 	return async (request, response, ...contextArguments) => {
-		const context = (contextArguments[0] ?? {}) as Record<string, unknown>;
 		const url = parseRequestTarget(request);
-		const target = { method: request.method ?? "GET", path: url.pathname };
-		const matched = match(target);
-		if (!matched || matched.implementation.route.mode === "webSocket")
-			return { matched: false };
-		const signal = createRequestSignal(request, response);
-		const result = await dispatch({
-			...target,
-			context,
-			signal,
-			catchParsingErrors: options.bodyParser === undefined,
-			errorHandlers: options.errorHandlers,
-			decode: async ({ params }) => ({
-				params,
-				query: Object.fromEntries(url.searchParams),
-				headers: request.headers,
-				body: await bodyParser(request),
-			}),
+		const matched = matchRoute({
+			method: request.method ?? "GET",
+			path: url.pathname,
 		});
-		if (result && !response.destroyed)
-			await writeNodeResponse(result, response);
+		if (!matched || matched.implementation.route.mode === "webSocket") {
+			return { matched: false };
+		}
+
+		const signal = createRequestSignal(request, response);
+		let body: unknown;
+		try {
+			body = await bodyParser(request);
+		} catch (error) {
+			if (options.bodyParser !== undefined) throw error;
+			response.statusCode = 400;
+			response.setHeader("content-type", "application/json");
+			response.end(
+				JSON.stringify({ message: "Failed to parse request body." }),
+			);
+			return { matched: true };
+		}
+		const parsedRequest = {
+			params: matched.params,
+			query: Object.fromEntries(url.searchParams),
+			headers: request.headers,
+			body,
+		};
+
+		const implementation = matched.implementation;
+		const result = await handleHttpRoute(
+			implementation.route,
+			implementation.handler as (request: unknown) => unknown,
+			{
+				request: parsedRequest,
+				context: { ...contextArguments[0], signal },
+				errorHandlers: options.errorHandlers,
+			},
+		);
+		if (!response.destroyed) await writeNodeResponse(result, response);
 		return { matched: true };
 	};
 }

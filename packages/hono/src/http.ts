@@ -2,7 +2,6 @@ import { createFetchResponse, defaultBodyParser } from "@rest-rpc/fetch";
 import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import { toColonPath } from "@rest-rpc/core/contract";
 import {
-	createRequestParsingErrorResponse,
 	handleHttpRoute,
 	type RouteImplementation,
 	type ServerErrorHandlers,
@@ -64,7 +63,7 @@ export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 						: await defaultBodyParser(c.req.raw);
 				} catch (error) {
 					if (!usesDefaultBodyParser) throw error;
-					return c.json(createRequestParsingErrorResponse().body, 400);
+					return c.json({ message: "Invalid request body" }, 400);
 				}
 
 				const result = await handleHttpRoute(route, implementation.handler, {
