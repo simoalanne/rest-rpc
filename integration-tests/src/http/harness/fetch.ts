@@ -71,23 +71,18 @@ export const createFetchAdapter = (
 				res.writeHead(response.status, toNodeResponseHeaders(response.headers));
 				try {
 					if (response.body) {
-						const iterator = response.body[Symbol.asyncIterator]();
+						const reader = response.body.getReader();
 						let closed = false;
 						let finished = false;
-						const closeIterator = async () => {
-							try {
-								await iterator.return?.();
-							} catch {}
-						};
 						const onClose = () => {
 							if (finished) return;
 							closed = true;
-							void closeIterator();
+							void reader.cancel().catch(() => {});
 						};
 						res.on("close", onClose);
 						try {
 							while (!closed) {
-								const { done, value } = await iterator.next();
+								const { done, value } = await reader.read();
 								if (done || closed) break;
 								res.write(value);
 							}

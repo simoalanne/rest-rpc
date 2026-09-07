@@ -1,6 +1,7 @@
 import type { WebSocket as FastifyWebSocket } from "@fastify/websocket";
 import type { WebSocketRouteDeclaration } from "@rest-rpc/core/contract";
 import { toColonPath } from "@rest-rpc/core/contract";
+import { createRequestSignal } from "@rest-rpc/node";
 import {
 	type BeforeWebSocketUpgrade,
 	handleWebSocketRoute,
@@ -78,12 +79,7 @@ export const registerFastifyWebSocketRoutes = (
 						};
 					}),
 					async (req: FastifyRequest, reply: FastifyReply) => {
-						const controller = new AbortController();
-						const abort = () => controller.abort();
-						req.raw.once("aborted", abort);
-						reply.raw.once("close", () => {
-							if (!reply.raw.writableFinished) abort();
-						});
+						const signal = createRequestSignal(req.raw, reply.raw);
 						const request = {
 							query: req.query,
 							params: req.params,
@@ -92,7 +88,7 @@ export const registerFastifyWebSocketRoutes = (
 						const upgrade = await prepareWebSocketUpgrade({
 							implementation,
 							request,
-							context: { req, signal: controller.signal },
+							context: { req, signal },
 							beforeUpgrade: options.beforeUpgrade,
 							errorHandlers,
 						});

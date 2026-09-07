@@ -21,6 +21,7 @@ import {
 } from "@rest-rpc/server";
 import type WebSocket from "ws";
 import type { WebSocketServer } from "ws";
+import { parseRequestTarget } from "@rest-rpc/node";
 import type { ExpressErrorContext } from "./registerRoutes.ts";
 
 export type ExpressWebSocketOptions = {
@@ -123,7 +124,7 @@ export const registerExpressWebSocketRoutes = (
 		let url: URL;
 		let matchedRoute: ReturnType<typeof matchContractRoute>;
 		try {
-			url = new URL(req.url ?? "/", "http://localhost");
+			url = parseRequestTarget(req);
 			matchedRoute = matchContractRoute({
 				method: req.method ?? "GET",
 				path: url.pathname,

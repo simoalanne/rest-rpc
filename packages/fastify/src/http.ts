@@ -1,15 +1,12 @@
-import { Readable } from "node:stream";
 import type { HttpMethod, RouteDeclaration } from "@rest-rpc/core/contract";
 import { toColonPath } from "@rest-rpc/core/contract";
+import { createNodeResponseStream, createRequestSignal } from "@rest-rpc/node";
 import {
 	handleHttpRoute,
 	handleHttpRouteResult,
-	type HttpRouteResultStreamMode,
 	type RouteImplementation,
 	type ServerErrorHandlers,
 	type ServerHttpRouteDeclaration,
-	formatSseEvent,
-	type SseEvent,
 } from "@rest-rpc/server";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
@@ -23,36 +20,6 @@ export type ExtendedFastifyPreHandler = (
 	reply: FastifyReply,
 	route: RouteDeclaration,
 ) => unknown;
-
-const toStream = (
-	body: AsyncIterable<unknown>,
-	mode: HttpRouteResultStreamMode = "ndjson",
-) =>
-	Readable.from(
-		(async function* () {
-			for await (const chunk of body) {
-				if (mode === "ndjson") {
-					yield `${JSON.stringify(chunk)}\n`;
-					continue;
-				}
-				if (mode === "sse") {
-					yield formatSseEvent(chunk as SseEvent<unknown>);
-					continue;
-				}
-				yield chunk;
-			}
-		})(),
-	);
-
-const createRequestSignal = (req: FastifyRequest, reply: FastifyReply) => {
-	const controller = new AbortController();
-	const abort = () => controller.abort();
-	req.raw.once("aborted", abort);
-	reply.raw.once("close", () => {
-		if (!reply.raw.writableFinished) abort();
-	});
-	return controller.signal;
-};
 
 export const registerFastifyHttpRoutes = (
 	app: FastifyInstance,
@@ -78,7 +45,7 @@ export const registerFastifyHttpRoutes = (
 				}),
 			},
 			async (req: FastifyRequest, reply: FastifyReply) => {
-				const signal = createRequestSignal(req, reply);
+				const signal = createRequestSignal(req.raw, reply.raw);
 				const result = await handleHttpRoute(route, handler, {
 					request: {
 						body: req.body,
@@ -96,7 +63,10 @@ export const registerFastifyHttpRoutes = (
 					sendJson: (status, body) => reply.status(status).send(body),
 					sendCustom: (status, body) => reply.status(status).send(body),
 					sendStream: ({ body, status, contentType, mode }) =>
-						reply.status(status).type(contentType).send(toStream(body, mode)),
+						reply
+							.status(status)
+							.type(contentType)
+							.send(createNodeResponseStream(body, mode)),
 				});
 			},
 		);

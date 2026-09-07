@@ -1,14 +1,12 @@
-import { createFetchResponse } from "@rest-rpc/fetch";
+import {
+	createFetchResponse,
+	defaultParseBody as parseFetchBody,
+} from "@rest-rpc/fetch";
 import type {
 	RequestBodySchema,
 	RouteDeclaration,
 } from "@rest-rpc/core/contract";
-import {
-	isFormBody,
-	isMultipartBody,
-	isNoBody,
-	toColonPath,
-} from "@rest-rpc/core/contract";
+import { isNoBody, toColonPath } from "@rest-rpc/core/contract";
 import {
 	createRequestParsingErrorResponse,
 	handleHttpRoute,
@@ -51,31 +49,12 @@ export type ExtendedHonoMiddleware<TEnv extends Env = Env> = (
 	// oxlint-disable-next-line typescript/no-explicit-any -- Hono itself accepts `any` for handler return type.
 ) => Promise<any> | any;
 
-const isFormUrlEncodedContentType = (contentType: string) =>
-	contentType.split(";")[0]?.trim().toLowerCase() ===
-	"application/x-www-form-urlencoded";
-
-const isMultipartFormDataContentType = (contentType: string) =>
-	contentType.split(";")[0]?.trim().toLowerCase() === "multipart/form-data";
-
 const defaultParseBody = <TEnv extends Env = Env>({
 	body,
 	c,
-}: HonoParseBodyInput<TEnv>) => {
-	if (isFormBody(body)) {
-		const contentType = c.req.header("content-type") ?? "";
-		return isFormUrlEncodedContentType(contentType)
-			? c.req.text().then((text) => new URLSearchParams(text))
-			: undefined;
-	}
-	if (isMultipartBody(body)) {
-		const contentType = c.req.header("content-type") ?? "";
-		return isMultipartFormDataContentType(contentType)
-			? c.req.formData()
-			: undefined;
-	}
-	return c.req.json();
-};
+	route,
+}: HonoParseBodyInput<TEnv>) =>
+	parseFetchBody({ request: c.req.raw, route, body });
 
 const parseRequestBody = async <TEnv extends Env = Env>(
 	c: Context<TEnv>,

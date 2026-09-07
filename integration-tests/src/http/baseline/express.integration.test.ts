@@ -90,8 +90,9 @@ it("supports Express router scoped middleware with a prefixed client baseUrl", a
 	}
 });
 
-it("waits for Express drain before pulling the next stream chunk", async () => {
+it("waits for Express drain before writing the next stream chunk", async () => {
 	let pulledChunks = 0;
+	let writeCalls = 0;
 	let emitDrain: (() => void) | undefined;
 	const handlers = createIntegrationHandlers();
 	const server = await createExpressAdapter(
@@ -112,7 +113,6 @@ it("waits for Express drain before pulling the next stream chunk", async () => {
 				app.use(
 					"/streams/text",
 					(_req: Request, res: Response, next: NextFunction) => {
-						let writeCalls = 0;
 						const originalWrite = res.write.bind(res) as (
 							...args: unknown[]
 						) => boolean;
@@ -136,7 +136,7 @@ it("waits for Express drain before pulling the next stream chunk", async () => {
 		const response = await fetch(`${server.origin}/streams/text`);
 
 		await delay(25);
-		assert.equal(pulledChunks, 1);
+		assert.equal(writeCalls, 1);
 		assert.equal(typeof emitDrain, "function");
 
 		emitDrain();
@@ -149,7 +149,7 @@ it("waits for Express drain before pulling the next stream chunk", async () => {
 });
 
 it("releases an Express backpressure wait when the response closes before drain", async () => {
-	let pulledChunks = 0;
+	let writeCalls = 0;
 	let firstWrite!: () => void;
 	const wrote = new Promise<void>((resolve) => {
 		firstWrite = resolve;
@@ -168,9 +168,7 @@ it("releases an Express backpressure wait when the response closes before drain"
 				...handlers.streams,
 				text: async function* () {
 					try {
-						pulledChunks = 1;
 						yield "alpha\n";
-						pulledChunks = 2;
 						yield "beta\n";
 					} finally {
 						returned = true;
@@ -184,7 +182,6 @@ it("releases an Express backpressure wait when the response closes before drain"
 				app.use(
 					"/streams/text",
 					(_req: Request, res: Response, next: NextFunction) => {
-						let writeCalls = 0;
 						const originalWrite = res.write.bind(res) as (
 							...args: unknown[]
 						) => boolean;
@@ -213,13 +210,13 @@ it("releases an Express backpressure wait when the response closes before drain"
 		);
 
 		await wrote;
-		assert.equal(pulledChunks, 1);
+		assert.equal(writeCalls, 1);
 		assert.equal(typeof closeResponse, "function");
 
 		closeResponse();
 		await finished;
 
-		assert.equal(pulledChunks, 1);
+		assert.equal(writeCalls, 1);
 		assert.equal(returned, true);
 		await request;
 	} finally {

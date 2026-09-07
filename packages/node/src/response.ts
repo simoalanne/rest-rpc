@@ -1,4 +1,6 @@
 import type { ServerResponse } from "node:http";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import {
 	formatSseEvent,
 	handleHttpRouteResult,
@@ -7,7 +9,33 @@ import {
 	type SseEvent,
 } from "@rest-rpc/server";
 
-/** Pumps a response stream with backpressure and disconnect cancellation. */
+const formatResponseStreamChunk = (
+	chunk: unknown,
+	mode: HttpRouteResultStreamMode,
+) => {
+	if (mode === "ndjson") return `${JSON.stringify(chunk)}\n`;
+	if (mode === "sse") return formatSseEvent(chunk as SseEvent<unknown>);
+	return chunk;
+};
+
+const frameResponseStream = async function* (
+	body: AsyncIterable<unknown>,
+	mode: HttpRouteResultStreamMode,
+): AsyncIterableIterator<unknown> {
+	for await (const chunk of body) {
+		yield formatResponseStreamChunk(chunk, mode);
+	}
+};
+
+/** Creates a Node readable stream with rest-rpc response framing. */
+export function createNodeResponseStream(
+	body: AsyncIterable<unknown>,
+	mode: HttpRouteResultStreamMode = "ndjson",
+): Readable {
+	return Readable.from(frameResponseStream(body, mode));
+}
+
+/** Writes a response stream to a Node HTTP response. */
 export async function writeStreamResponse(
 	body: AsyncIterable<unknown>,
 	res: ServerResponse,
@@ -17,75 +45,11 @@ export async function writeStreamResponse(
 ): Promise<void> {
 	res.statusCode = status;
 	res.setHeader("content-type", contentType);
-	const iterator = body[Symbol.asyncIterator]();
-	let closed = res.destroyed;
-	let done = false;
-	let returned = false;
-	let resolveClosed: () => void = () => {};
-	const disconnected = new Promise<{ done: true; value: undefined }>(
-		(resolve) => {
-			resolveClosed = () => resolve({ done: true, value: undefined });
-		},
-	);
-	const cancel = () => {
-		if (returned || done) return;
-		returned = true;
-		void Promise.resolve()
-			.then(() => iterator.return?.())
-			.catch(() => {});
-	};
-	const onClose = () => {
-		closed = true;
-		resolveClosed();
-		cancel();
-	};
-	res.once("close", onClose);
-	res.once("error", onClose);
-	const drain = () =>
-		new Promise<void>((resolve, reject) => {
-			const cleanup = () => {
-				res.off("drain", onDrain);
-				res.off("close", onDrain);
-				res.off("error", onError);
-			};
-			const onDrain = () => {
-				cleanup();
-				resolve();
-			};
-			const onError = (error: Error) => {
-				cleanup();
-				reject(error);
-			};
-			res.once("drain", onDrain);
-			res.once("close", onDrain);
-			res.once("error", onError);
-			if (res.destroyed) onDrain();
-		});
 	try {
-		while (!closed) {
-			const next = await Promise.race([iterator.next(), disconnected]);
-			if (closed) break;
-			if (next.done) {
-				done = true;
-				break;
-			}
-			const chunk =
-				mode === "ndjson"
-					? `${JSON.stringify(next.value)}\n`
-					: mode === "sse"
-						? formatSseEvent(next.value as SseEvent<unknown>)
-						: next.value;
-			if (!res.write(chunk as string | Uint8Array) && !closed) await drain();
-		}
-		if (!closed) res.end();
+		await pipeline(createNodeResponseStream(body, mode), res);
 	} catch (error) {
-		cancel();
-		if (!res.headersSent) throw error;
-		res.destroy(error instanceof Error ? error : undefined);
-	} finally {
-		res.off("close", onClose);
-		res.off("error", onClose);
-		if (!done) cancel();
+		if ((error as NodeJS.ErrnoException).code !== "ERR_STREAM_PREMATURE_CLOSE")
+			throw error;
 	}
 }
 

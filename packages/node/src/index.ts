@@ -48,4 +48,8 @@ export type { CreateNodeHandlerOptions } from "./handler.ts";
 export { createRequestSignal } from "./lifecycle.ts";
 export { defaultParseBody, parseRequestTarget } from "./request.ts";
 export type { NodeRouteParseBody, NodeRouteParseBodyInput } from "./request.ts";
-export { writeNodeResponse, writeStreamResponse } from "./response.ts";
+export {
+	createNodeResponseStream,
+	writeNodeResponse,
+	writeStreamResponse,
+} from "./response.ts";

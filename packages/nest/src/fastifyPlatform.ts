@@ -1,5 +1,5 @@
-import { Readable } from "node:stream";
-import { formatSseEvent, type SseEvent } from "@rest-rpc/server";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { createNodeResponseStream, createRequestSignal } from "@rest-rpc/node";
 import type {
 	NestHttpPlatform,
 	NestHttpReply,
@@ -47,35 +47,8 @@ const setHeader = (res: FastifyLikeResponse, name: string, value: unknown) => {
 	res.raw?.setHeader?.(name, value);
 };
 
-const createFastifyRequestSignal = (
-	req: FastifyLikeRequest,
-	res: FastifyLikeResponse,
-) => {
-	const controller = new AbortController();
-	const abort = () => controller.abort();
-	req.raw?.once?.("aborted", abort);
-	res.raw?.once?.("close", () => {
-		if (!res.raw?.writableFinished) abort();
-	});
-	return controller.signal;
-};
-
 const toNodeStream = ({ body, mode }: NestStreamResponseInput) =>
-	Readable.from(
-		(async function* () {
-			for await (const chunk of body) {
-				if (mode === "ndjson") {
-					yield `${JSON.stringify(chunk)}\n`;
-					continue;
-				}
-				if (mode === "sse") {
-					yield formatSseEvent(chunk as SseEvent<unknown>);
-					continue;
-				}
-				yield chunk;
-			}
-		})(),
-	);
+	createNodeResponseStream(body, mode);
 
 const createFastifyReply = (res: FastifyLikeResponse): NestHttpReply => ({
 	setHeader: (name, value) => setHeader(res, name, value),
@@ -106,9 +79,17 @@ export const createFastifyHttpPlatform = (
 	res: unknown,
 ): NestHttpPlatform | undefined => {
 	if (!isFastifyLikeResponse(res)) return undefined;
+	const rawRequest = (req as FastifyLikeRequest).raw;
+	const signal =
+		rawRequest && res.raw
+			? createRequestSignal(
+					rawRequest as IncomingMessage,
+					res.raw as ServerResponse,
+				)
+			: new AbortController().signal;
 
 	return {
-		signal: createFastifyRequestSignal(req as FastifyLikeRequest, res),
+		signal,
 		reply: createFastifyReply(res),
 	};
 };

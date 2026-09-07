@@ -43,6 +43,9 @@
 		"@rest-rpc/core": "workspace:*",
 		"@rest-rpc/server": "workspace:*"
 	},
+	"devDependencies": {
+		"@types/node": "26.3.0"
+	},
 	"tsd": {
 		"directory": "test-d"
 	}

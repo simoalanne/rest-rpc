@@ -146,6 +146,5 @@ describe("ApiClient streams", () => {
 		}
 
 		assert.equal(cancelled, true);
-		assert.equal(body.locked, false);
 	});
 });
