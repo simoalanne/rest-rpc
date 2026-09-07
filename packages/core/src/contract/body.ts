@@ -63,6 +63,11 @@ export type MultipartBody<
  */
 export type CustomBodyContentType = string | readonly string[];
 
+/** A value that can be written as a custom HTTP response body. */
+export type CustomResponseValue = string | Uint8Array;
+
+type CustomResponseSchema = StandardSchemaV1<unknown, CustomResponseValue>;
+
 /** Options for a structured body whose selected fields are encoded as arrays. */
 export type BodyWithArrayKeysOptions<
 	TSchema extends BodyWithArrayKeysSchema = BodyWithArrayKeysSchema,
@@ -121,7 +126,7 @@ export type CustomBody<
  * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-custom-content-type}
  */
 export type CustomResponseBody<
-	TSchema extends StandardSchemaV1 = StandardSchemaV1,
+	TSchema extends CustomResponseSchema = CustomResponseSchema,
 	TContentType extends CustomBodyContentType = CustomBodyContentType,
 > = {
 	kind: "customBody";
@@ -131,7 +136,7 @@ export type CustomResponseBody<
 
 /** Input accepted when declaring a response with a custom content type. */
 export type CustomResponseInput<
-	TSchema extends StandardSchemaV1 = StandardSchemaV1,
+	TSchema extends CustomResponseSchema = CustomResponseSchema,
 	TContentType extends CustomBodyContentType = CustomBodyContentType,
 > = {
 	schema: TSchema;
@@ -141,7 +146,12 @@ export type CustomResponseInput<
 export type CustomBodyInput<
 	TSchema extends StandardSchemaV1 = StandardSchemaV1,
 	TContentType extends CustomBodyContentType = CustomBodyContentType,
-> = TSchema | CustomResponseInput<TSchema, TContentType>;
+> =
+	| TSchema
+	| {
+			schema: TSchema;
+			contentType: TContentType;
+	  };
 
 /**
  * Declares a streaming response body.

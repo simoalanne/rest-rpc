@@ -64,7 +64,11 @@ export const registerExpressHttpRoutes = (
 					res.status(status).json(body);
 				},
 				sendCustom: (status, body) => {
-					res.status(status).send(body);
+					res
+						.status(status)
+						.send(
+							body instanceof Uint8Array ? Buffer.from(body) : String(body),
+						);
 				},
 				sendStream: ({ body, status, contentType, mode }) =>
 					writeStreamResponse(body, res, status, contentType, mode),

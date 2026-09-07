@@ -1,6 +1,6 @@
 import type { DynamicModule, ExecutionContext } from "@nestjs/common";
 import { Module } from "@nestjs/common";
-import { APP_INTERCEPTOR } from "@nestjs/core";
+import { APP_INTERCEPTOR, HttpAdapterHost } from "@nestjs/core";
 import type { ServerErrorHandlers } from "@rest-rpc/server";
 import { RestRpcRouteInterceptor } from "./routeInterceptor.ts";
 
@@ -85,10 +85,11 @@ export class RestRpcModule {
 				},
 				{
 					provide: RestRpcRouteInterceptor,
-					inject: [restRpcModuleOptions],
+					inject: [HttpAdapterHost, restRpcModuleOptions],
 					useFactory: (
+						httpAdapterHost: HttpAdapterHost,
 						moduleOptions: RestRpcModuleOptions<Record<string, unknown>>,
-					) => new RestRpcRouteInterceptor(moduleOptions),
+					) => new RestRpcRouteInterceptor(httpAdapterHost, moduleOptions),
 				},
 				{
 					provide: APP_INTERCEPTOR,

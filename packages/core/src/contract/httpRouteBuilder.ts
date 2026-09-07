@@ -8,6 +8,7 @@ import {
 	type CustomBodyContentType,
 	type CustomResponseBody,
 	type CustomResponseInput,
+	type CustomResponseValue,
 	type FormBody,
 	type FormBodySchema,
 	type MultipartBody,
@@ -268,7 +269,7 @@ type HttpResponseSetters<TState extends HttpBuilderState> = {
 	/** Declares a custom-content response. @see {@link https://rest-rpc.dev/docs/http-responses#response-with-custom-content-type} */
 	customResponse<
 		const TStatus extends number,
-		const TSchema extends StandardSchemaV1,
+		const TSchema extends StandardSchemaV1<unknown, CustomResponseValue>,
 		const TContentType extends CustomBodyContentType,
 		const TPath extends string = string,
 		const TMetadata extends RouteMetadata | never = never,
@@ -299,7 +300,7 @@ type HttpResponseSetters<TState extends HttpBuilderState> = {
 	/** Declares a custom-content response stream. @see {@link https://rest-rpc.dev/docs/http-responses#streaming-responses-with-custom-content-type} */
 	customStreamResponse<
 		const TStatus extends number,
-		const TSchema extends StandardSchemaV1,
+		const TSchema extends StandardSchemaV1<unknown, CustomResponseValue>,
 		const TContentType extends CustomBodyContentType,
 		const TPath extends string = string,
 		const TMetadata extends RouteMetadata | never = never,
@@ -412,7 +413,7 @@ type HttpBodySetters<TState extends HttpBuilderState> = WhenUnused<
 			const TMetadata extends RouteMetadata | never = never,
 		>(
 			this: BuilderReceiver<TPath, TMetadata>,
-			input: CustomResponseInput<TSchema, TContentType>,
+			input: { schema: TSchema; contentType: TContentType },
 		): HttpBuilderAtPath<
 			SetHttpRequest<TState, "body", CustomBody<TSchema, TContentType>, "body">,
 			TPath,

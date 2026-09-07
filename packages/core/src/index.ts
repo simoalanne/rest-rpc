@@ -25,7 +25,10 @@ export type {
 export type { ClientRequest } from "./contract/request.ts";
 export type { ClientResponseBody } from "./contract/response.ts";
 export { route } from "./contract/routeFactory.ts";
-export type { CustomResponseBody } from "./contract/body.ts";
+export type {
+	CustomResponseBody,
+	CustomResponseValue,
+} from "./contract/body.ts";
 export type {
 	CreateOpenApiDocumentOptions,
 	OpenApiDocument,

@@ -11,6 +11,7 @@ export type {
 	CustomBodyContentType,
 	CustomResponseBody,
 	CustomResponseInput,
+	CustomResponseValue,
 	FormBody,
 	FormBodySchema,
 	MultipartBody,

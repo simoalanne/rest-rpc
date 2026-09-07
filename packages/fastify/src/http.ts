@@ -61,7 +61,12 @@ export const registerFastifyHttpRoutes = (
 					setHeader: (name, value) => reply.header(name, value),
 					sendEmpty: (status) => reply.status(status).send(),
 					sendJson: (status, body) => reply.status(status).send(body),
-					sendCustom: (status, body) => reply.status(status).send(body),
+					sendCustom: (status, body) =>
+						reply
+							.status(status)
+							.send(
+								body instanceof Uint8Array ? Buffer.from(body) : String(body),
+							),
 					sendStream: ({ body, status, contentType, mode }) =>
 						reply
 							.status(status)

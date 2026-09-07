@@ -3,7 +3,15 @@ import {
 	type ExecutionContext,
 	Injectable,
 	type NestInterceptor,
+	StreamableFile,
 } from "@nestjs/common";
+import { HttpAdapterHost } from "@nestjs/core";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import {
+	createNodeResponseStream,
+	createRequestSignal,
+	writeStreamResponse,
+} from "@rest-rpc/node";
 import {
 	handleHttpRoute,
 	handleHttpRouteResult,
@@ -14,11 +22,21 @@ import {
 import type { Observable } from "rxjs";
 import { from, lastValueFrom } from "rxjs";
 import { REST_RPC_ROUTE_METADATA, type RouteMetadata } from "./decorators.ts";
-import {
-	createNestHttpPlatform,
-	type NestHttpRequest,
-} from "./httpPlatform.ts";
 import type { RestRpcModuleOptions } from "./module.ts";
+
+type NestHttpRequestFields = {
+	body?: unknown;
+	query?: unknown;
+	params?: unknown;
+	headers?: unknown;
+};
+
+type NestHttpRequest = NestHttpRequestFields &
+	((IncomingMessage & { raw?: never }) | { raw: IncomingMessage });
+
+type NestHttpResponse =
+	| (ServerResponse & { raw?: never })
+	| { raw: ServerResponse };
 
 type NestRouteImplementationContext = {
 	context?: Record<string, unknown>;
@@ -50,7 +68,10 @@ const assertRouteImplementation = (
 
 @Injectable()
 export class RestRpcRouteInterceptor implements NestInterceptor {
-	constructor(options?: RestRpcModuleOptions<Record<string, unknown>>) {
+	constructor(
+		private readonly httpAdapterHost: HttpAdapterHost,
+		options?: RestRpcModuleOptions<Record<string, unknown>>,
+	) {
 		this.options = options;
 	}
 
@@ -73,8 +94,11 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 	) {
 		const http = context.switchToHttp();
 		const req = http.getRequest<NestHttpRequest>();
-		const res = http.getResponse<unknown>();
-		const { signal, reply } = createNestHttpPlatform(req, res);
+		const res = http.getResponse<NestHttpResponse>();
+		const adapter = this.httpAdapterHost.httpAdapter;
+		const rawRequest = req.raw ?? req;
+		const rawResponse = res.raw ?? res;
+		const signal = createRequestSignal(rawRequest, rawResponse);
 		const userContext = await this.options?.createContext?.(context);
 		const implementation = assertRouteImplementation(
 			await lastValueFrom(next.handle()),
@@ -103,13 +127,42 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 
 		return handleHttpRouteResult(result, {
 			setHeader: (name, value) => {
-				if (value !== undefined) reply.setHeader(name, value);
+				if (value !== undefined) {
+					const headerValue = Array.isArray(value)
+						? value.map(String)
+						: String(value);
+					adapter.setHeader(res, name, headerValue as string);
+				}
 			},
-			sendEmpty: (status) => reply.sendEmpty(status),
-			sendJson: (status, body) => reply.sendJson(status, body),
-			sendCustom: (status, body) => reply.sendCustom(status, body),
-			sendStream: ({ body, status, contentType, mode }) =>
-				reply.sendStream({ body, status, contentType, mode, signal }),
+			sendEmpty: (status) => {
+				adapter.status(res, status);
+				return undefined;
+			},
+			sendJson: (status, body) => {
+				adapter.status(res, status);
+				return body;
+			},
+			sendCustom: (status, body) => {
+				adapter.status(res, status);
+				if (body instanceof Uint8Array) return new StreamableFile(body);
+				return String(body);
+			},
+			sendStream: ({ body, status, contentType, mode }) => {
+				adapter.status(res, status);
+				if (adapter.getType() === "express") {
+					return writeStreamResponse(
+						body,
+						rawResponse,
+						status,
+						contentType,
+						mode,
+					);
+				}
+
+				return new StreamableFile(createNodeResponseStream(body, mode), {
+					type: contentType,
+				});
+			},
 		});
 	}
 }

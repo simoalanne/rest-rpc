@@ -66,7 +66,7 @@ export const hoverApi = {
 			.get("/todos/:id/export")
 			.params(schemaType<{ id: string }>())
 			.customResponse(200, {
-				schema: schemaType<Blob>(),
+				schema: schemaType<Uint8Array>(),
 				contentType: ["text/csv", "application/json"] as const,
 			}),
 		events: route

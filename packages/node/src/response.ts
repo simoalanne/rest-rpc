@@ -15,7 +15,7 @@ const formatResponseStreamChunk = (
 ) => {
 	if (mode === "ndjson") return `${JSON.stringify(chunk)}\n`;
 	if (mode === "sse") return formatSseEvent(chunk as SseEvent<unknown>);
-	return chunk;
+	return chunk instanceof Uint8Array ? chunk : String(chunk);
 };
 
 const frameResponseStream = async function* (
@@ -73,11 +73,9 @@ export function writeNodeResponse(
 				res.setHeader("content-type", "application/json");
 			res.end(json);
 		},
-		sendCustom: async (status, body) => {
+		sendCustom: (status, body) => {
 			res.statusCode = status;
-			if (body instanceof Blob) body = new Uint8Array(await body.arrayBuffer());
-			if (body instanceof ArrayBuffer) body = new Uint8Array(body);
-			res.end(body);
+			res.end(body instanceof Uint8Array ? body : String(body));
 		},
 		sendStream: ({ status, body, contentType, mode }) =>
 			writeStreamResponse(body, res, status, contentType, mode),

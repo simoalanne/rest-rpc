@@ -579,6 +579,20 @@ route(customResponseApi.reports.csv, () => ({
 	body: "id,title\n1,First\n",
 }));
 
+const transformedCustomResponse = coreRoute
+	.get("/transformed-report.txt")
+	.customResponse(200, {
+		contentType: "text/plain",
+		schema: z.number().transform(String),
+	});
+route(transformedCustomResponse, () => ({ status: 200 as const, body: 42 }));
+expectError(
+	route(transformedCustomResponse, () => ({
+		status: 200 as const,
+		body: "42",
+	})),
+);
+
 async function* csvRows() {
 	yield "id,title\n";
 	yield "1,First\n";

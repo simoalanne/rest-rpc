@@ -7,6 +7,7 @@ import {
 	type WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
 import { route, type as schemaType } from "@rest-rpc/core";
+import z from "zod";
 import {
 	expectAssignable,
 	expectError,
@@ -31,6 +32,8 @@ const scalarQuery = schemaType<{
 	enabled: boolean;
 }>();
 const scalarParams = schemaType<{ accountId: string; version: number }>();
+const customText = schemaType<string>();
+const customBytes = schemaType<Uint8Array>();
 
 const apiRoute = route.with({
 	pathPrefix: "/api",
@@ -107,7 +110,7 @@ expectType<{
 const importRoute = route
 	.post("/imports")
 	.formBody({ schema: input, arrayKeys: ["title"] })
-	.customResponse(201, { contentType: "text/csv", schema: todo });
+	.customResponse(201, { contentType: "text/csv", schema: customText });
 
 expectType<"formBody">(importRoute.request.body.kind);
 expectType<typeof input>(importRoute.request.body.schema);
@@ -144,6 +147,30 @@ const customRequestBodySchema = route
 	.response(201);
 expectType<typeof input>(customRequestBodySchema.request.body.schema);
 
+// Custom response schemas constrain their output while preserving their input.
+const transformedCustomText = z.number().transform(String);
+const transformedCustomResponse = route
+	.get("/transformed-custom-response")
+	.customResponse(200, {
+		contentType: "text/plain",
+		schema: transformedCustomText,
+	});
+expectType<typeof transformedCustomText>(
+	transformedCustomResponse.responses[200].schema,
+);
+expectError(
+	route.get("/invalid-custom-response").customResponse(200, {
+		contentType: "application/json",
+		schema: z.object({ value: z.string() }),
+	}),
+);
+expectError(
+	route.get("/invalid-custom-stream-response").customStreamResponse(200, {
+		contentType: "application/octet-stream",
+		schema: z.instanceof(ArrayBuffer),
+	}),
+);
+
 // Preserves query and streaming response inference.
 const search = route.get("/search").jsonQuery(input).streamResponse(200, todo);
 expectType<"jsonQuery">(search.request.query.kind);
@@ -174,11 +201,11 @@ const typedResponses = route
 	.response(200, { body: todo, headers: typedResponseHeaders })
 	.customStreamResponse(201, {
 		contentType: "application/octet-stream",
-		schema: input,
+		schema: customBytes,
 	});
 expectType<typeof todo>(typedResponses.responses[200].body);
 expectType<typeof typedResponseHeaders>(typedResponses.responses[200].headers);
-expectType<typeof input>(typedResponses.responses[201].schema.schema);
+expectType<typeof customBytes>(typedResponses.responses[201].schema.schema);
 expectError(
 	route.get("/invalid-response-headers").response(200, {
 		body: todo,
@@ -218,27 +245,27 @@ expectAssignable<HttpRouteDeclaration>(duplicateResponseStatus);
 const mixedResponses = route
 	.get("/responses")
 	.response(200, todo)
-	.customResponse(201, { contentType: "text/csv", schema: input })
+	.customResponse(201, { contentType: "text/csv", schema: customText })
 	.streamResponse(202, event)
 	.customStreamResponse(203, {
 		contentType: "application/octet-stream",
-		schema: unauthorized,
+		schema: customBytes,
 	});
 
 expectType<typeof todo>(mixedResponses.responses[200]);
 expectType<"customBody">(mixedResponses.responses[201].kind);
-expectType<typeof input>(mixedResponses.responses[201].schema);
+expectType<typeof customText>(mixedResponses.responses[201].schema);
 expectType<"stream">(mixedResponses.responses[202].kind);
 expectType<typeof event>(mixedResponses.responses[202].schema);
 expectType<"stream">(mixedResponses.responses[203].kind);
 expectType<"customBody">(mixedResponses.responses[203].schema.kind);
-expectType<typeof unauthorized>(mixedResponses.responses[203].schema.schema);
+expectType<typeof customBytes>(mixedResponses.responses[203].schema.schema);
 expectAssignable<HttpRouteDeclaration>(mixedResponses);
 
 // Keeps unused request and route configuration available after a response.
 const configuredAfterResponse = route
 	.post("/configured-after-response")
-	.customResponse(200, { contentType: "text/plain", schema: todo })
+	.customResponse(200, { contentType: "text/plain", schema: customText })
 	.body(input)
 	.jsonQuery(schemaType<{ search: string }>())
 	.params(schemaType<{ id: string }>())
@@ -249,7 +276,7 @@ const configuredAfterResponse = route
 	.streamResponse(201, event);
 expectType<typeof input>(configuredAfterResponse.request.body);
 expectType<"jsonQuery">(configuredAfterResponse.request.query.kind);
-expectType<typeof todo>(configuredAfterResponse.responses[200].schema);
+expectType<typeof customText>(configuredAfterResponse.responses[200].schema);
 expectType<typeof event>(configuredAfterResponse.responses[201].schema);
 expectType<{ readonly auth: true }>(configuredAfterResponse.metadata);
 expectType<OpenApiRouteOptions>(configuredAfterResponse.openApi);

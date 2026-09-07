@@ -178,7 +178,7 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 			assert.equal(await response.body.text(), "plain response");
 		});
 
-		it("receives non-stream custom binary response bodies as exact bytes", async () => {
+		it("receives Uint8Array custom response bodies as exact bytes", async () => {
 			const response = await client.responses.binary.fetchResponse();
 
 			assert.equal(response.declared, true);

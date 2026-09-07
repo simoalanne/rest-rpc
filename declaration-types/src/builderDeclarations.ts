@@ -7,6 +7,7 @@
 import { route, type as schemaType } from "@rest-rpc/core";
 
 const scalar = schemaType<{ value: string }>();
+const customResponseScalar = schemaType<string>();
 const query = schemaType<{ search?: string }>();
 const params = schemaType<{ id: string }>();
 const headers = schemaType<{ authorization?: string }>();
@@ -62,14 +63,17 @@ export const responseHeadersRoute = route
 	});
 export const customResponseRoute = route
 	.get("/custom-response")
-	.customResponse(200, { schema: scalar, contentType: "text/plain" });
+	.customResponse(200, {
+		schema: customResponseScalar,
+		contentType: "text/plain",
+	});
 export const streamResponseRoute = route
 	.get("/stream-response")
 	.streamResponse(200, scalar);
 export const customStreamResponseRoute = route
 	.get("/custom-stream-response")
 	.customStreamResponse(200, {
-		schema: scalar,
+		schema: customResponseScalar,
 		contentType: "application/octet-stream",
 	});
 

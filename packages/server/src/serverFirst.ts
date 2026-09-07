@@ -3,6 +3,7 @@ import type {
 	BuilderExtension,
 	BuilderMetadata,
 	CustomResponseBody,
+	CustomResponseValue,
 	HttpBuilderDeclaration,
 	HttpBuilderFor,
 	HttpBuilderState,
@@ -101,10 +102,12 @@ type ImplicitResponseDeclaration<TResponse> = TResponse extends {
 }
 	? TBody extends AsyncIterable<infer TItem>
 		? TResponse extends { contentType: infer TContentType extends string }
-			? Stream<CustomResponseBody<ClientSchema<TItem>, TContentType>>
+			? Stream<
+					CustomResponseBody<ClientSchema<CustomResponseValue>, TContentType>
+				>
 			: Stream<ClientSchema<TItem>>
 		: TResponse extends { contentType: infer TContentType extends string }
-			? CustomResponseBody<ClientSchema<TBody>, TContentType>
+			? CustomResponseBody<ClientSchema<CustomResponseValue>, TContentType>
 			: ClientSchema<TBody>
 	: NoBody;
 

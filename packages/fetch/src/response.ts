@@ -23,9 +23,9 @@ const encodeResponseStream = async function* (
 				yield encoder.encode(formatSseEvent(chunk as SseEvent<unknown>));
 				break;
 			default:
-				yield typeof chunk === "string"
-					? encoder.encode(chunk)
-					: (chunk as Uint8Array);
+				yield chunk instanceof Uint8Array
+					? chunk
+					: encoder.encode(String(chunk));
 		}
 	}
 };
@@ -75,7 +75,7 @@ export function createFetchResponse(
 			return new Response(JSON.stringify(body), { status, headers });
 		},
 		sendCustom: (status, body) =>
-			new Response(body as ConstructorParameters<typeof Response>[0], {
+			new Response(body instanceof Uint8Array ? body : String(body), {
 				status,
 				headers,
 			}),
