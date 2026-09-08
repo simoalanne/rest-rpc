@@ -196,9 +196,6 @@ describe("handleHttpRoute", () => {
 					etag: "todo-etag",
 					"x-optional": undefined,
 				},
-				headers: {
-					"cache-control": "private",
-				},
 			}),
 			{ request: {}, context: {} },
 		);
@@ -207,34 +204,10 @@ describe("handleHttpRoute", () => {
 			kind: "json",
 			status: 200,
 			headers: {
-				"cache-control": "private",
 				etag: "todo-etag",
 			},
 			body: { id: "todo-1" },
 		});
-	});
-
-	it("rejects duplicate declared and raw response headers", async () => {
-		await assert.rejects(
-			() =>
-				handleHttpRoute(
-					coreRoute.get("/todos").response(200, {
-						body: z.object({ id: z.string() }),
-						headers: z.object({ etag: z.string() }),
-					}),
-					() => ({
-						status: 200 as const,
-						body: { id: "todo-1" },
-						responseHeaders: { etag: "declared" },
-						headers: { ETag: "raw" },
-					}),
-					{ request: {}, context: {} },
-				),
-			(error) =>
-				error instanceof Error &&
-				!(error instanceof ResponseValidationError) &&
-				/returned more than once/.test(error.message),
-		);
 	});
 
 	it("normalizes declared RouteResponseError responses", async () => {

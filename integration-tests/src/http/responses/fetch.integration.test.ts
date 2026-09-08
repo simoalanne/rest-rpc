@@ -75,9 +75,6 @@ const createLifecycleImplementations = () => {
 
 			return {
 				status: 200 as const,
-				headers: {
-					"x-contract-result": "returned",
-				},
 				body: { ok: true as const },
 			};
 		},
@@ -128,7 +125,6 @@ describe("fetch response lifecycle integration", () => {
 
 		assert.equal(response.declared, true);
 		assert.equal(response.status, 200);
-		assert.equal(response.headers.get("x-contract-result"), "returned");
 		assert.equal(response.headers.get("x-context-mutation"), null);
 		assert.equal(response.headers.get("x-context-response-mutation"), null);
 		assert.equal(response.headers.get("x-initial-context-response"), null);

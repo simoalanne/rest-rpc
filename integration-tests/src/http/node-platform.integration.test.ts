@@ -22,14 +22,6 @@ test("Node decodes chunked large JSON, multipart and repeated headers", async (t
 				status: 200,
 				body: { bytes: body.file.size, tags: body.tags },
 			})),
-		cookies: route
-			.get("/cookies")
-			.response(200, type<string>())
-			.handler(() => ({
-				status: 200,
-				headers: { "set-cookie": ["a=1", "b=2"] },
-				body: "ok",
-			})),
 	});
 	const server = await listen(
 		createServer(async (req, res) => {
@@ -73,7 +65,4 @@ test("Node decodes chunked large JSON, multipart and repeated headers", async (t
 		).json(),
 		{ bytes: 128 * 1024, tags: ["a", "b"] },
 	);
-	const cookies = await fetch(`${server.origin}/cookies`);
-	assert.deepEqual(cookies.headers.getSetCookie(), ["a=1", "b=2"]);
-	await cookies.text();
 });

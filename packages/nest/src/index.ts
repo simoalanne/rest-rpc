@@ -12,19 +12,12 @@ import {
 import type { DefaultNestContext, NestHandlerContext } from "./module.ts";
 
 export type {
-	ClearCookieOptions,
 	RouteErrors,
 	RouteResponse,
 	RouteResponseShorthand,
-	SetCookieOptions,
 	SseEvent,
 } from "@rest-rpc/server";
-export {
-	clearCookie,
-	RouteResponseError,
-	setCookie,
-	sseEvent,
-} from "@rest-rpc/server";
+export { RouteResponseError, sseEvent } from "@rest-rpc/server";
 export { Route, Router } from "./decorators.ts";
 export type {
 	DefaultNestContext,

@@ -75,9 +75,6 @@ export const createIntegrationHandlers = (): IntegrationHandlers => ({
 				"x-declared-result": "declared-value",
 				"x-optional-result": undefined,
 			},
-			headers: {
-				"x-integration-result": "header-value",
-			},
 		}),
 		text: () => "plain response",
 		undeclared: () => ({

@@ -17,7 +17,6 @@ import {
 import type { Request } from "express";
 
 export type {
-	ClearCookieOptions,
 	RouteErrors,
 	RouteReceived,
 	RouteRequestData,
@@ -25,7 +24,6 @@ export type {
 	RouteResponseShorthand,
 	RouteSent,
 	RouteSocket,
-	SetCookieOptions,
 	SseEvent,
 } from "@rest-rpc/server";
 export type {
@@ -36,11 +34,9 @@ export type {
 export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
 export {
-	clearCookie,
 	RequestValidationError,
 	ResponseValidationError,
 	RouteResponseError,
-	setCookie,
 	sseEvent,
 } from "@rest-rpc/server";
 

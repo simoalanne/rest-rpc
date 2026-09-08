@@ -12,7 +12,6 @@ import type {
 	WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
 import { REQUEST_CONTEXT_KEY } from "@rest-rpc/core/contract";
-import type { HttpHeaders } from "./headers.ts";
 import type { SseEvent } from "./sse.ts";
 
 export type EmptyObject = Record<never, never>;
@@ -128,8 +127,7 @@ type ExcludeResponseEnvelopeLike<T> = T extends unknown
 	: never;
 
 type HandlerResult<E extends ServerHttpRouteDeclaration> = MaybePromise<
-	| (RouteResponse<E> & { headers?: HttpHeaders })
-	| ExcludeResponseEnvelopeLike<RouteResponseShorthand<E>>
+	RouteResponse<E> | ExcludeResponseEnvelopeLike<RouteResponseShorthand<E>>
 >;
 
 type SseHandlerResult<E extends ServerHttpRouteDeclaration> = MaybePromise<

@@ -11,12 +11,6 @@ type ResponsesSuiteAdapter = {
 	start(): Promise<StartedServer>;
 };
 
-const getSetCookieHeaders = (headers: Headers): string[] =>
-	(headers as Headers & { getSetCookie(): string[] }).getSetCookie();
-
-const toCookieHeader = (setCookieHeaders: string[]) =>
-	setCookieHeaders.map((value) => value.split(";")[0]).join("; ");
-
 export const runResponsesSuite = (adapter: ResponsesSuiteAdapter) => {
 	describe(`${adapter.name} responses integration`, () => {
 		let server: StartedServer;
@@ -29,51 +23,6 @@ export const runResponsesSuite = (adapter: ResponsesSuiteAdapter) => {
 
 		after(async () => {
 			await server.close();
-		});
-
-		it("preserves explicit JSON content-type headers", async () => {
-			const response = await client.jsonContentType.fetchResponse();
-
-			assert.equal(response.declared, true);
-			assert.equal(response.status, 200);
-			assert.match(
-				response.headers.get("content-type") ?? "",
-				/^application\/vnd\.rest-rpc\+json(?:;|$)/,
-			);
-			assert.deepEqual(response.body, { ok: true });
-		});
-
-		it("skips undefined headers and serializes multiple header values", async () => {
-			const response = await client.headers.fetchResponse();
-
-			assert.equal(response.declared, true);
-			assert.equal(response.status, 200);
-			assert.equal(response.headers.get("x-defined"), "defined");
-			assert.equal(response.headers.get("x-skipped"), null);
-			assert.equal(response.headers.get("x-multi"), "first, second");
-			assert.deepEqual(response.body, { ok: true });
-		});
-
-		it("preserves set-cookie array headers as usable cookie values", async () => {
-			const issueResponse = await client.cookies.issue.fetchResponse();
-			const setCookieHeaders = getSetCookieHeaders(issueResponse.headers);
-
-			assert.equal(issueResponse.declared, true);
-			assert.equal(issueResponse.status, 200);
-			assert.deepEqual(setCookieHeaders, [
-				"rest_rpc_session=session-1; Path=/; HttpOnly; SameSite=Lax",
-				"rest_rpc_theme=dark; Path=/; SameSite=Lax",
-			]);
-
-			const readResponse = await client.cookies.read.fetchResponse({
-				cookie: toCookieHeader(setCookieHeaders),
-			});
-
-			assert.equal(readResponse.declared, true);
-			assert.equal(readResponse.status, 200);
-			assert.deepEqual(readResponse.body, {
-				cookie: "rest_rpc_session=session-1; rest_rpc_theme=dark",
-			});
 		});
 
 		it("returns undeclared runtime response status and body", async () => {

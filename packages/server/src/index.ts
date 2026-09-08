@@ -1,6 +1,3 @@
-export type { ClearCookieOptions, SetCookieOptions } from "./cookies.ts";
-export { clearCookie, setCookie } from "./cookies.ts";
-
 export type {
 	HandleHttpRouteOptions,
 	HttpRouteResult,

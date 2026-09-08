@@ -142,14 +142,12 @@ const normalizeHandlerResultEnvelopeOrShorthand = (
 ): {
 	status: number;
 	body: unknown;
-	headers?: HttpHeaders;
 	responseHeaders?: Record<string, unknown>;
 } => {
 	if (result && typeof result === "object" && "status" in result) {
 		return result as {
 			status: number;
 			body: unknown;
-			headers?: HttpHeaders;
 			responseHeaders?: Record<string, unknown>;
 		};
 	}
@@ -165,31 +163,6 @@ const normalizeHandlerResultEnvelopeOrShorthand = (
 		status,
 		body: result,
 	};
-};
-
-const assertNoHeaderConflicts = (
-	declared: HttpHeaders,
-	raw: HttpHeaders | undefined,
-) => {
-	if (!raw) return;
-
-	const rawHeaderNames = new Set(
-		Object.keys(raw).map((name) => name.toLowerCase()),
-	);
-	for (const name of Object.keys(declared)) {
-		if (!rawHeaderNames.has(name.toLowerCase())) continue;
-
-		throw new Error(`Response header "${name}" was returned more than once.`);
-	}
-};
-
-const mergeResponseHeaders = (
-	declared: HttpHeaders | undefined,
-	raw: HttpHeaders | undefined,
-): HttpHeaders | undefined => {
-	if (!declared || Object.keys(declared).length === 0) return raw;
-	assertNoHeaderConflicts(declared, raw);
-	return { ...raw, ...declared };
 };
 
 const normalizeCustomBodyResult = async (schema: CustomBody, body: unknown) => {
@@ -210,7 +183,6 @@ const normalizeResponseResult = async (
 	result: {
 		status: number;
 		body: unknown;
-		headers?: HttpHeaders;
 		responseHeaders?: Record<string, unknown>;
 	},
 ): Promise<HttpRouteResult> => {
@@ -220,7 +192,7 @@ const normalizeResponseResult = async (
 		schema,
 		result.responseHeaders,
 	);
-	const headers = mergeResponseHeaders(declaredHeaders, result.headers);
+	const headers = declaredHeaders;
 
 	if (bodySchema && isNoBody(bodySchema)) {
 		return {

@@ -204,18 +204,8 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 				response.responseHeaders["x-declared-result"],
 				"declared-value",
 			);
-			assert.equal(
-				(response.responseHeaders as Record<string, unknown>)[
-					"x-integration-result"
-				],
-				"header-value",
-			);
 			assert.equal(response.headers.get("x-declared-result"), "declared-value");
 			assert.equal(response.headers.get("x-optional-result"), null);
-			assert.equal(
-				response.headers.get("x-integration-result"),
-				"header-value",
-			);
 		});
 
 		it("receives NDJSON streams as async iterables", async () => {

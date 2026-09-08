@@ -86,9 +86,6 @@ const createLifecycleImplementations = () => {
 
 			return {
 				status: 200 as const,
-				headers: {
-					"x-contract-result": "returned",
-				},
 				body: { ok: true as const },
 			};
 		},
@@ -127,7 +124,6 @@ describe("hono response lifecycle integration", () => {
 
 		assert.equal(response.declared, true);
 		assert.equal(response.status, 200);
-		assert.equal(response.headers.get("x-contract-result"), "returned");
 		assert.equal(response.headers.get("x-context-mutation"), null);
 		assert.deepEqual(getSetCookieHeaders(response.headers), []);
 		assert.deepEqual(response.body, { ok: true });
