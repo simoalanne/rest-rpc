@@ -106,7 +106,6 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 		it("does not JSON-frame raw custom streams", async () => {
 			const response = await client.rawText.fetchResponse();
 
-			assert.equal(response.declared, true);
 			assert.equal(response.status, 200);
 			assert.match(
 				response.body.headers.get("content-type") ?? "",
@@ -118,7 +117,6 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 		it("streams raw binary custom chunks without text encoding", async () => {
 			const response = await client.rawBytes.fetchResponse();
 
-			assert.equal(response.declared, true);
 			assert.equal(response.status, 200);
 			assert.match(
 				response.body.headers.get("content-type") ?? "",

@@ -1,5 +1,6 @@
 import {
 	type Contract,
+	type HttpStatusCode,
 	type HttpRouteDeclaration,
 	type OpenApiRouteOptions,
 	type RouteMetadata,
@@ -34,6 +35,13 @@ const scalarQuery = schemaType<{
 const scalarParams = schemaType<{ accountId: string; version: number }>();
 const customText = schemaType<string>();
 const customBytes = schemaType<Uint8Array>();
+
+expectAssignable<HttpStatusCode>(100);
+expectAssignable<HttpStatusCode>(599);
+expectNotAssignable<HttpStatusCode>(0);
+expectNotAssignable<HttpStatusCode>(600);
+expectError(route.get("/invalid-zero-status").response(0));
+expectError(route.get("/invalid-high-status").response(600));
 
 const apiRoute = route.with({
 	pathPrefix: "/api",

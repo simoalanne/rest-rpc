@@ -263,12 +263,22 @@ expectType<Promise<{ id: string; title: string }>>(
 responseClient.todos.create
 	.fetchResponse({ title: "Write type tests" })
 	.then((response) => {
-		if (response.declared) {
+		expectError(response.declared);
+		if (response.status === 201) {
 			expectType<201>(response.status);
 			expectType<{ id: string; title: string }>(response.body);
 			expectType<string>(response.responseHeaders.location);
 			expectType<string | undefined>(response.responseHeaders["x-next-cursor"]);
 			expectType<Headers>(response.headers);
+		}
+
+		if ("rawResponse" in response) {
+			expectType<Response>(response.rawResponse);
+			expectError(response.headers);
+			expectError(response.body);
+		} else {
+			expectType<201>(response.status);
+			expectError(response.rawResponse);
 		}
 	});
 
@@ -394,7 +404,7 @@ const csvResponseClient = initClient(csvResponseApi, {
 expectType<Promise<Response>>(csvResponseClient.todos.exportCsv.fetch());
 
 csvResponseClient.todos.exportCsv.fetchResponse().then((response) => {
-	if (response.declared) {
+	if (response.status === 200) {
 		expectType<"text/csv">(response.contentType);
 		expectType<Response>(response.body);
 	}
@@ -418,7 +428,7 @@ const imageResponseClient = initClient(imageResponseApi, {
 expectType<Promise<Response>>(imageResponseClient.todos.exportImage.fetch());
 
 imageResponseClient.todos.exportImage.fetchResponse().then((response) => {
-	if (response.declared) {
+	if (response.status === 200) {
 		expectType<"image/png" | "image/jpeg">(response.contentType);
 		expectType<Response>(response.body);
 	}

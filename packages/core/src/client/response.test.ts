@@ -63,7 +63,6 @@ describe("ApiClient responses", () => {
 		const response = await client.todos.get.fetchResponse({ id: "missing" });
 
 		assert.deepEqual(response, {
-			declared: true,
 			status: 404,
 			headers: new Headers(),
 			body: { code: "not_found" },
@@ -103,8 +102,6 @@ describe("ApiClient responses", () => {
 
 		const response = await client.todos.get.fetchResponse({ id: "todo-1" });
 
-		assert.equal(response.declared, true);
-		if (!response.declared) throw new Error("Expected declared response");
 		assert.deepEqual(response.responseHeaders, {
 			etag: "todo-etag",
 			"x-count": 3,
@@ -124,8 +121,9 @@ describe("ApiClient responses", () => {
 		);
 	});
 
-	it("returns undeclared JSON response bodies", async () => {
-		captureFetch(jsonResponse({ code: "teapot" }, 418));
+	it("returns undeclared responses without consuming their bodies", async () => {
+		const rawResponse = jsonResponse({ code: "teapot" }, 418);
+		captureFetch(rawResponse);
 		const client = initClient(createResponseTestContract(), {
 			baseUrl: "https://api.test",
 		});
@@ -133,11 +131,22 @@ describe("ApiClient responses", () => {
 		const response = await client.todos.get.fetchResponse({ id: "todo-1" });
 
 		assert.deepEqual(response, {
-			declared: false,
 			status: 418,
-			headers: new Headers(),
-			body: { code: "teapot" },
+			rawResponse,
 		});
+		assert.equal(rawResponse.bodyUsed, false);
+	});
+
+	it("rejects response statuses outside the HTTP range", async () => {
+		captureFetch(Response.error());
+		const client = initClient(createResponseTestContract(), {
+			baseUrl: "https://api.test",
+		});
+
+		await assert.rejects(
+			() => client.todos.get.fetchResponse({ id: "todo-1" }),
+			/invalid HTTP response status "0"/,
+		);
 	});
 
 	it("rejects undeclared response statuses when strict status codes are enabled", async () => {
@@ -197,7 +206,7 @@ describe("ApiClient responses", () => {
 		assert.equal(response.body.createdAt, "2026-08-10T00:00:00.000Z");
 	});
 
-	it("returns undeclared text and empty response bodies", async () => {
+	it("preserves undeclared text and empty responses", async () => {
 		captureFetch((url) =>
 			String(url).includes("empty")
 				? new Response(null, { status: 418 })
@@ -210,8 +219,8 @@ describe("ApiClient responses", () => {
 		const textResponse = await client.todos.get.fetchResponse({ id: "text" });
 		const emptyResponse = await client.todos.get.fetchResponse({ id: "empty" });
 
-		assert.equal(textResponse.body, "plain error");
-		assert.equal(emptyResponse.body, undefined);
+		assert.equal(await textResponse.rawResponse.text(), "plain error");
+		assert.equal(await emptyResponse.rawResponse.text(), "");
 	});
 
 	it("trusts declared response bodies by default", async () => {
@@ -477,7 +486,6 @@ describe("ApiClient responses", () => {
 
 		const response = await client.reports.csv.fetchResponse();
 
-		assert.equal(response.declared, true);
 		assert.equal(response.contentType, "text/csv");
 		assert.ok(response.body instanceof Response);
 		assert.equal(response.body.headers.get("content-type"), "text/csv");
@@ -503,7 +511,6 @@ describe("ApiClient responses", () => {
 
 		const response = await client.reports.image.fetchResponse();
 
-		assert.equal(response.declared, true);
 		assert.equal(response.status, 200);
 		assert.equal(response.contentType, "image/jpeg");
 		assert.ok(response.body instanceof Response);

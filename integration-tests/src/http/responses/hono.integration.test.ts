@@ -122,7 +122,6 @@ describe("hono response lifecycle integration", () => {
 	it("ignores Hono context response mutations when returning a contract response", async () => {
 		const response = await client.contextMutation.fetchResponse();
 
-		assert.equal(response.declared, true);
 		assert.equal(response.status, 200);
 		assert.equal(response.headers.get("x-context-mutation"), null);
 		assert.deepEqual(getSetCookieHeaders(response.headers), []);
@@ -132,13 +131,12 @@ describe("hono response lifecycle integration", () => {
 	it("treats returned Response objects as invalid route response bodies", async () => {
 		const response = await client.returnResponse.fetchResponse();
 
-		assert.equal(response.declared, false);
 		assert.equal(response.status, 500);
 		assert.equal(
-			response.headers.get("x-error-handler"),
+			response.rawResponse.headers.get("x-error-handler"),
 			"response-validation",
 		);
-		assert.deepEqual(response.body, {
+		assert.deepEqual(await response.rawResponse.json(), {
 			code: "INVALID_RESPONSE",
 			path: "/responses/lifecycle/return-response",
 		});

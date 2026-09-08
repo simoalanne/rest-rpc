@@ -5,6 +5,20 @@ import { type } from "../standard-schema/index.ts";
 import { route } from "./routeFactory.ts";
 
 describe("HTTP route builder runtime", () => {
+	it("rejects invalid HTTP response statuses", () => {
+		assert.throws(
+			() => route.get("/invalid").response(600 as never),
+			/Invalid HTTP response status "600"/,
+		);
+		assert.throws(
+			() =>
+				route
+					.with({ responses: { 99: type<string>() } } as never)
+					.get("/invalid"),
+			/Invalid HTTP response status "99"/,
+		);
+	});
+
 	it("constructs every HTTP method and keeps methods non-enumerable", () => {
 		for (const [factory, method] of [
 			[route.get, "GET"],

@@ -26,7 +26,6 @@ describe("createRouteApi", () => {
 			async (...args) => {
 				fetchResponseCalls.push(args);
 				return {
-					declared: true,
 					status: 200,
 					body: { id: "item-1" },
 				};
@@ -57,7 +56,6 @@ describe("createRouteApi", () => {
 			async (...args) => {
 				fetchResponseCalls.push(args);
 				return {
-					declared: true,
 					status: 200,
 					body: { id: "item-1" },
 				};
@@ -90,7 +88,6 @@ describe("createRouteApi", () => {
 			routeWithRequest,
 			routeWithRequestPath,
 			async () => ({
-				declared: true,
 				status: 200,
 				body: {},
 			}),
@@ -110,7 +107,6 @@ describe("createRouteApi", () => {
 			routeWithRequest,
 			routeWithRequestPath,
 			async () => ({
-				declared: true,
 				status: 200,
 				body: {},
 			}),
@@ -127,7 +123,6 @@ describe("createRouteApi", () => {
 			routeWithRequest,
 			routeWithRequestPath,
 			async () => ({
-				declared: true,
 				status: 200,
 				body: {},
 			}),
@@ -150,7 +145,6 @@ describe("createRouteApi", () => {
 			async (...args) => {
 				fetchResponseCalls.push(args);
 				return {
-					declared: true,
 					status: 200,
 					body: { items: [] },
 				};
@@ -176,7 +170,6 @@ describe("createRouteApi", () => {
 			async (...args) => {
 				fetchResponseCalls.push(args);
 				return {
-					declared: true,
 					status: 201,
 					body: { id: "item-2" },
 				};
@@ -208,7 +201,6 @@ describe("createRouteApi", () => {
 			async (...args) => {
 				fetchResponseCalls.push(args);
 				return {
-					declared: true,
 					status: 200,
 					body: { items: [], nextCursor: "cursor-2" },
 				};
@@ -249,7 +241,6 @@ describe("createRouteApi", () => {
 			routeWithRequest,
 			routeWithRequestPath,
 			async () => ({
-				declared: true,
 				status: 200,
 				body: {},
 			}),
@@ -269,7 +260,6 @@ describe("createRouteApi", () => {
 			routeWithRequest,
 			routeWithRequestPath,
 			async () => ({
-				declared: true,
 				status: 200,
 				body: {},
 			}),

@@ -20,6 +20,7 @@ export type {
 	ClientSseReceived,
 	ClientSent,
 	Contract,
+	HttpStatusCode,
 	RouteDeclaration,
 } from "./contract/index.ts";
 export type { ClientRequest } from "./contract/request.ts";

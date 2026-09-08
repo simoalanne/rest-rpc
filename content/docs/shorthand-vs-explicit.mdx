@@ -327,24 +327,32 @@ Use `fetchResponse()` when HTTP status is normal control flow.
 ```ts
 const response = await client.todos.get.fetchResponse({ id: "todo_1" });
 
-if (response.declared && response.status === 200) {
+if (response.status === 200) {
 	response.body.title;
 }
 
-if (response.declared && response.status === 404) {
+if (response.status === 404) {
 	response.body.code;
 }
 ```
 
-Use `strictStatusCodes: true` when undeclared statuses should throw instead of
-being returned as `{ declared: false }`. Then `fetchResponse()` narrows to the
-declared status union and you can switch on `status` directly.
+Use `strictStatusCodes: true` on a route factory when undeclared statuses should
+throw instead of being returned through the native `rawResponse` property. Strict
+routes only return their declared status union.
 
 ```ts
-const client = initClient(api, {
-	baseUrl: "https://api.example.com",
-	strictStatusCodes: true,
-});
+const strictRoute = route.with({ strictStatusCodes: true });
+
+const api = {
+	todos: {
+		get: strictRoute
+			.get("/todos/:id")
+			.response(200, todoSchema)
+			.response(404, notFoundSchema),
+	},
+};
+
+const client = initClient(api, { baseUrl: "https://api.example.com" });
 
 const response = await client.todos.get.fetchResponse({ id: "todo_1" });
 
@@ -436,7 +444,7 @@ const todo = useQuery(
 				{ signal },
 			);
 
-			if (response.declared && response.status === 200) {
+			if (response.status === 200) {
 				return {
 					status: response.status,
 					body: response.body,
@@ -533,7 +541,7 @@ const todos = useInfiniteQuery(
 				signal,
 			});
 
-			if (response.declared && response.status === 200) {
+			if (response.status === 200) {
 				return {
 					status: response.status,
 					body: response.body,

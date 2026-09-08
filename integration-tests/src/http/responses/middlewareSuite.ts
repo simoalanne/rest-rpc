@@ -31,7 +31,6 @@ export const runResponseMiddlewareHeadersSuite = (
 		it("preserves headers written by framework middleware", async () => {
 			const response = await client.jsonContentType.fetchResponse();
 
-			assert.equal(response.declared, true);
 			assert.equal(response.status, 200);
 			for (const [name, value] of Object.entries(expectedHeaders)) {
 				assert.equal(response.headers.get(name), value);

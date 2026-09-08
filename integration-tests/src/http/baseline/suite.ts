@@ -98,7 +98,6 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 		it("receives declared 404 responses through fetchResponse", async () => {
 			const response = await client.items.get.fetchResponse({ id: "missing" });
 
-			assert.equal(response.declared, true);
 			assert.equal(response.status, 404);
 			assert.deepEqual(response.body, {
 				code: "not_found",
@@ -118,7 +117,6 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 				title: "Created item",
 			});
 
-			assert.equal(response.declared, true);
 			assert.equal(response.status, 201);
 			assert.deepEqual(response.body, {
 				id: "created-item",
@@ -132,7 +130,6 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 				async: false,
 			});
 
-			assert.equal(ok.declared, true);
 			assert.equal(ok.status, 200);
 			assert.deepEqual(ok.body, { id: "item-1", title: "Published item" });
 
@@ -141,7 +138,6 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 				async: true,
 			});
 
-			assert.equal(accepted.declared, true);
 			assert.equal(accepted.status, 202);
 			assert.deepEqual(accepted.body, {
 				queued: true,
@@ -155,7 +151,6 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 				body: "hello over real HTTP",
 			});
 
-			assert.equal(response.declared, true);
 			assert.equal(response.status, 200);
 			assertResponseBody(response.body);
 			assert.match(
@@ -168,7 +163,6 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 		it("receives custom response bodies as native Response objects", async () => {
 			const response = await client.responses.text.fetchResponse();
 
-			assert.equal(response.declared, true);
 			assert.equal(response.status, 200);
 			assertResponseBody(response.body);
 			assert.match(
@@ -181,7 +175,6 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 		it("receives Uint8Array custom response bodies as exact bytes", async () => {
 			const response = await client.responses.binary.fetchResponse();
 
-			assert.equal(response.declared, true);
 			assert.equal(response.status, 200);
 			assertResponseBody(response.body);
 			assert.match(
@@ -197,7 +190,6 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 		it("receives response headers", async () => {
 			const response = await client.responses.headers.fetchResponse();
 
-			assert.equal(response.declared, true);
 			assert.equal(response.status, 200);
 			assert.deepEqual(response.body, { ok: true });
 			assert.equal(
@@ -220,7 +212,6 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 		it("receives raw text streams as native Response objects", async () => {
 			const response = await client.streams.text.fetchResponse();
 
-			assert.equal(response.declared, true);
 			assert.equal(response.status, 200);
 			assertResponseBody(response.body);
 			assert.match(

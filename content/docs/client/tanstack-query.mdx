@@ -288,6 +288,7 @@ Declared 2xx responses become `data`.
 Declared non-2xx responses become `error`.
 
 Undeclared responses and runtime errors also become `error`.
+Undeclared responses contain the native `Response` object in `error.rawResponse`.
 
 This differs from `fetchResponse()`, which exposes declared non-2xx responses as
 values.

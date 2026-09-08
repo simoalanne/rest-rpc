@@ -30,7 +30,7 @@ import type {
 import { createRouteApi } from "./routeApi.ts";
 
 type ClientUndeclaredResponse<E extends RouteDeclaration> =
-	Extract<ClientResponse<E>, { declared: false }> extends infer TResponse
+	Extract<ClientResponse<E>, { rawResponse: Response }> extends infer TResponse
 		? Simplify<TResponse>
 		: never;
 

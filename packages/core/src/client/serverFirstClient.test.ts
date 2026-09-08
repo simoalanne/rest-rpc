@@ -11,7 +11,6 @@ type RuntimeRouteClient = {
 	fetchResponse: (...args: unknown[]) => Promise<{
 		body: unknown;
 		contentType?: string;
-		declared: true;
 		status: number;
 	}>;
 };

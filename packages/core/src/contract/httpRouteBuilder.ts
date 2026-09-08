@@ -33,6 +33,7 @@ import type {
 	RequestQuerySchema,
 } from "./request.ts";
 import type {
+	HttpStatusCode,
 	RegularResponseDeclaration,
 	ResponseDeclaration,
 	RouteResponses,
@@ -79,6 +80,12 @@ type HttpRouteFor<TOptions, TMethod extends HttpMethod> = {
 	? { readonly strictStatusCodes: TStrictStatusCodes }
 	: EmptyObject);
 
+const assertHttpStatusCode = (status: number) => {
+	if (!Number.isInteger(status) || status < 100 || status > 599) {
+		throw new Error(`Invalid HTTP response status "${status}".`);
+	}
+};
+
 const httpRequestDefaults = (
 	options: RouteFactoryOptions,
 ): RouteRequestDeclaration | undefined =>
@@ -116,6 +123,9 @@ class HttpRouteBuilder extends BaseRouteBuilder {
 			this.strictStatusCodes = options.strictStatusCodes;
 		}
 		if (options.responses) {
+			for (const status of Object.keys(options.responses)) {
+				assertHttpStatusCode(Number(status));
+			}
 			this.responses = { ...options.responses };
 		}
 	}
@@ -160,7 +170,8 @@ class HttpRouteBuilder extends BaseRouteBuilder {
 		return this;
 	}
 
-	private addResponse(status: number, schema: ResponseDeclaration) {
+	private addResponse(status: HttpStatusCode, schema: ResponseDeclaration) {
+		assertHttpStatusCode(status);
 		if (this.#localResponseStatuses.has(status)) {
 			throw new Error(
 				`Route declaration at path "${this.path}" has duplicate response status "${status}".`,
@@ -174,19 +185,19 @@ class HttpRouteBuilder extends BaseRouteBuilder {
 		return this;
 	}
 
-	response(status: number, schema?: RegularResponseDeclaration) {
+	response(status: HttpStatusCode, schema?: RegularResponseDeclaration) {
 		return this.addResponse(status, schema ?? { kind: "noBody" });
 	}
 
-	customResponse(status: number, input: CustomResponseInput) {
+	customResponse(status: HttpStatusCode, input: CustomResponseInput) {
 		return this.addResponse(status, { kind: "customBody", ...input });
 	}
 
-	streamResponse(status: number, schema: StandardSchemaV1) {
+	streamResponse(status: HttpStatusCode, schema: StandardSchemaV1) {
 		return this.addResponse(status, { kind: "stream", schema });
 	}
 
-	customStreamResponse(status: number, input: CustomResponseInput) {
+	customStreamResponse(status: HttpStatusCode, input: CustomResponseInput) {
 		return this.addResponse(status, {
 			kind: "stream",
 			schema: { kind: "customBody", ...input },
@@ -249,7 +260,7 @@ export type HttpBuilderAtPath<
 type HttpResponseSetters<TState extends HttpBuilderState> = {
 	/** Declares a response status and schema. @see {@link https://rest-rpc.dev/docs/contract/declaration#responses} */
 	response<
-		const TStatus extends number,
+		const TStatus extends HttpStatusCode,
 		const TSchema extends RegularResponseDeclaration | undefined = undefined,
 		const TPath extends string = string,
 		const TMetadata extends RouteMetadata | never = never,
@@ -268,7 +279,7 @@ type HttpResponseSetters<TState extends HttpBuilderState> = {
 	>;
 	/** Declares a custom-content response. @see {@link https://rest-rpc.dev/docs/http-responses#response-with-custom-content-type} */
 	customResponse<
-		const TStatus extends number,
+		const TStatus extends HttpStatusCode,
 		const TSchema extends StandardSchemaV1<unknown, CustomResponseValue>,
 		const TContentType extends CustomBodyContentType,
 		const TPath extends string = string,
@@ -284,7 +295,7 @@ type HttpResponseSetters<TState extends HttpBuilderState> = {
 	>;
 	/** Declares an NDJSON response stream. @see {@link https://rest-rpc.dev/docs/http-responses#streaming-ndjson-responses} */
 	streamResponse<
-		const TStatus extends number,
+		const TStatus extends HttpStatusCode,
 		const TSchema extends StandardSchemaV1,
 		const TPath extends string = string,
 		const TMetadata extends RouteMetadata | never = never,
@@ -299,7 +310,7 @@ type HttpResponseSetters<TState extends HttpBuilderState> = {
 	>;
 	/** Declares a custom-content response stream. @see {@link https://rest-rpc.dev/docs/http-responses#streaming-responses-with-custom-content-type} */
 	customStreamResponse<
-		const TStatus extends number,
+		const TStatus extends HttpStatusCode,
 		const TSchema extends StandardSchemaV1<unknown, CustomResponseValue>,
 		const TContentType extends CustomBodyContentType,
 		const TPath extends string = string,

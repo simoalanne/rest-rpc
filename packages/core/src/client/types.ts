@@ -3,6 +3,7 @@ import type { ClientRequest } from "../contract/request.ts";
 import type {
 	ClientResponseBody,
 	DeclaredClientResponse,
+	HttpStatusCode,
 } from "../contract/response.ts";
 import type { ClientSseReceived } from "../contract/sseRouteBuilder.ts";
 import type {
@@ -64,31 +65,25 @@ export type FetchFn<
 
 type Simplify<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
 
-type WithDeclaredResponseMetadata<TResponse, TMetadata> =
-	TResponse extends unknown ? Simplify<TResponse & TMetadata> : never;
+type WithResponseMetadata<TResponse, TMetadata> = TResponse extends unknown
+	? Simplify<TResponse & TMetadata>
+	: never;
 
-type RouteDeclaredResponse<E extends RouteDeclaration> =
-	WithDeclaredResponseMetadata<
-		DeclaredClientResponse<E>,
-		{
-			declared: true;
-			headers: Headers;
-		}
-	>;
+type RouteDeclaredResponse<E extends RouteDeclaration> = WithResponseMetadata<
+	DeclaredClientResponse<E>,
+	{
+		headers: Headers;
+	}
+>;
 
-type StrictRouteDeclaredResponse<E extends RouteDeclaration> =
-	WithDeclaredResponseMetadata<
-		DeclaredClientResponse<E>,
-		{
-			headers: Headers;
-		}
-	>;
+type DeclaredStatus<E extends RouteDeclaration> =
+	DeclaredClientResponse<E> extends { status: infer TStatus extends number }
+		? TStatus
+		: never;
 
-type RouteUndeclaredResponse = {
-	declared: false;
-	status: number;
-	body: unknown;
-	headers: Headers;
+type RouteUndeclaredResponse<E extends RouteDeclaration> = {
+	status: Exclude<HttpStatusCode, DeclaredStatus<E>>;
+	rawResponse: Response;
 };
 
 type IsStrictStatusRoute<E extends RouteDeclaration> = E extends {
@@ -107,8 +102,8 @@ export type ClientResponse<E extends RouteDeclaration> = E extends {
 }
 	? never
 	: IsStrictStatusRoute<E> extends true
-		? StrictRouteDeclaredResponse<E>
-		: RouteDeclaredResponse<E> | Simplify<RouteUndeclaredResponse>;
+		? RouteDeclaredResponse<E>
+		: RouteDeclaredResponse<E> | Simplify<RouteUndeclaredResponse<E>>;
 
 export type FetchResponseFn<
 	E extends RouteDeclaration,

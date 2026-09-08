@@ -96,6 +96,7 @@ export {
 export type {
 	DeclaredClientResponse,
 	ErrorDeclaredClientResponse,
+	HttpStatusCode,
 	ResponseBodySchema,
 	ResponseDeclaration,
 	ResponseHeaders,

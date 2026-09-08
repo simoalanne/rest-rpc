@@ -46,47 +46,51 @@ const response = await client.todos.get.fetchResponse({
 });
 ```
 
-`fetchResponse()` returns declared and undeclared responses as values.
+`fetchResponse()` returns `status` discriminated union for the response.
+Undeclared responses are returned as `rawResponse` with the native `Response` object.
 
 ```ts
-if (response.declared && response.status === 200) {
+if (response.status === 404) {
+	return;
+}
+
+if (response.status === 200) {
 	return response.body;
 }
 
-if (response.declared && response.status === 404) {
-	return undefined;
-}
-
-throw new Error(`Unexpected response: ${response.status}`);
+response.status; // Exclude<HttpStatusCode, 200 | 404>
+response.rawResponse; // Response
 ```
 
-Use it when HTTP status is part of normal control flow.
-
-Set `strictStatusCodes` to `true` when `fetchResponse()` should only return
-declared status codes.
+Set `strictStatusCodes` to `true` on a route factory when `fetchResponse()`
+should only return declared status codes and throw on undeclared statuses.
+This also narrows the return type to only declared statuses, excluding the `rawResponse` branch.
 
 ```ts
-const client = initClient(api, {
-	baseUrl: "https://api.example.com",
-	strictStatusCodes: true,
-});
-```
+const strictRoute = route.with({ strictStatusCodes: true });
 
-With strict status codes enabled, undeclared statuses throw and the response type
-narrows to the declared status union.
+const api = {
+	todos: {
+		get: strictRoute
+			.get("/todos/:id")
+			.response(200, todoSchema)
+			.response(404, notFoundSchema),
+	},
+};
+
+const client = initClient(api, { baseUrl: "https://api.example.com" });
+```
 
 ```ts
 const response = await client.todos.get.fetchResponse({
 	id: "todo_1",
 });
 
-if (response.status === 200) {
-	return response.body;
+if (response.status === 404) {
+	return;
 }
 
-if (response.status === 404) {
-	return undefined;
-}
+return response.body;
 ```
 
 ## Client Options
@@ -131,11 +135,6 @@ const client = initClient(api, {
 			type: "boolean",
 			default: "true",
 			description: "Rejects unknown request keys instead of stripping them.",
-		},
-		strictStatusCodes: {
-			type: "boolean",
-			default: "false",
-			description: "Throws when fetchResponse receives an undeclared status.",
 		},
 		validateResponses: {
 			type: "boolean",

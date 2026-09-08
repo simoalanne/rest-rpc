@@ -20,7 +20,6 @@ describe("fetchQueryData", () => {
 			async (...args) => {
 				calls.push(args);
 				return {
-					declared: true,
 					status: 200,
 					body: { id: "item-1" },
 				};
@@ -59,7 +58,6 @@ describe("fetchQueryData", () => {
 			async (...args) => {
 				calls.push(args);
 				return {
-					declared: true,
 					status: 200,
 					body: { items: [] },
 				};
@@ -77,7 +75,6 @@ describe("fetchQueryData", () => {
 			() =>
 				fetchQueryData(
 					async () => ({
-						declared: true,
 						status: 409,
 						body: { code: "ITEM_EXISTS" },
 					}),
@@ -93,9 +90,21 @@ describe("fetchQueryData", () => {
 
 	it("throws undeclared response envelopes unchanged", async () => {
 		const error = {
-			declared: false,
 			status: 500,
-			body: "server exploded",
+			rawResponse: new Response("server exploded", { status: 500 }),
+		};
+
+		await assert.rejects(
+			() => fetchQueryData(async () => error, routeWithoutRequest, undefined),
+			error,
+		);
+	});
+
+	it("throws undeclared 2xx responses instead of treating them as query data", async () => {
+		const rawResponse = new Response("unknown success", { status: 299 });
+		const error = {
+			status: 299,
+			rawResponse,
 		};
 
 		await assert.rejects(

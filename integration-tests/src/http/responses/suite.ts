@@ -25,12 +25,12 @@ export const runResponsesSuite = (adapter: ResponsesSuiteAdapter) => {
 			await server.close();
 		});
 
-		it("returns undeclared runtime response status and body", async () => {
+		it("returns undeclared runtime responses untouched", async () => {
 			const response = await client.undeclared.fetchResponse();
 
-			assert.equal(response.declared, false);
 			assert.equal(response.status, 418);
-			assert.deepEqual(response.body, {
+			assert.equal(response.rawResponse.bodyUsed, false);
+			assert.deepEqual(await response.rawResponse.json(), {
 				code: "TEAPOT",
 				message: "undeclared response",
 			});
@@ -39,13 +39,12 @@ export const runResponsesSuite = (adapter: ResponsesSuiteAdapter) => {
 		it("routes declared response validation failures through custom error handling", async () => {
 			const response = await client.invalidDeclared.fetchResponse();
 
-			assert.equal(response.declared, false);
 			assert.equal(response.status, 500);
 			assert.equal(
-				response.headers.get("x-error-handler"),
+				response.rawResponse.headers.get("x-error-handler"),
 				"response-validation",
 			);
-			assert.deepEqual(response.body, {
+			assert.deepEqual(await response.rawResponse.json(), {
 				code: "INVALID_RESPONSE",
 				path: "/responses/invalid-declared",
 			});

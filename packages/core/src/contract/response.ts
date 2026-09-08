@@ -2,6 +2,15 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { CustomBody, CustomResponseBody, NoBody, Stream } from "./body.ts";
 import type { BaseRouteDeclaration } from "./baseRouteDeclaration.ts";
 
+type StatusDigit = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+type StatusClass = 1 | 2 | 3 | 4 | 5;
+type NumericStatus<TStatus extends string> =
+	TStatus extends `${infer TNumber extends number}` ? TNumber : never;
+
+/** Any valid three-digit HTTP status code. */
+export type HttpStatusCode =
+	NumericStatus<`${StatusClass}${StatusDigit}${StatusDigit}`>;
+
 export type ResponseSchema = StandardSchemaV1;
 
 export type ResponseBodySchema =
@@ -40,7 +49,9 @@ export type ResponseDeclaration =
 			headers: ResponseHeaders;
 	  };
 
-export type RouteResponses = Record<number, ResponseDeclaration>;
+export type RouteResponses = Partial<
+	Record<HttpStatusCode, ResponseDeclaration>
+>;
 
 export type RouteResponseInput =
 	| { responses: RouteResponses; response?: never }

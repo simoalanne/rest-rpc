@@ -21,15 +21,13 @@ const normalizeError = (error: unknown) =>
 const isUndeclaredClientResponse = (
 	value: unknown,
 ): value is {
-	declared: false;
 	status: number;
-	body: unknown;
-	headers: Headers;
+	rawResponse: Response;
 } =>
 	typeof value === "object" &&
 	value !== null &&
-	"declared" in value &&
-	value.declared === false;
+	"rawResponse" in value &&
+	value.rawResponse instanceof Response;
 
 const isDeclaredResponse = (
 	value: unknown,
@@ -53,23 +51,21 @@ export const fetchQueryData = async (
 				? await fetchResponse(request, options)
 				: await fetchResponse(options)
 		) as {
-			declared?: boolean;
 			status: number;
 			headers?: Headers;
-			body: unknown;
+			body?: unknown;
+			rawResponse?: Response;
 		};
 
-		if (response.declared === false) {
+		if (response.rawResponse instanceof Response) {
 			throw response;
 		}
 
-		const { declared: _declared, ...declaredResponse } = response;
-
-		if (!isSuccessStatus(declaredResponse.status)) {
-			throw declaredResponse;
+		if (!isSuccessStatus(response.status)) {
+			throw response;
 		}
 
-		return declaredResponse;
+		return response;
 	} catch (error) {
 		if (isUndeclaredClientResponse(error) || isDeclaredResponse(error)) {
 			throw error;

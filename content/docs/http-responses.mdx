@@ -89,11 +89,11 @@ const response = await client.todos.get.fetchResponse({
 	id: "todo_1",
 });
 
-if (response.declared && response.status === 200) {
+if (response.status === 200) {
 	response.body.title;
 }
 
-if (response.declared && response.status === 404) {
+if (response.status === 404) {
 	response.body.code;
 }
 ```
@@ -176,7 +176,7 @@ const response = await client.todos.get.fetchResponse({
 	id: "todo_1",
 });
 
-if (response.declared && response.status === 200) {
+if (response.status === 200) {
 	response.responseHeaders.etag;
 	response.responseHeaders["x-next-cursor"];
 }
@@ -254,7 +254,7 @@ const response = await client.images.download.fetchResponse({
 	id: "image_1",
 });
 
-if (response.declared && response.status === 200) {
+if (response.status === 200) {
 	if (response.responseHeaders["content-type"] === "image/png") {
 		const pngBytes = await response.arrayBuffer();
 	} else {

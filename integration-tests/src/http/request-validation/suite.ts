@@ -18,18 +18,17 @@ type ValidationErrorBody = {
 	validationErrors: unknown;
 };
 
-const assertValidationResponse = (
+const assertValidationResponse = async (
 	response: Awaited<
 		ReturnType<RequestValidationClient["params"]["fetchResponse"]>
 	>,
 	location: "body" | "query" | "params" | "headers",
 ) => {
-	assert.equal(response.declared, false);
 	assert.equal(response.status, 400);
-	assert.equal(typeof response.body, "object");
-	assert.notEqual(response.body, null);
+	const body = (await response.rawResponse.json()) as ValidationErrorBody;
+	assert.equal(typeof body, "object");
+	assert.notEqual(body, null);
 
-	const body = response.body as ValidationErrorBody;
 	assert.equal(
 		body.message,
 		"Request validation failed. Check the validationErrors field for details.",
@@ -107,7 +106,7 @@ export const runRequestValidationSuite = (
 				id: "123",
 			} as never);
 
-			assertValidationResponse(response, "params");
+			await assertValidationResponse(response, "params");
 		});
 
 		it("rejects query values that do not match the route schema", async () => {
@@ -115,13 +114,13 @@ export const runRequestValidationSuite = (
 				page: 2,
 			});
 
-			assertValidationResponse(response, "query");
+			await assertValidationResponse(response, "query");
 		});
 
 		it("rejects missing required headers", async () => {
 			const response = await client.headers.fetchResponse({} as never);
 
-			assertValidationResponse(response, "headers");
+			await assertValidationResponse(response, "headers");
 		});
 
 		it("rejects JSON bodies that do not match the route schema", async () => {
@@ -129,7 +128,7 @@ export const runRequestValidationSuite = (
 				count: "3",
 			} as never);
 
-			assertValidationResponse(response, "body");
+			await assertValidationResponse(response, "body");
 		});
 	});
 };

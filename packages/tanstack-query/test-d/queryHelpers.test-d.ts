@@ -151,10 +151,8 @@ expectAssignable<Promise<RouteQueryData<typeof queryApi.todos.list>>>(
 );
 
 expectAssignable<RouteQueryError<typeof queryApi.todos.get>>({
-	declared: false,
 	status: 500,
-	body: "server exploded",
-	headers: new Headers(),
+	rawResponse: new Response("server exploded", { status: 500 }),
 });
 
 // strict status code options
@@ -195,10 +193,8 @@ expectAssignable<RouteQueryError<typeof strictStatusApi.todos.get>>({
 	headers: new Headers(),
 });
 expectNotAssignable<RouteQueryError<typeof strictStatusApi.todos.get>>({
-	declared: false,
 	status: 500,
-	body: "server exploded",
-	headers: new Headers(),
+	rawResponse: new Response("server exploded", { status: 500 }),
 });
 
 // stream query options
