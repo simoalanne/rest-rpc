@@ -26,6 +26,10 @@ export type FetchAdapterContext = { adapter: "fetch" };
 export type FetchAdapterOptions = {
 	context?: FetchAdapterContext;
 	createHandlerOptions?: CreateFetchHandlerOptions;
+	handleError?: (
+		error: unknown,
+		request: Request,
+	) => Response | Promise<Response>;
 	transformResponse?: (response: Response) => Response | Promise<Response>;
 };
 
@@ -64,8 +68,11 @@ export const createFetchAdapter = (
 						: new Response(null, { status: 404 });
 					response = (await options.transformResponse?.(response)) ?? response;
 				} catch (error) {
-					res.destroy(error instanceof Error ? error : undefined);
-					return;
+					if (!options.handleError) {
+						res.destroy(error instanceof Error ? error : undefined);
+						return;
+					}
+					response = await options.handleError(error, request);
 				}
 
 				res.writeHead(response.status, toNodeResponseHeaders(response.headers));

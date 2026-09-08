@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { initClient, route } from "@rest-rpc/core";
 import { REQUEST_CONTEXT_KEY } from "@rest-rpc/core/contract";
+import type { ResponseValidationErrorHandler } from "@rest-rpc/hono";
 import {
 	router as createRouter,
 	type ImplementationShape,
@@ -11,15 +12,39 @@ import { setCookie } from "hono/cookie";
 import z from "zod";
 import { createHonoAdapter } from "../harness/hono.ts";
 import type { StartedServer } from "../harness/listen.ts";
-import { responseErrorHandlers } from "./errorHandlers.ts";
 import { createResponsesImplementations } from "./handlers.ts";
 import { runResponseMiddlewareHeadersSuite } from "./middlewareSuite.ts";
 import { runResponsesSuite } from "./suite.ts";
 
+const responseValidationErrorHandler: ResponseValidationErrorHandler = (
+	_error,
+	c,
+) => {
+	c.header("x-error-handler", "response-validation");
+	return c.json(
+		{
+			code: "INVALID_RESPONSE",
+			path: c.req.path,
+		},
+		500,
+	);
+};
+
 runResponsesSuite(
 	createHonoAdapter(createResponsesImplementations(), {
 		registerRoutesOptions: {
-			errorHandlers: responseErrorHandlers,
+			responseValidationErrorHandler,
+		},
+		configureApp: (app) => {
+			app.onError((error, c) =>
+				c.json(
+					{
+						code: "TEAPOT",
+						message: error.message,
+					},
+					418,
+				),
+			);
 		},
 	}),
 );
@@ -87,7 +112,7 @@ describe("hono response lifecycle integration", () => {
 	before(async () => {
 		server = await createHonoAdapter(createLifecycleImplementations(), {
 			registerRoutesOptions: {
-				errorHandlers: responseErrorHandlers,
+				responseValidationErrorHandler,
 			},
 		}).start();
 		client = initClient(lifecycleContract, { baseUrl: server.origin });

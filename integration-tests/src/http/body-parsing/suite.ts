@@ -28,8 +28,18 @@ const assertDefaultValidationErrorResponse = async (response: Response) => {
 	);
 	const validationErrors = (body as { validationErrors?: unknown })
 		.validationErrors;
-	assert.ok(Array.isArray(validationErrors));
-	assert.ok(validationErrors.length > 0);
+
+	assert.equal(typeof validationErrors, "object");
+	assert.notEqual(validationErrors, null);
+	const grouped = validationErrors as Record<string, unknown>;
+	assert.deepEqual(Object.keys(grouped), [
+		"body",
+		"query",
+		"params",
+		"headers",
+	]);
+	assert.ok(Array.isArray(grouped.body));
+	assert.ok(grouped.body.length > 0);
 };
 
 export const runBodyParsingSuite = (adapter: BodyParsingSuiteAdapter) => {

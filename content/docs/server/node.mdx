@@ -145,7 +145,8 @@ handlers need the native objects.
 ```ts
 type CreateNodeHandlerOptions = {
 	bodyParser?: NodeBodyParser;
-	errorHandlers?: ServerErrorHandlers<Record<string, unknown>>;
+	requestValidationErrorHandler?: RequestValidationErrorHandler;
+	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 };
 ```
 
@@ -157,23 +158,33 @@ const handle = createRouteHandler(routes, {
 });
 ```
 
-### Error handlers
+### Error handling
+
+Request validation errors default to a 400 response. Response contract
+validation errors default to a generic 500 response. The validation handlers
+receive the native Node request and response. Other errors reject the handler
+promise and should be handled at the server boundary.
 
 ```ts
 const handle = createRouteHandler(routes, {
-	errorHandlers: {
-		onRequestValidationError: ({ issues }) => ({
-			status: 422,
-			body: { code: "VALIDATION_ERROR", issues },
-		}),
-		onResponseValidationError: () => ({
-			status: 500,
-			body: { code: "INVALID_RESPONSE" },
-		}),
-		onUnhandledError: () => ({
-			status: 500,
-			body: { code: "INTERNAL_SERVER_ERROR" },
-		}),
+	requestValidationErrorHandler: (error, req, res) => {
+		res.statusCode = 422;
+		res.setHeader("content-type", "application/json");
+		res.end(JSON.stringify({ code: "VALIDATION_ERROR", issues: error.issues }));
 	},
+	responseValidationErrorHandler: (_error, req, res) => {
+		res.statusCode = 500;
+		res.setHeader("content-type", "application/json");
+		res.end(JSON.stringify({ code: "INVALID_RESPONSE" }));
+	},
+});
+
+const server = createServer(async (req, res) => {
+	try {
+		await handle(req, res);
+	} catch (error) {
+		res.statusCode = 500;
+		res.end(JSON.stringify({ code: "INTERNAL_SERVER_ERROR" }));
+	}
 });
 ```

@@ -14,6 +14,7 @@ import {
 	prepareWebSocketUpgrade,
 	type WebSocketLike,
 } from "./websocket.ts";
+import { RequestValidationError } from "./validationErrors.ts";
 
 class FakeWebSocketLike implements WebSocketLike {
 	sent: string[] = [];
@@ -343,58 +344,26 @@ describe("prepareWebSocketUpgrade", () => {
 		}
 	});
 
-	it("returns validation rejections", async () => {
+	it("throws request validation errors", async () => {
 		const route = websocketRoute({
 			client: z.object({ text: z.string() }),
 			server: z.object({ text: z.string() }),
 		});
 		const implementation = { route, handler: () => undefined };
 
-		const result = await prepareWebSocketUpgrade({
-			implementation,
-			request: {},
-			context: {},
-		});
-
-		assert.equal(result.ok, false);
-		if (!result.ok) {
-			assert.equal(result.rejection.status, 400);
-		}
-	});
-
-	it("uses custom request validation error rejections", async () => {
-		const route = websocketRoute({
-			client: z.object({ text: z.string() }),
-			server: z.object({ text: z.string() }),
-		});
-		const implementation = { route, handler: () => undefined };
-
-		const result = await prepareWebSocketUpgrade({
-			implementation,
-			request: {},
-			context: { req: "request" },
-			errorHandlers: {
-				onRequestValidationError({ context, issues, route }) {
-					assert.deepEqual(context, { req: "request" });
-					assert.equal(route.path, "/rooms/:roomId");
-
-					return {
-						status: 422,
-						headers: { "x-error": "validation" },
-						body: { issueCount: issues.length },
-					};
-				},
+		await assert.rejects(
+			() =>
+				prepareWebSocketUpgrade({
+					implementation,
+					request: {},
+					context: {},
+				}),
+			(error) => {
+				assert.ok(error instanceof RequestValidationError);
+				assert.equal(error.issues.params.length, 1);
+				return true;
 			},
-		});
-
-		assert.deepEqual(result, {
-			ok: false,
-			rejection: {
-				status: 422,
-				headers: { "x-error": "validation" },
-				body: { issueCount: 1 },
-			},
-		});
+		);
 	});
 
 	it("returns beforeUpgrade rejections after validation", async () => {
@@ -432,75 +401,28 @@ describe("prepareWebSocketUpgrade", () => {
 		});
 	});
 
-	it("returns default unhandled error rejections when beforeUpgrade throws", async () => {
+	it("rethrows beforeUpgrade errors unchanged", async () => {
 		const route = websocketRoute({
 			client: z.object({ text: z.string() }),
 			server: z.object({ text: z.string() }),
 		});
 		const implementation = { route, handler: () => undefined };
 
-		const result = await prepareWebSocketUpgrade({
-			implementation,
-			request: {
-				params: { roomId: "room-1" },
-			},
-			context: {},
-			beforeUpgrade: () => {
-				throw new Error("boom");
-			},
-		});
-
-		assert.deepEqual(result, {
-			ok: false,
-			rejection: {
-				status: 500,
-				body: {
-					message: "WebSocket upgrade failed.",
-				},
-			},
-		});
-	});
-
-	it("uses custom unhandled error rejections when beforeUpgrade throws", async () => {
-		const route = websocketRoute({
-			client: z.object({ text: z.string() }),
-			server: z.object({ text: z.string() }),
-		});
-		const implementation = { route, handler: () => undefined };
-
-		const result = await prepareWebSocketUpgrade({
-			implementation,
-			request: {
-				params: { roomId: "room-1" },
-			},
-			context: { req: "request" },
-			beforeUpgrade: () => {
-				throw new Error("boom");
-			},
-			errorHandlers: {
-				onUnhandledError({ context, error, request, route }) {
-					assert.deepEqual(context, { req: "request" });
-					assert.equal((error as Error).message, "boom");
-					assert.deepEqual(request, { roomId: "room-1" });
-					assert.equal(route.path, "/rooms/:roomId");
-
-					return {
-						status: 503,
-						headers: { "x-error": "upgrade" },
-						body: { code: "UPGRADE_FAILED" },
-					};
-				},
-			},
-		});
-
-		assert.deepEqual(result, {
-			ok: false,
-			rejection: {
-				status: 503,
-				headers: { "x-error": "upgrade" },
-				body: { code: "UPGRADE_FAILED" },
-			},
-		});
+		const expected = new Error("boom");
+		await assert.rejects(
+			() =>
+				prepareWebSocketUpgrade({
+					implementation,
+					request: {
+						params: { roomId: "room-1" },
+					},
+					context: {},
+					beforeUpgrade: () => {
+						throw expected;
+					},
+				}),
+			(error) => error === expected,
+		);
 	});
 });
 

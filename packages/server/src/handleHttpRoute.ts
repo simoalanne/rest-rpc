@@ -11,13 +11,10 @@ import {
 	isStream,
 	REQUEST_CONTEXT_KEY,
 } from "@rest-rpc/core/contract";
-import type {
-	ServerErrorHandlers,
-	ServerErrorResponse,
-} from "./errorHandlers.ts";
 import type { HttpHeaders } from "./headers.ts";
 import { flattenRequestData } from "./requestData.ts";
 import { RouteResponseError } from "./routeResponseError.ts";
+import { RequestValidationError } from "./validationErrors.ts";
 import type {
 	HttpRouteHandlerContext,
 	RuntimeRouteHandler,
@@ -77,8 +74,6 @@ export type HttpRouteResult =
 export type HandleHttpRouteOptions<TContext extends HttpRouteHandlerContext> = {
 	request: RequestSegments;
 	context: TContext;
-	errorContext?: Record<string, unknown>;
-	errorHandlers?: ServerErrorHandlers<TContext>;
 };
 
 const isAsyncIterable = (value: unknown): value is AsyncIterable<unknown> =>
@@ -315,95 +310,27 @@ const normalizeSseResponseResult = (
 	};
 };
 
-const normalizeServerErrorResponse = (
-	response: ServerErrorResponse,
-): HttpRouteResult => {
-	if (response.body === undefined) {
-		return {
-			kind: "empty",
-			responseKindMetadata: false,
-			status: response.status,
-			headers: response.headers,
-		};
-	}
-
-	return {
-		kind: "json",
-		responseKindMetadata: false,
-		status: response.status,
-		headers: response.headers,
-		body: response.body,
-	};
-};
-
-const defaultResponseValidationErrorResponse: ServerErrorResponse = {
-	status: 500,
-	body: {
-		message: "Response validation failed.",
-	},
-};
-
-const handleResponseValidationError = async <
-	TContext extends HttpRouteHandlerContext,
->(
-	error: unknown,
-	route: ServerHttpRouteDeclaration,
-	options: HandleHttpRouteOptions<TContext>,
-	errorContext: TContext,
-) => {
-	const input = {
-		route,
-		request: options.request,
-		context: errorContext,
-		error,
-	};
-	const response =
-		(await options.errorHandlers?.onResponseValidationError?.(input)) ??
-		defaultResponseValidationErrorResponse;
-
-	return normalizeServerErrorResponse(response);
-};
-
-const normalizeHandlerResult = async <TContext extends HttpRouteHandlerContext>(
+const normalizeHandlerResult = async (
 	route: ServerHttpRouteDeclaration,
 	result: unknown,
-	options: HandleHttpRouteOptions<TContext>,
-	errorContext: TContext,
 ): Promise<HttpRouteResult> => {
-	try {
-		if (route.mode === "sse") return normalizeSseResponseResult(route, result);
+	if (route.mode === "sse") return normalizeSseResponseResult(route, result);
 
-		return await normalizeResponseResult(
-			route,
-			normalizeHandlerResultEnvelopeOrShorthand(route, result),
-		);
-	} catch (error) {
-		return handleResponseValidationError(error, route, options, errorContext);
-	}
+	return normalizeResponseResult(
+		route,
+		normalizeHandlerResultEnvelopeOrShorthand(route, result),
+	);
 };
 
-const normalizeRouteResponseError = async <
-	TContext extends HttpRouteHandlerContext,
->(
+const normalizeRouteResponseError = async (
 	route: ServerHttpRouteDeclaration,
 	error: RouteResponseError,
-	options: HandleHttpRouteOptions<TContext>,
-	errorContext: TContext,
 ): Promise<HttpRouteResult> => {
-	try {
-		return await normalizeResponseResult(route, {
-			status: error.status,
-			body: error.body,
-			responseHeaders: error.responseHeaders,
-		});
-	} catch (responseError) {
-		return handleResponseValidationError(
-			responseError,
-			route,
-			options,
-			errorContext,
-		);
-	}
+	return normalizeResponseResult(route, {
+		status: error.status,
+		body: error.body,
+		responseHeaders: error.responseHeaders,
+	});
 };
 
 /**
@@ -423,22 +350,13 @@ export async function handleHttpRoute<
 		declaredRoute,
 		options.request,
 	);
-	const errorContext = (options.errorContext ?? options.context) as TContext;
-
 	if (!requestValidation.success) {
-		const response =
-			(await options.errorHandlers?.onRequestValidationError?.({
-				route: declaredRoute,
-				request: options.request,
-				context: errorContext,
-				issues: requestValidation.response.body.validationErrors,
-			})) ?? requestValidation.response;
-
-		return normalizeServerErrorResponse(response);
+		throw new RequestValidationError(requestValidation.issues);
 	}
 
+	let handlerResult: unknown;
 	try {
-		const handlerResult = await handler({
+		handlerResult = await handler({
 			...flattenRequestData(declaredRoute, requestValidation.data),
 			[REQUEST_CONTEXT_KEY]:
 				declaredRoute.mode === "sse"
@@ -451,41 +369,16 @@ export async function handleHttpRoute<
 						}
 					: options.context,
 		});
-
-		if (!("responses" in declaredRoute)) {
-			return classifyImplicitResponse(
-				handlerResult as ImplicitResponseEnvelope,
-			);
-		}
-
-		return normalizeHandlerResult(
-			declaredRoute,
-			handlerResult,
-			options,
-			errorContext,
-		);
 	} catch (error) {
 		if (error instanceof RouteResponseError) {
-			return normalizeRouteResponseError(
-				declaredRoute,
-				error,
-				options,
-				errorContext,
-			);
+			return normalizeRouteResponseError(declaredRoute, error);
 		}
-
-		const unhandledErrorResponse =
-			await options.errorHandlers?.onUnhandledError?.({
-				route: declaredRoute,
-				request: options.request,
-				context: errorContext,
-				error,
-			});
-
-		if (unhandledErrorResponse) {
-			return normalizeServerErrorResponse(unhandledErrorResponse);
-		}
-
 		throw error;
 	}
+
+	if (!("responses" in declaredRoute)) {
+		return classifyImplicitResponse(handlerResult as ImplicitResponseEnvelope);
+	}
+
+	return normalizeHandlerResult(declaredRoute, handlerResult);
 }

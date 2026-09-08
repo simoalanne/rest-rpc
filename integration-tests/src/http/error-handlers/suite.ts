@@ -72,7 +72,7 @@ export const runErrorHandlersSuite = (adapter: ErrorHandlersSuiteAdapter) => {
 			});
 		});
 
-		it("only calls custom hooks for the matching error paths", async () => {
+		it("only invokes custom error handling for matching paths", async () => {
 			assert.deepEqual(await client.hookState.fetch(), {
 				validationErrors: 1,
 				unhandledErrors: 1,

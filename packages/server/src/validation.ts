@@ -22,6 +22,10 @@ import {
 	validateStandardSchema,
 } from "@rest-rpc/core/standard-schema";
 import type { HttpHeaders } from "./headers.ts";
+import {
+	ResponseValidationError,
+	type RequestValidationIssues,
+} from "./validationErrors.ts";
 
 /**
  * A Standard Schema validation issue surfaced by server request validation.
@@ -30,17 +34,12 @@ import type { HttpHeaders } from "./headers.ts";
  */
 export type ValidationIssue = StandardSchemaV1.Issue;
 
-export type RequestValidationFailure = {
-	status: 400;
-	body: {
-		message: string;
-		validationErrors: ValidationIssue[];
-	};
-};
-
 export type RequestValidationResponse =
 	| { success: true; data: Record<string, unknown> }
-	| { success: false; response: RequestValidationFailure };
+	| {
+			success: false;
+			issues: RequestValidationIssues;
+	  };
 
 /**
  * Parsed request pieces passed into server request validation.
@@ -338,6 +337,12 @@ export async function validateRequest(
 		: await validateRequestObject(request?.query, segments.query);
 	const params = await validateRequestObject(request?.params, segments.params);
 	const headers = await validateHeaders(request?.headers, segments.headers);
+	const issues = {
+		body: body.errors,
+		query: query.errors,
+		params: params.errors,
+		headers: headers.errors,
+	};
 	const errors = [
 		...body.errors,
 		...query.errors,
@@ -354,14 +359,7 @@ export async function validateRequest(
 
 	return {
 		success: false,
-		response: {
-			status: 400,
-			body: {
-				message:
-					"Request validation failed. Check the validationErrors field for details.",
-				validationErrors: errors,
-			},
-		},
+		issues,
 	};
 }
 
@@ -375,12 +373,16 @@ export const validateResponseBody = async (
 
 	if (isCustomBody(schema)) {
 		const validation = await validateStandardSchema(schema.schema, body);
-		if (validation.issues) throw validation.issues;
+		if (validation.issues) {
+			throw new ResponseValidationError("body", validation.issues);
+		}
 		return validation.value;
 	}
 
 	const validation = await validateStandardSchema(schema, body);
-	if (validation.issues) throw validation.issues;
+	if (validation.issues) {
+		throw new ResponseValidationError("body", validation.issues);
+	}
 	return validation.value;
 };
 
@@ -394,7 +396,9 @@ export const validateResponseHeaders = async (
 	if (!declaredHeaders) return undefined;
 
 	const result = await validateStandardSchema(declaredHeaders, headers ?? {});
-	if (result.issues) throw result.issues;
+	if (result.issues) {
+		throw new ResponseValidationError("headers", result.issues);
+	}
 
 	return Object.fromEntries(
 		Object.entries(result.value).flatMap(([name, value]) =>
@@ -431,18 +435,15 @@ export const validateResponseStreamChunk = async (
 	schema: ResponseBodySchema | undefined,
 	chunk: unknown,
 ) => {
-	if (!schema || !isStream(schema)) {
-		return validateResponseBody(schema, chunk);
-	}
+	if (!schema || isNoBody(schema)) return chunk;
 
-	const chunkSchema = isCustomBody(schema.schema)
-		? schema.schema.schema
-		: schema.schema;
+	const declaredChunkSchema = isStream(schema) ? schema.schema : schema;
+	const chunkSchema = isCustomBody(declaredChunkSchema)
+		? declaredChunkSchema.schema
+		: declaredChunkSchema;
 	const validation = await validateStandardSchema(chunkSchema, chunk);
 	if (validation.issues) {
-		throw new Error("Stream response validation failed.", {
-			cause: validation.issues,
-		});
+		throw new ResponseValidationError("stream", validation.issues);
 	}
 	return validation.value;
 };

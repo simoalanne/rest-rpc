@@ -1,7 +1,6 @@
 import type { DynamicModule, ExecutionContext } from "@nestjs/common";
 import { Module } from "@nestjs/common";
 import { APP_INTERCEPTOR, HttpAdapterHost } from "@nestjs/core";
-import type { ServerErrorHandlers } from "@rest-rpc/server";
 import { RestRpcRouteInterceptor } from "./routeInterceptor.ts";
 
 /**
@@ -44,8 +43,7 @@ export type NestHandlerContext<
  * Options for configuring the rest-rpc Nest adapter.
  *
  * @remarks Use `createContext` for request-scoped values shared by all
- * rest-rpc Nest handlers, and `errorHandlers` to customize validation and
- * unhandled error responses.
+ * rest-rpc Nest handlers.
  *
  * @see {@link https://rest-rpc.dev/docs/server/nest#options}
  */
@@ -53,7 +51,6 @@ export type RestRpcModuleOptions<
 	TContext extends ContextShape = DefaultNestContext,
 > = {
 	createContext?: (context: ExecutionContext) => TContext | Promise<TContext>;
-	errorHandlers?: ServerErrorHandlers<NestHandlerContext<TContext>>;
 };
 
 /**

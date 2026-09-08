@@ -9,6 +9,7 @@ import {
 	validateResponseHeaders,
 	validateResponseStreamChunks,
 } from "./validation.ts";
+import { ResponseValidationError } from "./validationErrors.ts";
 
 describe("validateRequest", () => {
 	it("validates inherited and local headers against raw input and merges local output last", async () => {
@@ -111,7 +112,7 @@ describe("validateRequest", () => {
 
 		assert.equal(result.success, false);
 		if (!result.success) {
-			assert.equal(result.response.body.validationErrors.length, 1);
+			assert.equal(result.issues.body.length, 1);
 		}
 	});
 
@@ -158,7 +159,8 @@ describe("validateRequest", () => {
 
 		assert.equal(result.success, false);
 		if (!result.success) {
-			assert.equal(result.response.body.validationErrors.length, 2);
+			assert.equal(result.issues.params.length, 1);
+			assert.equal(result.issues.query.length, 1);
 		}
 	});
 
@@ -248,7 +250,7 @@ describe("validateRequest", () => {
 
 		assert.equal(result.success, false);
 		if (!result.success) {
-			assert.deepEqual(result.response.body.validationErrors, [
+			assert.deepEqual(result.issues.body, [
 				{ message: "Unsupported custom body contentType." },
 			]);
 		}
@@ -397,7 +399,7 @@ describe("validateRequest", () => {
 
 		assert.equal(result.success, false);
 		if (!result.success) {
-			assert.deepEqual(result.response.body.validationErrors, [
+			assert.deepEqual(result.issues.query, [
 				{ message: 'Invalid JSON query parameter "query".' },
 			]);
 		}
@@ -415,6 +417,11 @@ describe("validateResponseBody", () => {
 				},
 				"id,title\n1,First\n",
 			),
+			(error) => {
+				assert.ok(error instanceof ResponseValidationError);
+				assert.equal(error.location, "body");
+				return true;
+			},
 		);
 	});
 });
@@ -449,6 +456,24 @@ describe("validateResponseHeaders", () => {
 			),
 			{
 				etag: "todo-etag",
+			},
+		);
+	});
+
+	it("throws response header validation errors", async () => {
+		await assert.rejects(
+			validateResponseHeaders(
+				{
+					body: z.object({ id: z.string() }),
+					headers: z.object({ etag: z.string() }),
+				},
+				{},
+			),
+			(error) => {
+				assert.ok(error instanceof ResponseValidationError);
+				assert.equal(error.location, "headers");
+				assert.equal(error.issues.length, 1);
+				return true;
 			},
 		);
 	});
@@ -511,10 +536,18 @@ describe("validateResponseStreamChunks", () => {
 			},
 		});
 
-		await assert.rejects(async () => {
-			for await (const _chunk of chunks) {
-				void _chunk;
-			}
-		}, /Stream response validation failed/);
+		await assert.rejects(
+			async () => {
+				for await (const _chunk of chunks) {
+					void _chunk;
+				}
+			},
+			(error) => {
+				assert.ok(error instanceof ResponseValidationError);
+				assert.equal(error.location, "stream");
+				assert.equal(error.issues.length, 1);
+				return true;
+			},
+		);
 	});
 });

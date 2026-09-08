@@ -5,8 +5,8 @@ import {
 	type CloseEventLike,
 	handleWebSocketRoute,
 	prepareWebSocketUpgrade,
+	RequestValidationError,
 	type RouteImplementation,
-	type ServerErrorHandlers,
 	type UpgradeRejection,
 	type WebSocketLike,
 } from "@rest-rpc/server";
@@ -85,10 +85,6 @@ export const registerHonoWebSocketRoutes = <TEnv extends Env = Env>(
 	options: HonoWebSocketOptions<TEnv>,
 	routes: RouteImplementation<WebSocketRouteDeclaration>[],
 	middleware: ExtendedHonoMiddleware<TEnv>[] = [],
-	errorHandlers?: ServerErrorHandlers<{
-		c: Context<TEnv>;
-		signal: AbortSignal;
-	}>,
 ) => {
 	for (const implementation of routes) {
 		app.get(
@@ -104,13 +100,31 @@ export const registerHonoWebSocketRoutes = <TEnv extends Env = Env>(
 					params: c.req.param(),
 					headers: c.req.header(),
 				};
-				const upgrade = await prepareWebSocketUpgrade({
-					implementation,
-					request,
-					context: { c, signal: c.req.raw.signal },
-					beforeUpgrade: options.beforeUpgrade,
-					errorHandlers,
-				});
+				let upgrade: Awaited<ReturnType<typeof prepareWebSocketUpgrade>>;
+				try {
+					upgrade = await prepareWebSocketUpgrade({
+						implementation,
+						request,
+						context: { c, signal: c.req.raw.signal },
+						beforeUpgrade: options.beforeUpgrade,
+					});
+				} catch (error) {
+					return sendUpgradeRejection(
+						error instanceof RequestValidationError
+							? {
+									status: 400,
+									body: {
+										message:
+											"Request validation failed. Check the validationErrors field for details.",
+										validationErrors: error.issues,
+									},
+								}
+							: {
+									status: 500,
+									body: { message: "WebSocket upgrade failed." },
+								},
+					);
+				}
 
 				if (!upgrade.ok) return sendUpgradeRejection(upgrade.rejection);
 

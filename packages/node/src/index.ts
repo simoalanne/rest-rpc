@@ -43,8 +43,16 @@ export type {
 	ServerRouteImplementation,
 	ServerSseBuilderExtension,
 } from "@rest-rpc/server";
+export {
+	RequestValidationError,
+	ResponseValidationError,
+} from "@rest-rpc/server";
 export { createRouteHandler } from "./handler.ts";
-export type { CreateNodeHandlerOptions } from "./handler.ts";
+export type {
+	CreateNodeHandlerOptions,
+	RequestValidationErrorHandler,
+	ResponseValidationErrorHandler,
+} from "./handler.ts";
 export { createRequestSignal } from "./lifecycle.ts";
 export { defaultBodyParser, parseRequestTarget } from "./request.ts";
 export type { NodeBodyParser } from "./request.ts";

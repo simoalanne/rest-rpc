@@ -16,6 +16,8 @@ import {
 	handleHttpRoute,
 	handleHttpRouteResult,
 	isHttpRouteImplementation,
+	RequestValidationError,
+	ResponseValidationError,
 	type RouteImplementation,
 	type ServerHttpRouteDeclaration,
 } from "@rest-rpc/server";
@@ -23,6 +25,10 @@ import type { Observable } from "rxjs";
 import { from, lastValueFrom } from "rxjs";
 import { REST_RPC_ROUTE_METADATA, type RouteMetadata } from "./decorators.ts";
 import type { RestRpcModuleOptions } from "./module.ts";
+import {
+	RequestValidationException,
+	ResponseValidationException,
+} from "./validationExceptions.ts";
 
 type NestHttpRequestFields = {
 	body?: unknown;
@@ -110,59 +116,70 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 			signal,
 		};
 
-		const result = await handleHttpRoute(
-			metadata.route,
-			implementation.handler,
-			{
-				request: {
-					body: req.body,
-					query: req.query,
-					params: req.params,
-					headers: req.headers,
+		try {
+			const result = await handleHttpRoute(
+				metadata.route,
+				implementation.handler,
+				{
+					request: {
+						body: req.body,
+						query: req.query,
+						params: req.params,
+						headers: req.headers,
+					},
+					context: routeContext,
 				},
-				context: routeContext,
-				errorHandlers: this.options?.errorHandlers,
-			},
-		);
+			);
 
-		return handleHttpRouteResult(result, {
-			setHeader: (name, value) => {
-				if (value !== undefined) {
-					const headerValue = Array.isArray(value)
-						? value.map(String)
-						: String(value);
-					adapter.setHeader(res, name, headerValue as string);
-				}
-			},
-			sendEmpty: (status) => {
-				adapter.status(res, status);
-				return undefined;
-			},
-			sendJson: (status, body) => {
-				adapter.status(res, status);
-				return body;
-			},
-			sendCustom: (status, body) => {
-				adapter.status(res, status);
-				if (body instanceof Uint8Array) return new StreamableFile(body);
-				return String(body);
-			},
-			sendStream: ({ body, status, contentType, mode }) => {
-				adapter.status(res, status);
-				if (adapter.getType() === "express") {
-					return writeStreamResponse(
-						body,
-						rawResponse,
-						status,
-						contentType,
-						mode,
-					);
-				}
+			return handleHttpRouteResult(result, {
+				setHeader: (name, value) => {
+					if (value !== undefined) {
+						const headerValue = Array.isArray(value)
+							? value.map(String)
+							: String(value);
+						adapter.setHeader(res, name, headerValue as string);
+					}
+				},
+				sendEmpty: (status) => {
+					adapter.status(res, status);
+					return undefined;
+				},
+				sendJson: (status, body) => {
+					adapter.status(res, status);
+					return body;
+				},
+				sendCustom: (status, body) => {
+					adapter.status(res, status);
+					if (body instanceof Uint8Array) return new StreamableFile(body);
+					return String(body);
+				},
+				sendStream: ({ body, status, contentType, mode }) => {
+					adapter.status(res, status);
+					if (adapter.getType() === "express") {
+						return writeStreamResponse(
+							body,
+							rawResponse,
+							status,
+							contentType,
+							mode,
+						);
+					}
 
-				return new StreamableFile(createNodeResponseStream(body, mode), {
-					type: contentType,
-				});
-			},
-		});
+					return new StreamableFile(createNodeResponseStream(body, mode), {
+						type: contentType,
+					});
+				},
+			});
+		} catch (error) {
+			if (error instanceof RequestValidationError) {
+				throw new RequestValidationException(error);
+			}
+
+			if (error instanceof ResponseValidationError) {
+				throw new ResponseValidationException(error);
+			}
+
+			throw error;
+		}
 	}
 }

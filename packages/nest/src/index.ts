@@ -32,6 +32,10 @@ export type {
 	RestRpcModuleOptions,
 } from "./module.ts";
 export { RestRpcModule } from "./module.ts";
+export {
+	RequestValidationException,
+	ResponseValidationException,
+} from "./validationExceptions.ts";
 
 /**
  * A contract tree containing Nest HTTP and SSE routes.

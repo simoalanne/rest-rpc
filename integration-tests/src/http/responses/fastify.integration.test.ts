@@ -1,5 +1,4 @@
 import { createFastifyAdapter } from "../harness/fastify.ts";
-import { responseErrorHandlers } from "./errorHandlers.ts";
 import { createResponsesImplementations } from "./handlers.ts";
 import { runResponseMiddlewareHeadersSuite } from "./middlewareSuite.ts";
 import { runResponsesSuite } from "./suite.ts";
@@ -7,7 +6,23 @@ import { runResponsesSuite } from "./suite.ts";
 runResponsesSuite(
 	createFastifyAdapter(createResponsesImplementations(), {
 		registerRoutesOptions: {
-			errorHandlers: responseErrorHandlers,
+			responseValidationErrorHandler: (_error, request, reply) => {
+				return reply
+					.status(500)
+					.header("x-error-handler", "response-validation")
+					.send({
+						code: "INVALID_RESPONSE",
+						path: request.routeOptions.url,
+					});
+			},
+		},
+		configureApp: (app) => {
+			app.setErrorHandler((error, _request, reply) => {
+				return reply.status(418).send({
+					code: "TEAPOT",
+					message: error.message,
+				});
+			});
 		},
 	}),
 );

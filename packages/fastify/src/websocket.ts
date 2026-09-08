@@ -6,8 +6,8 @@ import {
 	type BeforeWebSocketUpgrade,
 	handleWebSocketRoute,
 	prepareWebSocketUpgrade,
+	RequestValidationError,
 	type RouteImplementation,
-	type ServerErrorHandlers,
 	type UpgradeRejection,
 	type WebSocketLike,
 } from "@rest-rpc/server";
@@ -62,10 +62,6 @@ export const registerFastifyWebSocketRoutes = (
 	options: FastifyWebSocketOptions,
 	routes: RouteImplementation<WebSocketRouteDeclaration>[],
 	preHandler: ExtendedFastifyPreHandler[] = [],
-	errorHandlers?: ServerErrorHandlers<{
-		req: FastifyRequest;
-		signal: AbortSignal;
-	}>,
 ) => {
 	for (const implementation of routes) {
 		app.get(
@@ -85,13 +81,33 @@ export const registerFastifyWebSocketRoutes = (
 							params: req.params,
 							headers: req.headers,
 						};
-						const upgrade = await prepareWebSocketUpgrade({
-							implementation,
-							request,
-							context: { req, signal },
-							beforeUpgrade: options.beforeUpgrade,
-							errorHandlers,
-						});
+						let upgrade: Awaited<ReturnType<typeof prepareWebSocketUpgrade>>;
+						try {
+							upgrade = await prepareWebSocketUpgrade({
+								implementation,
+								request,
+								context: { req, signal },
+								beforeUpgrade: options.beforeUpgrade,
+							});
+						} catch (error) {
+							await sendUpgradeRejection(
+								reply,
+								error instanceof RequestValidationError
+									? {
+											status: 400,
+											body: {
+												message:
+													"Request validation failed. Check the validationErrors field for details.",
+												validationErrors: error.issues,
+											},
+										}
+									: {
+											status: 500,
+											body: { message: "WebSocket upgrade failed." },
+										},
+							);
+							return;
+						}
 
 						if (!upgrade.ok) {
 							await sendUpgradeRejection(reply, upgrade.rejection);

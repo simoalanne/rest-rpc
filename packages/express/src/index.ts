@@ -28,11 +28,17 @@ export type {
 	SetCookieOptions,
 	SseEvent,
 } from "@rest-rpc/server";
-export type { ExtendedExpressMiddleware } from "./http.ts";
+export type {
+	ExtendedExpressMiddleware,
+	RequestValidationErrorHandler,
+	ResponseValidationErrorHandler,
+} from "./http.ts";
 export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
 export {
 	clearCookie,
+	RequestValidationError,
+	ResponseValidationError,
 	RouteResponseError,
 	setCookie,
 	sseEvent,

@@ -2,8 +2,9 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import {
 	createRouteMatcher,
 	handleHttpRoute,
+	RequestValidationError,
+	ResponseValidationError,
 	type RuntimeImplementationTree,
-	type ServerErrorHandlers,
 } from "@rest-rpc/server";
 import type { DefaultContext, NodeRouteHandlerResult } from "./index.ts";
 import { createRequestSignal } from "./lifecycle.ts";
@@ -17,8 +18,23 @@ import { writeNodeResponse } from "./response.ts";
 /** Options for the general Node HTTP catch-all handler. */
 export type CreateNodeHandlerOptions = {
 	bodyParser?: NodeBodyParser;
-	errorHandlers?: ServerErrorHandlers<Record<string, unknown>>;
+	requestValidationErrorHandler?: RequestValidationErrorHandler;
+	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 };
+
+/** Handles a request validation error using native Node HTTP arguments. */
+export type RequestValidationErrorHandler = (
+	error: RequestValidationError,
+	request: IncomingMessage,
+	response: ServerResponse,
+) => unknown;
+
+/** Handles a response validation error using native Node HTTP arguments. */
+export type ResponseValidationErrorHandler = (
+	error: ResponseValidationError,
+	request: IncomingMessage,
+	response: ServerResponse,
+) => unknown;
 
 type ContextArguments = {} extends DefaultContext
 	? [context?: DefaultContext]
@@ -66,17 +82,57 @@ export function createRouteHandler(
 			body,
 		};
 
-		const implementation = matched.implementation;
-		const result = await handleHttpRoute(
-			implementation.route,
-			implementation.handler as (request: unknown) => unknown,
-			{
-				request: parsedRequest,
-				context: { ...contextArguments[0], signal },
-				errorHandlers: options.errorHandlers,
-			},
-		);
-		if (!response.destroyed) await writeNodeResponse(result, response);
-		return { matched: true };
+		try {
+			const implementation = matched.implementation;
+			const result = await handleHttpRoute(
+				implementation.route,
+				implementation.handler as (request: unknown) => unknown,
+				{
+					request: parsedRequest,
+					context: { ...contextArguments[0], signal },
+				},
+			);
+			if (!response.destroyed) await writeNodeResponse(result, response);
+			return { matched: true };
+		} catch (error) {
+			if (error instanceof RequestValidationError) {
+				if (options.requestValidationErrorHandler) {
+					await options.requestValidationErrorHandler(error, request, response);
+					return { matched: true };
+				}
+
+				response.statusCode = 400;
+				response.setHeader("content-type", "application/json");
+				response.end(
+					JSON.stringify({
+						message:
+							"Request validation failed. Check the validationErrors field for details.",
+						validationErrors: error.issues,
+					}),
+				);
+				return { matched: true };
+			}
+
+			if (error instanceof ResponseValidationError) {
+				if (options.responseValidationErrorHandler) {
+					await options.responseValidationErrorHandler(
+						error,
+						request,
+						response,
+					);
+					return { matched: true };
+				}
+
+				if (response.headersSent) throw error;
+				response.statusCode = 500;
+				response.setHeader("content-type", "application/json");
+				response.end(
+					JSON.stringify({ message: "Response validation failed." }),
+				);
+				return { matched: true };
+			}
+
+			throw error;
+		}
 	};
 }

@@ -1,9 +1,11 @@
 import type { RouteDeclaration } from "@rest-rpc/core/contract";
-import type { ImplementationTree, ServerErrorHandlers } from "@rest-rpc/server";
+import type { ImplementationTree } from "@rest-rpc/server";
 import { splitRouteImplementations } from "@rest-rpc/server";
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance } from "fastify";
 import {
 	type ExtendedFastifyPreHandler,
+	type RequestValidationErrorHandler,
+	type ResponseValidationErrorHandler,
 	registerFastifyHttpRoutes,
 } from "./http.ts";
 import {
@@ -17,10 +19,8 @@ import {
  * @see {@link https://rest-rpc.dev/docs/server/fastify#options}
  */
 export type RegisterRoutesOptions = {
-	errorHandlers?: ServerErrorHandlers<{
-		req: FastifyRequest;
-		signal: AbortSignal;
-	}>;
+	requestValidationErrorHandler?: RequestValidationErrorHandler;
+	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 	preHandler?: ExtendedFastifyPreHandler[];
 	webSocket?: FastifyWebSocketOptions;
 };
@@ -41,7 +41,8 @@ export function registerRoutes(
 				app,
 				httpRoutes,
 				options.preHandler,
-				options.errorHandlers,
+				options.requestValidationErrorHandler,
+				options.responseValidationErrorHandler,
 			),
 		handleWebSocketRoutes: (webSocketRoutes) =>
 			options.webSocket &&
@@ -50,7 +51,6 @@ export function registerRoutes(
 				options.webSocket,
 				webSocketRoutes,
 				options.preHandler,
-				options.errorHandlers,
 			),
 	});
 }

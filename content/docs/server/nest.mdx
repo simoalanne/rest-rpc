@@ -260,32 +260,47 @@ route-specific values in the global context type.
 ```ts
 type RestRpcModuleOptions<TContext = DefaultNestContext> = {
 	createContext?: (context: ExecutionContext) => TContext | Promise<TContext>;
-	errorHandlers?: ServerErrorHandlers<TContext & { signal: AbortSignal }>;
 };
 ```
 
-### Error Handlers
+### Error handling
 
-Request validation errors use `onRequestValidationError`. Response contract
-validation errors use `onResponseValidationError` and default to a generic 500
-response. Other unhandled route errors use `onUnhandledError`, or are re-thrown
-when that hook is omitted or returns `undefined`.
+Request validation throws `RequestValidationException`, which defaults to a 400
+response. Response contract validation throws `ResponseValidationException`,
+which defaults to a generic 500 response. Both are Nest `HttpException`
+subclasses and can be customized with ordinary Nest exception filters. Other
+errors continue through Nest's exception handling unchanged.
 
 ```ts
-RestRpcModule.forRoot({
-	errorHandlers: {
-		onRequestValidationError: ({ issues }) => ({
-			status: 422,
-			body: { code: "VALIDATION_ERROR", issues },
-		}),
-		onResponseValidationError: () => ({
-			status: 500,
-			body: { code: "INVALID_RESPONSE" },
-		}),
-		onUnhandledError: () => ({
-			status: 500,
-			body: { code: "INTERNAL_SERVER_ERROR" },
-		}),
-	},
-});
+import { ArgumentsHost, Catch, ExceptionFilter } from "@nestjs/common";
+import { APP_FILTER, HttpAdapterHost } from "@nestjs/core";
+import { RequestValidationException } from "@rest-rpc/nest";
+
+@Catch(RequestValidationException)
+class RequestValidationFilter implements ExceptionFilter {
+	constructor(private readonly adapterHost: HttpAdapterHost) {}
+
+	catch(error: RequestValidationException, host: ArgumentsHost) {
+		const response = host.switchToHttp().getResponse();
+		this.adapterHost.httpAdapter.reply(
+			response,
+			{
+				code: "VALIDATION_ERROR",
+				issues: error.validationError.issues,
+			},
+			422,
+		);
+	}
+}
+
+@Module({
+	imports: [RestRpcModule.forRoot()],
+	providers: [
+		{
+			provide: APP_FILTER,
+			useClass: RequestValidationFilter,
+		},
+	],
+})
+class AppModule {}
 ```

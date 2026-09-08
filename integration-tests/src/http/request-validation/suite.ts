@@ -15,13 +15,14 @@ type RequestValidationSuiteAdapter = {
 
 type ValidationErrorBody = {
 	message: string;
-	validationErrors: unknown[];
+	validationErrors: unknown;
 };
 
 const assertValidationResponse = (
 	response: Awaited<
 		ReturnType<RequestValidationClient["params"]["fetchResponse"]>
 	>,
+	location: "body" | "query" | "params" | "headers",
 ) => {
 	assert.equal(response.declared, false);
 	assert.equal(response.status, 400);
@@ -33,8 +34,18 @@ const assertValidationResponse = (
 		body.message,
 		"Request validation failed. Check the validationErrors field for details.",
 	);
-	assert.ok(Array.isArray(body.validationErrors));
-	assert.ok(body.validationErrors.length > 0);
+
+	assert.equal(typeof body.validationErrors, "object");
+	assert.notEqual(body.validationErrors, null);
+	const grouped = body.validationErrors as Record<string, unknown>;
+	assert.deepEqual(Object.keys(grouped), [
+		"body",
+		"query",
+		"params",
+		"headers",
+	]);
+	assert.ok(Array.isArray(grouped[location]));
+	assert.ok(grouped[location].length > 0);
 };
 
 export const runRequestValidationSuite = (
@@ -96,7 +107,7 @@ export const runRequestValidationSuite = (
 				id: "123",
 			} as never);
 
-			assertValidationResponse(response);
+			assertValidationResponse(response, "params");
 		});
 
 		it("rejects query values that do not match the route schema", async () => {
@@ -104,13 +115,13 @@ export const runRequestValidationSuite = (
 				page: 2,
 			});
 
-			assertValidationResponse(response);
+			assertValidationResponse(response, "query");
 		});
 
 		it("rejects missing required headers", async () => {
 			const response = await client.headers.fetchResponse({} as never);
 
-			assertValidationResponse(response);
+			assertValidationResponse(response, "headers");
 		});
 
 		it("rejects JSON bodies that do not match the route schema", async () => {
@@ -118,7 +129,7 @@ export const runRequestValidationSuite = (
 				count: "3",
 			} as never);
 
-			assertValidationResponse(response);
+			assertValidationResponse(response, "body");
 		});
 	});
 };

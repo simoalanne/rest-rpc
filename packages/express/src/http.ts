@@ -3,8 +3,9 @@ import type { HttpMethod } from "@rest-rpc/core/contract";
 import { toColonPath } from "@rest-rpc/core/contract";
 import {
 	handleHttpRoute,
+	RequestValidationError,
+	ResponseValidationError,
 	type RouteImplementation,
-	type ServerErrorHandlers,
 	type ServerHttpRouteDeclaration,
 } from "@rest-rpc/server";
 import type {
@@ -13,7 +14,22 @@ import type {
 	NextFunction,
 	Request,
 } from "express";
-import type { ExpressErrorContext } from "./registerRoutes.ts";
+
+/** Handles an HTTP request validation error using native Express arguments. */
+export type RequestValidationErrorHandler = (
+	error: RequestValidationError,
+	req: Request,
+	res: ExpressResponse,
+	next: NextFunction,
+) => unknown;
+
+/** Handles an HTTP response validation error using native Express arguments. */
+export type ResponseValidationErrorHandler = (
+	error: ResponseValidationError,
+	req: Request,
+	res: ExpressResponse,
+	next: NextFunction,
+) => unknown;
 
 /**
  * Express middleware that also receives the matched rest-rpc route declaration.
@@ -31,28 +47,58 @@ export const registerExpressHttpRoutes = (
 	app: IRouter,
 	routes: RouteImplementation<ServerHttpRouteDeclaration>[],
 	middleware: ExtendedExpressMiddleware[] = [],
-	errorHandlers?: ServerErrorHandlers<ExpressErrorContext>,
+	requestValidationErrorHandler?: RequestValidationErrorHandler,
+	responseValidationErrorHandler?: ResponseValidationErrorHandler,
 ) => {
 	for (const implementation of routes) {
 		const route: ServerHttpRouteDeclaration = implementation.route;
 		const method = route.method.toLowerCase() as Lowercase<HttpMethod>;
 		const handler = implementation.handler;
 
-		const serviceHandler = async (req: Request, res: ExpressResponse) => {
-			const signal = createRequestSignal(req, res);
-			const result = await handleHttpRoute(route, handler, {
-				request: {
-					body: req.body,
-					query: req.query,
-					params: req.params,
-					headers: req.headers,
-				},
-				context: { kind: "http", req, signal },
-				errorContext: { kind: "http", req, signal },
-				errorHandlers,
-			});
+		const serviceHandler = async (
+			req: Request,
+			res: ExpressResponse,
+			next: NextFunction,
+		) => {
+			try {
+				const signal = createRequestSignal(req, res);
+				const result = await handleHttpRoute(route, handler, {
+					request: {
+						body: req.body,
+						query: req.query,
+						params: req.params,
+						headers: req.headers,
+					},
+					context: { kind: "http", req, signal },
+				});
 
-			return writeNodeResponse(result, res);
+				return await writeNodeResponse(result, res);
+			} catch (error) {
+				if (error instanceof RequestValidationError) {
+					if (requestValidationErrorHandler) {
+						return requestValidationErrorHandler(error, req, res, next);
+					}
+
+					return res.status(400).json({
+						message:
+							"Request validation failed. Check the validationErrors field for details.",
+						validationErrors: error.issues,
+					});
+				}
+
+				if (error instanceof ResponseValidationError) {
+					if (responseValidationErrorHandler) {
+						return responseValidationErrorHandler(error, req, res, next);
+					}
+
+					if (res.headersSent) return next(error);
+					return res.status(500).json({
+						message: "Response validation failed.",
+					});
+				}
+
+				return next(error);
+			}
 		};
 
 		app[method](

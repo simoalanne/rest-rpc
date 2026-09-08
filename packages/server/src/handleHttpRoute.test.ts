@@ -5,6 +5,10 @@ import z from "zod";
 import { handleHttpRoute } from "./handleHttpRoute.ts";
 import { RouteResponseError } from "./routeResponseError.ts";
 import { sseEvent } from "./sse.ts";
+import {
+	RequestValidationError,
+	ResponseValidationError,
+} from "./validationErrors.ts";
 
 const routeWithDeclaredErrorResponse = coreRoute
 	.get("/todos/:id")
@@ -70,219 +74,110 @@ describe("handleHttpRoute", () => {
 		});
 	});
 
-	it("returns request validation errors without calling the handler", async () => {
+	it("throws grouped request validation errors without calling the handler", async () => {
 		let called = false;
-		const result = await handleHttpRoute(
-			coreRoute
-				.get("/todos/:id")
-				.params(z.object({ id: z.number() }))
-				.response(204),
-			() => {
-				called = true;
-			},
-			{
-				request: {
-					params: { id: "123" },
-				},
-				context: {},
+		await assert.rejects(
+			() =>
+				handleHttpRoute(
+					coreRoute
+						.get("/todos/:id")
+						.params(z.object({ id: z.number() }))
+						.response(204),
+					() => {
+						called = true;
+					},
+					{
+						request: {
+							params: { id: "123" },
+						},
+						context: {},
+					},
+				),
+			(error) => {
+				assert.ok(error instanceof RequestValidationError);
+				assert.equal(error.issues.body.length, 0);
+				assert.equal(error.issues.query.length, 0);
+				assert.equal(error.issues.params.length, 1);
+				assert.equal(error.issues.headers.length, 0);
+				return true;
 			},
 		);
 
 		assert.equal(called, false);
-		assert.equal(result.kind, "json");
-		assert.equal(result.status, 400);
 	});
 
-	it("uses custom request validation error responses", async () => {
-		const result = await handleHttpRoute(
-			coreRoute
-				.get("/todos/:id")
-				.params(z.object({ id: z.number() }))
-				.response(204),
-			() => undefined,
-			{
-				request: {
-					params: { id: "123" },
-				},
-				context: { requestId: "request-1" },
-				errorHandlers: {
-					onRequestValidationError({ context, issues, request, route }) {
-						assert.equal(context.requestId, "request-1");
-						assert.deepEqual(request.params, { id: "123" });
-						assert.equal(route.path, "/todos/:id");
-
-						return {
-							status: 422,
-							headers: { "x-error": "validation" },
-							body: {
-								code: "VALIDATION_ERROR",
-								issueCount: issues.length,
-							},
-						};
-					},
-				},
-			},
-		);
-
-		assert.deepEqual(result, {
-			kind: "json",
-			responseKindMetadata: false,
-			status: 422,
-			headers: { "x-error": "validation" },
-			body: {
-				code: "VALIDATION_ERROR",
-				issueCount: 1,
-			},
-		});
-	});
-
-	it("uses custom unhandled error responses", async () => {
-		const result = await handleHttpRoute(
-			coreRoute.get("/todos").response(200, z.object({ id: z.string() })),
-			() => {
-				throw new Error("boom");
-			},
-			{
-				request: {},
-				context: { requestId: "request-1" },
-				errorHandlers: {
-					onUnhandledError({ context, error, route }) {
-						assert.equal(context.requestId, "request-1");
-						assert.equal(route.path, "/todos");
-						assert.ok(error instanceof Error);
-
-						return {
-							status: 500,
-							body: { code: "INTERNAL_SERVER_ERROR" },
-						};
-					},
-				},
-			},
-		);
-
-		assert.deepEqual(result, {
-			kind: "json",
-			responseKindMetadata: false,
-			status: 500,
-			headers: undefined,
-			body: { code: "INTERNAL_SERVER_ERROR" },
-		});
-	});
-
-	it("rethrows unhandled errors when the custom handler returns undefined", async () => {
+	it("rethrows user handler errors unchanged", async () => {
+		const expected = new Error("boom");
 		await assert.rejects(
 			() =>
 				handleHttpRoute(
 					coreRoute.get("/todos").response(200, z.object({ id: z.string() })),
 					() => {
-						throw new Error("boom");
+						throw expected;
 					},
 					{
 						request: {},
 						context: {},
-						errorHandlers: {
-							onUnhandledError: () => undefined,
-						},
 					},
 				),
-			/boom/,
+			(error) => error === expected,
 		);
 	});
 
-	it("uses custom response validation error responses", async () => {
-		let unhandledCalled = false;
-		const result = await handleHttpRoute(
-			coreRoute.get("/todos").response(200, z.object({ id: z.string() })),
-			() => ({ id: 123 }),
-			{
-				request: {},
-				context: { requestId: "request-1" },
-				errorHandlers: {
-					onResponseValidationError({ context, error, route }) {
-						assert.equal(context.requestId, "request-1");
-						assert.equal(route.path, "/todos");
-						assert.ok(error);
-
-						return {
-							status: 502,
-							headers: { "x-error": "response-validation" },
-							body: { code: "INVALID_RESPONSE" },
-						};
-					},
-					onUnhandledError: () => {
-						unhandledCalled = true;
-						return { status: 500 };
-					},
-				},
+	it("throws response body validation errors", async () => {
+		await assert.rejects(
+			() =>
+				handleHttpRoute(
+					coreRoute.get("/todos").response(200, z.object({ id: z.string() })),
+					() => ({ id: 123 }),
+					{ request: {}, context: {} },
+				),
+			(error) => {
+				assert.ok(error instanceof ResponseValidationError);
+				assert.equal(error.location, "body");
+				assert.equal(error.issues.length, 1);
+				return true;
 			},
 		);
-
-		assert.equal(unhandledCalled, false);
-		assert.deepEqual(result, {
-			kind: "json",
-			responseKindMetadata: false,
-			status: 502,
-			headers: { "x-error": "response-validation" },
-			body: { code: "INVALID_RESPONSE" },
-		});
-	});
-
-	it("uses default response validation error responses", async () => {
-		const result = await handleHttpRoute(
-			coreRoute.get("/todos").response(200, z.object({ id: z.string() })),
-			() => ({ id: 123 }),
-			{ request: {}, context: {} },
-		);
-
-		assert.deepEqual(result, {
-			kind: "json",
-			responseKindMetadata: false,
-			status: 500,
-			headers: undefined,
-			body: {
-				message: "Response validation failed.",
-			},
-		});
 	});
 
 	it("requires explicit response objects when a route has multiple success statuses", async () => {
-		const result = await handleHttpRoute(
-			coreRoute
-				.post("/todos")
-				.response(200, z.object({ id: z.string() }))
-				.response(202, z.object({ id: z.string() })),
-			() => ({ id: "todo-1" }),
-			{ request: {}, context: {} },
+		await assert.rejects(
+			() =>
+				handleHttpRoute(
+					coreRoute
+						.post("/todos")
+						.response(200, z.object({ id: z.string() }))
+						.response(202, z.object({ id: z.string() })),
+					() => ({ id: "todo-1" }),
+					{ request: {}, context: {} },
+				),
+			(error) =>
+				error instanceof Error &&
+				!(error instanceof ResponseValidationError) &&
+				/declared response object/.test(error.message),
 		);
-
-		assert.equal(result.status, 500);
-		assert.deepEqual(result.kind === "json" ? result.body : undefined, {
-			message: "Response validation failed.",
-		});
 	});
 
 	it("treats returned status and body fields as an explicit response object", async () => {
-		const result = await handleHttpRoute(
-			coreRoute.get("/jobs/:id").response(
-				200,
-				z.object({
-					status: z.number(),
-					body: z.string(),
-				}),
-			),
-			() => ({ status: 123, body: "running" }),
-			{ request: {}, context: {} },
+		await assert.rejects(
+			() =>
+				handleHttpRoute(
+					coreRoute.get("/jobs/:id").response(
+						200,
+						z.object({
+							status: z.number(),
+							body: z.string(),
+						}),
+					),
+					() => ({ status: 123, body: "running" }),
+					{ request: {}, context: {} },
+				),
+			(error) =>
+				error instanceof Error &&
+				!(error instanceof ResponseValidationError) &&
+				/undeclared status 123/.test(error.message),
 		);
-
-		assert.deepEqual(result, {
-			kind: "json",
-			responseKindMetadata: false,
-			status: 500,
-			headers: undefined,
-			body: {
-				message: "Response validation failed.",
-			},
-		});
 	});
 
 	it("normalizes declared response headers", async () => {
@@ -320,29 +215,29 @@ describe("handleHttpRoute", () => {
 	});
 
 	it("rejects duplicate declared and raw response headers", async () => {
-		const result = await handleHttpRoute(
-			coreRoute.get("/todos").response(200, {
-				body: z.object({ id: z.string() }),
-				headers: z.object({ etag: z.string() }),
-			}),
-			() => ({
-				status: 200 as const,
-				body: { id: "todo-1" },
-				responseHeaders: {
-					etag: "declared",
-				},
-				headers: {
-					ETag: "raw",
-				},
-			}),
-			{ request: {}, context: {} },
+		await assert.rejects(
+			() =>
+				handleHttpRoute(
+					coreRoute.get("/todos").response(200, {
+						body: z.object({ id: z.string() }),
+						headers: z.object({ etag: z.string() }),
+					}),
+					() => ({
+						status: 200 as const,
+						body: { id: "todo-1" },
+						responseHeaders: { etag: "declared" },
+						headers: { ETag: "raw" },
+					}),
+					{ request: {}, context: {} },
+				),
+			(error) =>
+				error instanceof Error &&
+				!(error instanceof ResponseValidationError) &&
+				/returned more than once/.test(error.message),
 		);
-
-		assert.equal(result.status, 500);
 	});
 
 	it("normalizes declared RouteResponseError responses", async () => {
-		let called = false;
 		const result = await handleHttpRoute(
 			routeWithDeclaredErrorResponse,
 			() => {
@@ -351,19 +246,9 @@ describe("handleHttpRoute", () => {
 					body: { code: "not_found" },
 				});
 			},
-			{
-				request: {},
-				context: {},
-				errorHandlers: {
-					onUnhandledError: () => {
-						called = true;
-						return { status: 500 };
-					},
-				},
-			},
+			{ request: {}, context: {} },
 		);
 
-		assert.equal(called, false);
 		assert.deepEqual(result, {
 			kind: "json",
 			status: 404,
@@ -373,29 +258,27 @@ describe("handleHttpRoute", () => {
 	});
 
 	it("validates RouteResponseError response bodies during normalization", async () => {
-		const result = await handleHttpRoute(
-			routeWithDeclaredErrorResponse,
-			() => {
-				throw new RouteResponseError(routeWithDeclaredErrorResponse, {
-					status: 404,
-					body: { code: "gone" },
-				} as never);
+		await assert.rejects(
+			() =>
+				handleHttpRoute(
+					routeWithDeclaredErrorResponse,
+					() => {
+						throw new RouteResponseError(routeWithDeclaredErrorResponse, {
+							status: 404,
+							body: { code: "gone" },
+						} as never);
+					},
+					{ request: {}, context: {} },
+				),
+			(error) => {
+				assert.ok(error instanceof ResponseValidationError);
+				assert.equal(error.location, "body");
+				return true;
 			},
-			{ request: {}, context: {} },
 		);
-
-		assert.deepEqual(result, {
-			kind: "json",
-			responseKindMetadata: false,
-			status: 500,
-			headers: undefined,
-			body: {
-				message: "Response validation failed.",
-			},
-		});
 	});
 
-	it("returns 500 error when RouteResponseError is used to return response not declared for the handled route", async () => {
+	it("throws an ordinary error when RouteResponseError targets an undeclared status", async () => {
 		const routes = {
 			todos: {
 				get: routeWithDeclaredErrorResponse,
@@ -406,26 +289,23 @@ describe("handleHttpRoute", () => {
 			},
 		};
 
-		const result = await handleHttpRoute(
-			routes.todos.get,
-			() => {
-				throw new RouteResponseError(routes.todos, {
-					status: 409,
-					body: { code: "already_exists" },
-				});
-			},
-			{ request: {}, context: {} },
+		await assert.rejects(
+			() =>
+				handleHttpRoute(
+					routes.todos.get,
+					() => {
+						throw new RouteResponseError(routes.todos, {
+							status: 409,
+							body: { code: "already_exists" },
+						});
+					},
+					{ request: {}, context: {} },
+				),
+			(error) =>
+				error instanceof Error &&
+				!(error instanceof ResponseValidationError) &&
+				/undeclared status 409/.test(error.message),
 		);
-
-		assert.deepEqual(result, {
-			kind: "json",
-			responseKindMetadata: false,
-			status: 500,
-			headers: undefined,
-			body: {
-				message: "Response validation failed.",
-			},
-		});
 	});
 });
 

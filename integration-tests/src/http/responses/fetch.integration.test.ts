@@ -7,7 +7,6 @@ import { router } from "@rest-rpc/server";
 import z from "zod";
 import type { StartedServer } from "../harness/listen.ts";
 import { createFetchAdapter } from "../harness/fetch.ts";
-import { responseErrorHandlers } from "./errorHandlers.ts";
 import { createResponsesImplementations } from "./handlers.ts";
 import { runResponseMiddlewareHeadersSuite } from "./middlewareSuite.ts";
 import { runResponsesSuite } from "./suite.ts";
@@ -15,8 +14,26 @@ import { runResponsesSuite } from "./suite.ts";
 runResponsesSuite(
 	createFetchAdapter(createResponsesImplementations(), {
 		createHandlerOptions: {
-			errorHandlers: responseErrorHandlers,
+			responseValidationErrorHandler: (_error, request) =>
+				Response.json(
+					{
+						code: "INVALID_RESPONSE",
+						path: new URL(request.url).pathname,
+					},
+					{
+						status: 500,
+						headers: { "x-error-handler": "response-validation" },
+					},
+				),
 		},
+		handleError: (error) =>
+			Response.json(
+				{
+					code: "TEAPOT",
+					message: error instanceof Error ? error.message : "unknown error",
+				},
+				{ status: 418 },
+			),
 	}),
 );
 
@@ -86,7 +103,17 @@ describe("fetch response lifecycle integration", () => {
 				response: new Response(null),
 			},
 			createHandlerOptions: {
-				errorHandlers: responseErrorHandlers,
+				responseValidationErrorHandler: (_error, request) =>
+					Response.json(
+						{
+							code: "INVALID_RESPONSE",
+							path: new URL(request.url).pathname,
+						},
+						{
+							status: 500,
+							headers: { "x-error-handler": "response-validation" },
+						},
+					),
 			},
 		}).start();
 		client = initClient(lifecycleContract, { baseUrl: server.origin });

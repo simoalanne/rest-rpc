@@ -43,7 +43,16 @@ export type {
 	ServerSseBuilderExtension,
 } from "@rest-rpc/server";
 
+export {
+	RequestValidationError,
+	ResponseValidationError,
+} from "@rest-rpc/server";
+
 export { defaultBodyParser } from "./request.ts";
 export type { FetchBodyParser } from "./request.ts";
 export { createRouteHandler } from "./handler.ts";
-export type { CreateFetchHandlerOptions } from "./handler.ts";
+export type {
+	CreateFetchHandlerOptions,
+	RequestValidationErrorHandler,
+	ResponseValidationErrorHandler,
+} from "./handler.ts";

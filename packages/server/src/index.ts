@@ -2,13 +2,6 @@ export type { ClearCookieOptions, SetCookieOptions } from "./cookies.ts";
 export { clearCookie, setCookie } from "./cookies.ts";
 
 export type {
-	RequestValidationErrorInput,
-	ResponseValidationErrorInput,
-	ServerErrorHandlers,
-	ServerErrorResponse,
-	UnhandledErrorInput,
-} from "./errorHandlers.ts";
-export type {
 	HandleHttpRouteOptions,
 	HttpRouteResult,
 } from "./handleHttpRoute.ts";
@@ -55,6 +48,14 @@ export {
 export type { SseEvent } from "./sse.ts";
 export { formatSseEvent, sseEvent } from "./sse.ts";
 export type { RequestSegments, ValidationIssue } from "./validation.ts";
+export type {
+	RequestValidationIssues,
+	ResponseValidationLocation,
+} from "./validationErrors.ts";
+export {
+	RequestValidationError,
+	ResponseValidationError,
+} from "./validationErrors.ts";
 export type {
 	BeforeWebSocketUpgrade,
 	UpgradeRejection,

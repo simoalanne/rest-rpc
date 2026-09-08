@@ -1,10 +1,11 @@
-import type { IncomingMessage } from "node:http";
 import type { RouteDeclaration } from "@rest-rpc/core/contract";
-import type { ImplementationTree, ServerErrorHandlers } from "@rest-rpc/server";
+import type { ImplementationTree } from "@rest-rpc/server";
 import { splitRouteImplementations } from "@rest-rpc/server";
-import type { IRouter, Request } from "express";
+import type { IRouter } from "express";
 import {
 	type ExtendedExpressMiddleware,
+	type RequestValidationErrorHandler,
+	type ResponseValidationErrorHandler,
 	registerExpressHttpRoutes,
 } from "./http.ts";
 import {
@@ -12,29 +13,14 @@ import {
 	registerExpressWebSocketRoutes,
 } from "./websocket.ts";
 
-type ExpressHttpErrorContext = {
-	kind: "http";
-	req: Request;
-	signal: AbortSignal;
-};
-
-type ExpressWebSocketErrorContext = {
-	kind: "websocket";
-	req: IncomingMessage;
-	signal: AbortSignal;
-};
-
-export type ExpressErrorContext =
-	| ExpressHttpErrorContext
-	| ExpressWebSocketErrorContext;
-
 /**
  * Options for registering rest-rpc routes on an Express router.
  *
  * @see {@link https://rest-rpc.dev/docs/server/express#options}
  */
 export type RegisterRoutesOptions = {
-	errorHandlers?: ServerErrorHandlers<ExpressErrorContext>;
+	requestValidationErrorHandler?: RequestValidationErrorHandler;
+	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 	middleware?: ExtendedExpressMiddleware[];
 	webSocket?: ExpressWebSocketOptions;
 };
@@ -55,14 +41,11 @@ export function registerRoutes(
 				app,
 				httpRoutes,
 				options.middleware,
-				options.errorHandlers,
+				options.requestValidationErrorHandler,
+				options.responseValidationErrorHandler,
 			),
 		handleWebSocketRoutes: (webSocketRoutes) =>
 			options.webSocket &&
-			registerExpressWebSocketRoutes(
-				options.webSocket,
-				webSocketRoutes,
-				options.errorHandlers,
-			),
+			registerExpressWebSocketRoutes(options.webSocket, webSocketRoutes),
 	});
 }

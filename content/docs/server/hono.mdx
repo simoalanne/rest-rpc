@@ -55,10 +55,8 @@ type WebSocketRouteHandlerContext<E extends Env = Env> = {
 
 ```ts
 type RegisterRoutesOptions<TEnv extends Env = Env> = {
-	errorHandlers?: ServerErrorHandlers<{
-		c: Context<TEnv>;
-		signal: AbortSignal;
-	}>;
+	requestValidationErrorHandler?: RequestValidationErrorHandler<TEnv>;
+	responseValidationErrorHandler?: ResponseValidationErrorHandler<TEnv>;
 	bodyParser?: HonoBodyParser;
 	webSocket?: HonoWebSocketOptions<TEnv>;
 	middleware?: Array<
@@ -75,29 +73,25 @@ registerRoutes(app, routes, {
 });
 ```
 
-### Error Handlers
+### Error handling
 
-Request validation errors use `onRequestValidationError`. Response contract
-validation errors use `onResponseValidationError` and default to a generic 500
-response. Other unhandled route errors use `onUnhandledError`, or are re-thrown
-when that hook is omitted or returns `undefined`.
+Request validation errors default to a 400 response. Response contract
+validation errors default to a generic 500 response. Customize them with
+handlers that receive the native Hono context. Other errors are handled by
+Hono's error handler.
 
 ```ts
 registerRoutes(app, routes, {
-	errorHandlers: {
-		onRequestValidationError: ({ issues }) => ({
-			status: 422,
-			body: { code: "VALIDATION_ERROR", issues },
-		}),
-		onResponseValidationError: () => ({
-			status: 500,
-			body: { code: "INVALID_RESPONSE" },
-		}),
-		onUnhandledError: () => ({
-			status: 500,
-			body: { code: "INTERNAL_SERVER_ERROR" },
-		}),
+	requestValidationErrorHandler: (error, c) => {
+		return c.json({ code: "VALIDATION_ERROR", issues: error.issues }, 422);
 	},
+	responseValidationErrorHandler: (_error, c) => {
+		return c.json({ code: "INVALID_RESPONSE" }, 500);
+	},
+});
+
+app.onError((error, c) => {
+	return c.json({ code: "INTERNAL_SERVER_ERROR" }, 500);
 });
 ```
 

@@ -3,12 +3,25 @@ import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import { toColonPath } from "@rest-rpc/core/contract";
 import {
 	handleHttpRoute,
+	RequestValidationError,
+	ResponseValidationError,
 	type RouteImplementation,
-	type ServerErrorHandlers,
 	type ServerHttpRouteDeclaration,
 } from "@rest-rpc/server";
 import type { Context, Hono, HonoRequest, Next } from "hono";
 import type { Env } from "hono/types";
+
+/** Handles an HTTP request validation error using native Hono arguments. */
+export type RequestValidationErrorHandler<TEnv extends Env = Env> = (
+	error: RequestValidationError,
+	c: Context<TEnv>,
+) => Response | Promise<Response>;
+
+/** Handles an HTTP response validation error using native Hono arguments. */
+export type ResponseValidationErrorHandler<TEnv extends Env = Env> = (
+	error: ResponseValidationError,
+	c: Context<TEnv>,
+) => Response | Promise<Response>;
 
 /**
  * Custom Hono request body parser used during route registration.
@@ -36,10 +49,8 @@ export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 	routes: RouteImplementation<ServerHttpRouteDeclaration>[],
 	bodyParser: HonoBodyParser | undefined = undefined,
 	middleware: ExtendedHonoMiddleware<TEnv>[] = [],
-	errorHandlers?: ServerErrorHandlers<{
-		c: Context<TEnv>;
-		signal: AbortSignal;
-	}>,
+	requestValidationErrorHandler?: RequestValidationErrorHandler<TEnv>,
+	responseValidationErrorHandler?: ResponseValidationErrorHandler<TEnv>,
 ) => {
 	const usesDefaultBodyParser = bodyParser === undefined;
 
@@ -66,18 +77,44 @@ export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 					return c.json({ message: "Invalid request body" }, 400);
 				}
 
-				const result = await handleHttpRoute(route, implementation.handler, {
-					request: {
-						body,
-						query: c.req.query(),
-						params: c.req.param(),
-						headers: c.req.header(),
-					},
-					context: { c, signal: c.req.raw.signal },
-					errorHandlers,
-				});
+				try {
+					const result = await handleHttpRoute(route, implementation.handler, {
+						request: {
+							body,
+							query: c.req.query(),
+							params: c.req.param(),
+							headers: c.req.header(),
+						},
+						context: { c, signal: c.req.raw.signal },
+					});
 
-				return createFetchResponse(result);
+					return createFetchResponse(result);
+				} catch (error) {
+					if (error instanceof RequestValidationError) {
+						if (requestValidationErrorHandler) {
+							return requestValidationErrorHandler(error, c);
+						}
+
+						return c.json(
+							{
+								message:
+									"Request validation failed. Check the validationErrors field for details.",
+								validationErrors: error.issues,
+							},
+							400,
+						);
+					}
+
+					if (error instanceof ResponseValidationError) {
+						if (responseValidationErrorHandler) {
+							return responseValidationErrorHandler(error, c);
+						}
+
+						return c.json({ message: "Response validation failed." }, 500);
+					}
+
+					throw error;
+				}
 			},
 		);
 	}

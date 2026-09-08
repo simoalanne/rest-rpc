@@ -1,8 +1,9 @@
 import {
 	createRouteMatcher,
 	handleHttpRoute,
+	RequestValidationError,
+	ResponseValidationError,
 	type RuntimeImplementationTree,
-	type ServerErrorHandlers,
 } from "@rest-rpc/server";
 import type { DefaultContext } from "./index.ts";
 import { defaultBodyParser, type FetchBodyParser } from "./request.ts";
@@ -11,8 +12,21 @@ import { createFetchResponse } from "./response.ts";
 /** Options for the general Fetch catch-all handler. */
 export type CreateFetchHandlerOptions = {
 	bodyParser?: FetchBodyParser;
-	errorHandlers?: ServerErrorHandlers<Record<string, unknown>>;
+	requestValidationErrorHandler?: RequestValidationErrorHandler;
+	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 };
+
+/** Handles a request validation error using native Fetch arguments. */
+export type RequestValidationErrorHandler = (
+	error: RequestValidationError,
+	request: Request,
+) => Response | Promise<Response>;
+
+/** Handles a response validation error using native Fetch arguments. */
+export type ResponseValidationErrorHandler = (
+	error: ResponseValidationError,
+	request: Request,
+) => Response | Promise<Response>;
 
 type FetchRouteHandlerResult =
 	| { matched: true; response: Response }
@@ -65,17 +79,44 @@ export function createRouteHandler(
 			body,
 		};
 
-		const implementation = matched.implementation;
-		const result = await handleHttpRoute(
-			implementation.route,
-			implementation.handler as (request: unknown) => unknown,
-			{
-				request: parsedRequest,
-				context: { ...contextArguments[0], signal: request.signal },
-				errorHandlers: options.errorHandlers,
-			},
-		);
+		try {
+			const implementation = matched.implementation;
+			const result = await handleHttpRoute(
+				implementation.route,
+				implementation.handler as (request: unknown) => unknown,
+				{
+					request: parsedRequest,
+					context: { ...contextArguments[0], signal: request.signal },
+				},
+			);
 
-		return { matched: true, response: await createFetchResponse(result) };
+			return { matched: true, response: await createFetchResponse(result) };
+		} catch (error) {
+			if (error instanceof RequestValidationError) {
+				const response = options.requestValidationErrorHandler
+					? await options.requestValidationErrorHandler(error, request)
+					: Response.json(
+							{
+								message:
+									"Request validation failed. Check the validationErrors field for details.",
+								validationErrors: error.issues,
+							},
+							{ status: 400 },
+						);
+				return { matched: true, response };
+			}
+
+			if (error instanceof ResponseValidationError) {
+				const response = options.responseValidationErrorHandler
+					? await options.responseValidationErrorHandler(error, request)
+					: Response.json(
+							{ message: "Response validation failed." },
+							{ status: 500 },
+						);
+				return { matched: true, response };
+			}
+
+			throw error;
+		}
 	};
 }

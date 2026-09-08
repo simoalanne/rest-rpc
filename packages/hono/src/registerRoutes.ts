@@ -2,13 +2,14 @@ import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	type ImplementationTree,
 	splitRouteImplementations,
-	type ServerErrorHandlers,
 } from "@rest-rpc/server";
-import type { Context, Hono } from "hono";
+import type { Hono } from "hono";
 import type { Env } from "hono/types";
 import {
 	type ExtendedHonoMiddleware,
 	type HonoBodyParser,
+	type RequestValidationErrorHandler,
+	type ResponseValidationErrorHandler,
 	registerHonoHttpRoutes,
 } from "./http.ts";
 import {
@@ -22,10 +23,8 @@ import {
  * @see {@link https://rest-rpc.dev/docs/server/hono#options}
  */
 export type RegisterRoutesOptions<TEnv extends Env = Env> = {
-	errorHandlers?: ServerErrorHandlers<{
-		c: Context<TEnv>;
-		signal: AbortSignal;
-	}>;
+	requestValidationErrorHandler?: RequestValidationErrorHandler<TEnv>;
+	responseValidationErrorHandler?: ResponseValidationErrorHandler<TEnv>;
 	middleware?: ExtendedHonoMiddleware<TEnv>[];
 	bodyParser?: HonoBodyParser;
 	webSocket?: HonoWebSocketOptions<TEnv>;
@@ -48,7 +47,8 @@ export function registerRoutes<TEnv extends Env = Env>(
 				httpRoutes,
 				options.bodyParser,
 				options.middleware,
-				options.errorHandlers,
+				options.requestValidationErrorHandler,
+				options.responseValidationErrorHandler,
 			),
 		handleWebSocketRoutes: (webSocketRoutes) =>
 			options.webSocket &&
@@ -57,7 +57,6 @@ export function registerRoutes<TEnv extends Env = Env>(
 				options.webSocket,
 				webSocketRoutes,
 				options.middleware,
-				options.errorHandlers,
 			),
 	});
 }

@@ -7,6 +7,7 @@ import { listen } from "./listen.ts";
 
 export type ExpressAdapterOptions = {
 	configureApp?: (app: Application) => void;
+	configureAppAfterRoutes?: (app: Application) => void;
 	registerRoutesOptions?: RegisterRoutesOptions;
 };
 
@@ -21,6 +22,7 @@ export const createExpressAdapter = (
 		app.use(express.json());
 		options.configureApp?.(app);
 		registerRoutes(app, implementations, options.registerRoutesOptions);
+		options.configureAppAfterRoutes?.(app);
 
 		return listen(createServer(app));
 	},

@@ -12,6 +12,7 @@ import { implement, serverFirstRoute } from "./serverFirst.ts";
 import { SERVER_FIRST_RESPONSE_KIND_HEADER } from "@rest-rpc/core/client";
 import type { HttpRouteResult } from "../src/handleHttpRoute.ts";
 import { handleHttpRouteResult } from "../src/handleHttpRouteResult.ts";
+import { ResponseValidationError } from "./validationErrors.ts";
 
 const execute = (
 	implementation: {
@@ -134,10 +135,14 @@ describe("server-first runtime", () => {
 			.response(200, z.string())
 			.handler(() => ({ status: 200, body: 123 as never }));
 
-		const result = await execute(implementation);
-		assert.equal(result.status, 500);
-		assert.equal(result.kind, "json");
-		assert.equal(await responseKind(result), null);
+		await assert.rejects(
+			() => execute(implementation),
+			(error) => {
+				assert.ok(error instanceof ResponseValidationError);
+				assert.equal(error.location, "body");
+				return true;
+			},
+		);
 	});
 
 	it("normalizes server-first SSE routes with SSE response metadata", async () => {

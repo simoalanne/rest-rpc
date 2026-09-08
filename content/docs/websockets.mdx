@@ -129,7 +129,8 @@ registerRoutes(app, routes, {
 
 ## Error Handling
 
-Request validation errors use `onRequestValidationError`. After upgrade:
+Invalid upgrade requests receive a 400 response. Other upgrade failures receive
+a generic 500 response. After upgrade:
 
 - invalid incoming messages close the connection
 - errors thrown from the route handler or message handler close the connection

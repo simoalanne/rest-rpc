@@ -7,7 +7,7 @@ import {
 	type ErrorHandlersContract,
 	errorHandlersContract,
 } from "./contract.ts";
-import type { ErrorHandlerState } from "./errorHandlers.ts";
+import type { ErrorHandlerState } from "./state.ts";
 
 export type ErrorHandlersHandlers = ImplementationShape<ErrorHandlersContract>;
 

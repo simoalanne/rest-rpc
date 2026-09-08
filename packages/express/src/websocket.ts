@@ -10,15 +10,14 @@ import {
 	createRouteMatcher,
 	handleWebSocketRoute,
 	prepareWebSocketUpgrade,
+	RequestValidationError,
 	type RouteImplementation,
-	type ServerErrorHandlers,
 	type UpgradeRejection,
 	type WebSocketLike,
 } from "@rest-rpc/server";
 import type WebSocket from "ws";
 import type { WebSocketServer } from "ws";
 import { parseRequestTarget } from "@rest-rpc/node";
-import type { ExpressErrorContext } from "./registerRoutes.ts";
 
 export type ExpressWebSocketOptions = {
 	server: HttpServer;
@@ -100,7 +99,6 @@ const adaptWebSocket = (socket: WebSocket): WebSocketLike => ({
 export const registerExpressWebSocketRoutes = (
 	options: ExpressWebSocketOptions,
 	routes: RouteImplementation<WebSocketRouteDeclaration>[],
-	errorHandlers?: ServerErrorHandlers<ExpressErrorContext>,
 ) => {
 	if (routes.length === 0) return;
 
@@ -141,13 +139,33 @@ export const registerExpressWebSocketRoutes = (
 			headers: req.headers,
 		};
 
-		const upgrade = await prepareWebSocketUpgrade({
-			implementation,
-			request,
-			context: { kind: "websocket", req, signal: controller.signal },
-			beforeUpgrade: options.beforeUpgrade,
-			errorHandlers,
-		});
+		let upgrade: Awaited<ReturnType<typeof prepareWebSocketUpgrade>>;
+		try {
+			upgrade = await prepareWebSocketUpgrade({
+				implementation,
+				request,
+				context: { kind: "websocket", req, signal: controller.signal },
+				beforeUpgrade: options.beforeUpgrade,
+			});
+		} catch (error) {
+			sendUpgradeRejection(
+				socket,
+				error instanceof RequestValidationError
+					? {
+							status: 400,
+							body: {
+								message:
+									"Request validation failed. Check the validationErrors field for details.",
+								validationErrors: error.issues,
+							},
+						}
+					: {
+							status: 500,
+							body: { message: "WebSocket upgrade failed." },
+						},
+			);
+			return;
+		}
 
 		if (!upgrade.ok) {
 			sendUpgradeRejection(socket, upgrade.rejection);

@@ -1,3 +1,4 @@
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { createServer } from "node:http";
 import type { RuntimeImplementationTree } from "@rest-rpc/server";
 import {
@@ -8,7 +9,14 @@ import { listen } from "./listen.ts";
 
 export const createNodeAdapter = (
 	implementations: RuntimeImplementationTree,
-	options: { createHandlerOptions?: CreateNodeHandlerOptions } = {},
+	options: {
+		createHandlerOptions?: CreateNodeHandlerOptions;
+		handleError?: (
+			error: unknown,
+			request: IncomingMessage,
+			response: ServerResponse,
+		) => unknown;
+	} = {},
 ) => ({
 	name: "node",
 	start: async () => {
@@ -25,6 +33,10 @@ export const createNodeAdapter = (
 						res.end();
 					}
 				} catch (error) {
+					if (options.handleError) {
+						await options.handleError(error, req, res);
+						return;
+					}
 					res.destroy(error instanceof Error ? error : undefined);
 				}
 			}),

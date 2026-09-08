@@ -27,11 +27,17 @@ export type {
 	SetCookieOptions,
 	SseEvent,
 } from "@rest-rpc/server";
-export type { ExtendedFastifyPreHandler } from "./http.ts";
+export type {
+	ExtendedFastifyPreHandler,
+	RequestValidationErrorHandler,
+	ResponseValidationErrorHandler,
+} from "./http.ts";
 export type { RegisterRoutesOptions } from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
 export {
 	clearCookie,
+	RequestValidationError,
+	ResponseValidationError,
 	RouteResponseError,
 	setCookie,
 	sseEvent,
