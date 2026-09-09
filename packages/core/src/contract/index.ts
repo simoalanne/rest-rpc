@@ -2,9 +2,16 @@ export type {
 	HttpBuilderFor,
 	RouteFactoryOptions,
 	RouteFactory,
+	ShorthandRouteFactory,
 	SseBuilderFor,
 	WebSocketBuilderFor,
 } from "./routeFactory.ts";
+export type {
+	AnyShorthandRouteDeclaration,
+	ShorthandRouteDeclaration,
+	ShorthandRouteInputBuilder,
+	ShorthandRouteOutputBuilder,
+} from "./shorthandRouteBuilder.ts";
 export type {
 	BodyWithArrayKeysOptions,
 	CustomBody,

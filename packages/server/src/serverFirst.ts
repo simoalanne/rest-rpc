@@ -12,6 +12,8 @@ import type {
 	RouteFactoryOptions,
 	RouteMetadata,
 	ServerRequest,
+	AnyShorthandRouteDeclaration,
+	ShorthandRouteDeclaration,
 	SseBuilderDeclaration,
 	SseBuilderFor,
 	SseBuilderState,
@@ -42,6 +44,71 @@ interface ContextShape {
 type ServerFirstContext<TContext extends ContextShape> = TContext & {
 	signal: AbortSignal;
 };
+
+type ShorthandRequest<
+	TInput extends StandardSchemaV1 | never,
+	TContext extends ContextShape,
+> = Merge<
+	([TInput] extends [never]
+		? EmptyObject
+		: StandardSchemaV1.InferOutput<Extract<TInput, StandardSchemaV1>>) & {
+		context: ServerFirstContext<TContext>;
+	}
+>;
+
+type InferredShorthandRoute<
+	TInput extends StandardSchemaV1 | never,
+	TResult,
+> = ShorthandRouteDeclaration<
+	TInput,
+	StandardSchemaV1<unknown, Awaited<TResult>>
+>;
+
+/**
+ * A server-first shorthand builder that can declare input or output before its
+ * handler.
+ */
+export type ServerShorthandImplementationBuilder<
+	TInput extends StandardSchemaV1 | never,
+	TOutput extends StandardSchemaV1 | never,
+	TContext extends ContextShape,
+> = ([TOutput] extends [never]
+	? {
+			handler<const TResult>(
+				handler: (request: ShorthandRequest<TInput, TContext>) => TResult,
+			): ServerRouteImplementation<
+				InferredShorthandRoute<TInput, TResult>,
+				(request: ShorthandRequest<TInput, TContext>) => TResult,
+				InferredShorthandRoute<TInput, TResult>
+			>;
+		}
+	: {
+			handler<
+				const TResult extends MaybePromise<
+					StandardSchemaV1.InferInput<Extract<TOutput, StandardSchemaV1>>
+				>,
+			>(
+				handler: (request: ShorthandRequest<TInput, TContext>) => TResult,
+			): ServerRouteImplementation<
+				ShorthandRouteDeclaration<TInput, Extract<TOutput, StandardSchemaV1>>,
+				(request: ShorthandRequest<TInput, TContext>) => TResult,
+				ShorthandRouteDeclaration<TInput, Extract<TOutput, StandardSchemaV1>>
+			>;
+		}) &
+	([TInput] extends [never]
+		? {
+				input<const TNextInput extends StandardSchemaV1>(
+					schema: TNextInput,
+				): ServerShorthandImplementationBuilder<TNextInput, TOutput, TContext>;
+			}
+		: EmptyObject) &
+	([TOutput] extends [never]
+		? {
+				output<const TNextOutput extends StandardSchemaV1>(
+					schema: TNextOutput,
+				): ServerShorthandImplementationBuilder<TInput, TNextOutput, TContext>;
+			}
+		: EmptyObject);
 
 /** A server-first implementation carrying erased client route metadata. */
 export interface ServerRouteImplementation<
@@ -189,11 +256,13 @@ export type ServerFirstRouteResponseKind<TImplementation> =
 		route: infer TRoute;
 		handler: infer THandler;
 	}
-		? TRoute extends { mode: "sse" }
-			? "sse"
-			: TRoute extends { responses: Record<number, unknown> }
-				? never
-				: ImplicitResponseKind<HandlerResult<THandler>>
+		? TRoute extends { kind: "shorthand" }
+			? "json"
+			: TRoute extends { mode: "sse" }
+				? "sse"
+				: TRoute extends { responses: Record<number, unknown> }
+					? never
+					: ImplicitResponseKind<HandlerResult<THandler>>
 		: never;
 
 type Merge<T> = {
@@ -359,8 +428,7 @@ type ServerRouteOptions<TOptions extends RouteFactoryOptions> = Omit<
 > &
 	TOptions;
 
-/** Type-level model of the server-first HTTP and SSE route factory. */
-export type ServerRouteFactory<
+type ServerConfiguredRouteFactory<
 	TOptions extends RouteFactoryOptions = { flattenRequestKeys: true },
 	TContext extends ContextShape = EmptyObject,
 > = {
@@ -378,7 +446,28 @@ export type ServerRouteFactory<
 	): SseBuilderFor<TOptions, TPath, ServerSseBuilderExtension<TContext>>;
 	with<const TNextOptions extends RouteFactoryOptions>(
 		options: TNextOptions,
-	): ServerRouteFactory<ServerRouteOptions<TNextOptions>, TContext>;
+	): ServerConfiguredRouteFactory<ServerRouteOptions<TNextOptions>, TContext>;
+};
+
+/** Type-level model of the server-first HTTP, SSE, and shorthand route factory. */
+export type ServerRouteFactory<
+	TOptions extends RouteFactoryOptions = { flattenRequestKeys: true },
+	TContext extends ContextShape = EmptyObject,
+> = ServerConfiguredRouteFactory<TOptions, TContext> & {
+	/** Starts a shorthand route whose HTTP method and path come from its tree. */
+	handler: ServerShorthandImplementationBuilder<
+		never,
+		never,
+		TContext
+	>["handler"];
+	/** Declares the shorthand route's JSON request body schema. */
+	input<const TInput extends StandardSchemaV1>(
+		schema: TInput,
+	): ServerShorthandImplementationBuilder<TInput, never, TContext>;
+	/** Declares the shorthand route's `200` JSON response schema. */
+	output<const TOutput extends StandardSchemaV1>(
+		schema: TOutput,
+	): ServerShorthandImplementationBuilder<never, TOutput, TContext>;
 };
 
 type ImplementationBuilder<
@@ -423,6 +512,11 @@ export type ServerImplementationTree =
 			BaseRouteDeclaration,
 			AnyRouteHandler,
 			ServerHttpRouteDeclaration
+	  >
+	| ServerRouteImplementation<
+			AnyShorthandRouteDeclaration,
+			AnyRouteHandler,
+			AnyShorthandRouteDeclaration
 	  >
 	| { readonly [key: string]: ServerImplementationTree };
 

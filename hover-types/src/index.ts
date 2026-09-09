@@ -307,3 +307,93 @@ export type ServerFirstClientFetchResponseReturn = ReturnType<
 >;
 export type FetchServerFirstHandler = typeof fetchServerFirstHandler;
 export type NodeServerFirstHandler = typeof nodeServerFirstHandler;
+
+export const shorthandHoverApi = {
+	todos: {
+		get: route.output(schemaType<{ id: string; title: string }>()),
+		create: route
+			.input(schemaType<{ title: string }>())
+			.output(schemaType<{ id: string; title: string }>()),
+	},
+};
+
+export const shorthandHoverClient = initClient(shorthandHoverApi, {
+	baseUrl: "https://example.test",
+});
+export const shorthandHoverQuery = createTanstackQueryHelpers(
+	shorthandHoverApi,
+	{ baseUrl: "https://example.test" },
+);
+
+type ShorthandGetRoute = typeof shorthandHoverApi.todos.get;
+type ShorthandCreateRoute = typeof shorthandHoverApi.todos.create;
+
+export type ShorthandGetClientRequest = ClientRequest<ShorthandGetRoute>;
+export type ShorthandCreateClientRequest = ClientRequest<ShorthandCreateRoute>;
+export type ShorthandGetClientResponse = ClientResponse<ShorthandGetRoute>;
+export type ShorthandGetClientResponseBody =
+	ClientResponseBody<ShorthandGetRoute>;
+export type ShorthandGetCallParameters = Parameters<
+	typeof shorthandHoverClient.todos.get
+>;
+export type ShorthandGetCallReturn = ReturnType<
+	typeof shorthandHoverClient.todos.get
+>;
+export type ShorthandCreateCallParameters = Parameters<
+	typeof shorthandHoverClient.todos.create
+>;
+export type ShorthandCreateCallReturn = ReturnType<
+	typeof shorthandHoverClient.todos.create
+>;
+export type ShorthandQueryData = RouteQueryData<ShorthandGetRoute>;
+export type ShorthandQueryError = RouteQueryError<ShorthandGetRoute>;
+export type ShorthandMutationVariables =
+	RouteMutationVariables<ShorthandCreateRoute>;
+export type ShorthandQueryOptionsParameters = Parameters<
+	typeof shorthandHoverQuery.todos.get.queryOptions
+>;
+export type ShorthandMutationOptionsParameters = Parameters<
+	typeof shorthandHoverQuery.todos.create.mutationOptions
+>;
+
+export const shorthandServerFirstRoutes = {
+	todos: {
+		inferred: fetchRoute.handler(() => ({
+			id: "todo-1" as const,
+			title: "Todo" as const,
+		})),
+		declared: fetchRoute
+			.output(schemaType<{ id: string; title: string }>())
+			.handler(() => ({ id: "todo-1", title: "Todo" })),
+		explicit: fetchRoute
+			.get("/server-first/explicit")
+			.handler(() => ({ status: 204 as const })),
+	},
+	explicitOnly: {
+		health: fetchRoute
+			.get("/server-first/health")
+			.handler(() => ({ status: 204 as const })),
+	},
+};
+
+export const shorthandServerFirstClient = initClient<
+	typeof shorthandServerFirstRoutes
+>({ baseUrl: "https://example.test" });
+export const shorthandServerFirstQuery = createTanstackQueryHelpers<
+	typeof shorthandServerFirstRoutes
+>({ baseUrl: "https://example.test" });
+
+export type ServerFirstInferredShorthandReturn = ReturnType<
+	typeof shorthandServerFirstClient.todos.inferred
+>;
+export type ServerFirstDeclaredShorthandReturn = ReturnType<
+	typeof shorthandServerFirstClient.todos.declared
+>;
+export type ServerFirstShorthandNamespaceKeys =
+	keyof typeof shorthandServerFirstClient.todos;
+export type ServerFirstHasExplicitOnlyNamespace =
+	"explicitOnly" extends keyof typeof shorthandServerFirstClient ? true : false;
+export type ServerFirstTanstackShorthandNamespaceKeys =
+	keyof typeof shorthandServerFirstQuery.todos;
+export type ServerFirstTanstackHasExplicitOnlyNamespace =
+	"explicitOnly" extends keyof typeof shorthandServerFirstQuery ? true : false;

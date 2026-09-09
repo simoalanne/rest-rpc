@@ -75,6 +75,7 @@ export type {
 	ImplementationBuildersFor,
 	ServerImplementationTree,
 	ServerContract,
+	ServerShorthandImplementationBuilder,
 	ServerFirstResponseKind,
 	ServerFirstRouteResponseKind,
 	ServerHttpBuilderExtension,

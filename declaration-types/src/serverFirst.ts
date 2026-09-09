@@ -18,6 +18,37 @@ import {
 } from "@rest-rpc/node";
 
 const todoInput = schemaType<{ title: string }>();
+const todoOutput = schemaType<{ id: string; title: string }>();
+
+export const fetchShorthandInputBuilder = fetchRoute.input(todoInput);
+export const fetchShorthandOutputBuilder = fetchRoute.output(todoOutput);
+export const fetchShorthandInputOutputBuilder =
+	fetchShorthandInputBuilder.output(todoOutput);
+export const fetchShorthandOutputInputBuilder =
+	fetchShorthandOutputBuilder.input(todoInput);
+
+export const fetchShorthandDeclaredImplementation =
+	fetchShorthandOutputBuilder.handler(() => ({
+		id: "todo-1",
+		title: "Todo",
+	}));
+export const fetchShorthandInferredImplementation = fetchRoute.handler(() => ({
+	id: "todo-2" as const,
+}));
+
+export const fetchShorthandImplementations = {
+	todos: {
+		get: fetchShorthandDeclaredImplementation,
+		create: fetchShorthandInputOutputBuilder.handler(({ title }) => ({
+			id: "todo-1",
+			title,
+		})),
+		inferred: fetchShorthandInferredImplementation,
+	},
+};
+export const fetchShorthandClient = initClient<
+	typeof fetchShorthandImplementations
+>({ baseUrl: "http://localhost" });
 
 export const unfinishedFetchBuilder = fetchRoute.post("/todos").body(todoInput);
 export const unfinishedNodeBuilder = nodeRoute

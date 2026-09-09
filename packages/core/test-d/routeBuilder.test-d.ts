@@ -3,7 +3,9 @@ import {
 	type HttpStatusCode,
 	type HttpRouteDeclaration,
 	type OpenApiRouteOptions,
+	type RouteDeclaration,
 	type RouteMetadata,
+	type ShorthandRouteDeclaration,
 	type SseRouteDeclaration,
 	type WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
@@ -51,6 +53,55 @@ const apiRoute = route.with({
 	openApi: { tags: ["API"] },
 	flattenRequestKeys: true,
 });
+
+// Shorthand route builders
+
+// A declared output completes a no-input shorthand contract route.
+const shorthandNoInput = route.output(todo);
+expectType<"shorthand">(shorthandNoInput.kind);
+expectType<typeof todo>(shorthandNoInput.output);
+expectAssignable<ShorthandRouteDeclaration<never, typeof todo>>(
+	shorthandNoInput,
+);
+expectAssignable<Contract>(shorthandNoInput);
+expectNotAssignable<RouteDeclaration>(shorthandNoInput);
+
+// Like an HTTP route with one response, it is complete but remains extendable.
+const shorthandOutputFirst = shorthandNoInput.input(input);
+expectNotAssignable<RouteDeclaration>(shorthandOutputFirst);
+expectType<typeof input>(shorthandOutputFirst.input);
+expectType<typeof todo>(shorthandOutputFirst.output);
+expectAssignable<ShorthandRouteDeclaration<typeof input, typeof todo>>(
+	shorthandOutputFirst,
+);
+expectAssignable<Contract>(shorthandOutputFirst);
+
+// Input remains incomplete until an output is declared.
+const shorthandInput = route.input(input);
+expectNotAssignable<Contract>(shorthandInput);
+const shorthandWithInput = shorthandInput.output(todo);
+expectType<typeof input>(shorthandWithInput.input);
+expectType<typeof todo>(shorthandWithInput.output);
+expectAssignable<ShorthandRouteDeclaration<typeof input, typeof todo>>(
+	shorthandWithInput,
+);
+expectAssignable<Contract>(shorthandWithInput);
+
+// Completed shorthand declarations do not expose explicit HTTP setters.
+expectError(route.handler(() => ({ id: "todo-1", title: "Todo" })));
+expectError(
+	shorthandInput.handler((request: { title: string }) => ({
+		id: "todo-1",
+		title: request.title,
+	})),
+);
+expectError(shorthandInput.input(input));
+expectError(shorthandWithInput.output(todo));
+expectError(shorthandOutputFirst.input(input));
+expectError(shorthandOutputFirst.output(todo));
+expectError(shorthandWithInput.response(200, todo));
+expectError(route.post("/todos").input(input));
+expectError(apiRoute.input(input));
 
 // HTTP route builders
 

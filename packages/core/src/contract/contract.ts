@@ -1,4 +1,5 @@
 import type { HttpRouteDeclaration } from "./httpRouteBuilder.ts";
+import type { AnyShorthandRouteDeclaration } from "./shorthandRouteBuilder.ts";
 import type { SseRouteDeclaration } from "./sseRouteBuilder.ts";
 import type { WebSocketRouteDeclaration } from "./websocketRouteBuilder.ts";
 
@@ -17,4 +18,7 @@ export type RouteDeclaration =
  *
  * @see {@link https://rest-rpc.dev/docs/contract/declaration}
  */
-export type Contract = RouteDeclaration | { [key: string]: Contract };
+export type Contract =
+	| RouteDeclaration
+	| AnyShorthandRouteDeclaration
+	| { [key: string]: Contract };

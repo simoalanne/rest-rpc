@@ -66,6 +66,8 @@ const sortRouteCases = (left, right) => {
 const benchmarkResults = [
 	{ name: "Contract-first", directory: "contract-only" },
 	{ name: "Server-first", directory: "server-first" },
+	{ name: "Contract-first shorthand", directory: "contract-shorthand" },
+	{ name: "Server-first shorthand", directory: "server-first-shorthand" },
 ].map((benchmark) => {
 	const benchmarkRoot = join(generatedRoot, benchmark.directory);
 	if (!existsSync(benchmarkRoot)) {
@@ -174,5 +176,5 @@ writeFileSync(latestPath, result);
 
 console.log(`\nSaved results to ${relative(repoRoot, resultPath)}`);
 console.log(
-	"\nRaw fixtures live under benchmarks/generated/{contract-only,server-first}/ after generation.",
+	"\nRaw fixtures live under benchmarks/generated/ after generation.",
 );

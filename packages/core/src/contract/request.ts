@@ -2,6 +2,7 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { CustomBody, FormBody, MultipartBody, NoBody } from "./body.ts";
 import type { BaseRouteDeclaration } from "./baseRouteDeclaration.ts";
 import type { InferCustomBody } from "./response.ts";
+import type { AnyShorthandRouteDeclaration } from "./shorthandRouteBuilder.ts";
 
 export type RequestSegment = "body" | "query" | "params" | "headers";
 export type RequestKeys = Record<string, RequestSegment>;
@@ -280,9 +281,15 @@ type OptionalRequestKeys<T, TOptionalKeys extends PropertyKey> = [T] extends [
  * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
  */
 export type ClientRequest<
-	E extends BaseRouteDeclaration,
+	E extends BaseRouteDeclaration | AnyShorthandRouteDeclaration,
 	TOptionalKeys extends PropertyKey = never,
-> = OptionalRequestKeys<InferRequestFor<E, "input">, TOptionalKeys>;
+> = E extends AnyShorthandRouteDeclaration
+	? E extends { input: infer TInput extends StandardSchemaV1 }
+		? StandardSchemaV1.InferInput<TInput>
+		: never
+	: E extends BaseRouteDeclaration
+		? OptionalRequestKeys<InferRequestFor<E, "input">, TOptionalKeys>
+		: never;
 
 export type ServerRequest<E extends BaseRouteDeclaration> = InferRequestFor<
 	E,

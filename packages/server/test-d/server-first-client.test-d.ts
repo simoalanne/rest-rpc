@@ -10,6 +10,18 @@ const todo = z.object({ id: z.string(), title: z.string() });
 
 const routes = {
 	todos: {
+		shorthandGet: route.handler(() => ({ id: "todo-1", title: "Todo" })),
+		shorthandCreate: route
+			.input(z.object({ title: z.string() }))
+			.handler(({ title }) => ({ id: "todo-1", title })),
+		shorthandDeclaredGet: route.output(todo).handler(() => ({
+			id: "todo-1",
+			title: "Todo",
+		})),
+		shorthandDeclaredCreate: route
+			.input(z.object({ title: z.string() }))
+			.output(todo)
+			.handler(({ title }) => ({ id: "todo-1", title })),
 		create: route
 			.post("/todos/:accountId")
 			.params(z.object({ accountId: z.string() }))
@@ -51,6 +63,9 @@ const routes = {
 			responseHeaders: { etag: "todo-1", "x-page": 1 },
 		})),
 	},
+	explicitOnly: {
+		health: route.get("/health").handler(() => ({ status: 204 as const })),
+	},
 	events: route.sse("/events").handler(async function* () {
 		yield sseEvent({ id: "todo-1" });
 	}),
@@ -88,6 +103,25 @@ const routes = {
 const client = initClient<typeof routes>({
 	baseUrl: "https://example.test",
 });
+
+expectType<Promise<{ readonly id: "todo-1"; readonly title: "Todo" }>>(
+	client.todos.shorthandGet(),
+);
+expectType<Promise<{ readonly id: "todo-1"; readonly title: string }>>(
+	client.todos.shorthandCreate({ title: "Write tests" }),
+);
+expectType<Promise<{ id: string; title: string }>>(
+	client.todos.shorthandDeclaredGet(),
+);
+expectType<Promise<{ id: string; title: string }>>(
+	client.todos.shorthandDeclaredCreate({ title: "Write tests" }),
+);
+expectError(client.todos.shorthandCreate());
+expectError(client.todos.shorthandCreate({ title: 1 }));
+expectError(client.todos.shorthandGet.fetch);
+expectError(client.todos.create);
+expectError(client.events);
+expectError(client.explicitOnly);
 
 expectError(
 	initClient<typeof routes>({

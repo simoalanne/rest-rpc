@@ -158,6 +158,53 @@ const groupEntries = (routeCount, serverFirst) => {
 		.join(",\n");
 };
 
+const shorthandRouteSource = (index, serverFirst) => {
+	if (serverFirst) {
+		const builder = [
+			"route.output(todoSchema)",
+			"route.input(bodySchema).output(todoSchema)",
+			"route",
+			"route.input(bodySchema)",
+		][index % 4];
+		return `route${index}: ${builder}.handler(() => ({
+			id: "todo-${index}",
+			title: "Todo ${index}",
+			done: false,
+			tags: [] as string[],
+		}))`;
+	}
+
+	return `route${index}: ${
+		index % 2 === 0
+			? "route.output(todoSchema)"
+			: "route.input(bodySchema).output(todoSchema)"
+	}`;
+};
+
+const shorthandGroupEntries = (routeCount, serverFirst) => {
+	const groups = new Map();
+	for (let index = 0; index < routeCount; index += 1) {
+		const groupName = `group${Math.floor(index / 10)}`;
+		const routes = groups.get(groupName) ?? [];
+		routes.push(shorthandRouteSource(index, serverFirst));
+		groups.set(groupName, routes);
+	}
+
+	return [...groups.entries()]
+		.map(
+			([groupName, routes]) => `${groupName}: {
+			${routes.join(",\n")}
+		}`,
+		)
+		.join(",\n");
+};
+
+const shorthandClientEvaluations = (routeCount) =>
+	Array.from({ length: routeCount }, (_, index) => {
+		const groupName = `group${Math.floor(index / 10)}`;
+		return `EvaluateClientRoute<BenchmarkClient["${groupName}"]["route${index}"]>`;
+	}).join(",\n\t");
+
 const fixtureSource = (routeCount, schemaLibrary, serverFirst) => {
 	const groups = groupEntries(routeCount, serverFirst);
 
@@ -203,6 +250,33 @@ export type Api = typeof api;
 `;
 };
 
+const shorthandFixtureSource = (routeCount, schemaLibrary, serverFirst) => {
+	const groups = shorthandGroupEntries(routeCount, serverFirst);
+	const clientEvaluations = shorthandClientEvaluations(routeCount);
+	const clientType = serverFirst
+		? "ServerFirstClientFor<typeof api>"
+		: "ApiClientFor<typeof api>";
+
+	return `${serverFirst ? schemaLibrary.serverFirstImportSource : schemaLibrary.importSource}
+import type { ApiClientFor, ServerFirstClientFor } from "@rest-rpc/core";
+
+${schemaLibrary.schemas}
+
+export const api = {
+	${groups}
+};
+
+export type BenchmarkClient = ${clientType};
+type EvaluateClientRoute<T> = T extends (...args: infer TArgs) => infer TResult
+	? [args: TArgs, result: Awaited<TResult>]
+	: never;
+export type BenchmarkClientEvaluation = [
+	${clientEvaluations}
+];
+export type Api = typeof api;
+`;
+};
+
 const tsconfigSource = (caseName) => `{
 	"compilerOptions": {
 		"target": "ES2022",
@@ -220,6 +294,8 @@ const tsconfigSource = (caseName) => `{
 for (const [benchmarkName, serverFirst] of [
 	["contract-only", false],
 	["server-first", true],
+	["contract-shorthand", false],
+	["server-first-shorthand", true],
 ]) {
 	const benchmarkRoot = join(generatedRoot, benchmarkName);
 	rmSync(benchmarkRoot, { recursive: true, force: true });
@@ -234,14 +310,16 @@ for (const [benchmarkName, serverFirst] of [
 			mkdirSync(caseDir, { recursive: true });
 			writeFileSync(
 				join(caseDir, `${caseName}.ts`),
-				fixtureSource(
-					routeCount,
-					{
-						...schemaLibrary,
-						name: schemaLibraryName,
-					},
-					serverFirst,
-				),
+				benchmarkName.endsWith("shorthand")
+					? shorthandFixtureSource(routeCount, schemaLibrary, serverFirst)
+					: fixtureSource(
+							routeCount,
+							{
+								...schemaLibrary,
+								name: schemaLibraryName,
+							},
+							serverFirst,
+						),
 			);
 			writeFileSync(join(caseDir, "tsconfig.json"), tsconfigSource(caseName));
 		}

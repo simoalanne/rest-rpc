@@ -1,10 +1,12 @@
 import { route as coreRoute } from "@rest-rpc/core";
+import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import type { SseRouteHandlerContext } from "@rest-rpc/server";
 import {
 	implement as serverImplement,
 	serverFirstRoute,
 	type Implement,
 	type ServerImplementationTree,
+	type ServerFirstRouteResponseKind,
 	type ServerRouteFactory,
 } from "@rest-rpc/server";
 import { sseEvent } from "@rest-rpc/server";
@@ -29,6 +31,61 @@ const implement = serverImplement as Implement<ApplicationContext>;
 
 const todoInput = z.object({ title: z.string() });
 const todo = z.object({ id: z.string(), title: z.string() });
+
+// shorthand routes may infer both sides or declare either schema explicitly
+const shorthandGet = route.handler(({ context }) => {
+	expectType<ApplicationContext & { signal: AbortSignal }>(context);
+	return { id: "todo-1", title: "Todo" };
+});
+
+const shorthandCreate = route.input(todoInput).handler(({ title, context }) => {
+	expectType<string>(title);
+	expectType<ApplicationContext & { signal: AbortSignal }>(context);
+	return { id: "todo-1", title };
+});
+
+const shorthandDeclaredGet = route.output(todo).handler(({ context }) => {
+	expectType<ApplicationContext & { signal: AbortSignal }>(context);
+	return { id: "todo-1", title: "Todo" };
+});
+
+const shorthandDeclaredCreate = route
+	.input(todoInput)
+	.output(todo)
+	.handler(({ title, context }) => {
+		expectType<string>(title);
+		expectType<ApplicationContext & { signal: AbortSignal }>(context);
+		return { id: "todo-1", title };
+	});
+
+const shorthandOutputFirst = route
+	.output(todo)
+	.input(todoInput)
+	.handler(({ title }) => ({ id: "todo-1", title }));
+
+expectType<"shorthand">(shorthandGet.route.kind);
+expectType<{ readonly id: "todo-1"; readonly title: "Todo" }>(
+	null as unknown as StandardSchemaV1.InferOutput<
+		NonNullable<typeof shorthandGet.clientRoute>["output"]
+	>,
+);
+expectType<typeof todoInput>(shorthandCreate.route.input);
+expectType<typeof todo>(shorthandDeclaredGet.route.output);
+expectType<typeof todo>(shorthandDeclaredCreate.route.output);
+expectType<typeof todoInput>(shorthandOutputFirst.route.input);
+expectType<typeof todo>(shorthandOutputFirst.route.output);
+expectType<"json">(
+	null as unknown as ServerFirstRouteResponseKind<typeof shorthandGet>,
+);
+expectError(route.output(todo).handler(() => ({ id: 1, title: "Todo" })));
+
+const shorthandInput = route.input(todoInput);
+expectError(shorthandInput.input(todoInput));
+const shorthandOutput = route.output(todo);
+expectError(shorthandOutput.output(todo));
+expectError(shorthandDeclaredCreate.output);
+expectError(shorthandOutputFirst.input(todoInput));
+expectError(route.with({ pathPrefix: "/v1" }).handler(() => null));
 
 // server-first builders preserve core request methods, flatten request segments,
 // and retain literal methods and paths through handler attachment
@@ -165,7 +222,17 @@ const events = route
 	});
 
 const routes = {
-	todos: { create, declaredCreate, get, contractCreate, events },
+	todos: {
+		create,
+		declaredCreate,
+		get,
+		contractCreate,
+		events,
+		shorthandGet,
+		shorthandCreate,
+		shorthandDeclaredGet,
+		shorthandDeclaredCreate,
+	},
 };
 
 expectType<"/todos/events">(events.route.path);

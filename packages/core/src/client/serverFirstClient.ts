@@ -2,6 +2,7 @@ import type { BaseRouteDeclaration } from "../contract/baseRouteDeclaration.ts";
 import type { HttpMethod } from "../contract/baseRouteDeclaration.ts";
 import type { CustomBody, FormBody, MultipartBody } from "../contract/body.ts";
 import type { RouteDeclaration } from "../contract/contract.ts";
+import type { AnyShorthandRouteDeclaration } from "../contract/shorthandRouteBuilder.ts";
 import type { JsonQuery } from "../contract/request.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import {
@@ -28,6 +29,12 @@ type ServerFirstImplementation = {
 	readonly route: BaseRouteDeclaration;
 	readonly handler: AnyHandler;
 	readonly clientRoute?: RouteDeclaration;
+};
+
+type ServerFirstShorthandImplementation = {
+	readonly route: AnyShorthandRouteDeclaration;
+	readonly handler: AnyHandler;
+	readonly clientRoute?: AnyShorthandRouteDeclaration;
 };
 
 const requestEncoding = Symbol("rest-rpc.request-encoding");
@@ -109,8 +116,13 @@ type ServerFirstRequestDeclaration<TRequest> = TRequest extends object
 			}
 	: never;
 
-type ImplementationUnion<TTree> = TTree extends ServerFirstImplementation
-	? TTree
+type ImplementationUnion<TTree> = TTree extends {
+	readonly route: unknown;
+	readonly handler: AnyHandler;
+}
+	? TTree extends ServerFirstImplementation
+		? TTree
+		: never
 	: TTree extends object
 		? { [TKey in keyof TTree]: ImplementationUnion<TTree[TKey]> }[keyof TTree]
 		: never;
@@ -198,7 +210,40 @@ export type ServerFirstClientFor<
 		ServerFirstClientRouteFor<TTree, TSelector, TPath>,
 		TGlobalHeaders
 	>;
+} & ([ServerFirstShorthandClientTree<TTree>] extends [never]
+	? Record<never, never>
+	: ServerFirstShorthandClientTree<TTree>);
+
+type ServerFirstShorthandClientObject<TNode extends object> = {
+	[
+		TKey in keyof TNode as ServerFirstShorthandClientTree<
+			TNode[TKey]
+		> extends never
+			? never
+			: TKey
+	]: ServerFirstShorthandClientTree<TNode[TKey]>;
 };
+
+type ServerFirstShorthandClientTree<TNode> = unknown extends TNode
+	? never
+	: TNode extends {
+				readonly route: unknown;
+				readonly handler: AnyHandler;
+		  }
+		? TNode extends ServerFirstShorthandImplementation
+			? TNode extends {
+					clientRoute?: infer TRoute extends AnyShorthandRouteDeclaration;
+				}
+				? ApiClientRouteValue<TRoute>
+				: never
+			: never
+		: TNode extends object
+			? ServerFirstShorthandClientObject<TNode> extends infer TTree
+				? keyof TTree extends never
+					? never
+					: TTree
+				: never
+			: never;
 
 /** Options used to create a server-first Fetch client. */
 export type ServerFirstClientOptions<

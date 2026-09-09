@@ -4,13 +4,27 @@
 // every user with declarations set to true in tsconfig.json will get this error
 // when exporting a route declaration from their package/app.
 
-import { route, type as schemaType } from "@rest-rpc/core";
+import { initClient, route, type as schemaType } from "@rest-rpc/core";
 
 const scalar = schemaType<{ value: string }>();
 const customResponseScalar = schemaType<string>();
 const query = schemaType<{ search?: string }>();
 const params = schemaType<{ id: string }>();
 const headers = schemaType<{ authorization?: string }>();
+
+export const shorthandInputBuilder = route.input(scalar);
+export const shorthandOutputBuilder = route.output(scalar);
+export const shorthandInputFirst = shorthandInputBuilder.output(scalar);
+export const shorthandOutputFirst = shorthandOutputBuilder.input(scalar);
+export const shorthandContract = {
+	todos: {
+		get: shorthandOutputBuilder,
+		create: shorthandInputFirst,
+	},
+};
+export const shorthandClient = initClient(shorthandContract, {
+	baseUrl: "http://localhost",
+});
 
 export const configuredRoute = route.with({
 	flattenRequestKeys: false,

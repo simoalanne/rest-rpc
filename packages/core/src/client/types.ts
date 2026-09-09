@@ -1,5 +1,7 @@
 import type { Contract, RouteDeclaration } from "../contract/contract.ts";
+import type { AnyShorthandRouteDeclaration } from "../contract/shorthandRouteBuilder.ts";
 import type { ClientRequest } from "../contract/request.ts";
+import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type {
 	ClientResponseBody,
 	DeclaredClientResponse,
@@ -93,17 +95,24 @@ type IsStrictStatusRoute<E extends RouteDeclaration> = E extends {
 	: false;
 
 /**
- * The response envelope returned by `fetchResponse()` for a route.
+ * Infers a route's client result.
+ *
+ * Explicit routes produce the response envelope returned by `fetchResponse()`.
+ * Shorthand routes produce their output value directly.
  *
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#fetchresponse}
  */
-export type ClientResponse<E extends RouteDeclaration> = E extends {
-	mode: "sse";
-}
-	? never
-	: IsStrictStatusRoute<E> extends true
-		? RouteDeclaredResponse<E>
-		: RouteDeclaredResponse<E> | Simplify<RouteUndeclaredResponse<E>>;
+export type ClientResponse<
+	E extends RouteDeclaration | AnyShorthandRouteDeclaration,
+> = E extends AnyShorthandRouteDeclaration
+	? ShorthandRouteOutput<E>
+	: E extends RouteDeclaration
+		? E extends { mode: "sse" }
+			? never
+			: IsStrictStatusRoute<E> extends true
+				? RouteDeclaredResponse<E>
+				: RouteDeclaredResponse<E> | Simplify<RouteUndeclaredResponse<E>>
+		: never;
 
 export type FetchResponseFn<
 	E extends RouteDeclaration,
@@ -193,15 +202,29 @@ type ApiClientOpenConnectionRouteValue<
 
 /** Client operations available for a single declared route. */
 export type ApiClientRouteValue<
-	E extends RouteDeclaration = RouteDeclaration,
+	E extends RouteDeclaration | AnyShorthandRouteDeclaration = RouteDeclaration,
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
-> = E extends RouteDeclaration
-	? IsWebSocketRoute<E> extends true
-		? ApiClientOpenConnectionRouteValue<E, TGlobalHeaders>
-		: E extends { mode: "sse" }
-			? ApiClientOpenConnectionRouteValue<E, TGlobalHeaders>
-			: ApiClientHttpRouteValue<E, TGlobalHeaders>
+> = E extends RouteDeclaration | AnyShorthandRouteDeclaration
+	? E extends AnyShorthandRouteDeclaration
+		? [ClientRequest<E>] extends [never]
+			? (options?: FetchOptions) => Promise<ClientResponse<E>>
+			: (
+					input: ClientRequest<E>,
+					options?: FetchOptions,
+				) => Promise<ClientResponse<E>>
+		: E extends RouteDeclaration
+			? IsWebSocketRoute<E> extends true
+				? ApiClientOpenConnectionRouteValue<E, TGlobalHeaders>
+				: E extends { mode: "sse" }
+					? ApiClientOpenConnectionRouteValue<E, TGlobalHeaders>
+					: ApiClientHttpRouteValue<E, TGlobalHeaders>
+			: never
 	: never;
+
+type ShorthandRouteOutput<TRoute extends AnyShorthandRouteDeclaration> =
+	TRoute extends { output: infer TOutput extends StandardSchemaV1 }
+		? StandardSchemaV1.InferOutput<TOutput>
+		: never;
 
 /**
  * Infers the generated client tree for a contract.
@@ -211,7 +234,7 @@ export type ApiClientRouteValue<
 export type ApiClientFor<
 	T extends Contract = Contract,
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
-> = T extends RouteDeclaration
+> = T extends RouteDeclaration | AnyShorthandRouteDeclaration
 	? ApiClientRouteValue<T, TGlobalHeaders>
 	: {
 			[K in keyof T]: T[K] extends Contract

@@ -660,3 +660,121 @@ expectType<never>(
 expectType<never>(
 	null as unknown as RouteStreamedQueryData<typeof invalidApi.ambiguousStream>,
 );
+
+// shorthand route helpers
+
+const shorthandApi = {
+	todos: {
+		get: route.output(schemaType<{ id: string; title: string }>()),
+		add: route
+			.input(schemaType<{ title: string }>())
+			.output(schemaType<{ id: string; title: string }>()),
+	},
+};
+
+const shorthandTq = createTanstackQueryHelpers(shorthandApi, {
+	baseUrl: "https://example.test",
+});
+
+expectType<{ id: string; title: string }>(
+	null as unknown as RouteQueryData<typeof shorthandApi.todos.get>,
+);
+expectType<Error>(
+	null as unknown as RouteQueryError<typeof shorthandApi.todos.get>,
+);
+expectType<{ title: string }>(
+	null as unknown as RouteMutationVariables<typeof shorthandApi.todos.add>,
+);
+
+const shorthandGetOptions = shorthandTq.todos.get.queryOptions({
+	retry(_failureCount, error) {
+		expectType<Error>(error);
+		return false;
+	},
+	select(data) {
+		expectType<{ id: string; title: string }>(data);
+		expectError(data.status);
+		return data.title;
+	},
+});
+expectType<Promise<{ id: string; title: string }>>(
+	queryClient.fetchQuery(shorthandGetOptions),
+);
+
+shorthandTq.todos.add.mutationOptions({
+	onSuccess(data, variables) {
+		expectType<{ id: string; title: string }>(data);
+		expectType<{ title: string }>(variables);
+		expectError(data.status);
+	},
+	onError(error) {
+		expectType<Error>(error);
+	},
+});
+shorthandTq.todos.add.queryOptions({ title: "Todo" });
+expectError(shorthandTq.todos.add.queryOptions({ body: { title: "Todo" } }));
+expectError(shorthandTq.todos.add.queryOptions());
+expectError(shorthandTq.todos.get.streamedQueryOptions());
+
+declare const shorthandServerRoute: ServerRouteFactory;
+
+const serverShorthandRoutes = {
+	todos: {
+		get: shorthandServerRoute.handler(() => ({
+			id: "todo-1",
+			title: "Todo",
+		})),
+		add: shorthandServerRoute
+			.input(schemaType<{ title: string }>())
+			.handler(({ title }) => ({ id: "todo-1", title })),
+		explicit: shorthandServerRoute
+			.get("/todos/:id")
+			.handler(() => ({ status: 204 as const })),
+	},
+} as const;
+
+const serverShorthandTq = createTanstackQueryHelpers<
+	typeof serverShorthandRoutes
+>({ baseUrl: "https://example.test" });
+expectAssignable<
+	ServerFirstTanstackQueryHelpersFor<typeof serverShorthandRoutes>
+>(serverShorthandTq);
+
+const serverShorthandGetOptions = serverShorthandTq.todos.get.queryOptions({
+	retry(_failureCount, error) {
+		expectType<Error>(error);
+		return false;
+	},
+});
+expectType<Promise<{ readonly id: "todo-1"; readonly title: "Todo" }>>(
+	queryClient.fetchQuery(serverShorthandGetOptions),
+);
+
+serverShorthandTq.todos.add.mutationOptions({
+	onSuccess(data, variables) {
+		expectType<{ readonly id: "todo-1"; readonly title: string }>(data);
+		expectType<{ title: string }>(variables);
+		expectError(data.status);
+	},
+	onError(error) {
+		expectType<Error>(error);
+	},
+});
+serverShorthandTq.todos.add.queryOptions({ title: "Todo" });
+expectError(
+	serverShorthandTq.todos.add.queryOptions({ body: { title: "Todo" } }),
+);
+expectError(serverShorthandTq.todos.get.streamedQueryOptions());
+expectError(serverShorthandTq.todos.explicit);
+
+const explicitOnlyServerRoutes = {
+	admin: {
+		health: shorthandServerRoute.get("/health").handler(() => ({
+			status: 204 as const,
+		})),
+	},
+};
+const explicitOnlyServerTq = createTanstackQueryHelpers<
+	typeof explicitOnlyServerRoutes
+>({ baseUrl: "https://example.test" });
+expectError(explicitOnlyServerTq.admin);

@@ -22,6 +22,7 @@ export type {
 	Contract,
 	HttpStatusCode,
 	RouteDeclaration,
+	ShorthandRouteDeclaration,
 } from "./contract/index.ts";
 export type { ClientRequest } from "./contract/request.ts";
 export type { ClientResponseBody } from "./contract/response.ts";

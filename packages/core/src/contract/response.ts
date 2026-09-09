@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { CustomBody, CustomResponseBody, NoBody, Stream } from "./body.ts";
 import type { BaseRouteDeclaration } from "./baseRouteDeclaration.ts";
+import type { AnyShorthandRouteDeclaration } from "./shorthandRouteBuilder.ts";
 
 type StatusDigit = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 type StatusClass = 1 | 2 | 3 | 4 | 5;
@@ -332,11 +333,13 @@ type InferSseServerResponseBody<E extends BaseRouteDeclaration> = [
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
  */
-export type ClientResponseBody<E extends BaseRouteDeclaration> = E extends {
-	mode: "sse";
-}
-	? never
-	: InferSingleResponseBody<SuccessfulDeclaredClientResponse<E>>;
+export type ClientResponseBody<
+	E extends BaseRouteDeclaration | AnyShorthandRouteDeclaration,
+> = E extends BaseRouteDeclaration
+	? E extends { mode: "sse" }
+		? never
+		: InferSingleResponseBody<SuccessfulDeclaredClientResponse<E>>
+	: never;
 
 export type ServerSuccessBody<E extends BaseRouteDeclaration> = E extends {
 	mode: "sse";

@@ -1,6 +1,8 @@
 import {
 	type ApiClientFor,
+	type ApiClientRouteValue,
 	type ClientEventSource,
+	type ClientRequest,
 	type ClientResponse,
 	type ClientResponseBody,
 	type ClientSseReceived,
@@ -15,6 +17,57 @@ const todoSchema = z.object({
 	id: z.string(),
 	title: z.string(),
 });
+
+const shorthandInputSchema = z
+	.object({ title: z.string() })
+	.transform(({ title }) => ({ title, normalized: true as const }));
+const shorthandOutputSchema = todoSchema.transform(({ id, title }) => ({
+	id: Number(id),
+	title,
+}));
+
+const shorthandApi = {
+	todos: {
+		get: route.output(shorthandOutputSchema),
+		add: route.input(shorthandInputSchema).output(shorthandOutputSchema),
+	},
+};
+
+const shorthandClient = initClient(shorthandApi, {
+	baseUrl: "https://example.test",
+});
+
+expectType<Promise<{ id: number; title: string }>>(shorthandClient.todos.get());
+expectType<ApiClientRouteValue<typeof shorthandApi.todos.get>>(
+	shorthandClient.todos.get,
+);
+expectType<Promise<{ id: number; title: string }>>(
+	shorthandClient.todos.add({ title: "Write type tests" }),
+);
+shorthandClient.todos.get({ signal: AbortSignal.abort() });
+shorthandClient.todos.add(
+	{ title: "Write type tests" },
+	{ signal: AbortSignal.abort() },
+);
+expectError(shorthandClient.todos.add());
+expectError(shorthandClient.todos.add({ title: 1 }));
+expectError(
+	shorthandClient.todos.add({ title: "Write type tests", extra: true }),
+);
+expectError(shorthandClient.todos.get.fetch());
+
+expectType<{ title: string }>(
+	null as unknown as ClientRequest<typeof shorthandApi.todos.add>,
+);
+expectType<never>(
+	null as unknown as ClientRequest<typeof shorthandApi.todos.get>,
+);
+expectType<{ id: number; title: string }>(
+	null as unknown as ClientResponse<typeof shorthandApi.todos.get>,
+);
+expectType<never>(
+	null as unknown as ClientResponseBody<typeof shorthandApi.todos.get>,
+);
 
 const noInputApi = {
 	todos: {
@@ -33,6 +86,7 @@ expectType<Promise<Array<{ id: string; title: string }>>>(
 	noInputClient.todos.list.fetch(),
 );
 expectType<Promise<{ total: number }>>(noInputClient.todos.stats.fetch());
+expectError(noInputClient.todos.list());
 
 const pathParamApi = {
 	todos: {
