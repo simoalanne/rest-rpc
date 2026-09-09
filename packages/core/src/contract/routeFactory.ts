@@ -11,7 +11,10 @@ import {
 	createWebSocketRoute,
 	type WebSocketBuilderFor,
 } from "./websocketRouteBuilder.ts";
-import type { ShorthandRouteFactory } from "./shorthandRouteBuilder.ts";
+import {
+	createShorthandRouteFactory,
+	type ShorthandRouteFactory,
+} from "./shorthandRouteBuilder.ts";
 export { joinPathPrefix } from "./baseRouteBuilder.ts";
 
 /** Defaults applied locally by a configured route factory. */
@@ -82,6 +85,7 @@ type Simplify<T> = T extends object ? { [K in keyof T]: T[K] } : T;
  */
 export const route = {
 	...createFactory(),
+	...createShorthandRouteFactory(),
 	/** Creates a factory with shared options. @see {@link https://rest-rpc.dev/docs/contract/declaration#shared-route-options} */
 	with<const TOptions extends RouteFactoryOptions>(options: TOptions) {
 		return createFactory(options);

@@ -19,6 +19,7 @@ import type {
 	SuccessfulDeclaredClientResponse,
 	WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
+import { isShorthandRouteDeclaration } from "@rest-rpc/core/contract";
 import type {
 	DataTag,
 	InfiniteData,
@@ -28,7 +29,8 @@ import type {
 	QueryObserverOptions,
 	SkipToken,
 } from "@tanstack/query-core";
-import { createRouteApi } from "./routeApi.ts";
+import { fetchQueryData } from "./queryData.ts";
+import { createTanstackHelpersForRoute } from "./createHelperFunctions.ts";
 
 type ClientUndeclaredResponse<E extends RouteDeclaration> =
 	Extract<ClientResponse<E>, { rawResponse: Response }> extends infer TResponse
@@ -365,13 +367,15 @@ type ServerFirstShorthandTanstackQueryTree<TNode> = unknown extends TNode
 			}
 			? TanstackQueryRouteValue<TRoute>
 			: never
-		: TNode extends object
-			? ServerFirstShorthandTanstackQueryObject<TNode> extends infer TTree
-				? keyof TTree extends never
-					? never
-					: TTree
-				: never
-			: never;
+		: TNode extends QueryRoute
+			? never
+			: TNode extends object
+				? ServerFirstShorthandTanstackQueryObject<TNode> extends infer TTree
+					? keyof TTree extends never
+						? never
+						: TTree
+					: never
+				: never;
 
 /**
  * Infers the method-and-path and shorthand TanStack Query helpers for a server
@@ -450,30 +454,64 @@ export function createTanstackQueryHelpers(
 	contractOrOptions: Contract | CreateServerFirstTanstackQueryHelpersOptions,
 	maybeOptions?: CreateTanstackQueryHelpersOptions,
 ): unknown {
-	if (maybeOptions === undefined) {
-		const options =
+	const isServerFirstCreation = maybeOptions === undefined;
+	if (isServerFirstCreation) {
+		const serverFirstOptions =
 			contractOrOptions as CreateServerFirstTanstackQueryHelpersOptions;
-		const client = initClient<unknown>(options) as Record<
+		const serverFirstClient = initClient(serverFirstOptions) as Record<
 			string,
-			(path: string) => {
-				fetchResponse: (...args: unknown[]) => Promise<unknown>;
-			}
+			unknown
 		>;
 
-		return new Proxy(
-			{},
-			{
-				get: (_target, selectorKey) => {
-					if (typeof selectorKey !== "string") return undefined;
-
-					return (path: string) =>
-						createRouteApi(
-							[selectorKey, path],
-							client[selectorKey](path).fetchResponse,
+		const proxyChain = (capturedPath: string[]): unknown =>
+			new Proxy(() => {}, {
+				get: (_, propertyName) =>
+					proxyChain([...capturedPath, String(propertyName)]),
+				apply: (_target, _thisArg, callArgs) => {
+					// A top-level `$` selector is an explicit HTTP method call like
+					// `client.$get("/path").queryOptions(...)`.
+					const selectorName = capturedPath[0]!;
+					const usesExplicitHttpMethod =
+						capturedPath.length === 1 && selectorName.startsWith("$");
+					if (usesExplicitHttpMethod) {
+						const routePath = callArgs[0];
+						const selectRoute = serverFirstClient[selectorName] as (
+							path: string,
+						) => {
+							fetchResponse: (...args: unknown[]) => Promise<unknown>;
+						};
+						const routeClient = selectRoute(routePath);
+						return createTanstackHelpersForRoute(
+							[selectorName.slice(1), routePath],
+							(request, fetchOptions) =>
+								fetchQueryData(
+									routeClient.fetchResponse,
+									request,
+									fetchOptions,
+								),
+							routeClient.fetchResponse,
 						);
+					}
+
+					// else, the callable property is a shorthand route helper like `client.todos.byId.queryOptions(...)`.
+					// The last property in the chain is the helper function name, and the rest of the properties are the route path.
+					const helperName = capturedPath.at(-1);
+					const routePath = capturedPath.slice(0, -1);
+					const shorthandClient = getByPath(serverFirstClient, routePath) as (
+						...args: unknown[]
+					) => Promise<unknown>;
+					const tanstackQueryHelpers = createTanstackHelpersForRoute(
+						routePath,
+						shorthandClient,
+					);
+					const helperFunction = tanstackQueryHelpers[
+						helperName as keyof typeof tanstackQueryHelpers
+					] as (...args: unknown[]) => unknown;
+					return helperFunction(...callArgs);
 				},
-			},
-		);
+			});
+
+		return proxyChain([]);
 	}
 
 	const contract = contractOrOptions as Contract;
@@ -481,6 +519,13 @@ export function createTanstackQueryHelpers(
 	const client = initClient(contract, options);
 
 	const mapHttpRoutes = (node: Contract, path: string[] = []): unknown => {
+		if (isShorthandRouteDeclaration(node)) {
+			const apiNode = getByPath(client, path) as (
+				...args: unknown[]
+			) => Promise<unknown>;
+			return createTanstackHelpersForRoute(path, apiNode);
+		}
+
 		if (isRouteDeclaration(node)) {
 			if (isWebSocketRoute(node) || isSseRoute(node)) return undefined;
 
@@ -488,8 +533,14 @@ export function createTanstackQueryHelpers(
 				fetchResponse: FetchResponseFn<typeof node>;
 			};
 
-			return createRouteApi(
+			return createTanstackHelpersForRoute(
 				path,
+				(request, fetchOptions) =>
+					fetchQueryData(
+						apiNode.fetchResponse as (...args: unknown[]) => Promise<unknown>,
+						request,
+						fetchOptions,
+					),
 				apiNode.fetchResponse as (...args: unknown[]) => Promise<unknown>,
 			);
 		}

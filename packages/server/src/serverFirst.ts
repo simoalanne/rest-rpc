@@ -20,6 +20,10 @@ import type {
 	Stream,
 } from "@rest-rpc/core/contract";
 import { route as coreRoute } from "@rest-rpc/core";
+import {
+	createShorthandRouteDeclaration,
+	isShorthandRouteDeclaration,
+} from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import type {
 	HttpRouteHandlerContext,
@@ -485,6 +489,7 @@ type ImplementationBuilder<
 /** An HTTP contract route or nested contract tree supported by `implement`. */
 export type ServerContract =
 	| ServerHttpRouteDeclaration
+	| AnyShorthandRouteDeclaration
 	| { readonly [key: string]: ServerContract };
 
 /** Maps a contract route or tree to handler attachment builders. */
@@ -493,11 +498,19 @@ export type ImplementationBuildersFor<
 	TContext extends ContextShape = EmptyObject,
 > = TNode extends ServerHttpRouteDeclaration
 	? ImplementationBuilder<TNode, TContext>
-	: {
-			readonly [K in keyof TNode]: TNode[K] extends ServerContract
-				? ImplementationBuildersFor<TNode[K], TContext>
-				: never;
-		};
+	: TNode extends AnyShorthandRouteDeclaration
+		? ServerShorthandImplementationBuilder<
+				TNode extends { input: infer TInput extends StandardSchemaV1 }
+					? TInput
+					: never,
+				TNode["output"],
+				TContext
+			>
+		: {
+				readonly [K in keyof TNode]: TNode[K] extends ServerContract
+					? ImplementationBuildersFor<TNode[K], TContext>
+					: never;
+			};
 
 /** Type-level model of contract-first handler attachment. */
 export type Implement<TContext extends ContextShape = EmptyObject> = <
@@ -521,9 +534,14 @@ export type ServerImplementationTree =
 	| { readonly [key: string]: ServerImplementationTree };
 
 const attachHandler = (
-	route: BaseRouteDeclaration,
+	route: BaseRouteDeclaration | AnyShorthandRouteDeclaration,
 	handler: RuntimeRouteHandler,
-): RouteImplementation<BaseRouteDeclaration> => ({ route, handler });
+): RouteImplementation<
+	BaseRouteDeclaration | AnyShorthandRouteDeclaration
+> => ({
+	route,
+	handler,
+});
 
 const extendBuilder = (builder: BaseRouteDeclaration) =>
 	Object.assign(builder, {
@@ -531,6 +549,37 @@ const extendBuilder = (builder: BaseRouteDeclaration) =>
 			return attachHandler(builder, handler);
 		},
 	});
+
+const inferredOutputSchema: StandardSchemaV1 = {
+	"~standard": {
+		version: 1,
+		vendor: "rest-rpc",
+		validate: (value) => ({ value }),
+	},
+};
+
+const createShorthandImplementationBuilder = (
+	input?: StandardSchemaV1,
+	output?: StandardSchemaV1,
+): object => ({
+	handler: (handler: RuntimeRouteHandler) =>
+		attachHandler(
+			createShorthandRouteDeclaration(input, output ?? inferredOutputSchema),
+			handler,
+		),
+	...(input
+		? {}
+		: {
+				input: (schema: StandardSchemaV1) =>
+					createShorthandImplementationBuilder(schema, output),
+			}),
+	...(output
+		? {}
+		: {
+				output: (schema: StandardSchemaV1) =>
+					createShorthandImplementationBuilder(input, schema),
+			}),
+});
 
 const createServerRouteFactory = (options: RouteFactoryOptions = {}) => {
 	const resolvedOptions = { flattenRequestKeys: true, ...options };
@@ -543,6 +592,7 @@ const createServerRouteFactory = (options: RouteFactoryOptions = {}) => {
 		patch: (path: string) => extendBuilder(factory.patch(path)),
 		delete: (path: string) => extendBuilder(factory.delete(path)),
 		sse: (path: string) => extendBuilder(factory.sse(path)),
+		...createShorthandImplementationBuilder(),
 		with: (nextOptions: RouteFactoryOptions) =>
 			createServerRouteFactory(nextOptions),
 	};
@@ -554,7 +604,9 @@ const serverRouteFactory = createServerRouteFactory();
 export const serverFirstRoute =
 	serverRouteFactory as unknown as ServerRouteFactory;
 
-const createImplementationBuilder = (contract: BaseRouteDeclaration) => {
+const createImplementationBuilder = (
+	contract: BaseRouteDeclaration | AnyShorthandRouteDeclaration,
+) => {
 	const builder = {
 		handler: (handler: RuntimeRouteHandler) => attachHandler(contract, handler),
 	};
@@ -562,7 +614,7 @@ const createImplementationBuilder = (contract: BaseRouteDeclaration) => {
 };
 
 const implementationBuildersFor = (contract: ServerContract): unknown => {
-	if (isRouteDeclaration(contract)) {
+	if (isRouteDeclaration(contract) || isShorthandRouteDeclaration(contract)) {
 		return createImplementationBuilder(contract);
 	}
 

@@ -12,6 +12,10 @@ export type {
 	ShorthandRouteInputBuilder,
 	ShorthandRouteOutputBuilder,
 } from "./shorthandRouteBuilder.ts";
+export {
+	createShorthandRouteDeclaration,
+	isShorthandRouteDeclaration,
+} from "./shorthandRouteBuilder.ts";
 export type {
 	BodyWithArrayKeysOptions,
 	CustomBody,

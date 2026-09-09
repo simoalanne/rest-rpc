@@ -130,6 +130,37 @@ describe("createOpenApiDocument", () => {
 		assert.ok(document.paths["/todos/{id}"]?.delete);
 	});
 
+	it("documents shorthand routes as derived POST operations", () => {
+		const document = createOpenApiDocument(
+			{
+				todos: {
+					get: route.output(z.object({ id: z.string() })),
+					add: route
+						.input(z.object({ title: z.string() }))
+						.output(z.object({ id: z.string(), title: z.string() })),
+				},
+			},
+			{
+				info: { title: "Todo API", version: "1.0.0" },
+				schemaConverter,
+			},
+		);
+
+		assert.equal(document.paths["/todos/get"]?.post?.requestBody, undefined);
+		assert.equal(
+			document.paths["/todos/get"]?.post?.responses["200"].content?.[
+				"application/json"
+			].schema.type,
+			"object",
+		);
+		assert.equal(
+			document.paths["/todos/add"]?.post?.requestBody?.content[
+				"application/json"
+			].schema.type,
+			"object",
+		);
+	});
+
 	it("maps a representative API contract to paths, operations and schemas", () => {
 		const document = createOpenApiDocument(openApiTestContract, {
 			info: {

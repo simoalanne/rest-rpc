@@ -376,7 +376,6 @@ const createRuntimeRoute = (
 		} satisfies ClientRequestRoute,
 		requestInput: normalizedInput,
 		tagInput,
-		takesRequest: Object.keys(requestDeclaration).length > 1,
 	};
 };
 
@@ -386,6 +385,32 @@ const selectorMethod = (selector: string): HttpMethod => {
 		return method as HttpMethod;
 	}
 	throw new Error(`Unsupported server-first client selector "${selector}".`);
+};
+
+const executeShorthandRequest = async (
+	path: string[],
+	args: unknown[],
+	requestOptions: ExecuteRequestOptions,
+) => {
+	const input = args[0];
+	const fetchOptions = args[1] as FetchOptions | undefined;
+	const hasInput = input !== undefined;
+	const route: ClientRequestRoute = {
+		method: "POST",
+		path: `/${path.join("/")}`,
+		...(hasInput ? { request: { body: {}, flattenKeys: false as const } } : {}),
+	};
+	const rawResponse = await executeRequest(
+		route,
+		path,
+		[hasInput ? { body: input } : undefined, fetchOptions],
+		requestOptions,
+	);
+	const response = await readServerFirstResponse(rawResponse);
+	if (response.status < 200 || response.status >= 300) {
+		throw new Error("Request did not return a declared success response");
+	}
+	return response.body;
 };
 
 export const createServerFirstClient = <
@@ -398,15 +423,30 @@ export const createServerFirstClient = <
 		...options,
 		strictRequestKeys: true,
 	};
+	const createShorthandNamespace = (path: string[]): unknown =>
+		new Proxy(
+			(...args: unknown[]) =>
+				executeShorthandRequest(path, args, requestOptions),
+			{
+				get: (_target, key) =>
+					typeof key === "string" && key !== "then"
+						? createShorthandNamespace([...path, key])
+						: undefined,
+			},
+		);
 
 	return new Proxy(
 		{},
 		{
 			get: (_target, selectorKey) => {
 				if (typeof selectorKey !== "string") return undefined;
+				if (!selectorKey.startsWith("$")) {
+					return createShorthandNamespace([selectorKey]);
+				}
+				const selector = selectorKey.slice(1);
 
 				return (path: string) => {
-					if (selectorKey === "sse") {
+					if (selector === "sse") {
 						return {
 							openConnection: (...args: unknown[]) => {
 								const input = args[0] as ServerFirstRequestInput | undefined;
@@ -430,16 +470,14 @@ export const createServerFirstClient = <
 						};
 					}
 
-					const method = selectorMethod(selectorKey);
+					const method = selectorMethod(selector);
 					const fetchResponse = async (...args: unknown[]) => {
 						const { requestInput, fetchOptions } = getServerFirstArgs(args);
 						const runtime = createRuntimeRoute(method, path, requestInput);
 						const rawResponse = await executeRequest(
 							runtime.route,
 							runtime.route,
-							runtime.takesRequest
-								? [runtime.requestInput, fetchOptions]
-								: [fetchOptions],
+							[runtime.requestInput, fetchOptions],
 							requestOptions,
 							runtime.tagInput,
 						);

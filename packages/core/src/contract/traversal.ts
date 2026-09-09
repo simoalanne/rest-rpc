@@ -1,4 +1,12 @@
 import type { Contract, RouteDeclaration } from "./contract.ts";
+import {
+	isShorthandRouteDeclaration,
+	type AnyShorthandRouteDeclaration,
+} from "./shorthandRouteBuilder.ts";
+
+export type ContractRouteDeclaration =
+	| RouteDeclaration
+	| AnyShorthandRouteDeclaration;
 
 type Tree<T> = Record<string, unknown> | T;
 export type ContractRouteEntry = {
@@ -25,26 +33,32 @@ export const mapObjectValues = <TLeaf>(
 				{} as Record<string, unknown>,
 			);
 
-const isRouteDeclaration = (value: unknown): value is RouteDeclaration => {
+export const isContractRouteDeclaration = (
+	value: unknown,
+): value is ContractRouteDeclaration => {
 	return (
-		typeof value === "object" &&
-		value !== null &&
-		"path" in value &&
-		"method" in value
+		isShorthandRouteDeclaration(value) ||
+		(typeof value === "object" &&
+			value !== null &&
+			"path" in value &&
+			"method" in value)
 	);
 };
 
 export const mapContractRoutes = (
 	contract: Contract,
-	mappingFn: (route: RouteDeclaration, path: string[]) => unknown,
-) => mapObjectValues(contract, isRouteDeclaration, mappingFn);
+	mappingFn: (route: ContractRouteDeclaration, path: string[]) => unknown,
+) => mapObjectValues(contract, isContractRouteDeclaration, mappingFn);
 
 export function* contractRouteEntries(
 	contract: Contract,
 	path: string[] = [],
 ): Generator<ContractRouteEntry> {
-	if (isRouteDeclaration(contract)) {
-		yield { route: contract, path };
+	if (isContractRouteDeclaration(contract)) {
+		const route: RouteDeclaration = isShorthandRouteDeclaration(contract)
+			? { ...contract, path: `/${path.join("/")}` }
+			: contract;
+		yield { route, path };
 		return;
 	}
 

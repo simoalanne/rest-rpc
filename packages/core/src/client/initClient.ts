@@ -1,4 +1,6 @@
 import type { Contract, RouteDeclaration } from "../contract/contract.ts";
+import type { HttpRouteDeclaration } from "../contract/httpRouteBuilder.ts";
+import { isShorthandRouteDeclaration } from "../contract/shorthandRouteBuilder.ts";
 import { getRouteResponses } from "../contract/response.ts";
 import { mapContractRoutes } from "../contract/traversal.ts";
 import {
@@ -61,6 +63,30 @@ const createContractClient = <
 		fetchRouteResponse(request, validateResponses, route, routePath, ...args);
 
 	return mapContractRoutes(contract, (node, routePath) => {
+		if (isShorthandRouteDeclaration(node)) {
+			const resolvedRoute: HttpRouteDeclaration = {
+				...node,
+				path: `/${routePath.join("/")}`,
+			};
+			return (...args: FetchArgs) => {
+				if (!resolvedRoute.request?.body) {
+					return fetchSuccess(fetchResponse, resolvedRoute, routePath, ...args);
+				}
+				const clientRoute = {
+					...resolvedRoute,
+					request: { ...resolvedRoute.request, flattenKeys: false },
+				};
+
+				return fetchSuccess(
+					fetchResponse,
+					clientRoute,
+					routePath,
+					{ body: args[0] } as never,
+					args[1],
+				);
+			};
+		}
+
 		if (node.mode === "webSocket" || isSseRouteNode(node)) {
 			return {
 				openConnection: (...args: OpenConnectionArgs) => {

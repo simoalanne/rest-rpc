@@ -16,8 +16,7 @@ type RequestArgs = unknown[];
 type OptionsWithFetchOptions = Record<string, unknown> & {
 	fetchOptions?: ApiClientFetchOptions;
 };
-
-export type RouteApi = {
+export type TanstackQueryHelperFunctions = {
 	mutationOptions: (
 		options?: Record<string, unknown>,
 	) => MutationOptions<unknown, unknown, unknown>;
@@ -27,15 +26,19 @@ export type RouteApi = {
 	queryOptions: (
 		...args: RequestArgs
 	) => QueryObserverOptions<unknown, unknown, unknown>;
-	streamedQueryOptions: (
+	streamedQueryOptions?: (
 		...args: RequestArgs
 	) => QueryObserverOptions<unknown, unknown, unknown>;
 	getKey: (...args: RequestArgs) => QueryKey;
 };
 
+type FetchData = (
+	request: unknown,
+	fetchOptions: FetchOptions | undefined,
+) => Promise<unknown>;
+
 const isSkipToken = (value: unknown): value is typeof skipToken =>
 	value === skipToken;
-
 const stripUndefinedFields = (request: unknown) => {
 	if (typeof request !== "object" || request === null) return request;
 
@@ -73,18 +76,18 @@ const isAsyncIterable = (value: unknown): value is AsyncIterable<unknown> =>
 	Symbol.asyncIterator in value &&
 	typeof value[Symbol.asyncIterator] === "function";
 
-export const createRouteApi = (
+export const createTanstackHelpersForRoute = (
 	routePath: string[],
-	fetchResponse: FetchResponse,
-): RouteApi => {
+	dataFetchingFn: FetchData,
+	streamResponse?: FetchResponse,
+): TanstackQueryHelperFunctions => {
 	const getKey = (request?: unknown) => getQueryKey(request, routePath);
 
-	return {
+	const helpers: TanstackQueryHelperFunctions = {
 		mutationOptions: (options) => {
 			const { fetchOptions, queryOptions } = splitFetchOptions(options);
 			return {
-				mutationFn: (request: unknown) =>
-					fetchQueryData(fetchResponse, request, fetchOptions),
+				mutationFn: (request: unknown) => dataFetchingFn(request, fetchOptions),
 				...queryOptions,
 			};
 		},
@@ -97,10 +100,7 @@ export const createRouteApi = (
 			const queryFn = disabled
 				? skipToken
 				: ({ signal }: { signal?: FetchOptions["signal"] }) =>
-						fetchQueryData(fetchResponse, request, {
-							...fetchOptions,
-							signal,
-						});
+						dataFetchingFn(request, { ...fetchOptions, signal });
 			const queryKeyRequest = disabled ? undefined : request;
 
 			return {
@@ -109,7 +109,28 @@ export const createRouteApi = (
 				...queryOptions,
 			};
 		},
-		streamedQueryOptions: (...args: RequestArgs) => {
+		infiniteQueryOptions: (options) => {
+			const { fetchOptions, queryOptions } = splitFetchOptions(options);
+			const { initialRequest, getNextRequest, queryKey, ...tanstackOptions } =
+				queryOptions;
+			return {
+				queryKey: queryKey ?? getKey(),
+				initialPageParam: initialRequest,
+				getNextPageParam: getNextRequest,
+				queryFn: ({
+					pageParam,
+					signal,
+				}: {
+					pageParam: unknown;
+					signal?: FetchOptions["signal"];
+				}) => dataFetchingFn(pageParam, { ...fetchOptions, signal }),
+				...tanstackOptions,
+			} as unknown as InfiniteQueryObserverOptions<unknown, unknown, unknown>;
+		},
+		getKey: (...args: RequestArgs) => getKey(args[0]),
+	};
+	if (streamResponse) {
+		helpers.streamedQueryOptions = (...args: RequestArgs) => {
 			const request = args[0];
 			const { fetchOptions, queryOptions } = splitFetchOptions(
 				args[1] as Record<string, unknown> | undefined,
@@ -117,7 +138,7 @@ export const createRouteApi = (
 			const { initialValue, reducer, refetchMode, ...tanstackOptions } =
 				queryOptions;
 			const streamFn = async ({ signal }: { signal: AbortSignal }) => {
-				const response = (await fetchQueryData(fetchResponse, request, {
+				const response = (await fetchQueryData(streamResponse, request, {
 					...fetchOptions,
 					signal,
 				})) as { body: unknown };
@@ -149,29 +170,7 @@ export const createRouteApi = (
 				queryFn,
 				...tanstackOptions,
 			};
-		},
-		infiniteQueryOptions: (options) => {
-			const { fetchOptions, queryOptions } = splitFetchOptions(options);
-			const { initialRequest, getNextRequest, queryKey, ...tanstackOptions } =
-				queryOptions;
-			return {
-				queryKey: queryKey ?? getKey(),
-				initialPageParam: initialRequest,
-				getNextPageParam: getNextRequest,
-				queryFn: ({
-					pageParam,
-					signal,
-				}: {
-					pageParam: unknown;
-					signal?: FetchOptions["signal"];
-				}) =>
-					fetchQueryData(fetchResponse, pageParam, {
-						...fetchOptions,
-						signal,
-					}),
-				...tanstackOptions,
-			} as unknown as InfiniteQueryObserverOptions<unknown, unknown, unknown>;
-		},
-		getKey: (...args: RequestArgs) => getKey(args[0]),
-	};
+		};
+	}
+	return helpers;
 };

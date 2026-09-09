@@ -1,7 +1,9 @@
 import {
+	type AnyShorthandRouteDeclaration,
 	type BaseRouteDeclaration,
 	getPathParamSegmentName,
 	isPathParamSegment,
+	isShorthandRouteDeclaration,
 } from "@rest-rpc/core/contract";
 
 const splitPath = (path: string) => path.split("/").filter(Boolean);
@@ -73,15 +75,21 @@ export type RuntimeImplementation = {
 	handler: (...args: never[]) => unknown;
 };
 
-/** An implementation or nested implementation tree consumed by runtime matchers. */
+type ShorthandRuntimeImplementation = {
+	route: AnyShorthandRouteDeclaration;
+	handler: (...args: never[]) => unknown;
+};
+
+/** An implementation or nested implementation tree consumed at runtime. */
 export type RuntimeImplementationTree =
 	| RuntimeImplementation
-	| readonly RuntimeImplementation[]
+	| ShorthandRuntimeImplementation
+	| readonly RuntimeImplementationTree[]
 	| { readonly [key: string]: RuntimeImplementationTree };
 
 const isRuntimeImplementation = (
 	value: unknown,
-): value is RuntimeImplementation =>
+): value is RuntimeImplementation | ShorthandRuntimeImplementation =>
 	typeof value === "object" &&
 	value !== null &&
 	"route" in value &&
@@ -89,13 +97,30 @@ const isRuntimeImplementation = (
 
 const flattenImplementationTree = (
 	implementation: RuntimeImplementationTree,
+	path: string[] = [],
 ): RuntimeImplementation[] => {
 	if (Array.isArray(implementation)) {
-		return implementation.flatMap(flattenImplementationTree);
+		return implementation.flatMap((child) =>
+			flattenImplementationTree(child, path),
+		);
 	}
-	if (isRuntimeImplementation(implementation)) return [implementation];
-
-	return Object.values(implementation).flatMap(flattenImplementationTree);
+	if (isRuntimeImplementation(implementation)) {
+		if (!isShorthandRouteDeclaration(implementation.route)) {
+			return [implementation as RuntimeImplementation];
+		}
+		return [
+			{
+				route: {
+					...implementation.route,
+					path: `/${path.join("/")}`,
+				},
+				handler: implementation.handler,
+			},
+		];
+	}
+	return Object.entries(implementation).flatMap(([key, child]) =>
+		flattenImplementationTree(child, [...path, key]),
+	);
 };
 
 export const flattenRouteImplementations = (

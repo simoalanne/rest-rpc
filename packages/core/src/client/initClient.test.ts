@@ -81,4 +81,57 @@ describe("initClient", () => {
 
 		assert.equal(calls[0]?.url, "https://api.test/todos?search=milk");
 	});
+
+	it("calls shorthand routes as derived JSON POST operations", async () => {
+		const calls: FetchCall[] = [];
+		globalThis.fetch = async (url, init) => {
+			calls.push({ url: String(url), init });
+			return jsonResponse(String(calls.length));
+		};
+		const contract = {
+			todos: {
+				get: route.output(z.string().transform(Number)),
+				add: route
+					.input(z.object({ title: z.string() }))
+					.output(z.string().transform(Number)),
+				list: route.get("/todos").response(200, z.array(z.string())),
+			},
+		};
+		const client = initClient(contract, {
+			baseUrl: "https://api.test",
+			validateResponses: true,
+		});
+
+		assert.equal(await client.todos.get(undefined, { cache: "no-store" }), 1);
+		assert.equal(await client.todos.add({ title: "Write tests" }), 2);
+		assert.deepEqual(Object.keys(client.todos), ["get", "add", "list"]);
+		assert.deepEqual(Object.keys(client.todos.list), [
+			"fetch",
+			"fetchResponse",
+		]);
+		assert.equal(calls[0]?.url, "https://api.test/todos/get");
+		assert.equal(calls[0]?.init?.method, "POST");
+		assert.equal(calls[0]?.init?.body, undefined);
+		assert.equal(calls[0]?.init?.cache, "no-store");
+		assert.equal(calls[1]?.url, "https://api.test/todos/add");
+		assert.equal(calls[1]?.init?.method, "POST");
+		assert.equal(
+			calls[1]?.init?.body,
+			JSON.stringify({ title: "Write tests" }),
+		);
+		assert.equal(
+			new Headers(calls[1]?.init?.headers).get("content-type"),
+			"application/json",
+		);
+	});
+
+	it("throws native errors for unsuccessful shorthand requests", async () => {
+		captureFetch(jsonResponse({ code: "failed" }, 500));
+		const client = initClient(
+			{ todos: { get: route.output(z.object({ id: z.string() })) } },
+			{ baseUrl: "https://api.test" },
+		);
+
+		await assert.rejects(client.todos.get(), Error);
+	});
 });

@@ -1,24 +1,29 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { skipToken } from "@tanstack/query-core";
-import { createRouteApi } from "./routeApi.ts";
+import { createTanstackHelpersForRoute } from "./createHelperFunctions.ts";
 
 const routeWithoutRequestPath = ["items", "list"];
 const routeWithRequestPath = ["items", "byId"];
 
-describe("createRouteApi", () => {
+describe("createTanstackQueryRouteHelpers", () => {
 	it("creates query options with request-aware keys and fetchResponse", async () => {
 		const fetchResponseCalls: unknown[][] = [];
-		const routeApi = createRouteApi(routeWithRequestPath, async (...args) => {
-			fetchResponseCalls.push(args);
-			return {
-				status: 200,
-				body: { id: "item-1" },
-			};
-		});
+		const routeHelpers = createTanstackHelpersForRoute(
+			routeWithRequestPath,
+			async (...args) => {
+				fetchResponseCalls.push(args);
+				return {
+					status: 200,
+					body: { id: "item-1" },
+				};
+			},
+		);
 		const request = { id: "item-1" };
 
-		const options = routeApi.queryOptions(request, { staleTime: 123 }) as any;
+		const options = routeHelpers.queryOptions(request, {
+			staleTime: 123,
+		}) as any;
 
 		assert.deepEqual(options.queryKey, ["items", "byId", request]);
 		assert.equal(options.enabled, undefined);
@@ -35,16 +40,19 @@ describe("createRouteApi", () => {
 
 	it("forwards query fetch options to fetchResponse without returning them", async () => {
 		const fetchResponseCalls: unknown[][] = [];
-		const routeApi = createRouteApi(routeWithRequestPath, async (...args) => {
-			fetchResponseCalls.push(args);
-			return {
-				status: 200,
-				body: { id: "item-1" },
-			};
-		});
+		const routeHelpers = createTanstackHelpersForRoute(
+			routeWithRequestPath,
+			async (...args) => {
+				fetchResponseCalls.push(args);
+				return {
+					status: 200,
+					body: { id: "item-1" },
+				};
+			},
+		);
 		const request = { id: "item-1" };
 
-		const options = routeApi.queryOptions(request, {
+		const options = routeHelpers.queryOptions(request, {
 			fetchOptions: { credentials: "include", cache: "no-store" },
 			retry: false,
 		}) as any;
@@ -65,27 +73,33 @@ describe("createRouteApi", () => {
 	});
 
 	it("allows query options to override generated query keys", () => {
-		const routeApi = createRouteApi(routeWithRequestPath, async () => ({
-			status: 200,
-			body: {},
-		}));
+		const routeHelpers = createTanstackHelpersForRoute(
+			routeWithRequestPath,
+			async () => ({
+				status: 200,
+				body: {},
+			}),
+		);
 		const request = { id: "item-1" };
 
-		const options = routeApi.queryOptions(request, {
+		const options = routeHelpers.queryOptions(request, {
 			queryKey: ["custom", request],
 		});
 
 		assert.deepEqual(options.queryKey, ["custom", request]);
-		assert.deepEqual(routeApi.getKey(request), ["items", "byId", request]);
+		assert.deepEqual(routeHelpers.getKey(request), ["items", "byId", request]);
 	});
 
 	it("uses skipToken to disable request-based query options", () => {
-		const routeApi = createRouteApi(routeWithRequestPath, async () => ({
-			status: 200,
-			body: {},
-		}));
+		const routeHelpers = createTanstackHelpersForRoute(
+			routeWithRequestPath,
+			async () => ({
+				status: 200,
+				body: {},
+			}),
+		);
 
-		const options = routeApi.queryOptions(skipToken) as any;
+		const options = routeHelpers.queryOptions(skipToken) as any;
 
 		assert.equal(options.queryFn, skipToken);
 		assert.deepEqual(options.queryKey, ["items", "byId"]);
@@ -93,7 +107,7 @@ describe("createRouteApi", () => {
 
 	it("uses the second queryOptions argument for routes without request input", async () => {
 		const fetchResponseCalls: unknown[][] = [];
-		const routeApi = createRouteApi(
+		const routeHelpers = createTanstackHelpersForRoute(
 			routeWithoutRequestPath,
 			async (...args) => {
 				fetchResponseCalls.push(args);
@@ -104,13 +118,13 @@ describe("createRouteApi", () => {
 			},
 		);
 
-		const options = routeApi.queryOptions(undefined, { gcTime: 50 }) as any;
+		const options = routeHelpers.queryOptions(undefined, { gcTime: 50 }) as any;
 
 		assert.equal(options.enabled, undefined);
 		assert.equal(options.gcTime, 50);
 		assert.equal(options.fetchOptions, undefined);
 		assert.deepEqual(options.queryKey, ["items", "list"]);
-		assert.deepEqual(routeApi.getKey(), ["items", "list"]);
+		assert.deepEqual(routeHelpers.getKey(), ["items", "list"]);
 		await options.queryFn({ signal: "list-signal" });
 		assert.deepEqual(fetchResponseCalls, [
 			[undefined, { signal: "list-signal" }],
@@ -119,16 +133,19 @@ describe("createRouteApi", () => {
 
 	it("creates mutation options", async () => {
 		const fetchResponseCalls: unknown[][] = [];
-		const routeApi = createRouteApi(routeWithRequestPath, async (...args) => {
-			fetchResponseCalls.push(args);
-			return {
-				status: 201,
-				body: { id: "item-2" },
-			};
-		});
+		const routeHelpers = createTanstackHelpersForRoute(
+			routeWithRequestPath,
+			async (...args) => {
+				fetchResponseCalls.push(args);
+				return {
+					status: 201,
+					body: { id: "item-2" },
+				};
+			},
+		);
 		const request = { name: "Potato" };
 
-		const options = routeApi.mutationOptions({
+		const options = routeHelpers.mutationOptions({
 			fetchOptions: { credentials: "include", cache: "no-store" },
 			retry: false,
 		}) as any;
@@ -146,17 +163,20 @@ describe("createRouteApi", () => {
 
 	it("creates infinite query options with route requests as page params", async () => {
 		const fetchResponseCalls: unknown[][] = [];
-		const routeApi = createRouteApi(routeWithRequestPath, async (...args) => {
-			fetchResponseCalls.push(args);
-			return {
-				status: 200,
-				body: { items: [], nextCursor: "cursor-2" },
-			};
-		});
+		const routeHelpers = createTanstackHelpersForRoute(
+			routeWithRequestPath,
+			async (...args) => {
+				fetchResponseCalls.push(args);
+				return {
+					status: 200,
+					body: { items: [], nextCursor: "cursor-2" },
+				};
+			},
+		);
 		const initialRequest = { cursor: undefined, limit: 20 };
 		const nextRequest = { cursor: "cursor-2", limit: 20 };
 
-		const options = routeApi.infiniteQueryOptions({
+		const options = routeHelpers.infiniteQueryOptions({
 			initialRequest,
 			getNextRequest: () => nextRequest,
 			fetchOptions: { credentials: "include" },
@@ -184,12 +204,15 @@ describe("createRouteApi", () => {
 	});
 
 	it("allows custom infinite query keys", () => {
-		const routeApi = createRouteApi(routeWithRequestPath, async () => ({
-			status: 200,
-			body: {},
-		}));
+		const routeHelpers = createTanstackHelpersForRoute(
+			routeWithRequestPath,
+			async () => ({
+				status: 200,
+				body: {},
+			}),
+		);
 
-		const options = routeApi.infiniteQueryOptions({
+		const options = routeHelpers.infiniteQueryOptions({
 			queryKey: ["custom", "items"],
 			initialRequest: { limit: 20 },
 			getNextRequest: () => undefined,
@@ -199,15 +222,17 @@ describe("createRouteApi", () => {
 	});
 
 	it("omits undefined request fields in generated keys", () => {
-		const routeApi = createRouteApi(routeWithRequestPath, async () => ({
-			status: 200,
-			body: {},
-		}));
+		const routeHelpers = createTanstackHelpersForRoute(
+			routeWithRequestPath,
+			async () => ({
+				status: 200,
+				body: {},
+			}),
+		);
 
-		assert.deepEqual(routeApi.getKey({ id: "item-4", optional: undefined }), [
-			"items",
-			"byId",
-			{ id: "item-4" },
-		]);
+		assert.deepEqual(
+			routeHelpers.getKey({ id: "item-4", optional: undefined }),
+			["items", "byId", { id: "item-4" }],
+		);
 	});
 });

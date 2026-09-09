@@ -3,14 +3,14 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 type ShorthandInput<TInput extends StandardSchemaV1 | never> = [
 	TInput,
 ] extends [never]
-	? Record<never, never>
-	: { readonly input: TInput };
+	? { readonly request?: never }
+	: {
+			readonly input: TInput;
+			readonly request: { readonly body: TInput; readonly flattenKeys: true };
+		};
 
 /**
  * A shorthand HTTP route whose method and path are derived from its contract tree.
- *
- * @remarks The shorthand represents a JSON request body and a single `200` JSON
- * response. It is lowered to an ordinary HTTP route before runtime consumers use it.
  */
 export type ShorthandRouteDeclaration<
 	TInput extends StandardSchemaV1 | never = never,
@@ -18,6 +18,9 @@ export type ShorthandRouteDeclaration<
 > = {
 	readonly kind: "shorthand";
 	readonly output: TOutput;
+	readonly method: "POST";
+	readonly responses: { readonly 200: TOutput };
+	readonly strictStatusCodes: true;
 } & ShorthandInput<TInput>;
 
 /** Any complete shorthand route declaration accepted in a contract tree. */
@@ -52,4 +55,51 @@ export type ShorthandRouteFactory = {
 	output<const TOutput extends StandardSchemaV1>(
 		schema: TOutput,
 	): ShorthandRouteOutputBuilder<TOutput>;
+};
+
+/** Returns whether a value is a complete shorthand route declaration. */
+export const isShorthandRouteDeclaration = (
+	value: unknown,
+): value is AnyShorthandRouteDeclaration =>
+	typeof value === "object" &&
+	value !== null &&
+	"kind" in value &&
+	value.kind === "shorthand";
+
+export const createShorthandRouteDeclaration = (
+	input: StandardSchemaV1 | undefined,
+	output: StandardSchemaV1,
+): AnyShorthandRouteDeclaration => {
+	const declaration = {
+		kind: "shorthand" as const,
+		output,
+		method: "POST" as const,
+		responses: { 200: output },
+		strictStatusCodes: true as const,
+	};
+
+	return input
+		? {
+				...declaration,
+				input,
+				request: { body: input, flattenKeys: true },
+			}
+		: declaration;
+};
+
+/** Creates the runtime builder operations for shorthand route declarations. */
+export const createShorthandRouteFactory = (): ShorthandRouteFactory => {
+	const output = (schema: StandardSchemaV1) =>
+		Object.assign(createShorthandRouteDeclaration(undefined, schema), {
+			input: (inputSchema: StandardSchemaV1) =>
+				createShorthandRouteDeclaration(inputSchema, schema),
+		});
+
+	return {
+		input: (schema) => ({
+			output: (outputSchema) =>
+				createShorthandRouteDeclaration(schema, outputSchema),
+		}),
+		output,
+	} as ShorthandRouteFactory;
 };

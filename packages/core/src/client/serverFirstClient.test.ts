@@ -18,6 +18,11 @@ type RuntimeRouteClient = {
 type RuntimeClient = {
 	$get: (path: string) => RuntimeRouteClient;
 	$post: (path: string) => RuntimeRouteClient;
+	get: (...args: unknown[]) => Promise<unknown>;
+	todos: {
+		get: (...args: unknown[]) => Promise<unknown>;
+		add: (...args: unknown[]) => Promise<unknown>;
+	};
 };
 
 type FetchCall = {
@@ -72,6 +77,44 @@ describe("initClient server-first mode", () => {
 			"content-type": "application/json",
 			"x-request-id": "request-1",
 		});
+	});
+
+	it("accumulates shorthand paths while preserving explicit selectors", async () => {
+		const { calls, client } = createClient(() =>
+			response("json", JSON.stringify({ id: "todo-1" })),
+		);
+
+		assert.deepEqual(await client.todos.get(undefined, { cache: "no-store" }), {
+			id: "todo-1",
+		});
+		assert.deepEqual(await client.todos.add({ title: "Todo" }), {
+			id: "todo-1",
+		});
+		assert.equal(calls[0]?.url, "https://api.test/todos/get");
+		assert.equal(calls[0]?.init?.method, "POST");
+		assert.equal(calls[0]?.init?.body, undefined);
+		assert.equal(calls[0]?.init?.cache, "no-store");
+		assert.equal(calls[1]?.url, "https://api.test/todos/add");
+		assert.equal(calls[1]?.init?.method, "POST");
+		assert.equal(calls[1]?.init?.body, JSON.stringify({ title: "Todo" }));
+		assert.equal(typeof client.$get("/todos"), "object");
+		assert.throws(() => (client.$get("/todos") as unknown as () => void)());
+	});
+
+	it("throws native errors for unsuccessful shorthand calls", async () => {
+		const { client } = createClient(() => response("json", "{}", 500));
+
+		await assert.rejects(client.todos.get(), Error);
+	});
+
+	it("allows a top-level shorthand route to use an HTTP method name", async () => {
+		const { calls, client } = createClient(() =>
+			response("json", JSON.stringify({ ok: true })),
+		);
+
+		assert.deepEqual(await client.get(), { ok: true });
+		assert.equal(calls[0]?.url, "https://api.test/get");
+		assert.equal(calls[0]?.init?.method, "POST");
 	});
 
 	it("serializes explicit server-first request encodings", async () => {
