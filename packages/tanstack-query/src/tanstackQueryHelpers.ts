@@ -248,13 +248,23 @@ type streamedQueryOptionsResultFor<
 	queryKey: DataTag<QueryKey, TData, RouteQueryError<E>>;
 };
 
-type QueryDisabled = false | null | undefined | "" | 0;
+type StreamedQueryArgs<E extends RouteDeclaration, TData, TSelectedData> = [
+	RouteRequestValue<E>,
+] extends [never]
+	? [
+			request?: undefined,
+			options?: streamedQueryOptionsFor<E, TData, TSelectedData>,
+		]
+	: [
+			request: RouteRequestValue<E> | SkipToken,
+			options?: streamedQueryOptionsFor<E, TData, TSelectedData>,
+		];
 
 type UseQueryArgs<E extends QueryRoute, TData = RouteQueryData<E>> =
 	RouteRequestValue<E> extends never
-		? [options?: QueryOptionsFor<E, TData>]
+		? [request?: undefined, options?: QueryOptionsFor<E, TData>]
 		: [
-				request: RouteRequestValue<E> | QueryDisabled | SkipToken,
+				request: RouteRequestValue<E> | SkipToken,
 				options?: QueryOptionsFor<E, TData>,
 			];
 
@@ -295,20 +305,7 @@ type TanstackQueryStreamRouteValue<E extends QueryRoute> =
 							TData = RouteStreamedQueryData<E>,
 							TSelectedData = TData,
 						>(
-							...args: UseQueryArgs<E, TData> extends infer TArgs
-								? TArgs extends [options?: unknown]
-									? [options?: streamedQueryOptionsFor<E, TData, TSelectedData>]
-									: TArgs extends [request: infer TRequest, options?: unknown]
-										? [
-												request: TRequest,
-												options?: streamedQueryOptionsFor<
-													E,
-													TData,
-													TSelectedData
-												>,
-											]
-										: never
-								: never
+							...args: StreamedQueryArgs<E, TData, TSelectedData>
 						) => streamedQueryOptionsResultFor<E, TData, TSelectedData>;
 					}
 				: Record<never, never>
@@ -471,13 +468,8 @@ export function createTanstackQueryHelpers(
 
 					return (path: string) =>
 						createRouteApi(
-							{
-								method: selectorKey.toUpperCase(),
-								path,
-							} as RouteDeclaration,
 							[selectorKey, path],
 							client[selectorKey](path).fetchResponse,
-							"serverFirst",
 						);
 				},
 			},
@@ -497,7 +489,6 @@ export function createTanstackQueryHelpers(
 			};
 
 			return createRouteApi(
-				node,
 				path,
 				apiNode.fetchResponse as (...args: unknown[]) => Promise<unknown>,
 			);

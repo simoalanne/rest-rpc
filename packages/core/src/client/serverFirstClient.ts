@@ -298,20 +298,10 @@ export const request = {
 const isEncodedRequest = (value: unknown): value is RuntimeEncodedRequest =>
 	typeof value === "object" && value !== null && requestEncoding in value;
 
-const isServerFirstRequestInput = (
-	value: unknown,
-): value is ServerFirstRequestInput =>
-	typeof value === "object" &&
-	value !== null &&
-	["body", "query", "params", "headers"].some((key) => key in value);
-
 const getServerFirstArgs = (args: unknown[]) => {
-	const hasRequest = args.length > 1 || isServerFirstRequestInput(args[0]);
 	return {
-		requestInput: hasRequest
-			? (args[0] as ServerFirstRequestInput | undefined)
-			: undefined,
-		fetchOptions: (hasRequest ? args[1] : args[0]) as FetchOptions | undefined,
+		requestInput: args[0] as ServerFirstRequestInput | undefined,
+		fetchOptions: args[1] as FetchOptions | undefined,
 	};
 };
 

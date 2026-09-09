@@ -126,8 +126,8 @@ expectAssignable<Promise<GetTodoData>>(
 	queryClient.fetchQuery(selectedGetOptions),
 );
 
-// should treat routes without request input as options-only query routes
-const selectedListOptions = queryTq.todos.list.queryOptions({
+// routes without request input reserve the first positional slot for undefined
+const selectedListOptions = queryTq.todos.list.queryOptions(undefined, {
 	queryKey: ["todos", "custom"],
 	staleTime: 100,
 	fetchOptions: {
@@ -237,12 +237,15 @@ expectAssignable<Array<{ id: string; message: string }> | undefined>(
 	queryClient.getQueryData(materializedStreamOptions.queryKey),
 );
 
-const selectedStreamOptions = streamTq.events.list.streamedQueryOptions({
-	select(events) {
-		expectType<Array<{ id: string; message: string }>>(events);
-		return events.length;
+const selectedStreamOptions = streamTq.events.list.streamedQueryOptions(
+	undefined,
+	{
+		select(events) {
+			expectType<Array<{ id: string; message: string }>>(events);
+			return events.length;
+		},
 	},
-});
+);
 expectAssignable<Promise<Array<{ id: string; message: string }>>>(
 	queryClient.fetchQuery(selectedStreamOptions),
 );
@@ -250,28 +253,34 @@ expectAssignable<Array<{ id: string; message: string }> | undefined>(
 	queryClient.getQueryData(selectedStreamOptions.queryKey),
 );
 
-const reducedStreamOptions = streamTq.events.list.streamedQueryOptions({
-	initialValue: "",
-	reducer: (text, chunk) => {
-		expectType<string>(text);
-		expectType<{ id: string; message: string }>(chunk);
-		return `${text}${chunk.message}`;
+const reducedStreamOptions = streamTq.events.list.streamedQueryOptions(
+	undefined,
+	{
+		initialValue: "",
+		reducer: (text, chunk) => {
+			expectType<string>(text);
+			expectType<{ id: string; message: string }>(chunk);
+			return `${text}${chunk.message}`;
+		},
 	},
-});
+);
 expectAssignable<Promise<string>>(queryClient.fetchQuery(reducedStreamOptions));
 expectAssignable<string | undefined>(
 	queryClient.getQueryData(reducedStreamOptions.queryKey),
 );
 
-const arrayReducedStreamOptions = streamTq.events.list.streamedQueryOptions({
-	initialValue: [] as Array<{ id: string; message: string }>,
-	reducer: (events, chunk) => {
-		expectType<Array<{ id: string; message: string }>>(events);
-		expectType<{ id: string; message: string }>(chunk);
-		return [...events, chunk];
+const arrayReducedStreamOptions = streamTq.events.list.streamedQueryOptions(
+	undefined,
+	{
+		initialValue: [] as Array<{ id: string; message: string }>,
+		reducer: (events, chunk) => {
+			expectType<Array<{ id: string; message: string }>>(events);
+			expectType<{ id: string; message: string }>(chunk);
+			return [...events, chunk];
+		},
+		refetchMode: "replace",
 	},
-	refetchMode: "replace",
-});
+);
 expectAssignable<Promise<Array<{ id: string; message: string }>>>(
 	queryClient.fetchQuery(arrayReducedStreamOptions),
 );
@@ -279,19 +288,22 @@ expectAssignable<Array<{ id: string; message: string }> | undefined>(
 	queryClient.getQueryData(arrayReducedStreamOptions.queryKey),
 );
 
-const selectedReducedStreamOptions = streamTq.events.list.streamedQueryOptions({
-	initialValue: new Map<string, string>(),
-	reducer: (messages, chunk) => {
-		expectType<Map<string, string>>(messages);
-		expectType<{ id: string; message: string }>(chunk);
-		return new Map(messages).set(chunk.id, chunk.message);
+const selectedReducedStreamOptions = streamTq.events.list.streamedQueryOptions(
+	undefined,
+	{
+		initialValue: new Map<string, string>(),
+		reducer: (messages, chunk) => {
+			expectType<Map<string, string>>(messages);
+			expectType<{ id: string; message: string }>(chunk);
+			return new Map(messages).set(chunk.id, chunk.message);
+		},
+		refetchMode: "append",
+		select(messages) {
+			expectType<Map<string, string>>(messages);
+			return [...messages.values()];
+		},
 	},
-	refetchMode: "append",
-	select(messages) {
-		expectType<Map<string, string>>(messages);
-		return [...messages.values()];
-	},
-});
+);
 expectAssignable<Promise<Map<string, string>>>(
 	queryClient.fetchQuery(selectedReducedStreamOptions),
 );
@@ -301,17 +313,8 @@ expectAssignable<Map<string, string> | undefined>(
 
 // conditional query input
 
-// should accept skipToken or falsy request values for conditional request input
+// should accept skipToken for conditional request input
 const optionalId: string | undefined = "todo-1";
-
-const maybeRequest = optionalId && { id: optionalId };
-const conditionalOptions = queryTq.todos.get.queryOptions(maybeRequest, {
-	queryKey: ["todos", "conditional"],
-	staleTime: 100,
-});
-expectAssignable<
-	typeof skipToken | NonNullable<typeof getOptions.queryFn> | undefined
->(conditionalOptions.queryFn);
 
 const skippedOptions = queryTq.todos.get.queryOptions(
 	optionalId ? { id: optionalId } : skipToken,
@@ -506,7 +509,7 @@ expectError(
 );
 expectError(invalidTq.todos.get.queryOptions({ retry: false }));
 expectError(invalidTq.todos.list.queryOptions({ id: "todo-1" }));
-expectError(invalidTq.todos.list.queryOptions(undefined, { retry: false }));
+invalidTq.todos.list.queryOptions(undefined, { retry: false });
 expectError(invalidTq.todos.list.queryOptions(skipToken));
 expectError(invalidTq.todos.get.getKey());
 expectError(invalidTq.todos.get.getKey({ id: "todo-1", extra: true }));
@@ -686,7 +689,7 @@ expectType<{ title: string }>(
 	null as unknown as RouteMutationVariables<typeof shorthandApi.todos.add>,
 );
 
-const shorthandGetOptions = shorthandTq.todos.get.queryOptions({
+const shorthandGetOptions = shorthandTq.todos.get.queryOptions(undefined, {
 	retry(_failureCount, error) {
 		expectType<Error>(error);
 		return false;
@@ -740,12 +743,15 @@ expectAssignable<
 	ServerFirstTanstackQueryHelpersFor<typeof serverShorthandRoutes>
 >(serverShorthandTq);
 
-const serverShorthandGetOptions = serverShorthandTq.todos.get.queryOptions({
-	retry(_failureCount, error) {
-		expectType<Error>(error);
-		return false;
+const serverShorthandGetOptions = serverShorthandTq.todos.get.queryOptions(
+	undefined,
+	{
+		retry(_failureCount, error) {
+			expectType<Error>(error);
+			return false;
+		},
 	},
-});
+);
 expectType<Promise<{ readonly id: "todo-1"; readonly title: "Todo" }>>(
 	queryClient.fetchQuery(serverShorthandGetOptions),
 );

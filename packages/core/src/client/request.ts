@@ -295,17 +295,6 @@ export const constructBaseRequest = (
 	};
 };
 
-export const extractArgs = (route: ClientRequestRoute, args: unknown[]) => {
-	const requestArgs = takesRequestInput(route)
-		? (args[0] as FlatRequestInput)
-		: undefined;
-	const options = requestArgs ? args[1] : args[0];
-	return { requestArgs, options } as {
-		requestArgs?: FlatRequestInput;
-		options?: FetchOptions;
-	};
-};
-
 export type ExecuteRequestOptions = {
 	baseUrl: string;
 	fetch?: FetchLike;
@@ -358,7 +347,8 @@ export const executeRequest = async <E extends RouteDeclaration>(
 	options: ExecuteRequestOptions,
 	tagRequest?: FlatRequestInput,
 ): Promise<Response> => {
-	const { requestArgs, options: fetchOptions } = extractArgs(route, args);
+	const requestArgs = args[0] as FlatRequestInput | undefined;
+	const fetchOptions = args[1] as FetchOptions | undefined;
 	const {
 		url,
 		body,

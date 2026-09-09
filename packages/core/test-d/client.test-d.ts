@@ -44,7 +44,7 @@ expectType<ApiClientRouteValue<typeof shorthandApi.todos.get>>(
 expectType<Promise<{ id: number; title: string }>>(
 	shorthandClient.todos.add({ title: "Write type tests" }),
 );
-shorthandClient.todos.get({ signal: AbortSignal.abort() });
+shorthandClient.todos.get(undefined, { signal: AbortSignal.abort() });
 shorthandClient.todos.add(
 	{ title: "Write type tests" },
 	{ signal: AbortSignal.abort() },
@@ -86,6 +86,7 @@ expectType<Promise<Array<{ id: string; title: string }>>>(
 	noInputClient.todos.list.fetch(),
 );
 expectType<Promise<{ total: number }>>(noInputClient.todos.stats.fetch());
+noInputClient.todos.list.fetch(undefined, { cache: "no-store" });
 expectError(noInputClient.todos.list());
 
 const pathParamApi = {

@@ -1,17 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { route } from "@rest-rpc/core";
-import { type as schemaType } from "@rest-rpc/core/standard-schema";
 import { fetchQueryData } from "./queryData.ts";
-
-const routeWithoutRequest = route
-	.get("/items")
-	.response(200, schemaType<unknown>());
-
-const routeWithRequest = route
-	.get("/items/:id")
-	.params(schemaType<{ id: string }>())
-	.response(200, schemaType<unknown>());
 
 describe("fetchQueryData", () => {
 	it("returns declared success response envelopes", async () => {
@@ -24,7 +13,6 @@ describe("fetchQueryData", () => {
 					body: { id: "item-1" },
 				};
 			},
-			routeWithRequest,
 			{ id: "item-1" },
 			{ signal: "signal-value" as any },
 		);
@@ -42,7 +30,6 @@ describe("fetchQueryData", () => {
 				status: 200,
 				body: { id: "item-1" },
 			}),
-			routeWithoutRequest,
 			undefined,
 		);
 
@@ -52,7 +39,7 @@ describe("fetchQueryData", () => {
 		});
 	});
 
-	it("forwards options as the first argument for routes without request input", async () => {
+	it("forwards undefined and options for routes without request input", async () => {
 		const calls: unknown[][] = [];
 		await fetchQueryData(
 			async (...args) => {
@@ -62,12 +49,11 @@ describe("fetchQueryData", () => {
 					body: { items: [] },
 				};
 			},
-			routeWithoutRequest,
 			undefined,
 			{ signal: "list-signal" as any },
 		);
 
-		assert.deepEqual(calls, [[{ signal: "list-signal" }]]);
+		assert.deepEqual(calls, [[undefined, { signal: "list-signal" }]]);
 	});
 
 	it("throws declared non-success responses", async () => {
@@ -78,7 +64,6 @@ describe("fetchQueryData", () => {
 						status: 409,
 						body: { code: "ITEM_EXISTS" },
 					}),
-					routeWithoutRequest,
 					undefined,
 				),
 			{
@@ -95,7 +80,7 @@ describe("fetchQueryData", () => {
 		};
 
 		await assert.rejects(
-			() => fetchQueryData(async () => error, routeWithoutRequest, undefined),
+			() => fetchQueryData(async () => error, undefined),
 			error,
 		);
 	});
@@ -108,7 +93,7 @@ describe("fetchQueryData", () => {
 		};
 
 		await assert.rejects(
-			() => fetchQueryData(async () => error, routeWithoutRequest, undefined),
+			() => fetchQueryData(async () => error, undefined),
 			error,
 		);
 	});
@@ -116,13 +101,9 @@ describe("fetchQueryData", () => {
 	it("normalizes unknown thrown values to Error", async () => {
 		await assert.rejects(
 			() =>
-				fetchQueryData(
-					async () => {
-						throw "boom";
-					},
-					routeWithoutRequest,
-					undefined,
-				),
+				fetchQueryData(async () => {
+					throw "boom";
+				}, undefined),
 			(error: unknown) =>
 				error instanceof Error &&
 				error.message === "API request failed" &&

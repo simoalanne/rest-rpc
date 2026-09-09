@@ -54,7 +54,7 @@ export type FetchArgs<
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
 > =
 	ClientRequest<E, GlobalHeaderKeys<TGlobalHeaders>> extends never
-		? [options?: FetchOptions]
+		? [request?: undefined, options?: FetchOptions]
 		: [
 				request: ClientRequest<E, GlobalHeaderKeys<TGlobalHeaders>>,
 				options?: FetchOptions,
@@ -207,7 +207,10 @@ export type ApiClientRouteValue<
 > = E extends RouteDeclaration | AnyShorthandRouteDeclaration
 	? E extends AnyShorthandRouteDeclaration
 		? [ClientRequest<E>] extends [never]
-			? (options?: FetchOptions) => Promise<ClientResponse<E>>
+			? (
+					request?: undefined,
+					options?: FetchOptions,
+				) => Promise<ClientResponse<E>>
 			: (
 					input: ClientRequest<E>,
 					options?: FetchOptions,

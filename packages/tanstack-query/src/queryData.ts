@@ -40,17 +40,11 @@ const isDeclaredResponse = (
 
 export const fetchQueryData = async (
 	fetchResponse: FetchResponse,
-	route: RouteDeclaration,
 	request: unknown,
 	options?: FetchOptions,
-	hasRequest = takesRequestInput(route),
 ) => {
 	try {
-		const response = (
-			hasRequest
-				? await fetchResponse(request, options)
-				: await fetchResponse(options)
-		) as {
+		const response = (await fetchResponse(request, options)) as {
 			status: number;
 			headers?: Headers;
 			body?: unknown;

@@ -2,7 +2,6 @@ import type {
 	ApiClientFetchOptions,
 	FetchOptions,
 } from "@rest-rpc/core/client";
-import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	type InfiniteQueryObserverOptions,
 	type MutationOptions,
@@ -11,18 +10,12 @@ import {
 	experimental_streamedQuery as streamedQuery,
 	skipToken,
 } from "@tanstack/query-core";
-import {
-	type FetchResponse,
-	fetchQueryData,
-	takesRequestInput,
-} from "./queryData.ts";
+import { type FetchResponse, fetchQueryData } from "./queryData.ts";
 
 type RequestArgs = unknown[];
 type OptionsWithFetchOptions = Record<string, unknown> & {
 	fetchOptions?: ApiClientFetchOptions;
 };
-
-type RouteApiMode = "contract" | "serverFirst";
 
 export type RouteApi = {
 	mutationOptions: (
@@ -40,42 +33,8 @@ export type RouteApi = {
 	getKey: (...args: RequestArgs) => QueryKey;
 };
 
-const isServerFirstRequestInput = (value: unknown) =>
-	typeof value === "object" &&
-	value !== null &&
-	["body", "query", "params", "headers"].some((key) => key in value);
-
 const isSkipToken = (value: unknown): value is typeof skipToken =>
 	value === skipToken;
-
-const readsRequestArg = (
-	route: RouteDeclaration,
-	args: RequestArgs,
-	mode: RouteApiMode,
-) =>
-	mode === "serverFirst"
-		? args.length > 1 ||
-			isServerFirstRequestInput(args[0]) ||
-			(args.length > 0 && (!args[0] || isSkipToken(args[0])))
-		: takesRequestInput(route);
-
-const readRequestArg = (
-	route: RouteDeclaration,
-	args: RequestArgs,
-	mode: RouteApiMode,
-) => (readsRequestArg(route, args, mode) ? args[0] : undefined);
-
-const isDisabledRequest = (value: unknown) => !value || isSkipToken(value);
-
-const readQueryOptionsArg = (
-	route: RouteDeclaration,
-	args: RequestArgs,
-	mode: RouteApiMode,
-) =>
-	(readsRequestArg(route, args, mode) ? args[1] : args[0] || {}) as Record<
-		string,
-		unknown
-	>;
 
 const stripUndefinedFields = (request: unknown) => {
 	if (typeof request !== "object" || request === null) return request;
@@ -115,10 +74,8 @@ const isAsyncIterable = (value: unknown): value is AsyncIterable<unknown> =>
 	typeof value[Symbol.asyncIterator] === "function";
 
 export const createRouteApi = (
-	route: RouteDeclaration,
 	routePath: string[],
 	fetchResponse: FetchResponse,
-	mode: RouteApiMode = "contract",
 ): RouteApi => {
 	const getKey = (request?: unknown) => getQueryKey(request, routePath);
 
@@ -127,36 +84,23 @@ export const createRouteApi = (
 			const { fetchOptions, queryOptions } = splitFetchOptions(options);
 			return {
 				mutationFn: (request: unknown) =>
-					fetchQueryData(
-						fetchResponse,
-						route,
-						request,
-						fetchOptions,
-						mode === "serverFirst" || takesRequestInput(route),
-					),
+					fetchQueryData(fetchResponse, request, fetchOptions),
 				...queryOptions,
 			};
 		},
 		queryOptions: (...args: RequestArgs) => {
-			const hasRequest = readsRequestArg(route, args, mode);
-			const request = readRequestArg(route, args, mode);
+			const request = args[0];
 			const { fetchOptions, queryOptions } = splitFetchOptions(
-				readQueryOptionsArg(route, args, mode),
+				args[1] as Record<string, unknown> | undefined,
 			);
-			const disabled = hasRequest && isDisabledRequest(request);
+			const disabled = isSkipToken(request);
 			const queryFn = disabled
 				? skipToken
 				: ({ signal }: { signal?: FetchOptions["signal"] }) =>
-						fetchQueryData(
-							fetchResponse,
-							route,
-							request,
-							{
-								...fetchOptions,
-								signal,
-							},
-							hasRequest,
-						);
+						fetchQueryData(fetchResponse, request, {
+							...fetchOptions,
+							signal,
+						});
 			const queryKeyRequest = disabled ? undefined : request;
 
 			return {
@@ -166,24 +110,17 @@ export const createRouteApi = (
 			};
 		},
 		streamedQueryOptions: (...args: RequestArgs) => {
-			const hasRequest = readsRequestArg(route, args, mode);
-			const request = readRequestArg(route, args, mode);
+			const request = args[0];
 			const { fetchOptions, queryOptions } = splitFetchOptions(
-				readQueryOptionsArg(route, args, mode),
+				args[1] as Record<string, unknown> | undefined,
 			);
 			const { initialValue, reducer, refetchMode, ...tanstackOptions } =
 				queryOptions;
 			const streamFn = async ({ signal }: { signal: AbortSignal }) => {
-				const response = (await fetchQueryData(
-					fetchResponse,
-					route,
-					request,
-					{
-						...fetchOptions,
-						signal,
-					},
-					hasRequest,
-				)) as { body: unknown };
+				const response = (await fetchQueryData(fetchResponse, request, {
+					...fetchOptions,
+					signal,
+				})) as { body: unknown };
 
 				if (!isAsyncIterable(response.body)) {
 					throw new Error("Route did not return a stream response body");
@@ -191,7 +128,7 @@ export const createRouteApi = (
 
 				return response.body;
 			};
-			const disabled = hasRequest && isDisabledRequest(request);
+			const disabled = isSkipToken(request);
 			const queryFn = disabled
 				? skipToken
 				: typeof reducer === "function"
@@ -228,19 +165,13 @@ export const createRouteApi = (
 					pageParam: unknown;
 					signal?: FetchOptions["signal"];
 				}) =>
-					fetchQueryData(
-						fetchResponse,
-						route,
-						pageParam,
-						{
-							...fetchOptions,
-							signal,
-						},
-						mode === "serverFirst" || takesRequestInput(route),
-					),
+					fetchQueryData(fetchResponse, pageParam, {
+						...fetchOptions,
+						signal,
+					}),
 				...tanstackOptions,
 			} as unknown as InfiniteQueryObserverOptions<unknown, unknown, unknown>;
 		},
-		getKey: (...args: RequestArgs) => getKey(readRequestArg(route, args, mode)),
+		getKey: (...args: RequestArgs) => getKey(args[0]),
 	};
 };

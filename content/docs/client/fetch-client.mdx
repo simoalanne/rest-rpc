@@ -207,6 +207,14 @@ const todo = await client.todos.get.fetch(
 );
 ```
 
+If you need to pass fetch options to a route without request input, pass `undefined` for the request input.
+
+```ts
+const health = await client.health.fetch(undefined, {
+	cache: "no-store",
+});
+```
+
 ## Strict Request Keys
 
 By default, unknown request keys are rejected.

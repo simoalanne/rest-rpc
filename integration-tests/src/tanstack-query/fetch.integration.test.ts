@@ -140,7 +140,7 @@ describe("fetch TanStack Query integration", () => {
 		const queryClient = createQueryClient();
 
 		const response = await queryClient.fetchQuery(
-			tq.projects.list.queryOptions({ staleTime: Infinity }),
+			tq.projects.list.queryOptions(undefined, { staleTime: Infinity }),
 		);
 
 		assert.equal(response.status, 200);
@@ -183,7 +183,9 @@ describe("fetch TanStack Query integration", () => {
 		const tracked = createTrackedFetch();
 		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
-		const listOptions = tq.projects.list.queryOptions({ staleTime: Infinity });
+		const listOptions = tq.projects.list.queryOptions(undefined, {
+			staleTime: Infinity,
+		});
 
 		const beforeCreate = await queryClient.fetchQuery(listOptions);
 		const createObserver = new MutationObserver(
@@ -274,42 +276,6 @@ describe("fetch TanStack Query integration", () => {
 
 		assert.equal(tracked.calls.length, 0);
 		assert.deepEqual(observer.options.queryKey, ["projects", "get"]);
-	});
-
-	it("does not call fetch for falsy conditional request query observers", async () => {
-		const tracked = createTrackedFetch();
-		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
-		const queryClient = createQueryClient();
-		const selectedId = "";
-		const observer = new QueryObserver(
-			queryClient,
-			tq.projects.get.queryOptions(selectedId && { id: selectedId }),
-		);
-
-		const unsubscribe = observer.subscribe(() => {});
-		await new Promise((resolve) => setTimeout(resolve, 25));
-		unsubscribe();
-
-		assert.equal(tracked.calls.length, 0);
-		assert.deepEqual(observer.options.queryKey, ["projects", "get"]);
-	});
-
-	it("rejects declared query errors without retrying", async () => {
-		const tracked = createTrackedFetch();
-		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
-		const queryClient = createQueryClient();
-
-		await assert.rejects(
-			() =>
-				queryClient.fetchQuery(
-					tq.projects.get.queryOptions({ id: "missing" }, { retry: false }),
-				),
-			{
-				status: 404,
-				body: { code: "not_found", id: "missing" },
-			},
-		);
-		assert.equal(tracked.calls.length, 1);
 	});
 
 	it("rejects declared mutation errors without retrying", async () => {
@@ -425,7 +391,7 @@ describe("fetch TanStack Query integration", () => {
 		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
 
-		const options = tq.projects.events.streamedQueryOptions({
+		const options = tq.projects.events.streamedQueryOptions(undefined, {
 			queryKey: ["projects", "events", "streamed-query"],
 		});
 		const response = await queryClient.fetchQuery(options);

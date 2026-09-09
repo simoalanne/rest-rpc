@@ -56,24 +56,17 @@ const todo = useQuery(
 );
 ```
 
-Routes without request input can be called with only options.
+For routes without request input, pass `undefined` if you need to provide options.
 
 ```tsx
 const todos = useQuery(
-	tq.todos.list.queryOptions({
+	tq.todos.list.queryOptions(undefined, {
 		staleTime: 30_000,
 	}),
 );
 ```
 
-For request-based routes, falsy request values and TanStack Query's `skipToken`
-disable the query function.
-
-```tsx
-const todo = useQuery(
-	tq.todos.get.queryOptions(selectedId && { id: selectedId }),
-);
-```
+To disable a query in type-safe way you can use `skipToken` as request input.
 
 ```tsx
 import { skipToken } from "@tanstack/query-core";
@@ -186,7 +179,7 @@ shape.
 
 ```tsx
 const messages = useQuery(
-	tq.todos.events.streamedQueryOptions({
+	tq.todos.events.streamedQueryOptions(undefined, {
 		initialValue: "",
 		reducer: (text, event) => `${text}${event.message}`,
 	}),

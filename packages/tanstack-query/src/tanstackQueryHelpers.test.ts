@@ -38,7 +38,7 @@ describe("createTanstackQueryHelpers server-first mode", () => {
 		assert.equal(calls[0]?.input, "https://example.test/todos/todo-1");
 	});
 
-	it("distinguishes options-only calls and disabled grouped requests", async () => {
+	it("uses positional options and supports disabled grouped requests", async () => {
 		let callCount = 0;
 		const helpers = createTanstackQueryHelpers<unknown>({
 			baseUrl: "https://example.test",
@@ -48,7 +48,7 @@ describe("createTanstackQueryHelpers server-first mode", () => {
 			},
 		}) as any;
 		const route = helpers.get("/health");
-		const active = route.queryOptions({ staleTime: 50 });
+		const active = route.queryOptions(undefined, { staleTime: 50 });
 
 		assert.equal(active.staleTime, 50);
 		assert.deepEqual(active.queryKey, ["get", "/health"]);

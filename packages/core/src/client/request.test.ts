@@ -662,7 +662,7 @@ describe("ApiClient requests", () => {
 		assert.equal(calls[0]?.init?.body, '{"type":"created"}');
 	});
 
-	it("treats explicit no-body request declarations as options-only routes", async () => {
+	it("uses the second argument for options on routes without input", async () => {
 		const apiContract = {
 			ping: route.post("/ping").response(204),
 		};
@@ -672,7 +672,7 @@ describe("ApiClient requests", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await client.ping.fetch({ signal: controller.signal });
+		await client.ping.fetch(undefined, { signal: controller.signal });
 
 		assert.equal(calls[0]?.url, "https://api.test/ping");
 		assert.equal(calls[0]?.init?.body, undefined);
