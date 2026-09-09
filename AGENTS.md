@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repo is `rest-rpc`, a TypeScript library for defining one shared API contract and deriving RPC-style client and server code from it. The library is designed to be used in a monorepo with multiple packages that share the same API contract.
+This repo is `rest-rpc`, a TypeScript library for defining one shared API contract and deriving RPC-style client and server code from it. The library is designed to be used in a monorepo with multiple packages that share the same API contract. Both contract-first and server-first approaches are supported.
 
 ## Packages
 
@@ -51,3 +51,4 @@ For documentation related tasks:
 
 - README.md is shared across root and all packages. It's sole purpose is to link to the actual documentation in `content/docs/`. Updating documentation means updating the mdx files in `content/docs/`, not updating the README.md files.
 - Integration tests require network access. From sandboxed environments, they will fail with EPERM unless run with elevated permissions.
+- Library is currently pre v1.0.0 and is not yet stable. Breaking changes are expected until v1.0.0 is released.
