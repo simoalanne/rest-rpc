@@ -17,36 +17,20 @@ const client = initClient(api, {
 The client has the same route tree shape as the contract.
 
 ```ts
-const todo = await client.todos.get.fetch({ id: "todo_1" });
+const response = await client.todos.get({ id: "todo_1" });
 ```
 
-## `fetch()`
+## Call An HTTP Route
 
-Routes with one successful response expose `fetch()`.
+Every HTTP route is directly callable.
 
 ```ts
-const todo = await client.todos.get.fetch({
+const response = await client.todos.get({
 	id: "todo_1",
 });
 ```
 
-`fetch()` returns the successful response body directly.
-
-It throws when the response is undeclared or is not a declared success response.
-
-Use it when non-success responses should use the error path.
-
-## `fetchResponse()`
-
-Every HTTP route exposes `fetchResponse()`.
-
-```ts
-const response = await client.todos.get.fetchResponse({
-	id: "todo_1",
-});
-```
-
-`fetchResponse()` returns `status` discriminated union for the response.
+Calling an HTTP route returns a `status`-discriminated union for the response.
 Undeclared responses are returned as `rawResponse` with the native `Response` object.
 
 ```ts
@@ -62,8 +46,8 @@ response.status; // Exclude<HttpStatusCode, 200 | 404>
 response.rawResponse; // Response
 ```
 
-Set `strictStatusCodes` to `true` on a route factory when `fetchResponse()`
-should only return declared status codes and throw on undeclared statuses.
+Set `strictStatusCodes` to `true` on a route factory when route calls should only
+return declared status codes and throw on undeclared statuses.
 This also narrows the return type to only declared statuses, excluding the `rawResponse` branch.
 
 ```ts
@@ -82,7 +66,7 @@ const client = initClient(api, { baseUrl: "https://api.example.com" });
 ```
 
 ```ts
-const response = await client.todos.get.fetchResponse({
+const response = await client.todos.get({
 	id: "todo_1",
 });
 
@@ -168,8 +152,8 @@ const client = initClient(api, {
 	}),
 });
 
-await client.todos.list.fetch({});
-await client.todos.list.fetch({ authorization: "Bearer override" });
+await client.todos.list({});
+await client.todos.list({ authorization: "Bearer override" });
 ```
 
 ## Custom Fetch
@@ -196,7 +180,7 @@ const client = initClient(api, {
 Pass fetch options as the second argument.
 
 ```ts
-const todo = await client.todos.get.fetch(
+const response = await client.todos.get(
 	{
 		id: "todo_1",
 		"x-request-id": "req_1",
@@ -210,7 +194,7 @@ const todo = await client.todos.get.fetch(
 If you need to pass fetch options to a route without request input, pass `undefined` for the request input.
 
 ```ts
-const health = await client.health.fetch(undefined, {
+const response = await client.health(undefined, {
 	cache: "no-store",
 });
 ```
@@ -274,7 +258,7 @@ export const client = initClient(api, {
 });
 ```
 
-For `client.todos.get.fetch({ id: "todo_1" })`, the client attaches both the
+For `client.todos.get({ id: "todo_1" })`, the client attaches both the
 exact request tag and the broader route tag.
 
 ```ts
@@ -293,7 +277,7 @@ You can still pass Next.js fetch options normally through `fetchOptions`.
 Generated tags are merged with any tags you provide.
 
 ```ts
-await client.todos.get.fetch(
+await client.todos.get(
 	{ id: "todo_1" },
 	{
 		next: {
@@ -313,7 +297,7 @@ import { api } from "./contract";
 import { client } from "./client";
 
 export async function renameTodo(id: string, title: string) {
-	await client.todos.update.fetch({ id, title });
+	await client.todos.update({ id, title });
 
 	for (const tag of getNextFetchTags(
 		api.todos.get,
@@ -327,8 +311,7 @@ export async function renameTodo(id: string, title: string) {
 
 ## WebSocket Routes
 
-WebSocket routes expose `openConnection()` instead of `fetch()` and
-`fetchResponse()`.
+WebSocket routes expose `openConnection()` instead of being directly callable.
 
 ```ts
 const socket = client.todos.watch.openConnection({

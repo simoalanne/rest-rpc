@@ -18,7 +18,6 @@ export type {
 	ClientResponse,
 	ClientSocket,
 	FetchArgs,
-	FetchFn,
 	FetchLike,
 	FetchOptions,
 	FetchResponseFn,

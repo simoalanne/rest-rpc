@@ -1,7 +1,6 @@
 import type { Contract, RouteDeclaration } from "../contract/contract.ts";
 import type { HttpRouteDeclaration } from "../contract/httpRouteBuilder.ts";
 import { isShorthandRouteDeclaration } from "../contract/shorthandRouteBuilder.ts";
-import { getRouteResponses } from "../contract/response.ts";
 import { mapContractRoutes } from "../contract/traversal.ts";
 import {
 	constructBaseRequest,
@@ -26,12 +25,6 @@ import type {
 	OpenConnectionArgs,
 } from "./types.ts";
 import { openConnection as openRouteConnection } from "./websocket.ts";
-
-const hasSingleSuccessfulResponse = (route: RouteDeclaration) =>
-	Object.keys(getRouteResponses(route)).filter((status) => {
-		const statusCode = Number(status);
-		return statusCode >= 200 && statusCode < 300;
-	}).length === 1;
 
 const createContractClient = <
 	TContract extends Contract,
@@ -110,20 +103,7 @@ const createContractClient = <
 			};
 		}
 
-		const routeFetchResponse = (...args: FetchArgs) =>
-			fetchResponse(node, routePath, ...args);
-
-		if (!hasSingleSuccessfulResponse(node)) {
-			return {
-				fetchResponse: routeFetchResponse,
-			};
-		}
-
-		return {
-			fetch: (...args: FetchArgs) =>
-				fetchSuccess(fetchResponse, node, routePath, ...args),
-			fetchResponse: routeFetchResponse,
-		};
+		return (...args: FetchArgs) => fetchResponse(node, routePath, ...args);
 	}) as ApiClientFor<TContract, TGlobalHeaders>;
 };
 

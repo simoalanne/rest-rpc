@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { initClient } from "@rest-rpc/core";
+import { type ClientResponse, initClient } from "@rest-rpc/core";
 import type { StartedServer } from "../harness/listen.ts";
 import { streamsContract } from "./contract.ts";
 import type { StreamCancellationProbe } from "./handlers.ts";
@@ -19,18 +19,25 @@ const collectAsyncIterable = async <T>(iterable: AsyncIterable<T>) => {
 	return items;
 };
 
-const assertFetchOrFirstIterationRejects = async <T>(
-	fetchStream: () => Promise<AsyncIterable<T>>,
+const assertFetchOrFirstIterationRejects = async (
+	fetchStream: () => Promise<
+		ClientResponse<typeof streamsContract.throwsBeforeFirstChunk>
+	>,
 ) => {
-	let stream: AsyncIterable<T>;
+	let response: ClientResponse<typeof streamsContract.throwsBeforeFirstChunk>;
 	try {
-		stream = await fetchStream();
+		response = await fetchStream();
 	} catch (error) {
 		assert.ok(error);
 		return;
 	}
 
-	const iterator = stream[Symbol.asyncIterator]();
+	if (response.status !== 200) {
+		assert.equal(response.status, 500);
+		return;
+	}
+
+	const iterator = response.body[Symbol.asyncIterator]();
 	await assert.rejects(() => iterator.next());
 };
 
@@ -49,7 +56,9 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 		});
 
 		it("receives empty NDJSON streams as empty async iterables", async () => {
-			const stream = await client.empty.fetch();
+			const streamResponse = await client.empty();
+			assert.equal(streamResponse.status, 200);
+			const stream = streamResponse.body;
 
 			assert.deepEqual(await collectAsyncIterable(stream), []);
 		});
@@ -92,7 +101,9 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 			}
 
 			adapter.cancellationProbe.reset();
-			const stream = await client.cancellable.fetch();
+			const streamResponse = await client.cancellable();
+			assert.equal(streamResponse.status, 200);
+			const stream = streamResponse.body;
 
 			for await (const event of stream) {
 				assert.deepEqual(event, { id: "event-1", index: 1 });
@@ -104,7 +115,7 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 		});
 
 		it("does not JSON-frame raw custom streams", async () => {
-			const response = await client.rawText.fetchResponse();
+			const response = await client.rawText();
 
 			assert.equal(response.status, 200);
 			assert.match(
@@ -115,7 +126,7 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 		});
 
 		it("streams raw binary custom chunks without text encoding", async () => {
-			const response = await client.rawBytes.fetchResponse();
+			const response = await client.rawBytes();
 
 			assert.equal(response.status, 200);
 			assert.match(
@@ -129,7 +140,9 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 		});
 
 		it("surfaces invalid streamed chunks while continuing client iteration", async () => {
-			const stream = await client.invalid.fetch();
+			const streamResponse = await client.invalid();
+			assert.equal(streamResponse.status, 200);
+			const stream = streamResponse.body;
 			const iterator = stream[Symbol.asyncIterator]();
 
 			assert.deepEqual(await iterator.next(), {
@@ -142,12 +155,14 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 
 		it("surfaces stream failures before the first chunk", async () => {
 			await assertFetchOrFirstIterationRejects(() =>
-				client.throwsBeforeFirstChunk.fetch(),
+				client.throwsBeforeFirstChunk(),
 			);
 		});
 
 		it("surfaces stream failures after delivered chunks", async () => {
-			const stream = await client.throwsAfterChunks.fetch();
+			const streamResponse = await client.throwsAfterChunks();
+			assert.equal(streamResponse.status, 200);
+			const stream = streamResponse.body;
 			const iterator = stream[Symbol.asyncIterator]();
 
 			assert.deepEqual(await iterator.next(), {

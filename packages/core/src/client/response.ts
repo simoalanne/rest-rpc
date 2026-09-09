@@ -2,9 +2,9 @@ import type { CustomBody } from "../contract/body.ts";
 import { isCustomBody, isNoBody, isStream } from "../contract/body.ts";
 import type { RouteDeclaration } from "../contract/contract.ts";
 import type {
-	ClientResponseBody,
 	ResponseBodySchema,
 	ResponseDeclaration,
+	SuccessfulDeclaredClientResponse,
 } from "../contract/response.ts";
 import {
 	getResponseBody,
@@ -288,12 +288,19 @@ export const fetchSuccess = async <E extends RouteDeclaration>(
 	route: E,
 	routePath: readonly string[],
 	...args: FetchArgs<E>
-): Promise<ClientResponseBody<E>> => {
+): Promise<SuccessfulClientResponseBody<E>> => {
 	const response = await fetchRouteResponse(route, routePath, ...args);
 
 	if (!("body" in response) || !isSuccessStatus(response.status)) {
 		throw new Error("Request did not return a declared success response");
 	}
 
-	return response.body as ClientResponseBody<E>;
+	return response.body as SuccessfulClientResponseBody<E>;
 };
+
+type SuccessfulClientResponseBody<E extends RouteDeclaration> =
+	SuccessfulDeclaredClientResponse<E> extends infer TResponse
+		? TResponse extends { body: infer TBody }
+			? TBody
+			: never
+		: never;

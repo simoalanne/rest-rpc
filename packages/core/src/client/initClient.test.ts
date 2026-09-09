@@ -58,16 +58,13 @@ const captureFetch = (response: Response) => {
 };
 
 describe("initClient", () => {
-	it("creates route helpers that match route capabilities", () => {
+	it("creates callable HTTP routes and connection helpers", () => {
 		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 		});
 
-		assert.deepEqual(Object.keys(client.todos.list), [
-			"fetch",
-			"fetchResponse",
-		]);
-		assert.deepEqual(Object.keys(client.todos.publish), ["fetchResponse"]);
+		assert.deepEqual(Object.keys(client.todos.list), []);
+		assert.deepEqual(Object.keys(client.todos.publish), []);
 		assert.deepEqual(Object.keys(client.socket.join), ["openConnection"]);
 	});
 
@@ -77,7 +74,7 @@ describe("initClient", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await client.todos.list.fetch({ search: "milk" });
+		await client.todos.list({ search: "milk" });
 
 		assert.equal(calls[0]?.url, "https://api.test/todos?search=milk");
 	});
@@ -105,10 +102,7 @@ describe("initClient", () => {
 		assert.equal(await client.todos.get(undefined, { cache: "no-store" }), 1);
 		assert.equal(await client.todos.add({ title: "Write tests" }), 2);
 		assert.deepEqual(Object.keys(client.todos), ["get", "add", "list"]);
-		assert.deepEqual(Object.keys(client.todos.list), [
-			"fetch",
-			"fetchResponse",
-		]);
+		assert.deepEqual(Object.keys(client.todos.list), []);
 		assert.equal(calls[0]?.url, "https://api.test/todos/get");
 		assert.equal(calls[0]?.init?.method, "POST");
 		assert.equal(calls[0]?.init?.body, undefined);

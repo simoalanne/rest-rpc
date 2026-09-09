@@ -32,7 +32,7 @@ const api = {
 ```
 
 ```ts
-await client.todos.update.fetch({
+await client.todos.update({
 	id: "todo_1",
 	notify: true,
 	title: "Write docs",
@@ -60,7 +60,7 @@ const api = {
 ```
 
 ```ts
-await client.todos.update.fetch({
+await client.todos.update({
 	params: { id: "todo_1" },
 	query: { notify: true },
 	body: { title: "Write docs" },
@@ -111,7 +111,7 @@ const api = {
 ```
 
 ```ts
-await client.todos.batchCreate.fetch({
+await client.todos.batchCreate({
 	body: [{ title: "Write docs" }, { title: "Ship the docs" }],
 });
 ```
@@ -129,7 +129,7 @@ get: route
 ```
 
 ```ts
-await client.todos.get.fetch({ id: "todo_1" });
+await client.todos.get({ id: "todo_1" });
 ```
 
 The schema can validate or transform the transport string when the handler
@@ -195,7 +195,7 @@ csv: route
 ```
 
 ```ts
-await client.imports.csv.fetch({
+await client.imports.csv({
 	body: "id,title\n1,Write docs\n",
 });
 ```
@@ -203,7 +203,7 @@ await client.imports.csv.fetch({
 For multiple content types, `body` contains the chosen content type and payload.
 
 ```ts
-await client.images.upload.fetch({
+await client.images.upload({
 	body: {
 		contentType: "image/png",
 		payload: bytes,
@@ -216,7 +216,7 @@ await client.images.upload.fetch({
 Normal object query params flatten by default.
 
 ```ts
-await client.todos.list.fetch({
+await client.todos.list({
 	status: "open",
 	limit: 50,
 });
@@ -238,7 +238,7 @@ search: route
 ```
 
 ```ts
-await client.search.fetch({
+await client.search({
 	query: {
 		page: 2,
 		filters: { tags: ["docs"] },
@@ -250,7 +250,7 @@ With grouped request segments, the JSON query value lives directly under the
 `query` segment rather than under `query.query`.
 
 ```ts
-await client.search.fetch({
+await client.search({
 	query: {
 		page: 2,
 		filters: { tags: ["docs"] },
@@ -315,17 +315,22 @@ create({ title }) {
 
 ## Client Responses
 
-Use `fetch()` when a successful response body is the normal result and
-non-success statuses should go through the error path.
+Explicit HTTP routes return typed response values even when they declare only
+one successful status.
 
 ```ts
-const todo = await client.todos.get.fetch({ id: "todo_1" });
+const response = await client.todos.get({ id: "todo_1" });
+
+if (response.status === 200) {
+	const todo = response.body;
+}
 ```
 
-Use `fetchResponse()` when HTTP status is normal control flow.
+Explicit HTTP routes return a typed response value so status can remain normal
+control flow.
 
 ```ts
-const response = await client.todos.get.fetchResponse({ id: "todo_1" });
+const response = await client.todos.get({ id: "todo_1" });
 
 if (response.status === 200) {
 	response.body.title;
@@ -354,7 +359,7 @@ const api = {
 
 const client = initClient(api, { baseUrl: "https://api.example.com" });
 
-const response = await client.todos.get.fetchResponse({ id: "todo_1" });
+const response = await client.todos.get({ id: "todo_1" });
 
 if (response.status === 200) {
 	response.body.title;
@@ -388,7 +393,7 @@ remove: route
 Pass declared request headers at the call site when they are route-specific.
 
 ```ts
-await client.todos.list.fetch({
+await client.todos.list({
 	authorization: "Bearer token",
 });
 ```
@@ -405,5 +410,5 @@ const client = initClient(api, {
 	}),
 });
 
-await client.todos.list.fetch({});
+await client.todos.list({});
 ```

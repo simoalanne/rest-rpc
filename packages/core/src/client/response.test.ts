@@ -54,13 +54,13 @@ const captureFetch = (
 };
 
 describe("ApiClient responses", () => {
-	it("returns declared response metadata from fetchResponse", async () => {
+	it("returns declared response metadata from route calls", async () => {
 		captureFetch(jsonResponse({ code: "not_found" }, 404));
 		const client = initClient(createResponseTestContract(), {
 			baseUrl: "https://api.test",
 		});
 
-		const response = await client.todos.get.fetchResponse({ id: "missing" });
+		const response = await client.todos.get({ id: "missing" });
 
 		assert.deepEqual(response, {
 			status: 404,
@@ -69,7 +69,7 @@ describe("ApiClient responses", () => {
 		});
 	});
 
-	it("returns declared response headers from fetchResponse", async () => {
+	it("returns declared response headers from route calls", async () => {
 		captureFetch(
 			new Response(JSON.stringify({ id: "todo-1" }), {
 				status: 200,
@@ -100,25 +100,13 @@ describe("ApiClient responses", () => {
 			validateResponses: true,
 		});
 
-		const response = await client.todos.get.fetchResponse({ id: "todo-1" });
+		const response = await client.todos.get({ id: "todo-1" });
 
 		assert.deepEqual(response.responseHeaders, {
 			etag: "todo-etag",
 			"x-count": 3,
 		});
 		assert.equal(response.headers.get("etag"), "todo-etag");
-	});
-
-	it("rejects fetch when the response is not a declared success", async () => {
-		captureFetch(jsonResponse({ code: "not_found" }, 404));
-		const client = initClient(createResponseTestContract(), {
-			baseUrl: "https://api.test",
-		});
-
-		await assert.rejects(
-			() => client.todos.get.fetch({ id: "missing" }),
-			/declared success response/,
-		);
 	});
 
 	it("returns undeclared responses without consuming their bodies", async () => {
@@ -128,7 +116,7 @@ describe("ApiClient responses", () => {
 			baseUrl: "https://api.test",
 		});
 
-		const response = await client.todos.get.fetchResponse({ id: "todo-1" });
+		const response = await client.todos.get({ id: "todo-1" });
 
 		assert.deepEqual(response, {
 			status: 418,
@@ -144,7 +132,7 @@ describe("ApiClient responses", () => {
 		});
 
 		await assert.rejects(
-			() => client.todos.get.fetchResponse({ id: "todo-1" }),
+			() => client.todos.get({ id: "todo-1" }),
 			/invalid HTTP response status "0"/,
 		);
 	});
@@ -166,7 +154,7 @@ describe("ApiClient responses", () => {
 		});
 
 		await assert.rejects(
-			() => client.todos.get.fetchResponse({ id: "todo-1" }),
+			() => client.todos.get({ id: "todo-1" }),
 			/declared response/,
 		);
 	});
@@ -200,7 +188,7 @@ describe("ApiClient responses", () => {
 			baseUrl: "https://api.test",
 		});
 
-		const response = await client.todos.get.fetchResponse({ id: "todo-1" });
+		const response = await client.todos.get({ id: "todo-1" });
 
 		assert.equal(response.status, 200);
 		assert.equal(response.body.createdAt, "2026-08-10T00:00:00.000Z");
@@ -216,8 +204,8 @@ describe("ApiClient responses", () => {
 			baseUrl: "https://api.test",
 		});
 
-		const textResponse = await client.todos.get.fetchResponse({ id: "text" });
-		const emptyResponse = await client.todos.get.fetchResponse({ id: "empty" });
+		const textResponse = await client.todos.get({ id: "text" });
+		const emptyResponse = await client.todos.get({ id: "empty" });
 
 		assert.equal(await textResponse.rawResponse.text(), "plain error");
 		assert.equal(await emptyResponse.rawResponse.text(), "");
@@ -229,9 +217,10 @@ describe("ApiClient responses", () => {
 			baseUrl: "https://api.test",
 		});
 
-		const response = await client.todos.create.fetch({ title: "Buy milk" });
+		const response = await client.todos.create({ title: "Buy milk" });
+		assert.equal(response.status, 201);
 
-		assert.deepEqual(response, { id: 123 });
+		assert.deepEqual(response.body, { id: 123 });
 	});
 
 	it("validates declared response bodies when configured", async () => {
@@ -241,9 +230,7 @@ describe("ApiClient responses", () => {
 			validateResponses: true,
 		});
 
-		await assert.rejects(() =>
-			client.todos.create.fetch({ title: "Buy milk" }),
-		);
+		await assert.rejects(() => client.todos.create({ title: "Buy milk" }));
 	});
 
 	it("returns transformed response output when validation is disabled", async () => {
@@ -278,9 +265,10 @@ describe("ApiClient responses", () => {
 			baseUrl: "https://api.test",
 		});
 
-		const response = await client.todos.get.fetch({ id: "todo-1" });
+		const response = await client.todos.get({ id: "todo-1" });
+		assert.equal(response.status, 200);
 
-		assert.deepEqual(response, {
+		assert.deepEqual(response.body, {
 			id: "todo-1",
 			name: "Ada Lovelace",
 		});
@@ -319,7 +307,7 @@ describe("ApiClient responses", () => {
 			validateResponses: true,
 		});
 
-		await assert.rejects(() => client.todos.get.fetch({ id: "todo-1" }));
+		await assert.rejects(() => client.todos.get({ id: "todo-1" }));
 	});
 
 	it("returns serialized Date transform output when validation is disabled", async () => {
@@ -346,9 +334,10 @@ describe("ApiClient responses", () => {
 		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 		});
-		const response = await client.todos.get.fetch({ id: "todo-1" });
+		const response = await client.todos.get({ id: "todo-1" });
+		assert.equal(response.status, 200);
 
-		assert.equal(response.createdAt, "2026-08-10T00:00:00.000Z");
+		assert.equal(response.body.createdAt, "2026-08-10T00:00:00.000Z");
 	});
 
 	it("parses serialized Date transform output when validation is enabled", async () => {
@@ -376,10 +365,14 @@ describe("ApiClient responses", () => {
 			baseUrl: "https://api.test",
 			validateResponses: true,
 		});
-		const response = await client.todos.get.fetch({ id: "todo-1" });
+		const response = await client.todos.get({ id: "todo-1" });
+		assert.equal(response.status, 200);
 
-		assert.ok(response.createdAt instanceof Date);
-		assert.equal(response.createdAt.toISOString(), "2026-08-10T00:00:00.000Z");
+		assert.ok(response.body.createdAt instanceof Date);
+		assert.equal(
+			response.body.createdAt.toISOString(),
+			"2026-08-10T00:00:00.000Z",
+		);
 	});
 
 	it("returns string response output when a Date response schema serializes to JSON", async () => {
@@ -405,9 +398,10 @@ describe("ApiClient responses", () => {
 		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 		});
-		const response = await client.todos.get.fetch({ id: "todo-1" });
+		const response = await client.todos.get({ id: "todo-1" });
+		assert.equal(response.status, 200);
 
-		assert.deepEqual(response, {
+		assert.deepEqual(response.body, {
 			id: "todo-1",
 			createdAt: "2026-08-10T00:00:00.000Z",
 		});
@@ -432,7 +426,9 @@ describe("ApiClient responses", () => {
 		const trustingClient = initClient(apiContract, {
 			baseUrl: "https://api.test",
 		});
-		const trusted = await trustingClient.todos.get.fetch({ id: "todo-1" });
+		const trustedResponse = await trustingClient.todos.get({ id: "todo-1" });
+		assert.equal(trustedResponse.status, 200);
+		const trusted = trustedResponse.body;
 
 		assert.equal(trusted.createdAt, "2026-08-10T00:00:00.000Z");
 
@@ -442,9 +438,7 @@ describe("ApiClient responses", () => {
 			validateResponses: true,
 		});
 
-		await assert.rejects(() =>
-			validatingClient.todos.get.fetch({ id: "todo-1" }),
-		);
+		await assert.rejects(() => validatingClient.todos.get({ id: "todo-1" }));
 	});
 
 	it("reads noBody responses as undefined", async () => {
@@ -459,9 +453,10 @@ describe("ApiClient responses", () => {
 		captureFetch(new Response(null, { status: 204 }));
 		const client = initClient(apiContract, { baseUrl: "https://api.test" });
 
-		const response = await client.todos.remove.fetch({ id: "todo-1" });
+		const response = await client.todos.remove({ id: "todo-1" });
+		assert.equal(response.status, 204);
 
-		assert.equal(response, undefined);
+		assert.equal(response.body, undefined);
 	});
 
 	it("returns declared custom responses as native Response objects", async () => {
@@ -484,7 +479,7 @@ describe("ApiClient responses", () => {
 			validateResponses: true,
 		});
 
-		const response = await client.reports.csv.fetchResponse();
+		const response = await client.reports.csv();
 
 		assert.equal(response.contentType, "text/csv");
 		assert.ok(response.body instanceof Response);
@@ -492,7 +487,7 @@ describe("ApiClient responses", () => {
 		assert.equal(await response.body.text(), "id,title\n1,First\n");
 	});
 
-	it("returns selected content type metadata for custom fetchResponse bodies", async () => {
+	it("returns selected content type metadata for custom response bodies", async () => {
 		const apiContract = {
 			reports: {
 				image: route.get("/reports/image").customResponse(200, {
@@ -509,7 +504,7 @@ describe("ApiClient responses", () => {
 		);
 		const client = initClient(apiContract, { baseUrl: "https://api.test" });
 
-		const response = await client.reports.image.fetchResponse();
+		const response = await client.reports.image();
 
 		assert.equal(response.status, 200);
 		assert.equal(response.contentType, "image/jpeg");
@@ -517,7 +512,7 @@ describe("ApiClient responses", () => {
 		assert.equal(await response.body.text(), "jpeg bytes");
 	});
 
-	it("rejects custom fetchResponse bodies with mismatched content types", async () => {
+	it("rejects custom response bodies with mismatched content types", async () => {
 		const apiContract = {
 			reports: {
 				csv: route.get("/reports.csv").customResponse(200, {
@@ -535,7 +530,7 @@ describe("ApiClient responses", () => {
 		const client = initClient(apiContract, { baseUrl: "https://api.test" });
 
 		await assert.rejects(
-			() => client.reports.csv.fetchResponse(),
+			() => client.reports.csv(),
 			/unsupported custom response content-type/,
 		);
 	});
@@ -557,9 +552,10 @@ describe("ApiClient responses", () => {
 		);
 		const client = initClient(apiContract, { baseUrl: "https://api.test" });
 
-		const response = await client.reports.csv.fetch();
+		const response = await client.reports.csv();
+		assert.equal(response.status, 200);
 
-		assert.ok(response instanceof Response);
-		assert.equal(await response.text(), "id,title\n1,First\n");
+		assert.ok(response.body instanceof Response);
+		assert.equal(await response.body.text(), "id,title\n1,First\n");
 	});
 });

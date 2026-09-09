@@ -121,7 +121,7 @@ describe("fetch response lifecycle integration", () => {
 	});
 
 	it("ignores user-provided context response mutations when returning a contract response", async () => {
-		const response = await client.contextMutation.fetchResponse();
+		const response = await client.contextMutation();
 
 		assert.equal(response.status, 200);
 		assert.equal(response.headers.get("x-context-mutation"), null);
@@ -131,7 +131,7 @@ describe("fetch response lifecycle integration", () => {
 	});
 
 	it("treats returned Response objects as invalid route response bodies", async () => {
-		const response = await client.returnResponse.fetchResponse();
+		const response = await client.returnResponse();
 
 		assert.equal(response.status, 500);
 		assert.equal(

@@ -91,8 +91,8 @@ describe("ApiClient requests", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await client.todos.get.fetch({ id: "todo 1" });
-		await client.todos.list.fetch({ search: "milk", empty: undefined });
+		await client.todos.get({ id: "todo 1" });
+		await client.todos.list({ search: "milk", empty: undefined });
 
 		assert.equal(calls[0]?.url, "https://api.test/todos/todo%201");
 		assert.equal(calls[1]?.url, "https://api.test/todos?search=milk");
@@ -125,7 +125,7 @@ describe("ApiClient requests", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await client.todos.update.fetch({
+		await client.todos.update({
 			id: "todo-1",
 			page: 2,
 			title: "Updated",
@@ -339,7 +339,7 @@ describe("ApiClient requests", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await client.todos.create.fetch({ title: "Buy milk" });
+		await client.todos.create({ title: "Buy milk" });
 
 		assert.equal(calls[0]?.init?.body, '{"title":"Buy milk"}');
 		assert.deepEqual(calls[0]?.init?.headers, {
@@ -353,7 +353,7 @@ describe("ApiClient requests", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await client.uploads.create.fetch({
+		await client.uploads.create({
 			id: "file 1",
 			body: "hello",
 		});
@@ -380,7 +380,7 @@ describe("ApiClient requests", () => {
 		});
 		const body = new URLSearchParams([["title", "Write docs"]]);
 
-		await client.forms.submit.fetch({ body });
+		await client.forms.submit({ body });
 
 		assert.equal(calls[0]?.init?.body, body);
 		assert.deepEqual(calls[0]?.init?.headers, {});
@@ -405,7 +405,7 @@ describe("ApiClient requests", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await client.forms.submit.fetch({
+		await client.forms.submit({
 			body: {
 				title: "Write docs",
 				remember: true,
@@ -440,7 +440,7 @@ describe("ApiClient requests", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await client.forms.submit.fetch({
+		await client.forms.submit({
 			body: {
 				body: "Article contents",
 				title: "Write docs",
@@ -473,7 +473,7 @@ describe("ApiClient requests", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await client.forms.submit.fetch({
+		await client.forms.submit({
 			body: {
 				title: "Write docs",
 				tags: ["ts", "rpc"],
@@ -507,7 +507,7 @@ describe("ApiClient requests", () => {
 		});
 
 		await assert.rejects(
-			client.forms.submit.fetch({
+			client.forms.submit({
 				body: {
 					tags: ["ts", "rpc"],
 				},
@@ -539,7 +539,7 @@ describe("ApiClient requests", () => {
 		});
 		const file = new Blob(["hello"], { type: "text/plain" });
 
-		await client.uploads.create.fetch({
+		await client.uploads.create({
 			body: {
 				title: "Write docs",
 				file,
@@ -574,7 +574,7 @@ describe("ApiClient requests", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await client.uploads.create.fetch({
+		await client.uploads.create({
 			body: {
 				body: "File contents",
 				title: "Upload docs",
@@ -606,7 +606,7 @@ describe("ApiClient requests", () => {
 		});
 
 		await assert.rejects(
-			client.uploads.create.fetch({
+			client.uploads.create({
 				body: {
 					tags: ["ts", "rpc"],
 				},
@@ -634,7 +634,7 @@ describe("ApiClient requests", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await client.uploads.image.fetch({
+		await client.uploads.image({
 			id: "file 1",
 			body: {
 				contentType: "image/jpeg",
@@ -655,7 +655,7 @@ describe("ApiClient requests", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await client.uploads.json.fetch({
+		await client.uploads.json({
 			body: { type: "created" },
 		});
 
@@ -672,7 +672,7 @@ describe("ApiClient requests", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await client.ping.fetch(undefined, { signal: controller.signal });
+		await client.ping(undefined, { signal: controller.signal });
 
 		assert.equal(calls[0]?.url, "https://api.test/ping");
 		assert.equal(calls[0]?.init?.body, undefined);
@@ -691,7 +691,7 @@ describe("ApiClient requests", () => {
 			getGlobalHeaders: () => ({ Authorization: "Bearer token" }),
 		});
 
-		await client.todos.list.fetch({ search: "milk" }, { credentials: "omit" });
+		await client.todos.list({ search: "milk" }, { credentials: "omit" });
 
 		assert.equal(calls[0]?.init?.cache, "no-store");
 		assert.equal(calls[0]?.init?.credentials, "omit");
@@ -720,8 +720,8 @@ describe("ApiClient requests", () => {
 			},
 		});
 
-		await client.todos.list.fetch({ search: "milk" });
-		await client.todos.create.fetch({ title: "Buy milk" });
+		await client.todos.list({ search: "milk" });
+		await client.todos.create({ title: "Buy milk" });
 
 		assert.deepEqual(calls[0]?.init?.next, {
 			revalidate: 60,
@@ -754,7 +754,7 @@ describe("ApiClient requests", () => {
 			},
 		});
 
-		await client.todos.list.fetch({ search: "milk" });
+		await client.todos.list({ search: "milk" });
 
 		assert.deepEqual(calls[0]?.init?.headers, {
 			"x-custom-fetch": "true",
@@ -790,7 +790,7 @@ describe("ApiClient requests", () => {
 			}),
 		});
 
-		await client.todos.list.fetch({
+		await client.todos.list({
 			search: "milk",
 			"x-common": 123,
 			"X-Route": "route",
@@ -814,7 +814,7 @@ describe("ApiClient requests", () => {
 		});
 
 		await assert.rejects(
-			() => client.todos.create.fetch({ title: "created" }),
+			() => client.todos.create({ title: "created" }),
 			/getGlobalHeaders\(\) must not return a "content-type" header/,
 		);
 	});
@@ -827,7 +827,7 @@ describe("ApiClient requests", () => {
 
 		await assert.rejects(
 			() =>
-				client.todos.list.fetch({
+				client.todos.list({
 					search: "milk",
 					unknown: "drop me",
 				}),
@@ -847,7 +847,7 @@ describe("ApiClient requests", () => {
 		);
 
 		await assert.rejects(
-			() => client.opaque.fetch({ title: "created" }),
+			() => client.opaque({ title: "created" }),
 			/Unknown request key "title" for POST \/opaque/,
 		);
 	});
@@ -859,7 +859,7 @@ describe("ApiClient requests", () => {
 			strictRequestKeys: false,
 		});
 
-		await client.todos.list.fetch({
+		await client.todos.list({
 			search: "milk",
 			unknown: "drop me",
 		});
@@ -880,7 +880,7 @@ describe("ApiClient requests", () => {
 			timeoutMs: 5,
 		});
 
-		await assert.rejects(() => client.todos.list.fetch({ search: "milk" }));
+		await assert.rejects(() => client.todos.list({ search: "milk" }));
 		await new Promise((resolve) => setTimeout(resolve, 15));
 
 		assert.equal(abortEventCount, 0);
@@ -902,7 +902,7 @@ describe("ApiClient requests", () => {
 		});
 
 		await assert.rejects(
-			() => client.todos.list.fetch({ search: "milk" }),
+			() => client.todos.list({ search: "milk" }),
 			/headers unavailable/,
 		);
 
@@ -931,7 +931,7 @@ describe("ApiClient requests", () => {
 			timeoutMs: 5,
 		});
 
-		await client.todos.list.fetch({ search: "milk" });
+		await client.todos.list({ search: "milk" });
 
 		assert.equal(requestSignal?.aborted, false);
 	});

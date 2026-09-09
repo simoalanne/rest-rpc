@@ -149,12 +149,14 @@ export const runBodyParsingSuite = (adapter: BodyParsingSuiteAdapter) => {
 				baseUrl: server.origin,
 			});
 
-			const response = await client.rawUrlEncoded.fetch({
+			const responseResponse = await client.rawUrlEncoded({
 				body: new URLSearchParams([
 					["title", "Encoded form"],
 					["remember", "true"],
 				]),
 			});
+			assert.equal(responseResponse.status, 200);
+			const response = responseResponse.body;
 
 			assert.deepEqual(response, {
 				title: "Encoded form",
@@ -167,12 +169,14 @@ export const runBodyParsingSuite = (adapter: BodyParsingSuiteAdapter) => {
 				baseUrl: server.origin,
 			});
 
-			const response = await client.formUrlEncoded.fetch({
+			const responseResponse = await client.formUrlEncoded({
 				body: {
 					count: 7,
 					title: "Typed form",
 				},
 			});
+			assert.equal(responseResponse.status, 200);
+			const response = responseResponse.body;
 
 			assert.deepEqual(response, {
 				count: 7,

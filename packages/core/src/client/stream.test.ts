@@ -42,7 +42,9 @@ describe("ApiClient streams", () => {
 		});
 
 		const events = [];
-		for await (const event of await client.events.stream.fetch()) {
+		const response = await client.events.stream();
+		assert.equal(response.status, 200);
+		for await (const event of response.body) {
 			events.push(event);
 		}
 
@@ -55,7 +57,9 @@ describe("ApiClient streams", () => {
 			baseUrl: "https://api.test",
 		});
 
-		const events = await client.events.stream.fetch();
+		const eventsResponse = await client.events.stream();
+		assert.equal(eventsResponse.status, 200);
+		const events = eventsResponse.body;
 		const parsed = [];
 
 		for await (const event of events) parsed.push(event);
@@ -70,7 +74,9 @@ describe("ApiClient streams", () => {
 			validateResponses: true,
 		});
 
-		const events = await client.events.stream.fetch();
+		const eventsResponse = await client.events.stream();
+		assert.equal(eventsResponse.status, 200);
+		const events = eventsResponse.body;
 
 		await assert.rejects(async () => {
 			for await (const _event of events) {
@@ -88,10 +94,7 @@ describe("ApiClient streams", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await assert.rejects(
-			() => client.events.stream.fetch(),
-			/empty stream response/,
-		);
+		await assert.rejects(() => client.events.stream(), /empty stream response/);
 	});
 
 	it("skips blank NDJSON lines", async () => {

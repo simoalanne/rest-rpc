@@ -471,7 +471,7 @@ export const createServerFirstClient = <
 					}
 
 					const method = selectorMethod(selector);
-					const fetchResponse = async (...args: unknown[]) => {
+					return async (...args: unknown[]) => {
 						const { requestInput, fetchOptions } = getServerFirstArgs(args);
 						const runtime = createRuntimeRoute(method, path, requestInput);
 						const rawResponse = await executeRequest(
@@ -482,19 +482,6 @@ export const createServerFirstClient = <
 							runtime.tagInput,
 						);
 						return readServerFirstResponse(rawResponse);
-					};
-
-					return {
-						fetch: async (...args: unknown[]) => {
-							const response = await fetchResponse(...args);
-							if (response.status < 200 || response.status >= 300) {
-								throw new Error(
-									"Request did not return a declared success response",
-								);
-							}
-							return response.body;
-						},
-						fetchResponse,
 					};
 				};
 			},

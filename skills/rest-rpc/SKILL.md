@@ -25,7 +25,7 @@ Choose the architecture that matches the application:
 
 ## Library Philosophy
 
-`rest-rpc` is a type-safe bridge between an application's existing HTTP architecture and its API types. It does not replace framework architecture: keep using the framework's routing, modules, plugins, middleware, dependency injection, auth, and deployment conventions. Use `rest-rpc` explicitly where it preserves the contract-to-runtime type link. Prefer its helpers over partial or ad-hoc usage when they provide type safety: the core fluent `route` builder for contract-first declaration, server adapter `router`, `route`, or `implement` for implementations, `registerRoutes` or `createRouteHandler` for framework registration, and `fetch` or `fetchResponse` for typed fetch API calls.
+`rest-rpc` is a type-safe bridge between an application's existing HTTP architecture and its API types. It does not replace framework architecture: keep using the framework's routing, modules, plugins, middleware, dependency injection, auth, and deployment conventions. Use `rest-rpc` explicitly where it preserves the contract-to-runtime type link. Prefer its helpers over partial or ad-hoc usage when they provide type safety: the core fluent `route` builder for contract-first declaration, server adapter `router`, `route`, or `implement` for implementations, `registerRoutes` or `createRouteHandler` for framework registration, and generated client route calls for typed HTTP requests.
 
 Choose contract-first when the contract is independently shared, must generate OpenAPI or TanStack Query helpers, or needs to run across framework adapters. Choose server-first when a Node.js or Fetch server owns the API and colocating the handler with its method, path, request schemas, and inferred response union is more valuable than a separately named contract. Server-first is currently supported only by `@rest-rpc/node` and `@rest-rpc/fetch`:
 
@@ -40,7 +40,7 @@ export const routes = {
 };
 ```
 
-Create its client with `initClient<typeof routes>()`. Unlike a contract-first client such as `client.todos.get.fetch(...)`, a server-first client selects the wire route explicitly, such as `client.$get("/todos/:id").fetch({ params: { id } })`. Keep the implementation tree's type importable by the client package; no server runtime import is required when using `import type`.
+Create its client with `initClient<typeof routes>()`. Unlike a contract-first client such as `client.todos.get(...)`, a server-first client selects the wire route explicitly, such as `client.$get("/todos/:id")({ params: { id } })`. Keep the implementation tree's type importable by the client package; no server runtime import is required when using `import type`.
 
 ## Minimal Example
 
@@ -88,9 +88,13 @@ const client = initClient(api, {
 	baseUrl: "https://api.example.com",
 });
 
-const todo = await client.todos.getById.fetch({
+const response = await client.todos.getById({
 	id: "todo_1",
 });
+
+if (response.status === 200) {
+	const todo = response.body;
+}
 ```
 
 ### Server-first approach
@@ -137,9 +141,10 @@ const client = initClient<typeof routes>({
 });
 
 // tree-shaped call is replaced with explicit method, path and non-flattened request.
-const todo = await client.$post("/todos").fetch({
+const response = await client.$post("/todos")({
 	body: { title: "Ship v1" },
 });
+const todo = response.body;
 ```
 
 ## Packages

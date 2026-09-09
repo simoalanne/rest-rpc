@@ -36,7 +36,7 @@ Each top-level schema property becomes a key in the client and handler request
 object.
 
 ```ts
-await client.todos.update.fetch({
+await client.todos.update({
 	id: "5f4c6e4e-3f7b-46c7-9fb7-a2e41df03695",
 	includeCompleted: true,
 	"x-request-id": "req_1",

@@ -4,8 +4,16 @@ description: Learn how to handle different types of HTTP requests with rest-rpc
 ---
 
 ```ts
-const todos = await client.todos.list.fetch({ limit: 10 });
-const todo = await client.todos.byId.fetch({ id: "1" });
+const todosResponse = await client.todos.list({ limit: 10 });
+
+if (todosResponse.status === 200) {
+	const todos = todosResponse.body;
+}
+const todoResponse = await client.todos.byId({ id: "1" });
+
+if (todoResponse.status === 200) {
+	const todo = todoResponse.body;
+}
 ```
 
 ## Request With JSON Body
@@ -40,10 +48,14 @@ export const routes = router(api, {
 ```
 
 ```ts
-const todo = await client.todos.create.fetch({
+const response = await client.todos.create({
 	title: "Write docs",
 	labels: ["docs"],
 });
+
+if (response.status === 201) {
+	const todo = response.body;
+}
 ```
 
 ## Request Without Body
@@ -128,13 +140,17 @@ export const routes = router(api, {
 ```
 
 ```ts
-const result = await client.forms.submit.fetch({
+const response = await client.forms.submit({
 	body: {
 		title: "Write docs",
 		count: 3,
 		tags: ["typescript", "rpc"],
 	},
 });
+
+if (response.status === 201) {
+	const result = response.body;
+}
 ```
 
 Server body parsers should pass a `URLSearchParams` instance to rest-rpc for
@@ -199,13 +215,17 @@ export const routes = router(api, {
 ```
 
 ```ts
-const result = await client.uploads.create.fetch({
+const response = await client.uploads.create({
 	body: {
 		title: "Write docs",
 		file,
 		tags: ["typescript", "rpc"],
 	},
 });
+
+if (response.status === 201) {
+	const result = response.body;
+}
 ```
 
 Server body parsers should pass a `FormData` instance to rest-rpc for multipart
@@ -263,9 +283,13 @@ export const routes = router(api, {
 ```
 
 ```ts
-const result = await client.imports.csv.fetch({
+const response = await client.imports.csv({
 	body: "id,title\n1,Write docs\n",
 });
+
+if (response.status === 201) {
+	const result = response.body;
+}
 ```
 
 ## Request With Multiple Custom Content Types
@@ -307,12 +331,16 @@ export const routes = router(api, {
 ```
 
 ```ts
-const image = await client.images.upload.fetch({
+const response = await client.images.upload({
 	body: {
 		contentType: "image/png",
 		payload: bytes,
 	},
 });
+
+if (response.status === 201) {
+	const image = response.body;
+}
 ```
 
 ## Request With Fetch-Managed Content Type
@@ -349,9 +377,13 @@ export const routes = router(api, {
 ```
 
 ```ts
-const result = await client.forms.submit.fetch({
+const response = await client.forms.submit({
 	body: new URLSearchParams({
 		title: "Write docs",
 	}),
 });
+
+if (response.status === 201) {
+	const result = response.body;
+}
 ```

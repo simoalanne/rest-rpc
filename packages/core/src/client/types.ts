@@ -3,7 +3,6 @@ import type { AnyShorthandRouteDeclaration } from "../contract/shorthandRouteBui
 import type { ClientRequest } from "../contract/request.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type {
-	ClientResponseBody,
 	DeclaredClientResponse,
 	HttpStatusCode,
 } from "../contract/response.ts";
@@ -60,11 +59,6 @@ export type FetchArgs<
 				options?: FetchOptions,
 			];
 
-export type FetchFn<
-	E extends RouteDeclaration,
-	TGlobalHeaders extends HeaderRecord = Record<never, string>,
-> = (...args: FetchArgs<E, TGlobalHeaders>) => Promise<ClientResponseBody<E>>;
-
 type Simplify<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
 
 type WithResponseMetadata<TResponse, TMetadata> = TResponse extends unknown
@@ -97,10 +91,10 @@ type IsStrictStatusRoute<E extends RouteDeclaration> = E extends {
 /**
  * Infers a route's client result.
  *
- * Explicit routes produce the response envelope returned by `fetchResponse()`.
+ * Explicit routes produce a response envelope when called.
  * Shorthand routes produce their output value directly.
  *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#fetchresponse}
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-an-http-route}
  */
 export type ClientResponse<
 	E extends RouteDeclaration | AnyShorthandRouteDeclaration,
@@ -170,28 +164,10 @@ export type OpenConnectionFn<
 		? ClientEventSource<E>
 		: never;
 
-type ApiClientMoreThanOneSuccessResponseRouteValue<
-	E extends RouteDeclaration,
-	TGlobalHeaders extends HeaderRecord,
-> = {
-	fetchResponse: FetchResponseFn<E, TGlobalHeaders>;
-};
-
-type ApiClientSingleSuccessResponseRouteValue<
-	E extends RouteDeclaration,
-	TGlobalHeaders extends HeaderRecord,
-> = {
-	fetch: FetchFn<E, TGlobalHeaders>;
-	fetchResponse: FetchResponseFn<E, TGlobalHeaders>;
-};
-
 type ApiClientHttpRouteValue<
 	E extends RouteDeclaration = RouteDeclaration,
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
-> =
-	ClientResponseBody<E> extends never
-		? ApiClientMoreThanOneSuccessResponseRouteValue<E, TGlobalHeaders>
-		: ApiClientSingleSuccessResponseRouteValue<E, TGlobalHeaders>;
+> = FetchResponseFn<E, TGlobalHeaders>;
 
 type ApiClientOpenConnectionRouteValue<
 	E extends RouteDeclaration = RouteDeclaration,

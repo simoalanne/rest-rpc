@@ -595,9 +595,13 @@ const client = initClient(api, {
 	baseUrl: "http://localhost:3000",
 });
 
-const todo = await client.todos.create.fetch({
+const response = await client.todos.create({
 	title: "Ship v1",
 });
+
+if (response.status === 201) {
+	const todo = response.body;
+}
 ```
 
 </Tab>

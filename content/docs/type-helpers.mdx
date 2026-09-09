@@ -63,7 +63,6 @@ import type {
 	ClientReceived,
 	ClientRequest,
 	ClientResponse,
-	ClientResponseBody,
 	ClientSent,
 	ClientSocket,
 	ClientEventSource,
@@ -77,9 +76,6 @@ type GetTodoResponse = ClientResponse<typeof api.todos.get>;
 // | { status: 200; body: { id: string; title: string }; headers: Headers }
 // | { status: 404; body: { code: "NOT_FOUND" }; headers: Headers }
 // | { status: Exclude<HttpStatusCode, 200 | 404>; rawResponse: Response }
-
-type GetTodoBody = ClientResponseBody<typeof api.todos.get>;
-// { id: string; title: string }
 
 type WatchSocket = ClientSocket<typeof api.todos.watch>;
 // {
@@ -103,9 +99,7 @@ type LiveReceived = ClientSseReceived<typeof api.todos.live>;
 // { id: string; title: string }
 ```
 
-`ClientResponse` is the return value of `fetchResponse()`.
-`ClientResponseBody` is the return value of `fetch()` for routes with one
-successful response body.
+`ClientResponse` is the result returned when a client route is called.
 
 ## Server
 

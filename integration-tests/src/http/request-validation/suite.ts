@@ -19,9 +19,7 @@ type ValidationErrorBody = {
 };
 
 const assertValidationResponse = async (
-	response: Awaited<
-		ReturnType<RequestValidationClient["params"]["fetchResponse"]>
-	>,
+	response: Awaited<ReturnType<RequestValidationClient["params"]>>,
 	location: "body" | "query" | "params" | "headers",
 ) => {
 	assert.equal(response.status, 400);
@@ -66,11 +64,13 @@ export const runRequestValidationSuite = (
 		});
 
 		it("coerces string wire values when the route schemas opt in", async () => {
-			const body = await client.coerce.fetch({
+			const bodyResponse = await client.coerce({
 				id: 123,
 				published: "true",
 				"x-page": "2",
 			});
+			assert.equal(bodyResponse.status, 200);
+			const body = bodyResponse.body;
 
 			assert.deepEqual(body, {
 				id: 123,
@@ -80,19 +80,23 @@ export const runRequestValidationSuite = (
 		});
 
 		it("preserves empty query string values", async () => {
-			assert.deepEqual(await client.emptyQuery.fetch({ value: "" }), {
+			const response1 = await client.emptyQuery({ value: "" });
+			assert.equal(response1.status, 200);
+			assert.deepEqual(response1.body, {
 				value: "",
 			});
 		});
 
 		it("round trips JSON query values without scalar coercion schemas", async () => {
-			const body = await client.jsonQuery.fetch({
+			const bodyResponse = await client.jsonQuery({
 				query: {
 					page: 2,
 					includeArchived: false,
 					filters: { tags: ["api", "typescript"] },
 				},
 			});
+			assert.equal(bodyResponse.status, 200);
+			const body = bodyResponse.body;
 
 			assert.deepEqual(body, {
 				page: 2,
@@ -102,7 +106,7 @@ export const runRequestValidationSuite = (
 		});
 
 		it("rejects params that do not match the route schema", async () => {
-			const response = await client.params.fetchResponse({
+			const response = await client.params({
 				id: "123",
 			} as never);
 
@@ -110,7 +114,7 @@ export const runRequestValidationSuite = (
 		});
 
 		it("rejects query values that do not match the route schema", async () => {
-			const response = await client.query.fetchResponse({
+			const response = await client.query({
 				page: 2,
 			});
 
@@ -118,13 +122,13 @@ export const runRequestValidationSuite = (
 		});
 
 		it("rejects missing required headers", async () => {
-			const response = await client.headers.fetchResponse({} as never);
+			const response = await client.headers({} as never);
 
 			await assertValidationResponse(response, "headers");
 		});
 
 		it("rejects JSON bodies that do not match the route schema", async () => {
-			const response = await client.body.fetchResponse({
+			const response = await client.body({
 				count: "3",
 			} as never);
 

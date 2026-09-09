@@ -56,7 +56,7 @@ Those locations remain part of the contract. By default, clients and server
 handlers receive one flattened request object.
 
 ```ts
-await client.todos.update.fetch({
+await client.todos.update({
 	id: "todo_1",
 	includeCompleted: true,
 	"x-request-id": "req_1",
@@ -96,7 +96,7 @@ export const api = {
 ```
 
 ```ts
-await client.todos.update.fetch({
+await client.todos.update({
 	params: { id: "todo_1" },
 	query: { includeCompleted: true },
 	body: { title: "Write docs" },
@@ -190,7 +190,7 @@ const api = {
 The client and handler use a top-level `query` value:
 
 ```ts
-await client.search.fetch({
+await client.search({
 	query: {
 		page: 2,
 		includeArchived: false,

@@ -26,7 +26,7 @@ export const runResponsesSuite = (adapter: ResponsesSuiteAdapter) => {
 		});
 
 		it("returns undeclared runtime responses untouched", async () => {
-			const response = await client.undeclared.fetchResponse();
+			const response = await client.undeclared();
 
 			assert.equal(response.status, 418);
 			assert.equal(response.rawResponse.bodyUsed, false);
@@ -37,7 +37,7 @@ export const runResponsesSuite = (adapter: ResponsesSuiteAdapter) => {
 		});
 
 		it("routes declared response validation failures through custom error handling", async () => {
-			const response = await client.invalidDeclared.fetchResponse();
+			const response = await client.invalidDeclared();
 
 			assert.equal(response.status, 500);
 			assert.equal(

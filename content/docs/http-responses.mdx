@@ -39,14 +39,19 @@ export const routes = router(api, {
 ```
 
 ```ts
-const todo = await client.todos.create.fetch({
+const response = await client.todos.create({
 	title: "Write docs",
 });
+
+if (response.status === 201) {
+	const todo = response.body;
+}
 ```
 
 ## Response With Multiple Status Codes
 
-Use `fetchResponse()` when the client needs to handle multiple declared statuses.
+Call the route and narrow its result by `status` when the client needs to handle
+multiple declared statuses.
 
 ```ts
 export const api = {
@@ -85,7 +90,7 @@ export const routes = router(api, {
 ```
 
 ```ts
-const response = await client.todos.get.fetchResponse({
+const response = await client.todos.get({
 	id: "todo_1",
 });
 
@@ -126,7 +131,7 @@ export const routes = router(api, {
 ```
 
 ```ts
-await client.todos.remove.fetch({
+await client.todos.remove({
 	id: "todo_1",
 });
 ```
@@ -172,7 +177,7 @@ export const routes = router(api, {
 ```
 
 ```ts
-const response = await client.todos.get.fetchResponse({
+const response = await client.todos.get({
 	id: "todo_1",
 });
 
@@ -208,9 +213,11 @@ export const routes = router(api, {
 ```
 
 ```ts
-const response = await client.reports.csv.fetch();
+const response = await client.reports.csv();
 
-await response.text();
+if (response.status === 200) {
+	await response.body.text();
+}
 ```
 
 ## Response With Multiple Custom Content Types
@@ -250,15 +257,15 @@ export const routes = router(api, {
 ```
 
 ```ts
-const response = await client.images.download.fetchResponse({
+const response = await client.images.download({
 	id: "image_1",
 });
 
 if (response.status === 200) {
-	if (response.responseHeaders["content-type"] === "image/png") {
-		const pngBytes = await response.arrayBuffer();
+	if (response.contentType === "image/png") {
+		const pngBytes = await response.body.arrayBuffer();
 	} else {
-		const jpegBytes = await response.arrayBuffer();
+		const jpegBytes = await response.body.arrayBuffer();
 	}
 }
 ```
@@ -372,10 +379,12 @@ export const routes = router(api, {
 
 ```ts
 const controller = new AbortController();
-const tokens = await client.ai.tokens.fetch(
+const response = await client.ai.tokens(
 	{ prompt: "Write a changelog entry" },
 	{ signal: controller.signal },
 );
+if (response.status !== 200) throw new Error("Unexpected status");
+const tokens = response.body;
 
 let fullText = "";
 for await (const token of tokens) {
@@ -421,11 +430,12 @@ export const routes = router(api, {
 
 ```ts
 const controller = new AbortController();
-const response = await client.files.download.fetch(
+const response = await client.files.download(
 	{ id: "file_1" },
 	{ signal: controller.signal },
 );
-const reader = response.body?.getReader();
+if (response.status !== 200) throw new Error("Unexpected status");
+const reader = response.body.body?.getReader();
 const file = await openWritableFile("archive.zip");
 let downloaded = 0;
 

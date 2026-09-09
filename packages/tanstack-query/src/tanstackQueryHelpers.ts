@@ -1,4 +1,4 @@
-import { initClient, type ClientResponseBody } from "@rest-rpc/core";
+import { initClient } from "@rest-rpc/core";
 import type {
 	ApiClientFetchOptions,
 	ApiClientOptions,
@@ -53,7 +53,11 @@ type DeclaredRouteQueryError<E extends RouteDeclaration> =
 	| ClientUndeclaredResponse<E>
 	| Error;
 type DeclaredRouteResponseBody<E extends RouteDeclaration> =
-	ClientResponseBody<E>;
+	SuccessfulDeclaredClientResponse<E> extends infer TResponse
+		? TResponse extends { body: infer TBody }
+			? TBody
+			: never
+		: never;
 
 type RouteRequestValue<E extends QueryRoute> = ClientRequest<E>;
 
@@ -477,19 +481,13 @@ export function createTanstackQueryHelpers(
 						const routePath = callArgs[0];
 						const selectRoute = serverFirstClient[selectorName] as (
 							path: string,
-						) => {
-							fetchResponse: (...args: unknown[]) => Promise<unknown>;
-						};
+						) => (...args: unknown[]) => Promise<unknown>;
 						const routeClient = selectRoute(routePath);
 						return createTanstackHelpersForRoute(
 							[selectorName.slice(1), routePath],
 							(request, fetchOptions) =>
-								fetchQueryData(
-									routeClient.fetchResponse,
-									request,
-									fetchOptions,
-								),
-							routeClient.fetchResponse,
+								fetchQueryData(routeClient, request, fetchOptions),
+							routeClient,
 						);
 					}
 
@@ -529,19 +527,17 @@ export function createTanstackQueryHelpers(
 		if (isRouteDeclaration(node)) {
 			if (isWebSocketRoute(node) || isSseRoute(node)) return undefined;
 
-			const apiNode = getByPath(client, path) as {
-				fetchResponse: FetchResponseFn<typeof node>;
-			};
+			const apiNode = getByPath(client, path) as FetchResponseFn<typeof node>;
 
 			return createTanstackHelpersForRoute(
 				path,
 				(request, fetchOptions) =>
 					fetchQueryData(
-						apiNode.fetchResponse as (...args: unknown[]) => Promise<unknown>,
+						apiNode as (...args: unknown[]) => Promise<unknown>,
 						request,
 						fetchOptions,
 					),
-				apiNode.fetchResponse as (...args: unknown[]) => Promise<unknown>,
+				apiNode as (...args: unknown[]) => Promise<unknown>,
 			);
 		}
 

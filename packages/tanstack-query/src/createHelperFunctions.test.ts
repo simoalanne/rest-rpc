@@ -7,7 +7,7 @@ const routeWithoutRequestPath = ["items", "list"];
 const routeWithRequestPath = ["items", "byId"];
 
 describe("createTanstackQueryRouteHelpers", () => {
-	it("creates query options with request-aware keys and fetchResponse", async () => {
+	it("creates query options with request-aware keys and a route call", async () => {
 		const fetchResponseCalls: unknown[][] = [];
 		const routeHelpers = createTanstackHelpersForRoute(
 			routeWithRequestPath,
@@ -38,7 +38,7 @@ describe("createTanstackQueryRouteHelpers", () => {
 		]);
 	});
 
-	it("forwards query fetch options to fetchResponse without returning them", async () => {
+	it("forwards query fetch options to the route call without returning them", async () => {
 		const fetchResponseCalls: unknown[][] = [];
 		const routeHelpers = createTanstackHelpersForRoute(
 			routeWithRequestPath,

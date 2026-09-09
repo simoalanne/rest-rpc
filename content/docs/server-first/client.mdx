@@ -27,7 +27,7 @@ Select a route by its HTTP method and literal path instead of its object-tree
 keys. Request values are always grouped by HTTP location.
 
 ```ts
-await client.$patch("/todos/:id").fetch({
+await client.$patch("/todos/:id")({
 	params: { id: "todo_1" },
 	query: { notify: true },
 	body: { title: "Ship docs" },
@@ -44,7 +44,7 @@ to encode it.
 ```ts
 import { request } from "@rest-rpc/core";
 
-await client.$post("/uploads").fetch({
+await client.$post("/uploads")({
 	body: request.multipartBody({ title: "Screenshot", file }),
 });
 ```

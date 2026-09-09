@@ -167,7 +167,9 @@ it("combines Nest controller prefixes with contract route paths", async () => {
 			baseUrl: `${server.origin}/api/v1`,
 		});
 
-		assert.equal(await client.health.fetch(), undefined);
+		const healthResponse = await client.health();
+		assert.equal(healthResponse.status, 204);
+		assert.equal(healthResponse.body, undefined);
 		assert.equal((await fetch(`${server.origin}/api/v1/health`)).status, 204);
 		assert.equal((await fetch(`${server.origin}/health`)).status, 404);
 	} finally {
@@ -192,8 +194,12 @@ it("registers router routes whose contract key paths would produce the same flat
 	try {
 		const client = initClient(collisionContract, { baseUrl: server.origin });
 
-		assert.deepEqual(await client.a_b.fetch(), { source: "flat" });
-		assert.deepEqual(await client.a.b.fetch(), { source: "nested" });
+		const flatResponse = await client.a_b();
+		assert.equal(flatResponse.status, 200);
+		assert.deepEqual(flatResponse.body, { source: "flat" });
+		const nestedResponse = await client.a.b();
+		assert.equal(nestedResponse.status, 200);
+		assert.deepEqual(nestedResponse.body, { source: "nested" });
 	} finally {
 		await server.close();
 	}
@@ -243,13 +249,15 @@ it("supports async routers that close over values from Nest parameter decorators
 		await app.listen(0, "127.0.0.1");
 		const client = initClient(asyncContract, { baseUrl: await app.getUrl() });
 
-		assert.deepEqual(
-			await client.get.fetch({
-				id: "item-1",
-				"x-test-source": "decorated",
-			}),
-			{ id: "item-1", title: "decorated:async:item-1" },
-		);
+		const response = await client.get({
+			id: "item-1",
+			"x-test-source": "decorated",
+		});
+		assert.equal(response.status, 200);
+		assert.deepEqual(response.body, {
+			id: "item-1",
+			title: "decorated:async:item-1",
+		});
 	} finally {
 		await app.close();
 	}

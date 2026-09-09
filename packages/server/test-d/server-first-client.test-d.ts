@@ -137,15 +137,17 @@ expectError(
 );
 
 // Client inputs are grouped even though the server handler uses flattened keys.
-expectType<Promise<{ id: string; title: string }>>(
-	client.$post("/todos/:accountId").fetch({
+client
+	.$post("/todos/:accountId")({
 		body: { title: "Write tests" },
 		params: { accountId: "account-1" },
 		query: { notify: true },
-	}),
-);
+	})
+	.then((response) => {
+		expectType<{ id: string; title: string }>(response.body);
+	});
 expectError(
-	client.$post("/todos/:accountId").fetch({
+	client.$post("/todos/:accountId")({
 		accountId: "account-1",
 		notify: true,
 		title: "Write tests",
@@ -158,8 +160,7 @@ expectError(client.$post("/todos/:id"));
 
 // Server-first responses are always strict, even when the server option is false.
 client
-	.$get("/todos/:id")
-	.fetchResponse({ params: { id: "todo-1" } })
+	.$get("/todos/:id")({ params: { id: "todo-1" } })
 	.then((response) => {
 		expectType<200 | 404>(response.status);
 		expectError(response.declared);
@@ -172,13 +173,14 @@ client
 	});
 
 // Inferred response kinds flow through the existing client stream model.
-expectType<Promise<AsyncIterable<{ id: string; title: string }>>>(
-	client.$get("/todos/stream").fetch(),
-);
+client
+	.$get("/todos/stream")()
+	.then((response) => {
+		expectType<AsyncIterable<{ id: string; title: string }>>(response.body);
+	});
 
 client
-	.$get("/inferred-todos/:id")
-	.fetchResponse({ params: { id: "todo-1" } })
+	.$get("/inferred-todos/:id")({ params: { id: "todo-1" } })
 	.then((response) => {
 		if (response.status === 200) {
 			expectType<string>(response.body.id);
@@ -190,8 +192,7 @@ client
 	});
 
 client
-	.$get("/with-response-headers")
-	.fetchResponse()
+	.$get("/with-response-headers")()
 	.then((response) => {
 		expectType<"todo-1">(response.responseHeaders.etag);
 		expectType<"1">(response.responseHeaders["x-page"]);
@@ -206,33 +207,33 @@ client
 expectError(client.$get("/events"));
 
 // Specialized encodings are explicit and constrained by the server route.
-client.$post("/form").fetch({
+client.$post("/form")({
 	body: request.formBody({ title: "Todo", tags: ["docs", "api"] }),
 });
-expectError(client.$post("/form").fetch({ body: { title: "Todo" } }));
+expectError(client.$post("/form")({ body: { title: "Todo" } }));
 
-client.$post("/upload").fetch({
+client.$post("/upload")({
 	body: request.multipartBody({ title: "Todo", file: new Blob() }),
 });
-client.$get("/search").fetch({
+client.$get("/search")({
 	query: request.jsonQuery({ page: 2, filters: ["open"] }),
 });
-client.$post("/custom").fetch({
+client.$post("/custom")({
 	body: request.customBody("text/csv", "id,title\n1,Todo\n"),
 });
 expectError(
-	client.$post("/custom").fetch({
+	client.$post("/custom")({
 		body: request.customBody("application/json", "value"),
 	}),
 );
-client.$post("/selectable-custom").fetch({
+client.$post("/selectable-custom")({
 	body: request.customBody("image/png", new Uint8Array()),
 });
 expectError(
-	client.$post("/selectable-custom").fetch({
+	client.$post("/selectable-custom")({
 		body: request.customBody("image/webp", new Uint8Array()),
 	}),
 );
-client.$post("/fetch-managed-custom").fetch({
+client.$post("/fetch-managed-custom")({
 	body: request.customBody(new URLSearchParams({ title: "Todo" })),
 });

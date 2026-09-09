@@ -1,7 +1,6 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { CustomBody, CustomResponseBody, NoBody, Stream } from "./body.ts";
 import type { BaseRouteDeclaration } from "./baseRouteDeclaration.ts";
-import type { AnyShorthandRouteDeclaration } from "./shorthandRouteBuilder.ts";
 
 type StatusDigit = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 type StatusClass = 1 | 2 | 3 | 4 | 5;
@@ -296,14 +295,6 @@ type ServerSuccessResponse<E extends BaseRouteDeclaration> = E extends {
 		}[keyof TResponses]
 	: never;
 
-type InferSingleResponseBody<TResponse> = [TResponse] extends [never]
-	? never
-	: IsUnion<TResponse> extends true
-		? never
-		: TResponse extends { body: infer TBody }
-			? TBody
-			: never;
-
 type InferSingleServerResponseBody<TResponse> = [TResponse] extends [never]
 	? never
 	: IsUnion<TResponse> extends true
@@ -327,19 +318,6 @@ type InferSseServerResponseBody<E extends BaseRouteDeclaration> = [
 	: SseResponseDeclaration<E> extends ResponseDeclaration
 		? ServerResponseBody<ResponseBody<SseResponseDeclaration<E>>>
 		: never;
-
-/**
- * Infers the body returned by `fetch()` for routes with one successful response.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
- */
-export type ClientResponseBody<
-	E extends BaseRouteDeclaration | AnyShorthandRouteDeclaration,
-> = E extends BaseRouteDeclaration
-	? E extends { mode: "sse" }
-		? never
-		: InferSingleResponseBody<SuccessfulDeclaredClientResponse<E>>
-	: never;
 
 export type ServerSuccessBody<E extends BaseRouteDeclaration> = E extends {
 	mode: "sse";

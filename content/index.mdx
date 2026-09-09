@@ -112,13 +112,17 @@ const routes = router(api, {
 <Tab title="Client">
 
 ```ts
-const todo = await client.todos.update.fetch({
+const response = await client.todos.update({
 	id: "todo_1",
 	title: "Ship the docs",
 	completed: true,
 	notify: true,
 	"x-request-id": "req_123",
 });
+
+if (response.status === 200) {
+	const todo = response.body;
+}
 ```
 
 </Tab>
@@ -160,8 +164,8 @@ Read [Shorthand vs Explicit](/docs/shorthand-vs-explicit/).
 		global router.
 	</Card>
 	<Card title="Function-shaped usage" icon="braces" type="check">
-		Call `client.todos.get.fetch({id})` and implement `get({id})` while the
-		contract keeps the HTTP shape explicit.
+		Call `client.todos.get({id})` and implement `get({id})` while the contract
+		keeps the HTTP shape explicit.
 	</Card>
 	<Card title="Server adapters" icon="plug" type="check">
 		Use Express, Hono, Fastify, NestJS or fetch-native runtimes without moving

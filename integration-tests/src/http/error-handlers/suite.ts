@@ -30,7 +30,7 @@ export const runErrorHandlersSuite = (adapter: ErrorHandlersSuiteAdapter) => {
 		});
 
 		it("uses custom request validation error responses", async () => {
-			const response = await client.validation.fetchResponse({
+			const response = await client.validation({
 				page: 2,
 			});
 
@@ -47,7 +47,7 @@ export const runErrorHandlersSuite = (adapter: ErrorHandlersSuiteAdapter) => {
 		});
 
 		it("uses custom unhandled error responses", async () => {
-			const response = await client.unhandled.fetchResponse();
+			const response = await client.unhandled();
 
 			assert.equal(response.status, 503);
 			assert.equal(
@@ -62,7 +62,7 @@ export const runErrorHandlersSuite = (adapter: ErrorHandlersSuiteAdapter) => {
 		});
 
 		it("does not pass RouteResponseError through the unhandled hook", async () => {
-			const response = await client.contractResponse.fetchResponse();
+			const response = await client.contractResponse();
 
 			assert.equal(response.status, 409);
 			assert.equal(response.headers.get("x-error-handler"), null);
@@ -73,7 +73,9 @@ export const runErrorHandlersSuite = (adapter: ErrorHandlersSuiteAdapter) => {
 		});
 
 		it("only invokes custom error handling for matching paths", async () => {
-			assert.deepEqual(await client.hookState.fetch(), {
+			const response1 = await client.hookState();
+			assert.equal(response1.status, 200);
+			assert.deepEqual(response1.body, {
 				validationErrors: 1,
 				unhandledErrors: 1,
 			});

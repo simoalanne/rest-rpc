@@ -1,9 +1,5 @@
 import { initClient, route, type as schemaType } from "@rest-rpc/core";
-import type {
-	ClientRequest,
-	ClientResponse,
-	ClientResponseBody,
-} from "@rest-rpc/core";
+import type { ClientRequest, ClientResponse } from "@rest-rpc/core";
 import { route as expressRoute } from "@rest-rpc/express";
 import {
 	createRouteHandler as createFetchRouteHandler,
@@ -90,7 +86,24 @@ export const hoverClient = initClient(hoverApi, {
 	baseUrl: "https://example.test",
 });
 
-export const strictHoverClient = initClient(hoverApi, {
+export const strictHoverApi = {
+	todos: {
+		create: route
+			.with({ strictStatusCodes: true })
+			.post("/todos")
+			.body(schemaType<{ title: string }>())
+			.response(201, {
+				body: schemaType<{ id: string; title: string }>(),
+				headers: schemaType<{
+					location: string;
+					"x-next-cursor"?: string;
+				}>(),
+			})
+			.response(400, schemaType<{ code: "INVALID_TODO" }>()),
+	},
+};
+
+export const strictHoverClient = initClient(strictHoverApi, {
 	baseUrl: "https://example.test",
 });
 
@@ -98,7 +111,7 @@ export const hoverQuery = createTanstackQueryHelpers(hoverApi, {
 	baseUrl: "https://example.test",
 });
 
-export const strictHoverQuery = createTanstackQueryHelpers(hoverApi, {
+export const strictHoverQuery = createTanstackQueryHelpers(strictHoverApi, {
 	baseUrl: "https://example.test",
 });
 
@@ -111,14 +124,13 @@ export const createTodoServerRoute = expressRoute(
 	}),
 );
 
-export const createTodoFetchPromise = hoverClient.todos.create.fetch({
+export const createTodoFetchPromise = hoverClient.todos.create({
 	title: "Write hover tests",
 });
 
-export const createTodoFetchResponsePromise =
-	hoverClient.todos.create.fetchResponse({
-		title: "Write hover tests",
-	});
+export const createTodoFetchResponsePromise = hoverClient.todos.create({
+	title: "Write hover tests",
+});
 
 export const createTodoMutationOptions =
 	hoverQuery.todos.create.mutationOptions({
@@ -165,6 +177,7 @@ type CreateTodoRoute = typeof hoverApi.todos.create;
 type DownloadTodoRoute = typeof hoverApi.todos.download;
 type EventsRoute = typeof hoverApi.todos.events;
 type RemoveTodoRoute = typeof hoverApi.todos.remove;
+type StrictCreateTodoRoute = typeof strictHoverApi.todos.create;
 
 export type GetClientRequest = ClientRequest<GetTodoRoute>;
 export type CreateClientRequest = ClientRequest<CreateTodoRoute>;
@@ -172,23 +185,18 @@ export type PageClientRequest = ClientRequest<PageTodoRoute>;
 export type RemoveClientRequest = ClientRequest<RemoveTodoRoute>;
 
 export type CreateClientResponse = ClientResponse<CreateTodoRoute>;
-export type CreateStrictClientResponse = ClientResponse<CreateTodoRoute>;
-export type CreateClientResponseBody = ClientResponseBody<CreateTodoRoute>;
+export type CreateStrictClientResponse = ClientResponse<StrictCreateTodoRoute>;
 
-export type CreateFetchParameters = Parameters<
-	typeof hoverClient.todos.create.fetch
->;
-export type CreateFetchReturn = ReturnType<
-	typeof hoverClient.todos.create.fetch
->;
+export type CreateFetchParameters = Parameters<typeof hoverClient.todos.create>;
+export type CreateFetchReturn = ReturnType<typeof hoverClient.todos.create>;
 export type CreateFetchResponseParameters = Parameters<
-	typeof hoverClient.todos.create.fetchResponse
+	typeof hoverClient.todos.create
 >;
 export type CreateFetchResponseReturn = ReturnType<
-	typeof hoverClient.todos.create.fetchResponse
+	typeof hoverClient.todos.create
 >;
 export type StrictCreateFetchResponseReturn = ReturnType<
-	typeof strictHoverClient.todos.create.fetchResponse
+	typeof strictHoverClient.todos.create
 >;
 
 export type GetQueryOptionsParameters = Parameters<
@@ -220,7 +228,8 @@ export type CreateRouteMutationVariables =
 	RouteMutationVariables<CreateTodoRoute>;
 export type CreateRouteQueryData = RouteQueryData<CreateTodoRoute>;
 export type CreateRouteQueryError = RouteQueryError<CreateTodoRoute>;
-export type CreateStrictRouteQueryError = RouteQueryError<CreateTodoRoute>;
+export type CreateStrictRouteQueryError =
+	RouteQueryError<StrictCreateTodoRoute>;
 export type PageRouteInfiniteQueryData = RouteInfiniteQueryData<PageTodoRoute>;
 export type EventsRouteStreamedQueryData = RouteStreamedQueryData<EventsRoute>;
 
@@ -241,8 +250,6 @@ export type CreateExpressRouteImplementation = typeof createTodoServerRoute;
 
 export type DownloadClientResponse = ClientResponse<DownloadTodoRoute>;
 export type DownloadRouteQueryData = RouteQueryData<DownloadTodoRoute>;
-export type EventsClientResponseBody = ClientResponseBody<EventsRoute>;
-export type RemoveClientResponseBody = ClientResponseBody<RemoveTodoRoute>;
 
 export const fetchServerFirstRoutes = {
 	todos: {
@@ -280,9 +287,9 @@ export const serverFirstClient = initClient<typeof fetchServerFirstRoutes>({
 	baseUrl: "https://example.test",
 });
 
-export const serverFirstCreatePromise = serverFirstClient
-	.$post("/server-first/todos")
-	.fetch({ body: { title: "Write hover tests" } });
+export const serverFirstCreatePromise = serverFirstClient.$post(
+	"/server-first/todos",
+)({ body: { title: "Write hover tests" } });
 
 type ServerFirstCreateImplementation =
 	typeof fetchServerFirstRoutes.todos.create;
@@ -296,15 +303,12 @@ export type ServerFirstHandlerRequest = Parameters<
 export type ServerFirstHandlerResponse = ReturnType<
 	ServerFirstCreateImplementation["handler"]
 >;
-export type ServerFirstClientFetchParameters = Parameters<
-	ServerFirstCreateClientRoute["fetch"]
->;
-export type ServerFirstClientFetchReturn = ReturnType<
-	ServerFirstCreateClientRoute["fetch"]
->;
-export type ServerFirstClientFetchResponseReturn = ReturnType<
-	ServerFirstCreateClientRoute["fetchResponse"]
->;
+export type ServerFirstClientFetchParameters =
+	Parameters<ServerFirstCreateClientRoute>;
+export type ServerFirstClientFetchReturn =
+	ReturnType<ServerFirstCreateClientRoute>;
+export type ServerFirstClientFetchResponseReturn =
+	ReturnType<ServerFirstCreateClientRoute>;
 export type FetchServerFirstHandler = typeof fetchServerFirstHandler;
 export type NodeServerFirstHandler = typeof nodeServerFirstHandler;
 
@@ -331,8 +335,6 @@ type ShorthandCreateRoute = typeof shorthandHoverApi.todos.create;
 export type ShorthandGetClientRequest = ClientRequest<ShorthandGetRoute>;
 export type ShorthandCreateClientRequest = ClientRequest<ShorthandCreateRoute>;
 export type ShorthandGetClientResponse = ClientResponse<ShorthandGetRoute>;
-export type ShorthandGetClientResponseBody =
-	ClientResponseBody<ShorthandGetRoute>;
 export type ShorthandGetCallParameters = Parameters<
 	typeof shorthandHoverClient.todos.get
 >;

@@ -4,7 +4,6 @@ import {
 	type ClientEventSource,
 	type ClientRequest,
 	type ClientResponse,
-	type ClientResponseBody,
 	type ClientSseReceived,
 	initClient,
 	route,
@@ -54,7 +53,7 @@ expectError(shorthandClient.todos.add({ title: 1 }));
 expectError(
 	shorthandClient.todos.add({ title: "Write type tests", extra: true }),
 );
-expectError(shorthandClient.todos.get.fetch());
+expectError(shorthandClient.todos.get.fetch);
 
 expectType<{ title: string }>(
 	null as unknown as ClientRequest<typeof shorthandApi.todos.add>,
@@ -64,9 +63,6 @@ expectType<never>(
 );
 expectType<{ id: number; title: string }>(
 	null as unknown as ClientResponse<typeof shorthandApi.todos.get>,
-);
-expectType<never>(
-	null as unknown as ClientResponseBody<typeof shorthandApi.todos.get>,
 );
 
 const noInputApi = {
@@ -82,12 +78,16 @@ const noInputClient = initClient(noInputApi, {
 	baseUrl: "https://example.test",
 });
 
-expectType<Promise<Array<{ id: string; title: string }>>>(
-	noInputClient.todos.list.fetch(),
-);
-expectType<Promise<{ total: number }>>(noInputClient.todos.stats.fetch());
-noInputClient.todos.list.fetch(undefined, { cache: "no-store" });
-expectError(noInputClient.todos.list());
+noInputClient.todos.list().then((response) => {
+	if (response.status !== 200) throw new Error("Unexpected status");
+	expectType<Array<{ id: string; title: string }>>(response.body);
+});
+noInputClient.todos.stats().then((response) => {
+	if (response.status !== 200) throw new Error("Unexpected status");
+	expectType<{ total: number }>(response.body);
+});
+noInputClient.todos.list(undefined, { cache: "no-store" });
+expectError(noInputClient.todos.list.fetch);
 
 const pathParamApi = {
 	todos: {
@@ -102,9 +102,10 @@ const pathParamClient = initClient(pathParamApi, {
 	baseUrl: "https://example.test",
 });
 
-expectType<Promise<{ id: string; title: string }>>(
-	pathParamClient.todos.get.fetch({ id: "todo-1" }),
-);
+pathParamClient.todos.get({ id: "todo-1" }).then((response) => {
+	if (response.status !== 200) throw new Error("Unexpected status");
+	expectType<{ id: string; title: string }>(response.body);
+});
 
 const flatQueryApi = {
 	todos: {
@@ -125,13 +126,16 @@ const flatQueryClient = initClient(flatQueryApi, {
 	baseUrl: "https://example.test",
 });
 
-expectType<Promise<Array<{ id: string; title: string }>>>(
-	flatQueryClient.todos.search.fetch({
+flatQueryClient.todos
+	.search({
 		includeDone: false,
 		page: 1,
 		search: "milk",
-	}),
-);
+	})
+	.then((response) => {
+		if (response.status !== 200) throw new Error("Unexpected status");
+		expectType<Array<{ id: string; title: string }>>(response.body);
+	});
 
 const scalarRequestApi = {
 	items: {
@@ -152,7 +156,7 @@ const scalarRequestClient = initClient(scalarRequestApi, {
 	baseUrl: "https://example.test",
 });
 
-scalarRequestClient.items.get.fetch({ id: 1, page: 2, active: false });
+scalarRequestClient.items.get({ id: 1, page: 2, active: false });
 
 expectError(
 	route.get("/items").query(schemaType<{ filters: { tag: string } }>()),
@@ -206,16 +210,19 @@ const groupedRequestClient = initClient(groupedRequestApi, {
 	baseUrl: "https://example.test",
 });
 
-expectType<Promise<{ id: string; title: string }>>(
-	groupedRequestClient.todos.create.fetch({
+groupedRequestClient.todos
+	.create({
 		body: { title: "Write type tests" },
 		headers: { authorization: "Bearer token" },
 		params: { accountId: "account-1" },
 		query: { notify: true },
-	}),
-);
+	})
+	.then((response) => {
+		if (response.status !== 201) throw new Error("Unexpected status");
+		expectType<{ id: string; title: string }>(response.body);
+	});
 expectError(
-	groupedRequestClient.todos.create.fetch({
+	groupedRequestClient.todos.create({
 		accountId: "account-1",
 		authorization: "Bearer token",
 		notify: true,
@@ -239,15 +246,18 @@ const groupedRequestWithClient = initClient(groupedRequestWithApi, {
 	baseUrl: "https://example.test",
 });
 
-expectType<Promise<{ id: string; title: string }>>(
-	groupedRequestWithClient.todos.create.fetch({
+groupedRequestWithClient.todos
+	.create({
 		body: { title: "Write type tests" },
 		params: { accountId: "account-1" },
 		query: { notify: true },
-	}),
-);
+	})
+	.then((response) => {
+		if (response.status !== 201) throw new Error("Unexpected status");
+		expectType<{ id: string; title: string }>(response.body);
+	});
 expectError(
-	groupedRequestWithClient.todos.create.fetch({
+	groupedRequestWithClient.todos.create({
 		accountId: "account-1",
 		notify: true,
 		title: "Write type tests",
@@ -276,21 +286,27 @@ const jsonQueryClient = initClient(jsonQueryApi, {
 	baseUrl: "https://example.test",
 });
 
-expectType<Promise<Array<{ id: string; title: string }>>>(
-	jsonQueryClient.todos.jsonSearch.fetch({
+jsonQueryClient.todos
+	.jsonSearch({
 		query: {
 			page: "1",
 			filters: { tags: ["api"] },
 		},
-	}),
-);
-expectError(jsonQueryClient.todos.jsonSearch.fetch({ page: "1" }));
-expectError(jsonQueryClient.todos.jsonSearch.fetch());
-expectType<Promise<Array<{ id: string; title: string }>>>(
-	jsonQueryClient.todos.optionalJsonSearch.fetch({ query: undefined }),
-);
-expectError(jsonQueryClient.todos.optionalJsonSearch.fetch({}));
-expectError(jsonQueryClient.todos.optionalJsonSearch.fetch());
+	})
+	.then((response) => {
+		if (response.status !== 200) throw new Error("Unexpected status");
+		expectType<Array<{ id: string; title: string }>>(response.body);
+	});
+expectError(jsonQueryClient.todos.jsonSearch({ page: "1" }));
+expectError(jsonQueryClient.todos.jsonSearch());
+jsonQueryClient.todos
+	.optionalJsonSearch({ query: undefined })
+	.then((response) => {
+		if (response.status !== 200) throw new Error("Unexpected status");
+		expectType<Array<{ id: string; title: string }>>(response.body);
+	});
+expectError(jsonQueryClient.todos.optionalJsonSearch({}));
+expectError(jsonQueryClient.todos.optionalJsonSearch());
 
 const responseApi = {
 	todos: {
@@ -311,31 +327,30 @@ const responseClient = initClient(responseApi, {
 	baseUrl: "https://example.test",
 });
 
-expectType<Promise<{ id: string; title: string }>>(
-	responseClient.todos.create.fetch({ title: "Write type tests" }),
-);
+responseClient.todos.create({ title: "Write type tests" }).then((response) => {
+	if (response.status !== 201) throw new Error("Unexpected status");
+	expectType<{ id: string; title: string }>(response.body);
+});
 
-responseClient.todos.create
-	.fetchResponse({ title: "Write type tests" })
-	.then((response) => {
-		expectError(response.declared);
-		if (response.status === 201) {
-			expectType<201>(response.status);
-			expectType<{ id: string; title: string }>(response.body);
-			expectType<string>(response.responseHeaders.location);
-			expectType<string | undefined>(response.responseHeaders["x-next-cursor"]);
-			expectType<Headers>(response.headers);
-		}
+responseClient.todos.create({ title: "Write type tests" }).then((response) => {
+	expectError(response.declared);
+	if (response.status === 201) {
+		expectType<201>(response.status);
+		expectType<{ id: string; title: string }>(response.body);
+		expectType<string>(response.responseHeaders.location);
+		expectType<string | undefined>(response.responseHeaders["x-next-cursor"]);
+		expectType<Headers>(response.headers);
+	}
 
-		if ("rawResponse" in response) {
-			expectType<Response>(response.rawResponse);
-			expectError(response.headers);
-			expectError(response.body);
-		} else {
-			expectType<201>(response.status);
-			expectError(response.rawResponse);
-		}
-	});
+	if ("rawResponse" in response) {
+		expectType<Response>(response.rawResponse);
+		expectError(response.headers);
+		expectError(response.body);
+	} else {
+		expectType<201>(response.status);
+		expectError(response.rawResponse);
+	}
+});
 
 const strictResponseApi = {
 	todos: {
@@ -352,26 +367,31 @@ const strictResponseClient = initClient(strictResponseApi, {
 	baseUrl: "https://example.test",
 });
 
-strictResponseClient.todos.get
-	.fetchResponse({ id: "todo-1" })
-	.then((response) => {
-		expectType<200 | 404>(response.status);
-		expectType<Headers>(response.headers);
-		expectError(response.declared);
+strictResponseClient.todos.get({ id: "todo-1" }).then((response) => {
+	expectType<200 | 404>(response.status);
+	expectType<Headers>(response.headers);
+	expectError(response.declared);
 
-		if (response.status === 200) {
-			expectType<{ id: string; title: string }>(response.body);
-		} else {
-			expectType<{ code: "not_found" }>(response.body);
-		}
-	});
+	if (response.status === 200) {
+		expectType<{ id: string; title: string }>(response.body);
+	} else {
+		expectType<{ code: "not_found" }>(response.body);
+	}
+});
 
 type StrictRouteClientResponseType = ClientResponse<
 	typeof strictResponseApi.todos.get
 >;
 
+expectType<never>(
+	null as unknown as Extract<
+		StrictRouteClientResponseType,
+		{ rawResponse: Response }
+	>,
+);
+
 expectType<Promise<StrictRouteClientResponseType>>(
-	strictResponseClient.todos.get.fetchResponse({ id: "todo-1" }),
+	strictResponseClient.todos.get({ id: "todo-1" }),
 );
 expectType<ApiClientFor<typeof strictResponseApi>>(strictResponseClient);
 
@@ -403,17 +423,20 @@ const transformedClient = initClient(transformedApi, {
 	baseUrl: "https://example.test",
 });
 
-expectType<Promise<{ id: string }>>(
-	transformedClient.todos.transform.fetch({
+transformedClient.todos
+	.transform({
 		id: "1",
 		title: "Write type tests",
-	}),
+	})
+	.then((response) => {
+		if (response.status !== 200) throw new Error("Unexpected status");
+		expectType<{ id: string }>(response.body);
+	});
+expectError(
+	transformedClient.todos.transform({ id: 1, title: "wrong id input" }),
 );
 expectError(
-	transformedClient.todos.transform.fetch({ id: 1, title: "wrong id input" }),
-);
-expectError(
-	transformedClient.todos.transform.fetch({
+	transformedClient.todos.transform({
 		id: "1",
 		title: "Write type tests",
 		slug: "server-output-only",
@@ -435,9 +458,9 @@ const streamResponseClient = initClient(streamResponseApi, {
 });
 
 expectType<Promise<ClientResponse<typeof streamResponseApi.todos.events>>>(
-	streamResponseClient.todos.events.fetchResponse(),
+	streamResponseClient.todos.events(),
 );
-expectError(streamResponseClient.todos.events.fetch());
+expectError(streamResponseClient.todos.events.fetch);
 
 const csvResponseApi = {
 	todos: {
@@ -456,16 +479,22 @@ const csvResponseClient = initClient(csvResponseApi, {
 	baseUrl: "https://example.test",
 });
 
-expectType<Promise<Response>>(csvResponseClient.todos.exportCsv.fetch());
+csvResponseClient.todos.exportCsv().then((response) => {
+	if (response.status !== 200) throw new Error("Unexpected status");
+	expectType<Response>(response.body);
+});
 
-csvResponseClient.todos.exportCsv.fetchResponse().then((response) => {
+csvResponseClient.todos.exportCsv().then((response) => {
 	if (response.status === 200) {
 		expectType<"text/csv">(response.contentType);
 		expectType<Response>(response.body);
 	}
 });
 
-expectType<Promise<Response>>(csvResponseClient.todos.exportCsvStream.fetch());
+csvResponseClient.todos.exportCsvStream().then((response) => {
+	if (response.status !== 200) throw new Error("Unexpected status");
+	expectType<Response>(response.body);
+});
 
 const imageResponseApi = {
 	todos: {
@@ -480,9 +509,12 @@ const imageResponseClient = initClient(imageResponseApi, {
 	baseUrl: "https://example.test",
 });
 
-expectType<Promise<Response>>(imageResponseClient.todos.exportImage.fetch());
+imageResponseClient.todos.exportImage().then((response) => {
+	if (response.status !== 200) throw new Error("Unexpected status");
+	expectType<Response>(response.body);
+});
 
-imageResponseClient.todos.exportImage.fetchResponse().then((response) => {
+imageResponseClient.todos.exportImage().then((response) => {
 	if (response.status === 200) {
 		expectType<"image/png" | "image/jpeg">(response.contentType);
 		expectType<Response>(response.body);
@@ -506,17 +538,20 @@ const customRequestClient = initClient(customRequestApi, {
 	baseUrl: "https://example.test",
 });
 
-expectType<Promise<undefined>>(
-	customRequestClient.todos.uploadImage.fetch({
+customRequestClient.todos
+	.uploadImage({
 		id: "todo-1",
 		body: {
 			contentType: "image/png",
 			payload: new Uint8Array(),
 		},
-	}),
-);
+	})
+	.then((response) => {
+		if (response.status !== 204) throw new Error("Unexpected status");
+		expectType<undefined>(response.body);
+	});
 expectError(
-	customRequestClient.todos.uploadImage.fetch({
+	customRequestClient.todos.uploadImage({
 		id: "todo-1",
 		body: {
 			contentType: "image/webp",
@@ -538,13 +573,16 @@ const rawCustomRequestClient = initClient(rawCustomRequestApi, {
 	baseUrl: "https://example.test",
 });
 
-expectType<Promise<undefined>>(
-	rawCustomRequestClient.todos.submitForm.fetch({
+rawCustomRequestClient.todos
+	.submitForm({
 		body: new URLSearchParams(),
-	}),
-);
+	})
+	.then((response) => {
+		if (response.status !== 204) throw new Error("Unexpected status");
+		expectType<undefined>(response.body);
+	});
 expectError(
-	rawCustomRequestClient.todos.submitForm.fetch({
+	rawCustomRequestClient.todos.submitForm({
 		body: "title=Write+docs",
 	}),
 );
@@ -567,9 +605,9 @@ const requestArgumentClient = initClient(requestArgumentApi, {
 	baseUrl: "https://example.test",
 });
 
-expectError(requestArgumentClient.todos.get.fetch());
-expectError(requestArgumentClient.todos.get.fetch({ title: "wrong segment" }));
-expectError(requestArgumentClient.todos.list.fetch({ id: "todo-1" }));
+expectError(requestArgumentClient.todos.get());
+expectError(requestArgumentClient.todos.get({ title: "wrong segment" }));
+expectError(requestArgumentClient.todos.list({ id: "todo-1" }));
 
 const globalHeadersApi = {
 	todos: {
@@ -597,21 +635,19 @@ const globalHeadersClient = initClient(globalHeadersApi, {
 	}),
 });
 
-globalHeadersClient.todos.search.fetch({
+globalHeadersClient.todos.search({
 	search: "milk",
 	"x-request-id": "req-1",
 });
-globalHeadersClient.todos.search.fetch({
+globalHeadersClient.todos.search({
 	authorization: "Bearer override",
 	search: "milk",
 	"x-request-id": "req-1",
 });
-globalHeadersClient.todos.secure.fetch({});
-expectError(globalHeadersClient.todos.search.fetch({ search: "milk" }));
-expectError(
-	globalHeadersClient.todos.search.fetch({ "x-request-id": "req-1" }),
-);
-expectError(globalHeadersClient.todos.secure.fetch());
+globalHeadersClient.todos.secure({});
+expectError(globalHeadersClient.todos.search({ search: "milk" }));
+expectError(globalHeadersClient.todos.search({ "x-request-id": "req-1" }));
+expectError(globalHeadersClient.todos.secure());
 
 const looseGlobalHeadersClient = initClient(globalHeadersApi, {
 	baseUrl: "https://example.test",
@@ -620,9 +656,9 @@ const looseGlobalHeadersClient = initClient(globalHeadersApi, {
 	}),
 });
 
-expectError(looseGlobalHeadersClient.todos.search.fetch({}));
-expectError(looseGlobalHeadersClient.todos.search.fetch({ search: "milk" }));
-expectError(looseGlobalHeadersClient.todos.search.fetch());
+expectError(looseGlobalHeadersClient.todos.search({}));
+expectError(looseGlobalHeadersClient.todos.search({ search: "milk" }));
+expectError(looseGlobalHeadersClient.todos.search());
 
 const composedHeadersApi = {
 	todos: {
@@ -639,7 +675,7 @@ const composedHeadersClient = initClient(composedHeadersApi, {
 	baseUrl: "https://example.test",
 });
 expectError(
-	composedHeadersClient.todos.get.fetch({
+	composedHeadersClient.todos.get({
 		shared: "cannot satisfy both schemas",
 		inherited: "token",
 		local: true,
@@ -656,14 +692,12 @@ const additiveHeadersApi = {
 const additiveHeadersClient = initClient(additiveHeadersApi, {
 	baseUrl: "https://example.test",
 });
-additiveHeadersClient.items.fetch({
+additiveHeadersClient.items({
 	authorization: "Bearer token",
 	"x-request-id": "request-1",
 });
-expectError(
-	additiveHeadersClient.items.fetch({ authorization: "Bearer token" }),
-);
-expectError(additiveHeadersClient.items.fetch({ "x-request-id": "request-1" }));
+expectError(additiveHeadersClient.items({ authorization: "Bearer token" }));
+expectError(additiveHeadersClient.items({ "x-request-id": "request-1" }));
 
 const websocketApi = {
 	todos: {
@@ -748,14 +782,11 @@ expectType<ClientSseReceived<typeof sseApi.todos.events>>({
 	createdAt: new Date(),
 });
 expectType<never>(
-	null as unknown as ClientResponseBody<typeof sseApi.todos.events>,
-);
-expectType<never>(
 	null as unknown as ClientResponse<typeof sseApi.todos.events>,
 );
 
-expectError(sseClient.todos.events.fetch());
-expectError(sseClient.todos.events.fetchResponse());
+expectError(sseClient.todos.events());
+expectError(sseClient.todos.events());
 expectError(sseClient.todos.events.openConnection());
 expectError(
 	sseClient.todos.events.openConnection({
