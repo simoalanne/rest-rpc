@@ -26,8 +26,10 @@ import type {
 	RouteRequest,
 	RuntimeRouteHandler,
 	ServerHttpRouteDeclaration,
+	SseRouteHandlerContext,
 } from "./router.ts";
 import { isRouteDeclaration } from "./router.ts";
+import type { SseEvent } from "./sse.ts";
 
 type EmptyObject = Record<never, never>;
 type AnyRouteHandler = (...args: never[]) => unknown;
@@ -52,8 +54,18 @@ export interface ServerRouteImplementation<
 
 /** Explicit HTTP response envelope accepted from an inferred route handler. */
 export type ImplicitResponseEnvelope =
-	| { status: number; body?: never; contentType?: string }
-	| { status: number; body: unknown; contentType?: string };
+	| {
+			status: number;
+			body?: never;
+			contentType?: string;
+			responseHeaders?: Record<string, string | number | undefined>;
+	  }
+	| {
+			status: number;
+			body: unknown;
+			contentType?: string;
+			responseHeaders?: Record<string, string | number | undefined>;
+	  };
 
 /** Wire response classifications available to server-first HTTP routes. */
 export type ServerFirstResponseKind =
@@ -97,7 +109,19 @@ type HandlerResult<THandler> = THandler extends AnyRouteHandler
 
 type ClientSchema<TOutput> = StandardSchemaV1<unknown, TOutput>;
 
-type ImplicitResponseDeclaration<TResponse> = TResponse extends {
+type SerializedResponseHeader<TValue> = TValue extends string
+	? TValue
+	: TValue extends number
+		? `${TValue}`
+		: TValue extends undefined
+			? undefined
+			: never;
+
+type SerializedResponseHeaders<THeaders> = {
+	[TKey in keyof THeaders]: SerializedResponseHeader<THeaders[TKey]>;
+};
+
+type ImplicitResponseBodyDeclaration<TResponse> = TResponse extends {
 	body: infer TBody;
 }
 	? TBody extends AsyncIterable<infer TItem>
@@ -110,6 +134,16 @@ type ImplicitResponseDeclaration<TResponse> = TResponse extends {
 			? CustomResponseBody<ClientSchema<CustomResponseValue>, TContentType>
 			: ClientSchema<TBody>
 	: NoBody;
+
+type ImplicitResponseDeclaration<TResponse> =
+	ImplicitResponseBodyDeclaration<TResponse> extends infer TBody
+		? TResponse extends { responseHeaders: infer THeaders }
+			? {
+					body: TBody;
+					headers: ClientSchema<SerializedResponseHeaders<THeaders>>;
+				}
+			: TBody
+		: never;
 
 type ResponseStatuses<TResponse> = TResponse extends {
 	status: infer TStatus extends number;
@@ -125,6 +159,17 @@ type InferredResponses<TResponse> = {
 
 type InferredClientRoute<TRoute, TResult> = Omit<TRoute, "responses"> & {
 	responses: InferredResponses<Awaited<TResult>>;
+};
+
+type SseEventData<TResult> =
+	Awaited<TResult> extends AsyncIterable<infer TEvent>
+		? TEvent extends SseEvent<infer TData>
+			? TData
+			: never
+		: never;
+
+type InferredSseClientRoute<TRoute, TResult> = Omit<TRoute, "responses"> & {
+	responses: { 200: ClientSchema<SseEventData<TResult>> };
 };
 
 /** Infers the source response union retained by an implicit route implementation. */
@@ -172,6 +217,13 @@ type DeclaredRequest<
 > = Merge<
 	RouteRequest<TRoute, ServerFirstContext<TContext> & HttpRouteHandlerContext>
 >;
+
+type ImplicitSseRequest<
+	TRoute extends BaseRouteDeclaration,
+	TContext extends ContextShape,
+> = ServerFirstRequest<TRoute, TContext> & {
+	context: ServerFirstContext<TContext> & SseRouteHandlerContext;
+};
 
 type DeclaredHandlerResult<
 	TRoute extends ServerHttpRouteDeclaration,
@@ -254,18 +306,35 @@ type SseImplementationBuilder<
 > =
 	SseRouteForState<TState, TPath, TMetadata> extends infer TRoute extends
 		BaseRouteDeclaration
-		? TRoute extends ServerHttpRouteDeclaration
+		? [TState["response"]] extends [never]
 			? {
 					handler<
-						const TResult extends DeclaredHandlerResult<TRoute, TContext>,
+						const TResult extends MaybePromise<
+							AsyncIterable<SseEvent<unknown>>
+						>,
 					>(
-						handler: (request: DeclaredRequest<TRoute, TContext>) => TResult,
+						handler: (request: ImplicitSseRequest<TRoute, TContext>) => TResult,
 					): ServerRouteImplementation<
 						SseRouteForState<TState, TPath, TMetadata>,
-						(request: DeclaredRequest<TRoute, TContext>) => TResult
+						(request: ImplicitSseRequest<TRoute, TContext>) => TResult,
+						InferredSseClientRoute<
+							SseRouteForState<TState, TPath, TMetadata>,
+							TResult
+						>
 					>;
 				}
-			: EmptyObject
+			: TRoute extends ServerHttpRouteDeclaration
+				? {
+						handler<
+							const TResult extends DeclaredHandlerResult<TRoute, TContext>,
+						>(
+							handler: (request: DeclaredRequest<TRoute, TContext>) => TResult,
+						): ServerRouteImplementation<
+							SseRouteForState<TState, TPath, TMetadata>,
+							(request: DeclaredRequest<TRoute, TContext>) => TResult
+						>;
+					}
+				: never
 		: never;
 
 /** Core SSE builder extension carrying server handler attachment operations. */

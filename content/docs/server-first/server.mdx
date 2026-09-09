@@ -37,18 +37,19 @@ const getTodo = route
 Without `.response()` declarations, the handler return type defines the route's
 response union:
 
-| Handler return                                 | Inferred response      |
-| ---------------------------------------------- | ---------------------- |
-| `{ status }`                                   | Empty response         |
-| `{ status, body }`                             | JSON response          |
-| `{ status, body: AsyncIterable }`              | NDJSON stream          |
-| `{ status, contentType, body }`                | Custom response        |
-| `{ status, contentType, body: AsyncIterable }` | Custom response stream |
+| Handler return                                 | Inferred response                 |
+| ---------------------------------------------- | --------------------------------- |
+| `{ status, responseHeaders }`                  | Empty response + response headers |
+| `{ status, body }`                             | JSON response                     |
+| `{ status, body: AsyncIterable }`              | NDJSON stream                     |
+| `{ status, contentType, body }`                | Custom response                   |
+| `{ status, contentType, body: AsyncIterable }` | Custom response stream            |
+| `sseEvent(data, options)`                      | SSE event stream                  |
 
 Each returned literal status becomes a member of the client-visible response
 union.
 
-:::hint
+:::tip
 To avoid the status being widened to `number` for inferred responses, use `as const` to preserve the literal type.
 This allows the client to narrow the response type based on the status code correctly.
 :::

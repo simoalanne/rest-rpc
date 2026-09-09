@@ -45,13 +45,15 @@ const routes = {
 					? { status: 404 as const, body: { code: "not_found" as const } }
 					: { status: 200 as const, body: { id, title: "Todo" } },
 			),
+		withResponseHeaders: route.get("/with-response-headers").handler(() => ({
+			status: 200,
+			body: { id: "todo-1" },
+			responseHeaders: { etag: "todo-1", "x-page": 1 },
+		})),
 	},
-	events: route
-		.sse("/events")
-		.response(z.object({ id: z.string() }))
-		.handler(async function* () {
-			yield sseEvent({ id: "todo-1" });
-		}),
+	events: route.sse("/events").handler(async function* () {
+		yield sseEvent({ id: "todo-1" });
+	}),
 	form: route
 		.post("/form")
 		.formBody(
@@ -151,6 +153,14 @@ client
 			expectType<404>(response.status);
 			expectType<"not_found">(response.body.code);
 		}
+	});
+
+client
+	.get("/with-response-headers")
+	.fetchResponse()
+	.then((response) => {
+		expectType<"todo-1">(response.responseHeaders.etag);
+		expectType<"1">(response.responseHeaders["x-page"]);
 	});
 
 client

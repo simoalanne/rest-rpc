@@ -13,6 +13,7 @@ import { SERVER_FIRST_RESPONSE_KIND_HEADER } from "@rest-rpc/core/client";
 import type { HttpRouteResult } from "../src/handleHttpRoute.ts";
 import { handleHttpRouteResult } from "../src/handleHttpRouteResult.ts";
 import { ResponseValidationError } from "./validationErrors.ts";
+import { sseEvent } from "./sse.ts";
 
 const execute = (
 	implementation: {
@@ -158,5 +159,29 @@ describe("server-first runtime", () => {
 		const result = await execute(implementation, { signal });
 		assert.equal(result.kind, "stream");
 		assert.equal(await responseKind(result), "v=1 kind=sse");
+	});
+
+	it("normalizes inferred SSE routes", async () => {
+		const implementation = serverFirstRoute
+			.sse("/events")
+			.handler(async function* () {
+				yield sseEvent("updated");
+			});
+
+		const result = await execute(implementation);
+		assert.equal(result.kind, "stream");
+		assert.equal(result.status, 200);
+		assert.equal(await responseKind(result), "v=1 kind=sse");
+	});
+
+	it("preserves inferred response headers", async () => {
+		const implementation = serverFirstRoute.get("/headers").handler(() => ({
+			status: 200,
+			body: "ok",
+			responseHeaders: { etag: "todo-1", "x-page": 1 },
+		}));
+
+		const result = await execute(implementation);
+		assert.deepEqual(result.headers, { etag: "todo-1", "x-page": 1 });
 	});
 });

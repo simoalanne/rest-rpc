@@ -8,6 +8,7 @@ export default defineMeta({
 		"comparison",
 		"api-reference",
 		"contract",
+		"server-first",
 		"http-requests",
 		"http-responses",
 		"server",

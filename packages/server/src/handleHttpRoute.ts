@@ -85,8 +85,9 @@ const isAsyncIterable = (value: unknown): value is AsyncIterable<unknown> =>
 const classifyImplicitResponse = (
 	result: ImplicitResponseEnvelope,
 ): HttpRouteResult => {
+	const headers = result.responseHeaders;
 	if (!("body" in result)) {
-		return { kind: "empty", status: result.status };
+		return { kind: "empty", status: result.status, headers };
 	}
 
 	const body = result.body;
@@ -96,6 +97,7 @@ const classifyImplicitResponse = (
 		return {
 			kind: "stream",
 			status: result.status,
+			headers,
 			body,
 			...(contentType !== undefined
 				? { contentType, mode: "raw" as const }
@@ -104,10 +106,16 @@ const classifyImplicitResponse = (
 	}
 
 	if (contentType !== undefined) {
-		return { kind: "custom", status: result.status, body, contentType };
+		return {
+			kind: "custom",
+			status: result.status,
+			headers,
+			body,
+			contentType,
+		};
 	}
 
-	return { kind: "json", status: result.status, body };
+	return { kind: "json", status: result.status, headers, body };
 };
 
 const getResponseSchema = (
@@ -256,17 +264,23 @@ const normalizeResponseResult = async (
 };
 
 const normalizeSseResponseResult = (
-	route: SseRouteDeclaration,
+	route: Omit<SseRouteDeclaration, "responses"> &
+		Partial<Pick<SseRouteDeclaration, "responses">>,
 	body: unknown,
 ): HttpRouteResult => {
-	const status = getSingleSuccessfulStatus(route);
+	const declaredRoute = route.responses
+		? (route as SseRouteDeclaration)
+		: undefined;
+	const status = declaredRoute ? getSingleSuccessfulStatus(declaredRoute) : 200;
 	if (status === undefined) {
 		throw new Error(
 			`Service for "${route.method} ${route.path}" must return a declared response object.`,
 		);
 	}
 
-	const schema = getResponseSchema(route, status);
+	const schema = declaredRoute
+		? getResponseSchema(declaredRoute, status)
+		: undefined;
 	const bodySchema = schema ? getResponseBody(schema) : undefined;
 
 	return {
@@ -348,7 +362,13 @@ export async function handleHttpRoute<
 		throw error;
 	}
 
-	if (!("responses" in declaredRoute)) {
+	if (!("responses" in route)) {
+		if (route.mode === "sse") {
+			return normalizeSseResponseResult(
+				route as Omit<SseRouteDeclaration, "responses">,
+				handlerResult,
+			);
+		}
 		return classifyImplicitResponse(handlerResult as ImplicitResponseEnvelope);
 	}
 
