@@ -44,31 +44,23 @@ Create its client with `initClient<typeof routes>()`. Unlike a contract-first cl
 
 ## Minimal Example
 
-Contract declaration:
+### Contract-first approach
+
+Define a contract and implement it on the server:
 
 ```ts
 import { route } from "@rest-rpc/core";
 import { z } from "zod";
 
-const todo = z.object({ id: z.string(), title: z.string() });
-
-// reusable route factory with shared options applying to all routes using it
-const baseRoute = route.with({
-	pathPrefix: "/api",
-});
-
 export const api = {
 	todos: {
-		getById: baseRoute
+		getById: route
 			.get("/todos/:id")
 			.params(z.object({ id: z.string() }))
-			.response(200, todo)
-			.response(404),
+			.response(200, z.object({ id: z.string(), title: z.string() })),
 	},
 };
 ```
-
-Server implementation:
 
 ```ts
 // router and registerRoutes are exported from the server adapter package matching the framework, e.g. @rest-rpc/express
@@ -83,20 +75,71 @@ const routes = router(api, {
 	},
 });
 
-registerRoutes(app, routes, options);
+registerRoutes(app, routes);
 ```
 
-Client usage:
+Use the contract on the client with RPC-style function calls:
 
 ```ts
 import { initClient } from "@rest-rpc/core";
 import { api } from "./contract";
 
-const client = initClient(api, { baseUrl: "https://api.example.com" });
-// returns the 200 response body type, or throws on 404 or other errors
-const todoBody = await client.todos.getById.fetch({ id: "todo_1" });
-// returns a response envelope discriminated by status code, or throws on network errors
-const todoResponse = await client.todos.getById.fetchResponse({ id: "todo_1" });
+const client = initClient(api, {
+	baseUrl: "https://api.example.com",
+});
+
+const todo = await client.todos.getById.fetch({
+	id: "todo_1",
+});
+```
+
+### Server-first approach
+
+Define and implement the server route:
+
+```ts
+import { createServer } from "node:http";
+import { route, createRouteHandler } from "@rest-rpc/node";
+import { z } from "zod";
+
+export const routes = {
+	todos: {
+		create: route
+			.post("/todos")
+			.body(z.object({ title: z.string().min(1) }))
+			.handler(({ title }) => ({
+				status: 201,
+				body: { id: crypto.randomUUID(), title, completed: false },
+			})),
+	},
+};
+
+const handle = createRouteHandler(routes);
+
+const server = createServer(async (request, response) => {
+	const { matched } = await handle(request, response);
+	if (!matched) {
+		response.writeHead(404).end("Not found");
+	}
+});
+
+server.listen(3000);
+```
+
+Create a client from the same contract:
+
+```ts
+import { initClient } from "@rest-rpc/core";
+import type { routes } from "./server";
+
+const client = initClient<typeof routes>({
+	baseUrl: "https://api.example.com",
+});
+
+// tree-shaped call is replaced with explicit method, path and non-flattened request.
+const todo = await client.post("/todos").fetch({
+	body: { title: "Ship v1" },
+});
 ```
 
 ## Packages
