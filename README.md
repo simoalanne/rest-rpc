@@ -102,7 +102,7 @@ const client = initClient<typeof routes>({
 	baseUrl: "https://api.example.com",
 });
 
-const todo = await client.post("/todos").fetch({
+const todo = await client.$post("/todos").fetch({
 	body: { title: "Ship v1" },
 });
 ```

@@ -40,7 +40,7 @@ export const routes = {
 };
 ```
 
-Create its client with `initClient<typeof routes>()`. Unlike a contract-first client such as `client.todos.get.fetch(...)`, a server-first client selects the wire route explicitly, such as `client.get("/todos/:id").fetch({ params: { id } })`. Keep the implementation tree's type importable by the client package; no server runtime import is required when using `import type`.
+Create its client with `initClient<typeof routes>()`. Unlike a contract-first client such as `client.todos.get.fetch(...)`, a server-first client selects the wire route explicitly, such as `client.$get("/todos/:id").fetch({ params: { id } })`. Keep the implementation tree's type importable by the client package; no server runtime import is required when using `import type`.
 
 ## Minimal Example
 
@@ -137,7 +137,7 @@ const client = initClient<typeof routes>({
 });
 
 // tree-shaped call is replaced with explicit method, path and non-flattened request.
-const todo = await client.post("/todos").fetch({
+const todo = await client.$post("/todos").fetch({
 	body: { title: "Ship v1" },
 });
 ```

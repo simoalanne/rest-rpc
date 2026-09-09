@@ -16,8 +16,8 @@ type RuntimeRouteClient = {
 };
 
 type RuntimeClient = {
-	get: (path: string) => RuntimeRouteClient;
-	post: (path: string) => RuntimeRouteClient;
+	$get: (path: string) => RuntimeRouteClient;
+	$post: (path: string) => RuntimeRouteClient;
 };
 
 type FetchCall = {
@@ -54,7 +54,7 @@ describe("initClient server-first mode", () => {
 			response("json", JSON.stringify({ id: "todo-1" }), 201),
 		);
 
-		const result = await client.post("/accounts/:accountId/todos").fetch({
+		const result = await client.$post("/accounts/:accountId/todos").fetch({
 			body: { title: "Todo" },
 			headers: { "x-request-id": "request-1" },
 			params: { accountId: "account-1" },
@@ -77,19 +77,19 @@ describe("initClient server-first mode", () => {
 	it("serializes explicit server-first request encodings", async () => {
 		const { calls, client } = createClient(() => response("empty", null, 204));
 
-		await client.post("/form").fetch({
+		await client.$post("/form").fetch({
 			body: request.formBody({ title: "Todo", tags: ["docs", "api"] }),
 		});
-		await client.post("/multipart").fetch({
+		await client.$post("/multipart").fetch({
 			body: request.multipartBody({ title: "Todo", tags: ["docs", "api"] }),
 		});
-		await client.get("/search").fetch({
+		await client.$get("/search").fetch({
 			query: request.jsonQuery({ page: 2, filters: { tag: "open" } }),
 		});
-		await client.post("/custom").fetch({
+		await client.$post("/custom").fetch({
 			body: request.customBody("text/csv", "id,title\n1,Todo\n"),
 		});
-		await client.post("/fetch-managed").fetch({
+		await client.$post("/fetch-managed").fetch({
 			body: request.customBody(new URLSearchParams({ title: "Todo" })),
 		});
 
@@ -112,7 +112,7 @@ describe("initClient server-first mode", () => {
 	it("requires valid response-kind metadata", async () => {
 		const missing = createClient(() => new Response("{}"));
 		await assert.rejects(
-			missing.client.get("/todos").fetch(),
+			missing.client.$get("/todos").fetch(),
 			/missing required X-Rest-Rpc-Response-Kind header/,
 		);
 
@@ -123,7 +123,7 @@ describe("initClient server-first mode", () => {
 				}),
 		);
 		await assert.rejects(
-			invalid.client.get("/todos").fetch(),
+			invalid.client.$get("/todos").fetch(),
 			/invalid server-first response kind/,
 		);
 	});
@@ -139,20 +139,20 @@ describe("initClient server-first mode", () => {
 		);
 
 		await assert.rejects(
-			client.get("/export").fetchResponse(),
+			client.$get("/export").fetchResponse(),
 			/missing required Content-Type header/,
 		);
 	});
 
 	it("reads empty, NDJSON, and custom responses", async () => {
 		const empty = createClient(() => response("empty", null, 204));
-		assert.equal(await empty.client.get("/empty").fetch(), undefined);
+		assert.equal(await empty.client.$get("/empty").fetch(), undefined);
 
 		const ndjson = createClient(() =>
 			response("ndjson", '{"id":"one"}\n{"id":"two"}\n'),
 		);
 		const stream = (await ndjson.client
-			.get("/stream")
+			.$get("/stream")
 			.fetch()) as AsyncIterable<{
 			id: string;
 		}>;
@@ -169,7 +169,7 @@ describe("initClient server-first mode", () => {
 					},
 				}),
 		);
-		const customResponse = await custom.client.get("/export").fetchResponse();
+		const customResponse = await custom.client.$get("/export").fetchResponse();
 		assert.ok(customResponse.body instanceof Response);
 		assert.equal(customResponse.contentType, "text/csv");
 	});
@@ -179,7 +179,7 @@ describe("initClient server-first mode", () => {
 			nextFetchTags: { enabled: true, tagPrefix: "api" },
 		});
 
-		await client.get("/todos/:id").fetch({
+		await client.$get("/todos/:id").fetch({
 			params: { id: "todo-1" },
 			query: { include: "labels" },
 		});

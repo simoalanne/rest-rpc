@@ -380,7 +380,7 @@ type ServerFirstShorthandTanstackQueryTree<TNode> = unknown extends TNode
  * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#server-first}
  */
 export type ServerFirstTanstackQueryHelpersFor<TTree> = {
-	[TSelector in Exclude<ServerFirstClientSelector<TTree>, "sse">]: <
+	[TSelector in Exclude<ServerFirstClientSelector<TTree>, "$sse">]: <
 		const TPath extends ServerFirstClientPath<TTree, TSelector>,
 	>(
 		path: TPath,

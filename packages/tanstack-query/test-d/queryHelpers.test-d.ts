@@ -611,7 +611,7 @@ expectAssignable<ServerFirstTanstackQueryHelpersFor<typeof serverRoutes>>(
 );
 
 const serverGetOptions = serverTq
-	.get("/server-first/todos/:id")
+	.$get("/server-first/todos/:id")
 	.queryOptions({ params: { id: "todo-1" } });
 expectAssignable<
 	Promise<{
@@ -621,14 +621,14 @@ expectAssignable<
 	}>
 >(queryClient.fetchQuery(serverGetOptions));
 
-serverTq.post("/server-first/todos").mutationOptions({
+serverTq.$post("/server-first/todos").mutationOptions({
 	onSuccess(data, variables) {
 		expectType<201>(data.status);
 		expectType<{ body: { title: string } }>(variables);
 	},
 });
 
-serverTq.get("/server-first/todos").infiniteQueryOptions({
+serverTq.$get("/server-first/todos").infiniteQueryOptions({
 	initialRequest: { query: { limit: 20 } },
 	getNextRequest(_lastPage, _allPages, lastRequest) {
 		expectType<{ query: { cursor?: string; limit: number } }>(lastRequest);
@@ -637,18 +637,18 @@ serverTq.get("/server-first/todos").infiniteQueryOptions({
 });
 
 const serverStreamOptions = serverTq
-	.get("/server-first/todos/stream")
+	.$get("/server-first/todos/stream")
 	.streamedQueryOptions();
 expectAssignable<Promise<Array<{ id: string; title: string }>>>(
 	queryClient.fetchQuery(serverStreamOptions),
 );
 
-expectError(serverTq.get("/server-first/missing"));
-expectError(serverTq.post("/server-first/todos/:id"));
+expectError(serverTq.$get("/server-first/missing"));
+expectError(serverTq.$post("/server-first/todos/:id"));
 expectError(
-	serverTq.get("/server-first/todos/:id").queryOptions({ id: "todo-1" }),
+	serverTq.$get("/server-first/todos/:id").queryOptions({ id: "todo-1" }),
 );
-expectError(serverTq.sse("/server-first/events"));
+expectError(serverTq.$sse("/server-first/events"));
 expectNotAssignable<{ id: string }>(null as unknown as CreateTodoVariables);
 
 type ProjectEventsStreamedData = RouteStreamedQueryData<

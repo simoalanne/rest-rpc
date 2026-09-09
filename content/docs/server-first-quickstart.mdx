@@ -158,7 +158,7 @@ const client = initClient<typeof routes>({
 	baseUrl: "https://api.example.com",
 });
 
-const todo = await client.post("/todos").fetch({
+const todo = await client.$post("/todos").fetch({
 	body: { title: "Ship v1" },
 });
 ```
@@ -176,7 +176,7 @@ const tq = createTanstackQueryHelpers<typeof routes>({
 });
 
 const createTodo = useMutation(
-	tq.post("/todos").mutationOptions({
+	tq.$post("/todos").mutationOptions({
 		onSuccess(response) {
 			console.log(response.body.id);
 		},

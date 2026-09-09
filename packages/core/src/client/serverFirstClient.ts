@@ -131,8 +131,8 @@ type SelectorName<TImplementation> = TImplementation extends {
 	route: infer TRoute extends BaseRouteDeclaration;
 }
 	? TRoute extends { mode: "sse" }
-		? "sse"
-		: Lowercase<TRoute["method"]>
+		? "$sse"
+		: `$${Lowercase<TRoute["method"]>}`
 	: never;
 
 type SelectorPath<
