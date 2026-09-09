@@ -8,6 +8,7 @@ server handlers, fetch clients, openAPI documents, and more from it.
 ## Features
 
 - Shared TypeScript contracts for HTTP APIs.
+- Server-first and contract-first development approaches for maximum flexibility.
 - Typed server handlers for Express, Hono, Fastify, NestJS, Node.js, and Fetch runtimes.
 - Typed fetch client.
 - Typed TanStack Query helpers.
@@ -16,6 +17,8 @@ server handlers, fetch clients, openAPI documents, and more from it.
 - Standard Schema support.
 
 ## Minimal Example
+
+### Contract-first approach
 
 Define a contract
 
@@ -53,6 +56,54 @@ const client = initClient(api, {
 
 const todo = await client.todos.getById.fetch({
 	id: "todo_1",
+});
+```
+
+### Server-first approach
+
+Define and implement the server route
+
+```ts
+import { createServer } from "node:http";
+import { route, createRouteHandler } from "@rest-rpc/node";
+import { z } from "zod";
+
+export const routes = {
+	todos: {
+		create: route
+			.post("/todos")
+			.body(z.object({ title: z.string().min(1) }))
+			.handler(({ title }) => ({
+				status: 201,
+				body: { id: crypto.randomUUID(), title, completed: false },
+			})),
+	},
+};
+
+const handle = createRouteHandler(routes);
+
+const server = createServer(async (request, response) => {
+	const { matched } = await handle(request, response);
+	if (!matched) {
+		response.writeHead(404).end("Not found");
+	}
+});
+
+server.listen(3000);
+```
+
+Create a client from the same contract
+
+```ts
+import { initClient } from "@rest-rpc/core";
+import type { routes } from "./server";
+
+const client = initClient<typeof routes>({
+	baseUrl: "https://api.example.com",
+});
+
+const todo = await client.post("/todos").fetch({
+	body: { title: "Ship v1" },
 });
 ```
 

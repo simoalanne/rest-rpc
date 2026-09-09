@@ -3,7 +3,7 @@ import { defineMeta } from "blume";
 export default defineMeta({
 	pages: [
 		"quickstart",
-		"server-first",
+		"server-first-quickstart",
 		"shorthand-vs-explicit",
 		"comparison",
 		"api-reference",

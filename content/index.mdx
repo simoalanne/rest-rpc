@@ -133,9 +133,13 @@ curl -X PATCH "https://api.example.com/todos/todo_1?notify=true" \
 
 </Tab>
 </Tabs>
+:::tip
+Prefer deriving the client from server implementations instead?
+Read [Server-first approach](/docs/server-first-quickstart).
+:::
 
 :::tip
-Prefer explicit HTTP request segments, or want to see which APIs are shorthand?
+Prefer explicit HTTP request segments over flattened request keys?
 Read [Shorthand vs Explicit](/docs/shorthand-vs-explicit/).
 :::
 
@@ -145,6 +149,10 @@ Read [Shorthand vs Explicit](/docs/shorthand-vs-explicit/).
 	<Card title="REST contract" icon="route" type="check">
 		Build methods, paths, request locations, response bodies, and metadata with
 		a fluent API that keeps invalid combinations out of the contract.
+	</Card>
+	<Card title="Server-first support" icon="server" type="check">
+		Contract isn't mandatory. The client can also be derived from server
+		implementations, when contract feels like too much work.
 	</Card>
 	<Card title="Composable route builders" icon="blocks" type="check">
 		Create configured factories with `route.with()` to share prefixes, headers,
@@ -243,6 +251,11 @@ shape.
 		the value came. This and other shorthand features are just defaults; you can
 		make them explicit if you want. Read [Shorthand vs
 		Explicit](/docs/shorthand-vs-explicit/) to understand the design.
+	</AccordionItem>
+	<AccordionItem title="I don't want to declare a contract?">
+		You don't have to. rest-rpc also supports server-first approach if you'd
+		rather derive the client from server implementations. Read [Server-first
+		approach](/docs/server-first-quickstart/) to see how that works.
 	</AccordionItem>
 	<AccordionItem title="What happens when something breaks?">
 		You debug the same boundary you would debug by hand: method, path, query,

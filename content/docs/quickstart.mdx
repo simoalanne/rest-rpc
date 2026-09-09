@@ -27,7 +27,8 @@ This guide builds one `todos.create` route from a shared contract.
 ## Install Packages
 
 This guide uses Zod and Express by default. The same contract works with the
-other server tabs below.
+other server tabs below. The validation library can be replaced with any library
+implementing the [Standard Schema](https://standard-schema.dev/) or a built-in type-only schema.
 
 <Tabs>
 <Tab title="pnpm">
@@ -187,7 +188,7 @@ export const api = {
 </Tab>
 </Tabs>
 
-## Server implementation
+## Implement The Contract
 
 Implement the contract on the server with the framework of your choice.
 
@@ -506,12 +507,14 @@ const routes = {
 };
 const handle = createRouteHandler(routes);
 
-createServer(async (request, response) => {
+const server = createServer(async (request, response) => {
 	const { matched } = await handle(request, response);
 	if (!matched) {
 		response.writeHead(404).end("Not found");
 	}
-}).listen(3000);
+});
+
+server.listen(3000);
 ```
 
 </Tab>
@@ -551,7 +554,7 @@ export default {
 </Tab>
 </Tabs>
 
-## Client implementation
+## Create a Client
 
 Use the same contract to create a typed client.
 
@@ -660,3 +663,4 @@ createTodo.mutate({
 - [Server adapters](/docs/server/express/) cover framework-specific setup.
 - [Fetch Client](/docs/client/fetch-client/) and [TanStack Query](/docs/client/tanstack-query/)
   cover client behavior in more detail.
+- [Server-first Quickstart](/docs/server-first-quickstart/) covers the server-first approach if that feels more natural to you.

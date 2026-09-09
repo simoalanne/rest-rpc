@@ -1,0 +1,81 @@
+---
+title: Client
+description: Understand the client-side differences when types come from a server implementation.
+---
+
+This page only covers what changes from a contract-first client. Fetch options,
+response handling, streaming, errors, and TanStack Query behavior otherwise work
+as described in [Fetch Client](/docs/client/fetch-client/) and
+[TanStack Query](/docs/client/tanstack-query/).
+
+## Derive Routes From The Server
+
+Pass the implementation tree as a type parameter instead of passing a contract
+value. Use a type-only import so the server module is not included in the client
+bundle.
+
+```ts
+import { initClient } from "@rest-rpc/core";
+import type { routes } from "./server";
+
+export const client = initClient<typeof routes>({
+	baseUrl: "https://api.example.com",
+});
+```
+
+Select a route by its HTTP method and literal path instead of its object-tree
+keys. Request values are always grouped by HTTP location.
+
+```ts
+await client.patch("/todos/:id").fetch({
+	params: { id: "todo_1" },
+	query: { notify: true },
+	body: { title: "Ship docs" },
+});
+```
+
+## Mark Explicit Request Encodings
+
+For form, multipart, custom bodies, and JSON query, wrap the value with the
+matching `request.formBody()`, `request.multipartBody()`,
+`request.customBody()`, or `request.jsonQuery()` helper so the client knows how
+to encode it.
+
+```ts
+import { request } from "@rest-rpc/core";
+
+await client.post("/uploads").fetch({
+	body: request.multipartBody({ title: "Screenshot", file }),
+});
+```
+
+The payload types and encoding behavior are documented in
+[HTTP Requests](/docs/http-requests/).
+
+## Expose Response Metadata Through CORS
+
+For cross-origin browser clients, expose the response-kind header set by the
+server adapter so the client can decode inferred responses:
+
+```http
+Access-Control-Expose-Headers: X-Rest-Rpc-Response-Kind
+```
+
+## TanStack Query
+
+Pass the implementation tree as a type parameter, then select helpers by method
+and path. Their request values use the same grouped shape and encoding wrappers
+as the Fetch client.
+
+```ts
+import { createTanstackQueryHelpers } from "@rest-rpc/tanstack-query";
+import type { routes } from "./server";
+
+const tq = createTanstackQueryHelpers<typeof routes>({
+	baseUrl: "https://api.example.com",
+});
+
+const options = tq.get("/todos/:id").queryOptions({
+	params: { id: "todo_1" },
+});
+```

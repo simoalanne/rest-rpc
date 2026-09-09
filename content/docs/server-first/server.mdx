@@ -1,0 +1,75 @@
+---
+title: Server
+description: Understand the server-side differences when routes and handlers are defined together.
+---
+
+This page only covers what changes from contract-first handlers. Request
+schemas, validation, encodings, and adapter integration otherwise work as
+described in [HTTP Requests](/docs/http-requests/),
+[Node HTTP](/docs/server/node/), and [Fetch Runtime](/docs/server/fetch/).
+
+## Define The Handler On The Route
+
+Import `route` from the Node or Fetch adapter and end the route chain with
+`.handler()` instead of passing a contract route to `implement()`.
+
+```ts
+import { route } from "@rest-rpc/node";
+import { z } from "zod";
+
+const getTodo = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.handler(({ id }) => {
+		const todo = findTodo(id);
+
+		return todo
+			? { status: 200 as const, body: todo }
+			: {
+					status: 404 as const,
+					body: { code: "TODO_NOT_FOUND" },
+				};
+	});
+```
+
+## Infer Responses From The Handler
+
+Without `.response()` declarations, the handler return type defines the route's
+response union:
+
+| Handler return                                 | Inferred response      |
+| ---------------------------------------------- | ---------------------- |
+| `{ status }`                                   | Empty response         |
+| `{ status, body }`                             | JSON response          |
+| `{ status, body: AsyncIterable }`              | NDJSON stream          |
+| `{ status, contentType, body }`                | Custom response        |
+| `{ status, contentType, body: AsyncIterable }` | Custom response stream |
+
+Each returned literal status becomes a member of the client-visible response
+union.
+
+:::hint
+To avoid the status being widened to `number` for inferred responses, use `as const` to preserve the literal type.
+This allows the client to narrow the response type based on the status code correctly.
+:::
+
+## Declare Responses When Needed
+
+Response declarations remain available. Adding `.response()` makes those
+declarations the source of the response type and enables the same response
+schemas, headers, validation, and handler return forms documented in
+[HTTP Responses](/docs/http-responses/).
+
+```ts
+const getTodo = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.response(200, todoSchema)
+	.response(404, notFoundSchema)
+	.handler(({ id }) => {
+		const todo = findTodo(id);
+		return todo
+			? { status: 200, body: todo }
+			: { status: 404, body: { code: "TODO_NOT_FOUND" } };
+	});
+```

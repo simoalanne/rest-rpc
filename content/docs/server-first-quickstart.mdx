@@ -1,0 +1,204 @@
+---
+title: Server-first Quickstart
+description: Learn how to use rest-rpc with server-first approach
+---
+
+While rest-rpc is primarily designed for contract-first development,
+it can also be used server-first. In server-first development, the
+client is derived from the server implementation automatically.
+
+This is useful when:
+
+- You don't want to create a separate package for the API contract
+- Server implementation should be the single source of truth
+- You want the least amount of boilerplate possible
+- You are more used to thinking in terms of server routes than API contracts
+
+This guide mirrors the [Quickstart](../quickstart) guide, but with a server-first approach.
+
+<Steps>
+	<Step title="Install packages">
+		Add the core package, a schema library, and the adapter for the server
+		framework you want to use.
+	</Step>
+	<Step title="Define and Implement the server route">
+		Write server handlers using any Fetch or Node HTTP adapter compatible
+		framework.
+	</Step>
+	<Step title="Call it from the client">
+		Create a typed fetch client or TanStack Query helpers from the same
+		contract.
+	</Step>
+</Steps>
+
+## Install Packages
+
+This guide uses Zod and Node.js HTTP by default. The validation library can be replaced with any library
+implementing the [Standard Schema](https://standard-schema.dev/) or a built-in type-only schema.
+
+<Tabs>
+<Tab title="pnpm">
+
+```bash
+pnpm add @rest-rpc/core @rest-rpc/node zod
+```
+
+</Tab>
+<Tab title="npm">
+
+```bash
+npm install @rest-rpc/core @rest-rpc/node zod
+```
+
+</Tab>
+<Tab title="yarn">
+
+```bash
+yarn add @rest-rpc/core @rest-rpc/node zod
+```
+
+</Tab>
+<Tab title="bun">
+
+```bash
+bun add @rest-rpc/core @rest-rpc/node zod
+```
+
+</Tab>
+</Tabs>
+
+The server-first approach is currently implemented to `@rest-rpc/node` and `@rest-rpc/fetch` adapters.
+These adapters can generally be used inside any framework that is built on Node.js HTTP or Fetch API.
+
+For the TanStack Query client example, also install:
+
+```bash
+pnpm add @rest-rpc/tanstack-query @tanstack/react-query
+```
+
+## Define routes on the server
+
+<Tabs>
+<Tab title="Node.js HTTP">
+
+```ts
+import { createServer } from "node:http";
+import { route, createRouteHandler } from "@rest-rpc/node";
+import { z } from "zod";
+
+export const routes = {
+	todos: {
+		create: route
+			.post("/todos")
+			.body(z.object({ title: z.string().min(1) }))
+			.handler(({ title }) => ({
+				status: 201,
+				body: { id: crypto.randomUUID(), title, completed: false },
+			})),
+	},
+};
+
+const handle = createRouteHandler(routes);
+
+const server = createServer(async (request, response) => {
+	const { matched } = await handle(request, response);
+	if (!matched) {
+		response.writeHead(404).end("Not found");
+	}
+});
+
+server.listen(3000);
+```
+
+</Tab>
+<Tab title="Fetch API">
+
+```ts
+import { route, createRouteHandler } from "@rest-rpc/fetch";
+import { z } from "zod";
+
+export const routes = {
+	todos: {
+		create: route
+			.post("/todos")
+			.body(z.object({ title: z.string().min(1) }))
+			.handler(async ({ title }) => ({
+				status: 201 as const,
+				body: { id: crypto.randomUUID(), title, completed: false },
+			})),
+	},
+};
+
+const handle = createRouteHandler(routes);
+
+export default {
+	async fetch(request: Request) {
+		const result = await handle(request);
+		return result.matched
+			? result.response
+			: new Response("Not found", { status: 404 as const });
+	},
+};
+```
+
+</Tab>
+</Tabs>
+
+## Create a Client
+
+<Tabs>
+
+<Tab title="Fetch Client">
+
+```ts
+import { initClient } from "@rest-rpc/core";
+import type { routes } from "./server";
+
+const client = initClient<typeof routes>({
+	baseUrl: "https://api.example.com",
+});
+
+const todo = await client.post("/todos").fetch({
+	body: { title: "Ship v1" },
+});
+```
+
+</Tab>
+<Tab title="TanStack Query">
+
+```ts
+import { createTanstackQueryHelpers } from "@rest-rpc/tanstack-query";
+import { useMutation } from "@tanstack/react-query";
+import type { routes } from "./server";
+
+const tq = createTanstackQueryHelpers<typeof routes>({
+	baseUrl: "http://localhost:3000",
+});
+
+const createTodo = useMutation(
+	tq.post("/todos").mutationOptions({
+		onSuccess(response) {
+			console.log(response.body.id);
+		},
+	}),
+);
+
+createTodo.mutate({
+	title: "Ship v1",
+});
+```
+
+</Tab>
+</Tabs>
+
+## Next Steps
+
+- [Server-first Server](/docs/server-first/server/) covers request and response
+  inference.
+- [Server-first Client](/docs/server-first/client/) covers grouped inputs,
+  special request encodings, and TanStack Query differences.
+- [HTTP Requests](/docs/http-requests/) and [HTTP Responses](/docs/http-responses/)
+  cover behavior shared with contract-first routes.
+- [Node HTTP](/docs/server/node/) and [Fetch Runtime](/docs/server/fetch/) cover
+  adapter setup and options.
+- [Contract-first Quickstart](/docs/quickstart/) covers the contract-first approach if that feels more natural to you.
