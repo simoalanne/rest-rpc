@@ -65,9 +65,9 @@ export const runRequestValidationSuite = (
 
 		it("coerces string wire values when the route schemas opt in", async () => {
 			const bodyResponse = await client.coerce({
-				id: 123,
-				published: "true",
-				"x-page": "2",
+				params: { id: 123 },
+				query: { published: "true" },
+				headers: { "x-page": "2" },
 			});
 			assert.equal(bodyResponse.status, 200);
 			const body = bodyResponse.body;
@@ -80,7 +80,11 @@ export const runRequestValidationSuite = (
 		});
 
 		it("preserves empty query string values", async () => {
-			const response1 = await client.emptyQuery({ value: "" });
+			const response1 = await client.emptyQuery({
+				query: {
+					value: "",
+				},
+			});
 			assert.equal(response1.status, 200);
 			assert.deepEqual(response1.body, {
 				value: "",
@@ -107,7 +111,9 @@ export const runRequestValidationSuite = (
 
 		it("rejects params that do not match the route schema", async () => {
 			const response = await client.params({
-				id: "123",
+				params: {
+					id: "123",
+				},
 			} as never);
 
 			await assertValidationResponse(response, "params");
@@ -115,7 +121,9 @@ export const runRequestValidationSuite = (
 
 		it("rejects query values that do not match the route schema", async () => {
 			const response = await client.query({
-				page: 2,
+				query: {
+					page: 2,
+				},
 			});
 
 			await assertValidationResponse(response, "query");
@@ -129,7 +137,9 @@ export const runRequestValidationSuite = (
 
 		it("rejects JSON bodies that do not match the route schema", async () => {
 			const response = await client.body({
-				count: "3",
+				body: {
+					count: "3",
+				},
 			} as never);
 
 			await assertValidationResponse(response, "body");

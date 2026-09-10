@@ -105,15 +105,13 @@ type ClientRequestQuery<TQuery> =
 		: TQuery;
 
 type ServerFirstRequestDeclaration<TRequest> = TRequest extends object
-	? Omit<TRequest, "body" | "query" | "flattenKeys"> &
+	? Omit<TRequest, "body" | "query"> &
 			(TRequest extends { body: infer TBody }
 				? { body: ClientRequestBody<TBody> }
 				: unknown) &
 			(TRequest extends { query: infer TQuery }
 				? { query: ClientRequestQuery<TQuery> }
-				: unknown) & {
-				flattenKeys: false;
-			}
+				: unknown)
 	: never;
 
 type ImplementationUnion<TTree> = TTree extends {
@@ -272,10 +270,7 @@ type ServerFirstShorthandClientTree<TNode> = unknown extends TNode
 /** Options used to create a server-first Fetch client. */
 export type ServerFirstClientOptions<
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
-> = Omit<
-	ApiClientOptions<TGlobalHeaders>,
-	"strictRequestKeys" | "validateResponses"
->;
+> = Omit<ApiClientOptions<TGlobalHeaders>, "validateResponses">;
 
 type ServerFirstRequestInput = {
 	body?: unknown;
@@ -334,7 +329,7 @@ const createRuntimeRoute = (
 	path: string,
 	input: ServerFirstRequestInput | undefined,
 ) => {
-	const requestDeclaration: ClientRequestDeclaration = { flattenKeys: false };
+	const requestDeclaration: ClientRequestDeclaration = {};
 	const normalizedInput: ServerFirstRequestInput = { ...input };
 	const tagInput: ServerFirstRequestInput = { ...input };
 
@@ -359,7 +354,7 @@ const createRuntimeRoute = (
 						kind: "customBody",
 						...(body.contentType ? { contentType: body.contentType } : {}),
 					};
-					normalizedInput.body = { body: body.value };
+					normalizedInput.body = body.value;
 					break;
 				default:
 					throw new Error("Unsupported server-first request encoding.");
@@ -378,7 +373,7 @@ const createRuntimeRoute = (
 			requestDeclaration.query = {
 				kind: "jsonQuery",
 			};
-			normalizedInput.query = { query: query.value };
+			normalizedInput.query = query.value;
 			tagInput.query = query.value;
 		} else {
 			requestDeclaration.query = {};
@@ -422,7 +417,7 @@ const executeShorthandRequest = async (
 	const route: ClientRequestRoute = {
 		method: "POST",
 		path: `/${path.join("/")}`,
-		...(hasInput ? { request: { body: {}, flattenKeys: false as const } } : {}),
+		...(hasInput ? { request: { body: {} } } : {}),
 	};
 	const rawResponse = await executeRequest(
 		route,
@@ -445,7 +440,6 @@ export const createServerFirstClient = <
 ): ServerFirstClientFor<TTree, TGlobalHeaders> => {
 	const requestOptions: ExecuteRequestOptions = {
 		...options,
-		strictRequestKeys: true,
 	};
 	const createShorthandNamespace = (path: string[]): unknown =>
 		new Proxy(
@@ -483,7 +477,6 @@ export const createServerFirstClient = <
 									options.baseUrl,
 									route,
 									requestInput,
-									true,
 								);
 								return openSseConnection(
 									{ ...route, mode: "sse" } as RouteDeclaration,

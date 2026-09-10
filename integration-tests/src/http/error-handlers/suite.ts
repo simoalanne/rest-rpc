@@ -31,7 +31,9 @@ export const runErrorHandlersSuite = (adapter: ErrorHandlersSuiteAdapter) => {
 
 		it("uses custom request validation error responses", async () => {
 			const response = await client.validation({
-				page: 2,
+				query: {
+					page: 2,
+				},
 			});
 
 			assert.equal(response.status, 422);

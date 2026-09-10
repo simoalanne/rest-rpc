@@ -43,11 +43,11 @@ class TodoRepository {
 class TodoService implements RouteHandlers<typeof api.todos> {
 	constructor(private readonly todos: TodoRepository) {}
 
-	get({ id, context }: RouteRequest<typeof api.todos.get>) {
+	get({ params: { id }, context }: RouteRequest<typeof api.todos.get>) {
 		return this.todos.findForUser(id, context.userId);
 	}
 
-	create({ title, context }: RouteRequest<typeof api.todos.create>) {
+	create({ body: { title }, context }: RouteRequest<typeof api.todos.create>) {
 		return {
 			status: 201 as const,
 			body: this.todos.createForUser({ title, userId: context.userId }),
@@ -117,7 +117,7 @@ class TodoController {
 
 	@Route(api.todos.get)
 	getTodo() {
-		return route(api.todos.get, ({ id, context }) => {
+		return route(api.todos.get, ({ params: { id }, context }) => {
 			return this.todos.findForUser(id, context.userId);
 		});
 	}
@@ -152,8 +152,8 @@ class TodoController {
 	@Router(api.todos)
 	todosRouter(@Headers("x-user-id") userId: string) {
 		return router(api.todos, {
-			get: ({ id }) => this.todos.findForUser(id, userId),
-			create: ({ title }) => ({
+			get: ({ params: { id } }) => this.todos.findForUser(id, userId),
+			create: ({ body: { title } }) => ({
 				status: 201 as const,
 				body: this.todos.createForUser(title, userId),
 			}),
@@ -229,7 +229,10 @@ type TenantContext = {
 class TodoService implements RouteHandlers<typeof api.todos> {
 	constructor(private readonly todos: TodoRepository) {}
 
-	get({ id, context }: RouteRequest<typeof api.todos.get, TenantContext>) {
+	get({
+		params: { id },
+		context,
+	}: RouteRequest<typeof api.todos.get, TenantContext>) {
 		return this.todos.findForUser(id, context.tenant);
 	}
 }

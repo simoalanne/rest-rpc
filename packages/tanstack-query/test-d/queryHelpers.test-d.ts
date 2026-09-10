@@ -52,10 +52,10 @@ const validatedQueryTq = createTanstackQueryHelpers(validatedQueryApi, {
 type ValidatedQueryOptionsParameters = Parameters<
 	typeof validatedQueryTq.test.queryOptions
 >;
-expectType<{ id: string }>(
+expectType<{ params: { id: string } }>(
 	undefined as unknown as Extract<
 		ValidatedQueryOptionsParameters[0],
-		{ id: string }
+		{ params: { id: string } }
 	>,
 );
 
@@ -71,7 +71,11 @@ expectAssignable<CreateTanstackQueryHelpersOptions>({
 	baseUrl: "https://example.test",
 });
 
-const getOptions = queryTq.todos.get.queryOptions({ id: "todo-1" });
+const getOptions = queryTq.todos.get.queryOptions({
+	params: {
+		id: "todo-1",
+	},
+});
 expectAssignable<readonly unknown[]>(getOptions.queryKey);
 expectAssignable<
 	Promise<{
@@ -106,7 +110,9 @@ queryClient.setQueryData(getOptions.queryKey, (current) => {
 type GetTodoData = RouteQueryData<typeof queryApi.todos.get>;
 const selectedGetOptions = queryTq.todos.get.queryOptions(
 	{
-		id: "todo-1",
+		params: {
+			id: "todo-1",
+		},
 	},
 	{
 		select(data) {
@@ -177,7 +183,9 @@ expectAssignable<TanstackQueryHelpersFor<typeof strictStatusApi>>(
 );
 
 const strictStatusOptions = strictStatusTq.todos.get.queryOptions({
-	id: "todo-1",
+	params: {
+		id: "todo-1",
+	},
 });
 
 expectAssignable<
@@ -317,7 +325,7 @@ expectAssignable<Map<string, string> | undefined>(
 const optionalId: string | undefined = "todo-1";
 
 const skippedOptions = queryTq.todos.get.queryOptions(
-	optionalId ? { id: optionalId } : skipToken,
+	optionalId ? { params: { id: optionalId } } : skipToken,
 	{
 		queryKey: ["todos", "disabled"],
 		staleTime: 100,
@@ -330,9 +338,20 @@ expectAssignable<
 // request and fetch options
 
 // should keep request input and options as separate arguments for request-based routes
-queryTq.todos.get.queryOptions({ id: "todo-1" }, { retry: false });
 queryTq.todos.get.queryOptions(
-	{ id: "todo-1" },
+	{
+		params: {
+			id: "todo-1",
+		},
+	},
+	{ retry: false },
+);
+queryTq.todos.get.queryOptions(
+	{
+		params: {
+			id: "todo-1",
+		},
+	},
 	{
 		fetchOptions: { cache: "reload", credentials: "same-origin" },
 		gcTime: 1_000,
@@ -365,7 +384,7 @@ mutationTq.todos.create.mutationOptions({
 			body: { id: string; title: string };
 			headers: Headers;
 		}>(data);
-		expectType<{ title: string }>(variables);
+		expectType<{ body: { title: string } }>(variables);
 	},
 });
 
@@ -410,19 +429,23 @@ type TodoPageResponseShape = {
 };
 
 type TodoPageRequest = {
-	cursor?: string;
-	status: "open" | "done";
-	limit: number;
+	query: {
+		cursor?: string;
+		status: "open" | "done";
+		limit: number;
+	};
 };
 
 const infiniteOptions = pageTq.todos.page.infiniteQueryOptions({
-	initialRequest: { status: "open", limit: 50 },
-	fetchOptions: { cache: "no-store" },
+	initialRequest: { query: { status: "open", limit: 50 } },
+	fetchOptions: {
+		cache: "no-store",
+	},
 	getNextRequest(lastPage, _allPages, lastRequest) {
 		expectAssignable<TodoPageResponseShape>(lastPage);
 		expectType<TodoPageRequest>(lastRequest);
 		return lastPage.body.nextCursor
-			? { ...lastRequest, cursor: lastPage.body.nextCursor }
+			? { query: { ...lastRequest.query, cursor: lastPage.body.nextCursor } }
 			: undefined;
 	},
 });
@@ -445,7 +468,11 @@ if (cachedInfiniteData) {
 // query keys
 
 // should generate reusable typed keys for QueryClient cache operations
-const getKey = queryTq.todos.get.getKey({ id: "todo-1" });
+const getKey = queryTq.todos.get.getKey({
+	params: {
+		id: "todo-1",
+	},
+});
 expectAssignable<readonly unknown[]>(getKey);
 queryClient.invalidateQueries({ queryKey: getKey });
 queryClient.removeQueries({ queryKey: getKey });
@@ -503,18 +530,43 @@ expectError(invalidTq.todos.get.queryOptions());
 expectError(invalidTq.todos.get.queryOptions({ id: "todo-1", extra: true }));
 expectError(
 	invalidTq.todos.get.queryOptions(
-		{ id: "todo-1" },
+		{
+			params: {
+				id: "todo-1",
+			},
+		},
 		{ fetchOptions: { nope: true } },
 	),
 );
 expectError(invalidTq.todos.get.queryOptions({ retry: false }));
-expectError(invalidTq.todos.list.queryOptions({ id: "todo-1" }));
+expectError(
+	invalidTq.todos.list.queryOptions({
+		params: {
+			id: "todo-1",
+		},
+	}),
+);
 invalidTq.todos.list.queryOptions(undefined, { retry: false });
 expectError(invalidTq.todos.list.queryOptions(skipToken));
 expectError(invalidTq.todos.get.getKey());
-expectError(invalidTq.todos.get.getKey({ id: "todo-1", extra: true }));
+expectError(
+	invalidTq.todos.get.getKey({
+		extra: true,
+		params: {
+			params: {
+				id: "todo-1",
+			},
+		},
+	}),
+);
 expectError(invalidTq.todos.list.getKey({ queryKey: ["todos", "list"] }));
-expectError(invalidTq.todos.get.streamedQueryOptions({ id: "todo-1" }));
+expectError(
+	invalidTq.todos.get.streamedQueryOptions({
+		params: {
+			id: "todo-1",
+		},
+	}),
+);
 invalidTq.normalStream.streamedQueryOptions();
 expectError(invalidTq.ambiguousStream.streamedQueryOptions());
 expectError(
@@ -525,13 +577,13 @@ expectError(
 );
 expectError(
 	invalidTq.todos.page.infiniteQueryOptions({
-		initialRequest: { status: "open", limit: 50, extra: true },
+		initialRequest: { extra: true, query: { status: "open", limit: 50 } },
 		getNextRequest: () => undefined,
 	}),
 );
 expectError(
 	invalidTq.todos.page.infiniteQueryOptions({
-		initialRequest: { status: "open", limit: 50 },
+		initialRequest: { query: { status: "open", limit: 50 } },
 		getNextPageParam: () => undefined,
 	}),
 );
@@ -558,7 +610,7 @@ expectAssignable<{
 type CreateTodoVariables = RouteMutationVariables<
 	typeof mutationApi.todos.create
 >;
-expectType<{ title: string }>(null as unknown as CreateTodoVariables);
+expectType<{ body: { title: string } }>(null as unknown as CreateTodoVariables);
 
 // server-first helpers
 
@@ -569,7 +621,7 @@ const serverRoutes = {
 		get: serverRoute
 			.get("/server-first/todos/:id")
 			.params(schemaType<{ id: string }>())
-			.handler(({ id }) =>
+			.handler(({ params: { id } }) =>
 				id === "missing"
 					? { status: 404 as const, body: { code: "not_found" as const } }
 					: { status: 200 as const, body: { id, title: "Todo" } },
@@ -577,21 +629,24 @@ const serverRoutes = {
 		create: serverRoute
 			.post("/server-first/todos")
 			.body(schemaType<{ title: string }>())
-			.handler(({ title }) => ({
+			.handler(({ body: { title } }) => ({
 				status: 201 as const,
 				body: { id: "todo-1", title },
 			})),
 		page: serverRoute
 			.get("/server-first/todos")
 			.query(schemaType<{ cursor?: string; limit: number }>())
-			.handler(({ cursor, limit }) => ({
+			.handler(({ query: { cursor, limit } }) => ({
 				status: 200 as const,
 				body: { cursor, limit },
 			})),
 		stream: serverRoute.get("/server-first/todos/stream").handler(() => ({
 			status: 200 as const,
 			body: (async function* () {
-				yield { id: "todo-1", title: "Todo" };
+				yield {
+					id: "todo-1",
+					title: "Todo",
+				};
 			})(),
 		})),
 	},
@@ -610,9 +665,11 @@ expectAssignable<ServerFirstTanstackQueryHelpersFor<typeof serverRoutes>>(
 	serverTq,
 );
 
-const serverGetOptions = serverTq
-	.$get("/server-first/todos/:id")
-	.queryOptions({ params: { id: "todo-1" } });
+const serverGetOptions = serverTq.$get("/server-first/todos/:id").queryOptions({
+	params: {
+		id: "todo-1",
+	},
+});
 expectAssignable<
 	Promise<{
 		status: 200;
@@ -646,7 +703,9 @@ expectAssignable<Promise<Array<{ id: string; title: string }>>>(
 expectError(serverTq.$get("/server-first/missing"));
 expectError(serverTq.$post("/server-first/todos/:id"));
 expectError(
-	serverTq.$get("/server-first/todos/:id").queryOptions({ id: "todo-1" }),
+	serverTq.$get("/server-first/todos/:id").queryOptions({
+		id: "todo-1",
+	}),
 );
 expectError(serverTq.$sse("/server-first/events"));
 expectNotAssignable<{ id: string }>(null as unknown as CreateTodoVariables);
@@ -729,16 +788,18 @@ const serverShorthandRoutes = {
 		})),
 		add: shorthandServerRoute
 			.input(schemaType<{ title: string }>())
-			.handler(({ title }) => ({ id: "todo-1", title })),
-		explicit: shorthandServerRoute
-			.get("/todos/:id")
-			.handler(() => ({ status: 204 as const })),
+			.handler(({ input }) => ({ id: "todo-1", title: input.title })),
+		explicit: shorthandServerRoute.get("/todos/:id").handler(() => ({
+			status: 204 as const,
+		})),
 	},
 } as const;
 
 const serverShorthandTq = createTanstackQueryHelpers<
 	typeof serverShorthandRoutes
->({ baseUrl: "https://example.test" });
+>({
+	baseUrl: "https://example.test",
+});
 expectAssignable<
 	ServerFirstTanstackQueryHelpersFor<typeof serverShorthandRoutes>
 >(serverShorthandTq);
@@ -782,5 +843,7 @@ const explicitOnlyServerRoutes = {
 };
 const explicitOnlyServerTq = createTanstackQueryHelpers<
 	typeof explicitOnlyServerRoutes
->({ baseUrl: "https://example.test" });
+>({
+	baseUrl: "https://example.test",
+});
 expectError(explicitOnlyServerTq.admin);

@@ -87,13 +87,13 @@ export const api = {
 ```ts
 const routes = router(api, {
 	todos: {
-		update({ id, title, completed, notify, "x-request-id": requestId }) {
+		update({ params, body, query, headers }) {
 			return updateTodo({
-				id,
-				title,
-				completed,
-				notify,
-				requestId,
+				id: params.id,
+				title: body.title,
+				completed: body.completed,
+				notify: query.notify,
+				requestId: headers["x-request-id"],
 			});
 		},
 	},
@@ -105,11 +105,10 @@ const routes = router(api, {
 
 ```ts
 const response = await client.todos.update({
-	id: "todo_1",
-	title: "Ship the docs",
-	completed: true,
-	notify: true,
-	"x-request-id": "req_123",
+	params: { id: "todo_1" },
+	body: { title: "Ship the docs", completed: true },
+	query: { notify: true },
+	headers: { "x-request-id": "req_123" },
 });
 
 if (response.status === 200) {
@@ -151,8 +150,8 @@ Read [Server-first approach](/docs/server-first-quickstart).
 		global router.
 	</Card>
 	<Card title="Function-shaped usage" icon="braces" type="check">
-		Call `client.todos.get({id})` and implement `get({id})` while the contract
-		keeps the HTTP shape explicit.
+		Call routes through a typed client that mirrors your contract, such as
+		`client.todos.get({ params: { id } })`.
 	</Card>
 	<Card title="Server adapters" icon="plug" type="check">
 		Use Express, Hono, Fastify, NestJS or fetch-native runtimes without moving

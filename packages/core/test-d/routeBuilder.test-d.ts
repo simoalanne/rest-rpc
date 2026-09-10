@@ -51,7 +51,6 @@ const apiRoute = route.with({
 	responses: { 401: unauthorized },
 	metadata: { auth: true as const },
 	openApi: { tags: ["API"] },
-	flattenRequestKeys: true,
 });
 
 // Shorthand route builders
@@ -111,7 +110,6 @@ const create = apiRoute
 	.body(input)
 	.headers(schemaType<{ trace: string }>())
 	.params(schemaType<{ accountId: string }>())
-	.requestKeys({ title: "body", accountId: "params" })
 	.withMetadata({ permission: "todos:create" as const })
 	.withOpenApi({ summary: "Create todo" })
 	.response(201, todo);
@@ -138,7 +136,6 @@ const factoryResponse = apiRoute.get("/factory-response");
 expectAssignable<HttpRouteDeclaration>(factoryResponse);
 expectAssignable<Contract>(factoryResponse);
 expectType<typeof factoryHeaders>(factoryResponse.request.headers.inherited);
-expectType<true>(factoryResponse.request.flattenKeys);
 
 // Preserves factory boolean options as literal route properties.
 const strictRoute = route.with({ strictStatusCodes: true }).get("/strict");
@@ -329,7 +326,6 @@ const configuredAfterResponse = route
 	.jsonQuery(schemaType<{ search: string }>())
 	.params(schemaType<{ id: string }>())
 	.headers(input)
-	.requestKeys({ title: "body", id: "params" })
 	.withMetadata({ auth: true })
 	.withOpenApi({ summary: "Configured after response" })
 	.streamResponse(201, event);
@@ -359,12 +355,11 @@ const singleUseHttpConfigured = route
 	.query(input)
 	.params(input)
 	.headers(input)
-	.requestKeys({ title: "query" })
 	.withMetadata({ auth: true })
 	.withOpenApi({ summary: "single use" });
 expectError(singleUseHttpConfigured.params(input));
 expectError(singleUseHttpConfigured.headers(input));
-expectError(singleUseHttpConfigured.requestKeys({ title: "query" }));
+expectError(singleUseHttpConfigured.requestKeys);
 expectError(singleUseHttpConfigured.withMetadata({ auth: true }));
 expectError(singleUseHttpConfigured.withOpenApi({ summary: "again" }));
 expectAssignable<HttpRouteDeclaration>(singleUseHttpConfigured.response(200));
@@ -384,23 +379,20 @@ expectError(incompleteSse.response(event).response(event));
 
 // Allows each SSE request setter once and remains configurable until response().
 const sseConfiguredBeforeResponse = route
-	.with({ flattenRequestKeys: false })
 	.sse("/configured-events")
 	.query(input)
 	.params(schemaType<{ roomId: string }>())
-	.requestKeys({ title: "query", roomId: "params" })
 	.withMetadata({ public: true })
 	.withOpenApi({ summary: "events" });
 expectError(sseConfiguredBeforeResponse.query(input));
 expectError(sseConfiguredBeforeResponse.jsonQuery(input));
 expectError(sseConfiguredBeforeResponse.params(input));
-expectError(sseConfiguredBeforeResponse.requestKeys({ title: "query" }));
+expectError(sseConfiguredBeforeResponse.requestKeys);
 expectError(sseConfiguredBeforeResponse.withMetadata({ public: false }));
 expectError(sseConfiguredBeforeResponse.withOpenApi({ summary: "again" }));
 // Preserves protocol request configuration after response().
 const sseConfigured = sseConfiguredBeforeResponse.response(event);
 expectType<"/configured-events">(sseConfigured.path);
-expectType<false>(sseConfigured.request.flattenKeys);
 expectType<typeof input>(sseConfigured.request.query);
 expectType<typeof event>(sseConfigured.responses[200]);
 expectError(sseConfigured.body(event));
@@ -415,7 +407,6 @@ const sseConfiguredAfterResponse = route
 	.response(event)
 	.jsonQuery(input)
 	.params(schemaType<{ roomId: string }>())
-	.requestKeys({ query: "query", roomId: "params" })
 	.withMetadata({ public: true })
 	.withOpenApi({ summary: "events" });
 expectType<"jsonQuery">(sseConfiguredAfterResponse.request.query.kind);
@@ -469,7 +460,6 @@ const completeSocket = route
 	.ws("/complete-socket")
 	.query(input)
 	.params(schemaType<{ roomId: string }>())
-	.requestKeys({ title: "query", roomId: "params" })
 	.withMetadata({ public: true })
 	.clientMessage("command", clientMessage)
 	.serverMessage("event", serverMessage);
@@ -478,7 +468,7 @@ expectAssignable<Contract>(completeSocket);
 expectError(completeSocket.query(input));
 expectError(completeSocket.jsonQuery(input));
 expectError(completeSocket.params(input));
-expectError(completeSocket.requestKeys({ title: "query" }));
+expectError(completeSocket.requestKeys);
 expectError(completeSocket.withMetadata({ public: false }));
 expectError(completeSocket.withOpenApi({ summary: "socket" }));
 expectError(completeSocket.response(event));

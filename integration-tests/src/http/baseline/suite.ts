@@ -54,7 +54,9 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 		});
 
 		it("receives JSON success bodies", async () => {
-			const listResponse = await client.items.list({ search: "matched" });
+			const listResponse = await client.items.list({
+				query: { search: "matched" },
+			});
 			assert.equal(listResponse.status, 200);
 			assert.deepEqual(listResponse.body, [
 				{ id: "item-1", title: "matched" },
@@ -64,12 +66,10 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 
 		it("round trips params, query, headers, and JSON body values", async () => {
 			const bodyResponse = await client.echo.json({
-				id: "echo-1",
-				search: "needle",
-				limit: 10,
-				"x-test-token": "token-1",
-				title: "Echo title",
-				count: 3,
+				params: { id: "echo-1" },
+				query: { search: "needle", limit: 10 },
+				headers: { "x-test-token": "token-1" },
+				body: { title: "Echo title", count: 3 },
 			});
 			assert.equal(bodyResponse.status, 200);
 			const body = bodyResponse.body;
@@ -85,11 +85,10 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 
 		it("round trips encoded path params and reserved query characters", async () => {
 			const bodyResponse = await client.echo.json({
-				id: "encoded id/with slash",
-				search: "a+b & c=d ? done",
-				"x-test-token": "token-1",
-				title: "Encoded values",
-				count: 4,
+				params: { id: "encoded id/with slash" },
+				query: { search: "a+b & c=d ? done" },
+				headers: { "x-test-token": "token-1" },
+				body: { title: "Encoded values", count: 4 },
 			});
 			assert.equal(bodyResponse.status, 200);
 			const body = bodyResponse.body;
@@ -104,7 +103,7 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 		});
 
 		it("receives declared 404 responses as values", async () => {
-			const response = await client.items.get({ id: "missing" });
+			const response = await client.items.get({ params: { id: "missing" } });
 
 			assert.equal(response.status, 404);
 			assert.deepEqual(response.body, {
@@ -115,7 +114,9 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 
 		it("receives 201 create responses", async () => {
 			const response = await client.items.create({
-				title: "Created item",
+				body: {
+					title: "Created item",
+				},
 			});
 
 			assert.equal(response.status, 201);
@@ -127,16 +128,16 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 
 		it("receives multiple success statuses", async () => {
 			const ok = await client.items.publish({
-				id: "item-1",
-				async: false,
+				params: { id: "item-1" },
+				body: { async: false },
 			});
 
 			assert.equal(ok.status, 200);
 			assert.deepEqual(ok.body, { id: "item-1", title: "Published item" });
 
 			const accepted = await client.items.publish({
-				id: "item-1",
-				async: true,
+				params: { id: "item-1" },
+				body: { async: true },
 			});
 
 			assert.equal(accepted.status, 202);
@@ -148,8 +149,8 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 
 		it("sends and receives custom text/plain bodies", async () => {
 			const response = await client.echo.text({
-				id: "note-1",
 				body: "hello over real HTTP",
+				params: { id: "note-1" },
 			});
 
 			assert.equal(response.status, 200);

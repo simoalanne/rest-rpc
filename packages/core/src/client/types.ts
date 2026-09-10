@@ -245,6 +245,5 @@ export type ApiClientOptions<
 	getGlobalHeaders?: GetHeadersFn<TGlobalHeaders>;
 	nextFetchTags?: NextFetchTagsOptions;
 	timeoutMs?: number;
-	strictRequestKeys?: boolean;
 	validateResponses?: boolean;
 };

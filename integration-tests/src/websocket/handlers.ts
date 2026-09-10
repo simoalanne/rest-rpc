@@ -21,8 +21,8 @@ export const createWebSocketHandlers = (
 		socket.send({
 			type: "welcome",
 			message: {
-				roomId: request.roomId,
-				mode: request.mode,
+				roomId: request.params.roomId,
+				mode: request.query.mode,
 				adapter,
 			},
 		});
@@ -41,8 +41,8 @@ export const createWebSocketHandlers = (
 				type: "echo",
 				message: {
 					text: message.message.text,
-					roomId: request.roomId,
-					mode: request.mode,
+					roomId: request.params.roomId,
+					mode: request.query.mode,
 				},
 			});
 		});

@@ -88,8 +88,8 @@ export const runWebSocketSuite = (adapter: WebSocketSuiteAdapter) => {
 
 		it("connects and receives route params and query values", async () => {
 			const socket = client.room.openConnection({
-				roomId: "room 1/encoded",
-				mode: "fast",
+				params: { roomId: "room 1/encoded" },
+				query: { mode: "fast" },
 			});
 
 			try {
@@ -110,8 +110,8 @@ export const runWebSocketSuite = (adapter: WebSocketSuiteAdapter) => {
 
 		it("round trips validated client and server messages", async () => {
 			const socket = client.room.openConnection({
-				roomId: "echo-room",
-				mode: "slow",
+				params: { roomId: "echo-room" },
+				query: { mode: "slow" },
 			});
 
 			try {
@@ -138,8 +138,8 @@ export const runWebSocketSuite = (adapter: WebSocketSuiteAdapter) => {
 
 		it("closes invalid client messages with a protocol validation close", async () => {
 			const socket = client.room.openConnection({
-				roomId: "invalid-message-room",
-				mode: "fast",
+				params: { roomId: "invalid-message-room" },
+				query: { mode: "fast" },
 			});
 
 			try {
@@ -158,8 +158,8 @@ export const runWebSocketSuite = (adapter: WebSocketSuiteAdapter) => {
 
 		it("closes when message handlers reject", async () => {
 			const socket = client.room.openConnection({
-				roomId: "handler-failure-room",
-				mode: "fast",
+				params: { roomId: "handler-failure-room" },
+				query: { mode: "fast" },
 			});
 
 			try {

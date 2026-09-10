@@ -340,7 +340,9 @@ describe("prepareWebSocketUpgrade", () => {
 
 		assert.equal(result.ok, true);
 		if (result.ok) {
-			assert.deepEqual(result.request, { roomId: "room-1" });
+			assert.deepEqual(result.request, {
+				params: { roomId: "room-1" },
+			});
 		}
 	});
 
@@ -380,7 +382,9 @@ describe("prepareWebSocketUpgrade", () => {
 			},
 			context: { req: "request" },
 			beforeUpgrade: ({ request, context }) => {
-				assert.deepEqual(request, { roomId: "room-1" });
+				assert.deepEqual(request, {
+					params: { roomId: "room-1" },
+				});
 				assert.deepEqual(context, { req: "request" });
 
 				return {

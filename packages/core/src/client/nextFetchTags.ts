@@ -1,4 +1,3 @@
-import { groupRequestInput } from "./groupRequestInput.ts";
 import type { ClientRequestRoute } from "./requestRoute.ts";
 
 const DEFAULT_NEXT_FETCH_TAG_PREFIX = "rest-rpc";
@@ -52,25 +51,14 @@ const serializeRequest = (request: NextFetchTagRequest | undefined) => {
 };
 
 const getNextFetchTagRequest = (
-	route: ClientRequestRoute,
+	_route: ClientRequestRoute,
 	request: NextFetchTagRequest | undefined,
 ) => {
 	if (!request) return undefined;
 
-	if (route.request?.flattenKeys === false) {
-		return {
-			params: request.params,
-			query: request.query,
-		};
-	}
-
-	const grouped = groupRequestInput(route, request, {
-		strictRequestKeys: false,
-	});
-
 	return {
-		...(grouped.params as Record<string, unknown> | undefined),
-		...(grouped.query as Record<string, unknown> | undefined),
+		params: request.params,
+		query: request.query,
 	};
 };
 

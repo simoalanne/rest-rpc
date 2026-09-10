@@ -74,7 +74,7 @@ describe("initClient", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await client.todos.list({ search: "milk" });
+		await client.todos.list({ query: { search: "milk" } });
 
 		assert.equal(calls[0]?.url, "https://api.test/todos?search=milk");
 	});
@@ -123,7 +123,9 @@ describe("initClient", () => {
 		captureFetch(jsonResponse({ code: "failed" }, 500));
 		const client = initClient(
 			{ todos: { get: route.output(z.object({ id: z.string() })) } },
-			{ baseUrl: "https://api.test" },
+			{
+				baseUrl: "https://api.test",
+			},
 		);
 
 		await assert.rejects(client.todos.get(), Error);

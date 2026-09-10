@@ -4,7 +4,6 @@ import {
 	validateWebSocketMessageSync,
 } from "@rest-rpc/core/contract";
 import type { HttpHeaders } from "./headers.ts";
-import { flattenRequestData } from "./requestData.ts";
 import { RequestValidationError } from "./validationErrors.ts";
 import type {
 	CloseEventLike,
@@ -100,10 +99,7 @@ export async function prepareWebSocketUpgrade<
 	);
 	if (!validation.success) throw new RequestValidationError(validation.issues);
 
-	const request = flattenRequestData(
-		options.implementation.route,
-		validation.data,
-	);
+	const request = validation.data;
 	const rejection = await options.beforeUpgrade?.({
 		route: options.implementation.route,
 		request,

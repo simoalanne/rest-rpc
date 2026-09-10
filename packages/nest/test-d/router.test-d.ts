@@ -36,14 +36,14 @@ const api = {
 // should expose augmented default context and adapter signal to route handlers
 type GetTodoRequest = RouteRequest<typeof api.todos.get>;
 declare const getTodoRequest: GetTodoRequest;
-expectType<string>(getTodoRequest.id);
+expectType<string>(getTodoRequest.params.id);
 expectType<string>(getTodoRequest.context.userId);
 expectType<Request>(getTodoRequest.context.request);
 expectAssignable<AbortSignal>(getTodoRequest.context.signal);
 
 const getTodoHandler: RouteHandler<typeof api.todos.get> = ({
-	id,
 	context,
+	params: { id },
 }) => {
 	expectType<string>(id);
 	expectType<string>(context.userId);
@@ -70,7 +70,7 @@ expectType<typeof api.todos.get>(todoImplementations.get.route);
 router(
 	api.todos,
 	{
-		get: ({ id, context }) => {
+		get: ({ context, params: { id } }) => {
 			expectError(context.tenant);
 
 			return {
@@ -89,7 +89,7 @@ router(
 
 route(
 	api.todos.get,
-	({ id, context }) => {
+	({ context, params: { id } }) => {
 		expectError(context.tenant);
 
 		return {
@@ -107,7 +107,7 @@ route(
 
 route<typeof api.todos.get, { tenant: string }>(
 	api.todos.get,
-	({ id, context }) => {
+	({ context, params: { id } }) => {
 		expectType<string>(context.userId);
 		expectType<Request>(context.request);
 		expectType<string>(context.tenant);
@@ -122,7 +122,10 @@ route<typeof api.todos.get, { tenant: string }>(
 );
 
 class TenantTodoHandlers implements RouteHandlers<typeof api.todos> {
-	get({ id, context }: RouteRequest<typeof api.todos.get, { tenant: string }>) {
+	get({
+		context,
+		params: { id },
+	}: RouteRequest<typeof api.todos.get, { tenant: string }>) {
 		expectType<string>(context.userId);
 		expectType<Request>(context.request);
 		expectType<string>(context.tenant);

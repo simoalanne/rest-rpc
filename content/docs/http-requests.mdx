@@ -4,12 +4,12 @@ description: Learn how to handle different types of HTTP requests with rest-rpc
 ---
 
 ```ts
-const todosResponse = await client.todos.list({ limit: 10 });
+const todosResponse = await client.todos.list({ query: { limit: 10 } });
 
 if (todosResponse.status === 200) {
 	const todos = todosResponse.body;
 }
-const todoResponse = await client.todos.byId({ id: "1" });
+const todoResponse = await client.todos.byId({ params: { id: "1" } });
 
 if (todoResponse.status === 200) {
 	const todo = todoResponse.body;
@@ -17,9 +17,6 @@ if (todoResponse.status === 200) {
 ```
 
 ## Request With JSON Body
-
-Regular JSON request bodies are declared with `.body(schema)`. Fields from an
-object schema are flattened into the client call and server handler by default.
 
 ```ts
 export const api = {
@@ -40,7 +37,7 @@ export const api = {
 ```ts
 export const routes = router(api, {
 	todos: {
-		create({ title, labels }) {
+		create({ body: { title, labels } }) {
 			return createTodo({ title, labels });
 		},
 	},
@@ -49,8 +46,7 @@ export const routes = router(api, {
 
 ```ts
 const response = await client.todos.create({
-	title: "Write docs",
-	labels: ["docs"],
+	body: { title: "Write docs", labels: ["docs"] },
 });
 
 if (response.status === 201) {
@@ -84,10 +80,10 @@ export const api = {
 ```ts
 export const routes = router(api, {
 	todos: {
-		list({ limit }) {
+		list({ query: { limit } }) {
 			return listTodos({ limit });
 		},
-		byId({ id }) {
+		byId({ params: { id } }) {
 			return getTodoById({ id });
 		},
 	},

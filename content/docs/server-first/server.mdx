@@ -20,7 +20,7 @@ import { z } from "zod";
 const getTodo = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
-	.handler(({ id }) => {
+	.handler(({ params: { id } }) => {
 		const todo = findTodo(id);
 
 		return todo
@@ -67,7 +67,7 @@ const getTodo = route
 	.params(z.object({ id: z.string() }))
 	.response(200, todoSchema)
 	.response(404, notFoundSchema)
-	.handler(({ id }) => {
+	.handler(({ params: { id } }) => {
 		const todo = findTodo(id);
 		return todo
 			? { status: 200, body: todo }

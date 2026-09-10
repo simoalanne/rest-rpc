@@ -18,7 +18,7 @@ This gives you full type inference with very little ceremony and works well for 
 const routes = router(api, {
 	todos: {
 		async get(request) {
-			const todo = await store.get(request.id);
+			const todo = await store.get(request.params.id);
 
 			return {
 				status: 200,
@@ -62,7 +62,7 @@ class TodoService implements RouteHandlers<typeof api.todos> {
 	constructor(private readonly store: TodoStore) {}
 
 	async get(request: RouteRequest<typeof api.todos.get>) {
-		const todo = await this.store.get(request.id);
+		const todo = await this.store.get(request.params.id);
 
 		return {
 			status: 200 as const,
@@ -71,7 +71,7 @@ class TodoService implements RouteHandlers<typeof api.todos> {
 	}
 
 	async create(request: RouteRequest<typeof api.todos.create>) {
-		const todo = await this.store.create({ title: request.title });
+		const todo = await this.store.create({ title: request.body.title });
 
 		return {
 			status: 201 as const,
@@ -98,7 +98,7 @@ Nest lifecycle.
 class TodoService implements RouteHandlers<typeof api.todos> {
 	constructor(private readonly store: TodoStore) {}
 
-	get({ id }: RouteRequest<typeof api.todos.get>) {
+	get({ params: { id } }: RouteRequest<typeof api.todos.get>) {
 		return this.store.get(id);
 	}
 }
@@ -126,7 +126,7 @@ you can use the `RouteRequest` type helper for each method to get the correct re
 ```ts
 class TodoService implements RouteHandlers<typeof api.todos> {
 	get(request: RouteRequest<typeof api.todos.get>) {
-		return this.store.get(request.id);
+		return this.store.get(request.params.id);
 	}
 }
 ```
@@ -148,8 +148,8 @@ class TodoService implements RouteHandlers<typeof api.todos> {
 
 	get(request: RouteRequest<typeof api.todos.get>) {
 		return {
-			id: request.id,
-			title: `${this.prefix}-${request.id}`,
+			id: request.params.id,
+			title: `${this.prefix}-${request.params.id}`,
 		};
 	}
 }

@@ -31,12 +31,16 @@ Choose contract-first when the contract is independently shared, must generate O
 
 ```ts
 import { route } from "@rest-rpc/node";
+import { z } from "zod";
 
 export const routes = {
-	getTodo: route.get("/todos/:id").handler(({ id }) => ({
-		status: 200 as const,
-		body: { id, title: "Example" },
-	})),
+	getTodo: route
+		.get("/todos/:id")
+		.params(z.object({ id: z.string() }))
+		.handler(({ params: { id } }) => ({
+			status: 200 as const,
+			body: { id, title: "Example" },
+		})),
 };
 ```
 
@@ -69,7 +73,7 @@ import { api } from "./contract";
 
 const routes = router(api, {
 	todos: {
-		getById({ id }) {
+		getById({ params: { id } }) {
 			return getTodo(id);
 		},
 	},
@@ -89,7 +93,7 @@ const client = initClient(api, {
 });
 
 const response = await client.todos.getById({
-	id: "todo_1",
+	params: { id: "todo_1" },
 });
 
 if (response.status === 200) {
@@ -111,7 +115,7 @@ export const routes = {
 		create: route
 			.post("/todos")
 			.body(z.object({ title: z.string().min(1) }))
-			.handler(({ title }) => ({
+			.handler(({ body: { title } }) => ({
 				status: 201,
 				body: { id: crypto.randomUUID(), title, completed: false },
 			})),
@@ -140,7 +144,7 @@ const client = initClient<typeof routes>({
 	baseUrl: "https://api.example.com",
 });
 
-// tree-shaped call is replaced with explicit method, path and non-flattened request.
+// Select the HTTP method and path, then provide explicit request segments.
 const response = await client.$post("/todos", {
 	body: { title: "Ship v1" },
 });

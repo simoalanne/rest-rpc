@@ -51,7 +51,7 @@ import { useQuery } from "@tanstack/react-query";
 
 const todo = useQuery(
 	tq.todos.get.queryOptions({
-		id: "todo_1",
+		params: { id: "todo_1" },
 	}),
 );
 ```
@@ -72,7 +72,9 @@ To disable a query in type-safe way you can use `skipToken` as request input.
 import { skipToken } from "@tanstack/query-core";
 
 const todo = useQuery(
-	tq.todos.get.queryOptions(selectedId ? { id: selectedId } : skipToken),
+	tq.todos.get.queryOptions(
+		selectedId ? { params: { id: selectedId } } : skipToken,
+	),
 );
 ```
 
@@ -81,7 +83,7 @@ You can pass normal TanStack Query options.
 ```tsx
 const todo = useQuery(
 	tq.todos.get.queryOptions(
-		{ id: "todo_1" },
+		{ params: { id: "todo_1" } },
 		{
 			enabled: isReady,
 			select: (response) => response.body,
@@ -115,7 +117,7 @@ const createTodo = useMutation(
 
 ```tsx
 createTodo.mutate({
-	title: "Write docs",
+	body: { title: "Write docs" },
 });
 ```
 
@@ -136,12 +138,11 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 const todos = useInfiniteQuery(
 	tq.todos.page.infiniteQueryOptions({
 		initialRequest: {
-			status: "open",
-			limit: 50,
+			query: { status: "open", limit: 50 },
 		},
 		getNextRequest(lastPage, _allPages, lastRequest) {
 			return lastPage.body.nextCursor
-				? { ...lastRequest, cursor: lastPage.body.nextCursor }
+				? { query: { ...lastRequest.query, cursor: lastPage.body.nextCursor } }
 				: undefined;
 		},
 	}),
@@ -201,7 +202,7 @@ Use `getKey()` when you want the contract-generated key outside an options
 object.
 
 ```ts
-tq.todos.get.getKey({ id: "todo_1" });
+tq.todos.get.getKey({ params: { id: "todo_1" } });
 tq.todos.list.getKey();
 ```
 
@@ -211,7 +212,7 @@ Request fields with `undefined` values are omitted from generated keys.
 The returned key is typed for TanStack Query APIs.
 
 ```ts
-const todoKey = tq.todos.get.getKey({ id: "todo_1" });
+const todoKey = tq.todos.get.getKey({ params: { id: "todo_1" } });
 
 const todo = queryClient.getQueryData(todoKey);
 
@@ -237,7 +238,7 @@ Pass `queryKey` in options when a query needs a custom key.
 ```tsx
 const todo = useQuery(
 	tq.todos.get.queryOptions(
-		{ id: "todo_1" },
+		{ params: { id: "todo_1" } },
 		{
 			queryKey: ["todos", "detail", "todo_1"],
 		},
@@ -260,7 +261,7 @@ Generated options accept normal TanStack Query options plus `fetchOptions`.
 ```tsx
 const todo = useQuery(
 	tq.todos.get.queryOptions(
-		{ id: "todo_1" },
+		{ params: { id: "todo_1" } },
 		{
 			fetchOptions: {
 				cache: "no-store",

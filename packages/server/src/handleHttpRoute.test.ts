@@ -24,11 +24,11 @@ describe("handleHttpRoute", () => {
 				.response(200, z.object({ id: z.number() })),
 			(request) => {
 				assert.deepEqual(request, {
-					id: 123,
+					params: { id: 123 },
 					context: { requestId: "request-1" },
 				});
 
-				return { id: request.id };
+				return { id: request.params.id };
 			},
 			{
 				request: {
@@ -46,10 +46,9 @@ describe("handleHttpRoute", () => {
 		});
 	});
 
-	it("passes grouped request data when flattened request keys are disabled", async () => {
+	it("passes grouped request data under explicit HTTP segments", async () => {
 		const result = await handleHttpRoute(
 			coreRoute
-				.with({ flattenRequestKeys: false })
 				.get("/todos")
 				.query(z.object({ q: z.string() }).transform(() => ["todo"]))
 				.response(204),
@@ -130,7 +129,10 @@ describe("handleHttpRoute", () => {
 				handleHttpRoute(
 					coreRoute.get("/todos").response(200, z.object({ id: z.string() })),
 					() => ({ id: 123 }),
-					{ request: {}, context: {} },
+					{
+						request: {},
+						context: {},
+					},
 				),
 			(error) => {
 				assert.ok(error instanceof ResponseValidationError);
@@ -150,7 +152,10 @@ describe("handleHttpRoute", () => {
 						.response(200, z.object({ id: z.string() }))
 						.response(202, z.object({ id: z.string() })),
 					() => ({ id: "todo-1" }),
-					{ request: {}, context: {} },
+					{
+						request: {},
+						context: {},
+					},
 				),
 			(error) =>
 				error instanceof Error &&
@@ -171,7 +176,10 @@ describe("handleHttpRoute", () => {
 						}),
 					),
 					() => ({ status: 123, body: "running" }),
-					{ request: {}, context: {} },
+					{
+						request: {},
+						context: {},
+					},
 				),
 			(error) =>
 				error instanceof Error &&
@@ -197,7 +205,10 @@ describe("handleHttpRoute", () => {
 					"x-optional": undefined,
 				},
 			}),
-			{ request: {}, context: {} },
+			{
+				request: {},
+				context: {},
+			},
 		);
 
 		assert.deepEqual(result, {
@@ -219,7 +230,10 @@ describe("handleHttpRoute", () => {
 					body: { code: "not_found" },
 				});
 			},
-			{ request: {}, context: {} },
+			{
+				request: {},
+				context: {},
+			},
 		);
 
 		assert.deepEqual(result, {
@@ -241,7 +255,10 @@ describe("handleHttpRoute", () => {
 							body: { code: "gone" },
 						} as never);
 					},
-					{ request: {}, context: {} },
+					{
+						request: {},
+						context: {},
+					},
 				),
 			(error) => {
 				assert.ok(error instanceof ResponseValidationError);
@@ -272,7 +289,10 @@ describe("handleHttpRoute", () => {
 							body: { code: "already_exists" },
 						});
 					},
-					{ request: {}, context: {} },
+					{
+						request: {},
+						context: {},
+					},
 				),
 			(error) =>
 				error instanceof Error &&
@@ -290,7 +310,10 @@ describe("handleHttpRoute custom responses", () => {
 				schema: z.string(),
 			}),
 			() => ({ status: 200, body: "id,title\n1,First\n" }),
-			{ request: {}, context: {} },
+			{
+				request: {},
+				context: {},
+			},
 		);
 
 		assert.equal(result.kind, "custom");
@@ -312,7 +335,10 @@ describe("handleHttpRoute custom responses", () => {
 					payload: "jpeg bytes",
 				},
 			}),
-			{ request: {}, context: {} },
+			{
+				request: {},
+				context: {},
+			},
 		);
 
 		assert.equal(result.kind, "custom");
@@ -333,7 +359,10 @@ describe("handleHttpRoute custom responses", () => {
 				schema: z.string(),
 			}),
 			() => ({ status: 200, body: rows() }),
-			{ request: {}, context: {} },
+			{
+				request: {},
+				context: {},
+			},
 		);
 
 		assert.equal(result.kind, "stream");

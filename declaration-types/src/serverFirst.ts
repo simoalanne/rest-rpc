@@ -39,16 +39,18 @@ export const fetchShorthandInferredImplementation = fetchRoute.handler(() => ({
 export const fetchShorthandImplementations = {
 	todos: {
 		get: fetchShorthandDeclaredImplementation,
-		create: fetchShorthandInputOutputBuilder.handler(({ title }) => ({
+		create: fetchShorthandInputOutputBuilder.handler(({ input }) => ({
 			id: "todo-1",
-			title,
+			title: input.title,
 		})),
 		inferred: fetchShorthandInferredImplementation,
 	},
 };
 export const fetchShorthandClient = initClient<
 	typeof fetchShorthandImplementations
->({ baseUrl: "http://localhost" });
+>({
+	baseUrl: "http://localhost",
+});
 
 export const unfinishedFetchBuilder = fetchRoute.post("/todos").body(todoInput);
 export const unfinishedNodeBuilder = nodeRoute
@@ -56,9 +58,12 @@ export const unfinishedNodeBuilder = nodeRoute
 	.body(todoInput);
 
 export const fetchRoutes = {
-	create: unfinishedFetchBuilder.handler(({ title }) => ({
+	create: unfinishedFetchBuilder.handler(({ body: { title } }) => ({
 		status: 201 as const,
-		body: { id: "todo-1", title },
+		body: {
+			id: "todo-1",
+			title,
+		},
 	})),
 	health: implementFetch(contractRoute.get("/health").response(204)).handler(
 		() => undefined,
@@ -66,9 +71,12 @@ export const fetchRoutes = {
 };
 
 export const nodeRoutes = {
-	create: unfinishedNodeBuilder.handler(({ title }) => ({
+	create: unfinishedNodeBuilder.handler(({ body: { title } }) => ({
 		status: 201 as const,
-		body: { id: "todo-1", title },
+		body: {
+			id: "todo-1",
+			title,
+		},
 	})),
 	health: implementNode(
 		contractRoute.get("/node-health").response(204),

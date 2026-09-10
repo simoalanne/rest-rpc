@@ -91,7 +91,7 @@ export const routes = {
 		create: route
 			.post("/todos")
 			.body(z.object({ title: z.string().min(1) }))
-			.handler(({ title }) => ({
+			.handler(({ body: { title } }) => ({
 				status: 201,
 				body: { id: crypto.randomUUID(), title, completed: false },
 			})),
@@ -122,7 +122,7 @@ export const routes = {
 		create: route
 			.post("/todos")
 			.body(z.object({ title: z.string().min(1) }))
-			.handler(async ({ title }) => ({
+			.handler(async ({ body: { title } }) => ({
 				status: 201 as const,
 				body: { id: crypto.randomUUID(), title, completed: false },
 			})),
@@ -185,7 +185,7 @@ const createTodo = useMutation(
 );
 
 createTodo.mutate({
-	title: "Ship v1",
+	body: { title: "Ship v1" },
 });
 ```
 

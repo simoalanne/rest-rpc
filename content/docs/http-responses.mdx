@@ -31,7 +31,7 @@ export const api = {
 ```ts
 export const routes = router(api, {
 	todos: {
-		create({ title }) {
+		create({ body: { title } }) {
 			return createTodo({ title });
 		},
 	},
@@ -40,7 +40,7 @@ export const routes = router(api, {
 
 ```ts
 const response = await client.todos.create({
-	title: "Write docs",
+	body: { title: "Write docs" },
 });
 
 if (response.status === 201) {
@@ -73,7 +73,7 @@ export const api = {
 ```ts
 export const routes = router(api, {
 	todos: {
-		get({ id }) {
+		get({ params: { id } }) {
 			const todo = getTodo(id);
 
 			if (!todo) {
@@ -91,7 +91,7 @@ export const routes = router(api, {
 
 ```ts
 const response = await client.todos.get({
-	id: "todo_1",
+	params: { id: "todo_1" },
 });
 
 if (response.status === 200) {
@@ -123,7 +123,7 @@ export const api = {
 ```ts
 export const routes = router(api, {
 	todos: {
-		remove({ id }) {
+		remove({ params: { id } }) {
 			removeTodo(id);
 		},
 	},
@@ -132,7 +132,7 @@ export const routes = router(api, {
 
 ```ts
 await client.todos.remove({
-	id: "todo_1",
+	params: { id: "todo_1" },
 });
 ```
 
@@ -160,7 +160,7 @@ export const api = {
 ```ts
 export const routes = router(api, {
 	todos: {
-		get({ id }) {
+		get({ params: { id } }) {
 			const todo = getTodo(id);
 
 			return {
@@ -178,7 +178,7 @@ export const routes = router(api, {
 
 ```ts
 const response = await client.todos.get({
-	id: "todo_1",
+	params: { id: "todo_1" },
 });
 
 if (response.status === 200) {
@@ -241,7 +241,7 @@ export const api = {
 ```ts
 export const routes = router(api, {
 	images: {
-		download({ id }) {
+		download({ params: { id } }) {
 			const image = getImage(id);
 
 			return {
@@ -258,7 +258,7 @@ export const routes = router(api, {
 
 ```ts
 const response = await client.images.download({
-	id: "image_1",
+	params: { id: "image_1" },
 });
 
 if (response.status === 200) {
@@ -422,7 +422,7 @@ export const routes = router(api, {
 		download(request) {
 			const { signal } = request.context;
 
-			return readLargeFile(request.id, signal);
+			return readLargeFile(request.params.id, signal);
 		},
 	},
 });
@@ -431,7 +431,7 @@ export const routes = router(api, {
 ```ts
 const controller = new AbortController();
 const response = await client.files.download(
-	{ id: "file_1" },
+	{ params: { id: "file_1" } },
 	{ signal: controller.signal },
 );
 if (response.status !== 200) throw new Error("Unexpected status");

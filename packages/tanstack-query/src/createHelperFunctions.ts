@@ -39,11 +39,16 @@ type FetchData = (
 
 const isSkipToken = (value: unknown): value is typeof skipToken =>
 	value === skipToken;
-const stripUndefinedFields = (request: unknown) => {
+const stripUndefinedFields = (request: unknown): unknown => {
+	if (Array.isArray(request)) return request.map(stripUndefinedFields);
 	if (typeof request !== "object" || request === null) return request;
+	const prototype = Object.getPrototypeOf(request);
+	if (prototype !== Object.prototype && prototype !== null) return request;
 
 	return Object.fromEntries(
-		Object.entries(request).filter(([, value]) => value !== undefined),
+		Object.entries(request)
+			.filter(([, value]) => value !== undefined)
+			.map(([key, value]) => [key, stripUndefinedFields(value)]),
 	);
 };
 
@@ -100,7 +105,10 @@ export const createTanstackHelpersForRoute = (
 			const queryFn = disabled
 				? skipToken
 				: ({ signal }: { signal?: FetchOptions["signal"] }) =>
-						dataFetchingFn(request, { ...fetchOptions, signal });
+						dataFetchingFn(request, {
+							...fetchOptions,
+							signal,
+						});
 			const queryKeyRequest = disabled ? undefined : request;
 
 			return {
@@ -123,7 +131,11 @@ export const createTanstackHelpersForRoute = (
 				}: {
 					pageParam: unknown;
 					signal?: FetchOptions["signal"];
-				}) => dataFetchingFn(pageParam, { ...fetchOptions, signal }),
+				}) =>
+					dataFetchingFn(pageParam, {
+						...fetchOptions,
+						signal,
+					}),
 				...tanstackOptions,
 			} as unknown as InfiniteQueryObserverOptions<unknown, unknown, unknown>;
 		},

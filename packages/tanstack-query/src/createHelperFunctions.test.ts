@@ -231,8 +231,11 @@ describe("createTanstackQueryRouteHelpers", () => {
 		);
 
 		assert.deepEqual(
-			routeHelpers.getKey({ id: "item-4", optional: undefined }),
-			["items", "byId", { id: "item-4" }],
+			routeHelpers.getKey({
+				params: { id: "item-4" },
+				query: { optional: undefined },
+			}),
+			["items", "byId", { params: { id: "item-4" }, query: {} }],
 		);
 	});
 });

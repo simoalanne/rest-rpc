@@ -32,7 +32,7 @@ const todoSchema = z.object({
 
 // route handler request inference
 
-// should expose flattened request fields and adapter context to route handlers
+// should expose grouped request fields and adapter context to route handlers
 const createApi = {
 	todos: {
 		create: coreRoute
@@ -68,12 +68,12 @@ type CreateTodoRequest = RouteRequest<
 	TestRouteHandlerContext
 >;
 declare const createTodoRequest: CreateTodoRequest;
-expectType<string>(createTodoRequest.title);
+expectType<string>(createTodoRequest.body.title);
 expectType<TestRouteHandlerContext>(createTodoRequest.context);
 
 type CreateTodoRequestData = RouteRequestData<typeof createApi.todos.create>;
 declare const createTodoRequestData: CreateTodoRequestData;
-expectType<string>(createTodoRequestData.title);
+expectType<string>(createTodoRequestData.body.title);
 
 const composedHeadersApi = {
 	items: {
@@ -97,8 +97,8 @@ type ComposedHeadersRequest = RouteRequestData<
 	typeof composedHeadersApi.items.get
 >;
 declare const composedHeadersRequest: ComposedHeadersRequest;
-expectType<true>(composedHeadersRequest.authenticated);
-expectType<"request-1">(composedHeadersRequest.traceId);
+expectType<true>(composedHeadersRequest.headers.authenticated);
+expectType<"request-1">(composedHeadersRequest.headers.traceId);
 
 type CreateTodoResponse = RouteResponse<typeof createApi.todos.create>;
 declare const createTodoResponse: CreateTodoResponse;
@@ -153,7 +153,7 @@ expectError(
 // should infer route handler parameters and declared success response envelopes
 const createImplementation = route(
 	createApi.todos.create,
-	({ title, context }) => {
+	({ context, body: { title } }) => {
 		expectType<string>(title);
 		expectType<Record<string, unknown>>(context);
 
@@ -256,7 +256,7 @@ type SocketRequest = RouteRequest<
 	TestRouteHandlerContext
 >;
 declare const socketRequest: SocketRequest;
-expectType<string>(socketRequest.roomId);
+expectType<string>(socketRequest.params.roomId);
 expectType<string>(socketRequest.context.userId);
 expectType<RouteSocket<typeof socketApi.socket.room>>(
 	socketRequest.context.socket,
@@ -295,8 +295,8 @@ type SseRequest = RouteRequest<
 	TestRouteHandlerContext
 >;
 declare const sseRequest: SseRequest;
-expectType<string>(sseRequest.projectId);
-expectType<boolean | undefined>(sseRequest.includeDone);
+expectType<string>(sseRequest.params.projectId);
+expectType<boolean | undefined>(sseRequest.query.includeDone);
 expectType<string>(sseRequest.context.userId);
 expectError(sseRequest.context.signal);
 expectType<string | undefined>(sseRequest.context.lastEventId);
@@ -401,25 +401,31 @@ const transformedApi = {
 	},
 } as const;
 
-route(transformedApi.todos.transform, ({ id, title, slug }) => {
-	expectType<number>(id);
-	expectType<string>(title);
-	expectType<string>(slug);
+route(
+	transformedApi.todos.transform,
+	({ params: { id }, body: { title, slug } }) => {
+		expectType<number>(id);
+		expectType<string>(title);
+		expectType<string>(slug);
 
-	return {
-		status: 200 as const,
-		body: {
-			id: 1,
-		},
-	};
-});
+		return {
+			status: 200 as const,
+			body: {
+				id: 1,
+			},
+		};
+	},
+);
 
 // should expose single custom body content types as payloads to handlers
 const singleCustomRequestApi = {
 	todos: {
 		importCsv: coreRoute
 			.post("/todos/import.csv")
-			.customBody({ contentType: "text/csv", schema: z.string() })
+			.customBody({
+				contentType: "text/csv",
+				schema: z.string(),
+			})
 			.response(204),
 	},
 } as const;
@@ -488,7 +494,7 @@ const customRequestApi = {
 	},
 } as const;
 
-route(customRequestApi.todos.uploadImage, ({ id, body }) => {
+route(customRequestApi.todos.uploadImage, ({ body, params: { id } }) => {
 	expectType<string>(id);
 	expectType<"image/png" | "image/jpeg">(body.contentType);
 	expectType<Uint8Array<ArrayBuffer>>(body.payload);
@@ -497,7 +503,7 @@ route(customRequestApi.todos.uploadImage, ({ id, body }) => {
 });
 
 // should type websocket send and receive messages by discriminator
-route(socketApi.socket.room, ({ roomId, context }) => {
+route(socketApi.socket.room, ({ context, params: { roomId } }) => {
 	expectType<string>(roomId);
 
 	context.socket.send({ type: "ready", message: { roomId } });
@@ -564,9 +570,10 @@ expectError(
 // should accept native server payloads for custom responses
 const customResponseApi = {
 	reports: {
-		csv: coreRoute
-			.get("/reports.csv")
-			.customResponse(200, { contentType: "text/csv", schema: z.string() }),
+		csv: coreRoute.get("/reports.csv").customResponse(200, {
+			contentType: "text/csv",
+			schema: z.string(),
+		}),
 		csvStream: coreRoute.get("/reports-stream.csv").customStreamResponse(200, {
 			contentType: "text/csv",
 			schema: z.string(),
@@ -633,7 +640,7 @@ const implementationApi = {
 
 const implementations = router(implementationApi, {
 	todos: {
-		create: ({ title }) => ({
+		create: ({ body: { title } }) => ({
 			status: 201 as const,
 			body: {
 				id: "todo-1",
@@ -644,7 +651,7 @@ const implementations = router(implementationApi, {
 				"x-next-cursor": undefined,
 			},
 		}),
-		transform: ({ id }) => ({
+		transform: ({ params: { id } }) => ({
 			status: 200 as const,
 			body: {
 				id,
@@ -689,7 +696,7 @@ expectType<typeof implementationApi.todos.create>(
 
 // should accept composed routers and direct route implementations as router input
 const composedTodos = router(implementationApi.todos, {
-	create: route(implementationApi.todos.create, ({ title }) => ({
+	create: route(implementationApi.todos.create, ({ body: { title } }) => ({
 		status: 201 as const,
 		body: {
 			id: "todo-1",
@@ -699,7 +706,7 @@ const composedTodos = router(implementationApi.todos, {
 			location: "/todos/todo-1",
 		},
 	})),
-	transform: ({ id }) => ({
+	transform: ({ params: { id } }) => ({
 		status: 200 as const,
 		body: {
 			id,
@@ -764,7 +771,7 @@ expectError(router(createApi.todos, new MissingCreateTodoService()));
 
 // should reject class instances that return the wrong route response shape
 class WrongCreateTodoService {
-	create({ title }: RouteRequest<typeof createApi.todos.create>) {
+	create({ body: { title } }: RouteRequest<typeof createApi.todos.create>) {
 		return {
 			id: "todo-1",
 			title,
@@ -789,7 +796,7 @@ class WrongCheckedCreateTodoService implements RouteHandlers<
 	typeof createApi.todos
 > {
 	// @ts-expect-error The class method does not return the required response envelope.
-	create({ title }: RouteRequest<typeof createApi.todos.create>) {
+	create({ body: { title } }: RouteRequest<typeof createApi.todos.create>) {
 		return {
 			id: "todo-1",
 			title,
@@ -805,7 +812,7 @@ class CheckedCreateTodoService implements RouteHandlers<
 > {
 	readonly prefix = "todo";
 
-	create({ title }: RouteRequest<typeof createApi.todos.create>) {
+	create({ body: { title } }: RouteRequest<typeof createApi.todos.create>) {
 		return {
 			status: 201 as const,
 			body: {
@@ -861,7 +868,7 @@ const stackedApi = {
 } as const;
 
 const stackedTodoRoutes = router(stackedApi.admin.v1.todos, {
-	create: route(stackedApi.admin.v1.todos.create, ({ title }) => ({
+	create: route(stackedApi.admin.v1.todos.create, ({ body: { title } }) => ({
 		status: 201 as const,
 		body: {
 			id: "todo-1",
@@ -871,12 +878,15 @@ const stackedTodoRoutes = router(stackedApi.admin.v1.todos, {
 			location: "/todos/todo-1",
 		},
 	})),
-	transform: route(stackedApi.admin.v1.todos.transform, ({ id }) => ({
-		status: 200 as const,
-		body: {
-			id,
-		},
-	})),
+	transform: route(
+		stackedApi.admin.v1.todos.transform,
+		({ params: { id } }) => ({
+			status: 200 as const,
+			body: {
+				id,
+			},
+		}),
+	),
 });
 
 const stackedV1Routes = router(stackedApi.admin.v1, {
@@ -919,7 +929,7 @@ expectType<typeof stackedApi.public.todos.jsonSearch>(
 
 // should accept a compiled route in one sibling while preserving contextual typing
 router(stackedApi.admin.v1.todos, {
-	create: route(stackedApi.admin.v1.todos.create, ({ title }) => ({
+	create: route(stackedApi.admin.v1.todos.create, ({ body: { title } }) => ({
 		status: 201 as const,
 		body: {
 			id: "todo-1",
@@ -929,7 +939,7 @@ router(stackedApi.admin.v1.todos, {
 			location: "/todos/todo-1",
 		},
 	})),
-	transform: ({ id, title, slug }) => {
+	transform: ({ params: { id }, body: { title, slug } }) => {
 		expectType<number>(id);
 		expectType<string>(title);
 		expectType<string>(slug);
@@ -946,13 +956,13 @@ router(stackedApi.admin.v1.todos, {
 // should reject composed route implementations that do not match their contract slot
 expectError(
 	router(implementationApi.todos, {
-		create: route(implementationApi.todos.transform, ({ id }) => ({
+		create: route(implementationApi.todos.transform, ({ params: { id } }) => ({
 			status: 200 as const,
 			body: {
 				id,
 			},
 		})),
-		transform: ({ id }) => ({
+		transform: ({ params: { id } }) => ({
 			status: 200 as const,
 			body: {
 				id,
@@ -1000,7 +1010,7 @@ expectError(
 
 // should reject route handlers that omit the declared response envelope
 expectError(
-	route(createApi.todos.create, ({ title }) => ({
+	route(createApi.todos.create, ({ body: { title } }) => ({
 		id: "todo-1",
 		title,
 	})),
@@ -1008,7 +1018,7 @@ expectError(
 
 // should reject route handlers that omit required declared response headers
 expectError(
-	route(createApi.todos.create, ({ title }) => ({
+	route(createApi.todos.create, ({ body: { title } }) => ({
 		status: 201 as const,
 		body: {
 			id: "todo-1",
@@ -1018,7 +1028,7 @@ expectError(
 	})),
 );
 
-// should reject router implementations that read fields outside flattened request input
+// should reject router implementations that read fields outside declared request segments
 expectError(
 	router(implementationApi, {
 		todos: {

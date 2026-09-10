@@ -10,15 +10,15 @@ export type RequestValidationHandlers =
 export const createRequestValidationHandlers =
 	(): RequestValidationHandlers => ({
 		coerce: (request) => ({
-			id: request.id,
-			published: request.published,
-			page: request["x-page"],
+			id: request.params.id,
+			published: request.query.published,
+			page: request.headers["x-page"],
 		}),
 		params: () => ({ reached: true as const }),
 		query: () => ({ reached: true as const }),
 		headers: () => ({ reached: true as const }),
 		body: () => ({ reached: true as const }),
-		emptyQuery: (request) => ({ value: request.value }),
+		emptyQuery: (request) => ({ value: request.query.value }),
 		jsonQuery: (request) => ({
 			page: request.query.page,
 			includeArchived: request.query.includeArchived,

@@ -1,3 +1,4 @@
+import { resolveBuiltInRequestKeys } from "./requestKeys.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import {
 	resolveBodyWithArrayKeys,
@@ -28,7 +29,6 @@ import type {
 	JsonQuery,
 	RequestHeadersDeclaration,
 	RequestHeadersSchema,
-	RequestKeys,
 	RequestParamsSchema,
 	RequestQuerySchema,
 } from "./request.ts";
@@ -56,14 +56,11 @@ import {
 type OptionValue<TOptions, TKey extends PropertyKey, TFallback> =
 	TOptions extends Record<TKey, infer TValue> ? TValue : TFallback;
 
-type RequestFor<TOptions> = (TOptions extends {
+type RequestFor<TOptions> = TOptions extends {
 	headers: infer THeaders extends RequestHeadersSchema;
 }
 	? { headers: { inherited: THeaders } }
-	: EmptyObject) &
-	(TOptions extends { flattenRequestKeys: infer TFlatten extends boolean }
-		? { flattenKeys: TFlatten }
-		: EmptyObject);
+	: EmptyObject;
 
 type ResolvedPath<TOptions, TPath extends string> = TOptions extends {
 	pathPrefix: infer TPrefix extends string;
@@ -86,17 +83,23 @@ const assertHttpStatusCode = (status: number) => {
 	}
 };
 
+const assertHeaderSchema = (schema: RequestHeadersSchema, path: string) => {
+	for (const key of Object.keys(resolveBuiltInRequestKeys(schema) ?? {})) {
+		if (key.toLowerCase() === "content-type") {
+			throw new Error(
+				`Route declaration at path "${path}" has a reserved header key "${key}". Use customBody({ schema, contentType }) to declare request content type instead.`,
+			);
+		}
+	}
+};
+
 const httpRequestDefaults = (
 	options: RouteFactoryOptions,
-): RouteRequestDeclaration | undefined =>
-	options.headers || typeof options.flattenRequestKeys === "boolean"
-		? {
-				...(options.headers ? { headers: { inherited: options.headers } } : {}),
-				...(typeof options.flattenRequestKeys === "boolean"
-					? { flattenKeys: options.flattenRequestKeys }
-					: {}),
-			}
-		: undefined;
+): RouteRequestDeclaration | undefined => {
+	if (!options.headers) return undefined;
+	assertHeaderSchema(options.headers, options.pathPrefix ?? "");
+	return { headers: { inherited: options.headers } };
+};
 
 /** A canonical ordinary HTTP route declaration. */
 export type HttpRouteDeclaration = BaseRouteDeclaration & {
@@ -132,7 +135,6 @@ class HttpRouteBuilder extends BaseRouteBuilder {
 
 	body(schema: StandardSchemaV1) {
 		this.requestForWrite().body = schema;
-		this.recalculateRequestKeys();
 		return this;
 	}
 
@@ -141,7 +143,6 @@ class HttpRouteBuilder extends BaseRouteBuilder {
 			kind: "formBody",
 			...resolveBodyWithArrayKeys(input),
 		};
-		this.recalculateRequestKeys();
 		return this;
 	}
 
@@ -150,7 +151,6 @@ class HttpRouteBuilder extends BaseRouteBuilder {
 			kind: "multipartBody",
 			...resolveBodyWithArrayKeys(input),
 		};
-		this.recalculateRequestKeys();
 		return this;
 	}
 
@@ -159,14 +159,13 @@ class HttpRouteBuilder extends BaseRouteBuilder {
 			"~standard" in input
 				? { kind: "customBody", schema: input }
 				: { kind: "customBody", ...input };
-		this.recalculateRequestKeys();
 		return this;
 	}
 
 	headers(schema: RequestHeadersSchema) {
+		assertHeaderSchema(schema, this.path);
 		const request = this.requestForWrite();
 		request.headers = { ...request.headers, local: schema };
-		this.recalculateRequestKeys();
 		return this;
 	}
 
@@ -210,7 +209,6 @@ type HttpBuilderMethod =
 	| "query"
 	| "params"
 	| "headers"
-	| "requestKeys"
 	| "withMetadata"
 	| "withOpenApi";
 
@@ -507,25 +505,6 @@ type HttpRequestSetters<TState extends HttpBuilderState> = WhenUnused<
 						: { local: THeaders },
 					"headers"
 				>,
-				TPath,
-				TMetadata
-			>;
-		}
-	> &
-	WhenUnused<
-		TState,
-		"requestKeys",
-		{
-			/** Maps flattened request keys. @see {@link https://rest-rpc.dev/docs/contract/declaration#flattened-key-collisions} */
-			requestKeys<
-				const TKeys extends RequestKeys,
-				const TPath extends string = string,
-				const TMetadata extends RouteMetadata | never = never,
-			>(
-				this: BuilderReceiver<TPath, TMetadata>,
-				keys: TKeys,
-			): HttpBuilderAtPath<
-				SetHttpRequest<TState, "keys", TKeys, "requestKeys">,
 				TPath,
 				TMetadata
 			>;

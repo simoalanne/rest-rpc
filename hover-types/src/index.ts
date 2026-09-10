@@ -117,7 +117,7 @@ export const strictHoverQuery = createTanstackQueryHelpers(strictHoverApi, {
 
 export const createTodoServerRoute = expressRoute(
 	hoverApi.todos.create,
-	({ title }) => ({
+	({ body: { title } }) => ({
 		status: 201,
 		body: { id: "todo-1", title },
 		responseHeaders: { location: "/todos/todo-1" },
@@ -125,11 +125,15 @@ export const createTodoServerRoute = expressRoute(
 );
 
 export const createTodoFetchPromise = hoverClient.todos.create({
-	title: "Write hover tests",
+	body: {
+		title: "Write hover tests",
+	},
 });
 
 export const createTodoFetchResponsePromise = hoverClient.todos.create({
-	title: "Write hover tests",
+	body: {
+		title: "Write hover tests",
+	},
 });
 
 export const createTodoMutationOptions =
@@ -143,8 +147,8 @@ export const createTodoMutationOptions =
 	});
 
 export const getTodoQueryOptions = hoverQuery.todos.get.queryOptions({
-	id: "todo-1",
-	includeDone: false,
+	params: { id: "todo-1" },
+	query: { includeDone: false },
 });
 
 export const pageTodoInfiniteQueryOptions =
@@ -256,7 +260,7 @@ export const fetchServerFirstRoutes = {
 		create: fetchRoute
 			.post("/server-first/todos")
 			.body(schemaType<{ title: string }>())
-			.handler(({ title }) => ({
+			.handler(({ body: { title } }) => ({
 				status: 201 as const,
 				body: { id: "todo-1", title },
 			})),
@@ -268,7 +272,7 @@ export const nodeServerFirstRoutes = {
 		get: nodeRoute
 			.get("/server-first/todos/:id")
 			.params(schemaType<{ id: string }>())
-			.handler(({ id }) =>
+			.handler(({ params: { id } }) =>
 				id === "missing"
 					? { status: 404 as const, body: { code: "TODO_NOT_FOUND" as const } }
 					: { status: 200 as const, body: { id, title: "Todo" } },
@@ -289,7 +293,11 @@ export const serverFirstClient = initClient<typeof fetchServerFirstRoutes>({
 
 export const serverFirstCreatePromise = serverFirstClient.$post(
 	"/server-first/todos",
-	{ body: { title: "Write hover tests" } },
+	{
+		body: {
+			title: "Write hover tests",
+		},
+	},
 );
 
 type ServerFirstCreateImplementation =
@@ -326,7 +334,9 @@ export const shorthandHoverClient = initClient(shorthandHoverApi, {
 });
 export const shorthandHoverQuery = createTanstackQueryHelpers(
 	shorthandHoverApi,
-	{ baseUrl: "https://example.test" },
+	{
+		baseUrl: "https://example.test",
+	},
 );
 
 type ShorthandGetRoute = typeof shorthandHoverApi.todos.get;
@@ -380,10 +390,14 @@ export const shorthandServerFirstRoutes = {
 
 export const shorthandServerFirstClient = initClient<
 	typeof shorthandServerFirstRoutes
->({ baseUrl: "https://example.test" });
+>({
+	baseUrl: "https://example.test",
+});
 export const shorthandServerFirstQuery = createTanstackQueryHelpers<
 	typeof shorthandServerFirstRoutes
->({ baseUrl: "https://example.test" });
+>({
+	baseUrl: "https://example.test",
+});
 
 export type ServerFirstInferredShorthandReturn = ReturnType<
 	typeof shorthandServerFirstClient.todos.inferred

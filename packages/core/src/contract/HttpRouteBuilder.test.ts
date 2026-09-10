@@ -66,43 +66,34 @@ describe("HTTP route builder runtime", () => {
 		assert.equal(declaration.responses?.[201], schema);
 	});
 
-	it("allows opaque request schemas and preserves explicitly declared keys", () => {
+	it("allows opaque request schemas", () => {
 		const opaque = route.post("/items").body(type<{ title: string }>());
 		assert.doesNotThrow(() => opaque.response(201, type<{ id: string }>()));
-		assert.deepEqual(opaque.request?.keys, {});
 
 		const declaration = route
 			.post("/items")
 			.body(type<{ title: string }>())
-			.requestKeys({ title: "body" })
 			.response(201, type<{ id: string }>());
 
 		assert.doesNotThrow(() => declaration.response(204));
-		assert.deepEqual(declaration.request?.keys, { title: "body" });
 
 		const responseFirst = route
 			.post("/response-first")
 			.response(200)
 			.body(type<{ title: string }>());
 		assert.doesNotThrow(() => responseFirst.response(201));
-		assert.deepEqual(responseFirst.request?.keys, {});
 	});
 
-	it("resolves flattened request keys while building routes", () => {
+	it("allows the same property names in separate request segments", () => {
 		const declaration = route
 			.with({ headers: z.object({ authorization: z.string() }) })
 			.post("/items/:id")
-			.body(z.object({ title: z.string() }))
+			.body(z.object({ id: z.string(), context: z.string() }))
 			.headers(z.object({ "x-request-id": z.string() }))
 			.params(type<{ id: string }>())
 			.response(201, type<{ id: string }>());
-
-		assert.deepEqual(declaration.request?.keys, {
-			authorization: "headers",
-			id: "params",
-			title: "body",
-			"x-request-id": "headers",
-		});
+		assert.ok(declaration.request.body);
+		assert.ok(declaration.request.params);
 	});
 
 	it("applies isolated defaults with local values winning", () => {
@@ -113,7 +104,7 @@ describe("HTTP route builder runtime", () => {
 			responses: { 401: unauthorized },
 			metadata: { auth: true, nested: { role: "user" } },
 			openApi: { tags: ["Common"], responses: { 401: { description: "No" } } },
-			flattenRequestKeys: true,
+
 			strictStatusCodes: true,
 		} as const;
 		const factory = route.with(defaults);
@@ -220,10 +211,6 @@ describe("HTTP route builder runtime", () => {
 			.response(204);
 		assert.equal((custom.request!.body as { kind: string }).kind, "customBody");
 		assert.equal((custom.request!.query as { kind: string }).kind, "jsonQuery");
-		assert.deepEqual(custom.request?.keys, {
-			body: "body",
-			query: "query",
-		});
 	});
 
 	it("lets specialized request setters write the expected declaration slots", () => {

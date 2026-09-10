@@ -64,20 +64,33 @@ describe("server-first runtime", () => {
 				inferred: serverFirstRoute.handler(({ context }) => ({
 					title: String(context.requestId),
 				})),
-				input: serverFirstRoute
-					.input(input)
-					.handler(({ title }) => ({ title })),
-				output: serverFirstRoute
-					.output(output)
-					.handler(() => ({ title: "todo" })),
+				input: serverFirstRoute.input(input).handler(({ input }) => ({
+					title: input.title,
+				})),
+				output: serverFirstRoute.output(output).handler(() => ({
+					title: "todo",
+				})),
 				inputOutput: serverFirstRoute
 					.input(input)
 					.output(output)
-					.handler(({ title }) => ({ title })),
+					.handler(({ input }) => ({
+						title: input.title,
+					})),
 				outputInput: serverFirstRoute
 					.output(output)
 					.input(input)
-					.handler(({ title }) => ({ title })),
+					.handler(({ input }) => ({
+						title: input.title,
+					})),
+				primitiveInput: serverFirstRoute
+					.input(z.string().transform((value) => value.trim()))
+					.handler(({ input }) => ({ value: input })),
+				contextInput: serverFirstRoute
+					.input(z.object({ context: z.string() }))
+					.handler(({ input, context }) => ({
+						inputContext: input.context,
+						requestId: context.requestId,
+					})),
 			},
 		};
 		const matchRoute = createRouteMatcher(implementations);
@@ -143,6 +156,37 @@ describe("server-first runtime", () => {
 				title: "TODO",
 			});
 		}
+
+		const primitiveImplementation = implementationAt("/todos/primitiveInput")!;
+		const primitiveResult = await handleHttpRoute(
+			primitiveImplementation.route,
+			primitiveImplementation.handler,
+			{
+				request: { body: " value " },
+				context: { signal: new AbortController().signal },
+			},
+		);
+		assert.deepEqual(
+			"body" in primitiveResult ? primitiveResult.body : undefined,
+			{ value: "value" },
+		);
+
+		const contextImplementation = implementationAt("/todos/contextInput")!;
+		const contextResult = await handleHttpRoute(
+			contextImplementation.route,
+			contextImplementation.handler,
+			{
+				request: { body: { context: "input-context" } },
+				context: {
+					requestId: "request-context",
+					signal: new AbortController().signal,
+				},
+			},
+		);
+		assert.deepEqual("body" in contextResult ? contextResult.body : undefined, {
+			inputContext: "input-context",
+			requestId: "request-context",
+		});
 	});
 
 	it("implements shorthand contracts while retaining their tree-derived path", () => {
@@ -154,8 +198,8 @@ describe("server-first runtime", () => {
 			},
 		};
 		const implementation = implement(contract).todos.add.handler(
-			({ title }) => ({
-				title,
+			({ input }) => ({
+				title: input.title,
 			}),
 		);
 		const resolved = createRouteMatcher({ todos: { add: implementation } })({
@@ -174,7 +218,7 @@ describe("server-first runtime", () => {
 			.with({ pathPrefix: "/v1", metadata: { feature: "todos" } })
 			.post("/todos")
 			.body(type<{ title: string }>());
-		const implementation = builder.handler(({ title, context }) => ({
+		const implementation = builder.handler(({ context, body: { title } }) => ({
 			status: 201,
 			body: { title, requestId: context.requestId, signal: context.signal },
 		}));

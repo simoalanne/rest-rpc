@@ -31,12 +31,12 @@ export const createTanstackQueryHandlers = (): TanstackQueryHandlers => {
 				version,
 			}),
 			get: (request) => {
-				const project = projects.get(request.id);
+				const project = projects.get(request.params.id);
 
 				if (!project) {
 					return {
 						status: 404 as const,
-						body: { code: "not_found" as const, id: request.id },
+						body: { code: "not_found" as const, id: request.params.id },
 					};
 				}
 
@@ -48,10 +48,11 @@ export const createTanstackQueryHandlers = (): TanstackQueryHandlers => {
 			search: (request) => ({
 				projects: listProjects().filter((project) => {
 					const matchesStatus =
-						request.status === undefined || project.status === request.status;
+						request.query.status === undefined ||
+						project.status === request.query.status;
 					const matchesQuery =
-						request.q === undefined ||
-						project.name.toLowerCase().includes(request.q.toLowerCase());
+						request.query.q === undefined ||
+						project.name.toLowerCase().includes(request.query.q.toLowerCase());
 
 					return matchesStatus && matchesQuery;
 				}),
@@ -60,8 +61,8 @@ export const createTanstackQueryHandlers = (): TanstackQueryHandlers => {
 				version += 1;
 				const project = {
 					id: `project-${projects.size + 1}`,
-					name: request.name,
-					status: request.status ?? "active",
+					name: request.body.name,
+					status: request.body.status ?? "active",
 				} satisfies Project;
 				projects.set(project.id, project);
 
@@ -69,7 +70,7 @@ export const createTanstackQueryHandlers = (): TanstackQueryHandlers => {
 					status: 201 as const,
 					body: {
 						...project,
-						tenant: request["x-test-tenant"],
+						tenant: request.headers["x-test-tenant"],
 					},
 				};
 			},
@@ -77,37 +78,38 @@ export const createTanstackQueryHandlers = (): TanstackQueryHandlers => {
 				if (
 					listProjects().some(
 						(project) =>
-							project.id !== request.id && project.name === request.name,
+							project.id !== request.params.id &&
+							project.name === request.body.name,
 					)
 				) {
 					return {
 						status: 409 as const,
 						body: {
 							code: "name_conflict" as const,
-							name: request.name,
+							name: request.body.name,
 						},
 					};
 				}
 
-				const project = projects.get(request.id);
+				const project = projects.get(request.params.id);
 				if (!project) {
 					return {
 						status: 409 as const,
 						body: {
 							code: "name_conflict" as const,
-							name: request.name,
+							name: request.body.name,
 						},
 					};
 				}
 
 				version += 1;
-				const renamed = { ...project, name: request.name };
-				projects.set(request.id, renamed);
+				const renamed = { ...project, name: request.body.name };
+				projects.set(request.params.id, renamed);
 				return { status: 200 as const, body: renamed };
 			},
 			page: (request) => {
-				const start = request.cursor ? Number(request.cursor) : 0;
-				const end = start + request.limit;
+				const start = request.query.cursor ? Number(request.query.cursor) : 0;
+				const end = start + request.query.limit;
 				const pageProjects = listProjects().slice(start, end);
 				const nextCursor = end < projects.size ? String(end) : undefined;
 
@@ -121,7 +123,7 @@ export const createTanstackQueryHandlers = (): TanstackQueryHandlers => {
 				return {
 					status: 200 as const,
 					body: {
-						id: request.id,
+						id: request.params.id,
 						name: "Slow project",
 						status: "active" as const,
 					},

@@ -27,7 +27,6 @@ export const shorthandClient = initClient(shorthandContract, {
 });
 
 export const configuredRoute = route.with({
-	flattenRequestKeys: false,
 	strictStatusCodes: true,
 	pathPrefix: "/api",
 	metadata: { scope: "test" },
@@ -57,10 +56,7 @@ export const queryRoute = route.get("/query").query(query);
 export const jsonQueryRoute = route.get("/json-query").jsonQuery(scalar);
 export const paramsRoute = route.get("/params/:id").params(params);
 export const headersRoute = route.get("/headers").headers(headers);
-export const keyedRoute = route
-	.get("/keys")
-	.query(query)
-	.requestKeys({ search: "query" });
+export const keyedRoute = route.get("/keys").query(query);
 export const metadataRoute = route
 	.get("/metadata")
 	.withMetadata({ scope: "test" });
@@ -95,10 +91,7 @@ export const initialSse = route.sse("/sse");
 export const sseQuery = route.sse("/sse-query").query(query);
 export const sseJsonQuery = route.sse("/sse-json-query").jsonQuery(scalar);
 export const sseParams = route.sse("/sse/:id").params(params);
-export const sseKeys = route
-	.sse("/sse-keys")
-	.query(query)
-	.requestKeys({ search: "query" });
+export const sseKeys = route.sse("/sse-keys").query(query);
 export const sseMetadata = route
 	.sse("/sse-metadata")
 	.withMetadata({ scope: "test" });
@@ -111,10 +104,7 @@ export const initialWebSocket = route.ws("/ws");
 export const webSocketQuery = route.ws("/ws-query").query(query);
 export const webSocketJsonQuery = route.ws("/ws-json-query").jsonQuery(scalar);
 export const webSocketParams = route.ws("/ws/:id").params(params);
-export const webSocketKeys = route
-	.ws("/ws-keys")
-	.query(query)
-	.requestKeys({ search: "query" });
+export const webSocketKeys = route.ws("/ws-keys").query(query);
 export const webSocketMetadata = route
 	.ws("/ws-metadata")
 	.withMetadata({ scope: "test" });

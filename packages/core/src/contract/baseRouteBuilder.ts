@@ -1,5 +1,4 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import { isCustomBody, isFormBody, isMultipartBody, isNoBody } from "./body.ts";
 import type {
 	CommonOpenApiRouteOptions,
 	HttpMethod,
@@ -9,19 +8,7 @@ import type {
 	RouteRequestDeclaration,
 } from "./baseRouteDeclaration.ts";
 import type { RouteFactoryOptions } from "./routeFactory.ts";
-import { getPathParamNames } from "./path.ts";
-import type {
-	RequestKeys,
-	RequestParamsSchema,
-	RequestQuerySchema,
-	RequestSegment,
-} from "./request.ts";
-import {
-	getRequestHeaderSchemas,
-	isJsonQuery,
-	REQUEST_CONTEXT_KEY,
-} from "./request.ts";
-import { resolveBuiltInRequestKeys } from "./requestKeys.ts";
+import type { RequestParamsSchema, RequestQuerySchema } from "./request.ts";
 
 /** An object type with no declared properties. */
 export type EmptyObject = Record<never, never>;
@@ -87,13 +74,6 @@ export type BuilderState<
 	used: TUsed;
 };
 
-/** Resolves the initial protocol-route request state from factory options. */
-export type ProtocolRequestFor<TOptions> = TOptions extends {
-	flattenRequestKeys: infer TFlatten extends boolean;
-}
-	? { flattenKeys: TFlatten }
-	: EmptyObject;
-
 /** Returns builder state with one request declaration field updated. */
 export type WithRequest<
 	TState extends BuilderState<unknown, string>,
@@ -123,13 +103,6 @@ export const joinPathPrefix = (prefix: string, path: string) =>
 
 const pathWithPrefix = (path: string, options: RouteFactoryOptions) =>
 	options.pathPrefix ? joinPathPrefix(options.pathPrefix, path) : path;
-
-export const protocolRequestDefaults = (
-	options: RouteFactoryOptions,
-): Omit<RouteRequestDeclaration, "body" | "headers"> | undefined =>
-	typeof options.flattenRequestKeys === "boolean"
-		? { flattenKeys: options.flattenRequestKeys }
-		: undefined;
 
 const mergeUnique = (common: string[] = [], local: string[] = []) => [
 	...new Set([...common, ...local]),
@@ -181,15 +154,9 @@ const mergeOpenApi = (
 	};
 };
 
-const resolveSchemaRequestKeyNames = (schema: StandardSchemaV1) => {
-	const keyInfo = resolveBuiltInRequestKeys(schema);
-	return keyInfo ? Object.keys(keyInfo) : undefined;
-};
-
 export class BaseRouteBuilder {
 	#commonMetadata?: RouteMetadata;
 	#commonOpenApi?: RouteFactoryOptions["openApi"];
-	#explicitRequestKeys?: RequestKeys;
 	declare method: HttpMethod;
 	declare path: string;
 	declare mode?: "http" | "sse" | "webSocket";
@@ -219,141 +186,15 @@ export class BaseRouteBuilder {
 		if (commonOpenApi) {
 			Object.assign(this, { openApi: commonOpenApi });
 		}
-		this.recalculateRequestKeys();
 	}
 
 	protected requestForWrite() {
 		const request = (this.request ??= {});
-		request.keys ??= {};
 		return request;
-	}
-
-	protected requestKeyDeclarations(): Array<{
-		segment: RequestSegment;
-		keys: string[] | undefined;
-	}> {
-		const request = this.request;
-		return [
-			...(request?.body
-				? [
-						{
-							segment: "body" as const,
-							keys:
-								isCustomBody(request.body) ||
-								isFormBody(request.body) ||
-								isMultipartBody(request.body) ||
-								isNoBody(request.body)
-									? ["body"]
-									: resolveSchemaRequestKeyNames(request.body),
-						},
-					]
-				: []),
-			...(request?.query
-				? [
-						{
-							segment: "query" as const,
-							keys: isJsonQuery(request.query)
-								? ["query"]
-								: resolveSchemaRequestKeyNames(request.query),
-						},
-					]
-				: []),
-			...(request?.params
-				? (() => {
-						const pathParamKeys = getPathParamNames(this.path);
-						return [
-							{
-								segment: "params" as const,
-								keys:
-									pathParamKeys.length > 0
-										? pathParamKeys
-										: resolveSchemaRequestKeyNames(request.params),
-							},
-						];
-					})()
-				: []),
-			...(request?.headers
-				? [
-						{
-							segment: "headers" as const,
-							keys: getRequestHeaderSchemas(request.headers).flatMap(
-								(schema) => resolveSchemaRequestKeyNames(schema) ?? [],
-							),
-						},
-					]
-				: []),
-		];
-	}
-
-	protected assertRequestKeysAllowed(keys: RequestKeys) {
-		if (keys[REQUEST_CONTEXT_KEY] !== undefined) {
-			throw new Error(
-				`Route declaration at path "${this.path}" has a reserved request key "${REQUEST_CONTEXT_KEY}". Rename it to avoid conflict with the route handler context.`,
-			);
-		}
-		if (isJsonQuery(this.request?.query) && keys.query !== undefined) {
-			throw new Error(
-				`Route declaration at path "${this.path}" has a "query" request key that conflicts with the JSON query value.`,
-			);
-		}
-
-		const body = this.request?.body;
-		if (
-			body &&
-			(isCustomBody(body) || isFormBody(body) || isMultipartBody(body)) &&
-			keys.body !== undefined
-		) {
-			throw new Error(
-				`Route declaration at path "${this.path}" has a "body" request key that conflicts with the request body payload.`,
-			);
-		}
-
-		for (const key of Object.keys(keys)) {
-			if (keys[key] === "headers") this.assertHeaderKeyAllowed(key);
-		}
-	}
-
-	protected assertHeaderKeyAllowed(key: string) {
-		if (key.toLowerCase() === "content-type") {
-			throw new Error(
-				`Route declaration at path "${this.path}" has a reserved header key "${key}". Use customBody({ schema, contentType }) to declare request content type instead.`,
-			);
-		}
-	}
-
-	protected recalculateRequestKeys() {
-		const request = this.request;
-		if (!request || request.flattenKeys === false) return;
-
-		const keys: RequestKeys = { ...this.#explicitRequestKeys };
-		this.assertRequestKeysAllowed(keys);
-
-		for (const {
-			segment,
-			keys: segmentKeys,
-		} of this.requestKeyDeclarations()) {
-			if (segmentKeys === undefined) {
-				continue;
-			}
-
-			for (const key of segmentKeys) {
-				if (segment === "headers") this.assertHeaderKeyAllowed(key);
-				const existing = keys[key];
-				if (existing && existing !== segment) {
-					throw new Error(
-						`Route declaration at path "${this.path}" has duplicate request key "${key}" across its "body", "query", "params" and "headers" definitions.`,
-					);
-				}
-				keys[key] = segment;
-			}
-		}
-
-		request.keys = keys;
 	}
 
 	query(schema: RequestQuerySchema) {
 		this.requestForWrite().query = schema;
-		this.recalculateRequestKeys();
 		return this;
 	}
 
@@ -362,20 +203,11 @@ export class BaseRouteBuilder {
 			kind: "jsonQuery",
 			schema,
 		};
-		this.recalculateRequestKeys();
 		return this;
 	}
 
 	params(schema: RequestParamsSchema) {
 		this.requestForWrite().params = schema;
-		this.recalculateRequestKeys();
-		return this;
-	}
-
-	requestKeys(keys: RequestKeys) {
-		this.#explicitRequestKeys = { ...keys };
-		this.requestForWrite();
-		this.recalculateRequestKeys();
 		return this;
 	}
 

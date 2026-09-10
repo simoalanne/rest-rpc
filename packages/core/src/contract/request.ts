@@ -5,7 +5,6 @@ import type { InferCustomBody } from "./response.ts";
 import type { AnyShorthandRouteDeclaration } from "./shorthandRouteBuilder.ts";
 
 export type RequestSegment = "body" | "query" | "params" | "headers";
-export type RequestKeys = Record<string, RequestSegment>;
 export const REQUEST_CONTEXT_KEY = "context";
 
 /** Scalar value accepted by ordinary HTTP request schemas. */
@@ -77,33 +76,6 @@ type InferRequestBody<
 > = TBody extends NoBody
 	? never
 	: TBody extends CustomBody
-		? {
-				body: InferCustomBody<TBody, TIO>;
-			}
-		: TBody extends FormBody<infer TSchema>
-			? {
-					body: TIO extends "input"
-						? StandardSchemaV1.InferInput<TSchema>
-						: StandardSchemaV1.InferOutput<TSchema>;
-				}
-			: TBody extends MultipartBody<infer TSchema>
-				? {
-						body: TIO extends "input"
-							? StandardSchemaV1.InferInput<TSchema>
-							: StandardSchemaV1.InferOutput<TSchema>;
-					}
-				: TBody extends StandardSchemaV1
-					? TIO extends "input"
-						? StandardSchemaV1.InferInput<TBody>
-						: StandardSchemaV1.InferOutput<TBody>
-					: never;
-
-type InferGroupedRequestBody<
-	TBody,
-	TIO extends "input" | "output",
-> = TBody extends NoBody
-	? never
-	: TBody extends CustomBody
 		? InferCustomBody<TBody, TIO>
 		: TBody extends FormBody<infer TSchema>
 			? TIO extends "input"
@@ -120,15 +92,6 @@ type InferGroupedRequestBody<
 					: never;
 
 type InferJsonQuery<TQuery, TIO extends "input" | "output"> =
-	TQuery extends JsonQuery<infer TSchema>
-		? {
-				query: TIO extends "input"
-					? StandardSchemaV1.InferInput<TSchema>
-					: StandardSchemaV1.InferOutput<TSchema>;
-			}
-		: never;
-
-type InferGroupedJsonQuery<TQuery, TIO extends "input" | "output"> =
 	TQuery extends JsonQuery<infer TSchema>
 		? TIO extends "input"
 			? StandardSchemaV1.InferInput<TSchema>
@@ -173,13 +136,6 @@ type InferRequestObjectSegment<
 			: StandardSchemaV1.InferOutput<TSegment>
 		: never;
 
-type InferGroupedRequestObjectSegment<
-	TSegment,
-	TIO extends "input" | "output",
-> = TSegment extends JsonQuery
-	? InferGroupedJsonQuery<TSegment, TIO>
-	: InferRequestObjectSegment<TSegment, TIO>;
-
 type InferRequestSegments<R, TIO extends "input" | "output"> = {
 	body: R extends { body: infer TBody } ? InferRequestBody<TBody, TIO> : never;
 	query: R extends { query: infer TQuery }
@@ -195,35 +151,15 @@ type InferRequestSegments<R, TIO extends "input" | "output"> = {
 		: never;
 };
 
-type InferGroupedRequestSegments<R, TIO extends "input" | "output"> = {
-	body: R extends { body: infer TBody }
-		? InferGroupedRequestBody<TBody, TIO>
-		: never;
-	query: R extends { query: infer TQuery }
-		? InferGroupedRequestObjectSegment<TQuery, TIO>
-		: never;
-	params: R extends { params: infer Tparams }
-		? InferGroupedRequestObjectSegment<Tparams, TIO>
-		: never;
-	headers: R extends { headers: infer THeaders }
-		? THeaders extends RequestHeadersDeclaration
-			? InferRequestHeaders<THeaders, TIO>
-			: never
-		: never;
-};
-
 type RouteRequest<
 	E extends BaseRouteDeclaration,
 	TIO extends "input" | "output",
 > = E extends { request: infer TRequest }
-	? TRequest extends { flattenKeys: false }
-		? InferGroupedRequestSegments<TRequest, TIO>
-		: InferRequestSegments<TRequest, TIO>
+	? InferRequestSegments<TRequest, TIO>
 	: never;
 
 type Merge<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
 type EmptyObject = Record<never, never>;
-type MergeSegment<T> = [T] extends [never] ? unknown : T;
 type HasRequestInput<TRequest> = [
 	TRequest extends {
 		body: infer TBody;
@@ -249,31 +185,33 @@ type InferRequestFor<
 				headers: infer H;
 			}
 			? HasRequestInput<R> extends true
-				? E extends { request: { flattenKeys: false } }
-					? Merge<
-							([B] extends [never] ? EmptyObject : { body: B }) &
-								([Q] extends [never] ? EmptyObject : { query: Q }) &
-								([P] extends [never] ? EmptyObject : { params: P }) &
-								([H] extends [never] ? EmptyObject : { headers: H })
-						>
-					: Merge<
-							MergeSegment<B> &
-								MergeSegment<Q> &
-								MergeSegment<P> &
-								MergeSegment<H>
-						>
+				? Merge<
+						([B] extends [never] ? EmptyObject : { body: B }) &
+							([Q] extends [never] ? EmptyObject : { query: Q }) &
+							([P] extends [never] ? EmptyObject : { params: P }) &
+							([H] extends [never] ? EmptyObject : { headers: H })
+					>
 				: never
 			: never
 		: never;
 
-type OptionalRequestKeys<T, TOptionalKeys extends PropertyKey> = [T] extends [
-	never,
-]
+type OptionalHeaders<H, TOptionalKeys extends PropertyKey> = Merge<
+	Omit<H, Extract<keyof H, TOptionalKeys>> &
+		Partial<Pick<H, Extract<keyof H, TOptionalKeys>>>
+>;
+
+type OptionalRequestHeaders<T, TOptionalKeys extends PropertyKey> = [
+	T,
+] extends [never]
 	? never
-	: Merge<
-			Omit<T, Extract<keyof T, TOptionalKeys>> &
-				Partial<Pick<T, Extract<keyof T, TOptionalKeys>>>
-		>;
+	: T extends { headers: infer H }
+		? Merge<
+				Omit<T, "headers"> &
+					({} extends OptionalHeaders<H, TOptionalKeys>
+						? { headers?: OptionalHeaders<H, TOptionalKeys> }
+						: { headers: OptionalHeaders<H, TOptionalKeys> })
+			>
+		: T;
 
 /**
  * Infers the request type passed to a generated client route call.
@@ -288,7 +226,7 @@ export type ClientRequest<
 		? StandardSchemaV1.InferInput<TInput>
 		: never
 	: E extends BaseRouteDeclaration
-		? OptionalRequestKeys<InferRequestFor<E, "input">, TOptionalKeys>
+		? OptionalRequestHeaders<InferRequestFor<E, "input">, TOptionalKeys>
 		: never;
 
 export type ServerRequest<E extends BaseRouteDeclaration> = InferRequestFor<

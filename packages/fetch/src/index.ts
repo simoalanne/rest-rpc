@@ -14,7 +14,7 @@ export interface DefaultContext {}
 
 /** Starts a server-first route builder chain */
 export const route = serverFirstRoute as unknown as ServerRouteFactory<
-	{ flattenRequestKeys: true },
+	Record<never, never>,
 	DefaultContext
 >;
 

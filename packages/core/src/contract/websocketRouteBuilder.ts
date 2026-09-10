@@ -11,7 +11,6 @@ import type {
 import type { RouteFactoryOptions } from "./routeFactory.ts";
 import type {
 	JsonQuery,
-	RequestKeys,
 	RequestParamsSchema,
 	RequestQuerySchema,
 } from "./request.ts";
@@ -19,8 +18,6 @@ import {
 	BaseRouteBuilder,
 	type BuilderState,
 	type EmptyObject,
-	type ProtocolRequestFor,
-	protocolRequestDefaults,
 	type UseBuilderMethod,
 	type WhenUnused,
 	type WithRequest,
@@ -160,13 +157,7 @@ class WebSocketRouteBuilder extends BaseRouteBuilder {
 	>;
 
 	constructor(path: string, options?: RouteFactoryOptions) {
-		super(
-			"GET",
-			path,
-			options ?? {},
-			protocolRequestDefaults(options ?? {}),
-			"webSocket",
-		);
+		super("GET", path, options ?? {}, undefined, "webSocket");
 	}
 
 	private setMessage(
@@ -210,11 +201,7 @@ type AddWebSocketMessage<
 	};
 };
 
-type WebSocketBuilderMethod =
-	| "query"
-	| "params"
-	| "requestKeys"
-	| "withMetadata";
+type WebSocketBuilderMethod = "query" | "params" | "withMetadata";
 
 type WebSocketBuilderState = BuilderState<unknown, WebSocketBuilderMethod> & {
 	messages: WebSocketCompletion;
@@ -222,7 +209,7 @@ type WebSocketBuilderState = BuilderState<unknown, WebSocketBuilderMethod> & {
 
 type SetWebSocketRequest<
 	TState extends WebSocketBuilderState,
-	TKey extends "query" | "params" | "keys",
+	TKey extends "query" | "params",
 	TValue,
 	TMethod extends WebSocketBuilderMethod,
 > = UseBuilderMethod<WithRequest<TState, TKey, TValue>, TMethod>;
@@ -290,18 +277,6 @@ type WebSocketRequestSetters<TState extends WebSocketBuilderState> = WhenUnused<
 			>;
 		}
 	> &
-	WhenUnused<
-		TState,
-		"requestKeys",
-		{
-			/** Maps flattened request keys. @see {@link https://rest-rpc.dev/docs/contract/declaration#flattened-key-collisions} */
-			requestKeys<const TKeys extends RequestKeys>(
-				keys: TKeys,
-			): WebSocketBuilder<
-				SetWebSocketRequest<TState, "keys", TKeys, "requestKeys">
-			>;
-		}
-	> &
 	("withMetadata" extends TState["used"]
 		? { metadata: RouteMetadata }
 		: {
@@ -318,8 +293,8 @@ export type WebSocketBuilder<TState extends WebSocketBuilderState> =
 		WebSocketRequestSetters<TState>;
 
 /** Creates the initial WebSocket builder type for route factory options. */
-export type WebSocketBuilderFor<TOptions> = WebSocketBuilder<{
-	request: ProtocolRequestFor<TOptions>;
+export type WebSocketBuilderFor = WebSocketBuilder<{
+	request: EmptyObject;
 	used: never;
 	messages: EmptyObject;
 }>;

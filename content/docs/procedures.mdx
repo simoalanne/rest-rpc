@@ -70,7 +70,9 @@ const builders = implement(api);
 export const routes = {
 	todos: {
 		list: builders.todos.list.handler(() => listTodos()),
-		create: builders.todos.create.handler(({ title }) => createTodo(title)),
+		create: builders.todos.create.handler(({ input }) =>
+			createTodo(input.title),
+		),
 	},
 };
 
@@ -94,8 +96,8 @@ export const routes = {
 		list: route.handler(() => listTodos()),
 		create: route
 			.input(z.object({ title: z.string().min(1) }))
-			.handler(({ title, context }) => {
-				return createTodo(title, context.signal);
+			.handler(({ input, context }) => {
+				return createTodo(input.title, context.signal);
 			}),
 	},
 };
@@ -108,11 +110,14 @@ at runtime or when a stable schema should constrain the implementation.
 const create = route
 	.input(z.object({ title: z.string().min(1) }))
 	.output(todoSchema)
-	.handler(({ title }) => createTodo(title));
+	.handler(({ input }) => createTodo(input.title));
 ```
 
 Input and output may be declared in either order. `context` contains the same
 adapter context and `AbortSignal` available to explicit server-first routes.
+The handler receives validated procedure input under `input`, so input schemas
+may describe any JSON value and an input field named `context` cannot conflict
+with the handler context. Clients still pass the input value directly.
 
 ## Call Procedures
 

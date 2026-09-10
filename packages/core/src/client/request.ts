@@ -7,11 +7,7 @@ import {
 import type { RouteDeclaration } from "../contract/contract.ts";
 import { replacePathParams } from "../contract/path.ts";
 import { isJsonQuery } from "../contract/request.ts";
-import type {
-	FlatRequestInput,
-	GroupedRequestInput,
-} from "./groupRequestInput.ts";
-import { groupRequestInput } from "./groupRequestInput.ts";
+import type { GroupedRequestInput } from "./requestInput.ts";
 import { getNextFetchTags } from "./nextFetchTags.ts";
 import type { ClientRequestRoute } from "./requestRoute.ts";
 import type {
@@ -105,13 +101,9 @@ const serializeFormBody = (
 ) => {
 	const routeBody = route.request?.body;
 	const arrayKeys = getDeclaredArrayKeys(routeBody, "formBody");
-	const formBody =
-		route.request?.flattenKeys === false
-			? body
-			: ((body?.body as Record<string, unknown> | undefined) ?? body);
 
 	return new URLSearchParams(
-		Object.entries(formBody ?? {}).flatMap(([key, value]) => {
+		Object.entries(body ?? {}).flatMap(([key, value]) => {
 			if (Array.isArray(value)) {
 				if (arrayKeys && !arrayKeys.has(key)) {
 					throw new Error(
@@ -141,13 +133,9 @@ const serializeMultipartBody = (
 ) => {
 	const routeBody = route.request?.body;
 	const arrayKeys = getDeclaredArrayKeys(routeBody, "multipartBody");
-	const multipartBody =
-		route.request?.flattenKeys === false
-			? body
-			: ((body?.body as Record<string, unknown> | undefined) ?? body);
 	const formData = new FormData();
 
-	for (const [key, value] of Object.entries(multipartBody ?? {})) {
+	for (const [key, value] of Object.entries(body ?? {})) {
 		if (Array.isArray(value)) {
 			if (arrayKeys && !arrayKeys.has(key)) {
 				throw new Error(
@@ -196,7 +184,10 @@ const serializeParams = (
 };
 
 const serializeQuery = (route: ClientRequestRoute, query: unknown) => {
-	const entries = Object.entries(query ?? {}).flatMap(([key, value]) => {
+	const queryValues = isJsonQuery(route.request?.query)
+		? { query }
+		: (query ?? {});
+	const entries = Object.entries(queryValues).flatMap(([key, value]) => {
 		const stringValue = isJsonQuery(route.request?.query)
 			? stringifyJsonQueryValue(route, value)
 			: value === undefined
@@ -226,8 +217,7 @@ const stringifyJsonQueryValue = (route: ClientRequestRoute, value: unknown) => {
 export const constructBaseRequest = (
 	baseUrl: string,
 	route: ClientRequestRoute,
-	args: FlatRequestInput | undefined,
-	strictRequestKeys: boolean,
+	args: GroupedRequestInput | undefined,
 ): {
 	url: string;
 	body?: BodyInit | null;
@@ -237,11 +227,7 @@ export const constructBaseRequest = (
 	let urlBase = `${baseUrl}${route.path}`;
 	if (!args) return { url: urlBase };
 
-	const request =
-		route.request?.flattenKeys === false
-			? (args as GroupedRequestInput)
-			: groupRequestInput(route, args, { strictRequestKeys });
-	const { body, query, params, headers } = request;
+	const { body, query, params, headers } = args;
 	const routeBody = route.request?.body;
 
 	urlBase = `${baseUrl}${serializeParams(route, params)}${serializeQuery(route, query)}`;
@@ -269,7 +255,7 @@ export const constructBaseRequest = (
 	}
 
 	if (isCustomBody(routeBody)) {
-		const bodyPayload = (body as Record<string, unknown> | undefined)?.body;
+		const bodyPayload = body;
 		const { contentType, payload } = Array.isArray(routeBody.contentType)
 			? (bodyPayload as { contentType: string; payload: unknown })
 			: {
@@ -289,8 +275,8 @@ export const constructBaseRequest = (
 
 	return {
 		url: urlBase,
-		body: body ? JSON.stringify(body) : undefined,
-		contentType: body ? "application/json" : undefined,
+		body: body !== undefined ? JSON.stringify(body) : undefined,
+		contentType: body !== undefined ? "application/json" : undefined,
 		headers: stringifyHeaders(route, headers),
 	};
 };
@@ -302,7 +288,6 @@ export type ExecuteRequestOptions = {
 	getGlobalHeaders?: GetHeadersFn;
 	nextFetchTags?: NextFetchTagsOptions;
 	timeoutMs?: number;
-	strictRequestKeys: boolean;
 };
 
 const addNextFetchTags = (
@@ -311,9 +296,9 @@ const addNextFetchTags = (
 	routeIdentity:
 		| readonly string[]
 		| Pick<ClientRequestRoute, "method" | "path">,
-	request: FlatRequestInput | undefined,
+	request: GroupedRequestInput | undefined,
 	options: NextFetchTagsOptions | undefined,
-	tagRequest: FlatRequestInput | undefined,
+	tagRequest: GroupedRequestInput | undefined,
 ) => {
 	if (!options?.enabled || route.method !== "GET") return init;
 
@@ -345,21 +330,16 @@ export const executeRequest = async <E extends RouteDeclaration>(
 		| Pick<ClientRequestRoute, "method" | "path">,
 	args: FetchArgs<E> | unknown[],
 	options: ExecuteRequestOptions,
-	tagRequest?: FlatRequestInput,
+	tagRequest?: GroupedRequestInput,
 ): Promise<Response> => {
-	const requestArgs = args[0] as FlatRequestInput | undefined;
+	const requestArgs = args[0] as GroupedRequestInput | undefined;
 	const fetchOptions = args[1] as FetchOptions | undefined;
 	const {
 		url,
 		body,
 		contentType,
 		headers: requestHeaders,
-	} = constructBaseRequest(
-		options.baseUrl,
-		route,
-		requestArgs,
-		options.strictRequestKeys,
-	);
+	} = constructBaseRequest(options.baseUrl, route, requestArgs);
 
 	const headers = (await options.getGlobalHeaders?.()) ?? {};
 	assertNoContentTypeHeader(headers);

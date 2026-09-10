@@ -25,11 +25,11 @@ const routes = router(api, {
 		list() {
 			return listTodos();
 		},
-		get({ id, context }) {
+		get({ params: { id }, context }) {
 			const authorization = context.req.header("authorization");
 			return getTodo(id, { authorization });
 		},
-		create({ title }) {
+		create({ body: { title } }) {
 			return createTodo({ title });
 		},
 	},

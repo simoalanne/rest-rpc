@@ -211,12 +211,14 @@ it("supports async routers that close over values from Nest parameter decorators
 			.get("/async-items/:id")
 			.params(schemaType<{ id: string }>())
 			.headers(schemaType<{ "x-test-source": string }>())
-			.requestKeys({ "x-test-source": "headers" })
 			.response(200, schemaType<{ id: string; title: string }>()),
 	} as const;
 	@Injectable()
 	class AsyncItemService {
-		get(source: string, { id }: RouteRequest<typeof asyncContract.get>) {
+		get(
+			source: string,
+			{ params: { id } }: RouteRequest<typeof asyncContract.get>,
+		) {
 			return { id, title: `${source}:async:${id}` };
 		}
 	}
@@ -250,8 +252,8 @@ it("supports async routers that close over values from Nest parameter decorators
 		const client = initClient(asyncContract, { baseUrl: await app.getUrl() });
 
 		const response = await client.get({
-			id: "item-1",
-			"x-test-source": "decorated",
+			params: { id: "item-1" },
+			headers: { "x-test-source": "decorated" },
 		});
 		assert.equal(response.status, 200);
 		assert.deepEqual(response.body, {
@@ -324,8 +326,8 @@ it("serves a contract route implemented by a Nest provider class", async () => {
 		constructor(@Inject(ItemService) private readonly items: ItemService) {}
 
 		get({
-			id,
 			context,
+			params: { id },
 		}: RouteRequest<typeof classContract.items.get, AppContext>) {
 			return {
 				id,
@@ -391,8 +393,8 @@ it("passes controller-local context to Nest provider route handlers", async () =
 	@Injectable()
 	class ItemRoutes implements RouteHandlers<typeof classContract.items> {
 		get({
-			id,
 			context,
+			params: { id },
 		}: RouteRequest<typeof classContract.items.get, AppContext>) {
 			return {
 				id,

@@ -226,7 +226,6 @@ const apiRoute = route.with({
 		500: errorSchema,
 	},`
 	}
-	flattenRequestKeys: false,
 		strictStatusCodes: true,
 });
 

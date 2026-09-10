@@ -28,7 +28,6 @@ describe("shorthand route builder runtime", () => {
 		}
 		assert.deepEqual(inputFirst.request, {
 			body: input,
-			flattenKeys: true,
 		});
 	});
 });

@@ -70,7 +70,7 @@ import type {
 } from "@rest-rpc/core";
 
 type GetTodoRequest = ClientRequest<typeof api.todos.get>;
-// { id: string; includeDone?: boolean }
+// { params: { id: string }; query: { includeDone?: boolean } }
 
 type GetTodoResponse = ClientResponse<typeof api.todos.get>;
 // | { status: 200; body: { id: string; title: string }; headers: Headers }
@@ -121,10 +121,10 @@ import type {
 } from "@rest-rpc/express";
 
 type GetTodoRequest = RouteRequest<typeof api.todos.get>;
-// { id: string; includeDone?: boolean; context: HttpRouteHandlerContext }
+// { params: { id: string }; query: { includeDone?: boolean }; context: HttpRouteHandlerContext }
 
 type GetTodoRequestData = RouteRequestData<typeof api.todos.get>;
-// { id: string; includeDone?: boolean }
+// { params: { id: string }; query: { includeDone?: boolean } }
 
 type GetTodoResponse = RouteResponse<typeof api.todos.get>;
 // | { status: 200; body: { id: string; title: string } }
@@ -186,9 +186,7 @@ type TodoPagesData = RouteInfiniteQueryData<typeof api.todos.page>;
 //     headers: Headers;
 //   }>;
 //   pageParams: Array<{
-//     cursor?: string;
-//     status: "open" | "done";
-//     limit: number;
+//     query: { cursor?: string; status: "open" | "done"; limit: number };
 //   }>;
 // }
 
@@ -201,5 +199,5 @@ type GetTodoError = RouteQueryError<typeof api.todos.get>;
 // | Error
 
 type CreateTodoVariables = RouteMutationVariables<typeof api.todos.create>;
-// { title: string }
+// { body: { title: string } }
 ```

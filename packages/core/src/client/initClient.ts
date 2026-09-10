@@ -33,7 +33,6 @@ const createContractClient = <
 	contract: TContract,
 	options: ApiClientOptions<TGlobalHeaders>,
 ): ApiClientFor<TContract, TGlobalHeaders> => {
-	const strictRequestKeys = options.strictRequestKeys ?? true;
 	const validateResponses = options.validateResponses ?? false;
 	const requestOptions: ExecuteRequestOptions = {
 		baseUrl: options.baseUrl,
@@ -42,7 +41,6 @@ const createContractClient = <
 		getGlobalHeaders: options.getGlobalHeaders,
 		nextFetchTags: options.nextFetchTags,
 		timeoutMs: options.timeoutMs,
-		strictRequestKeys,
 	};
 
 	const request: RouteRequestFn = (route, routePath, ...args) =>
@@ -65,14 +63,10 @@ const createContractClient = <
 				if (!resolvedRoute.request?.body) {
 					return fetchSuccess(fetchResponse, resolvedRoute, routePath, ...args);
 				}
-				const clientRoute = {
-					...resolvedRoute,
-					request: { ...resolvedRoute.request, flattenKeys: false },
-				};
 
 				return fetchSuccess(
 					fetchResponse,
-					clientRoute,
+					resolvedRoute,
 					routePath,
 					{ body: args[0] } as never,
 					args[1],
@@ -88,7 +82,6 @@ const createContractClient = <
 						options.baseUrl,
 						node,
 						requestArgs,
-						strictRequestKeys,
 					);
 					const connectionOptions = {
 						validateIncomingMessages: validateResponses,

@@ -58,7 +58,9 @@ describe("ApiClient SSE", () => {
 		assert.throws(
 			() =>
 				client.events.notifications.openConnection({
-					projectId: "project-1",
+					params: {
+						projectId: "project-1",
+					},
 				}),
 			/EventSource is not available in this runtime/,
 		);
@@ -71,8 +73,8 @@ describe("ApiClient SSE", () => {
 		});
 
 		client.events.notifications.openConnection({
-			projectId: "project 1",
-			done: true,
+			params: { projectId: "project 1" },
+			query: { done: true },
 		});
 
 		assert.equal(
@@ -88,7 +90,9 @@ describe("ApiClient SSE", () => {
 		});
 
 		const source = client.events.notifications.openConnection({
-			projectId: "project-1",
+			params: {
+				projectId: "project-1",
+			},
 		});
 		const rawSource = instances[0];
 
@@ -113,7 +117,9 @@ describe("ApiClient SSE", () => {
 			validateResponses: true,
 		});
 		const source = client.events.notifications.openConnection({
-			projectId: "project-1",
+			params: {
+				projectId: "project-1",
+			},
 		});
 		const messages: unknown[] = [];
 		source.onMessage((message) => messages.push(message));
@@ -141,7 +147,9 @@ describe("ApiClient SSE", () => {
 			validateResponses: true,
 		});
 		const source = client.events.notifications.openConnection({
-			projectId: "project-1",
+			params: {
+				projectId: "project-1",
+			},
 		});
 		const messages: unknown[] = [];
 		source.onMessage((message) => messages.push(message));
@@ -163,7 +171,9 @@ describe("ApiClient SSE", () => {
 			baseUrl: "https://api.test",
 		});
 		const source = client.events.notifications.openConnection({
-			projectId: "project-1",
+			params: {
+				projectId: "project-1",
+			},
 		});
 		let openCount = 0;
 		let errorCount = 0;

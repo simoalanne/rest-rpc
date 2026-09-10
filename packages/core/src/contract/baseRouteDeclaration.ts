@@ -3,7 +3,6 @@ import type {
 	JsonQuery,
 	RequestBodySchema,
 	RequestHeadersDeclaration,
-	RequestKeys,
 	RequestParamsSchema,
 	RequestQuerySchema,
 } from "./request.ts";
@@ -53,8 +52,6 @@ export type RouteRequestDeclaration = {
 	query?: RequestQuerySchema | JsonQuery;
 	params?: RequestParamsSchema;
 	headers?: RequestHeadersDeclaration;
-	keys?: RequestKeys;
-	flattenKeys?: boolean;
 };
 
 /** Fields shared by every canonical route declaration. */

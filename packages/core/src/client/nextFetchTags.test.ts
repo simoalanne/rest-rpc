@@ -10,13 +10,6 @@ describe("Next fetch tags", () => {
 			items: {
 				list: route
 					.get("/items/:id")
-					.requestKeys({
-						id: "params",
-						filter: "query",
-						page: "query",
-						authorization: "headers",
-						ignoredBody: "body",
-					})
 					.body(type<{ ignoredBody: string }>())
 					.headers(type<{ authorization: string }>())
 					.params(type<{ id: string }>())
@@ -27,14 +20,13 @@ describe("Next fetch tags", () => {
 
 		assert.deepEqual(
 			getNextFetchTags(apiContract.items.list, ["items", "list"], {
-				id: "one/two",
-				filter: "open",
-				page: 2,
-				authorization: "Bearer secret",
-				ignoredBody: "ignored",
+				params: { id: "one/two" },
+				query: { filter: "open", page: 2 },
+				headers: { authorization: "Bearer secret" },
+				body: { ignoredBody: "ignored" },
 			}),
 			[
-				"rest-rpc:items.list:filter:open:id:one%2Ftwo:page:2",
+				"rest-rpc:items.list:params:%7B%22id%22%3A%22one%2Ftwo%22%7D:query:%7B%22filter%22%3A%22open%22%2C%22page%22%3A2%7D",
 				"rest-rpc:items.list",
 			],
 		);
@@ -50,9 +42,6 @@ describe("Next fetch tags", () => {
 				get: route
 					.get("/items/:id")
 					.params(type<{ id: string }>())
-					.requestKeys({
-						id: "params",
-					})
 					.response(204),
 			},
 		};
@@ -61,10 +50,10 @@ describe("Next fetch tags", () => {
 			getNextFetchTags(
 				apiContract.items.get,
 				["items", "get"],
-				{ id: "one" },
+				{ params: { id: "one" } },
 				{ tagPrefix: "api" },
 			),
-			["api:items.get:id:one", "api:items.get"],
+			["api:items.get:params:%7B%22id%22%3A%22one%22%7D", "api:items.get"],
 		);
 	});
 
@@ -73,7 +62,6 @@ describe("Next fetch tags", () => {
 			items: route
 				.get("/items/:id")
 				.params(type<{ id: string }>())
-				.requestKeys({ id: "params" })
 				.response(204),
 		};
 
@@ -81,14 +69,17 @@ describe("Next fetch tags", () => {
 			getNextFetchTags(
 				apiContract.items,
 				{ method: "GET", path: "/items/:id" },
-				{ id: "one" },
+				{ params: { id: "one" } },
 			),
-			["rest-rpc:get:/items/:id:id:one", "rest-rpc:get:/items/:id"],
+			[
+				"rest-rpc:get:/items/:id:params:%7B%22id%22%3A%22one%22%7D",
+				"rest-rpc:get:/items/:id",
+			],
 		);
 	});
 
-	it("uses grouped request segments when flattened request keys are disabled", () => {
-		const groupedRoute = route.with({ flattenRequestKeys: false });
+	it("omits undefined fields within request segments", () => {
+		const groupedRoute = route;
 		const apiContract = {
 			items: {
 				list: groupedRoute
@@ -112,7 +103,7 @@ describe("Next fetch tags", () => {
 	});
 
 	it("serializes JSON query values in grouped request segments", () => {
-		const groupedRoute = route.with({ flattenRequestKeys: false });
+		const groupedRoute = route;
 		const apiContract = {
 			items: {
 				list: groupedRoute

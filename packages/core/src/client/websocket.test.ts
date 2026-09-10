@@ -66,7 +66,8 @@ describe("ApiClient websockets", () => {
 		});
 
 		assert.throws(
-			() => client.socket.join.openConnection({ roomId: "general" }),
+			() =>
+				client.socket.join.openConnection({ params: { roomId: "general" } }),
 			/WebSocket is not available in this runtime/,
 		);
 	});
@@ -77,7 +78,7 @@ describe("ApiClient websockets", () => {
 			baseUrl: "https://api.test",
 		});
 
-		client.socket.join.openConnection({ roomId: "room 1" });
+		client.socket.join.openConnection({ params: { roomId: "room 1" } });
 
 		assert.equal(instances[0]?.url, "wss://api.test/rooms/room%201");
 	});
@@ -88,7 +89,9 @@ describe("ApiClient websockets", () => {
 			baseUrl: "https://api.test",
 		});
 
-		const socket = client.socket.join.openConnection({ roomId: "general" });
+		const socket = client.socket.join.openConnection({
+			params: { roomId: "general" },
+		});
 		const rawSocket = instances[0];
 
 		assert.notEqual(socket, rawSocket);
@@ -112,7 +115,9 @@ describe("ApiClient websockets", () => {
 		const client = initClient(apiContract, {
 			baseUrl: "http://api.test",
 		});
-		const socket = client.socket.join.openConnection({ roomId: "general" });
+		const socket = client.socket.join.openConnection({
+			params: { roomId: "general" },
+		});
 		instances[0].readyState = FakeWebSocket.OPEN;
 
 		socket.send({ type: "message", message: { text: "hello" } });
@@ -128,7 +133,9 @@ describe("ApiClient websockets", () => {
 		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 		});
-		const socket = client.socket.join.openConnection({ roomId: "general" });
+		const socket = client.socket.join.openConnection({
+			params: { roomId: "general" },
+		});
 
 		assert.throws(
 			() => socket.send({ type: "message", message: { text: "hello" } }),
@@ -141,7 +148,9 @@ describe("ApiClient websockets", () => {
 		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 		});
-		const socket = client.socket.join.openConnection({ roomId: "general" });
+		const socket = client.socket.join.openConnection({
+			params: { roomId: "general" },
+		});
 		const messages: unknown[] = [];
 		socket.onMessage((message) => messages.push(message));
 
@@ -161,7 +170,9 @@ describe("ApiClient websockets", () => {
 		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 		});
-		const socket = client.socket.join.openConnection({ roomId: "general" });
+		const socket = client.socket.join.openConnection({
+			params: { roomId: "general" },
+		});
 		let openCount = 0;
 		let errorCount = 0;
 		let closeCount = 0;
@@ -215,7 +226,9 @@ describe("ApiClient websockets", () => {
 		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 		});
-		const socket = client.socket.join.openConnection({ roomId: "general" });
+		const socket = client.socket.join.openConnection({
+			params: { roomId: "general" },
+		});
 		const messages: unknown[] = [];
 		const serverOutput = serverMessageSchema.parse({
 			name: { first: "Ada", last: "Lovelace" },
@@ -256,7 +269,9 @@ describe("ApiClient websockets", () => {
 			baseUrl: "https://api.test",
 			validateResponses: true,
 		});
-		const socket = client.socket.join.openConnection({ roomId: "general" });
+		const socket = client.socket.join.openConnection({
+			params: { roomId: "general" },
+		});
 		const messages: unknown[] = [];
 		const serverOutput = serverMessageSchema.parse({
 			name: { first: "Ada", last: "Lovelace" },
@@ -294,7 +309,9 @@ describe("ApiClient websockets", () => {
 		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 		});
-		const socket = client.socket.join.openConnection({ roomId: "general" });
+		const socket = client.socket.join.openConnection({
+			params: { roomId: "general" },
+		});
 		const messages: unknown[] = [];
 		const serverOutput = serverMessageSchema.parse({
 			createdAt: "2026-08-10T00:00:00.000Z",
@@ -334,7 +351,9 @@ describe("ApiClient websockets", () => {
 			baseUrl: "https://api.test",
 			validateResponses: true,
 		});
-		const socket = client.socket.join.openConnection({ roomId: "general" });
+		const socket = client.socket.join.openConnection({
+			params: { roomId: "general" },
+		});
 		const messages: Array<{ type: "message"; message: { createdAt: Date } }> =
 			[];
 		const serverOutput = serverMessageSchema.parse({
@@ -375,7 +394,9 @@ describe("ApiClient websockets", () => {
 			baseUrl: "https://api.test",
 			validateResponses: true,
 		});
-		const socket = client.socket.join.openConnection({ roomId: "general" });
+		const socket = client.socket.join.openConnection({
+			params: { roomId: "general" },
+		});
 		const messages: unknown[] = [];
 		socket.onMessage((message) => messages.push(message));
 
@@ -403,7 +424,9 @@ describe("ApiClient websockets", () => {
 			baseUrl: "https://api.test",
 			validateResponses: true,
 		});
-		const socket = client.socket.join.openConnection({ roomId: "general" });
+		const socket = client.socket.join.openConnection({
+			params: { roomId: "general" },
+		});
 		const messages: unknown[] = [];
 		socket.onMessage((message) => messages.push(message));
 

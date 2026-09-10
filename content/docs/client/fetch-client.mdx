@@ -17,7 +17,7 @@ const client = initClient(api, {
 The client has the same route tree shape as the contract.
 
 ```ts
-const response = await client.todos.get({ id: "todo_1" });
+const response = await client.todos.get({ params: { id: "todo_1" } });
 ```
 
 ## Call An HTTP Route
@@ -26,7 +26,7 @@ Every HTTP route is directly callable.
 
 ```ts
 const response = await client.todos.get({
-	id: "todo_1",
+	params: { id: "todo_1" },
 });
 ```
 
@@ -57,6 +57,7 @@ const api = {
 	todos: {
 		get: strictRoute
 			.get("/todos/:id")
+			.params(z.object({ id: z.string() }))
 			.response(200, todoSchema)
 			.response(404, notFoundSchema),
 	},
@@ -67,7 +68,7 @@ const client = initClient(api, { baseUrl: "https://api.example.com" });
 
 ```ts
 const response = await client.todos.get({
-	id: "todo_1",
+	params: { id: "todo_1" },
 });
 
 if (response.status === 404) {
@@ -115,11 +116,6 @@ const client = initClient(api, {
 			type: "number",
 			description: "Aborts a request when fetch does not return in time.",
 		},
-		strictRequestKeys: {
-			type: "boolean",
-			default: "true",
-			description: "Rejects unknown request keys instead of stripping them.",
-		},
 		validateResponses: {
 			type: "boolean",
 			default: "false",
@@ -153,7 +149,7 @@ const client = initClient(api, {
 });
 
 await client.todos.list({});
-await client.todos.list({ authorization: "Bearer override" });
+await client.todos.list({ headers: { authorization: "Bearer override" } });
 ```
 
 ## Custom Fetch
@@ -182,8 +178,8 @@ Pass fetch options as the second argument.
 ```ts
 const response = await client.todos.get(
 	{
-		id: "todo_1",
-		"x-request-id": "req_1",
+		params: { id: "todo_1" },
+		headers: { "x-request-id": "req_1" },
 	},
 	{
 		cache: "no-store",
@@ -196,27 +192,6 @@ If you need to pass fetch options to a route without request input, pass `undefi
 ```ts
 const response = await client.health(undefined, {
 	cache: "no-store",
-});
-```
-
-## Strict Request Keys
-
-By default, unknown request keys are rejected.
-
-```ts
-const client = initClient(api, {
-	baseUrl: "https://api.example.com",
-	strictRequestKeys: true,
-});
-```
-
-Set `strictRequestKeys` to `false` when extra keys should be ignored before
-building the HTTP request.
-
-```ts
-const client = initClient(api, {
-	baseUrl: "https://api.example.com",
-	strictRequestKeys: false,
 });
 ```
 
@@ -258,11 +233,11 @@ export const client = initClient(api, {
 });
 ```
 
-For `client.todos.get({ id: "todo_1" })`, the client attaches both the
+For `client.todos.get({ params: { id: "todo_1" } })`, the client attaches both the
 exact request tag and the broader route tag.
 
 ```ts
-["api:todos.get:id:todo_1", "api:todos.get"];
+["api:todos.get:params:%7B%22id%22%3A%22todo_1%22%7D", "api:todos.get"];
 ```
 
 Use the route-level tag for broad invalidation. Use the exact request tag when
@@ -278,7 +253,7 @@ Generated tags are merged with any tags you provide.
 
 ```ts
 await client.todos.get(
-	{ id: "todo_1" },
+	{ params: { id: "todo_1" } },
 	{
 		next: {
 			revalidate: 60,
@@ -297,11 +272,12 @@ import { api } from "./contract";
 import { client } from "./client";
 
 export async function renameTodo(id: string, title: string) {
-	await client.todos.update({ id, title });
+	await client.todos.update({ params: { id }, body: { title } });
 
 	for (const tag of getNextFetchTags(
 		api.todos.get,
-		{ id },
+		["todos", "get"],
+		{ params: { id } },
 		{ tagPrefix: "api" },
 	)) {
 		revalidateTag(tag);
@@ -315,7 +291,7 @@ WebSocket routes expose `openConnection()` instead of being directly callable.
 
 ```ts
 const socket = client.todos.watch.openConnection({
-	id: "todo_1",
+	params: { id: "todo_1" },
 });
 ```
 

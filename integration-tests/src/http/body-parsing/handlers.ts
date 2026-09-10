@@ -5,8 +5,8 @@ export type BodyParsingHandlers = ImplementationShape<BodyParsingContract>;
 
 export const createBodyParsingHandlers = (): BodyParsingHandlers => ({
 	json: (request) => ({
-		count: request.count,
-		title: request.title,
+		count: request.body.count,
+		title: request.body.title,
 	}),
 	text: (request) => ({ body: request.body }),
 	textVariant: (request) => ({

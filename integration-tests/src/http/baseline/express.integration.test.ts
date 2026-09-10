@@ -39,7 +39,7 @@ it("passes matched routes to Express route middleware", async () => {
 		const client = initClient(integrationContract, {
 			baseUrl: server.origin,
 		});
-		const response = await client.items.get({ id: "item-1" });
+		const response = await client.items.get({ params: { id: "item-1" } });
 
 		assert.equal(response.status, 200);
 		assert.equal(response.headers.get("x-route-middleware"), "/items/:id");
@@ -75,7 +75,9 @@ it("supports Express router scoped middleware with a prefixed client baseUrl", a
 		assert.equal(healthResponse.status, 204);
 		assert.equal(healthResponse.body, undefined);
 		const response = await client.items.list({
-			search: "scoped",
+			query: {
+				search: "scoped",
+			},
 		});
 
 		assert.equal(response.status, 200);

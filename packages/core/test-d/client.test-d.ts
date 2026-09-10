@@ -102,7 +102,7 @@ const pathParamClient = initClient(pathParamApi, {
 	baseUrl: "https://example.test",
 });
 
-pathParamClient.todos.get({ id: "todo-1" }).then((response) => {
+pathParamClient.todos.get({ params: { id: "todo-1" } }).then((response) => {
 	if (response.status !== 200) throw new Error("Unexpected status");
 	expectType<{ id: string; title: string }>(response.body);
 });
@@ -128,9 +128,11 @@ const flatQueryClient = initClient(flatQueryApi, {
 
 flatQueryClient.todos
 	.search({
-		includeDone: false,
-		page: 1,
-		search: "milk",
+		query: {
+			includeDone: false,
+			page: 1,
+			search: "milk",
+		},
 	})
 	.then((response) => {
 		if (response.status !== 200) throw new Error("Unexpected status");
@@ -156,7 +158,10 @@ const scalarRequestClient = initClient(scalarRequestApi, {
 	baseUrl: "https://example.test",
 });
 
-scalarRequestClient.items.get({ id: 1, page: 2, active: false });
+scalarRequestClient.items.get({
+	params: { id: 1 },
+	query: { page: 2, active: false },
+});
 
 expectError(
 	route.get("/items").query(schemaType<{ filters: { tag: string } }>()),
@@ -196,7 +201,6 @@ route.post("/uploads").multipartBody(
 const groupedRequestApi = {
 	todos: {
 		create: route
-			.with({ flattenRequestKeys: false })
 			.post("/todos/:accountId")
 			.params(z.object({ accountId: z.string() }))
 			.query(z.object({ notify: z.boolean() }))
@@ -213,7 +217,9 @@ const groupedRequestClient = initClient(groupedRequestApi, {
 groupedRequestClient.todos
 	.create({
 		body: { title: "Write type tests" },
-		headers: { authorization: "Bearer token" },
+		headers: {
+			authorization: "Bearer token",
+		},
 		params: { accountId: "account-1" },
 		query: { notify: true },
 	})
@@ -224,13 +230,12 @@ groupedRequestClient.todos
 expectError(
 	groupedRequestClient.todos.create({
 		accountId: "account-1",
-		authorization: "Bearer token",
 		notify: true,
 		title: "Write type tests",
 	}),
 );
 
-const groupedRequestFactory = route.with({ flattenRequestKeys: false });
+const groupedRequestFactory = route;
 const groupedRequestWithApi = {
 	todos: {
 		create: groupedRequestFactory
@@ -297,7 +302,7 @@ jsonQueryClient.todos
 		if (response.status !== 200) throw new Error("Unexpected status");
 		expectType<Array<{ id: string; title: string }>>(response.body);
 	});
-expectError(jsonQueryClient.todos.jsonSearch({ page: "1" }));
+expectError(jsonQueryClient.todos.jsonSearch({ query: { page: "1" } }));
 expectError(jsonQueryClient.todos.jsonSearch());
 jsonQueryClient.todos
 	.optionalJsonSearch({ query: undefined })
@@ -327,30 +332,34 @@ const responseClient = initClient(responseApi, {
 	baseUrl: "https://example.test",
 });
 
-responseClient.todos.create({ title: "Write type tests" }).then((response) => {
-	if (response.status !== 201) throw new Error("Unexpected status");
-	expectType<{ id: string; title: string }>(response.body);
-});
-
-responseClient.todos.create({ title: "Write type tests" }).then((response) => {
-	expectError(response.declared);
-	if (response.status === 201) {
-		expectType<201>(response.status);
+responseClient.todos
+	.create({ body: { title: "Write type tests" } })
+	.then((response) => {
+		if (response.status !== 201) throw new Error("Unexpected status");
 		expectType<{ id: string; title: string }>(response.body);
-		expectType<string>(response.responseHeaders.location);
-		expectType<string | undefined>(response.responseHeaders["x-next-cursor"]);
-		expectType<Headers>(response.headers);
-	}
+	});
 
-	if ("rawResponse" in response) {
-		expectType<Response>(response.rawResponse);
-		expectError(response.headers);
-		expectError(response.body);
-	} else {
-		expectType<201>(response.status);
-		expectError(response.rawResponse);
-	}
-});
+responseClient.todos
+	.create({ body: { title: "Write type tests" } })
+	.then((response) => {
+		expectError(response.declared);
+		if (response.status === 201) {
+			expectType<201>(response.status);
+			expectType<{ id: string; title: string }>(response.body);
+			expectType<string>(response.responseHeaders.location);
+			expectType<string | undefined>(response.responseHeaders["x-next-cursor"]);
+			expectType<Headers>(response.headers);
+		}
+
+		if ("rawResponse" in response) {
+			expectType<Response>(response.rawResponse);
+			expectError(response.headers);
+			expectError(response.body);
+		} else {
+			expectType<201>(response.status);
+			expectError(response.rawResponse);
+		}
+	});
 
 const strictResponseApi = {
 	todos: {
@@ -367,17 +376,19 @@ const strictResponseClient = initClient(strictResponseApi, {
 	baseUrl: "https://example.test",
 });
 
-strictResponseClient.todos.get({ id: "todo-1" }).then((response) => {
-	expectType<200 | 404>(response.status);
-	expectType<Headers>(response.headers);
-	expectError(response.declared);
+strictResponseClient.todos
+	.get({ params: { id: "todo-1" } })
+	.then((response) => {
+		expectType<200 | 404>(response.status);
+		expectType<Headers>(response.headers);
+		expectError(response.declared);
 
-	if (response.status === 200) {
-		expectType<{ id: string; title: string }>(response.body);
-	} else {
-		expectType<{ code: "not_found" }>(response.body);
-	}
-});
+		if (response.status === 200) {
+			expectType<{ id: string; title: string }>(response.body);
+		} else {
+			expectType<{ code: "not_found" }>(response.body);
+		}
+	});
 
 type StrictRouteClientResponseType = ClientResponse<
 	typeof strictResponseApi.todos.get
@@ -391,7 +402,7 @@ expectType<never>(
 );
 
 expectType<Promise<StrictRouteClientResponseType>>(
-	strictResponseClient.todos.get({ id: "todo-1" }),
+	strictResponseClient.todos.get({ params: { id: "todo-1" } }),
 );
 expectType<ApiClientFor<typeof strictResponseApi>>(strictResponseClient);
 
@@ -424,22 +435,22 @@ const transformedClient = initClient(transformedApi, {
 });
 
 transformedClient.todos
-	.transform({
-		id: "1",
-		title: "Write type tests",
-	})
+	.transform({ params: { id: "1" }, body: { title: "Write type tests" } })
 	.then((response) => {
 		if (response.status !== 200) throw new Error("Unexpected status");
 		expectType<{ id: string }>(response.body);
 	});
 expectError(
-	transformedClient.todos.transform({ id: 1, title: "wrong id input" }),
+	transformedClient.todos.transform({
+		params: { id: 1 },
+		body: { title: "wrong id input" },
+	}),
 );
 expectError(
 	transformedClient.todos.transform({
-		id: "1",
-		title: "Write type tests",
 		slug: "server-output-only",
+		params: { id: "1" },
+		body: { title: "Write type tests" },
 	}),
 );
 
@@ -540,11 +551,11 @@ const customRequestClient = initClient(customRequestApi, {
 
 customRequestClient.todos
 	.uploadImage({
-		id: "todo-1",
 		body: {
 			contentType: "image/png",
 			payload: new Uint8Array(),
 		},
+		params: { id: "todo-1" },
 	})
 	.then((response) => {
 		if (response.status !== 204) throw new Error("Unexpected status");
@@ -552,11 +563,11 @@ customRequestClient.todos
 	});
 expectError(
 	customRequestClient.todos.uploadImage({
-		id: "todo-1",
 		body: {
 			contentType: "image/webp",
 			payload: new Uint8Array(),
 		},
+		params: { id: "todo-1" },
 	}),
 );
 
@@ -636,17 +647,18 @@ const globalHeadersClient = initClient(globalHeadersApi, {
 });
 
 globalHeadersClient.todos.search({
-	search: "milk",
-	"x-request-id": "req-1",
+	query: { search: "milk" },
+	headers: { "x-request-id": "req-1" },
 });
 globalHeadersClient.todos.search({
-	authorization: "Bearer override",
-	search: "milk",
-	"x-request-id": "req-1",
+	headers: { authorization: "Bearer override", "x-request-id": "req-1" },
+	query: { search: "milk" },
 });
 globalHeadersClient.todos.secure({});
-expectError(globalHeadersClient.todos.search({ search: "milk" }));
-expectError(globalHeadersClient.todos.search({ "x-request-id": "req-1" }));
+expectError(globalHeadersClient.todos.search({ query: { search: "milk" } }));
+expectError(
+	globalHeadersClient.todos.search({ headers: { "x-request-id": "req-1" } }),
+);
 expectError(globalHeadersClient.todos.secure());
 
 const looseGlobalHeadersClient = initClient(globalHeadersApi, {
@@ -657,7 +669,9 @@ const looseGlobalHeadersClient = initClient(globalHeadersApi, {
 });
 
 expectError(looseGlobalHeadersClient.todos.search({}));
-expectError(looseGlobalHeadersClient.todos.search({ search: "milk" }));
+expectError(
+	looseGlobalHeadersClient.todos.search({ query: { search: "milk" } }),
+);
 expectError(looseGlobalHeadersClient.todos.search());
 
 const composedHeadersApi = {
@@ -676,9 +690,11 @@ const composedHeadersClient = initClient(composedHeadersApi, {
 });
 expectError(
 	composedHeadersClient.todos.get({
-		shared: "cannot satisfy both schemas",
-		inherited: "token",
-		local: true,
+		headers: {
+			shared: "cannot satisfy both schemas",
+			inherited: "token",
+			local: true,
+		},
 	}),
 );
 
@@ -693,11 +709,21 @@ const additiveHeadersClient = initClient(additiveHeadersApi, {
 	baseUrl: "https://example.test",
 });
 additiveHeadersClient.items({
-	authorization: "Bearer token",
-	"x-request-id": "request-1",
+	headers: {
+		authorization: "Bearer token",
+		"x-request-id": "request-1",
+	},
 });
-expectError(additiveHeadersClient.items({ authorization: "Bearer token" }));
-expectError(additiveHeadersClient.items({ "x-request-id": "request-1" }));
+expectError(
+	additiveHeadersClient.items({
+		headers: {
+			authorization: "Bearer token",
+		},
+	}),
+);
+expectError(
+	additiveHeadersClient.items({ headers: { "x-request-id": "request-1" } }),
+);
 
 const websocketApi = {
 	todos: {
@@ -763,8 +789,8 @@ const sseClient = initClient(sseApi, {
 });
 
 const events = sseClient.todos.events.openConnection({
-	id: "todo-1",
-	includeDone: false,
+	params: { id: "todo-1" },
+	query: { includeDone: false },
 });
 
 expectType<ClientEventSource<typeof sseApi.todos.events>>(events);
@@ -790,7 +816,7 @@ expectError(sseClient.todos.events());
 expectError(sseClient.todos.events.openConnection());
 expectError(
 	sseClient.todos.events.openConnection({
-		id: "todo-1",
-		includeDone: "false",
+		params: { id: "todo-1" },
+		query: { includeDone: "false" },
 	}),
 );

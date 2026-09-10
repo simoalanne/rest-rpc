@@ -55,7 +55,9 @@ type ShorthandRequest<
 > = Merge<
 	([TInput] extends [never]
 		? EmptyObject
-		: StandardSchemaV1.InferOutput<Extract<TInput, StandardSchemaV1>>) & {
+		: {
+				input: StandardSchemaV1.InferOutput<Extract<TInput, StandardSchemaV1>>;
+			}) & {
 		context: ServerFirstContext<TContext>;
 	}
 >;
@@ -427,13 +429,13 @@ export interface ServerSseBuilderExtension<
 }
 
 type ServerRouteOptions<TOptions extends RouteFactoryOptions> = Omit<
-	{ flattenRequestKeys: true },
+	Record<never, never>,
 	keyof TOptions
 > &
 	TOptions;
 
 type ServerConfiguredRouteFactory<
-	TOptions extends RouteFactoryOptions = { flattenRequestKeys: true },
+	TOptions extends RouteFactoryOptions = Record<never, never>,
 	TContext extends ContextShape = EmptyObject,
 > = {
 	[TMethod in Lowercase<HttpMethod>]: <const TPath extends string>(
@@ -455,7 +457,7 @@ type ServerConfiguredRouteFactory<
 
 /** Type-level model of the server-first HTTP, SSE, and shorthand route factory. */
 export type ServerRouteFactory<
-	TOptions extends RouteFactoryOptions = { flattenRequestKeys: true },
+	TOptions extends RouteFactoryOptions = Record<never, never>,
 	TContext extends ContextShape = EmptyObject,
 > = ServerConfiguredRouteFactory<TOptions, TContext> & {
 	/** Starts a shorthand route whose HTTP method and path come from its tree. */
@@ -582,7 +584,7 @@ const createShorthandImplementationBuilder = (
 });
 
 const createServerRouteFactory = (options: RouteFactoryOptions = {}) => {
-	const resolvedOptions = { flattenRequestKeys: true, ...options };
+	const resolvedOptions = { ...options };
 	const factory = coreRoute.with(resolvedOptions);
 
 	return {

@@ -30,7 +30,7 @@ it("passes matched routes to Fastify route preHandler", async () => {
 		const client = initClient(integrationContract, {
 			baseUrl: server.origin,
 		});
-		const response = await client.items.get({ id: "item-1" });
+		const response = await client.items.get({ params: { id: "item-1" } });
 
 		assert.equal(response.headers.get("x-route-prehandler"), "/items/:id");
 		assert.deepEqual(seenRoutes, ["GET /items/:id"]);
@@ -59,7 +59,9 @@ it("supports Fastify scoped registration with a prefixed client baseUrl", async 
 		const healthResponse = await client.health();
 		assert.equal(healthResponse.status, 204);
 		assert.equal(healthResponse.body, undefined);
-		const listResponse = await client.items.list({ search: "scoped" });
+		const listResponse = await client.items.list({
+			query: { search: "scoped" },
+		});
 		assert.equal(listResponse.status, 200);
 		assert.deepEqual(listResponse.body, [
 			{ id: "item-1", title: "scoped" },

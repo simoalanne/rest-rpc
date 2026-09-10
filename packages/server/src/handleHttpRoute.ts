@@ -1,3 +1,4 @@
+import { isShorthandRouteDeclaration } from "@rest-rpc/core/contract";
 import type {
 	CustomBody,
 	ResponseDeclaration,
@@ -12,7 +13,6 @@ import {
 	REQUEST_CONTEXT_KEY,
 } from "@rest-rpc/core/contract";
 import type { HttpHeaders } from "./headers.ts";
-import { flattenRequestData } from "./requestData.ts";
 import { RouteResponseError } from "./routeResponseError.ts";
 import { RequestValidationError } from "./validationErrors.ts";
 import type {
@@ -87,7 +87,11 @@ const classifyImplicitResponse = (
 ): HttpRouteResult => {
 	const headers = result.responseHeaders;
 	if (!("body" in result)) {
-		return { kind: "empty", status: result.status, headers };
+		return {
+			kind: "empty",
+			status: result.status,
+			headers,
+		};
 	}
 
 	const body = result.body;
@@ -343,7 +347,11 @@ export async function handleHttpRoute<
 	let handlerResult: unknown;
 	try {
 		handlerResult = await handler({
-			...flattenRequestData(declaredRoute, requestValidation.data),
+			...(isShorthandRouteDeclaration(declaredRoute)
+				? "input" in declaredRoute
+					? { input: requestValidation.data.body }
+					: {}
+				: requestValidation.data),
 			[REQUEST_CONTEXT_KEY]:
 				declaredRoute.mode === "sse"
 					? {

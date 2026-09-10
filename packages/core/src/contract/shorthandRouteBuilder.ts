@@ -6,7 +6,7 @@ type ShorthandInput<TInput extends StandardSchemaV1 | never> = [
 	? { readonly request?: never }
 	: {
 			readonly input: TInput;
-			readonly request: { readonly body: TInput; readonly flattenKeys: true };
+			readonly request: { readonly body: TInput };
 		};
 
 /**
@@ -82,7 +82,7 @@ export const createShorthandRouteDeclaration = (
 		? {
 				...declaration,
 				input,
-				request: { body: input, flattenKeys: true },
+				request: { body: input },
 			}
 		: declaration;
 };

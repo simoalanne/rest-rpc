@@ -48,7 +48,7 @@ export const api = {
 ```ts
 export const routes = router(api, {
 	chat: {
-		room({ roomId, name, context }) {
+		room({ params: { roomId }, query: { name }, context }) {
 			const member = joinRoom(roomId, {
 				name,
 				socket: context.socket,
@@ -83,8 +83,8 @@ export const routes = router(api, {
 
 ```ts
 const socket = client.chat.room.openConnection({
-	roomId: "general",
-	name: "Ada",
+	params: { roomId: "general" },
+	query: { name: "Ada" },
 });
 
 socket.onMessage((message) => {

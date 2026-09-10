@@ -19,7 +19,6 @@ export { joinPathPrefix } from "./baseRouteBuilder.ts";
 
 /** Defaults applied locally by a configured route factory. */
 export type RouteFactoryOptions = {
-	flattenRequestKeys?: boolean;
 	strictStatusCodes?: boolean;
 	pathPrefix?: string;
 	metadata?: RouteMetadata;
@@ -58,7 +57,7 @@ type RouteFactory<TOptions = undefined> = {
 	/** Starts an SSE route declaration. @see {@link https://rest-rpc.dev/docs/http-responses#server-sent-event-responses} */
 	sse<const TPath extends string>(path: TPath): SseBuilderFor<TOptions, TPath>;
 	/** Starts a WebSocket route declaration. @see {@link https://rest-rpc.dev/docs/websockets#contract} */
-	ws(path: string): WebSocketBuilderFor<TOptions>;
+	ws(path: string): WebSocketBuilderFor;
 };
 
 const createFactory = (options: RouteFactoryOptions = {}) => {

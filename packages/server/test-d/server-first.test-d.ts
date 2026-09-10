@@ -24,7 +24,7 @@ interface ApplicationContext {
 }
 
 const route = serverFirstRoute as unknown as ServerRouteFactory<
-	{ flattenRequestKeys: true },
+	Record<never, never>,
 	ApplicationContext
 >;
 const implement = serverImplement as Implement<ApplicationContext>;
@@ -38,10 +38,10 @@ const shorthandGet = route.handler(({ context }) => {
 	return { id: "todo-1", title: "Todo" };
 });
 
-const shorthandCreate = route.input(todoInput).handler(({ title, context }) => {
-	expectType<string>(title);
+const shorthandCreate = route.input(todoInput).handler(({ input, context }) => {
+	expectType<{ title: string }>(input);
 	expectType<ApplicationContext & { signal: AbortSignal }>(context);
-	return { id: "todo-1", title };
+	return { id: "todo-1", title: input.title };
 });
 
 const shorthandDeclaredGet = route.output(todo).handler(({ context }) => {
@@ -52,16 +52,27 @@ const shorthandDeclaredGet = route.output(todo).handler(({ context }) => {
 const shorthandDeclaredCreate = route
 	.input(todoInput)
 	.output(todo)
-	.handler(({ title, context }) => {
-		expectType<string>(title);
+	.handler(({ input, context }) => {
+		expectType<{ title: string }>(input);
 		expectType<ApplicationContext & { signal: AbortSignal }>(context);
-		return { id: "todo-1", title };
+		return { id: "todo-1", title: input.title };
 	});
 
 const shorthandOutputFirst = route
 	.output(todo)
 	.input(todoInput)
-	.handler(({ title }) => ({ id: "todo-1", title }));
+	.handler(({ input }) => ({ id: "todo-1", title: input.title }));
+
+route.input(z.string()).handler(({ input }) => {
+	expectType<string>(input);
+	return input.length;
+});
+
+route.input(z.object({ context: z.string() })).handler(({ input, context }) => {
+	expectType<string>(input.context);
+	expectType<ApplicationContext & { signal: AbortSignal }>(context);
+	return input.context;
+});
 
 expectType<"shorthand">(shorthandGet.route.kind);
 expectType<{ readonly id: "todo-1"; readonly title: "Todo" }>(
@@ -87,12 +98,12 @@ expectError(shorthandDeclaredCreate.output);
 expectError(shorthandOutputFirst.input(todoInput));
 expectError(route.with({ pathPrefix: "/v1" }).handler(() => null));
 
-// server-first builders preserve core request methods, flatten request segments,
+// server-first builders preserve core request methods, group request segments,
 // and retain literal methods and paths through handler attachment
 const create = route
 	.post("/todos")
 	.body(todoInput)
-	.handler(({ title, context }) => {
+	.handler(({ context, body: { title } }) => {
 		expectType<string>(title);
 		expectType<ApplicationContext & { signal: AbortSignal }>(context);
 		expectType<AbortSignal>(context.signal);
@@ -107,7 +118,6 @@ expectType<"POST">(create.route.method);
 expectType<"/todos">(create.route.path);
 expectType<201>(
 	create.handler({
-		title: "write tests",
 		context: {
 			signal: new AbortController().signal,
 			todos: { find: () => ({ id: "todo-1", title: "todo" }) },
@@ -116,6 +126,7 @@ expectType<201>(
 			name: "",
 			value: "",
 		},
+		body: { title: "write tests" },
 	}).status,
 );
 
@@ -125,7 +136,10 @@ const declaredCreate = route
 	.body(todoInput)
 	.response(201, todo)
 	.handler((request) => {
-		const { title, context } = request;
+		const {
+			context,
+			body: { title },
+		} = request;
 		expectType<string>(title);
 		expectType<
 			ApplicationContext & { signal: AbortSignal } & Record<string, unknown>
@@ -143,14 +157,17 @@ expectError(
 	route
 		.get("/invalid-declared-response")
 		.response(200, todo)
-		.handler(() => ({ status: 404 as const, body: { code: "NOT_FOUND" } })),
+		.handler(() => ({
+			status: 404 as const,
+			body: { code: "NOT_FOUND" },
+		})),
 );
 
-// configured factories preserve prefixes and may opt out of flattened keys
+// configured factories preserve prefixes and grouped request input
 const prefixed = route
 	.with({
 		pathPrefix: "/v1",
-		flattenRequestKeys: false,
+
 		metadata: { apiVersion: "v1", access: "shared" },
 	})
 	.post("/todos")
@@ -179,17 +196,22 @@ const contract = {
 } as const;
 
 // contract-first attachment mirrors trees and preserves the contract's request shape
-const get = implement(contract).todos.get.handler(({ id, context }) => {
-	expectType<string>(id);
-	expectType<
-		ApplicationContext & { signal: AbortSignal } & Record<string, unknown>
-	>(context);
-	expectType<AbortSignal>(context.signal);
-	return { status: 200 as const, body: context.todos.find(id) };
-});
+const get = implement(contract).todos.get.handler(
+	({ context, params: { id } }) => {
+		expectType<string>(id);
+		expectType<
+			ApplicationContext & { signal: AbortSignal } & Record<string, unknown>
+		>(context);
+		expectType<AbortSignal>(context.signal);
+		return { status: 200 as const, body: context.todos.find(id) };
+	},
+);
 
 const contractCreate = implement(contract.todos.create).handler((request) => {
-	const { title, context } = request;
+	const {
+		context,
+		body: { title },
+	} = request;
 	expectType<string>(title);
 	expectType<
 		ApplicationContext & { signal: AbortSignal } & Record<string, unknown>

@@ -7,7 +7,7 @@ import type {
 	RouteRequestDeclaration,
 } from "./baseRouteDeclaration.ts";
 import type { RouteFactoryOptions } from "./routeFactory.ts";
-import type { JsonQuery, RequestKeys } from "./request.ts";
+import type { JsonQuery } from "./request.ts";
 import type { RequestParamsSchema, RequestQuerySchema } from "./request.ts";
 import {
 	type ApplyBuilderExtension,
@@ -19,8 +19,6 @@ import {
 	type BuilderState,
 	type EmptyObject,
 	type MergeBuilderMetadata,
-	type ProtocolRequestFor,
-	protocolRequestDefaults,
 	type UseBuilderMethod,
 	type WhenUnused,
 	type WithRequest,
@@ -64,13 +62,7 @@ class SseRouteBuilder extends BaseRouteBuilder {
 	declare responses?: Record<200, StandardSchemaV1>;
 
 	constructor(path: string, options?: RouteFactoryOptions) {
-		super(
-			"GET",
-			path,
-			options ?? {},
-			protocolRequestDefaults(options ?? {}),
-			"sse",
-		);
+		super("GET", path, options ?? {}, undefined, "sse");
 	}
 
 	response(schema: StandardSchemaV1) {
@@ -79,12 +71,7 @@ class SseRouteBuilder extends BaseRouteBuilder {
 	}
 }
 
-type SseBuilderMethod =
-	| "query"
-	| "params"
-	| "requestKeys"
-	| "withMetadata"
-	| "withOpenApi";
+type SseBuilderMethod = "query" | "params" | "withMetadata" | "withOpenApi";
 
 /** Type state carried by an SSE route builder. */
 export type SseBuilderState = BuilderState<unknown, SseBuilderMethod> & {
@@ -94,7 +81,7 @@ export type SseBuilderState = BuilderState<unknown, SseBuilderMethod> & {
 
 type SetSseRequest<
 	TState extends SseBuilderState,
-	TKey extends "query" | "params" | "keys",
+	TKey extends "query" | "params",
 	TValue,
 	TMethod extends SseBuilderMethod,
 > = UseBuilderMethod<WithRequest<TState, TKey, TValue>, TMethod>;
@@ -189,25 +176,6 @@ type SseRequestSetters<TState extends SseBuilderState> = WhenUnused<
 			>;
 		}
 	> &
-	WhenUnused<
-		TState,
-		"requestKeys",
-		{
-			/** Maps flattened request keys. @see {@link https://rest-rpc.dev/docs/contract/declaration#flattened-key-collisions} */
-			requestKeys<
-				const TKeys extends RequestKeys,
-				const TPath extends string = string,
-				const TMetadata extends RouteMetadata | never = never,
-			>(
-				this: BuilderReceiver<TPath, TMetadata>,
-				keys: TKeys,
-			): SseBuilderAtPath<
-				SetSseRequest<TState, "keys", TKeys, "requestKeys">,
-				TPath,
-				TMetadata
-			>;
-		}
-	> &
 	("withMetadata" extends TState["used"]
 		? EmptyObject
 		: {
@@ -255,7 +223,7 @@ export type SseBuilderFor<
 	TExtension extends BuilderExtension | never = never,
 > = SseBuilderAtPath<
 	{
-		request: ProtocolRequestFor<TOptions>;
+		request: EmptyObject;
 		used: never;
 		response: never;
 		extension: TExtension;

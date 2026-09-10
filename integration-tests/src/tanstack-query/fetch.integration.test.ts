@@ -100,7 +100,7 @@ describe("fetch TanStack Query integration", () => {
 		const queryClient = createQueryClient();
 
 		const response = await queryClient.fetchQuery(
-			tq.projects.get.queryOptions({ id: "project-1" }),
+			tq.projects.get.queryOptions({ params: { id: "project-1" } }),
 		);
 
 		assertEnvelope(response, {
@@ -116,16 +116,20 @@ describe("fetch TanStack Query integration", () => {
 		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
 		const options = tq.projects.get.queryOptions(
-			{ id: "project-1" },
-			{ staleTime: Infinity },
+			{ params: { id: "project-1" } },
+			{
+				staleTime: Infinity,
+			},
 		);
 
 		await queryClient.fetchQuery(options);
 		await queryClient.fetchQuery(options);
 		await queryClient.fetchQuery(
 			tq.projects.get.queryOptions(
-				{ id: "project-2" },
-				{ staleTime: Infinity },
+				{ params: { id: "project-2" } },
+				{
+					staleTime: Infinity,
+				},
 			),
 		);
 
@@ -140,7 +144,9 @@ describe("fetch TanStack Query integration", () => {
 		const queryClient = createQueryClient();
 
 		const response = await queryClient.fetchQuery(
-			tq.projects.list.queryOptions(undefined, { staleTime: Infinity }),
+			tq.projects.list.queryOptions(undefined, {
+				staleTime: Infinity,
+			}),
 		);
 
 		assert.equal(response.status, 200);
@@ -159,8 +165,10 @@ describe("fetch TanStack Query integration", () => {
 		);
 
 		const response = await observer.mutate({
-			name: "Equinox",
-			status: "active",
+			body: {
+				name: "Equinox",
+				status: "active",
+			},
 		});
 
 		assertEnvelope(response, {
@@ -192,7 +200,7 @@ describe("fetch TanStack Query integration", () => {
 			queryClient,
 			tq.projects.create.mutationOptions(),
 		);
-		await createObserver.mutate({ name: "Fathom" });
+		await createObserver.mutate({ body: { name: "Fathom" } });
 		await queryClient.invalidateQueries({
 			queryKey: tq.projects.list.getKey(),
 		});
@@ -208,7 +216,7 @@ describe("fetch TanStack Query integration", () => {
 		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
 		const options = tq.projects.search.queryOptions(
-			{ q: "ap" },
+			{ query: { q: "ap" } },
 			{
 				queryKey: ["custom", "project-search", "ap"],
 				staleTime: Infinity,
@@ -224,7 +232,9 @@ describe("fetch TanStack Query integration", () => {
 			undefined,
 		);
 		assert.equal(
-			queryClient.getQueryData(tq.projects.search.getKey({ q: "ap" })),
+			queryClient.getQueryData(
+				tq.projects.search.getKey({ query: { q: "ap" } }),
+			),
 			undefined,
 		);
 	});
@@ -236,10 +246,10 @@ describe("fetch TanStack Query integration", () => {
 		const observer = new InfiniteQueryObserver(
 			queryClient,
 			tq.projects.page.infiniteQueryOptions({
-				initialRequest: { limit: 2 },
+				initialRequest: { query: { limit: 2 } },
 				getNextRequest: (lastPage) =>
 					lastPage.body.nextCursor
-						? { cursor: lastPage.body.nextCursor, limit: 2 }
+						? { query: { cursor: lastPage.body.nextCursor, limit: 2 } }
 						: undefined,
 			}),
 		);
@@ -255,8 +265,8 @@ describe("fetch TanStack Query integration", () => {
 			/\/project-page\?cursor=2&limit=2$/,
 		);
 		assert.deepEqual(result.data?.pageParams, [
-			{ limit: 2 },
-			{ cursor: "2", limit: 2 },
+			{ query: { limit: 2 } },
+			{ query: { cursor: "2", limit: 2 } },
 		]);
 		assert.equal(result.data?.pages.length, 2);
 	});
@@ -288,7 +298,11 @@ describe("fetch TanStack Query integration", () => {
 		);
 
 		await assert.rejects(
-			() => observer.mutate({ id: "project-1", name: "Borealis" }),
+			() =>
+				observer.mutate({
+					params: { id: "project-1" },
+					body: { name: "Borealis" },
+				}),
 			{
 				status: 409,
 				body: { code: "name_conflict", name: "Borealis" },
@@ -309,7 +323,7 @@ describe("fetch TanStack Query integration", () => {
 		});
 		const observer = new MutationObserver(queryClient, options);
 
-		const response = await observer.mutate({ name: "Grove" });
+		const response = await observer.mutate({ body: { name: "Grove" } });
 
 		assert.equal("fetchOptions" in options, false);
 		assert.equal(tracked.calls[0]?.init?.cache, "no-store");
@@ -334,17 +348,24 @@ describe("fetch TanStack Query integration", () => {
 
 		await queryClient.fetchQuery(
 			tq.projects.search.queryOptions(
-				{ q: "ap", status: undefined },
-				{ staleTime: Infinity },
+				{ query: { q: "ap", status: undefined } },
+				{
+					staleTime: Infinity,
+				},
 			),
 		);
 		await queryClient.fetchQuery(
-			tq.projects.search.queryOptions({ q: "ap" }, { staleTime: Infinity }),
+			tq.projects.search.queryOptions(
+				{ query: { q: "ap" } },
+				{
+					staleTime: Infinity,
+				},
+			),
 		);
 
 		assert.deepEqual(
-			tq.projects.search.getKey({ q: "ap", status: undefined }),
-			tq.projects.search.getKey({ q: "ap" }),
+			tq.projects.search.getKey({ query: { q: "ap", status: undefined } }),
+			tq.projects.search.getKey({ query: { q: "ap" } }),
 		);
 		assert.equal(tracked.calls.length, 1);
 	});
@@ -353,7 +374,9 @@ describe("fetch TanStack Query integration", () => {
 		const tracked = createTrackedFetch();
 		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
-		const options = tq.projects.slow.queryOptions({ id: "project-1" });
+		const options = tq.projects.slow.queryOptions({
+			params: { id: "project-1" },
+		});
 
 		const promise = queryClient.fetchQuery(options);
 		await waitForCall(tracked.calls, 1);

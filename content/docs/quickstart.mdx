@@ -240,7 +240,7 @@ const todos = new Map<
 
 const routes = router(api, {
 	todos: {
-		create({ title }) {
+		create({ body: { title } }) {
 			const todo = {
 				id: crypto.randomUUID(),
 				title,
@@ -307,7 +307,7 @@ const todos = new Map<
 
 const routes = router(api, {
 	todos: {
-		create({ title }) {
+		create({ body: { title } }) {
 			const todo = {
 				id: crypto.randomUUID(),
 				title,
@@ -374,7 +374,7 @@ const todos = new Map<
 
 const routes = router(api, {
 	todos: {
-		create({ title }) {
+		create({ body: { title } }) {
 			const todo = {
 				id: crypto.randomUUID(),
 				title,
@@ -448,7 +448,7 @@ class TodoService implements RouteHandlers<typeof api.todos> {
 		}
 	>();
 
-	create({ title }: RouteRequest<typeof api.todos.create>) {
+	create({ body: { title } }: RouteRequest<typeof api.todos.create>) {
 		const todo = {
 			id: crypto.randomUUID(),
 			title,
@@ -494,7 +494,7 @@ import { api } from "./contract";
 const todos = new Map();
 const routes = {
 	todos: {
-		create: implement(api).todos.create.handler(({ title }) => {
+		create: implement(api).todos.create.handler(({ body: { title } }) => {
 			const todo = {
 				id: crypto.randomUUID(),
 				title,
@@ -528,7 +528,7 @@ import { api } from "./contract";
 const todos = new Map();
 const routes = {
 	todos: {
-		create: implement(api).todos.create.handler(({ title }) => {
+		create: implement(api).todos.create.handler(({ body: { title } }) => {
 			const todo = {
 				id: crypto.randomUUID(),
 				title,
@@ -596,7 +596,7 @@ const client = initClient(api, {
 });
 
 const response = await client.todos.create({
-	title: "Ship v1",
+	body: { title: "Ship v1" },
 });
 
 if (response.status === 201) {
@@ -651,7 +651,7 @@ const createTodo = useMutation(
 );
 
 createTodo.mutate({
-	title: "Ship v1",
+	body: { title: "Ship v1" },
 });
 ```
 
@@ -661,7 +661,6 @@ createTodo.mutate({
 ## Next Steps
 
 - [Contract Declaration](/docs/contract/declaration/) explains the route declaration shape.
-  shown here next to the explicit alternatives.
 - [Schemas](/docs/contract/schemas/) explains validation and type-only schemas.
 - [Server adapters](/docs/server/express/) cover framework-specific setup.
 - [Fetch Client](/docs/client/fetch-client/) and [TanStack Query](/docs/client/tanstack-query/)

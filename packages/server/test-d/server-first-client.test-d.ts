@@ -10,10 +10,13 @@ const todo = z.object({ id: z.string(), title: z.string() });
 
 const routes = {
 	todos: {
-		shorthandGet: route.handler(() => ({ id: "todo-1", title: "Todo" })),
+		shorthandGet: route.handler(() => ({
+			id: "todo-1",
+			title: "Todo",
+		})),
 		shorthandCreate: route
 			.input(z.object({ title: z.string() }))
-			.handler(({ title }) => ({ id: "todo-1", title })),
+			.handler(({ input }) => ({ id: "todo-1", title: input.title })),
 		shorthandDeclaredGet: route.output(todo).handler(() => ({
 			id: "todo-1",
 			title: "Todo",
@@ -21,24 +24,26 @@ const routes = {
 		shorthandDeclaredCreate: route
 			.input(z.object({ title: z.string() }))
 			.output(todo)
-			.handler(({ title }) => ({ id: "todo-1", title })),
+			.handler(({ input }) => ({ id: "todo-1", title: input.title })),
 		create: route
 			.post("/todos/:accountId")
 			.params(z.object({ accountId: z.string() }))
 			.query(z.object({ notify: z.boolean() }))
 			.body(z.object({ title: z.string() }))
 			.response(201, todo)
-			.handler(({ accountId, notify, title }) => ({
-				status: 201,
-				body: { id: accountId, title: notify ? title : title },
-			})),
+			.handler(
+				({ params: { accountId }, query: { notify }, body: { title } }) => ({
+					status: 201,
+					body: { id: accountId, title: notify ? title : title },
+				}),
+			),
 		get: route
 			.with({ strictStatusCodes: false })
 			.get("/todos/:id")
 			.params(z.object({ id: z.string() }))
 			.response(200, todo)
 			.response(404, z.object({ code: z.literal("not_found") }))
-			.handler(({ id }) =>
+			.handler(({ params: { id } }) =>
 				id === "missing"
 					? { status: 404 as const, body: { code: "not_found" as const } }
 					: { status: 200 as const, body: { id, title: "Todo" } },
@@ -46,13 +51,16 @@ const routes = {
 		stream: route.get("/todos/stream").handler(() => ({
 			status: 200,
 			body: (async function* () {
-				yield { id: "todo-1", title: "Todo" };
+				yield {
+					id: "todo-1",
+					title: "Todo",
+				};
 			})(),
 		})),
 		inferred: route
 			.get("/inferred-todos/:id")
 			.params(z.object({ id: z.string() }))
-			.handler(({ id }) =>
+			.handler(({ params: { id } }) =>
 				id === "missing"
 					? { status: 404 as const, body: { code: "not_found" as const } }
 					: { status: 200 as const, body: { id, title: "Todo" } },
@@ -136,7 +144,7 @@ expectError(
 	}),
 );
 
-// Client inputs are grouped even though the server handler uses flattened keys.
+// Client and server inputs use the same HTTP segments.
 client
 	.$post("/todos/:accountId", {
 		body: { title: "Write tests" },

@@ -34,13 +34,21 @@ const createRequestTestContract = () => ({
 			.response(201, z.object({ id: z.string(), title: z.string() })),
 		get: route
 			.get("/todos/:id")
-			.params(z.object({ id: z.string() }))
+			.params(
+				z.object({
+					id: z.string(),
+				}),
+			)
 			.response(200, z.object({ id: z.string(), title: z.string() })),
 	},
 	uploads: {
 		create: route
 			.post("/uploads/:id")
-			.params(z.object({ id: z.string() }))
+			.params(
+				z.object({
+					id: z.string(),
+				}),
+			)
 			.customBody({
 				schema: z.string(),
 				contentType: "text/plain",
@@ -91,8 +99,10 @@ describe("ApiClient requests", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await client.todos.get({ id: "todo 1" });
-		await client.todos.list({ search: "milk", empty: undefined });
+		await client.todos.get({
+			params: { id: "todo 1" },
+		});
+		await client.todos.list({ query: { search: "milk", empty: undefined } });
 
 		assert.equal(calls[0]?.url, "https://api.test/todos/todo%201");
 		assert.equal(calls[1]?.url, "https://api.test/todos?search=milk");
@@ -126,10 +136,10 @@ describe("ApiClient requests", () => {
 		});
 
 		await client.todos.update({
-			id: "todo-1",
-			page: 2,
-			title: "Updated",
-			"x-request-id": 123,
+			params: { id: "todo-1" },
+			query: { page: 2 },
+			body: { title: "Updated" },
+			headers: { "x-request-id": 123 },
 		});
 
 		assert.equal(calls[0]?.url, "https://api.test/todos/todo-1?page=2");
@@ -140,13 +150,17 @@ describe("ApiClient requests", () => {
 		});
 	});
 
-	it("constructs requests from grouped segments when flattened request keys are disabled", () => {
-		const groupedRoute = route.with({ flattenRequestKeys: false });
+	it("constructs requests from grouped segments under explicit HTTP segments", () => {
+		const groupedRoute = route;
 		const apiContract = {
 			todos: {
 				get: groupedRoute
 					.get("/todos/:id")
-					.params(z.object({ id: z.string() }))
+					.params(
+						z.object({
+							id: z.string(),
+						}),
+					)
 					.response(204),
 			},
 		};
@@ -156,7 +170,6 @@ describe("ApiClient requests", () => {
 			{
 				params: { id: "todo 1" },
 			},
-			true,
 		);
 
 		assert.equal(request.url, "https://api.test/todos/todo%201");
@@ -187,14 +200,10 @@ describe("ApiClient requests", () => {
 			"https://api.test",
 			apiContract.items.get,
 			{
-				id: 12,
-				visible: false,
-				page: 2,
-				includeArchived: true,
-				"x-page": 2,
-				"x-visible": false,
+				params: { id: 12, visible: false },
+				query: { page: 2, includeArchived: true },
+				headers: { "x-page": 2, "x-visible": false },
 			},
-			"throw",
 		);
 
 		assert.equal(
@@ -225,10 +234,11 @@ describe("ApiClient requests", () => {
 			"https://api.test",
 			apiContract.items.get,
 			{
-				id: "one/two",
-				id2: "three",
+				params: {
+					id: "one/two",
+					id2: "three",
+				},
 			},
-			"throw",
 		);
 
 		assert.equal(request.url, "https://api.test/items/one%2Ftwo/three");
@@ -237,11 +247,15 @@ describe("ApiClient requests", () => {
 	it("rejects missing path params before sending requests", () => {
 		const declaration = route
 			.get("/items/:id")
-			.params(z.object({ id: z.string() }))
+			.params(
+				z.object({
+					id: z.string(),
+				}),
+			)
 			.response(204);
 
 		assert.throws(
-			() => constructBaseRequest("https://api.test", declaration, {}, true),
+			() => constructBaseRequest("https://api.test", declaration, {}),
 			/Missing path param "id" for GET \/items\/:id\./,
 		);
 	});
@@ -267,7 +281,6 @@ describe("ApiClient requests", () => {
 				search: undefined,
 				"x-request-id": undefined,
 			},
-			"throw",
 		);
 
 		assert.equal(request.url, "https://api.test/items");
@@ -282,7 +295,9 @@ describe("ApiClient requests", () => {
 					.jsonQuery(
 						z.object({
 							page: z.number(),
-							filters: z.object({ tags: z.array(z.string()) }),
+							filters: z.object({
+								tags: z.array(z.string()),
+							}),
 						}),
 					)
 					.response(204),
@@ -297,7 +312,6 @@ describe("ApiClient requests", () => {
 					filters: { tags: ["api", "typescript"] },
 				},
 			},
-			"throw",
 		);
 
 		assert.equal(
@@ -325,7 +339,6 @@ describe("ApiClient requests", () => {
 			"https://api.test",
 			apiContract.items.search,
 			{},
-			"throw",
 		);
 
 		assert.equal(request.url, "https://api.test/items");
@@ -339,7 +352,7 @@ describe("ApiClient requests", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await client.todos.create({ title: "Buy milk" });
+		await client.todos.create({ body: { title: "Buy milk" } });
 
 		assert.equal(calls[0]?.init?.body, '{"title":"Buy milk"}');
 		assert.deepEqual(calls[0]?.init?.headers, {
@@ -353,10 +366,7 @@ describe("ApiClient requests", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await client.uploads.create({
-			id: "file 1",
-			body: "hello",
-		});
+		await client.uploads.create({ body: "hello", params: { id: "file 1" } });
 
 		assert.equal(calls[0]?.url, "https://api.test/uploads/file%201");
 		assert.equal(calls[0]?.init?.body, "hello");
@@ -424,7 +434,6 @@ describe("ApiClient requests", () => {
 		const apiContract = {
 			forms: {
 				submit: route
-					.with({ flattenRequestKeys: false })
 					.post("/forms")
 					.formBody(
 						z.object({
@@ -558,7 +567,6 @@ describe("ApiClient requests", () => {
 		const apiContract = {
 			uploads: {
 				create: route
-					.with({ flattenRequestKeys: false })
 					.post("/uploads")
 					.multipartBody(
 						z.object({
@@ -621,7 +629,11 @@ describe("ApiClient requests", () => {
 			uploads: {
 				image: route
 					.post("/uploads/:id/image")
-					.params(z.object({ id: z.string() }))
+					.params(
+						z.object({
+							id: z.string(),
+						}),
+					)
 					.customBody({
 						contentType: ["image/png", "image/jpeg"],
 						schema: z.string(),
@@ -635,11 +647,11 @@ describe("ApiClient requests", () => {
 		});
 
 		await client.uploads.image({
-			id: "file 1",
 			body: {
 				contentType: "image/jpeg",
 				payload: "jpeg bytes",
 			},
+			params: { id: "file 1" },
 		});
 
 		assert.equal(calls[0]?.url, "https://api.test/uploads/file%201/image");
@@ -691,7 +703,10 @@ describe("ApiClient requests", () => {
 			getGlobalHeaders: () => ({ Authorization: "Bearer token" }),
 		});
 
-		await client.todos.list({ search: "milk" }, { credentials: "omit" });
+		await client.todos.list(
+			{ query: { search: "milk" } },
+			{ credentials: "omit" },
+		);
 
 		assert.equal(calls[0]?.init?.cache, "no-store");
 		assert.equal(calls[0]?.init?.credentials, "omit");
@@ -720,12 +735,16 @@ describe("ApiClient requests", () => {
 			},
 		});
 
-		await client.todos.list({ search: "milk" });
-		await client.todos.create({ title: "Buy milk" });
+		await client.todos.list({ query: { search: "milk" } });
+		await client.todos.create({ body: { title: "Buy milk" } });
 
 		assert.deepEqual(calls[0]?.init?.next, {
 			revalidate: 60,
-			tags: ["manual", "api:todos.list:search:milk", "api:todos.list"],
+			tags: [
+				"manual",
+				"api:todos.list:query:%7B%22search%22%3A%22milk%22%7D",
+				"api:todos.list",
+			],
 		});
 		assert.deepEqual(calls[1]?.init?.next, {
 			revalidate: 60,
@@ -754,7 +773,7 @@ describe("ApiClient requests", () => {
 			},
 		});
 
-		await client.todos.list({ search: "milk" });
+		await client.todos.list({ query: { search: "milk" } });
 
 		assert.deepEqual(calls[0]?.init?.headers, {
 			"x-custom-fetch": "true",
@@ -791,10 +810,12 @@ describe("ApiClient requests", () => {
 		});
 
 		await client.todos.list({
-			search: "milk",
-			"x-common": 123,
-			"X-Route": "route",
-			"x-shared": "route shared",
+			query: { search: "milk" },
+			headers: {
+				"x-common": 123,
+				"X-Route": "route",
+				"x-shared": "route shared",
+			},
 		});
 
 		assert.equal(calls[0]?.url, "https://api.test/todos?search=milk");
@@ -810,32 +831,52 @@ describe("ApiClient requests", () => {
 		captureFetch();
 		const client = initClient(createRequestTestContract(), {
 			baseUrl: "https://api.test",
-			getGlobalHeaders: () => ({ "content-type": "text/plain" }),
+			getGlobalHeaders: () => ({
+				"content-type": "text/plain",
+			}),
 		});
 
 		await assert.rejects(
-			() => client.todos.create({ title: "created" }),
+			() => client.todos.create({ body: { title: "created" } }),
 			/getGlobalHeaders\(\) must not return a "content-type" header/,
 		);
 	});
 
-	it("rejects unknown flattened request keys by default", async () => {
-		captureFetch();
-		const client = initClient(createRequestTestContract(), {
-			baseUrl: "https://api.test",
+	it("keeps duplicate property names in their declared HTTP segments", () => {
+		const declaration = route
+			.post("/items/:id")
+			.params(z.object({ id: z.string() }))
+			.query(z.object({ id: z.string() }))
+			.body(z.object({ id: z.string(), context: z.string() }))
+			.response(204);
+		const request = constructBaseRequest("https://api.test", declaration, {
+			params: { id: "path-id" },
+			query: { id: "query-id" },
+			body: { id: "body-id", context: "body-context" },
 		});
-
-		await assert.rejects(
-			() =>
-				client.todos.list({
-					search: "milk",
-					unknown: "drop me",
-				}),
-			/Unknown request key "unknown" for GET \/todos/,
+		assert.equal(request.url, "https://api.test/items/path-id?id=query-id");
+		assert.equal(
+			request.body,
+			JSON.stringify({ id: "body-id", context: "body-context" }),
 		);
 	});
 
-	it("rejects flat input when route keys could not be resolved", async () => {
+	it("serializes falsy JSON body values", () => {
+		const declaration = route
+			.post("/values")
+			.body(type<false | 0 | "" | null>())
+			.response(204);
+		for (const body of [false, 0, "", null]) {
+			const request = constructBaseRequest("https://api.test", declaration, {
+				body,
+			});
+			assert.equal(request.body, JSON.stringify(body));
+			assert.equal(request.contentType, "application/json");
+		}
+	});
+
+	it("serializes opaque schemas without request key metadata", async () => {
+		const calls = captureFetch(new Response(null, { status: 204 }));
 		const client = initClient(
 			{
 				opaque: route
@@ -843,28 +884,12 @@ describe("ApiClient requests", () => {
 					.body(type<{ title: string }>())
 					.response(204),
 			},
-			{ baseUrl: "https://api.test" },
+			{
+				baseUrl: "https://api.test",
+			},
 		);
-
-		await assert.rejects(
-			() => client.opaque({ title: "created" }),
-			/Unknown request key "title" for POST \/opaque/,
-		);
-	});
-
-	it("strips unknown flattened request keys when configured", async () => {
-		const calls = captureFetch(jsonResponse([]));
-		const client = initClient(createRequestTestContract(), {
-			baseUrl: "https://api.test",
-			strictRequestKeys: false,
-		});
-
-		await client.todos.list({
-			search: "milk",
-			unknown: "drop me",
-		});
-
-		assert.equal(calls[0]?.url, "https://api.test/todos?search=milk");
+		await client.opaque({ body: { title: "created" } });
+		assert.equal(calls[0]?.init?.body, JSON.stringify({ title: "created" }));
 	});
 
 	it("cleans up timeout signals after fetch failures", async () => {
@@ -880,7 +905,9 @@ describe("ApiClient requests", () => {
 			timeoutMs: 5,
 		});
 
-		await assert.rejects(() => client.todos.list({ search: "milk" }));
+		await assert.rejects(() =>
+			client.todos.list({ query: { search: "milk" } }),
+		);
 		await new Promise((resolve) => setTimeout(resolve, 15));
 
 		assert.equal(abortEventCount, 0);
@@ -902,7 +929,7 @@ describe("ApiClient requests", () => {
 		});
 
 		await assert.rejects(
-			() => client.todos.list({ search: "milk" }),
+			() => client.todos.list({ query: { search: "milk" } }),
 			/headers unavailable/,
 		);
 
@@ -923,7 +950,12 @@ describe("ApiClient requests", () => {
 						controller.close();
 					},
 				}),
-				{ status: 200, headers: { "content-type": "application/json" } },
+				{
+					status: 200,
+					headers: {
+						"content-type": "application/json",
+					},
+				},
 			);
 		};
 		const client = initClient(createRequestTestContract(), {
@@ -931,7 +963,7 @@ describe("ApiClient requests", () => {
 			timeoutMs: 5,
 		});
 
-		await client.todos.list({ search: "milk" });
+		await client.todos.list({ query: { search: "milk" } });
 
 		assert.equal(requestSignal?.aborted, false);
 	});
