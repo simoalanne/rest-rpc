@@ -142,11 +142,6 @@ Prefer deriving the client from server implementations instead?
 Read [Server-first approach](/docs/server-first-quickstart).
 :::
 
-:::tip
-Prefer explicit HTTP request segments over flattened request keys?
-Read [Shorthand vs Explicit](/docs/shorthand-vs-explicit/).
-:::
-
 ## What You Get
 
 <CardGroup cols={2}>
@@ -247,14 +242,6 @@ shape.
 		locations, status codes, headers, and response bodies. The generated client
 		and handlers make those routes nicer to call from TypeScript, but they do
 		not hide what goes over the wire.
-	</AccordionItem>
-	<AccordionItem title="Why flatten request keys by default?">
-		The contract already declares the HTTP details, so rest-rpc can infer the
-		request keys from it. That makes the client and server handlers at minimal
-		ceremony, for the common case where you don't care from which HTTP bucket
-		the value came. This and other shorthand features are just defaults; you can
-		make them explicit if you want. Read [Shorthand vs
-		Explicit](/docs/shorthand-vs-explicit/) to understand the design.
 	</AccordionItem>
 	<AccordionItem title="I don't want to declare a contract?">
 		You don't have to. rest-rpc also supports server-first approach if you'd
