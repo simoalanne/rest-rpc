@@ -197,6 +197,26 @@ export type ServerFirstClientRouteFor<
 	SelectedImplementation<ImplementationUnion<TTree>, TSelector, TPath>
 >;
 
+type ServerFirstClientCallArgs<
+	TRoute extends RouteDeclaration,
+	TGlobalHeaders extends HeaderRecord,
+> =
+	ApiClientRouteValue<TRoute, TGlobalHeaders> extends (
+		...args: infer TArgs
+	) => unknown
+		? TArgs
+		: [];
+
+type ServerFirstClientCallResult<
+	TRoute extends RouteDeclaration,
+	TGlobalHeaders extends HeaderRecord,
+> =
+	ApiClientRouteValue<TRoute, TGlobalHeaders> extends (
+		...args: infer _TArgs
+	) => infer TResult
+		? TResult
+		: ApiClientRouteValue<TRoute, TGlobalHeaders>;
+
 /** Infers the method-and-path client for a server implementation tree. */
 export type ServerFirstClientFor<
 	TTree,
@@ -206,7 +226,11 @@ export type ServerFirstClientFor<
 		const TPath extends ServerFirstClientPath<TTree, TSelector>,
 	>(
 		path: TPath,
-	) => ApiClientRouteValue<
+		...args: ServerFirstClientCallArgs<
+			ServerFirstClientRouteFor<TTree, TSelector, TPath>,
+			TGlobalHeaders
+		>
+	) => ServerFirstClientCallResult<
 		ServerFirstClientRouteFor<TTree, TSelector, TPath>,
 		TGlobalHeaders
 	>;
@@ -445,7 +469,7 @@ export const createServerFirstClient = <
 				}
 				const selector = selectorKey.slice(1);
 
-				return (path: string) => {
+				return (path: string, ...args: unknown[]) => {
 					if (selector === "sse") {
 						return {
 							openConnection: (...args: unknown[]) => {
@@ -471,18 +495,15 @@ export const createServerFirstClient = <
 					}
 
 					const method = selectorMethod(selector);
-					return async (...args: unknown[]) => {
-						const { requestInput, fetchOptions } = getServerFirstArgs(args);
-						const runtime = createRuntimeRoute(method, path, requestInput);
-						const rawResponse = await executeRequest(
-							runtime.route,
-							runtime.route,
-							[runtime.requestInput, fetchOptions],
-							requestOptions,
-							runtime.tagInput,
-						);
-						return readServerFirstResponse(rawResponse);
-					};
+					const { requestInput, fetchOptions } = getServerFirstArgs(args);
+					const runtime = createRuntimeRoute(method, path, requestInput);
+					return executeRequest(
+						runtime.route,
+						runtime.route,
+						[runtime.requestInput, fetchOptions],
+						requestOptions,
+						runtime.tagInput,
+					).then(readServerFirstResponse);
 				};
 			},
 		},

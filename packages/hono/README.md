@@ -102,7 +102,7 @@ const client = initClient<typeof routes>({
 	baseUrl: "https://api.example.com",
 });
 
-const todo = await client.$post("/todos")({
+const todo = await client.$post("/todos", {
 	body: { title: "Ship v1" },
 });
 ```

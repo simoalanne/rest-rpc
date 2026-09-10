@@ -473,16 +473,18 @@ export function createTanstackQueryHelpers(
 					proxyChain([...capturedPath, String(propertyName)]),
 				apply: (_target, _thisArg, callArgs) => {
 					// A top-level `$` selector is an explicit HTTP method call like
-					// `client.$get("/path").queryOptions(...)`.
+					// `helpers.$get("/path").queryOptions(...)`.
 					const selectorName = capturedPath[0]!;
 					const usesExplicitHttpMethod =
 						capturedPath.length === 1 && selectorName.startsWith("$");
 					if (usesExplicitHttpMethod) {
 						const routePath = callArgs[0];
-						const selectRoute = serverFirstClient[selectorName] as (
+						const callRoute = serverFirstClient[selectorName] as (
 							path: string,
-						) => (...args: unknown[]) => Promise<unknown>;
-						const routeClient = selectRoute(routePath);
+							...args: unknown[]
+						) => Promise<unknown>;
+						const routeClient = (...args: unknown[]) =>
+							callRoute(routePath, ...args);
 						return createTanstackHelpersForRoute(
 							[selectorName.slice(1), routePath],
 							(request, fetchOptions) =>

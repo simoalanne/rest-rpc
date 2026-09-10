@@ -289,13 +289,13 @@ export const serverFirstClient = initClient<typeof fetchServerFirstRoutes>({
 
 export const serverFirstCreatePromise = serverFirstClient.$post(
 	"/server-first/todos",
-)({ body: { title: "Write hover tests" } });
+	{ body: { title: "Write hover tests" } },
+);
 
 type ServerFirstCreateImplementation =
 	typeof fetchServerFirstRoutes.todos.create;
-type ServerFirstCreateClientRoute = ReturnType<
-	typeof serverFirstClient.$post<"/server-first/todos">
->;
+type ServerFirstCreateClientRoute =
+	typeof serverFirstClient.$post<"/server-first/todos">;
 
 export type ServerFirstHandlerRequest = Parameters<
 	ServerFirstCreateImplementation["handler"]
