@@ -41,13 +41,11 @@ export const configuredWebSocket = configuredRoute.ws("/configured-ws");
 export const initialHttp = route.get("/initial");
 export const jsonBody = route.post("/body").body(scalar);
 export const formBody = route.post("/form").formBody(scalar);
-export const formBodyWithArrays = route
-	.post("/form-arrays")
-	.formBody({ schema: scalar, arrayKeys: ["value"] });
+export const formBodyWithArrays = route.post("/form-arrays").formBody(scalar);
 export const multipartBody = route.post("/multipart").multipartBody(scalar);
 export const multipartBodyWithArrays = route
 	.post("/multipart-arrays")
-	.multipartBody({ schema: scalar, arrayKeys: ["value"] });
+	.multipartBody(scalar);
 export const customBody = route.post("/custom-body").customBody(scalar);
 export const customTypedBody = route
 	.post("/custom-typed-body")

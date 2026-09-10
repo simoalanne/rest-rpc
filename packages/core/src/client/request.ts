@@ -77,41 +77,14 @@ export const serializeCustomBody = (body: unknown, contentType: string) =>
 		? JSON.stringify(body)
 		: (body as BodyInit | null | undefined);
 
-const getDeclaredArrayKeys = (
-	body: unknown,
-	kind: "formBody" | "multipartBody",
-) => {
-	if (
-		typeof body !== "object" ||
-		body === null ||
-		!("kind" in body) ||
-		body.kind !== kind ||
-		!("arrayKeys" in body) ||
-		!Array.isArray(body.arrayKeys)
-	) {
-		return undefined;
-	}
-
-	return new Set(body.arrayKeys as string[]);
-};
-
 const serializeFormBody = (
-	route: ClientRequestRoute,
+	_route: ClientRequestRoute,
 	body: Record<string, unknown> | undefined,
 ) => {
-	const routeBody = route.request?.body;
-	const arrayKeys = getDeclaredArrayKeys(routeBody, "formBody");
-
 	return new URLSearchParams(
 		Object.entries(body ?? {}).flatMap(([key, value]) => {
 			if (Array.isArray(value)) {
-				if (arrayKeys && !arrayKeys.has(key)) {
-					throw new Error(
-						`Invalid body key "${key}" for ${route.method} ${route.path}. Expected string, number, boolean, or an array for a declared form array key.`,
-					);
-				}
-
-				return value.map((item) => [key, String(item)]);
+				return value.map((item) => [`${key}[]`, String(item)]);
 			}
 
 			return value === undefined ? [] : [[key, String(value)]];
@@ -128,23 +101,15 @@ const stringifyMultipartValue = (value: unknown) => {
 };
 
 const serializeMultipartBody = (
-	route: ClientRequestRoute,
+	_route: ClientRequestRoute,
 	body: Record<string, unknown> | undefined,
 ) => {
-	const routeBody = route.request?.body;
-	const arrayKeys = getDeclaredArrayKeys(routeBody, "multipartBody");
 	const formData = new FormData();
 
 	for (const [key, value] of Object.entries(body ?? {})) {
 		if (Array.isArray(value)) {
-			if (arrayKeys && !arrayKeys.has(key)) {
-				throw new Error(
-					`Invalid body key "${key}" for ${route.method} ${route.path}. Expected string, number, boolean, Blob, File, or an array for a declared multipart array key.`,
-				);
-			}
-
 			for (const item of value) {
-				formData.append(key, stringifyMultipartValue(item));
+				formData.append(`${key}[]`, stringifyMultipartValue(item));
 			}
 			continue;
 		}
@@ -188,6 +153,9 @@ const serializeQuery = (route: ClientRequestRoute, query: unknown) => {
 		? { query }
 		: (query ?? {});
 	const entries = Object.entries(queryValues).flatMap(([key, value]) => {
+		if (!isJsonQuery(route.request?.query) && Array.isArray(value)) {
+			return value.map((item) => [`${key}[]`, String(item)]);
+		}
 		const stringValue = isJsonQuery(route.request?.query)
 			? stringifyJsonQueryValue(route, value)
 			: value === undefined

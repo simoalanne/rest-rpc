@@ -25,6 +25,7 @@ const createRequestTestContract = () => ({
 				z.object({
 					search: z.string().optional(),
 					empty: z.string().optional(),
+					tags: z.array(z.string()).optional(),
 				}),
 			)
 			.response(200, z.array(z.object({ id: z.string(), title: z.string() }))),
@@ -102,10 +103,19 @@ describe("ApiClient requests", () => {
 		await client.todos.get({
 			params: { id: "todo 1" },
 		});
-		await client.todos.list({ query: { search: "milk", empty: undefined } });
+		await client.todos.list({
+			query: {
+				search: "milk",
+				empty: undefined,
+				tags: ["typescript", "rpc"],
+			},
+		});
 
 		assert.equal(calls[0]?.url, "https://api.test/todos/todo%201");
-		assert.equal(calls[1]?.url, "https://api.test/todos?search=milk");
+		assert.equal(
+			calls[1]?.url,
+			"https://api.test/todos?search=milk&tags%5B%5D=typescript&tags%5B%5D=rpc",
+		);
 	});
 
 	it("builds requests from object-schema request declarations", async () => {
@@ -463,7 +473,7 @@ describe("ApiClient requests", () => {
 		);
 	});
 
-	it("sends inferred form array keys as repeated URLSearchParams entries", async () => {
+	it("sends form arrays with empty-bracket field names", async () => {
 		const apiContract = {
 			forms: {
 				submit: route
@@ -492,38 +502,8 @@ describe("ApiClient requests", () => {
 		assert.ok(calls[0]?.init?.body instanceof URLSearchParams);
 		assert.equal(
 			calls[0].init.body.toString(),
-			"title=Write+docs&tags=ts&tags=rpc",
+			"title=Write+docs&tags%5B%5D=ts&tags%5B%5D=rpc",
 		);
-	});
-
-	it("rejects omitted explicit form array keys before sending requests", async () => {
-		const apiContract = {
-			forms: {
-				submit: route
-					.post("/forms")
-					.formBody({
-						schema: z.object({
-							tags: z.array(z.string()),
-						}),
-						arrayKeys: [],
-					})
-					.response(204),
-			},
-		};
-		const calls = captureFetch();
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-
-		await assert.rejects(
-			client.forms.submit({
-				body: {
-					tags: ["ts", "rpc"],
-				},
-			}),
-			/declared form array key/,
-		);
-		assert.equal(calls.length, 0);
 	});
 
 	it("sends multipart bodies as FormData without generated content type", async () => {
@@ -531,14 +511,13 @@ describe("ApiClient requests", () => {
 			uploads: {
 				create: route
 					.post("/uploads")
-					.multipartBody({
-						schema: z.object({
+					.multipartBody(
+						z.object({
 							title: z.string(),
 							file: z.instanceof(Blob),
 							tags: z.array(z.string()).optional(),
 						}),
-						arrayKeys: ["tags"],
-					})
+					)
 					.response(204),
 			},
 		};
@@ -559,7 +538,7 @@ describe("ApiClient requests", () => {
 		assert.ok(calls[0]?.init?.body instanceof FormData);
 		assert.equal(calls[0].init.body.get("title"), "Write docs");
 		assert.ok(calls[0].init.body.get("file") instanceof Blob);
-		assert.deepEqual(calls[0].init.body.getAll("tags"), ["ts", "rpc"]);
+		assert.deepEqual(calls[0].init.body.getAll("tags[]"), ["ts", "rpc"]);
 		assert.deepEqual(calls[0]?.init?.headers, {});
 	});
 
@@ -592,36 +571,6 @@ describe("ApiClient requests", () => {
 		assert.ok(calls[0]?.init?.body instanceof FormData);
 		assert.equal(calls[0].init.body.get("body"), "File contents");
 		assert.equal(calls[0].init.body.get("title"), "Upload docs");
-	});
-
-	it("rejects omitted explicit multipart array keys before sending requests", async () => {
-		const apiContract = {
-			uploads: {
-				create: route
-					.post("/uploads")
-					.multipartBody({
-						schema: z.object({
-							tags: z.array(z.string()),
-						}),
-						arrayKeys: [],
-					})
-					.response(204),
-			},
-		};
-		const calls = captureFetch();
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-
-		await assert.rejects(
-			client.uploads.create({
-				body: {
-					tags: ["ts", "rpc"],
-				},
-			}),
-			/declared multipart array key/,
-		);
-		assert.equal(calls.length, 0);
 	});
 
 	it("sends custom bodies with a selected declared content type", async () => {

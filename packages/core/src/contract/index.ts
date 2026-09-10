@@ -17,7 +17,6 @@ export {
 	isShorthandRouteDeclaration,
 } from "./shorthandRouteBuilder.ts";
 export type {
-	BodyWithArrayKeysOptions,
 	CustomBody,
 	CustomBodyContentType,
 	CustomResponseBody,

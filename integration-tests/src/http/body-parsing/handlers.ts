@@ -24,6 +24,8 @@ export const createBodyParsingHandlers = (): BodyParsingHandlers => ({
 	formUrlEncoded: (request) => ({
 		count: request.body.count,
 		title: request.body.title,
+		filters: request.query.filters,
+		tags: request.body.tags,
 	}),
 	binary: (request) => ({
 		byteLength: request.body.byteLength,

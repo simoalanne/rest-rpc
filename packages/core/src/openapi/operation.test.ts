@@ -380,7 +380,6 @@ describe("OpenAPI operations", () => {
 				schema: z.object({
 					title: z.string(),
 				}),
-				arrayKeys: [],
 			},
 			schemaConverter,
 		);
@@ -400,7 +399,6 @@ describe("OpenAPI operations", () => {
 					title: z.string(),
 					file: z.string(),
 				}),
-				arrayKeys: [],
 			},
 			schemaConverter,
 		);

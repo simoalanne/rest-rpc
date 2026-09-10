@@ -65,7 +65,7 @@ export const registerExpressHttpRoutes = (
 				const result = await handleHttpRoute(route, handler, {
 					request: {
 						body: req.body,
-						query: req.query,
+						query: new URL(req.originalUrl, "http://localhost").searchParams,
 						params: req.params,
 						headers: req.headers,
 					},

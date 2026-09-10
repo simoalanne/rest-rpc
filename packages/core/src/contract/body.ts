@@ -1,8 +1,4 @@
-import {
-	isStandardSchema,
-	type StandardSchemaV1,
-} from "../standard-schema/index.ts";
-import { resolveBuiltInRequestKeys } from "./requestKeys.ts";
+import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 
 type BodyScalar = string | number | boolean;
 
@@ -23,8 +19,6 @@ export type MultipartBodySchema = StandardSchemaV1<
 	unknown
 >;
 
-type BodyWithArrayKeysSchema = FormBodySchema | MultipartBodySchema;
-
 /**
  * Marks a request or response body as intentionally empty.
  *
@@ -37,13 +31,9 @@ export type NoBody = {
 /**
  * Declares an `application/x-www-form-urlencoded` request body.
  */
-export type FormBody<
-	TSchema extends FormBodySchema = FormBodySchema,
-	TArrayKeys extends readonly string[] = readonly string[],
-> = {
+export type FormBody<TSchema extends FormBodySchema = FormBodySchema> = {
 	kind: "formBody";
 	schema: TSchema;
-	arrayKeys: TArrayKeys;
 };
 
 /**
@@ -51,11 +41,9 @@ export type FormBody<
  */
 export type MultipartBody<
 	TSchema extends MultipartBodySchema = MultipartBodySchema,
-	TArrayKeys extends readonly string[] = readonly string[],
 > = {
 	kind: "multipartBody";
 	schema: TSchema;
-	arrayKeys: TArrayKeys;
 };
 
 /**
@@ -67,41 +55,6 @@ export type CustomBodyContentType = string | readonly string[];
 export type CustomResponseValue = string | Uint8Array;
 
 type CustomResponseSchema = StandardSchemaV1<unknown, CustomResponseValue>;
-
-/** Options for a structured body whose selected fields are encoded as arrays. */
-export type BodyWithArrayKeysOptions<
-	TSchema extends BodyWithArrayKeysSchema = BodyWithArrayKeysSchema,
-	TArrayKeys extends readonly string[] = readonly string[],
-> = {
-	schema: TSchema;
-	arrayKeys: TArrayKeys;
-};
-
-export type BodyWithArrayKeysInput<
-	TSchema extends BodyWithArrayKeysSchema = BodyWithArrayKeysSchema,
-	TArrayKeys extends readonly string[] = readonly string[],
-> = TSchema | BodyWithArrayKeysOptions<TSchema, TArrayKeys>;
-
-export function resolveBodyWithArrayKeys<
-	const TSchema extends BodyWithArrayKeysSchema,
-	const TArrayKeys extends readonly string[] = readonly string[],
->(
-	input: BodyWithArrayKeysInput<TSchema, TArrayKeys>,
-): {
-	schema: TSchema;
-	arrayKeys: readonly string[];
-} {
-	if (!isStandardSchema(input)) {
-		return input;
-	}
-
-	return {
-		schema: input,
-		arrayKeys: Object.entries(resolveBuiltInRequestKeys(input) ?? {})
-			.filter(([, isArray]) => isArray)
-			.map(([key]) => key),
-	};
-}
 
 /**
  * Declares a body schema with one or more non-JSON content types.

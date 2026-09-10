@@ -162,32 +162,25 @@ expectType<{
 	readonly operation: "read";
 }>(mergedMetadata.metadata);
 
-// Preserves schema and array-key inference for form and multipart bodies.
+// Preserves schema inference for form and multipart bodies.
 const importRoute = route
 	.post("/imports")
-	.formBody({ schema: input, arrayKeys: ["title"] })
+	.formBody(input)
 	.customResponse(201, { contentType: "text/csv", schema: customText });
 
 expectType<"formBody">(importRoute.request.body.kind);
 expectType<typeof input>(importRoute.request.body.schema);
-expectType<readonly ["title"]>(importRoute.request.body.arrayKeys);
 expectType<"customBody">(importRoute.responses[201].kind);
 
 // Supports the schema overload for form bodies.
 const formSchema = route.post("/form-schema").formBody(input).response(201);
 expectType<typeof input>(formSchema.request.body.schema);
-// Supports both multipart body overloads.
+// Supports multipart body schemas.
 const multipartSchema = route
 	.post("/multipart-schema")
 	.multipartBody(input)
 	.response(201);
 expectType<typeof input>(multipartSchema.request.body.schema);
-const multipartObject = route
-	.post("/multipart-object")
-	.multipartBody({ schema: input, arrayKeys: ["title"] })
-	.response(201);
-expectType<typeof input>(multipartObject.request.body.schema);
-expectType<readonly ["title"]>(multipartObject.request.body.arrayKeys);
 
 // Preserves schema and content-type inference for custom request bodies.
 const customRequestBody = route

@@ -77,7 +77,8 @@ export const registerFastifyWebSocketRoutes = (
 					async (req: FastifyRequest, reply: FastifyReply) => {
 						const signal = createRequestSignal(req.raw, reply.raw);
 						const request = {
-							query: req.query,
+							query: new URL(req.raw.url ?? "/", "http://localhost")
+								.searchParams,
 							params: req.params,
 							headers: req.headers,
 						};

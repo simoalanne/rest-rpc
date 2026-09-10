@@ -88,7 +88,8 @@ route
 
 ## JSON Query
 
-`.jsonQuery()` declares a JSON-shaped query value.
+When you need to pass a complex object as a query parameter, you can use `.jsonQuery()`.
+The object is serialized to a JSON string and sent as a single query parameter named `query` in the URL.
 
 ```ts
 const api = {
@@ -107,8 +108,6 @@ const api = {
 };
 ```
 
-The client and handler use a top-level `query` value:
-
 ```ts
 await client.search({
 	query: {
@@ -118,9 +117,6 @@ await client.search({
 	},
 });
 ```
-
-`rest-rpc` transports that value in the URL query parameter named `query`,
-parses it on the server, and validates it with the wrapped schema.
 
 ## Responses
 

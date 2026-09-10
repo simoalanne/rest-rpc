@@ -36,21 +36,6 @@ describe("HTTP route builder runtime", () => {
 		}
 	});
 
-	it("rejects reserved content-type keys derived from header schemas", () => {
-		assert.throws(
-			() =>
-				route.post("/items").headers(z.object({ "content-type": z.string() })),
-			/reserved header key "content-type"/,
-		);
-		assert.throws(
-			() =>
-				route
-					.with({ headers: z.object({ "Content-Type": z.string() }) })
-					.post("/items"),
-			/reserved header key "Content-Type"/,
-		);
-	});
-
 	it("supports independent setters in arbitrary order", () => {
 		const schema = z.object({ value: z.string() });
 		const declaration = route
@@ -179,12 +164,11 @@ describe("HTTP route builder runtime", () => {
 		const bytes = type<Uint8Array>();
 		const form = route
 			.post("/forms")
-			.formBody({ schema: formSchema, arrayKeys: ["tags"] })
+			.formBody(formSchema)
 			.customResponse(201, { contentType: "text/csv", schema: type<string>() });
 		assert.deepEqual(form.request?.body, {
 			kind: "formBody",
 			schema: formSchema,
-			arrayKeys: ["tags"],
 		});
 		assert.equal((form.responses[201] as { kind: string }).kind, "customBody");
 

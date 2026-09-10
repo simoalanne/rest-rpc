@@ -123,7 +123,8 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 				{
 					request: {
 						body: req.body,
-						query: req.query,
+						query: new URL(rawRequest.url ?? "/", "http://localhost")
+							.searchParams,
 						params: req.params,
 						headers: req.headers,
 					},

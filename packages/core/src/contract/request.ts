@@ -10,9 +10,9 @@ export const REQUEST_CONTEXT_KEY = "context";
 /** Scalar value accepted by ordinary HTTP request schemas. */
 export type RequestScalar = string | number | boolean;
 
-/** An ordinary query schema whose wire input contains scalar values. */
+/** An ordinary query schema whose wire input contains scalar or array values. */
 export type RequestQuerySchema = StandardSchemaV1<
-	Record<string, RequestScalar | undefined>,
+	Record<string, RequestScalar | readonly RequestScalar[] | undefined>,
 	unknown
 >;
 

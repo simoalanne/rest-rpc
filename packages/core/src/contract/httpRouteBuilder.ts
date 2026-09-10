@@ -1,9 +1,5 @@
-import { resolveBuiltInRequestKeys } from "./requestKeys.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import {
-	resolveBodyWithArrayKeys,
-	type BodyWithArrayKeysInput,
-	type BodyWithArrayKeysOptions,
 	type CustomBody,
 	type CustomBodyInput,
 	type CustomBodyContentType,
@@ -83,21 +79,10 @@ const assertHttpStatusCode = (status: number) => {
 	}
 };
 
-const assertHeaderSchema = (schema: RequestHeadersSchema, path: string) => {
-	for (const key of Object.keys(resolveBuiltInRequestKeys(schema) ?? {})) {
-		if (key.toLowerCase() === "content-type") {
-			throw new Error(
-				`Route declaration at path "${path}" has a reserved header key "${key}". Use customBody({ schema, contentType }) to declare request content type instead.`,
-			);
-		}
-	}
-};
-
 const httpRequestDefaults = (
 	options: RouteFactoryOptions,
 ): RouteRequestDeclaration | undefined => {
 	if (!options.headers) return undefined;
-	assertHeaderSchema(options.headers, options.pathPrefix ?? "");
 	return { headers: { inherited: options.headers } };
 };
 
@@ -138,18 +123,18 @@ class HttpRouteBuilder extends BaseRouteBuilder {
 		return this;
 	}
 
-	formBody(input: BodyWithArrayKeysInput<FormBodySchema>) {
+	formBody(schema: FormBodySchema) {
 		this.requestForWrite().body = {
 			kind: "formBody",
-			...resolveBodyWithArrayKeys(input),
+			schema,
 		};
 		return this;
 	}
 
-	multipartBody(input: BodyWithArrayKeysInput<MultipartBodySchema>) {
+	multipartBody(schema: MultipartBodySchema) {
 		this.requestForWrite().body = {
 			kind: "multipartBody",
-			...resolveBodyWithArrayKeys(input),
+			schema,
 		};
 		return this;
 	}
@@ -163,7 +148,6 @@ class HttpRouteBuilder extends BaseRouteBuilder {
 	}
 
 	headers(schema: RequestHeadersSchema) {
-		assertHeaderSchema(schema, this.path);
 		const request = this.requestForWrite();
 		request.headers = { ...request.headers, local: schema };
 		return this;
@@ -358,19 +342,6 @@ type HttpBodySetters<TState extends HttpBuilderState> = WhenUnused<
 			TPath,
 			TMetadata
 		>;
-		formBody<
-			const TSchema extends FormBodySchema,
-			const TArrayKeys extends readonly string[],
-			const TPath extends string = string,
-			const TMetadata extends RouteMetadata | never = never,
-		>(
-			this: BuilderReceiver<TPath, TMetadata>,
-			input: BodyWithArrayKeysOptions<TSchema, TArrayKeys>,
-		): HttpBuilderAtPath<
-			SetHttpRequest<TState, "body", FormBody<TSchema, TArrayKeys>, "body">,
-			TPath,
-			TMetadata
-		>;
 		/** Declares a multipart form body. @see {@link https://rest-rpc.dev/docs/http-requests#request-with-multipart-body} */
 		multipartBody<
 			const TSchema extends MultipartBodySchema,
@@ -381,24 +352,6 @@ type HttpBodySetters<TState extends HttpBuilderState> = WhenUnused<
 			schema: TSchema,
 		): HttpBuilderAtPath<
 			SetHttpRequest<TState, "body", MultipartBody<TSchema>, "body">,
-			TPath,
-			TMetadata
-		>;
-		multipartBody<
-			const TSchema extends MultipartBodySchema,
-			const TArrayKeys extends readonly string[],
-			const TPath extends string = string,
-			const TMetadata extends RouteMetadata | never = never,
-		>(
-			this: BuilderReceiver<TPath, TMetadata>,
-			input: BodyWithArrayKeysOptions<TSchema, TArrayKeys>,
-		): HttpBuilderAtPath<
-			SetHttpRequest<
-				TState,
-				"body",
-				MultipartBody<TSchema, TArrayKeys>,
-				"body"
-			>,
 			TPath,
 			TMetadata
 		>;

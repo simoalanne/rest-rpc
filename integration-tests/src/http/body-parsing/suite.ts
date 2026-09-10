@@ -170,6 +170,7 @@ export const runBodyParsingSuite = (adapter: BodyParsingSuiteAdapter) => {
 			});
 
 			const responseResponse = await client.formUrlEncoded({
+				query: {},
 				body: {
 					count: 7,
 					title: "Typed form",
@@ -181,6 +182,29 @@ export const runBodyParsingSuite = (adapter: BodyParsingSuiteAdapter) => {
 			assert.deepEqual(response, {
 				count: 7,
 				title: "Typed form",
+			});
+		});
+
+		it("parses empty-bracket arrays in query and urlencoded form fields", async () => {
+			const client = initClient(bodyParsingContract, {
+				baseUrl: server.origin,
+			});
+
+			const response = await client.formUrlEncoded({
+				query: { filters: ["open", "assigned"] },
+				body: {
+					count: 2,
+					title: "Array fields",
+					tags: ["typescript", "rpc"],
+				},
+			});
+
+			assert.equal(response.status, 200);
+			assert.deepEqual(response.body, {
+				count: 2,
+				title: "Array fields",
+				filters: ["open", "assigned"],
+				tags: ["typescript", "rpc"],
 			});
 		});
 

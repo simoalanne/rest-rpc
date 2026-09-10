@@ -48,7 +48,7 @@ export type RequestValidationResponse =
  */
 export type RequestSegments = {
 	body?: unknown;
-	query?: unknown;
+	query?: URLSearchParams;
 	params?: unknown;
 	headers?: unknown;
 };
@@ -60,12 +60,25 @@ type SegmentValidationResult = {
 
 type RequestObjectSchema = StandardSchemaV1<unknown, unknown>;
 
-const parseJsonQuery = (value: unknown) => {
-	if (Array.isArray(value)) value = value[0];
-	if (value === undefined) return undefined;
-	if (typeof value !== "string") return value;
-	return JSON.parse(value);
+const parseQueryOrFormData = (searchParams: URLSearchParams | FormData) => {
+	const data: Record<string, unknown> = {};
+
+	for (const [wireKey, value] of searchParams) {
+		if (wireKey.endsWith("[]")) {
+			const key = wireKey.slice(0, -2);
+			const current = data[key];
+			data[key] = Array.isArray(current) ? [...current, value] : [value];
+			continue;
+		}
+
+		data[wireKey] = value;
+	}
+
+	return data;
 };
+
+const parseJsonQuery = (value: string | null) =>
+	value === null ? undefined : JSON.parse(value);
 
 export const getHeaderValue = (
 	headers: unknown,
@@ -183,24 +196,6 @@ const validateCustomBody = async (
 	};
 };
 
-const formBodyToObject = (
-	body: URLSearchParams,
-	arrayKeys: readonly string[],
-) => {
-	const data: Record<string, string | string[]> = {};
-	const arrayKeySet = new Set(arrayKeys);
-	for (const key of new Set(body.keys())) {
-		if (arrayKeySet.has(key)) {
-			data[key] = body.getAll(key);
-			continue;
-		}
-
-		const value = body.get(key);
-		if (value !== null) data[key] = value;
-	}
-	return data;
-};
-
 const validateFormBody = async (
 	declaration: FormBody,
 	body: unknown,
@@ -214,31 +209,13 @@ const validateFormBody = async (
 
 	const result = await validateStandardSchema(
 		declaration.schema,
-		formBodyToObject(body, declaration.arrayKeys),
+		parseQueryOrFormData(body),
 	);
 	if (result.issues) {
 		return { data: {}, errors: result.issues };
 	}
 
 	return { data: { body: result.value }, errors: [] };
-};
-
-const multipartBodyToObject = (
-	body: FormData,
-	arrayKeys: readonly string[],
-) => {
-	const data: Record<string, FormDataEntryValue | FormDataEntryValue[]> = {};
-	const arrayKeySet = new Set(arrayKeys);
-	for (const key of new Set(body.keys())) {
-		if (arrayKeySet.has(key)) {
-			data[key] = body.getAll(key);
-			continue;
-		}
-
-		const value = body.get(key);
-		if (value !== null) data[key] = value;
-	}
-	return data;
 };
 
 const validateMultipartBody = async (
@@ -254,7 +231,7 @@ const validateMultipartBody = async (
 
 	const result = await validateStandardSchema(
 		declaration.schema,
-		multipartBodyToObject(body, declaration.arrayKeys),
+		parseQueryOrFormData(body),
 	);
 	if (result.issues) {
 		return { data: {}, errors: result.issues };
@@ -265,15 +242,11 @@ const validateMultipartBody = async (
 
 const validateJsonQuery = async (
 	declaration: JsonQuery,
-	query: unknown,
+	query: URLSearchParams | undefined,
 ): Promise<SegmentValidationResult> => {
 	let input: unknown;
 	try {
-		input = parseJsonQuery(
-			typeof query === "object" && query !== null
-				? (query as Record<string, unknown>).query
-				: undefined,
-		);
+		input = parseJsonQuery(query?.get("query") ?? null);
 	} catch {
 		return {
 			data: {},
@@ -334,7 +307,10 @@ export async function validateRequest(
 				: await validateRequestObject(request?.body, segments.body);
 	const query = isJsonQuery(request?.query)
 		? await validateJsonQuery(request.query, segments.query)
-		: await validateRequestObject(request?.query, segments.query);
+		: await validateRequestObject(
+				request?.query,
+				segments.query ? parseQueryOrFormData(segments.query) : undefined,
+			);
 	const params = await validateRequestObject(request?.params, segments.params);
 	const headers = await validateHeaders(request?.headers, segments.headers);
 	const issues = {

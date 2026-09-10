@@ -149,24 +149,7 @@ if (response.status === 201) {
 }
 ```
 
-Server body parsers should pass a `URLSearchParams` instance to rest-rpc for
-form bodies. Each present form key is passed to the schema as a string; omitted
-keys are absent from the validation input. Array fields are inferred from
-supported schemas and encoded or decoded as repeated form keys, such as
-`tags=typescript&tags=rpc`.
-
-When the array keys cannot be inferred, declare them explicitly with the
-`arrayKeys` option.
-
-```ts
-route
-	.post("/forms")
-	.formBody({
-		schema: type<{ title: string; tags: string[] }>(),
-		arrayKeys: ["tags"],
-	})
-	.response(204);
-```
+Body parsers should pass a `URLSearchParams` instance to rest-rpc for form bodies.
 
 ## Request With Multipart Body
 
@@ -224,23 +207,7 @@ if (response.status === 201) {
 }
 ```
 
-Server body parsers should pass a `FormData` instance to rest-rpc for multipart
-bodies. Each scalar key is passed to its schema as a string or `File`; omitted
-keys are absent from the validation input. Array fields are inferred from
-supported schemas and encoded or decoded as repeated form keys.
-
-When the array keys cannot be inferred, declare them explicitly with the
-`arrayKeys` option.
-
-```ts
-route
-	.post("/uploads")
-	.multipartBody({
-		schema: type<{ title: string; file: File; tags: string[] }>(),
-		arrayKeys: ["tags"],
-	})
-	.response(204);
-```
+Body parsers should pass a `FormData` instance to rest-rpc for multipart bodies.
 
 ## Request With Custom Content Type
 

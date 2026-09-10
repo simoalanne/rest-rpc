@@ -131,7 +131,7 @@ describe("validateRequest", () => {
 				.response(204),
 			{
 				params: { id: "123" },
-				query: { published: "false" },
+				query: new URLSearchParams({ published: "false" }),
 			},
 		);
 
@@ -153,7 +153,7 @@ describe("validateRequest", () => {
 				.response(204),
 			{
 				params: { id: "123" },
-				query: { published: "true" },
+				query: new URLSearchParams({ published: "true" }),
 			},
 		);
 
@@ -176,12 +176,12 @@ describe("validateRequest", () => {
 				)
 				.response(204),
 			{
-				query: {
+				query: new URLSearchParams({
 					query: JSON.stringify({
 						page: 2,
 						filters: { tags: ["api", "typescript"] },
 					}),
-				},
+				}),
 			},
 		);
 
@@ -311,24 +311,23 @@ describe("validateRequest", () => {
 		}
 	});
 
-	it("validates inferred urlencoded form array keys from repeated values", async () => {
+	it("validates urlencoded form arrays from empty-bracket fields", async () => {
 		const result = await validateRequest(
 			route
 				.post("/forms")
-				.formBody({
-					schema: z.object({
+				.formBody(
+					z.object({
 						title: z.string(),
 						tags: z.array(z.string()),
 					}),
-					arrayKeys: ["tags"],
-				})
+				)
 				.response(204),
 			{
 				body: new URLSearchParams([
 					["title", "First"],
 					["title", "Second"],
-					["tags", "ts"],
-					["tags", "rpc"],
+					["tags[]", "ts"],
+					["tags[]", "rpc"],
 				]),
 				headers: {
 					"content-type": "application/x-www-form-urlencoded",
@@ -340,7 +339,7 @@ describe("validateRequest", () => {
 		if (result.success) {
 			assert.deepEqual(result.data, {
 				body: {
-					title: "First",
+					title: "Second",
 					tags: ["ts", "rpc"],
 				},
 			});
@@ -353,21 +352,20 @@ describe("validateRequest", () => {
 		body.set("title", "Write docs");
 		body.set("count", "3");
 		body.set("file", file);
-		body.append("tags", "ts");
-		body.append("tags", "rpc");
+		body.append("tags[]", "ts");
+		body.append("tags[]", "rpc");
 
 		const result = await validateRequest(
 			route
 				.post("/uploads")
-				.multipartBody({
-					schema: z.object({
+				.multipartBody(
+					z.object({
 						title: z.string(),
 						count: z.coerce.number<number>(),
 						file: z.instanceof(Blob),
 						tags: z.array(z.string()),
 					}),
-					arrayKeys: ["tags"],
-				})
+				)
 				.response(204),
 			{
 				body,
@@ -393,7 +391,7 @@ describe("validateRequest", () => {
 				.jsonQuery(z.object({ page: z.number() }))
 				.response(204),
 			{
-				query: { query: "{" },
+				query: new URLSearchParams({ query: "{" }),
 			},
 		);
 

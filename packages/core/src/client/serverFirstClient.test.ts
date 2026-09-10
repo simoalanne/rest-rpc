@@ -141,11 +141,14 @@ describe("initClient server-first mode", () => {
 			body: request.customBody(new URLSearchParams({ title: "Todo" })),
 		});
 
-		assert.equal(String(calls[0]?.init?.body), "title=Todo&tags=docs&tags=api");
+		assert.equal(
+			String(calls[0]?.init?.body),
+			"title=Todo&tags%5B%5D=docs&tags%5B%5D=api",
+		);
 		assert.deepEqual(Array.from((calls[1]!.init!.body as FormData).entries()), [
 			["title", "Todo"],
-			["tags", "docs"],
-			["tags", "api"],
+			["tags[]", "docs"],
+			["tags[]", "api"],
 		]);
 		assert.equal(
 			calls[2]?.url,

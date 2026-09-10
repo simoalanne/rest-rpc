@@ -134,7 +134,7 @@ export const registerExpressWebSocketRoutes = (
 		socket.once("close", abort);
 
 		const request = {
-			query: Object.fromEntries(url.searchParams),
+			query: url.searchParams,
 			params: matchedRoute.params,
 			headers: req.headers,
 		};

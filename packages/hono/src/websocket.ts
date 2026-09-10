@@ -96,7 +96,7 @@ export const registerHonoWebSocketRoutes = <TEnv extends Env = Env>(
 			),
 			async (c: Context<TEnv>) => {
 				const request = {
-					query: c.req.query(),
+					query: new URL(c.req.raw.url).searchParams,
 					params: c.req.param(),
 					headers: c.req.header(),
 				};

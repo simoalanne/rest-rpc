@@ -74,7 +74,7 @@ export function createRouteHandler(
 		}
 		const parsedRequest = {
 			params: matched.params,
-			query: Object.fromEntries(url.searchParams),
+			query: url.searchParams,
 			headers: Object.fromEntries(request.headers),
 			body,
 		};

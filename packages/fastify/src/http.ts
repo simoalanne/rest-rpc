@@ -63,7 +63,8 @@ export const registerFastifyHttpRoutes = (
 					const result = await handleHttpRoute(route, handler, {
 						request: {
 							body: req.body,
-							query: req.query,
+							query: new URL(req.raw.url ?? "/", "http://localhost")
+								.searchParams,
 							params: req.params,
 							headers: req.headers,
 						},

@@ -60,7 +60,7 @@ describe("handleHttpRoute", () => {
 			},
 			{
 				request: {
-					query: { q: "todos" },
+					query: new URLSearchParams({ q: "todos" }),
 				},
 				context: {},
 			},

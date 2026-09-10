@@ -81,7 +81,7 @@ export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 					const result = await handleHttpRoute(route, implementation.handler, {
 						request: {
 							body,
-							query: c.req.query(),
+							query: new URL(c.req.raw.url).searchParams,
 							params: c.req.param(),
 							headers: c.req.header(),
 						},

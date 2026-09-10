@@ -14,10 +14,7 @@ test("Node decodes chunked large JSON, multipart and repeated headers", async (t
 			.handler(({ body: { text } }) => ({ status: 200, body: text.length })),
 		multipart: route
 			.post("/multipart")
-			.multipartBody({
-				schema: type<{ file: Blob; tags: string[] }>(),
-				arrayKeys: ["tags"],
-			})
+			.multipartBody(type<{ file: Blob; tags: string[] }>())
 			.handler(async ({ body }) => ({
 				status: 200,
 				body: { bytes: body.file.size, tags: body.tags },
@@ -57,8 +54,8 @@ test("Node decodes chunked large JSON, multipart and repeated headers", async (t
 	assert.equal(JSON.parse(response), 2 * 1024 * 1024);
 	const form = new FormData();
 	form.set("file", new Blob(["x".repeat(128 * 1024)]));
-	form.append("tags", "a");
-	form.append("tags", "b");
+	form.append("tags[]", "a");
+	form.append("tags[]", "b");
 	assert.deepEqual(
 		await (
 			await fetch(`${server.origin}/multipart`, { method: "POST", body: form })
