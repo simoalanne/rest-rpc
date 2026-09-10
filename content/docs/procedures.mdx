@@ -1,0 +1,205 @@
+---
+title: Procedure Routes
+description: Build type-safe function-like APIs without declaring HTTP details for every operation.
+---
+
+Procedure routes are the shortest path from a TypeScript function to a typed
+HTTP client. Declare an input and output—or attach a handler directly—and
+`rest-rpc` derives the transport details from the route tree.
+
+```ts
+const api = {
+	todos: {
+		get: route.input(z.object({ id: z.string() })).output(todoSchema),
+	},
+};
+```
+
+```ts
+const todo = await client.todos.get({ id: "todo_1" });
+```
+
+Use procedure routes as the starting point for application-owned APIs when an
+operation has one normal JSON result and callers should not need to work with
+HTTP response metadata. Use an [explicit HTTP route](./contract/declaration)
+when the HTTP interface itself is part of the design.
+
+| Start with a procedure route when                           | Use an explicit route when                                       |
+| ----------------------------------------------------------- | ---------------------------------------------------------------- |
+| The API is called by your own TypeScript applications       | The API is public or designed HTTP-first                         |
+| The operation has one successful JSON result                | Callers handle expected statuses such as `404` or `409`          |
+| A function-shaped client is the primary interface           | Method, URL, headers, or caching semantics matter                |
+| Errors are exceptional rather than part of the typed result | You need typed error bodies or response headers                  |
+| Input fits in one JSON value                                | You need path, query, form, file, stream, SSE, or WebSocket data |
+
+Procedure and explicit routes can coexist in the same tree. Starting with a
+procedure does not commit the whole API to that style.
+
+## Contract-First Procedures
+
+In a shared contract, `.input()` declares the JSON input and `.output()`
+declares the successful JSON result. An output is required; input is optional.
+
+```ts
+import { route } from "@rest-rpc/core";
+import { z } from "zod";
+
+const todoSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+});
+
+export const api = {
+	todos: {
+		list: route.output(z.array(todoSchema)),
+		create: route
+			.input(z.object({ title: z.string().min(1) }))
+			.output(todoSchema),
+	},
+};
+```
+
+Implement the contract with the Node or Fetch runtime adapter.
+
+```ts
+import { createRouteHandler, implement } from "@rest-rpc/node";
+import { api } from "./contract";
+
+const builders = implement(api);
+
+export const routes = {
+	todos: {
+		list: builders.todos.list.handler(() => listTodos()),
+		create: builders.todos.create.handler(({ title }) => createTodo(title)),
+	},
+};
+
+const handle = createRouteHandler(routes);
+```
+
+The schema validates server input and can validate output according to the
+same adapter options used by explicit routes.
+
+## Server-First Procedures
+
+With a server-first API, end the procedure with `.handler()`. The handler return
+type becomes the client result type, so an output schema is optional.
+
+```ts
+import { route } from "@rest-rpc/node";
+import { z } from "zod";
+
+export const routes = {
+	todos: {
+		list: route.handler(() => listTodos()),
+		create: route
+			.input(z.object({ title: z.string().min(1) }))
+			.handler(({ title, context }) => {
+				return createTodo(title, context.signal);
+			}),
+	},
+};
+```
+
+Add `.output(schema)` before `.handler()` when the output should be validated
+at runtime or when a stable schema should constrain the implementation.
+
+```ts
+const create = route
+	.input(z.object({ title: z.string().min(1) }))
+	.output(todoSchema)
+	.handler(({ title }) => createTodo(title));
+```
+
+Input and output may be declared in either order. `context` contains the same
+adapter context and `AbortSignal` available to explicit server-first routes.
+
+## Call Procedures
+
+The contract-first and server-first clients have the same procedure-shaped
+surface. A procedure returns its output directly instead of an HTTP response
+envelope.
+
+```ts
+import { initClient } from "@rest-rpc/core";
+import type { routes } from "./server";
+
+const client = initClient<typeof routes>({
+	baseUrl: "https://api.example.com",
+});
+
+const todos = await client.todos.list();
+const created = await client.todos.create({ title: "Write docs" });
+```
+
+Pass Fetch options as the second argument. For a procedure without input, pass
+`undefined` first.
+
+```ts
+await client.todos.list(undefined, { cache: "no-store" });
+```
+
+An unsuccessful HTTP response rejects the call with an `Error`. Procedure
+routes do not declare typed error results. If an error is an expected part of
+the API that clients should inspect, model it with explicit response statuses
+on an [HTTP route](./http-responses).
+
+## TanStack Query
+
+Procedure helpers also return direct data. Use `queryOptions()` for reads and
+`mutationOptions()` for writes according to how the operation is used by the
+application; every procedure uses `POST` on the wire.
+
+```tsx
+const todos = useQuery(tq.todos.list.queryOptions());
+
+const createTodo = useMutation(tq.todos.create.mutationOptions());
+createTodo.mutate({ title: "Write docs" });
+```
+
+`queryOptions()` and `mutationOptions()` both remain available for procedures
+with input. This is an application-level choice, not an inference from the HTTP
+method.
+
+## Derived HTTP Interface
+
+The object keys determine the URL, and the transport profile is fixed:
+
+```txt
+api.todos.create  ->  POST /todos/create
+```
+
+- The input, when present, is sent as a JSON request body.
+- A successful result is a `200` JSON response.
+- The client returns the decoded result directly.
+- OpenAPI generation emits the derived `POST` operation.
+- Per-call Fetch options and global client headers still apply.
+
+Renaming a tree key changes the URL. Treat those keys as part of the wire API if
+clients and servers are deployed independently.
+
+`route.with()` configures explicit route factories and does not change the
+fixed procedure profile. Switch that operation to an explicit route when it
+needs custom paths, shared responses, metadata, or other HTTP controls.
+
+## Adapter Support
+
+Procedure routes and server-first handlers are served by the runtime adapters:
+
+| Adapter             | Procedure routes | Server-first | Explicit contract-first routes |
+| ------------------- | ---------------- | ------------ | ------------------------------ |
+| `@rest-rpc/node`    | Yes              | Yes          | Yes                            |
+| `@rest-rpc/fetch`   | Yes              | Yes          | Yes                            |
+| `@rest-rpc/express` | No               | No           | Yes                            |
+| `@rest-rpc/fastify` | No               | No           | Yes                            |
+| `@rest-rpc/hono`    | No               | No           | Yes                            |
+| `@rest-rpc/nest`    | No               | No           | Yes                            |
+
+The Node and Fetch packages are full runtime routers. They can also be mounted
+inside compatible frameworks, as shown in [Node HTTP](./server/node) and
+[Fetch Runtime](./server/fetch). The framework-specific packages preserve
+native registration, context, middleware, and dependency-injection models for
+explicit contract-first routes.
+
+Choose the integration for the behavior you need; the packages do not all
+expose the same authoring model.

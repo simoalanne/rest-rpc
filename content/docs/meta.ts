@@ -4,7 +4,7 @@ export default defineMeta({
 	pages: [
 		"quickstart",
 		"server-first-quickstart",
-		"comparison",
+		"procedures",
 		"api-reference",
 		"contract",
 		"server-first",
