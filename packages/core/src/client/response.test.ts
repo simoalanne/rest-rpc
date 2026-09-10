@@ -83,7 +83,6 @@ describe("ApiClient responses", () => {
 		const apiContract = {
 			todos: {
 				get: route
-					.with({ strictStatusCodes: true })
 					.get("/todos/:id")
 					.params(z.object({ id: z.string() }))
 					.response(200, {
@@ -109,19 +108,17 @@ describe("ApiClient responses", () => {
 		assert.equal(response.headers.get("etag"), "todo-etag");
 	});
 
-	it("returns undeclared responses without consuming their bodies", async () => {
+	it("rejects undeclared response statuses without consuming their bodies", async () => {
 		const rawResponse = jsonResponse({ code: "teapot" }, 418);
 		captureFetch(rawResponse);
 		const client = initClient(createResponseTestContract(), {
 			baseUrl: "https://api.test",
 		});
 
-		const response = await client.todos.get({ params: { id: "todo-1" } });
-
-		assert.deepEqual(response, {
-			status: 418,
-			rawResponse,
-		});
+		await assert.rejects(
+			() => client.todos.get({ params: { id: "todo-1" } }),
+			/declared response/,
+		);
 		assert.equal(rawResponse.bodyUsed, false);
 	});
 
@@ -137,33 +134,10 @@ describe("ApiClient responses", () => {
 		);
 	});
 
-	it("rejects undeclared response statuses when strict status codes are enabled", async () => {
-		captureFetch(jsonResponse({ code: "teapot" }, 418));
+	it("returns declared responses without validating by default", async () => {
 		const apiContract = {
 			todos: {
 				get: route
-					.with({ strictStatusCodes: true })
-					.get("/todos/:id")
-					.params(z.object({ id: z.string() }))
-					.response(200, z.object({ id: z.string(), title: z.string() }))
-					.response(404, z.object({ code: z.literal("not_found") })),
-			},
-		};
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-
-		await assert.rejects(
-			() => client.todos.get({ params: { id: "todo-1" } }),
-			/declared response/,
-		);
-	});
-
-	it("returns declared responses without validating when strict status codes are enabled", async () => {
-		const apiContract = {
-			todos: {
-				get: route
-					.with({ strictStatusCodes: true })
 					.get("/todos/:id")
 					.params(z.object({ id: z.string() }))
 					.response(
@@ -195,23 +169,6 @@ describe("ApiClient responses", () => {
 
 		assert.equal(response.status, 200);
 		assert.equal(response.body.createdAt, "2026-08-10T00:00:00.000Z");
-	});
-
-	it("preserves undeclared text and empty responses", async () => {
-		captureFetch((url) =>
-			String(url).includes("empty")
-				? new Response(null, { status: 418 })
-				: new Response("plain error", { status: 418 }),
-		);
-		const client = initClient(createResponseTestContract(), {
-			baseUrl: "https://api.test",
-		});
-
-		const textResponse = await client.todos.get({ params: { id: "text" } });
-		const emptyResponse = await client.todos.get({ params: { id: "empty" } });
-
-		assert.equal(await textResponse.rawResponse.text(), "plain error");
-		assert.equal(await emptyResponse.rawResponse.text(), "");
 	});
 
 	it("trusts declared response bodies by default", async () => {

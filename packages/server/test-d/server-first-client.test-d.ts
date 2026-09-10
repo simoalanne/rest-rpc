@@ -38,7 +38,6 @@ const routes = {
 				}),
 			),
 		get: route
-			.with({ strictStatusCodes: false })
 			.get("/todos/:id")
 			.params(z.object({ id: z.string() }))
 			.response(200, todo)

@@ -343,28 +343,17 @@ responseClient.todos
 	.create({ body: { title: "Write type tests" } })
 	.then((response) => {
 		expectError(response.declared);
-		if (response.status === 201) {
-			expectType<201>(response.status);
-			expectType<{ id: string; title: string }>(response.body);
-			expectType<string>(response.responseHeaders.location);
-			expectType<string | undefined>(response.responseHeaders["x-next-cursor"]);
-			expectType<Headers>(response.headers);
-		}
-
-		if ("rawResponse" in response) {
-			expectType<Response>(response.rawResponse);
-			expectError(response.headers);
-			expectError(response.body);
-		} else {
-			expectType<201>(response.status);
-			expectError(response.rawResponse);
-		}
+		expectType<201>(response.status);
+		expectType<{ id: string; title: string }>(response.body);
+		expectType<string>(response.responseHeaders.location);
+		expectType<string | undefined>(response.responseHeaders["x-next-cursor"]);
+		expectType<Headers>(response.headers);
+		expectError(response.rawResponse);
 	});
 
-const strictResponseApi = {
+const declaredResponseApi = {
 	todos: {
 		get: route
-			.with({ strictStatusCodes: true })
 			.get("/todos/:id")
 			.params(z.object({ id: z.string() }))
 			.response(200, todoSchema)
@@ -372,11 +361,11 @@ const strictResponseApi = {
 	},
 };
 
-const strictResponseClient = initClient(strictResponseApi, {
+const declaredResponseClient = initClient(declaredResponseApi, {
 	baseUrl: "https://example.test",
 });
 
-strictResponseClient.todos
+declaredResponseClient.todos
 	.get({ params: { id: "todo-1" } })
 	.then((response) => {
 		expectType<200 | 404>(response.status);
@@ -390,21 +379,21 @@ strictResponseClient.todos
 		}
 	});
 
-type StrictRouteClientResponseType = ClientResponse<
-	typeof strictResponseApi.todos.get
+type DeclaredRouteClientResponseType = ClientResponse<
+	typeof declaredResponseApi.todos.get
 >;
 
 expectType<never>(
 	null as unknown as Extract<
-		StrictRouteClientResponseType,
+		DeclaredRouteClientResponseType,
 		{ rawResponse: Response }
 	>,
 );
 
-expectType<Promise<StrictRouteClientResponseType>>(
-	strictResponseClient.todos.get({ params: { id: "todo-1" } }),
+expectType<Promise<DeclaredRouteClientResponseType>>(
+	declaredResponseClient.todos.get({ params: { id: "todo-1" } }),
 );
-expectType<ApiClientFor<typeof strictResponseApi>>(strictResponseClient);
+expectType<ApiClientFor<typeof declaredResponseApi>>(declaredResponseClient);
 
 const transformedApi = {
 	todos: {

@@ -86,10 +86,9 @@ export const hoverClient = initClient(hoverApi, {
 	baseUrl: "https://example.test",
 });
 
-export const strictHoverApi = {
+export const declaredHoverApi = {
 	todos: {
 		create: route
-			.with({ strictStatusCodes: true })
 			.post("/todos")
 			.body(schemaType<{ title: string }>())
 			.response(201, {
@@ -103,7 +102,7 @@ export const strictHoverApi = {
 	},
 };
 
-export const strictHoverClient = initClient(strictHoverApi, {
+export const declaredHoverClient = initClient(declaredHoverApi, {
 	baseUrl: "https://example.test",
 });
 
@@ -111,7 +110,7 @@ export const hoverQuery = createTanstackQueryHelpers(hoverApi, {
 	baseUrl: "https://example.test",
 });
 
-export const strictHoverQuery = createTanstackQueryHelpers(strictHoverApi, {
+export const declaredHoverQuery = createTanstackQueryHelpers(declaredHoverApi, {
 	baseUrl: "https://example.test",
 });
 
@@ -181,7 +180,7 @@ type CreateTodoRoute = typeof hoverApi.todos.create;
 type DownloadTodoRoute = typeof hoverApi.todos.download;
 type EventsRoute = typeof hoverApi.todos.events;
 type RemoveTodoRoute = typeof hoverApi.todos.remove;
-type StrictCreateTodoRoute = typeof strictHoverApi.todos.create;
+type DeclaredCreateTodoRoute = typeof declaredHoverApi.todos.create;
 
 export type GetClientRequest = ClientRequest<GetTodoRoute>;
 export type CreateClientRequest = ClientRequest<CreateTodoRoute>;
@@ -189,7 +188,8 @@ export type PageClientRequest = ClientRequest<PageTodoRoute>;
 export type RemoveClientRequest = ClientRequest<RemoveTodoRoute>;
 
 export type CreateClientResponse = ClientResponse<CreateTodoRoute>;
-export type CreateStrictClientResponse = ClientResponse<StrictCreateTodoRoute>;
+export type CreateDeclaredClientResponse =
+	ClientResponse<DeclaredCreateTodoRoute>;
 
 export type CreateFetchParameters = Parameters<typeof hoverClient.todos.create>;
 export type CreateFetchReturn = ReturnType<typeof hoverClient.todos.create>;
@@ -199,8 +199,8 @@ export type CreateFetchResponseParameters = Parameters<
 export type CreateFetchResponseReturn = ReturnType<
 	typeof hoverClient.todos.create
 >;
-export type StrictCreateFetchResponseReturn = ReturnType<
-	typeof strictHoverClient.todos.create
+export type DeclaredCreateFetchResponseReturn = ReturnType<
+	typeof declaredHoverClient.todos.create
 >;
 
 export type GetQueryOptionsParameters = Parameters<
@@ -232,8 +232,8 @@ export type CreateRouteMutationVariables =
 	RouteMutationVariables<CreateTodoRoute>;
 export type CreateRouteQueryData = RouteQueryData<CreateTodoRoute>;
 export type CreateRouteQueryError = RouteQueryError<CreateTodoRoute>;
-export type CreateStrictRouteQueryError =
-	RouteQueryError<StrictCreateTodoRoute>;
+export type CreateDeclaredRouteQueryError =
+	RouteQueryError<DeclaredCreateTodoRoute>;
 export type PageRouteInfiniteQueryData = RouteInfiniteQueryData<PageTodoRoute>;
 export type EventsRouteStreamedQueryData = RouteStreamedQueryData<EventsRoute>;
 

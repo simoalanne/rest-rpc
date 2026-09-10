@@ -32,11 +32,6 @@ import type {
 import { fetchQueryData } from "./queryData.ts";
 import { createTanstackHelpersForRoute } from "./createHelperFunctions.ts";
 
-type ClientUndeclaredResponse<E extends RouteDeclaration> =
-	Extract<ClientResponse<E>, { rawResponse: Response }> extends infer TResponse
-		? Simplify<TResponse>
-		: never;
-
 type Simplify<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
 
 type WithHeaders<TResponse> = TResponse extends unknown
@@ -50,7 +45,6 @@ type DeclaredRouteQueryData<E extends RouteDeclaration> = WithHeaders<
 >;
 type DeclaredRouteQueryError<E extends RouteDeclaration> =
 	| WithHeaders<ErrorDeclaredClientResponse<E>>
-	| ClientUndeclaredResponse<E>
 	| Error;
 type DeclaredRouteResponseBody<E extends RouteDeclaration> =
 	SuccessfulDeclaredClientResponse<E> extends infer TResponse

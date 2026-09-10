@@ -27,7 +27,6 @@ export const shorthandClient = initClient(shorthandContract, {
 });
 
 export const configuredRoute = route.with({
-	strictStatusCodes: true,
 	pathPrefix: "/api",
 	metadata: { scope: "test" },
 	responses: { 401: scalar },

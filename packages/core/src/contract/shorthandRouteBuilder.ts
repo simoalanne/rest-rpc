@@ -20,7 +20,6 @@ export type ShorthandRouteDeclaration<
 	readonly output: TOutput;
 	readonly method: "POST";
 	readonly responses: { readonly 200: TOutput };
-	readonly strictStatusCodes: true;
 } & ShorthandInput<TInput>;
 
 /** Any complete shorthand route declaration accepted in a contract tree. */
@@ -75,7 +74,6 @@ export const createShorthandRouteDeclaration = (
 		output,
 		method: "POST" as const,
 		responses: { 200: output },
-		strictStatusCodes: true as const,
 	};
 
 	return input

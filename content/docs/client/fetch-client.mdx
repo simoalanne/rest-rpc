@@ -30,8 +30,9 @@ const response = await client.todos.get({
 });
 ```
 
-Calling an HTTP route returns a `status`-discriminated union for the response.
-Undeclared responses are returned as `rawResponse` with the native `Response` object.
+Calling an HTTP route returns a `status`-discriminated union containing only the
+responses declared in the contract. The client throws when the server returns an
+undeclared status code.
 
 ```ts
 if (response.status === 404) {
@@ -41,42 +42,10 @@ if (response.status === 404) {
 if (response.status === 200) {
 	return response.body;
 }
-
-response.status; // Exclude<HttpStatusCode, 200 | 404>
-response.rawResponse; // Response
 ```
 
-Set `strictStatusCodes` to `true` on a route factory when route calls should only
-return declared status codes and throw on undeclared statuses.
-This also narrows the return type to only declared statuses, excluding the `rawResponse` branch.
-
-```ts
-const strictRoute = route.with({ strictStatusCodes: true });
-
-const api = {
-	todos: {
-		get: strictRoute
-			.get("/todos/:id")
-			.params(z.object({ id: z.string() }))
-			.response(200, todoSchema)
-			.response(404, notFoundSchema),
-	},
-};
-
-const client = initClient(api, { baseUrl: "https://api.example.com" });
-```
-
-```ts
-const response = await client.todos.get({
-	params: { id: "todo_1" },
-});
-
-if (response.status === 404) {
-	return;
-}
-
-return response.body;
-```
+An undeclared status indicates that the server implementation and contract are
+out of sync. Declare every expected success and error response on the route.
 
 ## Client Options
 

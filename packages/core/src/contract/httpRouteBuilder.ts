@@ -64,14 +64,9 @@ type ResolvedPath<TOptions, TPath extends string> = TOptions extends {
 	? `${TPrefix}${TPath}`
 	: TPath;
 
-type HttpRouteFor<TOptions, TMethod extends HttpMethod> = {
+type HttpRouteFor<TMethod extends HttpMethod> = {
 	readonly method: TMethod;
-	readonly strictStatusCodes?: boolean;
-} & (TOptions extends {
-	strictStatusCodes: infer TStrictStatusCodes extends boolean;
-}
-	? { readonly strictStatusCodes: TStrictStatusCodes }
-	: EmptyObject);
+};
 
 const assertHttpStatusCode = (status: number) => {
 	if (!Number.isInteger(status) || status < 100 || status > 599) {
@@ -97,7 +92,6 @@ class HttpRouteBuilder extends BaseRouteBuilder {
 	#localResponseStatuses = new Set<number>();
 	declare method: HttpMethod;
 	declare path: string;
-	declare strictStatusCodes?: boolean;
 	declare request?: HttpRouteDeclaration["request"];
 	declare responses?: RouteResponses;
 
@@ -107,9 +101,6 @@ class HttpRouteBuilder extends BaseRouteBuilder {
 		options: RouteFactoryOptions = {},
 	) {
 		super(method, path, options, httpRequestDefaults(options));
-		if (typeof options.strictStatusCodes === "boolean") {
-			this.strictStatusCodes = options.strictStatusCodes;
-		}
 		if (options.responses) {
 			for (const status of Object.keys(options.responses)) {
 				assertHttpStatusCode(Number(status));
@@ -511,7 +502,7 @@ export type HttpBuilderFor<
 	TExtension extends BuilderExtension | never = never,
 > = HttpBuilderAtPath<
 	{
-		route: HttpRouteFor<TOptions, TMethod>;
+		route: HttpRouteFor<TMethod>;
 		request: RequestFor<TOptions>;
 		responses: OptionValue<TOptions, "responses", EmptyObject>;
 		used: never;

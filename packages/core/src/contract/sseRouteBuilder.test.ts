@@ -28,14 +28,12 @@ describe("SSE route builder runtime", () => {
 				headers: type<{ authorization: string }>(),
 				responses: { 401: schema },
 				metadata: { public: true },
-				strictStatusCodes: true,
 			})
 			.sse("/events")
 			.response(schema);
 
 		assert.equal(declaration.path, "/api/events");
 		assert.equal(declaration.request?.headers, undefined);
-		assert.equal(Object.hasOwn(declaration, "strictStatusCodes"), false);
 		assert.deepEqual({ ...declaration.metadata }, { public: true });
 	});
 });

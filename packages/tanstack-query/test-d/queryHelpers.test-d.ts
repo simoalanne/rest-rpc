@@ -156,51 +156,7 @@ expectAssignable<Promise<RouteQueryData<typeof queryApi.todos.list>>>(
 	queryClient.fetchQuery(selectedListOptions),
 );
 
-expectAssignable<RouteQueryError<typeof queryApi.todos.get>>({
-	status: 500,
-	rawResponse: new Response("server exploded", { status: 500 }),
-});
-
-// strict status code options
-
-// should allow strict status codes and remove undeclared responses from query errors
-const strictStatusApi = {
-	todos: {
-		get: route
-			.with({ strictStatusCodes: true })
-			.get("/todos/:id")
-			.params(schemaType<{ id: string }>())
-			.response(200, schemaType<{ id: string; title: string }>())
-			.response(404, schemaType<{ code: "TODO_NOT_FOUND" }>()),
-	},
-};
-
-const strictStatusTq = createTanstackQueryHelpers(strictStatusApi, {
-	baseUrl: "https://example.test",
-});
-expectAssignable<TanstackQueryHelpersFor<typeof strictStatusApi>>(
-	strictStatusTq,
-);
-
-const strictStatusOptions = strictStatusTq.todos.get.queryOptions({
-	params: {
-		id: "todo-1",
-	},
-});
-
-expectAssignable<
-	Promise<{
-		status: 200;
-		body: { id: string; title: string };
-		headers: Headers;
-	}>
->(queryClient.fetchQuery(strictStatusOptions));
-expectAssignable<RouteQueryError<typeof strictStatusApi.todos.get>>({
-	status: 404,
-	body: { code: "TODO_NOT_FOUND" },
-	headers: new Headers(),
-});
-expectNotAssignable<RouteQueryError<typeof strictStatusApi.todos.get>>({
+expectNotAssignable<RouteQueryError<typeof queryApi.todos.get>>({
 	status: 500,
 	rawResponse: new Response("server exploded", { status: 500 }),
 });

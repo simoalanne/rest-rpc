@@ -18,17 +18,6 @@ const normalizeError = (error: unknown) =>
 		? error
 		: new Error("API request failed", { cause: error });
 
-const isUndeclaredClientResponse = (
-	value: unknown,
-): value is {
-	status: number;
-	rawResponse: Response;
-} =>
-	typeof value === "object" &&
-	value !== null &&
-	"rawResponse" in value &&
-	value.rawResponse instanceof Response;
-
 const isDeclaredResponse = (
 	value: unknown,
 ): value is { status: number; headers?: Headers; body: unknown } =>
@@ -48,12 +37,7 @@ export const fetchQueryData = async (
 			status: number;
 			headers?: Headers;
 			body?: unknown;
-			rawResponse?: Response;
 		};
-
-		if (response.rawResponse instanceof Response) {
-			throw response;
-		}
 
 		if (!isSuccessStatus(response.status)) {
 			throw response;
@@ -61,7 +45,7 @@ export const fetchQueryData = async (
 
 		return response;
 	} catch (error) {
-		if (isUndeclaredClientResponse(error) || isDeclaredResponse(error)) {
+		if (isDeclaredResponse(error)) {
 			throw error;
 		}
 

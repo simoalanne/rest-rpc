@@ -137,13 +137,9 @@ expectAssignable<HttpRouteDeclaration>(factoryResponse);
 expectAssignable<Contract>(factoryResponse);
 expectType<typeof factoryHeaders>(factoryResponse.request.headers.inherited);
 
-// Preserves factory boolean options as literal route properties.
-const strictRoute = route.with({ strictStatusCodes: true }).get("/strict");
-expectType<true>(strictRoute.strictStatusCodes);
-const nonStrictRoute = route
-	.with({ strictStatusCodes: false })
-	.get("/non-strict");
-expectType<false>(nonStrictRoute.strictStatusCodes);
+// Rejects the removed status-code option.
+expectError(route.with({ strictStatusCodes: true }));
+expectError(route.with({ strictStatusCodes: false }));
 
 // Preserves inherited metadata and lets local metadata override shared keys.
 const inheritedMetadata = route

@@ -178,10 +178,8 @@ type GroupedRequest<TRoute extends RouteDeclaration> = TRoute extends {
 type ClientRoute<TImplementation> = TImplementation extends {
 	clientRoute?: infer TRoute extends RouteDeclaration;
 }
-	? Omit<TRoute, "request" | "strictStatusCodes"> &
-			GroupedRequest<TRoute> & {
-				strictStatusCodes: true;
-			} extends infer TClientRoute extends RouteDeclaration
+	? Omit<TRoute, "request"> &
+			GroupedRequest<TRoute> extends infer TClientRoute extends RouteDeclaration
 		? TClientRoute
 		: never
 	: never;

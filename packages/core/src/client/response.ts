@@ -257,13 +257,7 @@ export const fetchResponse = async <E extends RouteDeclaration>(
 
 	const schema = getResponseSchema(route, rawResponse.status);
 	if (!schema) {
-		if (route.strictStatusCodes === true) {
-			throw new Error("Request did not return a declared response");
-		}
-		return {
-			status: rawResponse.status,
-			rawResponse,
-		} as ClientResponse<E>;
+		throw new Error("Request did not return a declared response");
 	}
 
 	return {

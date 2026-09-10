@@ -6,9 +6,6 @@ export const responsesContract = {
 		body: z.object({ ok: z.literal(true) }),
 		headers: z.object({ "content-type": z.string() }),
 	}),
-	undeclared: route
-		.get("/responses/undeclared")
-		.response(200, z.object({ ok: z.literal(true) })),
 	invalidDeclared: route
 		.get("/responses/invalid-declared")
 		.response(200, z.object({ ok: z.boolean() })),

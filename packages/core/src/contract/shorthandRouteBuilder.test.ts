@@ -24,7 +24,6 @@ describe("shorthand route builder runtime", () => {
 			assert.equal(declaration.method, "POST");
 			assert.equal("path" in declaration, false);
 			assert.equal(declaration.responses[200], output);
-			assert.equal(declaration.strictStatusCodes, true);
 		}
 		assert.deepEqual(inputFirst.request, {
 			body: input,

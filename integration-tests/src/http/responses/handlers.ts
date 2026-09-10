@@ -11,9 +11,6 @@ export const createResponsesHandlers = (): ResponsesHandlers => ({
 		},
 		body: { ok: true as const },
 	}),
-	undeclared: () => {
-		throw new Error("undeclared response");
-	},
 	invalidDeclared: () =>
 		({
 			ok: "not-a-boolean",

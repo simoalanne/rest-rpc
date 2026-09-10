@@ -281,8 +281,8 @@ Declared 2xx responses become `data`.
 
 Declared non-2xx responses become `error`.
 
-Undeclared responses and runtime errors also become `error`.
-Undeclared responses contain the native `Response` object in `error.rawResponse`.
+Undeclared response statuses and other runtime failures become `Error` values in
+the error channel.
 
 This differs from calling an HTTP route directly, which exposes declared non-2xx
 responses as values.

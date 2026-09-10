@@ -59,7 +59,6 @@ export type BaseRouteDeclaration = {
 	path: string;
 	method: HttpMethod;
 	mode?: RouteMode;
-	strictStatusCodes?: boolean;
 	request?: RouteRequestDeclaration;
 	metadata?: RouteMetadata;
 	openApi?: OpenApiRouteOptions;

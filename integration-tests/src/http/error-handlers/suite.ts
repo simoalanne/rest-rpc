@@ -30,18 +30,16 @@ export const runErrorHandlersSuite = (adapter: ErrorHandlersSuiteAdapter) => {
 		});
 
 		it("uses custom request validation error responses", async () => {
-			const response = await client.validation({
-				query: {
-					page: 2,
-				},
-			});
+			const response = await fetch(
+				`${server.origin}/error-handlers/validation?page=2`,
+			);
 
 			assert.equal(response.status, 422);
 			assert.equal(
-				response.rawResponse.headers.get("x-error-handler"),
+				response.headers.get("x-error-handler"),
 				"request-validation",
 			);
-			assert.deepEqual(await response.rawResponse.json(), {
+			assert.deepEqual(await response.json(), {
 				code: "VALIDATION_ERROR",
 				issueCount: 1,
 				path: "/error-handlers/validation",
@@ -49,14 +47,11 @@ export const runErrorHandlersSuite = (adapter: ErrorHandlersSuiteAdapter) => {
 		});
 
 		it("uses custom unhandled error responses", async () => {
-			const response = await client.unhandled();
+			const response = await fetch(`${server.origin}/error-handlers/unhandled`);
 
 			assert.equal(response.status, 503);
-			assert.equal(
-				response.rawResponse.headers.get("x-error-handler"),
-				"unhandled",
-			);
-			assert.deepEqual(await response.rawResponse.json(), {
+			assert.equal(response.headers.get("x-error-handler"), "unhandled");
+			assert.deepEqual(await response.json(), {
 				code: "UNHANDLED_ERROR",
 				message: "boom from integration handler",
 				path: "/error-handlers/unhandled",

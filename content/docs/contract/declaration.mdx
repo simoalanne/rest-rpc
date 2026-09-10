@@ -164,8 +164,8 @@ route
 ## Shared Route Options
 
 `route.with()` creates a route factory with shared options for every route built
-from it. A factory can share headers, responses, metadata, OpenAPI metadata, a
-path prefix, and strict response status codes.
+from it. A factory can share headers, responses, metadata, OpenAPI metadata, and
+a path prefix.
 
 ```ts
 const apiRoute = route.with({

@@ -19,7 +19,6 @@ export { joinPathPrefix } from "./baseRouteBuilder.ts";
 
 /** Defaults applied locally by a configured route factory. */
 export type RouteFactoryOptions = {
-	strictStatusCodes?: boolean;
 	pathPrefix?: string;
 	metadata?: RouteMetadata;
 	responses?: RouteResponses;
@@ -74,6 +73,9 @@ const createFactory = (options: RouteFactoryOptions = {}) => {
 };
 
 type Simplify<T> = T extends object ? { [K in keyof T]: T[K] } : T;
+type RouteFactoryInput<TOptions extends RouteFactoryOptions> = TOptions & {
+	[TKey in Extract<keyof TOptions, "strictStatusCodes">]: never;
+};
 
 /**
  * Creates route declarations for a shared API contract.
@@ -86,7 +88,9 @@ export const route = {
 	...createFactory(),
 	...createShorthandRouteFactory(),
 	/** Creates a factory with shared options. @see {@link https://rest-rpc.dev/docs/contract/declaration#shared-route-options} */
-	with<const TOptions extends RouteFactoryOptions>(options: TOptions) {
+	with<const TOptions extends RouteFactoryOptions>(
+		options: RouteFactoryInput<TOptions>,
+	) {
 		return createFactory(options);
 	},
 } as unknown as Simplify<
@@ -94,7 +98,7 @@ export const route = {
 		ShorthandRouteFactory & {
 			/** Creates a factory with shared options. @see {@link https://rest-rpc.dev/docs/contract/declaration#shared-route-options} */
 			with<const TOptions extends RouteFactoryOptions>(
-				options: TOptions,
+				options: RouteFactoryInput<TOptions>,
 			): RouteFactory<TOptions>;
 		}
 >;

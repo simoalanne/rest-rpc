@@ -4,10 +4,6 @@ import { initClient } from "@rest-rpc/core";
 import type { StartedServer } from "../harness/listen.ts";
 import { requestValidationContract } from "./contract.ts";
 
-type RequestValidationClient = ReturnType<
-	typeof initClient<typeof requestValidationContract>
->;
-
 type RequestValidationSuiteAdapter = {
 	name: string;
 	start(): Promise<StartedServer>;
@@ -19,11 +15,11 @@ type ValidationErrorBody = {
 };
 
 const assertValidationResponse = async (
-	response: Awaited<ReturnType<RequestValidationClient["params"]>>,
+	response: Response,
 	location: "body" | "query" | "params" | "headers",
 ) => {
 	assert.equal(response.status, 400);
-	const body = (await response.rawResponse.json()) as ValidationErrorBody;
+	const body = (await response.json()) as ValidationErrorBody;
 	assert.equal(typeof body, "object");
 	assert.notEqual(body, null);
 
@@ -50,7 +46,7 @@ export const runRequestValidationSuite = (
 ) => {
 	describe(`${adapter.name} request validation integration`, () => {
 		let server: StartedServer;
-		let client: RequestValidationClient;
+		let client: ReturnType<typeof initClient<typeof requestValidationContract>>;
 
 		before(async () => {
 			server = await adapter.start();
@@ -110,37 +106,35 @@ export const runRequestValidationSuite = (
 		});
 
 		it("rejects params that do not match the route schema", async () => {
-			const response = await client.params({
-				params: {
-					id: "123",
-				},
-			} as never);
+			const response = await fetch(
+				`${server.origin}/request-validation/params/123`,
+			);
 
 			await assertValidationResponse(response, "params");
 		});
 
 		it("rejects query values that do not match the route schema", async () => {
-			const response = await client.query({
-				query: {
-					page: 2,
-				},
-			});
+			const response = await fetch(
+				`${server.origin}/request-validation/query?page=2`,
+			);
 
 			await assertValidationResponse(response, "query");
 		});
 
 		it("rejects missing required headers", async () => {
-			const response = await client.headers({} as never);
+			const response = await fetch(
+				`${server.origin}/request-validation/headers`,
+			);
 
 			await assertValidationResponse(response, "headers");
 		});
 
 		it("rejects JSON bodies that do not match the route schema", async () => {
-			const response = await client.body({
-				body: {
-					count: "3",
-				},
-			} as never);
+			const response = await fetch(`${server.origin}/request-validation/body`, {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ count: "3" }),
+			});
 
 			await assertValidationResponse(response, "body");
 		});

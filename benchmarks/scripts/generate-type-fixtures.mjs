@@ -226,7 +226,6 @@ const apiRoute = route.with({
 		500: errorSchema,
 	},`
 	}
-		strictStatusCodes: true,
 });
 
 export const api = {
@@ -237,11 +236,6 @@ type BenchmarkRoute = typeof api.group0.route0;
 export type BenchmarkOptionTypes = {
 	request: BenchmarkRoute extends { request: infer TRequest }
 		? TRequest
-		: never;
-	strictStatusCodes: BenchmarkRoute extends {
-		strictStatusCodes: infer TStrictStatusCodes;
-	}
-		? TStrictStatusCodes
 		: never;
 };
 

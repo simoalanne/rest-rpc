@@ -89,8 +89,6 @@ describe("HTTP route builder runtime", () => {
 			responses: { 401: unauthorized },
 			metadata: { auth: true, nested: { role: "user" } },
 			openApi: { tags: ["Common"], responses: { 401: { description: "No" } } },
-
-			strictStatusCodes: true,
 		} as const;
 		const factory = route.with(defaults);
 		const first = factory
@@ -116,7 +114,6 @@ describe("HTTP route builder runtime", () => {
 		);
 		assert.deepEqual(Object.keys(first.responses ?? {}), ["200", "401"]);
 		assert.equal((first.responses[401] as { kind: string }).kind, "customBody");
-		assert.equal(first.strictStatusCodes, true);
 		assert.deepEqual(first.metadata, { auth: false, nested: { role: "user" } });
 		assert.deepEqual(first.openApi?.tags, ["Common", "Items"]);
 		assert.equal(first.openApi?.responses?.[401]?.description, "Local");
@@ -132,13 +129,6 @@ describe("HTTP route builder runtime", () => {
 		assert.deepEqual(route.delete("/items").response(204).responses?.[204], {
 			kind: "noBody",
 		});
-		assert.equal(
-			route
-				.with({ strictStatusCodes: true })
-				.get("/items")
-				.response(200, schema).strictStatusCodes,
-			true,
-		);
 	});
 
 	it("rejects duplicate local response statuses at runtime", () => {

@@ -65,14 +65,12 @@ describe("WebSocket route builder runtime", () => {
 				pathPrefix: "/api",
 				headers: type<{ authorization: string }>(),
 				responses: { 401: schema },
-				strictStatusCodes: true,
 			})
 			.ws("/socket")
 			.clientMessage("message", schema);
 
 		assert.equal(declaration.path, "/api/socket");
 		assert.equal(declaration.request?.headers, undefined);
-		assert.equal(Object.hasOwn(declaration, "strictStatusCodes"), false);
 	});
 });
 

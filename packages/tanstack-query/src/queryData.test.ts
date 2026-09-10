@@ -73,31 +73,6 @@ describe("fetchQueryData", () => {
 		);
 	});
 
-	it("throws undeclared response envelopes unchanged", async () => {
-		const error = {
-			status: 500,
-			rawResponse: new Response("server exploded", { status: 500 }),
-		};
-
-		await assert.rejects(
-			() => fetchQueryData(async () => error, undefined),
-			error,
-		);
-	});
-
-	it("throws undeclared 2xx responses instead of treating them as query data", async () => {
-		const rawResponse = new Response("unknown success", { status: 299 });
-		const error = {
-			status: 299,
-			rawResponse,
-		};
-
-		await assert.rejects(
-			() => fetchQueryData(async () => error, undefined),
-			error,
-		);
-	});
-
 	it("normalizes unknown thrown values to Error", async () => {
 		await assert.rejects(
 			() =>

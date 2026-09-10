@@ -131,14 +131,16 @@ describe("fetch response lifecycle integration", () => {
 	});
 
 	it("treats returned Response objects as invalid route response bodies", async () => {
-		const response = await client.returnResponse();
+		const response = await fetch(
+			`${server.origin}/responses/lifecycle/return-response`,
+		);
 
 		assert.equal(response.status, 500);
 		assert.equal(
-			response.rawResponse.headers.get("x-error-handler"),
+			response.headers.get("x-error-handler"),
 			"response-validation",
 		);
-		assert.deepEqual(await response.rawResponse.json(), {
+		assert.deepEqual(await response.json(), {
 			code: "INVALID_RESPONSE",
 			path: "/responses/lifecycle/return-response",
 		});

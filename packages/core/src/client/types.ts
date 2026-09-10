@@ -2,10 +2,7 @@ import type { Contract, RouteDeclaration } from "../contract/contract.ts";
 import type { AnyShorthandRouteDeclaration } from "../contract/shorthandRouteBuilder.ts";
 import type { ClientRequest } from "../contract/request.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import type {
-	DeclaredClientResponse,
-	HttpStatusCode,
-} from "../contract/response.ts";
+import type { DeclaredClientResponse } from "../contract/response.ts";
 import type { ClientSseReceived } from "../contract/sseRouteBuilder.ts";
 import type {
 	ClientReceived,
@@ -72,22 +69,6 @@ type RouteDeclaredResponse<E extends RouteDeclaration> = WithResponseMetadata<
 	}
 >;
 
-type DeclaredStatus<E extends RouteDeclaration> =
-	DeclaredClientResponse<E> extends { status: infer TStatus extends number }
-		? TStatus
-		: never;
-
-type RouteUndeclaredResponse<E extends RouteDeclaration> = {
-	status: Exclude<HttpStatusCode, DeclaredStatus<E>>;
-	rawResponse: Response;
-};
-
-type IsStrictStatusRoute<E extends RouteDeclaration> = E extends {
-	strictStatusCodes: true;
-}
-	? true
-	: false;
-
 /**
  * Infers a route's client result.
  *
@@ -103,9 +84,7 @@ export type ClientResponse<
 	: E extends RouteDeclaration
 		? E extends { mode: "sse" }
 			? never
-			: IsStrictStatusRoute<E> extends true
-				? RouteDeclaredResponse<E>
-				: RouteDeclaredResponse<E> | Simplify<RouteUndeclaredResponse<E>>
+			: RouteDeclaredResponse<E>
 		: never;
 
 export type FetchResponseFn<
