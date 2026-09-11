@@ -73,12 +73,6 @@ export const hoverApi = {
 			.params(schemaType<{ id: string }>())
 			.response(204)
 			.response(404, schemaType<{ code: "TODO_NOT_FOUND" }>()),
-		sse: route
-			.sse("/todos/sse")
-			.response(schemaType<{ id: string; message: string }>()),
-		ws: route
-			.ws("/todos/ws")
-			.clientMessage("message", schemaType<{ id: string; message: string }>()),
 	},
 };
 

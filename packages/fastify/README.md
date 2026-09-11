@@ -12,7 +12,7 @@ server handlers, fetch clients, openAPI documents, and more from it.
 - Typed server handlers for Express, Hono, Fastify, NestJS, Node.js, and Fetch runtimes.
 - Typed fetch client.
 - Typed TanStack Query helpers.
-- Typed WebSockets, streaming, non-JSON requests/responses.
+- Typed streaming and non-JSON requests/responses.
 - OpenAPI documents generated from the TypeScript contract.
 - Standard Schema support.
 

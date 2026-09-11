@@ -176,8 +176,6 @@ const client = initClient(api, {
 });
 ```
 
-This option also validates incoming WebSocket server messages on the client.
-
 ## Use in Next.js
 
 When using the core fetch client with Next.js, the client can automatically add deterministic tags to GET
@@ -253,15 +251,3 @@ export async function renameTodo(id: string, title: string) {
 	}
 }
 ```
-
-## WebSocket Routes
-
-WebSocket routes expose `openConnection()` instead of being directly callable.
-
-```ts
-const socket = client.todos.watch.openConnection({
-	params: { id: "todo_1" },
-});
-```
-
-See [WebSockets](/docs/websockets/) for details.

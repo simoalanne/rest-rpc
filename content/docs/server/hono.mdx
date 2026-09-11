@@ -45,10 +45,6 @@ type HttpRouteHandlerContext<E extends Env = Env> = {
 	c: Context<E>;
 	signal: AbortSignal;
 };
-
-type WebSocketRouteHandlerContext<E extends Env = Env> = {
-	c: Context<E>;
-};
 ```
 
 ## Options
@@ -58,7 +54,6 @@ type RegisterRoutesOptions<TEnv extends Env = Env> = {
 	requestValidationErrorHandler?: RequestValidationErrorHandler<TEnv>;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler<TEnv>;
 	bodyParser?: HonoBodyParser;
-	webSocket?: HonoWebSocketOptions<TEnv>;
 	middleware?: Array<
 		(c: Context<TEnv>, next: Next, route: RouteDeclaration) => any
 	>;
@@ -92,22 +87,6 @@ registerRoutes(app, routes, {
 
 app.onError((error, c) => {
 	return c.json({ code: "INTERNAL_SERVER_ERROR" }, 500);
-});
-```
-
-### WebSocket
-
-```ts
-import { upgradeWebSocket } from "hono/cloudflare-workers";
-
-registerRoutes(app, routes, {
-	webSocket: {
-		upgradeWebSocket,
-		beforeUpgrade: ({ context }) => {
-			const authorization = context.c.req.header("authorization");
-			return authorization ? undefined : { status: 401 };
-		},
-	},
 });
 ```
 

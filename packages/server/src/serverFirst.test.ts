@@ -1,20 +1,17 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { route as coreRoute } from "@rest-rpc/core";
+import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import { type } from "@rest-rpc/core/standard-schema";
 import { z } from "zod";
 import { handleHttpRoute } from "./handleHttpRoute.ts";
 import { createRouteMatcher } from "./match.ts";
-import type {
-	RuntimeRouteHandler,
-	ServerHttpRouteDeclaration,
-} from "./router.ts";
+import type { RuntimeRouteHandler } from "./router.ts";
 import { implement, serverFirstRoute } from "./serverFirst.ts";
 import { SERVER_FIRST_RESPONSE_KIND_HEADER } from "@rest-rpc/core/client";
 import type { HttpRouteResult } from "../src/handleHttpRoute.ts";
 import { handleHttpRouteResult } from "../src/handleHttpRouteResult.ts";
 import { ResponseValidationError } from "./validationErrors.ts";
-import { sseEvent } from "./sse.ts";
 
 const execute = (
 	implementation: {
@@ -27,7 +24,7 @@ const execute = (
 	},
 ) =>
 	handleHttpRoute(
-		implementation.route as ServerHttpRouteDeclaration,
+		implementation.route as RouteDeclaration,
 		implementation.handler,
 		{
 			request: {},
@@ -228,7 +225,7 @@ describe("server-first runtime", () => {
 		assert.deepEqual(implementation.route.metadata, { feature: "todos" });
 
 		const result = await handleHttpRoute(
-			implementation.route as ServerHttpRouteDeclaration,
+			implementation.route as RouteDeclaration,
 			implementation.handler,
 			{
 				request: { body: { title: "Write tests" } },
@@ -305,34 +302,6 @@ describe("server-first runtime", () => {
 				return true;
 			},
 		);
-	});
-
-	it("normalizes server-first SSE routes with SSE response metadata", async () => {
-		const signal = new AbortController().signal;
-		const implementation = serverFirstRoute
-			.sse("/events")
-			.response(type<string>())
-			.handler(async function* ({ context }) {
-				assert.equal(context.signal, signal);
-				yield { data: "updated" };
-			});
-
-		const result = await execute(implementation, { signal });
-		assert.equal(result.kind, "stream");
-		assert.equal(await responseKind(result), "v=1 kind=sse");
-	});
-
-	it("normalizes inferred SSE routes", async () => {
-		const implementation = serverFirstRoute
-			.sse("/events")
-			.handler(async function* () {
-				yield sseEvent("updated");
-			});
-
-		const result = await execute(implementation);
-		assert.equal(result.kind, "stream");
-		assert.equal(result.status, 200);
-		assert.equal(await responseKind(result), "v=1 kind=sse");
 	});
 
 	it("preserves inferred response headers", async () => {

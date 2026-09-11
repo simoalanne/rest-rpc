@@ -6,9 +6,6 @@ const eventSchema = z.object({ id: z.string(), index: z.number() });
 export const streamsContract = {
 	empty: route.get("/streams/empty").streamResponse(200, eventSchema),
 	ndjson: route.get("/streams/ndjson-framing").streamResponse(200, eventSchema),
-	sse: route
-		.sse("/streams/sse")
-		.response(eventSchema.extend({ resumedFrom: z.string().optional() })),
 	cancellable: route
 		.get("/streams/cancellable")
 		.streamResponse(200, eventSchema),

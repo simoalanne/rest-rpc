@@ -270,63 +270,6 @@ if (response.status === 200) {
 }
 ```
 
-## Server-Sent Event Responses
-
-Start with `route.sse(path)` for a server-sent event route. The builder declares
-one event schema with `.response(schema)`, and the server yields `sseEvent()`
-values.
-
-```ts
-import { route } from "@rest-rpc/core";
-import z from "zod";
-
-const notificationSchema = z.object({
-	id: z.string(),
-	title: z.string(),
-});
-
-export const api = {
-	notifications: {
-		live: route.sse("/notifications/live").response(notificationSchema),
-	},
-};
-```
-
-```ts
-import { router, sseEvent } from "@rest-rpc/express";
-
-export const routes = router(api, {
-	notifications: {
-		async *live({ context }) {
-			const { lastEventId, signal } = context;
-
-			for await (const notification of subscribeNotifications({
-				lastEventId,
-				signal,
-			})) {
-				yield sseEvent(notification, {
-					id: notification.id,
-					retry: 5_000,
-				});
-			}
-		},
-	},
-});
-```
-
-```ts
-const source = client.notifications.live.openConnection();
-
-const unsubscribe = source.onMessage((notification) => {
-	notification.title;
-});
-
-source.onError(() => {
-	unsubscribe();
-	source.close();
-});
-```
-
 ## Streaming NDJSON Responses
 
 `.streamResponse(status, schema)` sends newline-delimited JSON and the client

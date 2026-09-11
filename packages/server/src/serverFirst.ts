@@ -9,14 +9,12 @@ import type {
 	HttpBuilderState,
 	HttpMethod,
 	NoBody,
+	RouteDeclaration,
 	RouteFactoryOptions,
 	RouteMetadata,
 	ServerRequest,
 	AnyShorthandRouteDeclaration,
 	ShorthandRouteDeclaration,
-	SseBuilderDeclaration,
-	SseBuilderFor,
-	SseBuilderState,
 	Stream,
 } from "@rest-rpc/core/contract";
 import { route as coreRoute } from "@rest-rpc/core";
@@ -31,11 +29,8 @@ import type {
 	RouteImplementation,
 	RouteRequest,
 	RuntimeRouteHandler,
-	ServerHttpRouteDeclaration,
-	SseRouteHandlerContext,
 } from "./router.ts";
 import { isRouteDeclaration } from "./router.ts";
-import type { SseEvent } from "./sse.ts";
 
 type EmptyObject = Record<never, never>;
 type AnyRouteHandler = (...args: never[]) => unknown;
@@ -146,8 +141,7 @@ export type ServerFirstResponseKind =
 	| "json"
 	| "ndjson"
 	| "custom"
-	| "custom-stream"
-	| "sse";
+	| "custom-stream";
 
 type BodyResponseKind<TResponse, TBody> =
 	TBody extends AsyncIterable<unknown>
@@ -234,17 +228,6 @@ type InferredClientRoute<TRoute, TResult> = Omit<TRoute, "responses"> & {
 	responses: InferredResponses<Awaited<TResult>>;
 };
 
-type SseEventData<TResult> =
-	Awaited<TResult> extends AsyncIterable<infer TEvent>
-		? TEvent extends SseEvent<infer TData>
-			? TData
-			: never
-		: never;
-
-type InferredSseClientRoute<TRoute, TResult> = Omit<TRoute, "responses"> & {
-	responses: { 200: ClientSchema<SseEventData<TResult>> };
-};
-
 /** Infers the source response union retained by an implicit route implementation. */
 export type InferredRouteResponse<TImplementation> =
 	ImplementationParts<TImplementation> extends {
@@ -264,11 +247,9 @@ export type ServerFirstRouteResponseKind<TImplementation> =
 	}
 		? TRoute extends { kind: "shorthand" }
 			? "json"
-			: TRoute extends { mode: "sse" }
-				? "sse"
-				: TRoute extends { responses: Record<number, unknown> }
-					? never
-					: ImplicitResponseKind<HandlerResult<THandler>>
+			: TRoute extends { responses: Record<number, unknown> }
+				? never
+				: ImplicitResponseKind<HandlerResult<THandler>>
 		: never;
 
 type Merge<T> = {
@@ -287,21 +268,14 @@ type ServerFirstRequest<
 >;
 
 type DeclaredRequest<
-	TRoute extends ServerHttpRouteDeclaration,
+	TRoute extends RouteDeclaration,
 	TContext extends ContextShape,
 > = Merge<
 	RouteRequest<TRoute, ServerFirstContext<TContext> & HttpRouteHandlerContext>
 >;
 
-type ImplicitSseRequest<
-	TRoute extends BaseRouteDeclaration,
-	TContext extends ContextShape,
-> = ServerFirstRequest<TRoute, TContext> & {
-	context: ServerFirstContext<TContext> & SseRouteHandlerContext;
-};
-
 type DeclaredHandlerResult<
-	TRoute extends ServerHttpRouteDeclaration,
+	TRoute extends RouteDeclaration,
 	TContext extends ContextShape,
 > = ReturnType<RouteHandler<TRoute, TContext & HttpRouteHandlerContext>>;
 
@@ -321,7 +295,7 @@ type HttpImplementationBuilder<
 > =
 	HttpBuilderDeclaration<TState> extends infer TRoute extends
 		BaseRouteDeclaration
-		? TRoute extends ServerHttpRouteDeclaration
+		? TRoute extends RouteDeclaration
 			? {
 					handler<
 						const TResult extends DeclaredHandlerResult<TRoute, TContext>,
@@ -362,72 +336,6 @@ export interface ServerHttpBuilderExtension<
 		: never;
 }
 
-type SseRouteForState<
-	TState extends SseBuilderState,
-	TPath extends string,
-	TMetadata extends RouteMetadata | never,
-> = SseBuilderDeclaration<TState> & {
-	readonly path: TPath;
-} & BuilderMetadata<TMetadata> &
-	([TState["response"]] extends [never]
-		? EmptyObject
-		: { responses: { 200: TState["response"] } });
-
-type SseImplementationBuilder<
-	TState extends SseBuilderState,
-	TPath extends string,
-	TMetadata extends RouteMetadata | never,
-	TContext extends ContextShape,
-> =
-	SseRouteForState<TState, TPath, TMetadata> extends infer TRoute extends
-		BaseRouteDeclaration
-		? [TState["response"]] extends [never]
-			? {
-					handler<
-						const TResult extends MaybePromise<
-							AsyncIterable<SseEvent<unknown>>
-						>,
-					>(
-						handler: (request: ImplicitSseRequest<TRoute, TContext>) => TResult,
-					): ServerRouteImplementation<
-						SseRouteForState<TState, TPath, TMetadata>,
-						(request: ImplicitSseRequest<TRoute, TContext>) => TResult,
-						InferredSseClientRoute<
-							SseRouteForState<TState, TPath, TMetadata>,
-							TResult
-						>
-					>;
-				}
-			: TRoute extends ServerHttpRouteDeclaration
-				? {
-						handler<
-							const TResult extends DeclaredHandlerResult<TRoute, TContext>,
-						>(
-							handler: (request: DeclaredRequest<TRoute, TContext>) => TResult,
-						): ServerRouteImplementation<
-							SseRouteForState<TState, TPath, TMetadata>,
-							(request: DeclaredRequest<TRoute, TContext>) => TResult
-						>;
-					}
-				: never
-		: never;
-
-/** Core SSE builder extension carrying server handler attachment operations. */
-export interface ServerSseBuilderExtension<
-	TContext extends ContextShape,
-> extends BuilderExtension {
-	readonly result: this["state"] extends infer TState extends SseBuilderState
-		? this["path"] extends infer TPath extends string
-			? SseImplementationBuilder<
-					TState,
-					TPath,
-					Extract<this["metadata"], RouteMetadata>,
-					TContext
-				>
-			: never
-		: never;
-}
-
 type ServerRouteOptions<TOptions extends RouteFactoryOptions> = Omit<
 	Record<never, never>,
 	keyof TOptions
@@ -447,15 +355,12 @@ type ServerConfiguredRouteFactory<
 		ServerHttpBuilderExtension<TContext>
 	>;
 } & {
-	sse<const TPath extends string>(
-		path: TPath,
-	): SseBuilderFor<TOptions, TPath, ServerSseBuilderExtension<TContext>>;
 	with<const TNextOptions extends RouteFactoryOptions>(
 		options: TNextOptions,
 	): ServerConfiguredRouteFactory<ServerRouteOptions<TNextOptions>, TContext>;
 };
 
-/** Type-level model of the server-first HTTP, SSE, and shorthand route factory. */
+/** Type-level model of the server-first HTTP and shorthand route factory. */
 export type ServerRouteFactory<
 	TOptions extends RouteFactoryOptions = Record<never, never>,
 	TContext extends ContextShape = EmptyObject,
@@ -477,7 +382,7 @@ export type ServerRouteFactory<
 };
 
 type ImplementationBuilder<
-	TRoute extends ServerHttpRouteDeclaration,
+	TRoute extends RouteDeclaration,
 	TContext extends ContextShape,
 > = {
 	handler<const TResult extends DeclaredHandlerResult<TRoute, TContext>>(
@@ -490,7 +395,7 @@ type ImplementationBuilder<
 
 /** An HTTP contract route or nested contract tree supported by `implement`. */
 export type ServerContract =
-	| ServerHttpRouteDeclaration
+	| RouteDeclaration
 	| AnyShorthandRouteDeclaration
 	| { readonly [key: string]: ServerContract };
 
@@ -498,7 +403,7 @@ export type ServerContract =
 export type ImplementationBuildersFor<
 	TNode extends ServerContract,
 	TContext extends ContextShape = EmptyObject,
-> = TNode extends ServerHttpRouteDeclaration
+> = TNode extends RouteDeclaration
 	? ImplementationBuilder<TNode, TContext>
 	: TNode extends AnyShorthandRouteDeclaration
 		? ServerShorthandImplementationBuilder<
@@ -526,7 +431,7 @@ export type ServerImplementationTree =
 	| ServerRouteImplementation<
 			BaseRouteDeclaration,
 			AnyRouteHandler,
-			ServerHttpRouteDeclaration
+			RouteDeclaration
 	  >
 	| ServerRouteImplementation<
 			AnyShorthandRouteDeclaration,
@@ -593,7 +498,6 @@ const createServerRouteFactory = (options: RouteFactoryOptions = {}) => {
 		put: (path: string) => extendBuilder(factory.put(path)),
 		patch: (path: string) => extendBuilder(factory.patch(path)),
 		delete: (path: string) => extendBuilder(factory.delete(path)),
-		sse: (path: string) => extendBuilder(factory.sse(path)),
 		...createShorthandImplementationBuilder(),
 		with: (nextOptions: RouteFactoryOptions) =>
 			createServerRouteFactory(nextOptions),

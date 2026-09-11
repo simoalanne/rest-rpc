@@ -24,13 +24,13 @@ operation has one normal JSON result and callers should not need to work with
 HTTP response metadata. Use an [explicit HTTP route](./contract/declaration)
 when the HTTP interface itself is part of the design.
 
-| Start with a procedure route when                           | Use an explicit route when                                       |
-| ----------------------------------------------------------- | ---------------------------------------------------------------- |
-| The API is called by your own TypeScript applications       | The API is public or designed HTTP-first                         |
-| The operation has one successful JSON result                | Callers handle expected statuses such as `404` or `409`          |
-| A function-shaped client is the primary interface           | Method, URL, headers, or caching semantics matter                |
-| Errors are exceptional rather than part of the typed result | You need typed error bodies or response headers                  |
-| Input fits in one JSON value                                | You need path, query, form, file, stream, SSE, or WebSocket data |
+| Start with a procedure route when                           | Use an explicit route when                              |
+| ----------------------------------------------------------- | ------------------------------------------------------- |
+| The API is called by your own TypeScript applications       | The API is public or designed HTTP-first                |
+| The operation has one successful JSON result                | Callers handle expected statuses such as `404` or `409` |
+| A function-shaped client is the primary interface           | Method, URL, headers, or caching semantics matter       |
+| Errors are exceptional rather than part of the typed result | You need typed error bodies or response headers         |
+| Input fits in one JSON value                                | You need path, query, form, file, or stream data        |
 
 Procedure and explicit routes can coexist in the same tree. Starting with a
 procedure does not commit the whole API to that style.
@@ -112,12 +112,6 @@ const create = route
 	.output(todoSchema)
 	.handler(({ input }) => createTodo(input.title));
 ```
-
-Input and output may be declared in either order. `context` contains the same
-adapter context and `AbortSignal` available to explicit server-first routes.
-The handler receives validated procedure input under `input`, so input schemas
-may describe any JSON value and an input field named `context` cannot conflict
-with the handler context. Clients still pass the input value directly.
 
 ## Call Procedures
 

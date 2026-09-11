@@ -1,16 +1,13 @@
 import { route as coreRoute } from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
-import type { SseRouteHandlerContext } from "@rest-rpc/server";
 import {
 	implement as serverImplement,
 	serverFirstRoute,
 	type Implement,
-	type ServerImplementationTree,
 	type ServerFirstRouteResponseKind,
 	type ServerRouteFactory,
 } from "@rest-rpc/server";
-import { sseEvent } from "@rest-rpc/server";
-import { expectAssignable, expectError, expectType } from "tsd";
+import { expectError, expectType } from "tsd";
 import { z } from "zod";
 
 interface ApplicationContext {
@@ -131,7 +128,7 @@ expectType<201>(
 );
 
 // declared responses remain authoritative on the server-first builder
-const declaredCreate = route
+const _declaredCreate = route
 	.post("/declared-todos")
 	.body(todoInput)
 	.response(201, todo)
@@ -229,40 +226,3 @@ expectError(
 		body: { code: "NOT_FOUND" },
 	})),
 );
-
-// HTTP and SSE implementations compose as ordinary nested objects
-const events = route
-	.sse("/todos/events")
-	.response(todo)
-	.handler(async function* ({ context }) {
-		expectType<
-			ApplicationContext & { signal: AbortSignal } & Record<string, unknown> &
-				SseRouteHandlerContext
-		>(context);
-		expectType<AbortSignal>(context.signal);
-		yield sseEvent(context.todos.find("todo-1"));
-	});
-
-const routes = {
-	todos: {
-		create,
-		declaredCreate,
-		get,
-		contractCreate,
-		events,
-		shorthandGet,
-		shorthandCreate,
-		shorthandDeclaredGet,
-		shorthandDeclaredCreate,
-	},
-};
-
-expectType<"/todos/events">(events.route.path);
-expectAssignable<ServerImplementationTree>(routes);
-
-// the general server-first construction model intentionally excludes WebSockets
-const socket = coreRoute
-	.ws("/socket")
-	.clientMessage("ping", z.string())
-	.serverMessage("pong", z.string());
-expectError(implement(socket));

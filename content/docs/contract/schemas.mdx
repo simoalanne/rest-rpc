@@ -13,17 +13,15 @@ Zod, Valibot, and ArkType are supported Standard Schema libraries. The built-in
 
 Schemas have an input type and an output type.
 
-| Position                        | Type used     |
-| ------------------------------- | ------------- |
-| Fetch client request input      | schema input  |
-| Server handler input            | schema output |
-| Server handler return value     | schema input  |
-| Fetch client response value     | schema output |
-| WebSocket message send value    | schema input  |
-| WebSocket message receive value | schema output |
+| Position                    | Type used     |
+| --------------------------- | ------------- |
+| Fetch client request input  | schema input  |
+| Server handler input        | schema output |
+| Server handler return value | schema input  |
+| Fetch client response value | schema output |
 
-Default HTTP bodies and WebSocket messages travel over JSON. Path params, query
-params, and headers travel through HTTP strings.
+Default HTTP bodies travel over JSON. Path params, query params, and headers
+travel through HTTP strings.
 
 Request schemas for HTTP string locations and form bodies must declare inputs
 that the generated client can serialize. Zod coercion schemas use `unknown` as
@@ -72,8 +70,7 @@ const api = {
 ```
 
 Fetch clients do not validate response bodies by default. With
-`validateResponses: true`, the client validates HTTP response bodies and
-incoming WebSocket server messages.
+`validateResponses: true`, the client validates HTTP response bodies.
 
 ```ts
 const client = initClient(api, {

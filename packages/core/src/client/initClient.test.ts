@@ -31,13 +31,6 @@ const apiContract = {
 			.response(200, z.object({ id: z.string() }))
 			.response(202, z.object({ queued: z.literal(true) })),
 	},
-	socket: {
-		join: route
-			.ws("/rooms/:roomId")
-			.params(z.object({ roomId: z.string() }))
-			.clientMessage("message", z.object({ text: z.string() }))
-			.serverMessage("message", z.object({ text: z.string() })),
-	},
 };
 
 const jsonResponse = (body: unknown, status = 200) =>
@@ -58,14 +51,13 @@ const captureFetch = (response: Response) => {
 };
 
 describe("initClient", () => {
-	it("creates callable HTTP routes and connection helpers", () => {
+	it("creates callable HTTP routes", () => {
 		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
 		});
 
 		assert.deepEqual(Object.keys(client.todos.list), []);
 		assert.deepEqual(Object.keys(client.todos.publish), []);
-		assert.deepEqual(Object.keys(client.socket.join), ["openConnection"]);
 	});
 
 	it("returns the API tree directly", async () => {

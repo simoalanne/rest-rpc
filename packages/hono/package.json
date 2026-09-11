@@ -1,7 +1,7 @@
 {
 	"name": "@rest-rpc/hono",
 	"version": "0.1.0-beta.19",
-	"description": "Hono adapter for serving rest-rpc contracts with typed HTTP and WebSocket routes.",
+	"description": "Hono adapter for serving rest-rpc contracts with typed HTTP routes.",
 	"keywords": [
 		"api-contract",
 		"contract-first",
@@ -14,8 +14,7 @@
 		"rpc",
 		"server",
 		"type-safe-api",
-		"typescript",
-		"websocket"
+		"typescript"
 	],
 	"license": "MIT",
 	"repository": {

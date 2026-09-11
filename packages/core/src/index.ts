@@ -1,9 +1,7 @@
 export type {
 	ApiClientFor,
 	ApiClientOptions,
-	ClientEventSource,
 	ClientResponse,
-	ClientSocket,
 	FetchLike,
 	NextFetchTagsOptions,
 	ServerFirstClientFor,
@@ -16,9 +14,6 @@ export {
 	SERVER_FIRST_RESPONSE_KIND_HEADER,
 } from "./client/index.ts";
 export type {
-	ClientReceived,
-	ClientSseReceived,
-	ClientSent,
 	Contract,
 	HttpStatusCode,
 	RouteDeclaration,

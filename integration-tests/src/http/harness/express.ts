@@ -1,5 +1,4 @@
 import { createServer } from "node:http";
-import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import { type RegisterRoutesOptions, registerRoutes } from "@rest-rpc/express";
 import type { ImplementationTree } from "@rest-rpc/server";
 import express, { type Application } from "express";
@@ -12,7 +11,7 @@ export type ExpressAdapterOptions = {
 };
 
 export const createExpressAdapter = (
-	implementations: ImplementationTree<HttpRouteDeclaration>,
+	implementations: ImplementationTree,
 	options: ExpressAdapterOptions = {},
 ) => ({
 	name: "express",

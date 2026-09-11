@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { HttpAdapterHost } from "@nestjs/core";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	createNodeResponseStream,
 	createRequestSignal,
@@ -15,11 +16,9 @@ import {
 import {
 	handleHttpRoute,
 	handleHttpRouteResult,
-	isHttpRouteImplementation,
 	RequestValidationError,
 	ResponseValidationError,
 	type RouteImplementation,
-	type ServerHttpRouteDeclaration,
 } from "@rest-rpc/server";
 import type { Observable } from "rxjs";
 import { from, lastValueFrom } from "rxjs";
@@ -50,16 +49,20 @@ type NestRouteImplementationContext = {
 
 const assertRouteImplementation = (
 	value: unknown,
-	route: ServerHttpRouteDeclaration,
-): RouteImplementation<ServerHttpRouteDeclaration> => {
-	if (!isHttpRouteImplementation(value as RouteImplementation)) {
+	route: RouteDeclaration,
+): RouteImplementation<RouteDeclaration> => {
+	if (
+		typeof value !== "object" ||
+		value === null ||
+		!("route" in value) ||
+		!("handler" in value)
+	) {
 		throw new Error(
 			`Controller method for "${route.method} ${route.path}" must return a rest-rpc route implementation.`,
 		);
 	}
 
-	const implementation =
-		value as RouteImplementation<ServerHttpRouteDeclaration>;
+	const implementation = value as RouteImplementation<RouteDeclaration>;
 	if (
 		implementation.route.method !== route.method ||
 		implementation.route.path !== route.path

@@ -1,6 +1,5 @@
-import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import type { ImplementationTree } from "@rest-rpc/server";
-import { splitRouteImplementations } from "@rest-rpc/server";
+import { flattenRouteImplementations } from "@rest-rpc/server";
 import type { FastifyInstance } from "fastify";
 import {
 	type ExtendedFastifyPreHandler,
@@ -8,10 +7,6 @@ import {
 	type ResponseValidationErrorHandler,
 	registerFastifyHttpRoutes,
 } from "./http.ts";
-import {
-	type FastifyWebSocketOptions,
-	registerFastifyWebSocketRoutes,
-} from "./websocket.ts";
 
 /**
  * Options for registering rest-rpc routes on a Fastify instance.
@@ -22,35 +17,23 @@ export type RegisterRoutesOptions = {
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 	preHandler?: ExtendedFastifyPreHandler[];
-	webSocket?: FastifyWebSocketOptions;
 };
 
 /**
- * Registers HTTP and WebSocket route implementations on a Fastify instance.
+ * Registers HTTP route implementations on a Fastify instance.
  *
  * @see {@link https://rest-rpc.dev/docs/server/fastify}
  */
 export function registerRoutes(
 	app: FastifyInstance,
-	implementations: ImplementationTree<RouteDeclaration>,
+	implementations: ImplementationTree,
 	options: RegisterRoutesOptions = {},
 ) {
-	return splitRouteImplementations(implementations, {
-		handleHttpRoutes: (httpRoutes) =>
-			registerFastifyHttpRoutes(
-				app,
-				httpRoutes,
-				options.preHandler,
-				options.requestValidationErrorHandler,
-				options.responseValidationErrorHandler,
-			),
-		handleWebSocketRoutes: (webSocketRoutes) =>
-			options.webSocket &&
-			registerFastifyWebSocketRoutes(
-				app,
-				options.webSocket,
-				webSocketRoutes,
-				options.preHandler,
-			),
-	});
+	return registerFastifyHttpRoutes(
+		app,
+		flattenRouteImplementations(implementations),
+		options.preHandler,
+		options.requestValidationErrorHandler,
+		options.responseValidationErrorHandler,
+	);
 }

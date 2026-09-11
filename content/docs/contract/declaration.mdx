@@ -34,9 +34,7 @@ Start a route with an HTTP method and path, then add request and response
 declarations with chainable setters. Body, query, and path-parameter setters
 each receive one schema.
 
-Use `.response(status, schema)` repeatedly for declared statuses. Protocol
-routes start with `.sse(path)` or `.ws(path)` and have their own completion
-setters.
+Use `.response(status, schema)` repeatedly for declared statuses.
 
 ## Request Model
 
@@ -217,4 +215,3 @@ Advanced declarations are covered separately:
 
 - [HTTP Requests](../http-requests)
 - [HTTP Responses](../http-responses)
-- [WebSockets](../websockets)

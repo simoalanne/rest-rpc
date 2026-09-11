@@ -159,7 +159,6 @@ export class BaseRouteBuilder {
 	#commonOpenApi?: RouteFactoryOptions["openApi"];
 	declare method: HttpMethod;
 	declare path: string;
-	declare mode?: "http" | "sse" | "webSocket";
 	declare request?: RouteRequestDeclaration;
 
 	constructor(
@@ -167,13 +166,9 @@ export class BaseRouteBuilder {
 		path: string,
 		options: RouteFactoryOptions,
 		request: RouteRequestDeclaration | undefined,
-		mode?: "sse" | "webSocket",
 	) {
 		this.method = method;
 		this.path = pathWithPrefix(path, options);
-		if (mode) {
-			this.mode = mode;
-		}
 		if (request) {
 			this.request = request;
 		}

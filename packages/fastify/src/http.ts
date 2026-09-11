@@ -7,7 +7,6 @@ import {
 	RequestValidationError,
 	ResponseValidationError,
 	type RouteImplementation,
-	type ServerHttpRouteDeclaration,
 } from "@rest-rpc/server";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
@@ -38,13 +37,13 @@ export type ExtendedFastifyPreHandler = (
 
 export const registerFastifyHttpRoutes = (
 	app: FastifyInstance,
-	routes: RouteImplementation<ServerHttpRouteDeclaration>[],
+	routes: RouteImplementation<RouteDeclaration>[],
 	preHandler: ExtendedFastifyPreHandler[] = [],
 	requestValidationErrorHandler?: RequestValidationErrorHandler,
 	responseValidationErrorHandler?: ResponseValidationErrorHandler,
 ) => {
 	for (const implementation of routes) {
-		const route: ServerHttpRouteDeclaration = implementation.route;
+		const route = implementation.route;
 		const method = route.method.toLowerCase() as Lowercase<HttpMethod>;
 		const handler = implementation.handler;
 

@@ -15,7 +15,6 @@
 		"type-safe-api",
 		"typescript",
 		"valibot",
-		"websocket",
 		"zod"
 	],
 	"homepage": "https://github.com/rest-rpc/rest-rpc#readme",

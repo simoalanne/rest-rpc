@@ -4,7 +4,6 @@ import {
 	type ServerFirstRouteResponseKind,
 	serverFirstRoute as route,
 } from "@rest-rpc/server";
-import { sseEvent } from "@rest-rpc/server";
 import { expectAssignable, expectError, expectNever, expectType } from "tsd";
 import { z } from "zod";
 
@@ -122,31 +121,6 @@ const customStream = route.get("/custom-stream").handler(() => ({
 expectType<"custom-stream">(
 	null as unknown as ServerFirstRouteResponseKind<typeof customStream>,
 );
-
-// SSE event payloads are inferred when no response schema is declared
-const inferredSse = route.sse("/inferred-events").handler(async function* () {
-	yield sseEvent({ id: "todo-1", type: "todo" as const });
-});
-expectType<"sse">(
-	null as unknown as ServerFirstRouteResponseKind<typeof inferredSse>,
-);
-expectAssignable<RouteDeclaration>(
-	null as unknown as NonNullable<typeof inferredSse.clientRoute>,
-);
-expectError(
-	route.sse("/invalid-events").handler(async function* () {
-		yield { data: { id: "todo-1" } };
-	}),
-);
-
-// Explicit SSE schemas retain their existing async-generator handler model
-const sse = route
-	.sse("/events")
-	.response(z.object({ id: z.string() }))
-	.handler(async function* () {
-		yield sseEvent({ id: "todo-1" });
-	});
-expectType<"sse">(null as unknown as ServerFirstRouteResponseKind<typeof sse>);
 
 // declared responses remain authoritative and are excluded from implicit inference
 const declared = route

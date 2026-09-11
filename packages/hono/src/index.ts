@@ -1,11 +1,7 @@
-import type {
-	RouteDeclaration,
-	WebSocketRouteDeclaration,
-} from "@rest-rpc/core/contract";
+import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	type Contract,
 	type ImplementationTreeFor,
-	type RouteHandlerFor,
 	type RouteImplementation,
 	type RouteHandler as ServerRouteHandler,
 	type RouteHandlers as ServerRouteHandlers,
@@ -18,13 +14,9 @@ import type { Env } from "hono/types";
 
 export type {
 	RouteErrors,
-	RouteReceived,
 	RouteRequestData,
 	RouteResponse,
 	RouteResponseShorthand,
-	RouteSent,
-	RouteSocket,
-	SseEvent,
 } from "@rest-rpc/server";
 export type {
 	ExtendedHonoMiddleware,
@@ -38,7 +30,6 @@ export {
 	RequestValidationError,
 	ResponseValidationError,
 	RouteResponseError,
-	sseEvent,
 } from "@rest-rpc/server";
 
 /**
@@ -52,22 +43,6 @@ export type HttpRouteHandlerContext<E extends Env = Env> = {
 };
 
 /**
- * The context object passed to Hono WebSocket route handlers.
- *
- * @see {@link https://rest-rpc.dev/docs/server/hono#framework-context}
- */
-export type WebSocketRouteHandlerContext<E extends Env = Env> = {
-	c: Context<E>;
-};
-
-type RouteContext<
-	E extends RouteDeclaration,
-	TEnv extends Env,
-> = E extends WebSocketRouteDeclaration
-	? WebSocketRouteHandlerContext<TEnv>
-	: HttpRouteHandlerContext<TEnv>;
-
-/**
  * Infers the route handler request type for a given route declaration.
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
@@ -75,7 +50,7 @@ type RouteContext<
 export type RouteRequest<
 	E extends RouteDeclaration,
 	TEnv extends Env = Env,
-> = ServerRouteRequest<E, RouteContext<E, TEnv>>;
+> = ServerRouteRequest<E, HttpRouteHandlerContext<TEnv>>;
 
 /**
  * Infers the Hono route handler type for a given route declaration.
@@ -85,7 +60,7 @@ export type RouteRequest<
 export type RouteHandler<
 	E extends RouteDeclaration,
 	TEnv extends Env = Env,
-> = ServerRouteHandler<E, RouteContext<E, TEnv>>;
+> = ServerRouteHandler<E, HttpRouteHandlerContext<TEnv>>;
 
 /**
  * Handler tree accepted by `router()` when building a Hono implementation tree.
@@ -105,13 +80,9 @@ export type RouteHandler<
  * @see {@link https://rest-rpc.dev/docs/recipes/organizing-route-handlers#service-classes-as-handlers}
  */
 export type RouteHandlers<
-	TNode extends Contract<RouteDeclaration>,
+	TNode extends Contract,
 	TEnv extends Env = Env,
-> = ServerRouteHandlers<
-	TNode,
-	HttpRouteHandlerContext<TEnv>,
-	WebSocketRouteHandlerContext<TEnv>
->;
+> = ServerRouteHandlers<TNode, HttpRouteHandlerContext<TEnv>>;
 
 /**
  * Builds a Hono route implementation for a single contract route.
@@ -123,11 +94,7 @@ export function route<
 	TEnv extends Env = Env,
 >(
 	contract: TNode,
-	handler: RouteHandlerFor<
-		TNode,
-		HttpRouteHandlerContext<TEnv>,
-		WebSocketRouteHandlerContext<TEnv>
-	>,
+	handler: RouteHandler<TNode, TEnv>,
 ): RouteImplementation<TNode> {
 	return serverRoute(contract, handler);
 }
@@ -137,12 +104,9 @@ export function route<
  *
  * @see {@link https://rest-rpc.dev/docs/server/hono}
  */
-export function router<
-	const TNode extends Contract<RouteDeclaration>,
-	TEnv extends Env = Env,
->(
+export function router<const TNode extends Contract, TEnv extends Env = Env>(
 	contract: TNode,
 	handlers: RouteHandlers<TNode, TEnv>,
-): ImplementationTreeFor<TNode, RouteDeclaration> {
+): ImplementationTreeFor<TNode> {
 	return serverRouter(contract, handlers);
 }

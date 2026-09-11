@@ -1,18 +1,11 @@
 import type {
-	HttpRouteDeclaration,
 	RouteDeclaration,
 	ServerErrors,
-	ServerReceived,
 	ServerRequest,
 	ServerResponse,
-	ServerSent,
-	ServerSseSent,
 	ServerSuccessBody,
-	SseRouteDeclaration,
-	WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
 import { REQUEST_CONTEXT_KEY } from "@rest-rpc/core/contract";
-import type { SseEvent } from "./sse.ts";
 
 export type EmptyObject = Record<never, never>;
 type MaybePromise<T> = T | Promise<T>;
@@ -20,38 +13,11 @@ type Merge<T> = {
 	[K in keyof T]: T[K];
 };
 /**
- * Routes registered through server HTTP adapters.
- *
- * @remarks This includes ordinary HTTP routes and server-sent event routes.
- * Core models them as distinct route modes, but server adapters handle both
- * through their HTTP registration path.
- */
-export type ServerHttpRouteDeclaration =
-	| HttpRouteDeclaration
-	| SseRouteDeclaration;
-
-/**
  * Base context object accepted by HTTP route handlers.
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
  */
 export type HttpRouteHandlerContext = Record<string, unknown>;
-
-/**
- * Base context object accepted by WebSocket route handlers.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
- */
-export type WebSocketRouteHandlerContext = Record<string, unknown>;
-
-/**
- * Base context fields available to SSE route handlers.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
- */
-export type SseRouteHandlerContext = {
-	lastEventId?: string;
-};
 
 /**
  * Untyped route handler shape stored in runtime route implementations.
@@ -70,26 +36,11 @@ export type RuntimeRouteHandler = (
 export type RouteRequestData<E extends RouteDeclaration> = ServerRequest<E>;
 
 /**
- * Infers the message type a server can send on a WebSocket route.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
- */
-export type RouteSent<E extends WebSocketRouteDeclaration> = ServerSent<E>;
-
-/**
- * Infers the message type a server receives from a WebSocket route.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
- */
-export type RouteReceived<E extends WebSocketRouteDeclaration> =
-	ServerReceived<E>;
-
-/**
  * Infers the shorthand successful response body for an HTTP route.
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
  */
-export type RouteResponseShorthand<E extends ServerHttpRouteDeclaration> =
+export type RouteResponseShorthand<E extends RouteDeclaration> =
 	ServerSuccessBody<E>;
 
 /**
@@ -97,23 +48,14 @@ export type RouteResponseShorthand<E extends ServerHttpRouteDeclaration> =
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
  */
-export type RouteErrors<E extends ServerHttpRouteDeclaration> = ServerErrors<E>;
+export type RouteErrors<E extends RouteDeclaration> = ServerErrors<E>;
 
 /**
  * Infers the explicit response union for an HTTP route.
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
  */
-export type RouteResponse<E extends ServerHttpRouteDeclaration> =
-	ServerResponse<E>;
-
-/**
- * Infers the event payload type a server sends from an SSE route.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server-sent-events}
- */
-export type RouteSseSent<E extends ServerHttpRouteDeclaration> =
-	ServerSseSent<E>;
+export type RouteResponse<E extends RouteDeclaration> = ServerResponse<E>;
 
 type RequestValue<E extends RouteDeclaration> =
 	RouteRequestData<E> extends never ? EmptyObject : RouteRequestData<E>;
@@ -126,65 +68,16 @@ type ExcludeResponseEnvelopeLike<T> = T extends unknown
 		: T
 	: never;
 
-type HandlerResult<E extends ServerHttpRouteDeclaration> = MaybePromise<
+type HandlerResult<E extends RouteDeclaration> = MaybePromise<
 	RouteResponse<E> | ExcludeResponseEnvelopeLike<RouteResponseShorthand<E>>
 >;
 
-type SseHandlerResult<E extends ServerHttpRouteDeclaration> = MaybePromise<
-	AsyncIterable<SseEvent<RouteSseSent<E>>>
->;
-
-type RouteHandlerResult<E extends ServerHttpRouteDeclaration> = E extends {
-	mode: "sse";
-}
-	? SseHandlerResult<E>
-	: HandlerResult<E>;
-
-/**
- * The typed socket available in a WebSocket route handler context.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
- */
-export type RouteSocket<E extends WebSocketRouteDeclaration> = {
-	send(message: RouteSent<E>): void;
-	onMessage(
-		callback: (message: RouteReceived<E>) => void | Promise<void>,
-	): () => void;
-	onClose(
-		callback: (event: CloseEventLike) => void | Promise<void>,
-	): () => void;
-	close(code?: number, reason?: string): void;
-};
-
-/**
- * Minimal close event shape passed to WebSocket route close handlers.
- *
- * @see {@link https://rest-rpc.dev/docs/websockets#server}
- */
-export type CloseEventLike = {
-	code: number;
-	reason?: string;
-};
-
 type HttpRouteRequest<
-	E extends ServerHttpRouteDeclaration,
+	E extends RouteDeclaration,
 	TContext extends HttpRouteHandlerContext,
 > = Merge<
 	RequestValue<E> & {
-		[REQUEST_CONTEXT_KEY]: E extends { mode: "sse" }
-			? TContext & SseRouteHandlerContext
-			: TContext;
-	}
->;
-
-type WebSocketRouteRequest<
-	E extends WebSocketRouteDeclaration,
-	TContext extends WebSocketRouteHandlerContext,
-> = Merge<
-	RequestValue<E> & {
-		[REQUEST_CONTEXT_KEY]: TContext & {
-			socket: RouteSocket<E>;
-		};
+		[REQUEST_CONTEXT_KEY]: TContext;
 	}
 >;
 
@@ -196,25 +89,12 @@ type WebSocketRouteRequest<
 export type RouteRequest<
 	E extends RouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
-> = E extends ServerHttpRouteDeclaration
-	? HttpRouteRequest<E, TContext>
-	: E extends WebSocketRouteDeclaration
-		? WebSocketRouteRequest<E, TContext>
-		: never;
+> = HttpRouteRequest<E, TContext>;
 
 type HttpRouteHandler<
-	E extends ServerHttpRouteDeclaration,
+	E extends RouteDeclaration,
 	TContext extends HttpRouteHandlerContext,
-> = (
-	...args: [request: HttpRouteRequest<E, TContext>]
-) => RouteHandlerResult<E>;
-
-type WebSocketRouteHandler<
-	E extends WebSocketRouteDeclaration,
-	TContext extends WebSocketRouteHandlerContext,
-> = (
-	...args: [request: WebSocketRouteRequest<E, TContext>]
-) => MaybePromise<void>;
+> = (...args: [request: HttpRouteRequest<E, TContext>]) => HandlerResult<E>;
 
 /**
  * Infers the route handler function type for a route declaration.
@@ -224,20 +104,14 @@ type WebSocketRouteHandler<
 export type RouteHandler<
 	E extends RouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
-> = E extends ServerHttpRouteDeclaration
-	? HttpRouteHandler<E, TContext>
-	: E extends WebSocketRouteDeclaration
-		? WebSocketRouteHandler<E, TContext>
-		: never;
+> = HttpRouteHandler<E, TContext>;
 
 /**
  * A server implementation contract tree restricted to a route kind.
  *
  * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registration-adapters}
  */
-export type Contract<TRoute extends RouteDeclaration = RouteDeclaration> =
-	| TRoute
-	| { [key: string]: Contract<TRoute> };
+export type Contract = RouteDeclaration | { [key: string]: Contract };
 
 /**
  * A runtime route implementation created by `route()` or `router()`.
@@ -257,43 +131,23 @@ export type RouteImplementation<
  *
  * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registration-adapters}
  */
-export type ImplementationTree<
-	TRoute extends RouteDeclaration = RouteDeclaration,
-> =
-	| RouteImplementation<TRoute>
-	| { readonly [key: string]: ImplementationTree<TRoute> };
+export type ImplementationTree =
+	| RouteImplementation
+	| { readonly [key: string]: ImplementationTree };
 
 /**
  * Infers an implementation tree for a specific contract node.
  *
  * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registration-adapters}
  */
-export type ImplementationTreeFor<
-	TNode extends Contract<TRoute>,
-	TRoute extends RouteDeclaration = RouteDeclaration,
-> = TNode extends TRoute
-	? RouteImplementation<TNode>
-	: {
-			readonly [K in keyof TNode]: TNode[K] extends Contract<TRoute>
-				? ImplementationTreeFor<TNode[K], TRoute>
-				: never;
-		};
-
-/**
- * Selects the HTTP or WebSocket handler type for a route declaration.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
- */
-export type RouteHandlerFor<
-	E extends RouteDeclaration,
-	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
-	TWebSocketContext extends WebSocketRouteHandlerContext =
-		WebSocketRouteHandlerContext,
-> = E extends ServerHttpRouteDeclaration
-	? RouteHandler<E, TContext>
-	: E extends WebSocketRouteDeclaration
-		? RouteHandler<E, TWebSocketContext>
-		: never;
+export type ImplementationTreeFor<TNode extends Contract> =
+	TNode extends RouteDeclaration
+		? RouteImplementation<TNode>
+		: {
+				readonly [K in keyof TNode]: TNode[K] extends Contract
+					? ImplementationTreeFor<TNode[K]>
+					: never;
+			};
 
 /**
  * Infers the plain handler object shape for a contract tree.
@@ -301,15 +155,13 @@ export type RouteHandlerFor<
  * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registration-adapters}
  */
 export type ImplementationShape<
-	TNode extends Contract<RouteDeclaration>,
+	TNode extends Contract,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
-	TWebSocketContext extends WebSocketRouteHandlerContext =
-		WebSocketRouteHandlerContext,
 > = TNode extends RouteDeclaration
-	? RouteHandlerFor<TNode, TContext, TWebSocketContext>
+	? RouteHandler<TNode, TContext>
 	: {
-			[K in keyof TNode]: TNode[K] extends Contract<RouteDeclaration>
-				? ImplementationShape<TNode[K], TContext, TWebSocketContext>
+			[K in keyof TNode]: TNode[K] extends Contract
+				? ImplementationShape<TNode[K], TContext>
 				: never;
 		};
 
@@ -331,17 +183,13 @@ export type ImplementationShape<
  * @see {@link https://rest-rpc.dev/docs/recipes/organizing-route-handlers#service-classes-as-handlers}
  */
 export type RouteHandlers<
-	TNode extends Contract<RouteDeclaration>,
+	TNode extends Contract,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
-	TWebSocketContext extends WebSocketRouteHandlerContext =
-		WebSocketRouteHandlerContext,
 > = TNode extends RouteDeclaration
-	?
-			| RouteHandlerFor<TNode, TContext, TWebSocketContext>
-			| RouteImplementation<TNode>
+	? RouteHandler<TNode, TContext> | RouteImplementation<TNode>
 	: {
-			[K in keyof TNode]: TNode[K] extends Contract<RouteDeclaration>
-				? RouteHandlers<TNode[K], TContext, TWebSocketContext>
+			[K in keyof TNode]: TNode[K] extends Contract
+				? RouteHandlers<TNode[K], TContext>
 				: never;
 		};
 
@@ -350,36 +198,6 @@ export const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
 	value !== null &&
 	"path" in value &&
 	"method" in value;
-
-export const isHttpRoute = (
-	route: RouteDeclaration,
-): route is ServerHttpRouteDeclaration => route.mode !== "webSocket";
-
-export const isWebSocketRoute = (
-	route: RouteDeclaration,
-): route is WebSocketRouteDeclaration => route.mode === "webSocket";
-
-/**
- * Checks whether a route implementation handles an HTTP route.
- *
- * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#splitting-implementations}
- */
-export function isHttpRouteImplementation(
-	implementation: RouteImplementation,
-): implementation is RouteImplementation<ServerHttpRouteDeclaration> {
-	return isHttpRoute(implementation.route);
-}
-
-/**
- * Checks whether a route implementation handles a WebSocket route.
- *
- * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#splitting-implementations}
- */
-export function isWebSocketRouteImplementation(
-	implementation: RouteImplementation,
-): implementation is RouteImplementation<WebSocketRouteDeclaration> {
-	return isWebSocketRoute(implementation.route);
-}
 
 export const isRouteImplementation = (
 	value: unknown,
@@ -416,12 +234,12 @@ const assertMatchingRoute = (
 };
 
 const collectImplementations = (
-	contract: Contract<RouteDeclaration>,
+	contract: Contract,
 	handlers: unknown,
 	createRouteImplementation: CreateRouteImplementation,
 	path: string[] = [],
 	parent?: unknown,
-): ImplementationTree<RouteDeclaration> => {
+): ImplementationTree => {
 	const routeName = path.join(".");
 
 	if (isRouteDeclaration(contract)) {
@@ -479,11 +297,9 @@ const collectImplementations = (
 export function route<
 	const TNode extends RouteDeclaration,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
-	TWebSocketContext extends WebSocketRouteHandlerContext =
-		WebSocketRouteHandlerContext,
 >(
 	contract: TNode,
-	handler: RouteHandlerFor<TNode, TContext, TWebSocketContext>,
+	handler: RouteHandler<TNode, TContext>,
 ): RouteImplementation<TNode> {
 	return {
 		route: contract,
@@ -497,15 +313,13 @@ export function route<
  * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registration-adapters}
  */
 export function router<
-	const TNode extends Contract<RouteDeclaration>,
+	const TNode extends Contract,
 	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
-	TWebSocketContext extends WebSocketRouteHandlerContext =
-		WebSocketRouteHandlerContext,
 >(
 	contract: TNode,
-	handlers: RouteHandlers<TNode, TContext, TWebSocketContext>,
+	handlers: RouteHandlers<TNode, TContext>,
 	options: RouterOptions = {},
-): ImplementationTreeFor<TNode, RouteDeclaration> {
+): ImplementationTreeFor<TNode> {
 	return collectImplementations(
 		contract,
 		handlers,
@@ -514,5 +328,5 @@ export function router<
 				route,
 				handler,
 			})),
-	) as ImplementationTreeFor<TNode, RouteDeclaration>;
+	) as ImplementationTreeFor<TNode>;
 }

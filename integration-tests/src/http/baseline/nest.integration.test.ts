@@ -7,7 +7,6 @@ import {
 	Inject,
 	Injectable,
 	Module,
-	Sse,
 } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { initClient, route, type as schemaType } from "@rest-rpc/core";
@@ -20,7 +19,6 @@ import {
 	router,
 } from "@rest-rpc/nest";
 import type { NextFunction, Request, Response } from "express";
-import { of } from "rxjs";
 import "reflect-metadata";
 import { createNestAdapter } from "../harness/nest.ts";
 import { integrationContract } from "./contract.ts";
@@ -260,41 +258,6 @@ it("supports async routers that close over values from Nest parameter decorators
 			id: "item-1",
 			title: "decorated:async:item-1",
 		});
-	} finally {
-		await app.close();
-	}
-});
-
-it("passes non-rest-rpc Observable handlers through the global interceptor", async () => {
-	@Controller()
-	class EventsController {
-		@Sse("events")
-		events() {
-			return of({ data: { index: 1 } }, { data: { index: 2 } });
-		}
-	}
-
-	@Module({
-		imports: [RestRpcModule.forRoot()],
-		controllers: [EventsController],
-	})
-	class AppModule {}
-
-	const app = await NestFactory.create(AppModule, { logger: false });
-
-	try {
-		await app.listen(0, "127.0.0.1");
-		const response = await fetch(`${await app.getUrl()}/events`);
-
-		assert.equal(response.status, 200);
-		assert.match(
-			response.headers.get("content-type") ?? "",
-			/^text\/event-stream/,
-		);
-		assert.deepEqual((await response.text()).match(/^data: .*$/gm), [
-			'data: {"index":1}',
-			'data: {"index":2}',
-		]);
 	} finally {
 		await app.close();
 	}

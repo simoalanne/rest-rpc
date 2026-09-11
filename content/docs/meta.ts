@@ -14,7 +14,6 @@ export default defineMeta({
 		"client",
 		"recipes",
 		"type-helpers",
-		"websockets",
 		"openapi",
 	],
 });

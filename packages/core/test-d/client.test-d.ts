@@ -1,10 +1,8 @@
 import {
 	type ApiClientFor,
 	type ApiClientRouteValue,
-	type ClientEventSource,
 	type ClientRequest,
 	type ClientResponse,
-	type ClientSseReceived,
 	initClient,
 	route,
 	type as schemaType,
@@ -712,100 +710,4 @@ expectError(
 );
 expectError(
 	additiveHeadersClient.items({ headers: { "x-request-id": "request-1" } }),
-);
-
-const websocketApi = {
-	todos: {
-		socket: route
-			.ws("/todos/socket")
-			.clientMessage("echo", z.object({ text: z.string() }))
-			.clientMessage(
-				"count",
-				z.object({
-					value: z.string().transform((value) => Number(value)),
-				}),
-			)
-			.serverMessage(
-				"ready",
-				z.object({
-					createdAt: z
-						.string()
-						.datetime()
-						.transform((value) => new Date(value)),
-				}),
-			)
-			.serverMessage("event", z.string()),
-	},
-};
-
-const websocketClient = initClient(websocketApi, {
-	baseUrl: "https://example.test",
-});
-
-const socket = websocketClient.todos.socket.openConnection();
-
-socket.send({ type: "echo", message: { text: "hello" } });
-socket.send({ type: "count", message: { value: "1" } });
-expectError(socket.send({ type: "count", message: { value: 1 } }));
-expectError(socket.send({ type: "missing", message: {} }));
-
-socket.onMessage((message) => {
-	if (message.type === "ready") {
-		expectType<Date>(message.message.createdAt);
-	} else {
-		expectType<"event">(message.type);
-		expectType<string>(message.message);
-	}
-});
-
-const sseApi = {
-	todos: {
-		events: route
-			.sse("/todos/:id/events")
-			.params(z.object({ id: z.string() }))
-			.query(z.object({ includeDone: z.boolean().optional() }))
-			.response(
-				z.object({
-					id: z.string(),
-					createdAt: z.string().transform((value) => new Date(value)),
-				}),
-			),
-	},
-};
-
-const sseClient = initClient(sseApi, {
-	baseUrl: "https://example.test",
-});
-
-const events = sseClient.todos.events.openConnection({
-	params: { id: "todo-1" },
-	query: { includeDone: false },
-});
-
-expectType<ClientEventSource<typeof sseApi.todos.events>>(events);
-expectType<EventSource>(events.raw);
-expectType<number>(events.readyState);
-expectType<string>(events.url);
-
-events.onMessage((message) => {
-	expectType<string>(message.id);
-	expectType<Date>(message.createdAt);
-});
-
-expectType<ClientSseReceived<typeof sseApi.todos.events>>({
-	id: "event-1",
-	createdAt: new Date(),
-});
-expectType<never>(
-	null as unknown as ClientResponse<typeof sseApi.todos.events>,
-);
-
-expectError(sseClient.todos.events());
-expectError(sseClient.todos.events());
-expectError(sseClient.todos.events.openConnection());
-expectError(
-	sseClient.todos.events.openConnection({
-		params: { id: "todo-1" },
-		query: { includeDone: "false" },
-	}),
 );

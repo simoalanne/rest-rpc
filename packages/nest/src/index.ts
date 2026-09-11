@@ -5,19 +5,18 @@ import {
 	type RouteImplementation,
 	type RouteHandler as ServerRouteHandler,
 	type RouteRequest as ServerRouteRequest,
-	type ServerHttpRouteDeclaration,
 	route as serverRoute,
 	router as serverRouter,
 } from "@rest-rpc/server";
+import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import type { DefaultNestContext, NestHandlerContext } from "./module.ts";
 
 export type {
 	RouteErrors,
 	RouteResponse,
 	RouteResponseShorthand,
-	SseEvent,
 } from "@rest-rpc/server";
-export { RouteResponseError, sseEvent } from "@rest-rpc/server";
+export { RouteResponseError } from "@rest-rpc/server";
 export { Route, Router } from "./decorators.ts";
 export type {
 	DefaultNestContext,
@@ -31,15 +30,15 @@ export {
 } from "./validationExceptions.ts";
 
 /**
- * A contract tree containing Nest HTTP and SSE routes.
+ * A contract tree containing Nest HTTP routes.
  *
- * @remarks The Nest adapter registers HTTP and SSE routes through Nest
- * controllers. Use this helper to constrain router contracts passed to
+ * @remarks The Nest adapter registers HTTP routes through Nest controllers.
+ * Use this helper to constrain router contracts passed to
  * `router()` and `RouteHandlers`.
  *
  * @see {@link https://rest-rpc.dev/docs/server/nest}
  */
-export type NestContract = Contract<ServerHttpRouteDeclaration>;
+export type NestContract = Contract;
 
 type AdditionalNestContext<TContext extends Record<string, unknown>> =
 	DefaultNestContext & TContext;
@@ -55,7 +54,7 @@ type AdditionalNestContext<TContext extends Record<string, unknown>> =
  * @see {@link https://rest-rpc.dev/docs/server/nest#controller-local-context}
  */
 export type RouteRequest<
-	E extends ServerHttpRouteDeclaration,
+	E extends RouteDeclaration,
 	TAdditionalContext extends Record<string, unknown> = Record<never, never>,
 > = ServerRouteRequest<
 	E,
@@ -73,14 +72,14 @@ export type RouteRequest<
  * @see {@link https://rest-rpc.dev/docs/server/nest#framework-context}
  */
 export type RouteHandler<
-	E extends ServerHttpRouteDeclaration,
+	E extends RouteDeclaration,
 	TAdditionalContext extends Record<string, unknown> = Record<never, never>,
 > = ServerRouteHandler<
 	E,
 	NestHandlerContext<AdditionalNestContext<TAdditionalContext>>
 >;
 
-type BivariantRouteHandler<E extends ServerHttpRouteDeclaration> = {
+type BivariantRouteHandler<E extends RouteDeclaration> = {
 	handler(...args: Parameters<RouteHandler<E>>): ReturnType<RouteHandler<E>>;
 }["handler"];
 
@@ -103,7 +102,7 @@ type BivariantRouteHandler<E extends ServerHttpRouteDeclaration> = {
  * @see {@link https://rest-rpc.dev/docs/server/nest#usage}
  */
 export type RouteHandlers<TContract extends NestContract> =
-	TContract extends ServerHttpRouteDeclaration
+	TContract extends RouteDeclaration
 		? BivariantRouteHandler<TContract> | RouteImplementation<TContract>
 		: {
 				[K in keyof TContract]: TContract[K] extends NestContract
@@ -113,15 +112,13 @@ export type RouteHandlers<TContract extends NestContract> =
 
 const isNestRouteImplementation = (
 	value: unknown,
-): value is RouteImplementation<ServerHttpRouteDeclaration> =>
+): value is RouteImplementation<RouteDeclaration> =>
 	typeof value === "object" &&
 	value !== null &&
 	"route" in value &&
 	"handler" in value;
 
-const attachNestRouteContext = <
-	TImplementation extends ImplementationTree<ServerHttpRouteDeclaration>,
->(
+const attachNestRouteContext = <TImplementation extends ImplementationTree>(
 	implementation: TImplementation,
 	context: Record<string, unknown> | undefined,
 ): TImplementation => {
@@ -137,10 +134,7 @@ const attachNestRouteContext = <
 	return Object.fromEntries(
 		Object.entries(implementation).map(([key, child]) => [
 			key,
-			attachNestRouteContext(
-				child as ImplementationTree<ServerHttpRouteDeclaration>,
-				context,
-			),
+			attachNestRouteContext(child as ImplementationTree, context),
 		]),
 	) as TImplementation;
 };
@@ -156,7 +150,7 @@ const attachNestRouteContext = <
  * @see {@link https://rest-rpc.dev/docs/server/nest#controller-local-context}
  */
 export function route<
-	const TRoute extends ServerHttpRouteDeclaration,
+	const TRoute extends RouteDeclaration,
 	TContext extends Record<string, unknown> = Record<never, never>,
 >(
 	contract: TRoute,
@@ -183,12 +177,12 @@ export function router<const TContract extends NestContract>(
 	contract: TContract,
 	handlers: RouteHandlers<TContract>,
 	options: { context?: Record<string, unknown> } = {},
-): ImplementationTreeFor<TContract, ServerHttpRouteDeclaration> {
+): ImplementationTreeFor<TContract> {
 	return attachNestRouteContext(
-		serverRouter(contract, handlers as never) as ImplementationTreeFor<
-			TContract,
-			ServerHttpRouteDeclaration
-		>,
+		serverRouter(
+			contract,
+			handlers as never,
+		) as ImplementationTreeFor<TContract>,
 		options.context,
 	);
 }

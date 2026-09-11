@@ -1,12 +1,7 @@
-import type { IncomingMessage } from "node:http";
-import type {
-	RouteDeclaration,
-	WebSocketRouteDeclaration,
-} from "@rest-rpc/core/contract";
+import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	type Contract,
 	type ImplementationTreeFor,
-	type RouteHandlerFor,
 	type RouteImplementation,
 	type RouteHandler as ServerRouteHandler,
 	type RouteHandlers as ServerRouteHandlers,
@@ -18,13 +13,9 @@ import type { Request } from "express";
 
 export type {
 	RouteErrors,
-	RouteReceived,
 	RouteRequestData,
 	RouteResponse,
 	RouteResponseShorthand,
-	RouteSent,
-	RouteSocket,
-	SseEvent,
 } from "@rest-rpc/server";
 export type {
 	ExtendedExpressMiddleware,
@@ -37,7 +28,6 @@ export {
 	RequestValidationError,
 	ResponseValidationError,
 	RouteResponseError,
-	sseEvent,
 } from "@rest-rpc/server";
 
 /**
@@ -51,27 +41,13 @@ export type HttpRouteHandlerContext = {
 };
 
 /**
- * The context object passed to Express WebSocket route handlers.
- *
- * @see {@link https://rest-rpc.dev/docs/server/express#framework-context}
- */
-export type WebSocketRouteHandlerContext = {
-	req: IncomingMessage;
-};
-
-type RouteContext<E extends RouteDeclaration> =
-	E extends WebSocketRouteDeclaration
-		? WebSocketRouteHandlerContext
-		: HttpRouteHandlerContext;
-
-/**
  * Infers the route handler request type for a given route declaration.
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
  */
 export type RouteRequest<E extends RouteDeclaration> = ServerRouteRequest<
 	E,
-	RouteContext<E>
+	HttpRouteHandlerContext
 >;
 
 /**
@@ -81,7 +57,7 @@ export type RouteRequest<E extends RouteDeclaration> = ServerRouteRequest<
  */
 export type RouteHandler<E extends RouteDeclaration> = ServerRouteHandler<
 	E,
-	RouteContext<E>
+	HttpRouteHandlerContext
 >;
 
 /**
@@ -101,12 +77,10 @@ export type RouteHandler<E extends RouteDeclaration> = ServerRouteHandler<
  *
  * @see {@link https://rest-rpc.dev/docs/recipes/organizing-route-handlers#service-classes-as-handlers}
  */
-export type RouteHandlers<TNode extends Contract<RouteDeclaration>> =
-	ServerRouteHandlers<
-		TNode,
-		HttpRouteHandlerContext,
-		WebSocketRouteHandlerContext
-	>;
+export type RouteHandlers<TNode extends Contract> = ServerRouteHandlers<
+	TNode,
+	HttpRouteHandlerContext
+>;
 
 /**
  * Builds an Express route implementation for a single contract route.
@@ -115,11 +89,7 @@ export type RouteHandlers<TNode extends Contract<RouteDeclaration>> =
  */
 export function route<const TNode extends RouteDeclaration>(
 	contract: TNode,
-	handler: RouteHandlerFor<
-		TNode,
-		HttpRouteHandlerContext,
-		WebSocketRouteHandlerContext
-	>,
+	handler: RouteHandler<TNode>,
 ): RouteImplementation<TNode> {
 	return serverRoute(contract, handler);
 }
@@ -129,9 +99,9 @@ export function route<const TNode extends RouteDeclaration>(
  *
  * @see {@link https://rest-rpc.dev/docs/server/express}
  */
-export function router<const TNode extends Contract<RouteDeclaration>>(
+export function router<const TNode extends Contract>(
 	contract: TNode,
 	handlers: RouteHandlers<TNode>,
-): ImplementationTreeFor<TNode, RouteDeclaration> {
+): ImplementationTreeFor<TNode> {
 	return serverRouter(contract, handlers);
 }

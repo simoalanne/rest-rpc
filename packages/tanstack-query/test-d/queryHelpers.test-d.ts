@@ -10,7 +10,7 @@ import {
 	type ServerFirstTanstackQueryHelpersFor,
 	type TanstackQueryHelpersFor,
 } from "@rest-rpc/tanstack-query";
-import { sseEvent, type ServerRouteFactory } from "@rest-rpc/server";
+import { type ServerRouteFactory } from "@rest-rpc/server";
 import { type QueryClient, skipToken } from "@tanstack/query-core";
 import {
 	expectAssignable,
@@ -449,7 +449,7 @@ queryClient.setQueryData(listKey, (current) => current);
 
 // invalid calls
 
-// should reject malformed request input, options placement, infinite options, and websocket/sse routes
+// should reject malformed request input, options placement, and infinite options
 const invalidApi = {
 	todos: {
 		list: queryApi.todos.list,
@@ -461,19 +461,7 @@ const invalidApi = {
 		.get("/ambiguous-stream")
 		.streamResponse(200, schemaType<{ id: string; message: string }>())
 		.response(202, schemaType<{ pending: true }>()),
-	events: route
-		.ws("/events")
-		.clientMessage("subscribe", schemaType<{ subscribe: boolean }>())
-		.serverMessage("id", schemaType<{ id: string }>()),
-	feeds: {
-		live: route
-			.sse("/feeds/live")
-			.response(schemaType<{ id: string; message: string }>()),
-	},
 	mixed: {
-		live: route
-			.sse("/mixed/live")
-			.response(schemaType<{ id: string; message: string }>()),
 		list: queryApi.todos.list,
 	},
 };
@@ -549,9 +537,6 @@ expectError(
 		getNextRequest: () => undefined,
 	}),
 );
-expectError(invalidTq.events);
-expectError(invalidTq.feeds.live.queryOptions());
-expectError(invalidTq.mixed.live.queryOptions());
 invalidTq.mixed.list.queryOptions();
 
 // exported helper types
@@ -606,12 +591,6 @@ const serverRoutes = {
 			})(),
 		})),
 	},
-	events: serverRoute
-		.sse("/server-first/events")
-		.response(schemaType<{ id: string }>())
-		.handler(async function* () {
-			yield sseEvent({ id: "event-1" });
-		}),
 } as const;
 
 const serverTq = createTanstackQueryHelpers<typeof serverRoutes>({
@@ -663,7 +642,6 @@ expectError(
 		id: "todo-1",
 	}),
 );
-expectError(serverTq.$sse("/server-first/events"));
 expectNotAssignable<{ id: string }>(null as unknown as CreateTodoVariables);
 
 type ProjectEventsStreamedData = RouteStreamedQueryData<

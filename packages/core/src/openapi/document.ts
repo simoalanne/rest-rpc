@@ -1,6 +1,4 @@
-import type { Contract, RouteDeclaration } from "../contract/contract.ts";
-import type { HttpRouteDeclaration } from "../contract/httpRouteBuilder.ts";
-import type { SseRouteDeclaration } from "../contract/sseRouteBuilder.ts";
+import type { Contract } from "../contract/contract.ts";
 import { toOpenApiPath } from "../contract/path.ts";
 import { contractRouteEntries } from "../contract/traversal.ts";
 import type {
@@ -69,15 +67,9 @@ export type CreateOpenApiDocumentOptions = {
 	transformOperation?: (context: OperationTransformContext) => OpenApiOperation;
 };
 
-const isOpenApiCompatibleRoute = (
-	route: RouteDeclaration,
-): route is HttpRouteDeclaration | SseRouteDeclaration =>
-	route.mode !== "webSocket";
-
 /**
  * Generates an OpenAPI document object from HTTP routes in a contract.
  *
- * @remarks WebSocket routes are skipped because they do not map faithfully to OpenAPI.
  * @see {@link https://rest-rpc.dev/docs/openapi}
  */
 export function createOpenApiDocument(
@@ -94,8 +86,6 @@ export function createOpenApiDocument(
 	};
 
 	for (const { route, path: routePath } of contractRouteEntries(contract)) {
-		if (!isOpenApiCompatibleRoute(route)) continue;
-
 		const path = toOpenApiPath(route.path);
 		const method = route.method.toLowerCase() as keyof OpenApiPathItem;
 		document.paths[path] ??= {};

@@ -17,7 +17,6 @@ import type {
 	HttpRouteDeclaration,
 	RouteDeclaration,
 	SuccessfulDeclaredClientResponse,
-	WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
 import { isShorthandRouteDeclaration } from "@rest-rpc/core/contract";
 import type {
@@ -334,13 +333,9 @@ type TanstackQueryTreeFor<T extends Contract> = {
 export type TanstackQueryHelpersFor<T extends Contract> =
 	T extends AnyShorthandRouteDeclaration
 		? TanstackQueryRouteValue<T>
-		: T extends WebSocketRouteDeclaration
-			? never
-			: T extends { mode: "sse" }
-				? never
-				: T extends HttpRouteDeclaration
-					? TanstackQueryRouteValue<T>
-					: TanstackQueryTreeFor<T>;
+		: T extends HttpRouteDeclaration
+			? TanstackQueryRouteValue<T>
+			: TanstackQueryTreeFor<T>;
 
 type AnyHandler = (...args: never[]) => unknown;
 
@@ -382,7 +377,7 @@ type ServerFirstShorthandTanstackQueryTree<TNode> = unknown extends TNode
  * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#server-first}
  */
 export type ServerFirstTanstackQueryHelpersFor<TTree> = {
-	[TSelector in Exclude<ServerFirstClientSelector<TTree>, "$sse">]: <
+	[TSelector in ServerFirstClientSelector<TTree>]: <
 		const TPath extends ServerFirstClientPath<TTree, TSelector>,
 	>(
 		path: TPath,
@@ -410,12 +405,6 @@ export type CreateTanstackQueryHelpersOptions<
 export type CreateServerFirstTanstackQueryHelpersOptions<
 	TGlobalHeaders extends Record<string, string> = Record<never, string>,
 > = ServerFirstClientOptions<TGlobalHeaders>;
-
-const isWebSocketRoute = (
-	route: RouteDeclaration,
-): route is WebSocketRouteDeclaration => route.mode === "webSocket";
-
-const isSseRoute = (route: RouteDeclaration) => route.mode === "sse";
 
 const isRouteDeclaration = (value: unknown): value is RouteDeclaration =>
 	typeof value === "object" &&
@@ -521,8 +510,6 @@ export function createTanstackQueryHelpers(
 		}
 
 		if (isRouteDeclaration(node)) {
-			if (isWebSocketRoute(node) || isSseRoute(node)) return undefined;
-
 			const apiNode = getByPath(client, path) as FetchResponseFn<typeof node>;
 
 			return createTanstackHelpersForRoute(

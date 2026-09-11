@@ -4,10 +4,7 @@ import {
 	type HttpRouteDeclaration,
 	type OpenApiRouteOptions,
 	type RouteDeclaration,
-	type RouteMetadata,
 	type ShorthandRouteDeclaration,
-	type SseRouteDeclaration,
-	type WebSocketRouteDeclaration,
 } from "@rest-rpc/core/contract";
 import { route, type as schemaType } from "@rest-rpc/core";
 import z from "zod";
@@ -22,10 +19,6 @@ const todo = schemaType<{ id: string; title: string }>();
 const input = schemaType<{ title: string }>();
 const unauthorized = schemaType<{ message: string }>();
 const event = schemaType<{ id: string }>();
-const clientMessage = schemaType<{ command: string }>();
-const clientClose = schemaType<{ code: number }>();
-const serverMessage = schemaType<{ event: string }>();
-const serverReady = schemaType<{ connected: boolean }>();
 const typedResponseHeaders = schemaType<{ "x-total": number }>();
 const factoryHeaders = schemaType<{ authorization: string }>();
 const localRequestHeader = schemaType<{ trace: number }>();
@@ -355,127 +348,3 @@ expectAssignable<HttpRouteDeclaration>(singleUseHttpConfigured.response(200));
 
 expectError(route.get("/health").response(todo));
 expectError(apiRoute.post("/todos").responses({ 201: todo }));
-
-// SSE route builders
-
-// Requires one event response before SSE completion and excludes HTTP APIs.
-const incompleteSse = route.sse("/events");
-expectNotAssignable<SseRouteDeclaration>(incompleteSse);
-expectNotAssignable<Contract>(incompleteSse);
-expectError(incompleteSse.body(event));
-expectError(incompleteSse.headers(schemaType<{ authorization: string }>()));
-expectError(incompleteSse.response(event).response(event));
-
-// Allows each SSE request setter once and remains configurable until response().
-const sseConfiguredBeforeResponse = route
-	.sse("/configured-events")
-	.query(input)
-	.params(schemaType<{ roomId: string }>())
-	.withMetadata({ public: true })
-	.withOpenApi({ summary: "events" });
-expectError(sseConfiguredBeforeResponse.query(input));
-expectError(sseConfiguredBeforeResponse.jsonQuery(input));
-expectError(sseConfiguredBeforeResponse.params(input));
-expectError(sseConfiguredBeforeResponse.requestKeys);
-expectError(sseConfiguredBeforeResponse.withMetadata({ public: false }));
-expectError(sseConfiguredBeforeResponse.withOpenApi({ summary: "again" }));
-// Preserves protocol request configuration after response().
-const sseConfigured = sseConfiguredBeforeResponse.response(event);
-expectType<"/configured-events">(sseConfigured.path);
-expectType<typeof input>(sseConfigured.request.query);
-expectType<typeof event>(sseConfigured.responses[200]);
-expectError(sseConfigured.body(event));
-expectError(sseConfigured.headers(input));
-expectError(sseConfigured.response(event));
-expectError(sseConfigured.streamResponse(200, event));
-expectError(sseConfigured.clientMessage(clientMessage));
-
-// Supports JSON query and unused route configuration after response().
-const sseConfiguredAfterResponse = route
-	.sse("/configured-after-response")
-	.response(event)
-	.jsonQuery(input)
-	.params(schemaType<{ roomId: string }>())
-	.withMetadata({ public: true })
-	.withOpenApi({ summary: "events" });
-expectType<"jsonQuery">(sseConfiguredAfterResponse.request.query.kind);
-expectType<typeof input>(sseConfiguredAfterResponse.request.query.schema);
-expectType<{ readonly public: true }>(sseConfiguredAfterResponse.metadata);
-expectType<OpenApiRouteOptions>(sseConfiguredAfterResponse.openApi);
-expectAssignable<SseRouteDeclaration>(sseConfiguredAfterResponse);
-expectAssignable<Contract>(sseConfiguredAfterResponse);
-
-// Builds a complete SSE declaration with query and route metadata.
-const sse = incompleteSse
-	.query(schemaType<{ cursor: string }>())
-	.response(event)
-	.withMetadata({ public: true as const });
-
-expectType<"GET">(sse.method);
-expectType<"/events">(sse.path);
-expectType<"sse">(sse.mode);
-expectType<typeof event>(sse.responses[200]);
-expectType<{ readonly public: true }>(sse.metadata);
-expectAssignable<SseRouteDeclaration>(sse);
-expectAssignable<Contract>(sse);
-
-// WebSocket route builders
-
-// Accumulates named client and server messages into the declaration.
-const socket = route
-	.ws("/socket")
-	.clientMessage("command", clientMessage)
-	.clientMessage("close", clientClose)
-	.serverMessage("event", serverMessage)
-	.serverMessage("ready", serverReady)
-	.params(schemaType<{ roomId: string }>())
-	.withMetadata({ public: true });
-
-expectType<"GET">(socket.method);
-expectType<"webSocket">(socket.mode);
-expectType<typeof clientMessage>(socket.messages.client.command);
-expectType<typeof clientClose>(socket.messages.client.close);
-expectType<typeof serverMessage>(socket.messages.server.event);
-expectType<typeof serverReady>(socket.messages.server.ready);
-expectError(socket.messages.client.missing);
-expectError(socket.messages.server.missing);
-expectType<RouteMetadata>(socket.metadata);
-expectAssignable<WebSocketRouteDeclaration>(socket);
-expectAssignable<Contract>(socket);
-expectError(socket.withOpenApi({ summary: "Join socket" }));
-
-// Allows each WebSocket request setter once and excludes HTTP/SSE APIs.
-const completeSocket = route
-	.ws("/complete-socket")
-	.query(input)
-	.params(schemaType<{ roomId: string }>())
-	.withMetadata({ public: true })
-	.clientMessage("command", clientMessage)
-	.serverMessage("event", serverMessage);
-expectAssignable<WebSocketRouteDeclaration>(completeSocket);
-expectAssignable<Contract>(completeSocket);
-expectError(completeSocket.query(input));
-expectError(completeSocket.jsonQuery(input));
-expectError(completeSocket.params(input));
-expectError(completeSocket.requestKeys);
-expectError(completeSocket.withMetadata({ public: false }));
-expectError(completeSocket.withOpenApi({ summary: "socket" }));
-expectError(completeSocket.response(event));
-expectError(completeSocket.streamResponse(200, event));
-expectError(completeSocket.body(event));
-expectError(completeSocket.headers(input));
-
-// A single message direction is enough to complete a WebSocket route.
-const clientOnlySocket = route
-	.ws("/client-only")
-	.clientMessage("command", clientMessage);
-expectAssignable<WebSocketRouteDeclaration>(clientOnlySocket);
-expectAssignable<Contract>(clientOnlySocket);
-const serverOnlySocket = route
-	.ws("/server-only")
-	.serverMessage("event", serverMessage);
-expectAssignable<WebSocketRouteDeclaration>(serverOnlySocket);
-expectAssignable<Contract>(serverOnlySocket);
-const messageLessSocket = route.ws("/message-less");
-expectNotAssignable<WebSocketRouteDeclaration>(messageLessSocket);
-expectNotAssignable<Contract>(messageLessSocket);

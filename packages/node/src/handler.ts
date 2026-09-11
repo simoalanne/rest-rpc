@@ -58,7 +58,7 @@ export function createRouteHandler(
 			method: request.method ?? "GET",
 			path: url.pathname,
 		});
-		if (!matched || matched.implementation.route.mode === "webSocket") {
+		if (!matched) {
 			return { matched: false };
 		}
 

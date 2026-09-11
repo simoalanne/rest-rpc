@@ -305,25 +305,8 @@ type InferSingleServerResponseBody<TResponse> = [TResponse] extends [never]
 				? TBody
 				: never;
 
-type SseResponseDeclaration<E extends BaseRouteDeclaration> = E extends {
-	responses: { 200: infer TResponse };
-}
-	? TResponse
-	: never;
-
-type InferSseServerResponseBody<E extends BaseRouteDeclaration> = [
-	SseResponseDeclaration<E>,
-] extends [never]
-	? InferSingleServerResponseBody<ServerSuccessResponse<E>>
-	: SseResponseDeclaration<E> extends ResponseDeclaration
-		? ServerResponseBody<ResponseBody<SseResponseDeclaration<E>>>
-		: never;
-
-export type ServerSuccessBody<E extends BaseRouteDeclaration> = E extends {
-	mode: "sse";
-}
-	? AsyncIterable<InferSseServerResponseBody<E>>
-	: InferSingleServerResponseBody<ServerSuccessResponse<E>>;
+export type ServerSuccessBody<E extends BaseRouteDeclaration> =
+	InferSingleServerResponseBody<ServerSuccessResponse<E>>;
 
 export type ErrorDeclaredClientResponse<E extends BaseRouteDeclaration> =
 	Exclude<DeclaredClientResponse<E>, SuccessfulDeclaredClientResponse<E>>;

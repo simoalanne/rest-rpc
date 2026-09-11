@@ -9,7 +9,8 @@ import {
 	createRequestBody,
 	createResponse,
 } from "./operation.ts";
-import type { OpenApiRouteDeclaration, SchemaConverter } from "./operation.ts";
+import type { SchemaConverter } from "./operation.ts";
+import type { HttpRouteDeclaration } from "../contract/httpRouteBuilder.ts";
 
 const schemaConverter: SchemaConverter = (schema, mode) =>
 	z.toJSONSchema(schema as z.ZodType, {
@@ -21,20 +22,6 @@ const schemaConverter: SchemaConverter = (schema, mode) =>
 const operationOptions = { schemaConverter };
 
 describe("OpenAPI operations", () => {
-	it("describes SSE responses as event streams", () => {
-		const operation = createOperation(
-			createRoute.sse("/events").response(z.object({ id: z.string() })),
-			{
-				info: { title: "Test", version: "1" },
-				schemaConverter,
-			},
-		);
-
-		assert.deepEqual(operation.responses["200"].content, {
-			"text/event-stream": { schema: { type: "string" } },
-		});
-	});
-
 	it("creates required path params and schema-required query params", () => {
 		const params = createParameters(
 			z.object({ id: z.string() }),
@@ -185,7 +172,7 @@ describe("OpenAPI operations", () => {
 	});
 
 	it("applies parameter transforms", () => {
-		const route: OpenApiRouteDeclaration = createRoute
+		const route: HttpRouteDeclaration = createRoute
 			.get("/todos/:id")
 			.params(z.object({ id: z.string() }))
 			.query(
@@ -666,7 +653,7 @@ describe("OpenAPI operations", () => {
 			modes.push(mode);
 			return { type: "object", properties: {} };
 		};
-		const route: OpenApiRouteDeclaration = createRoute
+		const route: HttpRouteDeclaration = createRoute
 			.post("/todos/:id")
 			.params(z.object({ id: z.string() }))
 			.headers(z.object({ "x-api-key": z.string() }))
@@ -682,9 +669,7 @@ describe("OpenAPI operations", () => {
 	});
 
 	it("applies operation transforms", () => {
-		const route: OpenApiRouteDeclaration = createRoute
-			.get("/todos")
-			.response(204);
+		const route: HttpRouteDeclaration = createRoute.get("/todos").response(204);
 
 		const operation = createOperation(
 			route,
@@ -703,7 +688,7 @@ describe("OpenAPI operations", () => {
 	});
 
 	it("applies explicit route OpenAPI options", () => {
-		const route: OpenApiRouteDeclaration = createRoute
+		const route: HttpRouteDeclaration = createRoute
 			.get("/todos")
 			.withOpenApi({
 				summary: "List todos",

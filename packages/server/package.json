@@ -13,8 +13,7 @@
 		"rpc",
 		"server",
 		"type-safe-api",
-		"typescript",
-		"websocket"
+		"typescript"
 	],
 	"homepage": "https://github.com/rest-rpc/rest-rpc#readme",
 	"license": "MIT",

@@ -41,7 +41,6 @@ export type {
 	ServerHttpBuilderExtension,
 	ServerRouteFactory,
 	ServerRouteImplementation,
-	ServerSseBuilderExtension,
 } from "@rest-rpc/server";
 export {
 	RequestValidationError,

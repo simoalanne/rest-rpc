@@ -10,9 +10,6 @@ import type {
 /** An HTTP method supported by a rest-rpc route. */
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
-/** Selects whether a route is handled as HTTP, SSE, or WebSocket. */
-export type RouteMode = "http" | "sse" | "webSocket";
-
 /** Application-defined metadata attached to a route. */
 export type RouteMetadata = Record<string, unknown>;
 
@@ -58,7 +55,6 @@ export type RouteRequestDeclaration = {
 export type BaseRouteDeclaration = {
 	path: string;
 	method: HttpMethod;
-	mode?: RouteMode;
 	request?: RouteRequestDeclaration;
 	metadata?: RouteMetadata;
 	openApi?: OpenApiRouteOptions;

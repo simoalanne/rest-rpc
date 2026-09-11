@@ -10,13 +10,12 @@ import type {
 	RouteDeclaration,
 } from "@rest-rpc/core/contract";
 import { contractRouteEntries, toColonPath } from "@rest-rpc/core/contract";
-import type { ServerHttpRouteDeclaration } from "@rest-rpc/server";
 import "reflect-metadata";
 
 export const REST_RPC_ROUTE_METADATA = Symbol.for("rest-rpc:nest-route");
 
 export type RouteMetadata = {
-	route: ServerHttpRouteDeclaration;
+	route: RouteDeclaration;
 };
 
 const methodMap: Record<HttpMethod, RequestMethod> = {
@@ -27,9 +26,7 @@ const methodMap: Record<HttpMethod, RequestMethod> = {
 	PUT: RequestMethod.PUT,
 };
 
-const createNestRouteDecorator = (
-	route: ServerHttpRouteDeclaration,
-): MethodDecorator =>
+const createNestRouteDecorator = (route: RouteDeclaration): MethodDecorator =>
 	applyDecorators(
 		RequestMapping({
 			path: toColonPath(route.path),
@@ -39,10 +36,6 @@ const createNestRouteDecorator = (
 			route,
 		} satisfies RouteMetadata),
 	);
-
-const isHttpRouteDeclaration = (
-	route: RouteDeclaration,
-): route is ServerHttpRouteDeclaration => "responses" in route;
 
 const getImplementationAtPath = (tree: unknown, path: string[]) =>
 	path.reduce(
@@ -80,7 +73,7 @@ const createRouterRouteMethod = (
 	target: object,
 	propertyKey: string | symbol,
 	descriptor: PropertyDescriptor,
-	route: ServerHttpRouteDeclaration,
+	route: RouteDeclaration,
 	path: string[],
 ) => {
 	const original = descriptor.value;
@@ -115,7 +108,7 @@ const createRouterRouteMethod = (
  *
  * @see {@link https://rest-rpc.dev/docs/server/nest#single-routes}
  */
-export function Route(route: ServerHttpRouteDeclaration): MethodDecorator {
+export function Route(route: RouteDeclaration): MethodDecorator {
 	return createNestRouteDecorator(route);
 }
 
@@ -131,7 +124,6 @@ export function Route(route: ServerHttpRouteDeclaration): MethodDecorator {
 export function Router(contract: Contract): MethodDecorator {
 	return (target, propertyKey, descriptor) => {
 		for (const { route, path } of contractRouteEntries(contract)) {
-			if (!isHttpRouteDeclaration(route)) continue;
 			createRouterRouteMethod(target, propertyKey, descriptor, route, path);
 		}
 	};

@@ -1,28 +1,18 @@
 import { route as coreRoute } from "@rest-rpc/core";
 import {
 	type RouteHandlers,
-	type RouteReceived,
 	type RouteRequest,
 	type RouteRequestData,
 	type RouteResponse,
-	type RouteSent,
-	type RouteSocket,
-	type RouteSseSent,
-	type SseEvent,
 	RouteResponseError,
 	route,
 	router,
-	sseEvent,
 } from "@rest-rpc/server";
 import { expectError, expectType } from "tsd";
 import { z } from "zod";
 
 type TestRouteHandlerContext = {
 	userId: string;
-};
-
-type RequestSignalRouteHandlerContext = TestRouteHandlerContext & {
-	signal: AbortSignal;
 };
 
 const todoSchema = z.object({
@@ -230,150 +220,6 @@ route(optionalStatusBodyApi.jobs.get, () => ({
 	},
 }));
 
-// websocket handler request inference
-
-// should expose path params, context, and typed outbound messages to websocket handlers
-const socketApi = {
-	socket: {
-		room: coreRoute
-			.ws("/rooms/:roomId")
-			.params(z.object({ roomId: z.string() }))
-			.clientMessage("echo", z.object({ text: z.string() }))
-			.clientMessage(
-				"count",
-				z.object({ value: z.string().transform((value) => Number(value)) }),
-			)
-			.serverMessage("ready", z.object({ roomId: z.string() }))
-			.serverMessage(
-				"counted",
-				z.object({ value: z.string().transform((value) => Number(value)) }),
-			),
-	},
-} as const;
-
-type SocketRequest = RouteRequest<
-	typeof socketApi.socket.room,
-	TestRouteHandlerContext
->;
-declare const socketRequest: SocketRequest;
-expectType<string>(socketRequest.params.roomId);
-expectType<string>(socketRequest.context.userId);
-expectType<RouteSocket<typeof socketApi.socket.room>>(
-	socketRequest.context.socket,
-);
-expectType<RouteSent<typeof socketApi.socket.room>>(
-	null as unknown as Parameters<typeof socketRequest.context.socket.send>[0],
-);
-socketRequest.context.socket.send({
-	type: "ready",
-	message: { roomId: "room-1" },
-});
-socketRequest.context.socket.onMessage((message) => {
-	expectType<RouteReceived<typeof socketApi.socket.room>>(message);
-});
-
-// sse handler request inference
-
-// should expose path params, context, and typed outbound events to sse handlers
-const sseApi = {
-	events: {
-		notifications: coreRoute
-			.sse("/events/:projectId")
-			.params(z.object({ projectId: z.string() }))
-			.query(z.object({ includeDone: z.boolean().optional() }))
-			.response(
-				z.object({
-					id: z.string(),
-					createdAt: z.string().transform((value) => new Date(value)),
-				}),
-			),
-	},
-} as const;
-
-type SseRequest = RouteRequest<
-	typeof sseApi.events.notifications,
-	TestRouteHandlerContext
->;
-declare const sseRequest: SseRequest;
-expectType<string>(sseRequest.params.projectId);
-expectType<boolean | undefined>(sseRequest.query.includeDone);
-expectType<string>(sseRequest.context.userId);
-expectError(sseRequest.context.signal);
-expectType<string | undefined>(sseRequest.context.lastEventId);
-
-type SseRequestWithSignal = RouteRequest<
-	typeof sseApi.events.notifications,
-	RequestSignalRouteHandlerContext
->;
-declare const sseRequestWithSignal: SseRequestWithSignal;
-expectType<AbortSignal>(sseRequestWithSignal.context.signal);
-expectType<string | undefined>(sseRequestWithSignal.context.lastEventId);
-
-expectType<RouteSseSent<typeof sseApi.events.notifications>>({
-	id: "event-1",
-	createdAt: "2026-08-27T00:00:00.000Z",
-});
-expectType<SseEvent<RouteSseSent<typeof sseApi.events.notifications>>>(
-	sseEvent({
-		id: "event-1",
-		createdAt: "2026-08-27T00:00:00.000Z",
-	}),
-);
-
-route(sseApi.events.notifications, async function* ({ context }) {
-	expectType<unknown>(context.signal);
-	expectType<string | undefined>(context.lastEventId);
-
-	yield sseEvent({
-		id: "event-1",
-		createdAt: "2026-08-27T00:00:00.000Z",
-	});
-});
-
-expectError(
-	route(sseApi.events.notifications, async function* () {
-		yield {
-			id: "event-1",
-			createdAt: "2026-08-27T00:00:00.000Z",
-		};
-	}),
-);
-
-// it should not allow response envelope for an sse handler
-expectError(
-	route(sseApi.events.notifications, () => ({
-		status: 200,
-		body: (async function* () {
-			yield sseEvent({
-				id: "event-1",
-				createdAt: "2026-08-27T00:00:00.000Z",
-			});
-		})(),
-		headers: {
-			"cache-control": "private",
-		},
-	})),
-);
-
-expectError(
-	router(sseApi, {
-		events: {
-			notifications: () => ({
-				status: 200,
-				body: (async function* () {
-					yield sseEvent({
-						id: "event-1",
-						createdAt: "2026-08-27T00:00:00.000Z",
-					});
-				})(),
-				headers: {
-					"cache-control": "private",
-				},
-			}),
-		},
-	}),
-);
-
 // route handler input and output coverage
 
 // should use server-side transformed schema output as handler input
@@ -502,25 +348,6 @@ route(customRequestApi.todos.uploadImage, ({ body, params: { id } }) => {
 	return undefined;
 });
 
-// should type websocket send and receive messages by discriminator
-route(socketApi.socket.room, ({ context, params: { roomId } }) => {
-	expectType<string>(roomId);
-
-	context.socket.send({ type: "ready", message: { roomId } });
-	context.socket.send({ type: "counted", message: { value: "1" } });
-	expectError(context.socket.send({ type: "counted", message: { value: 1 } }));
-	expectError(context.socket.send({ type: "missing", message: {} }));
-
-	context.socket.onMessage((message) => {
-		if (message.type === "echo") {
-			expectType<string>(message.message.text);
-		} else {
-			expectType<"count">(message.type);
-			expectType<number>(message.message.value);
-		}
-	});
-});
-
 // should expose JSON query schemas as a single typed query field
 const jsonQueryApi = {
 	todos: {
@@ -633,9 +460,6 @@ const implementationApi = {
 		csv: customResponseApi.reports.csv,
 		csvStream: customResponseApi.reports.csvStream,
 	},
-	socket: {
-		room: socketApi.socket.room,
-	},
 } as const;
 
 const implementations = router(implementationApi, {
@@ -679,14 +503,6 @@ const implementations = router(implementationApi, {
 			status: 200 as const,
 			body: csvRows(),
 		}),
-	},
-	socket: {
-		room: ({ context }) => {
-			context.socket.send({
-				type: "ready",
-				message: { roomId: "room-1" },
-			});
-		},
 	},
 });
 
@@ -737,19 +553,9 @@ const composedReports = router(implementationApi.reports, {
 	}),
 });
 
-const composedSocket = router(implementationApi.socket, {
-	room: route(implementationApi.socket.room, ({ context }) => {
-		context.socket.send({
-			type: "ready",
-			message: { roomId: "room-1" },
-		});
-	}),
-});
-
 const composedImplementations = router(implementationApi, {
 	todos: composedTodos,
 	reports: composedReports,
-	socket: composedSocket,
 });
 
 expectType<typeof implementationApi.todos.create>(
@@ -757,9 +563,6 @@ expectType<typeof implementationApi.todos.create>(
 );
 expectType<typeof implementationApi.reports.csv>(
 	composedImplementations.reports.csv.route,
-);
-expectType<typeof implementationApi.socket.room>(
-	composedImplementations.socket.room.route,
 );
 
 // should reject class instances that do not implement required routes

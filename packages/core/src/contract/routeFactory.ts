@@ -6,11 +6,6 @@ import { getPathParamNames } from "./path.ts";
 import type { RequestHeadersSchema } from "./request.ts";
 import type { RouteResponses } from "./response.ts";
 import { createHttpRoute, type HttpBuilderFor } from "./httpRouteBuilder.ts";
-import { createSseRoute, type SseBuilderFor } from "./sseRouteBuilder.ts";
-import {
-	createWebSocketRoute,
-	type WebSocketBuilderFor,
-} from "./websocketRouteBuilder.ts";
 import {
 	createShorthandRouteFactory,
 	type ShorthandRouteFactory,
@@ -53,10 +48,6 @@ type RouteFactory<TOptions = undefined> = {
 	delete<const TPath extends string>(
 		path: TPath,
 	): HttpBuilderFor<TOptions, "DELETE", TPath>;
-	/** Starts an SSE route declaration. @see {@link https://rest-rpc.dev/docs/http-responses#server-sent-event-responses} */
-	sse<const TPath extends string>(path: TPath): SseBuilderFor<TOptions, TPath>;
-	/** Starts a WebSocket route declaration. @see {@link https://rest-rpc.dev/docs/websockets#contract} */
-	ws(path: string): WebSocketBuilderFor;
 };
 
 const createFactory = (options: RouteFactoryOptions = {}) => {
@@ -67,8 +58,6 @@ const createFactory = (options: RouteFactoryOptions = {}) => {
 		put: (path: string) => createHttpRoute("PUT", path, options),
 		patch: (path: string) => createHttpRoute("PATCH", path, options),
 		delete: (path: string) => createHttpRoute("DELETE", path, options),
-		sse: (path: string) => createSseRoute(path, options),
-		ws: (path: string) => createWebSocketRoute(path, options),
 	};
 };
 
@@ -103,10 +92,4 @@ export const route = {
 		}
 >;
 
-export type {
-	HttpBuilderFor,
-	RouteFactory,
-	ShorthandRouteFactory,
-	SseBuilderFor,
-	WebSocketBuilderFor,
-};
+export type { HttpBuilderFor, RouteFactory, ShorthandRouteFactory };

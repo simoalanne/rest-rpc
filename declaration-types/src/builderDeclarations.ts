@@ -34,8 +34,6 @@ export const configuredRoute = route.with({
 	openApi: { tags: ["test"] },
 });
 export const configuredHttp = configuredRoute.get("/configured");
-export const configuredSse = configuredRoute.sse("/configured-sse");
-export const configuredWebSocket = configuredRoute.ws("/configured-ws");
 
 export const initialHttp = route.get("/initial");
 export const jsonBody = route.post("/body").body(scalar);
@@ -83,35 +81,3 @@ export const customStreamResponseRoute = route
 		schema: customResponseScalar,
 		contentType: "application/octet-stream",
 	});
-
-export const initialSse = route.sse("/sse");
-export const sseQuery = route.sse("/sse-query").query(query);
-export const sseJsonQuery = route.sse("/sse-json-query").jsonQuery(scalar);
-export const sseParams = route.sse("/sse/:id").params(params);
-export const sseKeys = route.sse("/sse-keys").query(query);
-export const sseMetadata = route
-	.sse("/sse-metadata")
-	.withMetadata({ scope: "test" });
-export const sseOpenApi = route
-	.sse("/sse-openapi")
-	.withOpenApi({ summary: "Test" });
-export const completeSse = route.sse("/complete-sse").response(scalar);
-
-export const initialWebSocket = route.ws("/ws");
-export const webSocketQuery = route.ws("/ws-query").query(query);
-export const webSocketJsonQuery = route.ws("/ws-json-query").jsonQuery(scalar);
-export const webSocketParams = route.ws("/ws/:id").params(params);
-export const webSocketKeys = route.ws("/ws-keys").query(query);
-export const webSocketMetadata = route
-	.ws("/ws-metadata")
-	.withMetadata({ scope: "test" });
-export const clientMessage = route
-	.ws("/ws-client")
-	.clientMessage("message", scalar);
-export const serverMessage = route
-	.ws("/ws-server")
-	.serverMessage("message", scalar);
-export const bidirectionalMessages = route
-	.ws("/ws-bidirectional")
-	.clientMessage("request", scalar)
-	.serverMessage("response", scalar);

@@ -1,12 +1,11 @@
 import { createRequestSignal, writeNodeResponse } from "@rest-rpc/node";
-import type { HttpMethod } from "@rest-rpc/core/contract";
+import type { HttpMethod, RouteDeclaration } from "@rest-rpc/core/contract";
 import { toColonPath } from "@rest-rpc/core/contract";
 import {
 	handleHttpRoute,
 	RequestValidationError,
 	ResponseValidationError,
 	type RouteImplementation,
-	type ServerHttpRouteDeclaration,
 } from "@rest-rpc/server";
 import type {
 	Response as ExpressResponse,
@@ -40,18 +39,18 @@ export type ExtendedExpressMiddleware = (
 	req: Request,
 	res: ExpressResponse,
 	next: NextFunction,
-	route: ServerHttpRouteDeclaration,
+	route: RouteDeclaration,
 ) => unknown;
 
 export const registerExpressHttpRoutes = (
 	app: IRouter,
-	routes: RouteImplementation<ServerHttpRouteDeclaration>[],
+	routes: RouteImplementation<RouteDeclaration>[],
 	middleware: ExtendedExpressMiddleware[] = [],
 	requestValidationErrorHandler?: RequestValidationErrorHandler,
 	responseValidationErrorHandler?: ResponseValidationErrorHandler,
 ) => {
 	for (const implementation of routes) {
-		const route: ServerHttpRouteDeclaration = implementation.route;
+		const route = implementation.route;
 		const method = route.method.toLowerCase() as Lowercase<HttpMethod>;
 		const handler = implementation.handler;
 

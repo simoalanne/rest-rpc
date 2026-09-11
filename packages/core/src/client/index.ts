@@ -14,16 +14,12 @@ export type {
 	ApiClientFetchOptions,
 	ApiClientFor,
 	ApiClientOptions,
-	ClientEventSource,
 	ClientResponse,
-	ClientSocket,
 	FetchArgs,
 	FetchLike,
 	FetchOptions,
 	FetchResponseFn,
 	NextFetchTagsOptions,
-	OpenConnectionArgs,
-	OpenConnectionFn,
 } from "./types.ts";
 
 export type { ApiClientRouteValue } from "./types.ts";

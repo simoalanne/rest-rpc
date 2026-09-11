@@ -7,7 +7,6 @@ import {
 } from "../contract/body.ts";
 import type { OpenApiResponseOptions } from "../contract/baseRouteDeclaration.ts";
 import type { HttpRouteDeclaration } from "../contract/httpRouteBuilder.ts";
-import type { SseRouteDeclaration } from "../contract/sseRouteBuilder.ts";
 import type {
 	JsonQuery,
 	RequestHeadersDeclaration,
@@ -29,7 +28,6 @@ import {
 } from "../standard-schema/index.ts";
 
 export const JSON_CONTENT_TYPE = "application/json";
-export const SSE_CONTENT_TYPE = "text/event-stream";
 export const NDJSON_CONTENT_TYPE = "application/x-ndjson";
 export const FORM_URLENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
 export const MULTIPART_FORM_DATA_CONTENT_TYPE = "multipart/form-data";
@@ -81,18 +79,14 @@ export type SchemaConverter = (
 	mode: "input" | "output",
 ) => OpenApiSchema | undefined;
 
-export type OpenApiRouteDeclaration =
-	| HttpRouteDeclaration
-	| SseRouteDeclaration;
-
 export type ParameterTransformContext = {
-	route: OpenApiRouteDeclaration;
+	route: HttpRouteDeclaration;
 	routePath: readonly string[];
 	parameter: OpenApiParameter;
 };
 
 export type OperationTransformContext = {
-	route: OpenApiRouteDeclaration;
+	route: HttpRouteDeclaration;
 	routePath: readonly string[];
 	operation: OpenApiOperation;
 };
@@ -333,7 +327,7 @@ const createStreamWireSchema = (contentType: string) =>
 		: { type: "string" };
 
 export const createResponses = (
-	route: OpenApiRouteDeclaration,
+	route: HttpRouteDeclaration,
 	converter: SchemaConverter | undefined,
 ) => {
 	const responses: Record<string, OpenApiResponse> = {};
@@ -346,22 +340,14 @@ export const createResponses = (
 			converter,
 			openApiResponse,
 		);
-		responses[status] =
-			route.mode === "sse"
-				? {
-						...response,
-						content: {
-							[SSE_CONTENT_TYPE]: { schema: { type: "string" } },
-						},
-					}
-				: response;
+		responses[status] = response;
 	}
 
 	return responses;
 };
 
 export const createOperation = (
-	route: OpenApiRouteDeclaration,
+	route: HttpRouteDeclaration,
 	options: CreateOperationOptions,
 	routePath: readonly string[] = [],
 ): OpenApiOperation => {

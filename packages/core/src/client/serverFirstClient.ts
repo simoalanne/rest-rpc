@@ -5,17 +5,12 @@ import type { RouteDeclaration } from "../contract/contract.ts";
 import type { AnyShorthandRouteDeclaration } from "../contract/shorthandRouteBuilder.ts";
 import type { JsonQuery } from "../contract/request.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import {
-	constructBaseRequest,
-	executeRequest,
-	type ExecuteRequestOptions,
-} from "./request.ts";
+import { executeRequest, type ExecuteRequestOptions } from "./request.ts";
 import type {
 	ClientRequestDeclaration,
 	ClientRequestRoute,
 } from "./requestRoute.ts";
 import { readServerFirstResponse } from "./response.ts";
-import { openSseConnection } from "./sse.ts";
 import type {
 	ApiClientOptions,
 	ApiClientRouteValue,
@@ -128,9 +123,7 @@ type ImplementationUnion<TTree> = TTree extends {
 type SelectorName<TImplementation> = TImplementation extends {
 	route: infer TRoute extends BaseRouteDeclaration;
 }
-	? TRoute extends { mode: "sse" }
-		? "$sse"
-		: `$${Lowercase<TRoute["method"]>}`
+	? `$${Lowercase<TRoute["method"]>}`
 	: never;
 
 type SelectorPath<
@@ -462,29 +455,6 @@ export const createServerFirstClient = <
 				const selector = selectorKey.slice(1);
 
 				return (path: string, ...args: unknown[]) => {
-					if (selector === "sse") {
-						return {
-							openConnection: (...args: unknown[]) => {
-								const input = args[0] as ServerFirstRequestInput | undefined;
-								const { route, requestInput } = createRuntimeRoute(
-									"GET",
-									path,
-									input,
-								);
-								const { url } = constructBaseRequest(
-									options.baseUrl,
-									route,
-									requestInput,
-								);
-								return openSseConnection(
-									{ ...route, mode: "sse" } as RouteDeclaration,
-									{ validateIncomingMessages: false },
-									url,
-								);
-							},
-						};
-					}
-
 					const method = selectorMethod(selector);
 					const { requestInput, fetchOptions } = getServerFirstArgs(args);
 					const runtime = createRuntimeRoute(method, path, requestInput);

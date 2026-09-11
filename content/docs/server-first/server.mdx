@@ -44,7 +44,6 @@ response union:
 | `{ status, body: AsyncIterable }`              | NDJSON stream                     |
 | `{ status, contentType, body }`                | Custom response                   |
 | `{ status, contentType, body: AsyncIterable }` | Custom response stream            |
-| `sseEvent(data, options)`                      | SSE event stream                  |
 
 Each returned literal status becomes a member of the client-visible response
 union.

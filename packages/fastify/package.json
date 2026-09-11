@@ -1,12 +1,11 @@
 {
 	"name": "@rest-rpc/fastify",
 	"version": "0.1.0-beta.19",
-	"description": "Fastify adapter for serving rest-rpc contracts with typed HTTP and WebSocket routes.",
+	"description": "Fastify adapter for serving rest-rpc contracts with typed HTTP routes.",
 	"keywords": [
 		"api-contract",
 		"contract-first",
 		"fastify",
-		"fastify-websocket",
 		"http",
 		"middleware",
 		"rest",
@@ -14,8 +13,7 @@
 		"rpc",
 		"server",
 		"type-safe-api",
-		"typescript",
-		"websocket"
+		"typescript"
 	],
 	"license": "MIT",
 	"repository": {
@@ -45,16 +43,9 @@
 		"@rest-rpc/server": "workspace:*"
 	},
 	"devDependencies": {
-		"@fastify/websocket": "^11.0.0",
 		"fastify": "^5.0.0"
 	},
 	"peerDependencies": {
-		"@fastify/websocket": "^11.0.0",
 		"fastify": "^5.0.0"
-	},
-	"peerDependenciesMeta": {
-		"@fastify/websocket": {
-			"optional": true
-		}
 	}
 }

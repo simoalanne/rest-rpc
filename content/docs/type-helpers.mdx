@@ -38,18 +38,9 @@ export const api = {
 			.post("/todos")
 			.body(z.object({ title: z.string() }))
 			.response(201, z.object({ id: z.string(), title: z.string() })),
-		live: route
-			.sse("/todos/live")
-			.response(z.object({ id: z.string(), title: z.string() })),
 		events: route
 			.get("/todos/events")
 			.streamResponse(200, z.object({ id: z.string(), message: z.string() })),
-		watch: route
-			.ws("/todos/:id/watch")
-			.params(z.object({ id: z.string() }))
-			.clientMessage("typing", z.object({ active: z.boolean() }))
-			.clientMessage("rename", z.object({ title: z.string() }))
-			.serverMessage("title", z.object({ title: z.string() })),
 	},
 };
 ```
@@ -59,15 +50,7 @@ export const api = {
 Import fetch client helpers from `@rest-rpc/core`.
 
 ```ts
-import type {
-	ClientReceived,
-	ClientRequest,
-	ClientResponse,
-	ClientSent,
-	ClientSocket,
-	ClientEventSource,
-	ClientSseReceived,
-} from "@rest-rpc/core";
+import type { ClientRequest, ClientResponse } from "@rest-rpc/core";
 
 type GetTodoRequest = ClientRequest<typeof api.todos.get>;
 // { params: { id: string }; query: { includeDone?: boolean } }
@@ -75,27 +58,6 @@ type GetTodoRequest = ClientRequest<typeof api.todos.get>;
 type GetTodoResponse = ClientResponse<typeof api.todos.get>;
 // | { status: 200; body: { id: string; title: string }; headers: Headers }
 // | { status: 404; body: { code: "NOT_FOUND" }; headers: Headers }
-
-type WatchSocket = ClientSocket<typeof api.todos.watch>;
-// {
-//   send(message: ClientSent<typeof api.todos.watch>): void;
-//   onMessage(callback: (message: ClientReceived<typeof api.todos.watch>) => void): () => void;
-// }
-
-type WatchSent = ClientSent<typeof api.todos.watch>;
-// | { type: "typing"; message: { active: boolean } }
-// | { type: "rename"; message: { title: string } }
-
-type WatchReceived = ClientReceived<typeof api.todos.watch>;
-// { type: "title"; message: { title: string } }
-
-type LiveEventSource = ClientEventSource<typeof api.todos.live>;
-// {
-//   onMessage(callback: (message: { id: string; title: string }) => void): () => void;
-// }
-
-type LiveReceived = ClientSseReceived<typeof api.todos.live>;
-// { id: string; title: string }
 ```
 
 `ClientResponse` is the result returned when a client route is called.
@@ -108,15 +70,10 @@ Import server helpers from the server adapter you use. The adapter-specific
 ```ts
 import type {
 	RouteErrors,
-	RouteReceived,
 	RouteRequest,
 	RouteRequestData,
 	RouteResponse,
 	RouteResponseShorthand,
-	RouteSent,
-	RouteSocket,
-	RouteSseSent,
-	SseEvent,
 } from "@rest-rpc/express";
 
 type GetTodoRequest = RouteRequest<typeof api.todos.get>;
@@ -134,25 +91,6 @@ type GetTodoErrors = RouteErrors<typeof api.todos.get>;
 
 type CreateTodoShorthand = RouteResponseShorthand<typeof api.todos.create>;
 // { id: string; title: string }
-
-type WatchSocket = RouteSocket<typeof api.todos.watch>;
-// {
-//   send(message: RouteSent<typeof api.todos.watch>): void;
-//   onMessage(callback: (message: RouteReceived<typeof api.todos.watch>) => void | Promise<void>): () => void;
-// }
-
-type WatchSent = RouteSent<typeof api.todos.watch>;
-// { type: "title"; message: { title: string } }
-
-type WatchReceived = RouteReceived<typeof api.todos.watch>;
-// | { type: "typing"; message: { active: boolean } }
-// | { type: "rename"; message: { title: string } }
-
-type LiveSent = RouteSseSent<typeof api.todos.live>;
-// { id: string; title: string }
-
-type LiveEvent = SseEvent<LiveSent>;
-// { data: LiveSent; id?: string; retry?: number }
 ```
 
 Use `RouteResponse` when returning an explicit status and body. Use

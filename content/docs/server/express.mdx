@@ -47,10 +47,6 @@ type HttpRouteHandlerContext = {
 	req: Request;
 	signal: AbortSignal;
 };
-
-type WebSocketRouteHandlerContext = {
-	req: IncomingMessage;
-};
 ```
 
 ## Options
@@ -59,7 +55,6 @@ type WebSocketRouteHandlerContext = {
 type RegisterRoutesOptions = {
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
-	webSocket?: ExpressWebSocketOptions;
 	middleware?: Array<
 		(
 			req: Request,
@@ -93,35 +88,7 @@ app.use((error, req, res, next) => {
 });
 ```
 
-### WebSocket
-
-```ts
-import { createServer } from "node:http";
-import { WebSocketServer } from "ws";
-
-const server = createServer(app);
-const webSocketServer = new WebSocketServer({ noServer: true });
-
-registerRoutes(app, routes, {
-	webSocket: {
-		server,
-		webSocketServer,
-		beforeUpgrade: ({ context }) => {
-			const authorization = context.req.headers.authorization;
-			return authorization ? undefined : { status: 401 };
-		},
-	},
-});
-
-server.listen(3000);
-```
-
 ### Middleware
-
-:::warning[Websocket middleware]
-WebSocket routes do not support middleware.
-You can use the `beforeUpgrade` option to implement middleware-like behavior for WebSocket routes.
-:::
 
 ```ts
 registerRoutes(app, routes, {

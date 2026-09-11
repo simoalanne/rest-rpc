@@ -5,6 +5,7 @@ import {
 	isPathParamSegment,
 	isShorthandRouteDeclaration,
 } from "@rest-rpc/core/contract";
+import type { ImplementationTree, RouteImplementation } from "./router.ts";
 
 const splitPath = (path: string) => path.split("/").filter(Boolean);
 
@@ -123,12 +124,20 @@ const flattenImplementationTree = (
 	);
 };
 
-export const flattenRouteImplementations = (
+/** Flattens and orders an implementation tree for route registration. */
+export function flattenRouteImplementations(
+	implementation: ImplementationTree,
+): RouteImplementation[];
+export function flattenRouteImplementations(
 	implementation: RuntimeImplementationTree,
-): RuntimeImplementation[] =>
-	flattenImplementationTree(implementation).sort((left, right) =>
+): RuntimeImplementation[];
+export function flattenRouteImplementations(
+	implementation: RuntimeImplementationTree,
+): RuntimeImplementation[] {
+	return flattenImplementationTree(implementation).sort((left, right) =>
 		compareRouteSpecificity(left.route, right.route),
 	);
+}
 
 /** A matched route implementation and its decoded URL parameters. */
 export type RouteMatch = {

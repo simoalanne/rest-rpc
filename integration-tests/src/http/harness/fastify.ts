@@ -1,4 +1,3 @@
-import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import { type RegisterRoutesOptions, registerRoutes } from "@rest-rpc/fastify";
 import type { ImplementationTree } from "@rest-rpc/server";
 import Fastify, { type FastifyInstance } from "fastify";
@@ -9,7 +8,7 @@ export type FastifyAdapterOptions = {
 };
 
 export const createFastifyAdapter = (
-	implementations: ImplementationTree<HttpRouteDeclaration>,
+	implementations: ImplementationTree,
 	options: FastifyAdapterOptions = {},
 ) => ({
 	name: "fastify",

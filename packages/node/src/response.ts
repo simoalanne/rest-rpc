@@ -2,11 +2,9 @@ import type { ServerResponse } from "node:http";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import {
-	formatSseEvent,
 	handleHttpRouteResult,
 	type HttpRouteResult,
 	type HttpRouteResultStreamMode,
-	type SseEvent,
 } from "@rest-rpc/server";
 
 const formatResponseStreamChunk = (
@@ -14,7 +12,6 @@ const formatResponseStreamChunk = (
 	mode: HttpRouteResultStreamMode,
 ) => {
 	if (mode === "ndjson") return `${JSON.stringify(chunk)}\n`;
-	if (mode === "sse") return formatSseEvent(chunk as SseEvent<unknown>);
 	return chunk instanceof Uint8Array ? chunk : String(chunk);
 };
 

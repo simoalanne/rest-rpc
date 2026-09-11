@@ -1,7 +1,7 @@
 {
 	"name": "@rest-rpc/express",
 	"version": "0.1.0-beta.19",
-	"description": "Express adapter for serving rest-rpc contracts with typed HTTP and WebSocket routes.",
+	"description": "Express adapter for serving rest-rpc contracts with typed HTTP routes.",
 	"keywords": [
 		"api-contract",
 		"contract-first",
@@ -14,9 +14,7 @@
 		"rpc",
 		"server",
 		"type-safe-api",
-		"typescript",
-		"websocket",
-		"ws"
+		"typescript"
 	],
 	"homepage": "https://github.com/rest-rpc/rest-rpc#readme",
 	"license": "MIT",
@@ -47,16 +45,9 @@
 		"@rest-rpc/server": "workspace:*"
 	},
 	"devDependencies": {
-		"@types/express": "^5.0.1",
-		"@types/ws": "^8.18.1"
+		"@types/express": "^5.0.1"
 	},
 	"peerDependencies": {
-		"express": "^5.0.0",
-		"ws": "^8.0.0"
-	},
-	"peerDependenciesMeta": {
-		"ws": {
-			"optional": true
-		}
+		"express": "^5.0.0"
 	}
 }

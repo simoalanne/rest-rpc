@@ -1,9 +1,7 @@
 import {
-	formatSseEvent,
 	type HttpRouteResult,
 	type HttpRouteResultStreamMode,
 	handleHttpRouteResult,
-	type SseEvent,
 } from "@rest-rpc/server";
 
 type HttpHeaderValue = string | number | readonly string[] | undefined;
@@ -18,9 +16,6 @@ const encodeResponseStream = async function* (
 		switch (mode) {
 			case "ndjson":
 				yield encoder.encode(`${JSON.stringify(chunk)}\n`);
-				break;
-			case "sse":
-				yield encoder.encode(formatSseEvent(chunk as SseEvent<unknown>));
 				break;
 			default:
 				yield chunk instanceof Uint8Array

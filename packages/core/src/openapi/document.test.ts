@@ -51,10 +51,6 @@ const openApiTestContract = {
 				type: z.string(),
 			}),
 		),
-		socket: route
-			.ws("/todos/socket")
-			.clientMessage("ping", z.object({ type: z.literal("ping") }))
-			.serverMessage("pong", z.object({ type: z.literal("pong") })),
 		import: route
 			.post("/todos/import")
 			.customBody({

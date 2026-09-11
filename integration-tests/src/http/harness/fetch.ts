@@ -1,7 +1,6 @@
 import type { OutgoingHttpHeaders } from "node:http";
 import { createServer } from "node:http";
 import { Readable } from "node:stream";
-import type { HttpRouteDeclaration } from "@rest-rpc/core/contract";
 import type { ImplementationTree } from "@rest-rpc/server";
 import {
 	type CreateFetchHandlerOptions,
@@ -34,7 +33,7 @@ export type FetchAdapterOptions = {
 };
 
 export const createFetchAdapter = (
-	implementations: ImplementationTree<HttpRouteDeclaration>,
+	implementations: ImplementationTree,
 	options: FetchAdapterOptions = {},
 ) => ({
 	name: "fetch",

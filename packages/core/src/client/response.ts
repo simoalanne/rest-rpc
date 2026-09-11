@@ -90,7 +90,6 @@ export const getResponseSchema = (
 	route: RouteDeclaration,
 	status: number,
 ): ResponseDeclaration | undefined => {
-	if (route.mode === "webSocket") return undefined;
 	const entry = Object.entries(getRouteResponses(route)).find(
 		([declaredStatus]) => Number(declaredStatus) === status,
 	);

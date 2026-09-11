@@ -1,6 +1,5 @@
 import { initClient, request } from "@rest-rpc/core";
 import type { ServerRouteFactory } from "@rest-rpc/server";
-import { sseEvent } from "@rest-rpc/server";
 import { expectError, expectType } from "tsd";
 import { z } from "zod";
 
@@ -73,9 +72,6 @@ const routes = {
 	explicitOnly: {
 		health: route.get("/health").handler(() => ({ status: 204 as const })),
 	},
-	events: route.sse("/events").handler(async function* () {
-		yield sseEvent({ id: "todo-1" });
-	}),
 	form: route
 		.post("/form")
 		.formBody(
@@ -201,14 +197,6 @@ client.$get("/with-response-headers").then((response) => {
 	expectType<"todo-1">(response.responseHeaders.etag);
 	expectType<"1">(response.responseHeaders["x-page"]);
 });
-
-client
-	.$sse("/events")
-	.openConnection()
-	.onMessage((message) => {
-		expectType<{ id: string }>(message);
-	});
-expectError(client.$get("/events"));
 
 // Specialized encodings are explicit and constrained by the server route.
 client.$post("/form", {

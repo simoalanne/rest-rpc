@@ -5,7 +5,7 @@ description: Use rest-rpc in TypeScript apps with contract-first or server-first
 
 # rest-rpc
 
-Use this skill for `rest-rpc` work: setup, contracts, adapters, clients, TanStack Query, OpenAPI, streaming/WebSockets, migrations, debugging, and architecture.
+Use this skill for `rest-rpc` work: setup, contracts, adapters, clients, TanStack Query, OpenAPI, streaming, migrations, debugging, and architecture.
 
 ## Core Model
 
@@ -14,7 +14,7 @@ Choose the architecture that matches the application:
 - In contract-first code, the shared API contract is the source of truth and each route is defined once in it.
 - In server-first code, the Node.js or Fetch implementation tree is the source of truth and each route ends with its `.handler(...)`.
 - Preserve explicit HTTP semantics: method, path, params, query, headers, body, responses, status codes, content types, and metadata.
-- Derive server handlers, fetch clients, TanStack Query helpers, OpenAPI, and WebSocket helpers from a contract, or infer a client from a server-first implementation tree.
+- Derive server handlers, fetch clients, TanStack Query helpers, and OpenAPI from a contract, or infer a client from a server-first implementation tree.
 - Avoid duplicated client/server types when the contract can infer them.
 - Declare contracts with the fluent `route` builder instead of untyped route
   object literals.

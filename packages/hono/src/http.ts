@@ -6,7 +6,6 @@ import {
 	RequestValidationError,
 	ResponseValidationError,
 	type RouteImplementation,
-	type ServerHttpRouteDeclaration,
 } from "@rest-rpc/server";
 import type { Context, Hono, HonoRequest, Next } from "hono";
 import type { Env } from "hono/types";
@@ -46,7 +45,7 @@ export type ExtendedHonoMiddleware<TEnv extends Env = Env> = (
 
 export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 	app: Hono<TEnv>,
-	routes: RouteImplementation<ServerHttpRouteDeclaration>[],
+	routes: RouteImplementation<RouteDeclaration>[],
 	bodyParser: HonoBodyParser | undefined = undefined,
 	middleware: ExtendedHonoMiddleware<TEnv>[] = [],
 	requestValidationErrorHandler?: RequestValidationErrorHandler<TEnv>,
@@ -55,9 +54,9 @@ export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 	const usesDefaultBodyParser = bodyParser === undefined;
 
 	for (const implementation of routes) {
-		const route: ServerHttpRouteDeclaration = implementation.route;
+		const route = implementation.route;
 		const method = route.method.toLowerCase() as Lowercase<
-			ServerHttpRouteDeclaration["method"]
+			RouteDeclaration["method"]
 		>;
 
 		app[method](

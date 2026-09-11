@@ -2,7 +2,7 @@ import { isShorthandRouteDeclaration } from "@rest-rpc/core/contract";
 import type {
 	CustomBody,
 	ResponseDeclaration,
-	SseRouteDeclaration,
+	RouteDeclaration,
 } from "@rest-rpc/core/contract";
 import {
 	getResponseBody,
@@ -15,16 +15,10 @@ import {
 import type { HttpHeaders } from "./headers.ts";
 import { RouteResponseError } from "./routeResponseError.ts";
 import { RequestValidationError } from "./validationErrors.ts";
-import type {
-	HttpRouteHandlerContext,
-	RuntimeRouteHandler,
-	ServerHttpRouteDeclaration,
-} from "./router.ts";
+import type { HttpRouteHandlerContext, RuntimeRouteHandler } from "./router.ts";
 import type { BaseRouteDeclaration } from "@rest-rpc/core/contract";
 import type { ImplicitResponseEnvelope } from "./serverFirst.ts";
-import { validateSseEvents } from "./sse.ts";
 import {
-	getHeaderValue,
 	resolveCustomResponseBody,
 	type RequestSegments,
 	validateRequest,
@@ -44,7 +38,7 @@ type HttpRouteResultBase = {
  *
  * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#writing-the-result}
  */
-export type HttpRouteResultStreamMode = "ndjson" | "raw" | "sse";
+export type HttpRouteResultStreamMode = "ndjson" | "raw";
 
 /**
  * A normalized HTTP route result ready for an adapter-specific writer.
@@ -123,7 +117,7 @@ const classifyImplicitResponse = (
 };
 
 const getResponseSchema = (
-	route: ServerHttpRouteDeclaration,
+	route: RouteDeclaration,
 	status: number,
 ): ResponseDeclaration => {
 	const entry = Object.entries(getRouteResponses(route)).find(
@@ -139,7 +133,7 @@ const getResponseSchema = (
 };
 
 const getSingleSuccessfulStatus = (
-	route: ServerHttpRouteDeclaration,
+	route: RouteDeclaration,
 ): number | undefined => {
 	const statuses = Object.keys(getRouteResponses(route))
 		.map(Number)
@@ -149,7 +143,7 @@ const getSingleSuccessfulStatus = (
 };
 
 const normalizeHandlerResultEnvelopeOrShorthand = (
-	route: ServerHttpRouteDeclaration,
+	route: RouteDeclaration,
 	result: unknown,
 ): {
 	status: number;
@@ -191,7 +185,7 @@ const normalizeCustomBodyResult = async (schema: CustomBody, body: unknown) => {
 };
 
 const normalizeResponseResult = async (
-	route: ServerHttpRouteDeclaration,
+	route: RouteDeclaration,
 	result: {
 		status: number;
 		body: unknown;
@@ -267,45 +261,10 @@ const normalizeResponseResult = async (
 	};
 };
 
-const normalizeSseResponseResult = (
-	route: Omit<SseRouteDeclaration, "responses"> &
-		Partial<Pick<SseRouteDeclaration, "responses">>,
-	body: unknown,
-): HttpRouteResult => {
-	const declaredRoute = route.responses
-		? (route as SseRouteDeclaration)
-		: undefined;
-	const status = declaredRoute ? getSingleSuccessfulStatus(declaredRoute) : 200;
-	if (status === undefined) {
-		throw new Error(
-			`Service for "${route.method} ${route.path}" must return a declared response object.`,
-		);
-	}
-
-	const schema = declaredRoute
-		? getResponseSchema(declaredRoute, status)
-		: undefined;
-	const bodySchema = schema ? getResponseBody(schema) : undefined;
-
-	return {
-		kind: "stream",
-		status,
-		headers: {
-			"cache-control": "no-cache",
-			"x-accel-buffering": "no",
-		},
-		contentType: "text/event-stream",
-		mode: "sse",
-		body: validateSseEvents(body as AsyncIterable<unknown>, bodySchema),
-	};
-};
-
 const normalizeHandlerResult = async (
-	route: ServerHttpRouteDeclaration,
+	route: RouteDeclaration,
 	result: unknown,
 ): Promise<HttpRouteResult> => {
-	if (route.mode === "sse") return normalizeSseResponseResult(route, result);
-
 	return normalizeResponseResult(
 		route,
 		normalizeHandlerResultEnvelopeOrShorthand(route, result),
@@ -313,7 +272,7 @@ const normalizeHandlerResult = async (
 };
 
 const normalizeRouteResponseError = async (
-	route: ServerHttpRouteDeclaration,
+	route: RouteDeclaration,
 	error: RouteResponseError,
 ): Promise<HttpRouteResult> => {
 	return normalizeResponseResult(route, {
@@ -335,7 +294,7 @@ export async function handleHttpRoute<
 	handler: RuntimeRouteHandler,
 	options: HandleHttpRouteOptions<TContext>,
 ): Promise<HttpRouteResult> {
-	const declaredRoute = route as ServerHttpRouteDeclaration;
+	const declaredRoute = route as RouteDeclaration;
 	const requestValidation = await validateRequest(
 		declaredRoute,
 		options.request,
@@ -352,16 +311,7 @@ export async function handleHttpRoute<
 					? { input: requestValidation.data.body }
 					: {}
 				: requestValidation.data),
-			[REQUEST_CONTEXT_KEY]:
-				declaredRoute.mode === "sse"
-					? {
-							...options.context,
-							lastEventId: getHeaderValue(
-								options.request.headers,
-								"last-event-id",
-							),
-						}
-					: options.context,
+			[REQUEST_CONTEXT_KEY]: options.context,
 		});
 	} catch (error) {
 		if (error instanceof RouteResponseError) {
@@ -371,12 +321,6 @@ export async function handleHttpRoute<
 	}
 
 	if (!("responses" in route)) {
-		if (route.mode === "sse") {
-			return normalizeSseResponseResult(
-				route as Omit<SseRouteDeclaration, "responses">,
-				handlerResult,
-			);
-		}
 		return classifyImplicitResponse(handlerResult as ImplicitResponseEnvelope);
 	}
 

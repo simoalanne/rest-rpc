@@ -2,29 +2,18 @@ import type { Contract, RouteDeclaration } from "../contract/contract.ts";
 import type { HttpRouteDeclaration } from "../contract/httpRouteBuilder.ts";
 import { isShorthandRouteDeclaration } from "../contract/shorthandRouteBuilder.ts";
 import { mapContractRoutes } from "../contract/traversal.ts";
-import {
-	constructBaseRequest,
-	type ExecuteRequestOptions,
-	executeRequest,
-} from "./request.ts";
+import { type ExecuteRequestOptions, executeRequest } from "./request.ts";
 import {
 	fetchResponse as fetchRouteResponse,
 	fetchSuccess,
 	type RouteRequestFn,
 } from "./response.ts";
-import { isSseRouteNode, openSseConnection } from "./sse.ts";
 import {
 	createServerFirstClient,
 	type ServerFirstClientFor,
 	type ServerFirstClientOptions,
 } from "./serverFirstClient.ts";
-import type {
-	ApiClientFor,
-	ApiClientOptions,
-	FetchArgs,
-	OpenConnectionArgs,
-} from "./types.ts";
-import { openConnection as openRouteConnection } from "./websocket.ts";
+import type { ApiClientFor, ApiClientOptions, FetchArgs } from "./types.ts";
 
 const createContractClient = <
 	TContract extends Contract,
@@ -71,28 +60,6 @@ const createContractClient = <
 					{ body: args[0] } as never,
 					args[1],
 				);
-			};
-		}
-
-		if (node.mode === "webSocket" || isSseRouteNode(node)) {
-			return {
-				openConnection: (...args: OpenConnectionArgs) => {
-					const requestArgs = args.at(0);
-					const { url } = constructBaseRequest(
-						options.baseUrl,
-						node,
-						requestArgs,
-					);
-					const connectionOptions = {
-						validateIncomingMessages: validateResponses,
-					};
-
-					if (node.mode === "sse") {
-						return openSseConnection(node, connectionOptions, url);
-					}
-
-					return openRouteConnection(node, connectionOptions, url);
-				},
 			};
 		}
 

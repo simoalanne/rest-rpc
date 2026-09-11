@@ -11,7 +11,6 @@ export type { HttpRouteResultStreamMode } from "./handleHttpRoute.ts";
 
 const responseKindFor = (result: HttpRouteResult) => {
 	if (result.kind === "stream") {
-		if (result.mode === "sse") return "sse";
 		return result.contentType !== undefined ? "custom-stream" : "ndjson";
 	}
 	return result.kind;

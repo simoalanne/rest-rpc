@@ -83,9 +83,7 @@ const httpRequestDefaults = (
 
 /** A canonical ordinary HTTP route declaration. */
 export type HttpRouteDeclaration = BaseRouteDeclaration & {
-	mode?: "http";
 	responses: RouteResponses;
-	messages?: never;
 };
 
 class HttpRouteBuilder extends BaseRouteBuilder {

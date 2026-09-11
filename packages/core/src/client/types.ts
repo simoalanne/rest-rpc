@@ -3,13 +3,6 @@ import type { AnyShorthandRouteDeclaration } from "../contract/shorthandRouteBui
 import type { ClientRequest } from "../contract/request.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { DeclaredClientResponse } from "../contract/response.ts";
-import type { ClientSseReceived } from "../contract/sseRouteBuilder.ts";
-import type {
-	ClientReceived,
-	ClientSent,
-	IsWebSocketRoute,
-	WebSocketRouteDeclaration,
-} from "../contract/websocketRouteBuilder.ts";
 
 export type FetchOptions = Omit<RequestInit, "method" | "body" | "headers">;
 
@@ -82,78 +75,13 @@ export type ClientResponse<
 > = E extends AnyShorthandRouteDeclaration
 	? ShorthandRouteOutput<E>
 	: E extends RouteDeclaration
-		? E extends { mode: "sse" }
-			? never
-			: RouteDeclaredResponse<E>
+		? RouteDeclaredResponse<E>
 		: never;
 
 export type FetchResponseFn<
 	E extends RouteDeclaration,
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
 > = (...args: FetchArgs<E, TGlobalHeaders>) => Promise<ClientResponse<E>>;
-
-export type OpenConnectionArgs<
-	E extends RouteDeclaration = RouteDeclaration,
-	TGlobalHeaders extends HeaderRecord = Record<never, string>,
-> =
-	ClientRequest<E, GlobalHeaderKeys<TGlobalHeaders>> extends never
-		? []
-		: [request: ClientRequest<E, GlobalHeaderKeys<TGlobalHeaders>>];
-
-/**
- * The typed WebSocket client returned by a WebSocket route's `openConnection()`.
- *
- * @see {@link https://rest-rpc.dev/docs/websockets#client}
- */
-export type ClientSocket<E extends WebSocketRouteDeclaration> = Pick<
-	WebSocket,
-	"close" | "readyState" | "url"
-> & {
-	raw: WebSocket;
-	send: (message: ClientSent<E>) => void;
-	onOpen: (callback: (event: Event) => void) => () => void;
-	onMessage: (callback: (message: ClientReceived<E>) => void) => () => void;
-	onError: (callback: (event: Event) => void) => () => void;
-	onClose: (callback: (event: CloseEvent) => void) => () => void;
-};
-
-/**
- * The typed EventSource client returned by an SSE route's `openConnection()`.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server-sent-events}
- */
-export type ClientEventSource<E extends RouteDeclaration> = Pick<
-	EventSource,
-	"close" | "readyState" | "url"
-> & {
-	raw: EventSource;
-	onOpen: (callback: (event: Event) => void) => () => void;
-	onMessage: (callback: (message: ClientSseReceived<E>) => void) => () => void;
-	onError: (callback: (event: Event) => void) => () => void;
-};
-
-export type OpenConnectionFn<
-	E extends RouteDeclaration,
-	TGlobalHeaders extends HeaderRecord = Record<never, string>,
-> = (
-	...args: OpenConnectionArgs<E, TGlobalHeaders>
-) => E extends WebSocketRouteDeclaration
-	? ClientSocket<E>
-	: E extends { mode: "sse" }
-		? ClientEventSource<E>
-		: never;
-
-type ApiClientHttpRouteValue<
-	E extends RouteDeclaration = RouteDeclaration,
-	TGlobalHeaders extends HeaderRecord = Record<never, string>,
-> = FetchResponseFn<E, TGlobalHeaders>;
-
-type ApiClientOpenConnectionRouteValue<
-	E extends RouteDeclaration = RouteDeclaration,
-	TGlobalHeaders extends HeaderRecord = Record<never, string>,
-> = {
-	openConnection: OpenConnectionFn<E, TGlobalHeaders>;
-};
 
 /** Client operations available for a single declared route. */
 export type ApiClientRouteValue<
@@ -171,11 +99,7 @@ export type ApiClientRouteValue<
 					options?: FetchOptions,
 				) => Promise<ClientResponse<E>>
 		: E extends RouteDeclaration
-			? IsWebSocketRoute<E> extends true
-				? ApiClientOpenConnectionRouteValue<E, TGlobalHeaders>
-				: E extends { mode: "sse" }
-					? ApiClientOpenConnectionRouteValue<E, TGlobalHeaders>
-					: ApiClientHttpRouteValue<E, TGlobalHeaders>
+			? FetchResponseFn<E, TGlobalHeaders>
 			: never
 	: never;
 
