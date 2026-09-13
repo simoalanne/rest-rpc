@@ -9,13 +9,21 @@ import {
 import type { Context, Hono, HonoRequest, Next } from "hono";
 import type { Env } from "hono/types";
 
-/** Handles an HTTP request validation error using native Hono arguments. */
+/**
+ * Defines the response returned when a request fails validation in Hono.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/hono#error-handling}
+ */
 export type RequestValidationErrorHandler<TEnv extends Env = Env> = (
 	error: RequestValidationError,
 	c: Context<TEnv>,
 ) => Response | Promise<Response>;
 
-/** Handles an HTTP response validation error using native Hono arguments. */
+/**
+ * Defines the response returned when handler output fails validation in Hono.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/hono#error-handling}
+ */
 export type ResponseValidationErrorHandler<TEnv extends Env = Env> = (
 	error: ResponseValidationError,
 	c: Context<TEnv>,

@@ -46,7 +46,11 @@ export type OpenApiDocument = {
 /**
  * Options for generating an OpenAPI document from a contract.
  *
- * @see {@link https://rest-rpc.dev/docs/openapi#schema-conversion}
+ * @remarks Without a `schemaConverter`, or when it returns `undefined`, a
+ * declared schema becomes an empty OpenAPI Schema Object. Transform hooks can
+ * adjust generated parameters and operations for project-specific conventions.
+ *
+ * @see {@link https://rest-rpc.dev/docs/openapi}
  */
 export type CreateOpenApiDocumentOptions = {
 	/** OpenAPI specification version to emit. */

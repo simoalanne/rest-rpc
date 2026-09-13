@@ -5,8 +5,10 @@ const TYPE_ONLY_SCHEMA_VENDOR = "rest-rpc";
 /**
  * Creates a type-only Standard Schema for compile-time contracts.
  *
- * @remarks Runtime validation accepts the input as-is; use only when runtime validation is not needed.
- * @see {@link https://rest-rpc.dev/docs/contract/schemas#request-schema-shapes}
+ * @remarks Runtime validation accepts the input as-is. Use this helper only
+ * when runtime validation is not needed.
+ *
+ * @see {@link https://rest-rpc.dev/docs/contract/schemas}
  */
 export function type<T>(): StandardSchemaV1<T, T> {
 	return {

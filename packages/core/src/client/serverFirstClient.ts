@@ -34,7 +34,11 @@ type ServerFirstProcedureImplementation = {
 
 const requestEncoding = Symbol("rest-rpc.request-encoding");
 
-/** Explicit request encoding wrapper used by the server-first request DSL. */
+/**
+ * Marks a value with the transport encoding required by a server-first route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server-first/client#mark-explicit-request-encodings}
+ */
 export interface EncodedRequest<TKind extends string, TValue> {
 	readonly [requestEncoding]: TKind;
 	readonly value: TValue;
@@ -207,7 +211,14 @@ type ServerFirstClientCallResult<
 		? TResult
 		: ApiClientRouteValue<TRoute, TGlobalHeaders>;
 
-/** Infers the method-and-path client for a server implementation tree. */
+/**
+ * Infers the method-and-path and procedure client for a server implementation tree.
+ *
+ * @remarks Explicit HTTP routes are selected by method and literal path.
+ * Procedure routes retain the object-tree shape of the implementation.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server-first/client#derive-routes-from-the-server}
+ */
 export type ServerFirstClientFor<
 	TTree,
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
@@ -260,7 +271,15 @@ type ServerFirstShorthandClientTree<TNode> = unknown extends TNode
 				: never
 			: never;
 
-/** Options used to create a server-first Fetch client. */
+/**
+ * Options used to create a server-first Fetch client.
+ *
+ * @remarks The server implementation is a type-only client dependency, so
+ * client-side response validation is not available. At runtime, the client
+ * relies on response metadata emitted by a rest-rpc server adapter.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server-first/client}
+ */
 export type ServerFirstClientOptions<
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
 > = Omit<ApiClientOptions<TGlobalHeaders>, "validateResponses">;
@@ -292,7 +311,14 @@ const customBodyRequest = <TValue>(...args: [TValue] | [string, TValue]) =>
 				contentType: args[0],
 			};
 
-/** Explicitly marks specialized encodings used by server-first requests. */
+/**
+ * Marks form bodies, multipart bodies, custom bodies, and JSON query values for
+ * server-first client calls.
+ *
+ * @remarks Ordinary JSON bodies and flat query objects do not need a wrapper.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server-first/client#mark-explicit-request-encodings}
+ */
 export const request = {
 	formBody: <TValue>(value: TValue) => encodedRequest("formBody", value),
 	multipartBody: <TValue>(value: TValue) =>

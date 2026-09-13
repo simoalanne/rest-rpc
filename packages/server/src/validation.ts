@@ -43,8 +43,6 @@ export type RequestValidationResponse =
 
 /**
  * Parsed request pieces passed into server request validation.
- *
- * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registering-http-routes}
  */
 export type RequestSegments = {
 	body?: unknown;

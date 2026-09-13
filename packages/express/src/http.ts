@@ -13,7 +13,11 @@ import type {
 	Request,
 } from "express";
 
-/** Handles an HTTP request validation error using native Express arguments. */
+/**
+ * Defines how an invalid request is handled through native Express arguments.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/express#error-handling}
+ */
 export type RequestValidationErrorHandler = (
 	error: RequestValidationError,
 	req: Request,
@@ -21,7 +25,11 @@ export type RequestValidationErrorHandler = (
 	next: NextFunction,
 ) => unknown;
 
-/** Handles an HTTP response validation error using native Express arguments. */
+/**
+ * Defines how an invalid handler response is handled through native Express arguments.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/express#error-handling}
+ */
 export type ResponseValidationErrorHandler = (
 	error: ResponseValidationError,
 	req: Request,

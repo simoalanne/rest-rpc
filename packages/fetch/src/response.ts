@@ -50,9 +50,7 @@ const createStreamResponse = (
 };
 
 /**
- * Converts a normalized HTTP route result into a Fetch `Response`.
- *
- * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#dispatch-adapters}
+ * Creates a Fetch `Response` from a normalized rest-rpc route result.
  */
 export function createFetchResponse(
 	result: HttpRouteResult,

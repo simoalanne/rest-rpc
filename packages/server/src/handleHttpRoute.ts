@@ -32,15 +32,11 @@ type HttpRouteResultBase = {
 
 /**
  * Identifies how a stream route result should be written by an adapter.
- *
- * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#writing-the-result}
  */
 export type HttpRouteResultStreamMode = "ndjson" | "raw";
 
 /**
  * A normalized HTTP route result ready for an adapter-specific writer.
- *
- * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#writing-the-result}
  */
 export type HttpRouteResult =
 	| (HttpRouteResultBase & { kind: "empty" })
@@ -59,8 +55,6 @@ export type HttpRouteResult =
 
 /**
  * Inputs needed to invoke and normalize one HTTP route handler.
- *
- * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registering-http-routes}
  */
 export type HandleHttpRouteOptions<
 	TAdditionalHandlerFields extends object = Record<never, never>,
@@ -238,8 +232,6 @@ const normalizeRouteResponseError = async (
 
 /**
  * Validates an HTTP request, invokes a route handler, and normalizes its result.
- *
- * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registering-http-routes}
  */
 export async function handleHttpRoute<
 	TAdditionalHandlerFields extends object = Record<never, never>,

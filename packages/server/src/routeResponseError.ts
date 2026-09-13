@@ -14,7 +14,10 @@ type HttpRoutes<TContract> = TContract extends {
 		: never;
 
 /**
- * Throws a declared non-success response from a route handler.
+ * Carries a declared non-success response thrown from a route handler.
+ *
+ * @remarks Server adapters validate and serialize its response as an ordinary
+ * declared route result instead of treating it as an unexpected server error.
  *
  * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-multiple-status-codes}
  */

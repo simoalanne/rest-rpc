@@ -13,19 +13,42 @@ type NodeHandlerFields = {
 	signal: AbortSignal;
 };
 
-/** Result of dispatching a request through the general Node HTTP handler. */
+/**
+ * Indicates whether the Node HTTP handler dispatched a request to a rest-rpc route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/node}
+ */
 export type NodeRouteHandlerResult = { matched: boolean };
 
-/** Application context used by Node route handlers by default. */
+/**
+ * Application context available to Node HTTP route handlers.
+ *
+ * @remarks Augment this interface to define the context accepted by the
+ * catch-all handler and received by every route handler.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/node#framework-context}
+ */
 export interface DefaultContext {}
 
-/** Starts a Node server-first route builder chain. */
+/**
+ * Entry point for declaring server-first routes handled by Node HTTP.
+ *
+ * @remarks Responses are inferred from the handler unless they are declared
+ * before `.handler()`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server-first/server}
+ * @see {@link https://rest-rpc.dev/docs/server/node}
+ */
 export const route = serverFirstRoute as unknown as ServerRouteBuilder<
 	NodeHandlerFields,
 	DefaultContext
 >;
 
-/** Exposes Node handler attachment on every route in a core contract. */
+/**
+ * Creates typed Node HTTP handler builders for every route in a shared contract.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/node}
+ */
 export function implement<const TContract extends Contract>(
 	contract: TContract,
 ): ContractImplementor<TContract, NodeHandlerFields, DefaultContext> {

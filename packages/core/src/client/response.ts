@@ -28,7 +28,14 @@ type FetchedRouteResponse<E extends RouteDeclaration> =
 
 const isSuccessStatus = (status: number) => status >= 200 && status < 300;
 
-/** Header used to describe bodies returned to server-first clients. */
+/**
+ * Response header through which server-first clients identify the body encoding.
+ *
+ * @remarks Browser clients must be allowed to read this header through CORS.
+ * The built-in server adapters emit it automatically.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server-first/client#expose-response-metadata-through-cors}
+ */
 export const SERVER_FIRST_RESPONSE_KIND_HEADER = "X-Rest-Rpc-Response-Kind";
 
 type ServerFirstResponseKind =

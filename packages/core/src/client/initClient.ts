@@ -68,7 +68,12 @@ const createContractClient = <
 /**
  * Creates a typed fetch client from a contract or server implementation tree.
  *
+ * @remarks Pass a contract value for contract-first APIs. For server-first
+ * APIs, pass the implementation tree as a type argument and provide only the
+ * client options at runtime.
+ *
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client}
+ * @see {@link https://rest-rpc.dev/docs/server-first/client#derive-routes-from-the-server}
  */
 export function initClient<
 	const TTree,
@@ -77,7 +82,11 @@ export function initClient<
 	options: ServerFirstClientOptions<TGlobalHeaders>,
 ): ServerFirstClientFor<TTree, TGlobalHeaders>;
 
-/** Creates a typed fetch client from a contract. */
+/**
+ * Creates a typed fetch client whose shape mirrors a contract.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client}
+ */
 export function initClient<
 	TContract extends Contract,
 	const TGlobalHeaders extends Record<string, string> = Record<never, string>,

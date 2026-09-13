@@ -51,7 +51,11 @@ export type MultipartBody<
  */
 export type CustomBodyContentType = string | readonly string[];
 
-/** A value that can be written as a custom HTTP response body. */
+/**
+ * A value accepted as the payload of a custom-content HTTP response.
+ *
+ * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-custom-content-type}
+ */
 export type CustomResponseValue = string | Uint8Array;
 
 type CustomResponseSchema = StandardSchemaV1<unknown, CustomResponseValue>;
@@ -74,7 +78,7 @@ export type CustomBody<
 	: { contentType?: Exclude<TContentType, undefined> });
 
 /**
- * A response body declaration with an explicit content type.
+ * Declares a response body with one or more non-JSON content types.
  *
  * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-custom-content-type}
  */

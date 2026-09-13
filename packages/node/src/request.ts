@@ -2,7 +2,11 @@ import type { IncomingMessage } from "node:http";
 import { Readable } from "node:stream";
 import { defaultBodyParser as parseFetchBody } from "@rest-rpc/fetch";
 
-/** Replacement Node request body decoder. */
+/**
+ * Defines how a Node HTTP request body is decoded before route validation.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/node#body-parsing}
+ */
 export type NodeBodyParser = (
 	request: IncomingMessage,
 ) => unknown | Promise<unknown>;
@@ -28,7 +32,11 @@ const toFetchRequest = (request: IncomingMessage) => {
 	return new Request(parseRequestTarget(request), init);
 };
 
-/** Decodes a Node request body through the shared Fetch body parser. */
+/**
+ * Decodes a Node request body according to its Content-Type header.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/node#body-parsing}
+ */
 export function defaultBodyParser(request: IncomingMessage) {
 	return parseFetchBody(toFetchRequest(request));
 }

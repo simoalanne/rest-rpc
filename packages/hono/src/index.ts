@@ -36,23 +36,43 @@ export {
 	RouteResponseError,
 } from "@rest-rpc/server";
 
-/** Infers the request passed to a Hono route handler. */
+/**
+ * Infers the validated request and Hono context available to a route handler.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ */
 export type RouteRequest<
 	TRoute extends ContractRoute,
 	TEnv extends Env = Env,
 > = ServerRouteRequest<TRoute["~restrpc"], HonoHandlerFields<TEnv>>;
 
-/** Infers a Hono route handler for a route declaration. */
+/**
+ * Infers the Hono handler signature for a route declaration.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ */
 export type RouteHandler<
 	TRoute extends ContractRoute,
 	TEnv extends Env = Env,
 > = ServerRouteHandler<TRoute["~restrpc"], HonoHandlerFields<TEnv>>;
 
-/** Starts a Hono server-first route builder chain. */
+/**
+ * Entry point for declaring server-first routes handled by Hono.
+ *
+ * @remarks Responses are inferred from the handler unless they are declared
+ * before `.handler()`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server-first/server}
+ * @see {@link https://rest-rpc.dev/docs/server/hono#framework-context}
+ */
 export const route =
 	serverFirstRoute as unknown as ServerRouteBuilder<HonoHandlerFields>;
 
-/** Exposes Hono handler attachment on every route in a core contract. */
+/**
+ * Creates typed Hono handler builders for every route in a shared contract.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/hono}
+ */
 export function implement<const TContract extends Contract>(
 	contract: TContract,
 ): ContractImplementor<TContract, HonoHandlerFields> {

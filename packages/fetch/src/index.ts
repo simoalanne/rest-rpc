@@ -11,16 +11,35 @@ type FetchHandlerFields = {
 	signal: AbortSignal;
 };
 
-/** Application context used by Fetch route handlers by default. */
+/**
+ * Application context available to Fetch route handlers.
+ *
+ * @remarks Augment this interface to define the context accepted by the
+ * catch-all handler and received by every route handler.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fetch#framework-context}
+ */
 export interface DefaultContext {}
 
-/** Starts a Fetch server-first route builder chain. */
+/**
+ * Entry point for declaring server-first routes handled by the Fetch runtime.
+ *
+ * @remarks Responses are inferred from the handler unless they are declared
+ * before `.handler()`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server-first/server}
+ * @see {@link https://rest-rpc.dev/docs/server/fetch}
+ */
 export const route = serverFirstRoute as unknown as ServerRouteBuilder<
 	FetchHandlerFields,
 	DefaultContext
 >;
 
-/** Exposes Fetch handler attachment on every route in a core contract. */
+/**
+ * Creates typed Fetch handler builders for every route in a shared contract.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fetch}
+ */
 export function implement<const TContract extends Contract>(
 	contract: TContract,
 ): ContractImplementor<TContract, FetchHandlerFields, DefaultContext> {

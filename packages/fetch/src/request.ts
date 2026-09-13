@@ -1,5 +1,5 @@
 /**
- * Custom request body parser for the Fetch runtime.
+ * Defines how a Fetch request body is decoded before route validation.
  *
  * @see {@link https://rest-rpc.dev/docs/server/fetch#body-parsing}
  */
@@ -11,7 +11,15 @@ const normalizeContentType = (contentType: string) =>
 const isJsonContentType = (contentType: string) =>
 	contentType === "application/json" || contentType.endsWith("+json");
 
-/** Decodes a Fetch request body according to its Content-Type header. */
+/**
+ * Decodes a Fetch request body according to its Content-Type header.
+ *
+ * @remarks JSON, URL-encoded form data, multipart form data, text, and binary
+ * bodies use the corresponding Fetch `Request` reader. Requests without a body
+ * produce `undefined`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fetch#body-parsing}
+ */
 export async function defaultBodyParser(request: Request) {
 	if (request.body === null) return undefined;
 

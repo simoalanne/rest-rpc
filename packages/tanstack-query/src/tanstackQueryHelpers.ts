@@ -56,7 +56,11 @@ type RouteRequestValue<E extends QueryRoute> = ClientRequest<RouteFor<E>>;
 /**
  * Infers the successful query data returned for a route.
  *
+ * @remarks HTTP routes retain their response envelope and include only 2xx
+ * statuses. Procedure routes produce their output value directly.
+ *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#tanstack-query}
+ * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#queries}
  */
 export type RouteQueryData<E extends QueryRoute> =
 	RouteFor<E> extends {
@@ -68,7 +72,11 @@ export type RouteQueryData<E extends QueryRoute> =
 /**
  * Infers the error value surfaced by generated TanStack Query options.
  *
+ * @remarks HTTP routes include declared non-2xx response envelopes and `Error`.
+ * Procedure routes surface `Error` because they do not declare typed failures.
+ *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#tanstack-query}
+ * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#error-model}
  */
 export type RouteQueryError<E extends QueryRoute> =
 	RouteFor<E> extends {
@@ -81,6 +89,7 @@ export type RouteQueryError<E extends QueryRoute> =
  * Infers mutation variables for a route.
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#tanstack-query}
+ * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#mutations}
  */
 export type RouteMutationVariables<E extends QueryRoute> =
 	RouteRequestValue<E> extends never ? undefined : RouteRequestValue<E>;
@@ -88,7 +97,11 @@ export type RouteMutationVariables<E extends QueryRoute> =
 /**
  * Infers infinite query data for a route.
  *
+ * @remarks Each page contains a successful route result, while each page
+ * parameter contains the complete request used to fetch that page.
+ *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#tanstack-query}
+ * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#infinite-queries}
  */
 export type RouteInfiniteQueryData<E extends QueryRoute> = InfiniteData<
 	RouteQueryData<E>,
@@ -106,7 +119,11 @@ type RouteStreamChunk<E extends QueryRoute> = [
 /**
  * Infers the accumulated data returned by generated stream query options.
  *
+ * @remarks The default accumulator materializes NDJSON chunks into an array
+ * and omits the HTTP response envelope.
+ *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#tanstack-query}
+ * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#streamed-queries}
  */
 export type RouteStreamedQueryData<E extends QueryRoute> = [
 	RouteStreamChunk<E>,
@@ -269,7 +286,14 @@ type UseQueryArgs<E extends QueryRoute, TData = RouteQueryData<E>> =
 type GetKeyArgs<E extends QueryRoute> =
 	RouteRequestValue<E> extends never ? [] : [request: RouteRequestValue<E>];
 
-/** Creates query options for a route, including disabled requests. */
+/**
+ * Describes the typed `queryOptions()` method available for a route.
+ *
+ * @remarks Passing TanStack Query's `skipToken` instead of request input
+ * produces disabled query options without losing route type safety.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#queries}
+ */
 export type RouteQueryOptionsMethod<E extends QueryRoute> = {
 	<TData = RouteQueryData<E>>(
 		...args: UseQueryArgs<E, TData>
@@ -326,6 +350,10 @@ type TanstackQueryTreeFor<T extends Contract> = {
 /**
  * Infers the generated TanStack Query helper tree for a contract.
  *
+ * @remarks The helper tree mirrors the contract. Each route exposes query,
+ * mutation, and key helpers; eligible streaming routes also expose streamed
+ * query options.
+ *
  * @see {@link https://rest-rpc.dev/docs/client/tanstack-query}
  */
 export type TanstackQueryHelpersFor<T extends Contract> = T extends QueryRoute
@@ -372,7 +400,7 @@ type ServerFirstShorthandTanstackQueryTree<TNode> = unknown extends TNode
  * Infers the method-and-path and shorthand TanStack Query helpers for a server
  * implementation tree.
  *
- * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#server-first}
+ * @see {@link https://rest-rpc.dev/docs/server-first/client#tanstack-query}
  */
 export type ServerFirstTanstackQueryHelpersFor<TTree> = {
 	[TSelector in ServerFirstClientSelector<TTree>]: <
@@ -402,7 +430,7 @@ export type CreateTanstackQueryHelpersOptions<
 /**
  * Options used to create TanStack Query helpers from a server implementation tree.
  *
- * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#server-first}
+ * @see {@link https://rest-rpc.dev/docs/server-first/client#tanstack-query}
  */
 export type CreateServerFirstTanstackQueryHelpersOptions<
 	TGlobalHeaders extends Record<string, string> = Record<never, string>,
@@ -420,7 +448,11 @@ const getRouteDeclaration = (value: unknown): RouteDeclaration | undefined =>
 const getByPath = (tree: unknown, path: string[]) =>
 	path.reduce((node, key) => (node as Record<string, unknown>)[key], tree);
 
-/** Creates TanStack Query option helpers from a server implementation tree. */
+/**
+ * Creates method-and-path and procedure helpers from a server implementation tree.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server-first/client#tanstack-query}
+ */
 export function createTanstackQueryHelpers<
 	const TTree,
 	const TGlobalHeaders extends Record<string, string> = Record<never, string>,
@@ -428,7 +460,11 @@ export function createTanstackQueryHelpers<
 	options: CreateServerFirstTanstackQueryHelpersOptions<TGlobalHeaders>,
 ): ServerFirstTanstackQueryHelpersFor<TTree>;
 
-/** Creates TanStack Query option helpers from a contract. */
+/**
+ * Creates a TanStack Query helper tree that mirrors a contract.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#setup}
+ */
 export function createTanstackQueryHelpers<
 	TContract extends Contract,
 	const TGlobalHeaders extends Record<string, string> = Record<never, string>,
@@ -440,7 +476,11 @@ export function createTanstackQueryHelpers<
 /**
  * Creates TanStack Query option helpers from a contract or server implementation tree.
  *
+ * @remarks Generated helpers create options and stable query keys; they do not
+ * create a `QueryClient` or call framework-specific hooks.
+ *
  * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#setup}
+ * @see {@link https://rest-rpc.dev/docs/server-first/client#tanstack-query}
  */
 export function createTanstackQueryHelpers(
 	contractOrOptions: Contract | CreateServerFirstTanstackQueryHelpersOptions,

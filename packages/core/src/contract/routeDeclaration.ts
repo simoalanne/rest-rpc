@@ -52,7 +52,14 @@ export type RouteRequestDeclaration = {
 	headers?: RequestHeadersDeclaration;
 };
 
-/** A canonical route declaration produced by an HTTP or procedure builder. */
+/**
+ * The contract information retained for one declared HTTP or procedure route.
+ *
+ * @remarks Applications normally create route declarations with `route`
+ * instead of constructing this representation directly.
+ *
+ * @see {@link https://rest-rpc.dev/docs/contract/declaration}
+ */
 export type RouteDeclaration = {
 	kind: "http" | "procedure";
 	path: string;

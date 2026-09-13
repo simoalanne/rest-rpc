@@ -35,23 +35,43 @@ export {
 	RouteResponseError,
 } from "@rest-rpc/server";
 
-/** Infers the request passed to an Express route handler. */
+/**
+ * Infers the validated request and Express context available to a route handler.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ */
 export type RouteRequest<TRoute extends ContractRoute> = ServerRouteRequest<
 	TRoute["~restrpc"],
 	ExpressHandlerFields
 >;
 
-/** Infers an Express route handler for a route declaration. */
+/**
+ * Infers the Express handler signature for a route declaration.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ */
 export type RouteHandler<TRoute extends ContractRoute> = ServerRouteHandler<
 	TRoute["~restrpc"],
 	ExpressHandlerFields
 >;
 
-/** Starts an Express server-first route builder chain. */
+/**
+ * Entry point for declaring server-first routes handled by Express.
+ *
+ * @remarks Responses are inferred from the handler unless they are declared
+ * before `.handler()`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server-first/server}
+ * @see {@link https://rest-rpc.dev/docs/server/express#framework-context}
+ */
 export const route =
 	serverFirstRoute as unknown as ServerRouteBuilder<ExpressHandlerFields>;
 
-/** Exposes Express handler attachment on every route in a core contract. */
+/**
+ * Creates typed Express handler builders for every route in a shared contract.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/express}
+ */
 export function implement<const TContract extends Contract>(
 	contract: TContract,
 ): ContractImplementor<TContract, ExpressHandlerFields> {

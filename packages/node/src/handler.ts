@@ -15,21 +15,33 @@ import {
 } from "./request.ts";
 import { writeNodeResponse } from "./response.ts";
 
-/** Options for the general Node HTTP catch-all handler. */
+/**
+ * Customizes request parsing and validation failures for a Node HTTP handler.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/node#options}
+ */
 export type CreateNodeHandlerOptions = {
 	bodyParser?: NodeBodyParser;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 };
 
-/** Handles a request validation error using native Node HTTP arguments. */
+/**
+ * Defines how an invalid request is written through native Node HTTP arguments.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/node#error-handling}
+ */
 export type RequestValidationErrorHandler = (
 	error: RequestValidationError,
 	request: IncomingMessage,
 	response: ServerResponse,
 ) => unknown;
 
-/** Handles a response validation error using native Node HTTP arguments. */
+/**
+ * Defines how invalid handler output is written through native Node HTTP arguments.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/node#error-handling}
+ */
 export type ResponseValidationErrorHandler = (
 	error: ResponseValidationError,
 	request: IncomingMessage,
@@ -40,7 +52,14 @@ type ContextArguments = {} extends DefaultContext
 	? [context?: DefaultContext]
 	: [context: DefaultContext];
 
-/** Creates a Node HTTP catch-all handler that leaves unmatched requests untouched. */
+/**
+ * Creates a Node HTTP handler that dispatches matching rest-rpc routes.
+ *
+ * @remarks Unmatched requests are left untouched and reported with
+ * `matched: false` so the surrounding server can provide fallback routing.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/node}
+ */
 export function createRouteHandler(
 	implementations: RuntimeImplementationTree,
 	options: CreateNodeHandlerOptions = {},

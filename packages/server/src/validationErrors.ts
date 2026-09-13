@@ -8,7 +8,14 @@ export type RequestValidationIssues = {
 	headers: readonly ValidationIssue[];
 };
 
-/** Error thrown when an HTTP request does not satisfy its route contract. */
+/**
+ * Error reported when an HTTP request does not satisfy its route contract.
+ *
+ * @remarks Server adapters handle this error before the route handler runs and
+ * expose adapter-specific hooks for replacing the default error response.
+ *
+ * @see {@link https://rest-rpc.dev/docs/contract/schemas#validation}
+ */
 export class RequestValidationError extends Error {
 	readonly name = "RequestValidationError";
 	/** Standard Schema validation issues grouped by HTTP request location. */
@@ -23,7 +30,14 @@ export class RequestValidationError extends Error {
 /** The HTTP response location whose schema validation failed. */
 export type ResponseValidationLocation = "body" | "headers" | "stream";
 
-/** Error thrown when an HTTP response does not satisfy its route contract. */
+/**
+ * Error reported when handler output does not satisfy its route contract.
+ *
+ * @remarks Server adapters expose adapter-specific hooks for replacing the
+ * default error response.
+ *
+ * @see {@link https://rest-rpc.dev/docs/contract/schemas#validation}
+ */
 export class ResponseValidationError extends Error {
 	readonly name = "ResponseValidationError";
 	/** The response location whose schema validation failed. */

@@ -23,14 +23,26 @@ export type RuntimeRouteHandler = (
 	request: unknown,
 ) => unknown | Promise<unknown>;
 
-/** Infers the validated request data for a route declaration. */
+/**
+ * Infers the validated request data declared for a route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ */
 export type RouteRequestData<TRoute extends RouteDeclaration> =
 	ServerRequest<TRoute>;
 
-/** Infers the declared non-success responses for a route. */
+/**
+ * Infers the declared non-2xx response envelopes for a route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ */
 export type RouteErrors<TRoute extends RouteDeclaration> = ServerErrors<TRoute>;
 
-/** Infers the declared explicit response union for a route. */
+/**
+ * Infers every response envelope a route handler may return.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ */
 export type RouteResponse<TRoute extends RouteDeclaration> =
 	ServerResponse<TRoute>;
 
@@ -43,7 +55,12 @@ type HandlerResult<TRoute extends RouteDeclaration> = MaybePromise<
 	RouteResponse<TRoute>
 >;
 
-/** Infers the route handler request type for a route declaration. */
+/**
+ * Infers the validated request, adapter fields, and application context
+ * received by a handler.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ */
 export type RouteRequest<
 	TRoute extends RouteDeclaration,
 	TAdditionalHandlerFields extends object = EmptyObject,
@@ -62,7 +79,11 @@ export type RouteRequest<
 		}
 >;
 
-/** Infers the route handler function type for a route declaration. */
+/**
+ * Infers the complete handler signature for a route declaration.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ */
 export type RouteHandler<
 	TRoute extends RouteDeclaration,
 	TAdditionalHandlerFields extends object = EmptyObject,
@@ -73,7 +94,14 @@ export type RouteHandler<
 
 type Merge<T> = { [TKey in keyof T]: T[TKey] };
 
-/** Explicit HTTP response envelope accepted from an inferred route handler. */
+/**
+ * HTTP response shape from which a server-first route infers its contract.
+ *
+ * @remarks An `AsyncIterable` body denotes a stream. Providing `contentType`
+ * selects a custom-content response; otherwise bodies use JSON or NDJSON.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server-first/server#infer-responses-from-the-handler}
+ */
 export type ImplicitResponseEnvelope =
 	| {
 			status: number;
@@ -88,7 +116,11 @@ export type ImplicitResponseEnvelope =
 			responseHeaders?: Record<string, string | number | undefined>;
 	  };
 
-/** Wire response classifications available to server-first HTTP routes. */
+/**
+ * Body encodings a server-first client can receive from an inferred route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server-first/client#expose-response-metadata-through-cors}
+ */
 export type ServerFirstResponseKind =
 	| "empty"
 	| "json"
@@ -105,7 +137,11 @@ type BodyResponseKind<TResponse, TBody> =
 			? "custom"
 			: "json";
 
-/** Classifies one inferred response envelope by its statically known shape. */
+/**
+ * Infers the body encoding selected by a server-first response shape.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server-first/server#infer-responses-from-the-handler}
+ */
 export type ImplicitResponseKind<TResponse> = TResponse extends unknown
 	? "body" extends keyof TResponse
 		? TResponse extends { body: infer TBody }
@@ -326,7 +362,11 @@ type ImplementationParts<TImplementation> = TImplementation extends {
 	? { route: TRoute; handler: THandler }
 	: never;
 
-/** Infers the source response union retained by a server-first implementation. */
+/**
+ * Infers the handler response union retained by a server-first implementation.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server-first/server#infer-responses-from-the-handler}
+ */
 export type InferredRouteResponse<TImplementation> =
 	ImplementationParts<TImplementation> extends { handler: infer THandler }
 		? THandler extends AnyRouteHandler
@@ -334,7 +374,11 @@ export type InferredRouteResponse<TImplementation> =
 			: never
 		: never;
 
-/** Infers the wire response kinds represented by a server-first implementation. */
+/**
+ * Infers the body encodings represented by a server-first implementation.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server-first/client#expose-response-metadata-through-cors}
+ */
 export type ServerFirstRouteResponseKind<TImplementation> =
 	ImplementationParts<TImplementation> extends {
 		route: infer TRoute;
@@ -345,7 +389,11 @@ export type ServerFirstRouteResponseKind<TImplementation> =
 			: ImplicitResponseKind<Awaited<ReturnType<THandler>>>
 		: never;
 
-/** Shared core route builder with server-first handler typing. */
+/**
+ * Route builder that finishes declarations by attaching a server handler.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server-first/server}
+ */
 export type ServerRouteBuilder<
 	TAdditionalHandlerFields extends object = EmptyObject,
 	TContext extends object = EmptyObject,

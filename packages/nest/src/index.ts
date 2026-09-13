@@ -35,27 +35,47 @@ export {
 	ResponseValidationException,
 } from "./validationExceptions.ts";
 
-/** Infers the request passed to a Nest route handler. */
+/**
+ * Infers the validated request and Nest context available to a route handler.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ */
 export type RouteRequest<TRoute extends ContractRoute> = ServerRouteRequest<
 	TRoute["~restrpc"],
 	NestHandlerFields,
 	DefaultContext
 >;
 
-/** Infers a Nest route handler for a route declaration. */
+/**
+ * Infers the Nest handler signature for a route declaration.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ */
 export type RouteHandler<TRoute extends ContractRoute> = ServerRouteHandler<
 	TRoute["~restrpc"],
 	NestHandlerFields,
 	DefaultContext
 >;
 
-/** Starts a Nest server-first route builder chain. */
+/**
+ * Entry point for declaring server-first routes handled by Nest.
+ *
+ * @remarks Responses are inferred from the handler unless they are declared
+ * before `.handler()`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server-first/server}
+ * @see {@link https://rest-rpc.dev/docs/server/nest#server-first-routes}
+ */
 export const route = serverFirstRoute as unknown as ServerRouteBuilder<
 	NestHandlerFields,
 	DefaultContext
 >;
 
-/** Exposes Nest handler attachment on every route in a core contract. */
+/**
+ * Creates typed Nest handler builders for every route in a shared contract.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/nest}
+ */
 export function implement<const TContract extends Contract>(
 	contract: TContract,
 ): ContractImplementor<TContract, NestHandlerFields, DefaultContext> {

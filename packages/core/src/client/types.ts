@@ -64,10 +64,11 @@ type RouteDeclaredResponse<E extends RouteDeclaration> = WithResponseMetadata<
 /**
  * Infers a route's client result.
  *
- * Explicit routes produce a response envelope when called.
- * Shorthand routes produce their output value directly.
+ * @remarks Explicit HTTP routes produce a status-discriminated response
+ * envelope. Procedure routes produce their output value directly.
  *
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-an-http-route}
+ * @see {@link https://rest-rpc.dev/docs/procedures#call-procedures}
  */
 export type ClientResponse<E extends RouteDeclaration> = E extends {
 	kind: "procedure";
@@ -82,7 +83,12 @@ export type FetchResponseFn<
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
 > = (...args: FetchArgs<E, TGlobalHeaders>) => Promise<ClientResponse<E>>;
 
-/** Client operations available for a single declared route. */
+/**
+ * Infers the callable client operation for one declared route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
+ * @see {@link https://rest-rpc.dev/docs/procedures#call-procedures}
+ */
 export type ApiClientRouteValue<
 	E extends RouteDeclaration = RouteDeclaration,
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
@@ -127,6 +133,9 @@ export type ApiClientFor<
 /**
  * Enables deterministic Next.js fetch tags for generated GET requests.
  *
+ * @remarks Automatic tags identify the route and, when present, its path
+ * parameters and query input. Bodies and headers are excluded.
+ *
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#use-in-nextjs}
  */
 export type NextFetchTagsOptions = {
@@ -136,6 +145,10 @@ export type NextFetchTagsOptions = {
 
 /**
  * Options used to create a typed fetch client.
+ *
+ * @remarks Headers returned by `getGlobalHeaders` make matching declared
+ * headers optional at individual call sites. Per-call Fetch options override
+ * defaults from `fetchOptions`.
  *
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#client-options}
  */

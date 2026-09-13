@@ -35,23 +35,43 @@ export {
 	RouteResponseError,
 } from "@rest-rpc/server";
 
-/** Infers the request passed to a Fastify route handler. */
+/**
+ * Infers the validated request and Fastify context available to a route handler.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ */
 export type RouteRequest<TRoute extends ContractRoute> = ServerRouteRequest<
 	TRoute["~restrpc"],
 	FastifyHandlerFields
 >;
 
-/** Infers a Fastify route handler for a route declaration. */
+/**
+ * Infers the Fastify handler signature for a route declaration.
+ *
+ * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ */
 export type RouteHandler<TRoute extends ContractRoute> = ServerRouteHandler<
 	TRoute["~restrpc"],
 	FastifyHandlerFields
 >;
 
-/** Starts a Fastify server-first route builder chain. */
+/**
+ * Entry point for declaring server-first routes handled by Fastify.
+ *
+ * @remarks Responses are inferred from the handler unless they are declared
+ * before `.handler()`.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server-first/server}
+ * @see {@link https://rest-rpc.dev/docs/server/fastify#framework-context}
+ */
 export const route =
 	serverFirstRoute as unknown as ServerRouteBuilder<FastifyHandlerFields>;
 
-/** Exposes Fastify handler attachment on every route in a core contract. */
+/**
+ * Creates typed Fastify handler builders for every route in a shared contract.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fastify}
+ */
 export function implement<const TContract extends Contract>(
 	contract: TContract,
 ): ContractImplementor<TContract, FastifyHandlerFields> {

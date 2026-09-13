@@ -18,8 +18,6 @@ const responseKindFor = (result: HttpRouteResult) => {
 
 /**
  * Adapter callbacks used to write a normalized HTTP route result.
- *
- * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#writing-the-result}
  */
 export type HttpRouteResultWriter<TResponse> = {
 	setHeader(name: string, value: HttpHeaderValue): void;
@@ -36,8 +34,6 @@ export type HttpRouteResultWriter<TResponse> = {
 
 /**
  * Writes a normalized HTTP route result through an adapter-provided writer.
- *
- * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#writing-the-result}
  */
 export async function handleHttpRouteResult<TResponse>(
 	result: HttpRouteResult,

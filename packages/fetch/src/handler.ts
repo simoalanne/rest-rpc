@@ -9,20 +9,32 @@ import type { DefaultContext } from "./index.ts";
 import { defaultBodyParser, type FetchBodyParser } from "./request.ts";
 import { createFetchResponse } from "./response.ts";
 
-/** Options for the general Fetch catch-all handler. */
+/**
+ * Customizes request parsing and validation failures for a Fetch catch-all handler.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fetch#options}
+ */
 export type CreateFetchHandlerOptions = {
 	bodyParser?: FetchBodyParser;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 };
 
-/** Handles a request validation error using native Fetch arguments. */
+/**
+ * Defines the Fetch response returned when a request fails validation.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fetch#error-handling}
+ */
 export type RequestValidationErrorHandler = (
 	error: RequestValidationError,
 	request: Request,
 ) => Response | Promise<Response>;
 
-/** Handles a response validation error using native Fetch arguments. */
+/**
+ * Defines the Fetch response returned when handler output fails validation.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fetch#error-handling}
+ */
 export type ResponseValidationErrorHandler = (
 	error: ResponseValidationError,
 	request: Request,
@@ -36,7 +48,14 @@ type ContextArguments = {} extends DefaultContext
 	? [context?: DefaultContext]
 	: [context: DefaultContext];
 
-/** Creates a Fetch catch-all handler from an ordinary route implementation tree. */
+/**
+ * Creates a Fetch catch-all handler that dispatches matching rest-rpc routes.
+ *
+ * @remarks An unmatched request is returned to the caller with `matched: false`
+ * so the surrounding runtime can provide fallback routing.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fetch}
+ */
 export function createRouteHandler(
 	implementations: RuntimeImplementationTree,
 	options: CreateFetchHandlerOptions = {},

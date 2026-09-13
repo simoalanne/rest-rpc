@@ -291,5 +291,13 @@ export class RouteBuilder {
 
 const runtimeRoute = new RouteBuilder();
 
-/** Root route builder used to declare HTTP and procedure routes. */
+/**
+ * Entry point for declaring contract-first HTTP and procedure routes.
+ *
+ * @remarks Every builder method returns a new route value, so configured route
+ * factories can be reused safely across declarations.
+ *
+ * @see {@link https://rest-rpc.dev/docs/contract/declaration#route-builders}
+ * @see {@link https://rest-rpc.dev/docs/procedures#contract-first-procedures}
+ */
 export const route = runtimeRoute as unknown as RootRouteBuilder;

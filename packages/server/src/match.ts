@@ -143,8 +143,6 @@ export type RouteMatch = {
 
 /**
  * Compiles route implementations into a method and path matcher.
- *
- * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#dispatch-adapters}
  */
 export function createRouteMatcher(implementations: RuntimeImplementationTree) {
 	const matchers = flattenRouteImplementations(implementations).map(

@@ -9,14 +9,22 @@ import {
 } from "@rest-rpc/server";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
-/** Handles an HTTP request validation error using native Fastify arguments. */
+/**
+ * Defines how an invalid request is handled through native Fastify arguments.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fastify#error-handling}
+ */
 export type RequestValidationErrorHandler = (
 	error: RequestValidationError,
 	request: FastifyRequest,
 	reply: FastifyReply,
 ) => unknown;
 
-/** Handles an HTTP response validation error using native Fastify arguments. */
+/**
+ * Defines how an invalid handler response is handled through native Fastify arguments.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fastify#error-handling}
+ */
 export type ResponseValidationErrorHandler = (
 	error: ResponseValidationError,
 	request: FastifyRequest,

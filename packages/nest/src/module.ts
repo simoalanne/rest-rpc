@@ -10,7 +10,7 @@ import { RestRpcRouteInterceptor } from "./routeInterceptor.ts";
  * project. The augmented shape is used by `RouteRequest`, `RouteHandler`,
  * `route`, and `implement()`.
  *
- * @see {@link https://rest-rpc.dev/docs/server/nest#global-context}
+ * @see {@link https://rest-rpc.dev/docs/server/nest#framework-context}
  */
 export interface DefaultContext {}
 
