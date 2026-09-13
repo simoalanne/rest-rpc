@@ -21,7 +21,7 @@ const todo = await client.todos.get({ id: "todo_1" });
 
 Use procedure routes as the starting point for application-owned APIs when an
 operation has one normal JSON result and callers should not need to work with
-HTTP response metadata. Use an [explicit HTTP route](./contract/declaration)
+HTTP response metadata. Use an [explicit HTTP route](/docs/contract/declaration)
 when the HTTP interface itself is part of the design.
 
 | Start with a procedure route when                           | Use an explicit route when                              |
@@ -141,7 +141,7 @@ await client.todos.list(undefined, { cache: "no-store" });
 An unsuccessful HTTP response rejects the call with an `Error`. Procedure
 routes do not declare typed error results. If an error is an expected part of
 the API that clients should inspect, model it with explicit response statuses
-on an [HTTP route](./http-responses).
+on an [HTTP route](/docs/http-responses).
 
 ## TanStack Query
 

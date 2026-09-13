@@ -5,7 +5,7 @@ description: Understand the server-side differences when routes and handlers are
 
 This page focuses on what changes compared to contract-first handlers.
 Request schemas, validation, encodings, and adapter integration otherwise
-work as described in [HTTP Requests](/docs/http-requests/) and the page for your server adapter.
+work as described in [HTTP Requests](/docs/http-requests) and the page for your server adapter.
 
 ## Define The Handler On The Route
 
@@ -59,7 +59,7 @@ type so clients can narrow the response by status.
 Response declarations remain available. Adding `.response()` makes those
 declarations the source of the response type and enables the same response
 schemas, headers, validation, and handler return forms documented in
-[HTTP Responses](/docs/http-responses/).
+[HTTP Responses](/docs/http-responses).
 
 ```ts
 const getTodo = route
