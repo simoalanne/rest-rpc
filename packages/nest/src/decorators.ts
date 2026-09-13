@@ -14,9 +14,7 @@ import "reflect-metadata";
 
 export const REST_RPC_ROUTE_METADATA = Symbol.for("rest-rpc:nest-route");
 
-export type RouteMetadata = {
-	route: RouteDeclaration;
-};
+export type RouteMetadata = { route: RouteDeclaration };
 
 const methodMap: Record<HttpMethod, RequestMethod> = {
 	DELETE: RequestMethod.DELETE,
@@ -32,9 +30,7 @@ const createNestRouteDecorator = (route: RouteDeclaration): MethodDecorator =>
 			path: toColonPath(route.path),
 			method: methodMap[route.method],
 		}),
-		SetMetadata(REST_RPC_ROUTE_METADATA, {
-			route,
-		} satisfies RouteMetadata),
+		SetMetadata(REST_RPC_ROUTE_METADATA, { route } satisfies RouteMetadata),
 	);
 
 const getImplementationAtPath = (tree: unknown, path: string[]) =>
@@ -67,9 +63,9 @@ const copyPropertyMetadata = (
 	}
 };
 
-let routerRouteMethodId = 0;
+let implementationRouteMethodId = 0;
 
-const createRouterRouteMethod = (
+const createImplementationRouteMethod = (
 	target: object,
 	propertyKey: string | symbol,
 	descriptor: PropertyDescriptor,
@@ -79,7 +75,7 @@ const createRouterRouteMethod = (
 	const original = descriptor.value;
 	if (typeof original !== "function") return;
 
-	const routeMethodName = `__restRpcRouter_${String(propertyKey)}_${routerRouteMethodId++}`;
+	const routeMethodName = `__restRpcImplement_${String(propertyKey)}_${implementationRouteMethodId++}`;
 	const routeMethod = async function (this: unknown, ...args: unknown[]) {
 		const tree = await original.apply(this, args);
 		return getImplementationAtPath(tree, path);
@@ -100,31 +96,29 @@ const createRouterRouteMethod = (
 };
 
 /**
- * Binds a Nest controller method to a rest-rpc HTTP contract route.
+ * Registers every route in a contract tree through a Nest controller method.
  *
- * @remarks Use this decorator when a controller method returns the
- * implementation for a single route. The method can still use Nest decorators
- * and dependency injection before handing off to `route()`.
+ * @remarks The decorated method must return a matching completed route or
+ * implementation tree. Nest decorators applied to the method are copied to
+ * every generated route method.
  *
- * @see {@link https://rest-rpc.dev/docs/server/nest#single-routes}
+ * @see {@link https://rest-rpc.dev/docs/server/nest}
  */
-export function Route(route: RouteDeclaration): MethodDecorator {
-	return createNestRouteDecorator(route);
-}
-
-/**
- * Binds one Nest controller method to every HTTP route in a rest-rpc contract router.
- *
- * @remarks Use this decorator when one controller method returns a
- * contract-shaped implementation tree from `router()`. The decorator registers
- * each HTTP route with Nest while the returned tree provides the handlers.
- *
- * @see {@link https://rest-rpc.dev/docs/server/nest#usage}
- */
-export function Router(contract: Contract): MethodDecorator {
+export function Implement(contract: Contract): MethodDecorator {
 	return (target, propertyKey, descriptor) => {
 		for (const { route, path } of contractRouteEntries(contract)) {
-			createRouterRouteMethod(target, propertyKey, descriptor, route, path);
+			if (route.kind === "procedure" && path.length === 0) {
+				throw new Error(
+					"@Implement() requires a procedure to be part of a route tree because its path is derived from its tree keys.",
+				);
+			}
+			createImplementationRouteMethod(
+				target,
+				propertyKey,
+				descriptor,
+				route,
+				path,
+			);
 		}
 	};
 }

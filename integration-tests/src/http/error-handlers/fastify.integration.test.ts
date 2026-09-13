@@ -28,11 +28,14 @@ runErrorHandlersSuite(
 		configureApp: (app) => {
 			app.setErrorHandler((error, request, reply) => {
 				state.unhandledErrors += 1;
-				return reply.status(503).header("x-error-handler", "unhandled").send({
-					code: "UNHANDLED_ERROR",
-					message: error.message,
-					path: request.routeOptions.url,
-				});
+				return reply
+					.status(503)
+					.header("x-error-handler", "unhandled")
+					.send({
+						code: "UNHANDLED_ERROR",
+						message: error instanceof Error ? error.message : "unknown error",
+						path: request.routeOptions.url,
+					});
 			});
 		},
 	}),

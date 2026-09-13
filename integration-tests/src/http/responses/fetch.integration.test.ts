@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { initClient, route } from "@rest-rpc/core";
-import { REQUEST_CONTEXT_KEY } from "@rest-rpc/core/contract";
-import type { ImplementationShape } from "@rest-rpc/server";
-import { router } from "@rest-rpc/server";
+import { initClient, route, type ApiClientFor } from "@rest-rpc/core";
+import { implement } from "@rest-rpc/fetch";
 import z from "zod";
 import type { StartedServer } from "../harness/listen.ts";
 import { createFetchAdapter } from "../harness/fetch.ts";
@@ -57,48 +55,33 @@ const lifecycleContract = {
 };
 
 type LifecycleContract = typeof lifecycleContract;
-type FetchLifecycleContext = {
-	adapter: "fetch";
-	responseHeaders: Headers;
-	response: Response;
-};
-
 const createLifecycleImplementations = () => {
-	const handlers: ImplementationShape<
-		LifecycleContract,
-		FetchLifecycleContext
-	> = {
-		contextMutation: (request) => {
-			const context = request[REQUEST_CONTEXT_KEY];
-			context.responseHeaders.set("x-context-mutation", "ignored");
-			context.response.headers.set("x-context-response-mutation", "ignored");
+	const implementor = implement(lifecycleContract);
 
+	return {
+		contextMutation: implementor.contextMutation.handler(({ request }) => {
+			request.headers.set("x-request-mutation", "ignored");
 			return {
 				status: 200 as const,
 				body: { ok: true as const },
 			};
-		},
-		returnResponse: () =>
-			new Response(JSON.stringify({ ok: true }), {
-				status: 200,
-				headers: { "content-type": "application/json" },
-			}) as never,
+		}),
+		returnResponse: implementor.returnResponse.handler(
+			() =>
+				new Response(JSON.stringify({ ok: true }), {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				}) as never,
+		),
 	};
-
-	return router(lifecycleContract, handlers);
 };
 
 describe("fetch response lifecycle integration", () => {
 	let server: StartedServer;
-	let client: ReturnType<typeof initClient<LifecycleContract>>;
+	let client: ApiClientFor<LifecycleContract>;
 
 	before(async () => {
 		server = await createFetchAdapter(createLifecycleImplementations(), {
-			context: {
-				adapter: "fetch",
-				responseHeaders: new Headers(),
-				response: new Response(null),
-			},
 			createHandlerOptions: {
 				responseValidationErrorHandler: (_error, request) =>
 					Response.json(
@@ -120,13 +103,11 @@ describe("fetch response lifecycle integration", () => {
 		await server.close();
 	});
 
-	it("ignores user-provided context response mutations when returning a contract response", async () => {
+	it("does not copy native request mutations onto the contract response", async () => {
 		const response = await client.contextMutation();
 
 		assert.equal(response.status, 200);
-		assert.equal(response.headers.get("x-context-mutation"), null);
-		assert.equal(response.headers.get("x-context-response-mutation"), null);
-		assert.equal(response.headers.get("x-initial-context-response"), null);
+		assert.equal(response.headers.get("x-request-mutation"), null);
 		assert.deepEqual(response.body, { ok: true });
 	});
 

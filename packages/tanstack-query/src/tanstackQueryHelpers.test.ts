@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { SERVER_FIRST_RESPONSE_KIND_HEADER } from "@rest-rpc/core/client";
+import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import { skipToken } from "@tanstack/query-core";
 import { createTanstackQueryHelpers } from "./tanstackQueryHelpers.ts";
 
@@ -12,6 +13,13 @@ const jsonResponse = (body: unknown) =>
 			[SERVER_FIRST_RESPONSE_KIND_HEADER]: "v=1 kind=json",
 		},
 	});
+
+type TestProcedureImplementation = {
+	readonly "~restrpc": RouteDeclaration & {
+		readonly kind: "procedure";
+		readonly handler: () => unknown;
+	};
+};
 
 describe("createTanstackQueryHelpers server-first mode", () => {
 	it("creates method-and-path query helpers with grouped requests", async () => {
@@ -64,8 +72,8 @@ describe("createTanstackQueryHelpers server-first mode", () => {
 		const calls: Array<{ input: string; init?: RequestInit }> = [];
 		const helpers = createTanstackQueryHelpers<{
 			todos: {
-				get: { route: never; handler: never; clientRoute?: never };
-				add: { route: never; handler: never; clientRoute?: never };
+				get: TestProcedureImplementation;
+				add: TestProcedureImplementation;
 			};
 		}>({
 			baseUrl: "https://example.test",

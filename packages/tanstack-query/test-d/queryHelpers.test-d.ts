@@ -10,7 +10,7 @@ import {
 	type ServerFirstTanstackQueryHelpersFor,
 	type TanstackQueryHelpersFor,
 } from "@rest-rpc/tanstack-query";
-import { type ServerRouteFactory } from "@rest-rpc/server";
+import { type ServerRouteBuilder } from "@rest-rpc/server";
 import { type QueryClient, skipToken } from "@tanstack/query-core";
 import {
 	expectAssignable,
@@ -555,7 +555,7 @@ expectType<{ body: { title: string } }>(null as unknown as CreateTodoVariables);
 
 // server-first helpers
 
-declare const serverRoute: ServerRouteFactory;
+declare const serverRoute: ServerRouteBuilder;
 
 const serverRoutes = {
 	todos: {
@@ -712,7 +712,7 @@ expectError(shorthandTq.todos.add.queryOptions({ body: { title: "Todo" } }));
 expectError(shorthandTq.todos.add.queryOptions());
 expectError(shorthandTq.todos.get.streamedQueryOptions());
 
-declare const shorthandServerRoute: ServerRouteFactory;
+declare const shorthandServerRoute: ServerRouteBuilder;
 
 const serverShorthandRoutes = {
 	todos: {

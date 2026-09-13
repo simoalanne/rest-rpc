@@ -1,5 +1,5 @@
 import {
-	type ImplementationTree,
+	type RuntimeImplementationTree,
 	flattenRouteImplementations,
 } from "@rest-rpc/server";
 import type { Hono } from "hono";
@@ -31,7 +31,7 @@ export type RegisterRoutesOptions<TEnv extends Env = Env> = {
  */
 export function registerRoutes<TEnv extends Env = Env>(
 	app: Hono<TEnv>,
-	implementations: ImplementationTree,
+	implementations: RuntimeImplementationTree,
 	options: RegisterRoutesOptions<TEnv> = {},
 ) {
 	return registerHonoHttpRoutes(

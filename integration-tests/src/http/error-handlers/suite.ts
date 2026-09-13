@@ -1,12 +1,10 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { initClient } from "@rest-rpc/core";
+import { initClient, type ApiClientFor } from "@rest-rpc/core";
 import type { StartedServer } from "../harness/listen.ts";
 import { errorHandlersContract } from "./contract.ts";
 
-type ErrorHandlersClient = ReturnType<
-	typeof initClient<typeof errorHandlersContract>
->;
+type ErrorHandlersClient = ApiClientFor<typeof errorHandlersContract>;
 
 type ErrorHandlersSuiteAdapter = {
 	name: string;

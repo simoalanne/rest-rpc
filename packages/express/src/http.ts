@@ -5,7 +5,6 @@ import {
 	handleHttpRoute,
 	RequestValidationError,
 	ResponseValidationError,
-	type RouteImplementation,
 } from "@rest-rpc/server";
 import type {
 	Response as ExpressResponse,
@@ -44,7 +43,9 @@ export type ExtendedExpressMiddleware = (
 
 export const registerExpressHttpRoutes = (
 	app: IRouter,
-	routes: RouteImplementation<RouteDeclaration>[],
+	routes: ReturnType<
+		typeof import("@rest-rpc/server").flattenRouteImplementations
+	>,
 	middleware: ExtendedExpressMiddleware[] = [],
 	requestValidationErrorHandler?: RequestValidationErrorHandler,
 	responseValidationErrorHandler?: ResponseValidationErrorHandler,
@@ -54,22 +55,27 @@ export const registerExpressHttpRoutes = (
 		const method = route.method.toLowerCase() as Lowercase<HttpMethod>;
 		const handler = implementation.handler;
 
-		const serviceHandler = async (
+		const routeHandler = async (
 			req: Request,
 			res: ExpressResponse,
 			next: NextFunction,
 		) => {
 			try {
 				const signal = createRequestSignal(req, res);
-				const result = await handleHttpRoute(route, handler, {
-					request: {
-						body: req.body,
-						query: new URL(req.originalUrl, "http://localhost").searchParams,
-						params: req.params,
-						headers: req.headers,
+				const result = await handleHttpRoute(
+					route,
+					handler as (request: unknown) => unknown,
+					{
+						request: {
+							body: req.body,
+							query: new URL(req.originalUrl, "http://localhost").searchParams,
+							params: req.params,
+							headers: req.headers,
+						},
+						context: {},
+						handlerFields: { req, res, signal },
 					},
-					context: { kind: "http", req, signal },
-				});
+				);
 
 				return await writeNodeResponse(result, res);
 			} catch (error) {
@@ -106,7 +112,7 @@ export const registerExpressHttpRoutes = (
 				return (req: Request, res: ExpressResponse, next: NextFunction) =>
 					handler(req, res, next, route);
 			}),
-			serviceHandler,
+			routeHandler,
 		);
 	}
 };

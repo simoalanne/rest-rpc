@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { route as createRoute } from "../contract/routeFactory.ts";
+import { route as createRoute } from "../contract/routeBuilder.ts";
 import z from "zod";
 import {
 	createHeaderParameters,
@@ -10,7 +10,7 @@ import {
 	createResponse,
 } from "./operation.ts";
 import type { SchemaConverter } from "./operation.ts";
-import type { HttpRouteDeclaration } from "../contract/httpRouteBuilder.ts";
+import type { RouteDeclaration } from "../contract/routeDeclaration.ts";
 
 const schemaConverter: SchemaConverter = (schema, mode) =>
 	z.toJSONSchema(schema as z.ZodType, {
@@ -172,7 +172,7 @@ describe("OpenAPI operations", () => {
 	});
 
 	it("applies parameter transforms", () => {
-		const route: HttpRouteDeclaration = createRoute
+		const route: RouteDeclaration = createRoute
 			.get("/todos/:id")
 			.params(z.object({ id: z.string() }))
 			.query(
@@ -195,7 +195,7 @@ describe("OpenAPI operations", () => {
 						.meta({ openApi: { required: false } }),
 				}),
 			)
-			.response(200, z.array(z.object({ id: z.string() })));
+			.response(200, z.array(z.object({ id: z.string() })))["~restrpc"];
 
 		const operation = createOperation(
 			route,
@@ -551,7 +551,7 @@ describe("OpenAPI operations", () => {
 		const operation = createOperation(
 			createRoute
 				.get("/todos")
-				.withOpenApi({
+				.openAPI({
 					responses: {
 						200: {
 							description: "Todos returned.",
@@ -561,7 +561,7 @@ describe("OpenAPI operations", () => {
 						},
 					},
 				})
-				.response(200, z.array(z.object({ id: z.string() }))),
+				.response(200, z.array(z.object({ id: z.string() })))["~restrpc"],
 			{
 				info: { title: "Todo API", version: "1.0.0" },
 				schemaConverter,
@@ -653,12 +653,12 @@ describe("OpenAPI operations", () => {
 			modes.push(mode);
 			return { type: "object", properties: {} };
 		};
-		const route: HttpRouteDeclaration = createRoute
+		const route: RouteDeclaration = createRoute
 			.post("/todos/:id")
 			.params(z.object({ id: z.string() }))
 			.headers(z.object({ "x-api-key": z.string() }))
 			.body(z.object({ title: z.string() }))
-			.response(201, z.object({ id: z.string() }));
+			.response(201, z.object({ id: z.string() }))["~restrpc"];
 
 		createOperation(route, {
 			info: { title: "Todo API", version: "1.0.0" },
@@ -669,7 +669,9 @@ describe("OpenAPI operations", () => {
 	});
 
 	it("applies operation transforms", () => {
-		const route: HttpRouteDeclaration = createRoute.get("/todos").response(204);
+		const route: RouteDeclaration = createRoute.get("/todos").response(204)[
+			"~restrpc"
+		];
 
 		const operation = createOperation(
 			route,
@@ -688,9 +690,9 @@ describe("OpenAPI operations", () => {
 	});
 
 	it("applies explicit route OpenAPI options", () => {
-		const route: HttpRouteDeclaration = createRoute
+		const route: RouteDeclaration = createRoute
 			.get("/todos")
-			.withOpenApi({
+			.openAPI({
 				summary: "List todos",
 				description: "Returns visible todos.",
 				operationId: "listTodos",
@@ -707,7 +709,7 @@ describe("OpenAPI operations", () => {
 					"x-feature": "todos",
 				},
 			})
-			.response(200, z.array(z.object({ id: z.string() })));
+			.response(200, z.array(z.object({ id: z.string() })))["~restrpc"];
 
 		const operation = createOperation(route, {
 			info: { title: "Todo API", version: "1.0.0" },

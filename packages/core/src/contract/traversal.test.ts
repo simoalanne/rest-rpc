@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { type } from "../standard-schema/type.ts";
-import { route } from "./routeFactory.ts";
+import { route } from "./routeBuilder.ts";
 import { contractRoutes, mapContractRoutes } from "./traversal.ts";
 
 const getTodo = route.get("/todos/:id").response(204);
@@ -54,7 +54,7 @@ describe("contract traversal", () => {
 					},
 				}),
 			],
-			[getTodo, listUsers],
+			[getTodo["~restrpc"], listUsers["~restrpc"]],
 		);
 	});
 

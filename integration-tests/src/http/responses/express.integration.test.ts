@@ -1,4 +1,5 @@
 import { createExpressAdapter } from "../harness/express.ts";
+import type { NextFunction, Request, Response } from "express";
 import { createResponsesImplementations } from "./handlers.ts";
 import { runResponseMiddlewareHeadersSuite } from "./middlewareSuite.ts";
 import { runResponsesSuite } from "./suite.ts";
@@ -14,12 +15,14 @@ runResponsesSuite(
 			},
 		},
 		configureAppAfterRoutes: (app) => {
-			app.use((error: unknown, _req, res, _next) => {
-				res.status(418).json({
-					code: "TEAPOT",
-					message: error instanceof Error ? error.message : "unknown error",
-				});
-			});
+			app.use(
+				(error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+					res.status(418).json({
+						code: "TEAPOT",
+						message: error instanceof Error ? error.message : "unknown error",
+					});
+				},
+			);
 		},
 	}),
 );

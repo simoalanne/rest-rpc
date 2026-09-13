@@ -1,7 +1,7 @@
 import type { Server } from "node:http";
 import { createAdaptorServer } from "@hono/node-server";
 import { type RegisterRoutesOptions, registerRoutes } from "@rest-rpc/hono";
-import type { ImplementationTree } from "@rest-rpc/server";
+import type { RuntimeImplementationTree } from "@rest-rpc/server";
 import { Hono } from "hono";
 import { listen } from "./listen.ts";
 
@@ -11,7 +11,7 @@ export type HonoAdapterOptions = {
 };
 
 export const createHonoAdapter = (
-	implementations: ImplementationTree,
+	implementations: RuntimeImplementationTree,
 	options: HonoAdapterOptions = {},
 ) => ({
 	name: "hono",

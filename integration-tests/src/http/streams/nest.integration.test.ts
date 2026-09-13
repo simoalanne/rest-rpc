@@ -2,7 +2,7 @@ import { createNestAdapter } from "../harness/nest.ts";
 import { streamsContract } from "./contract.ts";
 import {
 	createStreamCancellationProbe,
-	createStreamsHandlers,
+	createStreamsImplementations,
 } from "./handlers.ts";
 import { runStreamsSuite } from "./suite.ts";
 
@@ -11,7 +11,7 @@ const cancellationProbe = createStreamCancellationProbe();
 runStreamsSuite({
 	...createNestAdapter(
 		streamsContract,
-		createStreamsHandlers({ cancellationProbe }),
+		createStreamsImplementations({ cancellationProbe }),
 	),
 	cancellationProbe,
 });

@@ -1,4 +1,4 @@
-import type { HttpMethod } from "../contract/baseRouteDeclaration.ts";
+import type { HttpMethod } from "../contract/routeDeclaration.ts";
 
 export type ClientRequestDeclaration = {
 	body?: unknown;

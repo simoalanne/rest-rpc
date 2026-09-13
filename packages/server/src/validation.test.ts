@@ -30,7 +30,7 @@ describe("validateRequest", () => {
 			.with({ headers: inherited })
 			.get("/headers")
 			.headers(local)
-			.response(204);
+			.response(204)["~restrpc"];
 
 		const result = await validateRequest(declaration, {
 			headers: {
@@ -59,7 +59,7 @@ describe("validateRequest", () => {
 			.with({ headers: z.object({ authorization: z.string() }) })
 			.get("/headers")
 			.headers(z.object({ requestId: z.string() }))
-			.response(204);
+			.response(204)["~restrpc"];
 
 		for (const headers of [
 			{ requestId: "request-1" },
@@ -79,7 +79,7 @@ describe("validateRequest", () => {
 						createdAt: z.iso.datetime().transform((value) => new Date(value)),
 					}),
 				)
-				.response(204),
+				.response(204)["~restrpc"],
 			{
 				body: { createdAt: "2026-08-10T00:00:00.000Z" },
 			},
@@ -104,7 +104,7 @@ describe("validateRequest", () => {
 						createdAt: z.date(),
 					}),
 				)
-				.response(204),
+				.response(204)["~restrpc"],
 			{
 				body: wireBody,
 			},
@@ -128,7 +128,7 @@ describe("validateRequest", () => {
 							.transform((value) => value === "true"),
 					}),
 				)
-				.response(204),
+				.response(204)["~restrpc"],
 			{
 				params: { id: "123" },
 				query: new URLSearchParams({ published: "false" }),
@@ -150,7 +150,7 @@ describe("validateRequest", () => {
 				.get("/todos/:id")
 				.params(z.object({ id: z.number() }))
 				.query(z.object({ published: z.boolean() }))
-				.response(204),
+				.response(204)["~restrpc"],
 			{
 				params: { id: "123" },
 				query: new URLSearchParams({ published: "true" }),
@@ -174,7 +174,7 @@ describe("validateRequest", () => {
 						filters: z.object({ tags: z.array(z.string()) }),
 					}),
 				)
-				.response(204),
+				.response(204)["~restrpc"],
 			{
 				query: new URLSearchParams({
 					query: JSON.stringify({
@@ -198,7 +198,7 @@ describe("validateRequest", () => {
 			route
 				.get("/todos")
 				.jsonQuery(z.object({ page: z.number() }).optional())
-				.response(204),
+				.response(204)["~restrpc"],
 			{},
 		);
 
@@ -216,7 +216,7 @@ describe("validateRequest", () => {
 					contentType: ["image/png", "image/jpeg"],
 					schema: z.string().transform((value) => value.toUpperCase()),
 				})
-				.response(204),
+				.response(204)["~restrpc"],
 			{
 				body: "jpeg bytes",
 				headers: {
@@ -241,7 +241,7 @@ describe("validateRequest", () => {
 			route
 				.post("/text")
 				.customBody({ contentType: "text/plain", schema: z.string() })
-				.response(204),
+				.response(204)["~restrpc"],
 			{
 				body: "valid text",
 				headers: { "content-type": "text/markdown" },
@@ -261,7 +261,7 @@ describe("validateRequest", () => {
 			route
 				.post("/forms")
 				.customBody(z.instanceof(URLSearchParams))
-				.response(204),
+				.response(204)["~restrpc"],
 			{
 				body: new URLSearchParams([["title", "Write docs"]]),
 				headers: {
@@ -288,7 +288,7 @@ describe("validateRequest", () => {
 						remember: z.string().optional(),
 					}),
 				)
-				.response(204),
+				.response(204)["~restrpc"],
 			{
 				body: new URLSearchParams([
 					["title", "Write docs"],
@@ -321,7 +321,7 @@ describe("validateRequest", () => {
 						tags: z.array(z.string()),
 					}),
 				)
-				.response(204),
+				.response(204)["~restrpc"],
 			{
 				body: new URLSearchParams([
 					["title", "First"],
@@ -366,7 +366,7 @@ describe("validateRequest", () => {
 						tags: z.array(z.string()),
 					}),
 				)
-				.response(204),
+				.response(204)["~restrpc"],
 			{
 				body,
 				headers: {
@@ -389,7 +389,7 @@ describe("validateRequest", () => {
 			route
 				.get("/todos")
 				.jsonQuery(z.object({ page: z.number() }))
-				.response(204),
+				.response(204)["~restrpc"],
 			{
 				query: new URLSearchParams({ query: "{" }),
 			},

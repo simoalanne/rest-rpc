@@ -3,17 +3,13 @@ import { createServer } from "node:http";
 import { it } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 import { initClient } from "@rest-rpc/core";
-import { registerRoutes } from "@rest-rpc/express";
-import { router } from "@rest-rpc/server";
+import { implement, registerRoutes } from "@rest-rpc/express";
 import type { NextFunction, Request, Response } from "express";
 import express from "express";
 import { createExpressAdapter } from "../harness/express.ts";
 import { listen } from "../harness/listen.ts";
 import { integrationContract } from "./contract.ts";
-import {
-	createIntegrationHandlers,
-	createIntegrationImplementations,
-} from "./handlers.ts";
+import { createIntegrationImplementations } from "./handlers.ts";
 import { runClientHttpSuite } from "./suite.ts";
 
 runClientHttpSuite(createExpressAdapter(createIntegrationImplementations()));
@@ -100,20 +96,24 @@ it("waits for Express drain before writing the next stream chunk", async () => {
 	let pulledChunks = 0;
 	let writeCalls = 0;
 	let emitDrain: (() => void) | undefined;
-	const handlers = createIntegrationHandlers();
+	const implementations = createIntegrationImplementations();
+	const implementor = implement(integrationContract);
 	const server = await createExpressAdapter(
-		router(integrationContract, {
-			...handlers,
+		{
+			...implementations,
 			streams: {
-				...handlers.streams,
-				text: async function* () {
-					pulledChunks = 1;
-					yield "alpha\n";
-					pulledChunks = 2;
-					yield "beta\n";
-				},
+				...implementations.streams,
+				text: implementor.streams.text.handler(() => ({
+					status: 200,
+					body: (async function* () {
+						pulledChunks = 1;
+						yield "alpha\n";
+						pulledChunks = 2;
+						yield "beta\n";
+					})(),
+				})),
 			},
-		}),
+		},
 		{
 			configureApp: (app) => {
 				app.use(
@@ -145,7 +145,7 @@ it("waits for Express drain before writing the next stream chunk", async () => {
 		assert.equal(writeCalls, 1);
 		assert.equal(typeof emitDrain, "function");
 
-		emitDrain();
+		emitDrain?.();
 
 		assert.equal(await response.text(), "alpha\nbeta\n");
 		assert.equal(pulledChunks, 2);
@@ -166,23 +166,27 @@ it("releases an Express backpressure wait when the response closes before drain"
 	});
 	let returned = false;
 	let closeResponse: (() => void) | undefined;
-	const handlers = createIntegrationHandlers();
+	const implementations = createIntegrationImplementations();
+	const implementor = implement(integrationContract);
 	const server = await createExpressAdapter(
-		router(integrationContract, {
-			...handlers,
+		{
+			...implementations,
 			streams: {
-				...handlers.streams,
-				text: async function* () {
-					try {
-						yield "alpha\n";
-						yield "beta\n";
-					} finally {
-						returned = true;
-						finalized();
-					}
-				},
+				...implementations.streams,
+				text: implementor.streams.text.handler(() => ({
+					status: 200,
+					body: (async function* () {
+						try {
+							yield "alpha\n";
+							yield "beta\n";
+						} finally {
+							returned = true;
+							finalized();
+						}
+					})(),
+				})),
 			},
-		}),
+		},
 		{
 			configureApp: (app) => {
 				app.use(
@@ -219,7 +223,7 @@ it("releases an Express backpressure wait when the response closes before drain"
 		assert.equal(writeCalls, 1);
 		assert.equal(typeof closeResponse, "function");
 
-		closeResponse();
+		closeResponse?.();
 		await finished;
 
 		assert.equal(writeCalls, 1);

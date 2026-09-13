@@ -3,8 +3,8 @@ import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter } from "@nestjs/platform-fastify";
 import type { Contract } from "@rest-rpc/core/contract";
 import type { RestRpcModuleOptions } from "@rest-rpc/nest";
-import { RestRpcModule, Router, router } from "@rest-rpc/nest";
-import type { ImplementationShape } from "@rest-rpc/server";
+import { Implement, RestRpcModule } from "@rest-rpc/nest";
+import type { RuntimeImplementationTree } from "@rest-rpc/server";
 import express from "express";
 import type { FastifyInstance } from "fastify";
 import "reflect-metadata";
@@ -24,16 +24,16 @@ export type NestAdapterOptions = {
 
 export const createNestAdapter = <TContract extends Contract>(
 	contract: TContract,
-	handlers: ImplementationShape<TContract>,
+	implementations: RuntimeImplementationTree,
 	options: NestAdapterOptions = {},
 ) => ({
 	name: options.platform === "fastify" ? "nest-fastify" : "nest",
 	start: async (): Promise<StartedServer> => {
 		@Controller(options.controllerPrefix ?? "")
 		class RestRpcController {
-			@Router(contract)
+			@Implement(contract)
 			api() {
-				return router(contract as never, handlers as never);
+				return implementations;
 			}
 		}
 

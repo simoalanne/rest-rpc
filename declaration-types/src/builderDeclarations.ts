@@ -52,12 +52,8 @@ export const jsonQueryRoute = route.get("/json-query").jsonQuery(scalar);
 export const paramsRoute = route.get("/params/:id").params(params);
 export const headersRoute = route.get("/headers").headers(headers);
 export const keyedRoute = route.get("/keys").query(query);
-export const metadataRoute = route
-	.get("/metadata")
-	.withMetadata({ scope: "test" });
-export const openApiRoute = route
-	.get("/openapi")
-	.withOpenApi({ summary: "Test" });
+export const metadataRoute = route.get("/metadata").metadata({ scope: "test" });
+export const openApiRoute = route.get("/openapi").openAPI({ summary: "Test" });
 export const responseRoute = route.get("/response").response(200, scalar);
 export const noBodyResponseRoute = route.get("/no-body").response(204);
 export const responseHeadersRoute = route

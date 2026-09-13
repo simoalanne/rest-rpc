@@ -66,7 +66,7 @@ export const fetchRoutes = {
 		},
 	})),
 	health: implementFetch(contractRoute.get("/health").response(204)).handler(
-		() => undefined,
+		() => ({ status: 204 }),
 	),
 };
 
@@ -80,7 +80,7 @@ export const nodeRoutes = {
 	})),
 	health: implementNode(
 		contractRoute.get("/node-health").response(204),
-	).handler(() => undefined),
+	).handler(() => ({ status: 204 })),
 };
 
 export const fetchHandler = createFetchRouteHandler(fetchRoutes);

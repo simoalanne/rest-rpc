@@ -1,6 +1,4 @@
 import type { Contract, RouteDeclaration } from "../contract/contract.ts";
-import type { HttpRouteDeclaration } from "../contract/httpRouteBuilder.ts";
-import { isShorthandRouteDeclaration } from "../contract/shorthandRouteBuilder.ts";
 import { mapContractRoutes } from "../contract/traversal.ts";
 import { type ExecuteRequestOptions, executeRequest } from "./request.ts";
 import {
@@ -43,8 +41,8 @@ const createContractClient = <
 		fetchRouteResponse(request, validateResponses, route, routePath, ...args);
 
 	return mapContractRoutes(contract, (node, routePath) => {
-		if (isShorthandRouteDeclaration(node)) {
-			const resolvedRoute: HttpRouteDeclaration = {
+		if (node.kind === "procedure") {
+			const resolvedRoute: RouteDeclaration = {
 				...node,
 				path: `/${routePath.join("/")}`,
 			};

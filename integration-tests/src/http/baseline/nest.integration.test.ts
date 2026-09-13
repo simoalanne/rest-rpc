@@ -11,41 +11,50 @@ import {
 import { NestFactory } from "@nestjs/core";
 import { initClient, route, type as schemaType } from "@rest-rpc/core";
 import {
+	Implement,
 	RestRpcModule,
-	Route,
-	type RouteHandlers,
-	type RouteRequest,
-	Router,
-	router,
+	implement,
+	route as nestRoute,
 } from "@rest-rpc/nest";
 import type { NextFunction, Request, Response } from "express";
 import "reflect-metadata";
+import z from "zod";
 import { createNestAdapter } from "../harness/nest.ts";
 import { integrationContract } from "./contract.ts";
-import { createIntegrationHandlers } from "./handlers.ts";
+import { createIntegrationImplementations } from "./handlers.ts";
 import { runClientHttpSuite } from "./suite.ts";
 
+declare module "@rest-rpc/nest" {
+	interface DefaultContext {
+		source: string;
+	}
+}
+
 runClientHttpSuite(
-	createNestAdapter(integrationContract, createIntegrationHandlers()),
+	createNestAdapter(integrationContract, createIntegrationImplementations()),
 );
 
 it("waits for Nest Express drain before writing the next stream chunk", async () => {
 	let pulledChunks = 0;
 	let writeCalls = 0;
 	let emitDrain: (() => void) | undefined;
-	const handlers = createIntegrationHandlers();
+	const handlers = createIntegrationImplementations();
+	const nestImplementor = implement(integrationContract);
 	const server = await createNestAdapter(
 		integrationContract,
 		{
 			...handlers,
 			streams: {
 				...handlers.streams,
-				text: async function* () {
-					pulledChunks = 1;
-					yield "alpha\n";
-					pulledChunks = 2;
-					yield "beta\n";
-				},
+				text: nestImplementor.streams.text.handler(() => ({
+					status: 200,
+					body: (async function* () {
+						pulledChunks = 1;
+						yield "alpha\n";
+						pulledChunks = 2;
+						yield "beta\n";
+					})(),
+				})),
 			},
 		},
 		{
@@ -92,21 +101,25 @@ it("releases a Nest Express backpressure wait when the response closes before dr
 	let writeCalls = 0;
 	let returned = false;
 	let closeResponse: (() => void) | undefined;
-	const handlers = createIntegrationHandlers();
+	const handlers = createIntegrationImplementations();
+	const nestImplementor = implement(integrationContract);
 	const server = await createNestAdapter(
 		integrationContract,
 		{
 			...handlers,
 			streams: {
 				...handlers.streams,
-				text: async function* () {
-					try {
-						yield "alpha\n";
-						yield "beta\n";
-					} finally {
-						returned = true;
-					}
-				},
+				text: nestImplementor.streams.text.handler(() => ({
+					status: 200,
+					body: (async function* () {
+						try {
+							yield "alpha\n";
+							yield "beta\n";
+						} finally {
+							returned = true;
+						}
+					})(),
+				})),
 			},
 		},
 		{
@@ -156,7 +169,7 @@ it("releases a Nest Express backpressure wait when the response closes before dr
 it("combines Nest controller prefixes with contract route paths", async () => {
 	const server = await createNestAdapter(
 		integrationContract,
-		createIntegrationHandlers(),
+		createIntegrationImplementations(),
 		{ controllerPrefix: "api/v1" },
 	).start();
 
@@ -182,10 +195,17 @@ it("registers router routes whose contract key paths would produce the same flat
 			b: route.get("/nested").response(200, schemaType<{ source: string }>()),
 		},
 	} as const;
+	const collisionImplementor = implement(collisionContract);
 	const server = await createNestAdapter(collisionContract, {
-		a_b: () => ({ source: "flat" }),
+		a_b: collisionImplementor.a_b.handler(() => ({
+			status: 200,
+			body: { source: "flat" },
+		})),
 		a: {
-			b: () => ({ source: "nested" }),
+			b: collisionImplementor.a.b.handler(() => ({
+				status: 200,
+				body: { source: "nested" },
+			})),
 		},
 	}).start();
 
@@ -213,10 +233,7 @@ it("supports async routers that close over values from Nest parameter decorators
 	} as const;
 	@Injectable()
 	class AsyncItemService {
-		get(
-			source: string,
-			{ params: { id } }: RouteRequest<typeof asyncContract.get>,
-		) {
+		get(source: string, id: string) {
 			return { id, title: `${source}:async:${id}` };
 		}
 	}
@@ -227,12 +244,15 @@ it("supports async routers that close over values from Nest parameter decorators
 			@Inject(AsyncItemService) private readonly items: AsyncItemService,
 		) {}
 
-		@Router(asyncContract)
+		@Implement(asyncContract)
 		async api(@Headers("x-test-source") source: string) {
 			await Promise.resolve();
-			return router(asyncContract, {
-				get: (request) => this.items.get(source, request),
-			});
+			return {
+				get: implement(asyncContract).get.handler(({ params: { id } }) => ({
+					status: 200,
+					body: this.items.get(source, id),
+				})),
+			};
 		}
 	}
 
@@ -263,6 +283,90 @@ it("supports async routers that close over values from Nest parameter decorators
 	}
 });
 
+it("registers server-first routes and declared procedures", async () => {
+	const routes = {
+		health: nestRoute
+			.get("/server-first-health")
+			.handler(() => ({ status: 204 })),
+		procedures: {
+			greet: nestRoute.handler(() => ({ greeting: "hello" })),
+			welcome: route.input(z.object({ name: z.string() })).output(
+				z.object({ greeting: z.string() }).transform(({ greeting }) => ({
+					greeting: greeting.toUpperCase(),
+				})),
+			),
+		},
+	};
+	const implementations = {
+		...routes,
+		procedures: {
+			...routes.procedures,
+			welcome: implement(routes.procedures.welcome).handler(({ input }) => ({
+				greeting: `Hello, ${input.name}`,
+			})),
+		},
+	};
+
+	@Controller()
+	class ServerFirstController {
+		@Implement(routes)
+		api() {
+			return implementations;
+		}
+	}
+
+	@Module({
+		imports: [RestRpcModule.forRoot()],
+		controllers: [ServerFirstController],
+	})
+	class AppModule {}
+
+	const app = await NestFactory.create(AppModule, { logger: false });
+
+	try {
+		await app.listen(0, "127.0.0.1");
+		const origin = await app.getUrl();
+		assert.equal((await fetch(`${origin}/server-first-health`)).status, 204);
+
+		const procedureResponse = await fetch(`${origin}/procedures/greet`, {
+			method: "POST",
+		});
+		assert.equal(procedureResponse.status, 200);
+		assert.deepEqual(await procedureResponse.json(), { greeting: "hello" });
+
+		const declaredProcedureResponse = await fetch(
+			`${origin}/procedures/welcome`,
+			{
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ name: "Nest" }),
+			},
+		);
+		assert.equal(declaredProcedureResponse.status, 200);
+		assert.deepEqual(await declaredProcedureResponse.json(), {
+			greeting: "HELLO, NEST",
+		});
+	} finally {
+		await app.close();
+	}
+});
+
+it("rejects a singular procedure because it has no tree-derived path", () => {
+	const procedure = route.output(schemaType<{ greeting: string }>());
+
+	assert.throws(() => {
+		@Controller()
+		class InvalidProcedureController {
+			@Implement(procedure)
+			procedure() {
+				return implement(procedure).handler(() => ({ greeting: "hello" }));
+			}
+		}
+
+		return InvalidProcedureController;
+	}, / requires a procedure to be part of a route tree /);
+});
+
 const classContract = {
 	items: {
 		get: route
@@ -273,10 +377,6 @@ const classContract = {
 } as const;
 
 it("serves a contract route implemented by a Nest provider class", async () => {
-	type AppContext = {
-		source: string;
-	};
-
 	@Injectable()
 	class ItemService {
 		formatTitle(source: string, id: string) {
@@ -285,27 +385,29 @@ it("serves a contract route implemented by a Nest provider class", async () => {
 	}
 
 	@Injectable()
-	class ItemRoutes implements RouteHandlers<typeof classContract.items> {
+	class ItemRoutes {
 		constructor(@Inject(ItemService) private readonly items: ItemService) {}
 
-		get({
-			context,
-			params: { id },
-		}: RouteRequest<typeof classContract.items.get, AppContext>) {
-			return {
-				id,
-				title: this.items.formatTitle(context.source, id),
-			};
-		}
+		readonly routes = {
+			get: implement(classContract.items).get.handler(
+				({ context, params: { id } }) => ({
+					status: 200,
+					body: {
+						id,
+						title: this.items.formatTitle(context.source, id),
+					},
+				}),
+			),
+		};
 	}
 
 	@Controller()
 	class ItemsController {
 		constructor(@Inject(ItemRoutes) private readonly routes: ItemRoutes) {}
 
-		@Route(classContract.items.get)
+		@Implement(classContract.items.get)
 		getItem() {
-			return router(classContract.items, this.routes).get;
+			return this.routes.routes.get;
 		}
 	}
 
@@ -341,76 +443,6 @@ it("serves a contract route implemented by a Nest provider class", async () => {
 		assert.deepEqual(await response.json(), {
 			id: "item-1",
 			title: "provider:service:class:item-1",
-		});
-	} finally {
-		await app.close();
-	}
-});
-
-it("passes controller-local context to Nest provider route handlers", async () => {
-	type AppContext = {
-		source: string;
-		tenant: string;
-	};
-
-	@Injectable()
-	class ItemRoutes implements RouteHandlers<typeof classContract.items> {
-		get({
-			context,
-			params: { id },
-		}: RouteRequest<typeof classContract.items.get, AppContext>) {
-			return {
-				id,
-				title: `${context.source}:${context.tenant}:${id}`,
-			};
-		}
-	}
-
-	@Controller()
-	class ItemsController {
-		constructor(@Inject(ItemRoutes) private readonly routes: ItemRoutes) {}
-
-		@Router(classContract.items)
-		items(@Headers("x-test-tenant") tenant: string) {
-			return router(classContract.items, this.routes, {
-				context: { tenant },
-			});
-		}
-	}
-
-	@Module({
-		imports: [
-			RestRpcModule.forRoot({
-				createContext: (context) => {
-					const req = context
-						.switchToHttp()
-						.getRequest<{ headers: Record<string, unknown> }>();
-					return {
-						source: String(req.headers["x-test-source"] ?? "nest"),
-					};
-				},
-			}),
-		],
-		controllers: [ItemsController],
-		providers: [ItemRoutes],
-	})
-	class AppModule {}
-
-	const app = await NestFactory.create(AppModule, { logger: false });
-
-	try {
-		await app.listen(0, "127.0.0.1");
-		const response = await fetch(`${await app.getUrl()}/class-items/item-1`, {
-			headers: {
-				"x-test-source": "module",
-				"x-test-tenant": "controller",
-			},
-		});
-
-		assert.equal(response.status, 200);
-		assert.deepEqual(await response.json(), {
-			id: "item-1",
-			title: "module:controller:item-1",
 		});
 	} finally {
 		await app.close();

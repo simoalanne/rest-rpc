@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import z from "zod";
-import { route } from "../contract/routeFactory.ts";
+import { route } from "../contract/routeBuilder.ts";
 import { initClient } from "./initClient.ts";
 
 const originalFetch = globalThis.fetch;

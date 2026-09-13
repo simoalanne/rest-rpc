@@ -6,6 +6,7 @@ import type {
 	RequestParamsSchema,
 	RequestQuerySchema,
 } from "./request.ts";
+import type { RouteResponses } from "./response.ts";
 
 /** An HTTP method supported by a rest-rpc route. */
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
@@ -51,11 +52,13 @@ export type RouteRequestDeclaration = {
 	headers?: RequestHeadersDeclaration;
 };
 
-/** Fields shared by every canonical route declaration. */
-export type BaseRouteDeclaration = {
+/** A canonical route declaration produced by an HTTP or procedure builder. */
+export type RouteDeclaration = {
+	kind: "http" | "procedure";
 	path: string;
 	method: HttpMethod;
 	request?: RouteRequestDeclaration;
+	responses: RouteResponses;
 	metadata?: RouteMetadata;
 	openApi?: OpenApiRouteOptions;
 };

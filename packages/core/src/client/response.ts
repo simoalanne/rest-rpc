@@ -2,6 +2,7 @@ import type { CustomBody } from "../contract/body.ts";
 import { isCustomBody, isNoBody, isStream } from "../contract/body.ts";
 import type { RouteDeclaration } from "../contract/contract.ts";
 import type {
+	DeclaredClientResponse,
 	ResponseBodySchema,
 	ResponseDeclaration,
 	SuccessfulDeclaredClientResponse,
@@ -16,7 +17,14 @@ import {
 	validateStandardSchema,
 } from "../standard-schema/index.ts";
 import { parseNdjsonStream } from "./stream.ts";
-import type { ClientResponse, FetchArgs } from "./types.ts";
+import type { FetchArgs } from "./types.ts";
+
+type FetchedRouteResponse<E extends RouteDeclaration> =
+	DeclaredClientResponse<E> extends infer TResponse
+		? TResponse extends object
+			? TResponse & { headers: Headers }
+			: never
+		: never;
 
 const isSuccessStatus = (status: number) => status >= 200 && status < 300;
 
@@ -242,7 +250,7 @@ export const fetchResponse = async <E extends RouteDeclaration>(
 	route: E,
 	routePath: readonly string[],
 	...args: FetchArgs<E>
-): Promise<ClientResponse<E>> => {
+): Promise<FetchedRouteResponse<E>> => {
 	const rawResponse = await request(route, routePath, ...args);
 	if (
 		!Number.isInteger(rawResponse.status) ||
@@ -269,7 +277,7 @@ export const fetchResponse = async <E extends RouteDeclaration>(
 		headers: rawResponse.headers,
 		...(await readDeclaredHeaders(schema, rawResponse, validateResponse)),
 		...declaredResponseMetadata(schema, rawResponse),
-	} as ClientResponse<E>;
+	} as FetchedRouteResponse<E>;
 };
 
 export const fetchSuccess = async <E extends RouteDeclaration>(
@@ -277,7 +285,7 @@ export const fetchSuccess = async <E extends RouteDeclaration>(
 		route: E,
 		routePath: readonly string[],
 		...args: FetchArgs<E>
-	) => Promise<ClientResponse<E>>,
+	) => Promise<{ status: number; body?: unknown }>,
 	route: E,
 	routePath: readonly string[],
 	...args: FetchArgs<E>

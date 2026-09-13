@@ -1,8 +1,6 @@
-import type { BaseRouteDeclaration } from "../contract/baseRouteDeclaration.ts";
-import type { HttpMethod } from "../contract/baseRouteDeclaration.ts";
+import type { HttpMethod } from "../contract/routeDeclaration.ts";
 import type { CustomBody, FormBody, MultipartBody } from "../contract/body.ts";
 import type { RouteDeclaration } from "../contract/contract.ts";
-import type { AnyShorthandRouteDeclaration } from "../contract/shorthandRouteBuilder.ts";
 import type { JsonQuery } from "../contract/request.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { executeRequest, type ExecuteRequestOptions } from "./request.ts";
@@ -19,17 +17,19 @@ import type {
 } from "./types.ts";
 
 type AnyHandler = (...args: never[]) => unknown;
+type ServerFirstRuntimeRoute = RouteDeclaration;
 
 type ServerFirstImplementation = {
-	readonly route: BaseRouteDeclaration;
-	readonly handler: AnyHandler;
-	readonly clientRoute?: RouteDeclaration;
+	readonly "~restrpc": ServerFirstRuntimeRoute & {
+		readonly handler: AnyHandler;
+	};
 };
 
-type ServerFirstShorthandImplementation = {
-	readonly route: AnyShorthandRouteDeclaration;
-	readonly handler: AnyHandler;
-	readonly clientRoute?: AnyShorthandRouteDeclaration;
+type ServerFirstProcedureImplementation = {
+	readonly "~restrpc": RouteDeclaration & {
+		kind: "procedure";
+		readonly handler: AnyHandler;
+	};
 };
 
 const requestEncoding = Symbol("rest-rpc.request-encoding");
@@ -110,18 +110,19 @@ type ServerFirstRequestDeclaration<TRequest> = TRequest extends object
 	: never;
 
 type ImplementationUnion<TTree> = TTree extends {
-	readonly route: unknown;
-	readonly handler: AnyHandler;
+	readonly "~restrpc": { readonly handler: AnyHandler };
 }
 	? TTree extends ServerFirstImplementation
-		? TTree
+		? TTree["~restrpc"] extends { kind: "http" }
+			? TTree
+			: never
 		: never
 	: TTree extends object
 		? { [TKey in keyof TTree]: ImplementationUnion<TTree[TKey]> }[keyof TTree]
 		: never;
 
 type SelectorName<TImplementation> = TImplementation extends {
-	route: infer TRoute extends BaseRouteDeclaration;
+	readonly "~restrpc": infer TRoute extends ServerFirstRuntimeRoute;
 }
 	? `$${Lowercase<TRoute["method"]>}`
 	: never;
@@ -130,7 +131,7 @@ type SelectorPath<
 	TImplementation,
 	TSelector extends string,
 > = TImplementation extends {
-	route: infer TRoute extends BaseRouteDeclaration;
+	readonly "~restrpc": infer TRoute extends ServerFirstRuntimeRoute;
 }
 	? SelectorName<TImplementation> extends TSelector
 		? TRoute["path"]
@@ -153,7 +154,7 @@ type SelectedImplementation<
 	TSelector extends string,
 	TPath extends string,
 > = TImplementation extends {
-	route: infer TRoute extends BaseRouteDeclaration;
+	readonly "~restrpc": infer TRoute extends ServerFirstRuntimeRoute;
 }
 	? SelectorName<TImplementation> extends TSelector
 		? TRoute["path"] extends TPath
@@ -169,9 +170,9 @@ type GroupedRequest<TRoute extends RouteDeclaration> = TRoute extends {
 	: { request?: never };
 
 type ClientRoute<TImplementation> = TImplementation extends {
-	clientRoute?: infer TRoute extends RouteDeclaration;
+	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
-	? Omit<TRoute, "request"> &
+	? Omit<TRoute, "request" | "handler"> &
 			GroupedRequest<TRoute> extends infer TClientRoute extends RouteDeclaration
 		? TClientRoute
 		: never
@@ -216,11 +217,11 @@ export type ServerFirstClientFor<
 	>(
 		path: TPath,
 		...args: ServerFirstClientCallArgs<
-			ServerFirstClientRouteFor<TTree, TSelector, TPath>,
+			ServerFirstClientRouteFor<TTree, TSelector, Extract<TPath, string>>,
 			TGlobalHeaders
 		>
 	) => ServerFirstClientCallResult<
-		ServerFirstClientRouteFor<TTree, TSelector, TPath>,
+		ServerFirstClientRouteFor<TTree, TSelector, Extract<TPath, string>>,
 		TGlobalHeaders
 	>;
 } & ([ServerFirstShorthandClientTree<TTree>] extends [never]
@@ -240,12 +241,13 @@ type ServerFirstShorthandClientObject<TNode extends object> = {
 type ServerFirstShorthandClientTree<TNode> = unknown extends TNode
 	? never
 	: TNode extends {
-				readonly route: unknown;
-				readonly handler: AnyHandler;
+				readonly "~restrpc": { readonly handler: AnyHandler };
 		  }
-		? TNode extends ServerFirstShorthandImplementation
+		? TNode extends ServerFirstProcedureImplementation
 			? TNode extends {
-					clientRoute?: infer TRoute extends AnyShorthandRouteDeclaration;
+					readonly "~restrpc": infer TRoute extends RouteDeclaration & {
+						kind: "procedure";
+					};
 				}
 				? ApiClientRouteValue<TRoute>
 				: never

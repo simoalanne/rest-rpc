@@ -12,26 +12,29 @@ pnpm add @rest-rpc/hono
 ## Usage
 
 ```ts
-import { registerRoutes, router } from "@rest-rpc/hono";
+import { implement, registerRoutes } from "@rest-rpc/hono";
 import { Hono } from "hono";
 import { api } from "./contract";
 
 const app = new Hono();
 
-const routes = router(api, {
+const implementor = implement(api);
+
+const routes = {
 	todos: {
-		list() {
-			return listTodos();
-		},
-		get({ params: { id }, context }) {
-			const authorization = context.c.req.header("authorization");
-			return getTodo(id, { authorization });
-		},
-		create({ body: { title } }) {
-			return createTodo({ title });
-		},
+		list: implementor.todos.list.handler(() => ({
+			status: 200,
+			body: listTodos(),
+		})),
+		get: implementor.todos.get.handler(({ params: { id }, c }) => {
+			const authorization = c.req.header("authorization");
+			return { status: 200, body: getTodo(id, { authorization }) };
+		}),
+		create: implementor.todos.create.handler(({ body: { title } }) => {
+			return { status: 201, body: createTodo({ title }) };
+		}),
 	},
-});
+};
 
 registerRoutes(app, routes);
 
@@ -40,8 +43,10 @@ export default app;
 
 ## Framework Context
 
+Handlers receive the following adapter fields directly:
+
 ```ts
-type HttpRouteHandlerContext<E extends Env = Env> = {
+type RouteHandlerFields<E extends Env = Env> = {
 	c: Context<E>;
 	signal: AbortSignal;
 };

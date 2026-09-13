@@ -89,7 +89,8 @@ export function createRouteHandler(
 				implementation.handler as (request: unknown) => unknown,
 				{
 					request: parsedRequest,
-					context: { ...contextArguments[0], signal },
+					context: contextArguments[0] ?? {},
+					handlerFields: { req: request, res: response, signal },
 				},
 			);
 			if (!response.destroyed) await writeNodeResponse(result, response);

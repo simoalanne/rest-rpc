@@ -1,5 +1,5 @@
-import type { ImplementationShape } from "@rest-rpc/server";
-import type { TanstackQueryContract } from "./contract.ts";
+import { implement } from "@rest-rpc/fetch";
+import { tanstackQueryContract } from "./contract.ts";
 
 type Project = {
 	id: string;
@@ -7,11 +7,10 @@ type Project = {
 	status: "active" | "archived";
 };
 
-export type TanstackQueryHandlers = ImplementationShape<TanstackQueryContract>;
-
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export const createTanstackQueryHandlers = (): TanstackQueryHandlers => {
+export const createTanstackQueryImplementations = () => {
+	const implementor = implement(tanstackQueryContract);
 	let version = 1;
 	const projects = new Map<string, Project>(
 		[
@@ -26,11 +25,11 @@ export const createTanstackQueryHandlers = (): TanstackQueryHandlers => {
 
 	return {
 		projects: {
-			list: () => ({
-				projects: listProjects(),
-				version,
-			}),
-			get: (request) => {
+			list: implementor.projects.list.handler(() => ({
+				status: 200,
+				body: { projects: listProjects(), version },
+			})),
+			get: implementor.projects.get.handler((request) => {
 				const project = projects.get(request.params.id);
 
 				if (!project) {
@@ -44,20 +43,25 @@ export const createTanstackQueryHandlers = (): TanstackQueryHandlers => {
 					status: 200 as const,
 					body: project,
 				};
-			},
-			search: (request) => ({
-				projects: listProjects().filter((project) => {
-					const matchesStatus =
-						request.query.status === undefined ||
-						project.status === request.query.status;
-					const matchesQuery =
-						request.query.q === undefined ||
-						project.name.toLowerCase().includes(request.query.q.toLowerCase());
-
-					return matchesStatus && matchesQuery;
-				}),
 			}),
-			create: (request) => {
+			search: implementor.projects.search.handler((request) => ({
+				status: 200,
+				body: {
+					projects: listProjects().filter((project) => {
+						const matchesStatus =
+							request.query.status === undefined ||
+							project.status === request.query.status;
+						const matchesQuery =
+							request.query.q === undefined ||
+							project.name
+								.toLowerCase()
+								.includes(request.query.q.toLowerCase());
+
+						return matchesStatus && matchesQuery;
+					}),
+				},
+			})),
+			create: implementor.projects.create.handler((request) => {
 				version += 1;
 				const project = {
 					id: `project-${projects.size + 1}`,
@@ -73,8 +77,8 @@ export const createTanstackQueryHandlers = (): TanstackQueryHandlers => {
 						tenant: request.headers["x-test-tenant"],
 					},
 				};
-			},
-			rename: (request) => {
+			}),
+			rename: implementor.projects.rename.handler((request) => {
 				if (
 					listProjects().some(
 						(project) =>
@@ -106,19 +110,19 @@ export const createTanstackQueryHandlers = (): TanstackQueryHandlers => {
 				const renamed = { ...project, name: request.body.name };
 				projects.set(request.params.id, renamed);
 				return { status: 200 as const, body: renamed };
-			},
-			page: (request) => {
+			}),
+			page: implementor.projects.page.handler((request) => {
 				const start = request.query.cursor ? Number(request.query.cursor) : 0;
 				const end = start + request.query.limit;
 				const pageProjects = listProjects().slice(start, end);
 				const nextCursor = end < projects.size ? String(end) : undefined;
 
 				return {
-					projects: pageProjects,
-					nextCursor,
+					status: 200,
+					body: { projects: pageProjects, nextCursor },
 				};
-			},
-			slow: async (request) => {
+			}),
+			slow: implementor.projects.slow.handler(async (request) => {
 				await delay(1_000);
 				return {
 					status: 200 as const,
@@ -128,11 +132,14 @@ export const createTanstackQueryHandlers = (): TanstackQueryHandlers => {
 						status: "active" as const,
 					},
 				};
-			},
-			events: async function* () {
-				yield { id: "project-1", event: "created" as const };
-				yield { id: "project-1", event: "renamed" as const };
-			},
+			}),
+			events: implementor.projects.events.handler(() => ({
+				status: 200,
+				body: (async function* () {
+					yield { id: "project-1", event: "created" as const };
+					yield { id: "project-1", event: "renamed" as const };
+				})(),
+			})),
 		},
 	};
 };

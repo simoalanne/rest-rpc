@@ -20,7 +20,7 @@ runResponsesSuite(
 			app.setErrorHandler((error, _request, reply) => {
 				return reply.status(418).send({
 					code: "TEAPOT",
-					message: error.message,
+					message: error instanceof Error ? error.message : "unknown error",
 				});
 			});
 		},

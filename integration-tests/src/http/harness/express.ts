@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { type RegisterRoutesOptions, registerRoutes } from "@rest-rpc/express";
-import type { ImplementationTree } from "@rest-rpc/server";
+import type { RuntimeImplementationTree } from "@rest-rpc/server";
 import express, { type Application } from "express";
 import { listen } from "./listen.ts";
 
@@ -11,7 +11,7 @@ export type ExpressAdapterOptions = {
 };
 
 export const createExpressAdapter = (
-	implementations: ImplementationTree,
+	implementations: RuntimeImplementationTree,
 	options: ExpressAdapterOptions = {},
 ) => ({
 	name: "express",

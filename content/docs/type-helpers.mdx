@@ -73,7 +73,6 @@ import type {
 	RouteRequest,
 	RouteRequestData,
 	RouteResponse,
-	RouteResponseShorthand,
 } from "@rest-rpc/express";
 
 type GetTodoRequest = RouteRequest<typeof api.todos.get>;
@@ -88,13 +87,11 @@ type GetTodoResponse = RouteResponse<typeof api.todos.get>;
 
 type GetTodoErrors = RouteErrors<typeof api.todos.get>;
 // { status: 404; body: { code: "NOT_FOUND" } }
-
-type CreateTodoShorthand = RouteResponseShorthand<typeof api.todos.create>;
-// { id: string; title: string }
 ```
 
-Use `RouteResponse` when returning an explicit status and body. Use
-`RouteResponseShorthand` when returning the successful response body directly.
+`RouteResponse` is the response envelope returned by a declared HTTP handler.
+Responses with a body include `status` and `body`; responses declared without a
+body include only `status` (plus `responseHeaders` when declared).
 
 ## TanStack Query
 

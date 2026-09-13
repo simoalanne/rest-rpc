@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { type ClientResponse, initClient } from "@rest-rpc/core";
+import {
+	type ApiClientFor,
+	type ClientResponse,
+	initClient,
+} from "@rest-rpc/core";
 import type { StartedServer } from "../harness/listen.ts";
 import { streamsContract } from "./contract.ts";
 import type { StreamCancellationProbe } from "./handlers.ts";
 
-type StreamsClient = ReturnType<typeof initClient<typeof streamsContract>>;
+type StreamsClient = ApiClientFor<typeof streamsContract>;
 
 type StreamsSuiteAdapter = {
 	name: string;
@@ -21,10 +25,12 @@ const collectAsyncIterable = async <T>(iterable: AsyncIterable<T>) => {
 
 const assertFetchOrFirstIterationRejects = async (
 	fetchStream: () => Promise<
-		ClientResponse<typeof streamsContract.throwsBeforeFirstChunk>
+		ClientResponse<(typeof streamsContract.throwsBeforeFirstChunk)["~restrpc"]>
 	>,
 ) => {
-	let response: ClientResponse<typeof streamsContract.throwsBeforeFirstChunk>;
+	let response: ClientResponse<
+		(typeof streamsContract.throwsBeforeFirstChunk)["~restrpc"]
+	>;
 	try {
 		response = await fetchStream();
 	} catch (error) {

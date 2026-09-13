@@ -20,14 +20,14 @@ export const createNodeAdapter = (
 ) => ({
 	name: "node",
 	start: async () => {
-		const handle = createRouteHandler(
+		const handler = createRouteHandler(
 			implementations,
 			options.createHandlerOptions,
 		);
 		return listen(
 			createServer(async (req, res) => {
 				try {
-					const result = await handle(req, res, { adapter: "node" });
+					const result = await handler(req, res, { adapter: "node" });
 					if (!result.matched) {
 						res.statusCode = 404;
 						res.end();

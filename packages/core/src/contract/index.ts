@@ -1,20 +1,4 @@
 export type {
-	HttpBuilderFor,
-	RouteFactoryOptions,
-	RouteFactory,
-	ShorthandRouteFactory,
-} from "./routeFactory.ts";
-export type {
-	AnyShorthandRouteDeclaration,
-	ShorthandRouteDeclaration,
-	ShorthandRouteInputBuilder,
-	ShorthandRouteOutputBuilder,
-} from "./shorthandRouteBuilder.ts";
-export {
-	createShorthandRouteDeclaration,
-	isShorthandRouteDeclaration,
-} from "./shorthandRouteBuilder.ts";
-export type {
 	CustomBody,
 	CustomBodyContentType,
 	CustomResponseBody,
@@ -27,19 +11,6 @@ export type {
 	NoBody,
 	Stream,
 } from "./body.ts";
-export type {
-	ApplyBuilderExtension,
-	BuilderExtension,
-	BuilderMetadata,
-	BuilderMetadataFor,
-	BuilderReceiver,
-	BuilderState,
-	EmptyObject,
-	MergeBuilderMetadata,
-	UseBuilderMethod,
-	WhenUnused,
-	WithRequest,
-} from "./baseRouteBuilder.ts";
 export {
 	isCustomBody,
 	isFormBody,
@@ -48,19 +19,19 @@ export {
 	isStream,
 } from "./body.ts";
 export type {
-	BaseRouteDeclaration,
 	HttpMethod,
 	OpenApiRouteOptions,
+	RouteDeclaration,
 	RouteMetadata,
-} from "./baseRouteDeclaration.ts";
-export type { Contract, RouteDeclaration } from "./contract.ts";
+} from "./routeDeclaration.ts";
+export type { Contract } from "./contract.ts";
 export type {
-	HttpBuilder,
-	HttpBuilderAtPath,
-	HttpBuilderDeclaration,
-	HttpBuilderState,
-	HttpRouteDeclaration,
-} from "./httpRouteBuilder.ts";
+	BuilderExtension,
+	BuilderState,
+	PublicDeclarationFor,
+	RootRouteBuilder,
+	RouteBuilderView,
+} from "./routeBuilder.types.ts";
 export {
 	getPathParamSegmentName,
 	isPathParamSegment,
@@ -76,15 +47,10 @@ export type {
 	RequestQuerySchema,
 	ServerRequest,
 } from "./request.ts";
-export {
-	isJsonQuery,
-	getRequestHeaderSchemas,
-	REQUEST_CONTEXT_KEY,
-} from "./request.ts";
+export { isJsonQuery, getRequestHeaderSchemas } from "./request.ts";
 export type {
 	DeclaredClientResponse,
 	ErrorDeclaredClientResponse,
-	HttpStatusCode,
 	ResponseBodySchema,
 	ResponseDeclaration,
 	ResponseHeaders,
@@ -93,7 +59,6 @@ export type {
 	ServerErrors,
 	ServerResponse,
 	ServerResponseBody,
-	ServerSuccessBody,
 	SuccessfulDeclaredClientResponse,
 } from "./response.ts";
 export {

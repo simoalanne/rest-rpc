@@ -1,46 +1,47 @@
-/** Result of dispatching a request through the general Node HTTP handler. */
-export type NodeRouteHandlerResult = { matched: boolean };
+import type { IncomingMessage, ServerResponse } from "node:http";
+import type { Contract } from "@rest-rpc/core/contract";
 import {
 	implement as serverImplement,
 	serverFirstRoute,
+	type ContractImplementor,
+	type ServerRouteBuilder,
 } from "@rest-rpc/server";
-import type {
-	ImplementationBuildersFor,
-	ServerContract,
-	ServerRouteFactory,
-} from "@rest-rpc/server";
+
+type NodeHandlerFields = {
+	req: IncomingMessage;
+	res: ServerResponse;
+	signal: AbortSignal;
+};
+
+/** Result of dispatching a request through the general Node HTTP handler. */
+export type NodeRouteHandlerResult = { matched: boolean };
 
 /** Application context used by Node route handlers by default. */
 export interface DefaultContext {}
 
-/** Starts a server-first route builder chain */
-export const route = serverFirstRoute as unknown as ServerRouteFactory<
-	Record<never, never>,
+/** Starts a Node server-first route builder chain. */
+export const route = serverFirstRoute as unknown as ServerRouteBuilder<
+	NodeHandlerFields,
 	DefaultContext
 >;
 
-/** Converts a contract-first route or route tree into a server route builder */
-export function implement<const TNode extends ServerContract>(
-	contract: TNode,
-): ImplementationBuildersFor<TNode, DefaultContext> {
-	return serverImplement(contract) as ImplementationBuildersFor<
-		TNode,
+/** Exposes Node handler attachment on every route in a core contract. */
+export function implement<const TContract extends Contract>(
+	contract: TContract,
+): ContractImplementor<TContract, NodeHandlerFields, DefaultContext> {
+	return serverImplement(contract) as unknown as ContractImplementor<
+		TContract,
+		NodeHandlerFields,
 		DefaultContext
 	>;
 }
 
 export type {
-	Implement,
 	ImplicitResponseEnvelope,
 	ImplicitResponseKind,
 	InferredRouteResponse,
-	ImplementationBuildersFor,
-	ServerImplementationTree,
 	ServerFirstResponseKind,
 	ServerFirstRouteResponseKind,
-	ServerHttpBuilderExtension,
-	ServerRouteFactory,
-	ServerRouteImplementation,
 } from "@rest-rpc/server";
 export {
 	RequestValidationError,

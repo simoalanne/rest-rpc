@@ -12,26 +12,29 @@ pnpm add @rest-rpc/fastify
 ## Usage
 
 ```ts
-import { registerRoutes, router } from "@rest-rpc/fastify";
+import { implement, registerRoutes } from "@rest-rpc/fastify";
 import Fastify from "fastify";
 import { api } from "./contract";
 
 const app = Fastify();
 
-const routes = router(api, {
+const implementor = implement(api);
+
+const routes = {
 	todos: {
-		list() {
-			return listTodos();
-		},
-		get({ params: { id }, context }) {
-			const authorization = context.req.headers.authorization;
-			return getTodo(id, { authorization });
-		},
-		create({ body: { title } }) {
-			return createTodo({ title });
-		},
+		list: implementor.todos.list.handler(() => ({
+			status: 200,
+			body: listTodos(),
+		})),
+		get: implementor.todos.get.handler(({ params: { id }, req }) => {
+			const authorization = req.headers.authorization;
+			return { status: 200, body: getTodo(id, { authorization }) };
+		}),
+		create: implementor.todos.create.handler(({ body: { title } }) => {
+			return { status: 201, body: createTodo({ title }) };
+		}),
 	},
-});
+};
 
 registerRoutes(app, routes);
 
@@ -40,9 +43,12 @@ await app.listen({ port: 3000 });
 
 ## Framework Context
 
+Handlers receive the following adapter fields directly:
+
 ```ts
-type HttpRouteHandlerContext = {
+type RouteHandlerFields = {
 	req: FastifyRequest;
+	reply: FastifyReply;
 	signal: AbortSignal;
 };
 ```

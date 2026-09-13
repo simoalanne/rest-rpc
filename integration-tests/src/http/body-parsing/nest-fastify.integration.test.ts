@@ -1,12 +1,12 @@
 import { createNestAdapter } from "../harness/nest.ts";
 import { bodyParsingContract } from "./contract.ts";
-import { createBodyParsingHandlers } from "./handlers.ts";
+import { createBodyParsingImplementations } from "./handlers.ts";
 import { runBodyParsingSuite } from "./suite.ts";
 
 type FastifyParserDone = (error: Error | null, body?: unknown) => void;
 
 runBodyParsingSuite(
-	createNestAdapter(bodyParsingContract, createBodyParsingHandlers(), {
+	createNestAdapter(bodyParsingContract, createBodyParsingImplementations(), {
 		configureFastify: (app) => {
 			app.addContentTypeParser(
 				"text/markdown",

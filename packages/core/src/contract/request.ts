@@ -1,11 +1,12 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { CustomBody, FormBody, MultipartBody, NoBody } from "./body.ts";
-import type { BaseRouteDeclaration } from "./baseRouteDeclaration.ts";
+import type {
+	RouteDeclaration,
+	RouteRequestDeclaration,
+} from "./routeDeclaration.ts";
 import type { InferCustomBody } from "./response.ts";
-import type { AnyShorthandRouteDeclaration } from "./shorthandRouteBuilder.ts";
 
 export type RequestSegment = "body" | "query" | "params" | "headers";
-export const REQUEST_CONTEXT_KEY = "context";
 
 /** Scalar value accepted by ordinary HTTP request schemas. */
 export type RequestScalar = string | number | boolean;
@@ -152,7 +153,7 @@ type InferRequestSegments<R, TIO extends "input" | "output"> = {
 };
 
 type RouteRequest<
-	E extends BaseRouteDeclaration,
+	E extends { request?: RouteRequestDeclaration },
 	TIO extends "input" | "output",
 > = E extends { request: infer TRequest }
 	? InferRequestSegments<TRequest, TIO>
@@ -174,7 +175,7 @@ type HasRequestInput<TRequest> = [
 	: true;
 
 type InferRequestFor<
-	E extends BaseRouteDeclaration,
+	E extends { request?: RouteRequestDeclaration },
 	TIO extends "input" | "output",
 > =
 	RouteRequest<E, TIO> extends infer R
@@ -219,17 +220,17 @@ type OptionalRequestHeaders<T, TOptionalKeys extends PropertyKey> = [
  * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
  */
 export type ClientRequest<
-	E extends BaseRouteDeclaration | AnyShorthandRouteDeclaration,
+	E extends RouteDeclaration,
 	TOptionalKeys extends PropertyKey = never,
-> = E extends AnyShorthandRouteDeclaration
-	? E extends { input: infer TInput extends StandardSchemaV1 }
+> = E extends { kind: "procedure" }
+	? E extends {
+			request: { body: infer TInput extends StandardSchemaV1 };
+		}
 		? StandardSchemaV1.InferInput<TInput>
 		: never
-	: E extends BaseRouteDeclaration
+	: E extends RouteDeclaration
 		? OptionalRequestHeaders<InferRequestFor<E, "input">, TOptionalKeys>
 		: never;
 
-export type ServerRequest<E extends BaseRouteDeclaration> = InferRequestFor<
-	E,
-	"output"
->;
+export type ServerRequest<E extends { request?: RouteRequestDeclaration }> =
+	InferRequestFor<E, "output">;

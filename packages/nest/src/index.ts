@@ -1,188 +1,67 @@
+import type { ExecutionContext } from "@nestjs/common";
+import type { Contract, RouteDeclaration } from "@rest-rpc/core/contract";
 import {
-	type Contract,
-	type ImplementationTree,
-	type ImplementationTreeFor,
-	type RouteImplementation,
+	implement as serverImplement,
+	serverFirstRoute,
+	type ContractImplementor,
 	type RouteHandler as ServerRouteHandler,
 	type RouteRequest as ServerRouteRequest,
-	route as serverRoute,
-	router as serverRouter,
+	type ServerRouteBuilder,
 } from "@rest-rpc/server";
-import type { RouteDeclaration } from "@rest-rpc/core/contract";
-import type { DefaultNestContext, NestHandlerContext } from "./module.ts";
+import type { DefaultContext } from "./module.ts";
+
+type NestHandlerFields = {
+	executionContext: ExecutionContext;
+	signal: AbortSignal;
+};
+
+type ContractRoute = { readonly "~restrpc": RouteDeclaration };
 
 export type {
 	RouteErrors,
+	RouteRequestData,
 	RouteResponse,
-	RouteResponseShorthand,
 } from "@rest-rpc/server";
-export { RouteResponseError } from "@rest-rpc/server";
-export { Route, Router } from "./decorators.ts";
-export type {
-	DefaultNestContext,
-	NestHandlerContext,
-	RestRpcModuleOptions,
-} from "./module.ts";
+export {
+	RequestValidationError,
+	ResponseValidationError,
+	RouteResponseError,
+} from "@rest-rpc/server";
+export { Implement } from "./decorators.ts";
+export type { DefaultContext, RestRpcModuleOptions } from "./module.ts";
 export { RestRpcModule } from "./module.ts";
 export {
 	RequestValidationException,
 	ResponseValidationException,
 } from "./validationExceptions.ts";
 
-/**
- * A contract tree containing Nest HTTP routes.
- *
- * @remarks The Nest adapter registers HTTP routes through Nest controllers.
- * Use this helper to constrain router contracts passed to
- * `router()` and `RouteHandlers`.
- *
- * @see {@link https://rest-rpc.dev/docs/server/nest}
- */
-export type NestContract = Contract;
-
-type AdditionalNestContext<TContext extends Record<string, unknown>> =
-	DefaultNestContext & TContext;
-
-/**
- * Infers the Nest route handler request type for a given route declaration.
- *
- * @remarks The inferred request includes the route input fields and a
- * Nest-specific `context` property. Pass the second generic argument for
- * controller-local context values added by `router(..., { context })`.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
- * @see {@link https://rest-rpc.dev/docs/server/nest#controller-local-context}
- */
-export type RouteRequest<
-	E extends RouteDeclaration,
-	TAdditionalContext extends Record<string, unknown> = Record<never, never>,
-> = ServerRouteRequest<
-	E,
-	NestHandlerContext<AdditionalNestContext<TAdditionalContext>>
+/** Infers the request passed to a Nest route handler. */
+export type RouteRequest<TRoute extends ContractRoute> = ServerRouteRequest<
+	TRoute["~restrpc"],
+	NestHandlerFields,
+	DefaultContext
 >;
 
-/**
- * Infers the Nest route handler type for a given route declaration.
- *
- * @remarks Use this type when annotating reusable handler functions for a
- * single route. The handler receives the same context shape used by
- * `RouteRequest`.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
- * @see {@link https://rest-rpc.dev/docs/server/nest#framework-context}
- */
-export type RouteHandler<
-	E extends RouteDeclaration,
-	TAdditionalContext extends Record<string, unknown> = Record<never, never>,
-> = ServerRouteHandler<
-	E,
-	NestHandlerContext<AdditionalNestContext<TAdditionalContext>>
+/** Infers a Nest route handler for a route declaration. */
+export type RouteHandler<TRoute extends ContractRoute> = ServerRouteHandler<
+	TRoute["~restrpc"],
+	NestHandlerFields,
+	DefaultContext
 >;
 
-type BivariantRouteHandler<E extends RouteDeclaration> = {
-	handler(...args: Parameters<RouteHandler<E>>): ReturnType<RouteHandler<E>>;
-}["handler"];
+/** Starts a Nest server-first route builder chain. */
+export const route = serverFirstRoute as unknown as ServerRouteBuilder<
+	NestHandlerFields,
+	DefaultContext
+>;
 
-/**
- * Handler tree accepted by `router()` when building a Nest implementation tree.
- *
- * @remarks Use this type with `implements` to check injectable Nest provider
- * classes against a contract tree.
- *
- * @example
- * ```ts
- * @Injectable()
- * class TodoHandlers implements RouteHandlers<typeof api.todos> {
- *   get(request: RouteRequest<typeof api.todos.get>) {
- *     return { id: request.id };
- *   }
- * }
- * ```
- *
- * @see {@link https://rest-rpc.dev/docs/server/nest#usage}
- */
-export type RouteHandlers<TContract extends NestContract> =
-	TContract extends RouteDeclaration
-		? BivariantRouteHandler<TContract> | RouteImplementation<TContract>
-		: {
-				[K in keyof TContract]: TContract[K] extends NestContract
-					? RouteHandlers<TContract[K]>
-					: never;
-			};
-
-const isNestRouteImplementation = (
-	value: unknown,
-): value is RouteImplementation<RouteDeclaration> =>
-	typeof value === "object" &&
-	value !== null &&
-	"route" in value &&
-	"handler" in value;
-
-const attachNestRouteContext = <TImplementation extends ImplementationTree>(
-	implementation: TImplementation,
-	context: Record<string, unknown> | undefined,
-): TImplementation => {
-	if (context === undefined) return implementation;
-
-	if (isNestRouteImplementation(implementation)) {
-		return {
-			...implementation,
-			context,
-		} as TImplementation;
-	}
-
-	return Object.fromEntries(
-		Object.entries(implementation).map(([key, child]) => [
-			key,
-			attachNestRouteContext(child as ImplementationTree, context),
-		]),
-	) as TImplementation;
-};
-
-/**
- * Builds a Nest route implementation for a single contract route.
- *
- * @remarks Return this from a controller method decorated with `@Route()`. The
- * optional `context` value is merged into the runtime handler context for that
- * route.
- *
- * @see {@link https://rest-rpc.dev/docs/server/nest#single-routes}
- * @see {@link https://rest-rpc.dev/docs/server/nest#controller-local-context}
- */
-export function route<
-	const TRoute extends RouteDeclaration,
-	TContext extends Record<string, unknown> = Record<never, never>,
->(
-	contract: TRoute,
-	handler: RouteHandler<TRoute, TContext>,
-	options: { context?: Record<string, unknown> } = {},
-): RouteImplementation<TRoute> & { context?: Record<string, unknown> } {
-	return attachNestRouteContext(
-		serverRoute(contract, handler as never),
-		options.context,
-	);
-}
-
-/**
- * Builds a Nest router implementation for a contract.
- *
- * @remarks Return this from a controller method decorated with `@Router()`. The
- * optional `context` value is merged into the runtime handler context for every
- * route in the returned implementation tree.
- *
- * @see {@link https://rest-rpc.dev/docs/server/nest#usage}
- * @see {@link https://rest-rpc.dev/docs/server/nest#controller-local-context}
- */
-export function router<const TContract extends NestContract>(
+/** Exposes Nest handler attachment on every route in a core contract. */
+export function implement<const TContract extends Contract>(
 	contract: TContract,
-	handlers: RouteHandlers<TContract>,
-	options: { context?: Record<string, unknown> } = {},
-): ImplementationTreeFor<TContract> {
-	return attachNestRouteContext(
-		serverRouter(
-			contract,
-			handlers as never,
-		) as ImplementationTreeFor<TContract>,
-		options.context,
-	);
+): ContractImplementor<TContract, NestHandlerFields, DefaultContext> {
+	return serverImplement(contract) as unknown as ContractImplementor<
+		TContract,
+		NestHandlerFields,
+		DefaultContext
+	>;
 }

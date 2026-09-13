@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { route } from "../contract/routeFactory.ts";
+import { route } from "../contract/routeBuilder.ts";
 import { type } from "../standard-schema/type.ts";
 import { getNextFetchTags } from "./nextFetchTags.ts";
 

@@ -9,14 +9,7 @@ describe("getRouteResponses", () => {
 		assert.equal(getRouteResponses({ path: "/ping", responses }), responses);
 	});
 
-	it("rejects missing route responses", () => {
-		assert.throws(
-			() => getRouteResponses({ path: "/ping" }),
-			/missing responses/,
-		);
-	});
-
-	it("rejects empty route responses", () => {
+	it("rejects routes without response schemas", () => {
 		assert.throws(
 			() => getRouteResponses({ path: "/ping", responses: {} }),
 			/must declare at least one response schema/,

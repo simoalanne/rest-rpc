@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { initClient } from "@rest-rpc/core";
+import { initClient, type ApiClientFor } from "@rest-rpc/core";
 import type { StartedServer } from "../harness/listen.ts";
 import { responsesContract } from "./contract.ts";
 
-type ResponsesClient = ReturnType<typeof initClient<typeof responsesContract>>;
+type ResponsesClient = ApiClientFor<typeof responsesContract>;
 
 type MiddlewareSuiteAdapter = {
 	name: string;

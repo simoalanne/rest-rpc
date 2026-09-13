@@ -1,21 +1,23 @@
-import { type ImplementationShape, router } from "@rest-rpc/server";
-import { type ResponsesContract, responsesContract } from "./contract.ts";
+import { implement } from "@rest-rpc/server";
+import { responsesContract } from "./contract.ts";
 
-export type ResponsesHandlers = ImplementationShape<ResponsesContract>;
+export const createResponsesImplementations = () => {
+	const implementor = implement(responsesContract);
 
-export const createResponsesHandlers = (): ResponsesHandlers => ({
-	jsonContentType: () => ({
-		status: 200 as const,
-		responseHeaders: {
-			"content-type": "application/vnd.rest-rpc+json",
-		},
-		body: { ok: true as const },
-	}),
-	invalidDeclared: () =>
-		({
-			ok: "not-a-boolean",
-		}) as never,
-});
-
-export const createResponsesImplementations = () =>
-	router(responsesContract, createResponsesHandlers());
+	return {
+		jsonContentType: implementor.jsonContentType.handler(() => ({
+			status: 200 as const,
+			responseHeaders: {
+				"content-type": "application/vnd.rest-rpc+json",
+			},
+			body: { ok: true as const },
+		})),
+		invalidDeclared: implementor.invalidDeclared.handler(
+			() =>
+				({
+					status: 200,
+					body: { ok: "not-a-boolean" },
+				}) as never,
+		),
+	};
+};

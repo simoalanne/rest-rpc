@@ -1,12 +1,10 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { initClient } from "@rest-rpc/core";
+import { initClient, type ApiClientFor } from "@rest-rpc/core";
 import type { StartedServer } from "../harness/listen.ts";
 import { integrationContract } from "./contract.ts";
 
-type IntegrationClient = ReturnType<
-	typeof initClient<typeof integrationContract>
->;
+type IntegrationClient = ApiClientFor<typeof integrationContract>;
 
 type ClientHttpSuiteAdapter = {
 	name: string;

@@ -7,7 +7,7 @@ import { createRouteHandler, route } from "@rest-rpc/node";
 import { listen } from "./harness/listen.ts";
 
 test("Node decodes chunked large JSON, multipart and repeated headers", async (t) => {
-	const handle = createRouteHandler({
+	const handler = createRouteHandler({
 		json: route
 			.post("/json")
 			.body(type<{ text: string }>())
@@ -23,7 +23,7 @@ test("Node decodes chunked large JSON, multipart and repeated headers", async (t
 	const server = await listen(
 		createServer(async (req, res) => {
 			try {
-				await handle(req, res);
+				await handler(req, res);
 			} catch (error) {
 				res.destroy(error as Error);
 			}

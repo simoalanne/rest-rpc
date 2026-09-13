@@ -1,4 +1,4 @@
-import type { ImplementationTree } from "@rest-rpc/server";
+import type { RuntimeImplementationTree } from "@rest-rpc/server";
 import { flattenRouteImplementations } from "@rest-rpc/server";
 import type { FastifyInstance } from "fastify";
 import {
@@ -26,7 +26,7 @@ export type RegisterRoutesOptions = {
  */
 export function registerRoutes(
 	app: FastifyInstance,
-	implementations: ImplementationTree,
+	implementations: RuntimeImplementationTree,
 	options: RegisterRoutesOptions = {},
 ) {
 	return registerFastifyHttpRoutes(

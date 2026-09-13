@@ -5,8 +5,8 @@ import {
 	isNoBody,
 	isStream,
 } from "../contract/body.ts";
-import type { OpenApiResponseOptions } from "../contract/baseRouteDeclaration.ts";
-import type { HttpRouteDeclaration } from "../contract/httpRouteBuilder.ts";
+import type { OpenApiResponseOptions } from "../contract/routeDeclaration.ts";
+import type { RouteDeclaration } from "../contract/routeDeclaration.ts";
 import type {
 	JsonQuery,
 	RequestHeadersDeclaration,
@@ -80,13 +80,13 @@ export type SchemaConverter = (
 ) => OpenApiSchema | undefined;
 
 export type ParameterTransformContext = {
-	route: HttpRouteDeclaration;
+	route: RouteDeclaration;
 	routePath: readonly string[];
 	parameter: OpenApiParameter;
 };
 
 export type OperationTransformContext = {
-	route: HttpRouteDeclaration;
+	route: RouteDeclaration;
 	routePath: readonly string[];
 	operation: OpenApiOperation;
 };
@@ -327,7 +327,7 @@ const createStreamWireSchema = (contentType: string) =>
 		: { type: "string" };
 
 export const createResponses = (
-	route: HttpRouteDeclaration,
+	route: RouteDeclaration,
 	converter: SchemaConverter | undefined,
 ) => {
 	const responses: Record<string, OpenApiResponse> = {};
@@ -347,7 +347,7 @@ export const createResponses = (
 };
 
 export const createOperation = (
-	route: HttpRouteDeclaration,
+	route: RouteDeclaration,
 	options: CreateOperationOptions,
 	routePath: readonly string[] = [],
 ): OpenApiOperation => {

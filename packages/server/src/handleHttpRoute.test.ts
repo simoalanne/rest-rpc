@@ -12,27 +12,31 @@ import {
 const routeWithDeclaredErrorResponse = coreRoute
 	.get("/todos/:id")
 	.response(200, z.object({ id: z.string() }))
-	.response(404, z.object({ code: z.literal("not_found") }));
+	.response(404, z.object({ code: z.literal("not_found") }))["~restrpc"];
 
 describe("handleHttpRoute", () => {
-	it("passes validated request data and context to the handler", async () => {
+	it("passes validated request data, handler fields, context, and route", async () => {
+		const route = coreRoute
+			.get("/todos/:id")
+			.params(z.object({ id: z.coerce.number<number>() }))
+			.response(200, z.object({ id: z.number() }))["~restrpc"];
 		const result = await handleHttpRoute(
-			coreRoute
-				.get("/todos/:id")
-				.params(z.object({ id: z.coerce.number<number>() }))
-				.response(200, z.object({ id: z.number() })),
+			route,
 			(request) => {
 				assert.deepEqual(request, {
 					params: { id: 123 },
+					frameworkValue: "framework-1",
 					context: { requestId: "request-1" },
+					route,
 				});
 
-				return { id: request.params.id };
+				return { status: 200, body: { id: request.params.id } };
 			},
 			{
 				request: {
 					params: { id: "123" },
 				},
+				handlerFields: { frameworkValue: "framework-1" },
 				context: { requestId: "request-1" },
 			},
 		);
@@ -46,21 +50,25 @@ describe("handleHttpRoute", () => {
 	});
 
 	it("passes grouped request data under explicit HTTP segments", async () => {
+		const route = coreRoute
+			.get("/todos")
+			.query(z.object({ q: z.string() }).transform(() => ["todo"]))
+			.response(204)["~restrpc"];
 		const result = await handleHttpRoute(
-			coreRoute
-				.get("/todos")
-				.query(z.object({ q: z.string() }).transform(() => ["todo"]))
-				.response(204),
+			route,
 			(request) => {
 				assert.deepEqual(request, {
 					query: ["todo"],
 					context: {},
+					route,
 				});
+				return { status: 204 };
 			},
 			{
 				request: {
 					query: new URLSearchParams({ q: "todos" }),
 				},
+				handlerFields: {},
 				context: {},
 			},
 		);
@@ -80,7 +88,7 @@ describe("handleHttpRoute", () => {
 					coreRoute
 						.get("/todos/:id")
 						.params(z.object({ id: z.number() }))
-						.response(204),
+						.response(204)["~restrpc"],
 					() => {
 						called = true;
 					},
@@ -88,6 +96,7 @@ describe("handleHttpRoute", () => {
 						request: {
 							params: { id: "123" },
 						},
+						handlerFields: {},
 						context: {},
 					},
 				),
@@ -104,17 +113,58 @@ describe("handleHttpRoute", () => {
 		assert.equal(called, false);
 	});
 
+	it("normalizes inferred procedure results as successful JSON", async () => {
+		const route = {
+			kind: "procedure" as const,
+			method: "POST" as const,
+			path: "/todos/get",
+			responses: {},
+		};
+		const result = await handleHttpRoute(route, () => ({ id: "todo-1" }), {
+			request: {},
+			handlerFields: {},
+			context: {},
+		});
+
+		assert.deepEqual(result, {
+			kind: "json",
+			status: 200,
+			body: { id: "todo-1" },
+		});
+	});
+
+	it("normalizes declared procedure outputs directly", async () => {
+		const route = coreRoute.output(z.object({ status: z.literal("ready") }))[
+			"~restrpc"
+		];
+		const result = await handleHttpRoute(route, () => ({ status: "ready" }), {
+			request: {},
+			handlerFields: {},
+			context: {},
+		});
+
+		assert.deepEqual(result, {
+			kind: "json",
+			status: 200,
+			headers: undefined,
+			body: { status: "ready" },
+		});
+	});
+
 	it("rethrows user handler errors unchanged", async () => {
 		const expected = new Error("boom");
 		await assert.rejects(
 			() =>
 				handleHttpRoute(
-					coreRoute.get("/todos").response(200, z.object({ id: z.string() })),
+					coreRoute.get("/todos").response(200, z.object({ id: z.string() }))[
+						"~restrpc"
+					],
 					() => {
 						throw expected;
 					},
 					{
 						request: {},
+						handlerFields: {},
 						context: {},
 					},
 				),
@@ -126,10 +176,13 @@ describe("handleHttpRoute", () => {
 		await assert.rejects(
 			() =>
 				handleHttpRoute(
-					coreRoute.get("/todos").response(200, z.object({ id: z.string() })),
-					() => ({ id: 123 }),
+					coreRoute.get("/todos").response(200, z.object({ id: z.string() }))[
+						"~restrpc"
+					],
+					() => ({ status: 200, body: { id: 123 } }),
 					{
 						request: {},
+						handlerFields: {},
 						context: {},
 					},
 				),
@@ -139,27 +192,6 @@ describe("handleHttpRoute", () => {
 				assert.equal(error.issues.length, 1);
 				return true;
 			},
-		);
-	});
-
-	it("requires explicit response objects when a route has multiple success statuses", async () => {
-		await assert.rejects(
-			() =>
-				handleHttpRoute(
-					coreRoute
-						.post("/todos")
-						.response(200, z.object({ id: z.string() }))
-						.response(202, z.object({ id: z.string() })),
-					() => ({ id: "todo-1" }),
-					{
-						request: {},
-						context: {},
-					},
-				),
-			(error) =>
-				error instanceof Error &&
-				!(error instanceof ResponseValidationError) &&
-				/declared response object/.test(error.message),
 		);
 	});
 
@@ -173,10 +205,11 @@ describe("handleHttpRoute", () => {
 							status: z.number(),
 							body: z.string(),
 						}),
-					),
+					)["~restrpc"],
 					() => ({ status: 123, body: "running" }),
 					{
 						request: {},
+						handlerFields: {},
 						context: {},
 					},
 				),
@@ -195,7 +228,7 @@ describe("handleHttpRoute", () => {
 					etag: z.string(),
 					"x-optional": z.string().optional(),
 				}),
-			}),
+			})["~restrpc"],
 			() => ({
 				status: 200 as const,
 				body: { id: "todo-1" },
@@ -206,6 +239,7 @@ describe("handleHttpRoute", () => {
 			}),
 			{
 				request: {},
+				handlerFields: {},
 				context: {},
 			},
 		);
@@ -231,6 +265,7 @@ describe("handleHttpRoute", () => {
 			},
 			{
 				request: {},
+				handlerFields: {},
 				context: {},
 			},
 		);
@@ -256,6 +291,7 @@ describe("handleHttpRoute", () => {
 					},
 					{
 						request: {},
+						handlerFields: {},
 						context: {},
 					},
 				),
@@ -274,7 +310,9 @@ describe("handleHttpRoute", () => {
 				create: coreRoute
 					.post("/todos")
 					.response(201, z.object({ id: z.string() }))
-					.response(409, z.object({ code: z.literal("already_exists") })),
+					.response(409, z.object({ code: z.literal("already_exists") }))[
+					"~restrpc"
+				],
 			},
 		};
 
@@ -290,6 +328,7 @@ describe("handleHttpRoute", () => {
 					},
 					{
 						request: {},
+						handlerFields: {},
 						context: {},
 					},
 				),
@@ -307,10 +346,11 @@ describe("handleHttpRoute custom responses", () => {
 			coreRoute.get("/report.csv").customResponse(200, {
 				contentType: "text/csv",
 				schema: z.string(),
-			}),
+			})["~restrpc"],
 			() => ({ status: 200, body: "id,title\n1,First\n" }),
 			{
 				request: {},
+				handlerFields: {},
 				context: {},
 			},
 		);
@@ -326,7 +366,7 @@ describe("handleHttpRoute custom responses", () => {
 			coreRoute.get("/images/:id").customResponse(200, {
 				contentType: ["image/png", "image/jpeg"],
 				schema: z.string(),
-			}),
+			})["~restrpc"],
 			() => ({
 				status: 200,
 				body: {
@@ -336,6 +376,7 @@ describe("handleHttpRoute custom responses", () => {
 			}),
 			{
 				request: {},
+				handlerFields: {},
 				context: {},
 			},
 		);
@@ -356,10 +397,11 @@ describe("handleHttpRoute custom responses", () => {
 			coreRoute.get("/report.csv").customStreamResponse(200, {
 				contentType: "text/csv",
 				schema: z.string(),
-			}),
+			})["~restrpc"],
 			() => ({ status: 200, body: rows() }),
 			{
 				request: {},
+				handlerFields: {},
 				context: {},
 			},
 		);

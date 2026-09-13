@@ -1,5 +1,4 @@
 import type { Contract, RouteDeclaration } from "../contract/contract.ts";
-import type { AnyShorthandRouteDeclaration } from "../contract/shorthandRouteBuilder.ts";
 import type { ClientRequest } from "../contract/request.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { DeclaredClientResponse } from "../contract/response.ts";
@@ -70,10 +69,10 @@ type RouteDeclaredResponse<E extends RouteDeclaration> = WithResponseMetadata<
  *
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-an-http-route}
  */
-export type ClientResponse<
-	E extends RouteDeclaration | AnyShorthandRouteDeclaration,
-> = E extends AnyShorthandRouteDeclaration
-	? ShorthandRouteOutput<E>
+export type ClientResponse<E extends RouteDeclaration> = E extends {
+	kind: "procedure";
+}
+	? ProcedureRouteOutput<E>
 	: E extends RouteDeclaration
 		? RouteDeclaredResponse<E>
 		: never;
@@ -85,10 +84,10 @@ export type FetchResponseFn<
 
 /** Client operations available for a single declared route. */
 export type ApiClientRouteValue<
-	E extends RouteDeclaration | AnyShorthandRouteDeclaration = RouteDeclaration,
+	E extends RouteDeclaration = RouteDeclaration,
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
-> = E extends RouteDeclaration | AnyShorthandRouteDeclaration
-	? E extends AnyShorthandRouteDeclaration
+> = E extends RouteDeclaration
+	? E extends { kind: "procedure" }
 		? [ClientRequest<E>] extends [never]
 			? (
 					request?: undefined,
@@ -103,10 +102,11 @@ export type ApiClientRouteValue<
 			: never
 	: never;
 
-type ShorthandRouteOutput<TRoute extends AnyShorthandRouteDeclaration> =
-	TRoute extends { output: infer TOutput extends StandardSchemaV1 }
-		? StandardSchemaV1.InferOutput<TOutput>
-		: never;
+type ProcedureRouteOutput<TRoute extends RouteDeclaration> = TRoute extends {
+	responses: { 200: infer TOutput extends StandardSchemaV1 };
+}
+	? StandardSchemaV1.InferOutput<TOutput>
+	: never;
 
 /**
  * Infers the generated client tree for a contract.
@@ -116,8 +116,8 @@ type ShorthandRouteOutput<TRoute extends AnyShorthandRouteDeclaration> =
 export type ApiClientFor<
 	T extends Contract = Contract,
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
-> = T extends RouteDeclaration | AnyShorthandRouteDeclaration
-	? ApiClientRouteValue<T, TGlobalHeaders>
+> = T extends { readonly "~restrpc": infer TRoute extends RouteDeclaration }
+	? ApiClientRouteValue<TRoute, TGlobalHeaders>
 	: {
 			[K in keyof T]: T[K] extends Contract
 				? ApiClientFor<T[K], TGlobalHeaders>

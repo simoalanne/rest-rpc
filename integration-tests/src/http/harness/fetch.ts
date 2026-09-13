@@ -1,7 +1,7 @@
 import type { OutgoingHttpHeaders } from "node:http";
 import { createServer } from "node:http";
 import { Readable } from "node:stream";
-import type { ImplementationTree } from "@rest-rpc/server";
+import type { RuntimeImplementationTree } from "@rest-rpc/server";
 import {
 	type CreateFetchHandlerOptions,
 	createRouteHandler,
@@ -33,7 +33,7 @@ export type FetchAdapterOptions = {
 };
 
 export const createFetchAdapter = (
-	implementations: ImplementationTree,
+	implementations: RuntimeImplementationTree,
 	options: FetchAdapterOptions = {},
 ) => ({
 	name: "fetch",

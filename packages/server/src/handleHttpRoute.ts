@@ -1,4 +1,3 @@
-import { isShorthandRouteDeclaration } from "@rest-rpc/core/contract";
 import type {
 	CustomBody,
 	ResponseDeclaration,
@@ -10,14 +9,12 @@ import {
 	isCustomBody,
 	isNoBody,
 	isStream,
-	REQUEST_CONTEXT_KEY,
 } from "@rest-rpc/core/contract";
 import type { HttpHeaders } from "./headers.ts";
 import { RouteResponseError } from "./routeResponseError.ts";
 import { RequestValidationError } from "./validationErrors.ts";
-import type { HttpRouteHandlerContext, RuntimeRouteHandler } from "./router.ts";
-import type { BaseRouteDeclaration } from "@rest-rpc/core/contract";
-import type { ImplicitResponseEnvelope } from "./serverFirst.ts";
+import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
+import type { ImplicitResponseEnvelope } from "./routeBuilder.types.ts";
 import {
 	resolveCustomResponseBody,
 	type RequestSegments,
@@ -65,9 +62,13 @@ export type HttpRouteResult =
  *
  * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registering-http-routes}
  */
-export type HandleHttpRouteOptions<TContext extends HttpRouteHandlerContext> = {
+export type HandleHttpRouteOptions<
+	TAdditionalHandlerFields extends object = Record<never, never>,
+	TContext extends object = Record<never, never>,
+> = {
 	request: RequestSegments;
 	context: TContext;
+	handlerFields: TAdditionalHandlerFields;
 };
 
 const isAsyncIterable = (value: unknown): value is AsyncIterable<unknown> =>
@@ -76,25 +77,25 @@ const isAsyncIterable = (value: unknown): value is AsyncIterable<unknown> =>
 	Symbol.asyncIterator in value &&
 	typeof value[Symbol.asyncIterator] === "function";
 
-const classifyImplicitResponse = (
-	result: ImplicitResponseEnvelope,
+const classifyImplicitHttpResponse = (
+	response: ImplicitResponseEnvelope,
 ): HttpRouteResult => {
-	const headers = result.responseHeaders;
-	if (!("body" in result)) {
+	const headers = response.responseHeaders;
+	if (!("body" in response)) {
 		return {
 			kind: "empty",
-			status: result.status,
+			status: response.status,
 			headers,
 		};
 	}
 
-	const body = result.body;
-	const { contentType } = result;
+	const body = response.body;
+	const { contentType } = response;
 
 	if (isAsyncIterable(body)) {
 		return {
 			kind: "stream",
-			status: result.status,
+			status: response.status,
 			headers,
 			body,
 			...(contentType !== undefined
@@ -106,14 +107,14 @@ const classifyImplicitResponse = (
 	if (contentType !== undefined) {
 		return {
 			kind: "custom",
-			status: result.status,
+			status: response.status,
 			headers,
 			body,
 			contentType,
 		};
 	}
 
-	return { kind: "json", status: result.status, headers, body };
+	return { kind: "json", status: response.status, headers, body };
 };
 
 const getResponseSchema = (
@@ -132,43 +133,10 @@ const getResponseSchema = (
 	return entry[1];
 };
 
-const getSingleSuccessfulStatus = (
-	route: RouteDeclaration,
-): number | undefined => {
-	const statuses = Object.keys(getRouteResponses(route))
-		.map(Number)
-		.filter((status) => status >= 200 && status < 300);
-
-	return statuses.length === 1 ? statuses[0] : undefined;
-};
-
-const normalizeHandlerResultEnvelopeOrShorthand = (
-	route: RouteDeclaration,
-	result: unknown,
-): {
+type DeclaredResponseEnvelope = {
 	status: number;
-	body: unknown;
+	body?: unknown;
 	responseHeaders?: Record<string, unknown>;
-} => {
-	if (result && typeof result === "object" && "status" in result) {
-		return result as {
-			status: number;
-			body: unknown;
-			responseHeaders?: Record<string, unknown>;
-		};
-	}
-
-	const status = getSingleSuccessfulStatus(route);
-	if (status === undefined) {
-		throw new Error(
-			`Service for "${route.method} ${route.path}" must return a declared response object.`,
-		);
-	}
-
-	return {
-		status,
-		body: result,
-	};
 };
 
 const normalizeCustomBodyResult = async (schema: CustomBody, body: unknown) => {
@@ -186,11 +154,7 @@ const normalizeCustomBodyResult = async (schema: CustomBody, body: unknown) => {
 
 const normalizeResponseResult = async (
 	route: RouteDeclaration,
-	result: {
-		status: number;
-		body: unknown;
-		responseHeaders?: Record<string, unknown>;
-	},
+	result: DeclaredResponseEnvelope,
 ): Promise<HttpRouteResult> => {
 	const schema = getResponseSchema(route, result.status);
 	const bodySchema = getResponseBody(schema);
@@ -261,16 +225,6 @@ const normalizeResponseResult = async (
 	};
 };
 
-const normalizeHandlerResult = async (
-	route: RouteDeclaration,
-	result: unknown,
-): Promise<HttpRouteResult> => {
-	return normalizeResponseResult(
-		route,
-		normalizeHandlerResultEnvelopeOrShorthand(route, result),
-	);
-};
-
 const normalizeRouteResponseError = async (
 	route: RouteDeclaration,
 	error: RouteResponseError,
@@ -288,17 +242,14 @@ const normalizeRouteResponseError = async (
  * @see {@link https://rest-rpc.dev/docs/advanced/building-server-adapters#registering-http-routes}
  */
 export async function handleHttpRoute<
-	TContext extends HttpRouteHandlerContext = HttpRouteHandlerContext,
+	TAdditionalHandlerFields extends object = Record<never, never>,
+	TContext extends object = Record<never, never>,
 >(
-	route: BaseRouteDeclaration,
+	route: RouteDeclaration,
 	handler: RuntimeRouteHandler,
-	options: HandleHttpRouteOptions<TContext>,
+	options: HandleHttpRouteOptions<TAdditionalHandlerFields, TContext>,
 ): Promise<HttpRouteResult> {
-	const declaredRoute = route as RouteDeclaration;
-	const requestValidation = await validateRequest(
-		declaredRoute,
-		options.request,
-	);
+	const requestValidation = await validateRequest(route, options.request);
 	if (!requestValidation.success) {
 		throw new RequestValidationError(requestValidation.issues);
 	}
@@ -306,23 +257,30 @@ export async function handleHttpRoute<
 	let handlerResult: unknown;
 	try {
 		handlerResult = await handler({
-			...(isShorthandRouteDeclaration(declaredRoute)
-				? "input" in declaredRoute
+			...options.handlerFields,
+			...(route.kind === "procedure"
+				? route.request?.body
 					? { input: requestValidation.data.body }
 					: {}
 				: requestValidation.data),
-			[REQUEST_CONTEXT_KEY]: options.context,
+			context: options.context,
+			route,
 		});
 	} catch (error) {
 		if (error instanceof RouteResponseError) {
-			return normalizeRouteResponseError(declaredRoute, error);
+			return normalizeRouteResponseError(route, error);
 		}
 		throw error;
 	}
 
-	if (!("responses" in route)) {
-		return classifyImplicitResponse(handlerResult as ImplicitResponseEnvelope);
+	const hasDeclaredResponses = Object.keys(route.responses).length > 0;
+	if (route.kind === "procedure") {
+		return hasDeclaredResponses
+			? normalizeResponseResult(route, { status: 200, body: handlerResult })
+			: { kind: "json", status: 200, body: handlerResult };
 	}
 
-	return normalizeHandlerResult(declaredRoute, handlerResult);
+	return hasDeclaredResponses
+		? normalizeResponseResult(route, handlerResult as DeclaredResponseEnvelope)
+		: classifyImplicitHttpResponse(handlerResult as ImplicitResponseEnvelope);
 }

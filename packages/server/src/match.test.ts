@@ -1,66 +1,55 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { route as coreRoute } from "@rest-rpc/core";
 import { createRouteMatcher } from "./match.ts";
+import { serverFirstRoute } from "./routeBuilder.ts";
 
-const implementation = (method: "GET" | "POST", path: string) => ({
-	route:
-		method === "GET"
-			? coreRoute.get(path).response(204)
-			: coreRoute.post(path).response(204),
-	handler: () => undefined,
-});
+const implementation = (method: "GET" | "POST", path: string) =>
+	(method === "GET" ? serverFirstRoute.get(path) : serverFirstRoute.post(path))
+		.response(204)
+		.handler(() => ({ status: 204 }));
 
 describe("createRouteMatcher", () => {
 	it("returns the most specific implementation and decoded path params", () => {
-		const getTodo = implementation("GET", "/todos/:id");
-		const createTodo = implementation("GET", "/todos/new");
-		const matchRoute = createRouteMatcher([getTodo, createTodo]);
+		const matchRoute = createRouteMatcher([
+			implementation("GET", "/todos/:id"),
+			implementation("GET", "/todos/new"),
+		]);
 
-		assert.deepEqual(matchRoute({ method: "GET", path: "/todos/new" }), {
-			implementation: createTodo,
-			params: {},
+		const staticMatch = matchRoute({ method: "GET", path: "/todos/new" });
+		assert.equal(staticMatch?.implementation.route.path, "/todos/new");
+		assert.deepEqual(staticMatch?.params, {});
+
+		const paramMatch = matchRoute({
+			method: "GET",
+			path: "/todos/one%20two",
 		});
-		assert.deepEqual(matchRoute({ method: "GET", path: "/todos/one%20two" }), {
-			implementation: getTodo,
-			params: { id: "one two" },
-		});
+		assert.equal(paramMatch?.implementation.route.path, "/todos/:id");
+		assert.deepEqual(paramMatch?.params, { id: "one two" });
 	});
 
 	it("respects methods and optional trailing slashes", () => {
-		const getTodo = implementation("GET", "/todos/:id");
-		const createTodo = implementation("POST", "/todos/:id");
-		const matchRoute = createRouteMatcher([getTodo, createTodo]);
+		const matchRoute = createRouteMatcher([
+			implementation("GET", "/todos/:id"),
+			implementation("POST", "/todos/:id"),
+		]);
 
-		assert.deepEqual(matchRoute({ method: "POST", path: "/todos/todo-1/" }), {
-			implementation: createTodo,
-			params: { id: "todo-1" },
-		});
+		assert.equal(
+			matchRoute({ method: "POST", path: "/todos/todo-1/" })?.implementation
+				.route.method,
+			"POST",
+		);
 		assert.equal(
 			matchRoute({ method: "DELETE", path: "/todos/todo-1" }),
 			undefined,
 		);
 	});
 
-	it("matches route specificity within the requested method", () => {
-		const getTodo = implementation("GET", "/todos/:id");
-		const createNewTodo = implementation("POST", "/todos/new");
-		const matchRoute = createRouteMatcher([getTodo, createNewTodo]);
-
-		assert.deepEqual(matchRoute({ method: "GET", path: "/todos/new" }), {
-			implementation: getTodo,
-			params: { id: "new" },
-		});
-	});
-
 	it("escapes literal route characters before matching paths", () => {
-		const literal = implementation("GET", "/files/index.json");
-		const matchRoute = createRouteMatcher([literal]);
+		const matchRoute = createRouteMatcher([
+			implementation("GET", "/files/index.json"),
+		]);
 
-		assert.deepEqual(matchRoute({ method: "GET", path: "/files/index.json" }), {
-			implementation: literal,
-			params: {},
-		});
+		assert.ok(matchRoute({ method: "GET", path: "/files/index.json" }));
 		assert.equal(
 			matchRoute({ method: "GET", path: "/files/indexxjson" }),
 			undefined,

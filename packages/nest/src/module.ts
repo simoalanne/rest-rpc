@@ -8,36 +8,16 @@ import { RestRpcRouteInterceptor } from "./routeInterceptor.ts";
  *
  * @remarks Augment this interface to set the route handler context across a
  * project. The augmented shape is used by `RouteRequest`, `RouteHandler`,
- * `RouteHandlers`, `route()`, and `router()`.
+ * `route`, and `implement()`.
  *
  * @see {@link https://rest-rpc.dev/docs/server/nest#global-context}
  */
-export interface DefaultNestContext {}
+export interface DefaultContext {}
 
 interface ContextShape {
 	// oxlint-disable-next-line typescript/no-explicit-any -- `any` allows named interfaces without leaking an index signature.
 	[key: string]: any;
 }
-
-type Merge<T> = {
-	[K in keyof T]: T[K];
-};
-
-/**
- * The context object passed to Nest adapter route handlers.
- *
- * @remarks This combines the application context returned by `createContext`
- * with the adapter-supplied `AbortSignal`.
- *
- * @see {@link https://rest-rpc.dev/docs/server/nest#framework-context}
- */
-export type NestHandlerContext<
-	TContext extends ContextShape = DefaultNestContext,
-> = Merge<
-	TContext & {
-		signal: AbortSignal;
-	}
->;
 
 /**
  * Options for configuring the rest-rpc Nest adapter.
@@ -48,7 +28,7 @@ export type NestHandlerContext<
  * @see {@link https://rest-rpc.dev/docs/server/nest#options}
  */
 export type RestRpcModuleOptions<
-	TContext extends ContextShape = DefaultNestContext,
+	TContext extends ContextShape = DefaultContext,
 > = {
 	createContext?: (context: ExecutionContext) => TContext | Promise<TContext>;
 };
@@ -57,7 +37,7 @@ export type RestRpcModuleOptions<
  * Configures rest-rpc route handling for Nest controllers.
  *
  * @remarks Import `RestRpcModule.forRoot()` once in a Nest module to register
- * the global interceptor used by `@Route()` and `@Router()`.
+ * the global interceptor used by `@Implement()`.
  *
  * @see {@link https://rest-rpc.dev/docs/server/nest#usage}
  */
@@ -68,7 +48,7 @@ export class RestRpcModule {
 	 *
 	 * @see {@link https://rest-rpc.dev/docs/server/nest#options}
 	 */
-	static forRoot<TContext extends ContextShape = DefaultNestContext>(
+	static forRoot<TContext extends ContextShape = DefaultContext>(
 		options: RestRpcModuleOptions<TContext> = {},
 	): DynamicModule {
 		const restRpcModuleOptions = Symbol.for("rest-rpc:nest-options");

@@ -7,7 +7,7 @@ const route = coreRoute.get("/todos/:id").response(404);
 
 describe("RouteResponseError", () => {
 	it("stores the route and response envelope fields", () => {
-		const response = { status: 404, body: undefined };
+		const response = { status: 404 };
 		const error = new RouteResponseError(route, response);
 
 		assert.equal(error.message, "Route response error");

@@ -35,13 +35,15 @@ export const api = {
 ```
 
 ```ts
-export const routes = router(api, {
+export const routes = {
 	todos: {
-		create({ body: { title, labels } }) {
-			return createTodo({ title, labels });
-		},
+		create: implement(api.todos.create).handler(
+			({ body: { title, labels } }) => {
+				return { status: 201, body: createTodo({ title, labels }) };
+			},
+		),
 	},
-});
+};
 ```
 
 ```ts
@@ -78,16 +80,18 @@ export const api = {
 ```
 
 ```ts
-export const routes = router(api, {
+const implementor = implement(api);
+
+export const routes = {
 	todos: {
-		list({ query: { limit } }) {
-			return listTodos({ limit });
-		},
-		byId({ params: { id } }) {
-			return getTodoById({ id });
-		},
+		list: implementor.todos.list.handler(({ query: { limit } }) => {
+			return { status: 200, body: listTodos({ limit }) };
+		}),
+		byId: implementor.todos.byId.handler(({ params: { id } }) => {
+			return { status: 200, body: getTodoById({ id }) };
+		}),
 	},
-});
+};
 ```
 
 ## Request With Form Body
@@ -123,16 +127,16 @@ export const api = {
 ```
 
 ```ts
-export const routes = router(api, {
+export const routes = {
 	forms: {
-		submit({ body }) {
+		submit: implement(api.forms.submit).handler(({ body }) => {
 			return {
-				title: body.title,
-				count: body.count,
+				status: 201,
+				body: { title: body.title, count: body.count },
 			};
-		},
+		}),
 	},
-});
+};
 ```
 
 ```ts
@@ -182,15 +186,16 @@ export const api = {
 ```
 
 ```ts
-export const routes = router(api, {
+export const routes = {
 	uploads: {
-		create({ body }) {
+		create: implement(api.uploads.create).handler(({ body }) => {
 			return {
-				title: body.title,
+				status: 201,
+				body: { title: body.title },
 			};
-		},
+		}),
 	},
-});
+};
 ```
 
 ```ts
@@ -236,13 +241,13 @@ export const api = {
 ```
 
 ```ts
-export const routes = router(api, {
+export const routes = {
 	imports: {
-		csv({ body }) {
-			return importCsv(body);
-		},
+		csv: implement(api.imports.csv).handler(({ body }) => {
+			return { status: 201, body: importCsv(body) };
+		}),
 	},
-});
+};
 ```
 
 ```ts
@@ -281,16 +286,19 @@ export const api = {
 ```
 
 ```ts
-export const routes = router(api, {
+export const routes = {
 	images: {
-		upload({ body }) {
-			return saveImage({
-				contentType: body.contentType,
-				bytes: body.payload,
-			});
-		},
+		upload: implement(api.images.upload).handler(({ body }) => {
+			return {
+				status: 201,
+				body: saveImage({
+					contentType: body.contentType,
+					bytes: body.payload,
+				}),
+			};
+		}),
 	},
-});
+};
 ```
 
 ```ts
@@ -328,15 +336,16 @@ export const api = {
 ```
 
 ```ts
-export const routes = router(api, {
+export const routes = {
 	forms: {
-		submit({ body }) {
+		submit: implement(api.forms.submit).handler(({ body }) => {
 			return {
-				title: body.get("title") ?? "",
+				status: 201,
+				body: { title: body.get("title") ?? "" },
 			};
-		},
+		}),
 	},
-});
+};
 ```
 
 ```ts

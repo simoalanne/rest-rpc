@@ -5,7 +5,6 @@ import {
 	handleHttpRoute,
 	RequestValidationError,
 	ResponseValidationError,
-	type RouteImplementation,
 } from "@rest-rpc/server";
 import type { Context, Hono, HonoRequest, Next } from "hono";
 import type { Env } from "hono/types";
@@ -45,7 +44,9 @@ export type ExtendedHonoMiddleware<TEnv extends Env = Env> = (
 
 export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 	app: Hono<TEnv>,
-	routes: RouteImplementation<RouteDeclaration>[],
+	routes: ReturnType<
+		typeof import("@rest-rpc/server").flattenRouteImplementations
+	>,
 	bodyParser: HonoBodyParser | undefined = undefined,
 	middleware: ExtendedHonoMiddleware<TEnv>[] = [],
 	requestValidationErrorHandler?: RequestValidationErrorHandler<TEnv>,
@@ -77,15 +78,20 @@ export const registerHonoHttpRoutes = <TEnv extends Env = Env>(
 				}
 
 				try {
-					const result = await handleHttpRoute(route, implementation.handler, {
-						request: {
-							body,
-							query: new URL(c.req.raw.url).searchParams,
-							params: c.req.param(),
-							headers: c.req.header(),
+					const result = await handleHttpRoute(
+						route,
+						implementation.handler as (request: unknown) => unknown,
+						{
+							request: {
+								body,
+								query: new URL(c.req.raw.url).searchParams,
+								params: c.req.param(),
+								headers: c.req.header(),
+							},
+							context: {},
+							handlerFields: { c, signal: c.req.raw.signal },
 						},
-						context: { c, signal: c.req.raw.signal },
-					});
+					);
 
 					return createFetchResponse(result);
 				} catch (error) {

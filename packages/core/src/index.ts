@@ -13,14 +13,9 @@ export {
 	request,
 	SERVER_FIRST_RESPONSE_KIND_HEADER,
 } from "./client/index.ts";
-export type {
-	Contract,
-	HttpStatusCode,
-	RouteDeclaration,
-	ShorthandRouteDeclaration,
-} from "./contract/index.ts";
+export type { Contract, RouteDeclaration } from "./contract/index.ts";
 export type { ClientRequest } from "./contract/request.ts";
-export { route } from "./contract/routeFactory.ts";
+export { route } from "./contract/routeBuilder.ts";
 export type {
 	CustomResponseBody,
 	CustomResponseValue,

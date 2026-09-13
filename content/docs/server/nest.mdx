@@ -11,81 +11,58 @@ pnpm add @rest-rpc/nest
 
 ## Usage
 
-The Nest adapter lets a contract subtree map to a normal Nest provider class.
-The controller declares the Nest route boundary, while the provider implements
-the contract.
+Use `@Implement()` decorator on a Nest controller method with a contract route or tree.
+The method should return the matching completed route implementation or tree.
 
 ```ts
 import { Controller, Injectable, Module } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
-import {
-	RestRpcModule,
-	RouteRequest,
-	RouteHandlers,
-	Router,
-	router,
-} from "@rest-rpc/nest";
-import type { Request } from "express";
+import { Implement, implement, RestRpcModule } from "@rest-rpc/nest";
 import { api } from "./contract";
+
+const builders = implement(api);
 
 @Injectable()
 class TodoRepository {
-	findForUser(id: string, userId: string) {
-		return { id, title: "Write docs", userId };
+	find(id: string) {
+		return { id, title: "Write docs" };
 	}
 
-	createForUser(input: { title: string; userId: string }) {
-		return { id: "todo-1", title: input.title, userId: input.userId };
+	create(title: string) {
+		return { id: "todo-1", title };
 	}
 }
 
 @Injectable()
-class TodoService implements RouteHandlers<typeof api.todos> {
+class TodoRoutes {
 	constructor(private readonly todos: TodoRepository) {}
 
-	get({ params: { id }, context }: RouteRequest<typeof api.todos.get>) {
-		return this.todos.findForUser(id, context.userId);
-	}
-
-	create({ body: { title }, context }: RouteRequest<typeof api.todos.create>) {
-		return {
-			status: 201 as const,
-			body: this.todos.createForUser({ title, userId: context.userId }),
-		};
-	}
+	readonly routes = {
+		get: builders.todos.get.handler(({ params: { id } }) => ({
+			status: 200,
+			body: this.todos.find(id),
+		})),
+		create: builders.todos.create.handler(({ body: { title } }) => ({
+			status: 201,
+			body: this.todos.create(title),
+		})),
+	};
 }
 
 @Controller()
 class TodoController {
-	constructor(private readonly todos: TodoService) {}
+	constructor(private readonly todos: TodoRoutes) {}
 
-	@Router(api.todos)
-	todosRouter() {
-		return router(api.todos, this.todos);
-	}
-}
-
-declare module "@rest-rpc/nest" {
-	interface DefaultNestContext {
-		userId: string;
-		request: Request;
+	@Implement(api.todos)
+	todosRoutes() {
+		return this.todos.routes;
 	}
 }
 
 @Module({
-	imports: [
-		RestRpcModule.forRoot({
-			createContext: (context) => {
-				const req = context.switchToHttp().getRequest<Request>();
-				return {
-					userId: req.header("x-user-id") ?? "",
-					request: req,
-				};
-			},
-		}),
-	],
+	imports: [RestRpcModule.forRoot()],
 	controllers: [TodoController],
-	providers: [TodoRepository, TodoService],
+	providers: [TodoRepository, TodoRoutes],
 })
 class AppModule {}
 
@@ -93,106 +70,107 @@ const app = await NestFactory.create(AppModule);
 await app.listen(3000);
 ```
 
-`@Router()` belongs on the controller because it tells Nest which HTTP routes to
-register. `router()` connects the contract subtree to the provider instance that
-implements it.
+The decorated method can return a matching implementation from any
+source. `@Implement()` uses its argument to register Nest routes and uses the
+method return value when handling a request.
 
-The provider is a first-class Nest provider. It can use constructor injection,
-module ownership, scopes, lifecycle hooks, and testing overrides like any other
-service.
+Nest decorators applied to the decorated method are copied to every generated
+route method. This allows guards, interceptors, and Nest parameter decorators
+to be used at the contract-tree boundary.
 
 ## Single Routes
 
-Use `@Route()` when one endpoint needs custom glue, or when existing providers
-do not match the contract shape.
+The same decorator accepts a single explicit HTTP route:
 
 ```ts
-import { Controller } from "@nestjs/common";
-import { Route, route } from "@rest-rpc/nest";
-import { api } from "./contract";
+@Controller()
+class TodoController {
+	constructor(private readonly todos: TodoRepository) {}
+
+	@Implement(api.todos.get)
+	getTodo() {
+		return implement(api.todos.get).handler(({ params: { id } }) => ({
+			status: 200,
+			body: this.todos.find(id),
+		}));
+	}
+}
+```
+
+:::warning
+If you're using [Procedure routes](docs/procedures), which automatically
+generate the path from the tree keys, you must use a tree with both
+the decorator and the return value. Otherwise, the decorator cannot determine the path to register with Nest.
+:::
+
+## Server-First Routes
+
+`@Implement()` also accepts server-first route declarations. Keep the
+declaration outside the method so the decorator can read its method and path
+when Nest registers the controller.
+
+```ts
+import { Implement, route } from "@rest-rpc/nest";
+import { z } from "zod";
+
+const todoRoutes = {
+	get: route.get("/todos/:id").params(z.object({ id: z.string() })),
+};
 
 @Controller()
 class TodoController {
 	constructor(private readonly todos: TodoRepository) {}
 
-	@Route(api.todos.get)
-	getTodo() {
-		return route(api.todos.get, ({ params: { id }, context }) => {
-			return this.todos.findForUser(id, context.userId);
-		});
+	@Implement(todoRoutes)
+	routes() {
+		return {
+			get: todoRoutes.get.handler(({ params: { id } }) => ({
+				status: 200,
+				body: this.todos.find(id),
+			})),
+		};
 	}
 }
 ```
 
-## Inline Routers
-
-You can also define the handlers directly in the controller. This is
-useful when your providers expose their own application API instead of
-implementing `RouteHandlers`. The controller maps the typed contract request
-and values from Nest decorators into calls to those providers.
-
-```ts
-import { Controller, Headers, Injectable } from "@nestjs/common";
-
-@Injectable()
-class TodoService {
-	findForUser(id: string, userId: string) {
-		return { id, title: "Write docs", userId };
-	}
-
-	createForUser(title: string, userId: string) {
-		return { id: "todo-1", title, userId };
-	}
-}
-
-@Controller()
-class TodoController {
-	constructor(private readonly todos: TodoService) {}
-
-	@Router(api.todos)
-	todosRouter(@Headers("x-user-id") userId: string) {
-		return router(api.todos, {
-			get: ({ params: { id } }) => this.todos.findForUser(id, userId),
-			create: ({ body: { title } }) => ({
-				status: 201 as const,
-				body: this.todos.createForUser(title, userId),
-			}),
-		});
-	}
-}
-```
+Completed server-first implementations can be returned in the same way. The
+decorator only requires a route or tree from which Nest registration metadata
+can be read.
 
 ## Framework Context
 
-### Global Context
-
-Nest route handlers receive the context returned by `createContext`, plus an
-adapter-supplied abort signal.
-
-```ts
-type NestHandlerContext<TContext> = TContext & {
-	signal: AbortSignal;
-};
-```
-
-Augment `DefaultNestContext` to set the app context used by `RouteRequest`,
-`RouteHandler`, `RouteHandlers`, `route()`, and `router()`.
+Nest handlers can receive user-provided application context. Augment
+`DefaultContext` to type it across handlers:
 
 ```ts
 import type { Request } from "express";
-import { RestRpcModule } from "@rest-rpc/nest";
 
 declare module "@rest-rpc/nest" {
-	interface DefaultNestContext {
+	interface DefaultContext {
 		request: Request;
 		userId: string;
 	}
 }
+```
+
+Handlers receive the following adapter fields and typed context:
+
+```ts
+type RouteHandlerFields = {
+	executionContext: ExecutionContext;
+	signal: AbortSignal;
+	context: DefaultContext;
+};
+```
+
+Return the context from `createContext` when configuring `RestRpcModule`:
+
+```ts
+import { RestRpcModule } from "@rest-rpc/nest";
 
 RestRpcModule.forRoot({
 	createContext: (context) => {
 		const request = context.switchToHttp().getRequest<Request>();
-
 		return {
 			request,
 			userId: request.header("x-user-id") ?? "",
@@ -201,78 +179,22 @@ RestRpcModule.forRoot({
 });
 ```
 
-### Controller-Local Context
-
-Nest controller methods run at request time, so they can pass values resolved by
-Nest decorators into the route handler context without hiding that handoff in a
-guard, request mutation, or the global `createContext` hook.
-
-The `context` option to `router()` is merged with the context returned by the
-global `createContext` hook at runtime. It does not infer or change handler
-types.
-
-```ts
-import { Controller, Headers, Injectable } from "@nestjs/common";
-import {
-	type RouteHandlers,
-	type RouteRequest,
-	Router,
-	router,
-} from "@rest-rpc/nest";
-import { api } from "./contract";
-
-type TenantContext = {
-	tenant: string;
-};
-
-@Injectable()
-class TodoService implements RouteHandlers<typeof api.todos> {
-	constructor(private readonly todos: TodoRepository) {}
-
-	get({
-		params: { id },
-		context,
-	}: RouteRequest<typeof api.todos.get, TenantContext>) {
-		return this.todos.findForUser(id, context.tenant);
-	}
-}
-
-@Controller()
-class TodoController {
-	constructor(private readonly todos: TodoService) {}
-
-	@Router(api.todos)
-	todosRouter(@Headers("x-tenant") tenant: string) {
-		return router(api.todos, this.todos, {
-			context: { tenant },
-		});
-	}
-}
-```
-
-:::tip
-Keep `DefaultNestContext` aligned with the value returned by `createContext`.
-For values added only by specific controller methods, type those provider
-handler requests explicitly with the second generic argument to `RouteRequest`.
-That context is added to `DefaultNestContext`, which avoids putting
-route-specific values in the global context type.
-:::
-
 ## Options
 
 ```ts
-type RestRpcModuleOptions<TContext = DefaultNestContext> = {
+type RestRpcModuleOptions<TContext = DefaultContext> = {
 	createContext?: (context: ExecutionContext) => TContext | Promise<TContext>;
 };
 ```
 
 ### Error handling
 
-Request validation throws `RequestValidationException`, which defaults to a 400
-response. Response contract validation throws `ResponseValidationException`,
-which defaults to a generic 500 response. Both are Nest `HttpException`
-subclasses and can be customized with ordinary Nest exception filters. Other
-errors continue through Nest's exception handling unchanged.
+Request validation throws `RequestValidationException`, which defaults to a
+400 response. Response contract validation throws
+`ResponseValidationException`, which defaults to a generic 500 response. Both
+are Nest `HttpException` subclasses and can be customized with ordinary Nest
+exception filters. Other errors continue through Nest's exception handling
+unchanged.
 
 ```ts
 import { ArgumentsHost, Catch, ExceptionFilter } from "@nestjs/common";
@@ -298,12 +220,7 @@ class RequestValidationFilter implements ExceptionFilter {
 
 @Module({
 	imports: [RestRpcModule.forRoot()],
-	providers: [
-		{
-			provide: APP_FILTER,
-			useClass: RequestValidationFilter,
-		},
-	],
+	providers: [{ provide: APP_FILTER, useClass: RequestValidationFilter }],
 })
 class AppModule {}
 ```

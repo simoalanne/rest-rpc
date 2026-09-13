@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { initClient } from "@rest-rpc/core";
+import { initClient, type ApiClientFor } from "@rest-rpc/core";
 import type { StartedServer } from "../harness/listen.ts";
 import { requestValidationContract } from "./contract.ts";
 
@@ -46,7 +46,7 @@ export const runRequestValidationSuite = (
 ) => {
 	describe(`${adapter.name} request validation integration`, () => {
 		let server: StartedServer;
-		let client: ReturnType<typeof initClient<typeof requestValidationContract>>;
+		let client: ApiClientFor<typeof requestValidationContract>;
 
 		before(async () => {
 			server = await adapter.start();

@@ -49,6 +49,6 @@ A command that exits successfully is successful. Do not report warnings from suc
 
 For documentation related tasks:
 
-- README.md is shared across root and all packages. It's sole purpose is to link to the actual documentation in `content/docs/`. Updating documentation means updating the mdx files in `content/docs/`, not updating the README.md files.
+- README.md is shared across root and all packages and describes the project user-facing features concisely. It should link to the actual documentation in `content/docs/` for broader context. Task asking to update documentation generally means updating the mdx files in `content/docs/`, not updating the README.md files unless the user explicitly asks to update the README.md.
 - Integration tests require network access. From sandboxed environments, they will fail with EPERM unless run with elevated permissions.
 - Library is currently pre v1.0.0 and is not yet stable. Breaking changes are expected until v1.0.0 is released.

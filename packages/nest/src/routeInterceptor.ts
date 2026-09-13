@@ -18,7 +18,6 @@ import {
 	handleHttpRouteResult,
 	RequestValidationError,
 	ResponseValidationError,
-	type RouteImplementation,
 } from "@rest-rpc/server";
 import type { Observable } from "rxjs";
 import { from, lastValueFrom } from "rxjs";
@@ -43,32 +42,38 @@ type NestHttpResponse =
 	| (ServerResponse & { raw?: never })
 	| { raw: ServerResponse };
 
-type NestRouteImplementationContext = {
-	context?: Record<string, unknown>;
+type NestRouteImplementation = {
+	readonly "~restrpc": RouteDeclaration & {
+		readonly handler: (request: unknown) => unknown;
+	};
 };
 
 const assertRouteImplementation = (
 	value: unknown,
 	route: RouteDeclaration,
-): RouteImplementation<RouteDeclaration> => {
+): NestRouteImplementation => {
 	if (
 		typeof value !== "object" ||
 		value === null ||
-		!("route" in value) ||
-		!("handler" in value)
+		!("~restrpc" in value) ||
+		typeof value["~restrpc"] !== "object" ||
+		value["~restrpc"] === null ||
+		!("handler" in value["~restrpc"])
 	) {
 		throw new Error(
 			`Controller method for "${route.method} ${route.path}" must return a rest-rpc route implementation.`,
 		);
 	}
 
-	const implementation = value as RouteImplementation<RouteDeclaration>;
+	const implementation = value as NestRouteImplementation;
+	const implementationRoute = implementation["~restrpc"];
 	if (
-		implementation.route.method !== route.method ||
-		implementation.route.path !== route.path
+		implementationRoute.method !== route.method ||
+		(implementationRoute.kind !== "procedure" &&
+			implementationRoute.path !== route.path)
 	) {
 		throw new Error(
-			`Controller method for "${route.method} ${route.path}" returned an implementation for "${implementation.route.method} ${implementation.route.path}".`,
+			`Controller method for "${route.method} ${route.path}" returned an implementation for "${implementationRoute.method} ${implementationRoute.path}".`,
 		);
 	}
 
@@ -113,16 +118,11 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 			await lastValueFrom(next.handle()),
 			metadata.route,
 		);
-		const routeContext = {
-			...userContext,
-			...(implementation as NestRouteImplementationContext).context,
-			signal,
-		};
 
 		try {
 			const result = await handleHttpRoute(
 				metadata.route,
-				implementation.handler,
+				implementation["~restrpc"].handler,
 				{
 					request: {
 						body: req.body,
@@ -131,7 +131,11 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 						params: req.params,
 						headers: req.headers,
 					},
-					context: routeContext,
+					context: userContext ?? {},
+					handlerFields: {
+						executionContext: context,
+						signal,
+					},
 				},
 			);
 

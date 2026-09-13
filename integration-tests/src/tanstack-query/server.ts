@@ -2,9 +2,8 @@ import type { Server } from "node:http";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { Readable } from "node:stream";
-import { createRouteHandler, implement } from "@rest-rpc/fetch";
-import { tanstackQueryContract } from "./contract.ts";
-import { createTanstackQueryHandlers } from "./handlers.ts";
+import { createRouteHandler } from "@rest-rpc/fetch";
+import { createTanstackQueryImplementations } from "./handlers.ts";
 
 export type StartedTanstackQueryServer = {
 	origin: string;
@@ -42,20 +41,7 @@ const withoutBody = (method: string | undefined) =>
 	method === "GET" || method === "HEAD";
 
 export const startTanstackQueryServer = async () => {
-	const builders = implement(tanstackQueryContract);
-	const handlers = createTanstackQueryHandlers();
-	const handler = createRouteHandler({
-		projects: {
-			list: builders.projects.list.handler(handlers.projects.list),
-			get: builders.projects.get.handler(handlers.projects.get),
-			search: builders.projects.search.handler(handlers.projects.search),
-			create: builders.projects.create.handler(handlers.projects.create),
-			rename: builders.projects.rename.handler(handlers.projects.rename),
-			page: builders.projects.page.handler(handlers.projects.page),
-			slow: builders.projects.slow.handler(handlers.projects.slow),
-			events: builders.projects.events.handler(handlers.projects.events),
-		},
-	});
+	const handler = createRouteHandler(createTanstackQueryImplementations());
 
 	return listen(
 		createServer(async (req, res) => {

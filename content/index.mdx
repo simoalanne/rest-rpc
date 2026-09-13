@@ -85,19 +85,26 @@ export const api = {
 <Tab title="Server">
 
 ```ts
-const routes = router(api, {
+const implementor = implement(api);
+
+const routes = {
 	todos: {
-		update({ params, body, query, headers }) {
-			return updateTodo({
-				id: params.id,
-				title: body.title,
-				completed: body.completed,
-				notify: query.notify,
-				requestId: headers["x-request-id"],
-			});
-		},
+		update: implementor.todos.update.handler(
+			({ params, body, query, headers }) => {
+				return {
+					status: 200,
+					body: updateTodo({
+						id: params.id,
+						title: body.title,
+						completed: body.completed,
+						notify: query.notify,
+						requestId: headers["x-request-id"],
+					}),
+				};
+			},
+		),
 	},
-});
+};
 ```
 
 </Tab>

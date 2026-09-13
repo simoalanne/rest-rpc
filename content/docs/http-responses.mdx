@@ -29,13 +29,13 @@ export const api = {
 ```
 
 ```ts
-export const routes = router(api, {
+export const routes = {
 	todos: {
-		create({ body: { title } }) {
-			return createTodo({ title });
-		},
+		create: implement(api.todos.create).handler(({ body: { title } }) => {
+			return { status: 201, body: createTodo({ title }) };
+		}),
 	},
-});
+};
 ```
 
 ```ts
@@ -71,9 +71,9 @@ export const api = {
 ```
 
 ```ts
-export const routes = router(api, {
+export const routes = {
 	todos: {
-		get({ params: { id } }) {
+		get: implement(api.todos.get).handler(({ params: { id } }) => {
 			const todo = getTodo(id);
 
 			if (!todo) {
@@ -83,10 +83,10 @@ export const routes = router(api, {
 				});
 			}
 
-			return todo;
-		},
+			return { status: 200, body: todo };
+		}),
 	},
-});
+};
 ```
 
 ```ts
@@ -121,13 +121,14 @@ export const api = {
 ```
 
 ```ts
-export const routes = router(api, {
+export const routes = {
 	todos: {
-		remove({ params: { id } }) {
+		remove: implement(api.todos.remove).handler(({ params: { id } }) => {
 			removeTodo(id);
-		},
+			return { status: 204 };
+		}),
 	},
-});
+};
 ```
 
 ```ts
@@ -158,9 +159,9 @@ export const api = {
 ```
 
 ```ts
-export const routes = router(api, {
+export const routes = {
 	todos: {
-		get({ params: { id } }) {
+		get: implement(api.todos.get).handler(({ params: { id } }) => {
 			const todo = getTodo(id);
 
 			return {
@@ -171,9 +172,9 @@ export const routes = router(api, {
 					"x-next-cursor": todo.nextCursor,
 				},
 			};
-		},
+		}),
 	},
-});
+};
 ```
 
 ```ts
@@ -203,13 +204,13 @@ export const api = {
 ```
 
 ```ts
-export const routes = router(api, {
+export const routes = {
 	reports: {
-		csv() {
-			return "id,title\n1,First\n";
-		},
+		csv: implement(api.reports.csv).handler(() => {
+			return { status: 200, body: "id,title\n1,First\n" };
+		}),
 	},
-});
+};
 ```
 
 ```ts
@@ -239,9 +240,9 @@ export const api = {
 ```
 
 ```ts
-export const routes = router(api, {
+export const routes = {
 	images: {
-		download({ params: { id } }) {
+		download: implement(api.images.download).handler(({ params: { id } }) => {
 			const image = getImage(id);
 
 			return {
@@ -251,9 +252,9 @@ export const routes = router(api, {
 					payload: image.bytes,
 				},
 			};
-		},
+		}),
 	},
-});
+};
 ```
 
 ```ts
@@ -275,7 +276,7 @@ if (response.status === 200) {
 `.streamResponse(status, schema)` sends newline-delimited JSON and the client
 reads parsed items.
 
-`request.context.signal` is aborted when the HTTP request is cancelled.
+The handler's `signal` is aborted when the HTTP request is cancelled.
 
 ```ts
 import { route } from "@rest-rpc/core";
@@ -309,15 +310,14 @@ async function* streamTokens(prompt: string, signal: AbortSignal) {
 	}
 }
 
-export const routes = router(api, {
+export const routes = {
 	ai: {
-		tokens(request) {
-			const { signal } = request.context;
-
-			return streamTokens(request.prompt, signal);
-		},
+		tokens: implement(api.ai.tokens).handler(({ query, signal }) => ({
+			status: 200,
+			body: streamTokens(query.prompt, signal),
+		})),
 	},
-});
+};
 ```
 
 ```ts
@@ -360,15 +360,14 @@ export const api = {
 ```
 
 ```ts
-export const routes = router(api, {
+export const routes = {
 	files: {
-		download(request) {
-			const { signal } = request.context;
-
-			return readLargeFile(request.params.id, signal);
-		},
+		download: implement(api.files.download).handler(({ params, signal }) => ({
+			status: 200,
+			body: readLargeFile(params.id, signal),
+		})),
 	},
-});
+};
 ```
 
 ```ts

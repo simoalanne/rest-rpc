@@ -1,13 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { initClient, route } from "@rest-rpc/core";
-import { REQUEST_CONTEXT_KEY } from "@rest-rpc/core/contract";
-import type { ResponseValidationErrorHandler } from "@rest-rpc/hono";
-import {
-	router as createRouter,
-	type ImplementationShape,
-} from "@rest-rpc/server";
-import type { Context } from "hono";
+import { initClient, route, type ApiClientFor } from "@rest-rpc/core";
+import { implement, type ResponseValidationErrorHandler } from "@rest-rpc/hono";
 import { setCookie } from "hono/cookie";
 import z from "zod";
 import { createHonoAdapter } from "../harness/hono.ts";
@@ -71,12 +65,11 @@ const lifecycleContract = {
 };
 
 type LifecycleContract = typeof lifecycleContract;
-type HonoContext = { c: Context };
-
 const createLifecycleImplementations = () => {
-	const handlers: ImplementationShape<LifecycleContract, HonoContext> = {
-		contextMutation: (request) => {
-			const { c } = request[REQUEST_CONTEXT_KEY];
+	const implementor = implement(lifecycleContract);
+
+	return {
+		contextMutation: implementor.contextMutation.handler(({ c }) => {
 			c.header("x-context-mutation", "ignored");
 			setCookie(c, "context_cookie", "ignored", {
 				httpOnly: true,
@@ -88,15 +81,15 @@ const createLifecycleImplementations = () => {
 				status: 200 as const,
 				body: { ok: true as const },
 			};
-		},
-		returnResponse: () =>
-			new Response(JSON.stringify({ ok: true }), {
-				status: 200,
-				headers: { "content-type": "application/json" },
-			}) as never,
+		}),
+		returnResponse: implementor.returnResponse.handler(
+			() =>
+				new Response(JSON.stringify({ ok: true }), {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				}) as never,
+		),
 	};
-
-	return createRouter(lifecycleContract, handlers);
 };
 
 const getSetCookieHeaders = (headers: Headers): string[] =>
@@ -104,7 +97,7 @@ const getSetCookieHeaders = (headers: Headers): string[] =>
 
 describe("hono response lifecycle integration", () => {
 	let server: StartedServer;
-	let client: ReturnType<typeof initClient<LifecycleContract>>;
+	let client: ApiClientFor<LifecycleContract>;
 
 	before(async () => {
 		server = await createHonoAdapter(createLifecycleImplementations(), {

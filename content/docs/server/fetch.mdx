@@ -20,11 +20,14 @@ import { api } from "./contract";
 
 const routes = {
 	todos: {
-		get: implement(api).todos.get.handler(({ params: { id } }) => getTodo(id)),
+		get: implement(api.todos.get).handler(({ params: { id } }) => ({
+			status: 200,
+			body: getTodo(id),
+		})),
 	},
 };
 
-const handle = createRouteHandler(routes);
+const handler = createRouteHandler(routes);
 ```
 
 </Tab>
@@ -37,11 +40,11 @@ const routes = {
 	health: route.get("/health").handler(() => ({ status: 204 })),
 };
 
-const handle = createRouteHandler(routes);
+const handler = createRouteHandler(routes);
 
 export default {
 	async fetch(request: Request) {
-		const result = await handle(request);
+		const result = await handler(request);
 		return result.matched
 			? result.response
 			: new Response("Not found", { status: 404 });
@@ -53,9 +56,10 @@ export default {
 
 </Tabs>
 
-## Framework context
+## Framework Context
 
-Pass application context as the second argument to `handle`:
+Fetch handlers can receive user-provided application context. Augment
+`DefaultContext` to type it across handlers:
 
 ```ts
 declare module "@rest-rpc/fetch" {
@@ -63,12 +67,23 @@ declare module "@rest-rpc/fetch" {
 		user: { id: string };
 	}
 }
-
-const result = await handle(request, { user });
 ```
 
-Handlers also receive `context.signal`, taken from `request.signal`. Add the
-request or runtime-specific values to the context when handlers need them.
+Handlers receive the following adapter fields and typed context:
+
+```ts
+type RouteHandlerFields = {
+	request: Request;
+	signal: AbortSignal;
+	context: DefaultContext;
+};
+```
+
+Pass the context as the second argument to `handler`:
+
+```ts
+const result = await handler(request, { user });
+```
 
 ## Options
 
@@ -83,7 +98,7 @@ type CreateFetchHandlerOptions = {
 ### Body parsing
 
 ```ts
-const handle = createRouteHandler(routes, {
+const handler = createRouteHandler(routes, {
 	bodyParser: (request) => request.json(),
 });
 ```
@@ -96,7 +111,7 @@ receive the native `Request` and return a `Response`. Other errors reject the
 handler promise and should be handled by the surrounding runtime handler.
 
 ```ts
-const handle = createRouteHandler(routes, {
+const handler = createRouteHandler(routes, {
 	requestValidationErrorHandler: (error, request) => {
 		return Response.json(
 			{ code: "VALIDATION_ERROR", issues: error.issues },
@@ -111,7 +126,7 @@ const handle = createRouteHandler(routes, {
 export default {
 	async fetch(request: Request) {
 		try {
-			const result = await handle(request);
+			const result = await handler(request);
 			return result.matched
 				? result.response
 				: new Response("Not found", { status: 404 });

@@ -1,57 +1,53 @@
-export { createFetchResponse } from "./response.ts";
+import type { Contract } from "@rest-rpc/core/contract";
 import {
 	implement as serverImplement,
 	serverFirstRoute,
+	type ContractImplementor,
+	type ServerRouteBuilder,
 } from "@rest-rpc/server";
-import type {
-	ImplementationBuildersFor,
-	ServerContract,
-	ServerRouteFactory,
-} from "@rest-rpc/server";
+
+type FetchHandlerFields = {
+	request: Request;
+	signal: AbortSignal;
+};
 
 /** Application context used by Fetch route handlers by default. */
 export interface DefaultContext {}
 
-/** Starts a server-first route builder chain */
-export const route = serverFirstRoute as unknown as ServerRouteFactory<
-	Record<never, never>,
+/** Starts a Fetch server-first route builder chain. */
+export const route = serverFirstRoute as unknown as ServerRouteBuilder<
+	FetchHandlerFields,
 	DefaultContext
 >;
 
-/** Converts a contract-first route or route tree into a server route builder */
-export function implement<const TNode extends ServerContract>(
-	contract: TNode,
-): ImplementationBuildersFor<TNode, DefaultContext> {
-	return serverImplement(contract) as ImplementationBuildersFor<
-		TNode,
+/** Exposes Fetch handler attachment on every route in a core contract. */
+export function implement<const TContract extends Contract>(
+	contract: TContract,
+): ContractImplementor<TContract, FetchHandlerFields, DefaultContext> {
+	return serverImplement(contract) as unknown as ContractImplementor<
+		TContract,
+		FetchHandlerFields,
 		DefaultContext
 	>;
 }
 
 export type {
-	Implement,
 	ImplicitResponseEnvelope,
 	ImplicitResponseKind,
 	InferredRouteResponse,
-	ImplementationBuildersFor,
-	ServerImplementationTree,
 	ServerFirstResponseKind,
 	ServerFirstRouteResponseKind,
-	ServerHttpBuilderExtension,
-	ServerRouteFactory,
-	ServerRouteImplementation,
 } from "@rest-rpc/server";
-
 export {
 	RequestValidationError,
 	ResponseValidationError,
 } from "@rest-rpc/server";
-
-export { defaultBodyParser } from "./request.ts";
-export type { FetchBodyParser } from "./request.ts";
 export { createRouteHandler } from "./handler.ts";
 export type {
 	CreateFetchHandlerOptions,
 	RequestValidationErrorHandler,
 	ResponseValidationErrorHandler,
 } from "./handler.ts";
+export { defaultBodyParser } from "./request.ts";
+export type { FetchBodyParser } from "./request.ts";
+export { createFetchResponse } from "./response.ts";

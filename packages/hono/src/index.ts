@@ -1,22 +1,26 @@
-import type { RouteDeclaration } from "@rest-rpc/core/contract";
+import type { Contract, RouteDeclaration } from "@rest-rpc/core/contract";
 import {
-	type Contract,
-	type ImplementationTreeFor,
-	type RouteImplementation,
+	implement as serverImplement,
+	serverFirstRoute,
+	type ContractImplementor,
 	type RouteHandler as ServerRouteHandler,
-	type RouteHandlers as ServerRouteHandlers,
 	type RouteRequest as ServerRouteRequest,
-	route as serverRoute,
-	router as serverRouter,
+	type ServerRouteBuilder,
 } from "@rest-rpc/server";
 import type { Context } from "hono";
 import type { Env } from "hono/types";
+
+type HonoHandlerFields<TEnv extends Env = Env> = {
+	c: Context<TEnv>;
+	signal: AbortSignal;
+};
+
+type ContractRoute = { readonly "~restrpc": RouteDeclaration };
 
 export type {
 	RouteErrors,
 	RouteRequestData,
 	RouteResponse,
-	RouteResponseShorthand,
 } from "@rest-rpc/server";
 export type {
 	ExtendedHonoMiddleware,
@@ -32,81 +36,28 @@ export {
 	RouteResponseError,
 } from "@rest-rpc/server";
 
-/**
- * The context object passed to Hono HTTP route handlers.
- *
- * @see {@link https://rest-rpc.dev/docs/server/hono#framework-context}
- */
-export type HttpRouteHandlerContext<E extends Env = Env> = {
-	c: Context<E>;
-	signal: AbortSignal;
-};
-
-/**
- * Infers the route handler request type for a given route declaration.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
- */
+/** Infers the request passed to a Hono route handler. */
 export type RouteRequest<
-	E extends RouteDeclaration,
+	TRoute extends ContractRoute,
 	TEnv extends Env = Env,
-> = ServerRouteRequest<E, HttpRouteHandlerContext<TEnv>>;
+> = ServerRouteRequest<TRoute["~restrpc"], HonoHandlerFields<TEnv>>;
 
-/**
- * Infers the Hono route handler type for a given route declaration.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
- */
+/** Infers a Hono route handler for a route declaration. */
 export type RouteHandler<
-	E extends RouteDeclaration,
+	TRoute extends ContractRoute,
 	TEnv extends Env = Env,
-> = ServerRouteHandler<E, HttpRouteHandlerContext<TEnv>>;
+> = ServerRouteHandler<TRoute["~restrpc"], HonoHandlerFields<TEnv>>;
 
-/**
- * Handler tree accepted by `router()` when building a Hono implementation tree.
- *
- * @remarks Use this type with `implements` to check class-based route handler
- * services against a contract tree.
- *
- * @example
- * ```ts
- * class TodoHandlers implements RouteHandlers<typeof api.todos> {
- *   get(request: RouteRequest<typeof api.todos.get>) {
- *     return { id: request.id };
- *   }
- * }
- * ```
- *
- * @see {@link https://rest-rpc.dev/docs/recipes/organizing-route-handlers#service-classes-as-handlers}
- */
-export type RouteHandlers<
-	TNode extends Contract,
-	TEnv extends Env = Env,
-> = ServerRouteHandlers<TNode, HttpRouteHandlerContext<TEnv>>;
+/** Starts a Hono server-first route builder chain. */
+export const route =
+	serverFirstRoute as unknown as ServerRouteBuilder<HonoHandlerFields>;
 
-/**
- * Builds a Hono route implementation for a single contract route.
- *
- * @see {@link https://rest-rpc.dev/docs/server/hono}
- */
-export function route<
-	const TNode extends RouteDeclaration,
-	TEnv extends Env = Env,
->(
-	contract: TNode,
-	handler: RouteHandler<TNode, TEnv>,
-): RouteImplementation<TNode> {
-	return serverRoute(contract, handler);
-}
-
-/**
- * Builds a Hono router implementation for a contract.
- *
- * @see {@link https://rest-rpc.dev/docs/server/hono}
- */
-export function router<const TNode extends Contract, TEnv extends Env = Env>(
-	contract: TNode,
-	handlers: RouteHandlers<TNode, TEnv>,
-): ImplementationTreeFor<TNode> {
-	return serverRouter(contract, handlers);
+/** Exposes Hono handler attachment on every route in a core contract. */
+export function implement<const TContract extends Contract>(
+	contract: TContract,
+): ContractImplementor<TContract, HonoHandlerFields> {
+	return serverImplement(contract) as unknown as ContractImplementor<
+		TContract,
+		HonoHandlerFields
+	>;
 }

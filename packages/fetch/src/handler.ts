@@ -86,7 +86,8 @@ export function createRouteHandler(
 				implementation.handler as (request: unknown) => unknown,
 				{
 					request: parsedRequest,
-					context: { ...contextArguments[0], signal: request.signal },
+					context: contextArguments[0] ?? {},
+					handlerFields: { request, signal: request.signal },
 				},
 			);
 

@@ -1,5 +1,5 @@
 import { type RegisterRoutesOptions, registerRoutes } from "@rest-rpc/fastify";
-import type { ImplementationTree } from "@rest-rpc/server";
+import type { RuntimeImplementationTree } from "@rest-rpc/server";
 import Fastify, { type FastifyInstance } from "fastify";
 
 export type FastifyAdapterOptions = {
@@ -8,7 +8,7 @@ export type FastifyAdapterOptions = {
 };
 
 export const createFastifyAdapter = (
-	implementations: ImplementationTree,
+	implementations: RuntimeImplementationTree,
 	options: FastifyAdapterOptions = {},
 ) => ({
 	name: "fastify",

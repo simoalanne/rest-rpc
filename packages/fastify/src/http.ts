@@ -6,7 +6,6 @@ import {
 	handleHttpRouteResult,
 	RequestValidationError,
 	ResponseValidationError,
-	type RouteImplementation,
 } from "@rest-rpc/server";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
@@ -37,7 +36,9 @@ export type ExtendedFastifyPreHandler = (
 
 export const registerFastifyHttpRoutes = (
 	app: FastifyInstance,
-	routes: RouteImplementation<RouteDeclaration>[],
+	routes: ReturnType<
+		typeof import("@rest-rpc/server").flattenRouteImplementations
+	>,
 	preHandler: ExtendedFastifyPreHandler[] = [],
 	requestValidationErrorHandler?: RequestValidationErrorHandler,
 	responseValidationErrorHandler?: ResponseValidationErrorHandler,
@@ -59,16 +60,21 @@ export const registerFastifyHttpRoutes = (
 			async (req: FastifyRequest, reply: FastifyReply) => {
 				try {
 					const signal = createRequestSignal(req.raw, reply.raw);
-					const result = await handleHttpRoute(route, handler, {
-						request: {
-							body: req.body,
-							query: new URL(req.raw.url ?? "/", "http://localhost")
-								.searchParams,
-							params: req.params,
-							headers: req.headers,
+					const result = await handleHttpRoute(
+						route,
+						handler as (request: unknown) => unknown,
+						{
+							request: {
+								body: req.body,
+								query: new URL(req.raw.url ?? "/", "http://localhost")
+									.searchParams,
+								params: req.params,
+								headers: req.headers,
+							},
+							context: {},
+							handlerFields: { req, reply, signal },
 						},
-						context: { req, signal },
-					});
+					);
 
 					return handleHttpRouteResult(result, {
 						setHeader: (name, value) => reply.header(name, value),

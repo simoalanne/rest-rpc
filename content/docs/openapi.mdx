@@ -103,13 +103,13 @@ const document = createOpenApiDocument(api, {
 
 ## Route Metadata
 
-Use `.withOpenApi()` on a route builder for operation metadata.
+Use `.openAPI()` on a route builder for operation metadata.
 
 ```ts
 create: route
 	.post("/todos")
 	.body(z.object({ title: z.string().min(1) }))
-	.withOpenApi({
+	.openAPI({
 		summary: "Create a todo",
 		operationId: "createTodo",
 		responses: {
@@ -127,7 +127,7 @@ Each `.response()` call produces a status-keyed OpenAPI response.
 create: route
 	.post("/todos")
 	.body(z.object({ title: z.string().min(1) }))
-	.withOpenApi({
+	.openAPI({
 		summary: "Create a todo",
 		operationId: "createTodo",
 		responses: {
@@ -157,7 +157,7 @@ declare is skipped.
 route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
-	.withOpenApi({
+	.openAPI({
 		responses: {
 			200: {
 				headers: {
@@ -207,7 +207,7 @@ export const api = {
 ```
 
 The factory's `openApi.responses` is merged into each route's OpenAPI metadata.
-Metadata passed to `.withOpenApi()` overrides shared metadata. Typed headers
+Metadata passed to `.openAPI()` overrides shared metadata. Typed headers
 declared on a route response override OpenAPI-only headers with the same name
 in generated OpenAPI.
 

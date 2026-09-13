@@ -12,29 +12,29 @@ runBodyParsingSuite({
 		const app = express();
 
 		app.use(
-			bodyParsingContract.binary.path,
+			bodyParsingContract.binary["~restrpc"].path,
 			express.raw({ type: "application/octet-stream" }),
 		);
 		app.use(
-			bodyParsingContract.text.path,
+			bodyParsingContract.text["~restrpc"].path,
 			express.text({ type: "text/plain" }),
 		);
 		app.use(
-			bodyParsingContract.textVariant.path,
+			bodyParsingContract.textVariant["~restrpc"].path,
 			express.text({
 				type: ["text/plain", "text/markdown", "application/xml"],
 			}),
 		);
 		app.use(
-			bodyParsingContract.json.path,
+			bodyParsingContract.json["~restrpc"].path,
 			express.json({ type: "application/json" }),
 		);
 		app.use(
-			bodyParsingContract.customJson.path,
+			bodyParsingContract.customJson["~restrpc"].path,
 			express.json({ type: "application/json" }),
 		);
 		app.use(
-			bodyParsingContract.rawUrlEncoded.path,
+			bodyParsingContract.rawUrlEncoded["~restrpc"].path,
 			express.text({ type: "application/x-www-form-urlencoded" }),
 			(req, _res, next) => {
 				req.body = new URLSearchParams(req.body);
@@ -42,7 +42,7 @@ runBodyParsingSuite({
 			},
 		);
 		app.use(
-			bodyParsingContract.formUrlEncoded.path,
+			bodyParsingContract.formUrlEncoded["~restrpc"].path,
 			express.text({ type: "application/x-www-form-urlencoded" }),
 			(req, _res, next) => {
 				req.body = new URLSearchParams(req.body);

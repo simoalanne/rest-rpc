@@ -1,4 +1,5 @@
 import { createExpressAdapter } from "../harness/express.ts";
+import type { NextFunction, Request, Response } from "express";
 import { createErrorHandlerState } from "./state.ts";
 import { createErrorHandlersImplementations } from "./handlers.ts";
 import { runErrorHandlersSuite } from "./suite.ts";
@@ -23,17 +24,19 @@ runErrorHandlersSuite(
 			},
 		},
 		configureAppAfterRoutes: (app) => {
-			app.use((error: unknown, req, res, _next) => {
-				state.unhandledErrors += 1;
-				res
-					.status(503)
-					.header("x-error-handler", "unhandled")
-					.json({
-						code: "UNHANDLED_ERROR",
-						message: error instanceof Error ? error.message : "unknown error",
-						path: req.path,
-					});
-			});
+			app.use(
+				(error: unknown, req: Request, res: Response, _next: NextFunction) => {
+					state.unhandledErrors += 1;
+					res
+						.status(503)
+						.header("x-error-handler", "unhandled")
+						.json({
+							code: "UNHANDLED_ERROR",
+							message: error instanceof Error ? error.message : "unknown error",
+							path: req.path,
+						});
+				},
+			);
 		},
 	}),
 );

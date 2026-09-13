@@ -13,12 +13,12 @@ Zod, Valibot, and ArkType are supported Standard Schema libraries. The built-in
 
 Schemas have an input type and an output type.
 
-| Position                    | Type used     |
-| --------------------------- | ------------- |
-| Fetch client request input  | schema input  |
-| Server handler input        | schema output |
-| Server handler return value | schema input  |
-| Fetch client response value | schema output |
+| Position                     | Type used     |
+| ---------------------------- | ------------- |
+| Fetch client request input   | schema input  |
+| Server handler input         | schema output |
+| Server handler response body | schema input  |
+| Fetch client response value  | schema output |
 
 Default HTTP bodies travel over JSON. Path params, query params, and headers
 travel through HTTP strings.
@@ -46,17 +46,17 @@ Server adapters validate incoming request data before calling the handler. The
 handler receives schema output.
 
 ```ts
-const routes = router(api, {
+const routes = {
 	todos: {
-		get({ params: { id } }) {
-			return getTodo(id);
-		},
+		get: implement(api.todos.get).handler(({ params: { id } }) => {
+			return { status: 200, body: getTodo(id) };
+		}),
 	},
-});
+};
 ```
 
 Server adapters validate handler output before writing the HTTP response. The
-handler returns schema input.
+handler's response `body` uses the schema input type.
 
 ```ts
 const api = {

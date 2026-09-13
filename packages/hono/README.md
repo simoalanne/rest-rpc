@@ -36,13 +36,16 @@ export const api = {
 Implement the contract on the server
 
 ```ts
-const routes = router(api, {
+const implementor = implement(api);
+
+const routes = {
 	todos: {
-		getById({ id }) {
-			return getTodo(id);
-		},
+		getById: implementor.todos.getById.handler(({ params: { id } }) => ({
+			status: 200,
+			body: getTodo(id),
+		})),
 	},
-});
+};
 
 registerRoutes(app, routes);
 ```
@@ -54,9 +57,13 @@ const client = initClient(api, {
 	baseUrl: "https://api.example.com",
 });
 
-const todo = await client.todos.getById({
-	id: "todo_1",
+const response = await client.todos.getById({
+	params: { id: "todo_1" },
 });
+
+if (response.status === 200) {
+	const todo = response.body;
+}
 ```
 
 ### Server-first approach
@@ -73,17 +80,17 @@ export const routes = {
 		create: route
 			.post("/todos")
 			.body(z.object({ title: z.string().min(1) }))
-			.handler(({ title }) => ({
+			.handler(({ body: { title } }) => ({
 				status: 201,
 				body: { id: crypto.randomUUID(), title, completed: false },
 			})),
 	},
 };
 
-const handle = createRouteHandler(routes);
+const handler = createRouteHandler(routes);
 
 const server = createServer(async (request, response) => {
-	const { matched } = await handle(request, response);
+	const { matched } = await handler(request, response);
 	if (!matched) {
 		response.writeHead(404).end("Not found");
 	}
@@ -102,9 +109,11 @@ const client = initClient<typeof routes>({
 	baseUrl: "https://api.example.com",
 });
 
-const todo = await client.$post("/todos", {
+const response = await client.$post("/todos", {
 	body: { title: "Ship v1" },
 });
+
+const todo = response.body;
 ```
 
 ## Documentation
