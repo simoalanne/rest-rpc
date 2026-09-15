@@ -30,6 +30,10 @@ export const integrationContract = {
 			.params(z.object({ id: z.string() }))
 			.body(z.string(), { contentType: "text/plain" })
 			.response(200, z.string(), { contentType: "text/plain" }),
+		uppercaseHeader: route
+			.get("/echo/uppercase-header")
+			.headers(z.object({ "X-Test-Token": z.string() }))
+			.response(204),
 	},
 	items: {
 		list: route

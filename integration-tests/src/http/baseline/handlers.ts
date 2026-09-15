@@ -38,6 +38,9 @@ export const createIntegrationImplementations = () => {
 				status: 200,
 				body: request.body,
 			})),
+			uppercaseHeader: implementor.echo.uppercaseHeader.handler(() => ({
+				status: 204,
+			})),
 		},
 		items: {
 			list: implementor.items.list.handler((request) => ({

@@ -67,6 +67,20 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 			});
 		});
 
+		it("Does not support uppercase headers in any server framework", async () => {
+			const response = await fetch(`${server.origin}/echo/uppercase-header`, {
+				headers: { "X-Test-Token": "token-1" },
+			});
+
+			assert.equal(response.status, 400);
+			const body = (await response.json()) as {
+				validationErrors?: { headers?: unknown[] };
+			};
+			const headerIssues = body.validationErrors?.headers;
+			assert.ok(Array.isArray(headerIssues));
+			assert.ok(headerIssues.length > 0);
+		});
+
 		it("round trips encoded path params and reserved query characters", async () => {
 			const bodyResponse = await client.echo.json({
 				params: { id: "encoded id/with slash" },

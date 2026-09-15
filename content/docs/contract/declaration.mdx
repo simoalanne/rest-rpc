@@ -89,6 +89,19 @@ route
 	.response(200, todoSchema);
 ```
 
+## Headers
+
+Header keys should be declared in lowercase. The client will send headers in lowercase,
+and Node/Fetch server implementations normalize incoming headers to lowercase.
+Uppercased headers fail validation or resolve to `undefined` in the request.headers object.
+
+```ts
+route
+	.get("/todos")
+	.headers(z.object({ authorization: z.string() }))
+	.response(200, z.array(todoSchema));
+```
+
 ## Responses
 
 `.response(status, schema)` declares a response body for a status.
