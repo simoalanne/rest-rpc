@@ -7,7 +7,6 @@ export default defineMeta({
 		"procedures",
 		"api-reference",
 		"contract",
-		"server-first",
 		"http-requests",
 		"http-responses",
 		"server",

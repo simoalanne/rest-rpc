@@ -1,16 +1,12 @@
 import type {
 	BuilderExtension,
 	BuilderState,
-	CustomResponseBody,
-	CustomResponseValue,
-	NoBody,
 	PublicDeclarationFor,
 	RouteDeclaration,
 	RouteMetadata,
 	ServerErrors,
 	ServerRequest,
 	ServerResponse,
-	Stream,
 } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 
@@ -70,7 +66,10 @@ export type RouteRequest<
 		? TRoute extends {
 				request: { body: infer TInput extends StandardSchemaV1 };
 			}
-			? { input: StandardSchemaV1.InferOutput<TInput> }
+			? { input: StandardSchemaV1.InferOutput<TInput> } & Omit<
+					RequestValue<TRoute>,
+					"body"
+				>
 			: EmptyObject
 		: RequestValue<TRoute>) &
 		TAdditionalHandlerFields & {
@@ -97,10 +96,11 @@ type Merge<T> = { [TKey in keyof T]: T[TKey] };
 /**
  * HTTP response shape from which a server-first route infers its contract.
  *
- * @remarks An `AsyncIterable` body denotes a stream. Providing `contentType`
- * selects a custom-content response; otherwise bodies use JSON or NDJSON.
+ * @remarks An `AsyncIterable` body always denotes an NDJSON stream. Providing
+ * `contentType` selects a custom-content response for non-stream bodies;
+ * otherwise bodies use JSON.
  *
- * @see {@link https://rest-rpc.dev/docs/server-first/server#infer-responses-from-the-handler}
+ * @see {@link https://rest-rpc.dev/docs/server-first-quickstart#infer-responses-from-the-handler}
  */
 export type ImplicitResponseEnvelope =
 	| {
@@ -117,22 +117,15 @@ export type ImplicitResponseEnvelope =
 	  };
 
 /**
- * Body encodings a server-first client can receive from an inferred route.
+ * Body encodings inferred from a server-first response.
  *
- * @see {@link https://rest-rpc.dev/docs/server-first/client#expose-response-metadata-through-cors}
+ * @see {@link https://rest-rpc.dev/docs/server-first-quickstart#use-the-ordinary-client-apis}
  */
-export type ServerFirstResponseKind =
-	| "empty"
-	| "json"
-	| "ndjson"
-	| "custom"
-	| "custom-stream";
+export type ServerFirstResponseKind = "empty" | "json" | "ndjson" | "custom";
 
 type BodyResponseKind<TResponse, TBody> =
 	TBody extends AsyncIterable<unknown>
-		? TResponse extends { contentType: string }
-			? "custom-stream"
-			: "ndjson"
+		? "ndjson"
 		: TResponse extends { contentType: string }
 			? "custom"
 			: "json";
@@ -140,7 +133,7 @@ type BodyResponseKind<TResponse, TBody> =
 /**
  * Infers the body encoding selected by a server-first response shape.
  *
- * @see {@link https://rest-rpc.dev/docs/server-first/server#infer-responses-from-the-handler}
+ * @see {@link https://rest-rpc.dev/docs/server-first-quickstart#infer-responses-from-the-handler}
  */
 export type ImplicitResponseKind<TResponse> = TResponse extends unknown
 	? "body" extends keyof TResponse
@@ -168,25 +161,38 @@ type ImplicitResponseBodyDeclaration<TResponse> = TResponse extends {
 	body: infer TBody;
 }
 	? TBody extends AsyncIterable<infer TItem>
-		? TResponse extends { contentType: infer TContentType extends string }
-			? Stream<
-					CustomResponseBody<ClientSchema<CustomResponseValue>, TContentType>
-				>
-			: Stream<ClientSchema<TItem>>
-		: TResponse extends { contentType: infer TContentType extends string }
-			? CustomResponseBody<ClientSchema<CustomResponseValue>, TContentType>
-			: ClientSchema<TBody>
-	: NoBody;
+		? ClientSchema<TItem>
+		: ClientSchema<TBody>
+	: undefined;
 
-type ImplicitResponseDeclaration<TResponse> =
-	ImplicitResponseBodyDeclaration<TResponse> extends infer TBody
-		? TResponse extends { responseHeaders: infer THeaders }
+type ImplicitResponseContentType<TResponse> = TResponse extends {
+	body: infer TBody;
+}
+	? TBody extends AsyncIterable<unknown>
+		? "application/x-ndjson"
+		: TResponse extends { contentType: infer TContentType extends string }
+			? TContentType
+			: "application/json"
+	: never;
+
+type ImplicitResponseDeclaration<TResponse> = TResponse extends {
+	body: unknown;
+}
+	? {
+			body: ImplicitResponseBodyDeclaration<TResponse>;
+			contentType: ImplicitResponseContentType<TResponse>;
+		} & (TResponse extends { responseHeaders: infer THeaders }
 			? {
-					body: TBody;
 					headers: ClientSchema<SerializedResponseHeaders<THeaders>>;
 				}
-			: TBody
-		: never;
+			: unknown)
+	: { body: undefined } & (TResponse extends {
+			responseHeaders: infer THeaders;
+		}
+			? {
+					headers: ClientSchema<SerializedResponseHeaders<THeaders>>;
+				}
+			: unknown);
 
 type ResponseStatuses<TResponse> = TResponse extends {
 	status: infer TStatus extends number;
@@ -205,7 +211,12 @@ type InferredHttpRoute<TRoute, TResult> = Omit<TRoute, "responses"> & {
 };
 
 type InferredProcedureRoute<TRoute, TResult> = Omit<TRoute, "responses"> & {
-	responses: { 200: ClientSchema<Awaited<TResult>> };
+	responses: {
+		200: {
+			body: ClientSchema<Awaited<TResult>>;
+			contentType: "application/json";
+		};
+	};
 };
 
 /** Terminal builder shape containing a route declaration and its handler. */
@@ -235,7 +246,7 @@ type HandlerImplementation<
 	TAdditionalHandlerFields extends object,
 	TContext extends object,
 	TResult,
-	TPublicRoute = TRoute,
+	TPublicRoute extends RouteDeclaration = TRoute,
 > = CompletedRoute<
 	TPublicRoute,
 	HandlerFor<TRoute, TAdditionalHandlerFields, TContext, TResult>
@@ -248,7 +259,7 @@ type ProcedureHandlerMethod<
 > =
 	HasDeclaredResponses<TRoute> extends true
 		? TRoute extends {
-				responses: { 200: infer TOutput extends StandardSchemaV1 };
+				responses: { 200: { body: infer TOutput extends StandardSchemaV1 } };
 			}
 			? {
 					handler<
@@ -365,7 +376,7 @@ type ImplementationParts<TImplementation> = TImplementation extends {
 /**
  * Infers the handler response union retained by a server-first implementation.
  *
- * @see {@link https://rest-rpc.dev/docs/server-first/server#infer-responses-from-the-handler}
+ * @see {@link https://rest-rpc.dev/docs/server-first-quickstart#infer-responses-from-the-handler}
  */
 export type InferredRouteResponse<TImplementation> =
 	ImplementationParts<TImplementation> extends { handler: infer THandler }
@@ -377,7 +388,7 @@ export type InferredRouteResponse<TImplementation> =
 /**
  * Infers the body encodings represented by a server-first implementation.
  *
- * @see {@link https://rest-rpc.dev/docs/server-first/client#expose-response-metadata-through-cors}
+ * @see {@link https://rest-rpc.dev/docs/server-first-quickstart#use-the-ordinary-client-apis}
  */
 export type ServerFirstRouteResponseKind<TImplementation> =
 	ImplementationParts<TImplementation> extends {
@@ -392,7 +403,7 @@ export type ServerFirstRouteResponseKind<TImplementation> =
 /**
  * Route builder that finishes declarations by attaching a server handler.
  *
- * @see {@link https://rest-rpc.dev/docs/server-first/server}
+ * @see {@link https://rest-rpc.dev/docs/server-first-quickstart#define-routes-and-handlers}
  */
 export type ServerRouteBuilder<
 	TAdditionalHandlerFields extends object = EmptyObject,

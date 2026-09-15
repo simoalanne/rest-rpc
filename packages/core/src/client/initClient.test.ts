@@ -83,6 +83,11 @@ describe("initClient", () => {
 				add: route
 					.input(z.object({ title: z.string() }))
 					.output(z.string().transform(Number)),
+				form: route
+					.input(z.object({ title: z.string(), tags: z.array(z.string()) }), {
+						contentType: "application/x-www-form-urlencoded",
+					})
+					.output(z.string().transform(Number)),
 				list: route.get("/todos").response(200, z.array(z.string())),
 			},
 		};
@@ -93,7 +98,11 @@ describe("initClient", () => {
 
 		assert.equal(await client.todos.get(undefined, { cache: "no-store" }), 1);
 		assert.equal(await client.todos.add({ title: "Write tests" }), 2);
-		assert.deepEqual(Object.keys(client.todos), ["get", "add", "list"]);
+		assert.equal(
+			await client.todos.form({ title: "Write tests", tags: ["docs"] }),
+			3,
+		);
+		assert.deepEqual(Object.keys(client.todos), ["get", "add", "form", "list"]);
 		assert.deepEqual(Object.keys(client.todos.list), []);
 		assert.equal(calls[0]?.url, "https://api.test/todos/get");
 		assert.equal(calls[0]?.init?.method, "POST");
@@ -108,6 +117,14 @@ describe("initClient", () => {
 		assert.equal(
 			new Headers(calls[1]?.init?.headers).get("content-type"),
 			"application/json",
+		);
+		assert.equal(
+			String(calls[2]?.init?.body),
+			"title=Write+tests&tags%5B%5D=docs",
+		);
+		assert.equal(
+			new Headers(calls[2]?.init?.headers).get("content-type"),
+			"application/x-www-form-urlencoded",
 		);
 	});
 

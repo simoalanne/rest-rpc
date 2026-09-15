@@ -4,7 +4,7 @@ import { getRouteResponses } from "./response.ts";
 
 describe("getRouteResponses", () => {
 	it("returns non-empty route responses", () => {
-		const responses = { 204: { kind: "noBody" as const } };
+		const responses = { 204: { body: undefined } };
 
 		assert.equal(getRouteResponses({ path: "/ping", responses }), responses);
 	});

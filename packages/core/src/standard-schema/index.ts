@@ -75,10 +75,6 @@ export declare namespace StandardSchemaV1 {
 	>["output"];
 }
 
-export function isStandardSchema(value: unknown): value is StandardSchemaV1 {
-	return typeof value === "object" && value !== null && "~standard" in value;
-}
-
 export {
 	validateStandardSchema,
 	validateStandardSchemaSync,

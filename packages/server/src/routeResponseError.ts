@@ -27,6 +27,7 @@ export class RouteResponseError<
 	readonly response: RouteErrors<HttpRoutes<TContract>>;
 	readonly status: number;
 	readonly body: unknown;
+	readonly contentType: string | undefined;
 	readonly responseHeaders: Record<string, unknown> | undefined;
 	readonly route: TContract;
 
@@ -36,6 +37,7 @@ export class RouteResponseError<
 		this.response = response;
 		this.status = responseFields.status;
 		this.body = responseFields.body;
+		this.contentType = (response as { contentType?: string }).contentType;
 		this.responseHeaders = (
 			response as { responseHeaders?: Record<string, unknown> }
 		).responseHeaders;

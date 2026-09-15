@@ -59,7 +59,7 @@ const document = createOpenApiDocument(api, {
 
 For object-shaped path and query schemas, rest-rpc reads top-level
 `properties` and `required` from the converted JSON Schema to create OpenAPI
-parameters. Schema records, headers, and JSON query parameters do not always
+parameters. Schema records and headers do not always
 carry parameter-level requiredness in the converted schema. Use
 `transformParameter` when generated parameters need project-specific metadata.
 

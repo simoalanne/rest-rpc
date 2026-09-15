@@ -82,6 +82,7 @@ describe("validateRequest", () => {
 				.response(204)["~restrpc"],
 			{
 				body: { createdAt: "2026-08-10T00:00:00.000Z" },
+				headers: { "content-type": "application/json" },
 			},
 		);
 
@@ -164,58 +165,14 @@ describe("validateRequest", () => {
 		}
 	});
 
-	it("parses JSON query values before schema validation", async () => {
-		const result = await validateRequest(
-			route
-				.get("/todos")
-				.jsonQuery(
-					z.object({
-						page: z.number(),
-						filters: z.object({ tags: z.array(z.string()) }),
-					}),
-				)
-				.response(204)["~restrpc"],
-			{
-				query: new URLSearchParams({
-					query: JSON.stringify({
-						page: 2,
-						filters: { tags: ["api", "typescript"] },
-					}),
-				}),
-			},
-		);
-
-		assert.equal(result.success, true);
-		if (result.success) {
-			assert.deepEqual(result.data, {
-				query: { page: 2, filters: { tags: ["api", "typescript"] } },
-			});
-		}
-	});
-
-	it("allows omitted optional JSON query values", async () => {
-		const result = await validateRequest(
-			route
-				.get("/todos")
-				.jsonQuery(z.object({ page: z.number() }).optional())
-				.response(204)["~restrpc"],
-			{},
-		);
-
-		assert.equal(result.success, true);
-		if (result.success) {
-			assert.deepEqual(result.data, { query: undefined });
-		}
-	});
-
-	it("wraps custom request bodies with selected content type", async () => {
+	it("returns custom request bodies and selected content type separately", async () => {
 		const result = await validateRequest(
 			route
 				.post("/images")
-				.customBody({
-					contentType: ["image/png", "image/jpeg"],
-					schema: z.string().transform((value) => value.toUpperCase()),
-				})
+				.body(
+					z.string().transform((value) => value.toUpperCase()),
+					{ contentType: ["image/png", "image/jpeg"] },
+				)
 				.response(204)["~restrpc"],
 			{
 				body: "jpeg bytes",
@@ -228,10 +185,8 @@ describe("validateRequest", () => {
 		assert.equal(result.success, true);
 		if (result.success) {
 			assert.deepEqual(result.data, {
-				body: {
-					contentType: "image/jpeg",
-					payload: "JPEG BYTES",
-				},
+				body: "JPEG BYTES",
+				contentType: "image/jpeg",
 			});
 		}
 	});
@@ -240,7 +195,7 @@ describe("validateRequest", () => {
 		const result = await validateRequest(
 			route
 				.post("/text")
-				.customBody({ contentType: "text/plain", schema: z.string() })
+				.body(z.string(), { contentType: "text/plain" })
 				.response(204)["~restrpc"],
 			{
 				body: "valid text",
@@ -256,37 +211,17 @@ describe("validateRequest", () => {
 		}
 	});
 
-	it("validates custom request bodies without content type as payloads", async () => {
-		const result = await validateRequest(
-			route
-				.post("/forms")
-				.customBody(z.instanceof(URLSearchParams))
-				.response(204)["~restrpc"],
-			{
-				body: new URLSearchParams([["title", "Write docs"]]),
-				headers: {
-					"content-type": "application/x-www-form-urlencoded",
-				},
-			},
-		);
-
-		assert.equal(result.success, true);
-		if (result.success) {
-			assert.ok(result.data.body instanceof URLSearchParams);
-			assert.equal(result.data.body.get("title"), "Write docs");
-		}
-	});
-
 	it("validates urlencoded form bodies from URLSearchParams", async () => {
 		const result = await validateRequest(
 			route
 				.post("/forms")
-				.formBody(
+				.body(
 					z.object({
 						title: z.string(),
 						count: z.coerce.number<number>(),
 						remember: z.string().optional(),
 					}),
+					{ contentType: "application/x-www-form-urlencoded" },
 				)
 				.response(204)["~restrpc"],
 			{
@@ -307,6 +242,7 @@ describe("validateRequest", () => {
 					title: "Write docs",
 					count: 3,
 				},
+				contentType: "application/x-www-form-urlencoded",
 			});
 		}
 	});
@@ -315,11 +251,12 @@ describe("validateRequest", () => {
 		const result = await validateRequest(
 			route
 				.post("/forms")
-				.formBody(
+				.body(
 					z.object({
 						title: z.string(),
 						tags: z.array(z.string()),
 					}),
+					{ contentType: "application/x-www-form-urlencoded" },
 				)
 				.response(204)["~restrpc"],
 			{
@@ -342,6 +279,7 @@ describe("validateRequest", () => {
 					title: "Second",
 					tags: ["ts", "rpc"],
 				},
+				contentType: "application/x-www-form-urlencoded",
 			});
 		}
 	});
@@ -358,13 +296,14 @@ describe("validateRequest", () => {
 		const result = await validateRequest(
 			route
 				.post("/uploads")
-				.multipartBody(
+				.body(
 					z.object({
 						title: z.string(),
 						count: z.coerce.number<number>(),
 						file: z.instanceof(Blob),
 						tags: z.array(z.string()),
 					}),
+					{ contentType: "multipart/form-data" },
 				)
 				.response(204)["~restrpc"],
 			{
@@ -383,38 +322,12 @@ describe("validateRequest", () => {
 			assert.deepEqual(result.data.body.tags, ["ts", "rpc"]);
 		}
 	});
-
-	it("rejects malformed JSON query values as request validation errors", async () => {
-		const result = await validateRequest(
-			route
-				.get("/todos")
-				.jsonQuery(z.object({ page: z.number() }))
-				.response(204)["~restrpc"],
-			{
-				query: new URLSearchParams({ query: "{" }),
-			},
-		);
-
-		assert.equal(result.success, false);
-		if (!result.success) {
-			assert.deepEqual(result.issues.query, [
-				{ message: 'Invalid JSON query parameter "query".' },
-			]);
-		}
-	});
 });
 
 describe("validateResponseBody", () => {
-	it("validates custom response bodies", async () => {
+	it("validates response bodies", async () => {
 		await assert.rejects(
-			validateResponseBody(
-				{
-					kind: "customBody",
-					contentType: "text/csv",
-					schema: z.number(),
-				},
-				"id,title\n1,First\n",
-			),
+			validateResponseBody(z.number(), "id,title\n1,First\n"),
 			(error) => {
 				assert.ok(error instanceof ResponseValidationError);
 				assert.equal(error.location, "body");
@@ -481,20 +394,14 @@ describe("resolveCustomResponseBody", () => {
 	it("resolves declared custom response content types", () => {
 		assert.deepEqual(
 			resolveCustomResponseBody(
-				{
-					kind: "customBody",
-					contentType: ["image/png", "image/jpeg"],
-					schema: z.string(),
-				},
-				{
-					contentType: "image/jpeg",
-					payload: "jpeg bytes",
-				},
+				["image/png", "image/jpeg"],
+				"jpeg bytes",
+				"image/jpeg",
 				"Unsupported custom response body contentType.",
 			),
 			{
 				contentType: "image/jpeg",
-				payload: "jpeg bytes",
+				body: "jpeg bytes",
 			},
 		);
 	});
@@ -503,15 +410,9 @@ describe("resolveCustomResponseBody", () => {
 		assert.throws(
 			() =>
 				resolveCustomResponseBody(
-					{
-						kind: "customBody",
-						contentType: ["image/png", "image/jpeg"],
-						schema: z.string(),
-					},
-					{
-						contentType: "image/webp",
-						payload: "webp bytes",
-					},
+					["image/png", "image/jpeg"],
+					"webp bytes",
+					"image/webp",
 					"Unsupported custom response body contentType.",
 				),
 			/Unsupported custom response body contentType/,
@@ -525,14 +426,7 @@ describe("validateResponseStreamChunks", () => {
 			yield "id,title\n";
 		}
 
-		const chunks = validateResponseStreamChunks(rows(), {
-			kind: "stream",
-			schema: {
-				kind: "customBody",
-				contentType: "text/csv",
-				schema: z.number(),
-			},
-		});
+		const chunks = validateResponseStreamChunks(rows(), z.number());
 
 		await assert.rejects(
 			async () => {

@@ -37,18 +37,22 @@ export const configuredHttp = configuredRoute.get("/configured");
 
 export const initialHttp = route.get("/initial");
 export const jsonBody = route.post("/body").body(scalar);
-export const formBody = route.post("/form").formBody(scalar);
-export const formBodyWithArrays = route.post("/form-arrays").formBody(scalar);
-export const multipartBody = route.post("/multipart").multipartBody(scalar);
+export const formBody = route
+	.post("/form")
+	.body(scalar, { contentType: "application/x-www-form-urlencoded" });
+export const formBodyWithArrays = route
+	.post("/form-arrays")
+	.body(scalar, { contentType: "application/x-www-form-urlencoded" });
+export const multipartBody = route
+	.post("/multipart")
+	.body(scalar, { contentType: "multipart/form-data" });
 export const multipartBodyWithArrays = route
 	.post("/multipart-arrays")
-	.multipartBody(scalar);
-export const customBody = route.post("/custom-body").customBody(scalar);
+	.body(scalar, { contentType: "multipart/form-data" });
 export const customTypedBody = route
 	.post("/custom-typed-body")
-	.customBody({ schema: scalar, contentType: "text/plain" });
+	.body(scalar, { contentType: "text/plain" });
 export const queryRoute = route.get("/query").query(query);
-export const jsonQueryRoute = route.get("/json-query").jsonQuery(scalar);
 export const paramsRoute = route.get("/params/:id").params(params);
 export const headersRoute = route.get("/headers").headers(headers);
 export const keyedRoute = route.get("/keys").query(query);
@@ -58,22 +62,10 @@ export const responseRoute = route.get("/response").response(200, scalar);
 export const noBodyResponseRoute = route.get("/no-body").response(204);
 export const responseHeadersRoute = route
 	.get("/response-headers")
-	.response(200, {
-		body: scalar,
-		headers,
-	});
+	.response(200, scalar, { headers });
 export const customResponseRoute = route
 	.get("/custom-response")
-	.customResponse(200, {
-		schema: customResponseScalar,
-		contentType: "text/plain",
-	});
+	.response(200, customResponseScalar, { contentType: "text/plain" });
 export const streamResponseRoute = route
 	.get("/stream-response")
 	.streamResponse(200, scalar);
-export const customStreamResponseRoute = route
-	.get("/custom-stream-response")
-	.customStreamResponse(200, {
-		schema: customResponseScalar,
-		contentType: "application/octet-stream",
-	});

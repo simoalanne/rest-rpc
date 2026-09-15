@@ -53,10 +53,7 @@ const openApiTestContract = {
 		),
 		import: route
 			.post("/todos/import")
-			.customBody({
-				schema: z.string(),
-				contentType: "text/csv",
-			})
+			.body(z.string(), { contentType: "text/csv" })
 			.response(204),
 	},
 };

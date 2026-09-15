@@ -103,14 +103,20 @@ Create a client from the same contract
 
 ```ts
 import { initClient } from "@rest-rpc/core";
+import { generateContractFromType } from "@rest-rpc/core/generate";
 import type { routes } from "./server";
 
-const client = initClient<typeof routes>({
+const contract = generateContractFromType<typeof routes>({
+	filePath: "./server.ts",
+	exportName: "routes",
+});
+
+const client = initClient(contract, {
 	baseUrl: "https://api.example.com",
 });
 
-const response = await client.$post("/todos", {
-	body: { title: "Ship v1" },
+const response = await client.todos.create({
+	body: { title: "New Todo" },
 });
 
 const todo = response.body;

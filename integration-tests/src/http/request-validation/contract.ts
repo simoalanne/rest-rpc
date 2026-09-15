@@ -37,23 +37,6 @@ export const requestValidationContract = {
 		.get("/request-validation/empty-query")
 		.query(z.object({ value: z.literal("") }))
 		.response(200, z.object({ value: z.literal("") })),
-	jsonQuery: route
-		.get("/request-validation/json-query")
-		.jsonQuery(
-			z.object({
-				page: z.number(),
-				includeArchived: z.boolean(),
-				filters: z.object({ tags: z.array(z.string()) }),
-			}),
-		)
-		.response(
-			200,
-			z.object({
-				page: z.number(),
-				includeArchived: z.boolean(),
-				tags: z.array(z.string()),
-			}),
-		),
 } as const;
 
 export type RequestValidationContract = typeof requestValidationContract;

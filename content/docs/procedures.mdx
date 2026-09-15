@@ -37,8 +37,11 @@ procedure does not commit the whole API to that style.
 
 ## Contract-First Procedures
 
-In a shared contract, `.input()` declares the JSON input and `.output()`
-declares the successful JSON result. An output is required; input is optional.
+In a shared contract, `.input()` declares the input and `.output()` declares
+the successful JSON result. Input uses JSON by default and accepts the same
+optional content-type option as `.body()`. An output is required; input is
+optional. Form, multipart, and custom input values follow the transport-shape
+rules in [HTTP Requests](/docs/http-requests).
 
 ```ts
 import { route } from "@rest-rpc/core";
@@ -115,15 +118,11 @@ const create = route
 
 ## Call Procedures
 
-The contract-first and server-first clients have the same procedure-shaped
-surface. A procedure returns its output directly instead of an HTTP response
-envelope.
-
 ```ts
 import { initClient } from "@rest-rpc/core";
-import type { routes } from "./server";
+import contract from "./contract";
 
-const client = initClient<typeof routes>({
+const client = initClient(contract, {
 	baseUrl: "https://api.example.com",
 });
 
@@ -142,23 +141,6 @@ An unsuccessful HTTP response rejects the call with an `Error`. Procedure
 routes do not declare typed error results. If an error is an expected part of
 the API that clients should inspect, model it with explicit response statuses
 on an [HTTP route](/docs/http-responses).
-
-## TanStack Query
-
-Procedure helpers also return direct data. Use `queryOptions()` for reads and
-`mutationOptions()` for writes according to how the operation is used by the
-application; every procedure uses `POST` on the wire.
-
-```tsx
-const todos = useQuery(tq.todos.list.queryOptions());
-
-const createTodo = useMutation(tq.todos.create.mutationOptions());
-createTodo.mutate({ title: "Write docs" });
-```
-
-`queryOptions()` and `mutationOptions()` both remain available for procedures
-with input. This is an application-level choice, not an inference from the HTTP
-method.
 
 ## Derived HTTP Interface
 

@@ -1,10 +1,8 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import type { CustomBody, FormBody, MultipartBody, NoBody } from "./body.ts";
 import type {
 	RouteDeclaration,
 	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
-import type { InferCustomBody } from "./response.ts";
 
 export type RequestSegment = "body" | "query" | "params" | "headers";
 
@@ -44,60 +42,16 @@ export function getRequestHeaderSchemas(
 	);
 }
 
-/**
- * Declares a query string field that carries a JSON-encoded object value.
- *
- * @see {@link https://rest-rpc.dev/docs/contract/declaration#json-query}
- */
-export type JsonQuery<TSchema extends StandardSchemaV1 = StandardSchemaV1> = {
-	kind: "jsonQuery";
-	schema: TSchema;
-};
-
-export function isJsonQuery(schema: unknown): schema is JsonQuery {
-	return (
-		typeof schema === "object" &&
-		schema !== null &&
-		"kind" in schema &&
-		schema.kind === "jsonQuery"
-	);
-}
-
-export type RequestBodySchema =
-	| StandardSchemaV1
-	| CustomBody
-	| FormBody
-	| MultipartBody
-	| NoBody
-	| undefined;
+export type RequestBodySchema = StandardSchemaV1;
 
 type InferRequestBody<
 	TBody,
 	TIO extends "input" | "output",
-> = TBody extends NoBody
-	? never
-	: TBody extends CustomBody
-		? InferCustomBody<TBody, TIO>
-		: TBody extends FormBody<infer TSchema>
-			? TIO extends "input"
-				? StandardSchemaV1.InferInput<TSchema>
-				: StandardSchemaV1.InferOutput<TSchema>
-			: TBody extends MultipartBody<infer TSchema>
-				? TIO extends "input"
-					? StandardSchemaV1.InferInput<TSchema>
-					: StandardSchemaV1.InferOutput<TSchema>
-				: TBody extends StandardSchemaV1
-					? TIO extends "input"
-						? StandardSchemaV1.InferInput<TBody>
-						: StandardSchemaV1.InferOutput<TBody>
-					: never;
-
-type InferJsonQuery<TQuery, TIO extends "input" | "output"> =
-	TQuery extends JsonQuery<infer TSchema>
-		? TIO extends "input"
-			? StandardSchemaV1.InferInput<TSchema>
-			: StandardSchemaV1.InferOutput<TSchema>
-		: never;
+> = TBody extends StandardSchemaV1
+	? TIO extends "input"
+		? StandardSchemaV1.InferInput<TBody>
+		: StandardSchemaV1.InferOutput<TBody>
+	: never;
 
 type InferRequestHeaders<
 	THeaders extends RequestHeadersDeclaration,
@@ -129,13 +83,11 @@ type InferRequestHeaders<
 type InferRequestObjectSegment<
 	TSegment,
 	TIO extends "input" | "output",
-> = TSegment extends JsonQuery
-	? InferJsonQuery<TSegment, TIO>
-	: TSegment extends StandardSchemaV1
-		? TIO extends "input"
-			? StandardSchemaV1.InferInput<TSegment>
-			: StandardSchemaV1.InferOutput<TSegment>
-		: never;
+> = TSegment extends StandardSchemaV1
+	? TIO extends "input"
+		? StandardSchemaV1.InferInput<TSegment>
+		: StandardSchemaV1.InferOutput<TSegment>
+	: never;
 
 type InferRequestSegments<R, TIO extends "input" | "output"> = {
 	body: R extends { body: infer TBody } ? InferRequestBody<TBody, TIO> : never;
@@ -232,5 +184,18 @@ export type ClientRequest<
 		? OptionalRequestHeaders<InferRequestFor<E, "input">, TOptionalKeys>
 		: never;
 
+type ServerContentType<TRequest> = TRequest extends {
+	contentType: infer TContentType;
+}
+	? TContentType extends "application/json"
+		? unknown
+		: TContentType extends readonly string[]
+			? { contentType: TContentType[number] }
+			: TContentType extends string
+				? { contentType: TContentType }
+				: unknown
+	: unknown;
+
 export type ServerRequest<E extends { request?: RouteRequestDeclaration }> =
-	InferRequestFor<E, "output">;
+	InferRequestFor<E, "output"> &
+		ServerContentType<E extends { request: infer TRequest } ? TRequest : never>;

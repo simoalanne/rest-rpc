@@ -7,10 +7,8 @@ import {
 	type RouteQueryData,
 	type RouteQueryError,
 	type RouteStreamedQueryData,
-	type ServerFirstTanstackQueryHelpersFor,
 	type TanstackQueryHelpersFor,
 } from "@rest-rpc/tanstack-query";
-import { type ServerRouteBuilder } from "@rest-rpc/server";
 import { type QueryClient, skipToken } from "@tanstack/query-core";
 import {
 	expectAssignable,
@@ -20,6 +18,8 @@ import {
 } from "tsd";
 
 declare const queryClient: QueryClient;
+
+expectError(createTanstackQueryHelpers({ baseUrl: "https://example.test" }));
 
 // query options
 
@@ -553,95 +553,6 @@ type CreateTodoVariables = RouteMutationVariables<
 >;
 expectType<{ body: { title: string } }>(null as unknown as CreateTodoVariables);
 
-// server-first helpers
-
-declare const serverRoute: ServerRouteBuilder;
-
-const serverRoutes = {
-	todos: {
-		get: serverRoute
-			.get("/server-first/todos/:id")
-			.params(schemaType<{ id: string }>())
-			.handler(({ params: { id } }) =>
-				id === "missing"
-					? { status: 404 as const, body: { code: "not_found" as const } }
-					: { status: 200 as const, body: { id, title: "Todo" } },
-			),
-		create: serverRoute
-			.post("/server-first/todos")
-			.body(schemaType<{ title: string }>())
-			.handler(({ body: { title } }) => ({
-				status: 201 as const,
-				body: { id: "todo-1", title },
-			})),
-		page: serverRoute
-			.get("/server-first/todos")
-			.query(schemaType<{ cursor?: string; limit: number }>())
-			.handler(({ query: { cursor, limit } }) => ({
-				status: 200 as const,
-				body: { cursor, limit },
-			})),
-		stream: serverRoute.get("/server-first/todos/stream").handler(() => ({
-			status: 200 as const,
-			body: (async function* () {
-				yield {
-					id: "todo-1",
-					title: "Todo",
-				};
-			})(),
-		})),
-	},
-} as const;
-
-const serverTq = createTanstackQueryHelpers<typeof serverRoutes>({
-	baseUrl: "https://example.test",
-});
-expectAssignable<ServerFirstTanstackQueryHelpersFor<typeof serverRoutes>>(
-	serverTq,
-);
-
-const serverGetOptions = serverTq.$get("/server-first/todos/:id").queryOptions({
-	params: {
-		id: "todo-1",
-	},
-});
-expectAssignable<
-	Promise<{
-		status: 200;
-		body: { id: string; title: "Todo" };
-		headers: Headers;
-	}>
->(queryClient.fetchQuery(serverGetOptions));
-
-serverTq.$post("/server-first/todos").mutationOptions({
-	onSuccess(data, variables) {
-		expectType<201>(data.status);
-		expectType<{ body: { title: string } }>(variables);
-	},
-});
-
-serverTq.$get("/server-first/todos").infiniteQueryOptions({
-	initialRequest: { query: { limit: 20 } },
-	getNextRequest(_lastPage, _allPages, lastRequest) {
-		expectType<{ query: { cursor?: string; limit: number } }>(lastRequest);
-		return { query: { cursor: "next", limit: 20 } };
-	},
-});
-
-const serverStreamOptions = serverTq
-	.$get("/server-first/todos/stream")
-	.streamedQueryOptions();
-expectAssignable<Promise<Array<{ id: string; title: string }>>>(
-	queryClient.fetchQuery(serverStreamOptions),
-);
-
-expectError(serverTq.$get("/server-first/missing"));
-expectError(serverTq.$post("/server-first/todos/:id"));
-expectError(
-	serverTq.$get("/server-first/todos/:id").queryOptions({
-		id: "todo-1",
-	}),
-);
 expectNotAssignable<{ id: string }>(null as unknown as CreateTodoVariables);
 
 type ProjectEventsStreamedData = RouteStreamedQueryData<
@@ -711,73 +622,3 @@ shorthandTq.todos.add.queryOptions({ title: "Todo" });
 expectError(shorthandTq.todos.add.queryOptions({ body: { title: "Todo" } }));
 expectError(shorthandTq.todos.add.queryOptions());
 expectError(shorthandTq.todos.get.streamedQueryOptions());
-
-declare const shorthandServerRoute: ServerRouteBuilder;
-
-const serverShorthandRoutes = {
-	todos: {
-		get: shorthandServerRoute.handler(() => ({
-			id: "todo-1",
-			title: "Todo",
-		})),
-		add: shorthandServerRoute
-			.input(schemaType<{ title: string }>())
-			.handler(({ input }) => ({ id: "todo-1", title: input.title })),
-		explicit: shorthandServerRoute.get("/todos/:id").handler(() => ({
-			status: 204 as const,
-		})),
-	},
-} as const;
-
-const serverShorthandTq = createTanstackQueryHelpers<
-	typeof serverShorthandRoutes
->({
-	baseUrl: "https://example.test",
-});
-expectAssignable<
-	ServerFirstTanstackQueryHelpersFor<typeof serverShorthandRoutes>
->(serverShorthandTq);
-
-const serverShorthandGetOptions = serverShorthandTq.todos.get.queryOptions(
-	undefined,
-	{
-		retry(_failureCount, error) {
-			expectType<Error>(error);
-			return false;
-		},
-	},
-);
-expectType<Promise<{ readonly id: "todo-1"; readonly title: "Todo" }>>(
-	queryClient.fetchQuery(serverShorthandGetOptions),
-);
-
-serverShorthandTq.todos.add.mutationOptions({
-	onSuccess(data, variables) {
-		expectType<{ readonly id: "todo-1"; readonly title: string }>(data);
-		expectType<{ title: string }>(variables);
-		expectError(data.status);
-	},
-	onError(error) {
-		expectType<Error>(error);
-	},
-});
-serverShorthandTq.todos.add.queryOptions({ title: "Todo" });
-expectError(
-	serverShorthandTq.todos.add.queryOptions({ body: { title: "Todo" } }),
-);
-expectError(serverShorthandTq.todos.get.streamedQueryOptions());
-expectError(serverShorthandTq.todos.explicit);
-
-const explicitOnlyServerRoutes = {
-	admin: {
-		health: shorthandServerRoute.get("/health").handler(() => ({
-			status: 204 as const,
-		})),
-	},
-};
-const explicitOnlyServerTq = createTanstackQueryHelpers<
-	typeof explicitOnlyServerRoutes
->({
-	baseUrl: "https://example.test",
-});
-expectError(explicitOnlyServerTq.admin);

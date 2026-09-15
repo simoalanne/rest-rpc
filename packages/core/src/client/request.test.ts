@@ -50,15 +50,11 @@ const createRequestTestContract = () => ({
 					id: z.string(),
 				}),
 			)
-			.customBody({
-				schema: z.string(),
-				contentType: "text/plain",
-			})
+			.body(z.string(), { contentType: "text/plain" })
 			.response(204),
 		json: route
 			.post("/uploads/json")
-			.customBody({
-				schema: z.object({ type: z.string() }),
+			.body(z.object({ type: z.string() }), {
 				contentType: "application/json",
 			})
 			.response(204),
@@ -298,63 +294,6 @@ describe("ApiClient requests", () => {
 		assert.deepEqual(request.headers, {});
 	});
 
-	it("serializes JSON query values into the query parameter", () => {
-		const apiContract = {
-			items: {
-				search: route
-					.get("/items")
-					.jsonQuery(
-						z.object({
-							page: z.number(),
-							filters: z.object({
-								tags: z.array(z.string()),
-							}),
-						}),
-					)
-					.response(204),
-			},
-		};
-		const request = constructBaseRequest(
-			"https://api.test",
-			apiContract.items.search["~restrpc"],
-			{
-				query: {
-					page: 2,
-					filters: { tags: ["api", "typescript"] },
-				},
-			},
-		);
-
-		assert.equal(
-			request.url,
-			"https://api.test/items?query=%7B%22page%22%3A2%2C%22filters%22%3A%7B%22tags%22%3A%5B%22api%22%2C%22typescript%22%5D%7D%7D",
-		);
-	});
-
-	it("omits optional JSON query values when the query key is not provided", () => {
-		const apiContract = {
-			items: {
-				search: route
-					.get("/items")
-					.jsonQuery(
-						z
-							.object({
-								page: z.number(),
-							})
-							.optional(),
-					)
-					.response(204),
-			},
-		};
-		const request = constructBaseRequest(
-			"https://api.test",
-			apiContract.items.search["~restrpc"],
-			{},
-		);
-
-		assert.equal(request.url, "https://api.test/items");
-	});
-
 	it("sends JSON request bodies with generated content type", async () => {
 		const calls = captureFetch(
 			jsonResponse({ id: "todo-1", title: "Buy milk" }, 201),
@@ -386,37 +325,17 @@ describe("ApiClient requests", () => {
 		});
 	});
 
-	it("sends custom bodies without declared content types as raw fetch bodies", async () => {
+	it("sends form bodies as URLSearchParams with their declared content type", async () => {
 		const apiContract = {
 			forms: {
 				submit: route
 					.post("/forms")
-					.customBody(z.instanceof(URLSearchParams))
-					.response(204),
-			},
-		};
-		const calls = captureFetch();
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-		const body = new URLSearchParams([["title", "Write docs"]]);
-
-		await client.forms.submit({ body });
-
-		assert.equal(calls[0]?.init?.body, body);
-		assert.deepEqual(calls[0]?.init?.headers, {});
-	});
-
-	it("sends form bodies as URLSearchParams without generated content type", async () => {
-		const apiContract = {
-			forms: {
-				submit: route
-					.post("/forms")
-					.formBody(
+					.body(
 						z.object({
 							title: z.string(),
 							remember: z.boolean().optional(),
 						}),
+						{ contentType: "application/x-www-form-urlencoded" },
 					)
 					.response(204),
 			},
@@ -438,7 +357,9 @@ describe("ApiClient requests", () => {
 			calls[0].init.body.toString(),
 			"title=Write+docs&remember=true",
 		);
-		assert.deepEqual(calls[0]?.init?.headers, {});
+		assert.deepEqual(calls[0]?.init?.headers, {
+			"content-type": "application/x-www-form-urlencoded",
+		});
 	});
 
 	it("preserves body fields in grouped form payloads", async () => {
@@ -446,11 +367,12 @@ describe("ApiClient requests", () => {
 			forms: {
 				submit: route
 					.post("/forms")
-					.formBody(
+					.body(
 						z.object({
 							body: z.string(),
 							title: z.string(),
 						}),
+						{ contentType: "application/x-www-form-urlencoded" },
 					)
 					.response(204),
 			},
@@ -479,11 +401,12 @@ describe("ApiClient requests", () => {
 			forms: {
 				submit: route
 					.post("/forms")
-					.formBody(
+					.body(
 						z.object({
 							title: z.string(),
 							tags: z.array(z.string()),
 						}),
+						{ contentType: "application/x-www-form-urlencoded" },
 					)
 					.response(204),
 			},
@@ -512,12 +435,13 @@ describe("ApiClient requests", () => {
 			uploads: {
 				create: route
 					.post("/uploads")
-					.multipartBody(
+					.body(
 						z.object({
 							title: z.string(),
 							file: z.instanceof(Blob),
 							tags: z.array(z.string()).optional(),
 						}),
+						{ contentType: "multipart/form-data" },
 					)
 					.response(204),
 			},
@@ -548,11 +472,12 @@ describe("ApiClient requests", () => {
 			uploads: {
 				create: route
 					.post("/uploads")
-					.multipartBody(
+					.body(
 						z.object({
 							body: z.string(),
 							title: z.string(),
 						}),
+						{ contentType: "multipart/form-data" },
 					)
 					.response(204),
 			},
@@ -584,9 +509,8 @@ describe("ApiClient requests", () => {
 							id: z.string(),
 						}),
 					)
-					.customBody({
+					.body(z.string(), {
 						contentType: ["image/png", "image/jpeg"],
-						schema: z.string(),
 					})
 					.response(204),
 			},
@@ -596,13 +520,10 @@ describe("ApiClient requests", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await client.uploads.image({
-			body: {
-				contentType: "image/jpeg",
-				payload: "jpeg bytes",
-			},
-			params: { id: "file 1" },
-		});
+		await client.uploads.image(
+			{ body: "jpeg bytes", params: { id: "file 1" } },
+			{ contentType: "image/jpeg" },
+		);
 
 		assert.equal(calls[0]?.url, "https://api.test/uploads/file%201/image");
 		assert.equal(calls[0]?.init?.body, "jpeg bytes");

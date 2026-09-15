@@ -1,23 +1,12 @@
 import {
-	type CustomBody,
-	type FormBody,
-	getResponseHeaders,
-	isCustomBody,
-	isFormBody,
-	isJsonQuery,
-	isMultipartBody,
-	isNoBody,
+	type BodyContentType,
 	getRequestHeaderSchemas,
-	isStream,
-	type JsonQuery,
-	type MultipartBody,
 	type ResponseBodySchema,
 	type ResponseDeclaration,
 	type RouteDeclaration,
 	type RequestHeadersDeclaration,
 } from "@rest-rpc/core/contract";
 import {
-	isStandardSchema,
 	type StandardSchemaV1,
 	validateStandardSchema,
 } from "@rest-rpc/core/standard-schema";
@@ -75,9 +64,6 @@ const parseQueryOrFormData = (searchParams: URLSearchParams | FormData) => {
 	return data;
 };
 
-const parseJsonQuery = (value: string | null) =>
-	value === null ? undefined : JSON.parse(value);
-
 export const getHeaderValue = (
 	headers: unknown,
 	name: string,
@@ -107,14 +93,11 @@ const validateObjectSchema = async (
 };
 
 const validateRequestObject = async (
-	declaration: unknown,
+	declaration: RequestObjectSchema | undefined,
 	input: unknown,
 ): Promise<SegmentValidationResult> => {
-	if (isStandardSchema(declaration)) {
-		return validateObjectSchema(declaration as RequestObjectSchema, input);
-	}
-
-	return { data: {}, errors: [] };
+	if (!declaration) return { data: {}, errors: [] };
+	return validateObjectSchema(declaration, input);
 };
 
 const validateHeaders = async (
@@ -152,8 +135,10 @@ const validateCustomBody = async (
 	body: unknown,
 	headers: unknown,
 ): Promise<SegmentValidationResult> => {
-	const declaration = route.request?.body;
-	if (!isCustomBody(declaration)) return { data: {}, errors: [] };
+	const declaration = route.request;
+	if (!declaration?.body || declaration.contentType === undefined) {
+		return { data: {}, errors: [] };
+	}
 	const contentTypes =
 		declaration.contentType === undefined
 			? undefined
@@ -161,9 +146,7 @@ const validateCustomBody = async (
 				? declaration.contentType
 				: [declaration.contentType];
 	const contentType =
-		contentTypes && body !== undefined
-			? getHeaderValue(headers, "content-type")
-			: undefined;
+		body !== undefined ? getHeaderValue(headers, "content-type") : undefined;
 	const declaredContentType =
 		contentTypes && typeof contentType === "string"
 			? getDeclaredContentType(contentTypes, contentType)
@@ -176,88 +159,44 @@ const validateCustomBody = async (
 		};
 	}
 
-	const result = await validateStandardSchema(declaration.schema, body);
+	const normalized = declaredContentType
+		? normalizeContentType(declaredContentType)
+		: undefined;
+	let parsedBody = body;
+	if (normalized === "application/x-www-form-urlencoded") {
+		if (!(body instanceof URLSearchParams)) {
+			return {
+				data: {},
+				errors: [{ message: "Expected URLSearchParams form body." }],
+			};
+		}
+		parsedBody = parseQueryOrFormData(body);
+	} else if (normalized === "multipart/form-data") {
+		if (!(body instanceof FormData)) {
+			return {
+				data: {},
+				errors: [{ message: "Expected FormData multipart body." }],
+			};
+		}
+		parsedBody = parseQueryOrFormData(body);
+	}
+
+	const result = await validateStandardSchema(declaration.body, parsedBody);
 	if (result.issues) {
 		return { data: {}, errors: result.issues };
 	}
 
 	return {
 		data: {
-			body: Array.isArray(declaration.contentType)
-				? {
-						contentType: declaredContentType,
-						payload: result.value,
-					}
-				: result.value,
+			body: result.value,
+			...(declaredContentType
+				? { contentType: declaredContentType }
+				: typeof contentType === "string"
+					? { contentType }
+					: {}),
 		},
 		errors: [],
 	};
-};
-
-const validateFormBody = async (
-	declaration: FormBody,
-	body: unknown,
-): Promise<SegmentValidationResult> => {
-	if (!(body instanceof URLSearchParams)) {
-		return {
-			data: {},
-			errors: [{ message: "Expected URLSearchParams form body." }],
-		};
-	}
-
-	const result = await validateStandardSchema(
-		declaration.schema,
-		parseQueryOrFormData(body),
-	);
-	if (result.issues) {
-		return { data: {}, errors: result.issues };
-	}
-
-	return { data: { body: result.value }, errors: [] };
-};
-
-const validateMultipartBody = async (
-	declaration: MultipartBody,
-	body: unknown,
-): Promise<SegmentValidationResult> => {
-	if (!(body instanceof FormData)) {
-		return {
-			data: {},
-			errors: [{ message: "Expected FormData multipart body." }],
-		};
-	}
-
-	const result = await validateStandardSchema(
-		declaration.schema,
-		parseQueryOrFormData(body),
-	);
-	if (result.issues) {
-		return { data: {}, errors: result.issues };
-	}
-
-	return { data: { body: result.value }, errors: [] };
-};
-
-const validateJsonQuery = async (
-	declaration: JsonQuery,
-	query: URLSearchParams | undefined,
-): Promise<SegmentValidationResult> => {
-	let input: unknown;
-	try {
-		input = parseJsonQuery(query?.get("query") ?? null);
-	} catch {
-		return {
-			data: {},
-			errors: [{ message: 'Invalid JSON query parameter "query".' }],
-		};
-	}
-
-	const result = await validateStandardSchema(declaration.schema, input);
-	if (result.issues) {
-		return { data: {}, errors: result.issues };
-	}
-
-	return { data: { query: result.value }, errors: [] };
 };
 
 const getValidatedRequestData = (
@@ -269,23 +208,22 @@ const getValidatedRequestData = (
 ) => {
 	const request = route.request;
 	return {
-		...(request?.body && !isNoBody(request.body)
+		...(request?.body
 			? {
 					body:
-						isCustomBody(request.body) ||
-						isFormBody(request.body) ||
-						isMultipartBody(request.body)
+						request.contentType !== undefined
 							? (body.data as Record<string, unknown>).body
 							: body.data,
 				}
 			: {}),
-		...(request?.query
+		...(request?.contentType !== undefined &&
+		request.contentType !== "application/json" &&
+		(body.data as Record<string, unknown>).contentType !== undefined
 			? {
-					query: isJsonQuery(request.query)
-						? (query.data as Record<string, unknown>).query
-						: query.data,
+					contentType: (body.data as Record<string, unknown>).contentType,
 				}
 			: {}),
+		...(request?.query ? { query: query.data } : {}),
 		...(request?.params ? { params: params.data } : {}),
 		...(request?.headers ? { headers: headers.data } : {}),
 	};
@@ -296,19 +234,14 @@ export async function validateRequest(
 	segments: RequestSegments,
 ): Promise<RequestValidationResponse> {
 	const request = route.request;
-	const body = isCustomBody(request?.body)
-		? await validateCustomBody(route, segments.body, segments.headers)
-		: isFormBody(request?.body)
-			? await validateFormBody(request.body, segments.body)
-			: isMultipartBody(request?.body)
-				? await validateMultipartBody(request.body, segments.body)
-				: await validateRequestObject(request?.body, segments.body);
-	const query = isJsonQuery(request?.query)
-		? await validateJsonQuery(request.query, segments.query)
-		: await validateRequestObject(
-				request?.query,
-				segments.query ? parseQueryOrFormData(segments.query) : undefined,
-			);
+	const body =
+		request?.contentType !== undefined
+			? await validateCustomBody(route, segments.body, segments.headers)
+			: await validateRequestObject(request?.body, segments.body);
+	const query = await validateRequestObject(
+		request?.query,
+		segments.query ? parseQueryOrFormData(segments.query) : undefined,
+	);
 	const params = await validateRequestObject(request?.params, segments.params);
 	const headers = await validateHeaders(request?.headers, segments.headers);
 	const issues = {
@@ -338,19 +271,11 @@ export async function validateRequest(
 }
 
 export const validateResponseBody = async (
-	schema: ResponseBodySchema | CustomBody | undefined,
+	schema: ResponseBodySchema | undefined,
 	body: unknown,
 ): Promise<unknown> => {
-	if (!schema || isNoBody(schema) || isStream(schema)) {
+	if (!schema) {
 		return body;
-	}
-
-	if (isCustomBody(schema)) {
-		const validation = await validateStandardSchema(schema.schema, body);
-		if (validation.issues) {
-			throw new ResponseValidationError("body", validation.issues);
-		}
-		return validation.value;
 	}
 
 	const validation = await validateStandardSchema(schema, body);
@@ -366,7 +291,7 @@ export const validateResponseHeaders = async (
 ): Promise<HttpHeaders | undefined> => {
 	if (!schema) return undefined;
 
-	const declaredHeaders = getResponseHeaders(schema);
+	const declaredHeaders = schema.headers;
 	if (!declaredHeaders) return undefined;
 
 	const result = await validateStandardSchema(declaredHeaders, headers ?? {});
@@ -382,26 +307,26 @@ export const validateResponseHeaders = async (
 };
 
 export const resolveCustomResponseBody = (
-	schema: CustomBody,
+	declaredContentType: BodyContentType,
 	body: unknown,
+	selectedContentType: unknown,
 	errorMessage: string,
-): { contentType: string; payload: unknown } => {
-	if (!Array.isArray(schema.contentType)) {
-		if (!schema.contentType) throw new Error(errorMessage);
-		return { contentType: schema.contentType as string, payload: body };
-	}
-
-	const input = body as { contentType?: unknown; payload?: unknown };
+): { contentType: string; body: unknown } => {
+	const declaredContentTypes = Array.isArray(declaredContentType)
+		? declaredContentType
+		: [declaredContentType as string];
 	const contentType =
-		typeof input.contentType === "string"
-			? getDeclaredContentType(schema.contentType, input.contentType)
-			: undefined;
+		typeof selectedContentType === "string"
+			? getDeclaredContentType(declaredContentTypes, selectedContentType)
+			: declaredContentTypes.length === 1
+				? declaredContentTypes[0]
+				: undefined;
 
 	if (!contentType) throw new Error(errorMessage);
 
 	return {
 		contentType,
-		payload: input.payload,
+		body,
 	};
 };
 
@@ -409,13 +334,9 @@ export const validateResponseStreamChunk = async (
 	schema: ResponseBodySchema | undefined,
 	chunk: unknown,
 ) => {
-	if (!schema || isNoBody(schema)) return chunk;
+	if (!schema) return chunk;
 
-	const declaredChunkSchema = isStream(schema) ? schema.schema : schema;
-	const chunkSchema = isCustomBody(declaredChunkSchema)
-		? declaredChunkSchema.schema
-		: declaredChunkSchema;
-	const validation = await validateStandardSchema(chunkSchema, chunk);
+	const validation = await validateStandardSchema(schema, chunk);
 	if (validation.issues) {
 		throw new ResponseValidationError("stream", validation.issues);
 	}

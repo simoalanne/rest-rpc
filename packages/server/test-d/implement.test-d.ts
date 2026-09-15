@@ -10,8 +10,21 @@ const contract = {
 			.params(z.object({ id: z.string() }))
 			.response(200, z.object({ id: z.string() })),
 		create: route
-			.input(z.object({ title: z.string() }))
+			.input(z.object({ title: z.string() }), { contentType: "text/plain" })
 			.output(z.object({ id: z.string(), title: z.string() })),
+		upload: route
+			.post("/images")
+			.body(z.instanceof(Uint8Array), {
+				contentType: ["image/png", "image/jpeg"],
+			})
+			.response(204),
+		download: route.get("/images/:id").response(200, z.instanceof(Uint8Array), {
+			contentType: ["image/png", "image/jpeg"],
+		}),
+		importCsv: route
+			.post("/imports.csv")
+			.body(z.string(), { contentType: "text/csv" })
+			.response(204),
 	},
 } as const;
 
@@ -30,8 +43,38 @@ expectError(
 	})),
 );
 
-const create = implementor.todos.create.handler(({ input }) => ({
-	id: "todo-1",
-	title: input.title,
+const _upload = implementor.todos.upload.handler(({ body, contentType }) => {
+	expectType<Uint8Array<ArrayBuffer>>(body);
+	expectType<"image/png" | "image/jpeg">(contentType);
+	return { status: 204 };
+});
+
+const _importCsv = implementor.todos.importCsv.handler(
+	({ body, contentType }) => {
+		expectType<string>(body);
+		expectType<"text/csv">(contentType);
+		return { status: 204 };
+	},
+);
+
+implementor.todos.download.handler(() => ({
+	status: 200,
+	body: new Uint8Array(),
+	contentType: "image/png",
 }));
+expectError(
+	implementor.todos.download.handler(() => ({
+		status: 200,
+		body: new Uint8Array(),
+		contentType: "image/webp",
+	})),
+);
+
+const create = implementor.todos.create.handler(({ input, contentType }) => {
+	expectType<"text/plain">(contentType);
+	return {
+		id: "todo-1",
+		title: input.title,
+	};
+});
 expectType<"procedure">(create["~restrpc"].kind);

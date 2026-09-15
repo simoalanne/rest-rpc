@@ -63,7 +63,7 @@ export type RouteHandler<TRoute extends ContractRoute> = ServerRouteHandler<
  * @remarks Responses are inferred from the handler unless they are declared
  * before `.handler()`.
  *
- * @see {@link https://rest-rpc.dev/docs/server-first/server}
+ * @see {@link https://rest-rpc.dev/docs/server-first-quickstart#define-routes-and-handlers}
  * @see {@link https://rest-rpc.dev/docs/server/nest#server-first-routes}
  */
 export const route = serverFirstRoute as unknown as ServerRouteBuilder<

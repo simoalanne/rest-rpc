@@ -29,7 +29,7 @@ const ndjsonResponse = (chunks: string[]) => {
 				controller.close();
 			},
 		}),
-		{ status: 200 },
+		{ status: 200, headers: { "content-type": "application/x-ndjson" } },
 	);
 };
 
@@ -89,6 +89,7 @@ describe("ApiClient streams", () => {
 		globalThis.fetch = async () =>
 			new Response(null, {
 				status: 200,
+				headers: { "content-type": "application/x-ndjson" },
 			});
 		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",

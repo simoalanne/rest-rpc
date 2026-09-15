@@ -89,38 +89,6 @@ route
 	.response(200, todoSchema);
 ```
 
-## JSON Query
-
-When you need to pass a complex object as a query parameter, you can use `.jsonQuery()`.
-The object is serialized to a JSON string and sent as a single query parameter named `query` in the URL.
-
-```ts
-const api = {
-	search: route
-		.get("/search")
-		.jsonQuery(
-			z.object({
-				page: z.number(),
-				includeArchived: z.boolean(),
-				filters: z.object({
-					tags: z.array(z.string()),
-				}),
-			}),
-		)
-		.response(200, z.object({ results: z.array(z.string()) })),
-};
-```
-
-```ts
-await client.search({
-	query: {
-		page: 2,
-		includeArchived: false,
-		filters: { tags: ["docs", "api"] },
-	},
-});
-```
-
 ## Responses
 
 `.response(status, schema)` declares a response body for a status.
@@ -148,15 +116,14 @@ route
 Non-2xx statuses and no-body responses are declared through the same builder
 method.
 
-Status-specific response headers can be declared by passing an object containing
-`body` and `headers` as the response schema.
+Status-specific response headers can be declared in the options following the
+response schema.
 
 ```ts
 route
 	.post("/todos")
 	.body(z.object({ title: z.string().min(1) }))
-	.response(201, {
-		body: todoSchema,
+	.response(201, todoSchema, {
 		headers: z.object({
 			location: z.string(),
 			"x-next-cursor": z.string().optional(),

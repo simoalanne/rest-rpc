@@ -87,24 +87,6 @@ export const runRequestValidationSuite = (
 			});
 		});
 
-		it("round trips JSON query values without scalar coercion schemas", async () => {
-			const bodyResponse = await client.jsonQuery({
-				query: {
-					page: 2,
-					includeArchived: false,
-					filters: { tags: ["api", "typescript"] },
-				},
-			});
-			assert.equal(bodyResponse.status, 200);
-			const body = bodyResponse.body;
-
-			assert.deepEqual(body, {
-				page: 2,
-				includeArchived: false,
-				tags: ["api", "typescript"],
-			});
-		});
-
 		it("rejects params that do not match the route schema", async () => {
 			const response = await fetch(
 				`${server.origin}/request-validation/params/123`,

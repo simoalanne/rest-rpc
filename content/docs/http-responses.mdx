@@ -147,8 +147,7 @@ export const api = {
 		get: route
 			.get("/todos/:id")
 			.params(z.object({ id: z.string() }))
-			.response(200, {
-				body: todoSchema,
+			.response(200, todoSchema, {
 				headers: z.object({
 					etag: z.string(),
 					"x-next-cursor": z.string().optional(),
@@ -190,15 +189,18 @@ if (response.status === 200) {
 
 ## Response With Custom Content Type
 
+The fetch client parses non-stream custom responses from their declared content
+type and returns the schema output. JSON, URL-encoded form data, multipart form
+data, text, and binary responses use the corresponding Fetch body reader.
+
 ```ts
 import { route } from "@rest-rpc/core";
 
 export const api = {
 	reports: {
-		csv: route.get("/reports.csv").customResponse(200, {
-			contentType: "text/csv",
-			schema: z.string(),
-		}),
+		csv: route
+			.get("/reports.csv")
+			.response(200, z.string(), { contentType: "text/csv" }),
 	},
 };
 ```
@@ -217,13 +219,14 @@ export const routes = {
 const response = await client.reports.csv();
 
 if (response.status === 200) {
-	await response.body.text();
+	response.body; // string
 }
 ```
 
 ## Response With Multiple Custom Content Types
 
-When multiple content types are declared, return the selected `contentType` with the response `payload`.
+When a response can be one of multiple content types, declare them in an array.
+The server handler must specify the `contentType` of the response.
 
 ```ts
 export const api = {
@@ -231,9 +234,8 @@ export const api = {
 		download: route
 			.get("/images/:id")
 			.params(z.object({ id: z.string() }))
-			.customResponse(200, {
+			.response(200, z.instanceof(Uint8Array), {
 				contentType: ["image/png", "image/jpeg"],
-				schema: z.instanceof(Uint8Array),
 			}),
 	},
 };
@@ -247,10 +249,8 @@ export const routes = {
 
 			return {
 				status: 200,
-				body: {
-					contentType: image.type,
-					payload: image.bytes,
-				},
+				body: image.bytes,
+				contentType: image.type,
 			};
 		}),
 	},
@@ -264,9 +264,9 @@ const response = await client.images.download({
 
 if (response.status === 200) {
 	if (response.contentType === "image/png") {
-		const pngBytes = await response.body.arrayBuffer();
+		const pngBytes = response.body;
 	} else {
-		const jpegBytes = await response.body.arrayBuffer();
+		const jpegBytes = response.body;
 	}
 }
 ```
@@ -337,64 +337,5 @@ for await (const token of tokens) {
 		controller.abort();
 		break;
 	}
-}
-```
-
-## Streaming Responses With Custom Content Type
-
-`.customStreamResponse()` keeps a custom-content response as a raw `Response`
-stream.
-
-```ts
-export const api = {
-	files: {
-		download: route
-			.get("/files/:id")
-			.params(z.object({ id: z.string() }))
-			.customStreamResponse(200, {
-				contentType: "application/octet-stream",
-				schema: z.instanceof(Uint8Array),
-			}),
-	},
-};
-```
-
-```ts
-export const routes = {
-	files: {
-		download: implement(api.files.download).handler(({ params, signal }) => ({
-			status: 200,
-			body: readLargeFile(params.id, signal),
-		})),
-	},
-};
-```
-
-```ts
-const controller = new AbortController();
-const response = await client.files.download(
-	{ params: { id: "file_1" } },
-	{ signal: controller.signal },
-);
-if (response.status !== 200) throw new Error("Unexpected status");
-const reader = response.body.body?.getReader();
-const file = await openWritableFile("archive.zip");
-let downloaded = 0;
-
-try {
-	while (reader) {
-		const { value, done } = await reader.read();
-		if (done) break;
-
-		downloaded += value.byteLength;
-		await file.write(value);
-
-		if (downloaded > maxDownloadBytes) {
-			controller.abort();
-			break;
-		}
-	}
-} finally {
-	await file.close();
 }
 ```

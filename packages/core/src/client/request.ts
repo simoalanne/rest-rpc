@@ -1,12 +1,5 @@
-import {
-	isCustomBody,
-	isFormBody,
-	isMultipartBody,
-	isNoBody,
-} from "../contract/body.ts";
 import type { RouteDeclaration } from "../contract/contract.ts";
 import { replacePathParams } from "../contract/path.ts";
-import { isJsonQuery } from "../contract/request.ts";
 import type { GroupedRequestInput } from "./requestInput.ts";
 import { getNextFetchTags } from "./nextFetchTags.ts";
 import type { ClientRequestRoute } from "./requestRoute.ts";
@@ -41,10 +34,8 @@ export const takesRequestInput = (route: ClientRequestRoute) => {
 	if (request?.query || request?.params || request?.headers) {
 		return true;
 	}
-	if (isFormBody(request?.body)) return true;
-	if (isMultipartBody(request?.body)) return true;
-	if (isCustomBody(request?.body)) return true;
-	return Boolean(request?.body && !isNoBody(request.body));
+	if (request?.contentType !== undefined) return true;
+	return Boolean(request?.body);
 };
 
 const findHeader = (headers: Record<string, string>, name: string) =>
@@ -64,13 +55,16 @@ const normalizeHeaders = (headers: Record<string, string> | undefined) =>
 export const assertNoContentTypeHeader = (headers: Record<string, string>) => {
 	if (hasHeader(headers, "content-type")) {
 		throw new Error(
-			'ApiClient getGlobalHeaders() must not return a "content-type" header. Use customBody({ schema, contentType }) on the route declaration instead.',
+			'ApiClient getGlobalHeaders() must not return a "content-type" header. Pass the content type to body(schema, { contentType }) on the route declaration instead.',
 		);
 	}
 };
 
+const normalizeContentType = (contentType: string) =>
+	contentType.split(";")[0]?.trim().toLowerCase();
+
 export const isJsonContentType = (contentType: string) =>
-	contentType.split(";")[0]?.trim().toLowerCase() === "application/json";
+	normalizeContentType(contentType) === "application/json";
 
 export const serializeCustomBody = (body: unknown, contentType: string) =>
 	isJsonContentType(contentType)
@@ -149,43 +143,29 @@ const serializeParams = (
 };
 
 const serializeQuery = (route: ClientRequestRoute, query: unknown) => {
-	const queryValues = isJsonQuery(route.request?.query)
-		? { query }
-		: (query ?? {});
-	const entries = Object.entries(queryValues).flatMap(([key, value]) => {
-		if (!isJsonQuery(route.request?.query) && Array.isArray(value)) {
-			return value.map((item) => [`${key}[]`, String(item)]);
+	const searchParams = new URLSearchParams();
+	for (const [key, value] of Object.entries(query ?? {})) {
+		if (Array.isArray(value)) {
+			for (const item of value) {
+				searchParams.append(`${key}[]`, String(item));
+			}
+			continue;
 		}
-		const stringValue = isJsonQuery(route.request?.query)
-			? stringifyJsonQueryValue(route, value)
-			: value === undefined
-				? undefined
-				: String(value);
-		return stringValue === undefined ? [] : [[key, stringValue]];
-	});
 
-	const search = new URLSearchParams(entries).toString();
-	return search ? `?${search}` : "";
-};
-
-const stringifyJsonQueryValue = (route: ClientRequestRoute, value: unknown) => {
-	if (value === undefined) return undefined;
-	try {
-		const json = JSON.stringify(value);
-		if (json === undefined) return undefined;
-		return json;
-	} catch (error) {
-		throw new Error(
-			`Invalid JSON query for ${route.method} ${route.path}. Expected a JSON-serializable value.`,
-			{ cause: error },
-		);
+		if (value !== undefined) {
+			searchParams.append(key, String(value));
+		}
 	}
+
+	const search = searchParams.toString();
+	return search ? `?${search}` : "";
 };
 
 export const constructBaseRequest = (
 	baseUrl: string,
 	route: ClientRequestRoute,
 	args: GroupedRequestInput | undefined,
+	selectedContentType?: string,
 ): {
 	url: string;
 	body?: BodyInit | null;
@@ -196,47 +176,47 @@ export const constructBaseRequest = (
 	if (!args) return { url: urlBase };
 
 	const { body, query, params, headers } = args;
-	const routeBody = route.request?.body;
 
 	urlBase = `${baseUrl}${serializeParams(route, params)}${serializeQuery(route, query)}`;
 
-	if (isFormBody(routeBody)) {
+	if (route.request?.contentType !== undefined) {
+		if (
+			Array.isArray(route.request.contentType) &&
+			selectedContentType === undefined
+		) {
+			throw new Error(
+				`A contentType option is required for ${route.method} ${route.path}.`,
+			);
+		}
+		const contentType =
+			selectedContentType ??
+			(Array.isArray(route.request.contentType)
+				? undefined
+				: (route.request.contentType as string));
+
+		const normalizedContentType = contentType
+			? normalizeContentType(contentType)
+			: undefined;
 		return {
 			url: urlBase,
-			body: serializeFormBody(
-				route,
-				body as Record<string, unknown> | undefined,
-			),
-			headers: stringifyHeaders(route, headers),
-		};
-	}
-
-	if (isMultipartBody(routeBody)) {
-		return {
-			url: urlBase,
-			body: serializeMultipartBody(
-				route,
-				body as Record<string, unknown> | undefined,
-			),
-			headers: stringifyHeaders(route, headers),
-		};
-	}
-
-	if (isCustomBody(routeBody)) {
-		const bodyPayload = body;
-		const { contentType, payload } = Array.isArray(routeBody.contentType)
-			? (bodyPayload as { contentType: string; payload: unknown })
-			: {
-					contentType: routeBody.contentType as string | undefined,
-					payload: bodyPayload,
-				};
-
-		return {
-			url: urlBase,
-			body: contentType
-				? serializeCustomBody(payload, contentType)
-				: (payload as BodyInit | null | undefined),
-			contentType,
+			body:
+				normalizedContentType === "application/x-www-form-urlencoded"
+					? serializeFormBody(
+							route,
+							body as Record<string, unknown> | undefined,
+						)
+					: normalizedContentType === "multipart/form-data"
+						? serializeMultipartBody(
+								route,
+								body as Record<string, unknown> | undefined,
+							)
+						: contentType
+							? serializeCustomBody(body, contentType)
+							: (body as BodyInit | null | undefined),
+			contentType:
+				normalizedContentType === "multipart/form-data"
+					? undefined
+					: contentType,
 			headers: stringifyHeaders(route, headers),
 		};
 	}
@@ -307,7 +287,12 @@ export const executeRequest = async <E extends RouteDeclaration>(
 		body,
 		contentType,
 		headers: requestHeaders,
-	} = constructBaseRequest(options.baseUrl, route, requestArgs);
+	} = constructBaseRequest(
+		options.baseUrl,
+		route,
+		requestArgs,
+		fetchOptions?.contentType,
+	);
 
 	const headers = (await options.getGlobalHeaders?.()) ?? {};
 	assertNoContentTypeHeader(headers);
@@ -317,10 +302,12 @@ export const executeRequest = async <E extends RouteDeclaration>(
 	);
 
 	try {
+		const { contentType: _contentType, ...requestFetchOptions } =
+			fetchOptions ?? {};
 		const init = addNextFetchTags(
 			{
 				...options.fetchOptions,
-				...fetchOptions,
+				...requestFetchOptions,
 				method: route.method,
 				body,
 				headers: {

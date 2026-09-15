@@ -19,8 +19,8 @@ export const createBodyParsingImplementations = () => {
 		textVariant: implementor.textVariant.handler((request) => ({
 			status: 200,
 			body: {
-				contentType: request.body.contentType,
-				body: request.body.payload,
+				contentType: request.contentType,
+				body: request.body,
 			},
 		})),
 		customJson: implementor.customJson.handler((request) => ({
@@ -28,13 +28,6 @@ export const createBodyParsingImplementations = () => {
 			body: {
 				count: request.body.count,
 				ok: request.body.nested.ok,
-			},
-		})),
-		rawUrlEncoded: implementor.rawUrlEncoded.handler((request) => ({
-			status: 200,
-			body: {
-				title: request.body.get("title") ?? "",
-				remember: request.body.get("remember") ?? undefined,
 			},
 		})),
 		formUrlEncoded: implementor.formUrlEncoded.handler((request) => ({

@@ -56,7 +56,64 @@ describe("route builder runtime", () => {
 			.metadata({ scope: "write" })
 			.openAPI({ tags: ["Items"] });
 		assert.equal(declaration["~restrpc"].request?.body, schema);
-		assert.equal(declaration["~restrpc"].responses[201], schema);
+		assert.equal(
+			declaration["~restrpc"].request?.contentType,
+			"application/json",
+		);
+		assert.equal(declaration["~restrpc"].responses[201].body, schema);
+		assert.equal(
+			declaration["~restrpc"].responses[201].contentType,
+			"application/json",
+		);
+	});
+
+	it("stores request and response options beside their schemas", () => {
+		const bodySchema = z.string();
+		const headers = z.object({ location: z.string() });
+		const declaration = route
+			.post("/items")
+			.body(bodySchema, { contentType: "text/plain" })
+			.response(201, bodySchema, { contentType: "text/plain", headers })
+			.response(204, undefined, { headers });
+
+		assert.deepEqual(declaration["~restrpc"].request, {
+			body: bodySchema,
+			contentType: "text/plain",
+		});
+		assert.deepEqual(declaration["~restrpc"].responses[201], {
+			body: bodySchema,
+			contentType: "text/plain",
+			headers,
+		});
+		assert.deepEqual(declaration["~restrpc"].responses[204], {
+			body: undefined,
+			headers,
+		});
+
+		const procedure = route
+			.input(bodySchema, { contentType: "text/plain" })
+			.output(bodySchema);
+		assert.deepEqual(procedure["~restrpc"].request, {
+			body: bodySchema,
+			contentType: "text/plain",
+		});
+
+		const stream = route.get("/events").streamResponse(200, bodySchema);
+		assert.deepEqual(stream["~restrpc"].responses[200], {
+			body: bodySchema,
+			contentType: "application/x-ndjson",
+		});
+	});
+
+	it("normalizes common response schemas into response declarations", () => {
+		const errorSchema = z.object({ message: z.string() });
+		const declaration = route
+			.with({ responses: { 500: errorSchema } })
+			.get("/items");
+
+		assert.deepEqual(declaration["~restrpc"].responses, {
+			500: { body: errorSchema, contentType: "application/json" },
+		});
 	});
 
 	it("returns a new declaration from every builder method", () => {
@@ -80,6 +137,6 @@ describe("route builder runtime", () => {
 		const procedureOutput = procedureInput.output(schema);
 		assert.notEqual(procedureOutput, procedureInput);
 		assert.deepEqual(procedureInput["~restrpc"].responses, {});
-		assert.equal(procedureOutput["~restrpc"].responses[200], schema);
+		assert.equal(procedureOutput["~restrpc"].responses[200].body, schema);
 	});
 });

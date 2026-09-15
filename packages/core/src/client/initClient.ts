@@ -6,21 +6,20 @@ import {
 	fetchSuccess,
 	type RouteRequestFn,
 } from "./response.ts";
-import {
-	createServerFirstClient,
-	type ServerFirstClientFor,
-	type ServerFirstClientOptions,
-} from "./serverFirstClient.ts";
 import type { ApiClientFor, ApiClientOptions, FetchArgs } from "./types.ts";
 
-const createContractClient = <
+/**
+ * Creates a typed fetch client whose shape mirrors a contract.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client}
+ */
+export function initClient<
 	TContract extends Contract,
 	const TGlobalHeaders extends Record<string, string> = Record<never, string>,
 >(
 	contract: TContract,
 	options: ApiClientOptions<TGlobalHeaders>,
-): ApiClientFor<TContract, TGlobalHeaders> => {
-	const validateResponses = options.validateResponses ?? false;
+): ApiClientFor<TContract, TGlobalHeaders> {
 	const requestOptions: ExecuteRequestOptions = {
 		baseUrl: options.baseUrl,
 		fetch: options.fetch,
@@ -38,7 +37,14 @@ const createContractClient = <
 		routePath: readonly string[],
 		...args: FetchArgs
 	) =>
-		fetchRouteResponse(request, validateResponses, route, routePath, ...args);
+		fetchRouteResponse(
+			request,
+			route.source !== "generated" && (options.validateResponses ?? false),
+			options.bodyParser,
+			route,
+			routePath,
+			...args,
+		);
 
 	return mapContractRoutes(contract, (node, routePath) => {
 		if (node.kind === "procedure") {
@@ -47,10 +53,6 @@ const createContractClient = <
 				path: `/${routePath.join("/")}`,
 			};
 			return (...args: FetchArgs) => {
-				if (!resolvedRoute.request?.body) {
-					return fetchSuccess(fetchResponse, resolvedRoute, routePath, ...args);
-				}
-
 				return fetchSuccess(
 					fetchResponse,
 					resolvedRoute,
@@ -63,47 +65,4 @@ const createContractClient = <
 
 		return (...args: FetchArgs) => fetchResponse(node, routePath, ...args);
 	}) as ApiClientFor<TContract, TGlobalHeaders>;
-};
-
-/**
- * Creates a typed fetch client from a contract or server implementation tree.
- *
- * @remarks Pass a contract value for contract-first APIs. For server-first
- * APIs, pass the implementation tree as a type argument and provide only the
- * client options at runtime.
- *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client}
- * @see {@link https://rest-rpc.dev/docs/server-first/client#derive-routes-from-the-server}
- */
-export function initClient<
-	const TTree,
-	const TGlobalHeaders extends Record<string, string> = Record<never, string>,
->(
-	options: ServerFirstClientOptions<TGlobalHeaders>,
-): ServerFirstClientFor<TTree, TGlobalHeaders>;
-
-/**
- * Creates a typed fetch client whose shape mirrors a contract.
- *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client}
- */
-export function initClient<
-	TContract extends Contract,
-	const TGlobalHeaders extends Record<string, string> = Record<never, string>,
->(
-	contract: TContract,
-	options: ApiClientOptions<TGlobalHeaders>,
-): ApiClientFor<TContract, TGlobalHeaders>;
-
-export function initClient(
-	contractOrOptions: Contract | ServerFirstClientOptions,
-	maybeOptions?: ApiClientOptions,
-): unknown {
-	if (maybeOptions === undefined) {
-		return createServerFirstClient(
-			contractOrOptions as ServerFirstClientOptions,
-		);
-	}
-
-	return createContractClient(contractOrOptions as Contract, maybeOptions);
 }

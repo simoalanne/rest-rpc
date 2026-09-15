@@ -161,19 +161,13 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 					if (body instanceof Uint8Array) return new StreamableFile(body);
 					return String(body);
 				},
-				sendStream: ({ body, status, contentType, mode }) => {
+				sendStream: ({ body, status, contentType }) => {
 					adapter.status(res, status);
 					if (adapter.getType() === "express") {
-						return writeStreamResponse(
-							body,
-							rawResponse,
-							status,
-							contentType,
-							mode,
-						);
+						return writeStreamResponse(body, rawResponse, status, contentType);
 					}
 
-					return new StreamableFile(createNodeResponseStream(body, mode), {
+					return new StreamableFile(createNodeResponseStream(body), {
 						type: contentType,
 					});
 				},

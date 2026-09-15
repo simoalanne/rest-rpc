@@ -10,6 +10,8 @@ import {
 import { expectError, expectType } from "tsd";
 import { z } from "zod";
 
+expectError(initClient({ baseUrl: "https://example.test" }));
+
 const todoSchema = z.object({
 	id: z.string(),
 	title: z.string(),
@@ -27,6 +29,11 @@ const shorthandApi = {
 	todos: {
 		get: route.output(shorthandOutputSchema),
 		add: route.input(shorthandInputSchema).output(shorthandOutputSchema),
+		import: route
+			.input(shorthandInputSchema, {
+				contentType: ["text/plain", "text/markdown"],
+			})
+			.output(shorthandOutputSchema),
 	},
 };
 
@@ -52,6 +59,17 @@ expectError(
 	shorthandClient.todos.add({ title: "Write type tests", extra: true }),
 );
 expectError(shorthandClient.todos.get.fetch);
+shorthandClient.todos.import(
+	{ title: "Write type tests" },
+	{ contentType: "text/markdown" },
+);
+expectError(shorthandClient.todos.import({ title: "Write type tests" }));
+expectError(
+	shorthandClient.todos.import(
+		{ title: "Write type tests" },
+		{ contentType: "application/json" },
+	),
+);
 
 expectType<{ title: string }>(
 	null as unknown as ClientRequest<(typeof shorthandApi.todos.add)["~restrpc"]>,
@@ -174,28 +192,16 @@ expectError(
 expectError(
 	route.get("/items").headers(z.object({ "x-page": z.coerce.number() })),
 );
-expectError(
-	route.post("/forms").formBody(z.object({ count: z.coerce.number() })),
-);
-expectError(
-	route.post("/uploads").multipartBody(z.object({ count: z.coerce.number() })),
-);
-expectError(
-	route.post("/forms").formBody(schemaType<{ nested: { value: string } }>()),
-);
-expectError(
-	route
-		.post("/uploads")
-		.multipartBody(schemaType<{ metadata: { title: string } }>()),
-);
-
-route.post("/forms").formBody(z.object({ count: z.coerce.number<number>() }));
-route.post("/uploads").multipartBody(
+route.post("/forms").body(z.object({ count: z.coerce.number<number>() }), {
+	contentType: "application/x-www-form-urlencoded",
+});
+route.post("/uploads").body(
 	schemaType<{
 		file: Blob;
 		parts?: Array<Blob | string>;
 		title: string;
 	}>(),
+	{ contentType: "multipart/form-data" },
 );
 
 const groupedRequestApi = {
@@ -269,57 +275,12 @@ expectError(
 	}),
 );
 
-const jsonQueryApi = {
-	todos: {
-		jsonSearch: route
-			.get("/todos/json-search")
-			.jsonQuery(
-				z.object({
-					page: z.string().transform((value) => Number(value)),
-					filters: z.object({ tags: z.array(z.string()) }),
-				}),
-			)
-			.response(200, z.array(todoSchema)),
-		optionalJsonSearch: route
-			.get("/todos/optional-json-search")
-			.jsonQuery(z.object({ page: z.number() }).optional())
-			.response(200, z.array(todoSchema)),
-	},
-};
-
-const jsonQueryClient = initClient(jsonQueryApi, {
-	baseUrl: "https://example.test",
-});
-
-jsonQueryClient.todos
-	.jsonSearch({
-		query: {
-			page: "1",
-			filters: { tags: ["api"] },
-		},
-	})
-	.then((response) => {
-		if (response.status !== 200) throw new Error("Unexpected status");
-		expectType<Array<{ id: string; title: string }>>(response.body);
-	});
-expectError(jsonQueryClient.todos.jsonSearch({ query: { page: "1" } }));
-expectError(jsonQueryClient.todos.jsonSearch());
-jsonQueryClient.todos
-	.optionalJsonSearch({ query: undefined })
-	.then((response) => {
-		if (response.status !== 200) throw new Error("Unexpected status");
-		expectType<Array<{ id: string; title: string }>>(response.body);
-	});
-expectError(jsonQueryClient.todos.optionalJsonSearch({}));
-expectError(jsonQueryClient.todos.optionalJsonSearch());
-
 const responseApi = {
 	todos: {
 		create: route
 			.post("/todos")
 			.body(z.object({ title: z.string() }))
-			.response(201, {
-				body: todoSchema,
+			.response(201, todoSchema, {
 				headers: z.object({
 					location: z.string(),
 					"x-next-cursor": z.string().optional(),
@@ -464,14 +425,9 @@ expectError(streamResponseClient.todos.events.fetch);
 
 const csvResponseApi = {
 	todos: {
-		exportCsv: route.get("/todos.csv").customResponse(200, {
-			contentType: "text/csv",
-			schema: z.string(),
-		}),
-		exportCsvStream: route.get("/todos-stream.csv").customStreamResponse(200, {
-			contentType: "text/csv",
-			schema: z.string(),
-		}),
+		exportCsv: route
+			.get("/todos.csv")
+			.response(200, z.string(), { contentType: "text/csv" }),
 	},
 };
 
@@ -481,27 +437,23 @@ const csvResponseClient = initClient(csvResponseApi, {
 
 csvResponseClient.todos.exportCsv().then((response) => {
 	if (response.status !== 200) throw new Error("Unexpected status");
-	expectType<Response>(response.body);
+	expectType<string>(response.body);
 });
 
 csvResponseClient.todos.exportCsv().then((response) => {
 	if (response.status === 200) {
 		expectType<"text/csv">(response.contentType);
-		expectType<Response>(response.body);
+		expectType<string>(response.body);
 	}
-});
-
-csvResponseClient.todos.exportCsvStream().then((response) => {
-	if (response.status !== 200) throw new Error("Unexpected status");
-	expectType<Response>(response.body);
 });
 
 const imageResponseApi = {
 	todos: {
-		exportImage: route.get("/todos/image").customResponse(200, {
-			contentType: ["image/png", "image/jpeg"],
-			schema: z.instanceof(Uint8Array),
-		}),
+		exportImage: route
+			.get("/todos/image")
+			.response(200, z.instanceof(Uint8Array), {
+				contentType: ["image/png", "image/jpeg"],
+			}),
 	},
 };
 
@@ -511,13 +463,13 @@ const imageResponseClient = initClient(imageResponseApi, {
 
 imageResponseClient.todos.exportImage().then((response) => {
 	if (response.status !== 200) throw new Error("Unexpected status");
-	expectType<Response>(response.body);
+	expectType<Uint8Array<ArrayBuffer>>(response.body);
 });
 
 imageResponseClient.todos.exportImage().then((response) => {
 	if (response.status === 200) {
 		expectType<"image/png" | "image/jpeg">(response.contentType);
-		expectType<Response>(response.body);
+		expectType<Uint8Array<ArrayBuffer>>(response.body);
 	}
 });
 
@@ -526,9 +478,8 @@ const customRequestApi = {
 		uploadImage: route
 			.post("/todos/:id/image")
 			.params(z.object({ id: z.string() }))
-			.customBody({
+			.body(z.instanceof(Uint8Array), {
 				contentType: ["image/png", "image/jpeg"],
-				schema: z.instanceof(Uint8Array),
 			})
 			.response(204),
 	},
@@ -539,32 +490,31 @@ const customRequestClient = initClient(customRequestApi, {
 });
 
 customRequestClient.todos
-	.uploadImage({
-		body: {
-			contentType: "image/png",
-			payload: new Uint8Array(),
+	.uploadImage(
+		{
+			body: new Uint8Array(),
+			params: { id: "todo-1" },
 		},
-		params: { id: "todo-1" },
-	})
+		{ contentType: "image/png" },
+	)
 	.then((response) => {
 		if (response.status !== 204) throw new Error("Unexpected status");
 		expectType<undefined>(response.body);
 	});
 expectError(
-	customRequestClient.todos.uploadImage({
-		body: {
-			contentType: "image/webp",
-			payload: new Uint8Array(),
-		},
-		params: { id: "todo-1" },
-	}),
+	customRequestClient.todos.uploadImage(
+		{ body: new Uint8Array(), params: { id: "todo-1" } },
+		{ contentType: "image/webp" },
+	),
 );
 
 const rawCustomRequestApi = {
 	todos: {
 		submitForm: route
 			.post("/todos/form")
-			.customBody(z.instanceof(URLSearchParams))
+			.body(z.instanceof(URLSearchParams), {
+				contentType: "application/x-www-form-urlencoded",
+			})
 			.response(204),
 	},
 };

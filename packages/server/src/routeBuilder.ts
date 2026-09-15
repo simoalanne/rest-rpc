@@ -26,7 +26,12 @@ if (!prototype.handler) {
 			return new this.constructor({
 				...(state.kind
 					? state
-					: { kind: "procedure", method: "POST", path: "", responses: {} }),
+					: {
+							kind: "procedure",
+							method: "POST",
+							path: "",
+							responses: {},
+						}),
 				handler,
 			});
 		},

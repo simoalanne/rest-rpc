@@ -3,10 +3,7 @@ export type {
 	HttpRouteResult,
 } from "./handleHttpRoute.ts";
 export { handleHttpRoute } from "./handleHttpRoute.ts";
-export type {
-	HttpRouteResultStreamMode,
-	HttpRouteResultWriter,
-} from "./handleHttpRouteResult.ts";
+export type { HttpRouteResultWriter } from "./handleHttpRouteResult.ts";
 export { handleHttpRouteResult } from "./handleHttpRouteResult.ts";
 export { createRouteMatcher, flattenRouteImplementations } from "./match.ts";
 export type { RouteMatch, RuntimeImplementationTree } from "./match.ts";

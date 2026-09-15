@@ -144,26 +144,6 @@ export const runBodyParsingSuite = (adapter: BodyParsingSuiteAdapter) => {
 			});
 		});
 
-		it("passes raw custom bodies without declared content types through fetch", async () => {
-			const client = initClient(bodyParsingContract, {
-				baseUrl: server.origin,
-			});
-
-			const responseResponse = await client.rawUrlEncoded({
-				body: new URLSearchParams([
-					["title", "Encoded form"],
-					["remember", "true"],
-				]),
-			});
-			assert.equal(responseResponse.status, 200);
-			const response = responseResponse.body;
-
-			assert.deepEqual(response, {
-				title: "Encoded form",
-				remember: "true",
-			});
-		});
-
 		it("parses urlencoded form request bodies as validated objects", async () => {
 			const client = initClient(bodyParsingContract, {
 				baseUrl: server.origin,

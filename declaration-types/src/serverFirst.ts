@@ -1,11 +1,7 @@
 // This verifies that declarations exported by downstream packages can name all
-// public server-first builder, implementation, handler, and client types.
+// public server-first builder, implementation, and handler types.
 
-import {
-	initClient,
-	route as contractRoute,
-	type as schemaType,
-} from "@rest-rpc/core";
+import { route as contractRoute, type as schemaType } from "@rest-rpc/core";
 import {
 	createRouteHandler as createFetchRouteHandler,
 	implement as implementFetch,
@@ -46,12 +42,6 @@ export const fetchShorthandImplementations = {
 		inferred: fetchShorthandInferredImplementation,
 	},
 };
-export const fetchShorthandClient = initClient<
-	typeof fetchShorthandImplementations
->({
-	baseUrl: "http://localhost",
-});
-
 export const unfinishedFetchBuilder = fetchRoute.post("/todos").body(todoInput);
 export const unfinishedNodeBuilder = nodeRoute
 	.post("/node-todos")
@@ -85,9 +75,3 @@ export const nodeRoutes = {
 
 export const fetchHandler = createFetchRouteHandler(fetchRoutes);
 export const nodeHandler = createNodeRouteHandler(nodeRoutes);
-export const fetchClient = initClient<typeof fetchRoutes>({
-	baseUrl: "http://localhost",
-});
-export const nodeClient = initClient<typeof nodeRoutes>({
-	baseUrl: "http://localhost",
-});

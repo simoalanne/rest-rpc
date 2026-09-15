@@ -43,6 +43,10 @@
 			"types": "./dist/contract/index.d.ts",
 			"import": "./dist/contract/index.js"
 		},
+		"./generate": {
+			"types": "./dist/generate/index.d.ts",
+			"import": "./dist/generate/index.js"
+		},
 		"./openapi": {
 			"types": "./dist/openapi/index.d.ts",
 			"import": "./dist/openapi/index.js"
@@ -58,9 +62,19 @@
 		"test": "node --test src/*.test.ts src/**/*.test.ts"
 	},
 	"devDependencies": {
+		"@types/node": "26.3.0",
 		"arktype": "^2.2.3",
+		"typescript": "5.9.3",
 		"valibot": "^1.4.2",
 		"zod": "^4.4.3"
+	},
+	"peerDependencies": {
+		"typescript": ">=5 <7"
+	},
+	"peerDependenciesMeta": {
+		"typescript": {
+			"optional": true
+		}
 	},
 	"tsd": {
 		"directory": "test-d"

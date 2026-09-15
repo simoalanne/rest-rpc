@@ -2,6 +2,7 @@ import type { HttpMethod } from "../contract/routeDeclaration.ts";
 
 export type ClientRequestDeclaration = {
 	body?: unknown;
+	contentType?: string | readonly string[];
 	query?: unknown;
 	params?: unknown;
 	headers?: unknown;

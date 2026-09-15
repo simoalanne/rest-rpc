@@ -15,5 +15,6 @@ describe("RouteResponseError", () => {
 		assert.equal(error.response, response);
 		assert.equal(error.status, 404);
 		assert.equal(error.body, undefined);
+		assert.equal(error.contentType, undefined);
 	});
 });

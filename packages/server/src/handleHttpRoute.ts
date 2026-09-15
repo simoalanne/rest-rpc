@@ -1,15 +1,9 @@
 import type {
-	CustomBody,
+	ResponseBodySchema,
 	ResponseDeclaration,
 	RouteDeclaration,
 } from "@rest-rpc/core/contract";
-import {
-	getResponseBody,
-	getRouteResponses,
-	isCustomBody,
-	isNoBody,
-	isStream,
-} from "@rest-rpc/core/contract";
+import { getRouteResponses } from "@rest-rpc/core/contract";
 import type { HttpHeaders } from "./headers.ts";
 import { RouteResponseError } from "./routeResponseError.ts";
 import { RequestValidationError } from "./validationErrors.ts";
@@ -25,15 +19,9 @@ import {
 } from "./validation.ts";
 
 type HttpRouteResultBase = {
-	responseKindMetadata?: boolean;
 	status: number;
 	headers?: HttpHeaders;
 };
-
-/**
- * Identifies how a stream route result should be written by an adapter.
- */
-export type HttpRouteResultStreamMode = "ndjson" | "raw";
 
 /**
  * A normalized HTTP route result ready for an adapter-specific writer.
@@ -49,8 +37,6 @@ export type HttpRouteResult =
 	| (HttpRouteResultBase & {
 			kind: "stream";
 			body: AsyncIterable<unknown>;
-			contentType?: string;
-			mode?: HttpRouteResultStreamMode;
 	  });
 
 /**
@@ -84,20 +70,16 @@ const classifyImplicitHttpResponse = (
 	}
 
 	const body = response.body;
-	const { contentType } = response;
-
 	if (isAsyncIterable(body)) {
 		return {
 			kind: "stream",
 			status: response.status,
 			headers,
 			body,
-			...(contentType !== undefined
-				? { contentType, mode: "raw" as const }
-				: { mode: "ndjson" as const }),
 		};
 	}
 
+	const { contentType } = response;
 	if (contentType !== undefined) {
 		return {
 			kind: "custom",
@@ -130,19 +112,26 @@ const getResponseSchema = (
 type DeclaredResponseEnvelope = {
 	status: number;
 	body?: unknown;
+	contentType?: string;
 	responseHeaders?: Record<string, unknown>;
 };
 
-const normalizeCustomBodyResult = async (schema: CustomBody, body: unknown) => {
+const normalizeCustomBodyResult = async (
+	schema: ResponseBodySchema,
+	declaredContentType: string | readonly string[],
+	body: unknown,
+	contentType: unknown,
+) => {
 	const result = resolveCustomResponseBody(
-		schema,
+		declaredContentType,
 		body,
+		contentType,
 		"Unsupported custom response body contentType.",
 	);
 
 	return {
 		contentType: result.contentType,
-		body: await validateResponseBody(schema, result.payload),
+		body: await validateResponseBody(schema, result.body),
 	};
 };
 
@@ -151,14 +140,14 @@ const normalizeResponseResult = async (
 	result: DeclaredResponseEnvelope,
 ): Promise<HttpRouteResult> => {
 	const schema = getResponseSchema(route, result.status);
-	const bodySchema = getResponseBody(schema);
+	const bodySchema = schema.body;
 	const declaredHeaders = await validateResponseHeaders(
 		schema,
 		result.responseHeaders,
 	);
 	const headers = declaredHeaders;
 
-	if (bodySchema && isNoBody(bodySchema)) {
+	if (bodySchema === undefined) {
 		return {
 			kind: "empty",
 			status: result.status,
@@ -166,26 +155,8 @@ const normalizeResponseResult = async (
 		};
 	}
 
-	if (bodySchema && isStream(bodySchema)) {
-		if (isCustomBody(bodySchema.schema)) {
-			const streamResult = resolveCustomResponseBody(
-				bodySchema.schema,
-				result.body,
-				"Unsupported custom stream response contentType.",
-			);
-
-			return {
-				kind: "stream",
-				status: result.status,
-				headers,
-				contentType: streamResult.contentType,
-				body: validateResponseStreamChunks(
-					streamResult.payload as AsyncIterable<unknown>,
-					bodySchema,
-				),
-			};
-		}
-
+	const declaredContentType = schema.contentType;
+	if (declaredContentType === "application/x-ndjson") {
 		return {
 			kind: "stream",
 			status: result.status,
@@ -197,10 +168,21 @@ const normalizeResponseResult = async (
 		};
 	}
 
-	if (bodySchema && isCustomBody(bodySchema)) {
+	if (declaredContentType === "application/json") {
+		return {
+			kind: "json",
+			status: result.status,
+			headers,
+			body: await validateResponseBody(bodySchema, result.body),
+		};
+	}
+
+	if (declaredContentType !== undefined) {
 		const customResult = await normalizeCustomBodyResult(
 			bodySchema,
+			declaredContentType,
 			result.body,
+			result.contentType,
 		);
 		return {
 			kind: "custom",
@@ -226,6 +208,7 @@ const normalizeRouteResponseError = async (
 	return normalizeResponseResult(route, {
 		status: error.status,
 		body: error.body,
+		contentType: error.contentType,
 		responseHeaders: error.responseHeaders,
 	});
 };
@@ -252,7 +235,12 @@ export async function handleHttpRoute<
 			...options.handlerFields,
 			...(route.kind === "procedure"
 				? route.request?.body
-					? { input: requestValidation.data.body }
+					? {
+							input: requestValidation.data.body,
+							...("contentType" in requestValidation.data
+								? { contentType: requestValidation.data.contentType }
+								: {}),
+						}
 					: {}
 				: requestValidation.data),
 			context: options.context,

@@ -1,10 +1,5 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import type {
-	CustomBodyInput,
-	CustomResponseInput,
-	FormBodySchema,
-	MultipartBodySchema,
-} from "./body.ts";
+import type { BodyOptions } from "./body.ts";
 import type {
 	CommonOpenApiRouteOptions,
 	HttpMethod,
@@ -12,7 +7,6 @@ import type {
 	OpenApiRouteOptions,
 	RouteDeclaration,
 	RouteMetadata,
-	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
 import { getPathParamNames } from "./path.ts";
 import type {
@@ -21,8 +15,9 @@ import type {
 	RequestQuerySchema,
 } from "./request.ts";
 import type {
-	RegularResponseDeclaration,
 	ResponseDeclaration,
+	ResponseOptions,
+	RouteResponses,
 } from "./response.ts";
 import type {
 	RootRouteBuilder,
@@ -31,7 +26,8 @@ import type {
 
 export type { RouteBuilderOptions } from "./routeBuilder.types.ts";
 
-type RouteBuilderState = Partial<RouteDeclaration> & RouteBuilderOptions;
+type RouteBuilderState = Partial<RouteDeclaration> &
+	Omit<RouteBuilderOptions, "responses">;
 
 const assertHttpStatusCode = (status: number) => {
 	if (!Number.isInteger(status) || status < 100 || status > 599) {
@@ -44,6 +40,16 @@ const assertStaticPathPrefix = (pathPrefix: string | undefined) => {
 		throw new Error("Route builder pathPrefix cannot include path params.");
 	}
 };
+
+const normalizeCommonResponses = (
+	responses: NonNullable<RouteBuilderOptions["responses"]>,
+): RouteResponses =>
+	Object.fromEntries(
+		Object.entries(responses).map(([status, body]) => [
+			status,
+			{ body, contentType: "application/json" },
+		]),
+	);
 
 const mergeUnique = (common: string[] = [], local: string[] = []) => [
 	...new Set([...common, ...local]),
@@ -141,7 +147,12 @@ export class RouteBuilder {
 
 	with(options: RouteBuilderOptions): RouteBuilder {
 		assertStaticPathPrefix(options.pathPrefix);
-		return new RouteBuilder({ ...this["~restrpc"], ...options });
+		const { responses, ...sharedOptions } = options;
+		return new RouteBuilder({
+			...this["~restrpc"],
+			...sharedOptions,
+			...(responses ? { responses: normalizeCommonResponses(responses) } : {}),
+		});
 	}
 
 	get(path: string): RouteBuilder {
@@ -164,47 +175,27 @@ export class RouteBuilder {
 		return new RouteBuilder(httpState(this["~restrpc"], "DELETE", path));
 	}
 
-	body(schema: StandardSchemaV1): RouteBuilder {
+	body(schema: StandardSchemaV1, options?: BodyOptions): RouteBuilder {
 		const state = this["~restrpc"];
 		return new RouteBuilder({
 			...state,
-			request: { ...state.request, body: schema },
+			request: {
+				...state.request,
+				body: schema,
+				contentType: options?.contentType ?? "application/json",
+			},
 		});
 	}
 
-	input(schema: StandardSchemaV1): RouteBuilder {
+	input(schema: StandardSchemaV1, options?: BodyOptions): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
 		return new RouteBuilder({
 			...state,
-			request: { ...state.request, body: schema },
-		});
-	}
-
-	formBody(schema: FormBodySchema): RouteBuilder {
-		const state = this["~restrpc"];
-		return new RouteBuilder({
-			...state,
-			request: { ...state.request, body: { kind: "formBody", schema } },
-		});
-	}
-
-	multipartBody(schema: MultipartBodySchema): RouteBuilder {
-		const state = this["~restrpc"];
-		return new RouteBuilder({
-			...state,
-			request: { ...state.request, body: { kind: "multipartBody", schema } },
-		});
-	}
-
-	customBody(input: CustomBodyInput): RouteBuilder {
-		const body: NonNullable<RouteRequestDeclaration["body"]> =
-			"~standard" in input
-				? { kind: "customBody", schema: input }
-				: { kind: "customBody", ...input };
-		const state = this["~restrpc"];
-		return new RouteBuilder({
-			...state,
-			request: { ...state.request, body },
+			request: {
+				...state.request,
+				body: schema,
+				contentType: options?.contentType ?? "application/json",
+			},
 		});
 	}
 
@@ -224,14 +215,6 @@ export class RouteBuilder {
 		return new RouteBuilder({
 			...state,
 			request: { ...state.request, query: schema },
-		});
-	}
-
-	jsonQuery(schema: StandardSchemaV1): RouteBuilder {
-		const state = this["~restrpc"];
-		return new RouteBuilder({
-			...state,
-			request: { ...state.request, query: { kind: "jsonQuery", schema } },
 		});
 	}
 
@@ -259,32 +242,38 @@ export class RouteBuilder {
 		});
 	}
 
-	response(status: number, schema?: RegularResponseDeclaration): RouteBuilder {
-		return addResponse(this["~restrpc"], status, schema ?? { kind: "noBody" });
+	response(
+		status: number,
+		schema?: StandardSchemaV1,
+		options?: ResponseOptions,
+	): RouteBuilder {
+		return addResponse(
+			this["~restrpc"],
+			status,
+			schema
+				? {
+						...options,
+						body: schema,
+						contentType: options?.contentType ?? "application/json",
+					}
+				: {
+						body: undefined,
+						...(options?.headers ? { headers: options.headers } : {}),
+					},
+		);
 	}
 
 	output(schema: StandardSchemaV1): RouteBuilder {
-		return addResponse(procedureState(this["~restrpc"]), 200, schema);
-	}
-
-	customResponse(status: number, input: CustomResponseInput): RouteBuilder {
-		return addResponse(this["~restrpc"], status, {
-			kind: "customBody",
-			...input,
+		return addResponse(procedureState(this["~restrpc"]), 200, {
+			body: schema,
+			contentType: "application/json",
 		});
 	}
 
 	streamResponse(status: number, schema: StandardSchemaV1): RouteBuilder {
-		return addResponse(this["~restrpc"], status, { kind: "stream", schema });
-	}
-
-	customStreamResponse(
-		status: number,
-		input: CustomResponseInput,
-	): RouteBuilder {
 		return addResponse(this["~restrpc"], status, {
-			kind: "stream",
-			schema: { kind: "customBody", ...input },
+			body: schema,
+			contentType: "application/x-ndjson",
 		});
 	}
 }

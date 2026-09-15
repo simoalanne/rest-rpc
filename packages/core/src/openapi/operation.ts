@@ -1,31 +1,16 @@
-import {
-	isCustomBody,
-	isFormBody,
-	isMultipartBody,
-	isNoBody,
-	isStream,
-} from "../contract/body.ts";
 import type { OpenApiResponseOptions } from "../contract/routeDeclaration.ts";
 import type { RouteDeclaration } from "../contract/routeDeclaration.ts";
 import type {
-	JsonQuery,
 	RequestHeadersDeclaration,
 	RequestBodySchema,
 } from "../contract/request.ts";
-import { getRequestHeaderSchemas, isJsonQuery } from "../contract/request.ts";
+import { getRequestHeaderSchemas } from "../contract/request.ts";
 import type {
 	ResponseDeclaration,
 	ResponseHeaders,
 } from "../contract/response.ts";
-import {
-	getResponseBody,
-	getResponseHeaders,
-	getRouteResponses,
-} from "../contract/response.ts";
-import {
-	isStandardSchema,
-	type StandardSchemaV1,
-} from "../standard-schema/index.ts";
+import { getRouteResponses } from "../contract/response.ts";
+import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 
 export const JSON_CONTENT_TYPE = "application/json";
 export const NDJSON_CONTENT_TYPE = "application/x-ndjson";
@@ -122,37 +107,12 @@ const createContent = (
 ) =>
 	Object.fromEntries(contentTypes.map((contentType) => [contentType, value]));
 
-const contentTypesForCustomBody = (schema: {
-	contentType?: string | readonly string[];
-}) =>
-	schema.contentType === undefined
-		? []
-		: Array.isArray(schema.contentType)
-			? schema.contentType
-			: [schema.contentType];
-
 export const createParameters = (
-	schema: StandardSchemaV1 | JsonQuery | undefined,
+	schema: StandardSchemaV1 | undefined,
 	location: "path" | "query" | "header",
 	options: CreateOperationOptions,
 ): OpenApiParameter[] => {
 	if (!schema) return [];
-
-	if (isJsonQuery(schema)) {
-		const jsonSchema = options.schemaConverter?.(schema.schema, "input") ?? {};
-
-		return [
-			{
-				name: "query",
-				in: "query",
-				content: {
-					[JSON_CONTENT_TYPE]: {
-						schema: jsonSchema,
-					},
-				},
-			},
-		];
-	}
 
 	const jsonSchema = options.schemaConverter?.(schema, "input") ?? {};
 	const properties = getSchemaProperties(jsonSchema);
@@ -189,32 +149,22 @@ export const createHeaderParameters = (
 };
 
 export const createRequestBody = (
-	schema: RequestBodySchema,
+	schema: RequestBodySchema | undefined,
 	converter: SchemaConverter | undefined,
+	customContentType?: string | readonly string[],
 ): OpenApiRequestBody | undefined => {
 	if (!schema) return undefined;
-	if (isNoBody(schema)) return undefined;
-	const contentTypes = isFormBody(schema)
-		? [FORM_URLENCODED_CONTENT_TYPE]
-		: isMultipartBody(schema)
-			? [MULTIPART_FORM_DATA_CONTENT_TYPE]
-			: isCustomBody(schema)
-				? contentTypesForCustomBody(schema)
-				: [JSON_CONTENT_TYPE];
+	const contentTypes =
+		customContentType !== undefined
+			? Array.isArray(customContentType)
+				? customContentType
+				: [customContentType as string]
+			: [JSON_CONTENT_TYPE];
 	if (contentTypes.length === 0) return undefined;
-	const bodySchema =
-		isCustomBody(schema) || isFormBody(schema) || isMultipartBody(schema)
-			? schema.schema
-			: schema;
-	const openApiSchema = isStandardSchema(bodySchema)
-		? (converter?.(bodySchema, "input") ?? {})
-		: undefined;
+	const openApiSchema = converter?.(schema, "input") ?? {};
 
 	return {
-		content: createContent(
-			contentTypes,
-			openApiSchema ? { schema: openApiSchema } : {},
-		),
+		content: createContent(contentTypes, { schema: openApiSchema }),
 	};
 };
 
@@ -224,51 +174,47 @@ export const createResponse = (
 	converter: SchemaConverter | undefined,
 	openApiResponse?: OpenApiResponseOptions,
 ): OpenApiResponse => {
-	const schema = getResponseBody(responseDeclaration);
+	const {
+		body: schema,
+		contentType,
+		headers: declaredHeaders,
+	} = responseDeclaration;
 	const headers = mergeResponseHeaders(
 		createOpenApiResponseHeaders(openApiResponse?.headers, converter),
-		createResponseHeaders(getResponseHeaders(responseDeclaration), converter),
+		createResponseHeaders(declaredHeaders, converter),
 	);
 
-	if (isNoBody(schema)) {
+	if (schema === undefined) {
 		return {
 			description: openApiResponse?.description ?? description,
 			...(headers ? { headers } : {}),
 		};
 	}
 
-	if (isStream(schema)) {
-		const contentTypes = isCustomBody(schema.schema)
-			? contentTypesForCustomBody(schema.schema)
-			: [NDJSON_CONTENT_TYPE];
-
+	if (contentType === NDJSON_CONTENT_TYPE) {
 		return {
 			description: openApiResponse?.description ?? description,
 			...(headers ? { headers } : {}),
-			content: Object.fromEntries(
-				contentTypes.map((contentType) => [
-					contentType,
-					{
-						schema: createStreamWireSchema(contentType),
-					},
-				]),
-			),
+			content: {
+				[NDJSON_CONTENT_TYPE]: {
+					schema: createStreamWireSchema(NDJSON_CONTENT_TYPE),
+				},
+			},
 		};
 	}
 
-	const contentTypes = isCustomBody(schema)
-		? contentTypesForCustomBody(schema)
-		: [JSON_CONTENT_TYPE];
-	const bodySchema = isCustomBody(schema) ? schema.schema : schema;
-	const openApiSchema = converter?.(bodySchema, "output") ?? {};
+	const contentTypes =
+		contentType !== undefined
+			? Array.isArray(contentType)
+				? contentType
+				: [contentType as string]
+			: [JSON_CONTENT_TYPE];
+	const openApiSchema = converter?.(schema, "output") ?? {};
 
 	return {
 		description: openApiResponse?.description ?? description,
 		...(headers ? { headers } : {}),
-		content: createContent(
-			contentTypes,
-			openApiSchema ? { schema: openApiSchema } : {},
-		),
+		content: createContent(contentTypes, { schema: openApiSchema }),
 	};
 };
 
@@ -294,10 +240,9 @@ export const createOpenApiResponseHeaders = (
 
 	return Object.fromEntries(
 		Object.entries(headers).map(([name, header]) => {
-			const schema = isStandardSchema(header) ? header : header.schema;
-			const description = isStandardSchema(header)
-				? undefined
-				: header.description;
+			const isSchema = "~standard" in header;
+			const schema = isSchema ? header : header.schema;
+			const description = isSchema ? undefined : header.description;
 
 			return [
 				name,
@@ -361,7 +306,11 @@ export const createOperation = (
 			options.transformParameter?.({ route, routePath, parameter }) ??
 			parameter,
 	);
-	const requestBody = createRequestBody(request?.body, options.schemaConverter);
+	const requestBody = createRequestBody(
+		request?.body,
+		options.schemaConverter,
+		request?.contentType,
+	);
 	const { extensions, ...openApi } = route.openApi ?? {};
 	const operation: OpenApiOperation = {
 		...openApi,

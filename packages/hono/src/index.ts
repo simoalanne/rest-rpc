@@ -62,7 +62,7 @@ export type RouteHandler<
  * @remarks Responses are inferred from the handler unless they are declared
  * before `.handler()`.
  *
- * @see {@link https://rest-rpc.dev/docs/server-first/server}
+ * @see {@link https://rest-rpc.dev/docs/server-first-quickstart#define-routes-and-handlers}
  * @see {@link https://rest-rpc.dev/docs/server/hono#framework-context}
  */
 export const route =

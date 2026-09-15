@@ -246,12 +246,9 @@ export type Api = typeof api;
 const shorthandFixtureSource = (routeCount, schemaLibrary, serverFirst) => {
 	const groups = shorthandGroupEntries(routeCount, serverFirst);
 	const clientEvaluations = shorthandClientEvaluations(routeCount);
-	const clientType = serverFirst
-		? "ServerFirstClientFor<typeof api>"
-		: "ApiClientFor<typeof api>";
 
 	return `${serverFirst ? schemaLibrary.serverFirstImportSource : schemaLibrary.importSource}
-import type { ApiClientFor, ServerFirstClientFor } from "@rest-rpc/core";
+import type { ApiClientFor } from "@rest-rpc/core";
 
 ${schemaLibrary.schemas}
 
@@ -259,7 +256,7 @@ export const api = {
 	${groups}
 };
 
-export type BenchmarkClient = ${clientType};
+export type BenchmarkClient = ApiClientFor<typeof api>;
 type EvaluateClientRoute<T> = T extends (...args: infer TArgs) => infer TResult
 	? [args: TArgs, result: Awaited<TResult>]
 	: never;

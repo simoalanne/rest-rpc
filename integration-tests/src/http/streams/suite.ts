@@ -102,31 +102,6 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 			await adapter.cancellationProbe.waitForFinalized();
 		});
 
-		it("does not JSON-frame raw custom streams", async () => {
-			const response = await client.rawText();
-
-			assert.equal(response.status, 200);
-			assert.match(
-				response.body.headers.get("content-type") ?? "",
-				/^text\/plain/,
-			);
-			assert.equal(await response.body.text(), '{"not":"ndjson"}\nplain tail');
-		});
-
-		it("streams raw binary custom chunks without text encoding", async () => {
-			const response = await client.rawBytes();
-
-			assert.equal(response.status, 200);
-			assert.match(
-				response.body.headers.get("content-type") ?? "",
-				/^application\/octet-stream/,
-			);
-			assert.deepEqual(
-				Array.from(new Uint8Array(await response.body.arrayBuffer())),
-				[0, 1, 127, 128, 255],
-			);
-		});
-
 		it("surfaces invalid streamed chunks while continuing client iteration", async () => {
 			const streamResponse = await client.invalid();
 			assert.equal(streamResponse.status, 200);

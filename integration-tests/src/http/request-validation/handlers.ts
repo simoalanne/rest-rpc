@@ -33,13 +33,5 @@ export const createRequestValidationImplementations = () => {
 			status: 200,
 			body: { value: request.query.value },
 		})),
-		jsonQuery: implementor.jsonQuery.handler((request) => ({
-			status: 200,
-			body: {
-				page: request.query.page,
-				includeArchived: request.query.includeArchived,
-				tags: request.query.filters.tags,
-			},
-		})),
 	};
 };

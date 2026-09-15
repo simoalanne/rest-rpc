@@ -1,6 +1,6 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
+import type { BodyContentType } from "./body.ts";
 import type {
-	JsonQuery,
 	RequestBodySchema,
 	RequestHeadersDeclaration,
 	RequestParamsSchema,
@@ -47,7 +47,8 @@ export type CommonOpenApiRouteOptions = Omit<
 /** Canonical request declaration nested on a route. */
 export type RouteRequestDeclaration = {
 	body?: RequestBodySchema;
-	query?: RequestQuerySchema | JsonQuery;
+	contentType?: BodyContentType;
+	query?: RequestQuerySchema;
 	params?: RequestParamsSchema;
 	headers?: RequestHeadersDeclaration;
 };
@@ -61,6 +62,7 @@ export type RouteRequestDeclaration = {
  * @see {@link https://rest-rpc.dev/docs/contract/declaration}
  */
 export type RouteDeclaration = {
+	source?: "generated";
 	kind: "http" | "procedure";
 	path: string;
 	method: HttpMethod;

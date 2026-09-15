@@ -8,41 +8,32 @@ export const bodyParsingContract = {
 		.response(200, z.object({ count: z.number(), title: z.string() })),
 	text: route
 		.post("/body-parsing/text")
-		.customBody({ contentType: "text/plain", schema: z.string() })
+		.body(z.string(), { contentType: "text/plain" })
 		.response(200, z.object({ body: z.string() })),
 	textVariant: route
 		.post("/body-parsing/text-variant")
-		.customBody({
-			contentType: ["text/plain", "text/markdown"],
-			schema: z.string(),
-		})
+		.body(z.string(), { contentType: ["text/plain", "text/markdown"] })
 		.response(200, z.object({ contentType: z.string(), body: z.string() })),
 	customJson: route
 		.post("/body-parsing/custom-json")
-		.customBody({
-			contentType: "application/json; charset=utf-8",
-			schema: z.object({
+		.body(
+			z.object({
 				count: z.number(),
 				nested: z.object({ ok: z.boolean() }),
 			}),
-		})
+			{ contentType: "application/json; charset=utf-8" },
+		)
 		.response(200, z.object({ count: z.number(), ok: z.boolean() })),
-	rawUrlEncoded: route
-		.post("/body-parsing/raw-url-encoded")
-		.customBody(z.instanceof(URLSearchParams))
-		.response(
-			200,
-			z.object({ title: z.string(), remember: z.string().optional() }),
-		),
 	formUrlEncoded: route
 		.post("/body-parsing/form-url-encoded")
 		.query(z.object({ filters: z.array(z.string()).optional() }))
-		.formBody(
+		.body(
 			z.object({
 				count: z.coerce.number<number>(),
 				title: z.string(),
 				tags: z.array(z.string()).optional(),
 			}),
+			{ contentType: "application/x-www-form-urlencoded" },
 		)
 		.response(
 			200,
@@ -55,9 +46,8 @@ export const bodyParsingContract = {
 		),
 	binary: route
 		.post("/body-parsing/binary")
-		.customBody({
+		.body(z.instanceof(Uint8Array), {
 			contentType: "application/octet-stream",
-			schema: z.instanceof(Uint8Array),
 		})
 		.response(
 			200,

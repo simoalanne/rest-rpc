@@ -101,29 +101,4 @@ describe("Next fetch tags", () => {
 			],
 		);
 	});
-
-	it("serializes JSON query values in grouped request segments", () => {
-		const groupedRoute = route;
-		const apiContract = {
-			items: {
-				list: groupedRoute
-					.get("/items")
-					.jsonQuery(type<{ page: number; filters: { tag: string } }>())
-					.response(204),
-			},
-		};
-
-		assert.deepEqual(
-			getNextFetchTags(apiContract.items.list, ["items", "list"], {
-				query: {
-					page: 2,
-					filters: { tag: "open" },
-				},
-			}),
-			[
-				"rest-rpc:items.list:query:%7B%22filters%22%3A%7B%22tag%22%3A%22open%22%7D%2C%22page%22%3A2%7D",
-				"rest-rpc:items.list",
-			],
-		);
-	});
 });

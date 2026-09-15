@@ -23,8 +23,12 @@ This guide mirrors the [Quickstart](/docs/quickstart) guide, but with a server-f
 	<Step title="Define and Implement the server route">
 		Write server handlers with the adapter for your framework or runtime.
 	</Step>
+	<Step title="Generate the client contract">
+		Derive a runtime contract from the server route tree's type and a small
+		generation step.
+	</Step>
 	<Step title="Call it from the client">
-		Create a typed fetch client or TanStack Query helpers from the same
+		Create a typed fetch client or TanStack Query helpers from the generated
 		contract.
 	</Step>
 </Steps>
@@ -106,6 +110,37 @@ const server = createServer(async (request, response) => {
 server.listen(3000);
 ```
 
+## Generate the client contract
+
+The server route tree remains the source of truth. Generate a minimal runtime
+contract from its type before creating a client. This is a small in-process
+generation step and does not execute any code from the server implementation.
+
+```ts
+import { generateContractFromType } from "@rest-rpc/core/generate";
+import type { routes } from "./server";
+
+const contract = generateContractFromType<typeof routes>({
+	filePath: "./server.ts",
+	exportName: "routes",
+});
+```
+
+## Generation step limitations
+
+The generation step relies on the TypeScript compiler API and the filesystem, so
+keep these limitations in mind:
+
+- The project that imports `generateContractFromType` must use TypeScript 5 or 6. TypeScript 7 does not currently ship a compiler API. The rest of the
+  project can still use TypeScript 7 for project-wide checks.
+- Generation requires access to Node's `fs` module and the operating system
+  filesystem.
+- If the generated contract must be included in a browser bundle
+  or another filesystem-free runtime, use a macro to inline the generated code
+  at build time. [Bun supports macros natively](https://bun.com/docs/bundler/macros);
+  other runtimes and bundlers can use a package such as
+  [`unplugin-macros`](https://github.com/unplugin/unplugin-macros).
+
 ## Create a Client
 
 <Tabs>
@@ -114,13 +149,19 @@ server.listen(3000);
 
 ```ts
 import { initClient } from "@rest-rpc/core";
+import { generateContractFromType } from "@rest-rpc/core/generate";
 import type { routes } from "./server";
 
-const client = initClient<typeof routes>({
+const contract = generateContractFromType<typeof routes>({
+	filePath: "./server.ts",
+	exportName: "routes",
+});
+
+const client = initClient(contract, {
 	baseUrl: "https://api.example.com",
 });
 
-const response = await client.$post("/todos", {
+const response = await client.todos.create({
 	body: { title: "Ship v1" },
 });
 const todo = response.body;
@@ -132,14 +173,20 @@ const todo = response.body;
 ```ts
 import { createTanstackQueryHelpers } from "@rest-rpc/tanstack-query";
 import { useMutation } from "@tanstack/react-query";
+import { generateContractFromType } from "@rest-rpc/core/generate";
 import type { routes } from "./server";
 
-const tq = createTanstackQueryHelpers<typeof routes>({
+const contract = generateContractFromType<typeof routes>({
+	filePath: "./server.ts",
+	exportName: "routes",
+});
+
+const tq = createTanstackQueryHelpers(contract, {
 	baseUrl: "http://localhost:3000",
 });
 
 const createTodo = useMutation(
-	tq.$post("/todos").mutationOptions({
+	tq.todos.create.mutationOptions({
 		onSuccess(response) {
 			console.log(response.body.id);
 		},
@@ -156,9 +203,6 @@ createTodo.mutate({
 
 ## Next Steps
 
-- [Server-first Server](/docs/server-first/server) covers request and response
-  inference.
-- [Server-first Client](/docs/server-first/client) covers the client API differences compared to contract-first.
 - [HTTP Requests](/docs/http-requests) and [HTTP Responses](/docs/http-responses)
   cover behavior shared with contract-first routes.
 - [Contract-first Quickstart](/docs/quickstart) covers the contract-first approach.

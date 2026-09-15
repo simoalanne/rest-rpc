@@ -151,6 +151,38 @@ describe("handleHttpRoute", () => {
 		});
 	});
 
+	it("passes decoded custom procedure input and its content type", async () => {
+		const declaration = coreRoute
+			.input(z.object({ title: z.string() }), {
+				contentType: "application/x-www-form-urlencoded",
+			})
+			.output(z.object({ title: z.string() }))["~restrpc"];
+		const result = await handleHttpRoute(
+			declaration,
+			(request) => {
+				assert.deepEqual(request, {
+					input: { title: "Write docs" },
+					contentType: "application/x-www-form-urlencoded",
+					context: {},
+					route: declaration,
+				});
+				return { title: "Write docs" };
+			},
+			{
+				request: {
+					body: new URLSearchParams([["title", "Write docs"]]),
+					headers: {
+						"content-type": "application/x-www-form-urlencoded",
+					},
+				},
+				handlerFields: {},
+				context: {},
+			},
+		);
+
+		assert.equal(result.status, 200);
+	});
+
 	it("rethrows user handler errors unchanged", async () => {
 		const expected = new Error("boom");
 		await assert.rejects(
@@ -222,8 +254,7 @@ describe("handleHttpRoute", () => {
 
 	it("normalizes declared response headers", async () => {
 		const result = await handleHttpRoute(
-			coreRoute.get("/todos").response(200, {
-				body: z.object({ id: z.string() }),
+			coreRoute.get("/todos").response(200, z.object({ id: z.string() }), {
 				headers: z.object({
 					etag: z.string(),
 					"x-optional": z.string().optional(),
@@ -343,10 +374,9 @@ describe("handleHttpRoute", () => {
 describe("handleHttpRoute custom responses", () => {
 	it("normalizes custom single bodies after validating without serializing them", async () => {
 		const result = await handleHttpRoute(
-			coreRoute.get("/report.csv").customResponse(200, {
-				contentType: "text/csv",
-				schema: z.string(),
-			})["~restrpc"],
+			coreRoute
+				.get("/report.csv")
+				.response(200, z.string(), { contentType: "text/csv" })["~restrpc"],
 			() => ({ status: 200, body: "id,title\n1,First\n" }),
 			{
 				request: {},
@@ -363,16 +393,13 @@ describe("handleHttpRoute custom responses", () => {
 
 	it("normalizes custom response bodies with selected content types", async () => {
 		const result = await handleHttpRoute(
-			coreRoute.get("/images/:id").customResponse(200, {
+			coreRoute.get("/images/:id").response(200, z.string(), {
 				contentType: ["image/png", "image/jpeg"],
-				schema: z.string(),
 			})["~restrpc"],
 			() => ({
 				status: 200,
-				body: {
-					contentType: "image/jpeg",
-					payload: "jpeg bytes",
-				},
+				body: "jpeg bytes",
+				contentType: "image/jpeg",
 			}),
 			{
 				request: {},
@@ -385,34 +412,5 @@ describe("handleHttpRoute custom responses", () => {
 		assert.equal(result.status, 200);
 		assert.equal(result.contentType, "image/jpeg");
 		assert.equal(result.body, "jpeg bytes");
-	});
-
-	it("normalizes custom streamed bodies after validating without framing chunks", async () => {
-		async function* rows() {
-			yield "id,title\n";
-			yield "1,First\n";
-		}
-
-		const result = await handleHttpRoute(
-			coreRoute.get("/report.csv").customStreamResponse(200, {
-				contentType: "text/csv",
-				schema: z.string(),
-			})["~restrpc"],
-			() => ({ status: 200, body: rows() }),
-			{
-				request: {},
-				handlerFields: {},
-				context: {},
-			},
-		);
-
-		assert.equal(result.kind, "stream");
-		assert.equal(result.status, 200);
-		assert.equal(result.contentType, "text/csv");
-
-		const chunks = [];
-		for await (const chunk of result.body) chunks.push(chunk);
-
-		assert.deepEqual(chunks, ["id,title\n", "1,First\n"]);
 	});
 });

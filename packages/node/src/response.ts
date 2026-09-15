@@ -1,35 +1,24 @@
 import type { ServerResponse } from "node:http";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import {
-	handleHttpRouteResult,
-	type HttpRouteResult,
-	type HttpRouteResultStreamMode,
-} from "@rest-rpc/server";
+import { handleHttpRouteResult, type HttpRouteResult } from "@rest-rpc/server";
 
-const formatResponseStreamChunk = (
-	chunk: unknown,
-	mode: HttpRouteResultStreamMode,
-) => {
-	if (mode === "ndjson") return `${JSON.stringify(chunk)}\n`;
-	return chunk instanceof Uint8Array ? chunk : String(chunk);
-};
+const formatResponseStreamChunk = (chunk: unknown) =>
+	`${JSON.stringify(chunk)}\n`;
 
 const frameResponseStream = async function* (
 	body: AsyncIterable<unknown>,
-	mode: HttpRouteResultStreamMode,
 ): AsyncIterableIterator<unknown> {
 	for await (const chunk of body) {
-		yield formatResponseStreamChunk(chunk, mode);
+		yield formatResponseStreamChunk(chunk);
 	}
 };
 
 /** Creates a Node readable stream with rest-rpc response framing. */
 export function createNodeResponseStream(
 	body: AsyncIterable<unknown>,
-	mode: HttpRouteResultStreamMode = "ndjson",
 ): Readable {
-	return Readable.from(frameResponseStream(body, mode));
+	return Readable.from(frameResponseStream(body));
 }
 
 /** Writes a response stream to a Node HTTP response. */
@@ -38,12 +27,11 @@ export async function writeStreamResponse(
 	res: ServerResponse,
 	status: number,
 	contentType = "application/x-ndjson",
-	mode: HttpRouteResultStreamMode = "ndjson",
 ): Promise<void> {
 	res.statusCode = status;
 	res.setHeader("content-type", contentType);
 	try {
-		await pipeline(createNodeResponseStream(body, mode), res);
+		await pipeline(createNodeResponseStream(body), res);
 	} catch (error) {
 		if ((error as NodeJS.ErrnoException).code !== "ERR_STREAM_PREMATURE_CLOSE")
 			throw error;
@@ -74,7 +62,7 @@ export function writeNodeResponse(
 			res.statusCode = status;
 			res.end(body instanceof Uint8Array ? body : String(body));
 		},
-		sendStream: ({ status, body, contentType, mode }) =>
-			writeStreamResponse(body, res, status, contentType, mode),
+		sendStream: ({ status, body, contentType }) =>
+			writeStreamResponse(body, res, status, contentType),
 	});
 }

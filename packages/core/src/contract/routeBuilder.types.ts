@@ -1,17 +1,5 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import type {
-	CustomBody,
-	CustomBodyContentType,
-	CustomResponseBody,
-	CustomResponseInput,
-	CustomResponseValue,
-	FormBody,
-	FormBodySchema,
-	MultipartBody,
-	MultipartBodySchema,
-	NoBody,
-	Stream,
-} from "./body.ts";
+import type { BodyOptions } from "./body.ts";
 import type {
 	CommonOpenApiRouteOptions,
 	HttpMethod,
@@ -20,21 +8,37 @@ import type {
 	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
 import type {
-	JsonQuery,
 	RequestHeadersDeclaration,
 	RequestHeadersSchema,
 	RequestParamsSchema,
 	RequestQuerySchema,
 } from "./request.ts";
-import type { RegularResponseDeclaration, RouteResponses } from "./response.ts";
+import type { ResponseOptions } from "./response.ts";
 
 type EmptyObject = Record<never, never>;
+type JsonContentType = "application/json";
+type NdjsonContentType = "application/x-ndjson";
+
+type ContentTypeFor<TOptions> = TOptions extends BodyOptions
+	? TOptions["contentType"]
+	: JsonContentType;
+
+type ResponseFor<TSchema, TOptions> = TSchema extends StandardSchemaV1
+	? {
+			body: TSchema;
+			contentType: ContentTypeFor<TOptions>;
+		} & (TOptions extends { headers: infer THeaders }
+			? { headers: THeaders }
+			: EmptyObject)
+	: { body: undefined } & (TOptions extends { headers: infer THeaders }
+			? { headers: THeaders }
+			: EmptyObject);
 
 /** Defaults applied to routes created from a configured builder. */
 export type RouteBuilderOptions = {
 	pathPrefix?: string;
 	metadata?: RouteMetadata;
-	responses?: RouteResponses;
+	responses?: Record<number, StandardSchemaV1>;
 	headers?: RequestHeadersSchema;
 	openApi?: CommonOpenApiRouteOptions;
 };
@@ -100,6 +104,21 @@ type WithResponse<
 	responses: TState["responses"] & Record<TStatus, TResponse>;
 	openApi: TState["openApi"];
 	used: TState["used"];
+};
+
+type WithProcedureInput<
+	TState extends BuilderState,
+	TSchema extends StandardSchemaV1,
+	TOptions extends BodyOptions | undefined,
+> = {
+	route: TState["route"];
+	request: TState["request"] & {
+		body: TSchema;
+		contentType: ContentTypeFor<TOptions>;
+	};
+	responses: TState["responses"];
+	openApi: TState["openApi"];
+	used: TState["used"] | "input";
 };
 
 type MergeMetadata<
@@ -181,39 +200,20 @@ type ResponseMethods<
 	TState extends BuilderState,
 	TExtension extends BuilderExtension | never,
 > = {
-	/** Declares a response status and schema. @see {@link https://rest-rpc.dev/docs/contract/declaration#responses} */
+	/** Declares a response status, schema, and HTTP metadata. @see {@link https://rest-rpc.dev/docs/http-responses} */
 	response<
 		const TStatus extends number,
-		const TSchema extends RegularResponseDeclaration | undefined = undefined,
+		const TSchema extends StandardSchemaV1 | undefined = undefined,
+		const TOptions extends ResponseOptions | undefined = undefined,
 		const TPath extends string = string,
 		const TMetadata extends RouteMetadata | never = never,
 	>(
 		this: BuilderReceiver<TPath, TMetadata>,
 		status: TStatus,
 		schema?: TSchema,
+		options?: TOptions,
 	): RouteBuilderView<
-		WithResponse<
-			TState,
-			TStatus,
-			TSchema extends RegularResponseDeclaration ? TSchema : NoBody
-		>,
-		TExtension,
-		TPath,
-		TMetadata
-	>;
-	/** Declares a custom-content response. @see {@link https://rest-rpc.dev/docs/http-responses#response-with-custom-content-type} */
-	customResponse<
-		const TStatus extends number,
-		const TSchema extends StandardSchemaV1<unknown, CustomResponseValue>,
-		const TContentType extends CustomBodyContentType,
-		const TPath extends string = string,
-		const TMetadata extends RouteMetadata | never = never,
-	>(
-		this: BuilderReceiver<TPath, TMetadata>,
-		status: TStatus,
-		input: CustomResponseInput<TSchema, TContentType>,
-	): RouteBuilderView<
-		WithResponse<TState, TStatus, CustomResponseBody<TSchema, TContentType>>,
+		WithResponse<TState, TStatus, ResponseFor<TSchema, TOptions>>,
 		TExtension,
 		TPath,
 		TMetadata
@@ -229,27 +229,10 @@ type ResponseMethods<
 		status: TStatus,
 		schema: TSchema,
 	): RouteBuilderView<
-		WithResponse<TState, TStatus, Stream<TSchema>>,
-		TExtension,
-		TPath,
-		TMetadata
-	>;
-	/** Declares a custom-content response stream. @see {@link https://rest-rpc.dev/docs/http-responses#streaming-responses-with-custom-content-type} */
-	customStreamResponse<
-		const TStatus extends number,
-		const TSchema extends StandardSchemaV1<unknown, CustomResponseValue>,
-		const TContentType extends CustomBodyContentType,
-		const TPath extends string = string,
-		const TMetadata extends RouteMetadata | never = never,
-	>(
-		this: BuilderReceiver<TPath, TMetadata>,
-		status: TStatus,
-		input: CustomResponseInput<TSchema, TContentType>,
-	): RouteBuilderView<
 		WithResponse<
 			TState,
 			TStatus,
-			Stream<CustomResponseBody<TSchema, TContentType>>
+			{ body: TSchema; contentType: NdjsonContentType }
 		>,
 		TExtension,
 		TPath,
@@ -264,75 +247,23 @@ type BodyMethods<
 	TState,
 	"body",
 	{
-		/** Declares a JSON request body. @see {@link https://rest-rpc.dev/docs/http-requests#request-with-json-body} */
+		/** Declares a request body and its HTTP metadata. @see {@link https://rest-rpc.dev/docs/http-requests} */
 		body<
 			const TSchema extends StandardSchemaV1,
+			const TOptions extends BodyOptions | undefined = undefined,
 			const TPath extends string = string,
 			const TMetadata extends RouteMetadata | never = never,
 		>(
 			this: BuilderReceiver<TPath, TMetadata>,
 			schema: TSchema,
+			options?: TOptions,
 		): RouteBuilderView<
-			WithRequest<TState, "body", TSchema, "body">,
-			TExtension,
-			TPath,
-			TMetadata
-		>;
-		/** Declares a URL-encoded form body. @see {@link https://rest-rpc.dev/docs/http-requests#request-with-form-body} */
-		formBody<
-			const TSchema extends FormBodySchema,
-			const TPath extends string = string,
-			const TMetadata extends RouteMetadata | never = never,
-		>(
-			this: BuilderReceiver<TPath, TMetadata>,
-			schema: TSchema,
-		): RouteBuilderView<
-			WithRequest<TState, "body", FormBody<TSchema>, "body">,
-			TExtension,
-			TPath,
-			TMetadata
-		>;
-		/** Declares a multipart form body. @see {@link https://rest-rpc.dev/docs/http-requests#request-with-multipart-body} */
-		multipartBody<
-			const TSchema extends MultipartBodySchema,
-			const TPath extends string = string,
-			const TMetadata extends RouteMetadata | never = never,
-		>(
-			this: BuilderReceiver<TPath, TMetadata>,
-			schema: TSchema,
-		): RouteBuilderView<
-			WithRequest<TState, "body", MultipartBody<TSchema>, "body">,
-			TExtension,
-			TPath,
-			TMetadata
-		>;
-		/** Declares a custom-content request body. @see {@link https://rest-rpc.dev/docs/http-requests#request-with-custom-content-type} */
-		customBody<
-			const TSchema extends StandardSchemaV1,
-			const TPath extends string = string,
-			const TMetadata extends RouteMetadata | never = never,
-		>(
-			this: BuilderReceiver<TPath, TMetadata>,
-			schema: TSchema,
-		): RouteBuilderView<
-			WithRequest<TState, "body", CustomBody<TSchema, undefined>, "body">,
-			TExtension,
-			TPath,
-			TMetadata
-		>;
-		customBody<
-			const TSchema extends StandardSchemaV1,
-			const TContentType extends CustomBodyContentType,
-			const TPath extends string = string,
-			const TMetadata extends RouteMetadata | never = never,
-		>(
-			this: BuilderReceiver<TPath, TMetadata>,
-			input: {
-				schema: TSchema;
-				contentType: TContentType;
-			},
-		): RouteBuilderView<
-			WithRequest<TState, "body", CustomBody<TSchema, TContentType>, "body">,
+			WithRequest<
+				WithRequest<TState, "body", TSchema, "body">,
+				"contentType",
+				ContentTypeFor<TOptions>,
+				"body"
+			>,
 			TExtension,
 			TPath,
 			TMetadata
@@ -357,20 +288,6 @@ type RequestMethods<
 			schema: TSchema,
 		): RouteBuilderView<
 			WithRequest<TState, "query", TSchema, "query">,
-			TExtension,
-			TPath,
-			TMetadata
-		>;
-		/** Declares a JSON-encoded query value. @see {@link https://rest-rpc.dev/docs/contract/declaration#json-query} */
-		jsonQuery<
-			const TSchema extends StandardSchemaV1,
-			const TPath extends string = string,
-			const TMetadata extends RouteMetadata | never = never,
-		>(
-			this: BuilderReceiver<TPath, TMetadata>,
-			schema: TSchema,
-		): RouteBuilderView<
-			WithRequest<TState, "query", JsonQuery<TSchema>, "query">,
 			TExtension,
 			TPath,
 			TMetadata
@@ -475,11 +392,15 @@ type ProcedureMethods<
 	TState,
 	"input",
 	{
-		/** Declares the procedure's JSON input schema. */
-		input<const TSchema extends StandardSchemaV1>(
+		/** Declares the procedure's input schema and optional body media type. */
+		input<
+			const TSchema extends StandardSchemaV1,
+			const TOptions extends BodyOptions | undefined = undefined,
+		>(
 			schema: TSchema,
+			options?: TOptions,
 		): RouteBuilderView<
-			WithRequest<TState, "body", TSchema, "input">,
+			WithProcedureInput<TState, TSchema, TOptions>,
 			TExtension,
 			"",
 			never
@@ -494,7 +415,11 @@ type ProcedureMethods<
 			output<const TSchema extends StandardSchemaV1>(
 				schema: TSchema,
 			): RouteBuilderView<
-				WithResponse<UseMethod<TState, "output">, 200, TSchema>,
+				WithResponse<
+					UseMethod<TState, "output">,
+					200,
+					{ body: TSchema; contentType: JsonContentType }
+				>,
 				TExtension,
 				"",
 				never
@@ -524,9 +449,6 @@ export type RouteBuilderView<
 		Extract<TExtension, BuilderExtension>
 	>;
 
-type OptionValue<TOptions, TKey extends PropertyKey, TFallback> =
-	TOptions extends Record<TKey, infer TValue> ? TValue : TFallback;
-
 type RequestFor<TOptions> = TOptions extends {
 	headers: infer THeaders extends RequestHeadersSchema;
 }
@@ -551,13 +473,24 @@ type OpenApiFor<TOptions> = TOptions extends {
 	? OpenApiRouteOptions
 	: never;
 
+type ResponsesFor<TOptions> = TOptions extends {
+	responses: infer TResponses extends Record<number, StandardSchemaV1>;
+}
+	? {
+			[TStatus in keyof TResponses]: {
+				body: TResponses[TStatus];
+				contentType: JsonContentType;
+			};
+		}
+	: EmptyObject;
+
 type HttpStateFor<TOptions, TMethod extends HttpMethod> = {
 	route: {
 		readonly kind: "http";
 		readonly method: TMethod;
 	};
 	request: RequestFor<TOptions>;
-	responses: OptionValue<TOptions, "responses", EmptyObject>;
+	responses: ResponsesFor<TOptions>;
 	openApi: OpenApiFor<TOptions>;
 	used: never;
 };
@@ -574,10 +507,42 @@ type ProcedureState<TRequest, TResponses, TUsed extends BuilderMethod> = {
 };
 
 type HttpRootMethods<TOptions, TExtension extends BuilderExtension | never> = {
-	[TMethod in Lowercase<HttpMethod>]: <const TPath extends string>(
+	get<const TPath extends string>(
 		path: TPath,
-	) => RouteBuilderView<
-		HttpStateFor<TOptions, Uppercase<TMethod> & HttpMethod>,
+	): RouteBuilderView<
+		HttpStateFor<TOptions, "GET">,
+		TExtension,
+		PathFor<TOptions, TPath>,
+		MetadataFor<TOptions>
+	>;
+	post<const TPath extends string>(
+		path: TPath,
+	): RouteBuilderView<
+		HttpStateFor<TOptions, "POST">,
+		TExtension,
+		PathFor<TOptions, TPath>,
+		MetadataFor<TOptions>
+	>;
+	put<const TPath extends string>(
+		path: TPath,
+	): RouteBuilderView<
+		HttpStateFor<TOptions, "PUT">,
+		TExtension,
+		PathFor<TOptions, TPath>,
+		MetadataFor<TOptions>
+	>;
+	patch<const TPath extends string>(
+		path: TPath,
+	): RouteBuilderView<
+		HttpStateFor<TOptions, "PATCH">,
+		TExtension,
+		PathFor<TOptions, TPath>,
+		MetadataFor<TOptions>
+	>;
+	delete<const TPath extends string>(
+		path: TPath,
+	): RouteBuilderView<
+		HttpStateFor<TOptions, "DELETE">,
 		TExtension,
 		PathFor<TOptions, TPath>,
 		MetadataFor<TOptions>
@@ -585,11 +550,19 @@ type HttpRootMethods<TOptions, TExtension extends BuilderExtension | never> = {
 };
 
 type ProcedureRootMethods<TExtension extends BuilderExtension | never> = {
-	/** Declares the procedure's JSON input schema. */
-	input<const TInput extends StandardSchemaV1>(
+	/** Declares the procedure's input schema and optional body media type. */
+	input<
+		const TInput extends StandardSchemaV1,
+		const TOptions extends BodyOptions | undefined = undefined,
+	>(
 		schema: TInput,
+		options?: TOptions,
 	): RouteBuilderView<
-		ProcedureState<{ body: TInput }, EmptyObject, "input">,
+		ProcedureState<
+			{ body: TInput; contentType: ContentTypeFor<TOptions> },
+			EmptyObject,
+			"input"
+		>,
 		TExtension,
 		"",
 		never
@@ -598,7 +571,11 @@ type ProcedureRootMethods<TExtension extends BuilderExtension | never> = {
 	output<const TOutput extends StandardSchemaV1>(
 		schema: TOutput,
 	): RouteBuilderView<
-		ProcedureState<EmptyObject, { 200: TOutput }, "output">,
+		ProcedureState<
+			EmptyObject,
+			{ 200: { body: TOutput; contentType: JsonContentType } },
+			"output"
+		>,
 		TExtension,
 		"",
 		never

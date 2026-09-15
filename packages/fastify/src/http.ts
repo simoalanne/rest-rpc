@@ -94,11 +94,11 @@ export const registerFastifyHttpRoutes = (
 								.send(
 									body instanceof Uint8Array ? Buffer.from(body) : String(body),
 								),
-						sendStream: ({ body, status, contentType, mode }) =>
+						sendStream: ({ body, status, contentType }) =>
 							reply
 								.status(status)
 								.type(contentType)
-								.send(createNodeResponseStream(body, mode)),
+								.send(createNodeResponseStream(body)),
 					});
 				} catch (error) {
 					if (error instanceof RequestValidationError) {

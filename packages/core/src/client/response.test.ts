@@ -66,6 +66,7 @@ describe("ApiClient responses", () => {
 			status: 404,
 			headers: new Headers(),
 			body: { code: "not_found" },
+			responseHeaders: { "content-type": "application/json" },
 		});
 	});
 
@@ -85,8 +86,7 @@ describe("ApiClient responses", () => {
 				get: route
 					.get("/todos/:id")
 					.params(z.object({ id: z.string() }))
-					.response(200, {
-						body: z.object({ id: z.string() }),
+					.response(200, z.object({ id: z.string() }), {
 						headers: z.object({
 							etag: z.string(),
 							"x-count": z.coerce.number<number>(),
@@ -427,13 +427,12 @@ describe("ApiClient responses", () => {
 		assert.equal(response.body, undefined);
 	});
 
-	it("returns declared custom responses as native Response objects", async () => {
+	it("parses and validates declared custom text responses", async () => {
 		const apiContract = {
 			reports: {
-				csv: route.get("/reports.csv").customResponse(200, {
-					contentType: "text/csv",
-					schema: z.string(),
-				}),
+				csv: route
+					.get("/reports.csv")
+					.response(200, z.string(), { contentType: "text/csv" }),
 			},
 		};
 		captureFetch(
@@ -450,18 +449,41 @@ describe("ApiClient responses", () => {
 		const response = await client.reports.csv();
 
 		assert.equal(response.contentType, "text/csv");
-		assert.ok(response.body instanceof Response);
-		assert.equal(response.body.headers.get("content-type"), "text/csv");
-		assert.equal(await response.body.text(), "id,title\n1,First\n");
+		assert.equal(response.body, "id,title\n1,First\n");
 	});
 
-	it("returns selected content type metadata for custom response bodies", async () => {
+	it("uses a custom body parser for custom responses", async () => {
 		const apiContract = {
 			reports: {
-				image: route.get("/reports/image").customResponse(200, {
-					contentType: ["image/png", "image/jpeg"],
-					schema: z.instanceof(Uint8Array),
+				binaryText: route.get("/reports/custom").response(200, z.string(), {
+					contentType: "application/octet-stream",
 				}),
+			},
+		};
+		captureFetch(
+			new Response("custom value", {
+				headers: { "content-type": "application/octet-stream" },
+			}),
+		);
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+			bodyParser: (response) => response.text(),
+			validateResponses: true,
+		});
+
+		const response = await client.reports.binaryText();
+
+		assert.equal(response.body, "custom value");
+	});
+
+	it("returns normalized content type metadata for custom response bodies", async () => {
+		const apiContract = {
+			reports: {
+				image: route
+					.get("/reports/image")
+					.response(200, z.instanceof(Uint8Array), {
+						contentType: ["image/png", "image/jpeg"],
+					}),
 			},
 		};
 		captureFetch(
@@ -478,17 +500,15 @@ describe("ApiClient responses", () => {
 
 		assert.equal(response.status, 200);
 		assert.equal(response.contentType, "image/jpeg");
-		assert.ok(response.body instanceof Response);
-		assert.equal(await response.body.text(), "jpeg bytes");
+		assert.deepEqual(response.body, new TextEncoder().encode("jpeg bytes"));
 	});
 
-	it("rejects custom response bodies with mismatched content types", async () => {
+	it("uses the received content type when validation is disabled", async () => {
 		const apiContract = {
 			reports: {
-				csv: route.get("/reports.csv").customResponse(200, {
-					contentType: "text/csv",
-					schema: z.string(),
-				}),
+				csv: route
+					.get("/reports.csv")
+					.response(200, z.string(), { contentType: "text/csv" }),
 			},
 		};
 		captureFetch(
@@ -501,35 +521,12 @@ describe("ApiClient responses", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await assert.rejects(
-			() => client.reports.csv(),
-			/unsupported custom response content-type/,
-		);
-	});
-
-	it("returns declared custom stream responses as native Response objects", async () => {
-		const apiContract = {
-			reports: {
-				csv: route.get("/reports.csv").customStreamResponse(200, {
-					contentType: "text/csv",
-					schema: z.string(),
-				}),
-			},
-		};
-		captureFetch(
-			new Response("id,title\n1,First\n", {
-				status: 200,
-				headers: { "content-type": "text/csv" },
-			}),
-		);
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-
 		const response = await client.reports.csv();
-		assert.equal(response.status, 200);
 
-		assert.ok(response.body instanceof Response);
-		assert.equal(await response.body.text(), "id,title\n1,First\n");
+		assert.equal(response.status, 200);
+		assert.deepEqual(response.body, {});
+		assert.deepEqual(response.responseHeaders, {
+			"content-type": "application/json",
+		});
 	});
 });

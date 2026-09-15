@@ -31,14 +31,6 @@ runBodyParsingSuite(
 				express.json({ type: "application/json" }),
 			);
 			app.use(
-				bodyParsingContract.rawUrlEncoded["~restrpc"].path,
-				express.text({ type: "application/x-www-form-urlencoded" }),
-				(req: Request, _res: Response, next: NextFunction) => {
-					req.body = new URLSearchParams(req.body);
-					next();
-				},
-			);
-			app.use(
 				bodyParsingContract.formUrlEncoded["~restrpc"].path,
 				express.text({ type: "application/x-www-form-urlencoded" }),
 				(req: Request, _res: Response, next: NextFunction) => {

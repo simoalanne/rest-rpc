@@ -9,14 +9,6 @@ export const streamsContract = {
 	cancellable: route
 		.get("/streams/cancellable")
 		.streamResponse(200, eventSchema),
-	rawText: route.get("/streams/raw-text").customStreamResponse(200, {
-		contentType: "text/plain",
-		schema: z.string(),
-	}),
-	rawBytes: route.get("/streams/raw-bytes").customStreamResponse(200, {
-		contentType: "application/octet-stream",
-		schema: z.instanceof(Uint8Array),
-	}),
 	invalid: route.get("/streams/invalid").streamResponse(200, eventSchema),
 	throwsBeforeFirstChunk: route
 		.get("/streams/throws-before-first-chunk")

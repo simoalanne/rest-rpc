@@ -124,20 +124,6 @@ export const createStreamsImplementations = (
 				}
 			})(),
 		})),
-		rawText: implementor.rawText.handler(() => ({
-			status: 200,
-			body: (async function* () {
-				yield '{"not":"ndjson"}\n';
-				yield "plain tail";
-			})(),
-		})),
-		rawBytes: implementor.rawBytes.handler(() => ({
-			status: 200,
-			body: (async function* () {
-				yield new Uint8Array([0, 1, 127]);
-				yield new Uint8Array([128, 255]);
-			})(),
-		})),
 		invalid: implementor.invalid.handler(() => ({
 			status: 200,
 			body: (async function* () {

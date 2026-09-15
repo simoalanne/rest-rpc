@@ -1,27 +1,14 @@
-import {
-	type HttpRouteResult,
-	type HttpRouteResultStreamMode,
-	handleHttpRouteResult,
-} from "@rest-rpc/server";
+import { type HttpRouteResult, handleHttpRouteResult } from "@rest-rpc/server";
 
 type HttpHeaderValue = string | number | readonly string[] | undefined;
 
 const encodeResponseStream = async function* (
 	body: AsyncIterable<unknown>,
-	mode: HttpRouteResultStreamMode,
 ): AsyncIterableIterator<Uint8Array> {
 	const encoder = new TextEncoder();
 
 	for await (const chunk of body) {
-		switch (mode) {
-			case "ndjson":
-				yield encoder.encode(`${JSON.stringify(chunk)}\n`);
-				break;
-			default:
-				yield chunk instanceof Uint8Array
-					? chunk
-					: encoder.encode(String(chunk));
-		}
+		yield encoder.encode(`${JSON.stringify(chunk)}\n`);
 	}
 };
 
@@ -41,10 +28,9 @@ const createStreamResponse = (
 	status: number,
 	headers: Headers,
 	contentType: string,
-	mode: HttpRouteResultStreamMode,
 ) => {
 	headers.set("content-type", contentType);
-	const stream = ReadableStream.from(encodeResponseStream(body, mode));
+	const stream = ReadableStream.from(encodeResponseStream(body));
 
 	return new Response(stream, { status, headers });
 };
@@ -72,7 +58,7 @@ export function createFetchResponse(
 				status,
 				headers,
 			}),
-		sendStream: ({ status, body, contentType, mode }) =>
-			createStreamResponse(body, status, headers, contentType, mode),
+		sendStream: ({ status, body, contentType }) =>
+			createStreamResponse(body, status, headers, contentType),
 	});
 }
