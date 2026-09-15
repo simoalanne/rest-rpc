@@ -10,7 +10,6 @@ import {
 	experimental_streamedQuery as streamedQuery,
 	skipToken,
 } from "@tanstack/query-core";
-import { type FetchResponse, fetchQueryData } from "./queryData.ts";
 
 type RequestArgs = unknown[];
 type OptionsWithFetchOptions = Record<string, unknown> & {
@@ -84,7 +83,7 @@ const isAsyncIterable = (value: unknown): value is AsyncIterable<unknown> =>
 export const createTanstackHelpersForRoute = (
 	routePath: string[],
 	dataFetchingFn: FetchData,
-	streamResponse?: FetchResponse,
+	streamDataFetchingFn?: FetchData,
 ): TanstackQueryHelperFunctions => {
 	const getKey = (request?: unknown) => getQueryKey(request, routePath);
 
@@ -141,7 +140,7 @@ export const createTanstackHelpersForRoute = (
 		},
 		getKey: (...args: RequestArgs) => getKey(args[0]),
 	};
-	if (streamResponse) {
+	if (streamDataFetchingFn) {
 		helpers.streamedQueryOptions = (...args: RequestArgs) => {
 			const request = args[0];
 			const { fetchOptions, queryOptions } = splitFetchOptions(
@@ -150,16 +149,16 @@ export const createTanstackHelpersForRoute = (
 			const { initialValue, reducer, refetchMode, ...tanstackOptions } =
 				queryOptions;
 			const streamFn = async ({ signal }: { signal: AbortSignal }) => {
-				const response = (await fetchQueryData(streamResponse, request, {
+				const stream = await streamDataFetchingFn(request, {
 					...fetchOptions,
 					signal,
-				})) as { body: unknown };
+				});
 
-				if (!isAsyncIterable(response.body)) {
+				if (!isAsyncIterable(stream)) {
 					throw new Error("Route did not return a stream response body");
 				}
 
-				return response.body;
+				return stream;
 			};
 			const disabled = isSkipToken(request);
 			const queryFn = disabled

@@ -191,7 +191,7 @@ export const createResponse = (
 		};
 	}
 
-	if (contentType === NDJSON_CONTENT_TYPE) {
+	if (responseDeclaration.kind === "stream") {
 		return {
 			description: openApiResponse?.description ?? description,
 			...(headers ? { headers } : {}),

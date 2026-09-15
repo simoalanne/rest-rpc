@@ -22,6 +22,11 @@ export const api = {
 				contentType: ["text/plain", "text/markdown"],
 			})
 			.handler(({ input }) => ({ length: input.length })),
+		events: serverFirstRoute.handler(() =>
+			(async function* () {
+				yield { id: "event-1" as const };
+			})(),
+		),
 	},
 };
 

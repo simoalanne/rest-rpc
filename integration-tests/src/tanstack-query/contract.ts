@@ -87,6 +87,9 @@ export const tanstackQueryContract = {
 		events: route
 			.get("/project-events")
 			.streamResponse(200, projectEventSchema),
+		eventFeed: route
+			.input(z.object({ projectId: z.string() }))
+			.streamOutput(projectEventSchema),
 	},
 } as const;
 

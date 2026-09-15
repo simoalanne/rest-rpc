@@ -17,6 +17,7 @@ const apiContract = {
 		stream: route
 			.get("/events")
 			.streamResponse(200, z.object({ id: z.string() })),
+		procedure: route.streamOutput(z.object({ id: z.string() })),
 	},
 };
 
@@ -49,6 +50,20 @@ describe("ApiClient streams", () => {
 		}
 
 		assert.deepEqual(events, [{ id: "one" }, { id: "two" }, { id: "three" }]);
+	});
+
+	it("returns procedure streams without an HTTP response envelope", async () => {
+		globalThis.fetch = async () => ndjsonResponse(['{"id":"one"}\n']);
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+		});
+
+		const events = [];
+		for await (const event of await client.events.procedure()) {
+			events.push(event);
+		}
+
+		assert.deepEqual(events, [{ id: "one" }]);
 	});
 
 	it("trusts streamed items by default", async () => {

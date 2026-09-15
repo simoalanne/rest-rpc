@@ -18,6 +18,11 @@ const todoOutput = schemaType<{ id: string; title: string }>();
 
 export const fetchShorthandInputBuilder = fetchRoute.input(todoInput);
 export const fetchShorthandOutputBuilder = fetchRoute.output(todoOutput);
+export const fetchShorthandCustomOutputBuilder = fetchRoute.output(todoOutput, {
+	contentType: "text/plain",
+});
+export const fetchShorthandStreamOutputBuilder =
+	fetchRoute.streamOutput(todoOutput);
 export const fetchShorthandInputOutputBuilder =
 	fetchShorthandInputBuilder.output(todoOutput);
 export const fetchShorthandOutputInputBuilder =

@@ -263,17 +263,24 @@ export class RouteBuilder {
 		);
 	}
 
-	output(schema: StandardSchemaV1): RouteBuilder {
+	output(schema: StandardSchemaV1, options?: BodyOptions): RouteBuilder {
 		return addResponse(procedureState(this["~restrpc"]), 200, {
 			body: schema,
-			contentType: "application/json",
+			contentType: options?.contentType ?? "application/json",
+		});
+	}
+
+	streamOutput(schema: StandardSchemaV1): RouteBuilder {
+		return addResponse(procedureState(this["~restrpc"]), 200, {
+			kind: "stream",
+			body: schema,
 		});
 	}
 
 	streamResponse(status: number, schema: StandardSchemaV1): RouteBuilder {
 		return addResponse(this["~restrpc"], status, {
+			kind: "stream",
 			body: schema,
-			contentType: "application/x-ndjson",
 		});
 	}
 }

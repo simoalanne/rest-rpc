@@ -14,6 +14,10 @@ const headers = schemaType<{ authorization?: string }>();
 
 export const shorthandInputBuilder = route.input(scalar);
 export const shorthandOutputBuilder = route.output(scalar);
+export const shorthandCustomOutputBuilder = route.output(customResponseScalar, {
+	contentType: "text/plain",
+});
+export const shorthandStreamOutputBuilder = route.streamOutput(scalar);
 export const shorthandInputFirst = shorthandInputBuilder.output(scalar);
 export const shorthandOutputFirst = shorthandOutputBuilder.input(scalar);
 export const shorthandContract = {

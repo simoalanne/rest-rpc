@@ -452,6 +452,24 @@ describe("ApiClient responses", () => {
 		assert.equal(response.body, "id,title\n1,First\n");
 	});
 
+	it("returns custom procedure data without HTTP metadata", async () => {
+		const apiContract = {
+			export: route.output(z.string(), { contentType: "text/plain" }),
+		};
+		captureFetch(
+			new Response("report data", {
+				status: 200,
+				headers: { "content-type": "text/plain" },
+			}),
+		);
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+			validateResponses: true,
+		});
+
+		assert.equal(await client.export(), "report data");
+	});
+
 	it("uses a custom body parser for custom responses", async () => {
 		const apiContract = {
 			reports: {
@@ -474,6 +492,27 @@ describe("ApiClient responses", () => {
 		const response = await client.reports.binaryText();
 
 		assert.equal(response.body, "custom value");
+	});
+
+	it("does not infer streaming from a custom NDJSON content type", async () => {
+		const apiContract = {
+			events: route.get("/events").response(200, z.string(), {
+				contentType: "application/x-ndjson",
+			}),
+		};
+		captureFetch(
+			new Response("event data", {
+				headers: { "content-type": "application/x-ndjson" },
+			}),
+		);
+		const client = initClient(apiContract, {
+			baseUrl: "https://api.test",
+			bodyParser: (response) => response.text(),
+		});
+
+		const response = await client.events();
+		assert.equal(response.contentType, "application/x-ndjson");
+		assert.equal(response.body, "event data");
 	});
 
 	it("returns normalized content type metadata for custom response bodies", async () => {

@@ -57,6 +57,32 @@ const isAsyncIterable = (value: unknown): value is AsyncIterable<unknown> =>
 	Symbol.asyncIterator in value &&
 	typeof value[Symbol.asyncIterator] === "function";
 
+const isCustomProcedureOutput = (
+	value: unknown,
+): value is { contentType: string; data: unknown } =>
+	typeof value === "object" &&
+	value !== null &&
+	"data" in value &&
+	"contentType" in value &&
+	typeof value.contentType === "string";
+
+const classifyImplicitProcedureResponse = (
+	output: unknown,
+): HttpRouteResult => {
+	if (isAsyncIterable(output)) {
+		return { kind: "stream", status: 200, body: output };
+	}
+	if (isCustomProcedureOutput(output)) {
+		return {
+			kind: "custom",
+			status: 200,
+			body: output.data,
+			contentType: output.contentType,
+		};
+	}
+	return { kind: "json", status: 200, body: output };
+};
+
 const classifyImplicitHttpResponse = (
 	response: ImplicitResponseEnvelope,
 ): HttpRouteResult => {
@@ -155,8 +181,7 @@ const normalizeResponseResult = async (
 		};
 	}
 
-	const declaredContentType = schema.contentType;
-	if (declaredContentType === "application/x-ndjson") {
+	if (schema.kind === "stream") {
 		return {
 			kind: "stream",
 			status: result.status,
@@ -168,6 +193,7 @@ const normalizeResponseResult = async (
 		};
 	}
 
+	const declaredContentType = schema.contentType;
 	if (declaredContentType === "application/json") {
 		return {
 			kind: "json",
@@ -255,9 +281,28 @@ export async function handleHttpRoute<
 
 	const hasDeclaredResponses = Object.keys(route.responses).length > 0;
 	if (route.kind === "procedure") {
-		return hasDeclaredResponses
-			? normalizeResponseResult(route, { status: 200, body: handlerResult })
-			: { kind: "json", status: 200, body: handlerResult };
+		if (!hasDeclaredResponses) {
+			return classifyImplicitProcedureResponse(handlerResult);
+		}
+
+		const response = getResponseSchema(route, 200);
+		if (
+			response.kind !== "stream" &&
+			response.contentType !== "application/json"
+		) {
+			if (!isCustomProcedureOutput(handlerResult)) {
+				throw new Error(
+					"Custom procedure output must return { contentType, data }.",
+				);
+			}
+			return normalizeResponseResult(route, {
+				status: 200,
+				body: handlerResult.data,
+				contentType: handlerResult.contentType,
+			});
+		}
+
+		return normalizeResponseResult(route, { status: 200, body: handlerResult });
 	}
 
 	return hasDeclaredResponses

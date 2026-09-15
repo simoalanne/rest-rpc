@@ -401,7 +401,11 @@ export function createTanstackQueryHelpers<
 				const procedureClient = getByPath(client, path) as (
 					...args: unknown[]
 				) => Promise<unknown>;
-				return createTanstackHelpersForRoute(path, procedureClient);
+				return createTanstackHelpersForRoute(
+					path,
+					procedureClient,
+					procedureClient,
+				);
 			}
 			const apiNode = getByPath(client, path) as FetchResponseFn<typeof route>;
 
@@ -413,7 +417,14 @@ export function createTanstackQueryHelpers<
 						request,
 						fetchOptions,
 					),
-				apiNode as (...args: unknown[]) => Promise<unknown>,
+				async (request, fetchOptions) => {
+					const response = (await fetchQueryData(
+						apiNode as (...args: unknown[]) => Promise<unknown>,
+						request,
+						fetchOptions,
+					)) as { body: unknown };
+					return response.body;
+				},
 			);
 		}
 

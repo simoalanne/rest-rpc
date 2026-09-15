@@ -9,7 +9,7 @@ type GeneratedRoute = {
 		readonly method: string;
 		readonly path: string;
 		readonly request?: { readonly contentType: string | readonly string[] };
-		readonly responses: Readonly<Record<string, Record<never, never>>>;
+		readonly responses: Readonly<Record<string, { readonly kind?: "stream" }>>;
 	};
 };
 
@@ -146,6 +146,28 @@ const routeFromType = (
 			`Server route ${routeName(contractPath)} must have at least one response status.`,
 		);
 	}
+	const responses = Object.fromEntries(
+		responseProperties.map((property) => {
+			const declaration =
+				property.valueDeclaration ?? property.declarations?.[0] ?? location;
+			const responseType = checker.getTypeOfSymbolAtLocation(
+				property,
+				declaration,
+			);
+			const responseKind = optionalPropertyType(
+				checker,
+				responseType,
+				"kind",
+				declaration,
+			);
+			return [
+				property.getName(),
+				responseKind?.isStringLiteral() && responseKind.value === "stream"
+					? { kind: "stream" as const }
+					: {},
+			];
+		}),
+	);
 
 	const requestType = optionalPropertyType(
 		checker,
@@ -166,7 +188,7 @@ const routeFromType = (
 			...(contentType
 				? { request: { contentType: contentTypes(checker, contentType) } }
 				: {}),
-			responses: Object.fromEntries(statuses.map((status) => [status, {}])),
+			responses,
 		},
 	};
 };

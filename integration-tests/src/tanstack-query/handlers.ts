@@ -140,6 +140,12 @@ export const createTanstackQueryImplementations = () => {
 					yield { id: "project-1", event: "renamed" as const };
 				})(),
 			})),
+			eventFeed: implementor.projects.eventFeed.handler(({ input }) =>
+				(async function* () {
+					yield { id: input.projectId, event: "created" as const };
+					yield { id: input.projectId, event: "renamed" as const };
+				})(),
+			),
 		},
 	};
 };

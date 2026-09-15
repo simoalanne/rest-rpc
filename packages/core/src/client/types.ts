@@ -1,7 +1,9 @@
 import type { Contract, RouteDeclaration } from "../contract/contract.ts";
 import type { ClientRequest } from "../contract/request.ts";
-import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import type { DeclaredClientResponse } from "../contract/response.ts";
+import type {
+	DeclaredClientResponse,
+	SuccessfulDeclaredClientResponse,
+} from "../contract/response.ts";
 
 export type FetchOptions = Omit<RequestInit, "method" | "body" | "headers"> & {
 	contentType?: string;
@@ -134,11 +136,12 @@ export type ApiClientRouteValue<
 			: never
 	: never;
 
-type ProcedureRouteOutput<TRoute extends RouteDeclaration> = TRoute extends {
-	responses: { 200: { body: infer TOutput extends StandardSchemaV1 } };
-}
-	? StandardSchemaV1.InferOutput<TOutput>
-	: never;
+type ProcedureRouteOutput<TRoute extends RouteDeclaration> =
+	SuccessfulDeclaredClientResponse<TRoute> extends infer TResponse
+		? TResponse extends { body: infer TBody }
+			? TBody
+			: never
+		: never;
 
 /**
  * Infers the generated client tree for a contract.

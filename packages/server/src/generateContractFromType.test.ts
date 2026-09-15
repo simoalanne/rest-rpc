@@ -35,6 +35,15 @@ describe("generateContractFromType with server routes", () => {
 					responses: { 200: {} },
 				},
 			},
+			events: {
+				"~restrpc": {
+					source: "generated",
+					kind: "procedure",
+					method: "POST",
+					path: "",
+					responses: { 200: { kind: "stream" } },
+				},
+			},
 		},
 	};
 
@@ -82,6 +91,26 @@ describe("generateContractFromType with server routes", () => {
 
 		assert.equal(response.status, 422);
 		assert.deepEqual(response.body, { code: "invalid_name" });
+	});
+
+	it("preserves stream response kinds for generated clients", async () => {
+		const contract = generateContractFromType<typeof serverApi>({
+			filePath: resolve("test-fixtures/generate/server.ts"),
+			exportName: "api",
+		});
+		const client = initClient(contract, {
+			baseUrl: "https://api.test",
+			fetch: async () =>
+				new Response('{"id":"event-1"}\n', {
+					headers: { "content-type": "application/x-ndjson" },
+				}),
+		});
+
+		const events = [];
+		for await (const event of await client.documents.events()) {
+			events.push(event);
+		}
+		assert.deepEqual(events, [{ id: "event-1" }]);
 	});
 
 	for (const [exportName, expectedError] of [

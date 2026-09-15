@@ -92,16 +92,26 @@ describe("route builder runtime", () => {
 
 		const procedure = route
 			.input(bodySchema, { contentType: "text/plain" })
-			.output(bodySchema);
+			.output(bodySchema, { contentType: "text/csv" });
 		assert.deepEqual(procedure["~restrpc"].request, {
 			body: bodySchema,
 			contentType: "text/plain",
 		});
+		assert.deepEqual(procedure["~restrpc"].responses[200], {
+			body: bodySchema,
+			contentType: "text/csv",
+		});
+
+		const procedureStream = route.streamOutput(bodySchema);
+		assert.deepEqual(procedureStream["~restrpc"].responses[200], {
+			kind: "stream",
+			body: bodySchema,
+		});
 
 		const stream = route.get("/events").streamResponse(200, bodySchema);
 		assert.deepEqual(stream["~restrpc"].responses[200], {
+			kind: "stream",
 			body: bodySchema,
-			contentType: "application/x-ndjson",
 		});
 	});
 

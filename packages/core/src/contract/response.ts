@@ -23,12 +23,20 @@ export type ResponseHeaders = StandardSchemaV1<
  */
 export type ResponseDeclaration =
 	| {
+			kind?: never;
 			body: ResponseBodySchema;
 			contentType: BodyContentType;
 			headers?: ResponseHeaders;
 	  }
 	| {
+			kind?: never;
 			body: undefined;
+			contentType?: never;
+			headers?: ResponseHeaders;
+	  }
+	| {
+			kind: "stream";
+			body: ResponseBodySchema;
 			contentType?: never;
 			headers?: ResponseHeaders;
 	  };
@@ -61,8 +69,8 @@ export const getRouteResponses = (route: {
 
 type Simplify<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
 
-type IsNdjsonResponse<TResponse> = TResponse extends {
-	contentType: "application/x-ndjson";
+type IsStreamResponse<TResponse> = TResponse extends {
+	kind: "stream";
 }
 	? true
 	: false;
@@ -70,7 +78,7 @@ type IsNdjsonResponse<TResponse> = TResponse extends {
 type InferClientResponseBody<TResponse> =
 	ResponseBody<TResponse> extends infer TBody
 		? TBody extends StandardSchemaV1
-			? IsNdjsonResponse<TResponse> extends true
+			? IsStreamResponse<TResponse> extends true
 				? AsyncIterable<StandardSchemaV1.InferOutput<TBody>>
 				: StandardSchemaV1.InferOutput<TBody>
 			: TBody extends undefined
@@ -81,7 +89,7 @@ type InferClientResponseBody<TResponse> =
 export type ServerResponseBody<TResponse> =
 	ResponseBody<TResponse> extends infer TBody
 		? TBody extends StandardSchemaV1
-			? IsNdjsonResponse<TResponse> extends true
+			? IsStreamResponse<TResponse> extends true
 				? AsyncIterable<StandardSchemaV1.InferInput<TBody>>
 				: StandardSchemaV1.InferInput<TBody>
 			: TBody extends undefined
@@ -92,7 +100,7 @@ export type ServerResponseBody<TResponse> =
 type ClientResponseMetadata<TResponse> = TResponse extends {
 	contentType: infer TContentType;
 }
-	? TContentType extends "application/json" | "application/x-ndjson"
+	? TContentType extends "application/json"
 		? unknown
 		: TContentType extends readonly string[]
 			? { contentType: TContentType[number] }
@@ -104,7 +112,7 @@ type ClientResponseMetadata<TResponse> = TResponse extends {
 type ServerResponseMetadata<TResponse> = TResponse extends {
 	contentType: infer TContentType;
 }
-	? TContentType extends "application/json" | "application/x-ndjson"
+	? TContentType extends "application/json"
 		? unknown
 		: TContentType extends readonly string[]
 			? { contentType: TContentType[number] }

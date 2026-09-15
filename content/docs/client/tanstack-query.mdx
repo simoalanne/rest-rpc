@@ -151,10 +151,12 @@ const todos = useInfiniteQuery(
 
 ## Streamed Queries
 
-Use `streamedQueryOptions()` for routes that declare one successful
-`.streamResponse(status, schema)` response. The helper passes the route's async
-iterable body to TanStack Query and stores the materialized stream data, not the
-rest-rpc response envelope.
+Use `streamedQueryOptions()` for explicit routes that declare one successful
+`.streamResponse(status, schema)` response or procedures declared with
+`.streamOutput(schema)`. The helper passes the async iterable to TanStack Query
+and stores the materialized stream data. For an explicit route it discards the
+rest-rpc response envelope; procedure clients already return the iterable
+directly.
 
 :::note
 `streamedQueryOptions()` is based on TanStack Query's experimental
@@ -190,11 +192,12 @@ messages.data;
 // string | undefined
 ```
 
-`streamedQueryOptions()` is only generated for stream routes where rest-rpc can
-hide the response envelope honestly: the route must have exactly one successful
-response and that response body must be declared with `.streamResponse()`. Use
-`queryOptions()` when you need access to `status`, `headers`, or the raw async
-iterable response body.
+`streamedQueryOptions()` is only generated for procedure streams or explicit
+stream routes where rest-rpc can hide the response envelope honestly. An
+explicit route must have exactly one successful response and that response must
+be declared with `.streamResponse()`. Use `queryOptions()` for the raw async
+iterable. On an explicit route, `queryOptions()` also retains `status` and
+`headers`; on a procedure it returns the iterable directly.
 
 ## Query Keys
 

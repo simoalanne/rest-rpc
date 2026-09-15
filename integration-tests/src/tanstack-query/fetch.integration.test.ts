@@ -426,4 +426,46 @@ describe("fetch TanStack Query integration", () => {
 		assert.deepEqual(queryClient.getQueryData(options.queryKey), response);
 		assert.equal(tracked.calls.length, 1);
 	});
+
+	it("returns procedure streams directly from regular query options", async () => {
+		const tracked = createTrackedFetch();
+		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
+		const queryClient = createQueryClient();
+
+		const stream = await queryClient.fetchQuery(
+			tq.projects.eventFeed.queryOptions({ projectId: "project-2" }),
+		);
+
+		assert.equal(typeof stream[Symbol.asyncIterator], "function");
+		assert.deepEqual(await collectAsyncIterable(stream), [
+			{ id: "project-2", event: "created" },
+			{ id: "project-2", event: "renamed" },
+		]);
+		assert.strictEqual(
+			queryClient.getQueryData(
+				tq.projects.eventFeed.getKey({ projectId: "project-2" }),
+			),
+			stream,
+		);
+		assert.equal(tracked.calls.length, 1);
+	});
+
+	it("materializes procedure streams with stream query options", async () => {
+		const tracked = createTrackedFetch();
+		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
+		const queryClient = createQueryClient();
+
+		const options = tq.projects.eventFeed.streamedQueryOptions(
+			{ projectId: "project-2" },
+			{ queryKey: ["projects", "event-feed", "streamed-query"] },
+		);
+		const events = await queryClient.fetchQuery(options);
+
+		assert.deepEqual(events, [
+			{ id: "project-2", event: "created" },
+			{ id: "project-2", event: "renamed" },
+		]);
+		assert.deepEqual(queryClient.getQueryData(options.queryKey), events);
+		assert.equal(tracked.calls.length, 1);
+	});
 });

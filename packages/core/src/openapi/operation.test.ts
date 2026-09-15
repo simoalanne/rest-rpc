@@ -513,8 +513,8 @@ describe("OpenAPI operations", () => {
 		const response = createResponse(
 			"",
 			{
+				kind: "stream",
 				body: z.object({ id: z.string() }),
-				contentType: "application/x-ndjson",
 			},
 			schemaConverter,
 		);
@@ -522,6 +522,22 @@ describe("OpenAPI operations", () => {
 		assert.deepEqual(response.content?.["application/x-ndjson"].schema, {
 			type: "string",
 		});
+	});
+
+	it("treats an ordinary NDJSON content type as custom content", () => {
+		const response = createResponse(
+			"",
+			{
+				body: z.object({ id: z.string() }),
+				contentType: "application/x-ndjson",
+			},
+			schemaConverter,
+		);
+
+		assert.equal(
+			response.content?.["application/x-ndjson"].schema?.type,
+			"object",
+		);
 	});
 
 	it("uses input schemas for requests and output schemas for responses", () => {

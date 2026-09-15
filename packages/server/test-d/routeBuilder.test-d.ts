@@ -3,6 +3,7 @@ import { initClient, route as coreRoute } from "@rest-rpc/core";
 import {
 	serverFirstRoute,
 	type RouteResponse,
+	type ServerFirstRouteResponseKind,
 	type ServerRouteBuilder,
 } from "@rest-rpc/server";
 import { expectError, expectType } from "tsd";
@@ -57,6 +58,14 @@ expectType<201>(
 	}).status,
 );
 
+const inferredStream = route.get("/events").handler(() => ({
+	status: 200 as const,
+	body: (async function* () {
+		yield { id: "event-1" };
+	})(),
+}));
+expectType<"stream">(inferredStream["~restrpc"].responses[200].kind);
+
 const declared = route
 	.post("/declared")
 	.body(input)
@@ -92,6 +101,72 @@ expectType<
 
 route.output(output).handler(() => ({ id: "todo-1", title: "Todo" }));
 expectError(route.output(output).handler(() => ({ id: 1, title: "Todo" })));
+
+const declaredCustomProcedure = route
+	.output(z.string(), { contentType: "text/plain" })
+	.handler(() => ({ contentType: "text/plain", data: "todo data" }));
+expectError(
+	route.output(z.string(), { contentType: "text/plain" }).handler(() => "data"),
+);
+expectError(
+	route
+		.output(z.string(), { contentType: "text/plain" })
+		.handler(() => ({ contentType: "text/csv", data: "todo data" })),
+);
+expectType<"custom">(
+	null as unknown as ServerFirstRouteResponseKind<
+		typeof declaredCustomProcedure
+	>,
+);
+
+const declaredStreamProcedure = route.streamOutput(output).handler(() =>
+	(async function* () {
+		yield { id: "todo-1", title: "Todo" };
+	})(),
+);
+expectError(
+	route.streamOutput(output).handler(() => ({ id: "todo-1", title: "Todo" })),
+);
+expectType<"stream">(
+	null as unknown as ServerFirstRouteResponseKind<
+		typeof declaredStreamProcedure
+	>,
+);
+
+const inferredCustomProcedure = route.handler(() => ({
+	contentType: "text/plain" as const,
+	data: "todo data",
+}));
+expectType<"text/plain">(
+	inferredCustomProcedure["~restrpc"].responses[200].contentType,
+);
+expectType<"custom">(
+	null as unknown as ServerFirstRouteResponseKind<
+		typeof inferredCustomProcedure
+	>,
+);
+
+const inferredStreamProcedure = route.handler(() =>
+	(async function* () {
+		yield { id: "event-1" as const };
+	})(),
+);
+expectType<"stream">(inferredStreamProcedure["~restrpc"].responses[200].kind);
+expectType<"stream">(
+	null as unknown as ServerFirstRouteResponseKind<
+		typeof inferredStreamProcedure
+	>,
+);
+
+const procedureClient = initClient(
+	{
+		custom: inferredCustomProcedure,
+		stream: inferredStreamProcedure,
+	},
+	{ baseUrl: "https://example.test" },
+);
+expectType<Promise<"todo data">>(procedureClient.custom());
+expectType<Promise<AsyncIterable<{ id: "event-1" }>>>(procedureClient.stream());
 
 expectError(serverFirstRoute.with({ pathPrefix: "/v1" }).handler(() => null));
 

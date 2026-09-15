@@ -7,6 +7,7 @@ import type {
 	ServerErrors,
 	ServerRequest,
 	ServerResponse,
+	ServerResponseBody,
 } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 
@@ -121,11 +122,11 @@ export type ImplicitResponseEnvelope =
  *
  * @see {@link https://rest-rpc.dev/docs/server-first-quickstart#use-the-ordinary-client-apis}
  */
-export type ServerFirstResponseKind = "empty" | "json" | "ndjson" | "custom";
+export type ServerFirstResponseKind = "empty" | "json" | "stream" | "custom";
 
 type BodyResponseKind<TResponse, TBody> =
 	TBody extends AsyncIterable<unknown>
-		? "ndjson"
+		? "stream"
 		: TResponse extends { contentType: string }
 			? "custom"
 			: "json";
@@ -169,7 +170,7 @@ type ImplicitResponseContentType<TResponse> = TResponse extends {
 	body: infer TBody;
 }
 	? TBody extends AsyncIterable<unknown>
-		? "application/x-ndjson"
+		? never
 		: TResponse extends { contentType: infer TContentType extends string }
 			? TContentType
 			: "application/json"
@@ -180,12 +181,14 @@ type ImplicitResponseDeclaration<TResponse> = TResponse extends {
 }
 	? {
 			body: ImplicitResponseBodyDeclaration<TResponse>;
-			contentType: ImplicitResponseContentType<TResponse>;
-		} & (TResponse extends { responseHeaders: infer THeaders }
-			? {
-					headers: ClientSchema<SerializedResponseHeaders<THeaders>>;
-				}
-			: unknown)
+		} & (TResponse extends { body: AsyncIterable<unknown> }
+			? { kind: "stream" }
+			: { contentType: ImplicitResponseContentType<TResponse> }) &
+			(TResponse extends { responseHeaders: infer THeaders }
+				? {
+						headers: ClientSchema<SerializedResponseHeaders<THeaders>>;
+					}
+				: unknown)
 	: { body: undefined } & (TResponse extends {
 			responseHeaders: infer THeaders;
 		}
@@ -210,13 +213,20 @@ type InferredHttpRoute<TRoute, TResult> = Omit<TRoute, "responses"> & {
 	responses: InferredResponses<Awaited<TResult>>;
 };
 
+type InferredProcedureResponse<TResult> =
+	Awaited<TResult> extends infer TOutput
+		? TOutput extends AsyncIterable<infer TItem>
+			? { kind: "stream"; body: ClientSchema<TItem> }
+			: TOutput extends {
+						contentType: infer TContentType extends string;
+						data: infer TData;
+				  }
+				? { body: ClientSchema<TData>; contentType: TContentType }
+				: { body: ClientSchema<TOutput>; contentType: "application/json" }
+		: never;
+
 type InferredProcedureRoute<TRoute, TResult> = Omit<TRoute, "responses"> & {
-	responses: {
-		200: {
-			body: ClientSchema<Awaited<TResult>>;
-			contentType: "application/json";
-		};
-	};
+	responses: { 200: InferredProcedureResponse<TResult> };
 };
 
 /** Terminal builder shape containing a route declaration and its handler. */
@@ -252,6 +262,21 @@ type HandlerImplementation<
 	HandlerFor<TRoute, TAdditionalHandlerFields, TContext, TResult>
 >;
 
+type ProcedureContentType<TContentType> = TContentType extends readonly string[]
+	? TContentType[number]
+	: TContentType;
+
+type ProcedureHandlerResult<TResponse> = TResponse extends {
+	contentType: infer TContentType;
+}
+	? TContentType extends "application/json"
+		? ServerResponseBody<TResponse>
+		: {
+				data: ServerResponseBody<TResponse>;
+				contentType: ProcedureContentType<TContentType>;
+			}
+	: ServerResponseBody<TResponse>;
+
 type ProcedureHandlerMethod<
 	TRoute extends RouteDeclaration,
 	TAdditionalHandlerFields extends object,
@@ -259,12 +284,16 @@ type ProcedureHandlerMethod<
 > =
 	HasDeclaredResponses<TRoute> extends true
 		? TRoute extends {
-				responses: { 200: { body: infer TOutput extends StandardSchemaV1 } };
+				responses: {
+					200: infer TResponse extends {
+						body: StandardSchemaV1;
+					};
+				};
 			}
 			? {
 					handler<
 						const TResult extends MaybePromise<
-							StandardSchemaV1.InferInput<TOutput>
+							ProcedureHandlerResult<TResponse>
 						>,
 					>(
 						handler: HandlerFor<
@@ -395,8 +424,17 @@ export type ServerFirstRouteResponseKind<TImplementation> =
 		route: infer TRoute;
 		handler: infer THandler extends AnyRouteHandler;
 	}
-		? TRoute extends { kind: "procedure" }
-			? "json"
+		? TRoute extends {
+				kind: "procedure";
+				responses: { 200: infer TResponse };
+			}
+			? TResponse extends { kind: "stream" }
+				? "stream"
+				: TResponse extends { contentType: infer TContentType }
+					? TContentType extends "application/json"
+						? "json"
+						: "custom"
+					: "json"
 			: ImplicitResponseKind<Awaited<ReturnType<THandler>>>
 		: never;
 

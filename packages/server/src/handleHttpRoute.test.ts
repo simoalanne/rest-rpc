@@ -151,6 +151,99 @@ describe("handleHttpRoute", () => {
 		});
 	});
 
+	it("normalizes declared custom procedure output wrappers", async () => {
+		const route = coreRoute.output(z.string(), { contentType: "text/plain" })[
+			"~restrpc"
+		];
+		const result = await handleHttpRoute(
+			route,
+			() => ({ contentType: "text/plain", data: "todo data" }),
+			{
+				request: {},
+				handlerFields: {},
+				context: {},
+			},
+		);
+
+		assert.deepEqual(result, {
+			kind: "custom",
+			status: 200,
+			headers: undefined,
+			body: "todo data",
+			contentType: "text/plain",
+		});
+	});
+
+	it("requires declared custom procedure output wrappers", async () => {
+		const route = coreRoute.output(z.string(), { contentType: "text/plain" })[
+			"~restrpc"
+		];
+
+		await assert.rejects(
+			() =>
+				handleHttpRoute(route, () => "todo data", {
+					request: {},
+					handlerFields: {},
+					context: {},
+				}),
+			/Custom procedure output must return/,
+		);
+	});
+
+	it("normalizes declared procedure streams directly", async () => {
+		const route = coreRoute.streamOutput(z.object({ id: z.string() }))[
+			"~restrpc"
+		];
+		const result = await handleHttpRoute(
+			route,
+			() =>
+				(async function* () {
+					yield { id: "event-1" };
+				})(),
+			{
+				request: {},
+				handlerFields: {},
+				context: {},
+			},
+		);
+
+		assert.equal(result.kind, "stream");
+		if (result.kind !== "stream") throw new Error("Expected stream");
+		const events = [];
+		for await (const event of result.body) events.push(event);
+		assert.deepEqual(events, [{ id: "event-1" }]);
+	});
+
+	it("classifies inferred custom and stream procedure outputs", async () => {
+		const route = {
+			kind: "procedure" as const,
+			method: "POST" as const,
+			path: "/events",
+			responses: {},
+		};
+		const custom = await handleHttpRoute(
+			route,
+			() => ({ contentType: "text/plain", data: "event data" }),
+			{ request: {}, handlerFields: {}, context: {} },
+		);
+		const stream = await handleHttpRoute(
+			route,
+			() =>
+				(async function* () {
+					yield { id: "event-1" };
+				})(),
+			{ request: {}, handlerFields: {}, context: {} },
+		);
+
+		assert.deepEqual(custom, {
+			kind: "custom",
+			status: 200,
+			body: "event data",
+			contentType: "text/plain",
+		});
+		assert.equal(stream.kind, "stream");
+	});
+
 	it("passes decoded custom procedure input and its content type", async () => {
 		const declaration = coreRoute
 			.input(z.object({ title: z.string() }), {
@@ -412,5 +505,23 @@ describe("handleHttpRoute custom responses", () => {
 		assert.equal(result.status, 200);
 		assert.equal(result.contentType, "image/jpeg");
 		assert.equal(result.body, "jpeg bytes");
+	});
+
+	it("treats an ordinary NDJSON content type as custom content", async () => {
+		const result = await handleHttpRoute(
+			coreRoute.get("/events").response(200, z.string(), {
+				contentType: "application/x-ndjson",
+			})["~restrpc"],
+			() => ({ status: 200, body: "event data" }),
+			{
+				request: {},
+				handlerFields: {},
+				context: {},
+			},
+		);
+
+		assert.equal(result.kind, "custom");
+		assert.equal(result.contentType, "application/x-ndjson");
+		assert.equal(result.body, "event data");
 	});
 });

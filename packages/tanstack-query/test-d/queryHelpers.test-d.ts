@@ -573,6 +573,7 @@ expectType<never>(
 const shorthandApi = {
 	todos: {
 		get: route.output(schemaType<{ id: string; title: string }>()),
+		events: route.streamOutput(schemaType<{ id: string; message: string }>()),
 		add: route
 			.input(schemaType<{ title: string }>())
 			.output(schemaType<{ id: string; title: string }>()),
@@ -606,6 +607,16 @@ const shorthandGetOptions = shorthandTq.todos.get.queryOptions(undefined, {
 });
 expectType<Promise<{ id: string; title: string }>>(
 	queryClient.fetchQuery(shorthandGetOptions),
+);
+
+const shorthandStreamOptions = shorthandTq.todos.events.queryOptions();
+expectType<Promise<AsyncIterable<{ id: string; message: string }>>>(
+	queryClient.fetchQuery(shorthandStreamOptions),
+);
+const shorthandMaterializedStreamOptions =
+	shorthandTq.todos.events.streamedQueryOptions();
+expectType<Promise<Array<{ id: string; message: string }>>>(
+	queryClient.fetchQuery(shorthandMaterializedStreamOptions),
 );
 
 shorthandTq.todos.add.mutationOptions({

@@ -28,6 +28,8 @@ const shorthandOutputSchema = todoSchema.transform(({ id, title }) => ({
 const shorthandApi = {
 	todos: {
 		get: route.output(shorthandOutputSchema),
+		events: route.streamOutput(todoSchema),
+		export: route.output(z.string(), { contentType: "text/plain" }),
 		add: route.input(shorthandInputSchema).output(shorthandOutputSchema),
 		import: route
 			.input(shorthandInputSchema, {
@@ -42,6 +44,10 @@ const shorthandClient = initClient(shorthandApi, {
 });
 
 expectType<Promise<{ id: number; title: string }>>(shorthandClient.todos.get());
+expectType<Promise<AsyncIterable<{ id: string; title: string }>>>(
+	shorthandClient.todos.events(),
+);
+expectType<Promise<string>>(shorthandClient.todos.export());
 expectType<ApiClientRouteValue<(typeof shorthandApi.todos.get)["~restrpc"]>>(
 	shorthandClient.todos.get,
 );
