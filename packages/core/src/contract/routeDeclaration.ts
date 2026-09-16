@@ -54,7 +54,7 @@ export type RouteRequestDeclaration = {
 };
 
 /**
- * The contract information retained for one declared HTTP or procedure route.
+ * The contract information retained for one declared route.
  *
  * @remarks Applications normally create route declarations with `route`
  * instead of constructing this representation directly.
@@ -66,6 +66,8 @@ export type RouteDeclaration = {
 	kind: "http" | "procedure";
 	path: string;
 	method: HttpMethod;
+	input?: "input" | "segments";
+	output?: "output" | "response";
 	request?: RouteRequestDeclaration;
 	responses: RouteResponses;
 	metadata?: RouteMetadata;

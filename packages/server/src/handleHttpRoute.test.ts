@@ -131,17 +131,46 @@ describe("handleHttpRoute", () => {
 			status: 200,
 			body: { id: "todo-1" },
 		});
+		const enveloped = await handleHttpRoute(
+			route,
+			() => ({ status: 201, body: { id: "todo-1" } }),
+			{ request: {}, handlerFields: {}, context: {} },
+		);
+		assert.deepEqual(enveloped, {
+			kind: "json",
+			status: 201,
+			body: { id: "todo-1" },
+			headers: undefined,
+		});
+		await assert.rejects(
+			handleHttpRoute(route, () => ({ status: "bad" }), {
+				request: {},
+				handlerFields: {},
+				context: {},
+			}),
+			/Invalid inferred HTTP response status "bad"/,
+		);
 	});
 
 	it("normalizes declared procedure outputs directly", async () => {
-		const route = coreRoute.output(z.object({ status: z.literal("ready") }))[
-			"~restrpc"
-		];
-		const result = await handleHttpRoute(route, () => ({ status: "ready" }), {
-			request: {},
-			handlerFields: {},
-			context: {},
-		});
+		const route = coreRoute
+			.get("/ready")
+			.input(z.object({ term: z.string() }))
+			.output(z.object({ status: z.literal("ready") }))["~restrpc"];
+		let input: unknown;
+		const result = await handleHttpRoute(
+			route,
+			(request: { input: unknown }) => {
+				input = request.input;
+				return { status: "ready" };
+			},
+			{
+				request: { query: new URLSearchParams({ term: "go" }) },
+				handlerFields: {},
+				context: {},
+			},
+		);
+		assert.deepEqual(input, { term: "go" });
 
 		assert.deepEqual(result, {
 			kind: "json",

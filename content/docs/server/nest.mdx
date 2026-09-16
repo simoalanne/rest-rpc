@@ -80,7 +80,7 @@ to be used at the contract-tree boundary.
 
 ## Single Routes
 
-The same decorator accepts a single explicit HTTP route:
+The same decorator accepts a single route with an explicit path:
 
 ```ts
 @Controller()
@@ -98,8 +98,7 @@ class TodoController {
 ```
 
 :::warning
-If you're using [Procedure routes](/docs/procedures), which automatically
-generate the path from the tree keys, you must use a tree with both
+If you're using [a derived path](/docs/procedures), you must use a tree with both
 the decorator and the return value. Otherwise, the decorator cannot determine the path to register with Nest.
 :::
 

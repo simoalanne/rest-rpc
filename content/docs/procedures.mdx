@@ -1,142 +1,108 @@
 ---
-title: Procedure Routes
-description: Build type-safe function-like APIs without declaring HTTP details for every operation.
+title: Plain-Output Routes
+description: Use flat inputs and plain results with derived or explicit HTTP methods and paths.
 ---
 
-Procedure routes are the shortest path from a TypeScript function to a typed
-HTTP client. Declare an input and output—or attach a handler directly—and
-`rest-rpc` derives the transport details from the route tree.
+A route does not have to choose between a function-shaped API and an explicit
+HTTP interface. Choose the method and path, the input form, and the output form
+independently.
+
+Without a method setter, the route uses POST and derives its path from the
+contract tree. `.input(schema)` declares one flat value, sent as a body on POST,
+PUT, PATCH, and DELETE. `.output(schema)` declares one successful result that
+the client returns directly.
 
 ```ts
 const api = {
 	todos: {
-		get: route.input(z.object({ id: z.string() })).output(todoSchema),
+		create: route.input(z.object({ title: z.string() })).output(todoSchema),
 	},
 };
+
+const todo = await client.todos.create({ title: "Write docs" });
 ```
 
-```ts
-const todo = await client.todos.get({ id: "todo_1" });
-```
+The route above uses `POST /todos/create`. Renaming a tree key changes the
+derived URL. Client and server deployments should treat those keys as part of
+their wire contract.
 
-Use procedure routes as the starting point for application-owned APIs when an
-operation has one successful result and callers should not need to work with
-HTTP response metadata. Use an [explicit HTTP route](/docs/contract/declaration)
-when the HTTP interface itself is part of the design.
+## Choose a Method and Path
 
-| Start with a procedure route when                           | Use an explicit route when                              |
-| ----------------------------------------------------------- | ------------------------------------------------------- |
-| The API is called by your own TypeScript applications       | The API is public or designed HTTP-first                |
-| The operation has one successful result                     | Callers handle expected statuses such as `404` or `409` |
-| A function-shaped client is the primary interface           | Method, URL, headers, or caching semantics matter       |
-| Errors are exceptional rather than part of the typed result | You need typed error bodies or response headers         |
-| Input fits in one body value                                | You need path, query, or response metadata              |
-
-Procedure and explicit routes can coexist in the same tree. Starting with a
-procedure does not commit the whole API to that style.
-
-## Contract-First Procedures
-
-In a shared contract, `.input()` declares the input and `.output()` declares
-the successful result. Both use JSON by default and accept the same optional
-content-type option as `.body()`. An output is required; input is optional.
-Form, multipart, and custom input values follow the transport-shape rules in
-[HTTP Requests](/docs/http-requests).
+An explicit method setter works with the same flat input and plain output:
 
 ```ts
-import { route } from "@rest-rpc/core";
-import { z } from "zod";
-
-const todoSchema = z.object({
-	id: z.string(),
-	title: z.string(),
-});
-
-const todoEventSchema = z.object({
-	id: z.string(),
-	event: z.enum(["created", "updated"]),
-});
-
-export const api = {
+const api = {
 	todos: {
-		list: route.output(z.array(todoSchema)),
+		search: route
+			.get("/todos/search")
+			.input(z.object({ term: z.string() }))
+			.output(z.array(todoSchema)),
 		create: route
-			.input(z.object({ title: z.string().min(1) }))
+			.post("/todos")
+			.input(z.object({ title: z.string() }))
 			.output(todoSchema),
-		export: route.output(z.string(), { contentType: "text/plain" }),
-		events: route.streamOutput(todoEventSchema),
-	},
-};
-```
-
-Implement the contract with the adapter for your server framework or runtime.
-
-```ts
-import { createRouteHandler, implement } from "@rest-rpc/node";
-import { api } from "./contract";
-
-const builders = implement(api);
-
-export const routes = {
-	todos: {
-		list: builders.todos.list.handler(() => listTodos()),
-		create: builders.todos.create.handler(({ input }) =>
-			createTodo(input.title),
-		),
-		export: builders.todos.export.handler(() => ({
-			contentType: "text/plain",
-			data: createTodoReport(),
-		})),
-		events: builders.todos.events.handler(({ signal }) =>
-			streamTodoEvents(signal),
-		),
 	},
 };
 
-const handler = createRouteHandler(routes);
+await client.todos.search({ term: "open" });
+await client.todos.create({ title: "Write docs" });
 ```
 
-The schemas validate server input and can validate output according to the same
-adapter options used by explicit routes. For a custom `.output()` content type,
-the implementation returns `{ contentType, data }`. A `.streamOutput()`
-implementation returns an async iterable directly. These transport details are
-not exposed by the client: it receives the custom `data` value or async iterable
-directly.
+A flat GET input is encoded as query parameters and must satisfy the same
+scalar-or-array wire constraints as `.query()`. A flat input requires a static
+path. Use `.params()` and the segmented request form for paths containing
+`:id` or `{id}`.
 
-## Server-First Procedures
+## Choose Request Segments
 
-With a server-first API, end the procedure with `.handler()`. The handler return
-type becomes the client result type, so an output schema is optional.
+Use `.query()`, `.params()`, `.body()`, and `.headers()` when the request
+has distinct HTTP segments. Choosing any segment closes `.input()`. Plain
+`.output()` remains available with segmented input.
 
 ```ts
-import { route } from "@rest-rpc/node";
-import { z } from "zod";
+const getTodo = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.output(todoSchema);
 
-export const routes = {
-	todos: {
-		list: route.handler(() => listTodos()),
-		create: route
-			.input(z.object({ title: z.string().min(1) }))
-			.handler(({ input, signal }) => {
-				return createTodo(input.title, signal);
-			}),
-	},
-};
+const todo = await client.todos.get({ params: { id: "todo_1" } });
 ```
 
-Add `.output(schema)` before `.handler()` when the output should be validated
-at runtime or when a stable schema should constrain the implementation.
+GET routes cannot declare a body.
+
+## Choose Status Responses
+
+Use `.response(status, schema)` when the client or handler needs status
+envelopes. It can be repeated for different statuses and closes `.output()`.
+This choice is independent of the method and input form.
 
 ```ts
-const create = route
-	.input(z.object({ title: z.string().min(1) }))
-	.output(todoSchema)
-	.handler(({ input }) => createTodo(input.title));
+const createTodo = route
+	.input(z.object({ title: z.string() }))
+	.response(201, todoSchema)
+	.response(409, z.object({ code: z.literal("CONFLICT") }));
 ```
 
-A `{ contentType, data }` return value infers a custom output. Use
-`.output(schema, { contentType })` when that output should also have an explicit
-schema.
+The client receives a status-discriminated response, while a route declared
+with `.output()` returns the decoded value directly.
+
+## Server-First Inference
+
+Attach `.handler()` to a server route when the output is inferred from the
+handler. If every possible awaited return has a top-level `status`, rest-rpc
+infers response envelopes. If none has `status`, it infers a plain output. A
+return union mixing those two forms is invalid.
+
+```ts
+const list = route.get("/todos").handler(() => listTodos());
+const created = route.post("/todos").handler(() => ({
+	status: 201,
+	body: createTodo(),
+}));
+```
+
+A plain value uses JSON by default. An `AsyncIterable` infers a stream.
+`{ contentType, data }` infers a custom-content plain output.
 
 ```ts
 const report = route.handler(() => ({
@@ -144,71 +110,14 @@ const report = route.handler(() => ({
 	data: createTodoReport(),
 }));
 
-const declaredReport = route
-	.output(z.string(), { contentType: "text/plain" })
-	.handler(() => ({
-		contentType: "text/plain",
-		data: createTodoReport(),
-	}));
+const events = route.handler(() => streamTodoEvents());
 ```
 
-Returning an async iterable infers a stream. Add `.streamOutput(schema)` when
-its chunks should be validated or constrained explicitly.
+Use `.output(schema)` or `.streamOutput(schema)` when output validation or a
+stable schema is needed. For a custom declared output, the handler returns
+`{ contentType, data }`; a declared stream handler returns an async iterable.
+`.response(status, schema)` and `.streamResponse(status, schema)` constrain
+status-envelope handlers.
 
-```ts
-const events = route
-	.input(z.object({ projectId: z.string() }))
-	.handler(({ input, signal }) => streamProjectEvents(input.projectId, signal));
-
-const declaredEvents = route
-	.input(z.object({ projectId: z.string() }))
-	.streamOutput(projectEventSchema)
-	.handler(({ input, signal }) => streamProjectEvents(input.projectId, signal));
-```
-
-## Call Procedures
-
-```ts
-import { initClient } from "@rest-rpc/core";
-import contract from "./contract";
-
-const client = initClient(contract, {
-	baseUrl: "https://api.example.com",
-});
-
-const todos = await client.todos.list();
-const created = await client.todos.create({ title: "Write docs" });
-```
-
-Pass Fetch options as the second argument. For a procedure without input, pass
-`undefined` first.
-
-```ts
-await client.todos.list(undefined, { cache: "no-store" });
-```
-
-An unsuccessful HTTP response rejects the call with an `Error`. Procedure
-routes do not declare typed error results. If an error is an expected part of
-the API that clients should inspect, model it with explicit response statuses
-on an [HTTP route](/docs/http-responses).
-
-## Derived HTTP Interface
-
-The object keys determine the URL, and the transport profile is fixed:
-
-```txt
-api.todos.create  ->  POST /todos/create
-```
-
-- The input, when present, is sent as a body using its declared content type.
-- A successful result is a `200` response using its declared output kind.
-- The client returns the decoded result directly.
-- OpenAPI generation emits the derived `POST` operation.
-- Per-call Fetch options and global client headers still apply.
-
-Renaming a tree key changes the URL. Treat those keys as part of the wire API if
-clients and servers are deployed independently.
-
-`route.with()` configures explicit route factories and does not change the
-fixed procedure profile. Switch that operation to an explicit route when it
-needs custom paths, shared responses, metadata, or other HTTP controls.
+Request and response setters may appear in either order. `.metadata()` and
+`.openAPI()` can appear anywhere before `.handler()`.

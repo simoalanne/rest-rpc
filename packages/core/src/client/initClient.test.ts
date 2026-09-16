@@ -88,6 +88,13 @@ describe("initClient", () => {
 						contentType: "application/x-www-form-urlencoded",
 					})
 					.output(z.string().transform(Number)),
+				search: route
+					.get("/todos/search")
+					.input(z.object({ term: z.string() }))
+					.output(z.string().transform(Number)),
+				sync: route
+					.query(z.object({ id: z.string() }))
+					.response(200, z.string()),
 				list: route.get("/todos").response(200, z.array(z.string())),
 			},
 		};
@@ -102,7 +109,23 @@ describe("initClient", () => {
 			await client.todos.form({ title: "Write tests", tags: ["docs"] }),
 			3,
 		);
-		assert.deepEqual(Object.keys(client.todos), ["get", "add", "form", "list"]);
+		assert.equal(await client.todos.search({ term: "open" }), 4);
+		await assert.rejects(
+			client.todos.search("wrong" as never),
+			/GET flat input must be an object/,
+		);
+		assert.equal(
+			(await client.todos.sync({ query: { id: "todo-1" } })).body,
+			"5",
+		);
+		assert.deepEqual(Object.keys(client.todos), [
+			"get",
+			"add",
+			"form",
+			"search",
+			"sync",
+			"list",
+		]);
 		assert.deepEqual(Object.keys(client.todos.list), []);
 		assert.equal(calls[0]?.url, "https://api.test/todos/get");
 		assert.equal(calls[0]?.init?.method, "POST");
@@ -126,6 +149,10 @@ describe("initClient", () => {
 			new Headers(calls[2]?.init?.headers).get("content-type"),
 			"application/x-www-form-urlencoded",
 		);
+		assert.equal(calls[3]?.url, "https://api.test/todos/search?term=open");
+		assert.equal(calls[3]?.init?.body, undefined);
+		assert.equal(calls[4]?.url, "https://api.test/todos/sync?id=todo-1");
+		assert.equal(calls[4]?.init?.method, "POST");
 	});
 
 	it("throws native errors for unsuccessful shorthand requests", async () => {

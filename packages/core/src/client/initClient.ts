@@ -47,22 +47,40 @@ export function initClient<
 		);
 
 	return mapContractRoutes(contract, (node, routePath) => {
-		if (node.kind === "procedure") {
-			const resolvedRoute: RouteDeclaration = {
-				...node,
-				path: `/${routePath.join("/")}`,
-			};
-			return (...args: FetchArgs) => {
-				return fetchSuccess(
-					fetchResponse,
-					resolvedRoute,
-					routePath,
-					{ body: args[0] } as never,
-					args[1],
+		const resolvedRoute: RouteDeclaration =
+			node.kind === "procedure"
+				? { ...node, path: `/${routePath.join("/")}` }
+				: node;
+		const flatInput =
+			node.input === "input" ||
+			(node.input === undefined && node.kind === "procedure");
+		const plainOutput =
+			node.output === "output" ||
+			(node.output === undefined && node.kind === "procedure");
+		return (...args: FetchArgs) => {
+			if (
+				node.input === "input" &&
+				node.method === "GET" &&
+				(typeof args[0] !== "object" ||
+					args[0] === null ||
+					Array.isArray(args[0]))
+			) {
+				return Promise.reject(
+					new Error("GET flat input must be an object of query values."),
 				);
-			};
-		}
-
-		return (...args: FetchArgs) => fetchResponse(node, routePath, ...args);
+			}
+			const request = flatInput
+				? { [node.method === "GET" ? "query" : "body"]: args[0] }
+				: args[0];
+			return plainOutput
+				? fetchSuccess(
+						fetchResponse,
+						resolvedRoute,
+						routePath,
+						request as never,
+						args[1],
+					)
+				: fetchResponse(resolvedRoute, routePath, request as never, args[1]);
+		};
 	}) as ApiClientFor<TContract, TGlobalHeaders>;
 }

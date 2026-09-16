@@ -99,6 +99,34 @@ expectType<
 	StandardSchemaV1<unknown, { readonly id: "todo-1"; readonly title: string }>
 >(procedure["~restrpc"].responses[200].body);
 
+const flatGet = route
+	.get("/todos")
+	.input(z.object({ id: z.string() }))
+	.output(output)
+	.handler(({ input: flatInput }) => ({ id: flatInput.id, title: "Todo" }));
+expectType<"input">(flatGet["~restrpc"].input);
+expectType<"output">(flatGet["~restrpc"].output);
+expectType<Promise<{ id: string; title: string }>>(
+	initClient({ flatGet }, { baseUrl: "https://example.test" }).flatGet({
+		id: "todo-1",
+	}),
+);
+
+const derivedResponse = route
+	.query(z.object({ search: z.string() }))
+	.response(201, output)
+	.handler(({ query }) => ({
+		status: 201 as const,
+		body: { id: "1", title: query.search },
+	}));
+expectType<"segments">(derivedResponse["~restrpc"].input);
+expectType<"response">(derivedResponse["~restrpc"].output);
+expectError(
+	route.handler(() =>
+		Math.random() > 0.5 ? { status: 200, body: "ok" } : "ok",
+	),
+);
+
 route.output(output).handler(() => ({ id: "todo-1", title: "Todo" }));
 expectError(route.output(output).handler(() => ({ id: 1, title: "Todo" })));
 

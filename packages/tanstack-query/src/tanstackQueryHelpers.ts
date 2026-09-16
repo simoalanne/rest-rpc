@@ -49,6 +49,16 @@ type DeclaredRouteResponseBody<E extends RouteDeclaration> =
 
 type RouteRequestValue<E extends QueryRoute> = ClientRequest<RouteFor<E>>;
 
+type IsPlainOutput<E extends RouteDeclaration> = E extends {
+	output: "response";
+}
+	? false
+	: E extends { output: "output" }
+		? true
+		: E extends { kind: "procedure" }
+			? true
+			: false;
+
 /**
  * Infers the successful query data returned for a route.
  *
@@ -59,9 +69,7 @@ type RouteRequestValue<E extends QueryRoute> = ClientRequest<RouteFor<E>>;
  * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#queries}
  */
 export type RouteQueryData<E extends QueryRoute> =
-	RouteFor<E> extends {
-		kind: "procedure";
-	}
+	IsPlainOutput<RouteFor<E>> extends true
 		? ClientResponse<RouteFor<E>>
 		: DeclaredRouteQueryData<RouteFor<E>>;
 
@@ -75,9 +83,7 @@ export type RouteQueryData<E extends QueryRoute> =
  * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#error-model}
  */
 export type RouteQueryError<E extends QueryRoute> =
-	RouteFor<E> extends {
-		kind: "procedure";
-	}
+	IsPlainOutput<RouteFor<E>> extends true
 		? Error
 		: DeclaredRouteQueryError<RouteFor<E>>;
 
@@ -397,7 +403,10 @@ export function createTanstackQueryHelpers<
 	const mapHttpRoutes = (node: Contract, path: string[] = []): unknown => {
 		const route = getRouteDeclaration(node);
 		if (route) {
-			if (route.kind === "procedure") {
+			if (
+				route.output === "output" ||
+				(route.output === undefined && route.kind === "procedure")
+			) {
 				const procedureClient = getByPath(client, path) as (
 					...args: unknown[]
 				) => Promise<unknown>;

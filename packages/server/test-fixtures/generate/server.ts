@@ -17,6 +17,10 @@ export const api = {
 			),
 	},
 	documents: {
+		search: serverFirstRoute
+			.get("/documents/search")
+			.input(schemaType<{ term: string }>())
+			.handler(({ input }) => ({ items: [input.term] })),
 		import: serverFirstRoute
 			.input(schemaType<string>(), {
 				contentType: ["text/plain", "text/markdown"],

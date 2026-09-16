@@ -30,14 +30,13 @@ export const shorthandClient = initClient(shorthandContract, {
 	baseUrl: "http://localhost",
 });
 
-export const configuredRoute = route.with({
-	pathPrefix: "/api",
-	metadata: { scope: "test" },
-	responses: { 401: scalar },
-	headers,
-	openApi: { tags: ["test"] },
-});
-export const configuredHttp = configuredRoute.get("/configured");
+export const configuredRoute = route
+	.get("/api/configured")
+	.metadata({ scope: "test" });
+export const configuredHttp = configuredRoute
+	.headers(headers)
+	.openAPI({ tags: ["test"] })
+	.response(401, scalar);
 
 export const initialHttp = route.get("/initial");
 export const jsonBody = route.post("/body").body(scalar);

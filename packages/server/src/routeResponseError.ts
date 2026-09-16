@@ -4,9 +4,13 @@ import type { RouteErrors } from "./routeBuilder.types.ts";
 type HttpRoutes<TContract> = TContract extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
-	? TRoute extends { kind: "http" }
+	? TRoute extends { output: "response" }
 		? TRoute
-		: never
+		: TRoute extends { output: "output" }
+			? never
+			: TRoute extends { kind: "http" }
+				? TRoute
+				: never
 	: TContract extends Record<string, unknown>
 		? {
 				[TKey in keyof TContract]: HttpRoutes<TContract[TKey]>;

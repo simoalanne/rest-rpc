@@ -10,7 +10,6 @@ describe("Next fetch tags", () => {
 			items: {
 				list: route
 					.get("/items/:id")
-					.body(type<{ ignoredBody: string }>())
 					.headers(type<{ authorization: string }>())
 					.params(type<{ id: string }>())
 					.query(type<{ filter: string; page: number }>())

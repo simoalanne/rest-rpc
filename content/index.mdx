@@ -12,9 +12,48 @@ contract to derive typed server handlers, fetch clients, TanStack Query helpers,
 and OpenAPI documents.
 
 `rest-rpc` keeps the wire format REST-shaped while making application code feel
-like ordinary function calls. Its route builders guide each declaration from
-method and path through request schemas, responses, metadata, and real-time
-messages, so the valid next steps stay discoverable in your editor.
+like ordinary function calls. Choose the HTTP details each route needs: method
+and URL, request locations, and response status are independent choices.
+
+## Use Only the Details You Need
+
+```ts
+// Just input and output: POST, with a URL derived from the route tree.
+route.input(type<{ title: string }>()).output(type<Post>());
+
+// Choose the method and URL; keep the request and response flat.
+route.get("/posts").input(type<{ search?: string }>()).output(type<Post[]>());
+
+// Separate query and headers; keep the response flat.
+route
+	.query(type<{ search?: string }>())
+	.headers(type<{ authorization: string }>())
+	.output(type<Post[]>());
+
+// Keep flat input, but return different HTTP statuses.
+route.input(type<{ id: string }>()).handler(({ id }) => {
+	const post = findPost(id);
+	return post
+		? { status: 200, body: post }
+		: { status: 404, body: { error: "Post not found" } };
+});
+
+// Specify every HTTP detail when the route needs it.
+route
+	.get("/posts/:id")
+	.params(type<{ id: string }>())
+	.query(type<{ includeComments?: boolean }>())
+	.headers(type<{ authorization: string }>())
+	.handler(({ params, query, headers }) => ({
+		status: 200,
+		responseHeaders: { etag: makeEtag(params.id) },
+		body: findPost(params.id, query.includeComments, headers.authorization),
+	}));
+```
+
+Plain outputs reach the client as data. Returns with `status` reach it as HTTP
+response envelopes. The builder keeps both shapes typed without making you
+choose a separate route kind.
 
 <CardGroup cols={2}>
 	<Card
@@ -152,9 +191,8 @@ Read [Server-first approach](/docs/server-first-quickstart).
 		implementations, when contract feels like too much work.
 	</Card>
 	<Card title="Composable route builders" icon="blocks" type="check">
-		Create configured factories with `route.with()` to share prefixes, headers,
-		responses, metadata, and OpenAPI details without wrapping the contract in a
-		global router.
+		Choose a method and path, flat input or request segments, and plain output
+		or status responses independently in one fluent builder.
 	</Card>
 	<Card title="Function-shaped usage" icon="braces" type="check">
 		Call routes through a typed client that mirrors your contract, such as

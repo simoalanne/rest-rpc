@@ -48,6 +48,34 @@ type RequestValue<TRoute extends RouteDeclaration> =
 		? EmptyObject
 		: RouteRequestData<TRoute>;
 
+type FlatInputSchema<TRoute extends RouteDeclaration> = TRoute extends {
+	request: { query: infer TQuery extends StandardSchemaV1 };
+}
+	? TQuery
+	: TRoute extends { request: { body: infer TBody extends StandardSchemaV1 } }
+		? TBody
+		: never;
+
+type UsesFlatInput<TRoute extends RouteDeclaration> = TRoute extends {
+	input: "segments";
+}
+	? false
+	: TRoute extends { input: "input" }
+		? true
+		: TRoute["kind"] extends "procedure"
+			? true
+			: false;
+
+type UsesPlainOutput<TRoute extends RouteDeclaration> = TRoute extends {
+	output: "response";
+}
+	? false
+	: TRoute extends { output: "output" }
+		? true
+		: TRoute["kind"] extends "procedure"
+			? true
+			: false;
+
 type HandlerResult<TRoute extends RouteDeclaration> = MaybePromise<
 	RouteResponse<TRoute>
 >;
@@ -63,13 +91,11 @@ export type RouteRequest<
 	TAdditionalHandlerFields extends object = EmptyObject,
 	TContext extends object = EmptyObject,
 > = Merge<
-	(TRoute["kind"] extends "procedure"
-		? TRoute extends {
-				request: { body: infer TInput extends StandardSchemaV1 };
-			}
+	(UsesFlatInput<TRoute> extends true
+		? FlatInputSchema<TRoute> extends infer TInput extends StandardSchemaV1
 			? { input: StandardSchemaV1.InferOutput<TInput> } & Omit<
 					RequestValue<TRoute>,
-					"body"
+					"body" | "query"
 				>
 			: EmptyObject
 		: RequestValue<TRoute>) &
@@ -310,22 +336,7 @@ type ProcedureHandlerMethod<
 					>;
 				}
 			: never
-		: {
-				handler<const TResult>(
-					handler: HandlerFor<
-						TRoute,
-						TAdditionalHandlerFields,
-						TContext,
-						TResult
-					>,
-				): HandlerImplementation<
-					TRoute,
-					TAdditionalHandlerFields,
-					TContext,
-					TResult,
-					InferredProcedureRoute<TRoute, TResult>
-				>;
-			};
+		: ImplicitHandlerMethod<TRoute, TAdditionalHandlerFields, TContext>;
 
 type HttpHandlerMethod<
 	TRoute extends RouteDeclaration,
@@ -352,31 +363,58 @@ type HttpHandlerMethod<
 					TResult
 				>;
 			}
-		: {
-				handler<const TResult extends MaybePromise<ImplicitResponseEnvelope>>(
-					handler: HandlerFor<
-						TRoute,
-						TAdditionalHandlerFields,
-						TContext,
-						TResult
-					>,
-				): HandlerImplementation<
-					TRoute,
-					TAdditionalHandlerFields,
-					TContext,
-					TResult,
-					InferredHttpRoute<TRoute, TResult>
-				>;
-			};
+		: ImplicitHandlerMethod<TRoute, TAdditionalHandlerFields, TContext>;
+
+type ReturnKind<T> = T extends unknown
+	? "status" extends keyof T
+		? "response"
+		: "output"
+	: never;
+
+type ValidImplicitResult<TResult> = [ReturnKind<Awaited<TResult>>] extends [
+	never,
+]
+	? never
+	: [ReturnKind<Awaited<TResult>>] extends ["response"]
+		? Awaited<TResult> extends ImplicitResponseEnvelope
+			? unknown
+			: never
+		: [ReturnKind<Awaited<TResult>>] extends ["output"]
+			? unknown
+			: never;
+
+type InferredRoute<TRoute, TResult> = [ReturnKind<Awaited<TResult>>] extends [
+	"response",
+]
+	? InferredHttpRoute<TRoute, TResult> & { output: "response" }
+	: InferredProcedureRoute<TRoute, TResult> & { output: "output" };
+
+type ImplicitHandlerMethod<
+	TRoute extends RouteDeclaration,
+	TAdditionalHandlerFields extends object,
+	TContext extends object,
+> = {
+	handler<const TResult>(
+		handler: HandlerFor<TRoute, TAdditionalHandlerFields, TContext, TResult> &
+			ValidImplicitResult<TResult>,
+	): HandlerImplementation<
+		TRoute,
+		TAdditionalHandlerFields,
+		TContext,
+		TResult,
+		InferredRoute<TRoute, TResult>
+	>;
+};
 
 /** Resolves the handler operation for a complete route declaration. */
 export type HandlerMethodFor<
 	TRoute extends RouteDeclaration,
 	TAdditionalHandlerFields extends object = EmptyObject,
 	TContext extends object = EmptyObject,
-> = TRoute["kind"] extends "procedure"
-	? ProcedureHandlerMethod<TRoute, TAdditionalHandlerFields, TContext>
-	: HttpHandlerMethod<TRoute, TAdditionalHandlerFields, TContext>;
+> =
+	UsesPlainOutput<TRoute> extends true
+		? ProcedureHandlerMethod<TRoute, TAdditionalHandlerFields, TContext>
+		: HttpHandlerMethod<TRoute, TAdditionalHandlerFields, TContext>;
 
 /** Core builder extension that exposes server handler attachment. */
 export interface ServerBuilderExtension<
@@ -414,6 +452,18 @@ export type InferredRouteResponse<TImplementation> =
 			: never
 		: never;
 
+type PlainResponseKind<TRoute> = TRoute extends {
+	responses: { 200: infer TResponse };
+}
+	? TResponse extends { kind: "stream" }
+		? "stream"
+		: TResponse extends { contentType: infer TContentType }
+			? TContentType extends "application/json"
+				? "json"
+				: "custom"
+			: "json"
+	: never;
+
 /**
  * Infers the body encodings represented by a server-first implementation.
  *
@@ -424,17 +474,8 @@ export type ServerFirstRouteResponseKind<TImplementation> =
 		route: infer TRoute;
 		handler: infer THandler extends AnyRouteHandler;
 	}
-		? TRoute extends {
-				kind: "procedure";
-				responses: { 200: infer TResponse };
-			}
-			? TResponse extends { kind: "stream" }
-				? "stream"
-				: TResponse extends { contentType: infer TContentType }
-					? TContentType extends "application/json"
-						? "json"
-						: "custom"
-					: "json"
+		? UsesPlainOutput<Extract<TRoute, RouteDeclaration>> extends true
+			? PlainResponseKind<TRoute>
 			: ImplicitResponseKind<Awaited<ReturnType<THandler>>>
 		: never;
 

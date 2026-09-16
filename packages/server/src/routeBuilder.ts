@@ -23,6 +23,9 @@ if (!prototype.handler) {
 	Object.defineProperty(prototype, "handler", {
 		value(this: RuntimeBuilder, handler: RuntimeRouteHandler) {
 			const state = this["~restrpc"];
+			if ("handler" in state) {
+				throw new Error("Route handler has already been attached.");
+			}
 			return new this.constructor({
 				...(state.kind
 					? state

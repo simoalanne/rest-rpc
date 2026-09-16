@@ -8,6 +8,8 @@ type GeneratedRoute = {
 		readonly kind: "http" | "procedure";
 		readonly method: string;
 		readonly path: string;
+		readonly input?: "input" | "segments";
+		readonly output?: "output" | "response";
 		readonly request?: { readonly contentType: string | readonly string[] };
 		readonly responses: Readonly<Record<string, { readonly kind?: "stream" }>>;
 	};
@@ -118,6 +120,13 @@ const routeFromType = (
 		location,
 		contractPath,
 	);
+	const inputType = optionalPropertyType(checker, routeType, "input", location);
+	const outputType = optionalPropertyType(
+		checker,
+		routeType,
+		"output",
+		location,
+	);
 	const responsesType = optionalPropertyType(
 		checker,
 		routeType,
@@ -185,6 +194,12 @@ const routeFromType = (
 			kind,
 			method,
 			path,
+			...(inputType?.isStringLiteral()
+				? { input: inputType.value as "input" | "segments" }
+				: {}),
+			...(outputType?.isStringLiteral()
+				? { output: outputType.value as "output" | "response" }
+				: {}),
 			...(contentType
 				? { request: { contentType: contentTypes(checker, contentType) } }
 				: {}),

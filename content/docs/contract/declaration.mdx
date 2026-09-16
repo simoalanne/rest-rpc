@@ -30,11 +30,31 @@ clients, TanStack Query options, and OpenAPI generation.
 
 ## Route Builders
 
-Start a route with an HTTP method and path, then add request and response
-declarations with chainable setters. Body, query, and path-parameter setters
-each receive one schema.
+Without a method setter, a route uses POST and derives its path from the keys
+in the contract tree. Use `.get(path)`, `.post(path)`, `.put(path)`,
+`.patch(path)`, or `.delete(path)` when the method or path should be explicit.
 
-Use `.response(status, schema)` repeatedly for declared statuses.
+Choose one flat `.input(schema)` or declare request segments with `.query()`,
+`.params()`, `.body()`, and `.headers()`. A flat GET input is encoded as query
+parameters; a flat input on other methods is sent as the body. Flat input
+requires a static path. GET routes cannot declare a body.
+
+Choose `.output(schema)` for one plain client result, or use
+`.response(status, schema)` for status envelopes. Responses can be repeated for
+different statuses. Request and response setters may appear in either order.
+
+```ts
+const api = {
+	todos: {
+		search: route
+			.get("/todos/search")
+			.input(z.object({ term: z.string() }))
+			.output(z.array(todoSchema)),
+	},
+};
+
+await client.todos.search({ term: "open" });
+```
 
 ## Request Model
 
@@ -144,41 +164,24 @@ route
 	});
 ```
 
-## Shared Route Options
+## Route Metadata
 
-`route.with()` creates a route factory with shared options for every route built
-from it. A factory can share headers, responses, metadata, OpenAPI metadata, and
-a path prefix.
+`.metadata()` and `.openAPI()` add information to one route. They can appear
+before or after input and response declarations.
 
 ```ts
-const apiRoute = route.with({
-	pathPrefix: "/api",
-	metadata: { auth: "required" },
-	headers: z.object({ "x-request-id": z.string().optional() }),
-	responses: { 401: z.object({ code: z.literal("UNAUTHORIZED") }) },
-	openApi: {
-		tags: ["Todos"],
-		security: [{ bearerAuth: [] }],
-	},
-});
-
 export const api = {
 	todos: {
-		list: apiRoute
-			.get("/todos")
+		list: route
+			.get("/api/todos")
+			.metadata({ auth: "required" })
+			.headers(z.object({ "x-request-id": z.string().optional() }))
 			.openAPI({ summary: "List todos" })
-			.response(200, z.object({ items: z.array(todoSchema) })),
+			.response(200, z.object({ items: z.array(todoSchema) }))
+			.response(401, z.object({ code: z.literal("UNAUTHORIZED") })),
 	},
 };
 ```
-
-The route above is normalized to `GET /api/todos`, includes the factory header,
-the factory `401` response, and keeps the route-specific OpenAPI summary.
-
-When a route adds its own header schema, both the factory and route schemas
-validate the original request headers. Their validated object outputs are
-shallow-merged, with route-local properties winning when both outputs contain
-the same key. Both schemas remain validation requirements.
 
 ## Single Routes
 

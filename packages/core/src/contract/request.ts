@@ -175,14 +175,20 @@ export type ClientRequest<
 	E extends RouteDeclaration,
 	TOptionalKeys extends PropertyKey = never,
 > = E extends { kind: "procedure" }
-	? E extends {
-			request: { body: infer TInput extends StandardSchemaV1 };
-		}
-		? StandardSchemaV1.InferInput<TInput>
-		: never
-	: E extends RouteDeclaration
+	? E extends { input: "segments" }
 		? OptionalRequestHeaders<InferRequestFor<E, "input">, TOptionalKeys>
-		: never;
+		: E extends { request: { body: infer TInput extends StandardSchemaV1 } }
+			? StandardSchemaV1.InferInput<TInput>
+			: never
+	: E extends { input: "input" }
+		? E extends { request: { query: infer TQuery extends StandardSchemaV1 } }
+			? StandardSchemaV1.InferInput<TQuery>
+			: E extends { request: { body: infer TBody extends StandardSchemaV1 } }
+				? StandardSchemaV1.InferInput<TBody>
+				: never
+		: E extends RouteDeclaration
+			? OptionalRequestHeaders<InferRequestFor<E, "input">, TOptionalKeys>
+			: never;
 
 type ServerContentType<TRequest> = TRequest extends {
 	contentType: infer TContentType;

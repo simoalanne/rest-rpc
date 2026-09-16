@@ -652,18 +652,18 @@ describe("ApiClient requests", () => {
 	});
 
 	it("normalizes merged headers and lets declared request headers win", async () => {
-		const apiRoute = route.with({
-			headers: z.object({
-				"x-common": z.number(),
-				"x-shared": z.number(),
-			}),
-		});
 		const apiContract = {
 			todos: {
-				list: apiRoute
+				list: route
 					.get("/todos")
 					.query(z.object({ search: z.string() }))
-					.headers(z.object({ "X-Route": z.string(), "x-shared": z.string() }))
+					.headers(
+						z.object({
+							"x-common": z.number(),
+							"X-Route": z.string(),
+							"x-shared": z.string(),
+						}),
+					)
 					.response(
 						200,
 						z.array(z.object({ id: z.string(), title: z.string() })),

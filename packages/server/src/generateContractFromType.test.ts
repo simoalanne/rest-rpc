@@ -17,18 +17,33 @@ describe("generateContractFromType with server routes", () => {
 					kind: "http",
 					method: "POST",
 					path: "/users/:id",
+					input: "segments",
+					output: "response",
 					request: { contentType: "application/json" },
 					responses: { 201: {}, 422: {} },
 				},
 			},
 		},
 		documents: {
+			search: {
+				"~restrpc": {
+					source: "generated",
+					kind: "http",
+					method: "GET",
+					path: "/documents/search",
+					input: "input",
+					output: "output",
+					responses: { 200: {} },
+				},
+			},
 			import: {
 				"~restrpc": {
 					source: "generated",
 					kind: "procedure",
 					method: "POST",
 					path: "",
+					input: "input",
+					output: "output",
 					request: {
 						contentType: ["text/plain", "text/markdown"],
 					},
@@ -41,6 +56,7 @@ describe("generateContractFromType with server routes", () => {
 					kind: "procedure",
 					method: "POST",
 					path: "",
+					output: "output",
 					responses: { 200: { kind: "stream" } },
 				},
 			},
@@ -76,13 +92,21 @@ describe("generateContractFromType with server routes", () => {
 			exportName: "api",
 		});
 
+		let searchUrl: string | undefined;
 		const client = initClient(contract, {
 			baseUrl: "https://api.test",
-			fetch: async () =>
-				new Response(JSON.stringify({ code: "invalid_name" }), {
+			fetch: async (url) => {
+				if (String(url).includes("/documents/search")) {
+					searchUrl = String(url);
+					return new Response(JSON.stringify({ items: ["milk"] }), {
+						headers: { "content-type": "application/json" },
+					});
+				}
+				return new Response(JSON.stringify({ code: "invalid_name" }), {
 					status: 422,
 					headers: { "content-type": "application/problem+json" },
-				}),
+				});
+			},
 		});
 		const response = await client.users.create({
 			body: { name: "" },
@@ -91,6 +115,10 @@ describe("generateContractFromType with server routes", () => {
 
 		assert.equal(response.status, 422);
 		assert.deepEqual(response.body, { code: "invalid_name" });
+		assert.deepEqual(await client.documents.search({ term: "milk" }), {
+			items: ["milk"],
+		});
+		assert.equal(searchUrl, "https://api.test/documents/search?term=milk");
 	});
 
 	it("preserves stream response kinds for generated clients", async () => {

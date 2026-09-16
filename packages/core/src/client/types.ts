@@ -100,19 +100,23 @@ type RouteDeclaredResponse<E extends RouteDeclaration> = WithResponseMetadata<
 /**
  * Infers a route's client result.
  *
- * @remarks Explicit HTTP routes produce a status-discriminated response
- * envelope. Procedure routes produce their output value directly.
+ * @remarks Routes declared with `.response()` produce status-discriminated
+ * envelopes. Routes declared with `.output()` produce their output directly.
  *
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-an-http-route}
  * @see {@link https://rest-rpc.dev/docs/procedures#call-procedures}
  */
 export type ClientResponse<E extends RouteDeclaration> = E extends {
-	kind: "procedure";
+	output: "response";
 }
-	? ProcedureRouteOutput<E>
-	: E extends RouteDeclaration
-		? RouteDeclaredResponse<E>
-		: never;
+	? RouteDeclaredResponse<E>
+	: E extends { output: "output" }
+		? ProcedureRouteOutput<E>
+		: E extends { kind: "procedure" }
+			? ProcedureRouteOutput<E>
+			: E extends RouteDeclaration
+				? RouteDeclaredResponse<E>
+				: never;
 
 export type FetchResponseFn<
 	E extends RouteDeclaration,
@@ -128,13 +132,7 @@ export type FetchResponseFn<
 export type ApiClientRouteValue<
 	E extends RouteDeclaration = RouteDeclaration,
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
-> = E extends RouteDeclaration
-	? E extends { kind: "procedure" }
-		? (...args: FetchArgs<E, TGlobalHeaders>) => Promise<ClientResponse<E>>
-		: E extends RouteDeclaration
-			? FetchResponseFn<E, TGlobalHeaders>
-			: never
-	: never;
+> = E extends RouteDeclaration ? FetchResponseFn<E, TGlobalHeaders> : never;
 
 type ProcedureRouteOutput<TRoute extends RouteDeclaration> =
 	SuccessfulDeclaredClientResponse<TRoute> extends infer TResponse

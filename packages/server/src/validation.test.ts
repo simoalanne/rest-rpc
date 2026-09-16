@@ -26,11 +26,10 @@ describe("validateRequest", () => {
 				seen.push(value);
 				return { local: true, shared: "local" };
 			});
-		const declaration = route
-			.with({ headers: inherited })
-			.get("/headers")
-			.headers(local)
-			.response(204)["~restrpc"];
+		const declaration = {
+			...route.get("/headers").response(204)["~restrpc"],
+			request: { headers: { inherited, local } },
+		};
 
 		const result = await validateRequest(declaration, {
 			headers: {
@@ -55,11 +54,15 @@ describe("validateRequest", () => {
 	});
 
 	it("rejects a request when either inherited or local header validation fails", async () => {
-		const declaration = route
-			.with({ headers: z.object({ authorization: z.string() }) })
-			.get("/headers")
-			.headers(z.object({ requestId: z.string() }))
-			.response(204)["~restrpc"];
+		const declaration = {
+			...route.get("/headers").response(204)["~restrpc"],
+			request: {
+				headers: {
+					inherited: z.object({ authorization: z.string() }),
+					local: z.object({ requestId: z.string() }),
+				},
+			},
+		};
 
 		for (const headers of [
 			{ requestId: "request-1" },

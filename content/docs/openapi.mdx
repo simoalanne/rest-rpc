@@ -176,40 +176,32 @@ route
 Use route response `headers` instead when a handler-owned header is part of the
 typed rest-rpc contract.
 
-## Shared Metadata
+## Route Metadata
 
-Pass `openApi` to `route.with()` to apply metadata to every route created by
-that configured factory.
+Use `.openAPI()` to describe one route. Its position among the request and
+response setters does not affect the generated operation.
 
 ```ts
-const documentedRoute = route.with({
-	openApi: {
-		tags: ["Todos"],
-		security: [{ bearerAuth: [] }],
-		responses: {
-			200: {
-				headers: {
-					"x-request-id": z.string(),
-				},
-			},
-			401: {
-				description: "Authentication is required.",
-			},
-		},
-	},
-});
-
 export const api = {
 	todos: {
-		list: documentedRoute.get("/todos").response(200, z.array(todoSchema)),
+		list: route
+			.get("/todos")
+			.openAPI({
+				tags: ["Todos"],
+				security: [{ bearerAuth: [] }],
+				responses: {
+					200: { headers: { "x-request-id": z.string() } },
+					401: { description: "Authentication is required." },
+				},
+			})
+			.response(200, z.array(todoSchema))
+			.response(401, z.object({ code: z.string() })),
 	},
 };
 ```
 
-The factory's `openApi.responses` is merged into each route's OpenAPI metadata.
-Metadata passed to `.openAPI()` overrides shared metadata. Typed headers
-declared on a route response override OpenAPI-only headers with the same name
-in generated OpenAPI.
+Typed headers declared on a route response override OpenAPI-only headers with
+the same name in generated OpenAPI.
 
 ## Transform Hooks
 

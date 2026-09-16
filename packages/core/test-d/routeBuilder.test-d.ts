@@ -12,8 +12,6 @@ const input = schemaType<{ title: string }>();
 const unauthorized = schemaType<{ message: string }>();
 const event = schemaType<{ id: string }>();
 const typedResponseHeaders = schemaType<{ "x-total": number }>();
-const factoryHeaders = schemaType<{ authorization: string }>();
-const localRequestHeader = schemaType<{ trace: number }>();
 const scalarQuery = schemaType<{
 	search?: string;
 	page: number;
@@ -22,14 +20,6 @@ const scalarQuery = schemaType<{
 const scalarParams = schemaType<{ accountId: string; version: number }>();
 const customText = schemaType<string>();
 const customBytes = schemaType<Uint8Array>();
-
-const apiRoute = route.with({
-	pathPrefix: "/api",
-	headers: factoryHeaders,
-	responses: { 401: unauthorized },
-	metadata: { auth: true as const },
-	openApi: { tags: ["API"] },
-});
 
 // Shorthand route builders
 
@@ -88,69 +78,56 @@ expectError(shorthandOutputFirst.output(todo));
 expectError(streamOutput.output(todo));
 expectError(streamOutput.streamOutput(event));
 expectError(shorthandWithInput.response(200, todo));
-expectError(route.post("/todos").input(input));
-expectError(apiRoute.input(input));
+const explicitFlat = route.post("/todos").input(input).output(todo);
+expectType<typeof input>(explicitFlat["~restrpc"].request.body);
 
 // HTTP route builders
 
 // Builds an ordinary request/response route declaration.
-const create = apiRoute
+const create = route
 	.post("/todos")
 	.body(input)
 	.headers(schemaType<{ trace: string }>())
-	.params(schemaType<{ accountId: string }>())
 	.metadata({ permission: "todos:create" as const })
 	.openAPI({ summary: "Create todo" })
-	.response(201, todo);
+	.response(201, todo)
+	.response(401, unauthorized);
 
 expectType<"POST">(create["~restrpc"].method);
-expectType<"/api/todos">(create["~restrpc"].path);
-expectType<{ readonly auth: true; readonly permission: "todos:create" }>(
+expectType<"/todos">(create["~restrpc"].path);
+expectType<"segments">(create["~restrpc"].input);
+expectType<"response">(create["~restrpc"].output);
+expectType<{ readonly permission: "todos:create" }>(
 	create["~restrpc"].metadata,
 );
 expectType<OpenApiRouteOptions>(create["~restrpc"].openApi);
 expectType<typeof input>(create["~restrpc"].request.body);
 expectType<"application/json">(create["~restrpc"].request.contentType);
 expectType<typeof todo>(create["~restrpc"].responses[201].body);
-expectType<"application/json">(create["~restrpc"].responses[201].contentType);
 expectType<typeof unauthorized>(create["~restrpc"].responses[401].body);
 expectAssignable<RouteDeclaration>(create["~restrpc"]);
 expectAssignable<Contract>(create);
-expectError(route.with({ responses: { 401: { body: unauthorized } } }));
+expectError(create.input(input));
+expectError(create.output(todo));
 
 // Routes without a declared response carry an empty response map.
 const incompleteHttp = route.get("/incomplete");
 expectAssignable<RouteDeclaration>(incompleteHttp["~restrpc"]);
 expectAssignable<Contract>(incompleteHttp);
 
-// Accepts a response supplied by the route factory.
-const factoryResponse = apiRoute.get("/factory-response");
-expectAssignable<RouteDeclaration>(factoryResponse["~restrpc"]);
-expectAssignable<Contract>(factoryResponse);
-expectType<typeof factoryHeaders>(
-	factoryResponse["~restrpc"].request.headers.inherited,
+const flatGet = route.get("/search").input(scalarQuery).output(todo);
+expectType<"input">(flatGet["~restrpc"].input);
+expectType<"output">(flatGet["~restrpc"].output);
+expectType<typeof scalarQuery>(flatGet["~restrpc"].request.query);
+expectError(flatGet.query(scalarQuery));
+expectError(flatGet.response(200, todo));
+expectError(route.get("/search").body(input));
+expectError(
+	route.get("/search").input(scalarQuery, { contentType: "text/plain" }),
 );
-
-// Rejects the removed status-code option.
-expectError(route.with({ strictStatusCodes: true }));
-expectError(route.with({ strictStatusCodes: false }));
-
-// Preserves inherited metadata and lets local metadata override shared keys.
-const inheritedMetadata = route
-	.with({ metadata: { scope: "shared", authenticated: true } })
-	.get("/metadata");
-expectType<{
-	readonly scope: "shared";
-	readonly authenticated: true;
-}>(inheritedMetadata["~restrpc"].metadata);
-const mergedMetadata = inheritedMetadata
-	.metadata({ scope: "local", operation: "read" })
-	.response(200);
-expectType<{
-	readonly authenticated: true;
-	readonly scope: "local";
-	readonly operation: "read";
-}>(mergedMetadata["~restrpc"].metadata);
+expectError(
+	route.get("/search").input(schemaType<{ nested: { value: string } }>()),
+);
 
 // Preserves schema inference for form and multipart content types.
 const importRoute = route
@@ -235,18 +212,6 @@ expectError(
 	route.get("/invalid-response-headers").response(200, todo, {
 		headers: schemaType<{ invalid: { nested: string } }>(),
 	}),
-);
-
-// Merges factory request headers with route-local request headers.
-const factoryAndLocalHeaders = apiRoute
-	.get("/merged-headers")
-	.headers(localRequestHeader)
-	.response(200);
-expectType<typeof factoryHeaders>(
-	factoryAndLocalHeaders["~restrpc"].request.headers.inherited,
-);
-expectType<typeof localRequestHeader>(
-	factoryAndLocalHeaders["~restrpc"].request.headers.local,
 );
 
 expectAssignable<RouteDeclaration>(
@@ -335,4 +300,4 @@ expectAssignable<RouteDeclaration>(
 
 expectError(route.get("/health").response(todo));
 expectError(route.input(input, "text/plain"));
-expectError(apiRoute.post("/todos").responses({ 201: todo }));
+expectError(route.post("/todos").responses({ 201: todo }));

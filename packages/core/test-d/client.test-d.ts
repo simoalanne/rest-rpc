@@ -619,35 +619,12 @@ expectError(
 );
 expectError(looseGlobalHeadersClient.todos.search());
 
-const composedHeadersApi = {
-	todos: {
-		get: route
-			.with({
-				headers: z.object({ shared: z.string(), inherited: z.string() }),
-			})
-			.get("/todos/composed")
-			.headers(z.object({ shared: z.number(), local: z.boolean() }))
-			.response(204),
-	},
-};
-const composedHeadersClient = initClient(composedHeadersApi, {
-	baseUrl: "https://example.test",
-});
-expectError(
-	composedHeadersClient.todos.get({
-		headers: {
-			shared: "cannot satisfy both schemas",
-			inherited: "token",
-			local: true,
-		},
-	}),
-);
-
 const additiveHeadersApi = {
 	items: route
-		.with({ headers: z.object({ authorization: z.string() }) })
 		.get("/items")
-		.headers(z.object({ "x-request-id": z.string() }))
+		.headers(
+			z.object({ authorization: z.string(), "x-request-id": z.string() }),
+		)
 		.response(204),
 };
 const additiveHeadersClient = initClient(additiveHeadersApi, {

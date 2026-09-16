@@ -2,25 +2,23 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import z from "zod";
 import { type } from "../standard-schema/index.ts";
-import { route } from "./routeBuilder.ts";
+import { RouteBuilder, route } from "./routeBuilder.ts";
 
 describe("route builder runtime", () => {
 	it("rejects invalid HTTP response statuses", () => {
+		const runtimeRoute = route as unknown as RouteBuilder;
 		assert.throws(
 			() => route.get("/invalid").response(600 as never),
 			/Invalid HTTP response status "600"/,
 		);
 		assert.throws(
-			() =>
-				route
-					.with({ responses: { 99: type<string>() } } as never)
-					.get("/invalid"),
+			() => runtimeRoute.response(99, type<string>()),
 			/Invalid HTTP response status "99"/,
 		);
 	});
 
 	it("constructs every HTTP method with only namespaced runtime data", () => {
-		assert.deepEqual(route["~restrpc"], {});
+		assert.deepEqual(route["~restrpc"], { path: "" });
 		for (const [factory, method] of [
 			["get", "GET"],
 			["post", "POST"],
@@ -33,9 +31,9 @@ describe("route builder runtime", () => {
 			assert.equal(declaration["~restrpc"].path, "/items");
 			assert.deepEqual(Object.keys(declaration), ["~restrpc"]);
 			assert.deepEqual(Object.keys(declaration["~restrpc"]), [
+				"path",
 				"kind",
 				"method",
-				"path",
 				"responses",
 				"request",
 			]);
@@ -115,15 +113,42 @@ describe("route builder runtime", () => {
 		});
 	});
 
-	it("normalizes common response schemas into response declarations", () => {
-		const errorSchema = z.object({ message: z.string() });
-		const declaration = route
-			.with({ responses: { 500: errorSchema } })
-			.get("/items");
-
-		assert.deepEqual(declaration["~restrpc"].responses, {
-			500: { body: errorSchema, contentType: "application/json" },
-		});
+	it("rejects conflicting input and output choices", () => {
+		const runtimeRoute = route as unknown as RouteBuilder;
+		const schema = type<{ id: string }>();
+		assert.throws(
+			() => runtimeRoute.input(schema).body(schema),
+			/Cannot combine flat input with request segments/,
+		);
+		assert.throws(
+			() => runtimeRoute.body(schema).input(schema),
+			/Cannot combine flat input with request segments/,
+		);
+		assert.throws(
+			() => runtimeRoute.output(schema).response(201, schema),
+			/Cannot combine plain output with response envelopes/,
+		);
+		assert.throws(
+			() => runtimeRoute.response(201, schema).output(schema),
+			/Cannot combine plain output with response envelopes/,
+		);
+		assert.throws(
+			() => runtimeRoute.get("/items").body(schema),
+			/GET routes cannot declare a request body/,
+		);
+		assert.throws(
+			() =>
+				runtimeRoute.get("/items").input(schema, { contentType: "text/plain" }),
+			/GET flat input cannot declare a body content type/,
+		);
+		assert.throws(
+			() => runtimeRoute.get("/items/:id").input(schema),
+			/Flat input requires a static route path/,
+		);
+		assert.throws(
+			() => runtimeRoute.response(201, schema).response(201, schema),
+			/Response status "201" has already been declared/,
+		);
 	});
 
 	it("returns a new declaration from every builder method", () => {
