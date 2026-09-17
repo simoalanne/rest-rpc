@@ -11,33 +11,41 @@ pnpm add @rest-rpc/hono
 
 ## Usage
 
+Register routes on a Hono application or a child app. Hono middleware and the native
+context remain available to handlers.
+
 ```ts
-import { implement, registerRoutes } from "@rest-rpc/hono";
 import { Hono } from "hono";
-import { api } from "./contract";
+import { route, registerRoutes } from "@rest-rpc/hono";
+import { z } from "zod";
 
 const app = new Hono();
+const api = new Hono();
+const todos = new Map([["todo_1", { id: "todo_1", title: "Write docs" }]]);
 
-const implementor = implement(api);
+api.use("*", async (c, next) => {
+	console.log(c.req.method, c.req.path);
+	await next();
+});
 
-const routes = {
-	todos: {
-		list: implementor.todos.list.handler(() => ({
-			status: 200,
-			body: listTodos(),
-		})),
-		get: implementor.todos.get.handler(({ params: { id }, c }) => {
-			const authorization = c.req.header("authorization");
-			return { status: 200, body: getTodo(id, { authorization }) };
-		}),
-		create: implementor.todos.create.handler(({ body: { title } }) => {
-			return { status: 201, body: createTodo({ title }) };
-		}),
-	},
-};
+const getTodo = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.handler(({ params, c }) => {
+		const todo = todos.get(params.id);
+		return todo
+			? {
+					status: 200,
+					body: todo,
+					responseHeaders: { "x-request-id": c.req.header("x-request-id") },
+				}
+			: { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
+	});
 
-registerRoutes(app, routes);
+export const routes = { todos: { get: getTodo } };
 
+registerRoutes(api, routes);
+app.route("/api", api);
 export default app;
 ```
 
@@ -58,27 +66,22 @@ type RouteHandlerFields<E extends Env = Env> = {
 type RegisterRoutesOptions<TEnv extends Env = Env> = {
 	requestValidationErrorHandler?: RequestValidationErrorHandler<TEnv>;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler<TEnv>;
-	bodyParser?: HonoBodyParser;
+	bodyCodecs?: readonly BodyCodec<HonoRequest>[];
+	requestBodyLimit?: number;
 	middleware?: Array<
 		(c: Context<TEnv>, next: Next, route: RouteDeclaration) => any
 	>;
 };
 ```
 
-### Body Parsing
+`bodyCodecs`: see [Serialization and Codecs](/docs/http-behavior/serialization).
 
-```ts
-registerRoutes(app, routes, {
-	bodyParser: (request) => request.json(),
-});
-```
+`requestBodyLimit`: see [request body limits](/docs/http-behavior/serialization#server-request-deserialization).
 
 ### Error handling
 
-Request validation errors default to a 400 response. Response contract
-validation errors default to a generic 500 response. Customize them with
-handlers that receive the native Hono context. Other errors are handled by
-Hono's error handler.
+Use `requestValidationErrorHandler` and `responseValidationErrorHandler` to
+customize [validation errors](/docs/http-behavior/schemas). Other errors use Hono's error handler.
 
 ```ts
 registerRoutes(app, routes, {

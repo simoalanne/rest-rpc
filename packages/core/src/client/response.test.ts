@@ -65,8 +65,8 @@ describe("ApiClient responses", () => {
 		assert.deepEqual(response, {
 			status: 404,
 			headers: new Headers(),
+			responseHeaders: undefined,
 			body: { code: "not_found" },
-			responseHeaders: { "content-type": "application/json" },
 		});
 	});
 
@@ -122,7 +122,7 @@ describe("ApiClient responses", () => {
 		assert.equal(rawResponse.bodyUsed, false);
 	});
 
-	it("rejects response statuses outside the HTTP range", async () => {
+	it("rejects an error response as an undeclared status", async () => {
 		captureFetch(Response.error());
 		const client = initClient(createResponseTestContract(), {
 			baseUrl: "https://api.test",
@@ -130,7 +130,7 @@ describe("ApiClient responses", () => {
 
 		await assert.rejects(
 			() => client.todos.get({ params: { id: "todo-1" } }),
-			/invalid HTTP response status "0"/,
+			/declared response/,
 		);
 	});
 
@@ -448,7 +448,8 @@ describe("ApiClient responses", () => {
 
 		const response = await client.reports.csv();
 
-		assert.equal(response.contentType, "text/csv");
+		assert.equal(response.headers.get("content-type"), "text/csv");
+		assert.equal("contentType" in response, false);
 		assert.equal(response.body, "id,title\n1,First\n");
 	});
 
@@ -470,7 +471,7 @@ describe("ApiClient responses", () => {
 		assert.equal(await client.export(), "report data");
 	});
 
-	it("uses a custom body parser for custom responses", async () => {
+	it("uses a custom deserializer for custom responses", async () => {
 		const apiContract = {
 			reports: {
 				binaryText: route.get("/reports/custom").response(200, z.string(), {
@@ -485,7 +486,9 @@ describe("ApiClient responses", () => {
 		);
 		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
-			bodyParser: (response) => response.text(),
+			bodyCodecs: [
+				{ match: () => true, deserialize: (response) => response.text() },
+			],
 			validateResponses: true,
 		});
 
@@ -507,22 +510,23 @@ describe("ApiClient responses", () => {
 		);
 		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
-			bodyParser: (response) => response.text(),
+			bodyCodecs: [
+				{ match: () => true, deserialize: (response) => response.text() },
+			],
 		});
 
 		const response = await client.events();
-		assert.equal(response.contentType, "application/x-ndjson");
+		assert.equal(response.headers.get("content-type"), "application/x-ndjson");
+		assert.equal("contentType" in response, false);
 		assert.equal(response.body, "event data");
 	});
 
-	it("returns normalized content type metadata for custom response bodies", async () => {
+	it("retains original headers without incoming content type metadata", async () => {
 		const apiContract = {
 			reports: {
-				image: route
-					.get("/reports/image")
-					.response(200, z.instanceof(Uint8Array), {
-						contentType: ["image/png", "image/jpeg"],
-					}),
+				image: route.get("/reports/image").response(200, z.instanceof(Blob), {
+					contentType: ["image/png", "image/jpeg"],
+				}),
 			},
 		};
 		captureFetch(
@@ -538,34 +542,42 @@ describe("ApiClient responses", () => {
 		const response = await client.reports.image();
 
 		assert.equal(response.status, 200);
-		assert.equal(response.contentType, "image/jpeg");
-		assert.deepEqual(response.body, new TextEncoder().encode("jpeg bytes"));
-	});
-
-	it("uses the received content type when validation is disabled", async () => {
-		const apiContract = {
-			reports: {
-				csv: route
-					.get("/reports.csv")
-					.response(200, z.string(), { contentType: "text/csv" }),
-			},
-		};
-		captureFetch(
-			new Response("{}", {
-				status: 200,
-				headers: { "content-type": "application/json" },
-			}),
+		assert.equal("contentType" in response, false);
+		assert.equal(
+			response.headers.get("content-type"),
+			"image/jpeg; charset=binary",
 		);
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-
-		const response = await client.reports.csv();
-
-		assert.equal(response.status, 200);
-		assert.deepEqual(response.body, {});
-		assert.deepEqual(response.responseHeaders, {
-			"content-type": "application/json",
-		});
+		assert.ok(response.body instanceof Blob);
+		assert.equal(await response.body.text(), "jpeg bytes");
 	});
+
+	for (const validateResponses of [false, true]) {
+		it(`checks transport acceptance independently of schema validation (${validateResponses})`, async () => {
+			const rawResponse = new Response("{}", {
+				headers: { "content-type": "application/json" },
+			});
+			captureFetch(rawResponse);
+			const client = initClient(
+				{
+					csv: route
+						.get("/csv")
+						.response(200, z.string(), { contentType: "text/csv" }),
+				},
+				{
+					baseUrl: "https://api.test",
+					validateResponses,
+					bodyCodecs: [
+						{
+							match: () => {
+								throw new Error("Must reject before matching");
+							},
+							deserialize: () => "wrong",
+						},
+					],
+				},
+			);
+			await assert.rejects(client.csv(), /unsupported response content-type/);
+			assert.equal(rawResponse.bodyUsed, false);
+		});
+	}
 });

@@ -1,5 +1,4 @@
 import {
-	type BodyContentType,
 	getRequestHeaderSchemas,
 	type ResponseBodySchema,
 	type ResponseDeclaration,
@@ -13,22 +12,15 @@ import {
 import type { HttpHeaders } from "./headers.ts";
 import {
 	ResponseValidationError,
-	type RequestValidationIssues,
+	RequestValidationError,
 } from "./validationErrors.ts";
 
 /**
  * A Standard Schema validation issue surfaced by server request validation.
  *
- * @see {@link https://rest-rpc.dev/docs/contract/schemas#validation}
+ * @see {@link https://rest-rpc.dev/docs/http-behavior/schemas#request-validation}
  */
 export type ValidationIssue = StandardSchemaV1.Issue;
-
-export type RequestValidationResponse =
-	| { success: true; data: Record<string, unknown> }
-	| {
-			success: false;
-			issues: RequestValidationIssues;
-	  };
 
 /**
  * Parsed request pieces passed into server request validation.
@@ -47,7 +39,7 @@ type SegmentValidationResult = {
 
 type RequestObjectSchema = StandardSchemaV1<unknown, unknown>;
 
-const parseQueryOrFormData = (searchParams: URLSearchParams | FormData) => {
+const parseQuery = (searchParams: URLSearchParams) => {
 	const data: Record<string, unknown> = {};
 
 	for (const [wireKey, value] of searchParams) {
@@ -64,47 +56,30 @@ const parseQueryOrFormData = (searchParams: URLSearchParams | FormData) => {
 	return data;
 };
 
-export const getHeaderValue = (
-	headers: unknown,
-	name: string,
-): string | undefined => {
-	if (typeof headers !== "object" || headers === null) return undefined;
-
-	for (const [key, value] of Object.entries(headers)) {
-		if (key.toLowerCase() !== name) continue;
-		if (Array.isArray(value)) return String(value[0]);
-		if (value === undefined) return undefined;
-		return String(value);
-	}
-
-	return undefined;
-};
-
-const validateObjectSchema = async (
-	schema: RequestObjectSchema,
+const validateRequestSegment = async (
+	schema: RequestObjectSchema | undefined,
 	input: unknown,
 ): Promise<SegmentValidationResult> => {
+	if (!schema) return { data: undefined, errors: [] };
 	const result = await validateStandardSchema(schema, input);
 	if (result.issues) {
-		return { data: {}, errors: result.issues };
+		return { data: undefined, errors: result.issues };
 	}
-
 	return { data: result.value, errors: [] };
 };
 
-const validateRequestObject = async (
-	declaration: RequestObjectSchema | undefined,
-	input: unknown,
+const validateRequestQuery = async (
+	schema: RequestObjectSchema | undefined,
+	query: URLSearchParams | undefined,
 ): Promise<SegmentValidationResult> => {
-	if (!declaration) return { data: {}, errors: [] };
-	return validateObjectSchema(declaration, input);
+	return validateRequestSegment(schema, query ? parseQuery(query) : undefined);
 };
 
-const validateHeaders = async (
+const validateRequestHeaders = async (
 	declaration: RequestHeadersDeclaration | undefined,
 	input: unknown,
 ): Promise<SegmentValidationResult> => {
-	if (!declaration) return { data: {}, errors: [] };
+	if (!declaration) return { data: undefined, errors: [] };
 
 	const data: Record<string, unknown> = {};
 	const errors: StandardSchemaV1.Issue[] = [];
@@ -117,156 +92,41 @@ const validateHeaders = async (
 	return { data, errors };
 };
 
-const normalizeContentType = (contentType: string) =>
-	contentType.split(";")[0]?.trim().toLowerCase();
-
-const getDeclaredContentType = (
-	contentTypes: readonly string[],
-	contentType: string,
-) => {
-	const normalized = normalizeContentType(contentType);
-	return contentTypes.find(
-		(value) => normalizeContentType(value) === normalized,
-	);
-};
-
-const validateCustomBody = async (
-	route: RouteDeclaration,
-	body: unknown,
-	headers: unknown,
-): Promise<SegmentValidationResult> => {
-	const declaration = route.request;
-	if (!declaration?.body || declaration.contentType === undefined) {
-		return { data: {}, errors: [] };
-	}
-	const contentTypes =
-		declaration.contentType === undefined
-			? undefined
-			: Array.isArray(declaration.contentType)
-				? declaration.contentType
-				: [declaration.contentType];
-	const contentType =
-		body !== undefined ? getHeaderValue(headers, "content-type") : undefined;
-	const declaredContentType =
-		contentTypes && typeof contentType === "string"
-			? getDeclaredContentType(contentTypes, contentType)
-			: undefined;
-
-	if (contentTypes && !declaredContentType) {
-		return {
-			data: {},
-			errors: [{ message: "Unsupported custom body contentType." }],
-		};
-	}
-
-	const normalized = declaredContentType
-		? normalizeContentType(declaredContentType)
-		: undefined;
-	let parsedBody = body;
-	if (normalized === "application/x-www-form-urlencoded") {
-		if (!(body instanceof URLSearchParams)) {
-			return {
-				data: {},
-				errors: [{ message: "Expected URLSearchParams form body." }],
-			};
-		}
-		parsedBody = parseQueryOrFormData(body);
-	} else if (normalized === "multipart/form-data") {
-		if (!(body instanceof FormData)) {
-			return {
-				data: {},
-				errors: [{ message: "Expected FormData multipart body." }],
-			};
-		}
-		parsedBody = parseQueryOrFormData(body);
-	}
-
-	const result = await validateStandardSchema(declaration.body, parsedBody);
-	if (result.issues) {
-		return { data: {}, errors: result.issues };
-	}
-
-	return {
-		data: {
-			body: result.value,
-			...(declaredContentType
-				? { contentType: declaredContentType }
-				: typeof contentType === "string"
-					? { contentType }
-					: {}),
-		},
-		errors: [],
-	};
-};
-
-const getValidatedRequestData = (
-	route: RouteDeclaration,
-	body: SegmentValidationResult,
-	query: SegmentValidationResult,
-	params: SegmentValidationResult,
-	headers: SegmentValidationResult,
-) => {
-	const request = route.request;
-	return {
-		...(request?.body
-			? {
-					body:
-						request.contentType !== undefined
-							? (body.data as Record<string, unknown>).body
-							: body.data,
-				}
-			: {}),
-		...(request?.contentType !== undefined &&
-		request.contentType !== "application/json" &&
-		(body.data as Record<string, unknown>).contentType !== undefined
-			? {
-					contentType: (body.data as Record<string, unknown>).contentType,
-				}
-			: {}),
-		...(request?.query ? { query: query.data } : {}),
-		...(request?.params ? { params: params.data } : {}),
-		...(request?.headers ? { headers: headers.data } : {}),
-	};
-};
-
-export async function validateRequest(
+export async function validateRequestSegments(
 	route: RouteDeclaration,
 	segments: RequestSegments,
-): Promise<RequestValidationResponse> {
-	const request = route.request;
-	const body =
-		request?.contentType !== undefined
-			? await validateCustomBody(route, segments.body, segments.headers)
-			: await validateRequestObject(request?.body, segments.body);
-	const query = await validateRequestObject(
-		request?.query,
-		segments.query ? parseQueryOrFormData(segments.query) : undefined,
+) {
+	const requestSchemas = route.request;
+	const body = await validateRequestSegment(
+		requestSchemas?.body,
+		segments.body,
 	);
-	const params = await validateRequestObject(request?.params, segments.params);
-	const headers = await validateHeaders(request?.headers, segments.headers);
+	const query = await validateRequestQuery(
+		requestSchemas?.query,
+		segments.query,
+	);
+	const params = await validateRequestSegment(
+		requestSchemas?.params,
+		segments.params,
+	);
+	const headers = await validateRequestHeaders(
+		requestSchemas?.headers,
+		segments.headers,
+	);
 	const issues = {
 		body: body.errors,
 		query: query.errors,
 		params: params.errors,
 		headers: headers.errors,
 	};
-	const errors = [
-		...body.errors,
-		...query.errors,
-		...params.errors,
-		...headers.errors,
-	];
-
-	if (errors.length === 0) {
-		return {
-			success: true,
-			data: getValidatedRequestData(route, body, query, params, headers),
-		};
+	if (Object.values(issues).some((errors) => errors.length > 0)) {
+		throw new RequestValidationError(issues);
 	}
-
 	return {
-		success: false,
-		issues,
+		body: body.data,
+		query: query.data,
+		params: params.data,
+		headers: headers.data,
 	};
 }
 
@@ -304,30 +164,6 @@ export const validateResponseHeaders = async (
 			value === undefined ? [] : [[name, String(value)]],
 		),
 	);
-};
-
-export const resolveCustomResponseBody = (
-	declaredContentType: BodyContentType,
-	body: unknown,
-	selectedContentType: unknown,
-	errorMessage: string,
-): { contentType: string; body: unknown } => {
-	const declaredContentTypes = Array.isArray(declaredContentType)
-		? declaredContentType
-		: [declaredContentType as string];
-	const contentType =
-		typeof selectedContentType === "string"
-			? getDeclaredContentType(declaredContentTypes, selectedContentType)
-			: declaredContentTypes.length === 1
-				? declaredContentTypes[0]
-				: undefined;
-
-	if (!contentType) throw new Error(errorMessage);
-
-	return {
-		contentType,
-		body,
-	};
 };
 
 export const validateResponseStreamChunk = async (

@@ -1,55 +1,222 @@
 ---
-title: REST-shaped APIs with function-shaped TypeScript.
+title: REST APIs with RPC-like ergonomics.
 slug: index
 seo:
-  description: REST-shaped APIs with function-shaped TypeScript.
+  description: Define REST APIs with RPC-like ergonomics.
 ---
 
 <span data-home-page />
 
-Define your HTTP API once as a shared TypeScript contract. Use that same
-contract to derive typed server handlers, fetch clients, TanStack Query helpers,
-and OpenAPI documents.
+Define REST APIs with methods, paths, request segments, response statuses,
+content types, and streaming—or start with sensible defaults. Call them through
+a typed client that feels like ordinary function calls.
 
-`rest-rpc` keeps the wire format REST-shaped while making application code feel
-like ordinary function calls. Choose the HTTP details each route needs: method
-and URL, request locations, and response status are independent choices.
+`rest-rpc` puts HTTP first. Define routes alongside their handlers and infer
+client types from their return values. Use your existing server framework,
+middleware, and deployment model.
 
 ## Use Only the Details You Need
 
-```ts
-// Just input and output: POST, with a URL derived from the route tree.
-route.input(type<{ title: string }>()).output(type<Post>());
+<Tabs>
+<Tab title="Routes">
 
-// Choose the method and URL; keep the request and response flat.
-route.get("/posts").input(type<{ search?: string }>()).output(type<Post[]>());
+```ts twoslash
+// ---cut-start---
+// @filename: server.ts
+import { route } from "@rest-rpc/express";
+import { z } from "zod";
 
-// Separate query and headers; keep the response flat.
-route
-	.query(type<{ search?: string }>())
-	.headers(type<{ authorization: string }>())
-	.output(type<Post[]>());
+declare function createTodo(title: string): { id: string; title: string };
+declare function findTodo(
+	id: string,
+): { id: string; title: string } | undefined;
+// ---cut-end---
+// POST /todos/create, flat JSON input, plain result.
+const create = route
+	.input(z.object({ title: z.string() }))
+	.handler(({ input: { title } }) => createTodo(title));
 
-// Keep flat input, but return different HTTP statuses.
-route.input(type<{ id: string }>()).handler(({ id }) => {
-	const post = findPost(id);
-	return post
-		? { status: 200, body: post }
-		: { status: 404, body: { error: "Post not found" } };
+// Explicit method, path, request segments, statuses, and response headers.
+const get = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.query(z.object({ uppercase: z.enum(["yes", "no"]).optional() }))
+	.headers(z.object({ "x-request-id": z.string().optional() }))
+	.handler(({ params, query, headers }) => {
+		const todo = findTodo(params.id);
+		if (!todo) {
+			return { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
+		}
+		return {
+			status: 200,
+			responseHeaders: { "x-request-id": headers["x-request-id"] },
+			body: {
+				...todo,
+				title:
+					query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title,
+			},
+		};
+	});
+
+export const routes = { todos: { create, get } };
+```
+
+</Tab>
+<Tab title="Client">
+
+```ts twoslash
+// ---cut-start---
+// @filename: server.ts
+import { route } from "@rest-rpc/express";
+import { z } from "zod";
+
+declare function createTodo(title: string): { id: string; title: string };
+declare function findTodo(
+	id: string,
+): { id: string; title: string } | undefined;
+
+// POST /todos/create, flat JSON input, plain result.
+const create = route
+	.input(z.object({ title: z.string() }))
+	.handler(({ input: { title } }) => createTodo(title));
+
+// Explicit method, path, request segments, statuses, and response headers.
+const get = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.query(z.object({ uppercase: z.enum(["yes", "no"]).optional() }))
+	.headers(z.object({ "x-request-id": z.string().optional() }))
+	.handler(({ params, query, headers }) => {
+		const todo = findTodo(params.id);
+		if (!todo) {
+			return { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
+		}
+		return {
+			status: 200,
+			responseHeaders: { "x-request-id": headers["x-request-id"] },
+			body: {
+				...todo,
+				title:
+					query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title,
+			},
+		};
+	});
+
+export const routes = { todos: { create, get } };
+
+// @filename: client.ts
+// ---cut-end---
+import { initClient } from "@rest-rpc/core";
+import { generateContractFromType } from "@rest-rpc/core/generate";
+import type { routes } from "./server";
+
+// Run generation at build time for browser clients.
+const api = generateContractFromType<typeof routes>({
+	filePath: "./server.ts",
+	exportName: "routes",
+});
+const client = initClient(api, { baseUrl: "http://localhost:3000" });
+
+const todo = await client.todos.create({ title: "Write docs" });
+const response = await client.todos.get({
+	params: { id: todo.id },
+	query: { uppercase: "yes" },
+	headers: { "x-request-id": "req_1" },
 });
 
-// Specify every HTTP detail when the route needs it.
-route
-	.get("/posts/:id")
-	.params(type<{ id: string }>())
-	.query(type<{ includeComments?: boolean }>())
-	.headers(type<{ authorization: string }>())
-	.handler(({ params, query, headers }) => ({
-		status: 200,
-		responseHeaders: { etag: makeEtag(params.id) },
-		body: findPost(params.id, query.includeComments, headers.authorization),
-	}));
+if (response.status === 200) {
+	console.log(response.body.title);
+}
 ```
+
+</Tab>
+<Tab title="TanStack Query">
+
+```tsx twoslash
+// ---cut-start---
+// @filename: server.ts
+import { route } from "@rest-rpc/express";
+import { z } from "zod";
+
+declare function createTodo(title: string): { id: string; title: string };
+declare function findTodo(
+	id: string,
+): { id: string; title: string } | undefined;
+
+// POST /todos/create, flat JSON input, plain result.
+const create = route
+	.input(z.object({ title: z.string() }))
+	.handler(({ input: { title } }) => createTodo(title));
+
+// Explicit method, path, request segments, statuses, and response headers.
+const get = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.query(z.object({ uppercase: z.enum(["yes", "no"]).optional() }))
+	.headers(z.object({ "x-request-id": z.string().optional() }))
+	.handler(({ params, query, headers }) => {
+		const todo = findTodo(params.id);
+		if (!todo) {
+			return { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
+		}
+		return {
+			status: 200,
+			responseHeaders: { "x-request-id": headers["x-request-id"] },
+			body: {
+				...todo,
+				title:
+					query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title,
+			},
+		};
+	});
+
+export const routes = { todos: { create, get } };
+
+// @filename: client-contract.ts
+import { generateContractFromType } from "@rest-rpc/core/generate";
+import type { routes } from "./server";
+
+export const api = generateContractFromType<typeof routes>({
+	filePath: "./server.ts",
+	exportName: "routes",
+});
+
+// @filename: client.tsx
+import { api } from "./client-contract";
+// ---cut-end---
+import { createTanstackQueryHelpers } from "@rest-rpc/tanstack-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+
+const tq = createTanstackQueryHelpers(api, {
+	baseUrl: "http://localhost:3000",
+});
+
+const todo = useQuery(
+	tq.todos.get.queryOptions({
+		params: { id: "todo_1" },
+		query: { uppercase: "yes" },
+	}),
+);
+const create = useMutation(tq.todos.create.mutationOptions());
+
+create.mutate({ title: "Write docs" });
+```
+
+</Tab>
+
+<Tab title="cURL">
+
+```sh
+curl http://localhost:3000/todos/create \
+	-H 'content-type: application/json' \
+	-d '{"title":"Write docs"}'
+
+curl 'http://localhost:3000/todos/todo_1?uppercase=yes' \
+	-H 'x-request-id: req_1'
+```
+
+</Tab>
+</Tabs>
 
 Plain outputs reach the client as data. Returns with `status` reach it as HTTP
 response envelopes. The builder keeps both shapes typed without making you
@@ -62,17 +229,15 @@ choose a separate route kind.
 		icon="rocket"
 		cta="Open the quickstart"
 	>
-		Define a route, implement it on a server adapter, and call it from a typed
-		client.
+		Define HTTP routes with handlers and call them from a typed client.
 	</Card>
 	<Card
-		title="Learn the model"
-		href="/docs/contract/declaration/"
+		title="Learn the route builder"
+		href="/docs/route-builder/"
 		icon="map"
-		cta="Explore the contract"
+		cta="Explore route declarations"
 	>
-		REST at the boundary, RPC-style usage at the call site, and one contract as
-		the source of truth.
+		Choose inputs, outputs, HTTP details, streams, and metadata in one builder.
 	</Card>
 	<Card
 		title="Generate OpenAPI"
@@ -80,8 +245,7 @@ choose a separate route kind.
 		icon="file-json"
 		cta="View OpenAPI docs"
 	>
-		Turn your TypeScript contract into an OpenAPI document without maintaining a
-		separate schema.
+		Generate an OpenAPI document from your route schemas and metadata.
 	</Card>
 </CardGroup>
 
@@ -89,118 +253,29 @@ choose a separate route kind.
 npx skills add rest-rpc/rest-rpc
 ```
 
-## One Contract, Many Surfaces
-
-HTTP details live in the contract, then clients and handlers use the route tree
-as typed functions.
-
-<Tabs>
-<Tab title="Contract">
-
-```ts
-export const api = {
-	todos: {
-		update: route
-			.patch("/todos/:id")
-			.params(z.object({ id: z.string() }))
-			.query(
-				z.object({
-					notify: z.coerce.boolean<boolean>().optional(),
-				}),
-			)
-			.headers(z.object({ "x-request-id": z.string().optional() }))
-			.body(
-				z.object({
-					title: z.string().min(1),
-					completed: z.boolean().optional(),
-				}),
-			)
-			.response(200, todoSchema),
-	},
-};
-```
-
-</Tab>
-<Tab title="Server">
-
-```ts
-const implementor = implement(api);
-
-const routes = {
-	todos: {
-		update: implementor.todos.update.handler(
-			({ params, body, query, headers }) => {
-				return {
-					status: 200,
-					body: updateTodo({
-						id: params.id,
-						title: body.title,
-						completed: body.completed,
-						notify: query.notify,
-						requestId: headers["x-request-id"],
-					}),
-				};
-			},
-		),
-	},
-};
-```
-
-</Tab>
-<Tab title="Client">
-
-```ts
-const response = await client.todos.update({
-	params: { id: "todo_1" },
-	body: { title: "Ship the docs", completed: true },
-	query: { notify: true },
-	headers: { "x-request-id": "req_123" },
-});
-
-if (response.status === 200) {
-	const todo = response.body;
-}
-```
-
-</Tab>
-<Tab title="curl">
-
-```bash
-curl -X PATCH "https://api.example.com/todos/todo_1?notify=true" \
-	-H "content-type: application/json" \
-	-H "x-request-id: req_123" \
-	-d '{"title":"Ship the docs","completed":true}'
-```
-
-</Tab>
-</Tabs>
-:::tip
-Prefer deriving the client from server implementations instead?
-Read [Server-first approach](/docs/server-first-quickstart).
-:::
-
 ## What You Get
 
 <CardGroup cols={2}>
-	<Card title="REST contract" icon="route" type="check">
+	<Card title="REST APIs" icon="route" type="check">
 		Build methods, paths, request locations, response bodies, and metadata with
-		a fluent API that keeps invalid combinations out of the contract.
+		a fluent API that keeps invalid combinations out of route declarations.
 	</Card>
-	<Card title="Server-first support" icon="server" type="check">
-		Contract isn't mandatory. The client can also be derived from server
-		implementations, when contract feels like too much work.
+	<Card title="Optional shared contracts" icon="server" type="check">
+		Declare an HTTP interface separately when it should be shared independently
+		of the server implementation.
 	</Card>
 	<Card title="Composable route builders" icon="blocks" type="check">
 		Choose a method and path, flat input or request segments, and plain output
 		or status responses independently in one fluent builder.
 	</Card>
-	<Card title="Function-shaped usage" icon="braces" type="check">
-		Call routes through a typed client that mirrors your contract, such as
-		`client.todos.get({ params: { id } })`.
+	<Card title="RPC-like ergonomics" icon="braces" type="check">
+		Call routes and implement handlers as ordinary functions without
+		compromising HTTP semantics. Your server works exactly like it did before,
+		just with full type safety at the API boundary.
 	</Card>
 	<Card title="Server adapters" icon="plug" type="check">
-		Use Express, Hono, Fastify, NestJS or fetch-native runtimes without moving
-		the contract into the framework.
+		Use Express, Hono, Fastify, NestJS, Node HTTP, or fetch-native runtimes with
+		your existing middleware and application code.
 	</Card>
 	<Card title="Typed responses" icon="list-checks" type="check">
 		Return direct success bodies for simple routes, or status-keyed response
@@ -215,9 +290,8 @@ Read [Server-first approach](/docs/server-first-quickstart).
 		documents from the same route tree.
 	</Card>
 	<Card title="Beyond basic JSON" icon="wrench" type="check">
-		Use streaming, NDJSON streams, custom bodies, response headers, and content
-		types without leaving the contract or accepting hidden transport
-		assumptions.
+		Use typed streams, custom bodies, response headers, and content types in the
+		same route builder.
 	</Card>
 </CardGroup>
 
@@ -228,18 +302,16 @@ Read [Server-first approach](/docs/server-first-quickstart).
 		Start with the [Quickstart](/docs/quickstart/) if you want the fastest
 		end-to-end example.
 	</Step>
-	<Step title="Shape the contract" icon="file-code">
-		Read [Contract Declaration](/docs/contract/declaration/),
-		[Schemas](/docs/contract/schemas/), [HTTP Requests](/docs/http-requests/),
-		and [HTTP Responses](/docs/http-responses/) when you are designing real
-		routes.
+	<Step title="Shape the routes" icon="file-code">
+		Use the [Route Builder](/docs/route-builder/) to choose the HTTP details
+		your API needs.
 	</Step>
 	<Step title="Choose the runtime" icon="plug">
-		Wire the contract to [server adapters](/docs/server/express/), the [fetch
+		Explore the [server adapters](/docs/server/express/), the [fetch
 		client](/docs/client/fetch-client/), or [TanStack
 		Query](/docs/client/tanstack-query/).
 	</Step>
-	<Step title="Publish the contract" icon="share">
+	<Step title="Describe the API" icon="share">
 		Generate an [OpenAPI document](/docs/openapi/) without ceremony.
 	</Step>
 </Steps>
@@ -247,43 +319,38 @@ Read [Server-first approach](/docs/server-first-quickstart).
 :::tip[Small by design]
 `rest-rpc` stays focused on the API boundary so it can fit into code you already
 have. You keep using normal HTTP routes, your existing framework, middleware,
-authentication, database layer, and deployment model. The contract is just the
-shared description of that boundary, which makes adoption incremental and
-failures easier to trace back to a method, path, request shape, or response
-shape.
+authentication, database layer, and deployment model. Adopt the route builder,
+adapters, client, or OpenAPI generation as they become useful.
 :::
 
 ## Common Questions
 
 <Accordion>
 	<AccordionItem title="Who is rest-rpc for?">
-		`rest-rpc` is for developers who want end-to-end type safety and RPC-style,
-		function-shaped usage without replacing familiar HTTP concepts. You keep
-		methods, paths, headers, bodies, status codes, and your existing framework,
-		while the shared contract connects the server and client types in an
-		ergonomic way.
+		`rest-rpc` is for developers who want end-to-end type safety and RPC-like
+		ergonomics without replacing familiar HTTP concepts. You keep methods,
+		paths, headers, bodies, status codes, and your existing framework, while
+		route declarations connect server and client types.
 	</AccordionItem>
 	<AccordionItem title="Do I have to restructure my app?">
 		No. Keep your framework, middleware, authentication, database access, and
-		deployment model. Add the contract at the API boundary, then adopt the
-		server adapters, client, TanStack Query helpers, or OpenAPI generation as
-		they become useful.
+		deployment model. Add typed routes at the API boundary and adopt the client,
+		TanStack Query helpers, or OpenAPI generation as they become useful.
 	</AccordionItem>
 	<AccordionItem title="Do I need to learn a new API model?">
-		Not really. The contract is still made of HTTP methods, paths, request
-		locations, status codes, headers, and response bodies. The generated client
-		and handlers make those routes nicer to call from TypeScript, but they do
-		not hide what goes over the wire.
+		The model is ordinary HTTP: methods, paths, request locations, status codes,
+		headers, and response bodies. Choose explicit details when you need them or
+		use defaults for simple routes.
 	</AccordionItem>
-	<AccordionItem title="I don't want to declare a contract?">
-		You don't have to. rest-rpc also supports server-first approach if you'd
-		rather derive the client from server implementations. Read [Server-first
-		approach](/docs/server-first-quickstart/) to see how that works.
+	<AccordionItem title="Can I have a separate contract?">
+		Yes. Declare the HTTP interface independently, implement it with any server
+		adapter, and share it directly with clients. See the [Contract-first
+		Quickstart](/docs/contract-first-quickstart/).
 	</AccordionItem>
 	<AccordionItem title="What happens when something breaks?">
 		You debug the same boundary you would debug by hand: method, path, query,
 		headers, body, status, and response shape. Because those pieces live in one
-		contract, type errors and runtime validation errors point back to the route
-		declaration instead of a separate client or server type.
+		route declaration, type errors and validation errors point back to that
+		declaration.
 	</AccordionItem>
 </Accordion>

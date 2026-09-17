@@ -1,12 +1,14 @@
+import type { BodyCodec } from "@rest-rpc/core";
 import {
 	createRouteMatcher,
+	assertRequestContentType,
 	handleHttpRoute,
 	RequestValidationError,
 	ResponseValidationError,
 	type RuntimeImplementationTree,
 } from "@rest-rpc/server";
 import type { DefaultContext } from "./index.ts";
-import { defaultBodyParser, type FetchBodyParser } from "./request.ts";
+import { deserializeRequestBody } from "./deserializeRequestBody.ts";
 import { createFetchResponse } from "./response.ts";
 
 /**
@@ -15,7 +17,9 @@ import { createFetchResponse } from "./response.ts";
  * @see {@link https://rest-rpc.dev/docs/server/fetch#options}
  */
 export type CreateFetchHandlerOptions = {
-	bodyParser?: FetchBodyParser;
+	bodyCodecs?: readonly BodyCodec<Request>[];
+	/** The maximum accepted size of the request body in bytes. */
+	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 };
@@ -64,7 +68,14 @@ export function createRouteHandler(
 	...contextArguments: ContextArguments
 ) => Promise<FetchRouteHandlerResult> {
 	const matchRoute = createRouteMatcher(implementations);
-	const bodyParser = options.bodyParser ?? defaultBodyParser;
+	const bodyCodecs = options.bodyCodecs ?? [];
+	const maxBytes = options.requestBodyLimit;
+	if (
+		maxBytes !== undefined &&
+		(!Number.isSafeInteger(maxBytes) || maxBytes <= 0)
+	) {
+		throw new Error("requestBodyLimit must be a positive safe integer");
+	}
 
 	return async (request, ...contextArguments) => {
 		const url = new URL(request.url);
@@ -76,18 +87,32 @@ export function createRouteHandler(
 			return { matched: false, response: undefined };
 		}
 
-		let body: unknown;
-		try {
-			body = await bodyParser(request);
-		} catch (error) {
-			if (options.bodyParser !== undefined) throw error;
+		const rejection = assertRequestContentType(
+			matched.implementation.route,
+			request.headers.get("content-type"),
+		);
+		if (rejection) {
 			return {
 				matched: true,
 				response: Response.json(
-					{ message: "Invalid request body" },
-					{
-						status: 400,
-					},
+					{ message: rejection.message },
+					{ status: rejection.status },
+				),
+			};
+		}
+
+		const { body, rejection: bodyRejection } = await deserializeRequestBody(
+			request,
+			request,
+			bodyCodecs,
+			maxBytes,
+		);
+		if (bodyRejection) {
+			return {
+				matched: true,
+				response: Response.json(
+					{ message: bodyRejection.message },
+					{ status: bodyRejection.status },
 				),
 			};
 		}
@@ -98,45 +123,53 @@ export function createRouteHandler(
 			body,
 		};
 
-		try {
-			const implementation = matched.implementation;
-			const result = await handleHttpRoute(
-				implementation.route,
-				implementation.handler as (request: unknown) => unknown,
-				{
-					request: parsedRequest,
-					context: contextArguments[0] ?? {},
-					handlerFields: { request, signal: request.signal },
-				},
-			);
-
-			return { matched: true, response: await createFetchResponse(result) };
-		} catch (error) {
-			if (error instanceof RequestValidationError) {
-				const response = options.requestValidationErrorHandler
-					? await options.requestValidationErrorHandler(error, request)
-					: Response.json(
-							{
-								message:
-									"Request validation failed. Check the validationErrors field for details.",
-								validationErrors: error.issues,
-							},
-							{ status: 400 },
-						);
-				return { matched: true, response };
+		const implementation = matched.implementation;
+		const result = await handleHttpRoute(implementation, {
+			request: parsedRequest,
+			context: contextArguments[0] ?? {},
+			handlerFields: { request, signal: request.signal },
+		});
+		if (result instanceof RequestValidationError) {
+			if (options.requestValidationErrorHandler) {
+				return {
+					matched: true,
+					response: await options.requestValidationErrorHandler(
+						result,
+						request,
+					),
+				};
 			}
 
-			if (error instanceof ResponseValidationError) {
-				const response = options.responseValidationErrorHandler
-					? await options.responseValidationErrorHandler(error, request)
-					: Response.json(
-							{ message: "Response validation failed." },
-							{ status: 500 },
-						);
-				return { matched: true, response };
-			}
-
-			throw error;
+			return {
+				matched: true,
+				response: Response.json(result.responseBody, {
+					status: result.status,
+				}),
+			};
 		}
+
+		if (result instanceof ResponseValidationError) {
+			if (options.responseValidationErrorHandler) {
+				return {
+					matched: true,
+					response: await options.responseValidationErrorHandler(
+						result,
+						request,
+					),
+				};
+			}
+
+			return {
+				matched: true,
+				response: Response.json(result.responseBody, {
+					status: result.status,
+				}),
+			};
+		}
+
+		return {
+			matched: true,
+			response: await createFetchResponse(result, bodyCodecs),
+		};
 	};
 }

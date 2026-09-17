@@ -33,11 +33,16 @@
 		".": {
 			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js"
+		},
+		"./deserializeRequestBody": {
+			"types": "./dist/deserializeRequestBody.d.ts",
+			"import": "./dist/deserializeRequestBody.js"
 		}
 	},
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
-		"typecheck": "pnpm run build && tsc -p tsconfig.json"
+		"typecheck": "pnpm run build && tsc -p tsconfig.json",
+		"test": "node --test src/**/*.test.ts"
 	},
 	"dependencies": {
 		"@rest-rpc/core": "workspace:*",

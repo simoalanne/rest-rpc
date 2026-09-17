@@ -1,8 +1,15 @@
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
-import { initClient, route as coreRoute } from "@rest-rpc/core";
+import {
+	type ClientRequest,
+	type ClientResponse,
+	initClient,
+	route as coreRoute,
+} from "@rest-rpc/core";
 import {
 	serverFirstRoute,
 	type RouteResponse,
+	type RouteRequestData,
+	type RouteErrors,
 	type ServerFirstRouteResponseKind,
 	type ServerRouteBuilder,
 } from "@rest-rpc/server";
@@ -77,7 +84,7 @@ const declared = route
 expectType<typeof output>(declared["~restrpc"].responses[201].body);
 const declaredNoBody = route.get("/declared-no-body").response(204);
 expectType<{ status: 204 }>(
-	null as unknown as RouteResponse<(typeof declaredNoBody)["~restrpc"]>,
+	null as unknown as RouteResponse<typeof declaredNoBody>,
 );
 declaredNoBody.handler(() => ({ status: 204 }));
 expectError(
@@ -237,4 +244,58 @@ expectType<
 );
 expectType<Promise<{ readonly id: "todo-1"; readonly title: string }>>(
 	generatedClient.get({ title: "Todo" }),
+);
+
+// Public helpers accept builders and completed routes without unwrapping them.
+const helperDeclaration = coreRoute
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.response(200, z.object({ id: z.string() }))
+	.response(404, z.object({ code: z.literal("NOT_FOUND") }));
+const helperImplementation = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.handler(({ params }) => ({ status: 200, body: { id: params.id } }));
+
+expectType<{ params: { id: string } }>(
+	null as unknown as ClientRequest<typeof helperDeclaration>,
+);
+expectType<{ params: { id: string } }>(
+	null as unknown as RouteRequestData<typeof helperDeclaration>,
+);
+expectType<{ status: 404; body: { code: "NOT_FOUND" } }>(
+	null as unknown as RouteErrors<typeof helperDeclaration>,
+);
+expectType<
+	| { status: 200; body: { id: string } }
+	| { status: 404; body: { code: "NOT_FOUND" } }
+>(null as unknown as RouteResponse<typeof helperDeclaration>);
+expectType<{ params: { id: string } }>(
+	null as unknown as ClientRequest<typeof helperImplementation>,
+);
+expectType<{ params: { id: string } }>(
+	null as unknown as RouteRequestData<typeof helperImplementation>,
+);
+expectType<{ status: 200; body: unknown }>(
+	null as unknown as RouteResponse<typeof helperImplementation>,
+);
+expectType<{ status: 200; body: { readonly id: string }; headers: Headers }>(
+	null as unknown as ClientResponse<typeof helperImplementation>,
+);
+expectType<never>(null as unknown as RouteErrors<typeof helperImplementation>);
+// Internal declarations are not the public helper input.
+expectError(
+	null as unknown as ClientRequest<(typeof helperDeclaration)["~restrpc"]>,
+);
+expectError(
+	null as unknown as ClientResponse<(typeof helperDeclaration)["~restrpc"]>,
+);
+expectError(
+	null as unknown as RouteRequestData<(typeof helperDeclaration)["~restrpc"]>,
+);
+expectError(
+	null as unknown as RouteResponse<(typeof helperDeclaration)["~restrpc"]>,
+);
+expectError(
+	null as unknown as RouteErrors<(typeof helperDeclaration)["~restrpc"]>,
 );

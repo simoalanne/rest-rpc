@@ -3,11 +3,13 @@ title: Fetch Client
 description: Use rest-rpc with Fetch
 ---
 
-`initClient()` creates a typed fetch client from a contract.
+`initClient()` creates a typed Fetch client from a runtime contract. Use a
+[generated contract](/docs/client/contract-generation) for handler-based routes
+or import a [separate shared contract](/docs/contract-first-quickstart).
 
 ```ts
 import { initClient } from "@rest-rpc/core";
-import { api } from "./contract";
+import { api } from "./client-contract";
 
 const client = initClient(api, {
 	baseUrl: "https://api.example.com",
@@ -20,32 +22,69 @@ The client has the same route tree shape as the contract.
 const response = await client.todos.get({ params: { id: "todo_1" } });
 ```
 
-## Call An HTTP Route
+## Call Routes
 
-Every HTTP route is directly callable.
+Every route is directly callable. Its declaration determines the request and
+result shapes: flat input stays flat, and segmented input uses `params`,
+`query`, `headers`, and `body`.
 
 ```ts
-const response = await client.todos.get({
-	params: { id: "todo_1" },
-});
+const todo = await client.todos.create({ title: "Write docs" });
+const response = await client.todos.get({ params: { id: todo.id } });
 ```
 
-Calling an HTTP route returns a `status`-discriminated union containing only the
-responses declared in the contract. The client throws when the server returns an
-undeclared status code.
+Plain output routes return decoded data directly. Status response routes return
+a `status`-discriminated union with `body` and the Fetch `Headers` object. Declared
+response headers are also exposed through `responseHeaders`.
 
 ```ts
-if (response.status === 404) {
-	return;
-}
-
 if (response.status === 200) {
-	return response.body;
+	console.log(response.body.title);
+} else if (response.status === 404) {
+	console.log(response.body.code);
 }
 ```
 
-An undeclared status indicates that the server implementation and contract are
-out of sync. Declare every expected success and error response on the route.
+Declared non-2xx responses are returned as envelopes. Undeclared statuses throw,
+as do network failures and decoding errors. Plain output routes expect their
+successful status 200. See the [Route Builder](/docs/route-builder) for choosing
+result forms and declaring expected outcomes.
+
+## Consume Streams
+
+A plain stream returns an async iterable:
+
+```ts
+for await (const event of await client.todos.events()) {
+	console.log(event.message);
+}
+```
+
+For a status response stream, narrow the status and iterate its body:
+
+```ts
+const response = await client.todos.events();
+if (response.status === 200) {
+	for await (const event of response.body) {
+		console.log(event.message);
+	}
+}
+```
+
+Request and iteration errors can happen at different times: the initial call
+reads the response, while iteration reads and decodes the remaining items.
+Pass a per-call `signal` to cancel the request or stream:
+
+```ts
+const controller = new AbortController();
+const events = await client.todos.events(undefined, {
+	signal: controller.signal,
+});
+// Call controller.abort() when the consumer no longer needs the stream.
+```
+
+See [streaming wire behavior](/docs/http-behavior/serialization#streaming) for
+framing and item validation.
 
 ## Client Options
 
@@ -77,9 +116,10 @@ const client = initClient(api, {
 			type: "ApiClientFetchOptions",
 			description: "Default fetch options merged into every request.",
 		},
-		bodyParser: {
-			type: "ApiClientBodyParser",
-			description: "Custom parser for non-stream, non-JSON response bodies.",
+		bodyCodecs: {
+			type: "readonly BodyCodec<Response>[]",
+			description:
+				"Optional overrides for the default body codecs used to serialize and deserialize request and response bodies.",
 		},
 		getGlobalHeaders: {
 			type: "() => Record<string, string> | Promise<Record<string, string>>",
@@ -89,44 +129,30 @@ const client = initClient(api, {
 			type: "number",
 			description: "Aborts a request when fetch does not return in time.",
 		},
+		nextFetchTags: {
+			type: "NextFetchTagsOptions",
+			description:
+				"Optional deterministic Next.js cache tags for GET requests.",
+		},
 		validateResponses: {
 			type: "boolean",
 			default: "false",
 			description:
-				"Validates declared response bodies and headers on the client.",
+				"Validates declared response bodies, headers, and stream items when runtime schemas are available.",
 		},
 	}}
 />
 
-For contract-first clients, `bodyParser` receives non-stream responses whose
-route declares a custom content type. Server-first clients use it for every
-non-stream, non-JSON content type. By default, the client reads URL-encoded
-data, multipart data, text, or bytes according to the response `Content-Type`.
-The parsed value is still validated when `validateResponses` is enabled.
+See [Serialization and Codecs](/docs/http-behavior/serialization) for the default body codecs
+and how to override them with `bodyCodecs`.
+
+## Global Headers
+
+`getGlobalHeaders` runs for each request and can return a promise. Matching
+headers declared by the route become optional in client calls. For a route
+that requires an `authorization` header:
 
 ```ts
-const client = initClient(api, {
-	baseUrl: "https://api.example.com",
-	bodyParser: (response) => response.blob(),
-});
-```
-
-:::tip
-Headers provided by `getGlobalHeaders` make matching declared request headers
-optional for client calls. This way you can enforce that client should always
-send certain headers without requiring every call to provide them explicitly.
-:::
-
-```ts
-const api = {
-	todos: {
-		list: route
-			.get("/todos")
-			.headers(z.object({ authorization: z.string() }))
-			.response(200, z.array(todoSchema)),
-	},
-};
-
 const client = initClient(api, {
 	baseUrl: "https://api.example.com",
 	getGlobalHeaders: () => ({
@@ -137,6 +163,8 @@ const client = initClient(api, {
 await client.todos.list({});
 await client.todos.list({ headers: { authorization: "Bearer override" } });
 ```
+
+Per-call declared headers override matching global headers.
 
 ## Custom Fetch
 
@@ -159,7 +187,8 @@ const client = initClient(api, {
 
 ## Per-Call Fetch Options
 
-Pass fetch options as the second argument.
+Pass fetch options as the second argument. They override matching defaults in
+`fetchOptions`. Use `signal` for cancellation. `timeoutMs` aborts the request if fetch does not return in time.
 
 ```ts
 const response = await client.todos.get(
@@ -183,8 +212,9 @@ const response = await client.health(undefined, {
 
 ## Response Validation on the Client
 
-It is possible to enable server output validation on the client by enabling `validateResponses`.
-For understanding the implications of this option, read [Schemas](/docs/contract/schemas) first.
+`validateResponses` validates decoded responses against shared schemas. See
+[Schemas and Validation](/docs/http-behavior/schemas#response-validation-on-the-client)
+for when validation is available.
 
 ```ts
 const client = initClient(api, {
@@ -200,7 +230,7 @@ requests through Next's `fetch` options.
 
 ```ts
 import { initClient } from "@rest-rpc/core";
-import { api } from "./contract";
+import { api } from "./client-contract";
 
 export const client = initClient(api, {
 	baseUrl: "https://api.example.com",
@@ -252,7 +282,7 @@ await client.todos.get(
 
 import { revalidateTag } from "next/cache";
 import { getNextFetchTags } from "@rest-rpc/core";
-import { api } from "./contract";
+import { api } from "./client-contract";
 import { client } from "./client";
 
 export async function renameTodo(id: string, title: string) {

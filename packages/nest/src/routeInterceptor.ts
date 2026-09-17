@@ -1,3 +1,6 @@
+import type { SerializedBody } from "@rest-rpc/core";
+import { nestBodyCodecs } from "./codecs.ts";
+import { normalizeMediaType, resolveBodyCodec } from "@rest-rpc/core/codecs";
 import {
 	type CallHandler,
 	type ExecutionContext,
@@ -6,7 +9,6 @@ import {
 	StreamableFile,
 } from "@nestjs/common";
 import { HttpAdapterHost } from "@nestjs/core";
-import type { IncomingMessage, ServerResponse } from "node:http";
 import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import {
 	createNodeResponseStream,
@@ -14,8 +16,8 @@ import {
 	writeStreamResponse,
 } from "@rest-rpc/node";
 import {
+	assertRequestContentType,
 	handleHttpRoute,
-	handleHttpRouteResult,
 	RequestValidationError,
 	ResponseValidationError,
 } from "@rest-rpc/server";
@@ -27,20 +29,6 @@ import {
 	RequestValidationException,
 	ResponseValidationException,
 } from "./validationExceptions.ts";
-
-type NestHttpRequestFields = {
-	body?: unknown;
-	query?: unknown;
-	params?: unknown;
-	headers?: unknown;
-};
-
-type NestHttpRequest = NestHttpRequestFields &
-	((IncomingMessage & { raw?: never }) | { raw: IncomingMessage });
-
-type NestHttpResponse =
-	| (ServerResponse & { raw?: never })
-	| { raw: ServerResponse };
 
 type NestRouteImplementation = {
 	readonly "~restrpc": RouteDeclaration & {
@@ -107,81 +95,97 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 		metadata: RouteMetadata,
 	) {
 		const http = context.switchToHttp();
-		const req = http.getRequest<NestHttpRequest>();
-		const res = http.getResponse<NestHttpResponse>();
+		const req = http.getRequest();
+		const res = http.getResponse();
 		const adapter = this.httpAdapterHost.httpAdapter;
 		const rawRequest = req.raw ?? req;
 		const rawResponse = res.raw ?? res;
+		const rejection = assertRequestContentType(
+			metadata.route,
+			rawRequest.headers["content-type"],
+		);
+		if (rejection) {
+			adapter.status(res, rejection.status);
+			return { message: rejection.message };
+		}
+
 		const signal = createRequestSignal(rawRequest, rawResponse);
+		const mediaType = normalizeMediaType(rawRequest.headers["content-type"]);
+		const codec = resolveBodyCodec(mediaType, this.options?.bodyCodecs ?? []);
+		const body = codec?.deserialize
+			? await codec.deserialize(http.getRequest())
+			: req.body;
 		const userContext = await this.options?.createContext?.(context);
 		const implementation = assertRouteImplementation(
 			await lastValueFrom(next.handle()),
 			metadata.route,
 		);
 
-		try {
-			const result = await handleHttpRoute(
-				metadata.route,
-				implementation["~restrpc"].handler,
-				{
-					request: {
-						body: req.body,
-						query: new URL(rawRequest.url ?? "/", "http://localhost")
-							.searchParams,
-						params: req.params,
-						headers: req.headers,
-					},
-					context: userContext ?? {},
-					handlerFields: {
-						executionContext: context,
-						signal,
-					},
+		const result = await handleHttpRoute(
+			{
+				route: metadata.route,
+				handler: implementation["~restrpc"].handler,
+			},
+			{
+				request: {
+					body,
+					query: new URL(rawRequest.url ?? "/", "http://localhost")
+						.searchParams,
+					params: req.params,
+					headers: req.headers,
 				},
-			);
+				context: userContext ?? {},
+				handlerFields: {
+					executionContext: context,
+					signal,
+				},
+			},
+		);
 
-			return handleHttpRouteResult(result, {
-				setHeader: (name, value) => {
-					if (value !== undefined) {
-						const headerValue = Array.isArray(value)
-							? value.map(String)
-							: String(value);
-						adapter.setHeader(res, name, headerValue as string);
-					}
-				},
-				sendEmpty: (status) => {
-					adapter.status(res, status);
-					return undefined;
-				},
-				sendJson: (status, body) => {
-					adapter.status(res, status);
-					return body;
-				},
-				sendCustom: (status, body) => {
-					adapter.status(res, status);
-					if (body instanceof Uint8Array) return new StreamableFile(body);
-					return String(body);
-				},
-				sendStream: ({ body, status, contentType }) => {
-					adapter.status(res, status);
-					if (adapter.getType() === "express") {
-						return writeStreamResponse(body, rawResponse, status, contentType);
-					}
-
-					return new StreamableFile(createNodeResponseStream(body), {
-						type: contentType,
-					});
-				},
-			});
-		} catch (error) {
-			if (error instanceof RequestValidationError) {
-				throw new RequestValidationException(error);
-			}
-
-			if (error instanceof ResponseValidationError) {
-				throw new ResponseValidationException(error);
-			}
-
-			throw error;
+		if (result instanceof RequestValidationError) {
+			throw new RequestValidationException(result);
 		}
+
+		if (result instanceof ResponseValidationError) {
+			throw new ResponseValidationException(result);
+		}
+
+		let serialized: SerializedBody | undefined;
+		if (result.kind === "response" && result.body) {
+			const { value, contentType } = result.body;
+			const codec = resolveBodyCodec(normalizeMediaType(contentType), [
+				...(this.options?.bodyCodecs ?? []),
+				...nestBodyCodecs,
+			]);
+			serialized = await codec!.serialize!(value, contentType);
+			for (const [name, value] of Object.entries(serialized.headers ?? {})) {
+				if (value !== undefined) adapter.setHeader(res, name, String(value));
+			}
+		}
+		for (const [name, value] of Object.entries(result.headers ?? {})) {
+			if (value !== undefined) {
+				const headerValue = Array.isArray(value)
+					? value.map(String)
+					: String(value);
+				adapter.setHeader(res, name, headerValue as string);
+			}
+		}
+		adapter.status(res, result.status);
+		if (result.kind === "stream") {
+			if (adapter.getType() === "express") {
+				return writeStreamResponse(result.body, rawResponse, result.status);
+			}
+			return new StreamableFile(createNodeResponseStream(result.body), {
+				type: "application/x-ndjson",
+			});
+		}
+		if (!serialized) return undefined;
+		const contentType =
+			serialized.contentType === undefined
+				? result.body!.contentType
+				: serialized.contentType;
+		if (contentType === null) res.removeHeader("content-type");
+		else adapter.setHeader(res, "content-type", contentType);
+		return serialized.body;
 	}
 }

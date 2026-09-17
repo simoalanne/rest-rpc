@@ -39,6 +39,10 @@
 			"types": "./dist/client/index.d.ts",
 			"import": "./dist/client/index.js"
 		},
+		"./codecs": {
+			"types": "./dist/codecs/index.d.ts",
+			"import": "./dist/codecs/index.js"
+		},
 		"./contract": {
 			"types": "./dist/contract/index.d.ts",
 			"import": "./dist/contract/index.js"

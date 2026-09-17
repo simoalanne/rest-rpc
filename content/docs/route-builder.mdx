@@ -1,0 +1,240 @@
+---
+title: Route Builder
+description: Define HTTP routes with default or explicit details, typed results, and streams.
+---
+
+A route builder describes an HTTP interface. Start with flat inputs and plain
+results, then choose the HTTP details each route needs. Method and path, input
+form, and output form are independent choices.
+
+Import `route` from your server adapter. Attach a handler with `.handler()`;
+its return value determines the client's result type.
+
+Schemas can come from Zod, Valibot, ArkType, or another Standard Schema library.
+The built-in `type<T>()` helper declares types without runtime validation. See
+[Schemas and Validation](/docs/http-behavior/schemas).
+
+## Start with Defaults
+
+```ts
+import { route } from "@rest-rpc/express";
+import { z } from "zod";
+
+const create = route
+	.input(z.object({ title: z.string() }))
+	.handler(({ input: { title } }) => ({ id: crypto.randomUUID(), title }));
+
+export const routes = { todos: { create } };
+
+// After creating a client:
+const todo = await client.todos.create({ title: "Write docs" });
+```
+
+Without a method setter, a route uses POST and derives its path from its tree
+keys: this route is `POST /todos/create`. The handler receives the JSON body as
+`input`, and a plain output uses status 200.
+
+Route trees are plain TypeScript objects. Group routes into modules and compose
+them where they are registered or used to create a client.
+
+## Choose a Method and Path
+
+Explicit methods work with the same flat input and plain result:
+
+```ts
+const search = route
+	.get("/todos/search")
+	.input(z.object({ term: z.string() }))
+	.handler(({ input: { term } }) => searchTodos(term));
+
+const todo = route
+	.post("/todos")
+	.input(z.object({ title: z.string() }))
+	.handler(({ input: { title } }) => createTodo(title));
+```
+
+Use `.get(path)`, `.post(path)`, `.put(path)`, `.patch(path)`, or `.delete(path)`.
+Flat GET input becomes query parameters, while other methods send it as the body.
+Use request segments for dynamic paths.
+
+## Declare Request Segments
+
+Use `.params()`, `.query()`, `.headers()`, and `.body()` to separate HTTP request
+locations instead of `.input()`. GET routes cannot declare a body.
+
+```ts
+const update = route
+	.patch("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.query(z.object({ notify: z.enum(["yes", "no"]).optional() }))
+	.headers(z.object({ "x-request-id": z.string().optional() }))
+	.body(z.object({ title: z.string() }))
+	.handler(({ params, query, headers, body }) =>
+		updateTodo(params.id, body.title, {
+			notify: query.notify === "yes",
+			requestId: headers["x-request-id"],
+		}),
+	);
+
+const todo = await client.todos.update({
+	params: { id: "todo_1" },
+	query: { notify: "yes" },
+	headers: { "x-request-id": "req_1" },
+	body: { title: "Write docs" },
+});
+```
+
+Declare a schema for every dynamic path segment. Both `:id` and `{id}` syntax
+are supported. Use lowercase header names.
+
+Segmented requests can still return plain outputs.
+
+## Choose Plain Outputs or Status Responses
+
+A plain handler result reaches the client directly. Declare `.output(schema)`
+when you want an explicit output schema and runtime validation:
+
+```ts
+const create = route
+	.input(z.object({ title: z.string() }))
+	.output(todoSchema)
+	.handler(({ input: { title } }) => createTodo(title));
+```
+
+Return `{ status, body }` when the client needs to distinguish HTTP outcomes.
+The returned statuses and body types become the client's result type:
+
+```ts
+const get = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.handler(({ params }) => {
+		const todo = findTodo(params.id);
+		return todo
+			? { status: 200, body: todo }
+			: { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
+	});
+
+const response = await client.todos.get({ params: { id: "todo_1" } });
+if (response.status === 200) {
+	console.log(response.body.title);
+}
+```
+
+Use `.response()` for each status when you want explicit response schemas.
+Choose either plain outputs or status responses for a route.
+
+```ts
+const get = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.response(200, todoSchema)
+	.response(404, z.object({ code: z.literal("TODO_NOT_FOUND") }))
+	.handler(({ params }) => {
+		const todo = findTodo(params.id);
+		return todo
+			? { status: 200, body: todo }
+			: { status: 404, body: { code: "TODO_NOT_FOUND" } };
+	});
+```
+
+Omit the schema for a bodyless response, such as `.response(204)`. Non-2xx
+statuses use the same method as successful statuses. Declare status-specific
+response headers in the options and return them as `responseHeaders`:
+
+```ts
+route
+	.post("/todos")
+	.body(z.object({ title: z.string() }))
+	.response(201, todoSchema, {
+		headers: z.object({ location: z.string() }),
+	})
+	.handler(({ body }) => {
+		const todo = createTodo(body.title);
+		return {
+			status: 201,
+			body: todo,
+			responseHeaders: { location: `/todos/${todo.id}` },
+		};
+	});
+```
+
+## Declare Content Types
+
+Bodies default to JSON. Use `contentType` on `.input()`, `.body()`, `.output()`,
+or `.response()` for text, forms, or binary values.
+
+```ts
+const report = route
+	.get("/todos/report")
+	.output(z.string(), { contentType: "text/plain" })
+	.handler(() => ({ contentType: "text/plain", data: createTodoReport() }));
+
+const text = await client.todos.report();
+```
+
+A custom-content plain output handler returns `{ contentType, data }` and the
+client receives the decoded data. A status response handler uses
+`{ status, body, contentType }`. With no output declaration, the adapter can
+infer a custom-content output from `{ contentType: "text/plain" as const, data }`.
+
+Content types can also be declared as a list of alternatives.
+Use `contentType` to select one when sending a body. See
+[Serialization and Codecs](/docs/http-behavior/serialization) for decoded value
+types and compatible codecs.
+
+## Return Streams
+
+Returning an async iterable infers a plain stream. Its items reach the client
+through an async iterable:
+
+```ts
+const events = route.get("/todos/events").handler(async function* () {
+	yield { id: "todo_1", message: "Created" };
+	yield { id: "todo_1", message: "Completed" };
+});
+
+for await (const event of await client.todos.events()) {
+	console.log(event.message);
+}
+```
+
+Declare `.streamOutput(itemSchema)` to validate items while keeping the plain
+result. Use `.streamResponse(status, itemSchema)` for a status envelope whose
+`body` is the stream:
+
+```ts
+const events = route
+	.get("/todos/events")
+	.streamResponse(200, z.object({ id: z.string(), message: z.string() }))
+	.response(401, z.object({ code: z.literal("UNAUTHORIZED") }))
+	.handler(({ req }) => {
+		if (!req.header("authorization")) {
+			return { status: 401, body: { code: "UNAUTHORIZED" } };
+		}
+		return { status: 200, body: streamTodoEvents() };
+	});
+```
+
+A returned status envelope with an async iterable body also infers a stream.
+See [Fetch Client](/docs/client/fetch-client#consume-streams) for stream consumption
+and [Serialization and Codecs](/docs/http-behavior/serialization#streaming) for the
+stream format.
+
+## Add Metadata and OpenAPI Details
+
+`.metadata()` attaches application information. `.openAPI()` describes the
+operation for OpenAPI generation.
+
+```ts
+const list = route
+	.get("/todos")
+	.metadata({ auth: "required" })
+	.openAPI({ summary: "List todos", tags: ["Todos"] })
+	.output(z.array(todoSchema))
+	.handler(() => listTodos());
+```
+
+Request and output setters can appear in either order. `.metadata()` and
+`.openAPI()` can appear anywhere before `.handler()`, which completes the
+builder. See [OpenAPI](/docs/openapi) for document generation.

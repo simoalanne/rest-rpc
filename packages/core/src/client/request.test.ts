@@ -325,178 +325,102 @@ describe("ApiClient requests", () => {
 		});
 	});
 
-	it("sends form bodies as URLSearchParams with their declared content type", async () => {
-		const apiContract = {
-			forms: {
-				submit: route
-					.post("/forms")
-					.body(
-						z.object({
-							title: z.string(),
-							remember: z.boolean().optional(),
-						}),
-						{ contentType: "application/x-www-form-urlencoded" },
-					)
-					.response(204),
-			},
+	it("passes URLSearchParams through without constructing forms from objects", async () => {
+		const api = {
+			form: route
+				.post("/form")
+				.body(z.instanceof(URLSearchParams), {
+					contentType: "application/x-www-form-urlencoded",
+				})
+				.response(204),
 		};
 		const calls = captureFetch();
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-
-		await client.forms.submit({
-			body: {
-				title: "Write docs",
-				remember: true,
-			},
-		});
-
-		assert.ok(calls[0]?.init?.body instanceof URLSearchParams);
+		const client = initClient(api, { baseUrl: "https://api.test" });
+		const body = new URLSearchParams([
+			["body", "contents"],
+			["tags[]", "ts"],
+			["tags[]", "rpc"],
+		]);
+		await client.form({ body });
+		assert.equal(calls[0]?.init?.body, body);
 		assert.equal(
-			calls[0].init.body.toString(),
-			"title=Write+docs&remember=true",
+			new Headers(calls[0]?.init?.headers).get("content-type"),
+			"application/x-www-form-urlencoded",
 		);
-		assert.deepEqual(calls[0]?.init?.headers, {
-			"content-type": "application/x-www-form-urlencoded",
-		});
-	});
-
-	it("preserves body fields in grouped form payloads", async () => {
-		const apiContract = {
-			forms: {
-				submit: route
-					.post("/forms")
-					.body(
-						z.object({
-							body: z.string(),
-							title: z.string(),
-						}),
-						{ contentType: "application/x-www-form-urlencoded" },
-					)
-					.response(204),
-			},
-		};
-		const calls = captureFetch();
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-
-		await client.forms.submit({
-			body: {
-				body: "Article contents",
-				title: "Write docs",
-			},
-		});
-
-		assert.ok(calls[0]?.init?.body instanceof URLSearchParams);
-		assert.equal(
-			calls[0].init.body.toString(),
-			"body=Article+contents&title=Write+docs",
+		await assert.rejects(
+			client.form({ body: { title: "Hello" } as never }),
+			/URLSearchParams/,
 		);
 	});
 
-	it("sends form arrays with empty-bracket field names", async () => {
-		const apiContract = {
-			forms: {
-				submit: route
-					.post("/forms")
-					.body(
-						z.object({
-							title: z.string(),
-							tags: z.array(z.string()),
-						}),
-						{ contentType: "application/x-www-form-urlencoded" },
-					)
-					.response(204),
-			},
+	it("passes multipart forms through and lets Fetch generate their boundary", async () => {
+		const api = {
+			upload: route
+				.post("/upload")
+				.body(z.instanceof(FormData), {
+					contentType: "multipart/form-data",
+				})
+				.response(204),
 		};
 		const calls = captureFetch();
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-
-		await client.forms.submit({
-			body: {
-				title: "Write docs",
-				tags: ["ts", "rpc"],
-			},
-		});
-
-		assert.ok(calls[0]?.init?.body instanceof URLSearchParams);
+		const client = initClient(api, { baseUrl: "https://api.test" });
+		const body = new FormData();
+		body.append("body", "contents");
+		body.append("tags[]", "ts");
+		body.append("tags[]", "rpc");
+		body.append("file", new File(["hello"], "hello.txt"));
+		await client.upload({ body });
+		assert.equal(calls[0]?.init?.body, body);
 		assert.equal(
-			calls[0].init.body.toString(),
+			new Headers(calls[0]?.init?.headers).get("content-type"),
+			null,
+		);
+		const request = new Request(calls[0]!.url, calls[0]!.init);
+		assert.match(
+			request.headers.get("content-type")!,
+			/multipart\/form-data; boundary=/,
+		);
+		assert.deepEqual((await request.formData()).getAll("tags[]"), [
+			"ts",
+			"rpc",
+		]);
+		await assert.rejects(
+			client.upload({ body: { title: "Hello" } as never }),
+			/FormData/,
+		);
+	});
+
+	it("uses explicit custom codecs for object form conversion", async () => {
+		const schema = z.object({ title: z.string(), tags: z.array(z.string()) });
+		const api = {
+			form: route
+				.post("/form")
+				.body(schema, {
+					contentType: "application/x-www-form-urlencoded",
+				})
+				.response(204),
+		};
+		const calls = captureFetch();
+		const client = initClient(api, {
+			baseUrl: "https://api.test",
+			bodyCodecs: [
+				{
+					match: (mediaType) =>
+						mediaType === "application/x-www-form-urlencoded",
+					serialize(value) {
+						const input = schema.parse(value);
+						const body = new URLSearchParams({ title: input.title });
+						for (const tag of input.tags) body.append("tags[]", tag);
+						return { body };
+					},
+				},
+			],
+		});
+		await client.form({ body: { title: "Write docs", tags: ["ts", "rpc"] } });
+		assert.equal(
+			String(calls[0]?.init?.body),
 			"title=Write+docs&tags%5B%5D=ts&tags%5B%5D=rpc",
 		);
-	});
-
-	it("sends multipart bodies as FormData without generated content type", async () => {
-		const apiContract = {
-			uploads: {
-				create: route
-					.post("/uploads")
-					.body(
-						z.object({
-							title: z.string(),
-							file: z.instanceof(Blob),
-							tags: z.array(z.string()).optional(),
-						}),
-						{ contentType: "multipart/form-data" },
-					)
-					.response(204),
-			},
-		};
-		const calls = captureFetch();
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-		const file = new Blob(["hello"], { type: "text/plain" });
-
-		await client.uploads.create({
-			body: {
-				title: "Write docs",
-				file,
-				tags: ["ts", "rpc"],
-			},
-		});
-
-		assert.ok(calls[0]?.init?.body instanceof FormData);
-		assert.equal(calls[0].init.body.get("title"), "Write docs");
-		assert.ok(calls[0].init.body.get("file") instanceof Blob);
-		assert.deepEqual(calls[0].init.body.getAll("tags[]"), ["ts", "rpc"]);
-		assert.deepEqual(calls[0]?.init?.headers, {});
-	});
-
-	it("preserves body fields in grouped multipart payloads", async () => {
-		const apiContract = {
-			uploads: {
-				create: route
-					.post("/uploads")
-					.body(
-						z.object({
-							body: z.string(),
-							title: z.string(),
-						}),
-						{ contentType: "multipart/form-data" },
-					)
-					.response(204),
-			},
-		};
-		const calls = captureFetch();
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-
-		await client.uploads.create({
-			body: {
-				body: "File contents",
-				title: "Upload docs",
-			},
-		});
-
-		assert.ok(calls[0]?.init?.body instanceof FormData);
-		assert.equal(calls[0].init.body.get("body"), "File contents");
-		assert.equal(calls[0].init.body.get("title"), "Upload docs");
 	});
 
 	it("sends custom bodies with a selected declared content type", async () => {
@@ -509,7 +433,7 @@ describe("ApiClient requests", () => {
 							id: z.string(),
 						}),
 					)
-					.body(z.string(), {
+					.body(z.instanceof(Blob), {
 						contentType: ["image/png", "image/jpeg"],
 					})
 					.response(204),
@@ -520,13 +444,14 @@ describe("ApiClient requests", () => {
 			baseUrl: "https://api.test",
 		});
 
+		const body = new Blob(["jpeg bytes"], { type: "image/jpeg" });
 		await client.uploads.image(
-			{ body: "jpeg bytes", params: { id: "file 1" } },
+			{ body, params: { id: "file 1" } },
 			{ contentType: "image/jpeg" },
 		);
 
 		assert.equal(calls[0]?.url, "https://api.test/uploads/file%201/image");
-		assert.equal(calls[0]?.init?.body, "jpeg bytes");
+		assert.equal(calls[0]?.init?.body, body);
 		assert.deepEqual(calls[0]?.init?.headers, {
 			"content-type": "image/jpeg",
 		});
@@ -709,7 +634,7 @@ describe("ApiClient requests", () => {
 
 		await assert.rejects(
 			() => client.todos.create({ body: { title: "created" } }),
-			/getGlobalHeaders\(\) must not return a "content-type" header/,
+			/ApiClient request headers must not contain a "content-type" header/,
 		);
 	});
 
@@ -730,13 +655,10 @@ describe("ApiClient requests", () => {
 			},
 		);
 		assert.equal(request.url, "https://api.test/items/path-id?id=query-id");
-		assert.equal(
-			request.body,
-			JSON.stringify({ id: "body-id", context: "body-context" }),
-		);
+		assert.deepEqual(request.body, { id: "body-id", context: "body-context" });
 	});
 
-	it("serializes falsy JSON body values", () => {
+	it("retains falsy body values for codec serialization", () => {
 		const declaration = route
 			.post("/values")
 			.body(type<false | 0 | "" | null>())
@@ -749,7 +671,7 @@ describe("ApiClient requests", () => {
 					body,
 				},
 			);
-			assert.equal(request.body, JSON.stringify(body));
+			assert.equal(request.body, body);
 			assert.equal(request.contentType, "application/json");
 		}
 	});

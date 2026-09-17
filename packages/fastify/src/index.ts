@@ -26,8 +26,8 @@ export type {
 	ExtendedFastifyPreHandler,
 	RequestValidationErrorHandler,
 	ResponseValidationErrorHandler,
-} from "./http.ts";
-export type { RegisterRoutesOptions } from "./registerRoutes.ts";
+	RegisterRoutesOptions,
+} from "./registerRoutes.ts";
 export { registerRoutes } from "./registerRoutes.ts";
 export {
 	RequestValidationError,
@@ -56,12 +56,12 @@ export type RouteHandler<TRoute extends ContractRoute> = ServerRouteHandler<
 >;
 
 /**
- * Entry point for declaring server-first routes handled by Fastify.
+ * Entry point for declaring routes with handlers for Fastify.
  *
  * @remarks Responses are inferred from the handler unless they are declared
  * before `.handler()`.
  *
- * @see {@link https://rest-rpc.dev/docs/server-first-quickstart#define-routes-and-handlers}
+ * @see {@link https://rest-rpc.dev/docs/quickstart#define-and-register-routes}
  * @see {@link https://rest-rpc.dev/docs/server/fastify#framework-context}
  */
 export const route =

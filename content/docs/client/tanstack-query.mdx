@@ -14,7 +14,7 @@ pnpm add @rest-rpc/tanstack-query
 `@rest-rpc/tanstack-query` maps your contract to typed TanStack Query options
 and query keys.
 
-Each standard HTTP route exposes four helpers:
+Routes expose typed query, mutation, pagination, and key helpers:
 
 ```ts
 api.todos.get.queryOptions(...)
@@ -23,14 +23,15 @@ api.todos.create.mutationOptions(...)
 api.todos.get.getKey(...)
 ```
 
-Routes with one successful `.streamResponse(status, schema)` response also
-expose `streamedQueryOptions()`.
+Plain output streams and routes with exactly one successful streaming response
+also expose `streamedQueryOptions()`. See the [Route Builder](/docs/route-builder)
+for result forms.
 
 ## Setup
 
 ```ts
 import { createTanstackQueryHelpers } from "@rest-rpc/tanstack-query";
-import { api } from "./contract";
+import { api } from "./client-contract";
 
 export const tq = createTanstackQueryHelpers(api, {
 	baseUrl: "https://api.example.com",
@@ -40,7 +41,12 @@ export const tq = createTanstackQueryHelpers(api, {
 });
 ```
 
-The returned object mirrors the HTTP routes in the contract.
+The returned object mirrors the routes in the runtime contract. Use a
+[generated contract](/docs/client/contract-generation) for handler-based routes
+or import a [separate contract](/docs/contract-first-quickstart).
+
+Client configuration uses the same options as the [Fetch Client](/docs/client/fetch-client),
+including global headers, codecs, and optional response validation.
 
 ## Queries
 
@@ -159,7 +165,7 @@ data. It discards a response envelope when the route uses `.streamResponse()`;
 
 :::note
 `streamedQueryOptions()` is based on TanStack Query's experimental
-[`streamedQuery`](https://tanstack.com/query/latest/docs/reference/streamedQuery)
+[`streamedQuery`](https://tanstack.com/query/latest/docs/framework/react/reference/functions/experimental_streamedQuery)
 API.
 :::
 
@@ -190,12 +196,6 @@ const messages = useQuery(
 messages.data;
 // string | undefined
 ```
-
-`streamedQueryOptions()` is generated for plain output streams or response
-streams with exactly one successful `.streamResponse()`. Use `queryOptions()`
-for the raw async iterable. With `.streamResponse()`, `queryOptions()` also
-retains `status` and `headers`; with `.streamOutput()`, it returns the iterable
-directly.
 
 ## Query Keys
 
@@ -278,12 +278,11 @@ The adapter passes TanStack Query cancellation signals through fetch options.
 
 TanStack Query uses success and error channels.
 
-Declared 2xx responses become `data`.
+Plain outputs and declared 2xx responses become `data`.
 
 Declared non-2xx responses become `error`.
 
 Undeclared response statuses and other runtime failures become `Error` values in
 the error channel.
 
-This differs from calling an HTTP route directly, which exposes declared non-2xx
-responses as values.
+Direct Fetch client calls return declared non-2xx responses as envelopes instead. See [Fetch Client](/docs/client/fetch-client#call-routes).

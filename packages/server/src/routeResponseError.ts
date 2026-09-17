@@ -1,5 +1,8 @@
-import type { Contract, RouteDeclaration } from "@rest-rpc/core/contract";
-import type { RouteErrors } from "./routeBuilder.types.ts";
+import type {
+	Contract,
+	RouteDeclaration,
+	ServerErrors,
+} from "@rest-rpc/core/contract";
 
 type HttpRoutes<TContract> = TContract extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
@@ -23,19 +26,19 @@ type HttpRoutes<TContract> = TContract extends {
  * @remarks Server adapters validate and serialize its response as an ordinary
  * declared route result instead of treating it as an unexpected server error.
  *
- * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-multiple-status-codes}
+ * @see {@link https://rest-rpc.dev/docs/route-builder}
  */
 export class RouteResponseError<
 	TContract extends Contract = Contract,
 > extends Error {
-	readonly response: RouteErrors<HttpRoutes<TContract>>;
+	readonly response: ServerErrors<HttpRoutes<TContract>>;
 	readonly status: number;
 	readonly body: unknown;
 	readonly contentType: string | undefined;
 	readonly responseHeaders: Record<string, unknown> | undefined;
 	readonly route: TContract;
 
-	constructor(route: TContract, response: RouteErrors<HttpRoutes<TContract>>) {
+	constructor(route: TContract, response: ServerErrors<HttpRoutes<TContract>>) {
 		super("Route response error");
 		const responseFields = response as { status: number; body: unknown };
 		this.response = response;

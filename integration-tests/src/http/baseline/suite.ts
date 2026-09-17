@@ -24,7 +24,16 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 
 		before(async () => {
 			server = await adapter.start();
-			client = initClient(integrationContract, { baseUrl: server.origin });
+			client = initClient(integrationContract, {
+				baseUrl: server.origin,
+				bodyCodecs: [
+					{
+						match: (mediaType) => mediaType === "application/octet-stream",
+						deserialize: async (source) =>
+							new Uint8Array(await source.arrayBuffer()),
+					},
+				],
+			});
 		});
 
 		after(async () => {
@@ -152,7 +161,10 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 			});
 
 			assert.equal(response.status, 200);
-			assert.equal(response.contentType, "text/plain");
+			assert.match(
+				response.headers.get("content-type")!,
+				/^text\/plain(?:;|$)/,
+			);
 			assert.equal(response.body, "hello over real HTTP");
 		});
 
@@ -160,7 +172,10 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 			const response = await client.responses.text();
 
 			assert.equal(response.status, 200);
-			assert.equal(response.contentType, "text/plain");
+			assert.match(
+				response.headers.get("content-type")!,
+				/^text\/plain(?:;|$)/,
+			);
 			assert.equal(response.body, "plain response");
 		});
 
@@ -168,7 +183,10 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 			const response = await client.responses.binary();
 
 			assert.equal(response.status, 200);
-			assert.equal(response.contentType, "application/octet-stream");
+			assert.equal(
+				response.headers.get("content-type"),
+				"application/octet-stream",
+			);
 			assert.deepEqual(Array.from(response.body), [0, 1, 127, 128, 255]);
 		});
 

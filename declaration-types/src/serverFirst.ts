@@ -1,7 +1,17 @@
 // This verifies that declarations exported by downstream packages can name all
 // public server-first builder, implementation, and handler types.
 
-import { route as contractRoute, type as schemaType } from "@rest-rpc/core";
+import {
+	type ClientRequest,
+	type ClientResponse,
+	route as contractRoute,
+	type as schemaType,
+} from "@rest-rpc/core";
+import type {
+	RouteRequestData,
+	RouteResponse,
+	RouteErrors,
+} from "@rest-rpc/server";
 import {
 	createRouteHandler as createFetchRouteHandler,
 	implement as implementFetch,
@@ -80,3 +90,10 @@ export const nodeRoutes = {
 
 export const fetchHandler = createFetchRouteHandler(fetchRoutes);
 export const nodeHandler = createNodeRouteHandler(nodeRoutes);
+
+// Downstream packages use public helpers directly on completed routes.
+export type CreateClientRequest = ClientRequest<typeof fetchRoutes.create>;
+export type CreateClientResponse = ClientResponse<typeof fetchRoutes.create>;
+export type CreateServerRequest = RouteRequestData<typeof fetchRoutes.create>;
+export type CreateServerResponse = RouteResponse<typeof fetchRoutes.create>;
+export type CreateServerErrors = RouteErrors<typeof fetchRoutes.create>;

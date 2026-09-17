@@ -1,0 +1,126 @@
+---
+title: Contract-first Quickstart
+description: Declare a shared HTTP interface, implement it, and use it in a typed client.
+---
+
+A separate contract is useful when the HTTP interface should be shared
+independently of its implementation. Declare it with the core route builder,
+implement it with a server adapter, and pass the same contract to the client.
+
+This guide builds the same two routes as the [Quickstart](/docs/quickstart),
+using Express and Zod. The methods, paths, inputs, statuses, and client results
+are equivalent but the output types are declared explicitly rather than inferred from
+handlers.
+
+## Install
+
+```sh
+pnpm add @rest-rpc/core @rest-rpc/express express zod
+```
+
+## Declare the Contract
+
+Put the contract somewhere both server and client can import.
+
+```ts contract.ts
+import { route } from "@rest-rpc/core";
+import { z } from "zod";
+
+const todoSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+	completed: z.boolean(),
+});
+
+const create = route
+	.input(z.object({ title: z.string().min(1) }))
+	.output(todoSchema);
+
+const get = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.query(z.object({ uppercase: z.enum(["yes", "no"]).optional() }))
+	.response(200, todoSchema)
+	.response(404, z.object({ code: z.literal("TODO_NOT_FOUND") }));
+
+export const api = { todos: { create, get } };
+```
+
+`todos.create` uses the default `POST /todos/create` and returns a plain value.
+`todos.get` declares its HTTP method and path and returns a status envelope.
+The schemas also provide runtime validation of handler outputs.
+
+## Implement and Register Routes
+
+```ts server.ts
+import express from "express";
+import { implement, registerRoutes } from "@rest-rpc/express";
+import { api } from "./contract";
+
+type Todo = { id: string; title: string; completed: boolean };
+const todos = new Map<string, Todo>();
+
+const create = implement(api.todos.create).handler(({ input: { title } }) => {
+	const todo: Todo = {
+		id: crypto.randomUUID(),
+		title,
+		completed: false,
+	};
+	todos.set(todo.id, todo);
+	return todo;
+});
+
+const get = implement(api.todos.get).handler(({ params, query }) => {
+	const todo = todos.get(params.id);
+	if (!todo) {
+		return { status: 404, body: { code: "TODO_NOT_FOUND" } };
+	}
+	return {
+		status: 200,
+		body: {
+			...todo,
+			title: query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title,
+		},
+	};
+});
+
+const routes = { todos: { create, get } };
+
+const app = express();
+app.use(express.json());
+registerRoutes(app, routes);
+app.listen(3000);
+```
+
+`implement()` keeps each handler's input and result tied to its declaration.
+The contract itself contains no framework or handler code.
+
+## Call the Routes
+
+Import the shared contract directly. No contract generation step is needed.
+
+```ts client.ts
+import { initClient } from "@rest-rpc/core";
+import { api } from "./contract";
+
+const client = initClient(api, { baseUrl: "http://localhost:3000" });
+
+const todo = await client.todos.create({ title: "Write docs" });
+const response = await client.todos.get({
+	params: { id: todo.id },
+	query: { uppercase: "yes" },
+});
+
+if (response.status === 200) {
+	console.log(response.body.title);
+} else {
+	console.log(response.body.code); // "TODO_NOT_FOUND"
+}
+```
+
+## Next Steps
+
+- [Contract Route Builder](/docs/contract/declaration) covers declarations and implementation.
+- [Schemas and Validation](/docs/http-behavior/schemas) covers runtime validation.
+- [Express](/docs/server/express) and the other adapter pages cover framework integration.
+- [Fetch Client](/docs/client/fetch-client) and [TanStack Query](/docs/client/tanstack-query) cover client usage.

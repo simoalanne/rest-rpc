@@ -1,0 +1,122 @@
+---
+title: Schemas and Validation
+description: Understand schema input/output types and validation at the HTTP boundary.
+---
+
+`rest-rpc` accepts schemas that implement Standard Schema. Zod, Valibot, and
+ArkType are supported. The built-in `type<T>()` helper provides types without
+runtime validation.
+
+Schemas describe application values. Serialization determines how those values
+travel over HTTP. These rules apply to every server adapter and to both
+handler-based routes and separate contracts.
+
+## Schema Input and Output
+
+A schema has an input type and an output type. Validation can coerce, transform,
+or add defaults, so the two types can differ.
+
+| Position                               | Type used     |
+| -------------------------------------- | ------------- |
+| Fetch client request input             | Schema input  |
+| Server handler input                   | Schema output |
+| Server handler output or response body | Schema input  |
+| Fetch client result or response body   | Schema output |
+
+For inferred handler outputs, there is no declared response schema: client
+output types come from the handler's return value.
+
+## Request Validation
+
+The server decodes a request, then validates its declared request schemas before
+calling the handler. The handler receives validated schema output. Request
+validation failures produce a 400 response by default. Adapter pages cover how to
+customize error handling.
+
+```ts
+import { route } from "@rest-rpc/express";
+import { z } from "zod";
+
+const list = route
+	.get("/todos")
+	.query(z.object({ page: z.coerce.number<number>().int().min(1) }))
+	.handler(({ query }) => listTodos(query.page));
+```
+
+The client accepts a number such as `{ query: { page: 2 } }`. It serializes that
+number as an HTTP string. Zod receives `"2"` on the server and coerces it to `2`
+for the handler.
+
+### Inputs for HTTP Strings
+
+Path params, query params, and headers arrive as strings. Declaring a numeric or
+boolean client input does not automatically decode those strings into that
+type. Use a schema that can transform or coerce the input to the desired type.
+
+See [Serialization and Codecs](/docs/http-behavior/serialization#path-query-and-headers)
+for supported scalar and array shapes. Form bodies are decoded into
+`URLSearchParams` or `FormData` by the default codecs, so their schemas should
+accept those values.
+
+## Response Validation on the Server
+
+Declared output schemas validate the handler result before response
+serialization. A plain `.output(schema)` handler returns schema input directly;
+a `.response(status, schema)` handler supplies schema input in `body`.
+The server sends the validated schema output.
+
+```ts
+const create = route
+	.input(z.object({ title: z.string() }))
+	.output(z.object({ id: z.string(), title: z.string() }))
+	.handler(({ input: { title } }) => ({ id: crypto.randomUUID(), title }));
+```
+
+Inferred outputs provide type checking without runtime response validation.
+Add `.output()`, `.response()`, `.streamOutput()`, or `.streamResponse()` when
+runtime validation is needed. Declared stream schemas validate each item as it
+is yielded.
+
+Response validation failures normally produce a generic 500 response. Once a
+stream has started, an invalid item terminates the stream instead of replacing
+it with a new HTTP response. See each server adapter for error customization.
+
+## Response Validation on the Client
+
+The Fetch client decodes response bodies without schema validation by default.
+Enable `validateResponses` to validate decoded bodies, declared response
+headers, and stream items:
+
+```ts
+const client = initClient(api, {
+	baseUrl: "https://api.example.com",
+	validateResponses: true,
+});
+```
+
+Validation runs after deserialization. The client receives schema output on success.
+Enabling validation will validate against the **input** type of the declared schema.
+If you are using schema with different input and output types this may result in unexpected validation errors.
+
+:::note
+[Generated client contracts](/docs/client/contract-generation) contain no
+runtime schemas, so this option does not add validation to them and is a no-op.
+:::
+
+See [Fetch Client](/docs/client/fetch-client) for client-specific behavior and
+[Serialization and Codecs](/docs/http-behavior/serialization) for the decoding
+that precedes validation.
+
+## Type-only Schemas
+
+```ts
+import { type } from "@rest-rpc/core";
+
+const create = route
+	.input(type<{ title: string }>())
+	.handler(({ input: { title } }) => ({ id: crypto.randomUUID(), title }));
+```
+
+`type<T>()` accepts runtime values unchanged. It does not validate, coerce, or
+transform HTTP strings or decoded bodies. Use a validating schema when those
+operations are needed.

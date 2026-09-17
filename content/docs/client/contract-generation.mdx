@@ -1,0 +1,73 @@
+---
+title: Client Contract Generation
+description: Derive a client runtime contract from handler-based route declarations.
+---
+
+`generateContractFromType()` derives a client definition from your exported
+routes. Use it with the Fetch client or TanStack Query helpers without importing
+server code into the client.
+
+## Generate a Contract
+
+```ts client-contract.ts
+import { generateContractFromType } from "@rest-rpc/core/generate";
+import type { routes } from "./server";
+
+export const api = generateContractFromType<typeof routes>({
+	filePath: "./server.ts",
+	exportName: "routes",
+});
+```
+
+```ts
+import { initClient } from "@rest-rpc/core";
+import { api } from "./client-contract";
+
+const client = initClient(api, { baseUrl: "http://localhost:3000" });
+```
+
+## Run Generation at Build Time
+
+Generation needs Node's filesystem APIs and the TypeScript 5 or 6 compiler API.
+TypeScript 7 does not currently ship a compiler API, but it can still be used for
+project-wide checks. The checked project must be free of TypeScript errors, and
+route methods, paths, and response statuses must retain literal types.
+
+For a browser bundle or another runtime without filesystem access, inline the
+result with a build-time macro. For example, Bun macros can wrap the generation
+step:
+
+```ts client-contract.macro.ts
+import { generateContractFromType } from "@rest-rpc/core/generate";
+import type { routes } from "./server";
+
+export function getApi() {
+	return generateContractFromType<typeof routes>({
+		filePath: "./server.ts",
+		exportName: "routes",
+	});
+}
+```
+
+```ts client.ts
+import { initClient } from "@rest-rpc/core";
+import { getApi } from "./client-contract.macro" with { type: "macro" };
+
+const client = initClient(getApi(), { baseUrl: "http://localhost:3000" });
+```
+
+Other bundlers can use a macro integration such as `unplugin-macros`. Configure
+the integration so generation runs during the build and the resulting runtime
+contract is included in the client bundle.
+
+## Validation and OpenAPI
+
+Generated contracts carry client types but no runtime validators. Enabling
+`validateResponses` therefore cannot add schema validation to this artifact.
+Declared schemas still validate requests and outputs on the server.
+
+Generate OpenAPI from the server routes with explicit output schemas. See
+[OpenAPI](/docs/openapi).
+
+If the client needs shared runtime schemas, use a
+[separate contract](/docs/contract-first-quickstart).

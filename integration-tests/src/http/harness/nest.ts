@@ -12,20 +12,24 @@ import type { StartedServer } from "./listen.ts";
 
 type FastifyParserDone = (error: Error | null, body?: unknown) => void;
 
-export type NestAdapterOptions = {
+export type NestAdapterOptions<TRequest = unknown> = {
+	bodyParser?: boolean;
 	configureApp?: (
 		app: Awaited<ReturnType<typeof NestFactory.create>>,
 	) => void | Promise<void>;
 	configureFastify?: (app: FastifyInstance) => void | Promise<void>;
 	controllerPrefix?: string;
-	moduleOptions?: RestRpcModuleOptions<Record<string, unknown>>;
+	moduleOptions?: RestRpcModuleOptions<Record<string, unknown>, TRequest>;
 	platform?: "express" | "fastify";
 };
 
-export const createNestAdapter = <TContract extends Contract>(
+export const createNestAdapter = <
+	TContract extends Contract,
+	TRequest = unknown,
+>(
 	contract: TContract,
 	implementations: RuntimeImplementationTree,
-	options: NestAdapterOptions = {},
+	options: NestAdapterOptions<TRequest> = {},
 ) => ({
 	name: options.platform === "fastify" ? "nest-fastify" : "nest",
 	start: async (): Promise<StartedServer> => {
@@ -39,7 +43,7 @@ export const createNestAdapter = <TContract extends Contract>(
 
 		@Module({
 			imports: [
-				RestRpcModule.forRoot({
+				RestRpcModule.forRoot<Record<string, unknown>, TRequest>({
 					createContext: () => ({ adapter: "nest" }),
 					...options.moduleOptions,
 				}),
@@ -54,7 +58,10 @@ export const createNestAdapter = <TContract extends Contract>(
 						bodyParser: false,
 						logger: false,
 					})
-				: await NestFactory.create(AppModule, { logger: false });
+				: await NestFactory.create(AppModule, {
+						logger: false,
+						bodyParser: options.bodyParser,
+					});
 
 		if (options.platform === "fastify") {
 			const fastify = app.getHttpAdapter().getInstance() as FastifyInstance;
@@ -65,7 +72,7 @@ export const createNestAdapter = <TContract extends Contract>(
 					done(null, body),
 			);
 			await options.configureFastify?.(fastify);
-		} else {
+		} else if (options.bodyParser !== false) {
 			app.use(express.text({ type: "text/plain" }));
 		}
 

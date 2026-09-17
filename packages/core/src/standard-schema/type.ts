@@ -8,7 +8,7 @@ const TYPE_ONLY_SCHEMA_VENDOR = "rest-rpc";
  * @remarks Runtime validation accepts the input as-is. Use this helper only
  * when runtime validation is not needed.
  *
- * @see {@link https://rest-rpc.dev/docs/contract/schemas}
+ * @see {@link https://rest-rpc.dev/docs/http-behavior/schemas}
  */
 export function type<T>(): StandardSchemaV1<T, T> {
 	return {

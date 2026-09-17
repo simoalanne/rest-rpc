@@ -22,12 +22,12 @@ type FetchHandlerFields = {
 export interface DefaultContext {}
 
 /**
- * Entry point for declaring server-first routes handled by the Fetch runtime.
+ * Entry point for declaring routes with handlers for the Fetch runtime.
  *
  * @remarks Responses are inferred from the handler unless they are declared
  * before `.handler()`.
  *
- * @see {@link https://rest-rpc.dev/docs/server-first-quickstart#define-routes-and-handlers}
+ * @see {@link https://rest-rpc.dev/docs/quickstart#define-and-register-routes}
  * @see {@link https://rest-rpc.dev/docs/server/fetch}
  */
 export const route = serverFirstRoute as unknown as ServerRouteBuilder<
@@ -67,6 +67,4 @@ export type {
 	RequestValidationErrorHandler,
 	ResponseValidationErrorHandler,
 } from "./handler.ts";
-export { defaultBodyParser } from "./request.ts";
-export type { FetchBodyParser } from "./request.ts";
 export { createFetchResponse } from "./response.ts";

@@ -3,44 +3,52 @@ title: Type Helpers
 description: Infer route types for clients, TanStack Query, and server handlers
 ---
 
-Type helpers take a route declaration and infer the type used at a specific
-runtime boundary.
+Type helpers infer the request and response types for a route in your API tree.
+They work with generated client contracts and separately shared declarations.
 
 ```ts
 import { route } from "@rest-rpc/core";
 import { z } from "zod";
 
+const getTodo = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.query(z.object({ includeDone: z.enum(["yes", "no"]).optional() }))
+	.response(200, z.object({ id: z.string(), title: z.string() }))
+	.response(404, z.object({ code: z.literal("NOT_FOUND") }));
+
+const todoPage = route
+	.get("/todos/page")
+	.query(
+		z.object({
+			cursor: z.string().optional(),
+			status: z.enum(["open", "done"]),
+			limit: z.coerce.number<number>(),
+		}),
+	)
+	.response(
+		200,
+		z.object({
+			items: z.array(z.object({ id: z.string(), title: z.string() })),
+			nextCursor: z.string().optional(),
+		}),
+	);
+
+const createTodo = route
+	.post("/todos")
+	.body(z.object({ title: z.string() }))
+	.response(201, z.object({ id: z.string(), title: z.string() }));
+
+const todoEvents = route
+	.get("/todos/events")
+	.streamResponse(200, z.object({ id: z.string(), message: z.string() }));
+
 export const api = {
 	todos: {
-		get: route
-			.get("/todos/:id")
-			.params(z.object({ id: z.string() }))
-			.query(z.object({ includeDone: z.boolean().optional() }))
-			.response(200, z.object({ id: z.string(), title: z.string() }))
-			.response(404, z.object({ code: z.literal("NOT_FOUND") })),
-		page: route
-			.get("/todos/page")
-			.query(
-				z.object({
-					cursor: z.string().optional(),
-					status: z.enum(["open", "done"]),
-					limit: z.number(),
-				}),
-			)
-			.response(
-				200,
-				z.object({
-					items: z.array(z.object({ id: z.string(), title: z.string() })),
-					nextCursor: z.string().optional(),
-				}),
-			),
-		create: route
-			.post("/todos")
-			.body(z.object({ title: z.string() }))
-			.response(201, z.object({ id: z.string(), title: z.string() })),
-		events: route
-			.get("/todos/events")
-			.streamResponse(200, z.object({ id: z.string(), message: z.string() })),
+		get: getTodo,
+		page: todoPage,
+		create: createTodo,
+		events: todoEvents,
 	},
 };
 ```
@@ -53,7 +61,7 @@ Import fetch client helpers from `@rest-rpc/core`.
 import type { ClientRequest, ClientResponse } from "@rest-rpc/core";
 
 type GetTodoRequest = ClientRequest<typeof api.todos.get>;
-// { params: { id: string }; query: { includeDone?: boolean } }
+// { params: { id: string }; query: { includeDone?: "yes" | "no" } }
 
 type GetTodoResponse = ClientResponse<typeof api.todos.get>;
 // | { status: 200; body: { id: string; title: string }; headers: Headers }
@@ -76,10 +84,10 @@ import type {
 } from "@rest-rpc/express";
 
 type GetTodoRequest = RouteRequest<typeof api.todos.get>;
-// { params: { id: string }; query: { includeDone?: boolean }; context: HttpRouteHandlerContext }
+// Includes params, query, req, res, signal, route, and context.
 
 type GetTodoRequestData = RouteRequestData<typeof api.todos.get>;
-// { params: { id: string }; query: { includeDone?: boolean } }
+// { params: { id: string }; query: { includeDone?: "yes" | "no" } }
 
 type GetTodoResponse = RouteResponse<typeof api.todos.get>;
 // | { status: 200; body: { id: string; title: string } }
@@ -89,8 +97,8 @@ type GetTodoErrors = RouteErrors<typeof api.todos.get>;
 // { status: 404; body: { code: "NOT_FOUND" } }
 ```
 
-`RouteResponse` is the response envelope returned by a declared HTTP handler.
-Responses with a body include `status` and `body`; responses declared without a
+`RouteResponse` describes the declared status envelopes.
+Responses with a body include `status` and `body`. Responses declared without a
 body include only `status` (plus `responseHeaders` when declared).
 
 ## TanStack Query

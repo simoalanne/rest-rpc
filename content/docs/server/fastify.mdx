@@ -11,32 +11,36 @@ pnpm add @rest-rpc/fastify
 
 ## Usage
 
+Register routes inside a Fastify plugin to keep dependencies and hooks scoped to
+a module. Handlers can access the native request and reply.
+
 ```ts
-import { implement, registerRoutes } from "@rest-rpc/fastify";
 import Fastify from "fastify";
-import { api } from "./contract";
+import { route, registerRoutes } from "@rest-rpc/fastify";
+import { z } from "zod";
 
-const app = Fastify();
+const app = Fastify({ logger: true });
+const todos = new Map([["todo_1", { id: "todo_1", title: "Write docs" }]]);
 
-const implementor = implement(api);
+const getTodo = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.handler(({ params, req }) => {
+		req.log.info({ todoId: params.id }, "Reading todo");
+		const todo = todos.get(params.id);
+		return todo
+			? { status: 200, body: todo }
+			: { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
+	});
 
-const routes = {
-	todos: {
-		list: implementor.todos.list.handler(() => ({
-			status: 200,
-			body: listTodos(),
-		})),
-		get: implementor.todos.get.handler(({ params: { id }, req }) => {
-			const authorization = req.headers.authorization;
-			return { status: 200, body: getTodo(id, { authorization }) };
-		}),
-		create: implementor.todos.create.handler(({ body: { title } }) => {
-			return { status: 201, body: createTodo({ title }) };
-		}),
+export const routes = { todos: { get: getTodo } };
+
+await app.register(
+	async (api) => {
+		registerRoutes(api, routes);
 	},
-};
-
-registerRoutes(app, routes);
+	{ prefix: "/api" },
+);
 
 await app.listen({ port: 3000 });
 ```
@@ -57,6 +61,7 @@ type RouteHandlerFields = {
 
 ```ts
 type RegisterRoutesOptions = {
+	bodyCodecs?: readonly BodyCodec<FastifyRequest>[];
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 	preHandler?: Array<
@@ -69,12 +74,12 @@ type RegisterRoutesOptions = {
 };
 ```
 
+`bodyCodecs`: see [Serialization and Codecs](/docs/http-behavior/serialization).
+
 ### Error handling
 
-Request validation errors default to a 400 response. Response contract
-validation errors default to a generic 500 response. Customize them with
-handlers that receive native Fastify arguments. Other errors are handled by
-Fastify's error handler.
+Use `requestValidationErrorHandler` and `responseValidationErrorHandler` to
+customize [validation errors](/docs/http-behavior/schemas). Other errors use Fastify's error handler.
 
 ```ts
 registerRoutes(app, routes, {

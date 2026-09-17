@@ -1,23 +1,18 @@
+import {
+	resolveBodyCodec,
+	defaultBodyCodecs,
+	normalizeMediaType,
+	type BodyCodec,
+} from "../codecs/index.ts";
 import type { RouteDeclaration } from "../contract/contract.ts";
-import type {
-	DeclaredClientResponse,
-	ResponseBodySchema,
-	ResponseDeclaration,
-	SuccessfulDeclaredClientResponse,
-} from "../contract/response.ts";
+import type { ResponseDeclaration } from "../contract/response.ts";
 import { getRouteResponses } from "../contract/response.ts";
-import { validateStandardSchema } from "../standard-schema/index.ts";
+import {
+	validateStandardSchema,
+	type StandardSchemaV1,
+} from "../standard-schema/index.ts";
 import { parseNdjsonStream } from "./stream.ts";
-import type { ApiClientBodyParser, FetchArgs } from "./types.ts";
-
-type FetchedRouteResponse<E extends RouteDeclaration> =
-	DeclaredClientResponse<E> extends infer TResponse
-		? TResponse extends object
-			? TResponse & { headers: Headers }
-			: never
-		: never;
-
-const isSuccessStatus = (status: number) => status >= 200 && status < 300;
+import type { FetchArgs } from "./types.ts";
 
 export const getResponseSchema = (
 	route: RouteDeclaration,
@@ -29,147 +24,51 @@ export const getResponseSchema = (
 	return entry?.[1];
 };
 
-/** Reads an unvalidated response according to its Content-Type header. */
-export const readUnvalidatedResponse = async (
+const assertResponseContentType = (
+	declared: string | readonly string[] | undefined,
 	rawResponse: Response,
-	bodyParser: ApiClientBodyParser = defaultBodyParser,
-	kind?: "stream",
 ) => {
-	const contentType = rawResponse.headers.get("content-type") ?? undefined;
-	const normalizedContentType = normalizeContentType(contentType ?? "");
-	let body: unknown;
-
-	if (!contentType) {
-		body = undefined;
-	} else if (isJsonContentType(normalizedContentType)) {
-		body = await rawResponse.json();
-	} else if (
-		kind === "stream" &&
-		normalizedContentType === "application/x-ndjson"
+	const received = normalizeMediaType(
+		rawResponse.headers.get("content-type") ?? "",
+	);
+	if (!received || declared === undefined) return;
+	const allowed = typeof declared === "string" ? [declared] : declared;
+	if (
+		!allowed.some((contentType) => normalizeMediaType(contentType) === received)
 	) {
-		if (!rawResponse.body) {
-			throw new Error("Server returned an empty stream response");
-		}
-		body = parseNdjsonStream(undefined, rawResponse.body, false);
-	} else {
-		body = await bodyParser(rawResponse);
+		throw new Error("Server returned an unsupported response content-type.");
 	}
-	const isCustomContentType =
-		contentType !== undefined &&
-		kind !== "stream" &&
-		!isJsonContentType(normalizedContentType);
-
-	return {
-		status: rawResponse.status,
-		body,
-		headers: rawResponse.headers,
-		responseHeaders: Object.fromEntries(rawResponse.headers.entries()),
-		...(isCustomContentType ? { contentType: normalizedContentType } : {}),
-	};
 };
 
-export const readDeclaredBody = async (
-	schema: ResponseBodySchema | undefined,
+const STREAM_CONTENT_TYPE = "application/x-ndjson";
+
+const readStreamResponse = (
+	schema: StandardSchemaV1,
 	rawResponse: Response,
 	validate: boolean,
-	kind?: "stream",
-	customContentType?: string | readonly string[],
-	bodyParser: ApiClientBodyParser = defaultBodyParser,
 ) => {
-	if (schema === undefined) return undefined;
-	if (kind === "stream") {
-		if (!rawResponse.body) {
-			throw new Error("Server returned an empty stream response");
-		}
-		return parseNdjsonStream(schema, rawResponse.body, validate);
+	if (
+		normalizeMediaType(rawResponse.headers.get("content-type")) !==
+		STREAM_CONTENT_TYPE
+	) {
+		throw new Error("Server returned an unsupported stream content-type.");
 	}
 
-	if (customContentType !== undefined) {
-		resolveDeclaredContentType(
-			Array.isArray(customContentType)
-				? customContentType
-				: [customContentType as string],
-			rawResponse,
-		);
-		const value = await bodyParser(rawResponse);
-		if (!validate) return value;
-
-		const result = await validateStandardSchema(schema, value);
-		if (result.issues) throw result.issues;
-		return result.value;
+	if (rawResponse.body === null) {
+		throw new Error("Server returned no stream body");
 	}
+	return parseNdjsonStream(schema, rawResponse.body, validate);
+};
 
-	const value = await rawResponse.json();
-	if (!validate) return value;
-
+const validateResponseBody = async (
+	schema: StandardSchemaV1 | undefined,
+	value: unknown,
+	validate: boolean,
+) => {
+	if (!validate || schema === undefined) return value;
 	const result = await validateStandardSchema(schema, value);
 	if (result.issues) throw result.issues;
 	return result.value;
-};
-
-const normalizeContentType = (contentType: string) =>
-	contentType.split(";")[0]?.trim().toLowerCase() ?? "";
-
-const isJsonContentType = (contentType: string) =>
-	contentType === "application/json" || contentType.endsWith("+json");
-
-const defaultBodyParser: ApiClientBodyParser = async (rawResponse) => {
-	const normalized = normalizeContentType(
-		rawResponse.headers.get("content-type") ?? "",
-	);
-	if (isJsonContentType(normalized)) {
-		return rawResponse.json();
-	}
-	if (normalized === "application/x-www-form-urlencoded") {
-		return new URLSearchParams(await rawResponse.text());
-	}
-	if (normalized === "multipart/form-data") return rawResponse.formData();
-	if (normalized.startsWith("text/")) return rawResponse.text();
-	return new Uint8Array(await rawResponse.arrayBuffer());
-};
-
-const resolveDeclaredContentType = (
-	contentTypes: readonly string[],
-	rawResponse: Response,
-) => {
-	const responseContentType = rawResponse.headers.get("content-type");
-	const contentType =
-		responseContentType &&
-		contentTypes.find((value) => {
-			const declared = normalizeContentType(value);
-			const received = normalizeContentType(responseContentType);
-			return (
-				declared === received ||
-				(declared === "application/json" && received.endsWith("+json"))
-			);
-		});
-
-	if (!contentType) {
-		throw new Error(
-			"Server returned an unsupported custom response content-type.",
-		);
-	}
-
-	return contentType;
-};
-
-const declaredResponseMetadata = (
-	schema: ResponseDeclaration,
-	rawResponse: Response,
-) => {
-	const { contentType } = schema;
-	if (contentType !== undefined) {
-		if (contentType === "application/json") {
-			return {};
-		}
-		return {
-			contentType: resolveDeclaredContentType(
-				Array.isArray(contentType) ? contentType : [contentType as string],
-				rawResponse,
-			),
-		};
-	}
-	return {};
 };
 
 const readDeclaredHeaders = async (
@@ -178,14 +77,14 @@ const readDeclaredHeaders = async (
 	validate: boolean,
 ) => {
 	const { headers } = schema;
-	if (!headers) return {};
+	if (!headers) return undefined;
 
 	const rawHeaders = Object.fromEntries(rawResponse.headers.entries());
-	if (!validate) return { responseHeaders: rawHeaders };
+	if (!validate) return rawHeaders;
 
 	const result = await validateStandardSchema(headers, rawHeaders);
 	if (result.issues) throw result.issues;
-	return { responseHeaders: result.value };
+	return result.value;
 };
 
 export type RouteRequestFn = <E extends RouteDeclaration>(
@@ -197,49 +96,57 @@ export type RouteRequestFn = <E extends RouteDeclaration>(
 export const fetchResponse = async <E extends RouteDeclaration>(
 	request: RouteRequestFn,
 	validateResponse: boolean,
-	bodyParser: ApiClientBodyParser | undefined,
+	bodyCodecs: readonly BodyCodec<Response>[] | undefined,
 	route: E,
 	routePath: readonly string[],
 	...args: FetchArgs<E>
-): Promise<FetchedRouteResponse<E>> => {
+) => {
 	const rawResponse = await request(route, routePath, ...args);
-	if (
-		!Number.isInteger(rawResponse.status) ||
-		rawResponse.status < 100 ||
-		rawResponse.status > 599
-	) {
-		throw new Error(
-			`Server returned invalid HTTP response status "${rawResponse.status}".`,
-		);
-	}
 
 	const schema = getResponseSchema(route, rawResponse.status);
 	if (!schema) {
 		throw new Error("Request did not return a declared response");
 	}
-	if (!validateResponse) {
-		return readUnvalidatedResponse(
-			rawResponse,
-			bodyParser,
-			schema.kind,
-		) as Promise<FetchedRouteResponse<E>>;
-	}
 
-	return {
+	const responseMetadata = {
 		status: rawResponse.status,
-		body: await readDeclaredBody(
-			schema.body,
+		headers: rawResponse.headers,
+		responseHeaders: await readDeclaredHeaders(
+			schema,
 			rawResponse,
 			validateResponse,
-			schema.kind,
-			schema.contentType,
-			bodyParser,
 		),
-		headers: rawResponse.headers,
-		...(await readDeclaredHeaders(schema, rawResponse, validateResponse)),
-		...declaredResponseMetadata(schema, rawResponse),
-	} as FetchedRouteResponse<E>;
+	};
+
+	if (schema.kind === "stream") {
+		return {
+			...responseMetadata,
+			body: readStreamResponse(schema.body, rawResponse, validateResponse),
+		};
+	}
+
+	if (route.source !== "generated") {
+		assertResponseContentType(schema.contentType, rawResponse);
+	}
+
+	const mediaType = normalizeMediaType(rawResponse.headers.get("content-type"));
+	let value: unknown;
+	if (mediaType && rawResponse.body !== null) {
+		const resolvedCodec = resolveBodyCodec(mediaType, [
+			...(bodyCodecs ?? []),
+			...defaultBodyCodecs,
+		]);
+		value = await resolvedCodec?.deserialize?.(rawResponse);
+	}
+	const body = await validateResponseBody(schema.body, value, validateResponse);
+
+	return {
+		...responseMetadata,
+		body,
+	};
 };
+
+const isSuccessStatus = (status: number) => status >= 200 && status < 300;
 
 export const fetchSuccess = async <E extends RouteDeclaration>(
 	fetchRouteResponse: (
@@ -250,19 +157,12 @@ export const fetchSuccess = async <E extends RouteDeclaration>(
 	route: E,
 	routePath: readonly string[],
 	...args: FetchArgs<E>
-): Promise<SuccessfulClientResponseBody<E>> => {
+) => {
 	const response = await fetchRouteResponse(route, routePath, ...args);
 
-	if (!("body" in response) || !isSuccessStatus(response.status)) {
+	if (!isSuccessStatus(response.status)) {
 		throw new Error("Request did not return a declared success response");
 	}
 
-	return response.body as SuccessfulClientResponseBody<E>;
+	return response.body;
 };
-
-type SuccessfulClientResponseBody<E extends RouteDeclaration> =
-	SuccessfulDeclaredClientResponse<E> extends infer TResponse
-		? TResponse extends { body: infer TBody }
-			? TBody
-			: never
-		: never;

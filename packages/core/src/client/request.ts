@@ -1,3 +1,10 @@
+import {
+	resolveBodyCodec,
+	defaultBodyCodecs,
+	normalizeMediaType,
+	type SerializedBody,
+	type BodyCodec,
+} from "../codecs/index.ts";
 import type { RouteDeclaration } from "../contract/contract.ts";
 import { replacePathParams } from "../contract/path.ts";
 import type { GroupedRequestInput } from "./requestInput.ts";
@@ -55,65 +62,9 @@ const normalizeHeaders = (headers: Record<string, string> | undefined) =>
 export const assertNoContentTypeHeader = (headers: Record<string, string>) => {
 	if (hasHeader(headers, "content-type")) {
 		throw new Error(
-			'ApiClient getGlobalHeaders() must not return a "content-type" header. Pass the content type to body(schema, { contentType }) on the route declaration instead.',
+			'ApiClient request headers must not contain a "content-type" header. Pass the content type to body(schema, { contentType }) on the route declaration instead.',
 		);
 	}
-};
-
-const normalizeContentType = (contentType: string) =>
-	contentType.split(";")[0]?.trim().toLowerCase();
-
-export const isJsonContentType = (contentType: string) =>
-	normalizeContentType(contentType) === "application/json";
-
-export const serializeCustomBody = (body: unknown, contentType: string) =>
-	isJsonContentType(contentType)
-		? JSON.stringify(body)
-		: (body as BodyInit | null | undefined);
-
-const serializeFormBody = (
-	_route: ClientRequestRoute,
-	body: Record<string, unknown> | undefined,
-) => {
-	return new URLSearchParams(
-		Object.entries(body ?? {}).flatMap(([key, value]) => {
-			if (Array.isArray(value)) {
-				return value.map((item) => [`${key}[]`, String(item)]);
-			}
-
-			return value === undefined ? [] : [[key, String(value)]];
-		}),
-	);
-};
-
-const isMultipartFileValue = (value: unknown): value is Blob =>
-	typeof Blob !== "undefined" && value instanceof Blob;
-
-const stringifyMultipartValue = (value: unknown) => {
-	if (isMultipartFileValue(value)) return value;
-	return String(value);
-};
-
-const serializeMultipartBody = (
-	_route: ClientRequestRoute,
-	body: Record<string, unknown> | undefined,
-) => {
-	const formData = new FormData();
-
-	for (const [key, value] of Object.entries(body ?? {})) {
-		if (Array.isArray(value)) {
-			for (const item of value) {
-				formData.append(`${key}[]`, stringifyMultipartValue(item));
-			}
-			continue;
-		}
-
-		if (value !== undefined) {
-			formData.append(key, stringifyMultipartValue(value));
-		}
-	}
-
-	return formData;
 };
 
 const stringifyHeaders = (
@@ -168,69 +119,46 @@ export const constructBaseRequest = (
 	selectedContentType?: string,
 ): {
 	url: string;
-	body?: BodyInit | null;
+	body?: unknown;
 	contentType?: string;
 	headers?: Record<string, string>;
 } => {
-	let urlBase = `${baseUrl}${route.path}`;
-	if (!args) return { url: urlBase };
-
-	const { body, query, params, headers } = args;
-
-	urlBase = `${baseUrl}${serializeParams(route, params)}${serializeQuery(route, query)}`;
-
-	if (route.request?.contentType !== undefined) {
-		if (
-			Array.isArray(route.request.contentType) &&
-			selectedContentType === undefined
-		) {
-			throw new Error(
-				`A contentType option is required for ${route.method} ${route.path}.`,
-			);
-		}
-		const contentType =
-			selectedContentType ??
-			(Array.isArray(route.request.contentType)
-				? undefined
-				: (route.request.contentType as string));
-
-		const normalizedContentType = contentType
-			? normalizeContentType(contentType)
-			: undefined;
-		return {
-			url: urlBase,
-			body:
-				normalizedContentType === "application/x-www-form-urlencoded"
-					? serializeFormBody(
-							route,
-							body as Record<string, unknown> | undefined,
-						)
-					: normalizedContentType === "multipart/form-data"
-						? serializeMultipartBody(
-								route,
-								body as Record<string, unknown> | undefined,
-							)
-						: contentType
-							? serializeCustomBody(body, contentType)
-							: (body as BodyInit | null | undefined),
-			contentType:
-				normalizedContentType === "multipart/form-data"
-					? undefined
-					: contentType,
-			headers: stringifyHeaders(route, headers),
-		};
+	const { body, query, params, headers } = args ?? {};
+	const url = `${baseUrl}${serializeParams(route, params)}${serializeQuery(route, query)}`;
+	const declaredContentType = route.request?.contentType;
+	if (Array.isArray(declaredContentType) && selectedContentType === undefined) {
+		throw new Error(
+			`A contentType option is required for ${route.method} ${route.path}.`,
+		);
 	}
-
+	if (
+		selectedContentType !== undefined &&
+		(!Array.isArray(declaredContentType) ||
+			!declaredContentType.includes(selectedContentType))
+	) {
+		throw new Error(
+			`Unsupported request contentType for ${route.method} ${route.path}.`,
+		);
+	}
+	const contentType =
+		selectedContentType ??
+		(typeof declaredContentType === "string"
+			? declaredContentType
+			: undefined) ??
+		(route.request?.body ? "application/json" : undefined);
+	const requestHeaders = stringifyHeaders(route, headers);
+	assertNoContentTypeHeader(requestHeaders);
 	return {
-		url: urlBase,
-		body: body !== undefined ? JSON.stringify(body) : undefined,
-		contentType: body !== undefined ? "application/json" : undefined,
-		headers: stringifyHeaders(route, headers),
+		url,
+		body: contentType === undefined ? undefined : body,
+		contentType: body === undefined ? undefined : contentType,
+		headers: requestHeaders,
 	};
 };
 
 export type ExecuteRequestOptions = {
 	baseUrl: string;
+	bodyCodecs?: readonly BodyCodec<Response>[];
 	fetch?: FetchLike;
 	fetchOptions?: ApiClientFetchOptions;
 	getGlobalHeaders?: GetHeadersFn;
@@ -294,6 +222,26 @@ export const executeRequest = async <E extends RouteDeclaration>(
 		fetchOptions?.contentType,
 	);
 
+	let serialized: SerializedBody | undefined;
+	if (body !== undefined && contentType !== undefined) {
+		const mediaType = normalizeMediaType(contentType);
+		const resolvedCodec = resolveBodyCodec(mediaType, [
+			...(options.bodyCodecs ?? []),
+			...defaultBodyCodecs,
+		]);
+		if (!resolvedCodec?.serialize)
+			throw new Error("No serializer for declared content-type");
+		serialized = await resolvedCodec.serialize(body, contentType);
+	}
+	const codecHeaders = Object.fromEntries(
+		Object.entries(serialized?.headers ?? {}).flatMap(([name, value]) =>
+			value === undefined ? [] : [[name, String(value)]],
+		),
+	);
+	const outgoingContentType =
+		serialized?.contentType === undefined
+			? contentType
+			: serialized.contentType;
 	const headers = (await options.getGlobalHeaders?.()) ?? {};
 	assertNoContentTypeHeader(headers);
 	const signalState = createRequestSignal(
@@ -309,11 +257,14 @@ export const executeRequest = async <E extends RouteDeclaration>(
 				...options.fetchOptions,
 				...requestFetchOptions,
 				method: route.method,
-				body,
+				body: serialized?.body as BodyInit | undefined,
 				headers: {
 					...normalizeHeaders(headers),
+					...normalizeHeaders(codecHeaders),
 					...normalizeHeaders(requestHeaders),
-					...(contentType ? { "content-type": contentType } : {}),
+					...(outgoingContentType
+						? { "content-type": outgoingContentType }
+						: {}),
 				},
 				signal: signalState?.signal ?? fetchOptions?.signal,
 			},

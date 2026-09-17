@@ -11,6 +11,8 @@ import type {
 } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 
+type ContractRoute = { readonly "~restrpc": RouteDeclaration };
+
 type EmptyObject = Record<never, never>;
 type AnyRouteHandler = (...args: never[]) => unknown;
 type MaybePromise<T> = T | Promise<T>;
@@ -25,28 +27,30 @@ export type RuntimeRouteHandler = (
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
  */
-export type RouteRequestData<TRoute extends RouteDeclaration> =
-	ServerRequest<TRoute>;
+export type RouteRequestData<TRoute extends ContractRoute> = ServerRequest<
+	TRoute["~restrpc"]
+>;
 
 /**
  * Infers the declared non-2xx response envelopes for a route.
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
  */
-export type RouteErrors<TRoute extends RouteDeclaration> = ServerErrors<TRoute>;
+export type RouteErrors<TRoute extends ContractRoute> = ServerErrors<
+	TRoute["~restrpc"]
+>;
 
 /**
  * Infers every response envelope a route handler may return.
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
  */
-export type RouteResponse<TRoute extends RouteDeclaration> =
-	ServerResponse<TRoute>;
+export type RouteResponse<TRoute extends ContractRoute> = ServerResponse<
+	TRoute["~restrpc"]
+>;
 
 type RequestValue<TRoute extends RouteDeclaration> =
-	RouteRequestData<TRoute> extends never
-		? EmptyObject
-		: RouteRequestData<TRoute>;
+	ServerRequest<TRoute> extends never ? EmptyObject : ServerRequest<TRoute>;
 
 type FlatInputSchema<TRoute extends RouteDeclaration> = TRoute extends {
 	request: { query: infer TQuery extends StandardSchemaV1 };
@@ -77,7 +81,7 @@ type UsesPlainOutput<TRoute extends RouteDeclaration> = TRoute extends {
 			: false;
 
 type HandlerResult<TRoute extends RouteDeclaration> = MaybePromise<
-	RouteResponse<TRoute>
+	ServerResponse<TRoute>
 >;
 
 /**
@@ -121,13 +125,13 @@ export type RouteHandler<
 type Merge<T> = { [TKey in keyof T]: T[TKey] };
 
 /**
- * HTTP response shape from which a server-first route infers its contract.
+ * HTTP response shape from which a handler-based route infers its contract.
  *
  * @remarks An `AsyncIterable` body always denotes an NDJSON stream. Providing
  * `contentType` selects a custom-content response for non-stream bodies;
  * otherwise bodies use JSON.
  *
- * @see {@link https://rest-rpc.dev/docs/server-first-quickstart#infer-responses-from-the-handler}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#choose-plain-outputs-or-status-responses}
  */
 export type ImplicitResponseEnvelope =
 	| {
@@ -144,9 +148,9 @@ export type ImplicitResponseEnvelope =
 	  };
 
 /**
- * Body encodings inferred from a server-first response.
+ * Body encodings inferred from a handler response.
  *
- * @see {@link https://rest-rpc.dev/docs/server-first-quickstart#use-the-ordinary-client-apis}
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-routes}
  */
 export type ServerFirstResponseKind = "empty" | "json" | "stream" | "custom";
 
@@ -158,9 +162,9 @@ type BodyResponseKind<TResponse, TBody> =
 			: "json";
 
 /**
- * Infers the body encoding selected by a server-first response shape.
+ * Infers the body encoding selected by a handler response shape.
  *
- * @see {@link https://rest-rpc.dev/docs/server-first-quickstart#infer-responses-from-the-handler}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#choose-plain-outputs-or-status-responses}
  */
 export type ImplicitResponseKind<TResponse> = TResponse extends unknown
 	? "body" extends keyof TResponse
@@ -441,9 +445,9 @@ type ImplementationParts<TImplementation> = TImplementation extends {
 	: never;
 
 /**
- * Infers the handler response union retained by a server-first implementation.
+ * Infers the handler response union retained by a completed route.
  *
- * @see {@link https://rest-rpc.dev/docs/server-first-quickstart#infer-responses-from-the-handler}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#choose-plain-outputs-or-status-responses}
  */
 export type InferredRouteResponse<TImplementation> =
 	ImplementationParts<TImplementation> extends { handler: infer THandler }
@@ -465,9 +469,9 @@ type PlainResponseKind<TRoute> = TRoute extends {
 	: never;
 
 /**
- * Infers the body encodings represented by a server-first implementation.
+ * Infers the body encodings represented by a completed route.
  *
- * @see {@link https://rest-rpc.dev/docs/server-first-quickstart#use-the-ordinary-client-apis}
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-routes}
  */
 export type ServerFirstRouteResponseKind<TImplementation> =
 	ImplementationParts<TImplementation> extends {
@@ -482,7 +486,7 @@ export type ServerFirstRouteResponseKind<TImplementation> =
 /**
  * Route builder that finishes declarations by attaching a server handler.
  *
- * @see {@link https://rest-rpc.dev/docs/server-first-quickstart#define-routes-and-handlers}
+ * @see {@link https://rest-rpc.dev/docs/quickstart#define-and-register-routes}
  */
 export type ServerRouteBuilder<
 	TAdditionalHandlerFields extends object = EmptyObject,

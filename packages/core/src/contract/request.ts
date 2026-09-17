@@ -172,8 +172,13 @@ type OptionalRequestHeaders<T, TOptionalKeys extends PropertyKey> = [
  * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
  */
 export type ClientRequest<
-	E extends RouteDeclaration,
+	E extends { readonly "~restrpc": RouteDeclaration },
 	TOptionalKeys extends PropertyKey = never,
+> = InferClientRequest<E["~restrpc"], TOptionalKeys>;
+
+export type InferClientRequest<
+	E extends RouteDeclaration,
+	TOptionalKeys extends PropertyKey,
 > = E extends { kind: "procedure" }
 	? E extends { input: "segments" }
 		? OptionalRequestHeaders<InferRequestFor<E, "input">, TOptionalKeys>

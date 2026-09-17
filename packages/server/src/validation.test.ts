@@ -3,15 +3,17 @@ import { describe, it } from "node:test";
 import { route } from "@rest-rpc/core";
 import z from "zod";
 import {
-	resolveCustomResponseBody,
-	validateRequest,
+	validateRequestSegments,
 	validateResponseBody,
 	validateResponseHeaders,
 	validateResponseStreamChunks,
 } from "./validation.ts";
-import { ResponseValidationError } from "./validationErrors.ts";
+import {
+	RequestValidationError,
+	ResponseValidationError,
+} from "./validationErrors.ts";
 
-describe("validateRequest", () => {
+describe("validateRequestSegments", () => {
 	it("validates inherited and local headers against raw input and merges local output last", async () => {
 		const seen: unknown[] = [];
 		const inherited = z
@@ -31,7 +33,7 @@ describe("validateRequest", () => {
 			request: { headers: { inherited, local } },
 		};
 
-		const result = await validateRequest(declaration, {
+		const result = await validateRequestSegments(declaration, {
 			headers: {
 				authorization: "Bearer token",
 				shared: "raw-shared",
@@ -39,14 +41,11 @@ describe("validateRequest", () => {
 			},
 		});
 
-		assert.equal(result.success, true);
-		if (result.success) {
-			assert.deepEqual(result.data.headers, {
-				inherited: true,
-				local: true,
-				shared: "local",
-			});
-		}
+		assert.deepEqual(result.headers, {
+			inherited: true,
+			local: true,
+			shared: "local",
+		});
 		assert.deepEqual(seen, [
 			{ authorization: "Bearer token", shared: "raw-shared" },
 			{ shared: "raw-shared", requestId: "request-1" },
@@ -68,13 +67,15 @@ describe("validateRequest", () => {
 			{ requestId: "request-1" },
 			{ authorization: "Bearer token" },
 		]) {
-			const result = await validateRequest(declaration, { headers });
-			assert.equal(result.success, false);
+			await assert.rejects(
+				() => validateRequestSegments(declaration, { headers }),
+				RequestValidationError,
+			);
 		}
 	});
 
 	it("parses JSON date strings with request body transforms", async () => {
-		const result = await validateRequest(
+		const result = await validateRequestSegments(
 			route
 				.post("/todos")
 				.body(
@@ -89,10 +90,7 @@ describe("validateRequest", () => {
 			},
 		);
 
-		assert.equal(result.success, true);
-		if (result.success) {
-			assert.ok(result.data.body.createdAt instanceof Date);
-		}
+		assert.ok(result.body.createdAt instanceof Date);
 	});
 
 	it("rejects Date request bodies received as JSON strings", async () => {
@@ -100,28 +98,31 @@ describe("validateRequest", () => {
 			JSON.stringify({ createdAt: new Date("2026-08-10T00:00:00.000Z") }),
 		);
 
-		const result = await validateRequest(
-			route
-				.post("/todos")
-				.body(
-					z.object({
-						createdAt: z.date(),
-					}),
-				)
-				.response(204)["~restrpc"],
-			{
-				body: wireBody,
+		await assert.rejects(
+			() =>
+				validateRequestSegments(
+					route
+						.post("/todos")
+						.body(
+							z.object({
+								createdAt: z.date(),
+							}),
+						)
+						.response(204)["~restrpc"],
+					{
+						body: wireBody,
+					},
+				),
+			(error) => {
+				assert(error instanceof RequestValidationError);
+				assert.equal(error.issues.body.length, 1);
+				return true;
 			},
 		);
-
-		assert.equal(result.success, false);
-		if (!result.success) {
-			assert.equal(result.issues.body.length, 1);
-		}
 	});
 
 	it("parses string params and query with coercion or transforms", async () => {
-		const result = await validateRequest(
+		const result = await validateRequestSegments(
 			route
 				.get("/todos/:id")
 				.params(z.object({ id: z.coerce.number<number>() }))
@@ -139,190 +140,109 @@ describe("validateRequest", () => {
 			},
 		);
 
-		assert.equal(result.success, true);
-		if (result.success) {
-			assert.deepEqual(result.data, {
-				params: { id: 123 },
-				query: { published: false },
-			});
-		}
+		assert.deepEqual(result, {
+			body: undefined,
+			headers: undefined,
+			params: { id: 123 },
+			query: { published: false },
+		});
 	});
 
 	it("rejects numeric and boolean params or query without coercion", async () => {
-		const result = await validateRequest(
-			route
-				.get("/todos/:id")
-				.params(z.object({ id: z.number() }))
-				.query(z.object({ published: z.boolean() }))
-				.response(204)["~restrpc"],
-			{
-				params: { id: "123" },
-				query: new URLSearchParams({ published: "true" }),
+		await assert.rejects(
+			() =>
+				validateRequestSegments(
+					route
+						.get("/todos/:id")
+						.params(z.object({ id: z.number() }))
+						.query(z.object({ published: z.boolean() }))
+						.response(204)["~restrpc"],
+					{
+						params: { id: "123" },
+						query: new URLSearchParams({ published: "true" }),
+					},
+				),
+			(error) => {
+				assert(error instanceof RequestValidationError);
+				assert.equal(error.issues.params.length, 1);
+				assert.equal(error.issues.query.length, 1);
+				return true;
 			},
 		);
+	});
 
-		assert.equal(result.success, false);
-		if (!result.success) {
-			assert.equal(result.issues.params.length, 1);
-			assert.equal(result.issues.query.length, 1);
+	it("throws all schema issues grouped by request segment", async () => {
+		const declaration = route
+			.post("/body/:id")
+			.body(z.string())
+			.query(z.object({ q: z.string() }))
+			.params(z.object({ id: z.string() }))
+			.headers(z.object({ token: z.string() }))["~restrpc"];
+		await assert.rejects(
+			() => validateRequestSegments(declaration, {}),
+			(error) => {
+				assert(error instanceof RequestValidationError);
+				for (const issues of Object.values(error.issues)) {
+					assert.equal(issues.length, 1);
+				}
+				return true;
+			},
+		);
+	});
+
+	it("passes body values directly to the schema", async () => {
+		const form = new FormData();
+		form.append("title", "Write docs");
+		for (const body of [
+			new URLSearchParams("tags[]=ts&tags[]=rpc"),
+			form,
+			new Blob(["hello"]),
+			{ title: "Write docs" },
+			null,
+			undefined,
+		]) {
+			const declaration = route.post("/body").body(
+				z.unknown().transform((input) => {
+					assert.equal(input, body);
+					return input;
+				}),
+			)["~restrpc"];
+			const result = await validateRequestSegments(declaration, { body });
+			assert.equal(result.body, body);
 		}
 	});
 
-	it("returns custom request bodies and selected content type separately", async () => {
-		const result = await validateRequest(
-			route
-				.post("/images")
-				.body(
-					z.string().transform((value) => value.toUpperCase()),
-					{ contentType: ["image/png", "image/jpeg"] },
-				)
-				.response(204)["~restrpc"],
-			{
-				body: "jpeg bytes",
-				headers: {
-					"content-type": "image/jpeg; charset=binary",
+	it("validates body schemas independently of media-type declarations and headers", async () => {
+		const declaration = route.post("/body").body(
+			z.string().transform((value) => value.toUpperCase()),
+			{ contentType: ["image/png", "image/jpeg"] },
+		)["~restrpc"];
+		for (const headers of [undefined, { "content-type": "text/plain" }]) {
+			assert.deepEqual(
+				await validateRequestSegments(declaration, { body: "hello", headers }),
+				{
+					body: "HELLO",
+					query: undefined,
+					params: undefined,
+					headers: undefined,
 				},
-			},
+			);
+		}
+		await assert.rejects(
+			() => validateRequestSegments(declaration, { body: undefined }),
+			RequestValidationError,
 		);
+	});
 
-		assert.equal(result.success, true);
-		if (result.success) {
-			assert.deepEqual(result.data, {
-				body: "JPEG BYTES",
-				contentType: "image/jpeg",
+	it("returns undefined segments when no schemas are declared", async () => {
+		const declaration = route.get("/body")["~restrpc"];
+		for (const body of [undefined, { ignored: true }]) {
+			assert.deepEqual(await validateRequestSegments(declaration, { body }), {
+				body: undefined,
+				query: undefined,
+				params: undefined,
+				headers: undefined,
 			});
-		}
-	});
-
-	it("enforces a single explicitly declared custom body content type", async () => {
-		const result = await validateRequest(
-			route
-				.post("/text")
-				.body(z.string(), { contentType: "text/plain" })
-				.response(204)["~restrpc"],
-			{
-				body: "valid text",
-				headers: { "content-type": "text/markdown" },
-			},
-		);
-
-		assert.equal(result.success, false);
-		if (!result.success) {
-			assert.deepEqual(result.issues.body, [
-				{ message: "Unsupported custom body contentType." },
-			]);
-		}
-	});
-
-	it("validates urlencoded form bodies from URLSearchParams", async () => {
-		const result = await validateRequest(
-			route
-				.post("/forms")
-				.body(
-					z.object({
-						title: z.string(),
-						count: z.coerce.number<number>(),
-						remember: z.string().optional(),
-					}),
-					{ contentType: "application/x-www-form-urlencoded" },
-				)
-				.response(204)["~restrpc"],
-			{
-				body: new URLSearchParams([
-					["title", "Write docs"],
-					["count", "3"],
-				]),
-				headers: {
-					"content-type": "application/x-www-form-urlencoded",
-				},
-			},
-		);
-
-		assert.equal(result.success, true);
-		if (result.success) {
-			assert.deepEqual(result.data, {
-				body: {
-					title: "Write docs",
-					count: 3,
-				},
-				contentType: "application/x-www-form-urlencoded",
-			});
-		}
-	});
-
-	it("validates urlencoded form arrays from empty-bracket fields", async () => {
-		const result = await validateRequest(
-			route
-				.post("/forms")
-				.body(
-					z.object({
-						title: z.string(),
-						tags: z.array(z.string()),
-					}),
-					{ contentType: "application/x-www-form-urlencoded" },
-				)
-				.response(204)["~restrpc"],
-			{
-				body: new URLSearchParams([
-					["title", "First"],
-					["title", "Second"],
-					["tags[]", "ts"],
-					["tags[]", "rpc"],
-				]),
-				headers: {
-					"content-type": "application/x-www-form-urlencoded",
-				},
-			},
-		);
-
-		assert.equal(result.success, true);
-		if (result.success) {
-			assert.deepEqual(result.data, {
-				body: {
-					title: "Second",
-					tags: ["ts", "rpc"],
-				},
-				contentType: "application/x-www-form-urlencoded",
-			});
-		}
-	});
-
-	it("validates multipart bodies from FormData", async () => {
-		const file = new Blob(["hello"], { type: "text/plain" });
-		const body = new FormData();
-		body.set("title", "Write docs");
-		body.set("count", "3");
-		body.set("file", file);
-		body.append("tags[]", "ts");
-		body.append("tags[]", "rpc");
-
-		const result = await validateRequest(
-			route
-				.post("/uploads")
-				.body(
-					z.object({
-						title: z.string(),
-						count: z.coerce.number<number>(),
-						file: z.instanceof(Blob),
-						tags: z.array(z.string()),
-					}),
-					{ contentType: "multipart/form-data" },
-				)
-				.response(204)["~restrpc"],
-			{
-				body,
-				headers: {
-					"content-type": "multipart/form-data",
-				},
-			},
-		);
-
-		assert.equal(result.success, true);
-		if (result.success) {
-			assert.equal(result.data.body.title, "Write docs");
-			assert.equal(result.data.body.count, 3);
-			assert.ok(result.data.body.file instanceof Blob);
-			assert.deepEqual(result.data.body.tags, ["ts", "rpc"]);
 		}
 	});
 });
@@ -389,36 +309,6 @@ describe("validateResponseHeaders", () => {
 				assert.equal(error.issues.length, 1);
 				return true;
 			},
-		);
-	});
-});
-
-describe("resolveCustomResponseBody", () => {
-	it("resolves declared custom response content types", () => {
-		assert.deepEqual(
-			resolveCustomResponseBody(
-				["image/png", "image/jpeg"],
-				"jpeg bytes",
-				"image/jpeg",
-				"Unsupported custom response body contentType.",
-			),
-			{
-				contentType: "image/jpeg",
-				body: "jpeg bytes",
-			},
-		);
-	});
-
-	it("rejects undeclared custom response content types", () => {
-		assert.throws(
-			() =>
-				resolveCustomResponseBody(
-					["image/png", "image/jpeg"],
-					"webp bytes",
-					"image/webp",
-					"Unsupported custom response body contentType.",
-				),
-			/Unsupported custom response body contentType/,
 		);
 	});
 });

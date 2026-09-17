@@ -9,7 +9,7 @@ export type ResponseBodySchema = ResponseSchema;
 /**
  * Declares a whole-object schema for typed response headers.
  *
- * @see {@link https://rest-rpc.dev/docs/http-responses#response-with-typed-headers}
+ * @see {@link https://rest-rpc.dev/docs/route-builder}
  */
 export type ResponseHeaders = StandardSchemaV1<
 	unknown,
@@ -19,7 +19,7 @@ export type ResponseHeaders = StandardSchemaV1<
 /**
  * Canonical declaration for one route response.
  *
- * @see {@link https://rest-rpc.dev/docs/http-responses}
+ * @see {@link https://rest-rpc.dev/docs/http-behavior/serialization}
  */
 export type ResponseDeclaration =
 	| {
@@ -97,18 +97,6 @@ export type ServerResponseBody<TResponse> =
 				: never
 		: never;
 
-type ClientResponseMetadata<TResponse> = TResponse extends {
-	contentType: infer TContentType;
-}
-	? TContentType extends "application/json"
-		? unknown
-		: TContentType extends readonly string[]
-			? { contentType: TContentType[number] }
-			: TContentType extends string
-				? { contentType: TContentType }
-				: unknown
-	: unknown;
-
 type ServerResponseMetadata<TResponse> = TResponse extends {
 	contentType: infer TContentType;
 }
@@ -157,7 +145,6 @@ type ClientResponseEntry<TStatus extends number, TResponse> = ResponseEntry<
 	TStatus,
 	InferClientResponseBody<TResponse>
 > &
-	ClientResponseMetadata<TResponse> &
 	ResponseHeadersMetadata<TResponse, "output"> extends infer TEntry
 	? Simplify<TEntry>
 	: never;

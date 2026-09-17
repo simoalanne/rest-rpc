@@ -231,7 +231,7 @@ type ResponseMethods<
 > = WhenResponsesAvailable<
 	TState,
 	{
-		/** Declares a response status, schema, and HTTP metadata. @see {@link https://rest-rpc.dev/docs/http-responses} */
+		/** Declares a response status, schema, and HTTP metadata. @see {@link https://rest-rpc.dev/docs/http-behavior/serialization} */
 		response<
 			const TStatus extends number,
 			const TSchema extends StandardSchemaV1 | undefined = undefined,
@@ -249,7 +249,7 @@ type ResponseMethods<
 			TPath,
 			TMetadata
 		>;
-		/** Declares a streaming response. @see {@link https://rest-rpc.dev/docs/http-responses#streaming-ndjson-responses} */
+		/** Declares a streaming response. @see {@link https://rest-rpc.dev/docs/http-behavior/serialization#streaming} */
 		streamResponse<
 			const TStatus extends number,
 			const TSchema extends StandardSchemaV1,
@@ -277,7 +277,7 @@ type BodyMethods<
 		TState,
 		"body",
 		{
-			/** Declares a request body and its HTTP metadata. @see {@link https://rest-rpc.dev/docs/http-requests} */
+			/** Declares a request body and its HTTP metadata. @see {@link https://rest-rpc.dev/docs/http-behavior/serialization} */
 			body<
 				const TSchema extends StandardSchemaV1,
 				const TOptions extends BodyOptions | undefined = undefined,
@@ -311,7 +311,7 @@ type RequestMethods<
 		TState,
 		"query",
 		{
-			/** Declares URL query parameters. @see {@link https://rest-rpc.dev/docs/contract/declaration#request-model} */
+			/** Declares URL query parameters. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
 			query<
 				const TSchema extends RequestQuerySchema,
 				const TPath extends string = string,
@@ -334,7 +334,7 @@ type RequestMethods<
 			TState,
 			"params",
 			{
-				/** Declares path parameters. @see {@link https://rest-rpc.dev/docs/contract/declaration#path-params} */
+				/** Declares path parameters. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
 				params<
 					const TSchema extends RequestParamsSchema,
 					const TPath extends string = string,
@@ -357,7 +357,7 @@ type RequestMethods<
 			TState,
 			"headers",
 			{
-				/** Declares request headers. @see {@link https://rest-rpc.dev/docs/contract/declaration#request-model} */
+				/** Declares request headers. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
 				headers<
 					const THeaders extends RequestHeadersSchema,
 					const TPath extends string = string,
@@ -387,7 +387,7 @@ type RequestMethods<
 		TState,
 		"metadata",
 		{
-			/** Adds application metadata. @see {@link https://rest-rpc.dev/docs/contract/declaration#shared-route-options} */
+			/** Adds application metadata. @see {@link https://rest-rpc.dev/docs/route-builder#add-metadata-and-openapi-details} */
 			metadata<
 				const TLocal extends RouteMetadata,
 				const TPath extends string = string,

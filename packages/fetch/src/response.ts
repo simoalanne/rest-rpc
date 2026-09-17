@@ -1,4 +1,10 @@
-import { type HttpRouteResult, handleHttpRouteResult } from "@rest-rpc/server";
+import type { BodyCodec, SerializedBody } from "@rest-rpc/core";
+import {
+	defaultBodyCodecs,
+	normalizeMediaType,
+	resolveBodyCodec,
+} from "@rest-rpc/core/codecs";
+import type { HttpRouteResult } from "@rest-rpc/server";
 
 type HttpHeaderValue = string | number | readonly string[] | undefined;
 
@@ -38,27 +44,51 @@ const createStreamResponse = (
 /**
  * Creates a Fetch `Response` from a normalized rest-rpc route result.
  */
-export function createFetchResponse(
+export async function createFetchResponse(
 	result: HttpRouteResult,
+	bodyCodecs: readonly BodyCodec<never>[] = [],
 ): Promise<Response> {
 	const headers = new Headers();
-	const setHeaderIfUnset = (name: string, value: string) => {
-		if (!headers.has(name)) headers.set(name, value);
-	};
+	let serialized: SerializedBody | undefined;
+	if (result.kind === "response" && result.body) {
+		const { value, contentType } = result.body;
+		const codec = resolveBodyCodec(normalizeMediaType(contentType), [
+			...bodyCodecs,
+			...defaultBodyCodecs,
+		]);
+		if (!codec?.serialize) {
+			throw new Error("No serializer for declared content-type");
+		}
+		serialized = await codec.serialize(value, contentType);
+		for (const [name, value] of Object.entries(serialized.headers ?? {})) {
+			setHeader(headers, name, value);
+		}
+	}
+	for (const [name, value] of Object.entries(result.headers ?? {})) {
+		setHeader(headers, name, value);
+	}
+	if (result.kind === "stream") {
+		return createStreamResponse(
+			result.body,
+			result.status,
+			headers,
+			"application/x-ndjson",
+		);
+	}
+	if (!serialized)
+		return new Response(null, { status: result.status, headers });
 
-	return handleHttpRouteResult(result, {
-		setHeader: (name, value) => setHeader(headers, name, value),
-		sendEmpty: (status) => new Response(null, { status, headers }),
-		sendJson: (status, body) => {
-			setHeaderIfUnset("content-type", "application/json");
-			return new Response(JSON.stringify(body), { status, headers });
-		},
-		sendCustom: (status, body) =>
-			new Response(body instanceof Uint8Array ? body : String(body), {
-				status,
-				headers,
-			}),
-		sendStream: ({ status, body, contentType }) =>
-			createStreamResponse(body, status, headers, contentType),
-	});
+	const contentType =
+		serialized.contentType === undefined
+			? result.body?.contentType
+			: serialized.contentType;
+	if (contentType === null) {
+		headers.delete("content-type");
+	} else if (contentType !== undefined) {
+		headers.set("content-type", contentType);
+	}
+	return new Response(
+		serialized.body as ConstructorParameters<typeof Response>[0],
+		{ status: result.status, headers },
+	);
 }

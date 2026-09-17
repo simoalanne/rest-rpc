@@ -1,15 +1,29 @@
 ---
 title: OpenAPI
-description: Generate OpenAPI document from the contract.
+description: Generate an OpenAPI document from HTTP route declarations.
 ---
 
-`createOpenApiDocument()` generates OpenAPI document object from HTTP
-route declarations.
+`createOpenApiDocument()` generates an OpenAPI document from server routes or a
+separately shared contract. HTTP methods, paths, schemas, and operation
+metadata come from the same route builder used by the server and client.
+
+Declare output schemas with `.output()`, `.response()`, `.streamOutput()`, or
+`.streamResponse()` to include responses in OpenAPI.
 
 ```ts
 import { createOpenApiDocument } from "@rest-rpc/core";
+import { route } from "@rest-rpc/express";
+import { z } from "zod";
 
-const document = createOpenApiDocument(api, {
+const list = route
+	.get("/todos")
+	.output(z.array(z.object({ id: z.string(), title: z.string() })))
+	.openAPI({ summary: "List todos" })
+	.handler(() => [{ id: "todo_1", title: "Write docs" }]);
+
+const routes = { todos: { list } };
+
+const document = createOpenApiDocument(routes, {
 	info: {
 		title: "Todo API",
 		version: "1.0.0",
@@ -20,7 +34,7 @@ const document = createOpenApiDocument(api, {
 
 ## What Is Included
 
-OpenAPI generation includes HTTP routes.
+OpenAPI generation includes routes with implicit defaults and explicit HTTP details.
 
 It maps:
 
@@ -32,7 +46,6 @@ It maps:
 - status-keyed responses
 - custom body content types
 - route `openApi` metadata
-- OpenAPI metadata shared by a configured route factory
 
 ## Schema Conversion
 
@@ -44,7 +57,7 @@ particular schema, rest-rpc emits an empty OpenAPI Schema Object for that schema
 import { createOpenApiDocument } from "@rest-rpc/core";
 import { z } from "zod";
 
-const document = createOpenApiDocument(api, {
+const document = createOpenApiDocument(routes, {
 	info: {
 		title: "Todo API",
 		version: "1.0.0",
@@ -64,25 +77,25 @@ carry parameter-level requiredness in the converted schema. Use
 `transformParameter` when generated parameters need project-specific metadata.
 
 ```ts
-const api = {
-	search: route
-		.get("/search")
-		.query(
-			z.object({
-				q: z
-					.string()
-					.min(1)
-					.meta({ openApi: { required: true } }),
-				cursor: z
-					.string()
-					.optional()
-					.meta({ openApi: { required: false } }),
-			}),
-		)
-		.response(200, z.array(todoSchema)),
-};
+const search = route
+	.get("/search")
+	.query(
+		z.object({
+			q: z
+				.string()
+				.min(1)
+				.meta({ openApi: { required: true } }),
+			cursor: z
+				.string()
+				.optional()
+				.meta({ openApi: { required: false } }),
+		}),
+	)
+	.response(200, z.array(todoSchema));
 
-const document = createOpenApiDocument(api, {
+const routes = { search };
+
+const document = createOpenApiDocument(routes, {
 	info: {
 		title: "Todo API",
 		version: "1.0.0",
@@ -106,7 +119,7 @@ const document = createOpenApiDocument(api, {
 Use `.openAPI()` on a route builder for operation metadata.
 
 ```ts
-create: route
+const create = route
 	.post("/todos")
 	.body(z.object({ title: z.string().min(1) }))
 	.openAPI({
@@ -118,13 +131,13 @@ create: route
 			},
 		},
 	})
-	.response(201, todoSchema),
+	.response(201, todoSchema);
 ```
 
 Each `.response()` call produces a status-keyed OpenAPI response.
 
 ```ts
-create: route
+const create = route
 	.post("/todos")
 	.body(z.object({ title: z.string().min(1) }))
 	.openAPI({
@@ -145,7 +158,7 @@ create: route
 		z.object({
 			code: z.literal("TODO_ALREADY_EXISTS"),
 		}),
-	),
+	);
 ```
 
 `openApi.responses` only affects generated OpenAPI output. It does not change
@@ -154,7 +167,7 @@ validation, or server headers. Metadata for statuses that a route does not
 declare is skipped.
 
 ```ts
-route
+const get = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
 	.openAPI({
@@ -176,32 +189,10 @@ route
 Use route response `headers` instead when a handler-owned header is part of the
 typed rest-rpc contract.
 
-## Route Metadata
-
-Use `.openAPI()` to describe one route. Its position among the request and
-response setters does not affect the generated operation.
-
-```ts
-export const api = {
-	todos: {
-		list: route
-			.get("/todos")
-			.openAPI({
-				tags: ["Todos"],
-				security: [{ bearerAuth: [] }],
-				responses: {
-					200: { headers: { "x-request-id": z.string() } },
-					401: { description: "Authentication is required." },
-				},
-			})
-			.response(200, z.array(todoSchema))
-			.response(401, z.object({ code: z.string() })),
-	},
-};
-```
-
 Typed headers declared on a route response override OpenAPI-only headers with
-the same name in generated OpenAPI.
+the same name in generated OpenAPI. `.openAPI()` can appear anywhere before
+`.handler()`. Its position among request and output declarations does not affect
+the generated operation.
 
 ## Transform Hooks
 
@@ -210,7 +201,7 @@ project-specific changes. Both transform contexts include `routePath`, the route
 key path from the contract tree.
 
 ```ts
-const document = createOpenApiDocument(api, {
+const document = createOpenApiDocument(routes, {
 	info: {
 		title: "Todo API",
 		version: "1.0.0",

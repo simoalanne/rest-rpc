@@ -110,7 +110,7 @@ describe("ApiClient streams", () => {
 			baseUrl: "https://api.test",
 		});
 
-		await assert.rejects(() => client.events.stream(), /empty stream response/);
+		await assert.rejects(() => client.events.stream(), /no stream body/);
 	});
 
 	it("skips blank NDJSON lines", async () => {

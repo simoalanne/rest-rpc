@@ -20,14 +20,7 @@ export class RequestValidationException extends BadRequestException {
 	readonly validationError: RequestValidationError;
 
 	constructor(error: RequestValidationError) {
-		super(
-			{
-				message:
-					"Request validation failed. Check the validationErrors field for details.",
-				validationErrors: error.issues,
-			},
-			{ cause: error },
-		);
+		super(error.responseBody, { cause: error });
 		this.validationError = error;
 	}
 }
@@ -45,7 +38,7 @@ export class ResponseValidationException extends InternalServerErrorException {
 	readonly validationError: ResponseValidationError;
 
 	constructor(error: ResponseValidationError) {
-		super({ message: "Response validation failed." }, { cause: error });
+		super(error.responseBody, { cause: error });
 		this.validationError = error;
 	}
 }

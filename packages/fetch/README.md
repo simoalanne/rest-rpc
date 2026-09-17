@@ -1,138 +1,84 @@
 # rest-rpc
 
-REST-shaped APIs with function-shaped TypeScript.
+REST APIs with RPC-like ergonomics.
 
-Define your HTTP API once as a shared TypeScript contract, then derive typed
-server handlers, fetch clients, openAPI documents, and more from it.
+Define HTTP routes with methods, paths, request segments, response statuses,
+content types, and streaming—or start with sensible defaults. Call them through
+a typed client that feels like ordinary function calls.
+
+Define routes alongside handlers and infer their output types. A separately
+shared contract is also supported.
 
 ## Features
 
-- Shared TypeScript contracts for HTTP APIs.
-- Server-first and contract-first development approaches for maximum flexibility.
-- Typed server handlers for Express, Hono, Fastify, NestJS, Node.js, and Fetch runtimes.
-- Typed fetch client.
-- Typed TanStack Query helpers.
-- Typed streaming and non-JSON requests/responses.
-- OpenAPI documents generated from the TypeScript contract.
-- Standard Schema support.
+- Fluent route builder for HTTP
+- Typed handlers for Express, Hono, Fastify, NestJS, Node HTTP, and Fetch runtimes.
+- Typed Fetch client and TanStack Query helpers.
+- Typed NDJSON streams and custom request/response bodies
+- Standard Schema validation
+- OpenAPI generation from route declarations
+- Contract-first development
 
-## Minimal Example
+## Example
 
-### Contract-first approach
+Define HTTP routes with implicit or explicit details:
 
-Define a contract
-
-```ts
-export const api = {
-	todos: {
-		getById: route
-			.get("/todos/:id")
-			.params(z.object({ id: z.string() }))
-			.response(200, z.object({ id: z.string(), title: z.string() })),
-	},
-};
-```
-
-Implement the contract on the server
-
-```ts
-const implementor = implement(api);
-
-const routes = {
-	todos: {
-		getById: implementor.todos.getById.handler(({ params: { id } }) => ({
-			status: 200,
-			body: getTodo(id),
-		})),
-	},
-};
-
-registerRoutes(app, routes);
-```
-
-Use the contract on the client with RPC-style function calls
-
-```ts
-const client = initClient(api, {
-	baseUrl: "https://api.example.com",
-});
-
-const response = await client.todos.getById({
-	params: { id: "todo_1" },
-});
-
-if (response.status === 200) {
-	const todo = response.body;
-}
-```
-
-### Server-first approach
-
-Define and implement the server route
-
-```ts
-import { createServer } from "node:http";
-import { route, createRouteHandler } from "@rest-rpc/node";
-import { z } from "zod";
-
+```ts server.ts
 export const routes = {
 	todos: {
+		// Defaults to POST /todos/create with a plain JSON result.
 		create: route
-			.post("/todos")
-			.body(z.object({ title: z.string().min(1) }))
-			.handler(({ body: { title } }) => ({
-				status: 201,
-				body: { id: crypto.randomUUID(), title, completed: false },
-			})),
+			.input(z.object({ title: z.string() }))
+			.handler(({ input: { title } }) => createTodo(title)),
+		// Explicit HTTP method, path params, and response statuses.
+		get: route
+			.get("/todos/:id")
+			.params(z.object({ id: z.string() }))
+			.handler(({ params }) => {
+				const todo = findTodo(params.id);
+				return todo
+					? { status: 200, body: todo }
+					: { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
+			}),
 	},
 };
-
-const handler = createRouteHandler(routes);
-
-const server = createServer(async (request, response) => {
-	const { matched } = await handler(request, response);
-	if (!matched) {
-		response.writeHead(404).end("Not found");
-	}
-});
-
-server.listen(3000);
 ```
 
-Create a client from the same contract
+Derive the client contract from the server route tree's type, then call the
+routes as typed functions:
 
 ```ts
 import { initClient } from "@rest-rpc/core";
 import { generateContractFromType } from "@rest-rpc/core/generate";
 import type { routes } from "./server";
 
-const contract = generateContractFromType<typeof routes>({
+const api = generateContractFromType<typeof routes>({
 	filePath: "./server.ts",
 	exportName: "routes",
 });
 
-const client = initClient(contract, {
-	baseUrl: "https://api.example.com",
-});
+const client = initClient(api, { baseUrl: "http://localhost:3000" });
 
-const response = await client.todos.create({
-	body: { title: "New Todo" },
-});
+const todo = await client.todos.create({ title: "Write docs" });
 
-const todo = response.body;
+const response = await client.todos.get({ params: { id: todo.id } });
+
+if (response.status === 200) {
+	console.log(response.body.title);
+}
 ```
 
 ## Documentation
 
-Full documentation is available at [rest-rpc.dev](https://rest-rpc.dev)
+Full documentation is available at [rest-rpc.dev](https://rest-rpc.dev).
 
 ## Packages
 
-- [`@rest-rpc/core`](https://npmx.dev/package/@rest-rpc/core): API contract, client and openAPI generation.
+- [`@rest-rpc/core`](https://npmx.dev/package/@rest-rpc/core): Route declarations, Fetch client, and OpenAPI generation.
 - [`@rest-rpc/express`](https://npmx.dev/package/@rest-rpc/express): Express server adapter.
 - [`@rest-rpc/fastify`](https://npmx.dev/package/@rest-rpc/fastify): Fastify server adapter.
 - [`@rest-rpc/hono`](https://npmx.dev/package/@rest-rpc/hono): Hono server adapter.
 - [`@rest-rpc/nest`](https://npmx.dev/package/@rest-rpc/nest): NestJS server adapter.
-- [`@rest-rpc/node`](https://npmx.dev/package/@rest-rpc/node): Node.js HTTP server adapter.
+- [`@rest-rpc/node`](https://npmx.dev/package/@rest-rpc/node): Node HTTP server adapter.
 - [`@rest-rpc/fetch`](https://npmx.dev/package/@rest-rpc/fetch): Fetch runtime adapter.
-- [`@rest-rpc/tanstack-query`](https://npmx.dev/package/@rest-rpc/tanstack-query): TanStack Query adapter.
+- [`@rest-rpc/tanstack-query`](https://npmx.dev/package/@rest-rpc/tanstack-query): TanStack Query helpers.

@@ -141,6 +141,9 @@ importers:
       '@rest-rpc/node':
         specifier: workspace:*
         version: link:../packages/node
+      '@rest-rpc/server':
+        specifier: workspace:*
+        version: link:../packages/server
 
   hover-types:
     dependencies:
@@ -162,6 +165,10 @@ importers:
       '@tanstack/query-core':
         specifier: ^5.90.12
         version: 5.101.4
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.1
+        version: 5.0.6
 
   integration-tests:
     dependencies:

@@ -47,7 +47,7 @@ type DeclaredRouteResponseBody<E extends RouteDeclaration> =
 			: never
 		: never;
 
-type RouteRequestValue<E extends QueryRoute> = ClientRequest<RouteFor<E>>;
+type RouteRequestValue<E extends QueryRoute> = ClientRequest<E>;
 
 type IsPlainOutput<E extends RouteDeclaration> = E extends {
 	output: "response";
@@ -70,7 +70,7 @@ type IsPlainOutput<E extends RouteDeclaration> = E extends {
  */
 export type RouteQueryData<E extends QueryRoute> =
 	IsPlainOutput<RouteFor<E>> extends true
-		? ClientResponse<RouteFor<E>>
+		? ClientResponse<E>
 		: DeclaredRouteQueryData<RouteFor<E>>;
 
 /**

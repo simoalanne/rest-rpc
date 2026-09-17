@@ -1,3 +1,4 @@
+import type { BodyCodec } from "@rest-rpc/core";
 import type { DynamicModule, ExecutionContext } from "@nestjs/common";
 import { Module } from "@nestjs/common";
 import { APP_INTERCEPTOR, HttpAdapterHost } from "@nestjs/core";
@@ -30,6 +31,7 @@ interface ContextShape {
 export type RestRpcModuleOptions<
 	TContext extends ContextShape = DefaultContext,
 > = {
+	bodyCodecs?: readonly BodyCodec<unknown>[];
 	createContext?: (context: ExecutionContext) => TContext | Promise<TContext>;
 };
 

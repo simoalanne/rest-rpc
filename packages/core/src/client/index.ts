@@ -3,7 +3,6 @@ export { getNextFetchTags } from "./nextFetchTags.ts";
 export { constructBaseRequest } from "./request.ts";
 export type {
 	ApiClientFetchOptions,
-	ApiClientBodyParser,
 	ApiClientFor,
 	ApiClientOptions,
 	ClientResponse,

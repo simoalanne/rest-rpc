@@ -11,34 +11,28 @@ pnpm add @rest-rpc/fetch
 
 ## Usage
 
-<Tabs>
-<Tab title="Contract-first approach">
+Create a matcher and call it from your runtime's Fetch
+entry point. The result contains a `Response` when a route matched.
+You choose how to handle unmatched requests.
 
 ```ts
-import { createRouteHandler, implement } from "@rest-rpc/fetch";
-import { api } from "./contract";
+import { route, createRouteHandler } from "@rest-rpc/fetch";
+import { z } from "zod";
 
-const routes = {
-	todos: {
-		get: implement(api.todos.get).handler(({ params: { id } }) => ({
-			status: 200,
-			body: getTodo(id),
-		})),
-	},
-};
+const todos = new Map([["todo_1", { id: "todo_1", title: "Write docs" }]]);
 
-const handler = createRouteHandler(routes);
-```
+const getTodo = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.handler(({ params, request }) => {
+		console.log(request.headers.get("x-request-id"));
+		const todo = todos.get(params.id);
+		return todo
+			? { status: 200, body: todo }
+			: { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
+	});
 
-</Tab>
-<Tab title="Server-first approach">
-
-```ts
-import { createRouteHandler, route } from "@rest-rpc/fetch";
-
-const routes = {
-	health: route.get("/health").handler(() => ({ status: 204 })),
-};
+export const routes = { todos: { get: getTodo } };
 
 const handler = createRouteHandler(routes);
 
@@ -51,10 +45,6 @@ export default {
 	},
 };
 ```
-
-</Tab>
-
-</Tabs>
 
 ## Framework Context
 
@@ -89,26 +79,21 @@ const result = await handler(request, { user });
 
 ```ts
 type CreateFetchHandlerOptions = {
-	bodyParser?: FetchBodyParser;
+	bodyCodecs?: readonly BodyCodec<Request>[];
+	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 };
 ```
 
-### Body parsing
+`bodyCodecs`: see [Serialization and Codecs](/docs/http-behavior/serialization).
 
-```ts
-const handler = createRouteHandler(routes, {
-	bodyParser: (request) => request.json(),
-});
-```
+`requestBodyLimit`: see [request body limits](/docs/http-behavior/serialization#server-request-deserialization).
 
 ### Error handling
 
-Request validation errors default to a 400 response. Response contract
-validation errors default to a generic 500 response. The validation handlers
-receive the native `Request` and return a `Response`. Other errors reject the
-handler promise and should be handled by the surrounding runtime handler.
+Use `requestValidationErrorHandler` and `responseValidationErrorHandler` to
+customize [validation errors](/docs/http-behavior/schemas). Other errors reject the handler promise.
 
 ```ts
 const handler = createRouteHandler(routes, {

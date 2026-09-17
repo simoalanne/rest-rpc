@@ -1,5 +1,6 @@
+import type { BodyCodec } from "../codecs/index.ts";
 import type { Contract, RouteDeclaration } from "../contract/contract.ts";
-import type { ClientRequest } from "../contract/request.ts";
+import type { InferClientRequest } from "../contract/request.ts";
 import type {
 	DeclaredClientResponse,
 	SuccessfulDeclaredClientResponse,
@@ -23,11 +24,6 @@ export type FetchLike = (
 	input: string | URL | Request,
 	init?: RequestInit,
 ) => Promise<Response>;
-
-/** Parses a non-stream, non-JSON response body for an API client. */
-export type ApiClientBodyParser = (
-	response: Response,
-) => unknown | Promise<unknown>;
 
 export type HeaderRecord = Record<string, string>;
 
@@ -72,15 +68,15 @@ export type FetchArgs<
 	E extends RouteDeclaration = RouteDeclaration,
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
 > =
-	ClientRequest<E, GlobalHeaderKeys<TGlobalHeaders>> extends never
+	InferClientRequest<E, GlobalHeaderKeys<TGlobalHeaders>> extends never
 		? [request?: undefined, options?: FetchOptionsFor<E>]
 		: RequiresFetchOptions<E> extends false
 			? [
-					request: ClientRequest<E, GlobalHeaderKeys<TGlobalHeaders>>,
+					request: InferClientRequest<E, GlobalHeaderKeys<TGlobalHeaders>>,
 					options?: FetchOptionsFor<E>,
 				]
 			: [
-					request: ClientRequest<E, GlobalHeaderKeys<TGlobalHeaders>>,
+					request: InferClientRequest<E, GlobalHeaderKeys<TGlobalHeaders>>,
 					options: FetchOptionsFor<E>,
 				];
 
@@ -103,10 +99,13 @@ type RouteDeclaredResponse<E extends RouteDeclaration> = WithResponseMetadata<
  * @remarks Routes declared with `.response()` produce status-discriminated
  * envelopes. Routes declared with `.output()` produce their output directly.
  *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-an-http-route}
- * @see {@link https://rest-rpc.dev/docs/procedures#call-procedures}
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-routes}
  */
-export type ClientResponse<E extends RouteDeclaration> = E extends {
+export type ClientResponse<
+	E extends { readonly "~restrpc": RouteDeclaration },
+> = InferClientResponse<E["~restrpc"]>;
+
+type InferClientResponse<E extends RouteDeclaration> = E extends {
 	output: "response";
 }
 	? RouteDeclaredResponse<E>
@@ -121,13 +120,13 @@ export type ClientResponse<E extends RouteDeclaration> = E extends {
 export type FetchResponseFn<
 	E extends RouteDeclaration,
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
-> = (...args: FetchArgs<E, TGlobalHeaders>) => Promise<ClientResponse<E>>;
+> = (...args: FetchArgs<E, TGlobalHeaders>) => Promise<InferClientResponse<E>>;
 
 /**
  * Infers the callable client operation for one declared route.
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
- * @see {@link https://rest-rpc.dev/docs/procedures#call-procedures}
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-routes}
  */
 export type ApiClientRouteValue<
 	E extends RouteDeclaration = RouteDeclaration,
@@ -183,7 +182,7 @@ export type ApiClientOptions<
 	TGlobalHeaders extends HeaderRecord = Record<never, string>,
 > = {
 	baseUrl: string;
-	bodyParser?: ApiClientBodyParser;
+	bodyCodecs?: readonly BodyCodec<Response>[];
 	fetch?: FetchLike;
 	fetchOptions?: ApiClientFetchOptions;
 	getGlobalHeaders?: GetHeadersFn<TGlobalHeaders>;

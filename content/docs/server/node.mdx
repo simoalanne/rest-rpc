@@ -11,59 +11,41 @@ pnpm add @rest-rpc/node
 
 ## Usage
 
-<Tabs>
-
-<Tab title="Contract-first approach">
-
-```ts
-import { createRouteHandler, implement } from "@rest-rpc/node";
-import { api } from "./contract";
-
-const routes = {
-	todos: {
-		get: implement(api.todos.get).handler(({ params: { id } }) => ({
-			status: 200,
-			body: getTodo(id),
-		})),
-	},
-};
-
-const handler = createRouteHandler(routes);
-```
-
-</Tab>
-<Tab title="Server-first approach">
+Create a matcher and call it from a Node HTTP server. A
+matched request is written to the native response.
+You choose how to handle unmatched requests.
 
 ```ts
 import { createServer } from "node:http";
-import { createRouteHandler, route } from "@rest-rpc/node";
+import { route, createRouteHandler } from "@rest-rpc/node";
+import { z } from "zod";
 
-const routes = {
-	health: route.get("/health").handler(() => ({ status: 204 })),
-};
+const todos = new Map([["todo_1", { id: "todo_1", title: "Write docs" }]]);
+
+const getTodo = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.handler(({ params, req }) => {
+		console.log(req.method, req.headers["x-request-id"]);
+		const todo = todos.get(params.id);
+		return todo
+			? { status: 200, body: todo }
+			: { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
+	});
+
+export const routes = { todos: { get: getTodo } };
 
 const handler = createRouteHandler(routes);
-```
-
-</Tab>
-</Tabs>
-
-```ts
-import { createServer } from "node:http";
-import { createRouteHandler } from "@rest-rpc/node";
-import { routes } from "./routes";
-
-const handler = createRouteHandler(routes);
-
 const server = createServer(async (req, res) => {
-	const { matched } = await handler(req, res);
-
-	if (matched) {
-		return;
+	try {
+		const { matched } = await handler(req, res);
+		if (!matched) {
+			res.writeHead(404).end("Not found");
+		}
+	} catch (error) {
+		console.error(error);
+		res.writeHead(500).end("Internal server error");
 	}
-
-	res.statusCode = 404;
-	res.end("Not found");
 });
 
 server.listen(3000);
@@ -103,26 +85,21 @@ const result = await handler(req, res, { user });
 
 ```ts
 type CreateNodeHandlerOptions = {
-	bodyParser?: NodeBodyParser;
+	bodyCodecs?: readonly BodyCodec<IncomingMessage>[];
+	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 };
 ```
 
-### Body parsing
+`bodyCodecs`: see [Serialization and Codecs](/docs/http-behavior/serialization).
 
-```ts
-const handler = createRouteHandler(routes, {
-	bodyParser: async (request) => readCustomBody(request),
-});
-```
+`requestBodyLimit`: see [request body limits](/docs/http-behavior/serialization#server-request-deserialization).
 
 ### Error handling
 
-Request validation errors default to a 400 response. Response contract
-validation errors default to a generic 500 response. The validation handlers
-receive the native Node request and response. Other errors reject the handler
-promise and should be handled at the server boundary.
+Use `requestValidationErrorHandler` and `responseValidationErrorHandler` to
+customize [validation errors](/docs/http-behavior/schemas). Other errors reject the handler promise.
 
 ```ts
 const handler = createRouteHandler(routes, {

@@ -1,7 +1,10 @@
 import type { ServerResponse } from "node:http";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { handleHttpRouteResult, type HttpRouteResult } from "@rest-rpc/server";
+import type { HttpRouteResult } from "@rest-rpc/server";
+import type { BodyCodec, SerializedBody } from "@rest-rpc/core";
+import { normalizeMediaType, resolveBodyCodec } from "@rest-rpc/core/codecs";
+import { nodeBodyCodecs } from "./codecs.ts";
 
 const formatResponseStreamChunk = (chunk: unknown) =>
 	`${JSON.stringify(chunk)}\n`;
@@ -39,30 +42,44 @@ export async function writeStreamResponse(
 }
 
 /** Writes a normalized HTTP result to a Node ServerResponse. */
-export function writeNodeResponse(
+export async function writeNodeResponse(
 	result: HttpRouteResult,
 	res: ServerResponse,
+	bodyCodecs: readonly BodyCodec<never>[] = [],
 ): Promise<void> {
-	return handleHttpRouteResult(result, {
-		setHeader: (name, value) => {
+	let serialized: SerializedBody | undefined;
+	if (result.kind === "response" && result.body) {
+		const { value, contentType } = result.body;
+		const codec = resolveBodyCodec(normalizeMediaType(contentType), [
+			...bodyCodecs,
+			...nodeBodyCodecs,
+		]);
+		serialized = await codec!.serialize!(value, contentType);
+		for (const [name, value] of Object.entries(serialized.headers ?? {})) {
 			if (value !== undefined) res.setHeader(name, value);
-		},
-		sendEmpty: (status) => {
-			res.statusCode = status;
-			res.end();
-		},
-		sendJson: (status, body) => {
-			const json = JSON.stringify(body);
-			res.statusCode = status;
-			if (!res.hasHeader("content-type"))
-				res.setHeader("content-type", "application/json");
-			res.end(json);
-		},
-		sendCustom: (status, body) => {
-			res.statusCode = status;
-			res.end(body instanceof Uint8Array ? body : String(body));
-		},
-		sendStream: ({ status, body, contentType }) =>
-			writeStreamResponse(body, res, status, contentType),
-	});
+		}
+	}
+	for (const [name, value] of Object.entries(result.headers ?? {})) {
+		if (value !== undefined) res.setHeader(name, value);
+	}
+	if (result.kind === "stream") {
+		return writeStreamResponse(result.body, res, result.status);
+	}
+	res.statusCode = result.status;
+	if (!serialized) {
+		res.end();
+		return;
+	}
+	const contentType =
+		serialized.contentType === undefined
+			? result.body!.contentType
+			: serialized.contentType;
+	if (contentType === null) res.removeHeader("content-type");
+	else res.setHeader("content-type", contentType);
+
+	if (serialized.body instanceof Readable) {
+		await pipeline(serialized.body, res);
+	} else {
+		res.end(serialized.body);
+	}
 }

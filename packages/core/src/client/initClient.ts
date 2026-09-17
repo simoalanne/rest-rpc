@@ -22,6 +22,7 @@ export function initClient<
 ): ApiClientFor<TContract, TGlobalHeaders> {
 	const requestOptions: ExecuteRequestOptions = {
 		baseUrl: options.baseUrl,
+		bodyCodecs: options.bodyCodecs,
 		fetch: options.fetch,
 		fetchOptions: options.fetchOptions,
 		getGlobalHeaders: options.getGlobalHeaders,
@@ -40,7 +41,7 @@ export function initClient<
 		fetchRouteResponse(
 			request,
 			route.source !== "generated" && (options.validateResponses ?? false),
-			options.bodyParser,
+			options.bodyCodecs,
 			route,
 			routePath,
 			...args,

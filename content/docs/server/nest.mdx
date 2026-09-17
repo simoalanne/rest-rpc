@@ -11,25 +11,38 @@ pnpm add @rest-rpc/nest
 
 ## Usage
 
-Use `@Implement()` decorator on a Nest controller method with a contract route or tree.
-The method should return the matching completed route implementation or tree.
+Use `@Implement()` on a controller method. Pass a route or route tree to the
+decorator and return its completed handlers from the method. Handlers can use
+injected services.
 
 ```ts
+import "reflect-metadata";
 import { Controller, Injectable, Module } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
-import { Implement, implement, RestRpcModule } from "@rest-rpc/nest";
-import { api } from "./contract";
+import { Implement, route, RestRpcModule } from "@rest-rpc/nest";
+import { z } from "zod";
 
-const builders = implement(api);
+const getDeclaration = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }));
+const createDeclaration = route.input(z.object({ title: z.string() }));
+
+const declarations = {
+	todos: { get: getDeclaration, create: createDeclaration },
+};
 
 @Injectable()
 class TodoRepository {
+	private readonly todos = new Map<string, { id: string; title: string }>();
+
 	find(id: string) {
-		return { id, title: "Write docs" };
+		return this.todos.get(id);
 	}
 
 	create(title: string) {
-		return { id: "todo-1", title };
+		const todo = { id: crypto.randomUUID(), title };
+		this.todos.set(todo.id, todo);
+		return todo;
 	}
 }
 
@@ -37,24 +50,26 @@ class TodoRepository {
 class TodoRoutes {
 	constructor(private readonly todos: TodoRepository) {}
 
-	readonly routes = {
-		get: builders.todos.get.handler(({ params: { id } }) => ({
-			status: 200,
-			body: this.todos.find(id),
-		})),
-		create: builders.todos.create.handler(({ body: { title } }) => ({
-			status: 201,
-			body: this.todos.create(title),
-		})),
-	};
+	readonly get = getDeclaration.handler(({ params }) => {
+		const todo = this.todos.find(params.id);
+		return todo
+			? { status: 200, body: todo }
+			: { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
+	});
+
+	readonly create = createDeclaration.handler(({ input: { title } }) =>
+		this.todos.create(title),
+	);
+
+	readonly routes = { todos: { get: this.get, create: this.create } };
 }
 
 @Controller()
 class TodoController {
 	constructor(private readonly todos: TodoRoutes) {}
 
-	@Implement(api.todos)
-	todosRoutes() {
+	@Implement(declarations)
+	todoRoutes() {
 		return this.todos.routes;
 	}
 }
@@ -70,71 +85,35 @@ const app = await NestFactory.create(AppModule);
 await app.listen(3000);
 ```
 
-The decorated method can return a matching implementation from any
-source. `@Implement()` uses its argument to register Nest routes and uses the
-method return value when handling a request.
+`@Implement()` registers the methods and paths from its argument. The decorated
+method returns the matching completed route tree.
 
-Nest decorators applied to the decorated method are copied to every generated
-route method. This allows guards, interceptors, and Nest parameter decorators
-to be used at the contract-tree boundary.
+Nest decorators on the decorated method are copied to every generated route
+method, so guards, interceptors, and parameter decorators can be applied to a
+whole route tree.
 
 ## Single Routes
 
-The same decorator accepts a single route with an explicit path:
+The decorator also accepts a single route with an explicit path:
 
 ```ts
+const getTodo = route.get("/todos/:id").params(z.object({ id: z.string() }));
+
 @Controller()
 class TodoController {
 	constructor(private readonly todos: TodoRepository) {}
 
-	@Implement(api.todos.get)
-	getTodo() {
-		return implement(api.todos.get).handler(({ params: { id } }) => ({
-			status: 200,
-			body: this.todos.find(id),
-		}));
+	@Implement(getTodo)
+	get() {
+		return getTodo.handler(({ params }) => this.todos.find(params.id));
 	}
 }
 ```
 
 :::warning
-If you're using [a derived path](/docs/procedures), you must use a tree with both
-the decorator and the return value. Otherwise, the decorator cannot determine the path to register with Nest.
+Route with [derived path](/docs/route-builder#start-with-defaults) is not supported.
+Add explicit method and path or use a route tree with `@Implement()` instead.
 :::
-
-## Server-First Routes
-
-`@Implement()` also accepts server-first route declarations. Keep the
-declaration outside the method so the decorator can read its method and path
-when Nest registers the controller.
-
-```ts
-import { Implement, route } from "@rest-rpc/nest";
-import { z } from "zod";
-
-const todoRoutes = {
-	get: route.get("/todos/:id").params(z.object({ id: z.string() })),
-};
-
-@Controller()
-class TodoController {
-	constructor(private readonly todos: TodoRepository) {}
-
-	@Implement(todoRoutes)
-	routes() {
-		return {
-			get: todoRoutes.get.handler(({ params: { id } }) => ({
-				status: 200,
-				body: this.todos.find(id),
-			})),
-		};
-	}
-}
-```
-
-Completed server-first implementations can be returned in the same way. The
-decorator only requires a route or tree from which Nest registration metadata
-can be read.
 
 ## Framework Context
 
@@ -182,18 +161,18 @@ RestRpcModule.forRoot({
 
 ```ts
 type RestRpcModuleOptions<TContext = DefaultContext> = {
+	bodyCodecs?: readonly BodyCodec<unknown>[];
 	createContext?: (context: ExecutionContext) => TContext | Promise<TContext>;
 };
 ```
 
+`bodyCodecs`: see [Serialization and Codecs](/docs/http-behavior/serialization).
+
 ### Error handling
 
-Request validation throws `RequestValidationException`, which defaults to a
-400 response. Response contract validation throws
-`ResponseValidationException`, which defaults to a generic 500 response. Both
-are Nest `HttpException` subclasses and can be customized with ordinary Nest
-exception filters. Other errors continue through Nest's exception handling
-unchanged.
+`RequestValidationException` and `ResponseValidationException` are Nest
+`HttpException` subclasses. Customize [validation errors](/docs/http-behavior/schemas)
+with ordinary Nest exception filters.
 
 ```ts
 import { ArgumentsHost, Catch, ExceptionFilter } from "@nestjs/common";

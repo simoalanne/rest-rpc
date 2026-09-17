@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repo is `rest-rpc`, a TypeScript library for defining one shared API contract and deriving RPC-style client and server code from it. The library is designed to be used in a monorepo with multiple packages that share the same API contract. Both contract-first and server-first approaches are supported.
+This repo is `rest-rpc`, a TypeScript library for defining REST APIs with RPC-like ergonomics. It provides a type-safe way to declare HTTP routes, generate client contracts, and handle requests and responses. Both contract-first and server-first development approaches are supported but server-first is the recommended approach and what documentation shows.
 
 ## Packages
 
@@ -49,6 +49,7 @@ A command that exits successfully is successful. Do not report warnings from suc
 
 For documentation related tasks:
 
+- `integration-tests` and regular test files are not typechecked. They test runtime behavior and typing is irrelevant. Do not add type gymnastics to tests and do not run ad-hoc commands to typecheck them. Type errors in test files are irrelevant and should not be reported. They are only useful as a signal to debug failing tests consuming changed APIs.
 - README.md is shared across root and all packages and describes the project user-facing features concisely. It should link to the actual documentation in `content/docs/` for broader context. Task asking to update documentation generally means updating the mdx files in `content/docs/`, not updating the README.md files unless the user explicitly asks to update the README.md.
 - Integration tests require network access. From sandboxed environments, they will fail with EPERM unless run with elevated permissions.
 - Library is currently pre v1.0.0 and is not yet stable. Breaking changes are expected until v1.0.0 is released.

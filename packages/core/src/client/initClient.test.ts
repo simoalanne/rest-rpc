@@ -84,7 +84,7 @@ describe("initClient", () => {
 					.input(z.object({ title: z.string() }))
 					.output(z.string().transform(Number)),
 				form: route
-					.input(z.object({ title: z.string(), tags: z.array(z.string()) }), {
+					.input(z.instanceof(URLSearchParams), {
 						contentType: "application/x-www-form-urlencoded",
 					})
 					.output(z.string().transform(Number)),
@@ -106,7 +106,12 @@ describe("initClient", () => {
 		assert.equal(await client.todos.get(undefined, { cache: "no-store" }), 1);
 		assert.equal(await client.todos.add({ title: "Write tests" }), 2);
 		assert.equal(
-			await client.todos.form({ title: "Write tests", tags: ["docs"] }),
+			await client.todos.form(
+				new URLSearchParams([
+					["title", "Write tests"],
+					["tags[]", "docs"],
+				]),
+			),
 			3,
 		);
 		assert.equal(await client.todos.search({ term: "open" }), 4);

@@ -1,205 +1,78 @@
 ---
-title: Declaration
-description: Learn how to declare contracts with rest-rpc
+title: Contract Route Builder
+description: Declare an HTTP interface separately from its handlers.
 ---
 
-A contract is a plain TypeScript object composed from route builders.
+Import `route` from `@rest-rpc/core` to declare an HTTP interface independently
+of its server implementation. The contract can be shared directly with a Fetch
+client and implemented with any server adapter.
 
-```ts
+The declaration methods are the same as the [Route Builder](/docs/route-builder).
+The difference is that outputs are declared with schemas rather than inferred
+from handlers.
+
+## Declare Routes
+
+```ts contract.ts
 import { route } from "@rest-rpc/core";
 import { z } from "zod";
 
-const todoSchema = z.object({
-	id: z.string(),
-	title: z.string(),
-	completed: z.boolean(),
-});
+const todoSchema = z.object({ id: z.string(), title: z.string() });
 
-export const api = {
-	todos: {
-		get: route
-			.get("/todos/:id")
-			.params(z.object({ id: z.string() }))
-			.response(200, todoSchema),
-	},
-};
-```
+const create = route.input(z.object({ title: z.string() })).output(todoSchema);
 
-The contract is used at runtime and at type level. It can drive server handlers,
-clients, TanStack Query options, and OpenAPI generation.
-
-## Route Builders
-
-Without a method setter, a route uses POST and derives its path from the keys
-in the contract tree. Use `.get(path)`, `.post(path)`, `.put(path)`,
-`.patch(path)`, or `.delete(path)` when the method or path should be explicit.
-
-Choose one flat `.input(schema)` or declare request segments with `.query()`,
-`.params()`, `.body()`, and `.headers()`. A flat GET input is encoded as query
-parameters; a flat input on other methods is sent as the body. Flat input
-requires a static path. GET routes cannot declare a body.
-
-Choose `.output(schema)` for one plain client result, or use
-`.response(status, schema)` for status envelopes. Responses can be repeated for
-different statuses. Request and response setters may appear in either order.
-
-```ts
-const api = {
-	todos: {
-		search: route
-			.get("/todos/search")
-			.input(z.object({ term: z.string() }))
-			.output(z.array(todoSchema)),
-	},
-};
-
-await client.todos.search({ term: "open" });
-```
-
-## Request Model
-
-```ts
-route
-	.patch("/todos/:id")
-	.params(z.object({ id: z.string() }))
-	.query(z.object({ includeCompleted: z.coerce.boolean<boolean>().optional() }))
-	.headers(z.object({ "x-request-id": z.string().optional() }))
-	.body(z.object({ title: z.string() }))
-	.response(200, todoSchema);
-```
-
-```ts
-await client.todos.update({
-	params: { id: "todo_1" },
-	query: { includeCompleted: true },
-	headers: { "x-request-id": "req_1" },
-	body: { title: "Write docs" },
-});
-```
-
-```ts
-const routes = {
-	todos: {
-		update: implement(api.todos.update).handler(
-			({ params, query, headers, body }) => {
-				return {
-					status: 200,
-					body: updateTodo({
-						id: params.id,
-						includeCompleted: query.includeCompleted,
-						requestId: headers["x-request-id"],
-						title: body.title,
-					}),
-				};
-			},
-		),
-	},
-};
-```
-
-## Path Params
-
-Declare a schema for every dynamic path segment with `.params()`.
-Both colon-path (`:id`) and curly-brace (`{id}`) syntax is supported.
-
-```ts
-route
-	.get("/todos/:id")
-	.params(z.object({ id: z.string().uuid() }))
-	.response(200, todoSchema);
-```
-
-## Headers
-
-Header keys should be declared in lowercase. The client will send headers in lowercase,
-and Node/Fetch server implementations normalize incoming headers to lowercase.
-Uppercased headers fail validation or resolve to `undefined` in the request.headers object.
-
-```ts
-route
-	.get("/todos")
-	.headers(z.object({ authorization: z.string() }))
-	.response(200, z.array(todoSchema));
-```
-
-## Responses
-
-`.response(status, schema)` declares a response body for a status.
-
-```ts
-route
-	.post("/todos")
-	.body(z.object({ title: z.string().min(1) }))
-	.response(201, todoSchema);
-```
-
-The status is always explicit. Omit the schema argument to declare a response
-without a body, such as `.response(204)`.
-
-Call `.response()` once for each declared status code.
-
-```ts
-route
+const get = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
 	.response(200, todoSchema)
 	.response(404, z.object({ code: z.literal("TODO_NOT_FOUND") }));
+
+export const api = { todos: { create, get } };
 ```
 
-Non-2xx statuses and no-body responses are declared through the same builder
-method.
+Use `.output()` for a plain result or `.response()` for status responses.
+Streams use `.streamOutput()` or `.streamResponse()`. These schemas define
+handler and client types and provide [runtime validation](/docs/http-behavior/schemas).
 
-Status-specific response headers can be declared in the options following the
-response schema.
+## Implement Routes
+
+Each server adapter exports `implement()`. Pass a route or route tree to get
+builders with typed `.handler()` methods:
+
+```ts server.ts
+import { implement } from "@rest-rpc/express";
+import { api } from "./contract";
+import { createTodo, findTodo } from "./todos";
+
+const builders = implement(api);
+
+const create = builders.todos.create.handler(({ input: { title } }) =>
+	createTodo(title),
+);
+
+const get = builders.todos.get.handler(({ params }) => {
+	const todo = findTodo(params.id);
+	return todo
+		? { status: 200, body: todo }
+		: { status: 404, body: { code: "TODO_NOT_FOUND" } };
+});
+
+export const routes = { todos: { create, get } };
+```
+
+The implementation must match the contract's inputs and declared outputs.
+Register the completed routes with your adapter as usual.
+
+## Use in a Client
+
+Pass the shared contract directly to `initClient()`:
 
 ```ts
-route
-	.post("/todos")
-	.body(z.object({ title: z.string().min(1) }))
-	.response(201, todoSchema, {
-		headers: z.object({
-			location: z.string(),
-			"x-next-cursor": z.string().optional(),
-		}),
-	});
+import { initClient } from "@rest-rpc/core";
+import { api } from "./contract";
+
+const client = initClient(api, { baseUrl: "https://api.example.com" });
 ```
 
-## Route Metadata
-
-`.metadata()` and `.openAPI()` add information to one route. They can appear
-before or after input and response declarations.
-
-```ts
-export const api = {
-	todos: {
-		list: route
-			.get("/api/todos")
-			.metadata({ auth: "required" })
-			.headers(z.object({ "x-request-id": z.string().optional() }))
-			.openAPI({ summary: "List todos" })
-			.response(200, z.object({ items: z.array(todoSchema) }))
-			.response(401, z.object({ code: z.literal("UNAUTHORIZED") })),
-	},
-};
-```
-
-## Single Routes
-
-A method on `route` starts one route builder. The result can be exported on its
-own; a contract does not need to wrap it in another function or object.
-
-```ts
-import { route } from "@rest-rpc/core";
-
-export const getTodo = route
-	.get("/todos/:id")
-	.params(z.object({ id: z.string() }))
-	.response(200, todoSchema);
-```
-
-## Beyond JSON Contracts
-
-Advanced declarations are covered separately:
-
-- [HTTP Requests](/docs/http-requests)
-- [HTTP Responses](/docs/http-responses)
+See the [Contract-first Quickstart](/docs/contract-first-quickstart) for a
+complete example and [Fetch Client](/docs/client/fetch-client) for client options.

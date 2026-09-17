@@ -38,7 +38,7 @@ export type OpenApiRouteOptions = {
 	extensions?: Record<`x-${string}`, unknown>;
 };
 
-/** OpenAPI metadata that may be shared by a configured route factory. */
+/** OpenAPI operation metadata attached to a route declaration. */
 export type CommonOpenApiRouteOptions = Omit<
 	OpenApiRouteOptions,
 	"summary" | "description" | "operationId"
@@ -59,7 +59,7 @@ export type RouteRequestDeclaration = {
  * @remarks Applications normally create route declarations with `route`
  * instead of constructing this representation directly.
  *
- * @see {@link https://rest-rpc.dev/docs/contract/declaration}
+ * @see {@link https://rest-rpc.dev/docs/route-builder}
  */
 export type RouteDeclaration = {
 	source?: "generated";

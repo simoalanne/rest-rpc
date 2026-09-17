@@ -68,7 +68,7 @@ export const createPathMatcher = (path: string) => {
 	};
 };
 
-type RuntimeImplementation = {
+export type RuntimeImplementation = {
 	route: RouteDeclaration;
 	handler: (...args: never[]) => unknown;
 };

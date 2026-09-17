@@ -324,7 +324,6 @@ const runtimeRoute = new RouteBuilder({ path: "" });
  * @remarks Every builder method returns a new route value, so partially built
  * routes can be reused safely across declarations.
  *
- * @see {@link https://rest-rpc.dev/docs/contract/declaration#route-builders}
- * @see {@link https://rest-rpc.dev/docs/procedures}
+ * @see {@link https://rest-rpc.dev/docs/route-builder}
  */
 export const route = runtimeRoute as unknown as RootRouteBuilder;

@@ -2,7 +2,7 @@ import { defineConfig } from "blume";
 
 export default defineConfig({
 	title: "rest-rpc",
-	description: "REST-shaped APIs with function-shaped TypeScript",
+	description: "REST APIs with RPC-like ergonomics",
 	logo: {
 		image: "/icon.svg",
 		text: "rest-rpc",
@@ -19,7 +19,7 @@ export default defineConfig({
 			instructions:
 				"Use this server to search and read the latest rest-rpc documentation. Start with search_docs, then read relevant pages with get_page before answering API usage questions.",
 		},
-		skills: "./skills",
+		skills: "../skills",
 	},
 	content: {
 		root: ".",
