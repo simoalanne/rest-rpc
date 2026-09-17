@@ -1,3 +1,4 @@
+import { HttpError } from "./httpError.ts";
 import {
 	resolveBodyCodec,
 	defaultBodyCodecs,
@@ -27,6 +28,7 @@ export const getResponseSchema = (
 const assertResponseContentType = (
 	declared: string | readonly string[] | undefined,
 	rawResponse: Response,
+	body: unknown,
 ) => {
 	const received = normalizeMediaType(
 		rawResponse.headers.get("content-type") ?? "",
@@ -36,7 +38,9 @@ const assertResponseContentType = (
 	if (
 		!allowed.some((contentType) => normalizeMediaType(contentType) === received)
 	) {
-		throw new Error("Server returned an unsupported response content-type.");
+		throw new HttpError(rawResponse.status, body, {
+			cause: new Error("Server returned an unsupported response content-type."),
+		});
 	}
 };
 
@@ -57,17 +61,24 @@ const readStreamResponse = (
 	if (rawResponse.body === null) {
 		throw new Error("Server returned no stream body");
 	}
-	return parseNdjsonStream(schema, rawResponse.body, validate);
+	return parseNdjsonStream(
+		schema,
+		rawResponse.body,
+		validate,
+		rawResponse.status,
+	);
 };
 
 const validateResponseBody = async (
 	schema: StandardSchemaV1 | undefined,
 	value: unknown,
 	validate: boolean,
+	status: number,
 ) => {
 	if (!validate || schema === undefined) return value;
 	const result = await validateStandardSchema(schema, value);
-	if (result.issues) throw result.issues;
+	if (result.issues)
+		throw new HttpError(status, value, { cause: result.issues });
 	return result.value;
 };
 
@@ -75,6 +86,7 @@ const readDeclaredHeaders = async (
 	schema: ResponseDeclaration,
 	rawResponse: Response,
 	validate: boolean,
+	body: unknown,
 ) => {
 	const { headers } = schema;
 	if (!headers) return undefined;
@@ -83,7 +95,8 @@ const readDeclaredHeaders = async (
 	if (!validate) return rawHeaders;
 
 	const result = await validateStandardSchema(headers, rawHeaders);
-	if (result.issues) throw result.issues;
+	if (result.issues)
+		throw new HttpError(rawResponse.status, body, { cause: result.issues });
 	return result.value;
 };
 
@@ -104,29 +117,19 @@ export const fetchResponse = async <E extends RouteDeclaration>(
 	const rawResponse = await request(route, routePath, ...args);
 
 	const schema = getResponseSchema(route, rawResponse.status);
-	if (!schema) {
-		throw new Error("Request did not return a declared response");
-	}
-
-	const responseMetadata = {
-		status: rawResponse.status,
-		headers: rawResponse.headers,
-		responseHeaders: await readDeclaredHeaders(
-			schema,
-			rawResponse,
-			validateResponse,
-		),
-	};
-
-	if (schema.kind === "stream") {
+	if (schema?.kind === "stream") {
+		const body = readStreamResponse(schema.body, rawResponse, validateResponse);
 		return {
-			...responseMetadata,
-			body: readStreamResponse(schema.body, rawResponse, validateResponse),
+			status: rawResponse.status,
+			headers: rawResponse.headers,
+			responseHeaders: await readDeclaredHeaders(
+				schema,
+				rawResponse,
+				validateResponse,
+				body,
+			),
+			body,
 		};
-	}
-
-	if (route.source !== "generated") {
-		assertResponseContentType(schema.contentType, rawResponse);
 	}
 
 	const mediaType = normalizeMediaType(rawResponse.headers.get("content-type"));
@@ -138,7 +141,29 @@ export const fetchResponse = async <E extends RouteDeclaration>(
 		]);
 		value = await resolvedCodec?.deserialize?.(rawResponse);
 	}
-	const body = await validateResponseBody(schema.body, value, validateResponse);
+
+	if (!schema) {
+		throw new HttpError(rawResponse.status, value);
+	}
+	if (route.source !== "generated") {
+		assertResponseContentType(schema.contentType, rawResponse, value);
+	}
+	const responseMetadata = {
+		status: rawResponse.status,
+		headers: rawResponse.headers,
+		responseHeaders: await readDeclaredHeaders(
+			schema,
+			rawResponse,
+			validateResponse,
+			value,
+		),
+	};
+	const body = await validateResponseBody(
+		schema.body,
+		value,
+		validateResponse,
+		rawResponse.status,
+	);
 
 	return {
 		...responseMetadata,
@@ -161,7 +186,7 @@ export const fetchSuccess = async <E extends RouteDeclaration>(
 	const response = await fetchRouteResponse(route, routePath, ...args);
 
 	if (!isSuccessStatus(response.status)) {
-		throw new Error("Request did not return a declared success response");
+		throw new HttpError(response.status, response.body);
 	}
 
 	return response.body;

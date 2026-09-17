@@ -101,6 +101,7 @@ const todo = useQuery(
 ## Mutations
 
 ```tsx
+import { HttpError } from "@rest-rpc/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 const queryClient = useQueryClient();
@@ -113,7 +114,9 @@ const createTodo = useMutation(
 			});
 		},
 		onError(error) {
-			if ("status" in error && error.status === 409) {
+			if (error instanceof HttpError) {
+				console.log(error.status, error.body);
+			} else if (!(error instanceof Error) && error.status === 409) {
 				console.log(error.body.code);
 			}
 		},
@@ -278,11 +281,9 @@ The adapter passes TanStack Query cancellation signals through fetch options.
 
 TanStack Query uses success and error channels.
 
-Plain outputs and declared 2xx responses become `data`.
+Plain outputs and declared 2xx responses get mapped to the `data` key.
 
-Declared non-2xx responses become `error`.
+Declared non-2xx responses get mapped to the `error` key.
 
-Undeclared response statuses and other runtime failures become `Error` values in
-the error channel.
-
-Direct Fetch client calls return declared non-2xx responses as envelopes instead. See [Fetch Client](/docs/client/fetch-client#call-routes).
+Undeclared statuses and response validation failures become [`HttpError`](https://rest-rpc.dev/docs/client/fetch-client#error-handling).
+Network and other unexpected failures become ordinary `Error` objects.

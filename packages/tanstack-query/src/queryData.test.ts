@@ -1,3 +1,4 @@
+import { HttpError } from "@rest-rpc/core";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { fetchQueryData } from "./queryData.ts";
@@ -70,6 +71,16 @@ describe("fetchQueryData", () => {
 				status: 409,
 				body: { code: "ITEM_EXISTS" },
 			},
+		);
+	});
+
+	it("preserves HttpError in the error channel", async () => {
+		const failure = new HttpError(503, { message: "Unavailable" });
+		await assert.rejects(
+			fetchQueryData(async () => {
+				throw failure;
+			}, undefined),
+			(error) => error === failure,
 		);
 	});
 

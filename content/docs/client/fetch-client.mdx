@@ -50,6 +50,26 @@ as do network failures and decoding errors. Plain output routes expect their
 successful status 200. See the [Route Builder](/docs/route-builder) for choosing
 result forms and declaring expected outcomes.
 
+## Error Handling
+
+Undeclared statuses and response validation failures when enabled throw an `HttpError`.
+Its `status` is the received HTTP status and its `body` is deserialized.
+Validation issues are available through `cause`. A validation failure can have a 2xx status.
+
+```ts
+import { HttpError } from "@rest-rpc/core";
+
+try {
+	await client.todos.get({ params: { id: "todo_1" } });
+} catch (error) {
+	if (error instanceof HttpError) {
+		console.log(error.status, error.body);
+	} else {
+		throw error;
+	}
+}
+```
+
 ## Consume Streams
 
 A plain stream returns an async iterable:

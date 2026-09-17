@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import z from "zod";
 import { route } from "../contract/routeBuilder.ts";
-import { initClient } from "./index.ts";
+import { HttpError, initClient } from "./index.ts";
 
 const originalFetch = globalThis.fetch;
 
@@ -108,7 +108,7 @@ describe("ApiClient responses", () => {
 		assert.equal(response.headers.get("etag"), "todo-etag");
 	});
 
-	it("rejects undeclared response statuses without consuming their bodies", async () => {
+	it("decodes undeclared response statuses into HttpError", async () => {
 		const rawResponse = jsonResponse({ code: "teapot" }, 418);
 		captureFetch(rawResponse);
 		const client = initClient(createResponseTestContract(), {
@@ -117,9 +117,14 @@ describe("ApiClient responses", () => {
 
 		await assert.rejects(
 			() => client.todos.get({ params: { id: "todo-1" } }),
-			/declared response/,
+			(error) => {
+				assert.ok(error instanceof HttpError);
+				assert.equal(error.status, 418);
+				assert.deepEqual(error.body, { code: "teapot" });
+				return true;
+			},
 		);
-		assert.equal(rawResponse.bodyUsed, false);
+		assert.equal(rawResponse.bodyUsed, true);
 	});
 
 	it("rejects an error response as an undeclared status", async () => {
@@ -128,9 +133,78 @@ describe("ApiClient responses", () => {
 			baseUrl: "https://api.test",
 		});
 
+		await assert.rejects(() => client.todos.get({ params: { id: "todo-1" } }), {
+			name: "HttpError",
+			status: 0,
+			body: undefined,
+		});
+	});
+
+	it("preserves decoded bodies when response header validation fails", async () => {
+		captureFetch(jsonResponse({ id: "one" }));
+		const client = initClient(
+			{
+				todo: route.get("/todo").response(200, z.object({ id: z.string() }), {
+					headers: z.object({ etag: z.string() }),
+				}),
+			},
+			{ baseUrl: "https://api.test", validateResponses: true },
+		);
+		await assert.rejects(client.todo(), (error) => {
+			assert.ok(error instanceof HttpError);
+			assert.equal(error.status, 200);
+			assert.deepEqual(error.body, { id: "one" });
+			assert.ok(Array.isArray(error.cause));
+			return true;
+		});
+	});
+
+	for (const status of [200, 503]) {
+		it(`keeps JSON decoding failures as ordinary errors (${status})`, async () => {
+			captureFetch(
+				new Response("invalid json", {
+					status,
+					headers: { "content-type": "application/json" },
+				}),
+			);
+			const client = initClient(createResponseTestContract(), {
+				baseUrl: "https://api.test",
+			});
+			await assert.rejects(
+				client.todos.get({ params: { id: "one" } }),
+				(error) => {
+					assert.ok(error instanceof SyntaxError);
+					assert.equal(error instanceof HttpError, false);
+					return true;
+				},
+			);
+		});
+	}
+
+	it("uses custom codecs to decode undeclared responses", async () => {
+		captureFetch(
+			new Response("busy", {
+				status: 503,
+				headers: { "content-type": "text/custom" },
+			}),
+		);
+		const client = initClient(createResponseTestContract(), {
+			baseUrl: "https://api.test",
+			bodyCodecs: [
+				{
+					match: (mediaType) => mediaType === "text/custom",
+					deserialize: async (response) => ({ message: await response.text() }),
+				},
+			],
+		});
 		await assert.rejects(
-			() => client.todos.get({ params: { id: "todo-1" } }),
-			/declared response/,
+			client.todos.get({ params: { id: "one" } }),
+			(error) => {
+				assert.ok(error instanceof HttpError);
+				assert.equal(error.status, 503);
+				assert.deepEqual(error.body, { message: "busy" });
+				return true;
+			},
 		);
 	});
 
@@ -190,8 +264,15 @@ describe("ApiClient responses", () => {
 			validateResponses: true,
 		});
 
-		await assert.rejects(() =>
-			client.todos.create({ body: { title: "Buy milk" } }),
+		await assert.rejects(
+			() => client.todos.create({ body: { title: "Buy milk" } }),
+			(error) => {
+				assert.ok(error instanceof HttpError);
+				assert.equal(error.status, 201);
+				assert.deepEqual(error.body, { id: 123 });
+				assert.ok(Array.isArray(error.cause));
+				return true;
+			},
 		);
 	});
 
@@ -566,18 +647,15 @@ describe("ApiClient responses", () => {
 				{
 					baseUrl: "https://api.test",
 					validateResponses,
-					bodyCodecs: [
-						{
-							match: () => {
-								throw new Error("Must reject before matching");
-							},
-							deserialize: () => "wrong",
-						},
-					],
 				},
 			);
-			await assert.rejects(client.csv(), /unsupported response content-type/);
-			assert.equal(rawResponse.bodyUsed, false);
+			await assert.rejects(client.csv(), (error) => {
+				assert.ok(error instanceof HttpError);
+				assert.equal(error.status, 200);
+				assert.deepEqual(error.body, {});
+				return true;
+			});
+			assert.equal(rawResponse.bodyUsed, true);
 		});
 	}
 });

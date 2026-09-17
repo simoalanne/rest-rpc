@@ -3,7 +3,7 @@ import { afterEach, describe, it } from "node:test";
 import z from "zod";
 import { route } from "../contract/routeBuilder.ts";
 import { type } from "../standard-schema/type.ts";
-import { initClient } from "./index.ts";
+import { HttpError, initClient } from "./index.ts";
 import { parseNdjsonStream } from "./stream.ts";
 
 const originalFetch = globalThis.fetch;
@@ -93,11 +93,20 @@ describe("ApiClient streams", () => {
 		assert.equal(eventsResponse.status, 200);
 		const events = eventsResponse.body;
 
-		await assert.rejects(async () => {
-			for await (const _event of events) {
-				void _event;
-			}
-		});
+		await assert.rejects(
+			async () => {
+				for await (const _event of events) {
+					void _event;
+				}
+			},
+			(error) => {
+				assert.ok(error instanceof HttpError);
+				assert.equal(error.status, 200);
+				assert.deepEqual(error.body, { id: 123 });
+				assert.ok(Array.isArray(error.cause));
+				return true;
+			},
+		);
 	});
 
 	it("rejects declared stream responses without a body", async () => {

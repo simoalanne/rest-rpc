@@ -1,3 +1,4 @@
+export { HttpError } from "./client/index.ts";
 export type {
 	ApiClientFor,
 	ApiClientOptions,

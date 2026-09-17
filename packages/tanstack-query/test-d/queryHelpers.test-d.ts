@@ -1,3 +1,4 @@
+import { type HttpError } from "@rest-rpc/core";
 import { route, type as schemaType } from "@rest-rpc/core";
 import {
 	createTanstackQueryHelpers,
@@ -587,7 +588,7 @@ const shorthandTq = createTanstackQueryHelpers(shorthandApi, {
 expectType<{ id: string; title: string }>(
 	null as unknown as RouteQueryData<typeof shorthandApi.todos.get>,
 );
-expectType<Error>(
+expectType<HttpError | Error>(
 	null as unknown as RouteQueryError<typeof shorthandApi.todos.get>,
 );
 expectType<{ title: string }>(
@@ -596,7 +597,7 @@ expectType<{ title: string }>(
 
 const shorthandGetOptions = shorthandTq.todos.get.queryOptions(undefined, {
 	retry(_failureCount, error) {
-		expectType<Error>(error);
+		expectType<HttpError | Error>(error);
 		return false;
 	},
 	select(data) {
@@ -626,7 +627,7 @@ shorthandTq.todos.add.mutationOptions({
 		expectError(data.status);
 	},
 	onError(error) {
-		expectType<Error>(error);
+		expectType<HttpError | Error>(error);
 	},
 });
 shorthandTq.todos.add.queryOptions({ title: "Todo" });

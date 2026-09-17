@@ -1,4 +1,4 @@
-import { initClient } from "@rest-rpc/core";
+import { initClient, type HttpError } from "@rest-rpc/core";
 import type {
 	ApiClientFetchOptions,
 	ApiClientOptions,
@@ -39,6 +39,7 @@ type DeclaredRouteQueryData<E extends RouteDeclaration> = WithHeaders<
 >;
 type DeclaredRouteQueryError<E extends RouteDeclaration> =
 	| WithHeaders<ErrorDeclaredClientResponse<E>>
+	| HttpError
 	| Error;
 type DeclaredRouteResponseBody<E extends RouteDeclaration> =
 	SuccessfulDeclaredClientResponse<E> extends infer TResponse
@@ -76,15 +77,15 @@ export type RouteQueryData<E extends QueryRoute> =
 /**
  * Infers the error value surfaced by generated TanStack Query options.
  *
- * @remarks HTTP routes include declared non-2xx response envelopes and `Error`.
- * Procedure routes surface `Error` because they do not declare typed failures.
+ * @remarks HTTP routes include declared non-2xx response envelopes, `HttpError`,
+ * and `Error`. Plain output routes surface `HttpError` and `Error`.
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#tanstack-query}
  * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#error-model}
  */
 export type RouteQueryError<E extends QueryRoute> =
 	IsPlainOutput<RouteFor<E>> extends true
-		? Error
+		? HttpError | Error
 		: DeclaredRouteQueryError<RouteFor<E>>;
 
 /**

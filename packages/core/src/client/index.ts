@@ -1,3 +1,4 @@
+export { HttpError } from "./httpError.ts";
 export { initClient } from "./initClient.ts";
 export { getNextFetchTags } from "./nextFetchTags.ts";
 export { constructBaseRequest } from "./request.ts";
