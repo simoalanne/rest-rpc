@@ -17,7 +17,6 @@ const packages = [
 	["express", "packages/express/CHANGELOG.md"],
 	["fastify", "packages/fastify/CHANGELOG.md"],
 	["hono", "packages/hono/CHANGELOG.md"],
-	["next", "packages/next/CHANGELOG.md"],
 	["server", "packages/server/CHANGELOG.md"],
 	["tanstack-query", "packages/tanstack-query/CHANGELOG.md"],
 	["fetch", "packages/fetch/CHANGELOG.md"],
