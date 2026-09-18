@@ -1,6 +1,6 @@
 {
 	"name": "@rest-rpc/node",
-	"version": "0.1.0-beta.19",
+	"version": "0.1.0-beta.20",
 	"description": "Node HTTP adapter for serving rest-rpc contracts with IncomingMessage and ServerResponse handlers.",
 	"keywords": [
 		"api-contract",

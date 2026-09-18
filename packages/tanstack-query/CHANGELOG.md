@@ -1,5 +1,25 @@
 # @rest-rpc/tanstack-query
 
+## 0.1.0-beta.20
+
+### Minor Changes
+
+- d72a045: Replace inferred and explicitly declared form array keys with bracket notation serialization across query parameters, URL-encoded forms, and multipart forms.
+- 45d0fca: Replace the client response `declared` discriminator with status-based narrowing. Undeclared responses now preserve the untouched native `Response`, HTTP response declarations are limited to statuses from 100 through 599.
+- 45d0fca: Replace conditional positional arguments on fetch client and tanstack query for request/options with simpler convention. To pass options when there is no request input pass undefined as first argument explictly
+- 45d0fca: Replace `.fetch` and `.fetchResponse` with callable route leaves that return the response envelope. Server-first HTTP selectors now accept the path, grouped request, and Fetch API options in one call.
+- d72a045: Add custom codecs support for fetch client and server adapters
+- d72a045: Remove flattened request keys convention and make each http declaration specify the request segments
+- d72a045: Remove support of returning undeclared headers through server handler. Remove set-cookie header helpers
+- d72a045: Remove the WebSocket and server-sent events abstractions, including their route builders, client and server helpers, adapter options, and related public types.
+- 45d0fca: Add server-first route declarations and implementations, typed clients derived from server implementations, and matching TanStack Query helpers. Add new `@rest-rpc/node` adapter for serving routes directly with Node HTTP `IncomingMessage` and `ServerResponse` handler.
+- 45d0fca: Add shorthand routes that omit explicit HTTP details and behave like procedures. Support shorthand declarations in server-first implementations, generated clients, OpenAPI documents, and TanStack Query helpers. Procedure handlers receive validated input under an `input` field while clients pass the input value directly.
+- b301886: Remove the `strictStatusCodes` route factory option and make its behavior the default. HTTP clients now return only contract-declared responses and throw when a server returns an undeclared status. TanStack Query errors no longer include an undeclared `rawResponse` branch.
+
+### Patch Changes
+
+- eb811fd: Add HttpError to core package and convert all unknown responses to one
+
 ## 0.1.0-beta.19
 
 ### Minor Changes

@@ -1,5 +1,22 @@
 # @rest-rpc/server
 
+## 0.1.0-beta.20
+
+### Minor Changes
+
+- d72a045: Replace inferred and explicitly declared form array keys with bracket notation serialization across query parameters, URL-encoded forms, and multipart forms.
+- 3cc08a5: Use `body(schema, { contentType })` and `input(schema, { contentType })` for every request body encoding, removing the form and multipart wrapper methods. An omitted body content type is normalized to `application/json`. Client calls select among multiple declared content types through the Fetch options argument. Server-first body calls always provide that option for non-JSON content types.
+- 3cc08a5: Declare responses with `response(status, schema?, options?)`, where content type and typed headers are options and an omitted schema means no body. Store every response declaration as `{ body, contentType, headers? }`, normalizing an omitted body content type to `application/json` and `streamResponse()` to `application/x-ndjson`; no-body responses use `body: undefined`. Remove the custom body wrapper types, `isStandardSchema()`, and `customStreamResponse()`. Fetch clients parse and validate non-stream custom responses, with an optional `bodyParser` client setting for custom decoding.
+- d72a045: Add custom codecs support for fetch client and server adapters
+- 3cc08a5: Remove `jsonQuery(schema)` support. This allowed to sent json via query string, but added unnecessary complexity to the client and server.
+- f1e7102: Replace automatic 404 handling for non-matched route with a result type, giving more control for user on how to handle non-matched routes
+- 45d0fca: Use each framework's native error-handling flow for request and response validation failures. Replace the shared server error-handler API with exported validation error classes and adapter-specific hooks allowing for more native feeling error handling.
+- d72a045: Remove flattened request keys convention and make each http declaration specify the request segments
+- d72a045: Remove support of returning undeclared headers through server handler. Remove set-cookie header helpers
+- d72a045: Remove the WebSocket and server-sent events abstractions, including their route builders, client and server helpers, adapter options, and related public types.
+- 45d0fca: Add server-first route declarations and implementations, typed clients derived from server implementations, and matching TanStack Query helpers. Add new `@rest-rpc/node` adapter for serving routes directly with Node HTTP `IncomingMessage` and `ServerResponse` handler.
+- 45d0fca: Add shorthand routes that omit explicit HTTP details and behave like procedures. Support shorthand declarations in server-first implementations, generated clients, OpenAPI documents, and TanStack Query helpers. Procedure handlers receive validated input under an `input` field while clients pass the input value directly.
+
 ## 0.1.0-beta.19
 
 ### Minor Changes
