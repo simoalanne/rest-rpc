@@ -414,7 +414,7 @@ it("serves a contract route implemented by a Nest provider class", async () => {
 	@Module({
 		imports: [
 			RestRpcModule.forRoot({
-				createContext: (context) => {
+				context: (context) => {
 					const req = context
 						.switchToHttp()
 						.getRequest<{ headers: Record<string, unknown> }>();

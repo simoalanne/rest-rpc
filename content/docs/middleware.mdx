@@ -1,0 +1,92 @@
+---
+title: Middleware
+description: Wrap route execution with shared application context.
+---
+
+Use `.use()` to implement guards, transactions, cleanup, timing, and caching alongside
+framework middleware. Route middleware runs after request validation.
+
+## Add Middleware
+
+`next()` executes the remaining middleware and handler. Return its result to
+forward downstream output, or return another value to replace it. Returning
+without calling `next()` short-circuits the chain. Call `next()` at most once.
+
+```ts
+import { route } from "@rest-rpc/express";
+
+const getProfile = route
+	.get("/profile")
+	.use(async ({ next }) => {
+		const started = performance.now();
+		try {
+			return await next();
+		} finally {
+			console.log(performance.now() - started);
+		}
+	})
+	.use(({ context, next }) => {
+		if (!context.user) return { status: 401 };
+		return next();
+	})
+	.handler(({ context }) => ({ status: 200, body: { user: context.user } }));
+```
+
+Middleware runs in declaration order; work after `await next()` runs in reverse
+order. Request schemas validate before middleware runs, regardless of setter order.
+
+## Shared Context
+
+Middleware and the handler share one mutable `context` object. Declare its type by augmenting `DefaultContext`:
+
+```ts
+declare module "@rest-rpc/express" {
+	interface DefaultContext {
+		readonly requestId: string;
+		readonly user?: { id: string; name: string };
+	}
+}
+```
+
+## Reuse Middleware
+
+Define reusable callbacks with `route.middleware()` on the imported route root,
+then attach them with `.use()`:
+
+```ts
+const transaction = route.middleware(({ next }) =>
+	db.transaction(() => next()),
+);
+const base = route.use(transaction);
+
+const getTodos = base.get("/todos").handler(() => listTodos());
+```
+
+Adding middleware to one builder branch leaves sibling stacks unchanged. Use
+inline callbacks for route-specific inputs; declare their schemas before `.use()`
+to access validated request types.
+
+## Outputs and Errors
+
+Middleware receives raw application output. Response validation and serialization
+run after the chain completes. Middleware responses are unchecked and do not change
+the client contract; declare `.output()` or `.response()` schemas to validate the
+final value and expose responses to clients.
+
+Downstream errors propagate through `next()`, allowing middleware to catch errors
+or clean up in `finally`. Response delivery and stream consumption happen outside
+this wrapping scope.
+
+## Contract-first
+
+Attach `.use()` to individual implementations from `implement(singleRoute)` or
+leaves from `implement(contract)`:
+
+```ts
+const getTodo = implement(api.todos.get)
+	.use(logging)
+	.handler(async ({ params }) => ({
+		status: 200,
+		body: await findTodo(params.id),
+	}));
+```

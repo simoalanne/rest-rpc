@@ -17,15 +17,6 @@ describe("server route builder", () => {
 		assert.deepEqual(Object.keys(implementation), ["~restrpc"]);
 		assert.equal("handler" in builder["~restrpc"], false);
 		assert.equal("handler" in coreRoute, true);
-		const runtime = implementation as unknown as {
-			handler: typeof builder.handler;
-			response: (status: number) => unknown;
-		};
-		assert.throws(
-			() => runtime.handler(handler),
-			/handler has already been attached/,
-		);
-		assert.throws(() => runtime.response(204), /Cannot change a route/);
 	});
 
 	it("materializes the root shorthand as a procedure", () => {

@@ -2,6 +2,8 @@ import type {
 	BuilderExtension,
 	BuilderState,
 	PublicDeclarationFor,
+	RootRouteBuilder,
+	RouteBuilderView,
 	RouteDeclaration,
 	RouteMetadata,
 	ServerErrors,
@@ -10,6 +12,11 @@ import type {
 	ServerResponseBody,
 } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
+import type {
+	MiddlewareRequest,
+	MiddlewareReturn,
+	ReusableMiddlewareRequest,
+} from "./middleware.types.ts";
 
 type ContractRoute = { readonly "~restrpc": RouteDeclaration };
 
@@ -96,12 +103,14 @@ export type RouteRequest<
 	TContext extends object = EmptyObject,
 > = Merge<
 	(UsesFlatInput<TRoute> extends true
-		? FlatInputSchema<TRoute> extends infer TInput extends StandardSchemaV1
-			? { input: StandardSchemaV1.InferOutput<TInput> } & Omit<
-					RequestValue<TRoute>,
-					"body" | "query"
-				>
-			: EmptyObject
+		? [FlatInputSchema<TRoute>] extends [never]
+			? EmptyObject
+			: FlatInputSchema<TRoute> extends infer TInput extends StandardSchemaV1
+				? { input: StandardSchemaV1.InferOutput<TInput> } & Omit<
+						RequestValue<TRoute>,
+						"body" | "query"
+					>
+				: EmptyObject
 		: RequestValue<TRoute>) &
 		TAdditionalHandlerFields & {
 			route: TRoute;
@@ -420,7 +429,40 @@ export type HandlerMethodFor<
 		? ProcedureHandlerMethod<TRoute, TAdditionalHandlerFields, TContext>
 		: HttpHandlerMethod<TRoute, TAdditionalHandlerFields, TContext>;
 
-/** Core builder extension that exposes server handler attachment. */
+type MiddlewareUseMethod<
+	TState extends BuilderState,
+	TPath extends string,
+	TMetadata extends RouteMetadata | never,
+	TAdditionalHandlerFields extends object,
+	TContext extends object,
+> = {
+	/** Wraps downstream execution after request validation. @see {@link https://rest-rpc.dev/docs/middleware} */
+	use<TReceiver extends { readonly "~restrpc": object }>(
+		this: TReceiver,
+		middleware: (
+			request: MiddlewareRequest<
+				Extract<
+					PublicDeclarationFor<TState, TPath, TMetadata>,
+					RouteDeclaration
+				>,
+				TAdditionalHandlerFields,
+				TContext
+			>,
+		) => MiddlewareReturn,
+	): TReceiver["~restrpc"] extends RouteDeclaration
+		? RouteBuilderView<
+				TState,
+				ServerBuilderExtension<TAdditionalHandlerFields, TContext>,
+				TPath,
+				TMetadata
+			>
+		: RootRouteBuilder<
+				undefined,
+				ServerBuilderExtension<TAdditionalHandlerFields, TContext>
+			>;
+};
+
+/** Core builder extension that exposes middleware and server handler attachment. */
 export interface ServerBuilderExtension<
 	TAdditionalHandlerFields extends object = EmptyObject,
 	TContext extends object = EmptyObject,
@@ -431,7 +473,14 @@ export interface ServerBuilderExtension<
 				this["path"],
 				Extract<this["metadata"], RouteMetadata>
 			> extends infer TRoute extends RouteDeclaration
-			? HandlerMethodFor<TRoute, TAdditionalHandlerFields, TContext>
+			? HandlerMethodFor<TRoute, TAdditionalHandlerFields, TContext> &
+					MiddlewareUseMethod<
+						TState,
+						this["path"],
+						Extract<this["metadata"], RouteMetadata>,
+						TAdditionalHandlerFields,
+						TContext
+					>
 			: never
 		: never;
 }
@@ -491,7 +540,16 @@ export type ServerFirstRouteResponseKind<TImplementation> =
 export type ServerRouteBuilder<
 	TAdditionalHandlerFields extends object = EmptyObject,
 	TContext extends object = EmptyObject,
-> = import("@rest-rpc/core/contract").RootRouteBuilder<
+> = RootRouteBuilder<
 	undefined,
 	ServerBuilderExtension<TAdditionalHandlerFields, TContext>
->;
+> & {
+	/** Declares a reusable middleware function on the untouched route root. @see {@link https://rest-rpc.dev/docs/middleware} */
+	middleware(
+		callback: (
+			request: ReusableMiddlewareRequest<TAdditionalHandlerFields, TContext>,
+		) => MiddlewareReturn,
+	): (
+		request: ReusableMiddlewareRequest<TAdditionalHandlerFields, TContext>,
+	) => MiddlewareReturn;
+};

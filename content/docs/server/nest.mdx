@@ -141,13 +141,13 @@ type RouteHandlerFields = {
 };
 ```
 
-Return the context from `createContext` when configuring `RestRpcModule`:
+Return the context from `context` when configuring `RestRpcModule`:
 
 ```ts
 import { RestRpcModule } from "@rest-rpc/nest";
 
 RestRpcModule.forRoot({
-	createContext: (context) => {
+	context: (context) => {
 		const request = context.switchToHttp().getRequest<Request>();
 		return {
 			request,
@@ -162,8 +162,10 @@ RestRpcModule.forRoot({
 ```ts
 type RestRpcModuleOptions<TContext = DefaultContext> = {
 	bodyCodecs?: readonly BodyCodec<unknown>[];
-	createContext?: (context: ExecutionContext) => TContext | Promise<TContext>;
+	context?: (context: ExecutionContext) => TContext | Promise<TContext>;
 };
+
+See [Middleware](/docs/middleware) for route middleware that shares this context.
 ```
 
 `bodyCodecs`: see [Serialization and Codecs](/docs/http-behavior/serialization).

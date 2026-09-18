@@ -47,15 +47,38 @@ await app.listen({ port: 3000 });
 
 ## Framework Context
 
-Handlers receive the following adapter fields directly:
+Provide request-scoped context with the `context` option. Augment
+`DefaultContext` to type it across handlers:
+
+```ts
+declare module "@rest-rpc/fastify" {
+	interface DefaultContext {
+		user: { id: string };
+	}
+}
+```
+
+The context factory receives the Fastify request and reply. Handlers receive
+the following adapter fields and typed context:
 
 ```ts
 type RouteHandlerFields = {
 	req: FastifyRequest;
 	reply: FastifyReply;
 	signal: AbortSignal;
+	context: DefaultContext;
 };
 ```
+
+```ts
+registerRoutes(app, routes, {
+	context: ({ req }) => ({
+		user: { id: req.headers["x-user-id"]?.toString() ?? "" },
+	}),
+});
+```
+
+See [Middleware](/docs/middleware) for route middleware that shares this context.
 
 ## Options
 

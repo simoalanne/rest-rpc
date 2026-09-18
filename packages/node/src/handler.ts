@@ -50,8 +50,8 @@ export type ResponseValidationErrorHandler = (
 ) => unknown;
 
 type ContextArguments = {} extends DefaultContext
-	? [context?: DefaultContext]
-	: [context: DefaultContext];
+	? [options?: { context?: DefaultContext }]
+	: [options: { context: DefaultContext }];
 
 /**
  * Creates a Node HTTP handler that dispatches matching rest-rpc routes.
@@ -125,7 +125,7 @@ export function createRouteHandler(
 
 		const result = await handleHttpRoute(matched.implementation, {
 			request: parsedRequest,
-			context: contextArguments[0] ?? {},
+			context: contextArguments[0]?.context ?? {},
 			handlerFields: { req: request, res: response, signal },
 		});
 

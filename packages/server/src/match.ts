@@ -3,6 +3,7 @@ import {
 	isPathParamSegment,
 	type RouteDeclaration,
 } from "@rest-rpc/core/contract";
+import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
 
 const splitPath = (path: string) => path.split("/").filter(Boolean);
 
@@ -71,6 +72,7 @@ export const createPathMatcher = (path: string) => {
 export type RuntimeImplementation = {
 	route: RouteDeclaration;
 	handler: (...args: never[]) => unknown;
+	middleware?: readonly RuntimeRouteHandler[];
 };
 
 /** An implementation or nested implementation tree consumed at runtime. */
@@ -78,6 +80,7 @@ export type RuntimeImplementationTree =
 	| {
 			readonly "~restrpc": RouteDeclaration & {
 				readonly handler: (...args: never[]) => unknown;
+				readonly middleware?: readonly RuntimeRouteHandler[];
 			};
 	  }
 	| readonly RuntimeImplementationTree[]
@@ -88,6 +91,7 @@ const isBuilderImplementation = (
 ): value is {
 	readonly "~restrpc": RouteDeclaration & {
 		readonly handler: (...args: never[]) => unknown;
+		readonly middleware?: readonly RuntimeRouteHandler[];
 	};
 } =>
 	typeof value === "object" &&
@@ -107,9 +111,9 @@ const flattenImplementationTree = (
 		);
 	}
 	if (isBuilderImplementation(implementation)) {
-		const { handler, ...route } = implementation["~restrpc"];
+		const { handler, middleware, ...route } = implementation["~restrpc"];
 		if (route.kind !== "procedure") {
-			return [{ route, handler }];
+			return [{ route, handler, middleware }];
 		}
 		return [
 			{
@@ -118,6 +122,7 @@ const flattenImplementationTree = (
 					path: `/${path.join("/")}`,
 				},
 				handler,
+				middleware,
 			},
 		];
 	}

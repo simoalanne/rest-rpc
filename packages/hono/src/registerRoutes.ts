@@ -1,3 +1,4 @@
+import type { DefaultContext } from "./index.ts";
 import type { BodyCodec } from "@rest-rpc/core";
 import { createFetchResponse } from "@rest-rpc/fetch";
 import { deserializeRequestBody } from "@rest-rpc/fetch/deserializeRequestBody";
@@ -5,6 +6,8 @@ import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import { toColonPath } from "@rest-rpc/core/contract";
 import {
 	type RuntimeImplementationTree,
+	type ContextOptions,
+	resolveContext,
 	flattenRouteImplementations,
 	assertRequestContentType,
 	handleHttpRoute,
@@ -58,6 +61,10 @@ export type RegisterRoutesOptions<TEnv extends Env = Env> = {
 	requestValidationErrorHandler?: RequestValidationErrorHandler<TEnv>;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler<TEnv>;
 	middleware?: ExtendedHonoMiddleware<TEnv>[];
+} & ContextOptions<DefaultContext, ContextFields<TEnv>>;
+
+type ContextFields<TEnv extends Env = Env> = {
+	c: Context<TEnv>;
 };
 
 /**
@@ -68,8 +75,11 @@ export type RegisterRoutesOptions<TEnv extends Env = Env> = {
 export function registerRoutes<TEnv extends Env = Env>(
 	app: Hono<TEnv>,
 	implementations: RuntimeImplementationTree,
-	options: RegisterRoutesOptions<TEnv> = {},
+	...optionsArguments: {} extends DefaultContext
+		? [options?: RegisterRoutesOptions<TEnv>]
+		: [options: RegisterRoutesOptions<TEnv>]
 ) {
+	const options = optionsArguments[0] ?? ({} as RegisterRoutesOptions<TEnv>);
 	const maxBytes = options.requestBodyLimit;
 	if (
 		maxBytes !== undefined &&
@@ -126,7 +136,9 @@ export function registerRoutes<TEnv extends Env = Env>(
 						params: c.req.param(),
 						headers: c.req.header(),
 					},
-					context: {},
+					context: await resolveContext(options.context, {
+						c,
+					}),
 					handlerFields: { c, signal: c.req.raw.signal },
 				});
 

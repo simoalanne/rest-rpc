@@ -69,11 +69,13 @@ type RouteHandlerFields = {
 };
 ```
 
-Pass the context as the second argument to `handler`:
+Pass the context in the handler options:
 
 ```ts
-const result = await handler(request, { user });
+const result = await handler(request, { context: { user } });
 ```
+
+See [Middleware](/docs/middleware) for route middleware that shares this context.
 
 ## Options
 

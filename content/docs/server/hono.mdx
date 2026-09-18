@@ -51,14 +51,37 @@ export default app;
 
 ## Framework Context
 
-Handlers receive the following adapter fields directly:
+Provide request-scoped context with the `context` option. Augment
+`DefaultContext` to type it across handlers:
+
+```ts
+declare module "@rest-rpc/hono" {
+	interface DefaultContext {
+		user: { id: string };
+	}
+}
+```
+
+The context factory receives the Hono context. Handlers receive the following
+adapter fields and typed context:
 
 ```ts
 type RouteHandlerFields<E extends Env = Env> = {
 	c: Context<E>;
 	signal: AbortSignal;
+	context: DefaultContext;
 };
 ```
+
+```ts
+registerRoutes(app, routes, {
+	context: ({ c }) => ({
+		user: { id: c.req.header("x-user-id") ?? "" },
+	}),
+});
+```
+
+See [Middleware](/docs/middleware) for route middleware that shares this context.
 
 ## Options
 

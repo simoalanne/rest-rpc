@@ -6,40 +6,48 @@ import type {
 } from "./routeBuilder.types.ts";
 
 type RuntimeBuilder = {
-	readonly "~restrpc": Partial<RouteDeclaration>;
+	readonly "~restrpc": Partial<RouteDeclaration> & {
+		readonly middleware?: readonly RuntimeRouteHandler[];
+	};
 	constructor: new (state: object) => RuntimeBuilder;
 };
 
-type RuntimeBuilderPrototype = {
-	handler?: (
-		this: RuntimeBuilder,
-		handler: RuntimeRouteHandler,
-	) => RuntimeBuilder;
-};
-
-const prototype = Object.getPrototypeOf(coreRoute) as RuntimeBuilderPrototype;
-
-if (!prototype.handler) {
-	Object.defineProperty(prototype, "handler", {
+Object.defineProperties(Object.getPrototypeOf(coreRoute), {
+	handler: {
+		configurable: true,
 		value(this: RuntimeBuilder, handler: RuntimeRouteHandler) {
 			const state = this["~restrpc"];
-			if ("handler" in state) {
-				throw new Error("Route handler has already been attached.");
-			}
 			return new this.constructor({
 				...(state.kind
-					? state
+					? {}
 					: {
 							kind: "procedure",
 							method: "POST",
 							path: "",
 							responses: {},
 						}),
+				...state,
 				handler,
 			});
 		},
-	});
-}
+	},
+	use: {
+		configurable: true,
+		value(this: RuntimeBuilder, middleware: RuntimeRouteHandler) {
+			const state = this["~restrpc"];
+			return new this.constructor({
+				...state,
+				middleware: [...(state.middleware ?? []), middleware],
+			});
+		},
+	},
+	middleware: {
+		configurable: true,
+		value(callback: RuntimeRouteHandler) {
+			return callback;
+		},
+	},
+});
 
 /** Core route builder with server-first handler attachment enabled. */
 export const serverFirstRoute = coreRoute as unknown as ServerRouteBuilder;

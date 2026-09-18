@@ -49,8 +49,8 @@ type FetchRouteHandlerResult =
 	| { matched: false; response: undefined };
 
 type ContextArguments = {} extends DefaultContext
-	? [context?: DefaultContext]
-	: [context: DefaultContext];
+	? [options?: { context?: DefaultContext }]
+	: [options: { context: DefaultContext }];
 
 /**
  * Creates a Fetch catch-all handler that dispatches matching rest-rpc routes.
@@ -126,7 +126,7 @@ export function createRouteHandler(
 		const implementation = matched.implementation;
 		const result = await handleHttpRoute(implementation, {
 			request: parsedRequest,
-			context: contextArguments[0] ?? {},
+			context: contextArguments[0]?.context ?? {},
 			handlerFields: { request, signal: request.signal },
 		});
 		if (result instanceof RequestValidationError) {

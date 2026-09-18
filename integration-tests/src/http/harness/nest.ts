@@ -44,7 +44,7 @@ export const createNestAdapter = <
 		@Module({
 			imports: [
 				RestRpcModule.forRoot<Record<string, unknown>, TRequest>({
-					createContext: () => ({ adapter: "nest" }),
+					context: () => ({ adapter: "nest" }),
 					...options.moduleOptions,
 				}),
 			],

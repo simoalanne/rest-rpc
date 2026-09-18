@@ -20,6 +20,7 @@ import {
 	validateResponseHeaders,
 	validateResponseStreamChunks,
 } from "./validation.ts";
+import { invokeWithMiddleware } from "./middleware.ts";
 
 /** A validated logical response for adapter-specific serialization and delivery. */
 export type HttpRouteResult =
@@ -235,7 +236,7 @@ const getHandlerRequestFields = (
 };
 
 /**
- * Validates an HTTP request, invokes a route handler, and normalizes its result.
+ * Validates an HTTP request, executes middleware and its handler, and normalizes the selected output.
  * Returns validation errors for adapter handling; other failures propagate.
  */
 export async function handleHttpRoute<
@@ -255,12 +256,16 @@ export async function handleHttpRoute<
 
 		let handlerResult: unknown;
 		try {
-			handlerResult = await handler({
-				...getHandlerRequestFields(route, validatedRequest),
-				...options.handlerFields,
-				context: options.context,
-				route,
-			});
+			handlerResult = await invokeWithMiddleware(
+				implementation.middleware ?? [],
+				handler,
+				{
+					...getHandlerRequestFields(route, validatedRequest),
+					...options.handlerFields,
+					context: options.context,
+					route,
+				},
+			);
 		} catch (error) {
 			if (error instanceof RouteResponseError) {
 				return await normalizeRouteResponseError(route, error);

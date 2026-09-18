@@ -119,6 +119,16 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 			});
 		});
 
+		it("runs middleware added to a route implementation", async () => {
+			const response = await client.items.get({ params: { id: "item-1" } });
+
+			assert.equal(response.status, 200);
+			assert.deepEqual(response.body, {
+				id: "item-1",
+				title: "Fetched item via middleware",
+			});
+		});
+
 		it("receives 201 create responses", async () => {
 			const response = await client.items.create({
 				body: {

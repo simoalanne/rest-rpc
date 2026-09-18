@@ -50,17 +50,34 @@ export const createIntegrationImplementations = () => {
 					{ id: "item-2", title: request.query.empty ?? "Second item" },
 				],
 			})),
-			get: implementor.items.get.handler((request) =>
-				request.params.id === "missing"
-					? {
-							status: 404 as const,
-							body: { code: "not_found" as const, id: request.params.id },
-						}
-					: {
-							status: 200 as const,
-							body: { id: request.params.id, title: "Fetched item" },
+			get: implementor.items.get
+				.use(async ({ next }) => {
+					const result = (await next()) as {
+						status: number;
+						body:
+							| { id: string; title: string }
+							| { code: "not_found"; id: string };
+					};
+					if (result.status !== 200) return result;
+					return {
+						...result,
+						body: {
+							...result.body,
+							title: `${result.body.title} via middleware`,
 						},
-			),
+					};
+				})
+				.handler((request) =>
+					request.params.id === "missing"
+						? {
+								status: 404 as const,
+								body: { code: "not_found" as const, id: request.params.id },
+							}
+						: {
+								status: 200 as const,
+								body: { id: request.params.id, title: "Fetched item" },
+							},
+				),
 			create: implementor.items.create.handler((request) => ({
 				status: 201 as const,
 				body: { id: "created-item", title: request.body.title },

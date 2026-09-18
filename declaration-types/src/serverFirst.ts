@@ -97,3 +97,19 @@ export type CreateClientResponse = ClientResponse<typeof fetchRoutes.create>;
 export type CreateServerRequest = RouteRequestData<typeof fetchRoutes.create>;
 export type CreateServerResponse = RouteResponse<typeof fetchRoutes.create>;
 export type CreateServerErrors = RouteErrors<typeof fetchRoutes.create>;
+
+export const fetchMiddleware = fetchRoute.middleware(({ next }) => next());
+export const fetchMiddlewareBase = fetchRoute.use(fetchMiddleware);
+export const fetchMiddlewareBuilder = fetchMiddlewareBase
+	.get("/middleware")
+	.use(async ({ next }) => {
+		const output = await next();
+		return output;
+	});
+export const fetchMiddlewareImplementation = fetchMiddlewareBuilder.handler(
+	() => ({ status: 200, body: "ok" }),
+);
+export const nodeMiddleware = nodeRoute.middleware(({ next }) => next());
+export const implementedMiddlewareBuilder = implementFetch(
+	contractRoute.get("/implemented-middleware").response(204),
+).use(fetchMiddleware);

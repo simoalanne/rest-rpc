@@ -27,7 +27,9 @@ export const createNodeAdapter = (
 		return listen(
 			createServer(async (req, res) => {
 				try {
-					const result = await handler(req, res, { adapter: "node" });
+					const result = await handler(req, res, {
+						context: { adapter: "node" },
+					});
 					if (!result.matched) {
 						res.statusCode = 404;
 						res.end();

@@ -15,6 +15,9 @@ type HonoHandlerFields<TEnv extends Env = Env> = {
 	signal: AbortSignal;
 };
 
+/** Application context shared by middleware and handlers. Augment this interface globally. */
+export interface DefaultContext {}
+
 type ContractRoute = { readonly "~restrpc": RouteDeclaration };
 
 export type {
@@ -43,7 +46,11 @@ export {
 export type RouteRequest<
 	TRoute extends ContractRoute,
 	TEnv extends Env = Env,
-> = ServerRouteRequest<TRoute["~restrpc"], HonoHandlerFields<TEnv>>;
+> = ServerRouteRequest<
+	TRoute["~restrpc"],
+	HonoHandlerFields<TEnv>,
+	DefaultContext
+>;
 
 /**
  * Infers the Hono handler signature for a route declaration.
@@ -53,7 +60,11 @@ export type RouteRequest<
 export type RouteHandler<
 	TRoute extends ContractRoute,
 	TEnv extends Env = Env,
-> = ServerRouteHandler<TRoute["~restrpc"], HonoHandlerFields<TEnv>>;
+> = ServerRouteHandler<
+	TRoute["~restrpc"],
+	HonoHandlerFields<TEnv>,
+	DefaultContext
+>;
 
 /**
  * Entry point for declaring routes with handlers for Hono.
@@ -64,8 +75,10 @@ export type RouteHandler<
  * @see {@link https://rest-rpc.dev/docs/quickstart#define-and-register-routes}
  * @see {@link https://rest-rpc.dev/docs/server/hono#framework-context}
  */
-export const route =
-	serverFirstRoute as unknown as ServerRouteBuilder<HonoHandlerFields>;
+export const route = serverFirstRoute as unknown as ServerRouteBuilder<
+	HonoHandlerFields,
+	DefaultContext
+>;
 
 /**
  * Creates typed Hono handler builders for every route in a shared contract.
@@ -74,9 +87,10 @@ export const route =
  */
 export function implement<const TContract extends Contract>(
 	contract: TContract,
-): ContractImplementor<TContract, HonoHandlerFields> {
+): ContractImplementor<TContract, HonoHandlerFields, DefaultContext> {
 	return serverImplement(contract) as unknown as ContractImplementor<
 		TContract,
-		HonoHandlerFields
+		HonoHandlerFields,
+		DefaultContext
 	>;
 }

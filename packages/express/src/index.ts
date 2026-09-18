@@ -15,6 +15,9 @@ type ExpressHandlerFields = {
 	signal: AbortSignal;
 };
 
+/** Application context shared by middleware and handlers. Augment this interface globally. */
+export interface DefaultContext {}
+
 type ContractRoute = { readonly "~restrpc": RouteDeclaration };
 
 export type {
@@ -42,7 +45,8 @@ export {
  */
 export type RouteRequest<TRoute extends ContractRoute> = ServerRouteRequest<
 	TRoute["~restrpc"],
-	ExpressHandlerFields
+	ExpressHandlerFields,
+	DefaultContext
 >;
 
 /**
@@ -52,7 +56,8 @@ export type RouteRequest<TRoute extends ContractRoute> = ServerRouteRequest<
  */
 export type RouteHandler<TRoute extends ContractRoute> = ServerRouteHandler<
 	TRoute["~restrpc"],
-	ExpressHandlerFields
+	ExpressHandlerFields,
+	DefaultContext
 >;
 
 /**
@@ -64,8 +69,10 @@ export type RouteHandler<TRoute extends ContractRoute> = ServerRouteHandler<
  * @see {@link https://rest-rpc.dev/docs/quickstart#define-and-register-routes}
  * @see {@link https://rest-rpc.dev/docs/server/express#framework-context}
  */
-export const route =
-	serverFirstRoute as unknown as ServerRouteBuilder<ExpressHandlerFields>;
+export const route = serverFirstRoute as unknown as ServerRouteBuilder<
+	ExpressHandlerFields,
+	DefaultContext
+>;
 
 /**
  * Creates typed Express handler builders for every route in a shared contract.
@@ -74,9 +81,10 @@ export const route =
  */
 export function implement<const TContract extends Contract>(
 	contract: TContract,
-): ContractImplementor<TContract, ExpressHandlerFields> {
+): ContractImplementor<TContract, ExpressHandlerFields, DefaultContext> {
 	return serverImplement(contract) as unknown as ContractImplementor<
 		TContract,
-		ExpressHandlerFields
+		ExpressHandlerFields,
+		DefaultContext
 	>;
 }
