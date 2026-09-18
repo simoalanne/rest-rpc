@@ -1,5 +1,11 @@
 # @rest-rpc/hono
 
+## 0.1.0-beta.21
+
+### Patch Changes
+
+- 5676c02: re-export type<T>() helper from all server adapters
+
 ## 0.1.0-beta.20
 
 ### Minor Changes
