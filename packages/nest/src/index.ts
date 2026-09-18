@@ -17,6 +17,7 @@ type NestHandlerFields = {
 
 type ContractRoute = { readonly "~restrpc": RouteDeclaration };
 
+export { type } from "@rest-rpc/core";
 export type {
 	RouteErrors,
 	RouteRequestData,

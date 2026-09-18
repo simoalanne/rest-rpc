@@ -59,6 +59,7 @@ export function implement<const TContract extends Contract>(
 	>;
 }
 
+export { type } from "@rest-rpc/core";
 export type {
 	ImplicitResponseEnvelope,
 	ImplicitResponseKind,
