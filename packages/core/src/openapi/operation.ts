@@ -1,10 +1,9 @@
 import type { OpenApiResponseOptions } from "../contract/routeDeclaration.ts";
 import type { RouteDeclaration } from "../contract/routeDeclaration.ts";
 import type {
-	RequestHeadersDeclaration,
 	RequestBodySchema,
+	RequestHeadersSchema,
 } from "../contract/request.ts";
-import { getRequestHeaderSchemas } from "../contract/request.ts";
 import type {
 	ResponseDeclaration,
 	ResponseHeaders,
@@ -133,20 +132,9 @@ export const createParameters = (
 };
 
 export const createHeaderParameters = (
-	headers: RequestHeadersDeclaration | undefined,
+	headers: RequestHeadersSchema | undefined,
 	options: CreateOperationOptions,
-): OpenApiParameter[] => {
-	if (!headers) return [];
-
-	const parameters = getRequestHeaderSchemas(headers).flatMap((schema) =>
-		createParameters(schema, "header", options),
-	);
-	return [
-		...new Map(
-			parameters.map((parameter) => [parameter.name, parameter]),
-		).values(),
-	];
-};
+): OpenApiParameter[] => createParameters(headers, "header", options);
 
 export const createRequestBody = (
 	schema: RequestBodySchema | undefined,

@@ -2,7 +2,7 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { BodyContentType } from "./body.ts";
 import type {
 	RequestBodySchema,
-	RequestHeadersDeclaration,
+	RequestHeadersSchema,
 	RequestParamsSchema,
 	RequestQuerySchema,
 } from "./request.ts";
@@ -50,7 +50,7 @@ export type RouteRequestDeclaration = {
 	contentType?: BodyContentType;
 	query?: RequestQuerySchema;
 	params?: RequestParamsSchema;
-	headers?: RequestHeadersDeclaration;
+	headers?: RequestHeadersSchema;
 };
 
 /**

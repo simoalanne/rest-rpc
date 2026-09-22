@@ -203,16 +203,10 @@ describe("OpenAPI operations", () => {
 
 	it("creates request header parameters", () => {
 		const headers = createHeaderParameters(
-			{
-				inherited: z.object({
-					"x-api-key": z.string(),
-					"x-shared": z.string(),
-				}),
-				local: z.object({
-					"x-request-id": z.string().optional(),
-					"x-shared": z.number(),
-				}),
-			},
+			z.object({
+				"x-api-key": z.string(),
+				"x-request-id": z.string().optional(),
+			}),
 			operationOptions,
 		);
 
@@ -223,14 +217,6 @@ describe("OpenAPI operations", () => {
 				required: true,
 				schema: {
 					type: "string",
-				},
-			},
-			{
-				name: "x-shared",
-				in: "header",
-				required: true,
-				schema: {
-					type: "number",
 				},
 			},
 			{

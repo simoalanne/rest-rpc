@@ -222,10 +222,7 @@ export class RouteBuilder {
 		return new RouteBuilder({
 			...state,
 			input: "segments",
-			request: {
-				...state.request,
-				headers: { ...state.request?.headers, local: schema },
-			},
+			request: { ...state.request, headers: schema },
 		});
 	}
 

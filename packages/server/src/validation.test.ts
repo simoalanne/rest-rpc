@@ -14,54 +14,39 @@ import {
 } from "./validationErrors.ts";
 
 describe("validateRequestSegments", () => {
-	it("validates inherited and local headers against raw input and merges local output last", async () => {
-		const seen: unknown[] = [];
-		const inherited = z
-			.object({ authorization: z.string(), shared: z.string() })
-			.transform((value) => {
-				seen.push(value);
-				return { inherited: true, shared: "inherited" };
-			});
-		const local = z
-			.object({ shared: z.string(), requestId: z.string() })
-			.transform((value) => {
-				seen.push(value);
-				return { local: true, shared: "local" };
-			});
-		const declaration = {
-			...route.get("/headers").response(204)["~restrpc"],
-			request: { headers: { inherited, local } },
-		};
+	it("validates and transforms request headers", async () => {
+		const declaration = route
+			.get("/headers")
+			.headers(
+				z
+					.object({ authorization: z.string(), requestId: z.string() })
+					.transform(({ authorization, requestId }) => ({
+						authorization,
+						requestId,
+						validated: true as const,
+					})),
+			)
+			.response(204)["~restrpc"];
 
 		const result = await validateRequestSegments(declaration, {
 			headers: {
 				authorization: "Bearer token",
-				shared: "raw-shared",
 				requestId: "request-1",
 			},
 		});
 
 		assert.deepEqual(result.headers, {
-			inherited: true,
-			local: true,
-			shared: "local",
+			authorization: "Bearer token",
+			requestId: "request-1",
+			validated: true,
 		});
-		assert.deepEqual(seen, [
-			{ authorization: "Bearer token", shared: "raw-shared" },
-			{ shared: "raw-shared", requestId: "request-1" },
-		]);
 	});
 
-	it("rejects a request when either inherited or local header validation fails", async () => {
-		const declaration = {
-			...route.get("/headers").response(204)["~restrpc"],
-			request: {
-				headers: {
-					inherited: z.object({ authorization: z.string() }),
-					local: z.object({ requestId: z.string() }),
-				},
-			},
-		};
+	it("rejects a request when header validation fails", async () => {
+		const declaration = route
+			.get("/headers")
+			.headers(z.object({ authorization: z.string(), requestId: z.string() }))
+			.response(204)["~restrpc"];
 
 		for (const headers of [
 			{ requestId: "request-1" },

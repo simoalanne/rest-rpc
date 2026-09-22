@@ -1,9 +1,7 @@
 import {
-	getRequestHeaderSchemas,
 	type ResponseBodySchema,
 	type ResponseDeclaration,
 	type RouteDeclaration,
-	type RequestHeadersDeclaration,
 } from "@rest-rpc/core/contract";
 import {
 	type StandardSchemaV1,
@@ -75,23 +73,6 @@ const validateRequestQuery = async (
 	return validateRequestSegment(schema, query ? parseQuery(query) : undefined);
 };
 
-const validateRequestHeaders = async (
-	declaration: RequestHeadersDeclaration | undefined,
-	input: unknown,
-): Promise<SegmentValidationResult> => {
-	if (!declaration) return { data: undefined, errors: [] };
-
-	const data: Record<string, unknown> = {};
-	const errors: StandardSchemaV1.Issue[] = [];
-	for (const schema of getRequestHeaderSchemas(declaration)) {
-		const result = await validateStandardSchema(schema, input);
-		if (result.issues) errors.push(...result.issues);
-		else Object.assign(data, result.value);
-	}
-
-	return { data, errors };
-};
-
 export async function validateRequestSegments(
 	route: RouteDeclaration,
 	segments: RequestSegments,
@@ -109,7 +90,7 @@ export async function validateRequestSegments(
 		requestSchemas?.params,
 		segments.params,
 	);
-	const headers = await validateRequestHeaders(
+	const headers = await validateRequestSegment(
 		requestSchemas?.headers,
 		segments.headers,
 	);

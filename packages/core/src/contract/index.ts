@@ -25,13 +25,11 @@ export {
 export type {
 	ClientRequest,
 	RequestBodySchema,
-	RequestHeadersDeclaration,
 	RequestHeadersSchema,
 	RequestParamsSchema,
 	RequestQuerySchema,
 	ServerRequest,
 } from "./request.ts";
-export { getRequestHeaderSchemas } from "./request.ts";
 export type {
 	DeclaredClientResponse,
 	ErrorDeclaredClientResponse,

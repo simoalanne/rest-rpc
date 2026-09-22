@@ -27,21 +27,6 @@ export type RequestHeadersSchema = StandardSchemaV1<
 	Record<string, unknown>
 >;
 
-/** The canonical header declaration, including an optional inherited schema. */
-export type RequestHeadersDeclaration = {
-	inherited?: RequestHeadersSchema;
-	local?: RequestHeadersSchema;
-};
-
-/** Returns inherited and local header schemas in validation and merge order. */
-export function getRequestHeaderSchemas(
-	declaration: RequestHeadersDeclaration,
-): RequestHeadersSchema[] {
-	return [declaration.inherited, declaration.local].filter(
-		(schema): schema is RequestHeadersSchema => schema !== undefined,
-	);
-}
-
 export type RequestBodySchema = StandardSchemaV1;
 
 type InferRequestBody<
@@ -54,31 +39,11 @@ type InferRequestBody<
 	: never;
 
 type InferRequestHeaders<
-	THeaders extends RequestHeadersDeclaration,
+	THeaders extends RequestHeadersSchema,
 	TIO extends "input" | "output",
-> = THeaders extends {
-	inherited?: infer TInherited;
-	local?: infer TLocal;
-}
-	? TIO extends "input"
-		? (TInherited extends RequestHeadersSchema
-				? StandardSchemaV1.InferInput<TInherited>
-				: unknown) &
-				(TLocal extends RequestHeadersSchema
-					? StandardSchemaV1.InferInput<TLocal>
-					: unknown)
-		: Omit<
-				TInherited extends RequestHeadersSchema
-					? StandardSchemaV1.InferOutput<TInherited>
-					: Record<never, never>,
-				keyof (TLocal extends RequestHeadersSchema
-					? StandardSchemaV1.InferOutput<TLocal>
-					: Record<never, never>)
-			> &
-				(TLocal extends RequestHeadersSchema
-					? StandardSchemaV1.InferOutput<TLocal>
-					: Record<never, never>)
-	: never;
+> = TIO extends "input"
+	? StandardSchemaV1.InferInput<THeaders>
+	: StandardSchemaV1.InferOutput<THeaders>;
 
 type InferRequestObjectSegment<
 	TSegment,
@@ -98,7 +63,7 @@ type InferRequestSegments<R, TIO extends "input" | "output"> = {
 		? InferRequestObjectSegment<Tparams, TIO>
 		: never;
 	headers: R extends { headers: infer THeaders }
-		? THeaders extends RequestHeadersDeclaration
+		? THeaders extends RequestHeadersSchema
 			? InferRequestHeaders<THeaders, TIO>
 			: never
 		: never;

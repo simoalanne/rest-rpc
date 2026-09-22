@@ -7,7 +7,6 @@ import type {
 	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
 import type {
-	RequestHeadersDeclaration,
 	RequestHeadersSchema,
 	RequestParamsSchema,
 	RequestQuerySchema,
@@ -366,16 +365,7 @@ type RequestMethods<
 					this: BuilderReceiver<TPath, TMetadata>,
 					schema: THeaders,
 				): RouteBuilderView<
-					WithRequest<
-						TState,
-						"headers",
-						TState["request"] extends {
-							headers: infer TCommon extends RequestHeadersDeclaration;
-						}
-							? TCommon & { local: THeaders }
-							: { local: THeaders },
-						"headers"
-					>,
+					WithRequest<TState, "headers", THeaders, "headers">,
 					TExtension,
 					TPath,
 					TMetadata
