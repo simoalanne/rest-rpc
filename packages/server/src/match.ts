@@ -7,6 +7,9 @@ import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
 
 const splitPath = (path: string) => path.split("/").filter(Boolean);
 
+const joinPaths = (prefix: string, path: string) =>
+	`/${[...splitPath(prefix), ...splitPath(path)].join("/")}`;
+
 export const compareRouteSpecificity = (
 	left: RouteDeclaration,
 	right: RouteDeclaration,
@@ -149,11 +152,16 @@ export type RouteMatch = {
 /**
  * Compiles route implementations into a method and path matcher.
  */
-export function createRouteMatcher(implementations: RuntimeImplementationTree) {
+export function createRouteMatcher(
+	implementations: RuntimeImplementationTree,
+	prefix = "",
+) {
 	const matchers = flattenRouteImplementations(implementations).map(
 		(implementation) => ({
 			implementation,
-			matchPath: createPathMatcher(implementation.route.path),
+			matchPath: createPathMatcher(
+				joinPaths(prefix, implementation.route.path),
+			),
 		}),
 	);
 

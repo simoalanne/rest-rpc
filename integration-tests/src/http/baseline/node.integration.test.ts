@@ -35,4 +35,24 @@ describe("node route matching integration", () => {
 		assert.equal(response.status, 404);
 		assert.equal(await response.text(), "");
 	});
+
+	it("supports matching routes under a path prefix", async () => {
+		const prefixedServer = await createNodeAdapter(
+			createIntegrationImplementations(),
+			{ createHandlerOptions: { prefix: "/api/v1" } },
+		).start();
+
+		try {
+			assert.equal(
+				(await fetch(`${prefixedServer.origin}/api/v1/health`)).status,
+				204,
+			);
+			assert.equal(
+				(await fetch(`${prefixedServer.origin}/health`)).status,
+				404,
+			);
+		} finally {
+			await prefixedServer.close();
+		}
+	});
 });

@@ -18,6 +18,8 @@ import { createFetchResponse } from "./response.ts";
  */
 export type CreateFetchHandlerOptions = {
 	bodyCodecs?: readonly BodyCodec<Request>[];
+	/** Path prefix to apply to all routes in the route tree during matching. */
+	prefix?: string;
 	/** The maximum accepted size of the request body in bytes. */
 	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
@@ -67,7 +69,7 @@ export function createRouteHandler(
 	request: Request,
 	...contextArguments: ContextArguments
 ) => Promise<FetchRouteHandlerResult> {
-	const matchRoute = createRouteMatcher(implementations);
+	const matchRoute = createRouteMatcher(implementations, options.prefix);
 	const bodyCodecs = options.bodyCodecs ?? [];
 	const maxBytes = options.requestBodyLimit;
 	if (

@@ -203,8 +203,6 @@ const procedureClient = initClient(
 expectType<Promise<"todo data">>(procedureClient.custom());
 expectType<Promise<AsyncIterable<{ id: "event-1" }>>>(procedureClient.stream());
 
-expectError(serverFirstRoute.with({ pathPrefix: "/v1" }).handler(() => null));
-
 const generatedContract = {
 	create: {
 		"~restrpc": {

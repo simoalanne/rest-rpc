@@ -55,4 +55,20 @@ describe("createRouteMatcher", () => {
 			undefined,
 		);
 	});
+
+	it("prepends a path prefix when compiling route matchers", () => {
+		const matchRoute = createRouteMatcher(
+			[implementation("GET", "/todos/:id")],
+			"/api/v1/",
+		);
+
+		assert.deepEqual(
+			matchRoute({ method: "GET", path: "/api/v1/todos/todo-1" })?.params,
+			{ id: "todo-1" },
+		);
+		assert.equal(
+			matchRoute({ method: "GET", path: "/todos/todo-1" }),
+			undefined,
+		);
+	});
 });

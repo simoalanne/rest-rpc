@@ -35,7 +35,7 @@ const getTodo = route
 
 export const routes = { todos: { get: getTodo } };
 
-const handler = createRouteHandler(routes);
+const handler = createRouteHandler(routes, { prefix: "/api" });
 const server = createServer(async (req, res) => {
 	try {
 		const { matched } = await handler(req, res);
@@ -88,6 +88,7 @@ See [Middleware](/docs/middleware) for route middleware that shares this context
 ```ts
 type CreateNodeHandlerOptions = {
 	bodyCodecs?: readonly BodyCodec<IncomingMessage>[];
+	prefix?: string;
 	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;

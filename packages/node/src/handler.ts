@@ -21,6 +21,8 @@ import { writeNodeResponse } from "./response.ts";
  */
 export type CreateNodeHandlerOptions = {
 	bodyCodecs?: readonly BodyCodec<IncomingMessage>[];
+	/** Path prefix to apply to all routes in the route tree during matching. */
+	prefix?: string;
 	/** The maximum accepted size of the request body in bytes. */
 	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
@@ -69,7 +71,7 @@ export function createRouteHandler(
 	response: ServerResponse,
 	...contextArguments: ContextArguments
 ) => Promise<NodeRouteHandlerResult> {
-	const matchRoute = createRouteMatcher(implementations);
+	const matchRoute = createRouteMatcher(implementations, options.prefix);
 	const bodyCodecs = options.bodyCodecs ?? [];
 	const maxBytes = options.requestBodyLimit;
 	if (
