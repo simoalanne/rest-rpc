@@ -50,8 +50,8 @@ declare module "@rest-rpc/express" {
 
 ## Reuse Middleware
 
-Define reusable callbacks with `route.middleware()` on the imported route root,
-then attach them with `.use()`:
+When a middleware function should be applied to multiple routes,
+declare it once with `route.middleware()` and pass it to `.use()`.
 
 ```ts
 const transaction = route.middleware(({ next }) =>
@@ -60,6 +60,40 @@ const transaction = route.middleware(({ next }) =>
 const base = route.use(transaction);
 
 const getTodos = base.get("/todos").handler(() => listTodos());
+```
+
+:::tip
+If the middleware should only be usable on a route with a specific request shape,
+you can use a generic type to strongly type the middleware and constrain its usage to only routes that match the request shape.
+:::
+
+```ts
+const attachUser = route.middleware<{ headers: { authorization: string } }>(
+	async ({ headers, next, context }) => {
+		const user = await authenticate(headers.authorization);
+
+		if (!user) {
+			return { status: 401, body: { error: "Unauthorized" } };
+		}
+
+		context.user = user;
+		return await next();
+	},
+);
+
+const getUserProfile = route
+	.get("/profile")
+	.headers(z.object({ authorization: z.string() }))
+	.use(attachUser)
+	.response(
+		200,
+		z.object({ user: z.object({ id: z.string(), name: z.string() }) }),
+	)
+	.response(401, z.object({ error: z.string() }))
+	.handler(({ context }) => {
+		const profile = getProfileForUser(context.user.id);
+		return { status: 200, body: { user: profile } };
+	});
 ```
 
 Adding middleware to one builder branch leaves sibling stacks unchanged. Use

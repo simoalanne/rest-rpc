@@ -16,6 +16,7 @@ import type {
 	MiddlewareRequest,
 	MiddlewareReturn,
 	ReusableMiddlewareRequest,
+	RequestFields,
 } from "./middleware.types.ts";
 
 type ContractRoute = { readonly "~restrpc": RouteDeclaration };
@@ -545,11 +546,19 @@ export type ServerRouteBuilder<
 	ServerBuilderExtension<TAdditionalHandlerFields, TContext>
 > & {
 	/** Declares a reusable middleware function on the untouched route root. @see {@link https://rest-rpc.dev/docs/middleware} */
-	middleware(
+	middleware<TRequest extends RequestFields = RequestFields>(
 		callback: (
-			request: ReusableMiddlewareRequest<TAdditionalHandlerFields, TContext>,
+			request: ReusableMiddlewareRequest<
+				TRequest,
+				TAdditionalHandlerFields,
+				TContext
+			>,
 		) => MiddlewareReturn,
 	): (
-		request: ReusableMiddlewareRequest<TAdditionalHandlerFields, TContext>,
+		request: ReusableMiddlewareRequest<
+			TRequest,
+			TAdditionalHandlerFields,
+			TContext
+		>,
 	) => MiddlewareReturn;
 };

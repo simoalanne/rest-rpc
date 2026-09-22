@@ -299,3 +299,47 @@ expectError(
 expectError(
 	null as unknown as RouteErrors<(typeof helperDeclaration)["~restrpc"]>,
 );
+
+// should have contextual typing for inline middleware
+route
+	.patch("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.headers(z.object({ authorization: z.string() }))
+	.query(z.object({ search: z.string() }))
+	.body(z.string())
+	.use(({ params, headers, query, body, context, next }) => {
+		expectType<string>(params.id);
+		expectType<string>(headers.authorization);
+		expectType<string>(query.search);
+		expectType<string>(body);
+		expectType<AppContext>(context);
+		return next();
+	});
+
+// should allow typing for reusable middleware
+const reusableMiddleware = route.middleware<{
+	headers: { id: string };
+	params: { id: string };
+}>(({ headers, params, body, query, next }) => {
+	expectType<string>(headers.id);
+	expectType<string>(params.id);
+	expectType<unknown>(body);
+	expectType<unknown>(query);
+	return next();
+});
+
+// should reject usage of reusable middleware with missing required input types
+expectError(route.use(reusableMiddleware));
+
+// should allow it inside singular route handlers with the correct input types
+route
+	.headers(z.object({ id: z.string() }))
+	.params(z.object({ id: z.string() }))
+	.use(reusableMiddleware);
+
+// should allow route with richer input types to use it as long as it has the required input types
+route
+	.headers(z.object({ id: z.string(), name: z.string() }))
+	.params(z.object({ id: z.string(), name: z.string() }))
+	.body(z.string())
+	.use(reusableMiddleware);

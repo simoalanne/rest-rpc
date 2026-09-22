@@ -15,6 +15,8 @@ type UnknownRequest = {
 	input: unknown;
 };
 
+export type RequestFields = Partial<UnknownRequest>;
+
 /**
  * Validated declaration-position request data, adapter fields, context, and controls for inline middleware.
  *
@@ -32,7 +34,9 @@ export type MiddlewareRequest<
  * @see {@link https://rest-rpc.dev/docs/middleware}
  */
 export type ReusableMiddlewareRequest<
+	TRequest extends RequestFields,
 	TFields extends object,
 	TContext extends object,
 > = TFields &
+	TRequest &
 	UnknownRequest & { route: RouteDeclaration; context: TContext } & Controls;
