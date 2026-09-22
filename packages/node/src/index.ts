@@ -86,3 +86,9 @@ export {
 } from "./response.ts";
 
 export { nodeBodyCodecs } from "./codecs.ts";
+export type {
+	CreateOpenApiDocumentOptions,
+	OpenApiDocument,
+	BodyCodec,
+} from "@rest-rpc/core";
+export { createOpenApiDocument } from "@rest-rpc/core";

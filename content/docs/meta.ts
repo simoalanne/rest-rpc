@@ -6,7 +6,7 @@ export default defineMeta({
 		"contract-first-quickstart",
 		"route-builder",
 		"middleware",
-		"contract",
+		"contract-first",
 		"http-behavior",
 		"server",
 		"client",

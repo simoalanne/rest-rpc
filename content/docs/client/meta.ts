@@ -1,6 +1,6 @@
 import { defineMeta } from "blume";
 
 export default defineMeta({
-	pages: ["fetch-client", "contract-generation", "tanstack-query"],
+	pages: ["contract-generation", "fetch-client", "tanstack-query"],
 	title: "Client",
 });

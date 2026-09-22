@@ -1,6 +1,6 @@
 ---
 title: TanStack Query
-description: Use rest-rpc with Tanstack Query
+description: Create typed TanStack Query helpers and combine them with your Tanstack Query setup to call your routes over HTTP.
 ---
 
 ## Install
@@ -14,20 +14,24 @@ pnpm add @rest-rpc/tanstack-query
 `@rest-rpc/tanstack-query` maps your contract to typed TanStack Query options
 and query keys.
 
-Routes expose typed query, mutation, pagination, and key helpers:
+Routes expose typed query, mutation, pagination, stream and key helpers:
 
 ```ts
 api.todos.get.queryOptions(...)
 api.todos.page.infiniteQueryOptions(...)
 api.todos.create.mutationOptions(...)
 api.todos.get.getKey(...)
+api.todos.events.streamedQueryOptions(...)
 ```
 
-Plain output streams and routes with exactly one successful streaming response
-also expose `streamedQueryOptions()`. See the [Route Builder](/docs/route-builder)
-for result forms.
+:::note
+`streamedQueryOptions()` is only available for routes with one successful or inferred
+`.streamResponse(status, schema)` or a plain `.streamOutput(schema)`.
+:::
 
 ## Setup
+
+Client configuration uses the same setup and options as the [Fetch Client](/docs/client/fetch-client),
 
 ```ts
 import { createTanstackQueryHelpers } from "@rest-rpc/tanstack-query";
@@ -35,18 +39,8 @@ import { api } from "./client-contract";
 
 export const tq = createTanstackQueryHelpers(api, {
 	baseUrl: "https://api.example.com",
-	getGlobalHeaders: () => ({
-		authorization: `Bearer ${readToken()}`,
-	}),
 });
 ```
-
-The returned object mirrors the routes in the runtime contract. Use a
-[generated contract](/docs/client/contract-generation) for handler-based routes
-or import a [separate contract](/docs/contract-first-quickstart).
-
-Client configuration uses the same options as the [Fetch Client](/docs/client/fetch-client),
-including global headers, codecs, and optional response validation.
 
 ## Queries
 

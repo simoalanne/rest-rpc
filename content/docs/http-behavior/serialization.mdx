@@ -131,19 +131,16 @@ oversized bodies return `413` Response.
 
 ## Override A Codec
 
-Pass `bodyCodecs` to `initClient()`, `registerRoutes()`, `createRouteHandler()`,
-or `RestRpcModule.forRoot()`. Each codec has a `match(mediaType)` function and
+Create a custom `BodyCodec` and pass it to the server adapter or client options. Each codec has a `match(mediaType)` function and
 optional `serialize` and `deserialize` functions. Custom codecs run before the
 defaults. The first matching implementation wins independently for each
 operation, so overriding only serialization keeps the default deserializer.
-Both operations can be asynchronous.
 
-For example, this codec uses `Uint8Array` values for binary requests and responses:
+<Tabs>
+<Tab title="Server Adapter">
 
 ```ts
-import { initClient, type BodyCodec } from "@rest-rpc/core";
-import { createRouteHandler } from "@rest-rpc/fetch";
-import { api } from "./contract";
+import { createRouteHandler, type BodyCodec } from "@rest-rpc/fetch";
 import { routes } from "./routes";
 
 const binaryCodec: BodyCodec<Request | Response> = {
@@ -157,18 +154,40 @@ const binaryCodec: BodyCodec<Request | Response> = {
 	deserialize: async (source) => new Uint8Array(await source.arrayBuffer()),
 };
 
-const client = initClient(api, {
-	baseUrl: "https://api.example.com",
-	bodyCodecs: [binaryCodec],
-});
-
 const handler = createRouteHandler(routes, {
 	bodyCodecs: [binaryCodec],
 });
 ```
 
+</Tab>
+<Tab title="Client">
+
+```ts
+import { initClient, type BodyCodec } from "@rest-rpc/core";
+import { contract } from "./contract";
+
+const binaryCodec: BodyCodec<Response> = {
+	match: (mediaType) => mediaType === "application/octet-stream",
+	serialize: (value) => {
+		if (!(value instanceof Uint8Array)) {
+			throw new TypeError("Expected Uint8Array body");
+		}
+		return { body: value };
+	},
+	deserialize: async (source) => new Uint8Array(await source.arrayBuffer()),
+};
+
+const client = initClient(contract, {
+	baseUrl: "https://api.example.com",
+	bodyCodecs: [binaryCodec],
+});
+```
+
+</Tab>
+</Tabs>
+
 Use schemas that accept the decoded values, and configure compatible codecs on
-both ends. For other server adapters, adapt `deserialize` to the native request
+both ends. For server adapters, adapt `deserialize` to the native request
 source listed below and return a serialized body supported by that
 adapter's response API.
 

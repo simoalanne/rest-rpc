@@ -42,3 +42,9 @@ export type {
 	MiddlewareRequest,
 	ReusableMiddlewareRequest,
 } from "./middleware.types.ts";
+export type {
+	CreateOpenApiDocumentOptions,
+	OpenApiDocument,
+	BodyCodec,
+} from "@rest-rpc/core";
+export { createOpenApiDocument } from "@rest-rpc/core";

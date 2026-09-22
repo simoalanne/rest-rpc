@@ -69,3 +69,9 @@ export type {
 	ResponseValidationErrorHandler,
 } from "./handler.ts";
 export { createFetchResponse } from "./response.ts";
+export type {
+	CreateOpenApiDocumentOptions,
+	OpenApiDocument,
+	BodyCodec,
+} from "@rest-rpc/core";
+export { createOpenApiDocument } from "@rest-rpc/core";

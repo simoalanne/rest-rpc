@@ -47,17 +47,6 @@ The client accepts a number such as `{ query: { page: 2 } }`. It serializes that
 number as an HTTP string. Zod receives `"2"` on the server and coerces it to `2`
 for the handler.
 
-### Inputs for HTTP Strings
-
-Path params, query params, and headers arrive as strings. Declaring a numeric or
-boolean client input does not automatically decode those strings into that
-type. Use a schema that can transform or coerce the input to the desired type.
-
-See [Serialization and Codecs](/docs/http-behavior/serialization#path-query-and-headers)
-for supported scalar and array shapes. Form bodies are decoded into
-`URLSearchParams` or `FormData` by the default codecs, so their schemas should
-accept those values.
-
 ## Response Validation on the Server
 
 Declared output schemas validate the handler result before response

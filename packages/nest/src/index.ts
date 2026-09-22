@@ -35,6 +35,12 @@ export {
 	RequestValidationException,
 	ResponseValidationException,
 } from "./validationExceptions.ts";
+export type {
+	CreateOpenApiDocumentOptions,
+	OpenApiDocument,
+	BodyCodec,
+} from "@rest-rpc/core";
+export { createOpenApiDocument } from "@rest-rpc/core";
 
 /**
  * Infers the validated request and Nest context available to a route handler.

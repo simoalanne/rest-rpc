@@ -11,8 +11,7 @@ Declare output schemas with `.output()`, `.response()`, `.streamOutput()`, or
 `.streamResponse()` to include responses in OpenAPI.
 
 ```ts
-import { createOpenApiDocument } from "@rest-rpc/core";
-import { route } from "@rest-rpc/express";
+import { route, createOpenApiDocument } from "@rest-rpc/express";
 import { z } from "zod";
 
 const list = route
@@ -31,6 +30,11 @@ const document = createOpenApiDocument(routes, {
 	servers: [{ url: "https://api.example.com" }],
 });
 ```
+
+:::tip[Using a Shared Contract?]
+The `createOpenApiDocument()` function is also exported from the `@rest-rpc/core` package,
+and works identically with a shared contract too.
+:::
 
 ## What Is Included
 
