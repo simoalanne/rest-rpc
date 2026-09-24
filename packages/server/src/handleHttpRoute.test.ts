@@ -3,16 +3,10 @@ import { describe, it } from "node:test";
 import { route as coreRoute } from "@rest-rpc/core";
 import z from "zod";
 import { handleHttpRoute } from "./handleHttpRoute.ts";
-import { RouteResponseError } from "./routeResponseError.ts";
 import {
 	RequestValidationError,
 	ResponseValidationError,
 } from "./validationErrors.ts";
-
-const routeWithDeclaredErrorResponse = coreRoute
-	.get("/todos/:id")
-	.response(200, z.object({ id: z.string() }))
-	.response(404, z.object({ code: z.literal("not_found") }))["~restrpc"];
 
 describe("handleHttpRoute", () => {
 	it("passes validated request data, handler fields, context, and route", async () => {
@@ -445,91 +439,6 @@ describe("handleHttpRoute", () => {
 			},
 			body: { value: { id: "todo-1" }, contentType: "application/json" },
 		});
-	});
-
-	it("normalizes declared RouteResponseError responses", async () => {
-		const result = await handleHttpRoute(
-			{
-				route: routeWithDeclaredErrorResponse,
-				handler: () => {
-					throw new RouteResponseError(routeWithDeclaredErrorResponse, {
-						status: 404,
-						body: { code: "not_found" },
-					});
-				},
-			},
-			{
-				request: {},
-				handlerFields: {},
-				context: {},
-			},
-		);
-
-		assert.deepEqual(result, {
-			kind: "response",
-			status: 404,
-			headers: undefined,
-			body: { value: { code: "not_found" }, contentType: "application/json" },
-		});
-	});
-
-	it("validates RouteResponseError response bodies during normalization", async () => {
-		const error = await handleHttpRoute(
-			{
-				route: routeWithDeclaredErrorResponse,
-				handler: () => {
-					throw new RouteResponseError(routeWithDeclaredErrorResponse, {
-						status: 404,
-						body: { code: "gone" },
-					} as never);
-				},
-			},
-			{
-				request: {},
-				handlerFields: {},
-				context: {},
-			},
-		);
-		assert.ok(error instanceof ResponseValidationError);
-		assert.equal(error.location, "body");
-	});
-
-	it("throws an ordinary error when RouteResponseError targets an undeclared status", async () => {
-		const routes = {
-			todos: {
-				get: routeWithDeclaredErrorResponse,
-				create: coreRoute
-					.post("/todos")
-					.response(201, z.object({ id: z.string() }))
-					.response(409, z.object({ code: z.literal("already_exists") }))[
-					"~restrpc"
-				],
-			},
-		};
-
-		await assert.rejects(
-			() =>
-				handleHttpRoute(
-					{
-						route: routes.todos.get,
-						handler: () => {
-							throw new RouteResponseError(routes.todos, {
-								status: 409,
-								body: { code: "already_exists" },
-							});
-						},
-					},
-					{
-						request: {},
-						handlerFields: {},
-						context: {},
-					},
-				),
-			(error) =>
-				error instanceof Error &&
-				!(error instanceof ResponseValidationError) &&
-				/undeclared status 409/.test(error.message),
-		);
 	});
 });
 

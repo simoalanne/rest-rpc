@@ -56,17 +56,6 @@ export const runErrorHandlersSuite = (adapter: ErrorHandlersSuiteAdapter) => {
 			});
 		});
 
-		it("does not pass RouteResponseError through the unhandled hook", async () => {
-			const response = await client.contractResponse();
-
-			assert.equal(response.status, 409);
-			assert.equal(response.headers.get("x-error-handler"), null);
-			assert.deepEqual(response.body, {
-				code: "conflict",
-				source: "contract-response-error",
-			});
-		});
-
 		it("only invokes custom error handling for matching paths", async () => {
 			const response1 = await client.hookState();
 			assert.equal(response1.status, 200);

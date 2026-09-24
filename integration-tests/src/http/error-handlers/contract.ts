@@ -9,16 +9,6 @@ export const errorHandlersContract = {
 	unhandled: route
 		.get("/error-handlers/unhandled")
 		.response(200, z.object({ reached: z.literal(true) })),
-	contractResponse: route
-		.get("/error-handlers/contract-response")
-		.response(200, z.object({ reached: z.literal(true) }))
-		.response(
-			409,
-			z.object({
-				code: z.literal("conflict"),
-				source: z.literal("contract-response-error"),
-			}),
-		),
 	hookState: route
 		.get("/error-handlers/hook-state")
 		.response(

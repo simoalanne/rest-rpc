@@ -26,7 +26,6 @@ export type {
 export {
 	RequestValidationError,
 	ResponseValidationError,
-	RouteResponseError,
 } from "@rest-rpc/server";
 export { Implement } from "./decorators.ts";
 export type { DefaultContext, RestRpcModuleOptions } from "./module.ts";

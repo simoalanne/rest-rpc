@@ -9,7 +9,6 @@ import type {
 } from "@rest-rpc/core/contract";
 import { getRouteResponses } from "@rest-rpc/core/contract";
 import type { HttpHeaders } from "./headers.ts";
-import { RouteResponseError } from "./routeResponseError.ts";
 import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
 import type { RuntimeImplementation } from "./match.ts";
 import type { ImplicitResponseEnvelope } from "./routeBuilder.types.ts";
@@ -215,18 +214,6 @@ const normalizeResponseResult = async (
 	};
 };
 
-const normalizeRouteResponseError = async (
-	route: RouteDeclaration,
-	error: RouteResponseError,
-): Promise<HttpRouteResult> => {
-	return normalizeResponseResult(route, {
-		status: error.status,
-		body: error.body,
-		contentType: error.contentType,
-		responseHeaders: error.responseHeaders,
-	});
-};
-
 const getHandlerRequestFields = (
 	route: RouteDeclaration,
 	segments: Omit<RequestSegments, "query"> & { query: unknown },
@@ -254,24 +241,16 @@ export async function handleHttpRoute<
 			options.request,
 		);
 
-		let handlerResult: unknown;
-		try {
-			handlerResult = await invokeWithMiddleware(
-				implementation.middleware ?? [],
-				handler,
-				{
-					...getHandlerRequestFields(route, validatedRequest),
-					...options.handlerFields,
-					context: options.context,
-					route,
-				},
-			);
-		} catch (error) {
-			if (error instanceof RouteResponseError) {
-				return await normalizeRouteResponseError(route, error);
-			}
-			throw error;
-		}
+		const handlerResult = await invokeWithMiddleware(
+			implementation.middleware ?? [],
+			handler,
+			{
+				...getHandlerRequestFields(route, validatedRequest),
+				...options.handlerFields,
+				context: options.context,
+				route,
+			},
+		);
 
 		const hasDeclaredResponses = Object.keys(route.responses).length > 0;
 		if (!hasDeclaredResponses) {

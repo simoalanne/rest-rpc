@@ -36,7 +36,6 @@ export { registerRoutes } from "./registerRoutes.ts";
 export {
 	RequestValidationError,
 	ResponseValidationError,
-	RouteResponseError,
 } from "@rest-rpc/server";
 export type {
 	CreateOpenApiDocumentOptions,

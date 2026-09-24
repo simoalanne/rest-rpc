@@ -5,7 +5,6 @@ export type {
 export { handleHttpRoute } from "./handleHttpRoute.ts";
 export { createRouteMatcher, flattenRouteImplementations } from "./match.ts";
 export type { RouteMatch, RuntimeImplementationTree } from "./match.ts";
-export { RouteResponseError } from "./routeResponseError.ts";
 export type {
 	RouteErrors,
 	RouteHandler,
