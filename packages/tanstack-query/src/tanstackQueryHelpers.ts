@@ -2,13 +2,13 @@ import { initClient, type HttpError } from "@rest-rpc/core";
 import type {
 	ApiClientFetchOptions,
 	ApiClientOptions,
-	ClientResponse,
 	FetchResponseFn,
+	InferClientResponse,
 } from "@rest-rpc/core/client";
 import type {
-	ClientRequest,
 	Contract,
 	ErrorDeclaredClientResponse,
+	InferClientRequest,
 	RouteDeclaration,
 	SuccessfulDeclaredClientResponse,
 } from "@rest-rpc/core/contract";
@@ -48,30 +48,23 @@ type DeclaredRouteResponseBody<E extends RouteDeclaration> =
 			: never
 		: never;
 
-type RouteRequestValue<E extends QueryRoute> = ClientRequest<E>;
+type RouteRequestValue<E extends QueryRoute> = InferClientRequest<E>;
 
 type IsPlainOutput<E extends RouteDeclaration> = E extends {
-	output: "response";
+	output: "output";
 }
-	? false
-	: E extends { output: "output" }
-		? true
-		: E extends { kind: "procedure" }
-			? true
-			: false;
+	? true
+	: false;
 
 /**
  * Infers the successful query data returned for a route.
  *
  * @remarks HTTP routes retain their response envelope and include only 2xx
  * statuses. Procedure routes produce their output value directly.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#tanstack-query}
- * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#queries}
  */
 export type RouteQueryData<E extends QueryRoute> =
 	IsPlainOutput<RouteFor<E>> extends true
-		? ClientResponse<E>
+		? InferClientResponse<E>
 		: DeclaredRouteQueryData<RouteFor<E>>;
 
 /**
@@ -79,9 +72,6 @@ export type RouteQueryData<E extends QueryRoute> =
  *
  * @remarks HTTP routes include declared non-2xx response envelopes, `HttpError`,
  * and `Error`. Plain output routes surface `HttpError` and `Error`.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#tanstack-query}
- * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#error-model}
  */
 export type RouteQueryError<E extends QueryRoute> =
 	IsPlainOutput<RouteFor<E>> extends true
@@ -90,9 +80,6 @@ export type RouteQueryError<E extends QueryRoute> =
 
 /**
  * Infers mutation variables for a route.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#tanstack-query}
- * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#mutations}
  */
 export type RouteMutationVariables<E extends QueryRoute> =
 	RouteRequestValue<E> extends never ? undefined : RouteRequestValue<E>;
@@ -102,9 +89,6 @@ export type RouteMutationVariables<E extends QueryRoute> =
  *
  * @remarks Each page contains a successful route result, while each page
  * parameter contains the complete request used to fetch that page.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#tanstack-query}
- * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#infinite-queries}
  */
 export type RouteInfiniteQueryData<E extends QueryRoute> = InfiniteData<
 	RouteQueryData<E>,
@@ -124,9 +108,6 @@ type RouteStreamChunk<E extends QueryRoute> = [
  *
  * @remarks The default accumulator materializes SSE events into an array
  * and omits the HTTP response envelope.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#tanstack-query}
- * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#streamed-queries}
  */
 export type RouteStreamedQueryData<E extends QueryRoute> = [
 	RouteStreamChunk<E>,

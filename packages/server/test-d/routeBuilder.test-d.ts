@@ -1,7 +1,7 @@
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import {
-	type ClientRequest,
-	type ClientResponse,
+	type InferClientRequest,
+	type InferClientResponse,
 	type SseEvent,
 	initClient,
 	route as coreRoute,
@@ -9,8 +9,8 @@ import {
 import {
 	sse,
 	serverFirstRoute,
-	type RouteResponse,
-	type RouteRequestData,
+	type InferServerRequest,
+	type InferServerResponse,
 	type RouteErrors,
 	type ServerFirstRouteResponseKind,
 	type ServerRouteBuilder,
@@ -55,7 +55,10 @@ const inferred = route
 expectType<"POST">(inferred["~restrpc"].method);
 expectType<"/todos/:id">(inferred["~restrpc"].path);
 expectType<
-	StandardSchemaV1<unknown, { readonly id: string; readonly title: string }>
+	StandardSchemaV1<
+		{ readonly id: string; readonly title: string },
+		{ readonly id: string; readonly title: string }
+	>
 >(inferred["~restrpc"].responses[201].body);
 expectType<201>(
 	inferred["~restrpc"].handler({
@@ -86,7 +89,7 @@ const declared = route
 expectType<typeof output>(declared["~restrpc"].responses[201].body);
 const declaredNoBody = route.get("/declared-no-body").response(204);
 expectType<{ status: 204 }>(
-	null as unknown as RouteResponse<typeof declaredNoBody>,
+	null as unknown as InferServerResponse<typeof declaredNoBody>,
 );
 declaredNoBody.handler(() => ({ status: 204 }));
 expectError(
@@ -105,7 +108,10 @@ const procedure = route
 	});
 expectType<"procedure">(procedure["~restrpc"].kind);
 expectType<
-	StandardSchemaV1<unknown, { readonly id: "todo-1"; readonly title: string }>
+	StandardSchemaV1<
+		{ readonly id: "todo-1"; readonly title: string },
+		{ readonly id: "todo-1"; readonly title: string }
+	>
 >(procedure["~restrpc"].responses[200].body);
 
 const flatGet = route
@@ -273,10 +279,10 @@ const helperImplementation = route
 	.handler(({ params }) => ({ status: 200, body: { id: params.id } }));
 
 expectType<{ params: { id: string } }>(
-	null as unknown as ClientRequest<typeof helperDeclaration>,
+	null as unknown as InferClientRequest<typeof helperDeclaration>,
 );
 expectType<{ params: { id: string } }>(
-	null as unknown as RouteRequestData<typeof helperDeclaration>,
+	null as unknown as InferServerRequest<typeof helperDeclaration>,
 );
 expectType<{ status: 404; body: { code: "NOT_FOUND" } }>(
 	null as unknown as RouteErrors<typeof helperDeclaration>,
@@ -284,32 +290,66 @@ expectType<{ status: 404; body: { code: "NOT_FOUND" } }>(
 expectType<
 	| { status: 200; body: { id: string } }
 	| { status: 404; body: { code: "NOT_FOUND" } }
->(null as unknown as RouteResponse<typeof helperDeclaration>);
+>(null as unknown as InferServerResponse<typeof helperDeclaration>);
 expectType<{ params: { id: string } }>(
-	null as unknown as ClientRequest<typeof helperImplementation>,
+	null as unknown as InferClientRequest<typeof helperImplementation>,
 );
 expectType<{ params: { id: string } }>(
-	null as unknown as RouteRequestData<typeof helperImplementation>,
+	null as unknown as InferServerRequest<typeof helperImplementation>,
 );
-expectType<{ status: 200; body: unknown }>(
-	null as unknown as RouteResponse<typeof helperImplementation>,
+expectType<{ status: 200; body: { readonly id: string } }>(
+	null as unknown as InferServerResponse<typeof helperImplementation>,
 );
 expectType<{ status: 200; body: { readonly id: string }; headers: Headers }>(
-	null as unknown as ClientResponse<typeof helperImplementation>,
+	null as unknown as InferClientResponse<typeof helperImplementation>,
 );
 expectType<never>(null as unknown as RouteErrors<typeof helperImplementation>);
+
+const transformedInput = z
+	.object({ id: z.string() })
+	.transform(({ id }) => ({ id: Number(id) }));
+const transformedOutput = z
+	.object({ id: z.string() })
+	.transform(({ id }) => ({ id: Number(id) }));
+const helperProcedure = coreRoute
+	.input(transformedInput)
+	.output(transformedOutput);
+const helperProcedureImplementation = route
+	.input(transformedInput)
+	.output(transformedOutput)
+	.handler(({ input }) => ({ id: String(input.id) as "1" }));
+expectType<{ id: string }>(
+	null as unknown as InferClientRequest<typeof helperProcedure>,
+);
+expectType<{ input: { id: number } }>(
+	null as unknown as InferServerRequest<typeof helperProcedure>,
+);
+expectType<{ id: string }>(
+	null as unknown as InferServerResponse<typeof helperProcedure>,
+);
+expectType<{ id: number }>(
+	null as unknown as InferClientResponse<typeof helperProcedure>,
+);
+expectType<{ id: string }>(
+	null as unknown as InferServerResponse<typeof helperProcedureImplementation>,
+);
+
 // Internal declarations are not the public helper input.
 expectError(
-	null as unknown as ClientRequest<(typeof helperDeclaration)["~restrpc"]>,
+	null as unknown as InferClientRequest<(typeof helperDeclaration)["~restrpc"]>,
 );
 expectError(
-	null as unknown as ClientResponse<(typeof helperDeclaration)["~restrpc"]>,
+	null as unknown as InferClientResponse<
+		(typeof helperDeclaration)["~restrpc"]
+	>,
 );
 expectError(
-	null as unknown as RouteRequestData<(typeof helperDeclaration)["~restrpc"]>,
+	null as unknown as InferServerRequest<(typeof helperDeclaration)["~restrpc"]>,
 );
 expectError(
-	null as unknown as RouteResponse<(typeof helperDeclaration)["~restrpc"]>,
+	null as unknown as InferServerResponse<
+		(typeof helperDeclaration)["~restrpc"]
+	>,
 );
 expectError(
 	null as unknown as RouteErrors<(typeof helperDeclaration)["~restrpc"]>,

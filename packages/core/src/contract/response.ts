@@ -253,3 +253,42 @@ export type ServerErrors<E extends RouteDeclaration> = Exclude<
 	ServerResponse<E>,
 	ServerSuccessResponse<E>
 >;
+
+type ProcedureContentType<TContentType> = TContentType extends readonly string[]
+	? TContentType[number]
+	: TContentType;
+
+type ServerProcedureResponse<TResponse> = TResponse extends {
+	contentType: infer TContentType;
+}
+	? TContentType extends "application/json"
+		? ServerResponseBody<TResponse>
+		: {
+				data: ServerResponseBody<TResponse>;
+				contentType: ProcedureContentType<TContentType>;
+			}
+	: ServerResponseBody<TResponse>;
+
+type ServerProcedureOutput<E extends RouteDeclaration> = E extends {
+	responses: { 200: infer TResponse };
+}
+	? ServerProcedureResponse<TResponse>
+	: never;
+
+type ServerResponseForRoute<E extends RouteDeclaration> = E extends {
+	output: "output";
+}
+	? ServerProcedureOutput<E>
+	: ServerResponse<E>;
+
+/**
+ * Infers the output returned by a route handler.
+ *
+ * @remarks Response schemas contribute their input types because handlers
+ * produce values before response validation and transformation.
+ *
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
+ */
+export type InferServerResponse<
+	TRoute extends { readonly "~restrpc": RouteDeclaration },
+> = ServerResponseForRoute<TRoute["~restrpc"]>;

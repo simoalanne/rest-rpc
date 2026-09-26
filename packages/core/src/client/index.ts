@@ -8,7 +8,7 @@ export type {
 	ApiClientOptions,
 	ClientHeaders,
 	ClientHeaderValue,
-	ClientResponse,
+	InferClientResponse,
 	FetchArgs,
 	FetchLike,
 	FetchOptions,

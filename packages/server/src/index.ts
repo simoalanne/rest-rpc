@@ -9,9 +9,8 @@ export type {
 	RouteErrors,
 	RouteHandler,
 	RouteRequest,
-	RouteRequestData,
-	RouteResponse,
 } from "./routeBuilder.types.ts";
+export type { InferServerRequest, InferServerResponse } from "@rest-rpc/core";
 export type { RequestSegments, ValidationIssue } from "./validation.ts";
 export type {
 	RequestValidationIssues,
@@ -27,7 +26,6 @@ export { serverFirstRoute } from "./routeBuilder.ts";
 export type {
 	ImplicitResponseEnvelope,
 	ImplicitResponseKind,
-	InferredRouteResponse,
 	ServerFirstResponseKind,
 	ServerFirstRouteResponseKind,
 	ServerBuilderExtension,

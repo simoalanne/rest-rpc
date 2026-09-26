@@ -2,14 +2,14 @@
 // public server-first builder, implementation, and handler types.
 
 import {
-	type ClientRequest,
-	type ClientResponse,
+	type InferClientRequest,
+	type InferClientResponse,
 	route as contractRoute,
 	type as schemaType,
 } from "@rest-rpc/core";
 import type {
-	RouteRequestData,
-	RouteResponse,
+	InferServerRequest,
+	InferServerResponse,
 	RouteErrors,
 } from "@rest-rpc/server";
 import { sse } from "@rest-rpc/server";
@@ -97,10 +97,14 @@ export const fetchHandler = createFetchRouteHandler(fetchRoutes);
 export const nodeHandler = createNodeRouteHandler(nodeRoutes);
 
 // Downstream packages use public helpers directly on completed routes.
-export type CreateClientRequest = ClientRequest<typeof fetchRoutes.create>;
-export type CreateClientResponse = ClientResponse<typeof fetchRoutes.create>;
-export type CreateServerRequest = RouteRequestData<typeof fetchRoutes.create>;
-export type CreateServerResponse = RouteResponse<typeof fetchRoutes.create>;
+export type CreateClientRequest = InferClientRequest<typeof fetchRoutes.create>;
+export type CreateClientResponse = InferClientResponse<
+	typeof fetchRoutes.create
+>;
+export type CreateServerRequest = InferServerRequest<typeof fetchRoutes.create>;
+export type CreateServerResponse = InferServerResponse<
+	typeof fetchRoutes.create
+>;
 export type CreateServerErrors = RouteErrors<typeof fetchRoutes.create>;
 
 export const fetchMiddleware = fetchRoute.middleware(({ next }) => next());

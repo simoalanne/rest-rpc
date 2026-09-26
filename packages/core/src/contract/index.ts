@@ -23,7 +23,8 @@ export {
 	toColonPath,
 } from "./path.ts";
 export type {
-	ClientRequest,
+	InferClientRequest,
+	InferServerRequest,
 	RequestBodySchema,
 	RequestHeadersSchema,
 	RequestParamsSchema,
@@ -39,6 +40,7 @@ export type {
 	ResponseOptions,
 	RouteResponses,
 	ServerErrors,
+	InferServerResponse,
 	ServerResponse,
 	ServerResponseBody,
 	SuccessfulDeclaredClientResponse,

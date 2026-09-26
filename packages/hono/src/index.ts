@@ -22,9 +22,9 @@ type ContractRoute = { readonly "~restrpc": RouteDeclaration };
 
 export { type } from "@rest-rpc/core";
 export type {
+	InferServerRequest,
+	InferServerResponse,
 	RouteErrors,
-	RouteRequestData,
-	RouteResponse,
 } from "@rest-rpc/server";
 export type {
 	ExtendedHonoMiddleware,
@@ -49,7 +49,7 @@ export type { SseEvent } from "@rest-rpc/core";
 /**
  * Infers the validated request and Hono context available to a route handler.
  *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
  */
 export type RouteRequest<
 	TRoute extends ContractRoute,
@@ -63,7 +63,7 @@ export type RouteRequest<
 /**
  * Infers the Hono handler signature for a route declaration.
  *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
  */
 export type RouteHandler<
 	TRoute extends ContractRoute,

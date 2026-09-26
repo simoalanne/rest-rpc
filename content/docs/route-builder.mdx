@@ -216,3 +216,105 @@ const list = route
 Request and output setters can appear in either order. `.metadata()` and
 `.openAPI()` can appear anywhere before `.handler()`, which completes the
 builder. See [OpenAPI](/docs/openapi) for document generation.
+
+## Infer Route Types
+
+Use the route inference helpers when the request or response type needs to be
+reused elsewhere in your application.
+
+### Infer Client Request
+
+```ts twoslash
+import type { InferClientRequest } from "@rest-rpc/core";
+import { route } from "@rest-rpc/express";
+import z from "zod";
+
+const create = route
+	.input(z.object({ title: z.string() }))
+	.handler(({ input }) => ({ id: "todo_1" as const, title: input.title }));
+
+const update = route
+	.patch("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.body(z.object({ title: z.string() }))
+	.handler(({ params, body }) => ({ id: params.id, title: body.title }));
+
+type CreateTodoRequest = InferClientRequest<typeof create>;
+
+type UpdateTodoRequest = InferClientRequest<typeof update>;
+```
+
+### Infer Client Response
+
+```ts twoslash
+import type { InferClientResponse } from "@rest-rpc/core";
+import { route } from "@rest-rpc/express";
+import z from "zod";
+
+const list = route.handler(() => [{ id: "todo_1", title: "Write docs" }]);
+
+const getFirst = route.handler(() => {
+	const random = Math.random();
+
+	if (random < 0.5) {
+		return { status: 200, body: { id: "todo_1", title: "Write docs" } };
+	}
+	return { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
+});
+
+type ListTodosResponse = InferClientResponse<typeof list>;
+
+type GetFirstTodoResponse = InferClientResponse<typeof getFirst>;
+```
+
+### Infer Server Request
+
+```ts twoslash
+import type { InferServerRequest } from "@rest-rpc/express";
+import { route } from "@rest-rpc/express";
+import z from "zod";
+
+const create = route
+	.input(z.object({ title: z.string() }))
+	.handler(({ input }) => ({ id: "todo_1" as const, title: input.title }));
+
+const update = route
+	.patch("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.body(z.object({ title: z.string() }))
+	.handler(({ params, body }) => ({ id: params.id, title: body.title }));
+
+type CreateTodoRequest = InferServerRequest<typeof create>;
+
+type UpdateTodoRequest = InferServerRequest<typeof update>;
+```
+
+### Infer Server Response
+
+```ts twoslash
+import type { InferServerResponse } from "@rest-rpc/express";
+import { route } from "@rest-rpc/express";
+import z from "zod";
+
+const list = route
+	.output(z.array(z.object({ id: z.string(), title: z.string() })))
+	.handler(() => [{ id: "todo_1", title: "Write docs" }]);
+
+const getFirst = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.response(200, z.object({ id: z.string(), title: z.string() }))
+	.response(404, z.object({ code: z.literal("TODO_NOT_FOUND") }))
+	.handler(({ params }) => {
+		const random = Math.random();
+
+		if (random < 0.5) {
+			return { status: 200, body: { id: params.id, title: "Write docs" } };
+		}
+		return { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
+	});
+
+type ListTodosResponse = InferServerResponse<typeof list>;
+
+type GetFirstTodoResponse = InferServerResponse<typeof getFirst>;
+```

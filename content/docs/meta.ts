@@ -12,7 +12,6 @@ export default defineMeta({
 		"server",
 		"client",
 		"openapi",
-		"type-helpers",
 		"api-reference",
 	],
 });

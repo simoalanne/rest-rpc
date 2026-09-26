@@ -132,18 +132,17 @@ type OptionalRequestHeaders<T, TOptionalKeys extends PropertyKey> = [
 		: T;
 
 /**
- * Infers the request type passed to a generated client route call.
+ * Infers the input passed to a generated client route call.
  *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
  */
-export type ClientRequest<
-	E extends { readonly "~restrpc": RouteDeclaration },
-	TOptionalKeys extends PropertyKey = never,
-> = InferClientRequest<E["~restrpc"], TOptionalKeys>;
-
 export type InferClientRequest<
+	E extends { readonly "~restrpc": RouteDeclaration },
+> = ClientRequestForDeclaration<E["~restrpc"]>;
+
+export type ClientRequestForDeclaration<
 	E extends RouteDeclaration,
-	TOptionalKeys extends PropertyKey,
+	TOptionalKeys extends PropertyKey = never,
 > = E extends { kind: "procedure" }
 	? E extends { input: "segments" }
 		? OptionalRequestHeaders<InferRequestFor<E, "input">, TOptionalKeys>
@@ -165,3 +164,50 @@ export type ServerRequest<E extends { request?: RouteRequestDeclaration }> = [
 ] extends [never]
 	? Record<never, never>
 	: InferRequestFor<E, "output">;
+
+type FlatInputSchema<TRoute extends RouteDeclaration> = TRoute extends {
+	request: { query: infer TQuery extends StandardSchemaV1 };
+}
+	? TQuery
+	: TRoute extends { request: { body: infer TBody extends StandardSchemaV1 } }
+		? TBody
+		: never;
+
+type UsesFlatInput<TRoute extends RouteDeclaration> = TRoute extends {
+	input: "segments";
+}
+	? false
+	: TRoute extends { input: "input" }
+		? true
+		: TRoute["kind"] extends "procedure"
+			? true
+			: false;
+
+type ServerRequestValue<TRoute extends RouteDeclaration> =
+	ServerRequest<TRoute>;
+
+/**
+ * Infers the validated input received by a route handler.
+ *
+ * @remarks Adapter fields, transport metadata, route metadata, and application
+ * context are intentionally excluded.
+ *
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
+ */
+export type InferServerRequest<
+	TRoute extends { readonly "~restrpc": RouteDeclaration },
+> = TRoute["~restrpc"] extends infer TDeclaration extends RouteDeclaration
+	? UsesFlatInput<TDeclaration> extends true
+		? [FlatInputSchema<TDeclaration>] extends [never]
+			? Record<never, never>
+			: FlatInputSchema<TDeclaration> extends infer TInput extends
+						StandardSchemaV1
+				? Merge<
+						{ input: StandardSchemaV1.InferOutput<TInput> } & Omit<
+							ServerRequestValue<TDeclaration>,
+							"body" | "query"
+						>
+					>
+				: Record<never, never>
+		: ServerRequestValue<TDeclaration>
+	: never;

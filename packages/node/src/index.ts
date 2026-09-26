@@ -61,9 +61,10 @@ export function implement<const TContract extends Contract>(
 
 export { type } from "@rest-rpc/core";
 export type {
+	InferServerRequest,
+	InferServerResponse,
 	ImplicitResponseEnvelope,
 	ImplicitResponseKind,
-	InferredRouteResponse,
 	ServerFirstResponseKind,
 	ServerFirstRouteResponseKind,
 } from "@rest-rpc/server";

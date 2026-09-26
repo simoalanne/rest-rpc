@@ -1,22 +1,17 @@
-import { type HttpError, type SseEvent } from "@rest-rpc/core";
+import {
+	type HttpError,
+	type InferClientRequest,
+	type InferClientResponse,
+	type SseEvent,
+} from "@rest-rpc/core";
 import { route, type as schemaType } from "@rest-rpc/core";
+import { createTanstackQueryHelpers } from "@rest-rpc/tanstack-query";
 import {
-	createTanstackQueryHelpers,
-	type CreateTanstackQueryHelpersOptions,
-	type RouteInfiniteQueryData,
-	type RouteMutationVariables,
-	type RouteQueryData,
-	type RouteQueryError,
-	type RouteStreamedQueryData,
-	type TanstackQueryHelpersFor,
-} from "@rest-rpc/tanstack-query";
-import { type QueryClient, skipToken } from "@tanstack/query-core";
-import {
-	expectAssignable,
-	expectError,
-	expectNotAssignable,
-	expectType,
-} from "tsd";
+	type InfiniteData,
+	type QueryClient,
+	skipToken,
+} from "@tanstack/query-core";
+import { expectAssignable, expectError, expectType } from "tsd";
 
 declare const queryClient: QueryClient;
 
@@ -60,17 +55,12 @@ expectType<{ params: { id: string } }>(
 	>,
 );
 
-type FinalizedQueryData = RouteQueryData<typeof validatedQueryApi.test>;
+type FinalizedQueryData = InferClientResponse<typeof validatedQueryApi.test>;
 expectType<{
 	status: 200;
 	body: { id: string; title: string };
 	headers: Headers;
 }>(undefined as unknown as FinalizedQueryData);
-
-expectAssignable<TanstackQueryHelpersFor<typeof queryApi>>(queryTq);
-expectAssignable<CreateTanstackQueryHelpersOptions>({
-	baseUrl: "https://example.test",
-});
 
 const getOptions = queryTq.todos.get.queryOptions({
 	params: {
@@ -108,7 +98,7 @@ queryClient.setQueryData(getOptions.queryKey, (current) => {
 // select options
 
 // should preserve selected data callbacks while fetchQuery still resolves route data
-type GetTodoData = RouteQueryData<typeof queryApi.todos.get>;
+type GetTodoData = InferClientResponse<typeof queryApi.todos.get>;
 const selectedGetOptions = queryTq.todos.get.queryOptions(
 	{
 		params: {
@@ -151,16 +141,11 @@ const selectedListOptions = queryTq.todos.list.queryOptions(undefined, {
 	},
 });
 expectAssignable<
-	(data: RouteQueryData<typeof queryApi.todos.list>) => string[]
+	(data: InferClientResponse<typeof queryApi.todos.list>) => string[]
 >(selectedListOptions.select as NonNullable<typeof selectedListOptions.select>);
-expectAssignable<Promise<RouteQueryData<typeof queryApi.todos.list>>>(
+expectAssignable<Promise<InferClientResponse<typeof queryApi.todos.list>>>(
 	queryClient.fetchQuery(selectedListOptions),
 );
-
-expectNotAssignable<RouteQueryError<typeof queryApi.todos.get>>({
-	status: 500,
-	rawResponse: new Response("server exploded", { status: 500 }),
-});
 
 // stream query options
 
@@ -374,8 +359,11 @@ const pageTq = createTanstackQueryHelpers(pageApi, {
 	baseUrl: "https://example.test",
 });
 
-type TodoPageResponse = RouteQueryData<typeof pageApi.todos.page>;
-type TodoInfiniteData = RouteInfiniteQueryData<typeof pageApi.todos.page>;
+type TodoPageResponse = InferClientResponse<typeof pageApi.todos.page>;
+type TodoInfiniteData = InfiniteData<
+	TodoPageResponse,
+	InferClientRequest<typeof pageApi.todos.page>
+>;
 
 type TodoPageResponseShape = {
 	status: 200;
@@ -541,33 +529,6 @@ expectError(
 );
 invalidTq.mixed.list.queryOptions();
 
-// exported helper types
-
-// should resolve route query data and mutation variables for external consumers
-expectAssignable<{
-	status: 200;
-	body: { id: string; title: string };
-	headers: Headers;
-}>(null as unknown as GetTodoData);
-
-type CreateTodoVariables = RouteMutationVariables<
-	typeof mutationApi.todos.create
->;
-expectType<{ body: { title: string } }>(null as unknown as CreateTodoVariables);
-
-expectNotAssignable<{ id: string }>(null as unknown as CreateTodoVariables);
-
-type ProjectEventsStreamedData = RouteStreamedQueryData<
-	typeof streamApi.events.list
->;
-expectType<Event[]>(null as unknown as ProjectEventsStreamedData);
-expectType<never>(
-	null as unknown as RouteStreamedQueryData<typeof queryApi.todos.get>,
-);
-expectType<never>(
-	null as unknown as RouteStreamedQueryData<typeof invalidApi.ambiguousStream>,
-);
-
 // shorthand route helpers
 
 const shorthandApi = {
@@ -583,16 +544,6 @@ const shorthandApi = {
 const shorthandTq = createTanstackQueryHelpers(shorthandApi, {
 	baseUrl: "https://example.test",
 });
-
-expectType<{ id: string; title: string }>(
-	null as unknown as RouteQueryData<typeof shorthandApi.todos.get>,
-);
-expectType<HttpError | Error>(
-	null as unknown as RouteQueryError<typeof shorthandApi.todos.get>,
-);
-expectType<{ title: string }>(
-	null as unknown as RouteMutationVariables<typeof shorthandApi.todos.add>,
-);
 
 const shorthandGetOptions = shorthandTq.todos.get.queryOptions(undefined, {
 	retry(_failureCount, error) {

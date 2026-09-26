@@ -22,9 +22,9 @@ type ContractRoute = { readonly "~restrpc": RouteDeclaration };
 
 export { type } from "@rest-rpc/core";
 export type {
+	InferServerRequest,
+	InferServerResponse,
 	RouteErrors,
-	RouteRequestData,
-	RouteResponse,
 } from "@rest-rpc/server";
 export type {
 	ExtendedExpressMiddleware,
@@ -49,7 +49,7 @@ export type { SseEvent } from "@rest-rpc/core";
 /**
  * Infers the validated request and Express context available to a route handler.
  *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
  */
 export type RouteRequest<TRoute extends ContractRoute> = ServerRouteRequest<
 	TRoute["~restrpc"],
@@ -60,7 +60,7 @@ export type RouteRequest<TRoute extends ContractRoute> = ServerRouteRequest<
 /**
  * Infers the Express handler signature for a route declaration.
  *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
  */
 export type RouteHandler<TRoute extends ContractRoute> = ServerRouteHandler<
 	TRoute["~restrpc"],

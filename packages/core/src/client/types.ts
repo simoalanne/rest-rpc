@@ -1,6 +1,6 @@
 import type { BodyCodec } from "../codecs/index.ts";
 import type { Contract, RouteDeclaration } from "../contract/contract.ts";
-import type { InferClientRequest } from "../contract/request.ts";
+import type { ClientRequestForDeclaration } from "../contract/request.ts";
 import type { RequestScalar } from "../contract/request.ts";
 import type {
 	DeclaredClientResponse,
@@ -83,15 +83,21 @@ export type FetchArgs<
 	E extends RouteDeclaration = RouteDeclaration,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > =
-	InferClientRequest<E, GlobalHeaderKeys<TGlobalHeaders>> extends never
+	ClientRequestForDeclaration<E, GlobalHeaderKeys<TGlobalHeaders>> extends never
 		? [request?: undefined, options?: FetchOptionsFor<E>]
 		: RequiresFetchOptions<E> extends false
 			? [
-					request: InferClientRequest<E, GlobalHeaderKeys<TGlobalHeaders>>,
+					request: ClientRequestForDeclaration<
+						E,
+						GlobalHeaderKeys<TGlobalHeaders>
+					>,
 					options?: FetchOptionsFor<E>,
 				]
 			: [
-					request: InferClientRequest<E, GlobalHeaderKeys<TGlobalHeaders>>,
+					request: ClientRequestForDeclaration<
+						E,
+						GlobalHeaderKeys<TGlobalHeaders>
+					>,
 					options: FetchOptionsFor<E>,
 				];
 
@@ -114,33 +120,30 @@ type RouteDeclaredResponse<E extends RouteDeclaration> = WithResponseMetadata<
  * @remarks Routes declared with `.response()` produce status-discriminated
  * envelopes. Routes declared with `.output()` produce their output directly.
  *
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-routes}
  */
-export type ClientResponse<
+export type InferClientResponse<
 	E extends { readonly "~restrpc": RouteDeclaration },
-> = InferClientResponse<E["~restrpc"]>;
+> = ClientResponseForDeclaration<E["~restrpc"]>;
 
-type InferClientResponse<E extends RouteDeclaration> = E extends {
-	output: "response";
+type ClientResponseForDeclaration<E extends RouteDeclaration> = E extends {
+	output: "output";
 }
-	? RouteDeclaredResponse<E>
-	: E extends { output: "output" }
-		? ProcedureRouteOutput<E>
-		: E extends { kind: "procedure" }
-			? ProcedureRouteOutput<E>
-			: E extends RouteDeclaration
-				? RouteDeclaredResponse<E>
-				: never;
+	? ProcedureRouteOutput<E>
+	: RouteDeclaredResponse<E>;
 
 export type FetchResponseFn<
 	E extends RouteDeclaration,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
-> = (...args: FetchArgs<E, TGlobalHeaders>) => Promise<InferClientResponse<E>>;
+> = (
+	...args: FetchArgs<E, TGlobalHeaders>
+) => Promise<ClientResponseForDeclaration<E>>;
 
 /**
  * Infers the callable client operation for one declared route.
  *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-routes}
  */
 export type ApiClientRouteValue<
@@ -158,7 +161,7 @@ type ProcedureRouteOutput<TRoute extends RouteDeclaration> =
 /**
  * Infers the generated client tree for a contract.
  *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#fetch-client}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
  */
 export type ApiClientFor<
 	T extends Contract = Contract,

@@ -36,32 +36,13 @@ export type RuntimeRouteHandler = (
 ) => unknown | Promise<unknown>;
 
 /**
- * Infers the validated request data declared for a route.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
- */
-export type RouteRequestData<TRoute extends ContractRoute> = ServerRequest<
-	TRoute["~restrpc"]
->;
-
-/**
  * Infers the declared non-2xx response envelopes for a route.
  *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
  */
 export type RouteErrors<TRoute extends ContractRoute> = ServerErrors<
 	TRoute["~restrpc"]
 >;
-
-/**
- * Infers every response envelope a route handler may return.
- *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
- */
-export type RouteResponse<TRoute extends ContractRoute> =
-	ServerResponse<TRoute["~restrpc"]> extends infer TResponse
-		? WithSseServerEvents<TResponse>
-		: never;
 
 type RequestValue<TRoute extends RouteDeclaration> =
 	ServerRequest<TRoute> extends never ? EmptyObject : ServerRequest<TRoute>;
@@ -113,7 +94,7 @@ type HandlerResult<TRoute extends RouteDeclaration> = MaybePromise<
  * Infers the validated request, adapter fields, and application context
  * received by a handler.
  *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
  */
 export type RouteRequest<
 	TRoute extends RouteDeclaration,
@@ -140,7 +121,7 @@ export type RouteRequest<
 /**
  * Infers the complete handler signature for a route declaration.
  *
- * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
  */
 export type RouteHandler<
 	TRoute extends RouteDeclaration,
@@ -202,7 +183,10 @@ export type ImplicitResponseKind<TResponse> = TResponse extends unknown
 		: "empty"
 	: never;
 
-type ClientSchema<TOutput> = StandardSchemaV1<unknown, TOutput>;
+type InferredSchema<TInput, TOutput = TInput> = StandardSchemaV1<
+	TInput,
+	TOutput
+>;
 
 type SerializedResponseHeader<TValue> = TValue extends string
 	? TValue
@@ -222,8 +206,8 @@ type ImplicitResponseBodyDeclaration<TResponse> = TResponse extends {
 	body: infer TBody;
 }
 	? TBody extends AsyncIterable<infer TItem>
-		? ClientSchema<SseData<TItem>>
-		: ClientSchema<TBody>
+		? InferredSchema<TItem, SseData<TItem>>
+		: InferredSchema<TBody>
 	: undefined;
 
 type ImplicitResponseContentType<TResponse> = TResponse extends {
@@ -246,14 +230,20 @@ type ImplicitResponseDeclaration<TResponse> = TResponse extends {
 			: { contentType: ImplicitResponseContentType<TResponse> }) &
 			(TResponse extends { responseHeaders: infer THeaders }
 				? {
-						headers: ClientSchema<SerializedResponseHeaders<THeaders>>;
+						headers: InferredSchema<
+							THeaders,
+							SerializedResponseHeaders<THeaders>
+						>;
 					}
 				: unknown)
 	: { body: undefined } & (TResponse extends {
 			responseHeaders: infer THeaders;
 		}
 			? {
-					headers: ClientSchema<SerializedResponseHeaders<THeaders>>;
+					headers: InferredSchema<
+						THeaders,
+						SerializedResponseHeaders<THeaders>
+					>;
 				}
 			: unknown);
 
@@ -276,13 +266,16 @@ type InferredHttpRoute<TRoute, TResult> = Omit<TRoute, "responses"> & {
 type InferredProcedureResponse<TResult> =
 	Awaited<TResult> extends infer TOutput
 		? TOutput extends AsyncIterable<infer TItem>
-			? { kind: "stream"; body: ClientSchema<SseData<TItem>> }
+			? {
+					kind: "stream";
+					body: InferredSchema<TItem, SseData<TItem>>;
+				}
 			: TOutput extends {
 						contentType: infer TContentType extends string;
 						data: infer TData;
 				  }
-				? { body: ClientSchema<TData>; contentType: TContentType }
-				: { body: ClientSchema<TOutput>; contentType: "application/json" }
+				? { body: InferredSchema<TData>; contentType: TContentType }
+				: { body: InferredSchema<TOutput>; contentType: "application/json" }
 		: never;
 
 type InferredProcedureRoute<TRoute, TResult> = Omit<TRoute, "responses"> & {
@@ -513,18 +506,6 @@ type ImplementationParts<TImplementation> = TImplementation extends {
 }
 	? { route: TRoute; handler: THandler }
 	: never;
-
-/**
- * Infers the handler response union retained by a completed route.
- *
- * @see {@link https://rest-rpc.dev/docs/route-builder#choose-plain-outputs-or-status-responses}
- */
-export type InferredRouteResponse<TImplementation> =
-	ImplementationParts<TImplementation> extends { handler: infer THandler }
-		? THandler extends AnyRouteHandler
-			? Awaited<ReturnType<THandler>>
-			: never
-		: never;
 
 type PlainResponseKind<TRoute> = TRoute extends {
 	responses: { 200: infer TResponse };

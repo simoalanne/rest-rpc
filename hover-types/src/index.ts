@@ -1,30 +1,26 @@
 import { initClient, route, type as schemaType } from "@rest-rpc/core";
-import type { ClientRequest, ClientResponse, SseEvent } from "@rest-rpc/core";
+import type {
+	InferClientRequest,
+	InferClientResponse,
+	SseEvent,
+} from "@rest-rpc/core";
 import { implement as expressImplement, sse } from "@rest-rpc/express";
 import {
 	createRouteHandler as createFetchRouteHandler,
 	route as fetchRoute,
-	type InferredRouteResponse,
+	type InferServerResponse,
 } from "@rest-rpc/fetch";
 import type {
 	RouteErrors,
 	RouteHandler,
 	RouteRequest,
-	RouteRequestData,
-	RouteResponse,
+	InferServerRequest,
 } from "@rest-rpc/express";
 import {
 	createRouteHandler as createNodeRouteHandler,
 	route as nodeRoute,
 } from "@rest-rpc/node";
-import {
-	createTanstackQueryHelpers,
-	type RouteInfiniteQueryData,
-	type RouteMutationVariables,
-	type RouteQueryData,
-	type RouteQueryError,
-	type RouteStreamedQueryData,
-} from "@rest-rpc/tanstack-query";
+import { createTanstackQueryHelpers } from "@rest-rpc/tanstack-query";
 
 export const hoverApi = {
 	todos: {
@@ -173,18 +169,17 @@ type GetTodoRoute = typeof hoverApi.todos.get;
 type PageTodoRoute = typeof hoverApi.todos.page;
 type CreateTodoRoute = typeof hoverApi.todos.create;
 type DownloadTodoRoute = typeof hoverApi.todos.download;
-type EventsRoute = typeof hoverApi.todos.events;
 type RemoveTodoRoute = typeof hoverApi.todos.remove;
 type DeclaredCreateTodoRoute = typeof declaredHoverApi.todos.create;
 
-export type GetClientRequest = ClientRequest<GetTodoRoute>;
-export type CreateClientRequest = ClientRequest<CreateTodoRoute>;
-export type PageClientRequest = ClientRequest<PageTodoRoute>;
-export type RemoveClientRequest = ClientRequest<RemoveTodoRoute>;
+export type GetClientRequest = InferClientRequest<GetTodoRoute>;
+export type CreateClientRequest = InferClientRequest<CreateTodoRoute>;
+export type PageClientRequest = InferClientRequest<PageTodoRoute>;
+export type RemoveClientRequest = InferClientRequest<RemoveTodoRoute>;
 
-export type CreateClientResponse = ClientResponse<CreateTodoRoute>;
+export type CreateClientResponse = InferClientResponse<CreateTodoRoute>;
 export type CreateDeclaredClientResponse =
-	ClientResponse<DeclaredCreateTodoRoute>;
+	InferClientResponse<DeclaredCreateTodoRoute>;
 
 export type CreateFetchParameters = Parameters<typeof hoverClient.todos.create>;
 export type CreateFetchReturn = ReturnType<typeof hoverClient.todos.create>;
@@ -223,17 +218,8 @@ export type EventsStreamedQueryOptionsReturn = ReturnType<
 	typeof hoverQuery.todos.events.streamedQueryOptions
 >;
 
-export type CreateRouteMutationVariables =
-	RouteMutationVariables<CreateTodoRoute>;
-export type CreateRouteQueryData = RouteQueryData<CreateTodoRoute>;
-export type CreateRouteQueryError = RouteQueryError<CreateTodoRoute>;
-export type CreateDeclaredRouteQueryError =
-	RouteQueryError<DeclaredCreateTodoRoute>;
-export type PageRouteInfiniteQueryData = RouteInfiniteQueryData<PageTodoRoute>;
-export type EventsRouteStreamedQueryData = RouteStreamedQueryData<EventsRoute>;
-
 export type CreateExpressRouteRequest = RouteRequest<CreateTodoRoute>;
-export type CreateExpressRouteRequestData = RouteRequestData<CreateTodoRoute>;
+export type CreateExpressRouteRequestData = InferServerRequest<CreateTodoRoute>;
 export type CreateExpressRouteHandler = RouteHandler<CreateTodoRoute>;
 export type CreateExpressRouteHandlerParameters = Parameters<
 	RouteHandler<CreateTodoRoute>
@@ -241,12 +227,11 @@ export type CreateExpressRouteHandlerParameters = Parameters<
 export type CreateExpressRouteHandlerReturn = ReturnType<
 	RouteHandler<CreateTodoRoute>
 >;
-export type CreateExpressRouteResponse = RouteResponse<CreateTodoRoute>;
+export type CreateExpressRouteResponse = InferServerResponse<CreateTodoRoute>;
 export type CreateExpressRouteErrors = RouteErrors<CreateTodoRoute>;
 export type CreateExpressRouteImplementation = typeof createTodoServerRoute;
 
-export type DownloadClientResponse = ClientResponse<DownloadTodoRoute>;
-export type DownloadRouteQueryData = RouteQueryData<DownloadTodoRoute>;
+export type DownloadClientResponse = InferClientResponse<DownloadTodoRoute>;
 
 const fetchCreateBuilder = fetchRoute
 	.post("/server-first/todos")
@@ -288,7 +273,7 @@ export type ServerFirstHandlerRequest = Parameters<
 	Parameters<typeof fetchCreateBuilder.handler>[0]
 >[0];
 export type ServerFirstHandlerResponse =
-	InferredRouteResponse<ServerFirstCreateImplementation>;
+	InferServerResponse<ServerFirstCreateImplementation>;
 export type FetchServerFirstHandler = typeof fetchServerFirstHandler;
 export type NodeServerFirstHandler = typeof nodeServerFirstHandler;
 
@@ -314,9 +299,10 @@ export const shorthandHoverQuery = createTanstackQueryHelpers(
 type ShorthandGetRoute = typeof shorthandHoverApi.todos.get;
 type ShorthandCreateRoute = typeof shorthandHoverApi.todos.create;
 
-export type ShorthandGetClientRequest = ClientRequest<ShorthandGetRoute>;
-export type ShorthandCreateClientRequest = ClientRequest<ShorthandCreateRoute>;
-export type ShorthandGetClientResponse = ClientResponse<ShorthandGetRoute>;
+export type ShorthandGetClientRequest = InferClientRequest<ShorthandGetRoute>;
+export type ShorthandCreateClientRequest =
+	InferClientRequest<ShorthandCreateRoute>;
+export type ShorthandGetClientResponse = InferClientResponse<ShorthandGetRoute>;
 export type ShorthandGetCallParameters = Parameters<
 	typeof shorthandHoverClient.todos.get
 >;
@@ -329,10 +315,6 @@ export type ShorthandCreateCallParameters = Parameters<
 export type ShorthandCreateCallReturn = ReturnType<
 	typeof shorthandHoverClient.todos.create
 >;
-export type ShorthandQueryData = RouteQueryData<ShorthandGetRoute>;
-export type ShorthandQueryError = RouteQueryError<ShorthandGetRoute>;
-export type ShorthandMutationVariables =
-	RouteMutationVariables<ShorthandCreateRoute>;
 export type ShorthandQueryOptionsParameters = Parameters<
 	typeof shorthandHoverQuery.todos.get.queryOptions
 >;

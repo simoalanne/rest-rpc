@@ -1,8 +1,8 @@
 import {
 	type ApiClientFor,
 	type ApiClientRouteValue,
-	type ClientRequest,
-	type ClientResponse,
+	type InferClientRequest,
+	type InferClientResponse,
 	type SseEvent,
 	initClient,
 	route,
@@ -79,13 +79,13 @@ expectError(
 );
 
 expectType<{ title: string }>(
-	null as unknown as ClientRequest<typeof shorthandApi.todos.add>,
+	null as unknown as InferClientRequest<typeof shorthandApi.todos.add>,
 );
 expectType<never>(
-	null as unknown as ClientRequest<typeof shorthandApi.todos.get>,
+	null as unknown as InferClientRequest<typeof shorthandApi.todos.get>,
 );
 expectType<{ id: number; title: string }>(
-	null as unknown as ClientResponse<typeof shorthandApi.todos.get>,
+	null as unknown as InferClientResponse<typeof shorthandApi.todos.get>,
 );
 
 const noInputApi = {
@@ -345,7 +345,7 @@ declaredResponseClient.todos
 		}
 	});
 
-type DeclaredRouteClientResponseType = ClientResponse<
+type DeclaredRouteClientResponseType = InferClientResponse<
 	typeof declaredResponseApi.todos.get
 >;
 
@@ -423,7 +423,7 @@ const streamResponseClient = initClient(streamResponseApi, {
 	baseUrl: "https://example.test",
 });
 
-expectType<Promise<ClientResponse<typeof streamResponseApi.todos.events>>>(
+expectType<Promise<InferClientResponse<typeof streamResponseApi.todos.events>>>(
 	streamResponseClient.todos.events(),
 );
 expectError(streamResponseClient.todos.events.fetch);
