@@ -74,7 +74,7 @@ it with a new HTTP response. See each server adapter for error customization.
 
 The Fetch client decodes response bodies without schema validation by default.
 Enable `validateResponses` to validate decoded bodies, declared response
-headers, and stream items:
+headers, and stream event data:
 
 ```ts
 const client = initClient(api, {

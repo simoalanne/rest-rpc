@@ -1,4 +1,4 @@
-import { type HttpError } from "@rest-rpc/core";
+import { type HttpError, type SseEvent } from "@rest-rpc/core";
 import { route, type as schemaType } from "@rest-rpc/core";
 import {
 	createTanstackQueryHelpers,
@@ -176,29 +176,30 @@ const streamApi = {
 const streamTq = createTanstackQueryHelpers(streamApi, {
 	baseUrl: "https://example.test",
 });
+type Event = SseEvent<{ id: string; message: string }>;
 
 const streamOptions = streamTq.events.list.queryOptions();
 expectAssignable<
 	Promise<{
 		status: 200;
-		body: AsyncIterable<{ id: string; message: string }>;
+		body: AsyncIterable<Event>;
 		headers: Headers;
 	}>
 >(queryClient.fetchQuery(streamOptions));
 expectAssignable<
 	| {
 			status: 200;
-			body: AsyncIterable<{ id: string; message: string }>;
+			body: AsyncIterable<Event>;
 			headers: Headers;
 	  }
 	| undefined
 >(queryClient.getQueryData(streamOptions.queryKey));
 
 const materializedStreamOptions = streamTq.events.list.streamedQueryOptions();
-expectAssignable<Promise<Array<{ id: string; message: string }>>>(
+expectAssignable<Promise<Event[]>>(
 	queryClient.fetchQuery(materializedStreamOptions),
 );
-expectAssignable<Array<{ id: string; message: string }> | undefined>(
+expectAssignable<Event[] | undefined>(
 	queryClient.getQueryData(materializedStreamOptions.queryKey),
 );
 
@@ -206,15 +207,15 @@ const selectedStreamOptions = streamTq.events.list.streamedQueryOptions(
 	undefined,
 	{
 		select(events) {
-			expectType<Array<{ id: string; message: string }>>(events);
+			expectType<Event[]>(events);
 			return events.length;
 		},
 	},
 );
-expectAssignable<Promise<Array<{ id: string; message: string }>>>(
+expectAssignable<Promise<Event[]>>(
 	queryClient.fetchQuery(selectedStreamOptions),
 );
-expectAssignable<Array<{ id: string; message: string }> | undefined>(
+expectAssignable<Event[] | undefined>(
 	queryClient.getQueryData(selectedStreamOptions.queryKey),
 );
 
@@ -224,8 +225,8 @@ const reducedStreamOptions = streamTq.events.list.streamedQueryOptions(
 		initialValue: "",
 		reducer: (text, chunk) => {
 			expectType<string>(text);
-			expectType<{ id: string; message: string }>(chunk);
-			return `${text}${chunk.message}`;
+			expectType<Event>(chunk);
+			return `${text}${chunk.data.message}`;
 		},
 	},
 );
@@ -237,19 +238,19 @@ expectAssignable<string | undefined>(
 const arrayReducedStreamOptions = streamTq.events.list.streamedQueryOptions(
 	undefined,
 	{
-		initialValue: [] as Array<{ id: string; message: string }>,
+		initialValue: [] as Event[],
 		reducer: (events, chunk) => {
-			expectType<Array<{ id: string; message: string }>>(events);
-			expectType<{ id: string; message: string }>(chunk);
+			expectType<Event[]>(events);
+			expectType<Event>(chunk);
 			return [...events, chunk];
 		},
 		refetchMode: "replace",
 	},
 );
-expectAssignable<Promise<Array<{ id: string; message: string }>>>(
+expectAssignable<Promise<Event[]>>(
 	queryClient.fetchQuery(arrayReducedStreamOptions),
 );
-expectAssignable<Array<{ id: string; message: string }> | undefined>(
+expectAssignable<Event[] | undefined>(
 	queryClient.getQueryData(arrayReducedStreamOptions.queryKey),
 );
 
@@ -259,8 +260,8 @@ const selectedReducedStreamOptions = streamTq.events.list.streamedQueryOptions(
 		initialValue: new Map<string, string>(),
 		reducer: (messages, chunk) => {
 			expectType<Map<string, string>>(messages);
-			expectType<{ id: string; message: string }>(chunk);
-			return new Map(messages).set(chunk.id, chunk.message);
+			expectType<Event>(chunk);
+			return new Map(messages).set(chunk.data.id, chunk.data.message);
 		},
 		refetchMode: "append",
 		select(messages) {
@@ -559,9 +560,7 @@ expectNotAssignable<{ id: string }>(null as unknown as CreateTodoVariables);
 type ProjectEventsStreamedData = RouteStreamedQueryData<
 	typeof streamApi.events.list
 >;
-expectType<Array<{ id: string; message: string }>>(
-	null as unknown as ProjectEventsStreamedData,
-);
+expectType<Event[]>(null as unknown as ProjectEventsStreamedData);
 expectType<never>(
 	null as unknown as RouteStreamedQueryData<typeof queryApi.todos.get>,
 );
@@ -611,12 +610,12 @@ expectType<Promise<{ id: string; title: string }>>(
 );
 
 const shorthandStreamOptions = shorthandTq.todos.events.queryOptions();
-expectType<Promise<AsyncIterable<{ id: string; message: string }>>>(
+expectType<Promise<AsyncIterable<Event>>>(
 	queryClient.fetchQuery(shorthandStreamOptions),
 );
 const shorthandMaterializedStreamOptions =
 	shorthandTq.todos.events.streamedQueryOptions();
-expectType<Promise<Array<{ id: string; message: string }>>>(
+expectType<Promise<Event[]>>(
 	queryClient.fetchQuery(shorthandMaterializedStreamOptions),
 );
 

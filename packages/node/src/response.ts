@@ -6,30 +6,19 @@ import type { BodyCodec, SerializedBody } from "@rest-rpc/core";
 import { normalizeMediaType, resolveBodyCodec } from "@rest-rpc/core/codecs";
 import { nodeBodyCodecs } from "./codecs.ts";
 
-const formatResponseStreamChunk = (chunk: unknown) =>
-	`${JSON.stringify(chunk)}\n`;
-
-const frameResponseStream = async function* (
-	body: AsyncIterable<unknown>,
-): AsyncIterableIterator<unknown> {
-	for await (const chunk of body) {
-		yield formatResponseStreamChunk(chunk);
-	}
-};
-
 /** Creates a Node readable stream with rest-rpc response framing. */
 export function createNodeResponseStream(
-	body: AsyncIterable<unknown>,
+	body: AsyncIterable<string>,
 ): Readable {
-	return Readable.from(frameResponseStream(body));
+	return Readable.from(body);
 }
 
 /** Writes a response stream to a Node HTTP response. */
 export async function writeStreamResponse(
-	body: AsyncIterable<unknown>,
+	body: AsyncIterable<string>,
 	res: ServerResponse,
 	status: number,
-	contentType = "application/x-ndjson",
+	contentType = "text/event-stream",
 ): Promise<void> {
 	res.statusCode = status;
 	res.setHeader("content-type", contentType);

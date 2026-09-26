@@ -495,7 +495,7 @@ describe("OpenAPI operations", () => {
 		assert.equal(response.content?.["image/jpeg"].schema?.type, "string");
 	});
 
-	it("creates NDJSON stream responses as text wire bodies", () => {
+	it("creates SSE stream responses with the declared data schema", () => {
 		const response = createResponse(
 			"",
 			{
@@ -505,25 +505,12 @@ describe("OpenAPI operations", () => {
 			schemaConverter,
 		);
 
-		assert.deepEqual(response.content?.["application/x-ndjson"].schema, {
-			type: "string",
+		assert.deepEqual(response.content?.["text/event-stream"].schema, {
+			type: "object",
+			properties: { id: { type: "string" } },
+			required: ["id"],
+			additionalProperties: false,
 		});
-	});
-
-	it("treats an ordinary NDJSON content type as custom content", () => {
-		const response = createResponse(
-			"",
-			{
-				body: z.object({ id: z.string() }),
-				contentType: "application/x-ndjson",
-			},
-			schemaConverter,
-		);
-
-		assert.equal(
-			response.content?.["application/x-ndjson"].schema?.type,
-			"object",
-		);
 	});
 
 	it("uses input schemas for requests and output schemas for responses", () => {

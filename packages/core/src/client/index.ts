@@ -6,6 +6,8 @@ export type {
 	ApiClientFetchOptions,
 	ApiClientFor,
 	ApiClientOptions,
+	ClientHeaders,
+	ClientHeaderValue,
 	ClientResponse,
 	FetchArgs,
 	FetchLike,
@@ -15,3 +17,4 @@ export type {
 } from "./types.ts";
 
 export type { ApiClientRouteValue } from "./types.ts";
+export type { SseEvent } from "../sse.ts";

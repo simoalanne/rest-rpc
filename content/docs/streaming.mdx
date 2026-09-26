@@ -1,0 +1,139 @@
+---
+title: Streaming
+description: Declare, serve, and consume typed Server-Sent Event streams.
+---
+
+Streaming routes use Server-Sent Events (SSE) over Fetch. Handlers produce an
+async iterable, and clients consume an async iterable of typed events.
+
+## Declare a Stream
+
+Returning an async iterable infers a plain stream. Use `.streamOutput()` when
+you want to declare and validate its data schema.
+
+```ts
+const events = route
+	.get("/todos/events")
+	.streamOutput(z.object({ id: z.string(), message: z.string() }))
+	.handler(async function* () {
+		yield { id: "todo_1", message: "Created" };
+		yield { id: "todo_1", message: "Completed" };
+	});
+```
+
+Use `.streamResponse()` when the route can return different HTTP statuses:
+
+```ts
+const events = route
+	.get("/todos/events")
+	.streamResponse(200, z.object({ id: z.string(), message: z.string() }))
+	.response(401, z.object({ code: z.literal("UNAUTHORIZED") }))
+	.handler(() => ({ status: 200, body: streamTodoEvents() }));
+```
+
+Stream schemas describe event data. Declared schemas validate each value on the
+server and, when client response validation is enabled, each event's data on
+the client. Streaming responses bypass body codecs. The data must be JSON serializable
+and is sent as a JSON string in the SSE `data` field.
+
+## Add Event Metadata
+
+Yield data directly when an event does not need metadata. Use `sse()` to add an
+event ID, event name, or retry hint:
+
+```ts
+import { route, sse } from "@rest-rpc/express";
+
+const events = route.get("/todos/events").handler(async function* () {
+	yield { id: "todo_1", message: "Created" };
+	yield sse({
+		data: { id: "todo_1", message: "Completed" },
+		id: "event_2",
+		event: "todo.updated",
+		retry: 2_000,
+	});
+});
+```
+
+## Consume a Stream
+
+The Fetch client yields `SseEvent<T>` values. Application data is available on
+`event.data`:
+
+```ts
+export type SseEvent<T> = {
+	data: T;
+	id?: string;
+	event?: string;
+	retry?: number;
+};
+```
+
+```ts
+for await (const event of await client.todos.events()) {
+	console.log(event.data.message);
+	console.log(event.id, event.event, event.retry);
+}
+```
+
+For a status response stream, narrow the response before iterating its body:
+
+```ts
+const response = await client.todos.events();
+
+if (response.status === 200) {
+	for await (const event of response.body) {
+		console.log(event.data.message);
+	}
+}
+```
+
+The initial request and later stream iteration can fail independently. Pass an
+`AbortSignal` in the per-call options to cancel both the request and stream:
+
+```ts
+const controller = new AbortController();
+const events = await client.todos.events(undefined, {
+	signal: controller.signal,
+});
+
+controller.abort();
+```
+
+## Not an EventSource Replacement
+
+the client exposes SSE events over Fetch but is not a general replacement for the browser `EventSource` API.
+the fields in the `SseEvent` type are metadata only. rest-rpc client does not automatically reconnect, pass the last event ID, or filter events by name.
+Those are application-level concerns.
+
+`Last-Event-Id` can be passed in the request headers to resume a stream.
+
+```ts
+let lastEventId: string | undefined;
+
+async function connect() {
+	const events = await client.todos.events(undefined, {
+		additionalHeaders: {
+			"last-event-id": lastEventId,
+		},
+	});
+
+	for await (const event of events) {
+		lastEventId = event.id ?? lastEventId;
+		handleTodoEvent(event.data);
+	}
+}
+```
+
+The `Last-Event-Id` header is recognized by the server adapters and automatically passed to the handler as `lastEventId`.
+
+```ts
+const events = route
+	.get("/todos/events")
+	.handler(({ lastEventId }) => streamTodoEvents({ after: lastEventId }));
+```
+
+## TanStack Query
+
+The TanStack Query integration can materialize a stream or reduce events as
+they arrive. See [TanStack Query](/docs/client/tanstack-query#streamed-queries).

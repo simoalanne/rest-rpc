@@ -12,7 +12,7 @@ import {
 	validateStandardSchema,
 	type StandardSchemaV1,
 } from "../standard-schema/index.ts";
-import { parseNdjsonStream } from "./stream.ts";
+import { parseSseStream } from "./stream.ts";
 import type { FetchArgs } from "./types.ts";
 
 export const getResponseSchema = (
@@ -44,7 +44,7 @@ const assertResponseContentType = (
 	}
 };
 
-const STREAM_CONTENT_TYPE = "application/x-ndjson";
+const STREAM_CONTENT_TYPE = "text/event-stream";
 
 const readStreamResponse = (
 	schema: StandardSchemaV1,
@@ -61,12 +61,7 @@ const readStreamResponse = (
 	if (rawResponse.body === null) {
 		throw new Error("Server returned no stream body");
 	}
-	return parseNdjsonStream(
-		schema,
-		rawResponse.body,
-		validate,
-		rawResponse.status,
-	);
+	return parseSseStream(schema, rawResponse.body, validate, rawResponse.status);
 };
 
 const validateResponseBody = async (

@@ -118,7 +118,7 @@ export const createIntegrationImplementations = () => {
 			})),
 		},
 		streams: {
-			ndjson: implementor.streams.ndjson.handler(() => ({
+			sse: implementor.streams.sse.handler(() => ({
 				status: 200,
 				body: (async function* () {
 					yield { id: "event-1", index: 1 };

@@ -5,11 +5,9 @@ const eventSchema = z.object({ id: z.string(), index: z.number() });
 
 export const streamsContract = {
 	empty: route.get("/streams/empty").streamResponse(200, eventSchema),
-	ndjson: route.get("/streams/ndjson-framing").streamResponse(200, eventSchema),
 	cancellable: route
 		.get("/streams/cancellable")
 		.streamResponse(200, eventSchema),
-	invalid: route.get("/streams/invalid").streamResponse(200, eventSchema),
 	throwsBeforeFirstChunk: route
 		.get("/streams/throws-before-first-chunk")
 		.streamResponse(200, eventSchema),

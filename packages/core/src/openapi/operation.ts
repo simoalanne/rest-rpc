@@ -12,7 +12,7 @@ import { getRouteResponses } from "../contract/response.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 
 export const JSON_CONTENT_TYPE = "application/json";
-export const NDJSON_CONTENT_TYPE = "application/x-ndjson";
+export const SSE_CONTENT_TYPE = "text/event-stream";
 export const FORM_URLENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
 export const MULTIPART_FORM_DATA_CONTENT_TYPE = "multipart/form-data";
 
@@ -180,12 +180,13 @@ export const createResponse = (
 	}
 
 	if (responseDeclaration.kind === "stream") {
+		const openApiSchema = converter?.(schema, "output") ?? {};
 		return {
 			description: openApiResponse?.description ?? description,
 			...(headers ? { headers } : {}),
 			content: {
-				[NDJSON_CONTENT_TYPE]: {
-					schema: createStreamWireSchema(NDJSON_CONTENT_TYPE),
+				[SSE_CONTENT_TYPE]: {
+					schema: openApiSchema,
 				},
 			},
 		};
@@ -253,11 +254,6 @@ const mergeResponseHeaders = (
 		...declaredHeaders,
 	};
 };
-
-const createStreamWireSchema = (contentType: string) =>
-	contentType.split(";")[0]?.trim().toLowerCase() === "application/octet-stream"
-		? { type: "string", format: "binary" }
-		: { type: "string" };
 
 export const createResponses = (
 	route: RouteDeclaration,

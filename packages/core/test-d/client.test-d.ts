@@ -3,11 +3,12 @@ import {
 	type ApiClientRouteValue,
 	type ClientRequest,
 	type ClientResponse,
+	type SseEvent,
 	initClient,
 	route,
 	type as schemaType,
 } from "@rest-rpc/core";
-import { expectError, expectType } from "tsd";
+import { expectError, expectNotAssignable, expectType } from "tsd";
 import { z } from "zod";
 
 expectError(initClient({ baseUrl: "https://example.test" }));
@@ -44,7 +45,7 @@ const shorthandClient = initClient(shorthandApi, {
 });
 
 expectType<Promise<{ id: number; title: string }>>(shorthandClient.todos.get());
-expectType<Promise<AsyncIterable<{ id: string; title: string }>>>(
+expectType<Promise<AsyncIterable<SseEvent<{ id: string; title: string }>>>>(
 	shorthandClient.todos.events(),
 );
 expectType<Promise<string>>(shorthandClient.todos.export());
@@ -584,9 +585,9 @@ const globalHeadersApi = {
 
 const globalHeadersClient = initClient(globalHeadersApi, {
 	baseUrl: "https://example.test",
-	getGlobalHeaders: () => ({
+	globalHeaders: {
 		authorization: "Bearer token",
-	}),
+	},
 });
 
 globalHeadersClient.todos.search({
@@ -606,9 +607,9 @@ expectError(globalHeadersClient.todos.secure());
 
 const looseGlobalHeadersClient = initClient(globalHeadersApi, {
 	baseUrl: "https://example.test",
-	getGlobalHeaders: (): Record<string, string> => ({
+	globalHeaders: {
 		authorization: "Bearer token",
-	}),
+	} as Record<string, string>,
 });
 
 expectError(looseGlobalHeadersClient.todos.search({}));
@@ -616,6 +617,17 @@ expectError(
 	looseGlobalHeadersClient.todos.search({ query: { search: "milk" } }),
 );
 expectError(looseGlobalHeadersClient.todos.search());
+
+const optionalGlobalHeaderClient = initClient(globalHeadersApi, {
+	baseUrl: "https://example.test",
+	globalHeaders: {
+		authorization: (): string | undefined => undefined,
+	},
+});
+expectError(optionalGlobalHeaderClient.todos.secure({}));
+optionalGlobalHeaderClient.todos.secure({
+	headers: { authorization: "Bearer token" },
+});
 
 const additiveHeadersApi = {
 	items: route
@@ -634,6 +646,36 @@ additiveHeadersClient.items({
 		"x-request-id": "request-1",
 	},
 });
+additiveHeadersClient.items(
+	{
+		headers: {
+			authorization: "Bearer token",
+			"x-request-id": "request-1",
+		},
+	},
+	{
+		additionalHeaders: {
+			"x-trace-id": "trace-1",
+			"x-retry": 1,
+		},
+	},
+);
+type AdditionalHeaders = NonNullable<
+	NonNullable<
+		Parameters<typeof additiveHeadersClient.items>[1]
+	>["additionalHeaders"]
+>;
+expectNotAssignable<AdditionalHeaders>({
+	"x-trace-id": () => "trace-1",
+});
+expectError(
+	additiveHeadersClient.items(undefined, {
+		additionalHeaders: {
+			authorization: "Bearer token",
+			"x-request-id": "request-1",
+		},
+	}),
+);
 expectError(
 	additiveHeadersClient.items({
 		headers: {

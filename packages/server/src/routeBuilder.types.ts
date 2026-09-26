@@ -12,6 +12,7 @@ import type {
 	ServerResponseBody,
 } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
+import type { SseServerEvent } from "./sse.ts";
 import type {
 	MiddlewareRequest,
 	MiddlewareReturn,
@@ -22,6 +23,10 @@ import type {
 type ContractRoute = { readonly "~restrpc": RouteDeclaration };
 
 type EmptyObject = Record<never, never>;
+type RequestTransportFields = {
+	contentType?: string;
+	lastEventId?: string;
+};
 type AnyRouteHandler = (...args: never[]) => unknown;
 type MaybePromise<T> = T | Promise<T>;
 
@@ -53,9 +58,10 @@ export type RouteErrors<TRoute extends ContractRoute> = ServerErrors<
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#server}
  */
-export type RouteResponse<TRoute extends ContractRoute> = ServerResponse<
-	TRoute["~restrpc"]
->;
+export type RouteResponse<TRoute extends ContractRoute> =
+	ServerResponse<TRoute["~restrpc"]> extends infer TResponse
+		? WithSseServerEvents<TResponse>
+		: never;
 
 type RequestValue<TRoute extends RouteDeclaration> =
 	ServerRequest<TRoute> extends never ? EmptyObject : ServerRequest<TRoute>;
@@ -88,8 +94,19 @@ type UsesPlainOutput<TRoute extends RouteDeclaration> = TRoute extends {
 			? true
 			: false;
 
+type WithSseServerEvents<T> =
+	T extends AsyncIterable<infer TItem>
+		? AsyncIterable<TItem | SseServerEvent<TItem>>
+		: T extends { body: infer TBody }
+			? TBody extends AsyncIterable<infer TItem>
+				? Omit<T, "body"> & {
+						body: AsyncIterable<TItem | SseServerEvent<TItem>>;
+					}
+				: T
+			: T;
+
 type HandlerResult<TRoute extends RouteDeclaration> = MaybePromise<
-	ServerResponse<TRoute>
+	WithSseServerEvents<ServerResponse<TRoute>>
 >;
 
 /**
@@ -113,6 +130,7 @@ export type RouteRequest<
 					>
 				: EmptyObject
 		: RequestValue<TRoute>) &
+		RequestTransportFields &
 		TAdditionalHandlerFields & {
 			route: TRoute;
 			context: TContext;
@@ -137,7 +155,7 @@ type Merge<T> = { [TKey in keyof T]: T[TKey] };
 /**
  * HTTP response shape from which a handler-based route infers its contract.
  *
- * @remarks An `AsyncIterable` body always denotes an NDJSON stream. Providing
+ * @remarks An `AsyncIterable` body always denotes an SSE stream. Providing
  * `contentType` selects a custom-content response for non-stream bodies;
  * otherwise bodies use JSON.
  *
@@ -198,11 +216,13 @@ type SerializedResponseHeaders<THeaders> = {
 	[TKey in keyof THeaders]: SerializedResponseHeader<THeaders[TKey]>;
 };
 
+type SseData<T> = T extends SseServerEvent<infer TData> ? TData : T;
+
 type ImplicitResponseBodyDeclaration<TResponse> = TResponse extends {
 	body: infer TBody;
 }
 	? TBody extends AsyncIterable<infer TItem>
-		? ClientSchema<TItem>
+		? ClientSchema<SseData<TItem>>
 		: ClientSchema<TBody>
 	: undefined;
 
@@ -256,7 +276,7 @@ type InferredHttpRoute<TRoute, TResult> = Omit<TRoute, "responses"> & {
 type InferredProcedureResponse<TResult> =
 	Awaited<TResult> extends infer TOutput
 		? TOutput extends AsyncIterable<infer TItem>
-			? { kind: "stream"; body: ClientSchema<TItem> }
+			? { kind: "stream"; body: ClientSchema<SseData<TItem>> }
 			: TOutput extends {
 						contentType: infer TContentType extends string;
 						data: infer TData;
@@ -315,7 +335,7 @@ type ProcedureHandlerResult<TResponse> = TResponse extends {
 				data: ServerResponseBody<TResponse>;
 				contentType: ProcedureContentType<TContentType>;
 			}
-	: ServerResponseBody<TResponse>;
+	: WithSseServerEvents<ServerResponseBody<TResponse>>;
 
 type ProcedureHandlerMethod<
 	TRoute extends RouteDeclaration,

@@ -33,7 +33,7 @@ describe("client body codecs", () => {
 		const client = initClient(api, {
 			baseUrl,
 			validateResponses: true,
-			getGlobalHeaders: () => ({ "X-Version": "global", "X-Global": "kept" }),
+			globalHeaders: { "X-Version": "global", "X-Global": "kept" },
 			bodyCodecs: [
 				{
 					match: (mediaType) => mediaType === "application/json",
@@ -63,7 +63,7 @@ describe("client body codecs", () => {
 			fetch: async (_url, init) => {
 				assert.equal(init?.body, "hello");
 				assert.deepEqual(init?.headers, {
-					"x-version": "route",
+					"x-version": "codec",
 					"x-global": "kept",
 					"x-count": "3",
 					"content-type": "application/json; charset=utf-8",
@@ -190,7 +190,7 @@ describe("client body codecs", () => {
 		assert.equal((await client.optional()).body, "absent");
 	});
 
-	it("requires NDJSON headers and a body stream in both validation modes", async () => {
+	it("requires SSE headers and a body stream in both validation modes", async () => {
 		for (const validateResponses of [false, true]) {
 			for (const contentType of [undefined, "application/json"]) {
 				const response = new Response("{}", {
@@ -218,7 +218,7 @@ describe("client body codecs", () => {
 					fetch: async () =>
 						new Response(null, {
 							headers: {
-								"content-type": "Application/X-NDJSON; charset=utf-8",
+								"content-type": "Text/Event-Stream; charset=utf-8",
 							},
 						}),
 				},
@@ -249,7 +249,7 @@ describe("client body codecs", () => {
 		assert.equal((await client.value()).body, "hello");
 	});
 
-	it("rejects undeclared outgoing selections and reserved typed headers before fetch", async () => {
+	it("rejects undeclared outgoing content-type selections before fetch", async () => {
 		const api = {
 			value: route
 				.post("/value")
@@ -272,49 +272,41 @@ describe("client body codecs", () => {
 			client.value({ body: new Blob() }, undefined as never),
 			/contentType option is required/,
 		);
-		const headersClient = initClient(
-			{
-				value: route
-					.post("/value")
-					.headers(z.object({ "Content-Type": z.string() }))
-					.response(204),
-			},
-			{
-				baseUrl,
-				fetch: async () => {
-					throw new Error("Must not fetch");
-				},
-			},
-		);
-		await assert.rejects(
-			headersClient.value({ headers: { "Content-Type": "application/json" } }),
-			/content-type/,
-		);
 	});
 
-	it("checks serialized headers and media-type directives before Fetch delivery", async () => {
+	it("passes serialized headers through and checks media-type directives", async () => {
 		const api = {
 			value: route
 				.post("/value")
 				.body(z.string(), { contentType: "text/plain" })
 				.response(204),
 		};
-		for (const headers of [
-			{ "Content-Type": "bad" },
-			{ "CONTENT-Length": "1" },
-			{ "transfer-encoding": "chunked" },
-		]) {
-			const client = initClient(api, {
-				baseUrl,
-				bodyCodecs: [
-					{ match: () => true, serialize: () => ({ body: "", headers }) },
-				],
-				fetch: async () => {
-					throw new Error("Must not fetch");
+		const headersClient = initClient(api, {
+			baseUrl,
+			bodyCodecs: [
+				{
+					match: () => true,
+					serialize: () => ({
+						body: "wire",
+						headers: {
+							"Content-Type": "manual/type",
+							"CONTENT-Length": "4",
+							"transfer-encoding": "custom",
+						},
+					}),
 				},
-			});
-			await assert.rejects(client.value({ body: "hello" }), /Codec headers/);
-		}
+			],
+			fetch: async (_url, init) => {
+				assert.deepEqual(init?.headers, {
+					"content-length": "4",
+					"content-type": "text/plain",
+					"transfer-encoding": "custom",
+				});
+				return new Response(null, { status: 204 });
+			},
+		});
+		await headersClient.value({ body: "hello" });
+
 		const changedProtocol = initClient(api, {
 			baseUrl,
 			bodyCodecs: [
@@ -353,7 +345,7 @@ describe("client body codecs", () => {
 		}
 	});
 
-	it("propagates codec failures and keeps declared NDJSON on its streaming path", async () => {
+	it("propagates codec failures and keeps declared SSE on its streaming path", async () => {
 		const failure = new Error("Codec failed");
 		const input = {
 			value: route.post("/value").body(z.string()).response(204),
@@ -409,13 +401,13 @@ describe("client body codecs", () => {
 					},
 				],
 				fetch: async () =>
-					new Response('{"id":1}\n', {
-						headers: { "content-type": "application/x-ndjson" },
+					new Response('data: {"id":1}\n\n', {
+						headers: { "content-type": "text/event-stream" },
 					}),
 			},
 		);
 		const items = [];
 		for await (const item of (await streaming.events()).body) items.push(item);
-		assert.deepEqual(items, [{ id: 1 }]);
+		assert.deepEqual(items, [{ data: { id: 1 } }]);
 	});
 });

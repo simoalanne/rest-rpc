@@ -8,6 +8,7 @@ import {
 	validateStandardSchema,
 } from "@rest-rpc/core/standard-schema";
 import type { HttpHeaders } from "./headers.ts";
+import { isSseServerEvent, sse } from "./sse.ts";
 import {
 	ResponseValidationError,
 	RequestValidationError,
@@ -27,7 +28,7 @@ export type RequestSegments = {
 	body?: unknown;
 	query?: URLSearchParams;
 	params?: unknown;
-	headers?: unknown;
+	headers?: Record<string, string | readonly string[] | undefined>;
 };
 
 type SegmentValidationResult = {
@@ -165,6 +166,13 @@ export async function* validateResponseStreamChunks(
 	schema: ResponseBodySchema,
 ) {
 	for await (const chunk of body) {
-		yield await validateResponseStreamChunk(schema, chunk);
+		if (isSseServerEvent(chunk)) {
+			yield sse({
+				...chunk,
+				data: await validateResponseStreamChunk(schema, chunk.data),
+			});
+		} else {
+			yield await validateResponseStreamChunk(schema, chunk);
+		}
 	}
 }

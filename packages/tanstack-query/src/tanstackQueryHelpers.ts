@@ -122,7 +122,7 @@ type RouteStreamChunk<E extends QueryRoute> = [
 /**
  * Infers the accumulated data returned by generated stream query options.
  *
- * @remarks The default accumulator materializes NDJSON chunks into an array
+ * @remarks The default accumulator materializes SSE events into an array
  * and omits the HTTP response envelope.
  *
  * @see {@link https://rest-rpc.dev/docs/type-helpers#tanstack-query}

@@ -172,11 +172,11 @@ import { useQuery } from "@tanstack/react-query";
 const events = useQuery(tq.todos.events.streamedQueryOptions());
 ```
 
-By default, streamed chunks accumulate into an array.
+By default, SSE events accumulate into an array.
 
 ```ts
 events.data;
-// Array<{ id: string; message: string }> | undefined
+// Array<SseEvent<{ id: string; message: string }>> | undefined
 ```
 
 Pass `initialValue` and `reducer` when you want a different accumulated data
@@ -186,13 +186,16 @@ shape.
 const messages = useQuery(
 	tq.todos.events.streamedQueryOptions(undefined, {
 		initialValue: "",
-		reducer: (text, event) => `${text}${event.message}`,
+		reducer: (text, event) => `${text}${event.data.message}`,
 	}),
 );
 
 messages.data;
 // string | undefined
 ```
+
+See [Streaming](/docs/http-behavior/streaming) for the event shape and
+transport behavior.
 
 ## Query Keys
 

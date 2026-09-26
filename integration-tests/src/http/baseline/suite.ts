@@ -213,14 +213,14 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 			assert.equal(response.headers.get("x-optional-result"), null);
 		});
 
-		it("receives NDJSON streams as async iterables", async () => {
-			const streamResponse = await client.streams.ndjson();
+		it("receives SSE streams as event envelopes", async () => {
+			const streamResponse = await client.streams.sse();
 			assert.equal(streamResponse.status, 200);
 			const stream = streamResponse.body;
 
 			assert.deepEqual(await collectAsyncIterable(stream), [
-				{ id: "event-1", index: 1 },
-				{ id: "event-2", index: 2 },
+				{ data: { id: "event-1", index: 1 } },
+				{ data: { id: "event-2", index: 2 } },
 			]);
 		});
 
@@ -229,8 +229,8 @@ export const runClientHttpSuite = (adapter: ClientHttpSuiteAdapter) => {
 
 			assert.equal(response.status, 200);
 			assert.deepEqual(await collectAsyncIterable(response.body), [
-				"alpha\n",
-				"beta\n",
+				{ data: "alpha\n" },
+				{ data: "beta\n" },
 			]);
 		});
 	});

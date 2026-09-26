@@ -43,16 +43,19 @@ expectError(
 	})),
 );
 
-const _upload = implementor.todos.upload.handler(({ body, contentType }) => {
-	expectType<Uint8Array<ArrayBuffer>>(body);
-	expectType<"image/png" | "image/jpeg">(contentType);
-	return { status: 204 };
-});
+const _upload = implementor.todos.upload.handler(
+	({ body, contentType, lastEventId }) => {
+		expectType<Uint8Array<ArrayBuffer>>(body);
+		expectType<string | undefined>(contentType);
+		expectType<string | undefined>(lastEventId);
+		return { status: 204 };
+	},
+);
 
 const _importCsv = implementor.todos.importCsv.handler(
 	({ body, contentType }) => {
 		expectType<string>(body);
-		expectType<"text/csv">(contentType);
+		expectType<string | undefined>(contentType);
 		return { status: 204 };
 	},
 );
@@ -71,7 +74,7 @@ expectError(
 );
 
 const create = implementor.todos.create.handler(({ input, contentType }) => {
-	expectType<"text/plain">(contentType);
+	expectType<string | undefined>(contentType);
 	return {
 		id: "todo-1",
 		title: input.title,

@@ -15,7 +15,7 @@ import type {
 	FetchArgs,
 	FetchLike,
 	FetchOptions,
-	GetHeadersFn,
+	ClientHeaders,
 	NextFetchTagsOptions,
 } from "./types.ts";
 
@@ -45,28 +45,15 @@ export const takesRequestInput = (route: ClientRequestRoute) => {
 	return Boolean(request?.body);
 };
 
-const findHeader = (headers: Record<string, string>, name: string) =>
-	Object.keys(headers).find((header) => header.toLowerCase() === name);
-
-const hasHeader = (headers: Record<string, string>, name: string) =>
-	findHeader(headers, name) !== undefined;
-
-const normalizeHeaders = (headers: Record<string, string> | undefined) =>
+const normalizeHeaders = (
+	headers: Record<string, string> | undefined,
+): Record<string, string> =>
 	Object.fromEntries(
 		Object.entries(headers ?? {}).map(([key, value]) => [
 			key.toLowerCase(),
 			value,
 		]),
 	);
-
-export const assertNoContentTypeHeader = (headers: Record<string, string>) => {
-	if (hasHeader(headers, "content-type")) {
-		throw new Error(
-			'ApiClient request headers must not contain a "content-type" header. Pass the content type to body(schema, { contentType }) on the route declaration instead.',
-		);
-	}
-};
-
 const stringifyHeaders = (
 	_route: ClientRequestRoute,
 	headers: Record<string, unknown> | undefined,
@@ -147,7 +134,6 @@ export const constructBaseRequest = (
 			: undefined) ??
 		(route.request?.body ? "application/json" : undefined);
 	const requestHeaders = stringifyHeaders(route, headers);
-	assertNoContentTypeHeader(requestHeaders);
 	return {
 		url,
 		body: contentType === undefined ? undefined : body,
@@ -161,9 +147,23 @@ export type ExecuteRequestOptions = {
 	bodyCodecs?: readonly BodyCodec<Response>[];
 	fetch?: FetchLike;
 	fetchOptions?: ApiClientFetchOptions;
-	getGlobalHeaders?: GetHeadersFn;
+	globalHeaders?: ClientHeaders;
 	nextFetchTags?: NextFetchTagsOptions;
 	timeoutMs?: number;
+};
+
+const resolveHeaders = async (
+	headers: ClientHeaders,
+): Promise<Record<string, string>> => {
+	const entries = await Promise.all(
+		Object.entries(headers).map(async ([name, value]) => {
+			const resolved = typeof value === "function" ? await value() : value;
+			return resolved === undefined
+				? undefined
+				: ([name, String(resolved)] as const);
+		}),
+	);
+	return Object.fromEntries(entries.filter((entry) => entry !== undefined));
 };
 
 const addNextFetchTags = (
@@ -242,16 +242,26 @@ export const executeRequest = async <E extends RouteDeclaration>(
 		serialized?.contentType === undefined
 			? contentType
 			: serialized.contentType;
-	const headers = (await options.getGlobalHeaders?.()) ?? {};
-	assertNoContentTypeHeader(headers);
+	const globalHeaders = await resolveHeaders(options.globalHeaders ?? {});
+	const additionalHeaders = stringifyHeaders(
+		route,
+		fetchOptions?.additionalHeaders,
+	);
+	const clientHeaders = {
+		...normalizeHeaders(globalHeaders),
+		...normalizeHeaders(additionalHeaders),
+	};
 	const signalState = createRequestSignal(
 		fetchOptions?.signal,
 		options.timeoutMs,
 	);
 
 	try {
-		const { contentType: _contentType, ...requestFetchOptions } =
-			fetchOptions ?? {};
+		const {
+			contentType: _contentType,
+			additionalHeaders: _additionalHeaders,
+			...requestFetchOptions
+		} = fetchOptions ?? {};
 		const init = addNextFetchTags(
 			{
 				...options.fetchOptions,
@@ -259,9 +269,9 @@ export const executeRequest = async <E extends RouteDeclaration>(
 				method: route.method,
 				body: serialized?.body as BodyInit | undefined,
 				headers: {
-					...normalizeHeaders(headers),
-					...normalizeHeaders(codecHeaders),
+					...clientHeaders,
 					...normalizeHeaders(requestHeaders),
+					...normalizeHeaders(codecHeaders),
 					...(outgoingContentType
 						? { "content-type": outgoingContentType }
 						: {}),

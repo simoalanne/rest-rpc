@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { BodyContentType } from "./body.ts";
 import type { RouteDeclaration } from "./routeDeclaration.ts";
+import type { SseEvent } from "../sse.ts";
 
 export type ResponseSchema = StandardSchemaV1;
 
@@ -79,7 +80,7 @@ type InferClientResponseBody<TResponse> =
 	ResponseBody<TResponse> extends infer TBody
 		? TBody extends StandardSchemaV1
 			? IsStreamResponse<TResponse> extends true
-				? AsyncIterable<StandardSchemaV1.InferOutput<TBody>>
+				? AsyncIterable<SseEvent<StandardSchemaV1.InferOutput<TBody>>>
 				: StandardSchemaV1.InferOutput<TBody>
 			: TBody extends undefined
 				? undefined

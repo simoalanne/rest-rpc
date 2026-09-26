@@ -6,7 +6,12 @@ import {
 	fetchSuccess,
 	type RouteRequestFn,
 } from "./response.ts";
-import type { ApiClientFor, ApiClientOptions, FetchArgs } from "./types.ts";
+import type {
+	ApiClientFor,
+	ApiClientOptions,
+	ClientHeaders,
+	FetchArgs,
+} from "./types.ts";
 
 /**
  * Creates a typed fetch client whose shape mirrors a contract.
@@ -15,7 +20,7 @@ import type { ApiClientFor, ApiClientOptions, FetchArgs } from "./types.ts";
  */
 export function initClient<
 	TContract extends Contract,
-	const TGlobalHeaders extends Record<string, string> = Record<never, string>,
+	const TGlobalHeaders extends ClientHeaders = Record<never, string>,
 >(
 	contract: TContract,
 	options: ApiClientOptions<TGlobalHeaders>,
@@ -25,7 +30,7 @@ export function initClient<
 		bodyCodecs: options.bodyCodecs,
 		fetch: options.fetch,
 		fetchOptions: options.fetchOptions,
-		getGlobalHeaders: options.getGlobalHeaders,
+		globalHeaders: options.globalHeaders,
 		nextFetchTags: options.nextFetchTags,
 		timeoutMs: options.timeoutMs,
 	};

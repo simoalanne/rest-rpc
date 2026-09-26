@@ -29,8 +29,6 @@ A single `tag[]=one` remains an array. Repeated scalar keys such as
 
 Declare header schemas with lowercase names. Incoming Node and Fetch header
 names are normalized to lowercase and uppercase schema keys do not match them.
-Declare request content types through body options rather than a
-`content-type` request header.
 
 ## Bodies and Content Types
 
@@ -57,13 +55,9 @@ each selected type.
 
 ## Streaming
 
-Async iterable outputs use `application/x-ndjson`: each item is JSON-encoded on
-its own line. The client incrementally parses those lines and yields items
-through an async iterable.
-
-Inferred streams, `.streamOutput()`, and `.streamResponse()` use the same
-framing. Streams bypass `bodyCodecs`. Declared item schemas validate on the
-server and optionally on the client with `validateResponses`.
+Async iterable outputs use Server-Sent Events and bypass `bodyCodecs`. See
+[Streaming](/docs/http-behavior/streaming) for declarations, handlers, client
+consumption, and event metadata.
 
 ## Fetch Client Defaults
 
@@ -210,9 +204,8 @@ by this delivery path. Its result does not go through the default serializers.
 including parameters, and returns `{ body, headers?, contentType? }`:
 
 - `body` must be usable by the target Fetch or server response API.
-- `headers` adds headers. Declared request or response headers take precedence.
-  Codec headers cannot contain `Content-Type`, `Content-Length`, or
-  `Transfer-Encoding` (case-insensitively).
+- `headers` adds transport headers for the serialized body. Their handling can
+  depend on the Fetch or server runtime.
 - Omitting `contentType` preserves the declared content type. A string may change
   parameters but must keep the same base media type. `null` omits the explicit
   content-type header, allowing Fetch to supply it for bodies such as `FormData`.

@@ -171,7 +171,7 @@ export function registerRoutes(
 				if (result.kind === "stream") {
 					return reply
 						.status(result.status)
-						.type("application/x-ndjson")
+						.type("text/event-stream")
 						.send(createNodeResponseStream(result.body));
 				}
 				reply.status(result.status);

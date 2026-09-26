@@ -14,6 +14,10 @@ type UnknownRequest = {
 	query: unknown;
 	input: unknown;
 };
+type RequestTransportFields = {
+	contentType?: string;
+	lastEventId?: string;
+};
 
 export type RequestFields = Partial<UnknownRequest>;
 
@@ -39,4 +43,8 @@ export type ReusableMiddlewareRequest<
 	TContext extends object,
 > = TFields &
 	TRequest &
-	UnknownRequest & { route: RouteDeclaration; context: TContext } & Controls;
+	UnknownRequest &
+	RequestTransportFields & {
+		route: RouteDeclaration;
+		context: TContext;
+	} & Controls;

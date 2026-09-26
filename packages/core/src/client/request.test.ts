@@ -496,7 +496,7 @@ describe("ApiClient requests", () => {
 				cache: "no-store",
 				credentials: "include",
 			},
-			getGlobalHeaders: () => ({ Authorization: "Bearer token" }),
+			globalHeaders: { Authorization: "Bearer token" },
 		});
 
 		await client.todos.list(
@@ -509,6 +509,106 @@ describe("ApiClient requests", () => {
 		assert.deepEqual(calls[0]?.init?.headers, {
 			authorization: "Bearer token",
 		});
+	});
+
+	it("resolves global header providers concurrently with case-insensitive precedence", async () => {
+		const calls = captureFetch();
+		let releaseFirst!: () => void;
+		let secondStarted = false;
+		let overriddenCalls = 0;
+		const first = new Promise<void>((resolve) => {
+			releaseFirst = resolve;
+		});
+		const client = initClient(
+			{ ping: route.post("/ping").response(204) },
+			{
+				baseUrl: "https://api.test",
+				globalHeaders: {
+					"X-First": async () => {
+						await first;
+						return "first";
+					},
+					"X-Second": async () => {
+						secondStarted = true;
+						releaseFirst();
+						return "second";
+					},
+					"X-Overridden": () => {
+						overriddenCalls += 1;
+						return "global";
+					},
+				},
+			},
+		);
+
+		await client.ping(undefined, {
+			additionalHeaders: {
+				"x-overridden": "call",
+				"X-Static": "static",
+			},
+		});
+
+		assert.equal(secondStarted, true);
+		assert.equal(overriddenCalls, 1);
+		assert.deepEqual(calls[0]?.init?.headers, {
+			"x-first": "first",
+			"x-overridden": "call",
+			"x-second": "second",
+			"x-static": "static",
+		});
+	});
+
+	it("propagates provider errors and serializes scalar values", async () => {
+		const calls = captureFetch();
+		const rejected = initClient(
+			{ ping: route.post("/ping").response(204) },
+			{
+				baseUrl: "https://api.test",
+				globalHeaders: {
+					authorization: () => Promise.reject(new Error("token unavailable")),
+				},
+			},
+		);
+		await assert.rejects(() => rejected.ping(), /token unavailable/);
+
+		const scalars = initClient(
+			{ ping: route.post("/ping").response(204) },
+			{
+				baseUrl: "https://api.test",
+				globalHeaders: {
+					"x-number": 123,
+					"x-boolean": () => false,
+					"x-omitted": async () => undefined,
+				},
+			},
+		);
+		await scalars.ping(undefined, {
+			additionalHeaders: { "x-additional": true, "x-empty": undefined },
+		});
+		assert.deepEqual(calls.at(-1)?.init?.headers, {
+			"x-additional": "true",
+			"x-boolean": "false",
+			"x-number": "123",
+		});
+
+		const overriddenFailure = initClient(
+			{ ping: route.post("/ping").response(204) },
+			{
+				baseUrl: "https://api.test",
+				globalHeaders: {
+					authorization: async () => {
+						throw new Error("overridden provider failed");
+					},
+				},
+			},
+		);
+		await assert.rejects(
+			() =>
+				overriddenFailure.ping(undefined, {
+					additionalHeaders: { authorization: "override" },
+				}),
+			/overridden provider failed/,
+		);
 	});
 
 	it("adds Next fetch tags to GET requests when enabled", async () => {
@@ -598,11 +698,11 @@ describe("ApiClient requests", () => {
 		const calls = captureFetch(jsonResponse([]));
 		const client = initClient(apiContract, {
 			baseUrl: "https://api.test",
-			getGlobalHeaders: () => ({
+			globalHeaders: {
 				"X-Global": "global",
 				"X-Route": "from global",
 				"X-Shared": "from global",
-			}),
+			},
 		});
 
 		await client.todos.list({
@@ -623,19 +723,20 @@ describe("ApiClient requests", () => {
 		});
 	});
 
-	it("rejects global content-type headers", async () => {
-		captureFetch();
+	it("lets the managed content type override a manual client header", async () => {
+		const calls = captureFetch();
 		const client = initClient(createRequestTestContract(), {
 			baseUrl: "https://api.test",
-			getGlobalHeaders: () => ({
+			globalHeaders: {
 				"content-type": "text/plain",
-			}),
+			},
 		});
 
-		await assert.rejects(
-			() => client.todos.create({ body: { title: "created" } }),
-			/ApiClient request headers must not contain a "content-type" header/,
-		);
+		await client.uploads.json({ body: { type: "created" } });
+
+		assert.deepEqual(calls[0]?.init?.headers, {
+			"content-type": "application/json",
+		});
 	});
 
 	it("keeps duplicate property names in their declared HTTP segments", () => {
@@ -714,7 +815,7 @@ describe("ApiClient requests", () => {
 		assert.equal(abortEventCount, 0);
 	});
 
-	it("does not start the request timeout when global headers reject", async (t) => {
+	it("does not start the request timeout when a global header rejects", async (t) => {
 		const timeout = t.mock.method(
 			globalThis,
 			"setTimeout",
@@ -724,8 +825,10 @@ describe("ApiClient requests", () => {
 		const client = initClient(createRequestTestContract(), {
 			baseUrl: "https://api.test",
 			timeoutMs: 10_000,
-			getGlobalHeaders: async () => {
-				throw new Error("headers unavailable");
+			globalHeaders: {
+				authorization: async () => {
+					throw new Error("headers unavailable");
+				},
 			},
 		});
 

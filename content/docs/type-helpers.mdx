@@ -106,7 +106,7 @@ body include only `status` (plus `responseHeaders` when declared).
 Import TanStack Query helpers from `@rest-rpc/tanstack-query`.
 
 ```ts
-import type { HttpError } from "@rest-rpc/core";
+import type { HttpError, SseEvent } from "@rest-rpc/core";
 import type {
 	RouteQueryData,
 	RouteInfiniteQueryData,
@@ -134,7 +134,7 @@ type TodoPagesData = RouteInfiniteQueryData<typeof api.todos.page>;
 // }
 
 type TodoEventsData = RouteStreamedQueryData<typeof api.todos.events>;
-// Array<{ id: string; message: string }>
+// Array<SseEvent<{ id: string; message: string }>>
 
 type GetTodoError = RouteQueryError<typeof api.todos.get>;
 // | { status: 404; body: { code: "NOT_FOUND" }; headers: Headers }

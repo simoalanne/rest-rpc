@@ -89,18 +89,10 @@ export const createStreamsImplementations = (
 	options: StreamsHandlerOptions = {},
 ) => {
 	const implementor = implement(streamsContract);
-
 	return {
 		empty: implementor.empty.handler(() => ({
 			status: 200,
 			body: (async function* () {})(),
-		})),
-		ndjson: implementor.ndjson.handler(() => ({
-			status: 200,
-			body: (async function* () {
-				yield { id: "event-1", index: 1 };
-				yield { id: "event-2", index: 2 };
-			})(),
 		})),
 		cancellable: implementor.cancellable.handler(({ signal }) => ({
 			status: 200,
@@ -122,14 +114,6 @@ export const createStreamsImplementations = (
 				} finally {
 					options.cancellationProbe?.markFinalized();
 				}
-			})(),
-		})),
-		invalid: implementor.invalid.handler(() => ({
-			status: 200,
-			body: (async function* () {
-				yield { id: "event-1", index: 1 };
-				await delay(10);
-				yield { id: "event-2", index: "bad" } as never;
 			})(),
 		})),
 		throwsBeforeFirstChunk: implementor.throwsBeforeFirstChunk.handler(() => ({

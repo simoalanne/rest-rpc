@@ -14,7 +14,7 @@ shared contract is also supported.
 - Fluent route builder for HTTP
 - Typed handlers for Express, Hono, Fastify, NestJS, Node HTTP, and Fetch runtimes.
 - Typed Fetch client and TanStack Query helpers.
-- Typed NDJSON streams and custom request/response bodies
+- Typed Server-Sent Event streams and custom request/response bodies
 - Standard Schema validation
 - OpenAPI generation from route declarations
 - Contract-first development

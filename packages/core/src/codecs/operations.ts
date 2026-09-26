@@ -31,15 +31,6 @@ export function resolveBodyCodec<TSource>(
 				const serializeBody = codec.serialize;
 				serialize = async (value, contentType) => {
 					const result = await serializeBody(value, contentType);
-					for (const name of Object.keys(result.headers ?? {})) {
-						if (
-							["content-type", "content-length", "transfer-encoding"].includes(
-								name.toLowerCase(),
-							)
-						) {
-							throw new Error(`Codec headers must not contain "${name}"`);
-						}
-					}
 					if (
 						typeof result.contentType === "string" &&
 						normalizeMediaType(result.contentType) !== mediaType

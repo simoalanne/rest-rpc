@@ -198,8 +198,15 @@ describe("createOpenApiDocument", () => {
 		const eventsOperation = document.paths["/todos/events"]?.get;
 		assert.ok(eventsOperation);
 		assert.deepEqual(
-			eventsOperation.responses["200"].content?.["application/x-ndjson"].schema,
-			{ type: "string" },
+			eventsOperation.responses["200"].content?.["text/event-stream"].schema,
+			{
+				type: "object",
+				properties: {
+					type: { type: "string" },
+				},
+				required: ["type"],
+				additionalProperties: false,
+			},
 		);
 	});
 });

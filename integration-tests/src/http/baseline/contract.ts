@@ -90,8 +90,8 @@ export const integrationContract = {
 			.response(200, z.object({ ok: z.literal(true) })),
 	},
 	streams: {
-		ndjson: route
-			.get("/streams/ndjson")
+		sse: route
+			.get("/streams/sse")
 			.streamResponse(200, z.object({ id: z.string(), index: z.number() })),
 		text: route.get("/streams/text").streamResponse(200, z.string()),
 	},

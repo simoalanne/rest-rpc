@@ -129,8 +129,8 @@ describe("generateContractFromType with server routes", () => {
 		const client = initClient(contract, {
 			baseUrl: "https://api.test",
 			fetch: async () =>
-				new Response('{"id":"event-1"}\n', {
-					headers: { "content-type": "application/x-ndjson" },
+				new Response('data: {"id":"event-1"}\n\n', {
+					headers: { "content-type": "text/event-stream" },
 				}),
 		});
 
@@ -138,7 +138,7 @@ describe("generateContractFromType with server routes", () => {
 		for await (const event of await client.documents.events()) {
 			events.push(event);
 		}
-		assert.deepEqual(events, [{ id: "event-1" }]);
+		assert.deepEqual(events, [{ data: { id: "event-1" } }]);
 	});
 
 	for (const [exportName, expectedError] of [

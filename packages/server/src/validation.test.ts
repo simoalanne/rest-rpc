@@ -8,6 +8,7 @@ import {
 	validateResponseHeaders,
 	validateResponseStreamChunks,
 } from "./validation.ts";
+import { isSseServerEvent, sse } from "./sse.ts";
 import {
 	RequestValidationError,
 	ResponseValidationError,
@@ -319,5 +320,24 @@ describe("validateResponseStreamChunks", () => {
 				return true;
 			},
 		);
+	});
+
+	it("validates wrapped SSE data and leaves lookalike application objects plain", async () => {
+		async function* rows() {
+			yield sse({ data: { value: "1" }, id: "wrapped" });
+			yield { data: { value: "2" }, id: "application-data" };
+		}
+		const schema = z.unknown().transform((value) => ({ validated: value }));
+		const chunks = [];
+		for await (const chunk of validateResponseStreamChunks(rows(), schema)) {
+			chunks.push(chunk);
+		}
+
+		assert.equal(isSseServerEvent(chunks[0]), true);
+		assert.deepEqual(chunks[0]?.data, { validated: { value: "1" } });
+		assert.equal(isSseServerEvent(chunks[1]), false);
+		assert.deepEqual(chunks[1], {
+			validated: { data: { value: "2" }, id: "application-data" },
+		});
 	});
 });

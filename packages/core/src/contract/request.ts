@@ -160,18 +160,8 @@ export type InferClientRequest<
 			? OptionalRequestHeaders<InferRequestFor<E, "input">, TOptionalKeys>
 			: never;
 
-type ServerContentType<TRequest> = TRequest extends {
-	contentType: infer TContentType;
-}
-	? TContentType extends "application/json"
-		? unknown
-		: TContentType extends readonly string[]
-			? { contentType: TContentType[number] }
-			: TContentType extends string
-				? { contentType: TContentType }
-				: unknown
-	: unknown;
-
-export type ServerRequest<E extends { request?: RouteRequestDeclaration }> =
-	InferRequestFor<E, "output"> &
-		ServerContentType<E extends { request: infer TRequest } ? TRequest : never>;
+export type ServerRequest<E extends { request?: RouteRequestDeclaration }> = [
+	InferRequestFor<E, "output">,
+] extends [never]
+	? Record<never, never>
+	: InferRequestFor<E, "output">;

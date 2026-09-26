@@ -92,3 +92,5 @@ export type {
 	BodyCodec,
 } from "@rest-rpc/core";
 export { createOpenApiDocument } from "@rest-rpc/core";
+export { sse } from "@rest-rpc/server";
+export type { SseEvent } from "@rest-rpc/core";

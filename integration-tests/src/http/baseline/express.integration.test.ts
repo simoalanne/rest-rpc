@@ -147,7 +147,10 @@ it("waits for Express drain before writing the next stream chunk", async () => {
 
 		emitDrain?.();
 
-		assert.equal(await response.text(), '"alpha\\n"\n"beta\\n"\n');
+		assert.equal(
+			await response.text(),
+			'data: "alpha\\n"\n\ndata: "beta\\n"\n\n',
+		);
 		assert.equal(pulledChunks, 2);
 	} finally {
 		await server.close();

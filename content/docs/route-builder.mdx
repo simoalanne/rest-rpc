@@ -185,41 +185,19 @@ types and compatible codecs.
 
 ## Return Streams
 
-Returning an async iterable infers a plain stream. Its items reach the client
-through an async iterable:
-
-```ts
-const events = route.get("/todos/events").handler(async function* () {
-	yield { id: "todo_1", message: "Created" };
-	yield { id: "todo_1", message: "Completed" };
-});
-
-for await (const event of await client.todos.events()) {
-	console.log(event.message);
-}
-```
-
-Declare `.streamOutput(itemSchema)` to validate items while keeping the plain
-result. Use `.streamResponse(status, itemSchema)` for a status envelope whose
-`body` is the stream:
+Returning an async iterable infers a plain stream. Use `.streamOutput()` for an
+explicit data schema or `.streamResponse()` for a status response stream.
 
 ```ts
 const events = route
 	.get("/todos/events")
-	.streamResponse(200, z.object({ id: z.string(), message: z.string() }))
-	.response(401, z.object({ code: z.literal("UNAUTHORIZED") }))
-	.handler(({ req }) => {
-		if (!req.header("authorization")) {
-			return { status: 401, body: { code: "UNAUTHORIZED" } };
-		}
-		return { status: 200, body: streamTodoEvents() };
-	});
+	.streamOutput(z.object({ id: z.string(), message: z.string() }))
+	.handler(() => streamTodoEvents());
 ```
 
-A returned status envelope with an async iterable body also infers a stream.
-See [Fetch Client](/docs/client/fetch-client#consume-streams) for stream consumption
-and [Serialization and Codecs](/docs/http-behavior/serialization#streaming) for the
-stream format.
+Streaming routes use Server-Sent Events. See [Streaming](/docs/streaming)
+for handlers, client consumption, event metadata, validation, cancellation,
+and reconnection behavior.
 
 ## Add Metadata and OpenAPI Details
 

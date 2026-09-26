@@ -2,10 +2,12 @@ import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import {
 	type ClientRequest,
 	type ClientResponse,
+	type SseEvent,
 	initClient,
 	route as coreRoute,
 } from "@rest-rpc/core";
 import {
+	sse,
 	serverFirstRoute,
 	type RouteResponse,
 	type RouteRequestData,
@@ -201,7 +203,22 @@ const procedureClient = initClient(
 	{ baseUrl: "https://example.test" },
 );
 expectType<Promise<"todo data">>(procedureClient.custom());
-expectType<Promise<AsyncIterable<{ id: "event-1" }>>>(procedureClient.stream());
+expectType<Promise<AsyncIterable<SseEvent<{ id: "event-1" }>>>>(
+	procedureClient.stream(),
+);
+
+const inferredWrappedStream = route.handler(() =>
+	(async function* () {
+		yield sse({ data: { id: "event-2" as const }, id: "wire-2" });
+	})(),
+);
+const wrappedClient = initClient(
+	{ stream: inferredWrappedStream },
+	{ baseUrl: "https://example.test" },
+);
+expectType<Promise<AsyncIterable<SseEvent<{ id: "event-2" }>>>>(
+	wrappedClient.stream(),
+);
 
 const generatedContract = {
 	create: {
@@ -305,24 +322,39 @@ route
 	.headers(z.object({ authorization: z.string() }))
 	.query(z.object({ search: z.string() }))
 	.body(z.string())
-	.use(({ params, headers, query, body, context, next }) => {
-		expectType<string>(params.id);
-		expectType<string>(headers.authorization);
-		expectType<string>(query.search);
-		expectType<string>(body);
-		expectType<AppContext>(context);
-		return next();
-	});
+	.use(
+		({
+			params,
+			headers,
+			query,
+			body,
+			contentType,
+			lastEventId,
+			context,
+			next,
+		}) => {
+			expectType<string>(params.id);
+			expectType<string>(headers.authorization);
+			expectType<string>(query.search);
+			expectType<string>(body);
+			expectType<string | undefined>(contentType);
+			expectType<string | undefined>(lastEventId);
+			expectType<AppContext>(context);
+			return next();
+		},
+	);
 
 // should allow typing for reusable middleware
 const reusableMiddleware = route.middleware<{
 	headers: { id: string };
 	params: { id: string };
-}>(({ headers, params, body, query, next }) => {
+}>(({ headers, params, body, query, contentType, lastEventId, next }) => {
 	expectType<string>(headers.id);
 	expectType<string>(params.id);
 	expectType<unknown>(body);
 	expectType<unknown>(query);
+	expectType<string | undefined>(contentType);
+	expectType<string | undefined>(lastEventId);
 	return next();
 });
 

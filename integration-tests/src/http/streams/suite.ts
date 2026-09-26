@@ -61,7 +61,7 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 			await server.close();
 		});
 
-		it("receives empty NDJSON streams as empty async iterables", async () => {
+		it("receives empty SSE streams as empty async iterables", async () => {
 			const streamResponse = await client.empty();
 			assert.equal(streamResponse.status, 200);
 			const stream = streamResponse.body;
@@ -69,21 +69,7 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 			assert.deepEqual(await collectAsyncIterable(stream), []);
 		});
 
-		it("frames NDJSON chunks exactly once on the wire", async () => {
-			const response = await fetch(`${server.origin}/streams/ndjson-framing`);
-
-			assert.equal(response.status, 200);
-			assert.match(
-				response.headers.get("content-type") ?? "",
-				/^application\/x-ndjson/,
-			);
-			assert.equal(
-				await response.text(),
-				'{"id":"event-1","index":1}\n{"id":"event-2","index":2}\n',
-			);
-		});
-
-		it("propagates client NDJSON iterator cancellation to server stream producers", async () => {
+		it("propagates client SSE iterator cancellation to server stream producers", async () => {
 			if (!adapter.cancellationProbe) {
 				throw new Error("Streams suite adapter is missing cancellation probe");
 			}
@@ -94,26 +80,12 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 			const stream = streamResponse.body;
 
 			for await (const event of stream) {
-				assert.deepEqual(event, { id: "event-1", index: 1 });
+				assert.deepEqual(event, { data: { id: "event-1", index: 1 } });
 				break;
 			}
 
 			await adapter.cancellationProbe.waitForSignalAborted();
 			await adapter.cancellationProbe.waitForFinalized();
-		});
-
-		it("surfaces invalid streamed chunks while continuing client iteration", async () => {
-			const streamResponse = await client.invalid();
-			assert.equal(streamResponse.status, 200);
-			const stream = streamResponse.body;
-			const iterator = stream[Symbol.asyncIterator]();
-
-			assert.deepEqual(await iterator.next(), {
-				done: false,
-				value: { id: "event-1", index: 1 },
-			});
-
-			await assert.rejects(() => iterator.next());
 		});
 
 		it("surfaces stream failures before the first chunk", async () => {
@@ -130,11 +102,11 @@ export const runStreamsSuite = (adapter: StreamsSuiteAdapter) => {
 
 			assert.deepEqual(await iterator.next(), {
 				done: false,
-				value: { id: "event-1", index: 1 },
+				value: { data: { id: "event-1", index: 1 } },
 			});
 			assert.deepEqual(await iterator.next(), {
 				done: false,
-				value: { id: "event-2", index: 2 },
+				value: { data: { id: "event-2", index: 2 } },
 			});
 
 			await assert.rejects(() => iterator.next());

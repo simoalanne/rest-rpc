@@ -1,18 +1,20 @@
 import type { BodyCodec } from "../codecs/index.ts";
 import type { Contract, RouteDeclaration } from "../contract/contract.ts";
 import type { InferClientRequest } from "../contract/request.ts";
+import type { RequestScalar } from "../contract/request.ts";
 import type {
 	DeclaredClientResponse,
 	SuccessfulDeclaredClientResponse,
 } from "../contract/response.ts";
 
 export type FetchOptions = Omit<RequestInit, "method" | "body" | "headers"> & {
+	additionalHeaders?: Record<string, RequestScalar | undefined>;
 	contentType?: string;
 };
 
 export type ApiClientFetchOptions = Omit<
 	FetchOptions,
-	"signal" | "contentType"
+	"signal" | "contentType" | "additionalHeaders"
 >;
 
 /**
@@ -27,9 +29,14 @@ export type FetchLike = (
 
 export type HeaderRecord = Record<string, string>;
 
-export type GetHeadersFn<THeaders extends HeaderRecord = HeaderRecord> = () =>
-	| THeaders
-	| Promise<THeaders>;
+/** A static client header or a provider evaluated for each request. */
+export type ClientHeaderValue =
+	| RequestScalar
+	| undefined
+	| (() => RequestScalar | undefined | Promise<RequestScalar | undefined>);
+
+/** Transport headers added by the client outside the declared route input. */
+export type ClientHeaders = Record<string, ClientHeaderValue>;
 
 type LiteralKeys<T> = {
 	[K in keyof T]: string extends K
@@ -41,9 +48,17 @@ type LiteralKeys<T> = {
 				: K;
 }[keyof T];
 
-type GlobalHeaderKeys<TGlobalHeaders extends HeaderRecord> = LiteralKeys<
-	Awaited<TGlobalHeaders>
->;
+type ResolvedHeaderValue<T> = T extends (...args: never[]) => infer TResult
+	? Awaited<TResult>
+	: T;
+
+type GlobalHeaderKeys<TGlobalHeaders extends ClientHeaders> = {
+	[TKey in LiteralKeys<TGlobalHeaders>]: undefined extends ResolvedHeaderValue<
+		TGlobalHeaders[TKey]
+	>
+		? never
+		: TKey;
+}[LiteralKeys<TGlobalHeaders>];
 
 type DeclaredContentType<E> = E extends {
 	request: { contentType: infer TContentType };
@@ -66,7 +81,7 @@ type RequiresFetchOptions<E> = [DeclaredContentType<E>] extends [never]
 
 export type FetchArgs<
 	E extends RouteDeclaration = RouteDeclaration,
-	TGlobalHeaders extends HeaderRecord = Record<never, string>,
+	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > =
 	InferClientRequest<E, GlobalHeaderKeys<TGlobalHeaders>> extends never
 		? [request?: undefined, options?: FetchOptionsFor<E>]
@@ -119,7 +134,7 @@ type InferClientResponse<E extends RouteDeclaration> = E extends {
 
 export type FetchResponseFn<
 	E extends RouteDeclaration,
-	TGlobalHeaders extends HeaderRecord = Record<never, string>,
+	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > = (...args: FetchArgs<E, TGlobalHeaders>) => Promise<InferClientResponse<E>>;
 
 /**
@@ -130,7 +145,7 @@ export type FetchResponseFn<
  */
 export type ApiClientRouteValue<
 	E extends RouteDeclaration = RouteDeclaration,
-	TGlobalHeaders extends HeaderRecord = Record<never, string>,
+	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > = E extends RouteDeclaration ? FetchResponseFn<E, TGlobalHeaders> : never;
 
 type ProcedureRouteOutput<TRoute extends RouteDeclaration> =
@@ -147,7 +162,7 @@ type ProcedureRouteOutput<TRoute extends RouteDeclaration> =
  */
 export type ApiClientFor<
 	T extends Contract = Contract,
-	TGlobalHeaders extends HeaderRecord = Record<never, string>,
+	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > = T extends { readonly "~restrpc": infer TRoute extends RouteDeclaration }
 	? ApiClientRouteValue<TRoute, TGlobalHeaders>
 	: {
@@ -172,20 +187,20 @@ export type NextFetchTagsOptions = {
 /**
  * Options used to create a typed fetch client.
  *
- * @remarks Headers returned by `getGlobalHeaders` make matching declared
+ * @remarks Literal keys in `globalHeaders` make matching declared
  * headers optional at individual call sites. Per-call Fetch options override
  * defaults from `fetchOptions`.
  *
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#client-options}
  */
 export type ApiClientOptions<
-	TGlobalHeaders extends HeaderRecord = Record<never, string>,
+	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > = {
 	baseUrl: string;
 	bodyCodecs?: readonly BodyCodec<Response>[];
 	fetch?: FetchLike;
 	fetchOptions?: ApiClientFetchOptions;
-	getGlobalHeaders?: GetHeadersFn<TGlobalHeaders>;
+	globalHeaders?: TGlobalHeaders;
 	nextFetchTags?: NextFetchTagsOptions;
 	timeoutMs?: number;
 	validateResponses?: boolean;

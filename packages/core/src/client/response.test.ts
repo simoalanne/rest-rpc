@@ -578,30 +578,6 @@ describe("ApiClient responses", () => {
 		assert.equal(response.body, "custom value");
 	});
 
-	it("does not infer streaming from a custom NDJSON content type", async () => {
-		const apiContract = {
-			events: route.get("/events").response(200, z.string(), {
-				contentType: "application/x-ndjson",
-			}),
-		};
-		captureFetch(
-			new Response("event data", {
-				headers: { "content-type": "application/x-ndjson" },
-			}),
-		);
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-			bodyCodecs: [
-				{ match: () => true, deserialize: (response) => response.text() },
-			],
-		});
-
-		const response = await client.events();
-		assert.equal(response.headers.get("content-type"), "application/x-ndjson");
-		assert.equal("contentType" in response, false);
-		assert.equal(response.body, "event data");
-	});
-
 	it("retains original headers without incoming content type metadata", async () => {
 		const apiContract = {
 			reports: {

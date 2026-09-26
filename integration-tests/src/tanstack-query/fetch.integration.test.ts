@@ -399,8 +399,8 @@ describe("fetch TanStack Query integration", () => {
 		assert.equal(response.status, 200);
 		assert.equal(typeof response.body[Symbol.asyncIterator], "function");
 		assert.deepEqual(await collectAsyncIterable(response.body), [
-			{ id: "project-1", event: "created" },
-			{ id: "project-1", event: "renamed" },
+			{ data: { id: "project-1", event: "created" } },
+			{ data: { id: "project-1", event: "renamed" } },
 		]);
 		assert.strictEqual(
 			queryClient.getQueryData(tq.projects.events.getKey()),
@@ -420,8 +420,8 @@ describe("fetch TanStack Query integration", () => {
 		const response = await queryClient.fetchQuery(options);
 
 		assert.deepEqual(response, [
-			{ id: "project-1", event: "created" },
-			{ id: "project-1", event: "renamed" },
+			{ data: { id: "project-1", event: "created" } },
+			{ data: { id: "project-1", event: "renamed" } },
 		]);
 		assert.deepEqual(queryClient.getQueryData(options.queryKey), response);
 		assert.equal(tracked.calls.length, 1);
@@ -438,8 +438,8 @@ describe("fetch TanStack Query integration", () => {
 
 		assert.equal(typeof stream[Symbol.asyncIterator], "function");
 		assert.deepEqual(await collectAsyncIterable(stream), [
-			{ id: "project-2", event: "created" },
-			{ id: "project-2", event: "renamed" },
+			{ data: { id: "project-2", event: "created" } },
+			{ data: { id: "project-2", event: "renamed" } },
 		]);
 		assert.strictEqual(
 			queryClient.getQueryData(
@@ -462,8 +462,8 @@ describe("fetch TanStack Query integration", () => {
 		const events = await queryClient.fetchQuery(options);
 
 		assert.deepEqual(events, [
-			{ id: "project-2", event: "created" },
-			{ id: "project-2", event: "renamed" },
+			{ data: { id: "project-2", event: "created" } },
+			{ data: { id: "project-2", event: "renamed" } },
 		]);
 		assert.deepEqual(queryClient.getQueryData(options.queryKey), events);
 		assert.equal(tracked.calls.length, 1);

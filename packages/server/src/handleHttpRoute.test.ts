@@ -25,6 +25,8 @@ describe("handleHttpRoute", () => {
 						params: { id: 123 },
 						frameworkValue: "framework-1",
 						context: { requestId: "request-1" },
+						contentType: undefined,
+						lastEventId: undefined,
 						route,
 					});
 
@@ -63,6 +65,8 @@ describe("handleHttpRoute", () => {
 						headers: undefined,
 						query: ["todo"],
 						context: {},
+						contentType: undefined,
+						lastEventId: undefined,
 						route,
 					});
 					return { status: 204 };
@@ -262,7 +266,7 @@ describe("handleHttpRoute", () => {
 		if (result.kind !== "stream") throw new Error("Expected stream");
 		const events = [];
 		for await (const event of result.body) events.push(event);
-		assert.deepEqual(events, [{ id: "event-1" }]);
+		assert.deepEqual(events, ['data: {"id":"event-1"}\n\n']);
 	});
 
 	it("classifies inferred custom and stream procedure outputs", async () => {
@@ -307,9 +311,21 @@ describe("handleHttpRoute", () => {
 		const result = await handleHttpRoute(
 			{
 				route: declaration,
+				middleware: [
+					async (request) => {
+						assert.equal(
+							request.contentType,
+							"application/x-www-form-urlencoded",
+						);
+						assert.equal(request.lastEventId, "");
+						return request.next();
+					},
+				],
 				handler: (request) => {
 					assert.deepEqual(request, {
 						input: { title: "Write docs" },
+						contentType: "application/x-www-form-urlencoded",
+						lastEventId: "",
 						context: {},
 						route: declaration,
 					});
@@ -321,6 +337,7 @@ describe("handleHttpRoute", () => {
 					body: { title: "Write docs" },
 					headers: {
 						"content-type": "application/x-www-form-urlencoded",
+						"last-event-id": ["", "event-8"],
 					},
 				},
 				handlerFields: {},
@@ -489,26 +506,5 @@ describe("handleHttpRoute custom responses", () => {
 		assert.equal(result.status, 200);
 		assert.equal(result.body?.contentType, "image/jpeg");
 		assert.equal(result.body?.value, "jpeg bytes");
-	});
-
-	it("treats an ordinary NDJSON content type as custom content", async () => {
-		const result = await handleHttpRoute(
-			{
-				route: coreRoute.get("/events").response(200, z.string(), {
-					contentType: "application/x-ndjson",
-				})["~restrpc"],
-				handler: () => ({ status: 200, body: "event data" }),
-			},
-			{
-				request: {},
-				handlerFields: {},
-				context: {},
-			},
-		);
-
-		assert.equal(result.kind, "response");
-		if (result.kind !== "response") throw new Error("Expected response");
-		assert.equal(result.body?.contentType, "application/x-ndjson");
-		assert.equal(result.body?.value, "event data");
 	});
 });

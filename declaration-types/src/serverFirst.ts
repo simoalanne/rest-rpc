@@ -12,6 +12,7 @@ import type {
 	RouteResponse,
 	RouteErrors,
 } from "@rest-rpc/server";
+import { sse } from "@rest-rpc/server";
 import {
 	createRouteHandler as createFetchRouteHandler,
 	implement as implementFetch,
@@ -33,6 +34,10 @@ export const fetchShorthandCustomOutputBuilder = fetchRoute.output(todoOutput, {
 });
 export const fetchShorthandStreamOutputBuilder =
 	fetchRoute.streamOutput(todoOutput);
+export const fetchSseEvent = sse({
+	data: { id: "todo-1", title: "Todo" },
+	id: "event-1",
+});
 export const fetchShorthandInputOutputBuilder =
 	fetchShorthandInputBuilder.output(todoOutput);
 export const fetchShorthandOutputInputBuilder =

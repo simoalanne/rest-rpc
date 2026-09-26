@@ -20,6 +20,7 @@ import {
 	validateResponseStreamChunks,
 } from "./validation.ts";
 import { invokeWithMiddleware } from "./middleware.ts";
+import { frameSseStream } from "./sse.ts";
 
 /** A validated logical response for adapter-specific serialization and delivery. */
 export type HttpRouteResult =
@@ -33,7 +34,7 @@ export type HttpRouteResult =
 			kind: "stream";
 			status: number;
 			headers?: HttpHeaders;
-			body: AsyncIterable<unknown>;
+			body: AsyncIterable<string>;
 	  };
 
 /**
@@ -46,6 +47,11 @@ export type HandleHttpRouteOptions<
 	request: RequestSegments;
 	context: TContext;
 	handlerFields: TAdditionalHandlerFields;
+};
+
+const requestHeader = (headers: RequestSegments["headers"], name: string) => {
+	const value = headers?.[name];
+	return Array.isArray(value) ? value[0] : value;
 };
 
 const isAsyncIterable = (value: unknown): value is AsyncIterable<unknown> =>
@@ -74,7 +80,7 @@ const normalizeImplicitProcedureResponse = (
 	output: unknown,
 ): HttpRouteResult => {
 	if (isAsyncIterable(output)) {
-		return { kind: "stream", status: 200, body: output };
+		return { kind: "stream", status: 200, body: frameSseStream(output) };
 	}
 	if (isCustomProcedureOutput(output)) {
 		return {
@@ -117,7 +123,7 @@ const normalizeImplicitHttpResponse = (
 			kind: "stream",
 			status: response.status,
 			headers,
-			body,
+			body: frameSseStream(body),
 		};
 	}
 
@@ -193,9 +199,11 @@ const normalizeResponseResult = async (
 			kind: "stream",
 			status: result.status,
 			headers,
-			body: validateResponseStreamChunks(
-				result.body as AsyncIterable<unknown>,
-				bodySchema,
+			body: frameSseStream(
+				validateResponseStreamChunks(
+					result.body as AsyncIterable<unknown>,
+					bodySchema,
+				),
 			),
 		};
 	}
@@ -216,7 +224,12 @@ const normalizeResponseResult = async (
 
 const getHandlerRequestFields = (
 	route: RouteDeclaration,
-	segments: Omit<RequestSegments, "query"> & { query: unknown },
+	segments: {
+		body: unknown;
+		query: unknown;
+		params: unknown;
+		headers: unknown;
+	},
 ) => {
 	if (route.input !== "input") return segments;
 	return { input: route.method === "GET" ? segments.query : segments.body };
@@ -236,6 +249,12 @@ export async function handleHttpRoute<
 	try {
 		const { route } = implementation;
 		const handler = implementation.handler as RuntimeRouteHandler;
+		const rawContentType = requestHeader(
+			options.request.headers,
+			"content-type",
+		);
+		const contentType = normalizeMediaType(rawContentType) || undefined;
+		const lastEventId = requestHeader(options.request.headers, "last-event-id");
 		const validatedRequest = await validateRequestSegments(
 			route,
 			options.request,
@@ -248,6 +267,8 @@ export async function handleHttpRoute<
 				...getHandlerRequestFields(route, validatedRequest),
 				...options.handlerFields,
 				context: options.context,
+				contentType,
+				lastEventId,
 				route,
 			},
 		);

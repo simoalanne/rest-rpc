@@ -248,7 +248,7 @@ type ResponseMethods<
 			TPath,
 			TMetadata
 		>;
-		/** Declares a streaming response. @see {@link https://rest-rpc.dev/docs/http-behavior/serialization#streaming} */
+		/** Declares a streaming response. @see {@link https://rest-rpc.dev/docs/http-behavior/streaming} */
 		streamResponse<
 			const TStatus extends number,
 			const TSchema extends StandardSchemaV1,

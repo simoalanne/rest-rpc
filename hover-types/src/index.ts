@@ -1,6 +1,6 @@
 import { initClient, route, type as schemaType } from "@rest-rpc/core";
-import type { ClientRequest, ClientResponse } from "@rest-rpc/core";
-import { implement as expressImplement } from "@rest-rpc/express";
+import type { ClientRequest, ClientResponse, SseEvent } from "@rest-rpc/core";
+import { implement as expressImplement, sse } from "@rest-rpc/express";
 import {
 	createRouteHandler as createFetchRouteHandler,
 	route as fetchRoute,
@@ -77,6 +77,11 @@ export const hoverApi = {
 export const hoverClient = initClient(hoverApi, {
 	baseUrl: "https://example.test",
 });
+export const hoverSseEvent = sse({
+	data: { id: "todo-1", message: "Created" },
+	id: "event-1",
+});
+export type HoverSseEvent = SseEvent<{ id: string; message: string }>;
 
 export const declaredHoverApi = {
 	todos: {

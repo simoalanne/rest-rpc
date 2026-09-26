@@ -9,13 +9,10 @@ import type { HttpRouteResult } from "@rest-rpc/server";
 type HttpHeaderValue = string | number | readonly string[] | undefined;
 
 const encodeResponseStream = async function* (
-	body: AsyncIterable<unknown>,
+	body: AsyncIterable<string>,
 ): AsyncIterableIterator<Uint8Array> {
 	const encoder = new TextEncoder();
-
-	for await (const chunk of body) {
-		yield encoder.encode(`${JSON.stringify(chunk)}\n`);
-	}
+	for await (const frame of body) yield encoder.encode(frame);
 };
 
 const setHeader = (headers: Headers, name: string, value: HttpHeaderValue) => {
@@ -30,7 +27,7 @@ const setHeader = (headers: Headers, name: string, value: HttpHeaderValue) => {
 };
 
 const createStreamResponse = (
-	body: AsyncIterable<unknown>,
+	body: AsyncIterable<string>,
 	status: number,
 	headers: Headers,
 	contentType: string,
@@ -72,7 +69,7 @@ export async function createFetchResponse(
 			result.body,
 			result.status,
 			headers,
-			"application/x-ndjson",
+			"text/event-stream",
 		);
 	}
 	if (!serialized)

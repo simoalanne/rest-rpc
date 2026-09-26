@@ -178,7 +178,7 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 				return writeStreamResponse(result.body, rawResponse, result.status);
 			}
 			return new StreamableFile(createNodeResponseStream(result.body), {
-				type: "application/x-ndjson",
+				type: "text/event-stream",
 			});
 		}
 		if (!serialized) return undefined;
