@@ -230,7 +230,7 @@ type ResponseMethods<
 > = WhenResponsesAvailable<
 	TState,
 	{
-		/** Declares a response status, schema, and HTTP metadata. @see {@link https://rest-rpc.dev/docs/http-behavior/serialization} */
+		/** Declares a response status, schema, and HTTP metadata. @see {@link https://rest-rpc.dev/docs/route-builder#choose-plain-outputs-or-status-responses} */
 		response<
 			const TStatus extends number,
 			const TSchema extends StandardSchemaV1 | undefined = undefined,
@@ -248,7 +248,7 @@ type ResponseMethods<
 			TPath,
 			TMetadata
 		>;
-		/** Declares a streaming response. @see {@link https://rest-rpc.dev/docs/http-behavior/streaming} */
+		/** Declares a streaming response. @see {@link https://rest-rpc.dev/docs/streaming} */
 		streamResponse<
 			const TStatus extends number,
 			const TSchema extends StandardSchemaV1,
@@ -276,7 +276,7 @@ type BodyMethods<
 		TState,
 		"body",
 		{
-			/** Declares a request body and its HTTP metadata. @see {@link https://rest-rpc.dev/docs/http-behavior/serialization} */
+			/** Declares a request body and its HTTP metadata. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
 			body<
 				const TSchema extends StandardSchemaV1,
 				const TOptions extends BodyOptions | undefined = undefined,
@@ -437,7 +437,7 @@ type FlatMethods<
 	WhenOutputAvailable<
 		TState,
 		{
-			/** Declares one plain output value. */
+			/** Declares one plain output value. @see {@link https://rest-rpc.dev/docs/route-builder#choose-plain-outputs-or-status-responses} */
 			output<
 				const TSchema extends StandardSchemaV1,
 				const TOptions extends BodyOptions | undefined = undefined,
@@ -456,7 +456,7 @@ type FlatMethods<
 				TPath,
 				TMetadata
 			>;
-			/** Declares a streaming plain output. */
+			/** Declares a streaming plain output. @see {@link https://rest-rpc.dev/docs/streaming} */
 			streamOutput<
 				const TSchema extends StandardSchemaV1,
 				const TPath extends string = string,
