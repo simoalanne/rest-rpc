@@ -9,7 +9,7 @@ type RuntimeBuilder = {
 	readonly "~restrpc": Partial<RouteDeclaration> & {
 		readonly middleware?: readonly RuntimeRouteHandler[];
 	};
-	constructor: new (state: object) => RuntimeBuilder;
+	clone(state: object): RuntimeBuilder;
 };
 
 Object.defineProperties(Object.getPrototypeOf(coreRoute), {
@@ -17,7 +17,7 @@ Object.defineProperties(Object.getPrototypeOf(coreRoute), {
 		configurable: true,
 		value(this: RuntimeBuilder, handler: RuntimeRouteHandler) {
 			const state = this["~restrpc"];
-			return new this.constructor({
+			return this.clone({
 				...(state.kind
 					? {}
 					: {
@@ -35,7 +35,7 @@ Object.defineProperties(Object.getPrototypeOf(coreRoute), {
 		configurable: true,
 		value(this: RuntimeBuilder, middleware: RuntimeRouteHandler) {
 			const state = this["~restrpc"];
-			return new this.constructor({
+			return this.clone({
 				...state,
 				middleware: [...(state.middleware ?? []), middleware],
 			});

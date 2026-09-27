@@ -29,43 +29,57 @@ export type RequestHeadersSchema = StandardSchemaV1<
 
 export type RequestBodySchema = StandardSchemaV1;
 
-type InferRequestBody<
-	TBody,
-	TIO extends "input" | "output",
-> = TBody extends StandardSchemaV1
-	? TIO extends "input"
-		? StandardSchemaV1.InferInput<TBody>
-		: StandardSchemaV1.InferOutput<TBody>
-	: never;
+type Merge<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
+type RightMerge<TLeft, TRight> = Merge<Omit<TLeft, keyof TRight> & TRight>;
 
-type InferRequestHeaders<
-	THeaders extends RequestHeadersSchema,
-	TIO extends "input" | "output",
-> = TIO extends "input"
-	? StandardSchemaV1.InferInput<THeaders>
-	: StandardSchemaV1.InferOutput<THeaders>;
+/** Intersects the input types of an ordered Standard Schema list. */
+export type InferSchemaInputs<TSchemas extends readonly StandardSchemaV1[]> =
+	TSchemas extends readonly [
+		infer TFirst extends StandardSchemaV1,
+		...infer TRest extends readonly StandardSchemaV1[],
+	]
+		? TRest extends readonly []
+			? StandardSchemaV1.InferInput<TFirst>
+			: StandardSchemaV1.InferInput<TFirst> & InferSchemaInputs<TRest>
+		: TSchemas extends readonly (infer TSchema extends StandardSchemaV1)[]
+			? StandardSchemaV1.InferInput<TSchema>
+			: never;
 
-type InferRequestObjectSegment<
-	TSegment,
+/** Right-merges the output types of an ordered Standard Schema list. */
+export type InferSchemaOutputs<TSchemas extends readonly StandardSchemaV1[]> =
+	TSchemas extends readonly [
+		infer TFirst extends StandardSchemaV1,
+		...infer TRest extends readonly StandardSchemaV1[],
+	]
+		? TRest extends readonly []
+			? StandardSchemaV1.InferOutput<TFirst>
+			: RightMerge<
+					StandardSchemaV1.InferOutput<TFirst>,
+					InferSchemaOutputs<TRest>
+				>
+		: TSchemas extends readonly (infer TSchema extends StandardSchemaV1)[]
+			? StandardSchemaV1.InferOutput<TSchema>
+			: never;
+
+type InferSchemaList<
+	TSchemas,
 	TIO extends "input" | "output",
-> = TSegment extends StandardSchemaV1
+> = TSchemas extends readonly StandardSchemaV1[]
 	? TIO extends "input"
-		? StandardSchemaV1.InferInput<TSegment>
-		: StandardSchemaV1.InferOutput<TSegment>
+		? InferSchemaInputs<TSchemas>
+		: InferSchemaOutputs<TSchemas>
 	: never;
 
 type InferRequestSegments<R, TIO extends "input" | "output"> = {
-	body: R extends { body: infer TBody } ? InferRequestBody<TBody, TIO> : never;
+	body: R extends { body: infer TBody } ? InferSchemaList<TBody, TIO> : never;
 	query: R extends { query: infer TQuery }
-		? InferRequestObjectSegment<TQuery, TIO>
+		? InferSchemaList<TQuery, TIO>
 		: never;
 	params: R extends { params: infer Tparams }
-		? InferRequestObjectSegment<Tparams, TIO>
+		? InferSchemaList<Tparams, TIO>
 		: never;
 	headers: R extends { headers: infer THeaders }
-		? THeaders extends RequestHeadersSchema
-			? InferRequestHeaders<THeaders, TIO>
-			: never
+		? InferSchemaList<THeaders, TIO>
 		: never;
 };
 
@@ -76,7 +90,6 @@ type RouteRequest<
 	? InferRequestSegments<TRequest, TIO>
 	: never;
 
-type Merge<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
 type EmptyObject = Record<never, never>;
 type HasRequestInput<TRequest> = [
 	TRequest extends {
@@ -146,14 +159,26 @@ export type ClientRequestForDeclaration<
 > = E extends { kind: "procedure" }
 	? E extends { input: "segments" }
 		? OptionalRequestHeaders<InferRequestFor<E, "input">, TOptionalKeys>
-		: E extends { request: { body: infer TInput extends StandardSchemaV1 } }
-			? StandardSchemaV1.InferInput<TInput>
+		: E extends {
+					request: {
+						body: infer TInput extends readonly StandardSchemaV1[];
+					};
+			  }
+			? InferSchemaInputs<TInput>
 			: never
 	: E extends { input: "input" }
-		? E extends { request: { query: infer TQuery extends StandardSchemaV1 } }
-			? StandardSchemaV1.InferInput<TQuery>
-			: E extends { request: { body: infer TBody extends StandardSchemaV1 } }
-				? StandardSchemaV1.InferInput<TBody>
+		? E extends {
+				request: {
+					query: infer TQuery extends readonly StandardSchemaV1[];
+				};
+			}
+			? InferSchemaInputs<TQuery>
+			: E extends {
+						request: {
+							body: infer TBody extends readonly StandardSchemaV1[];
+						};
+				  }
+				? InferSchemaInputs<TBody>
 				: never
 		: E extends RouteDeclaration
 			? OptionalRequestHeaders<InferRequestFor<E, "input">, TOptionalKeys>
@@ -165,11 +190,13 @@ export type ServerRequest<E extends { request?: RouteRequestDeclaration }> = [
 	? Record<never, never>
 	: InferRequestFor<E, "output">;
 
-type FlatInputSchema<TRoute extends RouteDeclaration> = TRoute extends {
-	request: { query: infer TQuery extends StandardSchemaV1 };
+type FlatInputSchemas<TRoute extends RouteDeclaration> = TRoute extends {
+	request: { query: infer TQuery extends readonly StandardSchemaV1[] };
 }
 	? TQuery
-	: TRoute extends { request: { body: infer TBody extends StandardSchemaV1 } }
+	: TRoute extends {
+				request: { body: infer TBody extends readonly StandardSchemaV1[] };
+		  }
 		? TBody
 		: never;
 
@@ -198,12 +225,12 @@ export type InferServerRequest<
 	TRoute extends { readonly "~restrpc": RouteDeclaration },
 > = TRoute["~restrpc"] extends infer TDeclaration extends RouteDeclaration
 	? UsesFlatInput<TDeclaration> extends true
-		? [FlatInputSchema<TDeclaration>] extends [never]
+		? [FlatInputSchemas<TDeclaration>] extends [never]
 			? Record<never, never>
-			: FlatInputSchema<TDeclaration> extends infer TInput extends
-						StandardSchemaV1
+			: FlatInputSchemas<TDeclaration> extends infer TInput extends
+						readonly StandardSchemaV1[]
 				? Merge<
-						{ input: StandardSchemaV1.InferOutput<TInput> } & Omit<
+						{ input: InferSchemaOutputs<TInput> } & Omit<
 							ServerRequestValue<TDeclaration>,
 							"body" | "query"
 						>

@@ -3,7 +3,7 @@ title: Route Builder
 description: Define HTTP routes with default or explicit details, typed results, and streams.
 ---
 
-A route builder describes an HTTP interface. Start with flat inputs and plain
+A route builder describes an HTTP interface. Start with inputs and plain
 results, then choose the HTTP details each route needs. Method and path, input
 form, and output form are independent choices.
 
@@ -39,7 +39,7 @@ them where they are registered or used to create a client.
 
 ## Choose a Method and Path
 
-Explicit methods work with the same flat input and plain result:
+Explicit methods work with the same input and plain result:
 
 ```ts
 const search = route
@@ -54,13 +54,19 @@ const todo = route
 ```
 
 Use `.get(path)`, `.post(path)`, `.put(path)`, `.patch(path)`, or `.delete(path)`.
-Flat GET input becomes query parameters, while other methods send it as the body.
-Use request segments for dynamic paths.
+For GET requests, the input becomes query parameters, while other methods send it as the body.
+Path can be dynamic and supports both `:id` and `{id}` syntax. Each segment must have a corresponding schema in `.params()`.
 
 ## Declare Request Segments
 
 Use `.params()`, `.query()`, `.headers()`, and `.body()` to separate HTTP request
-locations instead of `.input()`. GET routes cannot declare a body.
+locations instead of `.input()`.
+
+Following limitations apply to request segments:
+
+- `.params()` must correspond to dynamic path segments.
+- `.body()` is not allowed for GET requests and will throw a runtime error if declared.
+- `input()` and request segments cannot be combined, except for a special case where only headers are declared in addition to input.
 
 ```ts
 const update = route
@@ -84,10 +90,49 @@ const todo = await client.todos.update({
 });
 ```
 
-Declare a schema for every dynamic path segment. Both `:id` and `{id}` syntax
-are supported. Use lowercase header names.
+### Combine Input and Headers
 
-Segmented requests can still return plain outputs.
+Combining input with headers is allowed but comes with a limitation. When using the fetch client,
+the headers must be supplied through `globalHeaders` in the client configuration and cannot be passed
+in the request call that only accepts the input. See [Fetch Client and Global Headers](/docs/client/fetch-client#global-headers) for details.
+
+```ts
+const create = route
+	.headers(z.object({ authorization: z.string() }))
+	.input(z.object({ title: z.string() }))
+	.handler(({ input: { title }, headers }) =>
+		createTodo(title, headers.authorization),
+	);
+
+const api = { todos: { create } };
+const client = initClient(api, {
+	baseUrl: "https://api.example.com",
+	globalHeaders: {
+		authorization: "Bearer token",
+	},
+});
+
+client.todos.create({ title: "Write docs" });
+```
+
+## Stacking Schemas
+
+Stacking schemas is supported for `body`, `query`, `params`, `headers` and `input`. Each schema is validated in declaration order
+against the original request value. The schema outputs are shallow-merged into a single object.
+
+:::warning
+When stacking schemas, the output of each schema must be an object. Non-object outputs will throw a runtime error
+during validation. Use single schema validation for non-object outputs. Avoid using strict schemas such as `z.strictObject()`
+that forbid unknown keys, if those keys are required by the other schemas in the stack.
+:::
+
+```ts
+const stacked = route
+	.post("/todos")
+	.body(z.object({ title: z.string() }))
+	.body(z.object({ description: z.string().optional() }))
+	.handler(({ body }) => createTodo(body.title, body.description));
+```
 
 ## Choose Plain Outputs or Status Responses
 

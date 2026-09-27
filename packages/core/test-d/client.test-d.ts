@@ -11,8 +11,6 @@ import {
 import { expectError, expectNotAssignable, expectType } from "tsd";
 import { z } from "zod";
 
-expectError(initClient({ baseUrl: "https://example.test" }));
-
 const todoSchema = z.object({
 	id: z.string(),
 	title: z.string(),
@@ -629,6 +627,17 @@ optionalGlobalHeaderClient.todos.secure({
 	headers: { authorization: "Bearer token" },
 });
 
+const stackedInputRoute = route
+	.input(z.object({ value: z.string(), left: z.string() }))
+	.input(z.object({ value: z.string(), right: z.string() }))
+	.output(todoSchema);
+const stackedInputClient = initClient(
+	{ create: stackedInputRoute },
+	{ baseUrl: "https://example.test" },
+);
+stackedInputClient.create({ value: "shared", left: "a", right: "b" });
+expectError(stackedInputClient.create({ value: "shared", left: "a" }));
+
 const additiveHeadersApi = {
 	items: route
 		.get("/items")
@@ -686,3 +695,66 @@ expectError(
 expectError(
 	additiveHeadersClient.items({ headers: { "x-request-id": "request-1" } }),
 );
+
+// combining headers + input
+
+const inputWithHeaders = route
+	.headers(z.object({ authorization: z.string() }))
+	.input(z.object({ title: z.string() }))
+	.output(z.any());
+
+const inputWithHeadersClient = initClient(
+	{ create: inputWithHeaders },
+	{ baseUrl: "https://example.test" },
+);
+
+// Should error because the required headers are not provided
+expectError(inputWithHeadersClient.create({ title: "Write type tests" }));
+
+// The error should be readable and indicate that the required headers are missing
+expectType<never>(
+	undefined as unknown as Parameters<
+		typeof inputWithHeadersClient.create
+	>[0]['ERROR: required header "authorization" needs a guaranteed globalHeaders value'],
+);
+
+const inputWithHeadersClientWithGlobalHeaders = initClient(
+	{ create: inputWithHeaders },
+	{
+		baseUrl: "https://example.test",
+		globalHeaders: { authorization: "Bearer token" },
+	},
+);
+
+// Should not error because global headers satisfy the required headers
+inputWithHeadersClientWithGlobalHeaders.create({ title: "Write type tests" });
+
+const inputWithHeadersClientWithOptionalGlobalHeaders = initClient(
+	{ create: inputWithHeaders },
+	{
+		baseUrl: "https://example.test",
+		globalHeaders: {
+			authorization: () => (Math.random() < 0.5 ? "Bearer token" : undefined),
+		},
+	},
+);
+
+// Should error because the global headers are optional and may not satisfy the required headers
+expectError(
+	inputWithHeadersClientWithOptionalGlobalHeaders.create({
+		title: "Write type tests",
+	}),
+);
+
+const inputWithOptionalHeaders = route
+	.headers(z.object({ authorization: z.string().optional() }))
+	.input(z.object({ title: z.string() }))
+	.output(z.any());
+
+const inputWithOptionalHeadersClient = initClient(
+	{ create: inputWithOptionalHeaders },
+	{ baseUrl: "https://example.test" },
+);
+
+// Should not error because the headers are optional
+inputWithOptionalHeadersClient.create({ title: "Write type tests" });

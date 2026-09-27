@@ -230,6 +230,81 @@ describe("OpenAPI operations", () => {
 		]);
 	});
 
+	it("composes stacked request schemas after converting them individually", () => {
+		const firstQuery = z.object({ id: z.string().optional() });
+		const secondQuery = z.object({
+			id: z.string(),
+			cursor: z.string().optional(),
+		});
+		const firstBody = z.string();
+		const secondBody = z.string();
+		const convertedSchemas = new Map<object, Record<string, unknown>>([
+			[
+				firstQuery,
+				{
+					type: "object",
+					properties: { id: { type: "string", minLength: 3 } },
+				},
+			],
+			[
+				secondQuery,
+				{
+					type: "object",
+					properties: {
+						id: { type: "string", pattern: "^usr_" },
+						cursor: { type: "string" },
+					},
+					required: ["id"],
+				},
+			],
+			[firstBody, { type: "string", minLength: 3 }],
+			[secondBody, { type: "string", pattern: "^usr_" }],
+		]);
+		const calls: object[] = [];
+		const converter: SchemaConverter = (schema) => {
+			calls.push(schema);
+			return convertedSchemas.get(schema);
+		};
+
+		assert.deepEqual(
+			createParameters([firstQuery, secondQuery], "query", {
+				schemaConverter: converter,
+			}),
+			[
+				{
+					name: "id",
+					in: "query",
+					required: true,
+					schema: {
+						allOf: [
+							{ type: "string", minLength: 3 },
+							{ type: "string", pattern: "^usr_" },
+						],
+					},
+				},
+				{
+					name: "cursor",
+					in: "query",
+					required: false,
+					schema: { type: "string" },
+				},
+			],
+		);
+		assert.deepEqual(createRequestBody([firstBody, secondBody], converter), {
+			content: {
+				"application/json": {
+					schema: {
+						allOf: [
+							{ type: "string", minLength: 3 },
+							{ type: "string", pattern: "^usr_" },
+						],
+					},
+				},
+			},
+		});
+		assert.deepEqual(calls, [firstQuery, secondQuery, firstBody, secondBody]);
+	});
+
 	it("creates JSON and custom request bodies", () => {
 		const jsonBody = createRequestBody(
 			z.object({ title: z.string() }),

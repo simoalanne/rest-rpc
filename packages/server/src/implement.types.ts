@@ -15,12 +15,13 @@ export type ContractImplementor<
 	TAdditionalHandlerFields extends object = EmptyObject,
 	TContext extends object = EmptyObject,
 > = TContract extends ContractRoute
-	? TContract &
-			HandlerMethodFor<
-				TContract["~restrpc"],
-				TAdditionalHandlerFields,
-				TContext
-			> & {
+	? {
+			readonly "~restrpc": TContract["~restrpc"];
+		} & HandlerMethodFor<
+			TContract["~restrpc"],
+			TAdditionalHandlerFields,
+			TContext
+		> & {
 				/** Wraps this contract leaf with middleware. @see {@link https://rest-rpc.dev/docs/middleware} */
 				use(
 					middleware: (

@@ -96,7 +96,11 @@ See [Fetch Client](/docs/client/fetch-client) for client-specific behavior and
 [Serialization and Codecs](/docs/http-behavior/serialization) for the decoding
 that precedes validation.
 
-## Type-only Schemas
+## Type Helper
+
+When you don't need runtime validation, use the built-in `type<T>()` helper to declare
+schemas with only TypeScript types. The helper accepts an optional mapping function
+to transform input to output. The mapping function can be asynchronous.
 
 ```ts
 import { type } from "@rest-rpc/core";
@@ -104,8 +108,6 @@ import { type } from "@rest-rpc/core";
 const create = route
 	.input(type<{ title: string }>())
 	.handler(({ input: { title } }) => ({ id: crypto.randomUUID(), title }));
-```
 
-`type<T>()` accepts runtime values unchanged. It does not validate, coerce, or
-transform HTTP strings or decoded bodies. Use a validating schema when those
-operations are needed.
+const numberToStringSchema = type((input: number) => input.toString());
+```

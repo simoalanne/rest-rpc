@@ -1,13 +1,13 @@
 import type {
 	BuilderExtension,
 	BuilderState,
+	InferServerRequest,
 	PublicDeclarationFor,
 	RootRouteBuilder,
 	RouteBuilderView,
 	RouteDeclaration,
 	RouteMetadata,
 	ServerErrors,
-	ServerRequest,
 	ServerResponse,
 	ServerResponseBody,
 } from "@rest-rpc/core/contract";
@@ -43,27 +43,6 @@ export type RuntimeRouteHandler = (
 export type RouteErrors<TRoute extends ContractRoute> = ServerErrors<
 	TRoute["~restrpc"]
 >;
-
-type RequestValue<TRoute extends RouteDeclaration> =
-	ServerRequest<TRoute> extends never ? EmptyObject : ServerRequest<TRoute>;
-
-type FlatInputSchema<TRoute extends RouteDeclaration> = TRoute extends {
-	request: { query: infer TQuery extends StandardSchemaV1 };
-}
-	? TQuery
-	: TRoute extends { request: { body: infer TBody extends StandardSchemaV1 } }
-		? TBody
-		: never;
-
-type UsesFlatInput<TRoute extends RouteDeclaration> = TRoute extends {
-	input: "segments";
-}
-	? false
-	: TRoute extends { input: "input" }
-		? true
-		: TRoute["kind"] extends "procedure"
-			? true
-			: false;
 
 type UsesPlainOutput<TRoute extends RouteDeclaration> = TRoute extends {
 	output: "response";
@@ -101,16 +80,7 @@ export type RouteRequest<
 	TAdditionalHandlerFields extends object = EmptyObject,
 	TContext extends object = EmptyObject,
 > = Merge<
-	(UsesFlatInput<TRoute> extends true
-		? [FlatInputSchema<TRoute>] extends [never]
-			? EmptyObject
-			: FlatInputSchema<TRoute> extends infer TInput extends StandardSchemaV1
-				? { input: StandardSchemaV1.InferOutput<TInput> } & Omit<
-						RequestValue<TRoute>,
-						"body" | "query"
-					>
-				: EmptyObject
-		: RequestValue<TRoute>) &
+	InferServerRequest<{ readonly "~restrpc": TRoute }> &
 		RequestTransportFields &
 		TAdditionalHandlerFields & {
 			route: TRoute;

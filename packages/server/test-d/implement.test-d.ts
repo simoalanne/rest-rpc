@@ -29,6 +29,31 @@ const contract = {
 } as const;
 
 const implementor = implement(contract);
+expectType<"~restrpc" | "handler" | "use">(
+	null as unknown as keyof typeof implementor.todos.get,
+);
+
+expectError(implement(route.get("/unfinished")));
+expectError(implement(route.input(z.object({ title: z.string() }))));
+expectError(
+	implement({
+		complete: route.get("/complete").response(204),
+		unfinished: route.get("/unfinished"),
+	}),
+);
+
+expectError(implementor.todos.get.get("/other"));
+expectError(implementor.todos.get.query(z.object({ search: z.string() })));
+expectError(implementor.todos.get.response(201));
+expectError(implementor.todos.get.output(z.string()));
+
+const getWithMiddleware = implementor.todos.get.use(({ next }) => next());
+expectType<"~restrpc" | "handler" | "use">(
+	null as unknown as keyof typeof getWithMiddleware,
+);
+expectError(getWithMiddleware.get("/other"));
+expectError(getWithMiddleware.response(201));
+
 const get = implementor.todos.get.handler(({ params }) => ({
 	status: 200 as const,
 	body: { id: params.id },

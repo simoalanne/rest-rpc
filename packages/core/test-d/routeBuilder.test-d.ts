@@ -3,9 +3,19 @@ import {
 	type OpenApiRouteOptions,
 	type RouteDeclaration,
 } from "@rest-rpc/core/contract";
-import { route, type as schemaType } from "@rest-rpc/core";
+import {
+	type InferClientRequest,
+	type InferServerRequest,
+	route,
+	type as schemaType,
+} from "@rest-rpc/core";
 import z from "zod";
-import { expectAssignable, expectError, expectType } from "tsd";
+import {
+	expectAssignable,
+	expectError,
+	expectNotAssignable,
+	expectType,
+} from "tsd";
 
 const todo = schemaType<{ id: string; title: string }>();
 const input = schemaType<{ title: string }>();
@@ -33,15 +43,19 @@ expectAssignable<Contract>(shorthandNoInput);
 // Like an HTTP route with one response, it is complete but remains extendable.
 const shorthandOutputFirst = shorthandNoInput.input(input);
 expectAssignable<RouteDeclaration>(shorthandOutputFirst["~restrpc"]);
-expectType<typeof input>(shorthandOutputFirst["~restrpc"].request.body);
+expectType<readonly [typeof input]>(
+	shorthandOutputFirst["~restrpc"].request.body,
+);
 expectType<typeof todo>(shorthandOutputFirst["~restrpc"].responses[200].body);
 expectAssignable<Contract>(shorthandOutputFirst);
 
 // Input starts with an empty response map until an output is declared.
 const shorthandInput = route.input(input);
-expectAssignable<Contract>(shorthandInput);
+expectNotAssignable<Contract>(shorthandInput);
 const shorthandWithInput = shorthandInput.output(todo);
-expectType<typeof input>(shorthandWithInput["~restrpc"].request.body);
+expectType<readonly [typeof input]>(
+	shorthandWithInput["~restrpc"].request.body,
+);
 expectType<typeof todo>(shorthandWithInput["~restrpc"].responses[200].body);
 expectAssignable<RouteDeclaration>(shorthandWithInput["~restrpc"]);
 expectAssignable<Contract>(shorthandWithInput);
@@ -52,17 +66,17 @@ const streamOutput = route.input(input).streamOutput(event);
 expectType<"stream">(streamOutput["~restrpc"].responses[200].kind);
 expectType<typeof event>(streamOutput["~restrpc"].responses[200].body);
 const streamOutputFirst = route.streamOutput(event).input(input);
-expectType<typeof input>(streamOutputFirst["~restrpc"].request.body);
+expectType<readonly [typeof input]>(streamOutputFirst["~restrpc"].request.body);
 
 const formInput = route
 	.input(input, { contentType: "application/x-www-form-urlencoded" })
 	.output(todo);
-expectType<typeof input>(formInput["~restrpc"].request.body);
+expectType<readonly [typeof input]>(formInput["~restrpc"].request.body);
 expectType<"application/x-www-form-urlencoded">(
 	formInput["~restrpc"].request.contentType,
 );
 
-// Completed shorthand declarations do not expose explicit HTTP setters.
+// Completed shorthand declarations remain eligible for explicit HTTP details.
 expectError(route.handler(() => ({ id: "todo-1", title: "Todo" })));
 expectError(
 	shorthandInput.handler((request: { title: string }) => ({
@@ -70,16 +84,49 @@ expectError(
 		title: request.title,
 	})),
 );
-expectError(shorthandInput.input(input));
+shorthandInput.input(input);
 expectError(shorthandWithInput.output(todo));
 expectError(shorthandWithInput.streamOutput(event));
-expectError(shorthandOutputFirst.input(input));
+shorthandOutputFirst.input(input);
 expectError(shorthandOutputFirst.output(todo));
 expectError(streamOutput.output(todo));
 expectError(streamOutput.streamOutput(event));
 expectError(shorthandWithInput.response(200, todo));
 const explicitFlat = route.post("/todos").input(input).output(todo);
-expectType<typeof input>(explicitFlat["~restrpc"].request.body);
+expectType<readonly [typeof input]>(explicitFlat["~restrpc"].request.body);
+
+const methodLastFlat = route.input(input).output(todo).post("/todos");
+expectType<"POST">(methodLastFlat["~restrpc"].method);
+expectType<readonly [typeof input]>(methodLastFlat["~restrpc"].request.body);
+expectError(methodLastFlat.get("/again"));
+
+const stackedFlat = route
+	.input(
+		schemaType<{ id: string; first: string }, { id: number; first: string }>(
+			(value) => ({ id: value.id.length, first: value.first }),
+		),
+	)
+	.input(
+		schemaType<{ id: number; second: string }, { id: boolean; second: string }>(
+			(value) => ({ id: value.id > 0, second: value.second }),
+		),
+	);
+expectType<never>(
+	undefined as unknown as InferClientRequest<typeof stackedFlat>["id"],
+);
+expectType<boolean>(
+	undefined as unknown as InferServerRequest<typeof stackedFlat>["input"]["id"],
+);
+expectType<string>(
+	undefined as unknown as InferServerRequest<
+		typeof stackedFlat
+	>["input"]["first"],
+);
+expectType<string>(
+	undefined as unknown as InferServerRequest<
+		typeof stackedFlat
+	>["input"]["second"],
+);
 
 // HTTP route builders
 
@@ -101,7 +148,7 @@ expectType<{ readonly permission: "todos:create" }>(
 	create["~restrpc"].metadata,
 );
 expectType<OpenApiRouteOptions>(create["~restrpc"].openApi);
-expectType<typeof input>(create["~restrpc"].request.body);
+expectType<readonly [typeof input]>(create["~restrpc"].request.body);
 expectType<"application/json">(create["~restrpc"].request.contentType);
 expectType<typeof todo>(create["~restrpc"].responses[201].body);
 expectType<typeof unauthorized>(create["~restrpc"].responses[401].body);
@@ -113,21 +160,37 @@ expectError(create.output(todo));
 // Routes without a declared response carry an empty response map.
 const incompleteHttp = route.get("/incomplete");
 expectAssignable<RouteDeclaration>(incompleteHttp["~restrpc"]);
-expectAssignable<Contract>(incompleteHttp);
+expectNotAssignable<Contract>(incompleteHttp);
 
 const flatGet = route.get("/search").input(scalarQuery).output(todo);
 expectType<"input">(flatGet["~restrpc"].input);
 expectType<"output">(flatGet["~restrpc"].output);
-expectType<typeof scalarQuery>(flatGet["~restrpc"].request.query);
+expectType<readonly [typeof scalarQuery]>(flatGet["~restrpc"].request.query);
 expectError(flatGet.query(scalarQuery));
 expectError(flatGet.response(200, todo));
-expectError(route.get("/search").body(input));
-expectError(
-	route.get("/search").input(scalarQuery, { contentType: "text/plain" }),
+route.get("/search").body(input);
+route.get("/search").input(scalarQuery, { contentType: "text/plain" });
+route.get("/search").input(schemaType<{ nested: { value: string } }>());
+
+const inputFirstGet = route.input(scalarQuery).get("/input-first");
+expectType<readonly [typeof scalarQuery]>(
+	inputFirstGet["~restrpc"].request.query,
 );
-expectError(
-	route.get("/search").input(schemaType<{ nested: { value: string } }>()),
+expectError(inputFirstGet["~restrpc"].request.body);
+
+const segmentsFirstGet = route
+	.headers(input)
+	.query(scalarQuery)
+	.response(401)
+	.get("/method-last");
+expectType<"GET">(segmentsFirstGet["~restrpc"].method);
+expectType<readonly [typeof input]>(
+	segmentsFirstGet["~restrpc"].request.headers,
 );
+expectType<readonly [typeof scalarQuery]>(
+	segmentsFirstGet["~restrpc"].request.query,
+);
+expectError(segmentsFirstGet.post("/again"));
 
 // Preserves schema inference for form and multipart content types.
 const importRoute = route
@@ -135,7 +198,7 @@ const importRoute = route
 	.body(input, { contentType: "application/x-www-form-urlencoded" })
 	.response(201, customText, { contentType: "text/csv" });
 
-expectType<typeof input>(importRoute["~restrpc"].request.body);
+expectType<readonly [typeof input]>(importRoute["~restrpc"].request.body);
 expectType<"application/x-www-form-urlencoded">(
 	importRoute["~restrpc"].request.contentType,
 );
@@ -146,19 +209,19 @@ const formSchema = route
 	.post("/form-schema")
 	.body(input, { contentType: "application/x-www-form-urlencoded" })
 	.response(201);
-expectType<typeof input>(formSchema["~restrpc"].request.body);
+expectType<readonly [typeof input]>(formSchema["~restrpc"].request.body);
 const multipartSchema = route
 	.post("/multipart-schema")
 	.body(input, { contentType: "multipart/form-data" })
 	.response(201);
-expectType<typeof input>(multipartSchema["~restrpc"].request.body);
+expectType<readonly [typeof input]>(multipartSchema["~restrpc"].request.body);
 
 // Preserves schema and content-type inference for custom request bodies.
 const customRequestBody = route
 	.post("/custom-body")
 	.body(input, { contentType: "application/xml" })
 	.response(201);
-expectType<typeof input>(customRequestBody["~restrpc"].request.body);
+expectType<readonly [typeof input]>(customRequestBody["~restrpc"].request.body);
 expectType<"application/xml">(
 	customRequestBody["~restrpc"].request.contentType,
 );
@@ -185,8 +248,12 @@ const scalarRequest = route
 	.query(scalarQuery)
 	.params(scalarParams)
 	.response(200, todo);
-expectType<typeof scalarQuery>(scalarRequest["~restrpc"].request.query);
-expectType<typeof scalarParams>(scalarRequest["~restrpc"].request.params);
+expectType<readonly [typeof scalarQuery]>(
+	scalarRequest["~restrpc"].request.query,
+);
+expectType<readonly [typeof scalarParams]>(
+	scalarRequest["~restrpc"].request.params,
+);
 
 // Structured query inputs must use scalar or array wire values.
 expectError(
@@ -263,7 +330,9 @@ const configuredAfterResponse = route
 	.metadata({ auth: true })
 	.openAPI({ summary: "Configured after response" })
 	.streamResponse(201, event);
-expectType<typeof input>(configuredAfterResponse["~restrpc"].request.body);
+expectType<readonly [typeof input]>(
+	configuredAfterResponse["~restrpc"].request.body,
+);
 expectType<typeof customText>(
 	configuredAfterResponse["~restrpc"].responses[200].body,
 );
@@ -276,12 +345,13 @@ expectType<{ readonly auth: true }>(
 expectType<OpenApiRouteOptions>(configuredAfterResponse["~restrpc"].openApi);
 expectAssignable<RouteDeclaration>(configuredAfterResponse["~restrpc"]);
 
-// Keeps HTTP body and query setters mutually exclusive.
+// Keeps flat input and request segments mutually exclusive.
 const bodyUsed = route.post("/body-used").body(input);
-expectError(bodyUsed.body(input, { contentType: "text/plain" }));
-expectError(route.get("/query-used").query(input).query(input));
+expectError(bodyUsed.input(input));
+bodyUsed.body(input, { contentType: "text/plain" });
+route.get("/query-used").query(input).query(input);
 
-// Allows each HTTP request setter only once regardless of response order.
+// Request schemas remain stackable regardless of response order.
 const singleUseHttpConfigured = route
 	.get("/single-use-http")
 	.query(input)
@@ -289,8 +359,8 @@ const singleUseHttpConfigured = route
 	.headers(input)
 	.metadata({ auth: true })
 	.openAPI({ summary: "single use" });
-expectError(singleUseHttpConfigured.params(input));
-expectError(singleUseHttpConfigured.headers(input));
+singleUseHttpConfigured.params(input);
+singleUseHttpConfigured.headers(input);
 expectError(singleUseHttpConfigured.requestKeys);
 expectError(singleUseHttpConfigured.metadata({ auth: true }));
 expectError(singleUseHttpConfigured.openAPI({ summary: "again" }));

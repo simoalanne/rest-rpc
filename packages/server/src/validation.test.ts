@@ -43,6 +43,70 @@ describe("validateRequestSegments", () => {
 		});
 	});
 
+	it("validates stacked schemas against the original value and merges outputs", async () => {
+		const declaration = route
+			.post("/todos")
+			.body(
+				z
+					.object({ shared: z.string(), title: z.string() })
+					.transform((value) => ({
+						first: value.title,
+						shared: "first" as const,
+					})),
+			)
+			.body(
+				z
+					.object({ shared: z.string(), count: z.number() })
+					.transform((value) => ({
+						second: value.count,
+						shared: "second" as const,
+					})),
+			)["~restrpc"];
+
+		const result = await validateRequestSegments(declaration, {
+			body: { shared: "raw", title: "Write tests", count: 2 },
+		});
+
+		assert.deepEqual(result.body, {
+			first: "Write tests",
+			second: 2,
+			shared: "second",
+		});
+	});
+
+	it("preserves one primitive output and rejects primitives in a stack", async () => {
+		const scalar = route.post("/scalar").body(z.string())["~restrpc"];
+		assert.equal(
+			(await validateRequestSegments(scalar, { body: "value" })).body,
+			"value",
+		);
+
+		const stacked = route
+			.post("/stacked")
+			.body(z.string())
+			.body(z.string().transform((value) => ({ value })))["~restrpc"];
+		await assert.rejects(
+			() => validateRequestSegments(stacked, { body: "value" }),
+			/Stacked request schema outputs must be objects/,
+		);
+	});
+
+	it("stops at the first failed schema in a request stack", async () => {
+		const declaration = route
+			.post("/todos")
+			.body(z.object({ title: z.string() }))
+			.body(z.object({ count: z.number() }))["~restrpc"];
+
+		await assert.rejects(
+			() => validateRequestSegments(declaration, { body: {} }),
+			(error) => {
+				assert(error instanceof RequestValidationError);
+				assert.equal(error.issues.body.length, 1);
+				return true;
+			},
+		);
+	});
+
 	it("rejects a request when header validation fails", async () => {
 		const declaration = route
 			.get("/headers")

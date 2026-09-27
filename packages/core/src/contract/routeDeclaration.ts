@@ -4,7 +4,6 @@ import type {
 	RequestBodySchema,
 	RequestHeadersSchema,
 	RequestParamsSchema,
-	RequestQuerySchema,
 } from "./request.ts";
 import type { RouteResponses } from "./response.ts";
 
@@ -44,13 +43,13 @@ export type CommonOpenApiRouteOptions = Omit<
 	"summary" | "description" | "operationId"
 >;
 
-/** Canonical request declaration nested on a route. */
+/** Canonical ordered request-schema declarations nested on a route. */
 export type RouteRequestDeclaration = {
-	body?: RequestBodySchema;
+	body?: readonly RequestBodySchema[];
 	contentType?: BodyContentType;
-	query?: RequestQuerySchema;
-	params?: RequestParamsSchema;
-	headers?: RequestHeadersSchema;
+	query?: readonly RequestBodySchema[];
+	params?: readonly RequestParamsSchema[];
+	headers?: readonly RequestHeadersSchema[];
 };
 
 /**

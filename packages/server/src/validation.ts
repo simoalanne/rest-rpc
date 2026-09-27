@@ -56,22 +56,38 @@ const parseQuery = (searchParams: URLSearchParams) => {
 };
 
 const validateRequestSegment = async (
-	schema: RequestObjectSchema | undefined,
+	schemas: readonly RequestObjectSchema[] | undefined,
 	input: unknown,
 ): Promise<SegmentValidationResult> => {
-	if (!schema) return { data: undefined, errors: [] };
-	const result = await validateStandardSchema(schema, input);
-	if (result.issues) {
-		return { data: undefined, errors: result.issues };
+	if (!schemas || schemas.length === 0) return { data: undefined, errors: [] };
+
+	let merged: Record<string, unknown> = {};
+
+	for (const schema of schemas) {
+		const result = await validateStandardSchema(schema, input);
+
+		if (result.issues) {
+			return { data: undefined, errors: result.issues };
+		}
+
+		if (schemas.length === 1) {
+			return { data: result.value, errors: [] };
+		}
+
+		if (typeof result.value !== "object" || result.value === null) {
+			throw new Error("Stacked request schema outputs must be objects.");
+		}
+
+		merged = { ...merged, ...result.value };
 	}
-	return { data: result.value, errors: [] };
+	return { data: merged, errors: [] };
 };
 
 const validateRequestQuery = async (
-	schema: RequestObjectSchema | undefined,
+	schemas: readonly RequestObjectSchema[] | undefined,
 	query: URLSearchParams | undefined,
 ): Promise<SegmentValidationResult> => {
-	return validateRequestSegment(schema, query ? parseQuery(query) : undefined);
+	return validateRequestSegment(schemas, query ? parseQuery(query) : undefined);
 };
 
 export async function validateRequestSegments(

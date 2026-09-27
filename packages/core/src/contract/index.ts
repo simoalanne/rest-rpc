@@ -24,6 +24,8 @@ export {
 } from "./path.ts";
 export type {
 	InferClientRequest,
+	InferSchemaInputs,
+	InferSchemaOutputs,
 	InferServerRequest,
 	RequestBodySchema,
 	RequestHeadersSchema,

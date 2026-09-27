@@ -6,5 +6,5 @@ import "./routeBuilder.ts";
 export function implement<const TContract extends Contract>(
 	contract: TContract,
 ): ContractImplementor<TContract> {
-	return contract as ContractImplementor<TContract>;
+	return contract as unknown as ContractImplementor<TContract>;
 }

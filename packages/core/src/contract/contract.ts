@@ -1,5 +1,9 @@
 import type { RouteDeclaration } from "./routeDeclaration.ts";
 
+type CompleteRouteDeclaration = RouteDeclaration & {
+	readonly output: NonNullable<RouteDeclaration["output"]>;
+};
+
 /**
  * Any complete route declaration in a contract tree.
  *
@@ -13,5 +17,5 @@ export type { RouteDeclaration } from "./routeDeclaration.ts";
  * @see {@link https://rest-rpc.dev/docs/route-builder}
  */
 export type Contract =
-	| { readonly "~restrpc": RouteDeclaration }
+	| { readonly "~restrpc": CompleteRouteDeclaration }
 	| { [key: string]: Contract };

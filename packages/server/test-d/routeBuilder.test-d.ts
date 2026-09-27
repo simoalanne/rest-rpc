@@ -114,6 +114,26 @@ expectType<
 	>
 >(procedure["~restrpc"].responses[200].body);
 
+route
+	.input(
+		z.object({ value: z.string(), left: z.string() }).transform((value) => ({
+			left: value.left,
+			value: value.value.length,
+		})),
+	)
+	.input(
+		z.object({ value: z.string(), right: z.string() }).transform((value) => ({
+			right: value.right,
+			value: value.value.length > 0,
+		})),
+	)
+	.handler(({ input: stackedInput }) => {
+		expectType<string>(stackedInput.left);
+		expectType<string>(stackedInput.right);
+		expectType<boolean>(stackedInput.value);
+		return { ok: true as const };
+	});
+
 const flatGet = route
 	.get("/todos")
 	.input(z.object({ id: z.string() }))
@@ -413,3 +433,13 @@ route
 	.params(z.object({ id: z.string(), name: z.string() }))
 	.body(z.string())
 	.use(reusableMiddleware);
+
+// when mixing flat input with headers, both should be accessible in the handler
+route
+	.headers(z.object({ authorization: z.string() }))
+	.input(z.object({ title: z.string() }))
+	.handler(({ headers, input }) => {
+		expectType<string>(headers.authorization);
+		expectType<string>(input.title);
+		return { id: "todo-1", title: input.title };
+	});

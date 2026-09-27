@@ -1,6 +1,10 @@
 import type { BodyCodec } from "../codecs/index.ts";
 import type { Contract, RouteDeclaration } from "../contract/contract.ts";
-import type { ClientRequestForDeclaration } from "../contract/request.ts";
+import type {
+	ClientRequestForDeclaration,
+	InferSchemaInputs,
+} from "../contract/request.ts";
+import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { RequestScalar } from "../contract/request.ts";
 import type {
 	DeclaredClientResponse,
@@ -60,6 +64,34 @@ type GlobalHeaderKeys<TGlobalHeaders extends ClientHeaders> = {
 		: TKey;
 }[LiteralKeys<TGlobalHeaders>];
 
+type RequiredKeys<T> = {
+	[TKey in keyof T]-?: {} extends Pick<T, TKey> ? never : TKey;
+}[keyof T];
+
+type UnsatisfiedFlatHeaderKeys<
+	E extends RouteDeclaration,
+	TGlobalHeaders extends ClientHeaders,
+> = E extends {
+	input: "input";
+	request: {
+		headers: infer THeaders extends readonly StandardSchemaV1[];
+	};
+}
+	? Exclude<
+			RequiredKeys<InferSchemaInputs<THeaders>>,
+			GlobalHeaderKeys<TGlobalHeaders>
+		>
+	: never;
+
+type MissingGlobalHeaders<TKeys extends PropertyKey> = {
+	readonly [
+		TKey in Extract<
+			TKeys,
+			string
+		> as `ERROR: required header "${TKey}" needs a guaranteed globalHeaders value`
+	]: never;
+};
+
 type DeclaredContentType<E> = E extends {
 	request: { contentType: infer TContentType };
 }
@@ -79,9 +111,9 @@ type RequiresFetchOptions<E> = [DeclaredContentType<E>] extends [never]
 		? true
 		: false;
 
-export type FetchArgs<
-	E extends RouteDeclaration = RouteDeclaration,
-	TGlobalHeaders extends ClientHeaders = Record<never, string>,
+type StandardFetchArgs<
+	E extends RouteDeclaration,
+	TGlobalHeaders extends ClientHeaders,
 > =
 	ClientRequestForDeclaration<E, GlobalHeaderKeys<TGlobalHeaders>> extends never
 		? [request?: undefined, options?: FetchOptionsFor<E>]
@@ -100,6 +132,16 @@ export type FetchArgs<
 					>,
 					options: FetchOptionsFor<E>,
 				];
+
+export type FetchArgs<
+	E extends RouteDeclaration = RouteDeclaration,
+	TGlobalHeaders extends ClientHeaders = Record<never, string>,
+> = [UnsatisfiedFlatHeaderKeys<E, TGlobalHeaders>] extends [never]
+	? StandardFetchArgs<E, TGlobalHeaders>
+	: [
+			request: ClientRequestForDeclaration<E> &
+				MissingGlobalHeaders<UnsatisfiedFlatHeaderKeys<E, TGlobalHeaders>>,
+		];
 
 type Simplify<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
 
