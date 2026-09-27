@@ -1,5 +1,12 @@
 # @rest-rpc/express
 
+## 0.1.0-beta.22
+
+### Minor Changes
+
+- d72a045: more flexible route builder
+- d72a045: centralize type helpers
+
 ## 0.1.0-beta.21
 
 ### Patch Changes
