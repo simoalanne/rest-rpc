@@ -46,6 +46,7 @@
 	},
 	"devDependencies": {
 		"@rest-rpc/server": "workspace:*",
+		"@tanstack/react-query": "^5.86.0",
 		"esmock": "^2.7.3"
 	},
 	"peerDependencies": {

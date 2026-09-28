@@ -227,18 +227,6 @@ type StreamedQueryReducedOptions<
 		"queryFn" | "queryKey"
 	>;
 
-type streamedQueryOptionsFor<
-	E extends QueryRoute,
-	TData,
-	TSelectedData,
-> = WithFetchOptions<
-	[TData] extends [RouteStreamedQueryData<E>]
-		?
-				| StreamedQuerySimpleOptions<E, TSelectedData>
-				| StreamedQueryReducedOptions<E, TData, TSelectedData>
-		: StreamedQueryReducedOptions<E, TData, TSelectedData>
->;
-
 type streamedQueryOptionsResultFor<
 	E extends QueryRoute,
 	TData,
@@ -247,16 +235,32 @@ type streamedQueryOptionsResultFor<
 	queryKey: DataTag<QueryKey, TData, RouteQueryError<E>>;
 };
 
-type StreamedQueryArgs<E extends QueryRoute, TData, TSelectedData> = [
+type StreamedSimpleQueryArgs<E extends QueryRoute, TSelectedData> = [
 	RouteRequestValue<E>,
 ] extends [never]
 	? [
 			request?: undefined,
-			options?: streamedQueryOptionsFor<E, TData, TSelectedData>,
+			options?: WithFetchOptions<StreamedQuerySimpleOptions<E, TSelectedData>>,
 		]
 	: [
 			request: RouteRequestValue<E> | SkipToken,
-			options?: streamedQueryOptionsFor<E, TData, TSelectedData>,
+			options?: WithFetchOptions<StreamedQuerySimpleOptions<E, TSelectedData>>,
+		];
+
+type StreamedReducedQueryArgs<E extends QueryRoute, TData, TSelectedData> = [
+	RouteRequestValue<E>,
+] extends [never]
+	? [
+			request: undefined,
+			options: WithFetchOptions<
+				StreamedQueryReducedOptions<E, TData, TSelectedData>
+			>,
+		]
+	: [
+			request: RouteRequestValue<E> | SkipToken,
+			options: WithFetchOptions<
+				StreamedQueryReducedOptions<E, TData, TSelectedData>
+			>,
 		];
 
 type UseQueryArgs<E extends QueryRoute, TData = RouteQueryData<E>> =
@@ -307,12 +311,20 @@ type TanstackQueryStreamRouteValue<E extends QueryRoute> = [
 	? Record<never, never>
 	: DeclaredRouteResponseBody<RouteFor<E>> extends AsyncIterable<unknown>
 		? {
-				streamedQueryOptions: <
-					TData = RouteStreamedQueryData<E>,
-					TSelectedData = TData,
-				>(
-					...args: StreamedQueryArgs<E, TData, TSelectedData>
-				) => streamedQueryOptionsResultFor<E, TData, TSelectedData>;
+				streamedQueryOptions: {
+					// Default accumulation fixes the cache data to the route's event array.
+					<TSelectedData = RouteStreamedQueryData<E>>(
+						...args: StreamedSimpleQueryArgs<E, TSelectedData>
+					): streamedQueryOptionsResultFor<
+						E,
+						RouteStreamedQueryData<E>,
+						TSelectedData
+					>;
+					// A required initial value and reducer are the inference source for cache data.
+					<TData, TSelectedData = TData>(
+						...args: StreamedReducedQueryArgs<E, TData, TSelectedData>
+					): streamedQueryOptionsResultFor<E, TData, TSelectedData>;
+				};
 			}
 		: Record<never, never>;
 

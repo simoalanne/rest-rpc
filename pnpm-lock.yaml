@@ -414,6 +414,9 @@ importers:
       '@rest-rpc/server':
         specifier: workspace:*
         version: link:../server
+      '@tanstack/react-query':
+        specifier: ^5.86.0
+        version: 5.101.4(react@19.2.8)
       esmock:
         specifier: ^2.7.3
         version: 2.7.6

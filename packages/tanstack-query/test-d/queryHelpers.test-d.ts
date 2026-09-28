@@ -11,6 +11,7 @@ import {
 	type QueryClient,
 	skipToken,
 } from "@tanstack/query-core";
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { expectAssignable, expectError, expectType } from "tsd";
 
 declare const queryClient: QueryClient;
@@ -155,6 +156,10 @@ const streamApi = {
 		list: route
 			.get("/events")
 			.streamResponse(200, schemaType<{ id: string; message: string }>()),
+		byTopic: route
+			.get("/events/by-topic")
+			.query(schemaType<{ topic: string }>())
+			.streamResponse(200, schemaType<{ id: string; message: string }>()),
 	},
 };
 
@@ -187,6 +192,18 @@ expectAssignable<Promise<Event[]>>(
 expectAssignable<Event[] | undefined>(
 	queryClient.getQueryData(materializedStreamOptions.queryKey),
 );
+const inlineMaterializedStreamQuery = useQuery(
+	streamTq.events.list.streamedQueryOptions(),
+);
+expectType<UseQueryResult<Event[], HttpError | Error>>(
+	inlineMaterializedStreamQuery,
+);
+const inlineSkippedStreamQuery = useQuery(
+	streamTq.events.byTopic.streamedQueryOptions(skipToken),
+);
+expectType<UseQueryResult<Event[], HttpError | Error>>(
+	inlineSkippedStreamQuery,
+);
 
 const selectedStreamOptions = streamTq.events.list.streamedQueryOptions(
 	undefined,
@@ -202,6 +219,17 @@ expectAssignable<Promise<Event[]>>(
 );
 expectAssignable<Event[] | undefined>(
 	queryClient.getQueryData(selectedStreamOptions.queryKey),
+);
+const inlineSelectedStreamQuery = useQuery(
+	streamTq.events.list.streamedQueryOptions(undefined, {
+		select(events) {
+			expectType<Event[]>(events);
+			return events.length;
+		},
+	}),
+);
+expectType<UseQueryResult<number, HttpError | Error>>(
+	inlineSelectedStreamQuery,
 );
 
 const reducedStreamOptions = streamTq.events.list.streamedQueryOptions(
@@ -219,6 +247,17 @@ expectAssignable<Promise<string>>(queryClient.fetchQuery(reducedStreamOptions));
 expectAssignable<string | undefined>(
 	queryClient.getQueryData(reducedStreamOptions.queryKey),
 );
+const inlineReducedStreamQuery = useQuery(
+	streamTq.events.list.streamedQueryOptions(undefined, {
+		initialValue: "",
+		reducer: (text, chunk) => {
+			expectType<string>(text);
+			expectType<Event>(chunk);
+			return `${text}${chunk.data.message}`;
+		},
+	}),
+);
+expectType<UseQueryResult<string, HttpError | Error>>(inlineReducedStreamQuery);
 
 const arrayReducedStreamOptions = streamTq.events.list.streamedQueryOptions(
 	undefined,
@@ -260,6 +299,23 @@ expectAssignable<Promise<Map<string, string>>>(
 );
 expectAssignable<Map<string, string> | undefined>(
 	queryClient.getQueryData(selectedReducedStreamOptions.queryKey),
+);
+const inlineSelectedReducedStreamQuery = useQuery(
+	streamTq.events.list.streamedQueryOptions(undefined, {
+		initialValue: new Map<string, string>(),
+		reducer: (messages, chunk) => {
+			expectType<Map<string, string>>(messages);
+			expectType<Event>(chunk);
+			return new Map(messages).set(chunk.data.id, chunk.data.message);
+		},
+		select(messages) {
+			expectType<Map<string, string>>(messages);
+			return [...messages.values()];
+		},
+	}),
+);
+expectType<UseQueryResult<string[], HttpError | Error>>(
+	inlineSelectedReducedStreamQuery,
 );
 
 // conditional query input
