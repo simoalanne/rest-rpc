@@ -3,6 +3,28 @@ export type ContextSource<TContext extends object, TFields> = (
 	fields: TFields,
 ) => TContext | Promise<TContext>;
 
+/** A typed per-request value store shared by route middleware and handlers. */
+export type Context<TValues extends object> = {
+	readonly get: <TKey extends keyof TValues>(key: TKey) => TValues[TKey];
+	readonly set: <TKey extends keyof TValues>(
+		key: TKey,
+		value: TValues[TKey],
+	) => void;
+};
+
+export const createContext = <TValues extends object>(
+	initialValues: TValues,
+): Context<TValues> => {
+	const values = { ...initialValues };
+
+	return {
+		get: (key) => values[key],
+		set: (key, value) => {
+			values[key] = value;
+		},
+	};
+};
+
 /** Configures the context shared by route middleware and handlers. */
 export type ContextOptions<
 	TContext extends object,

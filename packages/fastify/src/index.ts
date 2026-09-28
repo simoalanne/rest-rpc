@@ -22,6 +22,7 @@ type ContractRoute = { readonly "~restrpc": RouteDeclaration };
 
 export { type } from "@rest-rpc/core";
 export type {
+	Context,
 	InferServerRequest,
 	InferServerResponse,
 	RouteErrors,

@@ -69,7 +69,7 @@ adapter fields and typed context:
 type RouteHandlerFields<E extends Env = Env> = {
 	c: Context<E>;
 	signal: AbortSignal;
-	context: DefaultContext;
+	context: Context<DefaultContext>;
 };
 ```
 

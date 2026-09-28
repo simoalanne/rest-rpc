@@ -18,13 +18,15 @@ describe("handleHttpRoute", () => {
 			{
 				route: route,
 				handler: (request) => {
-					assert.deepEqual(request, {
+					const { context, ...requestFields } = request;
+					assert.deepEqual(Object.keys(context), ["get", "set"]);
+					assert.equal(context.get("requestId"), "request-1");
+					assert.deepEqual(requestFields, {
 						body: undefined,
 						query: undefined,
 						headers: undefined,
 						params: { id: 123 },
 						frameworkValue: "framework-1",
-						context: { requestId: "request-1" },
 						contentType: undefined,
 						lastEventId: undefined,
 						route,
@@ -59,12 +61,13 @@ describe("handleHttpRoute", () => {
 			{
 				route: route,
 				handler: (request) => {
-					assert.deepEqual(request, {
+					const { context, ...requestFields } = request;
+					assert.deepEqual(Object.keys(context), ["get", "set"]);
+					assert.deepEqual(requestFields, {
 						body: undefined,
 						params: undefined,
 						headers: undefined,
 						query: ["todo"],
-						context: {},
 						contentType: undefined,
 						lastEventId: undefined,
 						route,
@@ -350,15 +353,18 @@ describe("handleHttpRoute", () => {
 							"application/x-www-form-urlencoded",
 						);
 						assert.equal(request.lastEventId, "");
+						request.context.set("title", "From middleware");
 						return request.next();
 					},
 				],
 				handler: (request) => {
-					assert.deepEqual(request, {
+					const { context, ...requestFields } = request;
+					assert.deepEqual(Object.keys(context), ["get", "set"]);
+					assert.equal(context.get("title"), "From middleware");
+					assert.deepEqual(requestFields, {
 						input: { title: "Write docs" },
 						contentType: "application/x-www-form-urlencoded",
 						lastEventId: "",
-						context: {},
 						route: declaration,
 					});
 					return { title: "Write docs" };

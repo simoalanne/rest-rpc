@@ -26,10 +26,13 @@ const getProfile = route
 		}
 	})
 	.use(({ context, next }) => {
-		if (!context.user) return { status: 401 };
+		if (!context.get("user")) return { status: 401 };
 		return next();
 	})
-	.handler(({ context }) => ({ status: 200, body: { user: context.user } }));
+	.handler(({ context }) => ({
+		status: 200,
+		body: { user: context.get("user") },
+	}));
 ```
 
 Middleware runs in declaration order; work after `await next()` runs in reverse
@@ -37,7 +40,9 @@ order. Request schemas validate before middleware runs, regardless of setter ord
 
 ## Shared Context
 
-Middleware and the handler share one mutable `context` object. Declare its type by augmenting `DefaultContext`:
+Middleware and the handler share one mutable `context` store. Read and write values
+with `context.get(key)` and `context.set(key, value)`. Declare its values by augmenting
+`DefaultContext`:
 
 ```ts
 declare module "@rest-rpc/express" {
@@ -76,7 +81,7 @@ const attachUser = route.middleware<{ headers: { authorization: string } }>(
 			return { status: 401, body: { error: "Unauthorized" } };
 		}
 
-		context.user = user;
+		context.set("user", user);
 		return await next();
 	},
 );
@@ -91,7 +96,9 @@ const getUserProfile = route
 	)
 	.response(401, z.object({ error: z.string() }))
 	.handler(({ context }) => {
-		const profile = getProfileForUser(context.user.id);
+		const user = context.get("user");
+		if (!user) return { status: 401, body: { error: "Unauthorized" } };
+		const profile = getProfileForUser(user.id);
 		return { status: 200, body: { user: profile } };
 	});
 ```

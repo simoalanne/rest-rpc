@@ -397,7 +397,7 @@ it("serves a contract route implemented by a Nest provider class", async () => {
 					status: 200,
 					body: {
 						id,
-						title: this.items.formatTitle(context.source, id),
+						title: this.items.formatTitle(context.get("source"), id),
 					},
 				}),
 			),

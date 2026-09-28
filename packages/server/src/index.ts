@@ -34,7 +34,7 @@ export type {
 } from "./routeBuilder.types.ts";
 export { assertRequestContentType } from "./requestContentType.ts";
 export { resolveContext } from "./context.ts";
-export type { ContextSource, ContextOptions } from "./context.ts";
+export type { Context, ContextSource, ContextOptions } from "./context.ts";
 export type {
 	MiddlewareReturn,
 	MiddlewareRequest,

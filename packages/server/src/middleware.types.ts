@@ -1,5 +1,6 @@
 import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import type { RouteRequest } from "./routeBuilder.types.ts";
+import type { Context } from "./context.ts";
 
 /** Unchecked application output returned by middleware. */
 export type MiddlewareReturn = unknown;
@@ -46,5 +47,5 @@ export type ReusableMiddlewareRequest<
 	UnknownRequest &
 	RequestTransportFields & {
 		route: RouteDeclaration;
-		context: TContext;
+		context: Context<TContext>;
 	} & Controls;

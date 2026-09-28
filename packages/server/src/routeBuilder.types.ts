@@ -13,6 +13,7 @@ import type {
 } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import type { SseServerEvent } from "./sse.ts";
+import type { Context } from "./context.ts";
 import type {
 	MiddlewareRequest,
 	MiddlewareReturn,
@@ -84,7 +85,7 @@ export type RouteRequest<
 		RequestTransportFields &
 		TAdditionalHandlerFields & {
 			route: TRoute;
-			context: TContext;
+			context: Context<TContext>;
 		}
 >;
 

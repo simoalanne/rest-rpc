@@ -69,7 +69,7 @@ Handlers receive the following adapter fields and typed context:
 type RouteHandlerFields = {
 	request: Request;
 	signal: AbortSignal;
-	context: DefaultContext;
+	context: Context<DefaultContext>;
 };
 ```
 

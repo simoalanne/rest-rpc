@@ -21,6 +21,7 @@ import {
 } from "./validation.ts";
 import { invokeWithMiddleware } from "./middleware.ts";
 import { frameSseStream } from "./sse.ts";
+import { createContext } from "./context.ts";
 
 /** A validated logical response for adapter-specific serialization and delivery. */
 export type HttpRouteResult =
@@ -310,7 +311,7 @@ export async function handleHttpRoute<
 			{
 				...getHandlerRequestFields(route, validatedRequest),
 				...options.handlerFields,
-				context: options.context,
+				context: createContext(options.context),
 				contentType,
 				lastEventId,
 				route,

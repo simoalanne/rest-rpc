@@ -137,7 +137,7 @@ Handlers receive the following adapter fields and typed context:
 type RouteHandlerFields = {
 	executionContext: ExecutionContext;
 	signal: AbortSignal;
-	context: DefaultContext;
+	context: Context<DefaultContext>;
 };
 ```
 

@@ -33,7 +33,7 @@ expectError(coreRoute.handler(() => undefined));
 
 const rootProcedure = route.handler(({ context }) => ({
 	id: "todo-1" as const,
-	requestId: context.requestId,
+	requestId: context.get("requestId"),
 }));
 expectType<"procedure">(rootProcedure["~restrpc"].kind);
 
@@ -44,7 +44,10 @@ const inferred = route
 	.handler(({ params, body, context, signal, route }) => {
 		expectType<string>(params.id);
 		expectType<string>(body.title);
-		expectType<AppContext>(context);
+		expectType<string>(context.get("requestId"));
+		context.set("requestId", "request-2");
+		expectError(context.get("missing"));
+		expectError(context.set("requestId", 1));
 		expectType<AbortSignal>(signal);
 		expectType<"http">(route.kind);
 		expectType<"POST">(route.method);
@@ -64,7 +67,10 @@ expectType<201>(
 	inferred["~restrpc"].handler({
 		params: { id: "todo-1" },
 		body: { title: "Write tests" },
-		context: { requestId: "request-1" },
+		context: {
+			get: () => "request-1",
+			set: () => undefined,
+		},
 		signal: new AbortController().signal,
 		route: inferred["~restrpc"],
 	}).status,
@@ -103,7 +109,7 @@ const procedure = route
 	.input(input)
 	.handler(({ input: procedureInput, context }) => {
 		expectType<string>(procedureInput.title);
-		expectType<string>(context.requestId);
+		expectType<string>(context.get("requestId"));
 		return { id: "todo-1", title: procedureInput.title };
 	});
 expectType<"procedure">(procedure["~restrpc"].kind);
@@ -399,7 +405,7 @@ route
 			expectType<string>(body);
 			expectType<string | undefined>(contentType);
 			expectType<string | undefined>(lastEventId);
-			expectType<AppContext>(context);
+			expectType<string>(context.get("requestId"));
 			return next();
 		},
 	);
