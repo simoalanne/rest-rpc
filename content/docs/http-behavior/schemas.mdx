@@ -70,6 +70,44 @@ Response validation failures normally produce a generic 500 response. Once a
 stream has started, an invalid item terminates the stream instead of replacing
 it with a new HTTP response. See each server adapter for error customization.
 
+## Disabling Server Validation
+
+Every server adapter provides `disableRequestValidation` and
+`disableResponseValidation` options. Both default to `false`. These options
+disable only schema validation. Request decoding, content-type checks, route
+matching, response status and content-type selection, and response serialization
+still run normally.
+
+```ts
+registerRoutes(app, routes, {
+	disableRequestValidation: true,
+	disableResponseValidation: true,
+});
+```
+
+The schemas remain part of the route declaration and are still used for type
+inference and OpenAPI generation.
+
+:::warning
+Do not disable validation if you are using schemas that modify values, such as coercion, transformation, or defaulting.
+Those modifications will not be applied to the request segments or response body, which may result in unexpected behavior.
+
+In the example below the `id` parameter will be a string at runtime even though it's typed as a number in the handler.
+The `title` property can be missing in the response body because the default value is not applied when response validation is disabled.
+
+```ts
+const route = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.coerce.number<number>().int().min(1) }))
+	.output(z.object({ id: z.number(), title: z.string().default("Untitled") }))
+	.handler(({ input: { id } }) => {
+		const todo: { id: number; title?: string } = getTodoById(id);
+		return todo;
+	});
+```
+
+:::
+
 ## Response Validation on the Client
 
 The Fetch client decodes response bodies without schema validation by default.

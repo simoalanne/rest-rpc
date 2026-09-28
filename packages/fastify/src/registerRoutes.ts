@@ -11,6 +11,7 @@ import {
 import {
 	type RuntimeImplementationTree,
 	type ContextOptions,
+	type HandleHttpRouteConfiguration,
 	resolveContext,
 	flattenRouteImplementations,
 	assertRequestContentType,
@@ -63,7 +64,8 @@ export type RegisterRoutesOptions = {
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 	preHandler?: ExtendedFastifyPreHandler[];
-} & ContextOptions<DefaultContext, ContextFields>;
+} & HandleHttpRouteConfiguration &
+	ContextOptions<DefaultContext, ContextFields>;
 
 type ContextFields = {
 	req: FastifyRequest;
@@ -123,6 +125,10 @@ export function registerRoutes(
 					? await codec.deserialize(req)
 					: req.body;
 				const result = await handleHttpRoute(implementation, {
+					configuration: {
+						disableRequestValidation: options.disableRequestValidation,
+						disableResponseValidation: options.disableResponseValidation,
+					},
 					request: {
 						body,
 						query: new URL(req.raw.url ?? "/", "http://localhost").searchParams,

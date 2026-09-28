@@ -1,4 +1,5 @@
 export type {
+	HandleHttpRouteConfiguration,
 	HandleHttpRouteOptions,
 	HttpRouteResult,
 } from "./handleHttpRoute.ts";

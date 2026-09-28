@@ -162,6 +162,8 @@ RestRpcModule.forRoot({
 ```ts
 type RestRpcModuleOptions<TContext = DefaultContext> = {
 	bodyCodecs?: readonly BodyCodec<unknown>[];
+	disableRequestValidation?: boolean;
+	disableResponseValidation?: boolean;
 	context?: (context: ExecutionContext) => TContext | Promise<TContext>;
 };
 

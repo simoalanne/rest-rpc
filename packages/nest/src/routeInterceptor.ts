@@ -129,6 +129,10 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 				middleware: implementation["~restrpc"].middleware,
 			},
 			{
+				configuration: {
+					disableRequestValidation: this.options?.disableRequestValidation,
+					disableResponseValidation: this.options?.disableResponseValidation,
+				},
 				request: {
 					body,
 					query: new URL(rawRequest.url ?? "/", "http://localhost")

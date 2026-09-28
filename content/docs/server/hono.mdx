@@ -90,6 +90,8 @@ type RegisterRoutesOptions<TEnv extends Env = Env> = {
 	requestValidationErrorHandler?: RequestValidationErrorHandler<TEnv>;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler<TEnv>;
 	bodyCodecs?: readonly BodyCodec<HonoRequest>[];
+	disableRequestValidation?: boolean;
+	disableResponseValidation?: boolean;
 	requestBodyLimit?: number;
 	middleware?: Array<
 		(c: Context<TEnv>, next: Next, route: RouteDeclaration) => any

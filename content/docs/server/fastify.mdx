@@ -85,6 +85,8 @@ See [Middleware](/docs/middleware) for route middleware that shares this context
 ```ts
 type RegisterRoutesOptions = {
 	bodyCodecs?: readonly BodyCodec<FastifyRequest>[];
+	disableRequestValidation?: boolean;
+	disableResponseValidation?: boolean;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 	preHandler?: Array<

@@ -37,9 +37,35 @@ export type HttpRouteResult =
 			body: AsyncIterable<string>;
 	  };
 
-/**
- * Inputs needed to invoke and normalize one HTTP route handler.
- */
+/** Shared configuration options passed to the `handleHttpRoute` function. */
+export type HandleHttpRouteConfiguration = {
+	/**
+	 * When set to `true`, disables request schema validation. Validation errors
+	 * will not be thrown, and the handler will receive the raw request segments.
+	 * The schemas are still used for type inference and OpenAPI generation.
+	 *
+	 * @remarks Do not disable request validation if you are using schemas that
+	 * transform or coerce values, as those transformations will not be applied to
+	 * the request segments. See {@link https://rest-rpc.dev/docs/http-behavior/schemas#disabling-server-validation}.
+	 *
+	 * @default false
+	 */
+	disableRequestValidation?: boolean;
+	/**
+	 * When set to `true`, disables response schema validation. Validation errors
+	 * will not be thrown, and the handler's output will be returned as-is.
+	 * The schemas are still used for type inference and OpenAPI generation.
+	 *
+	 * @remarks Do not disable response validation if you are using schemas that
+	 * transform or coerce values, as those transformations will not be applied to
+	 * the response body. See {@link https://rest-rpc.dev/docs/http-behavior/schemas#disabling-server-validation}.
+	 *
+	 * @default false
+	 */
+	disableResponseValidation?: boolean;
+};
+
+/** Inputs needed to invoke and normalize one HTTP route handler. */
 export type HandleHttpRouteOptions<
 	TAdditionalHandlerFields extends object = Record<never, never>,
 	TContext extends object = Record<never, never>,
@@ -47,6 +73,7 @@ export type HandleHttpRouteOptions<
 	request: RequestSegments;
 	context: TContext;
 	handlerFields: TAdditionalHandlerFields;
+	configuration?: HandleHttpRouteConfiguration;
 };
 
 const requestHeader = (headers: RequestSegments["headers"], name: string) => {
@@ -181,10 +208,20 @@ const selectResponseContentType = (
 const normalizeResponseResult = async (
 	route: RouteDeclaration,
 	result: DeclaredResponseEnvelope,
+	disableValidation: boolean,
 ): Promise<HttpRouteResult> => {
 	const schema = getResponseSchema(route, result.status);
 	const bodySchema = schema.body;
-	const headers = await validateResponseHeaders(schema, result.responseHeaders);
+	const headers = disableValidation
+		? schema.headers
+			? Object.fromEntries(
+					Object.entries(result.responseHeaders ?? {}).flatMap(
+						([name, value]) =>
+							value === undefined ? [] : [[name, String(value)]],
+					),
+				)
+			: undefined
+		: await validateResponseHeaders(schema, result.responseHeaders);
 
 	if (bodySchema === undefined) {
 		return {
@@ -200,10 +237,12 @@ const normalizeResponseResult = async (
 			status: result.status,
 			headers,
 			body: frameSseStream(
-				validateResponseStreamChunks(
-					result.body as AsyncIterable<unknown>,
-					bodySchema,
-				),
+				disableValidation
+					? (result.body as AsyncIterable<unknown>)
+					: validateResponseStreamChunks(
+							result.body as AsyncIterable<unknown>,
+							bodySchema,
+						),
 			),
 		};
 	}
@@ -213,7 +252,9 @@ const normalizeResponseResult = async (
 		status: result.status,
 		headers,
 		body: {
-			value: await validateResponseBody(bodySchema, result.body),
+			value: disableValidation
+				? result.body
+				: await validateResponseBody(bodySchema, result.body),
 			contentType: selectResponseContentType(
 				schema.contentType ?? "application/json",
 				result.contentType,
@@ -225,10 +266,10 @@ const normalizeResponseResult = async (
 const getHandlerRequestFields = (
 	route: RouteDeclaration,
 	segments: {
-		body: unknown;
-		query: unknown;
-		params: unknown;
-		headers: unknown;
+		body?: unknown;
+		query?: unknown;
+		params?: unknown;
+		headers?: unknown;
 	},
 ) => {
 	if (route.input !== "input") return segments;
@@ -255,10 +296,13 @@ export async function handleHttpRoute<
 		);
 		const contentType = normalizeMediaType(rawContentType) || undefined;
 		const lastEventId = requestHeader(options.request.headers, "last-event-id");
-		const validatedRequest = await validateRequestSegments(
-			route,
-			options.request,
-		);
+		const disableRequestValidation =
+			options.configuration?.disableRequestValidation ?? false;
+		const validatedRequest = disableRequestValidation
+			? options.request
+			: await validateRequestSegments(route, options.request);
+		const disableResponseValidation =
+			options.configuration?.disableResponseValidation ?? false;
 
 		const handlerResult = await invokeWithMiddleware(
 			implementation.middleware ?? [],
@@ -291,22 +335,31 @@ export async function handleHttpRoute<
 						"Custom procedure output must return { contentType, data }.",
 					);
 				}
-				return await normalizeResponseResult(route, {
-					status: 200,
-					body: handlerResult.data,
-					contentType: handlerResult.contentType,
-				});
+				return await normalizeResponseResult(
+					route,
+					{
+						status: 200,
+						body: handlerResult.data,
+						contentType: handlerResult.contentType,
+					},
+					disableResponseValidation,
+				);
 			}
 
-			return await normalizeResponseResult(route, {
-				status: 200,
-				body: handlerResult,
-			});
+			return await normalizeResponseResult(
+				route,
+				{
+					status: 200,
+					body: handlerResult,
+				},
+				disableResponseValidation,
+			);
 		}
 
 		return await normalizeResponseResult(
 			route,
 			handlerResult as DeclaredResponseEnvelope,
+			disableResponseValidation,
 		);
 	} catch (error) {
 		if (

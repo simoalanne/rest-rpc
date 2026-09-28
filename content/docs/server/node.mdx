@@ -88,6 +88,8 @@ See [Middleware](/docs/middleware) for route middleware that shares this context
 ```ts
 type CreateNodeHandlerOptions = {
 	bodyCodecs?: readonly BodyCodec<IncomingMessage>[];
+	disableRequestValidation?: boolean;
+	disableResponseValidation?: boolean;
 	prefix?: string;
 	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;

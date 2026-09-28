@@ -86,6 +86,8 @@ See [Middleware](/docs/middleware) for route middleware that shares this context
 ```ts
 type CreateFetchHandlerOptions = {
 	bodyCodecs?: readonly BodyCodec<Request>[];
+	disableRequestValidation?: boolean;
+	disableResponseValidation?: boolean;
 	prefix?: string;
 	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;

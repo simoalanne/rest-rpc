@@ -123,6 +123,38 @@ describe("handleHttpRoute", () => {
 		assert.equal(called, false);
 	});
 
+	it("can disable request schema validation", async () => {
+		const route = coreRoute
+			.input(z.object({ title: z.string() }))
+			.output(z.object({ received: z.unknown() }))["~restrpc"];
+		const rawBody = { title: 123 };
+		const result = await handleHttpRoute(
+			{
+				route,
+				handler: (request: { input: unknown }) => {
+					assert.equal(request.input, rawBody);
+					return { received: request.input };
+				},
+			},
+			{
+				request: { body: rawBody },
+				handlerFields: {},
+				context: {},
+				configuration: { disableRequestValidation: true },
+			},
+		);
+
+		assert.deepEqual(result, {
+			kind: "response",
+			status: 200,
+			headers: undefined,
+			body: {
+				value: { received: rawBody },
+				contentType: "application/json",
+			},
+		});
+	});
+
 	it("normalizes inferred procedure results as successful JSON", async () => {
 		const route = {
 			kind: "procedure" as const,
@@ -392,6 +424,49 @@ describe("handleHttpRoute", () => {
 		});
 		assert.equal(error.location, "body");
 		assert.equal(error.issues.length, 1);
+	});
+
+	it("can disable response schema validation", async () => {
+		const result = await handleHttpRoute(
+			{
+				route: coreRoute.output(z.string())["~restrpc"],
+				handler: () => 123,
+			},
+			{
+				request: {},
+				handlerFields: {},
+				context: {},
+				configuration: { disableResponseValidation: true },
+			},
+		);
+
+		assert.deepEqual(result, {
+			kind: "response",
+			status: 200,
+			headers: undefined,
+			body: { value: 123, contentType: "application/json" },
+		});
+	});
+
+	it("keeps response declaration checks when schema validation is disabled", async () => {
+		await assert.rejects(
+			() =>
+				handleHttpRoute(
+					{
+						route: coreRoute.get("/todos").response(200, z.string())[
+							"~restrpc"
+						],
+						handler: () => ({ status: 201, body: 123 }),
+					},
+					{
+						request: {},
+						handlerFields: {},
+						context: {},
+						configuration: { disableResponseValidation: true },
+					},
+				),
+			/undeclared status 201/,
+		);
 	});
 
 	it("treats returned status and body fields as an explicit response object", async () => {

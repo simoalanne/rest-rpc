@@ -7,6 +7,7 @@ import {
 	handleHttpRoute,
 	RequestValidationError,
 	ResponseValidationError,
+	type HandleHttpRouteConfiguration,
 	type RuntimeImplementationTree,
 } from "@rest-rpc/server";
 import type { DefaultContext, NodeRouteHandlerResult } from "./index.ts";
@@ -27,7 +28,7 @@ export type CreateNodeHandlerOptions = {
 	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
-};
+} & HandleHttpRouteConfiguration;
 
 /**
  * Defines how an invalid request is written through native Node HTTP arguments.
@@ -126,6 +127,10 @@ export function createRouteHandler(
 		};
 
 		const result = await handleHttpRoute(matched.implementation, {
+			configuration: {
+				disableRequestValidation: options.disableRequestValidation,
+				disableResponseValidation: options.disableResponseValidation,
+			},
 			request: parsedRequest,
 			context: contextArguments[0]?.context ?? {},
 			handlerFields: { req: request, res: response, signal },

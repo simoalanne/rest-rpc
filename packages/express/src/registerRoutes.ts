@@ -7,6 +7,7 @@ import { toColonPath } from "@rest-rpc/core/contract";
 import {
 	type RuntimeImplementationTree,
 	type ContextOptions,
+	type HandleHttpRouteConfiguration,
 	resolveContext,
 	flattenRouteImplementations,
 	assertRequestContentType,
@@ -67,7 +68,8 @@ export type RegisterRoutesOptions = {
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 	middleware?: ExtendedExpressMiddleware[];
-} & ContextOptions<DefaultContext, ContextFields>;
+} & HandleHttpRouteConfiguration &
+	ContextOptions<DefaultContext, ContextFields>;
 
 type ContextFields = {
 	req: Request;
@@ -124,6 +126,10 @@ export function registerRoutes(
 					? await codec.deserialize(req)
 					: req.body;
 				result = await handleHttpRoute(implementation, {
+					configuration: {
+						disableRequestValidation: options.disableRequestValidation,
+						disableResponseValidation: options.disableResponseValidation,
+					},
 					request: {
 						body,
 						query: new URL(req.originalUrl, "http://localhost").searchParams,

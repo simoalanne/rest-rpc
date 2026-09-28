@@ -1,4 +1,5 @@
 import type { BodyCodec } from "@rest-rpc/core";
+import type { HandleHttpRouteConfiguration } from "@rest-rpc/server";
 import type { DynamicModule, ExecutionContext } from "@nestjs/common";
 import { Module } from "@nestjs/common";
 import { APP_INTERCEPTOR, HttpAdapterHost } from "@nestjs/core";
@@ -26,7 +27,7 @@ export interface DefaultContext {}
 export type RestRpcModuleOptions<TContext extends object = DefaultContext> = {
 	bodyCodecs?: readonly BodyCodec<unknown>[];
 	context?: (context: ExecutionContext) => TContext | Promise<TContext>;
-};
+} & HandleHttpRouteConfiguration;
 
 /**
  * Configures rest-rpc route handling for Nest controllers.

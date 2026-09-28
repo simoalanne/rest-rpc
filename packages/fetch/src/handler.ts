@@ -5,6 +5,7 @@ import {
 	handleHttpRoute,
 	RequestValidationError,
 	ResponseValidationError,
+	type HandleHttpRouteConfiguration,
 	type RuntimeImplementationTree,
 } from "@rest-rpc/server";
 import type { DefaultContext } from "./index.ts";
@@ -24,7 +25,7 @@ export type CreateFetchHandlerOptions = {
 	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
-};
+} & HandleHttpRouteConfiguration;
 
 /**
  * Defines the Fetch response returned when a request fails validation.
@@ -127,6 +128,10 @@ export function createRouteHandler(
 
 		const implementation = matched.implementation;
 		const result = await handleHttpRoute(implementation, {
+			configuration: {
+				disableRequestValidation: options.disableRequestValidation,
+				disableResponseValidation: options.disableResponseValidation,
+			},
 			request: parsedRequest,
 			context: contextArguments[0]?.context ?? {},
 			handlerFields: { request, signal: request.signal },

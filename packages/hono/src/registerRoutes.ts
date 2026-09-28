@@ -7,6 +7,7 @@ import { toColonPath } from "@rest-rpc/core/contract";
 import {
 	type RuntimeImplementationTree,
 	type ContextOptions,
+	type HandleHttpRouteConfiguration,
 	resolveContext,
 	flattenRouteImplementations,
 	assertRequestContentType,
@@ -61,7 +62,8 @@ export type RegisterRoutesOptions<TEnv extends Env = Env> = {
 	requestValidationErrorHandler?: RequestValidationErrorHandler<TEnv>;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler<TEnv>;
 	middleware?: ExtendedHonoMiddleware<TEnv>[];
-} & ContextOptions<DefaultContext, ContextFields<TEnv>>;
+} & HandleHttpRouteConfiguration &
+	ContextOptions<DefaultContext, ContextFields<TEnv>>;
 
 type ContextFields<TEnv extends Env = Env> = {
 	c: Context<TEnv>;
@@ -130,6 +132,10 @@ export function registerRoutes<TEnv extends Env = Env>(
 				}
 
 				const result = await handleHttpRoute(implementation, {
+					configuration: {
+						disableRequestValidation: options.disableRequestValidation,
+						disableResponseValidation: options.disableResponseValidation,
+					},
 					request: {
 						body,
 						query: new URL(c.req.raw.url).searchParams,
