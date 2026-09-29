@@ -46,13 +46,13 @@ import { implement } from "@rest-rpc/express";
 import { api } from "./contract";
 import { createTodo, findTodo } from "./todos";
 
-const builders = implement(api);
+const implementer = implement(api);
 
-const create = builders.todos.create.handler(({ input: { title } }) =>
+const create = implementer.todos.create.handler(({ input: { title } }) =>
 	createTodo(title),
 );
 
-const get = builders.todos.get.handler(({ params }) => {
+const get = implementer.todos.get.handler(({ params }) => {
 	const todo = findTodo(params.id);
 	return todo
 		? { status: 200, body: todo }
@@ -64,6 +64,33 @@ export const routes = { todos: { create, get } };
 
 The implementation must match the contract's inputs and declared outputs.
 Register the completed routes with your adapter as usual.
+
+## Context And Middleware
+
+Context and middleware are supported in contract-first routes. See [Context](/docs/context) and [Middleware](/docs/middleware) for details.
+
+`$context<T>()` and `.use()` can be called on the root builder to share context and middleware across all routes:
+
+```ts
+const implementer = implement(api)
+	.$context<{ user: { id: string } }>()
+	.use(yourMiddleware);
+const createTodo = implementer.todos.create.handler(yourHandler);
+```
+
+Alternatively, call them on a specific route to share context and middleware only with that route:
+
+```ts
+const implementer = implement(api);
+const create = implementer.todos.create
+	.$context<{ user: { id: string } }>()
+	.use(yourMiddleware)
+	.handler(yourHandler);
+```
+
+:::error[Reserved Keys]
+don't use top level keys `use` or `$context` in your contract. They are reserved for the implementation builder.
+:::
 
 ## Use in a Client
 

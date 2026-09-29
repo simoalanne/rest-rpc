@@ -33,7 +33,6 @@ expectType<"~restrpc" | "$context" | "handler" | "use">(
 	null as unknown as keyof typeof implementor.todos.get,
 );
 expectError(implementor.todos.$context<{ requestId: string }>());
-expectError(implementor.$context<{ requestId: string }>());
 
 expectError(implement(route.get("/unfinished")));
 expectError(implement(route.input(z.object({ title: z.string() }))));

@@ -37,6 +37,15 @@ export type RuntimeRouteHandler = (
 	request: unknown,
 ) => unknown | Promise<unknown>;
 
+/** Runtime route-builder shape used internally by server extensions. */
+export type RuntimeServerRoute = {
+	readonly "~restrpc": Partial<RouteDeclaration> & {
+		readonly handler?: unknown;
+		readonly middleware?: readonly RuntimeRouteHandler[];
+	};
+	clone(state: object): RuntimeServerRoute;
+};
+
 /**
  * Infers the declared non-2xx response envelopes for a route.
  *

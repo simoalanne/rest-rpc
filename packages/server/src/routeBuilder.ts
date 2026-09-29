@@ -1,21 +1,14 @@
 import { route as coreRoute } from "@rest-rpc/core";
-import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import type {
 	RuntimeRouteHandler,
+	RuntimeServerRoute,
 	ServerRouteBuilder,
 } from "./routeBuilder.types.ts";
-
-type RuntimeBuilder = {
-	readonly "~restrpc": Partial<RouteDeclaration> & {
-		readonly middleware?: readonly RuntimeRouteHandler[];
-	};
-	clone(state: object): RuntimeBuilder;
-};
 
 Object.defineProperties(Object.getPrototypeOf(coreRoute), {
 	handler: {
 		configurable: true,
-		value(this: RuntimeBuilder, handler: RuntimeRouteHandler) {
+		value(this: RuntimeServerRoute, handler: RuntimeRouteHandler) {
 			const state = this["~restrpc"];
 			return this.clone({
 				...(state.kind
@@ -33,7 +26,7 @@ Object.defineProperties(Object.getPrototypeOf(coreRoute), {
 	},
 	use: {
 		configurable: true,
-		value(this: RuntimeBuilder, middleware: RuntimeRouteHandler) {
+		value(this: RuntimeServerRoute, middleware: RuntimeRouteHandler) {
 			const state = this["~restrpc"];
 			return this.clone({
 				...state,
@@ -49,7 +42,7 @@ Object.defineProperties(Object.getPrototypeOf(coreRoute), {
 	},
 	$context: {
 		configurable: true,
-		value(this: RuntimeBuilder) {
+		value(this: RuntimeServerRoute) {
 			return this;
 		},
 	},

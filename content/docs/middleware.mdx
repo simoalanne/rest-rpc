@@ -102,17 +102,3 @@ final value and expose responses to clients.
 Downstream errors propagate through `next()`, allowing middleware to catch errors
 or clean up in `finally`. Response delivery and stream consumption happen outside
 this wrapping scope.
-
-## Contract-first
-
-Attach `.use()` to individual implementations from `implement(singleRoute)` or
-leaves from `implement(contract)`:
-
-```ts
-const getTodo = implement(api.todos.get)
-	.use(logging)
-	.handler(async ({ params }) => ({
-		status: 200,
-		body: await findTodo(params.id),
-	}));
-```
