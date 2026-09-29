@@ -11,7 +11,7 @@ import type {
 type EmptyObject = Record<never, never>;
 type ContractRoute = { readonly "~restrpc": RouteDeclaration };
 
-type ContractImplementorNode<
+type ContractimplementerNode<
 	TContract extends Contract,
 	TAdditionalHandlerFields extends object,
 	TContext extends object,
@@ -24,7 +24,7 @@ type ContractImplementorNode<
 			TContext
 		> & {
 				/** Selects the typed per-request context store for this implementation. @see {@link https://rest-rpc.dev/docs/middleware#shared-context} */
-				$context<TValues extends object>(): ContractImplementorNode<
+				$context<TValues extends object>(): ContractimplementerNode<
 					TContract,
 					TAdditionalHandlerFields,
 					TValues
@@ -38,27 +38,27 @@ type ContractImplementorNode<
 							TContext
 						>,
 					) => MiddlewareReturn,
-				): ContractImplementorNode<
+				): ContractimplementerNode<
 					TContract,
 					TAdditionalHandlerFields,
 					TContext
 				>;
 			}
 	: {
-			readonly [TKey in keyof TContract]: ContractImplementorNode<
+			readonly [TKey in keyof TContract]: ContractimplementerNode<
 				Extract<TContract[TKey], Contract>,
 				TAdditionalHandlerFields,
 				TContext
 			>;
 		};
 
-type ImplementorRootMethods<
+type implementerRootMethods<
 	TContract extends Contract,
 	TAdditionalHandlerFields extends object,
 	TContext extends object,
 > = {
 	/** Selects the typed per-request context store for this implementation tree. @see {@link https://rest-rpc.devdocs/contract-first/route-builder#context-and-middleware} */
-	$context<TValues extends object>(): ContractImplementorRoot<
+	$context<TValues extends object>(): ContractimplementerRoot<
 		TContract,
 		TAdditionalHandlerFields,
 		TValues
@@ -72,28 +72,28 @@ type ImplementorRootMethods<
 				TContext
 			>,
 		) => MiddlewareReturn,
-	): ContractImplementorRoot<TContract, TAdditionalHandlerFields, TContext>;
+	): ContractimplementerRoot<TContract, TAdditionalHandlerFields, TContext>;
 };
 
-type ContractImplementorRoot<
+type ContractimplementerRoot<
 	TContract extends Contract,
 	TAdditionalHandlerFields extends object,
 	TContext extends object,
 > = TContract extends ContractRoute
-	? ContractImplementorNode<TContract, TAdditionalHandlerFields, TContext>
+	? ContractimplementerNode<TContract, TAdditionalHandlerFields, TContext>
 	: {
 			readonly [
 				TKey in Exclude<keyof TContract, "use" | "$context">
-			]: ContractImplementorNode<
+			]: ContractimplementerNode<
 				Extract<TContract[TKey], Contract>,
 				TAdditionalHandlerFields,
 				TContext
 			>;
-		} & ImplementorRootMethods<TContract, TAdditionalHandlerFields, TContext>;
+		} & implementerRootMethods<TContract, TAdditionalHandlerFields, TContext>;
 
 /** Recursively exposes middleware and handler attachment on every route in a core contract. */
-export type ContractImplementor<
+export type Contractimplementer<
 	TContract extends Contract,
 	TAdditionalHandlerFields extends object = EmptyObject,
 	TContext extends object = EmptyObject,
-> = ContractImplementorRoot<TContract, TAdditionalHandlerFields, TContext>;
+> = ContractimplementerRoot<TContract, TAdditionalHandlerFields, TContext>;

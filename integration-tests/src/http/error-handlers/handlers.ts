@@ -5,17 +5,17 @@ import type { ErrorHandlerState } from "./state.ts";
 export const createErrorHandlersImplementations = (
 	state: ErrorHandlerState,
 ) => {
-	const implementor = implement(errorHandlersContract);
+	const implementer = implement(errorHandlersContract);
 
 	return {
-		validation: implementor.validation.handler(() => ({
+		validation: implementer.validation.handler(() => ({
 			status: 200,
 			body: { reached: true as const },
 		})),
-		unhandled: implementor.unhandled.handler(() => {
+		unhandled: implementer.unhandled.handler(() => {
 			throw new Error("boom from integration handler");
 		}),
-		hookState: implementor.hookState.handler(() => ({
+		hookState: implementer.hookState.handler(() => ({
 			status: 200,
 			body: {
 				validationErrors: state.validationErrors,

@@ -2,12 +2,12 @@ import { implement } from "@rest-rpc/server";
 import { integrationContract } from "./contract.ts";
 
 export const createIntegrationImplementations = () => {
-	const implementor = implement(integrationContract);
+	const implementer = implement(integrationContract);
 
 	return {
-		health: implementor.health.handler(() => ({ status: 204 })),
+		health: implementer.health.handler(() => ({ status: 204 })),
 		echo: {
-			json: implementor.echo.json.handler((request) => {
+			json: implementer.echo.json.handler((request) => {
 				const query: Record<string, string> = {};
 				if (request.query.search !== undefined)
 					query.search = request.query.search;
@@ -34,23 +34,23 @@ export const createIntegrationImplementations = () => {
 					},
 				};
 			}),
-			text: implementor.echo.text.handler((request) => ({
+			text: implementer.echo.text.handler((request) => ({
 				status: 200,
 				body: request.body,
 			})),
-			uppercaseHeader: implementor.echo.uppercaseHeader.handler(() => ({
+			uppercaseHeader: implementer.echo.uppercaseHeader.handler(() => ({
 				status: 204,
 			})),
 		},
 		items: {
-			list: implementor.items.list.handler((request) => ({
+			list: implementer.items.list.handler((request) => ({
 				status: 200,
 				body: [
 					{ id: "item-1", title: request.query.search ?? "First item" },
 					{ id: "item-2", title: request.query.empty ?? "Second item" },
 				],
 			})),
-			get: implementor.items.get
+			get: implementer.items.get
 				.use(async ({ next }) => {
 					const result = (await next()) as {
 						status: number;
@@ -78,11 +78,11 @@ export const createIntegrationImplementations = () => {
 								body: { id: request.params.id, title: "Fetched item" },
 							},
 				),
-			create: implementor.items.create.handler((request) => ({
+			create: implementer.items.create.handler((request) => ({
 				status: 201 as const,
 				body: { id: "created-item", title: request.body.title },
 			})),
-			publish: implementor.items.publish.handler((request) =>
+			publish: implementer.items.publish.handler((request) =>
 				request.body.async
 					? {
 							status: 202 as const,
@@ -93,14 +93,14 @@ export const createIntegrationImplementations = () => {
 							body: { id: request.params.id, title: "Published item" },
 						},
 			),
-			remove: implementor.items.remove.handler(() => ({ status: 204 })),
+			remove: implementer.items.remove.handler(() => ({ status: 204 })),
 		},
 		responses: {
-			binary: implementor.responses.binary.handler(() => ({
+			binary: implementer.responses.binary.handler(() => ({
 				status: 200,
 				body: new Uint8Array([0, 1, 127, 128, 255]),
 			})),
-			headers: implementor.responses.headers.handler(() => ({
+			headers: implementer.responses.headers.handler(() => ({
 				status: 200,
 				body: { ok: true },
 				responseHeaders: {
@@ -108,24 +108,24 @@ export const createIntegrationImplementations = () => {
 					"x-optional-result": undefined,
 				},
 			})),
-			text: implementor.responses.text.handler(() => ({
+			text: implementer.responses.text.handler(() => ({
 				status: 200,
 				body: "plain response",
 			})),
-			undeclared: implementor.responses.undeclared.handler(() => ({
+			undeclared: implementer.responses.undeclared.handler(() => ({
 				status: 200 as const,
 				body: { ok: true as const },
 			})),
 		},
 		streams: {
-			sse: implementor.streams.sse.handler(() => ({
+			sse: implementer.streams.sse.handler(() => ({
 				status: 200,
 				body: (async function* () {
 					yield { id: "event-1", index: 1 };
 					yield { id: "event-2", index: 2 };
 				})(),
 			})),
-			text: implementor.streams.text.handler(() => ({
+			text: implementer.streams.text.handler(() => ({
 				status: 200,
 				body: (async function* () {
 					yield "alpha\n";

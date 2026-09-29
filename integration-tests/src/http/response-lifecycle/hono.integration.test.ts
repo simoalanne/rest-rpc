@@ -46,10 +46,10 @@ const lifecycleContract = {
 
 type LifecycleContract = typeof lifecycleContract;
 const createLifecycleImplementations = () => {
-	const implementor = implement(lifecycleContract);
+	const implementer = implement(lifecycleContract);
 
 	return {
-		contextMutation: implementor.contextMutation.handler(({ c }) => {
+		contextMutation: implementer.contextMutation.handler(({ c }) => {
 			c.header("x-context-mutation", "ignored");
 			setCookie(c, "context_cookie", "ignored", {
 				httpOnly: true,
@@ -62,7 +62,7 @@ const createLifecycleImplementations = () => {
 				body: { ok: true as const },
 			};
 		}),
-		returnResponse: implementor.returnResponse.handler(
+		returnResponse: implementer.returnResponse.handler(
 			() =>
 				new Response(JSON.stringify({ ok: true }), {
 					status: 200,

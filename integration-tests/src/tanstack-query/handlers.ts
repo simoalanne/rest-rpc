@@ -10,7 +10,7 @@ type Project = {
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const createTanstackQueryImplementations = () => {
-	const implementor = implement(tanstackQueryContract);
+	const implementer = implement(tanstackQueryContract);
 	let version = 1;
 	const projects = new Map<string, Project>(
 		[
@@ -25,11 +25,11 @@ export const createTanstackQueryImplementations = () => {
 
 	return {
 		projects: {
-			list: implementor.projects.list.handler(() => ({
+			list: implementer.projects.list.handler(() => ({
 				status: 200,
 				body: { projects: listProjects(), version },
 			})),
-			get: implementor.projects.get.handler((request) => {
+			get: implementer.projects.get.handler((request) => {
 				const project = projects.get(request.params.id);
 
 				if (!project) {
@@ -44,7 +44,7 @@ export const createTanstackQueryImplementations = () => {
 					body: project,
 				};
 			}),
-			search: implementor.projects.search.handler((request) => ({
+			search: implementer.projects.search.handler((request) => ({
 				status: 200,
 				body: {
 					projects: listProjects().filter((project) => {
@@ -61,7 +61,7 @@ export const createTanstackQueryImplementations = () => {
 					}),
 				},
 			})),
-			create: implementor.projects.create.handler((request) => {
+			create: implementer.projects.create.handler((request) => {
 				version += 1;
 				const project = {
 					id: `project-${projects.size + 1}`,
@@ -78,7 +78,7 @@ export const createTanstackQueryImplementations = () => {
 					},
 				};
 			}),
-			rename: implementor.projects.rename.handler((request) => {
+			rename: implementer.projects.rename.handler((request) => {
 				if (
 					listProjects().some(
 						(project) =>
@@ -111,7 +111,7 @@ export const createTanstackQueryImplementations = () => {
 				projects.set(request.params.id, renamed);
 				return { status: 200 as const, body: renamed };
 			}),
-			page: implementor.projects.page.handler((request) => {
+			page: implementer.projects.page.handler((request) => {
 				const start = request.query.cursor ? Number(request.query.cursor) : 0;
 				const end = start + request.query.limit;
 				const pageProjects = listProjects().slice(start, end);
@@ -122,7 +122,7 @@ export const createTanstackQueryImplementations = () => {
 					body: { projects: pageProjects, nextCursor },
 				};
 			}),
-			slow: implementor.projects.slow.handler(async (request) => {
+			slow: implementer.projects.slow.handler(async (request) => {
 				await delay(1_000);
 				return {
 					status: 200 as const,
@@ -133,14 +133,14 @@ export const createTanstackQueryImplementations = () => {
 					},
 				};
 			}),
-			events: implementor.projects.events.handler(() => ({
+			events: implementer.projects.events.handler(() => ({
 				status: 200,
 				body: (async function* () {
 					yield { id: "project-1", event: "created" as const };
 					yield { id: "project-1", event: "renamed" as const };
 				})(),
 			})),
-			eventFeed: implementor.projects.eventFeed.handler(({ input }) =>
+			eventFeed: implementer.projects.eventFeed.handler(({ input }) =>
 				(async function* () {
 					yield { id: input.projectId, event: "created" as const };
 					yield { id: input.projectId, event: "renamed" as const };

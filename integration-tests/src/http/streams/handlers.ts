@@ -88,13 +88,13 @@ export type StreamsHandlerOptions = {
 export const createStreamsImplementations = (
 	options: StreamsHandlerOptions = {},
 ) => {
-	const implementor = implement(streamsContract);
+	const implementer = implement(streamsContract);
 	return {
-		empty: implementor.empty.handler(() => ({
+		empty: implementer.empty.handler(() => ({
 			status: 200,
 			body: (async function* () {})(),
 		})),
-		cancellable: implementor.cancellable.handler(({ signal }) => ({
+		cancellable: implementer.cancellable.handler(({ signal }) => ({
 			status: 200,
 			body: (async function* () {
 				options.cancellationProbe?.markStarted();
@@ -116,14 +116,14 @@ export const createStreamsImplementations = (
 				}
 			})(),
 		})),
-		throwsBeforeFirstChunk: implementor.throwsBeforeFirstChunk.handler(() => ({
+		throwsBeforeFirstChunk: implementer.throwsBeforeFirstChunk.handler(() => ({
 			status: 200,
 			body: (async function* () {
 				await delay(10);
 				yield throwBeforeYield();
 			})(),
 		})),
-		throwsAfterChunks: implementor.throwsAfterChunks.handler(() => ({
+		throwsAfterChunks: implementer.throwsAfterChunks.handler(() => ({
 			status: 200,
 			body: (async function* () {
 				yield { id: "event-1", index: 1 };

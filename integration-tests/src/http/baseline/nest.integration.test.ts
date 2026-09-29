@@ -39,14 +39,14 @@ it("waits for Nest Express drain before writing the next stream chunk", async ()
 	let writeCalls = 0;
 	let emitDrain: (() => void) | undefined;
 	const handlers = createIntegrationImplementations();
-	const nestImplementor = implement(integrationContract);
+	const nestimplementer = implement(integrationContract);
 	const server = await createNestAdapter(
 		integrationContract,
 		{
 			...handlers,
 			streams: {
 				...handlers.streams,
-				text: nestImplementor.streams.text.handler(() => ({
+				text: nestimplementer.streams.text.handler(() => ({
 					status: 200,
 					body: (async function* () {
 						pulledChunks = 1;
@@ -105,14 +105,14 @@ it("releases a Nest Express backpressure wait when the response closes before dr
 	let returned = false;
 	let closeResponse: (() => void) | undefined;
 	const handlers = createIntegrationImplementations();
-	const nestImplementor = implement(integrationContract);
+	const nestimplementer = implement(integrationContract);
 	const server = await createNestAdapter(
 		integrationContract,
 		{
 			...handlers,
 			streams: {
 				...handlers.streams,
-				text: nestImplementor.streams.text.handler(() => ({
+				text: nestimplementer.streams.text.handler(() => ({
 					status: 200,
 					body: (async function* () {
 						try {
@@ -198,14 +198,14 @@ it("registers router routes whose contract key paths would produce the same flat
 			b: route.get("/nested").response(200, schemaType<{ source: string }>()),
 		},
 	} as const;
-	const collisionImplementor = implement(collisionContract);
+	const collisionimplementer = implement(collisionContract);
 	const server = await createNestAdapter(collisionContract, {
-		a_b: collisionImplementor.a_b.handler(() => ({
+		a_b: collisionimplementer.a_b.handler(() => ({
 			status: 200,
 			body: { source: "flat" },
 		})),
 		a: {
-			b: collisionImplementor.a.b.handler(() => ({
+			b: collisionimplementer.a.b.handler(() => ({
 				status: 200,
 				body: { source: "nested" },
 			})),

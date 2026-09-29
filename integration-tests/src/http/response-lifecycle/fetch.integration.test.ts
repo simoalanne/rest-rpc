@@ -29,17 +29,17 @@ const lifecycleContract = {
 
 type LifecycleContract = typeof lifecycleContract;
 const createLifecycleImplementations = () => {
-	const implementor = implement(lifecycleContract);
+	const implementer = implement(lifecycleContract);
 
 	return {
-		contextMutation: implementor.contextMutation.handler(({ request }) => {
+		contextMutation: implementer.contextMutation.handler(({ request }) => {
 			request.headers.set("x-request-mutation", "ignored");
 			return {
 				status: 200 as const,
 				body: { ok: true as const },
 			};
 		}),
-		returnResponse: implementor.returnResponse.handler(
+		returnResponse: implementer.returnResponse.handler(
 			() =>
 				new Response(JSON.stringify({ ok: true }), {
 					status: 200,

@@ -6,7 +6,7 @@ import { implement } from "./implement.ts";
 import { serverFirstRoute } from "./routeBuilder.ts";
 
 describe("implement", () => {
-	it("creates an implementor facade and derives procedure paths", () => {
+	it("creates an implementer facade and derives procedure paths", () => {
 		const contract = {
 			todos: {
 				get: route.output({
@@ -18,12 +18,12 @@ describe("implement", () => {
 				}),
 			},
 		};
-		const implementor = implement(contract);
-		assert.notEqual(implementor, contract);
-		assert.deepEqual(Object.keys(implementor), ["todos", "$context", "use"]);
-		assert.equal(implementor.$context<{ requestId: string }>(), implementor);
+		const implementer = implement(contract);
+		assert.notEqual(implementer, contract);
+		assert.deepEqual(Object.keys(implementer), ["todos", "$context", "use"]);
+		assert.equal(implementer.$context<{ requestId: string }>(), implementer);
 
-		const implementation = implementor.todos.get.handler(() => "todo-1");
+		const implementation = implementer.todos.get.handler(() => "todo-1");
 		const match = createRouteMatcher({ todos: { get: implementation } })({
 			method: "POST",
 			path: "/todos/get",
@@ -52,10 +52,10 @@ describe("implement", () => {
 		const outer = () => undefined;
 		const inner = () => undefined;
 		const local = () => undefined;
-		const implementor = implement(contract).use(outer).use(inner);
+		const implementer = implement(contract).use(outer).use(inner);
 
-		const first = implementor.first.use(local).handler(() => "first");
-		const second = implementor.second.handler(() => "second");
+		const first = implementer.first.use(local).handler(() => "first");
+		const second = implementer.second.handler(() => "second");
 
 		assert.deepEqual(first["~restrpc"].middleware, [outer, inner, local]);
 		assert.deepEqual(second["~restrpc"].middleware, [outer, inner]);

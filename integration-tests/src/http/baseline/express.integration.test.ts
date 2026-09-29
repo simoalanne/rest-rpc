@@ -97,13 +97,13 @@ it("waits for Express drain before writing the next stream chunk", async () => {
 	let writeCalls = 0;
 	let emitDrain: (() => void) | undefined;
 	const implementations = createIntegrationImplementations();
-	const implementor = implement(integrationContract);
+	const implementer = implement(integrationContract);
 	const server = await createExpressAdapter(
 		{
 			...implementations,
 			streams: {
 				...implementations.streams,
-				text: implementor.streams.text.handler(() => ({
+				text: implementer.streams.text.handler(() => ({
 					status: 200,
 					body: (async function* () {
 						pulledChunks = 1;
@@ -170,13 +170,13 @@ it("releases an Express backpressure wait when the response closes before drain"
 	let returned = false;
 	let closeResponse: (() => void) | undefined;
 	const implementations = createIntegrationImplementations();
-	const implementor = implement(integrationContract);
+	const implementer = implement(integrationContract);
 	const server = await createExpressAdapter(
 		{
 			...implementations,
 			streams: {
 				...implementations.streams,
-				text: implementor.streams.text.handler(() => ({
+				text: implementer.streams.text.handler(() => ({
 					status: 200,
 					body: (async function* () {
 						try {

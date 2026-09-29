@@ -28,11 +28,11 @@ const contract = {
 	},
 } as const;
 
-const implementor = implement(contract);
+const implementer = implement(contract);
 expectType<"~restrpc" | "$context" | "handler" | "use">(
-	null as unknown as keyof typeof implementor.todos.get,
+	null as unknown as keyof typeof implementer.todos.get,
 );
-expectError(implementor.todos.$context<{ requestId: string }>());
+expectError(implementer.todos.$context<{ requestId: string }>());
 
 expectError(implement(route.get("/unfinished")));
 expectError(implement(route.input(z.object({ title: z.string() }))));
@@ -43,26 +43,26 @@ expectError(
 	}),
 );
 
-expectError(implementor.todos.get.get("/other"));
-expectError(implementor.todos.get.query(z.object({ search: z.string() })));
-expectError(implementor.todos.get.response(201));
-expectError(implementor.todos.get.output(z.string()));
+expectError(implementer.todos.get.get("/other"));
+expectError(implementer.todos.get.query(z.object({ search: z.string() })));
+expectError(implementer.todos.get.response(201));
+expectError(implementer.todos.get.output(z.string()));
 
-const getWithMiddleware = implementor.todos.get.use(({ next }) => next());
+const getWithMiddleware = implementer.todos.get.use(({ next }) => next());
 expectType<"~restrpc" | "$context" | "handler" | "use">(
 	null as unknown as keyof typeof getWithMiddleware,
 );
 expectError(getWithMiddleware.get("/other"));
 expectError(getWithMiddleware.response(201));
 
-const get = implementor.todos.get.handler(({ params }) => ({
+const get = implementer.todos.get.handler(({ params }) => ({
 	status: 200 as const,
 	body: { id: params.id },
 }));
 expectType<"GET">(get["~restrpc"].method);
 expectType<"/todos/:id">(get["~restrpc"].path);
 
-implementor.todos.get
+implementer.todos.get
 	.$context<{ requestId: string }>()
 	.use(({ context, next }) => {
 		context.set("requestId", "request-1");
@@ -75,13 +75,13 @@ implementor.todos.get
 	});
 
 expectError(
-	implementor.todos.get.handler(() => ({
+	implementer.todos.get.handler(() => ({
 		status: 404 as const,
 		body: { code: "missing" },
 	})),
 );
 
-const _upload = implementor.todos.upload.handler(
+const _upload = implementer.todos.upload.handler(
 	({ body, contentType, lastEventId }) => {
 		expectType<Uint8Array<ArrayBuffer>>(body);
 		expectType<string | undefined>(contentType);
@@ -90,7 +90,7 @@ const _upload = implementor.todos.upload.handler(
 	},
 );
 
-const _importCsv = implementor.todos.importCsv.handler(
+const _importCsv = implementer.todos.importCsv.handler(
 	({ body, contentType }) => {
 		expectType<string>(body);
 		expectType<string | undefined>(contentType);
@@ -98,20 +98,20 @@ const _importCsv = implementor.todos.importCsv.handler(
 	},
 );
 
-implementor.todos.download.handler(() => ({
+implementer.todos.download.handler(() => ({
 	status: 200,
 	body: new Uint8Array(),
 	contentType: "image/png",
 }));
 expectError(
-	implementor.todos.download.handler(() => ({
+	implementer.todos.download.handler(() => ({
 		status: 200,
 		body: new Uint8Array(),
 		contentType: "image/webp",
 	})),
 );
 
-const create = implementor.todos.create.handler(({ input, contentType }) => {
+const create = implementer.todos.create.handler(({ input, contentType }) => {
 	expectType<string | undefined>(contentType);
 	return {
 		id: "todo-1",
