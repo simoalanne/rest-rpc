@@ -84,9 +84,12 @@ app.use((error, req, res, next) => {
 
 ### Express Middleware
 
-If using Express middlewares over [build-in middlewares](/docs/middleware), you can use the `middleware` option to run them before the route handlers.
-Middlewares are registered to the the provided app/router and accept the same signature as Express middleware,
+If you prefer to use Express middlewares over the [build-in middlewares](/docs/middleware), you can pass them to the `middleware` option.
+These middlewares are registered to the the provided app/router before the route handlers and accept the same signature as Express middleware,
 with an additional `route` argument that contains the route declaration for the current request.
+
+The middlewares run before the route handler is executed and passing middleware to registerRoutes is
+equivalent to calling `app.use(middleware)` before `registerRoutes(app, routes)`.
 
 ```ts
 registerRoutes(app, routes, {
