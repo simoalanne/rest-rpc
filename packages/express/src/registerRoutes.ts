@@ -1,4 +1,3 @@
-import type { DefaultContext } from "./index.ts";
 import type { BodyCodec } from "@rest-rpc/core";
 import { normalizeMediaType, resolveBodyCodec } from "@rest-rpc/core/codecs";
 import { createRequestSignal, writeNodeResponse } from "@rest-rpc/node";
@@ -6,9 +5,7 @@ import type { HttpMethod, RouteDeclaration } from "@rest-rpc/core/contract";
 import { toColonPath } from "@rest-rpc/core/contract";
 import {
 	type RuntimeImplementationTree,
-	type ContextOptions,
 	type HandleHttpRouteConfiguration,
-	resolveContext,
 	flattenRouteImplementations,
 	assertRequestContentType,
 	handleHttpRoute,
@@ -68,13 +65,7 @@ export type RegisterRoutesOptions = {
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 	middleware?: ExtendedExpressMiddleware[];
-} & HandleHttpRouteConfiguration &
-	ContextOptions<DefaultContext, ContextFields>;
-
-type ContextFields = {
-	req: Request;
-	res: ExpressResponse;
-};
+} & HandleHttpRouteConfiguration;
 
 /**
  * Registers HTTP route implementations on an Express router.
@@ -84,11 +75,8 @@ type ContextFields = {
 export function registerRoutes(
 	app: IRouter,
 	implementations: RuntimeImplementationTree,
-	...optionsArguments: {} extends DefaultContext
-		? [options?: RegisterRoutesOptions]
-		: [options: RegisterRoutesOptions]
+	options: RegisterRoutesOptions = {},
 ) {
-	const options = optionsArguments[0] ?? ({} as RegisterRoutesOptions);
 	const {
 		middleware = [],
 		bodyCodecs = [],
@@ -136,10 +124,6 @@ export function registerRoutes(
 						params: req.params,
 						headers: req.headers,
 					},
-					context: await resolveContext(options.context, {
-						req,
-						res,
-					}),
 					handlerFields: { req, res, signal },
 				});
 			} catch (error) {

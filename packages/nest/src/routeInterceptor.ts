@@ -73,12 +73,12 @@ const assertRouteImplementation = (
 export class RestRpcRouteInterceptor implements NestInterceptor {
 	constructor(
 		private readonly httpAdapterHost: HttpAdapterHost,
-		options?: RestRpcModuleOptions<Record<string, unknown>>,
+		options?: RestRpcModuleOptions,
 	) {
 		this.options = options;
 	}
 
-	private readonly options?: RestRpcModuleOptions<Record<string, unknown>>;
+	private readonly options?: RestRpcModuleOptions;
 
 	intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
 		const metadata = Reflect.getMetadata(
@@ -116,7 +116,6 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 		const body = codec?.deserialize
 			? await codec.deserialize(http.getRequest())
 			: req.body;
-		const userContext = await this.options?.context?.(context);
 		const implementation = assertRouteImplementation(
 			await lastValueFrom(next.handle()),
 			metadata.route,
@@ -140,7 +139,6 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 					params: req.params,
 					headers: req.headers,
 				},
-				context: userContext ?? {},
 				handlerFields: {
 					executionContext: context,
 					signal,

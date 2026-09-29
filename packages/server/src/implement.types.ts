@@ -22,6 +22,12 @@ export type ContractImplementor<
 			TAdditionalHandlerFields,
 			TContext
 		> & {
+				/** Selects the typed per-request context store for this route implementation. @see {@link https://rest-rpc.dev/docs/middleware#shared-context} */
+				$context<TValues extends object>(): ContractImplementor<
+					TContract,
+					TAdditionalHandlerFields,
+					TValues
+				>;
 				/** Wraps this contract leaf with middleware. @see {@link https://rest-rpc.dev/docs/middleware} */
 				use(
 					middleware: (

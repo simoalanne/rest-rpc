@@ -11,10 +11,6 @@ pnpm add @rest-rpc/node
 
 ## Usage
 
-Create a matcher and call it from a Node HTTP server. A
-matched request is written to the native response.
-You choose how to handle unmatched requests.
-
 ```ts
 import { createServer } from "node:http";
 import { route, createRouteHandler } from "@rest-rpc/node";
@@ -51,43 +47,11 @@ const server = createServer(async (req, res) => {
 server.listen(3000);
 ```
 
-## Framework Context
-
-Node handlers can receive user-provided application context. Augment
-`DefaultContext` to type it across handlers:
-
-```ts
-declare module "@rest-rpc/node" {
-	interface DefaultContext {
-		user: { id: string };
-	}
-}
-```
-
-Handlers receive the following adapter fields and typed context:
-
-```ts
-type RouteHandlerFields = {
-	req: IncomingMessage;
-	res: ServerResponse;
-	signal: AbortSignal;
-	context: Context<DefaultContext>;
-};
-```
-
-Pass the context in the handler options:
-
-```ts
-const result = await handler(req, res, { context: { user } });
-```
-
-See [Middleware](/docs/middleware) for route middleware that shares this context.
-
 ## Options
 
 ```ts
 type CreateNodeHandlerOptions = {
-	bodyCodecs?: readonly BodyCodec<IncomingMessage>[];
+	bodyCodecs?: readonly BodyCodec<AdapterRequest>[];
 	disableRequestValidation?: boolean;
 	disableResponseValidation?: boolean;
 	prefix?: `/${string}`;

@@ -17,6 +17,12 @@ describe("handleHttpRoute", () => {
 		const result = await handleHttpRoute(
 			{
 				route: route,
+				middleware: [
+					(request) => {
+						request.context.set("requestId", "request-1");
+						return request.next();
+					},
+				],
 				handler: (request) => {
 					const { context, ...requestFields } = request;
 					assert.deepEqual(Object.keys(context), ["get", "set"]);
@@ -40,7 +46,6 @@ describe("handleHttpRoute", () => {
 					params: { id: "123" },
 				},
 				handlerFields: { frameworkValue: "framework-1" },
-				context: { requestId: "request-1" },
 			},
 		);
 
@@ -80,7 +85,6 @@ describe("handleHttpRoute", () => {
 					query: new URLSearchParams({ q: "todos" }),
 				},
 				handlerFields: {},
-				context: {},
 			},
 		);
 
@@ -108,7 +112,6 @@ describe("handleHttpRoute", () => {
 					params: { id: "123" },
 				},
 				handlerFields: {},
-				context: {},
 			},
 		);
 		assert.ok(error instanceof RequestValidationError);
@@ -142,7 +145,6 @@ describe("handleHttpRoute", () => {
 			{
 				request: { body: rawBody },
 				handlerFields: {},
-				context: {},
 				configuration: { disableRequestValidation: true },
 			},
 		);
@@ -170,7 +172,6 @@ describe("handleHttpRoute", () => {
 			{
 				request: {},
 				handlerFields: {},
-				context: {},
 			},
 		);
 
@@ -198,7 +199,6 @@ describe("handleHttpRoute", () => {
 				{
 					request: {},
 					handlerFields: {},
-					context: {},
 				},
 			),
 			/Invalid inferred HTTP response status "bad"/,
@@ -222,7 +222,6 @@ describe("handleHttpRoute", () => {
 			{
 				request: { query: new URLSearchParams({ term: "go" }) },
 				handlerFields: {},
-				context: {},
 			},
 		);
 		assert.deepEqual(input, { term: "go" });
@@ -247,7 +246,6 @@ describe("handleHttpRoute", () => {
 			{
 				request: {},
 				handlerFields: {},
-				context: {},
 			},
 		);
 
@@ -271,7 +269,6 @@ describe("handleHttpRoute", () => {
 					{
 						request: {},
 						handlerFields: {},
-						context: {},
 					},
 				),
 			/Custom procedure output must return/,
@@ -293,7 +290,6 @@ describe("handleHttpRoute", () => {
 			{
 				request: {},
 				handlerFields: {},
-				context: {},
 			},
 		);
 
@@ -379,7 +375,6 @@ describe("handleHttpRoute", () => {
 					},
 				},
 				handlerFields: {},
-				context: {},
 			},
 		);
 
@@ -402,7 +397,6 @@ describe("handleHttpRoute", () => {
 					{
 						request: {},
 						handlerFields: {},
-						context: {},
 					},
 				),
 			(error) => error === expected,
@@ -420,7 +414,6 @@ describe("handleHttpRoute", () => {
 			{
 				request: {},
 				handlerFields: {},
-				context: {},
 			},
 		);
 		assert.ok(error instanceof ResponseValidationError);
@@ -441,7 +434,6 @@ describe("handleHttpRoute", () => {
 			{
 				request: {},
 				handlerFields: {},
-				context: {},
 				configuration: { disableResponseValidation: true },
 			},
 		);
@@ -467,7 +459,6 @@ describe("handleHttpRoute", () => {
 					{
 						request: {},
 						handlerFields: {},
-						context: {},
 						configuration: { disableResponseValidation: true },
 					},
 				),
@@ -492,7 +483,6 @@ describe("handleHttpRoute", () => {
 					{
 						request: {},
 						handlerFields: {},
-						context: {},
 					},
 				),
 			(error) =>
@@ -525,7 +515,6 @@ describe("handleHttpRoute", () => {
 			{
 				request: {},
 				handlerFields: {},
-				context: {},
 			},
 		);
 
@@ -552,7 +541,6 @@ describe("handleHttpRoute custom responses", () => {
 			{
 				request: {},
 				handlerFields: {},
-				context: {},
 			},
 		);
 
@@ -578,7 +566,6 @@ describe("handleHttpRoute custom responses", () => {
 			{
 				request: {},
 				handlerFields: {},
-				context: {},
 			},
 		);
 

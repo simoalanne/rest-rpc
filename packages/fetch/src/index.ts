@@ -6,20 +6,26 @@ import {
 	type ServerRouteBuilder,
 } from "@rest-rpc/server";
 
-type FetchHandlerFields = {
-	request: Request;
-	signal: AbortSignal;
-};
-
 /**
- * Application context available to Fetch route handlers.
+ * The default application context shared by handlers and middleware. Augment this interface globally.
+ * Defaults to an empty object if not extended.
  *
- * @remarks Augment this interface to define the context accepted by the
- * catch-all handler and received by every route handler.
- *
- * @see {@link https://rest-rpc.dev/docs/server/fetch#framework-context}
+ * @default {}
  */
 export interface DefaultContext {}
+
+/**
+ * Native request available to Fetch adapter handlers and middleware. Augment this interface globally.
+ * Must extend `Request` to be compatible with the Fetch API.
+ *
+ * @default Request
+ */
+export interface DefaultRequest extends Request {}
+
+type FetchHandlerFields = {
+	request: DefaultRequest;
+	signal: AbortSignal;
+};
 
 /**
  * Entry point for declaring routes with handlers for the Fetch runtime.

@@ -47,6 +47,12 @@ Object.defineProperties(Object.getPrototypeOf(coreRoute), {
 			return callback;
 		},
 	},
+	$context: {
+		configurable: true,
+		value(this: RuntimeBuilder) {
+			return this;
+		},
+	},
 });
 
 /** Core route builder with server-first handler attachment enabled. */

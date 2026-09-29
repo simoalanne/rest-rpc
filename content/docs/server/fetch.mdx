@@ -11,10 +11,6 @@ pnpm add @rest-rpc/fetch
 
 ## Usage
 
-Create a matcher and call it from your runtime's Fetch entry point. This Bun
-example mounts the handler under `/api`. The result contains a `Response` when
-a route matched, and you choose how to handle unmatched requests.
-
 ```ts
 import { route, createRouteHandler } from "@rest-rpc/fetch";
 import { z } from "zod";
@@ -50,42 +46,11 @@ const server = Bun.serve({
 console.log(`Server running at ${server.url}`);
 ```
 
-## Framework Context
-
-Fetch handlers can receive user-provided application context. Augment
-`DefaultContext` to type it across handlers:
-
-```ts
-declare module "@rest-rpc/fetch" {
-	interface DefaultContext {
-		user: { id: string };
-	}
-}
-```
-
-Handlers receive the following adapter fields and typed context:
-
-```ts
-type RouteHandlerFields = {
-	request: Request;
-	signal: AbortSignal;
-	context: Context<DefaultContext>;
-};
-```
-
-Pass the context in the handler options:
-
-```ts
-const result = await handler(request, { context: { user } });
-```
-
-See [Middleware](/docs/middleware) for route middleware that shares this context.
-
 ## Options
 
 ```ts
 type CreateFetchHandlerOptions = {
-	bodyCodecs?: readonly BodyCodec<Request>[];
+	bodyCodecs?: readonly BodyCodec<AdapterRequest>[];
 	disableRequestValidation?: boolean;
 	disableResponseValidation?: boolean;
 	prefix?: `/${string}`;

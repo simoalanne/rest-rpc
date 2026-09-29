@@ -518,6 +518,11 @@ export type ServerRouteBuilder<
 	undefined,
 	ServerBuilderExtension<TAdditionalHandlerFields, TContext>
 > & {
+	/** Selects the typed per-request context store for this builder. @see {@link https://rest-rpc.dev/docs/middleware#shared-context} */
+	$context<TValues extends object>(): ServerRouteBuilder<
+		TAdditionalHandlerFields,
+		TValues
+	>;
 	/** Declares a reusable middleware function on the untouched route root. @see {@link https://rest-rpc.dev/docs/middleware} */
 	middleware<TRequest extends RequestFields = RequestFields>(
 		callback: (

@@ -1,12 +1,13 @@
-import type { IncomingMessage } from "node:http";
 import { Readable } from "node:stream";
+import type { DefaultRequest } from "./index.ts";
+
 /** Parses a Node request target without depending on the Host header. */
-export function parseRequestTarget(request: IncomingMessage): URL {
+export function parseRequestTarget(request: DefaultRequest): URL {
 	return new URL(request.url ?? "/", "http://localhost");
 }
 
 export const toFetchRequest = (
-	request: IncomingMessage,
+	request: DefaultRequest,
 	signal: AbortSignal,
 ) => {
 	const headers = new Headers();

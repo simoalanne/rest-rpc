@@ -29,9 +29,11 @@ const contract = {
 } as const;
 
 const implementor = implement(contract);
-expectType<"~restrpc" | "handler" | "use">(
+expectType<"~restrpc" | "$context" | "handler" | "use">(
 	null as unknown as keyof typeof implementor.todos.get,
 );
+expectError(implementor.todos.$context<{ requestId: string }>());
+expectError(implementor.$context<{ requestId: string }>());
 
 expectError(implement(route.get("/unfinished")));
 expectError(implement(route.input(z.object({ title: z.string() }))));
@@ -48,7 +50,7 @@ expectError(implementor.todos.get.response(201));
 expectError(implementor.todos.get.output(z.string()));
 
 const getWithMiddleware = implementor.todos.get.use(({ next }) => next());
-expectType<"~restrpc" | "handler" | "use">(
+expectType<"~restrpc" | "$context" | "handler" | "use">(
 	null as unknown as keyof typeof getWithMiddleware,
 );
 expectError(getWithMiddleware.get("/other"));
@@ -60,6 +62,18 @@ const get = implementor.todos.get.handler(({ params }) => ({
 }));
 expectType<"GET">(get["~restrpc"].method);
 expectType<"/todos/:id">(get["~restrpc"].path);
+
+implementor.todos.get
+	.$context<{ requestId: string }>()
+	.use(({ context, next }) => {
+		context.set("requestId", "request-1");
+		return next();
+	})
+	.handler(({ context }) => {
+		expectType<string>(context.get("requestId"));
+		expectError(context.get("missing"));
+		return { status: 200, body: { id: context.get("requestId") } };
+	});
 
 expectError(
 	implementor.todos.get.handler(() => ({

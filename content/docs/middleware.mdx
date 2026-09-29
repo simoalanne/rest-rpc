@@ -38,21 +38,6 @@ const getProfile = route
 Middleware runs in declaration order; work after `await next()` runs in reverse
 order. Request schemas validate before middleware runs, regardless of setter order.
 
-## Shared Context
-
-Middleware and the handler share one mutable `context` store. Read and write values
-with `context.get(key)` and `context.set(key, value)`. Declare its values by augmenting
-`DefaultContext`:
-
-```ts
-declare module "@rest-rpc/express" {
-	interface DefaultContext {
-		readonly requestId: string;
-		readonly user?: { id: string; name: string };
-	}
-}
-```
-
 ## Reuse Middleware
 
 When a middleware function should be applied to multiple routes,
@@ -111,7 +96,7 @@ to access validated request types.
 
 Middleware receives raw application output. Response validation and serialization
 run after the chain completes. Middleware responses are unchecked and do not change
-the client contract; declare `.output()` or `.response()` schemas to validate the
+the client contract. Declare `.output()` or `.response()` schemas to validate the
 final value and expose responses to clients.
 
 Downstream errors propagate through `next()`, allowing middleware to catch errors

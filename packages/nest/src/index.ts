@@ -8,7 +8,14 @@ import {
 	type RouteRequest as ServerRouteRequest,
 	type ServerRouteBuilder,
 } from "@rest-rpc/server";
-import type { DefaultContext } from "./module.ts";
+
+/**
+ * The default application context shared by handlers and middleware. Augment this interface globally.
+ * Defaults to an empty object if not extended.
+ *
+ * @default {}
+ */
+export interface DefaultContext {}
 
 type NestHandlerFields = {
 	executionContext: ExecutionContext;
@@ -29,7 +36,7 @@ export {
 	ResponseValidationError,
 } from "@rest-rpc/server";
 export { Implement } from "./decorators.ts";
-export type { DefaultContext, RestRpcModuleOptions } from "./module.ts";
+export type { RestRpcModuleOptions } from "./module.ts";
 export { RestRpcModule } from "./module.ts";
 export {
 	RequestValidationException,

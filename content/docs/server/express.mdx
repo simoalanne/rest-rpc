@@ -11,9 +11,6 @@ pnpm add @rest-rpc/express
 
 ## Usage
 
-Create a router, capture application dependencies in the handlers, and register
-the routes. Ordinary Express middleware runs before the route handlers.
-
 ```ts
 import express from "express";
 import { route, registerRoutes } from "@rest-rpc/express";
@@ -42,43 +39,6 @@ registerRoutes(router, routes);
 app.use("/api", router);
 app.listen(3000);
 ```
-
-`registerRoutes()` accepts an Express application or router.
-
-## Framework Context
-
-Provide request-scoped context with the `context` option. Augment
-`DefaultContext` to type it across handlers:
-
-```ts
-declare module "@rest-rpc/express" {
-	interface DefaultContext {
-		user: { id: string };
-	}
-}
-```
-
-The context factory receives the Express request and response. Handlers
-receive the following adapter fields and typed context:
-
-```ts
-type RouteHandlerFields = {
-	req: Request;
-	res: Response;
-	signal: AbortSignal;
-	context: Context<DefaultContext>;
-};
-```
-
-```ts
-registerRoutes(app, routes, {
-	context: ({ req }) => ({
-		user: { id: req.header("x-user-id") ?? "" },
-	}),
-});
-```
-
-See [Middleware](/docs/middleware) for route middleware that shares this context.
 
 ## Options
 
@@ -122,7 +82,11 @@ app.use((error, req, res, next) => {
 });
 ```
 
-### Middleware
+### Express Middleware
+
+If using Express middlewares over [build-in middlewares](/docs/middleware), you can use the `middleware` option to run them before the route handlers.
+Middlewares are registered to the the provided app/router and accept the same signature as Express middleware,
+with an additional `route` argument that contains the route declaration for the current request.
 
 ```ts
 registerRoutes(app, routes, {

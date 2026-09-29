@@ -1,0 +1,35 @@
+---
+title: Context
+description: Define a shared context for route handlers and middleware
+---
+
+## Route Context
+
+Route handlers and middleware share a mutable context object per request.
+Use `context.set()` to store values and `context.get()` to read them.
+Use `route.$context<T>()` to strongly type the context for set of routes or a single route.
+
+```ts
+const authenticatedRoute = route.$context<{
+	user: { id: string; name: string };
+}>();
+```
+
+## Global Context
+
+To avoid having to specify a context type for every route, you can define a default context type for you application globally.
+
+```ts
+declare module "@rest-rpc/express" {
+	interface DefaultContext {
+		env: {
+			DATABASE_URL: string;
+		};
+	}
+}
+```
+
+:::tip
+When declaring required properties use a centralized middleware that runs before downstream middleware or handlers try to access the properties.
+This avoids runtime errors when a property is not set in the context even though the type system indicates that it is present.
+:::

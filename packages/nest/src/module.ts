@@ -1,32 +1,17 @@
 import type { BodyCodec } from "@rest-rpc/core";
 import type { HandleHttpRouteConfiguration } from "@rest-rpc/server";
-import type { DynamicModule, ExecutionContext } from "@nestjs/common";
+import type { DynamicModule } from "@nestjs/common";
 import { Module } from "@nestjs/common";
 import { APP_INTERCEPTOR, HttpAdapterHost } from "@nestjs/core";
 import { RestRpcRouteInterceptor } from "./routeInterceptor.ts";
 
 /**
- * Default application context passed to Nest route handlers.
- *
- * @remarks Augment this interface to set the route handler context across a
- * project. The augmented shape is used by `RouteRequest`, `RouteHandler`,
- * `route`, and `implement()`.
- *
- * @see {@link https://rest-rpc.dev/docs/server/nest#framework-context}
- */
-export interface DefaultContext {}
-
-/**
  * Options for configuring the rest-rpc Nest adapter.
- *
- * @remarks Use `context` for request-scoped values shared by all
- * rest-rpc Nest handlers.
  *
  * @see {@link https://rest-rpc.dev/docs/server/nest#options}
  */
-export type RestRpcModuleOptions<TContext extends object = DefaultContext> = {
+export type RestRpcModuleOptions = {
 	bodyCodecs?: readonly BodyCodec<unknown>[];
-	context?: (context: ExecutionContext) => TContext | Promise<TContext>;
 } & HandleHttpRouteConfiguration;
 
 /**
@@ -44,9 +29,7 @@ export class RestRpcModule {
 	 *
 	 * @see {@link https://rest-rpc.dev/docs/server/nest#options}
 	 */
-	static forRoot<TContext extends object = DefaultContext>(
-		options: RestRpcModuleOptions<TContext> = {},
-	): DynamicModule {
+	static forRoot(options: RestRpcModuleOptions = {}): DynamicModule {
 		const restRpcModuleOptions = Symbol.for("rest-rpc:nest-options");
 
 		return {
@@ -61,7 +44,7 @@ export class RestRpcModule {
 					inject: [HttpAdapterHost, restRpcModuleOptions],
 					useFactory: (
 						httpAdapterHost: HttpAdapterHost,
-						moduleOptions: RestRpcModuleOptions<Record<string, unknown>>,
+						moduleOptions: RestRpcModuleOptions,
 					) => new RestRpcRouteInterceptor(httpAdapterHost, moduleOptions),
 				},
 				{

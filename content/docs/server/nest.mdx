@@ -11,10 +11,6 @@ pnpm add @rest-rpc/nest
 
 ## Usage
 
-Use `@Implement()` on a controller method. Pass a route or route tree to the
-decorator and return its completed handlers from the method. Handlers can use
-injected services.
-
 ```ts
 import "reflect-metadata";
 import { Controller, Injectable, Module } from "@nestjs/common";
@@ -92,7 +88,7 @@ Nest decorators on the decorated method are copied to every generated route
 method, so guards, interceptors, and parameter decorators can be applied to a
 whole route tree.
 
-## Single Routes
+### Single Route Registration
 
 The decorator also accepts a single route with an explicit path:
 
@@ -115,59 +111,14 @@ Route with [derived path](/docs/route-builder#start-with-defaults) is not suppor
 Add explicit method and path or use a route tree with `@Implement()` instead.
 :::
 
-## Framework Context
-
-Nest handlers can receive user-provided application context. Augment
-`DefaultContext` to type it across handlers:
-
-```ts
-import type { Request } from "express";
-
-declare module "@rest-rpc/nest" {
-	interface DefaultContext {
-		request: Request;
-		userId: string;
-	}
-}
-```
-
-Handlers receive the following adapter fields and typed context:
-
-```ts
-type RouteHandlerFields = {
-	executionContext: ExecutionContext;
-	signal: AbortSignal;
-	context: Context<DefaultContext>;
-};
-```
-
-Return the context from `context` when configuring `RestRpcModule`:
-
-```ts
-import { RestRpcModule } from "@rest-rpc/nest";
-
-RestRpcModule.forRoot({
-	context: (context) => {
-		const request = context.switchToHttp().getRequest<Request>();
-		return {
-			request,
-			userId: request.header("x-user-id") ?? "",
-		};
-	},
-});
-```
-
 ## Options
 
 ```ts
-type RestRpcModuleOptions<TContext = DefaultContext> = {
+type RestRpcModuleOptions = {
 	bodyCodecs?: readonly BodyCodec<unknown>[];
 	disableRequestValidation?: boolean;
 	disableResponseValidation?: boolean;
-	context?: (context: ExecutionContext) => TContext | Promise<TContext>;
 };
-
-See [Middleware](/docs/middleware) for route middleware that shares this context.
 ```
 
 `bodyCodecs`: see [Serialization and Codecs](/docs/http-behavior/serialization).

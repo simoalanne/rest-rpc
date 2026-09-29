@@ -23,10 +23,11 @@ interface AppContext {
 	requestId: string;
 }
 
-const route = serverFirstRoute as unknown as ServerRouteBuilder<
+const adapterRoute = serverFirstRoute as unknown as ServerRouteBuilder<
 	{ signal: AbortSignal },
-	AppContext
+	{ adapterWide: string }
 >;
+const route = adapterRoute.$context<AppContext>();
 const input = z.object({ title: z.string() });
 const output = z.object({ id: z.string(), title: z.string() });
 
@@ -35,11 +36,16 @@ expectError(createRouteMatcher({}, "api"));
 expectError(createRouteMatcher({}, ""));
 
 expectError(coreRoute.handler(() => undefined));
+expectError(route.get("/context-too-late").$context<AppContext>());
 
 const rootProcedure = route.handler(({ context }) => ({
 	id: "todo-1" as const,
 	requestId: context.get("requestId"),
 }));
+adapterRoute.handler(({ context }) => {
+	expectType<string>(context.get("adapterWide"));
+	return { ok: true };
+});
 expectType<"procedure">(rootProcedure["~restrpc"].kind);
 
 const inferred = route

@@ -20,10 +20,7 @@ const toNodeResponseHeaders = (headers: Headers): OutgoingHttpHeaders => {
 	return responseHeaders;
 };
 
-export type FetchAdapterContext = { adapter: "fetch" };
-
 export type FetchAdapterOptions = {
-	context?: FetchAdapterContext;
 	createHandlerOptions?: CreateFetchHandlerOptions;
 	handleError?: (
 		error: unknown,
@@ -42,8 +39,6 @@ export const createFetchAdapter = (
 			implementations,
 			options.createHandlerOptions,
 		);
-		const context = options.context ?? { adapter: "fetch" };
-
 		return listen(
 			createServer(async (req, res) => {
 				const controller = new AbortController();
@@ -61,7 +56,7 @@ export const createFetchAdapter = (
 				} as RequestInit & { duplex: "half" });
 				let response: Response;
 				try {
-					const result = await handler(request, { context });
+					const result = await handler(request);
 					response = result.matched
 						? result.response
 						: new Response(null, { status: 404 });

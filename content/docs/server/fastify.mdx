@@ -11,9 +11,6 @@ pnpm add @rest-rpc/fastify
 
 ## Usage
 
-Register routes inside a Fastify plugin to keep dependencies and hooks scoped to
-a module. Handlers can access the native request and reply.
-
 ```ts
 import Fastify from "fastify";
 import { route, registerRoutes } from "@rest-rpc/fastify";
@@ -44,41 +41,6 @@ await app.register(
 
 await app.listen({ port: 3000 });
 ```
-
-## Framework Context
-
-Provide request-scoped context with the `context` option. Augment
-`DefaultContext` to type it across handlers:
-
-```ts
-declare module "@rest-rpc/fastify" {
-	interface DefaultContext {
-		user: { id: string };
-	}
-}
-```
-
-The context factory receives the Fastify request and reply. Handlers receive
-the following adapter fields and typed context:
-
-```ts
-type RouteHandlerFields = {
-	req: FastifyRequest;
-	reply: FastifyReply;
-	signal: AbortSignal;
-	context: Context<DefaultContext>;
-};
-```
-
-```ts
-registerRoutes(app, routes, {
-	context: ({ req }) => ({
-		user: { id: req.headers["x-user-id"]?.toString() ?? "" },
-	}),
-});
-```
-
-See [Middleware](/docs/middleware) for route middleware that shares this context.
 
 ## Options
 
@@ -124,7 +86,11 @@ app.setErrorHandler((error, request, reply) => {
 });
 ```
 
-### preHandler
+### Fastify preHandler
+
+If using Fastify preHandlers over [build-in middlewares](/docs/middleware), you can use the `preHandler` option to run them before the route handlers.
+PreHandlers are registered to the the provided `Fastify` instance or plugin and accept the same signature as Fastify preHandlers,
+with an additional `route` argument that contains the route declaration for the current request.
 
 ```ts
 registerRoutes(app, routes, {

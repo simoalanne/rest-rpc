@@ -37,4 +37,11 @@ describe("server route builder", () => {
 
 		assert.deepEqual(declaration.request, { query: [schema] });
 	});
+
+	it("selects context without changing the runtime builder", () => {
+		assert.equal(
+			serverFirstRoute.$context<{ requestId: string }>(),
+			serverFirstRoute,
+		);
+	});
 });

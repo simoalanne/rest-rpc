@@ -1,6 +1,6 @@
 import type { AbsolutePath, BodyCodec } from "@rest-rpc/core";
 import { deserializeRequestBody } from "@rest-rpc/fetch/deserializeRequestBody";
-import type { IncomingMessage, ServerResponse } from "node:http";
+import type { ServerResponse } from "node:http";
 import {
 	createRouteMatcher,
 	assertRequestContentType,
@@ -10,7 +10,7 @@ import {
 	type HandleHttpRouteConfiguration,
 	type RuntimeImplementationTree,
 } from "@rest-rpc/server";
-import type { DefaultContext, NodeRouteHandlerResult } from "./index.ts";
+import type { DefaultRequest, NodeRouteHandlerResult } from "./index.ts";
 import { createRequestSignal } from "./lifecycle.ts";
 import { toFetchRequest, parseRequestTarget } from "./request.ts";
 import { writeNodeResponse } from "./response.ts";
@@ -21,7 +21,7 @@ import { writeNodeResponse } from "./response.ts";
  * @see {@link https://rest-rpc.dev/docs/server/node#options}
  */
 export type CreateNodeHandlerOptions = {
-	bodyCodecs?: readonly BodyCodec<IncomingMessage>[];
+	bodyCodecs?: readonly BodyCodec<DefaultRequest>[];
 	/** Path prefix to apply to all routes in the route tree during matching. */
 	prefix?: AbsolutePath;
 	/** The maximum accepted size of the request body in bytes. */
@@ -37,7 +37,7 @@ export type CreateNodeHandlerOptions = {
  */
 export type RequestValidationErrorHandler = (
 	error: RequestValidationError,
-	request: IncomingMessage,
+	request: DefaultRequest,
 	response: ServerResponse,
 ) => unknown;
 
@@ -48,13 +48,9 @@ export type RequestValidationErrorHandler = (
  */
 export type ResponseValidationErrorHandler = (
 	error: ResponseValidationError,
-	request: IncomingMessage,
+	request: DefaultRequest,
 	response: ServerResponse,
 ) => unknown;
-
-type ContextArguments = {} extends DefaultContext
-	? [options?: { context?: DefaultContext }]
-	: [options: { context: DefaultContext }];
 
 /**
  * Creates a Node HTTP handler that dispatches matching rest-rpc routes.
@@ -68,9 +64,8 @@ export function createRouteHandler(
 	implementations: RuntimeImplementationTree,
 	options: CreateNodeHandlerOptions = {},
 ): (
-	request: IncomingMessage,
+	request: DefaultRequest,
 	response: ServerResponse,
-	...contextArguments: ContextArguments
 ) => Promise<NodeRouteHandlerResult> {
 	const matchRoute = createRouteMatcher(implementations, options.prefix);
 	const bodyCodecs = options.bodyCodecs ?? [];
@@ -82,7 +77,7 @@ export function createRouteHandler(
 		throw new Error("requestBodyLimit must be a positive safe integer");
 	}
 
-	return async (request, response, ...contextArguments) => {
+	return async (request, response) => {
 		const url = parseRequestTarget(request);
 		const matched = matchRoute({
 			method: request.method ?? "GET",
@@ -132,7 +127,6 @@ export function createRouteHandler(
 				disableResponseValidation: options.disableResponseValidation,
 			},
 			request: parsedRequest,
-			context: contextArguments[0]?.context ?? {},
 			handlerFields: { req: request, res: response, signal },
 		});
 

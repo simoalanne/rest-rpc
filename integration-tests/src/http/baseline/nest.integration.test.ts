@@ -392,15 +392,22 @@ it("serves a contract route implemented by a Nest provider class", async () => {
 		constructor(@Inject(ItemService) private readonly items: ItemService) {}
 
 		readonly routes = {
-			get: implement(classContract.items).get.handler(
-				({ context, params: { id } }) => ({
+			get: implement(classContract.items)
+				.get.$context<{ source: string }>()
+				.use(({ context, executionContext, next }) => {
+					const req = executionContext
+						.switchToHttp()
+						.getRequest<{ headers: Record<string, unknown> }>();
+					context.set("source", String(req.headers["x-test-source"] ?? "nest"));
+					return next();
+				})
+				.handler(({ context, params: { id } }) => ({
 					status: 200,
 					body: {
 						id,
 						title: this.items.formatTitle(context.get("source"), id),
 					},
-				}),
-			),
+				})),
 		};
 	}
 
@@ -415,18 +422,7 @@ it("serves a contract route implemented by a Nest provider class", async () => {
 	}
 
 	@Module({
-		imports: [
-			RestRpcModule.forRoot({
-				context: (context) => {
-					const req = context
-						.switchToHttp()
-						.getRequest<{ headers: Record<string, unknown> }>();
-					return {
-						source: String(req.headers["x-test-source"] ?? "nest"),
-					};
-				},
-			}),
-		],
+		imports: [RestRpcModule.forRoot()],
 		controllers: [ItemsController],
 		providers: [ItemRoutes, ItemService],
 	})

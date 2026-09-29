@@ -19,6 +19,10 @@ describe("implement", () => {
 		};
 		const implementor = implement(contract);
 		assert.equal(implementor, contract);
+		assert.equal(
+			implementor.todos.get.$context<{ requestId: string }>(),
+			implementor.todos.get,
+		);
 
 		const implementation = implementor.todos.get.handler(() => "todo-1");
 		const match = createRouteMatcher({ todos: { get: implementation } })({

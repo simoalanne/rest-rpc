@@ -12,24 +12,21 @@ import type { StartedServer } from "./listen.ts";
 
 type FastifyParserDone = (error: Error | null, body?: unknown) => void;
 
-export type NestAdapterOptions<TRequest = unknown> = {
+export type NestAdapterOptions = {
 	bodyParser?: boolean;
 	configureApp?: (
 		app: Awaited<ReturnType<typeof NestFactory.create>>,
 	) => void | Promise<void>;
 	configureFastify?: (app: FastifyInstance) => void | Promise<void>;
 	controllerPrefix?: string;
-	moduleOptions?: RestRpcModuleOptions<Record<string, unknown>, TRequest>;
+	moduleOptions?: RestRpcModuleOptions;
 	platform?: "express" | "fastify";
 };
 
-export const createNestAdapter = <
-	TContract extends Contract,
-	TRequest = unknown,
->(
+export const createNestAdapter = <TContract extends Contract>(
 	contract: TContract,
 	implementations: RuntimeImplementationTree,
-	options: NestAdapterOptions<TRequest> = {},
+	options: NestAdapterOptions = {},
 ) => ({
 	name: options.platform === "fastify" ? "nest-fastify" : "nest",
 	start: async (): Promise<StartedServer> => {
@@ -42,12 +39,7 @@ export const createNestAdapter = <
 		}
 
 		@Module({
-			imports: [
-				RestRpcModule.forRoot<Record<string, unknown>, TRequest>({
-					context: () => ({ adapter: "nest" }),
-					...options.moduleOptions,
-				}),
-			],
+			imports: [RestRpcModule.forRoot(options.moduleOptions)],
 			controllers: [RestRpcController],
 		})
 		class AppModule {}

@@ -11,9 +11,6 @@ pnpm add @rest-rpc/hono
 
 ## Usage
 
-Register routes on a Hono application or a child app. Hono middleware and the native
-context remain available to handlers.
-
 ```ts
 import { Hono } from "hono";
 import { route, registerRoutes } from "@rest-rpc/hono";
@@ -48,40 +45,6 @@ registerRoutes(api, routes);
 app.route("/api", api);
 export default app;
 ```
-
-## Framework Context
-
-Provide request-scoped context with the `context` option. Augment
-`DefaultContext` to type it across handlers:
-
-```ts
-declare module "@rest-rpc/hono" {
-	interface DefaultContext {
-		user: { id: string };
-	}
-}
-```
-
-The context factory receives the Hono context. Handlers receive the following
-adapter fields and typed context:
-
-```ts
-type RouteHandlerFields<E extends Env = Env> = {
-	c: Context<E>;
-	signal: AbortSignal;
-	context: Context<DefaultContext>;
-};
-```
-
-```ts
-registerRoutes(app, routes, {
-	context: ({ c }) => ({
-		user: { id: c.req.header("x-user-id") ?? "" },
-	}),
-});
-```
-
-See [Middleware](/docs/middleware) for route middleware that shares this context.
 
 ## Options
 
@@ -123,7 +86,10 @@ app.onError((error, c) => {
 });
 ```
 
-### Middleware
+### Hono Middleware
+
+If using Hono middlewares over [build-in middlewares](/docs/middleware), you can use the `middleware` option to run them before the route handlers.
+Middlewares are registered to the the provided `Hono` instance and accept the same signature as Hono middleware, with an additional `route` argument that contains the route declaration for the current request.
 
 ```ts
 registerRoutes(app, routes, {

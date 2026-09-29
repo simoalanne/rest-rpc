@@ -7,8 +7,24 @@ import {
 	type ServerRouteBuilder,
 } from "@rest-rpc/server";
 
+/**
+ * The default application context shared by handlers and middleware. Augment this interface globally.
+ * Defaults to an empty object if not extended.
+ *
+ * @default {}
+ */
+export interface DefaultContext {}
+
+/**
+ * Native request available to Node HTTP adapter handlers and middleware. Augment this interface globally.
+ * Must extend `IncomingMessage` to be compatible with Node HTTP server.
+ *
+ * @default IncomingMessage
+ */
+export interface DefaultRequest extends IncomingMessage {}
+
 type NodeHandlerFields = {
-	req: IncomingMessage;
+	req: DefaultRequest;
 	res: ServerResponse;
 	signal: AbortSignal;
 };
@@ -19,16 +35,6 @@ type NodeHandlerFields = {
  * @see {@link https://rest-rpc.dev/docs/server/node}
  */
 export type NodeRouteHandlerResult = { matched: boolean };
-
-/**
- * Application context available to Node HTTP route handlers.
- *
- * @remarks Augment this interface to define the context accepted by the
- * catch-all handler and received by every route handler.
- *
- * @see {@link https://rest-rpc.dev/docs/server/node#framework-context}
- */
-export interface DefaultContext {}
 
 /**
  * Entry point for declaring routes with handlers for Node HTTP.

@@ -69,10 +69,8 @@ export type HandleHttpRouteConfiguration = {
 /** Inputs needed to invoke and normalize one HTTP route handler. */
 export type HandleHttpRouteOptions<
 	TAdditionalHandlerFields extends object = Record<never, never>,
-	TContext extends object = Record<never, never>,
 > = {
 	request: RequestSegments;
-	context: TContext;
 	handlerFields: TAdditionalHandlerFields;
 	configuration?: HandleHttpRouteConfiguration;
 };
@@ -283,10 +281,9 @@ const getHandlerRequestFields = (
  */
 export async function handleHttpRoute<
 	TAdditionalHandlerFields extends object = Record<never, never>,
-	TContext extends object = Record<never, never>,
 >(
 	implementation: RuntimeImplementation,
-	options: HandleHttpRouteOptions<TAdditionalHandlerFields, TContext>,
+	options: HandleHttpRouteOptions<TAdditionalHandlerFields>,
 ): Promise<HttpRouteResult | RequestValidationError | ResponseValidationError> {
 	try {
 		const { route } = implementation;
@@ -311,7 +308,7 @@ export async function handleHttpRoute<
 			{
 				...getHandlerRequestFields(route, validatedRequest),
 				...options.handlerFields,
-				context: createContext(options.context),
+				context: createContext(),
 				contentType,
 				lastEventId,
 				route,

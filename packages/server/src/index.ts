@@ -33,8 +33,7 @@ export type {
 	ServerRouteBuilder,
 } from "./routeBuilder.types.ts";
 export { assertRequestContentType } from "./requestContentType.ts";
-export { resolveContext } from "./context.ts";
-export type { Context, ContextSource, ContextOptions } from "./context.ts";
+export type { Context } from "./context.ts";
 export type {
 	MiddlewareReturn,
 	MiddlewareRequest,

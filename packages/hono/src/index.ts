@@ -15,7 +15,12 @@ type HonoHandlerFields<TEnv extends Env = Env> = {
 	signal: AbortSignal;
 };
 
-/** Application context shared by middleware and handlers. Augment this interface globally. */
+/**
+ * The default application context shared by handlers and middleware. Augment this interface globally.
+ * Defaults to an empty object if not extended.
+ *
+ * @default {}
+ */
 export interface DefaultContext {}
 
 type ContractRoute = { readonly "~restrpc": RouteDeclaration };

@@ -1,8 +1,9 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
+import type { ServerResponse } from "node:http";
+import type { DefaultRequest } from "./index.ts";
 
 /** Tracks request abortion and premature response closure until completion. */
 export function createRequestSignal(
-	req: IncomingMessage,
+	req: DefaultRequest,
 	res: ServerResponse,
 ): AbortSignal {
 	const controller = new AbortController();

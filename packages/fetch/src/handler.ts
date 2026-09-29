@@ -8,7 +8,7 @@ import {
 	type HandleHttpRouteConfiguration,
 	type RuntimeImplementationTree,
 } from "@rest-rpc/server";
-import type { DefaultContext } from "./index.ts";
+import type { DefaultRequest } from "./index.ts";
 import { deserializeRequestBody } from "./deserializeRequestBody.ts";
 import { createFetchResponse } from "./response.ts";
 
@@ -18,7 +18,7 @@ import { createFetchResponse } from "./response.ts";
  * @see {@link https://rest-rpc.dev/docs/server/fetch#options}
  */
 export type CreateFetchHandlerOptions = {
-	bodyCodecs?: readonly BodyCodec<Request>[];
+	bodyCodecs?: readonly BodyCodec<DefaultRequest>[];
 	/** Path prefix to apply to all routes in the route tree during matching. */
 	prefix?: AbsolutePath;
 	/** The maximum accepted size of the request body in bytes. */
@@ -34,7 +34,7 @@ export type CreateFetchHandlerOptions = {
  */
 export type RequestValidationErrorHandler = (
 	error: RequestValidationError,
-	request: Request,
+	request: DefaultRequest,
 ) => Response | Promise<Response>;
 
 /**
@@ -44,16 +44,12 @@ export type RequestValidationErrorHandler = (
  */
 export type ResponseValidationErrorHandler = (
 	error: ResponseValidationError,
-	request: Request,
+	request: DefaultRequest,
 ) => Response | Promise<Response>;
 
 type FetchRouteHandlerResult =
 	| { matched: true; response: Response }
 	| { matched: false; response: undefined };
-
-type ContextArguments = {} extends DefaultContext
-	? [options?: { context?: DefaultContext }]
-	: [options: { context: DefaultContext }];
 
 /**
  * Creates a Fetch catch-all handler that dispatches matching rest-rpc routes.
@@ -66,10 +62,7 @@ type ContextArguments = {} extends DefaultContext
 export function createRouteHandler(
 	implementations: RuntimeImplementationTree,
 	options: CreateFetchHandlerOptions = {},
-): (
-	request: Request,
-	...contextArguments: ContextArguments
-) => Promise<FetchRouteHandlerResult> {
+): (request: DefaultRequest) => Promise<FetchRouteHandlerResult> {
 	const matchRoute = createRouteMatcher(implementations, options.prefix);
 	const bodyCodecs = options.bodyCodecs ?? [];
 	const maxBytes = options.requestBodyLimit;
@@ -80,7 +73,7 @@ export function createRouteHandler(
 		throw new Error("requestBodyLimit must be a positive safe integer");
 	}
 
-	return async (request, ...contextArguments) => {
+	return async (request) => {
 		const url = new URL(request.url);
 		const matched = matchRoute({
 			method: request.method,
@@ -133,7 +126,6 @@ export function createRouteHandler(
 				disableResponseValidation: options.disableResponseValidation,
 			},
 			request: parsedRequest,
-			context: contextArguments[0]?.context ?? {},
 			handlerFields: { request, signal: request.signal },
 		});
 		if (result instanceof RequestValidationError) {
