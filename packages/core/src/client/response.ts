@@ -47,7 +47,7 @@ const assertResponseContentType = (
 const STREAM_CONTENT_TYPE = "text/event-stream";
 
 const readStreamResponse = (
-	schema: StandardSchemaV1,
+	schema: StandardSchemaV1 | undefined,
 	rawResponse: Response,
 	validate: boolean,
 ) => {
@@ -142,9 +142,7 @@ export const fetchResponse = async <
 	if (!schema) {
 		throw new HttpError(rawResponse.status, value);
 	}
-	if (route.source !== "generated") {
-		assertResponseContentType(schema.contentType, rawResponse, value);
-	}
+	assertResponseContentType(schema.contentType, rawResponse, value);
 	const responseMetadata = {
 		status: rawResponse.status,
 		headers: rawResponse.headers,

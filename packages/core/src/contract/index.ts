@@ -37,7 +37,6 @@ export type {
 export type {
 	DeclaredClientResponse,
 	ErrorDeclaredClientResponse,
-	ResponseBodySchema,
 	ResponseDeclaration,
 	ResponseHeaders,
 	ResponseOptions,

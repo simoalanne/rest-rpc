@@ -13,6 +13,10 @@ export const api = {
 					: {
 							status: 422 as const,
 							body: { code: "invalid_name" as const },
+							contentType: "application/problem+json" as const,
+							responseHeaders: {
+								"x-error-code": "invalid_name" as const,
+							},
 						},
 			),
 	},

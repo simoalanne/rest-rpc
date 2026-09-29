@@ -20,7 +20,13 @@ describe("generateContractFromType with server routes", () => {
 					input: "segments",
 					output: "response",
 					request: { contentType: "application/json" },
-					responses: { 201: {}, 422: {} },
+					responses: {
+						201: { contentType: "application/json" },
+						422: {
+							contentType: "application/problem+json",
+							headers: {},
+						},
+					},
 				},
 			},
 		},
@@ -33,7 +39,7 @@ describe("generateContractFromType with server routes", () => {
 					path: "/documents/search",
 					input: "input",
 					output: "output",
-					responses: { 200: {} },
+					responses: { 200: { contentType: "application/json" } },
 				},
 			},
 			import: {
@@ -47,7 +53,7 @@ describe("generateContractFromType with server routes", () => {
 					request: {
 						contentType: ["text/plain", "text/markdown"],
 					},
-					responses: { 200: {} },
+					responses: { 200: { contentType: "application/json" } },
 				},
 			},
 			events: {
@@ -104,7 +110,10 @@ describe("generateContractFromType with server routes", () => {
 				}
 				return new Response(JSON.stringify({ code: "invalid_name" }), {
 					status: 422,
-					headers: { "content-type": "application/problem+json" },
+					headers: {
+						"content-type": "application/problem+json",
+						"x-error-code": "invalid_name",
+					},
 				});
 			},
 		});
@@ -115,6 +124,10 @@ describe("generateContractFromType with server routes", () => {
 
 		assert.equal(response.status, 422);
 		assert.deepEqual(response.body, { code: "invalid_name" });
+		assert.deepEqual(response.responseHeaders, {
+			"content-type": "application/problem+json",
+			"x-error-code": "invalid_name",
+		});
 		assert.deepEqual(await client.documents.search({ term: "milk" }), {
 			items: ["milk"],
 		});

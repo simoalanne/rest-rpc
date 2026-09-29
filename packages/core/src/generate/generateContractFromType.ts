@@ -11,7 +11,16 @@ type GeneratedRoute = {
 		readonly input?: "input" | "segments";
 		readonly output?: "output" | "response";
 		readonly request?: { readonly contentType: string | readonly string[] };
-		readonly responses: Readonly<Record<string, { readonly kind?: "stream" }>>;
+		readonly responses: Readonly<
+			Record<
+				string,
+				{
+					readonly kind?: "stream";
+					readonly contentType?: string | readonly string[];
+					readonly headers?: Readonly<Record<string, never>>;
+				}
+			>
+		>;
 	};
 };
 
@@ -179,11 +188,29 @@ const routeFromType = (
 				"kind",
 				declaration,
 			);
+			const responseContentType = optionalPropertyType(
+				checker,
+				responseType,
+				"contentType",
+				declaration,
+			);
+			const responseHeaders = checker.getPropertyOfType(
+				checker.getNonNullableType(responseType),
+				"headers",
+			);
 			return [
 				property.getName(),
-				responseKind?.isStringLiteral() && responseKind.value === "stream"
-					? { kind: "stream" as const }
-					: {},
+				{
+					...(responseKind?.isStringLiteral() && responseKind.value === "stream"
+						? { kind: "stream" as const }
+						: {}),
+					...(responseContentType
+						? {
+								contentType: contentTypes(checker, responseContentType),
+							}
+						: {}),
+					...(responseHeaders ? { headers: {} } : {}),
+				},
 			];
 		}),
 	);

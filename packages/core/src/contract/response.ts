@@ -3,10 +3,6 @@ import type { BodyContentType } from "./body.ts";
 import type { RouteDeclaration } from "./routeDeclaration.ts";
 import type { SseEvent } from "../sse.ts";
 
-export type ResponseSchema = StandardSchemaV1;
-
-export type ResponseBodySchema = ResponseSchema;
-
 /**
  * Declares a whole-object schema for typed response headers.
  *
@@ -22,25 +18,12 @@ export type ResponseHeaders = StandardSchemaV1<
  *
  * @see {@link https://rest-rpc.dev/docs/http-behavior/serialization}
  */
-export type ResponseDeclaration =
-	| {
-			kind?: never;
-			body: ResponseBodySchema;
-			contentType: BodyContentType;
-			headers?: ResponseHeaders;
-	  }
-	| {
-			kind?: never;
-			body: undefined;
-			contentType?: never;
-			headers?: ResponseHeaders;
-	  }
-	| {
-			kind: "stream";
-			body: ResponseBodySchema;
-			contentType?: never;
-			headers?: ResponseHeaders;
-	  };
+export type ResponseDeclaration = {
+	kind?: "stream";
+	body?: StandardSchemaV1;
+	contentType?: BodyContentType;
+	headers?: ResponseHeaders;
+};
 
 /** HTTP metadata associated with a declared response schema. */
 export type ResponseOptions = {
@@ -49,11 +32,6 @@ export type ResponseOptions = {
 };
 
 export type RouteResponses = Record<number, ResponseDeclaration>;
-
-export type RouteResponseInput =
-	| { responses: RouteResponses; response?: never }
-	| { response: ResponseDeclaration; responses?: never }
-	| { response?: never; responses?: never };
 
 export const getRouteResponses = (route: {
 	path: string | undefined;

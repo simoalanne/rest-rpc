@@ -1,5 +1,4 @@
 import {
-	type ResponseBodySchema,
 	type ResponseDeclaration,
 	type RouteDeclaration,
 } from "@rest-rpc/core/contract";
@@ -129,7 +128,7 @@ export async function validateRequestSegments(
 }
 
 export const validateResponseBody = async (
-	schema: ResponseBodySchema | undefined,
+	schema: StandardSchemaV1 | undefined,
 	body: unknown,
 ): Promise<unknown> => {
 	if (!schema) {
@@ -165,7 +164,7 @@ export const validateResponseHeaders = async (
 };
 
 export const validateResponseStreamChunk = async (
-	schema: ResponseBodySchema | undefined,
+	schema: StandardSchemaV1 | undefined,
 	chunk: unknown,
 ) => {
 	if (!schema) return chunk;
@@ -179,7 +178,7 @@ export const validateResponseStreamChunk = async (
 
 export async function* validateResponseStreamChunks(
 	body: AsyncIterable<unknown>,
-	schema: ResponseBodySchema,
+	schema: StandardSchemaV1,
 ) {
 	for await (const chunk of body) {
 		if (isSseServerEvent(chunk)) {
