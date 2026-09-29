@@ -8,7 +8,6 @@ import {
 import type { RouteDeclaration } from "../contract/contract.ts";
 import { replacePathParams } from "../contract/path.ts";
 import type { GroupedRequestInput } from "./requestInput.ts";
-import { getNextFetchTags } from "./nextFetchTags.ts";
 import type { ClientRequestRoute } from "./requestRoute.ts";
 import type {
 	ApiClientFetchOptions,
@@ -16,7 +15,6 @@ import type {
 	FetchLike,
 	FetchOptions,
 	ClientHeaders,
-	NextFetchTagsOptions,
 } from "./types.ts";
 
 export const createRequestSignal = (
@@ -148,7 +146,6 @@ export type ExecuteRequestOptions = {
 	fetch?: FetchLike;
 	fetchOptions?: ApiClientFetchOptions;
 	globalHeaders?: ClientHeaders;
-	nextFetchTags?: NextFetchTagsOptions;
 	timeoutMs?: number;
 };
 
@@ -166,49 +163,12 @@ const resolveHeaders = async (
 	return Object.fromEntries(entries.filter((entry) => entry !== undefined));
 };
 
-const addNextFetchTags = (
-	init: RequestInit,
-	route: ClientRequestRoute,
-	routeIdentity:
-		| readonly string[]
-		| Pick<ClientRequestRoute, "method" | "path">,
-	request: GroupedRequestInput | undefined,
-	options: NextFetchTagsOptions | undefined,
-	tagRequest: GroupedRequestInput | undefined,
-) => {
-	if (!options?.enabled || route.method !== "GET") return init;
-
-	const nextInit = init as RequestInit & {
-		next?: {
-			tags?: string[];
-			[key: string]: unknown;
-		};
-	};
-
-	return {
-		...nextInit,
-		next: {
-			...nextInit.next,
-			tags: [
-				...(nextInit.next?.tags ?? []),
-				...getNextFetchTags(route, routeIdentity, tagRequest ?? request, {
-					tagPrefix: options.tagPrefix,
-				}),
-			],
-		},
-	};
-};
-
 export const executeRequest = async <
 	E extends RouteDeclaration & ClientRequestRoute,
 >(
 	route: E | ClientRequestRoute,
-	routeIdentity:
-		| readonly string[]
-		| Pick<ClientRequestRoute, "method" | "path">,
 	args: FetchArgs<E> | unknown[],
 	options: ExecuteRequestOptions,
-	tagRequest?: GroupedRequestInput,
 ): Promise<Response> => {
 	const requestArgs = args[0] as GroupedRequestInput | undefined;
 	const fetchOptions = args[1] as FetchOptions | undefined;
@@ -264,28 +224,19 @@ export const executeRequest = async <
 			additionalHeaders: _additionalHeaders,
 			...requestFetchOptions
 		} = fetchOptions ?? {};
-		const init = addNextFetchTags(
-			{
-				...options.fetchOptions,
-				...requestFetchOptions,
-				method: route.method,
-				body: serialized?.body as BodyInit | undefined,
-				headers: {
-					...clientHeaders,
-					...normalizeHeaders(requestHeaders),
-					...normalizeHeaders(codecHeaders),
-					...(outgoingContentType
-						? { "content-type": outgoingContentType }
-						: {}),
-				},
-				signal: signalState?.signal ?? fetchOptions?.signal,
+		const init: RequestInit = {
+			...options.fetchOptions,
+			...requestFetchOptions,
+			method: route.method,
+			body: serialized?.body as BodyInit | undefined,
+			headers: {
+				...clientHeaders,
+				...normalizeHeaders(requestHeaders),
+				...normalizeHeaders(codecHeaders),
+				...(outgoingContentType ? { "content-type": outgoingContentType } : {}),
 			},
-			route,
-			routeIdentity,
-			requestArgs,
-			options.nextFetchTags,
-			tagRequest,
-		);
+			signal: signalState?.signal ?? fetchOptions?.signal,
+		};
 		const fetchImpl =
 			options.fetch ?? ((input, init) => globalThis.fetch(input, init));
 		return await fetchImpl(url, init);

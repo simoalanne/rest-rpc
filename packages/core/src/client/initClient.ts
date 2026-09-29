@@ -31,12 +31,11 @@ export function initClient<
 		fetch: options.fetch,
 		fetchOptions: options.fetchOptions,
 		globalHeaders: options.globalHeaders,
-		nextFetchTags: options.nextFetchTags,
 		timeoutMs: options.timeoutMs,
 	};
 
-	const request: RouteRequestFn = (route, routePath, ...args) =>
-		executeRequest(route, routePath, args, requestOptions);
+	const request: RouteRequestFn = (route, _routePath, ...args) =>
+		executeRequest(route, args, requestOptions);
 
 	const fetchResponse = (
 		route: RouteDeclaration & { path: string },

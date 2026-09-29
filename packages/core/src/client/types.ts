@@ -217,19 +217,6 @@ export type ApiClientFor<
 		};
 
 /**
- * Enables deterministic Next.js fetch tags for generated GET requests.
- *
- * @remarks Automatic tags identify the route and, when present, its path
- * parameters and query input. Bodies and headers are excluded.
- *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#use-in-nextjs}
- */
-export type NextFetchTagsOptions = {
-	enabled: boolean;
-	tagPrefix?: string;
-};
-
-/**
  * Options used to create a typed fetch client.
  *
  * @remarks Literal keys in `globalHeaders` make matching declared
@@ -246,7 +233,6 @@ export type ApiClientOptions<
 	fetch?: FetchLike;
 	fetchOptions?: ApiClientFetchOptions;
 	globalHeaders?: TGlobalHeaders;
-	nextFetchTags?: NextFetchTagsOptions;
 	timeoutMs?: number;
 	validateResponses?: boolean;
 };

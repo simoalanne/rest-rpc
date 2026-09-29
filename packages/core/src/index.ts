@@ -6,9 +6,8 @@ export type {
 	ClientHeaderValue,
 	InferClientResponse,
 	FetchLike,
-	NextFetchTagsOptions,
 } from "./client/index.ts";
-export { getNextFetchTags, initClient } from "./client/index.ts";
+export { initClient } from "./client/index.ts";
 export type {
 	AbsolutePath,
 	Contract,

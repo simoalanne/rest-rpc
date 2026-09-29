@@ -126,11 +126,6 @@ const client = initClient(api, {
 			type: "number",
 			description: "Aborts a request when fetch does not return in time.",
 		},
-		nextFetchTags: {
-			type: "NextFetchTagsOptions",
-			description:
-				"Optional deterministic Next.js cache tags for GET requests.",
-		},
 		validateResponses: {
 			type: "boolean",
 			default: "false",
@@ -231,80 +226,4 @@ const client = initClient(api, {
 	baseUrl: "https://api.example.com",
 	validateResponses: true,
 });
-```
-
-## Use in Next.js
-
-When using the core fetch client with Next.js, the client can automatically add deterministic tags to GET
-requests through Next's `fetch` options.
-
-```ts
-import { initClient } from "@rest-rpc/core";
-import { api } from "./client-contract";
-
-export const client = initClient(api, {
-	baseUrl: "https://api.example.com",
-	nextFetchTags: {
-		enabled: true,
-		tagPrefix: "api",
-	},
-	fetchOptions: {
-		next: {
-			revalidate: 60,
-			tags: ["your-custom-tag"],
-		},
-	},
-});
-```
-
-For `client.todos.get({ params: { id: "todo_1" } })`, the client attaches both the
-exact request tag and the broader route tag.
-
-```ts
-["api:todos.get:params:%7B%22id%22%3A%22todo_1%22%7D", "api:todos.get"];
-```
-
-Use the route-level tag for broad invalidation. Use the exact request tag when
-the request identifies a stable cache variant.
-
-Automatic tags only include path params and query params. Request bodies are not
-included because body-based requests generally should not be cached as GET
-fetches. Headers are also excluded because they commonly contain sensitive data,
-such as authorization or session values.
-
-You can still pass Next.js fetch options normally through `fetchOptions`.
-Generated tags are merged with any tags you provide.
-
-```ts
-await client.todos.get(
-	{ params: { id: "todo_1" } },
-	{
-		next: {
-			revalidate: 60,
-			tags: ["todos"],
-		},
-	},
-);
-```
-
-```ts
-"use server";
-
-import { revalidateTag } from "next/cache";
-import { getNextFetchTags } from "@rest-rpc/core";
-import { api } from "./client-contract";
-import { client } from "./client";
-
-export async function renameTodo(id: string, title: string) {
-	await client.todos.update({ params: { id }, body: { title } });
-
-	for (const tag of getNextFetchTags(
-		api.todos.get,
-		["todos", "get"],
-		{ params: { id } },
-		{ tagPrefix: "api" },
-	)) {
-		revalidateTag(tag);
-	}
-}
 ```
