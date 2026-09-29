@@ -199,7 +199,9 @@ const addNextFetchTags = (
 	};
 };
 
-export const executeRequest = async <E extends RouteDeclaration>(
+export const executeRequest = async <
+	E extends RouteDeclaration & ClientRequestRoute,
+>(
 	route: E | ClientRequestRoute,
 	routeIdentity:
 		| readonly string[]

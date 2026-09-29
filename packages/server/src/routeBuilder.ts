@@ -23,7 +23,7 @@ Object.defineProperties(Object.getPrototypeOf(coreRoute), {
 					: {
 							kind: "procedure",
 							method: "POST",
-							path: "",
+							path: undefined,
 							responses: {},
 						}),
 				...state,

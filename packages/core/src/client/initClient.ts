@@ -39,7 +39,7 @@ export function initClient<
 		executeRequest(route, routePath, args, requestOptions);
 
 	const fetchResponse = (
-		route: RouteDeclaration,
+		route: RouteDeclaration & { path: string },
 		routePath: readonly string[],
 		...args: FetchArgs
 	) =>
@@ -53,10 +53,10 @@ export function initClient<
 		);
 
 	return mapContractRoutes(contract, (node, routePath) => {
-		const resolvedRoute: RouteDeclaration =
-			node.kind === "procedure"
-				? { ...node, path: `/${routePath.join("/")}` }
-				: node;
+		const resolvedRoute = {
+			...node,
+			path: node.path ?? `/${routePath.join("/")}`,
+		};
 		const flatInput =
 			node.input === "input" ||
 			(node.input === undefined && node.kind === "procedure");

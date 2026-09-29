@@ -83,6 +83,22 @@ const literalRouteProperty = (
 	return value.value;
 };
 
+const literalRoutePath = (
+	checker: ts.TypeChecker,
+	type: ts.Type,
+	location: ts.Node,
+	contractPath: readonly string[],
+) => {
+	const value = optionalPropertyType(checker, type, "path", location);
+	if ((value?.flags ?? 0) & ts.TypeFlags.Undefined) {
+		return `/${contractPath.join("/")}`;
+	}
+	if (value?.isStringLiteral()) return value.value;
+	throw new Error(
+		`Server route ${routeName(contractPath)} must have a literal path.`,
+	);
+};
+
 const contentTypes = (
 	checker: ts.TypeChecker,
 	type: ts.Type,
@@ -113,13 +129,7 @@ const routeFromType = (
 		location,
 		contractPath,
 	);
-	const path = literalRouteProperty(
-		checker,
-		routeType,
-		"path",
-		location,
-		contractPath,
-	);
+	const path = literalRoutePath(checker, routeType, location, contractPath);
 	const inputType = optionalPropertyType(checker, routeType, "input", location);
 	const outputType = optionalPropertyType(
 		checker,

@@ -41,7 +41,7 @@ describe("generateContractFromType with server routes", () => {
 					source: "generated",
 					kind: "procedure",
 					method: "POST",
-					path: "",
+					path: "/documents/import",
 					input: "input",
 					output: "output",
 					request: {
@@ -55,7 +55,7 @@ describe("generateContractFromType with server routes", () => {
 					source: "generated",
 					kind: "procedure",
 					method: "POST",
-					path: "",
+					path: "/documents/events",
 					output: "output",
 					responses: { 200: { kind: "stream" } },
 				},

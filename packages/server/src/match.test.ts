@@ -44,6 +44,20 @@ describe("createRouteMatcher", () => {
 		);
 	});
 
+	it("derives the path for a method declared without one", () => {
+		const matchRoute = createRouteMatcher({
+			todos: {
+				list: serverFirstRoute
+					.get()
+					.response(204)
+					.handler(() => ({ status: 204 })),
+			},
+		});
+
+		const match = matchRoute({ method: "GET", path: "/todos/list" });
+		assert.equal(match?.implementation.route.path, "/todos/list");
+	});
+
 	it("escapes literal route characters before matching paths", () => {
 		const matchRoute = createRouteMatcher([
 			implementation("GET", "/files/index.json"),

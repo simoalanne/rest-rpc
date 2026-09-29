@@ -57,6 +57,15 @@ Use `.get(path)`, `.post(path)`, `.put(path)`, `.patch(path)`, or `.delete(path)
 For GET requests, the input becomes query parameters, while other methods send it as the body.
 Path can be dynamic and supports both `:id` and `{id}` syntax. Each segment must have a corresponding schema in `.params()`.
 
+Path can also be omitted, in which case the route keeps resolving its path from its tree keys but uses the specified method over the default POST.
+
+```ts
+const getRoute = route.get();
+
+const listTodos = getRoute.handler(() => listTodos());
+const listNotes = getRoute.handler(() => listNotes());
+```
+
 ## Declare Request Segments
 
 Use `.params()`, `.query()`, `.headers()`, and `.body()` to separate HTTP request

@@ -9,7 +9,11 @@ export type {
 	NextFetchTagsOptions,
 } from "./client/index.ts";
 export { getNextFetchTags, initClient } from "./client/index.ts";
-export type { Contract, RouteDeclaration } from "./contract/index.ts";
+export type {
+	AbsolutePath,
+	Contract,
+	RouteDeclaration,
+} from "./contract/index.ts";
 export type {
 	InferClientRequest,
 	InferServerRequest,

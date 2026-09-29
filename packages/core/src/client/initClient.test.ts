@@ -71,6 +71,19 @@ describe("initClient", () => {
 		assert.equal(calls[0]?.url, "https://api.test/todos?search=milk");
 	});
 
+	it("uses the route tree path for a method declared without one", async () => {
+		const calls = captureFetch(new Response(null, { status: 204 }));
+		const client = initClient(
+			{ todos: { remove: route.delete().response(204) } },
+			{ baseUrl: "https://api.test" },
+		);
+
+		await client.todos.remove();
+
+		assert.equal(calls[0]?.url, "https://api.test/todos/remove");
+		assert.equal(calls[0]?.init?.method, "DELETE");
+	});
+
 	it("calls shorthand routes as derived JSON POST operations", async () => {
 		const calls: FetchCall[] = [];
 		globalThis.fetch = async (url, init) => {

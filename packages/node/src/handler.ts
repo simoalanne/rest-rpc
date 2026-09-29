@@ -1,4 +1,4 @@
-import type { BodyCodec } from "@rest-rpc/core";
+import type { AbsolutePath, BodyCodec } from "@rest-rpc/core";
 import { deserializeRequestBody } from "@rest-rpc/fetch/deserializeRequestBody";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
@@ -23,7 +23,7 @@ import { writeNodeResponse } from "./response.ts";
 export type CreateNodeHandlerOptions = {
 	bodyCodecs?: readonly BodyCodec<IncomingMessage>[];
 	/** Path prefix to apply to all routes in the route tree during matching. */
-	prefix?: string;
+	prefix?: AbsolutePath;
 	/** The maximum accepted size of the request body in bytes. */
 	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;

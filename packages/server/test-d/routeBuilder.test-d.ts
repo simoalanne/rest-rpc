@@ -7,6 +7,7 @@ import {
 	route as coreRoute,
 } from "@rest-rpc/core";
 import {
+	createRouteMatcher,
 	sse,
 	serverFirstRoute,
 	type InferServerRequest,
@@ -28,6 +29,10 @@ const route = serverFirstRoute as unknown as ServerRouteBuilder<
 >;
 const input = z.object({ title: z.string() });
 const output = z.object({ id: z.string(), title: z.string() });
+
+createRouteMatcher({}, "/api");
+expectError(createRouteMatcher({}, "api"));
+expectError(createRouteMatcher({}, ""));
 
 expectError(coreRoute.handler(() => undefined));
 

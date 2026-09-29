@@ -2,7 +2,7 @@ import type { Contract, RouteDeclaration } from "./contract.ts";
 
 type Tree<T> = Record<string, unknown> | T;
 export type ContractRouteEntry = {
-	route: RouteDeclaration;
+	route: RouteDeclaration & { path: string };
 	path: string[];
 };
 
@@ -47,10 +47,10 @@ export function* contractRouteEntries(
 ): Generator<ContractRouteEntry> {
 	if (isContractRouteDeclaration(contract)) {
 		const declaration = contract["~restrpc"];
-		const route: RouteDeclaration =
-			declaration.kind === "procedure"
-				? { ...declaration, path: `/${path.join("/")}` }
-				: declaration;
+		const route = {
+			...declaration,
+			path: declaration.path ?? `/${path.join("/")}`,
+		};
 		yield { route, path };
 		return;
 	}
@@ -68,4 +68,4 @@ export function* contractRoutes(contract: Contract) {
 
 export const flattenContractRoutes = <TContract extends Contract = Contract>(
 	contract: TContract,
-): RouteDeclaration[] => [...contractRoutes(contract)];
+): Array<RouteDeclaration & { path: string }> => [...contractRoutes(contract)];

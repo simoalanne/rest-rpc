@@ -1,4 +1,5 @@
 import type {
+	AbsolutePath,
 	BuilderExtension,
 	BuilderState,
 	InferServerRequest,
@@ -416,7 +417,7 @@ export type HandlerMethodFor<
 
 type MiddlewareUseMethod<
 	TState extends BuilderState,
-	TPath extends string,
+	TPath extends AbsolutePath | undefined,
 	TMetadata extends RouteMetadata | never,
 	TAdditionalHandlerFields extends object,
 	TContext extends object,

@@ -56,7 +56,7 @@ export type RouteResponseInput =
 	| { response?: never; responses?: never };
 
 export const getRouteResponses = (route: {
-	path: string;
+	path: string | undefined;
 	responses: RouteResponses;
 }): RouteResponses => {
 	if (Object.keys(route.responses).length === 0) {

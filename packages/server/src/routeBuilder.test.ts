@@ -24,7 +24,7 @@ describe("server route builder", () => {
 
 		assert.equal(implementation["~restrpc"].kind, "procedure");
 		assert.equal(implementation["~restrpc"].method, "POST");
-		assert.equal(implementation["~restrpc"].path, "");
+		assert.equal(implementation["~restrpc"].path, undefined);
 		assert.deepEqual(implementation["~restrpc"].responses, {});
 	});
 

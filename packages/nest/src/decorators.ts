@@ -14,7 +14,9 @@ import "reflect-metadata";
 
 export const REST_RPC_ROUTE_METADATA = Symbol.for("rest-rpc:nest-route");
 
-export type RouteMetadata = { route: RouteDeclaration };
+export type RouteMetadata = {
+	route: RouteDeclaration & { path: string };
+};
 
 const methodMap: Record<HttpMethod, RequestMethod> = {
 	DELETE: RequestMethod.DELETE,
@@ -24,7 +26,9 @@ const methodMap: Record<HttpMethod, RequestMethod> = {
 	PUT: RequestMethod.PUT,
 };
 
-const createNestRouteDecorator = (route: RouteDeclaration): MethodDecorator =>
+const createNestRouteDecorator = (
+	route: RouteDeclaration & { path: string },
+): MethodDecorator =>
 	applyDecorators(
 		RequestMapping({
 			path: toColonPath(route.path),
@@ -69,7 +73,7 @@ const createImplementationRouteMethod = (
 	target: object,
 	propertyKey: string | symbol,
 	descriptor: PropertyDescriptor,
-	route: RouteDeclaration,
+	route: RouteDeclaration & { path: string },
 	path: string[],
 ) => {
 	const original = descriptor.value;

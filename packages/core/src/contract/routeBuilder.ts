@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { BodyOptions } from "./body.ts";
 import type {
+	AbsolutePath,
 	CommonOpenApiRouteOptions,
 	HttpMethod,
 	OpenApiResponseOptions,
@@ -114,7 +115,7 @@ const procedureState = (state: RouteBuilderState): RouteBuilderState => {
 	return {
 		kind: "procedure",
 		method: "POST",
-		path: "",
+		path: undefined,
 		responses: {},
 		...state,
 	};
@@ -123,13 +124,13 @@ const procedureState = (state: RouteBuilderState): RouteBuilderState => {
 const httpState = (
 	state: RouteBuilderState,
 	method: HttpMethod,
-	path: string,
+	path: AbsolutePath | undefined,
 ): RouteBuilderState => {
 	assertMutable(state);
 	if (state.kind === "http") {
 		throw new Error("Route method and path have already been selected.");
 	}
-	if (state.input === "input" && getPathParamNames(path).length > 0) {
+	if (state.input === "input" && getPathParamNames(path ?? "").length > 0) {
 		throw new Error("Flat input requires a static route path.");
 	}
 	if (method === "GET" && state.input !== "input" && state.request?.body) {
@@ -185,23 +186,23 @@ export class RouteBuilder {
 		return new RouteBuilder(state);
 	}
 
-	get(path: string): RouteBuilder {
+	get(path?: AbsolutePath): RouteBuilder {
 		return this.#next(httpState(this["~restrpc"], "GET", path));
 	}
 
-	post(path: string): RouteBuilder {
+	post(path?: AbsolutePath): RouteBuilder {
 		return this.#next(httpState(this["~restrpc"], "POST", path));
 	}
 
-	put(path: string): RouteBuilder {
+	put(path?: AbsolutePath): RouteBuilder {
 		return this.#next(httpState(this["~restrpc"], "PUT", path));
 	}
 
-	patch(path: string): RouteBuilder {
+	patch(path?: AbsolutePath): RouteBuilder {
 		return this.#next(httpState(this["~restrpc"], "PATCH", path));
 	}
 
-	delete(path: string): RouteBuilder {
+	delete(path?: AbsolutePath): RouteBuilder {
 		return this.#next(httpState(this["~restrpc"], "DELETE", path));
 	}
 
@@ -356,7 +357,7 @@ export class RouteBuilder {
 	}
 }
 
-const runtimeRoute = new RouteBuilder({ path: "" });
+const runtimeRoute = new RouteBuilder({ path: undefined });
 
 /**
  * Entry point for declaring contract-first routes with independent input and output forms.

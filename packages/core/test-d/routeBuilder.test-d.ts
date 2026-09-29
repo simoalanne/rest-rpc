@@ -4,6 +4,7 @@ import {
 	type RouteDeclaration,
 } from "@rest-rpc/core/contract";
 import {
+	type AbsolutePath,
 	type InferClientRequest,
 	type InferServerRequest,
 	route,
@@ -161,6 +162,25 @@ expectError(create.output(todo));
 const incompleteHttp = route.get("/incomplete");
 expectAssignable<RouteDeclaration>(incompleteHttp["~restrpc"]);
 expectNotAssignable<Contract>(incompleteHttp);
+
+const inferredPathHttp = route.get().response(204);
+expectType<"http">(inferredPathHttp["~restrpc"].kind);
+expectType<"GET">(inferredPathHttp["~restrpc"].method);
+expectType<undefined>(inferredPathHttp["~restrpc"].path);
+expectAssignable<Contract>(inferredPathHttp);
+expectType<"/">(route.get("/")["~restrpc"].path);
+expectError(route.get(""));
+expectError(route.get("todos"));
+expectError(route.post("todos"));
+expectError(route.put("todos"));
+expectError(route.patch("todos"));
+expectError(route.delete("todos"));
+route.post();
+route.put();
+route.patch();
+route.delete();
+const configuredPath: AbsolutePath = "/configured";
+route.get(configuredPath);
 
 const flatGet = route.get("/search").input(scalarQuery).output(todo);
 expectType<"input">(flatGet["~restrpc"].input);

@@ -1,4 +1,4 @@
-import type { BodyCodec } from "@rest-rpc/core";
+import type { AbsolutePath, BodyCodec } from "@rest-rpc/core";
 import {
 	createRouteMatcher,
 	assertRequestContentType,
@@ -20,7 +20,7 @@ import { createFetchResponse } from "./response.ts";
 export type CreateFetchHandlerOptions = {
 	bodyCodecs?: readonly BodyCodec<Request>[];
 	/** Path prefix to apply to all routes in the route tree during matching. */
-	prefix?: string;
+	prefix?: AbsolutePath;
 	/** The maximum accepted size of the request body in bytes. */
 	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;

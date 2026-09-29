@@ -10,6 +10,9 @@ import type { RouteResponses } from "./response.ts";
 /** An HTTP method supported by a rest-rpc route. */
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
+/** An absolute URL path that begins with a slash. */
+export type AbsolutePath = `/${string}`;
+
 /** Application-defined metadata attached to a route. */
 export type RouteMetadata = Record<string, unknown>;
 
@@ -63,7 +66,7 @@ export type RouteRequestDeclaration = {
 export type RouteDeclaration = {
 	source?: "generated";
 	kind: "http" | "procedure";
-	path: string;
+	path: AbsolutePath | undefined;
 	method: HttpMethod;
 	input?: "input" | "segments";
 	output?: "output" | "response";

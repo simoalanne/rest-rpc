@@ -1,18 +1,22 @@
 import {
 	getPathParamSegmentName,
 	isPathParamSegment,
+	type AbsolutePath,
 	type RouteDeclaration,
 } from "@rest-rpc/core/contract";
 import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
 
 const splitPath = (path: string) => path.split("/").filter(Boolean);
 
-const joinPaths = (prefix: string, path: string) =>
-	`/${[...splitPath(prefix), ...splitPath(path)].join("/")}`;
+const joinPaths = (
+	prefix: AbsolutePath | undefined,
+	path: AbsolutePath,
+): AbsolutePath =>
+	`/${[...splitPath(prefix ?? ""), ...splitPath(path)].join("/")}`;
 
 export const compareRouteSpecificity = (
-	left: RouteDeclaration,
-	right: RouteDeclaration,
+	left: RouteDeclaration & { path: string },
+	right: RouteDeclaration & { path: string },
 ) => {
 	const leftSegments = splitPath(left.path);
 	const rightSegments = splitPath(right.path);
@@ -42,7 +46,7 @@ export const compareRouteSpecificity = (
 const escapeRegExp = (value: string) =>
 	value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-export const createPathMatcher = (path: string) => {
+export const createPathMatcher = (path: AbsolutePath) => {
 	const keys: string[] = [];
 	const segments = splitPath(path);
 	const pattern =
@@ -73,7 +77,7 @@ export const createPathMatcher = (path: string) => {
 };
 
 export type RuntimeImplementation = {
-	route: RouteDeclaration;
+	route: RouteDeclaration & { path: string };
 	handler: (...args: never[]) => unknown;
 	middleware?: readonly RuntimeRouteHandler[];
 };
@@ -115,14 +119,11 @@ const flattenImplementationTree = (
 	}
 	if (isBuilderImplementation(implementation)) {
 		const { handler, middleware, ...route } = implementation["~restrpc"];
-		if (route.kind !== "procedure") {
-			return [{ route, handler, middleware }];
-		}
 		return [
 			{
 				route: {
 					...route,
-					path: `/${path.join("/")}`,
+					path: route.path ?? `/${path.join("/")}`,
 				},
 				handler,
 				middleware,
@@ -154,7 +155,7 @@ export type RouteMatch = {
  */
 export function createRouteMatcher(
 	implementations: RuntimeImplementationTree,
-	prefix = "",
+	prefix?: AbsolutePath,
 ) {
 	const matchers = flattenRouteImplementations(implementations).map(
 		(implementation) => ({

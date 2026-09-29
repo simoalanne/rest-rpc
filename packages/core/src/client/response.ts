@@ -95,13 +95,15 @@ const readDeclaredHeaders = async (
 	return result.value;
 };
 
-export type RouteRequestFn = <E extends RouteDeclaration>(
+export type RouteRequestFn = <E extends RouteDeclaration & { path: string }>(
 	route: E,
 	routePath: readonly string[],
 	...args: FetchArgs<E>
 ) => Promise<Response>;
 
-export const fetchResponse = async <E extends RouteDeclaration>(
+export const fetchResponse = async <
+	E extends RouteDeclaration & { path: string },
+>(
 	request: RouteRequestFn,
 	validateResponse: boolean,
 	bodyCodecs: readonly BodyCodec<Response>[] | undefined,
@@ -168,7 +170,9 @@ export const fetchResponse = async <E extends RouteDeclaration>(
 
 const isSuccessStatus = (status: number) => status >= 200 && status < 300;
 
-export const fetchSuccess = async <E extends RouteDeclaration>(
+export const fetchSuccess = async <
+	E extends RouteDeclaration & { path: string },
+>(
 	fetchRouteResponse: (
 		route: E,
 		routePath: readonly string[],

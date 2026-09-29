@@ -72,4 +72,15 @@ describe("contract traversal", () => {
 		assert.equal(resolvedRoute?.method, "POST");
 		assert.equal(resolvedRoute?.path, "/todos/add");
 	});
+
+	it("derives paths for explicit methods without paths", () => {
+		const contract = {
+			todos: { list: route.get().response(204) },
+		};
+		const [resolvedRoute] = [...contractRoutes(contract)];
+
+		assert.equal(resolvedRoute?.kind, "http");
+		assert.equal(resolvedRoute?.method, "GET");
+		assert.equal(resolvedRoute?.path, "/todos/list");
+	});
 });

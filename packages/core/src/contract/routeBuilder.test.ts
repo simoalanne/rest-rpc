@@ -18,7 +18,7 @@ describe("route builder runtime", () => {
 	});
 
 	it("constructs every HTTP method with only namespaced runtime data", () => {
-		assert.deepEqual(route["~restrpc"], { path: "" });
+		assert.deepEqual(route["~restrpc"], { path: undefined });
 		for (const [factory, method] of [
 			["get", "GET"],
 			["post", "POST"],
@@ -39,6 +39,21 @@ describe("route builder runtime", () => {
 			]);
 			assert.equal(Object.hasOwn(declaration, "request"), false);
 			assert.equal(Object.hasOwn(declaration, "body"), false);
+		}
+	});
+
+	it("selects an HTTP method without an explicit path", () => {
+		for (const [factory, method] of [
+			["get", "GET"],
+			["post", "POST"],
+			["put", "PUT"],
+			["patch", "PATCH"],
+			["delete", "DELETE"],
+		] as const) {
+			const declaration = route[factory]();
+			assert.equal(declaration["~restrpc"].kind, "http");
+			assert.equal(declaration["~restrpc"].method, method);
+			assert.equal(declaration["~restrpc"].path, undefined);
 		}
 	});
 

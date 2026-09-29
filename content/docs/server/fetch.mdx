@@ -88,7 +88,7 @@ type CreateFetchHandlerOptions = {
 	bodyCodecs?: readonly BodyCodec<Request>[];
 	disableRequestValidation?: boolean;
 	disableResponseValidation?: boolean;
-	prefix?: string;
+	prefix?: `/${string}`;
 	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;

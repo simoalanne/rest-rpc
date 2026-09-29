@@ -4,6 +4,7 @@ export type {
 	KnownBodyContentType,
 } from "./body.ts";
 export type {
+	AbsolutePath,
 	HttpMethod,
 	OpenApiRouteOptions,
 	RouteDeclaration,

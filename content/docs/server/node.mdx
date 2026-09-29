@@ -90,7 +90,7 @@ type CreateNodeHandlerOptions = {
 	bodyCodecs?: readonly BodyCodec<IncomingMessage>[];
 	disableRequestValidation?: boolean;
 	disableResponseValidation?: boolean;
-	prefix?: string;
+	prefix?: `/${string}`;
 	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;

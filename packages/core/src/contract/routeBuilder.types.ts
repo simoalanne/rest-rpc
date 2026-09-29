@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { BodyOptions } from "./body.ts";
 import type {
+	AbsolutePath,
 	HttpMethod,
 	OpenApiRouteOptions,
 	RouteMetadata,
@@ -15,6 +16,7 @@ import type { ResponseOptions } from "./response.ts";
 
 type EmptyObject = Record<never, never>;
 type JsonContentType = "application/json";
+type BuilderPath = AbsolutePath | undefined;
 
 type ContentTypeFor<TOptions> = TOptions extends BodyOptions
 	? TOptions["contentType"]
@@ -251,7 +253,7 @@ type OpenApiDeclaration<TOpenApi extends OpenApiRouteOptions | never> = [
 /** Resolves the public declaration represented by builder state. */
 export type PublicDeclarationFor<
 	TState,
-	TPath extends string = string,
+	TPath extends BuilderPath = AbsolutePath,
 	TMetadata extends RouteMetadata | never = never,
 > = TState extends BuilderState
 	? TState["route"] & {
@@ -277,14 +279,14 @@ export type PublicDeclarationFor<
 /** Type-level hook used by packages that add operations to fluent builders. */
 export interface BuilderExtension {
 	readonly state: unknown;
-	readonly path: string;
+	readonly path: BuilderPath;
 	readonly metadata: unknown;
 	readonly result: unknown;
 }
 
 type ApplyExtension<
 	TState extends BuilderState,
-	TPath extends string,
+	TPath extends BuilderPath,
 	TMetadata extends RouteMetadata | never,
 	TExtension extends BuilderExtension | never,
 > = [TExtension] extends [never]
@@ -296,7 +298,7 @@ type ApplyExtension<
 		})["result"];
 
 type BuilderReceiver<
-	TPath extends string,
+	TPath extends BuilderPath,
 	TMetadata extends RouteMetadata | never,
 > = {
 	readonly "~restrpc": {
@@ -315,7 +317,7 @@ type ResponseMethods<
 			const TStatus extends number,
 			const TSchema extends StandardSchemaV1 | undefined = undefined,
 			const TOptions extends ResponseOptions | undefined = undefined,
-			const TPath extends string = string,
+			const TPath extends BuilderPath = AbsolutePath,
 			const TMetadata extends RouteMetadata | never = never,
 		>(
 			this: BuilderReceiver<TPath, TMetadata>,
@@ -332,7 +334,7 @@ type ResponseMethods<
 		streamResponse<
 			const TStatus extends number,
 			const TSchema extends StandardSchemaV1,
-			const TPath extends string = string,
+			const TPath extends BuilderPath = AbsolutePath,
 			const TMetadata extends RouteMetadata | never = never,
 		>(
 			this: BuilderReceiver<TPath, TMetadata>,
@@ -357,7 +359,7 @@ type BodyMethods<
 		body<
 			const TSchema extends StandardSchemaV1,
 			const TOptions extends BodyOptions | undefined = undefined,
-			const TPath extends string = string,
+			const TPath extends BuilderPath = AbsolutePath,
 			const TMetadata extends RouteMetadata | never = never,
 		>(
 			this: BuilderReceiver<TPath, TMetadata>,
@@ -386,7 +388,7 @@ type RequestMethods<
 		/** Declares URL query parameters. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
 		query<
 			const TSchema extends RequestQuerySchema,
-			const TPath extends string = string,
+			const TPath extends BuilderPath = AbsolutePath,
 			const TMetadata extends RouteMetadata | never = never,
 		>(
 			this: BuilderReceiver<TPath, TMetadata>,
@@ -405,7 +407,7 @@ type RequestMethods<
 			/** Declares path parameters. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
 			params<
 				const TSchema extends RequestParamsSchema,
-				const TPath extends string = string,
+				const TPath extends BuilderPath = AbsolutePath,
 				const TMetadata extends RouteMetadata | never = never,
 			>(
 				this: BuilderReceiver<TPath, TMetadata>,
@@ -421,7 +423,7 @@ type RequestMethods<
 		/** Declares request headers. Headers may be combined with flat input and must then be supplied by client global headers. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
 		headers<
 			const THeaders extends RequestHeadersSchema,
-			const TPath extends string = string,
+			const TPath extends BuilderPath = AbsolutePath,
 			const TMetadata extends RouteMetadata | never = never,
 		>(
 			this: BuilderReceiver<TPath, TMetadata>,
@@ -439,7 +441,7 @@ type RequestMethods<
 			/** Adds application metadata. @see {@link https://rest-rpc.dev/docs/route-builder#add-metadata-and-openapi-details} */
 			metadata<
 				const TLocal extends RouteMetadata,
-				const TPath extends string = string,
+				const TPath extends BuilderPath = AbsolutePath,
 				const TMetadata extends RouteMetadata | never = never,
 			>(
 				this: BuilderReceiver<TPath, TMetadata>,
@@ -458,7 +460,7 @@ type RequestMethods<
 		{
 			/** Adds OpenAPI metadata. @see {@link https://rest-rpc.dev/docs/openapi#route-metadata} */
 			openAPI<
-				const TPath extends string = string,
+				const TPath extends BuilderPath = AbsolutePath,
 				const TMetadata extends RouteMetadata | never = never,
 			>(
 				this: BuilderReceiver<TPath, TMetadata>,
@@ -477,7 +479,7 @@ type FlatMethods<
 		input<
 			const TSchema extends StandardSchemaV1,
 			const TOptions extends BodyOptions | undefined = undefined,
-			const TPath extends string = string,
+			const TPath extends BuilderPath = AbsolutePath,
 			const TMetadata extends RouteMetadata | never = never,
 		>(
 			this: BuilderReceiver<TPath, TMetadata>,
@@ -498,7 +500,7 @@ type FlatMethods<
 			output<
 				const TSchema extends StandardSchemaV1,
 				const TOptions extends BodyOptions | undefined = undefined,
-				const TPath extends string = string,
+				const TPath extends BuilderPath = AbsolutePath,
 				const TMetadata extends RouteMetadata | never = never,
 			>(
 				this: BuilderReceiver<TPath, TMetadata>,
@@ -516,7 +518,7 @@ type FlatMethods<
 			/** Declares a streaming plain output. @see {@link https://rest-rpc.dev/docs/streaming} */
 			streamOutput<
 				const TSchema extends StandardSchemaV1,
-				const TPath extends string = string,
+				const TPath extends BuilderPath = AbsolutePath,
 				const TMetadata extends RouteMetadata | never = never,
 			>(
 				this: BuilderReceiver<TPath, TMetadata>,
@@ -539,11 +541,11 @@ type HttpMethods<
 > = TState["method"] extends "available"
 	? {
 			get<
-				const TPath extends string,
+				const TPath extends BuilderPath = undefined,
 				const TMetadata extends RouteMetadata | never = never,
 			>(
-				this: BuilderReceiver<string, TMetadata>,
-				path: TPath,
+				this: BuilderReceiver<BuilderPath, TMetadata>,
+				path?: TPath,
 			): RouteBuilderView<
 				WithHttpRoute<TState, "GET">,
 				TExtension,
@@ -551,11 +553,11 @@ type HttpMethods<
 				TMetadata
 			>;
 			post<
-				const TPath extends string,
+				const TPath extends BuilderPath = undefined,
 				const TMetadata extends RouteMetadata | never = never,
 			>(
-				this: BuilderReceiver<string, TMetadata>,
-				path: TPath,
+				this: BuilderReceiver<BuilderPath, TMetadata>,
+				path?: TPath,
 			): RouteBuilderView<
 				WithHttpRoute<TState, "POST">,
 				TExtension,
@@ -563,11 +565,11 @@ type HttpMethods<
 				TMetadata
 			>;
 			put<
-				const TPath extends string,
+				const TPath extends BuilderPath = undefined,
 				const TMetadata extends RouteMetadata | never = never,
 			>(
-				this: BuilderReceiver<string, TMetadata>,
-				path: TPath,
+				this: BuilderReceiver<BuilderPath, TMetadata>,
+				path?: TPath,
 			): RouteBuilderView<
 				WithHttpRoute<TState, "PUT">,
 				TExtension,
@@ -575,11 +577,11 @@ type HttpMethods<
 				TMetadata
 			>;
 			patch<
-				const TPath extends string,
+				const TPath extends BuilderPath = undefined,
 				const TMetadata extends RouteMetadata | never = never,
 			>(
-				this: BuilderReceiver<string, TMetadata>,
-				path: TPath,
+				this: BuilderReceiver<BuilderPath, TMetadata>,
+				path?: TPath,
 			): RouteBuilderView<
 				WithHttpRoute<TState, "PATCH">,
 				TExtension,
@@ -587,11 +589,11 @@ type HttpMethods<
 				TMetadata
 			>;
 			delete<
-				const TPath extends string,
+				const TPath extends BuilderPath = undefined,
 				const TMetadata extends RouteMetadata | never = never,
 			>(
-				this: BuilderReceiver<string, TMetadata>,
-				path: TPath,
+				this: BuilderReceiver<BuilderPath, TMetadata>,
+				path?: TPath,
 			): RouteBuilderView<
 				WithHttpRoute<TState, "DELETE">,
 				TExtension,
@@ -613,7 +615,7 @@ type AvailableMethods<TState, TExtension> = TState extends BuilderState
 export type RouteBuilderView<
 	TState,
 	TExtension = never,
-	TPath extends string = string,
+	TPath extends BuilderPath = AbsolutePath,
 	TMetadata extends RouteMetadata | never = never,
 > = {
 	readonly "~restrpc": PublicDeclarationFor<TState, TPath, TMetadata>;
@@ -642,6 +644,9 @@ export type RootRouteBuilder<
 	TExtension extends BuilderExtension | never = never,
 > = TOptions extends undefined
 	? {
-			readonly "~restrpc": { readonly path: "" };
-		} & Omit<RouteBuilderView<DerivedState, TExtension, "", never>, "~restrpc">
+			readonly "~restrpc": { readonly path: undefined };
+		} & Omit<
+			RouteBuilderView<DerivedState, TExtension, undefined, never>,
+			"~restrpc"
+		>
 	: never;
