@@ -10,10 +10,10 @@ const implementation = (method: "GET" | "POST", path: string) =>
 
 describe("createRouteMatcher", () => {
 	it("returns the most specific implementation and decoded path params", () => {
-		const matchRoute = createRouteMatcher([
-			implementation("GET", "/todos/:id"),
-			implementation("GET", "/todos/new"),
-		]);
+		const matchRoute = createRouteMatcher({
+			getTodo: implementation("GET", "/todos/:id"),
+			newTodo: implementation("GET", "/todos/new"),
+		});
 
 		const staticMatch = matchRoute({ method: "GET", path: "/todos/new" });
 		assert.equal(staticMatch?.implementation.route.path, "/todos/new");
@@ -28,10 +28,10 @@ describe("createRouteMatcher", () => {
 	});
 
 	it("respects methods and optional trailing slashes", () => {
-		const matchRoute = createRouteMatcher([
-			implementation("GET", "/todos/:id"),
-			implementation("POST", "/todos/:id"),
-		]);
+		const matchRoute = createRouteMatcher({
+			getTodo: implementation("GET", "/todos/:id"),
+			createTodo: implementation("POST", "/todos/:id"),
+		});
 
 		assert.equal(
 			matchRoute({ method: "POST", path: "/todos/todo-1/" })?.implementation
@@ -59,9 +59,9 @@ describe("createRouteMatcher", () => {
 	});
 
 	it("escapes literal route characters before matching paths", () => {
-		const matchRoute = createRouteMatcher([
-			implementation("GET", "/files/index.json"),
-		]);
+		const matchRoute = createRouteMatcher({
+			getFile: implementation("GET", "/files/index.json"),
+		});
 
 		assert.ok(matchRoute({ method: "GET", path: "/files/index.json" }));
 		assert.equal(
@@ -72,7 +72,7 @@ describe("createRouteMatcher", () => {
 
 	it("prepends a path prefix when compiling route matchers", () => {
 		const matchRoute = createRouteMatcher(
-			[implementation("GET", "/todos/:id")],
+			{ getTodo: implementation("GET", "/todos/:id") },
 			"/api/v1/",
 		);
 

@@ -90,7 +90,6 @@ export type RuntimeImplementationTree =
 				readonly middleware?: readonly RuntimeRouteHandler[];
 			};
 	  }
-	| readonly RuntimeImplementationTree[]
 	| { readonly [key: string]: RuntimeImplementationTree };
 
 const isBuilderImplementation = (
@@ -112,11 +111,6 @@ const flattenImplementationTree = (
 	implementation: RuntimeImplementationTree,
 	path: string[] = [],
 ): RuntimeImplementation[] => {
-	if (Array.isArray(implementation)) {
-		return implementation.flatMap((child) =>
-			flattenImplementationTree(child, path),
-		);
-	}
 	if (isBuilderImplementation(implementation)) {
 		const { handler, middleware, ...route } = implementation["~restrpc"];
 		return [
