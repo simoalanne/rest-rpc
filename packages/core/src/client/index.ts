@@ -11,6 +11,7 @@ export type {
 	FetchArgs,
 	FetchLike,
 	FetchOptions,
+	FetchOptionsFor,
 	FetchResponseFn,
 } from "./types.ts";
 

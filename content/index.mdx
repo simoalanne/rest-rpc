@@ -193,8 +193,10 @@ const tq = createTanstackQueryHelpers(api, {
 
 const todo = useQuery(
 	tq.todos.get.queryOptions({
-		params: { id: "todo_1" },
-		query: { uppercase: "yes" },
+		request: {
+			params: { id: "todo_1" },
+			query: { uppercase: "yes" },
+		},
 	}),
 );
 const create = useMutation(tq.todos.create.mutationOptions());

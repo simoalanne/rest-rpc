@@ -1,6 +1,5 @@
 import {
 	type HttpError,
-	type InferClientRequest,
 	type InferClientResponse,
 	type SseEvent,
 } from "@rest-rpc/core";
@@ -46,15 +45,9 @@ const validatedQueryApi = {
 const validatedQueryTq = createTanstackQueryHelpers(validatedQueryApi, {
 	baseUrl: "https://example.test",
 });
-type ValidatedQueryOptionsParameters = Parameters<
-	typeof validatedQueryTq.test.queryOptions
->;
-expectType<{ params: { id: string } }>(
-	undefined as unknown as Extract<
-		ValidatedQueryOptionsParameters[0],
-		{ params: { id: string } }
-	>,
-);
+validatedQueryTq.test.queryOptions({
+	request: { params: { id: "test-1" } },
+});
 
 type FinalizedQueryData = InferClientResponse<typeof validatedQueryApi.test>;
 expectType<{
@@ -64,8 +57,10 @@ expectType<{
 }>(undefined as unknown as FinalizedQueryData);
 
 const getOptions = queryTq.todos.get.queryOptions({
-	params: {
-		id: "todo-1",
+	request: {
+		params: {
+			id: "todo-1",
+		},
 	},
 });
 expectAssignable<readonly unknown[]>(getOptions.queryKey);
@@ -100,23 +95,21 @@ queryClient.setQueryData(getOptions.queryKey, (current) => {
 
 // should preserve selected data callbacks while fetchQuery still resolves route data
 type GetTodoData = InferClientResponse<typeof queryApi.todos.get>;
-const selectedGetOptions = queryTq.todos.get.queryOptions(
-	{
+const selectedGetOptions = queryTq.todos.get.queryOptions({
+	request: {
 		params: {
 			id: "todo-1",
 		},
 	},
-	{
-		select(data) {
-			expectAssignable<{
-				status: 200;
-				body: { id: string; title: string };
-				headers: Headers;
-			}>(data);
-			return data.body.title;
-		},
+	select(data) {
+		expectAssignable<{
+			status: 200;
+			body: { id: string; title: string };
+			headers: Headers;
+		}>(data);
+		return data.body.title;
 	},
-);
+});
 expectAssignable<(data: GetTodoData) => string>(
 	selectedGetOptions.select as NonNullable<typeof selectedGetOptions.select>,
 );
@@ -124,8 +117,7 @@ expectAssignable<Promise<GetTodoData>>(
 	queryClient.fetchQuery(selectedGetOptions),
 );
 
-// routes without request input reserve the first positional slot for undefined
-const selectedListOptions = queryTq.todos.list.queryOptions(undefined, {
+const selectedListOptions = queryTq.todos.list.queryOptions({
 	queryKey: ["todos", "custom"],
 	staleTime: 100,
 	fetchOptions: {
@@ -198,22 +190,20 @@ const inlineMaterializedStreamQuery = useQuery(
 expectType<UseQueryResult<Event[], HttpError | Error>>(
 	inlineMaterializedStreamQuery,
 );
+streamTq.events.list.streamedQueryOptions({ request: skipToken });
 const inlineSkippedStreamQuery = useQuery(
-	streamTq.events.byTopic.streamedQueryOptions(skipToken),
+	streamTq.events.byTopic.streamedQueryOptions({ request: skipToken }),
 );
 expectType<UseQueryResult<Event[], HttpError | Error>>(
 	inlineSkippedStreamQuery,
 );
 
-const selectedStreamOptions = streamTq.events.list.streamedQueryOptions(
-	undefined,
-	{
-		select(events) {
-			expectType<Event[]>(events);
-			return events.length;
-		},
+const selectedStreamOptions = streamTq.events.list.streamedQueryOptions({
+	select(events) {
+		expectType<Event[]>(events);
+		return events.length;
 	},
-);
+});
 expectAssignable<Promise<Event[]>>(
 	queryClient.fetchQuery(selectedStreamOptions),
 );
@@ -221,7 +211,7 @@ expectAssignable<Event[] | undefined>(
 	queryClient.getQueryData(selectedStreamOptions.queryKey),
 );
 const inlineSelectedStreamQuery = useQuery(
-	streamTq.events.list.streamedQueryOptions(undefined, {
+	streamTq.events.list.streamedQueryOptions({
 		select(events) {
 			expectType<Event[]>(events);
 			return events.length;
@@ -232,23 +222,20 @@ expectType<UseQueryResult<number, HttpError | Error>>(
 	inlineSelectedStreamQuery,
 );
 
-const reducedStreamOptions = streamTq.events.list.streamedQueryOptions(
-	undefined,
-	{
-		initialValue: "",
-		reducer: (text, chunk) => {
-			expectType<string>(text);
-			expectType<Event>(chunk);
-			return `${text}${chunk.data.message}`;
-		},
+const reducedStreamOptions = streamTq.events.list.streamedQueryOptions({
+	initialValue: "",
+	reducer: (text, chunk) => {
+		expectType<string>(text);
+		expectType<Event>(chunk);
+		return `${text}${chunk.data.message}`;
 	},
-);
+});
 expectAssignable<Promise<string>>(queryClient.fetchQuery(reducedStreamOptions));
 expectAssignable<string | undefined>(
 	queryClient.getQueryData(reducedStreamOptions.queryKey),
 );
 const inlineReducedStreamQuery = useQuery(
-	streamTq.events.list.streamedQueryOptions(undefined, {
+	streamTq.events.list.streamedQueryOptions({
 		initialValue: "",
 		reducer: (text, chunk) => {
 			expectType<string>(text);
@@ -259,18 +246,15 @@ const inlineReducedStreamQuery = useQuery(
 );
 expectType<UseQueryResult<string, HttpError | Error>>(inlineReducedStreamQuery);
 
-const arrayReducedStreamOptions = streamTq.events.list.streamedQueryOptions(
-	undefined,
-	{
-		initialValue: [] as Event[],
-		reducer: (events, chunk) => {
-			expectType<Event[]>(events);
-			expectType<Event>(chunk);
-			return [...events, chunk];
-		},
-		refetchMode: "replace",
+const arrayReducedStreamOptions = streamTq.events.list.streamedQueryOptions({
+	initialValue: [] as Event[],
+	reducer: (events, chunk) => {
+		expectType<Event[]>(events);
+		expectType<Event>(chunk);
+		return [...events, chunk];
 	},
-);
+	refetchMode: "replace",
+});
 expectAssignable<Promise<Event[]>>(
 	queryClient.fetchQuery(arrayReducedStreamOptions),
 );
@@ -278,22 +262,19 @@ expectAssignable<Event[] | undefined>(
 	queryClient.getQueryData(arrayReducedStreamOptions.queryKey),
 );
 
-const selectedReducedStreamOptions = streamTq.events.list.streamedQueryOptions(
-	undefined,
-	{
-		initialValue: new Map<string, string>(),
-		reducer: (messages, chunk) => {
-			expectType<Map<string, string>>(messages);
-			expectType<Event>(chunk);
-			return new Map(messages).set(chunk.data.id, chunk.data.message);
-		},
-		refetchMode: "append",
-		select(messages) {
-			expectType<Map<string, string>>(messages);
-			return [...messages.values()];
-		},
+const selectedReducedStreamOptions = streamTq.events.list.streamedQueryOptions({
+	initialValue: new Map<string, string>(),
+	reducer: (messages, chunk) => {
+		expectType<Map<string, string>>(messages);
+		expectType<Event>(chunk);
+		return new Map(messages).set(chunk.data.id, chunk.data.message);
 	},
-);
+	refetchMode: "append",
+	select(messages) {
+		expectType<Map<string, string>>(messages);
+		return [...messages.values()];
+	},
+});
 expectAssignable<Promise<Map<string, string>>>(
 	queryClient.fetchQuery(selectedReducedStreamOptions),
 );
@@ -301,7 +282,7 @@ expectAssignable<Map<string, string> | undefined>(
 	queryClient.getQueryData(selectedReducedStreamOptions.queryKey),
 );
 const inlineSelectedReducedStreamQuery = useQuery(
-	streamTq.events.list.streamedQueryOptions(undefined, {
+	streamTq.events.list.streamedQueryOptions({
 		initialValue: new Map<string, string>(),
 		reducer: (messages, chunk) => {
 			expectType<Map<string, string>>(messages);
@@ -323,39 +304,138 @@ expectType<UseQueryResult<string[], HttpError | Error>>(
 // should accept skipToken for conditional request input
 const optionalId: string | undefined = "todo-1";
 
-const skippedOptions = queryTq.todos.get.queryOptions(
-	optionalId ? { params: { id: optionalId } } : skipToken,
-	{
-		queryKey: ["todos", "disabled"],
-		staleTime: 100,
-	},
-);
+const skippedOptions = queryTq.todos.get.queryOptions({
+	request: optionalId ? { params: { id: optionalId } } : skipToken,
+	queryKey: ["todos", "disabled"],
+	staleTime: 100,
+});
 expectAssignable<
 	typeof skipToken | NonNullable<typeof getOptions.queryFn> | undefined
 >(skippedOptions.queryFn);
 
 // request and fetch options
 
-// should keep request input and options as separate arguments for request-based routes
-queryTq.todos.get.queryOptions(
-	{
+// should combine request input and TanStack options in one object
+queryTq.todos.get.queryOptions({
+	request: {
 		params: {
 			id: "todo-1",
 		},
 	},
-	{ retry: false },
-);
-queryTq.todos.get.queryOptions(
-	{
+	retry: false,
+});
+queryTq.todos.get.queryOptions({
+	request: {
 		params: {
 			id: "todo-1",
 		},
 	},
-	{
-		fetchOptions: { cache: "reload", credentials: "same-origin" },
-		gcTime: 1_000,
-	},
+	fetchOptions: { cache: "reload", credentials: "same-origin" },
+	gcTime: 1_000,
+});
+expectError(
+	queryTq.todos.get.queryOptions({
+		request: { params: { id: "todo-1" } },
+		fetchOptions: { signal: AbortSignal.abort() },
+	}),
 );
+
+// should use the same global header providers and request inference as the fetch client
+const globalHeadersApi = {
+	secure: route
+		.headers(schemaType<{ authorization: string }>())
+		.input(schemaType<{ title: string }>())
+		.output(schemaType<{ id: string }>()),
+};
+const globalHeadersTq = createTanstackQueryHelpers(globalHeadersApi, {
+	baseUrl: "https://example.test",
+	globalHeaders: {
+		authorization: async () => "Bearer token",
+		"x-client-version": 2,
+	},
+});
+globalHeadersTq.secure.queryOptions({
+	request: { title: "Write type tests" },
+});
+globalHeadersTq.secure.mutationOptions({
+	onSuccess(_data, variables) {
+		expectType<{ title: string }>(variables);
+	},
+});
+
+const optionalGlobalHeadersTq = createTanstackQueryHelpers(globalHeadersApi, {
+	baseUrl: "https://example.test",
+	globalHeaders: {
+		authorization: (): string | undefined => undefined,
+	},
+});
+expectError(
+	optionalGlobalHeadersTq.secure.queryOptions({
+		request: { title: "Write type tests" },
+	}),
+);
+
+// should preserve route-specific Fetch options while query helpers own signals
+const contentTypeApi = {
+	imports: route
+		.input(schemaType<{ value: string }>(), {
+			contentType: ["text/plain", "text/markdown"],
+		})
+		.output(schemaType<{ id: string }>()),
+};
+const contentTypeTq = createTanstackQueryHelpers(contentTypeApi, {
+	baseUrl: "https://example.test",
+});
+contentTypeTq.imports.queryOptions({
+	request: { value: "hello" },
+	fetchOptions: {
+		additionalHeaders: { "x-trace-id": "trace-1", "x-retry": 1 },
+		contentType: "text/plain",
+	},
+});
+expectError(
+	contentTypeTq.imports.queryOptions({ request: { value: "hello" } }),
+);
+expectError(
+	contentTypeTq.imports.queryOptions({
+		request: { value: "hello" },
+		fetchOptions: { contentType: "application/json" },
+	}),
+);
+contentTypeTq.imports.queryOptions({
+	request: skipToken,
+	fetchOptions: { contentType: "text/plain" },
+});
+contentTypeTq.imports.mutationOptions({
+	fetchOptions: {
+		additionalHeaders: { "x-trace-id": "trace-1" },
+		contentType: "text/markdown",
+		signal: AbortSignal.abort(),
+	},
+});
+expectError(contentTypeTq.imports.mutationOptions());
+contentTypeTq.imports.infiniteQueryOptions({
+	request: (value) => {
+		expectType<string>(value);
+		return { value };
+	},
+	initialPageParam: "hello",
+	getNextPageParam: () => undefined,
+	fetchOptions: { contentType: "text/plain" },
+});
+expectError(
+	contentTypeTq.imports.infiniteQueryOptions({
+		request: (value: string) => ({ value }),
+		initialPageParam: "hello",
+		getNextPageParam: () => undefined,
+	}),
+);
+contentTypeTq.imports.infiniteQueryOptions({
+	request: skipToken,
+	initialPageParam: "hello",
+	getNextPageParam: () => undefined,
+	fetchOptions: { contentType: "text/plain" },
+});
 
 // mutation options
 
@@ -416,10 +496,8 @@ const pageTq = createTanstackQueryHelpers(pageApi, {
 });
 
 type TodoPageResponse = InferClientResponse<typeof pageApi.todos.page>;
-type TodoInfiniteData = InfiniteData<
-	TodoPageResponse,
-	InferClientRequest<typeof pageApi.todos.page>
->;
+type TodoPageParam = string | undefined;
+type TodoInfiniteData = InfiniteData<TodoPageResponse, TodoPageParam>;
 
 type TodoPageResponseShape = {
 	status: 200;
@@ -430,32 +508,40 @@ type TodoPageResponseShape = {
 	headers: Headers;
 };
 
-type TodoPageRequest = {
-	query: {
-		cursor?: string;
-		status: "open" | "done";
-		limit: number;
-	};
-};
-
 const infiniteOptions = pageTq.todos.page.infiniteQueryOptions({
-	initialRequest: { query: { status: "open", limit: 50 } },
+	request: (cursor: TodoPageParam) => ({
+		query: { cursor, status: "open", limit: 50 },
+	}),
+	initialPageParam: undefined,
 	fetchOptions: {
 		cache: "no-store",
 	},
-	getNextRequest(lastPage, _allPages, lastRequest) {
+	getNextPageParam(lastPage, _allPages, lastPageParam) {
 		expectAssignable<TodoPageResponseShape>(lastPage);
-		expectType<TodoPageRequest>(lastRequest);
-		return lastPage.body.nextCursor
-			? { query: { ...lastRequest.query, cursor: lastPage.body.nextCursor } }
-			: undefined;
+		expectType<TodoPageParam>(lastPageParam);
+		return lastPage.body.nextCursor;
 	},
 });
+
+pageTq.todos.page.infiniteQueryOptions({
+	request: skipToken,
+	initialPageParam: undefined as TodoPageParam,
+	getNextPageParam: () => undefined,
+});
+expectError(
+	pageTq.todos.page.infiniteQueryOptions({
+		request: (cursor: TodoPageParam) => ({
+			query: { cursor, status: "open", limit: 50 },
+		}),
+		initialPageParam: 0,
+		getNextPageParam: () => undefined,
+	}),
+);
 
 queryClient.fetchInfiniteQuery(infiniteOptions).then((data) => {
 	expectType<TodoInfiniteData>(data);
 	expectType<Array<TodoPageResponse>>(data.pages);
-	expectType<Array<TodoPageRequest>>(data.pageParams);
+	expectType<Array<TodoPageParam>>(data.pageParams);
 	expectAssignable<TodoPageResponseShape>(data.pages[0]);
 });
 
@@ -463,22 +549,22 @@ const cachedInfiniteData = queryClient.getQueryData(infiniteOptions.queryKey);
 if (cachedInfiniteData) {
 	expectType<TodoInfiniteData>(cachedInfiniteData);
 	expectType<Array<TodoPageResponse>>(cachedInfiniteData.pages);
-	expectType<Array<TodoPageRequest>>(cachedInfiniteData.pageParams);
+	expectType<Array<TodoPageParam>>(cachedInfiniteData.pageParams);
 	expectAssignable<TodoPageResponseShape>(cachedInfiniteData.pages[0]);
 }
 
 // query keys
 
 // should generate reusable typed keys for QueryClient cache operations
-const getKey = queryTq.todos.get.getKey({
+const key = queryTq.todos.get.queryKey({
 	params: {
 		id: "todo-1",
 	},
 });
-expectAssignable<readonly unknown[]>(getKey);
-queryClient.invalidateQueries({ queryKey: getKey });
-queryClient.removeQueries({ queryKey: getKey });
-queryClient.setQueryData(getKey, (current) => {
+expectAssignable<readonly unknown[]>(key);
+queryClient.invalidateQueries({ queryKey: key });
+queryClient.removeQueries({ queryKey: key });
+queryClient.setQueryData(key, (current) => {
 	expectAssignable<
 		| {
 				status: 200;
@@ -489,9 +575,15 @@ queryClient.setQueryData(getKey, (current) => {
 	>(current);
 	return current;
 });
-const listKey = queryTq.todos.list.getKey();
+const listKey = queryTq.todos.list.queryKey();
 queryClient.invalidateQueries({ queryKey: listKey });
 queryClient.setQueryData(listKey, (current) => current);
+
+const mutationKey = mutationTq.todos.create.mutationKey();
+expectAssignable<readonly unknown[]>(mutationKey);
+expectAssignable<readonly unknown[]>(
+	mutationTq.todos.create.mutationOptions().mutationKey,
+);
 
 // invalid calls
 
@@ -519,28 +611,26 @@ const invalidTq = createTanstackQueryHelpers(invalidApi, {
 expectError(invalidTq.todos.get.queryOptions());
 expectError(invalidTq.todos.get.queryOptions({ id: "todo-1", extra: true }));
 expectError(
-	invalidTq.todos.get.queryOptions(
-		{
+	invalidTq.todos.get.queryOptions({
+		request: {
 			params: {
 				id: "todo-1",
 			},
 		},
-		{ fetchOptions: { nope: true } },
-	),
+		fetchOptions: { nope: true },
+	}),
 );
 expectError(invalidTq.todos.get.queryOptions({ retry: false }));
 expectError(
 	invalidTq.todos.list.queryOptions({
-		params: {
-			id: "todo-1",
-		},
+		request: { params: { id: "todo-1" } },
 	}),
 );
-invalidTq.todos.list.queryOptions(undefined, { retry: false });
-expectError(invalidTq.todos.list.queryOptions(skipToken));
-expectError(invalidTq.todos.get.getKey());
+invalidTq.todos.list.queryOptions({ retry: false });
+invalidTq.todos.list.queryOptions({ request: skipToken });
+expectError(invalidTq.todos.get.queryKey());
 expectError(
-	invalidTq.todos.get.getKey({
+	invalidTq.todos.get.queryKey({
 		extra: true,
 		params: {
 			params: {
@@ -549,12 +639,10 @@ expectError(
 		},
 	}),
 );
-expectError(invalidTq.todos.list.getKey({ queryKey: ["todos", "list"] }));
+expectError(invalidTq.todos.list.queryKey({ queryKey: ["todos", "list"] }));
 expectError(
 	invalidTq.todos.get.streamedQueryOptions({
-		params: {
-			id: "todo-1",
-		},
+		request: { params: { id: "todo-1" } },
 	}),
 );
 invalidTq.normalStream.streamedQueryOptions();
@@ -562,27 +650,26 @@ expectError(invalidTq.ambiguousStream.streamedQueryOptions());
 expectError(
 	invalidTq.todos.page.infiniteQueryOptions({
 		initialPageParam: { status: "open", limit: 50 },
-		getNextRequest: () => undefined,
+		getNextPageParam: () => undefined,
 	}),
 );
 expectError(
 	invalidTq.todos.page.infiniteQueryOptions({
-		initialRequest: { extra: true, query: { status: "open", limit: 50 } },
-		getNextRequest: () => undefined,
+		request: () => ({ status: "open", limit: 50 }),
+		initialPageParam: undefined,
+		getNextPageParam: () => undefined,
 	}),
 );
 expectError(
 	invalidTq.todos.page.infiniteQueryOptions({
 		initialRequest: { query: { status: "open", limit: 50 } },
-		getNextPageParam: () => undefined,
-	}),
-);
-expectError(
-	invalidTq.todos.list.infiniteQueryOptions({
-		initialRequest: {},
 		getNextRequest: () => undefined,
 	}),
 );
+invalidTq.todos.list.infiniteQueryOptions({
+	initialPageParam: {},
+	getNextPageParam: () => undefined,
+});
 invalidTq.mixed.list.queryOptions();
 
 // shorthand route helpers
@@ -601,7 +688,7 @@ const shorthandTq = createTanstackQueryHelpers(shorthandApi, {
 	baseUrl: "https://example.test",
 });
 
-const shorthandGetOptions = shorthandTq.todos.get.queryOptions(undefined, {
+const shorthandGetOptions = shorthandTq.todos.get.queryOptions({
 	retry(_failureCount, error) {
 		expectType<HttpError | Error>(error);
 		return false;
@@ -636,7 +723,9 @@ shorthandTq.todos.add.mutationOptions({
 		expectType<HttpError | Error>(error);
 	},
 });
-shorthandTq.todos.add.queryOptions({ title: "Todo" });
-expectError(shorthandTq.todos.add.queryOptions({ body: { title: "Todo" } }));
+shorthandTq.todos.add.queryOptions({ request: { title: "Todo" } });
+expectError(
+	shorthandTq.todos.add.queryOptions({ request: { body: { title: "Todo" } } }),
+);
 expectError(shorthandTq.todos.add.queryOptions());
 expectError(shorthandTq.todos.get.streamedQueryOptions());

@@ -137,28 +137,24 @@ export const createTodoMutationOptions =
 	});
 
 export const getTodoQueryOptions = hoverQuery.todos.get.queryOptions({
-	params: { id: "todo-1" },
-	query: { includeDone: false },
+	request: {
+		params: { id: "todo-1" },
+		query: { includeDone: false },
+	},
 });
 
 export const pageTodoInfiniteQueryOptions =
 	hoverQuery.todos.page.infiniteQueryOptions({
-		initialRequest: {
+		request: (cursor: string | undefined) => ({
 			query: {
+				cursor,
 				status: "open",
 				limit: 25,
 			},
-		},
-		getNextRequest(lastPage) {
-			return lastPage.body.nextCursor === undefined
-				? undefined
-				: {
-						query: {
-							cursor: lastPage.body.nextCursor,
-							status: "open",
-							limit: 25,
-						},
-					};
+		}),
+		initialPageParam: undefined,
+		getNextPageParam(lastPage) {
+			return lastPage.body.nextCursor;
 		},
 	});
 

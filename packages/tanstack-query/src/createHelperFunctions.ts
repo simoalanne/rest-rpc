@@ -1,34 +1,32 @@
-import type {
-	ApiClientFetchOptions,
-	FetchOptions,
-} from "@rest-rpc/core/client";
+import type { FetchOptions } from "@rest-rpc/core/client";
 import {
-	type InfiniteQueryObserverOptions,
-	type MutationOptions,
+	type MutationKey,
 	type QueryKey,
-	type QueryObserverOptions,
 	experimental_streamedQuery as streamedQuery,
 	skipToken,
 } from "@tanstack/query-core";
 
-type RequestArgs = unknown[];
 type OptionsWithFetchOptions = Record<string, unknown> & {
-	fetchOptions?: ApiClientFetchOptions;
+	fetchOptions?: FetchOptions;
+	initialValue?: unknown;
+	queryKey?: QueryKey;
+	reducer?: (acc: unknown, chunk: unknown) => unknown;
+	refetchMode?: "append" | "reset" | "replace";
+	request?: unknown;
 };
 export type TanstackQueryHelperFunctions = {
 	mutationOptions: (
-		options?: Record<string, unknown>,
-	) => MutationOptions<unknown, unknown, unknown>;
+		options?: OptionsWithFetchOptions,
+	) => Record<string, unknown>;
 	infiniteQueryOptions: (
-		options: Record<string, unknown>,
-	) => InfiniteQueryObserverOptions<unknown, unknown, unknown>;
-	queryOptions: (
-		...args: RequestArgs
-	) => QueryObserverOptions<unknown, unknown, unknown>;
+		options: OptionsWithFetchOptions,
+	) => Record<string, unknown>;
+	queryOptions: (options?: OptionsWithFetchOptions) => Record<string, unknown>;
 	streamedQueryOptions?: (
-		...args: RequestArgs
-	) => QueryObserverOptions<unknown, unknown, unknown>;
-	getKey: (...args: RequestArgs) => QueryKey;
+		options?: OptionsWithFetchOptions,
+	) => Record<string, unknown>;
+	mutationKey: () => MutationKey;
+	queryKey: (request?: unknown) => QueryKey;
 };
 
 type FetchData = (
@@ -36,38 +34,8 @@ type FetchData = (
 	fetchOptions: FetchOptions | undefined,
 ) => Promise<unknown>;
 
-const isSkipToken = (value: unknown): value is typeof skipToken =>
-	value === skipToken;
-const stripUndefinedFields = (request: unknown): unknown => {
-	if (Array.isArray(request)) return request.map(stripUndefinedFields);
-	if (typeof request !== "object" || request === null) return request;
-	const prototype = Object.getPrototypeOf(request);
-	if (prototype !== Object.prototype && prototype !== null) return request;
-
-	return Object.fromEntries(
-		Object.entries(request)
-			.filter(([, value]) => value !== undefined)
-			.map(([key, value]) => [key, stripUndefinedFields(value)]),
-	);
-};
-
-const getQueryKey = (request: unknown, routePath: string[]) => {
-	const normalizedRequest = stripUndefinedFields(request);
-
-	return normalizedRequest &&
-		typeof normalizedRequest === "object" &&
-		Object.keys(normalizedRequest).length > 0
-		? [...routePath, normalizedRequest]
-		: routePath;
-};
-
-const splitFetchOptions = <
-	TOptions extends Record<string, unknown> | undefined,
->(
-	options: TOptions,
-) => {
-	const { fetchOptions, ...queryOptions } = (options ??
-		{}) as OptionsWithFetchOptions;
+const splitFetchOptions = (options?: OptionsWithFetchOptions) => {
+	const { fetchOptions, ...queryOptions } = options ?? {};
 	return {
 		fetchOptions,
 		queryOptions,
@@ -80,108 +48,124 @@ const isAsyncIterable = (value: unknown): value is AsyncIterable<unknown> =>
 	Symbol.asyncIterator in value &&
 	typeof value[Symbol.asyncIterator] === "function";
 
-export const createTanstackHelpersForRoute = (
-	routePath: string[],
-	dataFetchingFn: FetchData,
-	streamDataFetchingFn?: FetchData,
-): TanstackQueryHelperFunctions => {
-	const getKey = (request?: unknown) => getQueryKey(request, routePath);
-
+export const createTanstackHelpersForRoute = ({
+	routePath,
+	fetchData,
+	unwrapResponseBodyForStream = false,
+}: {
+	routePath: string[];
+	fetchData: FetchData;
+	unwrapResponseBodyForStream?: boolean;
+}): TanstackQueryHelperFunctions => {
 	const helpers: TanstackQueryHelperFunctions = {
 		mutationOptions: (options) => {
 			const { fetchOptions, queryOptions } = splitFetchOptions(options);
 			return {
-				mutationFn: (request: unknown) => dataFetchingFn(request, fetchOptions),
+				mutationKey: routePath,
+				mutationFn: (request: unknown) => fetchData(request, fetchOptions),
 				...queryOptions,
 			};
 		},
-		queryOptions: (...args: RequestArgs) => {
-			const request = args[0];
-			const { fetchOptions, queryOptions } = splitFetchOptions(
-				args[1] as Record<string, unknown> | undefined,
-			);
-			const disabled = isSkipToken(request);
+		queryOptions: (options) => {
+			const { fetchOptions, queryOptions } = splitFetchOptions(options);
+			const { request, queryKey, ...tanstackOptions } = queryOptions;
+			const disabled = request === skipToken;
 			const queryFn = disabled
 				? skipToken
-				: ({ signal }: { signal?: FetchOptions["signal"] }) =>
-						dataFetchingFn(request, {
+				: ({ signal }: { signal?: AbortSignal }) =>
+						fetchData(request, {
 							...fetchOptions,
 							signal,
 						});
-			const queryKeyRequest = disabled ? undefined : request;
-
 			return {
-				queryKey: getKey(queryKeyRequest),
+				queryKey:
+					queryKey ??
+					(disabled || request === undefined
+						? routePath
+						: [...routePath, request]),
 				queryFn,
-				...queryOptions,
+				...tanstackOptions,
 			};
 		},
 		infiniteQueryOptions: (options) => {
 			const { fetchOptions, queryOptions } = splitFetchOptions(options);
-			const { initialRequest, getNextRequest, queryKey, ...tanstackOptions } =
-				queryOptions;
+			const { request, queryKey, ...tanstackOptions } = queryOptions;
 			return {
-				queryKey: queryKey ?? getKey(),
-				initialPageParam: initialRequest,
-				getNextPageParam: getNextRequest,
-				queryFn: ({
-					pageParam,
-					signal,
-				}: {
-					pageParam: unknown;
-					signal?: FetchOptions["signal"];
-				}) =>
-					dataFetchingFn(pageParam, {
-						...fetchOptions,
-						signal,
-					}),
+				queryKey: queryKey ?? routePath,
+				queryFn:
+					request === skipToken
+						? skipToken
+						: ({
+								pageParam,
+								signal,
+							}: {
+								pageParam: unknown;
+								signal?: AbortSignal;
+							}) =>
+								fetchData(
+									typeof request === "function"
+										? request(pageParam)
+										: undefined,
+									{
+										...fetchOptions,
+										signal,
+									},
+								),
 				...tanstackOptions,
-			} as unknown as InfiniteQueryObserverOptions<unknown, unknown, unknown>;
+			};
 		},
-		getKey: (...args: RequestArgs) => getKey(args[0]),
+		mutationKey: () => routePath,
+		queryKey: (request?: unknown) =>
+			request === undefined ? routePath : [...routePath, request],
 	};
-	if (streamDataFetchingFn) {
-		helpers.streamedQueryOptions = (...args: RequestArgs) => {
-			const request = args[0];
-			const { fetchOptions, queryOptions } = splitFetchOptions(
-				args[1] as Record<string, unknown> | undefined,
-			);
-			const { initialValue, reducer, refetchMode, ...tanstackOptions } =
-				queryOptions;
-			const streamFn = async ({ signal }: { signal: AbortSignal }) => {
-				const stream = await streamDataFetchingFn(request, {
-					...fetchOptions,
-					signal,
-				});
+	helpers.streamedQueryOptions = (options) => {
+		const { fetchOptions, queryOptions } = splitFetchOptions(options);
+		const {
+			request,
+			initialValue,
+			reducer,
+			refetchMode,
+			queryKey,
+			...tanstackOptions
+		} = queryOptions;
+		const streamFn = async ({ signal }: { signal: AbortSignal }) => {
+			const data = await fetchData(request, {
+				...fetchOptions,
+				signal,
+			});
+			const stream = unwrapResponseBodyForStream
+				? (data as { body: unknown }).body
+				: data;
 
-				if (!isAsyncIterable(stream)) {
-					throw new Error("Route did not return a stream response body");
-				}
+			if (!isAsyncIterable(stream)) {
+				throw new Error("Route did not return a stream response body");
+			}
 
-				return stream;
-			};
-			const disabled = isSkipToken(request);
-			const queryFn = disabled
-				? skipToken
-				: typeof reducer === "function"
-					? streamedQuery({
-							refetchMode: refetchMode as "append" | "reset" | "replace",
-							initialValue,
-							reducer: reducer as (acc: unknown, chunk: unknown) => unknown,
-							streamFn,
-						})
-					: streamedQuery({
-							refetchMode: refetchMode as "append" | "reset" | "replace",
-							streamFn,
-						});
-			const queryKeyRequest = disabled ? undefined : request;
-
-			return {
-				queryKey: getKey(queryKeyRequest),
-				queryFn,
-				...tanstackOptions,
-			};
+			return stream;
 		};
-	}
+		const disabled = request === skipToken;
+		const queryFn = disabled
+			? skipToken
+			: typeof reducer === "function"
+				? streamedQuery({
+						refetchMode,
+						initialValue,
+						reducer,
+						streamFn,
+					})
+				: streamedQuery({
+						refetchMode,
+						streamFn,
+					});
+		return {
+			queryKey:
+				queryKey ??
+				(disabled || request === undefined
+					? routePath
+					: [...routePath, request]),
+			queryFn,
+			...tanstackOptions,
+		};
+	};
 	return helpers;
 };

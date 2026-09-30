@@ -98,7 +98,11 @@ type DeclaredContentType<E> = E extends {
 	? TContentType
 	: never;
 
-type FetchOptionsFor<E> = Omit<FetchOptions, "contentType"> &
+/** Fetch options accepted by a particular route call. */
+export type FetchOptionsFor<E extends RouteDeclaration> = Omit<
+	FetchOptions,
+	"contentType"
+> &
 	([DeclaredContentType<E>] extends [never]
 		? { contentType?: never }
 		: DeclaredContentType<E> extends readonly string[]

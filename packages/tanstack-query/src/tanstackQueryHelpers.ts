@@ -1,8 +1,10 @@
 import { initClient, type HttpError } from "@rest-rpc/core";
 import type {
-	ApiClientFetchOptions,
 	ApiClientOptions,
-	FetchResponseFn,
+	ClientHeaders,
+	FetchArgs,
+	FetchOptions,
+	FetchOptionsFor,
 	InferClientResponse,
 } from "@rest-rpc/core/client";
 import type {
@@ -16,15 +18,16 @@ import type {
 	DataTag,
 	InfiniteData,
 	InfiniteQueryObserverOptions,
+	MutationKey,
 	MutationOptions,
 	QueryKey,
 	QueryObserverOptions,
-	SkipToken,
+	skipToken,
 } from "@tanstack/query-core";
-import { fetchQueryData } from "./queryData.ts";
 import { createTanstackHelpersForRoute } from "./createHelperFunctions.ts";
 
 type Simplify<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
+type NoInferValue<T> = [T][T extends unknown ? 0 : never];
 
 type WithHeaders<TResponse> = TResponse extends unknown
 	? Simplify<TResponse & { headers: Headers }>
@@ -48,7 +51,13 @@ type DeclaredRouteResponseBody<E extends RouteDeclaration> =
 			: never
 		: never;
 
-type RouteRequestValue<E extends QueryRoute> = InferClientRequest<E>;
+type RouteRequestValue<
+	E extends QueryRoute,
+	TGlobalHeaders extends ClientHeaders,
+> =
+	InferClientRequest<E> extends never
+		? never
+		: FetchArgs<RouteFor<E>, TGlobalHeaders>[0];
 
 type IsPlainOutput<E extends RouteDeclaration> = E extends {
 	output: "output";
@@ -81,19 +90,24 @@ export type RouteQueryError<E extends QueryRoute> =
 /**
  * Infers mutation variables for a route.
  */
-export type RouteMutationVariables<E extends QueryRoute> =
-	RouteRequestValue<E> extends never ? undefined : RouteRequestValue<E>;
+export type RouteMutationVariables<
+	E extends QueryRoute,
+	TGlobalHeaders extends ClientHeaders = Record<never, string>,
+> =
+	RouteRequestValue<E, TGlobalHeaders> extends never
+		? undefined
+		: RouteRequestValue<E, TGlobalHeaders>;
 
 /**
  * Infers infinite query data for a route.
  *
- * @remarks Each page contains a successful route result, while each page
- * parameter contains the complete request used to fetch that page.
+ * @remarks Each page contains a successful route result. Page parameters are
+ * mapped to route requests by the infinite query's `request` callback.
  */
-export type RouteInfiniteQueryData<E extends QueryRoute> = InfiniteData<
-	RouteQueryData<E>,
-	RouteRequestValue<E>
->;
+export type RouteInfiniteQueryData<
+	E extends QueryRoute,
+	TPageParam = unknown,
+> = InfiniteData<RouteQueryData<E>, TPageParam>;
 
 type RouteStreamChunk<E extends QueryRoute> = [
 	DeclaredRouteResponseBody<RouteFor<E>>,
@@ -115,14 +129,30 @@ export type RouteStreamedQueryData<E extends QueryRoute> = [
 	? never
 	: Array<RouteStreamChunk<E>>;
 
-export type TanstackQueryFetchOptions = ApiClientFetchOptions;
+type QueryFetchOptions<E extends QueryRoute> = Omit<
+	FetchOptionsFor<RouteFor<E>>,
+	"signal"
+>;
 
-type WithFetchOptions<T> = T & {
-	fetchOptions?: TanstackQueryFetchOptions;
-};
+type MutationFetchOptions<E extends QueryRoute> = FetchOptionsFor<RouteFor<E>>;
+
+type WithFetchOptions<T, TFetchOptions> = T &
+	(TFetchOptions extends { contentType: string }
+		? { fetchOptions: TFetchOptions }
+		: { fetchOptions?: TFetchOptions });
+
+type RequestOption<
+	E extends QueryRoute,
+	TGlobalHeaders extends ClientHeaders,
+> = [RouteRequestValue<E, TGlobalHeaders>] extends [never]
+	? { request?: typeof skipToken }
+	: {
+			request: RouteRequestValue<E, TGlobalHeaders> | typeof skipToken;
+		};
 
 type QueryOptionsFor<
 	E extends QueryRoute,
+	TGlobalHeaders extends ClientHeaders,
 	TData = RouteQueryData<E>,
 > = WithFetchOptions<
 	Omit<
@@ -130,7 +160,8 @@ type QueryOptionsFor<
 		"queryKey" | "queryFn"
 	> & {
 		queryKey?: QueryKey;
-	}
+	} & RequestOption<E, TGlobalHeaders>,
+	QueryFetchOptions<E>
 >;
 
 type QueryOptionsResultFor<
@@ -140,20 +171,38 @@ type QueryOptionsResultFor<
 	queryKey: DataTag<QueryKey, RouteQueryData<E>, RouteQueryError<E>>;
 };
 
-type MutationOptionsFor<E extends QueryRoute> = WithFetchOptions<
+type MutationOptionsFor<
+	E extends QueryRoute,
+	TGlobalHeaders extends ClientHeaders,
+> = WithFetchOptions<
 	Omit<
 		MutationOptions<
 			RouteQueryData<E>,
 			RouteQueryError<E>,
-			RouteMutationVariables<E>
+			RouteMutationVariables<E, TGlobalHeaders>
 		>,
 		"mutationFn"
-	>
+	>,
+	MutationFetchOptions<E>
 >;
+
+type MutationOptionsResultFor<
+	E extends QueryRoute,
+	TGlobalHeaders extends ClientHeaders,
+> = MutationOptions<
+	RouteQueryData<E>,
+	RouteQueryError<E>,
+	RouteMutationVariables<E, TGlobalHeaders>
+> & {
+	mutationKey: MutationKey;
+};
 
 type InfiniteQueryOptionsFor<
 	E extends QueryRoute,
-	TData = RouteInfiniteQueryData<E>,
+	TGlobalHeaders extends ClientHeaders,
+	TInitialPageParam,
+	TPageParam,
+	TData = RouteInfiniteQueryData<E, TPageParam>,
 > = WithFetchOptions<
 	Omit<
 		InfiniteQueryObserverOptions<
@@ -161,32 +210,39 @@ type InfiniteQueryOptionsFor<
 			RouteQueryError<E>,
 			TData,
 			QueryKey,
-			RouteRequestValue<E>
+			NoInferValue<TPageParam>
 		>,
-		"queryFn" | "queryKey" | "initialPageParam" | "getNextPageParam"
+		"initialPageParam" | "queryFn" | "queryKey"
 	> & {
+		initialPageParam: TInitialPageParam;
 		queryKey?: QueryKey;
-		initialRequest: RouteRequestValue<E>;
-		getNextRequest: (
-			lastPage: RouteQueryData<E>,
-			allPages: Array<RouteQueryData<E>>,
-			lastRequest: RouteRequestValue<E>,
-			allRequests: Array<RouteRequestValue<E>>,
-		) => RouteRequestValue<E> | undefined | null;
-	}
+	} & ([RouteRequestValue<E, TGlobalHeaders>] extends [never]
+			? { request?: typeof skipToken }
+			: {
+					request:
+						| ((pageParam: TPageParam) => RouteRequestValue<E, TGlobalHeaders>)
+						| typeof skipToken;
+				}) &
+		([TInitialPageParam] extends [TPageParam] ? unknown : never),
+	QueryFetchOptions<E>
 >;
 
 type InfiniteQueryOptionsResultFor<
 	E extends QueryRoute,
-	TData = RouteInfiniteQueryData<E>,
+	TPageParam,
+	TData = RouteInfiniteQueryData<E, TPageParam>,
 > = InfiniteQueryObserverOptions<
 	RouteQueryData<E>,
 	RouteQueryError<E>,
 	TData,
 	QueryKey,
-	RouteRequestValue<E>
+	TPageParam
 > & {
-	queryKey: DataTag<QueryKey, RouteInfiniteQueryData<E>, RouteQueryError<E>>;
+	queryKey: DataTag<
+		QueryKey,
+		RouteInfiniteQueryData<E, TPageParam>,
+		RouteQueryError<E>
+	>;
 };
 
 type StreamedQueryRefetchMode = "append" | "reset" | "replace";
@@ -235,86 +291,107 @@ type streamedQueryOptionsResultFor<
 	queryKey: DataTag<QueryKey, TData, RouteQueryError<E>>;
 };
 
-type StreamedSimpleQueryArgs<E extends QueryRoute, TSelectedData> = [
-	RouteRequestValue<E>,
-] extends [never]
-	? [
-			request?: undefined,
-			options?: WithFetchOptions<StreamedQuerySimpleOptions<E, TSelectedData>>,
-		]
-	: [
-			request: RouteRequestValue<E> | SkipToken,
-			options?: WithFetchOptions<StreamedQuerySimpleOptions<E, TSelectedData>>,
-		];
+type OptionsArgument<TOptions> =
+	Record<never, never> extends TOptions
+		? [options?: TOptions]
+		: [options: TOptions];
 
-type StreamedReducedQueryArgs<E extends QueryRoute, TData, TSelectedData> = [
-	RouteRequestValue<E>,
-] extends [never]
-	? [
-			request: undefined,
-			options: WithFetchOptions<
-				StreamedQueryReducedOptions<E, TData, TSelectedData>
-			>,
-		]
-	: [
-			request: RouteRequestValue<E> | SkipToken,
-			options: WithFetchOptions<
-				StreamedQueryReducedOptions<E, TData, TSelectedData>
-			>,
-		];
+type StreamedSimpleQueryArgs<
+	E extends QueryRoute,
+	TGlobalHeaders extends ClientHeaders,
+	TSelectedData,
+> = OptionsArgument<
+	WithFetchOptions<
+		StreamedQuerySimpleOptions<E, TSelectedData> &
+			RequestOption<E, TGlobalHeaders>,
+		QueryFetchOptions<E>
+	>
+>;
 
-type UseQueryArgs<E extends QueryRoute, TData = RouteQueryData<E>> =
-	RouteRequestValue<E> extends never
-		? [request?: undefined, options?: QueryOptionsFor<E, TData>]
-		: [
-				request: RouteRequestValue<E> | SkipToken,
-				options?: QueryOptionsFor<E, TData>,
-			];
+type StreamedReducedQueryArgs<
+	E extends QueryRoute,
+	TGlobalHeaders extends ClientHeaders,
+	TData,
+	TSelectedData,
+> = OptionsArgument<
+	WithFetchOptions<
+		StreamedQueryReducedOptions<E, TData, TSelectedData> &
+			RequestOption<E, TGlobalHeaders>,
+		QueryFetchOptions<E>
+	>
+>;
 
-type GetKeyArgs<E extends QueryRoute> =
-	RouteRequestValue<E> extends never ? [] : [request: RouteRequestValue<E>];
+type UseQueryArgs<
+	E extends QueryRoute,
+	TGlobalHeaders extends ClientHeaders,
+	TData = RouteQueryData<E>,
+> = OptionsArgument<QueryOptionsFor<E, TGlobalHeaders, TData>>;
+
+type QueryKeyArgs<E extends QueryRoute, TGlobalHeaders extends ClientHeaders> =
+	RouteRequestValue<E, TGlobalHeaders> extends never
+		? []
+		: [request: RouteRequestValue<E, TGlobalHeaders>];
 
 /**
  * Describes the typed `queryOptions()` method available for a route.
  *
- * @remarks Passing TanStack Query's `skipToken` instead of request input
+ * @remarks Passing TanStack Query's `skipToken` as `request`
  * produces disabled query options without losing route type safety.
  *
  * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#queries}
  */
-export type RouteQueryOptionsMethod<E extends QueryRoute> = {
+export type RouteQueryOptionsMethod<
+	E extends QueryRoute,
+	TGlobalHeaders extends ClientHeaders = Record<never, string>,
+> = {
 	<TData = RouteQueryData<E>>(
-		...args: UseQueryArgs<E, TData>
+		...args: UseQueryArgs<E, TGlobalHeaders, TData>
 	): QueryOptionsResultFor<E, TData>;
 };
 
-type TanstackQueryBaseRouteValue<E extends QueryRoute> = {
+type MutationOptionsArgs<
+	E extends QueryRoute,
+	TGlobalHeaders extends ClientHeaders,
+> = OptionsArgument<MutationOptionsFor<E, TGlobalHeaders>>;
+
+type TanstackQueryBaseRouteValue<
+	E extends QueryRoute,
+	TGlobalHeaders extends ClientHeaders,
+> = {
 	mutationOptions: (
-		options?: MutationOptionsFor<E>,
-	) => MutationOptions<
-		RouteQueryData<E>,
-		RouteQueryError<E>,
-		RouteMutationVariables<E>
-	>;
-	queryOptions: RouteQueryOptionsMethod<E>;
-	infiniteQueryOptions: <TData = RouteInfiniteQueryData<E>>(
-		options: InfiniteQueryOptionsFor<E, TData>,
-	) => InfiniteQueryOptionsResultFor<E, TData>;
-	getKey: (
-		...args: GetKeyArgs<E>
+		...args: MutationOptionsArgs<E, TGlobalHeaders>
+	) => MutationOptionsResultFor<E, TGlobalHeaders>;
+	queryOptions: RouteQueryOptionsMethod<E, TGlobalHeaders>;
+	infiniteQueryOptions: <
+		TInitialPageParam,
+		TPageParam = TInitialPageParam,
+		TData = RouteInfiniteQueryData<E, TPageParam>,
+	>(
+		options: InfiniteQueryOptionsFor<
+			E,
+			TGlobalHeaders,
+			TInitialPageParam,
+			TPageParam,
+			TData
+		>,
+	) => InfiniteQueryOptionsResultFor<E, TPageParam, TData>;
+	mutationKey: () => MutationKey;
+	queryKey: (
+		...args: QueryKeyArgs<E, TGlobalHeaders>
 	) => DataTag<QueryKey, RouteQueryData<E>, RouteQueryError<E>>;
 };
 
-type TanstackQueryStreamRouteValue<E extends QueryRoute> = [
-	DeclaredRouteResponseBody<RouteFor<E>>,
-] extends [never]
+type TanstackQueryStreamRouteValue<
+	E extends QueryRoute,
+	TGlobalHeaders extends ClientHeaders,
+> = [DeclaredRouteResponseBody<RouteFor<E>>] extends [never]
 	? Record<never, never>
 	: DeclaredRouteResponseBody<RouteFor<E>> extends AsyncIterable<unknown>
 		? {
 				streamedQueryOptions: {
 					// Default accumulation fixes the cache data to the route's event array.
 					<TSelectedData = RouteStreamedQueryData<E>>(
-						...args: StreamedSimpleQueryArgs<E, TSelectedData>
+						...args: StreamedSimpleQueryArgs<E, TGlobalHeaders, TSelectedData>
 					): streamedQueryOptionsResultFor<
 						E,
 						RouteStreamedQueryData<E>,
@@ -322,39 +399,47 @@ type TanstackQueryStreamRouteValue<E extends QueryRoute> = [
 					>;
 					// A required initial value and reducer are the inference source for cache data.
 					<TData, TSelectedData = TData>(
-						...args: StreamedReducedQueryArgs<E, TData, TSelectedData>
+						...args: StreamedReducedQueryArgs<
+							E,
+							TGlobalHeaders,
+							TData,
+							TSelectedData
+						>
 					): streamedQueryOptionsResultFor<E, TData, TSelectedData>;
 				};
 			}
 		: Record<never, never>;
 
-type TanstackQueryRouteValue<E extends QueryRoute> =
-	TanstackQueryBaseRouteValue<E> & TanstackQueryStreamRouteValue<E>;
+type TanstackQueryRouteValue<
+	E extends QueryRoute,
+	TGlobalHeaders extends ClientHeaders,
+> = TanstackQueryBaseRouteValue<E, TGlobalHeaders> &
+	TanstackQueryStreamRouteValue<E, TGlobalHeaders>;
 
-type TanstackQueryTreeFor<T extends Contract> = {
-	[
-		K in keyof T as T[K] extends Contract
-			? TanstackQueryHelpersFor<T[K]> extends never
-				? never
-				: keyof TanstackQueryHelpersFor<T[K]> extends never
-					? never
-					: K
-			: never
-	]: T[K] extends Contract ? TanstackQueryHelpersFor<T[K]> : never;
+type TanstackQueryTreeFor<
+	T extends Contract,
+	TGlobalHeaders extends ClientHeaders,
+> = {
+	[K in keyof T]: T[K] extends Contract
+		? TanstackQueryHelpersFor<T[K], TGlobalHeaders>
+		: never;
 };
 
 /**
  * Infers the generated TanStack Query helper tree for a contract.
  *
  * @remarks The helper tree mirrors the contract. Each route exposes query,
- * mutation, and key helpers; eligible streaming routes also expose streamed
- * query options.
+ * mutation, query-key, and mutation-key helpers; eligible streaming routes
+ * also expose streamed query options.
  *
  * @see {@link https://rest-rpc.dev/docs/client/tanstack-query}
  */
-export type TanstackQueryHelpersFor<T extends Contract> = T extends QueryRoute
-	? TanstackQueryRouteValue<T>
-	: TanstackQueryTreeFor<T>;
+export type TanstackQueryHelpersFor<
+	T extends Contract,
+	TGlobalHeaders extends ClientHeaders = Record<never, string>,
+> = T extends QueryRoute
+	? TanstackQueryRouteValue<T, TGlobalHeaders>
+	: TanstackQueryTreeFor<T, TGlobalHeaders>;
 
 /**
  * Options used to create TanStack Query helpers from a contract.
@@ -362,20 +447,34 @@ export type TanstackQueryHelpersFor<T extends Contract> = T extends QueryRoute
  * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#setup}
  */
 export type CreateTanstackQueryHelpersOptions<
-	TGlobalHeaders extends Record<string, string> = Record<never, string>,
+	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > = ApiClientOptions<TGlobalHeaders>;
 
-const getRouteDeclaration = (value: unknown): RouteDeclaration | undefined =>
-	typeof value === "object" &&
-	value !== null &&
-	"~restrpc" in value &&
-	typeof value["~restrpc"] === "object" &&
-	value["~restrpc"] !== null
-		? (value["~restrpc"] as RouteDeclaration)
-		: undefined;
+const isRouteDeclaration = (
+	value: unknown,
+): value is { readonly "~restrpc": RouteDeclaration } =>
+	typeof value === "object" && value !== null && "~restrpc" in value;
 
-const getByPath = (tree: unknown, path: string[]) =>
-	path.reduce((node, key) => (node as Record<string, unknown>)[key], tree);
+const fetchSuccessfulResponse = async (
+	fetchResponse: (...args: unknown[]) => Promise<unknown>,
+	request: unknown,
+	options?: FetchOptions,
+) => {
+	let response: { status: number; headers?: Headers; body?: unknown };
+	try {
+		response = (await fetchResponse(request, options)) as typeof response;
+	} catch (error) {
+		throw error instanceof Error
+			? error
+			: new Error("API request failed", { cause: error });
+	}
+
+	if (response.status < 200 || response.status >= 300) {
+		throw response;
+	}
+
+	return response;
+};
 
 /**
  * Creates a TanStack Query helper tree that mirrors a contract.
@@ -387,60 +486,48 @@ const getByPath = (tree: unknown, path: string[]) =>
  */
 export function createTanstackQueryHelpers<
 	TContract extends Contract,
-	const TGlobalHeaders extends Record<string, string> = Record<never, string>,
+	const TGlobalHeaders extends ClientHeaders = Record<never, string>,
 >(
 	contract: TContract,
 	options: CreateTanstackQueryHelpersOptions<TGlobalHeaders>,
-): TanstackQueryHelpersFor<TContract> {
+): TanstackQueryHelpersFor<TContract, TGlobalHeaders> {
 	const client = initClient(contract, options);
 
-	const mapHttpRoutes = (node: Contract, path: string[] = []): unknown => {
-		const route = getRouteDeclaration(node);
-		if (route) {
-			if (
-				route.output === "output" ||
-				(route.output === undefined && route.kind === "procedure")
-			) {
-				const procedureClient = getByPath(client, path) as (
-					...args: unknown[]
-				) => Promise<unknown>;
-				return createTanstackHelpersForRoute(
-					path,
-					procedureClient,
-					procedureClient,
-				);
-			}
-			const apiNode = getByPath(client, path) as FetchResponseFn<typeof route>;
+	const buildTanstackQueryHelpers = (
+		node: Contract,
+		clientNode: unknown,
+		path: string[] = [],
+	): unknown => {
+		if (isRouteDeclaration(node)) {
+			const route = node["~restrpc"];
+			const routeFetchFn = clientNode as (
+				...args: unknown[]
+			) => Promise<unknown>;
 
-			return createTanstackHelpersForRoute(
-				path,
-				(request, fetchOptions) =>
-					fetchQueryData(
-						apiNode as (...args: unknown[]) => Promise<unknown>,
-						request,
-						fetchOptions,
-					),
-				async (request, fetchOptions) => {
-					const response = (await fetchQueryData(
-						apiNode as (...args: unknown[]) => Promise<unknown>,
-						request,
-						fetchOptions,
-					)) as { body: unknown };
-					return response.body;
-				},
-			);
+			const returnsResponseEnvelope = route.output === "response";
+
+			return createTanstackHelpersForRoute({
+				routePath: path,
+				fetchData: returnsResponseEnvelope
+					? (request, fetchOptions) =>
+							fetchSuccessfulResponse(routeFetchFn, request, fetchOptions)
+					: routeFetchFn,
+				unwrapResponseBodyForStream: returnsResponseEnvelope,
+			});
 		}
 
-		const entries = Object.entries(node)
-			.map(([key, value]) => [key, mapHttpRoutes(value, [...path, key])])
-			.filter((entry): entry is [string, unknown] => entry[1] !== undefined);
+		const client = clientNode as Record<string, unknown>;
 
-		if (entries.length === 0 && path.length > 0) {
-			return undefined;
-		}
-
-		return Object.fromEntries(entries);
+		return Object.fromEntries(
+			Object.entries(node).map(([key, value]) => [
+				key,
+				buildTanstackQueryHelpers(value, client[key], [...path, key]),
+			]),
+		);
 	};
 
-	return mapHttpRoutes(contract) as TanstackQueryHelpersFor<TContract>;
+	return buildTanstackQueryHelpers(contract, client) as TanstackQueryHelpersFor<
+		TContract,
+		TGlobalHeaders
+	>;
 }
