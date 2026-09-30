@@ -1,5 +1,18 @@
 # @rest-rpc/nest
 
+## 0.1.0-beta.23
+
+### Minor Changes
+
+- d72a045: Replace direct application context property access with a typed per-request `context.get(key)` and `context.set(key, value)` store.
+- d72a045: Add .$context<T>() for ther route builder to specify context for specific set of routes. Remove providing initial context option from route registeration.
+
+### Patch Changes
+
+- 8db54c8: Allow path to be omitted from http methods in route builder. enforce leading slash in paths in types.
+- 5676c02: Allow reusable context type and middleware for implement api
+- 5676c02: add options to disable request and response validation across server adapters
+
 ## 0.1.0-beta.22
 
 ### Minor Changes

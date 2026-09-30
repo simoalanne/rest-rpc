@@ -1,5 +1,16 @@
 # @rest-rpc/core
 
+## 0.1.0-beta.23
+
+### Minor Changes
+
+- 8c57e3d: Align TanStack Query utils with the Fetch client and TanStack Query APIs. Query and streamed-query utils now accept one options object with a `request` field, infinite queries map TanStack page parameters to route requests with a `request` callback, and `skipToken` consistently replaces `request`. Route utils expose explicit `queryKey()` and `mutationKey()` methods, generated mutation options use the route mutation key by default, and query keys preserve request input unchanged. Utils also preserve dynamic global-header inference and route-specific Fetch options, while mutations accept caller-managed cancellation signals.
+- 5fc6382: remove support for automated next.js tags from the core fetch client
+
+### Patch Changes
+
+- 8db54c8: Allow path to be omitted from http methods in route builder. enforce leading slash in paths in types.
+
 ## 0.1.0-beta.22
 
 ### Minor Changes
