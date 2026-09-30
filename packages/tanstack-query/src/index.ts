@@ -1,11 +1,11 @@
 export type {
-	CreateTanstackQueryHelpersOptions,
+	CreateTanstackQueryUtilsOptions,
 	RouteInfiniteQueryData,
 	RouteMutationVariables,
 	RouteQueryOptionsMethod,
 	RouteQueryData,
 	RouteQueryError,
 	RouteStreamedQueryData,
-	TanstackQueryHelpersFor,
-} from "./tanstackQueryHelpers.ts";
-export { createTanstackQueryHelpers } from "./tanstackQueryHelpers.ts";
+	TanstackQueryUtilsFor,
+} from "./createTanstackQueryUtils.ts";
+export { createTanstackQueryUtils } from "./createTanstackQueryUtils.ts";

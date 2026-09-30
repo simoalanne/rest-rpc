@@ -304,43 +304,43 @@ expectType<Promise<{ readonly id: "todo-1"; readonly title: string }>>(
 	generatedClient.get({ title: "Todo" }),
 );
 
-// Public helpers accept builders and completed routes without unwrapping them.
-const helperDeclaration = coreRoute
+// Public utils accept builders and completed routes without unwrapping them.
+const utilDeclaration = coreRoute
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
 	.response(200, z.object({ id: z.string() }))
 	.response(404, z.object({ code: z.literal("NOT_FOUND") }));
-const helperImplementation = route
+const utilImplementation = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
 	.handler(({ params }) => ({ status: 200, body: { id: params.id } }));
 
 expectType<{ params: { id: string } }>(
-	null as unknown as InferClientRequest<typeof helperDeclaration>,
+	null as unknown as InferClientRequest<typeof utilDeclaration>,
 );
 expectType<{ params: { id: string } }>(
-	null as unknown as InferServerRequest<typeof helperDeclaration>,
+	null as unknown as InferServerRequest<typeof utilDeclaration>,
 );
 expectType<{ status: 404; body: { code: "NOT_FOUND" } }>(
-	null as unknown as RouteErrors<typeof helperDeclaration>,
+	null as unknown as RouteErrors<typeof utilDeclaration>,
 );
 expectType<
 	| { status: 200; body: { id: string } }
 	| { status: 404; body: { code: "NOT_FOUND" } }
->(null as unknown as InferServerResponse<typeof helperDeclaration>);
+>(null as unknown as InferServerResponse<typeof utilDeclaration>);
 expectType<{ params: { id: string } }>(
-	null as unknown as InferClientRequest<typeof helperImplementation>,
+	null as unknown as InferClientRequest<typeof utilImplementation>,
 );
 expectType<{ params: { id: string } }>(
-	null as unknown as InferServerRequest<typeof helperImplementation>,
+	null as unknown as InferServerRequest<typeof utilImplementation>,
 );
 expectType<{ status: 200; body: { readonly id: string } }>(
-	null as unknown as InferServerResponse<typeof helperImplementation>,
+	null as unknown as InferServerResponse<typeof utilImplementation>,
 );
 expectType<{ status: 200; body: { readonly id: string }; headers: Headers }>(
-	null as unknown as InferClientResponse<typeof helperImplementation>,
+	null as unknown as InferClientResponse<typeof utilImplementation>,
 );
-expectType<never>(null as unknown as RouteErrors<typeof helperImplementation>);
+expectType<never>(null as unknown as RouteErrors<typeof utilImplementation>);
 
 const transformedInput = z
 	.object({ id: z.string() })
@@ -348,48 +348,44 @@ const transformedInput = z
 const transformedOutput = z
 	.object({ id: z.string() })
 	.transform(({ id }) => ({ id: Number(id) }));
-const helperProcedure = coreRoute
+const utilProcedure = coreRoute
 	.input(transformedInput)
 	.output(transformedOutput);
-const helperProcedureImplementation = route
+const utilProcedureImplementation = route
 	.input(transformedInput)
 	.output(transformedOutput)
 	.handler(({ input }) => ({ id: String(input.id) as "1" }));
 expectType<{ id: string }>(
-	null as unknown as InferClientRequest<typeof helperProcedure>,
+	null as unknown as InferClientRequest<typeof utilProcedure>,
 );
 expectType<{ input: { id: number } }>(
-	null as unknown as InferServerRequest<typeof helperProcedure>,
+	null as unknown as InferServerRequest<typeof utilProcedure>,
 );
 expectType<{ id: string }>(
-	null as unknown as InferServerResponse<typeof helperProcedure>,
+	null as unknown as InferServerResponse<typeof utilProcedure>,
 );
 expectType<{ id: number }>(
-	null as unknown as InferClientResponse<typeof helperProcedure>,
+	null as unknown as InferClientResponse<typeof utilProcedure>,
 );
 expectType<{ id: string }>(
-	null as unknown as InferServerResponse<typeof helperProcedureImplementation>,
+	null as unknown as InferServerResponse<typeof utilProcedureImplementation>,
 );
 
-// Internal declarations are not the public helper input.
+// Internal declarations are not the public util input.
 expectError(
-	null as unknown as InferClientRequest<(typeof helperDeclaration)["~restrpc"]>,
+	null as unknown as InferClientRequest<(typeof utilDeclaration)["~restrpc"]>,
 );
 expectError(
-	null as unknown as InferClientResponse<
-		(typeof helperDeclaration)["~restrpc"]
-	>,
+	null as unknown as InferClientResponse<(typeof utilDeclaration)["~restrpc"]>,
 );
 expectError(
-	null as unknown as InferServerRequest<(typeof helperDeclaration)["~restrpc"]>,
+	null as unknown as InferServerRequest<(typeof utilDeclaration)["~restrpc"]>,
 );
 expectError(
-	null as unknown as InferServerResponse<
-		(typeof helperDeclaration)["~restrpc"]
-	>,
+	null as unknown as InferServerResponse<(typeof utilDeclaration)["~restrpc"]>,
 );
 expectError(
-	null as unknown as RouteErrors<(typeof helperDeclaration)["~restrpc"]>,
+	null as unknown as RouteErrors<(typeof utilDeclaration)["~restrpc"]>,
 );
 
 // should have contextual typing for inline middleware

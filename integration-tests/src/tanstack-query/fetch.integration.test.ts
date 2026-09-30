@@ -96,11 +96,11 @@ describe("fetch TanStack Query integration", () => {
 
 	it("fetches query options through QueryClient and returns success envelopes", async () => {
 		const tracked = createTrackedFetch();
-		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
+		const restrpc = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
 
 		const response = await queryClient.fetchQuery(
-			tq.projects.get.queryOptions({
+			restrpc.projects.get.queryOptions({
 				request: { params: { id: "project-1" } },
 			}),
 		);
@@ -115,9 +115,9 @@ describe("fetch TanStack Query integration", () => {
 
 	it("reuses fresh cache entries for the same generated query key", async () => {
 		const tracked = createTrackedFetch();
-		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
+		const restrpc = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
-		const options = tq.projects.get.queryOptions({
+		const options = restrpc.projects.get.queryOptions({
 			request: { params: { id: "project-1" } },
 			staleTime: Infinity,
 		});
@@ -125,7 +125,7 @@ describe("fetch TanStack Query integration", () => {
 		await queryClient.fetchQuery(options);
 		await queryClient.fetchQuery(options);
 		await queryClient.fetchQuery(
-			tq.projects.get.queryOptions({
+			restrpc.projects.get.queryOptions({
 				request: { params: { id: "project-2" } },
 				staleTime: Infinity,
 			}),
@@ -138,28 +138,28 @@ describe("fetch TanStack Query integration", () => {
 
 	it("uses query options for routes without request input", async () => {
 		const tracked = createTrackedFetch();
-		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
+		const restrpc = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
 
 		const response = await queryClient.fetchQuery(
-			tq.projects.list.queryOptions({
+			restrpc.projects.list.queryOptions({
 				staleTime: Infinity,
 			}),
 		);
 
 		assert.equal(response.status, 200);
-		assert.deepEqual(tq.projects.list.queryKey(), ["projects", "list"]);
+		assert.deepEqual(restrpc.projects.list.queryKey(), ["projects", "list"]);
 		assert.equal(tracked.calls.length, 1);
 		assert.match(tracked.calls[0]?.url ?? "", /\/projects$/);
 	});
 
 	it("runs mutations through MutationObserver", async () => {
 		const tracked = createTrackedFetch();
-		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
+		const restrpc = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
 		const observer = new MutationObserver(
 			queryClient,
-			tq.projects.create.mutationOptions(),
+			restrpc.projects.create.mutationOptions(),
 		);
 
 		const response = await observer.mutate({
@@ -187,20 +187,20 @@ describe("fetch TanStack Query integration", () => {
 
 	it("invalidates generated keys after mutations and refetches fresh data", async () => {
 		const tracked = createTrackedFetch();
-		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
+		const restrpc = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
-		const listOptions = tq.projects.list.queryOptions({
+		const listOptions = restrpc.projects.list.queryOptions({
 			staleTime: Infinity,
 		});
 
 		const beforeCreate = await queryClient.fetchQuery(listOptions);
 		const createObserver = new MutationObserver(
 			queryClient,
-			tq.projects.create.mutationOptions(),
+			restrpc.projects.create.mutationOptions(),
 		);
 		await createObserver.mutate({ body: { name: "Fathom" } });
 		await queryClient.invalidateQueries({
-			queryKey: tq.projects.list.queryKey(),
+			queryKey: restrpc.projects.list.queryKey(),
 		});
 		const afterCreate = await queryClient.fetchQuery(listOptions);
 
@@ -211,9 +211,9 @@ describe("fetch TanStack Query integration", () => {
 
 	it("stores and reuses data under custom query keys", async () => {
 		const tracked = createTrackedFetch();
-		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
+		const restrpc = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
-		const options = tq.projects.search.queryOptions({
+		const options = restrpc.projects.search.queryOptions({
 			request: { query: { q: "ap" } },
 			queryKey: ["custom", "project-search", "ap"],
 			staleTime: Infinity,
@@ -229,7 +229,7 @@ describe("fetch TanStack Query integration", () => {
 		);
 		assert.equal(
 			queryClient.getQueryData(
-				tq.projects.search.queryKey({ query: { q: "ap" } }),
+				restrpc.projects.search.queryKey({ query: { q: "ap" } }),
 			),
 			undefined,
 		);
@@ -237,11 +237,11 @@ describe("fetch TanStack Query integration", () => {
 
 	it("fetches multiple pages with infinite query options", async () => {
 		const tracked = createTrackedFetch();
-		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
+		const restrpc = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
 		const observer = new InfiniteQueryObserver(
 			queryClient,
-			tq.projects.page.infiniteQueryOptions({
+			restrpc.projects.page.infiniteQueryOptions({
 				request: (cursor: string | undefined) => ({
 					query: { cursor, limit: 2 },
 				}),
@@ -266,11 +266,11 @@ describe("fetch TanStack Query integration", () => {
 
 	it("does not call fetch for skipToken query observers", async () => {
 		const tracked = createTrackedFetch();
-		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
+		const restrpc = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
 		const observer = new QueryObserver(
 			queryClient,
-			tq.projects.get.queryOptions({ request: skipToken }),
+			restrpc.projects.get.queryOptions({ request: skipToken }),
 		);
 
 		const unsubscribe = observer.subscribe(() => {});
@@ -283,11 +283,11 @@ describe("fetch TanStack Query integration", () => {
 
 	it("rejects declared mutation errors without retrying", async () => {
 		const tracked = createTrackedFetch();
-		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
+		const restrpc = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
 		const observer = new MutationObserver(
 			queryClient,
-			tq.projects.rename.mutationOptions({ retry: false }),
+			restrpc.projects.rename.mutationOptions({ retry: false }),
 		);
 
 		await assert.rejects(
@@ -307,9 +307,9 @@ describe("fetch TanStack Query integration", () => {
 
 	it("forwards fetchOptions to fetch without exposing them as query options", async () => {
 		const tracked = createTrackedFetch();
-		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
+		const restrpc = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
-		const options = tq.projects.create.mutationOptions({
+		const options = restrpc.projects.create.mutationOptions({
 			fetchOptions: {
 				cache: "no-store",
 			},
@@ -336,9 +336,9 @@ describe("fetch TanStack Query integration", () => {
 
 	it("passes TanStack cancellation signals to fetch", async () => {
 		const tracked = createTrackedFetch();
-		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
+		const restrpc = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
-		const options = tq.projects.slow.queryOptions({
+		const options = restrpc.projects.slow.queryOptions({
 			request: { params: { id: "project-1" } },
 		});
 
@@ -353,11 +353,11 @@ describe("fetch TanStack Query integration", () => {
 
 	it("returns stream route bodies as raw async iterables from regular query options", async () => {
 		const tracked = createTrackedFetch();
-		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
+		const restrpc = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
 
 		const response = await queryClient.fetchQuery(
-			tq.projects.events.queryOptions(),
+			restrpc.projects.events.queryOptions(),
 		);
 
 		assert.equal(response.status, 200);
@@ -367,7 +367,7 @@ describe("fetch TanStack Query integration", () => {
 			{ data: { id: "project-1", event: "renamed" } },
 		]);
 		assert.strictEqual(
-			queryClient.getQueryData(tq.projects.events.queryKey()),
+			queryClient.getQueryData(restrpc.projects.events.queryKey()),
 			response,
 		);
 		assert.equal(tracked.calls.length, 1);
@@ -375,10 +375,10 @@ describe("fetch TanStack Query integration", () => {
 
 	it("materializes rest-rpc stream route bodies with stream query options", async () => {
 		const tracked = createTrackedFetch();
-		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
+		const restrpc = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
 
-		const options = tq.projects.events.streamedQueryOptions({
+		const options = restrpc.projects.events.streamedQueryOptions({
 			queryKey: ["projects", "events", "streamed-query"],
 		});
 		const response = await queryClient.fetchQuery(options);
@@ -393,11 +393,11 @@ describe("fetch TanStack Query integration", () => {
 
 	it("returns procedure streams directly from regular query options", async () => {
 		const tracked = createTrackedFetch();
-		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
+		const restrpc = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
 
 		const stream = await queryClient.fetchQuery(
-			tq.projects.eventFeed.queryOptions({
+			restrpc.projects.eventFeed.queryOptions({
 				request: { projectId: "project-2" },
 			}),
 		);
@@ -409,7 +409,7 @@ describe("fetch TanStack Query integration", () => {
 		]);
 		assert.strictEqual(
 			queryClient.getQueryData(
-				tq.projects.eventFeed.queryKey({ projectId: "project-2" }),
+				restrpc.projects.eventFeed.queryKey({ projectId: "project-2" }),
 			),
 			stream,
 		);
@@ -418,10 +418,10 @@ describe("fetch TanStack Query integration", () => {
 
 	it("materializes procedure streams with stream query options", async () => {
 		const tracked = createTrackedFetch();
-		const tq = createTanstackQueryClient(server.origin, tracked.fetch);
+		const restrpc = createTanstackQueryClient(server.origin, tracked.fetch);
 		const queryClient = createQueryClient();
 
-		const options = tq.projects.eventFeed.streamedQueryOptions({
+		const options = restrpc.projects.eventFeed.streamedQueryOptions({
 			request: { projectId: "project-2" },
 			queryKey: ["projects", "event-feed", "streamed-query"],
 		});

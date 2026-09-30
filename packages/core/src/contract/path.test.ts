@@ -9,7 +9,7 @@ import {
 	toOpenApiPath,
 } from "./path.ts";
 
-describe("path helpers", () => {
+describe("path utils", () => {
 	it("extracts path params from supported marker styles", () => {
 		assert.deepEqual(getPathParamNames("/orgs/:orgId/todos/{todo_id}"), [
 			"orgId",

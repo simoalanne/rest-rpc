@@ -8,7 +8,7 @@ type TypeMapper = (input: never) => unknown;
 /**
  * Creates an unchecked Standard Schema with optional output mapping.
  *
- * @see {@link https://rest-rpc.dev/docs/http-behavior/schemas#type-helper}
+ * @see {@link https://rest-rpc.dev/docs/http-behavior/schemas#type-util}
  */
 export function type<TInput>(): StandardSchemaV1<TInput, TInput>;
 export function type<TMapper extends TypeMapper>(

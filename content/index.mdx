@@ -184,22 +184,22 @@ export const api = generateContractFromType<typeof routes>({
 // @filename: client.tsx
 import { api } from "./client-contract";
 // ---cut-end---
-import { createTanstackQueryHelpers } from "@rest-rpc/tanstack-query";
+import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
-const tq = createTanstackQueryHelpers(api, {
+const restrpc = createTanstackQueryUtils(api, {
 	baseUrl: "http://localhost:3000",
 });
 
 const todo = useQuery(
-	tq.todos.get.queryOptions({
+	restrpc.todos.get.queryOptions({
 		request: {
 			params: { id: "todo_1" },
 			query: { uppercase: "yes" },
 		},
 	}),
 );
-const create = useMutation(tq.todos.create.mutationOptions());
+const create = useMutation(restrpc.todos.create.mutationOptions());
 
 create.mutate({ title: "Write docs" });
 ```
@@ -284,10 +284,9 @@ npx skills add rest-rpc/rest-rpc
 		envelopes when the route has multiple expected outcomes.
 	</Card>
 	<Card title="Schema options" icon="shield-check" type="check">
-		Use Standard Schema-compatible libraries such as Zod, Valibot, or ArkType,
-		or built-in type-only helper when runtime validation is not needed.
+		Use Standard Schema-compatible libraries such as Zod, Valibot, or ArkType.
 	</Card>
-	<Card title="Generated helpers" icon="layers" type="check">
+	<Card title="Generated utils" icon="layers" type="check">
 		Derive typed fetch clients, TanStack Query options, query keys, and OpenAPI
 		documents from the same route tree.
 	</Card>
@@ -337,7 +336,7 @@ adapters, client, or OpenAPI generation as they become useful.
 	<AccordionItem title="Do I have to restructure my app?">
 		No. Keep your framework, middleware, authentication, database access, and
 		deployment model. Add typed routes at the API boundary and adopt the client,
-		TanStack Query helpers, or OpenAPI generation as they become useful.
+		TanStack Query utils, or OpenAPI generation as they become useful.
 	</AccordionItem>
 	<AccordionItem title="Do I need to learn a new API model?">
 		The model is ordinary HTTP: methods, paths, request locations, status codes,

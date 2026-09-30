@@ -1,6 +1,6 @@
 ---
 title: TanStack Query
-description: Create typed TanStack Query helpers and combine them with your Tanstack Query setup to call your routes over HTTP.
+description: Create typed TanStack Query utils and combine them with your Tanstack Query setup to call your routes over HTTP.
 ---
 
 ## Install
@@ -14,10 +14,10 @@ pnpm add @rest-rpc/tanstack-query
 Client configuration uses the same setup and options as the [Fetch Client](/docs/client/fetch-client),
 
 ```ts
-import { createTanstackQueryHelpers } from "@rest-rpc/tanstack-query";
+import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
 import { api } from "./client-contract";
 
-export const tq = createTanstackQueryHelpers(api, {
+export const restrpc = createTanstackQueryUtils(api, {
 	baseUrl: "https://api.example.com",
 });
 ```
@@ -25,13 +25,13 @@ export const tq = createTanstackQueryHelpers(api, {
 ## Queries
 
 Use `queryOptions()` to create a typed TanStack Query options object for a route.
-The helper accepts request input, Fetch options, and TanStack Query options in one object.
+The util accepts request input, Fetch options, and TanStack Query options in one object.
 
 ```tsx
 import { useQuery } from "@tanstack/react-query";
 
 const todo = useQuery(
-	tq.todos.get.queryOptions({
+	restrpc.todos.get.queryOptions({
 		request: {
 			params: { id: "todo_1" },
 		},
@@ -53,7 +53,7 @@ request used for its API call.
 import { useInfiniteQuery } from "@tanstack/react-query";
 
 const todos = useInfiniteQuery(
-	tq.todos.page.infiniteQueryOptions({
+	restrpc.todos.page.infiniteQueryOptions({
 		request: (cursor: string | undefined) => ({
 			query: { cursor, status: "open", limit: 50 },
 		}),
@@ -66,7 +66,7 @@ const todos = useInfiniteQuery(
 ## Streamed Queries
 
 Use `streamedQueryOptions()` for routes with one successful
-`.streamResponse(status, schema)` or a plain `.streamOutput(schema)`. The helper
+`.streamResponse(status, schema)` or a plain `.streamOutput(schema)`. The util
 passes the async iterable to TanStack Query and stores the materialized stream
 data. It discards a response envelope when the route uses `.streamResponse()`;
 `.streamOutput()` clients return the iterable directly.
@@ -80,7 +80,7 @@ API.
 ```tsx
 import { useQuery } from "@tanstack/react-query";
 
-const events = useQuery(tq.todos.events.streamedQueryOptions());
+const events = useQuery(restrpc.todos.events.streamedQueryOptions());
 ```
 
 By default, SSE events accumulate into an array.
@@ -95,7 +95,7 @@ shape.
 
 ```tsx
 const messages = useQuery(
-	tq.todos.events.streamedQueryOptions({
+	restrpc.todos.events.streamedQueryOptions({
 		initialValue: "",
 		reducer: (text, event) => `${text}${event.data.message}`,
 	}),
@@ -116,7 +116,7 @@ To disable a query in type-safe way you can use `skipToken` as request input.
 import { skipToken } from "@tanstack/query-core";
 
 const todo = useQuery(
-	tq.todos.get.queryOptions({
+	restrpc.todos.get.queryOptions({
 		request: selectedId ? { params: { id: selectedId } } : skipToken,
 	}),
 );
@@ -127,7 +127,7 @@ The callback is not called when the query is skipped.
 
 ```tsx
 const events = useQuery(
-	tq.todos.page.infiniteQueryOptions({
+	restrpc.todos.page.infiniteQueryOptions({
 		request: (cursor: string | undefined) =>
 			cursor ? { query: { cursor } } : skipToken,
 		initialPageParam: undefined,
@@ -142,15 +142,15 @@ Use `queryKey()` when you want the contract-generated query key outside an
 options object.
 
 ```ts
-tq.todos.get.queryKey({ params: { id: "todo_1" } }); // ["todos", "detail", { params: { id: "todo_1" } }]
-tq.todos.list.queryKey(); // ["todos", "list"]
+restrpc.todos.get.queryKey({ params: { id: "todo_1" } }); // ["todos", "detail", { params: { id: "todo_1" } }]
+restrpc.todos.list.queryKey(); // ["todos", "list"]
 ```
 
 Query keys are based on the route path in the route tree plus request input.
 The returned key is typed for TanStack Query APIs.
 
 ```ts
-const todoKey = tq.todos.get.queryKey({ params: { id: "todo_1" } });
+const todoKey = restrpc.todos.get.queryKey({ params: { id: "todo_1" } });
 
 const todo = queryClient.getQueryData(todoKey);
 
@@ -177,7 +177,7 @@ Pass `queryKey` in options when a query needs a custom key.
 
 ```tsx
 const todo = useQuery(
-	tq.todos.get.queryOptions({
+	restrpc.todos.get.queryOptions({
 		request: { params: { id: "todo_1" } },
 		queryKey: ["todos", "detail", "todo_1"],
 	}),
@@ -201,10 +201,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 const queryClient = useQueryClient();
 
 const createTodo = useMutation(
-	tq.todos.create.mutationOptions({
+	restrpc.todos.create.mutationOptions({
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({
-				queryKey: tq.todos.list.queryKey(),
+				queryKey: restrpc.todos.list.queryKey(),
 			});
 		},
 		onError(error) {
@@ -228,7 +228,7 @@ Mutation options use the route path as their default mutation key. Use
 `mutationKey()` with TanStack Query APIs that filter or configure mutations.
 
 ```ts
-queryClient.setMutationDefaults(tq.todos.create.mutationKey(), {
+queryClient.setMutationDefaults(restrpc.todos.create.mutationKey(), {
 	retry: 2,
 });
 ```
@@ -242,7 +242,7 @@ passes the Tanstack Query provided cancellation signal to the fetch client autom
 
 ```tsx
 const todo = useQuery(
-	tq.todos.get.queryOptions({
+	restrpc.todos.get.queryOptions({
 		request: { params: { id: "todo_1" } },
 		fetchOptions: {
 			cache: "no-store",

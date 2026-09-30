@@ -4,7 +4,7 @@ description: Understand schema input/output types and validation at the HTTP bou
 ---
 
 `rest-rpc` accepts schemas that implement Standard Schema. Zod, Valibot, and
-ArkType are supported. The built-in `type<T>()` helper provides types without
+ArkType are supported. The built-in `type<T>()` utility provides types without
 runtime validation.
 
 Schemas describe application values. Serialization determines how those values
@@ -134,10 +134,10 @@ See [Fetch Client](/docs/client/fetch-client) for client-specific behavior and
 [Serialization and Codecs](/docs/http-behavior/serialization) for the decoding
 that precedes validation.
 
-## Type Helper
+## Type Utility
 
-When you don't need runtime validation, use the built-in `type<T>()` helper to declare
-schemas with only TypeScript types. The helper accepts an optional mapping function
+When you don't need runtime validation, use the built-in `type<T>()` utility to declare
+schemas with only TypeScript types. The utility accepts an optional mapping function
 to transform input to output. The mapping function can be asynchronous.
 
 ```ts

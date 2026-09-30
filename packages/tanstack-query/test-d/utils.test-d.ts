@@ -4,7 +4,7 @@ import {
 	type SseEvent,
 } from "@rest-rpc/core";
 import { route, type as schemaType } from "@rest-rpc/core";
-import { createTanstackQueryHelpers } from "@rest-rpc/tanstack-query";
+import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
 import {
 	type InfiniteData,
 	type QueryClient,
@@ -15,7 +15,7 @@ import { expectAssignable, expectError, expectType } from "tsd";
 
 declare const queryClient: QueryClient;
 
-expectError(createTanstackQueryHelpers({ baseUrl: "https://example.test" }));
+expectError(createTanstackQueryUtils({ baseUrl: "https://example.test" }));
 
 // query options
 
@@ -32,7 +32,7 @@ const queryApi = {
 	},
 };
 
-const queryTq = createTanstackQueryHelpers(queryApi, {
+const queryrestrpc = createTanstackQueryUtils(queryApi, {
 	baseUrl: "https://example.test",
 });
 
@@ -42,10 +42,10 @@ const validatedQueryApi = {
 		.params(schemaType<{ id: string }>())
 		.response(200, schemaType<{ id: string; title: string }>()),
 };
-const validatedQueryTq = createTanstackQueryHelpers(validatedQueryApi, {
+const validatedQueryrestrpc = createTanstackQueryUtils(validatedQueryApi, {
 	baseUrl: "https://example.test",
 });
-validatedQueryTq.test.queryOptions({
+validatedQueryrestrpc.test.queryOptions({
 	request: { params: { id: "test-1" } },
 });
 
@@ -56,7 +56,7 @@ expectType<{
 	headers: Headers;
 }>(undefined as unknown as FinalizedQueryData);
 
-const getOptions = queryTq.todos.get.queryOptions({
+const getOptions = queryrestrpc.todos.get.queryOptions({
 	request: {
 		params: {
 			id: "todo-1",
@@ -95,7 +95,7 @@ queryClient.setQueryData(getOptions.queryKey, (current) => {
 
 // should preserve selected data callbacks while fetchQuery still resolves route data
 type GetTodoData = InferClientResponse<typeof queryApi.todos.get>;
-const selectedGetOptions = queryTq.todos.get.queryOptions({
+const selectedGetOptions = queryrestrpc.todos.get.queryOptions({
 	request: {
 		params: {
 			id: "todo-1",
@@ -117,7 +117,7 @@ expectAssignable<Promise<GetTodoData>>(
 	queryClient.fetchQuery(selectedGetOptions),
 );
 
-const selectedListOptions = queryTq.todos.list.queryOptions({
+const selectedListOptions = queryrestrpc.todos.list.queryOptions({
 	queryKey: ["todos", "custom"],
 	staleTime: 100,
 	fetchOptions: {
@@ -155,12 +155,12 @@ const streamApi = {
 	},
 };
 
-const streamTq = createTanstackQueryHelpers(streamApi, {
+const streamrestrpc = createTanstackQueryUtils(streamApi, {
 	baseUrl: "https://example.test",
 });
 type Event = SseEvent<{ id: string; message: string }>;
 
-const streamOptions = streamTq.events.list.queryOptions();
+const streamOptions = streamrestrpc.events.list.queryOptions();
 expectAssignable<
 	Promise<{
 		status: 200;
@@ -177,7 +177,7 @@ expectAssignable<
 	| undefined
 >(queryClient.getQueryData(streamOptions.queryKey));
 
-const materializedStreamOptions = streamTq.events.list.streamedQueryOptions();
+const materializedStreamOptions = streamrestrpc.events.list.streamedQueryOptions();
 expectAssignable<Promise<Event[]>>(
 	queryClient.fetchQuery(materializedStreamOptions),
 );
@@ -185,20 +185,20 @@ expectAssignable<Event[] | undefined>(
 	queryClient.getQueryData(materializedStreamOptions.queryKey),
 );
 const inlineMaterializedStreamQuery = useQuery(
-	streamTq.events.list.streamedQueryOptions(),
+	streamrestrpc.events.list.streamedQueryOptions(),
 );
 expectType<UseQueryResult<Event[], HttpError | Error>>(
 	inlineMaterializedStreamQuery,
 );
-streamTq.events.list.streamedQueryOptions({ request: skipToken });
+streamrestrpc.events.list.streamedQueryOptions({ request: skipToken });
 const inlineSkippedStreamQuery = useQuery(
-	streamTq.events.byTopic.streamedQueryOptions({ request: skipToken }),
+	streamrestrpc.events.byTopic.streamedQueryOptions({ request: skipToken }),
 );
 expectType<UseQueryResult<Event[], HttpError | Error>>(
 	inlineSkippedStreamQuery,
 );
 
-const selectedStreamOptions = streamTq.events.list.streamedQueryOptions({
+const selectedStreamOptions = streamrestrpc.events.list.streamedQueryOptions({
 	select(events) {
 		expectType<Event[]>(events);
 		return events.length;
@@ -211,7 +211,7 @@ expectAssignable<Event[] | undefined>(
 	queryClient.getQueryData(selectedStreamOptions.queryKey),
 );
 const inlineSelectedStreamQuery = useQuery(
-	streamTq.events.list.streamedQueryOptions({
+	streamrestrpc.events.list.streamedQueryOptions({
 		select(events) {
 			expectType<Event[]>(events);
 			return events.length;
@@ -222,7 +222,7 @@ expectType<UseQueryResult<number, HttpError | Error>>(
 	inlineSelectedStreamQuery,
 );
 
-const reducedStreamOptions = streamTq.events.list.streamedQueryOptions({
+const reducedStreamOptions = streamrestrpc.events.list.streamedQueryOptions({
 	initialValue: "",
 	reducer: (text, chunk) => {
 		expectType<string>(text);
@@ -235,7 +235,7 @@ expectAssignable<string | undefined>(
 	queryClient.getQueryData(reducedStreamOptions.queryKey),
 );
 const inlineReducedStreamQuery = useQuery(
-	streamTq.events.list.streamedQueryOptions({
+	streamrestrpc.events.list.streamedQueryOptions({
 		initialValue: "",
 		reducer: (text, chunk) => {
 			expectType<string>(text);
@@ -246,7 +246,7 @@ const inlineReducedStreamQuery = useQuery(
 );
 expectType<UseQueryResult<string, HttpError | Error>>(inlineReducedStreamQuery);
 
-const arrayReducedStreamOptions = streamTq.events.list.streamedQueryOptions({
+const arrayReducedStreamOptions = streamrestrpc.events.list.streamedQueryOptions({
 	initialValue: [] as Event[],
 	reducer: (events, chunk) => {
 		expectType<Event[]>(events);
@@ -262,7 +262,7 @@ expectAssignable<Event[] | undefined>(
 	queryClient.getQueryData(arrayReducedStreamOptions.queryKey),
 );
 
-const selectedReducedStreamOptions = streamTq.events.list.streamedQueryOptions({
+const selectedReducedStreamOptions = streamrestrpc.events.list.streamedQueryOptions({
 	initialValue: new Map<string, string>(),
 	reducer: (messages, chunk) => {
 		expectType<Map<string, string>>(messages);
@@ -282,7 +282,7 @@ expectAssignable<Map<string, string> | undefined>(
 	queryClient.getQueryData(selectedReducedStreamOptions.queryKey),
 );
 const inlineSelectedReducedStreamQuery = useQuery(
-	streamTq.events.list.streamedQueryOptions({
+	streamrestrpc.events.list.streamedQueryOptions({
 		initialValue: new Map<string, string>(),
 		reducer: (messages, chunk) => {
 			expectType<Map<string, string>>(messages);
@@ -304,7 +304,7 @@ expectType<UseQueryResult<string[], HttpError | Error>>(
 // should accept skipToken for conditional request input
 const optionalId: string | undefined = "todo-1";
 
-const skippedOptions = queryTq.todos.get.queryOptions({
+const skippedOptions = queryrestrpc.todos.get.queryOptions({
 	request: optionalId ? { params: { id: optionalId } } : skipToken,
 	queryKey: ["todos", "disabled"],
 	staleTime: 100,
@@ -316,7 +316,7 @@ expectAssignable<
 // request and fetch options
 
 // should combine request input and TanStack options in one object
-queryTq.todos.get.queryOptions({
+queryrestrpc.todos.get.queryOptions({
 	request: {
 		params: {
 			id: "todo-1",
@@ -324,7 +324,7 @@ queryTq.todos.get.queryOptions({
 	},
 	retry: false,
 });
-queryTq.todos.get.queryOptions({
+queryrestrpc.todos.get.queryOptions({
 	request: {
 		params: {
 			id: "todo-1",
@@ -334,7 +334,7 @@ queryTq.todos.get.queryOptions({
 	gcTime: 1_000,
 });
 expectError(
-	queryTq.todos.get.queryOptions({
+	queryrestrpc.todos.get.queryOptions({
 		request: { params: { id: "todo-1" } },
 		fetchOptions: { signal: AbortSignal.abort() },
 	}),
@@ -347,35 +347,35 @@ const globalHeadersApi = {
 		.input(schemaType<{ title: string }>())
 		.output(schemaType<{ id: string }>()),
 };
-const globalHeadersTq = createTanstackQueryHelpers(globalHeadersApi, {
+const globalHeadersrestrpc = createTanstackQueryUtils(globalHeadersApi, {
 	baseUrl: "https://example.test",
 	globalHeaders: {
 		authorization: async () => "Bearer token",
 		"x-client-version": 2,
 	},
 });
-globalHeadersTq.secure.queryOptions({
+globalHeadersrestrpc.secure.queryOptions({
 	request: { title: "Write type tests" },
 });
-globalHeadersTq.secure.mutationOptions({
+globalHeadersrestrpc.secure.mutationOptions({
 	onSuccess(_data, variables) {
 		expectType<{ title: string }>(variables);
 	},
 });
 
-const optionalGlobalHeadersTq = createTanstackQueryHelpers(globalHeadersApi, {
+const optionalGlobalHeadersrestrpc = createTanstackQueryUtils(globalHeadersApi, {
 	baseUrl: "https://example.test",
 	globalHeaders: {
 		authorization: (): string | undefined => undefined,
 	},
 });
 expectError(
-	optionalGlobalHeadersTq.secure.queryOptions({
+	optionalGlobalHeadersrestrpc.secure.queryOptions({
 		request: { title: "Write type tests" },
 	}),
 );
 
-// should preserve route-specific Fetch options while query helpers own signals
+// should preserve route-specific Fetch options while query utils own signals
 const contentTypeApi = {
 	imports: route
 		.input(schemaType<{ value: string }>(), {
@@ -383,10 +383,10 @@ const contentTypeApi = {
 		})
 		.output(schemaType<{ id: string }>()),
 };
-const contentTypeTq = createTanstackQueryHelpers(contentTypeApi, {
+const contentTyperestrpc = createTanstackQueryUtils(contentTypeApi, {
 	baseUrl: "https://example.test",
 });
-contentTypeTq.imports.queryOptions({
+contentTyperestrpc.imports.queryOptions({
 	request: { value: "hello" },
 	fetchOptions: {
 		additionalHeaders: { "x-trace-id": "trace-1", "x-retry": 1 },
@@ -394,27 +394,27 @@ contentTypeTq.imports.queryOptions({
 	},
 });
 expectError(
-	contentTypeTq.imports.queryOptions({ request: { value: "hello" } }),
+	contentTyperestrpc.imports.queryOptions({ request: { value: "hello" } }),
 );
 expectError(
-	contentTypeTq.imports.queryOptions({
+	contentTyperestrpc.imports.queryOptions({
 		request: { value: "hello" },
 		fetchOptions: { contentType: "application/json" },
 	}),
 );
-contentTypeTq.imports.queryOptions({
+contentTyperestrpc.imports.queryOptions({
 	request: skipToken,
 	fetchOptions: { contentType: "text/plain" },
 });
-contentTypeTq.imports.mutationOptions({
+contentTyperestrpc.imports.mutationOptions({
 	fetchOptions: {
 		additionalHeaders: { "x-trace-id": "trace-1" },
 		contentType: "text/markdown",
 		signal: AbortSignal.abort(),
 	},
 });
-expectError(contentTypeTq.imports.mutationOptions());
-contentTypeTq.imports.infiniteQueryOptions({
+expectError(contentTyperestrpc.imports.mutationOptions());
+contentTyperestrpc.imports.infiniteQueryOptions({
 	request: (value) => {
 		expectType<string>(value);
 		return { value };
@@ -424,13 +424,13 @@ contentTypeTq.imports.infiniteQueryOptions({
 	fetchOptions: { contentType: "text/plain" },
 });
 expectError(
-	contentTypeTq.imports.infiniteQueryOptions({
+	contentTyperestrpc.imports.infiniteQueryOptions({
 		request: (value: string) => ({ value }),
 		initialPageParam: "hello",
 		getNextPageParam: () => undefined,
 	}),
 );
-contentTypeTq.imports.infiniteQueryOptions({
+contentTyperestrpc.imports.infiniteQueryOptions({
 	request: skipToken,
 	initialPageParam: "hello",
 	getNextPageParam: () => undefined,
@@ -449,11 +449,11 @@ const mutationApi = {
 	},
 };
 
-const mutationTq = createTanstackQueryHelpers(mutationApi, {
+const mutationrestrpc = createTanstackQueryUtils(mutationApi, {
 	baseUrl: "https://example.test",
 });
 
-mutationTq.todos.create.mutationOptions({
+mutationrestrpc.todos.create.mutationOptions({
 	fetchOptions: {
 		cache: "no-store",
 	},
@@ -491,7 +491,7 @@ const pageApi = {
 	},
 };
 
-const pageTq = createTanstackQueryHelpers(pageApi, {
+const pagerestrpc = createTanstackQueryUtils(pageApi, {
 	baseUrl: "https://example.test",
 });
 
@@ -508,7 +508,7 @@ type TodoPageResponseShape = {
 	headers: Headers;
 };
 
-const infiniteOptions = pageTq.todos.page.infiniteQueryOptions({
+const infiniteOptions = pagerestrpc.todos.page.infiniteQueryOptions({
 	request: (cursor: TodoPageParam) => ({
 		query: { cursor, status: "open", limit: 50 },
 	}),
@@ -523,13 +523,13 @@ const infiniteOptions = pageTq.todos.page.infiniteQueryOptions({
 	},
 });
 
-pageTq.todos.page.infiniteQueryOptions({
+pagerestrpc.todos.page.infiniteQueryOptions({
 	request: skipToken,
 	initialPageParam: undefined as TodoPageParam,
 	getNextPageParam: () => undefined,
 });
 expectError(
-	pageTq.todos.page.infiniteQueryOptions({
+	pagerestrpc.todos.page.infiniteQueryOptions({
 		request: (cursor: TodoPageParam) => ({
 			query: { cursor, status: "open", limit: 50 },
 		}),
@@ -556,7 +556,7 @@ if (cachedInfiniteData) {
 // query keys
 
 // should generate reusable typed keys for QueryClient cache operations
-const key = queryTq.todos.get.queryKey({
+const key = queryrestrpc.todos.get.queryKey({
 	params: {
 		id: "todo-1",
 	},
@@ -575,14 +575,14 @@ queryClient.setQueryData(key, (current) => {
 	>(current);
 	return current;
 });
-const listKey = queryTq.todos.list.queryKey();
+const listKey = queryrestrpc.todos.list.queryKey();
 queryClient.invalidateQueries({ queryKey: listKey });
 queryClient.setQueryData(listKey, (current) => current);
 
-const mutationKey = mutationTq.todos.create.mutationKey();
+const mutationKey = mutationrestrpc.todos.create.mutationKey();
 expectAssignable<readonly unknown[]>(mutationKey);
 expectAssignable<readonly unknown[]>(
-	mutationTq.todos.create.mutationOptions().mutationKey,
+	mutationrestrpc.todos.create.mutationOptions().mutationKey,
 );
 
 // invalid calls
@@ -604,14 +604,14 @@ const invalidApi = {
 	},
 };
 
-const invalidTq = createTanstackQueryHelpers(invalidApi, {
+const invalidrestrpc = createTanstackQueryUtils(invalidApi, {
 	baseUrl: "https://example.test",
 });
 
-expectError(invalidTq.todos.get.queryOptions());
-expectError(invalidTq.todos.get.queryOptions({ id: "todo-1", extra: true }));
+expectError(invalidrestrpc.todos.get.queryOptions());
+expectError(invalidrestrpc.todos.get.queryOptions({ id: "todo-1", extra: true }));
 expectError(
-	invalidTq.todos.get.queryOptions({
+	invalidrestrpc.todos.get.queryOptions({
 		request: {
 			params: {
 				id: "todo-1",
@@ -620,17 +620,17 @@ expectError(
 		fetchOptions: { nope: true },
 	}),
 );
-expectError(invalidTq.todos.get.queryOptions({ retry: false }));
+expectError(invalidrestrpc.todos.get.queryOptions({ retry: false }));
 expectError(
-	invalidTq.todos.list.queryOptions({
+	invalidrestrpc.todos.list.queryOptions({
 		request: { params: { id: "todo-1" } },
 	}),
 );
-invalidTq.todos.list.queryOptions({ retry: false });
-invalidTq.todos.list.queryOptions({ request: skipToken });
-expectError(invalidTq.todos.get.queryKey());
+invalidrestrpc.todos.list.queryOptions({ retry: false });
+invalidrestrpc.todos.list.queryOptions({ request: skipToken });
+expectError(invalidrestrpc.todos.get.queryKey());
 expectError(
-	invalidTq.todos.get.queryKey({
+	invalidrestrpc.todos.get.queryKey({
 		extra: true,
 		params: {
 			params: {
@@ -639,40 +639,40 @@ expectError(
 		},
 	}),
 );
-expectError(invalidTq.todos.list.queryKey({ queryKey: ["todos", "list"] }));
+expectError(invalidrestrpc.todos.list.queryKey({ queryKey: ["todos", "list"] }));
 expectError(
-	invalidTq.todos.get.streamedQueryOptions({
+	invalidrestrpc.todos.get.streamedQueryOptions({
 		request: { params: { id: "todo-1" } },
 	}),
 );
-invalidTq.normalStream.streamedQueryOptions();
-expectError(invalidTq.ambiguousStream.streamedQueryOptions());
+invalidrestrpc.normalStream.streamedQueryOptions();
+expectError(invalidrestrpc.ambiguousStream.streamedQueryOptions());
 expectError(
-	invalidTq.todos.page.infiniteQueryOptions({
+	invalidrestrpc.todos.page.infiniteQueryOptions({
 		initialPageParam: { status: "open", limit: 50 },
 		getNextPageParam: () => undefined,
 	}),
 );
 expectError(
-	invalidTq.todos.page.infiniteQueryOptions({
+	invalidrestrpc.todos.page.infiniteQueryOptions({
 		request: () => ({ status: "open", limit: 50 }),
 		initialPageParam: undefined,
 		getNextPageParam: () => undefined,
 	}),
 );
 expectError(
-	invalidTq.todos.page.infiniteQueryOptions({
+	invalidrestrpc.todos.page.infiniteQueryOptions({
 		initialRequest: { query: { status: "open", limit: 50 } },
 		getNextRequest: () => undefined,
 	}),
 );
-invalidTq.todos.list.infiniteQueryOptions({
+invalidrestrpc.todos.list.infiniteQueryOptions({
 	initialPageParam: {},
 	getNextPageParam: () => undefined,
 });
-invalidTq.mixed.list.queryOptions();
+invalidrestrpc.mixed.list.queryOptions();
 
-// shorthand route helpers
+// shorthand route utils
 
 const shorthandApi = {
 	todos: {
@@ -684,11 +684,11 @@ const shorthandApi = {
 	},
 };
 
-const shorthandTq = createTanstackQueryHelpers(shorthandApi, {
+const shorthandrestrpc = createTanstackQueryUtils(shorthandApi, {
 	baseUrl: "https://example.test",
 });
 
-const shorthandGetOptions = shorthandTq.todos.get.queryOptions({
+const shorthandGetOptions = shorthandrestrpc.todos.get.queryOptions({
 	retry(_failureCount, error) {
 		expectType<HttpError | Error>(error);
 		return false;
@@ -703,17 +703,17 @@ expectType<Promise<{ id: string; title: string }>>(
 	queryClient.fetchQuery(shorthandGetOptions),
 );
 
-const shorthandStreamOptions = shorthandTq.todos.events.queryOptions();
+const shorthandStreamOptions = shorthandrestrpc.todos.events.queryOptions();
 expectType<Promise<AsyncIterable<Event>>>(
 	queryClient.fetchQuery(shorthandStreamOptions),
 );
 const shorthandMaterializedStreamOptions =
-	shorthandTq.todos.events.streamedQueryOptions();
+	shorthandrestrpc.todos.events.streamedQueryOptions();
 expectType<Promise<Event[]>>(
 	queryClient.fetchQuery(shorthandMaterializedStreamOptions),
 );
 
-shorthandTq.todos.add.mutationOptions({
+shorthandrestrpc.todos.add.mutationOptions({
 	onSuccess(data, variables) {
 		expectType<{ id: string; title: string }>(data);
 		expectType<{ title: string }>(variables);
@@ -723,9 +723,9 @@ shorthandTq.todos.add.mutationOptions({
 		expectType<HttpError | Error>(error);
 	},
 });
-shorthandTq.todos.add.queryOptions({ request: { title: "Todo" } });
+shorthandrestrpc.todos.add.queryOptions({ request: { title: "Todo" } });
 expectError(
-	shorthandTq.todos.add.queryOptions({ request: { body: { title: "Todo" } } }),
+	shorthandrestrpc.todos.add.queryOptions({ request: { body: { title: "Todo" } } }),
 );
-expectError(shorthandTq.todos.add.queryOptions());
-expectError(shorthandTq.todos.get.streamedQueryOptions());
+expectError(shorthandrestrpc.todos.add.queryOptions());
+expectError(shorthandrestrpc.todos.get.streamedQueryOptions());

@@ -24,7 +24,7 @@ import type {
 	QueryObserverOptions,
 	skipToken,
 } from "@tanstack/query-core";
-import { createTanstackHelpersForRoute } from "./createHelperFunctions.ts";
+import { createTanstackUtilsForRoute } from "./createUtils.ts";
 
 type Simplify<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
 type NoInferValue<T> = [T][T extends unknown ? 0 : never];
@@ -421,20 +421,20 @@ type TanstackQueryTreeFor<
 	TGlobalHeaders extends ClientHeaders,
 > = {
 	[K in keyof T]: T[K] extends Contract
-		? TanstackQueryHelpersFor<T[K], TGlobalHeaders>
+		? TanstackQueryUtilsFor<T[K], TGlobalHeaders>
 		: never;
 };
 
 /**
- * Infers the generated TanStack Query helper tree for a contract.
+ * Infers the generated TanStack Query util tree for a contract.
  *
- * @remarks The helper tree mirrors the contract. Each route exposes query,
- * mutation, query-key, and mutation-key helpers; eligible streaming routes
+ * @remarks The util tree mirrors the contract. Each route exposes query,
+ * mutation, query-key, and mutation-key utils; eligible streaming routes
  * also expose streamed query options.
  *
  * @see {@link https://rest-rpc.dev/docs/client/tanstack-query}
  */
-export type TanstackQueryHelpersFor<
+export type TanstackQueryUtilsFor<
 	T extends Contract,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > = T extends QueryRoute
@@ -442,11 +442,11 @@ export type TanstackQueryHelpersFor<
 	: TanstackQueryTreeFor<T, TGlobalHeaders>;
 
 /**
- * Options used to create TanStack Query helpers from a contract.
+ * Options used to create TanStack Query utils from a contract.
  *
  * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#setup}
  */
-export type CreateTanstackQueryHelpersOptions<
+export type CreateTanstackQueryUtilsOptions<
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > = ApiClientOptions<TGlobalHeaders>;
 
@@ -477,23 +477,23 @@ const fetchSuccessfulResponse = async (
 };
 
 /**
- * Creates a TanStack Query helper tree that mirrors a contract.
+ * Creates a TanStack Query util tree that mirrors a contract.
  *
- * @remarks Generated helpers create options and stable query keys; they do not
+ * @remarks Generated utils create options and stable query keys; they do not
  * create a `QueryClient` or call framework-specific hooks.
  *
  * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#setup}
  */
-export function createTanstackQueryHelpers<
+export function createTanstackQueryUtils<
 	TContract extends Contract,
 	const TGlobalHeaders extends ClientHeaders = Record<never, string>,
 >(
 	contract: TContract,
-	options: CreateTanstackQueryHelpersOptions<TGlobalHeaders>,
-): TanstackQueryHelpersFor<TContract, TGlobalHeaders> {
+	options: CreateTanstackQueryUtilsOptions<TGlobalHeaders>,
+): TanstackQueryUtilsFor<TContract, TGlobalHeaders> {
 	const client = initClient(contract, options);
 
-	const buildTanstackQueryHelpers = (
+	const buildTanstackQueryUtils = (
 		node: Contract,
 		clientNode: unknown,
 		path: string[] = [],
@@ -506,7 +506,7 @@ export function createTanstackQueryHelpers<
 
 			const returnsResponseEnvelope = route.output === "response";
 
-			return createTanstackHelpersForRoute({
+			return createTanstackUtilsForRoute({
 				routePath: path,
 				fetchData: returnsResponseEnvelope
 					? (request, fetchOptions) =>
@@ -521,12 +521,12 @@ export function createTanstackQueryHelpers<
 		return Object.fromEntries(
 			Object.entries(node).map(([key, value]) => [
 				key,
-				buildTanstackQueryHelpers(value, client[key], [...path, key]),
+				buildTanstackQueryUtils(value, client[key], [...path, key]),
 			]),
 		);
 	};
 
-	return buildTanstackQueryHelpers(contract, client) as TanstackQueryHelpersFor<
+	return buildTanstackQueryUtils(contract, client) as TanstackQueryUtilsFor<
 		TContract,
 		TGlobalHeaders
 	>;

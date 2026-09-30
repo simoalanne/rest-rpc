@@ -11,7 +11,7 @@ Import `route` from your server adapter. Attach a handler with `.handler()`;
 its return value determines the client's result type.
 
 Schemas can come from Zod, Valibot, ArkType, or another Standard Schema library.
-The built-in `type<T>()` helper declares types without runtime validation. See
+The built-in `type<T>()` utility declares types without runtime validation. See
 [Schemas and Validation](/docs/http-behavior/schemas).
 
 ## Start with Defaults
@@ -271,7 +271,7 @@ See [OpenAPI](/docs/openapi) for document generation.
 
 ## Infer Route Types
 
-Use the route inference helpers when the request or response type needs to be
+Use the route inference type helpers when the request or response type needs to be
 reused elsewhere in your application.
 
 ### Infer Client Request

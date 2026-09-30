@@ -88,7 +88,7 @@ if (response.status === 200) {
 
 Use only packages required by the detected stack:
 
-- `@rest-rpc/core`: route declarations, clients, OpenAPI, type helpers
+- `@rest-rpc/core`: route declarations, clients, OpenAPI and contract generation
 - `@rest-rpc/tanstack-query`: TanStack Query integration
 - `@rest-rpc/express`: Express adapter
 - `@rest-rpc/fastify`: Fastify adapter
@@ -151,6 +151,6 @@ For implementation tasks:
 6. Generate the client contract with `generateContractFromType` using a type-only server import. Generation needs filesystem access and the TypeScript 5 or 6 compiler API; run it at build time for browser clients.
 7. Use `registerRoutes` when registering with a framework router. Use `createRouteHandler` when a runtime needs a custom matcher or catch-all handler.
 8. Register routes in multiple modules when useful; route trees and handlers don't have to be monolithic.
-9. Use typed client helpers for direct calls. Use `@rest-rpc/tanstack-query` for query/mutation options and keys when TanStack Query should be used instead.
+9. Use typed client utils for direct calls. Use `@rest-rpc/tanstack-query` for query/mutation options and keys when TanStack Query should be used instead.
 10. If using contract-first declare contract in a package that both server and client depend on. Use `implement` to convert the contract into a server route tree and add handlers. Use the contract directly on the `initClient` call to create a typed client. No generation step is needed when the contract is shared.
 11. Let types infer from the route declarations. If inference is not enough, prefer exported helper types over new ad-hoc types.

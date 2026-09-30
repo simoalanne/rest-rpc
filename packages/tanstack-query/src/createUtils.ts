@@ -14,7 +14,7 @@ type OptionsWithFetchOptions = Record<string, unknown> & {
 	refetchMode?: "append" | "reset" | "replace";
 	request?: unknown;
 };
-export type TanstackQueryHelperFunctions = {
+export type TanstackQueryUtilFunctions = {
 	mutationOptions: (
 		options?: OptionsWithFetchOptions,
 	) => Record<string, unknown>;
@@ -48,7 +48,7 @@ const isAsyncIterable = (value: unknown): value is AsyncIterable<unknown> =>
 	Symbol.asyncIterator in value &&
 	typeof value[Symbol.asyncIterator] === "function";
 
-export const createTanstackHelpersForRoute = ({
+export const createTanstackUtilsForRoute = ({
 	routePath,
 	fetchData,
 	unwrapResponseBodyForStream = false,
@@ -56,8 +56,8 @@ export const createTanstackHelpersForRoute = ({
 	routePath: string[];
 	fetchData: FetchData;
 	unwrapResponseBodyForStream?: boolean;
-}): TanstackQueryHelperFunctions => {
-	const helpers: TanstackQueryHelperFunctions = {
+}): TanstackQueryUtilFunctions => {
+	const utils: TanstackQueryUtilFunctions = {
 		mutationOptions: (options) => {
 			const { fetchOptions, queryOptions } = splitFetchOptions(options);
 			return {
@@ -118,7 +118,7 @@ export const createTanstackHelpersForRoute = ({
 		queryKey: (request?: unknown) =>
 			request === undefined ? routePath : [...routePath, request],
 	};
-	helpers.streamedQueryOptions = (options) => {
+	utils.streamedQueryOptions = (options) => {
 		const { fetchOptions, queryOptions } = splitFetchOptions(options);
 		const {
 			request,
@@ -167,5 +167,5 @@ export const createTanstackHelpersForRoute = ({
 			...tanstackOptions,
 		};
 	};
-	return helpers;
+	return utils;
 };

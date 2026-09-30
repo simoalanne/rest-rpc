@@ -20,7 +20,7 @@ import {
 	createRouteHandler as createNodeRouteHandler,
 	route as nodeRoute,
 } from "@rest-rpc/node";
-import { createTanstackQueryHelpers } from "@rest-rpc/tanstack-query";
+import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
 
 export const hoverApi = {
 	todos: {
@@ -98,11 +98,11 @@ export const declaredHoverClient = initClient(declaredHoverApi, {
 	baseUrl: "https://example.test",
 });
 
-export const hoverQuery = createTanstackQueryHelpers(hoverApi, {
+export const hoverQuery = createTanstackQueryUtils(hoverApi, {
 	baseUrl: "https://example.test",
 });
 
-export const declaredHoverQuery = createTanstackQueryHelpers(declaredHoverApi, {
+export const declaredHoverQuery = createTanstackQueryUtils(declaredHoverApi, {
 	baseUrl: "https://example.test",
 });
 
@@ -285,12 +285,9 @@ export const shorthandHoverApi = {
 export const shorthandHoverClient = initClient(shorthandHoverApi, {
 	baseUrl: "https://example.test",
 });
-export const shorthandHoverQuery = createTanstackQueryHelpers(
-	shorthandHoverApi,
-	{
-		baseUrl: "https://example.test",
-	},
-);
+export const shorthandHoverQuery = createTanstackQueryUtils(shorthandHoverApi, {
+	baseUrl: "https://example.test",
+});
 
 type ShorthandGetRoute = typeof shorthandHoverApi.todos.get;
 type ShorthandCreateRoute = typeof shorthandHoverApi.todos.create;

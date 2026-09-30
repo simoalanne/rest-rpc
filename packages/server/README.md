@@ -13,7 +13,7 @@ shared contract is also supported.
 
 - Fluent route builder for HTTP
 - Typed handlers for Express, Hono, Fastify, NestJS, Node HTTP, and Fetch runtimes.
-- Typed Fetch client and TanStack Query helpers.
+- Typed Fetch client and TanStack Query utils.
 - Typed Server-Sent Event streams and custom request/response bodies
 - Standard Schema validation
 - OpenAPI generation from route declarations
@@ -81,4 +81,4 @@ Full documentation is available at [rest-rpc.dev](https://rest-rpc.dev).
 - [`@rest-rpc/nest`](https://npmx.dev/package/@rest-rpc/nest): NestJS server adapter.
 - [`@rest-rpc/node`](https://npmx.dev/package/@rest-rpc/node): Node HTTP server adapter.
 - [`@rest-rpc/fetch`](https://npmx.dev/package/@rest-rpc/fetch): Fetch runtime adapter.
-- [`@rest-rpc/tanstack-query`](https://npmx.dev/package/@rest-rpc/tanstack-query): TanStack Query helpers.
+- [`@rest-rpc/tanstack-query`](https://npmx.dev/package/@rest-rpc/tanstack-query): TanStack Query utils.

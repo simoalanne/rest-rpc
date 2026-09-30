@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { skipToken } from "@tanstack/query-core";
-import { createTanstackHelpersForRoute } from "./createHelperFunctions.ts";
+import { createTanstackUtilsForRoute } from "./createUtils.ts";
 
 const routeWithoutRequestPath = ["items", "list"];
 const routeWithRequestPath = ["items", "byId"];
 
-describe("createTanstackQueryRouteHelpers", () => {
+describe("createTanstackQueryRouteUtils", () => {
 	it("creates query options with request-aware keys and a route call", async () => {
 		const fetchResponseCalls: unknown[][] = [];
-		const routeHelpers = createTanstackHelpersForRoute({
+		const routeUtils = createTanstackUtilsForRoute({
 			routePath: routeWithRequestPath,
 			fetchData: async (...args) => {
 				fetchResponseCalls.push(args);
@@ -21,7 +21,7 @@ describe("createTanstackQueryRouteHelpers", () => {
 		});
 		const request = { id: "item-1" };
 
-		const options = routeHelpers.queryOptions({
+		const options = routeUtils.queryOptions({
 			request,
 			staleTime: 123,
 		}) as any;
@@ -41,7 +41,7 @@ describe("createTanstackQueryRouteHelpers", () => {
 
 	it("forwards query fetch options to the route call without returning them", async () => {
 		const fetchResponseCalls: unknown[][] = [];
-		const routeHelpers = createTanstackHelpersForRoute({
+		const routeUtils = createTanstackUtilsForRoute({
 			routePath: routeWithRequestPath,
 			fetchData: async (...args) => {
 				fetchResponseCalls.push(args);
@@ -53,7 +53,7 @@ describe("createTanstackQueryRouteHelpers", () => {
 		});
 		const request = { id: "item-1" };
 
-		const options = routeHelpers.queryOptions({
+		const options = routeUtils.queryOptions({
 			request,
 			fetchOptions: { credentials: "include", cache: "no-store" },
 			retry: false,
@@ -75,7 +75,7 @@ describe("createTanstackQueryRouteHelpers", () => {
 	});
 
 	it("allows query options to override generated query keys", () => {
-		const routeHelpers = createTanstackHelpersForRoute({
+		const routeUtils = createTanstackUtilsForRoute({
 			routePath: routeWithRequestPath,
 			fetchData: async () => ({
 				status: 200,
@@ -84,13 +84,13 @@ describe("createTanstackQueryRouteHelpers", () => {
 		});
 		const request = { id: "item-1" };
 
-		const options = routeHelpers.queryOptions({
+		const options = routeUtils.queryOptions({
 			request,
 			queryKey: ["custom", request],
 		});
 
 		assert.deepEqual(options.queryKey, ["custom", request]);
-		assert.deepEqual(routeHelpers.queryKey(request), [
+		assert.deepEqual(routeUtils.queryKey(request), [
 			"items",
 			"byId",
 			request,
@@ -98,7 +98,7 @@ describe("createTanstackQueryRouteHelpers", () => {
 	});
 
 	it("uses skipToken to disable request-based query options", () => {
-		const routeHelpers = createTanstackHelpersForRoute({
+		const routeUtils = createTanstackUtilsForRoute({
 			routePath: routeWithRequestPath,
 			fetchData: async () => ({
 				status: 200,
@@ -106,7 +106,7 @@ describe("createTanstackQueryRouteHelpers", () => {
 			}),
 		});
 
-		const options = routeHelpers.queryOptions({ request: skipToken }) as any;
+		const options = routeUtils.queryOptions({ request: skipToken }) as any;
 
 		assert.equal(options.queryFn, skipToken);
 		assert.deepEqual(options.queryKey, ["items", "byId"]);
@@ -114,7 +114,7 @@ describe("createTanstackQueryRouteHelpers", () => {
 
 	it("creates query options for routes without request input", async () => {
 		const fetchResponseCalls: unknown[][] = [];
-		const routeHelpers = createTanstackHelpersForRoute({
+		const routeUtils = createTanstackUtilsForRoute({
 			routePath: routeWithoutRequestPath,
 			fetchData: async (...args) => {
 				fetchResponseCalls.push(args);
@@ -125,13 +125,13 @@ describe("createTanstackQueryRouteHelpers", () => {
 			},
 		});
 
-		const options = routeHelpers.queryOptions({ gcTime: 50 }) as any;
+		const options = routeUtils.queryOptions({ gcTime: 50 }) as any;
 
 		assert.equal(options.enabled, undefined);
 		assert.equal(options.gcTime, 50);
 		assert.equal(options.fetchOptions, undefined);
 		assert.deepEqual(options.queryKey, ["items", "list"]);
-		assert.deepEqual(routeHelpers.queryKey(), ["items", "list"]);
+		assert.deepEqual(routeUtils.queryKey(), ["items", "list"]);
 		await options.queryFn({ signal: "list-signal" });
 		assert.deepEqual(fetchResponseCalls, [
 			[undefined, { signal: "list-signal" }],
@@ -140,7 +140,7 @@ describe("createTanstackQueryRouteHelpers", () => {
 
 	it("creates mutation options", async () => {
 		const fetchResponseCalls: unknown[][] = [];
-		const routeHelpers = createTanstackHelpersForRoute({
+		const routeUtils = createTanstackUtilsForRoute({
 			routePath: routeWithRequestPath,
 			fetchData: async (...args) => {
 				fetchResponseCalls.push(args);
@@ -152,7 +152,7 @@ describe("createTanstackQueryRouteHelpers", () => {
 		});
 		const request = { name: "Potato" };
 
-		const options = routeHelpers.mutationOptions({
+		const options = routeUtils.mutationOptions({
 			fetchOptions: { credentials: "include", cache: "no-store" },
 			retry: false,
 		}) as any;
@@ -160,7 +160,7 @@ describe("createTanstackQueryRouteHelpers", () => {
 		assert.equal(options.retry, false);
 		assert.equal(options.fetchOptions, undefined);
 		assert.deepEqual(options.mutationKey, ["items", "byId"]);
-		assert.deepEqual(routeHelpers.mutationKey(), ["items", "byId"]);
+		assert.deepEqual(routeUtils.mutationKey(), ["items", "byId"]);
 		assert.deepEqual(await options.mutationFn(request), {
 			status: 201,
 			body: { id: "item-2" },
@@ -171,7 +171,7 @@ describe("createTanstackQueryRouteHelpers", () => {
 	});
 
 	it("allows mutation options to override generated mutation keys", () => {
-		const routeHelpers = createTanstackHelpersForRoute({
+		const routeUtils = createTanstackUtilsForRoute({
 			routePath: routeWithRequestPath,
 			fetchData: async () => ({
 				status: 201,
@@ -179,17 +179,17 @@ describe("createTanstackQueryRouteHelpers", () => {
 			}),
 		});
 
-		const options = routeHelpers.mutationOptions({
+		const options = routeUtils.mutationOptions({
 			mutationKey: ["custom", "create"],
 		});
 
 		assert.deepEqual(options.mutationKey, ["custom", "create"]);
-		assert.deepEqual(routeHelpers.mutationKey(), ["items", "byId"]);
+		assert.deepEqual(routeUtils.mutationKey(), ["items", "byId"]);
 	});
 
 	it("creates route requests from infinite query page params", async () => {
 		const fetchResponseCalls: unknown[][] = [];
-		const routeHelpers = createTanstackHelpersForRoute({
+		const routeUtils = createTanstackUtilsForRoute({
 			routePath: routeWithRequestPath,
 			fetchData: async (...args) => {
 				fetchResponseCalls.push(args);
@@ -202,7 +202,7 @@ describe("createTanstackQueryRouteHelpers", () => {
 		const initialPageParam: string | undefined = undefined;
 		const nextPageParam = "cursor-2";
 
-		const options = routeHelpers.infiniteQueryOptions({
+		const options = routeUtils.infiniteQueryOptions({
 			request: (cursor: string | undefined) => ({ cursor, limit: 20 }),
 			initialPageParam,
 			getNextPageParam: () => nextPageParam,
@@ -234,12 +234,12 @@ describe("createTanstackQueryRouteHelpers", () => {
 	});
 
 	it("uses skipToken to disable infinite query options", () => {
-		const routeHelpers = createTanstackHelpersForRoute({
+		const routeUtils = createTanstackUtilsForRoute({
 			routePath: routeWithRequestPath,
 			fetchData: async () => ({ status: 200, body: { items: [] } }),
 		});
 
-		const options = routeHelpers.infiniteQueryOptions({
+		const options = routeUtils.infiniteQueryOptions({
 			request: skipToken,
 			initialPageParam: undefined,
 			getNextPageParam: () => undefined,
@@ -251,7 +251,7 @@ describe("createTanstackQueryRouteHelpers", () => {
 	});
 
 	it("allows custom infinite query keys", () => {
-		const routeHelpers = createTanstackHelpersForRoute({
+		const routeUtils = createTanstackUtilsForRoute({
 			routePath: routeWithRequestPath,
 			fetchData: async () => ({
 				status: 200,
@@ -259,7 +259,7 @@ describe("createTanstackQueryRouteHelpers", () => {
 			}),
 		});
 
-		const options = routeHelpers.infiniteQueryOptions({
+		const options = routeUtils.infiniteQueryOptions({
 			queryKey: ["custom", "items"],
 			request: (page: { limit: number }) => page,
 			initialPageParam: { limit: 20 },

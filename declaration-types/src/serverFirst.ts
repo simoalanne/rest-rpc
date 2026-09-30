@@ -96,7 +96,7 @@ export const nodeRoutes = {
 export const fetchHandler = createFetchRouteHandler(fetchRoutes);
 export const nodeHandler = createNodeRouteHandler(nodeRoutes);
 
-// Downstream packages use public helpers directly on completed routes.
+// Downstream packages use public utils directly on completed routes.
 export type CreateClientRequest = InferClientRequest<typeof fetchRoutes.create>;
 export type CreateClientResponse = InferClientResponse<
 	typeof fetchRoutes.create
