@@ -104,11 +104,11 @@ export type RouteHandler<
 	...args: [request: RouteRequest<TRoute, TAdditionalHandlerFields, TContext>]
 ) => HandlerResult<TRoute>;
 
-type Merge<T> = { [TKey in keyof T]: T[TKey] };
+type Merge<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
 
 /** Terminal builder shape containing a route declaration and its handler. */
 export type CompletedRoute<TRoute, THandler> = {
-	readonly "~restrpc": TRoute & { readonly handler: THandler };
+	readonly "~restrpc": Merge<TRoute & { readonly handler: THandler }>;
 };
 
 type HasDeclaredResponses<TRoute> = TRoute extends {

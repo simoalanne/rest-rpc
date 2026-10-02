@@ -2,6 +2,9 @@ import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import type { SseServerEvent } from "./sse.ts";
 
+// Keep schema bodies opaque while flattening each inferred response envelope.
+type Merge<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
+
 type AnyRouteHandler = (...args: never[]) => unknown;
 
 export type UsesPlainOutput<TRoute extends RouteDeclaration> = TRoute extends {
@@ -135,8 +138,8 @@ type ResponseStatuses<TResponse> = TResponse extends {
 	: never;
 
 type InferredResponses<TResponse> = {
-	[TStatus in ResponseStatuses<TResponse>]: ImplicitResponseDeclaration<
-		Extract<TResponse, { status: TStatus }>
+	[TStatus in ResponseStatuses<TResponse>]: Merge<
+		ImplicitResponseDeclaration<Extract<TResponse, { status: TStatus }>>
 	>;
 };
 
@@ -184,8 +187,8 @@ export type ValidImplicitResult<TResult> = [
 export type InferredRoute<TRoute, TResult> = [
 	ReturnKind<Awaited<TResult>>,
 ] extends ["response"]
-	? InferredHttpRoute<TRoute, TResult> & { output: "response" }
-	: InferredProcedureRoute<TRoute, TResult> & { output: "output" };
+	? Merge<InferredHttpRoute<TRoute, TResult> & { output: "response" }>
+	: Merge<InferredProcedureRoute<TRoute, TResult> & { output: "output" }>;
 
 type ImplementationParts<TImplementation> = TImplementation extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration & {

@@ -1,3 +1,4 @@
+import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { type } from "../standard-schema/type.ts";
 import { route } from "./routeBuilder.ts";
 
@@ -12,6 +13,28 @@ describe("routeBuilder types", () => {
 		expectTypeOf<
 			keyof (typeof value)["~restrpc"]["responses"]
 		>().toEqualTypeOf<200>();
+	});
+
+	it("normalizes declarations without expanding schemas", () => {
+		const schema = type<{ name: string }>();
+		const value = route.input(schema).output(schema);
+		expectTypeOf(value["~restrpc"]).toEqualTypeOf<{
+			readonly kind: "procedure";
+			readonly method: "POST";
+			readonly path: undefined;
+			request: {
+				body: readonly [StandardSchemaV1<{ name: string }>];
+				contentType: "application/json";
+			};
+			responses: {
+				200: {
+					body: StandardSchemaV1<{ name: string }>;
+					contentType: "application/json";
+				};
+			};
+			readonly input: "input";
+			readonly output: "output";
+		}>();
 	});
 
 	it("removes builder operations incompatible with the selected state", () => {

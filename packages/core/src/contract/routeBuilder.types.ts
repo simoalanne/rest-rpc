@@ -14,6 +14,9 @@ import type {
 } from "./request.ts";
 import type { ResponseOptions } from "./response.ts";
 
+// Normalize one library-owned object at a time so schema and metadata types stay intact.
+type Merge<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
+
 type EmptyObject = Record<never, never>;
 type JsonContentType = "application/json";
 type BuilderPath = AbsolutePath | undefined;
@@ -256,24 +259,30 @@ export type PublicDeclarationFor<
 	TPath extends BuilderPath = AbsolutePath,
 	TMetadata extends RouteMetadata | never = never,
 > = TState extends BuilderState
-	? TState["route"] & {
-			readonly path: TPath;
-		} & (keyof TState["request"] extends never
-				? { request?: never }
-				: { request: TState["request"] }) & {
-				responses: TState["responses"];
-			} & (TState["input"] extends "none"
-				? EmptyObject
-				: {
-						readonly input: TState["input"] extends "headers"
-							? "segments"
-							: TState["input"];
-					}) &
-			(TState["output"] extends "none"
-				? EmptyObject
-				: { readonly output: TState["output"] }) &
-			MetadataDeclaration<TMetadata> &
-			OpenApiDeclaration<TState["openApi"]>
+	? Merge<
+			TState["route"] & {
+				readonly path: TPath;
+			} & (keyof TState["request"] extends never
+					? { request?: never }
+					: { request: Merge<TState["request"]> }) & {
+					responses: {
+						[TStatus in keyof TState["responses"]]: Merge<
+							TState["responses"][TStatus]
+						>;
+					};
+				} & (TState["input"] extends "none"
+					? EmptyObject
+					: {
+							readonly input: TState["input"] extends "headers"
+								? "segments"
+								: TState["input"];
+						}) &
+				(TState["output"] extends "none"
+					? EmptyObject
+					: { readonly output: TState["output"] }) &
+				MetadataDeclaration<TMetadata> &
+				OpenApiDeclaration<TState["openApi"]>
+		>
 	: never;
 
 /** Type-level hook used by packages that add operations to fluent builders. */
