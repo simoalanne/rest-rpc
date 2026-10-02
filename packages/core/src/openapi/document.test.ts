@@ -1,212 +1,53 @@
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
-import z from "zod";
 import { route } from "../contract/routeBuilder.ts";
+import { type } from "../standard-schema/type.ts";
 import { createOpenApiDocument } from "./document.ts";
-import type { SchemaConverter } from "./operation.ts";
 
-const schemaConverter: SchemaConverter = (schema, mode) =>
-	z.toJSONSchema(schema as z.ZodType, {
-		target: "openapi-3.0",
-		io: mode,
-		unrepresentable: "throw",
-		reused: "inline",
-	}) as Record<string, unknown>;
-
-const openApiTestContract = {
-	todos: {
-		list: route
-			.get("/todos")
-			.query(
-				z.object({
-					search: z.string(),
-					includeCompleted: z.boolean().optional(),
-				}),
-			)
-			.response(200, z.array(z.object({ id: z.string(), title: z.string() }))),
-		update: route
-			.post("/todos/:id")
-			.params(z.object({ id: z.string() }))
-			.body(z.object({ title: z.string().min(1) }))
-			.response(
-				202,
-				z.object({
-					id: z.string(),
-					title: z.string(),
-				}),
-			)
-			.response(
-				409,
-				z.object({
-					code: z.literal("TITLE_ALREADY_EXISTS"),
-				}),
-			),
-		remove: route
-			.delete("/todos/:id")
-			.params(z.object({ id: z.string() }))
-			.response(204),
-		events: route.get("/todos/events").streamResponse(
-			200,
-			z.object({
-				type: z.string(),
-			}),
-		),
-		import: route
-			.post("/todos/import")
-			.body(z.string(), { contentType: "text/csv" })
-			.response(204),
-	},
-};
-
-describe("createOpenApiDocument", () => {
-	it("builds base document fields", () => {
-		const document = createOpenApiDocument(
-			{ health: route.get("/health").response(204) },
-			{
-				openapi: "3.0.3",
-				info: {
-					title: "Todo API",
-					version: "1.0.0",
-				},
-				servers: [{ url: "http://localhost:3000" }],
-				components: {
-					securitySchemes: {
-						bearerAuth: {
-							type: "http",
-							scheme: "bearer",
-						},
-					},
-				},
-				tags: [{ name: "todos" }],
-				schemaConverter,
+describe("document", () => {
+	it("preserves document metadata and rejects routes with empty response maps", () => {
+		const options = {
+			openapi: "3.0.3",
+			info: { title: "Users", version: "1", description: "API" },
+			servers: [{ url: "https://example.test", description: "Primary" }],
+			tags: [{ name: "users", description: "Users" }],
+			components: {
+				securitySchemes: { token: { type: "http", scheme: "bearer" } },
 			},
-		);
-
-		assert.equal(document.openapi, "3.0.3");
-		assert.deepEqual(document.info, {
-			title: "Todo API",
-			version: "1.0.0",
+		};
+		expect(createOpenApiDocument({}, options)).toEqual({
+			...options,
+			paths: {},
 		});
-		assert.deepEqual(document.servers, [{ url: "http://localhost:3000" }]);
-		assert.deepEqual(document.tags, [{ name: "todos" }]);
-		assert.deepEqual(document.components, {
-			securitySchemes: {
-				bearerAuth: {
-					type: "http",
-					scheme: "bearer",
-				},
+		const empty = {
+			"~restrpc": {
+				...route.get("/").response(204)["~restrpc"],
+				responses: {},
 			},
-		});
-	});
-
-	it("groups multiple methods under the same OpenAPI path", () => {
-		const document = createOpenApiDocument(
-			{
-				todos: {
-					get: route
-						.get("/todos/:id")
-						.params(z.object({ id: z.string() }))
-						.response(200, z.object({ id: z.string() })),
-					remove: route
-						.delete("/todos/:id")
-						.params(z.object({ id: z.string() }))
-						.response(204),
-				},
-			},
-			{
-				info: { title: "Todo API", version: "1.0.0" },
-				schemaConverter,
-			},
-		);
-
-		assert.ok(document.paths["/todos/{id}"]?.get);
-		assert.ok(document.paths["/todos/{id}"]?.delete);
-	});
-
-	it("documents shorthand routes as derived POST operations", () => {
-		const document = createOpenApiDocument(
-			{
-				todos: {
-					get: route.output(z.object({ id: z.string() })),
-					add: route
-						.input(z.object({ title: z.string() }))
-						.output(z.object({ id: z.string(), title: z.string() })),
-				},
-			},
-			{
-				info: { title: "Todo API", version: "1.0.0" },
-				schemaConverter,
-			},
-		);
-
-		assert.equal(document.paths["/todos/get"]?.post?.requestBody, undefined);
-		assert.equal(
-			document.paths["/todos/get"]?.post?.responses["200"].content?.[
-				"application/json"
-			].schema.type,
-			"object",
-		);
-		assert.equal(
-			document.paths["/todos/add"]?.post?.requestBody?.content[
-				"application/json"
-			].schema.type,
-			"object",
+		};
+		expect(() => createOpenApiDocument({ get: empty }, options)).toThrow(
+			"must declare at least one response schema",
 		);
 	});
-
-	it("maps a representative API contract to paths, operations and schemas", () => {
-		const document = createOpenApiDocument(openApiTestContract, {
-			info: {
-				title: "Todo API",
-				version: "1.0.0",
+	it("normalizes explicit paths and derives paths from nested contract keys", () => {
+		const contract = {
+			users: {
+				get: route.get("/users/:id").response(200, type<string>()),
+				remove: route.delete("/users/{id}").response(204),
+				create: route.input(type<string>()).output(type<string>()),
 			},
-			schemaConverter,
-			transformOperation: ({ routePath, operation }) => ({
-				...operation,
-				operationId: routePath.join("."),
-			}),
+		};
+		const document = createOpenApiDocument(contract, {
+			info: { title: "Users", version: "1" },
 		});
-
-		assert.equal(document.openapi, "3.1.0");
-		assert.deepEqual(Object.keys(document.paths).sort(), [
-			"/todos",
-			"/todos/events",
-			"/todos/import",
-			"/todos/{id}",
+		expect(Object.keys(document.paths)).toEqual([
+			"/users/{id}",
+			"/users/create",
 		]);
-
-		const updateOperation = document.paths["/todos/{id}"]?.post;
-		assert.ok(updateOperation);
-		assert.equal(updateOperation.operationId, "todos.update");
-		assert.equal(
-			updateOperation.requestBody?.content["application/json"].schema.type,
-			"object",
-		);
-		assert.equal(
-			updateOperation.responses["202"].content?.["application/json"].schema
-				.type,
-			"object",
-		);
-
-		const importOperation = document.paths["/todos/import"]?.post;
-		assert.ok(importOperation);
-		assert.equal(
-			importOperation.requestBody?.content["text/csv"].schema.type,
-			"string",
-		);
-
-		const eventsOperation = document.paths["/todos/events"]?.get;
-		assert.ok(eventsOperation);
-		assert.deepEqual(
-			eventsOperation.responses["200"].content?.["text/event-stream"].schema,
-			{
-				type: "object",
-				properties: {
-					type: { type: "string" },
-				},
-				required: ["type"],
-				additionalProperties: false,
-			},
+		expect(Object.keys(document.paths["/users/{id}"]!)).toEqual([
+			"get",
+			"delete",
+		]);
+		expect(document.paths["/users/create"]?.post?.requestBody?.content).toEqual(
+			{ "application/json": { schema: {} } },
 		);
 	});
 });

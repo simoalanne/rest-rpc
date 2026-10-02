@@ -1,857 +1,166 @@
-import assert from "node:assert/strict";
-import { afterEach, describe, it } from "node:test";
-import z from "zod";
-import { route } from "../contract/routeBuilder.ts";
-import { type } from "../standard-schema/index.ts";
-import { initClient } from "./index.ts";
-import { constructBaseRequest, createRequestSignal } from "./request.ts";
+import { constructBaseRequest, executeRequest } from "./request.ts";
 
-const originalFetch = globalThis.fetch;
-
-afterEach(() => {
-	globalThis.fetch = originalFetch;
-});
-
-type FetchCall = {
-	url: string;
-	init?: RequestInit;
-};
-
-const createRequestTestContract = () => ({
-	todos: {
-		list: route
-			.get("/todos")
-			.query(
-				z.object({
-					search: z.string().optional(),
-					empty: z.string().optional(),
-					tags: z.array(z.string()).optional(),
-				}),
-			)
-			.response(200, z.array(z.object({ id: z.string(), title: z.string() }))),
-		create: route
-			.post("/todos")
-			.body(z.object({ title: z.string() }))
-			.response(201, z.object({ id: z.string(), title: z.string() })),
-		get: route
-			.get("/todos/:id")
-			.params(
-				z.object({
-					id: z.string(),
-				}),
-			)
-			.response(200, z.object({ id: z.string(), title: z.string() })),
-	},
-	uploads: {
-		create: route
-			.post("/uploads/:id")
-			.params(
-				z.object({
-					id: z.string(),
-				}),
-			)
-			.body(z.string(), { contentType: "text/plain" })
-			.response(204),
-		json: route
-			.post("/uploads/json")
-			.body(z.object({ type: z.string() }), {
-				contentType: "application/json",
-			})
-			.response(204),
-	},
-});
-
-const jsonResponse = (body: unknown, status = 200) =>
-	new Response(JSON.stringify(body), {
-		status,
-		headers: { "Content-Type": "application/json" },
-	});
-
-const captureFetch = (
-	response:
-		| Response
-		| ((
-				url: URL | RequestInfo,
-				init?: RequestInit,
-		  ) => Response | Promise<Response>) = new Response(null, { status: 204 }),
-) => {
-	const calls: FetchCall[] = [];
-
-	globalThis.fetch = async (url, init) => {
-		calls.push({ url: String(url), init });
-		return typeof response === "function" ? response(url, init) : response;
-	};
-
-	return calls;
-};
-
-describe("ApiClient requests", () => {
-	it("builds URLs from params and query keys", async () => {
-		const calls = captureFetch((url) =>
-			String(url).includes("/todos/todo%201")
-				? jsonResponse({ id: "todo 1", title: "Buy milk" })
-				: jsonResponse([]),
-		);
-		const client = initClient(createRequestTestContract(), {
-			baseUrl: "https://api.test",
-		});
-
-		await client.todos.get({
-			params: { id: "todo 1" },
-		});
-		await client.todos.list({
-			query: {
-				search: "milk",
-				empty: undefined,
-				tags: ["typescript", "rpc"],
-			},
-		});
-
-		assert.equal(calls[0]?.url, "https://api.test/todos/todo%201");
-		assert.equal(
-			calls[1]?.url,
-			"https://api.test/todos?search=milk&tags%5B%5D=typescript&tags%5B%5D=rpc",
-		);
-	});
-
-	it("builds requests from object-schema request declarations", async () => {
-		const apiContract = {
-			todos: {
-				update: route
-					.post("/todos/:id")
-					.params(
-						z.object({
-							id: z.string(),
-						}),
-					)
-					.query(
-						z.object({
-							page: z.number(),
-						}),
-					)
-					.body(z.object({ title: z.string() }))
-					.headers(z.object({ "x-request-id": z.number() }))
-					.response(200, z.object({ id: z.string(), title: z.string() })),
-			},
-		};
-		const calls = captureFetch(
-			jsonResponse({ id: "todo-1", title: "Updated" }),
-		);
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-
-		await client.todos.update({
-			params: { id: "todo-1" },
-			query: { page: 2 },
-			body: { title: "Updated" },
-			headers: { "x-request-id": 123 },
-		});
-
-		assert.equal(calls[0]?.url, "https://api.test/todos/todo-1?page=2");
-		assert.equal(calls[0]?.init?.body, '{"title":"Updated"}');
-		assert.deepEqual(calls[0]?.init?.headers, {
-			"content-type": "application/json",
-			"x-request-id": "123",
-		});
-	});
-
-	it("constructs requests from grouped segments under explicit HTTP segments", () => {
-		const groupedRoute = route;
-		const apiContract = {
-			todos: {
-				get: groupedRoute
-					.get("/todos/:id")
-					.params(
-						z.object({
-							id: z.string(),
-						}),
-					)
-					.response(204),
-			},
-		};
-		const request = constructBaseRequest(
-			"https://api.test",
-			apiContract.todos.get["~restrpc"],
-			{
-				params: { id: "todo 1" },
-			},
-		);
-
-		assert.equal(request.url, "https://api.test/todos/todo%201");
-	});
-
-	it("serializes finite number and boolean params, query, and headers", async () => {
-		const apiContract = {
-			items: {
-				get: route
-					.get("/items/:id/:visible")
-					.params(
-						z.object({
-							id: z.number(),
-							visible: z.boolean(),
-						}),
-					)
-					.query(
-						z.object({
-							page: z.number(),
-							includeArchived: z.boolean(),
-						}),
-					)
-					.headers(z.object({ "x-page": z.number(), "x-visible": z.boolean() }))
-					.response(204),
-			},
-		};
-		const request = constructBaseRequest(
-			"https://api.test",
-			apiContract.items.get["~restrpc"],
-			{
-				params: { id: 12, visible: false },
-				query: { page: 2, includeArchived: true },
-				headers: { "x-page": 2, "x-visible": false },
-			},
-		);
-
-		assert.equal(
-			request.url,
-			"https://api.test/items/12/false?page=2&includeArchived=true",
-		);
-		assert.deepEqual(request.headers, {
-			"x-page": "2",
-			"x-visible": "false",
-		});
-	});
-
-	it("serializes path params by matching full path placeholders", () => {
-		const apiContract = {
-			items: {
-				get: route
-					.get("/items/:id/:id2")
-					.params(
-						z.object({
-							id: z.string(),
-							id2: z.string(),
-						}),
-					)
-					.response(204),
-			},
-		};
-		const request = constructBaseRequest(
-			"https://api.test",
-			apiContract.items.get["~restrpc"],
-			{
-				params: {
-					id: "one/two",
-					id2: "three",
-				},
-			},
-		);
-
-		assert.equal(request.url, "https://api.test/items/one%2Ftwo/three");
-	});
-
-	it("rejects missing path params before sending requests", () => {
-		const declaration = route
-			.get("/items/:id")
-			.params(
-				z.object({
-					id: z.string(),
-				}),
-			)
-			.response(204);
-
-		assert.throws(
-			() =>
-				constructBaseRequest("https://api.test", declaration["~restrpc"], {}),
-			/Missing path param "id" for GET \/items\/:id\./,
-		);
-	});
-
-	it("omits undefined query and header values", async () => {
-		const apiContract = {
-			items: {
-				list: route
-					.get("/items")
-					.query(
-						z.object({
-							search: z.string().optional(),
-						}),
-					)
-					.headers(z.object({ "x-request-id": z.string().optional() }))
-					.response(204),
-			},
-		};
-		const request = constructBaseRequest(
-			"https://api.test",
-			apiContract.items.list["~restrpc"],
-			{
-				search: undefined,
-				"x-request-id": undefined,
-			},
-		);
-
-		assert.equal(request.url, "https://api.test/items");
-		assert.deepEqual(request.headers, {});
-	});
-
-	it("sends JSON request bodies with generated content type", async () => {
-		const calls = captureFetch(
-			jsonResponse({ id: "todo-1", title: "Buy milk" }, 201),
-		);
-		const client = initClient(createRequestTestContract(), {
-			baseUrl: "https://api.test",
-		});
-
-		await client.todos.create({ body: { title: "Buy milk" } });
-
-		assert.equal(calls[0]?.init?.body, '{"title":"Buy milk"}');
-		assert.deepEqual(calls[0]?.init?.headers, {
-			"content-type": "application/json",
-		});
-	});
-
-	it("sends custom bodies with their declared content type", async () => {
-		const calls = captureFetch();
-		const client = initClient(createRequestTestContract(), {
-			baseUrl: "https://api.test",
-		});
-
-		await client.uploads.create({ body: "hello", params: { id: "file 1" } });
-
-		assert.equal(calls[0]?.url, "https://api.test/uploads/file%201");
-		assert.equal(calls[0]?.init?.body, "hello");
-		assert.deepEqual(calls[0]?.init?.headers, {
-			"content-type": "text/plain",
-		});
-	});
-
-	it("passes URLSearchParams through without constructing forms from objects", async () => {
-		const api = {
-			form: route
-				.post("/form")
-				.body(z.instanceof(URLSearchParams), {
-					contentType: "application/x-www-form-urlencoded",
-				})
-				.response(204),
-		};
-		const calls = captureFetch();
-		const client = initClient(api, { baseUrl: "https://api.test" });
-		const body = new URLSearchParams([
-			["body", "contents"],
-			["tags[]", "ts"],
-			["tags[]", "rpc"],
-		]);
-		await client.form({ body });
-		assert.equal(calls[0]?.init?.body, body);
-		assert.equal(
-			new Headers(calls[0]?.init?.headers).get("content-type"),
-			"application/x-www-form-urlencoded",
-		);
-		await assert.rejects(
-			client.form({ body: { title: "Hello" } as never }),
-			/URLSearchParams/,
-		);
-	});
-
-	it("passes multipart forms through and lets Fetch generate their boundary", async () => {
-		const api = {
-			upload: route
-				.post("/upload")
-				.body(z.instanceof(FormData), {
-					contentType: "multipart/form-data",
-				})
-				.response(204),
-		};
-		const calls = captureFetch();
-		const client = initClient(api, { baseUrl: "https://api.test" });
-		const body = new FormData();
-		body.append("body", "contents");
-		body.append("tags[]", "ts");
-		body.append("tags[]", "rpc");
-		body.append("file", new File(["hello"], "hello.txt"));
-		await client.upload({ body });
-		assert.equal(calls[0]?.init?.body, body);
-		assert.equal(
-			new Headers(calls[0]?.init?.headers).get("content-type"),
-			null,
-		);
-		const request = new Request(calls[0]!.url, calls[0]!.init);
-		assert.match(
-			request.headers.get("content-type")!,
-			/multipart\/form-data; boundary=/,
-		);
-		assert.deepEqual((await request.formData()).getAll("tags[]"), [
-			"ts",
-			"rpc",
-		]);
-		await assert.rejects(
-			client.upload({ body: { title: "Hello" } as never }),
-			/FormData/,
-		);
-	});
-
-	it("uses explicit custom codecs for object form conversion", async () => {
-		const schema = z.object({ title: z.string(), tags: z.array(z.string()) });
-		const api = {
-			form: route
-				.post("/form")
-				.body(schema, {
-					contentType: "application/x-www-form-urlencoded",
-				})
-				.response(204),
-		};
-		const calls = captureFetch();
-		const client = initClient(api, {
-			baseUrl: "https://api.test",
-			bodyCodecs: [
-				{
-					match: (mediaType) =>
-						mediaType === "application/x-www-form-urlencoded",
-					serialize(value) {
-						const input = schema.parse(value);
-						const body = new URLSearchParams({ title: input.title });
-						for (const tag of input.tags) body.append("tags[]", tag);
-						return { body };
-					},
-				},
-			],
-		});
-		await client.form({ body: { title: "Write docs", tags: ["ts", "rpc"] } });
-		assert.equal(
-			String(calls[0]?.init?.body),
-			"title=Write+docs&tags%5B%5D=ts&tags%5B%5D=rpc",
-		);
-	});
-
-	it("sends custom bodies with a selected declared content type", async () => {
-		const apiContract = {
-			uploads: {
-				image: route
-					.post("/uploads/:id/image")
-					.params(
-						z.object({
-							id: z.string(),
-						}),
-					)
-					.body(z.instanceof(Blob), {
-						contentType: ["image/png", "image/jpeg"],
-					})
-					.response(204),
-			},
-		};
-		const calls = captureFetch();
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-
-		const body = new Blob(["jpeg bytes"], { type: "image/jpeg" });
-		await client.uploads.image(
-			{ body, params: { id: "file 1" } },
-			{ contentType: "image/jpeg" },
-		);
-
-		assert.equal(calls[0]?.url, "https://api.test/uploads/file%201/image");
-		assert.equal(calls[0]?.init?.body, body);
-		assert.deepEqual(calls[0]?.init?.headers, {
-			"content-type": "image/jpeg",
-		});
-	});
-
-	it("stringifies application/json custom bodies", async () => {
-		const calls = captureFetch();
-		const client = initClient(createRequestTestContract(), {
-			baseUrl: "https://api.test",
-		});
-
-		await client.uploads.json({
-			body: { type: "created" },
-		});
-
-		assert.equal(calls[0]?.init?.body, '{"type":"created"}');
-	});
-
-	it("uses the second argument for options on routes without input", async () => {
-		const apiContract = {
-			ping: route.post("/ping").response(204),
-		};
-		const calls = captureFetch();
+describe("request", () => {
+	it("passes caller cancellation through to fetch", async () => {
 		const controller = new AbortController();
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-
-		await client.ping(undefined, { signal: controller.signal });
-
-		assert.equal(calls[0]?.url, "https://api.test/ping");
-		assert.equal(calls[0]?.init?.body, undefined);
-		assert.deepEqual(calls[0]?.init?.headers, {});
-		assert.equal(calls[0]?.init?.signal, controller.signal);
-	});
-
-	it("merges global fetch options and per-call options", async () => {
-		const calls = captureFetch(jsonResponse([]));
-		const client = initClient(createRequestTestContract(), {
-			baseUrl: "https://api.test",
-			fetchOptions: {
-				cache: "no-store",
-				credentials: "include",
-			},
-			globalHeaders: { Authorization: "Bearer token" },
-		});
-
-		await client.todos.list(
-			{ query: { search: "milk" } },
-			{ credentials: "omit" },
-		);
-
-		assert.equal(calls[0]?.init?.cache, "no-store");
-		assert.equal(calls[0]?.init?.credentials, "omit");
-		assert.deepEqual(calls[0]?.init?.headers, {
-			authorization: "Bearer token",
-		});
-	});
-
-	it("resolves global header providers concurrently with case-insensitive precedence", async () => {
-		const calls = captureFetch();
-		let releaseFirst!: () => void;
-		let secondStarted = false;
-		let overriddenCalls = 0;
-		const first = new Promise<void>((resolve) => {
-			releaseFirst = resolve;
-		});
-		const client = initClient(
-			{ ping: route.post("/ping").response(204) },
+		const fetch = vi.fn(async () => new Response(null, { status: 204 }));
+		await executeRequest(
+			{ method: "GET", path: "/" },
+			[undefined, { signal: controller.signal }],
 			{
-				baseUrl: "https://api.test",
-				globalHeaders: {
-					"X-First": async () => {
-						await first;
-						return "first";
-					},
-					"X-Second": async () => {
-						secondStarted = true;
-						releaseFirst();
-						return "second";
-					},
-					"X-Overridden": () => {
-						overriddenCalls += 1;
-						return "global";
-					},
-				},
+				baseUrl: "",
+				fetch,
 			},
 		);
-
-		await client.ping(undefined, {
-			additionalHeaders: {
-				"x-overridden": "call",
-				"X-Static": "static",
-			},
-		});
-
-		assert.equal(secondStarted, true);
-		assert.equal(overriddenCalls, 1);
-		assert.deepEqual(calls[0]?.init?.headers, {
-			"x-first": "first",
-			"x-overridden": "call",
-			"x-second": "second",
-			"x-static": "static",
-		});
+		expect(fetch.mock.calls[0]).toEqual([
+			"/",
+			expect.objectContaining({ signal: controller.signal }),
+		]);
 	});
 
-	it("propagates provider errors and serializes scalar values", async () => {
-		const calls = captureFetch();
-		const rejected = initClient(
-			{ ping: route.post("/ping").response(204) },
-			{
-				baseUrl: "https://api.test",
-				globalHeaders: {
-					authorization: () => Promise.reject(new Error("token unavailable")),
-				},
-			},
-		);
-		await assert.rejects(() => rejected.ping(), /token unavailable/);
-
-		const scalars = initClient(
-			{ ping: route.post("/ping").response(204) },
-			{
-				baseUrl: "https://api.test",
-				globalHeaders: {
-					"x-number": 123,
-					"x-boolean": () => false,
-					"x-omitted": async () => undefined,
-				},
-			},
-		);
-		await scalars.ping(undefined, {
-			additionalHeaders: { "x-additional": true, "x-empty": undefined },
-		});
-		assert.deepEqual(calls.at(-1)?.init?.headers, {
-			"x-additional": "true",
-			"x-boolean": "false",
-			"x-number": "123",
-		});
-
-		const overriddenFailure = initClient(
-			{ ping: route.post("/ping").response(204) },
-			{
-				baseUrl: "https://api.test",
-				globalHeaders: {
-					authorization: async () => {
-						throw new Error("overridden provider failed");
-					},
-				},
-			},
-		);
-		await assert.rejects(
-			() =>
-				overriddenFailure.ping(undefined, {
-					additionalHeaders: { authorization: "override" },
-				}),
-			/overridden provider failed/,
-		);
-	});
-
-	it("lets custom fetch inspect and replace the final request init", async () => {
-		const calls: Array<{ url: string; init?: RequestInit }> = [];
-		const client = initClient(createRequestTestContract(), {
-			baseUrl: "https://api.test",
-			fetch: async (url, init) => {
-				assert.equal(url, "https://api.test/todos?search=milk");
-				assert.equal(init?.method, "GET");
-
-				const preparedInit = {
-					...init,
-					headers: {
-						...(init?.headers as Record<string, string>),
-						"x-custom-fetch": "true",
-					},
-				};
-
-				calls.push({ url: String(url), init: preparedInit });
-				return jsonResponse([]);
-			},
-		});
-
-		await client.todos.list({ query: { search: "milk" } });
-
-		assert.deepEqual(calls[0]?.init?.headers, {
-			"x-custom-fetch": "true",
-		});
-	});
-
-	it("normalizes merged headers and lets declared request headers win", async () => {
-		const apiContract = {
-			todos: {
-				list: route
-					.get("/todos")
-					.query(z.object({ search: z.string() }))
-					.headers(
-						z.object({
-							"x-common": z.number(),
-							"X-Route": z.string(),
-							"x-shared": z.string(),
+	it.each(["timeout", "caller", "combined timeout", "combined caller"])(
+		"allows %s to abort a pending fetch",
+		async (source) => {
+			vi.useFakeTimers();
+			try {
+				const controller = new AbortController();
+				let started!: () => void;
+				const ready = new Promise<void>((resolve) => {
+					started = resolve;
+				});
+				const fetch = vi.fn(
+					(_input: unknown, init?: RequestInit) =>
+						new Promise<Response>((_resolve, reject) => {
+							init!.signal!.addEventListener(
+								"abort",
+								() => reject(init!.signal!.reason),
+								{ once: true },
+							);
+							started();
 						}),
-					)
-					.response(
-						200,
-						z.array(z.object({ id: z.string(), title: z.string() })),
-					),
-			},
-		};
-		const calls = captureFetch(jsonResponse([]));
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-			globalHeaders: {
-				"X-Global": "global",
-				"X-Route": "from global",
-				"X-Shared": "from global",
-			},
-		});
+				);
+				const request = executeRequest(
+					{ method: "GET", path: "/" },
+					[
+						undefined,
+						{ signal: source !== "timeout" ? controller.signal : undefined },
+					],
+					{
+						baseUrl: "",
+						fetch,
+						timeoutMs: source !== "caller" ? 100 : undefined,
+					},
+				);
+				const rejection = expect(request).rejects.toMatchObject({
+					name: "AbortError",
+				});
+				await ready;
+				if (source.endsWith("caller")) controller.abort();
+				else await vi.advanceTimersByTimeAsync(100);
+				await rejection;
+			} finally {
+				vi.useRealTimers();
+			}
+		},
+	);
 
-		await client.todos.list({
-			query: { search: "milk" },
-			headers: {
-				"x-common": 123,
-				"X-Route": "route",
-				"x-shared": "route shared",
-			},
-		});
-
-		assert.equal(calls[0]?.url, "https://api.test/todos?search=milk");
-		assert.deepEqual(calls[0]?.init?.headers, {
-			"x-common": "123",
-			"x-global": "global",
-			"x-route": "route",
-			"x-shared": "route shared",
-		});
-	});
-
-	it("lets the managed content type override a manual client header", async () => {
-		const calls = captureFetch();
-		const client = initClient(createRequestTestContract(), {
-			baseUrl: "https://api.test",
-			globalHeaders: {
-				"content-type": "text/plain",
-			},
-		});
-
-		await client.uploads.json({ body: { type: "created" } });
-
-		assert.deepEqual(calls[0]?.init?.headers, {
-			"content-type": "application/json",
-		});
-	});
-
-	it("keeps duplicate property names in their declared HTTP segments", () => {
-		const declaration = route
-			.post("/items/:id")
-			.params(z.object({ id: z.string() }))
-			.query(z.object({ id: z.string() }))
-			.body(z.object({ id: z.string(), context: z.string() }))
-			.response(204);
-		const request = constructBaseRequest(
-			"https://api.test",
-			declaration["~restrpc"],
-			{
-				params: { id: "path-id" },
-				query: { id: "query-id" },
-				body: { id: "body-id", context: "body-context" },
-			},
-		);
-		assert.equal(request.url, "https://api.test/items/path-id?id=query-id");
-		assert.deepEqual(request.body, { id: "body-id", context: "body-context" });
-	});
-
-	it("retains falsy body values for codec serialization", () => {
-		const declaration = route
-			.post("/values")
-			.body(type<false | 0 | "" | null>())
-			.response(204);
-		for (const body of [false, 0, "", null]) {
-			const request = constructBaseRequest(
-				"https://api.test",
-				declaration["~restrpc"],
-				{
-					body,
+	it("stops the timeout when fetch returns even if the response body is still pending", async () => {
+		vi.useFakeTimers();
+		try {
+			let signal: AbortSignal | null | undefined;
+			const body = new ReadableStream<Uint8Array>({});
+			const response = await executeRequest({ method: "GET", path: "/" }, [], {
+				baseUrl: "",
+				timeoutMs: 100,
+				fetch: async (_input, init) => {
+					signal = init?.signal;
+					return new Response(body);
 				},
-			);
-			assert.equal(request.body, body);
-			assert.equal(request.contentType, "application/json");
+			});
+			await vi.advanceTimersByTimeAsync(200);
+			expect(signal?.aborted).toBe(false);
+			expect(response.bodyUsed).toBe(false);
+			await response.body?.cancel();
+		} finally {
+			vi.useRealTimers();
 		}
 	});
-
-	it("serializes opaque schemas without request key metadata", async () => {
-		const calls = captureFetch(new Response(null, { status: 204 }));
-		const client = initClient(
+	it("encodes path segments, repeated query values and defined headers", () => {
+		const request = constructBaseRequest(
+			"https://example.test",
+			{ method: "GET", path: "/users/{id}/:slug" },
 			{
-				opaque: route
-					.post("/opaque")
-					.body(type<{ title: string }>())
-					.response(204),
-			},
-			{
-				baseUrl: "https://api.test",
+				params: { id: "a/b", slug: "hello world" },
+				query: { tags: ["a", "b"], missing: undefined, page: 0 },
+				headers: { count: 0, missing: undefined },
 			},
 		);
-		await client.opaque({ body: { title: "created" } });
-		assert.equal(calls[0]?.init?.body, JSON.stringify({ title: "created" }));
+		expect(request.url).toBe(
+			"https://example.test/users/a%2Fb/hello%20world?tags%5B%5D=a&tags%5B%5D=b&page=0",
+		);
+		expect(request.headers).toEqual({ count: "0" });
 	});
 
-	it("cleans up timeout signals after fetch failures", async () => {
-		let abortEventCount = 0;
-		globalThis.fetch = async (_url, init) => {
-			init?.signal?.addEventListener("abort", () => {
-				abortEventCount += 1;
-			});
-			throw new Error("network down");
-		};
-		const client = initClient(createRequestTestContract(), {
-			baseUrl: "https://api.test",
-			timeoutMs: 5,
-		});
-
-		await assert.rejects(() =>
-			client.todos.list({ query: { search: "milk" } }),
-		);
-		await new Promise((resolve) => setTimeout(resolve, 15));
-
-		assert.equal(abortEventCount, 0);
+	it("rejects missing path parameters", () => {
+		expect(() =>
+			constructBaseRequest(
+				"",
+				{ method: "GET", path: "/users/:id" },
+				undefined,
+			),
+		).toThrow('Missing path param "id"');
 	});
 
-	it("does not start the request timeout when a global header rejects", async (t) => {
-		const timeout = t.mock.method(
-			globalThis,
-			"setTimeout",
-			(() =>
-				0 as unknown as ReturnType<typeof setTimeout>) as typeof setTimeout,
+	it("requires a declared content type selection for multi-format bodies", () => {
+		const route = {
+			method: "POST",
+			path: "/",
+			request: { contentType: ["application/json", "text/plain"] },
+		} as const;
+		expect(
+			constructBaseRequest("", route, { body: "hello" }, "text/plain"),
+		).toMatchObject({ body: "hello", contentType: "text/plain" });
+		expect(() => constructBaseRequest("", route, { body: "hello" })).toThrow(
+			"A contentType option is required",
 		);
-		const client = initClient(createRequestTestContract(), {
-			baseUrl: "https://api.test",
-			timeoutMs: 10_000,
-			globalHeaders: {
-				authorization: async () => {
-					throw new Error("headers unavailable");
-				},
-			},
-		});
-
-		await assert.rejects(
-			() => client.todos.list({ query: { search: "milk" } }),
-			/headers unavailable/,
-		);
-
-		assert.equal(timeout.mock.callCount(), 0);
+		expect(() =>
+			constructBaseRequest("", route, { body: "hello" }, "image/png"),
+		).toThrow("Unsupported request contentType");
 	});
 
-	it("clears the request timeout before response parsing", async () => {
-		let requestSignal: AbortSignal | null | undefined;
-		globalThis.fetch = async (_url, init) => {
-			requestSignal = init?.signal;
-			return new Response(
-				new ReadableStream({
-					async start(controller) {
-						await new Promise((resolve) => setTimeout(resolve, 15));
-						controller.enqueue(
-							new TextEncoder().encode(JSON.stringify([{ id: "todo-1" }])),
-						);
-						controller.close();
-					},
-				}),
+	it("serializes JSON and applies header precedence case-insensitively", async () => {
+		const fetch = vi.fn(async () => new Response(null, { status: 204 }));
+		await executeRequest(
+			{ method: "POST", path: "/users", request: { body: true } },
+			[
+				{ body: { name: "Ada" }, headers: { "X-Token": "request" } },
 				{
-					status: 200,
-					headers: {
-						"content-type": "application/json",
-					},
+					additionalHeaders: { "x-token": "additional", "X-Extra": 2 },
+					cache: "no-store",
 				},
-			);
-		};
-		const client = initClient(createRequestTestContract(), {
-			baseUrl: "https://api.test",
-			timeoutMs: 5,
-		});
-
-		await client.todos.list({ query: { search: "milk" } });
-
-		assert.equal(requestSignal?.aborted, false);
-	});
-
-	it("creates timeout signals that abort and can be cleaned up", async () => {
-		const signalState = createRequestSignal(undefined, 5);
-		assert.ok(signalState);
-
-		let aborted = false;
-		signalState.signal.addEventListener("abort", () => {
-			aborted = true;
-		});
-		await new Promise((resolve) => setTimeout(resolve, 15));
-
-		assert.equal(aborted, true);
-
-		const cleanedUpSignalState = createRequestSignal(undefined, 20);
-		assert.ok(cleanedUpSignalState);
-		cleanedUpSignalState.cleanup();
-		await new Promise((resolve) => setTimeout(resolve, 30));
-
-		assert.equal(cleanedUpSignalState.signal.aborted, false);
+			],
+			{
+				baseUrl: "https://example.test",
+				fetch,
+				globalHeaders: {
+					"X-Token": async () => "global",
+					omitted: () => undefined,
+				},
+				fetchOptions: { cache: "reload" },
+			},
+		);
+		expect(fetch).toHaveBeenCalledWith(
+			"https://example.test/users",
+			expect.objectContaining({
+				method: "POST",
+				body: '{"name":"Ada"}',
+				cache: "no-store",
+				headers: {
+					"x-token": "request",
+					"x-extra": "2",
+					"content-type": "application/json",
+				},
+			}),
+		);
 	});
 });

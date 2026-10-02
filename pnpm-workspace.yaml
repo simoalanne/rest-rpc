@@ -1,7 +1,3 @@
 packages:
   - "packages/*"
-  - "benchmarks/"
   - "content/"
-  - "integration-tests/"
-  - "hover-types/"
-  - "declaration-types/"

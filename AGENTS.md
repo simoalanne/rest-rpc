@@ -15,20 +15,13 @@ This repo is `rest-rpc`, a TypeScript library for defining REST APIs with RPC-li
 - `@rest-rpc/fetch` - Fetch runtime `Request`/`Response` HTTP handler adapter for fetch-native runtimes and catch-all routes.
 - `@rest-rpc/tanstack-query` - TanStack Query options and key utils
 - `content/` contains documentation for the library and its packages. documentation is written in mdx and uses https://useblume.dev/.
-- `integration-tests/` contains a shared integration test suite that runs real HTTP requests against server adapters. It is used to verify that the generated code works as expected across all supported server adapters.
-- `benchmarks/` contains generated benchmark fixtures that exercise the library as a downstream consumer. It is used to measure TypeScript checker cost for contract declaration across the main supported validation libraries.
-- `declaration-types/` contains a package that exports route builder declarations as a regression test that ensure that the TypeScript compiler error TS2883 "cannot be named" does not occur when a route declaration is exported from consuming packages.
-- `hover-types/` is a package that is used to smoke test that the generated hover types look nice in IDEs. it's not a replacement for typetests but is important for ensuring that the inferred types are readable.
 
 ### Commands
 
 - `pnpm run typecheck` - Run workspace typechecking.
-- `pnpm run bench:typecheck -- "<message>"` - Build packages first, then run the generated downstream typecheck benchmark against package `dist` declarations.
+- `pnpm run test` - Run runtime and type tests with Vitest.
 - `pnpm run lint` - Run lint verification.
-- `pnpm run test:unit` - Run package unit tests.
-- `pnpm run test:integration` - Run the shared real HTTP integration suite.
-- `pnpm run test` - Run both unit and integration tests. Prefer running the relevant test command for verification after code changes.
-- `pnpm run check` - Run `lint`, `typecheck`, and `test` in sequence. Use this as the broad all-in-one pass.
+- `pnpm run check` - Run lint, typechecking, tests, and API documentation verification in sequence. Use this as the broad all-in-one pass.
 
 ### Formatting
 
@@ -49,7 +42,5 @@ A command that exits successfully is successful. Do not report warnings from suc
 
 For documentation related tasks:
 
-- `integration-tests` and regular test files are not typechecked. They test runtime behavior and typing is irrelevant. Do not add type gymnastics to tests and do not run ad-hoc commands to typecheck them. Type errors in test files are irrelevant and should not be reported. They are only useful as a signal to debug failing tests consuming changed APIs.
 - README.md is shared across root and all packages and describes the project user-facing features concisely. It should link to the actual documentation in `content/docs/` for broader context. Task asking to update documentation generally means updating the mdx files in `content/docs/`, not updating the README.md files unless the user explicitly asks to update the README.md.
-- Integration tests require network access. From sandboxed environments, they will fail with EPERM unless run with elevated permissions.
 - Library is currently pre v1.0.0 and is not yet stable. Breaking changes are expected until v1.0.0 is released.

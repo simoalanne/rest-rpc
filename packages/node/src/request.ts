@@ -9,7 +9,7 @@ export function parseRequestTarget(request: DefaultRequest): URL {
 export const toFetchRequest = (
 	request: DefaultRequest,
 	signal: AbortSignal,
-) => {
+): Request => {
 	const headers = new Headers();
 	for (const [name, value] of Object.entries(request.headers)) {
 		if (Array.isArray(value))

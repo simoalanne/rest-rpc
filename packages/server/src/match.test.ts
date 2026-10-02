@@ -1,88 +1,78 @@
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
-import { createRouteMatcher } from "./match.ts";
-import { serverFirstRoute } from "./routeBuilder.ts";
+import {
+	createPathMatcher,
+	createRouteMatcher,
+	flattenRouteImplementations,
+} from "./match.ts";
+import { serverFirstRoute as route } from "./routeBuilder.ts";
 
-const implementation = (method: "GET" | "POST", path: string) =>
-	(method === "GET" ? serverFirstRoute.get(path) : serverFirstRoute.post(path))
-		.response(204)
-		.handler(() => ({ status: 204 }));
+describe("match", () => {
+	it.each(["/users/:id/items/:id", "/users/{id}/items/{id}"] as const)(
+		"accepts repeated parameter names in %s",
+		(path) => {
+			expect(createPathMatcher(path)("/users/first/items/last")).toBeDefined();
+		},
+	);
 
-describe("createRouteMatcher", () => {
-	it("returns the most specific implementation and decoded path params", () => {
-		const matchRoute = createRouteMatcher({
-			getTodo: implementation("GET", "/todos/:id"),
-			newTodo: implementation("GET", "/todos/new"),
-		});
-
-		const staticMatch = matchRoute({ method: "GET", path: "/todos/new" });
-		assert.equal(staticMatch?.implementation.route.path, "/todos/new");
-		assert.deepEqual(staticMatch?.params, {});
-
-		const paramMatch = matchRoute({
-			method: "GET",
-			path: "/todos/one%20two",
-		});
-		assert.equal(paramMatch?.implementation.route.path, "/todos/:id");
-		assert.deepEqual(paramMatch?.params, { id: "one two" });
+	it("sorts static segments before dynamic segments at every differing depth", () => {
+		const paths = [
+			"/{group}/{id}/edit",
+			"/users/{id}/edit",
+			"/users/me/{action}",
+			"/users/me/edit",
+		] as const;
+		const tree = Object.fromEntries(
+			paths.map((path) => [path, route.get(path).handler(() => path)]),
+		);
+		expect(
+			flattenRouteImplementations(tree).map(({ route }) => route.path),
+		).toEqual([...paths].reverse());
+		const match = createRouteMatcher(tree);
+		expect(
+			match({ method: "GET", path: "/users/me/edit" })?.implementation.route
+				.path,
+		).toBe("/users/me/edit");
+		expect(
+			match({ method: "GET", path: "/users/42/edit" })?.implementation.route
+				.path,
+		).toBe("/users/{id}/edit");
+		expect(
+			match({ method: "GET", path: "/teams/42/edit" })?.implementation.route
+				.path,
+		).toBe("/{group}/{id}/edit");
+	});
+	it("matches complete paths, decodes params, and allows a trailing slash", () => {
+		const match = createPathMatcher("/files/{name}/v1.0");
+		expect(match("/files/a%20b/v1.0/")).toEqual({ name: "a b" });
+		expect(match("/files/a/v1x0")).toBeNull();
+		expect(match("/files/a/v1.0/extra")).toBeNull();
+		expect(match("/files//v1.0")).toBeNull();
+		expect(createPathMatcher("/")("/")).toEqual({});
 	});
 
-	it("respects methods and optional trailing slashes", () => {
-		const matchRoute = createRouteMatcher({
-			getTodo: implementation("GET", "/todos/:id"),
-			createTodo: implementation("POST", "/todos/:id"),
+	it("prefers static routes and respects method and prefix", () => {
+		const dynamic = route.get("/users/{id}").handler(() => "dynamic");
+		const fixed = route.get("/users/me").handler(() => "fixed");
+		const match = createRouteMatcher({ dynamic, fixed }, "/api/");
+		expect(
+			match({ method: "GET", path: "/api/users/me" })?.implementation.handler,
+		).toBe(fixed["~restrpc"].handler);
+		expect(match({ method: "GET", path: "/api/users/42" })?.params).toEqual({
+			id: "42",
 		});
-
-		assert.equal(
-			matchRoute({ method: "POST", path: "/todos/todo-1/" })?.implementation
-				.route.method,
-			"POST",
-		);
-		assert.equal(
-			matchRoute({ method: "DELETE", path: "/todos/todo-1" }),
-			undefined,
-		);
+		expect(match({ method: "POST", path: "/api/users/me" })).toBeUndefined();
+		expect(match({ method: "GET", path: "/users/me" })).toBeUndefined();
 	});
 
-	it("derives the path for a method declared without one", () => {
-		const matchRoute = createRouteMatcher({
-			todos: {
-				list: serverFirstRoute
-					.get()
-					.response(204)
-					.handler(() => ({ status: 204 })),
+	it("derives paths from nested keys only for routes without an explicit path", () => {
+		const implementations = flattenRouteImplementations({
+			users: {
+				list: route.handler(() => []),
+				get: route.get("/explicit").handler(() => "ok"),
 			},
 		});
-
-		const match = matchRoute({ method: "GET", path: "/todos/list" });
-		assert.equal(match?.implementation.route.path, "/todos/list");
-	});
-
-	it("escapes literal route characters before matching paths", () => {
-		const matchRoute = createRouteMatcher({
-			getFile: implementation("GET", "/files/index.json"),
-		});
-
-		assert.ok(matchRoute({ method: "GET", path: "/files/index.json" }));
-		assert.equal(
-			matchRoute({ method: "GET", path: "/files/indexxjson" }),
-			undefined,
-		);
-	});
-
-	it("prepends a path prefix when compiling route matchers", () => {
-		const matchRoute = createRouteMatcher(
-			{ getTodo: implementation("GET", "/todos/:id") },
-			"/api/v1/",
-		);
-
-		assert.deepEqual(
-			matchRoute({ method: "GET", path: "/api/v1/todos/todo-1" })?.params,
-			{ id: "todo-1" },
-		);
-		assert.equal(
-			matchRoute({ method: "GET", path: "/todos/todo-1" }),
-			undefined,
-		);
+		expect(implementations.map(({ route }) => route.path).sort()).toEqual([
+			"/explicit",
+			"/users/list",
+		]);
 	});
 });

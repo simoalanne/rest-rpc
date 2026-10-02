@@ -1,3 +1,8 @@
+import type { HttpRouteResult } from "./httpRouteResult.ts";
+import {
+	normalizeImplicitResponse,
+	isCustomProcedureOutput,
+} from "./implicitResponse.ts";
 import { normalizeMediaType } from "@rest-rpc/core/codecs";
 import {
 	RequestValidationError,
@@ -8,10 +13,8 @@ import type {
 	RouteDeclaration,
 } from "@rest-rpc/core/contract";
 import { getRouteResponses } from "@rest-rpc/core/contract";
-import type { HttpHeaders } from "./headers.ts";
 import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
 import type { RuntimeImplementation } from "./match.ts";
-import type { ImplicitResponseEnvelope } from "./routeBuilder.types.ts";
 import {
 	type RequestSegments,
 	validateRequestSegments,
@@ -22,21 +25,6 @@ import {
 import { invokeWithMiddleware } from "./middleware.ts";
 import { frameSseStream } from "./sse.ts";
 import { createContext } from "./context.ts";
-
-/** A validated logical response for adapter-specific serialization and delivery. */
-export type HttpRouteResult =
-	| {
-			kind: "response";
-			status: number;
-			headers?: HttpHeaders;
-			body?: { value: unknown; contentType: string };
-	  }
-	| {
-			kind: "stream";
-			status: number;
-			headers?: HttpHeaders;
-			body: AsyncIterable<string>;
-	  };
 
 /** Shared configuration options passed to the `handleHttpRoute` function. */
 export type HandleHttpRouteConfiguration = {
@@ -80,89 +68,9 @@ const requestHeader = (headers: RequestSegments["headers"], name: string) => {
 	return Array.isArray(value) ? value[0] : value;
 };
 
-const isAsyncIterable = (value: unknown): value is AsyncIterable<unknown> =>
-	value !== null &&
-	(typeof value === "object" || typeof value === "function") &&
-	Symbol.asyncIterator in value &&
-	typeof value[Symbol.asyncIterator] === "function";
-
-const isCustomProcedureOutput = (
-	value: unknown,
-): value is { contentType: string; data: unknown } =>
-	typeof value === "object" &&
-	value !== null &&
-	"data" in value &&
-	"contentType" in value &&
-	typeof value.contentType === "string";
-
 const usesPlainOutput = (route: RouteDeclaration) =>
 	route.output === "output" ||
 	(route.output === undefined && route.kind === "procedure");
-
-const hasStatus = (value: unknown): value is ImplicitResponseEnvelope =>
-	typeof value === "object" && value !== null && "status" in value;
-
-const normalizeImplicitProcedureResponse = (
-	output: unknown,
-): HttpRouteResult => {
-	if (isAsyncIterable(output)) {
-		return { kind: "stream", status: 200, body: frameSseStream(output) };
-	}
-	if (isCustomProcedureOutput(output)) {
-		return {
-			kind: "response",
-			status: 200,
-			body: { value: output.data, contentType: output.contentType },
-		};
-	}
-	return {
-		kind: "response",
-		status: 200,
-		body: { value: output, contentType: "application/json" },
-	};
-};
-
-const normalizeImplicitHttpResponse = (
-	response: ImplicitResponseEnvelope,
-): HttpRouteResult => {
-	if (
-		!Number.isInteger(response.status) ||
-		response.status < 100 ||
-		response.status > 599
-	) {
-		throw new Error(
-			`Invalid inferred HTTP response status "${response.status}".`,
-		);
-	}
-	const headers = response.responseHeaders;
-	if (!("body" in response)) {
-		return {
-			kind: "response",
-			status: response.status,
-			headers,
-		};
-	}
-
-	const body = response.body;
-	if (isAsyncIterable(body)) {
-		return {
-			kind: "stream",
-			status: response.status,
-			headers,
-			body: frameSseStream(body),
-		};
-	}
-
-	return {
-		kind: "response",
-		status: response.status,
-		headers,
-		body: {
-			value: body,
-			contentType: response.contentType ?? "application/json",
-		},
-	};
-};
 
 const getResponseSchema = (
 	route: RouteDeclaration,
@@ -317,9 +225,7 @@ export async function handleHttpRoute<
 
 		const hasDeclaredResponses = Object.keys(route.responses).length > 0;
 		if (!hasDeclaredResponses) {
-			return hasStatus(handlerResult)
-				? normalizeImplicitHttpResponse(handlerResult)
-				: normalizeImplicitProcedureResponse(handlerResult);
+			return normalizeImplicitResponse(handlerResult);
 		}
 
 		if (usesPlainOutput(route)) {

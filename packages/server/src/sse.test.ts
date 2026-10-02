@@ -1,46 +1,64 @@
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
-import { frameSseStream, isSseServerEvent, sse } from "./sse.ts";
+import { frameSseStream, sse } from "./sse.ts";
 
-const collect = async (values: AsyncIterable<string>) => {
-	const result = [];
-	for await (const value of values) result.push(value);
-	return result;
-};
-
-describe("SSE framing", () => {
-	it("frames plain data and branded metadata in canonical order", async () => {
-		async function* events() {
-			yield { message: "plain" };
-			yield sse({
-				data: { message: "updated" },
-				id: "event-42",
-				event: "updated",
-				retry: 2000,
-			});
+describe("sse", () => {
+	it("emits the supported JSON data and metadata frames", async () => {
+		async function* values() {
+			yield sse({ data: { count: 1 }, id: "one", event: "update", retry: 100 });
+			yield { count: 2 };
 		}
-
-		assert.deepEqual(await collect(frameSseStream(events())), [
-			'data: {"message":"plain"}\n\n',
-			'id: event-42\nevent: updated\nretry: 2000\ndata: {"message":"updated"}\n\n',
+		const frames: string[] = [];
+		for await (const frame of frameSseStream(values())) frames.push(frame);
+		expect(frames).toEqual([
+			'id: one\nevent: update\nretry: 100\ndata: {"count":1}\n\n',
+			'data: {"count":2}\n\n',
 		]);
 	});
 
-	it("brands explicit events and rejects values that could corrupt framing", () => {
-		const event = sse({ data: null, id: "event-1" });
-		assert.equal(isSseServerEvent(event), true);
-		assert.deepEqual(Object.keys(event), ["data", "id"]);
+	it.each([undefined, 1n])(
+		"rejects unframed stream data without a JSON representation (%s)",
+		async (data) => {
+			async function* values() {
+				yield data;
+			}
+			await expect(
+				frameSseStream(values())[Symbol.asyncIterator]().next(),
+			).rejects.toThrow();
+		},
+	);
+	it("frames raw data and branded event metadata without interpreting unbranded objects", async () => {
+		async function* values() {
+			yield { data: "ordinary object" };
+			yield sse({ data: { count: 1 }, id: "", event: "update", retry: 0 });
+		}
+		const frames: string[] = [];
+		for await (const frame of frameSseStream(values())) frames.push(frame);
+		expect(frames).toEqual([
+			'data: {"data":"ordinary object"}\n\n',
+			'id: \nevent: update\nretry: 0\ndata: {"count":1}\n\n',
+		]);
+	});
 
-		for (const value of ["nul\0", "cr\r", "lf\n"]) {
-			assert.throws(() => sse({ data: null, id: value }), /SSE event id/);
-		}
-		for (const value of ["cr\r", "lf\n"]) {
-			assert.throws(() => sse({ data: null, event: value }), /SSE event name/);
-		}
-		for (const retry of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
-			assert.throws(() => sse({ data: null, retry }), /SSE retry/);
-		}
-		assert.throws(() => sse({ data: undefined }), /JSON representation/);
-		assert.throws(() => sse({ data: 1n }), /JSON serializable/);
+	it.each(["\0", "\r", "\n"])("rejects an id containing %j", (id) => {
+		expect(() => sse({ data: null, id })).toThrow(TypeError);
+	});
+
+	it.each(["\r", "\n"])("rejects an event name containing %j", (event) => {
+		expect(() => sse({ data: null, event })).toThrow(TypeError);
+	});
+
+	it.each([-1, 0.5, Number.MAX_SAFE_INTEGER + 1])(
+		"rejects invalid retry %s",
+		(retry) => {
+			expect(() => sse({ data: null, retry })).toThrow(TypeError);
+		},
+	);
+
+	it("rejects data with no JSON representation or failed serialization", () => {
+		expect(() => sse({ data: undefined })).toThrow(
+			"SSE event data must have a JSON representation.",
+		);
+		expect(() => sse({ data: 1n })).toThrow(
+			"SSE event data must be JSON serializable.",
+		);
 	});
 });

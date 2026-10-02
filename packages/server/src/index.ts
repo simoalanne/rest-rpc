@@ -1,8 +1,8 @@
 export type {
 	HandleHttpRouteConfiguration,
 	HandleHttpRouteOptions,
-	HttpRouteResult,
 } from "./handleHttpRoute.ts";
+export type { HttpRouteResult } from "./httpRouteResult.ts";
 export { handleHttpRoute } from "./handleHttpRoute.ts";
 export { createRouteMatcher, flattenRouteImplementations } from "./match.ts";
 export type { RouteMatch, RuntimeImplementationTree } from "./match.ts";
@@ -29,6 +29,8 @@ export type {
 	ImplicitResponseKind,
 	ServerFirstResponseKind,
 	ServerFirstRouteResponseKind,
+} from "./implicitResponse.types.ts";
+export type {
 	ServerBuilderExtension,
 	ServerRouteBuilder,
 } from "./routeBuilder.types.ts";

@@ -7,17 +7,171 @@ import {
 } from "../codecs/index.ts";
 import type { RouteDeclaration } from "../contract/contract.ts";
 import { replacePathParams } from "../contract/path.ts";
-import type { GroupedRequestInput } from "./requestInput.ts";
-import type { ClientRequestRoute } from "./requestRoute.ts";
+import type { HttpMethod } from "../contract/routeDeclaration.ts";
 import type {
-	ApiClientFetchOptions,
-	FetchArgs,
-	FetchLike,
-	FetchOptions,
-	ClientHeaders,
-} from "./types.ts";
+	ClientRequestForDeclaration,
+	InferSchemaInputs,
+	RequestScalar,
+} from "../contract/request.ts";
+import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 
-export const createRequestSignal = (
+export type FetchOptions = Omit<RequestInit, "method" | "body" | "headers"> & {
+	additionalHeaders?: Record<string, RequestScalar | undefined>;
+	contentType?: string;
+};
+
+export type ApiClientFetchOptions = Omit<
+	FetchOptions,
+	"signal" | "contentType" | "additionalHeaders"
+>;
+
+/**
+ * The fetch-compatible function shape used by the core client.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#custom-fetch}
+ */
+export type FetchLike = (
+	input: string | URL | Request,
+	init?: RequestInit,
+) => Promise<Response>;
+
+/** A static client header or a provider evaluated for each request. */
+export type ClientHeaderValue =
+	| RequestScalar
+	| undefined
+	| (() => RequestScalar | undefined | Promise<RequestScalar | undefined>);
+
+/** Transport headers added by the client outside the declared route input. */
+export type ClientHeaders = Record<string, ClientHeaderValue>;
+
+type LiteralKeys<T> = {
+	[K in keyof T]: string extends K
+		? never
+		: number extends K
+			? never
+			: symbol extends K
+				? never
+				: K;
+}[keyof T];
+
+type ResolvedHeaderValue<T> = T extends (...args: never[]) => infer TResult
+	? Awaited<TResult>
+	: T;
+
+type GlobalHeaderKeys<TGlobalHeaders extends ClientHeaders> = {
+	[TKey in LiteralKeys<TGlobalHeaders>]: undefined extends ResolvedHeaderValue<
+		TGlobalHeaders[TKey]
+	>
+		? never
+		: TKey;
+}[LiteralKeys<TGlobalHeaders>];
+
+type RequiredKeys<T> = {
+	[TKey in keyof T]-?: {} extends Pick<T, TKey> ? never : TKey;
+}[keyof T];
+
+type UnsatisfiedFlatHeaderKeys<
+	E extends RouteDeclaration,
+	TGlobalHeaders extends ClientHeaders,
+> = E extends {
+	input: "input";
+	request: {
+		headers: infer THeaders extends readonly StandardSchemaV1[];
+	};
+}
+	? Exclude<
+			RequiredKeys<InferSchemaInputs<THeaders>>,
+			GlobalHeaderKeys<TGlobalHeaders>
+		>
+	: never;
+
+type MissingGlobalHeaders<TKeys extends PropertyKey> = {
+	readonly [
+		TKey in Extract<
+			TKeys,
+			string
+		> as `ERROR: required header "${TKey}" needs a guaranteed globalHeaders value`
+	]: never;
+};
+
+type DeclaredContentType<E> = E extends {
+	request: { contentType: infer TContentType };
+}
+	? TContentType
+	: never;
+
+/** Fetch options accepted by a particular route call. */
+export type FetchOptionsFor<E extends RouteDeclaration> = Omit<
+	FetchOptions,
+	"contentType"
+> &
+	([DeclaredContentType<E>] extends [never]
+		? { contentType?: never }
+		: DeclaredContentType<E> extends readonly string[]
+			? { contentType: DeclaredContentType<E>[number] }
+			: { contentType?: never });
+
+type RequiresFetchOptions<E> = [DeclaredContentType<E>] extends [never]
+	? false
+	: DeclaredContentType<E> extends readonly string[]
+		? true
+		: false;
+
+type StandardFetchArgs<
+	E extends RouteDeclaration,
+	TGlobalHeaders extends ClientHeaders,
+> =
+	ClientRequestForDeclaration<E, GlobalHeaderKeys<TGlobalHeaders>> extends never
+		? [request?: undefined, options?: FetchOptionsFor<E>]
+		: RequiresFetchOptions<E> extends false
+			? [
+					request: ClientRequestForDeclaration<
+						E,
+						GlobalHeaderKeys<TGlobalHeaders>
+					>,
+					options?: FetchOptionsFor<E>,
+				]
+			: [
+					request: ClientRequestForDeclaration<
+						E,
+						GlobalHeaderKeys<TGlobalHeaders>
+					>,
+					options: FetchOptionsFor<E>,
+				];
+
+export type FetchArgs<
+	E extends RouteDeclaration = RouteDeclaration,
+	TGlobalHeaders extends ClientHeaders = Record<never, string>,
+> = [UnsatisfiedFlatHeaderKeys<E, TGlobalHeaders>] extends [never]
+	? StandardFetchArgs<E, TGlobalHeaders>
+	: [
+			request: ClientRequestForDeclaration<E> &
+				MissingGlobalHeaders<UnsatisfiedFlatHeaderKeys<E, TGlobalHeaders>>,
+		];
+
+type GroupedRequestInput = {
+	body?: unknown;
+	contentType?: string;
+	query?: unknown;
+	params?: Record<string, unknown>;
+	headers?: Record<string, unknown>;
+};
+
+type ClientRequestDeclaration = {
+	body?: unknown;
+	contentType?: string | readonly string[];
+	query?: unknown;
+	params?: unknown;
+	headers?: unknown;
+};
+
+type ClientRequestRoute = {
+	method: HttpMethod;
+	path: string;
+	request?: ClientRequestDeclaration;
+};
+
+const createRequestSignal = (
 	signal: RequestInit["signal"],
 	timeoutMs: number | undefined,
 ) => {
@@ -34,15 +188,6 @@ export const createRequestSignal = (
 	};
 };
 
-export const takesRequestInput = (route: ClientRequestRoute) => {
-	const request = route.request;
-	if (request?.query || request?.params || request?.headers) {
-		return true;
-	}
-	if (request?.contentType !== undefined) return true;
-	return Boolean(request?.body);
-};
-
 const normalizeHeaders = (
 	headers: Record<string, string> | undefined,
 ): Record<string, string> =>
@@ -52,10 +197,7 @@ const normalizeHeaders = (
 			value,
 		]),
 	);
-const stringifyHeaders = (
-	_route: ClientRequestRoute,
-	headers: Record<string, unknown> | undefined,
-) =>
+const stringifyHeaders = (headers: Record<string, unknown> | undefined) =>
 	Object.fromEntries(
 		Object.entries(headers ?? {}).flatMap(([key, value]) => {
 			const stringValue = value === undefined ? undefined : String(value);
@@ -78,7 +220,7 @@ const serializeParams = (
 	});
 };
 
-const serializeQuery = (route: ClientRequestRoute, query: unknown) => {
+const serializeQuery = (query: unknown) => {
 	const searchParams = new URLSearchParams();
 	for (const [key, value] of Object.entries(query ?? {})) {
 		if (Array.isArray(value)) {
@@ -109,7 +251,7 @@ export const constructBaseRequest = (
 	headers?: Record<string, string>;
 } => {
 	const { body, query, params, headers } = args ?? {};
-	const url = `${baseUrl}${serializeParams(route, params)}${serializeQuery(route, query)}`;
+	const url = `${baseUrl}${serializeParams(route, params)}${serializeQuery(query)}`;
 	const declaredContentType = route.request?.contentType;
 	if (Array.isArray(declaredContentType) && selectedContentType === undefined) {
 		throw new Error(
@@ -131,7 +273,7 @@ export const constructBaseRequest = (
 			? declaredContentType
 			: undefined) ??
 		(route.request?.body ? "application/json" : undefined);
-	const requestHeaders = stringifyHeaders(route, headers);
+	const requestHeaders = stringifyHeaders(headers);
 	return {
 		url,
 		body: contentType === undefined ? undefined : body,
@@ -205,10 +347,7 @@ export const executeRequest = async <
 			? contentType
 			: serialized.contentType;
 	const globalHeaders = await resolveHeaders(options.globalHeaders ?? {});
-	const additionalHeaders = stringifyHeaders(
-		route,
-		fetchOptions?.additionalHeaders,
-	);
+	const additionalHeaders = stringifyHeaders(fetchOptions?.additionalHeaders);
 	const clientHeaders = {
 		...normalizeHeaders(globalHeaders),
 		...normalizeHeaders(additionalHeaders),
@@ -228,7 +367,7 @@ export const executeRequest = async <
 			...options.fetchOptions,
 			...requestFetchOptions,
 			method: route.method,
-			body: serialized?.body as BodyInit | undefined,
+			body: serialized?.body as RequestInit["body"],
 			headers: {
 				...clientHeaders,
 				...normalizeHeaders(requestHeaders),

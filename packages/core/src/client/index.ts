@@ -1,19 +1,20 @@
 export { HttpError } from "./httpError.ts";
-export { initClient } from "./initClient.ts";
-export { constructBaseRequest } from "./request.ts";
-export type {
-	ApiClientFetchOptions,
-	ApiClientFor,
-	ApiClientOptions,
-	ClientHeaders,
-	ClientHeaderValue,
-	InferClientResponse,
-	FetchArgs,
-	FetchLike,
-	FetchOptions,
-	FetchOptionsFor,
-	FetchResponseFn,
-} from "./types.ts";
-
-export type { ApiClientRouteValue } from "./types.ts";
+export {
+	initClient,
+	type ApiClientFor,
+	type ApiClientOptions,
+	type ApiClientRouteValue,
+	type FetchResponseFn,
+} from "./initClient.ts";
+export {
+	constructBaseRequest,
+	type ApiClientFetchOptions,
+	type ClientHeaders,
+	type ClientHeaderValue,
+	type FetchArgs,
+	type FetchLike,
+	type FetchOptions,
+	type FetchOptionsFor,
+} from "./request.ts";
+export type { InferClientResponse } from "./response.ts";
 export type { SseEvent } from "../sse.ts";

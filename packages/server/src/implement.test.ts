@@ -1,88 +1,51 @@
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
-import { route } from "@rest-rpc/core";
-import { createRouteMatcher } from "./match.ts";
+import { route, type } from "@rest-rpc/core";
 import { implement } from "./implement.ts";
-import { serverFirstRoute } from "./routeBuilder.ts";
+import type { RuntimeServerRoute } from "./routeBuilder.types.ts";
+
+const contract = {
+	users: {
+		get: route
+			.get("/users/{id}")
+			.params(type<{ id: string }>())
+			.response(200, type<{ name: string }>()),
+	},
+};
+
+const routeState = (value: unknown) =>
+	(value as RuntimeServerRoute)["~restrpc"];
 
 describe("implement", () => {
-	it("creates an implementer facade and derives procedure paths", () => {
-		const contract = {
-			todos: {
-				get: route.output({
-					"~standard": {
-						version: 1,
-						vendor: "test",
-						validate: (value) => ({ value }),
-					},
-				}),
-			},
-		};
-		const implementer = implement(contract);
-		assert.notEqual(implementer, contract);
-		assert.deepEqual(Object.keys(implementer), ["todos", "$context", "use"]);
-		assert.equal(implementer.$context<{ requestId: string }>(), implementer);
+	it("should apply root middleware to every route without mutating the contract", () => {
+		const middleware1 = () => "first";
+		const middleware2 = () => "second";
+		const implementation = implement(contract)
+			.use(middleware1)
+			.use(middleware2);
 
-		const implementation = implementer.todos.get.handler(() => "todo-1");
-		const match = createRouteMatcher({ todos: { get: implementation } })({
-			method: "POST",
-			path: "/todos/get",
-		});
-		assert.equal(match?.implementation.route.path, "/todos/get");
-		assert.equal(match?.implementation.handler(), "todo-1");
+		expect(implementation.users.get).not.toBe(contract.users.get);
+		expect(routeState(implementation.users.get).middleware).toEqual([
+			middleware1,
+			middleware2,
+		]);
+		expect(routeState(contract.users.get).middleware).toBeUndefined();
 	});
 
-	it("appends shared middleware to every route in declaration order", () => {
-		const contract = {
-			first: route.output({
-				"~standard": {
-					version: 1,
-					vendor: "test",
-					validate: (value) => ({ value }),
-				},
-			}),
-			second: route.output({
-				"~standard": {
-					version: 1,
-					vendor: "test",
-					validate: (value) => ({ value }),
-				},
-			}),
-		};
-		const outer = () => undefined;
-		const inner = () => undefined;
-		const local = () => undefined;
-		const implementer = implement(contract).use(outer).use(inner);
+	it("should reject contracts that already contain a handler", () => {
+		const implementedRoute = implement(contract.users.get).handler(() => ({
+			status: 200,
+			body: { name: "Ada" },
+		}));
 
-		const first = implementer.first.use(local).handler(() => "first");
-		const second = implementer.second.handler(() => "second");
-
-		assert.deepEqual(first["~restrpc"].middleware, [outer, inner, local]);
-		assert.deepEqual(second["~restrpc"].middleware, [outer, inner]);
+		expect(() => implement(implementedRoute)).toThrow(
+			"Cannot implement a route that already has a handler.",
+		);
 	});
 
-	it("rejects server-first middleware and routes implemented twice", () => {
-		const output = {
-			"~standard": {
-				version: 1 as const,
-				vendor: "test",
-				validate: (value: unknown) => ({ value }),
-			},
-		};
-		const routeWithMiddleware = serverFirstRoute
-			.use(() => undefined)
-			.output(output);
-		assert.throws(
-			() => implement(routeWithMiddleware),
-			/Cannot implement a route that already has middleware/,
-		);
+	it("should reject contracts that already contain middleware", () => {
+		const implementedRoute = implement(contract.users.get).use(() => {});
 
-		const implementation = implement(route.output(output)).handler(
-			() => "first",
-		);
-		assert.throws(
-			() => implement(implementation),
-			/Cannot implement a route that already has a handler/,
+		expect(() => implement(implementedRoute)).toThrow(
+			"Cannot implement a route that already has middleware.",
 		);
 	});
 });

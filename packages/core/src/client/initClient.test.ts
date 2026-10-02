@@ -1,187 +1,83 @@
-import assert from "node:assert/strict";
-import { afterEach, describe, it } from "node:test";
-import z from "zod";
 import { route } from "../contract/routeBuilder.ts";
+import { type } from "../standard-schema/type.ts";
 import { initClient } from "./initClient.ts";
 
-const originalFetch = globalThis.fetch;
-
-afterEach(() => {
-	globalThis.fetch = originalFetch;
-});
-
-type FetchCall = {
-	url: string;
-	init?: RequestInit;
-};
-
-const apiContract = {
-	todos: {
-		list: route
-			.get("/todos")
-			.query(
-				z.object({
-					search: z.string().optional(),
-				}),
-			)
-			.response(200, z.array(z.object({ id: z.string() }))),
-		publish: route
-			.post("/todos/:id/publish")
-			.params(z.object({ id: z.string() }))
-			.response(200, z.object({ id: z.string() }))
-			.response(202, z.object({ queued: z.literal(true) })),
-	},
-};
-
-const jsonResponse = (body: unknown, status = 200) =>
-	new Response(JSON.stringify(body), {
-		status,
-		headers: { "Content-Type": "application/json" },
-	});
-
-const captureFetch = (response: Response) => {
-	const calls: FetchCall[] = [];
-
-	globalThis.fetch = async (url, init) => {
-		calls.push({ url: String(url), init });
-		return response;
-	};
-
-	return calls;
-};
-
 describe("initClient", () => {
-	it("creates callable HTTP routes", () => {
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-
-		assert.deepEqual(Object.keys(client.todos.list), []);
-		assert.deepEqual(Object.keys(client.todos.publish), []);
-	});
-
-	it("returns the API tree directly", async () => {
-		const calls = captureFetch(jsonResponse([]));
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-
-		await client.todos.list({ query: { search: "milk" } });
-
-		assert.equal(calls[0]?.url, "https://api.test/todos?search=milk");
-	});
-
-	it("uses the route tree path for a method declared without one", async () => {
-		const calls = captureFetch(new Response(null, { status: 204 }));
-		const client = initClient(
-			{ todos: { remove: route.delete().response(204) } },
-			{ baseUrl: "https://api.test" },
-		);
-
-		await client.todos.remove();
-
-		assert.equal(calls[0]?.url, "https://api.test/todos/remove");
-		assert.equal(calls[0]?.init?.method, "DELETE");
-	});
-
-	it("calls shorthand routes as derived JSON POST operations", async () => {
-		const calls: FetchCall[] = [];
-		globalThis.fetch = async (url, init) => {
-			calls.push({ url: String(url), init });
-			return jsonResponse(String(calls.length));
-		};
+	it("mirrors nested contracts and resolves implicit paths for flat inputs and outputs", async () => {
+		const fetch = vi.fn(async () => Response.json("Ada"));
 		const contract = {
-			todos: {
-				get: route.output(z.string().transform(Number)),
-				add: route
-					.input(z.object({ title: z.string() }))
-					.output(z.string().transform(Number)),
-				form: route
-					.input(z.instanceof(URLSearchParams), {
-						contentType: "application/x-www-form-urlencoded",
-					})
-					.output(z.string().transform(Number)),
-				search: route
-					.get("/todos/search")
-					.input(z.object({ term: z.string() }))
-					.output(z.string().transform(Number)),
-				sync: route
-					.query(z.object({ id: z.string() }))
-					.response(200, z.string()),
-				list: route.get("/todos").response(200, z.array(z.string())),
+			users: {
+				find: route.input(type<{ id: number }>()).output(type<string>()),
 			},
 		};
 		const client = initClient(contract, {
-			baseUrl: "https://api.test",
-			validateResponses: true,
+			baseUrl: "https://example.test",
+			fetch,
 		});
-
-		assert.equal(await client.todos.get(undefined, { cache: "no-store" }), 1);
-		assert.equal(await client.todos.add({ title: "Write tests" }), 2);
-		assert.equal(
-			await client.todos.form(
-				new URLSearchParams([
-					["title", "Write tests"],
-					["tags[]", "docs"],
-				]),
-			),
-			3,
+		expect(await client.users.find({ id: 1 })).toBe("Ada");
+		expect(fetch).toHaveBeenCalledWith(
+			"https://example.test/users/find",
+			expect.objectContaining({ method: "POST", body: '{"id":1}' }),
 		);
-		assert.equal(await client.todos.search({ term: "open" }), 4);
-		await assert.rejects(
-			client.todos.search("wrong" as never),
-			/GET flat input must be an object/,
-		);
-		assert.equal(
-			(await client.todos.sync({ query: { id: "todo-1" } })).body,
-			"5",
-		);
-		assert.deepEqual(Object.keys(client.todos), [
-			"get",
-			"add",
-			"form",
-			"search",
-			"sync",
-			"list",
-		]);
-		assert.deepEqual(Object.keys(client.todos.list), []);
-		assert.equal(calls[0]?.url, "https://api.test/todos/get");
-		assert.equal(calls[0]?.init?.method, "POST");
-		assert.equal(calls[0]?.init?.body, undefined);
-		assert.equal(calls[0]?.init?.cache, "no-store");
-		assert.equal(calls[1]?.url, "https://api.test/todos/add");
-		assert.equal(calls[1]?.init?.method, "POST");
-		assert.equal(
-			calls[1]?.init?.body,
-			JSON.stringify({ title: "Write tests" }),
-		);
-		assert.equal(
-			new Headers(calls[1]?.init?.headers).get("content-type"),
-			"application/json",
-		);
-		assert.equal(
-			String(calls[2]?.init?.body),
-			"title=Write+tests&tags%5B%5D=docs",
-		);
-		assert.equal(
-			new Headers(calls[2]?.init?.headers).get("content-type"),
-			"application/x-www-form-urlencoded",
-		);
-		assert.equal(calls[3]?.url, "https://api.test/todos/search?term=open");
-		assert.equal(calls[3]?.init?.body, undefined);
-		assert.equal(calls[4]?.url, "https://api.test/todos/sync?id=todo-1");
-		assert.equal(calls[4]?.init?.method, "POST");
 	});
 
-	it("throws native errors for unsuccessful shorthand requests", async () => {
-		captureFetch(jsonResponse({ code: "failed" }, 500));
+	it("returns declared error envelopes without treating them as transport failures", async () => {
 		const client = initClient(
-			{ todos: { get: route.output(z.object({ id: z.string() })) } },
+			route.get("/users").response(404, type<{ message: string }>()),
 			{
-				baseUrl: "https://api.test",
+				baseUrl: "",
+				fetch: async () =>
+					Response.json({ message: "missing" }, { status: 404 }),
 			},
 		);
+		expect(await client()).toMatchObject({
+			status: 404,
+			body: { message: "missing" },
+		});
+	});
 
-		await assert.rejects(client.todos.get(), Error);
+	it("rejects undeclared statuses with the decoded response body", async () => {
+		const client = initClient(route.get().response(200, type<string>()), {
+			baseUrl: "",
+			fetch: async () => Response.json({ message: "missing" }, { status: 404 }),
+		});
+		await expect(client()).rejects.toMatchObject({
+			name: "HttpError",
+			status: 404,
+			body: { message: "missing" },
+		});
+	});
+
+	it("maps response bodies only when validation is enabled", async () => {
+		const contract = route.output(type((value: string) => value.length));
+		const options = { baseUrl: "", fetch: async () => Response.json("Ada") };
+		expect(await initClient(contract, options)()).toBe("Ada");
+		expect(
+			await initClient(contract, { ...options, validateResponses: true })(),
+		).toBe(3);
+	});
+
+	it("rejects a response media type outside the declaration even without validation", async () => {
+		const client = initClient(route.output(type<string>()), {
+			baseUrl: "",
+			fetch: async () =>
+				new Response("Ada", { headers: { "content-type": "text/plain" } }),
+		});
+		await expect(client()).rejects.toMatchObject({
+			name: "HttpError",
+			message: "Server returned an unsupported response content-type.",
+		});
+	});
+
+	it("rejects non-object GET flat inputs before fetching", async () => {
+		const fetch = vi.fn();
+		const client = initClient(
+			route.get().input(type<string>()).output(type<string>()),
+			{ baseUrl: "", fetch },
+		);
+		await expect(client("invalid")).rejects.toThrow(
+			"GET flat input must be an object of query values.",
+		);
+		expect(fetch).not.toHaveBeenCalled();
 	});
 });

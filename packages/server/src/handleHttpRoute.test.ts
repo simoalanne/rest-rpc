@@ -1,578 +1,261 @@
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
-import { route as coreRoute } from "@rest-rpc/core";
-import z from "zod";
+import { type } from "@rest-rpc/core";
 import { handleHttpRoute } from "./handleHttpRoute.ts";
+import {
+	flattenRouteImplementations,
+	type RuntimeImplementationTree,
+} from "./match.ts";
+import { serverFirstRoute as route } from "./routeBuilder.ts";
 import {
 	RequestValidationError,
 	ResponseValidationError,
 } from "./validationErrors.ts";
+import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
+
+const rejected: StandardSchemaV1<unknown, Record<string, string>> = {
+	"~standard": {
+		version: 1,
+		vendor: "test",
+		validate: () => ({ issues: [{ message: "invalid" }] }),
+	},
+};
+
+const execute = (implementation: RuntimeImplementationTree) =>
+	handleHttpRoute(flattenRouteImplementations(implementation)[0]!, {
+		request: {},
+		handlerFields: {},
+	});
 
 describe("handleHttpRoute", () => {
-	it("passes validated request data, handler fields, context, and route", async () => {
-		const route = coreRoute
-			.get("/todos/:id")
-			.params(z.object({ id: z.coerce.number<number>() }))
-			.response(200, z.object({ id: z.number() }))["~restrpc"];
-		const result = await handleHttpRoute(
-			{
-				route: route,
-				middleware: [
-					(request) => {
-						request.context.set("requestId", "request-1");
-						return request.next();
+	it.each(["GET", "POST"] as const)(
+		"projects transformed flat %s input and transport headers",
+		async (method) => {
+			const seen = vi.fn();
+			const implementation = (method === "GET" ? route.get() : route.post())
+				.input(
+					type((value: { count: string }) => ({ count: Number(value.count) })),
+				)
+				.handler((request) => {
+					seen(request);
+					return request.input;
+				});
+			const run = (disableRequestValidation: boolean) =>
+				handleHttpRoute(flattenRouteImplementations({ implementation })[0]!, {
+					request: {
+						...(method === "GET"
+							? { query: new URLSearchParams("count=2") }
+							: { body: { count: "2" } }),
+						headers: {
+							"content-type": ["Application/JSON; charset=utf-8"],
+							"last-event-id": ["one", "two"],
+						},
 					},
-				],
-				handler: (request) => {
-					const { context, ...requestFields } = request;
-					assert.deepEqual(Object.keys(context), ["get", "set"]);
-					assert.equal(context.get("requestId"), "request-1");
-					assert.deepEqual(requestFields, {
-						body: undefined,
-						query: undefined,
-						headers: undefined,
-						params: { id: 123 },
-						frameworkValue: "framework-1",
-						contentType: undefined,
-						lastEventId: undefined,
-						route,
-					});
-
-					return { status: 200, body: { id: request.params.id } };
-				},
-			},
-			{
-				request: {
-					params: { id: "123" },
-				},
-				handlerFields: { frameworkValue: "framework-1" },
-			},
-		);
-
-		assert.deepEqual(result, {
-			kind: "response",
-			status: 200,
-			headers: undefined,
-			body: { value: { id: 123 }, contentType: "application/json" },
-		});
-	});
-
-	it("passes grouped request data under explicit HTTP segments", async () => {
-		const route = coreRoute
-			.get("/todos")
-			.query(z.object({ q: z.string() }).transform(() => ["todo"]))
-			.response(204)["~restrpc"];
-		const result = await handleHttpRoute(
-			{
-				route: route,
-				handler: (request) => {
-					const { context, ...requestFields } = request;
-					assert.deepEqual(Object.keys(context), ["get", "set"]);
-					assert.deepEqual(requestFields, {
-						body: undefined,
-						params: undefined,
-						headers: undefined,
-						query: ["todo"],
-						contentType: undefined,
-						lastEventId: undefined,
-						route,
-					});
-					return { status: 204 };
-				},
-			},
-			{
-				request: {
-					query: new URLSearchParams({ q: "todos" }),
-				},
-				handlerFields: {},
-			},
-		);
-
-		assert.deepEqual(result, {
-			kind: "response",
-			status: 204,
-			headers: undefined,
-		});
-	});
-
-	it("returns grouped request validation errors without calling the handler", async () => {
-		let called = false;
-		const error = await handleHttpRoute(
-			{
-				route: coreRoute
-					.get("/todos/:id")
-					.params(z.object({ id: z.number() }))
-					.response(204)["~restrpc"],
-				handler: () => {
-					called = true;
-				},
-			},
-			{
-				request: {
-					params: { id: "123" },
-				},
-				handlerFields: {},
-			},
-		);
-		assert.ok(error instanceof RequestValidationError);
-		assert.equal(error.status, 400);
-		assert.deepEqual(error.responseBody, {
-			message:
-				"Request validation failed. Check the validationErrors field for details.",
-			validationErrors: error.issues,
-		});
-		assert.equal(error.issues.body.length, 0);
-		assert.equal(error.issues.query.length, 0);
-		assert.equal(error.issues.params.length, 1);
-		assert.equal(error.issues.headers.length, 0);
-
-		assert.equal(called, false);
-	});
-
-	it("can disable request schema validation", async () => {
-		const route = coreRoute
-			.input(z.object({ title: z.string() }))
-			.output(z.object({ received: z.unknown() }))["~restrpc"];
-		const rawBody = { title: 123 };
-		const result = await handleHttpRoute(
-			{
-				route,
-				handler: (request: { input: unknown }) => {
-					assert.equal(request.input, rawBody);
-					return { received: request.input };
-				},
-			},
-			{
-				request: { body: rawBody },
-				handlerFields: {},
-				configuration: { disableRequestValidation: true },
-			},
-		);
-
-		assert.deepEqual(result, {
-			kind: "response",
-			status: 200,
-			headers: undefined,
-			body: {
-				value: { received: rawBody },
+					handlerFields: { native: "adapter" },
+					configuration: { disableRequestValidation },
+				});
+			expect(await run(false)).toMatchObject({ body: { value: { count: 2 } } });
+			expect(seen.mock.calls[0]![0]).toMatchObject({
+				input: { count: 2 },
 				contentType: "application/json",
-			},
-		});
+				lastEventId: "one",
+				native: "adapter",
+			});
+			expect(seen.mock.calls[0]![0]).not.toHaveProperty("body");
+			const raw = await run(true);
+			expect(raw).toMatchObject({
+				body: {
+					value:
+						method === "GET" ? expect.any(URLSearchParams) : { count: "2" },
+				},
+			});
+		},
+	);
+
+	it("shares context with middleware and creates a fresh store per request", async () => {
+		const contexts: unknown[] = [];
+		const implementation = route
+			.$context<{ count: number }>()
+			.use(({ context, next }) => {
+				contexts.push(context);
+				context.set("count", 1);
+				return next();
+			})
+			.get("/")
+			.use(({ context, next }) => {
+				expect(context).toBe(contexts.at(-1));
+				context.set("count", context.get("count") + 1);
+				return next();
+			})
+			.handler(({ context }) => context.get("count"));
+		expect(await execute(implementation)).toMatchObject({ body: { value: 2 } });
+		expect(await execute(implementation)).toMatchObject({ body: { value: 2 } });
+		expect(contexts[0]).not.toBe(contexts[1]);
 	});
 
-	it("normalizes inferred procedure results as successful JSON", async () => {
-		const route = {
-			kind: "procedure" as const,
-			method: "POST" as const,
-			path: "/todos/get",
-			responses: {},
-		};
-		const result = await handleHttpRoute(
-			{ route: route, handler: () => ({ id: "todo-1" }) },
-			{
+	it("returns request validation errors without invoking the handler", async () => {
+		const handler = vi.fn(() => "ok");
+		const implementation = route.post("/").body(rejected).handler(handler);
+		expect(await execute(implementation)).toBeInstanceOf(
+			RequestValidationError,
+		);
+		expect(handler).not.toHaveBeenCalled();
+	});
+
+	it("transforms declared bodies and headers unless response validation is disabled", async () => {
+		const implementation = route
+			.get("/")
+			.response(
+				200,
+				type((value: string) => Number(value)),
+				{
+					headers: type((value: { count: number; omitted?: string }) => ({
+						count: value.count + 1,
+						omitted: undefined,
+					})),
+				},
+			)
+			.handler(() => ({
+				status: 200,
+				body: "2",
+				responseHeaders: { count: 2 },
+			}));
+		const run = (disableResponseValidation: boolean) =>
+			handleHttpRoute(flattenRouteImplementations(implementation)[0]!, {
 				request: {},
 				handlerFields: {},
-			},
-		);
+				configuration: { disableResponseValidation },
+			});
+		expect(await run(false)).toMatchObject({
+			headers: { count: "3" },
+			body: { value: 2 },
+		});
+		expect(await run(true)).toMatchObject({
+			headers: { count: "2" },
+			body: { value: "2" },
+		});
+	});
 
-		assert.deepEqual(result, {
-			kind: "response",
-			status: 200,
-			body: { value: { id: "todo-1" }, contentType: "application/json" },
-		});
-		const enveloped = await handleHttpRoute(
-			{
-				route: route,
-				handler: () => ({ status: 201, body: { id: "todo-1" } }),
-			},
-			{ request: {}, handlerFields: {}, context: {} },
-		);
-		assert.deepEqual(enveloped, {
-			kind: "response",
-			status: 201,
-			body: { value: { id: "todo-1" }, contentType: "application/json" },
-			headers: undefined,
-		});
-		await assert.rejects(
-			handleHttpRoute(
-				{ route: route, handler: () => ({ status: "bad" }) },
+	it.each(["body", "headers"] as const)(
+		"returns declared %s validation failures",
+		async (location) => {
+			const implementation = route
+				.get("/")
+				.response(
+					200,
+					location === "body" ? rejected : type<string>(),
+					location === "headers" ? { headers: rejected } : {},
+				)
+				.handler(() => ({ status: 200, body: "ok", responseHeaders: {} }));
+			const result = await execute(implementation);
+			expect(result).toBeInstanceOf(ResponseValidationError);
+			expect(result).toMatchObject({ location });
+		},
+	);
+
+	it("validates declared stream chunks lazily", async () => {
+		async function* chunks() {
+			yield "2";
+		}
+		const implementation = route
+			.get("/")
+			.streamResponse(
+				200,
+				type((value: string) => Number(value)),
+			)
+			.handler(() => ({ status: 200, body: chunks() }));
+		for (const disabled of [false, true]) {
+			const result = await handleHttpRoute(
+				flattenRouteImplementations(implementation)[0]!,
 				{
 					request: {},
 					handlerFields: {},
+					configuration: { disableResponseValidation: disabled },
 				},
+			);
+			if (!("kind" in result) || result.kind !== "stream")
+				throw new Error("Expected stream");
+			const frames = [];
+			for await (const frame of result.body) frames.push(frame);
+			expect(frames).toEqual([disabled ? 'data: "2"\n\n' : "data: 2\n\n"]);
+		}
+	});
+
+	it("dispatches declared plain and custom outputs through response validation", async () => {
+		expect(
+			await execute({
+				get: route
+					.output(type((value: string) => value.toUpperCase()))
+					.handler(() => "hello"),
+			}),
+		).toMatchObject({
+			body: { value: "HELLO", contentType: "application/json" },
+		});
+		const custom = route
+			.output(type<string>(), { contentType: "text/plain" })
+			.handler(() => ({ contentType: "text/plain", data: "hello" }));
+		expect(await execute({ custom })).toMatchObject({
+			body: { value: "hello", contentType: "text/plain" },
+		});
+		const runtime = flattenRouteImplementations({ custom })[0]!;
+		await expect(
+			handleHttpRoute(
+				{ ...runtime, handler: () => "hello" },
+				{ request: {}, handlerFields: {} },
 			),
-			/Invalid inferred HTTP response status "bad"/,
-		);
+		).rejects.toThrow("Custom procedure output must return");
 	});
-
-	it("normalizes declared procedure outputs directly", async () => {
-		const route = coreRoute
-			.get("/ready")
-			.input(z.object({ term: z.string() }))
-			.output(z.object({ status: z.literal("ready") }))["~restrpc"];
-		let input: unknown;
-		const result = await handleHttpRoute(
-			{
-				route: route,
-				handler: (request: { input: unknown }) => {
-					input = request.input;
-					return { status: "ready" };
-				},
-			},
-			{
-				request: { query: new URLSearchParams({ term: "go" }) },
-				handlerFields: {},
-			},
-		);
-		assert.deepEqual(input, { term: "go" });
-
-		assert.deepEqual(result, {
-			kind: "response",
-			status: 200,
-			headers: undefined,
-			body: { value: { status: "ready" }, contentType: "application/json" },
-		});
-	});
-
-	it("normalizes declared custom procedure output wrappers", async () => {
-		const route = coreRoute.output(z.string(), { contentType: "text/plain" })[
-			"~restrpc"
-		];
-		const result = await handleHttpRoute(
-			{
-				route: route,
-				handler: () => ({ contentType: "text/plain", data: "todo data" }),
-			},
-			{
-				request: {},
-				handlerFields: {},
-			},
-		);
-
-		assert.deepEqual(result, {
-			kind: "response",
-			status: 200,
-			headers: undefined,
-			body: { value: "todo data", contentType: "text/plain" },
-		});
-	});
-
-	it("requires declared custom procedure output wrappers", async () => {
-		const route = coreRoute.output(z.string(), { contentType: "text/plain" })[
-			"~restrpc"
-		];
-
-		await assert.rejects(
-			() =>
-				handleHttpRoute(
-					{ route: route, handler: () => "todo data" },
-					{
-						request: {},
-						handlerFields: {},
-					},
-				),
-			/Custom procedure output must return/,
-		);
-	});
-
-	it("normalizes declared procedure streams directly", async () => {
-		const route = coreRoute.streamOutput(z.object({ id: z.string() }))[
-			"~restrpc"
-		];
-		const result = await handleHttpRoute(
-			{
-				route: route,
-				handler: () =>
-					(async function* () {
-						yield { id: "event-1" };
-					})(),
-			},
-			{
-				request: {},
-				handlerFields: {},
-			},
-		);
-
-		assert.equal(result.kind, "stream");
-		if (result.kind !== "stream") throw new Error("Expected stream");
-		const events = [];
-		for await (const event of result.body) events.push(event);
-		assert.deepEqual(events, ['data: {"id":"event-1"}\n\n']);
-	});
-
-	it("classifies inferred custom and stream procedure outputs", async () => {
-		const route = {
-			kind: "procedure" as const,
-			method: "POST" as const,
-			path: "/events",
-			responses: {},
+	it("rejects an undeclared response status even with response validation disabled", async () => {
+		const declared = route
+			.get("/")
+			.response(200, type<string>())
+			.handler(() => ({ status: 200, body: "ok" }));
+		const implementation = {
+			...flattenRouteImplementations(declared)[0]!,
+			handler: () => ({ status: 404, body: "missing" }),
 		};
-		const custom = await handleHttpRoute(
-			{
-				route: route,
-				handler: () => ({ contentType: "text/plain", data: "event data" }),
-			},
-			{ request: {}, handlerFields: {}, context: {} },
-		);
-		const stream = await handleHttpRoute(
-			{
-				route: route,
-				handler: () =>
-					(async function* () {
-						yield { id: "event-1" };
-					})(),
-			},
-			{ request: {}, handlerFields: {}, context: {} },
-		);
-
-		assert.deepEqual(custom, {
-			kind: "response",
-			status: 200,
-			body: { value: "event data", contentType: "text/plain" },
-		});
-		assert.equal(stream.kind, "stream");
-	});
-
-	it("passes acquired procedure input through schema validation", async () => {
-		const declaration = coreRoute
-			.input(z.object({ title: z.string() }), {
-				contentType: "application/x-www-form-urlencoded",
-			})
-			.output(z.object({ title: z.string() }))["~restrpc"];
-		const result = await handleHttpRoute(
-			{
-				route: declaration,
-				middleware: [
-					async (request) => {
-						assert.equal(
-							request.contentType,
-							"application/x-www-form-urlencoded",
-						);
-						assert.equal(request.lastEventId, "");
-						request.context.set("title", "From middleware");
-						return request.next();
-					},
-				],
-				handler: (request) => {
-					const { context, ...requestFields } = request;
-					assert.deepEqual(Object.keys(context), ["get", "set"]);
-					assert.equal(context.get("title"), "From middleware");
-					assert.deepEqual(requestFields, {
-						input: { title: "Write docs" },
-						contentType: "application/x-www-form-urlencoded",
-						lastEventId: "",
-						route: declaration,
-					});
-					return { title: "Write docs" };
-				},
-			},
-			{
-				request: {
-					body: { title: "Write docs" },
-					headers: {
-						"content-type": "application/x-www-form-urlencoded",
-						"last-event-id": ["", "event-8"],
-					},
-				},
-				handlerFields: {},
-			},
-		);
-
-		assert.equal(result.status, 200);
-	});
-
-	it("rethrows user handler errors unchanged", async () => {
-		const expected = new Error("boom");
-		await assert.rejects(
-			() =>
-				handleHttpRoute(
-					{
-						route: coreRoute
-							.get("/todos")
-							.response(200, z.object({ id: z.string() }))["~restrpc"],
-						handler: () => {
-							throw expected;
-						},
-					},
-					{
-						request: {},
-						handlerFields: {},
-					},
-				),
-			(error) => error === expected,
-		);
-	});
-
-	it("returns response body validation errors", async () => {
-		const error = await handleHttpRoute(
-			{
-				route: coreRoute
-					.get("/todos")
-					.response(200, z.object({ id: z.string() }))["~restrpc"],
-				handler: () => ({ status: 200, body: { id: 123 } }),
-			},
-			{
-				request: {},
-				handlerFields: {},
-			},
-		);
-		assert.ok(error instanceof ResponseValidationError);
-		assert.equal(error.status, 500);
-		assert.deepEqual(error.responseBody, {
-			message: "Response validation failed.",
-		});
-		assert.equal(error.location, "body");
-		assert.equal(error.issues.length, 1);
-	});
-
-	it("can disable response schema validation", async () => {
-		const result = await handleHttpRoute(
-			{
-				route: coreRoute.output(z.string())["~restrpc"],
-				handler: () => 123,
-			},
-			{
+		await expect(
+			handleHttpRoute(implementation, {
 				request: {},
 				handlerFields: {},
 				configuration: { disableResponseValidation: true },
-			},
-		);
+			}),
+		).rejects.toThrow("returned undeclared status 404");
+	});
 
-		assert.deepEqual(result, {
-			kind: "response",
-			status: 200,
-			headers: undefined,
-			body: { value: 123, contentType: "application/json" },
+	it("requires a declared response content type and normalizes the selection", async () => {
+		const declared = route
+			.get("/")
+			.response(200, type<string>(), {
+				contentType: ["text/plain", "text/html"],
+			})
+			.handler(() => ({ status: 200, body: "ok", contentType: "text/plain" }));
+		const implementation = flattenRouteImplementations(declared)[0]!;
+		const run = (contentType?: string) =>
+			handleHttpRoute(
+				{
+					...implementation,
+					handler: () => ({ status: 200, body: "ok", contentType }),
+				},
+				{ request: {}, handlerFields: {} },
+			);
+		expect(await run("Text/Plain; charset=utf-8")).toMatchObject({
+			body: { contentType: "text/plain" },
 		});
-	});
-
-	it("keeps response declaration checks when schema validation is disabled", async () => {
-		await assert.rejects(
-			() =>
-				handleHttpRoute(
-					{
-						route: coreRoute.get("/todos").response(200, z.string())[
-							"~restrpc"
-						],
-						handler: () => ({ status: 201, body: 123 }),
-					},
-					{
-						request: {},
-						handlerFields: {},
-						configuration: { disableResponseValidation: true },
-					},
-				),
-			/undeclared status 201/,
+		await expect(run()).rejects.toThrow(
+			"Unsupported response body contentType.",
+		);
+		await expect(run("application/json")).rejects.toThrow(
+			"Unsupported response body contentType.",
 		);
 	});
 
-	it("treats returned status and body fields as an explicit response object", async () => {
-		await assert.rejects(
-			() =>
-				handleHttpRoute(
-					{
-						route: coreRoute.get("/jobs/:id").response(
-							200,
-							z.object({
-								status: z.number(),
-								body: z.string(),
-							}),
-						)["~restrpc"],
-						handler: () => ({ status: 123, body: "running" }),
-					},
-					{
-						request: {},
-						handlerFields: {},
-					},
-				),
-			(error) =>
-				error instanceof Error &&
-				!(error instanceof ResponseValidationError) &&
-				/undeclared status 123/.test(error.message),
-		);
-	});
-
-	it("normalizes declared response headers", async () => {
-		const result = await handleHttpRoute(
-			{
-				route: coreRoute
-					.get("/todos")
-					.response(200, z.object({ id: z.string() }), {
-						headers: z.object({
-							etag: z.string(),
-							"x-optional": z.string().optional(),
-						}),
-					})["~restrpc"],
-				handler: () => ({
-					status: 200 as const,
-					body: { id: "todo-1" },
-					responseHeaders: {
-						etag: "todo-etag",
-						"x-optional": undefined,
-					},
+	it("propagates ordinary handler errors", async () => {
+		const error = new Error("handler failed");
+		await expect(
+			execute(
+				route.handler((): string => {
+					throw error;
 				}),
-			},
-			{
-				request: {},
-				handlerFields: {},
-			},
-		);
-
-		assert.deepEqual(result, {
-			kind: "response",
-			status: 200,
-			headers: {
-				etag: "todo-etag",
-			},
-			body: { value: { id: "todo-1" }, contentType: "application/json" },
-		});
-	});
-});
-
-describe("handleHttpRoute custom responses", () => {
-	it("normalizes custom single bodies after validating without serializing them", async () => {
-		const result = await handleHttpRoute(
-			{
-				route: coreRoute
-					.get("/report.csv")
-					.response(200, z.string(), { contentType: "text/csv" })["~restrpc"],
-				handler: () => ({ status: 200, body: "id,title\n1,First\n" }),
-			},
-			{
-				request: {},
-				handlerFields: {},
-			},
-		);
-
-		assert.equal(result.kind, "response");
-		if (result.kind !== "response") throw new Error("Expected response");
-		assert.equal(result.status, 200);
-		assert.equal(result.body?.contentType, "text/csv");
-		assert.equal(result.body?.value, "id,title\n1,First\n");
-	});
-
-	it("normalizes custom response bodies with selected content types", async () => {
-		const result = await handleHttpRoute(
-			{
-				route: coreRoute.get("/images/:id").response(200, z.string(), {
-					contentType: ["image/png", "image/jpeg"],
-				})["~restrpc"],
-				handler: () => ({
-					status: 200,
-					body: "jpeg bytes",
-					contentType: "image/jpeg",
-				}),
-			},
-			{
-				request: {},
-				handlerFields: {},
-			},
-		);
-
-		assert.equal(result.kind, "response");
-		if (result.kind !== "response") throw new Error("Expected response");
-		assert.equal(result.status, 200);
-		assert.equal(result.body?.contentType, "image/jpeg");
-		assert.equal(result.body?.value, "jpeg bytes");
+			),
+		).rejects.toBe(error);
 	});
 });

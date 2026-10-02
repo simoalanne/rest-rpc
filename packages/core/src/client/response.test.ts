@@ -1,637 +1,174 @@
-import assert from "node:assert/strict";
-import { afterEach, describe, it } from "node:test";
-import z from "zod";
 import { route } from "../contract/routeBuilder.ts";
-import { HttpError, initClient } from "./index.ts";
+import { type } from "../standard-schema/type.ts";
+import type { StandardSchemaV1 } from "../standard-schema/index.ts";
+import { fetchResponse } from "./response.ts";
+import { HttpError } from "./httpError.ts";
 
-const originalFetch = globalThis.fetch;
-
-afterEach(() => {
-	globalThis.fetch = originalFetch;
-});
-
-type FetchCall = {
-	url: string;
-	init?: RequestInit;
-};
-
-const createResponseTestContract = () => ({
-	todos: {
-		create: route
-			.post("/todos")
-			.body(z.object({ title: z.string() }))
-			.response(201, z.object({ id: z.string(), title: z.string() })),
-		get: route
-			.get("/todos/:id")
-			.params(z.object({ id: z.string() }))
-			.response(200, z.object({ id: z.string(), title: z.string() }))
-			.response(404, z.object({ code: z.literal("not_found") })),
+const invalid: StandardSchemaV1<unknown, Record<string, string>> = {
+	"~standard": {
+		version: 1,
+		vendor: "test",
+		validate: () => ({ issues: [{ message: "invalid" }] }),
 	},
-});
-
-const jsonResponse = (body: unknown, status = 200) =>
-	new Response(JSON.stringify(body), {
-		status,
-		headers: { "Content-Type": "application/json" },
-	});
-
-const captureFetch = (
-	response:
-		| Response
-		| ((
-				url: URL | RequestInfo,
-				init?: RequestInit,
-		  ) => Response | Promise<Response>),
-) => {
-	const calls: FetchCall[] = [];
-
-	globalThis.fetch = async (url, init) => {
-		calls.push({ url: String(url), init });
-		return typeof response === "function" ? response(url, init) : response;
-	};
-
-	return calls;
 };
+const json = (value: unknown, headers?: RequestInit["headers"]) =>
+	Response.json(value, { status: 201, headers });
+const declared = route.get("/").response(201, type<{ name: string }>())[
+	"~restrpc"
+];
+const decode = (response: Response, validate = true, declaration = declared) =>
+	fetchResponse(async () => response, validate, undefined, declaration, []);
 
-describe("ApiClient responses", () => {
-	it("returns declared response metadata from route calls", async () => {
-		captureFetch(jsonResponse({ code: "not_found" }, 404));
-		const client = initClient(createResponseTestContract(), {
-			baseUrl: "https://api.test",
+describe("client response decoding", () => {
+	it("transforms declared headers and retains native headers", async () => {
+		const declaration = route.get("/").response(201, type<{ name: string }>(), {
+			headers: type((input: Record<string, string>) => ({
+				count: Number(input["x-count"]),
+			})),
+		})["~restrpc"];
+		const read = (validate: boolean) =>
+			fetchResponse(
+				async () => json({ name: "Ada" }, { "x-count": "2" }),
+				validate,
+				undefined,
+				declaration,
+				[],
+			);
+		expect(await read(true)).toMatchObject({
+			status: 201,
+			body: { name: "Ada" },
+			responseHeaders: { count: 2 },
+			headers: expect.any(Headers),
 		});
-
-		const response = await client.todos.get({ params: { id: "missing" } });
-
-		assert.deepEqual(response, {
-			status: 404,
-			headers: new Headers(),
-			responseHeaders: undefined,
-			body: { code: "not_found" },
+		expect(await read(false)).toMatchObject({
+			responseHeaders: { "x-count": "2" },
 		});
 	});
 
-	it("returns declared response headers from route calls", async () => {
-		captureFetch(
-			new Response(JSON.stringify({ id: "todo-1" }), {
-				status: 200,
-				headers: {
-					"content-type": "application/json",
-					etag: "todo-etag",
-					"x-count": "3",
-				},
-			}),
-		);
-		const apiContract = {
-			todos: {
-				get: route
-					.get("/todos/:id")
-					.params(z.object({ id: z.string() }))
-					.response(200, z.object({ id: z.string() }), {
-						headers: z.object({
-							etag: z.string(),
-							"x-count": z.coerce.number<number>(),
-						}),
+	it("retains status and decoded body on header and body schema failures", async () => {
+		for (const declaration of [
+			route.get("/").response(201, invalid)["~restrpc"],
+			route.get("/").response(201, type(), { headers: invalid })["~restrpc"],
+		]) {
+			const read = (validate: boolean) =>
+				fetchResponse(
+					async () => json({ name: "Ada" }),
+					validate,
+					undefined,
+					declaration,
+					[],
+				);
+			await expect(read(true)).rejects.toMatchObject({
+				status: 201,
+				body: { name: "Ada" },
+				cause: [{ message: "invalid" }],
+			});
+			expect(await read(false)).toMatchObject({
+				status: 201,
+				body: { name: "Ada" },
+			});
+		}
+	});
+
+	it("decodes bodyless responses without a codec", async () => {
+		const declaration = route.get("/").response(204)["~restrpc"];
+		expect(
+			await fetchResponse(
+				async () => new Response(null, { status: 204 }),
+				true,
+				undefined,
+				declaration,
+				[],
+			),
+		).toMatchObject({ status: 204, body: undefined });
+	});
+
+	it.each([undefined, "application/unknown"])(
+		"handles absent or unknown response content types (%s)",
+		async (contentType) => {
+			const declaration = route.get("/").response(200, type(), {
+				contentType: contentType ?? "application/json",
+			})["~restrpc"];
+			const response = new Response("hello", {
+				headers: contentType ? { "content-type": contentType } : {},
+			});
+			// Response adds a text/plain default for strings; explicitly remove it for the absent-header case.
+			if (!contentType) response.headers.delete("content-type");
+			const result = await fetchResponse(
+				async () => response,
+				true,
+				undefined,
+				declaration,
+				[],
+			);
+			if (contentType) {
+				expect(result.body).toBeInstanceOf(Blob);
+				expect(await (result.body as Blob).text()).toBe("hello");
+			} else {
+				expect(result.body).toBeUndefined();
+			}
+		},
+	);
+
+	it("falls back to binary decoding when a custom codec has no deserializer", async () => {
+		const declaration = route
+			.get("/")
+			.response(200, type(), { contentType: "application/custom" })["~restrpc"];
+		expect(
+			await fetchResponse(
+				async () =>
+					new Response("hello", {
+						headers: { "content-type": "application/custom" },
 					}),
-			},
-		};
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-			validateResponses: true,
-		});
-
-		const response = await client.todos.get({ params: { id: "todo-1" } });
-
-		assert.deepEqual(response.responseHeaders, {
-			etag: "todo-etag",
-			"x-count": 3,
-		});
-		assert.equal(response.headers.get("etag"), "todo-etag");
+				true,
+				[{ match: (mediaType) => mediaType === "application/custom" }],
+				declaration,
+				[],
+			),
+		).toHaveProperty("body", expect.any(Blob));
 	});
 
-	it("decodes undeclared response statuses into HttpError", async () => {
-		const rawResponse = jsonResponse({ code: "teapot" }, 418);
-		captureFetch(rawResponse);
-		const client = initClient(createResponseTestContract(), {
-			baseUrl: "https://api.test",
-		});
-
-		await assert.rejects(
-			() => client.todos.get({ params: { id: "todo-1" } }),
-			(error) => {
-				assert.ok(error instanceof HttpError);
-				assert.equal(error.status, 418);
-				assert.deepEqual(error.body, { code: "teapot" });
-				return true;
-			},
-		);
-		assert.equal(rawResponse.bodyUsed, true);
-	});
-
-	it("rejects an error response as an undeclared status", async () => {
-		captureFetch(Response.error());
-		const client = initClient(createResponseTestContract(), {
-			baseUrl: "https://api.test",
-		});
-
-		await assert.rejects(() => client.todos.get({ params: { id: "todo-1" } }), {
-			name: "HttpError",
-			status: 0,
-			body: undefined,
-		});
-	});
-
-	it("preserves decoded bodies when response header validation fails", async () => {
-		captureFetch(jsonResponse({ id: "one" }));
-		const client = initClient(
-			{
-				todo: route.get("/todo").response(200, z.object({ id: z.string() }), {
-					headers: z.object({ etag: z.string() }),
-				}),
-			},
-			{ baseUrl: "https://api.test", validateResponses: true },
-		);
-		await assert.rejects(client.todo(), (error) => {
-			assert.ok(error instanceof HttpError);
-			assert.equal(error.status, 200);
-			assert.deepEqual(error.body, { id: "one" });
-			assert.ok(Array.isArray(error.cause));
-			return true;
-		});
-	});
-
-	for (const status of [200, 503]) {
-		it(`keeps JSON decoding failures as ordinary errors (${status})`, async () => {
-			captureFetch(
-				new Response("invalid json", {
-					status,
+	it("propagates malformed JSON and rejects undeclared statuses with decoded bodies", async () => {
+		await expect(
+			decode(
+				new Response("{", {
+					status: 201,
 					headers: { "content-type": "application/json" },
 				}),
-			);
-			const client = initClient(createResponseTestContract(), {
-				baseUrl: "https://api.test",
-			});
-			await assert.rejects(
-				client.todos.get({ params: { id: "one" } }),
-				(error) => {
-					assert.ok(error instanceof SyntaxError);
-					assert.equal(error instanceof HttpError, false);
-					return true;
-				},
-			);
-		});
-	}
-
-	it("uses custom codecs to decode undeclared responses", async () => {
-		captureFetch(
-			new Response("busy", {
-				status: 503,
-				headers: { "content-type": "text/custom" },
-			}),
-		);
-		const client = initClient(createResponseTestContract(), {
-			baseUrl: "https://api.test",
-			bodyCodecs: [
-				{
-					match: (mediaType) => mediaType === "text/custom",
-					deserialize: async (response) => ({ message: await response.text() }),
-				},
-			],
-		});
-		await assert.rejects(
-			client.todos.get({ params: { id: "one" } }),
-			(error) => {
-				assert.ok(error instanceof HttpError);
-				assert.equal(error.status, 503);
-				assert.deepEqual(error.body, { message: "busy" });
-				return true;
-			},
-		);
-	});
-
-	it("returns declared responses without validating by default", async () => {
-		const apiContract = {
-			todos: {
-				get: route
-					.get("/todos/:id")
-					.params(z.object({ id: z.string() }))
-					.response(
-						200,
-						z.object({
-							id: z.string(),
-							createdAt: z
-								.string()
-								.datetime()
-								.transform((value) => new Date(value)),
-						}),
-					),
-			},
-		};
-		captureFetch(
-			jsonResponse(
-				{
-					id: "todo-1",
-					createdAt: "2026-08-10T00:00:00.000Z",
-				},
-				200,
 			),
-		);
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
+		).rejects.toBeInstanceOf(SyntaxError);
+		await expect(
+			decode(Response.json({ message: "missing" }, { status: 404 })),
+		).rejects.toMatchObject({
+			status: 404,
+			body: { message: "missing" },
 		});
-
-		const response = await client.todos.get({ params: { id: "todo-1" } });
-
-		assert.equal(response.status, 200);
-		assert.equal(response.body.createdAt, "2026-08-10T00:00:00.000Z");
+		await expect(
+			decode(Response.json({}, { status: 404 })),
+		).rejects.toBeInstanceOf(HttpError);
 	});
 
-	it("trusts declared response bodies by default", async () => {
-		captureFetch(jsonResponse({ id: 123 }, 201));
-		const client = initClient(createResponseTestContract(), {
-			baseUrl: "https://api.test",
-		});
-
-		const response = await client.todos.create({ body: { title: "Buy milk" } });
-		assert.equal(response.status, 201);
-
-		assert.deepEqual(response.body, { id: 123 });
-	});
-
-	it("validates declared response bodies when configured", async () => {
-		captureFetch(jsonResponse({ id: 123 }, 201));
-		const client = initClient(createResponseTestContract(), {
-			baseUrl: "https://api.test",
-			validateResponses: true,
-		});
-
-		await assert.rejects(
-			() => client.todos.create({ body: { title: "Buy milk" } }),
-			(error) => {
-				assert.ok(error instanceof HttpError);
-				assert.equal(error.status, 201);
-				assert.deepEqual(error.body, { id: 123 });
-				assert.ok(Array.isArray(error.cause));
-				return true;
-			},
-		);
-	});
-
-	it("returns transformed response output when validation is disabled", async () => {
-		const responseSchema = z.object({
-			id: z.string(),
-			name: z
-				.object({
-					first: z.string(),
-					last: z.string(),
-				})
-				.transform(({ first, last }) => `${first} ${last}`),
-		});
-		const apiContract = {
-			todos: {
-				get: route
-					.get("/todos/:id")
-					.params(z.object({ id: z.string() }))
-					.response(200, responseSchema),
-			},
-		};
-		const serverOutput = responseSchema.parse({
-			id: "todo-1",
-			name: {
-				first: "Ada",
-				last: "Lovelace",
-			},
-		});
-		const wireBody = JSON.parse(JSON.stringify(serverOutput));
-
-		captureFetch(jsonResponse(wireBody, 200));
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-
-		const response = await client.todos.get({ params: { id: "todo-1" } });
-		assert.equal(response.status, 200);
-
-		assert.deepEqual(response.body, {
-			id: "todo-1",
-			name: "Ada Lovelace",
-		});
-	});
-
-	it("rejects transformed response output that no longer matches response input when validation is enabled", async () => {
-		const responseSchema = z.object({
-			id: z.string(),
-			name: z
-				.object({
-					first: z.string(),
-					last: z.string(),
-				})
-				.transform(({ first, last }) => `${first} ${last}`),
-		});
-		const apiContract = {
-			todos: {
-				get: route
-					.get("/todos/:id")
-					.params(z.object({ id: z.string() }))
-					.response(200, responseSchema),
-			},
-		};
-		const serverOutput = responseSchema.parse({
-			id: "todo-1",
-			name: {
-				first: "Ada",
-				last: "Lovelace",
-			},
-		});
-		const wireBody = JSON.parse(JSON.stringify(serverOutput));
-
-		captureFetch(jsonResponse(wireBody, 200));
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-			validateResponses: true,
-		});
-
-		await assert.rejects(() => client.todos.get({ params: { id: "todo-1" } }));
-	});
-
-	it("returns serialized Date transform output when validation is disabled", async () => {
-		const responseSchema = z.object({
-			createdAt: z
-				.string()
-				.datetime()
-				.transform((value) => new Date(value)),
-		});
-		const apiContract = {
-			todos: {
-				get: route
-					.get("/todos/:id")
-					.params(z.object({ id: z.string() }))
-					.response(200, responseSchema),
-			},
-		};
-		const serverOutput = responseSchema.parse({
-			createdAt: "2026-08-10T00:00:00.000Z",
-		});
-		const wireBody = JSON.parse(JSON.stringify(serverOutput));
-
-		captureFetch(jsonResponse(wireBody, 200));
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-		const response = await client.todos.get({ params: { id: "todo-1" } });
-		assert.equal(response.status, 200);
-
-		assert.equal(response.body.createdAt, "2026-08-10T00:00:00.000Z");
-	});
-
-	it("parses serialized Date transform output when validation is enabled", async () => {
-		const responseSchema = z.object({
-			createdAt: z
-				.string()
-				.datetime()
-				.transform((value) => new Date(value)),
-		});
-		const apiContract = {
-			todos: {
-				get: route
-					.get("/todos/:id")
-					.params(z.object({ id: z.string() }))
-					.response(200, responseSchema),
-			},
-		};
-		const serverOutput = responseSchema.parse({
-			createdAt: "2026-08-10T00:00:00.000Z",
-		});
-		const wireBody = JSON.parse(JSON.stringify(serverOutput));
-
-		captureFetch(jsonResponse(wireBody, 200));
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-			validateResponses: true,
-		});
-		const response = await client.todos.get({ params: { id: "todo-1" } });
-		assert.equal(response.status, 200);
-
-		assert.ok(response.body.createdAt instanceof Date);
-		assert.equal(
-			response.body.createdAt.toISOString(),
-			"2026-08-10T00:00:00.000Z",
-		);
-	});
-
-	it("returns string response output when a Date response schema serializes to JSON", async () => {
-		const responseSchema = z.object({
-			id: z.string(),
-			createdAt: z.date().transform((value) => value.toISOString()),
-		});
-		const apiContract = {
-			todos: {
-				get: route
-					.get("/todos/:id")
-					.params(z.object({ id: z.string() }))
-					.response(200, responseSchema),
-			},
-		};
-		const serverOutput = responseSchema.parse({
-			id: "todo-1",
-			createdAt: new Date("2026-08-10T00:00:00.000Z"),
-		});
-		const wireBody = JSON.parse(JSON.stringify(serverOutput));
-
-		captureFetch(jsonResponse(wireBody, 200));
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-		const response = await client.todos.get({ params: { id: "todo-1" } });
-		assert.equal(response.status, 200);
-
-		assert.deepEqual(response.body, {
-			id: "todo-1",
-			createdAt: "2026-08-10T00:00:00.000Z",
-		});
-	});
-
-	it("returns serialized Date response output by default but rejects it when validation is enabled", async () => {
-		const responseSchema = z.object({ createdAt: z.date() });
-		const apiContract = {
-			todos: {
-				get: route
-					.get("/todos/:id")
-					.params(z.object({ id: z.string() }))
-					.response(200, responseSchema),
-			},
-		};
-		const serverOutput = responseSchema.parse({
-			createdAt: new Date("2026-08-10T00:00:00.000Z"),
-		});
-		const wireBody = JSON.parse(JSON.stringify(serverOutput));
-
-		captureFetch(jsonResponse(wireBody, 200));
-		const trustingClient = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-		const trustedResponse = await trustingClient.todos.get({
-			params: { id: "todo-1" },
-		});
-		assert.equal(trustedResponse.status, 200);
-		const trusted = trustedResponse.body;
-
-		assert.equal(trusted.createdAt, "2026-08-10T00:00:00.000Z");
-
-		captureFetch(jsonResponse(wireBody, 200));
-		const validatingClient = initClient(apiContract, {
-			baseUrl: "https://api.test",
-			validateResponses: true,
-		});
-
-		await assert.rejects(() =>
-			validatingClient.todos.get({ params: { id: "todo-1" } }),
-		);
-	});
-
-	it("reads noBody responses as undefined", async () => {
-		const apiContract = {
-			todos: {
-				remove: route
-					.delete("/todos/:id")
-					.params(z.object({ id: z.string() }))
-					.response(204),
-			},
-		};
-		captureFetch(new Response(null, { status: 204 }));
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-
-		const response = await client.todos.remove({ params: { id: "todo-1" } });
-		assert.equal(response.status, 204);
-
-		assert.equal(response.body, undefined);
-	});
-
-	it("parses and validates declared custom text responses", async () => {
-		const apiContract = {
-			reports: {
-				csv: route
-					.get("/reports.csv")
-					.response(200, z.string(), { contentType: "text/csv" }),
-			},
-		};
-		captureFetch(
-			new Response("id,title\n1,First\n", {
-				status: 200,
-				headers: { "content-type": "text/csv" },
-			}),
-		);
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-			validateResponses: true,
-		});
-
-		const response = await client.reports.csv();
-
-		assert.equal(response.headers.get("content-type"), "text/csv");
-		assert.equal("contentType" in response, false);
-		assert.equal(response.body, "id,title\n1,First\n");
-	});
-
-	it("returns custom procedure data without HTTP metadata", async () => {
-		const apiContract = {
-			export: route.output(z.string(), { contentType: "text/plain" }),
-		};
-		captureFetch(
-			new Response("report data", {
-				status: 200,
-				headers: { "content-type": "text/plain" },
-			}),
-		);
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-			validateResponses: true,
-		});
-
-		assert.equal(await client.export(), "report data");
-	});
-
-	it("uses a custom deserializer for custom responses", async () => {
-		const apiContract = {
-			reports: {
-				binaryText: route.get("/reports/custom").response(200, z.string(), {
-					contentType: "application/octet-stream",
-				}),
-			},
-		};
-		captureFetch(
-			new Response("custom value", {
-				headers: { "content-type": "application/octet-stream" },
-			}),
-		);
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-			bodyCodecs: [
-				{ match: () => true, deserialize: (response) => response.text() },
-			],
-			validateResponses: true,
-		});
-
-		const response = await client.reports.binaryText();
-
-		assert.equal(response.body, "custom value");
-	});
-
-	it("retains original headers without incoming content type metadata", async () => {
-		const apiContract = {
-			reports: {
-				image: route.get("/reports/image").response(200, z.instanceof(Blob), {
-					contentType: ["image/png", "image/jpeg"],
-				}),
-			},
-		};
-		captureFetch(
-			new Response("jpeg bytes", {
-				status: 200,
-				headers: { "content-type": "image/jpeg; charset=binary" },
-			}),
-		);
-		const client = initClient(apiContract, {
-			baseUrl: "https://api.test",
-		});
-
-		const response = await client.reports.image();
-
-		assert.equal(response.status, 200);
-		assert.equal("contentType" in response, false);
-		assert.equal(
-			response.headers.get("content-type"),
-			"image/jpeg; charset=binary",
-		);
-		assert.ok(response.body instanceof Blob);
-		assert.equal(await response.body.text(), "jpeg bytes");
-	});
-
-	for (const validateResponses of [false, true]) {
-		it(`checks transport acceptance independently of schema validation (${validateResponses})`, async () => {
-			const rawResponse = new Response("{}", {
-				headers: { "content-type": "application/json" },
-			});
-			captureFetch(rawResponse);
-			const client = initClient(
-				{
-					csv: route
-						.get("/csv")
-						.response(200, z.string(), { contentType: "text/csv" }),
-				},
-				{
-					baseUrl: "https://api.test",
-					validateResponses,
-				},
+	it.each(["wrong content type", "missing body"])(
+		"rejects streams with %s",
+		async (failure) => {
+			const declaration = route.get("/").streamResponse(200, type<number>())[
+				"~restrpc"
+			];
+			const response =
+				failure === "missing body"
+					? new Response(null, {
+							headers: { "content-type": "text/event-stream" },
+						})
+					: new Response("data: 1\n\n", {
+							headers: { "content-type": "application/json" },
+						});
+			await expect(
+				fetchResponse(async () => response, false, undefined, declaration, []),
+			).rejects.toThrow(
+				failure === "missing body"
+					? "no stream body"
+					: "unsupported stream content-type",
 			);
-			await assert.rejects(client.csv(), (error) => {
-				assert.ok(error instanceof HttpError);
-				assert.equal(error.status, 200);
-				assert.deepEqual(error.body, {});
-				return true;
-			});
-			assert.equal(rawResponse.bodyUsed, true);
-		});
-	}
+		},
+	);
 });

@@ -6,16 +6,60 @@ import {
 	type BodyCodec,
 } from "../codecs/index.ts";
 import type { RouteDeclaration } from "../contract/contract.ts";
-import type { ResponseDeclaration } from "../contract/response.ts";
+import type {
+	ResponseDeclaration,
+	DeclaredClientResponse,
+	SuccessfulDeclaredClientResponse,
+} from "../contract/response.ts";
 import { getRouteResponses } from "../contract/response.ts";
 import {
 	validateStandardSchema,
 	type StandardSchemaV1,
 } from "../standard-schema/index.ts";
 import { parseSseStream } from "./stream.ts";
-import type { FetchArgs } from "./types.ts";
+import type { FetchArgs } from "./request.ts";
 
-export const getResponseSchema = (
+type Simplify<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
+
+type WithResponseMetadata<TResponse, TMetadata> = TResponse extends unknown
+	? Simplify<TResponse & TMetadata>
+	: never;
+
+type RouteDeclaredResponse<E extends RouteDeclaration> = WithResponseMetadata<
+	DeclaredClientResponse<E>,
+	{
+		headers: Headers;
+	}
+>;
+
+/**
+ * Infers a route's client result.
+ *
+ * @remarks Routes declared with `.response()` produce status-discriminated
+ * envelopes. Routes declared with `.output()` produce their output directly.
+ *
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-routes}
+ */
+export type InferClientResponse<
+	E extends { readonly "~restrpc": RouteDeclaration },
+> = ClientResponseForDeclaration<E["~restrpc"]>;
+
+export type ClientResponseForDeclaration<E extends RouteDeclaration> =
+	E extends {
+		output: "output";
+	}
+		? ProcedureRouteOutput<E>
+		: RouteDeclaredResponse<E>;
+
+type ProcedureRouteOutput<TRoute extends RouteDeclaration> =
+	SuccessfulDeclaredClientResponse<TRoute> extends infer TResponse
+		? TResponse extends { body: infer TBody }
+			? TBody
+			: never
+		: never;
+
+const getResponseSchema = (
 	route: RouteDeclaration,
 	status: number,
 ): ResponseDeclaration | undefined => {

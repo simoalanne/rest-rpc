@@ -26,17 +26,24 @@
 		"dist"
 	],
 	"type": "module",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
+	"main": "./src/index.ts",
+	"types": "./src/index.ts",
 	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"import": "./dist/index.js"
+		".": "./src/index.ts"
+	},
+	"publishConfig": {
+		"main": "./dist/index.js",
+		"types": "./dist/index.d.ts",
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"import": "./dist/index.js"
+			}
 		}
 	},
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
-		"typecheck": "pnpm run build && tsc -p tsconfig.json"
+		"build": "tsc -p tsconfig.json",
+		"typecheck": "tsc -p tsconfig.json --noEmit --declaration false"
 	},
 	"dependencies": {
 		"@rest-rpc/core": "workspace:*",
@@ -49,7 +56,6 @@
 		"@nestjs/platform-express": "^11.0.0",
 		"@nestjs/platform-fastify": "^11.2.3",
 		"@types/express": "^5.0.1",
-		"@types/node": "^26.3.0",
 		"reflect-metadata": "^0.2.2",
 		"rxjs": "^7.8.0"
 	},
@@ -68,8 +74,5 @@
 		"@nestjs/platform-fastify": {
 			"optional": true
 		}
-	},
-	"tsd": {
-		"directory": "test-d"
 	}
 }

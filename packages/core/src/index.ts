@@ -35,7 +35,7 @@ export type {
 export { createOpenApiDocument } from "./openapi/index.ts";
 export type { SseEvent } from "./sse.ts";
 export { type } from "./standard-schema/type.ts";
-export type { ApiClientRouteValue } from "./client/types.ts";
+export type { ApiClientRouteValue } from "./client/index.ts";
 export type {
 	BodyCodec,
 	BodyDeserializer,
