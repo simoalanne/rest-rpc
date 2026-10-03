@@ -19,6 +19,7 @@ import {
 	type StandardSchemaV1,
 } from "../standard-schema/index.ts";
 import { parseSseStream } from "./stream.ts";
+import { validateResponseValue } from "./validateResponse.ts";
 import type { FetchArgs } from "./request.ts";
 
 type Simplify<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
@@ -194,19 +195,6 @@ const readStreamResponse = (
 	return parseSseStream(schema, rawResponse.body, validate, rawResponse.status);
 };
 
-const validateResponseBody = async (
-	schema: StandardSchemaV1 | undefined,
-	value: unknown,
-	validate: boolean,
-	status: number,
-) => {
-	if (!validate || schema === undefined) return value;
-	const result = await validateStandardSchema(schema, value);
-	if (result.issues)
-		throw new HttpError(status, value, { cause: result.issues });
-	return result.value;
-};
-
 const readDeclaredHeaders = async (
 	schema: ResponseDeclaration,
 	rawResponse: Response,
@@ -281,7 +269,7 @@ export const fetchResponse = async <
 			value,
 		),
 	};
-	const body = await validateResponseBody(
+	const body = await validateResponseValue(
 		schema.body,
 		value,
 		validateResponse,

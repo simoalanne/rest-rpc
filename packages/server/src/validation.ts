@@ -127,17 +127,16 @@ export async function validateRequestSegments(
 	};
 }
 
-export const validateResponseBody = async (
+export const validateResponseValue = async (
 	schema: StandardSchemaV1 | undefined,
-	body: unknown,
+	value: unknown,
+	location: "body" | "stream",
 ): Promise<unknown> => {
-	if (!schema) {
-		return body;
-	}
+	if (!schema) return value;
 
-	const validation = await validateStandardSchema(schema, body);
+	const validation = await validateStandardSchema(schema, value);
 	if (validation.issues) {
-		throw new ResponseValidationError("body", validation.issues);
+		throw new ResponseValidationError(location, validation.issues);
 	}
 	return validation.value;
 };
@@ -163,19 +162,6 @@ export const validateResponseHeaders = async (
 	);
 };
 
-const validateResponseStreamChunk = async (
-	schema: StandardSchemaV1 | undefined,
-	chunk: unknown,
-) => {
-	if (!schema) return chunk;
-
-	const validation = await validateStandardSchema(schema, chunk);
-	if (validation.issues) {
-		throw new ResponseValidationError("stream", validation.issues);
-	}
-	return validation.value;
-};
-
 export async function* validateResponseStreamChunks(
 	body: AsyncIterable<unknown>,
 	schema: StandardSchemaV1,
@@ -184,10 +170,10 @@ export async function* validateResponseStreamChunks(
 		if (isSseServerEvent(chunk)) {
 			yield sse({
 				...chunk,
-				data: await validateResponseStreamChunk(schema, chunk.data),
+				data: await validateResponseValue(schema, chunk.data, "stream"),
 			});
 		} else {
-			yield await validateResponseStreamChunk(schema, chunk);
+			yield await validateResponseValue(schema, chunk, "stream");
 		}
 	}
 }

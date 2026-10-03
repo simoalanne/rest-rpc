@@ -18,7 +18,7 @@ import type { RuntimeImplementation } from "./match.ts";
 import {
 	type RequestSegments,
 	validateRequestSegments,
-	validateResponseBody,
+	validateResponseValue,
 	validateResponseHeaders,
 	validateResponseStreamChunks,
 } from "./validation.ts";
@@ -161,7 +161,7 @@ const normalizeResponseResult = async (
 		body: {
 			value: disableValidation
 				? result.body
-				: await validateResponseBody(bodySchema, result.body),
+				: await validateResponseValue(bodySchema, result.body, "body"),
 			contentType: selectResponseContentType(
 				schema.contentType ?? "application/json",
 				result.contentType,
