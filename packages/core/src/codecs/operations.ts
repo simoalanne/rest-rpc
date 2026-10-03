@@ -37,33 +37,27 @@ export function resolveBodyCodec<TSource>(
 	  }
 	| undefined {
 	if (!mediaType) return undefined;
-	let serialize: BodySerializer | undefined;
-	let deserialize: BodyDeserializer<TSource> | undefined;
+	const serializeBody = codecs.find(
+		(codec) => codec.serialize && codec.match(mediaType),
+	)?.serialize;
+	const deserialize = codecs.find(
+		(codec) => codec.deserialize && codec.match(mediaType),
+	)?.deserialize;
+	if (!serializeBody && !deserialize) return undefined;
 
-	for (const codec of codecs) {
-		if (
-			(!serialize && codec.serialize) ||
-			(!deserialize && codec.deserialize)
-		) {
-			if (!codec.match(mediaType)) continue;
-			if (!serialize && codec.serialize) {
-				const serializeBody = codec.serialize;
-				serialize = async (value, contentType) => {
-					const result = await serializeBody(value, contentType);
-					if (
-						typeof result.contentType === "string" &&
-						normalizeMediaType(result.contentType) !== mediaType
-					) {
-						throw new Error(
-							"Codec content-type must retain the declared base media type",
-						);
-					}
-					return result;
-				};
+	const serialize: BodySerializer | undefined = serializeBody
+		? async (value, contentType) => {
+				const result = await serializeBody(value, contentType);
+				if (
+					typeof result.contentType === "string" &&
+					normalizeMediaType(result.contentType) !== mediaType
+				) {
+					throw new Error(
+						"Codec content-type must retain the declared base media type",
+					);
+				}
+				return result;
 			}
-			if (!deserialize && codec.deserialize) deserialize = codec.deserialize;
-			if (serialize && deserialize) return { serialize, deserialize };
-		}
-	}
-	return serialize || deserialize ? { serialize, deserialize } : undefined;
+		: undefined;
+	return { serialize, deserialize };
 }
