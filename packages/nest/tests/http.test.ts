@@ -2,17 +2,9 @@ import "reflect-metadata";
 import { Controller, Module, Query, SetMetadata } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { route as contractRoute, type } from "@rest-rpc/core";
-import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import { Implement, RestRpcModule, implement } from "@rest-rpc/nest";
 import type { AddressInfo } from "node:net";
 
-const invalid: StandardSchemaV1<unknown, string> = {
-	"~standard": {
-		version: 1,
-		vendor: "test",
-		validate: () => ({ issues: [{ message: "private validation detail" }] }),
-	},
-};
 const contract = {
 	users: {
 		get: contractRoute
@@ -20,8 +12,6 @@ const contract = {
 			.params(type<{ id: string }>())
 			.response(200, type<{ id: string; name: string }>()),
 	},
-	input: contractRoute.post("/invalid-input").body(invalid).response(204),
-	output: contractRoute.get("/invalid-output").response(200, invalid),
 	derived: contractRoute.get().response(200, type<{ derived: boolean }>()),
 };
 
@@ -47,11 +37,6 @@ class ApiController {
 					},
 				),
 			},
-			input: handlers.input.handler(() => ({ status: 204 })),
-			output: handlers.output.handler(() => ({
-				status: 200,
-				body: "private output",
-			})),
 			derived: handlers.derived.handler(() => ({
 				status: 200,
 				body: { derived: true },
@@ -63,7 +48,7 @@ class ApiController {
 class ApiModule {}
 
 describe("Nest HTTP integration", () => {
-	it("runs decorators, module, interceptor, and validation exceptions over HTTP", async () => {
+	it("runs decorators, module, and interceptor over HTTP", async () => {
 		const app = await NestFactory.create(ApiModule, { logger: false });
 		try {
 			await app.listen(0, "127.0.0.1");
@@ -71,22 +56,6 @@ describe("Nest HTTP integration", () => {
 			const response = await fetch(`${url}/users/42?prefix=argument`);
 			expect(response.status).toBe(200);
 			expect(await response.json()).toEqual({ id: "42", name: "Ada" });
-			const badInput = await fetch(`${url}/invalid-input?prefix=argument`, {
-				method: "POST",
-				headers: { "content-type": "application/json" },
-				body: '{"invalid":true}',
-			});
-			expect(badInput.status).toBe(400);
-			expect(await badInput.json()).toMatchObject({
-				validationErrors: {
-					body: [{ message: "private validation detail" }],
-				},
-			});
-			const badOutput = await fetch(`${url}/invalid-output?prefix=argument`);
-			expect(badOutput.status).toBe(500);
-			expect(await badOutput.json()).toEqual({
-				message: "Response validation failed.",
-			});
 			const derived = await fetch(`${url}/derived?prefix=argument`);
 			expect(derived.status).toBe(200);
 			expect(await derived.json()).toEqual({ derived: true });

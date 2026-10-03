@@ -121,6 +121,8 @@ The five identical `HttpMethods` signatures (`get`, `post`, …) stay as they ar
 
 ### 3.4 Shared adapter test suite
 
+**Status: done.** `packages/server/tests/adapterSuite.ts` defines `describeAdapterConformance`, which runs the shared cases (415 content type, default and custom validation error handlers, streams, a stream failing on its first chunk, bodiless responses, routes without a path, `requestBodyLimit`) through each adapter's `serve` setup in `packages/<adapter>/tests/conformance.test.ts`. The `requestBodyLimit` capability flag records the one intentional difference the cases branch on. Stream validation failures are checked as a shared invariant: an invalid chunk is never delivered. Nest serves the server-first routes as both contract and implementation. The suite showed that node and express never answered a stream failing on its first chunk with an error response: since `aec441f` they pipe with `pipeline`, which destroys the response, so the comments, docs and this audit had promised a capability that no longer existed. The promise is removed instead of the behavior being restored. The duplicated hono body-limit and nest validation assertions were removed.
+
 Keep each adapter's request flow explicit: content-type check → body → `handleHttpRoute` → validation errors → write. Being able to read it top to bottom is worth more than removing the duplication. Catch unintended drift with tests instead.
 
 - **Today:** `tests/httpServer.ts` only starts a test server. Each adapter writes its own cases, and fastify and nest don't use the helper.
@@ -134,7 +136,7 @@ Keep each adapter's request flow explicit: content-type check → body → `hand
 
 **Intentional differences between adapters** (also explained in code comments):
 
-- **Stream validation errors:** only node and express can turn one into an error response, and only when the first chunk fails, before headers are sent. Fetch and hono commit status and headers when the `Response` is returned. Fastify and nest leave stream errors to the framework.
+- **Stream validation errors:** no adapter turns one into an error response. Fetch and hono commit status and headers when the `Response` is returned. Node and express destroy the response through `pipeline`. Fastify and nest leave stream errors to the framework.
 - **`requestBodyLimit`:** only fetch, node and hono decode request bodies themselves. Express, fastify and nest use the framework's parser, which owns size limits. This is publicly documented in `content/docs/http-behavior/errors.mdx`.
 
 **Value: high.** It guards every adapter against regressions without hiding their code behind shared abstractions.
