@@ -15,6 +15,12 @@ pnpm bench:typecheck -- --label after --baseline before
 earlier result. Types and instantiations are deterministic, so compare those
 first; check time varies between runs.
 
+Fixtures check the workspace sources, so totals include a constant cost for
+checking the library itself. The second table reports the marginal cost per
+route between the smallest and largest route count, which is what scales with
+an application. A change that only moves totals by the same amount at every
+route count is library-internal.
+
 Fixtures are generated under `generated/` and import the workspace packages'
 sources. Each fixture also evaluates every client call signature, so request
 and response inference is measured, not just the builder:

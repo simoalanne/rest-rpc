@@ -112,6 +112,45 @@ const table = rows.map((row) => {
 
 console.table(table);
 
+// Fixtures check the workspace sources, so every count includes a constant cost
+// for the library itself. The marginal cost between route counts excludes it.
+const marginalCosts = (results: Row[]) =>
+	[...new Set(results.map((row) => row.fixture))].map((fixture) => {
+		const sorted = results
+			.filter((row) => row.fixture === fixture)
+			.sort((left, right) => left.routes - right.routes);
+		const first = sorted[0]!;
+		const last = sorted[sorted.length - 1]!;
+		const routes = last.routes - first.routes || 1;
+		return {
+			fixture,
+			typesPerRoute: Math.round((last.types - first.types) / routes),
+			instantiationsPerRoute: Math.round(
+				(last.instantiations - first.instantiations) / routes,
+			),
+		};
+	});
+
+const baselineMarginal = baseline && marginalCosts(baseline);
+console.log("\nMarginal cost per route");
+console.table(
+	marginalCosts(rows).map((row) => {
+		const previous = baselineMarginal?.find(
+			(candidate) => candidate.fixture === row.fixture,
+		);
+		return {
+			...row,
+			...(baselineMarginal && {
+				"Δ types": change(row.typesPerRoute, previous?.typesPerRoute),
+				"Δ instantiations": change(
+					row.instantiationsPerRoute,
+					previous?.instantiationsPerRoute,
+				),
+			}),
+		};
+	}),
+);
+
 mkdirSync(resultsRoot, { recursive: true });
 const resultPath = join(resultsRoot, `${label}.json`);
 writeFileSync(resultPath, `${JSON.stringify(rows, null, "\t")}\n`);
