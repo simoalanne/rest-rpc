@@ -10,6 +10,7 @@ import type { SseEvent } from "../sse.ts";
 import type {
 	ResponseDeclaration,
 	DeclaredClientResponse,
+	ErrorDeclaredClientResponse,
 	SuccessfulDeclaredClientResponse,
 } from "../contract/response.ts";
 import { getRouteResponses } from "../contract/response.ts";
@@ -40,7 +41,7 @@ type RouteDeclaredResponse<E extends RouteDeclaration> = WithResponseMetadata<
  * envelopes. Routes declared with `.output()` produce their output directly.
  * Pass a route tree to infer a matching tree of results.
  *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#infer-client-types}
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#type-helpers}
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-routes}
  */
 export type InferClientResponse<T extends RouteTree> = T extends {
@@ -54,13 +55,48 @@ export type InferClientResponse<T extends RouteTree> = T extends {
 		};
 
 /**
+ * Infers the successful result of a route's client call.
+ *
+ * @remarks Routes declared with `.response()` produce the envelopes of their
+ * 2xx responses. Routes declared with `.output()` produce their output
+ * directly. Pass a route tree to infer a matching tree of results.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#type-helpers}
+ */
+export type InferClientSuccess<T extends RouteTree> = T extends {
+	readonly "~restrpc": infer TRoute extends RouteDeclaration;
+}
+	? ClientSuccessForDeclaration<TRoute>
+	: {
+			[K in keyof T]: T[K] extends RouteTree ? InferClientSuccess<T[K]> : never;
+		};
+
+/**
+ * Infers the declared error responses a route's client call can return.
+ *
+ * @remarks Includes the envelopes of declared non-2xx responses. Routes
+ * declared with `.output()` infer `never` because the client throws their
+ * non-2xx responses. Thrown `HttpError` and `Error` values are not included.
+ * Pass a route tree to infer a matching tree of types.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#type-helpers}
+ */
+export type InferClientError<T extends RouteTree> = T extends {
+	readonly "~restrpc": infer TRoute extends RouteDeclaration;
+}
+	? ClientErrorForDeclaration<TRoute>
+	: {
+			[K in keyof T]: T[K] extends RouteTree ? InferClientError<T[K]> : never;
+		};
+
+/**
  * Infers the `data` of each event received from a streaming route.
  *
  * @remarks Unwraps the `SseEvent` values of successful stream responses.
  * Routes without a stream response infer `never`. Pass a route tree to infer
  * a matching tree of event data types.
  *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#infer-client-types}
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#type-helpers}
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#consume-streams}
  */
 export type InferClientStreamData<T extends RouteTree> = T extends {
@@ -86,6 +122,21 @@ export type ClientResponseForDeclaration<E extends RouteDeclaration> =
 	}
 		? ProcedureRouteOutput<E>
 		: RouteDeclaredResponse<E>;
+
+type ClientSuccessForDeclaration<E extends RouteDeclaration> = E extends {
+	output: "output";
+}
+	? ProcedureRouteOutput<E>
+	: WithResponseMetadata<
+			SuccessfulDeclaredClientResponse<E>,
+			{ headers: Headers }
+		>;
+
+type ClientErrorForDeclaration<E extends RouteDeclaration> = E extends {
+	output: "output";
+}
+	? never
+	: WithResponseMetadata<ErrorDeclaredClientResponse<E>, { headers: Headers }>;
 
 type ProcedureRouteOutput<TRoute extends RouteDeclaration> =
 	SuccessfulDeclaredClientResponse<TRoute> extends infer TResponse

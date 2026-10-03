@@ -2,7 +2,6 @@ import { route as contractRoute, type } from "@rest-rpc/core";
 import type {
 	Contractimplementer,
 	RouteHandler,
-	RouteErrors,
 	RouteHandlerFor,
 	RouteRequest,
 	ServerRouteBuilder,
@@ -23,23 +22,6 @@ declare const implementation: Contractimplementer<
 >;
 
 describe("server handler generic propagation", () => {
-	it("derives handler errors from declared non-2xx responses", () => {
-		const declaration = contractRoute
-			.get("/")
-			.response(200, type<string>())
-			.response(
-				404,
-				type((message: string) => ({ message })),
-			)
-			.response(503, type<{ retry: boolean }>());
-		expectTypeOf<RouteErrors<typeof declaration>>().toEqualTypeOf<
-			{ status: 404; body: string } | { status: 503; body: { retry: boolean } }
-		>();
-		expectTypeOf<
-			RouteErrors<typeof contract.users.get>
-		>().toEqualTypeOf<never>();
-	});
-
 	it("retains native fields and context through root and route middleware", () => {
 		const middleware = route.middleware(({ native, signal, context, next }) => {
 			expectTypeOf(native).toEqualTypeOf<Fields["native"]>();

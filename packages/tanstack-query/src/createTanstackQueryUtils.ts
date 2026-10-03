@@ -1,16 +1,19 @@
-import { initClient, type HttpError } from "@rest-rpc/core";
+import {
+	initClient,
+	type HttpError,
+	type InferClientError as InferDeclaredClientError,
+	type InferClientRequest,
+	type InferClientSuccess,
+} from "@rest-rpc/core";
 import type {
 	ApiClientOptions,
 	ClientHeaders,
 	FetchArgs,
 	FetchOptions,
 	FetchOptionsFor,
-	InferClientResponse,
 } from "@rest-rpc/core/client";
 import type {
 	Contract,
-	ErrorDeclaredClientResponse,
-	InferClientRequest,
 	RouteDeclaration,
 	RouteTree,
 	SuccessfulDeclaredClientResponse,
@@ -27,24 +30,12 @@ import type {
 } from "@tanstack/query-core";
 import { createTanstackUtilsForRoute } from "./createUtils.ts";
 
-type Simplify<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
 type NoInferValue<T> = [T][T extends unknown ? 0 : never];
-
-type WithHeaders<TResponse> = TResponse extends unknown
-	? Simplify<TResponse & { headers: Headers }>
-	: never;
 
 type QueryRoute = { readonly "~restrpc": RouteDeclaration };
 
 type RouteFor<E extends QueryRoute> = E["~restrpc"];
 
-type DeclaredRouteQueryData<E extends RouteDeclaration> = WithHeaders<
-	SuccessfulDeclaredClientResponse<E>
->;
-type DeclaredRouteQueryError<E extends RouteDeclaration> =
-	| WithHeaders<ErrorDeclaredClientResponse<E>>
-	| HttpError
-	| Error;
 type DeclaredRouteResponseBody<E extends RouteDeclaration> =
 	SuccessfulDeclaredClientResponse<E> extends infer TResponse
 		? TResponse extends { body: infer TBody }
@@ -55,26 +46,31 @@ type DeclaredRouteResponseBody<E extends RouteDeclaration> =
 type RouteRequestValue<
 	E extends QueryRoute,
 	TGlobalHeaders extends ClientHeaders,
-> =
-	InferClientRequest<E> extends never
-		? never
-		: FetchArgs<RouteFor<E>, TGlobalHeaders>[0];
+> = [InferClientRequest<E>] extends [undefined]
+	? never
+	: FetchArgs<RouteFor<E>, TGlobalHeaders>[0];
 
-type IsPlainOutput<E extends RouteDeclaration> = E extends {
-	output: "output";
-}
-	? true
-	: false;
+type RouteDataFor<E extends QueryRoute> = InferClientSuccess<E>;
 
-type QueryDataFor<E extends QueryRoute> =
-	IsPlainOutput<RouteFor<E>> extends true
-		? InferClientResponse<E>
-		: DeclaredRouteQueryData<RouteFor<E>>;
+// The conditional keeps editors from displaying this alias instead of the resolved union.
+type RouteErrorFor<E extends QueryRoute> = E extends unknown
+	? InferDeclaredClientError<E> | HttpError | Error
+	: never;
 
-type QueryErrorFor<E extends QueryRoute> =
-	IsPlainOutput<RouteFor<E>> extends true
-		? HttpError | Error
-		: DeclaredRouteQueryError<RouteFor<E>>;
+/**
+ * Infers the `error` of a route's generated query and mutation options.
+ *
+ * @remarks Includes the declared non-2xx responses, `HttpError`, and `Error`.
+ * The `InferClientError` from `@rest-rpc/core` contains only the declared
+ * non-2xx responses. Pass a route tree to infer a matching tree of types.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#type-helpers}
+ */
+export type InferClientError<T extends RouteTree> = T extends QueryRoute
+	? RouteErrorFor<T>
+	: {
+			[K in keyof T]: T[K] extends RouteTree ? InferClientError<T[K]> : never;
+		};
 
 type MutationVariablesFor<
 	E extends QueryRoute,
@@ -87,7 +83,7 @@ type MutationVariablesFor<
 type InfiniteQueryDataFor<
 	E extends QueryRoute,
 	TPageParam = unknown,
-> = InfiniteData<QueryDataFor<E>, TPageParam>;
+> = InfiniteData<RouteDataFor<E>, TPageParam>;
 
 type RouteStreamChunk<E extends QueryRoute> = [
 	DeclaredRouteResponseBody<RouteFor<E>>,
@@ -102,77 +98,6 @@ type StreamedQueryDataFor<E extends QueryRoute> = [
 ] extends [never]
 	? never
 	: Array<RouteStreamChunk<E>>;
-
-/**
- * Infers the successful query data returned for a route.
- *
- * @remarks HTTP routes retain their response envelope and include only 2xx
- * statuses. Procedure routes produce their output value directly. Pass a route
- * tree to infer a matching tree of types.
- */
-export type InferQueryData<T extends RouteTree> = T extends QueryRoute
-	? QueryDataFor<T>
-	: { [K in keyof T]: T[K] extends RouteTree ? InferQueryData<T[K]> : never };
-
-/**
- * Infers the error value surfaced by generated TanStack Query options.
- *
- * @remarks HTTP routes include declared non-2xx response envelopes, `HttpError`,
- * and `Error`. Plain output routes surface `HttpError` and `Error`. Pass a route
- * tree to infer a matching tree of types.
- */
-export type InferQueryError<T extends RouteTree> = T extends QueryRoute
-	? QueryErrorFor<T>
-	: { [K in keyof T]: T[K] extends RouteTree ? InferQueryError<T[K]> : never };
-
-/**
- * Infers mutation variables for a route.
- *
- * @remarks Pass a route tree to infer a matching tree of types.
- */
-export type InferMutationVariables<
-	T extends RouteTree,
-	TGlobalHeaders extends ClientHeaders = Record<never, string>,
-> = T extends QueryRoute
-	? MutationVariablesFor<T, TGlobalHeaders>
-	: {
-			[K in keyof T]: T[K] extends RouteTree
-				? InferMutationVariables<T[K], TGlobalHeaders>
-				: never;
-		};
-
-/**
- * Infers infinite query data for a route.
- *
- * @remarks Each page contains a successful route result. Page parameters are
- * mapped to route requests by the infinite query's `request` callback. Pass a route
- * tree to infer a matching tree of types.
- */
-export type InferInfiniteQueryData<
-	T extends RouteTree,
-	TPageParam = unknown,
-> = T extends QueryRoute
-	? InfiniteQueryDataFor<T, TPageParam>
-	: {
-			[K in keyof T]: T[K] extends RouteTree
-				? InferInfiniteQueryData<T[K], TPageParam>
-				: never;
-		};
-
-/**
- * Infers the accumulated data returned by generated stream query options.
- *
- * @remarks The default accumulator materializes SSE events into an array
- * and omits the HTTP response envelope. Pass a route
- * tree to infer a matching tree of types.
- */
-export type InferStreamedQueryData<T extends RouteTree> = T extends QueryRoute
-	? StreamedQueryDataFor<T>
-	: {
-			[K in keyof T]: T[K] extends RouteTree
-				? InferStreamedQueryData<T[K]>
-				: never;
-		};
 
 type QueryFetchOptions<E extends QueryRoute> = Omit<
 	FetchOptionsFor<RouteFor<E>>,
@@ -198,10 +123,10 @@ type RequestOption<
 type QueryOptionsFor<
 	E extends QueryRoute,
 	TGlobalHeaders extends ClientHeaders,
-	TData = QueryDataFor<E>,
+	TData = RouteDataFor<E>,
 > = WithFetchOptions<
 	Omit<
-		QueryObserverOptions<QueryDataFor<E>, QueryErrorFor<E>, TData>,
+		QueryObserverOptions<RouteDataFor<E>, RouteErrorFor<E>, TData>,
 		"queryKey" | "queryFn"
 	> & {
 		queryKey?: QueryKey;
@@ -211,9 +136,9 @@ type QueryOptionsFor<
 
 type QueryOptionsResultFor<
 	E extends QueryRoute,
-	TData = QueryDataFor<E>,
-> = QueryObserverOptions<QueryDataFor<E>, QueryErrorFor<E>, TData> & {
-	queryKey: DataTag<QueryKey, QueryDataFor<E>, QueryErrorFor<E>>;
+	TData = RouteDataFor<E>,
+> = QueryObserverOptions<RouteDataFor<E>, RouteErrorFor<E>, TData> & {
+	queryKey: DataTag<QueryKey, RouteDataFor<E>, RouteErrorFor<E>>;
 };
 
 type MutationOptionsFor<
@@ -222,8 +147,8 @@ type MutationOptionsFor<
 > = WithFetchOptions<
 	Omit<
 		MutationOptions<
-			QueryDataFor<E>,
-			QueryErrorFor<E>,
+			RouteDataFor<E>,
+			RouteErrorFor<E>,
 			MutationVariablesFor<E, TGlobalHeaders>
 		>,
 		"mutationFn"
@@ -235,8 +160,8 @@ type MutationOptionsResultFor<
 	E extends QueryRoute,
 	TGlobalHeaders extends ClientHeaders,
 > = MutationOptions<
-	QueryDataFor<E>,
-	QueryErrorFor<E>,
+	RouteDataFor<E>,
+	RouteErrorFor<E>,
 	MutationVariablesFor<E, TGlobalHeaders>
 > & {
 	mutationKey: MutationKey;
@@ -251,8 +176,8 @@ type InfiniteQueryOptionsFor<
 > = WithFetchOptions<
 	Omit<
 		InfiniteQueryObserverOptions<
-			QueryDataFor<E>,
-			QueryErrorFor<E>,
+			RouteDataFor<E>,
+			RouteErrorFor<E>,
 			TData,
 			QueryKey,
 			NoInferValue<TPageParam>
@@ -277,8 +202,8 @@ type InfiniteQueryOptionsResultFor<
 	TPageParam,
 	TData = InfiniteQueryDataFor<E, TPageParam>,
 > = InfiniteQueryObserverOptions<
-	QueryDataFor<E>,
-	QueryErrorFor<E>,
+	RouteDataFor<E>,
+	RouteErrorFor<E>,
 	TData,
 	QueryKey,
 	TPageParam
@@ -286,7 +211,7 @@ type InfiniteQueryOptionsResultFor<
 	queryKey: DataTag<
 		QueryKey,
 		InfiniteQueryDataFor<E, TPageParam>,
-		QueryErrorFor<E>
+		RouteErrorFor<E>
 	>;
 };
 
@@ -307,7 +232,7 @@ type StreamedQuerySimpleOptions<
 } & Omit<
 		QueryObserverOptions<
 			StreamedQueryDataFor<E>,
-			QueryErrorFor<E>,
+			RouteErrorFor<E>,
 			TSelectedData,
 			StreamedQueryDataFor<E>
 		>,
@@ -324,7 +249,7 @@ type StreamedQueryReducedOptions<
 	streamFn?: never;
 	queryKey?: QueryKey;
 } & Omit<
-		QueryObserverOptions<TData, QueryErrorFor<E>, TSelectedData, TData>,
+		QueryObserverOptions<TData, RouteErrorFor<E>, TSelectedData, TData>,
 		"queryFn" | "queryKey"
 	>;
 
@@ -332,8 +257,8 @@ type streamedQueryOptionsResultFor<
 	E extends QueryRoute,
 	TData,
 	TSelectedData,
-> = QueryObserverOptions<TData, QueryErrorFor<E>, TSelectedData, TData> & {
-	queryKey: DataTag<QueryKey, TData, QueryErrorFor<E>>;
+> = QueryObserverOptions<TData, RouteErrorFor<E>, TSelectedData, TData> & {
+	queryKey: DataTag<QueryKey, TData, RouteErrorFor<E>>;
 };
 
 type OptionsArgument<TOptions> =
@@ -369,7 +294,7 @@ type StreamedReducedQueryArgs<
 type UseQueryArgs<
 	E extends QueryRoute,
 	TGlobalHeaders extends ClientHeaders,
-	TData = QueryDataFor<E>,
+	TData = RouteDataFor<E>,
 > = OptionsArgument<QueryOptionsFor<E, TGlobalHeaders, TData>>;
 
 type QueryKeyArgs<E extends QueryRoute, TGlobalHeaders extends ClientHeaders> =
@@ -381,7 +306,7 @@ type RouteQueryOptionsMethod<
 	E extends QueryRoute,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > = {
-	<TData = QueryDataFor<E>>(
+	<TData = RouteDataFor<E>>(
 		...args: UseQueryArgs<E, TGlobalHeaders, TData>
 	): QueryOptionsResultFor<E, TData>;
 };
@@ -415,7 +340,7 @@ type TanstackQueryBaseRouteValue<
 	mutationKey: () => MutationKey;
 	queryKey: (
 		...args: QueryKeyArgs<E, TGlobalHeaders>
-	) => DataTag<QueryKey, QueryDataFor<E>, QueryErrorFor<E>>;
+	) => DataTag<QueryKey, RouteDataFor<E>, RouteErrorFor<E>>;
 };
 
 type TanstackQueryStreamRouteValue<

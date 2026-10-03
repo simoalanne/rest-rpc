@@ -145,21 +145,6 @@ type OptionalRequestHeaders<T, TOptionalKeys extends PropertyKey> = [
 			>
 		: T;
 
-/**
- * Infers the input passed to a generated client route call.
- *
- * @remarks Pass a route tree to infer a matching tree of request types.
- *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#infer-client-types}
- */
-export type InferClientRequest<T extends RouteTree> = T extends {
-	readonly "~restrpc": infer TRoute extends RouteDeclaration;
-}
-	? ClientRequestForDeclaration<TRoute>
-	: {
-			[K in keyof T]: T[K] extends RouteTree ? InferClientRequest<T[K]> : never;
-		};
-
 export type ClientRequestForDeclaration<
 	E extends RouteDeclaration,
 	TOptionalKeys extends PropertyKey = never,
@@ -227,7 +212,7 @@ type ServerRequestValue<TRoute extends RouteDeclaration> =
  * context are intentionally excluded. Pass a route tree to infer a matching
  * tree of request types.
  *
- * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-server-request}
  */
 export type InferServerRequest<T extends RouteTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;

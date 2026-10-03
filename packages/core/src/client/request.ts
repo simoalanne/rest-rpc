@@ -5,7 +5,7 @@ import {
 	type SerializedBody,
 	type BodyCodec,
 } from "../codecs/index.ts";
-import type { RouteDeclaration } from "../contract/contract.ts";
+import type { RouteDeclaration, RouteTree } from "../contract/contract.ts";
 import { replacePathParams } from "../contract/path.ts";
 import type { HttpMethod } from "../contract/routeDeclaration.ts";
 import type {
@@ -65,6 +65,33 @@ type GlobalHeaderKeys<TGlobalHeaders extends ClientHeaders> = {
 		? never
 		: TKey;
 }[LiteralKeys<TGlobalHeaders>];
+
+type ClientRequestValue<T> = [T] extends [never] ? undefined : T;
+
+/**
+ * Infers the input passed to a generated client route call.
+ *
+ * @remarks Routes without request input infer `undefined`, which the route
+ * call accepts. Pass the type of the client's `globalHeaders` as the second
+ * argument to make headers that it always provides optional. Pass a route tree
+ * to infer a matching tree of request types.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#type-helpers}
+ */
+export type InferClientRequest<
+	T extends RouteTree,
+	TGlobalHeaders extends ClientHeaders = Record<never, string>,
+> = T extends {
+	readonly "~restrpc": infer TRoute extends RouteDeclaration;
+}
+	? ClientRequestValue<
+			ClientRequestForDeclaration<TRoute, GlobalHeaderKeys<TGlobalHeaders>>
+		>
+	: {
+			[K in keyof T]: T[K] extends RouteTree
+				? InferClientRequest<T[K], TGlobalHeaders>
+				: never;
+		};
 
 type RequiredKeys<T> = {
 	[TKey in keyof T]-?: {} extends Pick<T, TKey> ? never : TKey;

@@ -24,7 +24,6 @@ export {
 	toColonPath,
 } from "./path.ts";
 export type {
-	InferClientRequest,
 	InferSchemaInputs,
 	InferSchemaOutputs,
 	InferServerRequest,
@@ -41,7 +40,6 @@ export type {
 	ResponseHeaders,
 	ResponseOptions,
 	RouteResponses,
-	ServerErrors,
 	InferServerResponse,
 	ServerResponse,
 	ServerResponseBody,

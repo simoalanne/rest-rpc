@@ -270,6 +270,9 @@ Declared non-2xx responses get mapped to the `error` key.
 Undeclared statuses and response validation failures become [`HttpError`](/docs/client/fetch-client#error-handling).
 Network and other unexpected failures become ordinary `Error` objects.
 
+`HttpError` is re-exported from `@rest-rpc/tanstack-query`, so errors can be
+narrowed with `instanceof HttpError`.
+
 ## Type Helpers
 
 Use the type helpers when a route's TanStack Query types need to be reused, for
@@ -278,25 +281,31 @@ contract, or a route tree to infer a matching tree of types.
 
 ```ts
 import type {
-	InferMutationVariables,
-	InferQueryData,
-	InferQueryError,
+	InferClientError,
+	InferClientRequest,
+	InferClientSuccess,
 } from "@rest-rpc/tanstack-query";
 import { api } from "./client-contract";
 
-type TodoData = InferQueryData<typeof api.todos.get>;
-type TodoError = InferQueryError<typeof api.todos.get>;
-type CreateTodoVariables = InferMutationVariables<typeof api.todos.create>;
+type TodoData = InferClientSuccess<typeof api.todos.get>;
+type TodoError = InferClientError<typeof api.todos.get>;
+type CreateTodoVariables = InferClientRequest<typeof api.todos.create>;
 ```
 
-| Type                                       | Infers                                                                            |
-| ------------------------------------------ | --------------------------------------------------------------------------------- |
-| `InferQueryData<Route>`                    | The `data` of a query or mutation.                                                |
-| `InferQueryError<Route>`                   | The `error` of a query or mutation, as described in [Error Model](#error-model).  |
-| `InferMutationVariables<Route>`            | The variables passed to `mutate()`, which are the route's request input.          |
-| `InferInfiniteQueryData<Route, PageParam>` | The `data` of an infinite query: pages of `InferQueryData` and their page params. |
-| `InferStreamedQueryData<Route>`            | The default `data` of a streamed query: an array of SSE events.                   |
-| `TanstackQueryUtilsFor<typeof api>`        | The whole util tree returned by `createTanstackQueryUtils()`.                     |
+| Type                                       | Infers                                                                           |
+| ------------------------------------------ | -------------------------------------------------------------------------------- |
+| `InferClientSuccess<Route>`                | The `data` of a query or mutation.                                               |
+| `InferClientError<Route>`                  | The `error` of a query or mutation, as described in [Error Model](#error-model). |
+| `InferClientRequest<Route, GlobalHeaders>` | The `request` of a query and the variables passed to `mutate()`.                 |
+| `InferClientStreamData<Route>`             | The `data` of each event in a [streamed query](#streamed-queries).               |
 
-`InferMutationVariables` and `TanstackQueryUtilsFor` accept the type of your `globalHeaders` as a second argument, so headers that
-`globalHeaders` always provides become optional in the inferred request.
+`InferClientSuccess`, `InferClientRequest`, and `InferClientStreamData` are
+re-exported from [`@rest-rpc/core`](/docs/client/fetch-client#type-helpers).
+`InferClientError` adds `HttpError` and `Error` to the core
+`InferClientError`, because the error channel also receives thrown errors.
+Import `InferClientError` from `@rest-rpc/core` when you need only the declared
+non-2xx responses.
+
+`TanstackQueryUtilsFor<typeof api>` is the type of the whole util tree returned
+by `createTanstackQueryUtils()`. It accepts the type of your `globalHeaders` as a
+second argument.

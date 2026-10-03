@@ -1,6 +1,7 @@
 import { route } from "./routeBuilder.ts";
 import { type } from "../standard-schema/type.ts";
-import type { InferClientRequest, InferServerRequest } from "./request.ts";
+import type { InferClientRequest } from "../client/request.ts";
+import type { InferServerRequest } from "./request.ts";
 
 describe("request inference", () => {
 	it("intersects stacked inputs and right-merges transformed outputs", () => {
@@ -50,7 +51,7 @@ describe("request inference", () => {
 			input: { count: number };
 		}>();
 		const empty = route.get("/");
-		expectTypeOf<InferClientRequest<typeof empty>>().toEqualTypeOf<never>();
+		expectTypeOf<InferClientRequest<typeof empty>>().toEqualTypeOf<undefined>();
 		expectTypeOf<InferServerRequest<typeof empty>>().toEqualTypeOf<
 			Record<never, never>
 		>();
@@ -67,6 +68,24 @@ describe("request inference", () => {
 		expectTypeOf<InferClientRequest<typeof optional>>().toEqualTypeOf<{
 			headers?: { token?: string };
 		}>();
+	});
+
+	it("makes headers guaranteed by global headers optional", () => {
+		const value = route
+			.get("/")
+			.headers(type<{ token: string; optional?: string }>());
+		const globalHeaders = { token: async () => "token" };
+		expectTypeOf<
+			InferClientRequest<typeof value, typeof globalHeaders>
+		>().toEqualTypeOf<{ headers?: { token?: string; optional?: string } }>();
+		const uncertainHeaders = { token: (): string | undefined => undefined };
+		expectTypeOf<
+			InferClientRequest<typeof value, typeof uncertainHeaders>
+		>().toEqualTypeOf<{ headers: { token: string; optional?: string } }>();
+		const tree = { users: { value } };
+		expectTypeOf<
+			InferClientRequest<typeof tree, typeof globalHeaders>["users"]["value"]
+		>().toEqualTypeOf<InferClientRequest<typeof value, typeof globalHeaders>>();
 	});
 
 	it("infers requests for a route tree", () => {

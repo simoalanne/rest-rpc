@@ -53,7 +53,7 @@ export type { SseEvent } from "@rest-rpc/core";
  * @remarks Use a route declared without `.handler()` to write its handler
  * separately. Pass a route tree to infer a matching tree of handler types.
  *
- * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-server-handler}
  */
 export type InferServerHandler<TRoute extends RouteTree> = RouteHandlerFor<
 	TRoute,

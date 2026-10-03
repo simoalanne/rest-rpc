@@ -321,7 +321,13 @@ Use the type helpers when a client request or result type needs to be reused,
 for example in your own wrapper functions.
 
 ```ts twoslash
-import type { InferClientRequest, InferClientResponse } from "@rest-rpc/core";
+import type {
+	InferClientError,
+	InferClientRequest,
+	InferClientResponse,
+	InferClientStreamData,
+	InferClientSuccess,
+} from "@rest-rpc/core";
 import { route } from "@rest-rpc/express";
 import z from "zod";
 
@@ -341,6 +347,45 @@ const getFirst = route.handler(() => {
 type UpdateTodoRequest = InferClientRequest<typeof update>;
 
 type GetFirstTodoResponse = InferClientResponse<typeof getFirst>;
+
+type GetFirstTodoSuccess = InferClientSuccess<typeof getFirst>;
+
+type GetFirstTodoError = InferClientError<typeof getFirst>;
+
+const events = route
+	.get("/todos/events")
+	.streamOutput(z.object({ id: z.string(), message: z.string() }))
+	.handler(async function* () {
+		yield { id: "todo_1", message: "Created" };
+	});
+
+type TodoEvent = InferClientStreamData<typeof events>;
+```
+
+| Type                                       | Infers                                                                                   |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| `InferClientRequest<Route, GlobalHeaders>` | The request passed to the route call, or `undefined` for routes without input.           |
+| `InferClientResponse<Route>`               | Every declared response, or the output of a `.output()` route.                           |
+| `InferClientSuccess<Route>`                | The declared 2xx responses, or the output of a `.output()` route.                        |
+| `InferClientError<Route>`                  | The declared non-2xx responses. `.output()` routes infer `never`.                        |
+| `InferClientStreamData<Route>`             | The `data` of each event from a [streaming route](#consume-streams), without `SseEvent`. |
+
+`InferClientError` contains only the responses the client returns. The
+[`HttpError`](#error-handling) and `Error` values it throws are not included.
+
+`InferClientRequest` accepts the type of your `globalHeaders` as a second
+argument, so headers that `globalHeaders` always provides become optional:
+
+```ts
+import type { InferClientRequest } from "@rest-rpc/core";
+import type { api } from "./client-contract";
+
+const globalHeaders = { authorization: () => `Bearer ${getToken()}` };
+
+type UpdateTodoRequest = InferClientRequest<
+	typeof api.todos.update,
+	typeof globalHeaders
+>;
 ```
 
 `ApiClientFor<typeof api>` is the type of the whole client created from a
@@ -356,14 +401,4 @@ import type { api } from "./client-contract";
 export type ClientResponses = InferClientResponse<typeof api>;
 
 type TodoResponse = ClientResponses["todos"]["get"];
-```
-
-`InferClientStreamData` infers the `data` of each event received from a
-[streaming route](#consume-streams), without the `SseEvent` wrapper:
-
-```ts
-import type { InferClientStreamData } from "@rest-rpc/core";
-import type { api } from "./client-contract";
-
-type TodoEvent = InferClientStreamData<typeof api.todos.events>;
 ```

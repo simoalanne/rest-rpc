@@ -14,7 +14,6 @@ import type {
 	RouteDeclaration,
 	RouteMetadata,
 	RouteTree,
-	ServerErrors,
 	ServerResponse,
 	ServerResponseBody,
 } from "@rest-rpc/core/contract";
@@ -27,15 +26,6 @@ import type {
 	ReusableMiddlewareRequest,
 	RequestFields,
 } from "./middleware.types.ts";
-
-/**
- * Infers the declared non-2xx response envelopes for a route.
- *
- * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
- */
-export type RouteErrors<
-	TRoute extends { readonly "~restrpc": RouteDeclaration },
-> = ServerErrors<TRoute["~restrpc"]>;
 
 type EmptyObject = Record<never, never>;
 type RequestTransportFields = {

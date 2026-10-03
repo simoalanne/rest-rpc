@@ -4,8 +4,11 @@ export type {
 	ApiClientOptions,
 	ClientHeaders,
 	ClientHeaderValue,
+	InferClientError,
+	InferClientRequest,
 	InferClientResponse,
 	InferClientStreamData,
+	InferClientSuccess,
 	FetchLike,
 	FetchOptionsFor,
 } from "./client/index.ts";
@@ -15,10 +18,7 @@ export type {
 	Contract,
 	RouteDeclaration,
 } from "./contract/index.ts";
-export type {
-	InferClientRequest,
-	InferServerRequest,
-} from "./contract/request.ts";
+export type { InferServerRequest } from "./contract/request.ts";
 export { route } from "./contract/routeBuilder.ts";
 export type {
 	BodyContentType,

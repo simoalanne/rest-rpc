@@ -7,7 +7,6 @@ export { handleHttpRoute } from "./handleHttpRoute.ts";
 export { createRouteMatcher, flattenRouteImplementations } from "./match.ts";
 export type { RouteMatch, RuntimeImplementationTree } from "./match.ts";
 export type {
-	RouteErrors,
 	RouteHandler,
 	RouteHandlerFor,
 	RouteRequest,

@@ -15,6 +15,12 @@ export {
 	type FetchLike,
 	type FetchOptions,
 	type FetchOptionsFor,
+	type InferClientRequest,
 } from "./request.ts";
-export type { InferClientResponse, InferClientStreamData } from "./response.ts";
+export type {
+	InferClientError,
+	InferClientResponse,
+	InferClientStreamData,
+	InferClientSuccess,
+} from "./response.ts";
 export type { SseEvent } from "../sse.ts";

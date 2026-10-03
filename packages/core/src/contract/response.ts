@@ -211,26 +211,9 @@ export type SuccessfulDeclaredClientResponse<E extends RouteDeclaration> =
 			}[keyof TResponses]
 		: never;
 
-type ServerSuccessResponse<E extends RouteDeclaration> = E extends {
-	responses: infer TResponses;
-}
-	? {
-			[TKeys in keyof TResponses]: TKeys extends ResponseKey
-				? TKeys extends SuccessfulResponseKeys<TResponses>
-					? ServerResponseEntry<ResponseStatus<TKeys>, TResponses[TKeys]>
-					: never
-				: never;
-		}[keyof TResponses]
-	: never;
-
 export type ErrorDeclaredClientResponse<E extends RouteDeclaration> = Exclude<
 	DeclaredClientResponse<E>,
 	SuccessfulDeclaredClientResponse<E>
->;
-
-export type ServerErrors<E extends RouteDeclaration> = Exclude<
-	ServerResponse<E>,
-	ServerSuccessResponse<E>
 >;
 
 type ProcedureContentType<TContentType> = TContentType extends readonly string[]
@@ -267,7 +250,7 @@ type ServerResponseForRoute<E extends RouteDeclaration> = E extends {
  * produce values before response validation and transformation. Pass a route
  * tree to infer a matching tree of response types.
  *
- * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-server-response}
  */
 export type InferServerResponse<T extends RouteTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
