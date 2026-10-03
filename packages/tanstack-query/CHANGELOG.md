@@ -1,5 +1,12 @@
 # @rest-rpc/tanstack-query
 
+## 0.1.0-beta.24
+
+### Minor Changes
+
+- fec6317: Type helpers accept a route tree as well as a single route and infer a matching tree of types, so one exported type can be indexed per route: `InferServerRequest<typeof routes>["todos"]["create"]`. This applies to `InferClientRequest`, `InferClientResponse`, `InferServerRequest`, `InferServerResponse`, the adapter `InferServerHandler`, and the TanStack Query `Infer*` helpers. Add `InferClientStreamData` to `@rest-rpc/core`, which infers the `data` of each event received from a streaming route without the `SseEvent` wrapper.
+- fec6317: Rename the TanStack Query type helpers to match the `Infer*` style of the core helpers: `RouteQueryData` → `InferQueryData`, `RouteQueryError` → `InferQueryError`, `RouteMutationVariables` → `InferMutationVariables`, `RouteInfiniteQueryData` → `InferInfiniteQueryData`, and `RouteStreamedQueryData` → `InferStreamedQueryData`.
+
 ## 0.1.0-beta.23
 
 ### Minor Changes

@@ -1,5 +1,13 @@
 # @rest-rpc/node
 
+## 0.1.0-beta.24
+
+### Minor Changes
+
+- fec6317: Rename the adapter `RouteHandler` type to `InferServerHandler` to match the `Infer*` style of the core helpers. `InferServerHandler` now expects a plain return value for `.output()` routes instead of a status envelope. Remove `RouteRequest` and `RouteErrors` from the adapter roots: use `InferServerRequest` for the validated request, `Parameters<InferServerHandler<typeof route>>[0]` for the full handler argument, and `Extract<InferServerResponse<typeof route>, { status: 404 }>` for specific status responses.
+- fec6317: Move adapter building blocks out of the package roots. `createFetchResponse` and `deserializeRequestBody` are now exported from `@rest-rpc/fetch/adapter` (replacing the `@rest-rpc/fetch/deserializeRequestBody` subpath), and `createRequestSignal`, `parseRequestTarget`, `createNodeResponseStream`, `writeNodeResponse`, `writeStreamResponse`, and `nodeBodyCodecs` from `@rest-rpc/node/adapter`. Both roots now export `InferServerHandler` like the other adapters, no longer export the `ImplicitResponse*`/`ServerFirst*` types, and `@rest-rpc/fetch` exports `FetchRouteHandlerResult`.
+- fec6317: Type helpers accept a route tree as well as a single route and infer a matching tree of types, so one exported type can be indexed per route: `InferServerRequest<typeof routes>["todos"]["create"]`. This applies to `InferClientRequest`, `InferClientResponse`, `InferServerRequest`, `InferServerResponse`, the adapter `InferServerHandler`, and the TanStack Query `Infer*` helpers. Add `InferClientStreamData` to `@rest-rpc/core`, which infers the `data` of each event received from a streaming route without the `SseEvent` wrapper.
+
 ## 0.1.0-beta.23
 
 ### Minor Changes

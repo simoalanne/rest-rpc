@@ -1,5 +1,12 @@
 # @rest-rpc/core
 
+## 0.1.0-beta.24
+
+### Minor Changes
+
+- 38a1e07: Simplify generateContractFromType to work without providing filePath and exportName. filePath remains as fallback option
+- fec6317: Type helpers accept a route tree as well as a single route and infer a matching tree of types, so one exported type can be indexed per route: `InferServerRequest<typeof routes>["todos"]["create"]`. This applies to `InferClientRequest`, `InferClientResponse`, `InferServerRequest`, `InferServerResponse`, the adapter `InferServerHandler`, and the TanStack Query `Infer*` helpers. Add `InferClientStreamData` to `@rest-rpc/core`, which infers the `data` of each event received from a streaming route without the `SseEvent` wrapper.
+
 ## 0.1.0-beta.23
 
 ### Minor Changes
