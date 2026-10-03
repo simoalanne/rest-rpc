@@ -2,6 +2,7 @@ import { HttpError } from "./httpError.ts";
 import {
 	resolveBodyCodec,
 	defaultBodyCodecs,
+	findDeclaredContentType,
 	normalizeMediaType,
 	type BodyCodec,
 } from "../codecs/index.ts";
@@ -160,10 +161,7 @@ const assertResponseContentType = (
 		rawResponse.headers.get("content-type") ?? "",
 	);
 	if (!received || declared === undefined) return;
-	const allowed = typeof declared === "string" ? [declared] : declared;
-	if (
-		!allowed.some((contentType) => normalizeMediaType(contentType) === received)
-	) {
+	if (findDeclaredContentType(declared, received) === undefined) {
 		throw new HttpError(rawResponse.status, body, {
 			cause: new Error("Server returned an unsupported response content-type."),
 		});

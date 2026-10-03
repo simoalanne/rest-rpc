@@ -3,7 +3,11 @@ import {
 	normalizeImplicitResponse,
 	isCustomProcedureOutput,
 } from "./implicitResponse.ts";
-import { normalizeMediaType } from "@rest-rpc/core/codecs";
+import {
+	contentTypeList,
+	findDeclaredContentType,
+	normalizeMediaType,
+} from "@rest-rpc/core/codecs";
 import {
 	RequestValidationError,
 	ResponseValidationError,
@@ -98,12 +102,10 @@ const selectResponseContentType = (
 	declared: string | readonly string[],
 	selected: unknown,
 ): string => {
-	const types = typeof declared === "string" ? [declared] : declared;
+	const types = contentTypeList(declared);
 	const contentType =
 		typeof selected === "string"
-			? types.find(
-					(type) => normalizeMediaType(type) === normalizeMediaType(selected),
-				)
+			? findDeclaredContentType(types, selected)
 			: types.length === 1
 				? types[0]
 				: undefined;

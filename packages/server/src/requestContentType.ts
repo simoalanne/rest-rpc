@@ -1,5 +1,8 @@
 import type { RouteDeclaration } from "@rest-rpc/core/contract";
-import { normalizeMediaType } from "@rest-rpc/core/codecs";
+import {
+	findDeclaredContentType,
+	normalizeMediaType,
+} from "@rest-rpc/core/codecs";
 
 /**
  * Checks a received media type against a route's declared request body types.
@@ -12,14 +15,9 @@ export function assertRequestContentType(
 ): { status: 415; message: string } | undefined {
 	const mediaType = normalizeMediaType(contentType);
 	if (!mediaType) return undefined;
-	const declared = route.request?.contentType;
-	const accepted =
-		declared === undefined
-			? []
-			: Array.isArray(declared)
-				? declared
-				: [declared];
-	if (accepted.some((type) => normalizeMediaType(type) === mediaType)) {
+	if (
+		findDeclaredContentType(route.request?.contentType, mediaType) !== undefined
+	) {
 		return undefined;
 	}
 	return { status: 415, message: "Unsupported request body content type." };

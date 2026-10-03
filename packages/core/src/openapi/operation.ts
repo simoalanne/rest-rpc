@@ -5,6 +5,7 @@ import type {
 	ResponseDeclaration,
 	ResponseHeaders,
 } from "../contract/response.ts";
+import { contentTypeList } from "../codecs/index.ts";
 import { getRouteResponses } from "../contract/response.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 
@@ -162,12 +163,7 @@ export const createRequestBody = (
 	if (!schemaOrSchemas) return undefined;
 	const schemas = getSchemas(schemaOrSchemas);
 	if (schemas.length === 0) return undefined;
-	const contentTypes =
-		customContentType !== undefined
-			? Array.isArray(customContentType)
-				? customContentType
-				: [customContentType as string]
-			: [JSON_CONTENT_TYPE];
+	const contentTypes = contentTypeList(customContentType ?? JSON_CONTENT_TYPE);
 	if (contentTypes.length === 0) return undefined;
 	const convertedSchemas = schemas.map(
 		(schema) => converter?.(schema, "input") ?? {},
@@ -206,11 +202,7 @@ export const createResponse = (
 	const contentTypes =
 		responseDeclaration.kind === "stream"
 			? [SSE_CONTENT_TYPE]
-			: contentType !== undefined
-				? Array.isArray(contentType)
-					? contentType
-					: [contentType as string]
-				: [JSON_CONTENT_TYPE];
+			: contentTypeList(contentType ?? JSON_CONTENT_TYPE);
 
 	return {
 		...response,
