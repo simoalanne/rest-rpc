@@ -110,6 +110,8 @@ export function registerRoutes(
 					normalizeMediaType(req.headers["content-type"]),
 					bodyCodecs,
 				);
+				// Without a matching codec the body comes from the framework's parser, which
+				// owns size limits, so requestBodyLimit is not offered here.
 				const body = codec?.deserialize
 					? await codec.deserialize(req)
 					: req.body;
@@ -145,6 +147,8 @@ export function registerRoutes(
 			}
 
 			try {
+				// Stream validation runs while writing. An error response is only possible
+				// when the first chunk fails, before headers are sent.
 				return await writeNodeResponse(result, res, bodyCodecs);
 			} catch (error) {
 				if (error instanceof ResponseValidationError) {

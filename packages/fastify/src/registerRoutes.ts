@@ -109,6 +109,8 @@ export function registerRoutes(
 					normalizeMediaType(req.headers["content-type"]),
 					bodyCodecs,
 				);
+				// Without a matching codec the body comes from the framework's parser, which
+				// owns size limits, so requestBodyLimit is not offered here.
 				const body = codec?.deserialize
 					? await codec.deserialize(req)
 					: req.body;
@@ -158,6 +160,8 @@ export function registerRoutes(
 				for (const [name, value] of Object.entries(result.headers ?? {})) {
 					if (value !== undefined) reply.header(name, value);
 				}
+				// Fastify owns stream errors: before headers are sent they reach its error
+				// handler, afterwards the connection is destroyed.
 				if (result.kind === "stream") {
 					return reply
 						.status(result.status)

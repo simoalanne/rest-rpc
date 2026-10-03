@@ -64,6 +64,8 @@ export async function createFetchResponse(
 	for (const [name, value] of Object.entries(result.headers ?? {})) {
 		setHeader(headers, name, value);
 	}
+	// Status and headers are committed with the returned Response before the stream
+	// is read, so stream validation failures can only error the body stream.
 	if (result.kind === "stream") {
 		return createStreamResponse(
 			result.body,

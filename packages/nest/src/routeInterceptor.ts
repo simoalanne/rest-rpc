@@ -113,6 +113,8 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 		const signal = createRequestSignal(rawRequest, rawResponse);
 		const mediaType = normalizeMediaType(rawRequest.headers["content-type"]);
 		const codec = resolveBodyCodec(mediaType, this.options?.bodyCodecs ?? []);
+		// Without a matching codec the body comes from the framework's parser, which
+		// owns size limits, so requestBodyLimit is not offered here.
 		const body = codec?.deserialize
 			? await codec.deserialize(http.getRequest())
 			: req.body;
@@ -175,6 +177,8 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 			}
 		}
 		adapter.status(res, result.status);
+		// Stream validation errors are left to Nest's exception handling, which can
+		// only respond while headers have not been sent.
 		if (result.kind === "stream") {
 			if (adapter.getType() === "express") {
 				return writeStreamResponse(result.body, rawResponse, result.status);
