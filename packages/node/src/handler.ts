@@ -151,22 +151,11 @@ export function createRouteHandler(
 			return { matched: true };
 		}
 
-		try {
-			if (!response.destroyed)
-				await writeNodeResponse(result, response, bodyCodecs);
-		} catch (error) {
-			// Stream validation runs while writing. The stream pipeline destroys the
-			// response when a chunk fails, so the stream ends without an error response.
-			if (!(error instanceof ResponseValidationError)) throw error;
-			if (options.responseValidationErrorHandler) {
-				await options.responseValidationErrorHandler(error, request, response);
-			} else {
-				if (response.headersSent) throw error;
-				response.statusCode = error.status;
-				response.setHeader("content-type", "application/json");
-				response.end(JSON.stringify(error.responseBody));
-			}
-		}
+		// Stream validation runs while writing. The stream pipeline destroys the
+		// response when a chunk fails, and the error rejects like any other write
+		// failure.
+		if (!response.destroyed)
+			await writeNodeResponse(result, response, bodyCodecs);
 		return { matched: true };
 	};
 }

@@ -148,16 +148,10 @@ export function registerRoutes(
 
 			try {
 				// Stream validation runs while writing. The stream pipeline destroys the
-				// response when a chunk fails, so the stream ends without an error response.
+				// response when a chunk fails, so the error goes to Express like any
+				// other write failure.
 				return await writeNodeResponse(result, res, bodyCodecs);
 			} catch (error) {
-				if (error instanceof ResponseValidationError) {
-					if (responseValidationErrorHandler) {
-						return responseValidationErrorHandler(error, req, res, next);
-					}
-					if (res.headersSent) return next(error);
-					return res.status(error.status).json(error.responseBody);
-				}
 				return next(error);
 			}
 		};

@@ -21,9 +21,13 @@ describeAdapterConformance("node", {
 			}),
 		});
 		return withHttpServer(async (req, res) => {
-			if (!(await handler(req, res)).matched) {
-				res.statusCode = 404;
-				res.end();
+			try {
+				if (!(await handler(req, res)).matched) {
+					res.statusCode = 404;
+					res.end();
+				}
+			} catch {
+				res.destroy();
 			}
 		}, run);
 	},
