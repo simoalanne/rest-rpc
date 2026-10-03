@@ -1,5 +1,8 @@
 import type { AbsolutePath, BodyCodec } from "@rest-rpc/core";
-import { deserializeRequestBody } from "@rest-rpc/fetch/adapter";
+import {
+	assertRequestBodyLimit,
+	deserializeRequestBody,
+} from "@rest-rpc/fetch/adapter";
 import type { ServerResponse } from "node:http";
 import {
 	createRouteMatcher,
@@ -70,12 +73,7 @@ export function createRouteHandler(
 	const matchRoute = createRouteMatcher(implementations, options.prefix);
 	const bodyCodecs = options.bodyCodecs ?? [];
 	const maxBytes = options.requestBodyLimit;
-	if (
-		maxBytes !== undefined &&
-		(!Number.isSafeInteger(maxBytes) || maxBytes <= 0)
-	) {
-		throw new Error("requestBodyLimit must be a positive safe integer");
-	}
+	assertRequestBodyLimit(maxBytes);
 
 	return async (request, response) => {
 		const url = parseRequestTarget(request);

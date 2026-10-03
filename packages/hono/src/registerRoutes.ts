@@ -1,5 +1,6 @@
 import type { BodyCodec } from "@rest-rpc/core";
 import {
+	assertRequestBodyLimit,
 	createFetchResponse,
 	deserializeRequestBody,
 } from "@rest-rpc/fetch/adapter";
@@ -73,13 +74,7 @@ export function registerRoutes<TEnv extends Env = Env>(
 	implementations: RuntimeImplementationTree,
 	options: RegisterRoutesOptions<TEnv> = {},
 ) {
-	const maxBytes = options.requestBodyLimit;
-	if (
-		maxBytes !== undefined &&
-		(!Number.isSafeInteger(maxBytes) || maxBytes <= 0)
-	) {
-		throw new Error("requestBodyLimit must be a positive safe integer");
-	}
+	assertRequestBodyLimit(options.requestBodyLimit);
 
 	const {
 		bodyCodecs = [],

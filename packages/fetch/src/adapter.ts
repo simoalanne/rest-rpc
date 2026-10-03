@@ -1,2 +1,5 @@
 export { createFetchResponse } from "./response.ts";
-export { deserializeRequestBody } from "./deserializeRequestBody.ts";
+export {
+	assertRequestBodyLimit,
+	deserializeRequestBody,
+} from "./deserializeRequestBody.ts";
