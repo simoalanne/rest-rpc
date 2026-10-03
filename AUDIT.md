@@ -98,6 +98,8 @@ The five identical `HttpMethods` signatures (`get`, `post`, …) stay as they ar
 
 ### 3.3 Request and response inference types
 
+**Status: done.** `InferSchemaInputs` / `InferSchemaOutputs` share one recursion (`InferSchemas`) that differs only in the combine step. `InferRequestFor` maps the declared segments directly and takes the "no input" result as a parameter, so `HasRequestInput` and the second never pass are gone. Client and server response bodies share `InferResponseBody`. `DeclaredClientResponse`, `ServerResponse`, `SuccessfulDeclaredClientResponse` and `ErrorDeclaredClientResponse` are `ResponseUnion` with a status filter, so errors filter non-2xx keys directly. The server's `ProcedureHandlerResult` wraps core's `ServerProcedureResponse`. `StandardFetchArgs` infers the request once, and `FetchOptionsFor` and the required-options check share `ContentTypeOption`. Inferred types are unchanged apart from request key order. Benchmark: per-route instantiations are unchanged or 3–10% lower. Totals include about 2k more types from checking the library sources, a constant cost independent of route count.
+
 `core/src/contract/request.ts`:
 
 - `InferSchemaInputs` and `InferSchemaOutputs` are the same recursion with a different combine step (`&` vs `RightMerge`).

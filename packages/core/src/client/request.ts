@@ -127,44 +127,34 @@ type DeclaredContentType<E> = E extends { method: "GET" }
 		? TContentType
 		: never;
 
+// A content-type list must be narrowed to one entry per call.
+type ContentTypeOption<E> = [DeclaredContentType<E>] extends [never]
+	? { contentType?: never }
+	: DeclaredContentType<E> extends readonly string[]
+		? { contentType: DeclaredContentType<E>[number] }
+		: { contentType?: never };
+
 /** Fetch options accepted by a particular route call. */
 export type FetchOptionsFor<E extends RouteDeclaration> = Omit<
 	FetchOptions,
 	"contentType"
 > &
-	([DeclaredContentType<E>] extends [never]
-		? { contentType?: never }
-		: DeclaredContentType<E> extends readonly string[]
-			? { contentType: DeclaredContentType<E>[number] }
-			: { contentType?: never });
-
-type RequiresFetchOptions<E> = [DeclaredContentType<E>] extends [never]
-	? false
-	: DeclaredContentType<E> extends readonly string[]
-		? true
-		: false;
+	ContentTypeOption<E>;
 
 type StandardFetchArgs<
 	E extends RouteDeclaration,
 	TGlobalHeaders extends ClientHeaders,
 > =
-	ClientRequestForDeclaration<E, GlobalHeaderKeys<TGlobalHeaders>> extends never
-		? [request?: undefined, options?: FetchOptionsFor<E>]
-		: RequiresFetchOptions<E> extends false
-			? [
-					request: ClientRequestForDeclaration<
-						E,
-						GlobalHeaderKeys<TGlobalHeaders>
-					>,
-					options?: FetchOptionsFor<E>,
-				]
-			: [
-					request: ClientRequestForDeclaration<
-						E,
-						GlobalHeaderKeys<TGlobalHeaders>
-					>,
-					options: FetchOptionsFor<E>,
-				];
+	ClientRequestForDeclaration<
+		E,
+		GlobalHeaderKeys<TGlobalHeaders>
+	> extends infer TRequest
+		? [TRequest] extends [never]
+			? [request?: undefined, options?: FetchOptionsFor<E>]
+			: ContentTypeOption<E> extends { contentType: string }
+				? [request: TRequest, options: FetchOptionsFor<E>]
+				: [request: TRequest, options?: FetchOptionsFor<E>]
+		: never;
 
 export type FetchArgs<
 	E extends RouteDeclaration = RouteDeclaration,

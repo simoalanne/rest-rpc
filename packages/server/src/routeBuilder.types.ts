@@ -7,7 +7,6 @@ import type {
 	BuilderExtension,
 	BuilderState,
 	InferServerRequest,
-	ProcedureContentType,
 	PublicDeclarationFor,
 	PublicRouteBuilder,
 	RouteBuilderView,
@@ -15,7 +14,7 @@ import type {
 	RouteMetadata,
 	RouteTree,
 	ServerResponse,
-	ServerResponseBody,
+	ServerProcedureResponse,
 	UsesPlainOutput,
 } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
@@ -136,16 +135,9 @@ type HandlerImplementation<
 	HandlerFor<TRoute, TAdditionalHandlerFields, TContext, TResult>
 >;
 
-type ProcedureHandlerResult<TResponse> = TResponse extends {
-	contentType: infer TContentType;
-}
-	? TContentType extends "application/json"
-		? ServerResponseBody<TResponse>
-		: {
-				data: ServerResponseBody<TResponse>;
-				contentType: ProcedureContentType<TContentType>;
-			}
-	: WithSseServerEvents<ServerResponseBody<TResponse>>;
+type ProcedureHandlerResult<TResponse> = WithSseServerEvents<
+	ServerProcedureResponse<TResponse>
+>;
 
 type ProcedureHandlerMethod<
 	TRoute extends RouteDeclaration,

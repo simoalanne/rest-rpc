@@ -47,6 +47,7 @@ export type {
 	RouteResponses,
 	InferServerResponse,
 	ProcedureContentType,
+	ServerProcedureResponse,
 	ServerResponse,
 	ServerResponseBody,
 	SuccessfulDeclaredClientResponse,

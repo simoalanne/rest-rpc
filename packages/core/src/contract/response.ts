@@ -2,6 +2,7 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { BodyContentType } from "./body.ts";
 import type { RouteDeclaration } from "./routeDeclaration.ts";
 import type { RouteTree } from "./contract.ts";
+import type { InferSchema } from "./request.ts";
 import type { UsesPlainOutput } from "./routeModes.ts";
 import type { SseEvent } from "../sse.ts";
 import type { Merge } from "../typeUtils.ts";
@@ -42,27 +43,27 @@ type IsStreamResponse<TResponse> = TResponse extends {
 	? true
 	: false;
 
-type InferClientResponseBody<TResponse> =
+// Handlers produce schema inputs; clients receive schema outputs, with stream
+// items wrapped in SSE events.
+type InferResponseBody<TResponse, TIO extends "input" | "output"> =
 	ResponseBody<TResponse> extends infer TBody
 		? TBody extends StandardSchemaV1
 			? IsStreamResponse<TResponse> extends true
-				? AsyncIterable<SseEvent<StandardSchemaV1.InferOutput<TBody>>>
-				: StandardSchemaV1.InferOutput<TBody>
+				? AsyncIterable<
+						TIO extends "output"
+							? SseEvent<InferSchema<TBody, TIO>>
+							: InferSchema<TBody, TIO>
+					>
+				: InferSchema<TBody, TIO>
 			: TBody extends undefined
 				? undefined
 				: never
 		: never;
 
-export type ServerResponseBody<TResponse> =
-	ResponseBody<TResponse> extends infer TBody
-		? TBody extends StandardSchemaV1
-			? IsStreamResponse<TResponse> extends true
-				? AsyncIterable<StandardSchemaV1.InferInput<TBody>>
-				: StandardSchemaV1.InferInput<TBody>
-			: TBody extends undefined
-				? undefined
-				: never
-		: never;
+export type ServerResponseBody<TResponse> = InferResponseBody<
+	TResponse,
+	"input"
+>;
 
 type ServerResponseMetadata<TResponse> = TResponse extends {
 	contentType: infer TContentType;
@@ -86,21 +87,12 @@ type ResponseHeadersFor<TResponse> = TResponse extends {
 	? THeaders
 	: never;
 
-type InferResponseHeaders<
-	THeaders,
-	TIO extends "input" | "output",
-> = THeaders extends StandardSchemaV1
-	? TIO extends "input"
-		? StandardSchemaV1.InferInput<THeaders>
-		: StandardSchemaV1.InferOutput<THeaders>
-	: never;
-
 type ResponseHeadersMetadata<TResponse, TIO extends "input" | "output"> = [
 	ResponseHeadersFor<TResponse>,
 ] extends [never]
 	? unknown
 	: {
-			responseHeaders: InferResponseHeaders<ResponseHeadersFor<TResponse>, TIO>;
+			responseHeaders: InferSchema<ResponseHeadersFor<TResponse>, TIO>;
 		};
 
 type ResponseEntry<TStatus extends number, TBody> = {
@@ -110,7 +102,7 @@ type ResponseEntry<TStatus extends number, TBody> = {
 
 type ClientResponseEntry<TStatus extends number, TResponse> = ResponseEntry<
 	TStatus,
-	InferClientResponseBody<TResponse>
+	InferResponseBody<TResponse, "output">
 > &
 	ResponseHeadersMetadata<TResponse, "output"> extends infer TEntry
 	? Merge<TEntry>
@@ -139,56 +131,67 @@ type ResponseStatus<TStatus> = TStatus extends number
 		? TNumber
 		: never;
 
-type SuccessfulResponseKeys<TResponses> = {
-	[TKeys in keyof TResponses]: TKeys extends ResponseKey
-		? `${ResponseStatus<TKeys>}` extends `2${string}`
-			? TKeys
-			: never
-		: never;
-}[keyof TResponses];
+type StatusFilter = "any" | "success" | "error";
 
-export type DeclaredClientResponse<E extends RouteDeclaration> = E extends {
-	responses: infer TResponses;
-}
+type MatchesStatusFilter<
+	TStatus extends number,
+	TFilter extends StatusFilter,
+> = TFilter extends "any"
+	? true
+	: `${TStatus}` extends `2${string}`
+		? TFilter extends "success"
+			? true
+			: false
+		: TFilter extends "error"
+			? true
+			: false;
+
+type ResponseEntryFor<
+	TSide extends "client" | "server",
+	TStatus extends number,
+	TResponse,
+> = TSide extends "client"
+	? ClientResponseEntry<TStatus, TResponse>
+	: ServerResponseEntry<TStatus, TResponse>;
+
+/** Maps each declared status that passes the filter to its response entry. */
+type ResponseUnion<
+	E extends RouteDeclaration,
+	TSide extends "client" | "server",
+	TFilter extends StatusFilter,
+> = E extends { responses: infer TResponses }
 	? {
 			[TKeys in keyof TResponses]: TKeys extends ResponseKey
-				? ClientResponseEntry<ResponseStatus<TKeys>, TResponses[TKeys]>
+				? MatchesStatusFilter<ResponseStatus<TKeys>, TFilter> extends true
+					? ResponseEntryFor<TSide, ResponseStatus<TKeys>, TResponses[TKeys]>
+					: never
 				: never;
 		}[keyof TResponses]
 	: never;
 
-export type ServerResponse<E extends RouteDeclaration> = E extends {
-	responses: infer TResponses;
-}
-	? {
-			[TKeys in keyof TResponses]: TKeys extends ResponseKey
-				? ServerResponseEntry<ResponseStatus<TKeys>, TResponses[TKeys]>
-				: never;
-		}[keyof TResponses]
-	: never;
+export type DeclaredClientResponse<E extends RouteDeclaration> = ResponseUnion<
+	E,
+	"client",
+	"any"
+>;
+
+export type ServerResponse<E extends RouteDeclaration> = ResponseUnion<
+	E,
+	"server",
+	"any"
+>;
 
 export type SuccessfulDeclaredClientResponse<E extends RouteDeclaration> =
-	E extends {
-		responses: infer TResponses;
-	}
-		? {
-				[TKeys in keyof TResponses]: TKeys extends ResponseKey
-					? TKeys extends SuccessfulResponseKeys<TResponses>
-						? ClientResponseEntry<ResponseStatus<TKeys>, TResponses[TKeys]>
-						: never
-					: never;
-			}[keyof TResponses]
-		: never;
+	ResponseUnion<E, "client", "success">;
 
-export type ErrorDeclaredClientResponse<E extends RouteDeclaration> = Exclude<
-	DeclaredClientResponse<E>,
-	SuccessfulDeclaredClientResponse<E>
->;
+export type ErrorDeclaredClientResponse<E extends RouteDeclaration> =
+	ResponseUnion<E, "client", "error">;
 
 export type ProcedureContentType<TContentType> =
 	TContentType extends readonly string[] ? TContentType[number] : TContentType;
 
-type ServerProcedureResponse<TResponse> = TResponse extends {
+/** Infers the plain value a procedure handler returns for its 200 response. */
+export type ServerProcedureResponse<TResponse> = TResponse extends {
 	contentType: infer TContentType;
 }
 	? TContentType extends "application/json"
