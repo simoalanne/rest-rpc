@@ -9,7 +9,8 @@ metadata come from the same route builder used by the server and client.
 
 Declare output schemas with `.output()`, `.response()`, `.streamOutput()`, or
 `.streamResponse()` to include responses in OpenAPI. Outputs inferred from
-handlers have no schema, so they produce no documented responses.
+handlers have no schema, so their routes get a placeholder `default` response
+that does not claim a status or body.
 
 ```ts
 import { route, createOpenApiDocument } from "@rest-rpc/express";
@@ -47,6 +48,7 @@ path are derived from their tree keys. The document includes:
 - request bodies with their content types
 - status-keyed responses with their content types and declared headers
 - streams as `text/event-stream` responses
+- a `default` placeholder response for routes without declared responses
 - route [`.openAPI()`](#route-metadata) metadata
 
 The document targets OpenAPI `3.1.0` unless the `openapi` option sets another

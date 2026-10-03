@@ -6,7 +6,6 @@ import type {
 	ResponseHeaders,
 } from "../contract/response.ts";
 import { contentTypeList } from "../codecs/index.ts";
-import { getRouteResponses } from "../contract/response.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 
 const JSON_CONTENT_TYPE = "application/json";
@@ -251,9 +250,20 @@ const createResponses = (
 	route: RouteDeclaration,
 	converter: SchemaConverter | undefined,
 ) => {
-	const responses: Record<string, OpenApiResponse> = {};
+	const declared = Object.entries(route.responses);
+	// Responses inferred from a handler have no schema. `default` documents them
+	// without claiming a status, and keeps the required Responses Object non-empty.
+	if (declared.length === 0) {
+		return {
+			default: {
+				description:
+					"Response inferred from the route handler; not documented.",
+			},
+		};
+	}
 
-	for (const [status, schema] of Object.entries(getRouteResponses(route))) {
+	const responses: Record<string, OpenApiResponse> = {};
+	for (const [status, schema] of declared) {
 		responses[status] = createResponse(
 			"",
 			schema,

@@ -14,7 +14,6 @@ import type {
 	ErrorDeclaredClientResponse,
 	SuccessfulDeclaredClientResponse,
 } from "../contract/response.ts";
-import { getRouteResponses } from "../contract/response.ts";
 import {
 	validateStandardSchema,
 	type StandardSchemaV1,
@@ -209,7 +208,7 @@ export const fetchResponse = async <
 ) => {
 	const rawResponse = await request(route, ...args);
 
-	const schema = getRouteResponses(route)[rawResponse.status];
+	const schema = route.responses[rawResponse.status];
 	if (schema?.kind === "stream") {
 		const body = readStreamResponse(schema.body, rawResponse, validateResponse);
 		return {

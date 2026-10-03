@@ -35,19 +35,6 @@ export type ResponseOptions = {
 
 export type RouteResponses = Record<number, ResponseDeclaration>;
 
-export const getRouteResponses = (route: {
-	path: string | undefined;
-	responses: RouteResponses;
-}): RouteResponses => {
-	if (Object.keys(route.responses).length === 0) {
-		throw new Error(
-			`Route declaration at path "${route.path}" must declare at least one response schema.`,
-		);
-	}
-
-	return route.responses;
-};
-
 type IsStreamResponse<TResponse> = TResponse extends {
 	kind: "stream";
 }

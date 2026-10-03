@@ -46,6 +46,5 @@ export type {
 	ServerResponseBody,
 	SuccessfulDeclaredClientResponse,
 } from "./response.ts";
-export { getRouteResponses } from "./response.ts";
 export type { ContractRouteEntry } from "./traversal.ts";
 export { contractRouteEntries } from "./traversal.ts";

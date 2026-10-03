@@ -16,7 +16,6 @@ import type {
 	ResponseDeclaration,
 	RouteDeclaration,
 } from "@rest-rpc/core/contract";
-import { getRouteResponses } from "@rest-rpc/core/contract";
 import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
 import type { RuntimeImplementation } from "./match.ts";
 import {
@@ -81,7 +80,7 @@ const getResponseSchema = (
 	route: RouteDeclaration,
 	status: number,
 ): ResponseDeclaration => {
-	const response = getRouteResponses(route)[status];
+	const response = route.responses[status];
 	if (!response) {
 		throw new Error(
 			`Route response for "${route.method} ${route.path}" returned undeclared status ${status}.`,
