@@ -649,13 +649,10 @@ type DerivedState = {
 
 /** Type-level view of the root route builder. */
 export type RootRouteBuilder<
-	TOptions = undefined,
 	TExtension extends BuilderExtension | never = never,
-> = TOptions extends undefined
-	? {
-			readonly "~restrpc": { readonly path: undefined };
-		} & Omit<
-			RouteBuilderView<DerivedState, TExtension, undefined, never>,
-			"~restrpc"
-		>
-	: never;
+> = {
+	readonly "~restrpc": { readonly path: undefined };
+} & Omit<
+	RouteBuilderView<DerivedState, TExtension, undefined, never>,
+	"~restrpc"
+>;

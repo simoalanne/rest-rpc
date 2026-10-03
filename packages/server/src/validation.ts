@@ -163,7 +163,7 @@ export const validateResponseHeaders = async (
 	);
 };
 
-export const validateResponseStreamChunk = async (
+const validateResponseStreamChunk = async (
 	schema: StandardSchemaV1 | undefined,
 	chunk: unknown,
 ) => {

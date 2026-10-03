@@ -227,7 +227,6 @@ const readDeclaredHeaders = async (
 
 export type RouteRequestFn = <E extends RouteDeclaration & { path: string }>(
 	route: E,
-	routePath: readonly string[],
 	...args: FetchArgs<E>
 ) => Promise<Response>;
 
@@ -238,10 +237,9 @@ export const fetchResponse = async <
 	validateResponse: boolean,
 	bodyCodecs: readonly BodyCodec<Response>[] | undefined,
 	route: E,
-	routePath: readonly string[],
 	...args: FetchArgs<E>
 ) => {
-	const rawResponse = await request(route, routePath, ...args);
+	const rawResponse = await request(route, ...args);
 
 	const schema = getResponseSchema(route, rawResponse.status);
 	if (schema?.kind === "stream") {
@@ -303,14 +301,12 @@ export const fetchSuccess = async <
 >(
 	fetchRouteResponse: (
 		route: E,
-		routePath: readonly string[],
 		...args: FetchArgs<E>
 	) => Promise<{ status: number; body?: unknown }>,
 	route: E,
-	routePath: readonly string[],
 	...args: FetchArgs<E>
 ) => {
-	const response = await fetchRouteResponse(route, routePath, ...args);
+	const response = await fetchRouteResponse(route, ...args);
 
 	if (!isSuccessStatus(response.status)) {
 		throw new HttpError(response.status, response.body);

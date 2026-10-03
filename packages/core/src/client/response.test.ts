@@ -17,7 +17,7 @@ const declared = route.get("/").response(201, type<{ name: string }>())[
 	"~restrpc"
 ];
 const decode = (response: Response, validate = true, declaration = declared) =>
-	fetchResponse(async () => response, validate, undefined, declaration, []);
+	fetchResponse(async () => response, validate, undefined, declaration);
 
 describe("client response decoding", () => {
 	it("transforms declared headers and retains native headers", async () => {
@@ -32,7 +32,6 @@ describe("client response decoding", () => {
 				validate,
 				undefined,
 				declaration,
-				[],
 			);
 		expect(await read(true)).toMatchObject({
 			status: 201,
@@ -56,7 +55,6 @@ describe("client response decoding", () => {
 					validate,
 					undefined,
 					declaration,
-					[],
 				);
 			await expect(read(true)).rejects.toMatchObject({
 				status: 201,
@@ -78,7 +76,6 @@ describe("client response decoding", () => {
 				true,
 				undefined,
 				declaration,
-				[],
 			),
 		).toMatchObject({ status: 204, body: undefined });
 	});
@@ -99,7 +96,6 @@ describe("client response decoding", () => {
 				true,
 				undefined,
 				declaration,
-				[],
 			);
 			if (contentType) {
 				expect(result.body).toBeInstanceOf(Blob);
@@ -123,7 +119,6 @@ describe("client response decoding", () => {
 				true,
 				[{ match: (mediaType) => mediaType === "application/custom" }],
 				declaration,
-				[],
 			),
 		).toHaveProperty("body", expect.any(Blob));
 	});
@@ -163,7 +158,7 @@ describe("client response decoding", () => {
 							headers: { "content-type": "application/json" },
 						});
 			await expect(
-				fetchResponse(async () => response, false, undefined, declaration, []),
+				fetchResponse(async () => response, false, undefined, declaration),
 			).rejects.toThrow(
 				failure === "missing body"
 					? "no stream body"

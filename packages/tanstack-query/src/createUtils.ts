@@ -14,7 +14,7 @@ type OptionsWithFetchOptions = Record<string, unknown> & {
 	refetchMode?: "append" | "reset" | "replace";
 	request?: unknown;
 };
-export type TanstackQueryUtilFunctions = {
+type TanstackQueryUtilFunctions = {
 	mutationOptions: (
 		options?: OptionsWithFetchOptions,
 	) => Record<string, unknown>;

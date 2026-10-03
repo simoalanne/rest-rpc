@@ -47,4 +47,4 @@ export type {
 } from "./response.ts";
 export { getRouteResponses } from "./response.ts";
 export type { ContractRouteEntry } from "./traversal.ts";
-export { contractRouteEntries, flattenContractRoutes } from "./traversal.ts";
+export { contractRouteEntries } from "./traversal.ts";

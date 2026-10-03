@@ -14,7 +14,7 @@ const joinPaths = (
 ): AbsolutePath =>
 	`/${[...splitPath(prefix ?? ""), ...splitPath(path)].join("/")}`;
 
-export const compareRouteSpecificity = (
+const compareRouteSpecificity = (
 	left: RouteDeclaration & { path: string },
 	right: RouteDeclaration & { path: string },
 ) => {

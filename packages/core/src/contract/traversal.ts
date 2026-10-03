@@ -6,7 +6,7 @@ export type ContractRouteEntry = {
 	path: string[];
 };
 
-export const mapObjectValues = <TLeaf>(
+const mapObjectValues = <TLeaf>(
 	tree: Tree<TLeaf>,
 	isLeaf: (value: unknown) => value is TLeaf,
 	mappingFn: (value: TLeaf, path: string[]) => unknown,
@@ -25,7 +25,7 @@ export const mapObjectValues = <TLeaf>(
 				{} as Record<string, unknown>,
 			);
 
-export const isContractRouteDeclaration = (
+const isContractRouteDeclaration = (
 	value: unknown,
 ): value is { readonly "~restrpc": RouteDeclaration } => {
 	return typeof value === "object" && value !== null && "~restrpc" in value;
@@ -59,13 +59,3 @@ export function* contractRouteEntries(
 		yield* contractRouteEntries(child, [...path, key]);
 	}
 }
-
-export function* contractRoutes(contract: Contract) {
-	for (const { route } of contractRouteEntries(contract)) {
-		yield route;
-	}
-}
-
-export const flattenContractRoutes = <TContract extends Contract = Contract>(
-	contract: TContract,
-): Array<RouteDeclaration & { path: string }> => [...contractRoutes(contract)];

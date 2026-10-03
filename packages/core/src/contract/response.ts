@@ -152,14 +152,6 @@ type ResponseStatus<TStatus> = TStatus extends number
 		? TNumber
 		: never;
 
-type IsUnion<T, U = T> = [T] extends [never]
-	? false
-	: T extends unknown
-		? [U] extends [T]
-			? false
-			: true
-		: false;
-
 type SuccessfulResponseKeys<TResponses> = {
 	[TKeys in keyof TResponses]: TKeys extends ResponseKey
 		? `${ResponseStatus<TKeys>}` extends `2${string}`
@@ -167,16 +159,6 @@ type SuccessfulResponseKeys<TResponses> = {
 			: never
 		: never;
 }[keyof TResponses];
-
-export type HasSuccessfulResponse<TResponses> = [
-	SuccessfulResponseKeys<TResponses>,
-] extends [never]
-	? false
-	: true;
-
-export type HasMultipleSuccessfulResponses<TResponses> = IsUnion<
-	SuccessfulResponseKeys<TResponses>
->;
 
 export type DeclaredClientResponse<E extends RouteDeclaration> = E extends {
 	responses: infer TResponses;

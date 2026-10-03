@@ -92,12 +92,11 @@ export function initClient<
 		timeoutMs: options.timeoutMs,
 	};
 
-	const request: RouteRequestFn = (route, _routePath, ...args) =>
+	const request: RouteRequestFn = (route, ...args) =>
 		executeRequest(route, args, requestOptions);
 
 	const fetchResponse = (
 		route: RouteDeclaration & { path: string },
-		routePath: readonly string[],
 		...args: FetchArgs
 	) =>
 		fetchRouteResponse(
@@ -105,7 +104,6 @@ export function initClient<
 			route.source !== "generated" && (options.validateResponses ?? false),
 			options.bodyCodecs,
 			route,
-			routePath,
 			...args,
 		);
 
@@ -136,14 +134,8 @@ export function initClient<
 				? { [node.method === "GET" ? "query" : "body"]: args[0] }
 				: args[0];
 			return plainOutput
-				? fetchSuccess(
-						fetchResponse,
-						resolvedRoute,
-						routePath,
-						request as never,
-						args[1],
-					)
-				: fetchResponse(resolvedRoute, routePath, request as never, args[1]);
+				? fetchSuccess(fetchResponse, resolvedRoute, request as never, args[1])
+				: fetchResponse(resolvedRoute, request as never, args[1]);
 		};
 	}) as ApiClientFor<TContract, TGlobalHeaders>;
 }

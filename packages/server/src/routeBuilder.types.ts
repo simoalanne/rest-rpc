@@ -119,7 +119,7 @@ export type RouteHandlerFor<
 type Merge<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
 
 /** Terminal builder shape containing a route declaration and its handler. */
-export type CompletedRoute<TRoute, THandler> = {
+type CompletedRoute<TRoute, THandler> = {
 	readonly "~restrpc": Merge<TRoute & { readonly handler: THandler }>;
 };
 
@@ -283,7 +283,6 @@ type MiddlewareUseMethod<
 				TMetadata
 			>
 		: RootRouteBuilder<
-				undefined,
 				ServerBuilderExtension<TAdditionalHandlerFields, TContext>
 			>;
 };
@@ -320,7 +319,6 @@ export type ServerRouteBuilder<
 	TAdditionalHandlerFields extends object = EmptyObject,
 	TContext extends object = EmptyObject,
 > = RootRouteBuilder<
-	undefined,
 	ServerBuilderExtension<TAdditionalHandlerFields, TContext>
 > & {
 	/** Selects the typed per-request context store for this builder. @see {@link https://rest-rpc.dev/docs/context} */

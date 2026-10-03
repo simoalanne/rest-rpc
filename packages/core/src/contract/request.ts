@@ -5,8 +5,6 @@ import type {
 } from "./routeDeclaration.ts";
 import type { RouteTree } from "./contract.ts";
 
-export type RequestSegment = "body" | "query" | "params" | "headers";
-
 /** Scalar value accepted by ordinary HTTP request schemas. */
 export type RequestScalar = string | number | boolean;
 

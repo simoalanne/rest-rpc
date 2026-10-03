@@ -17,7 +17,7 @@ export type AbsolutePath = `/${string}`;
 export type RouteMetadata = Record<string, unknown>;
 
 /** Declares one OpenAPI response header entry. */
-export type OpenApiResponseHeader =
+type OpenApiResponseHeader =
 	| StandardSchemaV1
 	| { description?: string; schema: StandardSchemaV1 };
 
