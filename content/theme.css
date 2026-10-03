@@ -9,6 +9,12 @@
 
 /* Below changes ensure that horizontal scrollbar does not appear for twoslash code blocks. */
 
+.prose pre.twoslash .twoslash-popup-container {
+	z-index: 50;
+	width: max-content;
+	max-width: min(90vw, 42rem);
+}
+
 .prose pre.twoslash .twoslash-hover:not(:hover) > .twoslash-popup-container,
 .prose
 	pre.twoslash

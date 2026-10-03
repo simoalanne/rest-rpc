@@ -111,13 +111,3 @@ type checked and do not change the client contract, so declare a
 Downstream errors propagate through `next()`, allowing middleware to catch errors
 or clean up in `finally`. Response delivery and stream consumption happen outside
 this wrapping scope.
-
-## Framework Middleware
-
-Framework middleware registered on your app keeps working alongside route
-middleware. To run framework middleware only for rest-rpc routes, with access
-to the matched route declaration, use your adapter's option: Express
-[`middleware`](/docs/server/express#middleware), Fastify
-[`preHandler`](/docs/server/fastify#prehandler), or Hono
-[`middleware`](/docs/server/hono#middleware). These run before request
-validation and route middleware.
