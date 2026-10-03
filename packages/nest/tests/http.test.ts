@@ -22,6 +22,7 @@ const contract = {
 	},
 	input: contractRoute.post("/invalid-input").body(invalid).response(204),
 	output: contractRoute.get("/invalid-output").response(200, invalid),
+	derived: contractRoute.get().response(200, type<{ derived: boolean }>()),
 };
 
 @Controller()
@@ -50,6 +51,10 @@ class ApiController {
 			output: handlers.output.handler(() => ({
 				status: 200,
 				body: "private output",
+			})),
+			derived: handlers.derived.handler(() => ({
+				status: 200,
+				body: { derived: true },
 			})),
 		};
 	}
@@ -82,8 +87,22 @@ describe("Nest HTTP integration", () => {
 			expect(await badOutput.json()).toEqual({
 				message: "Response validation failed.",
 			});
+			const derived = await fetch(`${url}/derived?prefix=argument`);
+			expect(derived.status).toBe(200);
+			expect(await derived.json()).toEqual({ derived: true });
 		} finally {
 			await app.close();
 		}
+	});
+
+	it("rejects a root route whose path is derived from tree keys", () => {
+		const decorate = Implement(
+			contractRoute.get().response(200, type<string>()),
+		);
+		expect(() =>
+			decorate(ApiController.prototype, "routes", {
+				value: () => undefined,
+			}),
+		).toThrow("@Implement() requires a route without a path");
 	});
 });

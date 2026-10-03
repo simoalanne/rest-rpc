@@ -31,17 +31,12 @@ const assertInputMode = (
 	state: RouteBuilderState,
 	mode: "input" | "segments",
 ) => {
-	const onlyHeaders =
-		state.request !== undefined &&
-		state.request.headers !== undefined &&
-		state.request.body === undefined &&
-		state.request.query === undefined &&
-		state.request.params === undefined;
-	if (
-		state.input &&
-		state.input !== mode &&
-		!(mode === "input" && onlyHeaders)
-	) {
+	const request = state.request;
+	const hasSegments =
+		request?.body !== undefined ||
+		request?.query !== undefined ||
+		request?.params !== undefined;
+	if (mode === "input" ? hasSegments : request?.input !== undefined) {
 		throw new Error("Cannot combine flat input with request segments.");
 	}
 };
@@ -114,7 +109,6 @@ const mergeOpenApi = (
 const procedureState = (state: RouteBuilderState): RouteBuilderState => {
 	assertMutable(state);
 	return {
-		kind: "procedure",
 		method: "POST",
 		path: undefined,
 		responses: {},
@@ -128,10 +122,7 @@ const httpState = (
 	path: AbsolutePath | undefined,
 ): RouteBuilderState => {
 	assertMutable(state);
-	if (state.kind === "http") {
-		throw new Error("Route method and path have already been selected.");
-	}
-	if (state.input === "input" && getPathParamNames(path ?? "").length > 0) {
+	if (state.request?.input && getPathParamNames(path ?? "").length > 0) {
 		throw new Error("Flat input requires a static route path.");
 	}
 	if (method === "GET" && state.request?.body) {
@@ -139,7 +130,6 @@ const httpState = (
 	}
 	return {
 		...state,
-		kind: "http",
 		method,
 		path,
 		responses: { ...state.responses },
@@ -155,7 +145,6 @@ const addRequestSegment = (
 	assertInputMode(state, "segments");
 	return {
 		...state,
-		input: "segments",
 		request: {
 			...state.request,
 			...request,
@@ -182,33 +171,46 @@ const addResponse = (
 /** Immutable runtime implementation used by every route-builder stage. */
 export class RouteBuilder {
 	readonly "~restrpc": RouteBuilderState;
+	/** Builder-only state: whether `.get()`, `.post()` or another method setter was called. */
+	protected readonly methodSelected: boolean;
 
-	constructor(state: RouteBuilderState = {}) {
+	constructor(state: RouteBuilderState = {}, methodSelected = false) {
 		this["~restrpc"] = { ...state };
+		this.methodSelected = methodSelected;
 	}
 
-	clone(state: RouteBuilderState): RouteBuilder {
-		return new RouteBuilder(state);
+	clone(state: RouteBuilderState, methodSelected?: boolean): RouteBuilder {
+		return new RouteBuilder(state, methodSelected ?? this.methodSelected);
+	}
+
+	private selectMethod(
+		method: HttpMethod,
+		path: AbsolutePath | undefined,
+	): RouteBuilder {
+		if (this.methodSelected) {
+			throw new Error("Route method and path have already been selected.");
+		}
+		return this.clone(httpState(this["~restrpc"], method, path), true);
 	}
 
 	get(path?: AbsolutePath): RouteBuilder {
-		return this.clone(httpState(this["~restrpc"], "GET", path));
+		return this.selectMethod("GET", path);
 	}
 
 	post(path?: AbsolutePath): RouteBuilder {
-		return this.clone(httpState(this["~restrpc"], "POST", path));
+		return this.selectMethod("POST", path);
 	}
 
 	put(path?: AbsolutePath): RouteBuilder {
-		return this.clone(httpState(this["~restrpc"], "PUT", path));
+		return this.selectMethod("PUT", path);
 	}
 
 	patch(path?: AbsolutePath): RouteBuilder {
-		return this.clone(httpState(this["~restrpc"], "PATCH", path));
+		return this.selectMethod("PATCH", path);
 	}
 
 	delete(path?: AbsolutePath): RouteBuilder {
-		return this.clone(httpState(this["~restrpc"], "DELETE", path));
+		return this.selectMethod("DELETE", path);
 	}
 
 	body(schema: StandardSchemaV1, options?: BodyOptions): RouteBuilder {
@@ -231,7 +233,6 @@ export class RouteBuilder {
 		}
 		return this.clone({
 			...state,
-			input: "input",
 			request: {
 				...state.request,
 				input: appendSchema(state.request?.input, schema),
@@ -244,7 +245,6 @@ export class RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
 		return this.clone({
 			...state,
-			input: state.input === "input" ? "input" : "segments",
 			request: {
 				...state.request,
 				headers: appendSchema(state.request?.headers, schema),

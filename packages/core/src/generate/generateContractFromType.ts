@@ -8,12 +8,13 @@ type ContentType = string | readonly string[];
 type GeneratedRoute = {
 	readonly "~restrpc": {
 		readonly source: "generated";
-		readonly kind: "http" | "procedure";
 		readonly method: string;
 		readonly path: string;
-		readonly input?: "input" | "segments";
 		readonly output?: "output" | "response";
-		readonly request?: { readonly contentType: ContentType };
+		readonly request?: {
+			readonly input?: readonly [];
+			readonly contentType?: ContentType;
+		};
 		readonly responses: Readonly<
 			Record<
 				string,
@@ -239,18 +240,26 @@ const routeFromType = (
 		checker,
 		requestType && propertyType(checker, requestType, "contentType"),
 	);
+	// The client only checks whether flat input exists, so its schemas are left out.
+	const flatInput =
+		requestType !== undefined &&
+		propertyType(checker, requestType, "input") !== undefined;
 
 	return {
 		"~restrpc": {
 			source: "generated",
-			kind: literalValue(property("kind")) as "http" | "procedure",
 			method,
 			path,
-			input: literalValue(property("input")) as "input" | "segments",
 			output: literalValue(property("output")) as "output" | "response",
-			request: requestContentType
-				? { contentType: requestContentType }
-				: undefined,
+			request:
+				flatInput || requestContentType
+					? {
+							...(flatInput ? { input: [] } : {}),
+							...(requestContentType
+								? { contentType: requestContentType }
+								: {}),
+						}
+					: undefined,
 			responses,
 		},
 	};

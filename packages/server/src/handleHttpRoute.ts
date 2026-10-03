@@ -73,9 +73,7 @@ const requestHeader = (headers: RequestSegments["headers"], name: string) => {
 	return Array.isArray(value) ? value[0] : value;
 };
 
-const usesPlainOutput = (route: RouteDeclaration) =>
-	route.output === "output" ||
-	(route.output === undefined && route.kind === "procedure");
+const usesPlainOutput = (route: RouteDeclaration) => route.output === "output";
 
 const getResponseSchema = (
 	route: RouteDeclaration,
@@ -194,7 +192,7 @@ const getHandlerRequestFields = (
 		headers?: unknown;
 	},
 ) => {
-	if (route.input !== "input") return segments;
+	if (route.request?.input === undefined) return segments;
 	return { input: segments[flatInputSegment(route.method)] };
 };
 

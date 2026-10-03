@@ -44,7 +44,6 @@ type BuilderMethod =
 	| "openAPI";
 
 type BuilderRoute = {
-	readonly kind: "http" | "procedure";
 	readonly method: HttpMethod;
 };
 
@@ -177,7 +176,7 @@ type WithFlatInput<
 >;
 
 type WithHttpRoute<TState extends BuilderState, TMethod extends HttpMethod> = {
-	route: { readonly kind: "http"; readonly method: TMethod };
+	route: { readonly method: TMethod };
 	method: "selected";
 	request: TState["request"];
 	responses: TState["responses"];
@@ -236,14 +235,7 @@ export type PublicDeclarationFor<
 							TState["responses"][TStatus]
 						>;
 					};
-				} & (TState["input"] extends "none"
-					? EmptyObject
-					: {
-							readonly input: TState["input"] extends "headers"
-								? "segments"
-								: TState["input"];
-						}) &
-				(TState["output"] extends "none"
+				} & (TState["output"] extends "none"
 					? EmptyObject
 					: { readonly output: TState["output"] }) &
 				MetadataDeclaration<TMetadata> &
@@ -603,7 +595,7 @@ export type RouteBuilderView<
 	>;
 
 type DerivedState = {
-	route: { readonly kind: "procedure"; readonly method: "POST" };
+	route: { readonly method: "POST" };
 	method: "available";
 	request: EmptyObject;
 	responses: EmptyObject;

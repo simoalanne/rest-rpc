@@ -13,17 +13,19 @@ type ServerRouteBuilderState = Partial<RouteDeclaration> & {
 export class ServerRouteBuilder extends RouteBuilder {
 	declare readonly "~restrpc": ServerRouteBuilderState;
 
-	override clone(state: ServerRouteBuilderState): ServerRouteBuilder {
-		return new ServerRouteBuilder(state);
+	override clone(
+		state: ServerRouteBuilderState,
+		methodSelected?: boolean,
+	): ServerRouteBuilder {
+		return new ServerRouteBuilder(state, methodSelected ?? this.methodSelected);
 	}
 
 	handler(handler: RuntimeRouteHandler): ServerRouteBuilder {
 		const state = this["~restrpc"];
 		return this.clone({
-			...(state.kind
+			...(state.method
 				? {}
 				: {
-						kind: "procedure",
 						method: "POST",
 						path: undefined,
 						responses: {},

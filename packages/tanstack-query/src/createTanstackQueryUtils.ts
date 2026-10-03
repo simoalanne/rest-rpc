@@ -453,7 +453,7 @@ export function createTanstackQueryUtils<
 				...args: unknown[]
 			) => Promise<unknown>;
 
-			const returnsResponseEnvelope = route.output === "response";
+			const returnsResponseEnvelope = route.output !== "output";
 
 			return createTanstackUtilsForRoute({
 				routePath: path,

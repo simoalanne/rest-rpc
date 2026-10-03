@@ -9,7 +9,11 @@ import type {
 	HttpMethod,
 	RouteDeclaration,
 } from "@rest-rpc/core/contract";
-import { contractRouteEntries, toColonPath } from "@rest-rpc/core/contract";
+import {
+	contractRouteEntries,
+	isRouteLeaf,
+	toColonPath,
+} from "@rest-rpc/core/contract";
 import "reflect-metadata";
 
 export const REST_RPC_ROUTE_METADATA = Symbol.for("rest-rpc:nest-route");
@@ -110,12 +114,12 @@ const createImplementationRouteMethod = (
  */
 export function Implement(contract: Contract): MethodDecorator {
 	return (target, propertyKey, descriptor) => {
+		if (isRouteLeaf(contract) && contract["~restrpc"].path === undefined) {
+			throw new Error(
+				"@Implement() requires a route without a path to be part of a route tree because its path is derived from its tree keys.",
+			);
+		}
 		for (const { route, path } of contractRouteEntries(contract)) {
-			if (route.kind === "procedure" && path.length === 0) {
-				throw new Error(
-					"@Implement() requires a procedure to be part of a route tree because its path is derived from its tree keys.",
-				);
-			}
 			createImplementationRouteMethod(
 				target,
 				propertyKey,

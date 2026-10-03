@@ -68,6 +68,8 @@ Type-level or design-level changes, to be reviewed last. For the type-level item
 
 ### 3.1 Derive route modes instead of storing `kind` and `input`
 
+**Status: done.** `RouteDeclaration` no longer has `kind` or `input`. Flat input is "has `request.input`", and plain output is `output === "output"`. `output` stays required on contract routes because `Contract` uses it to tell complete routes from partial ones, so the procedure builder doesn't set it eagerly. The `kind` fallback for `output` only mattered for routes without declared responses, which the server already resolves from the handler's return shape. The method-selected guard is builder-only state (`methodSelected` on `RouteBuilder`). Nest checks `path === undefined`, which also fixes `.get()` routes without a path. Generated contracts emit an empty `request.input` for flat-input routes. Benchmark: instantiations 1–4% lower on every fixture.
+
 `RouteDeclaration` stores `kind`, `input` and `output`, but only `output` carries information that can't be derived:
 
 - **`input`:** flat input is exactly "the route has `request.input`". The builder already keeps them in sync: `input()` sets both, the segment methods set `"segments"`, and `headers()` keeps whichever mode is set.

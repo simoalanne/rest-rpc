@@ -101,8 +101,8 @@ type UnsatisfiedFlatHeaderKeys<
 	E extends RouteDeclaration,
 	TGlobalHeaders extends ClientHeaders,
 > = E extends {
-	input: "input";
 	request: {
+		input: readonly StandardSchemaV1[];
 		headers: infer THeaders extends readonly StandardSchemaV1[];
 	};
 }

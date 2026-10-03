@@ -19,7 +19,6 @@ describe("routeBuilder types", () => {
 		const schema = type<{ name: string }>();
 		const value = route.input(schema).output(schema);
 		expectTypeOf(value["~restrpc"]).toEqualTypeOf<{
-			readonly kind: "procedure";
 			readonly method: "POST";
 			readonly path: undefined;
 			request: {
@@ -32,7 +31,6 @@ describe("routeBuilder types", () => {
 					contentType: "application/json";
 				};
 			};
-			readonly input: "input";
 			readonly output: "output";
 		}>();
 	});

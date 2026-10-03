@@ -108,15 +108,11 @@ export function initClient<
 			request: resolveRouteRequest(node),
 		};
 		const inputSegment = flatInputSegment(node.method);
-		const flatInput =
-			node.input === "input" ||
-			(node.input === undefined && node.kind === "procedure");
-		const plainOutput =
-			node.output === "output" ||
-			(node.output === undefined && node.kind === "procedure");
+		const flatInput = node.request?.input !== undefined;
+		const plainOutput = node.output === "output";
 		return (...args: FetchArgs) => {
 			if (
-				node.input === "input" &&
+				flatInput &&
 				inputSegment === "query" &&
 				(typeof args[0] !== "object" ||
 					args[0] === null ||

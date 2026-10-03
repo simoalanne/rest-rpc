@@ -45,7 +45,7 @@ const assertRouteImplementation = (
 	const implementationRoute = value["~restrpc"];
 	if (
 		implementationRoute.method !== route.method ||
-		(implementationRoute.kind !== "procedure" &&
+		(implementationRoute.path !== undefined &&
 			implementationRoute.path !== route.path)
 	) {
 		throw new Error(

@@ -161,14 +161,10 @@ export type ServerRequest<E extends { request?: RouteRequestDeclaration }> = [
 	: InferRequestFor<E, "output">;
 
 type UsesFlatInput<TRoute extends RouteDeclaration> = TRoute extends {
-	input: "segments";
+	request: { input: readonly StandardSchemaV1[] };
 }
-	? false
-	: TRoute extends { input: "input" }
-		? true
-		: TRoute["kind"] extends "procedure"
-			? true
-			: false;
+	? true
+	: false;
 
 /**
  * Infers the validated input received by a route handler.

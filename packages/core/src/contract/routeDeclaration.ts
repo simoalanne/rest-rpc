@@ -67,10 +67,8 @@ export type RouteRequestDeclaration = {
  */
 export type RouteDeclaration = {
 	source?: "generated";
-	kind: "http" | "procedure";
 	path: AbsolutePath | undefined;
 	method: HttpMethod;
-	input?: "input" | "segments";
 	output?: "output" | "response";
 	request?: RouteRequestDeclaration;
 	responses: RouteResponses;

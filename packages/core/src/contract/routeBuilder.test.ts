@@ -63,6 +63,17 @@ describe("routeBuilder", () => {
 		expect(() => new RouteBuilder().get().post()).toThrow(
 			"Route method and path have already been selected.",
 		);
+		expect(() => new RouteBuilder().post().input(schema).get()).toThrow(
+			"Route method and path have already been selected.",
+		);
+	});
+
+	it("does not store route modes in the declaration", () => {
+		const declaration = new RouteBuilder().headers(schema).input(schema)[
+			"~restrpc"
+		];
+		expect(declaration).not.toHaveProperty("kind");
+		expect(declaration).not.toHaveProperty("input");
 	});
 
 	it("rejects mixing plain output and response envelopes", () => {

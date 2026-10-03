@@ -4,14 +4,10 @@ import type { SseServerEvent } from "./sse.ts";
 import type { Merge } from "@rest-rpc/core/utils";
 
 export type UsesPlainOutput<TRoute extends RouteDeclaration> = TRoute extends {
-	output: "response";
+	output: "output";
 }
-	? false
-	: TRoute extends { output: "output" }
-		? true
-		: TRoute["kind"] extends "procedure"
-			? true
-			: false;
+	? true
+	: false;
 
 /**
  * HTTP response shape from which a handler-based route infers its contract.
