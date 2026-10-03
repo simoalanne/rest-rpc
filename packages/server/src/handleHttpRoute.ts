@@ -166,6 +166,25 @@ const normalizeResponseResult = async (
 	};
 };
 
+const plainOutputEnvelope = (
+	route: RouteDeclaration,
+	output: unknown,
+): DeclaredResponseEnvelope => {
+	const response = getResponseSchema(route, 200);
+	if (
+		response.kind === "stream" ||
+		response.contentType === "application/json"
+	) {
+		return { status: 200, body: output };
+	}
+	if (!isCustomProcedureOutput(output)) {
+		throw new Error(
+			"Custom procedure output must return { contentType, data }.",
+		);
+	}
+	return { status: 200, body: output.data, contentType: output.contentType };
+};
+
 const getHandlerRequestFields = (
 	route: RouteDeclaration,
 	segments: {
@@ -224,41 +243,11 @@ export async function handleHttpRoute<
 			return normalizeImplicitResponse(handlerResult);
 		}
 
-		if (usesPlainOutput(route)) {
-			const response = getResponseSchema(route, 200);
-			if (
-				response.kind !== "stream" &&
-				response.contentType !== "application/json"
-			) {
-				if (!isCustomProcedureOutput(handlerResult)) {
-					throw new Error(
-						"Custom procedure output must return { contentType, data }.",
-					);
-				}
-				return await normalizeResponseResult(
-					route,
-					{
-						status: 200,
-						body: handlerResult.data,
-						contentType: handlerResult.contentType,
-					},
-					disableResponseValidation,
-				);
-			}
-
-			return await normalizeResponseResult(
-				route,
-				{
-					status: 200,
-					body: handlerResult,
-				},
-				disableResponseValidation,
-			);
-		}
-
 		return await normalizeResponseResult(
 			route,
-			handlerResult as DeclaredResponseEnvelope,
+			usesPlainOutput(route)
+				? plainOutputEnvelope(route, handlerResult)
+				: (handlerResult as DeclaredResponseEnvelope),
 			disableResponseValidation,
 		);
 	} catch (error) {
