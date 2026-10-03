@@ -178,32 +178,28 @@ export class RouteBuilder {
 		this["~restrpc"] = { ...state };
 	}
 
-	#next(state: RouteBuilderState): RouteBuilder {
-		return this.clone(state);
-	}
-
 	clone(state: RouteBuilderState): RouteBuilder {
 		return new RouteBuilder(state);
 	}
 
 	get(path?: AbsolutePath): RouteBuilder {
-		return this.#next(httpState(this["~restrpc"], "GET", path));
+		return this.clone(httpState(this["~restrpc"], "GET", path));
 	}
 
 	post(path?: AbsolutePath): RouteBuilder {
-		return this.#next(httpState(this["~restrpc"], "POST", path));
+		return this.clone(httpState(this["~restrpc"], "POST", path));
 	}
 
 	put(path?: AbsolutePath): RouteBuilder {
-		return this.#next(httpState(this["~restrpc"], "PUT", path));
+		return this.clone(httpState(this["~restrpc"], "PUT", path));
 	}
 
 	patch(path?: AbsolutePath): RouteBuilder {
-		return this.#next(httpState(this["~restrpc"], "PATCH", path));
+		return this.clone(httpState(this["~restrpc"], "PATCH", path));
 	}
 
 	delete(path?: AbsolutePath): RouteBuilder {
-		return this.#next(httpState(this["~restrpc"], "DELETE", path));
+		return this.clone(httpState(this["~restrpc"], "DELETE", path));
 	}
 
 	body(schema: StandardSchemaV1, options?: BodyOptions): RouteBuilder {
@@ -212,7 +208,7 @@ export class RouteBuilder {
 			throw new Error("GET routes cannot declare a request body.");
 		}
 		assertInputMode(state, "segments");
-		return this.#next({
+		return this.clone({
 			...state,
 			input: "segments",
 			request: {
@@ -229,7 +225,7 @@ export class RouteBuilder {
 		if (getPathParamNames(state.path ?? "").length > 0) {
 			throw new Error("Flat input requires a static route path.");
 		}
-		return this.#next({
+		return this.clone({
 			...state,
 			input: "input",
 			request: {
@@ -246,7 +242,7 @@ export class RouteBuilder {
 
 	headers(schema: RequestHeadersSchema): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
-		return this.#next({
+		return this.clone({
 			...state,
 			input: state.input === "input" ? "input" : "segments",
 			request: {
@@ -259,7 +255,7 @@ export class RouteBuilder {
 	query(schema: RequestQuerySchema): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
 		assertInputMode(state, "segments");
-		return this.#next({
+		return this.clone({
 			...state,
 			input: "segments",
 			request: {
@@ -272,7 +268,7 @@ export class RouteBuilder {
 	params(schema: RequestParamsSchema): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
 		assertInputMode(state, "segments");
-		return this.#next({
+		return this.clone({
 			...state,
 			input: "segments",
 			request: {
@@ -284,7 +280,7 @@ export class RouteBuilder {
 
 	metadata(metadata: RouteMetadata): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
-		return this.#next({
+		return this.clone({
 			...state,
 			metadata: { ...state.metadata, ...metadata },
 		});
@@ -292,7 +288,7 @@ export class RouteBuilder {
 
 	openAPI(openApi: OpenApiRouteOptions): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
-		return this.#next({
+		return this.clone({
 			...state,
 			openApi: mergeOpenApi(state.openApi, openApi),
 		});
@@ -305,7 +301,7 @@ export class RouteBuilder {
 	): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
 		assertOutputMode(state, "response");
-		return this.#next(
+		return this.clone(
 			addResponse(
 				{ ...state, output: "response" },
 				status,
@@ -326,7 +322,7 @@ export class RouteBuilder {
 	output(schema: StandardSchemaV1, options?: BodyOptions): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
 		assertOutputMode(state, "output");
-		return this.#next(
+		return this.clone(
 			addResponse({ ...state, output: "output" }, 200, {
 				body: schema,
 				contentType: options?.contentType ?? "application/json",
@@ -337,7 +333,7 @@ export class RouteBuilder {
 	streamOutput(schema: StandardSchemaV1): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
 		assertOutputMode(state, "output");
-		return this.#next(
+		return this.clone(
 			addResponse({ ...state, output: "output" }, 200, {
 				kind: "stream",
 				body: schema,
@@ -348,7 +344,7 @@ export class RouteBuilder {
 	streamResponse(status: number, schema: StandardSchemaV1): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
 		assertOutputMode(state, "response");
-		return this.#next(
+		return this.clone(
 			addResponse({ ...state, output: "response" }, status, {
 				kind: "stream",
 				body: schema,

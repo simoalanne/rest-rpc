@@ -200,9 +200,6 @@ type UsesFlatInput<TRoute extends RouteDeclaration> = TRoute extends {
 			? true
 			: false;
 
-type ServerRequestValue<TRoute extends RouteDeclaration> =
-	ServerRequest<TRoute>;
-
 /**
  * Infers the validated input received by a route handler.
  *
@@ -228,9 +225,9 @@ type ServerRequestForDeclaration<TDeclaration extends RouteDeclaration> =
 						readonly StandardSchemaV1[]
 				? Merge<
 						{ input: InferSchemaOutputs<TInput> } & Omit<
-							ServerRequestValue<TDeclaration>,
+							ServerRequest<TDeclaration>,
 							"body" | "query"
 						>
 					>
 				: Record<never, never>
-		: ServerRequestValue<TDeclaration>;
+		: ServerRequest<TDeclaration>;
