@@ -155,8 +155,8 @@ export function createRouteHandler(
 			if (!response.destroyed)
 				await writeNodeResponse(result, response, bodyCodecs);
 		} catch (error) {
-			// Stream validation runs while writing. An error response is only possible
-			// when the first chunk fails, before headers are sent.
+			// Stream validation runs while writing. The stream pipeline destroys the
+			// response when a chunk fails, so the stream ends without an error response.
 			if (!(error instanceof ResponseValidationError)) throw error;
 			if (options.responseValidationErrorHandler) {
 				await options.responseValidationErrorHandler(error, request, response);

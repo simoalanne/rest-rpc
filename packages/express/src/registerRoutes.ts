@@ -147,8 +147,8 @@ export function registerRoutes(
 			}
 
 			try {
-				// Stream validation runs while writing. An error response is only possible
-				// when the first chunk fails, before headers are sent.
+				// Stream validation runs while writing. The stream pipeline destroys the
+				// response when a chunk fails, so the stream ends without an error response.
 				return await writeNodeResponse(result, res, bodyCodecs);
 			} catch (error) {
 				if (error instanceof ResponseValidationError) {
