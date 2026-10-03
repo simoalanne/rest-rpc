@@ -2,7 +2,6 @@ import type { Contract, RouteDeclaration } from "../contract/contract.ts";
 import { mapContractRoutes } from "../contract/traversal.ts";
 import type { BodyCodec } from "../codecs/index.ts";
 import {
-	type ExecuteRequestOptions,
 	type ApiClientFetchOptions,
 	type ClientHeaders,
 	type FetchArgs,
@@ -83,17 +82,8 @@ export function initClient<
 	contract: TContract,
 	options: ApiClientOptions<TGlobalHeaders>,
 ): ApiClientFor<TContract, TGlobalHeaders> {
-	const requestOptions: ExecuteRequestOptions = {
-		baseUrl: options.baseUrl,
-		bodyCodecs: options.bodyCodecs,
-		fetch: options.fetch,
-		fetchOptions: options.fetchOptions,
-		globalHeaders: options.globalHeaders,
-		timeoutMs: options.timeoutMs,
-	};
-
 	const request: RouteRequestFn = (route, ...args) =>
-		executeRequest(route, args, requestOptions);
+		executeRequest(route, args, options);
 
 	const fetchResponse = (
 		route: RouteDeclaration & { path: string },

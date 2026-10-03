@@ -2,11 +2,7 @@ import type { BodyCodec, SerializedBody } from "@rest-rpc/core";
 import { normalizeMediaType, resolveBodyCodec } from "@rest-rpc/core/codecs";
 import type { HttpMethod, RouteDeclaration } from "@rest-rpc/core/contract";
 import { toColonPath } from "@rest-rpc/core/contract";
-import {
-	createNodeResponseStream,
-	createRequestSignal,
-	nodeBodyCodecs,
-} from "@rest-rpc/node/adapter";
+import { createRequestSignal, nodeBodyCodecs } from "@rest-rpc/node/adapter";
 import {
 	type RuntimeImplementationTree,
 	type HandleHttpRouteConfiguration,
@@ -17,6 +13,7 @@ import {
 	ResponseValidationError,
 } from "@rest-rpc/server";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { Readable } from "node:stream";
 
 /**
  * Defines how an invalid request is handled through native Fastify arguments.
@@ -166,7 +163,7 @@ export function registerRoutes(
 					return reply
 						.status(result.status)
 						.type("text/event-stream")
-						.send(createNodeResponseStream(result.body));
+						.send(Readable.from(result.body));
 				}
 				reply.status(result.status);
 				if (!serialized) return reply.send();

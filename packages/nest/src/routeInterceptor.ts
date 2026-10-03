@@ -11,7 +11,6 @@ import {
 import { HttpAdapterHost } from "@nestjs/core";
 import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import {
-	createNodeResponseStream,
 	createRequestSignal,
 	writeStreamResponse,
 } from "@rest-rpc/node/adapter";
@@ -21,6 +20,7 @@ import {
 	RequestValidationError,
 	ResponseValidationError,
 } from "@rest-rpc/server";
+import { Readable } from "node:stream";
 import type { Observable } from "rxjs";
 import { from, lastValueFrom } from "rxjs";
 import { REST_RPC_ROUTE_METADATA, type RouteMetadata } from "./decorators.ts";
@@ -183,7 +183,7 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 			if (adapter.getType() === "express") {
 				return writeStreamResponse(result.body, rawResponse, result.status);
 			}
-			return new StreamableFile(createNodeResponseStream(result.body), {
+			return new StreamableFile(Readable.from(result.body), {
 				type: "text/event-stream",
 			});
 		}

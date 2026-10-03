@@ -97,8 +97,6 @@ type QueryFetchOptions<E extends QueryRoute> = Omit<
 	"signal"
 >;
 
-type MutationFetchOptions<E extends QueryRoute> = FetchOptionsFor<RouteFor<E>>;
-
 type WithFetchOptions<T, TFetchOptions> = T &
 	(TFetchOptions extends { contentType: string }
 		? { fetchOptions: TFetchOptions }
@@ -146,7 +144,7 @@ type MutationOptionsFor<
 		>,
 		"mutationFn"
 	>,
-	MutationFetchOptions<E>
+	FetchOptionsFor<RouteFor<E>>
 >;
 
 type MutationOptionsResultFor<

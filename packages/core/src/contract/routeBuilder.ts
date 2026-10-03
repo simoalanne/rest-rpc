@@ -353,8 +353,6 @@ export class RouteBuilder {
 	}
 }
 
-const runtimeRoute = new RouteBuilder({ path: undefined });
-
 /**
  * Entry point for declaring contract-first routes with independent input and output forms.
  *
@@ -363,4 +361,6 @@ const runtimeRoute = new RouteBuilder({ path: undefined });
  *
  * @see {@link https://rest-rpc.dev/docs/route-builder}
  */
-export const route = runtimeRoute as unknown as RootRouteBuilder;
+export const route = new RouteBuilder({
+	path: undefined,
+}) as unknown as RootRouteBuilder;

@@ -6,24 +6,16 @@ import type { BodyCodec, SerializedBody } from "@rest-rpc/core";
 import { normalizeMediaType, resolveBodyCodec } from "@rest-rpc/core/codecs";
 import { nodeBodyCodecs } from "./codecs.ts";
 
-/** Creates a Node readable stream with rest-rpc response framing. */
-export function createNodeResponseStream(
-	body: AsyncIterable<string>,
-): Readable {
-	return Readable.from(body);
-}
-
 /** Writes a response stream to a Node HTTP response. */
 export async function writeStreamResponse(
 	body: AsyncIterable<string>,
 	res: ServerResponse,
 	status: number,
-	contentType = "text/event-stream",
 ): Promise<void> {
 	res.statusCode = status;
-	res.setHeader("content-type", contentType);
+	res.setHeader("content-type", "text/event-stream");
 	try {
-		await pipeline(createNodeResponseStream(body), res);
+		await pipeline(Readable.from(body), res);
 	} catch (error) {
 		if ((error as NodeJS.ErrnoException).code !== "ERR_STREAM_PREMATURE_CLOSE")
 			throw error;

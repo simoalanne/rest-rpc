@@ -26,18 +26,6 @@ const setHeader = (headers: Headers, name: string, value: HttpHeaderValue) => {
 	}
 };
 
-const createStreamResponse = (
-	body: AsyncIterable<string>,
-	status: number,
-	headers: Headers,
-	contentType: string,
-) => {
-	headers.set("content-type", contentType);
-	const stream = ReadableStream.from(encodeResponseStream(body));
-
-	return new Response(stream, { status, headers });
-};
-
 /**
  * Creates a Fetch `Response` from a normalized rest-rpc route result.
  */
@@ -67,11 +55,13 @@ export async function createFetchResponse(
 	// Status and headers are committed with the returned Response before the stream
 	// is read, so stream validation failures can only error the body stream.
 	if (result.kind === "stream") {
-		return createStreamResponse(
-			result.body,
-			result.status,
-			headers,
-			"text/event-stream",
+		headers.set("content-type", "text/event-stream");
+		return new Response(
+			ReadableStream.from(encodeResponseStream(result.body)),
+			{
+				status: result.status,
+				headers,
+			},
 		);
 	}
 	if (!serialized)

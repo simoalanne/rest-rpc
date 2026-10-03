@@ -28,13 +28,6 @@ type WithResponseMetadata<TResponse, TMetadata> = TResponse extends unknown
 	? Merge<TResponse & TMetadata>
 	: never;
 
-type RouteDeclaredResponse<E extends RouteDeclaration> = WithResponseMetadata<
-	DeclaredClientResponse<E>,
-	{
-		headers: Headers;
-	}
->;
-
 /**
  * Infers a route's client result.
  *
@@ -122,7 +115,7 @@ export type ClientResponseForDeclaration<E extends RouteDeclaration> =
 		output: "output";
 	}
 		? SuccessfulResponseBody<E>
-		: RouteDeclaredResponse<E>;
+		: WithResponseMetadata<DeclaredClientResponse<E>, { headers: Headers }>;
 
 type ClientSuccessForDeclaration<E extends RouteDeclaration> = E extends {
 	output: "output";
@@ -145,11 +138,6 @@ export type SuccessfulResponseBody<TRoute extends RouteDeclaration> =
 			? TBody
 			: never
 		: never;
-
-const getResponseSchema = (
-	route: RouteDeclaration,
-	status: number,
-): ResponseDeclaration | undefined => getRouteResponses(route)[status];
 
 const assertResponseContentType = (
 	declared: string | readonly string[] | undefined,
@@ -221,7 +209,7 @@ export const fetchResponse = async <
 ) => {
 	const rawResponse = await request(route, ...args);
 
-	const schema = getResponseSchema(route, rawResponse.status);
+	const schema = getRouteResponses(route)[rawResponse.status];
 	if (schema?.kind === "stream") {
 		const body = readStreamResponse(schema.body, rawResponse, validateResponse);
 		return {

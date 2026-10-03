@@ -35,8 +35,6 @@ type SegmentValidationResult = {
 	errors: readonly StandardSchemaV1.Issue[];
 };
 
-type RequestObjectSchema = StandardSchemaV1<unknown, unknown>;
-
 const parseQuery = (searchParams: URLSearchParams) => {
 	const data: Record<string, unknown> = {};
 
@@ -55,7 +53,7 @@ const parseQuery = (searchParams: URLSearchParams) => {
 };
 
 const validateRequestSegment = async (
-	schemas: readonly RequestObjectSchema[] | undefined,
+	schemas: readonly StandardSchemaV1[] | undefined,
 	input: unknown,
 ): Promise<SegmentValidationResult> => {
 	if (!schemas || schemas.length === 0) return { data: undefined, errors: [] };
@@ -82,13 +80,6 @@ const validateRequestSegment = async (
 	return { data: merged, errors: [] };
 };
 
-const validateRequestQuery = async (
-	schemas: readonly RequestObjectSchema[] | undefined,
-	query: URLSearchParams | undefined,
-): Promise<SegmentValidationResult> => {
-	return validateRequestSegment(schemas, query ? parseQuery(query) : undefined);
-};
-
 export async function validateRequestSegments(
 	route: RouteDeclaration,
 	segments: RequestSegments,
@@ -98,9 +89,9 @@ export async function validateRequestSegments(
 		requestSchemas?.body,
 		segments.body,
 	);
-	const query = await validateRequestQuery(
+	const query = await validateRequestSegment(
 		requestSchemas?.query,
-		segments.query,
+		segments.query ? parseQuery(segments.query) : undefined,
 	);
 	const params = await validateRequestSegment(
 		requestSchemas?.params,
