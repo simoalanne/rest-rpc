@@ -1,20 +1,4 @@
-/* Blume's default header mark is 20px; the RR tile reads better at 32px. */
-[data-blume-header] > a[href="/"] > span[aria-hidden="true"],
-[data-blume-header] > a[href="/"] > span[aria-hidden="true"] > svg {
-	height: 2rem;
-}
-
-#blume-content .prose:has(> [data-home-page]) > h1:first-child {
-	margin-inline: auto;
-	max-width: 13ch;
-	text-align: center;
-}
-
-[data-home-page] {
-	display: none;
-}
-
-/* Twoslash hover popups need to escape the code block and the tab frame. */
+/* Twoslash hover popups should be allowed to overflow outside of the code block. */
 .prose blume-tabs:has(pre.twoslash),
 .prose blume-tabs:has(pre.twoslash) [data-blume-tab-content],
 .prose blume-tabs:has(pre.twoslash) [data-blume-tab-panel],
@@ -23,11 +7,7 @@
 	overflow: visible;
 }
 
-.prose pre.twoslash .twoslash-popup-container {
-	z-index: 50;
-	width: max-content;
-	max-width: min(90vw, 42rem);
-}
+/* Below changes ensure that horizontal scrollbar does not appear for twoslash code blocks. */
 
 .prose pre.twoslash .twoslash-hover:not(:hover) > .twoslash-popup-container,
 .prose

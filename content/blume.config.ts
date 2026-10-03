@@ -1,4 +1,6 @@
 import { defineConfig } from "blume";
+import { vercel } from "blume/deploy";
+import { filesystem, githubReleases } from "blume/sources";
 
 export default defineConfig({
 	title: "rest-rpc",
@@ -7,12 +9,8 @@ export default defineConfig({
 		image: "/icon.svg",
 		text: "rest-rpc",
 	},
-	deployment: {
-		output: "server",
-		adapter: "vercel",
-		site: "https://rest-rpc.dev",
-	},
-	ai: {
+	deployment: vercel({ site: "https://rest-rpc.dev" }),
+	agents: {
 		mcp: {
 			enabled: true,
 			route: "/mcp",
@@ -22,21 +20,21 @@ export default defineConfig({
 		skills: "../skills",
 	},
 	content: {
-		root: ".",
 		sources: [
-			{
-				type: "filesystem",
+			filesystem({
 				root: ".",
 				include: ["index.mdx", "docs/**/*.{md,mdx}"],
-			},
-			{
-				type: "github-releases",
+			}),
+			githubReleases({
 				prefix: "changelog",
 				owner: "rest-rpc",
 				prereleases: true,
 				repo: "rest-rpc",
-			},
+			}),
 		],
+	},
+	search: {
+		indexing: { includeCodeBlocks: true },
 	},
 	github: {
 		owner: "rest-rpc",
