@@ -57,13 +57,13 @@ type implementerRootMethods<
 	TAdditionalHandlerFields extends object,
 	TContext extends object,
 > = {
-	/** Selects the typed per-request context store for this implementation tree. @see {@link https://rest-rpc.devdocs/contract-first/route-builder#context-and-middleware} */
+	/** Selects the typed per-request context store for this implementation tree. @see {@link https://rest-rpc.dev/docs/context} */
 	$context<TValues extends object>(): ContractimplementerRoot<
 		TContract,
 		TAdditionalHandlerFields,
 		TValues
 	>;
-	/** Applies middleware to each route in this implementation tree. @see {@link https://rest-rpc.devdocs/contract-first/route-builder#context-and-middleware} */
+	/** Applies middleware to each route in this implementation tree. @see {@link https://rest-rpc.dev/docs/middleware} */
 	use(
 		middleware: (
 			request: ReusableMiddlewareRequest<
