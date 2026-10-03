@@ -1,4 +1,3 @@
-import type { SerializedBody } from "@rest-rpc/core";
 import { nestBodyCodecs } from "./codecs.ts";
 import { normalizeMediaType, resolveBodyCodec } from "@rest-rpc/core/codecs";
 import {
@@ -21,6 +20,7 @@ import {
 	isImplementedRoute,
 	RequestValidationError,
 	ResponseValidationError,
+	serializeHttpRouteResult,
 } from "@rest-rpc/server";
 import { Readable } from "node:stream";
 import type { Observable } from "rxjs";
@@ -143,19 +143,12 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 			throw new ResponseValidationException(result);
 		}
 
-		let serialized: SerializedBody | undefined;
-		if (result.kind === "response" && result.body) {
-			const { value, contentType } = result.body;
-			const codec = resolveBodyCodec(normalizeMediaType(contentType), [
-				...(this.options?.bodyCodecs ?? []),
-				...nestBodyCodecs,
-			]);
-			serialized = await codec!.serialize!(value, contentType);
-			for (const [name, value] of Object.entries(serialized.headers ?? {})) {
-				if (value !== undefined) adapter.setHeader(res, name, String(value));
-			}
-		}
-		for (const [name, value] of Object.entries(result.headers ?? {})) {
+		const serialized = await serializeHttpRouteResult(
+			result,
+			this.options?.bodyCodecs ?? [],
+			nestBodyCodecs,
+		);
+		for (const [name, value] of Object.entries(serialized.headers)) {
 			if (value !== undefined) {
 				const headerValue = Array.isArray(value)
 					? value.map(String)
@@ -163,24 +156,25 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 				adapter.setHeader(res, name, headerValue as string);
 			}
 		}
-		adapter.status(res, result.status);
+		adapter.status(res, serialized.status);
 		// Stream validation errors are left to Nest's exception handling, which can
 		// only respond while headers have not been sent.
-		if (result.kind === "stream") {
+		if (serialized.kind === "stream") {
 			if (adapter.getType() === "express") {
-				return writeStreamResponse(result.body, rawResponse, result.status);
+				return writeStreamResponse(
+					serialized.body,
+					rawResponse,
+					serialized.status,
+				);
 			}
-			return new StreamableFile(Readable.from(result.body), {
+			return new StreamableFile(Readable.from(serialized.body), {
 				type: "text/event-stream",
 			});
 		}
-		if (!serialized) return undefined;
-		const contentType =
-			serialized.contentType === undefined
-				? result.body!.contentType
-				: serialized.contentType;
+		if (!serialized.body) return undefined;
+		const { value, contentType } = serialized.body;
 		if (contentType === null) res.removeHeader("content-type");
 		else adapter.setHeader(res, "content-type", contentType);
-		return serialized.body;
+		return value;
 	}
 }

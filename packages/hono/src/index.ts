@@ -1,10 +1,8 @@
 import type { Contract, RouteTree } from "@rest-rpc/core/contract";
 import {
-	implement as serverImplement,
-	serverRoute,
+	createAdapterApi,
 	type ContractImplementer,
 	type RouteHandlerFor,
-	type PublicServerRouteBuilder,
 } from "@rest-rpc/server";
 import type { Context } from "hono";
 import type { Env } from "hono/types";
@@ -21,6 +19,8 @@ type HonoHandlerFields<TEnv extends Env = Env> = {
  * @default {}
  */
 export interface DefaultContext {}
+
+const adapterApi = createAdapterApi<HonoHandlerFields, DefaultContext>();
 
 export { type } from "@rest-rpc/core";
 export type {
@@ -70,10 +70,7 @@ export type InferServerHandler<
  * @see {@link https://rest-rpc.dev/docs/quickstart#define-and-register-routes}
  * @see {@link https://rest-rpc.dev/docs/server/hono#framework-context}
  */
-export const route = serverRoute as unknown as PublicServerRouteBuilder<
-	HonoHandlerFields,
-	DefaultContext
->;
+export const route = adapterApi.route;
 
 /**
  * Creates typed Hono handler builders for every route in a shared contract.
@@ -83,9 +80,5 @@ export const route = serverRoute as unknown as PublicServerRouteBuilder<
 export function implement<const TContract extends Contract>(
 	contract: TContract,
 ): ContractImplementer<TContract, HonoHandlerFields, DefaultContext> {
-	return serverImplement(contract) as unknown as ContractImplementer<
-		TContract,
-		HonoHandlerFields,
-		DefaultContext
-	>;
+	return adapterApi.implement(contract);
 }

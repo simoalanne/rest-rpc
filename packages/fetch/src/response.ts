@@ -1,10 +1,9 @@
-import type { BodyCodec, SerializedBody } from "@rest-rpc/core";
+import type { BodyCodec } from "@rest-rpc/core";
+import { defaultBodyCodecs } from "@rest-rpc/core/codecs";
 import {
-	defaultBodyCodecs,
-	normalizeMediaType,
-	resolveBodyCodec,
-} from "@rest-rpc/core/codecs";
-import type { HttpRouteResult } from "@rest-rpc/server";
+	serializeHttpRouteResult,
+	type HttpRouteResult,
+} from "@rest-rpc/server";
 
 type HttpHeaderValue = NonNullable<HttpRouteResult["headers"]>[string];
 
@@ -33,51 +32,38 @@ export async function createFetchResponse(
 	result: HttpRouteResult,
 	bodyCodecs: readonly BodyCodec<never>[] = [],
 ): Promise<Response> {
+	const serialized = await serializeHttpRouteResult(
+		result,
+		bodyCodecs,
+		defaultBodyCodecs,
+	);
 	const headers = new Headers();
-	let serialized: SerializedBody | undefined;
-	if (result.kind === "response" && result.body) {
-		const { value, contentType } = result.body;
-		const codec = resolveBodyCodec(normalizeMediaType(contentType), [
-			...bodyCodecs,
-			...defaultBodyCodecs,
-		]);
-		if (!codec?.serialize) {
-			throw new Error("No serializer for declared content-type");
-		}
-		serialized = await codec.serialize(value, contentType);
-		for (const [name, value] of Object.entries(serialized.headers ?? {})) {
-			setHeader(headers, name, value);
-		}
-	}
-	for (const [name, value] of Object.entries(result.headers ?? {})) {
+	for (const [name, value] of Object.entries(serialized.headers)) {
 		setHeader(headers, name, value);
 	}
 	// Status and headers are committed with the returned Response before the stream
 	// is read, so stream validation failures can only error the body stream.
-	if (result.kind === "stream") {
+	if (serialized.kind === "stream") {
 		headers.set("content-type", "text/event-stream");
 		return new Response(
-			ReadableStream.from(encodeResponseStream(result.body)),
+			ReadableStream.from(encodeResponseStream(serialized.body)),
 			{
-				status: result.status,
+				status: serialized.status,
 				headers,
 			},
 		);
 	}
-	if (!serialized)
-		return new Response(null, { status: result.status, headers });
+	if (!serialized.body)
+		return new Response(null, { status: serialized.status, headers });
 
-	const contentType =
-		serialized.contentType === undefined
-			? result.body?.contentType
-			: serialized.contentType;
+	const { value, contentType } = serialized.body;
 	if (contentType === null) {
 		headers.delete("content-type");
-	} else if (contentType !== undefined) {
+	} else {
 		headers.set("content-type", contentType);
 	}
-	return new Response(
-		serialized.body as ConstructorParameters<typeof Response>[0],
-		{ status: result.status, headers },
-	);
+	return new Response(value as ConstructorParameters<typeof Response>[0], {
+		status: serialized.status,
+		headers,
+	});
 }

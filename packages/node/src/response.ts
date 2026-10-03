@@ -1,9 +1,11 @@
 import type { ServerResponse } from "node:http";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import type { HttpRouteResult } from "@rest-rpc/server";
-import type { BodyCodec, SerializedBody } from "@rest-rpc/core";
-import { normalizeMediaType, resolveBodyCodec } from "@rest-rpc/core/codecs";
+import {
+	serializeHttpRouteResult,
+	type HttpRouteResult,
+} from "@rest-rpc/server";
+import type { BodyCodec } from "@rest-rpc/core";
 import { nodeBodyCodecs } from "./codecs.ts";
 
 /** Writes a response stream to a Node HTTP response. */
@@ -28,39 +30,29 @@ export async function writeNodeResponse(
 	res: ServerResponse,
 	bodyCodecs: readonly BodyCodec<never>[] = [],
 ): Promise<void> {
-	let serialized: SerializedBody | undefined;
-	if (result.kind === "response" && result.body) {
-		const { value, contentType } = result.body;
-		const codec = resolveBodyCodec(normalizeMediaType(contentType), [
-			...bodyCodecs,
-			...nodeBodyCodecs,
-		]);
-		serialized = await codec!.serialize!(value, contentType);
-		for (const [name, value] of Object.entries(serialized.headers ?? {})) {
-			if (value !== undefined) res.setHeader(name, value);
-		}
-	}
-	for (const [name, value] of Object.entries(result.headers ?? {})) {
+	const serialized = await serializeHttpRouteResult(
+		result,
+		bodyCodecs,
+		nodeBodyCodecs,
+	);
+	for (const [name, value] of Object.entries(serialized.headers)) {
 		if (value !== undefined) res.setHeader(name, value);
 	}
-	if (result.kind === "stream") {
-		return writeStreamResponse(result.body, res, result.status);
+	if (serialized.kind === "stream") {
+		return writeStreamResponse(serialized.body, res, serialized.status);
 	}
-	res.statusCode = result.status;
-	if (!serialized) {
+	res.statusCode = serialized.status;
+	if (!serialized.body) {
 		res.end();
 		return;
 	}
-	const contentType =
-		serialized.contentType === undefined
-			? result.body!.contentType
-			: serialized.contentType;
+	const { value, contentType } = serialized.body;
 	if (contentType === null) res.removeHeader("content-type");
 	else res.setHeader("content-type", contentType);
 
-	if (serialized.body instanceof Readable) {
-		await pipeline(serialized.body, res);
+	if (value instanceof Readable) {
+		await pipeline(value, res);
 	} else {
-		res.end(serialized.body);
+		res.end(value);
 	}
 }

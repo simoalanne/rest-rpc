@@ -3,6 +3,8 @@ export type {
 	HandleHttpRouteOptions,
 } from "./handleHttpRoute.ts";
 export type { HttpRouteResult } from "./httpRouteResult.ts";
+export type { SerializedHttpRouteResult } from "./serializeHttpRouteResult.ts";
+export { serializeHttpRouteResult } from "./serializeHttpRouteResult.ts";
 export { handleHttpRoute } from "./handleHttpRoute.ts";
 export {
 	createRouteMatcher,
@@ -30,6 +32,8 @@ export {
 	ResponseValidationError,
 } from "./validationErrors.ts";
 export { implement } from "./implement.ts";
+export type { AdapterApi } from "./adapterApi.ts";
+export { createAdapterApi } from "./adapterApi.ts";
 export type { ContractImplementer } from "./implement.types.ts";
 export { serverRoute } from "./routeBuilder.ts";
 export type {

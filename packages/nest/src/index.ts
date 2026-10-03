@@ -1,11 +1,9 @@
 import type { ExecutionContext } from "@nestjs/common";
 import type { Contract, RouteTree } from "@rest-rpc/core/contract";
 import {
-	implement as serverImplement,
-	serverRoute,
+	createAdapterApi,
 	type ContractImplementer,
 	type RouteHandlerFor,
-	type PublicServerRouteBuilder,
 } from "@rest-rpc/server";
 
 /**
@@ -15,6 +13,8 @@ import {
  * @default {}
  */
 export interface DefaultContext {}
+
+const adapterApi = createAdapterApi<NestHandlerFields, DefaultContext>();
 
 type NestHandlerFields = {
 	executionContext: ExecutionContext;
@@ -70,10 +70,7 @@ export type InferServerHandler<TRoute extends RouteTree> = RouteHandlerFor<
  * @see {@link https://rest-rpc.dev/docs/quickstart#define-and-register-routes}
  * @see {@link https://rest-rpc.dev/docs/server/nest#usage}
  */
-export const route = serverRoute as unknown as PublicServerRouteBuilder<
-	NestHandlerFields,
-	DefaultContext
->;
+export const route = adapterApi.route;
 
 /**
  * Creates typed Nest handler builders for every route in a shared contract.
@@ -83,9 +80,5 @@ export const route = serverRoute as unknown as PublicServerRouteBuilder<
 export function implement<const TContract extends Contract>(
 	contract: TContract,
 ): ContractImplementer<TContract, NestHandlerFields, DefaultContext> {
-	return serverImplement(contract) as unknown as ContractImplementer<
-		TContract,
-		NestHandlerFields,
-		DefaultContext
-	>;
+	return adapterApi.implement(contract);
 }
