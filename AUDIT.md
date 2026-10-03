@@ -14,10 +14,14 @@ Mechanical changes in one file or a few lines, with no behavior change.
 
 ### 1.1 Fix broken doc links
 
+**Status: done.**
+
 `packages/server/src/implement.types.ts:60` and `:66` link to `https://rest-rpc.devdocs/...`, which is missing a `/` and uses an old path.
 **Value: medium.** These links appear in editor hovers.
 
 ### 1.2 Remove pointless indirection
+
+**Status: done.**
 
 - `ServerRequestValue` (`core/src/contract/request.ts:203`) is a one-line alias of `ServerRequest`.
 - `RouteBuilder.#next` (`core/src/contract/routeBuilder.ts:181`) only forwards to `clone`.
@@ -26,6 +30,8 @@ Mechanical changes in one file or a few lines, with no behavior change.
 
 ### 1.3 Merge duplicate validation wrappers
 
+**Status: done.** Client: `validateResponseValue` in `client/validateResponse.ts`. Server: `validateResponseValue(schema, value, location)`.
+
 - Client: `validateResponseBody` (`client/response.ts:197`) and `validateData` (`client/stream.ts:6`) are identical.
 - Server: `validateResponseBody` (`server/validation.ts:130`) and `validateResponseStreamChunk` (`:166`) differ only in the `ResponseValidationError` location. One function can take the location as a parameter.
 
@@ -33,10 +39,14 @@ Mechanical changes in one file or a few lines, with no behavior change.
 
 ### 1.4 Look up response declarations directly
 
+**Status: done.**
+
 `getResponseSchema` in `core/src/client/response.ts:148` and `server/src/handleHttpRoute.ts:75` scans `Object.entries(...)` for `Number(status) === status`. A direct `route.responses[status]` lookup does the same.
 **Value: low.**
 
 ### 1.5 Simplify OpenAPI operation helpers in `core/src/openapi/operation.ts`
+
+**Status: done.**
 
 - `createHeaderParameters` (:160) only forwards to `createParameters`. Inline it.
 - `createResponse` (:193) repeats the description and headers spread in three branches. Build the base object once.
@@ -46,6 +56,8 @@ Mechanical changes in one file or a few lines, with no behavior change.
 
 ### 1.6 Tidy up the TanStack utils in `tanstack-query/src/createUtils.ts`
 
+**Status: done**, except merging the two `streamedQuery` calls: TanStack's overloads reject a conditional `reducer`/`initialValue` spread, so the two branches stay. `queryKey(skipToken)` now returns the route key, like the options helpers.
+
 - "`queryKey ?? (disabled || request === undefined ? routePath : [...routePath, request])`" appears three times. Extract one function for it.
 - `streamedQuery` is called in two branches that differ only by `reducer` / `initialValue`.
 - `streamedQueryOptions` is declared optional and assigned after the object literal (:121). Define it inside the literal instead.
@@ -54,6 +66,8 @@ Mechanical changes in one file or a few lines, with no behavior change.
 **Value: medium.** This file is short, and these four patterns make up most of it.
 
 ### 1.7 Extract small runtime helpers
+
+**Status: done.** `contentTypeList` and `findDeclaredContentType` are in `@rest-rpc/core/codecs`, and `assertRequestBodyLimit` is in `@rest-rpc/fetch/adapter`. Header stringification is down to one helper per package (client and server), because there is no shared internal module across packages.
 
 Each of these is a named call with no branching of its own, so the code that calls it still reads top to bottom.
 
@@ -74,6 +88,8 @@ Each of these is a named call with no branching of its own, so the code that cal
 **Value: medium.** These helpers encode rules (media type matching, header serialization) that should behave the same everywhere.
 
 ### 1.8 Share small helper types and guards
+
+**Status: done** for `Merge`/`Simplify` and `EmptyObject` (one internal `typeUtils.ts` each in core and server), and for `ProcedureContentType`, `SuccessfulResponseBody`, `RequestTransportFields` and `HttpHeaderValue`. **Left:** `MaybePromise` and `isAsyncIterable` (one copy per package, and sharing them would need a new export).
 
 Put these in one internal `type-utils.ts` in core. It should not be exported from the package root.
 
@@ -96,6 +112,8 @@ These changes cross package boundaries or need test updates.
 
 ### 2.1 Share response serialization across adapters
 
+**Status: not started** (high value, deferred).
+
 Four places resolve a codec with `[...bodyCodecs, ...defaults]`, serialize the body, copy the serializer's headers, copy the result headers, and handle `serialized.contentType` being `undefined`, `null` or a string:
 
 - `fetch/src/response.ts:44`
@@ -109,6 +127,8 @@ Fetch throws a clear error when no serializer matches. The other three use `code
 **Value: high.** This is the largest duplicated runtime block in the adapters.
 
 ### 2.2 Share the route mode predicates
+
+**Status: not started** (high value, deferred).
 
 "Uses plain output" and "uses flat input" are worked out separately in each layer:
 
@@ -127,6 +147,8 @@ Fetch throws a clear error when no serializer matches. The other three use `code
 
 ### 2.3 Route tree guards and the default procedure path
 
+**Status: not started** (high value, deferred).
+
 - Five type guards check for a `"~restrpc"` leaf:
   - `core/contract/traversal.ts:28`
   - `tanstack-query/createTanstackQueryUtils.ts:415`
@@ -140,6 +162,8 @@ Fetch throws a clear error when no serializer matches. The other three use `code
 
 ### 2.4 Simplify client request execution in `core/src/client/request.ts`
 
+**Status: done**, except the local route type: tests pass minimal routes, so it stays, trimmed to the fields that are actually read.
+
 - **Generic that adds nothing:** `executeRequest<E>` (:335) is generic, but takes `route: E | ClientRequestRoute` and `args: FetchArgs<E> | unknown[]` and casts both straight away.
 - **Duplicate local types:** `ClientRequestRoute`, `ClientRequestDeclaration` and `GroupedRequestInput` are local copies of `RouteDeclaration` / `RouteRequestDeclaration`.
 - **Coupled conditions:** `constructBaseRequest` clears `body` when there is no content type and clears `contentType` when there is no body. Both should collapse into one "has body" decision.
@@ -148,6 +172,8 @@ Fetch throws a clear error when no serializer matches. The other three use `code
 
 ### 2.5 Server result normalization in `server/src/handleHttpRoute.ts`
 
+**Status: done.**
+
 - The plain-output branch calls `normalizeResponseResult` twice with nearly identical envelopes.
 - With `disableResponseValidation`, the header handling repeats the stringification that `validateResponseHeaders` already does.
 
@@ -155,10 +181,14 @@ Fetch throws a clear error when no serializer matches. The other three use `code
 
 ### 2.6 Drop the single-schema branch in OpenAPI generation
 
+**Status: done.**
+
 `SchemaOrSchemas` / `getSchemas` (`openapi/operation.ts:113`) accept one schema or an array. Route declarations always store arrays, so the single-schema branch is reached only from `operation.test.ts`. Removing it means updating those tests.
 **Value: low.**
 
 ### 2.7 Accept only the lazy request shape in `fetch/src/deserializeRequestBody.ts:12`
+
+**Status:** `resolveBodyCodec` is done. **Lazy-only `deserializeRequestBody` was skipped:** an eager `Request` with a `null` body currently returns before a user codec runs, and keeping that through the lazy shape would need an extra "has body" field.
 
 - **Lazy request only:** the source parameter is a union of `Request` and a lazy `{ toFetchRequest, contentType }`, which leads to `isLazyRequest` branching throughout. Always taking the lazy shape (Fetch callers pass `() => request`) removes the branching.
 - **Codec lookup:** while here, `resolveBodyCodec` (`core/codecs/operations.ts:11`) nests its `serialize` / `deserialize` search inside one loop with compound conditions. Two `find` calls would be clearer.
