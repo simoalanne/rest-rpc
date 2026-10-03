@@ -17,6 +17,7 @@ import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
 import type { RuntimeImplementation } from "./match.ts";
 import {
 	type RequestSegments,
+	stringifyHeaders,
 	validateRequestSegments,
 	validateResponseValue,
 	validateResponseHeaders,
@@ -119,12 +120,7 @@ const normalizeResponseResult = async (
 	const bodySchema = schema.body;
 	const headers = disableValidation
 		? schema.headers
-			? Object.fromEntries(
-					Object.entries(result.responseHeaders ?? {}).flatMap(
-						([name, value]) =>
-							value === undefined ? [] : [[name, String(value)]],
-					),
-				)
+			? stringifyHeaders(result.responseHeaders)
 			: undefined
 		: await validateResponseHeaders(schema, result.responseHeaders);
 

@@ -224,12 +224,13 @@ const normalizeHeaders = (
 			value,
 		]),
 	);
-const stringifyHeaders = (headers: Record<string, unknown> | undefined) =>
+const stringifyHeaders = (
+	headers: Record<string, unknown> | undefined,
+): Record<string, string> =>
 	Object.fromEntries(
-		Object.entries(headers ?? {}).flatMap(([key, value]) => {
-			const stringValue = value === undefined ? undefined : String(value);
-			return stringValue === undefined ? [] : [[key, stringValue]];
-		}),
+		Object.entries(headers ?? {}).flatMap(([key, value]) =>
+			value === undefined ? [] : [[key, String(value)]],
+		),
 	);
 
 const serializeParams = (
@@ -364,11 +365,7 @@ export const executeRequest = async <
 			throw new Error("No serializer for declared content-type");
 		serialized = await resolvedCodec.serialize(body, contentType);
 	}
-	const codecHeaders = Object.fromEntries(
-		Object.entries(serialized?.headers ?? {}).flatMap(([name, value]) =>
-			value === undefined ? [] : [[name, String(value)]],
-		),
-	);
+	const codecHeaders = stringifyHeaders(serialized?.headers);
 	const outgoingContentType =
 		serialized?.contentType === undefined
 			? contentType

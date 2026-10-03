@@ -141,6 +141,15 @@ export const validateResponseValue = async (
 	return validation.value;
 };
 
+export const stringifyHeaders = (
+	headers: Record<string, unknown> | undefined,
+): Record<string, string> =>
+	Object.fromEntries(
+		Object.entries(headers ?? {}).flatMap(([name, value]) =>
+			value === undefined ? [] : [[name, String(value)]],
+		),
+	);
+
 export const validateResponseHeaders = async (
 	schema: ResponseDeclaration | undefined,
 	headers: Record<string, unknown> | undefined,
@@ -155,11 +164,7 @@ export const validateResponseHeaders = async (
 		throw new ResponseValidationError("headers", result.issues);
 	}
 
-	return Object.fromEntries(
-		Object.entries(result.value).flatMap(([name, value]) =>
-			value === undefined ? [] : [[name, String(value)]],
-		),
-	);
+	return stringifyHeaders(result.value);
 };
 
 export async function* validateResponseStreamChunks(
