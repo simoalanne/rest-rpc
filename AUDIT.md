@@ -26,6 +26,8 @@ These could be exported from `@rest-rpc/core/utils` or similar.
 
 ### 1.2 Share the `"~restrpc"` route guards
 
+**Status: done.** `isRouteLeaf` in `core/contract/traversal.ts` is the one route-leaf check, used by core traversal, tanstack-query and `implement` (which keeps a typed wrapper for its tree). `isImplementedRoute` in `server/match.ts` builds on it and is exported from `@rest-rpc/server`, so Nest calls it instead of inlining the check.
+
 Five places check for a `"~restrpc"` key to detect a route, in two variants:
 
 - **Route leaf:** `core/contract/traversal.ts` (`isContractRouteDeclaration`), `tanstack-query/createTanstackQueryUtils.ts` (`isRouteDeclaration`), `server/implement.ts` (`isContractRoute`, which skips the object/null check because its input is typed as a tree)

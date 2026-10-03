@@ -25,11 +25,11 @@ const mapObjectValues = <TLeaf>(
 				{} as Record<string, unknown>,
 			);
 
-const isContractRouteDeclaration = (
+/** Detects a route leaf in a contract or implementation tree. */
+export const isRouteLeaf = (
 	value: unknown,
-): value is { readonly "~restrpc": RouteDeclaration } => {
-	return typeof value === "object" && value !== null && "~restrpc" in value;
-};
+): value is { readonly "~restrpc": RouteDeclaration } =>
+	typeof value === "object" && value !== null && "~restrpc" in value;
 
 export const mapContractRoutes = (
 	contract: Contract,
@@ -37,7 +37,7 @@ export const mapContractRoutes = (
 ) =>
 	mapObjectValues<{ readonly "~restrpc": RouteDeclaration }>(
 		contract,
-		isContractRouteDeclaration,
+		isRouteLeaf,
 		(route, path) => mappingFn(route["~restrpc"], path),
 	);
 
@@ -45,7 +45,7 @@ export function* contractRouteEntries(
 	contract: Contract,
 	path: string[] = [],
 ): Generator<ContractRouteEntry> {
-	if (isContractRouteDeclaration(contract)) {
+	if (isRouteLeaf(contract)) {
 		const declaration = contract["~restrpc"];
 		const route = {
 			...declaration,

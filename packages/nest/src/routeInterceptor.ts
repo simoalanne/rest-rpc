@@ -17,6 +17,8 @@ import {
 import {
 	assertRequestContentType,
 	handleHttpRoute,
+	type ImplementedRoute,
+	isImplementedRoute,
 	RequestValidationError,
 	ResponseValidationError,
 } from "@rest-rpc/server";
@@ -30,32 +32,17 @@ import {
 	ResponseValidationException,
 } from "./validationExceptions.ts";
 
-type NestRouteImplementation = {
-	readonly "~restrpc": RouteDeclaration & {
-		readonly handler: (request: unknown) => unknown;
-		readonly middleware?: readonly ((request: unknown) => unknown)[];
-	};
-};
-
 const assertRouteImplementation = (
 	value: unknown,
 	route: RouteDeclaration & { path: string },
-): NestRouteImplementation => {
-	if (
-		typeof value !== "object" ||
-		value === null ||
-		!("~restrpc" in value) ||
-		typeof value["~restrpc"] !== "object" ||
-		value["~restrpc"] === null ||
-		!("handler" in value["~restrpc"])
-	) {
+): ImplementedRoute => {
+	if (!isImplementedRoute(value)) {
 		throw new Error(
 			`Controller method for "${route.method} ${route.path}" must return a rest-rpc route implementation.`,
 		);
 	}
 
-	const implementation = value as NestRouteImplementation;
-	const implementationRoute = implementation["~restrpc"];
+	const implementationRoute = value["~restrpc"];
 	if (
 		implementationRoute.method !== route.method ||
 		(implementationRoute.kind !== "procedure" &&
@@ -66,7 +53,7 @@ const assertRouteImplementation = (
 		);
 	}
 
-	return implementation;
+	return value;
 };
 
 @Injectable()

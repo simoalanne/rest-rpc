@@ -49,4 +49,4 @@ export type {
 	SuccessfulDeclaredClientResponse,
 } from "./response.ts";
 export type { ContractRouteEntry } from "./traversal.ts";
-export { contractRouteEntries } from "./traversal.ts";
+export { contractRouteEntries, isRouteLeaf } from "./traversal.ts";

@@ -13,10 +13,11 @@ import type {
 	FetchOptionsFor,
 	SuccessfulResponseBody,
 } from "@rest-rpc/core/client";
-import type {
-	Contract,
-	RouteDeclaration,
-	RouteTree,
+import {
+	isRouteLeaf,
+	type Contract,
+	type RouteDeclaration,
+	type RouteTree,
 } from "@rest-rpc/core/contract";
 import type {
 	DataTag,
@@ -403,11 +404,6 @@ export type CreateTanstackQueryUtilsOptions<
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > = ApiClientOptions<TGlobalHeaders>;
 
-const isRouteDeclaration = (
-	value: unknown,
-): value is { readonly "~restrpc": RouteDeclaration } =>
-	typeof value === "object" && value !== null && "~restrpc" in value;
-
 const fetchSuccessfulResponse = async (
 	fetchResponse: (...args: unknown[]) => Promise<unknown>,
 	request: unknown,
@@ -451,7 +447,7 @@ export function createTanstackQueryUtils<
 		clientNode: unknown,
 		path: string[] = [],
 	): unknown => {
-		if (isRouteDeclaration(node)) {
+		if (isRouteLeaf(node)) {
 			const route = node["~restrpc"];
 			const routeFetchFn = clientNode as (
 				...args: unknown[]

@@ -1,4 +1,4 @@
-import type { Contract } from "@rest-rpc/core/contract";
+import { isRouteLeaf, type Contract } from "@rest-rpc/core/contract";
 import type { ContractImplementer } from "./implement.types.ts";
 import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
 import { ServerRouteBuilder } from "./routeBuilder.ts";
@@ -9,7 +9,7 @@ type RuntimeContractTree =
 
 const isContractRoute = (
 	value: RuntimeContractTree,
-): value is ServerRouteBuilder => "~restrpc" in value;
+): value is ServerRouteBuilder => isRouteLeaf(value);
 
 const assertUnimplementedRoutes = (contract: RuntimeContractTree): void => {
 	if (isContractRoute(contract)) {
