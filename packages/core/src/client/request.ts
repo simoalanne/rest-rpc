@@ -178,24 +178,16 @@ export type FetchArgs<
 
 type GroupedRequestInput = {
 	body?: unknown;
-	contentType?: string;
 	query?: unknown;
 	params?: Record<string, unknown>;
 	headers?: Record<string, unknown>;
 };
 
-type ClientRequestDeclaration = {
-	body?: unknown;
-	contentType?: string | readonly string[];
-	query?: unknown;
-	params?: unknown;
-	headers?: unknown;
-};
-
+// Only the fields read while building a request, so tests can pass minimal routes.
 type ClientRequestRoute = {
 	method: HttpMethod;
 	path: string;
-	request?: ClientRequestDeclaration;
+	request?: { body?: unknown; contentType?: string | readonly string[] };
 };
 
 const createRequestSignal = (
@@ -301,12 +293,12 @@ export const constructBaseRequest = (
 			? declaredContentType
 			: undefined) ??
 		(route.request?.body ? "application/json" : undefined);
-	const requestHeaders = stringifyHeaders(headers);
+	const hasBody = body !== undefined && contentType !== undefined;
 	return {
 		url,
-		body: contentType === undefined ? undefined : body,
-		contentType: body === undefined ? undefined : contentType,
-		headers: requestHeaders,
+		body: hasBody ? body : undefined,
+		contentType: hasBody ? contentType : undefined,
+		headers: stringifyHeaders(headers),
 	};
 };
 
@@ -333,11 +325,9 @@ const resolveHeaders = async (
 	return Object.fromEntries(entries.filter((entry) => entry !== undefined));
 };
 
-export const executeRequest = async <
-	E extends RouteDeclaration & ClientRequestRoute,
->(
-	route: E | ClientRequestRoute,
-	args: FetchArgs<E> | unknown[],
+export const executeRequest = async (
+	route: ClientRequestRoute,
+	args: readonly unknown[],
 	options: ExecuteRequestOptions,
 ): Promise<Response> => {
 	const requestArgs = args[0] as GroupedRequestInput | undefined;
