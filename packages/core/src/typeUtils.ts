@@ -4,3 +4,5 @@ export type Merge<T> = T extends unknown
 	: never;
 
 export type EmptyObject = Record<never, never>;
+
+export type MaybePromise<T> = T | Promise<T>;

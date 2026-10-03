@@ -7,7 +7,7 @@ import type {
 	RequestFields,
 	ReusableMiddlewareRequest,
 } from "./middleware.types.ts";
-import type { EmptyObject } from "./typeUtils.ts";
+import type { EmptyObject } from "@rest-rpc/core/utils";
 
 type ContractRoute = { readonly "~restrpc": RouteDeclaration };
 

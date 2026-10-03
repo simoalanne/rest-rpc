@@ -28,9 +28,7 @@ import type {
 	RequestFields,
 	RequestTransportFields,
 } from "./middleware.types.ts";
-import type { EmptyObject, Merge } from "./typeUtils.ts";
-
-type MaybePromise<T> = T | Promise<T>;
+import type { EmptyObject, MaybePromise, Merge } from "@rest-rpc/core/utils";
 
 /** Untyped route handler stored in a completed runtime route declaration. */
 export type RuntimeRouteHandler = (

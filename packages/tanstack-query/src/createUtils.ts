@@ -1,4 +1,5 @@
 import type { FetchOptions } from "@rest-rpc/core/client";
+import { isAsyncIterable } from "@rest-rpc/core/utils";
 import {
 	type MutationKey,
 	type QueryKey,
@@ -33,12 +34,6 @@ type FetchData = (
 	request: unknown,
 	fetchOptions: FetchOptions | undefined,
 ) => Promise<unknown>;
-
-const isAsyncIterable = (value: unknown): value is AsyncIterable<unknown> =>
-	typeof value === "object" &&
-	value !== null &&
-	Symbol.asyncIterator in value &&
-	typeof value[Symbol.asyncIterator] === "function";
 
 export const createTanstackUtilsForRoute = ({
 	routePath,

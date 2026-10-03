@@ -12,6 +12,8 @@ Items are grouped by effort, cheapest first. Every item has a value note:
 
 ### 1.1 Share the last duplicated helpers
 
+**Status: done.** `Merge`, `EmptyObject`, `MaybePromise` and `isAsyncIterable` are exported from the internal `@rest-rpc/core/utils` subpath. Server and tanstack-query import them from there, and the server copy of `typeUtils.ts` is gone.
+
 Each package still keeps its own copy of these helpers, because sharing them needs a new export:
 
 - `typeUtils.ts` (`Merge`, `EmptyObject`): `core/src/typeUtils.ts` and `server/src/typeUtils.ts` are identical
