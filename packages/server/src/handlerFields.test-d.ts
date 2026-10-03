@@ -4,12 +4,12 @@ import type {
 	RouteHandler,
 	RouteHandlerFor,
 	RouteRequest,
-	ServerRouteBuilder,
+	PublicServerRouteBuilder,
 } from "./index.ts";
 
 type Fields = { native: { method: string }; signal: AbortSignal };
 type Values = { requestId: string };
-declare const route: ServerRouteBuilder<Fields, Values>;
+declare const route: PublicServerRouteBuilder<Fields, Values>;
 const declaration = contractRoute
 	.get("/users/{id}")
 	.params(type((value: { id: string }) => ({ id: Number(value.id) })))

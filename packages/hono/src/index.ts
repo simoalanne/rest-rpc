@@ -1,10 +1,10 @@
 import type { Contract, RouteTree } from "@rest-rpc/core/contract";
 import {
 	implement as serverImplement,
-	serverFirstRoute,
+	serverRoute,
 	type Contractimplementer,
 	type RouteHandlerFor,
-	type ServerRouteBuilder,
+	type PublicServerRouteBuilder,
 } from "@rest-rpc/server";
 import type { Context } from "hono";
 import type { Env } from "hono/types";
@@ -70,7 +70,7 @@ export type InferServerHandler<
  * @see {@link https://rest-rpc.dev/docs/quickstart#define-and-register-routes}
  * @see {@link https://rest-rpc.dev/docs/server/hono#framework-context}
  */
-export const route = serverFirstRoute as unknown as ServerRouteBuilder<
+export const route = serverRoute as unknown as PublicServerRouteBuilder<
 	HonoHandlerFields,
 	DefaultContext
 >;

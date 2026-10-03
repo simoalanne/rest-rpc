@@ -4,7 +4,7 @@ import {
 	flattenRouteImplementations,
 	type RuntimeImplementationTree,
 } from "./match.ts";
-import { serverFirstRoute as route } from "./routeBuilder.ts";
+import { serverRoute as route } from "./routeBuilder.ts";
 import {
 	RequestValidationError,
 	ResponseValidationError,

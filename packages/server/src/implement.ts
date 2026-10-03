@@ -1,18 +1,15 @@
 import type { Contract } from "@rest-rpc/core/contract";
 import type { Contractimplementer } from "./implement.types.ts";
-import type {
-	RuntimeRouteHandler,
-	RuntimeServerRoute,
-} from "./routeBuilder.types.ts";
-import "./routeBuilder.ts";
+import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
+import { ServerRouteBuilder } from "./routeBuilder.ts";
 
 type RuntimeContractTree =
-	| RuntimeServerRoute
+	| ServerRouteBuilder
 	| { readonly [key: string]: RuntimeContractTree };
 
 const isContractRoute = (
 	value: RuntimeContractTree,
-): value is RuntimeServerRoute => "~restrpc" in value;
+): value is ServerRouteBuilder => "~restrpc" in value;
 
 const assertUnimplementedRoutes = (contract: RuntimeContractTree): void => {
 	if (isContractRoute(contract)) {
@@ -31,25 +28,31 @@ const assertUnimplementedRoutes = (contract: RuntimeContractTree): void => {
 	}
 };
 
-const appendMiddlewareToRoutes = (
+const mapContractRoutes = (
 	contract: RuntimeContractTree,
-	middleware: RuntimeRouteHandler,
+	map: (route: ServerRouteBuilder) => ServerRouteBuilder,
 ): RuntimeContractTree => {
-	if (isContractRoute(contract)) {
-		const state = contract["~restrpc"];
-		return contract.clone({
-			...state,
-			middleware: [...(state.middleware ?? []), middleware],
-		});
-	}
+	if (isContractRoute(contract)) return map(contract);
 
 	return Object.fromEntries(
 		Object.entries(contract).map(([key, child]) => [
 			key,
-			appendMiddlewareToRoutes(child, middleware),
+			mapContractRoutes(child, map),
 		]),
 	);
 };
+
+const appendMiddlewareToRoutes = (
+	contract: RuntimeContractTree,
+	middleware: RuntimeRouteHandler,
+): RuntimeContractTree =>
+	mapContractRoutes(contract, (route) => {
+		const state = route["~restrpc"];
+		return route.clone({
+			...state,
+			middleware: [...(state.middleware ?? []), middleware],
+		});
+	});
 
 const createimplementer = (contract: RuntimeContractTree): object => {
 	if (isContractRoute(contract)) return contract;
@@ -72,6 +75,9 @@ export function implement<const TContract extends Contract>(
 	const runtimeContract = contract as unknown as RuntimeContractTree;
 	assertUnimplementedRoutes(runtimeContract);
 	return createimplementer(
-		runtimeContract,
+		mapContractRoutes(
+			runtimeContract,
+			(route) => new ServerRouteBuilder(route["~restrpc"]),
+		),
 	) as unknown as Contractimplementer<TContract>;
 }

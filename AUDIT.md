@@ -263,6 +263,8 @@ Storing flat input under a single `request.input` key in the declaration would l
 
 ### 3.5 Replace prototype patching with an explicit builder extension
 
+**Status: done.** `ServerRouteBuilder` in `server/src/routeBuilder.ts` subclasses core's `RouteBuilder` (now exported from `@rest-rpc/core/contract`), and `implement` converts contract routes to it. Naming follows one pattern: `RouteBuilder` / `PublicRouteBuilder` / `route` in core and `ServerRouteBuilder` / `PublicServerRouteBuilder` / `serverRoute` in server. `body`, `query` and `params` share `addRequestSegment`.
+
 - **Prototype patching:** `server/src/routeBuilder.ts:8` adds methods to core's `RouteBuilder` prototype through `Object.defineProperties`. This relies on side-effect imports (`import "./routeBuilder.ts"` in `implement.ts`).
 - **Explicit alternative:** a subclass, or a `RouteBuilder` constructor hook, would make the extension point visible.
 - **Repeated method bodies:** while here, `body`, `query` and `params` in `RouteBuilder` share an almost identical body.

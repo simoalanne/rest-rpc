@@ -645,7 +645,7 @@ type DerivedState = {
 };
 
 /** Type-level view of the root route builder. */
-export type RootRouteBuilder<
+export type PublicRouteBuilder<
 	TExtension extends BuilderExtension | never = never,
 > = {
 	readonly "~restrpc": { readonly path: undefined };

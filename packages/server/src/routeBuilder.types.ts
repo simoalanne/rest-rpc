@@ -10,7 +10,7 @@ import type {
 	InferServerRequest,
 	ProcedureContentType,
 	PublicDeclarationFor,
-	RootRouteBuilder,
+	PublicRouteBuilder,
 	RouteBuilderView,
 	RouteDeclaration,
 	RouteMetadata,
@@ -36,15 +36,6 @@ type MaybePromise<T> = T | Promise<T>;
 export type RuntimeRouteHandler = (
 	request: unknown,
 ) => unknown | Promise<unknown>;
-
-/** Runtime route-builder shape used internally by server extensions. */
-export type RuntimeServerRoute = {
-	readonly "~restrpc": Partial<RouteDeclaration> & {
-		readonly handler?: unknown;
-		readonly middleware?: readonly RuntimeRouteHandler[];
-	};
-	clone(state: object): RuntimeServerRoute;
-};
 
 type WithSseServerEvents<T> =
 	T extends AsyncIterable<infer TItem>
@@ -274,7 +265,7 @@ type MiddlewareUseMethod<
 				TPath,
 				TMetadata
 			>
-		: RootRouteBuilder<
+		: PublicRouteBuilder<
 				ServerBuilderExtension<TAdditionalHandlerFields, TContext>
 			>;
 };
@@ -307,14 +298,14 @@ export interface ServerBuilderExtension<
  *
  * @see {@link https://rest-rpc.dev/docs/quickstart#define-and-register-routes}
  */
-export type ServerRouteBuilder<
+export type PublicServerRouteBuilder<
 	TAdditionalHandlerFields extends object = EmptyObject,
 	TContext extends object = EmptyObject,
-> = RootRouteBuilder<
+> = PublicRouteBuilder<
 	ServerBuilderExtension<TAdditionalHandlerFields, TContext>
 > & {
 	/** Selects the typed per-request context store for this builder. @see {@link https://rest-rpc.dev/docs/context} */
-	$context<TValues extends object>(): ServerRouteBuilder<
+	$context<TValues extends object>(): PublicServerRouteBuilder<
 		TAdditionalHandlerFields,
 		TValues
 	>;

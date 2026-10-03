@@ -8,6 +8,7 @@ import type {
 	OpenApiRouteOptions,
 	RouteDeclaration,
 	RouteMetadata,
+	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
 import { getPathParamNames } from "./path.ts";
 import type {
@@ -16,7 +17,7 @@ import type {
 	RequestQuerySchema,
 } from "./request.ts";
 import type { ResponseDeclaration, ResponseOptions } from "./response.ts";
-import type { RootRouteBuilder } from "./routeBuilder.types.ts";
+import type { PublicRouteBuilder } from "./routeBuilder.types.ts";
 
 type RouteBuilderState = Partial<RouteDeclaration>;
 
@@ -155,6 +156,24 @@ const httpState = (
 	};
 };
 
+const addRequestSegment = (
+	state: RouteBuilderState,
+	segment: "body" | "query" | "params",
+	schema: StandardSchemaV1,
+	request?: RouteRequestDeclaration,
+): RouteBuilderState => {
+	assertInputMode(state, "segments");
+	return {
+		...state,
+		input: "segments",
+		request: {
+			...state.request,
+			...request,
+			[segment]: appendSchema(state.request?.[segment], schema),
+		},
+	};
+};
+
 const addResponse = (
 	state: RouteBuilderState,
 	status: number,
@@ -207,16 +226,11 @@ export class RouteBuilder {
 		if (state.method === "GET") {
 			throw new Error("GET routes cannot declare a request body.");
 		}
-		assertInputMode(state, "segments");
-		return this.clone({
-			...state,
-			input: "segments",
-			request: {
-				...state.request,
-				body: appendSchema(state.request?.body, schema),
+		return this.clone(
+			addRequestSegment(state, "body", schema, {
 				contentType: requestContentType(state, options),
-			},
-		});
+			}),
+		);
 	}
 
 	input(schema: StandardSchemaV1, options?: BodyOptions): RouteBuilder {
@@ -253,29 +267,15 @@ export class RouteBuilder {
 	}
 
 	query(schema: RequestQuerySchema): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
-		assertInputMode(state, "segments");
-		return this.clone({
-			...state,
-			input: "segments",
-			request: {
-				...state.request,
-				query: appendSchema(state.request?.query, schema),
-			},
-		});
+		return this.clone(
+			addRequestSegment(procedureState(this["~restrpc"]), "query", schema),
+		);
 	}
 
 	params(schema: RequestParamsSchema): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
-		assertInputMode(state, "segments");
-		return this.clone({
-			...state,
-			input: "segments",
-			request: {
-				...state.request,
-				params: appendSchema(state.request?.params, schema),
-			},
-		});
+		return this.clone(
+			addRequestSegment(procedureState(this["~restrpc"]), "params", schema),
+		);
 	}
 
 	metadata(metadata: RouteMetadata): RouteBuilder {
@@ -363,4 +363,4 @@ export class RouteBuilder {
  */
 export const route = new RouteBuilder({
 	path: undefined,
-}) as unknown as RootRouteBuilder;
+}) as unknown as PublicRouteBuilder;

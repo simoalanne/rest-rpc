@@ -23,16 +23,14 @@ export {
 } from "./validationErrors.ts";
 export { implement } from "./implement.ts";
 export type { Contractimplementer } from "./implement.types.ts";
-export { serverFirstRoute } from "./routeBuilder.ts";
+export { serverRoute } from "./routeBuilder.ts";
 export type {
 	ImplicitResponseEnvelope,
 	ImplicitResponseKind,
-	ServerFirstResponseKind,
-	ServerFirstRouteResponseKind,
 } from "./implicitResponse.types.ts";
 export type {
 	ServerBuilderExtension,
-	ServerRouteBuilder,
+	PublicServerRouteBuilder,
 } from "./routeBuilder.types.ts";
 export { assertRequestContentType } from "./requestContentType.ts";
 export type { Context } from "./context.ts";

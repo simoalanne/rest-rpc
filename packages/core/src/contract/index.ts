@@ -15,9 +15,10 @@ export type {
 	BuilderExtension,
 	BuilderState,
 	PublicDeclarationFor,
-	RootRouteBuilder,
+	PublicRouteBuilder,
 	RouteBuilderView,
 } from "./routeBuilder.types.ts";
+export { RouteBuilder } from "./routeBuilder.ts";
 export {
 	getPathParamSegmentName,
 	isPathParamSegment,

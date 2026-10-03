@@ -1,6 +1,6 @@
 import { route as contractRoute, type } from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
-import { serverFirstRoute as route } from "@rest-rpc/server";
+import { serverRoute as route } from "@rest-rpc/server";
 
 export interface InputSchema extends StandardSchemaV1<{ name: string }> {
 	customMethod(): string;

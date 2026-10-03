@@ -2,10 +2,10 @@ import type { ExecutionContext } from "@nestjs/common";
 import type { Contract, RouteTree } from "@rest-rpc/core/contract";
 import {
 	implement as serverImplement,
-	serverFirstRoute,
+	serverRoute,
 	type Contractimplementer,
 	type RouteHandlerFor,
-	type ServerRouteBuilder,
+	type PublicServerRouteBuilder,
 } from "@rest-rpc/server";
 
 /**
@@ -70,7 +70,7 @@ export type InferServerHandler<TRoute extends RouteTree> = RouteHandlerFor<
  * @see {@link https://rest-rpc.dev/docs/quickstart#define-and-register-routes}
  * @see {@link https://rest-rpc.dev/docs/server/nest#usage}
  */
-export const route = serverFirstRoute as unknown as ServerRouteBuilder<
+export const route = serverRoute as unknown as PublicServerRouteBuilder<
 	NestHandlerFields,
 	DefaultContext
 >;
