@@ -111,10 +111,7 @@ import { generateContractFromType } from "@rest-rpc/core/generate";
 import type { routes } from "./server";
 
 // Run generation at build time for browser clients.
-const api = generateContractFromType<typeof routes>({
-	filePath: "./server.ts",
-	exportName: "routes",
-});
+const api = generateContractFromType<typeof routes>();
 const client = initClient(api, { baseUrl: "http://localhost:3000" });
 
 const todo = await client.todos.create({ title: "Write docs" });
@@ -176,10 +173,7 @@ export const routes = { todos: { create, get } };
 import { generateContractFromType } from "@rest-rpc/core/generate";
 import type { routes } from "./server";
 
-export const api = generateContractFromType<typeof routes>({
-	filePath: "./server.ts",
-	exportName: "routes",
-});
+export const api = generateContractFromType<typeof routes>();
 
 // @filename: client.tsx
 import { api } from "./client-contract";

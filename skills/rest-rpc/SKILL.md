@@ -71,10 +71,7 @@ import { initClient } from "@rest-rpc/core";
 import { generateContractFromType } from "@rest-rpc/core/generate";
 import type { routes } from "./server";
 
-const api = generateContractFromType<typeof routes>({
-	filePath: "./server.ts",
-	exportName: "routes",
-});
+const api = generateContractFromType<typeof routes>();
 const client = initClient(api, { baseUrl: "http://localhost:3000" });
 
 const todo = await client.todos.create({ title: "Write docs" });

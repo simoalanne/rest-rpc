@@ -1,14 +1,22 @@
 import { fileURLToPath } from "node:url";
 import { generateContractFromType } from "@rest-rpc/core/generate";
+import type {
+	alias,
+	EmptyResponses,
+	InvalidStatus,
+	MissingResponses,
+	Nested,
+	nested,
+	root,
+	UnionContent,
+	WidenedMethod,
+	WidenedPath,
+	WidenedStatus,
+} from "./fixtures/generator/contract.ts";
 
-const filePath = fileURLToPath(
-	new URL("./fixtures/generator/contract.ts", import.meta.url),
-);
-const tsconfigPath = fileURLToPath(
-	new URL("./fixtures/generator/tsconfig.json", import.meta.url),
-);
-const generate = (exportName: string) =>
-	generateContractFromType({ filePath, exportName, tsconfigPath });
+const fixturePath = (path: string) =>
+	fileURLToPath(new URL(`./fixtures/generator/${path}`, import.meta.url));
+const tsconfigPath = fixturePath("tsconfig.json");
 
 describe("generated contract extraction", () => {
 	it("extracts root routes and aliased exports", () => {
@@ -22,8 +30,12 @@ describe("generated contract extraction", () => {
 				responses: { 204: {} },
 			},
 		};
-		expect(generate("root")).toEqual(expected);
-		expect(generate("alias")).toEqual(expected);
+		expect(generateContractFromType<typeof root>({ tsconfigPath })).toEqual(
+			expected,
+		);
+		expect(generateContractFromType<typeof alias>({ tsconfigPath })).toEqual(
+			expected,
+		);
 	}, 20000);
 
 	it("extracts nested routes, derived paths, media arrays, headers, and streams", () => {
@@ -67,12 +79,19 @@ describe("generated contract extraction", () => {
 				},
 			},
 		};
-		expect(generate("nested")).toEqual(expected);
-		expect(generate("Nested")).toEqual(expected);
+		expect(generateContractFromType<typeof nested>({ tsconfigPath })).toEqual(
+			expected,
+		);
+		expect(generateContractFromType<Nested>({ tsconfigPath })).toEqual(
+			expected,
+		);
 	}, 20000);
 
 	it("extracts content-type unions from raw declarations", () => {
-		expect(generate("UnionContent")).toMatchObject({
+		expect(
+			// @ts-expect-error raw declarations are not complete contracts
+			generateContractFromType<UnionContent>({ tsconfigPath }),
+		).toMatchObject({
 			"~restrpc": {
 				responses: {
 					200: {
@@ -83,39 +102,66 @@ describe("generated contract extraction", () => {
 		});
 	}, 20000);
 
-	it.each([
-		["WidenedMethod", "literal method"],
-		["WidenedPath", "literal path"],
-		["WidenedStatus", "literal numeric response statuses"],
-		["InvalidStatus", "literal numeric response statuses"],
-		["EmptyResponses", "at least one response status"],
-		["MissingResponses", "at least one response status"],
-	])(
-		"rejects %s",
-		(exportName, message) => {
-			expect(() => generate(exportName)).toThrow(message);
-		},
-		20000,
-	);
+	it("rejects invalid route declarations", () => {
+		expect(() =>
+			// @ts-expect-error raw declarations are not complete contracts
+			generateContractFromType<WidenedMethod>({ tsconfigPath }),
+		).toThrow("literal method");
+		expect(() =>
+			// @ts-expect-error raw declarations are not complete contracts
+			generateContractFromType<WidenedPath>({ tsconfigPath }),
+		).toThrow("literal path");
+		expect(() =>
+			// @ts-expect-error raw declarations are not complete contracts
+			generateContractFromType<WidenedStatus>({ tsconfigPath }),
+		).toThrow("literal numeric response statuses");
+		expect(() =>
+			// @ts-expect-error raw declarations are not complete contracts
+			generateContractFromType<InvalidStatus>({ tsconfigPath }),
+		).toThrow("literal numeric response statuses");
+		expect(() =>
+			// @ts-expect-error raw declarations are not complete contracts
+			generateContractFromType<EmptyResponses>({ tsconfigPath }),
+		).toThrow("at least one response status");
+		expect(() =>
+			// @ts-expect-error raw declarations are not complete contracts
+			generateContractFromType<MissingResponses>({ tsconfigPath }),
+		).toThrow("at least one response status");
+	}, 20000);
 
-	it("reports a missing export and unreadable config", () => {
-		expect(() => generate("missing")).toThrow(
-			'Could not find export "missing"',
+	it("reads the call from an explicit file path", () => {
+		expect(
+			generateContractFromType({
+				filePath: fixturePath("client.ts"),
+				tsconfigPath,
+			}),
+		).toMatchObject({ "~restrpc": { method: "GET", path: "/health" } });
+	}, 20000);
+
+	it("reports a missing generic argument or call", () => {
+		expect(() => generateContractFromType({ tsconfigPath })).toThrow(
+			"must be called with the server route tree type as a generic argument",
 		);
 		expect(() =>
 			generateContractFromType({
-				filePath,
-				exportName: "root",
+				filePath: fixturePath("contract.ts"),
+				tsconfigPath,
+			}),
+		).toThrow("Could not find a generateContractFromType call");
+	}, 20000);
+
+	it("reports an unreadable config", () => {
+		expect(() =>
+			generateContractFromType<typeof root>({
 				tsconfigPath: `${tsconfigPath}.missing`,
 			}),
 		).toThrow("Cannot read file");
-	}, 20000);
+	});
 
 	it("reports when no tsconfig can be found", () => {
 		expect(() =>
 			generateContractFromType({
 				filePath: "/missing-rest-rpc-fixture/contract.ts",
-				exportName: "root",
 			}),
 		).toThrow("Could not find a tsconfig.json");
 	});

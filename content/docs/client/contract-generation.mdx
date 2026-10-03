@@ -18,10 +18,7 @@ you can skip this step and import the shared contract directly in your client co
 import { generateContractFromType } from "@rest-rpc/core/generate";
 import type { routes } from "./server";
 
-export const api = generateContractFromType<typeof routes>({
-	filePath: "./server.ts",
-	exportName: "routes",
-});
+export const api = generateContractFromType<typeof routes>();
 ```
 
 ```ts
@@ -30,6 +27,11 @@ import { api } from "./client-contract";
 
 const client = initClient(api, { baseUrl: "http://localhost:3000" });
 ```
+
+The contract is generated from the type passed as the generic argument. Routes
+are type checked with the nearest `tsconfig.json`, or the one given with the
+`tsconfigPath` option. When running compiled JavaScript without source maps,
+pass the TypeScript source file containing the call as `filePath`.
 
 ## Run Generation at Build Time
 
@@ -47,10 +49,7 @@ import { generateContractFromType } from "@rest-rpc/core/generate";
 import type { routes } from "./server";
 
 export function getApi() {
-	return generateContractFromType<typeof routes>({
-		filePath: "./server.ts",
-		exportName: "routes",
-	});
+	return generateContractFromType<typeof routes>();
 }
 ```
 

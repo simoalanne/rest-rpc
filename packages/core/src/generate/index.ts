@@ -1,5 +1,5 @@
 export {
 	generateContractFromType,
-	type generateContractFromTypeOptions,
+	type GenerateContractFromTypeOptions,
 	type GeneratedServerContract,
 } from "./generateContractFromType.ts";

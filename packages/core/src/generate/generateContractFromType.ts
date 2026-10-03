@@ -1,6 +1,9 @@
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import type { Contract } from "../contract/contract.ts";
+
+type ContentType = string | readonly string[];
 
 type GeneratedRoute = {
 	readonly "~restrpc": {
@@ -10,13 +13,13 @@ type GeneratedRoute = {
 		readonly path: string;
 		readonly input?: "input" | "segments";
 		readonly output?: "output" | "response";
-		readonly request?: { readonly contentType: string | readonly string[] };
+		readonly request?: { readonly contentType: ContentType };
 		readonly responses: Readonly<
 			Record<
 				string,
 				{
 					readonly kind?: "stream";
-					readonly contentType?: string | readonly string[];
+					readonly contentType?: ContentType;
 					readonly headers?: Readonly<Record<string, never>>;
 				}
 			>
@@ -24,20 +27,27 @@ type GeneratedRoute = {
 	};
 };
 
-/** JSON-compatible contract tree produced from a checked server export. */
+/** JSON-compatible contract tree produced from a checked server route tree type. */
 export type GeneratedServerContract =
 	| GeneratedRoute
 	| { readonly [key: string]: GeneratedServerContract };
 
 /** Options for generating a server-backed contract artifact. */
-export type generateContractFromTypeOptions = {
-	/** Path to the TypeScript source file that exports the server route tree type. */
-	filePath: string;
-	/** Name of the exported server route tree to generate a contract from. */
-	exportName: string;
+export type GenerateContractFromTypeOptions = {
+	/**
+	 * Path to the TypeScript source file containing the `generateContractFromType`
+	 * call. Defaults to the calling file. Only needed when the calling file cannot
+	 * be resolved to its TypeScript source, such as compiled JavaScript without
+	 * source maps.
+	 */
+	filePath?: string;
 	/** Path to the tsconfig.json file to use for type checking. If omitted, nearest config is used. */
 	tsconfigPath?: string;
 };
+
+type CallerLocation = { readonly filePath: string; readonly line?: number };
+
+const functionName = "generateContractFromType";
 
 const formatDiagnostic = (diagnostic: ts.Diagnostic) => {
 	const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n");
@@ -48,250 +58,33 @@ const formatDiagnostic = (diagnostic: ts.Diagnostic) => {
 	return `${diagnostic.file.fileName}:${position.line + 1}:${position.character + 1} - ${message}`;
 };
 
-const optionalPropertyType = (
-	checker: ts.TypeChecker,
-	type: ts.Type,
-	name: string,
-	location: ts.Node,
-) => {
-	const property = checker.getPropertyOfType(
-		checker.getNonNullableType(type),
-		name,
-	);
-	if (!property) return undefined;
-	const declaration =
-		property.valueDeclaration ?? property.declarations?.[0] ?? location;
-	return checker.getTypeOfSymbolAtLocation(property, declaration);
-};
-
-const propertyType = (
-	checker: ts.TypeChecker,
-	type: ts.Type,
-	name: string,
-	location: ts.Node,
-) => optionalPropertyType(checker, type, name, location)!;
-
-const stringLiteral = (type: ts.Type) => (type as ts.StringLiteralType).value;
-
-const routeName = (path: readonly string[]) =>
-	path.length > 0 ? `"${path.join(".")}"` : "at the contract root";
-
-const literalRouteProperty = (
-	checker: ts.TypeChecker,
-	type: ts.Type,
-	name: "method" | "path",
-	location: ts.Node,
-	contractPath: readonly string[],
-) => {
-	const value = optionalPropertyType(checker, type, name, location);
-	if (!value?.isStringLiteral()) {
+const callerLocation = (): CallerLocation => {
+	// The formatted stack is source mapped by the runtime when supported, unlike
+	// raw call sites, so line numbers match the TypeScript source.
+	const holder: { stack?: string } = {};
+	Error.captureStackTrace(holder, generateContractFromType);
+	const frame = holder.stack
+		?.split("\n")
+		.find((entry) => entry.trimStart().startsWith("at "))
+		?.match(/\(?((?:file:\/\/)?[^\s()]+?):(\d+):\d+\)?$/);
+	if (!frame) {
 		throw new Error(
-			`Server route ${routeName(contractPath)} must have a literal ${name}.`,
+			`Could not resolve the file calling ${functionName}. Pass the filePath option.`,
 		);
 	}
-	return value.value;
-};
-
-const literalRoutePath = (
-	checker: ts.TypeChecker,
-	type: ts.Type,
-	location: ts.Node,
-	contractPath: readonly string[],
-) => {
-	const value = optionalPropertyType(checker, type, "path", location);
-	if ((value?.flags ?? 0) & ts.TypeFlags.Undefined) {
-		return `/${contractPath.join("/")}`;
-	}
-	if (value?.isStringLiteral()) return value.value;
-	throw new Error(
-		`Server route ${routeName(contractPath)} must have a literal path.`,
-	);
-};
-
-const contentTypes = (
-	checker: ts.TypeChecker,
-	type: ts.Type,
-): string | readonly string[] => {
-	if (type.isStringLiteral()) return type.value;
-	if (type.isUnion()) {
-		const values = type.types
-			.filter((entry) => (entry.flags & ts.TypeFlags.Undefined) === 0)
-			.map(stringLiteral);
-		return values.length === 1 ? values[0]! : values;
-	}
-	return checker.getTypeArguments(type as ts.TypeReference).map(stringLiteral);
-};
-
-const routeFromType = (
-	checker: ts.TypeChecker,
-	routeType: ts.Type,
-	location: ts.Node,
-	contractPath: readonly string[],
-): GeneratedRoute => {
-	const kind = stringLiteral(
-		propertyType(checker, routeType, "kind", location),
-	) as "http" | "procedure";
-	const method = literalRouteProperty(
-		checker,
-		routeType,
-		"method",
-		location,
-		contractPath,
-	);
-	const path = literalRoutePath(checker, routeType, location, contractPath);
-	const inputType = optionalPropertyType(checker, routeType, "input", location);
-	const outputType = optionalPropertyType(
-		checker,
-		routeType,
-		"output",
-		location,
-	);
-	const responsesType = optionalPropertyType(
-		checker,
-		routeType,
-		"responses",
-		location,
-	);
-	if (!responsesType) {
-		throw new Error(
-			`Server route ${routeName(contractPath)} must have at least one response status.`,
-		);
-	}
-	const responseProperties = checker.getPropertiesOfType(responsesType);
-	const hasWidenedStatus =
-		checker.getIndexTypeOfType(responsesType, ts.IndexKind.Number) !==
-			undefined ||
-		checker.getIndexTypeOfType(responsesType, ts.IndexKind.String) !==
-			undefined;
-	const statuses = responseProperties.map((property) => property.getName());
-	if (hasWidenedStatus || statuses.some((status) => !/^\d+$/.test(status))) {
-		throw new Error(
-			`Server route ${routeName(contractPath)} must have literal numeric response statuses.`,
-		);
-	}
-	if (statuses.length === 0) {
-		throw new Error(
-			`Server route ${routeName(contractPath)} must have at least one response status.`,
-		);
-	}
-	const responses = Object.fromEntries(
-		responseProperties.map((property) => {
-			const declaration =
-				property.valueDeclaration ?? property.declarations?.[0] ?? location;
-			const responseType = checker.getTypeOfSymbolAtLocation(
-				property,
-				declaration,
-			);
-			const responseKind = optionalPropertyType(
-				checker,
-				responseType,
-				"kind",
-				declaration,
-			);
-			const responseContentType = optionalPropertyType(
-				checker,
-				responseType,
-				"contentType",
-				declaration,
-			);
-			const responseHeaders = checker.getPropertyOfType(
-				checker.getNonNullableType(responseType),
-				"headers",
-			);
-			return [
-				property.getName(),
-				{
-					...(responseKind?.isStringLiteral() && responseKind.value === "stream"
-						? { kind: "stream" as const }
-						: {}),
-					...(responseContentType
-						? {
-								contentType: contentTypes(checker, responseContentType),
-							}
-						: {}),
-					...(responseHeaders ? { headers: {} } : {}),
-				},
-			];
-		}),
-	);
-
-	const requestType = optionalPropertyType(
-		checker,
-		routeType,
-		"request",
-		location,
-	);
-	const contentType = requestType
-		? optionalPropertyType(checker, requestType, "contentType", location)
-		: undefined;
-
+	const [, fileName, line] = frame;
 	return {
-		"~restrpc": {
-			source: "generated",
-			kind,
-			method,
-			path,
-			...(inputType?.isStringLiteral()
-				? { input: inputType.value as "input" | "segments" }
-				: {}),
-			...(outputType?.isStringLiteral()
-				? { output: outputType.value as "output" | "response" }
-				: {}),
-			...(contentType
-				? { request: { contentType: contentTypes(checker, contentType) } }
-				: {}),
-			responses,
-		},
+		filePath: fileName!.startsWith("file:")
+			? fileURLToPath(fileName!)
+			: fileName!,
+		line: Number(line),
 	};
 };
 
-const contractFromType = (
-	checker: ts.TypeChecker,
-	type: ts.Type,
-	contractPath: readonly string[] = [],
-): GeneratedServerContract => {
-	const routeProperty = checker.getPropertyOfType(type, "~restrpc");
-	if (routeProperty) {
-		const declaration =
-			routeProperty.valueDeclaration ?? routeProperty.declarations![0]!;
-		return routeFromType(
-			checker,
-			checker.getTypeOfSymbolAtLocation(routeProperty, declaration),
-			declaration,
-			contractPath,
-		);
-	}
-
-	const entries = checker.getPropertiesOfType(type).map((property) => {
-		const declaration = property.valueDeclaration ?? property.declarations![0]!;
-		return [
-			property.getName(),
-			contractFromType(
-				checker,
-				checker.getTypeOfSymbolAtLocation(property, declaration),
-				[...contractPath, property.getName()],
-			),
-		] as const;
-	});
-	return Object.fromEntries(entries) as GeneratedServerContract;
-};
-
-/**
- * Generates a minimal JSON-compatible contract from an exported server route tree type.
- *
- * @remarks The generation uses TypeScript compiler API to extract only the
- * minimal required information from an exported server route tree type to produce
- * a minimal JSON-compatible contract that can be used to create an API client.
- * Provide the exported route tree type as the generic argument to preserve the
- * full type information when passing the result to `initClient`.
- */
-export function generateContractFromType<TContract extends Contract>(
-	options: generateContractFromTypeOptions,
-): TContract {
-	const absoluteEntryPath = resolve(options.filePath);
-	const configPath = options.tsconfigPath
-		? resolve(options.tsconfigPath)
-		: ts.findConfigFile(dirname(absoluteEntryPath), ts.sys.fileExists);
+const createProgram = (filePath: string, tsconfigPath: string | undefined) => {
+	const configPath = tsconfigPath
+		? resolve(tsconfigPath)
+		: ts.findConfigFile(dirname(filePath), ts.sys.fileExists);
 	if (!configPath) throw new Error("Could not find a tsconfig.json.");
 
 	const config = ts.readConfigFile(configPath, ts.sys.readFile);
@@ -302,40 +95,224 @@ export function generateContractFromType<TContract extends Contract>(
 		dirname(configPath),
 	);
 	const program = ts.createProgram({
-		rootNames: [...new Set([...parsed.fileNames, absoluteEntryPath])],
+		rootNames: [...new Set([...parsed.fileNames, filePath])],
 		options: parsed.options,
 	});
 	const diagnostics = ts.getPreEmitDiagnostics(program);
 	if (diagnostics.length > 0) {
 		throw new Error(diagnostics.map(formatDiagnostic).join("\n"));
 	}
+	return program;
+};
 
-	const sourceFile = program.getSourceFile(absoluteEntryPath);
-	if (!sourceFile) throw new Error(`Could not load ${absoluteEntryPath}.`);
-	const checker = program.getTypeChecker();
-	const moduleSymbol = checker.getSymbolAtLocation(sourceFile);
-	const exported = moduleSymbol
-		? checker
-				.getExportsOfModule(moduleSymbol)
-				.find((symbol) => symbol.getName() === options.exportName)
-		: undefined;
-	if (!exported) {
+const findGenerateCall = (
+	checker: ts.TypeChecker,
+	sourceFile: ts.SourceFile,
+	line: number | undefined,
+) => {
+	const calls: ts.CallExpression[] = [];
+	const visit = (node: ts.Node) => {
+		if (ts.isCallExpression(node)) {
+			const callee = ts.isPropertyAccessExpression(node.expression)
+				? node.expression.name
+				: node.expression;
+			const symbol = checker.getSymbolAtLocation(callee);
+			const target =
+				symbol && symbol.flags & ts.SymbolFlags.Alias
+					? checker.getAliasedSymbol(symbol)
+					: symbol;
+			if (target?.getName() === functionName) calls.push(node);
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(sourceFile);
+
+	const lineOf = (position: number) =>
+		sourceFile.getLineAndCharacterOfPosition(position).line + 1;
+	const call =
+		calls.length === 1
+			? calls[0]
+			: line === undefined
+				? undefined
+				: calls.find(
+						(candidate) =>
+							lineOf(candidate.getStart(sourceFile)) <= line &&
+							line <= lineOf(candidate.end),
+					);
+	if (!call) {
 		throw new Error(
-			`Could not find export "${options.exportName}" in ${absoluteEntryPath}.`,
+			calls.length === 0
+				? `Could not find a ${functionName} call in ${sourceFile.fileName}.`
+				: `Could not determine which ${functionName} call in ${sourceFile.fileName} to generate. Use a single call per file.`,
 		);
 	}
-	const symbol =
-		exported.flags & ts.SymbolFlags.Alias
-			? checker.getAliasedSymbol(exported)
-			: exported;
-	const declaration = symbol.valueDeclaration ?? symbol.declarations?.[0];
-	if (!declaration) {
-		throw new Error(`Export "${options.exportName}" has no declaration.`);
+	return call;
+};
+
+const propertyType = (checker: ts.TypeChecker, type: ts.Type, name: string) => {
+	const property = checker.getPropertyOfType(
+		checker.getNonNullableType(type),
+		name,
+	);
+	return property ? checker.getTypeOfSymbol(property) : undefined;
+};
+
+const literalValue = (type: ts.Type | undefined) =>
+	type?.isStringLiteral() ? type.value : undefined;
+
+const routeName = (path: readonly string[]) =>
+	path.length > 0 ? `"${path.join(".")}"` : "at the contract root";
+
+const contentTypes = (
+	checker: ts.TypeChecker,
+	type: ts.Type | undefined,
+): ContentType | undefined => {
+	if (!type) return undefined;
+	const nonNullable = checker.getNonNullableType(type);
+	const isTuple = checker.isTupleType(nonNullable);
+	const entries = nonNullable.isUnion()
+		? nonNullable.types
+		: isTuple
+			? checker.getTypeArguments(nonNullable as ts.TypeReference)
+			: [nonNullable];
+	const values = entries.flatMap((entry) => literalValue(entry) ?? []);
+	if (values.length === 0) return undefined;
+	return values.length === 1 && !isTuple ? values[0] : values;
+};
+
+const routeFromType = (
+	checker: ts.TypeChecker,
+	routeType: ts.Type,
+	contractPath: readonly string[],
+): GeneratedRoute => {
+	const fail = (requirement: string) =>
+		new Error(
+			`Server route ${routeName(contractPath)} must have ${requirement}.`,
+		);
+	const property = (name: string) => propertyType(checker, routeType, name);
+
+	const method = literalValue(property("method"));
+	if (method === undefined) throw fail("a literal method");
+
+	const pathType = property("path");
+	const path =
+		(pathType?.flags ?? 0) & ts.TypeFlags.Undefined
+			? `/${contractPath.join("/")}`
+			: literalValue(pathType);
+	if (path === undefined) throw fail("a literal path");
+
+	const responsesType = property("responses");
+	const responseProperties = responsesType
+		? checker.getPropertiesOfType(responsesType)
+		: [];
+	if (
+		responsesType &&
+		(checker.getIndexInfosOfType(responsesType).length > 0 ||
+			responseProperties.some((status) => !/^\d+$/.test(status.getName())))
+	) {
+		throw fail("literal numeric response statuses");
 	}
-	const type =
-		symbol.flags & (ts.SymbolFlags.TypeAlias | ts.SymbolFlags.Interface)
-			? checker.getDeclaredTypeOfSymbol(symbol)
-			: checker.getTypeOfSymbolAtLocation(symbol, declaration);
-	const contract = contractFromType(checker, type);
-	return contract as TContract;
+	if (responseProperties.length === 0) {
+		throw fail("at least one response status");
+	}
+	const responses = Object.fromEntries(
+		responseProperties.map((status) => {
+			const responseType = checker.getTypeOfSymbol(status);
+			const response = (name: string) =>
+				propertyType(checker, responseType, name);
+			return [
+				status.getName(),
+				{
+					kind:
+						literalValue(response("kind")) === "stream"
+							? ("stream" as const)
+							: undefined,
+					contentType: contentTypes(checker, response("contentType")),
+					headers: response("headers") ? {} : undefined,
+				},
+			];
+		}),
+	);
+
+	const requestType = property("request");
+	const requestContentType = contentTypes(
+		checker,
+		requestType && propertyType(checker, requestType, "contentType"),
+	);
+
+	return {
+		"~restrpc": {
+			source: "generated",
+			kind: literalValue(property("kind")) as "http" | "procedure",
+			method,
+			path,
+			input: literalValue(property("input")) as "input" | "segments",
+			output: literalValue(property("output")) as "output" | "response",
+			request: requestContentType
+				? { contentType: requestContentType }
+				: undefined,
+			responses,
+		},
+	};
+};
+
+const contractFromType = (
+	checker: ts.TypeChecker,
+	type: ts.Type,
+	contractPath: readonly string[] = [],
+): GeneratedServerContract => {
+	const routeType = propertyType(checker, type, "~restrpc");
+	if (routeType) return routeFromType(checker, routeType, contractPath);
+
+	return Object.fromEntries(
+		checker
+			.getPropertiesOfType(type)
+			.map((property) => [
+				property.getName(),
+				contractFromType(checker, checker.getTypeOfSymbol(property), [
+					...contractPath,
+					property.getName(),
+				]),
+			]),
+	);
+};
+
+/**
+ * Generates a minimal JSON-compatible contract from a server route tree type.
+ *
+ * @remarks The route tree type is read from the generic argument of this call.
+ * The generation uses the TypeScript compiler API to locate the call in the
+ * calling file and extract only the minimal required information from the
+ * route tree type to produce a JSON-compatible contract that can be used to
+ * create an API client. The generic argument also preserves the full type
+ * information when passing the result to `initClient`.
+ *
+ * @example
+ * ```ts
+ * import type { routes } from "./server";
+ *
+ * export const api = generateContractFromType<typeof routes>();
+ * ```
+ */
+export function generateContractFromType<TContract extends Contract>(
+	options: GenerateContractFromTypeOptions = {},
+): TContract {
+	const caller: CallerLocation = options.filePath
+		? { filePath: resolve(options.filePath) }
+		: callerLocation();
+	const program = createProgram(caller.filePath, options.tsconfigPath);
+	const sourceFile = program.getSourceFile(caller.filePath);
+	if (!sourceFile) throw new Error(`Could not load ${caller.filePath}.`);
+	const checker = program.getTypeChecker();
+	const call = findGenerateCall(checker, sourceFile, caller.line);
+	const typeArgument = call.typeArguments?.[0];
+	if (!typeArgument) {
+		throw new Error(
+			`${functionName} must be called with the server route tree type as a generic argument.`,
+		);
+	}
+	return contractFromType(
+		checker,
+		checker.getTypeFromTypeNode(typeArgument),
+	) as TContract;
 }
