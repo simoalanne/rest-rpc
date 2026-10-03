@@ -12,9 +12,10 @@ import {
 	RequestValidationError,
 	ResponseValidationError,
 } from "./validationErrors.ts";
-import type {
-	ResponseDeclaration,
-	RouteDeclaration,
+import {
+	flatInputSegment,
+	type ResponseDeclaration,
+	type RouteDeclaration,
 } from "@rest-rpc/core/contract";
 import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
 import type { RuntimeImplementation } from "./match.ts";
@@ -194,7 +195,7 @@ const getHandlerRequestFields = (
 	},
 ) => {
 	if (route.input !== "input") return segments;
-	return { input: route.method === "GET" ? segments.query : segments.body };
+	return { input: segments[flatInputSegment(route.method)] };
 };
 
 /**

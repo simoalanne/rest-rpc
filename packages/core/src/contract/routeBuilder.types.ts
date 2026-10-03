@@ -166,51 +166,20 @@ type WithFlatInput<
 	TState extends BuilderState,
 	TSchema extends StandardSchemaV1,
 	TOptions extends BodyOptions | undefined,
-> = {
-	route: TState["route"];
-	method: TState["method"];
-	request: TState["route"]["method"] extends "GET"
-		? Omit<TState["request"], "query"> & {
-				query: TState["request"] extends {
-					query: infer TCurrent extends readonly unknown[];
-				}
-					? readonly [...TCurrent, TSchema]
-					: readonly [TSchema];
-			}
-		: Omit<TState["request"], "body" | "contentType"> & {
-				body: TState["request"] extends {
-					body: infer TCurrent extends readonly unknown[];
-				}
-					? readonly [...TCurrent, TSchema]
-					: readonly [TSchema];
-				contentType: TState["request"] extends {
-					contentType: infer TContentType;
-				}
-					? TContentType
-					: ContentTypeFor<TOptions>;
-			};
-	responses: TState["responses"];
-	openApi: TState["openApi"];
-	used: TState["used"] | "input";
-	input: "input";
-	output: TState["output"];
-};
-
-type MoveFlatInput<
-	TState extends BuilderState,
-	TMethod extends HttpMethod,
-> = TState["input"] extends "input"
-	? TMethod extends "GET"
-		? Omit<TState["request"], "body" | "contentType" | "query"> & {
-				query: TState["request"] extends { body: infer TBody } ? TBody : never;
-			}
-		: TState["request"]
-	: TState["request"];
+> = WithContentType<
+	Omit<WithRequest<TState, "input", TSchema>, "used" | "input"> & {
+		used: TState["used"] | "input";
+		input: "input";
+	},
+	TState["request"] extends { contentType: infer TContentType }
+		? TContentType
+		: ContentTypeFor<TOptions>
+>;
 
 type WithHttpRoute<TState extends BuilderState, TMethod extends HttpMethod> = {
 	route: { readonly kind: "http"; readonly method: TMethod };
 	method: "selected";
-	request: MoveFlatInput<TState, TMethod>;
+	request: TState["request"];
 	responses: TState["responses"];
 	openApi: TState["openApi"];
 	used: TState["used"];

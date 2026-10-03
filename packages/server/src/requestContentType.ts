@@ -1,4 +1,7 @@
-import type { RouteDeclaration } from "@rest-rpc/core/contract";
+import {
+	type RouteDeclaration,
+	resolveRouteRequest,
+} from "@rest-rpc/core/contract";
 import {
 	findDeclaredContentType,
 	normalizeMediaType,
@@ -16,7 +19,10 @@ export function assertRequestContentType(
 	const mediaType = normalizeMediaType(contentType);
 	if (!mediaType) return undefined;
 	if (
-		findDeclaredContentType(route.request?.contentType, mediaType) !== undefined
+		findDeclaredContentType(
+			resolveRouteRequest(route)?.contentType,
+			mediaType,
+		) !== undefined
 	) {
 		return undefined;
 	}

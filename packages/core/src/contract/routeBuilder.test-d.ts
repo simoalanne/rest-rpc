@@ -23,7 +23,7 @@ describe("routeBuilder types", () => {
 			readonly method: "POST";
 			readonly path: undefined;
 			request: {
-				body: readonly [StandardSchemaV1<{ name: string }>];
+				input: readonly [StandardSchemaV1<{ name: string }>];
 				contentType: "application/json";
 			};
 			responses: {

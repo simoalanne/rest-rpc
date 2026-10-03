@@ -253,6 +253,8 @@ Keep each adapter's request flow explicit: content-type check → body → `hand
 
 ### 3.4 Store flat input as `request.input` (design change)
 
+**Status: done.** Flat input is stored as `request.input`. `resolveRouteRequest` and `flatInputSegment` in `core/src/contract/routeRequest.ts` hold the GET/body rule; OpenAPI, server validation, the content-type check and the client read routes through them. The builder no longer moves input on `.get()`, and `MoveFlatInput` and `FlatInputSchemas` are gone.
+
 "Flat input goes to `query` for GET, otherwise to `body`" is encoded in at least 7 places:
 
 - Runtime: `routeBuilder.ts` `httpState` + `input()`, `initClient.ts`, `handleHttpRoute.ts`

@@ -19,6 +19,7 @@ export type {
 	RouteBuilderView,
 } from "./routeBuilder.types.ts";
 export { RouteBuilder } from "./routeBuilder.ts";
+export { flatInputSegment, resolveRouteRequest } from "./routeRequest.ts";
 export {
 	getPathParamSegmentName,
 	isPathParamSegment,

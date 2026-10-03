@@ -134,17 +134,8 @@ const httpState = (
 	if (state.input === "input" && getPathParamNames(path ?? "").length > 0) {
 		throw new Error("Flat input requires a static route path.");
 	}
-	if (method === "GET" && state.input !== "input" && state.request?.body) {
+	if (method === "GET" && state.request?.body) {
 		throw new Error("GET routes cannot declare a request body.");
-	}
-	let request = state.request;
-	if (method === "GET" && state.input === "input") {
-		const {
-			body,
-			contentType: _contentType,
-			...otherRequest
-		} = state.request ?? {};
-		request = { ...otherRequest, query: body };
 	}
 	return {
 		...state,
@@ -152,7 +143,6 @@ const httpState = (
 		method,
 		path,
 		responses: { ...state.responses },
-		request,
 	};
 };
 
@@ -244,12 +234,8 @@ export class RouteBuilder {
 			input: "input",
 			request: {
 				...state.request,
-				...(state.method === "GET"
-					? { query: appendSchema(state.request?.query, schema) }
-					: {
-							body: appendSchema(state.request?.body, schema),
-							contentType: requestContentType(state, options),
-						}),
+				input: appendSchema(state.request?.input, schema),
+				contentType: requestContentType(state, options),
 			},
 		});
 	}

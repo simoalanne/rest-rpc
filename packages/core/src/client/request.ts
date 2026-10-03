@@ -121,11 +121,11 @@ type MissingGlobalHeaders<TKeys extends PropertyKey> = {
 	]: never;
 };
 
-type DeclaredContentType<E> = E extends {
-	request: { contentType: infer TContentType };
-}
-	? TContentType
-	: never;
+type DeclaredContentType<E> = E extends { method: "GET" }
+	? never
+	: E extends { request: { contentType: infer TContentType } }
+		? TContentType
+		: never;
 
 /** Fetch options accepted by a particular route call. */
 export type FetchOptionsFor<E extends RouteDeclaration> = Omit<

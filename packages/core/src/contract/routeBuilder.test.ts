@@ -17,12 +17,16 @@ describe("routeBuilder", () => {
 		});
 	});
 
-	it("moves flat input to query when selecting GET and retains headers", () => {
+	it("stores flat input independently of declaration order", () => {
 		const headers = type<{ authorization: string }>();
-		const value = route.headers(headers).input(schema).get("/users")[
-			"~restrpc"
-		];
-		expect(value.request).toEqual({ headers: [headers], query: [schema] });
+		const before = route.headers(headers).input(schema).get("/users");
+		const after = route.headers(headers).get("/users").input(schema);
+		expect(before["~restrpc"].request).toEqual({
+			headers: [headers],
+			input: [schema],
+			contentType: "application/json",
+		});
+		expect(after["~restrpc"].request).toEqual(before["~restrpc"].request);
 	});
 
 	it("rejects mixing flat input and request segments in either order", () => {
