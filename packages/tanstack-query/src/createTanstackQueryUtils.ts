@@ -244,7 +244,7 @@ type StreamedQueryReducedOptions<
 		"queryFn" | "queryKey"
 	>;
 
-type streamedQueryOptionsResultFor<
+type StreamedQueryOptionsResultFor<
 	E extends QueryRoute,
 	TData,
 	TSelectedData,
@@ -345,7 +345,7 @@ type TanstackQueryStreamRouteValue<
 					// Default accumulation fixes the cache data to the route's event array.
 					<TSelectedData = StreamedQueryDataFor<E>>(
 						...args: StreamedSimpleQueryArgs<E, TGlobalHeaders, TSelectedData>
-					): streamedQueryOptionsResultFor<
+					): StreamedQueryOptionsResultFor<
 						E,
 						StreamedQueryDataFor<E>,
 						TSelectedData
@@ -358,7 +358,7 @@ type TanstackQueryStreamRouteValue<
 							TData,
 							TSelectedData
 						>
-					): streamedQueryOptionsResultFor<E, TData, TSelectedData>;
+					): StreamedQueryOptionsResultFor<E, TData, TSelectedData>;
 				};
 			}
 		: Record<never, never>;

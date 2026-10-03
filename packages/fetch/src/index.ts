@@ -2,7 +2,7 @@ import type { Contract, RouteTree } from "@rest-rpc/core/contract";
 import {
 	implement as serverImplement,
 	serverRoute,
-	type Contractimplementer,
+	type ContractImplementer,
 	type RouteHandlerFor,
 	type PublicServerRouteBuilder,
 } from "@rest-rpc/server";
@@ -63,8 +63,8 @@ export const route = serverRoute as unknown as PublicServerRouteBuilder<
  */
 export function implement<const TContract extends Contract>(
 	contract: TContract,
-): Contractimplementer<TContract, FetchHandlerFields, DefaultContext> {
-	return serverImplement(contract) as unknown as Contractimplementer<
+): ContractImplementer<TContract, FetchHandlerFields, DefaultContext> {
+	return serverImplement(contract) as unknown as ContractImplementer<
 		TContract,
 		FetchHandlerFields,
 		DefaultContext

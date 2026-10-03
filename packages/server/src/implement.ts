@@ -1,5 +1,5 @@
 import type { Contract } from "@rest-rpc/core/contract";
-import type { Contractimplementer } from "./implement.types.ts";
+import type { ContractImplementer } from "./implement.types.ts";
 import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
 import { ServerRouteBuilder } from "./routeBuilder.ts";
 
@@ -54,7 +54,7 @@ const appendMiddlewareToRoutes = (
 		});
 	});
 
-const createimplementer = (contract: RuntimeContractTree): object => {
+const createImplementer = (contract: RuntimeContractTree): object => {
 	if (isContractRoute(contract)) return contract;
 
 	return {
@@ -63,7 +63,7 @@ const createimplementer = (contract: RuntimeContractTree): object => {
 			return this;
 		},
 		use(callback: RuntimeRouteHandler) {
-			return createimplementer(appendMiddlewareToRoutes(contract, callback));
+			return createImplementer(appendMiddlewareToRoutes(contract, callback));
 		},
 	};
 };
@@ -71,13 +71,13 @@ const createimplementer = (contract: RuntimeContractTree): object => {
 /** Exposes handler attachment on every route in a core contract. */
 export function implement<const TContract extends Contract>(
 	contract: TContract,
-): Contractimplementer<TContract> {
+): ContractImplementer<TContract> {
 	const runtimeContract = contract as unknown as RuntimeContractTree;
 	assertUnimplementedRoutes(runtimeContract);
-	return createimplementer(
+	return createImplementer(
 		mapContractRoutes(
 			runtimeContract,
 			(route) => new ServerRouteBuilder(route["~restrpc"]),
 		),
-	) as unknown as Contractimplementer<TContract>;
+	) as unknown as ContractImplementer<TContract>;
 }

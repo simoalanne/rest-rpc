@@ -1,6 +1,6 @@
 import { route as contractRoute, type } from "@rest-rpc/core";
 import type {
-	Contractimplementer,
+	ContractImplementer,
 	RouteHandler,
 	RouteHandlerFor,
 	RouteRequest,
@@ -15,7 +15,7 @@ const declaration = contractRoute
 	.params(type((value: { id: string }) => ({ id: Number(value.id) })))
 	.response(200, type<string>());
 const contract = { users: { get: declaration } };
-declare const implementation: Contractimplementer<
+declare const implementation: ContractImplementer<
 	typeof contract,
 	Fields,
 	Values

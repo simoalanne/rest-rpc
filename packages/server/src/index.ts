@@ -22,7 +22,7 @@ export {
 	ResponseValidationError,
 } from "./validationErrors.ts";
 export { implement } from "./implement.ts";
-export type { Contractimplementer } from "./implement.types.ts";
+export type { ContractImplementer } from "./implement.types.ts";
 export { serverRoute } from "./routeBuilder.ts";
 export type {
 	ImplicitResponseEnvelope,

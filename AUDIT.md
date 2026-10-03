@@ -292,6 +292,8 @@ All six adapter entry points repeat `DefaultContext`, `InferServerHandler`, `rou
 
 ## Separate decision: casing of public names
 
+status: done. converted all to correct casing.
+
 `Contractimplementer` (a public type), `createimplementer`, `implementerRootMethods` and `streamedQueryOptionsResultFor` have inconsistent casing. Fixing it is cheap, but renaming `Contractimplementer` breaks its public name, so it should be done and released on its own.
 
 ## Dead code already removed
