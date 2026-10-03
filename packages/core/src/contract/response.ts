@@ -2,6 +2,7 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { BodyContentType } from "./body.ts";
 import type { RouteDeclaration } from "./routeDeclaration.ts";
 import type { RouteTree } from "./contract.ts";
+import type { UsesPlainOutput } from "./routeModes.ts";
 import type { SseEvent } from "../sse.ts";
 import type { Merge } from "../typeUtils.ts";
 
@@ -204,11 +205,10 @@ type ServerProcedureOutput<E extends RouteDeclaration> = E extends {
 	? ServerProcedureResponse<TResponse>
 	: never;
 
-type ServerResponseForRoute<E extends RouteDeclaration> = E extends {
-	output: "output";
-}
-	? ServerProcedureOutput<E>
-	: ServerResponse<E>;
+type ServerResponseForRoute<E extends RouteDeclaration> =
+	UsesPlainOutput<E> extends true
+		? ServerProcedureOutput<E>
+		: ServerResponse<E>;
 
 /**
  * Infers the output returned by a route handler.

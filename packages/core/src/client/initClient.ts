@@ -1,5 +1,7 @@
 import type { Contract, RouteDeclaration } from "../contract/contract.ts";
 import { mapContractRoutes } from "../contract/traversal.ts";
+import { resolveRoutePath } from "../contract/path.ts";
+import { usesFlatInput, usesPlainOutput } from "../contract/routeModes.ts";
 import {
 	flatInputSegment,
 	resolveRouteRequest,
@@ -104,12 +106,12 @@ export function initClient<
 	return mapContractRoutes(contract, (node, routePath) => {
 		const resolvedRoute = {
 			...node,
-			path: node.path ?? `/${routePath.join("/")}`,
+			path: resolveRoutePath(node, routePath),
 			request: resolveRouteRequest(node),
 		};
 		const inputSegment = flatInputSegment(node.method);
-		const flatInput = node.request?.input !== undefined;
-		const plainOutput = node.output === "output";
+		const flatInput = usesFlatInput(node);
+		const plainOutput = usesPlainOutput(node);
 		return (...args: FetchArgs) => {
 			if (
 				flatInput &&

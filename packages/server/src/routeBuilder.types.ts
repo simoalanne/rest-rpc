@@ -1,7 +1,6 @@
 import type {
 	InferredRoute,
 	ValidImplicitResult,
-	UsesPlainOutput,
 } from "./implicitResponse.types.ts";
 import type {
 	AbsolutePath,
@@ -17,6 +16,7 @@ import type {
 	RouteTree,
 	ServerResponse,
 	ServerResponseBody,
+	UsesPlainOutput,
 } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import type { SseServerEvent } from "./sse.ts";

@@ -42,6 +42,8 @@ These changes cross package boundaries or need test updates.
 
 ### 2.1 Share route rules between client and server
 
+**Status: done.** `usesFlatInput` / `usesPlainOutput` with matching `UsesFlatInput` / `UsesPlainOutput` types live in `core/contract/routeModes.ts`, and `resolveRoutePath` in `core/contract/path.ts`, all exported from `@rest-rpc/core/contract`. The client, server, tanstack-query, the generator and the response types use them instead of their own checks. Server route flattening is built on `contractRouteEntries`, and tanstack-query on `mapContractRoutes`. Benchmark: no measurable change.
+
 Rules that decide the wire format or the served path are derived separately in each layer. If they diverge, the client and server disagree.
 
 - **Plain output / flat input:**

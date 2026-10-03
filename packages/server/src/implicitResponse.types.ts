@@ -1,13 +1,6 @@
-import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import type { SseServerEvent } from "./sse.ts";
 import type { Merge } from "@rest-rpc/core/utils";
-
-export type UsesPlainOutput<TRoute extends RouteDeclaration> = TRoute extends {
-	output: "output";
-}
-	? true
-	: false;
 
 /**
  * HTTP response shape from which a handler-based route infers its contract.

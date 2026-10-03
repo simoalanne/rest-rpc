@@ -14,7 +14,8 @@ import type {
 	SuccessfulResponseBody,
 } from "@rest-rpc/core/client";
 import {
-	isRouteLeaf,
+	mapContractRoutes,
+	usesPlainOutput,
 	type Contract,
 	type RouteDeclaration,
 	type RouteTree,
@@ -440,43 +441,22 @@ export function createTanstackQueryUtils<
 	contract: TContract,
 	options: CreateTanstackQueryUtilsOptions<TGlobalHeaders>,
 ): TanstackQueryUtilsFor<TContract, TGlobalHeaders> {
-	const client = initClient(contract, options);
+	const client: unknown = initClient(contract, options);
 
-	const buildTanstackQueryUtils = (
-		node: Contract,
-		clientNode: unknown,
-		path: string[] = [],
-	): unknown => {
-		if (isRouteLeaf(node)) {
-			const route = node["~restrpc"];
-			const routeFetchFn = clientNode as (
-				...args: unknown[]
-			) => Promise<unknown>;
+	return mapContractRoutes(contract, (route, path) => {
+		const routeFetchFn = path.reduce(
+			(node, key) => (node as Record<string, unknown>)[key],
+			client,
+		) as (...args: unknown[]) => Promise<unknown>;
+		const returnsResponseEnvelope = !usesPlainOutput(route);
 
-			const returnsResponseEnvelope = route.output !== "output";
-
-			return createTanstackUtilsForRoute({
-				routePath: path,
-				fetchData: returnsResponseEnvelope
-					? (request, fetchOptions) =>
-							fetchSuccessfulResponse(routeFetchFn, request, fetchOptions)
-					: routeFetchFn,
-				unwrapResponseBodyForStream: returnsResponseEnvelope,
-			});
-		}
-
-		const client = clientNode as Record<string, unknown>;
-
-		return Object.fromEntries(
-			Object.entries(node).map(([key, value]) => [
-				key,
-				buildTanstackQueryUtils(value, client[key], [...path, key]),
-			]),
-		);
-	};
-
-	return buildTanstackQueryUtils(contract, client) as TanstackQueryUtilsFor<
-		TContract,
-		TGlobalHeaders
-	>;
+		return createTanstackUtilsForRoute({
+			routePath: path,
+			fetchData: returnsResponseEnvelope
+				? (request, fetchOptions) =>
+						fetchSuccessfulResponse(routeFetchFn, request, fetchOptions)
+				: routeFetchFn,
+			unwrapResponseBodyForStream: returnsResponseEnvelope,
+		});
+	}) as TanstackQueryUtilsFor<TContract, TGlobalHeaders>;
 }

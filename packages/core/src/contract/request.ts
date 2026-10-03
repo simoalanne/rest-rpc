@@ -4,6 +4,7 @@ import type {
 	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
 import type { RouteTree } from "./contract.ts";
+import type { UsesFlatInput } from "./routeModes.ts";
 import type { EmptyObject, Merge } from "../typeUtils.ts";
 
 /** Scalar value accepted by ordinary HTTP request schemas. */
@@ -159,12 +160,6 @@ export type ServerRequest<E extends { request?: RouteRequestDeclaration }> = [
 ] extends [never]
 	? Record<never, never>
 	: InferRequestFor<E, "output">;
-
-type UsesFlatInput<TRoute extends RouteDeclaration> = TRoute extends {
-	request: { input: readonly StandardSchemaV1[] };
-}
-	? true
-	: false;
 
 /**
  * Infers the validated input received by a route handler.

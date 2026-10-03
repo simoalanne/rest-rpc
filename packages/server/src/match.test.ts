@@ -16,6 +16,14 @@ describe("match", () => {
 		expect(isImplementedRoute(null)).toBe(false);
 	});
 
+	it("rejects route leaves without a handler", () => {
+		expect(() =>
+			flattenRouteImplementations({
+				users: route.get("/users") as never,
+			}),
+		).toThrow('Route "GET /users" has no handler.');
+	});
+
 	it.each(["/users/:id/items/:id", "/users/{id}/items/{id}"] as const)(
 		"accepts repeated parameter names in %s",
 		(path) => {

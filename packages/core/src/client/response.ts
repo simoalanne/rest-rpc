@@ -7,6 +7,7 @@ import {
 	type BodyCodec,
 } from "../codecs/index.ts";
 import type { RouteDeclaration, RouteTree } from "../contract/contract.ts";
+import type { UsesPlainOutput } from "../contract/routeModes.ts";
 import type { SseEvent } from "../sse.ts";
 import type {
 	ResponseDeclaration,
@@ -110,26 +111,25 @@ type ClientStreamDataForDeclaration<E extends RouteDeclaration> =
 		: never;
 
 export type ClientResponseForDeclaration<E extends RouteDeclaration> =
-	E extends {
-		output: "output";
-	}
+	UsesPlainOutput<E> extends true
 		? SuccessfulResponseBody<E>
 		: WithResponseMetadata<DeclaredClientResponse<E>, { headers: Headers }>;
 
-type ClientSuccessForDeclaration<E extends RouteDeclaration> = E extends {
-	output: "output";
-}
-	? SuccessfulResponseBody<E>
-	: WithResponseMetadata<
-			SuccessfulDeclaredClientResponse<E>,
-			{ headers: Headers }
-		>;
+type ClientSuccessForDeclaration<E extends RouteDeclaration> =
+	UsesPlainOutput<E> extends true
+		? SuccessfulResponseBody<E>
+		: WithResponseMetadata<
+				SuccessfulDeclaredClientResponse<E>,
+				{ headers: Headers }
+			>;
 
-type ClientErrorForDeclaration<E extends RouteDeclaration> = E extends {
-	output: "output";
-}
-	? never
-	: WithResponseMetadata<ErrorDeclaredClientResponse<E>, { headers: Headers }>;
+type ClientErrorForDeclaration<E extends RouteDeclaration> =
+	UsesPlainOutput<E> extends true
+		? never
+		: WithResponseMetadata<
+				ErrorDeclaredClientResponse<E>,
+				{ headers: Headers }
+			>;
 
 export type SuccessfulResponseBody<TRoute extends RouteDeclaration> =
 	SuccessfulDeclaredClientResponse<TRoute> extends infer TResponse

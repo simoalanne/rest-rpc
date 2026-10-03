@@ -2,6 +2,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import type { Contract } from "../contract/contract.ts";
+import { resolveRoutePath } from "../contract/path.ts";
 
 type ContentType = string | readonly string[];
 
@@ -198,7 +199,7 @@ const routeFromType = (
 	const pathType = property("path");
 	const path =
 		(pathType?.flags ?? 0) & ts.TypeFlags.Undefined
-			? `/${contractPath.join("/")}`
+			? resolveRoutePath({ path: undefined }, contractPath)
 			: literalValue(pathType);
 	if (path === undefined) throw fail("a literal path");
 

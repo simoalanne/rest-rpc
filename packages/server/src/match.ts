@@ -1,4 +1,5 @@
 import {
+	contractRouteEntries,
 	getPathParamSegmentName,
 	isPathParamSegment,
 	isRouteLeaf,
@@ -106,35 +107,24 @@ export function isImplementedRoute(value: unknown): value is ImplementedRoute {
 	);
 }
 
-const flattenImplementationTree = (
-	implementation: RuntimeImplementationTree,
-	path: string[] = [],
-): RuntimeImplementation[] => {
-	if (isImplementedRoute(implementation)) {
-		const { handler, middleware, ...route } = implementation["~restrpc"];
-		return [
-			{
-				route: {
-					...route,
-					path: route.path ?? `/${path.join("/")}`,
-				},
-				handler,
-				middleware,
-			},
-		];
-	}
-	return Object.entries(implementation).flatMap(([key, child]) =>
-		flattenImplementationTree(child, [...path, key]),
-	);
-};
-
 /** Flattens and orders an implementation tree for route registration. */
 export function flattenRouteImplementations(
 	implementation: RuntimeImplementationTree,
 ): RuntimeImplementation[] {
-	return flattenImplementationTree(implementation).sort((left, right) =>
-		compareRouteSpecificity(left.route, right.route),
-	);
+	return [...contractRouteEntries(implementation)]
+		.map(({ route: entry }) => {
+			const { handler, middleware, ...route } =
+				entry as ImplementedRoute["~restrpc"] & {
+					path: string;
+				};
+			if (typeof handler !== "function") {
+				throw new Error(
+					`Route "${route.method} ${route.path}" has no handler.`,
+				);
+			}
+			return { route, handler, middleware };
+		})
+		.sort((left, right) => compareRouteSpecificity(left.route, right.route));
 }
 
 /** A matched route implementation and its decoded URL parameters. */

@@ -1,4 +1,5 @@
-import type { Contract, RouteDeclaration } from "./contract.ts";
+import type { Contract, RouteDeclaration, RouteTree } from "./contract.ts";
+import { resolveRoutePath } from "./path.ts";
 
 type Tree<T> = Record<string, unknown> | T;
 export type ContractRouteEntry = {
@@ -42,14 +43,14 @@ export const mapContractRoutes = (
 	);
 
 export function* contractRouteEntries(
-	contract: Contract,
+	contract: RouteTree,
 	path: string[] = [],
 ): Generator<ContractRouteEntry> {
 	if (isRouteLeaf(contract)) {
 		const declaration = contract["~restrpc"];
 		const route = {
 			...declaration,
-			path: declaration.path ?? `/${path.join("/")}`,
+			path: resolveRoutePath(declaration, path),
 		};
 		yield { route, path };
 		return;

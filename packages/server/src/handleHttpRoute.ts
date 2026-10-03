@@ -14,6 +14,8 @@ import {
 } from "./validationErrors.ts";
 import {
 	flatInputSegment,
+	usesFlatInput,
+	usesPlainOutput,
 	type ResponseDeclaration,
 	type RouteDeclaration,
 } from "@rest-rpc/core/contract";
@@ -72,8 +74,6 @@ const requestHeader = (headers: RequestSegments["headers"], name: string) => {
 	const value = headers?.[name];
 	return Array.isArray(value) ? value[0] : value;
 };
-
-const usesPlainOutput = (route: RouteDeclaration) => route.output === "output";
 
 const getResponseSchema = (
 	route: RouteDeclaration,
@@ -192,7 +192,7 @@ const getHandlerRequestFields = (
 		headers?: unknown;
 	},
 ) => {
-	if (route.request?.input === undefined) return segments;
+	if (!usesFlatInput(route)) return segments;
 	return { input: segments[flatInputSegment(route.method)] };
 };
 
