@@ -81,8 +81,10 @@ const app = await NestFactory.create(AppModule);
 await app.listen(3000);
 ```
 
-`@Implement()` registers the methods and paths from its argument. The decorated
-method returns the matching completed route tree.
+`@Implement()` registers the methods and paths from its argument. A route
+without a path is registered at the path derived from its tree keys, like
+`/todos/create` above. The decorated method returns the matching completed
+route tree.
 
 Nest decorators on the decorated method are copied to every generated route
 method, so guards, interceptors, and parameter decorators can be applied to a
@@ -90,7 +92,8 @@ whole route tree.
 
 ### Single Route Registration
 
-The decorator also accepts a single route with an explicit path:
+The decorator also accepts a single route. A single route has no tree keys to
+derive a path from, so it must declare its path in its method setter:
 
 ```ts
 const getTodo = route.get("/todos/:id").params(z.object({ id: z.string() }));
@@ -107,8 +110,9 @@ class TodoController {
 ```
 
 :::warning
-Route with [derived path](/docs/route-builder#start-with-defaults) is not supported.
-Add explicit method and path or use a route tree with `@Implement()` instead.
+`@Implement()` throws for a single route without a path, such as
+`route.input(schema)` or `route.get()`. Pass a path to its method setter or put
+the route in a route tree.
 :::
 
 ## Framework Context

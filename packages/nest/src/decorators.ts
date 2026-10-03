@@ -104,11 +104,14 @@ const createImplementationRouteMethod = (
 };
 
 /**
- * Registers every route in a contract tree through a Nest controller method.
+ * Registers every route in a route tree or a single route through a Nest
+ * controller method.
  *
- * @remarks The decorated method must return a matching completed route or
- * implementation tree. Nest decorators applied to the method are copied to
- * every generated route method.
+ * @remarks A route without a path is registered at the path derived from its
+ * tree keys, so a single route must declare its path in its method setter,
+ * such as `.get("/todos")`. The decorated method must return the matching
+ * completed route or implementation tree. Nest decorators applied to the
+ * method are copied to every generated route method.
  *
  * @see {@link https://rest-rpc.dev/docs/server/nest}
  */
@@ -116,7 +119,7 @@ export function Implement(contract: Contract): MethodDecorator {
 	return (target, propertyKey, descriptor) => {
 		if (isRouteLeaf(contract) && contract["~restrpc"].path === undefined) {
 			throw new Error(
-				"@Implement() requires a route without a path to be part of a route tree because its path is derived from its tree keys.",
+				'@Implement() cannot derive a path for a single route without one. Pass a path to its method setter, such as .get("/todos"), or put the route in a route tree.',
 			);
 		}
 		for (const { route, path } of contractRouteEntries(contract)) {

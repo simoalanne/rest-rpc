@@ -72,6 +72,6 @@ describe("Nest HTTP integration", () => {
 			decorate(ApiController.prototype, "routes", {
 				value: () => undefined,
 			}),
-		).toThrow("@Implement() requires a route without a path");
+		).toThrow("@Implement() cannot derive a path");
 	});
 });
