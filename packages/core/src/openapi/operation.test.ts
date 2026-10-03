@@ -168,7 +168,7 @@ describe("operation", () => {
 			},
 		]);
 		expect(
-			createParameters(second, "path", options).map(
+			createParameters([second], "path", options).map(
 				(parameter) => parameter.required,
 			),
 		).toEqual([true, true]);
@@ -189,7 +189,7 @@ describe("operation", () => {
 			},
 		});
 		expect(createRequestBody([], undefined)).toBeUndefined();
-		expect(createRequestBody(type<string>(), undefined, [])).toBeUndefined();
+		expect(createRequestBody([type<string>()], undefined, [])).toBeUndefined();
 	});
 
 	it("omits content for bodyless responses and uses SSE for streams", () => {

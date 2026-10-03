@@ -108,27 +108,16 @@ const createContent = (
 ) =>
 	Object.fromEntries(contentTypes.map((contentType) => [contentType, value]));
 
-type SchemaOrSchemas<TSchema extends StandardSchemaV1> =
-	| TSchema
-	| readonly TSchema[];
-
-const getSchemas = <TSchema extends StandardSchemaV1>(
-	schemaOrSchemas: SchemaOrSchemas<TSchema>,
-): readonly TSchema[] =>
-	Array.isArray(schemaOrSchemas)
-		? (schemaOrSchemas as readonly TSchema[])
-		: [schemaOrSchemas as TSchema];
-
 export const createParameters = (
-	schemaOrSchemas: SchemaOrSchemas<StandardSchemaV1> | undefined,
+	schemas: readonly StandardSchemaV1[] | undefined,
 	location: "path" | "query" | "header",
 	options: CreateOperationOptions,
 ): OpenApiParameter[] => {
-	if (!schemaOrSchemas) return [];
+	if (!schemas) return [];
 
 	const properties: Record<string, OpenApiSchema> = {};
 	const requiredKeys = new Set<unknown>();
-	for (const schema of getSchemas(schemaOrSchemas)) {
+	for (const schema of schemas) {
 		const jsonSchema = options.schemaConverter?.(schema, "input") ?? {};
 		for (const [name, propertySchema] of Object.entries(
 			getSchemaProperties(jsonSchema),
@@ -156,13 +145,11 @@ export const createParameters = (
 };
 
 export const createRequestBody = (
-	schemaOrSchemas: SchemaOrSchemas<RequestBodySchema> | undefined,
+	schemas: readonly RequestBodySchema[] | undefined,
 	converter: SchemaConverter | undefined,
 	customContentType?: string | readonly string[],
 ): OpenApiRequestBody | undefined => {
-	if (!schemaOrSchemas) return undefined;
-	const schemas = getSchemas(schemaOrSchemas);
-	if (schemas.length === 0) return undefined;
+	if (!schemas || schemas.length === 0) return undefined;
 	const contentTypes = contentTypeList(customContentType ?? JSON_CONTENT_TYPE);
 	if (contentTypes.length === 0) return undefined;
 	const convertedSchemas = schemas.map(
