@@ -36,6 +36,19 @@ importers:
         specifier: 5.0.3
         version: 5.0.3(@types/node@26.3.0)(vite@8.3.2(@types/node@26.3.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))
 
+  benchmarks:
+    dependencies:
+      '@rest-rpc/core':
+        specifier: workspace:*
+        version: link:../packages/core
+      '@rest-rpc/fetch':
+        specifier: workspace:*
+        version: link:../packages/fetch
+    devDependencies:
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
   content:
     dependencies:
       '@modelcontextprotocol/sdk':

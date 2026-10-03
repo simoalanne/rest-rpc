@@ -62,7 +62,9 @@ Rules that decide the wire format or the served path are derived separately in e
 
 Type-level or design-level changes, to be reviewed last. For the type-level items, hover output and type tests are the review criteria.
 
-**Type-check benchmark first.** The repo has no type-checker performance benchmark right now. A basic `benchmarks/` package (generated fixtures plus a typecheck runner) existed until it was removed in `737b7a2`. Any branch that changes the builder or inference types (3.1–3.3) must restore or rebuild a benchmark as part of the same work. That way each change shows whether a type that is easier to read is also no slower to check. Several of these types are shaped for checker performance rather than readability, so a cleanup that only looks simpler can regress it.
+**Status: done.** `benchmarks/` generates contract-first, server-first and implemented route trees and reports types, instantiations, memory and check time from `tsc --extendedDiagnostics`. Run `pnpm bench:typecheck -- --label <name> [--baseline <name>]`.
+
+**Type-check benchmark first.** The repo had no type-checker performance benchmark. A basic `benchmarks/` package (generated fixtures plus a typecheck runner) existed until it was removed in `737b7a2`. Any branch that changes the builder or inference types (3.1–3.3) must restore or rebuild a benchmark as part of the same work. That way each change shows whether a type that is easier to read is also no slower to check. Several of these types are shaped for checker performance rather than readability, so a cleanup that only looks simpler can regress it.
 
 ### 3.1 Derive route modes instead of storing `kind` and `input`
 
