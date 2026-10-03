@@ -25,9 +25,6 @@ const create = route
 	.handler(({ input: { title } }) => ({ id: crypto.randomUUID(), title }));
 
 export const routes = { todos: { create } };
-
-// After creating a client:
-const todo = await client.todos.create({ title: "Write docs" });
 ```
 
 Without a method setter, a route uses POST and derives its path from its tree
@@ -54,10 +51,14 @@ const todo = route
 ```
 
 Use `.get(path)`, `.post(path)`, `.put(path)`, `.patch(path)`, or `.delete(path)`.
-For GET requests, the input becomes query parameters, while other methods send it as the body.
-Path can be dynamic and supports both `:id` and `{id}` syntax. Each segment must have a corresponding schema in `.params()`.
+A method can be selected once per route. For GET requests, `.input()` is sent
+as query parameters, while other methods send it as the body.
 
-Path can also be omitted, in which case the route keeps resolving its path from its tree keys but uses the specified method over the default POST.
+Paths can contain dynamic segments using either `:id` or `{id}` syntax. Declare
+each dynamic segment in `.params()`.
+
+The path can also be omitted, in which case the route keeps deriving its path
+from its tree keys but uses the specified method instead of the default POST.
 
 ```ts
 const getRoute = route.get();
@@ -68,14 +69,8 @@ const listNotes = getRoute.handler(() => listNotes());
 
 ## Declare Request Segments
 
-Use `.params()`, `.query()`, `.headers()`, and `.body()` to separate HTTP request
-locations instead of `.input()`.
-
-Following limitations apply to request segments:
-
-- `.params()` must correspond to dynamic path segments.
-- `.body()` is not allowed for GET requests and will throw a runtime error if declared.
-- `input()` and request segments cannot be combined, except for a special case where only headers are declared in addition to input.
+Use `.params()`, `.query()`, `.headers()`, and `.body()` instead of `.input()`
+to read each HTTP request location separately.
 
 ```ts
 const update = route
@@ -90,20 +85,24 @@ const update = route
 			requestId: headers["x-request-id"],
 		}),
 	);
-
-const todo = await client.todos.update({
-	params: { id: "todo_1" },
-	query: { notify: "yes" },
-	headers: { "x-request-id": "req_1" },
-	body: { title: "Write docs" },
-});
 ```
+
+The following rules apply to request segments:
+
+- `.params()` must correspond to dynamic path segments.
+- `.body()` is not allowed on GET routes and throws when declared.
+- `.input()` cannot be combined with `.params()`, `.query()`, or `.body()`.
+  It can be combined with `.headers()`.
+- `.input()` requires a static path, because it has no `params` location.
+
+Header schemas must use lowercase names. See
+[Serialization and Codecs](/docs/http-behavior/serialization#path-query-and-headers)
+for how each location is encoded.
 
 ### Combine Input and Headers
 
-Combining input with headers is allowed but comes with a limitation. When using the fetch client,
-the headers must be supplied through `globalHeaders` in the client configuration and cannot be passed
-in the request call that only accepts the input. See [Fetch Client and Global Headers](/docs/client/fetch-client#global-headers) for details.
+`.headers()` can be added to a route that uses `.input()`. The handler receives
+both `input` and `headers`:
 
 ```ts
 const create = route
@@ -112,17 +111,10 @@ const create = route
 	.handler(({ input: { title }, headers }) =>
 		createTodo(title, headers.authorization),
 	);
-
-const api = { todos: { create } };
-const client = initClient(api, {
-	baseUrl: "https://api.example.com",
-	globalHeaders: {
-		authorization: "Bearer token",
-	},
-});
-
-client.todos.create({ title: "Write docs" });
 ```
+
+A flat-input client call only accepts the input, so the Fetch client supplies
+these headers through [`globalHeaders`](/docs/client/fetch-client#global-headers).
 
 ## Stacking Schemas
 
@@ -168,15 +160,12 @@ const get = route
 			? { status: 200, body: todo }
 			: { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
 	});
-
-const response = await client.todos.get({ params: { id: "todo_1" } });
-if (response.status === 200) {
-	console.log(response.body.title);
-}
 ```
 
 Use `.response()` for each status when you want explicit response schemas.
-Choose either plain outputs or status responses for a route.
+A route uses either plain outputs or status responses, not both, and each status
+can be declared once. A handler returning a status that is not declared fails at
+runtime.
 
 ```ts
 const get = route
@@ -192,9 +181,9 @@ const get = route
 	});
 ```
 
-Omit the schema for a bodyless response, such as `.response(204)`. Non-2xx
-statuses use the same method as successful statuses. Declare status-specific
-response headers in the options and return them as `responseHeaders`:
+Omit the schema for a bodyless response, such as `.response(204)`. Declare
+status-specific response headers in the options and return them as
+`responseHeaders`:
 
 ```ts
 route
@@ -223,8 +212,6 @@ const report = route
 	.get("/todos/report")
 	.output(z.string(), { contentType: "text/plain" })
 	.handler(() => ({ contentType: "text/plain", data: createTodoReport() }));
-
-const text = await client.todos.report();
 ```
 
 A custom-content plain output handler returns `{ contentType, data }` and the
@@ -232,8 +219,10 @@ client receives the decoded data. A status response handler uses
 `{ status, body, contentType }`. With no output declaration, the adapter can
 infer a custom-content output from `{ contentType: "text/plain" as const, data }`.
 
-Content types can also be declared as a list of alternatives.
-Use `contentType` to select one when sending a body. See
+Content types can also be declared as a list of alternatives. The handler
+selects a response content type with its returned `contentType`, and the client
+selects a request content type in its
+[per-call options](/docs/client/fetch-client#per-call-options). See
 [Serialization and Codecs](/docs/http-behavior/serialization) for decoded value
 types and compatible codecs.
 
@@ -249,9 +238,8 @@ const events = route
 	.handler(() => streamTodoEvents());
 ```
 
-Streaming routes use Server-Sent Events. See [Streaming](/docs/streaming)
-for handlers, client consumption, event metadata, validation, cancellation,
-and reconnection behavior.
+See [Streaming](/docs/streaming) for handlers, event metadata, validation, and
+resuming streams.
 
 ## Add Metadata and OpenAPI Details
 
@@ -267,106 +255,148 @@ const list = route
 	.handler(() => listTodos());
 ```
 
-See [OpenAPI](/docs/openapi) for document generation.
+Both can be called more than once. Metadata objects are shallow-merged, and
+OpenAPI details are merged with tags combined. Read metadata from the handler's
+`route` argument, middleware, or adapter hooks. See [OpenAPI](/docs/openapi)
+for document generation.
 
-## Infer Route Types
+## Reuse Builders
 
-Use the route inference type helpers when the request or response type needs to be
-reused elsewhere in your application.
+Every builder method returns a new route value, so a partially built route can
+be shared as a base for other routes without affecting them:
 
-### Infer Client Request
+```ts
+const authenticated = route
+	.headers(z.object({ authorization: z.string() }))
+	.metadata({ auth: "required" });
 
-```ts twoslash
-import type { InferClientRequest } from "@rest-rpc/core";
-import { route } from "@rest-rpc/express";
-import z from "zod";
-
-const create = route
-	.input(z.object({ title: z.string() }))
-	.handler(({ input }) => ({ id: "todo_1" as const, title: input.title }));
-
-const update = route
-	.patch("/todos/:id")
+const list = authenticated.get("/todos").handler(() => listTodos());
+const remove = authenticated
+	.delete("/todos/:id")
 	.params(z.object({ id: z.string() }))
-	.body(z.object({ title: z.string() }))
-	.handler(({ params, body }) => ({ id: params.id, title: body.title }));
-
-type CreateTodoRequest = InferClientRequest<typeof create>;
-
-type UpdateTodoRequest = InferClientRequest<typeof update>;
+	.response(204)
+	.handler(({ params }) => {
+		deleteTodo(params.id);
+		return { status: 204 };
+	});
 ```
 
-### Infer Client Response
+A route cannot be changed after `.handler()` is attached.
 
-```ts twoslash
-import type { InferClientResponse } from "@rest-rpc/core";
-import { route } from "@rest-rpc/express";
-import z from "zod";
+## Handler Arguments
 
-const list = route.handler(() => [{ id: "todo_1", title: "Write docs" }]);
+A handler receives one object containing:
 
-const getFirst = route.handler(() => {
-	const random = Math.random();
+- The validated request: `input`, or `params`, `query`, `headers`, and `body`.
+- `context`: the per-request [context](/docs/context) shared with middleware.
+- `route`: the route declaration, including its method, path, and `metadata`.
+- `contentType`: the received request media type, if any.
+- `lastEventId`: the `Last-Event-ID` request header, used to [resume streams](/docs/streaming#resume-a-stream).
+- `signal`: an `AbortSignal` that aborts when the client disconnects.
+- Native framework values such as the request object. See the
+  "Framework Context" section of your [server adapter](/docs/server/express#framework-context).
 
-	if (random < 0.5) {
-		return { status: 200, body: { id: "todo_1", title: "Write docs" } };
-	}
-	return { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
-});
+## Type Helpers
 
-type ListTodosResponse = InferClientResponse<typeof list>;
+Use the type helpers to reuse a route's types in code that lives outside the
+route, such as service functions or separately written handlers. For
+client-side types, see
+[Fetch Client](/docs/client/fetch-client#infer-client-types).
 
-type GetFirstTodoResponse = InferClientResponse<typeof getFirst>;
+Infer from a route declared without `.handler()`, or from a contract route. A
+type inferred from a completed route cannot be used inside that route's own
+handler, because the route's type depends on the handler.
+
+Each helper also accepts a route tree and infers a matching tree of types.
+Declare one type for your routes and index into it where a route's type is
+needed:
+
+```ts
+import type { InferServerRequest } from "@rest-rpc/express";
+import type { routes } from "./routes";
+
+export type ServerRequests = InferServerRequest<typeof routes>;
+
+type CreateTodoRequest = ServerRequests["todos"]["create"];
 ```
 
 ### Infer Server Request
+
+`InferServerRequest` is the validated request a handler receives, without
+framework values or context. Use it to pass validated input to code that does
+not depend on the server framework.
 
 ```ts twoslash
 import type { InferServerRequest } from "@rest-rpc/express";
 import { route } from "@rest-rpc/express";
 import z from "zod";
 
-const create = route
-	.input(z.object({ title: z.string() }))
-	.handler(({ input }) => ({ id: "todo_1" as const, title: input.title }));
-
-const update = route
+const updateDeclaration = route
 	.patch("/todos/:id")
 	.params(z.object({ id: z.string() }))
-	.body(z.object({ title: z.string() }))
-	.handler(({ params, body }) => ({ id: params.id, title: body.title }));
+	.body(z.object({ title: z.string() }));
 
-type CreateTodoRequest = InferServerRequest<typeof create>;
+type UpdateTodoRequest = InferServerRequest<typeof updateDeclaration>;
 
-type UpdateTodoRequest = InferServerRequest<typeof update>;
+const updateTodo = ({ params, body }: UpdateTodoRequest) => ({
+	id: params.id,
+	title: body.title,
+});
+
+const update = updateDeclaration.handler(updateTodo);
 ```
 
 ### Infer Server Response
+
+`InferServerResponse` is the value a handler must return for the responses
+declared with `.output()` or `.response()`. When responses are inferred from
+the handler, there is no declared response to infer before `.handler()`.
 
 ```ts twoslash
 import type { InferServerResponse } from "@rest-rpc/express";
 import { route } from "@rest-rpc/express";
 import z from "zod";
 
-const list = route
-	.output(z.array(z.object({ id: z.string(), title: z.string() })))
-	.handler(() => [{ id: "todo_1", title: "Write docs" }]);
+const todoSchema = z.object({ id: z.string(), title: z.string() });
 
-const getFirst = route
+const getDeclaration = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
-	.response(200, z.object({ id: z.string(), title: z.string() }))
-	.response(404, z.object({ code: z.literal("TODO_NOT_FOUND") }))
-	.handler(({ params }) => {
-		const random = Math.random();
+	.response(200, todoSchema)
+	.response(404, z.object({ code: z.literal("TODO_NOT_FOUND") }));
 
-		if (random < 0.5) {
-			return { status: 200, body: { id: params.id, title: "Write docs" } };
-		}
-		return { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
-	});
+type GetTodoResponse = InferServerResponse<typeof getDeclaration>;
 
-type ListTodosResponse = InferServerResponse<typeof list>;
+const findTodo = (id: string): GetTodoResponse =>
+	id === "todo_1"
+		? { status: 200, body: { id, title: "Write docs" } }
+		: { status: 404, body: { code: "TODO_NOT_FOUND" } };
 
-type GetFirstTodoResponse = InferServerResponse<typeof getFirst>;
+const get = getDeclaration.handler(({ params }) => findTodo(params.id));
+```
+
+### Infer Server Handler
+
+`InferServerHandler` is the full handler signature, including framework values
+and context. It is exported by each server adapter. Use it to write a handler
+separately from its declaration:
+
+```ts twoslash
+import { route, type InferServerHandler } from "@rest-rpc/express";
+import z from "zod";
+
+const todoSchema = z.object({ id: z.string(), title: z.string() });
+
+const getDeclaration = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.response(200, todoSchema)
+	.response(404, z.object({ code: z.literal("TODO_NOT_FOUND") }));
+
+const getTodo: InferServerHandler<typeof getDeclaration> = ({ params, req }) =>
+	params.id === "todo_1"
+		? { status: 200, body: { id: params.id, title: req.hostname } }
+		: { status: 404, body: { code: "TODO_NOT_FOUND" } };
+
+const get = getDeclaration.handler(getTodo);
 ```

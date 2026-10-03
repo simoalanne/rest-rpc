@@ -1,6 +1,6 @@
 import type { BodyCodec } from "@rest-rpc/core";
 import { normalizeMediaType, resolveBodyCodec } from "@rest-rpc/core/codecs";
-import { createRequestSignal, writeNodeResponse } from "@rest-rpc/node";
+import { createRequestSignal, writeNodeResponse } from "@rest-rpc/node/adapter";
 import type { HttpMethod, RouteDeclaration } from "@rest-rpc/core/contract";
 import { toColonPath } from "@rest-rpc/core/contract";
 import {

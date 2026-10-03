@@ -1,10 +1,9 @@
-import type { Contract, RouteDeclaration } from "@rest-rpc/core/contract";
+import type { Contract, RouteTree } from "@rest-rpc/core/contract";
 import {
 	implement as serverImplement,
 	serverFirstRoute,
 	type Contractimplementer,
-	type RouteHandler as ServerRouteHandler,
-	type RouteRequest as ServerRouteRequest,
+	type RouteHandlerFor,
 	type ServerRouteBuilder,
 } from "@rest-rpc/server";
 import type { Context } from "hono";
@@ -23,14 +22,11 @@ type HonoHandlerFields<TEnv extends Env = Env> = {
  */
 export interface DefaultContext {}
 
-type ContractRoute = { readonly "~restrpc": RouteDeclaration };
-
 export { type } from "@rest-rpc/core";
 export type {
 	Context,
 	InferServerRequest,
 	InferServerResponse,
-	RouteErrors,
 } from "@rest-rpc/server";
 export type {
 	ExtendedHonoMiddleware,
@@ -53,32 +49,17 @@ export { sse } from "@rest-rpc/server";
 export type { SseEvent } from "@rest-rpc/core";
 
 /**
- * Infers the validated request and Hono context available to a route handler.
- *
- * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
- */
-export type RouteRequest<
-	TRoute extends ContractRoute,
-	TEnv extends Env = Env,
-> = ServerRouteRequest<
-	TRoute["~restrpc"],
-	HonoHandlerFields<TEnv>,
-	DefaultContext
->;
-
-/**
  * Infers the Hono handler signature for a route declaration.
  *
+ * @remarks Use a route declared without `.handler()` to write its handler
+ * separately. Pass a route tree to infer a matching tree of handler types.
+ *
  * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
  */
-export type RouteHandler<
-	TRoute extends ContractRoute,
+export type InferServerHandler<
+	TRoute extends RouteTree,
 	TEnv extends Env = Env,
-> = ServerRouteHandler<
-	TRoute["~restrpc"],
-	HonoHandlerFields<TEnv>,
-	DefaultContext
->;
+> = RouteHandlerFor<TRoute, HonoHandlerFields<TEnv>, DefaultContext>;
 
 /**
  * Entry point for declaring routes with handlers for Hono.

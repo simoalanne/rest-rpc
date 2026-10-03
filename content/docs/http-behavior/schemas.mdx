@@ -18,10 +18,10 @@ or add defaults, so the two types can differ.
 
 | Position                               | Type used     |
 | -------------------------------------- | ------------- |
-| Fetch client request input             | Schema input  |
+| Client request input                   | Schema input  |
 | Server handler input                   | Schema output |
 | Server handler output or response body | Schema input  |
-| Fetch client result or response body   | Schema output |
+| Client result or response body         | Schema output |
 
 For inferred handler outputs, there is no declared response schema: client
 output types come from the handler's return value.
@@ -29,9 +29,10 @@ output types come from the handler's return value.
 ## Request Validation
 
 The server decodes a request, then validates its declared request schemas before
-calling the handler. The handler receives validated schema output. Request
-validation failures produce a 400 response by default. Adapter pages cover how to
-customize error handling.
+running middleware and the handler. The handler receives validated schema
+output. Request validation failures produce a 400 response by default. See
+[Error Responses](/docs/http-behavior/errors) for the response body and how to
+customize it.
 
 ```ts
 import { route } from "@rest-rpc/express";
@@ -52,7 +53,8 @@ for the handler.
 Declared output schemas validate the handler result before response
 serialization. A plain `.output(schema)` handler returns schema input directly;
 a `.response(status, schema)` handler supplies schema input in `body`.
-The server sends the validated schema output.
+Declared response headers are validated too. The server sends the validated
+schema output.
 
 ```ts
 const create = route
@@ -66,13 +68,17 @@ Add `.output()`, `.response()`, `.streamOutput()`, or `.streamResponse()` when
 runtime validation is needed. Declared stream schemas validate each item as it
 is yielded.
 
-Response validation failures normally produce a generic 500 response. Once a
-stream has started, an invalid item terminates the stream instead of replacing
-it with a new HTTP response. See each server adapter for error customization.
+Response validation failures produce a generic 500 response by default. See
+[Error Responses](/docs/http-behavior/errors).
+
+## Response Validation on the Client
+
+The Fetch client does not validate responses unless `validateResponses` is
+enabled. See [Fetch Client](/docs/client/fetch-client#response-validation).
 
 ## Disabling Server Validation
 
-Every server adapter provides `disableRequestValidation` and
+Every server adapter accepts `disableRequestValidation` and
 `disableResponseValidation` options. Both default to `false`. These options
 disable only schema validation. Request decoding, content-type checks, route
 matching, response status and content-type selection, and response serialization
@@ -96,43 +102,17 @@ In the example below the `id` parameter will be a string at runtime even though 
 The `title` property can be missing in the response body because the default value is not applied when response validation is disabled.
 
 ```ts
-const route = route
+const getTodo = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.coerce.number<number>().int().min(1) }))
 	.output(z.object({ id: z.number(), title: z.string().default("Untitled") }))
-	.handler(({ input: { id } }) => {
+	.handler(({ params: { id } }) => {
 		const todo: { id: number; title?: string } = getTodoById(id);
 		return todo;
 	});
 ```
 
 :::
-
-## Response Validation on the Client
-
-The Fetch client decodes response bodies without schema validation by default.
-Enable `validateResponses` to validate decoded bodies, declared response
-headers, and stream event data:
-
-```ts
-const client = initClient(api, {
-	baseUrl: "https://api.example.com",
-	validateResponses: true,
-});
-```
-
-Validation runs after deserialization. The client receives schema output on success.
-Enabling validation will validate against the **input** type of the declared schema.
-If you are using schema with different input and output types this may result in unexpected validation errors.
-
-:::note
-[Generated client contracts](/docs/client/contract-generation) contain no
-runtime schemas, so this option does not add validation to them and is a no-op.
-:::
-
-See [Fetch Client](/docs/client/fetch-client) for client-specific behavior and
-[Serialization and Codecs](/docs/http-behavior/serialization) for the decoding
-that precedes validation.
 
 ## Type Utility
 
@@ -149,3 +129,5 @@ const create = route
 
 const numberToStringSchema = type((input: number) => input.toString());
 ```
+
+`type` is also exported from every server adapter package.

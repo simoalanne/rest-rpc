@@ -20,22 +20,13 @@ const app = new Hono();
 const api = new Hono();
 const todos = new Map([["todo_1", { id: "todo_1", title: "Write docs" }]]);
 
-api.use("*", async (c, next) => {
-	console.log(c.req.method, c.req.path);
-	await next();
-});
-
 const getTodo = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
-	.handler(({ params, c }) => {
+	.handler(({ params }) => {
 		const todo = todos.get(params.id);
 		return todo
-			? {
-					status: 200,
-					body: todo,
-					responseHeaders: { "x-request-id": c.req.header("x-request-id") },
-				}
+			? { status: 200, body: todo }
 			: { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
 	});
 
@@ -46,30 +37,90 @@ app.route("/api", api);
 export default app;
 ```
 
+`registerRoutes()` accepts a Hono app. Mount it with `app.route()` to serve
+routes under a prefix.
+
+## Framework Context
+
+Handlers and middleware receive the Hono context `c` in addition to the
+[common handler arguments](/docs/route-builder#handler-arguments):
+
+```ts
+const getTodo = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.handler(({ params, c }) => {
+		console.log(c.req.method, c.req.header("x-request-id"));
+		return todos.get(params.id);
+	});
+```
+
+To share an application [context](/docs/context) type across routes, augment
+`DefaultContext` in `@rest-rpc/hono`.
+
 ## Options
 
 ```ts
 type RegisterRoutesOptions<TEnv extends Env = Env> = {
-	requestValidationErrorHandler?: RequestValidationErrorHandler<TEnv>;
-	responseValidationErrorHandler?: ResponseValidationErrorHandler<TEnv>;
 	bodyCodecs?: readonly BodyCodec<HonoRequest>[];
 	disableRequestValidation?: boolean;
 	disableResponseValidation?: boolean;
 	requestBodyLimit?: number;
-	middleware?: Array<
-		(c: Context<TEnv>, next: Next, route: RouteDeclaration) => any
-	>;
+	requestValidationErrorHandler?: RequestValidationErrorHandler<TEnv>;
+	responseValidationErrorHandler?: ResponseValidationErrorHandler<TEnv>;
+	middleware?: ExtendedHonoMiddleware<TEnv>[];
 };
 ```
 
-`bodyCodecs`: see [Serialization and Codecs](/docs/http-behavior/serialization).
+- `bodyCodecs`, `requestBodyLimit`: see [Request and Response Bodies](#request-and-response-bodies).
+- `disableRequestValidation`, `disableResponseValidation`: see
+  [Disabling Server Validation](/docs/http-behavior/schemas#disabling-server-validation).
+- `requestValidationErrorHandler`, `responseValidationErrorHandler`: see [Error Handling](#error-handling).
+- `middleware`: see [Middleware](#middleware).
 
-`requestBodyLimit`: see [request body limits](/docs/http-behavior/serialization#server-request-deserialization).
+## Middleware
 
-### Error handling
+Use the `middleware` option to run Hono middleware only for rest-rpc routes.
+Each function has the Hono middleware signature plus a `route` argument that
+contains the matched route declaration, including its `metadata`.
+
+The middleware is registered on each rest-rpc route, so it does not run for
+other routes on the same app. It runs before rest-rpc decodes and validates the
+request, and before [route middleware](/docs/middleware).
+
+```ts
+registerRoutes(app, routes, {
+	middleware: [
+		async (c, next, route) => {
+			if (
+				route.metadata?.auth === "required" &&
+				!c.req.header("authorization")
+			) {
+				return c.json({ code: "UNAUTHORIZED" }, 401);
+			}
+			await next();
+		},
+	],
+});
+```
+
+## Request and Response Bodies
+
+The adapter decodes request bodies with the
+[default codecs](/docs/http-behavior/serialization#default-codecs), so no
+body-parsing middleware is needed. Built-in decoding reads at most
+`requestBodyLimit` bytes, `1 MiB` by default. A custom codec's `deserialize`
+receives the `HonoRequest` (`c.req`) and is not subject to `requestBodyLimit`.
+
+Handlers can return any value supported by the default codecs. A custom
+serializer's `body` must be a Fetch `Response` body, such as a string, `Blob`,
+`FormData`, byte array, or `ReadableStream`.
+
+## Error Handling
 
 Use `requestValidationErrorHandler` and `responseValidationErrorHandler` to
-customize [validation errors](/docs/http-behavior/schemas). Other errors use Hono's error handler.
+replace the [default validation error responses](/docs/http-behavior/errors).
+Other errors use Hono's error handler.
 
 ```ts
 registerRoutes(app, routes, {
@@ -83,28 +134,5 @@ registerRoutes(app, routes, {
 
 app.onError((error, c) => {
 	return c.json({ code: "INTERNAL_SERVER_ERROR" }, 500);
-});
-```
-
-### Hono Middleware
-
-If you prefer to use Hono middlewares over the [build-in middlewares](/docs/middleware), you can pass them to the `middleware` option.
-These middlewares are registered to the the provided `Hono` instance before the route handlers and accept the same signature as Hono middleware,
-with an additional `route` argument that contains the route declaration for the current request.
-
-The middlewares run before the route handler is executed and passing middleware to registerRoutes is
-equivalent to calling `app.use(middleware)` before `registerRoutes(app, routes)`.
-
-```ts
-registerRoutes(app, routes, {
-	middleware: [
-		async (c, next, route) => {
-			const authorization = c.req.header("authorization");
-			if (!authorization) {
-				return c.json({ code: "UNAUTHORIZED" }, 401);
-			}
-			await next();
-		},
-	],
 });
 ```

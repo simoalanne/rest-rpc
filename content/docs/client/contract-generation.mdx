@@ -8,7 +8,7 @@ routes. Use it with the Fetch client or TanStack Query utils without importing
 server code into the client.
 
 :::note[Using Contract-First Approach?]
-If using the [Contract-First Approach](/docs/contract/declaration),
+If using the [contract-first approach](/docs/contract-first),
 you can skip this step and import the shared contract directly in your client code.
 :::
 
@@ -64,14 +64,13 @@ Other bundlers can use a macro integration such as `unplugin-macros`. Configure
 the integration so generation runs during the build and the resulting runtime
 contract is included in the client bundle.
 
-## Validation and OpenAPI
+## Limitations
 
-Generated contracts carry client types but no runtime validators. Enabling
-`validateResponses` therefore cannot add schema validation to this artifact.
-Declared schemas still validate requests and outputs on the server.
+Generated contracts carry client types but no runtime schemas, so
+[client response validation](/docs/client/fetch-client#response-validation) is
+not available. Declared schemas still validate requests and outputs on the
+server. If the client needs runtime schemas, use a
+[shared contract](/docs/contract-first) instead.
 
-Generate OpenAPI from the server routes with explicit output schemas. See
-[OpenAPI](/docs/openapi).
-
-If the client needs shared runtime schemas, use a
-[separate contract](/docs/contract-first-quickstart).
+Generate [OpenAPI](/docs/openapi) documents from the server routes, not from a
+generated contract.

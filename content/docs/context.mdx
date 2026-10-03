@@ -1,23 +1,37 @@
 ---
 title: Context
-description: Define a shared context for route handlers and middleware
+description: Share typed per-request values between middleware and handlers.
 ---
 
 ## Route Context
 
-Route handlers and middleware share a mutable context object per request.
-Use `context.set()` to store values and `context.get()` to read them.
-Use `route.$context<T>()` to strongly type the context for set of routes or a single route.
+Route handlers and middleware share a context object that is created for each
+request. Use `context.set()` to store values and `context.get()` to read them.
+
+Use `route.$context<T>()` to type the context for a set of routes. Routes built
+from the returned builder share that type:
 
 ```ts
 const authenticatedRoute = route.$context<{
 	user: { id: string; name: string };
 }>();
+
+const getProfile = authenticatedRoute
+	.get("/profile")
+	.use(authenticate)
+	.handler(({ context }) => context.get("user"));
 ```
+
+`$context<T>()` is available on the root `route` builder and replaces the
+[global context](#global-context) type for routes built from it. For contract-first
+routes, call it on the `implement()` result. See
+[Contract-first](/docs/contract-first#context-and-middleware).
 
 ## Global Context
 
-To avoid having to specify a context type for every route, you can define a default context type for you application globally.
+To avoid having to specify a context type for every route, declare a default
+context type for your application globally by augmenting `DefaultContext` in
+your adapter package:
 
 ```ts
 declare module "@rest-rpc/express" {
@@ -30,6 +44,7 @@ declare module "@rest-rpc/express" {
 ```
 
 :::tip
-When declaring required properties use a centralized middleware that runs before downstream middleware or handlers try to access the properties.
-This avoids runtime errors when a property is not set in the context even though the type system indicates that it is present.
+The context type does not guarantee that a value has been set. Set required
+values in middleware that runs before any handler or middleware reads them.
+See [Middleware](/docs/middleware).
 :::

@@ -3,8 +3,9 @@ title: Middleware
 description: Wrap route execution with shared application context.
 ---
 
-Use `.use()` to implement guards, transactions, cleanup, timing, and caching alongside
-framework middleware. Route middleware runs after request validation.
+Use `.use()` to implement guards, transactions, cleanup, timing, and caching
+around route handlers. Route middleware runs after request validation, so it
+receives the same validated request as the handler.
 
 ## Add Middleware
 
@@ -16,7 +17,10 @@ without calling `next()` short-circuits the chain. Call `next()` at most once.
 import { route } from "@rest-rpc/express";
 
 const getProfile = route
+	.$context<{ user?: User }>()
 	.get("/profile")
+	.response(200, z.object({ user: userSchema }))
+	.response(401)
 	.use(async ({ next }) => {
 		const started = performance.now();
 		try {
@@ -25,18 +29,24 @@ const getProfile = route
 			console.log(performance.now() - started);
 		}
 	})
-	.use(({ context, next }) => {
-		if (!context.get("user")) return { status: 401 };
+	.use(async ({ req, context, next }) => {
+		const user = await authenticate(req.header("authorization"));
+		if (!user) return { status: 401 };
+		context.set("user", user);
 		return next();
 	})
 	.handler(({ context }) => ({
 		status: 200,
-		body: { user: context.get("user") },
+		body: { user: context.get("user")! },
 	}));
 ```
 
 Middleware runs in declaration order; work after `await next()` runs in reverse
 order. Request schemas validate before middleware runs, regardless of setter order.
+
+Middleware receives the same arguments as the handler, including
+[context](/docs/context) and the adapter's framework values. Declare request
+schemas before `.use()` to receive their validated types.
 
 ## Reuse Middleware
 
@@ -52,53 +62,62 @@ const base = route.use(transaction);
 const getTodos = base.get("/todos").handler(() => listTodos());
 ```
 
+Adding middleware to one builder branch leaves sibling stacks unchanged.
+
 :::tip
 If the middleware should only be usable on a route with a specific request shape,
-you can use a generic type to strongly type the middleware and constrain its usage to only routes that match the request shape.
+pass the shape as a type argument. The middleware can then only be used on routes
+whose request matches it.
 :::
 
 ```ts
-const attachUser = route.middleware<{ headers: { authorization: string } }>(
-	async ({ headers, next, context }) => {
-		const user = await authenticate(headers.authorization);
+const attachUser = route
+	.$context<{ user?: User }>()
+	.middleware<{ headers: { authorization: string } }>(
+		async ({ headers, next, context }) => {
+			const user = await authenticate(headers.authorization);
 
-		if (!user) {
-			return { status: 401, body: { error: "Unauthorized" } };
-		}
+			if (!user) {
+				return { status: 401, body: { error: "Unauthorized" } };
+			}
 
-		context.set("user", user);
-		return await next();
-	},
-);
+			context.set("user", user);
+			return await next();
+		},
+	);
 
 const getUserProfile = route
+	.$context<{ user?: User }>()
 	.get("/profile")
 	.headers(z.object({ authorization: z.string() }))
 	.use(attachUser)
-	.response(
-		200,
-		z.object({ user: z.object({ id: z.string(), name: z.string() }) }),
-	)
+	.response(200, z.object({ user: profileSchema }))
 	.response(401, z.object({ error: z.string() }))
 	.handler(({ context }) => {
 		const user = context.get("user");
 		if (!user) return { status: 401, body: { error: "Unauthorized" } };
-		const profile = getProfileForUser(user.id);
-		return { status: 200, body: { user: profile } };
+		return { status: 200, body: { user: getProfileForUser(user.id) } };
 	});
 ```
 
-Adding middleware to one builder branch leaves sibling stacks unchanged. Use
-inline callbacks for route-specific inputs; declare their schemas before `.use()`
-to access validated request types.
-
 ## Outputs and Errors
 
-Middleware receives raw application output. Response validation and serialization
-run after the chain completes. Middleware responses are unchecked and do not change
-the client contract. Declare `.output()` or `.response()` schemas to validate the
-final value and expose responses to clients.
+Middleware receives and returns raw application output. A value returned by
+middleware is handled like a handler result: response validation and
+serialization run after the chain completes. Middleware return values are not
+type checked and do not change the client contract, so declare a
+`.response()` for every status your middleware can return.
 
 Downstream errors propagate through `next()`, allowing middleware to catch errors
 or clean up in `finally`. Response delivery and stream consumption happen outside
 this wrapping scope.
+
+## Framework Middleware
+
+Framework middleware registered on your app keeps working alongside route
+middleware. To run framework middleware only for rest-rpc routes, with access
+to the matched route declaration, use your adapter's option: Express
+[`middleware`](/docs/server/express#middleware), Fastify
+[`preHandler`](/docs/server/fastify#prehandler), or Hono
+[`middleware`](/docs/server/hono#middleware). These run before request
+validation and route middleware.

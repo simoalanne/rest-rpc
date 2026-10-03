@@ -3,6 +3,7 @@ import type {
 	Contractimplementer,
 	RouteHandler,
 	RouteErrors,
+	RouteHandlerFor,
 	RouteRequest,
 	ServerRouteBuilder,
 } from "./index.ts";
@@ -95,5 +96,22 @@ describe("server handler generic propagation", () => {
 				context.get("requestId");
 				return { status: 200, body: "ok" };
 			});
+	});
+
+	it("infers handler signatures for a route tree", () => {
+		const tree = { users: { get: declaration } };
+		expectTypeOf<
+			RouteHandlerFor<typeof tree, Fields, Values>["users"]["get"]
+		>().toEqualTypeOf<
+			RouteHandler<(typeof declaration)["~restrpc"], Fields, Values>
+		>();
+	});
+
+	it("returns plain values from handlers of plain output routes", () => {
+		const output = contractRoute.get("/").output(type<string>());
+		type Handler = RouteHandlerFor<typeof output, Fields, Values>;
+		expectTypeOf<ReturnType<Handler>>().toEqualTypeOf<
+			string | Promise<string>
+		>();
 	});
 });

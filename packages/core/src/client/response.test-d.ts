@@ -1,7 +1,7 @@
 import { route } from "../contract/routeBuilder.ts";
 import { type } from "../standard-schema/type.ts";
 import type { SseEvent } from "../sse.ts";
-import type { InferClientResponse } from "./response.ts";
+import type { InferClientResponse, InferClientStreamData } from "./response.ts";
 
 describe("client response inference", () => {
 	it("uses transformed schema outputs in response unions", () => {
@@ -48,5 +48,33 @@ describe("client response inference", () => {
 			{ contentType: "text/plain" },
 		);
 		expectTypeOf<InferClientResponse<typeof plain>>().toEqualTypeOf<number>();
+	});
+
+	it("infers results for a route tree", () => {
+		const get = route.get("/").output(type<string>());
+		const tree = { users: { get } };
+		expectTypeOf<
+			InferClientResponse<typeof tree>["users"]["get"]
+		>().toEqualTypeOf<InferClientResponse<typeof get>>();
+	});
+
+	it("unwraps stream event data", () => {
+		const output = route.streamOutput(type((input: string) => Number(input)));
+		const response = route
+			.get("/")
+			.streamResponse(200, type<{ value: number }>())
+			.response(404, type<{ message: string }>());
+		const plain = route.output(type<string>());
+		expectTypeOf<
+			InferClientStreamData<typeof output>
+		>().toEqualTypeOf<number>();
+		expectTypeOf<InferClientStreamData<typeof response>>().toEqualTypeOf<{
+			value: number;
+		}>();
+		expectTypeOf<InferClientStreamData<typeof plain>>().toEqualTypeOf<never>();
+		const tree = { events: { output, response } };
+		expectTypeOf<
+			InferClientStreamData<typeof tree>["events"]["output"]
+		>().toEqualTypeOf<number>();
 	});
 });

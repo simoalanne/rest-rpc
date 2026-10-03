@@ -1,8 +1,9 @@
-import type { Contract } from "@rest-rpc/core/contract";
+import type { Contract, RouteTree } from "@rest-rpc/core/contract";
 import {
 	implement as serverImplement,
 	serverFirstRoute,
 	type Contractimplementer,
+	type RouteHandlerFor,
 	type ServerRouteBuilder,
 } from "@rest-rpc/server";
 
@@ -26,6 +27,20 @@ type FetchHandlerFields = {
 	request: DefaultRequest;
 	signal: AbortSignal;
 };
+
+/**
+ * Infers the Fetch handler signature for a route declaration.
+ *
+ * @remarks Use a route declared without `.handler()` to write its handler
+ * separately. Pass a route tree to infer a matching tree of handler types.
+ *
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
+ */
+export type InferServerHandler<TRoute extends RouteTree> = RouteHandlerFor<
+	TRoute,
+	FetchHandlerFields,
+	DefaultContext
+>;
 
 /**
  * Entry point for declaring routes with handlers for the Fetch runtime.
@@ -61,10 +76,6 @@ export type {
 	Context,
 	InferServerRequest,
 	InferServerResponse,
-	ImplicitResponseEnvelope,
-	ImplicitResponseKind,
-	ServerFirstResponseKind,
-	ServerFirstRouteResponseKind,
 } from "@rest-rpc/server";
 export {
 	RequestValidationError,
@@ -73,10 +84,10 @@ export {
 export { createRouteHandler } from "./handler.ts";
 export type {
 	CreateFetchHandlerOptions,
+	FetchRouteHandlerResult,
 	RequestValidationErrorHandler,
 	ResponseValidationErrorHandler,
 } from "./handler.ts";
-export { createFetchResponse } from "./response.ts";
 export type {
 	CreateOpenApiDocumentOptions,
 	OpenApiDocument,

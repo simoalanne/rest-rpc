@@ -11,7 +11,10 @@ pnpm add @rest-rpc/tanstack-query
 
 ## Setup
 
-Client configuration uses the same setup and options as the [Fetch Client](/docs/client/fetch-client),
+`createTanstackQueryUtils()` takes a contract and the same options as the
+[Fetch Client](/docs/client/fetch-client). It returns a util tree with the same
+shape as the contract. The utils create options objects and keys; they do not
+create a `QueryClient` or call hooks.
 
 ```ts
 import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
@@ -105,8 +108,9 @@ messages.data;
 // string | undefined
 ```
 
-See [Streaming](/docs/streaming) for the event shape and
-transport behavior.
+`refetchMode` is passed to `streamedQuery` and controls how a refetch treats
+existing data. See [Fetch Client](/docs/client/fetch-client#consume-streams) for
+the event shape.
 
 ## Skipping Queries
 
@@ -122,14 +126,14 @@ const todo = useQuery(
 );
 ```
 
-For infinite queries, pass `skipToken` to the `request` callback to disable the query.
-The callback is not called when the query is skipped.
+For infinite queries, pass `skipToken` instead of the `request` callback.
 
 ```tsx
-const events = useQuery(
+const todos = useInfiniteQuery(
 	restrpc.todos.page.infiniteQueryOptions({
-		request: (cursor: string | undefined) =>
-			cursor ? { query: { cursor } } : skipToken,
+		request: status
+			? (cursor: string | undefined) => ({ query: { cursor, status } })
+			: skipToken,
 		initialPageParam: undefined,
 		getNextPageParam: (lastPage) => lastPage.body.nextCursor,
 	}),
@@ -138,16 +142,17 @@ const events = useQuery(
 
 ## Query Keys
 
-Use `queryKey()` when you want the contract-generated query key outside an
-options object.
+Query keys are the route's key path in the route tree, followed by the request
+input when there is one. Use `queryKey()` to get the key outside an options
+object. The returned key is typed for TanStack Query APIs.
 
 ```ts
-restrpc.todos.get.queryKey({ params: { id: "todo_1" } }); // ["todos", "detail", { params: { id: "todo_1" } }]
+restrpc.todos.get.queryKey({ params: { id: "todo_1" } }); // ["todos", "get", { params: { id: "todo_1" } }]
 restrpc.todos.list.queryKey(); // ["todos", "list"]
 ```
 
-Query keys are based on the route path in the route tree plus request input.
-The returned key is typed for TanStack Query APIs.
+Because keys share the route path as a prefix, `restrpc.todos.get.queryKey()`
+without a request matches every `todos.get` query when used as a filter.
 
 ```ts
 const todoKey = restrpc.todos.get.queryKey({ params: { id: "todo_1" } });
@@ -235,10 +240,10 @@ queryClient.setMutationDefaults(restrpc.todos.create.mutationKey(), {
 
 ## Fetch Options
 
-Generated options accept normal TanStack Query options plus the same
-route-specific per-call `fetchOptions` as the Fetch client with the
-exception of `signal` that is not available for queries where rest-rpc
-passes the Tanstack Query provided cancellation signal to the fetch client automatically.
+Generated options accept normal TanStack Query options plus `fetchOptions`,
+which accepts the Fetch client's [per-call options](/docs/client/fetch-client#per-call-options).
+Query options do not accept `signal`, because the cancellation signal provided
+by TanStack Query is passed to the request automatically.
 
 ```tsx
 const todo = useQuery(
@@ -262,5 +267,36 @@ Plain outputs and declared 2xx responses get mapped to the `data` key.
 
 Declared non-2xx responses get mapped to the `error` key.
 
-Undeclared statuses and response validation failures become [`HttpError`](https://rest-rpc.dev/docs/client/fetch-client#error-handling).
+Undeclared statuses and response validation failures become [`HttpError`](/docs/client/fetch-client#error-handling).
 Network and other unexpected failures become ordinary `Error` objects.
+
+## Type Helpers
+
+Use the type helpers when a route's TanStack Query types need to be reused, for
+example in custom hooks or cache updates. Each helper takes a route from the
+contract, or a route tree to infer a matching tree of types.
+
+```ts
+import type {
+	InferMutationVariables,
+	InferQueryData,
+	InferQueryError,
+} from "@rest-rpc/tanstack-query";
+import { api } from "./client-contract";
+
+type TodoData = InferQueryData<typeof api.todos.get>;
+type TodoError = InferQueryError<typeof api.todos.get>;
+type CreateTodoVariables = InferMutationVariables<typeof api.todos.create>;
+```
+
+| Type                                       | Infers                                                                            |
+| ------------------------------------------ | --------------------------------------------------------------------------------- |
+| `InferQueryData<Route>`                    | The `data` of a query or mutation.                                                |
+| `InferQueryError<Route>`                   | The `error` of a query or mutation, as described in [Error Model](#error-model).  |
+| `InferMutationVariables<Route>`            | The variables passed to `mutate()`, which are the route's request input.          |
+| `InferInfiniteQueryData<Route, PageParam>` | The `data` of an infinite query: pages of `InferQueryData` and their page params. |
+| `InferStreamedQueryData<Route>`            | The default `data` of a streamed query: an array of SSE events.                   |
+| `TanstackQueryUtilsFor<typeof api>`        | The whole util tree returned by `createTanstackQueryUtils()`.                     |
+
+`InferMutationVariables` and `TanstackQueryUtilsFor` accept the type of your `globalHeaders` as a second argument, so headers that
+`globalHeaders` always provides become optional in the inferred request.

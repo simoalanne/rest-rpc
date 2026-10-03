@@ -1,0 +1,67 @@
+---
+title: Error Responses
+description: Default server responses for invalid requests and responses, and how errors reach your framework.
+---
+
+Server adapters reject invalid requests before the handler runs and check
+handler output before it is sent. This page lists the default responses. Each
+[server adapter](/docs/server/express#error-handling) documents how to replace
+them.
+
+## Default Responses
+
+| Situation                                                                                  | Status | Body                            |
+| ------------------------------------------------------------------------------------------ | ------ | ------------------------------- |
+| Request `Content-Type` is not declared by the route                                        | `415`  | `{ message }`                   |
+| Request body cannot be decoded by a built-in codec                                         | `400`  | `{ message }`                   |
+| Request body exceeds `requestBodyLimit`                                                    | `413`  | `{ message }`                   |
+| [Request validation](/docs/http-behavior/schemas#request-validation) fails                 | `400`  | `{ message, validationErrors }` |
+| [Response validation](/docs/http-behavior/schemas#response-validation-on-the-server) fails | `500`  | `{ message }`                   |
+
+Body decoding and `requestBodyLimit` only apply to adapters that decode request
+bodies themselves. Adapters that use the framework's body parsing report those
+failures through the framework.
+
+The request validation body groups Standard Schema issues by location:
+
+```ts
+{
+	message: string;
+	validationErrors: {
+		body: ValidationIssue[];
+		query: ValidationIssue[];
+		params: ValidationIssue[];
+		headers: ValidationIssue[];
+	};
+}
+```
+
+The response validation body does not expose validation details.
+
+## Validation Errors
+
+Validation failures are represented by error classes exported from every server
+adapter. Adapter error handlers receive them.
+
+`RequestValidationError` has:
+
+- `status`: the default status, `400`.
+- `issues`: Standard Schema issues grouped by `body`, `query`, `params`, and `headers`.
+- `responseBody`: the default response body.
+
+`ResponseValidationError` has:
+
+- `status`: the default status, `500`.
+- `location`: `"body"`, `"headers"`, or `"stream"`.
+- `issues`: the Standard Schema issues.
+- `responseBody`: the default response body.
+
+A stream item that fails validation after the stream has started cannot change
+the response status. The stream ends instead.
+
+## Other Errors
+
+Errors thrown by handlers, middleware, or custom codecs are not converted into
+responses. They propagate to the framework's error handling, or reject the
+handler promise for the Fetch and Node adapters. Returning a status that the
+route does not declare also produces an error.

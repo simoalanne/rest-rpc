@@ -13,6 +13,7 @@ import type {
 	RouteBuilderView,
 	RouteDeclaration,
 	RouteMetadata,
+	RouteTree,
 	ServerErrors,
 	ServerResponse,
 	ServerResponseBody,
@@ -69,7 +70,11 @@ type WithSseServerEvents<T> =
 			: T;
 
 type HandlerResult<TRoute extends RouteDeclaration> = MaybePromise<
-	WithSseServerEvents<ServerResponse<TRoute>>
+	UsesPlainOutput<TRoute> extends true
+		? TRoute extends { responses: { 200: infer TResponse } }
+			? ProcedureHandlerResult<TResponse>
+			: never
+		: WithSseServerEvents<ServerResponse<TRoute>>
 >;
 
 /**
@@ -103,6 +108,23 @@ export type RouteHandler<
 > = (
 	...args: [request: RouteRequest<TRoute, TAdditionalHandlerFields, TContext>]
 ) => HandlerResult<TRoute>;
+
+/**
+ * Infers handler signatures for a route or a nested object tree of routes.
+ *
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
+ */
+export type RouteHandlerFor<
+	T extends RouteTree,
+	TAdditionalHandlerFields extends object = EmptyObject,
+	TContext extends object = EmptyObject,
+> = T extends { readonly "~restrpc": infer TRoute extends RouteDeclaration }
+	? RouteHandler<TRoute, TAdditionalHandlerFields, TContext>
+	: {
+			[K in keyof T]: T[K] extends RouteTree
+				? RouteHandlerFor<T[K], TAdditionalHandlerFields, TContext>
+				: never;
+		};
 
 type Merge<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
 
@@ -311,7 +333,7 @@ export type ServerRouteBuilder<
 	undefined,
 	ServerBuilderExtension<TAdditionalHandlerFields, TContext>
 > & {
-	/** Selects the typed per-request context store for this builder. @see {@link https://rest-rpc.dev/docs/middleware#shared-context} */
+	/** Selects the typed per-request context store for this builder. @see {@link https://rest-rpc.dev/docs/context} */
 	$context<TValues extends object>(): ServerRouteBuilder<
 		TAdditionalHandlerFields,
 		TValues

@@ -22,8 +22,7 @@ const todos = new Map([["todo_1", { id: "todo_1", title: "Write docs" }]]);
 const getTodo = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
-	.handler(({ params, req }) => {
-		req.log.info({ todoId: params.id }, "Reading todo");
+	.handler(({ params }) => {
 		const todo = todos.get(params.id);
 		return todo
 			? { status: 200, body: todo }
@@ -42,6 +41,27 @@ await app.register(
 await app.listen({ port: 3000 });
 ```
 
+`registerRoutes()` accepts a Fastify instance. Register it inside a plugin to
+serve routes under a prefix.
+
+## Framework Context
+
+Handlers and middleware receive the Fastify `req` and `reply` objects in
+addition to the [common handler arguments](/docs/route-builder#handler-arguments):
+
+```ts
+const getTodo = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.handler(({ params, req }) => {
+		req.log.info({ todoId: params.id }, "Reading todo");
+		return todos.get(params.id);
+	});
+```
+
+To share an application [context](/docs/context) type across routes, augment
+`DefaultContext` in `@rest-rpc/fastify`.
+
 ## Options
 
 ```ts
@@ -51,22 +71,64 @@ type RegisterRoutesOptions = {
 	disableResponseValidation?: boolean;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
-	preHandler?: Array<
-		(
-			req: FastifyRequest,
-			reply: FastifyReply,
-			route: RouteDeclaration,
-		) => unknown
-	>;
+	preHandler?: ExtendedFastifyPreHandler[];
 };
 ```
 
-`bodyCodecs`: see [Serialization and Codecs](/docs/http-behavior/serialization).
+- `bodyCodecs`: see [Request and Response Bodies](#request-and-response-bodies).
+- `disableRequestValidation`, `disableResponseValidation`: see
+  [Disabling Server Validation](/docs/http-behavior/schemas#disabling-server-validation).
+- `requestValidationErrorHandler`, `responseValidationErrorHandler`: see [Error Handling](#error-handling).
+- `preHandler`: see [preHandler](#prehandler).
 
-### Error handling
+## preHandler
+
+Use the `preHandler` option to run Fastify `preHandler` hooks only for rest-rpc
+routes. Each hook receives `req` and `reply` plus a `route` argument that
+contains the matched route declaration, including its `metadata`.
+
+The hooks are registered on each rest-rpc route, so they do not run for other
+routes in the same Fastify instance. They run before rest-rpc decodes and
+validates the request, and before [route middleware](/docs/middleware).
+
+```ts
+registerRoutes(app, routes, {
+	preHandler: [
+		async (req, reply, route) => {
+			if (route.metadata?.auth !== "required") return;
+			if (!req.headers.authorization) {
+				return reply.status(401).send({ code: "UNAUTHORIZED" });
+			}
+		},
+	],
+});
+```
+
+## Request and Response Bodies
+
+Fastify parses request bodies with its content-type parsers. Add parsers with
+`addContentTypeParser()` for content types beyond Fastify's defaults; rest-rpc
+validates the resulting `request.body`. A custom codec's `deserialize` receives
+the `FastifyRequest` and replaces `request.body` for its content types.
+
+Handlers can return these values for the [default codecs](/docs/http-behavior/serialization#default-codecs):
+
+| Content type                                 | Value                                                         |
+| -------------------------------------------- | ------------------------------------------------------------- |
+| `application/json` or any `+json` media type | JSON value                                                    |
+| `application/x-www-form-urlencoded`          | `URLSearchParams`                                             |
+| `text/*`                                     | `string`                                                      |
+| Any other media type                         | `Blob`, `Uint8Array` (including `Buffer`), or Node `Readable` |
+
+`multipart/form-data` responses need a custom serializer. A custom serializer's
+`body` is passed to `reply.send()`. Return encoded bytes when the codec must
+control the exact payload, because Fastify serializes plain objects itself.
+
+## Error Handling
 
 Use `requestValidationErrorHandler` and `responseValidationErrorHandler` to
-customize [validation errors](/docs/http-behavior/schemas). Other errors use Fastify's error handler.
+replace the [default validation error responses](/docs/http-behavior/errors).
+Other errors use Fastify's error handler.
 
 ```ts
 registerRoutes(app, routes, {
@@ -83,27 +145,5 @@ registerRoutes(app, routes, {
 
 app.setErrorHandler((error, request, reply) => {
 	return reply.status(500).send({ code: "INTERNAL_SERVER_ERROR" });
-});
-```
-
-### Fastify preHandler
-
-If you prefer to use Fastify preHandlers over the [build-in middlewares](/docs/middleware), you can pass them to the `preHandler` option.
-These preHandlers are registered to the the provided `Fastify` instance or plugin before the route handlers and accept the same signature as Fastify preHandlers,
-with an additional `route` argument that contains the route declaration for the current request.
-
-The preHandlers run before the route handler is executed and passing middleware to registerRoutes is
-equivalent to calling `app.addHook('preHandler', middleware)` before `registerRoutes(app, routes)`.
-
-```ts
-registerRoutes(app, routes, {
-	preHandler: [
-		async (req, reply, route) => {
-			const authorization = req.headers.authorization;
-			if (!authorization) {
-				reply.status(401).send({ code: "UNAUTHORIZED" });
-			}
-		},
-	],
 });
 ```

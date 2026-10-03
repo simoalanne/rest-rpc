@@ -6,7 +6,7 @@ import {
 	createNodeResponseStream,
 	createRequestSignal,
 	nodeBodyCodecs,
-} from "@rest-rpc/node";
+} from "@rest-rpc/node/adapter";
 import {
 	type RuntimeImplementationTree,
 	type HandleHttpRouteConfiguration,

@@ -17,10 +17,6 @@ const client = initClient(api, {
 
 The client has the same route tree shape as the contract.
 
-```ts
-const response = await client.todos.get({ params: { id: "todo_1" } });
-```
-
 ## Call Routes
 
 The route declaration determines the request and
@@ -33,8 +29,8 @@ const response = await client.todos.get({ params: { id: todo.id } });
 ```
 
 Plain output routes return decoded data directly. Status response routes return
-a `status`-discriminated union with `body` and the Fetch `Headers` object. Declared
-response headers are also exposed through `responseHeaders`.
+a `status`-discriminated union with `body` and the Fetch `Headers` object as
+`headers`. Declared response headers are also exposed through `responseHeaders`.
 
 ```ts
 if (response.status === 200) {
@@ -44,16 +40,23 @@ if (response.status === 200) {
 }
 ```
 
-Declared non-2xx responses are returned as envelopes. Undeclared statuses,
-network failures and decoding errors throw. Plain output routes expect their
-successful status 200. See the [Route Builder](/docs/route-builder) for choosing
-result forms and declaring expected outcomes.
+Declared non-2xx responses are returned as envelopes. Undeclared statuses throw
+an [`HttpError`](#error-handling). Network failures and aborted requests reject
+with the error from `fetch`. See the [Route Builder](/docs/route-builder) for
+choosing result forms and declaring expected outcomes.
 
 ## Error Handling
 
-Undeclared statuses and response validation failures when enabled throw an `HttpError`.
-Its `status` is the received HTTP status and its `body` is deserialized.
-Validation issues are available through `cause`. A validation failure can have a 2xx status.
+An `HttpError` is thrown when a response does not match the route contract:
+
+- The status is not declared by the route. A plain output route only accepts its
+  successful status.
+- The response content type is not one the route declares.
+- [Response validation](#response-validation) is enabled and fails. This can
+  happen with a 2xx status.
+
+Its `status` is the received HTTP status, and its `body` is the decoded,
+unvalidated response body. Validation issues are available through `cause`.
 
 ```ts
 import { HttpError } from "@rest-rpc/core";
@@ -71,16 +74,76 @@ try {
 
 ## Consume Streams
 
-A plain stream returns an async iterable of Server-Sent Events:
+A [streaming route](/docs/streaming) returns an async iterable of `SseEvent<T>`
+values. Application data is available on `event.data`:
+
+```ts
+export type SseEvent<T> = {
+	data: T;
+	id?: string;
+	event?: string;
+	retry?: number;
+};
+```
 
 ```ts
 for await (const event of await client.todos.events()) {
 	console.log(event.data.message);
+	console.log(event.id, event.event, event.retry);
 }
 ```
 
-See [Streaming](/docs/streaming) for status responses, event
-metadata, cancellation, and manual reconnection.
+For a status response stream, narrow the response before iterating its body:
+
+```ts
+const response = await client.todos.events();
+
+if (response.status === 200) {
+	for await (const event of response.body) {
+		console.log(event.data.message);
+	}
+}
+```
+
+The initial request and later stream iteration can fail independently. Pass an
+`AbortSignal` in the per-call options to cancel both the request and stream:
+
+```ts
+const controller = new AbortController();
+const events = await client.todos.events(undefined, {
+	signal: controller.signal,
+});
+
+controller.abort();
+```
+
+### Reconnecting
+
+The client reads SSE events over Fetch but is not a replacement for the
+browser `EventSource` API. The `id`, `event`, and `retry` fields are exposed as
+metadata only: the client does not reconnect automatically, send the last event
+ID, or filter events by name.
+
+To resume a stream, send the last received event ID in the `last-event-id`
+header. The server receives it as
+[`lastEventId`](/docs/streaming#resume-a-stream).
+
+```ts
+let lastEventId: string | undefined;
+
+async function connect() {
+	const events = await client.todos.events(undefined, {
+		additionalHeaders: {
+			"last-event-id": lastEventId,
+		},
+	});
+
+	for await (const event of events) {
+		lastEventId = event.id ?? lastEventId;
+		handleTodoEvent(event.data);
+	}
+}
+```
 
 ## Client Options
 
@@ -110,12 +173,13 @@ const client = initClient(api, {
 		},
 		fetchOptions: {
 			type: "ApiClientFetchOptions",
-			description: "Default fetch options merged into every request.",
+			description:
+				"Default fetch options merged into every request. Excludes `signal`, which can only be passed per call.",
 		},
 		bodyCodecs: {
 			type: "readonly BodyCodec<Response>[]",
 			description:
-				"Optional overrides for the default body codecs used to serialize and deserialize request and response bodies.",
+				"Custom body codecs that take precedence over the defaults. See Serialization and Codecs.",
 		},
 		globalHeaders: {
 			type: "ClientHeaders",
@@ -130,7 +194,7 @@ const client = initClient(api, {
 			type: "boolean",
 			default: "false",
 			description:
-				"Validates declared response bodies, headers, and stream event data when runtime schemas are available.",
+				"Validates response bodies, declared response headers, and stream event data against the contract's schemas.",
 		},
 	}}
 />
@@ -157,6 +221,10 @@ const client = initClient(api, {
 A global header with a guaranteed value makes a matching declared route header
 optional in client calls. A provider that can return `undefined` does not.
 
+Routes that [combine `.input()` with `.headers()`](/docs/route-builder#combine-input-and-headers)
+only accept the input in client calls, so their declared headers must be
+supplied through `globalHeaders`.
+
 ## Custom Fetch
 
 If you need to wrap the fetch client with custom logic, pass a `fetch` function.
@@ -176,10 +244,11 @@ const client = initClient(api, {
 });
 ```
 
-## Per-Call Fetch Options
+## Per-Call Options
 
 Pass fetch options as the second argument. They override matching defaults in
-`fetchOptions`. Use `signal` for cancellation. `timeoutMs` aborts the request if fetch does not return in time.
+`fetchOptions`. Use `signal` for cancellation. `timeoutMs` still applies when a
+`signal` is passed.
 
 ```ts
 const response = await client.todos.get(
@@ -207,7 +276,14 @@ const response = await client.todos.get(
 );
 ```
 
-If you need to pass fetch options to a route without request input, pass `undefined` for the request input.
+When a route declares a list of request content types, `contentType` selects
+the one used to encode the body and is required:
+
+```ts
+await client.files.upload(bytes, { contentType: "image/png" });
+```
+
+If you need to pass options to a route without request input, pass `undefined` for the request input.
 
 ```ts
 const response = await client.health(undefined, {
@@ -215,15 +291,79 @@ const response = await client.health(undefined, {
 });
 ```
 
-## Response Validation on the Client
+## Response Validation
 
-`validateResponses` validates decoded responses against shared schemas. See
-[Schemas and Validation](/docs/http-behavior/schemas#response-validation-on-the-client)
-for when validation is available.
+The client decodes response bodies without schema validation by default.
+Enable `validateResponses` to validate decoded bodies, declared response
+headers, and stream event data:
 
 ```ts
 const client = initClient(api, {
 	baseUrl: "https://api.example.com",
 	validateResponses: true,
 });
+```
+
+The client receives the schema output on success, and a failure throws an
+[`HttpError`](#error-handling). The decoded response is the server's schema
+output, but the client validates it as schema input. Schemas whose input and
+output types differ, such as transforms, may fail on the client.
+
+:::note
+Validation requires runtime schemas, so it only applies to a
+[shared contract](/docs/contract-first). [Generated client contracts](/docs/client/contract-generation)
+contain no schemas, and the option has no effect on them.
+:::
+
+## Type Helpers
+
+Use the type helpers when a client request or result type needs to be reused,
+for example in your own wrapper functions.
+
+```ts twoslash
+import type { InferClientRequest, InferClientResponse } from "@rest-rpc/core";
+import { route } from "@rest-rpc/express";
+import z from "zod";
+
+const update = route
+	.patch("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.body(z.object({ title: z.string() }))
+	.handler(({ params, body }) => ({ id: params.id, title: body.title }));
+
+const getFirst = route.handler(() => {
+	if (Math.random() < 0.5) {
+		return { status: 200, body: { id: "todo_1", title: "Write docs" } };
+	}
+	return { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
+});
+
+type UpdateTodoRequest = InferClientRequest<typeof update>;
+
+type GetFirstTodoResponse = InferClientResponse<typeof getFirst>;
+```
+
+`ApiClientFor<typeof api>` is the type of the whole client created from a
+contract.
+
+Each helper also accepts a route tree and infers a matching tree of types, so
+one exported type covers every route:
+
+```ts
+import type { InferClientResponse } from "@rest-rpc/core";
+import type { api } from "./client-contract";
+
+export type ClientResponses = InferClientResponse<typeof api>;
+
+type TodoResponse = ClientResponses["todos"]["get"];
+```
+
+`InferClientStreamData` infers the `data` of each event received from a
+[streaming route](#consume-streams), without the `SseEvent` wrapper:
+
+```ts
+import type { InferClientStreamData } from "@rest-rpc/core";
+import type { api } from "./client-contract";
+
+type TodoEvent = InferClientStreamData<typeof api.todos.events>;
 ```

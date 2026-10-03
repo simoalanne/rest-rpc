@@ -10,7 +10,7 @@ export type {
 	RouteDeclaration,
 	RouteMetadata,
 } from "./routeDeclaration.ts";
-export type { Contract } from "./contract.ts";
+export type { Contract, RouteTree } from "./contract.ts";
 export type {
 	BuilderExtension,
 	BuilderState,

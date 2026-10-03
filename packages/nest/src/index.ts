@@ -1,11 +1,10 @@
 import type { ExecutionContext } from "@nestjs/common";
-import type { Contract, RouteDeclaration } from "@rest-rpc/core/contract";
+import type { Contract, RouteTree } from "@rest-rpc/core/contract";
 import {
 	implement as serverImplement,
 	serverFirstRoute,
 	type Contractimplementer,
-	type RouteHandler as ServerRouteHandler,
-	type RouteRequest as ServerRouteRequest,
+	type RouteHandlerFor,
 	type ServerRouteBuilder,
 } from "@rest-rpc/server";
 
@@ -22,14 +21,11 @@ type NestHandlerFields = {
 	signal: AbortSignal;
 };
 
-type ContractRoute = { readonly "~restrpc": RouteDeclaration };
-
 export { type } from "@rest-rpc/core";
 export type {
 	Context,
 	InferServerRequest,
 	InferServerResponse,
-	RouteErrors,
 } from "@rest-rpc/server";
 export {
 	RequestValidationError,
@@ -52,23 +48,15 @@ export { sse } from "@rest-rpc/server";
 export type { SseEvent } from "@rest-rpc/core";
 
 /**
- * Infers the validated request and Nest context available to a route handler.
- *
- * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
- */
-export type RouteRequest<TRoute extends ContractRoute> = ServerRouteRequest<
-	TRoute["~restrpc"],
-	NestHandlerFields,
-	DefaultContext
->;
-
-/**
  * Infers the Nest handler signature for a route declaration.
  *
+ * @remarks Use a route declared without `.handler()` to write its handler
+ * separately. Pass a route tree to infer a matching tree of handler types.
+ *
  * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
  */
-export type RouteHandler<TRoute extends ContractRoute> = ServerRouteHandler<
-	TRoute["~restrpc"],
+export type InferServerHandler<TRoute extends RouteTree> = RouteHandlerFor<
+	TRoute,
 	NestHandlerFields,
 	DefaultContext
 >;

@@ -21,8 +21,7 @@ const todos = new Map([["todo_1", { id: "todo_1", title: "Write docs" }]]);
 const getTodo = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
-	.handler(({ params, req }) => {
-		console.log(req.method, req.headers["x-request-id"]);
+	.handler(({ params }) => {
 		const todo = todos.get(params.id);
 		return todo
 			? { status: 200, body: todo }
@@ -47,11 +46,44 @@ const server = createServer(async (req, res) => {
 server.listen(3000);
 ```
 
+The handler writes the response for a matching route and resolves to
+`{ matched: true }`. Unmatched requests are left untouched and resolve to
+`{ matched: false }`, so the surrounding server can provide fallback routing.
+
+## Framework Context
+
+Handlers and middleware receive the Node `req` and `res` objects in addition to
+the [common handler arguments](/docs/route-builder#handler-arguments):
+
+```ts
+const getTodo = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.handler(({ params, req }) => {
+		console.log(req.method, req.headers["x-request-id"]);
+		return todos.get(params.id);
+	});
+```
+
+When your server passes an `IncomingMessage` subtype, augment `DefaultRequest`
+to type it:
+
+```ts
+declare module "@rest-rpc/node" {
+	interface DefaultRequest {
+		user?: { id: string };
+	}
+}
+```
+
+To share an application [context](/docs/context) type across routes, augment
+`DefaultContext` in `@rest-rpc/node`.
+
 ## Options
 
 ```ts
 type CreateNodeHandlerOptions = {
-	bodyCodecs?: readonly BodyCodec<AdapterRequest>[];
+	bodyCodecs?: readonly BodyCodec<DefaultRequest>[];
 	disableRequestValidation?: boolean;
 	disableResponseValidation?: boolean;
 	prefix?: `/${string}`;
@@ -61,14 +93,37 @@ type CreateNodeHandlerOptions = {
 };
 ```
 
-`bodyCodecs`: see [Serialization and Codecs](/docs/http-behavior/serialization).
+- `prefix`: path prefix prepended to every route path when matching requests.
+- `bodyCodecs`, `requestBodyLimit`: see [Request and Response Bodies](#request-and-response-bodies).
+- `disableRequestValidation`, `disableResponseValidation`: see
+  [Disabling Server Validation](/docs/http-behavior/schemas#disabling-server-validation).
+- `requestValidationErrorHandler`, `responseValidationErrorHandler`: see [Error Handling](#error-handling).
 
-`requestBodyLimit`: see [request body limits](/docs/http-behavior/serialization#server-request-deserialization).
+## Request and Response Bodies
 
-### Error handling
+The adapter decodes request bodies with the
+[default codecs](/docs/http-behavior/serialization#default-codecs). Built-in
+decoding reads at most `requestBodyLimit` bytes, `1 MiB` by default. A custom
+codec's `deserialize` receives the `IncomingMessage` and is not subject to
+`requestBodyLimit`.
+
+Handlers can return these values for the default codecs:
+
+| Content type                                 | Value                                                         |
+| -------------------------------------------- | ------------------------------------------------------------- |
+| `application/json` or any `+json` media type | JSON value                                                    |
+| `application/x-www-form-urlencoded`          | `URLSearchParams`                                             |
+| `text/*`                                     | `string`                                                      |
+| Any other media type                         | `Blob`, `Uint8Array` (including `Buffer`), or Node `Readable` |
+
+`multipart/form-data` responses need a custom serializer. A custom serializer's
+`body` must be a string, `Buffer`, `Uint8Array`, or Node `Readable`.
+
+## Error Handling
 
 Use `requestValidationErrorHandler` and `responseValidationErrorHandler` to
-customize [validation errors](/docs/http-behavior/schemas). Other errors reject the handler promise.
+replace the [default validation error responses](/docs/http-behavior/errors).
+Other errors reject the handler promise.
 
 ```ts
 const handler = createRouteHandler(routes, {

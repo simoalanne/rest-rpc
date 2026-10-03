@@ -5,6 +5,7 @@ export type {
 	ClientHeaders,
 	ClientHeaderValue,
 	InferClientResponse,
+	InferClientStreamData,
 	FetchLike,
 	FetchOptionsFor,
 } from "./client/index.ts";

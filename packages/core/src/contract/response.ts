@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { BodyContentType } from "./body.ts";
 import type { RouteDeclaration } from "./routeDeclaration.ts";
+import type { RouteTree } from "./contract.ts";
 import type { SseEvent } from "../sse.ts";
 
 /**
@@ -263,10 +264,17 @@ type ServerResponseForRoute<E extends RouteDeclaration> = E extends {
  * Infers the output returned by a route handler.
  *
  * @remarks Response schemas contribute their input types because handlers
- * produce values before response validation and transformation.
+ * produce values before response validation and transformation. Pass a route
+ * tree to infer a matching tree of response types.
  *
  * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
  */
-export type InferServerResponse<
-	TRoute extends { readonly "~restrpc": RouteDeclaration },
-> = ServerResponseForRoute<TRoute["~restrpc"]>;
+export type InferServerResponse<T extends RouteTree> = T extends {
+	readonly "~restrpc": infer TRoute extends RouteDeclaration;
+}
+	? ServerResponseForRoute<TRoute>
+	: {
+			[K in keyof T]: T[K] extends RouteTree
+				? InferServerResponse<T[K]>
+				: never;
+		};

@@ -25,8 +25,7 @@ router.use(express.json());
 const getTodo = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
-	.handler(({ params, req }) => {
-		console.log(req.method, req.header("x-request-id"));
+	.handler(({ params }) => {
 		const todo = todos.get(params.id);
 		return todo
 			? { status: 200, body: todo }
@@ -40,6 +39,27 @@ app.use("/api", router);
 app.listen(3000);
 ```
 
+`registerRoutes()` accepts an Express app or router. Mount a router to serve
+routes under a prefix.
+
+## Framework Context
+
+Handlers and middleware receive the Express `req` and `res` objects in addition
+to the [common handler arguments](/docs/route-builder#handler-arguments):
+
+```ts
+const getTodo = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.handler(({ params, req }) => {
+		console.log(req.method, req.header("x-request-id"));
+		return todos.get(params.id);
+	});
+```
+
+To share an application [context](/docs/context) type across routes, augment
+`DefaultContext` in `@rest-rpc/express`.
+
 ## Options
 
 ```ts
@@ -49,23 +69,66 @@ type RegisterRoutesOptions = {
 	disableResponseValidation?: boolean;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
-	middleware?: Array<
-		(
-			req: Request,
-			res: Response,
-			next: NextFunction,
-			route: HttpRouteDeclaration,
-		) => unknown
-	>;
+	middleware?: ExtendedExpressMiddleware[];
 };
 ```
 
-`bodyCodecs`: see [Serialization and Codecs](/docs/http-behavior/serialization).
+- `bodyCodecs`: see [Request and Response Bodies](#request-and-response-bodies).
+- `disableRequestValidation`, `disableResponseValidation`: see
+  [Disabling Server Validation](/docs/http-behavior/schemas#disabling-server-validation).
+- `requestValidationErrorHandler`, `responseValidationErrorHandler`: see [Error Handling](#error-handling).
+- `middleware`: see [Middleware](#middleware).
 
-### Error handling
+## Middleware
+
+Use the `middleware` option to run Express middleware only for rest-rpc routes.
+Each function has the Express middleware signature plus a `route` argument that
+contains the matched route declaration, including its `metadata`.
+
+The middleware is registered on each rest-rpc route, so it does not run for
+other routes on the same app or router. It runs before rest-rpc decodes and
+validates the request, and before [route middleware](/docs/middleware).
+
+```ts
+registerRoutes(app, routes, {
+	middleware: [
+		(req, res, next, route) => {
+			if (route.metadata?.auth !== "required") return next();
+			if (!req.header("authorization")) {
+				res.status(401).send({ code: "UNAUTHORIZED" });
+				return;
+			}
+			next();
+		},
+	],
+});
+```
+
+## Request and Response Bodies
+
+Express parses request bodies. Register parsers such as `express.json()`,
+`express.urlencoded()`, or `express.text()` for the content types your routes
+accept; rest-rpc validates the resulting `req.body`. A custom codec's
+`deserialize` receives the Express `Request` and replaces `req.body` for its
+content types.
+
+Handlers can return these values for the [default codecs](/docs/http-behavior/serialization#default-codecs):
+
+| Content type                                 | Value                                                         |
+| -------------------------------------------- | ------------------------------------------------------------- |
+| `application/json` or any `+json` media type | JSON value                                                    |
+| `application/x-www-form-urlencoded`          | `URLSearchParams`                                             |
+| `text/*`                                     | `string`                                                      |
+| Any other media type                         | `Blob`, `Uint8Array` (including `Buffer`), or Node `Readable` |
+
+`multipart/form-data` responses need a custom serializer. A custom serializer's
+`body` must be a string, `Buffer`, `Uint8Array`, or Node `Readable`.
+
+## Error Handling
 
 Use `requestValidationErrorHandler` and `responseValidationErrorHandler` to
-customize [validation errors](/docs/http-behavior/schemas). Other errors are passed to the next Express error handler.
+replace the [default validation error responses](/docs/http-behavior/errors).
+Other errors are passed to the next Express error handler.
 
 ```ts
 registerRoutes(app, routes, {
@@ -79,29 +142,5 @@ registerRoutes(app, routes, {
 
 app.use((error, req, res, next) => {
 	res.status(500).json({ code: "INTERNAL_SERVER_ERROR" });
-});
-```
-
-### Express Middleware
-
-If you prefer to use Express middlewares over the [build-in middlewares](/docs/middleware), you can pass them to the `middleware` option.
-These middlewares are registered to the the provided app/router before the route handlers and accept the same signature as Express middleware,
-with an additional `route` argument that contains the route declaration for the current request.
-
-The middlewares run before the route handler is executed and passing middleware to registerRoutes is
-equivalent to calling `app.use(middleware)` before `registerRoutes(app, routes)`.
-
-```ts
-registerRoutes(app, routes, {
-	middleware: [
-		(req, res, next, route) => {
-			const authorization = req.header("authorization");
-			if (!authorization) {
-				res.status(401).send({ code: "UNAUTHORIZED" });
-				return;
-			}
-			next();
-		},
-	],
 });
 ```

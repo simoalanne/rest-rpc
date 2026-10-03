@@ -111,7 +111,26 @@ Route with [derived path](/docs/route-builder#start-with-defaults) is not suppor
 Add explicit method and path or use a route tree with `@Implement()` instead.
 :::
 
+## Framework Context
+
+Handlers and middleware receive the Nest `executionContext` in addition to the
+[common handler arguments](/docs/route-builder#handler-arguments). Use it to
+read the underlying request or response:
+
+```ts
+readonly get = getDeclaration.handler(({ params, executionContext }) => {
+	const request = executionContext.switchToHttp().getRequest();
+	console.log(request.headers["x-request-id"]);
+	return this.todos.find(params.id);
+});
+```
+
+To share an application [context](/docs/context) type across routes, augment
+`DefaultContext` in `@rest-rpc/nest`.
+
 ## Options
+
+Pass options to `RestRpcModule.forRoot()`:
 
 ```ts
 type RestRpcModuleOptions = {
@@ -121,13 +140,32 @@ type RestRpcModuleOptions = {
 };
 ```
 
-`bodyCodecs`: see [Serialization and Codecs](/docs/http-behavior/serialization).
+- `bodyCodecs`: see [Request and Response Bodies](#request-and-response-bodies).
+- `disableRequestValidation`, `disableResponseValidation`: see
+  [Disabling Server Validation](/docs/http-behavior/schemas#disabling-server-validation).
 
-### Error handling
+## Request and Response Bodies
 
-`RequestValidationException` and `ResponseValidationException` are Nest
-`HttpException` subclasses. Customize [validation errors](/docs/http-behavior/schemas)
-with ordinary Nest exception filters.
+Request bodies are parsed by the underlying Express or Fastify platform.
+Configure its body parsers for the content types your routes accept; rest-rpc
+validates the resulting request `body`. A custom codec's `deserialize` receives
+the platform's request object, typed as `unknown`, and replaces the parsed body
+for its content types.
+
+JSON responses go through Nest's normal serialization. Text, form, and binary
+responses accept the same values as the [Express adapter](/docs/server/express#request-and-response-bodies)
+and are sent as a `StreamableFile`. A custom serializer's `body` is returned to
+Nest as the handler result, so return a `StreamableFile` for binary or streamed
+output.
+
+## Error Handling
+
+Validation failures are thrown as `RequestValidationException` (400) and
+`ResponseValidationException` (500). Both are Nest `HttpException` subclasses
+whose response is the [default validation error response](/docs/http-behavior/errors),
+and both expose the original error as `validationError`. Replace the response
+with ordinary Nest exception filters. Other errors also use Nest's exception
+handling.
 
 ```ts
 import { ArgumentsHost, Catch, ExceptionFilter } from "@nestjs/common";

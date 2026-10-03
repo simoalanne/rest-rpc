@@ -23,7 +23,7 @@ type ContractimplementerNode<
 			TAdditionalHandlerFields,
 			TContext
 		> & {
-				/** Selects the typed per-request context store for this implementation. @see {@link https://rest-rpc.dev/docs/middleware#shared-context} */
+				/** Selects the typed per-request context store for this implementation. @see {@link https://rest-rpc.dev/docs/context} */
 				$context<TValues extends object>(): ContractimplementerNode<
 					TContract,
 					TAdditionalHandlerFields,

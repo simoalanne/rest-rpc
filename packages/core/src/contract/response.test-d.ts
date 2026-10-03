@@ -54,4 +54,12 @@ describe("response inference", () => {
 			contentType: "text/plain";
 		}>();
 	});
+
+	it("infers responses for a route tree", () => {
+		const get = route.get("/").output(type<string>());
+		const tree = { users: { get } };
+		expectTypeOf<
+			InferServerResponse<typeof tree>["users"]["get"]
+		>().toEqualTypeOf<string>();
+	});
 });

@@ -5,7 +5,8 @@ import {
 	normalizeMediaType,
 	type BodyCodec,
 } from "../codecs/index.ts";
-import type { RouteDeclaration } from "../contract/contract.ts";
+import type { RouteDeclaration, RouteTree } from "../contract/contract.ts";
+import type { SseEvent } from "../sse.ts";
 import type {
 	ResponseDeclaration,
 	DeclaredClientResponse,
@@ -37,13 +38,47 @@ type RouteDeclaredResponse<E extends RouteDeclaration> = WithResponseMetadata<
  *
  * @remarks Routes declared with `.response()` produce status-discriminated
  * envelopes. Routes declared with `.output()` produce their output directly.
+ * Pass a route tree to infer a matching tree of results.
  *
- * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#infer-client-types}
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-routes}
  */
-export type InferClientResponse<
-	E extends { readonly "~restrpc": RouteDeclaration },
-> = ClientResponseForDeclaration<E["~restrpc"]>;
+export type InferClientResponse<T extends RouteTree> = T extends {
+	readonly "~restrpc": infer TRoute extends RouteDeclaration;
+}
+	? ClientResponseForDeclaration<TRoute>
+	: {
+			[K in keyof T]: T[K] extends RouteTree
+				? InferClientResponse<T[K]>
+				: never;
+		};
+
+/**
+ * Infers the `data` of each event received from a streaming route.
+ *
+ * @remarks Unwraps the `SseEvent` values of successful stream responses.
+ * Routes without a stream response infer `never`. Pass a route tree to infer
+ * a matching tree of event data types.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#infer-client-types}
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#consume-streams}
+ */
+export type InferClientStreamData<T extends RouteTree> = T extends {
+	readonly "~restrpc": infer TRoute extends RouteDeclaration;
+}
+	? ClientStreamDataForDeclaration<TRoute>
+	: {
+			[K in keyof T]: T[K] extends RouteTree
+				? InferClientStreamData<T[K]>
+				: never;
+		};
+
+type ClientStreamDataForDeclaration<E extends RouteDeclaration> =
+	SuccessfulDeclaredClientResponse<E> extends infer TResponse
+		? TResponse extends { body: AsyncIterable<SseEvent<infer TData>> }
+			? TData
+			: never
+		: never;
 
 export type ClientResponseForDeclaration<E extends RouteDeclaration> =
 	E extends {

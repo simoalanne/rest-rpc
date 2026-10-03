@@ -3,6 +3,7 @@ import type {
 	RouteDeclaration,
 	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
+import type { RouteTree } from "./contract.ts";
 
 export type RequestSegment = "body" | "query" | "params" | "headers";
 
@@ -147,11 +148,17 @@ type OptionalRequestHeaders<T, TOptionalKeys extends PropertyKey> = [
 /**
  * Infers the input passed to a generated client route call.
  *
- * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
+ * @remarks Pass a route tree to infer a matching tree of request types.
+ *
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#infer-client-types}
  */
-export type InferClientRequest<
-	E extends { readonly "~restrpc": RouteDeclaration },
-> = ClientRequestForDeclaration<E["~restrpc"]>;
+export type InferClientRequest<T extends RouteTree> = T extends {
+	readonly "~restrpc": infer TRoute extends RouteDeclaration;
+}
+	? ClientRequestForDeclaration<TRoute>
+	: {
+			[K in keyof T]: T[K] extends RouteTree ? InferClientRequest<T[K]> : never;
+		};
 
 export type ClientRequestForDeclaration<
 	E extends RouteDeclaration,
@@ -217,14 +224,21 @@ type ServerRequestValue<TRoute extends RouteDeclaration> =
  * Infers the validated input received by a route handler.
  *
  * @remarks Adapter fields, transport metadata, route metadata, and application
- * context are intentionally excluded.
+ * context are intentionally excluded. Pass a route tree to infer a matching
+ * tree of request types.
  *
  * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
  */
-export type InferServerRequest<
-	TRoute extends { readonly "~restrpc": RouteDeclaration },
-> = TRoute["~restrpc"] extends infer TDeclaration extends RouteDeclaration
-	? UsesFlatInput<TDeclaration> extends true
+export type InferServerRequest<T extends RouteTree> = T extends {
+	readonly "~restrpc": infer TRoute extends RouteDeclaration;
+}
+	? ServerRequestForDeclaration<TRoute>
+	: {
+			[K in keyof T]: T[K] extends RouteTree ? InferServerRequest<T[K]> : never;
+		};
+
+type ServerRequestForDeclaration<TDeclaration extends RouteDeclaration> =
+	UsesFlatInput<TDeclaration> extends true
 		? [FlatInputSchemas<TDeclaration>] extends [never]
 			? Record<never, never>
 			: FlatInputSchemas<TDeclaration> extends infer TInput extends
@@ -236,5 +250,4 @@ export type InferServerRequest<
 						>
 					>
 				: Record<never, never>
-		: ServerRequestValue<TDeclaration>
-	: never;
+		: ServerRequestValue<TDeclaration>;

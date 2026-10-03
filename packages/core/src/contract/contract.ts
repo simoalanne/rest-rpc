@@ -19,3 +19,8 @@ export type { RouteDeclaration } from "./routeDeclaration.ts";
 export type Contract =
 	| { readonly "~restrpc": CompleteRouteDeclaration }
 	| { [key: string]: Contract };
+
+/** A route, including one declared without `.handler()`, or a nested object tree of routes. */
+export type RouteTree =
+	| { readonly "~restrpc": RouteDeclaration }
+	| { [key: string]: RouteTree };

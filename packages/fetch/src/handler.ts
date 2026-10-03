@@ -47,7 +47,15 @@ export type ResponseValidationErrorHandler = (
 	request: DefaultRequest,
 ) => Response | Promise<Response>;
 
-type FetchRouteHandlerResult =
+/**
+ * Result of dispatching a request with the Fetch route handler.
+ *
+ * @remarks `matched` is `false` when no route matches, so the surrounding
+ * runtime can provide fallback routing.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fetch#usage}
+ */
+export type FetchRouteHandlerResult =
 	| { matched: true; response: Response }
 	| { matched: false; response: undefined };
 

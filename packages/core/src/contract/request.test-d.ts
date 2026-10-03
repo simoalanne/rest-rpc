@@ -68,4 +68,15 @@ describe("request inference", () => {
 			headers?: { token?: string };
 		}>();
 	});
+
+	it("infers requests for a route tree", () => {
+		const get = route.get("/users/{id}").params(type<{ id: string }>());
+		const tree = { users: { get } };
+		expectTypeOf<
+			InferClientRequest<typeof tree>["users"]["get"]
+		>().toEqualTypeOf<InferClientRequest<typeof get>>();
+		expectTypeOf<
+			InferServerRequest<typeof tree>["users"]["get"]
+		>().toEqualTypeOf<{ params: { id: string } }>();
+	});
 });

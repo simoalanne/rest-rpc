@@ -1,6 +1,8 @@
 import type { BodyCodec } from "@rest-rpc/core";
-import { createFetchResponse } from "@rest-rpc/fetch";
-import { deserializeRequestBody } from "@rest-rpc/fetch/deserializeRequestBody";
+import {
+	createFetchResponse,
+	deserializeRequestBody,
+} from "@rest-rpc/fetch/adapter";
 import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import { toColonPath } from "@rest-rpc/core/contract";
 import {

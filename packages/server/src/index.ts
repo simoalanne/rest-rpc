@@ -9,6 +9,7 @@ export type { RouteMatch, RuntimeImplementationTree } from "./match.ts";
 export type {
 	RouteErrors,
 	RouteHandler,
+	RouteHandlerFor,
 	RouteRequest,
 } from "./routeBuilder.types.ts";
 export type { InferServerRequest, InferServerResponse } from "@rest-rpc/core";

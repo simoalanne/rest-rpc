@@ -26,7 +26,7 @@ export type FetchResponseFn<
 /**
  * Infers the callable client operation for one declared route.
  *
- * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#infer-client-types}
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-routes}
  */
 export type ApiClientRouteValue<
@@ -37,7 +37,7 @@ export type ApiClientRouteValue<
 /**
  * Infers the generated client tree for a contract.
  *
- * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
+ * @see {@link https://rest-rpc.dev/docs/client/fetch-client#infer-client-types}
  */
 export type ApiClientFor<
 	T extends Contract = Contract,

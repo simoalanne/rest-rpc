@@ -14,7 +14,7 @@ import {
 	createNodeResponseStream,
 	createRequestSignal,
 	writeStreamResponse,
-} from "@rest-rpc/node";
+} from "@rest-rpc/node/adapter";
 import {
 	assertRequestContentType,
 	handleHttpRoute,

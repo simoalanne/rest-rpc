@@ -1,10 +1,13 @@
 ---
 title: Streaming
-description: Declare, serve, and consume typed Server-Sent Event streams.
+description: Declare and serve typed Server-Sent Event streams.
 ---
 
-Streaming routes use Server-Sent Events (SSE) over Fetch. Handlers produce an
-async iterable, and clients consume an async iterable of typed events.
+Streaming routes send Server-Sent Events (SSE). Handlers produce an async
+iterable, and each yielded value becomes one event. See
+[Serialization and Codecs](/docs/http-behavior/serialization#streams) for the
+wire format and [Fetch Client](/docs/client/fetch-client#consume-streams) for
+consuming streams.
 
 ## Declare a Stream
 
@@ -31,10 +34,10 @@ const events = route
 	.handler(() => ({ status: 200, body: streamTodoEvents() }));
 ```
 
-Stream schemas describe event data. Declared schemas validate each value on the
-server and, when client response validation is enabled, each event's data on
-the client. Streaming responses bypass body codecs. The data must be JSON serializable
-and is sent as a JSON string in the SSE `data` field.
+Stream schemas describe event data. Event data must be JSON serializable.
+Declared schemas validate each value as it is yielded. Once a stream has
+started, an invalid value ends the stream instead of producing an error
+response.
 
 ## Add Event Metadata
 
@@ -55,77 +58,26 @@ const events = route.get("/todos/events").handler(async function* () {
 });
 ```
 
-## Consume a Stream
+`sse()` throws when `id` or `event` contain line breaks, or when `retry` is not
+a non-negative integer number of milliseconds.
 
-The Fetch client yields `SseEvent<T>` values. Application data is available on
-`event.data`:
+## Stop a Stream
 
-```ts
-export type SseEvent<T> = {
-	data: T;
-	id?: string;
-	event?: string;
-	retry?: number;
-};
-```
+The handler's `signal` aborts when the client disconnects. Use it to stop
+producing events and release resources:
 
 ```ts
-for await (const event of await client.todos.events()) {
-	console.log(event.data.message);
-	console.log(event.id, event.event, event.retry);
-}
-```
-
-For a status response stream, narrow the response before iterating its body:
-
-```ts
-const response = await client.todos.events();
-
-if (response.status === 200) {
-	for await (const event of response.body) {
-		console.log(event.data.message);
+const events = route.get("/todos/events").handler(async function* ({ signal }) {
+	while (!signal.aborted) {
+		yield await nextTodoEvent({ signal });
 	}
-}
-```
-
-The initial request and later stream iteration can fail independently. Pass an
-`AbortSignal` in the per-call options to cancel both the request and stream:
-
-```ts
-const controller = new AbortController();
-const events = await client.todos.events(undefined, {
-	signal: controller.signal,
 });
-
-controller.abort();
 ```
 
-## Not an EventSource Replacement
+## Resume a Stream
 
-the client exposes SSE events over Fetch but is not a general replacement for the browser `EventSource` API.
-the fields in the `SseEvent` type are metadata only. rest-rpc client does not automatically reconnect, pass the last event ID, or filter events by name.
-Those are application-level concerns.
-
-`Last-Event-Id` can be passed in the request headers to resume a stream.
-
-```ts
-let lastEventId: string | undefined;
-
-async function connect() {
-	const events = await client.todos.events(undefined, {
-		additionalHeaders: {
-			"last-event-id": lastEventId,
-		},
-	});
-
-	for await (const event of events) {
-		lastEventId = event.id ?? lastEventId;
-		handleTodoEvent(event.data);
-	}
-}
-```
-
-The `Last-Event-Id` header is recognized by the server adapters and automatically passed to the handler as `lastEventId`.
+A client that reconnects can send the `Last-Event-ID` header. Its value is
+passed to the handler as `lastEventId`:
 
 ```ts
 const events = route
@@ -133,7 +85,4 @@ const events = route
 	.handler(({ lastEventId }) => streamTodoEvents({ after: lastEventId }));
 ```
 
-## TanStack Query
-
-The TanStack Query integration can materialize a stream or reduce events as
-they arrive. See [TanStack Query](/docs/client/tanstack-query#streamed-queries).
+Give events an `id` with `sse()` so clients have a value to resume from.

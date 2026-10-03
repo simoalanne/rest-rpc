@@ -1,9 +1,10 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { Contract } from "@rest-rpc/core/contract";
+import type { Contract, RouteTree } from "@rest-rpc/core/contract";
 import {
 	implement as serverImplement,
 	serverFirstRoute,
 	type Contractimplementer,
+	type RouteHandlerFor,
 	type ServerRouteBuilder,
 } from "@rest-rpc/server";
 
@@ -28,6 +29,20 @@ type NodeHandlerFields = {
 	res: ServerResponse;
 	signal: AbortSignal;
 };
+
+/**
+ * Infers the Node HTTP handler signature for a route declaration.
+ *
+ * @remarks Use a route declared without `.handler()` to write its handler
+ * separately. Pass a route tree to infer a matching tree of handler types.
+ *
+ * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
+ */
+export type InferServerHandler<TRoute extends RouteTree> = RouteHandlerFor<
+	TRoute,
+	NodeHandlerFields,
+	DefaultContext
+>;
 
 /**
  * Indicates whether the Node HTTP handler dispatched a request to a rest-rpc route.
@@ -70,10 +85,6 @@ export type {
 	Context,
 	InferServerRequest,
 	InferServerResponse,
-	ImplicitResponseEnvelope,
-	ImplicitResponseKind,
-	ServerFirstResponseKind,
-	ServerFirstRouteResponseKind,
 } from "@rest-rpc/server";
 export {
 	RequestValidationError,
@@ -85,15 +96,6 @@ export type {
 	RequestValidationErrorHandler,
 	ResponseValidationErrorHandler,
 } from "./handler.ts";
-export { createRequestSignal } from "./lifecycle.ts";
-export { parseRequestTarget } from "./request.ts";
-export {
-	createNodeResponseStream,
-	writeNodeResponse,
-	writeStreamResponse,
-} from "./response.ts";
-
-export { nodeBodyCodecs } from "./codecs.ts";
 export type {
 	CreateOpenApiDocumentOptions,
 	OpenApiDocument,

@@ -1,5 +1,5 @@
 import type { AbsolutePath, BodyCodec } from "@rest-rpc/core";
-import { deserializeRequestBody } from "@rest-rpc/fetch/deserializeRequestBody";
+import { deserializeRequestBody } from "@rest-rpc/fetch/adapter";
 import type { ServerResponse } from "node:http";
 import {
 	createRouteMatcher,

@@ -8,7 +8,8 @@ separately shared contract. HTTP methods, paths, schemas, and operation
 metadata come from the same route builder used by the server and client.
 
 Declare output schemas with `.output()`, `.response()`, `.streamOutput()`, or
-`.streamResponse()` to include responses in OpenAPI.
+`.streamResponse()` to include responses in OpenAPI. Outputs inferred from
+handlers have no schema, so they produce no documented responses.
 
 ```ts
 import { route, createOpenApiDocument } from "@rest-rpc/express";
@@ -38,18 +39,18 @@ and works identically with a shared contract too.
 
 ## What Is Included
 
-OpenAPI generation includes routes with implicit defaults and explicit HTTP details.
-
-It maps:
+Every route in the tree becomes an operation, including routes whose method and
+path are derived from their tree keys. The document includes:
 
 - route methods and paths
-- path params
-- query params
-- request headers
-- request bodies
-- status-keyed responses
-- custom body content types
-- route `openApi` metadata
+- path, query, and header parameters
+- request bodies with their content types
+- status-keyed responses with their content types and declared headers
+- streams as `text/event-stream` responses
+- route [`.openAPI()`](#route-metadata) metadata
+
+The document targets OpenAPI `3.1.0` unless the `openapi` option sets another
+version. `servers`, `components`, and `tags` options are copied to the document.
 
 ## Schema Conversion
 
@@ -120,7 +121,10 @@ const document = createOpenApiDocument(routes, {
 
 ## Route Metadata
 
-Use `.openAPI()` on a route builder for operation metadata.
+Use `.openAPI()` on a route builder for operation metadata. It accepts
+`summary`, `description`, `operationId`, `tags`, `deprecated`, `security`,
+`externalDocs`, `responses`, and `extensions`. `extensions` keys must start
+with `x-` and are added to the operation.
 
 ```ts
 const create = route
@@ -196,7 +200,8 @@ typed rest-rpc contract.
 Typed headers declared on a route response override OpenAPI-only headers with
 the same name in generated OpenAPI. `.openAPI()` can appear anywhere before
 `.handler()`. Its position among request and output declarations does not affect
-the generated operation.
+the generated operation. Calling it more than once merges the details, so a
+shared base builder can set common `tags` or `security`.
 
 ## Transform Hooks
 
@@ -216,7 +221,7 @@ const document = createOpenApiDocument(routes, {
 			? { ...parameter, required: false }
 			: parameter,
 	transformOperation: ({ route, routePath, operation }) => {
-		if (route.metadata.auth === "required") {
+		if (route.metadata?.auth === "required") {
 			return {
 				...operation,
 				operationId: routePath.join("."),
