@@ -1,9 +1,6 @@
 import type { OpenApiResponseOptions } from "../contract/routeDeclaration.ts";
 import type { RouteDeclaration } from "../contract/routeDeclaration.ts";
-import type {
-	RequestBodySchema,
-	RequestHeadersSchema,
-} from "../contract/request.ts";
+import type { RequestBodySchema } from "../contract/request.ts";
 import type {
 	ResponseDeclaration,
 	ResponseHeaders,
@@ -157,11 +154,6 @@ export const createParameters = (
 	});
 };
 
-const createHeaderParameters = (
-	headers: SchemaOrSchemas<RequestHeadersSchema> | undefined,
-	options: CreateOperationOptions,
-): OpenApiParameter[] => createParameters(headers, "header", options);
-
 export const createRequestBody = (
 	schemaOrSchemas: SchemaOrSchemas<RequestBodySchema> | undefined,
 	converter: SchemaConverter | undefined,
@@ -205,39 +197,26 @@ export const createResponse = (
 		createOpenApiResponseHeaders(openApiResponse?.headers, converter),
 		createResponseHeaders(declaredHeaders, converter),
 	);
-
-	if (schema === undefined) {
-		return {
-			description: openApiResponse?.description ?? description,
-			...(headers ? { headers } : {}),
-		};
-	}
-
-	if (responseDeclaration.kind === "stream") {
-		const openApiSchema = converter?.(schema, "output") ?? {};
-		return {
-			description: openApiResponse?.description ?? description,
-			...(headers ? { headers } : {}),
-			content: {
-				[SSE_CONTENT_TYPE]: {
-					schema: openApiSchema,
-				},
-			},
-		};
-	}
-
-	const contentTypes =
-		contentType !== undefined
-			? Array.isArray(contentType)
-				? contentType
-				: [contentType as string]
-			: [JSON_CONTENT_TYPE];
-	const openApiSchema = converter?.(schema, "output") ?? {};
-
-	return {
+	const response: OpenApiResponse = {
 		description: openApiResponse?.description ?? description,
 		...(headers ? { headers } : {}),
-		content: createContent(contentTypes, { schema: openApiSchema }),
+	};
+	if (schema === undefined) return response;
+
+	const contentTypes =
+		responseDeclaration.kind === "stream"
+			? [SSE_CONTENT_TYPE]
+			: contentType !== undefined
+				? Array.isArray(contentType)
+					? contentType
+					: [contentType as string]
+				: [JSON_CONTENT_TYPE];
+
+	return {
+		...response,
+		content: createContent(contentTypes, {
+			schema: converter?.(schema, "output") ?? {},
+		}),
 	};
 };
 
@@ -296,14 +275,12 @@ const createResponses = (
 	const responses: Record<string, OpenApiResponse> = {};
 
 	for (const [status, schema] of Object.entries(getRouteResponses(route))) {
-		const openApiResponse = route.openApi?.responses?.[Number(status)];
-		const response = createResponse(
-			openApiResponse?.description ?? "",
+		responses[status] = createResponse(
+			"",
 			schema,
 			converter,
-			openApiResponse,
+			route.openApi?.responses?.[Number(status)],
 		);
-		responses[status] = response;
 	}
 
 	return responses;
@@ -318,7 +295,7 @@ export const createOperation = (
 	const parameters = [
 		...createParameters(request?.params, "path", options),
 		...createParameters(request?.query, "query", options),
-		...createHeaderParameters(request?.headers, options),
+		...createParameters(request?.headers, "header", options),
 	].map(
 		(parameter) =>
 			options.transformParameter?.({ route, routePath, parameter }) ??
