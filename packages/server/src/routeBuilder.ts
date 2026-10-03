@@ -13,11 +13,8 @@ type ServerRouteBuilderState = Partial<RouteDeclaration> & {
 export class ServerRouteBuilder extends RouteBuilder {
 	declare readonly "~restrpc": ServerRouteBuilderState;
 
-	override clone(
-		state: ServerRouteBuilderState,
-		methodSelected?: boolean,
-	): ServerRouteBuilder {
-		return new ServerRouteBuilder(state, methodSelected ?? this.methodSelected);
+	override clone(state: ServerRouteBuilderState): ServerRouteBuilder {
+		return new ServerRouteBuilder(state);
 	}
 
 	handler(handler: RuntimeRouteHandler): ServerRouteBuilder {

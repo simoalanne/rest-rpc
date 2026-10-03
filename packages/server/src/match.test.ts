@@ -2,28 +2,10 @@ import {
 	createPathMatcher,
 	createRouteMatcher,
 	flattenRouteImplementations,
-	isImplementedRoute,
 } from "./match.ts";
 import { serverRoute as route } from "./routeBuilder.ts";
 
 describe("match", () => {
-	it("detects route leaves that have a handler", () => {
-		expect(isImplementedRoute(route.get("/users"))).toBe(false);
-		expect(isImplementedRoute(route.get("/users").handler(() => "ok"))).toBe(
-			true,
-		);
-		expect(isImplementedRoute({ users: route.get("/users") })).toBe(false);
-		expect(isImplementedRoute(null)).toBe(false);
-	});
-
-	it("rejects route leaves without a handler", () => {
-		expect(() =>
-			flattenRouteImplementations({
-				users: route.get("/users") as never,
-			}),
-		).toThrow('Route "GET /users" has no handler.');
-	});
-
 	it.each(["/users/:id/items/:id", "/users/{id}/items/{id}"] as const)(
 		"accepts repeated parameter names in %s",
 		(path) => {

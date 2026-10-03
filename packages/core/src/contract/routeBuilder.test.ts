@@ -29,15 +29,6 @@ describe("routeBuilder", () => {
 		expect(after["~restrpc"].request).toEqual(before["~restrpc"].request);
 	});
 
-	it("rejects mixing flat input and request segments in either order", () => {
-		expect(() => new RouteBuilder().input(schema).query(schema)).toThrow(
-			"Cannot combine flat input with request segments.",
-		);
-		expect(() => new RouteBuilder().query(schema).input(schema)).toThrow(
-			"Cannot combine flat input with request segments.",
-		);
-	});
-
 	it("rejects GET bodies regardless of declaration order", () => {
 		expect(() => new RouteBuilder().get().body(schema)).toThrow(
 			"GET routes cannot declare a request body.",
@@ -58,32 +49,6 @@ describe("routeBuilder", () => {
 			);
 		},
 	);
-
-	it("rejects selecting the HTTP method twice", () => {
-		expect(() => new RouteBuilder().get().post()).toThrow(
-			"Route method and path have already been selected.",
-		);
-		expect(() => new RouteBuilder().post().input(schema).get()).toThrow(
-			"Route method and path have already been selected.",
-		);
-	});
-
-	it("does not store route modes in the declaration", () => {
-		const declaration = new RouteBuilder().headers(schema).input(schema)[
-			"~restrpc"
-		];
-		expect(declaration).not.toHaveProperty("kind");
-		expect(declaration).not.toHaveProperty("input");
-	});
-
-	it("rejects mixing plain output and response envelopes", () => {
-		expect(() =>
-			new RouteBuilder().output(schema).response(201, schema),
-		).toThrow("Cannot combine plain output with response envelopes.");
-		expect(() =>
-			new RouteBuilder().response(201, schema).output(schema),
-		).toThrow("Cannot combine plain output with response envelopes.");
-	});
 
 	it("rejects duplicate response statuses across stream and body responses", () => {
 		expect(() =>
