@@ -76,16 +76,14 @@ const getResponseSchema = (
 	route: RouteDeclaration,
 	status: number,
 ): ResponseDeclaration => {
-	const entry = Object.entries(getRouteResponses(route)).find(
-		([declaredStatus]) => Number(declaredStatus) === status,
-	);
-	if (!entry) {
+	const response = getRouteResponses(route)[status];
+	if (!response) {
 		throw new Error(
 			`Route response for "${route.method} ${route.path}" returned undeclared status ${status}.`,
 		);
 	}
 
-	return entry[1];
+	return response;
 };
 
 type DeclaredResponseEnvelope = {

@@ -149,12 +149,7 @@ type ProcedureRouteOutput<TRoute extends RouteDeclaration> =
 const getResponseSchema = (
 	route: RouteDeclaration,
 	status: number,
-): ResponseDeclaration | undefined => {
-	const entry = Object.entries(getRouteResponses(route)).find(
-		([declaredStatus]) => Number(declaredStatus) === status,
-	);
-	return entry?.[1];
-};
+): ResponseDeclaration | undefined => getRouteResponses(route)[status];
 
 const assertResponseContentType = (
 	declared: string | readonly string[] | undefined,
