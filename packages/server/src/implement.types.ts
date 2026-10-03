@@ -7,8 +7,8 @@ import type {
 	RequestFields,
 	ReusableMiddlewareRequest,
 } from "./middleware.types.ts";
+import type { EmptyObject } from "./typeUtils.ts";
 
-type EmptyObject = Record<never, never>;
 type ContractRoute = { readonly "~restrpc": RouteDeclaration };
 
 type ContractimplementerNode<

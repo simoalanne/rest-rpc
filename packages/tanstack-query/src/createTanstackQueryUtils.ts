@@ -11,12 +11,12 @@ import type {
 	FetchArgs,
 	FetchOptions,
 	FetchOptionsFor,
+	SuccessfulResponseBody,
 } from "@rest-rpc/core/client";
 import type {
 	Contract,
 	RouteDeclaration,
 	RouteTree,
-	SuccessfulDeclaredClientResponse,
 } from "@rest-rpc/core/contract";
 import type {
 	DataTag,
@@ -35,13 +35,6 @@ type NoInferValue<T> = [T][T extends unknown ? 0 : never];
 type QueryRoute = { readonly "~restrpc": RouteDeclaration };
 
 type RouteFor<E extends QueryRoute> = E["~restrpc"];
-
-type DeclaredRouteResponseBody<E extends RouteDeclaration> =
-	SuccessfulDeclaredClientResponse<E> extends infer TResponse
-		? TResponse extends { body: infer TBody }
-			? TBody
-			: never
-		: never;
 
 type RouteRequestValue<
 	E extends QueryRoute,
@@ -86,10 +79,10 @@ type InfiniteQueryDataFor<
 > = InfiniteData<RouteDataFor<E>, TPageParam>;
 
 type RouteStreamChunk<E extends QueryRoute> = [
-	DeclaredRouteResponseBody<RouteFor<E>>,
+	SuccessfulResponseBody<RouteFor<E>>,
 ] extends [never]
 	? never
-	: DeclaredRouteResponseBody<RouteFor<E>> extends AsyncIterable<infer TChunk>
+	: SuccessfulResponseBody<RouteFor<E>> extends AsyncIterable<infer TChunk>
 		? TChunk
 		: never;
 
@@ -346,9 +339,9 @@ type TanstackQueryBaseRouteValue<
 type TanstackQueryStreamRouteValue<
 	E extends QueryRoute,
 	TGlobalHeaders extends ClientHeaders,
-> = [DeclaredRouteResponseBody<RouteFor<E>>] extends [never]
+> = [SuccessfulResponseBody<RouteFor<E>>] extends [never]
 	? Record<never, never>
-	: DeclaredRouteResponseBody<RouteFor<E>> extends AsyncIterable<unknown>
+	: SuccessfulResponseBody<RouteFor<E>> extends AsyncIterable<unknown>
 		? {
 				streamedQueryOptions: {
 					// Default accumulation fixes the cache data to the route's event array.

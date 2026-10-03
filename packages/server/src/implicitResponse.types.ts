@@ -1,9 +1,7 @@
 import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import type { SseServerEvent } from "./sse.ts";
-
-// Keep schema bodies opaque while flattening each inferred response envelope.
-type Merge<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
+import type { Merge } from "./typeUtils.ts";
 
 type AnyRouteHandler = (...args: never[]) => unknown;
 

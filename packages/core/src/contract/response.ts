@@ -3,6 +3,7 @@ import type { BodyContentType } from "./body.ts";
 import type { RouteDeclaration } from "./routeDeclaration.ts";
 import type { RouteTree } from "./contract.ts";
 import type { SseEvent } from "../sse.ts";
+import type { Merge } from "../typeUtils.ts";
 
 /**
  * Declares a whole-object schema for typed response headers.
@@ -46,8 +47,6 @@ export const getRouteResponses = (route: {
 
 	return route.responses;
 };
-
-type Simplify<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
 
 type IsStreamResponse<TResponse> = TResponse extends {
 	kind: "stream";
@@ -126,7 +125,7 @@ type ClientResponseEntry<TStatus extends number, TResponse> = ResponseEntry<
 	InferClientResponseBody<TResponse>
 > &
 	ResponseHeadersMetadata<TResponse, "output"> extends infer TEntry
-	? Simplify<TEntry>
+	? Merge<TEntry>
 	: never;
 
 type ServerResponseBase<TStatus extends number, TBody> = [TBody] extends [
@@ -141,7 +140,7 @@ type ServerResponseEntry<
 > = ServerResponseBase<TStatus, ServerResponseBody<TResponse>> &
 	ServerResponseMetadata<TResponse> &
 	ResponseHeadersMetadata<TResponse, "input"> extends infer TEntry
-	? Simplify<TEntry>
+	? Merge<TEntry>
 	: never;
 
 type ResponseKey = number | `${number}`;
@@ -198,9 +197,8 @@ export type ErrorDeclaredClientResponse<E extends RouteDeclaration> = Exclude<
 	SuccessfulDeclaredClientResponse<E>
 >;
 
-type ProcedureContentType<TContentType> = TContentType extends readonly string[]
-	? TContentType[number]
-	: TContentType;
+export type ProcedureContentType<TContentType> =
+	TContentType extends readonly string[] ? TContentType[number] : TContentType;
 
 type ServerProcedureResponse<TResponse> = TResponse extends {
 	contentType: infer TContentType;

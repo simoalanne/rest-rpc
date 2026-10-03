@@ -4,6 +4,7 @@ import type {
 	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
 import type { RouteTree } from "./contract.ts";
+import type { EmptyObject, Merge } from "../typeUtils.ts";
 
 /** Scalar value accepted by ordinary HTTP request schemas. */
 export type RequestScalar = string | number | boolean;
@@ -28,7 +29,6 @@ export type RequestHeadersSchema = StandardSchemaV1<
 
 export type RequestBodySchema = StandardSchemaV1;
 
-type Merge<T> = T extends unknown ? { [K in keyof T]: T[K] } : never;
 type RightMerge<TLeft, TRight> = Merge<Omit<TLeft, keyof TRight> & TRight>;
 
 /** Intersects the input types of an ordered Standard Schema list. */
@@ -89,7 +89,6 @@ type RouteRequest<
 	? InferRequestSegments<TRequest, TIO>
 	: never;
 
-type EmptyObject = Record<never, never>;
 type HasRequestInput<TRequest> = [
 	TRequest extends {
 		body: infer TBody;

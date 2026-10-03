@@ -22,11 +22,10 @@ import {
 import { parseSseStream } from "./stream.ts";
 import { validateResponseValue } from "./validateResponse.ts";
 import type { FetchArgs } from "./request.ts";
-
-type Simplify<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
+import type { Merge } from "../typeUtils.ts";
 
 type WithResponseMetadata<TResponse, TMetadata> = TResponse extends unknown
-	? Simplify<TResponse & TMetadata>
+	? Merge<TResponse & TMetadata>
 	: never;
 
 type RouteDeclaredResponse<E extends RouteDeclaration> = WithResponseMetadata<
@@ -122,13 +121,13 @@ export type ClientResponseForDeclaration<E extends RouteDeclaration> =
 	E extends {
 		output: "output";
 	}
-		? ProcedureRouteOutput<E>
+		? SuccessfulResponseBody<E>
 		: RouteDeclaredResponse<E>;
 
 type ClientSuccessForDeclaration<E extends RouteDeclaration> = E extends {
 	output: "output";
 }
-	? ProcedureRouteOutput<E>
+	? SuccessfulResponseBody<E>
 	: WithResponseMetadata<
 			SuccessfulDeclaredClientResponse<E>,
 			{ headers: Headers }
@@ -140,7 +139,7 @@ type ClientErrorForDeclaration<E extends RouteDeclaration> = E extends {
 	? never
 	: WithResponseMetadata<ErrorDeclaredClientResponse<E>, { headers: Headers }>;
 
-type ProcedureRouteOutput<TRoute extends RouteDeclaration> =
+export type SuccessfulResponseBody<TRoute extends RouteDeclaration> =
 	SuccessfulDeclaredClientResponse<TRoute> extends infer TResponse
 		? TResponse extends { body: infer TBody }
 			? TBody

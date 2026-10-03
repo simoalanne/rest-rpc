@@ -8,6 +8,7 @@ import type {
 	BuilderExtension,
 	BuilderState,
 	InferServerRequest,
+	ProcedureContentType,
 	PublicDeclarationFor,
 	RootRouteBuilder,
 	RouteBuilderView,
@@ -25,13 +26,10 @@ import type {
 	MiddlewareReturn,
 	ReusableMiddlewareRequest,
 	RequestFields,
+	RequestTransportFields,
 } from "./middleware.types.ts";
+import type { EmptyObject, Merge } from "./typeUtils.ts";
 
-type EmptyObject = Record<never, never>;
-type RequestTransportFields = {
-	contentType?: string;
-	lastEventId?: string;
-};
 type MaybePromise<T> = T | Promise<T>;
 
 /** Untyped route handler stored in a completed runtime route declaration. */
@@ -116,8 +114,6 @@ export type RouteHandlerFor<
 				: never;
 		};
 
-type Merge<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
-
 /** Terminal builder shape containing a route declaration and its handler. */
 type CompletedRoute<TRoute, THandler> = {
 	readonly "~restrpc": Merge<TRoute & { readonly handler: THandler }>;
@@ -150,10 +146,6 @@ type HandlerImplementation<
 	TPublicRoute,
 	HandlerFor<TRoute, TAdditionalHandlerFields, TContext, TResult>
 >;
-
-type ProcedureContentType<TContentType> = TContentType extends readonly string[]
-	? TContentType[number]
-	: TContentType;
 
 type ProcedureHandlerResult<TResponse> = TResponse extends {
 	contentType: infer TContentType;

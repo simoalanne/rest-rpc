@@ -13,11 +13,8 @@ import type {
 	RequestQuerySchema,
 } from "./request.ts";
 import type { ResponseOptions } from "./response.ts";
+import type { EmptyObject, Merge } from "../typeUtils.ts";
 
-// Normalize one library-owned object at a time so schema and metadata types stay intact.
-type Merge<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
-
-type EmptyObject = Record<never, never>;
 type JsonContentType = "application/json";
 type BuilderPath = AbsolutePath | undefined;
 

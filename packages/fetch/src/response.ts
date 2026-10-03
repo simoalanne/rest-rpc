@@ -6,7 +6,7 @@ import {
 } from "@rest-rpc/core/codecs";
 import type { HttpRouteResult } from "@rest-rpc/server";
 
-type HttpHeaderValue = string | number | readonly string[] | undefined;
+type HttpHeaderValue = NonNullable<HttpRouteResult["headers"]>[string];
 
 const encodeResponseStream = async function* (
 	body: AsyncIterable<string>,
