@@ -22,7 +22,7 @@ type TanstackQueryUtilFunctions = {
 		options: OptionsWithFetchOptions,
 	) => Record<string, unknown>;
 	queryOptions: (options?: OptionsWithFetchOptions) => Record<string, unknown>;
-	streamedQueryOptions?: (
+	streamedQueryOptions: (
 		options?: OptionsWithFetchOptions,
 	) => Record<string, unknown>;
 	mutationKey: () => MutationKey;
@@ -33,14 +33,6 @@ type FetchData = (
 	request: unknown,
 	fetchOptions: FetchOptions | undefined,
 ) => Promise<unknown>;
-
-const splitFetchOptions = (options?: OptionsWithFetchOptions) => {
-	const { fetchOptions, ...queryOptions } = options ?? {};
-	return {
-		fetchOptions,
-		queryOptions,
-	};
-};
 
 const isAsyncIterable = (value: unknown): value is AsyncIterable<unknown> =>
 	typeof value === "object" &&
@@ -57,39 +49,35 @@ export const createTanstackUtilsForRoute = ({
 	fetchData: FetchData;
 	unwrapResponseBodyForStream?: boolean;
 }): TanstackQueryUtilFunctions => {
-	const utils: TanstackQueryUtilFunctions = {
+	const queryKeyFor = (request: unknown): QueryKey =>
+		request === undefined || request === skipToken
+			? routePath
+			: [...routePath, request];
+
+	return {
 		mutationOptions: (options) => {
-			const { fetchOptions, queryOptions } = splitFetchOptions(options);
+			const { fetchOptions, ...mutationOptions } = options ?? {};
 			return {
 				mutationKey: routePath,
 				mutationFn: (request: unknown) => fetchData(request, fetchOptions),
-				...queryOptions,
+				...mutationOptions,
 			};
 		},
 		queryOptions: (options) => {
-			const { fetchOptions, queryOptions } = splitFetchOptions(options);
-			const { request, queryKey, ...tanstackOptions } = queryOptions;
-			const disabled = request === skipToken;
-			const queryFn = disabled
-				? skipToken
-				: ({ signal }: { signal?: AbortSignal }) =>
-						fetchData(request, {
-							...fetchOptions,
-							signal,
-						});
+			const { fetchOptions, request, queryKey, ...tanstackOptions } =
+				options ?? {};
 			return {
-				queryKey:
-					queryKey ??
-					(disabled || request === undefined
-						? routePath
-						: [...routePath, request]),
-				queryFn,
+				queryKey: queryKey ?? queryKeyFor(request),
+				queryFn:
+					request === skipToken
+						? skipToken
+						: ({ signal }: { signal?: AbortSignal }) =>
+								fetchData(request, { ...fetchOptions, signal }),
 				...tanstackOptions,
 			};
 		},
 		infiniteQueryOptions: (options) => {
-			const { fetchOptions, queryOptions } = splitFetchOptions(options);
-			const { request, queryKey, ...tanstackOptions } = queryOptions;
+			const { fetchOptions, request, queryKey, ...tanstackOptions } = options;
 			return {
 				queryKey: queryKey ?? routePath,
 				queryFn:
@@ -106,66 +94,45 @@ export const createTanstackUtilsForRoute = ({
 									typeof request === "function"
 										? request(pageParam)
 										: undefined,
-									{
-										...fetchOptions,
-										signal,
-									},
+									{ ...fetchOptions, signal },
 								),
 				...tanstackOptions,
 			};
 		},
+		streamedQueryOptions: (options) => {
+			const {
+				fetchOptions,
+				request,
+				initialValue,
+				reducer,
+				refetchMode,
+				queryKey,
+				...tanstackOptions
+			} = options ?? {};
+			const streamFn = async ({ signal }: { signal: AbortSignal }) => {
+				const data = await fetchData(request, { ...fetchOptions, signal });
+				const stream = unwrapResponseBodyForStream
+					? (data as { body: unknown }).body
+					: data;
+
+				if (!isAsyncIterable(stream)) {
+					throw new Error("Route did not return a stream response body");
+				}
+
+				return stream;
+			};
+			return {
+				queryKey: queryKey ?? queryKeyFor(request),
+				queryFn:
+					request === skipToken
+						? skipToken
+						: typeof reducer === "function"
+							? streamedQuery({ refetchMode, streamFn, initialValue, reducer })
+							: streamedQuery({ refetchMode, streamFn }),
+				...tanstackOptions,
+			};
+		},
 		mutationKey: () => routePath,
-		queryKey: (request?: unknown) =>
-			request === undefined ? routePath : [...routePath, request],
+		queryKey: queryKeyFor,
 	};
-	utils.streamedQueryOptions = (options) => {
-		const { fetchOptions, queryOptions } = splitFetchOptions(options);
-		const {
-			request,
-			initialValue,
-			reducer,
-			refetchMode,
-			queryKey,
-			...tanstackOptions
-		} = queryOptions;
-		const streamFn = async ({ signal }: { signal: AbortSignal }) => {
-			const data = await fetchData(request, {
-				...fetchOptions,
-				signal,
-			});
-			const stream = unwrapResponseBodyForStream
-				? (data as { body: unknown }).body
-				: data;
-
-			if (!isAsyncIterable(stream)) {
-				throw new Error("Route did not return a stream response body");
-			}
-
-			return stream;
-		};
-		const disabled = request === skipToken;
-		const queryFn = disabled
-			? skipToken
-			: typeof reducer === "function"
-				? streamedQuery({
-						refetchMode,
-						initialValue,
-						reducer,
-						streamFn,
-					})
-				: streamedQuery({
-						refetchMode,
-						streamFn,
-					});
-		return {
-			queryKey:
-				queryKey ??
-				(disabled || request === undefined
-					? routePath
-					: [...routePath, request]),
-			queryFn,
-			...tanstackOptions,
-		};
-	};
-	return utils;
 };
