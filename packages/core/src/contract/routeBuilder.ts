@@ -161,7 +161,7 @@ const addResponse = (
 	schema: ResponseDeclaration,
 ): RouteBuilderState => {
 	assertHttpStatusCode(status);
-	if (Object.hasOwn(state.responses ?? {}, status)) {
+	if (state.responses?.[status]) {
 		throw new Error(`Response status "${status}" has already been declared.`);
 	}
 	return {
