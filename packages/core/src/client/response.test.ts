@@ -20,7 +20,7 @@ const decode = (response: Response, validate = true, declaration = declared) =>
 	fetchResponse(async () => response, validate, undefined, declaration);
 
 describe("client response decoding", () => {
-	it("transforms declared headers and retains native headers", async () => {
+	it("transforms declared headers and retains raw headers", async () => {
 		const declaration = route.get("/").response(201, type<{ name: string }>(), {
 			headers: type((input: Record<string, string>) => ({
 				count: Number(input["x-count"]),
@@ -36,11 +36,11 @@ describe("client response decoding", () => {
 		expect(await read(true)).toMatchObject({
 			status: 201,
 			body: { name: "Ada" },
-			responseHeaders: { count: 2 },
-			headers: expect.any(Headers),
+			headers: { count: 2 },
+			rawHeaders: expect.any(Headers),
 		});
 		expect(await read(false)).toMatchObject({
-			responseHeaders: { "x-count": "2" },
+			headers: { "x-count": "2" },
 		});
 	});
 

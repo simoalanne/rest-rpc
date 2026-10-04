@@ -93,7 +93,7 @@ type DeclaredResponseEnvelope = {
 	status: number;
 	body?: unknown;
 	contentType?: string;
-	responseHeaders?: Record<string, unknown>;
+	headers?: Record<string, unknown>;
 };
 
 const selectResponseContentType = (
@@ -120,9 +120,9 @@ const normalizeResponseResult = async (
 	const bodySchema = schema.body;
 	const headers = disableValidation
 		? schema.headers
-			? stringifyHeaders(result.responseHeaders)
+			? stringifyHeaders(result.headers)
 			: undefined
-		: await validateResponseHeaders(schema, result.responseHeaders);
+		: await validateResponseHeaders(schema, result.headers);
 
 	if (bodySchema === undefined) {
 		return {

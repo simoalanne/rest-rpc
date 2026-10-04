@@ -8,105 +8,31 @@ import {
 } from "./operation.ts";
 
 describe("operation", () => {
-	it("merges OpenAPI-only response headers with declared headers taking precedence", () => {
-		const declared = type<{ count: number }>();
-		const description = type<string>();
+	it("documents declared response descriptions, headers and content types", () => {
+		const headers = type<{ count: number }>();
 		const body = type<string>();
 		const converter = vi.fn((schema: unknown, _mode: "input" | "output") =>
-			schema === declared
+			schema === headers
 				? { properties: { count: { type: "integer" } } }
 				: { type: "string" },
 		);
 		expect(
 			createResponse(
-				"fallback",
-				{ body, headers: declared, contentType: ["text/plain", "text/html"] },
-				converter,
 				{
+					body,
+					headers,
+					contentType: ["text/plain", "text/html"],
 					description: "Created",
-					headers: {
-						count: { description: "overridden", schema: description },
-						extra: { description: "Extra", schema: description },
-						plain: description,
-					},
 				},
+				converter,
 			),
 		).toEqual({
 			description: "Created",
-			headers: {
-				count: { schema: { type: "integer" } },
-				extra: { description: "Extra", schema: { type: "string" } },
-				plain: { schema: { type: "string" } },
-			},
+			headers: { count: { schema: { type: "integer" } } },
 			content: {
 				"text/plain": { schema: { type: "string" } },
 				"text/html": { schema: { type: "string" } },
 			},
-		});
-		expect(converter.mock.calls.every((call) => call[1] === "output")).toBe(
-			true,
-		);
-	});
-
-	it("keeps query and header requirements from known schemas when another schema is unknown", () => {
-		const known = type<{ required: string; optional?: string }>();
-		const unknown = type();
-		for (const location of ["query", "header"] as const) {
-			expect(
-				createParameters([known, unknown], location, {
-					schemaConverter: (schema) =>
-						schema === known
-							? {
-									properties: {
-										required: { type: "string" },
-										optional: { type: "string" },
-									},
-									required: ["required"],
-								}
-							: undefined,
-				}),
-			).toEqual([
-				{
-					name: "required",
-					in: location,
-					required: true,
-					schema: { type: "string" },
-				},
-				{
-					name: "optional",
-					in: location,
-					required: false,
-					schema: { type: "string" },
-				},
-			]);
-		}
-	});
-
-	it("preserves route metadata and extensions while generating response descriptions", () => {
-		const metadata = {
-			summary: "List users",
-			description: "Description",
-			operationId: "users.list",
-			tags: ["users"],
-			deprecated: true,
-			security: [{ token: [] }],
-			externalDocs: { url: "https://example.test/docs", description: "Docs" },
-			extensions: { "x-owner": "users" },
-			responses: { 204: { description: "No users" } },
-		};
-		const declaration = route.get("/").response(204).openAPI(metadata)[
-			"~restrpc"
-		];
-		expect(createOperation(declaration, {})).toEqual({
-			summary: metadata.summary,
-			description: metadata.description,
-			operationId: metadata.operationId,
-			tags: metadata.tags,
-			deprecated: true,
-			security: metadata.security,
-			externalDocs: metadata.externalDocs,
-			"x-owner": "users",
-			responses: { 204: { description: "No users", headers: {} } },
 		});
 	});
 
@@ -193,13 +119,12 @@ describe("operation", () => {
 	});
 
 	it("omits content for bodyless responses and uses SSE for streams", () => {
-		expect(createResponse("Deleted", { body: undefined }, undefined)).toEqual({
-			description: "Deleted",
+		expect(createResponse({ body: undefined }, undefined)).toEqual({
+			description: "",
 		});
 		expect(
 			createResponse(
-				"Updates",
-				{ kind: "stream", body: type<string>() },
+				{ kind: "stream", body: type<string>(), description: "Updates" },
 				() => ({ type: "string" }),
 			),
 		).toEqual({

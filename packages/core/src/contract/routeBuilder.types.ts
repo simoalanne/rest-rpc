@@ -12,7 +12,12 @@ import type {
 	RequestParamsSchema,
 	RequestQuerySchema,
 } from "./request.ts";
-import type { ResponseOptions } from "./response.ts";
+import type {
+	OutputOptions,
+	ResponseOptions,
+	StreamOutputOptions,
+	StreamResponseOptions,
+} from "./response.ts";
 import type { EmptyObject, Merge } from "../typeUtils.ts";
 
 type JsonContentType = "application/json";
@@ -22,16 +27,18 @@ type ContentTypeFor<TOptions> = TOptions extends BodyOptions
 	? TOptions["contentType"]
 	: JsonContentType;
 
+type ResponseHeadersFor<TOptions> = TOptions extends {
+	headers: infer THeaders;
+}
+	? { headers: THeaders }
+	: EmptyObject;
+
 type ResponseFor<TSchema, TOptions> = TSchema extends StandardSchemaV1
 	? {
 			body: TSchema;
 			contentType: ContentTypeFor<TOptions>;
-		} & (TOptions extends { headers: infer THeaders }
-			? { headers: THeaders }
-			: EmptyObject)
-	: { body: undefined } & (TOptions extends { headers: infer THeaders }
-			? { headers: THeaders }
-			: EmptyObject);
+		} & ResponseHeadersFor<TOptions>
+	: { body: undefined } & ResponseHeadersFor<TOptions>;
 
 type BuilderMethod =
 	| "body"
@@ -301,14 +308,20 @@ type ResponseMethods<
 		streamResponse<
 			const TStatus extends number,
 			const TSchema extends StandardSchemaV1,
+			const TOptions extends StreamResponseOptions | undefined = undefined,
 			const TPath extends BuilderPath = AbsolutePath,
 			const TMetadata extends RouteMetadata | never = never,
 		>(
 			this: BuilderReceiver<TPath, TMetadata>,
 			status: TStatus,
 			schema: TSchema,
+			options?: TOptions,
 		): RouteBuilderView<
-			WithResponse<TState, TStatus, { kind: "stream"; body: TSchema }>,
+			WithResponse<
+				TState,
+				TStatus,
+				{ kind: "stream"; body: TSchema } & ResponseHeadersFor<TOptions>
+			>,
 			TExtension,
 			TPath,
 			TMetadata
@@ -466,7 +479,7 @@ type FlatMethods<
 			/** Declares one plain output value. @see {@link https://rest-rpc.dev/docs/route-builder#choose-plain-outputs-or-status-responses} */
 			output<
 				const TSchema extends StandardSchemaV1,
-				const TOptions extends BodyOptions | undefined = undefined,
+				const TOptions extends OutputOptions | undefined = undefined,
 				const TPath extends BuilderPath = AbsolutePath,
 				const TMetadata extends RouteMetadata | never = never,
 			>(
@@ -490,6 +503,7 @@ type FlatMethods<
 			>(
 				this: BuilderReceiver<TPath, TMetadata>,
 				schema: TSchema,
+				options?: StreamOutputOptions,
 			): RouteBuilderView<
 				WithPlainOutput<
 					UseMethod<TState, "output">,

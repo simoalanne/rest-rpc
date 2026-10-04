@@ -62,6 +62,19 @@ Rules that decide the wire format or the served path are derived separately in e
   **Suggestion:** add `serializeHttpRouteResult(result, codecs, defaultCodecs)` to `@rest-rpc/server`, returning `{ status, headers, contentType, body }`. Writing to the native response stays in each adapter. **Value: high.** This is the largest duplicated runtime block in the adapters.
 - **`index.ts` boilerplate:** all six adapter entry points repeat `DefaultContext`, `InferServerHandler`, `route`, `implement` and an identical re-export block. A shared generic `AdapterApi<TFields, TContext>` type would cut the cast noise in `route` and `implement`. The per-package `DefaultContext` interface and the TSDoc on each export have to stay. **Value: low.**
 
+### 2.3 Declare response descriptions on the response, not in `.openAPI()`
+
+**Status: done.** `.openAPI()` no longer accepts `responses`, and `OpenApiResponseOptions` is gone. `.response()`, `.output()`, `.streamResponse()` and `.streamOutput()` take a `description` option that is stored on the `ResponseDeclaration` and read by `createResponse`. A bodyless response is described with `.response(204, undefined, { description })`. An overload that accepts options in place of the schema was left out to keep builder type changes out of this item. `.streamResponse()` also accepts `headers`, which fixes the capability gap below. The shared adapter suite checks that declared stream headers reach the wire. Response headers are now called `headers` everywhere: handlers return them as `headers` instead of `responseHeaders`, and client results expose the typed headers as `headers` and the Fetch `Headers` object as `rawHeaders`.
+
+`openApi.responses` declared each response a second time, keyed by status, only for OpenAPI:
+
+- **Duplicated declaration:** a description lived in `.openAPI({ responses: { 201: … } })`, away from the `.response(201, …)` it describes. Metadata for an undeclared status was silently skipped, and a shared builder's response metadata only applied to routes that happened to declare the same status.
+- **OpenAPI-only headers:** a second header mechanism next to the typed response `headers`, with its own schema-or-object entry shape, conversion and precedence rules (`mergeOpenApiResponse`, `createOpenApiResponseHeaders`, `mergeResponseHeaders`). Headers outside the contract, such as ones set by middleware or a proxy, can be added with `transformOperation`.
+- **Stream response headers:** `.streamResponse(status, schema)` had no options, so a declared stream route could not type or validate response headers. Every later stage already supported them: `normalizeResponseResult` validates the returned headers before branching on `kind`, handler-inferred stream routes carry `headers`, the client reads declared headers on its stream branch, and `createResponse` documents them. Only the builder was missing the option.
+- **Split header naming:** the declaration option was `headers`, but handlers returned the same values as `responseHeaders` and clients read them back as `responseHeaders`, because the client result already used `headers` for the Fetch `Headers` object. The second name only existed to avoid that client collision, and every route author had to learn it. Moving the raw object to `rawHeaders` lets the declaration, the handler result and the client result use one name.
+
+**Value: medium.** It removes a duplicated declaration path and its merge code, closes a capability gap between declared and inferred stream routes, and gives response headers one name from declaration to client.
+
 ## Tier 3: large
 
 Type-level or design-level changes, to be reviewed last. For the type-level items, hover output and type tests are the review criteria.

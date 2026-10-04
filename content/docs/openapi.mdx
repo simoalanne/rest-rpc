@@ -125,8 +125,10 @@ const document = createOpenApiDocument(routes, {
 
 Use `.openAPI()` on a route builder for operation metadata. It accepts
 `summary`, `description`, `operationId`, `tags`, `deprecated`, `security`,
-`externalDocs`, `responses`, and `extensions`. `extensions` keys must start
-with `x-` and are added to the operation.
+`externalDocs`, and `extensions`. `extensions` keys must start with `x-` and
+are added to the operation.
+
+calling `.openAPI()` more than once merges the details, so a shared base builder can set common `tags` or `security`.
 
 ```ts
 const create = route
@@ -135,75 +137,26 @@ const create = route
 	.openAPI({
 		summary: "Create a todo",
 		operationId: "createTodo",
-		responses: {
-			201: {
-				description: "Todo created.",
-			},
-		},
 	})
 	.response(201, todoSchema);
 ```
 
-Each `.response()` call produces a status-keyed OpenAPI response.
+## Response Descriptions
+
+Each declared response produces a status-keyed OpenAPI response. Describe it
+with the `description` option of `.response()`, `.output()`,
+`.streamResponse()`, or `.streamOutput()`. Pass `undefined` as the schema to
+describe a bodyless response:
 
 ```ts
-const create = route
-	.post("/todos")
-	.body(z.object({ title: z.string().min(1) }))
-	.openAPI({
-		summary: "Create a todo",
-		operationId: "createTodo",
-		responses: {
-			201: {
-				description: "Todo created.",
-			},
-			409: {
-				description: "A todo with the same title already exists.",
-			},
-		},
-	})
-	.response(201, todoSchema)
-	.response(
-		409,
-		z.object({
-			code: z.literal("TODO_ALREADY_EXISTS"),
-		}),
-	);
-```
-
-`openApi.responses` only affects generated OpenAPI output. It does not change
-rest-rpc runtime behavior, handler return types, client response types,
-validation, or server headers. Metadata for statuses that a route does not
-declare is skipped.
-
-```ts
-const get = route
-	.get("/todos/:id")
+const remove = route
+	.delete("/todos/:id")
 	.params(z.object({ id: z.string() }))
-	.openAPI({
-		responses: {
-			200: {
-				headers: {
-					"x-request-id": {
-						description: "Request correlation id.",
-						schema: z.string(),
-					},
-					"x-rate-limit": z.number(),
-				},
-			},
-		},
-	})
-	.response(200, todoSchema);
+	.response(204, undefined, { description: "Todo deleted." })
+	.response(404, z.object({ code: z.literal("TODO_NOT_FOUND") }), {
+		description: "No todo has this id.",
+	});
 ```
-
-Use route response `headers` instead when a handler-owned header is part of the
-typed rest-rpc contract.
-
-Typed headers declared on a route response override OpenAPI-only headers with
-the same name in generated OpenAPI. `.openAPI()` can appear anywhere before
-`.handler()`. Its position among request and output declarations does not affect
-the generated operation. Calling it more than once merges the details, so a
-shared base builder can set common `tags` or `security`.
 
 ## Transform Hooks
 

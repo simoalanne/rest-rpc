@@ -142,6 +142,28 @@ export const describeAdapterConformance = (
 			});
 		});
 
+		it("sends declared stream response headers", async () => {
+			const routes = {
+				events: route
+					.get("/header-events")
+					.streamResponse(200, type<number>(), {
+						headers: type<{ "x-stream-id": string }>(),
+					})
+					.handler(() => ({
+						status: 200,
+						body: (async function* () {
+							yield 1;
+						})(),
+						headers: { "x-stream-id": "stream_1" },
+					})),
+			};
+			await serve(routes, {}, async (url) => {
+				const response = await fetch(`${url}/header-events`);
+				expect(response.headers.get("x-stream-id")).toBe("stream_1");
+				expect(await response.text()).toContain("data: 1\n\n");
+			});
+		});
+
 		it("ends a stream whose chunk fails validation without delivering it", async () => {
 			const routes = {
 				events: route

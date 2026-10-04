@@ -42,16 +42,16 @@ describe("implicit response inference", () => {
 			status: 200,
 			body: "ok",
 			contentType: "text/plain",
-			responseHeaders: { count: 2, omitted: undefined },
+			headers: { count: 2, omitted: undefined },
 		}));
 		expectTypeOf<
-			InferClientResponse<typeof custom>["responseHeaders"]
+			InferClientResponse<typeof custom>["headers"]
 		>().toEqualTypeOf<{
 			readonly count: "2";
 			readonly omitted: undefined;
 		}>();
 		expectTypeOf<
-			InferServerResponse<typeof custom>["responseHeaders"]
+			InferServerResponse<typeof custom>["headers"]
 		>().toEqualTypeOf<{
 			readonly count: 2;
 			readonly omitted: undefined;
@@ -107,6 +107,6 @@ describe("implicit response inference", () => {
 		// @ts-expect-error Status envelopes require a number.
 		route.handler(() => ({ status: "200", body: "bad" }));
 		// @ts-expect-error Response headers must be transport scalars.
-		route.handler(() => ({ status: 200, responseHeaders: { count: {} } }));
+		route.handler(() => ({ status: 200, headers: { count: {} } }));
 	});
 });

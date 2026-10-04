@@ -47,7 +47,7 @@ const normalizeImplicitHttpResponse = (
 			`Invalid inferred HTTP response status "${response.status}".`,
 		);
 	}
-	const headers = response.responseHeaders;
+	const headers = response.headers;
 	if (!("body" in response)) {
 		return {
 			kind: "response",

@@ -27,12 +27,35 @@ export type ResponseDeclaration = {
 	body?: StandardSchemaV1;
 	contentType?: BodyContentType;
 	headers?: ResponseHeaders;
+	description?: string;
 };
 
 /** HTTP metadata associated with a declared response schema. */
 export type ResponseOptions = {
 	contentType?: BodyContentType;
 	headers?: ResponseHeaders;
+	/** Describes the response in generated OpenAPI documents. */
+	description?: string;
+};
+
+/** HTTP metadata associated with a declared plain output. */
+export type OutputOptions = {
+	contentType?: BodyContentType;
+	/** Describes the response in generated OpenAPI documents. */
+	description?: string;
+};
+
+/** HTTP metadata associated with a declared streaming response. */
+export type StreamResponseOptions = {
+	headers?: ResponseHeaders;
+	/** Describes the response in generated OpenAPI documents. */
+	description?: string;
+};
+
+/** HTTP metadata associated with a declared streaming plain output. */
+export type StreamOutputOptions = {
+	/** Describes the response in generated OpenAPI documents. */
+	description?: string;
 };
 
 export type RouteResponses = Record<number, ResponseDeclaration>;
@@ -92,7 +115,7 @@ type ResponseHeadersMetadata<TResponse, TIO extends "input" | "output"> = [
 ] extends [never]
 	? unknown
 	: {
-			responseHeaders: InferSchema<ResponseHeadersFor<TResponse>, TIO>;
+			headers: InferSchema<ResponseHeadersFor<TResponse>, TIO>;
 		};
 
 type ResponseEntry<TStatus extends number, TBody> = {

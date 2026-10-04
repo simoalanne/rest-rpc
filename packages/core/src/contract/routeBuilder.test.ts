@@ -50,6 +50,35 @@ describe("routeBuilder", () => {
 		},
 	);
 
+	it("stores response descriptions and stream response headers", () => {
+		const headers = type<{ "x-cursor": string }>();
+		expect(
+			new RouteBuilder()
+				.response(204, undefined, { description: "Deleted" })
+				.streamResponse(200, schema, { headers, description: "Events" })[
+				"~restrpc"
+			].responses,
+		).toEqual({
+			204: { body: undefined, description: "Deleted" },
+			200: { kind: "stream", body: schema, headers, description: "Events" },
+		});
+		expect(
+			new RouteBuilder().output(schema, { description: "Name" })["~restrpc"]
+				.responses,
+		).toEqual({
+			200: {
+				body: schema,
+				contentType: "application/json",
+				description: "Name",
+			},
+		});
+		expect(
+			new RouteBuilder().streamOutput(schema, { description: "Names" })[
+				"~restrpc"
+			].responses,
+		).toEqual({ 200: { kind: "stream", body: schema, description: "Names" } });
+	});
+
 	it("rejects duplicate response statuses across stream and body responses", () => {
 		expect(() =>
 			new RouteBuilder().response(200, schema).streamResponse(200, schema),

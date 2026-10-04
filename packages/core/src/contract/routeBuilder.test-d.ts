@@ -35,6 +35,22 @@ describe("routeBuilder types", () => {
 		}>();
 	});
 
+	it("keeps descriptions out of declaration types and accepts stream headers", () => {
+		const schema = type<string>();
+		const headers = type<{ "x-cursor": string }>();
+		const output = route.output(schema, { description: "Name" });
+		expectTypeOf(output["~restrpc"].responses).toEqualTypeOf<{
+			200: { body: typeof schema; contentType: "application/json" };
+		}>();
+		const stream = route.get("/events").streamResponse(200, schema, {
+			headers,
+			description: "Events",
+		});
+		expectTypeOf(stream["~restrpc"].responses).toEqualTypeOf<{
+			200: { kind: "stream"; body: typeof schema; headers: typeof headers };
+		}>();
+	});
+
 	it("removes builder operations incompatible with the selected state", () => {
 		const input = route.input(type<string>());
 		expectTypeOf(input).not.toHaveProperty("body");

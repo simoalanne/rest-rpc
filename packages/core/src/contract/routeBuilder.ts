@@ -4,7 +4,6 @@ import type {
 	AbsolutePath,
 	CommonOpenApiRouteOptions,
 	HttpMethod,
-	OpenApiResponseOptions,
 	OpenApiRouteOptions,
 	RouteDeclaration,
 	RouteMetadata,
@@ -16,7 +15,13 @@ import type {
 	RequestParamsSchema,
 	RequestQuerySchema,
 } from "./request.ts";
-import type { ResponseDeclaration, ResponseOptions } from "./response.ts";
+import type {
+	OutputOptions,
+	ResponseDeclaration,
+	ResponseOptions,
+	StreamOutputOptions,
+	StreamResponseOptions,
+} from "./response.ts";
 import type { PublicRouteBuilder } from "./routeBuilder.types.ts";
 
 type RouteBuilderState = Partial<RouteDeclaration>;
@@ -41,39 +46,16 @@ const mergeUnique = (common: string[] = [], local: string[] = []) => [
 	...new Set([...common, ...local]),
 ];
 
-const mergeOpenApiResponse = (
-	common: OpenApiResponseOptions | undefined,
-	local: OpenApiResponseOptions | undefined,
-): OpenApiResponseOptions => ({
-	...common,
-	...local,
-	headers: { ...common?.headers, ...local?.headers },
-});
-
 const mergeOpenApi = (
 	common: CommonOpenApiRouteOptions | undefined,
 	local: OpenApiRouteOptions | undefined,
 ): OpenApiRouteOptions | undefined => {
 	if (!common && !local) return undefined;
-	const statuses = new Set([
-		...Object.keys(common?.responses ?? {}),
-		...Object.keys(local?.responses ?? {}),
-	]);
-
 	return {
 		...common,
 		...local,
 		tags: mergeUnique(common?.tags, local?.tags),
 		extensions: { ...common?.extensions, ...local?.extensions },
-		responses: Object.fromEntries(
-			[...statuses].map((status) => [
-				status,
-				mergeOpenApiResponse(
-					common?.responses?.[Number(status)],
-					local?.responses?.[Number(status)],
-				),
-			]),
-		),
 	};
 };
 
@@ -116,6 +98,11 @@ const addRequestSegment = (
 		[segment]: appendSchema(state.request?.[segment], schema),
 	},
 });
+
+const withDescription = (options: { description?: string } | undefined) =>
+	options?.description === undefined
+		? {}
+		: { description: options.description };
 
 const addResponse = (
 	state: RouteBuilderState,
@@ -249,37 +236,49 @@ export class RouteBuilder {
 					: {
 							body: undefined,
 							...(options?.headers ? { headers: options.headers } : {}),
+							...withDescription(options),
 						},
 			),
 		);
 	}
 
-	output(schema: StandardSchemaV1, options?: BodyOptions): RouteBuilder {
+	output(schema: StandardSchemaV1, options?: OutputOptions): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
 		return this.clone(
 			addResponse({ ...state, output: "output" }, 200, {
 				body: schema,
 				contentType: options?.contentType ?? "application/json",
+				...withDescription(options),
 			}),
 		);
 	}
 
-	streamOutput(schema: StandardSchemaV1): RouteBuilder {
+	streamOutput(
+		schema: StandardSchemaV1,
+		options?: StreamOutputOptions,
+	): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
 		return this.clone(
 			addResponse({ ...state, output: "output" }, 200, {
 				kind: "stream",
 				body: schema,
+				...withDescription(options),
 			}),
 		);
 	}
 
-	streamResponse(status: number, schema: StandardSchemaV1): RouteBuilder {
+	streamResponse(
+		status: number,
+		schema: StandardSchemaV1,
+		options?: StreamResponseOptions,
+	): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
 		return this.clone(
 			addResponse({ ...state, output: "response" }, status, {
 				kind: "stream",
 				body: schema,
+				...(options?.headers ? { headers: options.headers } : {}),
+				...withDescription(options),
 			}),
 		);
 	}

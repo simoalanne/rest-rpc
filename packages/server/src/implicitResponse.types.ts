@@ -16,13 +16,13 @@ export type ImplicitResponseEnvelope =
 			status: number;
 			body?: never;
 			contentType?: string;
-			responseHeaders?: Record<string, string | number | undefined>;
+			headers?: Record<string, string | number | undefined>;
 	  }
 	| {
 			status: number;
 			body: unknown;
 			contentType?: string;
-			responseHeaders?: Record<string, string | number | undefined>;
+			headers?: Record<string, string | number | undefined>;
 	  };
 
 type BodyResponseKind<TResponse, TBody> =
@@ -90,7 +90,7 @@ type ImplicitResponseDeclaration<TResponse> = TResponse extends {
 		} & (TResponse extends { body: AsyncIterable<unknown> }
 			? { kind: "stream" }
 			: { contentType: ImplicitResponseContentType<TResponse> }) &
-			(TResponse extends { responseHeaders: infer THeaders }
+			(TResponse extends { headers: infer THeaders }
 				? {
 						headers: InferredSchema<
 							THeaders,
@@ -99,7 +99,7 @@ type ImplicitResponseDeclaration<TResponse> = TResponse extends {
 					}
 				: unknown)
 	: { body: undefined } & (TResponse extends {
-			responseHeaders: infer THeaders;
+			headers: infer THeaders;
 		}
 			? {
 					headers: InferredSchema<

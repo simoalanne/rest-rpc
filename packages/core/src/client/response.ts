@@ -113,14 +113,14 @@ type ClientStreamDataForDeclaration<E extends RouteDeclaration> =
 export type ClientResponseForDeclaration<E extends RouteDeclaration> =
 	UsesPlainOutput<E> extends true
 		? SuccessfulResponseBody<E>
-		: WithResponseMetadata<DeclaredClientResponse<E>, { headers: Headers }>;
+		: WithResponseMetadata<DeclaredClientResponse<E>, { rawHeaders: Headers }>;
 
 type ClientSuccessForDeclaration<E extends RouteDeclaration> =
 	UsesPlainOutput<E> extends true
 		? SuccessfulResponseBody<E>
 		: WithResponseMetadata<
 				SuccessfulDeclaredClientResponse<E>,
-				{ headers: Headers }
+				{ rawHeaders: Headers }
 			>;
 
 type ClientErrorForDeclaration<E extends RouteDeclaration> =
@@ -128,7 +128,7 @@ type ClientErrorForDeclaration<E extends RouteDeclaration> =
 		? never
 		: WithResponseMetadata<
 				ErrorDeclaredClientResponse<E>,
-				{ headers: Headers }
+				{ rawHeaders: Headers }
 			>;
 
 export type SuccessfulResponseBody<TRoute extends RouteDeclaration> =
@@ -213,8 +213,8 @@ export const fetchResponse = async <
 		const body = readStreamResponse(schema.body, rawResponse, validateResponse);
 		return {
 			status: rawResponse.status,
-			headers: rawResponse.headers,
-			responseHeaders: await readDeclaredHeaders(
+			rawHeaders: rawResponse.headers,
+			headers: await readDeclaredHeaders(
 				schema,
 				rawResponse,
 				validateResponse,
@@ -240,8 +240,8 @@ export const fetchResponse = async <
 	assertResponseContentType(schema.contentType, rawResponse, value);
 	const responseMetadata = {
 		status: rawResponse.status,
-		headers: rawResponse.headers,
-		responseHeaders: await readDeclaredHeaders(
+		rawHeaders: rawResponse.headers,
+		headers: await readDeclaredHeaders(
 			schema,
 			rawResponse,
 			validateResponse,
