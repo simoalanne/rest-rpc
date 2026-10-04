@@ -3,7 +3,7 @@ import {
 	createRouteMatcher,
 	flattenRouteImplementations,
 } from "./match.ts";
-import { serverFirstRoute as route } from "./routeBuilder.ts";
+import { serverRoute as route } from "./routeBuilder.ts";
 
 describe("match", () => {
 	it.each(["/users/:id/items/:id", "/users/{id}/items/{id}"] as const)(

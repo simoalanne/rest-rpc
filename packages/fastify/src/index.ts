@@ -1,10 +1,8 @@
 import type { Contract, RouteTree } from "@rest-rpc/core/contract";
 import {
-	implement as serverImplement,
-	serverFirstRoute,
-	type Contractimplementer,
+	createAdapterApi,
+	type ContractImplementer,
 	type RouteHandlerFor,
-	type ServerRouteBuilder,
 } from "@rest-rpc/server";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
@@ -21,6 +19,8 @@ type FastifyHandlerFields = {
  * @default {}
  */
 export interface DefaultContext {}
+
+const adapterApi = createAdapterApi<FastifyHandlerFields, DefaultContext>();
 
 export { type } from "@rest-rpc/core";
 export type {
@@ -71,10 +71,7 @@ export type InferServerHandler<TRoute extends RouteTree> = RouteHandlerFor<
  * @see {@link https://rest-rpc.dev/docs/quickstart#define-and-register-routes}
  * @see {@link https://rest-rpc.dev/docs/server/fastify#framework-context}
  */
-export const route = serverFirstRoute as unknown as ServerRouteBuilder<
-	FastifyHandlerFields,
-	DefaultContext
->;
+export const route = adapterApi.route;
 
 /**
  * Creates typed Fastify handler builders for every route in a shared contract.
@@ -83,10 +80,6 @@ export const route = serverFirstRoute as unknown as ServerRouteBuilder<
  */
 export function implement<const TContract extends Contract>(
 	contract: TContract,
-): Contractimplementer<TContract, FastifyHandlerFields, DefaultContext> {
-	return serverImplement(contract) as unknown as Contractimplementer<
-		TContract,
-		FastifyHandlerFields,
-		DefaultContext
-	>;
+): ContractImplementer<TContract, FastifyHandlerFields, DefaultContext> {
+	return adapterApi.implement(contract);
 }

@@ -1,7 +1,6 @@
 import type {
 	InferredRoute,
 	ValidImplicitResult,
-	UsesPlainOutput,
 } from "./implicitResponse.types.ts";
 import type {
 	AbsolutePath,
@@ -9,13 +8,14 @@ import type {
 	BuilderState,
 	InferServerRequest,
 	PublicDeclarationFor,
-	RootRouteBuilder,
+	PublicRouteBuilder,
 	RouteBuilderView,
 	RouteDeclaration,
 	RouteMetadata,
 	RouteTree,
 	ServerResponse,
-	ServerResponseBody,
+	ServerProcedureResponse,
+	UsesPlainOutput,
 } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import type { SseServerEvent } from "./sse.ts";
@@ -25,28 +25,14 @@ import type {
 	MiddlewareReturn,
 	ReusableMiddlewareRequest,
 	RequestFields,
+	RequestTransportFields,
 } from "./middleware.types.ts";
-
-type EmptyObject = Record<never, never>;
-type RequestTransportFields = {
-	contentType?: string;
-	lastEventId?: string;
-};
-type MaybePromise<T> = T | Promise<T>;
+import type { EmptyObject, MaybePromise, Merge } from "@rest-rpc/core/utils";
 
 /** Untyped route handler stored in a completed runtime route declaration. */
 export type RuntimeRouteHandler = (
 	request: unknown,
 ) => unknown | Promise<unknown>;
-
-/** Runtime route-builder shape used internally by server extensions. */
-export type RuntimeServerRoute = {
-	readonly "~restrpc": Partial<RouteDeclaration> & {
-		readonly handler?: unknown;
-		readonly middleware?: readonly RuntimeRouteHandler[];
-	};
-	clone(state: object): RuntimeServerRoute;
-};
 
 type WithSseServerEvents<T> =
 	T extends AsyncIterable<infer TItem>
@@ -116,10 +102,8 @@ export type RouteHandlerFor<
 				: never;
 		};
 
-type Merge<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
-
 /** Terminal builder shape containing a route declaration and its handler. */
-export type CompletedRoute<TRoute, THandler> = {
+type CompletedRoute<TRoute, THandler> = {
 	readonly "~restrpc": Merge<TRoute & { readonly handler: THandler }>;
 };
 
@@ -151,20 +135,9 @@ type HandlerImplementation<
 	HandlerFor<TRoute, TAdditionalHandlerFields, TContext, TResult>
 >;
 
-type ProcedureContentType<TContentType> = TContentType extends readonly string[]
-	? TContentType[number]
-	: TContentType;
-
-type ProcedureHandlerResult<TResponse> = TResponse extends {
-	contentType: infer TContentType;
-}
-	? TContentType extends "application/json"
-		? ServerResponseBody<TResponse>
-		: {
-				data: ServerResponseBody<TResponse>;
-				contentType: ProcedureContentType<TContentType>;
-			}
-	: WithSseServerEvents<ServerResponseBody<TResponse>>;
+type ProcedureHandlerResult<TResponse> = WithSseServerEvents<
+	ServerProcedureResponse<TResponse>
+>;
 
 type ProcedureHandlerMethod<
 	TRoute extends RouteDeclaration,
@@ -282,8 +255,7 @@ type MiddlewareUseMethod<
 				TPath,
 				TMetadata
 			>
-		: RootRouteBuilder<
-				undefined,
+		: PublicRouteBuilder<
 				ServerBuilderExtension<TAdditionalHandlerFields, TContext>
 			>;
 };
@@ -316,15 +288,14 @@ export interface ServerBuilderExtension<
  *
  * @see {@link https://rest-rpc.dev/docs/quickstart#define-and-register-routes}
  */
-export type ServerRouteBuilder<
+export type PublicServerRouteBuilder<
 	TAdditionalHandlerFields extends object = EmptyObject,
 	TContext extends object = EmptyObject,
-> = RootRouteBuilder<
-	undefined,
+> = PublicRouteBuilder<
 	ServerBuilderExtension<TAdditionalHandlerFields, TContext>
 > & {
 	/** Selects the typed per-request context store for this builder. @see {@link https://rest-rpc.dev/docs/context} */
-	$context<TValues extends object>(): ServerRouteBuilder<
+	$context<TValues extends object>(): PublicServerRouteBuilder<
 		TAdditionalHandlerFields,
 		TValues
 	>;

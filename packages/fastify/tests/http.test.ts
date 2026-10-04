@@ -48,7 +48,7 @@ describe("registerRoutes", () => {
 				get: route.get("/message").handler(() => ({
 					status: 200,
 					body: "hello",
-					responseHeaders: { "x-source": "route" },
+					headers: { "x-source": "route" },
 				})),
 			},
 			{

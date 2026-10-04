@@ -10,7 +10,7 @@ import type {
 } from "./operation.ts";
 import { createOperation } from "./operation.ts";
 
-export type OpenApiPathItem = Partial<
+type OpenApiPathItem = Partial<
 	Record<"get" | "post" | "put" | "delete" | "patch", OpenApiOperation>
 >;
 

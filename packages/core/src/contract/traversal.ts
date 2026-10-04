@@ -1,4 +1,5 @@
-import type { Contract, RouteDeclaration } from "./contract.ts";
+import type { Contract, RouteDeclaration, RouteTree } from "./contract.ts";
+import { resolveRoutePath } from "./path.ts";
 
 type Tree<T> = Record<string, unknown> | T;
 export type ContractRouteEntry = {
@@ -6,7 +7,7 @@ export type ContractRouteEntry = {
 	path: string[];
 };
 
-export const mapObjectValues = <TLeaf>(
+const mapObjectValues = <TLeaf>(
 	tree: Tree<TLeaf>,
 	isLeaf: (value: unknown) => value is TLeaf,
 	mappingFn: (value: TLeaf, path: string[]) => unknown,
@@ -25,11 +26,11 @@ export const mapObjectValues = <TLeaf>(
 				{} as Record<string, unknown>,
 			);
 
-export const isContractRouteDeclaration = (
+/** Detects a route leaf in a contract or implementation tree. */
+export const isRouteLeaf = (
 	value: unknown,
-): value is { readonly "~restrpc": RouteDeclaration } => {
-	return typeof value === "object" && value !== null && "~restrpc" in value;
-};
+): value is { readonly "~restrpc": RouteDeclaration } =>
+	typeof value === "object" && value !== null && "~restrpc" in value;
 
 export const mapContractRoutes = (
 	contract: Contract,
@@ -37,19 +38,19 @@ export const mapContractRoutes = (
 ) =>
 	mapObjectValues<{ readonly "~restrpc": RouteDeclaration }>(
 		contract,
-		isContractRouteDeclaration,
+		isRouteLeaf,
 		(route, path) => mappingFn(route["~restrpc"], path),
 	);
 
 export function* contractRouteEntries(
-	contract: Contract,
+	contract: RouteTree,
 	path: string[] = [],
 ): Generator<ContractRouteEntry> {
-	if (isContractRouteDeclaration(contract)) {
+	if (isRouteLeaf(contract)) {
 		const declaration = contract["~restrpc"];
 		const route = {
 			...declaration,
-			path: declaration.path ?? `/${path.join("/")}`,
+			path: resolveRoutePath(declaration, path),
 		};
 		yield { route, path };
 		return;
@@ -59,13 +60,3 @@ export function* contractRouteEntries(
 		yield* contractRouteEntries(child, [...path, key]);
 	}
 }
-
-export function* contractRoutes(contract: Contract) {
-	for (const { route } of contractRouteEntries(contract)) {
-		yield route;
-	}
-}
-
-export const flattenContractRoutes = <TContract extends Contract = Contract>(
-	contract: TContract,
-): Array<RouteDeclaration & { path: string }> => [...contractRoutes(contract)];

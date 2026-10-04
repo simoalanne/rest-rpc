@@ -101,8 +101,8 @@ type UnsatisfiedFlatHeaderKeys<
 	E extends RouteDeclaration,
 	TGlobalHeaders extends ClientHeaders,
 > = E extends {
-	input: "input";
 	request: {
+		input: readonly StandardSchemaV1[];
 		headers: infer THeaders extends readonly StandardSchemaV1[];
 	};
 }
@@ -121,50 +121,40 @@ type MissingGlobalHeaders<TKeys extends PropertyKey> = {
 	]: never;
 };
 
-type DeclaredContentType<E> = E extends {
-	request: { contentType: infer TContentType };
-}
-	? TContentType
-	: never;
+type DeclaredContentType<E> = E extends { method: "GET" }
+	? never
+	: E extends { request: { contentType: infer TContentType } }
+		? TContentType
+		: never;
+
+// A content-type list must be narrowed to one entry per call.
+type ContentTypeOption<E> = [DeclaredContentType<E>] extends [never]
+	? { contentType?: never }
+	: DeclaredContentType<E> extends readonly string[]
+		? { contentType: DeclaredContentType<E>[number] }
+		: { contentType?: never };
 
 /** Fetch options accepted by a particular route call. */
 export type FetchOptionsFor<E extends RouteDeclaration> = Omit<
 	FetchOptions,
 	"contentType"
 > &
-	([DeclaredContentType<E>] extends [never]
-		? { contentType?: never }
-		: DeclaredContentType<E> extends readonly string[]
-			? { contentType: DeclaredContentType<E>[number] }
-			: { contentType?: never });
-
-type RequiresFetchOptions<E> = [DeclaredContentType<E>] extends [never]
-	? false
-	: DeclaredContentType<E> extends readonly string[]
-		? true
-		: false;
+	ContentTypeOption<E>;
 
 type StandardFetchArgs<
 	E extends RouteDeclaration,
 	TGlobalHeaders extends ClientHeaders,
 > =
-	ClientRequestForDeclaration<E, GlobalHeaderKeys<TGlobalHeaders>> extends never
-		? [request?: undefined, options?: FetchOptionsFor<E>]
-		: RequiresFetchOptions<E> extends false
-			? [
-					request: ClientRequestForDeclaration<
-						E,
-						GlobalHeaderKeys<TGlobalHeaders>
-					>,
-					options?: FetchOptionsFor<E>,
-				]
-			: [
-					request: ClientRequestForDeclaration<
-						E,
-						GlobalHeaderKeys<TGlobalHeaders>
-					>,
-					options: FetchOptionsFor<E>,
-				];
+	ClientRequestForDeclaration<
+		E,
+		GlobalHeaderKeys<TGlobalHeaders>
+	> extends infer TRequest
+		? [TRequest] extends [never]
+			? [request?: undefined, options?: FetchOptionsFor<E>]
+			: ContentTypeOption<E> extends { contentType: string }
+				? [request: TRequest, options: FetchOptionsFor<E>]
+				: [request: TRequest, options?: FetchOptionsFor<E>]
+		: never;
 
 export type FetchArgs<
 	E extends RouteDeclaration = RouteDeclaration,
@@ -178,24 +168,16 @@ export type FetchArgs<
 
 type GroupedRequestInput = {
 	body?: unknown;
-	contentType?: string;
 	query?: unknown;
 	params?: Record<string, unknown>;
 	headers?: Record<string, unknown>;
 };
 
-type ClientRequestDeclaration = {
-	body?: unknown;
-	contentType?: string | readonly string[];
-	query?: unknown;
-	params?: unknown;
-	headers?: unknown;
-};
-
+// Only the fields read while building a request, so tests can pass minimal routes.
 type ClientRequestRoute = {
 	method: HttpMethod;
 	path: string;
-	request?: ClientRequestDeclaration;
+	request?: { body?: unknown; contentType?: string | readonly string[] };
 };
 
 const createRequestSignal = (
@@ -224,12 +206,13 @@ const normalizeHeaders = (
 			value,
 		]),
 	);
-const stringifyHeaders = (headers: Record<string, unknown> | undefined) =>
+const stringifyHeaders = (
+	headers: Record<string, unknown> | undefined,
+): Record<string, string> =>
 	Object.fromEntries(
-		Object.entries(headers ?? {}).flatMap(([key, value]) => {
-			const stringValue = value === undefined ? undefined : String(value);
-			return stringValue === undefined ? [] : [[key, stringValue]];
-		}),
+		Object.entries(headers ?? {}).flatMap(([key, value]) =>
+			value === undefined ? [] : [[key, String(value)]],
+		),
 	);
 
 const serializeParams = (
@@ -300,12 +283,12 @@ export const constructBaseRequest = (
 			? declaredContentType
 			: undefined) ??
 		(route.request?.body ? "application/json" : undefined);
-	const requestHeaders = stringifyHeaders(headers);
+	const hasBody = body !== undefined && contentType !== undefined;
 	return {
 		url,
-		body: contentType === undefined ? undefined : body,
-		contentType: body === undefined ? undefined : contentType,
-		headers: requestHeaders,
+		body: hasBody ? body : undefined,
+		contentType: hasBody ? contentType : undefined,
+		headers: stringifyHeaders(headers),
 	};
 };
 
@@ -332,11 +315,9 @@ const resolveHeaders = async (
 	return Object.fromEntries(entries.filter((entry) => entry !== undefined));
 };
 
-export const executeRequest = async <
-	E extends RouteDeclaration & ClientRequestRoute,
->(
-	route: E | ClientRequestRoute,
-	args: FetchArgs<E> | unknown[],
+export const executeRequest = async (
+	route: ClientRequestRoute,
+	args: readonly unknown[],
 	options: ExecuteRequestOptions,
 ): Promise<Response> => {
 	const requestArgs = args[0] as GroupedRequestInput | undefined;
@@ -364,11 +345,7 @@ export const executeRequest = async <
 			throw new Error("No serializer for declared content-type");
 		serialized = await resolvedCodec.serialize(body, contentType);
 	}
-	const codecHeaders = Object.fromEntries(
-		Object.entries(serialized?.headers ?? {}).flatMap(([name, value]) =>
-			value === undefined ? [] : [[name, String(value)]],
-		),
-	);
+	const codecHeaders = stringifyHeaders(serialized?.headers);
 	const outgoingContentType =
 		serialized?.contentType === undefined
 			? contentType

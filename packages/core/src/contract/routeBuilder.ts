@@ -4,10 +4,10 @@ import type {
 	AbsolutePath,
 	CommonOpenApiRouteOptions,
 	HttpMethod,
-	OpenApiResponseOptions,
 	OpenApiRouteOptions,
 	RouteDeclaration,
 	RouteMetadata,
+	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
 import { getPathParamNames } from "./path.ts";
 import type {
@@ -15,44 +15,16 @@ import type {
 	RequestParamsSchema,
 	RequestQuerySchema,
 } from "./request.ts";
-import type { ResponseDeclaration, ResponseOptions } from "./response.ts";
-import type { RootRouteBuilder } from "./routeBuilder.types.ts";
+import type {
+	OutputOptions,
+	ResponseDeclaration,
+	ResponseOptions,
+	StreamOutputOptions,
+	StreamResponseOptions,
+} from "./response.ts";
+import type { PublicRouteBuilder } from "./routeBuilder.types.ts";
 
 type RouteBuilderState = Partial<RouteDeclaration>;
-
-const assertMutable = (state: RouteBuilderState) => {
-	if ("handler" in state) {
-		throw new Error("Cannot change a route after attaching a handler.");
-	}
-};
-
-const assertInputMode = (
-	state: RouteBuilderState,
-	mode: "input" | "segments",
-) => {
-	const onlyHeaders =
-		state.request !== undefined &&
-		state.request.headers !== undefined &&
-		state.request.body === undefined &&
-		state.request.query === undefined &&
-		state.request.params === undefined;
-	if (
-		state.input &&
-		state.input !== mode &&
-		!(mode === "input" && onlyHeaders)
-	) {
-		throw new Error("Cannot combine flat input with request segments.");
-	}
-};
-
-const assertOutputMode = (
-	state: RouteBuilderState,
-	mode: "output" | "response",
-) => {
-	if (state.output && state.output !== mode) {
-		throw new Error("Cannot combine plain output with response envelopes.");
-	}
-};
 
 const appendSchema = <TSchema extends StandardSchemaV1>(
 	schemas: readonly TSchema[] | undefined,
@@ -74,86 +46,63 @@ const mergeUnique = (common: string[] = [], local: string[] = []) => [
 	...new Set([...common, ...local]),
 ];
 
-const mergeOpenApiResponse = (
-	common: OpenApiResponseOptions | undefined,
-	local: OpenApiResponseOptions | undefined,
-): OpenApiResponseOptions => ({
-	...common,
-	...local,
-	headers: { ...common?.headers, ...local?.headers },
-});
-
 const mergeOpenApi = (
 	common: CommonOpenApiRouteOptions | undefined,
 	local: OpenApiRouteOptions | undefined,
 ): OpenApiRouteOptions | undefined => {
 	if (!common && !local) return undefined;
-	const statuses = new Set([
-		...Object.keys(common?.responses ?? {}),
-		...Object.keys(local?.responses ?? {}),
-	]);
-
 	return {
 		...common,
 		...local,
 		tags: mergeUnique(common?.tags, local?.tags),
 		extensions: { ...common?.extensions, ...local?.extensions },
-		responses: Object.fromEntries(
-			[...statuses].map((status) => [
-				status,
-				mergeOpenApiResponse(
-					common?.responses?.[Number(status)],
-					local?.responses?.[Number(status)],
-				),
-			]),
-		),
 	};
 };
 
-const procedureState = (state: RouteBuilderState): RouteBuilderState => {
-	assertMutable(state);
-	return {
-		kind: "procedure",
-		method: "POST",
-		path: undefined,
-		responses: {},
-		...state,
-	};
-};
+const procedureState = (state: RouteBuilderState): RouteBuilderState => ({
+	method: "POST",
+	path: undefined,
+	responses: {},
+	...state,
+});
 
 const httpState = (
 	state: RouteBuilderState,
 	method: HttpMethod,
 	path: AbsolutePath | undefined,
 ): RouteBuilderState => {
-	assertMutable(state);
-	if (state.kind === "http") {
-		throw new Error("Route method and path have already been selected.");
-	}
-	if (state.input === "input" && getPathParamNames(path ?? "").length > 0) {
+	if (state.request?.input && getPathParamNames(path ?? "").length > 0) {
 		throw new Error("Flat input requires a static route path.");
 	}
-	if (method === "GET" && state.input !== "input" && state.request?.body) {
+	if (method === "GET" && state.request?.body) {
 		throw new Error("GET routes cannot declare a request body.");
-	}
-	let request = state.request;
-	if (method === "GET" && state.input === "input") {
-		const {
-			body,
-			contentType: _contentType,
-			...otherRequest
-		} = state.request ?? {};
-		request = { ...otherRequest, query: body };
 	}
 	return {
 		...state,
-		kind: "http",
 		method,
 		path,
 		responses: { ...state.responses },
-		request,
 	};
 };
+
+const addRequestSegment = (
+	state: RouteBuilderState,
+	segment: "body" | "query" | "params",
+	schema: StandardSchemaV1,
+	request?: RouteRequestDeclaration,
+): RouteBuilderState => ({
+	...state,
+	request: {
+		...state.request,
+		...request,
+		[segment]: appendSchema(state.request?.[segment], schema),
+	},
+});
+
+const withDescription = (options: { description?: string } | undefined) =>
+	options?.description === undefined
+		? {}
+		: { description: options.description };
 
 const addResponse = (
 	state: RouteBuilderState,
@@ -161,7 +110,7 @@ const addResponse = (
 	schema: ResponseDeclaration,
 ): RouteBuilderState => {
 	assertHttpStatusCode(status);
-	if (Object.hasOwn(state.responses ?? {}, status)) {
+	if (state.responses?.[status]) {
 		throw new Error(`Response status "${status}" has already been declared.`);
 	}
 	return {
@@ -178,32 +127,28 @@ export class RouteBuilder {
 		this["~restrpc"] = { ...state };
 	}
 
-	#next(state: RouteBuilderState): RouteBuilder {
-		return this.clone(state);
-	}
-
 	clone(state: RouteBuilderState): RouteBuilder {
 		return new RouteBuilder(state);
 	}
 
 	get(path?: AbsolutePath): RouteBuilder {
-		return this.#next(httpState(this["~restrpc"], "GET", path));
+		return this.clone(httpState(this["~restrpc"], "GET", path));
 	}
 
 	post(path?: AbsolutePath): RouteBuilder {
-		return this.#next(httpState(this["~restrpc"], "POST", path));
+		return this.clone(httpState(this["~restrpc"], "POST", path));
 	}
 
 	put(path?: AbsolutePath): RouteBuilder {
-		return this.#next(httpState(this["~restrpc"], "PUT", path));
+		return this.clone(httpState(this["~restrpc"], "PUT", path));
 	}
 
 	patch(path?: AbsolutePath): RouteBuilder {
-		return this.#next(httpState(this["~restrpc"], "PATCH", path));
+		return this.clone(httpState(this["~restrpc"], "PATCH", path));
 	}
 
 	delete(path?: AbsolutePath): RouteBuilder {
-		return this.#next(httpState(this["~restrpc"], "DELETE", path));
+		return this.clone(httpState(this["~restrpc"], "DELETE", path));
 	}
 
 	body(schema: StandardSchemaV1, options?: BodyOptions): RouteBuilder {
@@ -211,44 +156,32 @@ export class RouteBuilder {
 		if (state.method === "GET") {
 			throw new Error("GET routes cannot declare a request body.");
 		}
-		assertInputMode(state, "segments");
-		return this.#next({
-			...state,
-			input: "segments",
-			request: {
-				...state.request,
-				body: appendSchema(state.request?.body, schema),
+		return this.clone(
+			addRequestSegment(state, "body", schema, {
 				contentType: requestContentType(state, options),
-			},
-		});
+			}),
+		);
 	}
 
 	input(schema: StandardSchemaV1, options?: BodyOptions): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
-		assertInputMode(state, "input");
 		if (getPathParamNames(state.path ?? "").length > 0) {
 			throw new Error("Flat input requires a static route path.");
 		}
-		return this.#next({
+		return this.clone({
 			...state,
-			input: "input",
 			request: {
 				...state.request,
-				...(state.method === "GET"
-					? { query: appendSchema(state.request?.query, schema) }
-					: {
-							body: appendSchema(state.request?.body, schema),
-							contentType: requestContentType(state, options),
-						}),
+				input: appendSchema(state.request?.input, schema),
+				contentType: requestContentType(state, options),
 			},
 		});
 	}
 
 	headers(schema: RequestHeadersSchema): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
-		return this.#next({
+		return this.clone({
 			...state,
-			input: state.input === "input" ? "input" : "segments",
 			request: {
 				...state.request,
 				headers: appendSchema(state.request?.headers, schema),
@@ -257,34 +190,20 @@ export class RouteBuilder {
 	}
 
 	query(schema: RequestQuerySchema): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
-		assertInputMode(state, "segments");
-		return this.#next({
-			...state,
-			input: "segments",
-			request: {
-				...state.request,
-				query: appendSchema(state.request?.query, schema),
-			},
-		});
+		return this.clone(
+			addRequestSegment(procedureState(this["~restrpc"]), "query", schema),
+		);
 	}
 
 	params(schema: RequestParamsSchema): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
-		assertInputMode(state, "segments");
-		return this.#next({
-			...state,
-			input: "segments",
-			request: {
-				...state.request,
-				params: appendSchema(state.request?.params, schema),
-			},
-		});
+		return this.clone(
+			addRequestSegment(procedureState(this["~restrpc"]), "params", schema),
+		);
 	}
 
 	metadata(metadata: RouteMetadata): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
-		return this.#next({
+		return this.clone({
 			...state,
 			metadata: { ...state.metadata, ...metadata },
 		});
@@ -292,7 +211,7 @@ export class RouteBuilder {
 
 	openAPI(openApi: OpenApiRouteOptions): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
-		return this.#next({
+		return this.clone({
 			...state,
 			openApi: mergeOpenApi(state.openApi, openApi),
 		});
@@ -304,8 +223,7 @@ export class RouteBuilder {
 		options?: ResponseOptions,
 	): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
-		assertOutputMode(state, "response");
-		return this.#next(
+		return this.clone(
 			addResponse(
 				{ ...state, output: "response" },
 				status,
@@ -318,46 +236,53 @@ export class RouteBuilder {
 					: {
 							body: undefined,
 							...(options?.headers ? { headers: options.headers } : {}),
+							...withDescription(options),
 						},
 			),
 		);
 	}
 
-	output(schema: StandardSchemaV1, options?: BodyOptions): RouteBuilder {
+	output(schema: StandardSchemaV1, options?: OutputOptions): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
-		assertOutputMode(state, "output");
-		return this.#next(
+		return this.clone(
 			addResponse({ ...state, output: "output" }, 200, {
 				body: schema,
 				contentType: options?.contentType ?? "application/json",
+				...withDescription(options),
 			}),
 		);
 	}
 
-	streamOutput(schema: StandardSchemaV1): RouteBuilder {
+	streamOutput(
+		schema: StandardSchemaV1,
+		options?: StreamOutputOptions,
+	): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
-		assertOutputMode(state, "output");
-		return this.#next(
+		return this.clone(
 			addResponse({ ...state, output: "output" }, 200, {
 				kind: "stream",
 				body: schema,
+				...withDescription(options),
 			}),
 		);
 	}
 
-	streamResponse(status: number, schema: StandardSchemaV1): RouteBuilder {
+	streamResponse(
+		status: number,
+		schema: StandardSchemaV1,
+		options?: StreamResponseOptions,
+	): RouteBuilder {
 		const state = procedureState(this["~restrpc"]);
-		assertOutputMode(state, "response");
-		return this.#next(
+		return this.clone(
 			addResponse({ ...state, output: "response" }, status, {
 				kind: "stream",
 				body: schema,
+				...(options?.headers ? { headers: options.headers } : {}),
+				...withDescription(options),
 			}),
 		);
 	}
 }
-
-const runtimeRoute = new RouteBuilder({ path: undefined });
 
 /**
  * Entry point for declaring contract-first routes with independent input and output forms.
@@ -367,4 +292,6 @@ const runtimeRoute = new RouteBuilder({ path: undefined });
  *
  * @see {@link https://rest-rpc.dev/docs/route-builder}
  */
-export const route = runtimeRoute as unknown as RootRouteBuilder;
+export const route = new RouteBuilder({
+	path: undefined,
+}) as unknown as PublicRouteBuilder;

@@ -23,9 +23,9 @@ describe("response inference", () => {
 		expectTypeOf<
 			Extract<Server, { status: 200 }>["body"]
 		>().toEqualTypeOf<string>();
-		expectTypeOf<
-			Extract<Server, { status: 200 }>["responseHeaders"]
-		>().toEqualTypeOf<{ count: string }>();
+		expectTypeOf<Extract<Server, { status: 200 }>["headers"]>().toEqualTypeOf<{
+			count: string;
+		}>();
 		expectTypeOf<
 			Extract<Server, { status: 200 }>["contentType"]
 		>().toEqualTypeOf<"text/plain" | "application/json">();

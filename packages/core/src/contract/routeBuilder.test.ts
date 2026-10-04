@@ -17,21 +17,16 @@ describe("routeBuilder", () => {
 		});
 	});
 
-	it("moves flat input to query when selecting GET and retains headers", () => {
+	it("stores flat input independently of declaration order", () => {
 		const headers = type<{ authorization: string }>();
-		const value = route.headers(headers).input(schema).get("/users")[
-			"~restrpc"
-		];
-		expect(value.request).toEqual({ headers: [headers], query: [schema] });
-	});
-
-	it("rejects mixing flat input and request segments in either order", () => {
-		expect(() => new RouteBuilder().input(schema).query(schema)).toThrow(
-			"Cannot combine flat input with request segments.",
-		);
-		expect(() => new RouteBuilder().query(schema).input(schema)).toThrow(
-			"Cannot combine flat input with request segments.",
-		);
+		const before = route.headers(headers).input(schema).get("/users");
+		const after = route.headers(headers).get("/users").input(schema);
+		expect(before["~restrpc"].request).toEqual({
+			headers: [headers],
+			input: [schema],
+			contentType: "application/json",
+		});
+		expect(after["~restrpc"].request).toEqual(before["~restrpc"].request);
 	});
 
 	it("rejects GET bodies regardless of declaration order", () => {
@@ -55,19 +50,33 @@ describe("routeBuilder", () => {
 		},
 	);
 
-	it("rejects selecting the HTTP method twice", () => {
-		expect(() => new RouteBuilder().get().post()).toThrow(
-			"Route method and path have already been selected.",
-		);
-	});
-
-	it("rejects mixing plain output and response envelopes", () => {
-		expect(() =>
-			new RouteBuilder().output(schema).response(201, schema),
-		).toThrow("Cannot combine plain output with response envelopes.");
-		expect(() =>
-			new RouteBuilder().response(201, schema).output(schema),
-		).toThrow("Cannot combine plain output with response envelopes.");
+	it("stores response descriptions and stream response headers", () => {
+		const headers = type<{ "x-cursor": string }>();
+		expect(
+			new RouteBuilder()
+				.response(204, undefined, { description: "Deleted" })
+				.streamResponse(200, schema, { headers, description: "Events" })[
+				"~restrpc"
+			].responses,
+		).toEqual({
+			204: { body: undefined, description: "Deleted" },
+			200: { kind: "stream", body: schema, headers, description: "Events" },
+		});
+		expect(
+			new RouteBuilder().output(schema, { description: "Name" })["~restrpc"]
+				.responses,
+		).toEqual({
+			200: {
+				body: schema,
+				contentType: "application/json",
+				description: "Name",
+			},
+		});
+		expect(
+			new RouteBuilder().streamOutput(schema, { description: "Names" })[
+				"~restrpc"
+			].responses,
+		).toEqual({ 200: { kind: "stream", body: schema, description: "Names" } });
 	});
 
 	it("rejects duplicate response statuses across stream and body responses", () => {

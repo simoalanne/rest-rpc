@@ -1,10 +1,8 @@
 import type { Contract, RouteTree } from "@rest-rpc/core/contract";
 import {
-	implement as serverImplement,
-	serverFirstRoute,
-	type Contractimplementer,
+	createAdapterApi,
+	type ContractImplementer,
 	type RouteHandlerFor,
-	type ServerRouteBuilder,
 } from "@rest-rpc/server";
 import type { Request, Response } from "express";
 
@@ -21,6 +19,8 @@ type ExpressHandlerFields = {
  * @default {}
  */
 export interface DefaultContext {}
+
+const adapterApi = createAdapterApi<ExpressHandlerFields, DefaultContext>();
 
 export { type } from "@rest-rpc/core";
 export type {
@@ -71,10 +71,7 @@ export type InferServerHandler<TRoute extends RouteTree> = RouteHandlerFor<
  * @see {@link https://rest-rpc.dev/docs/quickstart#define-and-register-routes}
  * @see {@link https://rest-rpc.dev/docs/server/express#framework-context}
  */
-export const route = serverFirstRoute as unknown as ServerRouteBuilder<
-	ExpressHandlerFields,
-	DefaultContext
->;
+export const route = adapterApi.route;
 
 /**
  * Creates typed Express handler builders for every route in a shared contract.
@@ -83,10 +80,6 @@ export const route = serverFirstRoute as unknown as ServerRouteBuilder<
  */
 export function implement<const TContract extends Contract>(
 	contract: TContract,
-): Contractimplementer<TContract, ExpressHandlerFields, DefaultContext> {
-	return serverImplement(contract) as unknown as Contractimplementer<
-		TContract,
-		ExpressHandlerFields,
-		DefaultContext
-	>;
+): ContractImplementer<TContract, ExpressHandlerFields, DefaultContext> {
+	return adapterApi.implement(contract);
 }

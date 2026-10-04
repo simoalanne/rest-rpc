@@ -1,6 +1,7 @@
 import {
 	type ResponseDeclaration,
 	type RouteDeclaration,
+	resolveRouteRequest,
 } from "@rest-rpc/core/contract";
 import {
 	type StandardSchemaV1,
@@ -35,8 +36,6 @@ type SegmentValidationResult = {
 	errors: readonly StandardSchemaV1.Issue[];
 };
 
-type RequestObjectSchema = StandardSchemaV1<unknown, unknown>;
-
 const parseQuery = (searchParams: URLSearchParams) => {
 	const data: Record<string, unknown> = {};
 
@@ -55,7 +54,7 @@ const parseQuery = (searchParams: URLSearchParams) => {
 };
 
 const validateRequestSegment = async (
-	schemas: readonly RequestObjectSchema[] | undefined,
+	schemas: readonly StandardSchemaV1[] | undefined,
 	input: unknown,
 ): Promise<SegmentValidationResult> => {
 	if (!schemas || schemas.length === 0) return { data: undefined, errors: [] };
@@ -82,25 +81,18 @@ const validateRequestSegment = async (
 	return { data: merged, errors: [] };
 };
 
-const validateRequestQuery = async (
-	schemas: readonly RequestObjectSchema[] | undefined,
-	query: URLSearchParams | undefined,
-): Promise<SegmentValidationResult> => {
-	return validateRequestSegment(schemas, query ? parseQuery(query) : undefined);
-};
-
 export async function validateRequestSegments(
 	route: RouteDeclaration,
 	segments: RequestSegments,
 ) {
-	const requestSchemas = route.request;
+	const requestSchemas = resolveRouteRequest(route);
 	const body = await validateRequestSegment(
 		requestSchemas?.body,
 		segments.body,
 	);
-	const query = await validateRequestQuery(
+	const query = await validateRequestSegment(
 		requestSchemas?.query,
-		segments.query,
+		segments.query ? parseQuery(segments.query) : undefined,
 	);
 	const params = await validateRequestSegment(
 		requestSchemas?.params,
@@ -127,20 +119,28 @@ export async function validateRequestSegments(
 	};
 }
 
-export const validateResponseBody = async (
+export const validateResponseValue = async (
 	schema: StandardSchemaV1 | undefined,
-	body: unknown,
+	value: unknown,
+	location: "body" | "stream",
 ): Promise<unknown> => {
-	if (!schema) {
-		return body;
-	}
+	if (!schema) return value;
 
-	const validation = await validateStandardSchema(schema, body);
+	const validation = await validateStandardSchema(schema, value);
 	if (validation.issues) {
-		throw new ResponseValidationError("body", validation.issues);
+		throw new ResponseValidationError(location, validation.issues);
 	}
 	return validation.value;
 };
+
+export const stringifyHeaders = (
+	headers: Record<string, unknown> | undefined,
+): Record<string, string> =>
+	Object.fromEntries(
+		Object.entries(headers ?? {}).flatMap(([name, value]) =>
+			value === undefined ? [] : [[name, String(value)]],
+		),
+	);
 
 export const validateResponseHeaders = async (
 	schema: ResponseDeclaration | undefined,
@@ -156,24 +156,7 @@ export const validateResponseHeaders = async (
 		throw new ResponseValidationError("headers", result.issues);
 	}
 
-	return Object.fromEntries(
-		Object.entries(result.value).flatMap(([name, value]) =>
-			value === undefined ? [] : [[name, String(value)]],
-		),
-	);
-};
-
-export const validateResponseStreamChunk = async (
-	schema: StandardSchemaV1 | undefined,
-	chunk: unknown,
-) => {
-	if (!schema) return chunk;
-
-	const validation = await validateStandardSchema(schema, chunk);
-	if (validation.issues) {
-		throw new ResponseValidationError("stream", validation.issues);
-	}
-	return validation.value;
+	return stringifyHeaders(result.value);
 };
 
 export async function* validateResponseStreamChunks(
@@ -184,10 +167,10 @@ export async function* validateResponseStreamChunks(
 		if (isSseServerEvent(chunk)) {
 			yield sse({
 				...chunk,
-				data: await validateResponseStreamChunk(schema, chunk.data),
+				data: await validateResponseValue(schema, chunk.data, "stream"),
 			});
 		} else {
-			yield await validateResponseStreamChunk(schema, chunk);
+			yield await validateResponseValue(schema, chunk, "stream");
 		}
 	}
 }

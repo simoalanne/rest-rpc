@@ -2,10 +2,12 @@ import { HttpError } from "./httpError.ts";
 import {
 	resolveBodyCodec,
 	defaultBodyCodecs,
+	findDeclaredContentType,
 	normalizeMediaType,
 	type BodyCodec,
 } from "../codecs/index.ts";
 import type { RouteDeclaration, RouteTree } from "../contract/contract.ts";
+import type { UsesPlainOutput } from "../contract/routeModes.ts";
 import type { SseEvent } from "../sse.ts";
 import type {
 	ResponseDeclaration,
@@ -13,26 +15,18 @@ import type {
 	ErrorDeclaredClientResponse,
 	SuccessfulDeclaredClientResponse,
 } from "../contract/response.ts";
-import { getRouteResponses } from "../contract/response.ts";
 import {
 	validateStandardSchema,
 	type StandardSchemaV1,
 } from "../standard-schema/index.ts";
 import { parseSseStream } from "./stream.ts";
+import { validateResponseValue } from "./validateResponse.ts";
 import type { FetchArgs } from "./request.ts";
-
-type Simplify<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
+import type { Merge } from "../typeUtils.ts";
 
 type WithResponseMetadata<TResponse, TMetadata> = TResponse extends unknown
-	? Simplify<TResponse & TMetadata>
+	? Merge<TResponse & TMetadata>
 	: never;
-
-type RouteDeclaredResponse<E extends RouteDeclaration> = WithResponseMetadata<
-	DeclaredClientResponse<E>,
-	{
-		headers: Headers;
-	}
->;
 
 /**
  * Infers a route's client result.
@@ -117,43 +111,32 @@ type ClientStreamDataForDeclaration<E extends RouteDeclaration> =
 		: never;
 
 export type ClientResponseForDeclaration<E extends RouteDeclaration> =
-	E extends {
-		output: "output";
-	}
-		? ProcedureRouteOutput<E>
-		: RouteDeclaredResponse<E>;
+	UsesPlainOutput<E> extends true
+		? SuccessfulResponseBody<E>
+		: WithResponseMetadata<DeclaredClientResponse<E>, { rawHeaders: Headers }>;
 
-type ClientSuccessForDeclaration<E extends RouteDeclaration> = E extends {
-	output: "output";
-}
-	? ProcedureRouteOutput<E>
-	: WithResponseMetadata<
-			SuccessfulDeclaredClientResponse<E>,
-			{ headers: Headers }
-		>;
+type ClientSuccessForDeclaration<E extends RouteDeclaration> =
+	UsesPlainOutput<E> extends true
+		? SuccessfulResponseBody<E>
+		: WithResponseMetadata<
+				SuccessfulDeclaredClientResponse<E>,
+				{ rawHeaders: Headers }
+			>;
 
-type ClientErrorForDeclaration<E extends RouteDeclaration> = E extends {
-	output: "output";
-}
-	? never
-	: WithResponseMetadata<ErrorDeclaredClientResponse<E>, { headers: Headers }>;
+type ClientErrorForDeclaration<E extends RouteDeclaration> =
+	UsesPlainOutput<E> extends true
+		? never
+		: WithResponseMetadata<
+				ErrorDeclaredClientResponse<E>,
+				{ rawHeaders: Headers }
+			>;
 
-type ProcedureRouteOutput<TRoute extends RouteDeclaration> =
+export type SuccessfulResponseBody<TRoute extends RouteDeclaration> =
 	SuccessfulDeclaredClientResponse<TRoute> extends infer TResponse
 		? TResponse extends { body: infer TBody }
 			? TBody
 			: never
 		: never;
-
-const getResponseSchema = (
-	route: RouteDeclaration,
-	status: number,
-): ResponseDeclaration | undefined => {
-	const entry = Object.entries(getRouteResponses(route)).find(
-		([declaredStatus]) => Number(declaredStatus) === status,
-	);
-	return entry?.[1];
-};
 
 const assertResponseContentType = (
 	declared: string | readonly string[] | undefined,
@@ -164,10 +147,7 @@ const assertResponseContentType = (
 		rawResponse.headers.get("content-type") ?? "",
 	);
 	if (!received || declared === undefined) return;
-	const allowed = typeof declared === "string" ? [declared] : declared;
-	if (
-		!allowed.some((contentType) => normalizeMediaType(contentType) === received)
-	) {
+	if (findDeclaredContentType(declared, received) === undefined) {
 		throw new HttpError(rawResponse.status, body, {
 			cause: new Error("Server returned an unsupported response content-type."),
 		});
@@ -194,19 +174,6 @@ const readStreamResponse = (
 	return parseSseStream(schema, rawResponse.body, validate, rawResponse.status);
 };
 
-const validateResponseBody = async (
-	schema: StandardSchemaV1 | undefined,
-	value: unknown,
-	validate: boolean,
-	status: number,
-) => {
-	if (!validate || schema === undefined) return value;
-	const result = await validateStandardSchema(schema, value);
-	if (result.issues)
-		throw new HttpError(status, value, { cause: result.issues });
-	return result.value;
-};
-
 const readDeclaredHeaders = async (
 	schema: ResponseDeclaration,
 	rawResponse: Response,
@@ -227,7 +194,6 @@ const readDeclaredHeaders = async (
 
 export type RouteRequestFn = <E extends RouteDeclaration & { path: string }>(
 	route: E,
-	routePath: readonly string[],
 	...args: FetchArgs<E>
 ) => Promise<Response>;
 
@@ -238,18 +204,17 @@ export const fetchResponse = async <
 	validateResponse: boolean,
 	bodyCodecs: readonly BodyCodec<Response>[] | undefined,
 	route: E,
-	routePath: readonly string[],
 	...args: FetchArgs<E>
 ) => {
-	const rawResponse = await request(route, routePath, ...args);
+	const rawResponse = await request(route, ...args);
 
-	const schema = getResponseSchema(route, rawResponse.status);
+	const schema = route.responses[rawResponse.status];
 	if (schema?.kind === "stream") {
 		const body = readStreamResponse(schema.body, rawResponse, validateResponse);
 		return {
 			status: rawResponse.status,
-			headers: rawResponse.headers,
-			responseHeaders: await readDeclaredHeaders(
+			rawHeaders: rawResponse.headers,
+			headers: await readDeclaredHeaders(
 				schema,
 				rawResponse,
 				validateResponse,
@@ -275,15 +240,15 @@ export const fetchResponse = async <
 	assertResponseContentType(schema.contentType, rawResponse, value);
 	const responseMetadata = {
 		status: rawResponse.status,
-		headers: rawResponse.headers,
-		responseHeaders: await readDeclaredHeaders(
+		rawHeaders: rawResponse.headers,
+		headers: await readDeclaredHeaders(
 			schema,
 			rawResponse,
 			validateResponse,
 			value,
 		),
 	};
-	const body = await validateResponseBody(
+	const body = await validateResponseValue(
 		schema.body,
 		value,
 		validateResponse,
@@ -303,14 +268,12 @@ export const fetchSuccess = async <
 >(
 	fetchRouteResponse: (
 		route: E,
-		routePath: readonly string[],
 		...args: FetchArgs<E>
 	) => Promise<{ status: number; body?: unknown }>,
 	route: E,
-	routePath: readonly string[],
 	...args: FetchArgs<E>
 ) => {
-	const response = await fetchRouteResponse(route, routePath, ...args);
+	const response = await fetchRouteResponse(route, ...args);
 
 	if (!isSuccessStatus(response.status)) {
 		throw new HttpError(response.status, response.body);

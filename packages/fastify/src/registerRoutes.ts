@@ -1,12 +1,8 @@
-import type { BodyCodec, SerializedBody } from "@rest-rpc/core";
+import type { BodyCodec } from "@rest-rpc/core";
 import { normalizeMediaType, resolveBodyCodec } from "@rest-rpc/core/codecs";
 import type { HttpMethod, RouteDeclaration } from "@rest-rpc/core/contract";
 import { toColonPath } from "@rest-rpc/core/contract";
-import {
-	createNodeResponseStream,
-	createRequestSignal,
-	nodeBodyCodecs,
-} from "@rest-rpc/node/adapter";
+import { createRequestSignal, nodeBodyCodecs } from "@rest-rpc/node/adapter";
 import {
 	type RuntimeImplementationTree,
 	type HandleHttpRouteConfiguration,
@@ -15,8 +11,10 @@ import {
 	handleHttpRoute,
 	RequestValidationError,
 	ResponseValidationError,
+	serializeHttpRouteResult,
 } from "@rest-rpc/server";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { Readable } from "node:stream";
 
 /**
  * Defines how an invalid request is handled through native Fastify arguments.
@@ -109,6 +107,8 @@ export function registerRoutes(
 					normalizeMediaType(req.headers["content-type"]),
 					bodyCodecs,
 				);
+				// Without a matching codec the body comes from the framework's parser, which
+				// owns size limits, so requestBodyLimit is not offered here.
 				const body = codec?.deserialize
 					? await codec.deserialize(req)
 					: req.body;
@@ -141,38 +141,28 @@ export function registerRoutes(
 					return reply.status(result.status).send(result.responseBody);
 				}
 
-				let serialized: SerializedBody | undefined;
-				if (result.kind === "response" && result.body) {
-					const { value, contentType } = result.body;
-					const codec = resolveBodyCodec(normalizeMediaType(contentType), [
-						...bodyCodecs,
-						...nodeBodyCodecs,
-					]);
-					serialized = await codec!.serialize!(value, contentType);
-					for (const [name, value] of Object.entries(
-						serialized.headers ?? {},
-					)) {
-						if (value !== undefined) reply.header(name, value);
-					}
-				}
-				for (const [name, value] of Object.entries(result.headers ?? {})) {
+				const serialized = await serializeHttpRouteResult(
+					result,
+					bodyCodecs,
+					nodeBodyCodecs,
+				);
+				for (const [name, value] of Object.entries(serialized.headers)) {
 					if (value !== undefined) reply.header(name, value);
 				}
-				if (result.kind === "stream") {
+				// Fastify owns stream errors: before headers are sent they reach its error
+				// handler, afterwards the connection is destroyed.
+				if (serialized.kind === "stream") {
 					return reply
-						.status(result.status)
+						.status(serialized.status)
 						.type("text/event-stream")
-						.send(createNodeResponseStream(result.body));
+						.send(Readable.from(serialized.body));
 				}
-				reply.status(result.status);
-				if (!serialized) return reply.send();
-				const contentType =
-					serialized.contentType === undefined
-						? result.body!.contentType
-						: serialized.contentType;
+				reply.status(serialized.status);
+				if (!serialized.body) return reply.send();
+				const { value, contentType } = serialized.body;
 				if (contentType === null) reply.removeHeader("content-type");
 				else reply.type(contentType);
-				return reply.send(serialized.body);
+				return reply.send(value);
 			},
 		);
 	}

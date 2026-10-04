@@ -1,6 +1,6 @@
 import { route, type } from "@rest-rpc/core";
 import { implement } from "./implement.ts";
-import type { RuntimeServerRoute } from "./routeBuilder.types.ts";
+import type { ServerRouteBuilder } from "./routeBuilder.ts";
 
 const contract = {
 	users: {
@@ -12,7 +12,7 @@ const contract = {
 };
 
 const routeState = (value: unknown) =>
-	(value as RuntimeServerRoute)["~restrpc"];
+	(value as ServerRouteBuilder)["~restrpc"];
 
 describe("implement", () => {
 	it("should apply root middleware to every route without mutating the contract", () => {
@@ -28,6 +28,14 @@ describe("implement", () => {
 			middleware2,
 		]);
 		expect(routeState(contract.users.get).middleware).toBeUndefined();
+	});
+
+	it("should attach handlers to nested contract routes", () => {
+		const handler = () => ({ status: 200 as const, body: { name: "Ada" } });
+		const implementedRoute = implement(contract).users.get.handler(handler);
+
+		expect(routeState(implementedRoute).handler).toBe(handler);
+		expect(routeState(contract.users.get).handler).toBeUndefined();
 	});
 
 	it("should reject contracts that already contain a handler", () => {

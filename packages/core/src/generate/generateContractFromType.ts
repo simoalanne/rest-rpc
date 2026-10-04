@@ -2,18 +2,20 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import type { Contract } from "../contract/contract.ts";
+import { resolveRoutePath } from "../contract/path.ts";
 
 type ContentType = string | readonly string[];
 
 type GeneratedRoute = {
 	readonly "~restrpc": {
 		readonly source: "generated";
-		readonly kind: "http" | "procedure";
 		readonly method: string;
 		readonly path: string;
-		readonly input?: "input" | "segments";
 		readonly output?: "output" | "response";
-		readonly request?: { readonly contentType: ContentType };
+		readonly request?: {
+			readonly input?: readonly [];
+			readonly contentType?: ContentType;
+		};
 		readonly responses: Readonly<
 			Record<
 				string,
@@ -197,7 +199,7 @@ const routeFromType = (
 	const pathType = property("path");
 	const path =
 		(pathType?.flags ?? 0) & ts.TypeFlags.Undefined
-			? `/${contractPath.join("/")}`
+			? resolveRoutePath({ path: undefined }, contractPath)
 			: literalValue(pathType);
 	if (path === undefined) throw fail("a literal path");
 
@@ -239,18 +241,26 @@ const routeFromType = (
 		checker,
 		requestType && propertyType(checker, requestType, "contentType"),
 	);
+	// The client only checks whether flat input exists, so its schemas are left out.
+	const flatInput =
+		requestType !== undefined &&
+		propertyType(checker, requestType, "input") !== undefined;
 
 	return {
 		"~restrpc": {
 			source: "generated",
-			kind: literalValue(property("kind")) as "http" | "procedure",
 			method,
 			path,
-			input: literalValue(property("input")) as "input" | "segments",
 			output: literalValue(property("output")) as "output" | "response",
-			request: requestContentType
-				? { contentType: requestContentType }
-				: undefined,
+			request:
+				flatInput || requestContentType
+					? {
+							...(flatInput ? { input: [] } : {}),
+							...(requestContentType
+								? { contentType: requestContentType }
+								: {}),
+						}
+					: undefined,
 			responses,
 		},
 	};

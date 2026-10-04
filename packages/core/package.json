@@ -37,7 +37,8 @@
 		"./contract": "./src/contract/index.ts",
 		"./generate": "./src/generate/index.ts",
 		"./openapi": "./src/openapi/index.ts",
-		"./standard-schema": "./src/standard-schema/index.ts"
+		"./standard-schema": "./src/standard-schema/index.ts",
+		"./utils": "./src/utils/index.ts"
 	},
 	"publishConfig": {
 		"main": "./dist/index.js",
@@ -70,6 +71,10 @@
 			"./standard-schema": {
 				"types": "./dist/standard-schema/index.d.ts",
 				"import": "./dist/standard-schema/index.js"
+			},
+			"./utils": {
+				"types": "./dist/utils/index.d.ts",
+				"import": "./dist/utils/index.js"
 			}
 		}
 	},

@@ -14,7 +14,7 @@ it("serves a fetch-native catch-all route over HTTP", async () => {
 					return {
 						status: 201,
 						body: { id: params.id, name: body.name },
-						responseHeaders: { "x-native": "fetch" },
+						headers: { "x-native": "fetch" },
 					};
 				}),
 		},

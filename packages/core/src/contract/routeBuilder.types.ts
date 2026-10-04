@@ -12,12 +12,14 @@ import type {
 	RequestParamsSchema,
 	RequestQuerySchema,
 } from "./request.ts";
-import type { ResponseOptions } from "./response.ts";
+import type {
+	OutputOptions,
+	ResponseOptions,
+	StreamOutputOptions,
+	StreamResponseOptions,
+} from "./response.ts";
+import type { EmptyObject, Merge } from "../typeUtils.ts";
 
-// Normalize one library-owned object at a time so schema and metadata types stay intact.
-type Merge<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
-
-type EmptyObject = Record<never, never>;
 type JsonContentType = "application/json";
 type BuilderPath = AbsolutePath | undefined;
 
@@ -25,16 +27,18 @@ type ContentTypeFor<TOptions> = TOptions extends BodyOptions
 	? TOptions["contentType"]
 	: JsonContentType;
 
+type ResponseHeadersFor<TOptions> = TOptions extends {
+	headers: infer THeaders;
+}
+	? { headers: THeaders }
+	: EmptyObject;
+
 type ResponseFor<TSchema, TOptions> = TSchema extends StandardSchemaV1
 	? {
 			body: TSchema;
 			contentType: ContentTypeFor<TOptions>;
-		} & (TOptions extends { headers: infer THeaders }
-			? { headers: THeaders }
-			: EmptyObject)
-	: { body: undefined } & (TOptions extends { headers: infer THeaders }
-			? { headers: THeaders }
-			: EmptyObject);
+		} & ResponseHeadersFor<TOptions>
+	: { body: undefined } & ResponseHeadersFor<TOptions>;
 
 type BuilderMethod =
 	| "body"
@@ -47,7 +51,6 @@ type BuilderMethod =
 	| "openAPI";
 
 type BuilderRoute = {
-	readonly kind: "http" | "procedure";
 	readonly method: HttpMethod;
 };
 
@@ -63,16 +66,28 @@ export type BuilderState = {
 	output: "none" | "output" | "response";
 };
 
-type UseMethod<TState extends BuilderState, TMethod extends BuilderMethod> = {
-	route: TState["route"];
-	method: TState["method"];
-	request: TState["request"];
-	responses: TState["responses"];
-	openApi: TState["openApi"];
-	used: TState["used"] | TMethod;
-	input: TState["input"];
-	output: TState["output"];
+/**
+ * Replaces the fields in `TChanges` and keeps the rest of `TState`. Mapping
+ * over the fixed `BuilderState` keys keeps the result one flat object, so
+ * chained calls don't build up nested intersections.
+ *
+ * `WithRequest` and `WithResponse` list every field by hand instead. They run
+ * once per request segment and per response, and the per-key conditional here
+ * measurably raises per-route checker cost on those paths.
+ */
+type Patch<
+	TState extends BuilderState,
+	TChanges extends Partial<BuilderState>,
+> = {
+	[TKey in keyof BuilderState]: TKey extends keyof TChanges
+		? TChanges[TKey]
+		: TState[TKey];
 };
+
+type UseMethod<
+	TState extends BuilderState,
+	TMethod extends BuilderMethod,
+> = Patch<TState, { used: TState["used"] | TMethod }>;
 
 type WhenUnused<
 	TState extends BuilderState,
@@ -97,6 +112,7 @@ type WhenResponsesAvailable<
 	TView,
 > = TState["output"] extends "output" ? EmptyObject : TView;
 
+/** Appends a request segment schema. Written out by hand, see `Patch`. */
 type WithRequest<
 	TState extends BuilderState,
 	TKey extends keyof RouteRequestDeclaration,
@@ -104,16 +120,7 @@ type WithRequest<
 > = {
 	route: TState["route"];
 	method: TState["method"];
-	request: Omit<TState["request"], TKey> &
-		Record<
-			TKey,
-			TState["request"] extends Record<
-				TKey,
-				infer TCurrent extends readonly unknown[]
-			>
-				? readonly [...TCurrent, TValue]
-				: readonly [TValue]
-		>;
+	request: AppendRequest<TState["request"], TKey, TValue>;
 	responses: TState["responses"];
 	openApi: TState["openApi"];
 	used: TState["used"];
@@ -121,34 +128,46 @@ type WithRequest<
 	output: TState["output"];
 };
 
+type AppendRequest<
+	TRequest,
+	TKey extends keyof RouteRequestDeclaration,
+	TValue,
+> = Omit<TRequest, TKey> &
+	Record<
+		TKey,
+		TRequest extends Record<TKey, infer TCurrent extends readonly unknown[]>
+			? readonly [...TCurrent, TValue]
+			: readonly [TValue]
+	>;
+
 type WithHeaders<
 	TState extends BuilderState,
 	THeaders extends RequestHeadersSchema,
-> = Omit<WithRequest<TState, "headers", THeaders>, "input"> & {
-	input: TState["input"] extends "input"
-		? "input"
-		: TState["input"] extends "segments"
-			? "segments"
+> = Patch<
+	TState,
+	{
+		request: AppendRequest<TState["request"], "headers", THeaders>;
+		input: TState["input"] extends "input" | "segments"
+			? TState["input"]
 			: "headers";
-};
+	}
+>;
 
-type WithContentType<TState extends BuilderState, TContentType> = {
-	route: TState["route"];
-	method: TState["method"];
-	request: Omit<TState["request"], "contentType"> & {
-		contentType: TContentType;
-	};
-	responses: TState["responses"];
-	openApi: TState["openApi"];
-	used: TState["used"];
-	input: TState["input"];
-	output: TState["output"];
-};
+type WithContentType<TState extends BuilderState, TContentType> = Patch<
+	TState,
+	{
+		request: Omit<TState["request"], "contentType"> & {
+			contentType: TContentType;
+		};
+	}
+>;
 
+/** Adds a declared response. Written out by hand, see `Patch`. */
 type WithResponse<
 	TState extends BuilderState,
 	TStatus extends PropertyKey,
 	TResponse,
+	TOutput extends BuilderState["output"] = "response",
 > = {
 	route: TState["route"];
 	method: TState["method"];
@@ -157,69 +176,38 @@ type WithResponse<
 	openApi: TState["openApi"];
 	used: TState["used"];
 	input: TState["input"];
-	output: "response";
+	output: TOutput;
 };
 
-type WithPlainOutput<TState extends BuilderState, TResponse> = Omit<
-	WithResponse<TState, 200, TResponse>,
+type WithPlainOutput<TState extends BuilderState, TResponse> = WithResponse<
+	UseMethod<TState, "output">,
+	200,
+	TResponse,
 	"output"
-> & { output: "output" };
+>;
 
 type WithFlatInput<
 	TState extends BuilderState,
 	TSchema extends StandardSchemaV1,
 	TOptions extends BodyOptions | undefined,
-> = {
-	route: TState["route"];
-	method: TState["method"];
-	request: TState["route"]["method"] extends "GET"
-		? Omit<TState["request"], "query"> & {
-				query: TState["request"] extends {
-					query: infer TCurrent extends readonly unknown[];
-				}
-					? readonly [...TCurrent, TSchema]
-					: readonly [TSchema];
-			}
-		: Omit<TState["request"], "body" | "contentType"> & {
-				body: TState["request"] extends {
-					body: infer TCurrent extends readonly unknown[];
-				}
-					? readonly [...TCurrent, TSchema]
-					: readonly [TSchema];
-				contentType: TState["request"] extends {
-					contentType: infer TContentType;
-				}
-					? TContentType
-					: ContentTypeFor<TOptions>;
-			};
-	responses: TState["responses"];
-	openApi: TState["openApi"];
-	used: TState["used"] | "input";
-	input: "input";
-	output: TState["output"];
-};
+> = WithContentType<
+	Patch<
+		TState,
+		{
+			request: AppendRequest<TState["request"], "input", TSchema>;
+			used: TState["used"] | "input";
+			input: "input";
+		}
+	>,
+	TState["request"] extends { contentType: infer TContentType }
+		? TContentType
+		: ContentTypeFor<TOptions>
+>;
 
-type MoveFlatInput<
+type WithHttpRoute<
 	TState extends BuilderState,
 	TMethod extends HttpMethod,
-> = TState["input"] extends "input"
-	? TMethod extends "GET"
-		? Omit<TState["request"], "body" | "contentType" | "query"> & {
-				query: TState["request"] extends { body: infer TBody } ? TBody : never;
-			}
-		: TState["request"]
-	: TState["request"];
-
-type WithHttpRoute<TState extends BuilderState, TMethod extends HttpMethod> = {
-	route: { readonly kind: "http"; readonly method: TMethod };
-	method: "selected";
-	request: MoveFlatInput<TState, TMethod>;
-	responses: TState["responses"];
-	openApi: TState["openApi"];
-	used: TState["used"];
-	input: TState["input"];
-	output: TState["output"];
-};
+> = Patch<TState, { route: { readonly method: TMethod }; method: "selected" }>;
 
 type MergeMetadata<
 	TMetadata extends RouteMetadata | never,
@@ -230,16 +218,10 @@ type MergeMetadata<
 		? { [TKey in keyof TMerged]: TMerged[TKey] }
 		: never;
 
-type WithOpenApi<TState extends BuilderState> = {
-	route: TState["route"];
-	method: TState["method"];
-	request: TState["request"];
-	responses: TState["responses"];
-	openApi: OpenApiRouteOptions;
-	used: TState["used"] | "openAPI";
-	input: TState["input"];
-	output: TState["output"];
-};
+type WithOpenApi<TState extends BuilderState> = Patch<
+	TState,
+	{ openApi: OpenApiRouteOptions; used: TState["used"] | "openAPI" }
+>;
 
 type MetadataDeclaration<TMetadata extends RouteMetadata | never> = [
 	TMetadata,
@@ -270,14 +252,7 @@ export type PublicDeclarationFor<
 							TState["responses"][TStatus]
 						>;
 					};
-				} & (TState["input"] extends "none"
-					? EmptyObject
-					: {
-							readonly input: TState["input"] extends "headers"
-								? "segments"
-								: TState["input"];
-						}) &
-				(TState["output"] extends "none"
+				} & (TState["output"] extends "none"
 					? EmptyObject
 					: { readonly output: TState["output"] }) &
 				MetadataDeclaration<TMetadata> &
@@ -343,14 +318,20 @@ type ResponseMethods<
 		streamResponse<
 			const TStatus extends number,
 			const TSchema extends StandardSchemaV1,
+			const TOptions extends StreamResponseOptions | undefined = undefined,
 			const TPath extends BuilderPath = AbsolutePath,
 			const TMetadata extends RouteMetadata | never = never,
 		>(
 			this: BuilderReceiver<TPath, TMetadata>,
 			status: TStatus,
 			schema: TSchema,
+			options?: TOptions,
 		): RouteBuilderView<
-			WithResponse<TState, TStatus, { kind: "stream"; body: TSchema }>,
+			WithResponse<
+				TState,
+				TStatus,
+				{ kind: "stream"; body: TSchema } & ResponseHeadersFor<TOptions>
+			>,
 			TExtension,
 			TPath,
 			TMetadata
@@ -508,7 +489,7 @@ type FlatMethods<
 			/** Declares one plain output value. @see {@link https://rest-rpc.dev/docs/route-builder#choose-plain-outputs-or-status-responses} */
 			output<
 				const TSchema extends StandardSchemaV1,
-				const TOptions extends BodyOptions | undefined = undefined,
+				const TOptions extends OutputOptions | undefined = undefined,
 				const TPath extends BuilderPath = AbsolutePath,
 				const TMetadata extends RouteMetadata | never = never,
 			>(
@@ -516,10 +497,7 @@ type FlatMethods<
 				schema: TSchema,
 				options?: TOptions,
 			): RouteBuilderView<
-				WithPlainOutput<
-					UseMethod<TState, "output">,
-					ResponseFor<TSchema, TOptions>
-				>,
+				WithPlainOutput<TState, ResponseFor<TSchema, TOptions>>,
 				TExtension,
 				TPath,
 				TMetadata
@@ -532,11 +510,9 @@ type FlatMethods<
 			>(
 				this: BuilderReceiver<TPath, TMetadata>,
 				schema: TSchema,
+				options?: StreamOutputOptions,
 			): RouteBuilderView<
-				WithPlainOutput<
-					UseMethod<TState, "output">,
-					{ kind: "stream"; body: TSchema }
-				>,
+				WithPlainOutput<TState, { kind: "stream"; body: TSchema }>,
 				TExtension,
 				TPath,
 				TMetadata
@@ -637,7 +613,7 @@ export type RouteBuilderView<
 	>;
 
 type DerivedState = {
-	route: { readonly kind: "procedure"; readonly method: "POST" };
+	route: { readonly method: "POST" };
 	method: "available";
 	request: EmptyObject;
 	responses: EmptyObject;
@@ -648,14 +624,11 @@ type DerivedState = {
 };
 
 /** Type-level view of the root route builder. */
-export type RootRouteBuilder<
-	TOptions = undefined,
+export type PublicRouteBuilder<
 	TExtension extends BuilderExtension | never = never,
-> = TOptions extends undefined
-	? {
-			readonly "~restrpc": { readonly path: undefined };
-		} & Omit<
-			RouteBuilderView<DerivedState, TExtension, undefined, never>,
-			"~restrpc"
-		>
-	: never;
+> = {
+	readonly "~restrpc": { readonly path: undefined };
+} & Omit<
+	RouteBuilderView<DerivedState, TExtension, undefined, never>,
+	"~restrpc"
+>;

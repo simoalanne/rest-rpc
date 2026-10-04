@@ -35,9 +35,8 @@ const events = route
 ```
 
 Stream schemas describe event data. Event data must be JSON serializable.
-Declared schemas validate each value as it is yielded. Once a stream has
-started, an invalid value ends the stream instead of producing an error
-response.
+Declared schemas validate each value as it is yielded. An invalid value ends
+the stream instead of producing an error response.
 
 ## Add Event Metadata
 

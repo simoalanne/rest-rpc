@@ -2,11 +2,8 @@ import {
 	type InferClientResponse,
 	type InferServerResponse,
 } from "@rest-rpc/core";
-import { serverFirstRoute as route } from "./routeBuilder.ts";
-import type {
-	ImplicitResponseKind,
-	ServerFirstRouteResponseKind,
-} from "./implicitResponse.types.ts";
+import { serverRoute as route } from "./routeBuilder.ts";
+import type { ImplicitResponseKind } from "./implicitResponse.types.ts";
 import { sse } from "./sse.ts";
 
 describe("implicit response inference", () => {
@@ -41,30 +38,24 @@ describe("implicit response inference", () => {
 		expectTypeOf<
 			InferClientResponse<typeof empty>["body"]
 		>().toEqualTypeOf<undefined>();
-		expectTypeOf<
-			ServerFirstRouteResponseKind<typeof empty>
-		>().toEqualTypeOf<"empty">();
 		const custom = route.get("/").handler(() => ({
 			status: 200,
 			body: "ok",
 			contentType: "text/plain",
-			responseHeaders: { count: 2, omitted: undefined },
+			headers: { count: 2, omitted: undefined },
 		}));
 		expectTypeOf<
-			InferClientResponse<typeof custom>["responseHeaders"]
+			InferClientResponse<typeof custom>["headers"]
 		>().toEqualTypeOf<{
 			readonly count: "2";
 			readonly omitted: undefined;
 		}>();
 		expectTypeOf<
-			InferServerResponse<typeof custom>["responseHeaders"]
+			InferServerResponse<typeof custom>["headers"]
 		>().toEqualTypeOf<{
 			readonly count: 2;
 			readonly omitted: undefined;
 		}>();
-		expectTypeOf<
-			ServerFirstRouteResponseKind<typeof custom>
-		>().toEqualTypeOf<"custom">();
 	});
 
 	it("infers plain, custom, stream, and SSE data independently of metadata", () => {
@@ -84,18 +75,6 @@ describe("implicit response inference", () => {
 			readonly id: "one";
 		}>();
 		expectTypeOf<InferClientResponse<typeof custom>>().toEqualTypeOf<"hello">();
-		expectTypeOf<
-			ServerFirstRouteResponseKind<typeof plain>
-		>().toEqualTypeOf<"json">();
-		expectTypeOf<
-			ServerFirstRouteResponseKind<typeof custom>
-		>().toEqualTypeOf<"custom">();
-		expectTypeOf<
-			ServerFirstRouteResponseKind<typeof stream>
-		>().toEqualTypeOf<"stream">();
-		expectTypeOf<
-			ServerFirstRouteResponseKind<typeof envelope>
-		>().toEqualTypeOf<"stream">();
 		expectTypeOf<InferClientResponse<typeof stream>>().toEqualTypeOf<
 			AsyncIterable<{
 				data: { count: number };
@@ -103,6 +82,12 @@ describe("implicit response inference", () => {
 				event?: string;
 				retry?: number;
 			}>
+		>();
+		expectTypeOf<
+			InferClientResponse<typeof envelope>["status"]
+		>().toEqualTypeOf<200>();
+		expectTypeOf<InferClientResponse<typeof envelope>["body"]>().toEqualTypeOf<
+			InferClientResponse<typeof stream>
 		>();
 		expectTypeOf<
 			ImplicitResponseKind<
@@ -122,6 +107,6 @@ describe("implicit response inference", () => {
 		// @ts-expect-error Status envelopes require a number.
 		route.handler(() => ({ status: "200", body: "bad" }));
 		// @ts-expect-error Response headers must be transport scalars.
-		route.handler(() => ({ status: 200, responseHeaders: { count: {} } }));
+		route.handler(() => ({ status: 200, headers: { count: {} } }));
 	});
 });

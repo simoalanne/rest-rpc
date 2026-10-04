@@ -5,4 +5,9 @@ export type {
 	SerializedBody,
 } from "./types.ts";
 export { defaultBodyCodecs } from "./defaults.ts";
-export { normalizeMediaType, resolveBodyCodec } from "./operations.ts";
+export {
+	contentTypeList,
+	findDeclaredContentType,
+	normalizeMediaType,
+	resolveBodyCodec,
+} from "./operations.ts";

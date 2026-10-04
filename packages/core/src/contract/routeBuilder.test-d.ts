@@ -19,11 +19,10 @@ describe("routeBuilder types", () => {
 		const schema = type<{ name: string }>();
 		const value = route.input(schema).output(schema);
 		expectTypeOf(value["~restrpc"]).toEqualTypeOf<{
-			readonly kind: "procedure";
 			readonly method: "POST";
 			readonly path: undefined;
 			request: {
-				body: readonly [StandardSchemaV1<{ name: string }>];
+				input: readonly [StandardSchemaV1<{ name: string }>];
 				contentType: "application/json";
 			};
 			responses: {
@@ -32,8 +31,23 @@ describe("routeBuilder types", () => {
 					contentType: "application/json";
 				};
 			};
-			readonly input: "input";
 			readonly output: "output";
+		}>();
+	});
+
+	it("keeps descriptions out of declaration types and accepts stream headers", () => {
+		const schema = type<string>();
+		const headers = type<{ "x-cursor": string }>();
+		const output = route.output(schema, { description: "Name" });
+		expectTypeOf(output["~restrpc"].responses).toEqualTypeOf<{
+			200: { body: typeof schema; contentType: "application/json" };
+		}>();
+		const stream = route.get("/events").streamResponse(200, schema, {
+			headers,
+			description: "Events",
+		});
+		expectTypeOf(stream["~restrpc"].responses).toEqualTypeOf<{
+			200: { kind: "stream"; body: typeof schema; headers: typeof headers };
 		}>();
 	});
 

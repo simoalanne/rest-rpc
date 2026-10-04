@@ -15,7 +15,7 @@ type UnknownRequest = {
 	query: unknown;
 	input: unknown;
 };
-type RequestTransportFields = {
+export type RequestTransportFields = {
 	contentType?: string;
 	lastEventId?: string;
 };

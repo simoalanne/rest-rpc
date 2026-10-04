@@ -1,6 +1,8 @@
 import {
+	contractRouteEntries,
 	getPathParamSegmentName,
 	isPathParamSegment,
+	isRouteLeaf,
 	type AbsolutePath,
 	type RouteDeclaration,
 } from "@rest-rpc/core/contract";
@@ -14,7 +16,7 @@ const joinPaths = (
 ): AbsolutePath =>
 	`/${[...splitPath(prefix ?? ""), ...splitPath(path)].join("/")}`;
 
-export const compareRouteSpecificity = (
+const compareRouteSpecificity = (
 	left: RouteDeclaration & { path: string },
 	right: RouteDeclaration & { path: string },
 ) => {
@@ -82,60 +84,47 @@ export type RuntimeImplementation = {
 	middleware?: readonly RuntimeRouteHandler[];
 };
 
-/** An implementation or nested implementation tree consumed at runtime. */
-export type RuntimeImplementationTree =
-	| {
-			readonly "~restrpc": RouteDeclaration & {
-				readonly handler: (...args: never[]) => unknown;
-				readonly middleware?: readonly RuntimeRouteHandler[];
-			};
-	  }
-	| { readonly [key: string]: RuntimeImplementationTree };
-
-const isBuilderImplementation = (
-	value: unknown,
-): value is {
+/** A route leaf whose declaration has a handler attached. */
+export type ImplementedRoute = {
 	readonly "~restrpc": RouteDeclaration & {
 		readonly handler: (...args: never[]) => unknown;
 		readonly middleware?: readonly RuntimeRouteHandler[];
 	};
-} =>
-	typeof value === "object" &&
-	value !== null &&
-	"~restrpc" in value &&
-	typeof value["~restrpc"] === "object" &&
-	value["~restrpc"] !== null &&
-	"handler" in value["~restrpc"];
-
-const flattenImplementationTree = (
-	implementation: RuntimeImplementationTree,
-	path: string[] = [],
-): RuntimeImplementation[] => {
-	if (isBuilderImplementation(implementation)) {
-		const { handler, middleware, ...route } = implementation["~restrpc"];
-		return [
-			{
-				route: {
-					...route,
-					path: route.path ?? `/${path.join("/")}`,
-				},
-				handler,
-				middleware,
-			},
-		];
-	}
-	return Object.entries(implementation).flatMap(([key, child]) =>
-		flattenImplementationTree(child, [...path, key]),
-	);
 };
+
+/** An implementation or nested implementation tree consumed at runtime. */
+export type RuntimeImplementationTree =
+	| ImplementedRoute
+	| { readonly [key: string]: RuntimeImplementationTree };
+
+/** Detects a route leaf whose declaration has a handler attached. */
+export function isImplementedRoute(value: unknown): value is ImplementedRoute {
+	return (
+		isRouteLeaf(value) &&
+		typeof value["~restrpc"] === "object" &&
+		value["~restrpc"] !== null &&
+		"handler" in value["~restrpc"]
+	);
+}
 
 /** Flattens and orders an implementation tree for route registration. */
 export function flattenRouteImplementations(
 	implementation: RuntimeImplementationTree,
 ): RuntimeImplementation[] {
-	return flattenImplementationTree(implementation).sort((left, right) =>
-		compareRouteSpecificity(left.route, right.route),
-	);
+	return [...contractRouteEntries(implementation)]
+		.map(({ route: entry }) => {
+			const { handler, middleware, ...route } =
+				entry as ImplementedRoute["~restrpc"] & {
+					path: string;
+				};
+			if (typeof handler !== "function") {
+				throw new Error(
+					`Route "${route.method} ${route.path}" has no handler.`,
+				);
+			}
+			return { route, handler, middleware };
+		})
+		.sort((left, right) => compareRouteSpecificity(left.route, right.route));
 }
 
 /** A matched route implementation and its decoded URL parameters. */
