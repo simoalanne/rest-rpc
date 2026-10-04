@@ -40,7 +40,11 @@ describe("createTanstackQueryUtils types", () => {
 			},
 			onError: (error) => {
 				expectTypeOf(error).toEqualTypeOf<InferClientError<typeof get>>();
-				if ("status" in error && error.status === 404 && "headers" in error) {
+				if (
+					"status" in error &&
+					error.status === 404 &&
+					"rawHeaders" in error
+				) {
 					expectTypeOf(error.body).toEqualTypeOf<{ message: string }>();
 				}
 			},

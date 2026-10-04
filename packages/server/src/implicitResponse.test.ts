@@ -50,7 +50,7 @@ describe("normalizeImplicitResponse", () => {
 					status,
 					body: "hello",
 					contentType: "text/plain",
-					responseHeaders: { count: 2 },
+					headers: { count: 2 },
 				}),
 			).toEqual({
 				kind: "response",
@@ -84,7 +84,7 @@ describe("normalizeImplicitResponse", () => {
 							status: 201,
 							body: output,
 							contentType: "text/plain",
-							responseHeaders: { count: 1 },
+							headers: { count: 1 },
 						},
 			);
 			expect(result.kind).toBe("stream");

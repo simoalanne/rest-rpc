@@ -23,7 +23,6 @@ describe("generated contract extraction", () => {
 		const expected = {
 			"~restrpc": {
 				source: "generated",
-				kind: "http",
 				method: "GET",
 				path: "/health",
 				output: "response",
@@ -44,22 +43,18 @@ describe("generated contract extraction", () => {
 				create: {
 					"~restrpc": {
 						source: "generated",
-						kind: "procedure",
 						method: "POST",
 						path: "/users/create",
-						input: "input",
 						output: "output",
-						request: { contentType: "application/json" },
+						request: { input: [], contentType: "application/json" },
 						responses: { 200: { contentType: "application/json" } },
 					},
 				},
 				custom: {
 					"~restrpc": {
 						source: "generated",
-						kind: "http",
 						method: "POST",
 						path: "/custom",
-						input: "segments",
 						output: "response",
 						request: { contentType: ["text/plain", "text/html"] },
 						responses: {
@@ -70,7 +65,6 @@ describe("generated contract extraction", () => {
 				events: {
 					"~restrpc": {
 						source: "generated",
-						kind: "http",
 						method: "GET",
 						path: "/events",
 						output: "response",

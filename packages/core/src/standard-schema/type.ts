@@ -1,8 +1,8 @@
+import type { MaybePromise } from "../typeUtils.ts";
 import type { StandardSchemaV1 } from "./index.ts";
 
 const UNCHECKED_SCHEMA_VENDOR = "rest-rpc";
 
-type MaybePromise<T> = T | Promise<T>;
 type TypeMapper = (input: never) => unknown;
 
 /**

@@ -1,8 +1,13 @@
 import type { Contract, RouteDeclaration } from "../contract/contract.ts";
 import { mapContractRoutes } from "../contract/traversal.ts";
+import { resolveRoutePath } from "../contract/path.ts";
+import { usesFlatInput, usesPlainOutput } from "../contract/routeModes.ts";
+import {
+	flatInputSegment,
+	resolveRouteRequest,
+} from "../contract/routeRequest.ts";
 import type { BodyCodec } from "../codecs/index.ts";
 import {
-	type ExecuteRequestOptions,
 	type ApiClientFetchOptions,
 	type ClientHeaders,
 	type FetchArgs,
@@ -83,21 +88,11 @@ export function initClient<
 	contract: TContract,
 	options: ApiClientOptions<TGlobalHeaders>,
 ): ApiClientFor<TContract, TGlobalHeaders> {
-	const requestOptions: ExecuteRequestOptions = {
-		baseUrl: options.baseUrl,
-		bodyCodecs: options.bodyCodecs,
-		fetch: options.fetch,
-		fetchOptions: options.fetchOptions,
-		globalHeaders: options.globalHeaders,
-		timeoutMs: options.timeoutMs,
-	};
-
-	const request: RouteRequestFn = (route, _routePath, ...args) =>
-		executeRequest(route, args, requestOptions);
+	const request: RouteRequestFn = (route, ...args) =>
+		executeRequest(route, args, options);
 
 	const fetchResponse = (
 		route: RouteDeclaration & { path: string },
-		routePath: readonly string[],
 		...args: FetchArgs
 	) =>
 		fetchRouteResponse(
@@ -105,25 +100,22 @@ export function initClient<
 			route.source !== "generated" && (options.validateResponses ?? false),
 			options.bodyCodecs,
 			route,
-			routePath,
 			...args,
 		);
 
 	return mapContractRoutes(contract, (node, routePath) => {
 		const resolvedRoute = {
 			...node,
-			path: node.path ?? `/${routePath.join("/")}`,
+			path: resolveRoutePath(node, routePath),
+			request: resolveRouteRequest(node),
 		};
-		const flatInput =
-			node.input === "input" ||
-			(node.input === undefined && node.kind === "procedure");
-		const plainOutput =
-			node.output === "output" ||
-			(node.output === undefined && node.kind === "procedure");
+		const inputSegment = flatInputSegment(node.method);
+		const flatInput = usesFlatInput(node);
+		const plainOutput = usesPlainOutput(node);
 		return (...args: FetchArgs) => {
 			if (
-				node.input === "input" &&
-				node.method === "GET" &&
+				flatInput &&
+				inputSegment === "query" &&
 				(typeof args[0] !== "object" ||
 					args[0] === null ||
 					Array.isArray(args[0]))
@@ -132,18 +124,10 @@ export function initClient<
 					new Error("GET flat input must be an object of query values."),
 				);
 			}
-			const request = flatInput
-				? { [node.method === "GET" ? "query" : "body"]: args[0] }
-				: args[0];
+			const request = flatInput ? { [inputSegment]: args[0] } : args[0];
 			return plainOutput
-				? fetchSuccess(
-						fetchResponse,
-						resolvedRoute,
-						routePath,
-						request as never,
-						args[1],
-					)
-				: fetchResponse(resolvedRoute, routePath, request as never, args[1]);
+				? fetchSuccess(fetchResponse, resolvedRoute, request as never, args[1])
+				: fetchResponse(resolvedRoute, request as never, args[1]);
 		};
 	}) as ApiClientFor<TContract, TGlobalHeaders>;
 }

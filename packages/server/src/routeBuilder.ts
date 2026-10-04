@@ -1,52 +1,55 @@
-import { route as coreRoute } from "@rest-rpc/core";
+import { RouteBuilder, type RouteDeclaration } from "@rest-rpc/core/contract";
 import type {
+	PublicServerRouteBuilder,
 	RuntimeRouteHandler,
-	RuntimeServerRoute,
-	ServerRouteBuilder,
 } from "./routeBuilder.types.ts";
 
-Object.defineProperties(Object.getPrototypeOf(coreRoute), {
-	handler: {
-		configurable: true,
-		value(this: RuntimeServerRoute, handler: RuntimeRouteHandler) {
-			const state = this["~restrpc"];
-			return this.clone({
-				...(state.kind
-					? {}
-					: {
-							kind: "procedure",
-							method: "POST",
-							path: undefined,
-							responses: {},
-						}),
-				...state,
-				handler,
-			});
-		},
-	},
-	use: {
-		configurable: true,
-		value(this: RuntimeServerRoute, middleware: RuntimeRouteHandler) {
-			const state = this["~restrpc"];
-			return this.clone({
-				...state,
-				middleware: [...(state.middleware ?? []), middleware],
-			});
-		},
-	},
-	middleware: {
-		configurable: true,
-		value(callback: RuntimeRouteHandler) {
-			return callback;
-		},
-	},
-	$context: {
-		configurable: true,
-		value(this: RuntimeServerRoute) {
-			return this;
-		},
-	},
-});
+type ServerRouteBuilderState = Partial<RouteDeclaration> & {
+	readonly handler?: unknown;
+	readonly middleware?: readonly RuntimeRouteHandler[];
+};
+
+/** Core route builder extended with server handler and middleware attachment. */
+export class ServerRouteBuilder extends RouteBuilder {
+	declare readonly "~restrpc": ServerRouteBuilderState;
+
+	override clone(state: ServerRouteBuilderState): ServerRouteBuilder {
+		return new ServerRouteBuilder(state);
+	}
+
+	handler(handler: RuntimeRouteHandler): ServerRouteBuilder {
+		const state = this["~restrpc"];
+		return this.clone({
+			...(state.method
+				? {}
+				: {
+						method: "POST",
+						path: undefined,
+						responses: {},
+					}),
+			...state,
+			handler,
+		});
+	}
+
+	use(middleware: RuntimeRouteHandler): ServerRouteBuilder {
+		const state = this["~restrpc"];
+		return this.clone({
+			...state,
+			middleware: [...(state.middleware ?? []), middleware],
+		});
+	}
+
+	middleware(callback: RuntimeRouteHandler): RuntimeRouteHandler {
+		return callback;
+	}
+
+	$context(): this {
+		return this;
+	}
+}
 
 /** Core route builder with server-first handler attachment enabled. */
-export const serverFirstRoute = coreRoute as unknown as ServerRouteBuilder;
+export const serverRoute = new ServerRouteBuilder({
+	path: undefined,
+}) as unknown as PublicServerRouteBuilder;

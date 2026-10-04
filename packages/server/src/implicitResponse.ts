@@ -1,12 +1,7 @@
+import { isAsyncIterable } from "@rest-rpc/core/utils";
 import type { HttpRouteResult } from "./httpRouteResult.ts";
 import type { ImplicitResponseEnvelope } from "./implicitResponse.types.ts";
 import { frameSseStream } from "./sse.ts";
-
-const isAsyncIterable = (value: unknown): value is AsyncIterable<unknown> =>
-	value !== null &&
-	(typeof value === "object" || typeof value === "function") &&
-	Symbol.asyncIterator in value &&
-	typeof value[Symbol.asyncIterator] === "function";
 
 export const isCustomProcedureOutput = (
 	value: unknown,
@@ -52,7 +47,7 @@ const normalizeImplicitHttpResponse = (
 			`Invalid inferred HTTP response status "${response.status}".`,
 		);
 	}
-	const headers = response.responseHeaders;
+	const headers = response.headers;
 	if (!("body" in response)) {
 		return {
 			kind: "response",

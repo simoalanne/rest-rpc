@@ -1,5 +1,8 @@
 import type { AbsolutePath, BodyCodec } from "@rest-rpc/core";
-import { deserializeRequestBody } from "@rest-rpc/fetch/adapter";
+import {
+	assertRequestBodyLimit,
+	deserializeRequestBody,
+} from "@rest-rpc/fetch/adapter";
 import type { ServerResponse } from "node:http";
 import {
 	createRouteMatcher,
@@ -70,12 +73,7 @@ export function createRouteHandler(
 	const matchRoute = createRouteMatcher(implementations, options.prefix);
 	const bodyCodecs = options.bodyCodecs ?? [];
 	const maxBytes = options.requestBodyLimit;
-	if (
-		maxBytes !== undefined &&
-		(!Number.isSafeInteger(maxBytes) || maxBytes <= 0)
-	) {
-		throw new Error("requestBodyLimit must be a positive safe integer");
-	}
+	assertRequestBodyLimit(maxBytes);
 
 	return async (request, response) => {
 		const url = parseRequestTarget(request);
@@ -153,20 +151,11 @@ export function createRouteHandler(
 			return { matched: true };
 		}
 
-		try {
-			if (!response.destroyed)
-				await writeNodeResponse(result, response, bodyCodecs);
-		} catch (error) {
-			if (!(error instanceof ResponseValidationError)) throw error;
-			if (options.responseValidationErrorHandler) {
-				await options.responseValidationErrorHandler(error, request, response);
-			} else {
-				if (response.headersSent) throw error;
-				response.statusCode = error.status;
-				response.setHeader("content-type", "application/json");
-				response.end(JSON.stringify(error.responseBody));
-			}
-		}
+		// Stream validation runs while writing. The stream pipeline destroys the
+		// response when a chunk fails, and the error rejects like any other write
+		// failure.
+		if (!response.destroyed)
+			await writeNodeResponse(result, response, bodyCodecs);
 		return { matched: true };
 	};
 }

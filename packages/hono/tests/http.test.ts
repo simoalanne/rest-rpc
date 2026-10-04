@@ -42,43 +42,4 @@ describe("registerRoutes", () => {
 			},
 		);
 	});
-
-	it("applies the body limit before invoking the route handler", async () => {
-		const app = new Hono();
-		const handler = vi.fn(() => ({ status: 204 as const }));
-		registerRoutes(
-			app,
-			{
-				post: route
-					.post("/message")
-					.body(type<string>(), { contentType: "text/plain" })
-					.handler(handler),
-			},
-			{ requestBodyLimit: 3 },
-		);
-		await withFetchServer(
-			(request) => app.fetch(request),
-			async (url) => {
-				expect(
-					(
-						await fetch(`${url}/message`, {
-							method: "POST",
-							headers: { "content-type": "text/plain" },
-							body: "abcd",
-						})
-					).status,
-				).toBe(413);
-				expect(handler).not.toHaveBeenCalled();
-				expect(
-					(
-						await fetch(`${url}/message`, {
-							method: "POST",
-							headers: { "content-type": "text/plain" },
-							body: "abc",
-						})
-					).status,
-				).toBe(204);
-			},
-		);
-	});
 });

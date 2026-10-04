@@ -9,6 +9,15 @@ type DeserializedRequestBody =
 	| { body: unknown; rejection: undefined }
 	| { body: undefined; rejection: { status: 400 | 413; message: string } };
 
+export function assertRequestBodyLimit(maxBytes: number | undefined) {
+	if (
+		maxBytes !== undefined &&
+		(!Number.isSafeInteger(maxBytes) || maxBytes <= 0)
+	) {
+		throw new Error("requestBodyLimit must be a positive safe integer");
+	}
+}
+
 export async function deserializeRequestBody<TRequest>(
 	request: TRequest,
 	rawRequestSource:

@@ -1,21 +1,6 @@
-import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import type { SseServerEvent } from "./sse.ts";
-
-// Keep schema bodies opaque while flattening each inferred response envelope.
-type Merge<T> = T extends unknown ? { [TKey in keyof T]: T[TKey] } : never;
-
-type AnyRouteHandler = (...args: never[]) => unknown;
-
-export type UsesPlainOutput<TRoute extends RouteDeclaration> = TRoute extends {
-	output: "response";
-}
-	? false
-	: TRoute extends { output: "output" }
-		? true
-		: TRoute["kind"] extends "procedure"
-			? true
-			: false;
+import type { Merge } from "@rest-rpc/core/utils";
 
 /**
  * HTTP response shape from which a handler-based route infers its contract.
@@ -31,21 +16,14 @@ export type ImplicitResponseEnvelope =
 			status: number;
 			body?: never;
 			contentType?: string;
-			responseHeaders?: Record<string, string | number | undefined>;
+			headers?: Record<string, string | number | undefined>;
 	  }
 	| {
 			status: number;
 			body: unknown;
 			contentType?: string;
-			responseHeaders?: Record<string, string | number | undefined>;
+			headers?: Record<string, string | number | undefined>;
 	  };
-
-/**
- * Body encodings inferred from a handler response.
- *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-routes}
- */
-export type ServerFirstResponseKind = "empty" | "json" | "stream" | "custom";
 
 type BodyResponseKind<TResponse, TBody> =
 	TBody extends AsyncIterable<unknown>
@@ -112,7 +90,7 @@ type ImplicitResponseDeclaration<TResponse> = TResponse extends {
 		} & (TResponse extends { body: AsyncIterable<unknown> }
 			? { kind: "stream" }
 			: { contentType: ImplicitResponseContentType<TResponse> }) &
-			(TResponse extends { responseHeaders: infer THeaders }
+			(TResponse extends { headers: infer THeaders }
 				? {
 						headers: InferredSchema<
 							THeaders,
@@ -121,7 +99,7 @@ type ImplicitResponseDeclaration<TResponse> = TResponse extends {
 					}
 				: unknown)
 	: { body: undefined } & (TResponse extends {
-			responseHeaders: infer THeaders;
+			headers: infer THeaders;
 		}
 			? {
 					headers: InferredSchema<
@@ -189,38 +167,3 @@ export type InferredRoute<TRoute, TResult> = [
 ] extends ["response"]
 	? Merge<InferredHttpRoute<TRoute, TResult> & { output: "response" }>
 	: Merge<InferredProcedureRoute<TRoute, TResult> & { output: "output" }>;
-
-type ImplementationParts<TImplementation> = TImplementation extends {
-	readonly "~restrpc": infer TRoute extends RouteDeclaration & {
-		handler: AnyRouteHandler;
-	};
-}
-	? { route: TRoute; handler: TRoute["handler"] }
-	: never;
-
-type PlainResponseKind<TRoute> = TRoute extends {
-	responses: { 200: infer TResponse };
-}
-	? TResponse extends { kind: "stream" }
-		? "stream"
-		: TResponse extends { contentType: infer TContentType }
-			? TContentType extends "application/json"
-				? "json"
-				: "custom"
-			: "json"
-	: never;
-
-/**
- * Infers the body encodings represented by a completed route.
- *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-routes}
- */
-export type ServerFirstRouteResponseKind<TImplementation> =
-	ImplementationParts<TImplementation> extends {
-		route: infer TRoute;
-		handler: infer THandler extends AnyRouteHandler;
-	}
-		? UsesPlainOutput<Extract<TRoute, RouteDeclaration>> extends true
-			? PlainResponseKind<TRoute>
-			: ImplicitResponseKind<Awaited<ReturnType<THandler>>>
-		: never;

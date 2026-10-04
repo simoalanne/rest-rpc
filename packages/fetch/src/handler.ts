@@ -9,7 +9,10 @@ import {
 	type RuntimeImplementationTree,
 } from "@rest-rpc/server";
 import type { DefaultRequest } from "./index.ts";
-import { deserializeRequestBody } from "./deserializeRequestBody.ts";
+import {
+	assertRequestBodyLimit,
+	deserializeRequestBody,
+} from "./deserializeRequestBody.ts";
 import { createFetchResponse } from "./response.ts";
 
 /**
@@ -74,12 +77,7 @@ export function createRouteHandler(
 	const matchRoute = createRouteMatcher(implementations, options.prefix);
 	const bodyCodecs = options.bodyCodecs ?? [];
 	const maxBytes = options.requestBodyLimit;
-	if (
-		maxBytes !== undefined &&
-		(!Number.isSafeInteger(maxBytes) || maxBytes <= 0)
-	) {
-		throw new Error("requestBodyLimit must be a positive safe integer");
-	}
+	assertRequestBodyLimit(maxBytes);
 
 	return async (request) => {
 		const url = new URL(request.url);

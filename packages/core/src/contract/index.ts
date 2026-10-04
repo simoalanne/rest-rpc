@@ -15,14 +15,19 @@ export type {
 	BuilderExtension,
 	BuilderState,
 	PublicDeclarationFor,
-	RootRouteBuilder,
+	PublicRouteBuilder,
 	RouteBuilderView,
 } from "./routeBuilder.types.ts";
+export { RouteBuilder } from "./routeBuilder.ts";
+export { flatInputSegment, resolveRouteRequest } from "./routeRequest.ts";
 export {
 	getPathParamSegmentName,
 	isPathParamSegment,
+	resolveRoutePath,
 	toColonPath,
 } from "./path.ts";
+export type { UsesFlatInput, UsesPlainOutput } from "./routeModes.ts";
+export { usesFlatInput, usesPlainOutput } from "./routeModes.ts";
 export type {
 	InferSchemaInputs,
 	InferSchemaOutputs,
@@ -38,13 +43,21 @@ export type {
 	ErrorDeclaredClientResponse,
 	ResponseDeclaration,
 	ResponseHeaders,
+	OutputOptions,
 	ResponseOptions,
+	StreamOutputOptions,
+	StreamResponseOptions,
 	RouteResponses,
 	InferServerResponse,
+	ProcedureContentType,
+	ServerProcedureResponse,
 	ServerResponse,
 	ServerResponseBody,
 	SuccessfulDeclaredClientResponse,
 } from "./response.ts";
-export { getRouteResponses } from "./response.ts";
 export type { ContractRouteEntry } from "./traversal.ts";
-export { contractRouteEntries, flattenContractRoutes } from "./traversal.ts";
+export {
+	contractRouteEntries,
+	isRouteLeaf,
+	mapContractRoutes,
+} from "./traversal.ts";

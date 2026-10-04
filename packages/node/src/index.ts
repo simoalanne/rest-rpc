@@ -1,11 +1,9 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Contract, RouteTree } from "@rest-rpc/core/contract";
 import {
-	implement as serverImplement,
-	serverFirstRoute,
-	type Contractimplementer,
+	createAdapterApi,
+	type ContractImplementer,
 	type RouteHandlerFor,
-	type ServerRouteBuilder,
 } from "@rest-rpc/server";
 
 /**
@@ -15,6 +13,8 @@ import {
  * @default {}
  */
 export interface DefaultContext {}
+
+const adapterApi = createAdapterApi<NodeHandlerFields, DefaultContext>();
 
 /**
  * Native request available to Node HTTP adapter handlers and middleware. Augment this interface globally.
@@ -60,10 +60,7 @@ export type NodeRouteHandlerResult = { matched: boolean };
  * @see {@link https://rest-rpc.dev/docs/quickstart#define-and-register-routes}
  * @see {@link https://rest-rpc.dev/docs/server/node}
  */
-export const route = serverFirstRoute as unknown as ServerRouteBuilder<
-	NodeHandlerFields,
-	DefaultContext
->;
+export const route = adapterApi.route;
 
 /**
  * Creates typed Node HTTP handler builders for every route in a shared contract.
@@ -72,12 +69,8 @@ export const route = serverFirstRoute as unknown as ServerRouteBuilder<
  */
 export function implement<const TContract extends Contract>(
 	contract: TContract,
-): Contractimplementer<TContract, NodeHandlerFields, DefaultContext> {
-	return serverImplement(contract) as unknown as Contractimplementer<
-		TContract,
-		NodeHandlerFields,
-		DefaultContext
-	>;
+): ContractImplementer<TContract, NodeHandlerFields, DefaultContext> {
+	return adapterApi.implement(contract);
 }
 
 export { type } from "@rest-rpc/core";

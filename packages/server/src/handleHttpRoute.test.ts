@@ -4,7 +4,7 @@ import {
 	flattenRouteImplementations,
 	type RuntimeImplementationTree,
 } from "./match.ts";
-import { serverFirstRoute as route } from "./routeBuilder.ts";
+import { serverRoute as route } from "./routeBuilder.ts";
 import {
 	RequestValidationError,
 	ResponseValidationError,
@@ -116,7 +116,7 @@ describe("handleHttpRoute", () => {
 			.handler(() => ({
 				status: 200,
 				body: "2",
-				responseHeaders: { count: 2 },
+				headers: { count: 2 },
 			}));
 		const run = (disableResponseValidation: boolean) =>
 			handleHttpRoute(flattenRouteImplementations(implementation)[0]!, {
@@ -144,7 +144,7 @@ describe("handleHttpRoute", () => {
 					location === "body" ? rejected : type<string>(),
 					location === "headers" ? { headers: rejected } : {},
 				)
-				.handler(() => ({ status: 200, body: "ok", responseHeaders: {} }));
+				.handler(() => ({ status: 200, body: "ok", headers: {} }));
 			const result = await execute(implementation);
 			expect(result).toBeInstanceOf(ResponseValidationError);
 			expect(result).toMatchObject({ location });

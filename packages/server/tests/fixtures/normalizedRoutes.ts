@@ -1,6 +1,6 @@
 import { route as contractRoute, type } from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
-import { serverFirstRoute as route } from "@rest-rpc/server";
+import { serverRoute as route } from "@rest-rpc/server";
 
 export interface InputSchema extends StandardSchemaV1<{ name: string }> {
 	customMethod(): string;
@@ -33,11 +33,11 @@ export const getContract = () => ({
 		),
 	empty: route
 		.delete()
-		.handler(() => ({ status: 204, responseHeaders: { "x-count": 1 } })),
+		.handler(() => ({ status: 204, headers: { "x-count": 1 } })),
 	http: route.post("/users").handler(() => ({
 		status: 201,
 		body: output,
-		responseHeaders: { "x-count": 1 },
+		headers: { "x-count": 1 },
 	})),
 	declared: route
 		.get("/users/{id}")
@@ -49,7 +49,7 @@ export const getContract = () => ({
 		.handler(() => ({
 			status: 200,
 			body: output,
-			responseHeaders: { "x-count": "1" },
+			headers: { "x-count": "1" },
 		})),
 	contract: contractRoute
 		.body(inputSchema)

@@ -1,5 +1,5 @@
 import { type } from "@rest-rpc/core";
-import { serverFirstRoute as route } from "./routeBuilder.ts";
+import { serverRoute as route } from "./routeBuilder.ts";
 
 describe("routeBuilder types", () => {
 	it("checks declared response statuses and bodies", () => {

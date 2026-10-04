@@ -1,4 +1,3 @@
-import type { SerializedBody } from "@rest-rpc/core";
 import { nestBodyCodecs } from "./codecs.ts";
 import { normalizeMediaType, resolveBodyCodec } from "@rest-rpc/core/codecs";
 import {
@@ -11,16 +10,19 @@ import {
 import { HttpAdapterHost } from "@nestjs/core";
 import type { RouteDeclaration } from "@rest-rpc/core/contract";
 import {
-	createNodeResponseStream,
 	createRequestSignal,
 	writeStreamResponse,
 } from "@rest-rpc/node/adapter";
 import {
 	assertRequestContentType,
 	handleHttpRoute,
+	type ImplementedRoute,
+	isImplementedRoute,
 	RequestValidationError,
 	ResponseValidationError,
+	serializeHttpRouteResult,
 } from "@rest-rpc/server";
+import { Readable } from "node:stream";
 import type { Observable } from "rxjs";
 import { from, lastValueFrom } from "rxjs";
 import { REST_RPC_ROUTE_METADATA, type RouteMetadata } from "./decorators.ts";
@@ -30,35 +32,20 @@ import {
 	ResponseValidationException,
 } from "./validationExceptions.ts";
 
-type NestRouteImplementation = {
-	readonly "~restrpc": RouteDeclaration & {
-		readonly handler: (request: unknown) => unknown;
-		readonly middleware?: readonly ((request: unknown) => unknown)[];
-	};
-};
-
 const assertRouteImplementation = (
 	value: unknown,
 	route: RouteDeclaration & { path: string },
-): NestRouteImplementation => {
-	if (
-		typeof value !== "object" ||
-		value === null ||
-		!("~restrpc" in value) ||
-		typeof value["~restrpc"] !== "object" ||
-		value["~restrpc"] === null ||
-		!("handler" in value["~restrpc"])
-	) {
+): ImplementedRoute => {
+	if (!isImplementedRoute(value)) {
 		throw new Error(
 			`Controller method for "${route.method} ${route.path}" must return a rest-rpc route implementation.`,
 		);
 	}
 
-	const implementation = value as NestRouteImplementation;
-	const implementationRoute = implementation["~restrpc"];
+	const implementationRoute = value["~restrpc"];
 	if (
 		implementationRoute.method !== route.method ||
-		(implementationRoute.kind !== "procedure" &&
+		(implementationRoute.path !== undefined &&
 			implementationRoute.path !== route.path)
 	) {
 		throw new Error(
@@ -66,7 +53,7 @@ const assertRouteImplementation = (
 		);
 	}
 
-	return implementation;
+	return value;
 };
 
 @Injectable()
@@ -113,6 +100,8 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 		const signal = createRequestSignal(rawRequest, rawResponse);
 		const mediaType = normalizeMediaType(rawRequest.headers["content-type"]);
 		const codec = resolveBodyCodec(mediaType, this.options?.bodyCodecs ?? []);
+		// Without a matching codec the body comes from the framework's parser, which
+		// owns size limits, so requestBodyLimit is not offered here.
 		const body = codec?.deserialize
 			? await codec.deserialize(http.getRequest())
 			: req.body;
@@ -154,19 +143,12 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 			throw new ResponseValidationException(result);
 		}
 
-		let serialized: SerializedBody | undefined;
-		if (result.kind === "response" && result.body) {
-			const { value, contentType } = result.body;
-			const codec = resolveBodyCodec(normalizeMediaType(contentType), [
-				...(this.options?.bodyCodecs ?? []),
-				...nestBodyCodecs,
-			]);
-			serialized = await codec!.serialize!(value, contentType);
-			for (const [name, value] of Object.entries(serialized.headers ?? {})) {
-				if (value !== undefined) adapter.setHeader(res, name, String(value));
-			}
-		}
-		for (const [name, value] of Object.entries(result.headers ?? {})) {
+		const serialized = await serializeHttpRouteResult(
+			result,
+			this.options?.bodyCodecs ?? [],
+			nestBodyCodecs,
+		);
+		for (const [name, value] of Object.entries(serialized.headers)) {
 			if (value !== undefined) {
 				const headerValue = Array.isArray(value)
 					? value.map(String)
@@ -174,22 +156,25 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 				adapter.setHeader(res, name, headerValue as string);
 			}
 		}
-		adapter.status(res, result.status);
-		if (result.kind === "stream") {
+		adapter.status(res, serialized.status);
+		// Stream validation errors are left to Nest's exception handling, which can
+		// only respond while headers have not been sent.
+		if (serialized.kind === "stream") {
 			if (adapter.getType() === "express") {
-				return writeStreamResponse(result.body, rawResponse, result.status);
+				return writeStreamResponse(
+					serialized.body,
+					rawResponse,
+					serialized.status,
+				);
 			}
-			return new StreamableFile(createNodeResponseStream(result.body), {
+			return new StreamableFile(Readable.from(serialized.body), {
 				type: "text/event-stream",
 			});
 		}
-		if (!serialized) return undefined;
-		const contentType =
-			serialized.contentType === undefined
-				? result.body!.contentType
-				: serialized.contentType;
+		if (!serialized.body) return undefined;
+		const { value, contentType } = serialized.body;
 		if (contentType === null) res.removeHeader("content-type");
 		else adapter.setHeader(res, "content-type", contentType);
-		return serialized.body;
+		return value;
 	}
 }

@@ -22,5 +22,6 @@ export type {
 	InferClientResponse,
 	InferClientStreamData,
 	InferClientSuccess,
+	SuccessfulResponseBody,
 } from "./response.ts";
 export type { SseEvent } from "../sse.ts";

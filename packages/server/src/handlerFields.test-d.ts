@@ -1,21 +1,21 @@
 import { route as contractRoute, type } from "@rest-rpc/core";
 import type {
-	Contractimplementer,
+	ContractImplementer,
 	RouteHandler,
 	RouteHandlerFor,
 	RouteRequest,
-	ServerRouteBuilder,
+	PublicServerRouteBuilder,
 } from "./index.ts";
 
 type Fields = { native: { method: string }; signal: AbortSignal };
 type Values = { requestId: string };
-declare const route: ServerRouteBuilder<Fields, Values>;
+declare const route: PublicServerRouteBuilder<Fields, Values>;
 const declaration = contractRoute
 	.get("/users/{id}")
 	.params(type((value: { id: string }) => ({ id: Number(value.id) })))
 	.response(200, type<string>());
 const contract = { users: { get: declaration } };
-declare const implementation: Contractimplementer<
+declare const implementation: ContractImplementer<
 	typeof contract,
 	Fields,
 	Values

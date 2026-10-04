@@ -1,4 +1,3 @@
-import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { BodyContentType } from "./body.ts";
 import type {
 	RequestBodySchema,
@@ -16,17 +15,6 @@ export type AbsolutePath = `/${string}`;
 /** Application-defined metadata attached to a route. */
 export type RouteMetadata = Record<string, unknown>;
 
-/** Declares one OpenAPI response header entry. */
-export type OpenApiResponseHeader =
-	| StandardSchemaV1
-	| { description?: string; schema: StandardSchemaV1 };
-
-/** Adds OpenAPI-only metadata for one route response status. */
-export type OpenApiResponseOptions = {
-	description?: string;
-	headers?: Record<string, OpenApiResponseHeader>;
-};
-
 /** OpenAPI metadata attached to one route. */
 export type OpenApiRouteOptions = {
 	summary?: string;
@@ -36,7 +24,6 @@ export type OpenApiRouteOptions = {
 	deprecated?: boolean;
 	security?: Array<Record<string, string[]>>;
 	externalDocs?: { url: string; description?: string };
-	responses?: Record<number, OpenApiResponseOptions>;
 	extensions?: Record<`x-${string}`, unknown>;
 };
 
@@ -48,6 +35,8 @@ export type CommonOpenApiRouteOptions = Omit<
 
 /** Canonical ordered request-schema declarations nested on a route. */
 export type RouteRequestDeclaration = {
+	/** Flat input schemas. Read through `resolveRouteRequest` to get their wire segment. */
+	input?: readonly RequestBodySchema[];
 	body?: readonly RequestBodySchema[];
 	contentType?: BodyContentType;
 	query?: readonly RequestBodySchema[];
@@ -65,10 +54,8 @@ export type RouteRequestDeclaration = {
  */
 export type RouteDeclaration = {
 	source?: "generated";
-	kind: "http" | "procedure";
 	path: AbsolutePath | undefined;
 	method: HttpMethod;
-	input?: "input" | "segments";
 	output?: "output" | "response";
 	request?: RouteRequestDeclaration;
 	responses: RouteResponses;

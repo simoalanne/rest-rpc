@@ -182,8 +182,9 @@ const get = route
 ```
 
 Omit the schema for a bodyless response, such as `.response(204)`. Declare
-status-specific response headers in the options and return them as
-`responseHeaders`:
+status-specific response headers with the `headers` option and return them as
+`headers`. The option is available on every status response, including
+bodyless responses and `.streamResponse()`:
 
 ```ts
 route
@@ -197,7 +198,7 @@ route
 		return {
 			status: 201,
 			body: todo,
-			responseHeaders: { location: `/todos/${todo.id}` },
+			headers: { location: `/todos/${todo.id}` },
 		};
 	});
 ```

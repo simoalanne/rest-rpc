@@ -22,7 +22,6 @@ export { root as alias };
 type Raw<TOverrides> = {
 	"~restrpc": Omit<
 		{
-			kind: "http";
 			method: "GET";
 			path: "/";
 			responses: { 200: { contentType: "application/json" } };
@@ -39,7 +38,7 @@ export type WidenedStatus = Raw<{
 export type InvalidStatus = Raw<{ responses: { nope: {} } }>;
 export type EmptyResponses = Raw<{ responses: {} }>;
 export type MissingResponses = {
-	"~restrpc": { kind: "http"; method: "GET"; path: "/" };
+	"~restrpc": { method: "GET"; path: "/" };
 };
 export type UnionContent = Raw<{
 	responses: { 200: { contentType: "text/plain" | "text/html" } };

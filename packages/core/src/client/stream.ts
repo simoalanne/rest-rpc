@@ -1,21 +1,6 @@
-import { HttpError } from "./httpError.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import { validateStandardSchema } from "../standard-schema/index.ts";
 import type { SseEvent } from "../sse.ts";
-
-const validateData = async (
-	data: unknown,
-	schema: StandardSchemaV1 | undefined,
-	validate: boolean,
-	status: number,
-) => {
-	if (!validate || !schema) return data;
-	const result = await validateStandardSchema(schema, data);
-	if (result.issues) {
-		throw new HttpError(status, data, { cause: result.issues });
-	}
-	return result.value;
-};
+import { validateResponseValue } from "./validateResponse.ts";
 
 const parseFrame = async (
 	frame: string,
@@ -29,7 +14,7 @@ const parseFrame = async (
 		if (line.startsWith("data: ")) {
 			const encodedData = line.slice(6);
 			const data = JSON.parse(encodedData);
-			result.data = await validateData(data, schema, validate, status);
+			result.data = await validateResponseValue(schema, data, validate, status);
 		}
 		if (line.startsWith("id: ")) result.id = line.slice(4);
 		if (line.startsWith("event: ")) result.event = line.slice(7);

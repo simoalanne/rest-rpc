@@ -17,10 +17,10 @@ const declared = route.get("/").response(201, type<{ name: string }>())[
 	"~restrpc"
 ];
 const decode = (response: Response, validate = true, declaration = declared) =>
-	fetchResponse(async () => response, validate, undefined, declaration, []);
+	fetchResponse(async () => response, validate, undefined, declaration);
 
 describe("client response decoding", () => {
-	it("transforms declared headers and retains native headers", async () => {
+	it("transforms declared headers and retains raw headers", async () => {
 		const declaration = route.get("/").response(201, type<{ name: string }>(), {
 			headers: type((input: Record<string, string>) => ({
 				count: Number(input["x-count"]),
@@ -32,16 +32,15 @@ describe("client response decoding", () => {
 				validate,
 				undefined,
 				declaration,
-				[],
 			);
 		expect(await read(true)).toMatchObject({
 			status: 201,
 			body: { name: "Ada" },
-			responseHeaders: { count: 2 },
-			headers: expect.any(Headers),
+			headers: { count: 2 },
+			rawHeaders: expect.any(Headers),
 		});
 		expect(await read(false)).toMatchObject({
-			responseHeaders: { "x-count": "2" },
+			headers: { "x-count": "2" },
 		});
 	});
 
@@ -56,7 +55,6 @@ describe("client response decoding", () => {
 					validate,
 					undefined,
 					declaration,
-					[],
 				);
 			await expect(read(true)).rejects.toMatchObject({
 				status: 201,
@@ -78,7 +76,6 @@ describe("client response decoding", () => {
 				true,
 				undefined,
 				declaration,
-				[],
 			),
 		).toMatchObject({ status: 204, body: undefined });
 	});
@@ -99,7 +96,6 @@ describe("client response decoding", () => {
 				true,
 				undefined,
 				declaration,
-				[],
 			);
 			if (contentType) {
 				expect(result.body).toBeInstanceOf(Blob);
@@ -123,7 +119,6 @@ describe("client response decoding", () => {
 				true,
 				[{ match: (mediaType) => mediaType === "application/custom" }],
 				declaration,
-				[],
 			),
 		).toHaveProperty("body", expect.any(Blob));
 	});
@@ -163,7 +158,7 @@ describe("client response decoding", () => {
 							headers: { "content-type": "application/json" },
 						});
 			await expect(
-				fetchResponse(async () => response, false, undefined, declaration, []),
+				fetchResponse(async () => response, false, undefined, declaration),
 			).rejects.toThrow(
 				failure === "missing body"
 					? "no stream body"

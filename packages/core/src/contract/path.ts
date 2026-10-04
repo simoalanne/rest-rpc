@@ -1,3 +1,11 @@
+import type { AbsolutePath, RouteDeclaration } from "./routeDeclaration.ts";
+
+/** Returns the declared path, or the path derived from the route's tree keys. */
+export const resolveRoutePath = (
+	route: Pick<RouteDeclaration, "path">,
+	treePath: readonly string[],
+): AbsolutePath => route.path ?? `/${treePath.join("/")}`;
+
 const pathParamSegmentPattern = /^(?::([^/]+)|\{([^/]+)\})$/;
 
 const pathParamNameFromCaptures = (

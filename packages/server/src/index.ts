@@ -3,9 +3,19 @@ export type {
 	HandleHttpRouteOptions,
 } from "./handleHttpRoute.ts";
 export type { HttpRouteResult } from "./httpRouteResult.ts";
+export type { SerializedHttpRouteResult } from "./serializeHttpRouteResult.ts";
+export { serializeHttpRouteResult } from "./serializeHttpRouteResult.ts";
 export { handleHttpRoute } from "./handleHttpRoute.ts";
-export { createRouteMatcher, flattenRouteImplementations } from "./match.ts";
-export type { RouteMatch, RuntimeImplementationTree } from "./match.ts";
+export {
+	createRouteMatcher,
+	flattenRouteImplementations,
+	isImplementedRoute,
+} from "./match.ts";
+export type {
+	ImplementedRoute,
+	RouteMatch,
+	RuntimeImplementationTree,
+} from "./match.ts";
 export type {
 	RouteHandler,
 	RouteHandlerFor,
@@ -22,17 +32,17 @@ export {
 	ResponseValidationError,
 } from "./validationErrors.ts";
 export { implement } from "./implement.ts";
-export type { Contractimplementer } from "./implement.types.ts";
-export { serverFirstRoute } from "./routeBuilder.ts";
+export type { AdapterApi } from "./adapterApi.ts";
+export { createAdapterApi } from "./adapterApi.ts";
+export type { ContractImplementer } from "./implement.types.ts";
+export { serverRoute } from "./routeBuilder.ts";
 export type {
 	ImplicitResponseEnvelope,
 	ImplicitResponseKind,
-	ServerFirstResponseKind,
-	ServerFirstRouteResponseKind,
 } from "./implicitResponse.types.ts";
 export type {
 	ServerBuilderExtension,
-	ServerRouteBuilder,
+	PublicServerRouteBuilder,
 } from "./routeBuilder.types.ts";
 export { assertRequestContentType } from "./requestContentType.ts";
 export type { Context } from "./context.ts";

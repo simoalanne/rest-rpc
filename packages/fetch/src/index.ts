@@ -1,10 +1,8 @@
 import type { Contract, RouteTree } from "@rest-rpc/core/contract";
 import {
-	implement as serverImplement,
-	serverFirstRoute,
-	type Contractimplementer,
+	createAdapterApi,
+	type ContractImplementer,
 	type RouteHandlerFor,
-	type ServerRouteBuilder,
 } from "@rest-rpc/server";
 
 /**
@@ -14,6 +12,8 @@ import {
  * @default {}
  */
 export interface DefaultContext {}
+
+const adapterApi = createAdapterApi<FetchHandlerFields, DefaultContext>();
 
 /**
  * Native request available to Fetch adapter handlers and middleware. Augment this interface globally.
@@ -51,10 +51,7 @@ export type InferServerHandler<TRoute extends RouteTree> = RouteHandlerFor<
  * @see {@link https://rest-rpc.dev/docs/quickstart#define-and-register-routes}
  * @see {@link https://rest-rpc.dev/docs/server/fetch}
  */
-export const route = serverFirstRoute as unknown as ServerRouteBuilder<
-	FetchHandlerFields,
-	DefaultContext
->;
+export const route = adapterApi.route;
 
 /**
  * Creates typed Fetch handler builders for every route in a shared contract.
@@ -63,12 +60,8 @@ export const route = serverFirstRoute as unknown as ServerRouteBuilder<
  */
 export function implement<const TContract extends Contract>(
 	contract: TContract,
-): Contractimplementer<TContract, FetchHandlerFields, DefaultContext> {
-	return serverImplement(contract) as unknown as Contractimplementer<
-		TContract,
-		FetchHandlerFields,
-		DefaultContext
-	>;
+): ContractImplementer<TContract, FetchHandlerFields, DefaultContext> {
+	return adapterApi.implement(contract);
 }
 
 export { type } from "@rest-rpc/core";

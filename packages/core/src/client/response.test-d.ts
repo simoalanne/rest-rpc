@@ -29,9 +29,9 @@ describe("client response inference", () => {
 		expectTypeOf<
 			Extract<Client, { status: 200 }>["body"]
 		>().toEqualTypeOf<number>();
-		expectTypeOf<
-			Extract<Client, { status: 200 }>["responseHeaders"]
-		>().toEqualTypeOf<{ count: number }>();
+		expectTypeOf<Extract<Client, { status: 200 }>["headers"]>().toEqualTypeOf<{
+			count: number;
+		}>();
 		expectTypeOf<
 			Extract<Client, { status: 204 }>["body"]
 		>().toEqualTypeOf<undefined>();
@@ -70,13 +70,13 @@ describe("client response inference", () => {
 			.response(204)
 			.response(404, type<{ message: string }>());
 		expectTypeOf<InferClientSuccess<typeof value>>().toEqualTypeOf<
-			| { status: 200; body: { name: string }; headers: Headers }
-			| { status: 204; body: undefined; headers: Headers }
+			| { status: 200; body: { name: string }; rawHeaders: Headers }
+			| { status: 204; body: undefined; rawHeaders: Headers }
 		>();
 		expectTypeOf<InferClientError<typeof value>>().toEqualTypeOf<{
 			status: 404;
 			body: { message: string };
-			headers: Headers;
+			rawHeaders: Headers;
 		}>();
 		const plain = route.output(type<string>());
 		expectTypeOf<InferClientSuccess<typeof plain>>().toEqualTypeOf<string>();

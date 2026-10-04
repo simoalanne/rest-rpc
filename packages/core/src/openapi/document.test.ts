@@ -3,7 +3,7 @@ import { type } from "../standard-schema/type.ts";
 import { createOpenApiDocument } from "./document.ts";
 
 describe("document", () => {
-	it("preserves document metadata and rejects routes with empty response maps", () => {
+	it("preserves document metadata", () => {
 		const options = {
 			openapi: "3.0.3",
 			info: { title: "Users", version: "1", description: "API" },
@@ -17,15 +17,24 @@ describe("document", () => {
 			...options,
 			paths: {},
 		});
-		const empty = {
+	});
+	it("documents routes without declared responses with a default placeholder", () => {
+		const inferred = {
 			"~restrpc": {
 				...route.get("/").response(204)["~restrpc"],
 				responses: {},
 			},
 		};
-		expect(() => createOpenApiDocument({ get: empty }, options)).toThrow(
-			"must declare at least one response schema",
+		const document = createOpenApiDocument(
+			{ inferred },
+			{ info: { title: "Users", version: "1" } },
 		);
+		expect(document.paths["/"]?.get?.responses).toEqual({
+			default: {
+				description:
+					"Response inferred from the route handler; not documented.",
+			},
+		});
 	});
 	it("normalizes explicit paths and derives paths from nested contract keys", () => {
 		const contract = {

@@ -2,7 +2,7 @@ import { route, type } from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import {
 	validateRequestSegments,
-	validateResponseBody,
+	validateResponseValue,
 	validateResponseHeaders,
 	validateResponseStreamChunks,
 } from "./validation.ts";
@@ -84,12 +84,13 @@ describe("validation", () => {
 
 	it("uses transformed response bodies and stringifies declared headers while omitting undefined", async () => {
 		expect(
-			await validateResponseBody(
+			await validateResponseValue(
 				schema(() => ({ value: 42 })),
 				"42",
+				"body",
 			),
 		).toBe(42);
-		expect(await validateResponseBody(undefined, "raw")).toBe("raw");
+		expect(await validateResponseValue(undefined, "raw", "body")).toBe("raw");
 		expect(
 			await validateResponseHeaders(
 				{
@@ -107,9 +108,10 @@ describe("validation", () => {
 	it("identifies response failures without exposing issues in the response body", async () => {
 		const issues = [{ message: "private detail" }];
 		await expect(
-			validateResponseBody(
+			validateResponseValue(
 				schema(() => ({ issues })),
 				{},
+				"body",
 			),
 		).rejects.toMatchObject({
 			location: "body",

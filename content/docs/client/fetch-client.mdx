@@ -30,7 +30,7 @@ const response = await client.todos.get({ params: { id: todo.id } });
 
 Plain output routes return decoded data directly. Status response routes return
 a `status`-discriminated union with `body` and the Fetch `Headers` object as
-`headers`. Declared response headers are also exposed through `responseHeaders`.
+`rawHeaders`. Declared response headers are exposed as typed `headers`.
 
 ```ts
 if (response.status === 200) {

@@ -3,22 +3,29 @@ import {
 	normalizeImplicitResponse,
 	isCustomProcedureOutput,
 } from "./implicitResponse.ts";
-import { normalizeMediaType } from "@rest-rpc/core/codecs";
+import {
+	contentTypeList,
+	findDeclaredContentType,
+	normalizeMediaType,
+} from "@rest-rpc/core/codecs";
 import {
 	RequestValidationError,
 	ResponseValidationError,
 } from "./validationErrors.ts";
-import type {
-	ResponseDeclaration,
-	RouteDeclaration,
+import {
+	flatInputSegment,
+	usesFlatInput,
+	usesPlainOutput,
+	type ResponseDeclaration,
+	type RouteDeclaration,
 } from "@rest-rpc/core/contract";
-import { getRouteResponses } from "@rest-rpc/core/contract";
 import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
 import type { RuntimeImplementation } from "./match.ts";
 import {
 	type RequestSegments,
+	stringifyHeaders,
 	validateRequestSegments,
-	validateResponseBody,
+	validateResponseValue,
 	validateResponseHeaders,
 	validateResponseStreamChunks,
 } from "./validation.ts";
@@ -68,43 +75,35 @@ const requestHeader = (headers: RequestSegments["headers"], name: string) => {
 	return Array.isArray(value) ? value[0] : value;
 };
 
-const usesPlainOutput = (route: RouteDeclaration) =>
-	route.output === "output" ||
-	(route.output === undefined && route.kind === "procedure");
-
 const getResponseSchema = (
 	route: RouteDeclaration,
 	status: number,
 ): ResponseDeclaration => {
-	const entry = Object.entries(getRouteResponses(route)).find(
-		([declaredStatus]) => Number(declaredStatus) === status,
-	);
-	if (!entry) {
+	const response = route.responses[status];
+	if (!response) {
 		throw new Error(
 			`Route response for "${route.method} ${route.path}" returned undeclared status ${status}.`,
 		);
 	}
 
-	return entry[1];
+	return response;
 };
 
 type DeclaredResponseEnvelope = {
 	status: number;
 	body?: unknown;
 	contentType?: string;
-	responseHeaders?: Record<string, unknown>;
+	headers?: Record<string, unknown>;
 };
 
 const selectResponseContentType = (
 	declared: string | readonly string[],
 	selected: unknown,
 ): string => {
-	const types = typeof declared === "string" ? [declared] : declared;
+	const types = contentTypeList(declared);
 	const contentType =
 		typeof selected === "string"
-			? types.find(
-					(type) => normalizeMediaType(type) === normalizeMediaType(selected),
-				)
+			? findDeclaredContentType(types, selected)
 			: types.length === 1
 				? types[0]
 				: undefined;
@@ -121,14 +120,9 @@ const normalizeResponseResult = async (
 	const bodySchema = schema.body;
 	const headers = disableValidation
 		? schema.headers
-			? Object.fromEntries(
-					Object.entries(result.responseHeaders ?? {}).flatMap(
-						([name, value]) =>
-							value === undefined ? [] : [[name, String(value)]],
-					),
-				)
+			? stringifyHeaders(result.headers)
 			: undefined
-		: await validateResponseHeaders(schema, result.responseHeaders);
+		: await validateResponseHeaders(schema, result.headers);
 
 	if (bodySchema === undefined) {
 		return {
@@ -161,13 +155,32 @@ const normalizeResponseResult = async (
 		body: {
 			value: disableValidation
 				? result.body
-				: await validateResponseBody(bodySchema, result.body),
+				: await validateResponseValue(bodySchema, result.body, "body"),
 			contentType: selectResponseContentType(
 				schema.contentType ?? "application/json",
 				result.contentType,
 			),
 		},
 	};
+};
+
+const plainOutputEnvelope = (
+	route: RouteDeclaration,
+	output: unknown,
+): DeclaredResponseEnvelope => {
+	const response = getResponseSchema(route, 200);
+	if (
+		response.kind === "stream" ||
+		response.contentType === "application/json"
+	) {
+		return { status: 200, body: output };
+	}
+	if (!isCustomProcedureOutput(output)) {
+		throw new Error(
+			"Custom procedure output must return { contentType, data }.",
+		);
+	}
+	return { status: 200, body: output.data, contentType: output.contentType };
 };
 
 const getHandlerRequestFields = (
@@ -179,8 +192,8 @@ const getHandlerRequestFields = (
 		headers?: unknown;
 	},
 ) => {
-	if (route.input !== "input") return segments;
-	return { input: route.method === "GET" ? segments.query : segments.body };
+	if (!usesFlatInput(route)) return segments;
+	return { input: segments[flatInputSegment(route.method)] };
 };
 
 /**
@@ -228,41 +241,11 @@ export async function handleHttpRoute<
 			return normalizeImplicitResponse(handlerResult);
 		}
 
-		if (usesPlainOutput(route)) {
-			const response = getResponseSchema(route, 200);
-			if (
-				response.kind !== "stream" &&
-				response.contentType !== "application/json"
-			) {
-				if (!isCustomProcedureOutput(handlerResult)) {
-					throw new Error(
-						"Custom procedure output must return { contentType, data }.",
-					);
-				}
-				return await normalizeResponseResult(
-					route,
-					{
-						status: 200,
-						body: handlerResult.data,
-						contentType: handlerResult.contentType,
-					},
-					disableResponseValidation,
-				);
-			}
-
-			return await normalizeResponseResult(
-				route,
-				{
-					status: 200,
-					body: handlerResult,
-				},
-				disableResponseValidation,
-			);
-		}
-
 		return await normalizeResponseResult(
 			route,
-			handlerResult as DeclaredResponseEnvelope,
+			usesPlainOutput(route)
+				? plainOutputEnvelope(route, handlerResult)
+				: (handlerResult as DeclaredResponseEnvelope),
 			disableResponseValidation,
 		);
 	} catch (error) {

@@ -42,14 +42,14 @@ const get = route
 	.params(z.object({ id: z.string() }))
 	.query(z.object({ uppercase: z.enum(["yes", "no"]).optional() }))
 	.headers(z.object({ "x-request-id": z.string().optional() }))
-	.handler(({ params, query, headers }) => {
+	.handler(({ params, query }) => {
 		const todo = findTodo(params.id);
 		if (!todo) {
 			return { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
 		}
 		return {
 			status: 200,
-			responseHeaders: { "x-request-id": headers["x-request-id"] },
+			headers: { "x-powered-by": "rest-rpc" },
 			body: {
 				...todo,
 				title:
@@ -86,14 +86,14 @@ const get = route
 	.params(z.object({ id: z.string() }))
 	.query(z.object({ uppercase: z.enum(["yes", "no"]).optional() }))
 	.headers(z.object({ "x-request-id": z.string().optional() }))
-	.handler(({ params, query, headers }) => {
+	.handler(({ params, query }) => {
 		const todo = findTodo(params.id);
 		if (!todo) {
 			return { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
 		}
 		return {
 			status: 200,
-			responseHeaders: { "x-request-id": headers["x-request-id"] },
+			headers: { "x-powered-by": "rest-rpc" },
 			body: {
 				...todo,
 				title:
@@ -151,14 +151,14 @@ const get = route
 	.params(z.object({ id: z.string() }))
 	.query(z.object({ uppercase: z.enum(["yes", "no"]).optional() }))
 	.headers(z.object({ "x-request-id": z.string().optional() }))
-	.handler(({ params, query, headers }) => {
+	.handler(({ params, query }) => {
 		const todo = findTodo(params.id);
 		if (!todo) {
 			return { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
 		}
 		return {
 			status: 200,
-			responseHeaders: { "x-request-id": headers["x-request-id"] },
+			headers: { "x-powered-by": "rest-rpc" },
 			body: {
 				...todo,
 				title:
