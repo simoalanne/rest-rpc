@@ -66,16 +66,28 @@ export type BuilderState = {
 	output: "none" | "output" | "response";
 };
 
-type UseMethod<TState extends BuilderState, TMethod extends BuilderMethod> = {
-	route: TState["route"];
-	method: TState["method"];
-	request: TState["request"];
-	responses: TState["responses"];
-	openApi: TState["openApi"];
-	used: TState["used"] | TMethod;
-	input: TState["input"];
-	output: TState["output"];
+/**
+ * Replaces the fields in `TChanges` and keeps the rest of `TState`. Mapping
+ * over the fixed `BuilderState` keys keeps the result one flat object, so
+ * chained calls don't build up nested intersections.
+ *
+ * `WithRequest` and `WithResponse` list every field by hand instead. They run
+ * once per request segment and per response, and the per-key conditional here
+ * measurably raises per-route checker cost on those paths.
+ */
+type Patch<
+	TState extends BuilderState,
+	TChanges extends Partial<BuilderState>,
+> = {
+	[TKey in keyof BuilderState]: TKey extends keyof TChanges
+		? TChanges[TKey]
+		: TState[TKey];
 };
+
+type UseMethod<
+	TState extends BuilderState,
+	TMethod extends BuilderMethod,
+> = Patch<TState, { used: TState["used"] | TMethod }>;
 
 type WhenUnused<
 	TState extends BuilderState,
@@ -100,6 +112,7 @@ type WhenResponsesAvailable<
 	TView,
 > = TState["output"] extends "output" ? EmptyObject : TView;
 
+/** Appends a request segment schema. Written out by hand, see `Patch`. */
 type WithRequest<
 	TState extends BuilderState,
 	TKey extends keyof RouteRequestDeclaration,
@@ -107,16 +120,7 @@ type WithRequest<
 > = {
 	route: TState["route"];
 	method: TState["method"];
-	request: Omit<TState["request"], TKey> &
-		Record<
-			TKey,
-			TState["request"] extends Record<
-				TKey,
-				infer TCurrent extends readonly unknown[]
-			>
-				? readonly [...TCurrent, TValue]
-				: readonly [TValue]
-		>;
+	request: AppendRequest<TState["request"], TKey, TValue>;
 	responses: TState["responses"];
 	openApi: TState["openApi"];
 	used: TState["used"];
@@ -124,34 +128,46 @@ type WithRequest<
 	output: TState["output"];
 };
 
+type AppendRequest<
+	TRequest,
+	TKey extends keyof RouteRequestDeclaration,
+	TValue,
+> = Omit<TRequest, TKey> &
+	Record<
+		TKey,
+		TRequest extends Record<TKey, infer TCurrent extends readonly unknown[]>
+			? readonly [...TCurrent, TValue]
+			: readonly [TValue]
+	>;
+
 type WithHeaders<
 	TState extends BuilderState,
 	THeaders extends RequestHeadersSchema,
-> = Omit<WithRequest<TState, "headers", THeaders>, "input"> & {
-	input: TState["input"] extends "input"
-		? "input"
-		: TState["input"] extends "segments"
-			? "segments"
+> = Patch<
+	TState,
+	{
+		request: AppendRequest<TState["request"], "headers", THeaders>;
+		input: TState["input"] extends "input" | "segments"
+			? TState["input"]
 			: "headers";
-};
+	}
+>;
 
-type WithContentType<TState extends BuilderState, TContentType> = {
-	route: TState["route"];
-	method: TState["method"];
-	request: Omit<TState["request"], "contentType"> & {
-		contentType: TContentType;
-	};
-	responses: TState["responses"];
-	openApi: TState["openApi"];
-	used: TState["used"];
-	input: TState["input"];
-	output: TState["output"];
-};
+type WithContentType<TState extends BuilderState, TContentType> = Patch<
+	TState,
+	{
+		request: Omit<TState["request"], "contentType"> & {
+			contentType: TContentType;
+		};
+	}
+>;
 
+/** Adds a declared response. Written out by hand, see `Patch`. */
 type WithResponse<
 	TState extends BuilderState,
 	TStatus extends PropertyKey,
 	TResponse,
+	TOutput extends BuilderState["output"] = "response",
 > = {
 	route: TState["route"];
 	method: TState["method"];
@@ -160,38 +176,38 @@ type WithResponse<
 	openApi: TState["openApi"];
 	used: TState["used"];
 	input: TState["input"];
-	output: "response";
+	output: TOutput;
 };
 
-type WithPlainOutput<TState extends BuilderState, TResponse> = Omit<
-	WithResponse<TState, 200, TResponse>,
+type WithPlainOutput<TState extends BuilderState, TResponse> = WithResponse<
+	UseMethod<TState, "output">,
+	200,
+	TResponse,
 	"output"
-> & { output: "output" };
+>;
 
 type WithFlatInput<
 	TState extends BuilderState,
 	TSchema extends StandardSchemaV1,
 	TOptions extends BodyOptions | undefined,
 > = WithContentType<
-	Omit<WithRequest<TState, "input", TSchema>, "used" | "input"> & {
-		used: TState["used"] | "input";
-		input: "input";
-	},
+	Patch<
+		TState,
+		{
+			request: AppendRequest<TState["request"], "input", TSchema>;
+			used: TState["used"] | "input";
+			input: "input";
+		}
+	>,
 	TState["request"] extends { contentType: infer TContentType }
 		? TContentType
 		: ContentTypeFor<TOptions>
 >;
 
-type WithHttpRoute<TState extends BuilderState, TMethod extends HttpMethod> = {
-	route: { readonly method: TMethod };
-	method: "selected";
-	request: TState["request"];
-	responses: TState["responses"];
-	openApi: TState["openApi"];
-	used: TState["used"];
-	input: TState["input"];
-	output: TState["output"];
-};
+type WithHttpRoute<
+	TState extends BuilderState,
+	TMethod extends HttpMethod,
+> = Patch<TState, { route: { readonly method: TMethod }; method: "selected" }>;
 
 type MergeMetadata<
 	TMetadata extends RouteMetadata | never,
@@ -202,16 +218,10 @@ type MergeMetadata<
 		? { [TKey in keyof TMerged]: TMerged[TKey] }
 		: never;
 
-type WithOpenApi<TState extends BuilderState> = {
-	route: TState["route"];
-	method: TState["method"];
-	request: TState["request"];
-	responses: TState["responses"];
-	openApi: OpenApiRouteOptions;
-	used: TState["used"] | "openAPI";
-	input: TState["input"];
-	output: TState["output"];
-};
+type WithOpenApi<TState extends BuilderState> = Patch<
+	TState,
+	{ openApi: OpenApiRouteOptions; used: TState["used"] | "openAPI" }
+>;
 
 type MetadataDeclaration<TMetadata extends RouteMetadata | never> = [
 	TMetadata,
@@ -487,10 +497,7 @@ type FlatMethods<
 				schema: TSchema,
 				options?: TOptions,
 			): RouteBuilderView<
-				WithPlainOutput<
-					UseMethod<TState, "output">,
-					ResponseFor<TSchema, TOptions>
-				>,
+				WithPlainOutput<TState, ResponseFor<TSchema, TOptions>>,
 				TExtension,
 				TPath,
 				TMetadata
@@ -505,10 +512,7 @@ type FlatMethods<
 				schema: TSchema,
 				options?: StreamOutputOptions,
 			): RouteBuilderView<
-				WithPlainOutput<
-					UseMethod<TState, "output">,
-					{ kind: "stream"; body: TSchema }
-				>,
+				WithPlainOutput<TState, { kind: "stream"; body: TSchema }>,
 				TExtension,
 				TPath,
 				TMetadata

@@ -101,6 +101,8 @@ The `kind` fallback for `input` only applies to routes without input, where "fla
 
 ### 3.2 Builder state transitions in `core/src/contract/routeBuilder.types.ts`
 
+**Status: done.** `Patch<TState, TChanges>` is a mapped type over the fixed `BuilderState` keys, so it returns one flat object without `Omit` or intersections. `UseMethod`, `WithHeaders`, `WithContentType`, `WithFlatInput`, `WithHttpRoute` and `WithOpenApi` are built on it, and `WithPlainOutput` reuses `WithResponse`. `WithRequest` and `WithResponse` still list every field: they run once per request segment and per response, and `Patch` there raised per-route instantiations by about 8% on `contract-http`. Measured alternatives (`Omit` + intersection, a key-filtered mapped type + intersection, `infer`-based lookup) were all slower than the per-key conditional. Benchmark: per-route instantiations 1–2% lower on HTTP fixtures and 8–10% lower on procedure fixtures.
+
 Transition types such as `UseMethod`, `WithHttpRoute` and `WithOpenApi` list every `BuilderState` field by hand, so adding a state field means editing each of them. A `Patch<TState, TChanges> = Omit<TState, keyof TChanges> & TChanges` helper, or an explicit mapped equivalent, could remove the repetition.
 
 The `WithX` types deliberately collapse builder state into one object, so TypeScript doesn't recompute the same information at every chained call. A naive version with one generic per option would cause that recomputation. `Omit` + intersection can bring back some of that cost and produce deeper instantiations, so only adopt `Patch` if the benchmark shows no regression.
