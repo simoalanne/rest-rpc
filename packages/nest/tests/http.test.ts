@@ -1,4 +1,3 @@
-import "reflect-metadata";
 import { Controller, Module, Query, SetMetadata } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { route as contractRoute, type } from "@rest-rpc/core";

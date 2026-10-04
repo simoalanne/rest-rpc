@@ -14,7 +14,6 @@ import {
 	isRouteLeaf,
 	toColonPath,
 } from "@rest-rpc/core/contract";
-import "reflect-metadata";
 
 export const REST_RPC_ROUTE_METADATA = Symbol.for("rest-rpc:nest-route");
 
