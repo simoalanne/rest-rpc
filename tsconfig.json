@@ -12,5 +12,5 @@
 		"verbatimModuleSyntax": true,
 		"rewriteRelativeImportExtensions": true
 	},
-	"exclude": ["content/**"]
+	"exclude": ["content/**", "benchmarks/**"]
 }
