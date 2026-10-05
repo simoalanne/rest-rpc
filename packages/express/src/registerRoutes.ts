@@ -105,7 +105,7 @@ export function registerRoutes(
 
 			let result;
 			try {
-				const signal = createRequestSignal(req, res);
+				const signal = createRequestSignal(res);
 				const codec = resolveBodyCodec(
 					normalizeMediaType(req.headers["content-type"]),
 					bodyCodecs,

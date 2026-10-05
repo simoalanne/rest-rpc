@@ -102,7 +102,7 @@ export function registerRoutes(
 						.send({ message: rejection.message });
 				}
 
-				const signal = createRequestSignal(req.raw, reply.raw);
+				const signal = createRequestSignal(reply.raw);
 				const codec = resolveBodyCodec(
 					normalizeMediaType(req.headers["content-type"]),
 					bodyCodecs,

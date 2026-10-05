@@ -96,7 +96,7 @@ export function createRouteHandler(
 			return { matched: true };
 		}
 
-		const signal = createRequestSignal(request, response);
+		const signal = createRequestSignal(response);
 		const { body, rejection: bodyRejection } = await deserializeRequestBody(
 			request,
 			{
