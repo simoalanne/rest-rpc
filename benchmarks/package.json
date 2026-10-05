@@ -3,13 +3,10 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"bench:typecheck": "node scripts/generateTypeFixtures.ts && node scripts/runTypecheck.ts"
+		"bench:typecheck": "node scripts/gen.ts && tsc --noEmit --incremental false --extendedDiagnostics"
 	},
 	"dependencies": {
 		"@rest-rpc/core": "workspace:*",
-		"@rest-rpc/fetch": "workspace:*"
-	},
-	"devDependencies": {
-		"typescript": "5.9.3"
+		"@rest-rpc/node": "workspace:*"
 	}
 }

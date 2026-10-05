@@ -41,13 +41,9 @@ importers:
       '@rest-rpc/core':
         specifier: workspace:*
         version: link:../packages/core
-      '@rest-rpc/fetch':
+      '@rest-rpc/node':
         specifier: workspace:*
-        version: link:../packages/fetch
-    devDependencies:
-      typescript:
-        specifier: 5.9.3
-        version: 5.9.3
+        version: link:../packages/node
 
   content:
     dependencies:
