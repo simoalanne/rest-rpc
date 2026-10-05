@@ -97,7 +97,7 @@ export class RestRpcRouteInterceptor implements NestInterceptor {
 			return { message: rejection.message };
 		}
 
-		const signal = createRequestSignal(rawRequest, rawResponse);
+		const signal = createRequestSignal(rawResponse);
 		const mediaType = normalizeMediaType(rawRequest.headers["content-type"]);
 		const codec = resolveBodyCodec(mediaType, this.options?.bodyCodecs ?? []);
 		// Without a matching codec the body comes from the framework's parser, which
