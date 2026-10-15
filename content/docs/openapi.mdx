@@ -7,10 +7,10 @@ description: Generate an OpenAPI document from HTTP route declarations.
 separately shared contract. HTTP methods, paths, schemas, and operation
 metadata come from the same route builder used by the server and client.
 
-Declare output schemas with `.output()`, `.response()`, `.streamOutput()`, or
-`.streamResponse()` to include responses in OpenAPI. Outputs inferred from
-handlers have no schema, so their routes get a placeholder `default` response
-that does not claim a status or body.
+Declare response schemas with `.response()` or `.streamResponse()` to include
+responses in OpenAPI. Responses inferred from handlers have no schema, so their
+routes get a placeholder `default` response that does not claim a status or
+body.
 
 ```ts
 import { route, createOpenApiDocument } from "@rest-rpc/express";
@@ -18,7 +18,7 @@ import { z } from "zod";
 
 const list = route
 	.get("/todos")
-	.output(z.array(z.object({ id: z.string(), title: z.string() })))
+	.response(z.array(z.object({ id: z.string(), title: z.string() })))
 	.openAPI({ summary: "List todos" })
 	.handler(() => [{ id: "todo_1", title: "Write docs" }]);
 
@@ -98,7 +98,7 @@ const search = route
 				.meta({ openApi: { required: false } }),
 		}),
 	)
-	.response(200, z.array(todoSchema));
+	.response(z.array(todoSchema));
 
 const routes = { search };
 
@@ -138,22 +138,22 @@ const create = route
 		summary: "Create a todo",
 		operationId: "createTodo",
 	})
-	.response(201, todoSchema);
+	.response(todoSchema, { status: 201 });
 ```
 
 ## Response Descriptions
 
 Each declared response produces a status-keyed OpenAPI response. Describe it
-with the `description` option of `.response()`, `.output()`,
-`.streamResponse()`, or `.streamOutput()`. Pass `undefined` as the schema to
-describe a bodyless response:
+with the `description` option of `.response()` or `.streamResponse()`. Pass
+only options to describe a bodyless response:
 
 ```ts
 const remove = route
 	.delete("/todos/:id")
 	.params(z.object({ id: z.string() }))
-	.response(204, undefined, { description: "Todo deleted." })
-	.response(404, z.object({ code: z.literal("TODO_NOT_FOUND") }), {
+	.response({ status: 204, description: "Todo deleted." })
+	.response(z.object({ code: z.literal("TODO_NOT_FOUND") }), {
+		status: 404,
 		description: "No todo has this id.",
 	});
 ```

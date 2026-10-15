@@ -14,8 +14,7 @@ import type {
 	RouteMetadata,
 	RouteTree,
 	ServerResponse,
-	ServerProcedureResponse,
-	UsesPlainOutput,
+	ServerResponseBody,
 } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import type { SseServerEvent } from "./sse.ts";
@@ -34,23 +33,31 @@ export type RuntimeRouteHandler = (
 	request: unknown,
 ) => unknown | Promise<unknown>;
 
-type WithSseServerEvents<T> =
+type WithSseItems<T> =
 	T extends AsyncIterable<infer TItem>
 		? AsyncIterable<TItem | SseServerEvent<TItem>>
-		: T extends { body: infer TBody }
-			? TBody extends AsyncIterable<infer TItem>
-				? Omit<T, "body"> & {
-						body: AsyncIterable<TItem | SseServerEvent<TItem>>;
-					}
-				: T
-			: T;
+		: T;
+
+type WithSseServerEvents<T> = T extends {
+	body: AsyncIterable<unknown>;
+}
+	? Omit<T, "body"> & { body: WithSseItems<T["body"]> }
+	: T;
+
+// Handlers may return the body of a declared 200 response directly, unless its
+// content type must be selected from a list.
+type PlainResponseBody<TRoute extends RouteDeclaration> = TRoute extends {
+	responses: { 200: infer TResponse };
+}
+	? TResponse extends { contentType: readonly string[] }
+		? never
+		: TResponse extends { body: StandardSchemaV1 }
+			? WithSseItems<ServerResponseBody<TResponse>>
+			: never
+	: never;
 
 type HandlerResult<TRoute extends RouteDeclaration> = MaybePromise<
-	UsesPlainOutput<TRoute> extends true
-		? TRoute extends { responses: { 200: infer TResponse } }
-			? ProcedureHandlerResult<TResponse>
-			: never
-		: WithSseServerEvents<ServerResponse<TRoute>>
+	WithSseServerEvents<ServerResponse<TRoute>> | PlainResponseBody<TRoute>
 >;
 
 /**
@@ -135,72 +142,6 @@ type HandlerImplementation<
 	HandlerFor<TRoute, TAdditionalHandlerFields, TContext, TResult>
 >;
 
-type ProcedureHandlerResult<TResponse> = WithSseServerEvents<
-	ServerProcedureResponse<TResponse>
->;
-
-type ProcedureHandlerMethod<
-	TRoute extends RouteDeclaration,
-	TAdditionalHandlerFields extends object,
-	TContext extends object,
-> =
-	HasDeclaredResponses<TRoute> extends true
-		? TRoute extends {
-				responses: {
-					200: infer TResponse extends {
-						body: StandardSchemaV1;
-					};
-				};
-			}
-			? {
-					handler<
-						const TResult extends MaybePromise<
-							ProcedureHandlerResult<TResponse>
-						>,
-					>(
-						handler: HandlerFor<
-							TRoute,
-							TAdditionalHandlerFields,
-							TContext,
-							TResult
-						>,
-					): HandlerImplementation<
-						TRoute,
-						TAdditionalHandlerFields,
-						TContext,
-						TResult
-					>;
-				}
-			: never
-		: ImplicitHandlerMethod<TRoute, TAdditionalHandlerFields, TContext>;
-
-type HttpHandlerMethod<
-	TRoute extends RouteDeclaration,
-	TAdditionalHandlerFields extends object,
-	TContext extends object,
-> =
-	HasDeclaredResponses<TRoute> extends true
-		? {
-				handler<
-					const TResult extends ReturnType<
-						RouteHandler<TRoute, TAdditionalHandlerFields, TContext>
-					>,
-				>(
-					handler: HandlerFor<
-						TRoute,
-						TAdditionalHandlerFields,
-						TContext,
-						TResult
-					>,
-				): HandlerImplementation<
-					TRoute,
-					TAdditionalHandlerFields,
-					TContext,
-					TResult
-				>;
-			}
-		: ImplicitHandlerMethod<TRoute, TAdditionalHandlerFields, TContext>;
-
 type ImplicitHandlerMethod<
 	TRoute extends RouteDeclaration,
 	TAdditionalHandlerFields extends object,
@@ -224,9 +165,27 @@ export type HandlerMethodFor<
 	TAdditionalHandlerFields extends object = EmptyObject,
 	TContext extends object = EmptyObject,
 > =
-	UsesPlainOutput<TRoute> extends true
-		? ProcedureHandlerMethod<TRoute, TAdditionalHandlerFields, TContext>
-		: HttpHandlerMethod<TRoute, TAdditionalHandlerFields, TContext>;
+	HasDeclaredResponses<TRoute> extends true
+		? {
+				handler<
+					const TResult extends ReturnType<
+						RouteHandler<TRoute, TAdditionalHandlerFields, TContext>
+					>,
+				>(
+					handler: HandlerFor<
+						TRoute,
+						TAdditionalHandlerFields,
+						TContext,
+						TResult
+					>,
+				): HandlerImplementation<
+					TRoute,
+					TAdditionalHandlerFields,
+					TContext,
+					TResult
+				>;
+			}
+		: ImplicitHandlerMethod<TRoute, TAdditionalHandlerFields, TContext>;
 
 type MiddlewareUseMethod<
 	TState extends BuilderState,

@@ -9,7 +9,7 @@ import type { Merge } from "@rest-rpc/core/utils";
  * `contentType` selects a custom-content response for non-stream bodies;
  * otherwise bodies use JSON.
  *
- * @see {@link https://rest-rpc.dev/docs/route-builder#choose-plain-outputs-or-status-responses}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#return-responses}
  */
 export type ImplicitResponseEnvelope =
 	| {
@@ -35,7 +35,7 @@ type BodyResponseKind<TResponse, TBody> =
 /**
  * Infers the body encoding selected by a handler response shape.
  *
- * @see {@link https://rest-rpc.dev/docs/route-builder#choose-plain-outputs-or-status-responses}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#return-responses}
  */
 export type ImplicitResponseKind<TResponse> = TResponse extends unknown
 	? "body" extends keyof TResponse
@@ -121,49 +121,44 @@ type InferredResponses<TResponse> = {
 	>;
 };
 
-type InferredHttpRoute<TRoute, TResult> = Omit<TRoute, "responses"> & {
-	responses: InferredResponses<Awaited<TResult>>;
-};
+type EnvelopeKey = "status" | "body" | "contentType" | "headers";
 
-type InferredProcedureResponse<TResult> =
-	Awaited<TResult> extends infer TOutput
-		? TOutput extends AsyncIterable<infer TItem>
-			? {
-					kind: "stream";
-					body: InferredSchema<TItem, SseData<TItem>>;
-				}
-			: TOutput extends {
-						contentType: infer TContentType extends string;
-						data: infer TData;
-				  }
-				? { body: InferredSchema<TData>; contentType: TContentType }
-				: { body: InferredSchema<TOutput>; contentType: "application/json" }
-		: never;
-
-type InferredProcedureRoute<TRoute, TResult> = Omit<TRoute, "responses"> & {
-	responses: { 200: InferredProcedureResponse<TResult> };
-};
-
-type ReturnKind<T> = T extends unknown
-	? "status" extends keyof T
-		? "response"
-		: "output"
-	: never;
-
-export type ValidImplicitResult<TResult> = [
-	ReturnKind<Awaited<TResult>>,
+// TypeScript adds optional `undefined` envelope keys to plain object members
+// returned next to envelopes; they are not part of the body.
+type WithoutNormalizedEnvelopeKeys<T> = [
+	Extract<keyof T, EnvelopeKey>,
 ] extends [never]
+	? T
+	: {
+			[
+				TKey in keyof T as TKey extends EnvelopeKey
+					? [T[TKey]] extends [undefined]
+						? {} extends Pick<T, TKey>
+							? never
+							: TKey
+						: TKey
+					: TKey
+			]: T[TKey];
+		};
+
+// A member with a numeric status is an envelope; any other value is the 200 body.
+type ResponseEnvelopeOf<TResult> = TResult extends { status: number }
+	? TResult
+	: { status: 200; body: WithoutNormalizedEnvelopeKeys<TResult> };
+
+export type ValidImplicitResult<TResult> = [Awaited<TResult>] extends [never]
 	? never
-	: [ReturnKind<Awaited<TResult>>] extends ["response"]
-		? Awaited<TResult> extends ImplicitResponseEnvelope
-			? unknown
-			: never
-		: [ReturnKind<Awaited<TResult>>] extends ["output"]
+	: [Extract<Awaited<TResult>, { status: number }>] extends [never]
+		? unknown
+		: Extract<
+					Awaited<TResult>,
+					{ status: number }
+			  > extends ImplicitResponseEnvelope
 			? unknown
 			: never;
 
-export type InferredRoute<TRoute, TResult> = [
-	ReturnKind<Awaited<TResult>>,
-] extends ["response"]
-	? Merge<InferredHttpRoute<TRoute, TResult> & { output: "response" }>
-	: Merge<InferredProcedureRoute<TRoute, TResult> & { output: "output" }>;
+export type InferredRoute<TRoute, TResult> = Merge<
+	Omit<TRoute, "responses"> & {
+		responses: InferredResponses<ResponseEnvelopeOf<Awaited<TResult>>>;
+	}
+>;

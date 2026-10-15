@@ -8,9 +8,9 @@ independently of its implementation. Declare it with the core route builder,
 implement it with a server adapter, and pass the same contract to the client.
 
 This guide builds the same two routes as the [Quickstart](/docs/quickstart),
-using Express and Zod. The methods, paths, inputs, statuses, and client results
-are equivalent, but the output types are declared explicitly rather than inferred
-from handlers.
+using Express and Zod. The methods, paths, requests, statuses, and client
+results are equivalent, but the response types are declared explicitly rather
+than inferred from handlers.
 
 ## Install
 
@@ -33,22 +33,21 @@ const todoSchema = z.object({
 });
 
 const create = route
-	.input(z.object({ title: z.string().min(1) }))
-	.output(todoSchema);
+	.body(z.object({ title: z.string().min(1) }))
+	.response(todoSchema);
 
 const get = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
 	.query(z.object({ uppercase: z.enum(["yes", "no"]).optional() }))
-	.response(200, todoSchema)
-	.response(404, z.object({ code: z.literal("TODO_NOT_FOUND") }));
+	.response(todoSchema)
+	.response(z.object({ code: z.literal("TODO_NOT_FOUND") }), { status: 404 });
 
 export const api = { todos: { create, get } };
 ```
 
-`todos.create` uses the default `POST /todos/create` and returns a plain value.
-`todos.get` declares its HTTP method and path and returns a status envelope.
-The schemas also provide runtime validation of handler outputs.
+`todos.create` uses the default `POST /todos/create`. `todos.get` declares its
+HTTP method, path, and 200 and 404 responses. The schemas also provide runtime validation of handler results.
 
 ## Implement and Register Routes
 
@@ -60,7 +59,7 @@ import { api } from "./contract";
 type Todo = { id: string; title: string; completed: boolean };
 const todos = new Map<string, Todo>();
 
-const create = implement(api.todos.create).handler(({ input: { title } }) => {
+const create = implement(api.todos.create).handler(({ body: { title } }) => {
 	const todo: Todo = {
 		id: crypto.randomUUID(),
 		title,
@@ -76,11 +75,8 @@ const get = implement(api.todos.get).handler(({ params, query }) => {
 		return { status: 404, body: { code: "TODO_NOT_FOUND" } };
 	}
 	return {
-		status: 200,
-		body: {
-			...todo,
-			title: query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title,
-		},
+		...todo,
+		title: query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title,
 	};
 });
 
@@ -92,12 +88,12 @@ registerRoutes(app, routes);
 app.listen(3000);
 ```
 
-`implement()` keeps each handler's input and result tied to its declaration.
+`implement()` keeps each handler's request and result tied to its declaration.
 The contract itself contains no framework or handler code.
 
 ## Call the Routes
 
-Import the shared contract directly. No contract generation step is needed.
+Import the shared contract directly. No contract extraction step is needed.
 
 ```ts client.ts
 import { initClient } from "@rest-rpc/core";
@@ -105,9 +101,9 @@ import { api } from "./contract";
 
 const client = initClient(api, { baseUrl: "http://localhost:3000" });
 
-const todo = await client.todos.create({ title: "Write docs" });
+const created = await client.todos.create({ body: { title: "Write docs" } });
 const response = await client.todos.get({
-	params: { id: todo.id },
+	params: { id: created.body.id },
 	query: { uppercase: "yes" },
 });
 

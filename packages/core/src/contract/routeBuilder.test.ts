@@ -5,9 +5,9 @@ const schema = type<{ name: string }>();
 
 describe("routeBuilder", () => {
 	it("reuses partial routes without sharing later declarations", () => {
-		const base = route.input(schema);
-		const first = base.output(schema);
-		const second = base.response(201, schema);
+		const base = route.body(schema);
+		const first = base.response(schema);
+		const second = base.response(schema, { status: 201 });
 		expect(base["~restrpc"].responses).toEqual({});
 		expect(first["~restrpc"].responses).toEqual({
 			200: { body: schema, contentType: "application/json" },
@@ -15,18 +15,6 @@ describe("routeBuilder", () => {
 		expect(second["~restrpc"].responses).toEqual({
 			201: { body: schema, contentType: "application/json" },
 		});
-	});
-
-	it("stores flat input independently of declaration order", () => {
-		const headers = type<{ authorization: string }>();
-		const before = route.headers(headers).input(schema).get("/users");
-		const after = route.headers(headers).get("/users").input(schema);
-		expect(before["~restrpc"].request).toEqual({
-			headers: [headers],
-			input: [schema],
-			contentType: "application/json",
-		});
-		expect(after["~restrpc"].request).toEqual(before["~restrpc"].request);
 	});
 
 	it("rejects GET bodies regardless of declaration order", () => {
@@ -38,24 +26,12 @@ describe("routeBuilder", () => {
 		);
 	});
 
-	it.each(["/users/:id", "/users/{id}"] as const)(
-		"rejects flat input with path parameters in %s",
-		(path) => {
-			expect(() => new RouteBuilder().get(path).input(schema)).toThrow(
-				"Flat input requires a static route path.",
-			);
-			expect(() => new RouteBuilder().input(schema).get(path)).toThrow(
-				"Flat input requires a static route path.",
-			);
-		},
-	);
-
 	it("stores response descriptions and stream response headers", () => {
 		const headers = type<{ "x-cursor": string }>();
 		expect(
 			new RouteBuilder()
-				.response(204, undefined, { description: "Deleted" })
-				.streamResponse(200, schema, { headers, description: "Events" })[
+				.response({ status: 204, description: "Deleted" })
+				.streamResponse(schema, { headers, description: "Events" })[
 				"~restrpc"
 			].responses,
 		).toEqual({
@@ -63,8 +39,9 @@ describe("routeBuilder", () => {
 			200: { kind: "stream", body: schema, headers, description: "Events" },
 		});
 		expect(
-			new RouteBuilder().output(schema, { description: "Name" })["~restrpc"]
-				.responses,
+			new RouteBuilder().response(schema, { description: "Name" })[
+				"~restrpc"
+			].responses,
 		).toEqual({
 			200: {
 				body: schema,
@@ -72,21 +49,16 @@ describe("routeBuilder", () => {
 				description: "Name",
 			},
 		});
-		expect(
-			new RouteBuilder().streamOutput(schema, { description: "Names" })[
-				"~restrpc"
-			].responses,
-		).toEqual({ 200: { kind: "stream", body: schema, description: "Names" } });
 	});
 
 	it("rejects duplicate response statuses across stream and body responses", () => {
 		expect(() =>
-			new RouteBuilder().response(200, schema).streamResponse(200, schema),
+			new RouteBuilder().response(schema).streamResponse(schema),
 		).toThrow('Response status "200" has already been declared.');
 	});
 
 	it.each([99, 600, 200.5, NaN])("rejects invalid HTTP status %s", (status) => {
-		expect(() => new RouteBuilder().response(status)).toThrow(
+		expect(() => new RouteBuilder().response({ status })).toThrow(
 			"Invalid HTTP response status",
 		);
 	});

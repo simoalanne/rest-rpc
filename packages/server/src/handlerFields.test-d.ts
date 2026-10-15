@@ -13,7 +13,7 @@ declare const route: PublicServerRouteBuilder<Fields, Values>;
 const declaration = contractRoute
 	.get("/users/{id}")
 	.params(type((value: { id: string }) => ({ id: Number(value.id) })))
-	.response(200, type<string>());
+	.response(type<string>());
 const contract = { users: { get: declaration } };
 declare const implementation: ContractImplementer<
 	typeof contract,
@@ -89,11 +89,13 @@ describe("server handler generic propagation", () => {
 		>();
 	});
 
-	it("returns plain values from handlers of plain output routes", () => {
-		const output = contractRoute.get("/").output(type<string>());
-		type Handler = RouteHandlerFor<typeof output, Fields, Values>;
+	it("returns envelopes or the 200 body from handlers of declared routes", () => {
+		const declared = contractRoute.get("/").response(type<string>());
+		type Handler = RouteHandlerFor<typeof declared, Fields, Values>;
 		expectTypeOf<ReturnType<Handler>>().toEqualTypeOf<
-			string | Promise<string>
+			| { status: 200; body: string }
+			| string
+			| Promise<{ status: 200; body: string } | string>
 		>();
 	});
 });

@@ -9,22 +9,25 @@ import type {
 	RouteMetadata,
 	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
-import { getPathParamNames } from "./path.ts";
 import type {
 	RequestHeadersSchema,
 	RequestParamsSchema,
 	RequestQuerySchema,
 } from "./request.ts";
 import type {
-	OutputOptions,
+	BodylessResponseOptions,
 	ResponseDeclaration,
 	ResponseOptions,
-	StreamOutputOptions,
 	StreamResponseOptions,
 } from "./response.ts";
 import type { PublicRouteBuilder } from "./routeBuilder.types.ts";
 
 type RouteBuilderState = Partial<RouteDeclaration>;
+
+const isStandardSchema = (value: unknown): value is StandardSchemaV1 =>
+	(typeof value === "object" || typeof value === "function") &&
+	value !== null &&
+	"~standard" in value;
 
 const appendSchema = <TSchema extends StandardSchemaV1>(
 	schemas: readonly TSchema[] | undefined,
@@ -59,7 +62,7 @@ const mergeOpenApi = (
 	};
 };
 
-const procedureState = (state: RouteBuilderState): RouteBuilderState => ({
+const defaultRouteState = (state: RouteBuilderState): RouteBuilderState => ({
 	method: "POST",
 	path: undefined,
 	responses: {},
@@ -71,9 +74,6 @@ const httpState = (
 	method: HttpMethod,
 	path: AbsolutePath | undefined,
 ): RouteBuilderState => {
-	if (state.request?.input && getPathParamNames(path ?? "").length > 0) {
-		throw new Error("Flat input requires a static route path.");
-	}
 	if (method === "GET" && state.request?.body) {
 		throw new Error("GET routes cannot declare a request body.");
 	}
@@ -152,7 +152,7 @@ export class RouteBuilder {
 	}
 
 	body(schema: StandardSchemaV1, options?: BodyOptions): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
+		const state = defaultRouteState(this["~restrpc"]);
 		if (state.method === "GET") {
 			throw new Error("GET routes cannot declare a request body.");
 		}
@@ -163,23 +163,8 @@ export class RouteBuilder {
 		);
 	}
 
-	input(schema: StandardSchemaV1, options?: BodyOptions): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
-		if (getPathParamNames(state.path ?? "").length > 0) {
-			throw new Error("Flat input requires a static route path.");
-		}
-		return this.clone({
-			...state,
-			request: {
-				...state.request,
-				input: appendSchema(state.request?.input, schema),
-				contentType: requestContentType(state, options),
-			},
-		});
-	}
-
 	headers(schema: RequestHeadersSchema): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
+		const state = defaultRouteState(this["~restrpc"]);
 		return this.clone({
 			...state,
 			request: {
@@ -191,18 +176,18 @@ export class RouteBuilder {
 
 	query(schema: RequestQuerySchema): RouteBuilder {
 		return this.clone(
-			addRequestSegment(procedureState(this["~restrpc"]), "query", schema),
+			addRequestSegment(defaultRouteState(this["~restrpc"]), "query", schema),
 		);
 	}
 
 	params(schema: RequestParamsSchema): RouteBuilder {
 		return this.clone(
-			addRequestSegment(procedureState(this["~restrpc"]), "params", schema),
+			addRequestSegment(defaultRouteState(this["~restrpc"]), "params", schema),
 		);
 	}
 
 	metadata(metadata: RouteMetadata): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
+		const state = defaultRouteState(this["~restrpc"]);
 		return this.clone({
 			...state,
 			metadata: { ...state.metadata, ...metadata },
@@ -210,7 +195,7 @@ export class RouteBuilder {
 	}
 
 	openAPI(openApi: OpenApiRouteOptions): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
+		const state = defaultRouteState(this["~restrpc"]);
 		return this.clone({
 			...state,
 			openApi: mergeOpenApi(state.openApi, openApi),
@@ -218,63 +203,37 @@ export class RouteBuilder {
 	}
 
 	response(
-		status: number,
-		schema?: StandardSchemaV1,
+		schemaOrOptions?: StandardSchemaV1 | BodylessResponseOptions,
 		options?: ResponseOptions,
 	): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
+		const state = defaultRouteState(this["~restrpc"]);
+		if (!isStandardSchema(schemaOrOptions)) {
+			const { status = 200, headers } = schemaOrOptions ?? {};
+			return this.clone(
+				addResponse(state, status, {
+					body: undefined,
+					...(headers ? { headers } : {}),
+					...withDescription(schemaOrOptions),
+				}),
+			);
+		}
+		const { status = 200, ...declaration } = options ?? {};
 		return this.clone(
-			addResponse(
-				{ ...state, output: "response" },
-				status,
-				schema
-					? {
-							...options,
-							body: schema,
-							contentType: options?.contentType ?? "application/json",
-						}
-					: {
-							body: undefined,
-							...(options?.headers ? { headers: options.headers } : {}),
-							...withDescription(options),
-						},
-			),
-		);
-	}
-
-	output(schema: StandardSchemaV1, options?: OutputOptions): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
-		return this.clone(
-			addResponse({ ...state, output: "output" }, 200, {
-				body: schema,
-				contentType: options?.contentType ?? "application/json",
-				...withDescription(options),
-			}),
-		);
-	}
-
-	streamOutput(
-		schema: StandardSchemaV1,
-		options?: StreamOutputOptions,
-	): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
-		return this.clone(
-			addResponse({ ...state, output: "output" }, 200, {
-				kind: "stream",
-				body: schema,
-				...withDescription(options),
+			addResponse(state, status, {
+				...declaration,
+				body: schemaOrOptions,
+				contentType: declaration.contentType ?? "application/json",
 			}),
 		);
 	}
 
 	streamResponse(
-		status: number,
 		schema: StandardSchemaV1,
 		options?: StreamResponseOptions,
 	): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
+		const state = defaultRouteState(this["~restrpc"]);
 		return this.clone(
-			addResponse({ ...state, output: "response" }, status, {
+			addResponse(state, options?.status ?? 200, {
 				kind: "stream",
 				body: schema,
 				...(options?.headers ? { headers: options.headers } : {}),
@@ -285,7 +244,7 @@ export class RouteBuilder {
 }
 
 /**
- * Entry point for declaring contract-first routes with independent input and output forms.
+ * Entry point for declaring contract-first routes.
  *
  * @remarks Every builder method returns a new route value, so partially built
  * routes can be reused safely across declarations.

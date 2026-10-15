@@ -54,7 +54,7 @@ it("emits normalized route declarations while preserving schema, context, and ou
 	visit(statement!);
 	expect(intersections).toEqual([]);
 	expect(statement!.getText(source)).not.toContain("Omit<");
-	expect(declaration).toContain("input: readonly [InputSchema];");
+	expect(declaration).toContain("query: readonly [InputSchema];");
 	expect(declaration).toContain(
 		"body: readonly [InputSchema, StandardSchemaV1<",
 	);

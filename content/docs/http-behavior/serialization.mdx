@@ -20,8 +20,7 @@ schemas, which perform any required coercion.
 | Headers     | Object of scalars or optional values                 | String values under lowercase header names                 |
 
 Undefined query and header values are omitted. Missing required path params
-fail on the client. Nested query objects are unsupported. A flat GET `.input()`
-uses the same query encoding as `.query()`.
+fail on the client. Nested query objects are unsupported.
 
 The server reconstructs `tag[]=one&tag[]=two` as `{ tag: ["one", "two"] }`.
 A single `tag[]=one` remains an array. Repeated scalar keys such as
@@ -33,8 +32,7 @@ normalized to lowercase, so uppercase schema keys do not match them.
 ## Bodies and Content Types
 
 Body codecs serialize values into HTTP bodies and deserialize HTTP bodies into
-values. `.input()`, `.body()`, `.output()`, and `.response()` default to
-`application/json`. Specifying the `contentType` option can select another media type.
+values. `.body()` and `.response()` default to `application/json`. Specifying the `contentType` option can select another media type.
 Schemas operate on values before encoding and after decoding.
 
 Outgoing codecs are selected from the declared content type. Incoming codecs

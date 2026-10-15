@@ -4,7 +4,6 @@ import type {
 	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
 import type { RouteTree } from "./contract.ts";
-import type { UsesFlatInput } from "./routeModes.ts";
 import type { Merge } from "../typeUtils.ts";
 
 /** Scalar value accepted by ordinary HTTP request schemas. */
@@ -109,14 +108,7 @@ type OptionalRequestHeaders<T, TOptionalKeys extends PropertyKey> = [
 export type ClientRequestForDeclaration<
 	E extends RouteDeclaration,
 	TOptionalKeys extends PropertyKey = never,
-> =
-	UsesFlatInput<E> extends true
-		? E extends {
-				request: { input: infer TInput extends readonly StandardSchemaV1[] };
-			}
-			? InferSchemaInputs<TInput>
-			: never
-		: OptionalRequestHeaders<InferRequestFor<E, "input", never>, TOptionalKeys>;
+> = OptionalRequestHeaders<InferRequestFor<E, "input", never>, TOptionalKeys>;
 
 export type ServerRequest<E extends { request?: RouteRequestDeclaration }> =
 	InferRequestFor<E, "output", Record<never, never>>;
@@ -133,18 +125,7 @@ export type ServerRequest<E extends { request?: RouteRequestDeclaration }> =
 export type InferServerRequest<T extends RouteTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
-	? ServerRequestForDeclaration<TRoute>
+	? ServerRequest<TRoute>
 	: {
 			[K in keyof T]: T[K] extends RouteTree ? InferServerRequest<T[K]> : never;
 		};
-
-type ServerRequestForDeclaration<TDeclaration extends RouteDeclaration> =
-	UsesFlatInput<TDeclaration> extends true
-		? TDeclaration extends {
-				request: { input: infer TInput extends readonly StandardSchemaV1[] };
-			}
-			? Merge<
-					{ input: InferSchemaOutputs<TInput> } & ServerRequest<TDeclaration>
-				>
-			: Record<never, never>
-		: ServerRequest<TDeclaration>;

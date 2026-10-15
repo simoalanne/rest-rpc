@@ -16,14 +16,14 @@ export const getContract = () => ({
 	stream: route.handler(async function* () {
 		yield output;
 	}),
-	input: route
+	body: route
 		.$context<AppContext>()
-		.input(inputSchema)
-		.handler(({ input }) => input.name),
-	getInput: route
-		.input(inputSchema)
+		.body(inputSchema)
+		.handler(({ body }) => body.name),
+	query: route
 		.get("/users")
-		.handler(({ input }) => input.name),
+		.query(inputSchema)
+		.handler(({ query }) => query.name),
 	union: route
 		.get()
 		.handler(() =>
@@ -44,8 +44,8 @@ export const getContract = () => ({
 		.params(type<{ id: string }>())
 		.query(type<{ q: string }>())
 		.headers(type<{ authorization: string }>())
-		.response(200, type<Output>(), { headers: type<{ "x-count": string }>() })
-		.response(204)
+		.response(type<Output>(), { headers: type<{ "x-count": string }>() })
+		.response({ status: 204 })
 		.handler(() => ({
 			status: 200,
 			body: output,
@@ -54,7 +54,7 @@ export const getContract = () => ({
 	contract: contractRoute
 		.body(inputSchema)
 		.body(type<{ extra: string }>())
-		.response(200, type<Output>(), { headers: type<{ "x-count": string }>() })[
+		.response(type<Output>(), { headers: type<{ "x-count": string }>() })[
 		"~restrpc"
 	],
 });

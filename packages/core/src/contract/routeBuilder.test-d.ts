@@ -7,7 +7,7 @@ describe("routeBuilder types", () => {
 		const value = route
 			.get("/users/{id}")
 			.params(type<{ id: string }>())
-			.response(200, type<string>());
+			.response(type<string>());
 		expectTypeOf(value["~restrpc"].method).toEqualTypeOf<"GET">();
 		expectTypeOf(value["~restrpc"].path).toEqualTypeOf<"/users/{id}">();
 		expectTypeOf<
@@ -17,12 +17,12 @@ describe("routeBuilder types", () => {
 
 	it("normalizes declarations without expanding schemas", () => {
 		const schema = type<{ name: string }>();
-		const value = route.input(schema).output(schema);
+		const value = route.body(schema).response(schema);
 		expectTypeOf(value["~restrpc"]).toEqualTypeOf<{
 			readonly method: "POST";
 			readonly path: undefined;
 			request: {
-				input: readonly [StandardSchemaV1<{ name: string }>];
+				body: readonly [StandardSchemaV1<{ name: string }>];
 				contentType: "application/json";
 			};
 			responses: {
@@ -31,18 +31,17 @@ describe("routeBuilder types", () => {
 					contentType: "application/json";
 				};
 			};
-			readonly output: "output";
 		}>();
 	});
 
 	it("keeps descriptions out of declaration types and accepts stream headers", () => {
 		const schema = type<string>();
 		const headers = type<{ "x-cursor": string }>();
-		const output = route.output(schema, { description: "Name" });
+		const output = route.response(schema, { description: "Name" });
 		expectTypeOf(output["~restrpc"].responses).toEqualTypeOf<{
 			200: { body: typeof schema; contentType: "application/json" };
 		}>();
-		const stream = route.get("/events").streamResponse(200, schema, {
+		const stream = route.get("/events").streamResponse(schema, {
 			headers,
 			description: "Events",
 		});
@@ -52,14 +51,26 @@ describe("routeBuilder types", () => {
 	});
 
 	it("removes builder operations incompatible with the selected state", () => {
-		const input = route.input(type<string>());
-		expectTypeOf(input).not.toHaveProperty("body");
-		expectTypeOf(input).not.toHaveProperty("query");
-		expectTypeOf(route.query(type<{ q: string }>())).not.toHaveProperty(
-			"input",
-		);
+		expectTypeOf(route).not.toHaveProperty("input");
+		expectTypeOf(route).not.toHaveProperty("output");
+		expectTypeOf(route).not.toHaveProperty("streamOutput");
 		expectTypeOf(route.get()).not.toHaveProperty("post");
-		expectTypeOf(route.output(type<string>())).not.toHaveProperty("response");
-		expectTypeOf(route.response(200)).not.toHaveProperty("output");
+		expectTypeOf(route.metadata({})).not.toHaveProperty("metadata");
+	});
+
+	it("defaults response statuses to 200 and reads them from options", () => {
+		const value = route
+			.get("/")
+			.response(type<string>())
+			.response({ status: 204 })
+			.streamResponse(type<number>(), { status: 206 });
+		expectTypeOf<
+			keyof (typeof value)["~restrpc"]["responses"]
+		>().toEqualTypeOf<200 | 204 | 206>();
+		expectTypeOf(route.response()["~restrpc"].responses).toEqualTypeOf<{
+			200: { body: undefined };
+		}>();
+		// @ts-expect-error Bodyless responses have no content type.
+		route.response({ status: 204, contentType: "text/plain" });
 	});
 });

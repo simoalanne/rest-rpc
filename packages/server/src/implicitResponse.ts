@@ -3,30 +3,20 @@ import type { HttpRouteResult } from "./httpRouteResult.ts";
 import type { ImplicitResponseEnvelope } from "./implicitResponse.types.ts";
 import { frameSseStream } from "./sse.ts";
 
-export const isCustomProcedureOutput = (
+/** A handler result with a numeric `status` is a response envelope; anything else is a 200 body. */
+export const isResponseEnvelope = (
 	value: unknown,
-): value is { contentType: string; data: unknown } =>
+): value is ImplicitResponseEnvelope =>
 	typeof value === "object" &&
 	value !== null &&
-	"data" in value &&
-	"contentType" in value &&
-	typeof value.contentType === "string";
+	"status" in value &&
+	typeof value.status === "number";
 
-const hasStatus = (value: unknown): value is ImplicitResponseEnvelope =>
-	typeof value === "object" && value !== null && "status" in value;
-
-const normalizeImplicitProcedureResponse = (
+const normalizeImplicitBody = (
 	output: unknown,
 ): HttpRouteResult => {
 	if (isAsyncIterable(output)) {
 		return { kind: "stream", status: 200, body: frameSseStream(output) };
-	}
-	if (isCustomProcedureOutput(output)) {
-		return {
-			kind: "response",
-			status: 200,
-			body: { value: output.data, contentType: output.contentType },
-		};
 	}
 	return {
 		kind: "response",
@@ -78,6 +68,6 @@ const normalizeImplicitHttpResponse = (
 };
 
 export const normalizeImplicitResponse = (result: unknown): HttpRouteResult =>
-	hasStatus(result)
+	isResponseEnvelope(result)
 		? normalizeImplicitHttpResponse(result)
-		: normalizeImplicitProcedureResponse(result);
+		: normalizeImplicitBody(result);
