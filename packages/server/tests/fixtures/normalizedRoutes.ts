@@ -16,14 +16,14 @@ export const getContract = () => ({
 	stream: route.handler(async function* () {
 		yield output;
 	}),
-	input: route
+	body: route
 		.$context<AppContext>()
-		.input(inputSchema)
-		.handler(({ input }) => input.name),
-	getInput: route
-		.input(inputSchema)
+		.body(inputSchema)
+		.handler(({ body }) => body.name),
+	query: route
 		.get("/users")
-		.handler(({ input }) => input.name),
+		.query(inputSchema)
+		.handler(({ query }) => query.name),
 	union: route
 		.get()
 		.handler(() =>

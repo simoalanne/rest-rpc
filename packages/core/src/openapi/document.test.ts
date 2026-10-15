@@ -41,7 +41,7 @@ describe("document", () => {
 			users: {
 				get: route.get("/users/:id").response(200, type<string>()),
 				remove: route.delete("/users/{id}").response(204),
-				create: route.input(type<string>()).output(type<string>()),
+				create: route.body(type<string>()).response(200, type<string>()),
 			},
 		};
 		const document = createOpenApiDocument(contract, {

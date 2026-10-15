@@ -27,9 +27,7 @@ export type {
 } from "./contract/body.ts";
 export type {
 	InferServerResponse,
-	OutputOptions,
 	ResponseOptions,
-	StreamOutputOptions,
 	StreamResponseOptions,
 } from "./contract/response.ts";
 export type {

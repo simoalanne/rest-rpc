@@ -1,8 +1,5 @@
 import type { HttpRouteResult } from "./httpRouteResult.ts";
-import {
-	normalizeImplicitResponse,
-	isCustomProcedureOutput,
-} from "./implicitResponse.ts";
+import { normalizeImplicitResponse } from "./implicitResponse.ts";
 import {
 	contentTypeList,
 	findDeclaredContentType,
@@ -12,12 +9,9 @@ import {
 	RequestValidationError,
 	ResponseValidationError,
 } from "./validationErrors.ts";
-import {
-	flatInputSegment,
-	usesFlatInput,
-	usesPlainOutput,
-	type ResponseDeclaration,
-	type RouteDeclaration,
+import type {
+	ResponseDeclaration,
+	RouteDeclaration,
 } from "@rest-rpc/core/contract";
 import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
 import type { RuntimeImplementation } from "./match.ts";
@@ -164,38 +158,6 @@ const normalizeResponseResult = async (
 	};
 };
 
-const plainOutputEnvelope = (
-	route: RouteDeclaration,
-	output: unknown,
-): DeclaredResponseEnvelope => {
-	const response = getResponseSchema(route, 200);
-	if (
-		response.kind === "stream" ||
-		response.contentType === "application/json"
-	) {
-		return { status: 200, body: output };
-	}
-	if (!isCustomProcedureOutput(output)) {
-		throw new Error(
-			"Custom procedure output must return { contentType, data }.",
-		);
-	}
-	return { status: 200, body: output.data, contentType: output.contentType };
-};
-
-const getHandlerRequestFields = (
-	route: RouteDeclaration,
-	segments: {
-		body?: unknown;
-		query?: unknown;
-		params?: unknown;
-		headers?: unknown;
-	},
-) => {
-	if (!usesFlatInput(route)) return segments;
-	return { input: segments[flatInputSegment(route.method)] };
-};
-
 /**
  * Validates an HTTP request, executes middleware and its handler, and normalizes the selected output.
  * Returns validation errors for adapter handling; other failures propagate.
@@ -227,7 +189,7 @@ export async function handleHttpRoute<
 			implementation.middleware ?? [],
 			handler,
 			{
-				...getHandlerRequestFields(route, validatedRequest),
+				...validatedRequest,
 				...options.handlerFields,
 				context: createContext(),
 				contentType,
@@ -243,9 +205,7 @@ export async function handleHttpRoute<
 
 		return await normalizeResponseResult(
 			route,
-			usesPlainOutput(route)
-				? plainOutputEnvelope(route, handlerResult)
-				: (handlerResult as DeclaredResponseEnvelope),
+			handlerResult as DeclaredResponseEnvelope,
 			disableResponseValidation,
 		);
 	} catch (error) {

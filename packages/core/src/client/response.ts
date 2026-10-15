@@ -7,7 +7,6 @@ import {
 	type BodyCodec,
 } from "../codecs/index.ts";
 import type { RouteDeclaration, RouteTree } from "../contract/contract.ts";
-import type { UsesPlainOutput } from "../contract/routeModes.ts";
 import type { SseEvent } from "../sse.ts";
 import type {
 	ResponseDeclaration,
@@ -31,9 +30,8 @@ type WithResponseMetadata<TResponse, TMetadata> = TResponse extends unknown
 /**
  * Infers a route's client result.
  *
- * @remarks Routes declared with `.response()` produce status-discriminated
- * envelopes. Routes declared with `.output()` produce their output directly.
- * Pass a route tree to infer a matching tree of results.
+ * @remarks Every route produces status-discriminated envelopes. Pass a route
+ * tree to infer a matching tree of results.
  *
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#type-helpers}
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-routes}
@@ -51,9 +49,8 @@ export type InferClientResponse<T extends RouteTree> = T extends {
 /**
  * Infers the successful result of a route's client call.
  *
- * @remarks Routes declared with `.response()` produce the envelopes of their
- * 2xx responses. Routes declared with `.output()` produce their output
- * directly. Pass a route tree to infer a matching tree of results.
+ * @remarks Includes the envelopes of 2xx responses. Pass a route tree to
+ * infer a matching tree of results.
  *
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#type-helpers}
  */
@@ -68,9 +65,8 @@ export type InferClientSuccess<T extends RouteTree> = T extends {
 /**
  * Infers the declared error responses a route's client call can return.
  *
- * @remarks Includes the envelopes of declared non-2xx responses. Routes
- * declared with `.output()` infer `never` because the client throws their
- * non-2xx responses. Thrown `HttpError` and `Error` values are not included.
+ * @remarks Includes the envelopes of declared non-2xx responses. Thrown
+ * `HttpError` and `Error` values are not included.
  * Pass a route tree to infer a matching tree of types.
  *
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#type-helpers}
@@ -111,32 +107,16 @@ type ClientStreamDataForDeclaration<E extends RouteDeclaration> =
 		: never;
 
 export type ClientResponseForDeclaration<E extends RouteDeclaration> =
-	UsesPlainOutput<E> extends true
-		? SuccessfulResponseBody<E>
-		: WithResponseMetadata<DeclaredClientResponse<E>, { rawHeaders: Headers }>;
+	WithResponseMetadata<DeclaredClientResponse<E>, { rawHeaders: Headers }>;
 
 type ClientSuccessForDeclaration<E extends RouteDeclaration> =
-	UsesPlainOutput<E> extends true
-		? SuccessfulResponseBody<E>
-		: WithResponseMetadata<
-				SuccessfulDeclaredClientResponse<E>,
-				{ rawHeaders: Headers }
-			>;
+	WithResponseMetadata<
+		SuccessfulDeclaredClientResponse<E>,
+		{ rawHeaders: Headers }
+	>;
 
 type ClientErrorForDeclaration<E extends RouteDeclaration> =
-	UsesPlainOutput<E> extends true
-		? never
-		: WithResponseMetadata<
-				ErrorDeclaredClientResponse<E>,
-				{ rawHeaders: Headers }
-			>;
-
-export type SuccessfulResponseBody<TRoute extends RouteDeclaration> =
-	SuccessfulDeclaredClientResponse<TRoute> extends infer TResponse
-		? TResponse extends { body: infer TBody }
-			? TBody
-			: never
-		: never;
+	WithResponseMetadata<ErrorDeclaredClientResponse<E>, { rawHeaders: Headers }>;
 
 const assertResponseContentType = (
 	declared: string | readonly string[] | undefined,
@@ -261,23 +241,9 @@ export const fetchResponse = async <
 	};
 };
 
-const isSuccessStatus = (status: number) => status >= 200 && status < 300;
-
-export const fetchSuccess = async <
-	E extends RouteDeclaration & { path: string },
->(
-	fetchRouteResponse: (
-		route: E,
-		...args: FetchArgs<E>
-	) => Promise<{ status: number; body?: unknown }>,
-	route: E,
-	...args: FetchArgs<E>
-) => {
-	const response = await fetchRouteResponse(route, ...args);
-
-	if (!isSuccessStatus(response.status)) {
-		throw new HttpError(response.status, response.body);
-	}
-
-	return response.body;
-};
+export type SuccessfulResponseBody<TRoute extends RouteDeclaration> =
+	SuccessfulDeclaredClientResponse<TRoute> extends infer TResponse
+		? TResponse extends { body: infer TBody }
+			? TBody
+			: never
+		: never;

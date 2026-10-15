@@ -28,21 +28,4 @@ describe("client request inference", () => {
 			[{ body: string }, { contentType: "image/png" }]
 		>().not.toExtend<MultipleArgs>();
 	});
-
-	it("requires literal guaranteed global headers to satisfy flat inputs", () => {
-		const flat = route
-			.headers(type<{ authorization: string }>())
-			.input(type<string>())
-			.output(type<string>());
-		type Declaration = (typeof flat)["~restrpc"];
-		expectTypeOf<[string]>().toExtend<
-			FetchArgs<Declaration, { authorization: () => Promise<string> }>
-		>();
-		expectTypeOf<[string]>().not.toExtend<
-			FetchArgs<Declaration, { authorization: () => string | undefined }>
-		>();
-		expectTypeOf<[string]>().not.toExtend<
-			FetchArgs<Declaration, Record<string, string>>
-		>();
-	});
 });

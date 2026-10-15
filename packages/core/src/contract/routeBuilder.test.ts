@@ -5,8 +5,8 @@ const schema = type<{ name: string }>();
 
 describe("routeBuilder", () => {
 	it("reuses partial routes without sharing later declarations", () => {
-		const base = route.input(schema);
-		const first = base.output(schema);
+		const base = route.body(schema);
+		const first = base.response(200, schema);
 		const second = base.response(201, schema);
 		expect(base["~restrpc"].responses).toEqual({});
 		expect(first["~restrpc"].responses).toEqual({
@@ -17,18 +17,6 @@ describe("routeBuilder", () => {
 		});
 	});
 
-	it("stores flat input independently of declaration order", () => {
-		const headers = type<{ authorization: string }>();
-		const before = route.headers(headers).input(schema).get("/users");
-		const after = route.headers(headers).get("/users").input(schema);
-		expect(before["~restrpc"].request).toEqual({
-			headers: [headers],
-			input: [schema],
-			contentType: "application/json",
-		});
-		expect(after["~restrpc"].request).toEqual(before["~restrpc"].request);
-	});
-
 	it("rejects GET bodies regardless of declaration order", () => {
 		expect(() => new RouteBuilder().get().body(schema)).toThrow(
 			"GET routes cannot declare a request body.",
@@ -37,18 +25,6 @@ describe("routeBuilder", () => {
 			"GET routes cannot declare a request body.",
 		);
 	});
-
-	it.each(["/users/:id", "/users/{id}"] as const)(
-		"rejects flat input with path parameters in %s",
-		(path) => {
-			expect(() => new RouteBuilder().get(path).input(schema)).toThrow(
-				"Flat input requires a static route path.",
-			);
-			expect(() => new RouteBuilder().input(schema).get(path)).toThrow(
-				"Flat input requires a static route path.",
-			);
-		},
-	);
 
 	it("stores response descriptions and stream response headers", () => {
 		const headers = type<{ "x-cursor": string }>();
@@ -63,8 +39,9 @@ describe("routeBuilder", () => {
 			200: { kind: "stream", body: schema, headers, description: "Events" },
 		});
 		expect(
-			new RouteBuilder().output(schema, { description: "Name" })["~restrpc"]
-				.responses,
+			new RouteBuilder().response(200, schema, { description: "Name" })[
+				"~restrpc"
+			].responses,
 		).toEqual({
 			200: {
 				body: schema,
@@ -72,11 +49,6 @@ describe("routeBuilder", () => {
 				description: "Name",
 			},
 		});
-		expect(
-			new RouteBuilder().streamOutput(schema, { description: "Names" })[
-				"~restrpc"
-			].responses,
-		).toEqual({ 200: { kind: "stream", body: schema, description: "Names" } });
 	});
 
 	it("rejects duplicate response statuses across stream and body responses", () => {

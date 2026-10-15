@@ -38,11 +38,9 @@ type FetchData = (
 export const createTanstackUtilsForRoute = ({
 	routePath,
 	fetchData,
-	unwrapResponseBodyForStream = false,
 }: {
 	routePath: string[];
 	fetchData: FetchData;
-	unwrapResponseBodyForStream?: boolean;
 }): TanstackQueryUtilFunctions => {
 	const queryKeyFor = (request: unknown): QueryKey =>
 		request === undefined || request === skipToken
@@ -105,10 +103,10 @@ export const createTanstackUtilsForRoute = ({
 				...tanstackOptions
 			} = options ?? {};
 			const streamFn = async ({ signal }: { signal: AbortSignal }) => {
-				const data = await fetchData(request, { ...fetchOptions, signal });
-				const stream = unwrapResponseBodyForStream
-					? (data as { body: unknown }).body
-					: data;
+				const { body: stream } = (await fetchData(request, {
+					...fetchOptions,
+					signal,
+				})) as { body: unknown };
 
 				if (!isAsyncIterable(stream)) {
 					throw new Error("Route did not return a stream response body");

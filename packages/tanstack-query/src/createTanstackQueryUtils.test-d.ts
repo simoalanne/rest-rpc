@@ -247,7 +247,7 @@ describe("createTanstackQueryUtils types", () => {
 		expectTypeOf<InferClientError<typeof get>>().toEqualTypeOf<
 			InferDeclaredClientError<typeof get> | HttpError | Error
 		>();
-		const plain = route.output(type<string>());
+		const plain = route.response(200, type<string>());
 		expectTypeOf<InferClientError<typeof plain>>().toEqualTypeOf<
 			HttpError | Error
 		>();

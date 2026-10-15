@@ -3,7 +3,6 @@ import type { BodyContentType } from "./body.ts";
 import type { RouteDeclaration } from "./routeDeclaration.ts";
 import type { RouteTree } from "./contract.ts";
 import type { InferSchema } from "./request.ts";
-import type { UsesPlainOutput } from "./routeModes.ts";
 import type { SseEvent } from "../sse.ts";
 import type { Merge } from "../typeUtils.ts";
 
@@ -38,22 +37,9 @@ export type ResponseOptions = {
 	description?: string;
 };
 
-/** HTTP metadata associated with a declared plain output. */
-export type OutputOptions = {
-	contentType?: BodyContentType;
-	/** Describes the response in generated OpenAPI documents. */
-	description?: string;
-};
-
 /** HTTP metadata associated with a declared streaming response. */
 export type StreamResponseOptions = {
 	headers?: ResponseHeaders;
-	/** Describes the response in generated OpenAPI documents. */
-	description?: string;
-};
-
-/** HTTP metadata associated with a declared streaming plain output. */
-export type StreamOutputOptions = {
 	/** Describes the response in generated OpenAPI documents. */
 	description?: string;
 };
@@ -210,32 +196,6 @@ export type SuccessfulDeclaredClientResponse<E extends RouteDeclaration> =
 export type ErrorDeclaredClientResponse<E extends RouteDeclaration> =
 	ResponseUnion<E, "client", "error">;
 
-export type ProcedureContentType<TContentType> =
-	TContentType extends readonly string[] ? TContentType[number] : TContentType;
-
-/** Infers the plain value a procedure handler returns for its 200 response. */
-export type ServerProcedureResponse<TResponse> = TResponse extends {
-	contentType: infer TContentType;
-}
-	? TContentType extends "application/json"
-		? ServerResponseBody<TResponse>
-		: {
-				data: ServerResponseBody<TResponse>;
-				contentType: ProcedureContentType<TContentType>;
-			}
-	: ServerResponseBody<TResponse>;
-
-type ServerProcedureOutput<E extends RouteDeclaration> = E extends {
-	responses: { 200: infer TResponse };
-}
-	? ServerProcedureResponse<TResponse>
-	: never;
-
-type ServerResponseForRoute<E extends RouteDeclaration> =
-	UsesPlainOutput<E> extends true
-		? ServerProcedureOutput<E>
-		: ServerResponse<E>;
-
 /**
  * Infers the output returned by a route handler.
  *
@@ -248,7 +208,7 @@ type ServerResponseForRoute<E extends RouteDeclaration> =
 export type InferServerResponse<T extends RouteTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
-	? ServerResponseForRoute<TRoute>
+	? ServerResponse<TRoute>
 	: {
 			[K in keyof T]: T[K] extends RouteTree
 				? InferServerResponse<T[K]>

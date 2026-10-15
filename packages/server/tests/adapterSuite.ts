@@ -209,8 +209,8 @@ export const describeAdapterConformance = (
 			const routes = {
 				users: {
 					create: route
-						.input(type<{ name: string }>())
-						.handler(({ input }) => ({ created: input.name })),
+						.body(type<{ name: string }>())
+						.handler(({ body }) => ({ created: body.name })),
 					current: route.get().handler(() => ({ name: "Ada" })),
 				},
 			};

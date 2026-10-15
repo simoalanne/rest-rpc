@@ -89,11 +89,12 @@ describe("server handler generic propagation", () => {
 		>();
 	});
 
-	it("returns plain values from handlers of plain output routes", () => {
-		const output = contractRoute.get("/").output(type<string>());
-		type Handler = RouteHandlerFor<typeof output, Fields, Values>;
+	it("returns response envelopes from handlers of declared routes", () => {
+		const declared = contractRoute.get("/").response(200, type<string>());
+		type Handler = RouteHandlerFor<typeof declared, Fields, Values>;
 		expectTypeOf<ReturnType<Handler>>().toEqualTypeOf<
-			string | Promise<string>
+			| { status: 200; body: string }
+			| Promise<{ status: 200; body: string }>
 		>();
 	});
 });

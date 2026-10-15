@@ -44,14 +44,21 @@ describe("initClient types", () => {
 	it("uses schema inputs for arguments and schema outputs for results", () => {
 		const contract = {
 			length: route
-				.input(type((value: string) => Number(value)))
-				.output(type((value: string) => value.length)),
+				.body(type((value: string) => Number(value)))
+				.response(
+					200,
+					type((value: string) => value.length),
+				),
 		};
 		const client = initClient(contract, { baseUrl: "" });
-		expectTypeOf(client.length).parameter(0).toEqualTypeOf<string>();
-		expectTypeOf(client.length).returns.resolves.toEqualTypeOf<number>();
+		expectTypeOf(client.length).parameter(0).toEqualTypeOf<{ body: string }>();
+		expectTypeOf(client.length).returns.resolves.toEqualTypeOf<{
+			status: 200;
+			body: number;
+			rawHeaders: Headers;
+		}>();
 		// @ts-expect-error Requests use the schema input, not its transformed output.
-		client.length(1);
+		client.length({ body: 1 });
 	});
 
 	it("narrows response envelopes by their declared status", async () => {
@@ -74,7 +81,7 @@ describe("initClient types", () => {
 				.body(type<string>(), {
 					contentType: ["text/plain", "application/json"],
 				})
-				.output(type<string>()),
+				.response(200, type<string>()),
 			{ baseUrl: "" },
 		);
 		client({ body: "Ada" }, { contentType: "text/plain" });
@@ -82,23 +89,5 @@ describe("initClient types", () => {
 		client({ body: "Ada" });
 		// @ts-expect-error A selection must be a declared format.
 		client({ body: "Ada" }, { contentType: "image/png" });
-	});
-
-	it("requires guaranteed global header values for flat inputs", () => {
-		const contract = route
-			.headers(type<{ authorization: string }>())
-			.input(type<string>())
-			.output(type<string>());
-		const client = initClient(contract, {
-			baseUrl: "",
-			globalHeaders: { authorization: async () => "token" },
-		});
-		client("Ada");
-		const missing = initClient(contract, {
-			baseUrl: "",
-			globalHeaders: { authorization: (): string | undefined => undefined },
-		});
-		// @ts-expect-error An optional provider cannot satisfy a required flat-input header.
-		missing("Ada");
 	});
 });

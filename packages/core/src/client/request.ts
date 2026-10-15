@@ -10,10 +10,8 @@ import { replacePathParams } from "../contract/path.ts";
 import type { HttpMethod } from "../contract/routeDeclaration.ts";
 import type {
 	ClientRequestForDeclaration,
-	InferSchemaInputs,
 	RequestScalar,
 } from "../contract/request.ts";
-import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 
 export type FetchOptions = Omit<RequestInit, "method" | "body" | "headers"> & {
 	additionalHeaders?: Record<string, RequestScalar | undefined>;
@@ -93,34 +91,6 @@ export type InferClientRequest<
 				: never;
 		};
 
-type RequiredKeys<T> = {
-	[TKey in keyof T]-?: {} extends Pick<T, TKey> ? never : TKey;
-}[keyof T];
-
-type UnsatisfiedFlatHeaderKeys<
-	E extends RouteDeclaration,
-	TGlobalHeaders extends ClientHeaders,
-> = E extends {
-	request: {
-		input: readonly StandardSchemaV1[];
-		headers: infer THeaders extends readonly StandardSchemaV1[];
-	};
-}
-	? Exclude<
-			RequiredKeys<InferSchemaInputs<THeaders>>,
-			GlobalHeaderKeys<TGlobalHeaders>
-		>
-	: never;
-
-type MissingGlobalHeaders<TKeys extends PropertyKey> = {
-	readonly [
-		TKey in Extract<
-			TKeys,
-			string
-		> as `ERROR: required header "${TKey}" needs a guaranteed globalHeaders value`
-	]: never;
-};
-
 type DeclaredContentType<E> = E extends { method: "GET" }
 	? never
 	: E extends { request: { contentType: infer TContentType } }
@@ -141,9 +111,9 @@ export type FetchOptionsFor<E extends RouteDeclaration> = Omit<
 > &
 	ContentTypeOption<E>;
 
-type StandardFetchArgs<
-	E extends RouteDeclaration,
-	TGlobalHeaders extends ClientHeaders,
+export type FetchArgs<
+	E extends RouteDeclaration = RouteDeclaration,
+	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > =
 	ClientRequestForDeclaration<
 		E,
@@ -155,16 +125,6 @@ type StandardFetchArgs<
 				? [request: TRequest, options: FetchOptionsFor<E>]
 				: [request: TRequest, options?: FetchOptionsFor<E>]
 		: never;
-
-export type FetchArgs<
-	E extends RouteDeclaration = RouteDeclaration,
-	TGlobalHeaders extends ClientHeaders = Record<never, string>,
-> = [UnsatisfiedFlatHeaderKeys<E, TGlobalHeaders>] extends [never]
-	? StandardFetchArgs<E, TGlobalHeaders>
-	: [
-			request: ClientRequestForDeclaration<E> &
-				MissingGlobalHeaders<UnsatisfiedFlatHeaderKeys<E, TGlobalHeaders>>,
-		];
 
 type GroupedRequestInput = {
 	body?: unknown;

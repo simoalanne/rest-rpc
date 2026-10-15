@@ -12,12 +12,7 @@ import type {
 	RequestParamsSchema,
 	RequestQuerySchema,
 } from "./request.ts";
-import type {
-	OutputOptions,
-	ResponseOptions,
-	StreamOutputOptions,
-	StreamResponseOptions,
-} from "./response.ts";
+import type { ResponseOptions, StreamResponseOptions } from "./response.ts";
 import type { EmptyObject, Merge } from "../typeUtils.ts";
 
 type JsonContentType = "application/json";
@@ -42,8 +37,6 @@ type ResponseFor<TSchema, TOptions> = TSchema extends StandardSchemaV1
 
 type BuilderMethod =
 	| "body"
-	| "input"
-	| "output"
 	| "query"
 	| "params"
 	| "headers"
@@ -62,8 +55,6 @@ export type BuilderState = {
 	responses: unknown;
 	openApi: OpenApiRouteOptions | never;
 	used: BuilderMethod;
-	input: "none" | "headers" | "input" | "segments";
-	output: "none" | "output" | "response";
 };
 
 /**
@@ -95,23 +86,6 @@ type WhenUnused<
 	TView,
 > = TMethod extends TState["used"] ? EmptyObject : TView;
 
-type WhenInputAvailable<
-	TState extends BuilderState,
-	TView,
-> = TState["input"] extends "segments" ? EmptyObject : TView;
-type WhenSegmentsAvailable<
-	TState extends BuilderState,
-	TView,
-> = TState["input"] extends "input" ? EmptyObject : TView;
-type WhenOutputAvailable<
-	TState extends BuilderState,
-	TView,
-> = TState["output"] extends "none" ? TView : EmptyObject;
-type WhenResponsesAvailable<
-	TState extends BuilderState,
-	TView,
-> = TState["output"] extends "output" ? EmptyObject : TView;
-
 /** Appends a request segment schema. Written out by hand, see `Patch`. */
 type WithRequest<
 	TState extends BuilderState,
@@ -124,8 +98,6 @@ type WithRequest<
 	responses: TState["responses"];
 	openApi: TState["openApi"];
 	used: TState["used"];
-	input: "segments";
-	output: TState["output"];
 };
 
 type AppendRequest<
@@ -145,12 +117,7 @@ type WithHeaders<
 	THeaders extends RequestHeadersSchema,
 > = Patch<
 	TState,
-	{
-		request: AppendRequest<TState["request"], "headers", THeaders>;
-		input: TState["input"] extends "input" | "segments"
-			? TState["input"]
-			: "headers";
-	}
+	{ request: AppendRequest<TState["request"], "headers", THeaders> }
 >;
 
 type WithContentType<TState extends BuilderState, TContentType> = Patch<
@@ -167,7 +134,6 @@ type WithResponse<
 	TState extends BuilderState,
 	TStatus extends PropertyKey,
 	TResponse,
-	TOutput extends BuilderState["output"] = "response",
 > = {
 	route: TState["route"];
 	method: TState["method"];
@@ -175,34 +141,7 @@ type WithResponse<
 	responses: TState["responses"] & Record<TStatus, TResponse>;
 	openApi: TState["openApi"];
 	used: TState["used"];
-	input: TState["input"];
-	output: TOutput;
 };
-
-type WithPlainOutput<TState extends BuilderState, TResponse> = WithResponse<
-	UseMethod<TState, "output">,
-	200,
-	TResponse,
-	"output"
->;
-
-type WithFlatInput<
-	TState extends BuilderState,
-	TSchema extends StandardSchemaV1,
-	TOptions extends BodyOptions | undefined,
-> = WithContentType<
-	Patch<
-		TState,
-		{
-			request: AppendRequest<TState["request"], "input", TSchema>;
-			used: TState["used"] | "input";
-			input: "input";
-		}
-	>,
-	TState["request"] extends { contentType: infer TContentType }
-		? TContentType
-		: ContentTypeFor<TOptions>
->;
 
 type WithHttpRoute<
 	TState extends BuilderState,
@@ -252,10 +191,7 @@ export type PublicDeclarationFor<
 							TState["responses"][TStatus]
 						>;
 					};
-				} & (TState["output"] extends "none"
-					? EmptyObject
-					: { readonly output: TState["output"] }) &
-				MetadataDeclaration<TMetadata> &
+				} & MetadataDeclaration<TMetadata> &
 				OpenApiDeclaration<TState["openApi"]>
 		>
 	: never;
@@ -293,9 +229,7 @@ type BuilderReceiver<
 type ResponseMethods<
 	TState extends BuilderState,
 	TExtension extends BuilderExtension | never,
-> = WhenResponsesAvailable<
-	TState,
-	{
+> = {
 		/** Declares a response status, schema, and HTTP metadata. @see {@link https://rest-rpc.dev/docs/route-builder#choose-plain-outputs-or-status-responses} */
 		response<
 			const TStatus extends number,
@@ -336,15 +270,12 @@ type ResponseMethods<
 			TPath,
 			TMetadata
 		>;
-	}
->;
+	};
 
 type BodyMethods<
 	TState extends BuilderState,
 	TExtension extends BuilderExtension | never,
-> = WhenSegmentsAvailable<
-	TState,
-	{
+> = {
 		/** Declares a request body and its HTTP metadata. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
 		body<
 			const TSchema extends StandardSchemaV1,
@@ -366,15 +297,12 @@ type BodyMethods<
 			TPath,
 			TMetadata
 		>;
-	}
->;
+	};
 
 type RequestMethods<
 	TState extends BuilderState,
 	TExtension extends BuilderExtension | never,
-> = WhenSegmentsAvailable<
-	TState,
-	{
+> = {
 		/** Declares URL query parameters. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
 		query<
 			const TSchema extends RequestQuerySchema,
@@ -389,12 +317,7 @@ type RequestMethods<
 			TPath,
 			TMetadata
 		>;
-	}
-> &
-	WhenSegmentsAvailable<
-		TState,
-		{
-			/** Declares path parameters. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
+		/** Declares path parameters. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
 			params<
 				const TSchema extends RequestParamsSchema,
 				const TPath extends BuilderPath = AbsolutePath,
@@ -408,9 +331,7 @@ type RequestMethods<
 				TPath,
 				TMetadata
 			>;
-		}
-	> & {
-		/** Declares request headers. Headers may be combined with flat input and must then be supplied by client global headers. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
+		/** Declares request headers. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
 		headers<
 			const THeaders extends RequestHeadersSchema,
 			const TPath extends BuilderPath = AbsolutePath,
@@ -456,67 +377,6 @@ type RequestMethods<
 				this: BuilderReceiver<TPath, TMetadata>,
 				openApi: OpenApiRouteOptions,
 			): RouteBuilderView<WithOpenApi<TState>, TExtension, TPath, TMetadata>;
-		}
-	>;
-
-type FlatMethods<
-	TState extends BuilderState,
-	TExtension extends BuilderExtension | never,
-> = WhenInputAvailable<
-	TState,
-	{
-		/** Declares one flat input value. GET inputs use query encoding; other methods use a body. */
-		input<
-			const TSchema extends StandardSchemaV1,
-			const TOptions extends BodyOptions | undefined = undefined,
-			const TPath extends BuilderPath = AbsolutePath,
-			const TMetadata extends RouteMetadata | never = never,
-		>(
-			this: BuilderReceiver<TPath, TMetadata>,
-			schema: TSchema,
-			options?: TOptions,
-		): RouteBuilderView<
-			WithFlatInput<TState, TSchema, TOptions>,
-			TExtension,
-			TPath,
-			TMetadata
-		>;
-	}
-> &
-	WhenOutputAvailable<
-		TState,
-		{
-			/** Declares one plain output value. @see {@link https://rest-rpc.dev/docs/route-builder#choose-plain-outputs-or-status-responses} */
-			output<
-				const TSchema extends StandardSchemaV1,
-				const TOptions extends OutputOptions | undefined = undefined,
-				const TPath extends BuilderPath = AbsolutePath,
-				const TMetadata extends RouteMetadata | never = never,
-			>(
-				this: BuilderReceiver<TPath, TMetadata>,
-				schema: TSchema,
-				options?: TOptions,
-			): RouteBuilderView<
-				WithPlainOutput<TState, ResponseFor<TSchema, TOptions>>,
-				TExtension,
-				TPath,
-				TMetadata
-			>;
-			/** Declares a streaming plain output. @see {@link https://rest-rpc.dev/docs/streaming} */
-			streamOutput<
-				const TSchema extends StandardSchemaV1,
-				const TPath extends BuilderPath = AbsolutePath,
-				const TMetadata extends RouteMetadata | never = never,
-			>(
-				this: BuilderReceiver<TPath, TMetadata>,
-				schema: TSchema,
-				options?: StreamOutputOptions,
-			): RouteBuilderView<
-				WithPlainOutput<TState, { kind: "stream"; body: TSchema }>,
-				TExtension,
-				TPath,
-				TMetadata
-			>;
 		}
 	>;
 
@@ -590,7 +450,6 @@ type HttpMethods<
 
 type AvailableMethods<TState, TExtension> = TState extends BuilderState
 	? HttpMethods<TState, Extract<TExtension, BuilderExtension>> &
-			FlatMethods<TState, Extract<TExtension, BuilderExtension>> &
 			ResponseMethods<TState, Extract<TExtension, BuilderExtension>> &
 			BodyMethods<TState, Extract<TExtension, BuilderExtension>> &
 			RequestMethods<TState, Extract<TExtension, BuilderExtension>>
@@ -619,8 +478,6 @@ type DerivedState = {
 	responses: EmptyObject;
 	openApi: never;
 	used: never;
-	input: "none";
-	output: "none";
 };
 
 /** Type-level view of the root route builder. */

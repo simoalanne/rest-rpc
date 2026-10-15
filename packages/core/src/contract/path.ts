@@ -19,12 +19,6 @@ const pathParamNameFromCaptures = (
 	return name;
 };
 
-export const getPathParamNames = (path: string) =>
-	path
-		.split("/")
-		.map(getPathParamSegmentName)
-		.filter((name): name is string => name !== undefined);
-
 export const getPathParamSegmentName = (segment: string) => {
 	const match = pathParamSegmentPattern.exec(segment);
 	if (!match) return undefined;

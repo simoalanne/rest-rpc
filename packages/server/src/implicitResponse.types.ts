@@ -125,23 +125,18 @@ type InferredHttpRoute<TRoute, TResult> = Omit<TRoute, "responses"> & {
 	responses: InferredResponses<Awaited<TResult>>;
 };
 
-type InferredProcedureResponse<TResult> =
+type InferredBodyResponse<TResult> =
 	Awaited<TResult> extends infer TOutput
 		? TOutput extends AsyncIterable<infer TItem>
 			? {
 					kind: "stream";
 					body: InferredSchema<TItem, SseData<TItem>>;
 				}
-			: TOutput extends {
-						contentType: infer TContentType extends string;
-						data: infer TData;
-				  }
-				? { body: InferredSchema<TData>; contentType: TContentType }
-				: { body: InferredSchema<TOutput>; contentType: "application/json" }
+			: { body: InferredSchema<TOutput>; contentType: "application/json" }
 		: never;
 
-type InferredProcedureRoute<TRoute, TResult> = Omit<TRoute, "responses"> & {
-	responses: { 200: InferredProcedureResponse<TResult> };
+type InferredBodyRoute<TRoute, TResult> = Omit<TRoute, "responses"> & {
+	responses: { 200: InferredBodyResponse<TResult> };
 };
 
 type ReturnKind<T> = T extends unknown
@@ -165,5 +160,5 @@ export type ValidImplicitResult<TResult> = [
 export type InferredRoute<TRoute, TResult> = [
 	ReturnKind<Awaited<TResult>>,
 ] extends ["response"]
-	? Merge<InferredHttpRoute<TRoute, TResult> & { output: "response" }>
-	: Merge<InferredProcedureRoute<TRoute, TResult> & { output: "output" }>;
+	? Merge<InferredHttpRoute<TRoute, TResult>>
+	: Merge<InferredBodyRoute<TRoute, TResult>>;

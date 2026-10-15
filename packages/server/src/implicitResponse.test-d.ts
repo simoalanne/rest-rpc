@@ -58,12 +58,8 @@ describe("implicit response inference", () => {
 		}>();
 	});
 
-	it("infers plain, custom, stream, and SSE data independently of metadata", () => {
+	it("infers plain, stream, and SSE data independently of metadata", () => {
 		const plain = route.handler(() => ({ id: "one" }));
-		const custom = route.handler(async () => ({
-			contentType: "text/plain",
-			data: "hello",
-		}));
 		async function* chunks() {
 			yield sse({ data: { count: 1 }, id: "one" });
 		}
@@ -72,10 +68,11 @@ describe("implicit response inference", () => {
 			.get("/")
 			.handler(() => ({ status: 200, body: chunks() }));
 		expectTypeOf<InferClientResponse<typeof plain>>().toEqualTypeOf<{
-			readonly id: "one";
+			status: 200;
+			body: { readonly id: "one" };
+			rawHeaders: Headers;
 		}>();
-		expectTypeOf<InferClientResponse<typeof custom>>().toEqualTypeOf<"hello">();
-		expectTypeOf<InferClientResponse<typeof stream>>().toEqualTypeOf<
+		expectTypeOf<InferClientResponse<typeof stream>["body"]>().toEqualTypeOf<
 			AsyncIterable<{
 				data: { count: number };
 				id?: string;
@@ -87,7 +84,7 @@ describe("implicit response inference", () => {
 			InferClientResponse<typeof envelope>["status"]
 		>().toEqualTypeOf<200>();
 		expectTypeOf<InferClientResponse<typeof envelope>["body"]>().toEqualTypeOf<
-			InferClientResponse<typeof stream>
+			InferClientResponse<typeof stream>["body"]
 		>();
 		expectTypeOf<
 			ImplicitResponseKind<

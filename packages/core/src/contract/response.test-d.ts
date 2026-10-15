@@ -37,7 +37,7 @@ describe("response inference", () => {
 		}>();
 	});
 
-	it("uses schema inputs for streams and plain custom outputs", () => {
+	it("uses schema inputs for streams", () => {
 		const stream = route.get("/").streamResponse(
 			200,
 			type((input: string) => Number(input)),
@@ -45,21 +45,13 @@ describe("response inference", () => {
 		expectTypeOf<InferServerResponse<typeof stream>["body"]>().toEqualTypeOf<
 			AsyncIterable<string>
 		>();
-		const plain = route.output(
-			type((input: string) => Number(input)),
-			{ contentType: "text/plain" },
-		);
-		expectTypeOf<InferServerResponse<typeof plain>>().toEqualTypeOf<{
-			data: string;
-			contentType: "text/plain";
-		}>();
 	});
 
 	it("infers responses for a route tree", () => {
-		const get = route.get("/").output(type<string>());
+		const get = route.get("/").response(200, type<string>());
 		const tree = { users: { get } };
 		expectTypeOf<
 			InferServerResponse<typeof tree>["users"]["get"]
-		>().toEqualTypeOf<string>();
+		>().toEqualTypeOf<{ status: 200; body: string }>();
 	});
 });

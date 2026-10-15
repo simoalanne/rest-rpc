@@ -9,6 +9,7 @@ describe("normalizeImplicitResponse", () => {
 		42,
 		{ data: "ordinary" },
 		{ contentType: 1, data: "ordinary" },
+		{ contentType: "text/plain", data: "ordinary" },
 	])("uses JSON for ordinary output %j", (value) => {
 		expect(normalizeImplicitResponse(value)).toEqual({
 			kind: "response",
@@ -17,10 +18,7 @@ describe("normalizeImplicitResponse", () => {
 		});
 	});
 
-	it("recognizes custom output structurally and gives status envelopes precedence", () => {
-		expect(
-			normalizeImplicitResponse({ contentType: "text/plain", data: "hello" }),
-		).toMatchObject({ body: { value: "hello", contentType: "text/plain" } });
+	it("gives status envelopes precedence over other fields", () => {
 		expect(
 			normalizeImplicitResponse({
 				status: 204,

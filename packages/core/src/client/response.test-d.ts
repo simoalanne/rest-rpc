@@ -40,7 +40,7 @@ describe("client response inference", () => {
 		}>();
 	});
 
-	it("uses transformed schema outputs for streams and custom outputs", () => {
+	it("uses transformed schema outputs for streams", () => {
 		const stream = route.get("/").streamResponse(
 			200,
 			type((input: string) => Number(input)),
@@ -48,15 +48,10 @@ describe("client response inference", () => {
 		expectTypeOf<InferClientResponse<typeof stream>["body"]>().toEqualTypeOf<
 			AsyncIterable<SseEvent<number>>
 		>();
-		const plain = route.output(
-			type((input: string) => Number(input)),
-			{ contentType: "text/plain" },
-		);
-		expectTypeOf<InferClientResponse<typeof plain>>().toEqualTypeOf<number>();
 	});
 
 	it("infers results for a route tree", () => {
-		const get = route.get("/").output(type<string>());
+		const get = route.get("/").response(200, type<string>());
 		const tree = { users: { get } };
 		expectTypeOf<
 			InferClientResponse<typeof tree>["users"]["get"]
@@ -78,9 +73,6 @@ describe("client response inference", () => {
 			body: { message: string };
 			rawHeaders: Headers;
 		}>();
-		const plain = route.output(type<string>());
-		expectTypeOf<InferClientSuccess<typeof plain>>().toEqualTypeOf<string>();
-		expectTypeOf<InferClientError<typeof plain>>().toEqualTypeOf<never>();
 		const tree = { users: { value } };
 		expectTypeOf<
 			InferClientSuccess<typeof tree>["users"]["value"]
@@ -91,12 +83,15 @@ describe("client response inference", () => {
 	});
 
 	it("unwraps stream event data", () => {
-		const output = route.streamOutput(type((input: string) => Number(input)));
+		const output = route.streamResponse(
+			200,
+			type((input: string) => Number(input)),
+		);
 		const response = route
 			.get("/")
 			.streamResponse(200, type<{ value: number }>())
 			.response(404, type<{ message: string }>());
-		const plain = route.output(type<string>());
+		const plain = route.response(200, type<string>());
 		expectTypeOf<
 			InferClientStreamData<typeof output>
 		>().toEqualTypeOf<number>();

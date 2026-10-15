@@ -9,17 +9,14 @@ import type {
 	RouteMetadata,
 	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
-import { getPathParamNames } from "./path.ts";
 import type {
 	RequestHeadersSchema,
 	RequestParamsSchema,
 	RequestQuerySchema,
 } from "./request.ts";
 import type {
-	OutputOptions,
 	ResponseDeclaration,
 	ResponseOptions,
-	StreamOutputOptions,
 	StreamResponseOptions,
 } from "./response.ts";
 import type { PublicRouteBuilder } from "./routeBuilder.types.ts";
@@ -59,7 +56,7 @@ const mergeOpenApi = (
 	};
 };
 
-const procedureState = (state: RouteBuilderState): RouteBuilderState => ({
+const defaultRouteState = (state: RouteBuilderState): RouteBuilderState => ({
 	method: "POST",
 	path: undefined,
 	responses: {},
@@ -71,9 +68,6 @@ const httpState = (
 	method: HttpMethod,
 	path: AbsolutePath | undefined,
 ): RouteBuilderState => {
-	if (state.request?.input && getPathParamNames(path ?? "").length > 0) {
-		throw new Error("Flat input requires a static route path.");
-	}
 	if (method === "GET" && state.request?.body) {
 		throw new Error("GET routes cannot declare a request body.");
 	}
@@ -152,7 +146,7 @@ export class RouteBuilder {
 	}
 
 	body(schema: StandardSchemaV1, options?: BodyOptions): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
+		const state = defaultRouteState(this["~restrpc"]);
 		if (state.method === "GET") {
 			throw new Error("GET routes cannot declare a request body.");
 		}
@@ -163,23 +157,8 @@ export class RouteBuilder {
 		);
 	}
 
-	input(schema: StandardSchemaV1, options?: BodyOptions): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
-		if (getPathParamNames(state.path ?? "").length > 0) {
-			throw new Error("Flat input requires a static route path.");
-		}
-		return this.clone({
-			...state,
-			request: {
-				...state.request,
-				input: appendSchema(state.request?.input, schema),
-				contentType: requestContentType(state, options),
-			},
-		});
-	}
-
 	headers(schema: RequestHeadersSchema): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
+		const state = defaultRouteState(this["~restrpc"]);
 		return this.clone({
 			...state,
 			request: {
@@ -191,18 +170,18 @@ export class RouteBuilder {
 
 	query(schema: RequestQuerySchema): RouteBuilder {
 		return this.clone(
-			addRequestSegment(procedureState(this["~restrpc"]), "query", schema),
+			addRequestSegment(defaultRouteState(this["~restrpc"]), "query", schema),
 		);
 	}
 
 	params(schema: RequestParamsSchema): RouteBuilder {
 		return this.clone(
-			addRequestSegment(procedureState(this["~restrpc"]), "params", schema),
+			addRequestSegment(defaultRouteState(this["~restrpc"]), "params", schema),
 		);
 	}
 
 	metadata(metadata: RouteMetadata): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
+		const state = defaultRouteState(this["~restrpc"]);
 		return this.clone({
 			...state,
 			metadata: { ...state.metadata, ...metadata },
@@ -210,7 +189,7 @@ export class RouteBuilder {
 	}
 
 	openAPI(openApi: OpenApiRouteOptions): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
+		const state = defaultRouteState(this["~restrpc"]);
 		return this.clone({
 			...state,
 			openApi: mergeOpenApi(state.openApi, openApi),
@@ -222,10 +201,10 @@ export class RouteBuilder {
 		schema?: StandardSchemaV1,
 		options?: ResponseOptions,
 	): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
+		const state = defaultRouteState(this["~restrpc"]);
 		return this.clone(
 			addResponse(
-				{ ...state, output: "response" },
+				state,
 				status,
 				schema
 					? {
@@ -242,39 +221,14 @@ export class RouteBuilder {
 		);
 	}
 
-	output(schema: StandardSchemaV1, options?: OutputOptions): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
-		return this.clone(
-			addResponse({ ...state, output: "output" }, 200, {
-				body: schema,
-				contentType: options?.contentType ?? "application/json",
-				...withDescription(options),
-			}),
-		);
-	}
-
-	streamOutput(
-		schema: StandardSchemaV1,
-		options?: StreamOutputOptions,
-	): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
-		return this.clone(
-			addResponse({ ...state, output: "output" }, 200, {
-				kind: "stream",
-				body: schema,
-				...withDescription(options),
-			}),
-		);
-	}
-
 	streamResponse(
 		status: number,
 		schema: StandardSchemaV1,
 		options?: StreamResponseOptions,
 	): RouteBuilder {
-		const state = procedureState(this["~restrpc"]);
+		const state = defaultRouteState(this["~restrpc"]);
 		return this.clone(
-			addResponse({ ...state, output: "response" }, status, {
+			addResponse(state, status, {
 				kind: "stream",
 				body: schema,
 				...(options?.headers ? { headers: options.headers } : {}),

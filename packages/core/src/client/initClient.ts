@@ -1,11 +1,6 @@
 import type { Contract, RouteDeclaration } from "../contract/contract.ts";
 import { mapContractRoutes } from "../contract/traversal.ts";
 import { resolveRoutePath } from "../contract/path.ts";
-import { usesFlatInput, usesPlainOutput } from "../contract/routeModes.ts";
-import {
-	flatInputSegment,
-	resolveRouteRequest,
-} from "../contract/routeRequest.ts";
 import type { BodyCodec } from "../codecs/index.ts";
 import {
 	type ApiClientFetchOptions,
@@ -16,7 +11,6 @@ import {
 } from "./request.ts";
 import {
 	fetchResponse as fetchRouteResponse,
-	fetchSuccess,
 	type RouteRequestFn,
 	type ClientResponseForDeclaration,
 } from "./response.ts";
@@ -97,7 +91,7 @@ export function initClient<
 	) =>
 		fetchRouteResponse(
 			request,
-			route.source !== "generated" && (options.validateResponses ?? false),
+			options.validateResponses ?? false,
 			options.bodyCodecs,
 			route,
 			...args,
@@ -107,27 +101,7 @@ export function initClient<
 		const resolvedRoute = {
 			...node,
 			path: resolveRoutePath(node, routePath),
-			request: resolveRouteRequest(node),
 		};
-		const inputSegment = flatInputSegment(node.method);
-		const flatInput = usesFlatInput(node);
-		const plainOutput = usesPlainOutput(node);
-		return (...args: FetchArgs) => {
-			if (
-				flatInput &&
-				inputSegment === "query" &&
-				(typeof args[0] !== "object" ||
-					args[0] === null ||
-					Array.isArray(args[0]))
-			) {
-				return Promise.reject(
-					new Error("GET flat input must be an object of query values."),
-				);
-			}
-			const request = flatInput ? { [inputSegment]: args[0] } : args[0];
-			return plainOutput
-				? fetchSuccess(fetchResponse, resolvedRoute, request as never, args[1])
-				: fetchResponse(resolvedRoute, request as never, args[1]);
-		};
+		return (...args: FetchArgs) => fetchResponse(resolvedRoute, ...args);
 	}) as ApiClientFor<TContract, TGlobalHeaders>;
 }
