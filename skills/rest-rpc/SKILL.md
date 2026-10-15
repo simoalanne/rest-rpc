@@ -10,11 +10,11 @@ Use this skill for `rest-rpc` work: setup, contracts, adapters, clients, TanStac
 ## Core Model
 
 `rest-rpc` provides REST APIs with RPC-like ergonomics. HTTP is the foundation:
-explicit methods, paths, params, query, headers, bodies, statuses, content
-types, and streams. Implicit defaults also produce ordinary HTTP routes.
+methods, paths, params, query, headers, bodies, statuses, content types, and
+streams, described with an expressive route builder and sensible defaults.
 There is no separate RPC protocol or transport to learn.
 
-Clients are derived from server implementations with small generation step. When the client should be independent of the server and both should depend on a shared contract, contract-first development is also fully supported.
+Clients are derived from server implementations with a small build-time extraction step. When the client should be independent of the server and both should depend on a shared contract, contract-first development is also fully supported.
 
 ## Library Philosophy
 
@@ -27,11 +27,10 @@ routes to the framework.
 
 ## Minimal Example
 
-Define and register HTTP routes with Express:
+Define HTTP routes in a module without side effects:
 
-```ts server.ts
-import express from "express";
-import { route, registerRoutes } from "@rest-rpc/express";
+```ts routes.ts
+import { route } from "@rest-rpc/express";
 import { z } from "zod";
 
 const todos = new Map<string, { id: string; title: string }>();
@@ -39,8 +38,8 @@ const todos = new Map<string, { id: string; title: string }>();
 export const routes = {
 	todos: {
 		create: route
-			.input(z.object({ title: z.string().min(1) }))
-			.handler(({ input: { title } }) => {
+			.body(z.object({ title: z.string().min(1) }))
+			.handler(({ body: { title } }) => {
 				const todo = { id: crypto.randomUUID(), title };
 				todos.set(todo.id, todo);
 				return todo;
@@ -50,12 +49,21 @@ export const routes = {
 			.params(z.object({ id: z.string() }))
 			.handler(({ params }) => {
 				const todo = todos.get(params.id);
-				return todo
-					? { status: 200, body: todo }
-					: { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
+				return (
+					todo ?? { status: 404, body: { code: "TODO_NOT_FOUND" as const } }
+				);
 			}),
 	},
 };
+```
+
+A handler returns a body for a 200 response, or an envelope with a numeric
+`status` for anything else. Register the routes with the framework:
+
+```ts server.ts
+import express from "express";
+import { registerRoutes } from "@rest-rpc/express";
+import { routes } from "./routes";
 
 const app = express();
 app.use(express.json());
@@ -63,19 +71,27 @@ registerRoutes(app, routes);
 app.listen(3000);
 ```
 
-Generate the client contract from the server route tree, then call the routes
-as typed functions:
+Extract the client contract from the route tree at build time, then call the
+routes as typed functions:
+
+```ts extract-contract.ts
+import { writeFile } from "node:fs/promises";
+import { extractContract } from "@rest-rpc/core";
+import { routes } from "./routes";
+
+await writeFile("contract.json", JSON.stringify(extractContract(routes)));
+```
 
 ```ts
 import { initClient } from "@rest-rpc/core";
-import { generateContractFromType } from "@rest-rpc/core/generate";
-import type { routes } from "./server";
+import type { routes } from "./routes";
+import contract from "./contract.json";
 
-const api = generateContractFromType<typeof routes>();
+const api = contract as unknown as typeof routes;
 const client = initClient(api, { baseUrl: "http://localhost:3000" });
 
-const todo = await client.todos.create({ title: "Write docs" });
-const response = await client.todos.get({ params: { id: todo.id } });
+const created = await client.todos.create({ body: { title: "Write docs" } });
+const response = await client.todos.get({ params: { id: created.body.id } });
 if (response.status === 200) {
 	console.log(response.body.title);
 }
@@ -85,7 +101,7 @@ if (response.status === 200) {
 
 Use only packages required by the detected stack:
 
-- `@rest-rpc/core`: route declarations, clients, OpenAPI and contract generation
+- `@rest-rpc/core`: route declarations, clients, OpenAPI and contract extraction
 - `@rest-rpc/tanstack-query`: TanStack Query integration
 - `@rest-rpc/express`: Express adapter
 - `@rest-rpc/fastify`: Fastify adapter
@@ -144,10 +160,10 @@ For implementation tasks:
 2. Read targeted docs only when exact current API details are needed.
 3. Install missing `rest-rpc` packages with the detected package manager.
 4. Use the server adapter that matches the project framework. Prefer normal framework organization such as Express routers, Fastify plugins, Hono route modules, NestJS modules, or framework catch-all routes.
-5. Declare routes with the adapter's `route` builder and export the completed route tree or its type. Input schemas validate requests, and handler returns infer output types.
-6. Generate the client contract with `generateContractFromType` using a type-only server import. Generation needs filesystem access and the TypeScript 5 or 6 compiler API; run it at build time for browser clients.
+5. Declare routes with the adapter's `route` builder and export the completed route tree from a module without side effects. Request segment schemas validate requests, and handler returns infer response types.
+6. Extract the client contract with `extractContract(routes)` at build time, and give it the route tree type with a type-only import in client code.
 7. Use `registerRoutes` when registering with a framework router. Use `createRouteHandler` when a runtime needs a custom matcher or catch-all handler.
 8. Register routes in multiple modules when useful; route trees and handlers don't have to be monolithic.
 9. Use typed client utils for direct calls. Use `@rest-rpc/tanstack-query` for query/mutation options and keys when TanStack Query should be used instead.
-10. If using contract-first declare contract in a package that both server and client depend on. Use `implement` to convert the contract into a server route tree and add handlers. Use the contract directly on the `initClient` call to create a typed client. No generation step is needed when the contract is shared.
+10. If using contract-first declare contract in a package that both server and client depend on. Use `implement` to convert the contract into a server route tree and add handlers. Use the contract directly on the `initClient` call to create a typed client. No extraction step is needed when the contract is shared.
 11. Let types infer from the route declarations. If inference is not enough, prefer exported helper types over new ad-hoc types.

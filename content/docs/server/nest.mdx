@@ -20,7 +20,7 @@ import { z } from "zod";
 const getDeclaration = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }));
-const createDeclaration = route.input(z.object({ title: z.string() }));
+const createDeclaration = route.body(z.object({ title: z.string() }));
 
 const declarations = {
 	todos: { get: getDeclaration, create: createDeclaration },
@@ -47,12 +47,10 @@ class TodoRoutes {
 
 	readonly get = getDeclaration.handler(({ params }) => {
 		const todo = this.todos.find(params.id);
-		return todo
-			? { status: 200, body: todo }
-			: { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
+		return todo ?? { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
 	});
 
-	readonly create = createDeclaration.handler(({ input: { title } }) =>
+	readonly create = createDeclaration.handler(({ body: { title } }) =>
 		this.todos.create(title),
 	);
 
@@ -110,7 +108,7 @@ class TodoController {
 
 :::warning
 `@Implement()` throws for a single route without a path, such as
-`route.input(schema)` or `route.get()`. Pass a path to its method setter or put
+`route.body(schema)` or `route.get()`. Pass a path to its method setter or put
 the route in a route tree.
 :::
 

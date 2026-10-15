@@ -34,7 +34,7 @@ export type ApiClientRouteValue<
 > = E extends RouteDeclaration ? FetchResponseFn<E, TGlobalHeaders> : never;
 
 /**
- * Infers the generated client tree for a contract.
+ * Infers the client tree for a contract.
  *
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#type-helpers}
  */

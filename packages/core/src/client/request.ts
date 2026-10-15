@@ -67,7 +67,7 @@ type GlobalHeaderKeys<TGlobalHeaders extends ClientHeaders> = {
 type ClientRequestValue<T> = [T] extends [never] ? undefined : T;
 
 /**
- * Infers the input passed to a generated client route call.
+ * Infers the request passed to a client route call.
  *
  * @remarks Routes without request input infer `undefined`, which the route
  * call accepts. Pass the type of the client's `globalHeaders` as the second

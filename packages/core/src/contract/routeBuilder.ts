@@ -244,7 +244,7 @@ export class RouteBuilder {
 }
 
 /**
- * Entry point for declaring contract-first routes with independent input and output forms.
+ * Entry point for declaring contract-first routes.
  *
  * @remarks Every builder method returns a new route value, so partially built
  * routes can be reused safely across declarations.

@@ -23,8 +23,8 @@ or add defaults, so the two types can differ.
 | Server handler output or response body | Schema input  |
 | Client result or response body         | Schema output |
 
-For inferred handler outputs, there is no declared response schema: client
-output types come from the handler's return value.
+For inferred handler responses, there is no declared response schema: client
+result types come from the handler's return value.
 
 ## Request Validation
 
@@ -50,23 +50,20 @@ for the handler.
 
 ## Response Validation on the Server
 
-Declared output schemas validate the handler result before response
-serialization. A plain `.output(schema)` handler returns schema input directly;
-a `.response(status, schema)` handler supplies schema input in `body`.
-Declared response headers are validated too. The server sends the validated
-schema output.
+Declared response schemas validate the handler's response body before
+serialization. Declared response headers are validated too. The server sends
+the validated schema output.
 
 ```ts
 const create = route
-	.input(z.object({ title: z.string() }))
-	.output(z.object({ id: z.string(), title: z.string() }))
-	.handler(({ input: { title } }) => ({ id: crypto.randomUUID(), title }));
+	.body(z.object({ title: z.string() }))
+	.response(z.object({ id: z.string(), title: z.string() }))
+	.handler(({ body: { title } }) => ({ id: crypto.randomUUID(), title }));
 ```
 
-Inferred outputs provide type checking without runtime response validation.
-Add `.output()`, `.response()`, `.streamOutput()`, or `.streamResponse()` when
-runtime validation is needed. Declared stream schemas validate each item as it
-is yielded.
+Inferred responses provide type checking without runtime response validation.
+Add `.response()` or `.streamResponse()` when runtime validation is needed.
+Declared stream schemas validate each item as it is yielded.
 
 Response validation failures produce a generic 500 response by default. See
 [Error Responses](/docs/http-behavior/errors).
@@ -105,7 +102,7 @@ The `title` property can be missing in the response body because the default val
 const getTodo = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.coerce.number<number>().int().min(1) }))
-	.output(z.object({ id: z.number(), title: z.string().default("Untitled") }))
+	.response(z.object({ id: z.number(), title: z.string().default("Untitled") }))
 	.handler(({ params: { id } }) => {
 		const todo: { id: number; title?: string } = getTodoById(id);
 		return todo;
@@ -124,8 +121,8 @@ to transform input to output. The mapping function can be asynchronous.
 import { type } from "@rest-rpc/core";
 
 const create = route
-	.input(type<{ title: string }>())
-	.handler(({ input: { title } }) => ({ id: crypto.randomUUID(), title }));
+	.body(type<{ title: string }>())
+	.handler(({ body: { title } }) => ({ id: crypto.randomUUID(), title }));
 
 const numberToStringSchema = type((input: number) => input.toString());
 ```

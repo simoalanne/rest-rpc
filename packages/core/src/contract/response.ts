@@ -171,12 +171,12 @@ type MatchesStatusFilter<
 	: number extends TStatus
 		? true
 		: `${TStatus}` extends `2${string}`
-		? TFilter extends "success"
-			? true
-			: false
-		: TFilter extends "error"
-			? true
-			: false;
+			? TFilter extends "success"
+				? true
+				: false
+			: TFilter extends "error"
+				? true
+				: false;
 
 type ResponseEntryFor<
 	TSide extends "client" | "server",
@@ -220,11 +220,12 @@ export type ErrorDeclaredClientResponse<E extends RouteDeclaration> =
 	ResponseUnion<E, "client", "error">;
 
 /**
- * Infers the output returned by a route handler.
+ * Infers the response envelopes returned by a route handler.
  *
  * @remarks Response schemas contribute their input types because handlers
- * produce values before response validation and transformation. Pass a route
- * tree to infer a matching tree of response types.
+ * produce values before response validation and transformation. Handlers may
+ * also return the body of a declared 200 response directly. Pass a route tree
+ * to infer a matching tree of response types.
  *
  * @see {@link https://rest-rpc.dev/docs/route-builder#infer-server-response}
  */

@@ -7,15 +7,14 @@ seo:
 
 <span data-home-page />
 
-Define REST APIs with methods, paths, request segments, response statuses,
-content types, and streaming—or start with sensible defaults. Call them through
-a typed client that feels like ordinary function calls.
+Define REST APIs with an expressive HTTP route builder and sensible defaults.
+Call them through a typed client that feels like ordinary function calls.
 
 `rest-rpc` puts HTTP first. Define routes alongside their handlers and infer
 client types from their return values. Use your existing server framework,
 middleware, and deployment model.
 
-## Use Only the Details You Need
+## Define Routes, Call Functions
 
 <Tabs>
 <Tab title="Routes">
@@ -31,12 +30,12 @@ declare function findTodo(
 	id: string,
 ): { id: string; title: string } | undefined;
 // ---cut-end---
-// POST /todos/create, flat JSON input, plain result.
+// POST /todos/create, JSON body, 200 result.
 const create = route
-	.input(z.object({ title: z.string() }))
-	.handler(({ input: { title } }) => createTodo(title));
+	.body(z.object({ title: z.string() }))
+	.handler(({ body: { title } }) => createTodo(title));
 
-// Explicit method, path, request segments, statuses, and response headers.
+// GET /todos/:id with params, query, headers, statuses, and response headers.
 const get = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
@@ -75,77 +74,12 @@ declare function findTodo(
 	id: string,
 ): { id: string; title: string } | undefined;
 
-// POST /todos/create, flat JSON input, plain result.
+// POST /todos/create, JSON body, 200 result.
 const create = route
-	.input(z.object({ title: z.string() }))
-	.handler(({ input: { title } }) => createTodo(title));
+	.body(z.object({ title: z.string() }))
+	.handler(({ body: { title } }) => createTodo(title));
 
-// Explicit method, path, request segments, statuses, and response headers.
-const get = route
-	.get("/todos/:id")
-	.params(z.object({ id: z.string() }))
-	.query(z.object({ uppercase: z.enum(["yes", "no"]).optional() }))
-	.headers(z.object({ "x-request-id": z.string().optional() }))
-	.handler(({ params, query }) => {
-		const todo = findTodo(params.id);
-		if (!todo) {
-			return { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
-		}
-		return {
-			status: 200,
-			headers: { "x-powered-by": "rest-rpc" },
-			body: {
-				...todo,
-				title:
-					query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title,
-			},
-		};
-	});
-
-export const routes = { todos: { create, get } };
-
-// @filename: client.ts
-// ---cut-end---
-import { initClient } from "@rest-rpc/core";
-import { generateContractFromType } from "@rest-rpc/core/generate";
-import type { routes } from "./server";
-
-// Run generation at build time for browser clients.
-const api = generateContractFromType<typeof routes>();
-const client = initClient(api, { baseUrl: "http://localhost:3000" });
-
-const todo = await client.todos.create({ title: "Write docs" });
-const response = await client.todos.get({
-	params: { id: todo.id },
-	query: { uppercase: "yes" },
-	headers: { "x-request-id": "req_1" },
-});
-
-if (response.status === 200) {
-	console.log(response.body.title);
-}
-```
-
-</Tab>
-<Tab title="TanStack Query">
-
-```tsx twoslash
-// ---cut-start---
-// @filename: server.ts
-import { route } from "@rest-rpc/express";
-import { z } from "zod";
-
-declare function createTodo(title: string): { id: string; title: string };
-declare function findTodo(
-	id: string,
-): { id: string; title: string } | undefined;
-
-// POST /todos/create, flat JSON input, plain result.
-const create = route
-	.input(z.object({ title: z.string() }))
-	.handler(({ input: { title } }) => createTodo(title));
-
-// Explicit method, path, request segments, statuses, and response headers.
+// GET /todos/:id with params, query, headers, statuses, and response headers.
 const get = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
@@ -170,10 +104,75 @@ const get = route
 export const routes = { todos: { create, get } };
 
 // @filename: client-contract.ts
-import { generateContractFromType } from "@rest-rpc/core/generate";
 import type { routes } from "./server";
+export declare const api: typeof routes;
 
-export const api = generateContractFromType<typeof routes>();
+// @filename: client.ts
+// ---cut-end---
+import { initClient } from "@rest-rpc/core";
+// Extracted from the routes at build time with extractContract(routes).
+import { api } from "./client-contract";
+
+const client = initClient(api, { baseUrl: "http://localhost:3000" });
+
+const created = await client.todos.create({ body: { title: "Write docs" } });
+const response = await client.todos.get({
+	params: { id: created.body.id },
+	query: { uppercase: "yes" },
+	headers: { "x-request-id": "req_1" },
+});
+
+if (response.status === 200) {
+	console.log(response.body.title);
+}
+```
+
+</Tab>
+<Tab title="TanStack Query">
+
+```tsx twoslash
+// ---cut-start---
+// @filename: server.ts
+import { route } from "@rest-rpc/express";
+import { z } from "zod";
+
+declare function createTodo(title: string): { id: string; title: string };
+declare function findTodo(
+	id: string,
+): { id: string; title: string } | undefined;
+
+// POST /todos/create, JSON body, 200 result.
+const create = route
+	.body(z.object({ title: z.string() }))
+	.handler(({ body: { title } }) => createTodo(title));
+
+// GET /todos/:id with params, query, headers, statuses, and response headers.
+const get = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.query(z.object({ uppercase: z.enum(["yes", "no"]).optional() }))
+	.headers(z.object({ "x-request-id": z.string().optional() }))
+	.handler(({ params, query }) => {
+		const todo = findTodo(params.id);
+		if (!todo) {
+			return { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
+		}
+		return {
+			status: 200,
+			headers: { "x-powered-by": "rest-rpc" },
+			body: {
+				...todo,
+				title:
+					query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title,
+			},
+		};
+	});
+
+export const routes = { todos: { create, get } };
+
+// @filename: client-contract.ts
+import type { routes } from "./server";
+export declare const api: typeof routes;
 
 // @filename: client.tsx
 import { api } from "./client-contract";
@@ -195,7 +194,7 @@ const todo = useQuery(
 );
 const create = useMutation(restrpc.todos.create.mutationOptions());
 
-create.mutate({ title: "Write docs" });
+create.mutate({ body: { title: "Write docs" } });
 ```
 
 </Tab>
@@ -214,10 +213,6 @@ curl 'http://localhost:3000/todos/todo_1?uppercase=yes' \
 </Tab>
 </Tabs>
 
-Plain outputs reach the client as data. Returns with `status` reach it as HTTP
-response envelopes. The builder keeps both shapes typed without making you
-choose a separate route kind.
-
 <CardGroup cols={2}>
 	<Card
 		title="Start building"
@@ -233,7 +228,8 @@ choose a separate route kind.
 		icon="map"
 		cta="Explore route declarations"
 	>
-		Choose inputs, outputs, HTTP details, streams, and metadata in one builder.
+		Choose request segments, responses, HTTP details, streams, and metadata in
+		one builder.
 	</Card>
 	<Card
 		title="Generate OpenAPI"
@@ -261,8 +257,8 @@ npx skills add rest-rpc/rest-rpc
 		of the server implementation.
 	</Card>
 	<Card title="Composable route builders" icon="blocks" type="check">
-		Choose a method and path, flat input or request segments, and plain output
-		or status responses independently in one fluent builder.
+		Describe methods, paths, request segments, and responses in one fluent
+		builder with sensible defaults.
 	</Card>
 	<Card title="RPC-like ergonomics" icon="braces" type="check">
 		Call routes and implement handlers as ordinary functions without
@@ -298,8 +294,8 @@ npx skills add rest-rpc/rest-rpc
 		end-to-end example.
 	</Step>
 	<Step title="Shape the routes" icon="file-code">
-		Use the [Route Builder](/docs/route-builder/) to choose the HTTP details
-		your API needs.
+		Use the [Route Builder](/docs/route-builder/) to describe requests,
+		responses, and streams.
 	</Step>
 	<Step title="Choose the runtime" icon="plug">
 		Explore the [server adapters](/docs/server/express/), the [fetch
@@ -334,8 +330,8 @@ adapters, client, or OpenAPI generation as they become useful.
 	</AccordionItem>
 	<AccordionItem title="Do I need to learn a new API model?">
 		The model is ordinary HTTP: methods, paths, request locations, status codes,
-		headers, and response bodies. Choose explicit details when you need them or
-		use defaults for simple routes.
+		headers, and response bodies. The route builder describes them directly,
+		with sensible defaults for methods, paths, and success statuses.
 	</AccordionItem>
 	<AccordionItem title="Can I have a separate contract?">
 		Yes. Declare the HTTP interface independently, implement it with any server

@@ -9,7 +9,7 @@ import type { Merge } from "@rest-rpc/core/utils";
  * `contentType` selects a custom-content response for non-stream bodies;
  * otherwise bodies use JSON.
  *
- * @see {@link https://rest-rpc.dev/docs/route-builder#choose-plain-outputs-or-status-responses}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#return-responses}
  */
 export type ImplicitResponseEnvelope =
 	| {
@@ -35,7 +35,7 @@ type BodyResponseKind<TResponse, TBody> =
 /**
  * Infers the body encoding selected by a handler response shape.
  *
- * @see {@link https://rest-rpc.dev/docs/route-builder#choose-plain-outputs-or-status-responses}
+ * @see {@link https://rest-rpc.dev/docs/route-builder#return-responses}
  */
 export type ImplicitResponseKind<TResponse> = TResponse extends unknown
 	? "body" extends keyof TResponse
@@ -125,18 +125,20 @@ type EnvelopeKey = "status" | "body" | "contentType" | "headers";
 
 // TypeScript adds optional `undefined` envelope keys to plain object members
 // returned next to envelopes; they are not part of the body.
-type WithoutNormalizedEnvelopeKeys<T> = [Extract<keyof T, EnvelopeKey>] extends [
-	never,
-]
+type WithoutNormalizedEnvelopeKeys<T> = [
+	Extract<keyof T, EnvelopeKey>,
+] extends [never]
 	? T
 	: {
-			[TKey in keyof T as TKey extends EnvelopeKey
-				? [T[TKey]] extends [undefined]
-					? {} extends Pick<T, TKey>
-						? never
+			[
+				TKey in keyof T as TKey extends EnvelopeKey
+					? [T[TKey]] extends [undefined]
+						? {} extends Pick<T, TKey>
+							? never
+							: TKey
 						: TKey
 					: TKey
-				: TKey]: T[TKey];
+			]: T[TKey];
 		};
 
 // A member with a numeric status is an envelope; any other value is the 200 body.
@@ -148,7 +150,10 @@ export type ValidImplicitResult<TResult> = [Awaited<TResult>] extends [never]
 	? never
 	: [Extract<Awaited<TResult>, { status: number }>] extends [never]
 		? unknown
-		: Extract<Awaited<TResult>, { status: number }> extends ImplicitResponseEnvelope
+		: Extract<
+					Awaited<TResult>,
+					{ status: number }
+			  > extends ImplicitResponseEnvelope
 			? unknown
 			: never;
 

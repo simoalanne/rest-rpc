@@ -19,8 +19,8 @@ import { route } from "@rest-rpc/express";
 const getProfile = route
 	.$context<{ user?: User }>()
 	.get("/profile")
-	.response(200, z.object({ user: userSchema }))
-	.response(401)
+	.response(z.object({ user: userSchema }))
+	.response({ status: 401 })
 	.use(async ({ next }) => {
 		const started = performance.now();
 		try {
@@ -91,8 +91,8 @@ const getUserProfile = route
 	.get("/profile")
 	.headers(z.object({ authorization: z.string() }))
 	.use(attachUser)
-	.response(200, z.object({ user: profileSchema }))
-	.response(401, z.object({ error: z.string() }))
+	.response(z.object({ user: profileSchema }))
+	.response(z.object({ error: z.string() }), { status: 401 })
 	.handler(({ context }) => {
 		const user = context.get("user");
 		if (!user) return { status: 401, body: { error: "Unauthorized" } };

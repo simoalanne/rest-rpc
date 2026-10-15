@@ -1,0 +1,103 @@
+---
+title: Client Contract Extraction
+description: Extract a minimal runtime contract from your server routes.
+---
+
+`extractContract()` turns your server route tree into the minimal contract a
+client needs. Use it with the Fetch client or TanStack Query utils without
+shipping server code to the client.
+
+:::note[Using Contract-First Approach?]
+If using the [contract-first approach](/docs/contract-first),
+you can skip this step and import the shared contract directly in your client code.
+:::
+
+## What Is Extracted
+
+For each route, the contract keeps only:
+
+- the HTTP method,
+- the path, with paths derived from tree keys resolved,
+- the request body content type, when the route declares a body.
+
+Schemas, responses, metadata, OpenAPI details, and handlers are left out. The
+result is plain JSON. Its type is the route tree type, so the client still
+infers requests and responses from your server routes.
+
+## Extract at Build Time
+
+Extraction imports and runs the module that defines your routes, so it runs
+at build time, not in the client. Keep the route tree in a module without side
+effects, separate from code that starts the server or connects to databases.
+
+### With a Script
+
+Write the contract to a JSON file and import it with the route tree type:
+
+```ts scripts/extract-contract.ts
+import { writeFile } from "node:fs/promises";
+import { extractContract } from "@rest-rpc/core";
+import { routes } from "../src/server/routes";
+
+await writeFile(
+	"src/client/contract.json",
+	JSON.stringify(extractContract(routes)),
+);
+```
+
+```ts src/client/client-contract.ts
+import type { routes } from "../server/routes";
+import contract from "./contract.json";
+
+export const api = contract as unknown as typeof routes;
+```
+
+```ts
+import { initClient } from "@rest-rpc/core";
+import { api } from "./client-contract";
+
+const client = initClient(api, { baseUrl: "http://localhost:3000" });
+```
+
+The `import type` is erased from the client bundle. The client's TypeScript
+project still needs to be able to type check the server route files.
+
+### With a Bundler Macro
+
+A build-time macro inlines the contract into the client bundle. For example,
+with Bun macros:
+
+```ts client-contract.macro.ts
+import { extractContract } from "@rest-rpc/core";
+import { routes } from "./server/routes";
+
+export function getApi() {
+	return extractContract(routes);
+}
+```
+
+```ts client.ts
+import { initClient } from "@rest-rpc/core";
+import { getApi } from "./client-contract.macro" with { type: "macro" };
+
+const client = initClient(getApi(), { baseUrl: "http://localhost:3000" });
+```
+
+Other bundlers can use a macro integration such as `unplugin-macros`.
+
+## Limitations
+
+An extracted contract has no response declarations or schemas:
+
+- [Client response validation](/docs/client/fetch-client#response-validation)
+  is not available.
+- The client does not check response statuses or content types. An
+  unexpected response, such as an error page from a proxy, is returned with a
+  status the types do not list.
+
+Declared schemas still validate requests and responses on the server. If the
+client needs runtime schemas, use a [shared contract](/docs/contract-first)
+instead.
+
+Generate [OpenAPI](/docs/openapi) documents from the server routes, not from an
+extracted contract.
