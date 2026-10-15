@@ -27,12 +27,6 @@ export type OpenApiRouteOptions = {
 	extensions?: Record<`x-${string}`, unknown>;
 };
 
-/** OpenAPI operation metadata attached to a route declaration. */
-export type CommonOpenApiRouteOptions = Omit<
-	OpenApiRouteOptions,
-	"summary" | "description" | "operationId"
->;
-
 /** Canonical ordered request-schema declarations nested on a route. */
 export type RouteRequestDeclaration = {
 	body?: readonly RequestBodySchema[];

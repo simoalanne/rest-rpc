@@ -2,7 +2,6 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { BodyOptions } from "./body.ts";
 import type {
 	AbsolutePath,
-	CommonOpenApiRouteOptions,
 	HttpMethod,
 	OpenApiRouteOptions,
 	RouteDeclaration,
@@ -45,20 +44,20 @@ const assertHttpStatusCode = (status: number) => {
 	}
 };
 
-const mergeUnique = (common: string[] = [], local: string[] = []) => [
-	...new Set([...common, ...local]),
+const mergeUnique = (current: string[] = [], next: string[] = []) => [
+	...new Set([...current, ...next]),
 ];
 
 const mergeOpenApi = (
-	common: CommonOpenApiRouteOptions | undefined,
-	local: OpenApiRouteOptions | undefined,
+	current: OpenApiRouteOptions | undefined,
+	next: OpenApiRouteOptions | undefined,
 ): OpenApiRouteOptions | undefined => {
-	if (!common && !local) return undefined;
+	if (!current && !next) return undefined;
 	return {
-		...common,
-		...local,
-		tags: mergeUnique(common?.tags, local?.tags),
-		extensions: { ...common?.extensions, ...local?.extensions },
+		...current,
+		...next,
+		tags: mergeUnique(current?.tags, next?.tags),
+		extensions: { ...current?.extensions, ...next?.extensions },
 	};
 };
 
