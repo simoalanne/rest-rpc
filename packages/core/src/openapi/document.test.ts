@@ -21,7 +21,7 @@ describe("document", () => {
 	it("documents routes without declared responses with a default placeholder", () => {
 		const inferred = {
 			"~restrpc": {
-				...route.get("/").response(204)["~restrpc"],
+				...route.get("/").response({ status: 204 })["~restrpc"],
 				responses: {},
 			},
 		};
@@ -39,9 +39,9 @@ describe("document", () => {
 	it("normalizes explicit paths and derives paths from nested contract keys", () => {
 		const contract = {
 			users: {
-				get: route.get("/users/:id").response(200, type<string>()),
-				remove: route.delete("/users/{id}").response(204),
-				create: route.body(type<string>()).response(200, type<string>()),
+				get: route.get("/users/:id").response(type<string>()),
+				remove: route.delete("/users/{id}").response({ status: 204 }),
+				create: route.body(type<string>()).response(type<string>()),
 			},
 		};
 		const document = createOpenApiDocument(contract, {

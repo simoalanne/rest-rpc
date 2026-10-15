@@ -14,7 +14,9 @@ import type {
 	RouteMetadata,
 	RouteTree,
 	ServerResponse,
+	ServerResponseBody,
 } from "@rest-rpc/core/contract";
+import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import type { SseServerEvent } from "./sse.ts";
 import type { Context } from "./context.ts";
 import type {
@@ -31,16 +33,31 @@ export type RuntimeRouteHandler = (
 	request: unknown,
 ) => unknown | Promise<unknown>;
 
-type WithSseServerEvents<T> = T extends { body: infer TBody }
-	? TBody extends AsyncIterable<infer TItem>
-		? Omit<T, "body"> & {
-				body: AsyncIterable<TItem | SseServerEvent<TItem>>;
-			}
-		: T
+type WithSseItems<T> =
+	T extends AsyncIterable<infer TItem>
+		? AsyncIterable<TItem | SseServerEvent<TItem>>
+		: T;
+
+type WithSseServerEvents<T> = T extends {
+	body: AsyncIterable<unknown>;
+}
+	? Omit<T, "body"> & { body: WithSseItems<T["body"]> }
 	: T;
 
+// Handlers may return the body of a declared 200 response directly, unless its
+// content type must be selected from a list.
+type PlainResponseBody<TRoute extends RouteDeclaration> = TRoute extends {
+	responses: { 200: infer TResponse };
+}
+	? TResponse extends { contentType: readonly string[] }
+		? never
+		: TResponse extends { body: StandardSchemaV1 }
+			? WithSseItems<ServerResponseBody<TResponse>>
+			: never
+	: never;
+
 type HandlerResult<TRoute extends RouteDeclaration> = MaybePromise<
-	WithSseServerEvents<ServerResponse<TRoute>>
+	WithSseServerEvents<ServerResponse<TRoute>> | PlainResponseBody<TRoute>
 >;
 
 /**

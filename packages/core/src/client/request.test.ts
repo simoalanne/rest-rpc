@@ -131,7 +131,11 @@ describe("request", () => {
 	it("serializes JSON and applies header precedence case-insensitively", async () => {
 		const fetch = vi.fn(async () => new Response(null, { status: 204 }));
 		await executeRequest(
-			{ method: "POST", path: "/users", request: { body: true } },
+			{
+				method: "POST",
+				path: "/users",
+				request: { contentType: "application/json" },
+			},
 			[
 				{ body: { name: "Ada" }, headers: { "X-Token": "request" } },
 				{

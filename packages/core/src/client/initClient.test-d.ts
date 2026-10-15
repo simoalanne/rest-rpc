@@ -4,13 +4,13 @@ import { initClient } from "./initClient.ts";
 
 describe("initClient types", () => {
 	it("allows empty requests and optional or guaranteed segmented headers", () => {
-		const empty = initClient(route.get("/").response(204), { baseUrl: "" });
+		const empty = initClient(route.get("/").response({ status: 204 }), { baseUrl: "" });
 		empty();
 		empty(undefined, {});
 		const contract = route
 			.get("/")
 			.headers(type<{ token: string; optional?: string }>())
-			.response(204);
+			.response({ status: 204 });
 		const literal = initClient(contract, {
 			baseUrl: "",
 			globalHeaders: { token: "value" },
@@ -35,7 +35,7 @@ describe("initClient types", () => {
 		// @ts-expect-error An optional provider cannot guarantee the required token.
 		optionalProvider({});
 		const optional = initClient(
-			route.get("/").headers(type<{ token?: string }>()).response(204),
+			route.get("/").headers(type<{ token?: string }>()).response({ status: 204 }),
 			{ baseUrl: "" },
 		);
 		optional({});
@@ -45,10 +45,7 @@ describe("initClient types", () => {
 		const contract = {
 			length: route
 				.body(type((value: string) => Number(value)))
-				.response(
-					200,
-					type((value: string) => value.length),
-				),
+				.response(type((value: string) => value.length)),
 		};
 		const client = initClient(contract, { baseUrl: "" });
 		expectTypeOf(client.length).parameter(0).toEqualTypeOf<{ body: string }>();
@@ -65,8 +62,8 @@ describe("initClient types", () => {
 		const client = initClient(
 			route
 				.get()
-				.response(200, type<{ name: string }>())
-				.response(404, type<{ message: string }>()),
+				.response(type<{ name: string }>())
+				.response(type<{ message: string }>(), { status: 404 }),
 			{ baseUrl: "" },
 		);
 		const response = await client();
@@ -81,7 +78,7 @@ describe("initClient types", () => {
 				.body(type<string>(), {
 					contentType: ["text/plain", "application/json"],
 				})
-				.response(200, type<string>()),
+				.response(type<string>()),
 			{ baseUrl: "" },
 		);
 		client({ body: "Ada" }, { contentType: "text/plain" });

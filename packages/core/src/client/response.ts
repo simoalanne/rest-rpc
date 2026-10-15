@@ -141,35 +141,38 @@ const readStreamResponse = (
 	rawResponse: Response,
 	validate: boolean,
 ) => {
-	if (
-		normalizeMediaType(rawResponse.headers.get("content-type")) !==
-		STREAM_CONTENT_TYPE
-	) {
-		throw new Error("Server returned an unsupported stream content-type.");
-	}
-
 	if (rawResponse.body === null) {
 		throw new Error("Server returned no stream body");
 	}
 	return parseSseStream(schema, rawResponse.body, validate, rawResponse.status);
 };
 
-const readDeclaredHeaders = async (
-	schema: ResponseDeclaration,
+const readHeaders = async (
+	schema: ResponseDeclaration | undefined,
 	rawResponse: Response,
 	validate: boolean,
 	body: unknown,
 ) => {
-	const { headers } = schema;
-	if (!headers) return undefined;
-
 	const rawHeaders = Object.fromEntries(rawResponse.headers.entries());
-	if (!validate) return rawHeaders;
+	if (!schema?.headers || !validate) return rawHeaders;
 
-	const result = await validateStandardSchema(headers, rawHeaders);
+	const result = await validateStandardSchema(schema.headers, rawHeaders);
 	if (result.issues)
 		throw new HttpError(rawResponse.status, body, { cause: result.issues });
 	return result.value;
+};
+
+const readBody = async (
+	rawResponse: Response,
+	mediaType: string,
+	bodyCodecs: readonly BodyCodec<Response>[] | undefined,
+) => {
+	if (!mediaType || rawResponse.body === null) return undefined;
+	const resolvedCodec = resolveBodyCodec(mediaType, [
+		...(bodyCodecs ?? []),
+		...defaultBodyCodecs,
+	]);
+	return resolvedCodec?.deserialize?.(rawResponse);
 };
 
 export type RouteRequestFn = <E extends RouteDeclaration & { path: string }>(
@@ -177,6 +180,14 @@ export type RouteRequestFn = <E extends RouteDeclaration & { path: string }>(
 	...args: FetchArgs<E>
 ) => Promise<Response>;
 
+/**
+ * Reads a fetch response into a status envelope.
+ *
+ * @remarks `text/event-stream` responses are always parsed as SSE streams.
+ * Routes without response declarations, such as extracted contracts, return
+ * every status as an envelope. Routes with declarations reject undeclared
+ * statuses and undeclared media types.
+ */
 export const fetchResponse = async <
 	E extends RouteDeclaration & { path: string },
 >(
@@ -187,57 +198,39 @@ export const fetchResponse = async <
 	...args: FetchArgs<E>
 ) => {
 	const rawResponse = await request(route, ...args);
+	const { status } = rawResponse;
+	const schema: ResponseDeclaration | undefined = route.responses?.[status];
+	const mediaType = normalizeMediaType(rawResponse.headers.get("content-type"));
 
-	const schema = route.responses[rawResponse.status];
-	if (schema?.kind === "stream") {
-		const body = readStreamResponse(schema.body, rawResponse, validateResponse);
+	if (mediaType === STREAM_CONTENT_TYPE) {
+		const body = readStreamResponse(schema?.body, rawResponse, validateResponse);
 		return {
-			status: rawResponse.status,
+			status,
 			rawHeaders: rawResponse.headers,
-			headers: await readDeclaredHeaders(
-				schema,
-				rawResponse,
-				validateResponse,
-				body,
-			),
+			headers: await readHeaders(schema, rawResponse, validateResponse, body),
 			body,
 		};
 	}
-
-	const mediaType = normalizeMediaType(rawResponse.headers.get("content-type"));
-	let value: unknown;
-	if (mediaType && rawResponse.body !== null) {
-		const resolvedCodec = resolveBodyCodec(mediaType, [
-			...(bodyCodecs ?? []),
-			...defaultBodyCodecs,
-		]);
-		value = await resolvedCodec?.deserialize?.(rawResponse);
+	if (schema?.kind === "stream") {
+		throw new Error("Server returned an unsupported stream content-type.");
 	}
 
-	if (!schema) {
-		throw new HttpError(rawResponse.status, value);
+	const value = await readBody(rawResponse, mediaType, bodyCodecs);
+	const declaresResponses = Object.keys(route.responses ?? {}).length > 0;
+	if (!schema && declaresResponses) {
+		throw new HttpError(status, value);
 	}
-	assertResponseContentType(schema.contentType, rawResponse, value);
-	const responseMetadata = {
-		status: rawResponse.status,
-		rawHeaders: rawResponse.headers,
-		headers: await readDeclaredHeaders(
-			schema,
-			rawResponse,
-			validateResponse,
-			value,
-		),
-	};
-	const body = await validateResponseValue(
-		schema.body,
-		value,
-		validateResponse,
-		rawResponse.status,
-	);
-
+	if (schema) assertResponseContentType(schema.contentType, rawResponse, value);
 	return {
-		...responseMetadata,
-		body,
+		status,
+		rawHeaders: rawResponse.headers,
+		headers: await readHeaders(schema, rawResponse, validateResponse, value),
+		body: await validateResponseValue(
+			schema?.body,
+			value,
+			validateResponse,
+			status,
+		),
 	};
 };
 

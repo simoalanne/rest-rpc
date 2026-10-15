@@ -3,7 +3,7 @@ import { serverRoute as route } from "./routeBuilder.ts";
 
 describe("routeBuilder types", () => {
 	it("checks declared response statuses and bodies", () => {
-		const declared = route.get("/").response(200, type<{ id: string }>());
+		const declared = route.get("/").response(type<{ id: string }>());
 		declared.handler(() => ({ status: 200, body: { id: "ok" } }));
 		// @ts-expect-error The route only declares status 200.
 		declared.handler(() => ({ status: 404, body: { id: "missing" } }));

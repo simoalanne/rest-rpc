@@ -1,6 +1,7 @@
 import { route } from "../contract/routeBuilder.ts";
 import { type } from "../standard-schema/type.ts";
 import type { SseEvent } from "../sse.ts";
+import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type {
 	InferClientError,
 	InferClientResponse,
@@ -12,18 +13,14 @@ describe("client response inference", () => {
 	it("uses transformed schema outputs in response unions", () => {
 		const value = route
 			.get("/")
-			.response(
-				200,
-				type((input: string) => Number(input)),
-				{
+			.response(type((input: string) => Number(input)), {
 					contentType: ["text/plain", "application/json"],
 					headers: type((input: { count: string }) => ({
 						count: Number(input.count),
 					})),
-				},
-			)
-			.response(204)
-			.response(404, type<{ message: string }>());
+				})
+			.response({ status: 204 })
+			.response(type<{ message: string }>(), { status: 404 });
 		type Client = InferClientResponse<typeof value>;
 		expectTypeOf<Client["status"]>().toEqualTypeOf<200 | 204 | 404>();
 		expectTypeOf<
@@ -41,17 +38,14 @@ describe("client response inference", () => {
 	});
 
 	it("uses transformed schema outputs for streams", () => {
-		const stream = route.get("/").streamResponse(
-			200,
-			type((input: string) => Number(input)),
-		);
+		const stream = route.get("/").streamResponse(type((input: string) => Number(input)));
 		expectTypeOf<InferClientResponse<typeof stream>["body"]>().toEqualTypeOf<
 			AsyncIterable<SseEvent<number>>
 		>();
 	});
 
 	it("infers results for a route tree", () => {
-		const get = route.get("/").response(200, type<string>());
+		const get = route.get("/").response(type<string>());
 		const tree = { users: { get } };
 		expectTypeOf<
 			InferClientResponse<typeof tree>["users"]["get"]
@@ -61,9 +55,9 @@ describe("client response inference", () => {
 	it("splits declared responses into success and error results", () => {
 		const value = route
 			.get("/")
-			.response(200, type<{ name: string }>())
-			.response(204)
-			.response(404, type<{ message: string }>());
+			.response(type<{ name: string }>())
+			.response({ status: 204 })
+			.response(type<{ message: string }>(), { status: 404 });
 		expectTypeOf<InferClientSuccess<typeof value>>().toEqualTypeOf<
 			| { status: 200; body: { name: string }; rawHeaders: Headers }
 			| { status: 204; body: undefined; rawHeaders: Headers }
@@ -83,15 +77,12 @@ describe("client response inference", () => {
 	});
 
 	it("unwraps stream event data", () => {
-		const output = route.streamResponse(
-			200,
-			type((input: string) => Number(input)),
-		);
+		const output = route.streamResponse(type((input: string) => Number(input)));
 		const response = route
 			.get("/")
-			.streamResponse(200, type<{ value: number }>())
-			.response(404, type<{ message: string }>());
-		const plain = route.response(200, type<string>());
+			.streamResponse(type<{ value: number }>())
+			.response(type<{ message: string }>(), { status: 404 });
+		const plain = route.response(type<string>());
 		expectTypeOf<
 			InferClientStreamData<typeof output>
 		>().toEqualTypeOf<number>();
@@ -103,5 +94,23 @@ describe("client response inference", () => {
 		expectTypeOf<
 			InferClientStreamData<typeof tree>["events"]["output"]
 		>().toEqualTypeOf<number>();
+	});
+
+	it("types event-stream content as a stream and keeps non-literal statuses on both sides", () => {
+		const raw = route.get("/").response(type<string>(), {
+			contentType: "text/event-stream",
+		});
+		expectTypeOf<InferClientResponse<typeof raw>["body"]>().toEqualTypeOf<
+			AsyncIterable<SseEvent<unknown>>
+		>();
+		type Wide = {
+			readonly "~restrpc": {
+				method: "GET";
+				path: "/";
+				responses: { [status: number]: { body: StandardSchemaV1<string> } };
+			};
+		};
+		expectTypeOf<InferClientSuccess<Wide>["status"]>().toEqualTypeOf<number>();
+		expectTypeOf<InferClientError<Wide>["status"]>().toEqualTypeOf<number>();
 	});
 });

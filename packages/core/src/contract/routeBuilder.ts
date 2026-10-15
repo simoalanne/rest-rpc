@@ -15,6 +15,7 @@ import type {
 	RequestQuerySchema,
 } from "./request.ts";
 import type {
+	BodylessResponseOptions,
 	ResponseDeclaration,
 	ResponseOptions,
 	StreamResponseOptions,
@@ -22,6 +23,11 @@ import type {
 import type { PublicRouteBuilder } from "./routeBuilder.types.ts";
 
 type RouteBuilderState = Partial<RouteDeclaration>;
+
+const isStandardSchema = (value: unknown): value is StandardSchemaV1 =>
+	(typeof value === "object" || typeof value === "function") &&
+	value !== null &&
+	"~standard" in value;
 
 const appendSchema = <TSchema extends StandardSchemaV1>(
 	schemas: readonly TSchema[] | undefined,
@@ -197,38 +203,37 @@ export class RouteBuilder {
 	}
 
 	response(
-		status: number,
-		schema?: StandardSchemaV1,
+		schemaOrOptions?: StandardSchemaV1 | BodylessResponseOptions,
 		options?: ResponseOptions,
 	): RouteBuilder {
 		const state = defaultRouteState(this["~restrpc"]);
+		if (!isStandardSchema(schemaOrOptions)) {
+			const { status = 200, headers } = schemaOrOptions ?? {};
+			return this.clone(
+				addResponse(state, status, {
+					body: undefined,
+					...(headers ? { headers } : {}),
+					...withDescription(schemaOrOptions),
+				}),
+			);
+		}
+		const { status = 200, ...declaration } = options ?? {};
 		return this.clone(
-			addResponse(
-				state,
-				status,
-				schema
-					? {
-							...options,
-							body: schema,
-							contentType: options?.contentType ?? "application/json",
-						}
-					: {
-							body: undefined,
-							...(options?.headers ? { headers: options.headers } : {}),
-							...withDescription(options),
-						},
-			),
+			addResponse(state, status, {
+				...declaration,
+				body: schemaOrOptions,
+				contentType: declaration.contentType ?? "application/json",
+			}),
 		);
 	}
 
 	streamResponse(
-		status: number,
 		schema: StandardSchemaV1,
 		options?: StreamResponseOptions,
 	): RouteBuilder {
 		const state = defaultRouteState(this["~restrpc"]);
 		return this.clone(
-			addResponse(state, status, {
+			addResponse(state, options?.status ?? 200, {
 				kind: "stream",
 				body: schema,
 				...(options?.headers ? { headers: options.headers } : {}),

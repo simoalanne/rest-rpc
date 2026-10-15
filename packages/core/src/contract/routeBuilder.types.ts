@@ -12,7 +12,11 @@ import type {
 	RequestParamsSchema,
 	RequestQuerySchema,
 } from "./request.ts";
-import type { ResponseOptions, StreamResponseOptions } from "./response.ts";
+import type {
+	BodylessResponseOptions,
+	ResponseOptions,
+	StreamResponseOptions,
+} from "./response.ts";
 import type { EmptyObject, Merge } from "../typeUtils.ts";
 
 type JsonContentType = "application/json";
@@ -27,6 +31,12 @@ type ResponseHeadersFor<TOptions> = TOptions extends {
 }
 	? { headers: THeaders }
 	: EmptyObject;
+
+type StatusFor<TOptions> = TOptions extends {
+	status: infer TStatus extends number;
+}
+	? TStatus
+	: 200;
 
 type ResponseFor<TSchema, TOptions> = TSchema extends StandardSchemaV1
 	? {
@@ -230,47 +240,57 @@ type ResponseMethods<
 	TState extends BuilderState,
 	TExtension extends BuilderExtension | never,
 > = {
-		/** Declares a response status, schema, and HTTP metadata. @see {@link https://rest-rpc.dev/docs/route-builder#choose-plain-outputs-or-status-responses} */
-		response<
-			const TStatus extends number,
-			const TSchema extends StandardSchemaV1 | undefined = undefined,
-			const TOptions extends ResponseOptions | undefined = undefined,
-			const TPath extends BuilderPath = AbsolutePath,
-			const TMetadata extends RouteMetadata | never = never,
-		>(
-			this: BuilderReceiver<TPath, TMetadata>,
-			status: TStatus,
-			schema?: TSchema,
-			options?: TOptions,
-		): RouteBuilderView<
-			WithResponse<TState, TStatus, ResponseFor<TSchema, TOptions>>,
-			TExtension,
-			TPath,
-			TMetadata
-		>;
-		/** Declares a streaming response. @see {@link https://rest-rpc.dev/docs/streaming} */
-		streamResponse<
-			const TStatus extends number,
-			const TSchema extends StandardSchemaV1,
-			const TOptions extends StreamResponseOptions | undefined = undefined,
-			const TPath extends BuilderPath = AbsolutePath,
-			const TMetadata extends RouteMetadata | never = never,
-		>(
-			this: BuilderReceiver<TPath, TMetadata>,
-			status: TStatus,
-			schema: TSchema,
-			options?: TOptions,
-		): RouteBuilderView<
-			WithResponse<
-				TState,
-				TStatus,
-				{ kind: "stream"; body: TSchema } & ResponseHeadersFor<TOptions>
-			>,
-			TExtension,
-			TPath,
-			TMetadata
-		>;
-	};
+	/** Declares a response schema and HTTP metadata. The status defaults to 200. @see {@link https://rest-rpc.dev/docs/route-builder#declare-responses} */
+	response<
+		const TSchema extends StandardSchemaV1,
+		const TOptions extends ResponseOptions | undefined = undefined,
+		const TPath extends BuilderPath = AbsolutePath,
+		const TMetadata extends RouteMetadata | never = never,
+	>(
+		this: BuilderReceiver<TPath, TMetadata>,
+		schema: TSchema,
+		options?: TOptions,
+	): RouteBuilderView<
+		WithResponse<TState, StatusFor<TOptions>, ResponseFor<TSchema, TOptions>>,
+		TExtension,
+		TPath,
+		TMetadata
+	>;
+	/** Declares a response without a body. The status defaults to 200. @see {@link https://rest-rpc.dev/docs/route-builder#declare-responses} */
+	response<
+		const TOptions extends BodylessResponseOptions | undefined = undefined,
+		const TPath extends BuilderPath = AbsolutePath,
+		const TMetadata extends RouteMetadata | never = never,
+	>(
+		this: BuilderReceiver<TPath, TMetadata>,
+		options?: TOptions,
+	): RouteBuilderView<
+		WithResponse<TState, StatusFor<TOptions>, ResponseFor<undefined, TOptions>>,
+		TExtension,
+		TPath,
+		TMetadata
+	>;
+	/** Declares a streaming response. The status defaults to 200. @see {@link https://rest-rpc.dev/docs/streaming} */
+	streamResponse<
+		const TSchema extends StandardSchemaV1,
+		const TOptions extends StreamResponseOptions | undefined = undefined,
+		const TPath extends BuilderPath = AbsolutePath,
+		const TMetadata extends RouteMetadata | never = never,
+	>(
+		this: BuilderReceiver<TPath, TMetadata>,
+		schema: TSchema,
+		options?: TOptions,
+	): RouteBuilderView<
+		WithResponse<
+			TState,
+			StatusFor<TOptions>,
+			{ kind: "stream"; body: TSchema } & ResponseHeadersFor<TOptions>
+		>,
+		TExtension,
+		TPath,
+		TMetadata
+	>;
+};
 
 type BodyMethods<
 	TState extends BuilderState,

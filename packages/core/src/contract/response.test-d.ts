@@ -6,18 +6,14 @@ describe("response inference", () => {
 	it("uses schema inputs in response unions", () => {
 		const value = route
 			.get("/")
-			.response(
-				200,
-				type((input: string) => Number(input)),
-				{
+			.response(type((input: string) => Number(input)), {
 					contentType: ["text/plain", "application/json"],
 					headers: type((input: { count: string }) => ({
 						count: Number(input.count),
 					})),
-				},
-			)
-			.response(204)
-			.response(404, type<{ message: string }>());
+				})
+			.response({ status: 204 })
+			.response(type<{ message: string }>(), { status: 404 });
 		type Server = InferServerResponse<typeof value>;
 		expectTypeOf<Server["status"]>().toEqualTypeOf<200 | 204 | 404>();
 		expectTypeOf<
@@ -38,17 +34,14 @@ describe("response inference", () => {
 	});
 
 	it("uses schema inputs for streams", () => {
-		const stream = route.get("/").streamResponse(
-			200,
-			type((input: string) => Number(input)),
-		);
+		const stream = route.get("/").streamResponse(type((input: string) => Number(input)));
 		expectTypeOf<InferServerResponse<typeof stream>["body"]>().toEqualTypeOf<
 			AsyncIterable<string>
 		>();
 	});
 
 	it("infers responses for a route tree", () => {
-		const get = route.get("/").response(200, type<string>());
+		const get = route.get("/").response(type<string>());
 		const tree = { users: { get } };
 		expectTypeOf<
 			InferServerResponse<typeof tree>["users"]["get"]

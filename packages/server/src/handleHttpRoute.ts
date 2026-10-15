@@ -1,5 +1,8 @@
 import type { HttpRouteResult } from "./httpRouteResult.ts";
-import { normalizeImplicitResponse } from "./implicitResponse.ts";
+import {
+	isResponseEnvelope,
+	normalizeImplicitResponse,
+} from "./implicitResponse.ts";
 import {
 	contentTypeList,
 	findDeclaredContentType,
@@ -205,7 +208,9 @@ export async function handleHttpRoute<
 
 		return await normalizeResponseResult(
 			route,
-			handlerResult as DeclaredResponseEnvelope,
+			isResponseEnvelope(handlerResult)
+				? handlerResult
+				: { status: 200, body: handlerResult },
 			disableResponseValidation,
 		);
 	} catch (error) {

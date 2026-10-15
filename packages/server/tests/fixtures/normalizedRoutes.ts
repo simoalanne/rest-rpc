@@ -44,8 +44,8 @@ export const getContract = () => ({
 		.params(type<{ id: string }>())
 		.query(type<{ q: string }>())
 		.headers(type<{ authorization: string }>())
-		.response(200, type<Output>(), { headers: type<{ "x-count": string }>() })
-		.response(204)
+		.response(type<Output>(), { headers: type<{ "x-count": string }>() })
+		.response({ status: 204 })
 		.handler(() => ({
 			status: 200,
 			body: output,
@@ -54,7 +54,7 @@ export const getContract = () => ({
 	contract: contractRoute
 		.body(inputSchema)
 		.body(type<{ extra: string }>())
-		.response(200, type<Output>(), { headers: type<{ "x-count": string }>() })[
+		.response(type<Output>(), { headers: type<{ "x-count": string }>() })[
 		"~restrpc"
 	],
 });

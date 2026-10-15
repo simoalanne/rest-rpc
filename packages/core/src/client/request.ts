@@ -137,7 +137,7 @@ type GroupedRequestInput = {
 type ClientRequestRoute = {
 	method: HttpMethod;
 	path: string;
-	request?: { body?: unknown; contentType?: string | readonly string[] };
+	request?: { contentType?: string | readonly string[] };
 };
 
 const createRequestSignal = (
@@ -239,10 +239,7 @@ export const constructBaseRequest = (
 	}
 	const contentType =
 		selectedContentType ??
-		(typeof declaredContentType === "string"
-			? declaredContentType
-			: undefined) ??
-		(route.request?.body ? "application/json" : undefined);
+		(typeof declaredContentType === "string" ? declaredContentType : undefined);
 	const hasBody = body !== undefined && contentType !== undefined;
 	return {
 		url,

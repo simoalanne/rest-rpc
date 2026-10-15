@@ -19,6 +19,7 @@ export type {
 	RouteBuilderView,
 } from "./routeBuilder.types.ts";
 export { RouteBuilder } from "./routeBuilder.ts";
+export { extractContract } from "./extract.ts";
 export {
 	getPathParamSegmentName,
 	isPathParamSegment,
@@ -40,6 +41,7 @@ export type {
 	ErrorDeclaredClientResponse,
 	ResponseDeclaration,
 	ResponseHeaders,
+	BodylessResponseOptions,
 	ResponseOptions,
 	StreamResponseOptions,
 	RouteResponses,

@@ -96,13 +96,28 @@ describe("implicit response inference", () => {
 		>().toEqualTypeOf<"empty" | "json" | "stream" | "custom">();
 	});
 
-	it("rejects mixed output modes, invalid statuses, and invalid headers", () => {
-		// @ts-expect-error A handler must use a single output mode.
-		route.handler(() =>
-			Math.random() > 0.5 ? "plain" : { status: 200, body: "envelope" },
-		);
-		// @ts-expect-error Status envelopes require a number.
-		route.handler(() => ({ status: "200", body: "bad" }));
+	it("infers plain bodies and envelopes per returned member", () => {
+		const mixed = route
+			.get("/")
+			.handler(() =>
+				Math.random() > 0.5
+					? { id: "one" }
+					: { status: 404, body: { message: "missing" } },
+			);
+		type Client = InferClientResponse<typeof mixed>;
+		expectTypeOf<Client["status"]>().toEqualTypeOf<200 | 404>();
+		expectTypeOf<Extract<Client, { status: 200 }>["body"]>().toEqualTypeOf<{
+			readonly id: "one";
+		}>();
+		const textStatus = route.handler(() => ({ id: "one", status: "open" }));
+		expectTypeOf<InferClientResponse<typeof textStatus>>().toEqualTypeOf<{
+			status: 200;
+			body: { readonly id: "one"; readonly status: "open" };
+			rawHeaders: Headers;
+		}>();
+	});
+
+	it("rejects invalid envelope headers", () => {
 		// @ts-expect-error Response headers must be transport scalars.
 		route.handler(() => ({ status: 200, headers: { count: {} } }));
 	});

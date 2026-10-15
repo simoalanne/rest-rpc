@@ -6,8 +6,8 @@ const schema = type<{ name: string }>();
 describe("routeBuilder", () => {
 	it("reuses partial routes without sharing later declarations", () => {
 		const base = route.body(schema);
-		const first = base.response(200, schema);
-		const second = base.response(201, schema);
+		const first = base.response(schema);
+		const second = base.response(schema, { status: 201 });
 		expect(base["~restrpc"].responses).toEqual({});
 		expect(first["~restrpc"].responses).toEqual({
 			200: { body: schema, contentType: "application/json" },
@@ -30,8 +30,8 @@ describe("routeBuilder", () => {
 		const headers = type<{ "x-cursor": string }>();
 		expect(
 			new RouteBuilder()
-				.response(204, undefined, { description: "Deleted" })
-				.streamResponse(200, schema, { headers, description: "Events" })[
+				.response({ status: 204, description: "Deleted" })
+				.streamResponse(schema, { headers, description: "Events" })[
 				"~restrpc"
 			].responses,
 		).toEqual({
@@ -39,7 +39,7 @@ describe("routeBuilder", () => {
 			200: { kind: "stream", body: schema, headers, description: "Events" },
 		});
 		expect(
-			new RouteBuilder().response(200, schema, { description: "Name" })[
+			new RouteBuilder().response(schema, { description: "Name" })[
 				"~restrpc"
 			].responses,
 		).toEqual({
@@ -53,12 +53,12 @@ describe("routeBuilder", () => {
 
 	it("rejects duplicate response statuses across stream and body responses", () => {
 		expect(() =>
-			new RouteBuilder().response(200, schema).streamResponse(200, schema),
+			new RouteBuilder().response(schema).streamResponse(schema),
 		).toThrow('Response status "200" has already been declared.');
 	});
 
 	it.each([99, 600, 200.5, NaN])("rejects invalid HTTP status %s", (status) => {
-		expect(() => new RouteBuilder().response(status)).toThrow(
+		expect(() => new RouteBuilder().response({ status })).toThrow(
 			"Invalid HTTP response status",
 		);
 	});

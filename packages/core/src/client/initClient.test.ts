@@ -7,7 +7,7 @@ describe("initClient", () => {
 		const fetch = vi.fn(async () => Response.json("Ada"));
 		const contract = {
 			users: {
-				find: route.body(type<{ id: number }>()).response(200, type<string>()),
+				find: route.body(type<{ id: number }>()).response(type<string>()),
 			},
 		};
 		const client = initClient(contract, {
@@ -26,7 +26,7 @@ describe("initClient", () => {
 
 	it("returns declared error envelopes without treating them as transport failures", async () => {
 		const client = initClient(
-			route.get("/users").response(404, type<{ message: string }>()),
+			route.get("/users").response(type<{ message: string }>(), { status: 404 }),
 			{
 				baseUrl: "",
 				fetch: async () =>
@@ -40,7 +40,7 @@ describe("initClient", () => {
 	});
 
 	it("rejects undeclared statuses with the decoded response body", async () => {
-		const client = initClient(route.get().response(200, type<string>()), {
+		const client = initClient(route.get().response(type<string>()), {
 			baseUrl: "",
 			fetch: async () => Response.json({ message: "missing" }, { status: 404 }),
 		});
@@ -52,10 +52,7 @@ describe("initClient", () => {
 	});
 
 	it("maps response bodies only when validation is enabled", async () => {
-		const contract = route.response(
-			200,
-			type((value: string) => value.length),
-		);
+		const contract = route.response(type((value: string) => value.length));
 		const options = { baseUrl: "", fetch: async () => Response.json("Ada") };
 		expect((await initClient(contract, options)()).body).toBe("Ada");
 		expect(
@@ -65,7 +62,7 @@ describe("initClient", () => {
 	});
 
 	it("rejects a response media type outside the declaration even without validation", async () => {
-		const client = initClient(route.response(200, type<string>()), {
+		const client = initClient(route.response(type<string>()), {
 			baseUrl: "",
 			fetch: async () =>
 				new Response("Ada", { headers: { "content-type": "text/plain" } }),

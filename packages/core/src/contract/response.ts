@@ -31,7 +31,19 @@ export type ResponseDeclaration = {
 
 /** HTTP metadata associated with a declared response schema. */
 export type ResponseOptions = {
+	/** HTTP status of the response. Defaults to 200. */
+	status?: number;
 	contentType?: BodyContentType;
+	headers?: ResponseHeaders;
+	/** Describes the response in generated OpenAPI documents. */
+	description?: string;
+};
+
+/** HTTP metadata associated with a declared response without a body. */
+export type BodylessResponseOptions = {
+	/** HTTP status of the response. Defaults to 200. */
+	status?: number;
+	contentType?: never;
 	headers?: ResponseHeaders;
 	/** Describes the response in generated OpenAPI documents. */
 	description?: string;
@@ -39,6 +51,8 @@ export type ResponseOptions = {
 
 /** HTTP metadata associated with a declared streaming response. */
 export type StreamResponseOptions = {
+	/** HTTP status of the response. Defaults to 200. */
+	status?: number;
 	headers?: ResponseHeaders;
 	/** Describes the response in generated OpenAPI documents. */
 	description?: string;
@@ -109,9 +123,16 @@ type ResponseEntry<TStatus extends number, TBody> = {
 	body: TBody;
 };
 
+// The client parses every `text/event-stream` response as an SSE stream.
+type ClientResponseBody<TResponse> = TResponse extends {
+	contentType: "text/event-stream";
+}
+	? AsyncIterable<SseEvent<unknown>>
+	: InferResponseBody<TResponse, "output">;
+
 type ClientResponseEntry<TStatus extends number, TResponse> = ResponseEntry<
 	TStatus,
-	InferResponseBody<TResponse, "output">
+	ClientResponseBody<TResponse>
 > &
 	ResponseHeadersMetadata<TResponse, "output"> extends infer TEntry
 	? Merge<TEntry>
@@ -147,7 +168,9 @@ type MatchesStatusFilter<
 	TFilter extends StatusFilter,
 > = TFilter extends "any"
 	? true
-	: `${TStatus}` extends `2${string}`
+	: number extends TStatus
+		? true
+		: `${TStatus}` extends `2${string}`
 		? TFilter extends "success"
 			? true
 			: false

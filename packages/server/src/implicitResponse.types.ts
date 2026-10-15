@@ -121,44 +121,39 @@ type InferredResponses<TResponse> = {
 	>;
 };
 
-type InferredHttpRoute<TRoute, TResult> = Omit<TRoute, "responses"> & {
-	responses: InferredResponses<Awaited<TResult>>;
-};
+type EnvelopeKey = "status" | "body" | "contentType" | "headers";
 
-type InferredBodyResponse<TResult> =
-	Awaited<TResult> extends infer TOutput
-		? TOutput extends AsyncIterable<infer TItem>
-			? {
-					kind: "stream";
-					body: InferredSchema<TItem, SseData<TItem>>;
-				}
-			: { body: InferredSchema<TOutput>; contentType: "application/json" }
-		: never;
+// TypeScript adds optional `undefined` envelope keys to plain object members
+// returned next to envelopes; they are not part of the body.
+type WithoutNormalizedEnvelopeKeys<T> = [Extract<keyof T, EnvelopeKey>] extends [
+	never,
+]
+	? T
+	: {
+			[TKey in keyof T as TKey extends EnvelopeKey
+				? [T[TKey]] extends [undefined]
+					? {} extends Pick<T, TKey>
+						? never
+						: TKey
+					: TKey
+				: TKey]: T[TKey];
+		};
 
-type InferredBodyRoute<TRoute, TResult> = Omit<TRoute, "responses"> & {
-	responses: { 200: InferredBodyResponse<TResult> };
-};
+// A member with a numeric status is an envelope; any other value is the 200 body.
+type ResponseEnvelopeOf<TResult> = TResult extends { status: number }
+	? TResult
+	: { status: 200; body: WithoutNormalizedEnvelopeKeys<TResult> };
 
-type ReturnKind<T> = T extends unknown
-	? "status" extends keyof T
-		? "response"
-		: "output"
-	: never;
-
-export type ValidImplicitResult<TResult> = [
-	ReturnKind<Awaited<TResult>>,
-] extends [never]
+export type ValidImplicitResult<TResult> = [Awaited<TResult>] extends [never]
 	? never
-	: [ReturnKind<Awaited<TResult>>] extends ["response"]
-		? Awaited<TResult> extends ImplicitResponseEnvelope
-			? unknown
-			: never
-		: [ReturnKind<Awaited<TResult>>] extends ["output"]
+	: [Extract<Awaited<TResult>, { status: number }>] extends [never]
+		? unknown
+		: Extract<Awaited<TResult>, { status: number }> extends ImplicitResponseEnvelope
 			? unknown
 			: never;
 
-export type InferredRoute<TRoute, TResult> = [
-	ReturnKind<Awaited<TResult>>,
-] extends ["response"]
-	? Merge<InferredHttpRoute<TRoute, TResult>>
-	: Merge<InferredBodyRoute<TRoute, TResult>>;
+export type InferredRoute<TRoute, TResult> = Merge<
+	Omit<TRoute, "responses"> & {
+		responses: InferredResponses<ResponseEnvelopeOf<Awaited<TResult>>>;
+	}
+>;

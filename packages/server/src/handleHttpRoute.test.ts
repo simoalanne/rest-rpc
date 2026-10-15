@@ -95,16 +95,12 @@ describe("handleHttpRoute", () => {
 	it("transforms declared bodies and headers unless response validation is disabled", async () => {
 		const implementation = route
 			.get("/")
-			.response(
-				200,
-				type((value: string) => Number(value)),
-				{
+			.response(type((value: string) => Number(value)), {
 					headers: type((value: { count: number; omitted?: string }) => ({
 						count: value.count + 1,
 						omitted: undefined,
 					})),
-				},
-			)
+				})
 			.handler(() => ({
 				status: 200,
 				body: "2",
@@ -131,11 +127,7 @@ describe("handleHttpRoute", () => {
 		async (location) => {
 			const implementation = route
 				.get("/")
-				.response(
-					200,
-					location === "body" ? rejected : type<string>(),
-					location === "headers" ? { headers: rejected } : {},
-				)
+				.response(location === "body" ? rejected : type<string>(), location === "headers" ? { headers: rejected } : {})
 				.handler(() => ({ status: 200, body: "ok", headers: {} }));
 			const result = await execute(implementation);
 			expect(result).toBeInstanceOf(ResponseValidationError);
@@ -149,10 +141,7 @@ describe("handleHttpRoute", () => {
 		}
 		const implementation = route
 			.get("/")
-			.streamResponse(
-				200,
-				type((value: string) => Number(value)),
-			)
+			.streamResponse(type((value: string) => Number(value)))
 			.handler(() => ({ status: 200, body: chunks() }));
 		for (const disabled of [false, true]) {
 			const result = await handleHttpRoute(
@@ -171,24 +160,29 @@ describe("handleHttpRoute", () => {
 		}
 	});
 
-	it("dispatches declared responses through response validation", async () => {
+	it("dispatches declared envelopes and plain 200 bodies through response validation", async () => {
+		const schema = type((value: string) => value.toUpperCase());
 		expect(
 			await execute({
 				get: route
-					.response(
-						200,
-						type((value: string) => value.toUpperCase()),
-					)
+					.response(schema)
 					.handler(() => ({ status: 200, body: "hello" })),
 			}),
 		).toMatchObject({
+			status: 200,
+			body: { value: "HELLO", contentType: "application/json" },
+		});
+		expect(
+			await execute({ get: route.response(schema).handler(() => "hello") }),
+		).toMatchObject({
+			status: 200,
 			body: { value: "HELLO", contentType: "application/json" },
 		});
 	});
 	it("rejects an undeclared response status even with response validation disabled", async () => {
 		const declared = route
 			.get("/")
-			.response(200, type<string>())
+			.response(type<string>())
 			.handler(() => ({ status: 200, body: "ok" }));
 		const implementation = {
 			...flattenRouteImplementations(declared)[0]!,
@@ -206,7 +200,7 @@ describe("handleHttpRoute", () => {
 	it("requires a declared response content type and normalizes the selection", async () => {
 		const declared = route
 			.get("/")
-			.response(200, type<string>(), {
+			.response(type<string>(), {
 				contentType: ["text/plain", "text/html"],
 			})
 			.handler(() => ({ status: 200, body: "ok", contentType: "text/plain" }));

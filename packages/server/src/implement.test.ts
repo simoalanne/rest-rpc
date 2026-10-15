@@ -7,7 +7,7 @@ const contract = {
 		get: route
 			.get("/users/{id}")
 			.params(type<{ id: string }>())
-			.response(200, type<{ name: string }>()),
+			.response(type<{ name: string }>()),
 	},
 };
 

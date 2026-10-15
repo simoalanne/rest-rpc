@@ -50,11 +50,11 @@ const validationRoutes = {
 	request: route
 		.post("/invalid-request")
 		.body(invalid)
-		.response(204)
+		.response({ status: 204 })
 		.handler(() => ({ status: 204 })),
 	response: route
 		.get("/invalid-response")
-		.response(200, invalid)
+		.response(invalid)
 		.handler(() => ({ status: 200, body: "unchecked" })),
 };
 
@@ -146,7 +146,7 @@ export const describeAdapterConformance = (
 			const routes = {
 				events: route
 					.get("/header-events")
-					.streamResponse(200, type<number>(), {
+					.streamResponse(type<number>(), {
 						headers: type<{ "x-stream-id": string }>(),
 					})
 					.handler(() => ({
@@ -168,7 +168,7 @@ export const describeAdapterConformance = (
 			const routes = {
 				events: route
 					.get("/invalid-events")
-					.streamResponse(200, invalid)
+					.streamResponse(invalid)
 					.handler(() => ({
 						status: 200,
 						body: (async function* () {
@@ -191,7 +191,7 @@ export const describeAdapterConformance = (
 				inferred: route.delete("/inferred").handler(() => ({ status: 204 })),
 				declared: route
 					.delete("/declared")
-					.response(204)
+					.response({ status: 204 })
 					.handler(() => ({ status: 204 })),
 			};
 			await serve(routes, {}, async (url) => {

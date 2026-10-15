@@ -19,6 +19,7 @@ export type {
 	RouteDeclaration,
 } from "./contract/index.ts";
 export type { InferServerRequest } from "./contract/request.ts";
+export { extractContract } from "./contract/extract.ts";
 export { route } from "./contract/routeBuilder.ts";
 export type {
 	BodyContentType,
@@ -27,6 +28,7 @@ export type {
 } from "./contract/body.ts";
 export type {
 	InferServerResponse,
+	BodylessResponseOptions,
 	ResponseOptions,
 	StreamResponseOptions,
 } from "./contract/response.ts";
