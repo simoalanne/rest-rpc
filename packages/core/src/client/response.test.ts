@@ -13,15 +13,16 @@ const invalid: StandardSchemaV1<unknown, Record<string, string>> = {
 };
 const json = (value: unknown, headers?: RequestInit["headers"]) =>
 	Response.json(value, { status: 201, headers });
-const declared = route.get("/").response(201, type<{ name: string }>())[
-	"~restrpc"
-];
+const declared = route
+	.get("/")
+	.response(type<{ name: string }>(), { status: 201 })["~restrpc"];
 const decode = (response: Response, validate = true, declaration = declared) =>
 	fetchResponse(async () => response, validate, undefined, declaration);
 
 describe("client response decoding", () => {
-	it("transforms declared headers and retains raw headers", async () => {
-		const declaration = route.get("/").response(201, type<{ name: string }>(), {
+	it("transforms declared headers and keeps undeclared headers", async () => {
+		const declaration = route.get("/").response(type<{ name: string }>(), {
+			status: 201,
 			headers: type((input: Record<string, string>) => ({
 				count: Number(input["x-count"]),
 			})),
@@ -36,8 +37,7 @@ describe("client response decoding", () => {
 		expect(await read(true)).toMatchObject({
 			status: 201,
 			body: { name: "Ada" },
-			headers: { count: 2 },
-			rawHeaders: expect.any(Headers),
+			headers: { count: 2, "x-count": "2", "content-type": "application/json" },
 		});
 		expect(await read(false)).toMatchObject({
 			headers: { "x-count": "2" },
@@ -46,8 +46,10 @@ describe("client response decoding", () => {
 
 	it("retains status and decoded body on header and body schema failures", async () => {
 		for (const declaration of [
-			route.get("/").response(201, invalid)["~restrpc"],
-			route.get("/").response(201, type(), { headers: invalid })["~restrpc"],
+			route.get("/").response(invalid, { status: 201 })["~restrpc"],
+			route.get("/").response(type(), { status: 201, headers: invalid })[
+				"~restrpc"
+			],
 		]) {
 			const read = (validate: boolean) =>
 				fetchResponse(
@@ -69,7 +71,7 @@ describe("client response decoding", () => {
 	});
 
 	it("decodes bodyless responses without a codec", async () => {
-		const declaration = route.get("/").response(204)["~restrpc"];
+		const declaration = route.get("/").response({ status: 204 })["~restrpc"];
 		expect(
 			await fetchResponse(
 				async () => new Response(null, { status: 204 }),
@@ -83,7 +85,7 @@ describe("client response decoding", () => {
 	it.each([undefined, "application/unknown"])(
 		"handles absent or unknown response content types (%s)",
 		async (contentType) => {
-			const declaration = route.get("/").response(200, type(), {
+			const declaration = route.get("/").response(type(), {
 				contentType: contentType ?? "application/json",
 			})["~restrpc"];
 			const response = new Response("hello", {
@@ -109,7 +111,7 @@ describe("client response decoding", () => {
 	it("falls back to binary decoding when a custom codec has no deserializer", async () => {
 		const declaration = route
 			.get("/")
-			.response(200, type(), { contentType: "application/custom" })["~restrpc"];
+			.response(type(), { contentType: "application/custom" })["~restrpc"];
 		expect(
 			await fetchResponse(
 				async () =>
@@ -146,7 +148,7 @@ describe("client response decoding", () => {
 	it.each(["wrong content type", "missing body"])(
 		"rejects streams with %s",
 		async (failure) => {
-			const declaration = route.get("/").streamResponse(200, type<number>())[
+			const declaration = route.get("/").streamResponse(type<number>())[
 				"~restrpc"
 			];
 			const response =
@@ -166,4 +168,22 @@ describe("client response decoding", () => {
 			);
 		},
 	);
+
+	it("parses event streams without a declaration and before user codecs", async () => {
+		const deserialize = vi.fn();
+		const response = await fetchResponse(
+			async () =>
+				new Response('data: {"n":1}\n\n', {
+					headers: { "content-type": "text/event-stream; charset=utf-8" },
+				}),
+			false,
+			[{ match: () => true, deserialize }],
+			route.get("/")["~restrpc"],
+		);
+		const events = [];
+		for await (const event of response.body as AsyncIterable<unknown>)
+			events.push(event);
+		expect(events).toEqual([{ data: { n: 1 } }]);
+		expect(deserialize).not.toHaveBeenCalled();
+	});
 });

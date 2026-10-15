@@ -9,9 +9,9 @@ const contract = {
 		get: contractRoute
 			.get("/users/{id}")
 			.params(type<{ id: string }>())
-			.response(200, type<{ id: string; name: string }>()),
+			.response(type<{ id: string; name: string }>()),
 	},
-	derived: contractRoute.get().response(200, type<{ derived: boolean }>()),
+	derived: contractRoute.get().response(type<{ derived: boolean }>()),
 };
 
 @Controller()
@@ -65,7 +65,7 @@ describe("Nest HTTP integration", () => {
 
 	it("rejects a root route whose path is derived from tree keys", () => {
 		const decorate = Implement(
-			contractRoute.get().response(200, type<string>()),
+			contractRoute.get().response(type<string>()),
 		);
 		expect(() =>
 			decorate(ApiController.prototype, "routes", {

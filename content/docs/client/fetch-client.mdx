@@ -4,7 +4,7 @@ description: Create a typed Fetch client to call your routes over HTTP.
 ---
 
 `initClient()` creates a typed Fetch client from a runtime contract. When the
-routes are implemented in the server, you need to [Generate a Contract](/docs/client/contract-generation) first.
+routes are implemented in the server, [extract a contract](/docs/client/contract-extraction) first.
 
 ```ts
 import { initClient } from "@rest-rpc/core";
@@ -19,18 +19,16 @@ The client has the same route tree shape as the contract.
 
 ## Call Routes
 
-The route declaration determines the request and
-result shapes. Flat input stays flat, and segmented input uses `params`,
-`query`, `headers`, and `body`.
+The route declaration determines the request and result shapes.
 
 ```ts
-const todo = await client.todos.create({ title: "Write docs" });
-const response = await client.todos.get({ params: { id: todo.id } });
+const created = await client.todos.create({ body: { title: "Write docs" } });
+const response = await client.todos.get({ params: { id: created.body.id } });
 ```
 
-Plain output routes return decoded data directly. Status response routes return
-a `status`-discriminated union with `body` and the Fetch `Headers` object as
-`rawHeaders`. Declared response headers are exposed as typed `headers`.
+A call returns a `status`-discriminated union with `body` and `headers`.
+`headers` is a record of every response header with lowercase names, and
+declared response headers are typed.
 
 ```ts
 if (response.status === 200) {
@@ -40,23 +38,25 @@ if (response.status === 200) {
 }
 ```
 
-Declared non-2xx responses are returned as envelopes. Undeclared statuses throw
-an [`HttpError`](#error-handling). Network failures and aborted requests reject
-with the error from `fetch`. See the [Route Builder](/docs/route-builder) for
-choosing result forms and declaring expected outcomes.
+Non-2xx responses are returned, not thrown. Network failures and aborted
+requests reject with the error from `fetch`. See the
+[Route Builder](/docs/route-builder) for declaring expected outcomes.
 
 ## Error Handling
 
-An `HttpError` is thrown when a response does not match the route contract:
+An `HttpError` is thrown when a response does not match the route's declared
+responses:
 
-- The status is not declared by the route. A plain output route only accepts its
-  successful status.
+- The status is not declared by the route.
 - The response content type is not one the route declares.
 - [Response validation](#response-validation) is enabled and fails. This can
   happen with a 2xx status.
 
-Its `status` is the received HTTP status, and its `body` is the decoded,
-unvalidated response body. Validation issues are available through `cause`.
+[Extracted contracts](/docs/client/contract-extraction#limitations) have no
+response declarations, so these checks do not apply to them.
+
+An `HttpError` has the received HTTP `status` and the decoded, unvalidated
+response `body`. Validation issues are available through `cause`.
 
 ```ts
 import { HttpError } from "@rest-rpc/core";
@@ -75,7 +75,7 @@ try {
 ## Consume Streams
 
 A [streaming route](/docs/streaming) returns an async iterable of `SseEvent<T>`
-values. Application data is available on `event.data`:
+values as its `body`. Application data is available on `event.data`:
 
 ```ts
 export type SseEvent<T> = {
@@ -86,14 +86,7 @@ export type SseEvent<T> = {
 };
 ```
 
-```ts
-for await (const event of await client.todos.events()) {
-	console.log(event.data.message);
-	console.log(event.id, event.event, event.retry);
-}
-```
-
-For a status response stream, narrow the response before iterating its body:
+Narrow the response before iterating its body:
 
 ```ts
 const response = await client.todos.events();
@@ -101,16 +94,20 @@ const response = await client.todos.events();
 if (response.status === 200) {
 	for await (const event of response.body) {
 		console.log(event.data.message);
+		console.log(event.id, event.event, event.retry);
 	}
 }
 ```
+
+Every `text/event-stream` response is parsed as an SSE stream. Body codecs are
+not consulted for it.
 
 The initial request and later stream iteration can fail independently. Pass an
 `AbortSignal` in the per-call options to cancel both the request and stream:
 
 ```ts
 const controller = new AbortController();
-const events = await client.todos.events(undefined, {
+const response = await client.todos.events(undefined, {
 	signal: controller.signal,
 });
 
@@ -132,13 +129,14 @@ header. The server receives it as
 let lastEventId: string | undefined;
 
 async function connect() {
-	const events = await client.todos.events(undefined, {
+	const response = await client.todos.events(undefined, {
 		additionalHeaders: {
 			"last-event-id": lastEventId,
 		},
 	});
+	if (response.status !== 200) return;
 
-	for await (const event of events) {
+	for await (const event of response.body) {
 		lastEventId = event.id ?? lastEventId;
 		handleTodoEvent(event.data);
 	}
@@ -221,10 +219,6 @@ const client = initClient(api, {
 A global header with a guaranteed value makes a matching declared route header
 optional in client calls. A provider that can return `undefined` does not.
 
-Routes that [combine `.input()` with `.headers()`](/docs/route-builder#combine-input-and-headers)
-only accept the input in client calls, so their declared headers must be
-supplied through `globalHeaders`.
-
 ## Custom Fetch
 
 If you need to wrap the fetch client with custom logic, pass a `fetch` function.
@@ -243,6 +237,10 @@ const client = initClient(api, {
 	},
 });
 ```
+
+A custom `fetch` also receives the raw `Response`, for details the client
+result does not keep, such as each `Set-Cookie` header from
+`headers.getSetCookie()`.
 
 ## Per-Call Options
 
@@ -280,7 +278,7 @@ When a route declares a list of request content types, `contentType` selects
 the one used to encode the body and is required:
 
 ```ts
-await client.files.upload(bytes, { contentType: "image/png" });
+await client.files.upload({ body: bytes }, { contentType: "image/png" });
 ```
 
 If you need to pass options to a route without request input, pass `undefined` for the request input.
@@ -311,7 +309,7 @@ output types differ, such as transforms, may fail on the client.
 
 :::note
 Validation requires runtime schemas, so it only applies to a
-[shared contract](/docs/contract-first). [Generated client contracts](/docs/client/contract-generation)
+[shared contract](/docs/contract-first). [Extracted contracts](/docs/client/contract-extraction)
 contain no schemas, and the option has no effect on them.
 :::
 
@@ -354,7 +352,7 @@ type GetFirstTodoError = InferClientError<typeof getFirst>;
 
 const events = route
 	.get("/todos/events")
-	.streamOutput(z.object({ id: z.string(), message: z.string() }))
+	.streamResponse(z.object({ id: z.string(), message: z.string() }))
 	.handler(async function* () {
 		yield { id: "todo_1", message: "Created" };
 	});
@@ -365,9 +363,9 @@ type TodoEvent = InferClientStreamData<typeof events>;
 | Type                                       | Infers                                                                                   |
 | ------------------------------------------ | ---------------------------------------------------------------------------------------- |
 | `InferClientRequest<Route, GlobalHeaders>` | The request passed to the route call, or `undefined` for routes without input.           |
-| `InferClientResponse<Route>`               | Every declared response, or the output of a `.output()` route.                           |
-| `InferClientSuccess<Route>`                | The declared 2xx responses, or the output of a `.output()` route.                        |
-| `InferClientError<Route>`                  | The declared non-2xx responses. `.output()` routes infer `never`.                        |
+| `InferClientResponse<Route>`               | Every response envelope of the route.                                                    |
+| `InferClientSuccess<Route>`                | The 2xx response envelopes.                                                              |
+| `InferClientError<Route>`                  | The non-2xx response envelopes.                                                          |
 | `InferClientStreamData<Route>`             | The `data` of each event from a [streaming route](#consume-streams), without `SseEvent`. |
 
 `InferClientError` contains only the responses the client returns. The

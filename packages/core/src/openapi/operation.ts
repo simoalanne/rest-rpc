@@ -1,5 +1,4 @@
 import type { RouteDeclaration } from "../contract/routeDeclaration.ts";
-import { resolveRouteRequest } from "../contract/routeRequest.ts";
 import type { RequestBodySchema } from "../contract/request.ts";
 import type {
 	ResponseDeclaration,
@@ -232,7 +231,7 @@ export const createOperation = (
 	options: CreateOperationOptions,
 	routePath: readonly string[] = [],
 ): OpenApiOperation => {
-	const request = resolveRouteRequest(route);
+	const { request } = route;
 	const parameters = [
 		...createParameters(request?.params, "path", options),
 		...createParameters(request?.query, "query", options),

@@ -20,12 +20,10 @@ import {
 const get = route
 	.get("/users/{id}")
 	.params(type<{ id: string }>())
-	.response(200, type<{ name: string }>())
-	.response(404, type<{ message: string }>());
-const empty = route.get("/health").response(204);
-const events = route
-	.get("/events")
-	.streamResponse(200, type<{ value: number }>());
+	.response(type<{ name: string }>())
+	.response(type<{ message: string }>(), { status: 404 });
+const empty = route.get("/health").response({ status: 204 });
+const events = route.get("/events").streamResponse(type<{ value: number }>());
 const utils = createTanstackQueryUtils(
 	{ get, empty, events },
 	{ baseUrl: "https://example.test" },
@@ -40,11 +38,7 @@ describe("createTanstackQueryUtils types", () => {
 			},
 			onError: (error) => {
 				expectTypeOf(error).toEqualTypeOf<InferClientError<typeof get>>();
-				if (
-					"status" in error &&
-					error.status === 404 &&
-					"rawHeaders" in error
-				) {
+				if ("status" in error && error.status === 404 && "headers" in error) {
 					expectTypeOf(error.body).toEqualTypeOf<{ message: string }>();
 				}
 			},
@@ -61,7 +55,7 @@ describe("createTanstackQueryUtils types", () => {
 		const custom = route
 			.post("/")
 			.body(type<string>(), { contentType: ["text/plain", "text/html"] })
-			.response(200, type<string>());
+			.response(type<string>());
 		const customUtils = createTanstackQueryUtils(custom, { baseUrl: "" });
 		customUtils.queryOptions({
 			request: { body: "hello" },
@@ -90,7 +84,7 @@ describe("createTanstackQueryUtils types", () => {
 		const secured = route
 			.get("/")
 			.headers(type<{ token: string; optional?: string }>())
-			.response(200, type<string>());
+			.response(type<string>());
 		const securedUtils = createTanstackQueryUtils(secured, {
 			baseUrl: "",
 			globalHeaders: { token: async () => "token" },
@@ -247,7 +241,7 @@ describe("createTanstackQueryUtils types", () => {
 		expectTypeOf<InferClientError<typeof get>>().toEqualTypeOf<
 			InferDeclaredClientError<typeof get> | HttpError | Error
 		>();
-		const plain = route.output(type<string>());
+		const plain = route.response(type<string>());
 		expectTypeOf<InferClientError<typeof plain>>().toEqualTypeOf<
 			HttpError | Error
 		>();

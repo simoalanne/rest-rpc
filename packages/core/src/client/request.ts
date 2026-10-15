@@ -10,10 +10,8 @@ import { replacePathParams } from "../contract/path.ts";
 import type { HttpMethod } from "../contract/routeDeclaration.ts";
 import type {
 	ClientRequestForDeclaration,
-	InferSchemaInputs,
 	RequestScalar,
 } from "../contract/request.ts";
-import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 
 export type FetchOptions = Omit<RequestInit, "method" | "body" | "headers"> & {
 	additionalHeaders?: Record<string, RequestScalar | undefined>;
@@ -69,7 +67,7 @@ type GlobalHeaderKeys<TGlobalHeaders extends ClientHeaders> = {
 type ClientRequestValue<T> = [T] extends [never] ? undefined : T;
 
 /**
- * Infers the input passed to a generated client route call.
+ * Infers the request passed to a client route call.
  *
  * @remarks Routes without request input infer `undefined`, which the route
  * call accepts. Pass the type of the client's `globalHeaders` as the second
@@ -93,34 +91,6 @@ export type InferClientRequest<
 				: never;
 		};
 
-type RequiredKeys<T> = {
-	[TKey in keyof T]-?: {} extends Pick<T, TKey> ? never : TKey;
-}[keyof T];
-
-type UnsatisfiedFlatHeaderKeys<
-	E extends RouteDeclaration,
-	TGlobalHeaders extends ClientHeaders,
-> = E extends {
-	request: {
-		input: readonly StandardSchemaV1[];
-		headers: infer THeaders extends readonly StandardSchemaV1[];
-	};
-}
-	? Exclude<
-			RequiredKeys<InferSchemaInputs<THeaders>>,
-			GlobalHeaderKeys<TGlobalHeaders>
-		>
-	: never;
-
-type MissingGlobalHeaders<TKeys extends PropertyKey> = {
-	readonly [
-		TKey in Extract<
-			TKeys,
-			string
-		> as `ERROR: required header "${TKey}" needs a guaranteed globalHeaders value`
-	]: never;
-};
-
 type DeclaredContentType<E> = E extends { method: "GET" }
 	? never
 	: E extends { request: { contentType: infer TContentType } }
@@ -141,9 +111,9 @@ export type FetchOptionsFor<E extends RouteDeclaration> = Omit<
 > &
 	ContentTypeOption<E>;
 
-type StandardFetchArgs<
-	E extends RouteDeclaration,
-	TGlobalHeaders extends ClientHeaders,
+export type FetchArgs<
+	E extends RouteDeclaration = RouteDeclaration,
+	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > =
 	ClientRequestForDeclaration<
 		E,
@@ -156,16 +126,6 @@ type StandardFetchArgs<
 				: [request: TRequest, options?: FetchOptionsFor<E>]
 		: never;
 
-export type FetchArgs<
-	E extends RouteDeclaration = RouteDeclaration,
-	TGlobalHeaders extends ClientHeaders = Record<never, string>,
-> = [UnsatisfiedFlatHeaderKeys<E, TGlobalHeaders>] extends [never]
-	? StandardFetchArgs<E, TGlobalHeaders>
-	: [
-			request: ClientRequestForDeclaration<E> &
-				MissingGlobalHeaders<UnsatisfiedFlatHeaderKeys<E, TGlobalHeaders>>,
-		];
-
 type GroupedRequestInput = {
 	body?: unknown;
 	query?: unknown;
@@ -177,7 +137,7 @@ type GroupedRequestInput = {
 type ClientRequestRoute = {
 	method: HttpMethod;
 	path: string;
-	request?: { body?: unknown; contentType?: string | readonly string[] };
+	request?: { contentType?: string | readonly string[] };
 };
 
 const createRequestSignal = (
@@ -279,10 +239,7 @@ export const constructBaseRequest = (
 	}
 	const contentType =
 		selectedContentType ??
-		(typeof declaredContentType === "string"
-			? declaredContentType
-			: undefined) ??
-		(route.request?.body ? "application/json" : undefined);
+		(typeof declaredContentType === "string" ? declaredContentType : undefined);
 	const hasBody = body !== undefined && contentType !== undefined;
 	return {
 		url,

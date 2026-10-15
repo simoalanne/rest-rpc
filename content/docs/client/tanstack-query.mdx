@@ -68,11 +68,10 @@ const todos = useInfiniteQuery(
 
 ## Streamed Queries
 
-Use `streamedQueryOptions()` for routes with one successful
-`.streamResponse(status, schema)` or a plain `.streamOutput(schema)`. The util
-passes the async iterable to TanStack Query and stores the materialized stream
-data. It discards a response envelope when the route uses `.streamResponse()`;
-`.streamOutput()` clients return the iterable directly.
+Use `streamedQueryOptions()` for routes with one successful stream response,
+declared with `.streamResponse()` or inferred from a handler that returns an
+async iterable. The util passes the envelope's async iterable body to TanStack
+Query and stores the materialized stream data.
 
 :::note
 `streamedQueryOptions()` is based on TanStack Query's experimental
@@ -263,9 +262,10 @@ const todo = useQuery(
 
 TanStack Query uses success and error channels.
 
-Plain outputs and declared 2xx responses get mapped to the `data` key.
+2xx response envelopes get mapped to the `data` key. Use TanStack Query's
+`select` option to read only the `body`.
 
-Declared non-2xx responses get mapped to the `error` key.
+Non-2xx response envelopes get mapped to the `error` key.
 
 Undeclared statuses and response validation failures become [`HttpError`](/docs/client/fetch-client#error-handling).
 Network and other unexpected failures become ordinary `Error` objects.

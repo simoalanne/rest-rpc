@@ -35,7 +35,6 @@
 		"./client": "./src/client/index.ts",
 		"./codecs": "./src/codecs/index.ts",
 		"./contract": "./src/contract/index.ts",
-		"./generate": "./src/generate/index.ts",
 		"./openapi": "./src/openapi/index.ts",
 		"./standard-schema": "./src/standard-schema/index.ts",
 		"./utils": "./src/utils/index.ts"
@@ -60,10 +59,6 @@
 				"types": "./dist/contract/index.d.ts",
 				"import": "./dist/contract/index.js"
 			},
-			"./generate": {
-				"types": "./dist/generate/index.d.ts",
-				"import": "./dist/generate/index.js"
-			},
 			"./openapi": {
 				"types": "./dist/openapi/index.d.ts",
 				"import": "./dist/openapi/index.js"
@@ -84,13 +79,5 @@
 	},
 	"devDependencies": {
 		"typescript": "5.9.3"
-	},
-	"peerDependencies": {
-		"typescript": ">=5 <7"
-	},
-	"peerDependenciesMeta": {
-		"typescript": {
-			"optional": true
-		}
 	}
 }

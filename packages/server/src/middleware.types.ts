@@ -13,7 +13,6 @@ type UnknownRequest = {
 	headers: unknown;
 	body: unknown;
 	query: unknown;
-	input: unknown;
 };
 export type RequestTransportFields = {
 	contentType?: string;

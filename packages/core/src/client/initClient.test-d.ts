@@ -4,13 +4,15 @@ import { initClient } from "./initClient.ts";
 
 describe("initClient types", () => {
 	it("allows empty requests and optional or guaranteed segmented headers", () => {
-		const empty = initClient(route.get("/").response(204), { baseUrl: "" });
+		const empty = initClient(route.get("/").response({ status: 204 }), {
+			baseUrl: "",
+		});
 		empty();
 		empty(undefined, {});
 		const contract = route
 			.get("/")
 			.headers(type<{ token: string; optional?: string }>())
-			.response(204);
+			.response({ status: 204 });
 		const literal = initClient(contract, {
 			baseUrl: "",
 			globalHeaders: { token: "value" },
@@ -35,7 +37,10 @@ describe("initClient types", () => {
 		// @ts-expect-error An optional provider cannot guarantee the required token.
 		optionalProvider({});
 		const optional = initClient(
-			route.get("/").headers(type<{ token?: string }>()).response(204),
+			route
+				.get("/")
+				.headers(type<{ token?: string }>())
+				.response({ status: 204 }),
 			{ baseUrl: "" },
 		);
 		optional({});
@@ -44,22 +49,26 @@ describe("initClient types", () => {
 	it("uses schema inputs for arguments and schema outputs for results", () => {
 		const contract = {
 			length: route
-				.input(type((value: string) => Number(value)))
-				.output(type((value: string) => value.length)),
+				.body(type((value: string) => Number(value)))
+				.response(type((value: string) => value.length)),
 		};
 		const client = initClient(contract, { baseUrl: "" });
-		expectTypeOf(client.length).parameter(0).toEqualTypeOf<string>();
-		expectTypeOf(client.length).returns.resolves.toEqualTypeOf<number>();
+		expectTypeOf(client.length).parameter(0).toEqualTypeOf<{ body: string }>();
+		expectTypeOf(client.length).returns.resolves.toEqualTypeOf<{
+			status: 200;
+			body: number;
+			headers: Record<string, string>;
+		}>();
 		// @ts-expect-error Requests use the schema input, not its transformed output.
-		client.length(1);
+		client.length({ body: 1 });
 	});
 
 	it("narrows response envelopes by their declared status", async () => {
 		const client = initClient(
 			route
 				.get()
-				.response(200, type<{ name: string }>())
-				.response(404, type<{ message: string }>()),
+				.response(type<{ name: string }>())
+				.response(type<{ message: string }>(), { status: 404 }),
 			{ baseUrl: "" },
 		);
 		const response = await client();
@@ -74,7 +83,7 @@ describe("initClient types", () => {
 				.body(type<string>(), {
 					contentType: ["text/plain", "application/json"],
 				})
-				.output(type<string>()),
+				.response(type<string>()),
 			{ baseUrl: "" },
 		);
 		client({ body: "Ada" }, { contentType: "text/plain" });
@@ -82,23 +91,5 @@ describe("initClient types", () => {
 		client({ body: "Ada" });
 		// @ts-expect-error A selection must be a declared format.
 		client({ body: "Ada" }, { contentType: "image/png" });
-	});
-
-	it("requires guaranteed global header values for flat inputs", () => {
-		const contract = route
-			.headers(type<{ authorization: string }>())
-			.input(type<string>())
-			.output(type<string>());
-		const client = initClient(contract, {
-			baseUrl: "",
-			globalHeaders: { authorization: async () => "token" },
-		});
-		client("Ada");
-		const missing = initClient(contract, {
-			baseUrl: "",
-			globalHeaders: { authorization: (): string | undefined => undefined },
-		});
-		// @ts-expect-error An optional provider cannot satisfy a required flat-input header.
-		missing("Ada");
 	});
 });

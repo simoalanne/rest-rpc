@@ -7,7 +7,6 @@ import {
 	type BodyCodec,
 } from "../codecs/index.ts";
 import type { RouteDeclaration, RouteTree } from "../contract/contract.ts";
-import type { UsesPlainOutput } from "../contract/routeModes.ts";
 import type { SseEvent } from "../sse.ts";
 import type {
 	ResponseDeclaration,
@@ -22,18 +21,12 @@ import {
 import { parseSseStream } from "./stream.ts";
 import { validateResponseValue } from "./validateResponse.ts";
 import type { FetchArgs } from "./request.ts";
-import type { Merge } from "../typeUtils.ts";
-
-type WithResponseMetadata<TResponse, TMetadata> = TResponse extends unknown
-	? Merge<TResponse & TMetadata>
-	: never;
 
 /**
  * Infers a route's client result.
  *
- * @remarks Routes declared with `.response()` produce status-discriminated
- * envelopes. Routes declared with `.output()` produce their output directly.
- * Pass a route tree to infer a matching tree of results.
+ * @remarks Every route produces status-discriminated envelopes. Pass a route
+ * tree to infer a matching tree of results.
  *
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#type-helpers}
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-routes}
@@ -41,7 +34,7 @@ type WithResponseMetadata<TResponse, TMetadata> = TResponse extends unknown
 export type InferClientResponse<T extends RouteTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
-	? ClientResponseForDeclaration<TRoute>
+	? DeclaredClientResponse<TRoute>
 	: {
 			[K in keyof T]: T[K] extends RouteTree
 				? InferClientResponse<T[K]>
@@ -51,16 +44,15 @@ export type InferClientResponse<T extends RouteTree> = T extends {
 /**
  * Infers the successful result of a route's client call.
  *
- * @remarks Routes declared with `.response()` produce the envelopes of their
- * 2xx responses. Routes declared with `.output()` produce their output
- * directly. Pass a route tree to infer a matching tree of results.
+ * @remarks Includes the envelopes of 2xx responses. Pass a route tree to
+ * infer a matching tree of results.
  *
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#type-helpers}
  */
 export type InferClientSuccess<T extends RouteTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
-	? ClientSuccessForDeclaration<TRoute>
+	? SuccessfulDeclaredClientResponse<TRoute>
 	: {
 			[K in keyof T]: T[K] extends RouteTree ? InferClientSuccess<T[K]> : never;
 		};
@@ -68,9 +60,8 @@ export type InferClientSuccess<T extends RouteTree> = T extends {
 /**
  * Infers the declared error responses a route's client call can return.
  *
- * @remarks Includes the envelopes of declared non-2xx responses. Routes
- * declared with `.output()` infer `never` because the client throws their
- * non-2xx responses. Thrown `HttpError` and `Error` values are not included.
+ * @remarks Includes the envelopes of declared non-2xx responses. Thrown
+ * `HttpError` and `Error` values are not included.
  * Pass a route tree to infer a matching tree of types.
  *
  * @see {@link https://rest-rpc.dev/docs/client/fetch-client#type-helpers}
@@ -78,7 +69,7 @@ export type InferClientSuccess<T extends RouteTree> = T extends {
 export type InferClientError<T extends RouteTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
-	? ClientErrorForDeclaration<TRoute>
+	? ErrorDeclaredClientResponse<TRoute>
 	: {
 			[K in keyof T]: T[K] extends RouteTree ? InferClientError<T[K]> : never;
 		};
@@ -110,34 +101,6 @@ type ClientStreamDataForDeclaration<E extends RouteDeclaration> =
 			: never
 		: never;
 
-export type ClientResponseForDeclaration<E extends RouteDeclaration> =
-	UsesPlainOutput<E> extends true
-		? SuccessfulResponseBody<E>
-		: WithResponseMetadata<DeclaredClientResponse<E>, { rawHeaders: Headers }>;
-
-type ClientSuccessForDeclaration<E extends RouteDeclaration> =
-	UsesPlainOutput<E> extends true
-		? SuccessfulResponseBody<E>
-		: WithResponseMetadata<
-				SuccessfulDeclaredClientResponse<E>,
-				{ rawHeaders: Headers }
-			>;
-
-type ClientErrorForDeclaration<E extends RouteDeclaration> =
-	UsesPlainOutput<E> extends true
-		? never
-		: WithResponseMetadata<
-				ErrorDeclaredClientResponse<E>,
-				{ rawHeaders: Headers }
-			>;
-
-export type SuccessfulResponseBody<TRoute extends RouteDeclaration> =
-	SuccessfulDeclaredClientResponse<TRoute> extends infer TResponse
-		? TResponse extends { body: infer TBody }
-			? TBody
-			: never
-		: never;
-
 const assertResponseContentType = (
 	declared: string | readonly string[] | undefined,
 	rawResponse: Response,
@@ -161,35 +124,39 @@ const readStreamResponse = (
 	rawResponse: Response,
 	validate: boolean,
 ) => {
-	if (
-		normalizeMediaType(rawResponse.headers.get("content-type")) !==
-		STREAM_CONTENT_TYPE
-	) {
-		throw new Error("Server returned an unsupported stream content-type.");
-	}
-
 	if (rawResponse.body === null) {
 		throw new Error("Server returned no stream body");
 	}
 	return parseSseStream(schema, rawResponse.body, validate, rawResponse.status);
 };
 
-const readDeclaredHeaders = async (
-	schema: ResponseDeclaration,
+const readHeaders = async (
+	schema: ResponseDeclaration | undefined,
 	rawResponse: Response,
 	validate: boolean,
 	body: unknown,
 ) => {
-	const { headers } = schema;
-	if (!headers) return undefined;
+	const headers = Object.fromEntries(rawResponse.headers.entries());
+	if (!schema?.headers || !validate) return headers;
 
-	const rawHeaders = Object.fromEntries(rawResponse.headers.entries());
-	if (!validate) return rawHeaders;
-
-	const result = await validateStandardSchema(headers, rawHeaders);
+	const result = await validateStandardSchema(schema.headers, headers);
 	if (result.issues)
 		throw new HttpError(rawResponse.status, body, { cause: result.issues });
-	return result.value;
+	// Keep headers the schema does not declare.
+	return { ...headers, ...result.value };
+};
+
+const readBody = async (
+	rawResponse: Response,
+	mediaType: string,
+	bodyCodecs: readonly BodyCodec<Response>[] | undefined,
+) => {
+	if (!mediaType || rawResponse.body === null) return undefined;
+	const resolvedCodec = resolveBodyCodec(mediaType, [
+		...(bodyCodecs ?? []),
+		...defaultBodyCodecs,
+	]);
+	return resolvedCodec?.deserialize?.(rawResponse);
 };
 
 export type RouteRequestFn = <E extends RouteDeclaration & { path: string }>(
@@ -197,6 +164,14 @@ export type RouteRequestFn = <E extends RouteDeclaration & { path: string }>(
 	...args: FetchArgs<E>
 ) => Promise<Response>;
 
+/**
+ * Reads a fetch response into a status envelope.
+ *
+ * @remarks `text/event-stream` responses are always parsed as SSE streams.
+ * Routes without response declarations, such as extracted contracts, return
+ * every status as an envelope. Routes with declarations reject undeclared
+ * statuses and undeclared media types.
+ */
 export const fetchResponse = async <
 	E extends RouteDeclaration & { path: string },
 >(
@@ -207,77 +182,47 @@ export const fetchResponse = async <
 	...args: FetchArgs<E>
 ) => {
 	const rawResponse = await request(route, ...args);
+	const { status } = rawResponse;
+	const schema: ResponseDeclaration | undefined = route.responses?.[status];
+	const mediaType = normalizeMediaType(rawResponse.headers.get("content-type"));
 
-	const schema = route.responses[rawResponse.status];
-	if (schema?.kind === "stream") {
-		const body = readStreamResponse(schema.body, rawResponse, validateResponse);
+	if (mediaType === STREAM_CONTENT_TYPE) {
+		const body = readStreamResponse(
+			schema?.body,
+			rawResponse,
+			validateResponse,
+		);
 		return {
-			status: rawResponse.status,
-			rawHeaders: rawResponse.headers,
-			headers: await readDeclaredHeaders(
-				schema,
-				rawResponse,
-				validateResponse,
-				body,
-			),
+			status,
+			headers: await readHeaders(schema, rawResponse, validateResponse, body),
 			body,
 		};
 	}
-
-	const mediaType = normalizeMediaType(rawResponse.headers.get("content-type"));
-	let value: unknown;
-	if (mediaType && rawResponse.body !== null) {
-		const resolvedCodec = resolveBodyCodec(mediaType, [
-			...(bodyCodecs ?? []),
-			...defaultBodyCodecs,
-		]);
-		value = await resolvedCodec?.deserialize?.(rawResponse);
+	if (schema?.kind === "stream") {
+		throw new Error("Server returned an unsupported stream content-type.");
 	}
 
-	if (!schema) {
-		throw new HttpError(rawResponse.status, value);
+	const value = await readBody(rawResponse, mediaType, bodyCodecs);
+	const declaresResponses = Object.keys(route.responses ?? {}).length > 0;
+	if (!schema && declaresResponses) {
+		throw new HttpError(status, value);
 	}
-	assertResponseContentType(schema.contentType, rawResponse, value);
-	const responseMetadata = {
-		status: rawResponse.status,
-		rawHeaders: rawResponse.headers,
-		headers: await readDeclaredHeaders(
-			schema,
-			rawResponse,
-			validateResponse,
+	if (schema) assertResponseContentType(schema.contentType, rawResponse, value);
+	return {
+		status,
+		headers: await readHeaders(schema, rawResponse, validateResponse, value),
+		body: await validateResponseValue(
+			schema?.body,
 			value,
+			validateResponse,
+			status,
 		),
 	};
-	const body = await validateResponseValue(
-		schema.body,
-		value,
-		validateResponse,
-		rawResponse.status,
-	);
-
-	return {
-		...responseMetadata,
-		body,
-	};
 };
 
-const isSuccessStatus = (status: number) => status >= 200 && status < 300;
-
-export const fetchSuccess = async <
-	E extends RouteDeclaration & { path: string },
->(
-	fetchRouteResponse: (
-		route: E,
-		...args: FetchArgs<E>
-	) => Promise<{ status: number; body?: unknown }>,
-	route: E,
-	...args: FetchArgs<E>
-) => {
-	const response = await fetchRouteResponse(route, ...args);
-
-	if (!isSuccessStatus(response.status)) {
-		throw new HttpError(response.status, response.body);
-	}
-
-	return response.body;
-};
+export type SuccessfulResponseBody<TRoute extends RouteDeclaration> =
+	SuccessfulDeclaredClientResponse<TRoute> extends infer TResponse
+		? TResponse extends { body: infer TBody }
+			? TBody
+			: never
+		: never;

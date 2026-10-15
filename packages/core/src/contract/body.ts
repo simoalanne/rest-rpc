@@ -12,7 +12,7 @@ export type BodyContentType =
 	| (string & Record<never, never>)
 	| readonly (KnownBodyContentType | (string & Record<never, never>))[];
 
-/** Options for declaring a request or procedure input body. */
+/** Options for declaring a request body. */
 export type BodyOptions = {
 	contentType: BodyContentType;
 };

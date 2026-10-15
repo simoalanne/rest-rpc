@@ -96,7 +96,6 @@ describe("createUtils", () => {
 		const utils = createTanstackUtilsForRoute({
 			routePath: ["stream"],
 			fetchData: async () => ({ body: stream() }),
-			unwrapResponseBodyForStream: true,
 		});
 		const options = utils.streamedQueryOptions!();
 		expect(
@@ -122,7 +121,7 @@ describe("createUtils", () => {
 		const client = new QueryClient();
 		const utils = createTanstackUtilsForRoute({
 			routePath: [],
-			fetchData: async () => [],
+			fetchData: async () => ({ body: [] }),
 		});
 		await expect(
 			client.fetchQuery({

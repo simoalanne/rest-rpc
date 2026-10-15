@@ -43,7 +43,7 @@ describe("registerRoutes", () => {
 		registerRoutes(app, {
 			get: route
 				.get("/failure")
-				.response(204)
+				.response({ status: 204 })
 				.handler(() => {
 					throw failure;
 				}),

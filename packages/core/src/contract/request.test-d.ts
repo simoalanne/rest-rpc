@@ -31,25 +31,7 @@ describe("request inference", () => {
 		}>();
 	});
 
-	it("distinguishes flat GET, flat POST, segmented and empty requests", () => {
-		const schema = type((input: { count: string }) => ({
-			count: Number(input.count),
-		}));
-		const get = route.get("/").input(schema);
-		const post = route.post("/").input(schema);
-		const procedure = route.input(schema);
-		expectTypeOf<InferClientRequest<typeof get>>().toEqualTypeOf<{
-			count: string;
-		}>();
-		expectTypeOf<InferClientRequest<typeof post>>().toEqualTypeOf<{
-			count: string;
-		}>();
-		expectTypeOf<InferServerRequest<typeof get>>().toEqualTypeOf<{
-			input: { count: number };
-		}>();
-		expectTypeOf<InferServerRequest<typeof procedure>>().toEqualTypeOf<{
-			input: { count: number };
-		}>();
+	it("distinguishes segmented and empty requests", () => {
 		const empty = route.get("/");
 		expectTypeOf<InferClientRequest<typeof empty>>().toEqualTypeOf<undefined>();
 		expectTypeOf<InferServerRequest<typeof empty>>().toEqualTypeOf<

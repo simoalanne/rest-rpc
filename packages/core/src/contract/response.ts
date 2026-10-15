@@ -3,7 +3,6 @@ import type { BodyContentType } from "./body.ts";
 import type { RouteDeclaration } from "./routeDeclaration.ts";
 import type { RouteTree } from "./contract.ts";
 import type { InferSchema } from "./request.ts";
-import type { UsesPlainOutput } from "./routeModes.ts";
 import type { SseEvent } from "../sse.ts";
 import type { Merge } from "../typeUtils.ts";
 
@@ -32,28 +31,29 @@ export type ResponseDeclaration = {
 
 /** HTTP metadata associated with a declared response schema. */
 export type ResponseOptions = {
+	/** HTTP status of the response. Defaults to 200. */
+	status?: number;
 	contentType?: BodyContentType;
 	headers?: ResponseHeaders;
 	/** Describes the response in generated OpenAPI documents. */
 	description?: string;
 };
 
-/** HTTP metadata associated with a declared plain output. */
-export type OutputOptions = {
-	contentType?: BodyContentType;
+/** HTTP metadata associated with a declared response without a body. */
+export type BodylessResponseOptions = {
+	/** HTTP status of the response. Defaults to 200. */
+	status?: number;
+	contentType?: never;
+	headers?: ResponseHeaders;
 	/** Describes the response in generated OpenAPI documents. */
 	description?: string;
 };
 
 /** HTTP metadata associated with a declared streaming response. */
 export type StreamResponseOptions = {
+	/** HTTP status of the response. Defaults to 200. */
+	status?: number;
 	headers?: ResponseHeaders;
-	/** Describes the response in generated OpenAPI documents. */
-	description?: string;
-};
-
-/** HTTP metadata associated with a declared streaming plain output. */
-export type StreamOutputOptions = {
 	/** Describes the response in generated OpenAPI documents. */
 	description?: string;
 };
@@ -123,13 +123,26 @@ type ResponseEntry<TStatus extends number, TBody> = {
 	body: TBody;
 };
 
-type ClientResponseEntry<TStatus extends number, TResponse> = ResponseEntry<
-	TStatus,
-	InferResponseBody<TResponse, "output">
-> &
-	ResponseHeadersMetadata<TResponse, "output"> extends infer TEntry
-	? Merge<TEntry>
-	: never;
+// The client parses every `text/event-stream` response as an SSE stream.
+type ClientResponseBody<TResponse> = TResponse extends {
+	contentType: "text/event-stream";
+}
+	? AsyncIterable<SseEvent<unknown>>
+	: InferResponseBody<TResponse, "output">;
+
+// Clients receive every response header; declared headers narrow their keys.
+type ClientResponseHeaders<TResponse> = [
+	ResponseHeadersFor<TResponse>,
+] extends [never]
+	? Record<string, string>
+	: Record<string, string> &
+			InferSchema<ResponseHeadersFor<TResponse>, "output">;
+
+type ClientResponseEntry<TStatus extends number, TResponse> = {
+	status: TStatus;
+	body: ClientResponseBody<TResponse>;
+	headers: ClientResponseHeaders<TResponse>;
+};
 
 type ServerResponseBase<TStatus extends number, TBody> = [TBody] extends [
 	undefined,
@@ -161,13 +174,15 @@ type MatchesStatusFilter<
 	TFilter extends StatusFilter,
 > = TFilter extends "any"
 	? true
-	: `${TStatus}` extends `2${string}`
-		? TFilter extends "success"
-			? true
-			: false
-		: TFilter extends "error"
-			? true
-			: false;
+	: number extends TStatus
+		? true
+		: `${TStatus}` extends `2${string}`
+			? TFilter extends "success"
+				? true
+				: false
+			: TFilter extends "error"
+				? true
+				: false;
 
 type ResponseEntryFor<
 	TSide extends "client" | "server",
@@ -210,45 +225,20 @@ export type SuccessfulDeclaredClientResponse<E extends RouteDeclaration> =
 export type ErrorDeclaredClientResponse<E extends RouteDeclaration> =
 	ResponseUnion<E, "client", "error">;
 
-export type ProcedureContentType<TContentType> =
-	TContentType extends readonly string[] ? TContentType[number] : TContentType;
-
-/** Infers the plain value a procedure handler returns for its 200 response. */
-export type ServerProcedureResponse<TResponse> = TResponse extends {
-	contentType: infer TContentType;
-}
-	? TContentType extends "application/json"
-		? ServerResponseBody<TResponse>
-		: {
-				data: ServerResponseBody<TResponse>;
-				contentType: ProcedureContentType<TContentType>;
-			}
-	: ServerResponseBody<TResponse>;
-
-type ServerProcedureOutput<E extends RouteDeclaration> = E extends {
-	responses: { 200: infer TResponse };
-}
-	? ServerProcedureResponse<TResponse>
-	: never;
-
-type ServerResponseForRoute<E extends RouteDeclaration> =
-	UsesPlainOutput<E> extends true
-		? ServerProcedureOutput<E>
-		: ServerResponse<E>;
-
 /**
- * Infers the output returned by a route handler.
+ * Infers the response envelopes returned by a route handler.
  *
  * @remarks Response schemas contribute their input types because handlers
- * produce values before response validation and transformation. Pass a route
- * tree to infer a matching tree of response types.
+ * produce values before response validation and transformation. Handlers may
+ * also return the body of a declared 200 response directly. Pass a route tree
+ * to infer a matching tree of response types.
  *
  * @see {@link https://rest-rpc.dev/docs/route-builder#infer-server-response}
  */
 export type InferServerResponse<T extends RouteTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
-	? ServerResponseForRoute<TRoute>
+	? ServerResponse<TRoute>
 	: {
 			[K in keyof T]: T[K] extends RouteTree
 				? InferServerResponse<T[K]>

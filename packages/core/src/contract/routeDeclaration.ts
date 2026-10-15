@@ -35,8 +35,6 @@ export type CommonOpenApiRouteOptions = Omit<
 
 /** Canonical ordered request-schema declarations nested on a route. */
 export type RouteRequestDeclaration = {
-	/** Flat input schemas. Read through `resolveRouteRequest` to get their wire segment. */
-	input?: readonly RequestBodySchema[];
 	body?: readonly RequestBodySchema[];
 	contentType?: BodyContentType;
 	query?: readonly RequestBodySchema[];
@@ -53,10 +51,8 @@ export type RouteRequestDeclaration = {
  * @see {@link https://rest-rpc.dev/docs/route-builder}
  */
 export type RouteDeclaration = {
-	source?: "generated";
 	path: AbsolutePath | undefined;
 	method: HttpMethod;
-	output?: "output" | "response";
 	request?: RouteRequestDeclaration;
 	responses: RouteResponses;
 	metadata?: RouteMetadata;

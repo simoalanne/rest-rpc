@@ -40,7 +40,7 @@ describe("operation", () => {
 		const declaration = route
 			.get("/")
 			.query(type<{ q: string }>())
-			.response(200, type<string>())["~restrpc"];
+			.response(type<string>())["~restrpc"];
 		type Options = Parameters<typeof createOperation>[1];
 		const transformOperation = vi.fn(
 			() => undefined,
@@ -137,7 +137,7 @@ describe("operation", () => {
 		const declaration = route
 			.get("/users")
 			.query(type<{ q: string }>())
-			.response(204)["~restrpc"];
+			.response({ status: 204 })["~restrpc"];
 		const transformOperation = vi.fn(({ operation }) => ({
 			...operation,
 			operationId: "users.list",

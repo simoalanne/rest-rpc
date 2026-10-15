@@ -19,15 +19,13 @@ export type {
 	RouteBuilderView,
 } from "./routeBuilder.types.ts";
 export { RouteBuilder } from "./routeBuilder.ts";
-export { flatInputSegment, resolveRouteRequest } from "./routeRequest.ts";
+export { extractContract } from "./extract.ts";
 export {
 	getPathParamSegmentName,
 	isPathParamSegment,
 	resolveRoutePath,
 	toColonPath,
 } from "./path.ts";
-export type { UsesFlatInput, UsesPlainOutput } from "./routeModes.ts";
-export { usesFlatInput, usesPlainOutput } from "./routeModes.ts";
 export type {
 	InferSchemaInputs,
 	InferSchemaOutputs,
@@ -43,14 +41,11 @@ export type {
 	ErrorDeclaredClientResponse,
 	ResponseDeclaration,
 	ResponseHeaders,
-	OutputOptions,
+	BodylessResponseOptions,
 	ResponseOptions,
-	StreamOutputOptions,
 	StreamResponseOptions,
 	RouteResponses,
 	InferServerResponse,
-	ProcedureContentType,
-	ServerProcedureResponse,
 	ServerResponse,
 	ServerResponseBody,
 	SuccessfulDeclaredClientResponse,

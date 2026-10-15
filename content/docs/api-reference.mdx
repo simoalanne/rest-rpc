@@ -7,14 +7,12 @@ Each package's API reference is automatically generated from its TypeScript sour
 include all exported types, functions, and classes, along with their documentation comments.
 The references are available on [npmx.dev](https://npmx.dev).
 
-The package root exports are the main public API. Client contract generation is
-available from `@rest-rpc/core/generate`, as documented in
-[Client Contract Generation](/docs/client/contract-generation). Other subpath-only
-exports are implementation details and may change.
+The package root exports are the main public API. Subpath-only exports are
+implementation details and may change.
 
 | Package                                                                               | Purpose                                                                              | Related Docs                                                                                              |
 | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| [`@rest-rpc/core`](https://npmx.dev/package-docs/@rest-rpc/core/)                     | Route declarations, Fetch client, OpenAPI and contract generation.                   | [Route Builder](/docs/route-builder), [Fetch Client](/docs/client/fetch-client), [OpenAPI](/docs/openapi) |
+| [`@rest-rpc/core`](https://npmx.dev/package-docs/@rest-rpc/core/)                     | Route declarations, Fetch client, OpenAPI and contract extraction.                   | [Route Builder](/docs/route-builder), [Fetch Client](/docs/client/fetch-client), [OpenAPI](/docs/openapi) |
 | [`@rest-rpc/express`](https://npmx.dev/package-docs/@rest-rpc/express/)               | Express route registration and implementation utils.                                 | [Express](/docs/server/express)                                                                           |
 | [`@rest-rpc/fastify`](https://npmx.dev/package-docs/@rest-rpc/fastify/)               | Fastify route registration and implementation utils.                                 | [Fastify](/docs/server/fastify)                                                                           |
 | [`@rest-rpc/hono`](https://npmx.dev/package-docs/@rest-rpc/hono/)                     | Hono route registration and implementation utils.                                    | [Hono](/docs/server/hono)                                                                                 |

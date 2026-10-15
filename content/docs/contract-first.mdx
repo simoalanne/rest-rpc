@@ -8,7 +8,7 @@ of its server implementation. The contract can be shared directly with a Fetch
 client and implemented with any server adapter.
 
 The declaration methods are the same as the [Route Builder](/docs/route-builder).
-The difference is that outputs are declared with schemas rather than inferred
+The difference is that responses are declared with schemas rather than inferred
 from handlers.
 
 ## Declare Routes
@@ -19,20 +19,19 @@ import { z } from "zod";
 
 const todoSchema = z.object({ id: z.string(), title: z.string() });
 
-const create = route.input(z.object({ title: z.string() })).output(todoSchema);
+const create = route.body(z.object({ title: z.string() })).response(todoSchema);
 
 const get = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
-	.response(200, todoSchema)
-	.response(404, z.object({ code: z.literal("TODO_NOT_FOUND") }));
+	.response(todoSchema)
+	.response(z.object({ code: z.literal("TODO_NOT_FOUND") }), { status: 404 });
 
 export const api = { todos: { create, get } };
 ```
 
-Use `.output()` for a plain result or `.response()` for status responses.
-Streams use `.streamOutput()` or `.streamResponse()`. These schemas define
-handler and client types and provide [runtime validation](/docs/http-behavior/schemas).
+Use `.response()` for each response and `.streamResponse()` for streams. These
+schemas define handler and client types and provide [runtime validation](/docs/http-behavior/schemas).
 See [Streaming](/docs/streaming) for stream handlers.
 
 ## Implement Routes
@@ -47,22 +46,20 @@ import { createTodo, findTodo } from "./todos";
 
 const implementer = implement(api);
 
-const create = implementer.todos.create.handler(({ input: { title } }) =>
+const create = implementer.todos.create.handler(({ body: { title } }) =>
 	createTodo(title),
 );
 
 const get = implementer.todos.get.handler(({ params }) => {
 	const todo = findTodo(params.id);
-	return todo
-		? { status: 200, body: todo }
-		: { status: 404, body: { code: "TODO_NOT_FOUND" } };
+	return todo ?? { status: 404, body: { code: "TODO_NOT_FOUND" } };
 });
 
 export const routes = { todos: { create, get } };
 ```
 
-The implementation must match the contract's inputs and declared outputs.
-Register the completed routes with your adapter as usual.
+The implementation must match the contract's request segments and declared
+responses. Register the completed routes with your adapter as usual.
 
 ## Context And Middleware
 
@@ -94,7 +91,7 @@ Don't use `use` or `$context` as top-level keys in your contract. They are reser
 ## Use in a Client
 
 Pass the shared contract directly to `initClient()` or
-`createTanstackQueryUtils()`. No [contract generation](/docs/client/contract-generation)
+`createTanstackQueryUtils()`. No [contract extraction](/docs/client/contract-extraction)
 step is needed, and the client can [validate responses](/docs/client/fetch-client#response-validation)
 with the contract's schemas.
 

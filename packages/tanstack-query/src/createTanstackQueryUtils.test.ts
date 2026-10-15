@@ -6,8 +6,8 @@ const contract = {
 	users: {
 		get: route
 			.get("/users")
-			.response(200, type<{ name: string }>())
-			.response(404, type<{ message: string }>()),
+			.response(type<{ name: string }>())
+			.response(type<{ message: string }>(), { status: 404 }),
 	},
 };
 

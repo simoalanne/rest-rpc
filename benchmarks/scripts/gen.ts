@@ -8,8 +8,8 @@ const NUM_ROUTERS = 500;
 const ROUTER_DIR = path.resolve(__dirname, "../src/router");
 const CONSUME_DIR = path.resolve(__dirname, "../src/consume");
 
-const PROCEDURE_1 = `route.get().input(schema<{ who: string }>()).handler(({input}) => \`hello \${input.who}\`)`;
-const PROCEDURE_2 = `route.input(schema<{ id: string }>()).handler(({input}) => ({ id: input.id }))`;
+const PROCEDURE_1 = `route.get().query(schema<{ who: string }>()).handler(({query}) => \`hello \${query.who}\`)`;
+const PROCEDURE_2 = `route.body(schema<{ id: string }>()).handler(({body}) => ({ id: body.id }))`;
 
 function createRouter(routerName: string): string {
 	return `
@@ -33,12 +33,12 @@ function createConsume(routerName: string): string {
 	return `
 import { client } from '../client.ts';
 
-const procedure_1: string = await client.${routerName}.procedure_1({ who: 'world' });
-const procedure_2: { id: string } = await client.${routerName}.procedure_2({ id: '123' });
-const nested_procedure_1: string = await client.${routerName}.nested.procedure_1({ who: 'world' });
-const nested_procedure_2: { id: string } = await client.${routerName}.nested.procedure_2({ id: '123' });
-const nested_nested_procedure_1: string = await client.${routerName}.nested.nested.procedure_1({ who: 'world' });
-const nested_nested_procedure_2: { id: string } = await client.${routerName}.nested.nested.procedure_2({ id: '123' });
+const procedure_1: string = (await client.${routerName}.procedure_1({ query: { who: 'world' } })).body;
+const procedure_2: { id: string } = (await client.${routerName}.procedure_2({ body: { id: '123' } })).body;
+const nested_procedure_1: string = (await client.${routerName}.nested.procedure_1({ query: { who: 'world' } })).body;
+const nested_procedure_2: { id: string } = (await client.${routerName}.nested.procedure_2({ body: { id: '123' } })).body;
+const nested_nested_procedure_1: string = (await client.${routerName}.nested.nested.procedure_1({ query: { who: 'world' } })).body;
+const nested_nested_procedure_2: { id: string } = (await client.${routerName}.nested.nested.procedure_2({ body: { id: '123' } })).body;
 `.trim();
 }
 

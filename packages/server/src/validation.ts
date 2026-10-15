@@ -1,7 +1,6 @@
-import {
-	type ResponseDeclaration,
-	type RouteDeclaration,
-	resolveRouteRequest,
+import type {
+	ResponseDeclaration,
+	RouteDeclaration,
 } from "@rest-rpc/core/contract";
 import {
 	type StandardSchemaV1,
@@ -85,7 +84,7 @@ export async function validateRequestSegments(
 	route: RouteDeclaration,
 	segments: RequestSegments,
 ) {
-	const requestSchemas = resolveRouteRequest(route);
+	const requestSchemas = route.request;
 	const body = await validateRequestSegment(
 		requestSchemas?.body,
 		segments.body,

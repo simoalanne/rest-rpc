@@ -11,26 +11,26 @@ consuming streams.
 
 ## Declare a Stream
 
-Returning an async iterable infers a plain stream. Use `.streamOutput()` when
+Returning an async iterable infers a stream. Use `.streamResponse()` when
 you want to declare and validate its data schema.
 
 ```ts
 const events = route
 	.get("/todos/events")
-	.streamOutput(z.object({ id: z.string(), message: z.string() }))
+	.streamResponse(z.object({ id: z.string(), message: z.string() }))
 	.handler(async function* () {
 		yield { id: "todo_1", message: "Created" };
 		yield { id: "todo_1", message: "Completed" };
 	});
 ```
 
-Use `.streamResponse()` when the route can return different HTTP statuses:
+Return an envelope when the route can return different HTTP statuses:
 
 ```ts
 const events = route
 	.get("/todos/events")
-	.streamResponse(200, z.object({ id: z.string(), message: z.string() }))
-	.response(401, z.object({ code: z.literal("UNAUTHORIZED") }))
+	.streamResponse(z.object({ id: z.string(), message: z.string() }))
+	.response(z.object({ code: z.literal("UNAUTHORIZED") }), { status: 401 })
 	.handler(() => ({ status: 200, body: streamTodoEvents() }));
 ```
 

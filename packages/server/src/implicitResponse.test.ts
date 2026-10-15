@@ -9,6 +9,7 @@ describe("normalizeImplicitResponse", () => {
 		42,
 		{ data: "ordinary" },
 		{ contentType: 1, data: "ordinary" },
+		{ contentType: "text/plain", data: "ordinary" },
 	])("uses JSON for ordinary output %j", (value) => {
 		expect(normalizeImplicitResponse(value)).toEqual({
 			kind: "response",
@@ -17,10 +18,7 @@ describe("normalizeImplicitResponse", () => {
 		});
 	});
 
-	it("recognizes custom output structurally and gives status envelopes precedence", () => {
-		expect(
-			normalizeImplicitResponse({ contentType: "text/plain", data: "hello" }),
-		).toMatchObject({ body: { value: "hello", contentType: "text/plain" } });
+	it("gives status envelopes precedence over other fields", () => {
 		expect(
 			normalizeImplicitResponse({
 				status: 204,
@@ -61,7 +59,18 @@ describe("normalizeImplicitResponse", () => {
 		},
 	);
 
-	it.each([99, 600, 200.5, NaN, Infinity, "200", undefined])(
+	it.each([{ status: "200" }, { status: undefined }, { id: 1, status: "open" }])(
+		"treats a non-numeric status as part of a 200 body %j",
+		(value) => {
+			expect(normalizeImplicitResponse(value)).toEqual({
+				kind: "response",
+				status: 200,
+				body: { value, contentType: "application/json" },
+			});
+		},
+	);
+
+	it.each([99, 600, 200.5, NaN, Infinity])(
 		"rejects invalid inferred status %s",
 		(status) => {
 			expect(() => normalizeImplicitResponse({ status })).toThrow(

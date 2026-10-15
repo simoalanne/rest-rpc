@@ -15,7 +15,6 @@ import type {
 } from "@rest-rpc/core/client";
 import {
 	mapContractRoutes,
-	usesPlainOutput,
 	type Contract,
 	type RouteDeclaration,
 	type RouteTree,
@@ -443,20 +442,15 @@ export function createTanstackQueryUtils<
 ): TanstackQueryUtilsFor<TContract, TGlobalHeaders> {
 	const client: unknown = initClient(contract, options);
 
-	return mapContractRoutes(contract, (route, path) => {
+	return mapContractRoutes(contract, (_route, path) => {
 		const routeFetchFn = path.reduce(
 			(node, key) => (node as Record<string, unknown>)[key],
 			client,
 		) as (...args: unknown[]) => Promise<unknown>;
-		const returnsResponseEnvelope = !usesPlainOutput(route);
-
 		return createTanstackUtilsForRoute({
 			routePath: path,
-			fetchData: returnsResponseEnvelope
-				? (request, fetchOptions) =>
-						fetchSuccessfulResponse(routeFetchFn, request, fetchOptions)
-				: routeFetchFn,
-			unwrapResponseBodyForStream: returnsResponseEnvelope,
+			fetchData: (request, fetchOptions) =>
+				fetchSuccessfulResponse(routeFetchFn, request, fetchOptions),
 		});
 	}) as TanstackQueryUtilsFor<TContract, TGlobalHeaders>;
 }

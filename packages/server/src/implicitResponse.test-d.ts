@@ -44,12 +44,12 @@ describe("implicit response inference", () => {
 			contentType: "text/plain",
 			headers: { count: 2, omitted: undefined },
 		}));
-		expectTypeOf<
-			InferClientResponse<typeof custom>["headers"]
-		>().toEqualTypeOf<{
-			readonly count: "2";
-			readonly omitted: undefined;
-		}>();
+		expectTypeOf<InferClientResponse<typeof custom>["headers"]>().toEqualTypeOf<
+			Record<string, string> & {
+				readonly count: "2";
+				readonly omitted: undefined;
+			}
+		>();
 		expectTypeOf<
 			InferServerResponse<typeof custom>["headers"]
 		>().toEqualTypeOf<{
@@ -58,12 +58,8 @@ describe("implicit response inference", () => {
 		}>();
 	});
 
-	it("infers plain, custom, stream, and SSE data independently of metadata", () => {
+	it("infers plain, stream, and SSE data independently of metadata", () => {
 		const plain = route.handler(() => ({ id: "one" }));
-		const custom = route.handler(async () => ({
-			contentType: "text/plain",
-			data: "hello",
-		}));
 		async function* chunks() {
 			yield sse({ data: { count: 1 }, id: "one" });
 		}
@@ -72,10 +68,11 @@ describe("implicit response inference", () => {
 			.get("/")
 			.handler(() => ({ status: 200, body: chunks() }));
 		expectTypeOf<InferClientResponse<typeof plain>>().toEqualTypeOf<{
-			readonly id: "one";
+			status: 200;
+			body: { readonly id: "one" };
+			headers: Record<string, string>;
 		}>();
-		expectTypeOf<InferClientResponse<typeof custom>>().toEqualTypeOf<"hello">();
-		expectTypeOf<InferClientResponse<typeof stream>>().toEqualTypeOf<
+		expectTypeOf<InferClientResponse<typeof stream>["body"]>().toEqualTypeOf<
 			AsyncIterable<{
 				data: { count: number };
 				id?: string;
@@ -87,7 +84,7 @@ describe("implicit response inference", () => {
 			InferClientResponse<typeof envelope>["status"]
 		>().toEqualTypeOf<200>();
 		expectTypeOf<InferClientResponse<typeof envelope>["body"]>().toEqualTypeOf<
-			InferClientResponse<typeof stream>
+			InferClientResponse<typeof stream>["body"]
 		>();
 		expectTypeOf<
 			ImplicitResponseKind<
@@ -99,13 +96,28 @@ describe("implicit response inference", () => {
 		>().toEqualTypeOf<"empty" | "json" | "stream" | "custom">();
 	});
 
-	it("rejects mixed output modes, invalid statuses, and invalid headers", () => {
-		// @ts-expect-error A handler must use a single output mode.
-		route.handler(() =>
-			Math.random() > 0.5 ? "plain" : { status: 200, body: "envelope" },
-		);
-		// @ts-expect-error Status envelopes require a number.
-		route.handler(() => ({ status: "200", body: "bad" }));
+	it("infers plain bodies and envelopes per returned member", () => {
+		const mixed = route
+			.get("/")
+			.handler(() =>
+				Math.random() > 0.5
+					? { id: "one" }
+					: { status: 404, body: { message: "missing" } },
+			);
+		type Client = InferClientResponse<typeof mixed>;
+		expectTypeOf<Client["status"]>().toEqualTypeOf<200 | 404>();
+		expectTypeOf<Extract<Client, { status: 200 }>["body"]>().toEqualTypeOf<{
+			readonly id: "one";
+		}>();
+		const textStatus = route.handler(() => ({ id: "one", status: "open" }));
+		expectTypeOf<InferClientResponse<typeof textStatus>>().toEqualTypeOf<{
+			status: 200;
+			body: { readonly id: "one"; readonly status: "open" };
+			headers: Record<string, string>;
+		}>();
+	});
+
+	it("rejects invalid envelope headers", () => {
 		// @ts-expect-error Response headers must be transport scalars.
 		route.handler(() => ({ status: 200, headers: { count: {} } }));
 	});

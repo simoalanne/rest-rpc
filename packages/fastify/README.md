@@ -2,11 +2,10 @@
 
 REST APIs with RPC-like ergonomics.
 
-Define HTTP routes with methods, paths, request segments, response statuses,
-content types, and streaming—or start with sensible defaults. Call them through
-a typed client that feels like ordinary function calls.
+Define HTTP routes with an expressive route builder and sensible defaults.
+Call them through a typed client that feels like ordinary function calls.
 
-Define routes alongside handlers and infer their output types. A separately
+Define routes alongside handlers and infer their response types. A separately
 shared contract is also supported.
 
 ## Features
@@ -21,44 +20,51 @@ shared contract is also supported.
 
 ## Example
 
-Define HTTP routes with implicit or explicit details:
+Define HTTP routes:
 
-```ts server.ts
+```ts routes.ts
 export const routes = {
 	todos: {
-		// Defaults to POST /todos/create with a plain JSON result.
+		// Defaults to POST /todos/create with a 200 JSON response.
 		create: route
-			.input(z.object({ title: z.string() }))
-			.handler(({ input: { title } }) => createTodo(title)),
-		// Explicit HTTP method, path params, and response statuses.
+			.body(z.object({ title: z.string() }))
+			.handler(({ body: { title } }) => createTodo(title)),
+		// GET /todos/:id with path params and a 404 response.
 		get: route
 			.get("/todos/:id")
 			.params(z.object({ id: z.string() }))
 			.handler(({ params }) => {
 				const todo = findTodo(params.id);
-				return todo
-					? { status: 200, body: todo }
-					: { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
+				return (
+					todo ?? { status: 404, body: { code: "TODO_NOT_FOUND" as const } }
+				);
 			}),
 	},
 };
 ```
 
-Derive the client contract from the server route tree's type, then call the
-routes as typed functions:
+Extract a minimal client contract from the route tree at build time, then call
+the routes as typed functions:
+
+```ts extract-contract.ts
+import { writeFile } from "node:fs/promises";
+import { extractContract } from "@rest-rpc/core";
+import { routes } from "./routes";
+
+await writeFile("contract.json", JSON.stringify(extractContract(routes)));
+```
 
 ```ts
 import { initClient } from "@rest-rpc/core";
-import { generateContractFromType } from "@rest-rpc/core/generate";
-import type { routes } from "./server";
+import type { routes } from "./routes";
+import contract from "./contract.json";
 
-const api = generateContractFromType<typeof routes>();
-
+const api = contract as unknown as typeof routes;
 const client = initClient(api, { baseUrl: "http://localhost:3000" });
 
-const todo = await client.todos.create({ title: "Write docs" });
+const created = await client.todos.create({ body: { title: "Write docs" } });
 
-const response = await client.todos.get({ params: { id: todo.id } });
+const response = await client.todos.get({ params: { id: created.body.id } });
 
 if (response.status === 200) {
 	console.log(response.body.title);

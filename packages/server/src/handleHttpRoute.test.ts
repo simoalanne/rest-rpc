@@ -26,49 +26,41 @@ const execute = (implementation: RuntimeImplementationTree) =>
 	});
 
 describe("handleHttpRoute", () => {
-	it.each(["GET", "POST"] as const)(
-		"projects transformed flat %s input and transport headers",
-		async (method) => {
-			const seen = vi.fn();
-			const implementation = (method === "GET" ? route.get() : route.post())
-				.input(
-					type((value: { count: string }) => ({ count: Number(value.count) })),
-				)
-				.handler((request) => {
-					seen(request);
-					return request.input;
-				});
-			const run = (disableRequestValidation: boolean) =>
-				handleHttpRoute(flattenRouteImplementations({ implementation })[0]!, {
-					request: {
-						...(method === "GET"
-							? { query: new URLSearchParams("count=2") }
-							: { body: { count: "2" } }),
-						headers: {
-							"content-type": ["Application/JSON; charset=utf-8"],
-							"last-event-id": ["one", "two"],
-						},
+	it("projects transformed request segments and transport headers", async () => {
+		const seen = vi.fn();
+		const implementation = route
+			.post()
+			.body(
+				type((value: { count: string }) => ({ count: Number(value.count) })),
+			)
+			.handler((request) => {
+				seen(request);
+				return request.body;
+			});
+		const run = (disableRequestValidation: boolean) =>
+			handleHttpRoute(flattenRouteImplementations({ implementation })[0]!, {
+				request: {
+					body: { count: "2" },
+					headers: {
+						"content-type": ["Application/JSON; charset=utf-8"],
+						"last-event-id": ["one", "two"],
 					},
-					handlerFields: { native: "adapter" },
-					configuration: { disableRequestValidation },
-				});
-			expect(await run(false)).toMatchObject({ body: { value: { count: 2 } } });
-			expect(seen.mock.calls[0]![0]).toMatchObject({
-				input: { count: 2 },
-				contentType: "application/json",
-				lastEventId: "one",
-				native: "adapter",
-			});
-			expect(seen.mock.calls[0]![0]).not.toHaveProperty("body");
-			const raw = await run(true);
-			expect(raw).toMatchObject({
-				body: {
-					value:
-						method === "GET" ? expect.any(URLSearchParams) : { count: "2" },
 				},
+				handlerFields: { native: "adapter" },
+				configuration: { disableRequestValidation },
 			});
-		},
-	);
+		expect(await run(false)).toMatchObject({ body: { value: { count: 2 } } });
+		expect(seen.mock.calls[0]![0]).toMatchObject({
+			body: { count: 2 },
+			contentType: "application/json",
+			lastEventId: "one",
+			native: "adapter",
+		});
+		expect(seen.mock.calls[0]![0]).not.toHaveProperty("input");
+		expect(await run(true)).toMatchObject({
+			body: { value: { count: "2" } },
+		});
+	});
 
 	it("shares context with middleware and creates a fresh store per request", async () => {
 		const contexts: unknown[] = [];
@@ -103,16 +95,12 @@ describe("handleHttpRoute", () => {
 	it("transforms declared bodies and headers unless response validation is disabled", async () => {
 		const implementation = route
 			.get("/")
-			.response(
-				200,
-				type((value: string) => Number(value)),
-				{
+			.response(type((value: string) => Number(value)), {
 					headers: type((value: { count: number; omitted?: string }) => ({
 						count: value.count + 1,
 						omitted: undefined,
 					})),
-				},
-			)
+				})
 			.handler(() => ({
 				status: 200,
 				body: "2",
@@ -139,11 +127,7 @@ describe("handleHttpRoute", () => {
 		async (location) => {
 			const implementation = route
 				.get("/")
-				.response(
-					200,
-					location === "body" ? rejected : type<string>(),
-					location === "headers" ? { headers: rejected } : {},
-				)
+				.response(location === "body" ? rejected : type<string>(), location === "headers" ? { headers: rejected } : {})
 				.handler(() => ({ status: 200, body: "ok", headers: {} }));
 			const result = await execute(implementation);
 			expect(result).toBeInstanceOf(ResponseValidationError);
@@ -157,10 +141,7 @@ describe("handleHttpRoute", () => {
 		}
 		const implementation = route
 			.get("/")
-			.streamResponse(
-				200,
-				type((value: string) => Number(value)),
-			)
+			.streamResponse(type((value: string) => Number(value)))
 			.handler(() => ({ status: 200, body: chunks() }));
 		for (const disabled of [false, true]) {
 			const result = await handleHttpRoute(
@@ -179,34 +160,29 @@ describe("handleHttpRoute", () => {
 		}
 	});
 
-	it("dispatches declared plain and custom outputs through response validation", async () => {
+	it("dispatches declared envelopes and plain 200 bodies through response validation", async () => {
+		const schema = type((value: string) => value.toUpperCase());
 		expect(
 			await execute({
 				get: route
-					.output(type((value: string) => value.toUpperCase()))
-					.handler(() => "hello"),
+					.response(schema)
+					.handler(() => ({ status: 200, body: "hello" })),
 			}),
 		).toMatchObject({
+			status: 200,
 			body: { value: "HELLO", contentType: "application/json" },
 		});
-		const custom = route
-			.output(type<string>(), { contentType: "text/plain" })
-			.handler(() => ({ contentType: "text/plain", data: "hello" }));
-		expect(await execute({ custom })).toMatchObject({
-			body: { value: "hello", contentType: "text/plain" },
+		expect(
+			await execute({ get: route.response(schema).handler(() => "hello") }),
+		).toMatchObject({
+			status: 200,
+			body: { value: "HELLO", contentType: "application/json" },
 		});
-		const runtime = flattenRouteImplementations({ custom })[0]!;
-		await expect(
-			handleHttpRoute(
-				{ ...runtime, handler: () => "hello" },
-				{ request: {}, handlerFields: {} },
-			),
-		).rejects.toThrow("Custom procedure output must return");
 	});
 	it("rejects an undeclared response status even with response validation disabled", async () => {
 		const declared = route
 			.get("/")
-			.response(200, type<string>())
+			.response(type<string>())
 			.handler(() => ({ status: 200, body: "ok" }));
 		const implementation = {
 			...flattenRouteImplementations(declared)[0]!,
@@ -224,7 +200,7 @@ describe("handleHttpRoute", () => {
 	it("requires a declared response content type and normalizes the selection", async () => {
 		const declared = route
 			.get("/")
-			.response(200, type<string>(), {
+			.response(type<string>(), {
 				contentType: ["text/plain", "text/html"],
 			})
 			.handler(() => ({ status: 200, body: "ok", contentType: "text/plain" }));
