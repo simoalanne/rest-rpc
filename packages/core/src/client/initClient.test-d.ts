@@ -4,7 +4,9 @@ import { initClient } from "./initClient.ts";
 
 describe("initClient types", () => {
 	it("allows empty requests and optional or guaranteed segmented headers", () => {
-		const empty = initClient(route.get("/").response({ status: 204 }), { baseUrl: "" });
+		const empty = initClient(route.get("/").response({ status: 204 }), {
+			baseUrl: "",
+		});
 		empty();
 		empty(undefined, {});
 		const contract = route
@@ -35,7 +37,10 @@ describe("initClient types", () => {
 		// @ts-expect-error An optional provider cannot guarantee the required token.
 		optionalProvider({});
 		const optional = initClient(
-			route.get("/").headers(type<{ token?: string }>()).response({ status: 204 }),
+			route
+				.get("/")
+				.headers(type<{ token?: string }>())
+				.response({ status: 204 }),
 			{ baseUrl: "" },
 		);
 		optional({});
@@ -52,7 +57,7 @@ describe("initClient types", () => {
 		expectTypeOf(client.length).returns.resolves.toEqualTypeOf<{
 			status: 200;
 			body: number;
-			rawHeaders: Headers;
+			headers: Record<string, string>;
 		}>();
 		// @ts-expect-error Requests use the schema input, not its transformed output.
 		client.length({ body: 1 });

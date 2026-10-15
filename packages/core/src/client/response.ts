@@ -21,11 +21,6 @@ import {
 import { parseSseStream } from "./stream.ts";
 import { validateResponseValue } from "./validateResponse.ts";
 import type { FetchArgs } from "./request.ts";
-import type { Merge } from "../typeUtils.ts";
-
-type WithResponseMetadata<TResponse, TMetadata> = TResponse extends unknown
-	? Merge<TResponse & TMetadata>
-	: never;
 
 /**
  * Infers a route's client result.
@@ -39,7 +34,7 @@ type WithResponseMetadata<TResponse, TMetadata> = TResponse extends unknown
 export type InferClientResponse<T extends RouteTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
-	? ClientResponseForDeclaration<TRoute>
+	? DeclaredClientResponse<TRoute>
 	: {
 			[K in keyof T]: T[K] extends RouteTree
 				? InferClientResponse<T[K]>
@@ -57,7 +52,7 @@ export type InferClientResponse<T extends RouteTree> = T extends {
 export type InferClientSuccess<T extends RouteTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
-	? ClientSuccessForDeclaration<TRoute>
+	? SuccessfulDeclaredClientResponse<TRoute>
 	: {
 			[K in keyof T]: T[K] extends RouteTree ? InferClientSuccess<T[K]> : never;
 		};
@@ -74,7 +69,7 @@ export type InferClientSuccess<T extends RouteTree> = T extends {
 export type InferClientError<T extends RouteTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
-	? ClientErrorForDeclaration<TRoute>
+	? ErrorDeclaredClientResponse<TRoute>
 	: {
 			[K in keyof T]: T[K] extends RouteTree ? InferClientError<T[K]> : never;
 		};
@@ -105,18 +100,6 @@ type ClientStreamDataForDeclaration<E extends RouteDeclaration> =
 			? TData
 			: never
 		: never;
-
-export type ClientResponseForDeclaration<E extends RouteDeclaration> =
-	WithResponseMetadata<DeclaredClientResponse<E>, { rawHeaders: Headers }>;
-
-type ClientSuccessForDeclaration<E extends RouteDeclaration> =
-	WithResponseMetadata<
-		SuccessfulDeclaredClientResponse<E>,
-		{ rawHeaders: Headers }
-	>;
-
-type ClientErrorForDeclaration<E extends RouteDeclaration> =
-	WithResponseMetadata<ErrorDeclaredClientResponse<E>, { rawHeaders: Headers }>;
 
 const assertResponseContentType = (
 	declared: string | readonly string[] | undefined,
@@ -153,13 +136,14 @@ const readHeaders = async (
 	validate: boolean,
 	body: unknown,
 ) => {
-	const rawHeaders = Object.fromEntries(rawResponse.headers.entries());
-	if (!schema?.headers || !validate) return rawHeaders;
+	const headers = Object.fromEntries(rawResponse.headers.entries());
+	if (!schema?.headers || !validate) return headers;
 
-	const result = await validateStandardSchema(schema.headers, rawHeaders);
+	const result = await validateStandardSchema(schema.headers, headers);
 	if (result.issues)
 		throw new HttpError(rawResponse.status, body, { cause: result.issues });
-	return result.value;
+	// Keep headers the schema does not declare.
+	return { ...headers, ...result.value };
 };
 
 const readBody = async (
@@ -203,10 +187,13 @@ export const fetchResponse = async <
 	const mediaType = normalizeMediaType(rawResponse.headers.get("content-type"));
 
 	if (mediaType === STREAM_CONTENT_TYPE) {
-		const body = readStreamResponse(schema?.body, rawResponse, validateResponse);
+		const body = readStreamResponse(
+			schema?.body,
+			rawResponse,
+			validateResponse,
+		);
 		return {
 			status,
-			rawHeaders: rawResponse.headers,
 			headers: await readHeaders(schema, rawResponse, validateResponse, body),
 			body,
 		};
@@ -223,7 +210,6 @@ export const fetchResponse = async <
 	if (schema) assertResponseContentType(schema.contentType, rawResponse, value);
 	return {
 		status,
-		rawHeaders: rawResponse.headers,
 		headers: await readHeaders(schema, rawResponse, validateResponse, value),
 		body: await validateResponseValue(
 			schema?.body,

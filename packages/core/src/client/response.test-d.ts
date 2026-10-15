@@ -13,12 +13,15 @@ describe("client response inference", () => {
 	it("uses transformed schema outputs in response unions", () => {
 		const value = route
 			.get("/")
-			.response(type((input: string) => Number(input)), {
+			.response(
+				type((input: string) => Number(input)),
+				{
 					contentType: ["text/plain", "application/json"],
 					headers: type((input: { count: string }) => ({
 						count: Number(input.count),
 					})),
-				})
+				},
+			)
 			.response({ status: 204 })
 			.response(type<{ message: string }>(), { status: 404 });
 		type Client = InferClientResponse<typeof value>;
@@ -26,9 +29,9 @@ describe("client response inference", () => {
 		expectTypeOf<
 			Extract<Client, { status: 200 }>["body"]
 		>().toEqualTypeOf<number>();
-		expectTypeOf<Extract<Client, { status: 200 }>["headers"]>().toEqualTypeOf<{
-			count: number;
-		}>();
+		expectTypeOf<Extract<Client, { status: 200 }>["headers"]>().toEqualTypeOf<
+			Record<string, string> & { count: number }
+		>();
 		expectTypeOf<
 			Extract<Client, { status: 204 }>["body"]
 		>().toEqualTypeOf<undefined>();
@@ -38,7 +41,9 @@ describe("client response inference", () => {
 	});
 
 	it("uses transformed schema outputs for streams", () => {
-		const stream = route.get("/").streamResponse(type((input: string) => Number(input)));
+		const stream = route
+			.get("/")
+			.streamResponse(type((input: string) => Number(input)));
 		expectTypeOf<InferClientResponse<typeof stream>["body"]>().toEqualTypeOf<
 			AsyncIterable<SseEvent<number>>
 		>();
@@ -59,13 +64,13 @@ describe("client response inference", () => {
 			.response({ status: 204 })
 			.response(type<{ message: string }>(), { status: 404 });
 		expectTypeOf<InferClientSuccess<typeof value>>().toEqualTypeOf<
-			| { status: 200; body: { name: string }; rawHeaders: Headers }
-			| { status: 204; body: undefined; rawHeaders: Headers }
+			| { status: 200; body: { name: string }; headers: Record<string, string> }
+			| { status: 204; body: undefined; headers: Record<string, string> }
 		>();
 		expectTypeOf<InferClientError<typeof value>>().toEqualTypeOf<{
 			status: 404;
 			body: { message: string };
-			rawHeaders: Headers;
+			headers: Record<string, string>;
 		}>();
 		const tree = { users: { value } };
 		expectTypeOf<

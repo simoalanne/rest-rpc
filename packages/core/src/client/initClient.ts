@@ -12,15 +12,15 @@ import {
 import {
 	fetchResponse as fetchRouteResponse,
 	type RouteRequestFn,
-	type ClientResponseForDeclaration,
 } from "./response.ts";
+import type { DeclaredClientResponse } from "../contract/response.ts";
 
 export type FetchResponseFn<
 	E extends RouteDeclaration,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > = (
 	...args: FetchArgs<E, TGlobalHeaders>
-) => Promise<ClientResponseForDeclaration<E>>;
+) => Promise<DeclaredClientResponse<E>>;
 
 /**
  * Infers the callable client operation for one declared route.

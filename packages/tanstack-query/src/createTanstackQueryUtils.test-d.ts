@@ -23,9 +23,7 @@ const get = route
 	.response(type<{ name: string }>())
 	.response(type<{ message: string }>(), { status: 404 });
 const empty = route.get("/health").response({ status: 204 });
-const events = route
-	.get("/events")
-	.streamResponse(type<{ value: number }>());
+const events = route.get("/events").streamResponse(type<{ value: number }>());
 const utils = createTanstackQueryUtils(
 	{ get, empty, events },
 	{ baseUrl: "https://example.test" },
@@ -40,11 +38,7 @@ describe("createTanstackQueryUtils types", () => {
 			},
 			onError: (error) => {
 				expectTypeOf(error).toEqualTypeOf<InferClientError<typeof get>>();
-				if (
-					"status" in error &&
-					error.status === 404 &&
-					"rawHeaders" in error
-				) {
+				if ("status" in error && error.status === 404 && "headers" in error) {
 					expectTypeOf(error.body).toEqualTypeOf<{ message: string }>();
 				}
 			},

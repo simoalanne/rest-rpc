@@ -13,17 +13,20 @@ const invalid: StandardSchemaV1<unknown, Record<string, string>> = {
 };
 const json = (value: unknown, headers?: RequestInit["headers"]) =>
 	Response.json(value, { status: 201, headers });
-const declared = route.get("/").response(type<{ name: string }>(), { status: 201 })[
-	"~restrpc"
-];
+const declared = route
+	.get("/")
+	.response(type<{ name: string }>(), { status: 201 })["~restrpc"];
 const decode = (response: Response, validate = true, declaration = declared) =>
 	fetchResponse(async () => response, validate, undefined, declaration);
 
 describe("client response decoding", () => {
-	it("transforms declared headers and retains raw headers", async () => {
-		const declaration = route.get("/").response(type<{ name: string }>(), { status: 201, headers: type((input: Record<string, string>) => ({
+	it("transforms declared headers and keeps undeclared headers", async () => {
+		const declaration = route.get("/").response(type<{ name: string }>(), {
+			status: 201,
+			headers: type((input: Record<string, string>) => ({
 				count: Number(input["x-count"]),
-			})) })["~restrpc"];
+			})),
+		})["~restrpc"];
 		const read = (validate: boolean) =>
 			fetchResponse(
 				async () => json({ name: "Ada" }, { "x-count": "2" }),
@@ -34,8 +37,7 @@ describe("client response decoding", () => {
 		expect(await read(true)).toMatchObject({
 			status: 201,
 			body: { name: "Ada" },
-			headers: { count: 2 },
-			rawHeaders: expect.any(Headers),
+			headers: { count: 2, "x-count": "2", "content-type": "application/json" },
 		});
 		expect(await read(false)).toMatchObject({
 			headers: { "x-count": "2" },
@@ -45,7 +47,9 @@ describe("client response decoding", () => {
 	it("retains status and decoded body on header and body schema failures", async () => {
 		for (const declaration of [
 			route.get("/").response(invalid, { status: 201 })["~restrpc"],
-			route.get("/").response(type(), { status: 201, headers: invalid })["~restrpc"],
+			route.get("/").response(type(), { status: 201, headers: invalid })[
+				"~restrpc"
+			],
 		]) {
 			const read = (validate: boolean) =>
 				fetchResponse(

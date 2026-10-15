@@ -26,9 +26,9 @@ const created = await client.todos.create({ body: { title: "Write docs" } });
 const response = await client.todos.get({ params: { id: created.body.id } });
 ```
 
-A call returns a `status`-discriminated union with `body`, `headers`, and the
-Fetch `Headers` object as `rawHeaders`. Declared response headers are typed;
-otherwise `headers` holds the raw response headers.
+A call returns a `status`-discriminated union with `body` and `headers`.
+`headers` is a record of every response header with lowercase names, and
+declared response headers are typed.
 
 ```ts
 if (response.status === 200) {
@@ -237,6 +237,10 @@ const client = initClient(api, {
 	},
 });
 ```
+
+A custom `fetch` also receives the raw `Response`, for details the client
+result does not keep, such as each `Set-Cookie` header from
+`headers.getSetCookie()`.
 
 ## Per-Call Options
 

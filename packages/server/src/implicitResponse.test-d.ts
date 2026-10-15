@@ -44,12 +44,12 @@ describe("implicit response inference", () => {
 			contentType: "text/plain",
 			headers: { count: 2, omitted: undefined },
 		}));
-		expectTypeOf<
-			InferClientResponse<typeof custom>["headers"]
-		>().toEqualTypeOf<{
-			readonly count: "2";
-			readonly omitted: undefined;
-		}>();
+		expectTypeOf<InferClientResponse<typeof custom>["headers"]>().toEqualTypeOf<
+			Record<string, string> & {
+				readonly count: "2";
+				readonly omitted: undefined;
+			}
+		>();
 		expectTypeOf<
 			InferServerResponse<typeof custom>["headers"]
 		>().toEqualTypeOf<{
@@ -70,7 +70,7 @@ describe("implicit response inference", () => {
 		expectTypeOf<InferClientResponse<typeof plain>>().toEqualTypeOf<{
 			status: 200;
 			body: { readonly id: "one" };
-			rawHeaders: Headers;
+			headers: Record<string, string>;
 		}>();
 		expectTypeOf<InferClientResponse<typeof stream>["body"]>().toEqualTypeOf<
 			AsyncIterable<{
@@ -113,7 +113,7 @@ describe("implicit response inference", () => {
 		expectTypeOf<InferClientResponse<typeof textStatus>>().toEqualTypeOf<{
 			status: 200;
 			body: { readonly id: "one"; readonly status: "open" };
-			rawHeaders: Headers;
+			headers: Record<string, string>;
 		}>();
 	});
 

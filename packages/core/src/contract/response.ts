@@ -130,13 +130,19 @@ type ClientResponseBody<TResponse> = TResponse extends {
 	? AsyncIterable<SseEvent<unknown>>
 	: InferResponseBody<TResponse, "output">;
 
-type ClientResponseEntry<TStatus extends number, TResponse> = ResponseEntry<
-	TStatus,
-	ClientResponseBody<TResponse>
-> &
-	ResponseHeadersMetadata<TResponse, "output"> extends infer TEntry
-	? Merge<TEntry>
-	: never;
+// Clients receive every response header; declared headers narrow their keys.
+type ClientResponseHeaders<TResponse> = [
+	ResponseHeadersFor<TResponse>,
+] extends [never]
+	? Record<string, string>
+	: Record<string, string> &
+			InferSchema<ResponseHeadersFor<TResponse>, "output">;
+
+type ClientResponseEntry<TStatus extends number, TResponse> = {
+	status: TStatus;
+	body: ClientResponseBody<TResponse>;
+	headers: ClientResponseHeaders<TResponse>;
+};
 
 type ServerResponseBase<TStatus extends number, TBody> = [TBody] extends [
 	undefined,
