@@ -11,7 +11,7 @@ shared contract is also supported.
 ## Features
 
 - Fluent route builder for HTTP
-- Typed handlers for Express, Hono, Fastify, NestJS, Node HTTP, and Fetch runtimes.
+- Typed handlers for Node HTTP and Fetch runtimes, registrable on any framework's router.
 - Typed Fetch client and TanStack Query utils.
 - Typed Server-Sent Event streams and custom request/response bodies
 - Standard Schema validation

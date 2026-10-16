@@ -1,22 +1,30 @@
 ---
 title: Fetch Runtime
-description: Use rest-rpc with Fetch API on the server
+description: Serve rest-rpc routes with Fetch Request and Response
 ---
 
-The Fetch adapter turns a Fetch `Request` into a `Response`. Use it with
-fetch-native runtimes such as Bun, Deno, and Cloudflare Workers, or inside a
-catch-all route of another framework.
+The Fetch runtime turns a Fetch `Request` into a `Response`. Use it with
+fetch-native runtimes such as Bun, Deno, and Cloudflare Workers, or with
+frameworks built on Fetch such as Hono.
 
 ## Install
 
 ```package-install
-npm i @rest-rpc/fetch
+npm i @rest-rpc/server
 ```
 
 ## Usage
 
+Compile the route tree, then either let rest-rpc route requests with the
+catch-all handler, or register each compiled route on a router you already
+have.
+
 ```ts
-import { route, createRouteHandler } from "@rest-rpc/fetch";
+import {
+	compileRoutes,
+	createCatchAllHandler,
+	route,
+} from "@rest-rpc/server/fetch";
 import { z } from "zod";
 
 const todos = new Map([["todo_1", { id: "todo_1", title: "Write docs" }]]);
@@ -33,62 +41,90 @@ const getTodo = route
 
 export const routes = { todos: { get: getTodo } };
 
-const handler = createRouteHandler(routes, { prefix: "/api" });
+const handler = createCatchAllHandler(
+	compileRoutes(routes, { prefix: "/api" }),
+);
 
-const server = Bun.serve({
-	routes: {
-		"/api/*": async (request) => {
-			const result = await handler(request);
-			return result.matched
-				? result.response
-				: new Response("Not found", { status: 404 });
-		},
+export default {
+	async fetch(request: Request) {
+		const result = await handler(request);
+		return result.matched
+			? result.response
+			: new Response("Not found", { status: 404 });
 	},
-});
-
-console.log(`Server running at ${server.url}`);
+};
 ```
 
-The handler resolves to `{ matched: true, response }` when the request matches a
-route, and `{ matched: false }` otherwise, so the surrounding runtime can
-provide fallback routing.
+The catch-all handler resolves to `{ matched: true, response }` when the request
+matches a route, and `{ matched: false }` otherwise, so the surrounding runtime
+can provide fallback routing.
 
-## Framework Context
+## Registering Routes on a Router
 
-Handlers and middleware receive the Fetch `request` in addition to the
-[common handler arguments](/docs/route-builder#handler-arguments):
+`compileRoutes` returns one route per method and path:
 
 ```ts
-const getTodo = route
-	.get("/todos/:id")
-	.params(z.object({ id: z.string() }))
-	.handler(({ params, request }) => {
-		console.log(request.headers.get("x-request-id"));
-		return todos.get(params.id);
-	});
+type FetchRoute = {
+	method: HttpMethod;
+	path: string;
+	handle: (request: Request, options?: HandleOptions) => Promise<Response>;
+};
 ```
 
-When your runtime passes a `Request` subtype, augment `DefaultRequest` to type
-it. The handler then accepts and exposes that type:
+`path` has the `prefix` applied. `handle` runs validation, middleware, and the
+handler for a request that is already routed to it, and reads params from the
+request URL. With Bun's built-in router:
 
 ```ts
-import type { BunRequest } from "bun";
-
-declare module "@rest-rpc/fetch" {
-	interface DefaultRequest extends BunRequest {}
+const bunRoutes: Record<
+	string,
+	Record<string, (request: Request) => Promise<Response>>
+> = {};
+for (const route of compileRoutes(routes, {
+	prefix: "/api",
+	paramSyntax: "colon",
+})) {
+	(bunRoutes[route.path] ??= {})[route.method] = (request) =>
+		route.handle(request);
 }
+
+Bun.serve({
+	routes: bunRoutes,
+	fetch: () => new Response("Not found", { status: 404 }),
+});
 ```
 
-To share an application [context](/docs/context) type across routes, augment
-`DefaultContext` in `@rest-rpc/fetch`.
+Wrap `handle` instead of passing it to a router directly. Routers pass extra
+arguments, such as Bun's `server`, that would land in the `options` position.
+
+`handle` rejects when the request path does not match the route's path, which
+means the route was registered under a different path than it was compiled
+with. Set `prefix` to match where the routes are mounted.
+
+See [Frameworks](/docs/server/frameworks) for Hono and other routers.
+
+## Context
+
+Handlers and middleware receive the
+[common handler arguments](/docs/route-builder#handler-arguments) and the
+request's `signal`. To pass values from the host into the request
+[context](/docs/context), such as an authenticated user or the native request,
+seed it with the `context` option:
+
+```ts
+const result = await handler(request, { context: { user } });
+// or, for a compiled route
+const response = await route.handle(request, { context: { user } });
+```
 
 ## Options
 
 ```ts
-type CreateFetchHandlerOptions = {
-	bodyCodecs?: readonly BodyCodec<DefaultRequest>[];
+type CompileRoutesOptions = {
+	bodyCodecs?: readonly BodyCodec[];
 	disableRequestValidation?: boolean;
 	disableResponseValidation?: boolean;
+	paramSyntax?: "colon" | "braces";
 	prefix?: `/${string}`;
 	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
@@ -96,19 +132,27 @@ type CreateFetchHandlerOptions = {
 };
 ```
 
-- `prefix`: path prefix prepended to every route path when matching requests.
+- `prefix`: path prefix prepended to every route path.
+- `paramSyntax`: rewrites path params in compiled paths to `:name` (`"colon"`)
+  or `{name}` (`"braces"`) for routers that expect one of them. Paths keep the
+  markers they were declared with by default.
 - `bodyCodecs`, `requestBodyLimit`: see [Request and Response Bodies](#request-and-response-bodies).
 - `disableRequestValidation`, `disableResponseValidation`: see
   [Disabling Server Validation](/docs/http-behavior/schemas#disabling-server-validation).
 - `requestValidationErrorHandler`, `responseValidationErrorHandler`: see [Error Handling](#error-handling).
 
+## Paths
+
+Path params are written as `:name` or `{name}`. Matching follows
+[rou3](https://github.com/h3js/rou3): static segments take precedence over
+params, and one trailing slash is ignored. Param values are percent-decoded.
+
 ## Request and Response Bodies
 
-The adapter decodes request bodies with the
-[default codecs](/docs/http-behavior/serialization#default-codecs). Built-in
-decoding reads at most `requestBodyLimit` bytes, `1 MiB` by default. A custom
-codec's `deserialize` receives the `Request` and is not subject to
-`requestBodyLimit`.
+Request bodies are decoded with custom `bodyCodecs` first and the
+[default codecs](/docs/http-behavior/serialization#default-codecs) after them.
+A codec's `deserialize` receives the Fetch `Request`. Decoding reads at most
+`requestBodyLimit` bytes, `1 MiB` by default.
 
 Handlers can return any value supported by the default codecs. A custom
 serializer's `body` must be a Fetch `Response` body, such as a string, `Blob`,
@@ -121,17 +165,19 @@ replace the [default validation error responses](/docs/http-behavior/errors).
 Other errors reject the handler promise.
 
 ```ts
-const handler = createRouteHandler(routes, {
-	requestValidationErrorHandler: (error, request) => {
-		return Response.json(
-			{ code: "VALIDATION_ERROR", issues: error.issues },
-			{ status: 422 },
-		);
-	},
-	responseValidationErrorHandler: (_error, request) => {
-		return Response.json({ code: "INVALID_RESPONSE" }, { status: 500 });
-	},
-});
+const handler = createCatchAllHandler(
+	compileRoutes(routes, {
+		requestValidationErrorHandler: (error, request) => {
+			return Response.json(
+				{ code: "VALIDATION_ERROR", issues: error.issues },
+				{ status: 422 },
+			);
+		},
+		responseValidationErrorHandler: (_error, request) => {
+			return Response.json({ code: "INVALID_RESPONSE" }, { status: 500 });
+		},
+	}),
+);
 
 export default {
 	async fetch(request: Request) {

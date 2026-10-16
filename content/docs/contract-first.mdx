@@ -5,7 +5,7 @@ description: Declare routes in a shared contract and implement them separately.
 
 Import `route` from `@rest-rpc/core` to declare a route independently
 of its server implementation. The contract can be shared directly with a Fetch
-client and implemented with any server adapter.
+client and implemented with `@rest-rpc/server`.
 
 The declaration methods are the same as the [Route Builder](/docs/route-builder).
 The difference is that responses are declared with schemas rather than inferred
@@ -36,11 +36,11 @@ See [Streaming](/docs/streaming) for stream handlers.
 
 ## Implement Routes
 
-Each server adapter exports `implement()`. Pass a route or route tree to get
+`@rest-rpc/server/node` and `@rest-rpc/server/fetch` export `implement()`. Pass a route or route tree to get
 builders with typed `.handler()` methods:
 
 ```ts server.ts
-import { implement } from "@rest-rpc/express";
+import { implement } from "@rest-rpc/server/node";
 import { api } from "./contract";
 import { createTodo, findTodo } from "./todos";
 
@@ -59,7 +59,7 @@ export const routes = { todos: { create, get } };
 ```
 
 The implementation must match the contract's request segments and declared
-responses. Register the completed routes with your adapter as usual.
+responses. Compile and register the completed routes as usual.
 
 ## Context And Middleware
 
