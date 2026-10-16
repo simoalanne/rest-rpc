@@ -1,11 +1,12 @@
 import {
 	contractRouteEntries,
-	getPathParamSegmentName,
 	isPathParamSegment,
 	isRouteLeaf,
+	toColonPath,
 	type AbsolutePath,
 	type RouteDeclaration,
 } from "@rest-rpc/core/contract";
+import { addRoute, createRouter, findRoute } from "rou3";
 import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
 
 const splitPath = (path: string) => path.split("/").filter(Boolean);
@@ -43,39 +44,6 @@ const compareRouteSpecificity = (
 	}
 
 	return left.method.localeCompare(right.method);
-};
-
-const escapeRegExp = (value: string) =>
-	value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-export const createPathMatcher = (path: AbsolutePath) => {
-	const keys: string[] = [];
-	const segments = splitPath(path);
-	const pattern =
-		segments.length === 0
-			? "/"
-			: `/${segments
-					.map((segment) => {
-						const paramName = getPathParamSegmentName(segment);
-						if (!paramName) return escapeRegExp(segment);
-						keys.push(paramName);
-						return "([^/]+)";
-					})
-					.join("/")}`;
-	const regex = new RegExp(`^${pattern}/?$`);
-
-	return (pathname: string) => {
-		const match = regex.exec(pathname);
-		if (!match) return null;
-
-		return keys.reduce(
-			(params, key, index) => {
-				params[key] = decodeURIComponent(match[index + 1] ?? "");
-				return params;
-			},
-			{} as Record<string, string>,
-		);
-	};
 };
 
 export type RuntimeImplementation = {
@@ -130,35 +98,35 @@ export type RouteMatch = {
 
 /**
  * Compiles route implementations into a method and path matcher.
+ *
+ * @remarks Matching follows rou3 semantics. Params are percent-decoded to
+ * mirror the client, which encodes them.
  */
 export function createRouteMatcher(
 	implementations: RuntimeImplementationTree,
 	prefix?: AbsolutePath,
 ) {
-	const matchers = flattenRouteImplementations(implementations).map(
-		(implementation) => ({
+	const router = createRouter<RuntimeImplementation>();
+	for (const implementation of flattenRouteImplementations(implementations)) {
+		addRoute(
+			router,
+			implementation.route.method,
+			toColonPath(joinPaths(prefix, implementation.route.path as AbsolutePath)),
 			implementation,
-			matchPath: createPathMatcher(
-				joinPaths(prefix, implementation.route.path),
-			),
-		}),
-	);
+		);
+	}
 
 	return (request: {
 		path: string;
 		method: string;
 	}): RouteMatch | undefined => {
-		for (const matcher of matchers) {
-			if (matcher.implementation.route.method !== request.method) continue;
-			const params = matcher.matchPath(request.path);
-			if (params === null) continue;
+		const match = findRoute(router, request.method, request.path);
+		if (!match) return undefined;
 
-			return {
-				implementation: matcher.implementation,
-				params,
-			};
+		const params: Record<string, string> = {};
+		for (const [key, value] of Object.entries(match.params ?? {})) {
+			params[key] = decodeURIComponent(value);
 		}
-
-		return undefined;
+		return { implementation: match.data, params };
 	};
 }

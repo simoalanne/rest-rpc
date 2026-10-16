@@ -46,6 +46,7 @@
 		"typecheck": "tsc -p tsconfig.json --noEmit --declaration false"
 	},
 	"dependencies": {
-		"@rest-rpc/core": "workspace:*"
+		"@rest-rpc/core": "workspace:*",
+		"rou3": "^1.0.0"
 	}
 }

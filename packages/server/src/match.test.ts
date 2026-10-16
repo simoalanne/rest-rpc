@@ -1,15 +1,13 @@
-import {
-	createPathMatcher,
-	createRouteMatcher,
-	flattenRouteImplementations,
-} from "./match.ts";
+import { createRouteMatcher, flattenRouteImplementations } from "./match.ts";
 import { serverRoute as route } from "./routeBuilder.ts";
 
 describe("match", () => {
 	it.each(["/users/:id/items/:id", "/users/{id}/items/{id}"] as const)(
-		"accepts repeated parameter names in %s",
+		"rejects repeated parameter names in %s",
 		(path) => {
-			expect(createPathMatcher(path)("/users/first/items/last")).toBeDefined();
+			expect(() =>
+				createRouteMatcher({ item: route.get(path).handler(() => "ok") }),
+			).toThrow();
 		},
 	);
 
@@ -41,12 +39,16 @@ describe("match", () => {
 		).toBe("/{group}/{id}/edit");
 	});
 	it("matches complete paths, decodes params, and allows a trailing slash", () => {
-		const match = createPathMatcher("/files/{name}/v1.0");
-		expect(match("/files/a%20b/v1.0/")).toEqual({ name: "a b" });
-		expect(match("/files/a/v1x0")).toBeNull();
-		expect(match("/files/a/v1.0/extra")).toBeNull();
-		expect(match("/files//v1.0")).toBeNull();
-		expect(createPathMatcher("/")("/")).toEqual({});
+		const match = createRouteMatcher({
+			file: route.get("/files/{name}/v1.0").handler(() => "file"),
+			root: route.get("/").handler(() => "root"),
+		});
+		const matchPath = (path: string) => match({ method: "GET", path });
+		expect(matchPath("/files/a%20b/v1.0/")?.params).toEqual({ name: "a b" });
+		expect(matchPath("/files/a/v1x0")).toBeUndefined();
+		expect(matchPath("/files/a/v1.0/extra")).toBeUndefined();
+		expect(matchPath("/files//v1.0")).toBeUndefined();
+		expect(matchPath("/")?.params).toEqual({});
 	});
 
 	it("prefers static routes and respects method and prefix", () => {
