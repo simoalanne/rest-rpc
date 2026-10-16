@@ -1,3 +1,12 @@
+/**
+ * The default application context shared by handlers and middleware. Augment
+ * this interface with `declare module "@rest-rpc/server"`. Defaults to an empty
+ * object if not extended.
+ *
+ * @default {}
+ */
+export interface DefaultContext {}
+
 export type {
 	HandleHttpRouteConfiguration,
 	HandleHttpRouteOptions,
@@ -7,13 +16,17 @@ export type { SerializedHttpRouteResult } from "./serializeHttpRouteResult.ts";
 export { serializeHttpRouteResult } from "./serializeHttpRouteResult.ts";
 export { handleHttpRoute } from "./handleHttpRoute.ts";
 export {
+	createPathParamsReader,
 	createRouteMatcher,
 	flattenRouteImplementations,
 	isImplementedRoute,
+	resolveImplementationPath,
 } from "./match.ts";
 export type {
 	ImplementedRoute,
+	ParamSyntax,
 	RouteMatch,
+	RuntimeImplementation,
 	RuntimeImplementationTree,
 } from "./match.ts";
 export type {

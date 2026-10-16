@@ -26,6 +26,7 @@ export {
 	isPathParamSegment,
 	resolveRoutePath,
 	toColonPath,
+	toOpenApiPath,
 } from "./path.ts";
 export type {
 	InferSchemaInputs,

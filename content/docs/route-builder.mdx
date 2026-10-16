@@ -6,8 +6,9 @@ description: Define HTTP routes with request segments, typed responses, and stre
 A route builder describes an HTTP interface: a method and path, the request
 segments it reads, and the responses it returns.
 
-Import `route` from your server adapter. Attach a handler with `.handler()`;
-its return value determines the client's result type.
+Import `route` from `@rest-rpc/server/node` or `@rest-rpc/server/fetch`. Both
+export the same builder, so routes work with either runtime. Attach a handler
+with `.handler()`; its return value determines the client's result type.
 
 Schemas can come from Zod, Valibot, ArkType, or another Standard Schema library.
 The built-in `type<T>()` utility declares types without runtime validation. See
@@ -16,7 +17,7 @@ The built-in `type<T>()` utility declares types without runtime validation. See
 ## Start with Defaults
 
 ```ts
-import { route } from "@rest-rpc/express";
+import { route } from "@rest-rpc/server/node";
 import { z } from "zod";
 
 const create = route
@@ -51,7 +52,8 @@ Use `.get(path)`, `.post(path)`, `.put(path)`, `.patch(path)`, or `.delete(path)
 A method can be selected once per route.
 
 Paths can contain dynamic segments using either `:id` or `{id}` syntax. Declare
-each dynamic segment in `.params()`.
+each dynamic segment in `.params()`. Other router syntax, such as wildcards or
+regular expressions, is not officially supported.
 
 The path can also be omitted, in which case the route keeps deriving its path
 from its tree keys but uses the specified method instead of the default POST.
@@ -232,7 +234,7 @@ const list = route
 
 Both can be called more than once. Metadata objects are shallow-merged, and
 OpenAPI details are merged with tags combined. Read metadata from the handler's
-`route` argument, middleware, or adapter hooks. See [OpenAPI](/docs/openapi)
+`route` argument or middleware. See [OpenAPI](/docs/openapi)
 for document generation.
 
 ## Reuse Builders
@@ -268,8 +270,9 @@ A handler receives one object containing:
 - `contentType`: the received request media type, if any.
 - `lastEventId`: the `Last-Event-ID` request header, used to [resume streams](/docs/streaming#resume-a-stream).
 - `signal`: an `AbortSignal` that aborts when the client disconnects.
-- Native framework values such as the request object. See the
-  "Framework Context" section of your [server adapter](/docs/server/express#framework-context).
+
+Native request objects are not passed to handlers. To make them or other host
+values available, [seed the context](/docs/context#values-from-the-host).
 
 ## Type Helpers
 
@@ -287,7 +290,7 @@ Declare one type for your routes and index into it where a route's type is
 needed:
 
 ```ts
-import type { InferServerRequest } from "@rest-rpc/express";
+import type { InferServerRequest } from "@rest-rpc/server/node";
 import type { routes } from "./routes";
 
 export type ServerRequests = InferServerRequest<typeof routes>;
@@ -298,12 +301,12 @@ type CreateTodoRequest = ServerRequests["todos"]["create"];
 ### Infer Server Request
 
 `InferServerRequest` is the validated request a handler receives, without
-framework values or context. Use it to pass validated input to code that does
+context or `signal`. Use it to pass validated input to code that does
 not depend on the server framework.
 
 ```ts twoslash
-import type { InferServerRequest } from "@rest-rpc/express";
-import { route } from "@rest-rpc/express";
+import type { InferServerRequest } from "@rest-rpc/server/node";
+import { route } from "@rest-rpc/server/node";
 import z from "zod";
 
 const updateDeclaration = route
@@ -328,8 +331,8 @@ for the responses declared with `.response()`. When responses are inferred
 from the handler, there is no declared response to infer before `.handler()`.
 
 ```ts twoslash
-import type { InferServerResponse } from "@rest-rpc/express";
-import { route } from "@rest-rpc/express";
+import type { InferServerResponse } from "@rest-rpc/server/node";
+import { route } from "@rest-rpc/server/node";
 import z from "zod";
 
 const todoSchema = z.object({ id: z.string(), title: z.string() });
@@ -352,12 +355,11 @@ const get = getDeclaration.handler(({ params }) => findTodo(params.id));
 
 ### Infer Server Handler
 
-`InferServerHandler` is the full handler signature, including framework values
-and context. It is exported by each server adapter. Use it to write a handler
-separately from its declaration:
+`InferServerHandler` is the full handler signature, including context and
+`signal`. Use it to write a handler separately from its declaration:
 
 ```ts twoslash
-import { route, type InferServerHandler } from "@rest-rpc/express";
+import { route, type InferServerHandler } from "@rest-rpc/server/node";
 import z from "zod";
 
 const todoSchema = z.object({ id: z.string(), title: z.string() });
@@ -368,9 +370,9 @@ const getDeclaration = route
 	.response(todoSchema)
 	.response(z.object({ code: z.literal("TODO_NOT_FOUND") }), { status: 404 });
 
-const getTodo: InferServerHandler<typeof getDeclaration> = ({ params, req }) =>
+const getTodo: InferServerHandler<typeof getDeclaration> = ({ params }) =>
 	params.id === "todo_1"
-		? { status: 200, body: { id: params.id, title: req.hostname } }
+		? { status: 200, body: { id: params.id, title: "Write docs" } }
 		: { status: 404, body: { code: "TODO_NOT_FOUND" } };
 
 const get = getDeclaration.handler(getTodo);

@@ -1,11 +1,13 @@
 import {
 	contractRouteEntries,
-	getPathParamSegmentName,
 	isPathParamSegment,
 	isRouteLeaf,
+	toColonPath,
+	toOpenApiPath,
 	type AbsolutePath,
 	type RouteDeclaration,
 } from "@rest-rpc/core/contract";
+import { addRoute, createRouter, findRoute } from "rou3";
 import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
 
 const splitPath = (path: string) => path.split("/").filter(Boolean);
@@ -45,39 +47,7 @@ const compareRouteSpecificity = (
 	return left.method.localeCompare(right.method);
 };
 
-const escapeRegExp = (value: string) =>
-	value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-export const createPathMatcher = (path: AbsolutePath) => {
-	const keys: string[] = [];
-	const segments = splitPath(path);
-	const pattern =
-		segments.length === 0
-			? "/"
-			: `/${segments
-					.map((segment) => {
-						const paramName = getPathParamSegmentName(segment);
-						if (!paramName) return escapeRegExp(segment);
-						keys.push(paramName);
-						return "([^/]+)";
-					})
-					.join("/")}`;
-	const regex = new RegExp(`^${pattern}/?$`);
-
-	return (pathname: string) => {
-		const match = regex.exec(pathname);
-		if (!match) return null;
-
-		return keys.reduce(
-			(params, key, index) => {
-				params[key] = decodeURIComponent(match[index + 1] ?? "");
-				return params;
-			},
-			{} as Record<string, string>,
-		);
-	};
-};
-
+/** A flattened route declaration with its handler and middleware. */
 export type RuntimeImplementation = {
 	route: RouteDeclaration & { path: string };
 	handler: (...args: never[]) => unknown;
@@ -122,43 +92,75 @@ export function flattenRouteImplementations(
 		.sort((left, right) => compareRouteSpecificity(left.route, right.route));
 }
 
-/** A matched route implementation and its decoded URL parameters. */
-export type RouteMatch = {
-	implementation: RuntimeImplementation;
+/** Param marker style used in compiled route paths. */
+export type ParamSyntax = "colon" | "braces";
+
+/**
+ * Joins a prefix and route path and optionally rewrites param markers.
+ *
+ * @remarks Without `paramSyntax` the declared markers are kept as written.
+ */
+export function resolveImplementationPath(
+	path: string,
+	prefix?: AbsolutePath,
+	paramSyntax?: ParamSyntax,
+): string {
+	const joined = joinPaths(prefix, path as AbsolutePath);
+	if (paramSyntax === "colon") return toColonPath(joined);
+	if (paramSyntax === "braces") return toOpenApiPath(joined);
+	return joined;
+}
+
+const decodeParams = (params: Record<string, string> | undefined) => {
+	const decoded: Record<string, string> = {};
+	for (const [key, value] of Object.entries(params ?? {})) {
+		decoded[key] = decodeURIComponent(value);
+	}
+	return decoded;
+};
+
+/** A matched route and its decoded URL parameters. */
+export type RouteMatch<TRoute> = {
+	route: TRoute;
 	params: Record<string, string>;
 };
 
 /**
- * Compiles route implementations into a method and path matcher.
+ * Compiles routes into a method and path matcher.
+ *
+ * @remarks Matching follows rou3 semantics. Params are percent-decoded to
+ * mirror the client, which encodes them.
  */
-export function createRouteMatcher(
-	implementations: RuntimeImplementationTree,
-	prefix?: AbsolutePath,
-) {
-	const matchers = flattenRouteImplementations(implementations).map(
-		(implementation) => ({
-			implementation,
-			matchPath: createPathMatcher(
-				joinPaths(prefix, implementation.route.path),
-			),
-		}),
-	);
+export function createRouteMatcher<
+	TRoute extends { readonly method: string; readonly path: string },
+>(
+	routes: readonly TRoute[],
+): (method: string, pathname: string) => RouteMatch<TRoute> | undefined {
+	const router = createRouter<TRoute>();
+	for (const route of routes) {
+		addRoute(router, route.method, toColonPath(route.path), route);
+	}
 
-	return (request: {
-		path: string;
-		method: string;
-	}): RouteMatch | undefined => {
-		for (const matcher of matchers) {
-			if (matcher.implementation.route.method !== request.method) continue;
-			const params = matcher.matchPath(request.path);
-			if (params === null) continue;
+	return (method, pathname) => {
+		const match = findRoute(router, method, pathname);
+		if (!match) return undefined;
+		return { route: match.data, params: decodeParams(match.params) };
+	};
+}
 
-			return {
-				implementation: matcher.implementation,
-				params,
-			};
-		}
+/**
+ * Compiles one path pattern into a reader for its decoded URL parameters.
+ *
+ * @remarks Returns `undefined` when the pathname does not match the pattern.
+ */
+export function createPathParamsReader(
+	path: string,
+): (pathname: string) => Record<string, string> | undefined {
+	const router = createRouter<true>();
+	addRoute(router, "", toColonPath(path), true);
 
-		return undefined;
+	return (pathname) => {
+		const match = findRoute(router, "", pathname);
+		return match ? decodeParams(match.params) : undefined;
 	};
 }

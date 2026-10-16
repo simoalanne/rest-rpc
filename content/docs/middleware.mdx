@@ -14,11 +14,12 @@ forward downstream output, or return another value to replace it. Returning
 without calling `next()` short-circuits the chain. Call `next()` at most once.
 
 ```ts
-import { route } from "@rest-rpc/express";
+import { route } from "@rest-rpc/server/node";
 
 const getProfile = route
 	.$context<{ user?: User }>()
 	.get("/profile")
+	.headers(z.object({ authorization: z.string().optional() }))
 	.response(z.object({ user: userSchema }))
 	.response({ status: 401 })
 	.use(async ({ next }) => {
@@ -29,8 +30,8 @@ const getProfile = route
 			console.log(performance.now() - started);
 		}
 	})
-	.use(async ({ req, context, next }) => {
-		const user = await authenticate(req.header("authorization"));
+	.use(async ({ headers, context, next }) => {
+		const user = await authenticate(headers.authorization);
 		if (!user) return { status: 401 };
 		context.set("user", user);
 		return next();
@@ -45,7 +46,7 @@ Middleware runs in declaration order; work after `await next()` runs in reverse
 order. Request schemas validate before middleware runs, regardless of setter order.
 
 Middleware receives the same arguments as the handler, including
-[context](/docs/context) and the adapter's framework values. Declare request
+[context](/docs/context) and the request `signal`. Declare request
 schemas before `.use()` to receive their validated types.
 
 ## Reuse Middleware
