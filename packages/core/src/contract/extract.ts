@@ -26,14 +26,13 @@ import { mapContractRoutes } from "./traversal.ts";
 export function extractContract<const TRoutes extends RouteTree>(
 	routes: TRoutes,
 ): TRoutes {
-	return mapContractRoutes(routes, (route, routePath) => {
-		const contentType = route.request?.contentType;
-		return {
-			"~restrpc": {
-				method: route.method,
-				path: resolveRoutePath(route, routePath),
-				...(contentType === undefined ? {} : { request: { contentType } }),
+	return mapContractRoutes(routes, (route, routePath) => ({
+		"~restrpc": {
+			method: route.method,
+			path: resolveRoutePath(route, routePath),
+			request: {
+				contentType: route.request?.contentType,
 			},
-		};
-	}) as TRoutes;
+		},
+	})) as TRoutes;
 }

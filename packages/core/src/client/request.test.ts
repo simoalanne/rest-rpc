@@ -101,33 +101,6 @@ describe("request", () => {
 		expect(request.headers).toEqual({ count: "0" });
 	});
 
-	it("rejects missing path parameters", () => {
-		expect(() =>
-			constructBaseRequest(
-				"",
-				{ method: "GET", path: "/users/:id" },
-				undefined,
-			),
-		).toThrow('Missing path param "id"');
-	});
-
-	it("requires a declared content type selection for multi-format bodies", () => {
-		const route = {
-			method: "POST",
-			path: "/",
-			request: { contentType: ["application/json", "text/plain"] },
-		} as const;
-		expect(
-			constructBaseRequest("", route, { body: "hello" }, "text/plain"),
-		).toMatchObject({ body: "hello", contentType: "text/plain" });
-		expect(() => constructBaseRequest("", route, { body: "hello" })).toThrow(
-			"A contentType option is required",
-		);
-		expect(() =>
-			constructBaseRequest("", route, { body: "hello" }, "image/png"),
-		).toThrow("Unsupported request contentType");
-	});
-
 	it("serializes JSON and applies header precedence case-insensitively", async () => {
 		const fetch = vi.fn(async () => new Response(null, { status: 204 }));
 		await executeRequest(

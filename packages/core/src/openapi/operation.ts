@@ -134,9 +134,7 @@ export const createParameters = (
 		return {
 			name,
 			in: location,
-			...(location === "path"
-				? { required: true }
-				: { required: requiredKeys.has(name) }),
+			required: location === "path" || requiredKeys.has(name),
 			schema: propertySchema,
 		};
 	});

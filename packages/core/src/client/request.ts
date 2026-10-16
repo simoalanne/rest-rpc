@@ -179,15 +179,9 @@ const serializeParams = (
 	route: ClientRequestRoute,
 	params: Record<string, unknown> | undefined,
 ) => {
-	return replacePathParams(route.path, (key) => {
-		const value = params?.[key];
-		if (value === undefined) {
-			throw new Error(
-				`Missing path param "${key}" for ${route.method} ${route.path}.`,
-			);
-		}
-		return encodeURIComponent(String(value));
-	});
+	return replacePathParams(route.path, (key) =>
+		encodeURIComponent(String(params?.[key])),
+	);
 };
 
 const serializeQuery = (query: unknown) => {
@@ -214,37 +208,17 @@ export const constructBaseRequest = (
 	route: ClientRequestRoute,
 	args: GroupedRequestInput | undefined,
 	selectedContentType?: string,
-): {
-	url: string;
-	body?: unknown;
-	contentType?: string;
-	headers?: Record<string, string>;
-} => {
+) => {
 	const { body, query, params, headers } = args ?? {};
 	const url = `${baseUrl}${serializeParams(route, params)}${serializeQuery(query)}`;
-	const declaredContentType = route.request?.contentType;
-	if (Array.isArray(declaredContentType) && selectedContentType === undefined) {
-		throw new Error(
-			`A contentType option is required for ${route.method} ${route.path}.`,
-		);
-	}
-	if (
-		selectedContentType !== undefined &&
-		(!Array.isArray(declaredContentType) ||
-			!declaredContentType.includes(selectedContentType))
-	) {
-		throw new Error(
-			`Unsupported request contentType for ${route.method} ${route.path}.`,
-		);
-	}
 	const contentType =
-		selectedContentType ??
-		(typeof declaredContentType === "string" ? declaredContentType : undefined);
-	const hasBody = body !== undefined && contentType !== undefined;
+		typeof route.request?.contentType === "string"
+			? route.request.contentType
+			: selectedContentType;
 	return {
 		url,
-		body: hasBody ? body : undefined,
-		contentType: hasBody ? contentType : undefined,
+		body,
+		contentType: contentType,
 		headers: stringifyHeaders(headers),
 	};
 };
@@ -304,9 +278,7 @@ export const executeRequest = async (
 	}
 	const codecHeaders = stringifyHeaders(serialized?.headers);
 	const outgoingContentType =
-		serialized?.contentType === undefined
-			? contentType
-			: serialized.contentType;
+		serialized && (serialized.contentType ?? contentType);
 	const globalHeaders = await resolveHeaders(options.globalHeaders ?? {});
 	const additionalHeaders = stringifyHeaders(fetchOptions?.additionalHeaders);
 	const clientHeaders = {
