@@ -1,10 +1,7 @@
 import type { ServerResponse } from "node:http";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import {
-	serializeHttpRouteResult,
-	type HttpRouteResult,
-} from "@rest-rpc/server";
+import { serializeHttpRouteResult, type HttpRouteResult } from "../index.ts";
 import type { BodyCodec } from "@rest-rpc/core";
 import { nodeBodyCodecs } from "./codecs.ts";
 

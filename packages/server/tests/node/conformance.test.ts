@@ -1,6 +1,6 @@
-import { compileRoutes, createCatchAllHandler } from "@rest-rpc/node";
-import { describeAdapterConformance } from "../../server/tests/adapterSuite.ts";
-import { withHttpServer } from "../../../tests/httpServer.ts";
+import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server/node";
+import { describeAdapterConformance } from "../adapterSuite.ts";
+import { withHttpServer } from "../../../../tests/httpServer.ts";
 
 describeAdapterConformance("node", {
 	capabilities: {

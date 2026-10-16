@@ -1,9 +1,6 @@
 import type { BodyCodec } from "@rest-rpc/core";
 import { defaultBodyCodecs } from "@rest-rpc/core/codecs";
-import {
-	serializeHttpRouteResult,
-	type HttpRouteResult,
-} from "@rest-rpc/server";
+import { serializeHttpRouteResult, type HttpRouteResult } from "../index.ts";
 
 type HttpHeaderValue = NonNullable<HttpRouteResult["headers"]>[string];
 

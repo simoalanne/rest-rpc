@@ -9,17 +9,31 @@ const formatPath = (root: string, filePath: string) =>
 const readJson = (filePath: string) =>
 	JSON.parse(fs.readFileSync(filePath, "utf8"));
 
-const hasRootEntryPoint = (packageJson: Record<string, unknown>) => {
+// Subpaths that are public API in addition to the package root. Other
+// subpaths are internal.
+const publicSubpaths: Record<string, readonly string[]> = {
+	"@rest-rpc/server": ["./fetch", "./node"],
+};
+
+const getEntryPoints = (packageJson: Record<string, unknown>) => {
 	const exportsField = packageJson.exports;
 
 	if (typeof exportsField === "string") {
-		return true;
+		return [[".", exportsField]] as const;
 	}
 
-	return (
-		typeof exportsField === "object" &&
-		exportsField !== null &&
-		Object.hasOwn(exportsField, ".")
+	if (typeof exportsField !== "object" || exportsField === null) {
+		return [];
+	}
+
+	const publicPaths = new Set([
+		".",
+		...(publicSubpaths[packageJson.name as string] ?? []),
+	]);
+
+	return Object.entries(exportsField).filter(
+		(entry): entry is [string, string] =>
+			publicPaths.has(entry[0]) && typeof entry[1] === "string",
 	);
 };
 
@@ -118,37 +132,34 @@ const checkWildcardExports = (
 			);
 
 			failures.push(
-				`${formatPath(root, sourceFile.fileName)}:${position.line + 1}: package root exports must name public symbols explicitly`,
+				`${formatPath(root, sourceFile.fileName)}:${position.line + 1}: entry point exports must name public symbols explicitly`,
 			);
 		}
 	}
 };
 
-const checkPackage = (root: string, packageDir: string) => {
-	const packageJsonPath = path.join(packageDir, "package.json");
-	const packageJson = readJson(packageJsonPath);
-
-	if (!hasRootEntryPoint(packageJson)) {
-		return [];
-	}
-
-	const indexPath = path.join(packageDir, "src", "index.ts");
+const checkEntryPoint = (
+	root: string,
+	packageDir: string,
+	packageName: string,
+	program: ts.Program,
+	entryPath: string,
+) => {
+	const checker = program.getTypeChecker();
 	const failures: string[] = [];
 
-	if (!fs.existsSync(indexPath)) {
+	if (!fs.existsSync(entryPath)) {
 		failures.push(
-			`${formatPath(root, indexPath)}: missing package root source file`,
+			`${formatPath(root, entryPath)}: missing entry point source file`,
 		);
 		return failures;
 	}
 
-	const program = loadPackageProgram(packageDir);
-	const checker = program.getTypeChecker();
-	const sourceFile = program.getSourceFile(indexPath);
+	const sourceFile = program.getSourceFile(entryPath);
 
 	if (!sourceFile) {
 		failures.push(
-			`${formatPath(root, indexPath)}: not included by tsconfig.json`,
+			`${formatPath(root, entryPath)}: not included by tsconfig.json`,
 		);
 		return failures;
 	}
@@ -159,7 +170,7 @@ const checkPackage = (root: string, packageDir: string) => {
 
 	if (!moduleSymbol) {
 		failures.push(
-			`${formatPath(root, indexPath)}: could not read module exports`,
+			`${formatPath(root, entryPath)}: could not read module exports`,
 		);
 		return failures;
 	}
@@ -173,7 +184,7 @@ const checkPackage = (root: string, packageDir: string) => {
 
 		if (!hasDocComment(symbol)) {
 			failures.push(
-				`${packageJson.name}: root export "${name}" must have a TSDoc comment on its declaration`,
+				`${packageName}: export "${name}" must have a TSDoc comment on its declaration`,
 			);
 		}
 
@@ -184,12 +195,34 @@ const checkPackage = (root: string, packageDir: string) => {
 			!isRegularFunctionDeclaration(symbol)
 		) {
 			failures.push(
-				`${packageJson.name}: root export "${name}" must use a regular function declaration`,
+				`${packageName}: export "${name}" must use a regular function declaration`,
 			);
 		}
 	}
 
 	return failures;
+};
+
+const checkPackage = (root: string, packageDir: string) => {
+	const packageJsonPath = path.join(packageDir, "package.json");
+	const packageJson = readJson(packageJsonPath);
+	const entryPoints = getEntryPoints(packageJson);
+
+	if (entryPoints.length === 0) {
+		return [];
+	}
+
+	const program = loadPackageProgram(packageDir);
+
+	return entryPoints.flatMap(([subpath, target]) =>
+		checkEntryPoint(
+			root,
+			packageDir,
+			path.posix.join(packageJson.name, subpath),
+			program,
+			path.join(packageDir, target),
+		),
+	);
 };
 
 export const checkWorkspace = (root = process.cwd()) => {

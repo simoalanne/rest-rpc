@@ -1,3 +1,12 @@
+/**
+ * The default application context shared by handlers and middleware. Augment
+ * this interface with `declare module "@rest-rpc/server"`. Defaults to an empty
+ * object if not extended.
+ *
+ * @default {}
+ */
+export interface DefaultContext {}
+
 export type {
 	HandleHttpRouteConfiguration,
 	HandleHttpRouteOptions,

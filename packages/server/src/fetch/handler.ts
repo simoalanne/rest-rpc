@@ -10,11 +10,12 @@ import {
 	handleHttpRoute,
 	RequestValidationError,
 	ResponseValidationError,
+	type DefaultContext,
 	type HandleHttpRouteConfiguration,
 	type RuntimeImplementation,
 	type RuntimeImplementationTree,
-} from "@rest-rpc/server";
-import type { DefaultContext } from "./index.ts";
+} from "../index.ts";
+
 import {
 	assertRequestBodyLimit,
 	deserializeRequestBody,

@@ -7,6 +7,6 @@
 	},
 	"dependencies": {
 		"@rest-rpc/core": "workspace:*",
-		"@rest-rpc/node": "workspace:*"
+		"@rest-rpc/server": "workspace:*"
 	}
 }

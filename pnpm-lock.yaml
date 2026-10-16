@@ -41,9 +41,9 @@ importers:
       '@rest-rpc/core':
         specifier: workspace:*
         version: link:../packages/core
-      '@rest-rpc/node':
+      '@rest-rpc/server':
         specifier: workspace:*
-        version: link:../packages/node
+        version: link:../packages/server
 
   content:
     dependencies:
@@ -56,12 +56,9 @@ importers:
       '@rest-rpc/core':
         specifier: workspace:*
         version: link:../packages/core
-      '@rest-rpc/fetch':
+      '@rest-rpc/server':
         specifier: workspace:*
-        version: link:../packages/fetch
-      '@rest-rpc/node':
-        specifier: workspace:*
-        version: link:../packages/node
+        version: link:../packages/server
       '@rest-rpc/tanstack-query':
         specifier: workspace:*
         version: link:../packages/tanstack-query
@@ -101,27 +98,6 @@ importers:
       typescript:
         specifier: 5.9.3
         version: 5.9.3
-
-  packages/fetch:
-    dependencies:
-      '@rest-rpc/core':
-        specifier: workspace:*
-        version: link:../core
-      '@rest-rpc/server':
-        specifier: workspace:*
-        version: link:../server
-
-  packages/node:
-    dependencies:
-      '@rest-rpc/core':
-        specifier: workspace:*
-        version: link:../core
-      '@rest-rpc/fetch':
-        specifier: workspace:*
-        version: link:../fetch
-      '@rest-rpc/server':
-        specifier: workspace:*
-        version: link:../server
 
   packages/server:
     dependencies:

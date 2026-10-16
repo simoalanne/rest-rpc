@@ -3,10 +3,10 @@ import {
 	createCatchAllHandler,
 	route,
 	type,
-} from "@rest-rpc/fetch";
-import { withFetchServer } from "../../../tests/httpServer.ts";
+} from "@rest-rpc/server/node";
+import { withHttpServer } from "../../../../tests/httpServer.ts";
 
-it("serves a fetch-native catch-all route over HTTP", async () => {
+it("serves parsed Node requests over HTTP and leaves unmatched requests to the host", async () => {
 	const handler = createCatchAllHandler(
 		compileRoutes(
 			{
@@ -19,16 +19,20 @@ it("serves a fetch-native catch-all route over HTTP", async () => {
 						return {
 							status: 201,
 							body: { id: params.id, name: body.name },
-							headers: { "x-native": "fetch" },
+							headers: { "x-native": "node" },
 						};
 					}),
 			},
 			{ prefix: "/api" },
 		),
 	);
-	await withFetchServer(
-		async (request) =>
-			(await handler(request)).response ?? new Response(null, { status: 404 }),
+	await withHttpServer(
+		async (req, res) => {
+			if (!(await handler(req, res)).matched) {
+				res.statusCode = 404;
+				res.end();
+			}
+		},
 		async (url) => {
 			const response = await fetch(`${url}/api/users/42`, {
 				method: "POST",
@@ -36,7 +40,7 @@ it("serves a fetch-native catch-all route over HTTP", async () => {
 				body: '{"name":"Ada"}',
 			});
 			expect(response.status).toBe(201);
-			expect(response.headers.get("x-native")).toBe("fetch");
+			expect(response.headers.get("x-native")).toBe("node");
 			expect(await response.json()).toEqual({ id: "42", name: "Ada" });
 			expect((await fetch(`${url}/missing`)).status).toBe(404);
 		},

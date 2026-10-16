@@ -1,6 +1,6 @@
-import { compileRoutes, createCatchAllHandler } from "@rest-rpc/fetch";
-import { describeAdapterConformance } from "../../server/tests/adapterSuite.ts";
-import { withFetchServer } from "../../../tests/httpServer.ts";
+import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server/fetch";
+import { describeAdapterConformance } from "../adapterSuite.ts";
+import { withFetchServer } from "../../../../tests/httpServer.ts";
 
 describeAdapterConformance("fetch", {
 	capabilities: {

@@ -7,9 +7,7 @@ This repo is `rest-rpc`, a TypeScript library for defining REST APIs with RPC-li
 ## Packages
 
 - `@rest-rpc/core` - core library that has contract,client and openapi code.
-- `@rest-rpc/server` - reusable server-side code for different server adapters.
-- `@rest-rpc/fetch` - Fetch runtime `Request`/`Response` HTTP handler adapter for fetch-native runtimes and catch-all routes.
-- `@rest-rpc/node` - Node.js `IncomingMessage`/`ServerResponse` HTTP handler adapter for `node:http` servers.
+- `@rest-rpc/server` - route builder, handlers, validation and serialization. Runtime handlers live on the `@rest-rpc/server/fetch` (Fetch `Request`/`Response`) and `@rest-rpc/server/node` (Node `IncomingMessage`/`ServerResponse`) subpaths.
 - `@rest-rpc/tanstack-query` - TanStack Query options and key utils
 - `content/` contains documentation for the library and its packages. documentation is written in mdx and uses https://useblume.dev/.
 
@@ -30,10 +28,10 @@ A command that exits successfully is successful. Do not report warnings from suc
 
 ### Public API
 
-- A package's root entry point is its public API surface. Subpath-only exports are not public API unless they are also re-exported from the package root.
-- Do not use wildcard exports from package root entry points. Export each public symbol explicitly so the public surface is reviewable.
-- Every exported declaration in a package root must have a TSDoc comment on the declaration itself, not on the re-export.
-- Any function that is exported from a package root must be written as regular function, not an arrow function. This is required for API reference generation to be able to separate variables from functions. Non-exported functions should be arrow functions by default.
+- A package's root entry point is its public API surface, plus the `@rest-rpc/server/fetch` and `@rest-rpc/server/node` subpaths. Other subpath-only exports are not public API unless they are also re-exported from the package root. `scripts/check-public-api-docs.ts` lists the public subpaths.
+- Do not use wildcard exports from public entry points. Export each public symbol explicitly so the public surface is reviewable.
+- Every exported declaration in a public entry point must have a TSDoc comment on the declaration itself, not on the re-export.
+- Any function that is exported from a public entry point must be written as regular function, not an arrow function. This is required for API reference generation to be able to separate variables from functions. Non-exported functions should be arrow functions by default.
 
 ### Notes
 

@@ -3,7 +3,7 @@ import type { HttpMethod } from "@rest-rpc/core/contract";
 import {
 	assertRequestBodyLimit,
 	deserializeRequestBody,
-} from "@rest-rpc/fetch/adapter";
+} from "../fetch/deserializeRequestBody.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
 	createPathParamsReader,
@@ -15,11 +15,12 @@ import {
 	handleHttpRoute,
 	RequestValidationError,
 	ResponseValidationError,
+	type DefaultContext,
 	type HandleHttpRouteConfiguration,
 	type RuntimeImplementation,
 	type RuntimeImplementationTree,
-} from "@rest-rpc/server";
-import type { DefaultContext, NodeRouteHandlerResult } from "./index.ts";
+} from "../index.ts";
+import type { NodeRouteHandlerResult } from "./index.ts";
 import { createRequestSignal } from "./lifecycle.ts";
 import { toFetchRequest, parseRequestTarget } from "./request.ts";
 import { writeNodeResponse } from "./response.ts";

@@ -78,6 +78,5 @@ Full documentation is available at [rest-rpc.dev](https://rest-rpc.dev).
 ## Packages
 
 - [`@rest-rpc/core`](https://npmx.dev/package/@rest-rpc/core): Route declarations, Fetch client, and OpenAPI generation.
-- [`@rest-rpc/node`](https://npmx.dev/package/@rest-rpc/node): Node HTTP server adapter.
-- [`@rest-rpc/fetch`](https://npmx.dev/package/@rest-rpc/fetch): Fetch runtime adapter.
+- [`@rest-rpc/server`](https://npmx.dev/package/@rest-rpc/server): Route handlers for Fetch (`@rest-rpc/server/fetch`) and Node HTTP (`@rest-rpc/server/node`) runtimes.
 - [`@rest-rpc/tanstack-query`](https://npmx.dev/package/@rest-rpc/tanstack-query): TanStack Query utils.
