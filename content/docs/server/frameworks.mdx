@@ -1,0 +1,110 @@
+---
+title: Frameworks
+description: Register rest-rpc routes on an existing framework's router
+---
+
+rest-rpc does not need a framework-specific package. Compile the route tree
+with the [Fetch](/docs/server/fetch) or [Node HTTP](/docs/server/node) runtime
+and register each compiled route on the framework's router. The framework keeps
+owning routing, its own middleware, and server lifecycle. rest-rpc validates,
+runs route middleware and handlers, and writes responses.
+
+Every integration follows the same pattern:
+
+1. Pick the runtime that matches the framework's native request: Fetch for
+   `Request`-based frameworks, Node for `IncomingMessage`-based ones.
+2. Loop the compiled routes and register `route.method` and `route.path`.
+3. Call `route.handle()` with the native request, passing any framework values
+   handlers need through the `context` option.
+
+rest-rpc reads request bodies itself. Skip the framework's body parsing on
+rest-rpc routes.
+
+## Hono
+
+Hono handlers receive a Fetch `Request` through `c.req.raw`.
+
+```ts
+import { Hono } from "hono";
+import { compileRoutes } from "@rest-rpc/server/fetch";
+import { routes } from "./routes";
+
+const app = new Hono();
+
+for (const route of compileRoutes(routes, {
+	prefix: "/api",
+	paramSyntax: "colon",
+})) {
+	app.on(route.method, route.path, (c) =>
+		route.handle(c.req.raw, { context: { user: c.var.user } }),
+	);
+}
+```
+
+## Express
+
+Register routes without `express.json()` or other body parsers in front of
+them.
+
+```ts
+import express from "express";
+import { compileRoutes } from "@rest-rpc/server/node";
+import { routes } from "./routes";
+
+const app = express();
+
+for (const route of compileRoutes(routes, {
+	prefix: "/api",
+	paramSyntax: "colon",
+})) {
+	const method = route.method.toLowerCase() as
+		"get" | "post" | "put" | "patch" | "delete";
+	app[method](route.path, (req, res, next) => {
+		route.handle(req, res).catch(next);
+	});
+}
+
+app.listen(3000);
+```
+
+## Fastify
+
+Fastify parses bodies before the handler runs. Replace its content-type parsers
+with one that leaves the body stream unread, and hand the native request and
+response to rest-rpc with `reply.hijack()`.
+
+```ts
+import Fastify from "fastify";
+import { compileRoutes } from "@rest-rpc/server/node";
+import { routes } from "./routes";
+
+const app = Fastify();
+app.removeAllContentTypeParsers();
+app.addContentTypeParser("*", (_request, _payload, done) => done(null));
+
+for (const route of compileRoutes(routes, {
+	prefix: "/api",
+	paramSyntax: "colon",
+})) {
+	app.route({
+		method: route.method,
+		url: route.path,
+		handler: async (request, reply) => {
+			reply.hijack();
+			await route.handle(request.raw, reply.raw);
+		},
+	});
+}
+
+await app.listen({ port: 3000 });
+```
+
+To keep Fastify's parsers for other routes, register rest-rpc routes inside an
+encapsulated plugin and replace the parsers there.
+
+## Other Frameworks
+
+For frameworks that expose neither a Fetch `Request` nor a Node
+`IncomingMessage`, or that need full control over the response, mount the
+[catch-all handler](/docs/server/node#usage) on a wildcard route and forward
+the native request and response to it.

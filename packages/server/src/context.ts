@@ -7,8 +7,13 @@ export type Context<TValues extends object> = {
 	) => void;
 };
 
-export const createContext = <TValues extends object>(): Context<TValues> => {
+export const createContext = <TValues extends object>(
+	initial?: Partial<TValues>,
+): Context<TValues> => {
 	const values = new Map();
+	for (const [key, value] of Object.entries(initial ?? {})) {
+		values.set(key, value);
+	}
 
 	return {
 		get: (key) => values.get(key),

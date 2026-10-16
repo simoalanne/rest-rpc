@@ -11,14 +11,19 @@ export type BodySerializer = (
 	declaredContentType: string,
 ) => SerializedBody | Promise<SerializedBody>;
 
-/** Reads an entry point's native source and returns a value for schema validation. */
-export type BodyDeserializer<TSource> = (
-	source: TSource,
+/**
+ * Reads an incoming body and returns a value for schema validation.
+ *
+ * @remarks Servers pass the Fetch `Request` and clients pass the Fetch
+ * `Response`, so one codec works on both sides.
+ */
+export type BodyDeserializer = (
+	source: Request | Response,
 ) => unknown | Promise<unknown>;
 
 /** Supplies optional operations selected by a normalized base media type. */
-export type BodyCodec<TSource> = {
+export type BodyCodec = {
 	match: (mediaType: string) => boolean;
 	serialize?: BodySerializer;
-	deserialize?: BodyDeserializer<TSource>;
+	deserialize?: BodyDeserializer;
 };

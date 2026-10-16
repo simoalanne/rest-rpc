@@ -22,7 +22,7 @@ middleware, and deployment model.
 ```ts twoslash
 // ---cut-start---
 // @filename: server.ts
-import { route } from "@rest-rpc/express";
+import { route } from "@rest-rpc/server/node";
 import { z } from "zod";
 
 declare function createTodo(title: string): { id: string; title: string };
@@ -66,7 +66,7 @@ export const routes = { todos: { create, get } };
 ```ts twoslash
 // ---cut-start---
 // @filename: server.ts
-import { route } from "@rest-rpc/express";
+import { route } from "@rest-rpc/server/node";
 import { z } from "zod";
 
 declare function createTodo(title: string): { id: string; title: string };
@@ -133,7 +133,7 @@ if (response.status === 200) {
 ```tsx twoslash
 // ---cut-start---
 // @filename: server.ts
-import { route } from "@rest-rpc/express";
+import { route } from "@rest-rpc/server/node";
 import { z } from "zod";
 
 declare function createTodo(title: string): { id: string; title: string };
@@ -265,9 +265,9 @@ npx skills add rest-rpc/rest-rpc
 		compromising HTTP semantics. Your server works exactly like it did before,
 		just with full type safety at the API boundary.
 	</Card>
-	<Card title="Server adapters" icon="plug" type="check">
-		Use Express, Hono, Fastify, NestJS, Node HTTP, or fetch-native runtimes with
-		your existing middleware and application code.
+	<Card title="Any stack, or none" icon="plug" type="check">
+		Serve routes on Node HTTP or fetch-native runtimes without a framework, or
+		register them on the router of Express, Hono, Fastify, and others.
 	</Card>
 	<Card title="Typed responses" icon="list-checks" type="check">
 		Return direct success bodies for simple routes, or status-keyed response
@@ -298,8 +298,10 @@ npx skills add rest-rpc/rest-rpc
 		responses, and streams.
 	</Step>
 	<Step title="Choose the runtime" icon="plug">
-		Explore the [server adapters](/docs/server/express/), the [fetch
-		client](/docs/client/fetch-client/), or [TanStack
+		Serve routes on the [Fetch](/docs/server/fetch/) or [Node
+		HTTP](/docs/server/node/) runtime or an [existing
+		framework](/docs/server/frameworks/), and call them with the [fetch
+		client](/docs/client/fetch-client/) or [TanStack
 		Query](/docs/client/tanstack-query/).
 	</Step>
 	<Step title="Describe the API" icon="share">
@@ -309,10 +311,16 @@ npx skills add rest-rpc/rest-rpc
 
 :::tip[Small by design]
 `rest-rpc` stays focused on the API boundary so it can fit into code you already
-have. You keep using normal HTTP routes, your existing framework, middleware,
-authentication, database layer, and deployment model. Adopt the route builder,
-adapters, client, or OpenAPI generation as they become useful.
-:::
+have. It types and validates what crosses the wire, and leaves routing features,
+plugins, and server lifecycle to your stack. Adopt it one step at a time, each
+useful without the next:
+
+1. Declare routes and infer request and response types for handlers you write.
+2. Validate requests and responses at runtime.
+3. Extract a contract and call the routes with the typed client.
+4. Serve the routes with the catch-all handler, or register them on your
+   framework's router.
+   :::
 
 ## Common Questions
 
@@ -328,15 +336,20 @@ adapters, client, or OpenAPI generation as they become useful.
 		deployment model. Add typed routes at the API boundary and adopt the client,
 		TanStack Query utils, or OpenAPI generation as they become useful.
 	</AccordionItem>
+	<AccordionItem title="Do I need a server framework?">
+		No. If an app only needs typed, validated endpoints, serve them directly on
+		Node HTTP, Bun, Deno, or Cloudflare Workers. If it needs a framework for
+		other reasons, register the routes on the framework's router instead.
+	</AccordionItem>
 	<AccordionItem title="Do I need to learn a new API model?">
 		The model is ordinary HTTP: methods, paths, request locations, status codes,
 		headers, and response bodies. The route builder describes them directly,
 		with sensible defaults for methods, paths, and success statuses.
 	</AccordionItem>
 	<AccordionItem title="Can I have a separate contract?">
-		Yes. Declare the HTTP interface independently, implement it with any server
-		adapter, and share it directly with clients. See the [Contract-first
-		Quickstart](/docs/contract-first-quickstart/).
+		Yes. Declare the HTTP interface independently, implement it with
+		`@rest-rpc/server`, and share it directly with clients. See the
+		[Contract-first Quickstart](/docs/contract-first-quickstart/).
 	</AccordionItem>
 	<AccordionItem title="What happens when something breaks?">
 		You debug the same boundary you would debug by hand: method, path, query,

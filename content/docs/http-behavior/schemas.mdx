@@ -8,7 +8,7 @@ ArkType are supported. The built-in `type<T>()` utility provides types without
 runtime validation.
 
 Schemas describe application values. Serialization determines how those values
-travel over HTTP. These rules apply to every server adapter and to both
+travel over HTTP. These rules apply to both server runtimes and to both
 handler-based routes and separate contracts.
 
 ## Schema Input and Output
@@ -35,7 +35,7 @@ output. Request validation failures produce a 400 response by default. See
 customize it.
 
 ```ts
-import { route } from "@rest-rpc/express";
+import { route } from "@rest-rpc/server/node";
 import { z } from "zod";
 
 const list = route
@@ -75,14 +75,14 @@ enabled. See [Fetch Client](/docs/client/fetch-client#response-validation).
 
 ## Disabling Server Validation
 
-Every server adapter accepts `disableRequestValidation` and
+`compileRoutes` accepts `disableRequestValidation` and
 `disableResponseValidation` options. Both default to `false`. These options
 disable only schema validation. Request decoding, content-type checks, route
 matching, response status and content-type selection, and response serialization
 still run normally.
 
 ```ts
-registerRoutes(app, routes, {
+compileRoutes(routes, {
 	disableRequestValidation: true,
 	disableResponseValidation: true,
 });
@@ -127,4 +127,4 @@ const create = route
 const numberToStringSchema = type((input: number) => input.toString());
 ```
 
-`type` is also exported from every server adapter package.
+`type` is also exported from `@rest-rpc/server/node` and `@rest-rpc/server/fetch`.

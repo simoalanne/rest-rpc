@@ -3,24 +3,21 @@ title: Error Responses
 description: Default server responses for invalid requests and responses, and how errors reach your framework.
 ---
 
-Server adapters reject invalid requests before the handler runs and check
-handler output before it is sent. This page lists the default responses. Each
-[server adapter](/docs/server/express#error-handling) documents how to replace
-them.
+The server rejects invalid requests before the handler runs and checks
+handler output before it is sent. This page lists the default responses. The
+[Fetch](/docs/server/fetch#error-handling) and
+[Node HTTP](/docs/server/node#error-handling) runtime pages document how to
+replace them.
 
 ## Default Responses
 
 | Situation                                                                                  | Status | Body                            |
 | ------------------------------------------------------------------------------------------ | ------ | ------------------------------- |
 | Request `Content-Type` is not declared by the route                                        | `415`  | `{ message }`                   |
-| Request body cannot be decoded by a built-in codec                                         | `400`  | `{ message }`                   |
+| Request body cannot be decoded                                                             | `400`  | `{ message }`                   |
 | Request body exceeds `requestBodyLimit`                                                    | `413`  | `{ message }`                   |
 | [Request validation](/docs/http-behavior/schemas#request-validation) fails                 | `400`  | `{ message, validationErrors }` |
 | [Response validation](/docs/http-behavior/schemas#response-validation-on-the-server) fails | `500`  | `{ message }`                   |
-
-Body decoding and `requestBodyLimit` only apply to adapters that decode request
-bodies themselves. Adapters that use the framework's body parsing report those
-failures through the framework.
 
 The request validation body groups Standard Schema issues by location:
 
@@ -40,8 +37,9 @@ The response validation body does not expose validation details.
 
 ## Validation Errors
 
-Validation failures are represented by error classes exported from every server
-adapter. Adapter error handlers receive them.
+Validation failures are represented by error classes exported from
+`@rest-rpc/server/node` and `@rest-rpc/server/fetch`. The validation error
+handlers receive them.
 
 `RequestValidationError` has:
 
@@ -61,7 +59,7 @@ stream ends instead.
 
 ## Other Errors
 
-Errors thrown by handlers, middleware, or custom codecs are not converted into
-responses. They propagate to the framework's error handling, or reject the
-handler promise for the Fetch and Node adapters. Returning a status that the
+Errors thrown by handlers, middleware, or custom serializers are not converted
+into responses. They reject the handler promise, and reach the framework's
+error handling when routes are registered on a framework. Returning a status that the
 route does not declare also produces an error.

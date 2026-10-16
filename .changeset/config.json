@@ -6,18 +6,7 @@
 	"changelog": "./changelog-generator.ts",
 	"commit": false,
 	"ignore": [],
-	"fixed": [
-		[
-			"@rest-rpc/core",
-			"@rest-rpc/express",
-			"@rest-rpc/fastify",
-			"@rest-rpc/hono",
-			"@rest-rpc/fetch",
-			"@rest-rpc/node",
-			"@rest-rpc/server",
-			"@rest-rpc/tanstack-query"
-		]
-	],
+	"fixed": [["@rest-rpc/core", "@rest-rpc/server", "@rest-rpc/tanstack-query"]],
 	"linked": [],
 	"updateInternalDependencies": "patch"
 }

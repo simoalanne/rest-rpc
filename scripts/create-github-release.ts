@@ -14,13 +14,8 @@ const repoUrl = `https://github.com/rest-rpc/rest-rpc`;
 
 const packages = [
 	["core", "packages/core/CHANGELOG.md"],
-	["express", "packages/express/CHANGELOG.md"],
-	["fastify", "packages/fastify/CHANGELOG.md"],
-	["hono", "packages/hono/CHANGELOG.md"],
 	["server", "packages/server/CHANGELOG.md"],
 	["tanstack-query", "packages/tanstack-query/CHANGELOG.md"],
-	["fetch", "packages/fetch/CHANGELOG.md"],
-	["node", "packages/node/CHANGELOG.md"],
 ] as const;
 
 const changelogs = await Promise.all(

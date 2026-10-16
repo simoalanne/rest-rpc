@@ -65,6 +65,8 @@ export type HandleHttpRouteOptions<
 	request: RequestSegments;
 	handlerFields: TAdditionalHandlerFields;
 	configuration?: HandleHttpRouteConfiguration;
+	/** Initial context values, set before middleware runs. */
+	context?: object;
 };
 
 const requestHeader = (headers: RequestSegments["headers"], name: string) => {
@@ -194,7 +196,7 @@ export async function handleHttpRoute<
 			{
 				...validatedRequest,
 				...options.handlerFields,
-				context: createContext(),
+				context: createContext(options.context),
 				contentType,
 				lastEventId,
 				route,

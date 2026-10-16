@@ -32,8 +32,8 @@ export type SerializedHttpRouteResult =
  */
 export async function serializeHttpRouteResult(
 	result: HttpRouteResult,
-	bodyCodecs: readonly BodyCodec<never>[],
-	defaultBodyCodecs: readonly BodyCodec<never>[],
+	bodyCodecs: readonly BodyCodec[],
+	defaultBodyCodecs: readonly BodyCodec[],
 ): Promise<SerializedHttpRouteResult> {
 	if (result.kind === "stream" || !result.body) {
 		return { ...result, headers: { ...result.headers } };

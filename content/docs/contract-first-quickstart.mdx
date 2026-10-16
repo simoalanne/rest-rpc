@@ -5,17 +5,17 @@ description: Declare a shared HTTP interface, implement it, and use it in a type
 
 A separate contract is useful when the HTTP interface should be shared
 independently of its implementation. Declare it with the core route builder,
-implement it with a server adapter, and pass the same contract to the client.
+implement it with `@rest-rpc/server`, and pass the same contract to the client.
 
 This guide builds the same two routes as the [Quickstart](/docs/quickstart),
-using Express and Zod. The methods, paths, requests, statuses, and client
+using Node's `node:http` server and Zod. The methods, paths, requests, statuses, and client
 results are equivalent, but the response types are declared explicitly rather
 than inferred from handlers.
 
 ## Install
 
 ```package-install
-npm i @rest-rpc/core @rest-rpc/express express zod
+npm i @rest-rpc/core @rest-rpc/server zod
 ```
 
 ## Declare the Contract
@@ -52,8 +52,12 @@ HTTP method, path, and 200 and 404 responses. The schemas also provide runtime v
 ## Implement and Register Routes
 
 ```ts server.ts
-import express from "express";
-import { implement, registerRoutes } from "@rest-rpc/express";
+import { createServer } from "node:http";
+import {
+	compileRoutes,
+	createCatchAllHandler,
+	implement,
+} from "@rest-rpc/server/node";
 import { api } from "./contract";
 
 type Todo = { id: string; title: string; completed: boolean };
@@ -82,10 +86,12 @@ const get = implement(api.todos.get).handler(({ params, query }) => {
 
 const routes = { todos: { create, get } };
 
-const app = express();
-app.use(express.json());
-registerRoutes(app, routes);
-app.listen(3000);
+const handler = createCatchAllHandler(compileRoutes(routes));
+
+createServer(async (req, res) => {
+	const { matched } = await handler(req, res);
+	if (!matched) res.writeHead(404).end();
+}).listen(3000);
 ```
 
 `implement()` keeps each handler's request and result tied to its declaration.
@@ -118,5 +124,5 @@ if (response.status === 200) {
 
 - [Contract-first](/docs/contract-first) covers declarations, implementation, context, and middleware.
 - [Schemas and Validation](/docs/http-behavior/schemas) covers runtime validation.
-- [Express](/docs/server/express) and the other adapter pages cover framework integration.
+- [Frameworks](/docs/server/frameworks) covers registering routes on an existing router.
 - [Fetch Client](/docs/client/fetch-client) and [TanStack Query](/docs/client/tanstack-query) cover client usage.

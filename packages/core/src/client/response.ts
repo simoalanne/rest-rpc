@@ -149,7 +149,7 @@ const readHeaders = async (
 const readBody = async (
 	rawResponse: Response,
 	mediaType: string,
-	bodyCodecs: readonly BodyCodec<Response>[] | undefined,
+	bodyCodecs: readonly BodyCodec[] | undefined,
 ) => {
 	if (!mediaType || rawResponse.body === null) return undefined;
 	const resolvedCodec = resolveBodyCodec(mediaType, [
@@ -177,7 +177,7 @@ export const fetchResponse = async <
 >(
 	request: RouteRequestFn,
 	validateResponse: boolean,
-	bodyCodecs: readonly BodyCodec<Response>[] | undefined,
+	bodyCodecs: readonly BodyCodec[] | undefined,
 	route: E,
 	...args: FetchArgs<E>
 ) => {

@@ -4,7 +4,7 @@ description: How values are encoded over HTTP and how to customize body codecs.
 ---
 
 HTTP values travel through URL strings, headers, or request and response bodies.
-These rules are shared by the client and every server adapter. See the
+These rules are shared by the client and the server. See the
 [Route Builder](/docs/route-builder) for declaring the interface and
 [Schemas and Validation](/docs/http-behavior/schemas) for validation boundaries.
 
@@ -59,10 +59,10 @@ schema and codecs must agree on the values represented by each selected type.
 | `text/*`                                     | `string`                                               |
 | Any other media type                         | `Blob` or `Uint8Array` when sent, `Blob` when received |
 
-The client uses these codecs for requests and responses. Server adapters
-follow the same mapping, with framework-specific differences in which bodies
-they parse and which values they can send. See the "Request and Response
-Bodies" section of your [server adapter](/docs/server/express#request-and-response-bodies).
+The client uses these codecs for requests and responses. The server follows the
+same mapping, with runtime-specific differences in which values it can send.
+See "Request and Response Bodies" for the [Fetch](/docs/server/fetch#request-and-response-bodies)
+and [Node HTTP](/docs/server/node#request-and-response-bodies) runtimes.
 
 ## Streams
 
@@ -72,20 +72,20 @@ optional `id`, `event`, and `retry` fields.
 
 ## Custom Codecs
 
-Create a `BodyCodec` and pass it in `bodyCodecs` to a server adapter or the
-client. Each codec has a `match(mediaType)` function and optional `serialize`
+Create a `BodyCodec` and pass it in `bodyCodecs` to `compileRoutes` or the
+client. The same codec works on both sides. Each codec has a `match(mediaType)` function and optional `serialize`
 and `deserialize` functions. Custom codecs run before the defaults. The first
 matching implementation wins independently for each operation, so overriding
 only serialization keeps the default deserializer.
 
 <Tabs>
-<Tab title="Server Adapter">
+<Tab title="Server">
 
 ```ts
-import { createRouteHandler, type BodyCodec } from "@rest-rpc/fetch";
+import { compileRoutes, type BodyCodec } from "@rest-rpc/server/fetch";
 import { routes } from "./routes";
 
-const binaryCodec: BodyCodec<Request> = {
+const binaryCodec: BodyCodec = {
 	match: (mediaType) => mediaType === "application/octet-stream",
 	serialize: (value) => {
 		if (!(value instanceof Uint8Array)) {
@@ -96,7 +96,7 @@ const binaryCodec: BodyCodec<Request> = {
 	deserialize: async (source) => new Uint8Array(await source.arrayBuffer()),
 };
 
-const handler = createRouteHandler(routes, {
+const compiledRoutes = compileRoutes(routes, {
 	bodyCodecs: [binaryCodec],
 });
 ```
@@ -108,7 +108,7 @@ const handler = createRouteHandler(routes, {
 import { initClient, type BodyCodec } from "@rest-rpc/core";
 import { contract } from "./contract";
 
-const binaryCodec: BodyCodec<Response> = {
+const binaryCodec: BodyCodec = {
 	match: (mediaType) => mediaType === "application/octet-stream",
 	serialize: (value) => {
 		if (!(value instanceof Uint8Array)) {
@@ -137,7 +137,7 @@ both ends.
 including parameters, and returns `{ body, headers?, contentType? }`:
 
 - `body` is sent as-is. On the client it must be a Fetch request body. On the
-  server it must be a value the adapter can send. See your adapter's
+  server it must be a value the runtime can send. See the runtime's
   "Request and Response Bodies" section.
 - `headers` adds headers for the serialized body.
 - Omitting `contentType` preserves the declared content type. A string may change
@@ -147,8 +147,9 @@ including parameters, and returns `{ body, headers?, contentType? }`:
 ### Deserializer Source
 
 `deserialize(source)` returns the value to validate. On the client, `source` is
-the Fetch `Response`. On the server, it is the adapter's native request object.
+the Fetch `Response`. On the server, it is a Fetch `Request`, also on the Node
+runtime.
 
-Custom deserializers read the body themselves, so they are responsible for
-their own size limits and error handling. Errors they throw are not converted
-into responses and propagate to the adapter's normal error handling.
+On the server, the request body is limited to `requestBodyLimit` bytes for
+custom deserializers too. An error thrown while deserializing responds with
+`400`, or `413` when the body exceeds the limit.

@@ -11,7 +11,7 @@ describe("operations", () => {
 
 	it("selects the first matching serializer and deserializer independently", async () => {
 		const deserialize = async () => "decoded";
-		const codecs: BodyCodec<Response>[] = [
+		const codecs: BodyCodec[] = [
 			{ match: () => false, serialize: () => ({ body: "ignored" }) },
 			{ match: () => true, serialize: () => ({ body: "first" }) },
 			{ match: () => true, serialize: () => ({ body: "second" }), deserialize },

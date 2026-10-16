@@ -62,7 +62,7 @@ export type ApiClientOptions<
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > = {
 	baseUrl: string;
-	bodyCodecs?: readonly BodyCodec<Response>[];
+	bodyCodecs?: readonly BodyCodec[];
 	fetch?: FetchLike;
 	fetchOptions?: ApiClientFetchOptions;
 	globalHeaders?: TGlobalHeaders;

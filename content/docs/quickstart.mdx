@@ -6,23 +6,25 @@ description: Define HTTP routes with handlers and call them through a typed clie
 `rest-rpc` builds REST APIs with RPC-like ergonomics: an HTTP route builder
 with sensible defaults, and a typed client to call the routes.
 
-This guide uses Express and Zod to build two routes: a minimal create operation
+This guide uses Node's `node:http` server and Zod to build two routes: a minimal create operation
 and a GET with path params, query input, and success/error responses.
 Their response types are inferred from the handlers.
 
 ## Install
 
 ```package-install
-npm i @rest-rpc/core @rest-rpc/express express zod
+npm i @rest-rpc/core @rest-rpc/server zod
 ```
 
-Use an existing TypeScript project with a `tsconfig.json`. For other frameworks
-and runtimes, see the [server adapters](/docs/server/express).
+Use an existing TypeScript project with a `tsconfig.json`. For fetch-native
+runtimes such as Bun, Deno, and Cloudflare Workers, see the
+[Fetch runtime](/docs/server/fetch). To use an existing framework's router, see
+[Frameworks](/docs/server/frameworks).
 
 ## Define Routes
 
 ```ts routes.ts
-import { route } from "@rest-rpc/express";
+import { route } from "@rest-rpc/server/node";
 import { z } from "zod";
 
 type Todo = { id: string; title: string; completed: boolean };
@@ -68,15 +70,21 @@ the client's result type.
 ## Register Routes
 
 ```ts server.ts
-import express from "express";
-import { registerRoutes } from "@rest-rpc/express";
+import { createServer } from "node:http";
+import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server/node";
 import { routes } from "./routes";
 
-const app = express();
-app.use(express.json());
-registerRoutes(app, routes);
-app.listen(3000);
+const handler = createCatchAllHandler(compileRoutes(routes));
+
+createServer(async (req, res) => {
+	const { matched } = await handler(req, res);
+	if (!matched) res.writeHead(404).end();
+}).listen(3000);
 ```
+
+`compileRoutes` prepares the routes once. The catch-all handler routes each
+request to the matching route, or reports `matched: false` so the server can
+respond otherwise.
 
 ## Create the Client
 

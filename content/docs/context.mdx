@@ -31,10 +31,10 @@ routes, call it on the `implement()` result. See
 
 To avoid having to specify a context type for every route, declare a default
 context type for your application globally by augmenting `DefaultContext` in
-your adapter package:
+`@rest-rpc/server`:
 
 ```ts
-declare module "@rest-rpc/express" {
+declare module "@rest-rpc/server" {
 	interface DefaultContext {
 		env: {
 			DATABASE_URL: string;
@@ -42,6 +42,23 @@ declare module "@rest-rpc/express" {
 	}
 }
 ```
+
+## Values from the Host
+
+To make values from the surrounding server available in the context, such as a
+user authenticated by framework middleware or the native request, seed the
+context when handling the request. Seeded values are set before route
+middleware runs:
+
+```ts
+const handler = createCatchAllHandler(compileRoutes(routes));
+
+await handler(request, { context: { user: await authenticate(request) } });
+```
+
+Compiled routes accept the same option: `route.handle(request, { context })`.
+See the [Fetch](/docs/server/fetch#context) and
+[Node HTTP](/docs/server/node#context) runtimes.
 
 :::tip
 The context type does not guarantee that a value has been set. Set required
