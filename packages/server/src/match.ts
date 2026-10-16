@@ -117,11 +117,6 @@ export function flattenRouteImplementations(
 				entry as ImplementedRoute["~restrpc"] & {
 					path: string;
 				};
-			if (typeof handler !== "function") {
-				throw new Error(
-					`Route "${route.method} ${route.path}" has no handler.`,
-				);
-			}
 			return { route, handler, middleware };
 		})
 		.sort((left, right) => compareRouteSpecificity(left.route, right.route));

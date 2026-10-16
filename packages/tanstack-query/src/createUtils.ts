@@ -1,5 +1,4 @@
 import type { FetchOptions } from "@rest-rpc/core/client";
-import { isAsyncIterable } from "@rest-rpc/core/utils";
 import {
 	type MutationKey,
 	type QueryKey,
@@ -106,12 +105,7 @@ export const createTanstackUtilsForRoute = ({
 				const { body: stream } = (await fetchData(request, {
 					...fetchOptions,
 					signal,
-				})) as { body: unknown };
-
-				if (!isAsyncIterable(stream)) {
-					throw new Error("Route did not return a stream response body");
-				}
-
+				})) as { body: AsyncIterable<unknown> };
 				return stream;
 			};
 			return {

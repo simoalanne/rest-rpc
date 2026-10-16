@@ -106,11 +106,6 @@ const addRequestSegment = (
 	},
 });
 
-const withDescription = (options: { description?: string } | undefined) =>
-	options?.description === undefined
-		? {}
-		: { description: options.description };
-
 const addResponse = (
 	state: RouteBuilderState,
 	status: number,
@@ -279,13 +274,9 @@ export class RouteBuilder<
 	): never {
 		const state = defaultRouteState(this["~restrpc"]);
 		if (!isStandardSchema(schemaOrOptions)) {
-			const { status = 200, headers } = schemaOrOptions ?? {};
+			const { status = 200, headers, description } = schemaOrOptions ?? {};
 			return this.clone(
-				addResponse(state, status, {
-					body: undefined,
-					...(headers ? { headers } : {}),
-					...withDescription(schemaOrOptions),
-				}),
+				addResponse(state, status, { body: undefined, headers, description }),
 			);
 		}
 		const { status = 200, ...declaration } = options ?? {};
@@ -311,8 +302,8 @@ export class RouteBuilder<
 			addResponse(state, options?.status ?? 200, {
 				kind: "stream",
 				body: schema,
-				...(options?.headers ? { headers: options.headers } : {}),
-				...withDescription(options),
+				headers: options?.headers,
+				description: options?.description,
 			}),
 		);
 	}

@@ -116,20 +116,4 @@ describe("createUtils", () => {
 		).toBe(3);
 		client.clear();
 	});
-
-	it("rejects stream options when the route does not return an async iterable", async () => {
-		const client = new QueryClient();
-		const utils = createTanstackUtilsForRoute({
-			routePath: [],
-			fetchData: async () => ({ body: [] }),
-		});
-		await expect(
-			client.fetchQuery({
-				queryKey: [],
-				queryFn: utils.streamedQueryOptions!().queryFn as QueryFunction,
-				retry: false,
-			}),
-		).rejects.toThrow("Route did not return a stream response body");
-		client.clear();
-	});
 });

@@ -24,7 +24,7 @@ describe("extractContract", () => {
 	it("keeps only methods, resolved paths, and request content types", () => {
 		expect(extractContract(routes)).toEqual({
 			users: {
-				get: { "~restrpc": { method: "GET", path: "/users/:id" } },
+				get: { "~restrpc": { method: "GET", path: "/users/:id", request: {} } },
 				create: {
 					"~restrpc": {
 						method: "POST",
@@ -42,7 +42,7 @@ describe("extractContract", () => {
 		};
 		const contract = extractContract({ health: withHandler });
 		expect(JSON.parse(JSON.stringify(contract))).toEqual({
-			health: { "~restrpc": { method: "GET", path: "/health" } },
+			health: { "~restrpc": { method: "GET", path: "/health", request: {} } },
 		});
 	});
 
