@@ -8,10 +8,6 @@ This repo is `rest-rpc`, a TypeScript library for defining REST APIs with RPC-li
 
 - `@rest-rpc/core` - core library that has contract,client and openapi code.
 - `@rest-rpc/server` - reusable server-side code for different server adapters.
-- `@rest-rpc/express` - express server adapter
-- `@rest-rpc/hono` - hono server adapter
-- `@rest-rpc/fastify` - fastify server adapter
-- `@rest-rpc/nest` - NestJS server adapter
 - `@rest-rpc/fetch` - Fetch runtime `Request`/`Response` HTTP handler adapter for fetch-native runtimes and catch-all routes.
 - `@rest-rpc/node` - Node.js `IncomingMessage`/`ServerResponse` HTTP handler adapter for `node:http` servers.
 - `@rest-rpc/tanstack-query` - TanStack Query options and key utils
