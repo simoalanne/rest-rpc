@@ -40,10 +40,8 @@ export type {
 	ImplicitResponseEnvelope,
 	ImplicitResponseKind,
 } from "./implicitResponse.types.ts";
-export type {
-	ServerBuilderExtension,
-	PublicServerRouteBuilder,
-} from "./routeBuilder.types.ts";
+export type { PublicServerRouteBuilder } from "./routeBuilder.types.ts";
+export type { ServerRouteBuilderKind } from "./routeBuilder.ts";
 export { assertRequestContentType } from "./requestContentType.ts";
 export type { Context } from "./context.ts";
 export type {

@@ -86,7 +86,7 @@ const update = route
 The following rules apply to request segments:
 
 - `.params()` must correspond to dynamic path segments.
-- `.body()` is not allowed on GET routes and throws when declared.
+- `.body()` is not available on GET routes, and `.get()` is not available after `.body()`.
 
 Header schemas must use lowercase names. See
 [Serialization and Codecs](/docs/http-behavior/serialization#path-query-and-headers)

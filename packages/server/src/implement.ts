@@ -1,15 +1,19 @@
 import { isRouteLeaf, type Contract } from "@rest-rpc/core/contract";
 import type { ContractImplementer } from "./implement.types.ts";
 import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
-import { ServerRouteBuilder } from "./routeBuilder.ts";
+import {
+	ServerRouteBuilder,
+	type ServerRouteBuilderState,
+} from "./routeBuilder.ts";
+
+type RuntimeRoute = { readonly "~restrpc": ServerRouteBuilderState };
 
 type RuntimeContractTree =
-	| ServerRouteBuilder
+	| RuntimeRoute
 	| { readonly [key: string]: RuntimeContractTree };
 
-const isContractRoute = (
-	value: RuntimeContractTree,
-): value is ServerRouteBuilder => isRouteLeaf(value);
+const isContractRoute = (value: RuntimeContractTree): value is RuntimeRoute =>
+	isRouteLeaf(value);
 
 const assertUnimplementedRoutes = (contract: RuntimeContractTree): void => {
 	if (isContractRoute(contract)) {
@@ -30,7 +34,7 @@ const assertUnimplementedRoutes = (contract: RuntimeContractTree): void => {
 
 const mapContractRoutes = (
 	contract: RuntimeContractTree,
-	map: (route: ServerRouteBuilder) => ServerRouteBuilder,
+	map: (route: RuntimeRoute) => RuntimeRoute,
 ): RuntimeContractTree => {
 	if (isContractRoute(contract)) return map(contract);
 
@@ -48,7 +52,7 @@ const appendMiddlewareToRoutes = (
 ): RuntimeContractTree =>
 	mapContractRoutes(contract, (route) => {
 		const state = route["~restrpc"];
-		return route.clone({
+		return new ServerRouteBuilder({
 			...state,
 			middleware: [...(state.middleware ?? []), middleware],
 		});
