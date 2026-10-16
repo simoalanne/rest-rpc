@@ -17,31 +17,20 @@ describe("routeBuilder", () => {
 		});
 	});
 
-	it("rejects GET bodies regardless of declaration order", () => {
-		expect(() => new RouteBuilder().get().body(schema)).toThrow(
-			"GET routes cannot declare a request body.",
-		);
-		expect(() => new RouteBuilder().body(schema).get()).toThrow(
-			"GET routes cannot declare a request body.",
-		);
-	});
-
 	it("stores response descriptions and stream response headers", () => {
 		const headers = type<{ "x-cursor": string }>();
 		expect(
 			new RouteBuilder()
 				.response({ status: 204, description: "Deleted" })
-				.streamResponse(schema, { headers, description: "Events" })[
-				"~restrpc"
-			].responses,
+				.streamResponse(schema, { headers, description: "Events" })["~restrpc"]
+				.responses,
 		).toEqual({
 			204: { body: undefined, description: "Deleted" },
 			200: { kind: "stream", body: schema, headers, description: "Events" },
 		});
 		expect(
-			new RouteBuilder().response(schema, { description: "Name" })[
-				"~restrpc"
-			].responses,
+			new RouteBuilder().response(schema, { description: "Name" })["~restrpc"]
+				.responses,
 		).toEqual({
 			200: {
 				body: schema,

@@ -19,7 +19,20 @@ import type {
 	ResponseOptions,
 	StreamResponseOptions,
 } from "./response.ts";
-import type { PublicRouteBuilder } from "./routeBuilder.types.ts";
+import type {
+	BuilderFor,
+	BuilderKind,
+	BuilderState,
+	DeclarationFor,
+	NextState,
+	RootBuilderState,
+	WithBody,
+	WithHttpMethod,
+	WithMetadata,
+	WithRequest,
+	WithResponse,
+	WithStreamResponse,
+} from "./routeBuilder.types.ts";
 
 type RouteBuilderState = Partial<RouteDeclaration>;
 
@@ -72,17 +85,12 @@ const httpState = (
 	state: RouteBuilderState,
 	method: HttpMethod,
 	path: AbsolutePath | undefined,
-): RouteBuilderState => {
-	if (method === "GET" && state.request?.body) {
-		throw new Error("GET routes cannot declare a request body.");
-	}
-	return {
-		...state,
-		method,
-		path,
-		responses: { ...state.responses },
-	};
-};
+): RouteBuilderState => ({
+	...state,
+	method,
+	path,
+	responses: { ...state.responses },
+});
 
 const addRequestSegment = (
 	state: RouteBuilderState,
@@ -118,43 +126,78 @@ const addResponse = (
 	};
 };
 
-/** Immutable runtime implementation used by every route-builder stage. */
-export class RouteBuilder {
-	readonly "~restrpc": RouteBuilderState;
+/** Builder kind of the core route builder. */
+export interface RouteBuilderKind extends BuilderKind {
+	readonly builder: this["state"] extends infer TState extends BuilderState
+		? Omit<RouteBuilder<TState>, TState["omit"]>
+		: never;
+}
+
+/**
+ * Immutable fluent route builder.
+ *
+ * @remarks Every method returns a new builder typed by `TKind`, which lets
+ * packages extending the builder keep their own builder type.
+ */
+export class RouteBuilder<
+	TState extends BuilderState = RootBuilderState,
+	TKind extends BuilderKind = RouteBuilderKind,
+> {
+	readonly "~restrpc": DeclarationFor<TState>;
 
 	constructor(state: RouteBuilderState = {}) {
-		this["~restrpc"] = { ...state };
+		this["~restrpc"] = { ...state } as DeclarationFor<TState>;
 	}
 
-	clone(state: RouteBuilderState): RouteBuilder {
-		return new RouteBuilder(state);
+	// Typed as `never` so each builder method returns its declared type.
+	protected clone(state: RouteBuilderState): never {
+		return new RouteBuilder(state) as never;
 	}
 
-	get(path?: AbsolutePath): RouteBuilder {
+	/** Declares a GET route. @see {@link https://rest-rpc.dev/docs/route-builder} */
+	get<const TPath extends AbsolutePath | undefined = undefined>(
+		path?: TPath,
+	): BuilderFor<TKind, WithHttpMethod<TState, "GET", TPath>> {
 		return this.clone(httpState(this["~restrpc"], "GET", path));
 	}
 
-	post(path?: AbsolutePath): RouteBuilder {
+	/** Declares a POST route. @see {@link https://rest-rpc.dev/docs/route-builder} */
+	post<const TPath extends AbsolutePath | undefined = undefined>(
+		path?: TPath,
+	): BuilderFor<TKind, WithHttpMethod<TState, "POST", TPath>> {
 		return this.clone(httpState(this["~restrpc"], "POST", path));
 	}
 
-	put(path?: AbsolutePath): RouteBuilder {
+	/** Declares a PUT route. @see {@link https://rest-rpc.dev/docs/route-builder} */
+	put<const TPath extends AbsolutePath | undefined = undefined>(
+		path?: TPath,
+	): BuilderFor<TKind, WithHttpMethod<TState, "PUT", TPath>> {
 		return this.clone(httpState(this["~restrpc"], "PUT", path));
 	}
 
-	patch(path?: AbsolutePath): RouteBuilder {
+	/** Declares a PATCH route. @see {@link https://rest-rpc.dev/docs/route-builder} */
+	patch<const TPath extends AbsolutePath | undefined = undefined>(
+		path?: TPath,
+	): BuilderFor<TKind, WithHttpMethod<TState, "PATCH", TPath>> {
 		return this.clone(httpState(this["~restrpc"], "PATCH", path));
 	}
 
-	delete(path?: AbsolutePath): RouteBuilder {
+	/** Declares a DELETE route. @see {@link https://rest-rpc.dev/docs/route-builder} */
+	delete<const TPath extends AbsolutePath | undefined = undefined>(
+		path?: TPath,
+	): BuilderFor<TKind, WithHttpMethod<TState, "DELETE", TPath>> {
 		return this.clone(httpState(this["~restrpc"], "DELETE", path));
 	}
 
-	body(schema: StandardSchemaV1, options?: BodyOptions): RouteBuilder {
+	/** Declares a request body and its HTTP metadata. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
+	body<
+		const TSchema extends StandardSchemaV1,
+		const TOptions extends BodyOptions | undefined = undefined,
+	>(
+		schema: TSchema,
+		options?: TOptions,
+	): BuilderFor<TKind, WithBody<TState, TSchema, TOptions>> {
 		const state = defaultRouteState(this["~restrpc"]);
-		if (state.method === "GET") {
-			throw new Error("GET routes cannot declare a request body.");
-		}
 		return this.clone(
 			addRequestSegment(state, "body", schema, {
 				contentType: requestContentType(state, options),
@@ -162,7 +205,10 @@ export class RouteBuilder {
 		);
 	}
 
-	headers(schema: RequestHeadersSchema): RouteBuilder {
+	/** Declares request headers. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
+	headers<const TSchema extends RequestHeadersSchema>(
+		schema: TSchema,
+	): BuilderFor<TKind, WithRequest<TState, "headers", TSchema>> {
 		const state = defaultRouteState(this["~restrpc"]);
 		return this.clone({
 			...state,
@@ -173,19 +219,28 @@ export class RouteBuilder {
 		});
 	}
 
-	query(schema: RequestQuerySchema): RouteBuilder {
+	/** Declares URL query parameters. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
+	query<const TSchema extends RequestQuerySchema>(
+		schema: TSchema,
+	): BuilderFor<TKind, WithRequest<TState, "query", TSchema>> {
 		return this.clone(
 			addRequestSegment(defaultRouteState(this["~restrpc"]), "query", schema),
 		);
 	}
 
-	params(schema: RequestParamsSchema): RouteBuilder {
+	/** Declares path parameters. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
+	params<const TSchema extends RequestParamsSchema>(
+		schema: TSchema,
+	): BuilderFor<TKind, WithRequest<TState, "params", TSchema>> {
 		return this.clone(
 			addRequestSegment(defaultRouteState(this["~restrpc"]), "params", schema),
 		);
 	}
 
-	metadata(metadata: RouteMetadata): RouteBuilder {
+	/** Adds application metadata, shallow-merged with earlier metadata. @see {@link https://rest-rpc.dev/docs/route-builder#add-metadata-and-openapi-details} */
+	metadata<const TMetadata extends RouteMetadata>(
+		metadata: TMetadata,
+	): BuilderFor<TKind, WithMetadata<TState, TMetadata>> {
 		const state = defaultRouteState(this["~restrpc"]);
 		return this.clone({
 			...state,
@@ -193,7 +248,10 @@ export class RouteBuilder {
 		});
 	}
 
-	openAPI(openApi: OpenApiRouteOptions): RouteBuilder {
+	/** Adds OpenAPI metadata, merged with earlier details. @see {@link https://rest-rpc.dev/docs/openapi#route-metadata} */
+	openAPI(
+		openApi: OpenApiRouteOptions,
+	): BuilderFor<TKind, NextState<TState, { openApi: true }>> {
 		const state = defaultRouteState(this["~restrpc"]);
 		return this.clone({
 			...state,
@@ -201,10 +259,24 @@ export class RouteBuilder {
 		});
 	}
 
+	/** Declares a response schema and HTTP metadata. The status defaults to 200. @see {@link https://rest-rpc.dev/docs/route-builder#declare-responses} */
+	response<
+		const TSchema extends StandardSchemaV1,
+		const TOptions extends ResponseOptions | undefined = undefined,
+	>(
+		schema: TSchema,
+		options?: TOptions,
+	): BuilderFor<TKind, WithResponse<TState, TSchema, TOptions>>;
+	/** Declares a response without a body. The status defaults to 200. @see {@link https://rest-rpc.dev/docs/route-builder#declare-responses} */
+	response<
+		const TOptions extends BodylessResponseOptions | undefined = undefined,
+	>(
+		options?: TOptions,
+	): BuilderFor<TKind, WithResponse<TState, undefined, TOptions>>;
 	response(
 		schemaOrOptions?: StandardSchemaV1 | BodylessResponseOptions,
 		options?: ResponseOptions,
-	): RouteBuilder {
+	): never {
 		const state = defaultRouteState(this["~restrpc"]);
 		if (!isStandardSchema(schemaOrOptions)) {
 			const { status = 200, headers } = schemaOrOptions ?? {};
@@ -226,10 +298,14 @@ export class RouteBuilder {
 		);
 	}
 
-	streamResponse(
-		schema: StandardSchemaV1,
-		options?: StreamResponseOptions,
-	): RouteBuilder {
+	/** Declares a streaming response. The status defaults to 200. @see {@link https://rest-rpc.dev/docs/streaming} */
+	streamResponse<
+		const TSchema extends StandardSchemaV1,
+		const TOptions extends StreamResponseOptions | undefined = undefined,
+	>(
+		schema: TSchema,
+		options?: TOptions,
+	): BuilderFor<TKind, WithStreamResponse<TState, TSchema, TOptions>> {
 		const state = defaultRouteState(this["~restrpc"]);
 		return this.clone(
 			addResponse(state, options?.status ?? 200, {
@@ -250,6 +326,4 @@ export class RouteBuilder {
  *
  * @see {@link https://rest-rpc.dev/docs/route-builder}
  */
-export const route = new RouteBuilder({
-	path: undefined,
-}) as unknown as PublicRouteBuilder;
+export const route = new RouteBuilder();

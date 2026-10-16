@@ -1,17 +1,9 @@
+import type { ValidImplicitResult } from "./implicitResponse.types.ts";
 import type {
-	InferredRoute,
-	ValidImplicitResult,
-} from "./implicitResponse.types.ts";
-import type {
-	AbsolutePath,
-	BuilderExtension,
-	BuilderState,
+	BuilderFor,
 	InferServerRequest,
-	PublicDeclarationFor,
-	PublicRouteBuilder,
-	RouteBuilderView,
+	RootBuilderState,
 	RouteDeclaration,
-	RouteMetadata,
 	RouteTree,
 	ServerResponse,
 	ServerResponseBody,
@@ -19,13 +11,8 @@ import type {
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import type { SseServerEvent } from "./sse.ts";
 import type { Context } from "./context.ts";
-import type {
-	MiddlewareRequest,
-	MiddlewareReturn,
-	ReusableMiddlewareRequest,
-	RequestFields,
-	RequestTransportFields,
-} from "./middleware.types.ts";
+import type { RequestTransportFields } from "./middleware.types.ts";
+import type { ServerRouteBuilderKind } from "./routeBuilder.ts";
 import type { EmptyObject, MaybePromise, Merge } from "@rest-rpc/core/utils";
 
 /** Untyped route handler stored in a completed runtime route declaration. */
@@ -109,12 +96,7 @@ export type RouteHandlerFor<
 				: never;
 		};
 
-/** Terminal builder shape containing a route declaration and its handler. */
-type CompletedRoute<TRoute, THandler> = {
-	readonly "~restrpc": Merge<TRoute & { readonly handler: THandler }>;
-};
-
-type HasDeclaredResponses<TRoute> = TRoute extends {
+export type HasDeclaredResponses<TRoute> = TRoute extends {
 	responses: infer TResponses;
 }
 	? keyof TResponses extends never
@@ -122,125 +104,24 @@ type HasDeclaredResponses<TRoute> = TRoute extends {
 		: true
 	: false;
 
-type HandlerFor<
+/**
+ * Results a handler may return. Routes with declared responses must return one
+ * of them; other routes infer their responses from any valid result.
+ */
+export type AllowedHandlerResult<
 	TRoute extends RouteDeclaration,
 	TAdditionalHandlerFields extends object,
 	TContext extends object,
-	TResult,
-> = (
-	request: RouteRequest<TRoute, TAdditionalHandlerFields, TContext>,
-) => TResult;
-
-type HandlerImplementation<
-	TRoute extends RouteDeclaration,
-	TAdditionalHandlerFields extends object,
-	TContext extends object,
-	TResult,
-	TPublicRoute extends RouteDeclaration = TRoute,
-> = CompletedRoute<
-	TPublicRoute,
-	HandlerFor<TRoute, TAdditionalHandlerFields, TContext, TResult>
->;
-
-type ImplicitHandlerMethod<
-	TRoute extends RouteDeclaration,
-	TAdditionalHandlerFields extends object,
-	TContext extends object,
-> = {
-	handler<const TResult>(
-		handler: HandlerFor<TRoute, TAdditionalHandlerFields, TContext, TResult> &
-			ValidImplicitResult<TResult>,
-	): HandlerImplementation<
-		TRoute,
-		TAdditionalHandlerFields,
-		TContext,
-		TResult,
-		InferredRoute<TRoute, TResult>
-	>;
-};
-
-/** Resolves the handler operation for a complete route declaration. */
-export type HandlerMethodFor<
-	TRoute extends RouteDeclaration,
-	TAdditionalHandlerFields extends object = EmptyObject,
-	TContext extends object = EmptyObject,
 > =
 	HasDeclaredResponses<TRoute> extends true
-		? {
-				handler<
-					const TResult extends ReturnType<
-						RouteHandler<TRoute, TAdditionalHandlerFields, TContext>
-					>,
-				>(
-					handler: HandlerFor<
-						TRoute,
-						TAdditionalHandlerFields,
-						TContext,
-						TResult
-					>,
-				): HandlerImplementation<
-					TRoute,
-					TAdditionalHandlerFields,
-					TContext,
-					TResult
-				>;
-			}
-		: ImplicitHandlerMethod<TRoute, TAdditionalHandlerFields, TContext>;
+		? ReturnType<RouteHandler<TRoute, TAdditionalHandlerFields, TContext>>
+		: unknown;
 
-type MiddlewareUseMethod<
-	TState extends BuilderState,
-	TPath extends AbsolutePath | undefined,
-	TMetadata extends RouteMetadata | never,
-	TAdditionalHandlerFields extends object,
-	TContext extends object,
-> = {
-	/** Wraps downstream execution after request validation. @see {@link https://rest-rpc.dev/docs/middleware} */
-	use<TReceiver extends { readonly "~restrpc": object }>(
-		this: TReceiver,
-		middleware: (
-			request: MiddlewareRequest<
-				Extract<
-					PublicDeclarationFor<TState, TPath, TMetadata>,
-					RouteDeclaration
-				>,
-				TAdditionalHandlerFields,
-				TContext
-			>,
-		) => MiddlewareReturn,
-	): TReceiver["~restrpc"] extends RouteDeclaration
-		? RouteBuilderView<
-				TState,
-				ServerBuilderExtension<TAdditionalHandlerFields, TContext>,
-				TPath,
-				TMetadata
-			>
-		: PublicRouteBuilder<
-				ServerBuilderExtension<TAdditionalHandlerFields, TContext>
-			>;
-};
-
-/** Core builder extension that exposes middleware and server handler attachment. */
-export interface ServerBuilderExtension<
-	TAdditionalHandlerFields extends object = EmptyObject,
-	TContext extends object = EmptyObject,
-> extends BuilderExtension {
-	readonly result: this["state"] extends infer TState extends BuilderState
-		? PublicDeclarationFor<
-				TState,
-				this["path"],
-				Extract<this["metadata"], RouteMetadata>
-			> extends infer TRoute extends RouteDeclaration
-			? HandlerMethodFor<TRoute, TAdditionalHandlerFields, TContext> &
-					MiddlewareUseMethod<
-						TState,
-						this["path"],
-						Extract<this["metadata"], RouteMetadata>,
-						TAdditionalHandlerFields,
-						TContext
-					>
-			: never
-		: never;
-}
+/** Rejects invalid implicit response envelopes. */
+export type ValidHandlerResult<TRoute extends RouteDeclaration, TResult> =
+	HasDeclaredResponses<TRoute> extends true
+		? unknown
+		: ValidImplicitResult<TResult>;
 
 /**
  * Route builder that finishes declarations by attaching a server handler.
@@ -250,28 +131,7 @@ export interface ServerBuilderExtension<
 export type PublicServerRouteBuilder<
 	TAdditionalHandlerFields extends object = EmptyObject,
 	TContext extends object = EmptyObject,
-> = PublicRouteBuilder<
-	ServerBuilderExtension<TAdditionalHandlerFields, TContext>
-> & {
-	/** Selects the typed per-request context store for this builder. @see {@link https://rest-rpc.dev/docs/context} */
-	$context<TValues extends object>(): PublicServerRouteBuilder<
-		TAdditionalHandlerFields,
-		TValues
-	>;
-	/** Declares a reusable middleware function on the untouched route root. @see {@link https://rest-rpc.dev/docs/middleware} */
-	middleware<TRequest extends RequestFields = RequestFields>(
-		callback: (
-			request: ReusableMiddlewareRequest<
-				TRequest,
-				TAdditionalHandlerFields,
-				TContext
-			>,
-		) => MiddlewareReturn,
-	): (
-		request: ReusableMiddlewareRequest<
-			TRequest,
-			TAdditionalHandlerFields,
-			TContext
-		>,
-	) => MiddlewareReturn;
-};
+> = BuilderFor<
+	ServerRouteBuilderKind<TAdditionalHandlerFields, TContext>,
+	RootBuilderState
+>;

@@ -1,5 +1,5 @@
 import type { Contract, RouteDeclaration } from "@rest-rpc/core/contract";
-import type { HandlerMethodFor } from "./routeBuilder.types.ts";
+import type { HandlerMethodFor } from "./routeBuilder.ts";
 
 import type {
 	MiddlewareRequest,

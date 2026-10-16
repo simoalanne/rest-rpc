@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { type } from "../standard-schema/type.ts";
 import { route } from "./routeBuilder.ts";
+import type { OpenApiRouteOptions } from "./routeDeclaration.ts";
 
 describe("routeBuilder types", () => {
 	it("preserves method, path and response status literals", () => {
@@ -55,7 +56,25 @@ describe("routeBuilder types", () => {
 		expectTypeOf(route).not.toHaveProperty("output");
 		expectTypeOf(route).not.toHaveProperty("streamOutput");
 		expectTypeOf(route.get()).not.toHaveProperty("post");
-		expectTypeOf(route.metadata({})).not.toHaveProperty("metadata");
+		expectTypeOf(route.get()).not.toHaveProperty("body");
+		expectTypeOf(route.body(type<string>())).not.toHaveProperty("get");
+		expectTypeOf(route.body(type<string>())).toHaveProperty("post");
+		expectTypeOf(route.post()).toHaveProperty("body");
+	});
+
+	it("merges repeated metadata and OpenAPI details", () => {
+		const value = route
+			.metadata({ auth: "required", scope: "read" })
+			.openAPI({ tags: ["Todos"] })
+			.metadata({ scope: "write" })
+			.openAPI({ summary: "List todos" });
+		expectTypeOf(value["~restrpc"].metadata).toEqualTypeOf<{
+			readonly auth: "required";
+			readonly scope: "write";
+		}>();
+		expectTypeOf(
+			value["~restrpc"].openApi,
+		).toEqualTypeOf<OpenApiRouteOptions>();
 	});
 
 	it("defaults response statuses to 200 and reads them from options", () => {
@@ -64,9 +83,9 @@ describe("routeBuilder types", () => {
 			.response(type<string>())
 			.response({ status: 204 })
 			.streamResponse(type<number>(), { status: 206 });
-		expectTypeOf<
-			keyof (typeof value)["~restrpc"]["responses"]
-		>().toEqualTypeOf<200 | 204 | 206>();
+		expectTypeOf<keyof (typeof value)["~restrpc"]["responses"]>().toEqualTypeOf<
+			200 | 204 | 206
+		>();
 		expectTypeOf(route.response()["~restrpc"].responses).toEqualTypeOf<{
 			200: { body: undefined };
 		}>();

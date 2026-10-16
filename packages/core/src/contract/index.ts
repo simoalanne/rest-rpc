@@ -12,13 +12,14 @@ export type {
 } from "./routeDeclaration.ts";
 export type { Contract, RouteTree } from "./contract.ts";
 export type {
-	BuilderExtension,
+	BuilderFor,
+	BuilderKind,
 	BuilderState,
-	PublicDeclarationFor,
-	PublicRouteBuilder,
-	RouteBuilderView,
+	DeclarationFor,
+	NextState,
+	RootBuilderState,
 } from "./routeBuilder.types.ts";
-export { RouteBuilder } from "./routeBuilder.ts";
+export { RouteBuilder, type RouteBuilderKind } from "./routeBuilder.ts";
 export { extractContract } from "./extract.ts";
 export {
 	getPathParamSegmentName,

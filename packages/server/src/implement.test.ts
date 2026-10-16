@@ -1,6 +1,6 @@
 import { route, type } from "@rest-rpc/core";
 import { implement } from "./implement.ts";
-import type { ServerRouteBuilder } from "./routeBuilder.ts";
+import type { ServerRouteBuilderState } from "./routeBuilder.ts";
 
 const contract = {
 	users: {
@@ -12,7 +12,7 @@ const contract = {
 };
 
 const routeState = (value: unknown) =>
-	(value as ServerRouteBuilder)["~restrpc"];
+	(value as { "~restrpc": ServerRouteBuilderState })["~restrpc"];
 
 describe("implement", () => {
 	it("should apply root middleware to every route without mutating the contract", () => {
