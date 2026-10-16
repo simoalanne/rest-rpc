@@ -14,7 +14,7 @@ import {
 	type RuntimeImplementation,
 	type RuntimeImplementationTree,
 } from "@rest-rpc/server";
-import type { DefaultContext, DefaultRequest } from "./index.ts";
+import type { DefaultContext } from "./index.ts";
 import {
 	assertRequestBodyLimit,
 	deserializeRequestBody,
@@ -27,7 +27,7 @@ import { createFetchResponse } from "./response.ts";
  * @see {@link https://rest-rpc.dev/docs/server/fetch#options}
  */
 export type CompileRoutesOptions = {
-	bodyCodecs?: readonly BodyCodec<DefaultRequest>[];
+	bodyCodecs?: readonly BodyCodec<Request>[];
 	/** Path prefix to apply to all routes in the route tree. */
 	prefix?: AbsolutePath;
 	/**
@@ -48,7 +48,7 @@ export type CompileRoutesOptions = {
  */
 export type RequestValidationErrorHandler = (
 	error: RequestValidationError,
-	request: DefaultRequest,
+	request: Request,
 ) => Response | Promise<Response>;
 
 /**
@@ -58,7 +58,7 @@ export type RequestValidationErrorHandler = (
  */
 export type ResponseValidationErrorHandler = (
 	error: ResponseValidationError,
-	request: DefaultRequest,
+	request: Request,
 ) => Response | Promise<Response>;
 
 /**
@@ -97,7 +97,7 @@ export type FetchRoute = {
 	 * request URL.
 	 */
 	readonly handle: (
-		request: DefaultRequest,
+		request: Request,
 		options?: HandleOptions,
 	) => Promise<Response>;
 };
@@ -105,14 +105,14 @@ export type FetchRoute = {
 type FetchDispatch = (
 	implementation: RuntimeImplementation,
 	params: Record<string, string>,
-	request: DefaultRequest,
+	request: Request,
 	url: URL,
 	options: HandleOptions | undefined,
 ) => Promise<Response>;
 
 type MatchedDispatch = (
 	params: Record<string, string>,
-	request: DefaultRequest,
+	request: Request,
 	url: URL,
 	options: HandleOptions | undefined,
 ) => Promise<Response>;
@@ -162,7 +162,7 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 				disableResponseValidation: options.disableResponseValidation,
 			},
 			request: parsedRequest,
-			handlerFields: { request, signal: request.signal },
+			handlerFields: { signal: request.signal },
 			context: handleOptions?.context,
 		});
 		if (result instanceof RequestValidationError) {
@@ -238,7 +238,7 @@ export function compileRoutes(
 export function createCatchAllHandler(
 	routes: readonly FetchRoute[],
 ): (
-	request: DefaultRequest,
+	request: Request,
 	options?: HandleOptions,
 ) => Promise<FetchRouteHandlerResult> {
 	const matchRoute = createRouteMatcher(routes);

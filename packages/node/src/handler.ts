@@ -4,7 +4,7 @@ import {
 	assertRequestBodyLimit,
 	deserializeRequestBody,
 } from "@rest-rpc/fetch/adapter";
-import type { ServerResponse } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import {
 	createPathParamsReader,
 	createRouteMatcher,
@@ -19,11 +19,7 @@ import {
 	type RuntimeImplementation,
 	type RuntimeImplementationTree,
 } from "@rest-rpc/server";
-import type {
-	DefaultContext,
-	DefaultRequest,
-	NodeRouteHandlerResult,
-} from "./index.ts";
+import type { DefaultContext, NodeRouteHandlerResult } from "./index.ts";
 import { createRequestSignal } from "./lifecycle.ts";
 import { toFetchRequest, parseRequestTarget } from "./request.ts";
 import { writeNodeResponse } from "./response.ts";
@@ -34,7 +30,7 @@ import { writeNodeResponse } from "./response.ts";
  * @see {@link https://rest-rpc.dev/docs/server/node#options}
  */
 export type CompileRoutesOptions = {
-	bodyCodecs?: readonly BodyCodec<DefaultRequest>[];
+	bodyCodecs?: readonly BodyCodec<IncomingMessage>[];
 	/** Path prefix to apply to all routes in the route tree. */
 	prefix?: AbsolutePath;
 	/**
@@ -55,7 +51,7 @@ export type CompileRoutesOptions = {
  */
 export type RequestValidationErrorHandler = (
 	error: RequestValidationError,
-	request: DefaultRequest,
+	request: IncomingMessage,
 	response: ServerResponse,
 ) => unknown;
 
@@ -66,7 +62,7 @@ export type RequestValidationErrorHandler = (
  */
 export type ResponseValidationErrorHandler = (
 	error: ResponseValidationError,
-	request: DefaultRequest,
+	request: IncomingMessage,
 	response: ServerResponse,
 ) => unknown;
 
@@ -94,7 +90,7 @@ export type NodeRoute = {
 	 * including streams, to `response`. Params are read from the request URL.
 	 */
 	readonly handle: (
-		request: DefaultRequest,
+		request: IncomingMessage,
 		response: ServerResponse,
 		options?: HandleOptions,
 	) => Promise<void>;
@@ -103,7 +99,7 @@ export type NodeRoute = {
 type NodeDispatch = (
 	implementation: RuntimeImplementation,
 	params: Record<string, string>,
-	request: DefaultRequest,
+	request: IncomingMessage,
 	response: ServerResponse,
 	url: URL,
 	options: HandleOptions | undefined,
@@ -111,7 +107,7 @@ type NodeDispatch = (
 
 type MatchedDispatch = (
 	params: Record<string, string>,
-	request: DefaultRequest,
+	request: IncomingMessage,
 	response: ServerResponse,
 	url: URL,
 	options: HandleOptions | undefined,
@@ -177,7 +173,7 @@ const createNodeDispatch = (options: CompileRoutesOptions): NodeDispatch => {
 				disableResponseValidation: options.disableResponseValidation,
 			},
 			request: parsedRequest,
-			handlerFields: { req: request, res: response, signal },
+			handlerFields: { signal },
 			context: handleOptions?.context,
 		});
 
@@ -267,7 +263,7 @@ export function compileRoutes(
 export function createCatchAllHandler(
 	routes: readonly NodeRoute[],
 ): (
-	request: DefaultRequest,
+	request: IncomingMessage,
 	response: ServerResponse,
 	options?: HandleOptions,
 ) => Promise<NodeRouteHandlerResult> {

@@ -2,7 +2,7 @@ import { compileRoutes, createCatchAllHandler } from "./handler.ts";
 import { route, type, type Context } from "./index.ts";
 
 describe("handler", () => {
-	it("dispatches prefixed routes with parsed input and the native request", async () => {
+	it("dispatches prefixed routes with parsed input and the request signal", async () => {
 		const request = new Request("http://localhost/api/users/42", {
 			method: "POST",
 			headers: { "content-type": "application/json" },
@@ -16,7 +16,6 @@ describe("handler", () => {
 						.params(type<{ id: string }>())
 						.body(type<{ name: string }>())
 						.handler((input) => {
-							expect(input.request).toBe(request);
 							expect(input.signal).toBe(request.signal);
 							return {
 								status: 201,

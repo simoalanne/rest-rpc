@@ -15,16 +15,7 @@ export interface DefaultContext {}
 
 const adapterApi = createAdapterApi<FetchHandlerFields, DefaultContext>();
 
-/**
- * Native request available to Fetch adapter handlers and middleware. Augment this interface globally.
- * Must extend `Request` to be compatible with the Fetch API.
- *
- * @default Request
- */
-export interface DefaultRequest extends Request {}
-
 type FetchHandlerFields = {
-	request: DefaultRequest;
 	signal: AbortSignal;
 };
 

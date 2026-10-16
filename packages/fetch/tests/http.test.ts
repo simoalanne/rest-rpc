@@ -14,9 +14,8 @@ it("serves a fetch-native catch-all route over HTTP", async () => {
 					.post("/users/{id}")
 					.params(type<{ id: string }>())
 					.body(type<{ name: string }>())
-					.handler(({ params, body, request, signal }) => {
-						expect(request.method).toBe("POST");
-						expect(signal).toBe(request.signal);
+					.handler(({ params, body, signal }) => {
+						expect(signal).toBeInstanceOf(AbortSignal);
 						return {
 							status: 201,
 							body: { id: params.id, name: body.name },

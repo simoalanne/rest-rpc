@@ -15,8 +15,8 @@ describe("handler types", () => {
 
 	it("rejects a Fetch Request and a relative prefix", () => {
 		const response = {} as ServerResponse;
-		// @ts-expect-error Node handlers require native Node HTTP arguments
 		createCatchAllHandler(compileRoutes({}))(
+			// @ts-expect-error Node handlers require native Node HTTP arguments
 			new Request("http://localhost/"),
 			response,
 		);

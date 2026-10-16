@@ -14,11 +14,13 @@ it("serves parsed Node requests over HTTP and leaves unmatched requests to the h
 					.post("/users/{id}")
 					.params(type<{ id: string }>())
 					.body(type<{ name: string }>())
-					.handler(({ params, body, req, res, signal }) => {
+					.handler(({ params, body, signal }) => {
 						expect(signal).toBeInstanceOf(AbortSignal);
-						expect(req.method).toBe("POST");
-						res.setHeader("x-native", "node");
-						return { status: 201, body: { id: params.id, name: body.name } };
+						return {
+							status: 201,
+							body: { id: params.id, name: body.name },
+							headers: { "x-native": "node" },
+						};
 					}),
 			},
 			{ prefix: "/api" },

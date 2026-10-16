@@ -13,7 +13,7 @@ const setup = (url: string) => {
 };
 
 describe("handler", () => {
-	it("dispatches a route with native Node fields and writes its response", async () => {
+	it("dispatches a route with the request signal and writes its response", async () => {
 		const { request, response, end } = setup("/api/users/42");
 		const handler = createCatchAllHandler(
 			compileRoutes(
@@ -22,8 +22,6 @@ describe("handler", () => {
 						.get("/users/{id}")
 						.params(type<{ id: string }>())
 						.handler((input) => {
-							expect(input.req).toBe(request);
-							expect(input.res).toBe(response);
 							expect(input.signal.aborted).toBe(false);
 							return { status: 200, body: { id: input.params.id } };
 						}),
@@ -51,8 +49,8 @@ describe("handler", () => {
 		const { request, response, end } = setup("/users");
 		const handler = createCatchAllHandler(
 			compileRoutes({
-				users: route.get("/users").handler(({ res }) => {
-					res.destroyed = true;
+				users: route.get("/users").handler(() => {
+					response.destroyed = true;
 					return { status: 204 };
 				}),
 			}),

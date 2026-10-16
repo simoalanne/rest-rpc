@@ -1,4 +1,3 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Contract, RouteTree } from "@rest-rpc/core/contract";
 import {
 	createAdapterApi,
@@ -16,17 +15,7 @@ export interface DefaultContext {}
 
 const adapterApi = createAdapterApi<NodeHandlerFields, DefaultContext>();
 
-/**
- * Native request available to Node HTTP adapter handlers and middleware. Augment this interface globally.
- * Must extend `IncomingMessage` to be compatible with Node HTTP server.
- *
- * @default IncomingMessage
- */
-export interface DefaultRequest extends IncomingMessage {}
-
 type NodeHandlerFields = {
-	req: DefaultRequest;
-	res: ServerResponse;
 	signal: AbortSignal;
 };
 
