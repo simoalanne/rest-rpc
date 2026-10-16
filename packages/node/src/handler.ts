@@ -30,7 +30,7 @@ import { writeNodeResponse } from "./response.ts";
  * @see {@link https://rest-rpc.dev/docs/server/node#options}
  */
 export type CompileRoutesOptions = {
-	bodyCodecs?: readonly BodyCodec<IncomingMessage>[];
+	bodyCodecs?: readonly BodyCodec[];
 	/** Path prefix to apply to all routes in the route tree. */
 	prefix?: AbsolutePath;
 	/**
@@ -146,7 +146,6 @@ const createNodeDispatch = (options: CompileRoutesOptions): NodeDispatch => {
 
 		const signal = createRequestSignal(response);
 		const { body, rejection: bodyRejection } = await deserializeRequestBody(
-			request,
 			{
 				toFetchRequest: () => toFetchRequest(request, signal),
 				contentType: request.headers["content-type"],

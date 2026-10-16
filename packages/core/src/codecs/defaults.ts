@@ -1,7 +1,7 @@
 import type { BodyCodec } from "./types.ts";
 
 /** Fetch-compatible built-in codecs, ordered from specific formats to binary fallback. */
-export const defaultBodyCodecs: readonly BodyCodec<Request | Response>[] = [
+export const defaultBodyCodecs: readonly BodyCodec[] = [
 	{
 		match: (mediaType) =>
 			mediaType === "application/json" || mediaType.endsWith("+json"),

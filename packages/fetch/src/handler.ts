@@ -27,7 +27,7 @@ import { createFetchResponse } from "./response.ts";
  * @see {@link https://rest-rpc.dev/docs/server/fetch#options}
  */
 export type CompileRoutesOptions = {
-	bodyCodecs?: readonly BodyCodec<Request>[];
+	bodyCodecs?: readonly BodyCodec[];
 	/** Path prefix to apply to all routes in the route tree. */
 	prefix?: AbsolutePath;
 	/**
@@ -138,7 +138,6 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 		}
 
 		const { body, rejection: bodyRejection } = await deserializeRequestBody(
-			request,
 			request,
 			bodyCodecs,
 			maxBytes,

@@ -225,7 +225,7 @@ export const constructBaseRequest = (
 
 export type ExecuteRequestOptions = {
 	baseUrl: string;
-	bodyCodecs?: readonly BodyCodec<Response>[];
+	bodyCodecs?: readonly BodyCodec[];
 	fetch?: FetchLike;
 	fetchOptions?: ApiClientFetchOptions;
 	globalHeaders?: ClientHeaders;

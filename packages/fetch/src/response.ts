@@ -30,7 +30,7 @@ const setHeader = (headers: Headers, name: string, value: HttpHeaderValue) => {
  */
 export async function createFetchResponse(
 	result: HttpRouteResult,
-	bodyCodecs: readonly BodyCodec<never>[] = [],
+	bodyCodecs: readonly BodyCodec[] = [],
 ): Promise<Response> {
 	const serialized = await serializeHttpRouteResult(
 		result,

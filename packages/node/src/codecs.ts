@@ -3,7 +3,7 @@ import { Readable } from "node:stream";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 
 /** Default response codecs producing bodies for Node writes and Fastify replies. */
-export const nodeBodyCodecs: readonly BodyCodec<unknown>[] = [
+export const nodeBodyCodecs: readonly BodyCodec[] = [
 	{
 		match: (mediaType) =>
 			mediaType === "application/json" || mediaType.endsWith("+json"),

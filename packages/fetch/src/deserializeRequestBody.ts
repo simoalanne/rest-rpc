@@ -18,12 +18,11 @@ export function assertRequestBodyLimit(maxBytes: number | undefined) {
 	}
 }
 
-export async function deserializeRequestBody<TRequest>(
-	request: TRequest,
+export async function deserializeRequestBody(
 	rawRequestSource:
 		| Request
 		| { toFetchRequest: () => Request; contentType: string | null | undefined },
-	bodyCodecs: readonly BodyCodec<TRequest>[] = [],
+	bodyCodecs: readonly BodyCodec[] = [],
 	maxBytes?: number,
 ): Promise<DeserializedRequestBody> {
 	const effectiveMaxBytes = maxBytes ?? 1_048_576;
@@ -37,16 +36,11 @@ export async function deserializeRequestBody<TRequest>(
 		return { body: undefined, rejection: undefined };
 	}
 
-	const resolvedUserCodec = resolveBodyCodec(mediaType, bodyCodecs);
-	if (resolvedUserCodec?.deserialize) {
-		return {
-			body: await resolvedUserCodec.deserialize(request),
-			rejection: undefined,
-		};
-	}
-
-	const resolvedDefaultCodec = resolveBodyCodec(mediaType, defaultBodyCodecs);
-	if (!resolvedDefaultCodec?.deserialize)
+	const resolvedCodec = resolveBodyCodec(mediaType, [
+		...bodyCodecs,
+		...defaultBodyCodecs,
+	]);
+	if (!resolvedCodec?.deserialize)
 		return { body: undefined, rejection: undefined };
 
 	const rawRequest = isLazyRequest
@@ -92,7 +86,7 @@ export async function deserializeRequestBody<TRequest>(
 			duplex: "half",
 		} as RequestInit & { duplex: "half" });
 		return {
-			body: await resolvedDefaultCodec.deserialize(boundedRequest),
+			body: await resolvedCodec.deserialize(boundedRequest),
 			rejection: undefined,
 		};
 	} catch {

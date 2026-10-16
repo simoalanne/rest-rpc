@@ -28,7 +28,7 @@ export async function writeStreamResponse(
 export async function writeNodeResponse(
 	result: HttpRouteResult,
 	res: ServerResponse,
-	bodyCodecs: readonly BodyCodec<never>[] = [],
+	bodyCodecs: readonly BodyCodec[] = [],
 ): Promise<void> {
 	const serialized = await serializeHttpRouteResult(
 		result,
