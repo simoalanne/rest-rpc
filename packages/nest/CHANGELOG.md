@@ -1,5 +1,13 @@
 # @rest-rpc/nest
 
+## 0.1.0-beta.25
+
+### Patch Changes
+
+- daefcb5: Add `serializeHttpRouteResult`, which serializes a route result body with the matching body codec and merges codec and result headers, and `createAdapterApi` with its `AdapterApi` type, which types `route` and `implement` for an adapter's handler fields. All adapters use them. Node, Express, Fastify and Nest now throw "No serializer for declared content-type" when no codec matches a response body, as Fetch and Hono already did.
+- daefcb5: Route declarations no longer store `kind` and `input`. A route uses flat input when it declares `request.input`, and plain output when `output` is `"output"`. Generated contracts mark flat input with an empty `request.input`. In Nest, `@Implement()` now accepts method routes without a path, such as `route.get()`, inside a route tree, and rejects any route without a path at the tree root.
+- f38f306: Support nestjs v12. drop unnecessary peer dependencies.
+
 ## 0.1.0-beta.24
 
 ### Minor Changes

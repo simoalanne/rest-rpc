@@ -1,5 +1,21 @@
 # @rest-rpc/tanstack-query
 
+## 0.1.0-beta.25
+
+### Minor Changes
+
+- 5a6a1ce: Replace type-driven contract generation with runtime extraction. `generateContractFromType` and the `@rest-rpc/core/generate` entry point are removed, along with the optional `typescript` peer dependency. Call `extractContract(routes)` from `@rest-rpc/core` at build time instead: it keeps each route's method, resolved path, and request content type, and its type is the route tree type. An extracted contract has no response declarations, so the client returns any status as an envelope without checking it against the route types.
+
+Remove `.input()`, `.output()`, and `.streamOutput()` from the route builder, along with the `OutputOptions` and `StreamOutputOptions` types. Declare request segments with `.body()` or `.query()`, and responses with `.response(schema, options)`, whose `status` option defaults to 200. Migrate `.output(schema)` → `.response(schema)`, `.response(404, schema)` → `.response(schema, { status: 404 })`, `.response(204)` → `.response({ status: 204 })`, and `.streamResponse(200, schema)` → `.streamResponse(schema)`. `BodylessResponseOptions` is exported for bodyless responses.
+
+A handler result that is an object with a numeric `status` is a response envelope, and any other value is the body of a 200 response. This applies to inferred and declared routes, and a handler can return both forms. Custom-content plain results return `{ status: 200, body, contentType }` instead of `{ contentType, data }`.
+
+Every client call takes `{ params, query, body, headers }` and returns a `status`-discriminated envelope. Client results no longer have `rawHeaders`: `headers` is a record of every response header, with declared or inferred headers typed, and validated header output is merged over the received headers. Every `text/event-stream` response is parsed as an SSE stream before body codecs. TanStack Query `data` is the 2xx envelope, so use `select` to read only the `body`.
+
+- 67864f7: Add `InferClientSuccess` and `InferClientError` to `@rest-rpc/core`, which split a route's client result into its declared 2xx and non-2xx responses. The core `InferClientError` contains only returned responses, not thrown `HttpError` or `Error` values. `InferClientRequest` accepts the type of the client's `globalHeaders` as a second argument to make guaranteed headers optional. `InferClientRequest` infers `undefined` instead of `never` for routes without request input, matching what the route call accepts.
+
+Replace the TanStack Query type helpers with the core names. `@rest-rpc/tanstack-query` re-exports `InferClientSuccess`, `InferClientRequest`, `InferClientStreamData`, and `HttpError`, and exports an `InferClientError` that also includes `HttpError` and `Error`, matching the `error` of generated options. Migrate `InferQueryData` → `InferClientSuccess`, `InferQueryError` → `InferClientError`, `InferMutationVariables` → `InferClientRequest`, `InferInfiniteQueryData<Route, PageParam>` → `InfiniteData<InferClientSuccess<Route>, PageParam>`, and `InferStreamedQueryData<Route>` → `Array<SseEvent<InferClientStreamData<Route>>>`.
+
 ## 0.1.0-beta.24
 
 ### Minor Changes
