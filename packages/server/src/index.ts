@@ -14,6 +14,7 @@ export {
 export type {
 	ImplementedRoute,
 	RouteMatch,
+	RuntimeImplementation,
 	RuntimeImplementationTree,
 } from "./match.ts";
 export type {

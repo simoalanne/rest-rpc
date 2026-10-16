@@ -46,6 +46,7 @@ const compareRouteSpecificity = (
 	return left.method.localeCompare(right.method);
 };
 
+/** A flattened route declaration with its handler and middleware. */
 export type RuntimeImplementation = {
 	route: RouteDeclaration & { path: string };
 	handler: (...args: never[]) => unknown;

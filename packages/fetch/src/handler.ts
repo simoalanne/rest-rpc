@@ -6,6 +6,7 @@ import {
 	RequestValidationError,
 	ResponseValidationError,
 	type HandleHttpRouteConfiguration,
+	type RuntimeImplementation,
 	type RuntimeImplementationTree,
 } from "@rest-rpc/server";
 import type { DefaultRequest } from "./index.ts";
@@ -62,6 +63,75 @@ export type FetchRouteHandlerResult =
 	| { matched: true; response: Response }
 	| { matched: false; response: undefined };
 
+type FetchDispatch = (
+	implementation: RuntimeImplementation,
+	params: Record<string, string>,
+	request: DefaultRequest,
+	url: URL,
+) => Promise<Response>;
+
+const createFetchDispatch = (
+	options: CreateFetchHandlerOptions,
+): FetchDispatch => {
+	const bodyCodecs = options.bodyCodecs ?? [];
+	const maxBytes = options.requestBodyLimit;
+	assertRequestBodyLimit(maxBytes);
+
+	return async (implementation, params, request, url) => {
+		const rejection = assertRequestContentType(
+			implementation.route,
+			request.headers.get("content-type"),
+		);
+		if (rejection) {
+			return Response.json(
+				{ message: rejection.message },
+				{ status: rejection.status },
+			);
+		}
+
+		const { body, rejection: bodyRejection } = await deserializeRequestBody(
+			request,
+			request,
+			bodyCodecs,
+			maxBytes,
+		);
+		if (bodyRejection) {
+			return Response.json(
+				{ message: bodyRejection.message },
+				{ status: bodyRejection.status },
+			);
+		}
+		const parsedRequest = {
+			params,
+			query: url.searchParams,
+			headers: Object.fromEntries(request.headers),
+			body,
+		};
+
+		const result = await handleHttpRoute(implementation, {
+			configuration: {
+				disableRequestValidation: options.disableRequestValidation,
+				disableResponseValidation: options.disableResponseValidation,
+			},
+			request: parsedRequest,
+			handlerFields: { request, signal: request.signal },
+		});
+		if (result instanceof RequestValidationError) {
+			return options.requestValidationErrorHandler
+				? options.requestValidationErrorHandler(result, request)
+				: Response.json(result.responseBody, { status: result.status });
+		}
+
+		if (result instanceof ResponseValidationError) {
+			return options.responseValidationErrorHandler
+				? options.responseValidationErrorHandler(result, request)
+				: Response.json(result.responseBody, { status: result.status });
+		}
+
+		return createFetchResponse(result, bodyCodecs);
+	};
+};
+
 /**
  * Creates a Fetch catch-all handler that dispatches matching rest-rpc routes.
  *
@@ -75,9 +145,7 @@ export function createRouteHandler(
 	options: CreateFetchHandlerOptions = {},
 ): (request: DefaultRequest) => Promise<FetchRouteHandlerResult> {
 	const matchRoute = createRouteMatcher(implementations, options.prefix);
-	const bodyCodecs = options.bodyCodecs ?? [];
-	const maxBytes = options.requestBodyLimit;
-	assertRequestBodyLimit(maxBytes);
+	const dispatch = createFetchDispatch(options);
 
 	return async (request) => {
 		const url = new URL(request.url);
@@ -89,92 +157,14 @@ export function createRouteHandler(
 			return { matched: false, response: undefined };
 		}
 
-		const rejection = assertRequestContentType(
-			matched.implementation.route,
-			request.headers.get("content-type"),
-		);
-		if (rejection) {
-			return {
-				matched: true,
-				response: Response.json(
-					{ message: rejection.message },
-					{ status: rejection.status },
-				),
-			};
-		}
-
-		const { body, rejection: bodyRejection } = await deserializeRequestBody(
-			request,
-			request,
-			bodyCodecs,
-			maxBytes,
-		);
-		if (bodyRejection) {
-			return {
-				matched: true,
-				response: Response.json(
-					{ message: bodyRejection.message },
-					{ status: bodyRejection.status },
-				),
-			};
-		}
-		const parsedRequest = {
-			params: matched.params,
-			query: url.searchParams,
-			headers: Object.fromEntries(request.headers),
-			body,
-		};
-
-		const implementation = matched.implementation;
-		const result = await handleHttpRoute(implementation, {
-			configuration: {
-				disableRequestValidation: options.disableRequestValidation,
-				disableResponseValidation: options.disableResponseValidation,
-			},
-			request: parsedRequest,
-			handlerFields: { request, signal: request.signal },
-		});
-		if (result instanceof RequestValidationError) {
-			if (options.requestValidationErrorHandler) {
-				return {
-					matched: true,
-					response: await options.requestValidationErrorHandler(
-						result,
-						request,
-					),
-				};
-			}
-
-			return {
-				matched: true,
-				response: Response.json(result.responseBody, {
-					status: result.status,
-				}),
-			};
-		}
-
-		if (result instanceof ResponseValidationError) {
-			if (options.responseValidationErrorHandler) {
-				return {
-					matched: true,
-					response: await options.responseValidationErrorHandler(
-						result,
-						request,
-					),
-				};
-			}
-
-			return {
-				matched: true,
-				response: Response.json(result.responseBody, {
-					status: result.status,
-				}),
-			};
-		}
-
 		return {
 			matched: true,
-			response: await createFetchResponse(result, bodyCodecs),
+			response: await dispatch(
+				matched.implementation,
+				matched.params,
+				request,
+				url,
+			),
 		};
 	};
 }

@@ -11,6 +11,7 @@ import {
 	RequestValidationError,
 	ResponseValidationError,
 	type HandleHttpRouteConfiguration,
+	type RuntimeImplementation,
 	type RuntimeImplementationTree,
 } from "@rest-rpc/server";
 import type { DefaultRequest, NodeRouteHandlerResult } from "./index.ts";
@@ -55,6 +56,96 @@ export type ResponseValidationErrorHandler = (
 	response: ServerResponse,
 ) => unknown;
 
+type NodeDispatch = (
+	implementation: RuntimeImplementation,
+	params: Record<string, string>,
+	request: DefaultRequest,
+	response: ServerResponse,
+	url: URL,
+) => Promise<void>;
+
+const writeJson = (response: ServerResponse, status: number, body: unknown) => {
+	response.statusCode = status;
+	response.setHeader("content-type", "application/json");
+	response.end(JSON.stringify(body));
+};
+
+const createNodeDispatch = (
+	options: CreateNodeHandlerOptions,
+): NodeDispatch => {
+	const bodyCodecs = options.bodyCodecs ?? [];
+	const maxBytes = options.requestBodyLimit;
+	assertRequestBodyLimit(maxBytes);
+
+	return async (implementation, params, request, response, url) => {
+		const rejection = assertRequestContentType(
+			implementation.route,
+			request.headers["content-type"],
+		);
+		if (rejection) {
+			writeJson(response, rejection.status, { message: rejection.message });
+			return;
+		}
+
+		const signal = createRequestSignal(response);
+		const { body, rejection: bodyRejection } = await deserializeRequestBody(
+			request,
+			{
+				toFetchRequest: () => toFetchRequest(request, signal),
+				contentType: request.headers["content-type"],
+			},
+			bodyCodecs,
+			maxBytes,
+		);
+		if (bodyRejection) {
+			writeJson(response, bodyRejection.status, {
+				message: bodyRejection.message,
+			});
+			return;
+		}
+		const parsedRequest = {
+			params,
+			query: url.searchParams,
+			headers: request.headers,
+			body,
+		};
+
+		const result = await handleHttpRoute(implementation, {
+			configuration: {
+				disableRequestValidation: options.disableRequestValidation,
+				disableResponseValidation: options.disableResponseValidation,
+			},
+			request: parsedRequest,
+			handlerFields: { req: request, res: response, signal },
+		});
+
+		if (result instanceof RequestValidationError) {
+			if (options.requestValidationErrorHandler) {
+				await options.requestValidationErrorHandler(result, request, response);
+			} else {
+				writeJson(response, result.status, result.responseBody);
+			}
+			return;
+		}
+
+		if (result instanceof ResponseValidationError) {
+			if (options.responseValidationErrorHandler) {
+				await options.responseValidationErrorHandler(result, request, response);
+			} else {
+				if (response.headersSent) throw result;
+				writeJson(response, result.status, result.responseBody);
+			}
+			return;
+		}
+
+		// Stream validation runs while writing. The stream pipeline destroys the
+		// response when a chunk fails, and the error rejects like any other write
+		// failure.
+		if (!response.destroyed)
+			await writeNodeResponse(result, response, bodyCodecs);
+	};
+};
+
 /**
  * Creates a Node HTTP handler that dispatches matching rest-rpc routes.
  *
@@ -71,9 +162,7 @@ export function createRouteHandler(
 	response: ServerResponse,
 ) => Promise<NodeRouteHandlerResult> {
 	const matchRoute = createRouteMatcher(implementations, options.prefix);
-	const bodyCodecs = options.bodyCodecs ?? [];
-	const maxBytes = options.requestBodyLimit;
-	assertRequestBodyLimit(maxBytes);
+	const dispatch = createNodeDispatch(options);
 
 	return async (request, response) => {
 		const url = parseRequestTarget(request);
@@ -85,77 +174,13 @@ export function createRouteHandler(
 			return { matched: false };
 		}
 
-		const rejection = assertRequestContentType(
-			matched.implementation.route,
-			request.headers["content-type"],
-		);
-		if (rejection) {
-			response.statusCode = rejection.status;
-			response.setHeader("content-type", "application/json");
-			response.end(JSON.stringify({ message: rejection.message }));
-			return { matched: true };
-		}
-
-		const signal = createRequestSignal(response);
-		const { body, rejection: bodyRejection } = await deserializeRequestBody(
+		await dispatch(
+			matched.implementation,
+			matched.params,
 			request,
-			{
-				toFetchRequest: () => toFetchRequest(request, signal),
-				contentType: request.headers["content-type"],
-			},
-			bodyCodecs,
-			maxBytes,
+			response,
+			url,
 		);
-		if (bodyRejection) {
-			response.statusCode = bodyRejection.status;
-			response.setHeader("content-type", "application/json");
-			response.end(JSON.stringify({ message: bodyRejection.message }));
-			return { matched: true };
-		}
-		const parsedRequest = {
-			params: matched.params,
-			query: url.searchParams,
-			headers: request.headers,
-			body,
-		};
-
-		const result = await handleHttpRoute(matched.implementation, {
-			configuration: {
-				disableRequestValidation: options.disableRequestValidation,
-				disableResponseValidation: options.disableResponseValidation,
-			},
-			request: parsedRequest,
-			handlerFields: { req: request, res: response, signal },
-		});
-
-		if (result instanceof RequestValidationError) {
-			if (options.requestValidationErrorHandler) {
-				await options.requestValidationErrorHandler(result, request, response);
-			} else {
-				response.statusCode = result.status;
-				response.setHeader("content-type", "application/json");
-				response.end(JSON.stringify(result.responseBody));
-			}
-			return { matched: true };
-		}
-
-		if (result instanceof ResponseValidationError) {
-			if (options.responseValidationErrorHandler) {
-				await options.responseValidationErrorHandler(result, request, response);
-			} else {
-				if (response.headersSent) throw result;
-				response.statusCode = result.status;
-				response.setHeader("content-type", "application/json");
-				response.end(JSON.stringify(result.responseBody));
-			}
-			return { matched: true };
-		}
-
-		// Stream validation runs while writing. The stream pipeline destroys the
-		// response when a chunk fails, and the error rejects like any other write
-		// failure.
-		if (!response.destroyed)
-			await writeNodeResponse(result, response, bodyCodecs);
 		return { matched: true };
 	};
 }
