@@ -1,24 +1,31 @@
-import { createRouteHandler, route, type } from "@rest-rpc/fetch";
+import {
+	compileRoutes,
+	createCatchAllHandler,
+	route,
+	type,
+} from "@rest-rpc/fetch";
 import { withFetchServer } from "../../../tests/httpServer.ts";
 
 it("serves a fetch-native catch-all route over HTTP", async () => {
-	const handler = createRouteHandler(
-		{
-			create: route
-				.post("/users/{id}")
-				.params(type<{ id: string }>())
-				.body(type<{ name: string }>())
-				.handler(({ params, body, request, signal }) => {
-					expect(request.method).toBe("POST");
-					expect(signal).toBe(request.signal);
-					return {
-						status: 201,
-						body: { id: params.id, name: body.name },
-						headers: { "x-native": "fetch" },
-					};
-				}),
-		},
-		{ prefix: "/api" },
+	const handler = createCatchAllHandler(
+		compileRoutes(
+			{
+				create: route
+					.post("/users/{id}")
+					.params(type<{ id: string }>())
+					.body(type<{ name: string }>())
+					.handler(({ params, body, request, signal }) => {
+						expect(request.method).toBe("POST");
+						expect(signal).toBe(request.signal);
+						return {
+							status: 201,
+							body: { id: params.id, name: body.name },
+							headers: { "x-native": "fetch" },
+						};
+					}),
+			},
+			{ prefix: "/api" },
+		),
 	);
 	await withFetchServer(
 		async (request) =>

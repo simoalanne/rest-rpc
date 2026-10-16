@@ -7,12 +7,15 @@ export type { SerializedHttpRouteResult } from "./serializeHttpRouteResult.ts";
 export { serializeHttpRouteResult } from "./serializeHttpRouteResult.ts";
 export { handleHttpRoute } from "./handleHttpRoute.ts";
 export {
+	createPathParamsReader,
 	createRouteMatcher,
 	flattenRouteImplementations,
 	isImplementedRoute,
+	resolveImplementationPath,
 } from "./match.ts";
 export type {
 	ImplementedRoute,
+	ParamSyntax,
 	RouteMatch,
 	RuntimeImplementation,
 	RuntimeImplementationTree,

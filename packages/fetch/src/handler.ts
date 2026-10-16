@@ -1,6 +1,11 @@
 import type { AbsolutePath, BodyCodec } from "@rest-rpc/core";
+import type { HttpMethod } from "@rest-rpc/core/contract";
 import {
+	createPathParamsReader,
 	createRouteMatcher,
+	flattenRouteImplementations,
+	resolveImplementationPath,
+	type ParamSyntax,
 	assertRequestContentType,
 	handleHttpRoute,
 	RequestValidationError,
@@ -9,7 +14,7 @@ import {
 	type RuntimeImplementation,
 	type RuntimeImplementationTree,
 } from "@rest-rpc/server";
-import type { DefaultRequest } from "./index.ts";
+import type { DefaultContext, DefaultRequest } from "./index.ts";
 import {
 	assertRequestBodyLimit,
 	deserializeRequestBody,
@@ -17,14 +22,19 @@ import {
 import { createFetchResponse } from "./response.ts";
 
 /**
- * Customizes request parsing and validation failures for a Fetch catch-all handler.
+ * Customizes paths, request parsing and validation failures for compiled Fetch routes.
  *
  * @see {@link https://rest-rpc.dev/docs/server/fetch#options}
  */
-export type CreateFetchHandlerOptions = {
+export type CompileRoutesOptions = {
 	bodyCodecs?: readonly BodyCodec<DefaultRequest>[];
-	/** Path prefix to apply to all routes in the route tree during matching. */
+	/** Path prefix to apply to all routes in the route tree. */
 	prefix?: AbsolutePath;
+	/**
+	 * Rewrites param markers in compiled paths to `:name` (`"colon"`) or
+	 * `{name}` (`"braces"`). Declared markers are kept when omitted.
+	 */
+	paramSyntax?: ParamSyntax;
 	/** The maximum accepted size of the request body in bytes. */
 	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
@@ -52,7 +62,17 @@ export type ResponseValidationErrorHandler = (
 ) => Response | Promise<Response>;
 
 /**
- * Result of dispatching a request with the Fetch route handler.
+ * Per-request options for compiled Fetch routes and the catch-all handler.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fetch#context}
+ */
+export type HandleOptions = {
+	/** Initial context values, set before middleware runs. */
+	context?: Partial<DefaultContext>;
+};
+
+/**
+ * Result of dispatching a request with the Fetch catch-all handler.
  *
  * @remarks `matched` is `false` when no route matches, so the surrounding
  * runtime can provide fallback routing.
@@ -63,21 +83,49 @@ export type FetchRouteHandlerResult =
 	| { matched: true; response: Response }
 	| { matched: false; response: undefined };
 
+/**
+ * A compiled route ready to be registered on a router.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fetch#routes}
+ */
+export type FetchRoute = {
+	readonly method: HttpMethod;
+	/** Route path with prefix applied and param markers per `paramSyntax`. */
+	readonly path: string;
+	/**
+	 * Handles a request already routed to this route. Params are read from the
+	 * request URL.
+	 */
+	readonly handle: (
+		request: DefaultRequest,
+		options?: HandleOptions,
+	) => Promise<Response>;
+};
+
 type FetchDispatch = (
 	implementation: RuntimeImplementation,
 	params: Record<string, string>,
 	request: DefaultRequest,
 	url: URL,
+	options: HandleOptions | undefined,
 ) => Promise<Response>;
 
-const createFetchDispatch = (
-	options: CreateFetchHandlerOptions,
-): FetchDispatch => {
+type MatchedDispatch = (
+	params: Record<string, string>,
+	request: DefaultRequest,
+	url: URL,
+	options: HandleOptions | undefined,
+) => Promise<Response>;
+
+// Lets the catch-all dispatch with params it already matched.
+const matchedDispatches = new WeakMap<FetchRoute, MatchedDispatch>();
+
+const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 	const bodyCodecs = options.bodyCodecs ?? [];
 	const maxBytes = options.requestBodyLimit;
 	assertRequestBodyLimit(maxBytes);
 
-	return async (implementation, params, request, url) => {
+	return async (implementation, params, request, url, handleOptions) => {
 		const rejection = assertRequestContentType(
 			implementation.route,
 			request.headers.get("content-type"),
@@ -115,6 +163,7 @@ const createFetchDispatch = (
 			},
 			request: parsedRequest,
 			handlerFields: { request, signal: request.signal },
+			context: handleOptions?.context,
 		});
 		if (result instanceof RequestValidationError) {
 			return options.requestValidationErrorHandler
@@ -133,38 +182,80 @@ const createFetchDispatch = (
 };
 
 /**
- * Creates a Fetch catch-all handler that dispatches matching rest-rpc routes.
+ * Compiles a route tree into Fetch routes to register on a router.
+ *
+ * @remarks Pass the result to {@link createCatchAllHandler} to let rest-rpc
+ * do the routing instead.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/fetch#routes}
+ */
+export function compileRoutes(
+	implementations: RuntimeImplementationTree,
+	options: CompileRoutesOptions = {},
+): FetchRoute[] {
+	const dispatch = createFetchDispatch(options);
+
+	return flattenRouteImplementations(implementations).map((implementation) => {
+		const path = resolveImplementationPath(
+			implementation.route.path,
+			options.prefix,
+			options.paramSyntax,
+		);
+		const readParams = createPathParamsReader(path);
+		const dispatchMatched: MatchedDispatch = (
+			params,
+			request,
+			url,
+			handleOptions,
+		) => dispatch(implementation, params, request, url, handleOptions);
+		const route: FetchRoute = {
+			method: implementation.route.method,
+			path,
+			handle: async (request, handleOptions) => {
+				const url = new URL(request.url);
+				const params = readParams(url.pathname);
+				if (!params) {
+					throw new Error(
+						`Request path "${url.pathname}" does not match route "${implementation.route.method} ${path}".`,
+					);
+				}
+				return dispatchMatched(params, request, url, handleOptions);
+			},
+		};
+		matchedDispatches.set(route, dispatchMatched);
+		return route;
+	});
+}
+
+/**
+ * Creates a Fetch catch-all handler that routes requests to compiled routes.
  *
  * @remarks An unmatched request is returned to the caller with `matched: false`
  * so the surrounding runtime can provide fallback routing.
  *
  * @see {@link https://rest-rpc.dev/docs/server/fetch}
  */
-export function createRouteHandler(
-	implementations: RuntimeImplementationTree,
-	options: CreateFetchHandlerOptions = {},
-): (request: DefaultRequest) => Promise<FetchRouteHandlerResult> {
-	const matchRoute = createRouteMatcher(implementations, options.prefix);
-	const dispatch = createFetchDispatch(options);
+export function createCatchAllHandler(
+	routes: readonly FetchRoute[],
+): (
+	request: DefaultRequest,
+	options?: HandleOptions,
+) => Promise<FetchRouteHandlerResult> {
+	const matchRoute = createRouteMatcher(routes);
 
-	return async (request) => {
+	return async (request, options) => {
 		const url = new URL(request.url);
-		const matched = matchRoute({
-			method: request.method,
-			path: url.pathname,
-		});
+		const matched = matchRoute(request.method, url.pathname);
 		if (!matched) {
 			return { matched: false, response: undefined };
 		}
 
+		const dispatchMatched = matchedDispatches.get(matched.route);
 		return {
 			matched: true,
-			response: await dispatch(
-				matched.implementation,
-				matched.params,
-				request,
-				url,
-			),
+			response: dispatchMatched
+				? await dispatchMatched(matched.params, request, url, options)
+				: await matched.route.handle(request, options),
 		};
 	};
 }

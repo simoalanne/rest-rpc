@@ -1,21 +1,28 @@
-import { createRouteHandler, route, type } from "@rest-rpc/node";
+import {
+	compileRoutes,
+	createCatchAllHandler,
+	route,
+	type,
+} from "@rest-rpc/node";
 import { withHttpServer } from "../../../tests/httpServer.ts";
 
 it("serves parsed Node requests over HTTP and leaves unmatched requests to the host", async () => {
-	const handler = createRouteHandler(
-		{
-			create: route
-				.post("/users/{id}")
-				.params(type<{ id: string }>())
-				.body(type<{ name: string }>())
-				.handler(({ params, body, req, res, signal }) => {
-					expect(signal).toBeInstanceOf(AbortSignal);
-					expect(req.method).toBe("POST");
-					res.setHeader("x-native", "node");
-					return { status: 201, body: { id: params.id, name: body.name } };
-				}),
-		},
-		{ prefix: "/api" },
+	const handler = createCatchAllHandler(
+		compileRoutes(
+			{
+				create: route
+					.post("/users/{id}")
+					.params(type<{ id: string }>())
+					.body(type<{ name: string }>())
+					.handler(({ params, body, req, res, signal }) => {
+						expect(signal).toBeInstanceOf(AbortSignal);
+						expect(req.method).toBe("POST");
+						res.setHeader("x-native", "node");
+						return { status: 201, body: { id: params.id, name: body.name } };
+					}),
+			},
+			{ prefix: "/api" },
+		),
 	);
 	await withHttpServer(
 		async (req, res) => {

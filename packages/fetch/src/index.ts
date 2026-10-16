@@ -74,10 +74,12 @@ export {
 	RequestValidationError,
 	ResponseValidationError,
 } from "@rest-rpc/server";
-export { createRouteHandler } from "./handler.ts";
+export { compileRoutes, createCatchAllHandler } from "./handler.ts";
 export type {
-	CreateFetchHandlerOptions,
+	CompileRoutesOptions,
+	FetchRoute,
 	FetchRouteHandlerResult,
+	HandleOptions,
 	RequestValidationErrorHandler,
 	ResponseValidationErrorHandler,
 } from "./handler.ts";

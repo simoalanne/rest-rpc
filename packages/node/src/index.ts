@@ -45,7 +45,7 @@ export type InferServerHandler<TRoute extends RouteTree> = RouteHandlerFor<
 >;
 
 /**
- * Indicates whether the Node HTTP handler dispatched a request to a rest-rpc route.
+ * Indicates whether the Node HTTP catch-all handler dispatched a request to a rest-rpc route.
  *
  * @see {@link https://rest-rpc.dev/docs/server/node}
  */
@@ -83,9 +83,11 @@ export {
 	RequestValidationError,
 	ResponseValidationError,
 } from "@rest-rpc/server";
-export { createRouteHandler } from "./handler.ts";
+export { compileRoutes, createCatchAllHandler } from "./handler.ts";
 export type {
-	CreateNodeHandlerOptions,
+	CompileRoutesOptions,
+	HandleOptions,
+	NodeRoute,
 	RequestValidationErrorHandler,
 	ResponseValidationErrorHandler,
 } from "./handler.ts";

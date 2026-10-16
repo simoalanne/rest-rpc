@@ -1,4 +1,4 @@
-import { createRouteHandler } from "@rest-rpc/fetch";
+import { compileRoutes, createCatchAllHandler } from "@rest-rpc/fetch";
 import { describeAdapterConformance } from "../../server/tests/adapterSuite.ts";
 import { withFetchServer } from "../../../tests/httpServer.ts";
 
@@ -7,15 +7,17 @@ describeAdapterConformance("fetch", {
 		requestBodyLimit: true,
 	},
 	serve: (routes, options, run) => {
-		const handler = createRouteHandler(routes, {
-			requestBodyLimit: options.requestBodyLimit,
-			...(options.customValidationHandlers && {
-				requestValidationErrorHandler: () =>
-					Response.json({ handled: "request" }, { status: 422 }),
-				responseValidationErrorHandler: () =>
-					Response.json({ handled: "response" }, { status: 502 }),
+		const handler = createCatchAllHandler(
+			compileRoutes(routes, {
+				requestBodyLimit: options.requestBodyLimit,
+				...(options.customValidationHandlers && {
+					requestValidationErrorHandler: () =>
+						Response.json({ handled: "request" }, { status: 422 }),
+					responseValidationErrorHandler: () =>
+						Response.json({ handled: "response" }, { status: 502 }),
+				}),
 			}),
-		});
+		);
 		return withFetchServer(
 			async (request) =>
 				(await handler(request)).response ??

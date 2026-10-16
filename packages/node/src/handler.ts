@@ -1,11 +1,16 @@
 import type { AbsolutePath, BodyCodec } from "@rest-rpc/core";
+import type { HttpMethod } from "@rest-rpc/core/contract";
 import {
 	assertRequestBodyLimit,
 	deserializeRequestBody,
 } from "@rest-rpc/fetch/adapter";
 import type { ServerResponse } from "node:http";
 import {
+	createPathParamsReader,
 	createRouteMatcher,
+	flattenRouteImplementations,
+	resolveImplementationPath,
+	type ParamSyntax,
 	assertRequestContentType,
 	handleHttpRoute,
 	RequestValidationError,
@@ -14,20 +19,29 @@ import {
 	type RuntimeImplementation,
 	type RuntimeImplementationTree,
 } from "@rest-rpc/server";
-import type { DefaultRequest, NodeRouteHandlerResult } from "./index.ts";
+import type {
+	DefaultContext,
+	DefaultRequest,
+	NodeRouteHandlerResult,
+} from "./index.ts";
 import { createRequestSignal } from "./lifecycle.ts";
 import { toFetchRequest, parseRequestTarget } from "./request.ts";
 import { writeNodeResponse } from "./response.ts";
 
 /**
- * Customizes request parsing and validation failures for a Node HTTP handler.
+ * Customizes paths, request parsing and validation failures for compiled Node routes.
  *
  * @see {@link https://rest-rpc.dev/docs/server/node#options}
  */
-export type CreateNodeHandlerOptions = {
+export type CompileRoutesOptions = {
 	bodyCodecs?: readonly BodyCodec<DefaultRequest>[];
-	/** Path prefix to apply to all routes in the route tree during matching. */
+	/** Path prefix to apply to all routes in the route tree. */
 	prefix?: AbsolutePath;
+	/**
+	 * Rewrites param markers in compiled paths to `:name` (`"colon"`) or
+	 * `{name}` (`"braces"`). Declared markers are kept when omitted.
+	 */
+	paramSyntax?: ParamSyntax;
 	/** The maximum accepted size of the request body in bytes. */
 	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
@@ -56,13 +70,55 @@ export type ResponseValidationErrorHandler = (
 	response: ServerResponse,
 ) => unknown;
 
+/**
+ * Per-request options for compiled Node routes and the catch-all handler.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/node#context}
+ */
+export type HandleOptions = {
+	/** Initial context values, set before middleware runs. */
+	context?: Partial<DefaultContext>;
+};
+
+/**
+ * A compiled route ready to be registered on a router.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/node#routes}
+ */
+export type NodeRoute = {
+	readonly method: HttpMethod;
+	/** Route path with prefix applied and param markers per `paramSyntax`. */
+	readonly path: string;
+	/**
+	 * Handles a request already routed to this route and writes the result,
+	 * including streams, to `response`. Params are read from the request URL.
+	 */
+	readonly handle: (
+		request: DefaultRequest,
+		response: ServerResponse,
+		options?: HandleOptions,
+	) => Promise<void>;
+};
+
 type NodeDispatch = (
 	implementation: RuntimeImplementation,
 	params: Record<string, string>,
 	request: DefaultRequest,
 	response: ServerResponse,
 	url: URL,
+	options: HandleOptions | undefined,
 ) => Promise<void>;
+
+type MatchedDispatch = (
+	params: Record<string, string>,
+	request: DefaultRequest,
+	response: ServerResponse,
+	url: URL,
+	options: HandleOptions | undefined,
+) => Promise<void>;
+
+// Lets the catch-all dispatch with params it already matched.
+const matchedDispatches = new WeakMap<NodeRoute, MatchedDispatch>();
 
 const writeJson = (response: ServerResponse, status: number, body: unknown) => {
 	response.statusCode = status;
@@ -70,14 +126,19 @@ const writeJson = (response: ServerResponse, status: number, body: unknown) => {
 	response.end(JSON.stringify(body));
 };
 
-const createNodeDispatch = (
-	options: CreateNodeHandlerOptions,
-): NodeDispatch => {
+const createNodeDispatch = (options: CompileRoutesOptions): NodeDispatch => {
 	const bodyCodecs = options.bodyCodecs ?? [];
 	const maxBytes = options.requestBodyLimit;
 	assertRequestBodyLimit(maxBytes);
 
-	return async (implementation, params, request, response, url) => {
+	return async (
+		implementation,
+		params,
+		request,
+		response,
+		url,
+		handleOptions,
+	) => {
 		const rejection = assertRequestContentType(
 			implementation.route,
 			request.headers["content-type"],
@@ -117,6 +178,7 @@ const createNodeDispatch = (
 			},
 			request: parsedRequest,
 			handlerFields: { req: request, res: response, signal },
+			context: handleOptions?.context,
 		});
 
 		if (result instanceof RequestValidationError) {
@@ -147,40 +209,83 @@ const createNodeDispatch = (
 };
 
 /**
- * Creates a Node HTTP handler that dispatches matching rest-rpc routes.
+ * Compiles a route tree into Node routes to register on a router.
+ *
+ * @remarks Pass the result to {@link createCatchAllHandler} to let rest-rpc
+ * do the routing instead.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/node#routes}
+ */
+export function compileRoutes(
+	implementations: RuntimeImplementationTree,
+	options: CompileRoutesOptions = {},
+): NodeRoute[] {
+	const dispatch = createNodeDispatch(options);
+
+	return flattenRouteImplementations(implementations).map((implementation) => {
+		const path = resolveImplementationPath(
+			implementation.route.path,
+			options.prefix,
+			options.paramSyntax,
+		);
+		const readParams = createPathParamsReader(path);
+		const dispatchMatched: MatchedDispatch = (
+			params,
+			request,
+			response,
+			url,
+			handleOptions,
+		) =>
+			dispatch(implementation, params, request, response, url, handleOptions);
+		const route: NodeRoute = {
+			method: implementation.route.method,
+			path,
+			handle: async (request, response, handleOptions) => {
+				const url = parseRequestTarget(request);
+				const params = readParams(url.pathname);
+				if (!params) {
+					throw new Error(
+						`Request path "${url.pathname}" does not match route "${implementation.route.method} ${path}".`,
+					);
+				}
+				return dispatchMatched(params, request, response, url, handleOptions);
+			},
+		};
+		matchedDispatches.set(route, dispatchMatched);
+		return route;
+	});
+}
+
+/**
+ * Creates a Node HTTP catch-all handler that routes requests to compiled routes.
  *
  * @remarks Unmatched requests are left untouched and reported with
  * `matched: false` so the surrounding server can provide fallback routing.
  *
  * @see {@link https://rest-rpc.dev/docs/server/node}
  */
-export function createRouteHandler(
-	implementations: RuntimeImplementationTree,
-	options: CreateNodeHandlerOptions = {},
+export function createCatchAllHandler(
+	routes: readonly NodeRoute[],
 ): (
 	request: DefaultRequest,
 	response: ServerResponse,
+	options?: HandleOptions,
 ) => Promise<NodeRouteHandlerResult> {
-	const matchRoute = createRouteMatcher(implementations, options.prefix);
-	const dispatch = createNodeDispatch(options);
+	const matchRoute = createRouteMatcher(routes);
 
-	return async (request, response) => {
+	return async (request, response, options) => {
 		const url = parseRequestTarget(request);
-		const matched = matchRoute({
-			method: request.method ?? "GET",
-			path: url.pathname,
-		});
+		const matched = matchRoute(request.method ?? "GET", url.pathname);
 		if (!matched) {
 			return { matched: false };
 		}
 
-		await dispatch(
-			matched.implementation,
-			matched.params,
-			request,
-			response,
-			url,
-		);
+		const dispatchMatched = matchedDispatches.get(matched.route);
+		if (dispatchMatched) {
+			await dispatchMatched(matched.params, request, response, url, options);
+		} else {
+			await matched.route.handle(request, response, options);
+		}
 		return { matched: true };
 	};
 }

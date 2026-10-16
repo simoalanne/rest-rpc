@@ -1,12 +1,12 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { createRouteHandler } from "./handler.ts";
-import type { NodeRouteHandlerResult } from "./index.ts";
+import { compileRoutes, createCatchAllHandler } from "./handler.ts";
+import type { HandleOptions, NodeRouteHandlerResult } from "./index.ts";
 
 describe("handler types", () => {
 	it("accepts native Node request/response arguments and returns dispatch status", () => {
-		const handler = createRouteHandler({});
+		const handler = createCatchAllHandler(compileRoutes({}));
 		expectTypeOf(handler).parameters.toEqualTypeOf<
-			[IncomingMessage, ServerResponse]
+			[IncomingMessage, ServerResponse, HandleOptions?]
 		>();
 		expectTypeOf(
 			handler,
@@ -16,8 +16,11 @@ describe("handler types", () => {
 	it("rejects a Fetch Request and a relative prefix", () => {
 		const response = {} as ServerResponse;
 		// @ts-expect-error Node handlers require native Node HTTP arguments
-		createRouteHandler({})(new Request("http://localhost/"), response);
+		createCatchAllHandler(compileRoutes({}))(
+			new Request("http://localhost/"),
+			response,
+		);
 		// @ts-expect-error route prefixes must be absolute
-		createRouteHandler({}, { prefix: "api" });
+		createCatchAllHandler(compileRoutes({}, { prefix: "api" }));
 	});
 });
