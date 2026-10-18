@@ -1,6 +1,6 @@
 import { route } from "./routeBuilder.ts";
 import { type } from "../standard-schema/type.ts";
-import type { InferServerResponse } from "./response.ts";
+import type { ServerResponse } from "./response.ts";
 
 describe("response inference", () => {
 	it("uses schema inputs in response unions", () => {
@@ -17,7 +17,7 @@ describe("response inference", () => {
 			)
 			.response({ status: 204 })
 			.response(type<{ message: string }>(), { status: 404 });
-		type Server = InferServerResponse<typeof value>;
+		type Server = ServerResponse<(typeof value)["~restrpc"]>;
 		expectTypeOf<Server["status"]>().toEqualTypeOf<200 | 204 | 404>();
 		expectTypeOf<
 			Extract<Server, { status: 200 }>["body"]
@@ -40,16 +40,8 @@ describe("response inference", () => {
 		const stream = route
 			.get("/")
 			.streamResponse(type((input: string) => Number(input)));
-		expectTypeOf<InferServerResponse<typeof stream>["body"]>().toEqualTypeOf<
-			AsyncIterable<string>
-		>();
-	});
-
-	it("infers responses for a route tree", () => {
-		const get = route.get("/").response(type<string>());
-		const tree = { users: { get } };
 		expectTypeOf<
-			InferServerResponse<typeof tree>["users"]["get"]
-		>().toEqualTypeOf<{ status: 200; body: string }>();
+			ServerResponse<(typeof stream)["~restrpc"]>["body"]
+		>().toEqualTypeOf<AsyncIterable<string>>();
 	});
 });

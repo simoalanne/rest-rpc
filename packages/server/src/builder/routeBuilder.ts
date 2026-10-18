@@ -7,7 +7,6 @@ import {
 	type NextState,
 	type RootBuilderState,
 	type RouteDeclaration,
-	type RouteTree,
 } from "@rest-rpc/core/contract";
 import type { EmptyObject, Merge } from "@rest-rpc/core/utils";
 import type { DefaultContext } from "./context.ts";
@@ -19,17 +18,11 @@ import type {
 	MiddlewareReturn,
 	RequestFields,
 	ReusableMiddlewareRequest,
-	RouteHandlerFor,
 	RouteRequest,
 	RuntimeRouteHandler,
+	ServerRouteBuilderState,
 	ValidHandlerResult,
 } from "./routeBuilder.types.ts";
-
-/** Runtime declaration of a server route, including its handler and middleware. */
-export type ServerRouteBuilderState = Partial<RouteDeclaration> & {
-	readonly handler?: unknown;
-	readonly middleware?: readonly RuntimeRouteHandler[];
-};
 
 type RootOnlyMethod = "$context" | "middleware";
 
@@ -40,7 +33,8 @@ type HandlerRoute<TState extends BuilderState> = Extract<
 >;
 
 // Handler types are not exported, so emitted declarations of completed routes
-// expand to plain objects instead of referencing internal aliases.
+// expand to plain objects instead of referencing internal aliases. For the same
+// reason, `HandlerMethodFor` lives here rather than in routeBuilder.types.ts.
 type HandlerFor<
 	TRoute extends RouteDeclaration,
 	TContext extends object,
@@ -57,6 +51,7 @@ type HandledRoute<
 			? TRoute
 			: InferredRoute<TRoute, TResult>) & {
 			readonly handler: HandlerFor<TRoute, TContext, TResult>;
+			readonly context?: TContext;
 		}
 	>;
 };
@@ -90,6 +85,11 @@ export class ServerRouteBuilder<
 	TState extends BuilderState = RootBuilderState,
 	TContext extends object = EmptyObject,
 > extends RouteBuilder<TState, ServerRouteBuilderKind<TContext>> {
+	/** Route declaration. `context` is a type-only field holding the context selected with `$context()`. */
+	declare readonly "~restrpc": DeclarationFor<TState> & {
+		readonly context?: TContext;
+	};
+
 	constructor(state: ServerRouteBuilderState = {}) {
 		super(state);
 	}
@@ -158,19 +158,6 @@ export class ServerRouteBuilder<
 		return this as never;
 	}
 }
-
-/**
- * Infers the handler signature for a route declaration.
- *
- * @remarks Use a route declared without `.handler()` to write its handler
- * separately. Pass a route tree to infer a matching tree of handler types.
- *
- * @see {@link https://rest-rpc.dev/docs/route-builder#infer-server-handler}
- */
-export type InferServerHandler<TRoute extends RouteTree> = RouteHandlerFor<
-	TRoute,
-	DefaultContext
->;
 
 /**
  * Entry point for declaring routes with handlers.

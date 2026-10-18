@@ -1,13 +1,12 @@
 import type {
-	InferServerRequest,
 	RouteDeclaration,
-	RouteTree,
+	ServerRequest,
 	ServerResponse,
 	ServerResponseBody,
 } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import type { SseServerEvent } from "../pipeline/sse.ts";
-import type { Context } from "./context.ts";
+import type { Context, DefaultContext } from "./context.ts";
 import type { EmptyObject, MaybePromise, Merge } from "@rest-rpc/core/utils";
 
 /**
@@ -176,6 +175,12 @@ export type RuntimeRouteHandler = (
 	request: unknown,
 ) => unknown | Promise<unknown>;
 
+/** Runtime declaration of a server route, including its handler and middleware. */
+export type ServerRouteBuilderState = Partial<RouteDeclaration> & {
+	readonly handler?: unknown;
+	readonly middleware?: readonly RuntimeRouteHandler[];
+};
+
 type WithSseItems<T> =
 	T extends AsyncIterable<infer TItem>
 		? AsyncIterable<TItem | SseServerEvent<TItem>>
@@ -224,14 +229,12 @@ type HandlerFields = {
 /**
  * Infers the validated request, handler fields, and application context
  * received by a handler.
- *
- * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
  */
 export type RouteRequest<
 	TRoute extends RouteDeclaration,
 	TContext extends object = EmptyObject,
 > = Merge<
-	InferServerRequest<{ readonly "~restrpc": TRoute }> &
+	ServerRequest<TRoute> &
 		HandlerFields & {
 			route: TRoute;
 			context: Context<TContext>;
@@ -240,8 +243,6 @@ export type RouteRequest<
 
 /**
  * Infers the complete handler signature for a route declaration.
- *
- * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
  */
 export type RouteHandler<
 	TRoute extends RouteDeclaration,
@@ -251,19 +252,39 @@ export type RouteHandler<
 ) => HandlerResult<TRoute>;
 
 /**
- * Infers handler signatures for a route or a nested object tree of routes.
- *
- * @see {@link https://rest-rpc.dev/docs/route-builder#infer-route-types}
+ * A route, a nested object of routes, or a contract implementer tree, whose
+ * `$context()` and `use()` methods are ignored.
  */
-export type RouteHandlerFor<
-	T extends RouteTree,
-	TContext extends object = EmptyObject,
-> = T extends { readonly "~restrpc": infer TRoute extends RouteDeclaration }
-	? RouteHandler<TRoute, TContext>
+export type HandlerTree =
+	| { readonly "~restrpc": RouteDeclaration }
+	| { readonly [key: string]: HandlerTree | ((...args: never) => unknown) };
+
+// Server routes and implementer leaves carry their selected context as a
+// type-only declaration field. Contract routes do not, because the context is
+// selected when they are implemented.
+type ContextOf<TRoute> = TRoute extends {
+	readonly context?: infer TContext extends object;
+}
+	? TContext
+	: DefaultContext;
+
+type WithoutContext<TRoute extends RouteDeclaration> =
+	"context" extends keyof TRoute
+		? Extract<Omit<TRoute, "context">, RouteDeclaration>
+		: TRoute;
+
+/**
+ * Infers handler signatures for a route or a nested object tree of routes,
+ * using each route's selected context.
+ */
+export type RouteHandlerFor<T extends HandlerTree> = T extends {
+	readonly "~restrpc": infer TRoute extends RouteDeclaration;
+}
+	? RouteHandler<WithoutContext<TRoute>, ContextOf<TRoute>>
 	: {
-			[K in keyof T]: T[K] extends RouteTree
-				? RouteHandlerFor<T[K], TContext>
-				: never;
+			[K in keyof T as T[K] extends HandlerTree ? K : never]: RouteHandlerFor<
+				Extract<T[K], HandlerTree>
+			>;
 		};
 
 export type HasDeclaredResponses<TRoute> = TRoute extends {
@@ -291,6 +312,51 @@ export type ValidHandlerResult<TRoute extends RouteDeclaration, TResult> =
 	HasDeclaredResponses<TRoute> extends true
 		? unknown
 		: ValidImplicitResult<TResult>;
+
+/**
+ * Infers the handler signature for a route declaration.
+ *
+ * @remarks Use a route declared without `.handler()` to write its handler
+ * separately. Pass a route tree or a contract implementer to infer a matching
+ * tree of handler types. The context is the one selected with `$context()`, or
+ * `DefaultContext` for contract routes passed directly.
+ *
+ * @see {@link https://rest-rpc.dev/docs/route-builder#type-helpers}
+ */
+export type InferServerHandler<TRoute extends HandlerTree> =
+	RouteHandlerFor<TRoute>;
+
+type HandlerRequests<T> = T extends (...args: never) => unknown
+	? Parameters<T>[0]
+	: { [K in keyof T]: HandlerRequests<T[K]> };
+
+type HandlerResponses<T> = T extends (...args: never) => unknown
+	? Awaited<ReturnType<T>>
+	: { [K in keyof T]: HandlerResponses<T[K]> };
+
+/**
+ * Infers the request a handler receives, including context and `signal`.
+ *
+ * @remarks The first parameter of {@link InferServerHandler}. Pass a route
+ * tree to infer a matching tree of request types.
+ *
+ * @see {@link https://rest-rpc.dev/docs/route-builder#type-helpers}
+ */
+export type InferServerRequest<TRoute extends HandlerTree> = HandlerRequests<
+	InferServerHandler<TRoute>
+>;
+
+/**
+ * Infers the result a handler may return.
+ *
+ * @remarks The awaited return type of {@link InferServerHandler}. Pass a route
+ * tree to infer a matching tree of response types.
+ *
+ * @see {@link https://rest-rpc.dev/docs/route-builder#type-helpers}
+ */
+export type InferServerResponse<TRoute extends HandlerTree> = HandlerResponses<
+	InferServerHandler<TRoute>
+>;
 
 /** Unchecked application output returned by middleware. */
 export type MiddlewareReturn = unknown;

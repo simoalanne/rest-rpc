@@ -3,7 +3,6 @@ import type {
 	RouteDeclaration,
 	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
-import type { RouteTree } from "./contract.ts";
 import type { Merge } from "../utils/typeUtils.ts";
 
 /** Scalar value accepted by ordinary HTTP request schemas. */
@@ -112,20 +111,3 @@ export type ClientRequestForDeclaration<
 
 export type ServerRequest<E extends { request?: RouteRequestDeclaration }> =
 	InferRequestFor<E, "output", Record<never, never>>;
-
-/**
- * Infers the validated input received by a route handler.
- *
- * @remarks Adapter fields, transport metadata, route metadata, and application
- * context are intentionally excluded. Pass a route tree to infer a matching
- * tree of request types.
- *
- * @see {@link https://rest-rpc.dev/docs/route-builder#infer-server-request}
- */
-export type InferServerRequest<T extends RouteTree> = T extends {
-	readonly "~restrpc": infer TRoute extends RouteDeclaration;
-}
-	? ServerRequest<TRoute>
-	: {
-			[K in keyof T]: T[K] extends RouteTree ? InferServerRequest<T[K]> : never;
-		};

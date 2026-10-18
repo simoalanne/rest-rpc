@@ -1,7 +1,13 @@
 import { route, type } from "@rest-rpc/core";
+import type { Context } from "./context.ts";
 import { implement } from "./implement.ts";
 import type { ContractImplementer } from "./implement.types.ts";
-import type { RouteHandler, RouteRequest } from "./routeBuilder.types.ts";
+import type {
+	InferServerHandler,
+	InferServerRequest,
+	RouteHandler,
+	RouteRequest,
+} from "./routeBuilder.types.ts";
 
 const contract = {
 	users: {
@@ -70,5 +76,21 @@ describe("implement types", () => {
 				context.get("requestId");
 				return { status: 200, body: "ok" };
 			});
+	});
+
+	it("infers the selected context from implementer routes and trees", () => {
+		const implementation = implement(contract).$context<Values>();
+		expectTypeOf<
+			InferServerRequest<typeof implementation.users.get>["context"]
+		>().toEqualTypeOf<Context<Values>>();
+		type Handlers = InferServerHandler<typeof implementation>;
+		expectTypeOf<keyof Handlers>().toEqualTypeOf<"users">();
+		expectTypeOf<
+			InferServerRequest<typeof implementation>["users"]["get"]["context"]
+		>().toEqualTypeOf<Context<Values>>();
+		const leaf = implement(contract).users.get.$context<{ count: number }>();
+		expectTypeOf<InferServerRequest<typeof leaf>["context"]>().toEqualTypeOf<
+			Context<{ count: number }>
+		>();
 	});
 });

@@ -2,14 +2,19 @@ import {
 	route as contractRoute,
 	type,
 	type InferClientResponse,
-	type InferServerResponse,
 } from "@rest-rpc/core";
+import type { ServerResponse } from "@rest-rpc/core/contract";
 import { sse } from "../pipeline/sse.ts";
+import type { Context, DefaultContext } from "./context.ts";
 import { route } from "./routeBuilder.ts";
 import type {
 	ImplicitResponseKind,
+	InferServerHandler,
+	InferServerRequest,
+	InferServerResponse,
 	RouteHandler,
 	RouteHandlerFor,
+	RouteRequest,
 } from "./routeBuilder.types.ts";
 
 type Values = { requestId: string };
@@ -61,14 +66,52 @@ describe("routeBuilder types", () => {
 	it("infers handler signatures for a route tree", () => {
 		const declaration = contractRoute.get("/").response(type<string>());
 		const tree = { users: { get: declaration } };
+		expectTypeOf<RouteHandlerFor<typeof tree>["users"]["get"]>().toEqualTypeOf<
+			RouteHandler<(typeof declaration)["~restrpc"], DefaultContext>
+		>();
+	});
+
+	it("infers the context selected for a server route", () => {
+		const declared = fieldRoute.get("/").params(type<{ id: string }>());
+		type Request = InferServerRequest<typeof declared>;
+		expectTypeOf<Request["context"]>().toEqualTypeOf<Context<Values>>();
+		expectTypeOf<Request["params"]>().toEqualTypeOf<{ id: string }>();
+		expectTypeOf<Request["route"]>().not.toHaveProperty("context");
+		expectTypeOf<Request["route"]["method"]>().toEqualTypeOf<"GET">();
+		const completed = fieldRoute.handler(() => "ok");
 		expectTypeOf<
-			RouteHandlerFor<typeof tree, Values>["users"]["get"]
-		>().toEqualTypeOf<RouteHandler<(typeof declaration)["~restrpc"], Values>>();
+			InferServerRequest<typeof completed>["context"]
+		>().toEqualTypeOf<Context<Values>>();
+		const contractDeclared = contractRoute.get("/");
+		expectTypeOf<
+			InferServerRequest<typeof contractDeclared>["context"]
+		>().toEqualTypeOf<Context<DefaultContext>>();
+	});
+
+	it("infers handler requests and responses from the handler signature", () => {
+		const declared = contractRoute
+			.get("/{id}")
+			.params(type<{ id: string }>())
+			.response(type<string>());
+		type Route = (typeof declared)["~restrpc"];
+		expectTypeOf<InferServerRequest<typeof declared>>().toEqualTypeOf<
+			RouteRequest<Route, DefaultContext>
+		>();
+		expectTypeOf<InferServerResponse<typeof declared>>().toEqualTypeOf<
+			{ status: 200; body: string } | string
+		>();
+		const tree = { users: { get: declared } };
+		expectTypeOf<
+			InferServerRequest<typeof tree>["users"]["get"]
+		>().toEqualTypeOf<Parameters<InferServerHandler<typeof declared>>[0]>();
+		expectTypeOf<
+			InferServerResponse<typeof tree>["users"]["get"]
+		>().toEqualTypeOf<InferServerResponse<typeof declared>>();
 	});
 
 	it("returns envelopes or the body of a single declared response", () => {
 		const declared = contractRoute.get("/").response(type<string>());
-		type Handler = RouteHandlerFor<typeof declared, Values>;
+		type Handler = RouteHandlerFor<typeof declared>;
 		expectTypeOf<ReturnType<Handler>>().toEqualTypeOf<
 			| { status: 200; body: string }
 			| string
@@ -77,7 +120,7 @@ describe("routeBuilder types", () => {
 		const created = contractRoute
 			.post("/")
 			.response(type<string>(), { status: 201 });
-		type CreatedHandler = RouteHandlerFor<typeof created, Values>;
+		type CreatedHandler = RouteHandlerFor<typeof created>;
 		expectTypeOf<ReturnType<CreatedHandler>>().toEqualTypeOf<
 			| { status: 201; body: string }
 			| string
@@ -122,7 +165,7 @@ describe("implicit response inference", () => {
 
 	it("infers empty bodies, custom media, and serialized response headers", () => {
 		const empty = route.get("/").handler(() => ({ status: 204 }));
-		expectTypeOf<InferServerResponse<typeof empty>>().toEqualTypeOf<{
+		expectTypeOf<ServerResponse<(typeof empty)["~restrpc"]>>().toEqualTypeOf<{
 			status: 204;
 		}>();
 		expectTypeOf<
@@ -141,7 +184,7 @@ describe("implicit response inference", () => {
 			}
 		>();
 		expectTypeOf<
-			InferServerResponse<typeof custom>["headers"]
+			ServerResponse<(typeof custom)["~restrpc"]>["headers"]
 		>().toEqualTypeOf<{
 			readonly count: 2;
 			readonly omitted: undefined;

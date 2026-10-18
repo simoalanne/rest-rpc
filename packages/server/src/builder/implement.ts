@@ -1,11 +1,11 @@
 import { isRouteLeaf, type Contract } from "@rest-rpc/core/contract";
 import type { ContractImplementer } from "./implement.types.ts";
-import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
+import type {
+	RuntimeRouteHandler,
+	ServerRouteBuilderState,
+} from "./routeBuilder.types.ts";
 import type { DefaultContext } from "./context.ts";
-import {
-	ServerRouteBuilder,
-	type ServerRouteBuilderState,
-} from "./routeBuilder.ts";
+import { ServerRouteBuilder } from "./routeBuilder.ts";
 
 type RuntimeRoute = { readonly "~restrpc": ServerRouteBuilderState };
 

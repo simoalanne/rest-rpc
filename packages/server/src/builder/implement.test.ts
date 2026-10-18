@@ -1,6 +1,6 @@
 import { route, type } from "@rest-rpc/core";
 import { implement } from "./implement.ts";
-import type { ServerRouteBuilderState } from "./routeBuilder.ts";
+import type { ServerRouteBuilderState } from "./routeBuilder.types.ts";
 
 const contract = {
 	users: {

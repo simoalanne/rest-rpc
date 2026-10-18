@@ -15,7 +15,9 @@ type ContractImplementerNode<
 	TContext extends object,
 > = TContract extends ContractRoute
 	? {
-			readonly "~restrpc": TContract["~restrpc"];
+			readonly "~restrpc": TContract["~restrpc"] & {
+				readonly context?: TContext;
+			};
 		} & HandlerMethodFor<TContract["~restrpc"], TContext> & {
 				/** Selects the typed per-request context store for this implementation. @see {@link https://rest-rpc.dev/docs/context} */
 				$context<TValues extends object>(): ContractImplementerNode<
