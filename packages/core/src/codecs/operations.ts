@@ -27,13 +27,13 @@ export function findDeclaredContentType(
 }
 
 /** Resolves a matching body codec for a given media type from a list of codecs. */
-export function resolveBodyCodec(
+export function resolveBodyCodec<Source = Request | Response>(
 	mediaType: string,
-	codecs: readonly BodyCodec[],
+	codecs: readonly BodyCodec<Source>[],
 ):
 	| {
 			serialize?: BodySerializer;
-			deserialize?: BodyDeserializer;
+			deserialize?: BodyDeserializer<Source>;
 	  }
 	| undefined {
 	if (!mediaType) return undefined;
@@ -61,3 +61,12 @@ export function resolveBodyCodec(
 		: undefined;
 	return { serialize, deserialize };
 }
+
+/** Detects async iterable bodies, such as generators and Node streams. */
+export const isAsyncIterable = (
+	value: unknown,
+): value is AsyncIterable<unknown> =>
+	value !== null &&
+	(typeof value === "object" || typeof value === "function") &&
+	Symbol.asyncIterator in value &&
+	typeof value[Symbol.asyncIterator] === "function";

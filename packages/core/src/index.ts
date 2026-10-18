@@ -18,7 +18,6 @@ export type {
 	Contract,
 	RouteDeclaration,
 } from "./contract/index.ts";
-export type { InferServerRequest } from "./contract/request.ts";
 export { extractContract } from "./contract/extract.ts";
 export { route } from "./contract/routeBuilder.ts";
 export type {
@@ -27,7 +26,6 @@ export type {
 	KnownBodyContentType,
 } from "./contract/body.ts";
 export type {
-	InferServerResponse,
 	BodylessResponseOptions,
 	ResponseOptions,
 	StreamResponseOptions,
@@ -37,7 +35,7 @@ export type {
 	OpenApiDocument,
 } from "./openapi/index.ts";
 export { createOpenApiDocument } from "./openapi/index.ts";
-export type { SseEvent } from "./sse.ts";
+export type { SseEvent } from "./contract/sse.ts";
 export { type } from "./standard-schema/type.ts";
 export type { ApiClientRouteValue } from "./client/index.ts";
 export type {

@@ -31,7 +31,6 @@ export {
 export type {
 	InferSchemaInputs,
 	InferSchemaOutputs,
-	InferServerRequest,
 	RequestBodySchema,
 	RequestHeadersSchema,
 	RequestParamsSchema,
@@ -47,7 +46,6 @@ export type {
 	ResponseOptions,
 	StreamResponseOptions,
 	RouteResponses,
-	InferServerResponse,
 	ServerResponse,
 	ServerResponseBody,
 	SuccessfulDeclaredClientResponse,

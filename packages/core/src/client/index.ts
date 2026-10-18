@@ -24,4 +24,4 @@ export type {
 	InferClientSuccess,
 	SuccessfulResponseBody,
 } from "./response.ts";
-export type { SseEvent } from "../sse.ts";
+export type { SseEvent } from "../contract/sse.ts";

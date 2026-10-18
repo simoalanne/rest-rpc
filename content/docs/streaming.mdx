@@ -44,7 +44,7 @@ Yield data directly when an event does not need metadata. Use `sse()` to add an
 event ID, event name, or retry hint:
 
 ```ts
-import { route, sse } from "@rest-rpc/server/node";
+import { route, sse } from "@rest-rpc/server";
 
 const events = route.get("/todos/events").handler(async function* () {
 	yield { id: "todo_1", message: "Created" };

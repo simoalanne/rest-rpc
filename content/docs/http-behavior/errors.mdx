@@ -5,8 +5,7 @@ description: Default server responses for invalid requests and responses, and ho
 
 The server rejects invalid requests before the handler runs and checks
 handler output before it is sent. This page lists the default responses. The
-[Fetch](/docs/server/fetch#error-handling) and
-[Node HTTP](/docs/server/node#error-handling) runtime pages document how to
+[Fetch runtime](/docs/server/fetch#error-handling) page documents how to
 replace them.
 
 ## Default Responses
@@ -36,10 +35,6 @@ The request validation body groups Standard Schema issues by location:
 The response validation body does not expose validation details.
 
 ## Validation Errors
-
-Validation failures are represented by error classes exported from
-`@rest-rpc/server/node` and `@rest-rpc/server/fetch`. The validation error
-handlers receive them.
 
 `RequestValidationError` has:
 
