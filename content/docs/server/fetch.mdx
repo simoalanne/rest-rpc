@@ -90,14 +90,7 @@ Bun.serve({
 });
 ```
 
-Wrap `handle` instead of passing it to a router directly. Routers pass extra
-arguments, such as Bun's `server`, that would land in the `options` position.
-
-`handle` rejects when the request path does not match the route's path, which
-means the route was registered under a different path than it was compiled
-with. Set `prefix` to match where the routes are mounted.
-
-See [Frameworks](/docs/server/frameworks) for Hono and other routers.
+See [Frameworks](/docs/server/frameworks) for more examples.
 
 ## Context
 

@@ -3,9 +3,17 @@ title: Node HTTP
 description: Serve rest-rpc routes with Node.js IncomingMessage and ServerResponse
 ---
 
-The Node runtime reads a Node `IncomingMessage` and writes the result, including
-streams, to the `ServerResponse`. Use it with `node:http` or with frameworks
-that expose the native request and response, such as Express and Fastify.
+The Node runtime adapts the [Fetch runtime](/docs/server/fetch) to work with Node's
+`IncomingMessage` and `ServerResponse`. Each request is converted to a Fetch
+`Request`, handled by the same pipeline, and the resulting Fetch `Response`,
+including streams, is written back to the `ServerResponse`. Use it with
+`node:http` or with frameworks that expose the native request and response,
+such as Express and Fastify.
+
+Import `compileRoutes` and `createCatchAllHandler` from `@rest-rpc/server/node` instead.
+They take the same [options](/docs/server/fetch#options) as their Fetch counterparts.
+The handlers they return take `req, res` instead of a `Request` and write the
+response to `res` instead of returning it.
 
 ## Install
 
@@ -15,73 +23,29 @@ npm i @rest-rpc/server
 
 ## Usage
 
-Compile the route tree, then either let rest-rpc route requests with the
-catch-all handler, or register each compiled route on a router you already
-have.
-
 ```ts
 import { createServer } from "node:http";
-import { route } from "@rest-rpc/server";
 import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server/node";
-import { z } from "zod";
-
-const todos = new Map([["todo_1", { id: "todo_1", title: "Write docs" }]]);
-
-const getTodo = route
-	.get("/todos/:id")
-	.params(z.object({ id: z.string() }))
-	.handler(({ params }) => {
-		const todo = todos.get(params.id);
-		return todo
-			? { status: 200, body: todo }
-			: { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
-	});
-
-export const routes = { todos: { get: getTodo } };
+import { routes } from "./routes";
 
 const handler = createCatchAllHandler(
 	compileRoutes(routes, { prefix: "/api" }),
 );
-const server = createServer(async (req, res) => {
+
+createServer(async (req, res) => {
 	try {
 		const { matched } = await handler(req, res);
-		if (!matched) {
-			res.writeHead(404).end("Not found");
-		}
+		if (!matched) res.writeHead(404).end("Not found");
 	} catch (error) {
 		console.error(error);
 		res.writeHead(500).end("Internal server error");
 	}
-});
-
-server.listen(3000);
+}).listen(3000);
 ```
-
-The catch-all handler writes the response for a matching route and resolves to
-`{ matched: true }`. Unmatched requests are left untouched and resolve to
-`{ matched: false }`, so the surrounding server can provide fallback routing.
 
 ## Registering Routes on a Router
 
-`compileRoutes` returns one route per method and path:
-
-```ts
-type NodeRoute = {
-	method: HttpMethod;
-	path: string;
-	handle: (
-		req: IncomingMessage,
-		res: ServerResponse,
-		options?: HandleOptions,
-	) => Promise<void>;
-};
-```
-
-`path` has the `prefix` applied. `handle` runs validation, middleware, and the
-handler for a request that is already routed to it, reads params from the
-request URL, and writes the result to `res`. Routes are ordered with static
-segments before params, so routers that use the first match, such as Express,
-pick the most specific route.
+To register routes on a router instead, call each compiled route's `handle`:
 
 ```ts
 for (const route of compileRoutes(routes, { prefix: "/api" })) {
@@ -89,117 +53,4 @@ for (const route of compileRoutes(routes, { prefix: "/api" })) {
 }
 ```
 
-Wrap `handle` instead of passing it to a router directly. Routers pass extra
-arguments, such as matched params, that would land in the `options` position.
-
-`handle` rejects when the request path does not match the route's path, which
-means the route was registered under a different path than it was compiled
-with. Set `prefix` to match where the routes are mounted.
-
-See [Frameworks](/docs/server/frameworks) for Express, Fastify, and other
-routers.
-
-## Context
-
-Handlers and middleware receive the
-[common handler arguments](/docs/route-builder#handler-arguments) and a `signal`
-that aborts when the client disconnects. To pass values from the host into the
-request [context](/docs/context), such as an authenticated user or the native
-`req`, seed it with the `context` option:
-
-```ts
-const { matched } = await handler(req, res, { context: { user } });
-// or, for a compiled route
-await route.handle(req, res, { context: { user } });
-```
-
-## Options
-
-```ts
-type CompileRoutesOptions = {
-	bodyCodecs?: readonly BodyCodec[];
-	disableRequestValidation?: boolean;
-	disableResponseValidation?: boolean;
-	paramSyntax?: "colon" | "braces";
-	prefix?: `/${string}`;
-	requestBodyLimit?: number;
-	requestValidationErrorHandler?: RequestValidationErrorHandler;
-	responseValidationErrorHandler?: ResponseValidationErrorHandler;
-};
-```
-
-- `prefix`: path prefix prepended to every route path.
-- `paramSyntax`: rewrites path params in compiled paths to `:name` (`"colon"`)
-  or `{name}` (`"braces"`) for routers that expect one of them. Paths keep the
-  markers they were declared with by default.
-- `bodyCodecs`, `requestBodyLimit`: see [Request and Response Bodies](#request-and-response-bodies).
-- `disableRequestValidation`, `disableResponseValidation`: see
-  [Disabling Server Validation](/docs/http-behavior/schemas#disabling-server-validation).
-- `requestValidationErrorHandler`, `responseValidationErrorHandler`: see [Error Handling](#error-handling).
-
-## Paths
-
-Path params are written as `:name` or `{name}`. Matching follows
-[rou3](https://github.com/h3js/rou3): static segments take precedence over
-params, and one trailing slash is ignored. Param values are percent-decoded.
-
-## Request and Response Bodies
-
-rest-rpc reads request bodies from the request stream itself. Do not run a body
-parser, such as `express.json()`, on rest-rpc routes.
-
-Request bodies are decoded with custom `bodyCodecs` first and the
-[default codecs](/docs/http-behavior/serialization#default-codecs) after them.
-Decoding reads at most `requestBodyLimit` bytes, `1 MiB` by default. The
-default codecs decode the same values as on the
-[Fetch runtime](/docs/server/fetch#request-and-response-bodies).
-
-A codec's `deserialize` receives a Fetch `Request`, so the same
-[custom codecs](/docs/http-behavior/serialization#custom-codecs) work on the
-client and both server runtimes.
-
-Handlers can return these values for the default codecs:
-
-| Content type                                 | Value                                                                           |
-| -------------------------------------------- | ------------------------------------------------------------------------------- |
-| `application/json` or any `+json` media type | JSON value                                                                      |
-| `application/x-www-form-urlencoded`          | `URLSearchParams`                                                               |
-| `multipart/form-data`                        | `FormData`                                                                      |
-| `text/*`                                     | `string`                                                                        |
-| Any other media type                         | `Blob`, `Uint8Array` (including `Buffer`), `ReadableStream`, or Node `Readable` |
-
-A custom serializer's `body` must be a Fetch `Response` body, such as a string,
-`Blob`, `FormData`, byte array, or `ReadableStream`, or an async iterable of
-byte chunks, such as a Node `Readable`.
-
-## Error Handling
-
-Use `requestValidationErrorHandler` and `responseValidationErrorHandler` to
-replace the [default validation error responses](/docs/http-behavior/errors).
-They receive the request as a Fetch `Request` and return a Fetch `Response`,
-which is written to `res`. Other errors reject the handler promise.
-
-```ts
-const handler = createCatchAllHandler(
-	compileRoutes(routes, {
-		requestValidationErrorHandler: (error, request) =>
-			Response.json(
-				{ code: "VALIDATION_ERROR", issues: error.issues },
-				{ status: 422 },
-			),
-		responseValidationErrorHandler: (_error, request) =>
-			Response.json({ code: "INVALID_RESPONSE" }, { status: 500 }),
-	}),
-);
-
-const server = createServer(async (req, res) => {
-	try {
-		await handler(req, res);
-	} catch (error) {
-		res.statusCode = 500;
-		res.end(JSON.stringify({ code: "INTERNAL_SERVER_ERROR" }));
-	}
-});
-
-server.listen(3000);
-```
+See [Frameworks](/docs/server/frameworks) for more examples.

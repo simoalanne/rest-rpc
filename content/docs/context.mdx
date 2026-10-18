@@ -57,8 +57,7 @@ await handler(request, { context: { user: await authenticate(request) } });
 ```
 
 Compiled routes accept the same option: `route.handle(request, { context })`.
-See the [Fetch](/docs/server/fetch#context) and
-[Node HTTP](/docs/server/node#context) runtimes.
+See the [Fetch runtime](/docs/server/fetch#context).
 
 :::tip
 The context type does not guarantee that a value has been set. Set required
