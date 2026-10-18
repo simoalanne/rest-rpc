@@ -8,7 +8,7 @@ independently of its implementation. Declare it with the core route builder,
 implement it with `@rest-rpc/server`, and pass the same contract to the client.
 
 This guide builds the same two routes as the [Quickstart](/docs/quickstart),
-using Node's `node:http` server and Zod. The methods, paths, requests, statuses, and client
+using Bun and Zod. The methods, paths, requests, statuses, and client
 results are equivalent, but the response types are declared explicitly rather
 than inferred from handlers.
 
@@ -52,12 +52,11 @@ HTTP method, path, and 200 and 404 responses. The schemas also provide runtime v
 ## Implement and Register Routes
 
 ```ts server.ts
-import { createServer } from "node:http";
 import {
 	compileRoutes,
 	createCatchAllHandler,
 	implement,
-} from "@rest-rpc/server/node";
+} from "@rest-rpc/server";
 import { api } from "./contract";
 
 type Todo = { id: string; title: string; completed: boolean };
@@ -88,10 +87,15 @@ const routes = { todos: { create, get } };
 
 const handler = createCatchAllHandler(compileRoutes(routes));
 
-createServer(async (req, res) => {
-	const { matched } = await handler(req, res);
-	if (!matched) res.writeHead(404).end();
-}).listen(3000);
+Bun.serve({
+	port: 3000,
+	async fetch(request) {
+		const result = await handler(request);
+		return result.matched
+			? result.response
+			: new Response("Not found", { status: 404 });
+	},
+});
 ```
 
 `implement()` keeps each handler's request and result tied to its declaration.

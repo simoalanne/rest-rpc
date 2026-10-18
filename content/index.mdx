@@ -22,7 +22,7 @@ middleware, and deployment model.
 ```ts twoslash
 // ---cut-start---
 // @filename: server.ts
-import { route } from "@rest-rpc/server/node";
+import { route } from "@rest-rpc/server";
 import { z } from "zod";
 
 declare function createTodo(title: string): { id: string; title: string };
@@ -66,7 +66,7 @@ export const routes = { todos: { create, get } };
 ```ts twoslash
 // ---cut-start---
 // @filename: server.ts
-import { route } from "@rest-rpc/server/node";
+import { route } from "@rest-rpc/server";
 import { z } from "zod";
 
 declare function createTodo(title: string): { id: string; title: string };
@@ -133,7 +133,7 @@ if (response.status === 200) {
 ```tsx twoslash
 // ---cut-start---
 // @filename: server.ts
-import { route } from "@rest-rpc/server/node";
+import { route } from "@rest-rpc/server";
 import { z } from "zod";
 
 declare function createTodo(title: string): { id: string; title: string };

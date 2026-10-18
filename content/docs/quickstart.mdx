@@ -6,9 +6,13 @@ description: Define HTTP routes with handlers and call them through a typed clie
 `rest-rpc` builds REST APIs with RPC-like ergonomics: an HTTP route builder
 with sensible defaults, and a typed client to call the routes.
 
-This guide uses Node's `node:http` server and Zod to build two routes: a minimal create operation
+This guide uses Bun and Zod to build two routes: a minimal create operation
 and a GET with path params, query input, and success/error responses.
 Their response types are inferred from the handlers.
+
+Same code runs on other fetch-native runtimes such as Deno and Cloudflare Workers.
+See the [Fetch Runtime](/docs/server/fetch) for details, [Node HTTP](/docs/server/node) for `node:http`,
+and [Frameworks](/docs/server/frameworks) to use an existing framework's router.
 
 ## Install
 
@@ -16,15 +20,10 @@ Their response types are inferred from the handlers.
 npm i @rest-rpc/core @rest-rpc/server zod
 ```
 
-Use an existing TypeScript project with a `tsconfig.json`. For fetch-native
-runtimes such as Bun, Deno, and Cloudflare Workers, see the
-[Fetch runtime](/docs/server/fetch). To use an existing framework's router, see
-[Frameworks](/docs/server/frameworks).
-
 ## Define Routes
 
 ```ts routes.ts
-import { route } from "@rest-rpc/server/node";
+import { route } from "@rest-rpc/server";
 import { z } from "zod";
 
 type Todo = { id: string; title: string; completed: boolean };
@@ -70,52 +69,51 @@ the client's result type.
 ## Register Routes
 
 ```ts server.ts
-import { createServer } from "node:http";
-import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server/node";
+import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server";
 import { routes } from "./routes";
 
 const handler = createCatchAllHandler(compileRoutes(routes));
 
-createServer(async (req, res) => {
-	const { matched } = await handler(req, res);
-	if (!matched) res.writeHead(404).end();
-}).listen(3000);
+Bun.serve({
+	port: 3000,
+	async fetch(request) {
+		const result = await handler(request);
+		return result.matched
+			? result.response
+			: new Response("Not found", { status: 404 });
+	},
+});
 ```
 
 `compileRoutes` prepares the routes once. The catch-all handler routes each
-request to the matching route, or reports `matched: false` so the server can
-respond otherwise.
+request to the matching route and resolves to its `response`, or reports
+`matched: false` so the server can respond otherwise.
 
 ## Create the Client
 
-Extract a minimal contract from the routes at build time, and import it with
-the route tree type:
+Extract a minimal contract from the routes with a
+[Bun macro](https://bun.com/docs/bundler/macros). The macro runs at bundle time
+and inlines the contract into the client, so no server code is shipped:
 
-```ts extract-contract.ts
-import { writeFile } from "node:fs/promises";
+```ts client-contract.ts
 import { extractContract } from "@rest-rpc/core";
 import { routes } from "./routes";
 
-await writeFile("contract.json", JSON.stringify(extractContract(routes)));
+export function getApi() {
+	return extractContract(routes);
+}
 ```
 
-```ts client-contract.ts
-import type { routes } from "./routes";
-import contract from "./contract.json";
-
-export const api = contract as unknown as typeof routes;
-```
-
-See [Client Contract Extraction](/docs/client/contract-extraction) for bundler
-setups.
+See [Client Contract Extraction](/docs/client/contract-extraction) for other
+bundler setups.
 
 ## Call the Routes
 
 ```ts client.ts
 import { initClient } from "@rest-rpc/core";
-import { api } from "./client-contract";
+import { getApi } from "./client-contract" with { type: "macro" };
 
-const client = initClient(api, { baseUrl: "http://localhost:3000" });
+const client = initClient(getApi(), { baseUrl: "http://localhost:3000" });
 
 const created = await client.todos.create({ body: { title: "Write docs" } });
 const response = await client.todos.get({

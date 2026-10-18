@@ -36,11 +36,8 @@ See [Streaming](/docs/streaming) for stream handlers.
 
 ## Implement Routes
 
-`@rest-rpc/server/node` and `@rest-rpc/server/fetch` export `implement()`. Pass a route or route tree to get
-builders with typed `.handler()` methods:
-
 ```ts server.ts
-import { implement } from "@rest-rpc/server/node";
+import { implement } from "@rest-rpc/server";
 import { api } from "./contract";
 import { createTodo, findTodo } from "./todos";
 

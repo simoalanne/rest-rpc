@@ -14,7 +14,7 @@ forward downstream output, or return another value to replace it. Returning
 without calling `next()` short-circuits the chain. Call `next()` at most once.
 
 ```ts
-import { route } from "@rest-rpc/server/node";
+import { route } from "@rest-rpc/server";
 
 const getProfile = route
 	.$context<{ user?: User }>()

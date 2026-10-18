@@ -1,6 +1,6 @@
 import { route } from "../contract/routeBuilder.ts";
 import { type } from "../standard-schema/type.ts";
-import type { SseEvent } from "../sse.ts";
+import type { SseEvent } from "../contract/sse.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type {
 	InferClientError,

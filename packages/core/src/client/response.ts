@@ -7,7 +7,7 @@ import {
 	type BodyCodec,
 } from "../codecs/index.ts";
 import type { RouteDeclaration, RouteTree } from "../contract/contract.ts";
-import type { SseEvent } from "../sse.ts";
+import type { SseEvent } from "../contract/sse.ts";
 import type {
 	ResponseDeclaration,
 	DeclaredClientResponse,

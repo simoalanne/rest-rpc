@@ -35,7 +35,7 @@ output. Request validation failures produce a 400 response by default. See
 customize it.
 
 ```ts
-import { route } from "@rest-rpc/server/node";
+import { route } from "@rest-rpc/server";
 import { z } from "zod";
 
 const list = route
@@ -118,7 +118,7 @@ schemas with only TypeScript types. The utility accepts an optional mapping func
 to transform input to output. The mapping function can be asynchronous.
 
 ```ts
-import { type } from "@rest-rpc/core";
+import { type } from "@rest-rpc/server";
 
 const create = route
 	.body(type<{ title: string }>())
@@ -126,5 +126,3 @@ const create = route
 
 const numberToStringSchema = type((input: number) => input.toString());
 ```
-
-`type` is also exported from `@rest-rpc/server/node` and `@rest-rpc/server/fetch`.

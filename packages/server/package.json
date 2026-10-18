@@ -32,8 +32,7 @@
 	"types": "./src/index.ts",
 	"exports": {
 		".": "./src/index.ts",
-		"./fetch": "./src/fetch/index.ts",
-		"./node": "./src/node/index.ts"
+		"./node": "./src/node/adapter.ts"
 	},
 	"publishConfig": {
 		"main": "./dist/index.js",
@@ -43,13 +42,9 @@
 				"types": "./dist/index.d.ts",
 				"import": "./dist/index.js"
 			},
-			"./fetch": {
-				"types": "./dist/fetch/index.d.ts",
-				"import": "./dist/fetch/index.js"
-			},
 			"./node": {
-				"types": "./dist/node/index.d.ts",
-				"import": "./dist/node/index.js"
+				"types": "./dist/node/adapter.d.ts",
+				"import": "./dist/node/adapter.js"
 			}
 		}
 	},

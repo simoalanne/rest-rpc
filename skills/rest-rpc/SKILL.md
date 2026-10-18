@@ -24,8 +24,8 @@ that only needs typed endpoints can serve them directly on Node HTTP or a
 fetch-native runtime, and an app that uses a framework keeps the framework's
 routing, modules, plugins, middleware, dependency injection, auth, and
 deployment conventions. Declare routes with `route` or `implement` from
-`@rest-rpc/server/node` or `@rest-rpc/server/fetch`, compile them with
-`compileRoutes`, then serve them with `createCatchAllHandler` or register each
+`@rest-rpc/server`, compile them with `compileRoutes` from `@rest-rpc/server`
+(Fetch) or `@rest-rpc/server/node`, then serve them with `createCatchAllHandler` or register each
 compiled route on the framework's router.
 
 ## Minimal Example
@@ -33,7 +33,7 @@ compiled route on the framework's router.
 Define HTTP routes in a module without side effects:
 
 ```ts routes.ts
-import { route } from "@rest-rpc/server/node";
+import { route } from "@rest-rpc/server";
 import { z } from "zod";
 
 const todos = new Map<string, { id: string; title: string }>();
@@ -113,7 +113,7 @@ Use only packages required by the detected stack:
 
 - `@rest-rpc/core`: route declarations, clients, OpenAPI and contract extraction
 - `@rest-rpc/tanstack-query`: TanStack Query integration
-- `@rest-rpc/server`: route handlers. Import from `@rest-rpc/server/fetch` for Fetch `Request`/`Response` runtimes and frameworks (Bun, Deno, Workers, Hono), or `@rest-rpc/server/node` for Node `IncomingMessage`/`ServerResponse` servers and frameworks (`node:http`, Express, Fastify)
+- `@rest-rpc/server`: route handlers. The root serves Fetch `Request`/`Response` runtimes and frameworks (Bun, Deno, Workers, Hono). Import `compileRoutes` and `createCatchAllHandler` from `@rest-rpc/server/node` for Node `IncomingMessage`/`ServerResponse` servers and frameworks (`node:http`, Express, Fastify)
 
 ## When To Read Docs
 

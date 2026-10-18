@@ -1,4 +1,4 @@
-import type { StandardSchemaV1 } from "./index.ts";
+import type { StandardSchemaV1 } from "./standardSchema.ts";
 
 export const validateStandardSchema = async <TSchema extends StandardSchemaV1>(
 	schema: TSchema,

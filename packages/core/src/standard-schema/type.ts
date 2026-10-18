@@ -1,5 +1,5 @@
-import type { MaybePromise } from "../typeUtils.ts";
-import type { StandardSchemaV1 } from "./index.ts";
+import type { MaybePromise } from "../utils/typeUtils.ts";
+import type { StandardSchemaV1 } from "./standardSchema.ts";
 
 const UNCHECKED_SCHEMA_VENDOR = "rest-rpc";
 

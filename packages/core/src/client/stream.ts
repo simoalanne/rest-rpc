@@ -1,5 +1,5 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import type { SseEvent } from "../sse.ts";
+import type { SseEvent } from "../contract/sse.ts";
 import { validateResponseValue } from "./validateResponse.ts";
 
 const parseFrame = async (

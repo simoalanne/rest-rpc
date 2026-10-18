@@ -26,7 +26,9 @@ describe("initClient", () => {
 
 	it("returns declared error envelopes without treating them as transport failures", async () => {
 		const client = initClient(
-			route.get("/users").response(type<{ message: string }>(), { status: 404 }),
+			route
+				.get("/users")
+				.response(type<{ message: string }>(), { status: 404 }),
 			{
 				baseUrl: "",
 				fetch: async () =>

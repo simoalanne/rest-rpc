@@ -60,9 +60,8 @@ schema and codecs must agree on the values represented by each selected type.
 | Any other media type                         | `Blob` or `Uint8Array` when sent, `Blob` when received |
 
 The client uses these codecs for requests and responses. The server follows the
-same mapping, with runtime-specific differences in which values it can send.
-See "Request and Response Bodies" for the [Fetch](/docs/server/fetch#request-and-response-bodies)
-and [Node HTTP](/docs/server/node#request-and-response-bodies) runtimes.
+same mapping and can also send streams. See
+[Request and Response Bodies](/docs/server/fetch#request-and-response-bodies).
 
 ## Streams
 
@@ -73,7 +72,7 @@ optional `id`, `event`, and `retry` fields.
 ## Custom Codecs
 
 Create a `BodyCodec` and pass it in `bodyCodecs` to `compileRoutes` or the
-client. The same codec works on both sides. Each codec has a `match(mediaType)` function and optional `serialize`
+client. The same codec works on the client and on both server runtimes. Each codec has a `match(mediaType)` function and optional `serialize`
 and `deserialize` functions. Custom codecs run before the defaults. The first
 matching implementation wins independently for each operation, so overriding
 only serialization keeps the default deserializer.
@@ -82,7 +81,7 @@ only serialization keeps the default deserializer.
 <Tab title="Server">
 
 ```ts
-import { compileRoutes, type BodyCodec } from "@rest-rpc/server/fetch";
+import { compileRoutes, type BodyCodec } from "@rest-rpc/server";
 import { routes } from "./routes";
 
 const binaryCodec: BodyCodec = {
@@ -147,8 +146,7 @@ including parameters, and returns `{ body, headers?, contentType? }`:
 ### Deserializer Source
 
 `deserialize(source)` returns the value to validate. On the client, `source` is
-the Fetch `Response`. On the server, it is a Fetch `Request`, also on the Node
-runtime.
+the Fetch `Response`. On the server, it is the Fetch `Request`.
 
 On the server, the request body is limited to `requestBodyLimit` bytes for
 custom deserializers too. An error thrown while deserializing responds with

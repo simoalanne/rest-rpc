@@ -12,7 +12,7 @@ const readJson = (filePath: string) =>
 // Subpaths that are public API in addition to the package root. Other
 // subpaths are internal.
 const publicSubpaths: Record<string, readonly string[]> = {
-	"@rest-rpc/server": ["./fetch", "./node"],
+	"@rest-rpc/server": ["./node"],
 };
 
 const getEntryPoints = (packageJson: Record<string, unknown>) => {

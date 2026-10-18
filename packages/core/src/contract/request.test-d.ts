@@ -1,7 +1,7 @@
 import { route } from "./routeBuilder.ts";
 import { type } from "../standard-schema/type.ts";
 import type { InferClientRequest } from "../client/request.ts";
-import type { InferServerRequest } from "./request.ts";
+import type { ServerRequest } from "./request.ts";
 
 describe("request inference", () => {
 	it("intersects stacked inputs and right-merges transformed outputs", () => {
@@ -24,7 +24,7 @@ describe("request inference", () => {
 		expectTypeOf<InferClientRequest<typeof value>["body"]>().toEqualTypeOf<
 			{ first: string; shared: string } & { second: string; shared: string }
 		>();
-		expectTypeOf<InferServerRequest<typeof value>>().toEqualTypeOf<{
+		expectTypeOf<ServerRequest<(typeof value)["~restrpc"]>>().toEqualTypeOf<{
 			body: { first: number; second: number; shared: string };
 			params: { id: number };
 			query: { page: number };
@@ -34,7 +34,7 @@ describe("request inference", () => {
 	it("distinguishes segmented and empty requests", () => {
 		const empty = route.get("/");
 		expectTypeOf<InferClientRequest<typeof empty>>().toEqualTypeOf<undefined>();
-		expectTypeOf<InferServerRequest<typeof empty>>().toEqualTypeOf<
+		expectTypeOf<ServerRequest<(typeof empty)["~restrpc"]>>().toEqualTypeOf<
 			Record<never, never>
 		>();
 	});
@@ -76,8 +76,5 @@ describe("request inference", () => {
 		expectTypeOf<
 			InferClientRequest<typeof tree>["users"]["get"]
 		>().toEqualTypeOf<InferClientRequest<typeof get>>();
-		expectTypeOf<
-			InferServerRequest<typeof tree>["users"]["get"]
-		>().toEqualTypeOf<{ params: { id: string } }>();
 	});
 });

@@ -20,11 +20,7 @@ catch-all handler, or register each compiled route on a router you already
 have.
 
 ```ts
-import {
-	compileRoutes,
-	createCatchAllHandler,
-	route,
-} from "@rest-rpc/server/fetch";
+import { compileRoutes, createCatchAllHandler, route } from "@rest-rpc/server";
 import { z } from "zod";
 
 const todos = new Map([["todo_1", { id: "todo_1", title: "Write docs" }]]);
@@ -94,14 +90,7 @@ Bun.serve({
 });
 ```
 
-Wrap `handle` instead of passing it to a router directly. Routers pass extra
-arguments, such as Bun's `server`, that would land in the `options` position.
-
-`handle` rejects when the request path does not match the route's path, which
-means the route was registered under a different path than it was compiled
-with. Set `prefix` to match where the routes are mounted.
-
-See [Frameworks](/docs/server/frameworks) for Hono and other routers.
+See [Frameworks](/docs/server/frameworks) for more examples.
 
 ## Context
 
@@ -156,7 +145,7 @@ A codec's `deserialize` receives the Fetch `Request`. Decoding reads at most
 
 Handlers can return any value supported by the default codecs. A custom
 serializer's `body` must be a Fetch `Response` body, such as a string, `Blob`,
-`FormData`, byte array, or `ReadableStream`.
+`FormData`, byte array, or `ReadableStream`, or an async iterable of byte chunks.
 
 ## Error Handling
 
