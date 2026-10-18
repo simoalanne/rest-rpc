@@ -27,13 +27,13 @@ export function findDeclaredContentType(
 }
 
 /** Resolves a matching body codec for a given media type from a list of codecs. */
-export function resolveBodyCodec(
+export function resolveBodyCodec<Source = Request | Response>(
 	mediaType: string,
-	codecs: readonly BodyCodec[],
+	codecs: readonly BodyCodec<Source>[],
 ):
 	| {
 			serialize?: BodySerializer;
-			deserialize?: BodyDeserializer;
+			deserialize?: BodyDeserializer<Source>;
 	  }
 	| undefined {
 	if (!mediaType) return undefined;

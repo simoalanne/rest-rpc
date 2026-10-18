@@ -6,12 +6,15 @@ describe("response inference", () => {
 	it("uses schema inputs in response unions", () => {
 		const value = route
 			.get("/")
-			.response(type((input: string) => Number(input)), {
+			.response(
+				type((input: string) => Number(input)),
+				{
 					contentType: ["text/plain", "application/json"],
 					headers: type((input: { count: string }) => ({
 						count: Number(input.count),
 					})),
-				})
+				},
+			)
 			.response({ status: 204 })
 			.response(type<{ message: string }>(), { status: 404 });
 		type Server = InferServerResponse<typeof value>;
@@ -34,7 +37,9 @@ describe("response inference", () => {
 	});
 
 	it("uses schema inputs for streams", () => {
-		const stream = route.get("/").streamResponse(type((input: string) => Number(input)));
+		const stream = route
+			.get("/")
+			.streamResponse(type((input: string) => Number(input)));
 		expectTypeOf<InferServerResponse<typeof stream>["body"]>().toEqualTypeOf<
 			AsyncIterable<string>
 		>();

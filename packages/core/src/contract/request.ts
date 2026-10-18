@@ -4,7 +4,7 @@ import type {
 	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
 import type { RouteTree } from "./contract.ts";
-import type { Merge } from "../typeUtils.ts";
+import type { Merge } from "../utils/typeUtils.ts";
 
 /** Scalar value accepted by ordinary HTTP request schemas. */
 export type RequestScalar = string | number | boolean;

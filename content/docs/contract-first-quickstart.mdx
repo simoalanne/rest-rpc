@@ -53,11 +53,8 @@ HTTP method, path, and 200 and 404 responses. The schemas also provide runtime v
 
 ```ts server.ts
 import { createServer } from "node:http";
-import {
-	compileRoutes,
-	createCatchAllHandler,
-	implement,
-} from "@rest-rpc/server/node";
+import { implement } from "@rest-rpc/server";
+import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server/node";
 import { api } from "./contract";
 
 type Todo = { id: string; title: string; completed: boolean };

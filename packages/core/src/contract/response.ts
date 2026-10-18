@@ -3,8 +3,8 @@ import type { BodyContentType } from "./body.ts";
 import type { RouteDeclaration } from "./routeDeclaration.ts";
 import type { RouteTree } from "./contract.ts";
 import type { InferSchema } from "./request.ts";
-import type { SseEvent } from "../sse.ts";
-import type { Merge } from "../typeUtils.ts";
+import type { SseEvent } from "./sse.ts";
+import type { Merge } from "../utils/typeUtils.ts";
 
 /**
  * Declares a whole-object schema for typed response headers.

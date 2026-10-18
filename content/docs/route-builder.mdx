@@ -6,10 +6,6 @@ description: Define HTTP routes with request segments, typed responses, and stre
 A route builder describes an HTTP interface: a method and path, the request
 segments it reads, and the responses it returns.
 
-Import `route` from `@rest-rpc/server/node` or `@rest-rpc/server/fetch`. Both
-export the same builder, so routes work with either runtime. Attach a handler
-with `.handler()`; its return value determines the client's result type.
-
 Schemas can come from Zod, Valibot, ArkType, or another Standard Schema library.
 The built-in `type<T>()` utility declares types without runtime validation. See
 [Schemas and Validation](/docs/http-behavior/schemas).
@@ -17,7 +13,7 @@ The built-in `type<T>()` utility declares types without runtime validation. See
 ## Start with Defaults
 
 ```ts
-import { route } from "@rest-rpc/server/node";
+import { route } from "@rest-rpc/server";
 import { z } from "zod";
 
 const create = route
@@ -290,7 +286,7 @@ Declare one type for your routes and index into it where a route's type is
 needed:
 
 ```ts
-import type { InferServerRequest } from "@rest-rpc/server/node";
+import type { InferServerRequest } from "@rest-rpc/server";
 import type { routes } from "./routes";
 
 export type ServerRequests = InferServerRequest<typeof routes>;
@@ -305,8 +301,8 @@ context or `signal`. Use it to pass validated input to code that does
 not depend on the server framework.
 
 ```ts twoslash
-import type { InferServerRequest } from "@rest-rpc/server/node";
-import { route } from "@rest-rpc/server/node";
+import type { InferServerRequest } from "@rest-rpc/server";
+import { route } from "@rest-rpc/server";
 import z from "zod";
 
 const updateDeclaration = route
@@ -331,8 +327,8 @@ for the responses declared with `.response()`. When responses are inferred
 from the handler, there is no declared response to infer before `.handler()`.
 
 ```ts twoslash
-import type { InferServerResponse } from "@rest-rpc/server/node";
-import { route } from "@rest-rpc/server/node";
+import type { InferServerResponse } from "@rest-rpc/server";
+import { route } from "@rest-rpc/server";
 import z from "zod";
 
 const todoSchema = z.object({ id: z.string(), title: z.string() });
@@ -359,7 +355,7 @@ const get = getDeclaration.handler(({ params }) => findTodo(params.id));
 `signal`. Use it to write a handler separately from its declaration:
 
 ```ts twoslash
-import { route, type InferServerHandler } from "@rest-rpc/server/node";
+import { route, type InferServerHandler } from "@rest-rpc/server";
 import z from "zod";
 
 const todoSchema = z.object({ id: z.string(), title: z.string() });

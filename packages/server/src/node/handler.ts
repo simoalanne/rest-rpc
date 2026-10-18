@@ -3,26 +3,30 @@ import type { HttpMethod } from "@rest-rpc/core/contract";
 import {
 	assertRequestBodyLimit,
 	deserializeRequestBody,
-} from "../fetch/deserializeRequestBody.ts";
+} from "../pipeline/deserializeRequestBody.ts";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
-	createPathParamsReader,
+	assertPathParams,
 	createRouteMatcher,
 	flattenRouteImplementations,
+	readPathParams,
 	resolveImplementationPath,
-	type ParamSyntax,
-	assertRequestContentType,
-	handleHttpRoute,
-	RequestValidationError,
-	ResponseValidationError,
-	type DefaultContext,
-	type HandleHttpRouteConfiguration,
 	type RuntimeImplementation,
 	type RuntimeImplementationTree,
-} from "../index.ts";
-import type { NodeRouteHandlerResult } from "./index.ts";
+} from "../routing/match.ts";
+import { assertRequestContentType } from "../pipeline/requestContentType.ts";
+import {
+	handleHttpRoute,
+	type HandleOptions,
+} from "../pipeline/handleHttpRoute.ts";
+import {
+	RequestValidationError,
+	ResponseValidationError,
+} from "../pipeline/errors.ts";
 import { createRequestSignal } from "./lifecycle.ts";
-import { toFetchRequest, parseRequestTarget } from "./request.ts";
+import { splitRequestUrl } from "../routing/requestUrl.ts";
+import { nodeBodyCodecs, type NodeRequestBody } from "./codecs.ts";
+import { nodeRequestBody } from "./request.ts";
 import { writeNodeResponse } from "./response.ts";
 
 /**
@@ -31,19 +35,43 @@ import { writeNodeResponse } from "./response.ts";
  * @see {@link https://rest-rpc.dev/docs/server/node#options}
  */
 export type CompileRoutesOptions = {
-	bodyCodecs?: readonly BodyCodec[];
+	bodyCodecs?: readonly BodyCodec<NodeRequestBody>[];
 	/** Path prefix to apply to all routes in the route tree. */
 	prefix?: AbsolutePath;
 	/**
 	 * Rewrites param markers in compiled paths to `:name` (`"colon"`) or
 	 * `{name}` (`"braces"`). Declared markers are kept when omitted.
 	 */
-	paramSyntax?: ParamSyntax;
+	paramSyntax?: "colon" | "braces";
 	/** The maximum accepted size of the request body in bytes. */
 	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
-} & HandleHttpRouteConfiguration;
+	/**
+	 * When set to `true`, disables request schema validation. Handlers receive
+	 * the declared request segments without schema validation. The schemas are
+	 * still used for type inference and OpenAPI generation.
+	 *
+	 * @remarks Do not disable request validation if you are using schemas that
+	 * transform or coerce values, as those transformations will not be applied to
+	 * the request segments. See {@link https://rest-rpc.dev/docs/http-behavior/schemas#disabling-server-validation}.
+	 *
+	 * @default false
+	 */
+	disableRequestValidation?: boolean;
+	/**
+	 * When set to `true`, disables response schema validation. Validation errors
+	 * will not be thrown, and the handler's output will be returned as-is.
+	 * The schemas are still used for type inference and OpenAPI generation.
+	 *
+	 * @remarks Do not disable response validation if you are using schemas that
+	 * transform or coerce values, as those transformations will not be applied to
+	 * the response body. See {@link https://rest-rpc.dev/docs/http-behavior/schemas#disabling-server-validation}.
+	 *
+	 * @default false
+	 */
+	disableResponseValidation?: boolean;
+};
 
 /**
  * Defines how an invalid request is written through native Node HTTP arguments.
@@ -54,7 +82,7 @@ export type RequestValidationErrorHandler = (
 	error: RequestValidationError,
 	request: IncomingMessage,
 	response: ServerResponse,
-) => unknown;
+) => void | Promise<void>;
 
 /**
  * Defines how invalid handler output is written through native Node HTTP arguments.
@@ -65,17 +93,7 @@ export type ResponseValidationErrorHandler = (
 	error: ResponseValidationError,
 	request: IncomingMessage,
 	response: ServerResponse,
-) => unknown;
-
-/**
- * Per-request options for compiled Node routes and the catch-all handler.
- *
- * @see {@link https://rest-rpc.dev/docs/server/node#context}
- */
-export type HandleOptions = {
-	/** Initial context values, set before middleware runs. */
-	context?: Partial<DefaultContext>;
-};
+) => void | Promise<void>;
 
 /**
  * A compiled route ready to be registered on a router.
@@ -88,7 +106,8 @@ export type NodeRoute = {
 	readonly path: string;
 	/**
 	 * Handles a request already routed to this route and writes the result,
-	 * including streams, to `response`. Params are read from the request URL.
+	 * including streams, to `response`. Params are read from the request URL
+	 * unless passed in `options`.
 	 */
 	readonly handle: (
 		request: IncomingMessage,
@@ -97,25 +116,21 @@ export type NodeRoute = {
 	) => Promise<void>;
 };
 
+/**
+ * Indicates whether the Node HTTP catch-all handler dispatched a request to a rest-rpc route.
+ *
+ * @see {@link https://rest-rpc.dev/docs/server/node}
+ */
+export type NodeRouteHandlerResult = { matched: boolean };
+
 type NodeDispatch = (
 	implementation: RuntimeImplementation,
-	params: Record<string, string>,
+	params: Record<string, string> | undefined,
 	request: IncomingMessage,
 	response: ServerResponse,
-	url: URL,
+	search: string,
 	options: HandleOptions | undefined,
 ) => Promise<void>;
-
-type MatchedDispatch = (
-	params: Record<string, string>,
-	request: IncomingMessage,
-	response: ServerResponse,
-	url: URL,
-	options: HandleOptions | undefined,
-) => Promise<void>;
-
-// Lets the catch-all dispatch with params it already matched.
-const matchedDispatches = new WeakMap<NodeRoute, MatchedDispatch>();
 
 const writeJson = (response: ServerResponse, status: number, body: unknown) => {
 	response.statusCode = status;
@@ -125,6 +140,7 @@ const writeJson = (response: ServerResponse, status: number, body: unknown) => {
 
 const createNodeDispatch = (options: CompileRoutesOptions): NodeDispatch => {
 	const bodyCodecs = options.bodyCodecs ?? [];
+	const requestBodyCodecs = [...bodyCodecs, ...nodeBodyCodecs];
 	const maxBytes = options.requestBodyLimit;
 	assertRequestBodyLimit(maxBytes);
 
@@ -133,7 +149,7 @@ const createNodeDispatch = (options: CompileRoutesOptions): NodeDispatch => {
 		params,
 		request,
 		response,
-		url,
+		search,
 		handleOptions,
 	) => {
 		const rejection = assertRequestContentType(
@@ -147,11 +163,8 @@ const createNodeDispatch = (options: CompileRoutesOptions): NodeDispatch => {
 
 		const signal = createRequestSignal(response);
 		const { body, rejection: bodyRejection } = await deserializeRequestBody(
-			{
-				toFetchRequest: () => toFetchRequest(request, signal),
-				contentType: request.headers["content-type"],
-			},
-			bodyCodecs,
+			nodeRequestBody(request),
+			requestBodyCodecs,
 			maxBytes,
 		);
 		if (bodyRejection) {
@@ -162,7 +175,7 @@ const createNodeDispatch = (options: CompileRoutesOptions): NodeDispatch => {
 		}
 		const parsedRequest = {
 			params,
-			query: url.searchParams,
+			query: search,
 			headers: request.headers,
 			body,
 		};
@@ -173,32 +186,22 @@ const createNodeDispatch = (options: CompileRoutesOptions): NodeDispatch => {
 				disableResponseValidation: options.disableResponseValidation,
 			},
 			request: parsedRequest,
-			handlerFields: { signal },
+			signal,
 			context: handleOptions?.context,
 		});
 
 		if (result instanceof RequestValidationError) {
-			if (options.requestValidationErrorHandler) {
-				await options.requestValidationErrorHandler(result, request, response);
-			} else {
-				writeJson(response, result.status, result.responseBody);
-			}
-			return;
+			return options.requestValidationErrorHandler
+				? options.requestValidationErrorHandler(result, request, response)
+				: writeJson(response, result.status, result.responseBody);
 		}
 
 		if (result instanceof ResponseValidationError) {
-			if (options.responseValidationErrorHandler) {
-				await options.responseValidationErrorHandler(result, request, response);
-			} else {
-				if (response.headersSent) throw result;
-				writeJson(response, result.status, result.responseBody);
-			}
-			return;
+			return options.responseValidationErrorHandler
+				? options.responseValidationErrorHandler(result, request, response)
+				: writeJson(response, result.status, result.responseBody);
 		}
 
-		// Stream validation runs while writing. The stream pipeline destroys the
-		// response when a chunk fails, and the error rejects like any other write
-		// failure.
 		if (!response.destroyed)
 			await writeNodeResponse(result, response, bodyCodecs);
 	};
@@ -224,31 +227,27 @@ export function compileRoutes(
 			options.prefix,
 			options.paramSyntax,
 		);
-		const readParams = createPathParamsReader(path);
-		const dispatchMatched: MatchedDispatch = (
-			params,
-			request,
-			response,
-			url,
-			handleOptions,
-		) =>
-			dispatch(implementation, params, request, response, url, handleOptions);
-		const route: NodeRoute = {
+		return {
 			method: implementation.route.method,
 			path,
 			handle: async (request, response, handleOptions) => {
-				const url = parseRequestTarget(request);
-				const params = readParams(url.pathname);
-				if (!params) {
-					throw new Error(
-						`Request path "${url.pathname}" does not match route "${implementation.route.method} ${path}".`,
-					);
+				const { pathname, search } = splitRequestUrl(request.url ?? "/");
+				let params: Record<string, string> | undefined;
+				if (implementation.route.request?.params) {
+					params = handleOptions?.params
+						? assertPathParams(path, handleOptions.params)
+						: readPathParams(path, pathname);
 				}
-				return dispatchMatched(params, request, response, url, handleOptions);
+				return dispatch(
+					implementation,
+					params,
+					request,
+					response,
+					search,
+					handleOptions,
+				);
 			},
 		};
-		matchedDispatches.set(route, dispatchMatched);
-		return route;
 	});
 }
 
@@ -270,18 +269,15 @@ export function createCatchAllHandler(
 	const matchRoute = createRouteMatcher(routes);
 
 	return async (request, response, options) => {
-		const url = parseRequestTarget(request);
-		const matched = matchRoute(request.method ?? "GET", url.pathname);
-		if (!matched) {
+		const route = matchRoute(
+			request.method ?? "GET",
+			splitRequestUrl(request.url ?? "/").pathname,
+		);
+		if (!route) {
 			return { matched: false };
 		}
 
-		const dispatchMatched = matchedDispatches.get(matched.route);
-		if (dispatchMatched) {
-			await dispatchMatched(matched.params, request, response, url, options);
-		} else {
-			await matched.route.handle(request, response, options);
-		}
+		await route.handle(request, response, options);
 		return { matched: true };
 	};
 }

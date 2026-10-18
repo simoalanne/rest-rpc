@@ -73,7 +73,8 @@ optional `id`, `event`, and `retry` fields.
 ## Custom Codecs
 
 Create a `BodyCodec` and pass it in `bodyCodecs` to `compileRoutes` or the
-client. The same codec works on both sides. Each codec has a `match(mediaType)` function and optional `serialize`
+client. The same codec works on the client and the Fetch server. Node codecs
+deserialize from a [different source](/docs/server/node#request-and-response-bodies). Each codec has a `match(mediaType)` function and optional `serialize`
 and `deserialize` functions. Custom codecs run before the defaults. The first
 matching implementation wins independently for each operation, so overriding
 only serialization keeps the default deserializer.
@@ -147,8 +148,8 @@ including parameters, and returns `{ body, headers?, contentType? }`:
 ### Deserializer Source
 
 `deserialize(source)` returns the value to validate. On the client, `source` is
-the Fetch `Response`. On the server, it is a Fetch `Request`, also on the Node
-runtime.
+the Fetch `Response`. On the Fetch server, it is the Fetch `Request`. On the
+Node server, it is a [`NodeRequestBody`](/docs/server/node#request-and-response-bodies).
 
 On the server, the request body is limited to `requestBodyLimit` bytes for
 custom deserializers too. An error thrown while deserializing responds with

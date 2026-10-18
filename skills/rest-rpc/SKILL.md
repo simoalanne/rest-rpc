@@ -33,7 +33,7 @@ compiled route on the framework's router.
 Define HTTP routes in a module without side effects:
 
 ```ts routes.ts
-import { route } from "@rest-rpc/server/node";
+import { route } from "@rest-rpc/server";
 import { z } from "zod";
 
 const todos = new Map<string, { id: string; title: string }>();

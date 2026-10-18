@@ -1,26 +1,32 @@
-import { Readable } from "node:stream";
 import type { IncomingMessage } from "node:http";
+import type { RequestBodySource } from "../pipeline/deserializeRequestBody.ts";
+import type { NodeRequestBody } from "./codecs.ts";
 
-/** Parses a Node request target without depending on the Host header. */
-export function parseRequestTarget(request: IncomingMessage): URL {
-	return new URL(request.url ?? "/", "http://localhost");
+async function* limitBody(
+	request: IncomingMessage,
+	maxBytes: number,
+	onOversized: () => void,
+): AsyncGenerator<Buffer> {
+	let bytes = 0;
+	for await (const chunk of request as AsyncIterable<Buffer>) {
+		bytes += chunk.byteLength;
+		if (bytes > maxBytes) {
+			onOversized();
+			throw new Error("Request body too large");
+		}
+		yield chunk;
+	}
 }
 
-export const toFetchRequest = (
+/** Exposes a Node request body to codecs as size-limited chunks. */
+export const nodeRequestBody = (
 	request: IncomingMessage,
-	signal: AbortSignal,
-): Request => {
-	const headers = new Headers();
-	for (const [name, value] of Object.entries(request.headers)) {
-		if (Array.isArray(value))
-			for (const entry of value) headers.append(name, entry);
-		else if (value !== undefined) headers.set(name, value);
-	}
-	const method = request.method ?? "GET";
-	const init: RequestInit & { duplex?: "half" } = { method, headers, signal };
-	if (method !== "GET" && method !== "HEAD") {
-		init.body = Readable.toWeb(request) as ReadableStream;
-		init.duplex = "half";
-	}
-	return new Request(parseRequestTarget(request), init);
-};
+): RequestBodySource<NodeRequestBody> => ({
+	contentType: request.headers["content-type"],
+	contentLength: request.headers["content-length"],
+	hasBody: request.method !== "GET" && request.method !== "HEAD",
+	open: (maxBytes, onOversized) => ({
+		body: limitBody(request, maxBytes, onOversized),
+		request,
+	}),
+});

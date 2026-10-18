@@ -1,25 +1,31 @@
 import type { AbsolutePath, BodyCodec } from "@rest-rpc/core";
+import { defaultBodyCodecs } from "@rest-rpc/core/codecs";
 import type { HttpMethod } from "@rest-rpc/core/contract";
 import {
-	createPathParamsReader,
+	assertPathParams,
 	createRouteMatcher,
 	flattenRouteImplementations,
+	readPathParams,
 	resolveImplementationPath,
-	type ParamSyntax,
-	assertRequestContentType,
-	handleHttpRoute,
-	RequestValidationError,
-	ResponseValidationError,
-	type DefaultContext,
-	type HandleHttpRouteConfiguration,
 	type RuntimeImplementation,
 	type RuntimeImplementationTree,
-} from "../index.ts";
+} from "../routing/match.ts";
+import { assertRequestContentType } from "../pipeline/requestContentType.ts";
+import {
+	handleHttpRoute,
+	type HandleOptions,
+} from "../pipeline/handleHttpRoute.ts";
+import {
+	RequestValidationError,
+	ResponseValidationError,
+} from "../pipeline/errors.ts";
 
 import {
 	assertRequestBodyLimit,
 	deserializeRequestBody,
-} from "./deserializeRequestBody.ts";
+} from "../pipeline/deserializeRequestBody.ts";
+import { splitRequestUrl } from "../routing/requestUrl.ts";
+import { fetchRequestBody } from "./request.ts";
 import { createFetchResponse } from "./response.ts";
 
 /**
@@ -35,12 +41,36 @@ export type CompileRoutesOptions = {
 	 * Rewrites param markers in compiled paths to `:name` (`"colon"`) or
 	 * `{name}` (`"braces"`). Declared markers are kept when omitted.
 	 */
-	paramSyntax?: ParamSyntax;
+	paramSyntax?: "colon" | "braces";
 	/** The maximum accepted size of the request body in bytes. */
 	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
-} & HandleHttpRouteConfiguration;
+	/**
+	 * When set to `true`, disables request schema validation. Handlers receive
+	 * the declared request segments without schema validation. The schemas are
+	 * still used for type inference and OpenAPI generation.
+	 *
+	 * @remarks Do not disable request validation if you are using schemas that
+	 * transform or coerce values, as those transformations will not be applied to
+	 * the request segments. See {@link https://rest-rpc.dev/docs/http-behavior/schemas#disabling-server-validation}.
+	 *
+	 * @default false
+	 */
+	disableRequestValidation?: boolean;
+	/**
+	 * When set to `true`, disables response schema validation. Validation errors
+	 * will not be thrown, and the handler's output will be returned as-is.
+	 * The schemas are still used for type inference and OpenAPI generation.
+	 *
+	 * @remarks Do not disable response validation if you are using schemas that
+	 * transform or coerce values, as those transformations will not be applied to
+	 * the response body. See {@link https://rest-rpc.dev/docs/http-behavior/schemas#disabling-server-validation}.
+	 *
+	 * @default false
+	 */
+	disableResponseValidation?: boolean;
+};
 
 /**
  * Defines the Fetch response returned when a request fails validation.
@@ -61,16 +91,6 @@ export type ResponseValidationErrorHandler = (
 	error: ResponseValidationError,
 	request: Request,
 ) => Response | Promise<Response>;
-
-/**
- * Per-request options for compiled Fetch routes and the catch-all handler.
- *
- * @see {@link https://rest-rpc.dev/docs/server/fetch#context}
- */
-export type HandleOptions = {
-	/** Initial context values, set before middleware runs. */
-	context?: Partial<DefaultContext>;
-};
 
 /**
  * Result of dispatching a request with the Fetch catch-all handler.
@@ -95,7 +115,7 @@ export type FetchRoute = {
 	readonly path: string;
 	/**
 	 * Handles a request already routed to this route. Params are read from the
-	 * request URL.
+	 * request URL unless passed in `options`.
 	 */
 	readonly handle: (
 		request: Request,
@@ -105,28 +125,19 @@ export type FetchRoute = {
 
 type FetchDispatch = (
 	implementation: RuntimeImplementation,
-	params: Record<string, string>,
+	params: Record<string, string> | undefined,
 	request: Request,
-	url: URL,
+	search: string,
 	options: HandleOptions | undefined,
 ) => Promise<Response>;
-
-type MatchedDispatch = (
-	params: Record<string, string>,
-	request: Request,
-	url: URL,
-	options: HandleOptions | undefined,
-) => Promise<Response>;
-
-// Lets the catch-all dispatch with params it already matched.
-const matchedDispatches = new WeakMap<FetchRoute, MatchedDispatch>();
 
 const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 	const bodyCodecs = options.bodyCodecs ?? [];
+	const requestBodyCodecs = [...bodyCodecs, ...defaultBodyCodecs];
 	const maxBytes = options.requestBodyLimit;
 	assertRequestBodyLimit(maxBytes);
 
-	return async (implementation, params, request, url, handleOptions) => {
+	return async (implementation, params, request, search, handleOptions) => {
 		const rejection = assertRequestContentType(
 			implementation.route,
 			request.headers.get("content-type"),
@@ -139,8 +150,8 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 		}
 
 		const { body, rejection: bodyRejection } = await deserializeRequestBody(
-			request,
-			bodyCodecs,
+			fetchRequestBody(request),
+			requestBodyCodecs,
 			maxBytes,
 		);
 		if (bodyRejection) {
@@ -151,7 +162,7 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 		}
 		const parsedRequest = {
 			params,
-			query: url.searchParams,
+			query: search,
 			headers: Object.fromEntries(request.headers),
 			body,
 		};
@@ -162,7 +173,7 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 				disableResponseValidation: options.disableResponseValidation,
 			},
 			request: parsedRequest,
-			handlerFields: { signal: request.signal },
+			signal: request.signal,
 			context: handleOptions?.context,
 		});
 		if (result instanceof RequestValidationError) {
@@ -201,29 +212,20 @@ export function compileRoutes(
 			options.prefix,
 			options.paramSyntax,
 		);
-		const readParams = createPathParamsReader(path);
-		const dispatchMatched: MatchedDispatch = (
-			params,
-			request,
-			url,
-			handleOptions,
-		) => dispatch(implementation, params, request, url, handleOptions);
-		const route: FetchRoute = {
+		return {
 			method: implementation.route.method,
 			path,
 			handle: async (request, handleOptions) => {
-				const url = new URL(request.url);
-				const params = readParams(url.pathname);
-				if (!params) {
-					throw new Error(
-						`Request path "${url.pathname}" does not match route "${implementation.route.method} ${path}".`,
-					);
+				const { pathname, search } = splitRequestUrl(request.url);
+				let params: Record<string, string> | undefined;
+				if (implementation.route.request?.params) {
+					params = handleOptions?.params
+						? assertPathParams(path, handleOptions.params)
+						: readPathParams(path, pathname);
 				}
-				return dispatchMatched(params, request, url, handleOptions);
+				return dispatch(implementation, params, request, search, handleOptions);
 			},
 		};
-		matchedDispatches.set(route, dispatchMatched);
-		return route;
 	});
 }
 
@@ -244,18 +246,14 @@ export function createCatchAllHandler(
 	const matchRoute = createRouteMatcher(routes);
 
 	return async (request, options) => {
-		const url = new URL(request.url);
-		const matched = matchRoute(request.method, url.pathname);
-		if (!matched) {
+		const route = matchRoute(
+			request.method,
+			splitRequestUrl(request.url).pathname,
+		);
+		if (!route) {
 			return { matched: false, response: undefined };
 		}
 
-		const dispatchMatched = matchedDispatches.get(matched.route);
-		return {
-			matched: true,
-			response: dispatchMatched
-				? await dispatchMatched(matched.params, request, url, options)
-				: await matched.route.handle(request, options),
-		};
+		return { matched: true, response: await route.handle(request, options) };
 	};
 }

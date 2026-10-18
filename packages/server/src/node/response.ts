@@ -1,31 +1,18 @@
 import type { ServerResponse } from "node:http";
-import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { serializeHttpRouteResult, type HttpRouteResult } from "../index.ts";
+import {
+	isAsyncIterable,
+	type HttpRouteResult,
+} from "../pipeline/handleHttpRoute.ts";
+import { serializeHttpRouteResult } from "../pipeline/serializeHttpRouteResult.ts";
 import type { BodyCodec } from "@rest-rpc/core";
-import { nodeBodyCodecs } from "./codecs.ts";
-
-/** Writes a response stream to a Node HTTP response. */
-export async function writeStreamResponse(
-	body: AsyncIterable<string>,
-	res: ServerResponse,
-	status: number,
-): Promise<void> {
-	res.statusCode = status;
-	res.setHeader("content-type", "text/event-stream");
-	try {
-		await pipeline(Readable.from(body), res);
-	} catch (error) {
-		if ((error as NodeJS.ErrnoException).code !== "ERR_STREAM_PREMATURE_CLOSE")
-			throw error;
-	}
-}
+import { nodeBodyCodecs, type NodeRequestBody } from "./codecs.ts";
 
 /** Writes a normalized HTTP result to a Node ServerResponse. */
 export async function writeNodeResponse(
 	result: HttpRouteResult,
 	res: ServerResponse,
-	bodyCodecs: readonly BodyCodec[] = [],
+	bodyCodecs: readonly BodyCodec<NodeRequestBody>[] = [],
 ): Promise<void> {
 	const serialized = await serializeHttpRouteResult(
 		result,
@@ -34,9 +21,6 @@ export async function writeNodeResponse(
 	);
 	for (const [name, value] of Object.entries(serialized.headers)) {
 		if (value !== undefined) res.setHeader(name, value);
-	}
-	if (serialized.kind === "stream") {
-		return writeStreamResponse(serialized.body, res, serialized.status);
 	}
 	res.statusCode = serialized.status;
 	if (!serialized.body) {
@@ -47,9 +31,17 @@ export async function writeNodeResponse(
 	if (contentType === null) res.removeHeader("content-type");
 	else res.setHeader("content-type", contentType);
 
-	if (value instanceof Readable) {
-		await pipeline(value, res);
-	} else {
+	if (!isAsyncIterable(value)) {
 		res.end(value);
+		return;
+	}
+	try {
+		await pipeline(value, res);
+	} catch (error) {
+		if (
+			(error as NodeJS.ErrnoException).code !== "ERR_STREAM_PREMATURE_CLOSE"
+		) {
+			throw error;
+		}
 	}
 }

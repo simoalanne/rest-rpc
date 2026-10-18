@@ -7,7 +7,7 @@ import type {
 	RouteMetadata,
 	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
-import type { EmptyObject, Merge } from "../typeUtils.ts";
+import type { EmptyObject, Merge } from "../utils/typeUtils.ts";
 
 /**
  * Type-level state of a route builder.

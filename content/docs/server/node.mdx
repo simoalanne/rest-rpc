@@ -21,10 +21,10 @@ have.
 
 ```ts
 import { createServer } from "node:http";
+import { route } from "@rest-rpc/server;
 import {
 	compileRoutes,
 	createCatchAllHandler,
-	route,
 } from "@rest-rpc/server/node";
 import { z } from "zod";
 
@@ -120,7 +120,7 @@ await route.handle(req, res, { context: { user } });
 
 ```ts
 type CompileRoutesOptions = {
-	bodyCodecs?: readonly BodyCodec[];
+	bodyCodecs?: readonly BodyCodec<NodeRequestBody>[];
 	disableRequestValidation?: boolean;
 	disableResponseValidation?: boolean;
 	paramSyntax?: "colon" | "braces";
@@ -153,9 +153,33 @@ parser, such as `express.json()`, on rest-rpc routes.
 
 Request bodies are decoded with custom `bodyCodecs` first and the
 [default codecs](/docs/http-behavior/serialization#default-codecs) after them.
-A codec's `deserialize` receives a Fetch `Request` created from the
-`IncomingMessage`. Decoding reads at most `requestBodyLimit` bytes, `1 MiB` by
-default.
+Decoding reads at most `requestBodyLimit` bytes, `1 MiB` by default. The
+default codecs decode the same values as on the
+[Fetch runtime](/docs/server/fetch#request-and-response-bodies).
+
+A codec's `deserialize` receives a `NodeRequestBody` instead of a Fetch
+`Request`, so Node codecs are separate from Fetch and client codecs. `body`
+yields the request's chunks and fails once the body exceeds the limit, and
+`request` is the native `IncomingMessage`:
+
+```ts
+import type { BodyCodec } from "@rest-rpc/server";
+import { compileRoutes } from "@rest-rpc/server";
+import { type NodeRequestBody } from "@rest-rpc/server/node";
+
+const binaryCodec: BodyCodec<NodeRequestBody> = {
+	match: (mediaType) => mediaType === "application/octet-stream",
+	deserialize: async ({ body }) => {
+		const chunks: Buffer[] = [];
+		for await (const chunk of body) chunks.push(chunk);
+		return new Uint8Array(Buffer.concat(chunks));
+	},
+};
+
+const compiledRoutes = compileRoutes(routes, { bodyCodecs: [binaryCodec] });
+```
+
+Read from `body` rather than `request` so the limit applies.
 
 Handlers can return these values for the default codecs:
 
