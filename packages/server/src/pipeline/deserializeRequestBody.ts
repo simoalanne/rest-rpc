@@ -8,18 +8,6 @@ type DeserializedRequestBody =
 	| { body: unknown; rejection: undefined }
 	| { body: undefined; rejection: { status: 400 | 413; message: string } };
 
-/** Reads an adapter's native request body for codec deserialization. */
-export type RequestBodySource<Source> = {
-	contentType: string | null | undefined;
-	contentLength: string | null | undefined;
-	hasBody: boolean;
-	/**
-	 * Opens the codec source. Its body must fail once more than `maxBytes` are
-	 * read, calling `onOversized` first.
-	 */
-	open: (maxBytes: number, onOversized: () => void) => Source;
-};
-
 export function assertRequestBodyLimit(maxBytes: number | undefined) {
 	if (
 		maxBytes !== undefined &&
@@ -34,29 +22,64 @@ const tooLarge = {
 	rejection: { status: 413, message: "Request body too large" },
 } as const;
 
+/** Copies `request` with a body that fails once more than `maxBytes` are read. */
+const limitRequestBody = (
+	request: Request,
+	maxBytes: number,
+	onOversized: () => void,
+): Request => {
+	const reader = request.body!.getReader();
+	let bytes = 0;
+	const body = new ReadableStream<Uint8Array>({
+		async pull(controller) {
+			const chunk = await reader.read();
+			if (chunk.done) {
+				controller.close();
+				return;
+			}
+			bytes += chunk.value.byteLength;
+			if (bytes > maxBytes) {
+				onOversized();
+				const error = new Error("Request body too large");
+				controller.error(error);
+				void reader.cancel(error).catch(() => {});
+				return;
+			}
+			controller.enqueue(chunk.value);
+		},
+		cancel(reason) {
+			return reader.cancel(reason);
+		},
+	});
+	return new Request(request, {
+		body,
+		duplex: "half",
+	} as RequestInit & { duplex: "half" });
+};
+
 /**
  * Deserializes a request body with the first matching codec while enforcing
  * the body limit. Codecs are resolved in order, so callers list custom codecs
  * before the defaults.
  */
-export async function deserializeRequestBody<Source>(
-	source: RequestBodySource<Source>,
-	bodyCodecs: readonly BodyCodec<Source>[],
+export async function deserializeRequestBody(
+	request: Request,
+	bodyCodecs: readonly BodyCodec[],
 	maxBytes = 1_048_576,
 ): Promise<DeserializedRequestBody> {
-	const mediaType = normalizeMediaType(source.contentType);
-	if (!mediaType || !source.hasBody)
+	const mediaType = normalizeMediaType(request.headers.get("content-type"));
+	if (!mediaType || request.body === null)
 		return { body: undefined, rejection: undefined };
 
 	const deserialize = resolveBodyCodec(mediaType, bodyCodecs)?.deserialize;
 	if (!deserialize) return { body: undefined, rejection: undefined };
 
-	if (Number(source.contentLength) > maxBytes) return tooLarge;
+	if (Number(request.headers.get("content-length")) > maxBytes) return tooLarge;
 
 	let oversized = false;
 	try {
 		const body = await deserialize(
-			source.open(maxBytes, () => {
+			limitRequestBody(request, maxBytes, () => {
 				oversized = true;
 			}),
 		);

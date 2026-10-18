@@ -14,6 +14,16 @@ export {
 	type ValidationIssue,
 } from "./pipeline/errors.ts";
 export { sse, type SseServerEvent } from "./pipeline/sse.ts";
+export {
+	compileRoutes,
+	createCatchAllHandler,
+	type CompileRoutesOptions,
+	type FetchRoute,
+	type FetchRouteHandlerResult,
+	type RequestValidationErrorHandler,
+	type ResponseValidationErrorHandler,
+} from "./pipeline/compileRoutes.ts";
+export type { HandleOptions } from "./pipeline/handleHttpRoute.ts";
 export { createOpenApiDocument, type } from "@rest-rpc/core";
 export type {
 	BodyCodec,

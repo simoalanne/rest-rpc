@@ -1,3 +1,4 @@
+import { isAsyncIterable } from "./operations.ts";
 import type { BodyCodec } from "./types.ts";
 
 /** Fetch-compatible built-in codecs, ordered from specific formats to binary fallback. */
@@ -42,9 +43,16 @@ export const defaultBodyCodecs: readonly BodyCodec[] = [
 	{
 		match: () => true,
 		serialize: (value) => {
-			if (value instanceof Blob) return { body: value };
-			if (value instanceof Uint8Array) return { body: value };
-			throw new TypeError("Expected Blob or Uint8Array body");
+			if (
+				value instanceof Blob ||
+				value instanceof Uint8Array ||
+				value instanceof ReadableStream ||
+				isAsyncIterable(value)
+			)
+				return { body: value };
+			throw new TypeError(
+				"Expected Blob, Uint8Array, ReadableStream or AsyncIterable body",
+			);
 		},
 		deserialize: (source) => source.blob(),
 	},

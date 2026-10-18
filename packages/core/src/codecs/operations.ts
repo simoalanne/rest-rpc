@@ -61,3 +61,12 @@ export function resolveBodyCodec<Source = Request | Response>(
 		: undefined;
 	return { serialize, deserialize };
 }
+
+/** Detects async iterable bodies, such as generators and Node streams. */
+export const isAsyncIterable = (
+	value: unknown,
+): value is AsyncIterable<unknown> =>
+	value !== null &&
+	(typeof value === "object" || typeof value === "function") &&
+	Symbol.asyncIterator in value &&
+	typeof value[Symbol.asyncIterator] === "function";

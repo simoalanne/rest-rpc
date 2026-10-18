@@ -10,23 +10,15 @@ import {
 	type RuntimeImplementation,
 	type RuntimeImplementationTree,
 } from "../routing/match.ts";
-import { assertRequestContentType } from "../pipeline/requestContentType.ts";
-import {
-	handleHttpRoute,
-	type HandleOptions,
-} from "../pipeline/handleHttpRoute.ts";
-import {
-	RequestValidationError,
-	ResponseValidationError,
-} from "../pipeline/errors.ts";
-
+import { assertRequestContentType } from "./requestContentType.ts";
+import { handleHttpRoute, type HandleOptions } from "./handleHttpRoute.ts";
+import { RequestValidationError, ResponseValidationError } from "./errors.ts";
 import {
 	assertRequestBodyLimit,
 	deserializeRequestBody,
-} from "../pipeline/deserializeRequestBody.ts";
+} from "./deserializeRequestBody.ts";
+import { serializeHttpRouteResult } from "./serializeHttpRouteResult.ts";
 import { splitRequestUrl } from "../routing/requestUrl.ts";
-import { fetchRequestBody } from "./request.ts";
-import { createFetchResponse } from "./response.ts";
 
 /**
  * Customizes paths, request parsing and validation failures for compiled Fetch routes.
@@ -150,7 +142,7 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 		}
 
 		const { body, rejection: bodyRejection } = await deserializeRequestBody(
-			fetchRequestBody(request),
+			request,
 			requestBodyCodecs,
 			maxBytes,
 		);
@@ -188,7 +180,7 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 				: Response.json(result.responseBody, { status: result.status });
 		}
 
-		return createFetchResponse(result, bodyCodecs);
+		return serializeHttpRouteResult(result, bodyCodecs);
 	};
 };
 

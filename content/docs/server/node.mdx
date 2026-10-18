@@ -21,11 +21,8 @@ have.
 
 ```ts
 import { createServer } from "node:http";
-import { route } from "@rest-rpc/server;
-import {
-	compileRoutes,
-	createCatchAllHandler,
-} from "@rest-rpc/server/node";
+import { route } from "@rest-rpc/server";
+import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server/node";
 import { z } from "zod";
 
 const todos = new Map([["todo_1", { id: "todo_1", title: "Write docs" }]]);
@@ -120,7 +117,7 @@ await route.handle(req, res, { context: { user } });
 
 ```ts
 type CompileRoutesOptions = {
-	bodyCodecs?: readonly BodyCodec<NodeRequestBody>[];
+	bodyCodecs?: readonly BodyCodec[];
 	disableRequestValidation?: boolean;
 	disableResponseValidation?: boolean;
 	paramSyntax?: "colon" | "braces";
@@ -157,63 +154,41 @@ Decoding reads at most `requestBodyLimit` bytes, `1 MiB` by default. The
 default codecs decode the same values as on the
 [Fetch runtime](/docs/server/fetch#request-and-response-bodies).
 
-A codec's `deserialize` receives a `NodeRequestBody` instead of a Fetch
-`Request`, so Node codecs are separate from Fetch and client codecs. `body`
-yields the request's chunks and fails once the body exceeds the limit, and
-`request` is the native `IncomingMessage`:
-
-```ts
-import type { BodyCodec } from "@rest-rpc/server";
-import { compileRoutes } from "@rest-rpc/server";
-import { type NodeRequestBody } from "@rest-rpc/server/node";
-
-const binaryCodec: BodyCodec<NodeRequestBody> = {
-	match: (mediaType) => mediaType === "application/octet-stream",
-	deserialize: async ({ body }) => {
-		const chunks: Buffer[] = [];
-		for await (const chunk of body) chunks.push(chunk);
-		return new Uint8Array(Buffer.concat(chunks));
-	},
-};
-
-const compiledRoutes = compileRoutes(routes, { bodyCodecs: [binaryCodec] });
-```
-
-Read from `body` rather than `request` so the limit applies.
+A codec's `deserialize` receives a Fetch `Request`, so the same
+[custom codecs](/docs/http-behavior/serialization#custom-codecs) work on the
+client and both server runtimes.
 
 Handlers can return these values for the default codecs:
 
-| Content type                                 | Value                                                         |
-| -------------------------------------------- | ------------------------------------------------------------- |
-| `application/json` or any `+json` media type | JSON value                                                    |
-| `application/x-www-form-urlencoded`          | `URLSearchParams`                                             |
-| `text/*`                                     | `string`                                                      |
-| Any other media type                         | `Blob`, `Uint8Array` (including `Buffer`), or Node `Readable` |
+| Content type                                 | Value                                                                           |
+| -------------------------------------------- | ------------------------------------------------------------------------------- |
+| `application/json` or any `+json` media type | JSON value                                                                      |
+| `application/x-www-form-urlencoded`          | `URLSearchParams`                                                               |
+| `multipart/form-data`                        | `FormData`                                                                      |
+| `text/*`                                     | `string`                                                                        |
+| Any other media type                         | `Blob`, `Uint8Array` (including `Buffer`), `ReadableStream`, or Node `Readable` |
 
-`multipart/form-data` responses need a custom serializer. A custom serializer's
-`body` must be a string, `Buffer`, `Uint8Array`, or Node `Readable`.
+A custom serializer's `body` must be a Fetch `Response` body, such as a string,
+`Blob`, `FormData`, byte array, or `ReadableStream`, or an async iterable of
+byte chunks, such as a Node `Readable`.
 
 ## Error Handling
 
 Use `requestValidationErrorHandler` and `responseValidationErrorHandler` to
 replace the [default validation error responses](/docs/http-behavior/errors).
-Other errors reject the handler promise.
+They receive the request as a Fetch `Request` and return a Fetch `Response`,
+which is written to `res`. Other errors reject the handler promise.
 
 ```ts
 const handler = createCatchAllHandler(
 	compileRoutes(routes, {
-		requestValidationErrorHandler: (error, req, res) => {
-			res.statusCode = 422;
-			res.setHeader("content-type", "application/json");
-			res.end(
-				JSON.stringify({ code: "VALIDATION_ERROR", issues: error.issues }),
-			);
-		},
-		responseValidationErrorHandler: (_error, req, res) => {
-			res.statusCode = 500;
-			res.setHeader("content-type", "application/json");
-			res.end(JSON.stringify({ code: "INVALID_RESPONSE" }));
-		},
+		requestValidationErrorHandler: (error, request) =>
+			Response.json(
+				{ code: "VALIDATION_ERROR", issues: error.issues },
+				{ status: 422 },
+			),
+		responseValidationErrorHandler: (_error, request) =>
+			Response.json({ code: "INVALID_RESPONSE" }, { status: 500 }),
 	}),
 );
 

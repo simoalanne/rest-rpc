@@ -1,17 +1,11 @@
 import { defaultBodyCodecs, type BodyCodec } from "@rest-rpc/core/codecs";
-import { fetchRequestBody } from "../fetch/request.ts";
 import { deserializeRequestBody as deserialize } from "./deserializeRequestBody.ts";
 
 const deserializeRequestBody = (
 	raw: Request,
 	bodyCodecs: readonly BodyCodec[] = [],
 	maxBytes?: number,
-) =>
-	deserialize(
-		fetchRequestBody(raw),
-		[...bodyCodecs, ...defaultBodyCodecs],
-		maxBytes,
-	);
+) => deserialize(raw, [...bodyCodecs, ...defaultBodyCodecs], maxBytes);
 
 const request = (body: string, headers: Record<string, string> = {}) =>
 	new Request("http://localhost/", {

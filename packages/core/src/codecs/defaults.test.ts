@@ -60,13 +60,20 @@ describe("defaults", () => {
 			"application/octet-stream",
 			defaultBodyCodecs,
 		);
-		for (const body of [new Uint8Array([1]), new Blob(["data"])]) {
+		for (const body of [
+			new Uint8Array([1]),
+			new Blob(["data"]),
+			new ReadableStream(),
+			(async function* () {})(),
+		]) {
 			expect(
 				await binary?.serialize?.(body, "application/octet-stream"),
 			).toEqual({ body });
 		}
 		await expect(
 			binary?.serialize?.("data", "application/octet-stream"),
-		).rejects.toThrow("Expected Blob or Uint8Array body");
+		).rejects.toThrow(
+			"Expected Blob, Uint8Array, ReadableStream or AsyncIterable body",
+		);
 	});
 });

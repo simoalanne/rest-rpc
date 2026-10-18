@@ -20,11 +20,7 @@ catch-all handler, or register each compiled route on a router you already
 have.
 
 ```ts
-import {
-	compileRoutes,
-	createCatchAllHandler,
-	route,
-} from "@rest-rpc/server/fetch";
+import { compileRoutes, createCatchAllHandler, route } from "@rest-rpc/server";
 import { z } from "zod";
 
 const todos = new Map([["todo_1", { id: "todo_1", title: "Write docs" }]]);
@@ -156,7 +152,7 @@ A codec's `deserialize` receives the Fetch `Request`. Decoding reads at most
 
 Handlers can return any value supported by the default codecs. A custom
 serializer's `body` must be a Fetch `Response` body, such as a string, `Blob`,
-`FormData`, byte array, or `ReadableStream`.
+`FormData`, byte array, or `ReadableStream`, or an async iterable of byte chunks.
 
 ## Error Handling
 

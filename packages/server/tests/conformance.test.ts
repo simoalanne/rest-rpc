@@ -1,7 +1,11 @@
 import type { AbsolutePath } from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
-import { route, type } from "@rest-rpc/server";
-import * as fetchAdapter from "@rest-rpc/server/fetch";
+import {
+	compileRoutes,
+	createCatchAllHandler,
+	route,
+	type,
+} from "@rest-rpc/server";
 import * as nodeAdapter from "@rest-rpc/server/node";
 import { createServer, type RequestListener } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -68,8 +72,8 @@ type Serve = (
 ) => Promise<void>;
 
 const serveFetch: Serve = (routes, options, run) => {
-	const handler = fetchAdapter.createCatchAllHandler(
-		fetchAdapter.compileRoutes(routes, {
+	const handler = createCatchAllHandler(
+		compileRoutes(routes, {
 			prefix: options.prefix,
 			requestBodyLimit: options.requestBodyLimit,
 			...(options.customValidationHandlers && {
@@ -94,14 +98,10 @@ const serveNode: Serve = (routes, options, run) => {
 			prefix: options.prefix,
 			requestBodyLimit: options.requestBodyLimit,
 			...(options.customValidationHandlers && {
-				requestValidationErrorHandler: (_error, _req, res) => {
-					res.statusCode = 422;
-					res.end(JSON.stringify({ handled: "request" }));
-				},
-				responseValidationErrorHandler: (_error, _req, res) => {
-					res.statusCode = 502;
-					res.end(JSON.stringify({ handled: "response" }));
-				},
+				requestValidationErrorHandler: () =>
+					Response.json({ handled: "request" }, { status: 422 }),
+				responseValidationErrorHandler: () =>
+					Response.json({ handled: "response" }, { status: 502 }),
 			}),
 		}),
 	);
@@ -398,6 +398,56 @@ describe.each([
 				"application/octet-stream",
 				"raw",
 			]);
+		});
+	});
+
+	it("treats a request without a body as bodiless", async () => {
+		const routes = {
+			echo: route
+				.post("/echo")
+				.body(type<unknown>())
+				.handler(({ body }) => ({ received: body ?? null })),
+		};
+		await serve(routes, {}, async (url) => {
+			const response = await fetch(`${url}/echo`, {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+			});
+			expect(response.status).toBe(200);
+			expect(await response.json()).toEqual({ received: null });
+		});
+	});
+
+	it("serializes FormData response bodies", async () => {
+		const routes = {
+			form: route.get("/form").handler(() => {
+				const body = new FormData();
+				body.set("name", "Ada");
+				return { status: 200, contentType: "multipart/form-data", body };
+			}),
+		};
+		await serve(routes, {}, async (url) => {
+			const response = await fetch(`${url}/form`);
+			expect(response.status).toBe(200);
+			expect((await response.formData()).get("name")).toBe("Ada");
+		});
+	});
+
+	it("streams binary response bodies", async () => {
+		const routes = {
+			bytes: route.get("/bytes").handler(() => ({
+				status: 200,
+				contentType: "application/octet-stream",
+				body: (async function* () {
+					yield new TextEncoder().encode("A");
+					yield new TextEncoder().encode("B");
+				})(),
+			})),
+		};
+		await serve(routes, {}, async (url) => {
+			const response = await fetch(`${url}/bytes`);
+			expect(response.status).toBe(200);
+			expect(await response.text()).toBe("AB");
 		});
 	});
 

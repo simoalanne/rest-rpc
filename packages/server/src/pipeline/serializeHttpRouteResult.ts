@@ -1,18 +1,11 @@
 import type { BodyCodec } from "@rest-rpc/core";
-import { normalizeMediaType, resolveBodyCodec } from "@rest-rpc/core/codecs";
+import {
+	defaultBodyCodecs,
+	isAsyncIterable,
+	normalizeMediaType,
+	resolveBodyCodec,
+} from "@rest-rpc/core/codecs";
 import type { HttpRouteResult } from "./handleHttpRoute.ts";
-
-/** A route result whose response body has been serialized for an adapter to write. */
-export type SerializedHttpRouteResult = {
-	status: number;
-	/** Codec headers overridden by the result's own headers. */
-	headers: Record<string, string | number | undefined>;
-	/**
-	 * Serialized body, absent for bodyless responses. A `null` content type
-	 * means no content-type header is sent.
-	 */
-	body?: { value: unknown; contentType: string | null };
-};
 
 // SSE is a special case that should override all codecs and serialize as-is, since the body is already framed and encoded.
 const sseCodec = {
@@ -20,21 +13,41 @@ const sseCodec = {
 	serialize: (body: unknown) => ({ body }),
 };
 
-/**
- * Serializes a route result body with the first matching body codec and
- * merges the codec's headers with the result headers.
- *
- * @remarks Adapters write the returned status, headers and body to their
- * native response. `bodyCodecs` take precedence over `defaultBodyCodecs`.
- */
-export async function serializeHttpRouteResult<Source>(
-	result: HttpRouteResult,
-	bodyCodecs: readonly BodyCodec<Source>[],
-	defaultBodyCodecs: readonly BodyCodec<Source>[],
-): Promise<SerializedHttpRouteResult> {
-	if (!result.body) {
-		return { status: result.status, headers: { ...result.headers } };
+const encodeChunks = async function* (
+	body: AsyncIterable<unknown>,
+): AsyncIterableIterator<unknown> {
+	const encoder = new TextEncoder();
+	for await (const chunk of body) {
+		yield typeof chunk === "string" ? encoder.encode(chunk) : chunk;
 	}
+};
+
+const toBodyInit = (value: unknown) =>
+	(isAsyncIterable(value) && !(value instanceof ReadableStream)
+		? ReadableStream.from(encodeChunks(value))
+		: value) as ConstructorParameters<typeof Response>[0];
+
+/**
+ * Serializes a route result into a Fetch `Response`, encoding the body with
+ * the first matching body codec. The result's headers override codec headers.
+ *
+ * @remarks `bodyCodecs` take precedence over the default codecs.
+ */
+export async function serializeHttpRouteResult(
+	result: HttpRouteResult,
+	bodyCodecs: readonly BodyCodec[],
+): Promise<Response> {
+	const headers = new Headers();
+	const setHeaders = (values?: Record<string, string | number | undefined>) => {
+		for (const [name, value] of Object.entries(values ?? {})) {
+			if (value !== undefined) headers.set(name, String(value));
+		}
+	};
+	if (!result.body) {
+		setHeaders(result.headers);
+		return new Response(null, { status: result.status, headers });
+	}
+
 	const { value, contentType } = result.body;
 	const codec = resolveBodyCodec(normalizeMediaType(contentType), [
 		sseCodec,
@@ -45,15 +58,17 @@ export async function serializeHttpRouteResult<Source>(
 		throw new Error("No serializer for declared content-type");
 	}
 	const serialized = await codec.serialize(value, contentType);
-	return {
+	setHeaders(serialized.headers);
+	setHeaders(result.headers);
+	const bodyContentType =
+		serialized.contentType === undefined ? contentType : serialized.contentType;
+	if (bodyContentType === null) {
+		headers.delete("content-type");
+	} else {
+		headers.set("content-type", bodyContentType);
+	}
+	return new Response(toBodyInit(serialized.body), {
 		status: result.status,
-		headers: { ...serialized.headers, ...result.headers },
-		body: {
-			value: serialized.body,
-			contentType:
-				serialized.contentType === undefined
-					? contentType
-					: serialized.contentType,
-		},
-	};
+		headers,
+	});
 }

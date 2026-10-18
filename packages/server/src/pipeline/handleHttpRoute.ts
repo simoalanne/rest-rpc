@@ -1,6 +1,7 @@
 import {
 	contentTypeList,
 	findDeclaredContentType,
+	isAsyncIterable,
 	normalizeMediaType,
 } from "@rest-rpc/core/codecs";
 import { RequestValidationError, ResponseValidationError } from "./errors.ts";
@@ -25,34 +26,7 @@ import {
 import { invokeWithMiddleware } from "../builder/middleware.ts";
 import { sseBody } from "./sse.ts";
 import { createContext } from "../builder/context.ts";
-
-/** Shared configuration options passed to the `handleHttpRoute` function. */
-export type HandleHttpRouteConfiguration = {
-	/**
-	 * When set to `true`, disables request schema validation. Handlers receive
-	 * the declared request segments without schema validation. The schemas are
-	 * still used for type inference and OpenAPI generation.
-	 *
-	 * @remarks Do not disable request validation if you are using schemas that
-	 * transform or coerce values, as those transformations will not be applied to
-	 * the request segments. See {@link https://rest-rpc.dev/docs/http-behavior/schemas#disabling-server-validation}.
-	 *
-	 * @default false
-	 */
-	disableRequestValidation?: boolean;
-	/**
-	 * When set to `true`, disables response schema validation. Validation errors
-	 * will not be thrown, and the handler's output will be returned as-is.
-	 * The schemas are still used for type inference and OpenAPI generation.
-	 *
-	 * @remarks Do not disable response validation if you are using schemas that
-	 * transform or coerce values, as those transformations will not be applied to
-	 * the response body. See {@link https://rest-rpc.dev/docs/http-behavior/schemas#disabling-server-validation}.
-	 *
-	 * @default false
-	 */
-	disableResponseValidation?: boolean;
-};
+import type { CompileRoutesOptions } from "./compileRoutes.ts";
 
 /**
  * Per-request options for compiled routes and the catch-all handler.
@@ -76,7 +50,10 @@ export type HandleHttpRouteOptions = {
 	request: RequestSegments;
 	/** Aborts when the client disconnects. */
 	signal: AbortSignal;
-	configuration?: HandleHttpRouteConfiguration;
+	configuration?: Pick<
+		CompileRoutesOptions,
+		"disableRequestValidation" | "disableResponseValidation"
+	>;
 	/** Initial context values, set before middleware runs. */
 	context?: Record<string, unknown>;
 };
@@ -182,14 +159,6 @@ export const isResponseEnvelope = (
 	value !== null &&
 	"status" in value &&
 	typeof value.status === "number";
-
-export const isAsyncIterable = (
-	value: unknown,
-): value is AsyncIterable<unknown> =>
-	value !== null &&
-	(typeof value === "object" || typeof value === "function") &&
-	Symbol.asyncIterator in value &&
-	typeof value[Symbol.asyncIterator] === "function";
 
 const normalizeImplicitHttpResponse = (
 	response: ImplicitResponseEnvelope,
