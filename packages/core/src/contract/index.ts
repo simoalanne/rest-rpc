@@ -35,13 +35,14 @@ export type {
 	RequestHeadersSchema,
 	RequestParamsSchema,
 	RequestQuerySchema,
+	RequestScalar,
 	ServerRequest,
 } from "./request.ts";
 export type {
 	DeclaredClientResponse,
 	ErrorDeclaredClientResponse,
 	ResponseDeclaration,
-	ResponseHeaders,
+	ResponseHeadersSchema,
 	BodylessResponseOptions,
 	ResponseOptions,
 	StreamResponseOptions,
