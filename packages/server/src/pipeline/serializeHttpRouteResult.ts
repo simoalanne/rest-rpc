@@ -5,6 +5,7 @@ import {
 	normalizeMediaType,
 	resolveBodyCodec,
 } from "@rest-rpc/core/codecs";
+import type { RequestScalar } from "@rest-rpc/core/contract";
 import type { HttpRouteResult } from "./handleHttpRoute.ts";
 
 // SSE is a special case that should override all codecs and serialize as-is, since the body is already framed and encoded.
@@ -38,7 +39,7 @@ export async function serializeHttpRouteResult(
 	bodyCodecs: readonly BodyCodec[],
 ): Promise<Response> {
 	const headers = new Headers();
-	const setHeaders = (values?: Record<string, string | number | undefined>) => {
+	const setHeaders = (values?: Record<string, RequestScalar | undefined>) => {
 		for (const [name, value] of Object.entries(values ?? {})) {
 			if (value !== undefined) headers.set(name, String(value));
 		}

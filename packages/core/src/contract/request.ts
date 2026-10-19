@@ -23,7 +23,7 @@ export type RequestParamsSchema = StandardSchemaV1<
 /** A whole-object schema for request headers. */
 export type RequestHeadersSchema = StandardSchemaV1<
 	Record<string, RequestScalar | undefined>,
-	Record<string, unknown>
+	unknown
 >;
 
 export type RequestBodySchema = StandardSchemaV1;

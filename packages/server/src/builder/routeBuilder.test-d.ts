@@ -163,7 +163,7 @@ describe("implicit response inference", () => {
 		>();
 	});
 
-	it("infers empty bodies, custom media, and serialized response headers", () => {
+	it("infers empty bodies, custom media, and response headers", () => {
 		const empty = route.get("/").handler(() => ({ status: 204 }));
 		expectTypeOf<ServerResponse<(typeof empty)["~restrpc"]>>().toEqualTypeOf<{
 			status: 204;
@@ -175,11 +175,12 @@ describe("implicit response inference", () => {
 			status: 200,
 			body: "ok",
 			contentType: "text/plain",
-			headers: { count: 2, omitted: undefined },
+			headers: { count: 2, enabled: true, omitted: undefined },
 		}));
 		expectTypeOf<InferClientResponse<typeof custom>["headers"]>().toEqualTypeOf<
 			Record<string, string> & {
-				readonly count: "2";
+				readonly count: 2;
+				readonly enabled: true;
 				readonly omitted: undefined;
 			}
 		>();
@@ -187,6 +188,7 @@ describe("implicit response inference", () => {
 			ServerResponse<(typeof custom)["~restrpc"]>["headers"]
 		>().toEqualTypeOf<{
 			readonly count: 2;
+			readonly enabled: true;
 			readonly omitted: undefined;
 		}>();
 	});

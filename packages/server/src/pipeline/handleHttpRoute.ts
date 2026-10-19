@@ -6,6 +6,7 @@ import {
 } from "@rest-rpc/core/codecs";
 import { RequestValidationError, ResponseValidationError } from "./errors.ts";
 import type {
+	RequestScalar,
 	ResponseDeclaration,
 	RouteDeclaration,
 } from "@rest-rpc/core/contract";
@@ -147,7 +148,7 @@ const normalizeResponseResult = async (
 /** A validated logical response for the Fetch and Node handlers to serialize and write. */
 export type HttpRouteResult = {
 	status: number;
-	headers?: Record<string, string | number | undefined>;
+	headers?: Record<string, RequestScalar | undefined>;
 	body?: { value: unknown; contentType: string };
 };
 

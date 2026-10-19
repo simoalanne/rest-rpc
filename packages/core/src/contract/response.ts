@@ -1,18 +1,19 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { BodyContentType } from "./body.ts";
 import type { RouteDeclaration } from "./routeDeclaration.ts";
-import type { InferSchema } from "./request.ts";
+import type { InferSchema, RequestScalar } from "./request.ts";
 import type { SseEvent } from "./sse.ts";
 import type { Merge } from "../utils/typeUtils.ts";
 
 /**
- * Declares a whole-object schema for typed response headers.
+ * A whole-object schema for response headers whose output contains scalar
+ * values. The counterpart of `RequestHeadersSchema`.
  *
  * @see {@link https://rest-rpc.dev/docs/route-builder}
  */
-export type ResponseHeaders = StandardSchemaV1<
+export type ResponseHeadersSchema = StandardSchemaV1<
 	unknown,
-	Record<string, string | number | undefined>
+	Record<string, RequestScalar | undefined>
 >;
 
 /**
@@ -24,7 +25,7 @@ export type ResponseDeclaration = {
 	kind?: "stream";
 	body?: StandardSchemaV1;
 	contentType?: BodyContentType;
-	headers?: ResponseHeaders;
+	headers?: ResponseHeadersSchema;
 	description?: string;
 };
 
@@ -33,7 +34,7 @@ export type ResponseOptions = {
 	/** HTTP status of the response. Defaults to 200. */
 	status?: number;
 	contentType?: BodyContentType;
-	headers?: ResponseHeaders;
+	headers?: ResponseHeadersSchema;
 	/** Describes the response in generated OpenAPI documents. */
 	description?: string;
 };
@@ -43,7 +44,7 @@ export type BodylessResponseOptions = {
 	/** HTTP status of the response. Defaults to 200. */
 	status?: number;
 	contentType?: never;
-	headers?: ResponseHeaders;
+	headers?: ResponseHeadersSchema;
 	/** Describes the response in generated OpenAPI documents. */
 	description?: string;
 };
@@ -52,7 +53,7 @@ export type BodylessResponseOptions = {
 export type StreamResponseOptions = {
 	/** HTTP status of the response. Defaults to 200. */
 	status?: number;
-	headers?: ResponseHeaders;
+	headers?: ResponseHeadersSchema;
 	/** Describes the response in generated OpenAPI documents. */
 	description?: string;
 };
@@ -104,7 +105,7 @@ type ResponseBody<TResponse> = TResponse extends { body: infer TBody }
 	: never;
 
 type ResponseHeadersFor<TResponse> = TResponse extends {
-	headers: infer THeaders extends ResponseHeaders;
+	headers: infer THeaders extends ResponseHeadersSchema;
 }
 	? THeaders
 	: never;

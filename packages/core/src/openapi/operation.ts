@@ -2,7 +2,7 @@ import type { RouteDeclaration } from "../contract/routeDeclaration.ts";
 import type { RequestBodySchema } from "../contract/request.ts";
 import type {
 	ResponseDeclaration,
-	ResponseHeaders,
+	ResponseHeadersSchema,
 } from "../contract/response.ts";
 import { contentTypeList } from "../codecs/index.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
@@ -187,7 +187,7 @@ export const createResponse = (
 };
 
 const createResponseHeaders = (
-	headers: ResponseHeaders | undefined,
+	headers: ResponseHeadersSchema | undefined,
 	converter: SchemaConverter | undefined,
 ): OpenApiResponse["headers"] | undefined => {
 	if (!headers) return undefined;

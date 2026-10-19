@@ -1,4 +1,5 @@
 import type {
+	RequestScalar,
 	RouteDeclaration,
 	ServerRequest,
 	ServerResponse,
@@ -23,13 +24,13 @@ export type ImplicitResponseEnvelope =
 			status: number;
 			body?: never;
 			contentType?: string;
-			headers?: Record<string, string | number | undefined>;
+			headers?: Record<string, RequestScalar | undefined>;
 	  }
 	| {
 			status: number;
 			body: unknown;
 			contentType?: string;
-			headers?: Record<string, string | number | undefined>;
+			headers?: Record<string, RequestScalar | undefined>;
 	  };
 
 type BodyResponseKind<TResponse, TBody> =
@@ -56,18 +57,6 @@ type InferredSchema<TInput, TOutput = TInput> = StandardSchemaV1<
 	TInput,
 	TOutput
 >;
-
-type SerializedResponseHeader<TValue> = TValue extends string
-	? TValue
-	: TValue extends number
-		? `${TValue}`
-		: TValue extends undefined
-			? undefined
-			: never;
-
-type SerializedResponseHeaders<THeaders> = {
-	[TKey in keyof THeaders]: SerializedResponseHeader<THeaders[TKey]>;
-};
 
 type SseData<T> = T extends SseServerEvent<infer TData> ? TData : T;
 
@@ -98,22 +87,12 @@ type ImplicitResponseDeclaration<TResponse> = TResponse extends {
 			? { kind: "stream" }
 			: { contentType: ImplicitResponseContentType<TResponse> }) &
 			(TResponse extends { headers: infer THeaders }
-				? {
-						headers: InferredSchema<
-							THeaders,
-							SerializedResponseHeaders<THeaders>
-						>;
-					}
+				? { headers: InferredSchema<THeaders> }
 				: unknown)
 	: { body: undefined } & (TResponse extends {
 			headers: infer THeaders;
 		}
-			? {
-					headers: InferredSchema<
-						THeaders,
-						SerializedResponseHeaders<THeaders>
-					>;
-				}
+			? { headers: InferredSchema<THeaders> }
 			: unknown);
 
 type ResponseStatuses<TResponse> = TResponse extends {
