@@ -32,7 +32,7 @@ import type { CompileRoutesOptions } from "./compileRoutes.ts";
 /**
  * Per-request options for compiled routes and the catch-all handler.
  *
- * @see {@link https://rest-rpc.dev/docs/context#values-from-the-host}
+ * @see {@link https://rest-rpc.vercel.app/docs/context#values-from-the-host}
  */
 export type HandleOptions = {
 	/**

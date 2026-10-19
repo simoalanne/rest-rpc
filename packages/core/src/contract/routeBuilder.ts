@@ -149,42 +149,42 @@ export class RouteBuilder<
 		return new RouteBuilder(state) as never;
 	}
 
-	/** Declares a GET route. @see {@link https://rest-rpc.dev/docs/route-builder} */
+	/** Declares a GET route. @see {@link https://rest-rpc.vercel.app/docs/route-builder} */
 	get<const TPath extends AbsolutePath | undefined = undefined>(
 		path?: TPath,
 	): BuilderFor<TKind, WithHttpMethod<TState, "GET", TPath>> {
 		return this.clone(httpState(this["~restrpc"], "GET", path));
 	}
 
-	/** Declares a POST route. @see {@link https://rest-rpc.dev/docs/route-builder} */
+	/** Declares a POST route. @see {@link https://rest-rpc.vercel.app/docs/route-builder} */
 	post<const TPath extends AbsolutePath | undefined = undefined>(
 		path?: TPath,
 	): BuilderFor<TKind, WithHttpMethod<TState, "POST", TPath>> {
 		return this.clone(httpState(this["~restrpc"], "POST", path));
 	}
 
-	/** Declares a PUT route. @see {@link https://rest-rpc.dev/docs/route-builder} */
+	/** Declares a PUT route. @see {@link https://rest-rpc.vercel.app/docs/route-builder} */
 	put<const TPath extends AbsolutePath | undefined = undefined>(
 		path?: TPath,
 	): BuilderFor<TKind, WithHttpMethod<TState, "PUT", TPath>> {
 		return this.clone(httpState(this["~restrpc"], "PUT", path));
 	}
 
-	/** Declares a PATCH route. @see {@link https://rest-rpc.dev/docs/route-builder} */
+	/** Declares a PATCH route. @see {@link https://rest-rpc.vercel.app/docs/route-builder} */
 	patch<const TPath extends AbsolutePath | undefined = undefined>(
 		path?: TPath,
 	): BuilderFor<TKind, WithHttpMethod<TState, "PATCH", TPath>> {
 		return this.clone(httpState(this["~restrpc"], "PATCH", path));
 	}
 
-	/** Declares a DELETE route. @see {@link https://rest-rpc.dev/docs/route-builder} */
+	/** Declares a DELETE route. @see {@link https://rest-rpc.vercel.app/docs/route-builder} */
 	delete<const TPath extends AbsolutePath | undefined = undefined>(
 		path?: TPath,
 	): BuilderFor<TKind, WithHttpMethod<TState, "DELETE", TPath>> {
 		return this.clone(httpState(this["~restrpc"], "DELETE", path));
 	}
 
-	/** Declares a request body and its HTTP metadata. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
+	/** Declares a request body and its HTTP metadata. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-request-segments} */
 	body<
 		const TSchema extends StandardSchemaV1,
 		const TOptions extends BodyOptions | undefined = undefined,
@@ -200,7 +200,7 @@ export class RouteBuilder<
 		);
 	}
 
-	/** Declares request headers. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
+	/** Declares request headers. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-request-segments} */
 	headers<const TSchema extends RequestHeadersSchema>(
 		schema: TSchema,
 	): BuilderFor<TKind, WithRequest<TState, "headers", TSchema>> {
@@ -214,7 +214,7 @@ export class RouteBuilder<
 		});
 	}
 
-	/** Declares URL query parameters. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
+	/** Declares URL query parameters. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-request-segments} */
 	query<const TSchema extends RequestQuerySchema>(
 		schema: TSchema,
 	): BuilderFor<TKind, WithRequest<TState, "query", TSchema>> {
@@ -223,7 +223,7 @@ export class RouteBuilder<
 		);
 	}
 
-	/** Declares path parameters. @see {@link https://rest-rpc.dev/docs/route-builder#declare-request-segments} */
+	/** Declares path parameters. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-request-segments} */
 	params<const TSchema extends RequestParamsSchema>(
 		schema: TSchema,
 	): BuilderFor<TKind, WithRequest<TState, "params", TSchema>> {
@@ -232,7 +232,7 @@ export class RouteBuilder<
 		);
 	}
 
-	/** Adds application metadata, shallow-merged with earlier metadata. @see {@link https://rest-rpc.dev/docs/route-builder#add-metadata-and-openapi-details} */
+	/** Adds application metadata, shallow-merged with earlier metadata. @see {@link https://rest-rpc.vercel.app/docs/route-builder#add-metadata-and-openapi-details} */
 	metadata<const TMetadata extends RouteMetadata>(
 		metadata: TMetadata,
 	): BuilderFor<TKind, WithMetadata<TState, TMetadata>> {
@@ -243,7 +243,7 @@ export class RouteBuilder<
 		});
 	}
 
-	/** Adds OpenAPI metadata, merged with earlier details. @see {@link https://rest-rpc.dev/docs/openapi#route-metadata} */
+	/** Adds OpenAPI metadata, merged with earlier details. @see {@link https://rest-rpc.vercel.app/docs/openapi#route-metadata} */
 	openAPI(
 		openApi: OpenApiRouteOptions,
 	): BuilderFor<TKind, NextState<TState, { openApi: true }>> {
@@ -254,7 +254,7 @@ export class RouteBuilder<
 		});
 	}
 
-	/** Declares a response schema and HTTP metadata. The status defaults to 200. @see {@link https://rest-rpc.dev/docs/route-builder#declare-responses} */
+	/** Declares a response schema and HTTP metadata. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-responses} */
 	response<
 		const TSchema extends StandardSchemaV1,
 		const TOptions extends ResponseOptions | undefined = undefined,
@@ -262,7 +262,7 @@ export class RouteBuilder<
 		schema: TSchema,
 		options?: TOptions,
 	): BuilderFor<TKind, WithResponse<TState, TSchema, TOptions>>;
-	/** Declares a response without a body. The status defaults to 200. @see {@link https://rest-rpc.dev/docs/route-builder#declare-responses} */
+	/** Declares a response without a body. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-responses} */
 	response<
 		const TOptions extends BodylessResponseOptions | undefined = undefined,
 	>(
@@ -289,7 +289,7 @@ export class RouteBuilder<
 		);
 	}
 
-	/** Declares a streaming response. The status defaults to 200. @see {@link https://rest-rpc.dev/docs/streaming} */
+	/** Declares a streaming response. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/streaming} */
 	streamResponse<
 		const TSchema extends StandardSchemaV1,
 		const TOptions extends StreamResponseOptions | undefined = undefined,
@@ -315,6 +315,6 @@ export class RouteBuilder<
  * @remarks Every builder method returns a new route value, so partially built
  * routes can be reused safely across declarations.
  *
- * @see {@link https://rest-rpc.dev/docs/route-builder}
+ * @see {@link https://rest-rpc.vercel.app/docs/route-builder}
  */
 export const route = new RouteBuilder();

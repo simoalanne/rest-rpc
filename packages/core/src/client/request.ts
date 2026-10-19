@@ -26,7 +26,7 @@ export type ApiClientFetchOptions = Omit<
 /**
  * The fetch-compatible function shape used by the core client.
  *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#custom-fetch}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#custom-fetch}
  */
 export type FetchLike = (
 	input: string | URL | Request,
@@ -74,7 +74,7 @@ type ClientRequestValue<T> = [T] extends [never] ? undefined : T;
  * argument to make headers that it always provides optional. Pass a route tree
  * to infer a matching tree of request types.
  *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#type-helpers}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
  */
 export type InferClientRequest<
 	T extends RouteTree,

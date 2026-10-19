@@ -28,8 +28,8 @@ import type { FetchArgs } from "./request.ts";
  * @remarks Every route produces status-discriminated envelopes. Pass a route
  * tree to infer a matching tree of results.
  *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#type-helpers}
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-routes}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#call-routes}
  */
 export type InferClientResponse<T extends RouteTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
@@ -47,7 +47,7 @@ export type InferClientResponse<T extends RouteTree> = T extends {
  * @remarks Includes the envelopes of 2xx responses. Pass a route tree to
  * infer a matching tree of results.
  *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#type-helpers}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
  */
 export type InferClientSuccess<T extends RouteTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
@@ -64,7 +64,7 @@ export type InferClientSuccess<T extends RouteTree> = T extends {
  * `HttpError` and `Error` values are not included.
  * Pass a route tree to infer a matching tree of types.
  *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#type-helpers}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
  */
 export type InferClientError<T extends RouteTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
@@ -81,8 +81,8 @@ export type InferClientError<T extends RouteTree> = T extends {
  * Routes without a stream response infer `never`. Pass a route tree to infer
  * a matching tree of event data types.
  *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#type-helpers}
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#consume-streams}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#consume-streams}
  */
 export type InferClientStreamData<T extends RouteTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;

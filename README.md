@@ -73,7 +73,7 @@ if (response.status === 200) {
 
 ## Documentation
 
-Full documentation is available at [rest-rpc.dev](https://rest-rpc.dev).
+Full documentation is available at [rest-rpc.vercel.app](https://rest-rpc.vercel.app).
 
 ## Packages
 

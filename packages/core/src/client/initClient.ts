@@ -25,8 +25,8 @@ export type FetchResponseFn<
 /**
  * Infers the callable client operation for one declared route.
  *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#type-helpers}
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#call-routes}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#call-routes}
  */
 export type ApiClientRouteValue<
 	E extends RouteDeclaration = RouteDeclaration,
@@ -36,7 +36,7 @@ export type ApiClientRouteValue<
 /**
  * Infers the client tree for a contract.
  *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#type-helpers}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
  */
 export type ApiClientFor<
 	T extends Contract = Contract,
@@ -56,7 +56,7 @@ export type ApiClientFor<
  * headers optional at individual call sites. Per-call Fetch options override
  * defaults from `fetchOptions`.
  *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client#client-options}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#client-options}
  */
 export type ApiClientOptions<
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
@@ -73,7 +73,7 @@ export type ApiClientOptions<
 /**
  * Creates a typed fetch client whose shape mirrors a contract.
  *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client}
  */
 export function initClient<
 	TContract extends Contract,

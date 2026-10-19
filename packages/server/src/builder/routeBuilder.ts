@@ -98,7 +98,7 @@ export class ServerRouteBuilder<
 		return new ServerRouteBuilder(state) as never;
 	}
 
-	/** Attaches the server handler that completes the route. @see {@link https://rest-rpc.dev/docs/route-builder#return-responses} */
+	/** Attaches the server handler that completes the route. @see {@link https://rest-rpc.vercel.app/docs/route-builder#return-responses} */
 	handler<
 		const TResult extends AllowedHandlerResult<HandlerRoute<TState>, TContext>,
 	>(
@@ -119,7 +119,7 @@ export class ServerRouteBuilder<
 		});
 	}
 
-	/** Wraps downstream execution after request validation. @see {@link https://rest-rpc.dev/docs/middleware} */
+	/** Wraps downstream execution after request validation. @see {@link https://rest-rpc.vercel.app/docs/middleware} */
 	use(
 		middleware: (
 			request: MiddlewareRequest<HandlerRoute<TState>, TContext>,
@@ -141,7 +141,7 @@ export class ServerRouteBuilder<
 		});
 	}
 
-	/** Declares a reusable middleware function on the untouched route root. @see {@link https://rest-rpc.dev/docs/middleware} */
+	/** Declares a reusable middleware function on the untouched route root. @see {@link https://rest-rpc.vercel.app/docs/middleware} */
 	middleware<TRequest extends RequestFields = RequestFields>(
 		callback: (
 			request: ReusableMiddlewareRequest<TRequest, TContext>,
@@ -150,7 +150,7 @@ export class ServerRouteBuilder<
 		return callback;
 	}
 
-	/** Selects the typed per-request context store for this builder. @see {@link https://rest-rpc.dev/docs/context} */
+	/** Selects the typed per-request context store for this builder. @see {@link https://rest-rpc.vercel.app/docs/context} */
 	$context<TValues extends object>(): BuilderFor<
 		ServerRouteBuilderKind<TValues>,
 		TState
@@ -166,6 +166,6 @@ export class ServerRouteBuilder<
  * before `.handler()`. Routes are runtime-independent: the same route works
  * with the Fetch and Node HTTP handlers.
  *
- * @see {@link https://rest-rpc.dev/docs/quickstart#define-and-register-routes}
+ * @see {@link https://rest-rpc.vercel.app/docs/quickstart#define-and-register-routes}
  */
 export const route = new ServerRouteBuilder<RootBuilderState, DefaultContext>();

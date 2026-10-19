@@ -3,7 +3,7 @@ import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 /**
  * A Standard Schema validation issue surfaced by server request validation.
  *
- * @see {@link https://rest-rpc.dev/docs/http-behavior/schemas#request-validation}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/schemas#request-validation}
  */
 export type ValidationIssue = StandardSchemaV1.Issue;
 
@@ -21,7 +21,7 @@ export type RequestValidationIssues = {
  * @remarks Server adapters handle this error before the route handler runs and
  * expose adapter-specific hooks for replacing the default error response.
  *
- * @see {@link https://rest-rpc.dev/docs/http-behavior/errors#validation-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/errors#validation-errors}
  */
 export class RequestValidationError extends Error {
 	readonly name = "RequestValidationError";
@@ -55,7 +55,7 @@ export type ResponseValidationLocation = "body" | "headers" | "stream";
  * @remarks Server adapters expose adapter-specific hooks for replacing the
  * default error response.
  *
- * @see {@link https://rest-rpc.dev/docs/http-behavior/errors#validation-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/errors#validation-errors}
  */
 export class ResponseValidationError extends Error {
 	readonly name = "ResponseValidationError";
