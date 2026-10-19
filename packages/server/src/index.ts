@@ -24,10 +24,18 @@ export {
 	type ResponseValidationErrorHandler,
 } from "./pipeline/compileRoutes.ts";
 export type { HandleOptions } from "./pipeline/handleHttpRoute.ts";
+export {
+	call,
+	initLocalClient,
+	type CallOptions,
+	type LocalClient,
+} from "./pipeline/call.ts";
 export { createOpenApiDocument, type } from "@rest-rpc/core";
 export type {
 	BodyCodec,
 	CreateOpenApiDocumentOptions,
+	InferClientRequest,
+	InferClientResponse,
 	OpenApiDocument,
 	SseEvent,
 } from "@rest-rpc/core";

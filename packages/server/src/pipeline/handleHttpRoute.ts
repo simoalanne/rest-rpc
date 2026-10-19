@@ -59,6 +59,28 @@ export type HandleHttpRouteOptions = {
 	context?: Record<string, unknown>;
 };
 
+/** Inputs needed to invoke one route handler with decoded request segments. */
+export type ExecuteRouteOptions = {
+	request: Record<string, unknown>;
+	signal: AbortSignal;
+	/** The received request media type. Normalized before handlers receive it. */
+	contentType?: string;
+	lastEventId?: string;
+	/** Initial context values, set before middleware runs. */
+	context?: Record<string, unknown>;
+	disableRequestValidation?: boolean;
+	disableResponseValidation?: boolean;
+};
+
+/** A validated route result before SSE framing and header serialization. */
+export type RouteResult = {
+	status: number;
+	headers?: Record<string, unknown>;
+	body?:
+		| { value: unknown; contentType: string }
+		| { stream: AsyncIterable<unknown> };
+};
+
 const requestHeader = (headers: RequestSegments["headers"], name: string) => {
 	const value = headers?.[name];
 	return Array.isArray(value) ? value[0] : value;
@@ -104,12 +126,12 @@ const normalizeResponseResult = async (
 	route: RouteDeclaration,
 	result: DeclaredResponseEnvelope,
 	disableValidation: boolean,
-): Promise<HttpRouteResult> => {
+): Promise<RouteResult> => {
 	const schema = getResponseSchema(route, result.status);
 	const bodySchema = schema.body;
 	const headers = disableValidation
 		? schema.headers
-			? stringifyHeaders(result.headers)
+			? result.headers
 			: undefined
 		: await validateResponseHeaders(schema, result.headers);
 
@@ -122,11 +144,11 @@ const normalizeResponseResult = async (
 		return {
 			status: result.status,
 			headers,
-			body: sseBody(
-				disableValidation
+			body: {
+				stream: disableValidation
 					? body
 					: validateResponseStreamChunks(body, bodySchema),
-			),
+			},
 		};
 	}
 
@@ -163,7 +185,7 @@ export const isResponseEnvelope = (
 
 const normalizeImplicitHttpResponse = (
 	response: ImplicitResponseEnvelope,
-): HttpRouteResult => {
+): RouteResult => {
 	if (
 		!Number.isInteger(response.status) ||
 		response.status < 100 ||
@@ -179,7 +201,7 @@ const normalizeImplicitHttpResponse = (
 	// An explicit content type sends a stream through the body codecs as-is.
 	const { body, contentType } = response;
 	if (contentType === undefined && isAsyncIterable(body)) {
-		return { status, headers, body: sseBody(body) };
+		return { status, headers, body: { stream: body } };
 	}
 	return {
 		status,
@@ -188,10 +210,66 @@ const normalizeImplicitHttpResponse = (
 	};
 };
 
-export const normalizeImplicitResponse = (result: unknown): HttpRouteResult =>
+export const normalizeImplicitResponse = (result: unknown): RouteResult =>
 	normalizeImplicitHttpResponse(
 		isResponseEnvelope(result) ? result : { status: 200, body: result },
 	);
+
+/**
+ * Validates decoded request segments, executes middleware and the handler, and
+ * validates the selected output. Validation errors are thrown.
+ */
+export async function executeRoute(
+	implementation: RuntimeImplementation,
+	options: ExecuteRouteOptions,
+): Promise<RouteResult> {
+	const { route } = implementation;
+	const handler = implementation.handler as RuntimeRouteHandler;
+	const validatedRequest = options.disableRequestValidation
+		? options.request
+		: await validateRequestSegments(route, options.request);
+
+	const handlerResult = await invokeWithMiddleware(
+		implementation.middleware ?? [],
+		handler,
+		{
+			...validatedRequest,
+			context: createContext(options.context),
+			signal: options.signal,
+			contentType: normalizeMediaType(options.contentType) || undefined,
+			lastEventId: options.lastEventId,
+			route,
+		},
+	);
+
+	const declaredStatuses = Object.keys(route.responses);
+	if (declaredStatuses.length === 0) {
+		return normalizeImplicitResponse(handlerResult);
+	}
+
+	// Types only allow plain bodies on routes with a single declared status.
+	return normalizeResponseResult(
+		route,
+		isResponseEnvelope(handlerResult)
+			? handlerResult
+			: { status: Number(declaredStatuses[0]), body: handlerResult },
+		options.disableResponseValidation ?? false,
+	);
+}
+
+const toHttpRouteResult = ({
+	status,
+	headers,
+	body,
+}: RouteResult): HttpRouteResult => {
+	const httpHeaders = headers && stringifyHeaders(headers);
+	if (!body) return { status, headers: httpHeaders };
+	return {
+		status,
+		headers: httpHeaders,
+		body: "stream" in body ? sseBody(body.stream) : body,
+	};
+};
 
 /**
  * Validates an HTTP request, executes middleware and its handler, and normalizes the selected output.
@@ -202,48 +280,19 @@ export async function handleHttpRoute(
 	options: HandleHttpRouteOptions,
 ): Promise<HttpRouteResult | RequestValidationError | ResponseValidationError> {
 	try {
-		const { route } = implementation;
-		const handler = implementation.handler as RuntimeRouteHandler;
-		const rawContentType = requestHeader(
-			options.request.headers,
-			"content-type",
-		);
-		const contentType = normalizeMediaType(rawContentType) || undefined;
-		const lastEventId = requestHeader(options.request.headers, "last-event-id");
-		const disableRequestValidation =
-			options.configuration?.disableRequestValidation ?? false;
-		const validatedRequest = disableRequestValidation
-			? readDeclaredRequestSegments(route, options.request)
-			: await validateRequestSegments(route, options.request);
-		const disableResponseValidation =
-			options.configuration?.disableResponseValidation ?? false;
-
-		const handlerResult = await invokeWithMiddleware(
-			implementation.middleware ?? [],
-			handler,
-			{
-				...validatedRequest,
-				context: createContext(options.context),
-				signal: options.signal,
-				contentType,
-				lastEventId,
-				route,
-			},
-		);
-
-		const declaredStatuses = Object.keys(route.responses);
-		if (declaredStatuses.length === 0) {
-			return normalizeImplicitResponse(handlerResult);
-		}
-
-		// Types only allow plain bodies on routes with a single declared status.
-		return await normalizeResponseResult(
-			route,
-			isResponseEnvelope(handlerResult)
-				? handlerResult
-				: { status: Number(declaredStatuses[0]), body: handlerResult },
-			disableResponseValidation,
-		);
+		const { headers } = options.request;
+		const result = await executeRoute(implementation, {
+			request: readDeclaredRequestSegments(
+				implementation.route,
+				options.request,
+			),
+			signal: options.signal,
+			contentType: requestHeader(headers, "content-type"),
+			lastEventId: requestHeader(headers, "last-event-id"),
+			context: options.context,
+			...options.configuration,
+		});
+		return toHttpRouteResult(result);
 	} catch (error) {
 		if (
 			error instanceof RequestValidationError ||

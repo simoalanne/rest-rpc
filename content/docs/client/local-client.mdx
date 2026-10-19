@@ -1,0 +1,61 @@
+---
+title: Local Client
+description: Call route handlers in-process with call or initLocalClient.
+---
+
+A local call runs the same route pipeline as an HTTP request:
+
+1. The input is validated with the route's request schemas.
+2. The route's middleware and handler run.
+3. The handler output is validated with the route's response schemas.
+
+The steps that only exist for HTTP are skipped: body decoding, request content
+type checks, body size limits, and response serialization. The result is the
+validated output, not an encoded `Response`.
+
+## One-off Calls
+
+Use `call()` to invoke single route handler without creating a [Local Client](/docs/client/local-client#local-client).
+
+```ts twoslash
+import { call, route } from "@rest-rpc/server";
+import z from "zod";
+
+const getTodo = route
+	.get("/todos/{id}")
+	.params(z.object({ id: z.coerce.number<string>() }))
+	.handler(({ params }) => ({ id: params.id, title: "Write docs" }));
+
+const response = await call(getTodo, { params: { id: "1" } });
+```
+
+`call()` takes the same request and returns the same response as a
+[Fetch client](/docs/client/fetch-client) call. Request segments are schema
+inputs, the values a client would send, and handlers receive the schema output.
+
+The optional third argument replaces what an HTTP request would otherwise provide:
+
+| Option        | Description                                                                            |
+| ------------- | -------------------------------------------------------------------------------------- |
+| `signal`      | Passed to the handler. Defaults to a signal that never aborts.                         |
+| `contentType` | One of the request media types the route declares, if it declares several.             |
+| `lastEventId` | Resumes a stream, as the `Last-Event-ID` header does over HTTP.                        |
+| `context`     | Initial [Context](/docs/context) values, set before middleware runs. Any subset works. |
+
+## Local Client
+
+When you want to call several routes or create a reusable client, `initLocalClient()` creates one that mirrors the route tree.
+It is the local equivalent of the [Fetch client](/docs/client/fetch-client).
+
+```ts
+import { initLocalClient } from "@rest-rpc/server";
+import { routes } from "./routes";
+
+const client = initLocalClient(routes);
+
+const created = await client.todos.create({ body: { title: "Write docs" } });
+const response = await client.todos.get(
+	{ params: { id: created.body.id } },
+	{ context: { user: { id: "user_1" } } },
+);
+```
