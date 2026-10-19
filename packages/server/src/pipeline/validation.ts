@@ -94,27 +94,27 @@ const validateRequestSegment = async (
 	return { data: merged, errors: [] };
 };
 
+/** Validates decoded request segments, ignoring segments the route does not declare. */
 export async function validateRequestSegments(
 	route: RouteDeclaration,
-	segments: RequestSegments,
+	segments: Record<string, unknown>,
 ) {
 	const requestSchemas = route.request;
-	const declared = readDeclaredRequestSegments(route, segments);
 	const body = await validateRequestSegment(
 		requestSchemas?.body,
-		declared.body,
+		segments.body,
 	);
 	const query = await validateRequestSegment(
 		requestSchemas?.query,
-		declared.query,
+		segments.query,
 	);
 	const params = await validateRequestSegment(
 		requestSchemas?.params,
-		declared.params,
+		segments.params,
 	);
 	const headers = await validateRequestSegment(
 		requestSchemas?.headers,
-		declared.headers,
+		segments.headers,
 	);
 	const issues = {
 		body: body.errors,
@@ -159,7 +159,7 @@ export const stringifyHeaders = (
 export const validateResponseHeaders = async (
 	schema: ResponseDeclaration | undefined,
 	headers: Record<string, unknown> | undefined,
-): Promise<Record<string, string> | undefined> => {
+): Promise<Record<string, unknown> | undefined> => {
 	if (!schema) return undefined;
 
 	const declaredHeaders = schema.headers;
@@ -170,7 +170,7 @@ export const validateResponseHeaders = async (
 		throw new ResponseValidationError("headers", result.issues);
 	}
 
-	return stringifyHeaders(result.value);
+	return result.value;
 };
 
 export async function* validateResponseStreamChunks(

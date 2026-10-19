@@ -169,6 +169,29 @@ describe("handleHttpRoute", () => {
 		}
 	});
 
+	it("frames inferred streams as SSE and serializes headers", async () => {
+		async function* values() {
+			yield sse({ data: 1, id: "one" });
+		}
+		const result = await execute(
+			route.get("/").handler(() => ({
+				status: 201,
+				body: values(),
+				headers: { count: 1 },
+			})),
+		);
+		if (!("body" in result)) throw new Error("Expected stream");
+		expect(result).toMatchObject({
+			status: 201,
+			headers: { count: "1" },
+			body: { contentType: "text/event-stream" },
+		});
+		const frames = [];
+		for await (const frame of result.body!.value as AsyncIterable<string>)
+			frames.push(frame);
+		expect(frames).toEqual(["id: one\ndata: 1\n\n"]);
+	});
+
 	it("dispatches declared envelopes and plain bodies through response validation", async () => {
 		const schema = type((value: string) => value.toUpperCase());
 		expect(
@@ -330,23 +353,18 @@ describe("normalizeImplicitResponse", () => {
 	);
 
 	it.each(["plain", "envelope"])(
-		"frames %s async iterables as SSE",
-		async (mode) => {
-			async function* values() {
-				yield sse({ data: 1, id: "one" });
-			}
-			const output = values();
-			const result = normalizeImplicitResponse(
-				mode === "plain"
-					? output
-					: { status: 201, body: output, headers: { count: 1 } },
-			);
-			expect(result.status).toBe(mode === "plain" ? 200 : 201);
-			expect(result.body?.contentType).toBe("text/event-stream");
-			const frames = [];
-			for await (const frame of result.body!.value as AsyncIterable<string>)
-				frames.push(frame);
-			expect(frames).toEqual(["id: one\ndata: 1\n\n"]);
+		"treats %s async iterables as streams",
+		(mode) => {
+			const stream = (async function* () {})();
+			expect(
+				normalizeImplicitResponse(
+					mode === "plain" ? stream : { status: 201, body: stream },
+				),
+			).toEqual({
+				status: mode === "plain" ? 200 : 201,
+				headers: undefined,
+				body: { stream },
+			});
 		},
 	);
 

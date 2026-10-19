@@ -29,10 +29,15 @@ export const isSseServerEvent = (
 	value !== null &&
 	(value as Record<symbol, unknown>)[sseBrand] === true;
 
+/** Converts a stream item into a plain SSE event without the server brand. */
+export const toSseEvent = (value: unknown): SseEvent<unknown> => {
+	if (!isSseServerEvent(value)) return { data: value };
+	const { [sseBrand]: _brand, ...event } = value;
+	return event;
+};
+
 const formatSseEvent = (value: unknown) => {
-	const event: SseEvent<unknown> = isSseServerEvent(value)
-		? value
-		: { data: value };
+	const event = toSseEvent(value);
 	return [
 		event.id === undefined ? undefined : `id: ${event.id}`,
 		event.event === undefined ? undefined : `event: ${event.event}`,

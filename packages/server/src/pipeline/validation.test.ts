@@ -21,9 +21,10 @@ describe("validation", () => {
 			.get("/")
 			.query(type<{ tags: string[]; page: string }>())["~restrpc"];
 		const query = "tags[]=a&tags[]=b&page=1&page=2";
-		expect(
-			(await validateRequestSegments(declaration, { query })).query,
-		).toEqual({ tags: ["a", "b"], page: "2" });
+		expect(readDeclaredRequestSegments(declaration, { query }).query).toEqual({
+			tags: ["a", "b"],
+			page: "2",
+		});
 	});
 
 	it("keeps only declared segments and parses a declared query", () => {
@@ -106,7 +107,7 @@ describe("validation", () => {
 		expect(later).not.toHaveBeenCalled();
 	});
 
-	it("uses transformed response bodies and stringifies declared headers while omitting undefined", async () => {
+	it("uses transformed response bodies and headers", async () => {
 		expect(
 			await validateResponseValue(
 				schema(() => ({ value: 42 })),
@@ -123,7 +124,7 @@ describe("validation", () => {
 				},
 				{},
 			),
-		).toEqual({ count: "2" });
+		).toEqual({ count: 2, absent: undefined });
 		expect(
 			await validateResponseHeaders(undefined, { count: 2 }),
 		).toBeUndefined();

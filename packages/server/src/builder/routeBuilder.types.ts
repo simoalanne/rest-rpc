@@ -241,7 +241,7 @@ export type HandlerTree =
 // Server routes and implementer leaves carry their selected context as a
 // type-only declaration field. Contract routes do not, because the context is
 // selected when they are implemented.
-type ContextOf<TRoute> = TRoute extends {
+export type ContextOf<TRoute> = TRoute extends {
 	readonly context?: infer TContext extends object;
 }
 	? TContext
