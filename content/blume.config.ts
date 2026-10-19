@@ -9,7 +9,7 @@ export default defineConfig({
 		image: "/icon.svg",
 		text: "rest-rpc",
 	},
-	deployment: vercel({ site: "https://rest-rpc.dev" }),
+	deployment: vercel({ site: "https://rest-rpc.vercel.app" }),
 	agents: {
 		mcp: {
 			enabled: true,
@@ -27,7 +27,7 @@ export default defineConfig({
 			}),
 			githubReleases({
 				prefix: "changelog",
-				owner: "rest-rpc",
+				owner: "simoalanne",
 				prereleases: true,
 				repo: "rest-rpc",
 			}),
@@ -37,7 +37,7 @@ export default defineConfig({
 		indexing: { includeCodeBlocks: true },
 	},
 	github: {
-		owner: "rest-rpc",
+		owner: "simoalanne",
 		repo: "rest-rpc",
 	},
 	navigation: {

@@ -130,13 +130,13 @@ If tools are not installed they can be added using:
 For Codex:
 
 ```bash
-codex mcp add rest-rpc --url https://rest-rpc.dev/mcp
+codex mcp add rest-rpc --url https://rest-rpc.vercel.app/mcp
 ```
 
 For Claude Code:
 
 ```bash
-claude mcp add --transport http rest-rpc https://rest-rpc.dev/mcp
+claude mcp add --transport http rest-rpc https://rest-rpc.vercel.app/mcp
 ```
 
 1. MCP `search_docs`
@@ -147,8 +147,8 @@ claude mcp add --transport http rest-rpc https://rest-rpc.dev/mcp
 
 Useful indexes:
 
-- `https://rest-rpc.dev/agent-readability.json`
-- `https://rest-rpc.dev/llms.txt`
+- `https://rest-rpc.vercel.app/agent-readability.json`
+- `https://rest-rpc.vercel.app/llms.txt`
 
 ### Via reading source code (when the documentation does not cover the needed details)
 

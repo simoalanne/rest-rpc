@@ -21,7 +21,7 @@ import { mapContractRoutes } from "./traversal.ts";
  * export const api = extractContract(routes);
  * ```
  *
- * @see {@link https://rest-rpc.dev/docs/client/contract-extraction}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/contract-extraction}
  */
 export function extractContract<const TRoutes extends RouteTree>(
 	routes: TRoutes,

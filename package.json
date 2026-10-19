@@ -1,11 +1,11 @@
 {
 	"name": "rest-rpc",
 	"private": true,
-	"homepage": "https://github.com/rest-rpc/rest-rpc#readme",
+	"homepage": "https://github.com/simoalanne/rest-rpc#readme",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/rest-rpc/rest-rpc.git"
+		"url": "git+https://github.com/simoalanne/rest-rpc.git"
 	},
 	"type": "module",
 	"scripts": {

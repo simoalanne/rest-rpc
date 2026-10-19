@@ -76,7 +76,7 @@ const createImplementer = (contract: RuntimeContractTree): object => {
 /**
  * Converts a contract into an implementer, used to implement each route in the contract in type-safe way.
  *
- * @see {@link https://rest-rpc.dev/docs/contract-first}
+ * @see {@link https://rest-rpc.vercel.app/docs/contract-first}
  */
 export function implement<const TContract extends Contract>(
 	contract: TContract,

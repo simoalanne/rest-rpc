@@ -9,7 +9,7 @@ import type { Merge } from "../utils/typeUtils.ts";
  * A whole-object schema for response headers whose output contains scalar
  * values. The counterpart of `RequestHeadersSchema`.
  *
- * @see {@link https://rest-rpc.dev/docs/route-builder}
+ * @see {@link https://rest-rpc.vercel.app/docs/route-builder}
  */
 export type ResponseHeadersSchema = StandardSchemaV1<
 	unknown,
@@ -19,7 +19,7 @@ export type ResponseHeadersSchema = StandardSchemaV1<
 /**
  * Canonical declaration for one route response.
  *
- * @see {@link https://rest-rpc.dev/docs/http-behavior/serialization}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/serialization}
  */
 export type ResponseDeclaration = {
 	kind?: "stream";

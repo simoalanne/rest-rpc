@@ -5,7 +5,7 @@
  * Network and decoding failures remain ordinary errors. For stream validation
  * failures, the body is the decoded item that failed validation.
  *
- * @see {@link https://rest-rpc.dev/docs/client/fetch-client}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client}
  */
 export class HttpError extends Error {
 	readonly name = "HttpError";

@@ -42,7 +42,7 @@ const toCallResult = ({ status, headers = {}, body }: RouteResult) => ({
  *
  * @remarks options can be used to provide values HTTP request would normally provide.
  *
- * @see {@link https://rest-rpc.dev/docs/client/local-client#one-off-calls}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/local-client#one-off-calls}
  */
 export async function call<TRoute extends ImplementedRoute>(
 	route: TRoute,
@@ -92,7 +92,7 @@ const createLocalClient = (tree: RuntimeImplementationTree): unknown =>
  * Creates a local client for a route tree, whose leaves call their route
  * handlers with `call`.
  *
- * @see {@link https://rest-rpc.dev/docs/client/local-client#local-client}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/local-client#local-client}
  */
 export function initLocalClient<const T extends RuntimeImplementationTree>(
 	routes: T,

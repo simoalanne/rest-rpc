@@ -13,7 +13,7 @@ const PROCEDURE_2 = `route.body(schema<{ id: string }>()).handler(({body}) => ({
 
 function createRouter(routerName: string): string {
 	return `
-import { route, type as schema } from '@rest-rpc/server/node';
+import { route, type as schema } from '@rest-rpc/server';
 
 export const ${routerName} = {
   procedure_1: ${PROCEDURE_1},

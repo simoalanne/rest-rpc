@@ -58,7 +58,7 @@ type RouteErrorFor<E extends QueryRoute> = E extends unknown
  * The `InferClientError` from `@rest-rpc/core` contains only the declared
  * non-2xx responses. Pass a route tree to infer a matching tree of types.
  *
- * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#type-helpers}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/tanstack-query#type-helpers}
  */
 export type InferClientError<T extends RouteTree> = T extends QueryRoute
 	? RouteErrorFor<T>
@@ -386,7 +386,7 @@ type TanstackQueryTreeFor<
  * mutation, query-key, and mutation-key utils; eligible streaming routes
  * also expose streamed query options.
  *
- * @see {@link https://rest-rpc.dev/docs/client/tanstack-query}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/tanstack-query}
  */
 export type TanstackQueryUtilsFor<
 	T extends Contract,
@@ -398,7 +398,7 @@ export type TanstackQueryUtilsFor<
 /**
  * Options used to create TanStack Query utils from a contract.
  *
- * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#setup}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/tanstack-query#setup}
  */
 export type CreateTanstackQueryUtilsOptions<
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
@@ -431,7 +431,7 @@ const fetchSuccessfulResponse = async (
  * @remarks Generated utils create options and stable query keys; they do not
  * create a `QueryClient` or call framework-specific hooks.
  *
- * @see {@link https://rest-rpc.dev/docs/client/tanstack-query#setup}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/tanstack-query#setup}
  */
 export function createTanstackQueryUtils<
 	TContract extends Contract,

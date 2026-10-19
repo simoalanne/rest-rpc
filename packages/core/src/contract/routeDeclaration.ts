@@ -42,7 +42,7 @@ export type RouteRequestDeclaration = {
  * @remarks Applications normally create route declarations with `route`
  * instead of constructing this representation directly.
  *
- * @see {@link https://rest-rpc.dev/docs/route-builder}
+ * @see {@link https://rest-rpc.vercel.app/docs/route-builder}
  */
 export type RouteDeclaration = {
 	path: AbsolutePath | undefined;

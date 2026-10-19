@@ -17,11 +17,11 @@
 		"type-safe-api",
 		"typescript"
 	],
-	"homepage": "https://github.com/rest-rpc/rest-rpc#readme",
+	"homepage": "https://github.com/simoalanne/rest-rpc#readme",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/rest-rpc/rest-rpc.git",
+		"url": "git+https://github.com/simoalanne/rest-rpc.git",
 		"directory": "packages/tanstack-query"
 	},
 	"files": [

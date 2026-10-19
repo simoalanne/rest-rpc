@@ -19,12 +19,12 @@ type ContractImplementerNode<
 				readonly context?: TContext;
 			};
 		} & HandlerMethodFor<TContract["~restrpc"], TContext> & {
-				/** Selects the typed per-request context store for this implementation. @see {@link https://rest-rpc.dev/docs/context} */
+				/** Selects the typed per-request context store for this implementation. @see {@link https://rest-rpc.vercel.app/docs/context} */
 				$context<TValues extends object>(): ContractImplementerNode<
 					TContract,
 					TValues
 				>;
-				/** Wraps this contract leaf with middleware. @see {@link https://rest-rpc.dev/docs/middleware} */
+				/** Wraps this contract leaf with middleware. @see {@link https://rest-rpc.vercel.app/docs/middleware} */
 				use(
 					middleware: (
 						request: MiddlewareRequest<TContract["~restrpc"], TContext>,
@@ -42,12 +42,12 @@ type ImplementerRootMethods<
 	TContract extends Contract,
 	TContext extends object,
 > = {
-	/** Selects the typed per-request context store for this implementation tree. @see {@link https://rest-rpc.dev/docs/context} */
+	/** Selects the typed per-request context store for this implementation tree. @see {@link https://rest-rpc.vercel.app/docs/context} */
 	$context<TValues extends object>(): ContractImplementerRoot<
 		TContract,
 		TValues
 	>;
-	/** Applies middleware to each route in this implementation tree. @see {@link https://rest-rpc.dev/docs/middleware} */
+	/** Applies middleware to each route in this implementation tree. @see {@link https://rest-rpc.vercel.app/docs/middleware} */
 	use(
 		middleware: (
 			request: ReusableMiddlewareRequest<RequestFields, TContext>,

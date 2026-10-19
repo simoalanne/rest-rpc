@@ -84,7 +84,7 @@ const writeFetchResponse = async (
 /**
  * A compiled route ready to be registered on a Node router.
  *
- * @see {@link https://rest-rpc.dev/docs/server/node#routes}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/node#routes}
  */
 export type NodeRoute = {
 	readonly method: HttpMethod;
@@ -105,7 +105,7 @@ export type NodeRoute = {
 /**
  * Indicates whether the Node HTTP catch-all handler dispatched a request to a rest-rpc route.
  *
- * @see {@link https://rest-rpc.dev/docs/server/node}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/node}
  */
 export type NodeRouteHandlerResult = { matched: boolean };
 
@@ -117,7 +117,7 @@ export type NodeRouteHandlerResult = { matched: boolean };
  * Pass the result to {@link createCatchAllHandler} to let rest-rpc do the
  * routing instead.
  *
- * @see {@link https://rest-rpc.dev/docs/server/node#routes}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/node#routes}
  */
 export function compileRoutes(
 	implementations: RuntimeImplementationTree,
@@ -141,7 +141,7 @@ export function compileRoutes(
  * @remarks Unmatched requests are left untouched and reported with
  * `matched: false` so the surrounding server can provide fallback routing.
  *
- * @see {@link https://rest-rpc.dev/docs/server/node}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/node}
  */
 export function createCatchAllHandler(
 	routes: readonly NodeRoute[],

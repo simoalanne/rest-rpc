@@ -23,7 +23,7 @@ import { splitRequestUrl } from "../routing/requestUrl.ts";
 /**
  * Customizes paths, request parsing and validation failures for compiled Fetch routes.
  *
- * @see {@link https://rest-rpc.dev/docs/server/fetch#options}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#options}
  */
 export type CompileRoutesOptions = {
 	bodyCodecs?: readonly BodyCodec[];
@@ -45,7 +45,7 @@ export type CompileRoutesOptions = {
 	 *
 	 * @remarks Do not disable request validation if you are using schemas that
 	 * transform or coerce values, as those transformations will not be applied to
-	 * the request segments. See {@link https://rest-rpc.dev/docs/http-behavior/schemas#disabling-server-validation}.
+	 * the request segments. See {@link https://rest-rpc.vercel.app/docs/http-behavior/schemas#disabling-server-validation}.
 	 *
 	 * @default false
 	 */
@@ -57,7 +57,7 @@ export type CompileRoutesOptions = {
 	 *
 	 * @remarks Do not disable response validation if you are using schemas that
 	 * transform or coerce values, as those transformations will not be applied to
-	 * the response body. See {@link https://rest-rpc.dev/docs/http-behavior/schemas#disabling-server-validation}.
+	 * the response body. See {@link https://rest-rpc.vercel.app/docs/http-behavior/schemas#disabling-server-validation}.
 	 *
 	 * @default false
 	 */
@@ -67,7 +67,7 @@ export type CompileRoutesOptions = {
 /**
  * Defines the Fetch response returned when a request fails validation.
  *
- * @see {@link https://rest-rpc.dev/docs/server/fetch#error-handling}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#error-handling}
  */
 export type RequestValidationErrorHandler = (
 	error: RequestValidationError,
@@ -77,7 +77,7 @@ export type RequestValidationErrorHandler = (
 /**
  * Defines the Fetch response returned when handler output fails validation.
  *
- * @see {@link https://rest-rpc.dev/docs/server/fetch#error-handling}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#error-handling}
  */
 export type ResponseValidationErrorHandler = (
 	error: ResponseValidationError,
@@ -90,7 +90,7 @@ export type ResponseValidationErrorHandler = (
  * @remarks `matched` is `false` when no route matches, so the surrounding
  * runtime can provide fallback routing.
  *
- * @see {@link https://rest-rpc.dev/docs/server/fetch#usage}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#usage}
  */
 export type FetchRouteHandlerResult =
 	| { matched: true; response: Response }
@@ -99,7 +99,7 @@ export type FetchRouteHandlerResult =
 /**
  * A compiled route ready to be registered on a router.
  *
- * @see {@link https://rest-rpc.dev/docs/server/fetch#routes}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#routes}
  */
 export type FetchRoute = {
 	readonly method: HttpMethod;
@@ -190,7 +190,7 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
  * @remarks Pass the result to {@link createCatchAllHandler} to let rest-rpc
  * do the routing instead.
  *
- * @see {@link https://rest-rpc.dev/docs/server/fetch#routes}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#routes}
  */
 export function compileRoutes(
 	implementations: RuntimeImplementationTree,
@@ -227,7 +227,7 @@ export function compileRoutes(
  * @remarks An unmatched request is returned to the caller with `matched: false`
  * so the surrounding runtime can provide fallback routing.
  *
- * @see {@link https://rest-rpc.dev/docs/server/fetch}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/fetch}
  */
 export function createCatchAllHandler(
 	routes: readonly FetchRoute[],

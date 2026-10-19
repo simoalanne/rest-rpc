@@ -10,7 +10,7 @@ type ChangelogEntry = {
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const version = corePackage.version;
-const repoUrl = `https://github.com/rest-rpc/rest-rpc`;
+const repoUrl = `https://github.com/simoalanne/rest-rpc`;
 
 const packages = [
 	["core", "packages/core/CHANGELOG.md"],

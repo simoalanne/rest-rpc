@@ -17,7 +17,7 @@ import type { EmptyObject, MaybePromise, Merge } from "@rest-rpc/core/utils";
  * `contentType` selects a custom-content response for non-stream bodies;
  * otherwise bodies use JSON.
  *
- * @see {@link https://rest-rpc.dev/docs/route-builder#return-responses}
+ * @see {@link https://rest-rpc.vercel.app/docs/route-builder#return-responses}
  */
 export type ImplicitResponseEnvelope =
 	| {
@@ -43,7 +43,7 @@ type BodyResponseKind<TResponse, TBody> =
 /**
  * Infers the body encoding selected by a handler response shape.
  *
- * @see {@link https://rest-rpc.dev/docs/route-builder#return-responses}
+ * @see {@link https://rest-rpc.vercel.app/docs/route-builder#return-responses}
  */
 export type ImplicitResponseKind<TResponse> = TResponse extends unknown
 	? "body" extends keyof TResponse
@@ -300,7 +300,7 @@ export type ValidHandlerResult<TRoute extends RouteDeclaration, TResult> =
  * tree of handler types. The context is the one selected with `$context()`, or
  * `DefaultContext` for contract routes passed directly.
  *
- * @see {@link https://rest-rpc.dev/docs/route-builder#type-helpers}
+ * @see {@link https://rest-rpc.vercel.app/docs/route-builder#type-helpers}
  */
 export type InferServerHandler<TRoute extends HandlerTree> =
 	RouteHandlerFor<TRoute>;
@@ -319,7 +319,7 @@ type HandlerResponses<T> = T extends (...args: never) => unknown
  * @remarks The first parameter of {@link InferServerHandler}. Pass a route
  * tree to infer a matching tree of request types.
  *
- * @see {@link https://rest-rpc.dev/docs/route-builder#type-helpers}
+ * @see {@link https://rest-rpc.vercel.app/docs/route-builder#type-helpers}
  */
 export type InferServerRequest<TRoute extends HandlerTree> = HandlerRequests<
 	InferServerHandler<TRoute>
@@ -331,7 +331,7 @@ export type InferServerRequest<TRoute extends HandlerTree> = HandlerRequests<
  * @remarks The awaited return type of {@link InferServerHandler}. Pass a route
  * tree to infer a matching tree of response types.
  *
- * @see {@link https://rest-rpc.dev/docs/route-builder#type-helpers}
+ * @see {@link https://rest-rpc.vercel.app/docs/route-builder#type-helpers}
  */
 export type InferServerResponse<TRoute extends HandlerTree> = HandlerResponses<
 	InferServerHandler<TRoute>
@@ -356,7 +356,7 @@ export type RequestFields = Partial<UnknownRequest>;
 /**
  * Validated declaration-position request data, handler fields, context, and controls for inline middleware.
  *
- * @see {@link https://rest-rpc.dev/docs/middleware}
+ * @see {@link https://rest-rpc.vercel.app/docs/middleware}
  */
 export type MiddlewareRequest<
 	TRoute extends RouteDeclaration,
@@ -366,7 +366,7 @@ export type MiddlewareRequest<
 /**
  * Handler fields, global context, unknown request locations, and controls for reusable middleware.
  *
- * @see {@link https://rest-rpc.dev/docs/middleware}
+ * @see {@link https://rest-rpc.vercel.app/docs/middleware}
  */
 export type ReusableMiddlewareRequest<
 	TRequest extends RequestFields,
