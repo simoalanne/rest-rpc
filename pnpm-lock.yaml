@@ -243,11 +243,7 @@ importers:
         specifier: ^4.6.7
         version: 4.6.7
 
-  packages/core:
-    devDependencies:
-      typescript:
-        specifier: 5.9.3
-        version: 5.9.3
+  packages/core: {}
 
   packages/server:
     dependencies:
