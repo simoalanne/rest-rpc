@@ -92,20 +92,6 @@ Bun.serve({
 
 See [Frameworks](/docs/server/frameworks) for more examples.
 
-## Context
-
-Handlers and middleware receive the
-[common handler arguments](/docs/route-builder#handler-arguments) and the
-request's `signal`. To pass values from the host into the request
-[context](/docs/context), such as an authenticated user or the native request,
-seed it with the `context` option:
-
-```ts
-const result = await handler(request, { context: { user } });
-// or, for a compiled route
-const response = await route.handle(request, { context: { user } });
-```
-
 ## Options
 
 ```ts
@@ -115,7 +101,6 @@ type CompileRoutesOptions = {
 	disableResponseValidation?: boolean;
 	paramSyntax?: "colon" | "braces";
 	prefix?: `/${string}`;
-	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 };
@@ -125,10 +110,34 @@ type CompileRoutesOptions = {
 - `paramSyntax`: rewrites path params in compiled paths to `:name` (`"colon"`)
   or `{name}` (`"braces"`) for routers that expect one of them. Paths keep the
   markers they were declared with by default.
-- `bodyCodecs`, `requestBodyLimit`: see [Request and Response Bodies](#request-and-response-bodies).
+- `bodyCodecs`: see [Request and Response Bodies](#request-and-response-bodies).
 - `disableRequestValidation`, `disableResponseValidation`: see
   [Disabling Server Validation](/docs/http-behavior/schemas#disabling-server-validation).
 - `requestValidationErrorHandler`, `responseValidationErrorHandler`: see [Error Handling](#error-handling).
+
+## Handle Options
+
+Compiled routes and the catch-all handler take per-request options:
+
+```ts
+type HandleOptions = {
+	context?: Record<string, unknown>;
+	params?: Record<string, string>;
+	body?: unknown;
+};
+
+const response = await route.handle(request, { context: { user } });
+```
+
+- `context`: values from the host to seed the request [context](/docs/context)
+  with before middleware runs, such as an authenticated user or the native
+  request. They are not type-checked against the context types routes declare.
+- `params`: percent-decoded path params already parsed by the framework's
+  router. Passing them gives a small performance gain, as the params are not
+  parsed from the request URL again.
+- `body`: a request body already parsed by the framework, such as with a body
+  parser. The request body is then not read, but the value is still validated
+  against the route's body schema.
 
 ## Paths
 
@@ -140,8 +149,7 @@ params, and one trailing slash is ignored. Param values are percent-decoded.
 
 Request bodies are decoded with custom `bodyCodecs` first and the
 [default codecs](/docs/http-behavior/serialization#default-codecs) after them.
-A codec's `deserialize` receives the Fetch `Request`. Decoding reads at most
-`requestBodyLimit` bytes, `1 MiB` by default.
+A codec's `deserialize` receives the Fetch `Request`.
 
 Handlers can return any value supported by the default codecs. A custom
 serializer's `body` must be a Fetch `Response` body, such as a string, `Blob`,

@@ -13,10 +13,7 @@ import {
 import { assertRequestContentType } from "./requestContentType.ts";
 import { handleHttpRoute, type HandleOptions } from "./handleHttpRoute.ts";
 import { RequestValidationError, ResponseValidationError } from "./errors.ts";
-import {
-	assertRequestBodyLimit,
-	deserializeRequestBody,
-} from "./deserializeRequestBody.ts";
+import { deserializeRequestBody } from "./deserializeRequestBody.ts";
 import { serializeHttpRouteResult } from "./serializeHttpRouteResult.ts";
 import { splitRequestUrl } from "../routing/requestUrl.ts";
 
@@ -34,8 +31,6 @@ export type CompileRoutesOptions = {
 	 * `{name}` (`"braces"`). Declared markers are kept when omitted.
 	 */
 	paramSyntax?: "colon" | "braces";
-	/** The maximum accepted size of the request body in bytes. */
-	requestBodyLimit?: number;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 	/**
@@ -106,8 +101,8 @@ export type FetchRoute = {
 	/** Route path with prefix applied and param markers per `paramSyntax`. */
 	readonly path: string;
 	/**
-	 * Handles a request already routed to this route. Params are read from the
-	 * request URL unless passed in `options`.
+	 * Handles a request already routed to this route. Params and the body are
+	 * read from the request unless passed in `options`.
 	 */
 	readonly handle: (
 		request: Request,
@@ -126,8 +121,6 @@ type FetchDispatch = (
 const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 	const bodyCodecs = options.bodyCodecs ?? [];
 	const requestBodyCodecs = [...bodyCodecs, ...defaultBodyCodecs];
-	const maxBytes = options.requestBodyLimit;
-	assertRequestBodyLimit(maxBytes);
 
 	return async (implementation, params, request, search, handleOptions) => {
 		const rejection = assertRequestContentType(
@@ -141,11 +134,10 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 			);
 		}
 
-		const { body, rejection: bodyRejection } = await deserializeRequestBody(
-			request,
-			requestBodyCodecs,
-			maxBytes,
-		);
+		const { body, rejection: bodyRejection } =
+			handleOptions && "body" in handleOptions
+				? { body: handleOptions.body, rejection: undefined }
+				: await deserializeRequestBody(request, requestBodyCodecs);
 		if (bodyRejection) {
 			return Response.json(
 				{ message: bodyRejection.message },

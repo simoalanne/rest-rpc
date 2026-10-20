@@ -13,4 +13,4 @@ Narrow the server side to Fetch and Node HTTP runtimes that integrate with any f
 - Handlers and catch-all handlers accept `{ context }` to seed the request context before middleware runs.
 - Handlers and middleware no longer receive the native `request`, `req` or `res`, and the `DefaultRequest` interface is removed. Pass native values through `context` when needed.
 - Routing uses rou3. Static segments take precedence over params, one trailing slash is ignored, and repeated param names in one path are rejected.
-- `BodyCodec` and `BodyDeserializer` are no longer generic. Custom deserializers receive a Fetch `Request` on the server, including on Node, and are subject to `requestBodyLimit`. An error thrown while deserializing now responds with `400`.
+- `BodyCodec` and `BodyDeserializer` are no longer generic. Custom deserializers receive a Fetch `Request` on the server, including on Node,. An error thrown while deserializing now responds with `400`.

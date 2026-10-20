@@ -32,7 +32,7 @@ import type { CompileRoutesOptions } from "./compileRoutes.ts";
 /**
  * Per-request options for compiled routes and the catch-all handler.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/context#values-from-the-host}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#handle-options}
  */
 export type HandleOptions = {
 	/**
@@ -44,6 +44,12 @@ export type HandleOptions = {
 	 * Percent-decoded path params. Read from the request URL when omitted.
 	 */
 	params?: Record<string, string>;
+	/**
+	 * An already decoded request body, such as one parsed by a framework's body
+	 * parser. When the key is present, even as `undefined`, the request body is
+	 * not read. The value is still validated against the route's body schema.
+	 */
+	body?: unknown;
 };
 
 /** Inputs needed to invoke and normalize one HTTP route handler. */

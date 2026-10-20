@@ -148,6 +148,4 @@ including parameters, and returns `{ body, headers?, contentType? }`:
 `deserialize(source)` returns the value to validate. On the client, `source` is
 the Fetch `Response`. On the server, it is the Fetch `Request`.
 
-On the server, the request body is limited to `requestBodyLimit` bytes for
-custom deserializers too. An error thrown while deserializing responds with
-`400`, or `413` when the body exceeds the limit.
+On the server, an error thrown while deserializing responds with `400`.
