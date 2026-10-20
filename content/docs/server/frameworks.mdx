@@ -11,14 +11,8 @@ on Node's `IncomingMessage`, such as Express.
 Register each compiled route on the framework's [native router](#native-router),
 or mount the [catch-all](#catch-all) handler and let rest-rpc do the routing.
 Either way, pass framework values that handlers need, such as an authenticated
-user, through the [`context` option](/docs/server/fetch#context).
-
-:::warning
-rest-rpc reads request bodies itself so it behaves predictably regardless of the underlying framework.
-When using frameworks that provide body parsers, such as `express.json()`, avoid registering them on rest-rpc routes.
-Use the `requestBodyLimit` option with the [default codecs](/docs/http-behavior/serialization#default-codecs),
-or [custom codecs](/docs/http-behavior/serialization#custom-codecs) for other formats.
-:::
+user, through the [`context` option](/docs/server/fetch#handle-options), and
+params or a body the framework already parsed through `params` and `body`.
 
 ## Native Router
 

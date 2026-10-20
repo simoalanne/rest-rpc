@@ -177,25 +177,47 @@ route
 	});
 ```
 
-## Declare Content Types
+## Declare Media Types
 
-Bodies default to JSON. Use `contentType` on `.body()` or `.response()` for
-text, forms, or binary values:
+Bodies passed as a schema are JSON. For text, forms, binary values, or several
+media types, pass a record of schemas keyed by base media type:
 
 ```ts
 const report = route
 	.get("/todos/report")
-	.response(z.string(), { contentType: "text/plain" })
+	.response({ "text/plain": z.string() })
 	.handler(() => createTodoReport());
 ```
 
-Without a declaration, return the body in an envelope with its `contentType`,
-and the content type is inferred.
+With several media types, requests and responses are unions discriminated by
+`contentType`. The handler receives the request media type with a narrowed
+`body`, and selects a response media type with its returned `contentType`:
 
-Content types can also be declared as a list of alternatives. The handler
-selects a response content type with its returned `contentType`, and the client
-selects a request content type in its
-[per-call options](/docs/client/fetch-client#per-call-options). See
+```ts
+const importTodos = route
+	.post("/todos/import")
+	.body({
+		"application/json": z.array(z.object({ title: z.string() })),
+		"text/csv": z.string(),
+	})
+	.response({ "application/json": z.object({ count: z.number() }) })
+	.handler(({ contentType, body }) => {
+		const titles =
+			contentType === "text/csv"
+				? body.split("\n")
+				: body.map((todo) => todo.title);
+		return { count: titles.length };
+	});
+```
+
+`contentType` may be omitted when a status declares one media type. Clients
+select the request media type with `contentType` in the
+[request](/docs/client/fetch-client#select-a-request-media-type). Repeated
+`.body()` calls [stack](#stacking-schemas) schemas per media type, and a schema
+passed alone counts as `application/json`.
+
+Without declared responses, return the body in an envelope with its
+`contentType`, and the media type is inferred. See
 [Serialization and Codecs](/docs/http-behavior/serialization) for decoded value
 types and compatible codecs.
 
@@ -209,6 +231,24 @@ const events = route
 	.get("/todos/events")
 	.streamResponse(z.object({ id: z.string(), message: z.string() }))
 	.handler(() => streamTodoEvents());
+```
+
+`.streamResponse(schema)` is sugar for `.response({ "text/event-stream": schema })`,
+so it declares the whole status. To offer a stream and another media type on the
+same status, declare both in one record and select one with `contentType`:
+
+```ts
+const todos = route
+	.get("/todos")
+	.response({
+		"application/json": z.array(todoSchema),
+		"text/event-stream": todoSchema,
+	})
+	.handler(() =>
+		wantsStream()
+			? { status: 200, contentType: "text/event-stream", body: streamTodos() }
+			: { status: 200, contentType: "application/json", body: listTodos() },
+	);
 ```
 
 See [Streaming](/docs/streaming) for handlers, event metadata, validation, and
@@ -263,7 +303,8 @@ A handler receives one object containing:
 - The validated request: `params`, `query`, `headers`, and `body`.
 - `context`: the per-request [context](/docs/context) shared with middleware.
 - `route`: the route declaration, including its method, path, and `metadata`.
-- `contentType`: the received request media type, if any.
+- `contentType`: the request body media type. Routes with a body narrow it to
+  their declared media types, and `body` with it.
 - `lastEventId`: the `Last-Event-ID` request header, used to [resume streams](/docs/streaming#resume-a-stream).
 - `signal`: an `AbortSignal` that aborts when the client disconnects.
 

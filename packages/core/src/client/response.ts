@@ -1,11 +1,5 @@
 import { HttpError } from "./httpError.ts";
-import {
-	resolveBodyCodec,
-	defaultBodyCodecs,
-	findDeclaredContentType,
-	normalizeMediaType,
-	type BodyCodec,
-} from "../codecs/index.ts";
+import { normalizeMediaType, type BodyCodecRegistry } from "../codecs/index.ts";
 import type { RouteDeclaration, RouteTree } from "../contract/contract.ts";
 import type { SseEvent } from "../contract/sse.ts";
 import type {
@@ -102,15 +96,13 @@ type ClientStreamDataForDeclaration<E extends RouteDeclaration> =
 		: never;
 
 const assertResponseContentType = (
-	declared: string | readonly string[] | undefined,
+	declared: ResponseDeclaration["content"],
+	mediaType: string,
 	rawResponse: Response,
 	body: unknown,
 ) => {
-	const received = normalizeMediaType(
-		rawResponse.headers.get("content-type") ?? "",
-	);
-	if (!received || declared === undefined) return;
-	if (findDeclaredContentType(declared, received) === undefined) {
+	if (!mediaType || declared === undefined) return;
+	if (!(mediaType in declared)) {
 		throw new HttpError(rawResponse.status, body, {
 			cause: new Error("Server returned an unsupported response content-type."),
 		});
@@ -149,14 +141,10 @@ const readHeaders = async (
 const readBody = async (
 	rawResponse: Response,
 	mediaType: string,
-	bodyCodecs: readonly BodyCodec[] | undefined,
+	codecs: BodyCodecRegistry,
 ) => {
 	if (!mediaType || rawResponse.body === null) return undefined;
-	const resolvedCodec = resolveBodyCodec(mediaType, [
-		...(bodyCodecs ?? []),
-		...defaultBodyCodecs,
-	]);
-	return resolvedCodec?.deserialize?.(rawResponse);
+	return codecs.deserialize(rawResponse, mediaType);
 };
 
 export type RouteRequestFn = <E extends RouteDeclaration & { path: string }>(
@@ -170,14 +158,15 @@ export type RouteRequestFn = <E extends RouteDeclaration & { path: string }>(
  * @remarks `text/event-stream` responses are always parsed as SSE streams.
  * Routes without response declarations, such as extracted contracts, return
  * every status as an envelope. Routes with declarations reject undeclared
- * statuses and undeclared media types.
+ * statuses and undeclared media types. `contentType` is the received base
+ * media type, or `undefined` without a content type.
  */
 export const fetchResponse = async <
 	E extends RouteDeclaration & { path: string },
 >(
 	request: RouteRequestFn,
 	validateResponse: boolean,
-	bodyCodecs: readonly BodyCodec[] | undefined,
+	codecs: BodyCodecRegistry,
 	route: E,
 	...args: FetchArgs<E>
 ) => {
@@ -185,34 +174,36 @@ export const fetchResponse = async <
 	const { status } = rawResponse;
 	const schema: ResponseDeclaration | undefined = route.responses?.[status];
 	const mediaType = normalizeMediaType(rawResponse.headers.get("content-type"));
+	const contentType = mediaType || undefined;
 
 	if (mediaType === STREAM_CONTENT_TYPE) {
 		const body = readStreamResponse(
-			schema?.body,
+			schema?.content?.[STREAM_CONTENT_TYPE],
 			rawResponse,
 			validateResponse,
 		);
 		return {
 			status,
+			contentType,
 			headers: await readHeaders(schema, rawResponse, validateResponse, body),
 			body,
 		};
 	}
-	if (schema?.kind === "stream") {
-		throw new Error("Server returned an unsupported stream content-type.");
-	}
 
-	const value = await readBody(rawResponse, mediaType, bodyCodecs);
+	const value = await readBody(rawResponse, mediaType, codecs);
 	const declaresResponses = Object.keys(route.responses ?? {}).length > 0;
 	if (!schema && declaresResponses) {
 		throw new HttpError(status, value);
 	}
-	if (schema) assertResponseContentType(schema.contentType, rawResponse, value);
+	if (schema) {
+		assertResponseContentType(schema.content, mediaType, rawResponse, value);
+	}
 	return {
 		status,
+		contentType,
 		headers: await readHeaders(schema, rawResponse, validateResponse, value),
 		body: await validateResponseValue(
-			schema?.body,
+			schema?.content?.[mediaType],
 			value,
 			validateResponse,
 			status,

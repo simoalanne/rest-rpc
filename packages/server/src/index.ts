@@ -30,9 +30,17 @@ export {
 	type CallOptions,
 	type LocalClient,
 } from "./pipeline/call.ts";
-export { createOpenApiDocument, type } from "@rest-rpc/core";
+export {
+	bodyCodec,
+	createOpenApiDocument,
+	serializedBody,
+	type,
+} from "@rest-rpc/core";
 export type {
 	BodyCodec,
+	BodyCodecOperations,
+	BodyValue,
+	SerializedBody,
 	CreateOpenApiDocumentOptions,
 	InferClientRequest,
 	InferClientResponse,

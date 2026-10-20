@@ -1,23 +1,35 @@
 import { route, type } from "@rest-rpc/core";
-import { assertRequestContentType } from "./requestContentType.ts";
+import { resolveRequestMediaType } from "./requestContentType.ts";
 
-describe("requestContentType", () => {
-	it("accepts normalized declared types and missing headers", () => {
-		const declaration = route.post("/").body(type<string>(), {
-			contentType: ["text/plain", "application/json"],
-		})["~restrpc"];
+describe("resolveRequestMediaType", () => {
+	const declaration = route.post("/").body({
+		"text/plain": type<string>(),
+		"application/json": type<{ name: string }>(),
+	})["~restrpc"];
+
+	it("selects declared media types from normalized content types", () => {
 		expect(
-			assertRequestContentType(declaration, "Text/Plain; charset=utf-8"),
-		).toBeUndefined();
-		expect(assertRequestContentType(declaration, null)).toBeUndefined();
-		expect(assertRequestContentType(declaration, "image/png")).toMatchObject({
-			status: 415,
+			resolveRequestMediaType(declaration, "Text/Plain; charset=utf-8"),
+		).toEqual({ mediaType: "text/plain", rejection: undefined });
+		expect(resolveRequestMediaType(declaration, "image/png")).toMatchObject({
+			rejection: { status: 415 },
+		});
+	});
+
+	it("uses the only declared media type when the content type is missing", () => {
+		const single = route.post("/").body(type<string>())["~restrpc"];
+		expect(resolveRequestMediaType(single, null)).toEqual({
+			mediaType: "application/json",
+			rejection: undefined,
+		});
+		expect(resolveRequestMediaType(declaration, null)).toMatchObject({
+			rejection: { status: 415 },
 		});
 	});
 
 	it("rejects received content types when no request body is declared", () => {
 		expect(
-			assertRequestContentType(route.get("/")["~restrpc"], "application/json"),
-		).toMatchObject({ status: 415 });
+			resolveRequestMediaType(route.get("/")["~restrpc"], "application/json"),
+		).toMatchObject({ rejection: { status: 415 } });
 	});
 });

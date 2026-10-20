@@ -1,3 +1,6 @@
+import { bodyCodec } from "../codecs/bodyCodec.ts";
+import { createBodyCodecRegistry } from "../codecs/registry.ts";
+import type { BodyContent } from "../contract/body.ts";
 import { route } from "../contract/routeBuilder.ts";
 import { type } from "../standard-schema/type.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
@@ -16,8 +19,9 @@ const json = (value: unknown, headers?: RequestInit["headers"]) =>
 const declared = route
 	.get("/")
 	.response(type<{ name: string }>(), { status: 201 })["~restrpc"];
+const codecs = createBodyCodecRegistry([]);
 const decode = (response: Response, validate = true, declaration = declared) =>
-	fetchResponse(async () => response, validate, undefined, declaration);
+	fetchResponse(async () => response, validate, codecs, declaration);
 
 describe("client response decoding", () => {
 	it("transforms declared headers and keeps undeclared headers", async () => {
@@ -31,7 +35,7 @@ describe("client response decoding", () => {
 			fetchResponse(
 				async () => json({ name: "Ada" }, { "x-count": "2" }),
 				validate,
-				undefined,
+				codecs,
 				declaration,
 			);
 		expect(await read(true)).toMatchObject({
@@ -55,7 +59,7 @@ describe("client response decoding", () => {
 				fetchResponse(
 					async () => json({ name: "Ada" }),
 					validate,
-					undefined,
+					codecs,
 					declaration,
 				);
 			await expect(read(true)).rejects.toMatchObject({
@@ -76,7 +80,7 @@ describe("client response decoding", () => {
 			await fetchResponse(
 				async () => new Response(null, { status: 204 }),
 				true,
-				undefined,
+				codecs,
 				declaration,
 			),
 		).toMatchObject({ status: 204, body: undefined });
@@ -85,9 +89,10 @@ describe("client response decoding", () => {
 	it.each([undefined, "application/unknown"])(
 		"handles absent or unknown response content types (%s)",
 		async (contentType) => {
-			const declaration = route.get("/").response(type(), {
-				contentType: contentType ?? "application/json",
-			})["~restrpc"];
+			const content = {
+				[contentType ?? "application/json"]: type(),
+			} as BodyContent;
+			const declaration = route.get("/").response(content)["~restrpc"];
 			const response = new Response("hello", {
 				headers: contentType ? { "content-type": contentType } : {},
 			});
@@ -96,7 +101,7 @@ describe("client response decoding", () => {
 			const result = await fetchResponse(
 				async () => response,
 				true,
-				undefined,
+				codecs,
 				declaration,
 			);
 			if (contentType) {
@@ -111,7 +116,7 @@ describe("client response decoding", () => {
 	it("falls back to binary decoding when a custom codec has no deserializer", async () => {
 		const declaration = route
 			.get("/")
-			.response(type(), { contentType: "application/custom" })["~restrpc"];
+			.response({ "application/custom": type() })["~restrpc"];
 		expect(
 			await fetchResponse(
 				async () =>
@@ -119,7 +124,9 @@ describe("client response decoding", () => {
 						headers: { "content-type": "application/custom" },
 					}),
 				true,
-				[{ match: (mediaType) => mediaType === "application/custom" }],
+				createBodyCodecRegistry([
+					bodyCodec("application/custom", { serialize: String }),
+				]),
 				declaration,
 			),
 		).toHaveProperty("body", expect.any(Blob));
@@ -156,15 +163,11 @@ describe("client response decoding", () => {
 					? new Response(null, {
 							headers: { "content-type": "text/event-stream" },
 						})
-					: new Response("data: 1\n\n", {
-							headers: { "content-type": "application/json" },
-						});
+					: Response.json(1);
 			await expect(
-				fetchResponse(async () => response, false, undefined, declaration),
+				fetchResponse(async () => response, false, codecs, declaration),
 			).rejects.toThrow(
-				failure === "missing body"
-					? "no stream body"
-					: "unsupported stream content-type",
+				failure === "missing body" ? "no stream body" : HttpError,
 			);
 		},
 	);
@@ -177,7 +180,7 @@ describe("client response decoding", () => {
 					headers: { "content-type": "text/event-stream; charset=utf-8" },
 				}),
 			false,
-			[{ match: () => true, deserialize }],
+			createBodyCodecRegistry([{ mediaTypes: [/.*/], deserialize }]),
 			route.get("/")["~restrpc"],
 		);
 		const events = [];

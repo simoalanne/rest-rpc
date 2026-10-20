@@ -12,9 +12,8 @@ replace them.
 
 | Situation                                                                                  | Status | Body                            |
 | ------------------------------------------------------------------------------------------ | ------ | ------------------------------- |
-| Request `Content-Type` is not declared by the route                                        | `415`  | `{ message }`                   |
+| Request `Content-Type` is not declared, or missing when several media types are            | `415`  | `{ message }`                   |
 | Request body cannot be decoded                                                             | `400`  | `{ message }`                   |
-| Request body exceeds `requestBodyLimit`                                                    | `413`  | `{ message }`                   |
 | [Request validation](/docs/http-behavior/schemas#request-validation) fails                 | `400`  | `{ message, validationErrors }` |
 | [Response validation](/docs/http-behavior/schemas#response-validation-on-the-server) fails | `500`  | `{ message }`                   |
 

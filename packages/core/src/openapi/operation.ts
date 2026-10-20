@@ -1,14 +1,12 @@
-import type { RouteDeclaration } from "../contract/routeDeclaration.ts";
-import type { RequestBodySchema } from "../contract/request.ts";
+import type {
+	RequestBodyDeclaration,
+	RouteDeclaration,
+} from "../contract/routeDeclaration.ts";
 import type {
 	ResponseDeclaration,
 	ResponseHeadersSchema,
 } from "../contract/response.ts";
-import { contentTypeList } from "../codecs/index.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-
-const JSON_CONTENT_TYPE = "application/json";
-const SSE_CONTENT_TYPE = "text/event-stream";
 
 type OpenApiSchema = Record<string, unknown>;
 
@@ -100,11 +98,16 @@ const getRequiredSchemaKeys = (schema: OpenApiSchema): SchemaRequiredKeys => {
 	return { type: "unknown" };
 };
 
-const createContent = (
-	contentTypes: readonly string[],
-	value: Record<string, unknown>,
+const mapContent = <TValue>(
+	content: Readonly<Record<string, TValue>>,
+	toSchema: (value: TValue) => OpenApiSchema,
 ) =>
-	Object.fromEntries(contentTypes.map((contentType) => [contentType, value]));
+	Object.fromEntries(
+		Object.entries(content).map(([mediaType, value]) => [
+			mediaType,
+			{ schema: toSchema(value) },
+		]),
+	);
 
 export const createParameters = (
 	schemas: readonly StandardSchemaV1[] | undefined,
@@ -141,23 +144,20 @@ export const createParameters = (
 };
 
 export const createRequestBody = (
-	schemas: readonly RequestBodySchema[] | undefined,
+	body: RequestBodyDeclaration | undefined,
 	converter: SchemaConverter | undefined,
-	customContentType?: string | readonly string[],
 ): OpenApiRequestBody | undefined => {
-	if (!schemas || schemas.length === 0) return undefined;
-	const contentTypes = contentTypeList(customContentType ?? JSON_CONTENT_TYPE);
-	if (contentTypes.length === 0) return undefined;
-	const convertedSchemas = schemas.map(
-		(schema) => converter?.(schema, "input") ?? {},
-	);
-	const openApiSchema =
-		convertedSchemas.length === 1
-			? convertedSchemas[0]
-			: { allOf: convertedSchemas };
+	if (!body) return undefined;
 
 	return {
-		content: createContent(contentTypes, { schema: openApiSchema }),
+		content: mapContent(body, (schemas) => {
+			const convertedSchemas = schemas.map(
+				(schema) => converter?.(schema, "input") ?? {},
+			);
+			return convertedSchemas.length === 1
+				? convertedSchemas[0]!
+				: { allOf: convertedSchemas };
+		}),
 	};
 };
 
@@ -165,24 +165,20 @@ export const createResponse = (
 	responseDeclaration: ResponseDeclaration,
 	converter: SchemaConverter | undefined,
 ): OpenApiResponse => {
-	const { body: schema, contentType } = responseDeclaration;
+	const { content } = responseDeclaration;
 	const headers = createResponseHeaders(responseDeclaration.headers, converter);
 	const response: OpenApiResponse = {
 		description: responseDeclaration.description ?? "",
 		...(headers ? { headers } : {}),
 	};
-	if (schema === undefined) return response;
-
-	const contentTypes =
-		responseDeclaration.kind === "stream"
-			? [SSE_CONTENT_TYPE]
-			: contentTypeList(contentType ?? JSON_CONTENT_TYPE);
+	if (content === undefined) return response;
 
 	return {
 		...response,
-		content: createContent(contentTypes, {
-			schema: converter?.(schema, "output") ?? {},
-		}),
+		content: mapContent(
+			content,
+			(schema) => converter?.(schema, "output") ?? {},
+		),
 	};
 };
 
@@ -239,11 +235,7 @@ export const createOperation = (
 			options.transformParameter?.({ route, routePath, parameter }) ??
 			parameter,
 	);
-	const requestBody = createRequestBody(
-		request?.body,
-		options.schemaConverter,
-		request?.contentType,
-	);
+	const requestBody = createRequestBody(request?.body, options.schemaConverter);
 	const { extensions, ...openApi } = route.openApi ?? {};
 	const operation: OpenApiOperation = {
 		...openApi,

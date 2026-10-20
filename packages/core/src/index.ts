@@ -10,7 +10,7 @@ export type {
 	InferClientStreamData,
 	InferClientSuccess,
 	FetchLike,
-	FetchOptionsFor,
+	FetchOptions,
 } from "./client/index.ts";
 export { initClient } from "./client/index.ts";
 export type {
@@ -21,15 +21,11 @@ export type {
 export { extractContract } from "./contract/extract.ts";
 export { route } from "./contract/routeBuilder.ts";
 export type {
-	BodyContentType,
-	BodyOptions,
+	BodyContent,
 	KnownBodyContentType,
+	MediaType,
 } from "./contract/body.ts";
-export type {
-	BodylessResponseOptions,
-	ResponseOptions,
-	StreamResponseOptions,
-} from "./contract/response.ts";
+export type { ResponseOptions } from "./contract/response.ts";
 export type {
 	CreateOpenApiDocumentOptions,
 	OpenApiDocument,
@@ -40,7 +36,10 @@ export { type } from "./standard-schema/type.ts";
 export type { ApiClientRouteValue } from "./client/index.ts";
 export type {
 	BodyCodec,
+	BodyCodecOperations,
 	BodyDeserializer,
 	BodySerializer,
+	BodyValue,
 	SerializedBody,
 } from "./codecs/index.ts";
+export { bodyCodec, serializedBody } from "./codecs/index.ts";
