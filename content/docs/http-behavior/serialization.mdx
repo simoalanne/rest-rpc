@@ -29,25 +29,41 @@ A single `tag[]=one` remains an array. Repeated scalar keys such as
 Declare header schemas with lowercase names. Incoming header names are
 normalized to lowercase, so uppercase schema keys do not match them.
 
-## Bodies and Content Types
+## Bodies and Media Types
 
 Body codecs serialize values into HTTP bodies and deserialize HTTP bodies into
-values. `.body()` and `.response()` default to `application/json`. Specifying the `contentType` option can select another media type.
-Schemas operate on values before encoding and after decoding.
+values. Schemas operate on values before encoding and after decoding.
 
-Outgoing codecs are selected from the declared content type. Incoming codecs
-are selected from the received `Content-Type` header. Matching uses the lowercase
-base media type without parameters, so `application/json; charset=utf-8` matches
-the JSON codec.
+A schema passed to `.body()` or `.response()` declares a JSON body. Other media
+types are declared with a record of schemas keyed by base media type, lowercase
+and without parameters:
 
-A request whose `Content-Type` is not declared by the route is rejected with
-`415` before validation. A client response without a content type or body
-decodes to `undefined`.
+```ts
+route
+	.post("/todos/import")
+	.body({
+		"application/json": z.array(z.object({ title: z.string() })),
+		"text/csv": z.string(),
+	})
+	.response({ "text/plain": z.string() });
+```
 
-When a route declares a list of content types, the client selects the request
-type with the [`contentType` call option](/docs/client/fetch-client#per-call-options),
-and the handler selects the response type with its returned `contentType`. The
-schema and codecs must agree on the values represented by each selected type.
+Each media type has its own schema, and requests and responses are unions
+discriminated by `contentType`. The client selects the request media type with
+[`contentType` in the request](/docs/client/fetch-client#select-a-request-media-type),
+and the handler selects the response media type with its returned
+`contentType`. Either may be omitted when one media type is declared.
+
+Outgoing codecs are selected from the selected media type. Incoming codecs and
+schemas are selected from the received `Content-Type` header. Matching uses the
+lowercase base media type without parameters, so
+`application/json; charset=utf-8` matches `application/json`.
+
+A request is rejected with `415` before validation when its `Content-Type` is
+not declared by the route, or when it has no `Content-Type` and the route
+declares several media types. Without a `Content-Type`, a route with one
+media type uses it. A client response without a content type or body decodes to
+`undefined`.
 
 ## Default Codecs
 
