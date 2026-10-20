@@ -1,7 +1,8 @@
 export type {
-	BodyContentType,
-	BodyOptions,
+	BodyContent,
+	DefaultBodyContentType,
 	KnownBodyContentType,
+	MediaType,
 } from "./body.ts";
 export type {
 	AbsolutePath,
@@ -9,12 +10,15 @@ export type {
 	OpenApiRouteOptions,
 	RouteDeclaration,
 	RouteMetadata,
+	RouteRequestDeclaration,
+	RequestBodyDeclaration,
 } from "./routeDeclaration.ts";
 export type { Contract, RouteTree } from "./contract.ts";
 export type {
 	BuilderFor,
 	BuilderKind,
 	BuilderState,
+	ContentFor,
 	DeclarationFor,
 	NextState,
 	RootBuilderState,
@@ -41,14 +45,12 @@ export type {
 export type {
 	DeclaredClientResponse,
 	ErrorDeclaredClientResponse,
+	ResponseContentDeclaration,
 	ResponseDeclaration,
 	ResponseHeadersSchema,
-	BodylessResponseOptions,
 	ResponseOptions,
-	StreamResponseOptions,
 	RouteResponses,
 	ServerResponse,
-	ServerResponseBody,
 	SuccessfulDeclaredClientResponse,
 } from "./response.ts";
 export type { ContractRouteEntry } from "./traversal.ts";

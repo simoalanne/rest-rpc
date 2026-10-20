@@ -14,7 +14,6 @@ export {
 	type FetchArgs,
 	type FetchLike,
 	type FetchOptions,
-	type FetchOptionsFor,
 	type InferClientRequest,
 } from "./request.ts";
 export type {

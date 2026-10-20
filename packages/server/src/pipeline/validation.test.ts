@@ -55,13 +55,17 @@ describe("validation", () => {
 		const stacked = {
 			...declaration,
 			request: {
-				body: [
-					schema(() => ({ value: { first: true, shared: 1 } })),
-					schema(async () => ({ value: { second: true, shared: 2 } })),
-				],
+				body: {
+					"application/json": [
+						schema(() => ({ value: { first: true, shared: 1 } })),
+						schema(async () => ({ value: { second: true, shared: 2 } })),
+					],
+				},
 			},
 		};
-		expect((await validateRequestSegments(stacked, {})).body).toEqual({
+		expect(
+			(await validateRequestSegments(stacked, {}, "application/json")).body,
+		).toEqual({
 			first: true,
 			second: true,
 			shared: 2,
@@ -81,9 +85,12 @@ describe("validation", () => {
 			validateRequestSegments(
 				{
 					...declaration,
-					request: { body: [schema(() => ({ value: 1 })), type()] },
+					request: {
+						body: { "text/plain": [schema(() => ({ value: 1 })), type()] },
+					},
 				},
 				{},
+				"text/plain",
 			),
 		).rejects.toThrow("Stacked request schema outputs must be objects.");
 	});
@@ -94,12 +101,14 @@ describe("validation", () => {
 		const declaration = {
 			...route.post("/")["~restrpc"],
 			request: {
-				body: [schema(() => ({ issues })), schema(later)],
+				body: {
+					"application/json": [schema(() => ({ issues })), schema(later)],
+				},
 				query: [schema(() => ({ issues }))],
 			},
 		};
 		await expect(
-			validateRequestSegments(declaration, {}),
+			validateRequestSegments(declaration, {}, "application/json"),
 		).rejects.toMatchObject({
 			status: 400,
 			issues: { body: issues, query: issues, params: [], headers: [] },
@@ -119,7 +128,6 @@ describe("validation", () => {
 		expect(
 			await validateResponseHeaders(
 				{
-					body: undefined,
 					headers: schema(() => ({ value: { count: 2, absent: undefined } })),
 				},
 				{},
@@ -145,10 +153,7 @@ describe("validation", () => {
 			responseBody: { message: "Response validation failed." },
 		});
 		await expect(
-			validateResponseHeaders(
-				{ body: undefined, headers: schema(() => ({ issues })) },
-				{},
-			),
+			validateResponseHeaders({ headers: schema(() => ({ issues })) }, {}),
 		).rejects.toMatchObject({ location: "headers", issues });
 	});
 

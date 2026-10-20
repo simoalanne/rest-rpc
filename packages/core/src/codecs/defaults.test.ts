@@ -1,64 +1,51 @@
-import { defaultBodyCodecs } from "./defaults.ts";
-import { resolveBodyCodec } from "./operations.ts";
+import { createBodyCodecRegistry } from "./registry.ts";
+import { serializedBody } from "./serializedBody.ts";
+
+const codecs = createBodyCodecRegistry([]);
 
 describe("defaults", () => {
 	it("round-trips JSON including structured suffix media types", async () => {
-		const codec = resolveBodyCodec(
-			"application/problem+json",
-			defaultBodyCodecs,
-		);
 		const value = { message: "missing" };
-		const serialized = await codec?.serialize?.(
-			value,
-			"application/problem+json",
+		expect(codecs.serialize(value, "application/problem+json")).toBe(
+			JSON.stringify(value),
 		);
-		expect(serialized?.body).toBe(JSON.stringify(value));
-		expect(await codec?.deserialize?.(Response.json(value))).toEqual(value);
-		await expect(
-			codec?.serialize?.(undefined, "application/problem+json"),
-		).rejects.toThrow("Expected a JSON body");
+		expect(
+			await codecs.deserialize(
+				Response.json(value),
+				"application/problem+json",
+			),
+		).toEqual(value);
+		expect(() =>
+			codecs.serialize(undefined, "application/problem+json"),
+		).toThrow("Expected a JSON body");
 	});
 
-	it("preserves form data and clears content-type so fetch can add its boundary", async () => {
-		const codec = resolveBodyCodec("multipart/form-data", defaultBodyCodecs);
+	it("leaves the multipart content type to the runtime", () => {
 		const body = new FormData();
-		body.append("name", "Ada");
-		expect(await codec?.serialize?.(body, "multipart/form-data")).toEqual({
-			body,
-			contentType: null,
-		});
-		await expect(
-			codec?.serialize?.({ name: "Ada" }, "multipart/form-data"),
-		).rejects.toThrow("Expected FormData body");
+		expect(codecs.serialize(body, "multipart/form-data")).toEqual(
+			serializedBody(body),
+		);
+		expect(() =>
+			codecs.serialize({ name: "Ada" }, "multipart/form-data"),
+		).toThrow("Expected FormData body");
 	});
 
 	it("preserves URLSearchParams and decodes repeated form values", async () => {
-		const codec = resolveBodyCodec(
-			"application/x-www-form-urlencoded",
-			defaultBodyCodecs,
-		);
+		const mediaType = "application/x-www-form-urlencoded";
 		const body = new URLSearchParams("tag=a&tag=b");
-		expect(
-			await codec?.serialize?.(body, "application/x-www-form-urlencoded"),
-		).toEqual({ body });
-		const decoded = await codec?.deserialize?.(new Response(body));
-		expect(decoded).toEqual(body);
-		await expect(
-			codec?.serialize?.("tag=a", "application/x-www-form-urlencoded"),
-		).rejects.toThrow("Expected URLSearchParams body");
+		expect(codecs.serialize(body, mediaType)).toBe(body);
+		expect(await codecs.deserialize(new Response(body), mediaType)).toEqual(
+			body,
+		);
+		expect(() => codecs.serialize("tag=a", mediaType)).toThrow(
+			"Expected URLSearchParams body",
+		);
 	});
 
-	it("accepts text strings and binary values but rejects other body shapes", async () => {
-		const text = resolveBodyCodec("text/plain", defaultBodyCodecs);
-		expect(await text?.serialize?.("Ada", "text/plain")).toEqual({
-			body: "Ada",
-		});
-		await expect(text?.serialize?.(1, "text/plain")).rejects.toThrow(
+	it("accepts text strings and binary values but rejects other body shapes", () => {
+		expect(codecs.serialize("Ada", "text/plain")).toBe("Ada");
+		expect(() => codecs.serialize(1, "text/plain")).toThrow(
 			"Expected string body",
-		);
-		const binary = resolveBodyCodec(
-			"application/octet-stream",
-			defaultBodyCodecs,
 		);
 		for (const body of [
 			new Uint8Array([1]),
@@ -66,13 +53,9 @@ describe("defaults", () => {
 			new ReadableStream(),
 			(async function* () {})(),
 		]) {
-			expect(
-				await binary?.serialize?.(body, "application/octet-stream"),
-			).toEqual({ body });
+			expect(codecs.serialize(body, "application/octet-stream")).toBe(body);
 		}
-		await expect(
-			binary?.serialize?.("data", "application/octet-stream"),
-		).rejects.toThrow(
+		expect(() => codecs.serialize("data", "application/octet-stream")).toThrow(
 			"Expected Blob, Uint8Array, ReadableStream or AsyncIterable body",
 		);
 	});

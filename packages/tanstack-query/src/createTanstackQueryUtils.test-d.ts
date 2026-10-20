@@ -51,35 +51,6 @@ describe("createTanstackQueryUtils types", () => {
 		>().toEqualTypeOf<InferClientSuccess<typeof get>>();
 	});
 
-	it("requires declared custom-media fetch options for queries and mutations", () => {
-		const custom = route
-			.post("/")
-			.body(type<string>(), { contentType: ["text/plain", "text/html"] })
-			.response(type<string>());
-		const customUtils = createTanstackQueryUtils(custom, { baseUrl: "" });
-		customUtils.queryOptions({
-			request: { body: "hello" },
-			fetchOptions: { contentType: "text/plain" },
-		});
-		customUtils.mutationOptions({ fetchOptions: { contentType: "text/html" } });
-		customUtils.infiniteQueryOptions({
-			initialPageParam: 0,
-			request: () => ({ body: "hello" }),
-			fetchOptions: { contentType: "text/plain" },
-			getNextPageParam: () => undefined,
-		});
-		// @ts-expect-error Query options require media selection.
-		customUtils.queryOptions({ request: { body: "hello" } });
-		// @ts-expect-error Mutation options require media selection.
-		customUtils.mutationOptions();
-		customUtils.mutationOptions({
-			fetchOptions: {
-				// @ts-expect-error Only declared media types are allowed.
-				contentType: "application/json",
-			},
-		});
-	});
-
 	it("uses guaranteed global headers in query requests and mutation variables", () => {
 		const secured = route
 			.get("/")

@@ -10,7 +10,6 @@ import type {
 	ClientHeaders,
 	FetchArgs,
 	FetchOptions,
-	FetchOptionsFor,
 	SuccessfulResponseBody,
 } from "@rest-rpc/core/client";
 import {
@@ -93,15 +92,9 @@ type StreamedQueryDataFor<E extends QueryRoute> = [
 	? never
 	: Array<RouteStreamChunk<E>>;
 
-type QueryFetchOptions<E extends QueryRoute> = Omit<
-	FetchOptionsFor<RouteFor<E>>,
-	"signal"
->;
+type QueryFetchOptions = Omit<FetchOptions, "signal">;
 
-type WithFetchOptions<T, TFetchOptions> = T &
-	(TFetchOptions extends { contentType: string }
-		? { fetchOptions: TFetchOptions }
-		: { fetchOptions?: TFetchOptions });
+type WithFetchOptions<T, TFetchOptions> = T & { fetchOptions?: TFetchOptions };
 
 type RequestOption<
 	E extends QueryRoute,
@@ -123,7 +116,7 @@ type QueryOptionsFor<
 	> & {
 		queryKey?: QueryKey;
 	} & RequestOption<E, TGlobalHeaders>,
-	QueryFetchOptions<E>
+	QueryFetchOptions
 >;
 
 type QueryOptionsResultFor<
@@ -145,7 +138,7 @@ type MutationOptionsFor<
 		>,
 		"mutationFn"
 	>,
-	FetchOptionsFor<RouteFor<E>>
+	FetchOptions
 >;
 
 type MutationOptionsResultFor<
@@ -186,7 +179,7 @@ type InfiniteQueryOptionsFor<
 						| typeof skipToken;
 				}) &
 		([TInitialPageParam] extends [TPageParam] ? unknown : never),
-	QueryFetchOptions<E>
+	QueryFetchOptions
 >;
 
 type InfiniteQueryOptionsResultFor<
@@ -266,7 +259,7 @@ type StreamedSimpleQueryArgs<
 	WithFetchOptions<
 		StreamedQuerySimpleOptions<E, TSelectedData> &
 			RequestOption<E, TGlobalHeaders>,
-		QueryFetchOptions<E>
+		QueryFetchOptions
 	>
 >;
 
@@ -279,7 +272,7 @@ type StreamedReducedQueryArgs<
 	WithFetchOptions<
 		StreamedQueryReducedOptions<E, TData, TSelectedData> &
 			RequestOption<E, TGlobalHeaders>,
-		QueryFetchOptions<E>
+		QueryFetchOptions
 	>
 >;
 

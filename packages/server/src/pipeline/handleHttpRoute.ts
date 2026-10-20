@@ -1,12 +1,8 @@
-import {
-	contentTypeList,
-	findDeclaredContentType,
-	isAsyncIterable,
-	normalizeMediaType,
-} from "@rest-rpc/core/codecs";
+import { isAsyncIterable, normalizeMediaType } from "@rest-rpc/core/codecs";
 import { RequestValidationError, ResponseValidationError } from "./errors.ts";
 import type {
 	RequestScalar,
+	ResponseContentDeclaration,
 	ResponseDeclaration,
 	RouteDeclaration,
 } from "@rest-rpc/core/contract";
@@ -32,7 +28,7 @@ import type { CompileRoutesOptions } from "./compileRoutes.ts";
 /**
  * Per-request options for compiled routes and the catch-all handler.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/context#values-from-the-host}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#handle-options}
  */
 export type HandleOptions = {
 	/**
@@ -44,6 +40,12 @@ export type HandleOptions = {
 	 * Percent-decoded path params. Read from the request URL when omitted.
 	 */
 	params?: Record<string, string>;
+	/**
+	 * An already decoded request body, such as one parsed by a framework's body
+	 * parser. When the key is present, even as `undefined`, the request body is
+	 * not read. The value is still validated against the route's body schema.
+	 */
+	body?: unknown;
 };
 
 /** Inputs needed to invoke and normalize one HTTP route handler. */
@@ -63,7 +65,10 @@ export type HandleHttpRouteOptions = {
 export type ExecuteRouteOptions = {
 	request: Record<string, unknown>;
 	signal: AbortSignal;
-	/** The received request media type. Normalized before handlers receive it. */
+	/**
+	 * The received request content type. Handlers receive the declared body
+	 * media type it selects.
+	 */
 	contentType?: string;
 	lastEventId?: string;
 	/** Initial context values, set before middleware runs. */
@@ -107,19 +112,22 @@ type DeclaredResponseEnvelope = {
 	headers?: Record<string, unknown>;
 };
 
-const selectResponseContentType = (
-	declared: string | readonly string[],
+// A response with one media type may omit it; otherwise the handler selects one.
+const selectResponseMediaType = (
+	content: ResponseContentDeclaration,
 	selected: unknown,
 ): string => {
-	const types = contentTypeList(declared);
-	const contentType =
+	const declared = Object.keys(content);
+	const mediaType =
 		typeof selected === "string"
-			? findDeclaredContentType(types, selected)
-			: types.length === 1
-				? types[0]
+			? normalizeMediaType(selected)
+			: declared.length === 1
+				? declared[0]
 				: undefined;
-	if (!contentType) throw new Error("Unsupported response body contentType.");
-	return contentType;
+	if (mediaType === undefined || !(mediaType in content)) {
+		throw new Error("Unsupported response body contentType.");
+	}
+	return mediaType;
 };
 
 const normalizeResponseResult = async (
@@ -128,18 +136,20 @@ const normalizeResponseResult = async (
 	disableValidation: boolean,
 ): Promise<RouteResult> => {
 	const schema = getResponseSchema(route, result.status);
-	const bodySchema = schema.body;
+	const { content } = schema;
 	const headers = disableValidation
 		? schema.headers
 			? result.headers
 			: undefined
 		: await validateResponseHeaders(schema, result.headers);
 
-	if (bodySchema === undefined) {
+	if (content === undefined) {
 		return { status: result.status, headers };
 	}
 
-	if (schema.kind === "stream") {
+	const mediaType = selectResponseMediaType(content, result.contentType);
+	// A `text/event-stream` schema validates each item of the stream.
+	if (mediaType === "text/event-stream") {
 		const body = result.body as AsyncIterable<unknown>;
 		return {
 			status: result.status,
@@ -147,7 +157,7 @@ const normalizeResponseResult = async (
 			body: {
 				stream: disableValidation
 					? body
-					: validateResponseStreamChunks(body, bodySchema),
+					: validateResponseStreamChunks(body, content[mediaType]!),
 			},
 		};
 	}
@@ -158,11 +168,8 @@ const normalizeResponseResult = async (
 		body: {
 			value: disableValidation
 				? result.body
-				: await validateResponseValue(bodySchema, result.body, "body"),
-			contentType: selectResponseContentType(
-				schema.contentType ?? "application/json",
-				result.contentType,
-			),
+				: await validateResponseValue(content[mediaType], result.body, "body"),
+			contentType: mediaType,
 		},
 	};
 };
@@ -198,9 +205,14 @@ const normalizeImplicitHttpResponse = (
 	const { status, headers } = response;
 	if (!("body" in response)) return { status, headers };
 
-	// An explicit content type sends a stream through the body codecs as-is.
+	// Async iterables are SSE streams unless another content type sends them
+	// through the body codecs.
 	const { body, contentType } = response;
-	if (contentType === undefined && isAsyncIterable(body)) {
+	if (
+		isAsyncIterable(body) &&
+		(contentType === undefined ||
+			normalizeMediaType(contentType) === "text/event-stream")
+	) {
 		return { status, headers, body: { stream: body } };
 	}
 	return {
@@ -225,9 +237,13 @@ export async function executeRoute(
 ): Promise<RouteResult> {
 	const { route } = implementation;
 	const handler = implementation.handler as RuntimeRouteHandler;
+	// HTTP requests with undeclared media types are rejected before this.
+	const mediaType =
+		normalizeMediaType(options.contentType) ||
+		Object.keys(route.request?.body ?? {})[0];
 	const validatedRequest = options.disableRequestValidation
 		? options.request
-		: await validateRequestSegments(route, options.request);
+		: await validateRequestSegments(route, options.request, mediaType);
 
 	const handlerResult = await invokeWithMiddleware(
 		implementation.middleware ?? [],
@@ -236,7 +252,7 @@ export async function executeRoute(
 			...validatedRequest,
 			context: createContext(options.context),
 			signal: options.signal,
-			contentType: normalizeMediaType(options.contentType) || undefined,
+			contentType: mediaType,
 			lastEventId: options.lastEventId,
 			route,
 		},

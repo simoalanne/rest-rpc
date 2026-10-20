@@ -1,8 +1,9 @@
 import type {
-	FetchOptionsFor,
+	FetchOptions,
 	InferClientRequest,
 	InferClientResponse,
 } from "@rest-rpc/core";
+import { normalizeMediaType } from "@rest-rpc/core/codecs";
 import type { ContextOf } from "../builder/routeBuilder.types.ts";
 import {
 	isImplementedRoute,
@@ -14,8 +15,9 @@ import { executeRoute, type RouteResult } from "./handleHttpRoute.ts";
 import { toSseEvent } from "./sse.ts";
 
 /** Options accepted by `call`. */
-export type CallOptions<TRoute extends ImplementedRoute> = Partial<
-	Pick<FetchOptionsFor<TRoute["~restrpc"]>, "signal" | "contentType">
+export type CallOptions<TRoute extends ImplementedRoute> = Pick<
+	FetchOptions,
+	"signal"
 > & {
 	lastEventId?: string;
 	context?: Partial<ContextOf<TRoute["~restrpc"]>>;
@@ -31,8 +33,14 @@ const toSseEvents = async function* (stream: AsyncIterable<unknown>) {
 	for await (const item of stream) yield toSseEvent(item);
 };
 
+// Mirrors the fetch client, which reports the received base media type.
 const toCallResult = ({ status, headers = {}, body }: RouteResult) => ({
 	status,
+	contentType:
+		body &&
+		("stream" in body
+			? "text/event-stream"
+			: normalizeMediaType(body.contentType)),
 	headers,
 	body: body && ("stream" in body ? toSseEvents(body.stream) : body.value),
 });
@@ -49,8 +57,9 @@ export async function call<TRoute extends ImplementedRoute>(
 	...[request, options = {}]: CallArgs<TRoute>
 ): Promise<InferClientResponse<TRoute>> {
 	const { handler, middleware, ...declaration } = route["~restrpc"];
-	const { signal, contentType, lastEventId, context } =
+	const { signal, lastEventId, context } =
 		options as CallOptions<ImplementedRoute>;
+	const { contentType } = (request ?? {}) as { contentType?: string };
 	const result = await executeRoute(
 		{
 			route: declaration as RuntimeImplementation["route"],

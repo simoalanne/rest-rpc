@@ -14,22 +14,22 @@ const routes = {
 			.response(user)
 			.response(type<{ code: "NOT_FOUND" }>(), { status: 404 }),
 		create: route
-			.body(user, { contentType: ["application/json", "text/plain"] })
+			.body({ "application/json": user, "text/plain": type<string>() })
 			.openAPI({ summary: "Create user" })
 			.response(user, { status: 201 }),
 	},
 };
 
 describe("extractContract", () => {
-	it("keeps only methods, resolved paths, and request content types", () => {
+	it("keeps only methods, resolved paths, and request body media types", () => {
 		expect(extractContract(routes)).toEqual({
 			users: {
-				get: { "~restrpc": { method: "GET", path: "/users/:id", request: {} } },
+				get: { "~restrpc": { method: "GET", path: "/users/:id" } },
 				create: {
 					"~restrpc": {
 						method: "POST",
 						path: "/users/create",
-						request: { contentType: ["application/json", "text/plain"] },
+						request: { body: { "application/json": [], "text/plain": [] } },
 					},
 				},
 			},
@@ -42,7 +42,7 @@ describe("extractContract", () => {
 		};
 		const contract = extractContract({ health: withHandler });
 		expect(JSON.parse(JSON.stringify(contract))).toEqual({
-			health: { "~restrpc": { method: "GET", path: "/health", request: {} } },
+			health: { "~restrpc": { method: "GET", path: "/health" } },
 		});
 	});
 

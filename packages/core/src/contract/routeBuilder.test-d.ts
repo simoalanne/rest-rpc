@@ -23,13 +23,13 @@ describe("routeBuilder types", () => {
 			readonly method: "POST";
 			readonly path: undefined;
 			request: {
-				body: readonly [StandardSchemaV1<{ name: string }>];
-				contentType: "application/json";
+				body: {
+					"application/json": readonly [StandardSchemaV1<{ name: string }>];
+				};
 			};
 			responses: {
 				200: {
-					body: StandardSchemaV1<{ name: string }>;
-					contentType: "application/json";
+					content: { "application/json": StandardSchemaV1<{ name: string }> };
 				};
 			};
 		}>();
@@ -40,14 +40,17 @@ describe("routeBuilder types", () => {
 		const headers = type<{ "x-cursor": string }>();
 		const output = route.response(schema, { description: "Name" });
 		expectTypeOf(output["~restrpc"].responses).toEqualTypeOf<{
-			200: { body: typeof schema; contentType: "application/json" };
+			200: { content: { "application/json": typeof schema } };
 		}>();
 		const stream = route.get("/events").streamResponse(schema, {
 			headers,
 			description: "Events",
 		});
 		expectTypeOf(stream["~restrpc"].responses).toEqualTypeOf<{
-			200: { kind: "stream"; body: typeof schema; headers: typeof headers };
+			200: {
+				content: { "text/event-stream": typeof schema };
+				headers: typeof headers;
+			};
 		}>();
 	});
 
@@ -87,9 +90,7 @@ describe("routeBuilder types", () => {
 			200 | 204 | 206
 		>();
 		expectTypeOf(route.response()["~restrpc"].responses).toEqualTypeOf<{
-			200: { body: undefined };
+			200: {};
 		}>();
-		// @ts-expect-error Bodyless responses have no content type.
-		route.response({ status: 204, contentType: "text/plain" });
 	});
 });

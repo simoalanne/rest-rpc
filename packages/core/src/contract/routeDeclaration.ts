@@ -1,4 +1,3 @@
-import type { BodyContentType } from "./body.ts";
 import type {
 	RequestBodySchema,
 	RequestHeadersSchema,
@@ -27,10 +26,14 @@ export type OpenApiRouteOptions = {
 	extensions?: Record<`x-${string}`, unknown>;
 };
 
+/** Ordered body schemas keyed by base media type. */
+export type RequestBodyDeclaration = {
+	readonly [mediaType: string]: readonly RequestBodySchema[];
+};
+
 /** Canonical ordered request-schema declarations nested on a route. */
 export type RouteRequestDeclaration = {
-	body?: readonly RequestBodySchema[];
-	contentType?: BodyContentType;
+	body?: RequestBodyDeclaration;
 	query?: readonly RequestBodySchema[];
 	params?: readonly RequestParamsSchema[];
 	headers?: readonly RequestHeadersSchema[];

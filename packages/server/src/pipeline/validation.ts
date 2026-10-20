@@ -57,7 +57,7 @@ export function readDeclaredRequestSegments(
 ) {
 	const schemas = route.request;
 	return {
-		body: isDeclared(schemas?.body) ? segments.body : undefined,
+		body: schemas?.body ? segments.body : undefined,
 		query: isDeclared(schemas?.query)
 			? parseQuery(segments.query ?? "")
 			: undefined,
@@ -94,14 +94,18 @@ const validateRequestSegment = async (
 	return { data: merged, errors: [] };
 };
 
-/** Validates decoded request segments, ignoring segments the route does not declare. */
+/**
+ * Validates decoded request segments, ignoring segments the route does not
+ * declare. The body is validated with the schemas of `mediaType`.
+ */
 export async function validateRequestSegments(
 	route: RouteDeclaration,
 	segments: Record<string, unknown>,
+	mediaType?: string,
 ) {
 	const requestSchemas = route.request;
 	const body = await validateRequestSegment(
-		requestSchemas?.body,
+		mediaType === undefined ? undefined : requestSchemas?.body?.[mediaType],
 		segments.body,
 	);
 	const query = await validateRequestSegment(

@@ -1,18 +1,10 @@
-import type { BodyCodec } from "@rest-rpc/core";
 import {
-	defaultBodyCodecs,
 	isAsyncIterable,
-	normalizeMediaType,
-	resolveBodyCodec,
+	isSerializedBody,
+	type BodyCodecRegistry,
 } from "@rest-rpc/core/codecs";
 import type { RequestScalar } from "@rest-rpc/core/contract";
 import type { HttpRouteResult } from "./handleHttpRoute.ts";
-
-// SSE is a special case that should override all codecs and serialize as-is, since the body is already framed and encoded.
-const sseCodec = {
-	match: (mediaType: string) => mediaType === "text/event-stream",
-	serialize: (body: unknown) => ({ body }),
-};
 
 const encodeChunks = async function* (
 	body: AsyncIterable<unknown>,
@@ -30,13 +22,12 @@ const toBodyInit = (value: unknown) =>
 
 /**
  * Serializes a route result into a Fetch `Response`, encoding the body with
- * the first matching body codec. The result's headers override codec headers.
- *
- * @remarks `bodyCodecs` take precedence over the default codecs.
+ * the codec for its media type. The result's headers override the headers of
+ * a `SerializedBody` returned by the codec.
  */
 export async function serializeHttpRouteResult(
 	result: HttpRouteResult,
-	bodyCodecs: readonly BodyCodec[],
+	codecs: BodyCodecRegistry,
 ): Promise<Response> {
 	const headers = new Headers();
 	const setHeaders = (values?: Record<string, RequestScalar | undefined>) => {
@@ -50,25 +41,20 @@ export async function serializeHttpRouteResult(
 	}
 
 	const { value, contentType } = result.body;
-	const codec = resolveBodyCodec(normalizeMediaType(contentType), [
-		sseCodec,
-		...bodyCodecs,
-		...defaultBodyCodecs,
-	]);
-	if (!codec?.serialize) {
-		throw new Error("No serializer for declared content-type");
+	const serialized = await codecs.serialize(value, contentType);
+	if (isSerializedBody(serialized)) {
+		serialized.headers.forEach((headerValue, name) =>
+			headers.set(name, headerValue),
+		);
+		setHeaders(result.headers);
+		return new Response(toBodyInit(serialized.body), {
+			status: result.status,
+			headers,
+		});
 	}
-	const serialized = await codec.serialize(value, contentType);
-	setHeaders(serialized.headers);
 	setHeaders(result.headers);
-	const bodyContentType =
-		serialized.contentType === undefined ? contentType : serialized.contentType;
-	if (bodyContentType === null) {
-		headers.delete("content-type");
-	} else {
-		headers.set("content-type", bodyContentType);
-	}
-	return new Response(toBodyInit(serialized.body), {
+	headers.set("content-type", contentType);
+	return new Response(toBodyInit(serialized), {
 		status: result.status,
 		headers,
 	});

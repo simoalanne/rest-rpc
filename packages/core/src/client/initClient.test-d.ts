@@ -53,9 +53,13 @@ describe("initClient types", () => {
 				.response(type((value: string) => value.length)),
 		};
 		const client = initClient(contract, { baseUrl: "" });
-		expectTypeOf(client.length).parameter(0).toEqualTypeOf<{ body: string }>();
+		expectTypeOf(client.length).parameter(0).toEqualTypeOf<{
+			contentType?: "application/json";
+			body: string;
+		}>();
 		expectTypeOf(client.length).returns.resolves.toEqualTypeOf<{
 			status: 200;
+			contentType: "application/json";
 			body: number;
 			headers: Record<string, string>;
 		}>();
@@ -75,21 +79,5 @@ describe("initClient types", () => {
 		if (response.status === 200)
 			expectTypeOf(response.body).toEqualTypeOf<{ name: string }>();
 		else expectTypeOf(response.body).toEqualTypeOf<{ message: string }>();
-	});
-
-	it("requires a supported media type when the request declares several", () => {
-		const client = initClient(
-			route
-				.body(type<string>(), {
-					contentType: ["text/plain", "application/json"],
-				})
-				.response(type<string>()),
-			{ baseUrl: "" },
-		);
-		client({ body: "Ada" }, { contentType: "text/plain" });
-		// @ts-expect-error Multi-format requests require a selection.
-		client({ body: "Ada" });
-		// @ts-expect-error A selection must be a declared format.
-		client({ body: "Ada" }, { contentType: "image/png" });
 	});
 });

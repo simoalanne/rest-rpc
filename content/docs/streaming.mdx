@@ -24,6 +24,12 @@ const events = route
 	});
 ```
 
+`.streamResponse(schema)` is the same as
+`.response({ "text/event-stream": schema })`. A `text/event-stream` schema always
+describes the stream's items, so a status can also offer a stream next to other
+[media types](/docs/route-builder#declare-media-types), with the handler
+selecting one with its returned `contentType`.
+
 Return an envelope when the route can return different HTTP statuses:
 
 ```ts

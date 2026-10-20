@@ -1,5 +1,5 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import type { BodyOptions } from "./body.ts";
+import type { DefaultBodyContentType } from "./body.ts";
 import type {
 	AbsolutePath,
 	HttpMethod,
@@ -133,28 +133,36 @@ export type WithRequest<
 	{ request: AppendRequest<TState["request"], TKey, TSchema> }
 >;
 
-type ContentTypeFor<TOptions> = TOptions extends BodyOptions
-	? TOptions["contentType"]
-	: "application/json";
+/** Normalizes a `.body()` or `.response()` argument to a media type record. */
+export type ContentFor<TSchemaOrContent> =
+	TSchemaOrContent extends StandardSchemaV1
+		? { [TKey in DefaultBodyContentType]: TSchemaOrContent }
+		: TSchemaOrContent;
 
-// The first body declares the request content type.
-export type WithBody<
-	TState extends BuilderState,
-	TSchema,
-	TOptions,
-> = NextState<
+// Each body appends its schemas to the media types it declares.
+type AppendBody<TBody, TContent> = Merge<{
+	[
+		TMediaType in keyof TBody | keyof TContent
+	]: TMediaType extends keyof TContent
+		? TMediaType extends keyof TBody
+			? TBody[TMediaType] extends readonly unknown[]
+				? readonly [...TBody[TMediaType], TContent[TMediaType]]
+				: never
+			: readonly [TContent[TMediaType]]
+		: TMediaType extends keyof TBody
+			? TBody[TMediaType]
+			: never;
+}>;
+
+export type WithBody<TState extends BuilderState, TSchemaOrContent> = NextState<
 	TState,
 	{
 		omit: TState["omit"] | "get";
-		request: Omit<
-			AppendRequest<TState["request"], "body", TSchema>,
-			"contentType"
-		> & {
-			contentType: TState["request"] extends {
-				contentType: infer TContentType;
-			}
-				? TContentType
-				: ContentTypeFor<TOptions>;
+		request: Omit<TState["request"], "body"> & {
+			body: AppendBody<
+				TState["request"] extends { body: infer TBody } ? TBody : EmptyObject,
+				ContentFor<TSchemaOrContent>
+			>;
 		};
 	}
 >;
@@ -183,36 +191,21 @@ type ResponseHeadersFor<TOptions> = TOptions extends {
 	? { headers: THeaders }
 	: EmptyObject;
 
-type ResponseFor<TSchema, TOptions> = TSchema extends StandardSchemaV1
-	? {
-			body: TSchema;
-			contentType: ContentTypeFor<TOptions>;
-		} & ResponseHeadersFor<TOptions>
-	: { body: undefined } & ResponseHeadersFor<TOptions>;
+type ResponseFor<TSchemaOrContent, TOptions> = ([TSchemaOrContent] extends [
+	undefined,
+]
+	? EmptyObject
+	: { content: ContentFor<TSchemaOrContent> }) &
+	ResponseHeadersFor<TOptions>;
 
 export type WithResponse<
 	TState extends BuilderState,
-	TSchema,
+	TSchemaOrContent,
 	TOptions,
 > = NextState<
 	TState,
 	{
 		responses: TState["responses"] &
-			Record<StatusFor<TOptions>, ResponseFor<TSchema, TOptions>>;
-	}
->;
-
-export type WithStreamResponse<
-	TState extends BuilderState,
-	TSchema,
-	TOptions,
-> = NextState<
-	TState,
-	{
-		responses: TState["responses"] &
-			Record<
-				StatusFor<TOptions>,
-				{ kind: "stream"; body: TSchema } & ResponseHeadersFor<TOptions>
-			>;
+			Record<StatusFor<TOptions>, ResponseFor<TSchemaOrContent, TOptions>>;
 	}
 >;

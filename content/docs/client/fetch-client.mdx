@@ -26,9 +26,11 @@ const created = await client.todos.create({ body: { title: "Write docs" } });
 const response = await client.todos.get({ params: { id: created.body.id } });
 ```
 
-A call returns a `status`-discriminated union with `body` and `headers`.
-`headers` is a record of every response header with lowercase names, and
-declared response headers are typed.
+A call returns a `status`-discriminated union with `contentType`, `body`, and
+`headers`. `contentType` is the received base media type, or `undefined` when
+the response has no content type. When a status declares several media types,
+checking `contentType` narrows `body`. `headers` is a record of every response
+header with lowercase names, and declared response headers are typed.
 
 ```ts
 if (response.status === 200) {
@@ -41,6 +43,16 @@ if (response.status === 200) {
 Non-2xx responses are returned, not thrown. Network failures and aborted
 requests reject with the error from `fetch`. See the
 [Route Builder](/docs/route-builder) for declaring expected outcomes.
+
+### Select a Request Media Type
+
+When a route declares several request body media types, `contentType` in the
+request selects the one used to encode the body, and narrows `body` to its
+schema. It is optional when the route declares one media type.
+
+```ts
+await client.todos.import({ contentType: "text/csv", body: csv });
+```
 
 ## Error Handling
 
@@ -272,13 +284,6 @@ const response = await client.todos.get(
 		},
 	},
 );
-```
-
-When a route declares a list of request content types, `contentType` selects
-the one used to encode the body and is required:
-
-```ts
-await client.files.upload({ body: bytes }, { contentType: "image/png" });
 ```
 
 If you need to pass options to a route without request input, pass `undefined` for the request input.

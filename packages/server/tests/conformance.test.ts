@@ -5,6 +5,7 @@ import {
 	createCatchAllHandler,
 	route,
 	type,
+	type HandleOptions,
 } from "@rest-rpc/server";
 import * as nodeAdapter from "@rest-rpc/server/node";
 import { createServer, type RequestListener } from "node:http";
@@ -62,7 +63,7 @@ const withFetchServer = (
 type ServeOptions = {
 	customValidationHandlers?: boolean;
 	prefix?: AbsolutePath;
-	requestBodyLimit?: number;
+	handleOptions?: HandleOptions;
 };
 
 type Serve = (
@@ -75,7 +76,6 @@ const serveFetch: Serve = (routes, options, run) => {
 	const handler = createCatchAllHandler(
 		compileRoutes(routes, {
 			prefix: options.prefix,
-			requestBodyLimit: options.requestBodyLimit,
 			...(options.customValidationHandlers && {
 				requestValidationErrorHandler: () =>
 					Response.json({ handled: "request" }, { status: 422 }),
@@ -86,7 +86,7 @@ const serveFetch: Serve = (routes, options, run) => {
 	);
 	return withFetchServer(
 		async (request) =>
-			(await handler(request)).response ??
+			(await handler(request, options.handleOptions)).response ??
 			new Response("unmatched", { status: 404 }),
 		run,
 	);
@@ -96,7 +96,6 @@ const serveNode: Serve = (routes, options, run) => {
 	const handler = nodeAdapter.createCatchAllHandler(
 		nodeAdapter.compileRoutes(routes, {
 			prefix: options.prefix,
-			requestBodyLimit: options.requestBodyLimit,
 			...(options.customValidationHandlers && {
 				requestValidationErrorHandler: () =>
 					Response.json({ handled: "request" }, { status: 422 }),
@@ -107,7 +106,7 @@ const serveNode: Serve = (routes, options, run) => {
 	);
 	return withHttpServer(async (req, res) => {
 		try {
-			if (!(await handler(req, res)).matched) {
+			if (!(await handler(req, res, options.handleOptions)).matched) {
 				res.statusCode = 404;
 				res.end("unmatched");
 			}
@@ -359,14 +358,12 @@ describe.each([
 		const routes = {
 			decode: route
 				.post("/decode")
-				.body(type<unknown>(), {
-					contentType: [
-						"application/json",
-						"application/x-www-form-urlencoded",
-						"multipart/form-data",
-						"text/plain",
-						"application/octet-stream",
-					],
+				.body({
+					"application/json": type<unknown>(),
+					"application/x-www-form-urlencoded": type<URLSearchParams>(),
+					"multipart/form-data": type<FormData>(),
+					"text/plain": type<string>(),
+					"application/octet-stream": type<Blob>(),
 				})
 				.handler(({ body }) => describeBody(body)),
 		};
@@ -451,22 +448,33 @@ describe.each([
 		});
 	});
 
-	it("rejects oversized request bodies", async () => {
+	it("uses a parsed body instead of reading the request body", async () => {
 		const routes = {
-			message: route
-				.post("/message")
-				.body(type<string>(), { contentType: "text/plain" })
-				.handler(() => ({ status: 204 })),
+			echo: route
+				.post("/echo")
+				.body(type<string>())
+				.handler(({ body }) => body),
 		};
-		await serve(routes, { requestBodyLimit: 3 }, async (url) => {
-			const send = (body: string) =>
-				fetch(`${url}/message`, {
-					method: "POST",
-					headers: { "content-type": "text/plain" },
-					body,
-				});
-			expect((await send("abcd")).status).toBe(413);
-			expect((await send("abc")).status).toBe(204);
+		await serve(routes, { handleOptions: { body: "parsed" } }, async (url) => {
+			const response = await postJson(`${url}/echo`, "raw");
+			expect(await response.json()).toBe("parsed");
 		});
+	});
+
+	it("uses parsed params instead of reading the request URL", async () => {
+		const routes = {
+			user: route
+				.get("/users/{id}")
+				.params(type<{ id: string }>())
+				.handler(({ params }) => params.id),
+		};
+		await serve(
+			routes,
+			{ handleOptions: { params: { id: "parsed" } } },
+			async (url) => {
+				const response = await fetch(`${url}/users/raw`);
+				expect(await response.json()).toBe("parsed");
+			},
+		);
 	});
 });

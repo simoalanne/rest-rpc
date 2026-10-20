@@ -18,7 +18,8 @@ For each route, the contract keeps only:
 
 - the HTTP method,
 - the path, with paths derived from tree keys resolved,
-- the request body content type, when the route declares a body.
+- the request body media types, when the route declares a body. They keep the
+  declaration shape, `request.body`, with empty schema lists.
 
 Schemas, responses, metadata, OpenAPI details, and handlers are left out. The
 result is plain JSON. Its type is the route tree type, so the client still

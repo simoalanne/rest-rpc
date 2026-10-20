@@ -29,25 +29,41 @@ A single `tag[]=one` remains an array. Repeated scalar keys such as
 Declare header schemas with lowercase names. Incoming header names are
 normalized to lowercase, so uppercase schema keys do not match them.
 
-## Bodies and Content Types
+## Bodies and Media Types
 
 Body codecs serialize values into HTTP bodies and deserialize HTTP bodies into
-values. `.body()` and `.response()` default to `application/json`. Specifying the `contentType` option can select another media type.
-Schemas operate on values before encoding and after decoding.
+values. Schemas operate on values before encoding and after decoding.
 
-Outgoing codecs are selected from the declared content type. Incoming codecs
-are selected from the received `Content-Type` header. Matching uses the lowercase
-base media type without parameters, so `application/json; charset=utf-8` matches
-the JSON codec.
+A schema passed to `.body()` or `.response()` declares a JSON body. Other media
+types are declared with a record of schemas keyed by base media type, lowercase
+and without parameters:
 
-A request whose `Content-Type` is not declared by the route is rejected with
-`415` before validation. A client response without a content type or body
-decodes to `undefined`.
+```ts
+route
+	.post("/todos/import")
+	.body({
+		"application/json": z.array(z.object({ title: z.string() })),
+		"text/csv": z.string(),
+	})
+	.response({ "text/plain": z.string() });
+```
 
-When a route declares a list of content types, the client selects the request
-type with the [`contentType` call option](/docs/client/fetch-client#per-call-options),
-and the handler selects the response type with its returned `contentType`. The
-schema and codecs must agree on the values represented by each selected type.
+Each media type has its own schema, and requests and responses are unions
+discriminated by `contentType`. The client selects the request media type with
+[`contentType` in the request](/docs/client/fetch-client#select-a-request-media-type),
+and the handler selects the response media type with its returned
+`contentType`. Either may be omitted when one media type is declared.
+
+Outgoing codecs are selected from the selected media type. Incoming codecs and
+schemas are selected from the received `Content-Type` header. Matching uses the
+lowercase base media type without parameters, so
+`application/json; charset=utf-8` matches `application/json`.
+
+A request is rejected with `415` before validation when its `Content-Type` is
+not declared by the route, or when it has no `Content-Type` and the route
+declares several media types. Without a `Content-Type`, a route with one
+media type uses it. A client response without a content type or body decodes to
+`undefined`.
 
 ## Default Codecs
 
@@ -65,35 +81,44 @@ same mapping and can also send streams. See
 
 ## Streams
 
-[Streaming routes](/docs/streaming) respond with `text/event-stream` and do not
-use body codecs. Each yielded value is sent as JSON in an SSE `data` field, with
-optional `id`, `event`, and `retry` fields.
+A `text/event-stream` response is always a server-sent event stream, handled by
+rest-rpc on both ends, and custom codecs cannot override it. Its schema
+validates each item. The server frames each value a
+[streaming route](/docs/streaming) yields as JSON in an SSE `data` field, with
+optional `id`, `event`, and `retry` fields, and the client always parses
+`text/event-stream` responses as an SSE stream.
 
 ## Custom Codecs
 
-Create a `BodyCodec` and pass it in `bodyCodecs` to `compileRoutes` or the
-client. The same codec works on the client and on both server runtimes. Each codec has a `match(mediaType)` function and optional `serialize`
-and `deserialize` functions. Custom codecs run before the defaults. The first
-matching implementation wins independently for each operation, so overriding
-only serialization keeps the default deserializer.
+Create a codec with `bodyCodec(mediaTypes, operations)` and pass it in
+`bodyCodecs` to `compileRoutes` or the client. The same codec works on the
+client and on both server runtimes. `mediaTypes` is a media type, a pattern, or
+a list of both, and a codec has a `serialize` function, a `deserialize`
+function, or both.
+
+A media type string matches one lowercase base media type exactly. A
+regular expression matches a family, such as `/\+json$/`. Exact strings take
+precedence over patterns, so list a media type exactly to override a default
+codec. Patterns are tested in order, custom codecs before the defaults. Each
+operation is selected independently, so overriding only serialization keeps the
+default deserializer.
 
 <Tabs>
 <Tab title="Server">
 
 ```ts
-import { compileRoutes, type BodyCodec } from "@rest-rpc/server";
+import { bodyCodec, compileRoutes } from "@rest-rpc/server";
 import { routes } from "./routes";
 
-const binaryCodec: BodyCodec = {
-	match: (mediaType) => mediaType === "application/octet-stream",
+const binaryCodec = bodyCodec("application/octet-stream", {
 	serialize: (value) => {
 		if (!(value instanceof Uint8Array)) {
 			throw new TypeError("Expected Uint8Array body");
 		}
-		return { body: value };
+		return value;
 	},
 	deserialize: async (source) => new Uint8Array(await source.arrayBuffer()),
-};
+});
 
 const compiledRoutes = compileRoutes(routes, {
 	bodyCodecs: [binaryCodec],
@@ -104,19 +129,18 @@ const compiledRoutes = compileRoutes(routes, {
 <Tab title="Client">
 
 ```ts
-import { initClient, type BodyCodec } from "@rest-rpc/core";
+import { bodyCodec, initClient } from "@rest-rpc/core";
 import { contract } from "./contract";
 
-const binaryCodec: BodyCodec = {
-	match: (mediaType) => mediaType === "application/octet-stream",
+const binaryCodec = bodyCodec("application/octet-stream", {
 	serialize: (value) => {
 		if (!(value instanceof Uint8Array)) {
 			throw new TypeError("Expected Uint8Array body");
 		}
-		return { body: value };
+		return value;
 	},
 	deserialize: async (source) => new Uint8Array(await source.arrayBuffer()),
-};
+});
 
 const client = initClient(contract, {
 	baseUrl: "https://api.example.com",
@@ -132,22 +156,39 @@ both ends.
 
 ### Serializer Result
 
-`serialize(value, declaredContentType)` receives the full selected content type,
-including parameters, and returns `{ body, headers?, contentType? }`:
+`serialize(value, contentType)` receives the full selected content type,
+including parameters, and returns the serialized body:
 
-- `body` is sent as-is. On the client it must be a Fetch request body. On the
-  server it must be a value the runtime can send. See the runtime's
-  "Request and Response Bodies" section.
-- `headers` adds headers for the serialized body.
-- Omitting `contentType` preserves the declared content type. A string may change
-  parameters but must keep the same base media type. `null` omits the explicit
-  content-type header, allowing Fetch to supply it for bodies such as `FormData`.
+- A plain body is sent with the
+  [previously selected content type](#bodies-and-media-types). On the client it
+  must be a Fetch request body. On the server it must be a value the runtime can
+  send. See
+  [Request and Response Bodies](/docs/server/fetch#request-and-response-bodies).
+- `serializedBody(body, headers)` sends a body with its own headers, for codecs
+  that set headers such as `content-encoding`. Without a `content-type` header,
+  the Fetch `Request` or `Response` sets one for the body, such as
+  `multipart/form-data` with its generated boundary for `FormData`. A
+  `content-type` header may change parameters but must keep the
+  selected base media type, since content types are part of route types.
+
+```ts
+import { bodyCodec, serializedBody } from "@rest-rpc/core";
+
+const gzipJsonCodec = bodyCodec("application/json", {
+	serialize: (value) =>
+		serializedBody(gzip(JSON.stringify(value)), {
+			"content-type": "application/json",
+			"content-encoding": "gzip",
+		}),
+});
+```
 
 ### Deserializer Source
 
-`deserialize(source)` returns the value to validate. On the client, `source` is
-the Fetch `Response`. On the server, it is the Fetch `Request`.
+`deserialize(source)` returns the value to validate. `source` is typed as
+`Request | Response`: the client passes the Fetch `Response` and the server the
+Fetch `Request`. Both share the Fetch body methods, such as `json()` and
+`arrayBuffer()`. A codec used only on one side can treat `source` as that type
+when it needs an API only one of them has.
 
-On the server, the request body is limited to `requestBodyLimit` bytes for
-custom deserializers too. An error thrown while deserializing responds with
-`400`, or `413` when the body exceeds the limit.
+On the server, an error thrown while deserializing responds with `400`.

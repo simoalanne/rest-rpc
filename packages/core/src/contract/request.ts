@@ -67,7 +67,46 @@ export type InferSchemaInputs<TSchemas extends readonly StandardSchemaV1[]> =
 export type InferSchemaOutputs<TSchemas extends readonly StandardSchemaV1[]> =
 	InferSchemas<TSchemas, "output">;
 
-type RequestSegment = "body" | "query" | "params" | "headers";
+type RequestSegment = "query" | "params" | "headers";
+
+type IsUnion<T, TAll = T> = T extends unknown
+	? [TAll] extends [T]
+		? false
+		: true
+	: never;
+
+type InferRequestSegments<TRequest, TIO extends "input" | "output"> = {
+	[
+		TKey in Extract<keyof TRequest, RequestSegment>
+	]: TRequest[TKey] extends readonly StandardSchemaV1[]
+		? InferSchemas<TRequest[TKey], TIO>
+		: never;
+};
+
+// Clients select a media type only when several are declared; handlers always
+// receive the selected one.
+type BodyContentTypeField<
+	TMediaType,
+	TMediaTypes,
+	TIO extends "input" | "output",
+> = TIO extends "input"
+	? IsUnion<TMediaTypes> extends true
+		? { contentType: TMediaType }
+		: { contentType?: TMediaType }
+	: { contentType: TMediaType };
+
+/** One request body variant per declared media type, discriminated by `contentType`. */
+type InferRequestBody<TBody, TIO extends "input" | "output"> = {
+	[TMediaType in Extract<keyof TBody, string>]: BodyContentTypeField<
+		TMediaType,
+		Extract<keyof TBody, string>,
+		TIO
+	> & {
+		body: TBody[TMediaType] extends readonly StandardSchemaV1[]
+			? InferSchemas<TBody[TMediaType], TIO>
+			: never;
+	};
+}[Extract<keyof TBody, string>];
 
 /** Infers each declared request segment, or `TEmpty` when none is declared. */
 type InferRequestFor<
@@ -75,15 +114,11 @@ type InferRequestFor<
 	TIO extends "input" | "output",
 	TEmpty,
 > = E extends { request: infer TRequest }
-	? [Extract<keyof TRequest, RequestSegment>] extends [never]
-		? TEmpty
-		: {
-				[
-					TKey in Extract<keyof TRequest, RequestSegment>
-				]: TRequest[TKey] extends readonly StandardSchemaV1[]
-					? InferSchemas<TRequest[TKey], TIO>
-					: never;
-			}
+	? TRequest extends { body: infer TBody }
+		? Merge<InferRequestSegments<TRequest, TIO> & InferRequestBody<TBody, TIO>>
+		: [Extract<keyof TRequest, RequestSegment>] extends [never]
+			? TEmpty
+			: InferRequestSegments<TRequest, TIO>
 	: TEmpty;
 
 type OptionalHeaders<H, TOptionalKeys extends PropertyKey> = Merge<
