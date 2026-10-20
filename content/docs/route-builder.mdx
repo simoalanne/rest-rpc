@@ -213,8 +213,8 @@ const importTodos = route
 `contentType` may be omitted when a status declares one media type. Clients
 select the request media type with `contentType` in the
 [request](/docs/client/fetch-client#select-a-request-media-type). Repeated
-`.body()` calls add schemas per media type, and a schema passed alone counts as
-`application/json`.
+`.body()` calls [stack](#stacking-schemas) schemas per media type, and a schema
+passed alone counts as `application/json`.
 
 Without declared responses, return the body in an envelope with its
 `contentType`, and the media type is inferred. See
@@ -231,6 +231,24 @@ const events = route
 	.get("/todos/events")
 	.streamResponse(z.object({ id: z.string(), message: z.string() }))
 	.handler(() => streamTodoEvents());
+```
+
+`.streamResponse(schema)` is sugar for `.response({ "text/event-stream": schema })`,
+so it declares the whole status. To offer a stream and another media type on the
+same status, declare both in one record and select one with `contentType`:
+
+```ts
+const todos = route
+	.get("/todos")
+	.response({
+		"application/json": z.array(todoSchema),
+		"text/event-stream": todoSchema,
+	})
+	.handler(() =>
+		wantsStream()
+			? { status: 200, contentType: "text/event-stream", body: streamTodos() }
+			: { status: 200, contentType: "application/json", body: listTodos() },
+	);
 ```
 
 See [Streaming](/docs/streaming) for handlers, event metadata, validation, and
