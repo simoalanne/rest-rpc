@@ -32,26 +32,6 @@ export type ImplicitResponseEnvelope =
 			headers?: Record<string, RequestScalar | undefined>;
 	  };
 
-type BodyResponseKind<TResponse, TBody> =
-	TBody extends AsyncIterable<unknown>
-		? "stream"
-		: TResponse extends { contentType: string }
-			? "custom"
-			: "json";
-
-/**
- * Infers the body encoding selected by a handler response shape.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/route-builder#return-responses}
- */
-export type ImplicitResponseKind<TResponse> = TResponse extends unknown
-	? "body" extends keyof TResponse
-		? TResponse extends { body: infer TBody }
-			? BodyResponseKind<TResponse, TBody>
-			: "empty"
-		: "empty"
-	: never;
-
 type InferredSchema<TInput, TOutput = TInput> = StandardSchemaV1<
 	TInput,
 	TOutput
@@ -59,46 +39,47 @@ type InferredSchema<TInput, TOutput = TInput> = StandardSchemaV1<
 
 type SseData<T> = T extends SseServerEvent<infer TData> ? TData : T;
 
+// Async iterables without a content type are SSE streams; other bodies without
+// one are JSON.
 type ImplicitContentType<TResponse> = TResponse extends {
 	contentType: infer TContentType extends string;
 }
 	? TContentType
-	: "application/json";
+	: TResponse extends { body: AsyncIterable<unknown> }
+		? "text/event-stream"
+		: "application/json";
 
-// The body schema of the envelopes returned with one media type.
-type ImplicitBodySchema<TResponse, TMediaType> = InferredSchema<
-	TResponse extends { body: infer TBody }
-		? ImplicitContentType<TResponse> extends TMediaType
-			? TBody
-			: never
+// The bodies of the envelopes returned with one media type.
+type ImplicitBody<TResponse, TMediaType> = TResponse extends {
+	body: infer TBody;
+}
+	? ImplicitContentType<TResponse> extends TMediaType
+		? TBody
 		: never
->;
+	: never;
 
 type ImplicitStreamSchema<TBody> =
 	TBody extends AsyncIterable<infer TItem>
 		? InferredSchema<TItem, SseData<TItem>>
 		: never;
 
+// A `text/event-stream` schema describes stream items.
+type ImplicitBodySchema<TResponse, TMediaType> =
+	TMediaType extends "text/event-stream"
+		? ImplicitStreamSchema<ImplicitBody<TResponse, TMediaType>>
+		: InferredSchema<ImplicitBody<TResponse, TMediaType>>;
+
 type ImplicitResponseContent<TResponse> = [
-	Extract<TResponse, { body: AsyncIterable<unknown> }>,
+	Extract<TResponse, { body: unknown }>,
 ] extends [never]
-	? [Extract<TResponse, { body: unknown }>] extends [never]
-		? unknown
-		: {
-				content: {
-					[
-						TMediaType in ImplicitContentType<
-							Extract<TResponse, { body: unknown }>
-						>
-					]: ImplicitBodySchema<TResponse, TMediaType>;
-				};
-			}
+	? unknown
 	: {
-			kind: "stream";
 			content: {
-				"text/event-stream": ImplicitStreamSchema<
-					Extract<TResponse, { body: AsyncIterable<unknown> }>["body"]
-				>;
+				[
+					TMediaType in ImplicitContentType<
+						Extract<TResponse, { body: unknown }>
+					>
+				]: ImplicitBodySchema<TResponse, TMediaType>;
 			};
 		};
 
@@ -152,6 +133,14 @@ type ResponseEnvelopeOf<TResult> = TResult extends { status: number }
 	? TResult
 	: { status: 200; body: WithoutNormalizedEnvelopeKeys<TResult> };
 
+// rest-rpc frames SSE itself, so `text/event-stream` bodies must be streams.
+type ValidStreamEnvelopes<TEnvelope> =
+	Extract<TEnvelope, { contentType: "text/event-stream" }> extends {
+		body: AsyncIterable<unknown>;
+	}
+		? unknown
+		: never;
+
 export type ValidImplicitResult<TResult> = [Awaited<TResult>] extends [never]
 	? never
 	: [Extract<Awaited<TResult>, { status: number }>] extends [never]
@@ -160,7 +149,7 @@ export type ValidImplicitResult<TResult> = [Awaited<TResult>] extends [never]
 					Awaited<TResult>,
 					{ status: number }
 			  > extends ImplicitResponseEnvelope
-			? unknown
+			? ValidStreamEnvelopes<Extract<Awaited<TResult>, { status: number }>>
 			: never;
 
 export type InferredRoute<TRoute, TResult> = Merge<

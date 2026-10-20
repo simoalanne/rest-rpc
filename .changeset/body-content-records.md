@@ -11,3 +11,5 @@ Requests and responses are unions discriminated by `contentType`. Handlers recei
 A request with an undeclared media type, or without a content type for a route that declares several, is rejected with `415`. OpenAPI documents get a schema per media type. `extractContract` keeps request body media types as `request.body` with empty schema lists.
 
 `FetchOptionsFor` is replaced by `FetchOptions`. `BodyContentType`, `BodyOptions`, `BodylessResponseOptions`, and `StreamResponseOptions` are removed in favor of `BodyContent`, `MediaType`, and `ResponseOptions`. `fetchOptions` in TanStack Query options is always optional.
+
+A `text/event-stream` response is always an SSE stream whose schema validates each item, and response declarations no longer have a `kind`. `.streamResponse(schema)` is the same as `.response({ "text/event-stream": schema })`, so a status can offer a stream next to other media types. Handlers can no longer send pre-framed SSE text as a `text/event-stream` body; a `text/event-stream` envelope must have an async iterable body.

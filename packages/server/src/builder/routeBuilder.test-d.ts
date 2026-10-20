@@ -8,7 +8,6 @@ import { sse } from "../pipeline/sse.ts";
 import type { Context, DefaultContext } from "./context.ts";
 import { route } from "./routeBuilder.ts";
 import type {
-	ImplicitResponseKind,
 	InferServerHandler,
 	InferServerRequest,
 	InferServerResponse,
@@ -228,14 +227,6 @@ describe("implicit response inference", () => {
 		expectTypeOf<InferClientResponse<typeof envelope>["body"]>().toEqualTypeOf<
 			InferClientResponse<typeof stream>["body"]
 		>();
-		expectTypeOf<
-			ImplicitResponseKind<
-				| { status: 204 }
-				| { body: string }
-				| { body: AsyncIterable<number> }
-				| { body: string; contentType: "text/plain" }
-			>
-		>().toEqualTypeOf<"empty" | "json" | "stream" | "custom">();
 	});
 
 	it("infers plain bodies and envelopes per returned member", () => {

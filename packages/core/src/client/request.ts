@@ -1,9 +1,8 @@
 import {
-	resolveBodyCodec,
-	defaultBodyCodecs,
-	normalizeMediaType,
+	isSerializedBody,
+	type BodyCodecRegistry,
+	type BodyValue,
 	type SerializedBody,
-	type BodyCodec,
 } from "../codecs/index.ts";
 import type { RouteDeclaration, RouteTree } from "../contract/contract.ts";
 import { replacePathParams } from "../contract/path.ts";
@@ -203,9 +202,25 @@ export const constructBaseRequest = (
 	};
 };
 
+// A plain body is sent with the selected content type, and a serialized body
+// with its own headers.
+const toRequestBody = (
+	serialized: BodyValue | SerializedBody,
+	contentType: string,
+) =>
+	isSerializedBody(serialized)
+		? {
+				body: serialized.body as RequestInit["body"],
+				headers: Object.fromEntries(serialized.headers),
+			}
+		: {
+				body: serialized as RequestInit["body"],
+				headers: { "content-type": contentType },
+			};
+
 export type ExecuteRequestOptions = {
 	baseUrl: string;
-	bodyCodecs?: readonly BodyCodec[];
+	codecs: BodyCodecRegistry;
 	fetch?: FetchLike;
 	fetchOptions?: ApiClientFetchOptions;
 	globalHeaders?: ClientHeaders;
@@ -240,20 +255,13 @@ export const executeRequest = async (
 		headers: requestHeaders,
 	} = constructBaseRequest(options.baseUrl, route, requestArgs);
 
-	let serialized: SerializedBody | undefined;
-	if (body !== undefined && contentType !== undefined) {
-		const mediaType = normalizeMediaType(contentType);
-		const resolvedCodec = resolveBodyCodec(mediaType, [
-			...(options.bodyCodecs ?? []),
-			...defaultBodyCodecs,
-		]);
-		if (!resolvedCodec?.serialize)
-			throw new Error("No serializer for declared content-type");
-		serialized = await resolvedCodec.serialize(body, contentType);
-	}
-	const codecHeaders = stringifyHeaders(serialized?.headers);
-	const outgoingContentType =
-		serialized && (serialized.contentType ?? contentType);
+	const serialized =
+		body !== undefined && contentType !== undefined
+			? toRequestBody(
+					await options.codecs.serialize(body, contentType),
+					contentType,
+				)
+			: undefined;
 	const globalHeaders = await resolveHeaders(options.globalHeaders ?? {});
 	const additionalHeaders = stringifyHeaders(fetchOptions?.additionalHeaders);
 	const clientHeaders = {
@@ -272,12 +280,11 @@ export const executeRequest = async (
 			...options.fetchOptions,
 			...requestFetchOptions,
 			method: route.method,
-			body: serialized?.body as RequestInit["body"],
+			body: serialized?.body,
 			headers: {
 				...clientHeaders,
 				...normalizeHeaders(requestHeaders),
-				...normalizeHeaders(codecHeaders),
-				...(outgoingContentType ? { "content-type": outgoingContentType } : {}),
+				...serialized?.headers,
 			},
 			signal: signalState?.signal ?? fetchOptions?.signal,
 		};

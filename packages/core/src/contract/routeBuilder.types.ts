@@ -209,21 +209,3 @@ export type WithResponse<
 			Record<StatusFor<TOptions>, ResponseFor<TSchemaOrContent, TOptions>>;
 	}
 >;
-
-export type WithStreamResponse<
-	TState extends BuilderState,
-	TSchema,
-	TOptions,
-> = NextState<
-	TState,
-	{
-		responses: TState["responses"] &
-			Record<
-				StatusFor<TOptions>,
-				{
-					kind: "stream";
-					content: { "text/event-stream": TSchema };
-				} & ResponseHeadersFor<TOptions>
-			>;
-	}
->;

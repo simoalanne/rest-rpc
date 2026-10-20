@@ -1,4 +1,7 @@
+import { createBodyCodecRegistry } from "../codecs/registry.ts";
 import { constructBaseRequest, executeRequest } from "./request.ts";
+
+const codecs = createBodyCodecRegistry([]);
 
 describe("request", () => {
 	it("passes caller cancellation through to fetch", async () => {
@@ -9,6 +12,7 @@ describe("request", () => {
 			[undefined, { signal: controller.signal }],
 			{
 				baseUrl: "",
+				codecs,
 				fetch,
 			},
 		);
@@ -47,6 +51,7 @@ describe("request", () => {
 					],
 					{
 						baseUrl: "",
+						codecs,
 						fetch,
 						timeoutMs: source !== "caller" ? 100 : undefined,
 					},
@@ -71,6 +76,7 @@ describe("request", () => {
 			const body = new ReadableStream<Uint8Array>({});
 			const response = await executeRequest({ method: "GET", path: "/" }, [], {
 				baseUrl: "",
+				codecs,
 				timeoutMs: 100,
 				fetch: async (_input, init) => {
 					signal = init?.signal;
@@ -118,6 +124,7 @@ describe("request", () => {
 			],
 			{
 				baseUrl: "https://example.test",
+				codecs,
 				fetch,
 				globalHeaders: {
 					"X-Token": async () => "global",

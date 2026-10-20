@@ -152,8 +152,10 @@ Request bodies are decoded with custom `bodyCodecs` first and the
 A codec's `deserialize` receives the Fetch `Request`.
 
 Handlers can return any value supported by the default codecs. A custom
-serializer's `body` must be a Fetch `Response` body, such as a string, `Blob`,
-`FormData`, byte array, or `ReadableStream`, or an async iterable of byte chunks.
+serializer must return a Fetch `Response` body, such as a string, `Blob`,
+`FormData`, byte array, or `ReadableStream`, or an async iterable of byte
+chunks. To send it with its own headers, return it wrapped in
+[`serializedBody()`](/docs/http-behavior/serialization#serializer-result).
 
 ## Error Handling
 

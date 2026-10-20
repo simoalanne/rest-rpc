@@ -1,6 +1,14 @@
-import type { SseEvent } from "@rest-rpc/core";
+import { bodyCodec, type BodyValue, type SseEvent } from "@rest-rpc/core";
 
 const sseBrand = Symbol("rest-rpc.sse");
+
+/**
+ * Sends SSE bodies as-is, since they are already framed and encoded. Listed
+ * before custom codecs so it overrides them.
+ */
+export const sseBodyCodec = bodyCodec("text/event-stream", {
+	serialize: (body) => body as BodyValue,
+});
 
 /** A branded SSE value yielded by server handlers when event metadata is needed. */
 export type SseServerEvent<T> = SseEvent<T> & {

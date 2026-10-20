@@ -28,7 +28,6 @@ describe("routeBuilder", () => {
 		).toEqual({
 			204: { description: "Deleted" },
 			200: {
-				kind: "stream",
 				content: { "text/event-stream": schema },
 				headers,
 				description: "Events",

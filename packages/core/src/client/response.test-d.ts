@@ -121,11 +121,11 @@ describe("client response inference", () => {
 	});
 
 	it("types event-stream content as a stream and keeps non-literal statuses on both sides", () => {
-		const raw = route
+		const stream = route
 			.get("/")
 			.response({ "text/event-stream": type<string>() });
-		expectTypeOf<InferClientResponse<typeof raw>["body"]>().toEqualTypeOf<
-			AsyncIterable<SseEvent<unknown>>
+		expectTypeOf<InferClientResponse<typeof stream>["body"]>().toEqualTypeOf<
+			AsyncIterable<SseEvent<string>>
 		>();
 		type Wide = {
 			readonly "~restrpc": {

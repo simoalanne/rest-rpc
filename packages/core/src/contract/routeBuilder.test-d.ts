@@ -48,7 +48,6 @@ describe("routeBuilder types", () => {
 		});
 		expectTypeOf(stream["~restrpc"].responses).toEqualTypeOf<{
 			200: {
-				kind: "stream";
 				content: { "text/event-stream": typeof schema };
 				headers: typeof headers;
 			};

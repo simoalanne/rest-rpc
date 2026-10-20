@@ -36,7 +36,10 @@ export { type } from "./standard-schema/type.ts";
 export type { ApiClientRouteValue } from "./client/index.ts";
 export type {
 	BodyCodec,
+	BodyCodecOperations,
 	BodyDeserializer,
 	BodySerializer,
+	BodyValue,
 	SerializedBody,
 } from "./codecs/index.ts";
+export { bodyCodec, serializedBody } from "./codecs/index.ts";

@@ -1,10 +1,5 @@
 import { HttpError } from "./httpError.ts";
-import {
-	resolveBodyCodec,
-	defaultBodyCodecs,
-	normalizeMediaType,
-	type BodyCodec,
-} from "../codecs/index.ts";
+import { normalizeMediaType, type BodyCodecRegistry } from "../codecs/index.ts";
 import type { RouteDeclaration, RouteTree } from "../contract/contract.ts";
 import type { SseEvent } from "../contract/sse.ts";
 import type {
@@ -146,14 +141,10 @@ const readHeaders = async (
 const readBody = async (
 	rawResponse: Response,
 	mediaType: string,
-	bodyCodecs: readonly BodyCodec[] | undefined,
+	codecs: BodyCodecRegistry,
 ) => {
 	if (!mediaType || rawResponse.body === null) return undefined;
-	const resolvedCodec = resolveBodyCodec(mediaType, [
-		...(bodyCodecs ?? []),
-		...defaultBodyCodecs,
-	]);
-	return resolvedCodec?.deserialize?.(rawResponse);
+	return codecs.deserialize(rawResponse, mediaType);
 };
 
 export type RouteRequestFn = <E extends RouteDeclaration & { path: string }>(
@@ -175,7 +166,7 @@ export const fetchResponse = async <
 >(
 	request: RouteRequestFn,
 	validateResponse: boolean,
-	bodyCodecs: readonly BodyCodec[] | undefined,
+	codecs: BodyCodecRegistry,
 	route: E,
 	...args: FetchArgs<E>
 ) => {
@@ -198,11 +189,8 @@ export const fetchResponse = async <
 			body,
 		};
 	}
-	if (schema?.kind === "stream") {
-		throw new Error("Server returned an unsupported stream content-type.");
-	}
 
-	const value = await readBody(rawResponse, mediaType, bodyCodecs);
+	const value = await readBody(rawResponse, mediaType, codecs);
 	const declaresResponses = Object.keys(route.responses ?? {}).length > 0;
 	if (!schema && declaresResponses) {
 		throw new HttpError(status, value);

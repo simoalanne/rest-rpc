@@ -1,5 +1,5 @@
 import type { AbsolutePath, BodyCodec } from "@rest-rpc/core";
-import { defaultBodyCodecs } from "@rest-rpc/core/codecs";
+import { createBodyCodecRegistry } from "@rest-rpc/core/codecs";
 import type { HttpMethod } from "@rest-rpc/core/contract";
 import {
 	assertPathParams,
@@ -16,6 +16,7 @@ import { RequestValidationError, ResponseValidationError } from "./errors.ts";
 import { deserializeRequestBody } from "./deserializeRequestBody.ts";
 import { serializeHttpRouteResult } from "./serializeHttpRouteResult.ts";
 import { splitRequestUrl } from "../routing/requestUrl.ts";
+import { sseBodyCodec } from "./sse.ts";
 
 /**
  * Customizes paths, request parsing and validation failures for compiled Fetch routes.
@@ -119,8 +120,10 @@ type FetchDispatch = (
 ) => Promise<Response>;
 
 const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
-	const bodyCodecs = options.bodyCodecs ?? [];
-	const requestBodyCodecs = [...bodyCodecs, ...defaultBodyCodecs];
+	const codecs = createBodyCodecRegistry([
+		sseBodyCodec,
+		...(options.bodyCodecs ?? []),
+	]);
 
 	return async (implementation, params, request, search, handleOptions) => {
 		const { rejection } = resolveRequestMediaType(
@@ -137,7 +140,7 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 		const { body, rejection: bodyRejection } =
 			handleOptions && "body" in handleOptions
 				? { body: handleOptions.body, rejection: undefined }
-				: await deserializeRequestBody(request, requestBodyCodecs);
+				: await deserializeRequestBody(request, codecs);
 		if (bodyRejection) {
 			return Response.json(
 				{ message: bodyRejection.message },
@@ -172,7 +175,7 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 				: Response.json(result.responseBody, { status: result.status });
 		}
 
-		return serializeHttpRouteResult(result, bodyCodecs);
+		return serializeHttpRouteResult(result, codecs);
 	};
 };
 

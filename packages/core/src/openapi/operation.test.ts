@@ -124,7 +124,6 @@ describe("operation", () => {
 		expect(
 			createResponse(
 				{
-					kind: "stream",
 					content: { "text/event-stream": type<string>() },
 					description: "Updates",
 				},

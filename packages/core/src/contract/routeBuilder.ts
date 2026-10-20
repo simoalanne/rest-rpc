@@ -29,7 +29,6 @@ import type {
 	WithMetadata,
 	WithRequest,
 	WithResponse,
-	WithStreamResponse,
 } from "./routeBuilder.types.ts";
 
 type RouteBuilderState = Partial<RouteDeclaration>;
@@ -337,23 +336,18 @@ export class RouteBuilder<
 		);
 	}
 
-	/** Declares a streaming response. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/streaming} */
+	/** Declares a streaming response, the same as a `text/event-stream` response whose schema validates each item. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/streaming} */
 	streamResponse<
 		const TSchema extends StandardSchemaV1,
 		const TOptions extends ResponseOptions | undefined = undefined,
 	>(
 		schema: TSchema,
 		options?: TOptions,
-	): BuilderFor<TKind, WithStreamResponse<TState, TSchema, TOptions>> {
-		const state = defaultRouteState(this["~restrpc"]);
-		return this.clone(
-			addResponse(state, options?.status ?? 200, {
-				kind: "stream",
-				content: { "text/event-stream": schema },
-				headers: options?.headers,
-				description: options?.description,
-			}),
-		);
+	): BuilderFor<
+		TKind,
+		WithResponse<TState, { "text/event-stream": TSchema }, TOptions>
+	> {
+		return this.response({ "text/event-stream": schema }, options) as never;
 	}
 }
 

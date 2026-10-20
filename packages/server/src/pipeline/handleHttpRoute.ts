@@ -147,21 +147,21 @@ const normalizeResponseResult = async (
 		return { status: result.status, headers };
 	}
 
-	if (schema.kind === "stream") {
+	const mediaType = selectResponseMediaType(content, result.contentType);
+	// A `text/event-stream` schema validates each item of the stream.
+	if (mediaType === "text/event-stream") {
 		const body = result.body as AsyncIterable<unknown>;
-		const itemSchema = content["text/event-stream"]!;
 		return {
 			status: result.status,
 			headers,
 			body: {
 				stream: disableValidation
 					? body
-					: validateResponseStreamChunks(body, itemSchema),
+					: validateResponseStreamChunks(body, content[mediaType]!),
 			},
 		};
 	}
 
-	const mediaType = selectResponseMediaType(content, result.contentType);
 	return {
 		status: result.status,
 		headers,
@@ -205,9 +205,14 @@ const normalizeImplicitHttpResponse = (
 	const { status, headers } = response;
 	if (!("body" in response)) return { status, headers };
 
-	// An explicit content type sends a stream through the body codecs as-is.
+	// Async iterables are SSE streams unless another content type sends them
+	// through the body codecs.
 	const { body, contentType } = response;
-	if (contentType === undefined && isAsyncIterable(body)) {
+	if (
+		isAsyncIterable(body) &&
+		(contentType === undefined ||
+			normalizeMediaType(contentType) === "text/event-stream")
+	) {
 		return { status, headers, body: { stream: body } };
 	}
 	return {

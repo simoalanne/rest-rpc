@@ -23,13 +23,12 @@ export type ResponseContentDeclaration = {
 /**
  * Canonical declaration for one route response.
  *
- * @remarks A streaming response declares the schema of each item under
- * `text/event-stream`.
+ * @remarks A `text/event-stream` entry is always an SSE stream, and its schema
+ * validates each item.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/serialization}
  */
 export type ResponseDeclaration = {
-	kind?: "stream";
 	content?: ResponseContentDeclaration;
 	headers?: ResponseHeadersSchema;
 	description?: string;
@@ -69,12 +68,6 @@ type ResponseMediaType<TResponse> = TResponse extends {
 	? Extract<keyof TContent, string>
 	: never;
 
-type IsStreamResponse<TResponse> = TResponse extends {
-	kind: "stream";
-}
-	? true
-	: false;
-
 type ResponseHeadersFor<TResponse> = TResponse extends {
 	headers: infer THeaders extends ResponseHeadersSchema;
 }
@@ -96,31 +89,24 @@ type ContentSchema<TResponse, TMediaType> =
 			: never
 		: never;
 
-// Handlers produce schema inputs and stream items.
-type ServerBody<TResponse, TMediaType> =
-	IsStreamResponse<TResponse> extends true
-		? AsyncIterable<InferSchema<ContentSchema<TResponse, TMediaType>, "input">>
-		: InferSchema<ContentSchema<TResponse, TMediaType>, "input">;
+// `text/event-stream` schemas describe stream items. Handlers produce schema
+// inputs, and clients receive schema outputs wrapped in SSE events.
+type ServerBody<TResponse, TMediaType> = TMediaType extends "text/event-stream"
+	? AsyncIterable<InferSchema<ContentSchema<TResponse, TMediaType>, "input">>
+	: InferSchema<ContentSchema<TResponse, TMediaType>, "input">;
 
-// Clients receive schema outputs and parse every `text/event-stream` response
-// as an SSE stream.
-type ClientBody<TResponse, TMediaType> =
-	IsStreamResponse<TResponse> extends true
-		? AsyncIterable<
-				SseEvent<InferSchema<ContentSchema<TResponse, TMediaType>, "output">>
-			>
-		: TMediaType extends "text/event-stream"
-			? AsyncIterable<SseEvent<unknown>>
-			: InferSchema<ContentSchema<TResponse, TMediaType>, "output">;
+type ClientBody<TResponse, TMediaType> = TMediaType extends "text/event-stream"
+	? AsyncIterable<
+			SseEvent<InferSchema<ContentSchema<TResponse, TMediaType>, "output">>
+		>
+	: InferSchema<ContentSchema<TResponse, TMediaType>, "output">;
 
-// Streams always use `text/event-stream`. A response with several media types
-// must select one; a single media type may be omitted.
+// A response with several media types must select one; a single media type
+// may be omitted.
 type ServerContentType<TResponse, TMediaType> =
-	IsStreamResponse<TResponse> extends true
-		? unknown
-		: IsUnion<ResponseMediaType<TResponse>> extends true
-			? { contentType: TMediaType }
-			: { contentType?: TMediaType };
+	IsUnion<ResponseMediaType<TResponse>> extends true
+		? { contentType: TMediaType }
+		: { contentType?: TMediaType };
 
 type ServerResponseEntry<TStatus extends number, TResponse> = [
 	ResponseMediaType<TResponse>,
