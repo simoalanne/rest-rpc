@@ -2,3 +2,8 @@ packages:
   - "packages/*"
   - "benchmarks"
   - "content/"
+
+# `next` is only an optional peer of `@vercel/analytics`, pulled in through the
+# docs site's blume. Keep it on a patched release.
+overrides:
+  next: ^16.4.2
