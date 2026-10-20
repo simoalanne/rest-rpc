@@ -2,3 +2,14 @@ packages:
   - "packages/*"
   - "benchmarks"
   - "content/"
+
+# Both are only in the docs site's blume dependencies. `next` is an optional
+# peer of `@vercel/analytics`, and `@vercel/routing-utils` pins a vulnerable
+# `path-to-regexp` 6.x. Keep them on patched releases.
+overrides:
+  next: ^16.4.2
+  path-to-regexp@>=4 <6.3.0: ^6.3.0
+
+# Install scripts that may run. lefthook's installs the git hooks.
+allowBuilds:
+  lefthook: true

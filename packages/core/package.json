@@ -71,8 +71,5 @@
 	"scripts": {
 		"build": "tsc -p tsconfig.json",
 		"typecheck": "tsc -p tsconfig.json --noEmit --declaration false"
-	},
-	"devDependencies": {
-		"typescript": "5.9.3"
 	}
 }
