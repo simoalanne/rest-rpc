@@ -1,3 +1,4 @@
+import type { BodyContent } from "../contract/body.ts";
 import { route } from "../contract/routeBuilder.ts";
 import { type } from "../standard-schema/type.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
@@ -85,9 +86,10 @@ describe("client response decoding", () => {
 	it.each([undefined, "application/unknown"])(
 		"handles absent or unknown response content types (%s)",
 		async (contentType) => {
-			const declaration = route.get("/").response(type(), {
-				contentType: contentType ?? "application/json",
-			})["~restrpc"];
+			const content = {
+				[contentType ?? "application/json"]: type(),
+			} as BodyContent;
+			const declaration = route.get("/").response(content)["~restrpc"];
 			const response = new Response("hello", {
 				headers: contentType ? { "content-type": contentType } : {},
 			});
@@ -111,7 +113,7 @@ describe("client response decoding", () => {
 	it("falls back to binary decoding when a custom codec has no deserializer", async () => {
 		const declaration = route
 			.get("/")
-			.response(type(), { contentType: "application/custom" })["~restrpc"];
+			.response({ "application/custom": type() })["~restrpc"];
 		expect(
 			await fetchResponse(
 				async () =>

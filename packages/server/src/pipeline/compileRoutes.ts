@@ -10,7 +10,7 @@ import {
 	type RuntimeImplementation,
 	type RuntimeImplementationTree,
 } from "../routing/match.ts";
-import { assertRequestContentType } from "./requestContentType.ts";
+import { resolveRequestMediaType } from "./requestContentType.ts";
 import { handleHttpRoute, type HandleOptions } from "./handleHttpRoute.ts";
 import { RequestValidationError, ResponseValidationError } from "./errors.ts";
 import { deserializeRequestBody } from "./deserializeRequestBody.ts";
@@ -123,7 +123,7 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 	const requestBodyCodecs = [...bodyCodecs, ...defaultBodyCodecs];
 
 	return async (implementation, params, request, search, handleOptions) => {
-		const rejection = assertRequestContentType(
+		const { rejection } = resolveRequestMediaType(
 			implementation.route,
 			request.headers.get("content-type"),
 		);

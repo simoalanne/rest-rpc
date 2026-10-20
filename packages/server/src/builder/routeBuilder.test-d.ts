@@ -98,7 +98,7 @@ describe("routeBuilder types", () => {
 			RouteRequest<Route, DefaultContext>
 		>();
 		expectTypeOf<InferServerResponse<typeof declared>>().toEqualTypeOf<
-			{ status: 200; body: string } | string
+			{ status: 200; contentType?: "application/json"; body: string } | string
 		>();
 		const tree = { users: { get: declared } };
 		expectTypeOf<
@@ -112,19 +112,25 @@ describe("routeBuilder types", () => {
 	it("returns envelopes or the body of a single declared response", () => {
 		const declared = contractRoute.get("/").response(type<string>());
 		type Handler = RouteHandlerFor<typeof declared>;
+		type Envelope = {
+			status: 200;
+			contentType?: "application/json";
+			body: string;
+		};
 		expectTypeOf<ReturnType<Handler>>().toEqualTypeOf<
-			| { status: 200; body: string }
-			| string
-			| Promise<{ status: 200; body: string } | string>
+			Envelope | string | Promise<Envelope | string>
 		>();
 		const created = contractRoute
 			.post("/")
 			.response(type<string>(), { status: 201 });
 		type CreatedHandler = RouteHandlerFor<typeof created>;
+		type CreatedEnvelope = {
+			status: 201;
+			contentType?: "application/json";
+			body: string;
+		};
 		expectTypeOf<ReturnType<CreatedHandler>>().toEqualTypeOf<
-			| { status: 201; body: string }
-			| string
-			| Promise<{ status: 201; body: string } | string>
+			CreatedEnvelope | string | Promise<CreatedEnvelope | string>
 		>();
 	});
 
@@ -204,6 +210,7 @@ describe("implicit response inference", () => {
 			.handler(() => ({ status: 200, body: chunks() }));
 		expectTypeOf<InferClientResponse<typeof plain>>().toEqualTypeOf<{
 			status: 200;
+			contentType: "application/json";
 			body: { readonly id: "one" };
 			headers: Record<string, string>;
 		}>();
@@ -247,6 +254,7 @@ describe("implicit response inference", () => {
 		const textStatus = route.handler(() => ({ id: "one", status: "open" }));
 		expectTypeOf<InferClientResponse<typeof textStatus>>().toEqualTypeOf<{
 			status: 200;
+			contentType: "application/json";
 			body: { readonly id: "one"; readonly status: "open" };
 			headers: Record<string, string>;
 		}>();

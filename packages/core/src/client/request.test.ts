@@ -107,7 +107,7 @@ describe("request", () => {
 			{
 				method: "POST",
 				path: "/users",
-				request: { contentType: "application/json" },
+				request: { body: { "application/json": [] } },
 			},
 			[
 				{ body: { name: "Ada" }, headers: { "X-Token": "request" } },

@@ -240,8 +240,9 @@ describe("handleHttpRoute", () => {
 	it("requires a declared response content type and normalizes the selection", async () => {
 		const declared = route
 			.get("/")
-			.response(type<string>(), {
-				contentType: ["text/plain", "text/html"],
+			.response({
+				"text/plain": type<string>(),
+				"text/html": type((value: string) => `<p>${value}</p>`),
 			})
 			.handler(() => ({ status: 200, body: "ok", contentType: "text/plain" }));
 		const implementation = flattenRouteImplementations(declared)[0]!;
@@ -254,7 +255,10 @@ describe("handleHttpRoute", () => {
 				{ request: {}, signal },
 			);
 		expect(await run("Text/Plain; charset=utf-8")).toMatchObject({
-			body: { contentType: "text/plain" },
+			body: { value: "ok", contentType: "text/plain" },
+		});
+		expect(await run("text/html")).toMatchObject({
+			body: { value: "<p>ok</p>", contentType: "text/html" },
 		});
 		await expect(run()).rejects.toThrow(
 			"Unsupported response body contentType.",
@@ -262,6 +266,32 @@ describe("handleHttpRoute", () => {
 		await expect(run("application/json")).rejects.toThrow(
 			"Unsupported response body contentType.",
 		);
+	});
+
+	it("validates the request body with the schemas of the received media type", async () => {
+		const seen = vi.fn();
+		const declared = route
+			.post("/")
+			.body({
+				"text/plain": type((value: string) => value.toUpperCase()),
+				"application/json": type((value: { name: string }) => value.name),
+			})
+			.handler(({ contentType, body }) => {
+				seen(contentType, body);
+				return { status: 204 };
+			});
+		const implementation = flattenRouteImplementations(declared)[0]!;
+		const run = (contentType: string, body: unknown) =>
+			handleHttpRoute(implementation, {
+				request: { body, headers: { "content-type": contentType } },
+				signal,
+			});
+		await run("text/plain; charset=utf-8", "ada");
+		await run("application/json", { name: "Grace" });
+		expect(seen.mock.calls).toEqual([
+			["text/plain", "ADA"],
+			["application/json", "Grace"],
+		]);
 	});
 
 	it("propagates ordinary handler errors", async () => {

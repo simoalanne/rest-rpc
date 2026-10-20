@@ -358,14 +358,12 @@ describe.each([
 		const routes = {
 			decode: route
 				.post("/decode")
-				.body(type<unknown>(), {
-					contentType: [
-						"application/json",
-						"application/x-www-form-urlencoded",
-						"multipart/form-data",
-						"text/plain",
-						"application/octet-stream",
-					],
+				.body({
+					"application/json": type<unknown>(),
+					"application/x-www-form-urlencoded": type<URLSearchParams>(),
+					"multipart/form-data": type<FormData>(),
+					"text/plain": type<string>(),
+					"application/octet-stream": type<Blob>(),
 				})
 				.handler(({ body }) => describeBody(body)),
 		};

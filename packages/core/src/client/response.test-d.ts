@@ -14,9 +14,11 @@ describe("client response inference", () => {
 		const value = route
 			.get("/")
 			.response(
-				type((input: string) => Number(input)),
 				{
-					contentType: ["text/plain", "application/json"],
+					"text/plain": type((input: string) => Number(input)),
+					"application/json": type<{ value: number }>(),
+				},
+				{
 					headers: type((input: { count: string }) => ({
 						count: Number(input.count),
 					})),
@@ -27,14 +29,20 @@ describe("client response inference", () => {
 		type Client = InferClientResponse<typeof value>;
 		expectTypeOf<Client["status"]>().toEqualTypeOf<200 | 204 | 404>();
 		expectTypeOf<
-			Extract<Client, { status: 200 }>["body"]
+			Extract<Client, { contentType: "text/plain" }>["body"]
 		>().toEqualTypeOf<number>();
+		expectTypeOf<
+			Extract<Client, { contentType: "application/json"; status: 200 }>["body"]
+		>().toEqualTypeOf<{ value: number }>();
 		expectTypeOf<Extract<Client, { status: 200 }>["headers"]>().toEqualTypeOf<
 			Record<string, string> & { count: number }
 		>();
-		expectTypeOf<
-			Extract<Client, { status: 204 }>["body"]
-		>().toEqualTypeOf<undefined>();
+		expectTypeOf<Extract<Client, { status: 204 }>>().toEqualTypeOf<{
+			status: 204;
+			contentType: undefined;
+			body: undefined;
+			headers: Record<string, string>;
+		}>();
 		expectTypeOf<Extract<Client, { status: 404 }>["body"]>().toEqualTypeOf<{
 			message: string;
 		}>();
@@ -64,11 +72,22 @@ describe("client response inference", () => {
 			.response({ status: 204 })
 			.response(type<{ message: string }>(), { status: 404 });
 		expectTypeOf<InferClientSuccess<typeof value>>().toEqualTypeOf<
-			| { status: 200; body: { name: string }; headers: Record<string, string> }
-			| { status: 204; body: undefined; headers: Record<string, string> }
+			| {
+					status: 200;
+					contentType: "application/json";
+					body: { name: string };
+					headers: Record<string, string>;
+			  }
+			| {
+					status: 204;
+					contentType: undefined;
+					body: undefined;
+					headers: Record<string, string>;
+			  }
 		>();
 		expectTypeOf<InferClientError<typeof value>>().toEqualTypeOf<{
 			status: 404;
+			contentType: "application/json";
 			body: { message: string };
 			headers: Record<string, string>;
 		}>();
@@ -102,9 +121,9 @@ describe("client response inference", () => {
 	});
 
 	it("types event-stream content as a stream and keeps non-literal statuses on both sides", () => {
-		const raw = route.get("/").response(type<string>(), {
-			contentType: "text/event-stream",
-		});
+		const raw = route
+			.get("/")
+			.response({ "text/event-stream": type<string>() });
 		expectTypeOf<InferClientResponse<typeof raw>["body"]>().toEqualTypeOf<
 			AsyncIterable<SseEvent<unknown>>
 		>();
@@ -112,7 +131,11 @@ describe("client response inference", () => {
 			readonly "~restrpc": {
 				method: "GET";
 				path: "/";
-				responses: { [status: number]: { body: StandardSchemaV1<string> } };
+				responses: {
+					[status: number]: {
+						content: { "application/json": StandardSchemaV1<string> };
+					};
+				};
 			};
 		};
 		expectTypeOf<InferClientSuccess<Wide>["status"]>().toEqualTypeOf<number>();

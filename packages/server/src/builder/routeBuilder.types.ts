@@ -3,7 +3,6 @@ import type {
 	RouteDeclaration,
 	ServerRequest,
 	ServerResponse,
-	ServerResponseBody,
 } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import type { SseServerEvent } from "../pipeline/sse.ts";
@@ -60,40 +59,61 @@ type InferredSchema<TInput, TOutput = TInput> = StandardSchemaV1<
 
 type SseData<T> = T extends SseServerEvent<infer TData> ? TData : T;
 
-type ImplicitResponseBodyDeclaration<TResponse> = TResponse extends {
-	body: infer TBody;
+type ImplicitContentType<TResponse> = TResponse extends {
+	contentType: infer TContentType extends string;
 }
-	? TBody extends AsyncIterable<infer TItem>
-		? InferredSchema<TItem, SseData<TItem>>
-		: InferredSchema<TBody>
-	: undefined;
+	? TContentType
+	: "application/json";
 
-type ImplicitResponseContentType<TResponse> = TResponse extends {
-	body: infer TBody;
+// The body schema of the envelopes returned with one media type.
+type ImplicitBodySchema<TResponse, TMediaType> = InferredSchema<
+	TResponse extends { body: infer TBody }
+		? ImplicitContentType<TResponse> extends TMediaType
+			? TBody
+			: never
+		: never
+>;
+
+type ImplicitStreamSchema<TBody> =
+	TBody extends AsyncIterable<infer TItem>
+		? InferredSchema<TItem, SseData<TItem>>
+		: never;
+
+type ImplicitResponseContent<TResponse> = [
+	Extract<TResponse, { body: AsyncIterable<unknown> }>,
+] extends [never]
+	? [Extract<TResponse, { body: unknown }>] extends [never]
+		? unknown
+		: {
+				content: {
+					[
+						TMediaType in ImplicitContentType<
+							Extract<TResponse, { body: unknown }>
+						>
+					]: ImplicitBodySchema<TResponse, TMediaType>;
+				};
+			}
+	: {
+			kind: "stream";
+			content: {
+				"text/event-stream": ImplicitStreamSchema<
+					Extract<TResponse, { body: AsyncIterable<unknown> }>["body"]
+				>;
+			};
+		};
+
+type ImplicitResponseHeaders<TResponse> = TResponse extends {
+	headers: infer THeaders;
 }
-	? TBody extends AsyncIterable<unknown>
-		? never
-		: TResponse extends { contentType: infer TContentType extends string }
-			? TContentType
-			: "application/json"
+	? THeaders
 	: never;
 
-type ImplicitResponseDeclaration<TResponse> = TResponse extends {
-	body: unknown;
-}
-	? {
-			body: ImplicitResponseBodyDeclaration<TResponse>;
-		} & (TResponse extends { body: AsyncIterable<unknown> }
-			? { kind: "stream" }
-			: { contentType: ImplicitResponseContentType<TResponse> }) &
-			(TResponse extends { headers: infer THeaders }
-				? { headers: InferredSchema<THeaders> }
-				: unknown)
-	: { body: undefined } & (TResponse extends {
-			headers: infer THeaders;
-		}
-			? { headers: InferredSchema<THeaders> }
-			: unknown);
+// Groups every envelope returned with one status into one declaration.
+type ImplicitResponseDeclaration<TResponse> =
+	ImplicitResponseContent<TResponse> &
+		([ImplicitResponseHeaders<TResponse>] extends [never]
+			? unknown
+			: { headers: InferredSchema<ImplicitResponseHeaders<TResponse>> });
 
 type ResponseStatuses<TResponse> = TResponse extends {
 	status: infer TStatus extends number;
@@ -178,16 +198,16 @@ type IsUnion<T, TAll = T> = T extends unknown
 	: never;
 
 // Handlers may return the body of a route's only declared response directly,
-// unless its content type must be selected from a list.
+// unless that response has several media types to select from.
 type PlainResponseBody<TRoute extends RouteDeclaration> = [
 	IsUnion<keyof TRoute["responses"]>,
 ] extends [false]
-	? TRoute["responses"][keyof TRoute["responses"]] extends infer TResponse
-		? TResponse extends { contentType: readonly string[] }
-			? never
-			: TResponse extends { body: StandardSchemaV1 }
-				? WithSseItems<ServerResponseBody<TResponse>>
+	? ServerResponse<TRoute> extends infer TResponse
+		? [IsUnion<TResponse>] extends [false]
+			? TResponse extends { body: infer TBody }
+				? WithSseItems<TBody>
 				: never
+			: never
 		: never
 	: never;
 
@@ -199,7 +219,10 @@ type HandlerResult<TRoute extends RouteDeclaration> = MaybePromise<
 type HandlerFields = {
 	/** Aborts when the client disconnects. */
 	signal: AbortSignal;
-	/** The received request media type, if any. */
+	/**
+	 * The request body media type. Routes with a body narrow it to the declared
+	 * media types.
+	 */
 	contentType?: string;
 	/** The `Last-Event-ID` request header, used to resume streams. */
 	lastEventId?: string;

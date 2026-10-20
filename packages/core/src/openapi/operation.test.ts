@@ -10,18 +10,20 @@ import {
 describe("operation", () => {
 	it("documents declared response descriptions, headers and content types", () => {
 		const headers = type<{ count: number }>();
-		const body = type<string>();
+		const text = type<string>();
+		const json = type<{ name: string }>();
 		const converter = vi.fn((schema: unknown, _mode: "input" | "output") =>
 			schema === headers
 				? { properties: { count: { type: "integer" } } }
-				: { type: "string" },
+				: schema === json
+					? { type: "object" }
+					: { type: "string" },
 		);
 		expect(
 			createResponse(
 				{
-					body,
+					content: { "text/plain": text, "application/json": json },
 					headers,
-					contentType: ["text/plain", "text/html"],
 					description: "Created",
 				},
 				converter,
@@ -31,7 +33,7 @@ describe("operation", () => {
 			headers: { count: { schema: { type: "integer" } } },
 			content: {
 				"text/plain": { schema: { type: "string" } },
-				"text/html": { schema: { type: "string" } },
+				"application/json": { schema: { type: "object" } },
 			},
 		});
 	});
@@ -100,31 +102,32 @@ describe("operation", () => {
 		).toEqual([true, true]);
 	});
 
-	it("combines request schemas for every declared content type", () => {
+	it("combines stacked request schemas per media type", () => {
+		const json = type<{ name: string }>();
 		const body = createRequestBody(
-			[type<string>(), type<string>()],
-			() => ({ type: "string" }),
-			["text/plain", "application/json"],
+			{ "text/plain": [type<string>()], "application/json": [json, json] },
+			(schema) => (schema === json ? { type: "object" } : { type: "string" }),
 		);
 		expect(body?.content).toEqual({
-			"text/plain": {
-				schema: { allOf: [{ type: "string" }, { type: "string" }] },
-			},
+			"text/plain": { schema: { type: "string" } },
 			"application/json": {
-				schema: { allOf: [{ type: "string" }, { type: "string" }] },
+				schema: { allOf: [{ type: "object" }, { type: "object" }] },
 			},
 		});
-		expect(createRequestBody([], undefined)).toBeUndefined();
-		expect(createRequestBody([type<string>()], undefined, [])).toBeUndefined();
+		expect(createRequestBody(undefined, undefined)).toBeUndefined();
 	});
 
 	it("omits content for bodyless responses and uses SSE for streams", () => {
-		expect(createResponse({ body: undefined }, undefined)).toEqual({
+		expect(createResponse({}, undefined)).toEqual({
 			description: "",
 		});
 		expect(
 			createResponse(
-				{ kind: "stream", body: type<string>(), description: "Updates" },
+				{
+					kind: "stream",
+					content: { "text/event-stream": type<string>() },
+					description: "Updates",
+				},
 				() => ({ type: "string" }),
 			),
 		).toEqual({

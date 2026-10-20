@@ -13,14 +13,19 @@ import type {
 	RequestScalar,
 } from "../contract/request.ts";
 
+/**
+ * Fetch options accepted by a route call, plus headers added outside the
+ * declared route input.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#per-call-options}
+ */
 export type FetchOptions = Omit<RequestInit, "method" | "body" | "headers"> & {
 	additionalHeaders?: Record<string, RequestScalar | undefined>;
-	contentType?: string;
 };
 
 export type ApiClientFetchOptions = Omit<
 	FetchOptions,
-	"signal" | "contentType" | "additionalHeaders"
+	"signal" | "additionalHeaders"
 >;
 
 /**
@@ -91,26 +96,6 @@ export type InferClientRequest<
 				: never;
 		};
 
-type DeclaredContentType<E> = E extends { method: "GET" }
-	? never
-	: E extends { request: { contentType: infer TContentType } }
-		? TContentType
-		: never;
-
-// A content-type list must be narrowed to one entry per call.
-type ContentTypeOption<E> = [DeclaredContentType<E>] extends [never]
-	? { contentType?: never }
-	: DeclaredContentType<E> extends readonly string[]
-		? { contentType: DeclaredContentType<E>[number] }
-		: { contentType?: never };
-
-/** Fetch options accepted by a particular route call. */
-export type FetchOptionsFor<E extends RouteDeclaration> = Omit<
-	FetchOptions,
-	"contentType"
-> &
-	ContentTypeOption<E>;
-
 export type FetchArgs<
 	E extends RouteDeclaration = RouteDeclaration,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
@@ -120,13 +105,12 @@ export type FetchArgs<
 		GlobalHeaderKeys<TGlobalHeaders>
 	> extends infer TRequest
 		? [TRequest] extends [never]
-			? [request?: undefined, options?: FetchOptionsFor<E>]
-			: ContentTypeOption<E> extends { contentType: string }
-				? [request: TRequest, options: FetchOptionsFor<E>]
-				: [request: TRequest, options?: FetchOptionsFor<E>]
+			? [request?: undefined, options?: FetchOptions]
+			: [request: TRequest, options?: FetchOptions]
 		: never;
 
 type GroupedRequestInput = {
+	contentType?: string;
 	body?: unknown;
 	query?: unknown;
 	params?: Record<string, unknown>;
@@ -137,7 +121,7 @@ type GroupedRequestInput = {
 type ClientRequestRoute = {
 	method: HttpMethod;
 	path: string;
-	request?: { contentType?: string | readonly string[] };
+	request?: { body?: Readonly<Record<string, unknown>> };
 };
 
 const createRequestSignal = (
@@ -207,18 +191,14 @@ export const constructBaseRequest = (
 	baseUrl: string,
 	route: ClientRequestRoute,
 	args: GroupedRequestInput | undefined,
-	selectedContentType?: string,
 ) => {
-	const { body, query, params, headers } = args ?? {};
+	const { contentType, body, query, params, headers } = args ?? {};
 	const url = `${baseUrl}${serializeParams(route, params)}${serializeQuery(query)}`;
-	const contentType =
-		typeof route.request?.contentType === "string"
-			? route.request.contentType
-			: selectedContentType;
 	return {
 		url,
 		body,
-		contentType: contentType,
+		// Calls select a media type when the route declares several.
+		contentType: contentType ?? Object.keys(route.request?.body ?? {})[0],
 		headers: stringifyHeaders(headers),
 	};
 };
@@ -258,12 +238,7 @@ export const executeRequest = async (
 		body,
 		contentType,
 		headers: requestHeaders,
-	} = constructBaseRequest(
-		options.baseUrl,
-		route,
-		requestArgs,
-		fetchOptions?.contentType,
-	);
+	} = constructBaseRequest(options.baseUrl, route, requestArgs);
 
 	let serialized: SerializedBody | undefined;
 	if (body !== undefined && contentType !== undefined) {
@@ -291,11 +266,8 @@ export const executeRequest = async (
 	);
 
 	try {
-		const {
-			contentType: _contentType,
-			additionalHeaders: _additionalHeaders,
-			...requestFetchOptions
-		} = fetchOptions ?? {};
+		const { additionalHeaders: _additionalHeaders, ...requestFetchOptions } =
+			fetchOptions ?? {};
 		const init: RequestInit = {
 			...options.fetchOptions,
 			...requestFetchOptions,

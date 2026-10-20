@@ -28,7 +28,12 @@ describe("call", () => {
 				{ params: { id: "1" } },
 				{ lastEventId: "one", context: { user: "Ada" } },
 			),
-		).toEqual({ status: 200, body: 2, headers: { total: 2 } });
+		).toEqual({
+			status: 200,
+			contentType: "application/json",
+			body: 2,
+			headers: { total: 2 },
+		});
 		const request = seen.mock.calls[0]![0];
 		expect(request).toMatchObject({ params: { id: 1 }, lastEventId: "one" });
 		expect(request.signal.aborted).toBe(false);

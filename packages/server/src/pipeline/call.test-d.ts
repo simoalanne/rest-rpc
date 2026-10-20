@@ -9,7 +9,10 @@ import { route } from "../builder/routeBuilder.ts";
 const withRequest = route
 	.post("/items/{id}")
 	.params(type<{ id: string }>())
-	.body(type<string>(), { contentType: ["text/plain", "application/json"] })
+	.body({
+		"text/plain": type<string>(),
+		"application/json": type<{ name: string }>(),
+	})
 	.handler(() => "ok");
 
 const withContext = route
@@ -20,7 +23,11 @@ const withContext = route
 describe("call types", () => {
 	it("returns the client response of the route", () => {
 		expectTypeOf(
-			call(withRequest, { params: { id: "1" }, body: "a" }),
+			call(withRequest, {
+				contentType: "text/plain",
+				params: { id: "1" },
+				body: "a",
+			}),
 		).resolves.toEqualTypeOf<InferClientResponse<typeof withRequest>>();
 	});
 
@@ -30,13 +37,10 @@ describe("call types", () => {
 		call(withRequest);
 	});
 
-	it("accepts a partial context and an optional declared content type", () => {
+	it("accepts a partial context", () => {
 		expectTypeOf<CallOptions<typeof withContext>["context"]>().toEqualTypeOf<
 			{ user?: string } | undefined
 		>();
-		expectTypeOf<
-			CallOptions<typeof withRequest>["contentType"]
-		>().toEqualTypeOf<"text/plain" | "application/json" | undefined>();
 	});
 });
 

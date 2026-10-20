@@ -1,24 +1,37 @@
 import type { RouteDeclaration } from "@rest-rpc/core/contract";
-import {
-	findDeclaredContentType,
-	normalizeMediaType,
-} from "@rest-rpc/core/codecs";
+import { normalizeMediaType } from "@rest-rpc/core/codecs";
+
+type RequestMediaType =
+	| { mediaType: string | undefined; rejection: undefined }
+	| { mediaType: undefined; rejection: { status: 415; message: string } };
+
+const unsupported = (message: string): RequestMediaType => ({
+	mediaType: undefined,
+	rejection: { status: 415, message },
+});
 
 /**
- * Checks a received media type against a route's declared request body types.
- * Returns a transport rejection, or undefined when the header is accepted.
- * Missing headers pass; received types without a matching declaration are rejected.
+ * Selects the declared body media type for a received content type.
+ *
+ * @remarks Received media types without a matching declaration are rejected.
+ * Without a content type, a route with one body media type uses it, and a
+ * route with several requires one.
  */
-export function assertRequestContentType(
+export function resolveRequestMediaType(
 	route: RouteDeclaration,
 	contentType: string | null | undefined,
-): { status: 415; message: string } | undefined {
+): RequestMediaType {
+	const body = route.request?.body ?? {};
 	const mediaType = normalizeMediaType(contentType);
-	if (!mediaType) return undefined;
-	if (
-		findDeclaredContentType(route.request?.contentType, mediaType) !== undefined
-	) {
-		return undefined;
+	if (mediaType) {
+		return mediaType in body
+			? { mediaType, rejection: undefined }
+			: unsupported("Unsupported request body content type.");
 	}
-	return { status: 415, message: "Unsupported request body content type." };
+
+	const declared = Object.keys(body);
+	if (declared.length > 1) {
+		return unsupported("Request body content type is required.");
+	}
+	return { mediaType: declared[0], rejection: undefined };
 }

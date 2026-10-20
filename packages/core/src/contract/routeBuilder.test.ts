@@ -1,4 +1,5 @@
 import { type } from "../standard-schema/type.ts";
+import type { BodyContent } from "./body.ts";
 import { RouteBuilder, route } from "./routeBuilder.ts";
 
 const schema = type<{ name: string }>();
@@ -10,10 +11,10 @@ describe("routeBuilder", () => {
 		const second = base.response(schema, { status: 201 });
 		expect(base["~restrpc"].responses).toEqual({});
 		expect(first["~restrpc"].responses).toEqual({
-			200: { body: schema, contentType: "application/json" },
+			200: { content: { "application/json": schema } },
 		});
 		expect(second["~restrpc"].responses).toEqual({
-			201: { body: schema, contentType: "application/json" },
+			201: { content: { "application/json": schema } },
 		});
 	});
 
@@ -25,20 +26,44 @@ describe("routeBuilder", () => {
 				.streamResponse(schema, { headers, description: "Events" })["~restrpc"]
 				.responses,
 		).toEqual({
-			204: { body: undefined, description: "Deleted" },
-			200: { kind: "stream", body: schema, headers, description: "Events" },
-		});
-		expect(
-			new RouteBuilder().response(schema, { description: "Name" })["~restrpc"]
-				.responses,
-		).toEqual({
+			204: { description: "Deleted" },
 			200: {
-				body: schema,
-				contentType: "application/json",
-				description: "Name",
+				kind: "stream",
+				content: { "text/event-stream": schema },
+				headers,
+				description: "Events",
 			},
 		});
+		expect(
+			new RouteBuilder()
+				.response(schema, { description: "Name" })
+				.response({ "text/csv": schema }, { status: 201 })["~restrpc"]
+				.responses,
+		).toEqual({
+			200: { content: { "application/json": schema }, description: "Name" },
+			201: { content: { "text/csv": schema } },
+		});
 	});
+
+	it("appends body schemas per media type", () => {
+		const text = type<string>();
+		expect(
+			route
+				.body(schema)
+				.body({ "text/plain": text, "application/json": schema })["~restrpc"]
+				.request.body,
+		).toEqual({ "application/json": [schema, schema], "text/plain": [text] });
+	});
+
+	it.each(["Text/Plain", "text/plain; charset=utf-8"])(
+		"rejects the media type key %s",
+		(mediaType) => {
+			const content = { [mediaType]: schema } as BodyContent;
+			expect(() => route.body(content)).toThrow(
+				`Media type "${mediaType}" must be a lowercase base media type such as "application/json".`,
+			);
+		},
+	);
 
 	it("rejects duplicate response statuses across stream and body responses", () => {
 		expect(() =>
