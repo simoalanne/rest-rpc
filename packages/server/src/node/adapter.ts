@@ -5,14 +5,17 @@ import {
 	compileRoutes as compileFetchRoutes,
 	type CompileRoutesOptions,
 } from "../pipeline/compileRoutes.ts";
-import type { HandleOptions } from "../pipeline/handleHttpRoute.ts";
+import type {
+	CatchAllHandleOptions,
+	HandleOptions,
+} from "../pipeline/handleHttpRoute.ts";
 import {
 	createRouteMatcher,
 	parsePathParams,
 	readAttachedPathParams,
 	type RuntimeImplementationTree,
 } from "../routing/match.ts";
-import { readRequestPathname } from "../routing/requestUrl.ts";
+import { readRequestPathname, stripMountPath } from "../routing/requestUrl.ts";
 
 // A body is present only when framed by content-length or transfer-encoding.
 const hasBody = (req: IncomingMessage) =>
@@ -30,13 +33,20 @@ const createRequestSignal = (res: ServerResponse): AbortSignal => {
 	return controller.signal;
 };
 
+// Express removes the mount path from `req.url` and keeps the full request
+// target in `originalUrl`.
+const readRequestTarget = (req: IncomingMessage) =>
+	(req as IncomingMessage & { originalUrl?: string }).originalUrl ??
+	req.url ??
+	"/";
+
 /** Reads a Node request as a Fetch `Request` that aborts when the client disconnects. */
 const toFetchRequest = (req: IncomingMessage, res: ServerResponse): Request => {
 	const headers = new Headers();
 	for (let index = 0; index < req.rawHeaders.length; index += 2) {
 		headers.append(req.rawHeaders[index], req.rawHeaders[index + 1]);
 	}
-	const url = req.url ?? "/";
+	const url = readRequestTarget(req);
 	return new Request(
 		url.startsWith("/")
 			? `http://${req.headers.host ?? "localhost"}${url}`
@@ -90,7 +100,7 @@ const writeFetchResponse = async (
  */
 export type NodeRoute = {
 	readonly method: HttpMethod;
-	/** Route path with prefix applied and param markers per `paramSyntax`. */
+	/** Route path with param markers per `paramSyntax`. */
 	readonly path: string;
 	/**
 	 * Handles a request already routed to this route and writes the result,
@@ -163,15 +173,16 @@ export function createCatchAllHandler(
 ): (
 	request: IncomingMessage,
 	response: ServerResponse,
-	options?: HandleOptions,
+	options?: CatchAllHandleOptions,
 ) => Promise<NodeRouteHandlerResult> {
 	const matchRoute = createRouteMatcher(routes);
 
 	return async (request, response, options) => {
-		const match = matchRoute(
-			request.method ?? "GET",
-			readRequestPathname(request.url ?? "/"),
-		);
+		const pathname = readRequestPathname(readRequestTarget(request));
+		const routePath = options?.mountPath
+			? stripMountPath(pathname, options.mountPath)
+			: pathname;
+		const match = routePath && matchRoute(request.method ?? "GET", routePath);
 		if (!match) {
 			return { matched: false };
 		}
