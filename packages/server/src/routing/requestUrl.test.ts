@@ -1,4 +1,8 @@
-import { readRequestPathname, readRequestSearch } from "./requestUrl.ts";
+import {
+	readRequestPathname,
+	readRequestSearch,
+	stripMountPath,
+} from "./requestUrl.ts";
 
 describe("readRequestPathname", () => {
 	it("reads the path without normalizing it", () => {
@@ -21,5 +25,19 @@ describe("readRequestSearch", () => {
 		expect(readRequestSearch("/users/1?a=1&b=x+y")).toBe("a=1&b=x+y");
 		expect(readRequestSearch("http://localhost?page=2")).toBe("page=2");
 		expect(readRequestSearch("/users/1")).toBe("");
+	});
+});
+
+describe("stripMountPath", () => {
+	it("removes the mount path at a segment boundary", () => {
+		expect(stripMountPath("/api/users", "/api")).toBe("/users");
+		expect(stripMountPath("/api", "/api")).toBe("/");
+		expect(stripMountPath("/apix/users", "/api")).toBeUndefined();
+	});
+
+	it("rejects a mount path with a trailing slash", () => {
+		expect(() => stripMountPath("/api/users", "/api/")).toThrow(
+			'Mount path "/api/" must not end with a slash',
+		);
 	});
 });

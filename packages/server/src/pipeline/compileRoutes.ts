@@ -1,4 +1,4 @@
-import type { AbsolutePath, BodyCodec } from "@rest-rpc/core";
+import type { BodyCodec } from "@rest-rpc/core";
 import {
 	createBodyCodecRegistry,
 	normalizeMediaType,
@@ -17,7 +17,11 @@ import {
 	type RuntimeImplementationTree,
 } from "../routing/match.ts";
 import { resolveRequestMediaType } from "./requestContentType.ts";
-import { handleHttpRoute, type HandleOptions } from "./handleHttpRoute.ts";
+import {
+	handleHttpRoute,
+	type CatchAllHandleOptions,
+	type HandleOptions,
+} from "./handleHttpRoute.ts";
 import { RequestValidationError, ResponseValidationError } from "./errors.ts";
 import { deserializeRequestBody } from "./deserializeRequestBody.ts";
 import { serializeHttpRouteResult } from "./serializeHttpRouteResult.ts";
@@ -25,6 +29,7 @@ import { parseQuery } from "./validation.ts";
 import {
 	readRequestPathname,
 	readRequestSearch,
+	stripMountPath,
 } from "../routing/requestUrl.ts";
 import { sseBodyCodec } from "./sse.ts";
 
@@ -35,8 +40,6 @@ import { sseBodyCodec } from "./sse.ts";
  */
 export type CompileRoutesOptions = {
 	bodyCodecs?: readonly BodyCodec[];
-	/** Path prefix to apply to all routes in the route tree. */
-	prefix?: AbsolutePath;
 	/**
 	 * Rewrites param markers in compiled paths to `:name` (`"colon"`) or
 	 * `{name}` (`"braces"`). Declared markers are kept when omitted.
@@ -109,7 +112,7 @@ export type FetchRouteHandlerResult =
  */
 export type FetchRoute = {
 	readonly method: HttpMethod;
-	/** Route path with prefix applied and param markers per `paramSyntax`. */
+	/** Route path with param markers per `paramSyntax`. */
 	readonly path: string;
 	/**
 	 * Handles a request already routed to this route. Params and the body are
@@ -240,7 +243,6 @@ export function compileRoutes(
 	return flattenRouteImplementations(implementations).map((implementation) => {
 		const path = resolveImplementationPath(
 			implementation.route.path,
-			options.prefix,
 			options.paramSyntax,
 		);
 		const pathParams = parsePathParams(path);
@@ -265,12 +267,16 @@ export function createCatchAllHandler(
 	routes: readonly FetchRoute[],
 ): (
 	request: Request,
-	options?: HandleOptions,
+	options?: CatchAllHandleOptions,
 ) => Promise<FetchRouteHandlerResult> {
 	const matchRoute = createRouteMatcher(routes);
 
 	return async (request, options) => {
-		const match = matchRoute(request.method, readRequestPathname(request.url));
+		const pathname = readRequestPathname(request.url);
+		const routePath = options?.mountPath
+			? stripMountPath(pathname, options.mountPath)
+			: pathname;
+		const match = routePath && matchRoute(request.method, routePath);
 		if (!match) {
 			return { matched: false, response: undefined };
 		}

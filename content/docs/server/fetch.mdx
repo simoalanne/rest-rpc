@@ -37,9 +37,7 @@ const getTodo = route
 
 export const routes = { todos: { get: getTodo } };
 
-const handler = createCatchAllHandler(
-	compileRoutes(routes, { prefix: "/api" }),
-);
+const handler = createCatchAllHandler(compileRoutes(routes));
 
 export default {
 	async fetch(request: Request) {
@@ -67,7 +65,8 @@ type FetchRoute = {
 };
 ```
 
-`path` has the `prefix` applied. `handle` runs validation, middleware, and the
+`path` is the route path, including any [prefix](/docs/route-builder#path-prefixes)
+declared with `.prefix()`. `handle` runs validation, middleware, and the
 handler for a request that is already routed to it. It uses the params a router
 attaches as `request.params`, as Bun's router does, and otherwise reads them
 from the request URL. With Bun's built-in router:
@@ -77,10 +76,7 @@ const bunRoutes: Record<
 	string,
 	Record<string, (request: Request) => Promise<Response>>
 > = {};
-for (const route of compileRoutes(routes, {
-	prefix: "/api",
-	paramSyntax: "colon",
-})) {
+for (const route of compileRoutes(routes, { paramSyntax: "colon" })) {
 	(bunRoutes[route.path] ??= {})[route.method] = (request) =>
 		route.handle(request);
 }
@@ -101,13 +97,11 @@ type CompileRoutesOptions = {
 	disableRequestValidation?: boolean;
 	disableResponseValidation?: boolean;
 	paramSyntax?: "colon" | "braces";
-	prefix?: `/${string}`;
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 };
 ```
 
-- `prefix`: path prefix prepended to every route path.
 - `paramSyntax`: rewrites path params in compiled paths to `:name` (`"colon"`)
   or `{name}` (`"braces"`) for routers that expect one of them. Paths keep the
   markers they were declared with by default.
@@ -141,6 +135,26 @@ const response = await route.handle(request, { context: { user } });
 - `body`: a request body already parsed by the framework, such as with a body
   parser. The request body is then not read, but the value is still validated
   against the route's body schema.
+
+## Mount Path
+
+When the catch-all handler is mounted under a path that is not part of the
+route paths, pass it as `mountPath`. Requests outside it are unmatched, and it
+is removed from the request path before matching:
+
+```ts
+const handler = createCatchAllHandler(compileRoutes(routes));
+
+app.all("/internal/*", async (c) => {
+	const result = await handler(c.req.raw, { mountPath: "/internal" });
+	return result.matched ? result.response : c.notFound();
+});
+```
+
+`mountPath` is a per-request option, so one handler can serve the same routes
+under several mount paths. A path that clients use, such as `/api/v1`, belongs
+in the routes instead, declared with [`.prefix()`](/docs/route-builder#path-prefixes),
+so that clients and OpenAPI documents include it.
 
 ## Paths
 

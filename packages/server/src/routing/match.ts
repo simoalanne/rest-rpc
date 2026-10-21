@@ -6,19 +6,12 @@ import {
 	isRouteLeaf,
 	toColonPath,
 	toOpenApiPath,
-	type AbsolutePath,
 	type RouteDeclaration,
 } from "@rest-rpc/core/contract";
 import { addRoute, createRouter, findRoute } from "rou3";
 import type { RuntimeRouteHandler } from "../builder/routeBuilder.types.ts";
 
 const splitPath = (path: string) => path.split("/").filter(Boolean);
-
-const joinPaths = (
-	prefix: AbsolutePath | undefined,
-	path: AbsolutePath,
-): AbsolutePath =>
-	`/${[...splitPath(prefix ?? ""), ...splitPath(path)].join("/")}`;
 
 const compareRouteSpecificity = (
 	left: RouteDeclaration & { path: string },
@@ -138,19 +131,18 @@ export function flattenRouteImplementations(
 export type ParamSyntax = "colon" | "braces";
 
 /**
- * Joins a prefix and route path and optionally rewrites param markers.
+ * Normalizes a route path and optionally rewrites param markers.
  *
  * @remarks Without `paramSyntax` the declared markers are kept as written.
  */
 export function resolveImplementationPath(
 	path: string,
-	prefix?: AbsolutePath,
 	paramSyntax?: ParamSyntax,
 ): string {
-	const joined = joinPaths(prefix, path as AbsolutePath);
-	if (paramSyntax === "colon") return toColonPath(joined);
-	if (paramSyntax === "braces") return toOpenApiPath(joined);
-	return joined;
+	const normalized = `/${splitPath(path).join("/")}`;
+	if (paramSyntax === "colon") return toColonPath(normalized);
+	if (paramSyntax === "braces") return toOpenApiPath(normalized);
+	return normalized;
 }
 
 // Most segments are not encoded, so only those with `%` are decoded.

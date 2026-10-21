@@ -1,11 +1,10 @@
-import type { AbsolutePath } from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import {
 	compileRoutes,
 	createCatchAllHandler,
 	route,
 	type,
-	type HandleOptions,
+	type CatchAllHandleOptions,
 } from "@rest-rpc/server";
 import * as nodeAdapter from "@rest-rpc/server/node";
 import { createServer, type RequestListener } from "node:http";
@@ -62,8 +61,7 @@ const withFetchServer = (
 
 type ServeOptions = {
 	customValidationHandlers?: boolean;
-	prefix?: AbsolutePath;
-	handleOptions?: HandleOptions;
+	handleOptions?: CatchAllHandleOptions;
 };
 
 type Serve = (
@@ -75,7 +73,6 @@ type Serve = (
 const serveFetch: Serve = (routes, options, run) => {
 	const handler = createCatchAllHandler(
 		compileRoutes(routes, {
-			prefix: options.prefix,
 			...(options.customValidationHandlers && {
 				requestValidationErrorHandler: () =>
 					Response.json({ handled: "request" }, { status: 422 }),
@@ -95,7 +92,6 @@ const serveFetch: Serve = (routes, options, run) => {
 const serveNode: Serve = (routes, options, run) => {
 	const handler = nodeAdapter.createCatchAllHandler(
 		nodeAdapter.compileRoutes(routes, {
-			prefix: options.prefix,
 			...(options.customValidationHandlers && {
 				requestValidationErrorHandler: () =>
 					Response.json({ handled: "request" }, { status: 422 }),
@@ -151,7 +147,7 @@ describe.each([
 	{ name: "fetch", serve: serveFetch },
 	{ name: "node", serve: serveNode },
 ])("$name adapter conformance", ({ serve }) => {
-	it("serves params, body, headers and the request signal under a prefix", async () => {
+	it("serves params, body, headers and the request signal under a mount path", async () => {
 		const routes = {
 			create: route
 				.post("/users/{id}")
@@ -166,15 +162,19 @@ describe.each([
 					};
 				}),
 		};
-		await serve(routes, { prefix: "/api" }, async (url) => {
-			const response = await postJson(`${url}/api/users/42`, {
-				name: "Ada",
-			});
-			expect(response.status).toBe(201);
-			expect(response.headers.get("x-route")).toBe("create");
-			expect(response.headers.get("x-count")).toBe("1");
-			expect(await response.json()).toEqual({ id: "42", name: "Ada" });
-		});
+		await serve(
+			routes,
+			{ handleOptions: { mountPath: "/api" } },
+			async (url) => {
+				const response = await postJson(`${url}/api/users/42`, {
+					name: "Ada",
+				});
+				expect(response.status).toBe(201);
+				expect(response.headers.get("x-route")).toBe("create");
+				expect(response.headers.get("x-count")).toBe("1");
+				expect(await response.json()).toEqual({ id: "42", name: "Ada" });
+			},
+		);
 	});
 
 	it("passes params of dynamic path segments without a params schema as strings", async () => {
@@ -206,13 +206,17 @@ describe.each([
 		const routes = {
 			current: route.get("/current").handler(() => ({ name: "Ada" })),
 		};
-		await serve(routes, { prefix: "/api" }, async (url) => {
-			for (const path of ["/current", "/api/missing"]) {
-				const response = await fetch(`${url}${path}`);
-				expect(response.status).toBe(404);
-				expect(await response.text()).toBe("unmatched");
-			}
-		});
+		await serve(
+			routes,
+			{ handleOptions: { mountPath: "/api" } },
+			async (url) => {
+				for (const path of ["/current", "/api/missing"]) {
+					const response = await fetch(`${url}${path}`);
+					expect(response.status).toBe(404);
+					expect(await response.text()).toBe("unmatched");
+				}
+			},
+		);
 	});
 
 	it("rejects a request body content type the route does not declare", async () => {
@@ -505,6 +509,25 @@ describe.each([
 });
 
 describe("node adapter", () => {
+	it("matches the full request target when a router strips the mount path", async () => {
+		const handler = nodeAdapter.createCatchAllHandler(
+			nodeAdapter.compileRoutes({
+				user: route.get("/users/:id").handler(({ params }) => params.id),
+			}),
+		);
+		await withHttpServer(
+			async (req, res) => {
+				// Express keeps the full target in `originalUrl` for `app.use("/api")`.
+				Object.assign(req, { originalUrl: req.url, url: req.url!.slice(4) });
+				await handler(req, res, { mountPath: "/api" });
+			},
+			async (url) => {
+				const response = await fetch(`${url}/api/users/1`);
+				expect(await response.json()).toBe("1");
+			},
+		);
+	});
+
 	it("uses params a router such as Express set on the request", async () => {
 		const [user] = nodeAdapter.compileRoutes({
 			user: route
