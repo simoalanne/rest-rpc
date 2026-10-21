@@ -1,3 +1,4 @@
+import type { AbsolutePath } from "@rest-rpc/core";
 import { isAsyncIterable, normalizeMediaType } from "@rest-rpc/core/codecs";
 import { RequestValidationError, ResponseValidationError } from "./errors.ts";
 import type {
@@ -46,6 +47,20 @@ export type HandleOptions = {
 	 * not read. The value is still validated against the route's body schema.
 	 */
 	body?: unknown;
+};
+
+/**
+ * Per-request options for the catch-all handler.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#mount-path}
+ */
+export type CatchAllHandleOptions = HandleOptions & {
+	/**
+	 * The path the catch-all handler is mounted at, such as `/api`. Requests
+	 * outside it are unmatched, and it is removed from the request path before
+	 * matching. Route paths do not include it.
+	 */
+	mountPath?: AbsolutePath;
 };
 
 /** Inputs needed to invoke one route handler with decoded request segments. */

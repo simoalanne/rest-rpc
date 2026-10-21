@@ -13,7 +13,9 @@ such as Express and Fastify.
 Import `compileRoutes` and `createCatchAllHandler` from `@rest-rpc/server/node` instead.
 They take the same [options](/docs/server/fetch#options) as their Fetch counterparts.
 The handlers they return take `req, res` instead of a `Request` and write the
-response to `res` instead of returning it.
+response to `res` instead of returning it. Requests are read from
+`req.originalUrl` when a framework sets it, as Express does when it removes a
+mount path from `req.url`, so pass the full mount path as `mountPath`.
 
 ## Install
 
@@ -28,9 +30,7 @@ import { createServer } from "node:http";
 import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server/node";
 import { routes } from "./routes";
 
-const handler = createCatchAllHandler(
-	compileRoutes(routes, { prefix: "/api" }),
-);
+const handler = createCatchAllHandler(compileRoutes(routes));
 
 createServer(async (req, res) => {
 	try {
@@ -48,7 +48,7 @@ createServer(async (req, res) => {
 To register routes on a router instead, call each compiled route's `handle`:
 
 ```ts
-for (const route of compileRoutes(routes, { prefix: "/api" })) {
+for (const route of compileRoutes(routes)) {
 	router.on(route.method, route.path, (req, res) => route.handle(req, res));
 }
 ```

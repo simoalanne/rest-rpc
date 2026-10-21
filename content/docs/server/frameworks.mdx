@@ -31,10 +31,7 @@ import { routes } from "./routes";
 
 const app = new Hono();
 
-for (const route of compileRoutes(routes, {
-	prefix: "/api",
-	paramSyntax: "colon",
-})) {
+for (const route of compileRoutes(routes, { paramSyntax: "colon" })) {
 	app.on(route.method, route.path, (c) =>
 		route.handle(c.req.raw, { context: { user: c.var.user } }),
 	);
@@ -51,10 +48,7 @@ import { routes } from "./routes";
 
 const app = express();
 
-for (const route of compileRoutes(routes, {
-	prefix: "/api",
-	paramSyntax: "colon",
-})) {
+for (const route of compileRoutes(routes, { paramSyntax: "colon" })) {
 	const method = route.method.toLowerCase() as
 		"get" | "post" | "put" | "patch" | "delete";
 	app[method](route.path, (req, res, next) => {
@@ -70,7 +64,8 @@ for (const route of compileRoutes(routes, {
 
 Mount the catch-all handler on a single route or middleware. rest-rpc does the
 routing and reports `matched: false` for requests it does not handle, so the
-framework can continue with its own routes.
+framework can continue with its own routes. Pass the path it is mounted at as
+[`mountPath`](/docs/server/fetch#mount-path).
 
 <Tabs>
 <Tab title="Hono">
@@ -81,12 +76,13 @@ import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server";
 import { routes } from "./routes";
 
 const app = new Hono();
-const handler = createCatchAllHandler(
-	compileRoutes(routes, { prefix: "/api" }),
-);
+const handler = createCatchAllHandler(compileRoutes(routes));
 
 app.all("/api/*", async (c) => {
-	const result = await handler(c.req.raw, { context: { user: c.var.user } });
+	const result = await handler(c.req.raw, {
+		mountPath: "/api",
+		context: { user: c.var.user },
+	});
 	return result.matched ? result.response : c.notFound();
 });
 ```
@@ -100,17 +96,15 @@ import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server/node";
 import { routes } from "./routes";
 
 const app = express();
-const handler = createCatchAllHandler(
-	compileRoutes(routes, { prefix: "/api" }),
-);
+const handler = createCatchAllHandler(compileRoutes(routes));
 
-app.use((req, res, next) => {
-	handler(req, res).then(({ matched }) => matched || next(), next);
+app.use("/api", (req, res, next) => {
+	handler(req, res, { mountPath: "/api" }).then(
+		({ matched }) => matched || next(),
+		next,
+	);
 });
 ```
-
-Mount the catch-all without a path. `app.use("/api", ...)` strips the mount
-path from `req.url`, so the requests no longer match the prefixed routes.
 
 </Tab>
 </Tabs>

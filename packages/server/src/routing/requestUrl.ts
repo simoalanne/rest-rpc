@@ -25,3 +25,25 @@ export function readRequestSearch(url: string): string {
 	const queryStart = url.indexOf("?");
 	return queryStart === -1 ? "" : url.slice(queryStart + 1);
 }
+
+/**
+ * Removes a mount path, such as `/api`, from the start of a request path.
+ *
+ * @remarks Returns `undefined` when the path is not under the mount path. The
+ * mount path itself resolves to `/`.
+ */
+export function stripMountPath(
+	pathname: string,
+	mountPath: string,
+): string | undefined {
+	if (mountPath.endsWith("/")) {
+		throw new TypeError(
+			`Mount path "${mountPath}" must not end with a slash, such as "/api".`,
+		);
+	}
+	if (!pathname.startsWith(mountPath)) return undefined;
+	if (pathname.length === mountPath.length) return "/";
+	return pathname[mountPath.length] === "/"
+		? pathname.slice(mountPath.length)
+		: undefined;
+}

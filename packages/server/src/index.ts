@@ -23,7 +23,10 @@ export {
 	type RequestValidationErrorHandler,
 	type ResponseValidationErrorHandler,
 } from "./pipeline/compileRoutes.ts";
-export type { HandleOptions } from "./pipeline/handleHttpRoute.ts";
+export type {
+	CatchAllHandleOptions,
+	HandleOptions,
+} from "./pipeline/handleHttpRoute.ts";
 export {
 	call,
 	initLocalClient,

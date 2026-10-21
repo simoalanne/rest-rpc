@@ -11,10 +11,10 @@ import {
 } from "./match.ts";
 import { route } from "../builder/routeBuilder.ts";
 
-const compile = (tree: RuntimeImplementationTree, prefix?: `/${string}`) =>
+const compile = (tree: RuntimeImplementationTree) =>
 	flattenRouteImplementations(tree).map((implementation) => ({
 		method: implementation.route.method,
-		path: resolveImplementationPath(implementation.route.path, prefix),
+		path: resolveImplementationPath(implementation.route.path),
 		implementation,
 	}));
 
@@ -72,18 +72,17 @@ describe("match", () => {
 		});
 	});
 
-	it("prefers static routes and respects method and prefix", () => {
+	it("prefers static routes and respects method", () => {
 		const dynamic = route.get("/users/{id}").handler(() => "dynamic");
 		const fixed = route.get("/users/me").handler(() => "fixed");
-		const match = createRouteMatcher(compile({ dynamic, fixed }, "/api/"));
-		expect(match("GET", "/api/users/me")?.route.implementation.handler).toBe(
+		const match = createRouteMatcher(compile({ dynamic, fixed }));
+		expect(match("GET", "/users/me")?.route.implementation.handler).toBe(
 			fixed["~restrpc"].handler,
 		);
-		expect(match("GET", "/api/users/42")?.route.implementation.handler).toBe(
+		expect(match("GET", "/users/42")?.route.implementation.handler).toBe(
 			dynamic["~restrpc"].handler,
 		);
-		expect(match("POST", "/api/users/me")).toBeUndefined();
-		expect(match("GET", "/users/me")).toBeUndefined();
+		expect(match("POST", "/users/me")).toBeUndefined();
 	});
 
 	it("derives paths from nested keys only for routes without an explicit path", () => {
@@ -102,13 +101,13 @@ describe("match", () => {
 
 describe("resolveImplementationPath", () => {
 	it("keeps declared markers unless a param syntax is requested", () => {
-		expect(resolveImplementationPath("/users/{id}/:tab", "/api")).toBe(
-			"/api/users/{id}/:tab",
+		expect(resolveImplementationPath("/users/{id}/:tab")).toBe(
+			"/users/{id}/:tab",
 		);
-		expect(resolveImplementationPath("/users/{id}", undefined, "colon")).toBe(
+		expect(resolveImplementationPath("/users/{id}", "colon")).toBe(
 			"/users/:id",
 		);
-		expect(resolveImplementationPath("/users/:id", undefined, "braces")).toBe(
+		expect(resolveImplementationPath("/users/:id", "braces")).toBe(
 			"/users/{id}",
 		);
 	});
