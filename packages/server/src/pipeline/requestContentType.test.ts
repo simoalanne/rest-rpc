@@ -1,35 +1,38 @@
-import { route, type } from "@rest-rpc/core";
+import { type } from "@rest-rpc/core";
+import { route } from "../builder/routeBuilder.ts";
+import { toRuntimeImplementation } from "../routing/match.ts";
 import { resolveRequestMediaType } from "./requestContentType.ts";
 
 describe("resolveRequestMediaType", () => {
-	const declaration = route.post("/").body({
-		"text/plain": type<string>(),
-		"application/json": type<{ name: string }>(),
-	})["~restrpc"];
+	const implementation = toRuntimeImplementation(
+		route
+			.post("/")
+			.body({
+				"text/plain": type<string>(),
+				"application/json": type<{ name: string }>(),
+			})
+			.handler(() => undefined)["~restrpc"],
+	);
 
-	it("selects declared media types from normalized content types", () => {
-		expect(
-			resolveRequestMediaType(declaration, "Text/Plain; charset=utf-8"),
-		).toEqual({ mediaType: "text/plain", rejection: undefined });
-		expect(resolveRequestMediaType(declaration, "image/png")).toMatchObject({
-			rejection: { status: 415 },
+	it("selects declared media types", () => {
+		expect(resolveRequestMediaType(implementation, "text/plain")).toBe(
+			"text/plain",
+		);
+		expect(resolveRequestMediaType(implementation, "image/png")).toMatchObject({
+			status: 415,
 		});
 	});
 
 	it("uses the only declared media type when the content type is missing", () => {
-		const single = route.post("/").body(type<string>())["~restrpc"];
-		expect(resolveRequestMediaType(single, null)).toEqual({
-			mediaType: "application/json",
-			rejection: undefined,
+		const single = toRuntimeImplementation(
+			route
+				.post("/")
+				.body(type<string>())
+				.handler(() => undefined)["~restrpc"],
+		);
+		expect(resolveRequestMediaType(single, "")).toBe("application/json");
+		expect(resolveRequestMediaType(implementation, "")).toMatchObject({
+			status: 415,
 		});
-		expect(resolveRequestMediaType(declaration, null)).toMatchObject({
-			rejection: { status: 415 },
-		});
-	});
-
-	it("rejects received content types when no request body is declared", () => {
-		expect(
-			resolveRequestMediaType(route.get("/")["~restrpc"], "application/json"),
-		).toMatchObject({ rejection: { status: 415 } });
 	});
 });

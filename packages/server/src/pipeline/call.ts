@@ -7,8 +7,8 @@ import { normalizeMediaType } from "@rest-rpc/core/codecs";
 import type { ContextOf } from "../builder/routeBuilder.types.ts";
 import {
 	isImplementedRoute,
+	toRuntimeImplementation,
 	type ImplementedRoute,
-	type RuntimeImplementation,
 	type RuntimeImplementationTree,
 } from "../routing/match.ts";
 import { executeRoute, type RouteResult } from "./handleHttpRoute.ts";
@@ -19,7 +19,6 @@ export type CallOptions<TRoute extends ImplementedRoute> = Pick<
 	FetchOptions,
 	"signal"
 > & {
-	lastEventId?: string;
 	context?: Partial<ContextOf<TRoute["~restrpc"]>>;
 };
 
@@ -56,24 +55,19 @@ export async function call<TRoute extends ImplementedRoute>(
 	route: TRoute,
 	...[request, options = {}]: CallArgs<TRoute>
 ): Promise<InferClientResponse<TRoute>> {
-	const { handler, middleware, ...declaration } = route["~restrpc"];
-	const { signal, lastEventId, context } =
-		options as CallOptions<ImplementedRoute>;
+	const implementation = toRuntimeImplementation(route["~restrpc"]);
+	const { signal, context } = options as CallOptions<ImplementedRoute>;
 	const { contentType } = (request ?? {}) as { contentType?: string };
-	const result = await executeRoute(
-		{
-			route: declaration as RuntimeImplementation["route"],
-			handler,
-			middleware,
-		},
-		{
-			request: request ?? {},
-			signal: signal ?? new AbortController().signal,
-			contentType,
-			lastEventId,
-			context,
-		},
-	);
+	// Routes without a body schema have no request media type.
+	const mediaType =
+		implementation.route.request?.body &&
+		(normalizeMediaType(contentType) || implementation.defaultBodyMediaType);
+	const result = await executeRoute(implementation, {
+		request: request ?? {},
+		signal: signal ?? new AbortController().signal,
+		mediaType,
+		context,
+	});
 	return toCallResult(result) as InferClientResponse<TRoute>;
 }
 

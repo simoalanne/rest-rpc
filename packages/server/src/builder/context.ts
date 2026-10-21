@@ -16,18 +16,24 @@ export type Context<TValues extends object> = {
 	) => void;
 };
 
-export const createContext = <TValues extends object>(
-	initial?: Record<string, unknown>,
-): Context<TValues> => {
-	const values = new Map();
-	for (const [key, value] of Object.entries(initial ?? {})) {
-		values.set(key, value);
+// Methods live on the prototype, so a request only allocates the store itself.
+class ContextStore<TValues extends object> implements Context<TValues> {
+	// Most requests never touch the context, so the map is created on demand.
+	#values: Map<PropertyKey, unknown> | undefined;
+
+	constructor(initial?: Record<string, unknown>) {
+		if (initial) this.#values = new Map(Object.entries(initial));
 	}
 
-	return {
-		get: (key) => values.get(key),
-		set: (key, value) => {
-			values.set(key, value);
-		},
-	};
-};
+	get<TKey extends keyof TValues>(key: TKey): TValues[TKey] {
+		return this.#values?.get(key) as TValues[TKey];
+	}
+
+	set<TKey extends keyof TValues>(key: TKey, value: TValues[TKey]): void {
+		(this.#values ??= new Map()).set(key, value);
+	}
+}
+
+export const createContext = <TValues extends object>(
+	initial?: Record<string, unknown>,
+): Context<TValues> => new ContextStore<TValues>(initial);

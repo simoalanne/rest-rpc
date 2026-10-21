@@ -210,12 +210,17 @@ type HandlerFields = {
 	signal: AbortSignal;
 	/**
 	 * The request body media type. Routes with a body narrow it to the declared
-	 * media types.
+	 * media types, and routes without one never receive it.
 	 */
 	contentType?: string;
-	/** The `Last-Event-ID` request header, used to resume streams. */
-	lastEventId?: string;
 };
+
+// Routes without a body schema have no request media type.
+type BodylessFields<TRoute extends RouteDeclaration> = TRoute extends {
+	request: { body: object };
+}
+	? EmptyObject
+	: { contentType?: undefined };
 
 /**
  * Infers the validated request, handler fields, and application context
@@ -226,7 +231,8 @@ export type RouteRequest<
 	TContext extends object = EmptyObject,
 > = Merge<
 	ServerRequest<TRoute> &
-		HandlerFields & {
+		HandlerFields &
+		BodylessFields<TRoute> & {
 			route: TRoute;
 			context: Context<TContext>;
 		}

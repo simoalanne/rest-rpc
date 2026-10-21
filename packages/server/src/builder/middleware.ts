@@ -1,11 +1,14 @@
+import type { MaybePromise } from "@rest-rpc/core/utils";
 import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
 
-export const invokeWithMiddleware = async (
-	middleware: readonly RuntimeRouteHandler[],
+// Returns synchronous handler results directly; only `next` is always async.
+export const invokeWithMiddleware = (
+	middleware: readonly RuntimeRouteHandler[] | undefined,
 	handler: RuntimeRouteHandler,
 	request: object,
-): Promise<unknown> => {
-	const dispatch = async (index: number): Promise<unknown> => {
+): MaybePromise<unknown> => {
+	if (!middleware?.length) return handler(request);
+	const dispatch = (index: number): MaybePromise<unknown> => {
 		const callback = middleware[index];
 		if (!callback) return handler(request);
 		let called = false;
