@@ -162,7 +162,8 @@ const noRequestSegments: RequestSegmentValues = {
 
 /**
  * Validates decoded request segments, ignoring segments the route does not
- * declare. The body is validated with the schemas of `mediaType`.
+ * declare, except params, which are passed through without a schema. The body
+ * is validated with the schemas of `mediaType`.
  */
 export function validateRequestSegments(
 	route: RouteDeclaration,
@@ -170,7 +171,11 @@ export function validateRequestSegments(
 	mediaType?: string,
 ): MaybePromise<RequestSegmentValues> {
 	const requestSchemas = route.request;
-	if (!requestSchemas) return noRequestSegments;
+	if (!requestSchemas) {
+		return segments.params === undefined
+			? noRequestSegments
+			: { ...noRequestSegments, params: segments.params };
+	}
 	return mapMaybePromise(
 		allMaybePromise([
 			validateRequestSegment(
@@ -178,7 +183,10 @@ export function validateRequestSegments(
 				segments.body,
 			),
 			validateRequestSegment(requestSchemas.query, segments.query),
-			validateRequestSegment(requestSchemas.params, segments.params),
+			// Params of dynamic path segments without a schema are passed as strings.
+			isDeclared(requestSchemas.params)
+				? validateRequestSegment(requestSchemas.params, segments.params)
+				: { data: segments.params, errors: noIssues },
 			validateRequestSegment(requestSchemas.headers, segments.headers),
 		]),
 		toValidatedRequest,

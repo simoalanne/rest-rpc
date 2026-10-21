@@ -26,11 +26,13 @@ export type {
 export { RouteBuilder, type RouteBuilderKind } from "./routeBuilder.ts";
 export { extractContract } from "./extract.ts";
 export {
+	getPathParamNames,
 	getPathParamSegmentName,
 	isPathParamSegment,
 	resolveRoutePath,
 	toColonPath,
 	toOpenApiPath,
+	type PathParamNames,
 } from "./path.ts";
 export type {
 	InferSchemaInputs,

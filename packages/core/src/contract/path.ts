@@ -1,10 +1,21 @@
 import type { AbsolutePath, RouteDeclaration } from "./routeDeclaration.ts";
 
-/** Returns the declared path, or the path derived from the route's tree keys. */
+/** Joins a prefix and a path. The `/` path resolves to the prefix itself. */
+export const joinPrefix = (
+	prefix: AbsolutePath | undefined,
+	path: AbsolutePath,
+): AbsolutePath =>
+	prefix === undefined ? path : path === "/" ? prefix : `${prefix}${path}`;
+
+/**
+ * Returns the declared path, which already includes the prefix, or the path
+ * derived from the route's tree keys with the prefix prepended.
+ */
 export const resolveRoutePath = (
-	route: Pick<RouteDeclaration, "path">,
+	route: Pick<RouteDeclaration, "path" | "prefix">,
 	treePath: readonly string[],
-): AbsolutePath => route.path ?? `/${treePath.join("/")}`;
+): AbsolutePath =>
+	route.path ?? joinPrefix(route.prefix, `/${treePath.join("/")}`);
 
 const pathParamSegmentPattern = /^(?::([^/]+)|\{([^/]+)\})$/;
 
@@ -27,6 +38,28 @@ export const getPathParamSegmentName = (segment: string) => {
 
 export const isPathParamSegment = (segment: string) =>
 	getPathParamSegmentName(segment) !== undefined;
+
+/** Returns the names of the dynamic segments of a path, in order. */
+export const getPathParamNames = (path: string) =>
+	path.split("/").flatMap((segment) => {
+		const name = getPathParamSegmentName(segment);
+		return name === undefined ? [] : [name];
+	});
+
+type PathParamSegmentName<TSegment extends string> =
+	TSegment extends `:${infer TName}`
+		? TName
+		: TSegment extends `{${infer TName}}`
+			? TName
+			: never;
+
+/** The names of the dynamic segments of a literal path, or `never` without any. */
+export type PathParamNames<TPath> =
+	TPath extends `${infer TSegment}/${infer TRest}`
+		? PathParamSegmentName<TSegment> | PathParamNames<TRest>
+		: TPath extends string
+			? PathParamSegmentName<TPath>
+			: never;
 
 export const replacePathParams = (
 	path: string,

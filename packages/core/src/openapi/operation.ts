@@ -7,6 +7,7 @@ import type {
 	ResponseHeadersSchema,
 } from "../contract/response.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
+import { getPathParamNames } from "../contract/path.ts";
 
 type OpenApiSchema = Record<string, unknown>;
 
@@ -143,6 +144,20 @@ export const createParameters = (
 	});
 };
 
+// Dynamic path segments without a params schema are received as strings.
+const createPathParameters = (
+	route: RouteDeclaration,
+	options: CreateOperationOptions,
+): OpenApiParameter[] =>
+	route.request?.params?.length
+		? createParameters(route.request.params, "path", options)
+		: getPathParamNames(route.path ?? "").map((name) => ({
+				name,
+				in: "path",
+				required: true,
+				schema: { type: "string" },
+			}));
+
 export const createRequestBody = (
 	body: RequestBodyDeclaration | undefined,
 	converter: SchemaConverter | undefined,
@@ -227,7 +242,7 @@ export const createOperation = (
 ): OpenApiOperation => {
 	const { request } = route;
 	const parameters = [
-		...createParameters(request?.params, "path", options),
+		...createPathParameters(route, options),
 		...createParameters(request?.query, "query", options),
 		...createParameters(request?.headers, "header", options),
 	].map(

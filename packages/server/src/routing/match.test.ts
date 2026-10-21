@@ -1,3 +1,4 @@
+import { type } from "@rest-rpc/core";
 import {
 	assertPathParams,
 	createRouteMatcher,
@@ -157,5 +158,18 @@ describe("assertPathParams", () => {
 		expect(
 			readAttachedPathParams(pathParams, new Request("http://localhost/")),
 		).toBeUndefined();
+	});
+
+	it("rejects params declared on a path without dynamic segments", () => {
+		expect(() =>
+			flattenRouteImplementations({
+				user: route
+					.get("/users")
+					.params(type<{ id: string }>())
+					.handler(() => "ok"),
+			}),
+		).toThrow(
+			'Route "GET /users" declares params, but its path has no dynamic segments.',
+		);
 	});
 });

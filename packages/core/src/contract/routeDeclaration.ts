@@ -48,7 +48,10 @@ export type RouteRequestDeclaration = {
  * @see {@link https://rest-rpc.vercel.app/docs/route-builder}
  */
 export type RouteDeclaration = {
+	/** The full path, including any prefix, or `undefined` to derive it from tree keys. */
 	path: AbsolutePath | undefined;
+	/** Prefix prepended to a path derived from tree keys. */
+	prefix?: AbsolutePath;
 	method: HttpMethod;
 	request?: RouteRequestDeclaration;
 	responses: RouteResponses;

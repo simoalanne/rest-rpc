@@ -69,4 +69,11 @@ describe("extractContract", () => {
 			expect.objectContaining({ method: "GET" }),
 		);
 	});
+
+	it("resolves prefixed tree-derived paths", () => {
+		const api = route.prefix("/api");
+		expect(
+			extractContract({ todos: { list: api.get() } }).todos.list["~restrpc"],
+		).toEqual({ method: "GET", path: "/api/todos/list" });
+	});
 });

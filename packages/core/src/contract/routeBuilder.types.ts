@@ -18,6 +18,7 @@ import type { EmptyObject, Merge } from "../utils/typeUtils.ts";
 export type BuilderState = {
 	method: HttpMethod | undefined;
 	path: AbsolutePath | undefined;
+	prefix: AbsolutePath | undefined;
 	request: object;
 	responses: object;
 	metadata: RouteMetadata | undefined;
@@ -29,6 +30,7 @@ export type BuilderState = {
 export type RootBuilderState = {
 	method: undefined;
 	path: undefined;
+	prefix: undefined;
 	request: EmptyObject;
 	responses: EmptyObject;
 	metadata: undefined;
@@ -87,6 +89,9 @@ export type DeclarationFor<TState extends BuilderState> =
 					} & (TState["metadata"] extends RouteMetadata
 						? { readonly metadata: TState["metadata"] }
 						: EmptyObject) &
+					(TState["prefix"] extends AbsolutePath
+						? { readonly prefix: TState["prefix"] }
+						: EmptyObject) &
 					(TState["openApi"] extends true
 						? { readonly openApi: OpenApiRouteOptions }
 						: EmptyObject)
@@ -95,7 +100,23 @@ export type DeclarationFor<TState extends BuilderState> =
 
 type HttpMethodName = "get" | "post" | "put" | "patch" | "delete";
 
-// GET routes cannot declare a body, so `get` and `body` exclude each other.
+/** Joins a prefix and a path the same way the route builder does at runtime. */
+export type JoinPrefix<
+	TPrefix extends AbsolutePath | undefined,
+	TPath extends AbsolutePath,
+> = TPrefix extends AbsolutePath
+	? TPath extends "/"
+		? TPrefix
+		: `${TPrefix}${TPath}`
+	: TPath;
+
+export type WithPrefix<
+	TState extends BuilderState,
+	TPrefix extends AbsolutePath,
+> = NextState<TState, { prefix: JoinPrefix<TState["prefix"], TPrefix> }>;
+
+// GET routes cannot declare a body, so `get` and `body` exclude each other. A
+// method path includes the prefix, so no prefix can be added after it.
 export type WithHttpMethod<
 	TState extends BuilderState,
 	TMethod extends HttpMethod,
@@ -104,10 +125,13 @@ export type WithHttpMethod<
 	TState,
 	{
 		method: TMethod;
-		path: TPath;
+		path: TPath extends AbsolutePath
+			? JoinPrefix<TState["prefix"], TPath>
+			: undefined;
 		omit:
 			| TState["omit"]
 			| HttpMethodName
+			| "prefix"
 			| (TMethod extends "GET" ? "body" : never);
 	}
 >;

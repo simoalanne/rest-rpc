@@ -161,11 +161,16 @@ const stringifyHeaders = (
 const serializeParams = (
 	route: ClientRequestRoute,
 	params: Record<string, unknown> | undefined,
-) => {
-	return replacePathParams(route.path, (key) =>
-		encodeURIComponent(String(params?.[key])),
-	);
-};
+) =>
+	replacePathParams(route.path, (key) => {
+		const value = params?.[key];
+		if (value === undefined) {
+			throw new TypeError(
+				`Missing path param "${key}" for route "${route.method} ${route.path}".`,
+			);
+		}
+		return encodeURIComponent(String(value));
+	});
 
 const serializeQuery = (query: unknown) => {
 	const searchParams = new URLSearchParams();

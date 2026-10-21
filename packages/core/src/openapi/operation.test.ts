@@ -165,4 +165,12 @@ describe("operation", () => {
 			}),
 		);
 	});
+
+	it("documents dynamic path segments without a params schema as strings", () => {
+		const declaration = route.get("/users/:id/posts/{slug}")["~restrpc"];
+		expect(createOperation(declaration, {}).parameters).toEqual([
+			{ name: "id", in: "path", required: true, schema: { type: "string" } },
+			{ name: "slug", in: "path", required: true, schema: { type: "string" } },
+		]);
+	});
 });
