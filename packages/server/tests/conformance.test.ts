@@ -177,6 +177,31 @@ describe.each([
 		});
 	});
 
+	it("passes params of dynamic path segments without a params schema as strings", async () => {
+		const routes = {
+			post: route
+				.get("/users/:id/posts/{slug}")
+				.handler(({ params }) => params),
+		};
+		await serve(routes, {}, async (url) => {
+			const response = await fetch(`${url}/users/1/posts/a%20b`);
+			expect(await response.json()).toEqual({ id: "1", slug: "a b" });
+		});
+	});
+
+	it("serves prefixed tree-derived routes with params from the prefix", async () => {
+		const routes = {
+			todos: route
+				.prefix("/tenants/:tenant")
+				.get()
+				.handler(({ params }) => params),
+		};
+		await serve(routes, {}, async (url) => {
+			const response = await fetch(`${url}/tenants/acme/todos`);
+			expect(await response.json()).toEqual({ tenant: "acme" });
+		});
+	});
+
 	it("leaves unmatched requests to the host", async () => {
 		const routes = {
 			current: route.get("/current").handler(() => ({ name: "Ada" })),

@@ -32,6 +32,34 @@ describe("request inference", () => {
 		}>();
 	});
 
+	it("infers string params from dynamic path segments without a params schema", () => {
+		const value = route.get("/users/:id/posts/{slug}");
+		expectTypeOf<InferClientRequest<typeof value>>().toEqualTypeOf<{
+			params: { id: string; slug: string };
+		}>();
+		expectTypeOf<ServerRequest<(typeof value)["~restrpc"]>>().toEqualTypeOf<{
+			params: { id: string; slug: string };
+		}>();
+
+		const withQuery = route.get("/users/:id").query(type<{ page: string }>());
+		expectTypeOf<InferClientRequest<typeof withQuery>>().toEqualTypeOf<{
+			params: { id: string };
+			query: { page: string };
+		}>();
+
+		const explicit = route
+			.get("/users/:id")
+			.params(type((input: { id: string }) => ({ id: Number(input.id) })));
+		expectTypeOf<ServerRequest<(typeof explicit)["~restrpc"]>>().toEqualTypeOf<{
+			params: { id: number };
+		}>();
+
+		const staticPath = route.get("/users");
+		expectTypeOf<
+			InferClientRequest<typeof staticPath>
+		>().toEqualTypeOf<undefined>();
+	});
+
 	it("discriminates body variants by media type", () => {
 		const single = route.post("/").body({ "text/plain": type<string>() });
 		expectTypeOf<InferClientRequest<typeof single>>().toEqualTypeOf<{
@@ -115,5 +143,16 @@ describe("request inference", () => {
 		expectTypeOf<
 			InferClientRequest<typeof tree>["users"]["get"]
 		>().toEqualTypeOf<InferClientRequest<typeof get>>();
+	});
+
+	it("infers params from prefixes", () => {
+		const tenant = route.prefix("/tenants/:tenant");
+		expectTypeOf<
+			InferClientRequest<ReturnType<typeof tenant.get<"/todos/{id}">>>
+		>().toEqualTypeOf<{ params: { tenant: string; id: string } }>();
+		// A path derived from tree keys keeps the prefix params.
+		expectTypeOf<
+			InferClientRequest<ReturnType<typeof tenant.get<undefined>>>
+		>().toEqualTypeOf<{ params: { tenant: string } }>();
 	});
 });

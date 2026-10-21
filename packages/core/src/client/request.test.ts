@@ -147,4 +147,16 @@ describe("request", () => {
 			}),
 		);
 	});
+
+	it("rejects a missing path param instead of sending it as undefined", async () => {
+		const fetch = vi.fn(async () => new Response(null, { status: 204 }));
+		await expect(
+			executeRequest({ method: "GET", path: "/users/:id" }, [{ params: {} }], {
+				baseUrl: "",
+				codecs,
+				fetch,
+			}),
+		).rejects.toThrow('Missing path param "id" for route "GET /users/:id".');
+		expect(fetch).not.toHaveBeenCalled();
+	});
 });

@@ -40,6 +40,15 @@ describe("call", () => {
 		expect(request.context.get("user")).toBe("Ada");
 	});
 
+	it("passes params of dynamic path segments without a params schema", async () => {
+		const implementation = route
+			.get("/items/{id}")
+			.handler(({ params }) => params.id);
+		expect(await call(implementation, { params: { id: "1" } })).toMatchObject({
+			body: "1",
+		});
+	});
+
 	it("yields stream items as SSE events", async () => {
 		async function* values() {
 			yield sse({ data: 1, id: "one" });

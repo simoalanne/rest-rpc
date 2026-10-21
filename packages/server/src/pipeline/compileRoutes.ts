@@ -137,10 +137,11 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 
 	return async (implementation, pathParams, request, handleOptions) => {
 		const schemas = implementation.route.request;
-		// The URL is only read for the params and query the route declares, and
-		// params a router already attached to the request are used as-is.
+		// The URL is only read for the params of dynamic path segments and a
+		// declared query, and params a router attached to the request are used
+		// as-is.
 		let params: Record<string, string> | undefined;
-		if (schemas?.params?.length) {
+		if (pathParams.params.length > 0) {
 			params = handleOptions?.params
 				? assertPathParams(pathParams, handleOptions.params)
 				: (readAttachedPathParams(pathParams, request) ??
