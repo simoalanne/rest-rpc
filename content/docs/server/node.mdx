@@ -53,4 +53,7 @@ for (const route of compileRoutes(routes, { prefix: "/api" })) {
 }
 ```
 
+Params a router sets as `req.params`, as Express does, are used instead of
+reading them from the request URL again.
+
 See [Frameworks](/docs/server/frameworks) for more examples.

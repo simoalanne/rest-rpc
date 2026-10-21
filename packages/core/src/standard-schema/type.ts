@@ -24,10 +24,10 @@ export function type<TInput, TOutput = TInput>(
 		"~standard": {
 			version: 1,
 			vendor: UNCHECKED_SCHEMA_VENDOR,
-			validate: async (value) => ({
-				value:
-					map === undefined ? (value as TOutput) : await map(value as TInput),
-			}),
+			validate:
+				map === undefined
+					? (value) => ({ value: value as TOutput })
+					: async (value) => ({ value: await map(value as TInput) }),
 		},
 	};
 }

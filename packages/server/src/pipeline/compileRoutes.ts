@@ -1,11 +1,17 @@
 import type { AbsolutePath, BodyCodec } from "@rest-rpc/core";
-import { createBodyCodecRegistry } from "@rest-rpc/core/codecs";
+import {
+	createBodyCodecRegistry,
+	normalizeMediaType,
+} from "@rest-rpc/core/codecs";
 import type { HttpMethod } from "@rest-rpc/core/contract";
 import {
 	assertPathParams,
 	createRouteMatcher,
 	flattenRouteImplementations,
+	parsePathParams,
+	readAttachedPathParams,
 	readPathParams,
+	type PathParams,
 	resolveImplementationPath,
 	type RuntimeImplementation,
 	type RuntimeImplementationTree,
@@ -15,7 +21,11 @@ import { handleHttpRoute, type HandleOptions } from "./handleHttpRoute.ts";
 import { RequestValidationError, ResponseValidationError } from "./errors.ts";
 import { deserializeRequestBody } from "./deserializeRequestBody.ts";
 import { serializeHttpRouteResult } from "./serializeHttpRouteResult.ts";
-import { splitRequestUrl } from "../routing/requestUrl.ts";
+import { parseQuery } from "./validation.ts";
+import {
+	readRequestPathname,
+	readRequestSearch,
+} from "../routing/requestUrl.ts";
 import { sseBodyCodec } from "./sse.ts";
 
 /**
@@ -113,9 +123,8 @@ export type FetchRoute = {
 
 type FetchDispatch = (
 	implementation: RuntimeImplementation,
-	params: Record<string, string> | undefined,
+	pathParams: PathParams,
 	request: Request,
-	search: string,
 	options: HandleOptions | undefined,
 ) => Promise<Response>;
 
@@ -124,45 +133,79 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 		sseBodyCodec,
 		...(options.bodyCodecs ?? []),
 	]);
+	const { disableRequestValidation, disableResponseValidation } = options;
 
-	return async (implementation, params, request, search, handleOptions) => {
-		const { rejection } = resolveRequestMediaType(
-			implementation.route,
-			request.headers.get("content-type"),
-		);
-		if (rejection) {
-			return Response.json(
-				{ message: rejection.message },
-				{ status: rejection.status },
-			);
+	return async (implementation, pathParams, request, handleOptions) => {
+		const schemas = implementation.route.request;
+		// The URL is only read for the params and query the route declares, and
+		// params a router already attached to the request are used as-is.
+		let params: Record<string, string> | undefined;
+		if (schemas?.params?.length) {
+			params = handleOptions?.params
+				? assertPathParams(pathParams, handleOptions.params)
+				: (readAttachedPathParams(pathParams, request) ??
+					readPathParams(pathParams, readRequestPathname(request.url)));
 		}
 
-		const { body, rejection: bodyRejection } =
-			handleOptions && "body" in handleOptions
-				? { body: handleOptions.body, rejection: undefined }
-				: await deserializeRequestBody(request, codecs);
-		if (bodyRejection) {
-			return Response.json(
-				{ message: bodyRejection.message },
-				{ status: bodyRejection.status },
+		// Routes without a body schema ignore the request body and its content type.
+		let body: unknown;
+		let mediaType: string | undefined;
+		if (schemas?.body) {
+			const receivedMediaType = normalizeMediaType(
+				request.headers.get("content-type"),
 			);
-		}
-		const parsedRequest = {
-			params,
-			query: search,
-			headers: Object.fromEntries(request.headers),
-			body,
-		};
+			const selected = resolveRequestMediaType(
+				implementation,
+				receivedMediaType,
+			);
+			if (typeof selected === "object") {
+				return Response.json(
+					{ message: selected.message },
+					{ status: selected.status },
+				);
+			}
+			mediaType = selected;
 
-		const result = await handleHttpRoute(implementation, {
-			configuration: {
-				disableRequestValidation: options.disableRequestValidation,
-				disableResponseValidation: options.disableResponseValidation,
+			if (handleOptions && "body" in handleOptions) {
+				body = handleOptions.body;
+			} else {
+				const deserializing = deserializeRequestBody(
+					request,
+					receivedMediaType,
+					codecs,
+				);
+				const deserialized =
+					deserializing instanceof Promise
+						? await deserializing
+						: deserializing;
+				if (deserialized.rejection) {
+					return Response.json(
+						{ message: deserialized.rejection.message },
+						{ status: deserialized.rejection.status },
+					);
+				}
+				body = deserialized.body;
+			}
+		}
+
+		const handled = handleHttpRoute(implementation, {
+			request: {
+				params,
+				query: schemas?.query?.length
+					? parseQuery(readRequestSearch(request.url))
+					: undefined,
+				headers: schemas?.headers?.length
+					? Object.fromEntries(request.headers)
+					: undefined,
+				body,
 			},
-			request: parsedRequest,
 			signal: request.signal,
+			mediaType,
 			context: handleOptions?.context,
+			disableRequestValidation,
+			disableResponseValidation,
 		});
+		const result = handled instanceof Promise ? await handled : handled;
 		if (result instanceof RequestValidationError) {
 			return options.requestValidationErrorHandler
 				? options.requestValidationErrorHandler(result, request)
@@ -199,19 +242,12 @@ export function compileRoutes(
 			options.prefix,
 			options.paramSyntax,
 		);
+		const pathParams = parsePathParams(path);
 		return {
 			method: implementation.route.method,
 			path,
-			handle: async (request, handleOptions) => {
-				const { pathname, search } = splitRequestUrl(request.url);
-				let params: Record<string, string> | undefined;
-				if (implementation.route.request?.params) {
-					params = handleOptions?.params
-						? assertPathParams(path, handleOptions.params)
-						: readPathParams(path, pathname);
-				}
-				return dispatch(implementation, params, request, search, handleOptions);
-			},
+			handle: (request, handleOptions) =>
+				dispatch(implementation, pathParams, request, handleOptions),
 		};
 	});
 }
@@ -233,14 +269,21 @@ export function createCatchAllHandler(
 	const matchRoute = createRouteMatcher(routes);
 
 	return async (request, options) => {
-		const route = matchRoute(
-			request.method,
-			splitRequestUrl(request.url).pathname,
-		);
-		if (!route) {
+		const match = matchRoute(request.method, readRequestPathname(request.url));
+		if (!match) {
 			return { matched: false, response: undefined };
 		}
 
-		return { matched: true, response: await route.handle(request, options) };
+		// Unless the caller passes params, the matched ones are passed on, so they
+		// are not parsed from the URL again and params another router attached to
+		// the request are ignored.
+		const { route, params } = match;
+		return {
+			matched: true,
+			response: await route.handle(
+				request,
+				params && !options?.params ? { ...options, params } : options,
+			),
+		};
 	};
 }

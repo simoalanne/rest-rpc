@@ -3,8 +3,9 @@ import {
 	isSerializedBody,
 	type BodyCodecRegistry,
 } from "@rest-rpc/core/codecs";
-import type { RequestScalar } from "@rest-rpc/core/contract";
+import type { MaybePromise } from "@rest-rpc/core/utils";
 import type { HttpRouteResult } from "./handleHttpRoute.ts";
+import { mapMaybePromise } from "./maybePromise.ts";
 
 const encodeChunks = async function* (
 	body: AsyncIterable<unknown>,
@@ -20,42 +21,56 @@ const toBodyInit = (value: unknown) =>
 		? ReadableStream.from(encodeChunks(value))
 		: value) as ConstructorParameters<typeof Response>[0];
 
+const setHeaders = (headers: Headers, values?: Record<string, unknown>) => {
+	for (const name in values) {
+		const value = values[name];
+		if (value !== undefined) headers.set(name, String(value));
+	}
+};
+
 /**
  * Serializes a route result into a Fetch `Response`, encoding the body with
  * the codec for its media type. The result's headers override the headers of
  * a `SerializedBody` returned by the codec.
  */
-export async function serializeHttpRouteResult(
+export function serializeHttpRouteResult(
 	result: HttpRouteResult,
 	codecs: BodyCodecRegistry,
-): Promise<Response> {
-	const headers = new Headers();
-	const setHeaders = (values?: Record<string, RequestScalar | undefined>) => {
-		for (const [name, value] of Object.entries(values ?? {})) {
-			if (value !== undefined) headers.set(name, String(value));
-		}
-	};
+): MaybePromise<Response> {
 	if (!result.body) {
-		setHeaders(result.headers);
+		const headers = new Headers();
+		setHeaders(headers, result.headers);
 		return new Response(null, { status: result.status, headers });
 	}
 
 	const { value, contentType } = result.body;
-	const serialized = await codecs.serialize(value, contentType);
-	if (isSerializedBody(serialized)) {
-		serialized.headers.forEach((headerValue, name) =>
-			headers.set(name, headerValue),
-		);
-		setHeaders(result.headers);
-		return new Response(toBodyInit(serialized.body), {
+	// `Response.json` serializes faster than the JSON codec, but only without
+	// headers to set.
+	if (
+		result.headers === undefined &&
+		contentType === "application/json" &&
+		codecs.serializesJson(contentType)
+	) {
+		return Response.json(value, { status: result.status });
+	}
+
+	return mapMaybePromise(codecs.serialize(value, contentType), (serialized) => {
+		const headers = new Headers();
+		if (isSerializedBody(serialized)) {
+			serialized.headers.forEach((headerValue, name) =>
+				headers.set(name, headerValue),
+			);
+			setHeaders(headers, result.headers);
+			return new Response(toBodyInit(serialized.body), {
+				status: result.status,
+				headers,
+			});
+		}
+		setHeaders(headers, result.headers);
+		headers.set("content-type", contentType);
+		return new Response(toBodyInit(serialized), {
 			status: result.status,
 			headers,
 		});
-	}
-	setHeaders(result.headers);
-	headers.set("content-type", contentType);
-	return new Response(toBodyInit(serialized), {
-		status: result.status,
-		headers,
 	});
 }

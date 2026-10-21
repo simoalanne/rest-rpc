@@ -1,7 +1,7 @@
 import { route, type } from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import {
-	readDeclaredRequestSegments,
+	parseQuery,
 	validateRequestSegments,
 	validateResponseValue,
 	validateResponseHeaders,
@@ -16,38 +16,28 @@ const schema = <T>(
 });
 
 describe("validation", () => {
-	it("parses bracket arrays and uses the last scalar query value", async () => {
-		const declaration = route
-			.get("/")
-			.query(type<{ tags: string[]; page: string }>())["~restrpc"];
-		const query = "tags[]=a&tags[]=b&page=1&page=2";
-		expect(readDeclaredRequestSegments(declaration, { query }).query).toEqual({
+	it("parses bracket arrays and uses the last scalar query value", () => {
+		expect(parseQuery("tags[]=a&tags[]=b&page=1&page=2")).toEqual({
 			tags: ["a", "b"],
 			page: "2",
 		});
 	});
 
-	it("keeps only declared segments and parses a declared query", () => {
-		const segments = {
-			body: "body",
-			query: "page=1",
-			params: { id: "1" },
-			headers: { accept: "*/*" },
-		};
-		expect(
-			readDeclaredRequestSegments(route.get("/")["~restrpc"], segments),
-		).toEqual({
-			body: undefined,
-			query: undefined,
-			params: undefined,
-			headers: undefined,
-		});
-		expect(
-			readDeclaredRequestSegments(
-				route.get("/").query(type<{ page: string }>())["~restrpc"],
-				segments,
-			).query,
-		).toEqual({ page: "1" });
+	it("parses queries like URLSearchParams", () => {
+		for (const query of [
+			"",
+			"a",
+			"a=&=b&&c=d=e",
+			"name=a+b&encoded=%C3%A4%20x&bad=%E0%A4%A&tags%5B%5D=x",
+		]) {
+			expect(parseQuery(query)).toEqual(
+				Object.fromEntries(
+					[...new URLSearchParams(query)].map(([key, value]) =>
+						key.endsWith("[]") ? [key.slice(0, -2), [value]] : [key, value],
+					),
+				),
+			);
+		}
 	});
 
 	it("merges stacked schema outputs with later keys taking precedence", async () => {
@@ -81,7 +71,7 @@ describe("validation", () => {
 
 	it("rejects nonobject stacked outputs", async () => {
 		const declaration = route.post("/")["~restrpc"];
-		await expect(
+		await expect(async () =>
 			validateRequestSegments(
 				{
 					...declaration,
@@ -107,7 +97,7 @@ describe("validation", () => {
 				query: [schema(() => ({ issues }))],
 			},
 		};
-		await expect(
+		await expect(async () =>
 			validateRequestSegments(declaration, {}, "application/json"),
 		).rejects.toMatchObject({
 			status: 400,
@@ -140,7 +130,7 @@ describe("validation", () => {
 
 	it("identifies response failures without exposing issues in the response body", async () => {
 		const issues = [{ message: "private detail" }];
-		await expect(
+		await expect(async () =>
 			validateResponseValue(
 				schema(() => ({ issues })),
 				{},
@@ -152,7 +142,7 @@ describe("validation", () => {
 			status: 500,
 			responseBody: { message: "Response validation failed." },
 		});
-		await expect(
+		await expect(async () =>
 			validateResponseHeaders({ headers: schema(() => ({ issues })) }, {}),
 		).rejects.toMatchObject({ location: "headers", issues });
 	});

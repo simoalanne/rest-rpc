@@ -62,6 +62,18 @@ describe("routeBuilder types", () => {
 			});
 	});
 
+	it("narrows the request media type to the declared body media types", () => {
+		route.get("/").handler(({ contentType }) => {
+			expectTypeOf(contentType).toEqualTypeOf<undefined>();
+		});
+		route
+			.post("/")
+			.body(type<string>())
+			.handler(({ contentType }) => {
+				expectTypeOf(contentType).toEqualTypeOf<"application/json">();
+			});
+	});
+
 	it("infers handler signatures for a route tree", () => {
 		const declaration = contractRoute.get("/").response(type<string>());
 		const tree = { users: { get: declaration } };

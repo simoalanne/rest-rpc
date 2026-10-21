@@ -162,7 +162,7 @@ describe.each([
 					return {
 						status: 201,
 						body: { id: params.id, name: body.name },
-						headers: { "x-route": "create" },
+						headers: { "x-route": "create", "x-count": 1 },
 					};
 				}),
 		};
@@ -172,6 +172,7 @@ describe.each([
 			});
 			expect(response.status).toBe(201);
 			expect(response.headers.get("x-route")).toBe("create");
+			expect(response.headers.get("x-count")).toBe("1");
 			expect(await response.json()).toEqual({ id: "42", name: "Ada" });
 		});
 	});
@@ -205,6 +206,22 @@ describe.each([
 				message: "Unsupported request body content type.",
 			});
 			expect(handler).not.toHaveBeenCalled();
+		});
+	});
+
+	it("ignores the request body of routes without a body schema", async () => {
+		const handler = vi.fn(() => ({ status: 204 as const }));
+		const routes = { ping: route.post("/ping").handler(handler) };
+		await serve(routes, {}, async (url) => {
+			const response = await fetch(`${url}/ping`, {
+				method: "POST",
+				headers: { "content-type": "text/plain" },
+				body: "Ada",
+			});
+			expect(response.status).toBe(204);
+			expect(handler).toHaveBeenCalledWith(
+				expect.objectContaining({ body: undefined, contentType: undefined }),
+			);
 		});
 	});
 
@@ -398,23 +415,6 @@ describe.each([
 		});
 	});
 
-	it("treats a request without a body as bodiless", async () => {
-		const routes = {
-			echo: route
-				.post("/echo")
-				.body(type<unknown>())
-				.handler(({ body }) => ({ received: body ?? null })),
-		};
-		await serve(routes, {}, async (url) => {
-			const response = await fetch(`${url}/echo`, {
-				method: "POST",
-				headers: { "content-type": "application/json" },
-			});
-			expect(response.status).toBe(200);
-			expect(await response.json()).toEqual({ received: null });
-		});
-	});
-
 	it("serializes FormData response bodies", async () => {
 		const routes = {
 			form: route.get("/form").handler(() => {
@@ -476,5 +476,28 @@ describe.each([
 				expect(await response.json()).toBe("parsed");
 			},
 		);
+	});
+});
+
+describe("node adapter", () => {
+	it("uses params a router such as Express set on the request", async () => {
+		const [user] = nodeAdapter.compileRoutes({
+			user: route
+				.get("/users/:id")
+				.params(type<{ id: string }>())
+				.handler(({ params }) => params.id),
+		});
+		const attached = (params: unknown, expected: string) =>
+			withHttpServer(
+				(req, res) => user!.handle(Object.assign(req, { params }), res),
+				async (url) => {
+					const response = await fetch(`${url}/users/raw`);
+					expect(await response.json()).toBe(expected);
+				},
+			);
+		await attached({ id: "attached" }, "attached");
+		// Params of another route, such as a wildcard mount, are not used.
+		await attached({}, "raw");
+		await attached(undefined, "raw");
 	});
 });

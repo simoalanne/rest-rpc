@@ -81,13 +81,20 @@ const events = route.get("/todos/events").handler(async function* ({ signal }) {
 
 ## Resume a Stream
 
-A client that reconnects can send the `Last-Event-ID` header. Its value is
-passed to the handler as `lastEventId`:
+A client that reconnects can send the `Last-Event-ID` header. rest-rpc does not
+resume streams itself, so read the header like any other request header with
+`.headers()`:
 
 ```ts
 const events = route
 	.get("/todos/events")
-	.handler(({ lastEventId }) => streamTodoEvents({ after: lastEventId }));
+	.headers(z.object({ "last-event-id": z.string().optional() }))
+	.handler(({ headers }) =>
+		streamTodoEvents({ after: headers["last-event-id"] }),
+	);
 ```
+
+To resume streams the same way across routes, read the header in the host and
+[seed the context](/docs/context#values-from-the-host) with it instead.
 
 Give events an `id` with `sse()` so clients have a value to resume from.

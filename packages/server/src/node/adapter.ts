@@ -8,9 +8,11 @@ import {
 import type { HandleOptions } from "../pipeline/handleHttpRoute.ts";
 import {
 	createRouteMatcher,
+	parsePathParams,
+	readAttachedPathParams,
 	type RuntimeImplementationTree,
 } from "../routing/match.ts";
-import { splitRequestUrl } from "../routing/requestUrl.ts";
+import { readRequestPathname } from "../routing/requestUrl.ts";
 
 // A body is present only when framed by content-length or transfer-encoding.
 const hasBody = (req: IncomingMessage) =>
@@ -92,8 +94,9 @@ export type NodeRoute = {
 	readonly path: string;
 	/**
 	 * Handles a request already routed to this route and writes the result,
-	 * including streams, to `response`. Params are read from the request URL
-	 * unless passed in `options`.
+	 * including streams, to `response`. Params are used from `options`, then
+	 * from `request.params` when a router such as Express sets it, and are
+	 * otherwise read from the request URL.
 	 */
 	readonly handle: (
 		request: IncomingMessage,
@@ -123,16 +126,28 @@ export function compileRoutes(
 	implementations: RuntimeImplementationTree,
 	options: CompileRoutesOptions = {},
 ): NodeRoute[] {
-	return compileFetchRoutes(implementations, options).map((route) => ({
-		method: route.method,
-		path: route.path,
-		handle: async (request, response, handleOptions) => {
-			await writeFetchResponse(
-				await route.handle(toFetchRequest(request, response), handleOptions),
-				response,
-			);
-		},
-	}));
+	return compileFetchRoutes(implementations, options).map((route) => {
+		const pathParams = parsePathParams(route.path);
+		return {
+			method: route.method,
+			path: route.path,
+			handle: async (request, response, handleOptions) => {
+				// Params a router such as Express set on the Node request are lost
+				// when it is converted, so they are passed on.
+				const params =
+					pathParams.params.length > 0 && !handleOptions?.params
+						? readAttachedPathParams(pathParams, request)
+						: undefined;
+				await writeFetchResponse(
+					await route.handle(
+						toFetchRequest(request, response),
+						params ? { ...handleOptions, params } : handleOptions,
+					),
+					response,
+				);
+			},
+		};
+	});
 }
 
 /**
@@ -153,15 +168,22 @@ export function createCatchAllHandler(
 	const matchRoute = createRouteMatcher(routes);
 
 	return async (request, response, options) => {
-		const route = matchRoute(
+		const match = matchRoute(
 			request.method ?? "GET",
-			splitRequestUrl(request.url ?? "/").pathname,
+			readRequestPathname(request.url ?? "/"),
 		);
-		if (!route) {
+		if (!match) {
 			return { matched: false };
 		}
 
-		await route.handle(request, response, options);
+		// Unless the caller passes params, the matched ones are passed on, so they
+		// are not parsed from the URL again.
+		const { route, params } = match;
+		await route.handle(
+			request,
+			response,
+			params && !options?.params ? { ...options, params } : options,
+		);
 		return { matched: true };
 	};
 }

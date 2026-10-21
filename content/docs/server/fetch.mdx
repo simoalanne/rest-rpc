@@ -68,8 +68,9 @@ type FetchRoute = {
 ```
 
 `path` has the `prefix` applied. `handle` runs validation, middleware, and the
-handler for a request that is already routed to it, and reads params from the
-request URL. With Bun's built-in router:
+handler for a request that is already routed to it. It uses the params a router
+attaches as `request.params`, as Bun's router does, and otherwise reads them
+from the request URL. With Bun's built-in router:
 
 ```ts
 const bunRoutes: Record<
@@ -132,9 +133,11 @@ const response = await route.handle(request, { context: { user } });
 - `context`: values from the host to seed the request [context](/docs/context)
   with before middleware runs, such as an authenticated user or the native
   request. They are not type-checked against the context types routes declare.
-- `params`: percent-decoded path params already parsed by the framework's
-  router. Passing them gives a small performance gain, as the params are not
-  parsed from the request URL again.
+- `params`: percent-decoded path params, for requests whose URL does not
+  contain the route path, such as after a rewrite or when calling `handle` with
+  a constructed request. Otherwise params are used from `request.params` when
+  the router sets it, as Bun's router does, or read from the request URL. The
+  catch-all handler passes the params it matched.
 - `body`: a request body already parsed by the framework, such as with a body
   parser. The request body is then not read, but the value is still validated
   against the route's body schema.

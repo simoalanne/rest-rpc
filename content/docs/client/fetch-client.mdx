@@ -134,8 +134,8 @@ metadata only: the client does not reconnect automatically, send the last event
 ID, or filter events by name.
 
 To resume a stream, send the last received event ID in the `last-event-id`
-header. The server receives it as
-[`lastEventId`](/docs/streaming#resume-a-stream).
+header. See [Resume a Stream](/docs/streaming#resume-a-stream) for reading it
+on the server.
 
 ```ts
 let lastEventId: string | undefined;

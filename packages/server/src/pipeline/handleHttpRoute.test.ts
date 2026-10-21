@@ -22,49 +22,16 @@ const rejected: StandardSchemaV1<unknown, Record<string, string>> = {
 
 const signal = new AbortController().signal;
 
-const execute = (implementation: RuntimeImplementationTree) =>
-	handleHttpRoute(flattenRouteImplementations(implementation)[0]!, {
+const execute = (implementation: RuntimeImplementationTree) => {
+	const flattened = flattenRouteImplementations(implementation)[0]!;
+	return handleHttpRoute(flattened, {
 		request: {},
 		signal,
+		mediaType: flattened.defaultBodyMediaType,
 	});
+};
 
 describe("handleHttpRoute", () => {
-	it("projects transformed request segments and transport headers", async () => {
-		const seen = vi.fn();
-		const implementation = route
-			.post()
-			.body(
-				type((value: { count: string }) => ({ count: Number(value.count) })),
-			)
-			.handler((request) => {
-				seen(request);
-				return request.body;
-			});
-		const run = (disableRequestValidation: boolean) =>
-			handleHttpRoute(flattenRouteImplementations({ implementation })[0]!, {
-				request: {
-					body: { count: "2" },
-					headers: {
-						"content-type": ["Application/JSON; charset=utf-8"],
-						"last-event-id": ["one", "two"],
-					},
-				},
-				signal,
-				configuration: { disableRequestValidation },
-			});
-		expect(await run(false)).toMatchObject({ body: { value: { count: 2 } } });
-		expect(seen.mock.calls[0]![0]).toMatchObject({
-			body: { count: 2 },
-			contentType: "application/json",
-			lastEventId: "one",
-			signal,
-		});
-		expect(seen.mock.calls[0]![0]).not.toHaveProperty("input");
-		expect(await run(true)).toMatchObject({
-			body: { value: { count: "2" } },
-		});
-	});
-
 	it("shares context with middleware and creates a fresh store per request", async () => {
 		const contexts: unknown[] = [];
 		const implementation = route
@@ -116,14 +83,14 @@ describe("handleHttpRoute", () => {
 			handleHttpRoute(flattenRouteImplementations(implementation)[0]!, {
 				request: {},
 				signal,
-				configuration: { disableResponseValidation },
+				disableResponseValidation,
 			});
 		expect(await run(false)).toMatchObject({
-			headers: { count: "3" },
+			headers: { count: 3 },
 			body: { value: 2 },
 		});
 		expect(await run(true)).toMatchObject({
-			headers: { count: "2" },
+			headers: { count: 2 },
 			body: { value: "2" },
 		});
 	});
@@ -158,7 +125,7 @@ describe("handleHttpRoute", () => {
 				{
 					request: {},
 					signal,
-					configuration: { disableResponseValidation: disabled },
+					disableResponseValidation: disabled,
 				},
 			);
 			if (!("body" in result)) throw new Error("Expected stream");
@@ -169,7 +136,7 @@ describe("handleHttpRoute", () => {
 		}
 	});
 
-	it("frames inferred streams as SSE and serializes headers", async () => {
+	it("frames inferred streams as SSE and preserves headers", async () => {
 		async function* values() {
 			yield sse({ data: 1, id: "one" });
 		}
@@ -183,7 +150,7 @@ describe("handleHttpRoute", () => {
 		if (!("body" in result)) throw new Error("Expected stream");
 		expect(result).toMatchObject({
 			status: 201,
-			headers: { count: "1" },
+			headers: { count: 1 },
 			body: { contentType: "text/event-stream" },
 		});
 		const frames = [];
@@ -228,11 +195,11 @@ describe("handleHttpRoute", () => {
 			...flattenRouteImplementations(declared)[0]!,
 			handler: () => ({ status: 404, body: "missing" }),
 		};
-		await expect(
+		await expect(async () =>
 			handleHttpRoute(implementation, {
 				request: {},
 				signal,
-				configuration: { disableResponseValidation: true },
+				disableResponseValidation: true,
 			}),
 		).rejects.toThrow("returned undeclared status 404");
 	});
@@ -260,15 +227,15 @@ describe("handleHttpRoute", () => {
 		expect(await run("text/html")).toMatchObject({
 			body: { value: "<p>ok</p>", contentType: "text/html" },
 		});
-		await expect(run()).rejects.toThrow(
+		await expect(async () => run()).rejects.toThrow(
 			"Unsupported response body contentType.",
 		);
-		await expect(run("application/json")).rejects.toThrow(
+		await expect(async () => run("application/json")).rejects.toThrow(
 			"Unsupported response body contentType.",
 		);
 	});
 
-	it("validates the request body with the schemas of the received media type", async () => {
+	it("validates the request body with the schemas of the selected media type", async () => {
 		const seen = vi.fn();
 		const declared = route
 			.post("/")
@@ -281,12 +248,13 @@ describe("handleHttpRoute", () => {
 				return { status: 204 };
 			});
 		const implementation = flattenRouteImplementations(declared)[0]!;
-		const run = (contentType: string, body: unknown) =>
+		const run = (mediaType: string, body: unknown) =>
 			handleHttpRoute(implementation, {
-				request: { body, headers: { "content-type": contentType } },
+				request: { body },
 				signal,
+				mediaType,
 			});
-		await run("text/plain; charset=utf-8", "ada");
+		await run("text/plain", "ada");
 		await run("application/json", { name: "Grace" });
 		expect(seen.mock.calls).toEqual([
 			["text/plain", "ADA"],
@@ -296,7 +264,7 @@ describe("handleHttpRoute", () => {
 
 	it("propagates ordinary handler errors", async () => {
 		const error = new Error("handler failed");
-		await expect(
+		await expect(async () =>
 			execute(
 				route.handler((): string => {
 					throw error;

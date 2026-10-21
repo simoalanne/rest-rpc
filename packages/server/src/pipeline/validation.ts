@@ -6,18 +6,19 @@ import {
 	type StandardSchemaV1,
 	validateStandardSchema,
 } from "@rest-rpc/core/standard-schema";
+import type { MaybePromise } from "@rest-rpc/core/utils";
+import { allMaybePromise, mapMaybePromise } from "./maybePromise.ts";
 import { isSseServerEvent, sse } from "./sse.ts";
 import { ResponseValidationError, RequestValidationError } from "./errors.ts";
 
 /**
- * Parsed request pieces passed into server request validation.
+ * Decoded request segments passed into server request validation.
  */
 export type RequestSegments = {
 	body?: unknown;
-	/** Raw query string without the leading `?`. */
-	query?: string;
+	query?: Record<string, unknown>;
 	params?: unknown;
-	headers?: Record<string, string | readonly string[] | undefined>;
+	headers?: Record<string, string | undefined>;
 };
 
 type SegmentValidationResult = {
@@ -25,109 +26,124 @@ type SegmentValidationResult = {
 	errors: readonly StandardSchemaV1.Issue[];
 };
 
-const parseQuery = (search: string) => {
-	const data: Record<string, unknown> = {};
+const noIssues: readonly StandardSchemaV1.Issue[] = [];
 
-	for (const [wireKey, value] of new URLSearchParams(search)) {
-		if (wireKey.endsWith("[]")) {
-			const key = wireKey.slice(0, -2);
-			const current = data[key];
-			data[key] = Array.isArray(current) ? [...current, value] : [value];
-			continue;
-		}
+const undeclaredSegment: SegmentValidationResult = {
+	data: undefined,
+	errors: noIssues,
+};
 
+const setQueryValue = (
+	data: Record<string, unknown>,
+	wireKey: string,
+	value: string,
+) => {
+	if (!wireKey.endsWith("[]")) {
 		data[wireKey] = value;
+		return;
+	}
+	const key = wireKey.slice(0, -2);
+	const current = data[key];
+	if (Array.isArray(current)) current.push(value);
+	else data[key] = [value];
+};
+
+/**
+ * Parses a raw query string without the leading `?`. Keys ending in `[]`
+ * collect arrays; other repeated keys keep the last value.
+ */
+export function parseQuery(search: string): Record<string, unknown> {
+	const data: Record<string, unknown> = {};
+	// Only encoded queries need `URLSearchParams` to decode them.
+	if (search.includes("%") || search.includes("+")) {
+		new URLSearchParams(search).forEach((value, wireKey) =>
+			setQueryValue(data, wireKey, value),
+		);
+		return data;
 	}
 
+	for (const pair of search.split("&")) {
+		if (!pair) continue;
+		const separator = pair.indexOf("=");
+		if (separator === -1) setQueryValue(data, pair, "");
+		else
+			setQueryValue(data, pair.slice(0, separator), pair.slice(separator + 1));
+	}
 	return data;
-};
+}
 
 const isDeclared = (
 	schemas: readonly StandardSchemaV1[] | undefined,
 ): schemas is readonly StandardSchemaV1[] =>
 	schemas !== undefined && schemas.length > 0;
 
-/**
- * Keeps only the request segments the route declares schemas for, parsing the
- * query string when it is declared.
- */
-export function readDeclaredRequestSegments(
-	route: RouteDeclaration,
-	segments: RequestSegments,
-) {
-	const schemas = route.request;
-	return {
-		body: schemas?.body ? segments.body : undefined,
-		query: isDeclared(schemas?.query)
-			? parseQuery(segments.query ?? "")
-			: undefined,
-		params: isDeclared(schemas?.params) ? segments.params : undefined,
-		headers: isDeclared(schemas?.headers) ? segments.headers : undefined,
-	};
-}
+const toSegmentValidationResult = (
+	result: StandardSchemaV1.Result<unknown>,
+): SegmentValidationResult =>
+	result.issues
+		? { data: undefined, errors: result.issues }
+		: { data: result.value, errors: noIssues };
 
-const validateRequestSegment = async (
-	schemas: readonly StandardSchemaV1[] | undefined,
+// Schemas run in order and stay synchronous until one returns a promise.
+const validateStackedRequestSegment = (
+	schemas: readonly StandardSchemaV1[],
 	input: unknown,
-): Promise<SegmentValidationResult> => {
-	if (!isDeclared(schemas)) return { data: undefined, errors: [] };
+	index = 0,
+	merged: Record<string, unknown> = {},
+): MaybePromise<SegmentValidationResult> => {
+	if (index === schemas.length) return { data: merged, errors: noIssues };
 
-	let merged: Record<string, unknown> = {};
-
-	for (const schema of schemas) {
-		const result = await validateStandardSchema(schema, input);
-
-		if (result.issues) {
-			return { data: undefined, errors: result.issues };
-		}
-
-		if (schemas.length === 1) {
-			return { data: result.value, errors: [] };
-		}
-
-		if (typeof result.value !== "object" || result.value === null) {
-			throw new Error("Stacked request schema outputs must be objects.");
-		}
-
-		merged = { ...merged, ...result.value };
-	}
-	return { data: merged, errors: [] };
+	return mapMaybePromise(
+		validateStandardSchema(schemas[index]!, input),
+		(result) => {
+			if (result.issues) return { data: undefined, errors: result.issues };
+			if (typeof result.value !== "object" || result.value === null) {
+				throw new Error("Stacked request schema outputs must be objects.");
+			}
+			return validateStackedRequestSegment(schemas, input, index + 1, {
+				...merged,
+				...result.value,
+			});
+		},
+	);
 };
 
-/**
- * Validates decoded request segments, ignoring segments the route does not
- * declare. The body is validated with the schemas of `mediaType`.
- */
-export async function validateRequestSegments(
-	route: RouteDeclaration,
-	segments: Record<string, unknown>,
-	mediaType?: string,
-) {
-	const requestSchemas = route.request;
-	const body = await validateRequestSegment(
-		mediaType === undefined ? undefined : requestSchemas?.body?.[mediaType],
-		segments.body,
+const validateRequestSegment = (
+	schemas: readonly StandardSchemaV1[] | undefined,
+	input: unknown,
+): MaybePromise<SegmentValidationResult> => {
+	if (!isDeclared(schemas)) return undeclaredSegment;
+	if (schemas.length > 1) return validateStackedRequestSegment(schemas, input);
+
+	return mapMaybePromise(
+		validateStandardSchema(schemas[0], input),
+		toSegmentValidationResult,
 	);
-	const query = await validateRequestSegment(
-		requestSchemas?.query,
-		segments.query,
-	);
-	const params = await validateRequestSegment(
-		requestSchemas?.params,
-		segments.params,
-	);
-	const headers = await validateRequestSegment(
-		requestSchemas?.headers,
-		segments.headers,
-	);
-	const issues = {
-		body: body.errors,
-		query: query.errors,
-		params: params.errors,
-		headers: headers.errors,
-	};
-	if (Object.values(issues).some((errors) => errors.length > 0)) {
-		throw new RequestValidationError(issues);
+};
+
+type RequestSegmentValues = Record<
+	"body" | "query" | "params" | "headers",
+	unknown
+>;
+
+const toValidatedRequest = ([
+	body,
+	query,
+	params,
+	headers,
+]: readonly SegmentValidationResult[]): RequestSegmentValues => {
+	if (
+		body.errors.length > 0 ||
+		query.errors.length > 0 ||
+		params.errors.length > 0 ||
+		headers.errors.length > 0
+	) {
+		throw new RequestValidationError({
+			body: body.errors,
+			query: query.errors,
+			params: params.errors,
+			headers: headers.errors,
+		});
 	}
 	return {
 		body: body.data,
@@ -135,46 +151,73 @@ export async function validateRequestSegments(
 		params: params.data,
 		headers: headers.data,
 	};
+};
+
+const noRequestSegments: RequestSegmentValues = {
+	body: undefined,
+	query: undefined,
+	params: undefined,
+	headers: undefined,
+};
+
+/**
+ * Validates decoded request segments, ignoring segments the route does not
+ * declare. The body is validated with the schemas of `mediaType`.
+ */
+export function validateRequestSegments(
+	route: RouteDeclaration,
+	segments: RequestSegments,
+	mediaType?: string,
+): MaybePromise<RequestSegmentValues> {
+	const requestSchemas = route.request;
+	if (!requestSchemas) return noRequestSegments;
+	return mapMaybePromise(
+		allMaybePromise([
+			validateRequestSegment(
+				mediaType === undefined ? undefined : requestSchemas.body?.[mediaType],
+				segments.body,
+			),
+			validateRequestSegment(requestSchemas.query, segments.query),
+			validateRequestSegment(requestSchemas.params, segments.params),
+			validateRequestSegment(requestSchemas.headers, segments.headers),
+		]),
+		toValidatedRequest,
+	);
 }
 
-export const validateResponseValue = async (
+export const validateResponseValue = (
 	schema: StandardSchemaV1 | undefined,
 	value: unknown,
 	location: "body" | "stream",
-): Promise<unknown> => {
+): MaybePromise<unknown> => {
 	if (!schema) return value;
 
-	const validation = await validateStandardSchema(schema, value);
-	if (validation.issues) {
-		throw new ResponseValidationError(location, validation.issues);
-	}
-	return validation.value;
+	return mapMaybePromise(validateStandardSchema(schema, value), (result) => {
+		if (result.issues) {
+			throw new ResponseValidationError(location, result.issues);
+		}
+		return result.value;
+	});
 };
 
-export const stringifyHeaders = (
-	headers: Record<string, unknown> | undefined,
-): Record<string, string> =>
-	Object.fromEntries(
-		Object.entries(headers ?? {}).flatMap(([name, value]) =>
-			value === undefined ? [] : [[name, String(value)]],
-		),
-	);
-
-export const validateResponseHeaders = async (
+export const validateResponseHeaders = (
 	schema: ResponseDeclaration | undefined,
 	headers: Record<string, unknown> | undefined,
-): Promise<Record<string, unknown> | undefined> => {
+): MaybePromise<Record<string, unknown> | undefined> => {
 	if (!schema) return undefined;
 
 	const declaredHeaders = schema.headers;
 	if (!declaredHeaders) return undefined;
 
-	const result = await validateStandardSchema(declaredHeaders, headers ?? {});
-	if (result.issues) {
-		throw new ResponseValidationError("headers", result.issues);
-	}
-
-	return result.value;
+	return mapMaybePromise(
+		validateStandardSchema(declaredHeaders, headers ?? {}),
+		(result) => {
+			if (result.issues) {
+				throw new ResponseValidationError("headers", result.issues);
+			}
+			return result.value;
+		},
+	);
 };
 
 export async function* validateResponseStreamChunks(

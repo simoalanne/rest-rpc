@@ -305,7 +305,6 @@ A handler receives one object containing:
 - `route`: the route declaration, including its method, path, and `metadata`.
 - `contentType`: the request body media type. Routes with a body narrow it to
   their declared media types, and `body` with it.
-- `lastEventId`: the `Last-Event-ID` request header, used to [resume streams](/docs/streaming#resume-a-stream).
 - `signal`: an `AbortSignal` that aborts when the client disconnects.
 
 Native request objects are not passed to handlers. To make them or other host

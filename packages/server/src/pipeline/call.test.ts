@@ -26,7 +26,7 @@ describe("call", () => {
 			await call(
 				implementation,
 				{ params: { id: "1" } },
-				{ lastEventId: "one", context: { user: "Ada" } },
+				{ context: { user: "Ada" } },
 			),
 		).toEqual({
 			status: 200,
@@ -35,7 +35,7 @@ describe("call", () => {
 			headers: { total: 2 },
 		});
 		const request = seen.mock.calls[0]![0];
-		expect(request).toMatchObject({ params: { id: 1 }, lastEventId: "one" });
+		expect(request).toMatchObject({ params: { id: 1 } });
 		expect(request.signal.aborted).toBe(false);
 		expect(request.context.get("user")).toBe("Ada");
 	});
