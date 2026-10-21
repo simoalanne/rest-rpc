@@ -115,16 +115,25 @@ type DeclaredRequest<E> = E extends { request: infer TRequest }
 
 type EmptyRequest = Record<never, never>;
 
+// A declared path includes the prefix; a path derived from tree keys adds only
+// static segments to it.
+type ParamsPath<E> = E extends { path: infer TPath extends string }
+	? TPath
+	: E extends { prefix: infer TPrefix }
+		? TPrefix
+		: undefined;
+
 // Dynamic path segments without a params schema are received as strings.
-type PathParamsRequest<E> = E extends { path: infer TPath }
-	? [PathParamNames<TPath>] extends [never]
-		? EmptyRequest
-		: {
-				params: readonly [
-					StandardSchemaV1<{ [TName in PathParamNames<TPath>]: string }>,
-				];
-			}
-	: EmptyRequest;
+type PathParamsRequest<E> =
+	ParamsPath<E> extends infer TPath
+		? [PathParamNames<TPath>] extends [never]
+			? EmptyRequest
+			: {
+					params: readonly [
+						StandardSchemaV1<{ [TName in PathParamNames<TPath>]: string }>,
+					];
+				}
+		: EmptyRequest;
 
 type RequestWithPathParams<E> =
 	DeclaredRequest<E> extends { params: readonly StandardSchemaV1[] }

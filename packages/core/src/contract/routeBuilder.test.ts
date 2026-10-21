@@ -1,5 +1,6 @@
 import { type } from "../standard-schema/type.ts";
 import type { BodyContent } from "./body.ts";
+import { resolveRoutePath } from "./path.ts";
 import { RouteBuilder, route } from "./routeBuilder.ts";
 
 const schema = type<{ name: string }>();
@@ -73,6 +74,21 @@ describe("routeBuilder", () => {
 	it.each([99, 600, 200.5, NaN])("rejects invalid HTTP status %s", (status) => {
 		expect(() => new RouteBuilder().response({ status })).toThrow(
 			"Invalid HTTP response status",
+		);
+	});
+
+	it("prepends prefixes in order to method paths and tree-derived paths", () => {
+		const api = route.prefix("/api").prefix("/v1");
+		expect(api.get("/todos")["~restrpc"].path).toBe("/api/v1/todos");
+		expect(api.get("/")["~restrpc"].path).toBe("/api/v1");
+		expect(resolveRoutePath(api.get()["~restrpc"], ["todos"])).toBe(
+			"/api/v1/todos",
+		);
+	});
+
+	it.each(["api", "/api/"])("rejects the prefix %s", (prefix) => {
+		expect(() => route.prefix(prefix as `/${string}`)).toThrow(
+			`Prefix "${prefix}" must start with a slash and not end with one`,
 		);
 	});
 });

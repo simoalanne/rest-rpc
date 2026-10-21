@@ -1,5 +1,6 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { BodyContent } from "./body.ts";
+import { joinPrefix } from "./path.ts";
 import type {
 	AbsolutePath,
 	HttpMethod,
@@ -27,6 +28,7 @@ import type {
 	WithBody,
 	WithHttpMethod,
 	WithMetadata,
+	WithPrefix,
 	WithRequest,
 	WithResponse,
 } from "./routeBuilder.types.ts";
@@ -130,9 +132,17 @@ const httpState = (
 ): RouteBuilderState => ({
 	...state,
 	method,
-	path,
+	path: path === undefined ? undefined : joinPrefix(state.prefix, path),
 	responses: { ...state.responses },
 });
+
+const assertPrefix = (prefix: string) => {
+	if (!prefix.startsWith("/") || prefix.length < 2 || prefix.endsWith("/")) {
+		throw new Error(
+			`Prefix "${prefix}" must start with a slash and not end with one, such as "/api".`,
+		);
+	}
+};
 
 type OptionalKeys<T> = {
 	[TKey in keyof T]-?: Record<never, never> extends Pick<T, TKey>
@@ -200,6 +210,15 @@ export class RouteBuilder<
 	// Typed as `never` so each builder method returns its declared type.
 	protected clone(state: RouteBuilderState): never {
 		return new RouteBuilder(state) as never;
+	}
+
+	/** Prepends a path prefix to the route path, before a method is selected. @see {@link https://rest-rpc.vercel.app/docs/route-builder#path-prefixes} */
+	prefix<const TPrefix extends AbsolutePath>(
+		prefix: TPrefix,
+	): BuilderFor<TKind, WithPrefix<TState, TPrefix>> {
+		assertPrefix(prefix);
+		const state = defaultRouteState(this["~restrpc"]);
+		return this.clone({ ...state, prefix: joinPrefix(state.prefix, prefix) });
 	}
 
 	/** Declares a GET route. @see {@link https://rest-rpc.vercel.app/docs/route-builder} */

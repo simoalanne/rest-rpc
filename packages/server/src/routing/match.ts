@@ -97,10 +97,11 @@ export function toRuntimeImplementation(
 	const { handler, middleware, ...route } = declaration;
 	if (
 		route.request?.params?.length &&
-		getPathParamNames(route.path ?? "").length === 0
+		// A path derived from tree keys adds no dynamic segments to the prefix.
+		getPathParamNames(route.path ?? route.prefix ?? "").length === 0
 	) {
 		throw new Error(
-			`Route "${route.method} ${route.path ?? "(derived path)"}" declares params, but its path has no dynamic segments.`,
+			`Route "${route.method} ${route.path ?? route.prefix ?? "(derived path)"}" declares params, but its path has no dynamic segments.`,
 		);
 	}
 	const bodyMediaTypes = Object.keys(route.request?.body ?? {});

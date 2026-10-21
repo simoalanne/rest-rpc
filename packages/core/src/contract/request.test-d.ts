@@ -144,4 +144,15 @@ describe("request inference", () => {
 			InferClientRequest<typeof tree>["users"]["get"]
 		>().toEqualTypeOf<InferClientRequest<typeof get>>();
 	});
+
+	it("infers params from prefixes", () => {
+		const tenant = route.prefix("/tenants/:tenant");
+		expectTypeOf<
+			InferClientRequest<ReturnType<typeof tenant.get<"/todos/{id}">>>
+		>().toEqualTypeOf<{ params: { tenant: string; id: string } }>();
+		// A path derived from tree keys keeps the prefix params.
+		expectTypeOf<
+			InferClientRequest<ReturnType<typeof tenant.get<undefined>>>
+		>().toEqualTypeOf<{ params: { tenant: string } }>();
+	});
 });

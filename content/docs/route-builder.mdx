@@ -69,6 +69,49 @@ const listTodos = getRoute.handler(() => listTodos());
 const listNotes = getRoute.handler(() => listNotes());
 ```
 
+## Path Prefixes
+
+Use `.prefix()` to prepend a path to routes, such as an API version. Call it
+before the method, so routes built on a shared base inherit it:
+
+```ts
+const api = route.prefix("/api/v1");
+
+const listTodos = api.get("/todos").handler(() => listTodos()); // GET /api/v1/todos
+const getTodo = api
+	.get("/todos/:id")
+	.handler(({ params }) => findTodo(params.id)); // GET /api/v1/todos/:id
+```
+
+Prefixes are joined in order and are part of the contract, so clients and
+OpenAPI documents use the prefixed paths. A route without a method path
+derives its path from its tree keys and prepends the prefix to it.
+
+A prefix can contain dynamic segments. They are params like the ones of the
+method path, and a route's params are either all inferred or all declared:
+
+- Without any `.params()` schema, every dynamic segment is inferred as a
+  string param.
+- Adding one or more `.params()` schemas overrides the inferred string params
+  of every dynamic segment, including those of the prefix.
+
+:::tip
+When adding explicit `params()` schemas, declare the prefix schema separately from route specific schemas
+by stacking them. This allows the prefix schema to be reused across multiple routes without needing to redefine it each time.
+
+```ts
+const tenant = route
+	.prefix("/tenants/:tenant")
+	.params(z.object({ tenant: z.string() }));
+
+const getTodo = tenant
+	.get("/todos/:id")
+	.params(z.object({ id: z.coerce<number>() }))
+	.handler(({ params }) => findTodo(params.tenant, params.id));
+```
+
+:::
+
 ## Declare Request Segments
 
 Use `.params()`, `.query()`, `.headers()`, and `.body()` to read each HTTP
@@ -92,7 +135,7 @@ const update = route
 The following rules apply to request segments:
 
 - `.params()` schemas replace the inferred string params, so they must cover
-  every dynamic path segment. Their keys cannot be optional, and a route that
+  every dynamic path segment, including those of prefixes. Their keys cannot be optional, and a route that
   declares params must have dynamic segments.
 - `.body()` is not available on GET routes, and `.get()` is not available after `.body()`.
 

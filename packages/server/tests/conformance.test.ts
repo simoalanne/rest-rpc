@@ -189,6 +189,19 @@ describe.each([
 		});
 	});
 
+	it("serves prefixed tree-derived routes with params from the prefix", async () => {
+		const routes = {
+			todos: route
+				.prefix("/tenants/:tenant")
+				.get()
+				.handler(({ params }) => params),
+		};
+		await serve(routes, {}, async (url) => {
+			const response = await fetch(`${url}/tenants/acme/todos`);
+			expect(await response.json()).toEqual({ tenant: "acme" });
+		});
+	});
+
 	it("leaves unmatched requests to the host", async () => {
 		const routes = {
 			current: route.get("/current").handler(() => ({ name: "Ada" })),
