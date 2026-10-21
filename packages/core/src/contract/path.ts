@@ -28,6 +28,28 @@ export const getPathParamSegmentName = (segment: string) => {
 export const isPathParamSegment = (segment: string) =>
 	getPathParamSegmentName(segment) !== undefined;
 
+/** Returns the names of the dynamic segments of a path, in order. */
+export const getPathParamNames = (path: string) =>
+	path.split("/").flatMap((segment) => {
+		const name = getPathParamSegmentName(segment);
+		return name === undefined ? [] : [name];
+	});
+
+type PathParamSegmentName<TSegment extends string> =
+	TSegment extends `:${infer TName}`
+		? TName
+		: TSegment extends `{${infer TName}}`
+			? TName
+			: never;
+
+/** The names of the dynamic segments of a literal path, or `never` without any. */
+export type PathParamNames<TPath> =
+	TPath extends `${infer TSegment}/${infer TRest}`
+		? PathParamSegmentName<TSegment> | PathParamNames<TRest>
+		: TPath extends string
+			? PathParamSegmentName<TPath>
+			: never;
+
 export const replacePathParams = (
 	path: string,
 	replace: (name: string) => string,

@@ -93,4 +93,12 @@ describe("routeBuilder types", () => {
 			200: {};
 		}>();
 	});
+
+	it("rejects optional params schema keys", () => {
+		route.get("/users/:id").params(type<{ id: string }>());
+		// @ts-expect-error Path params are always present.
+		route.get("/users/:id").params(type<{ id?: string }>());
+		// @ts-expect-error Extra optional keys are never provided.
+		route.get("/users/:id").params(type<{ id: string; include?: string }>());
+	});
 });

@@ -4,6 +4,7 @@ import type {
 	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
 import type { Merge } from "../utils/typeUtils.ts";
+import type { PathParamNames } from "./path.ts";
 
 /** Scalar value accepted by ordinary HTTP request schemas. */
 export type RequestScalar = string | number | boolean;
@@ -108,18 +109,43 @@ type InferRequestBody<TBody, TIO extends "input" | "output"> = {
 	};
 }[Extract<keyof TBody, string>];
 
+type DeclaredRequest<E> = E extends { request: infer TRequest }
+	? TRequest
+	: EmptyRequest;
+
+type EmptyRequest = Record<never, never>;
+
+// Dynamic path segments without a params schema are received as strings.
+type PathParamsRequest<E> = E extends { path: infer TPath }
+	? [PathParamNames<TPath>] extends [never]
+		? EmptyRequest
+		: {
+				params: readonly [
+					StandardSchemaV1<{ [TName in PathParamNames<TPath>]: string }>,
+				];
+			}
+	: EmptyRequest;
+
+type RequestWithPathParams<E> =
+	DeclaredRequest<E> extends { params: readonly StandardSchemaV1[] }
+		? DeclaredRequest<E>
+		: DeclaredRequest<E> & PathParamsRequest<E>;
+
 /** Infers each declared request segment, or `TEmpty` when none is declared. */
 type InferRequestFor<
 	E extends { request?: RouteRequestDeclaration },
 	TIO extends "input" | "output",
 	TEmpty,
-> = E extends { request: infer TRequest }
-	? TRequest extends { body: infer TBody }
-		? Merge<InferRequestSegments<TRequest, TIO> & InferRequestBody<TBody, TIO>>
-		: [Extract<keyof TRequest, RequestSegment>] extends [never]
-			? TEmpty
-			: InferRequestSegments<TRequest, TIO>
-	: TEmpty;
+> =
+	RequestWithPathParams<E> extends infer TRequest
+		? TRequest extends { body: infer TBody }
+			? Merge<
+					InferRequestSegments<TRequest, TIO> & InferRequestBody<TBody, TIO>
+				>
+			: [Extract<keyof TRequest, RequestSegment>] extends [never]
+				? TEmpty
+				: InferRequestSegments<TRequest, TIO>
+		: never;
 
 type OptionalHeaders<H, TOptionalKeys extends PropertyKey> = Merge<
 	Omit<H, Extract<keyof H, TOptionalKeys>> &

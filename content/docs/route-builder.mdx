@@ -47,9 +47,17 @@ const todo = route
 Use `.get(path)`, `.post(path)`, `.put(path)`, `.patch(path)`, or `.delete(path)`.
 A method can be selected once per route.
 
-Paths can contain dynamic segments using either `:id` or `{id}` syntax. Declare
-each dynamic segment in `.params()`. Other router syntax, such as wildcards or
-regular expressions, is not officially supported.
+Paths can contain dynamic segments using either `:id` or `{id}` syntax. Without
+a `.params()` schema, each dynamic segment is a string param:
+
+```ts
+const getTodo = route
+	.get("/todos/:id")
+	.handler(({ params }) => findTodo(params.id)); // params: { id: string }
+```
+
+Declare `.params()` to validate or transform them. Other router syntax, such as
+wildcards or regular expressions, is not officially supported.
 
 The path can also be omitted, in which case the route keeps deriving its path
 from its tree keys but uses the specified method instead of the default POST.
@@ -83,7 +91,9 @@ const update = route
 
 The following rules apply to request segments:
 
-- `.params()` must correspond to dynamic path segments.
+- `.params()` schemas replace the inferred string params, so they must cover
+  every dynamic path segment. Their keys cannot be optional, and a route that
+  declares params must have dynamic segments.
 - `.body()` is not available on GET routes, and `.get()` is not available after `.body()`.
 
 Header schemas must use lowercase names. See

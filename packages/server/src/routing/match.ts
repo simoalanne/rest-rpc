@@ -1,5 +1,6 @@
 import {
 	contractRouteEntries,
+	getPathParamNames,
 	getPathParamSegmentName,
 	isPathParamSegment,
 	isRouteLeaf,
@@ -94,6 +95,14 @@ export function toRuntimeImplementation(
 	declaration: ImplementedRoute["~restrpc"],
 ): RuntimeImplementation {
 	const { handler, middleware, ...route } = declaration;
+	if (
+		route.request?.params?.length &&
+		getPathParamNames(route.path ?? "").length === 0
+	) {
+		throw new Error(
+			`Route "${route.method} ${route.path ?? "(derived path)"}" declares params, but its path has no dynamic segments.`,
+		);
+	}
 	const bodyMediaTypes = Object.keys(route.request?.body ?? {});
 	const defaultResponseMediaTypes: Record<number, string> = {};
 	for (const [status, response] of Object.entries(route.responses)) {

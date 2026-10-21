@@ -134,6 +134,19 @@ const httpState = (
 	responses: { ...state.responses },
 });
 
+type OptionalKeys<T> = {
+	[TKey in keyof T]-?: Record<never, never> extends Pick<T, TKey>
+		? TKey
+		: never;
+}[keyof T];
+
+// Path params are always present, so params schemas cannot make keys optional.
+type RequiredParamsCheck<TSchema extends RequestParamsSchema> = [
+	OptionalKeys<StandardSchemaV1.InferInput<TSchema>>,
+] extends [never]
+	? unknown
+	: { "~error": "Params schema keys cannot be optional." };
+
 const addRequestSegment = (
 	state: RouteBuilderState,
 	segment: "query" | "params",
@@ -266,7 +279,7 @@ export class RouteBuilder<
 
 	/** Declares path parameters. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-request-segments} */
 	params<const TSchema extends RequestParamsSchema>(
-		schema: TSchema,
+		schema: TSchema & RequiredParamsCheck<TSchema>,
 	): BuilderFor<TKind, WithRequest<TState, "params", TSchema>> {
 		return this.clone(
 			addRequestSegment(defaultRouteState(this["~restrpc"]), "params", schema),
