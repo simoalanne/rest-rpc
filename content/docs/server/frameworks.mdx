@@ -11,8 +11,10 @@ on Node's `IncomingMessage`, such as Express.
 Register each compiled route on the framework's [native router](#native-router),
 or mount the [catch-all](#catch-all) handler and let rest-rpc do the routing.
 Either way, pass framework values that handlers need, such as an authenticated
-user, through the [`context` option](/docs/server/fetch#handle-options), and
-params or a body the framework already parsed through `params` and `body`.
+user, through the [`context` option](/docs/server/fetch#handle-options), and a
+body the framework already parsed through `body`. Params are read from the
+request, so they only need to be passed in
+[some cases](/docs/server/fetch#handle-options).
 
 ## Native Router
 

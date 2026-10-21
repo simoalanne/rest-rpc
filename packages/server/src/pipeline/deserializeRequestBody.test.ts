@@ -1,10 +1,19 @@
-import { createBodyCodecRegistry, type BodyCodec } from "@rest-rpc/core/codecs";
+import {
+	createBodyCodecRegistry,
+	normalizeMediaType,
+	type BodyCodec,
+} from "@rest-rpc/core/codecs";
 import { deserializeRequestBody as deserialize } from "./deserializeRequestBody.ts";
 
 const deserializeRequestBody = (
 	raw: Request,
 	bodyCodecs: readonly BodyCodec[] = [],
-) => deserialize(raw, createBodyCodecRegistry(bodyCodecs));
+) =>
+	deserialize(
+		raw,
+		normalizeMediaType(raw.headers.get("content-type")),
+		createBodyCodecRegistry(bodyCodecs),
+	);
 
 const request = (body: string, headers: Record<string, string> = {}) =>
 	new Request("http://localhost/", {

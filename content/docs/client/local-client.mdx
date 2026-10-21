@@ -37,11 +37,10 @@ A request body media type is selected with `contentType` in the request, as in a
 
 The optional third argument replaces what an HTTP request would otherwise provide:
 
-| Option        | Description                                                                            |
-| ------------- | -------------------------------------------------------------------------------------- |
-| `signal`      | Passed to the handler. Defaults to a signal that never aborts.                         |
-| `lastEventId` | Resumes a stream, as the `Last-Event-ID` header does over HTTP.                        |
-| `context`     | Initial [Context](/docs/context) values, set before middleware runs. Any subset works. |
+| Option    | Description                                                                            |
+| --------- | -------------------------------------------------------------------------------------- |
+| `signal`  | Passed to the handler. Defaults to a signal that never aborts.                         |
+| `context` | Initial [Context](/docs/context) values, set before middleware runs. Any subset works. |
 
 ## Local Client
 

@@ -2,7 +2,13 @@
 export function normalizeMediaType(
 	contentType: string | undefined | null,
 ): string {
-	return contentType?.split(";")[0]?.trim().toLowerCase() ?? "";
+	if (!contentType) return "";
+	const parametersStart = contentType.indexOf(";");
+	return (
+		parametersStart === -1 ? contentType : contentType.slice(0, parametersStart)
+	)
+		.trim()
+		.toLowerCase();
 }
 
 /** Detects async iterable bodies, such as generators and Node streams. */

@@ -2,6 +2,8 @@ import {
 	assertPathParams,
 	createRouteMatcher,
 	flattenRouteImplementations,
+	parsePathParams,
+	readAttachedPathParams,
 	readPathParams,
 	resolveImplementationPath,
 	type RuntimeImplementationTree,
@@ -41,9 +43,11 @@ describe("match", () => {
 			flattenRouteImplementations(tree).map(({ route }) => route.path),
 		).toEqual([...paths].reverse());
 		const match = createRouteMatcher(compile(tree));
-		expect(match("GET", "/users/me/edit")?.path).toBe("/users/me/edit");
-		expect(match("GET", "/users/42/edit")?.path).toBe("/users/{id}/edit");
-		expect(match("GET", "/teams/42/edit")?.path).toBe("/{group}/{id}/edit");
+		expect(match("GET", "/users/me/edit")?.route.path).toBe("/users/me/edit");
+		expect(match("GET", "/users/42/edit")?.route.path).toBe("/users/{id}/edit");
+		expect(match("GET", "/teams/42/edit")?.route.path).toBe(
+			"/{group}/{id}/edit",
+		);
 	});
 
 	it("matches complete paths and allows a trailing slash", () => {
@@ -54,21 +58,27 @@ describe("match", () => {
 			}),
 		);
 		const matchPath = (path: string) => match("GET", path);
-		expect(matchPath("/files/a%20b/v1.0/")?.path).toBe("/files/{name}/v1.0");
+		expect(matchPath("/files/a%20b/v1.0/")).toMatchObject({
+			route: { path: "/files/{name}/v1.0" },
+			params: { name: "a b" },
+		});
 		expect(matchPath("/files/a/v1x0")).toBeUndefined();
 		expect(matchPath("/files/a/v1.0/extra")).toBeUndefined();
 		expect(matchPath("/files//v1.0")).toBeUndefined();
-		expect(matchPath("/")?.path).toBe("/");
+		expect(matchPath("/")).toMatchObject({
+			route: { path: "/" },
+			params: undefined,
+		});
 	});
 
 	it("prefers static routes and respects method and prefix", () => {
 		const dynamic = route.get("/users/{id}").handler(() => "dynamic");
 		const fixed = route.get("/users/me").handler(() => "fixed");
 		const match = createRouteMatcher(compile({ dynamic, fixed }, "/api/"));
-		expect(match("GET", "/api/users/me")?.implementation.handler).toBe(
+		expect(match("GET", "/api/users/me")?.route.implementation.handler).toBe(
 			fixed["~restrpc"].handler,
 		);
-		expect(match("GET", "/api/users/42")?.implementation.handler).toBe(
+		expect(match("GET", "/api/users/42")?.route.implementation.handler).toBe(
 			dynamic["~restrpc"].handler,
 		);
 		expect(match("POST", "/api/users/me")).toBeUndefined();
@@ -105,7 +115,7 @@ describe("resolveImplementationPath", () => {
 
 describe("readPathParams", () => {
 	it("reads decoded params aligned to the end of the request path", () => {
-		const path = "/users/{id}/items/:item";
+		const path = parsePathParams("/users/{id}/items/:item");
 		expect(readPathParams(path, "/users/a%20b/items/1/")).toEqual({
 			id: "a b",
 			item: "1",
@@ -114,7 +124,9 @@ describe("readPathParams", () => {
 			id: "42",
 			item: "1",
 		});
-		expect(readPathParams("/users/me", "/users/me")).toEqual({});
+		expect(readPathParams(parsePathParams("/users/me"), "/users/me")).toEqual(
+			{},
+		);
 		expect(() => readPathParams(path, "/items/1")).toThrow(
 			'Request path "/items/1" has fewer segments than route path "/users/{id}/items/:item".',
 		);
@@ -123,11 +135,27 @@ describe("readPathParams", () => {
 
 describe("assertPathParams", () => {
 	it("requires every route param", () => {
-		const path = "/users/{id}/items/:item";
+		const path = parsePathParams("/users/{id}/items/:item");
 		const params = { id: "1", item: "2" };
 		expect(assertPathParams(path, params)).toBe(params);
 		expect(() => assertPathParams(path, { id: "1" })).toThrow(
 			'Params for route path "/users/{id}/items/:item" are missing "item".',
 		);
+	});
+
+	it("uses attached request params only when every route param is a string", () => {
+		const pathParams = parsePathParams("/users/:id/items/:item");
+		const request = (params: unknown) =>
+			Object.assign(new Request("http://localhost/"), { params });
+		const attached = { id: "a b", item: "1" };
+		expect(readAttachedPathParams(pathParams, request(attached))).toBe(
+			attached,
+		);
+		expect(
+			readAttachedPathParams(pathParams, request({ id: "a b" })),
+		).toBeUndefined();
+		expect(
+			readAttachedPathParams(pathParams, new Request("http://localhost/")),
+		).toBeUndefined();
 	});
 });

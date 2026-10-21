@@ -62,8 +62,9 @@ lowercase base media type without parameters, so
 A request is rejected with `415` before validation when its `Content-Type` is
 not declared by the route, or when it has no `Content-Type` and the route
 declares several media types. Without a `Content-Type`, a route with one
-media type uses it. A client response without a content type or body decodes to
-`undefined`.
+media type uses it. Routes without a body schema ignore the request body and
+its `Content-Type`, and their handlers receive no `contentType`. A client
+response without a content type or body decodes to `undefined`.
 
 ## Default Codecs
 

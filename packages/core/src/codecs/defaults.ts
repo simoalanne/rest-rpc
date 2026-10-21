@@ -3,14 +3,17 @@ import { isAsyncIterable } from "./operations.ts";
 import { serializedBody } from "./serializedBody.ts";
 import type { BodyCodec } from "./types.ts";
 
+/** The built-in JSON serializer. Fetch handlers detect it to send `Response.json` instead. */
+export const serializeJson = (value: unknown) => {
+	const body = JSON.stringify(value);
+	if (body === undefined) throw new TypeError("Expected a JSON body");
+	return body;
+};
+
 /** Fetch-compatible built-in codecs, ordered from specific formats to binary fallback. */
 export const defaultBodyCodecs: readonly BodyCodec[] = [
 	bodyCodec(["application/json", /\+json$/], {
-		serialize: (value) => {
-			const body = JSON.stringify(value);
-			if (body === undefined) throw new TypeError("Expected a JSON body");
-			return body;
-		},
+		serialize: serializeJson,
 		deserialize: (source) => source.json(),
 	}),
 	bodyCodec("application/x-www-form-urlencoded", {

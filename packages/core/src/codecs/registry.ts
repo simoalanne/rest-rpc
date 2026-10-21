@@ -1,7 +1,12 @@
-import { defaultBodyCodecs } from "./defaults.ts";
+import { defaultBodyCodecs, serializeJson } from "./defaults.ts";
 import { normalizeMediaType } from "./operations.ts";
 import { isSerializedBody } from "./serializedBody.ts";
-import type { BodyCodec, BodyValue, SerializedBody } from "./types.ts";
+import type {
+	BodyCodec,
+	BodySerializer,
+	BodyValue,
+	SerializedBody,
+} from "./types.ts";
 
 /** Body operations looked up by media type from custom and default codecs. */
 export type BodyCodecRegistry = {
@@ -12,6 +17,8 @@ export type BodyCodecRegistry = {
 	) => BodyValue | SerializedBody | Promise<BodyValue | SerializedBody>;
 	/** Deserializes a source with the codec for a base media type. */
 	deserialize: (source: Request | Response, mediaType: string) => unknown;
+	/** Whether `contentType` is serialized by the built-in JSON serializer. */
+	serializesJson: (contentType: string) => boolean;
 };
 
 // Indexes one operation of every codec that has it. Strings are looked up
@@ -63,16 +70,33 @@ export function createBodyCodecRegistry(
 	const findSerializer = indexOperation(all, (codec) => codec.serialize);
 	const findDeserializer = indexOperation(all, (codec) => codec.deserialize);
 
-	// The default binary codec matches every media type, so lookups always
-	// find an operation.
+	// Serialized content types come from application code, so each one is
+	// resolved once. The default binary codec matches every media type, so
+	// lookups always find an operation.
+	const serializers = new Map<
+		string,
+		{ mediaType: string; serialize: BodySerializer }
+	>();
+	const resolveSerializer = (contentType: string) => {
+		let resolved = serializers.get(contentType);
+		if (!resolved) {
+			const mediaType = normalizeMediaType(contentType);
+			resolved = { mediaType, serialize: findSerializer(mediaType)! };
+			serializers.set(contentType, resolved);
+		}
+		return resolved;
+	};
+
 	return {
 		serialize: (value, contentType) => {
-			const mediaType = normalizeMediaType(contentType);
-			const result = findSerializer(mediaType)!(value, contentType);
+			const { mediaType, serialize } = resolveSerializer(contentType);
+			const result = serialize(value, contentType);
 			return result instanceof Promise
 				? result.then((resolved) => assertBaseMediaType(resolved, mediaType))
 				: assertBaseMediaType(result, mediaType);
 		},
 		deserialize: (source, mediaType) => findDeserializer(mediaType)!(source),
+		serializesJson: (contentType) =>
+			resolveSerializer(contentType).serialize === serializeJson,
 	};
 }
