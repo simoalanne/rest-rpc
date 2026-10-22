@@ -24,35 +24,6 @@ describe("initClient", () => {
 		);
 	});
 
-	it("returns declared error envelopes without treating them as transport failures", async () => {
-		const client = initClient(
-			route
-				.get("/users")
-				.response(type<{ message: string }>(), { status: 404 }),
-			{
-				baseUrl: "",
-				fetch: async () =>
-					Response.json({ message: "missing" }, { status: 404 }),
-			},
-		);
-		expect(await client()).toMatchObject({
-			status: 404,
-			body: { message: "missing" },
-		});
-	});
-
-	it("rejects undeclared statuses with the decoded response body", async () => {
-		const client = initClient(route.get().response(type<string>()), {
-			baseUrl: "",
-			fetch: async () => Response.json({ message: "missing" }, { status: 404 }),
-		});
-		await expect(client()).rejects.toMatchObject({
-			name: "HttpError",
-			status: 404,
-			body: { message: "missing" },
-		});
-	});
-
 	it("maps response bodies only when validation is enabled", async () => {
 		const contract = route.response(type((value: string) => value.length));
 		const options = { baseUrl: "", fetch: async () => Response.json("Ada") };
@@ -69,9 +40,8 @@ describe("initClient", () => {
 			fetch: async () =>
 				new Response("Ada", { headers: { "content-type": "text/plain" } }),
 		});
-		await expect(client()).rejects.toMatchObject({
-			name: "HttpError",
-			message: "Server returned an unsupported response content-type.",
-		});
+		await expect(client()).rejects.toThrow(
+			new Error("Response did not match the route contract."),
+		);
 	});
 });

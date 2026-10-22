@@ -1,17 +1,6 @@
+import type { RouteError } from "@rest-rpc/core";
 import type { RuntimeImplementation } from "../routing/match.ts";
-
-/** Rejects a request body whose media type cannot be selected. */
-export type RequestMediaTypeRejection = { status: 415; message: string };
-
-const unsupportedContentType: RequestMediaTypeRejection = {
-	status: 415,
-	message: "Unsupported request body content type.",
-};
-
-const requiredContentType: RequestMediaTypeRejection = {
-	status: 415,
-	message: "Request body content type is required.",
-};
+import { UnsupportedMediaType } from "./errors.ts";
 
 /**
  * Selects the declared body media type for a received base media type.
@@ -23,13 +12,15 @@ const requiredContentType: RequestMediaTypeRejection = {
 export function resolveRequestMediaType(
 	implementation: RuntimeImplementation,
 	receivedMediaType: string,
-): string | undefined | RequestMediaTypeRejection {
+): string | undefined | RouteError {
 	if (receivedMediaType) {
 		return receivedMediaType in (implementation.route.request?.body ?? {})
 			? receivedMediaType
-			: unsupportedContentType;
+			: new UnsupportedMediaType();
 	}
 	return implementation.requiresBodyContentType
-		? requiredContentType
+		? new UnsupportedMediaType({
+				message: "Request body content type is required.",
+			})
 		: implementation.defaultBodyMediaType;
 }

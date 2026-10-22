@@ -42,6 +42,20 @@ The optional third argument replaces what an HTTP request would otherwise provid
 | `signal`  | Passed to the handler. Defaults to a signal that never aborts.                         |
 | `context` | Initial [Context](/docs/context) values, set before middleware runs. Any subset works. |
 
+### Errors
+
+A local call rejects like a [Fetch client call](/docs/client/fetch-client#typesafe-error-handling),
+so [`safe()`](/docs/client/fetch-client#with-safe) works with it too:
+
+- A thrown error the route declares rejects with that error as declared, after
+  its `data` is validated.
+- A declared error whose `data` fails validation rejects with the
+  `INTERNAL_SERVER_ERROR` that would be sent.
+- A `RouteError` with a code the route does not declare, including
+  [built-in errors](/docs/http-behavior/errors#built-in-errors), rejects as
+  thrown.
+- Other errors thrown by the handler reject unchanged.
+
 ## Local Client
 
 When you want to call several routes or create a reusable client, `initLocalClient()` creates one that mirrors the route tree.

@@ -1,22 +1,20 @@
 import {
 	initClient,
-	type HttpError,
-	type InferClientError as InferDeclaredClientError,
+	type InferClientError,
 	type InferClientRequest,
-	type InferClientSuccess,
+	type InferClientResponse,
 } from "@rest-rpc/core";
 import type {
 	ApiClientOptions,
 	ClientHeaders,
+	ClientResponseBody,
 	FetchArgs,
 	FetchOptions,
-	SuccessfulResponseBody,
 } from "@rest-rpc/core/client";
 import {
 	mapContractRoutes,
 	type Contract,
 	type RouteDeclaration,
-	type RouteTree,
 } from "@rest-rpc/core/contract";
 import type {
 	DataTag,
@@ -43,27 +41,12 @@ type RouteRequestValue<
 	? never
 	: FetchArgs<RouteFor<E>, TGlobalHeaders>[0];
 
-type RouteDataFor<E extends QueryRoute> = InferClientSuccess<E>;
+type RouteDataFor<E extends QueryRoute> = InferClientResponse<E>;
 
 // The conditional keeps editors from displaying this alias instead of the resolved union.
 type RouteErrorFor<E extends QueryRoute> = E extends unknown
-	? InferDeclaredClientError<E> | HttpError | Error
+	? InferClientError<E> | Error
 	: never;
-
-/**
- * Infers the `error` of a route's generated query and mutation options.
- *
- * @remarks Includes the declared non-2xx responses, `HttpError`, and `Error`.
- * The `InferClientError` from `@rest-rpc/core` contains only the declared
- * non-2xx responses. Pass a route tree to infer a matching tree of types.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/client/tanstack-query#type-helpers}
- */
-export type InferClientError<T extends RouteTree> = T extends QueryRoute
-	? RouteErrorFor<T>
-	: {
-			[K in keyof T]: T[K] extends RouteTree ? InferClientError<T[K]> : never;
-		};
 
 type MutationVariablesFor<
 	E extends QueryRoute,
@@ -79,10 +62,10 @@ type InfiniteQueryDataFor<
 > = InfiniteData<RouteDataFor<E>, TPageParam>;
 
 type RouteStreamChunk<E extends QueryRoute> = [
-	SuccessfulResponseBody<RouteFor<E>>,
+	ClientResponseBody<RouteFor<E>>,
 ] extends [never]
 	? never
-	: SuccessfulResponseBody<RouteFor<E>> extends AsyncIterable<infer TChunk>
+	: ClientResponseBody<RouteFor<E>> extends AsyncIterable<infer TChunk>
 		? TChunk
 		: never;
 
@@ -331,9 +314,9 @@ type TanstackQueryBaseRouteValue<
 type TanstackQueryStreamRouteValue<
 	E extends QueryRoute,
 	TGlobalHeaders extends ClientHeaders,
-> = [SuccessfulResponseBody<RouteFor<E>>] extends [never]
+> = [ClientResponseBody<RouteFor<E>>] extends [never]
 	? Record<never, never>
-	: SuccessfulResponseBody<RouteFor<E>> extends AsyncIterable<unknown>
+	: ClientResponseBody<RouteFor<E>> extends AsyncIterable<unknown>
 		? {
 				streamedQueryOptions: {
 					// Default accumulation fixes the cache data to the route's event array.
@@ -397,27 +380,6 @@ export type CreateTanstackQueryUtilsOptions<
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > = ApiClientOptions<TGlobalHeaders>;
 
-const fetchSuccessfulResponse = async (
-	fetchResponse: (...args: unknown[]) => Promise<unknown>,
-	request: unknown,
-	options?: FetchOptions,
-) => {
-	let response: { status: number; headers?: Headers; body?: unknown };
-	try {
-		response = (await fetchResponse(request, options)) as typeof response;
-	} catch (error) {
-		throw error instanceof Error
-			? error
-			: new Error("API request failed", { cause: error });
-	}
-
-	if (response.status < 200 || response.status >= 300) {
-		throw response;
-	}
-
-	return response;
-};
-
 /**
  * Creates a TanStack Query util tree that mirrors a contract.
  *
@@ -442,8 +404,7 @@ export function createTanstackQueryUtils<
 		) as (...args: unknown[]) => Promise<unknown>;
 		return createTanstackUtilsForRoute({
 			routePath: path,
-			fetchData: (request, fetchOptions) =>
-				fetchSuccessfulResponse(routeFetchFn, request, fetchOptions),
+			fetchData: (request, fetchOptions) => routeFetchFn(request, fetchOptions),
 		});
 	}) as TanstackQueryUtilsFor<TContract, TGlobalHeaders>;
 }

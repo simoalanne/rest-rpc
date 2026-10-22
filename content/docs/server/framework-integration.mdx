@@ -33,13 +33,13 @@ such as Express and Fastify. Both export the same functions.
 
 There are two ways to integrate, compared here with `createApp`:
 
-|                    | `createApp`   | Catch-all handler                         | Native router                                   |
-| ------------------ | ------------- | ----------------------------------------- | ----------------------------------------------- |
-| Server             | rest-rpc only | Your framework                            | Your framework                                  |
-| Routing            | rest-rpc      | rest-rpc, under one framework route       | The framework, one framework route per route    |
-| Framework features | None          | Per mount, such as middleware on `/api/*` | Per route, such as middleware on a single route |
-| Unmatched requests | `notFound`    | Passed back to the framework              | Never reach rest-rpc                            |
-| Errors             | `onError`     | The framework's error handling            | The framework's error handling                  |
+|                    | `createApp`             | Catch-all handler                         | Native router                                   |
+| ------------------ | ----------------------- | ----------------------------------------- | ----------------------------------------------- |
+| Server             | rest-rpc only           | Your framework                            | Your framework                                  |
+| Routing            | rest-rpc                | rest-rpc, under one framework route       | The framework, one framework route per route    |
+| Framework features | None                    | Per mount, such as middleware on `/api/*` | Per route, such as middleware on a single route |
+| Unmatched requests | `notFound`              | Passed back to the framework              | Never reach rest-rpc                            |
+| Unhandled errors   | `INTERNAL_SERVER_ERROR` | The framework's error handling            | The framework's error handling                  |
 
 Use the [catch-all handler](#catch-all-handler) to mount all routes at once,
 and the [native router](#native-router) when the framework should see each
@@ -208,9 +208,10 @@ type HandleOptions = {
 
 ## Error Handling
 
-Validation errors are answered with the
-[default validation error responses](/docs/http-behavior/errors), or with the
-error handlers from the [compile options](/docs/server/fetch#error-handling).
-Other errors thrown by handlers or middleware reject the promise returned by
-`handle` or the catch-all handler, so pass them to the framework's error
-handling, as the Express examples do with `next`.
+[Declared and built-in errors](/docs/http-behavior/errors) are sent as error
+responses, and observed with `onError` from the
+[compile options](/docs/server/fetch#error-handling). Other errors thrown by
+handlers or middleware, including errors with a code the route does not
+declare, reject the promise returned by `handle` or the catch-all handler, so
+pass them to the framework's error handling, as the Express examples do with
+`next`.

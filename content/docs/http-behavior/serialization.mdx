@@ -192,4 +192,7 @@ Fetch `Request`. Both share the Fetch body methods, such as `json()` and
 `arrayBuffer()`. A codec used only on one side can treat `source` as that type
 when it needs an API only one of them has.
 
-On the server, an error thrown while deserializing responds with `400`.
+On the server, an error thrown while deserializing responds with the
+`MALFORMED_REQUEST_BODY` [error](/docs/http-behavior/errors#built-in-errors)
+and status 400. On the client, a body that cannot be decoded rejects with an
+[`Error`](/docs/client/fetch-client#typesafe-error-handling).

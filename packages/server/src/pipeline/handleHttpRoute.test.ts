@@ -1,4 +1,4 @@
-import { type } from "@rest-rpc/core";
+import { routeError, type } from "@rest-rpc/core";
 import {
 	handleHttpRoute,
 	normalizeImplicitResponse,
@@ -9,7 +9,6 @@ import {
 	type RuntimeImplementationTree,
 } from "../routing/match.ts";
 import { route } from "../builder/routeBuilder.ts";
-import { RequestValidationError, ResponseValidationError } from "./errors.ts";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 
 const rejected: StandardSchemaV1<unknown, Record<string, string>> = {
@@ -53,12 +52,29 @@ describe("handleHttpRoute", () => {
 		expect(contexts[0]).not.toBe(contexts[1]);
 	});
 
-	it("returns request validation errors without invoking the handler", async () => {
+	it("passes the declared error classes to middleware and the handler", async () => {
+		const Gone = routeError("GONE", { status: 410 });
+		const implementation = route
+			.get("/")
+			.error(Gone)
+			.use(({ errors, next }) => {
+				expect(errors.GONE).toBe(Gone);
+				return next();
+			})
+			.handler(({ errors }): string => {
+				throw new errors.GONE();
+			});
+		await expect(async () => execute(implementation)).rejects.toBeInstanceOf(
+			Gone,
+		);
+	});
+
+	it("rejects invalid requests without invoking the handler", async () => {
 		const handler = vi.fn(() => "ok");
 		const implementation = route.post("/").body(rejected).handler(handler);
-		expect(await execute(implementation)).toBeInstanceOf(
-			RequestValidationError,
-		);
+		await expect(async () => execute(implementation)).rejects.toMatchObject({
+			code: "REQUEST_VALIDATION_FAILED",
+		});
 		expect(handler).not.toHaveBeenCalled();
 	});
 
@@ -96,7 +112,7 @@ describe("handleHttpRoute", () => {
 	});
 
 	it.each(["body", "headers"] as const)(
-		"returns declared %s validation failures",
+		"rejects declared %s validation failures",
 		async (location) => {
 			const implementation = route
 				.get("/")
@@ -105,9 +121,10 @@ describe("handleHttpRoute", () => {
 					location === "headers" ? { headers: rejected } : {},
 				)
 				.handler(() => ({ status: 200, body: "ok", headers: {} }));
-			const result = await execute(implementation);
-			expect(result).toBeInstanceOf(ResponseValidationError);
-			expect(result).toMatchObject({ location });
+			await expect(async () => execute(implementation)).rejects.toMatchObject({
+				code: "INTERNAL_SERVER_ERROR",
+				cause: { location },
+			});
 		},
 	);
 
@@ -157,6 +174,29 @@ describe("handleHttpRoute", () => {
 		for await (const frame of result.body!.value as AsyncIterable<string>)
 			frames.push(frame);
 		expect(frames).toEqual(["id: one\ndata: 1\n\n"]);
+	});
+
+	it("reports route errors that end a started stream", async () => {
+		async function* values() {
+			yield "bad";
+		}
+		const onStreamError = vi.fn();
+		const result = await handleHttpRoute(
+			flattenRouteImplementations(
+				route
+					.get("/")
+					.streamResponse(rejected)
+					.handler(() => ({ status: 200, body: values() })),
+			)[0]!,
+			{ request: {}, signal, onStreamError },
+		);
+		const frames = result.body!.value as AsyncIterable<string>;
+		await expect(async () => {
+			for await (const _ of frames);
+		}).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
+		expect(onStreamError).toHaveBeenCalledWith(
+			expect.objectContaining({ code: "INTERNAL_SERVER_ERROR" }),
+		);
 	});
 
 	it("dispatches declared envelopes and plain bodies through response validation", async () => {
@@ -312,8 +352,8 @@ describe("normalizeImplicitResponse", () => {
 		});
 	});
 
-	it.each([100, 200, 599])(
-		"accepts integer HTTP status %s and preserves headers",
+	it.each([200, 299])(
+		"accepts the 2xx status %s and preserves headers",
 		(status) => {
 			expect(
 				normalizeImplicitResponse({
@@ -341,11 +381,11 @@ describe("normalizeImplicitResponse", () => {
 		});
 	});
 
-	it.each([99, 600, 200.5, NaN, Infinity])(
-		"rejects invalid inferred status %s",
+	it.each([199, 300, 404, 200.5, NaN, Infinity])(
+		"rejects the inferred status %s outside 2xx",
 		(status) => {
 			expect(() => normalizeImplicitResponse({ status })).toThrow(
-				"Invalid inferred HTTP response status",
+				"must be from 200 to 299",
 			);
 		},
 	);

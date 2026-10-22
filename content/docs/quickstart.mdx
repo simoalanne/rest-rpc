@@ -7,8 +7,8 @@ description: Define HTTP routes with handlers and call them through a typed clie
 with sensible defaults, and a typed client to call the routes.
 
 This guide uses Bun and Zod to build two routes: a minimal create operation
-and a GET with path params, query input, and success/error responses.
-Their response types are inferred from the handlers.
+and a GET with path params, query input, and a declared error. Their response
+types are inferred from the handlers.
 
 Same code runs on other fetch-native runtimes such as Deno and Cloudflare Workers.
 See the [Fetch Runtime](/docs/server/fetch) for details, [Node HTTP](/docs/server/node) for `node:http`,
@@ -45,11 +45,10 @@ const get = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
 	.query(z.object({ uppercase: z.enum(["yes", "no"]).optional() }))
-	.handler(({ params, query }) => {
+	.error("TODO_NOT_FOUND", { status: 404 })
+	.handler(({ params, query, errors }) => {
 		const todo = todos.get(params.id);
-		if (!todo) {
-			return { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
-		}
+		if (!todo) throw new errors.TODO_NOT_FOUND();
 		return {
 			...todo,
 			title: query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title,
@@ -61,7 +60,8 @@ export const routes = { todos: { create, get } };
 
 `todos.create` uses `POST /todos/create`, reads a JSON body, and returns the
 todo as a 200 response. `todos.get` uses `GET /todos/:id?uppercase=yes` and
-returns either the todo with status 200 or a 404 envelope.
+returns the todo with status 200, or responds with the `TODO_NOT_FOUND` error
+and status 404.
 
 The request schemas validate inputs, and the handler's return value determines
 the client's result type.
@@ -100,23 +100,31 @@ bundler setups.
 ## Call the Routes
 
 ```ts client.ts
-import { initClient } from "@rest-rpc/core";
+import { initClient, isDeclaredError, safe } from "@rest-rpc/core";
 import { getApi } from "./client-contract" with { type: "macro" };
 
 const client = initClient(getApi(), { baseUrl: "http://localhost:3000" });
 
 const created = await client.todos.create({ body: { title: "Write docs" } });
-const response = await client.todos.get({
-	params: { id: created.body.id },
-	query: { uppercase: "yes" },
-});
+const result = await safe(
+	client.todos.get({
+		params: { id: created.body.id },
+		query: { uppercase: "yes" },
+	}),
+);
 
-if (response.status === 200) {
-	console.log(response.body.title);
-} else {
-	console.log(response.body.code); // "TODO_NOT_FOUND"
+if (!result.error) {
+	console.log(result.data.body.title);
+} else if (
+	isDeclaredError(result.error) &&
+	result.error.code === "TODO_NOT_FOUND"
+) {
+	console.log(result.error.message);
 }
 ```
+
+Calls reject with errors, and `safe()` returns them as values instead. See
+[Handle Errors](/docs/client/fetch-client#typesafe-error-handling).
 
 The calls are typed functions, while the requests still use the methods, URLs,
 query parameters, and statuses you defined. Other HTTP clients can call the same
@@ -124,7 +132,7 @@ endpoints.
 
 ## Next Steps
 
-- [Route Builder](/docs/route-builder) covers declared responses, media types, streams, and metadata.
+- [Route Builder](/docs/route-builder) covers declared responses, errors, media types, streams, and metadata.
 - [Fetch Client](/docs/client/fetch-client) covers client behavior and options.
 - [TanStack Query](/docs/client/tanstack-query) adds query and mutation utils.
 - [Contract-first Quickstart](/docs/contract-first-quickstart) builds the same API from a separately shared contract.

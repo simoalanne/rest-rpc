@@ -1,5 +1,5 @@
 import type {
-	ResponseDeclaration,
+	ResponseHeadersSchema,
 	RouteDeclaration,
 } from "@rest-rpc/core/contract";
 import {
@@ -9,7 +9,11 @@ import {
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import { allMaybePromise, mapMaybePromise } from "./maybePromise.ts";
 import { isSseServerEvent, sse } from "./sse.ts";
-import { ResponseValidationError, RequestValidationError } from "./errors.ts";
+import {
+	RequestValidationFailed,
+	responseValidationFailed,
+	type ResponseValidationLocation,
+} from "./errors.ts";
 
 /**
  * Decoded request segments passed into server request validation.
@@ -138,7 +142,7 @@ const toValidatedRequest = ([
 		params.errors.length > 0 ||
 		headers.errors.length > 0
 	) {
-		throw new RequestValidationError({
+		throw new RequestValidationFailed({
 			body: body.errors,
 			query: query.errors,
 			params: params.errors,
@@ -196,20 +200,20 @@ export function validateRequestSegments(
 export const validateResponseValue = (
 	schema: StandardSchemaV1 | undefined,
 	value: unknown,
-	location: "body" | "stream",
+	location: Exclude<ResponseValidationLocation, "headers">,
 ): MaybePromise<unknown> => {
 	if (!schema) return value;
 
 	return mapMaybePromise(validateStandardSchema(schema, value), (result) => {
 		if (result.issues) {
-			throw new ResponseValidationError(location, result.issues);
+			throw responseValidationFailed(location, result.issues);
 		}
 		return result.value;
 	});
 };
 
 export const validateResponseHeaders = (
-	schema: ResponseDeclaration | undefined,
+	schema: { headers?: ResponseHeadersSchema } | undefined,
 	headers: Record<string, unknown> | undefined,
 ): MaybePromise<Record<string, unknown> | undefined> => {
 	if (!schema) return undefined;
@@ -221,7 +225,7 @@ export const validateResponseHeaders = (
 		validateStandardSchema(declaredHeaders, headers ?? {}),
 		(result) => {
 			if (result.issues) {
-				throw new ResponseValidationError("headers", result.issues);
+				throw responseValidationFailed("headers", result.issues);
 			}
 			return result.value;
 		},

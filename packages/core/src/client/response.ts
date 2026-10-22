@@ -1,26 +1,33 @@
-import { HttpError } from "./httpError.ts";
 import { normalizeMediaType, type BodyCodecRegistry } from "../codecs/index.ts";
 import type { RouteDeclaration, RouteTree } from "../contract/contract.ts";
 import type { SseEvent } from "../contract/sse.ts";
 import type {
+	ClientRouteError,
 	ResponseDeclaration,
 	DeclaredClientResponse,
-	ErrorDeclaredClientResponse,
-	SuccessfulDeclaredClientResponse,
 } from "../contract/response.ts";
+import {
+	markDeclared,
+	RouteError,
+	type RouteErrorDeclaration,
+} from "../contract/routeError.ts";
 import {
 	validateStandardSchema,
 	type StandardSchemaV1,
 } from "../standard-schema/index.ts";
 import { parseSseStream } from "./stream.ts";
-import { validateResponseValue } from "./validateResponse.ts";
+import {
+	contractError,
+	contractMismatch,
+	validateResponseValue,
+} from "./validateResponse.ts";
 import type { FetchArgs } from "./request.ts";
 
 /**
  * Infers a route's client result.
  *
- * @remarks Every route produces status-discriminated envelopes. Pass a route
- * tree to infer a matching tree of results.
+ * @remarks Every route resolves with status-discriminated envelopes of its
+ * successful responses. Pass a route tree to infer a matching tree of results.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#call-routes}
@@ -36,34 +43,19 @@ export type InferClientResponse<T extends RouteTree> = T extends {
 		};
 
 /**
- * Infers the successful result of a route's client call.
+ * Infers the `RouteError`s a route declares, which its client call rejects
+ * with.
  *
- * @remarks Includes the envelopes of 2xx responses. Pass a route tree to
- * infer a matching tree of results.
+ * @remarks Calls also reject with other `Error`s, such as when no response
+ * arrived or it does not match the route contract. Pass a route tree to infer
+ * a matching tree of types.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
- */
-export type InferClientSuccess<T extends RouteTree> = T extends {
-	readonly "~restrpc": infer TRoute extends RouteDeclaration;
-}
-	? SuccessfulDeclaredClientResponse<TRoute>
-	: {
-			[K in keyof T]: T[K] extends RouteTree ? InferClientSuccess<T[K]> : never;
-		};
-
-/**
- * Infers the declared error responses a route's client call can return.
- *
- * @remarks Includes the envelopes of declared non-2xx responses. Thrown
- * `HttpError` and `Error` values are not included.
- * Pass a route tree to infer a matching tree of types.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#typesafe-error-handling}
  */
 export type InferClientError<T extends RouteTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
-	? ErrorDeclaredClientResponse<TRoute>
+	? ClientRouteError<TRoute>
 	: {
 			[K in keyof T]: T[K] extends RouteTree ? InferClientError<T[K]> : never;
 		};
@@ -71,9 +63,9 @@ export type InferClientError<T extends RouteTree> = T extends {
 /**
  * Infers the `data` of each event received from a streaming route.
  *
- * @remarks Unwraps the `SseEvent` values of successful stream responses.
- * Routes without a stream response infer `never`. Pass a route tree to infer
- * a matching tree of event data types.
+ * @remarks Unwraps the `SseEvent` values of stream responses. Routes without
+ * a stream response infer `never`. Pass a route tree to infer a matching tree
+ * of event data types.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#consume-streams}
@@ -89,62 +81,129 @@ export type InferClientStreamData<T extends RouteTree> = T extends {
 		};
 
 type ClientStreamDataForDeclaration<E extends RouteDeclaration> =
-	SuccessfulDeclaredClientResponse<E> extends infer TResponse
+	DeclaredClientResponse<E> extends infer TResponse
 		? TResponse extends { body: AsyncIterable<SseEvent<infer TData>> }
 			? TData
 			: never
 		: never;
 
-const assertResponseContentType = (
-	declared: ResponseDeclaration["content"],
-	mediaType: string,
-	rawResponse: Response,
-	body: unknown,
-) => {
-	if (!mediaType || declared === undefined) return;
-	if (!(mediaType in declared)) {
-		throw new HttpError(rawResponse.status, body, {
-			cause: new Error("Server returned an unsupported response content-type."),
-		});
-	}
-};
-
 const STREAM_CONTENT_TYPE = "text/event-stream";
 
-const readStreamResponse = (
-	schema: StandardSchemaV1 | undefined,
-	rawResponse: Response,
-	validate: boolean,
-) => {
-	if (rawResponse.body === null) {
-		throw new Error("Server returned no stream body");
-	}
-	return parseSseStream(schema, rawResponse.body, validate, rawResponse.status);
-};
-
 const readHeaders = async (
-	schema: ResponseDeclaration | undefined,
+	schema: ResponseDeclaration | RouteErrorDeclaration | undefined,
 	rawResponse: Response,
 	validate: boolean,
-	body: unknown,
 ) => {
 	const headers = Object.fromEntries(rawResponse.headers.entries());
 	if (!schema?.headers || !validate) return headers;
 
 	const result = await validateStandardSchema(schema.headers, headers);
-	if (result.issues)
-		throw new HttpError(rawResponse.status, body, { cause: result.issues });
+	if (result.issues) {
+		throw contractError(contractMismatch, result.issues);
+	}
 	// Keep headers the schema does not declare.
 	return { ...headers, ...result.value };
 };
 
+// Failures of reading the body stay transport failures, while bodies that
+// cannot be decoded are part of the response. Reads are tracked instead of
+// buffering the body, so codecs can still stream it.
 const readBody = async (
 	rawResponse: Response,
 	mediaType: string,
 	codecs: BodyCodecRegistry,
 ) => {
 	if (!mediaType || rawResponse.body === null) return undefined;
-	return codecs.deserialize(rawResponse, mediaType);
+	const reader = rawResponse.body.getReader();
+	let readFailure: { error: unknown } | undefined;
+	const body = new ReadableStream<Uint8Array>({
+		pull: async (controller) => {
+			const chunk = await reader.read().catch((error: unknown) => {
+				readFailure = { error };
+				throw error;
+			});
+			if (chunk.done) controller.close();
+			else controller.enqueue(chunk.value);
+		},
+		cancel: (reason) => reader.cancel(reason),
+	});
+	const { status, statusText, headers } = rawResponse;
+	try {
+		return await codecs.deserialize(
+			new Response(body, { status, statusText, headers }),
+			mediaType,
+		);
+	} catch (cause) {
+		if (readFailure) throw readFailure.error;
+		throw contractError("Response body could not be decoded.", cause);
+	}
+};
+
+const readValidated = async (
+	schema: StandardSchemaV1 | undefined,
+	value: unknown,
+	validate: boolean,
+) => {
+	const result = await validateResponseValue(schema, value, validate);
+	if (result.issues) {
+		throw contractError(contractMismatch, result.issues);
+	}
+	return result.value;
+};
+
+const readCode = (body: unknown) =>
+	typeof body === "object" &&
+	body !== null &&
+	"code" in body &&
+	typeof body.code === "string"
+		? body.code
+		: undefined;
+
+/**
+ * Reads a non-2xx response into a `RouteError` when its body has a `code`.
+ * A code the route declares is marked as declared after its status, `data` and
+ * headers are checked; one that breaks the declaration becomes an `Error`, like
+ * bodies without a code.
+ */
+const readErrorResponse = async (
+	rawResponse: Response,
+	mediaType: string,
+	route: RouteDeclaration,
+	validate: boolean,
+	codecs: BodyCodecRegistry,
+): Promise<Error> => {
+	const { status } = rawResponse;
+	const body = await readBody(rawResponse, mediaType, codecs);
+	const code = readCode(body);
+	if (code === undefined) {
+		return new Error(`Request failed with status ${status}.`);
+	}
+
+	const { message, data } = body as { message?: unknown; data?: unknown };
+	const options = {
+		status,
+		message: typeof message === "string" ? message : code,
+	};
+	const declaration =
+		route.errors && Object.hasOwn(route.errors, code)
+			? route.errors[code]
+			: undefined;
+	if (!declaration) {
+		return new RouteError(code, {
+			...options,
+			data,
+			headers: Object.fromEntries(rawResponse.headers.entries()),
+		});
+	}
+	if (declaration.status !== status) return contractError(contractMismatch);
+
+	const [validatedData, headers] = await Promise.all([
+		readValidated(declaration.data, data, validate),
+		readHeaders(declaration, rawResponse, validate),
+	]);
+	return markDeclared(
+		new RouteError(code, { ...options, data: validatedData, headers }),
+	);
 };
 
 export type RouteRequestFn = <E extends RouteDeclaration & { path: string }>(
@@ -153,13 +212,16 @@ export type RouteRequestFn = <E extends RouteDeclaration & { path: string }>(
 ) => Promise<Response>;
 
 /**
- * Reads a fetch response into a status envelope.
+ * Reads a fetch response into a status envelope, or rejects with a
+ * `RouteError` for error responses with a `code`, and an `Error` for other
+ * responses outside the route contract.
  *
- * @remarks `text/event-stream` responses are always parsed as SSE streams.
- * Routes without response declarations, such as extracted contracts, return
- * every status as an envelope. Routes with declarations reject undeclared
- * statuses and undeclared media types. `contentType` is the received base
- * media type, or `undefined` without a content type.
+ * @remarks `text/event-stream` responses are parsed as SSE streams. Routes
+ * without response declarations, such as routes with inferred responses,
+ * accept every 2xx status. Routes with declarations, including extracted
+ * ones, reject undeclared statuses and undeclared media types, streams
+ * included. `contentType` is the received base media type, or `undefined`
+ * without a content type.
  */
 export const fetchResponse = async <
 	E extends RouteDeclaration & { path: string },
@@ -172,47 +234,66 @@ export const fetchResponse = async <
 ) => {
 	const rawResponse = await request(route, ...args);
 	const { status } = rawResponse;
-	const schema: ResponseDeclaration | undefined = route.responses?.[status];
 	const mediaType = normalizeMediaType(rawResponse.headers.get("content-type"));
 	const contentType = mediaType || undefined;
 
-	if (mediaType === STREAM_CONTENT_TYPE) {
-		const body = readStreamResponse(
-			schema?.content?.[STREAM_CONTENT_TYPE],
+	if (!rawResponse.ok) {
+		throw await readErrorResponse(
 			rawResponse,
+			mediaType,
+			route,
+			validateResponse,
+			codecs,
+		);
+	}
+
+	const schema: ResponseDeclaration | undefined = route.responses?.[status];
+	const declaresResponses = Object.keys(route.responses ?? {}).length > 0;
+	const breaksContract =
+		(!schema && declaresResponses) ||
+		(mediaType && schema?.content && !(mediaType in schema.content));
+	if (mediaType === STREAM_CONTENT_TYPE) {
+		// A stream may never end, so it is cancelled instead of read.
+		if (breaksContract) {
+			rawResponse.body?.cancel().catch(() => {});
+			throw contractError(contractMismatch);
+		}
+		if (rawResponse.body === null) {
+			throw contractError("Server returned no stream body.");
+		}
+		const body = parseSseStream(
+			schema?.content?.[STREAM_CONTENT_TYPE],
+			rawResponse as Response & {
+				body: ReadableStream<Uint8Array<ArrayBuffer>>;
+			},
 			validateResponse,
 		);
 		return {
 			status,
 			contentType,
-			headers: await readHeaders(schema, rawResponse, validateResponse, body),
+			headers: await readHeaders(schema, rawResponse, validateResponse),
 			body,
 		};
 	}
 
 	const value = await readBody(rawResponse, mediaType, codecs);
-	const declaresResponses = Object.keys(route.responses ?? {}).length > 0;
-	if (!schema && declaresResponses) {
-		throw new HttpError(status, value);
-	}
-	if (schema) {
-		assertResponseContentType(schema.content, mediaType, rawResponse, value);
+	if (breaksContract) {
+		throw contractError(contractMismatch);
 	}
 	return {
 		status,
 		contentType,
-		headers: await readHeaders(schema, rawResponse, validateResponse, value),
-		body: await validateResponseValue(
+		headers: await readHeaders(schema, rawResponse, validateResponse),
+		body: await readValidated(
 			schema?.content?.[mediaType],
 			value,
 			validateResponse,
-			status,
 		),
 	};
 };
 
-export type SuccessfulResponseBody<TRoute extends RouteDeclaration> =
-	SuccessfulDeclaredClientResponse<TRoute> extends infer TResponse
+export type ClientResponseBody<TRoute extends RouteDeclaration> =
+	DeclaredClientResponse<TRoute> extends infer TResponse
 		? TResponse extends { body: infer TBody }
 			? TBody
 			: never

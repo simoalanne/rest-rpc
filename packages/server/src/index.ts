@@ -7,10 +7,12 @@ export type {
 } from "./builder/routeBuilder.types.ts";
 export type { Context, DefaultContext } from "./builder/context.ts";
 export {
-	RequestValidationError,
-	ResponseValidationError,
+	InternalServerError,
+	MalformedRequestBody,
+	NotFound,
+	RequestValidationFailed,
+	UnsupportedMediaType,
 	type RequestValidationIssues,
-	type ResponseValidationLocation,
 	type ValidationIssue,
 } from "./pipeline/errors.ts";
 export { sse, type SseServerEvent } from "./pipeline/sse.ts";
@@ -20,8 +22,6 @@ export {
 	type CompileRoutesOptions,
 	type FetchRoute,
 	type FetchRouteHandlerResult,
-	type RequestValidationErrorHandler,
-	type ResponseValidationErrorHandler,
 } from "./pipeline/compileRoutes.ts";
 export {
 	createApp,
@@ -41,6 +41,10 @@ export {
 export {
 	bodyCodec,
 	createOpenApiDocument,
+	isDeclaredError,
+	RouteError,
+	routeError,
+	safe,
 	serializedBody,
 	type,
 } from "@rest-rpc/core";
@@ -48,10 +52,15 @@ export type {
 	BodyCodec,
 	BodyCodecOperations,
 	BodyValue,
+	ClientPromise,
+	InferClientError,
+	SafeResult,
 	SerializedBody,
 	CreateOpenApiDocumentOptions,
 	InferClientRequest,
 	InferClientResponse,
 	OpenApiDocument,
+	RouteErrorDefinitionOptions,
+	RouteErrorOptions,
 	SseEvent,
 } from "@rest-rpc/core";

@@ -1,18 +1,15 @@
 import type { BodyCodecRegistry } from "@rest-rpc/core/codecs";
+import type { RouteError } from "@rest-rpc/core";
 import type { MaybePromise } from "@rest-rpc/core/utils";
+import { MalformedRequestBody } from "./errors.ts";
 
 type DeserializedRequestBody =
 	| { body: unknown; rejection: undefined }
-	| { body: undefined; rejection: { status: 400; message: string } };
+	| { body: undefined; rejection: RouteError };
 
 const noBody: DeserializedRequestBody = {
 	body: undefined,
 	rejection: undefined,
-};
-
-const invalidBody: DeserializedRequestBody = {
-	body: undefined,
-	rejection: { status: 400, message: "Invalid request body" },
 };
 
 const toDeserialized = (body: unknown): DeserializedRequestBody => ({
@@ -20,7 +17,10 @@ const toDeserialized = (body: unknown): DeserializedRequestBody => ({
 	rejection: undefined,
 });
 
-const toInvalidBody = () => invalidBody;
+const toInvalidBody = (): DeserializedRequestBody => ({
+	body: undefined,
+	rejection: new MalformedRequestBody(),
+});
 
 /**
  * Deserializes a request body with the codec for its received base media
@@ -41,6 +41,6 @@ export function deserializeRequestBody(
 			? body.then(toDeserialized, toInvalidBody)
 			: toDeserialized(body);
 	} catch {
-		return invalidBody;
+		return toInvalidBody();
 	}
 }

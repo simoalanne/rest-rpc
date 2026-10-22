@@ -4,6 +4,7 @@ import type {
 	RequestParamsSchema,
 } from "./request.ts";
 import type { RouteResponses } from "./response.ts";
+import type { RouteErrorDeclaration } from "./routeError.ts";
 
 /** An HTTP method supported by a rest-rpc route. */
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
@@ -39,6 +40,11 @@ export type RouteRequestDeclaration = {
 	headers?: readonly RequestHeadersSchema[];
 };
 
+/** Error declarations keyed by error code. */
+export type RouteErrors = {
+	readonly [code: string]: RouteErrorDeclaration;
+};
+
 /**
  * The contract information retained for one declared route.
  *
@@ -55,6 +61,7 @@ export type RouteDeclaration = {
 	method: HttpMethod;
 	request?: RouteRequestDeclaration;
 	responses: RouteResponses;
+	errors?: RouteErrors;
 	metadata?: RouteMetadata;
 	openApi?: OpenApiRouteOptions;
 };

@@ -12,7 +12,7 @@ const routes = {
 			.params(type<{ id: string }>())
 			.metadata({ auth: "required" })
 			.response(user)
-			.response(type<{ code: "NOT_FOUND" }>(), { status: 404 }),
+			.error("USER_NOT_FOUND", { status: 404, data: type<{ id: string }>() }),
 		create: route
 			.body({ "application/json": user, "text/plain": type<string>() })
 			.openAPI({ summary: "Create user" })
@@ -21,17 +21,32 @@ const routes = {
 };
 
 describe("extractContract", () => {
-	it("keeps only methods, resolved paths, and request body media types", () => {
+	it("keeps only methods, resolved paths, request body media types, response statuses and media types, and error statuses", () => {
 		expect(extractContract(routes)).toEqual({
 			users: {
-				get: { "~restrpc": { method: "GET", path: "/users/:id" } },
+				get: {
+					"~restrpc": {
+						method: "GET",
+						path: "/users/:id",
+						responses: { 200: { content: { "application/json": null } } },
+						errors: { USER_NOT_FOUND: { status: 404 } },
+					},
+				},
 				create: {
 					"~restrpc": {
 						method: "POST",
 						path: "/users/create",
 						request: { body: { "application/json": [], "text/plain": [] } },
+						responses: { 201: { content: { "application/json": null } } },
 					},
 				},
+			},
+		});
+		expect(
+			extractContract({ remove: route.delete("/").response({ status: 204 }) }),
+		).toEqual({
+			remove: {
+				"~restrpc": { method: "DELETE", path: "/", responses: { 204: {} } },
 			},
 		});
 	});
@@ -46,11 +61,11 @@ describe("extractContract", () => {
 		});
 	});
 
-	it("creates a client that returns every status as an envelope", async () => {
+	it("creates a client that recognizes declared error codes", async () => {
 		const fetch = vi.fn(async () =>
 			Response.json(
-				{ message: "unavailable" },
-				{ status: 503, headers: { "x-trace": "abc" } },
+				{ code: "USER_NOT_FOUND", message: "Missing", data: { id: "1" } },
+				{ status: 404 },
 			),
 		);
 		const client = initClient(extractContract(routes), {
@@ -59,14 +74,41 @@ describe("extractContract", () => {
 		});
 		await expect(
 			client.users.get({ params: { id: "1" } }),
-		).resolves.toMatchObject({
-			status: 503,
-			body: { message: "unavailable" },
-			headers: { "x-trace": "abc" },
+		).rejects.toMatchObject({
+			code: "USER_NOT_FOUND",
+			status: 404,
+			data: { id: "1" },
 		});
 		expect(fetch).toHaveBeenCalledWith(
 			"https://example.test/users/1",
 			expect.objectContaining({ method: "GET" }),
+		);
+	});
+
+	it("creates a client that checks response statuses and media types without schemas", async () => {
+		const respond = vi.fn(async () => Response.json({ name: 1 }));
+		const client = initClient(extractContract(routes), {
+			baseUrl: "https://example.test",
+			fetch: respond,
+			validateResponses: true,
+		});
+		await expect(
+			client.users.get({ params: { id: "1" } }),
+		).resolves.toMatchObject({ status: 200, body: { name: 1 } });
+
+		respond.mockImplementation(async () =>
+			Response.json({ name: "Ada" }, { status: 202 }),
+		);
+		await expect(client.users.get({ params: { id: "1" } })).rejects.toThrow(
+			"Response did not match the route contract.",
+		);
+
+		respond.mockImplementation(
+			async () =>
+				new Response("Ada", { headers: { "content-type": "text/plain" } }),
+		);
+		await expect(client.users.get({ params: { id: "1" } })).rejects.toThrow(
+			"Response did not match the route contract.",
 		);
 	});
 

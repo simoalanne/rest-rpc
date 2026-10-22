@@ -13,14 +13,18 @@ import {
 	fetchResponse as fetchRouteResponse,
 	type RouteRequestFn,
 } from "./response.ts";
-import type { DeclaredClientResponse } from "../contract/response.ts";
+import type {
+	ClientRouteError,
+	DeclaredClientResponse,
+} from "../contract/response.ts";
+import type { ClientPromise } from "./safe.ts";
 
 export type FetchResponseFn<
 	E extends RouteDeclaration,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > = (
 	...args: FetchArgs<E, TGlobalHeaders>
-) => Promise<DeclaredClientResponse<E>>;
+) => ClientPromise<DeclaredClientResponse<E>, ClientRouteError<E> | Error>;
 
 /**
  * Infers the callable client operation for one declared route.

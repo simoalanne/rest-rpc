@@ -4,8 +4,8 @@ import type { BodyContent } from "../contract/body.ts";
 import { route } from "../contract/routeBuilder.ts";
 import { type } from "../standard-schema/type.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
+import { routeError, RouteError } from "../contract/routeError.ts";
 import { fetchResponse } from "./response.ts";
-import { HttpError } from "./httpError.ts";
 
 const invalid: StandardSchemaV1<unknown, Record<string, string>> = {
 	"~standard": {
@@ -22,6 +22,14 @@ const declared = route
 const codecs = createBodyCodecRegistry([]);
 const decode = (response: Response, validate = true, declaration = declared) =>
 	fetchResponse(async () => response, validate, codecs, declaration);
+// Responses outside the contract reject with a plain Error, not a RouteError.
+const expectError = async (promise: Promise<unknown>, expected: object) => {
+	const error = await promise.catch((caught: unknown) => caught);
+	expect(error).toBeInstanceOf(Error);
+	expect(error).not.toBeInstanceOf(RouteError);
+	expect(error).toMatchObject(expected);
+};
+const contractMismatch = "Response did not match the route contract.";
 
 describe("client response decoding", () => {
 	it("transforms declared headers and keeps undeclared headers", async () => {
@@ -48,7 +56,7 @@ describe("client response decoding", () => {
 		});
 	});
 
-	it("retains status and decoded body on header and body schema failures", async () => {
+	it("rejects header and body schema failures as errors with the issues", async () => {
 		for (const declaration of [
 			route.get("/").response(invalid, { status: 201 })["~restrpc"],
 			route.get("/").response(type(), { status: 201, headers: invalid })[
@@ -62,9 +70,8 @@ describe("client response decoding", () => {
 					codecs,
 					declaration,
 				);
-			await expect(read(true)).rejects.toMatchObject({
-				status: 201,
-				body: { name: "Ada" },
+			await expectError(read(true), {
+				message: contractMismatch,
 				cause: [{ message: "invalid" }],
 			});
 			expect(await read(false)).toMatchObject({
@@ -132,45 +139,114 @@ describe("client response decoding", () => {
 		).toHaveProperty("body", expect.any(Blob));
 	});
 
-	it("propagates malformed JSON and rejects undeclared statuses with decoded bodies", async () => {
-		await expect(
+	it("rejects undecodable bodies, undeclared statuses and undeclared media types as errors", async () => {
+		await expectError(
 			decode(
 				new Response("{", {
 					status: 201,
 					headers: { "content-type": "application/json" },
 				}),
 			),
-		).rejects.toBeInstanceOf(SyntaxError);
-		await expect(
-			decode(Response.json({ message: "missing" }, { status: 404 })),
-		).rejects.toMatchObject({
-			status: 404,
-			body: { message: "missing" },
+			{
+				message: "Response body could not be decoded.",
+				cause: expect.any(SyntaxError),
+			},
+		);
+		await expectError(decode(Response.json({ name: "Ada" }, { status: 202 })), {
+			message: contractMismatch,
 		});
-		await expect(
-			decode(Response.json({}, { status: 404 })),
-		).rejects.toBeInstanceOf(HttpError);
+		await expectError(
+			decode(
+				new Response("Ada", {
+					status: 201,
+					headers: { "content-type": "text/plain" },
+				}),
+			),
+			{ message: contractMismatch },
+		);
 	});
 
-	it.each(["wrong content type", "missing body"])(
-		"rejects streams with %s",
-		async (failure) => {
-			const declaration = route.get("/").streamResponse(type<number>())[
-				"~restrpc"
-			];
-			const response =
-				failure === "missing body"
-					? new Response(null, {
-							headers: { "content-type": "text/event-stream" },
-						})
-					: Response.json(1);
-			await expect(
-				fetchResponse(async () => response, false, codecs, declaration),
-			).rejects.toThrow(
-				failure === "missing body" ? "no stream body" : HttpError,
-			);
-		},
-	);
+	it("keeps failures of reading the body as transport errors", async () => {
+		const failure = new TypeError("terminated");
+		const body = new ReadableStream({
+			start: (controller) => controller.error(failure),
+		});
+		await expect(
+			decode(
+				new Response(body, {
+					status: 404,
+					headers: { "content-type": "application/json" },
+				}),
+			),
+		).rejects.toBe(failure);
+	});
+
+	it("passes the body to codecs without buffering it", async () => {
+		const encoder = new TextEncoder();
+		const body = new ReadableStream<Uint8Array>({
+			start: (controller) => controller.enqueue(encoder.encode("first")),
+		});
+		const declaration = route
+			.get("/")
+			.response({ "application/custom": type<string>() })["~restrpc"];
+		const result = await fetchResponse(
+			async () =>
+				new Response(body, {
+					headers: { "content-type": "application/custom" },
+				}),
+			true,
+			createBodyCodecRegistry([
+				bodyCodec("application/custom", {
+					deserialize: async (source) => {
+						const { value } = await source.body!.getReader().read();
+						return new TextDecoder().decode(value);
+					},
+				}),
+			]),
+			declaration,
+		);
+		expect(result.body).toBe("first");
+	});
+
+	it.each([
+		["wrong content type", contractMismatch],
+		["missing body", "Server returned no stream body."],
+	])("rejects streams with %s as errors", async (failure, message) => {
+		const declaration = route.get("/").streamResponse(type<number>())[
+			"~restrpc"
+		];
+		const response =
+			failure === "missing body"
+				? new Response(null, {
+						headers: { "content-type": "text/event-stream" },
+					})
+				: Response.json(1);
+		await expectError(
+			fetchResponse(async () => response, false, codecs, declaration),
+			{ message },
+		);
+	});
+
+	it("rejects event streams the route does not declare without reading them", async () => {
+		const cancel = vi.fn();
+		const stream = () =>
+			new Response(new ReadableStream({ cancel }), {
+				status: 202,
+				headers: { "content-type": "text/event-stream" },
+			});
+		await expectError(decode(stream()), { message: contractMismatch });
+		const json = route.get("/").response(type<string>())["~restrpc"];
+		const ok = new Response(new ReadableStream({ cancel }), {
+			headers: { "content-type": "text/event-stream" },
+		});
+		await expectError(
+			fetchResponse(async () => ok, false, codecs, json),
+			{
+				message: contractMismatch,
+			},
+		);
+		expect(cancel).toHaveBeenCalledTimes(2);
+	});
 
 	it("parses event streams without a declaration and before user codecs", async () => {
 		const deserialize = vi.fn();
@@ -188,5 +264,90 @@ describe("client response decoding", () => {
 			events.push(event);
 		expect(events).toEqual([{ data: { n: 1 } }]);
 		expect(deserialize).not.toHaveBeenCalled();
+	});
+});
+
+describe("client error responses", () => {
+	const UserNotFound = routeError("USER_NOT_FOUND", {
+		status: 404,
+		data: type((input: { id: number }) => ({ id: String(input.id) })),
+		headers: type((input: Record<string, string>) => ({
+			retry: Number(input["x-retry"]),
+		})),
+	});
+	const declaration = route.get("/").error(UserNotFound)["~restrpc"];
+	const read = (response: Response, validate = true) =>
+		fetchResponse(async () => response, validate, codecs, declaration);
+	const notFound = (body: unknown, status = 404) =>
+		Response.json(body, { status, headers: { "x-retry": "2" } });
+
+	it("rejects with the declared error and validates its data and headers", async () => {
+		const body = {
+			code: "USER_NOT_FOUND",
+			message: "Missing",
+			data: { id: 1 },
+		};
+		const error = await read(notFound(body)).catch((value: unknown) => value);
+		expect(error).toBeInstanceOf(RouteError);
+		expect(error).toMatchObject({
+			code: "USER_NOT_FOUND",
+			status: 404,
+			message: "Missing",
+			data: { id: "1" },
+			headers: { retry: 2, "x-retry": "2" },
+			isDeclared: true,
+		});
+		await expect(read(notFound(body), false)).rejects.toMatchObject({
+			data: { id: 1 },
+			headers: { "x-retry": "2" },
+		});
+	});
+
+	it.each([
+		[
+			"an undeclared code",
+			{ code: "GONE", message: "Gone", data: { id: 1 } },
+			404,
+			"Gone",
+		],
+	])(
+		"rejects %s as an undeclared error with the received values",
+		async (_case, body, status, message) => {
+			const error = await read(notFound(body, status)).catch(
+				(value: unknown) => value,
+			);
+			expect(error).toBeInstanceOf(RouteError);
+			expect(error).toMatchObject({
+				code: body.code,
+				status,
+				message,
+				data: "data" in body ? body.data : undefined,
+				headers: { "x-retry": "2" },
+				isDeclared: false,
+			});
+		},
+	);
+
+	it("rejects a declared code with another status as a contract mismatch", async () => {
+		await expectError(read(notFound({ code: "USER_NOT_FOUND" }, 410)), {
+			message: contractMismatch,
+		});
+	});
+
+	it("rejects a body without a code as an error with the status in its message", async () => {
+		await expectError(read(notFound("Bad gateway", 502)), {
+			message: "Request failed with status 502.",
+		});
+	});
+
+	it("rejects declared errors whose data fails validation as errors", async () => {
+		const body = { code: "USER_NOT_FOUND", message: "Missing", data: "1" };
+		const invalidData = route
+			.get("/")
+			.error("USER_NOT_FOUND", { status: 404, data: invalid })["~restrpc"];
+		await expectError(
+			fetchResponse(async () => notFound(body), true, codecs, invalidData),
+			{ message: contractMismatch, cause: [{ message: "invalid" }] },
+		);
 	});
 });

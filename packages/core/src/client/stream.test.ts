@@ -3,13 +3,16 @@ import { parseSseStream } from "./stream.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 
 const stream = (...chunks: string[]) =>
-	new ReadableStream<Uint8Array<ArrayBuffer>>({
-		start(controller) {
-			for (const chunk of chunks)
-				controller.enqueue(new TextEncoder().encode(chunk));
-			controller.close();
-		},
-	});
+	new Response(
+		new ReadableStream<Uint8Array<ArrayBuffer>>({
+			start(controller) {
+				for (const chunk of chunks)
+					controller.enqueue(new TextEncoder().encode(chunk));
+				controller.close();
+			},
+		}),
+		{ status: 201 },
+	) as Response & { body: ReadableStream<Uint8Array<ArrayBuffer>> };
 const collect = async (events: AsyncIterable<unknown>) => {
 	const result = [];
 	for await (const event of events) result.push(event);
@@ -31,13 +34,32 @@ describe("stream", () => {
 			{ data: { count: 2 } },
 		]);
 	});
-	it("rejects malformed JSON data", async () => {
-		await expect(
-			collect(parseSseStream(undefined, stream("data: {\n\n"), false)),
-		).rejects.toBeInstanceOf(SyntaxError);
+	it("rejects frames that cannot be decoded as errors", async () => {
+		for (const [frames, cause] of [
+			["data: {\n\n", expect.any(SyntaxError)],
+			["id: one\n\n", new Error("SSE frame has no data field.")],
+			["data: 1\n", new Error("Incomplete SSE frame.")],
+		] as const) {
+			await expect(
+				collect(parseSseStream(undefined, stream(frames), false)),
+			).rejects.toMatchObject({
+				message: "Event stream could not be decoded.",
+				cause,
+			});
+		}
 	});
 
-	it("retains status and event data on schema failure and supports disabled validation", async () => {
+	it("keeps failures of reading the stream as transport errors", async () => {
+		const failure = new TypeError("terminated");
+		const response = new Response(
+			new ReadableStream({ start: (controller) => controller.error(failure) }),
+		) as Response & { body: ReadableStream<Uint8Array<ArrayBuffer>> };
+		await expect(
+			collect(parseSseStream(undefined, response, false)),
+		).rejects.toBe(failure);
+	});
+
+	it("rejects schema failures as errors with the issues unless validation is disabled", async () => {
 		const schema: StandardSchemaV1 = {
 			"~standard": {
 				version: 1,
@@ -46,10 +68,9 @@ describe("stream", () => {
 			},
 		};
 		await expect(
-			collect(parseSseStream(schema, stream("data: 1\n\n"), true, 201)),
+			collect(parseSseStream(schema, stream("data: 1\n\n"), true)),
 		).rejects.toMatchObject({
-			status: 201,
-			body: 1,
+			message: "Response did not match the route contract.",
 			cause: [{ message: "invalid chunk" }],
 		});
 		expect(
@@ -70,17 +91,5 @@ describe("stream", () => {
 			{ id: "one", event: "update", retry: 100, data: 2 },
 			{ data: 3 },
 		]);
-	});
-
-	it("rejects frames without data", async () => {
-		await expect(
-			collect(parseSseStream(undefined, stream("id: one\n\n"), false)),
-		).rejects.toThrow("SSE frame has no data field.");
-	});
-
-	it("rejects an unterminated final frame", async () => {
-		await expect(
-			collect(parseSseStream(undefined, stream("data: 1\n"), false)),
-		).rejects.toThrow("Incomplete SSE frame.");
 	});
 });

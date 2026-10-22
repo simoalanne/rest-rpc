@@ -8,10 +8,13 @@ import {
 	type CompileRoutesOptions,
 } from "./compileRoutes.ts";
 import type { CatchAllHandleOptions } from "./handleHttpRoute.ts";
+import { InternalServerError, NotFound, observeError } from "./errors.ts";
 import { mapMaybePromise } from "./maybePromise.ts";
+import { serializeRouteError } from "./serializeHttpRouteResult.ts";
 
 /**
- * Customizes the routes, fallback responses and request parsing of an app.
+ * Customizes the routes, not found responses, request parsing and error
+ * observation of an app.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#app-options}
  */
@@ -43,19 +46,9 @@ export type CreateAppOptions<TArgs extends unknown[] = []> = Omit<
 	 * Returns the response for requests that match no route. Returning
 	 * nothing keeps the default response.
 	 *
-	 * @default A 404 response with `{ message: "Not found" }`.
+	 * @default A `NOT_FOUND` error response.
 	 */
 	notFound?: (request: Request) => Response | void | Promise<Response | void>;
-	/**
-	 * Returns the response when a handler or middleware throws. Returning
-	 * nothing keeps the default response.
-	 *
-	 * @default A 500 response with `{ message: "Internal server error" }`.
-	 */
-	onError?: (
-		error: unknown,
-		request: Request,
-	) => Response | void | Promise<Response | void>;
 };
 
 /**
@@ -89,17 +82,16 @@ export type App<TArgs extends unknown[] = []> = {
 	>;
 };
 
-const defaultNotFound = () =>
-	Response.json({ message: "Not found" }, { status: 404 });
-
-const defaultOnError = () =>
-	Response.json({ message: "Internal server error" }, { status: 500 });
+const defaultNotFound = () => serializeRouteError(new NotFound());
 
 /**
  * Creates a Fetch app that serves a route tree.
  *
- * @remarks Use {@link compileRoutes} and {@link createCatchAllHandler}
- * instead to serve the routes from an existing server or framework.
+ * @remarks Errors that are not sent as error responses by the routes, such as
+ * errors thrown by handlers, are sent as `INTERNAL_SERVER_ERROR` responses
+ * with the thrown error as `cause`. Use {@link compileRoutes} and
+ * {@link createCatchAllHandler} instead to serve the routes from an existing
+ * server or framework.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#usage}
  */
@@ -111,9 +103,13 @@ export function createApp<TArgs extends unknown[] = []>(
 		mountPath,
 		context,
 		notFound = defaultNotFound,
-		onError = defaultOnError,
 		...compileOptions
 	} = options;
+	const respondWithInternalError = (error: unknown, request: Request) => {
+		const internal = new InternalServerError({ cause: error });
+		observeError(compileOptions.onError, internal, request);
+		return serializeRouteError(internal);
+	};
 	const compiled = compileRoutes(implementations, {
 		...compileOptions,
 		paramSyntax: "colon",
@@ -152,7 +148,7 @@ export function createApp<TArgs extends unknown[] = []>(
 						: handleOptions,
 				);
 			} catch (error) {
-				return (await onError(error, request)) ?? defaultOnError();
+				return respondWithInternalError(error, request);
 			}
 		};
 	}
@@ -173,7 +169,7 @@ export function createApp<TArgs extends unknown[] = []>(
 					? result.response
 					: ((await notFound(request)) ?? defaultNotFound());
 			} catch (error) {
-				return (await onError(error, request)) ?? defaultOnError();
+				return respondWithInternalError(error, request);
 			}
 		},
 		routes,
