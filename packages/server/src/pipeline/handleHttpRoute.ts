@@ -1,6 +1,5 @@
-import type { AbsolutePath } from "@rest-rpc/core";
+import { RouteError, type AbsolutePath } from "@rest-rpc/core";
 import { isAsyncIterable, normalizeMediaType } from "@rest-rpc/core/codecs";
-import { RequestValidationError, ResponseValidationError } from "./errors.ts";
 import type {
 	ResponseContentDeclaration,
 	ResponseDeclaration,
@@ -193,9 +192,12 @@ export const isResponseEnvelope = (
 	"status" in value &&
 	typeof value.status === "number";
 
+// Errors are thrown, so inferred statuses are successful.
 const assertImplicitStatus = (status: number) => {
-	if (!Number.isInteger(status) || status < 100 || status > 599) {
-		throw new Error(`Invalid inferred HTTP response status "${status}".`);
+	if (!Number.isInteger(status) || status < 200 || status > 299) {
+		throw new Error(
+			`Inferred response status "${status}" must be from 200 to 299.`,
+		);
 	}
 };
 
@@ -246,6 +248,8 @@ const normalizeHandlerResult = (
 	);
 };
 
+const noErrors = {};
+
 /**
  * Validates decoded request segments, executes middleware and the handler, and
  * validates the selected output. Validation errors are thrown.
@@ -270,6 +274,7 @@ export function executeRoute(
 			signal: options.signal,
 			contentType: mediaType,
 			route,
+			errors: route.errors ?? noErrors,
 		}),
 	);
 	return mapMaybePromise(handlerResult, (result) =>
@@ -281,41 +286,44 @@ export function executeRoute(
 	);
 }
 
-// Only stream bodies change; other results are already HTTP results.
-const toHttpRouteResult = (result: RouteResult): HttpRouteResult => {
-	const { status, headers, body } = result;
-	if (!body || !("stream" in body)) return result as HttpRouteResult;
-	return { status, headers, body: sseBody(body.stream) };
+/** Observes a `RouteError` that ends a stream after its response started. */
+export type StreamErrorObserver = (error: RouteError) => void;
+
+const observeStream = async function* (
+	stream: AsyncIterable<unknown>,
+	observe: StreamErrorObserver,
+) {
+	try {
+		yield* stream;
+	} catch (error) {
+		if (error instanceof RouteError) observe(error);
+		throw error;
+	}
 };
 
-const toValidationError = (
-	error: unknown,
-): RequestValidationError | ResponseValidationError => {
-	if (
-		error instanceof RequestValidationError ||
-		error instanceof ResponseValidationError
-	) {
-		return error;
-	}
-	throw error;
+// Only stream bodies change; other results are already HTTP results.
+const toHttpRouteResult = (
+	result: RouteResult,
+	observe: StreamErrorObserver | undefined,
+): HttpRouteResult => {
+	const { status, headers, body } = result;
+	if (!body || !("stream" in body)) return result as HttpRouteResult;
+	return {
+		status,
+		headers,
+		body: sseBody(observe ? observeStream(body.stream, observe) : body.stream),
+	};
 };
 
 /**
- * Validates an HTTP request, executes middleware and its handler, and normalizes the selected output.
- * Returns validation errors for adapter handling; other failures propagate.
+ * Validates an HTTP request, executes middleware and its handler, and
+ * normalizes the selected output. Errors, including `RouteError`s, propagate.
  */
 export function handleHttpRoute(
 	implementation: RuntimeImplementation,
-	options: ExecuteRouteOptions,
-): MaybePromise<
-	HttpRouteResult | RequestValidationError | ResponseValidationError
-> {
-	try {
-		const execution = executeRoute(implementation, options);
-		return execution instanceof Promise
-			? execution.then(toHttpRouteResult, toValidationError)
-			: toHttpRouteResult(execution);
-	} catch (error) {
-		return toValidationError(error);
-	}
+	options: ExecuteRouteOptions & { onStreamError?: StreamErrorObserver },
+): MaybePromise<HttpRouteResult> {
+	return mapMaybePromise(executeRoute(implementation, options), (result) =>
+		toHttpRouteResult(result, options.onStreamError),
+	);
 }

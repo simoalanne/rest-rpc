@@ -1,18 +1,21 @@
-import { HttpError } from "./httpError.ts";
 import {
 	validateStandardSchema,
 	type StandardSchemaV1,
 } from "../standard-schema/index.ts";
 
+/** Validates a received value, unless validation is disabled or undeclared. */
 export const validateResponseValue = async (
 	schema: StandardSchemaV1 | undefined,
 	value: unknown,
 	validate: boolean,
-	status: number,
-) => {
-	if (!validate || schema === undefined) return value;
-	const result = await validateStandardSchema(schema, value);
-	if (result.issues)
-		throw new HttpError(status, value, { cause: result.issues });
-	return result.value;
-};
+): Promise<StandardSchemaV1.Result<unknown>> =>
+	validate && schema ? validateStandardSchema(schema, value) : { value };
+
+/**
+ * Creates the error for a received response the route contract does not
+ * describe.
+ */
+export const contractError = (message: string, cause?: unknown) =>
+	new Error(message, cause === undefined ? undefined : { cause });
+
+export const contractMismatch = "Response did not match the route contract.";

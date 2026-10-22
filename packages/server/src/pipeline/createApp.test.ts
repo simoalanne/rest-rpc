@@ -38,7 +38,10 @@ describe("createApp", () => {
 			new Request("http://localhost/missing"),
 		);
 		expect(fallback.status).toBe(404);
-		expect(await fallback.json()).toEqual({ message: "Not found" });
+		expect(await fallback.json()).toEqual({
+			code: "NOT_FOUND",
+			message: "Not found.",
+		});
 
 		const custom = await createApp(routes, {
 			notFound: () => new Response("custom", { status: 404 }),
@@ -52,42 +55,44 @@ describe("createApp", () => {
 			notFound: (request) => void requests.push(request),
 		}).fetch(new Request("http://localhost/missing"));
 		expect(response.status).toBe(404);
-		expect(await response.json()).toEqual({ message: "Not found" });
 		expect(requests).toHaveLength(1);
 	});
 
-	it("returns onError when a handler throws", async () => {
-		const fallback = await createApp(routes).fetch(
-			new Request("http://localhost/fail"),
+	it("sends errors the routes do not handle as internal server errors and reports them", async () => {
+		const onError = vi.fn();
+		const app = createApp(routes, { onError });
+		for (const response of [
+			await app.fetch(new Request("http://localhost/fail")),
+			await app.routes["/fail"]!.GET!(new Request("http://localhost/fail")),
+		]) {
+			expect(response.status).toBe(500);
+			expect(await response.json()).toEqual({
+				code: "INTERNAL_SERVER_ERROR",
+				message: "Internal server error.",
+			});
+		}
+		expect(onError).toHaveBeenCalledTimes(2);
+		expect(onError).toHaveBeenCalledWith(
+			expect.objectContaining({
+				code: "INTERNAL_SERVER_ERROR",
+				cause: new Error("boom"),
+			}),
+			expect.any(Request),
 		);
-		expect(fallback.status).toBe(500);
-		expect(await fallback.json()).toEqual({
-			message: "Internal server error",
-		});
-
-		const app = createApp(routes, {
-			onError: (error) =>
-				new Response((error as Error).message, { status: 500 }),
-		});
-		const fromFetch = await app.fetch(new Request("http://localhost/fail"));
-		expect(await fromFetch.text()).toBe("boom");
-		const fromRoutes = await app.routes["/fail"]!.GET!(
-			new Request("http://localhost/fail"),
-		);
-		expect(await fromRoutes.text()).toBe("boom");
 	});
 
-	it("keeps the default error response when onError returns nothing", async () => {
-		const errors: unknown[] = [];
-		const app = createApp(routes, {
-			onError: (error) => void errors.push(error),
-		});
+	it.each([
+		[
+			"throws",
+			() => {
+				throw new Error("observer");
+			},
+		],
+		["rejects", async () => Promise.reject(new Error("observer"))],
+	])("sends the response when onError %s", async (_, onError) => {
+		const app = createApp(routes, { onError });
 		const response = await app.fetch(new Request("http://localhost/fail"));
 		expect(response.status).toBe(500);
-		expect(await response.json()).toEqual({
-			message: "Internal server error",
-		});
-		expect(errors).toHaveLength(1);
 	});
 
 	it("lists routes in Bun's routes format with colon params", async () => {
@@ -156,16 +161,13 @@ describe("createApp", () => {
 		expect(await fromRoutes.json()).toBe("routes");
 	});
 
-	it("returns onError when the context function throws", async () => {
+	it("sends an internal server error when the context function throws", async () => {
 		const app = createApp(routes, {
 			context: async () => {
 				throw new Error("unauthenticated");
 			},
-			onError: (error) =>
-				new Response((error as Error).message, { status: 401 }),
 		});
 		const response = await app.fetch(new Request("http://localhost/todos/1"));
-		expect(response.status).toBe(401);
-		expect(await response.text()).toBe("unauthenticated");
+		expect(response.status).toBe(500);
 	});
 });

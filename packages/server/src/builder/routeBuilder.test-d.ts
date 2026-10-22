@@ -1,5 +1,6 @@
 import {
 	route as contractRoute,
+	routeError,
 	type,
 	type InferClientResponse,
 } from "@rest-rpc/core";
@@ -149,35 +150,90 @@ describe("routeBuilder types", () => {
 		const declared = route
 			.get("/")
 			.response(type<string>())
-			.response(type<{ message: string }>(), { status: 404 });
+			.response(type<{ id: string }>(), { status: 201 });
 		declared.handler(() => ({ status: 200, body: "ok" }));
 		// @ts-expect-error Plain bodies are ambiguous between declared statuses.
 		declared.handler(() => "ok");
 	});
 });
 
+describe("route errors", () => {
+	const Unauthorized = routeError("UNAUTHORIZED", { status: 401 });
+	const NotFound = routeError("NOT_FOUND", {
+		status: 404,
+		data: type<{ id: string }>(),
+	});
+
+	it("types declared error classes on middleware and the handler and keeps responses inferred", () => {
+		const value = route
+			.error(Unauthorized)
+			.get("/users/:id")
+			.use(({ errors, next }) => {
+				expectTypeOf(errors.UNAUTHORIZED).toEqualTypeOf<typeof Unauthorized>();
+				return next();
+			})
+			.error(NotFound)
+			.handler(({ errors, params }) => {
+				expectTypeOf(errors).toEqualTypeOf<{
+					UNAUTHORIZED: typeof Unauthorized;
+					NOT_FOUND: typeof NotFound;
+				}>();
+				if (!params.id) throw new errors.NOT_FOUND({ id: params.id });
+				return { id: params.id };
+			});
+		expectTypeOf<
+			InferClientResponse<typeof value>["status"]
+		>().toEqualTypeOf<200>();
+		route.handler(({ errors }) => {
+			expectTypeOf(errors).toEqualTypeOf<{}>();
+			return "ok";
+		});
+	});
+
+	it("requires the errors a reusable middleware declares on routes that use it", () => {
+		const auth = route.middleware<{
+			errors: { UNAUTHORIZED: typeof Unauthorized };
+		}>(({ errors, next }) => {
+			expectTypeOf(errors.UNAUTHORIZED).toEqualTypeOf<typeof Unauthorized>();
+			return next();
+		});
+		route.get("/me").error(Unauthorized).use(auth);
+		// @ts-expect-error The route does not declare UNAUTHORIZED.
+		route.get("/me").use(auth);
+		route.middleware(({ errors, next }) => {
+			expectTypeOf(errors.UNAUTHORIZED).toEqualTypeOf<unknown>();
+			return next();
+		});
+	});
+});
+
 describe("implicit response inference", () => {
-	it("preserves sync and async status unions and error envelopes", () => {
+	it("preserves sync and async status unions", () => {
 		const sync = route
 			.get("/")
 			.handler(() =>
 				Math.random() > 0.5
 					? ({ status: 201, body: { id: "new" } } as const)
-					: ({ status: 404, body: { message: "missing" } } as const),
+					: ({ status: 202, body: { queued: true } } as const),
 			);
 		const asyncRoute = route
 			.get("/")
 			.handler(async () =>
 				Math.random() > 0.5
 					? ({ status: 201, body: { id: "new" } } as const)
-					: ({ status: 404, body: { message: "missing" } } as const),
+					: ({ status: 202, body: { queued: true } } as const),
 			);
 		expectTypeOf<InferClientResponse<typeof sync>>().toEqualTypeOf<
 			InferClientResponse<typeof asyncRoute>
 		>();
 		expectTypeOf<InferClientResponse<typeof sync>["status"]>().toEqualTypeOf<
-			201 | 404
+			201 | 202
 		>();
+	});
+
+	it("rejects inferred statuses outside 2xx", () => {
+		// @ts-expect-error Errors are thrown instead of returned.
+		route.handler(() => ({ status: 404, body: { message: "missing" } }));
 	});
 
 	it("infers empty bodies, custom media, and response headers", () => {
@@ -247,10 +303,10 @@ describe("implicit response inference", () => {
 			.handler(() =>
 				Math.random() > 0.5
 					? { id: "one" }
-					: { status: 404, body: { message: "missing" } },
+					: { status: 202, body: { queued: true } },
 			);
 		type Client = InferClientResponse<typeof mixed>;
-		expectTypeOf<Client["status"]>().toEqualTypeOf<200 | 404>();
+		expectTypeOf<Client["status"]>().toEqualTypeOf<200 | 202>();
 		expectTypeOf<Extract<Client, { status: 200 }>["body"]>().toEqualTypeOf<{
 			readonly id: "one";
 		}>();

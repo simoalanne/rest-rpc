@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { type } from "../standard-schema/type.ts";
 import { route } from "./routeBuilder.ts";
+import { routeError } from "./routeError.ts";
 import type { OpenApiRouteOptions } from "./routeDeclaration.ts";
 
 describe("routeBuilder types", () => {
@@ -92,6 +93,17 @@ describe("routeBuilder types", () => {
 		expectTypeOf(route.response()["~restrpc"].responses).toEqualTypeOf<{
 			200: {};
 		}>();
+	});
+
+	it("accumulates declared errors by code and keeps methods selectable", () => {
+		const Unauthorized = routeError("UNAUTHORIZED", { status: 401 });
+		const authed = route.error(Unauthorized);
+		const value = authed.get("/me").error("INVALID", { data: type<string>() });
+		expectTypeOf(value["~restrpc"].errors.UNAUTHORIZED).toEqualTypeOf<
+			typeof Unauthorized
+		>();
+		expectTypeOf(value["~restrpc"].errors.INVALID.status).toEqualTypeOf<400>();
+		expectTypeOf(value["~restrpc"].responses).toEqualTypeOf<{}>();
 	});
 
 	it("rejects optional params schema keys", () => {

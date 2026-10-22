@@ -141,6 +141,21 @@ type ValidStreamEnvelopes<TEnvelope> =
 		? unknown
 		: never;
 
+type NonSuccessStatus<TEnvelope> = TEnvelope extends {
+	status: infer TStatus extends number;
+}
+	? number extends TStatus
+		? never
+		: `${TStatus}` extends `2${string}`
+			? never
+			: TStatus
+	: never;
+
+// Errors are thrown, so inferred statuses are successful.
+type SuccessStatuses<TEnvelope> = [NonSuccessStatus<TEnvelope>] extends [never]
+	? unknown
+	: never;
+
 export type ValidImplicitResult<TResult> = [Awaited<TResult>] extends [never]
 	? never
 	: [Extract<Awaited<TResult>, { status: number }>] extends [never]
@@ -149,7 +164,8 @@ export type ValidImplicitResult<TResult> = [Awaited<TResult>] extends [never]
 					Awaited<TResult>,
 					{ status: number }
 			  > extends ImplicitResponseEnvelope
-			? ValidStreamEnvelopes<Extract<Awaited<TResult>, { status: number }>>
+			? ValidStreamEnvelopes<Extract<Awaited<TResult>, { status: number }>> &
+					SuccessStatuses<Extract<Awaited<TResult>, { status: number }>>
 			: never;
 
 export type InferredRoute<TRoute, TResult> = Merge<
@@ -222,9 +238,15 @@ type BodylessFields<TRoute extends RouteDeclaration> = TRoute extends {
 	? EmptyObject
 	: { contentType?: undefined };
 
+type ErrorsOf<TRoute extends RouteDeclaration> = TRoute extends {
+	errors: infer TErrors;
+}
+	? TErrors
+	: EmptyObject;
+
 /**
- * Infers the validated request, handler fields, and application context
- * received by a handler.
+ * Infers the validated request, handler fields, application context, and
+ * declared error classes received by a handler.
  */
 export type RouteRequest<
 	TRoute extends RouteDeclaration,
@@ -235,6 +257,7 @@ export type RouteRequest<
 		BodylessFields<TRoute> & {
 			route: TRoute;
 			context: Context<TContext>;
+			errors: ErrorsOf<TRoute>;
 		}
 >;
 
@@ -367,6 +390,7 @@ type UnknownRequest = {
 	headers: unknown;
 	body: unknown;
 	query: unknown;
+	errors: Readonly<Record<string, unknown>>;
 };
 
 export type RequestFields = Partial<UnknownRequest>;

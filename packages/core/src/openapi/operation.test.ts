@@ -38,6 +38,55 @@ describe("operation", () => {
 		});
 	});
 
+	it("documents declared errors grouped by status next to inferred responses", () => {
+		const data = type<{ id: string }>();
+		const headers = type<{ "retry-after": number }>();
+		const declaration = route
+			.get("/")
+			.error("NOT_FOUND", { status: 404, data, description: "Missing" })
+			.error("GONE", { status: 404, headers, description: "Deleted" })
+			.error("CONFLICT", { status: 409 })["~restrpc"];
+		const converter = (schema: unknown) =>
+			schema === headers
+				? { properties: { "retry-after": { type: "integer" } } }
+				: { type: "object" };
+		const body = (code: string, extra = {}) => ({
+			type: "object",
+			properties: {
+				code: { const: code },
+				message: { type: "string" },
+				...extra,
+			},
+			required: ["code", "message", ...Object.keys(extra)],
+		});
+		expect(
+			createOperation(declaration, { schemaConverter: converter }).responses,
+		).toEqual({
+			default: {
+				description:
+					"Response inferred from the route handler; not documented.",
+			},
+			404: {
+				description: "Missing\nDeleted",
+				headers: { "retry-after": { schema: { type: "integer" } } },
+				content: {
+					"application/json": {
+						schema: {
+							oneOf: [
+								body("NOT_FOUND", { data: { type: "object" } }),
+								body("GONE"),
+							],
+						},
+					},
+				},
+			},
+			409: {
+				description: "",
+				content: { "application/json": { schema: body("CONFLICT") } },
+			},
+		});
+	});
+
 	it("falls back to empty schemas and original operations when hooks return undefined", () => {
 		const declaration = route
 			.get("/")

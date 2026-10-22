@@ -1,4 +1,3 @@
-export { HttpError } from "./client/index.ts";
 export type {
 	ApiClientFor,
 	ApiClientOptions,
@@ -8,11 +7,15 @@ export type {
 	InferClientRequest,
 	InferClientResponse,
 	InferClientStreamData,
-	InferClientSuccess,
 	FetchLike,
 	FetchOptions,
 } from "./client/index.ts";
-export { initClient } from "./client/index.ts";
+export {
+	initClient,
+	safe,
+	type ClientPromise,
+	type SafeResult,
+} from "./client/index.ts";
 export type {
 	AbsolutePath,
 	Contract,
@@ -20,6 +23,13 @@ export type {
 } from "./contract/index.ts";
 export { extractContract } from "./contract/extract.ts";
 export { route } from "./contract/routeBuilder.ts";
+export {
+	isDeclaredError,
+	RouteError,
+	routeError,
+	type RouteErrorDefinitionOptions,
+	type RouteErrorOptions,
+} from "./contract/routeError.ts";
 export type {
 	BodyContent,
 	KnownBodyContentType,

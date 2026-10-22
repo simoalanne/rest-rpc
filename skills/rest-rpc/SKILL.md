@@ -50,18 +50,19 @@ export const routes = {
 		get: route
 			.get("/todos/:id")
 			.params(z.object({ id: z.string() }))
-			.handler(({ params }) => {
+			.error("TODO_NOT_FOUND", { status: 404 })
+			.handler(({ params, errors }) => {
 				const todo = todos.get(params.id);
-				return (
-					todo ?? { status: 404, body: { code: "TODO_NOT_FOUND" as const } }
-				);
+				if (!todo) throw new errors.TODO_NOT_FOUND();
+				return todo;
 			}),
 	},
 };
 ```
 
-A handler returns a body for a 200 response, or an envelope with a numeric
-`status` for anything else. Serve the routes:
+A handler returns a body for a 200 response, or an envelope with a numeric 2xx
+`status`. Errors are declared with `.error()` and thrown; they are sent as JSON
+`{ code, message, data? }` and clients reject with them. Serve the routes:
 
 ```ts server.ts
 import { createServer } from "node:http";
@@ -93,7 +94,7 @@ await writeFile("contract.json", JSON.stringify(extractContract(routes)));
 ```
 
 ```ts
-import { initClient } from "@rest-rpc/core";
+import { initClient, safe } from "@rest-rpc/core";
 import type { routes } from "./routes";
 import contract from "./contract.json";
 
@@ -101,10 +102,10 @@ const api = contract as unknown as typeof routes;
 const client = initClient(api, { baseUrl: "http://localhost:3000" });
 
 const created = await client.todos.create({ body: { title: "Write docs" } });
-const response = await client.todos.get({ params: { id: created.body.id } });
-if (response.status === 200) {
-	console.log(response.body.title);
-}
+const [error, response] = await safe(
+	client.todos.get({ params: { id: created.body.id } }),
+);
+if (!error) console.log(response.body.title);
 ```
 
 ## Packages

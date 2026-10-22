@@ -1,4 +1,4 @@
-import type { BodyCodec } from "@rest-rpc/core";
+import { RouteError, type BodyCodec } from "@rest-rpc/core";
 import {
 	createBodyCodecRegistry,
 	normalizeMediaType,
@@ -21,10 +21,15 @@ import {
 	handleHttpRoute,
 	type CatchAllHandleOptions,
 	type HandleOptions,
+	type HttpRouteResult,
 } from "./handleHttpRoute.ts";
-import { RequestValidationError, ResponseValidationError } from "./errors.ts";
 import { deserializeRequestBody } from "./deserializeRequestBody.ts";
-import { serializeHttpRouteResult } from "./serializeHttpRouteResult.ts";
+import { observeError } from "./errors.ts";
+import { resolveRouteError } from "./resolveRouteError.ts";
+import {
+	serializeHttpRouteResult,
+	serializeRouteError,
+} from "./serializeHttpRouteResult.ts";
 import { parseQuery } from "./validation.ts";
 import {
 	readRequestPathname,
@@ -34,7 +39,7 @@ import {
 import { sseBodyCodec } from "./sse.ts";
 
 /**
- * Customizes paths, request parsing and validation failures for compiled Fetch routes.
+ * Customizes paths, request parsing, validation and error observation for compiled Fetch routes.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#compile-options}
  */
@@ -45,8 +50,13 @@ export type CompileRoutesOptions = {
 	 * `{name}` (`"braces"`). Declared markers are kept when omitted.
 	 */
 	paramSyntax?: "colon" | "braces";
-	requestValidationErrorHandler?: RequestValidationErrorHandler;
-	responseValidationErrorHandler?: ResponseValidationErrorHandler;
+	/**
+	 * Observes every error sent as an error response, and `RouteError`s that
+	 * end a stream after its response started, such as stream item validation
+	 * failures. It is not awaited, and errors it throws or rejects with are
+	 * ignored, so it cannot change the response.
+	 */
+	onError?: (error: RouteError, request: Request) => void;
 	/**
 	 * When set to `true`, disables request schema validation. Handlers receive
 	 * the declared request segments without schema validation. The schemas are
@@ -72,26 +82,6 @@ export type CompileRoutesOptions = {
 	 */
 	disableResponseValidation?: boolean;
 };
-
-/**
- * Defines the Fetch response returned when a request fails validation.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#error-handling}
- */
-export type RequestValidationErrorHandler = (
-	error: RequestValidationError,
-	request: Request,
-) => Response | Promise<Response>;
-
-/**
- * Defines the Fetch response returned when handler output fails validation.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#error-handling}
- */
-export type ResponseValidationErrorHandler = (
-	error: ResponseValidationError,
-	request: Request,
-) => Response | Promise<Response>;
 
 /**
  * Result of dispatching a request with the Fetch catch-all handler.
@@ -136,7 +126,21 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 		sseBodyCodec,
 		...(options.bodyCodecs ?? []),
 	]);
-	const { disableRequestValidation, disableResponseValidation } = options;
+	const { disableRequestValidation, disableResponseValidation, onError } =
+		options;
+	const respondWithError = async (
+		implementation: RuntimeImplementation,
+		error: RouteError,
+		request: Request,
+	) => {
+		const resolved = await resolveRouteError(
+			implementation.route,
+			error,
+			disableResponseValidation ?? false,
+		);
+		observeError(onError, resolved, request);
+		return serializeRouteError(resolved);
+	};
 
 	return async (implementation, pathParams, request, handleOptions) => {
 		const schemas = implementation.route.request;
@@ -162,11 +166,8 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 				implementation,
 				receivedMediaType,
 			);
-			if (typeof selected === "object") {
-				return Response.json(
-					{ message: selected.message },
-					{ status: selected.status },
-				);
+			if (selected instanceof RouteError) {
+				return respondWithError(implementation, selected, request);
 			}
 			mediaType = selected;
 
@@ -183,43 +184,43 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 						? await deserializing
 						: deserializing;
 				if (deserialized.rejection) {
-					return Response.json(
-						{ message: deserialized.rejection.message },
-						{ status: deserialized.rejection.status },
+					return respondWithError(
+						implementation,
+						deserialized.rejection,
+						request,
 					);
 				}
 				body = deserialized.body;
 			}
 		}
 
-		const handled = handleHttpRoute(implementation, {
-			request: {
-				params,
-				query: schemas?.query?.length
-					? parseQuery(readRequestSearch(request.url))
-					: undefined,
-				headers: schemas?.headers?.length
-					? Object.fromEntries(request.headers)
-					: undefined,
-				body,
-			},
-			signal: request.signal,
-			mediaType,
-			context: handleOptions?.context,
-			disableRequestValidation,
-			disableResponseValidation,
-		});
-		const result = handled instanceof Promise ? await handled : handled;
-		if (result instanceof RequestValidationError) {
-			return options.requestValidationErrorHandler
-				? options.requestValidationErrorHandler(result, request)
-				: Response.json(result.responseBody, { status: result.status });
-		}
-
-		if (result instanceof ResponseValidationError) {
-			return options.responseValidationErrorHandler
-				? options.responseValidationErrorHandler(result, request)
-				: Response.json(result.responseBody, { status: result.status });
+		let result: HttpRouteResult;
+		try {
+			const handled = handleHttpRoute(implementation, {
+				request: {
+					params,
+					query: schemas?.query?.length
+						? parseQuery(readRequestSearch(request.url))
+						: undefined,
+					headers: schemas?.headers?.length
+						? Object.fromEntries(request.headers)
+						: undefined,
+					body,
+				},
+				signal: request.signal,
+				mediaType,
+				context: handleOptions?.context,
+				disableRequestValidation,
+				disableResponseValidation,
+				onStreamError:
+					onError && ((error) => observeError(onError, error, request)),
+			});
+			result = handled instanceof Promise ? await handled : handled;
+		} catch (error) {
+			if (error instanceof RouteError) {
+				return respondWithError(implementation, error, request);
+			}
+			throw error;
 		}
 
 		return serializeHttpRouteResult(result, codecs);

@@ -35,17 +35,16 @@ const create = route
 	.body(z.object({ title: z.string() }))
 	.handler(({ body: { title } }) => createTodo(title));
 
-// GET /todos/:id with params, query, headers, statuses, and response headers.
+// GET /todos/:id with params, query, headers, an error, and response headers.
 const get = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
 	.query(z.object({ uppercase: z.enum(["yes", "no"]).optional() }))
 	.headers(z.object({ "x-request-id": z.string().optional() }))
-	.handler(({ params, query }) => {
+	.error("TODO_NOT_FOUND", { status: 404 })
+	.handler(({ params, query, errors }) => {
 		const todo = findTodo(params.id);
-		if (!todo) {
-			return { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
-		}
+		if (!todo) throw new errors.TODO_NOT_FOUND();
 		return {
 			status: 200,
 			headers: { "x-powered-by": "rest-rpc" },
@@ -79,17 +78,16 @@ const create = route
 	.body(z.object({ title: z.string() }))
 	.handler(({ body: { title } }) => createTodo(title));
 
-// GET /todos/:id with params, query, headers, statuses, and response headers.
+// GET /todos/:id with params, query, headers, an error, and response headers.
 const get = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
 	.query(z.object({ uppercase: z.enum(["yes", "no"]).optional() }))
 	.headers(z.object({ "x-request-id": z.string().optional() }))
-	.handler(({ params, query }) => {
+	.error("TODO_NOT_FOUND", { status: 404 })
+	.handler(({ params, query, errors }) => {
 		const todo = findTodo(params.id);
-		if (!todo) {
-			return { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
-		}
+		if (!todo) throw new errors.TODO_NOT_FOUND();
 		return {
 			status: 200,
 			headers: { "x-powered-by": "rest-rpc" },
@@ -146,17 +144,16 @@ const create = route
 	.body(z.object({ title: z.string() }))
 	.handler(({ body: { title } }) => createTodo(title));
 
-// GET /todos/:id with params, query, headers, statuses, and response headers.
+// GET /todos/:id with params, query, headers, an error, and response headers.
 const get = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
 	.query(z.object({ uppercase: z.enum(["yes", "no"]).optional() }))
 	.headers(z.object({ "x-request-id": z.string().optional() }))
-	.handler(({ params, query }) => {
+	.error("TODO_NOT_FOUND", { status: 404 })
+	.handler(({ params, query, errors }) => {
 		const todo = findTodo(params.id);
-		if (!todo) {
-			return { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
-		}
+		if (!todo) throw new errors.TODO_NOT_FOUND();
 		return {
 			status: 200,
 			headers: { "x-powered-by": "rest-rpc" },
@@ -272,7 +269,7 @@ npx skills add simoalanne/rest-rpc
 	</Card>
 	<Card title="Typed responses" icon="list-checks" type="check">
 		Return direct success bodies for simple routes, or status-keyed response
-		envelopes when the route has multiple expected outcomes.
+		envelopes, and throw declared errors that clients receive typed.
 	</Card>
 	<Card title="Schema options" icon="shield-check" type="check">
 		Use Standard Schema-compatible libraries such as Zod, Valibot, or ArkType.

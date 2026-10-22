@@ -4,6 +4,7 @@ import {
 	createApp,
 	createCatchAllHandler,
 	route,
+	routeError,
 	type,
 	type CatchAllHandleOptions,
 } from "@rest-rpc/server";
@@ -61,7 +62,6 @@ const withFetchServer = (
 // Adapters
 
 type ServeOptions = {
-	customValidationHandlers?: boolean;
 	handleOptions?: CatchAllHandleOptions;
 };
 
@@ -72,16 +72,7 @@ type Serve = (
 ) => Promise<void>;
 
 const serveFetch: Serve = (routes, options, run) => {
-	const handler = createCatchAllHandler(
-		compileRoutes(routes, {
-			...(options.customValidationHandlers && {
-				requestValidationErrorHandler: () =>
-					Response.json({ handled: "request" }, { status: 422 }),
-				responseValidationErrorHandler: () =>
-					Response.json({ handled: "response" }, { status: 502 }),
-			}),
-		}),
-	);
+	const handler = createCatchAllHandler(compileRoutes(routes));
 	return withFetchServer(
 		async (request) =>
 			(await handler(request, options.handleOptions)).response ??
@@ -92,14 +83,7 @@ const serveFetch: Serve = (routes, options, run) => {
 
 const serveNode: Serve = (routes, options, run) => {
 	const handler = nodeAdapter.createCatchAllHandler(
-		nodeAdapter.compileRoutes(routes, {
-			...(options.customValidationHandlers && {
-				requestValidationErrorHandler: () =>
-					Response.json({ handled: "request" }, { status: 422 }),
-				responseValidationErrorHandler: () =>
-					Response.json({ handled: "response" }, { status: 502 }),
-			}),
-		}),
+		nodeAdapter.compileRoutes(routes),
 	);
 	return withHttpServer(async (req, res) => {
 		try {
@@ -233,6 +217,7 @@ describe.each([
 			});
 			expect(response.status).toBe(415);
 			expect(await response.json()).toEqual({
+				code: "UNSUPPORTED_MEDIA_TYPE",
 				message: "Unsupported request body content type.",
 			});
 			expect(handler).not.toHaveBeenCalled();
@@ -255,34 +240,70 @@ describe.each([
 		});
 	});
 
-	it("answers validation errors with the default responses", async () => {
+	it("sends built-in errors as JSON error responses", async () => {
 		await serve(validationRoutes, {}, async (url) => {
 			const request = await postJson(`${url}/invalid-request`, {});
 			expect(request.status).toBe(400);
-			expect(await request.json()).toMatchObject({
-				validationErrors: { body: [{ message: "invalid value" }] },
+			expect(await request.json()).toEqual({
+				code: "REQUEST_VALIDATION_FAILED",
+				message: "Request validation failed.",
+				data: {
+					body: [{ message: "invalid value" }],
+					query: [],
+					params: [],
+					headers: [],
+				},
+			});
+			const malformed = await fetch(`${url}/invalid-request`, {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: "{",
+			});
+			expect(malformed.status).toBe(400);
+			expect(await malformed.json()).toEqual({
+				code: "MALFORMED_REQUEST_BODY",
+				message: "Invalid request body.",
 			});
 			const response = await fetch(`${url}/invalid-response`);
 			expect(response.status).toBe(500);
 			expect(await response.json()).toEqual({
-				message: "Response validation failed.",
+				code: "INTERNAL_SERVER_ERROR",
+				message: "Internal server error.",
 			});
 		});
 	});
 
-	it("answers validation errors with custom handlers", async () => {
-		await serve(
-			validationRoutes,
-			{ customValidationHandlers: true },
-			async (url) => {
-				const request = await postJson(`${url}/invalid-request`, {});
-				expect(request.status).toBe(422);
-				expect(await request.json()).toEqual({ handled: "request" });
-				const response = await fetch(`${url}/invalid-response`);
-				expect(response.status).toBe(502);
-				expect(await response.json()).toEqual({ handled: "response" });
-			},
-		);
+	it("sends thrown declared errors with their status, headers and data", async () => {
+		const RateLimited = routeError("RATE_LIMITED", {
+			status: 429,
+			message: "Slow down",
+			data: type<{ limit: number }>(),
+			headers: type<{ "retry-after": number }>(),
+		});
+		const routes = {
+			limited: route
+				.get("/limited")
+				.error(RateLimited)
+				.handler((): string => {
+					throw new RateLimited(
+						{ limit: 10 },
+						{ headers: { "retry-after": 30 } },
+					);
+				}),
+		};
+		await serve(routes, {}, async (url) => {
+			const response = await fetch(`${url}/limited`);
+			expect(response.status).toBe(429);
+			expect(response.headers.get("retry-after")).toBe("30");
+			expect(response.headers.get("content-type")).toMatch(
+				/^application\/json/,
+			);
+			expect(await response.json()).toEqual({
+				code: "RATE_LIMITED",
+				message: "Slow down",
+				data: { limit: 10 },
+			});
+		});
 	});
 
 	it("streams server-sent events", async () => {

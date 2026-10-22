@@ -2,6 +2,7 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { RouteDeclaration } from "./routeDeclaration.ts";
 import type { InferSchema, RequestScalar } from "./request.ts";
 import type { SseEvent } from "./sse.ts";
+import type { RouteError } from "./routeError.ts";
 import type { Merge } from "../utils/typeUtils.ts";
 
 /**
@@ -40,7 +41,7 @@ export type ResponseDeclaration = {
  * @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-responses}
  */
 export type ResponseOptions = {
-	/** HTTP status of the response. Defaults to 200. */
+	/** HTTP status of the response, from 200 to 299. Defaults to 200. */
 	status?: number;
 	headers?: ResponseHeadersSchema;
 	/** Describes the response in generated OpenAPI documents. */
@@ -160,23 +161,6 @@ type ResponseStatus<TStatus> = TStatus extends number
 		? TNumber
 		: never;
 
-type StatusFilter = "any" | "success" | "error";
-
-type MatchesStatusFilter<
-	TStatus extends number,
-	TFilter extends StatusFilter,
-> = TFilter extends "any"
-	? true
-	: number extends TStatus
-		? true
-		: `${TStatus}` extends `2${string}`
-			? TFilter extends "success"
-				? true
-				: false
-			: TFilter extends "error"
-				? true
-				: false;
-
 type ResponseEntryFor<
 	TSide extends "client" | "server",
 	TStatus extends number,
@@ -185,35 +169,55 @@ type ResponseEntryFor<
 	? ClientResponseEntry<TStatus, TResponse>
 	: ServerResponseEntry<TStatus, TResponse>;
 
-/** Maps each declared status that passes the filter to its response entry. */
+/** Maps each declared status to its response entry. */
 type ResponseUnion<
 	E extends RouteDeclaration,
 	TSide extends "client" | "server",
-	TFilter extends StatusFilter,
 > = E extends { responses: infer TResponses }
 	? {
 			[TKeys in keyof TResponses]: TKeys extends ResponseKey
-				? MatchesStatusFilter<ResponseStatus<TKeys>, TFilter> extends true
-					? ResponseEntryFor<TSide, ResponseStatus<TKeys>, TResponses[TKeys]>
-					: never
+				? ResponseEntryFor<TSide, ResponseStatus<TKeys>, TResponses[TKeys]>
 				: never;
 		}[keyof TResponses]
 	: never;
 
 export type DeclaredClientResponse<E extends RouteDeclaration> = ResponseUnion<
 	E,
-	"client",
-	"any"
+	"client"
 >;
 
 export type ServerResponse<E extends RouteDeclaration> = ResponseUnion<
 	E,
-	"server",
-	"any"
+	"server"
 >;
 
-export type SuccessfulDeclaredClientResponse<E extends RouteDeclaration> =
-	ResponseUnion<E, "client", "success">;
+type ClientErrorHeaders<TDeclaration> = TDeclaration extends {
+	headers: infer THeaders extends ResponseHeadersSchema;
+}
+	? Record<string, string> & InferSchema<THeaders, "output">
+	: Record<string, string>;
 
-export type ErrorDeclaredClientResponse<E extends RouteDeclaration> =
-	ResponseUnion<E, "client", "error">;
+type ClientErrorData<TDeclaration> = TDeclaration extends {
+	data: infer TData extends StandardSchemaV1;
+}
+	? InferSchema<TData, "output">
+	: undefined;
+
+/** The declared errors of a route as received by clients. */
+// The top-level conditional keeps editors from displaying this alias instead of the resolved union.
+export type ClientRouteError<E extends RouteDeclaration> = E extends {
+	errors: infer TErrors;
+}
+	? {
+			[TCode in Extract<keyof TErrors, string>]: TErrors[TCode] extends {
+				status: infer TStatus extends number;
+			}
+				? RouteError<
+						TCode,
+						ClientErrorData<TErrors[TCode]>,
+						TStatus,
+						ClientErrorHeaders<TErrors[TCode]>
+					>
+				: never;
+		}[Extract<keyof TErrors, string>]
+	: never;
