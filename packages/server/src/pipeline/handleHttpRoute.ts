@@ -192,9 +192,12 @@ export const isResponseEnvelope = (
 	"status" in value &&
 	typeof value.status === "number";
 
+// Errors are thrown, so inferred statuses are successful.
 const assertImplicitStatus = (status: number) => {
-	if (!Number.isInteger(status) || status < 100 || status > 599) {
-		throw new Error(`Invalid inferred HTTP response status "${status}".`);
+	if (!Number.isInteger(status) || status < 200 || status > 299) {
+		throw new Error(
+			`Inferred response status "${status}" must be from 200 to 299.`,
+		);
 	}
 };
 
@@ -245,6 +248,8 @@ const normalizeHandlerResult = (
 	);
 };
 
+const noErrors = {};
+
 /**
  * Validates decoded request segments, executes middleware and the handler, and
  * validates the selected output. Validation errors are thrown.
@@ -269,6 +274,7 @@ export function executeRoute(
 			signal: options.signal,
 			contentType: mediaType,
 			route,
+			errors: route.errors ?? noErrors,
 		}),
 	);
 	return mapMaybePromise(handlerResult, (result) =>

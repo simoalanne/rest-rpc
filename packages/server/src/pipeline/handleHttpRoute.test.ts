@@ -1,4 +1,4 @@
-import { type } from "@rest-rpc/core";
+import { routeError, type } from "@rest-rpc/core";
 import {
 	handleHttpRoute,
 	normalizeImplicitResponse,
@@ -50,6 +50,23 @@ describe("handleHttpRoute", () => {
 		expect(await execute(implementation)).toMatchObject({ body: { value: 2 } });
 		expect(await execute(implementation)).toMatchObject({ body: { value: 2 } });
 		expect(contexts[0]).not.toBe(contexts[1]);
+	});
+
+	it("passes the declared error classes to middleware and the handler", async () => {
+		const Gone = routeError("GONE", { status: 410 });
+		const implementation = route
+			.get("/")
+			.error(Gone)
+			.use(({ errors, next }) => {
+				expect(errors.GONE).toBe(Gone);
+				return next();
+			})
+			.handler(({ errors }): string => {
+				throw new errors.GONE();
+			});
+		await expect(async () => execute(implementation)).rejects.toBeInstanceOf(
+			Gone,
+		);
 	});
 
 	it("rejects invalid requests without invoking the handler", async () => {
@@ -335,8 +352,8 @@ describe("normalizeImplicitResponse", () => {
 		});
 	});
 
-	it.each([100, 200, 599])(
-		"accepts integer HTTP status %s and preserves headers",
+	it.each([200, 299])(
+		"accepts the 2xx status %s and preserves headers",
 		(status) => {
 			expect(
 				normalizeImplicitResponse({
@@ -364,11 +381,11 @@ describe("normalizeImplicitResponse", () => {
 		});
 	});
 
-	it.each([99, 600, 200.5, NaN, Infinity])(
-		"rejects invalid inferred status %s",
+	it.each([199, 300, 404, 200.5, NaN, Infinity])(
+		"rejects the inferred status %s outside 2xx",
 		(status) => {
 			expect(() => normalizeImplicitResponse({ status })).toThrow(
-				"Invalid inferred HTTP response status",
+				"must be from 200 to 299",
 			);
 		},
 	);
