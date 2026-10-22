@@ -14,6 +14,7 @@ shared contract is also supported.
 - Typed handlers for Node HTTP and Fetch runtimes, registrable on any framework's router.
 - One-line servers for Bun, Node, and other Fetch runtimes, with Bun's native router on Bun.
 - Typed Fetch client and TanStack Query utils.
+- Typed errors sent as plain JSON, separate from successful responses
 - Typed Server-Sent Event streams and custom request/response bodies
 - Standard Schema validation
 - OpenAPI generation from route declarations
@@ -30,15 +31,15 @@ export const routes = {
 		create: route
 			.body(z.object({ title: z.string() }))
 			.handler(({ body: { title } }) => createTodo(title)),
-		// GET /todos/:id with path params and a 404 response.
+		// GET /todos/:id with path params and a declared 404 error.
 		get: route
 			.get("/todos/:id")
 			.params(z.object({ id: z.string() }))
-			.handler(({ params }) => {
+			.error("TODO_NOT_FOUND", { status: 404 })
+			.handler(({ params, errors }) => {
 				const todo = findTodo(params.id);
-				return (
-					todo ?? { status: 404, body: { code: "TODO_NOT_FOUND" as const } }
-				);
+				if (!todo) throw new errors.TODO_NOT_FOUND();
+				return todo;
 			}),
 	},
 };
@@ -65,7 +66,7 @@ await writeFile("contract.json", JSON.stringify(extractContract(routes)));
 ```
 
 ```ts
-import { initClient } from "@rest-rpc/core";
+import { initClient, RouteError, safe } from "@rest-rpc/core";
 import type { routes } from "./routes";
 import contract from "./contract.json";
 
@@ -74,10 +75,17 @@ const client = initClient(api, { baseUrl: "http://localhost:3000" });
 
 const created = await client.todos.create({ body: { title: "Write docs" } });
 
-const response = await client.todos.get({ params: { id: created.body.id } });
+// Calls reject with typed errors, or resolve to [error, data] with safe().
+const [error, todo] = await safe(
+	client.todos.get({ params: { id: created.body.id } }),
+);
 
-if (response.status === 200) {
-	console.log(response.body.title);
+if (!error) {
+	console.log(todo.body.title);
+} else if (error instanceof RouteError && error.code === "TODO_NOT_FOUND") {
+	console.log("Todo not found");
+} else {
+	throw error;
 }
 ```
 
