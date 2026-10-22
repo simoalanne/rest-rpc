@@ -20,6 +20,12 @@ export type {
 } from "./contract/index.ts";
 export { extractContract } from "./contract/extract.ts";
 export { route } from "./contract/routeBuilder.ts";
+export {
+	RouteError,
+	routeError,
+	type RouteErrorDefinitionOptions,
+	type RouteErrorOptions,
+} from "./contract/routeError.ts";
 export type {
 	BodyContent,
 	KnownBodyContentType,

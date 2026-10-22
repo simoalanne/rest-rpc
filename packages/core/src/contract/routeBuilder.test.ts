@@ -2,6 +2,7 @@ import { type } from "../standard-schema/type.ts";
 import type { BodyContent } from "./body.ts";
 import { resolveRoutePath } from "./path.ts";
 import { RouteBuilder, route } from "./routeBuilder.ts";
+import { routeError } from "./routeError.ts";
 
 const schema = type<{ name: string }>();
 
@@ -74,6 +75,22 @@ describe("routeBuilder", () => {
 	it.each([99, 600, 200.5, NaN])("rejects invalid HTTP status %s", (status) => {
 		expect(() => new RouteBuilder().response({ status })).toThrow(
 			"Invalid HTTP response status",
+		);
+	});
+
+	it("declares errors by definition or inline and rejects conflicting codes", () => {
+		const Unauthorized = routeError("UNAUTHORIZED", { status: 401 });
+		const authed = route.error(Unauthorized);
+		const value = authed.error(Unauthorized).error("INVALID", { data: schema });
+		expect(value["~restrpc"].errors.UNAUTHORIZED).toBe(Unauthorized);
+		expect({ ...value["~restrpc"].errors.INVALID }).toMatchObject({
+			code: "INVALID",
+			status: 400,
+			data: schema,
+		});
+		expect(authed["~restrpc"].responses).toEqual({});
+		expect(() => authed.error("UNAUTHORIZED")).toThrow(
+			'Error code "UNAUTHORIZED" has already been declared.',
 		);
 	});
 

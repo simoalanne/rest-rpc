@@ -12,7 +12,7 @@ const routes = {
 			.params(type<{ id: string }>())
 			.metadata({ auth: "required" })
 			.response(user)
-			.response(type<{ code: "NOT_FOUND" }>(), { status: 404 }),
+			.error("USER_NOT_FOUND", { status: 404, data: type<{ id: string }>() }),
 		create: route
 			.body({ "application/json": user, "text/plain": type<string>() })
 			.openAPI({ summary: "Create user" })
@@ -21,10 +21,16 @@ const routes = {
 };
 
 describe("extractContract", () => {
-	it("keeps only methods, resolved paths, and request body media types", () => {
+	it("keeps only methods, resolved paths, request body media types, and error statuses", () => {
 		expect(extractContract(routes)).toEqual({
 			users: {
-				get: { "~restrpc": { method: "GET", path: "/users/:id" } },
+				get: {
+					"~restrpc": {
+						method: "GET",
+						path: "/users/:id",
+						errors: { USER_NOT_FOUND: { status: 404 } },
+					},
+				},
 				create: {
 					"~restrpc": {
 						method: "POST",

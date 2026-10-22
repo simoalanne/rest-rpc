@@ -18,6 +18,12 @@ import type {
 	ResponseDeclaration,
 	ResponseOptions,
 } from "./response.ts";
+import {
+	routeError,
+	type AnyRouteErrorClass,
+	type RouteErrorClassFor,
+	type RouteErrorDefinitionOptions,
+} from "./routeError.ts";
 import type {
 	BuilderFor,
 	BuilderKind,
@@ -26,6 +32,7 @@ import type {
 	NextState,
 	RootBuilderState,
 	WithBody,
+	WithError,
 	WithHttpMethod,
 	WithMetadata,
 	WithPrefix,
@@ -181,6 +188,24 @@ const addResponse = (
 	return {
 		...state,
 		responses: { ...state.responses, [status]: schema },
+	};
+};
+
+// Shared bases may declare the same definition a route declares again.
+const addError = (
+	state: RouteBuilderState,
+	definition: AnyRouteErrorClass,
+): RouteBuilderState => {
+	const declared = state.errors?.[definition.code];
+	if (declared === definition) return state;
+	if (declared) {
+		throw new Error(
+			`Error code "${definition.code}" has already been declared.`,
+		);
+	}
+	return {
+		...state,
+		errors: { ...state.errors, [definition.code]: definition },
 	};
 };
 
@@ -365,6 +390,32 @@ export class RouteBuilder<
 				...declaration,
 				content: toContent(schemaOrContentOrOptions),
 			}),
+		);
+	}
+
+	/** Declares an error defined with `routeError`. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-errors} */
+	error<const TDefinition extends AnyRouteErrorClass>(
+		definition: TDefinition,
+	): BuilderFor<TKind, WithError<TState, TDefinition>>;
+	/** Declares an error, the same as declaring `routeError(code, options)`. The status defaults to 400. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-errors} */
+	error<
+		const TCode extends string,
+		const TOptions extends RouteErrorDefinitionOptions | undefined = undefined,
+	>(
+		code: TCode,
+		options?: TOptions,
+	): BuilderFor<TKind, WithError<TState, RouteErrorClassFor<TCode, TOptions>>>;
+	error(
+		definitionOrCode: AnyRouteErrorClass | string,
+		options?: RouteErrorDefinitionOptions,
+	): never {
+		return this.clone(
+			addError(
+				defaultRouteState(this["~restrpc"]),
+				typeof definitionOrCode === "string"
+					? routeError(definitionOrCode, options)
+					: definitionOrCode,
+			),
 		);
 	}
 

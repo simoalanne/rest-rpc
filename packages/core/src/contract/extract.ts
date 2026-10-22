@@ -5,10 +5,11 @@ import { mapContractRoutes } from "./traversal.ts";
 /**
  * Extracts the minimal JSON-compatible client contract from a route tree.
  *
- * @remarks Keeps only each route's method, resolved path, and request body
- * media types. The body keeps the declaration shape with empty schema lists.
- * Schemas, responses, metadata, and handlers are left out, so the result can
- * be serialized and shipped to a client without server code.
+ * @remarks Keeps only each route's method, resolved path, request body media
+ * types, and the status of each declared error code. The body keeps the
+ * declaration shape with empty schema lists. Schemas, responses, metadata,
+ * and handlers are left out, so the result can be serialized and shipped to a
+ * client without server code.
  * The return type keeps the route tree type for client inference.
  *
  * Extraction runs the module that defines the routes, so call it at build
@@ -37,6 +38,14 @@ export function extractContract<const TRoutes extends RouteTree>(
 						Object.keys(route.request.body).map((mediaType) => [mediaType, []]),
 					),
 				},
+			}),
+			...(route.errors && {
+				errors: Object.fromEntries(
+					Object.entries(route.errors).map(([code, { status }]) => [
+						code,
+						{ status },
+					]),
+				),
 			}),
 		},
 	})) as TRoutes;

@@ -1,9 +1,11 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
+import type { RouteErrorDeclaration } from "./routeError.ts";
 import type { DefaultBodyContentType } from "./body.ts";
 import type {
 	AbsolutePath,
 	HttpMethod,
 	OpenApiRouteOptions,
+	RouteErrors,
 	RouteMetadata,
 	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
@@ -21,6 +23,7 @@ export type BuilderState = {
 	prefix: AbsolutePath | undefined;
 	request: object;
 	responses: object;
+	errors: RouteErrors;
 	metadata: RouteMetadata | undefined;
 	openApi: boolean;
 	omit: PropertyKey;
@@ -33,6 +36,7 @@ export type RootBuilderState = {
 	prefix: undefined;
 	request: EmptyObject;
 	responses: EmptyObject;
+	errors: EmptyObject;
 	metadata: undefined;
 	openApi: false;
 	omit: never;
@@ -86,7 +90,10 @@ export type DeclarationFor<TState extends BuilderState> =
 								TState["responses"][TStatus]
 							>;
 						};
-					} & (TState["metadata"] extends RouteMetadata
+					} & (keyof TState["errors"] extends never
+						? EmptyObject
+						: { errors: TState["errors"] }) &
+					(TState["metadata"] extends RouteMetadata
 						? { readonly metadata: TState["metadata"] }
 						: EmptyObject) &
 					(TState["prefix"] extends AbsolutePath
@@ -231,5 +238,18 @@ export type WithResponse<
 	{
 		responses: TState["responses"] &
 			Record<StatusFor<TOptions>, ResponseFor<TSchemaOrContent, TOptions>>;
+	}
+>;
+
+export type WithError<
+	TState extends BuilderState,
+	TDefinition extends RouteErrorDeclaration,
+> = NextState<
+	TState,
+	{
+		errors: Merge<
+			Omit<TState["errors"], TDefinition["code"]> &
+				Record<TDefinition["code"], TDefinition>
+		>;
 	}
 >;

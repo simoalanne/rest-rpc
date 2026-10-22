@@ -9,6 +9,7 @@ export type {
 	HttpMethod,
 	OpenApiRouteOptions,
 	RouteDeclaration,
+	RouteErrors,
 	RouteMetadata,
 	RouteRequestDeclaration,
 	RequestBodyDeclaration,
@@ -24,6 +25,17 @@ export type {
 	RootBuilderState,
 } from "./routeBuilder.types.ts";
 export { RouteBuilder, type RouteBuilderKind } from "./routeBuilder.ts";
+export {
+	RouteError,
+	routeError,
+	UNKNOWN_ERROR,
+	type AnyRouteErrorClass,
+	type RouteErrorClass,
+	type RouteErrorClassFor,
+	type RouteErrorDeclaration,
+	type RouteErrorDefinitionOptions,
+	type RouteErrorOptions,
+} from "./routeError.ts";
 export { extractContract } from "./extract.ts";
 export {
 	getPathParamNames,

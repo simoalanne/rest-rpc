@@ -41,6 +41,8 @@ export {
 export {
 	bodyCodec,
 	createOpenApiDocument,
+	RouteError,
+	routeError,
 	serializedBody,
 	type,
 } from "@rest-rpc/core";
@@ -53,5 +55,7 @@ export type {
 	InferClientRequest,
 	InferClientResponse,
 	OpenApiDocument,
+	RouteErrorDefinitionOptions,
+	RouteErrorOptions,
 	SseEvent,
 } from "@rest-rpc/core";
