@@ -199,7 +199,7 @@ await queryClient.invalidateQueries({
 ## Mutations
 
 ```tsx
-import { HttpError } from "@rest-rpc/core";
+import { RouteError } from "@rest-rpc/tanstack-query";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 const queryClient = useQueryClient();
@@ -212,10 +212,8 @@ const createTodo = useMutation(
 			});
 		},
 		onError(error) {
-			if (error instanceof HttpError) {
-				console.log(error.status, error.body);
-			} else if (!(error instanceof Error) && error.status === 409) {
-				console.log(error.body.code);
+			if (error instanceof RouteError && error.code === "TODO_EXISTS") {
+				console.log(error.message);
 			}
 		},
 	}),
@@ -262,16 +260,15 @@ const todo = useQuery(
 
 TanStack Query uses success and error channels.
 
-2xx response envelopes get mapped to the `data` key. Use TanStack Query's
-`select` option to read only the `body`.
+Response envelopes get mapped to the `data` key. Use TanStack Query's `select`
+option to read only the `body`.
 
-Non-2xx response envelopes get mapped to the `error` key.
+The errors the [Fetch client](/docs/client/fetch-client#handle-errors) rejects
+with get mapped to the `error` key: a `RouteError` with a declared code or
+`UNKNOWN_ERROR` when a response arrived, and the original `Error` otherwise.
 
-Undeclared statuses and response validation failures become [`HttpError`](/docs/client/fetch-client#error-handling).
-Network and other unexpected failures become ordinary `Error` objects.
-
-`HttpError` is re-exported from `@rest-rpc/tanstack-query`, so errors can be
-narrowed with `instanceof HttpError`.
+`RouteError` is re-exported from `@rest-rpc/tanstack-query`, so errors can be
+narrowed with `instanceof RouteError` and then by `code`.
 
 ## Type Helpers
 
@@ -283,28 +280,25 @@ contract, or a route tree to infer a matching tree of types.
 import type {
 	InferClientError,
 	InferClientRequest,
-	InferClientSuccess,
+	InferClientResponse,
 } from "@rest-rpc/tanstack-query";
 import { api } from "./client-contract";
 
-type TodoData = InferClientSuccess<typeof api.todos.get>;
-type TodoError = InferClientError<typeof api.todos.get>;
+type TodoData = InferClientResponse<typeof api.todos.get>;
+type TodoError = InferClientError<typeof api.todos.get> | Error;
 type CreateTodoVariables = InferClientRequest<typeof api.todos.create>;
 ```
 
-| Type                                       | Infers                                                                           |
-| ------------------------------------------ | -------------------------------------------------------------------------------- |
-| `InferClientSuccess<Route>`                | The `data` of a query or mutation.                                               |
-| `InferClientError<Route>`                  | The `error` of a query or mutation, as described in [Error Model](#error-model). |
-| `InferClientRequest<Route, GlobalHeaders>` | The `request` of a query and the variables passed to `mutate()`.                 |
-| `InferClientStreamData<Route>`             | The `data` of each event in a [streamed query](#streamed-queries).               |
+| Type                                       | Infers                                                                                 |
+| ------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `InferClientResponse<Route>`               | The `data` of a query or mutation.                                                     |
+| `InferClientError<Route>`                  | The `RouteError`s of a query or mutation, as described in [Error Model](#error-model). |
+| `InferClientRequest<Route, GlobalHeaders>` | The `request` of a query and the variables passed to `mutate()`.                       |
+| `InferClientStreamData<Route>`             | The `data` of each event in a [streamed query](#streamed-queries).                     |
 
-`InferClientSuccess`, `InferClientRequest`, and `InferClientStreamData` are
-re-exported from [`@rest-rpc/core`](/docs/client/fetch-client#type-helpers).
-`InferClientError` adds `HttpError` and `Error` to the core
-`InferClientError`, because the error channel also receives thrown errors.
-Import `InferClientError` from `@rest-rpc/core` when you need only the declared
-non-2xx responses.
+The helpers are re-exported from
+[`@rest-rpc/core`](/docs/client/fetch-client#type-helpers). The `error` of a
+query or mutation is `InferClientError<Route> | Error`.
 
 `TanstackQueryUtilsFor<typeof api>` is the type of the whole util tree returned
 by `createTanstackQueryUtils()`. It accepts the type of your `globalHeaders` as a

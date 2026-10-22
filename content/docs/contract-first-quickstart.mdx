@@ -41,13 +41,13 @@ const get = route
 	.params(z.object({ id: z.string() }))
 	.query(z.object({ uppercase: z.enum(["yes", "no"]).optional() }))
 	.response(todoSchema)
-	.response(z.object({ code: z.literal("TODO_NOT_FOUND") }), { status: 404 });
+	.error("TODO_NOT_FOUND", { status: 404 });
 
 export const api = { todos: { create, get } };
 ```
 
 `todos.create` uses the default `POST /todos/create`. `todos.get` declares its
-HTTP method, path, and 200 and 404 responses. The schemas also provide runtime validation of handler results.
+HTTP method, path, 200 response, and `TODO_NOT_FOUND` error with status 404. The schemas also provide runtime validation of handler results.
 
 ## Implement and Register Routes
 
@@ -72,11 +72,9 @@ const create = implement(api.todos.create).handler(({ body: { title } }) => {
 	return todo;
 });
 
-const get = implement(api.todos.get).handler(({ params, query }) => {
+const get = implement(api.todos.get).handler(({ params, query, errors }) => {
 	const todo = todos.get(params.id);
-	if (!todo) {
-		return { status: 404, body: { code: "TODO_NOT_FOUND" } };
-	}
+	if (!todo) throw new errors.TODO_NOT_FOUND();
 	return {
 		...todo,
 		title: query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title,
@@ -106,21 +104,23 @@ The contract itself contains no framework or handler code.
 Import the shared contract directly. No contract extraction step is needed.
 
 ```ts client.ts
-import { initClient } from "@rest-rpc/core";
+import { initClient, safe } from "@rest-rpc/core";
 import { api } from "./contract";
 
 const client = initClient(api, { baseUrl: "http://localhost:3000" });
 
 const created = await client.todos.create({ body: { title: "Write docs" } });
-const response = await client.todos.get({
-	params: { id: created.body.id },
-	query: { uppercase: "yes" },
-});
+const [error, response] = await safe(
+	client.todos.get({
+		params: { id: created.body.id },
+		query: { uppercase: "yes" },
+	}),
+);
 
-if (response.status === 200) {
+if (!error) {
 	console.log(response.body.title);
-} else {
-	console.log(response.body.code); // "TODO_NOT_FOUND"
+} else if ("code" in error && error.code === "TODO_NOT_FOUND") {
+	console.log(error.message);
 }
 ```
 

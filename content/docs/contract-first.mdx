@@ -25,13 +25,15 @@ const get = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
 	.response(todoSchema)
-	.response(z.object({ code: z.literal("TODO_NOT_FOUND") }), { status: 404 });
+	.error("TODO_NOT_FOUND", { status: 404 });
 
 export const api = { todos: { create, get } };
 ```
 
-Use `.response()` for each response and `.streamResponse()` for streams. These
-schemas define handler and client types and provide [runtime validation](/docs/http-behavior/schemas).
+Use `.response()` for each successful response, `.streamResponse()` for
+streams, and `.error()` for each [error](/docs/route-builder#declare-errors).
+These schemas define handler and client types and provide
+[runtime validation](/docs/http-behavior/schemas).
 See [Streaming](/docs/streaming) for stream handlers.
 
 ## Implement Routes
@@ -47,16 +49,17 @@ const create = implementer.todos.create.handler(({ body: { title } }) =>
 	createTodo(title),
 );
 
-const get = implementer.todos.get.handler(({ params }) => {
+const get = implementer.todos.get.handler(({ params, errors }) => {
 	const todo = findTodo(params.id);
-	return todo ?? { status: 404, body: { code: "TODO_NOT_FOUND" } };
+	if (!todo) throw new errors.TODO_NOT_FOUND();
+	return todo;
 });
 
 export const routes = { todos: { create, get } };
 ```
 
 The implementation must match the contract's request segments and declared
-responses. Compile and register the completed routes as usual.
+responses, and throw the contract's declared errors. Compile and register the completed routes as usual.
 
 ## Context And Middleware
 

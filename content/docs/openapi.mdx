@@ -152,11 +152,20 @@ const remove = route
 	.delete("/todos/:id")
 	.params(z.object({ id: z.string() }))
 	.response({ status: 204, description: "Todo deleted." })
-	.response(z.object({ code: z.literal("TODO_NOT_FOUND") }), {
+	.error("TODO_NOT_FOUND", {
 		status: 404,
 		description: "No todo has this id.",
 	});
 ```
+
+## Errors
+
+Each [declared error](/docs/route-builder#declare-errors) produces a JSON
+response for its status, whose body schema is `{ code, message, data? }` with
+`code` as a constant. Errors that share a status are documented as one response
+whose schema is a `oneOf` of their bodies, and whose description joins their
+descriptions. [Built-in errors](/docs/http-behavior/errors#built-in-errors) are
+not documented.
 
 ## Transform Hooks
 

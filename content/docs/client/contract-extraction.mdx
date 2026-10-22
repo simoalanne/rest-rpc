@@ -19,7 +19,10 @@ For each route, the contract keeps only:
 - the HTTP method,
 - the path, with paths derived from tree keys resolved,
 - the request body media types, when the route declares a body. They keep the
-  declaration shape, `request.body`, with empty schema lists.
+  declaration shape, `request.body`, with empty schema lists,
+- the status of each [declared error](/docs/route-builder#declare-errors), as
+  `errors: { CODE: { status } }`, so the client recognizes declared error
+  codes.
 
 Schemas, responses, metadata, OpenAPI details, and handlers are left out. The
 result is plain JSON. Its type is the route tree type, so the client still
@@ -92,9 +95,10 @@ An extracted contract has no response declarations or schemas:
 
 - [Client response validation](/docs/client/fetch-client#response-validation)
   is not available.
-- The client does not check response statuses or content types. An
-  unexpected response, such as an error page from a proxy, is returned with a
-  status the types do not list.
+- The client does not check 2xx response statuses or content types. Error
+  responses are still classified: declared codes reject with their error, and
+  anything else, such as an error page from a proxy, rejects with
+  [`UNKNOWN_ERROR`](/docs/client/fetch-client#handle-errors).
 
 Declared schemas still validate requests and responses on the server. If the
 client needs runtime schemas, use a [shared contract](/docs/contract-first)

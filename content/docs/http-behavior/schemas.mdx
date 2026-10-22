@@ -30,9 +30,9 @@ result types come from the handler's return value.
 
 The server decodes a request, then validates its declared request schemas before
 running middleware and the handler. The handler receives validated schema
-output. Request validation failures produce a 400 response by default. See
-[Error Responses](/docs/http-behavior/errors) for the response body and how to
-customize it.
+output. Request validation failures produce a `REQUEST_VALIDATION_FAILED`
+error response with status 400. See [Errors](/docs/http-behavior/errors#built-in-errors)
+for the response body.
 
 ```ts
 import { route } from "@rest-rpc/server";
@@ -65,8 +65,9 @@ Inferred responses provide type checking without runtime response validation.
 Add `.response()` or `.streamResponse()` when runtime validation is needed.
 Declared stream schemas validate each item as it is yielded.
 
-Response validation failures produce a generic 500 response by default. See
-[Error Responses](/docs/http-behavior/errors).
+Response validation failures produce a `RESPONSE_VALIDATION_FAILED` error
+response with status 500, without validation details. See
+[Errors](/docs/http-behavior/errors#built-in-errors).
 
 ## Response Validation on the Client
 

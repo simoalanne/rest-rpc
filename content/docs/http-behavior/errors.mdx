@@ -1,59 +1,84 @@
 ---
-title: Error Responses
-description: Default server responses for invalid requests and responses, and how errors reach your framework.
+title: Errors
+description: How declared and built-in errors are sent, and how other errors reach your framework.
 ---
 
-The server rejects invalid requests before the handler runs and checks
-handler output before it is sent. This page lists the default responses. The
-[Fetch runtime](/docs/server/fetch#error-handling) page documents how to
-replace them.
+Routes return successful responses and throw errors. A route
+[declares](/docs/route-builder#declare-errors) each error it can respond with
+by a unique code, and clients reject with the declared error when they receive
+it.
 
-## Default Responses
+## Wire Format
 
-| Situation                                                                                              | Status | Body                            |
-| ------------------------------------------------------------------------------------------------------ | ------ | ------------------------------- |
-| Request `Content-Type` is not declared by a route with a body, or missing when several media types are | `415`  | `{ message }`                   |
-| Request body cannot be decoded                                                                         | `400`  | `{ message }`                   |
-| [Request validation](/docs/http-behavior/schemas#request-validation) fails                             | `400`  | `{ message, validationErrors }` |
-| [Response validation](/docs/http-behavior/schemas#response-validation-on-the-server) fails             | `500`  | `{ message }`                   |
+Every error response rest-rpc sends is JSON with the error's status:
 
-The request validation body groups Standard Schema issues by location:
+```http
+HTTP/1.1 404 Not Found
+Content-Type: application/json
+
+{ "code": "TODO_NOT_FOUND", "message": "Todo not found", "data": { "id": "42" } }
+```
+
+- `code` and `message` are always present, and `data` is present when the error
+  has data.
+- Declared error headers are sent as response headers.
+
+Any HTTP client can read these responses. The rest-rpc client recognizes a code
+when the route declares it with the received status, and turns every other
+response outside the contract into `UNKNOWN_ERROR`. See
+[Fetch Client](/docs/client/fetch-client#handle-errors).
+
+## Throwing Errors
+
+Throw `new errors.CODE(...)` from a handler or middleware, or throw an error
+defined with `routeError()` from any code. Both create a `RouteError`.
+
+The route's declaration decides the response: its status, and the validated
+`data` and headers. When `data` or headers fail validation, the
+`RESPONSE_VALIDATION_FAILED` error is sent instead.
+
+Throwing an error whose code the route does not declare is a programmer error.
+The route rejects with an error that names the route and the code, as it does
+for an undeclared response status.
+
+## Built-in Errors
+
+The server sends these errors without a declaration:
+
+| Code                         | Status | `data`                                                 | Sent when                                                                                                        |
+| ---------------------------- | ------ | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `REQUEST_VALIDATION_FAILED`  | `400`  | Issues grouped by `body`, `query`, `params`, `headers` | [Request validation](/docs/http-behavior/schemas#request-validation) fails                                       |
+| `MALFORMED_REQUEST_BODY`     | `400`  | none                                                   | The request body cannot be decoded                                                                               |
+| `UNSUPPORTED_MEDIA_TYPE`     | `415`  | none                                                   | The request `Content-Type` is not declared by a route with a body, or missing when several media types are       |
+| `RESPONSE_VALIDATION_FAILED` | `500`  | none                                                   | [Response validation](/docs/http-behavior/schemas#response-validation-on-the-server) fails, including error data |
+| `INTERNAL_SERVER_ERROR`      | `500`  | none                                                   | A handler or middleware throws another error, with [`createApp`](/docs/server/fetch) only                        |
+| `NOT_FOUND`                  | `404`  | none                                                   | No route matches, with `createApp`'s default `notFound` only                                                     |
+
+The request validation issues have the `RequestValidationIssues` type:
 
 ```ts
 {
-	message: string;
-	validationErrors: {
-		body: ValidationIssue[];
-		query: ValidationIssue[];
-		params: ValidationIssue[];
-		headers: ValidationIssue[];
-	};
+	body: ValidationIssue[];
+	query: ValidationIssue[];
+	params: ValidationIssue[];
+	headers: ValidationIssue[];
 }
 ```
 
-The response validation body does not expose validation details.
+Response validation details are not sent. The error's `cause` holds the
+validation `location` and `issues`, and is available to
+[`onError`](/docs/server/fetch#error-handling).
 
-## Validation Errors
-
-`RequestValidationError` has:
-
-- `status`: the default status, `400`.
-- `issues`: Standard Schema issues grouped by `body`, `query`, `params`, and `headers`.
-- `responseBody`: the default response body.
-
-`ResponseValidationError` has:
-
-- `status`: the default status, `500`.
-- `location`: `"body"`, `"headers"`, or `"stream"`.
-- `issues`: the Standard Schema issues.
-- `responseBody`: the default response body.
+Built-in codes are not part of route types, so clients receive them as
+`UNKNOWN_ERROR`. To make one known to clients, declare it on the route with its
+built-in status.
 
 A stream item that fails validation cannot change the response status. The
 stream ends instead.
 
 ## Other Errors
 
-Errors thrown by handlers, middleware, or custom serializers are not converted
-into responses. They reject the handler promise, and reach the framework's
-error handling when routes are registered on a framework. Returning a status that the
-route does not declare also produces an error.
+Other errors thrown by handlers, middleware, or custom serializers are not sent
+as error responses by compiled routes. They reject the handler promise, and
+reach the framework's error handling when routes are registered on a framework.
+`createApp` sends them as `INTERNAL_SERVER_ERROR` responses.

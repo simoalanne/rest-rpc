@@ -30,14 +30,19 @@ describes the stream's items, so a status can also offer a stream next to other
 [media types](/docs/route-builder#declare-media-types), with the handler
 selecting one with its returned `contentType`.
 
-Return an envelope when the route can return different HTTP statuses:
+Throw a [declared error](/docs/route-builder#declare-errors) before the stream
+starts to respond with an error instead:
 
 ```ts
 const events = route
 	.get("/todos/events")
+	.headers(z.object({ authorization: z.string() }))
 	.streamResponse(z.object({ id: z.string(), message: z.string() }))
-	.response(z.object({ code: z.literal("UNAUTHORIZED") }), { status: 401 })
-	.handler(() => ({ status: 200, body: streamTodoEvents() }));
+	.error("UNAUTHORIZED", { status: 401 })
+	.handler(({ headers, errors }) => {
+		if (!authorize(headers.authorization)) throw new errors.UNAUTHORIZED();
+		return streamTodoEvents();
+	});
 ```
 
 Stream schemas describe event data. Event data must be JSON serializable.

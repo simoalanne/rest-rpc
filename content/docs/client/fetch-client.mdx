@@ -35,14 +35,11 @@ header with lowercase names, and declared response headers are typed.
 ```ts
 if (response.status === 200) {
 	console.log(response.body.title);
-} else if (response.status === 404) {
-	console.log(response.body.code);
 }
 ```
 
-Non-2xx responses are returned, not thrown. Network failures and aborted
-requests reject with the error from `fetch`. See the
-[Route Builder](/docs/route-builder) for declaring expected outcomes.
+A call resolves with a successful response and rejects with an error otherwise.
+See [Handle Errors](#handle-errors).
 
 ### Select a Request Media Type
 
@@ -54,35 +51,68 @@ schema. It is optional when the route declares one media type.
 await client.todos.import({ contentType: "text/csv", body: csv });
 ```
 
-## Error Handling
+## Handle Errors
 
-An `HttpError` is thrown when a response does not match the route's declared
-responses:
+A call rejects with a `RouteError` whenever a response arrived:
 
-- The status is not declared by the route.
-- The response content type is not one the route declares.
-- [Response validation](#response-validation) is enabled and fails. This can
-  happen with a 2xx status.
+- A non-2xx response whose JSON body has a `code` the route
+  [declares](/docs/route-builder#declare-errors) with the received status
+  rejects with that error. Its `data` and declared headers are typed.
+- Every other response outside the route contract rejects with
+  `UNKNOWN_ERROR`: undeclared codes, including the server's
+  [built-in errors](/docs/http-behavior/errors#built-in-errors), other error
+  bodies such as a proxy's error page, undeclared 2xx statuses or content
+  types, bodies that cannot be decoded, and
+  [response validation](#response-validation) failures.
 
-[Extracted contracts](/docs/client/contract-extraction#limitations) have no
-response declarations, so these checks do not apply to them.
-
-An `HttpError` has the received HTTP `status` and the decoded, unvalidated
-response `body`. Validation issues are available through `cause`.
+When no response arrived, such as on network failures, timeouts and aborted
+requests, the call rejects with the original error instead.
 
 ```ts
-import { HttpError } from "@rest-rpc/core";
+import { RouteError } from "@rest-rpc/core";
 
 try {
 	await client.todos.get({ params: { id: "todo_1" } });
 } catch (error) {
-	if (error instanceof HttpError) {
-		console.log(error.status, error.body);
+	if (!(error instanceof RouteError)) throw error;
+	if (error.code === "TODO_NOT_FOUND") {
+		console.log(error.data.id);
 	} else {
-		throw error;
+		console.log(error.status, error.message, error.data);
 	}
 }
 ```
+
+| Field     | Declared error                                    | `UNKNOWN_ERROR`                                            |
+| --------- | ------------------------------------------------- | ---------------------------------------------------------- |
+| `status`  | The response status                               | The response status                                        |
+| `message` | The `message` of the body                         | The body's `message` when it is a string, or a generic one |
+| `data`    | The `data` of the body                            | The decoded body, or `undefined` when it cannot be decoded |
+| `headers` | The response headers, with declared headers typed | The response headers                                       |
+| `cause`   | none                                              | Validation issues or the decoding error, when there is one |
+
+### Safe Results
+
+`safe()` resolves a call to an `[error, data]` tuple instead of rejecting, with
+the error typed for the route:
+
+```ts
+import { safe } from "@rest-rpc/core";
+
+const [error, response] = await safe(
+	client.todos.get({ params: { id: "todo_1" } }),
+);
+if (error) {
+	console.error(error);
+} else {
+	console.log(response.body.title);
+}
+```
+
+Calls return a `ClientPromise`, a promise that also carries the type of its
+errors. Promise methods and `async` functions return plain promises, which
+`safe()` types with an `unknown` error. To keep the error type in a wrapper,
+return the call directly and annotate it with `ClientPromise`.
 
 ## Consume Streams
 
@@ -307,8 +337,8 @@ const client = initClient(api, {
 });
 ```
 
-The client receives the schema output on success, and a failure throws an
-[`HttpError`](#error-handling). The decoded response is the server's schema
+The client receives the schema output on success, and a failure rejects with
+an [`UNKNOWN_ERROR`](#handle-errors). The decoded response is the server's schema
 output, but the client validates it as schema input. Schemas whose input and
 output types differ, such as transforms, may fail on the client.
 
@@ -329,7 +359,6 @@ import type {
 	InferClientRequest,
 	InferClientResponse,
 	InferClientStreamData,
-	InferClientSuccess,
 } from "@rest-rpc/core";
 import { route } from "@rest-rpc/server";
 import z from "zod";
@@ -340,18 +369,16 @@ const update = route
 	.body(z.object({ title: z.string() }))
 	.handler(({ params, body }) => ({ id: params.id, title: body.title }));
 
-const getFirst = route.handler(() => {
-	if (Math.random() < 0.5) {
-		return { status: 200, body: { id: "todo_1", title: "Write docs" } };
-	}
-	return { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
-});
+const getFirst = route
+	.error("TODO_NOT_FOUND", { status: 404 })
+	.handler(({ errors }) => {
+		if (Math.random() < 0.5) throw new errors.TODO_NOT_FOUND();
+		return { id: "todo_1", title: "Write docs" };
+	});
 
 type UpdateTodoRequest = InferClientRequest<typeof update>;
 
 type GetFirstTodoResponse = InferClientResponse<typeof getFirst>;
-
-type GetFirstTodoSuccess = InferClientSuccess<typeof getFirst>;
 
 type GetFirstTodoError = InferClientError<typeof getFirst>;
 
@@ -369,12 +396,11 @@ type TodoEvent = InferClientStreamData<typeof events>;
 | ------------------------------------------ | ---------------------------------------------------------------------------------------- |
 | `InferClientRequest<Route, GlobalHeaders>` | The request passed to the route call, or `undefined` for routes without input.           |
 | `InferClientResponse<Route>`               | Every response envelope of the route.                                                    |
-| `InferClientSuccess<Route>`                | The 2xx response envelopes.                                                              |
-| `InferClientError<Route>`                  | The non-2xx response envelopes.                                                          |
+| `InferClientError<Route>`                  | The declared errors of the route and `UNKNOWN_ERROR`.                                    |
 | `InferClientStreamData<Route>`             | The `data` of each event from a [streaming route](#consume-streams), without `SseEvent`. |
 
-`InferClientError` contains only the responses the client returns. The
-[`HttpError`](#error-handling) and `Error` values it throws are not included.
+Calls reject with `InferClientError<Route>` when a response arrived, and with
+other `Error`s otherwise.
 
 `InferClientRequest` accepts the type of your `globalHeaders` as a second
 argument, so headers that `globalHeaders` always provides become optional:

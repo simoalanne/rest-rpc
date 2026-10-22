@@ -29,11 +29,11 @@ const todos = new Map([["todo_1", { id: "todo_1", title: "Write docs" }]]);
 const getTodo = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
-	.handler(({ params }) => {
+	.error("TODO_NOT_FOUND", { status: 404 })
+	.handler(({ params, errors }) => {
 		const todo = todos.get(params.id);
-		return todo
-			? { status: 200, body: todo }
-			: { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
+		if (!todo) throw new errors.TODO_NOT_FOUND();
+		return todo;
 	});
 
 export const routes = { todos: { get: getTodo } };
@@ -74,10 +74,6 @@ type CreateAppOptions = {
 	notFound?: (
 		request: Request,
 	) => Promise<Response> | Response | Promise<void> | void;
-	onError?: (
-		error: unknown,
-		request: Request,
-	) => Promise<Response> | Response | Promise<void> | void;
 };
 ```
 
@@ -89,7 +85,7 @@ type CreateAppOptions = {
 - `context`: values to seed the request [context](/docs/context) with before
   middleware runs, or a function, sync or async, that returns them for each
   request. They are not type-checked against the context types routes declare.
-  If the function throws, the response is the one from `onError`.
+  If the function throws, the response is an `INTERNAL_SERVER_ERROR`.
 
   ```ts
   createApp(routes, {
@@ -107,13 +103,15 @@ type CreateAppOptions = {
   }) satisfies ExportedHandler<Env>;
   ```
 
-- `notFound`: the response for requests that match no route. Defaults to a 404
-  response with `{ message: "Not found" }`.
-- `onError`: the response when a handler or middleware throws. Defaults to a
-  500 response with `{ message: "Internal server error" }`.
+- `notFound`: the response for requests that match no route. Return nothing to
+  keep the default response, the
+  [`NOT_FOUND`](/docs/http-behavior/errors#built-in-errors) error, and only run
+  side effects.
 
-Return nothing from `notFound` or `onError` to keep the default response and
-only run side effects, such as logging.
+Errors a route does not send as an error response, such as errors thrown by
+handlers, are sent as
+[`INTERNAL_SERVER_ERROR`](/docs/http-behavior/errors#built-in-errors) responses
+and passed to [`onError`](#error-handling).
 
 ## Compile Options
 
@@ -122,16 +120,14 @@ type CompileRoutesOptions = {
 	bodyCodecs?: readonly BodyCodec[];
 	disableRequestValidation?: boolean;
 	disableResponseValidation?: boolean;
-	requestValidationErrorHandler?: RequestValidationErrorHandler;
-	responseValidationErrorHandler?: ResponseValidationErrorHandler;
+	onError?: (error: RouteError, request: Request) => void;
 };
 ```
 
 - `bodyCodecs`: see [Request and Response Bodies](#request-and-response-bodies).
 - `disableRequestValidation`, `disableResponseValidation`: see
   [Disabling Server Validation](/docs/http-behavior/schemas#disabling-server-validation).
-- `requestValidationErrorHandler`, `responseValidationErrorHandler`: see
-  [Error Handling](#error-handling).
+- `onError`: see [Error Handling](#error-handling).
 
 The same options are taken by `compileRoutes` when
 [integrating with a framework](/docs/server/framework-integration#compiling-routes).
@@ -156,23 +152,17 @@ chunks. To send it with its own headers, return it wrapped in
 
 ## Error Handling
 
-Use `requestValidationErrorHandler` and `responseValidationErrorHandler` to
-replace the [default validation error responses](/docs/http-behavior/errors).
-Other errors thrown by handlers or middleware are passed to `onError`.
+[Declared and built-in errors](/docs/http-behavior/errors) are sent as JSON
+error responses. `onError` observes each of them, and errors that end a stream
+after its response started. It is not awaited and cannot change the response:
 
 ```ts
 export default createApp(routes, {
-	requestValidationErrorHandler: (error, request) => {
-		return Response.json(
-			{ code: "VALIDATION_ERROR", issues: error.issues },
-			{ status: 422 },
-		);
-	},
-	responseValidationErrorHandler: (_error, request) => {
-		return Response.json({ code: "INVALID_RESPONSE" }, { status: 500 });
-	},
-	onError: (error) => {
-		console.error(error);
+	onError: (error, request) => {
+		if (error.status >= 500) console.error(request.url, error, error.cause);
 	},
 });
 ```
+
+With `createApp`, `onError` also receives the `INTERNAL_SERVER_ERROR` created
+for other thrown errors, whose `cause` is the thrown error.

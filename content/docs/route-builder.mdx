@@ -1,10 +1,10 @@
 ---
 title: Route Builder
-description: Define HTTP routes with request segments, typed responses, and streams.
+description: Define HTTP routes with request segments, typed responses, errors, and streams.
 ---
 
 A route builder describes an HTTP interface: a method and path, the request
-segments it reads, and the responses it returns.
+segments it reads, the responses it returns, and the errors it throws.
 
 Schemas can come from Zod, Valibot, ArkType, or another Standard Schema library.
 The built-in `type<T>()` utility declares types without runtime validation. See
@@ -171,16 +171,14 @@ A handler returns either a response envelope or a body:
 - Any other value is the response body with status 200.
 
 Without declared responses, the returned statuses and body types become the
-client's result type:
+client's result type. Returned statuses are successful, from 200 to 299.
+Errors are [thrown](#declare-errors) instead:
 
 ```ts
-const get = route
-	.get("/todos/:id")
-	.params(z.object({ id: z.string() }))
-	.handler(({ params }) => {
-		const todo = findTodo(params.id);
-		return todo ?? { status: 404, body: { code: "TODO_NOT_FOUND" as const } };
-	});
+const created = route
+	.post("/todos")
+	.body(z.object({ title: z.string() }))
+	.handler(({ body }) => ({ status: 201, body: createTodo(body.title) }));
 ```
 
 :::note
@@ -190,21 +188,17 @@ Return it wrapped, as `{ status: 200, body: value }`.
 
 ## Declare Responses
 
-Use `.response(schema, options)` to declare response schemas with runtime
-validation. Set a status other than 200 with the `status` option. Each status
-can be declared once, and a handler returning a status that is not declared
-fails at runtime.
+Use `.response(schema, options)` to declare successful response schemas with
+runtime validation. Set a status from 201 to 299 with the `status` option. Each
+status can be declared once, and a handler returning a status that is not
+declared fails at runtime.
 
 ```ts
 const get = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
 	.response(todoSchema)
-	.response(z.object({ code: z.literal("TODO_NOT_FOUND") }), { status: 404 })
-	.handler(({ params }) => {
-		const todo = findTodo(params.id);
-		return todo ?? { status: 404, body: { code: "TODO_NOT_FOUND" } };
-	});
+	.handler(({ params }) => findTodo(params.id));
 ```
 
 Pass only options for a bodyless response, such as `.response({ status: 204 })`.
@@ -229,6 +223,73 @@ route
 		};
 	});
 ```
+
+## Declare Errors
+
+Errors are thrown, not returned. Declare each error a route can respond with,
+by a unique code, with `.error(code, options)`:
+
+```ts
+const get = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.response(todoSchema)
+	.error("TODO_NOT_FOUND", { status: 404, data: z.object({ id: z.string() }) })
+	.handler(({ params, errors }) => {
+		const todo = findTodo(params.id);
+		if (!todo) throw new errors.TODO_NOT_FOUND({ id: params.id });
+		return todo;
+	});
+```
+
+| Option        | Default  | Description                                                   |
+| ------------- | -------- | ------------------------------------------------------------- |
+| `status`      | `400`    | The HTTP status, from 400 to 599.                             |
+| `data`        | none     | Schema of the error's `data` field, passed first when thrown. |
+| `headers`     | none     | Response headers schema, passed as `headers` when thrown.     |
+| `message`     | The code | Default message, overridable when thrown.                     |
+| `description` | none     | Describes the error in [OpenAPI](/docs/openapi) documents.    |
+
+Handlers and [middleware](/docs/middleware) receive the declared errors as
+`errors`. The error is sent as a JSON `{ code, message, data? }` response with
+its status, and clients reject with it. See
+[Errors](/docs/http-behavior/errors).
+
+Declaring errors does not declare responses, so a route that only declares
+errors still infers its responses from the handler.
+
+### Define Errors Once
+
+Code outside the handler cannot receive `errors`. Define the error with
+`routeError()`, declare the definition on routes, and throw it from any code
+that imports it:
+
+```ts
+import { route, routeError } from "@rest-rpc/server";
+
+export const TodoNotFound = routeError("TODO_NOT_FOUND", {
+	status: 404,
+	data: z.object({ id: z.string() }),
+});
+
+export const findTodo = (id: string) => {
+	const todo = todos.get(id);
+	if (!todo) throw new TodoNotFound({ id });
+	return todo;
+};
+
+const get = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.error(TodoNotFound)
+	.handler(({ params }) => findTodo(params.id));
+```
+
+The route's declaration decides the response. Throwing an error whose code the
+route does not declare is a programmer error, so the server rejects instead of
+sending it. Declaring the same definition twice, for example on a shared base
+and on a route, is allowed; declaring a different error with an existing code
+throws.
 
 ## Declare Media Types
 
@@ -334,7 +395,8 @@ be shared as a base for other routes without affecting them:
 ```ts
 const authenticated = route
 	.headers(z.object({ authorization: z.string() }))
-	.metadata({ auth: "required" });
+	.metadata({ auth: "required" })
+	.error("UNAUTHORIZED", { status: 401 });
 
 const list = authenticated.get("/todos").handler(() => listTodos());
 const remove = authenticated
@@ -356,6 +418,7 @@ A handler receives one object containing:
 - The validated request: `params`, `query`, `headers`, and `body`.
 - `context`: the per-request [context](/docs/context) shared with middleware.
 - `route`: the route declaration, including its method, path, and `metadata`.
+- `errors`: the [declared errors](#declare-errors), to throw.
 - `contentType`: the request body media type. Routes with a body narrow it to
   their declared media types, and `body` with it.
 - `signal`: an `AbortSignal` that aborts when the client disconnects.
@@ -426,20 +489,20 @@ import z from "zod";
 
 const todoSchema = z.object({ id: z.string(), title: z.string() });
 
-const getDeclaration = route
-	.get("/todos/:id")
-	.params(z.object({ id: z.string() }))
-	.response(todoSchema)
-	.response(z.object({ code: z.literal("TODO_NOT_FOUND") }), { status: 404 });
+const createDeclaration = route
+	.post("/todos")
+	.body(z.object({ title: z.string() }))
+	.response(todoSchema, { status: 201 })
+	.response({ status: 202 });
 
-type GetTodoResponse = InferServerResponse<typeof getDeclaration>;
+type CreateTodoResponse = InferServerResponse<typeof createDeclaration>;
 
-const findTodo = (id: string): GetTodoResponse =>
-	id === "todo_1"
-		? { status: 200, body: { id, title: "Write docs" } }
-		: { status: 404, body: { code: "TODO_NOT_FOUND" } };
+const createTodo = (title: string): CreateTodoResponse =>
+	title.length > 100
+		? { status: 202 }
+		: { status: 201, body: { id: "todo_1", title } };
 
-const get = getDeclaration.handler(({ params }) => findTodo(params.id));
+const create = createDeclaration.handler(({ body }) => createTodo(body.title));
 ```
 
 ### Infer Server Handler
@@ -457,12 +520,15 @@ const getDeclaration = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
 	.response(todoSchema)
-	.response(z.object({ code: z.literal("TODO_NOT_FOUND") }), { status: 404 });
+	.error("TODO_NOT_FOUND", { status: 404 });
 
-const getTodo: InferServerHandler<typeof getDeclaration> = ({ params }) =>
-	params.id === "todo_1"
-		? { status: 200, body: { id: params.id, title: "Write docs" } }
-		: { status: 404, body: { code: "TODO_NOT_FOUND" } };
+const getTodo: InferServerHandler<typeof getDeclaration> = ({
+	params,
+	errors,
+}) => {
+	if (params.id !== "todo_1") throw new errors.TODO_NOT_FOUND();
+	return { id: params.id, title: "Write docs" };
+};
 
 const get = getDeclaration.handler(getTodo);
 ```
