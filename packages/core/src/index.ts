@@ -1,4 +1,3 @@
-export { HttpError } from "./client/index.ts";
 export type {
 	ApiClientFor,
 	ApiClientOptions,
@@ -8,7 +7,6 @@ export type {
 	InferClientRequest,
 	InferClientResponse,
 	InferClientStreamData,
-	InferClientSuccess,
 	FetchLike,
 	FetchOptions,
 } from "./client/index.ts";

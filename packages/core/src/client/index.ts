@@ -1,4 +1,3 @@
-export { HttpError } from "./httpError.ts";
 export {
 	initClient,
 	type ApiClientFor,
@@ -17,10 +16,9 @@ export {
 	type InferClientRequest,
 } from "./request.ts";
 export type {
+	ClientResponseBody,
 	InferClientError,
 	InferClientResponse,
 	InferClientStreamData,
-	InferClientSuccess,
-	SuccessfulResponseBody,
 } from "./response.ts";
 export type { SseEvent } from "../contract/sse.ts";

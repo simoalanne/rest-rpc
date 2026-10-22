@@ -18,9 +18,9 @@ describe("response inference", () => {
 				},
 			)
 			.response({ status: 204 })
-			.response(type<{ message: string }>(), { status: 404 });
+			.response(type<{ id: string }>(), { status: 201 });
 		type Server = ServerResponse<(typeof value)["~restrpc"]>;
-		expectTypeOf<Server["status"]>().toEqualTypeOf<200 | 204 | 404>();
+		expectTypeOf<Server["status"]>().toEqualTypeOf<200 | 201 | 204>();
 		expectTypeOf<Extract<Server, { status: 200 }>>().toEqualTypeOf<
 			| {
 					status: 200;
@@ -38,10 +38,10 @@ describe("response inference", () => {
 		expectTypeOf<Extract<Server, { status: 204 }>>().toEqualTypeOf<{
 			status: 204;
 		}>();
-		expectTypeOf<Extract<Server, { status: 404 }>>().toEqualTypeOf<{
-			status: 404;
+		expectTypeOf<Extract<Server, { status: 201 }>>().toEqualTypeOf<{
+			status: 201;
 			contentType?: "application/json";
-			body: { message: string };
+			body: { id: string };
 		}>();
 	});
 

@@ -72,11 +72,14 @@ describe("routeBuilder", () => {
 		).toThrow('Response status "200" has already been declared.');
 	});
 
-	it.each([99, 600, 200.5, NaN])("rejects invalid HTTP status %s", (status) => {
-		expect(() => new RouteBuilder().response({ status })).toThrow(
-			"Invalid HTTP response status",
-		);
-	});
+	it.each([199, 300, 404, 200.5, NaN])(
+		"rejects the response status %s outside 2xx",
+		(status) => {
+			expect(() => new RouteBuilder().response({ status })).toThrow(
+				"must be from 200 to 299",
+			);
+		},
+	);
 
 	it("declares errors by definition or inline and rejects conflicting codes", () => {
 		const Unauthorized = routeError("UNAUTHORIZED", { status: 401 });

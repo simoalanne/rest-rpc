@@ -102,9 +102,10 @@ const appendBody = (
 	return { ...state, request: { ...state.request, body } };
 };
 
-const assertHttpStatusCode = (status: number) => {
-	if (!Number.isInteger(status) || status < 100 || status > 599) {
-		throw new Error(`Invalid HTTP response status "${status}".`);
+// Errors are declared with `.error()`, so responses are successful.
+const assertSuccessStatus = (status: number) => {
+	if (!Number.isInteger(status) || status < 200 || status > 299) {
+		throw new Error(`Response status "${status}" must be from 200 to 299.`);
 	}
 };
 
@@ -181,7 +182,7 @@ const addResponse = (
 	status: number,
 	schema: ResponseDeclaration,
 ): RouteBuilderState => {
-	assertHttpStatusCode(status);
+	assertSuccessStatus(status);
 	if (state.responses?.[status]) {
 		throw new Error(`Response status "${status}" has already been declared.`);
 	}
@@ -352,7 +353,7 @@ export class RouteBuilder<
 		});
 	}
 
-	/** Declares a JSON response. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-responses} */
+	/** Declares a successful JSON response. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-responses} */
 	response<
 		const TSchema extends StandardSchemaV1,
 		const TOptions extends ResponseOptions | undefined = undefined,
@@ -360,7 +361,7 @@ export class RouteBuilder<
 		schema: TSchema,
 		options?: TOptions,
 	): BuilderFor<TKind, WithResponse<TState, TSchema, TOptions>>;
-	/** Declares response schemas keyed by media type. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-responses} */
+	/** Declares successful response schemas keyed by media type. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-responses} */
 	response<
 		const TContent extends BodyContent,
 		const TOptions extends ResponseOptions | undefined = undefined,
@@ -368,7 +369,7 @@ export class RouteBuilder<
 		content: MediaTypeKeysOnly<TContent>,
 		options?: TOptions,
 	): BuilderFor<TKind, WithResponse<TState, TContent, TOptions>>;
-	/** Declares a response without a body. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-responses} */
+	/** Declares a successful response without a body. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-responses} */
 	response<const TOptions extends ResponseOptions | undefined = undefined>(
 		options?: TOptions,
 	): BuilderFor<TKind, WithResponse<TState, undefined, TOptions>>;

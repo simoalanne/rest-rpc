@@ -1,4 +1,5 @@
 import { route } from "../contract/routeBuilder.ts";
+import { type RouteError, routeError } from "../contract/routeError.ts";
 import { type } from "../standard-schema/type.ts";
 import type { SseEvent } from "../contract/sse.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
@@ -6,7 +7,6 @@ import type {
 	InferClientError,
 	InferClientResponse,
 	InferClientStreamData,
-	InferClientSuccess,
 } from "./response.ts";
 
 describe("client response inference", () => {
@@ -24,10 +24,9 @@ describe("client response inference", () => {
 					})),
 				},
 			)
-			.response({ status: 204 })
-			.response(type<{ message: string }>(), { status: 404 });
+			.response({ status: 204 });
 		type Client = InferClientResponse<typeof value>;
-		expectTypeOf<Client["status"]>().toEqualTypeOf<200 | 204 | 404>();
+		expectTypeOf<Client["status"]>().toEqualTypeOf<200 | 204>();
 		expectTypeOf<
 			Extract<Client, { contentType: "text/plain" }>["body"]
 		>().toEqualTypeOf<number>();
@@ -42,9 +41,6 @@ describe("client response inference", () => {
 			contentType: undefined;
 			body: undefined;
 			headers: Record<string, string>;
-		}>();
-		expectTypeOf<Extract<Client, { status: 404 }>["body"]>().toEqualTypeOf<{
-			message: string;
 		}>();
 	});
 
@@ -65,36 +61,37 @@ describe("client response inference", () => {
 		>().toEqualTypeOf<InferClientResponse<typeof get>>();
 	});
 
-	it("splits declared responses into success and error results", () => {
+	it("infers declared errors from their schema outputs and unknown errors", () => {
+		const NotFound = routeError("NOT_FOUND", {
+			status: 404,
+			data: type((input: number) => String(input)),
+			headers: type((input: { retry: string }) => ({
+				retry: Number(input.retry),
+			})),
+		});
 		const value = route
 			.get("/")
-			.response(type<{ name: string }>())
-			.response({ status: 204 })
-			.response(type<{ message: string }>(), { status: 404 });
-		expectTypeOf<InferClientSuccess<typeof value>>().toEqualTypeOf<
-			| {
-					status: 200;
-					contentType: "application/json";
-					body: { name: string };
-					headers: Record<string, string>;
-			  }
-			| {
-					status: 204;
-					contentType: undefined;
-					body: undefined;
-					headers: Record<string, string>;
-			  }
+			.error(NotFound)
+			.error("CONFLICT", { status: 409 });
+		type Unknown = RouteError<
+			"UNKNOWN_ERROR",
+			unknown,
+			number,
+			Record<string, string>
+		>;
+		expectTypeOf<InferClientError<typeof value>>().toEqualTypeOf<
+			| RouteError<
+					"NOT_FOUND",
+					string,
+					404,
+					Record<string, string> & { retry: number }
+			  >
+			| RouteError<"CONFLICT", undefined, 409, Record<string, string>>
+			| Unknown
 		>();
-		expectTypeOf<InferClientError<typeof value>>().toEqualTypeOf<{
-			status: 404;
-			contentType: "application/json";
-			body: { message: string };
-			headers: Record<string, string>;
-		}>();
+		const plain = route.get("/");
+		expectTypeOf<InferClientError<typeof plain>>().toEqualTypeOf<Unknown>();
 		const tree = { users: { value } };
-		expectTypeOf<
-			InferClientSuccess<typeof tree>["users"]["value"]
-		>().toEqualTypeOf<InferClientSuccess<typeof value>>();
 		expectTypeOf<
 			InferClientError<typeof tree>["users"]["value"]
 		>().toEqualTypeOf<InferClientError<typeof value>>();
@@ -105,7 +102,7 @@ describe("client response inference", () => {
 		const response = route
 			.get("/")
 			.streamResponse(type<{ value: number }>())
-			.response(type<{ message: string }>(), { status: 404 });
+			.response(type<{ message: string }>(), { status: 201 });
 		const plain = route.response(type<string>());
 		expectTypeOf<
 			InferClientStreamData<typeof output>
@@ -138,7 +135,6 @@ describe("client response inference", () => {
 				};
 			};
 		};
-		expectTypeOf<InferClientSuccess<Wide>["status"]>().toEqualTypeOf<number>();
-		expectTypeOf<InferClientError<Wide>["status"]>().toEqualTypeOf<number>();
+		expectTypeOf<InferClientResponse<Wide>["status"]>().toEqualTypeOf<number>();
 	});
 });

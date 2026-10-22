@@ -52,11 +52,11 @@ describe("extractContract", () => {
 		});
 	});
 
-	it("creates a client that returns every status as an envelope", async () => {
+	it("creates a client that recognizes declared error codes", async () => {
 		const fetch = vi.fn(async () =>
 			Response.json(
-				{ message: "unavailable" },
-				{ status: 503, headers: { "x-trace": "abc" } },
+				{ code: "USER_NOT_FOUND", message: "Missing", data: { id: "1" } },
+				{ status: 404 },
 			),
 		);
 		const client = initClient(extractContract(routes), {
@@ -65,10 +65,10 @@ describe("extractContract", () => {
 		});
 		await expect(
 			client.users.get({ params: { id: "1" } }),
-		).resolves.toMatchObject({
-			status: 503,
-			body: { message: "unavailable" },
-			headers: { "x-trace": "abc" },
+		).rejects.toMatchObject({
+			code: "USER_NOT_FOUND",
+			status: 404,
+			data: { id: "1" },
 		});
 		expect(fetch).toHaveBeenCalledWith(
 			"https://example.test/users/1",

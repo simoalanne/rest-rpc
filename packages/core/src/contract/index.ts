@@ -57,15 +57,15 @@ export type {
 	ServerRequest,
 } from "./request.ts";
 export type {
+	ClientRouteError,
 	DeclaredClientResponse,
-	ErrorDeclaredClientResponse,
 	ResponseContentDeclaration,
 	ResponseDeclaration,
 	ResponseHeadersSchema,
 	ResponseOptions,
 	RouteResponses,
 	ServerResponse,
-	SuccessfulDeclaredClientResponse,
+	UnknownRouteError,
 } from "./response.ts";
 export type { ContractRouteEntry } from "./traversal.ts";
 export {

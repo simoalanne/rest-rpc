@@ -72,12 +72,12 @@ describe("initClient types", () => {
 			route
 				.get()
 				.response(type<{ name: string }>())
-				.response(type<{ message: string }>(), { status: 404 }),
+				.response(type<{ id: string }>(), { status: 201 }),
 			{ baseUrl: "" },
 		);
 		const response = await client();
 		if (response.status === 200)
 			expectTypeOf(response.body).toEqualTypeOf<{ name: string }>();
-		else expectTypeOf(response.body).toEqualTypeOf<{ message: string }>();
+		else expectTypeOf(response.body).toEqualTypeOf<{ id: string }>();
 	});
 });

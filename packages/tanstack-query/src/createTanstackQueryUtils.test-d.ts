@@ -1,9 +1,4 @@
-import {
-	route,
-	type,
-	type InferClientError as InferDeclaredClientError,
-	type SseEvent,
-} from "@rest-rpc/core";
+import { route, routeError, type, type SseEvent } from "@rest-rpc/core";
 import {
 	QueryClient,
 	skipToken,
@@ -11,17 +6,18 @@ import {
 } from "@tanstack/query-core";
 import {
 	createTanstackQueryUtils,
-	type HttpError,
 	type InferClientError,
 	type InferClientRequest,
-	type InferClientSuccess,
+	type InferClientResponse,
 } from "./index.ts";
 
 const get = route
 	.get("/users/{id}")
 	.params(type<{ id: string }>())
 	.response(type<{ name: string }>())
-	.response(type<{ message: string }>(), { status: 404 });
+	.error(
+		routeError("NOT_FOUND", { status: 404, data: type<{ id: string }>() }),
+	);
 const empty = route.get("/health").response({ status: 204 });
 const events = route.get("/events").streamResponse(type<{ value: number }>());
 const utils = createTanstackQueryUtils(
@@ -33,13 +29,15 @@ describe("createTanstackQueryUtils types", () => {
 	it("preserves mutation variables, successful results, and declared errors", () => {
 		const options = utils.get.mutationOptions({
 			onSuccess: (data, variables) => {
-				expectTypeOf(data).toEqualTypeOf<InferClientSuccess<typeof get>>();
+				expectTypeOf(data).toEqualTypeOf<InferClientResponse<typeof get>>();
 				expectTypeOf(variables).toEqualTypeOf<{ params: { id: string } }>();
 			},
 			onError: (error) => {
-				expectTypeOf(error).toEqualTypeOf<InferClientError<typeof get>>();
-				if ("status" in error && error.status === 404 && "headers" in error) {
-					expectTypeOf(error.body).toEqualTypeOf<{ message: string }>();
+				expectTypeOf(error).toEqualTypeOf<
+					InferClientError<typeof get> | Error
+				>();
+				if ("code" in error && error.code === "NOT_FOUND") {
+					expectTypeOf(error.data).toEqualTypeOf<{ id: string }>();
 				}
 			},
 		});
@@ -48,7 +46,7 @@ describe("createTanstackQueryUtils types", () => {
 		>().toEqualTypeOf<{ params: { id: string } }>();
 		expectTypeOf<
 			Awaited<ReturnType<NonNullable<typeof options.mutationFn>>>
-		>().toEqualTypeOf<InferClientSuccess<typeof get>>();
+		>().toEqualTypeOf<InferClientResponse<typeof get>>();
 	});
 
 	it("uses guaranteed global headers in query requests and mutation variables", () => {
@@ -83,7 +81,7 @@ describe("createTanstackQueryUtils types", () => {
 			getNextPageParam: () => undefined,
 			select: (data) => {
 				expectTypeOf(data.pages).toEqualTypeOf<
-					Array<InferClientSuccess<typeof get>>
+					Array<InferClientResponse<typeof get>>
 				>();
 				expectTypeOf(data.pageParams).toEqualTypeOf<number[]>();
 				return data.pages.map((page) => page.body.name);
@@ -92,7 +90,7 @@ describe("createTanstackQueryUtils types", () => {
 		expectTypeOf(
 			new QueryClient().getQueryData(options.queryKey),
 		).toEqualTypeOf<
-			InfiniteData<InferClientSuccess<typeof get>, number> | undefined
+			InfiniteData<InferClientResponse<typeof get>, number> | undefined
 		>();
 		utils.get.infiniteQueryOptions({
 			initialPageParam: 0,
@@ -155,11 +153,11 @@ describe("createTanstackQueryUtils types", () => {
 		// @ts-expect-error The id is a string.
 		utils.get.queryOptions({ request: { params: { id: 1 } } });
 		expectTypeOf<
-			InferClientSuccess<typeof get>["status"]
+			InferClientResponse<typeof get>["status"]
 		>().toEqualTypeOf<200>();
 		expectTypeOf(
 			new QueryClient().getQueryData(options.queryKey),
-		).toEqualTypeOf<InferClientSuccess<typeof get> | undefined>();
+		).toEqualTypeOf<InferClientResponse<typeof get> | undefined>();
 		expectTypeOf<
 			Parameters<
 				NonNullable<
@@ -206,19 +204,5 @@ describe("createTanstackQueryUtils types", () => {
 		utils.get.streamedQueryOptions();
 		// @ts-expect-error A reducer requires an initial value.
 		utils.events.streamedQueryOptions({ reducer: (total: number) => total });
-	});
-
-	it("adds thrown errors to the declared errors of core", () => {
-		expectTypeOf<InferClientError<typeof get>>().toEqualTypeOf<
-			InferDeclaredClientError<typeof get> | HttpError | Error
-		>();
-		const plain = route.response(type<string>());
-		expectTypeOf<InferClientError<typeof plain>>().toEqualTypeOf<
-			HttpError | Error
-		>();
-		const tree = { users: { get } };
-		expectTypeOf<InferClientError<typeof tree>["users"]["get"]>().toEqualTypeOf<
-			InferClientError<typeof get>
-		>();
 	});
 });
