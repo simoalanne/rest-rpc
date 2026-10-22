@@ -100,8 +100,9 @@ describe("validation", () => {
 		await expect(async () =>
 			validateRequestSegments(declaration, {}, "application/json"),
 		).rejects.toMatchObject({
+			code: "REQUEST_VALIDATION_FAILED",
 			status: 400,
-			issues: { body: issues, query: issues, params: [], headers: [] },
+			data: { body: issues, query: issues, params: [], headers: [] },
 		});
 		expect(later).not.toHaveBeenCalled();
 	});
@@ -128,7 +129,7 @@ describe("validation", () => {
 		).toBeUndefined();
 	});
 
-	it("identifies response failures without exposing issues in the response body", async () => {
+	it("keeps response failure issues in the cause instead of the data", async () => {
 		const issues = [{ message: "private detail" }];
 		await expect(async () =>
 			validateResponseValue(
@@ -137,14 +138,14 @@ describe("validation", () => {
 				"body",
 			),
 		).rejects.toMatchObject({
-			location: "body",
-			issues,
+			code: "RESPONSE_VALIDATION_FAILED",
 			status: 500,
-			responseBody: { message: "Response validation failed." },
+			data: undefined,
+			cause: { location: "body", issues },
 		});
 		await expect(async () =>
 			validateResponseHeaders({ headers: schema(() => ({ issues })) }, {}),
-		).rejects.toMatchObject({ location: "headers", issues });
+		).rejects.toMatchObject({ cause: { location: "headers", issues } });
 	});
 
 	it("validates stream data while preserving SSE metadata and reports stream failures lazily", async () => {
@@ -164,6 +165,8 @@ describe("validation", () => {
 			data: 1,
 			id: "event-1",
 		});
-		await expect(chunks.next()).rejects.toMatchObject({ location: "stream" });
+		await expect(chunks.next()).rejects.toMatchObject({
+			cause: { location: "stream" },
+		});
 	});
 });

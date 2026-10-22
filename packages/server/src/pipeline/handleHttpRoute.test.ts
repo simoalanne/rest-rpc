@@ -9,7 +9,6 @@ import {
 	type RuntimeImplementationTree,
 } from "../routing/match.ts";
 import { route } from "../builder/routeBuilder.ts";
-import { RequestValidationError, ResponseValidationError } from "./errors.ts";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 
 const rejected: StandardSchemaV1<unknown, Record<string, string>> = {
@@ -53,12 +52,12 @@ describe("handleHttpRoute", () => {
 		expect(contexts[0]).not.toBe(contexts[1]);
 	});
 
-	it("returns request validation errors without invoking the handler", async () => {
+	it("rejects invalid requests without invoking the handler", async () => {
 		const handler = vi.fn(() => "ok");
 		const implementation = route.post("/").body(rejected).handler(handler);
-		expect(await execute(implementation)).toBeInstanceOf(
-			RequestValidationError,
-		);
+		await expect(async () => execute(implementation)).rejects.toMatchObject({
+			code: "REQUEST_VALIDATION_FAILED",
+		});
 		expect(handler).not.toHaveBeenCalled();
 	});
 
@@ -96,7 +95,7 @@ describe("handleHttpRoute", () => {
 	});
 
 	it.each(["body", "headers"] as const)(
-		"returns declared %s validation failures",
+		"rejects declared %s validation failures",
 		async (location) => {
 			const implementation = route
 				.get("/")
@@ -105,9 +104,10 @@ describe("handleHttpRoute", () => {
 					location === "headers" ? { headers: rejected } : {},
 				)
 				.handler(() => ({ status: 200, body: "ok", headers: {} }));
-			const result = await execute(implementation);
-			expect(result).toBeInstanceOf(ResponseValidationError);
-			expect(result).toMatchObject({ location });
+			await expect(async () => execute(implementation)).rejects.toMatchObject({
+				code: "RESPONSE_VALIDATION_FAILED",
+				cause: { location },
+			});
 		},
 	);
 
@@ -157,6 +157,29 @@ describe("handleHttpRoute", () => {
 		for await (const frame of result.body!.value as AsyncIterable<string>)
 			frames.push(frame);
 		expect(frames).toEqual(["id: one\ndata: 1\n\n"]);
+	});
+
+	it("reports route errors that end a started stream", async () => {
+		async function* values() {
+			yield "bad";
+		}
+		const onStreamError = vi.fn();
+		const result = await handleHttpRoute(
+			flattenRouteImplementations(
+				route
+					.get("/")
+					.streamResponse(rejected)
+					.handler(() => ({ status: 200, body: values() })),
+			)[0]!,
+			{ request: {}, signal, onStreamError },
+		);
+		const frames = result.body!.value as AsyncIterable<string>;
+		await expect(async () => {
+			for await (const _ of frames);
+		}).rejects.toMatchObject({ code: "RESPONSE_VALIDATION_FAILED" });
+		expect(onStreamError).toHaveBeenCalledWith(
+			expect.objectContaining({ code: "RESPONSE_VALIDATION_FAILED" }),
+		);
 	});
 
 	it("dispatches declared envelopes and plain bodies through response validation", async () => {

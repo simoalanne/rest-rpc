@@ -6,12 +6,9 @@ export type {
 	InferServerResponse,
 } from "./builder/routeBuilder.types.ts";
 export type { Context, DefaultContext } from "./builder/context.ts";
-export {
-	RequestValidationError,
-	ResponseValidationError,
-	type RequestValidationIssues,
-	type ResponseValidationLocation,
-	type ValidationIssue,
+export type {
+	RequestValidationIssues,
+	ValidationIssue,
 } from "./pipeline/errors.ts";
 export { sse, type SseServerEvent } from "./pipeline/sse.ts";
 export {
@@ -20,8 +17,6 @@ export {
 	type CompileRoutesOptions,
 	type FetchRoute,
 	type FetchRouteHandlerResult,
-	type RequestValidationErrorHandler,
-	type ResponseValidationErrorHandler,
 } from "./pipeline/compileRoutes.ts";
 export {
 	createApp,

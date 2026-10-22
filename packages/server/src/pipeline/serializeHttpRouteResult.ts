@@ -1,3 +1,4 @@
+import type { RouteError } from "@rest-rpc/core";
 import {
 	isAsyncIterable,
 	isSerializedBody,
@@ -6,6 +7,7 @@ import {
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import type { HttpRouteResult } from "./handleHttpRoute.ts";
 import { mapMaybePromise } from "./maybePromise.ts";
+import { errorBody } from "./resolveRouteError.ts";
 
 const encodeChunks = async function* (
 	body: AsyncIterable<unknown>,
@@ -73,4 +75,11 @@ export function serializeHttpRouteResult(
 			headers,
 		});
 	});
+}
+
+/** Serializes an error as a JSON `{ code, message, data? }` response. */
+export function serializeRouteError(error: RouteError): Response {
+	const headers = new Headers();
+	setHeaders(headers, error.headers as Record<string, unknown>);
+	return Response.json(errorBody(error), { status: error.status, headers });
 }
