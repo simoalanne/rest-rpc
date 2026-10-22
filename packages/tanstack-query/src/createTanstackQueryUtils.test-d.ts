@@ -6,6 +6,7 @@ import {
 } from "@tanstack/query-core";
 import {
 	createTanstackQueryUtils,
+	isRouteError,
 	type InferClientError,
 	type InferClientRequest,
 	type InferClientResponse,
@@ -36,7 +37,7 @@ describe("createTanstackQueryUtils types", () => {
 				expectTypeOf(error).toEqualTypeOf<
 					InferClientError<typeof get> | Error
 				>();
-				if ("code" in error && error.code === "NOT_FOUND") {
+				if (isRouteError(error) && error.code === "NOT_FOUND") {
 					expectTypeOf(error.data).toEqualTypeOf<{ id: string }>();
 				}
 			},

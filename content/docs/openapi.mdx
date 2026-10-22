@@ -165,7 +165,7 @@ response for its status, whose body schema is `{ code, message, data? }` with
 `code` as a constant. Errors that share a status are documented as one response
 whose schema is a `oneOf` of their bodies, and whose description joins their
 descriptions. [Built-in errors](/docs/http-behavior/errors#built-in-errors) are
-not documented.
+documented only when the route declares them.
 
 ## Transform Hooks
 

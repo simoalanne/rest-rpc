@@ -26,6 +26,7 @@ export type {
 } from "./routeBuilder.types.ts";
 export { RouteBuilder, type RouteBuilderKind } from "./routeBuilder.ts";
 export {
+	isRouteError,
 	RouteError,
 	routeError,
 	UNKNOWN_ERROR,

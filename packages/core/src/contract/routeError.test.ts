@@ -1,5 +1,5 @@
 import { type } from "../standard-schema/type.ts";
-import { RouteError, routeError } from "./routeError.ts";
+import { isRouteError, RouteError, routeError } from "./routeError.ts";
 
 describe("routeError", () => {
 	it("creates RouteError subclasses that carry their declaration", () => {
@@ -49,5 +49,15 @@ describe("routeError", () => {
 		["TOO_HIGH", 600, 'Error status "600" must be from 400 to 599.'],
 	])("rejects the declaration %s with status %s", (code, status, message) => {
 		expect(() => routeError(code, { status })).toThrow(message);
+	});
+});
+
+describe("isRouteError", () => {
+	it("checks for RouteError instances", () => {
+		const Gone = routeError("GONE", { status: 410 });
+		expect(isRouteError(new Gone())).toBe(true);
+		expect(isRouteError(new RouteError("UNKNOWN_ERROR"))).toBe(true);
+		expect(isRouteError(new Error("offline"))).toBe(false);
+		expect(isRouteError({ code: "GONE" })).toBe(false);
 	});
 });

@@ -267,8 +267,8 @@ describe.each([
 			const response = await fetch(`${url}/invalid-response`);
 			expect(response.status).toBe(500);
 			expect(await response.json()).toEqual({
-				code: "RESPONSE_VALIDATION_FAILED",
-				message: "Response validation failed.",
+				code: "INTERNAL_SERVER_ERROR",
+				message: "Internal server error.",
 			});
 		});
 	});

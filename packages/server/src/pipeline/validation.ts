@@ -10,7 +10,7 @@ import type { MaybePromise } from "@rest-rpc/core/utils";
 import { allMaybePromise, mapMaybePromise } from "./maybePromise.ts";
 import { isSseServerEvent, sse } from "./sse.ts";
 import {
-	requestValidationFailed,
+	RequestValidationFailed,
 	responseValidationFailed,
 	type ResponseValidationLocation,
 } from "./errors.ts";
@@ -142,7 +142,7 @@ const toValidatedRequest = ([
 		params.errors.length > 0 ||
 		headers.errors.length > 0
 	) {
-		throw requestValidationFailed({
+		throw new RequestValidationFailed({
 			body: body.errors,
 			query: query.errors,
 			params: params.errors,

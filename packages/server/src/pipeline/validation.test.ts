@@ -138,7 +138,7 @@ describe("validation", () => {
 				"body",
 			),
 		).rejects.toMatchObject({
-			code: "RESPONSE_VALIDATION_FAILED",
+			code: "INTERNAL_SERVER_ERROR",
 			status: 500,
 			data: undefined,
 			cause: { location: "body", issues },

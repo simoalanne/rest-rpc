@@ -105,22 +105,36 @@ const readHeaders = async (
 	return { ...headers, ...result.value };
 };
 
-// The body is read before it is decoded, so failures of reading it stay
-// transport failures, while bodies that cannot be decoded are part of the
-// response.
+// Failures of reading the body stay transport failures, while bodies that
+// cannot be decoded are part of the response. Reads are tracked instead of
+// buffering the body, so codecs can still stream it.
 const readBody = async (
 	rawResponse: Response,
 	mediaType: string,
 	codecs: BodyCodecRegistry,
 ) => {
 	if (!mediaType || rawResponse.body === null) return undefined;
-	const bytes = await rawResponse.arrayBuffer();
+	const reader = rawResponse.body.getReader();
+	let readFailure: { error: unknown } | undefined;
+	const body = new ReadableStream<Uint8Array>({
+		pull: async (controller) => {
+			const chunk = await reader.read().catch((error: unknown) => {
+				readFailure = { error };
+				throw error;
+			});
+			if (chunk.done) controller.close();
+			else controller.enqueue(chunk.value);
+		},
+		cancel: (reason) => reader.cancel(reason),
+	});
+	const { status, statusText, headers } = rawResponse;
 	try {
 		return await codecs.deserialize(
-			new Response(bytes, { headers: rawResponse.headers }),
+			new Response(body, { status, statusText, headers }),
 			mediaType,
 		);
 	} catch (cause) {
+		if (readFailure) throw readFailure.error;
 		throw unknownError(
 			rawResponse,
 			undefined,
@@ -201,11 +215,12 @@ export type RouteRequestFn = <E extends RouteDeclaration & { path: string }>(
  * Reads a fetch response into a status envelope, or rejects with a
  * `RouteError` for error responses and responses outside the route contract.
  *
- * @remarks `text/event-stream` responses are always parsed as SSE streams.
- * Routes without response declarations, such as extracted contracts, accept
- * every 2xx status. Routes with declarations reject undeclared statuses and
- * undeclared media types. `contentType` is the received base media type, or
- * `undefined` without a content type.
+ * @remarks `text/event-stream` responses are parsed as SSE streams. Routes
+ * without response declarations, such as routes with inferred responses,
+ * accept every 2xx status. Routes with declarations, including extracted
+ * ones, reject undeclared statuses and undeclared media types, streams
+ * included. `contentType` is the received base media type, or `undefined`
+ * without a content type.
  */
 export const fetchResponse = async <
 	E extends RouteDeclaration & { path: string },
@@ -232,7 +247,16 @@ export const fetchResponse = async <
 	}
 
 	const schema: ResponseDeclaration | undefined = route.responses?.[status];
+	const declaresResponses = Object.keys(route.responses ?? {}).length > 0;
+	const breaksContract =
+		(!schema && declaresResponses) ||
+		(mediaType && schema?.content && !(mediaType in schema.content));
 	if (mediaType === STREAM_CONTENT_TYPE) {
+		// A stream may never end, so it is cancelled instead of read.
+		if (breaksContract) {
+			rawResponse.body?.cancel().catch(() => {});
+			throw unknownError(rawResponse, undefined, contractMismatch);
+		}
 		if (rawResponse.body === null) {
 			throw unknownError(
 				rawResponse,
@@ -256,11 +280,7 @@ export const fetchResponse = async <
 	}
 
 	const value = await readBody(rawResponse, mediaType, codecs);
-	const declaresResponses = Object.keys(route.responses ?? {}).length > 0;
-	if (
-		(!schema && declaresResponses) ||
-		(mediaType && schema?.content && !(mediaType in schema.content))
-	) {
+	if (breaksContract) {
 		throw unknownError(rawResponse, value, contractMismatch);
 	}
 	return {

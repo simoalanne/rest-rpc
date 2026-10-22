@@ -53,35 +53,30 @@ await client.todos.import({ contentType: "text/csv", body: csv });
 
 ## Handle Errors
 
-A call rejects with a `RouteError` whenever a response arrived:
+A non-2xx response rejects with a `RouteError`:
 
-- A non-2xx response whose JSON body has a `code` the route
+- A JSON body with a `code` the route
   [declares](/docs/route-builder#declare-errors) with the received status
   rejects with that error. Its `data` and declared headers are typed.
-- Every other response outside the route contract rejects with
-  `UNKNOWN_ERROR`: undeclared codes, including the server's
-  [built-in errors](/docs/http-behavior/errors#built-in-errors), other error
-  bodies such as a proxy's error page, undeclared 2xx statuses or content
-  types, bodies that cannot be decoded, and
-  [response validation](#response-validation) failures.
+- Every other error response rejects with `UNKNOWN_ERROR`: undeclared codes,
+  including the server's
+  [built-in errors](/docs/http-behavior/errors#built-in-errors), and other
+  bodies such as a proxy's error page.
+
+A 2xx response rejects with `UNKNOWN_ERROR` when it breaks the route
+contract: a status or content type the route's declared responses do not
+include, a body that cannot be decoded, or, with
+[response validation](#response-validation), a body or headers that fail it.
+
+:::warning
+Routes with [inferred responses](/docs/route-builder#return-responses) declare
+no statuses at runtime, so every 2xx response resolves. An
+[extracted contract](/docs/client/contract-extraction) has no schemas, so its
+bodies, headers and error `data` are not validated.
+:::
 
 When no response arrived, such as on network failures, timeouts and aborted
 requests, the call rejects with the original error instead.
-
-```ts
-import { RouteError } from "@rest-rpc/core";
-
-try {
-	await client.todos.get({ params: { id: "todo_1" } });
-} catch (error) {
-	if (!(error instanceof RouteError)) throw error;
-	if (error.code === "TODO_NOT_FOUND") {
-		console.log(error.data.id);
-	} else {
-		console.log(error.status, error.message, error.data);
-	}
-}
-```
 
 | Field     | Declared error                                    | `UNKNOWN_ERROR`                                            |
 | --------- | ------------------------------------------------- | ---------------------------------------------------------- |
@@ -91,21 +86,83 @@ try {
 | `headers` | The response headers, with declared headers typed | The response headers                                       |
 | `cause`   | none                                              | Validation issues or the decoding error, when there is one |
 
-### Safe Results
+### With try/catch
+
+A `catch` block receives `unknown`, so `isRouteError()` narrows a caught error
+only to `RouteError`, without the route's codes or `data` types. Catch errors
+when only their kind matters:
+
+```ts twoslash
+// ---cut-start---
+// @filename: server.ts
+import { route } from "@rest-rpc/server";
+import { z } from "zod";
+
+const get = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.error("TODO_NOT_FOUND", { status: 404, data: z.object({ id: z.string() }) })
+	.handler(({ params }) => ({ id: params.id, title: "Write docs" }));
+
+export const routes = { todos: { get } };
+
+// @filename: client.ts
+import { initClient } from "@rest-rpc/core";
+import type { routes } from "./server";
+declare const api: typeof routes;
+const client = initClient(api, { baseUrl: "http://localhost:3000" });
+// ---cut-end---
+import { isRouteError } from "@rest-rpc/core";
+
+try {
+	await client.todos.get({ params: { id: "todo_1" } });
+} catch (error) {
+	if (isRouteError(error)) {
+		console.log(error.status, error.code);
+	}
+	throw error;
+}
+```
+
+### With `safe()`
 
 `safe()` resolves a call to an `[error, data]` tuple instead of rejecting, with
-the error typed for the route:
+the error typed for the route. Narrow it with `isRouteError()` and then by
+`code` when errors are part of the application logic:
 
-```ts
-import { safe } from "@rest-rpc/core";
+```ts twoslash
+// ---cut-start---
+// @filename: server.ts
+import { route } from "@rest-rpc/server";
+import { z } from "zod";
+
+const get = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
+	.error("TODO_NOT_FOUND", { status: 404, data: z.object({ id: z.string() }) })
+	.handler(({ params }) => ({ id: params.id, title: "Write docs" }));
+
+export const routes = { todos: { get } };
+
+// @filename: client.ts
+import { initClient } from "@rest-rpc/core";
+import type { routes } from "./server";
+declare const api: typeof routes;
+const client = initClient(api, { baseUrl: "http://localhost:3000" });
+// ---cut-end---
+import { isRouteError, safe } from "@rest-rpc/core";
 
 const [error, response] = await safe(
 	client.todos.get({ params: { id: "todo_1" } }),
 );
-if (error) {
-	console.error(error);
+if (isRouteError(error)) {
+	if (error.code === "TODO_NOT_FOUND") {
+		console.log(error.data);
+	}
+} else if (error) {
+	throw error;
 } else {
-	console.log(response.body.title);
+	console.log(response.body);
 }
 ```
 

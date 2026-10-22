@@ -19,6 +19,7 @@ export type {
 export { extractContract } from "./contract/extract.ts";
 export { route } from "./contract/routeBuilder.ts";
 export {
+	isRouteError,
 	RouteError,
 	routeError,
 	type RouteErrorDefinitionOptions,

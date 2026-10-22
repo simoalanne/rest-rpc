@@ -66,7 +66,7 @@ await writeFile("contract.json", JSON.stringify(extractContract(routes)));
 ```
 
 ```ts
-import { initClient, RouteError, safe } from "@rest-rpc/core";
+import { initClient, isRouteError, safe } from "@rest-rpc/core";
 import type { routes } from "./routes";
 import contract from "./contract.json";
 
@@ -82,7 +82,7 @@ const [error, todo] = await safe(
 
 if (!error) {
 	console.log(todo.body.title);
-} else if (error instanceof RouteError && error.code === "TODO_NOT_FOUND") {
+} else if (isRouteError(error) && error.code === "TODO_NOT_FOUND") {
 	console.log("Todo not found");
 } else {
 	throw error;

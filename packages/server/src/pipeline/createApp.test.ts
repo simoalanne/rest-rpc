@@ -81,6 +81,20 @@ describe("createApp", () => {
 		);
 	});
 
+	it.each([
+		[
+			"throws",
+			() => {
+				throw new Error("observer");
+			},
+		],
+		["rejects", async () => Promise.reject(new Error("observer"))],
+	])("sends the response when onError %s", async (_, onError) => {
+		const app = createApp(routes, { onError });
+		const response = await app.fetch(new Request("http://localhost/fail"));
+		expect(response.status).toBe(500);
+	});
+
 	it("lists routes in Bun's routes format with colon params", async () => {
 		const app = createApp(routes, { mountPath: "/api" });
 		expect(

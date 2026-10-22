@@ -1,7 +1,7 @@
 import type { BodyCodecRegistry } from "@rest-rpc/core/codecs";
 import type { RouteError } from "@rest-rpc/core";
 import type { MaybePromise } from "@rest-rpc/core/utils";
-import { malformedRequestBody } from "./errors.ts";
+import { MalformedRequestBody } from "./errors.ts";
 
 type DeserializedRequestBody =
 	| { body: unknown; rejection: undefined }
@@ -19,7 +19,7 @@ const toDeserialized = (body: unknown): DeserializedRequestBody => ({
 
 const toInvalidBody = (): DeserializedRequestBody => ({
 	body: undefined,
-	rejection: malformedRequestBody(),
+	rejection: new MalformedRequestBody(),
 });
 
 /**

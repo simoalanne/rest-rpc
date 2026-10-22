@@ -120,21 +120,31 @@ The pipeline does:
 
 Matching is by code, not class. The route's declaration is the source of truth.
 Validation of `data` and headers follows `disableResponseValidation`; a failure
-becomes `RESPONSE_VALIDATION_FAILED`.
+becomes `INTERNAL_SERVER_ERROR`.
 
 ### Built-in errors
 
-| Code                         | Status | `data`                                      | Produced by                       |
-| ---------------------------- | ------ | ------------------------------------------- | --------------------------------- |
-| `REQUEST_VALIDATION_FAILED`  | 400    | issues grouped by body/query/params/headers | request validation                |
-| `MALFORMED_REQUEST_BODY`     | 400    | none                                        | body decoding                     |
-| `UNSUPPORTED_MEDIA_TYPE`     | 415    | none                                        | request content type selection    |
-| `RESPONSE_VALIDATION_FAILED` | 500    | none (`cause` holds `{ location, issues }`) | response, error and stream checks |
-| `INTERNAL_SERVER_ERROR`      | 500    | none (`cause` holds the thrown error)       | `createApp` only                  |
-| `NOT_FOUND`                  | 404    | none                                        | `createApp` default `notFound`    |
+| Code                        | Definition                | Status | `data`                                      | Produced by                           |
+| --------------------------- | ------------------------- | ------ | ------------------------------------------- | ------------------------------------- |
+| `REQUEST_VALIDATION_FAILED` | `RequestValidationFailed` | 400    | issues grouped by body/query/params/headers | request validation                    |
+| `MALFORMED_REQUEST_BODY`    | `MalformedRequestBody`    | 400    | none                                        | body decoding                         |
+| `UNSUPPORTED_MEDIA_TYPE`    | `UnsupportedMediaType`    | 415    | none                                        | request content type selection        |
+| `INTERNAL_SERVER_ERROR`     | `InternalServerError`     | 500    | none (`cause` holds `{ location, issues }`) | response, error and stream checks     |
+| `INTERNAL_SERVER_ERROR`     | `InternalServerError`     | 500    | none (`cause` holds the thrown error)       | other thrown errors, `createApp` only |
+| `NOT_FOUND`                 | `NotFound`                | 404    | none                                        | `createApp` default `notFound`        |
 
-Built-ins are not reserved and not part of route types. A route may declare one
-to make it known to clients; it must use the built-in status to be recognized.
+An invalid response is a server bug, so response validation failures share
+`INTERNAL_SERVER_ERROR` and do not reveal that validation failed. `onError`
+tells them apart by `cause`.
+
+The definitions are `routeError` classes exported from `@rest-rpc/server`, and
+the server creates built-in errors from them.
+
+Built-ins are sent whether or not the route declares them, because the server
+produces them. They are not part of route types, so clients receive an
+undeclared built-in as `UNKNOWN_ERROR`. Declaring the definition with
+`.error()` makes clients recognize it and types its `data`. This differs from
+other undeclared codes, which are programmer errors and are never sent.
 
 ### Layers
 
@@ -142,7 +152,7 @@ to make it known to clients; it must use the built-in status to be recognized.
 | ---------------------------------------- | --------------------------------- | ------------------------------------- |
 | `compileRoutes`, `createCatchAllHandler` | serialized                        | rejects into the framework            |
 | `createApp` (and Node `serve`)           | serialized                        | serialized as `INTERNAL_SERVER_ERROR` |
-| `call`, local client                     | see [Local client](#local-client) | propagates unchanged                  |
+| `call`, local client                     | see [Local client](#local-client) | see [Local client](#local-client)     |
 
 ### Hooks
 
@@ -150,15 +160,17 @@ to make it known to clients; it must use the built-in status to be recognized.
 - `onError?: (error: RouteError, request: Request) => void` is a
   `compileRoutes` option, inherited by `createApp`. It observes every
   `RouteError` the pipeline serializes, including stream item validation
-  failures after a stream started. It is not awaited and cannot change the
-  response.
+  failures after a stream started. It is not awaited, and errors it throws or
+  rejects with are ignored, so it cannot change the response.
 - `createApp`'s `onError` no longer returns a response. `notFound` stays and
   its default body is the `NOT_FOUND` error.
 
 ## Contract extraction
 
 Extracted routes keep `errors` as `{ CODE: { status } }`, enough for the client
-to recognize declared codes.
+to recognize declared codes. They also keep each declared response's status and
+media types as `responses: { STATUS: { content?: { MEDIA_TYPE: null } } }`, so
+the client checks 2xx statuses and content types without schemas.
 
 ## Fetch client
 
@@ -188,6 +200,11 @@ Everything else that has a response becomes `UNKNOWN_ERROR`:
 | Body decoding fails                                         | `undefined`  | decoding error |
 | Stream item fails validation or cannot be decoded           | decoded item | issues / error |
 
+Status and content type checks need declared responses, so routes with
+inferred responses accept every 2xx response. A `text/event-stream` response
+that breaks the contract is cancelled without being read, so its `data` is
+`undefined`. Validation needs schemas, so extracted contracts skip it.
+
 `message` is the body's `message` when it is a string, otherwise a generic one.
 `status` is always the response status.
 
@@ -201,34 +218,42 @@ Everything else that has a response becomes `UNKNOWN_ERROR`:
   property. Client calls return it.
 - `safe(promise)`: resolves to `[null, data] | [error, undefined]`. The error
   type is read from `ClientPromise`, or `unknown` for other promises.
+- `isRouteError(error)`: `error instanceof RouteError`, typed as
+  `error is Extract<T, RouteError>`, so a typed error from `safe()` or TanStack
+  narrows to the route's `RouteError`s without naming the route. An `unknown`
+  value narrows to `RouteError`. `instanceof RouteError` would also keep the
+  plain `Error` member as `RouteError<any, …>`, which leaves `data` as `any`.
 
-No safe client helper is provided.
+No safe client helper or third `safe()` element is provided: `isRouteError()`
+is the one way to narrow typed errors, and a `catch` block that needs the
+route's codes uses `safe()` instead.
 
 ## Local client
 
 `call` and the local client return `ClientPromise` with the same types as the
 fetch client:
 
-| Thrown inside `call`                      | Rejection                                                                                  |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Declared code, valid `data`               | the resolved `RouteError`                                                                  |
-| Built-in, or declared with invalid `data` | `UNKNOWN_ERROR` with the built-in status, the wire body as `data`, the built-in as `cause` |
-| Undeclared code or other error            | the `Error`, unchanged                                                                     |
+| Thrown inside `call`                   | Rejection                                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Declared code, valid `data`            | the resolved `RouteError`                                                                  |
+| Undeclared built-in, or invalid `data` | `UNKNOWN_ERROR` with the built-in status, the wire body as `data`, the built-in as `cause` |
+| Undeclared code                        | an `Error` naming the route and code, with the thrown error as `cause`                     |
+| Other error                            | the `Error`, unchanged                                                                     |
 
 ## TanStack Query
 
 The fetch client throws, so generated options no longer throw envelopes. The
-error type is `InferClientError<E> | Error`. The package's own
-`InferClientError` is removed.
+error type is `InferClientError<E> | Error`, narrowed with `isRouteError()`.
+The package's own `InferClientError` is removed.
 
 ## OpenAPI
 
 Declared errors become responses keyed by status. Codes sharing a status merge
 into a `oneOf` of their bodies. Each body schema is
-`{ code: const, message: string, data? }`. Built-in errors are not documented.
+`{ code: const, message: string, data? }`. Built-in errors are documented only
+when the route declares them.
 
 ## Non-goals
 
 - A safe client wrapper, `unwrap()`, or a custom error wire format.
 - SSE error events. A started stream that fails ends.
-- Exporting built-in error definitions.

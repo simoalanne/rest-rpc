@@ -122,7 +122,7 @@ describe("handleHttpRoute", () => {
 				)
 				.handler(() => ({ status: 200, body: "ok", headers: {} }));
 			await expect(async () => execute(implementation)).rejects.toMatchObject({
-				code: "RESPONSE_VALIDATION_FAILED",
+				code: "INTERNAL_SERVER_ERROR",
 				cause: { location },
 			});
 		},
@@ -193,9 +193,9 @@ describe("handleHttpRoute", () => {
 		const frames = result.body!.value as AsyncIterable<string>;
 		await expect(async () => {
 			for await (const _ of frames);
-		}).rejects.toMatchObject({ code: "RESPONSE_VALIDATION_FAILED" });
+		}).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
 		expect(onStreamError).toHaveBeenCalledWith(
-			expect.objectContaining({ code: "RESPONSE_VALIDATION_FAILED" }),
+			expect.objectContaining({ code: "INTERNAL_SERVER_ERROR" }),
 		);
 	});
 

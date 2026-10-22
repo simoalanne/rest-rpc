@@ -8,7 +8,7 @@ import {
 	type CompileRoutesOptions,
 } from "./compileRoutes.ts";
 import type { CatchAllHandleOptions } from "./handleHttpRoute.ts";
-import { internalServerError, notFound } from "./errors.ts";
+import { InternalServerError, NotFound, observeError } from "./errors.ts";
 import { mapMaybePromise } from "./maybePromise.ts";
 import { serializeRouteError } from "./serializeHttpRouteResult.ts";
 
@@ -82,7 +82,7 @@ export type App<TArgs extends unknown[] = []> = {
 	>;
 };
 
-const defaultNotFound = () => serializeRouteError(notFound());
+const defaultNotFound = () => serializeRouteError(new NotFound());
 
 /**
  * Creates a Fetch app that serves a route tree.
@@ -106,8 +106,8 @@ export function createApp<TArgs extends unknown[] = []>(
 		...compileOptions
 	} = options;
 	const respondWithInternalError = (error: unknown, request: Request) => {
-		const internal = internalServerError(error);
-		compileOptions.onError?.(internal, request);
+		const internal = new InternalServerError({ cause: error });
+		observeError(compileOptions.onError, internal, request);
 		return serializeRouteError(internal);
 	};
 	const compiled = compileRoutes(implementations, {

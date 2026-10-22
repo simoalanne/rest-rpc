@@ -1,6 +1,7 @@
 import { RouteError, routeError, type } from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import { call, initLocalClient } from "./call.ts";
+import { RequestValidationFailed } from "./errors.ts";
 import { sse } from "./sse.ts";
 import { route } from "../builder/routeBuilder.ts";
 
@@ -78,6 +79,17 @@ describe("call", () => {
 			status: 400,
 			data: { code: "REQUEST_VALIDATION_FAILED" },
 			cause: { code: "REQUEST_VALIDATION_FAILED" },
+		});
+
+		const declared = route
+			.post("/")
+			.body(rejecting)
+			.error(RequestValidationFailed)
+			.handler(() => "ok");
+		await expect(call(declared, { body: {} })).rejects.toMatchObject({
+			code: "REQUEST_VALIDATION_FAILED",
+			status: 400,
+			data: { body: [{ message: "invalid" }] },
 		});
 
 		thrown.mockImplementation(() => new RouteError("GONE"));

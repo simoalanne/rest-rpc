@@ -7,7 +7,7 @@ import {
 	type InferClientResponse,
 } from "@rest-rpc/core";
 import { normalizeMediaType } from "@rest-rpc/core/codecs";
-import type { RouteDeclaration } from "@rest-rpc/core/contract";
+import { UNKNOWN_ERROR, type RouteDeclaration } from "@rest-rpc/core/contract";
 import type { ContextOf } from "../builder/routeBuilder.types.ts";
 import {
 	isImplementedRoute,
@@ -62,7 +62,7 @@ const toClientError = async (route: RouteDeclaration, error: RouteError) => {
 	if (route.errors && Object.hasOwn(route.errors, resolved.code)) {
 		return resolved;
 	}
-	return new RouteError("UNKNOWN_ERROR", {
+	return new RouteError(UNKNOWN_ERROR, {
 		status: resolved.status,
 		message: resolved.message,
 		data: errorBody(resolved),

@@ -1,7 +1,7 @@
 import { RouteError, routeError, type } from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import { route } from "../builder/routeBuilder.ts";
-import { requestValidationFailed } from "./errors.ts";
+import { RequestValidationFailed } from "./errors.ts";
 import { resolveRouteError } from "./resolveRouteError.ts";
 
 const UserNotFound = routeError("USER_NOT_FOUND", {
@@ -47,14 +47,14 @@ describe("resolveRouteError", () => {
 			false,
 		);
 		expect(resolved).toMatchObject({
-			code: "RESPONSE_VALIDATION_FAILED",
+			code: "INTERNAL_SERVER_ERROR",
 			status: 500,
 			cause: { location: "data", issues },
 		});
 	});
 
 	it("passes undeclared built-in errors and rejects other undeclared codes", async () => {
-		const builtIn = requestValidationFailed({
+		const builtIn = new RequestValidationFailed({
 			body: [],
 			query: [],
 			params: [],

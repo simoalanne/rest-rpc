@@ -21,13 +21,14 @@ const routes = {
 };
 
 describe("extractContract", () => {
-	it("keeps only methods, resolved paths, request body media types, and error statuses", () => {
+	it("keeps only methods, resolved paths, request body media types, response statuses and media types, and error statuses", () => {
 		expect(extractContract(routes)).toEqual({
 			users: {
 				get: {
 					"~restrpc": {
 						method: "GET",
 						path: "/users/:id",
+						responses: { 200: { content: { "application/json": null } } },
 						errors: { USER_NOT_FOUND: { status: 404 } },
 					},
 				},
@@ -36,8 +37,16 @@ describe("extractContract", () => {
 						method: "POST",
 						path: "/users/create",
 						request: { body: { "application/json": [], "text/plain": [] } },
+						responses: { 201: { content: { "application/json": null } } },
 					},
 				},
+			},
+		});
+		expect(
+			extractContract({ remove: route.delete("/").response({ status: 204 }) }),
+		).toEqual({
+			remove: {
+				"~restrpc": { method: "DELETE", path: "/", responses: { 204: {} } },
 			},
 		});
 	});
@@ -74,6 +83,37 @@ describe("extractContract", () => {
 			"https://example.test/users/1",
 			expect.objectContaining({ method: "GET" }),
 		);
+	});
+
+	it("creates a client that checks response statuses and media types without schemas", async () => {
+		const respond = vi.fn(async () => Response.json({ name: 1 }));
+		const client = initClient(extractContract(routes), {
+			baseUrl: "https://example.test",
+			fetch: respond,
+			validateResponses: true,
+		});
+		await expect(
+			client.users.get({ params: { id: "1" } }),
+		).resolves.toMatchObject({ status: 200, body: { name: 1 } });
+
+		respond.mockImplementation(async () =>
+			Response.json({ name: "Ada" }, { status: 202 }),
+		);
+		await expect(
+			client.users.get({ params: { id: "1" } }),
+		).rejects.toMatchObject({ code: "UNKNOWN_ERROR", status: 202 });
+
+		respond.mockImplementation(
+			async () =>
+				new Response("Ada", { headers: { "content-type": "text/plain" } }),
+		);
+		await expect(
+			client.users.get({ params: { id: "1" } }),
+		).rejects.toMatchObject({
+			code: "UNKNOWN_ERROR",
+			status: 200,
+			data: "Ada",
+		});
 	});
 
 	it("resolves prefixed tree-derived paths", () => {

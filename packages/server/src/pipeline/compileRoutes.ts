@@ -24,6 +24,7 @@ import {
 	type HttpRouteResult,
 } from "./handleHttpRoute.ts";
 import { deserializeRequestBody } from "./deserializeRequestBody.ts";
+import { observeError } from "./errors.ts";
 import { resolveRouteError } from "./resolveRouteError.ts";
 import {
 	serializeHttpRouteResult,
@@ -50,9 +51,10 @@ export type CompileRoutesOptions = {
 	 */
 	paramSyntax?: "colon" | "braces";
 	/**
-	 * Observes every error sent as an error response, and errors that end a
-	 * stream after its response started. It is not awaited and cannot change
-	 * the response.
+	 * Observes every error sent as an error response, and `RouteError`s that
+	 * end a stream after its response started, such as stream item validation
+	 * failures. It is not awaited, and errors it throws or rejects with are
+	 * ignored, so it cannot change the response.
 	 */
 	onError?: (error: RouteError, request: Request) => void;
 	/**
@@ -136,7 +138,7 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 			error,
 			disableResponseValidation ?? false,
 		);
-		onError?.(resolved, request);
+		observeError(onError, resolved, request);
 		return serializeRouteError(resolved);
 	};
 
@@ -210,7 +212,8 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 				context: handleOptions?.context,
 				disableRequestValidation,
 				disableResponseValidation,
-				onStreamError: onError && ((error) => onError(error, request)),
+				onStreamError:
+					onError && ((error) => observeError(onError, error, request)),
 			});
 			result = handled instanceof Promise ? await handled : handled;
 		} catch (error) {

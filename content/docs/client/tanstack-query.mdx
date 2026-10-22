@@ -199,7 +199,7 @@ await queryClient.invalidateQueries({
 ## Mutations
 
 ```tsx
-import { RouteError } from "@rest-rpc/tanstack-query";
+import { isRouteError } from "@rest-rpc/tanstack-query";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 const queryClient = useQueryClient();
@@ -212,7 +212,7 @@ const createTodo = useMutation(
 			});
 		},
 		onError(error) {
-			if (error instanceof RouteError && error.code === "TODO_EXISTS") {
+			if (isRouteError(error) && error.code === "TODO_EXISTS") {
 				console.log(error.message);
 			}
 		},
@@ -267,8 +267,9 @@ The errors the [Fetch client](/docs/client/fetch-client#handle-errors) rejects
 with get mapped to the `error` key: a `RouteError` with a declared code or
 `UNKNOWN_ERROR` when a response arrived, and the original `Error` otherwise.
 
-`RouteError` is re-exported from `@rest-rpc/tanstack-query`, so errors can be
-narrowed with `instanceof RouteError` and then by `code`.
+`isRouteError()` and `RouteError` are re-exported from
+`@rest-rpc/tanstack-query`. Narrow `error` with `isRouteError()` and then by
+`code` to type its `data`, as in [Safe Results](/docs/client/fetch-client#safe-results).
 
 ## Type Helpers
 

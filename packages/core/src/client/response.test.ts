@@ -178,6 +178,33 @@ describe("client response decoding", () => {
 		).rejects.toBe(failure);
 	});
 
+	it("passes the body to codecs without buffering it", async () => {
+		const encoder = new TextEncoder();
+		const body = new ReadableStream<Uint8Array>({
+			start: (controller) => controller.enqueue(encoder.encode("first")),
+		});
+		const declaration = route
+			.get("/")
+			.response({ "application/custom": type<string>() })["~restrpc"];
+		const result = await fetchResponse(
+			async () =>
+				new Response(body, {
+					headers: { "content-type": "application/custom" },
+				}),
+			true,
+			createBodyCodecRegistry([
+				bodyCodec("application/custom", {
+					deserialize: async (source) => {
+						const { value } = await source.body!.getReader().read();
+						return new TextDecoder().decode(value);
+					},
+				}),
+			]),
+			declaration,
+		);
+		expect(result.body).toBe("first");
+	});
+
 	it.each(["wrong content type", "missing body"])(
 		"rejects streams with %s as unknown errors",
 		async (failure) => {
@@ -195,6 +222,28 @@ describe("client response decoding", () => {
 			).rejects.toMatchObject({ code: "UNKNOWN_ERROR", status: 200 });
 		},
 	);
+
+	it("rejects event streams the route does not declare without reading them", async () => {
+		const cancel = vi.fn();
+		const stream = () =>
+			new Response(new ReadableStream({ cancel }), {
+				status: 202,
+				headers: { "content-type": "text/event-stream" },
+			});
+		await expect(decode(stream())).rejects.toMatchObject({
+			code: "UNKNOWN_ERROR",
+			status: 202,
+			data: undefined,
+		});
+		const json = route.get("/").response(type<string>())["~restrpc"];
+		const ok = new Response(new ReadableStream({ cancel }), {
+			headers: { "content-type": "text/event-stream" },
+		});
+		await expect(
+			fetchResponse(async () => ok, false, codecs, json),
+		).rejects.toMatchObject({ code: "UNKNOWN_ERROR", status: 200 });
+		expect(cancel).toHaveBeenCalledTimes(2);
+	});
 
 	it("parses event streams without a declaration and before user codecs", async () => {
 		const deserialize = vi.fn();

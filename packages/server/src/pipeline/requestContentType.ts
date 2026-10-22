@@ -1,6 +1,6 @@
 import type { RouteError } from "@rest-rpc/core";
 import type { RuntimeImplementation } from "../routing/match.ts";
-import { unsupportedMediaType } from "./errors.ts";
+import { UnsupportedMediaType } from "./errors.ts";
 
 /**
  * Selects the declared body media type for a received base media type.
@@ -16,9 +16,11 @@ export function resolveRequestMediaType(
 	if (receivedMediaType) {
 		return receivedMediaType in (implementation.route.request?.body ?? {})
 			? receivedMediaType
-			: unsupportedMediaType("Unsupported request body content type.");
+			: new UnsupportedMediaType();
 	}
 	return implementation.requiresBodyContentType
-		? unsupportedMediaType("Request body content type is required.")
+		? new UnsupportedMediaType({
+				message: "Request body content type is required.",
+			})
 		: implementation.defaultBodyMediaType;
 }

@@ -3,7 +3,7 @@ export type {
 	TanstackQueryUtilsFor,
 } from "./createTanstackQueryUtils.ts";
 export { createTanstackQueryUtils } from "./createTanstackQueryUtils.ts";
-export { RouteError } from "@rest-rpc/core";
+export { isRouteError, RouteError } from "@rest-rpc/core";
 export type {
 	InferClientError,
 	InferClientRequest,

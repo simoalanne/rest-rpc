@@ -91,7 +91,10 @@ Bun.serve({
 		const result = await handler(request);
 		return result.matched
 			? result.response
-			: new Response("Not found", { status: 404 });
+			: Response.json(
+					{ code: "NOT_FOUND", message: "Not found." },
+					{ status: 404 },
+				);
 	},
 });
 ```
@@ -104,7 +107,7 @@ The contract itself contains no framework or handler code.
 Import the shared contract directly. No contract extraction step is needed.
 
 ```ts client.ts
-import { initClient, safe } from "@rest-rpc/core";
+import { initClient, isRouteError, safe } from "@rest-rpc/core";
 import { api } from "./contract";
 
 const client = initClient(api, { baseUrl: "http://localhost:3000" });
@@ -119,7 +122,7 @@ const [error, response] = await safe(
 
 if (!error) {
 	console.log(response.body.title);
-} else if ("code" in error && error.code === "TODO_NOT_FOUND") {
+} else if (isRouteError(error) && error.code === "TODO_NOT_FOUND") {
 	console.log(error.message);
 }
 ```

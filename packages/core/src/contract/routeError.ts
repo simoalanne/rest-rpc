@@ -65,6 +65,30 @@ export class RouteError<
 	}
 }
 
+/**
+ * Checks whether a value is a `RouteError`, and narrows a typed client error
+ * to the route's `RouteError`s.
+ *
+ * @remarks Narrows errors from `safe()` and TanStack Query, whose types list
+ * the route's errors, so `data` is typed after checking `code`. An `unknown`
+ * value, such as in a `catch` block, narrows to `RouteError`.
+ *
+ * @example
+ * ```ts
+ * const [error, todo] = await safe(client.todos.get({ params: { id: "1" } }));
+ * if (isRouteError(error) && error.code === "TODO_NOT_FOUND") {
+ * 	console.log(error.data.id);
+ * }
+ * ```
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#handle-errors}
+ */
+export function isRouteError<T>(
+	error: T,
+): error is unknown extends T ? T & RouteError : Extract<T, RouteError> {
+	return error instanceof RouteError;
+}
+
 /** The declaration of an error a route can respond with. */
 export type RouteErrorDeclaration = {
 	readonly code: string;

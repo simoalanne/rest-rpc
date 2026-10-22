@@ -6,9 +6,14 @@ export type {
 	InferServerResponse,
 } from "./builder/routeBuilder.types.ts";
 export type { Context, DefaultContext } from "./builder/context.ts";
-export type {
-	RequestValidationIssues,
-	ValidationIssue,
+export {
+	InternalServerError,
+	MalformedRequestBody,
+	NotFound,
+	RequestValidationFailed,
+	UnsupportedMediaType,
+	type RequestValidationIssues,
+	type ValidationIssue,
 } from "./pipeline/errors.ts";
 export { sse, type SseServerEvent } from "./pipeline/sse.ts";
 export {
@@ -36,6 +41,7 @@ export {
 export {
 	bodyCodec,
 	createOpenApiDocument,
+	isRouteError,
 	RouteError,
 	routeError,
 	safe,
