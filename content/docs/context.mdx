@@ -48,16 +48,22 @@ declare module "@rest-rpc/server" {
 To make values from the surrounding server available in the context, such as a
 user authenticated by framework middleware or the native request, seed the
 context when handling the request. Seeded values are set before route
-middleware runs:
+middleware runs. With `createApp`, pass the values or a function that returns
+them per request as its [`context`](/docs/server/fetch#app-options) option:
 
 ```ts
-const handler = createCatchAllHandler(compileRoutes(routes));
-
-await handler(request, { context: { user: await authenticate(request) } });
+createApp(routes, {
+	context: async (request) => ({ user: await authenticate(request) }),
+});
 ```
 
-Compiled routes accept the same option: `route.handle(request, { context })`.
-See [Handle Options](/docs/server/fetch#handle-options).
+When [integrating with a framework](/docs/server/framework-integration), pass them as the
+`context` [handle option](/docs/server/framework-integration#handle-options) of the
+catch-all handler or a compiled route:
+
+```ts
+await handler(request, { context: { user: await authenticate(request) } });
+```
 
 :::tip
 The context type does not guarantee that a value has been set. Set required

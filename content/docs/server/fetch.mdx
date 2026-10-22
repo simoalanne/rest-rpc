@@ -3,9 +3,11 @@ title: Fetch Runtime
 description: Serve rest-rpc routes with Fetch Request and Response
 ---
 
-The Fetch runtime turns a Fetch `Request` into a `Response`. Use it with
-fetch-native runtimes such as Bun, Deno, and Cloudflare Workers, or with
-frameworks built on Fetch such as Hono.
+The Fetch runtime serves rest-rpc routes with Fetch `Request` and `Response`,
+on fetch-native runtimes such as Bun, Deno, and Cloudflare Workers. For
+`node:http`, see [Node HTTP](/docs/server/node). To add the routes to an
+existing framework such as Hono or Express, see
+[Framework Integration](/docs/server/framework-integration).
 
 ## Install
 
@@ -15,12 +17,11 @@ npm i @rest-rpc/server
 
 ## Usage
 
-Compile the route tree, then either let rest-rpc route requests with the
-catch-all handler, or register each compiled route on a router you already
-have.
+`createApp` turns a route tree into an app with a `fetch` handler. Runtimes such
+as Bun, Deno, and Cloudflare Workers serve it when it is the default export:
 
-```ts
-import { compileRoutes, createCatchAllHandler, route } from "@rest-rpc/server";
+```ts server.ts
+import { createApp, route } from "@rest-rpc/server";
 import { z } from "zod";
 
 const todos = new Map([["todo_1", { id: "todo_1", title: "Write docs" }]]);
@@ -37,124 +38,103 @@ const getTodo = route
 
 export const routes = { todos: { get: getTodo } };
 
-const handler = createCatchAllHandler(compileRoutes(routes));
-
-export default {
-	async fetch(request: Request) {
-		const result = await handler(request);
-		return result.matched
-			? result.response
-			: new Response("Not found", { status: 404 });
-	},
-};
+export default createApp(routes);
 ```
 
-The catch-all handler resolves to `{ matched: true, response }` when the request
-matches a route, and `{ matched: false }` otherwise, so the surrounding runtime
-can provide fallback routing.
+### Bun
 
-## Registering Routes on a Router
+The app also has a `routes` property in the format of Bun's `routes` server
+option, so Bun's native router routes the requests. Pass the app to
+`Bun.serve()` to set other server options, and spread `app.routes` to add your
+own routes next to it:
 
-`compileRoutes` returns one route per method and path:
-
-```ts
-type FetchRoute = {
-	method: HttpMethod;
-	path: string;
-	handle: (request: Request, options?: HandleOptions) => Promise<Response>;
-};
-```
-
-`path` is the route path, including any [prefix](/docs/route-builder#path-prefixes)
-declared with `.prefix()`. `handle` runs validation, middleware, and the
-handler for a request that is already routed to it. It uses the params a router
-attaches as `request.params`, as Bun's router does, and otherwise reads them
-from the request URL. With Bun's built-in router:
-
-```ts
-const bunRoutes: Record<
-	string,
-	Record<string, (request: Request) => Promise<Response>>
-> = {};
-for (const route of compileRoutes(routes, { paramSyntax: "colon" })) {
-	(bunRoutes[route.path] ??= {})[route.method] = (request) =>
-		route.handle(request);
-}
+```ts server.ts
+const app = createApp(routes);
 
 Bun.serve({
-	routes: bunRoutes,
-	fetch: () => new Response("Not found", { status: 404 }),
+	...app,
+	port: 8080,
+	routes: { ...app.routes, "/health": new Response("ok") },
 });
 ```
 
-See [Frameworks](/docs/server/frameworks) for more examples.
+## App Options
 
-## Options
+`createApp` takes the [compile options](#compile-options) and these:
+
+```ts
+type CreateAppOptions = {
+	mountPath?: AbsolutePath;
+	context?:
+		| Record<string, unknown>
+		| ((
+				request: Request,
+				...args: TArgs
+		  ) => Record<string, unknown> | Promise<Record<string, unknown>>);
+	notFound?: (
+		request: Request,
+	) => Promise<Response> | Response | Promise<void> | void;
+	onError?: (
+		error: unknown,
+		request: Request,
+	) => Promise<Response> | Response | Promise<void> | void;
+};
+```
+
+- `mountPath`: the path the routes are served under, such as `/internal`.
+  Route paths do not include it. A path that clients use, such as `/api/v1`,
+  belongs in the routes instead, declared with
+  [`.prefix()`](/docs/route-builder#path-prefixes), so that clients and OpenAPI
+  documents include it.
+- `context`: values to seed the request [context](/docs/context) with before
+  middleware runs, or a function, sync or async, that returns them for each
+  request. They are not type-checked against the context types routes declare.
+  If the function throws, the response is the one from `onError`.
+
+  ```ts
+  createApp(routes, {
+  	context: async (request) => ({ user: await authenticate(request) }),
+  });
+  ```
+
+  The function also receives what the runtime passes to `fetch` after the
+  request, such as the `env` bindings of Cloudflare Workers or the connection
+  info of Deno. Their types are inferred from the function's parameters:
+
+  ```ts
+  export default createApp(routes, {
+  	context: (request, env: Env) => ({ db: env.DB }),
+  }) satisfies ExportedHandler<Env>;
+  ```
+
+- `notFound`: the response for requests that match no route. Defaults to a 404
+  response with `{ message: "Not found" }`.
+- `onError`: the response when a handler or middleware throws. Defaults to a
+  500 response with `{ message: "Internal server error" }`.
+
+Return nothing from `notFound` or `onError` to keep the default response and
+only run side effects, such as logging.
+
+## Compile Options
 
 ```ts
 type CompileRoutesOptions = {
 	bodyCodecs?: readonly BodyCodec[];
 	disableRequestValidation?: boolean;
 	disableResponseValidation?: boolean;
-	paramSyntax?: "colon" | "braces";
 	requestValidationErrorHandler?: RequestValidationErrorHandler;
 	responseValidationErrorHandler?: ResponseValidationErrorHandler;
 };
 ```
 
-- `paramSyntax`: rewrites path params in compiled paths to `:name` (`"colon"`)
-  or `{name}` (`"braces"`) for routers that expect one of them. Paths keep the
-  markers they were declared with by default.
 - `bodyCodecs`: see [Request and Response Bodies](#request-and-response-bodies).
 - `disableRequestValidation`, `disableResponseValidation`: see
   [Disabling Server Validation](/docs/http-behavior/schemas#disabling-server-validation).
-- `requestValidationErrorHandler`, `responseValidationErrorHandler`: see [Error Handling](#error-handling).
+- `requestValidationErrorHandler`, `responseValidationErrorHandler`: see
+  [Error Handling](#error-handling).
 
-## Handle Options
-
-Compiled routes and the catch-all handler take per-request options:
-
-```ts
-type HandleOptions = {
-	context?: Record<string, unknown>;
-	params?: Record<string, string>;
-	body?: unknown;
-};
-
-const response = await route.handle(request, { context: { user } });
-```
-
-- `context`: values from the host to seed the request [context](/docs/context)
-  with before middleware runs, such as an authenticated user or the native
-  request. They are not type-checked against the context types routes declare.
-- `params`: percent-decoded path params, for requests whose URL does not
-  contain the route path, such as after a rewrite or when calling `handle` with
-  a constructed request. Otherwise params are used from `request.params` when
-  the router sets it, as Bun's router does, or read from the request URL. The
-  catch-all handler passes the params it matched.
-- `body`: a request body already parsed by the framework, such as with a body
-  parser. The request body is then not read, but the value is still validated
-  against the route's body schema.
-
-## Mount Path
-
-When the catch-all handler is mounted under a path that is not part of the
-route paths, pass it as `mountPath`. Requests outside it are unmatched, and it
-is removed from the request path before matching:
-
-```ts
-const handler = createCatchAllHandler(compileRoutes(routes));
-
-app.all("/internal/*", async (c) => {
-	const result = await handler(c.req.raw, { mountPath: "/internal" });
-	return result.matched ? result.response : c.notFound();
-});
-```
-
-`mountPath` is a per-request option, so one handler can serve the same routes
-under several mount paths. A path that clients use, such as `/api/v1`, belongs
-in the routes instead, declared with [`.prefix()`](/docs/route-builder#path-prefixes),
-so that clients and OpenAPI documents include it.
+The same options are taken by `compileRoutes` when
+[integrating with a framework](/docs/server/framework-integration#compiling-routes).
 
 ## Paths
 
@@ -178,33 +158,21 @@ chunks. To send it with its own headers, return it wrapped in
 
 Use `requestValidationErrorHandler` and `responseValidationErrorHandler` to
 replace the [default validation error responses](/docs/http-behavior/errors).
-Other errors reject the handler promise.
+Other errors thrown by handlers or middleware are passed to `onError`.
 
 ```ts
-const handler = createCatchAllHandler(
-	compileRoutes(routes, {
-		requestValidationErrorHandler: (error, request) => {
-			return Response.json(
-				{ code: "VALIDATION_ERROR", issues: error.issues },
-				{ status: 422 },
-			);
-		},
-		responseValidationErrorHandler: (_error, request) => {
-			return Response.json({ code: "INVALID_RESPONSE" }, { status: 500 });
-		},
-	}),
-);
-
-export default {
-	async fetch(request: Request) {
-		try {
-			const result = await handler(request);
-			return result.matched
-				? result.response
-				: new Response("Not found", { status: 404 });
-		} catch (error) {
-			return Response.json({ code: "INTERNAL_SERVER_ERROR" }, { status: 500 });
-		}
+export default createApp(routes, {
+	requestValidationErrorHandler: (error, request) => {
+		return Response.json(
+			{ code: "VALIDATION_ERROR", issues: error.issues },
+			{ status: 422 },
+		);
 	},
-};
+	responseValidationErrorHandler: (_error, request) => {
+		return Response.json({ code: "INVALID_RESPONSE" }, { status: 500 });
+	},
+	onError: (error) => {
+		console.error(error);
+	},
+});
 ```

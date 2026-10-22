@@ -1,21 +1,14 @@
 ---
 title: Node HTTP
-description: Serve rest-rpc routes with Node.js IncomingMessage and ServerResponse
+description: Serve rest-rpc routes with Node.js node:http
 ---
 
-The Node runtime adapts the [Fetch runtime](/docs/server/fetch) to work with Node's
-`IncomingMessage` and `ServerResponse`. Each request is converted to a Fetch
-`Request`, handled by the same pipeline, and the resulting Fetch `Response`,
-including streams, is written back to the `ServerResponse`. Use it with
-`node:http` or with frameworks that expose the native request and response,
-such as Express and Fastify.
-
-Import `compileRoutes` and `createCatchAllHandler` from `@rest-rpc/server/node` instead.
-They take the same [options](/docs/server/fetch#options) as their Fetch counterparts.
-The handlers they return take `req, res` instead of a `Request` and write the
-response to `res` instead of returning it. Requests are read from
-`req.originalUrl` when a framework sets it, as Express does when it removes a
-mount path from `req.url`, so pass the full mount path as `mountPath`.
+The Node runtime serves the same app as the [Fetch runtime](/docs/server/fetch)
+on `node:http`. Apps are created with `createApp` and configured with the same
+[options](/docs/server/fetch#app-options), and routes behave the same, including
+streamed responses. This page covers `serve`, which starts the server. To add
+the routes to an existing framework such as Express or Fastify, see
+[Framework Integration](/docs/server/framework-integration).
 
 ## Install
 
@@ -23,37 +16,32 @@ mount path from `req.url`, so pass the full mount path as `mountPath`.
 npm i @rest-rpc/server
 ```
 
-## Usage
+## Serve
 
-```ts
-import { createServer } from "node:http";
-import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server/node";
+`serve` starts a `node:http` server for an app:
+
+```ts server.ts
+import { createApp } from "@rest-rpc/server";
+import { serve } from "@rest-rpc/server/node";
 import { routes } from "./routes";
 
-const handler = createCatchAllHandler(compileRoutes(routes));
+const server = serve(createApp(routes), { port: 3000 }, (address) => {
+	console.log(`Listening on port ${address.port}`);
+});
 
-createServer(async (req, res) => {
-	try {
-		const { matched } = await handler(req, res);
-		if (!matched) res.writeHead(404).end("Not found");
-	} catch (error) {
-		console.error(error);
-		res.writeHead(500).end("Internal server error");
-	}
-}).listen(3000);
+process.on("SIGTERM", () => server.close());
 ```
-
-## Registering Routes on a Router
-
-To register routes on a router instead, call each compiled route's `handle`:
 
 ```ts
-for (const route of compileRoutes(routes)) {
-	router.on(route.method, route.path, (req, res) => route.handle(req, res));
-}
+type ServeOptions = {
+	port?: number;
+	hostname?: string;
+};
 ```
 
-Params a router sets as `req.params`, as Express does, are used instead of
-reading them from the request URL again.
+- `port`: defaults to `3000`. With `0`, a free port is chosen and passed to the
+  callback.
+- `hostname`: listens on all interfaces when omitted, as `server.listen()` does.
 
-See [Frameworks](/docs/server/frameworks) for more examples.
+`serve` returns the underlying `http.Server`, so closing it and handling its
+events are up to you.

@@ -12,6 +12,7 @@ shared contract is also supported.
 
 - Fluent route builder for HTTP
 - Typed handlers for Node HTTP and Fetch runtimes, registrable on any framework's router.
+- One-line servers for Bun, Node, and other Fetch runtimes, with Bun's native router on Bun.
 - Typed Fetch client and TanStack Query utils.
 - Typed Server-Sent Event streams and custom request/response bodies
 - Standard Schema validation
@@ -41,6 +42,15 @@ export const routes = {
 			}),
 	},
 };
+```
+
+Serve them with Bun, or with `serve` from `@rest-rpc/server/node` on Node:
+
+```ts server.ts
+import { createApp } from "@rest-rpc/server";
+import { routes } from "./routes";
+
+Bun.serve({ ...createApp(routes), port: 3000 });
 ```
 
 Extract a minimal client contract from the route tree at build time, then call
@@ -78,5 +88,5 @@ Full documentation is available at [rest-rpc.vercel.app](https://rest-rpc.vercel
 ## Packages
 
 - [`@rest-rpc/core`](https://npmx.dev/package/@rest-rpc/core): Route declarations, Fetch client, and OpenAPI generation.
-- [`@rest-rpc/server`](https://npmx.dev/package/@rest-rpc/server): Route handlers for Fetch (`@rest-rpc/server/fetch`) and Node HTTP (`@rest-rpc/server/node`) runtimes.
+- [`@rest-rpc/server`](https://npmx.dev/package/@rest-rpc/server): Servers and route handlers for Fetch (`@rest-rpc/server`) and Node HTTP (`@rest-rpc/server/node`) runtimes.
 - [`@rest-rpc/tanstack-query`](https://npmx.dev/package/@rest-rpc/tanstack-query): TanStack Query utils.

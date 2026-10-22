@@ -36,7 +36,7 @@ import { sseBodyCodec } from "./sse.ts";
 /**
  * Customizes paths, request parsing and validation failures for compiled Fetch routes.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#options}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#compile-options}
  */
 export type CompileRoutesOptions = {
 	bodyCodecs?: readonly BodyCodec[];
@@ -99,7 +99,7 @@ export type ResponseValidationErrorHandler = (
  * @remarks `matched` is `false` when no route matches, so the surrounding
  * runtime can provide fallback routing.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#usage}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#catch-all-handler}
  */
 export type FetchRouteHandlerResult =
 	| { matched: true; response: Response }
@@ -108,7 +108,7 @@ export type FetchRouteHandlerResult =
 /**
  * A compiled route ready to be registered on a router.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#routes}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
  */
 export type FetchRoute = {
 	readonly method: HttpMethod;
@@ -232,7 +232,7 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
  * @remarks Pass the result to {@link createCatchAllHandler} to let rest-rpc
  * do the routing instead.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#routes}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
  */
 export function compileRoutes(
 	implementations: RuntimeImplementationTree,
@@ -261,7 +261,7 @@ export function compileRoutes(
  * @remarks An unmatched request is returned to the caller with `matched: false`
  * so the surrounding runtime can provide fallback routing.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/fetch}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#catch-all-handler}
  */
 export function createCatchAllHandler(
 	routes: readonly FetchRoute[],

@@ -266,8 +266,9 @@ npx skills add simoalanne/rest-rpc
 		just with full type safety at the API boundary.
 	</Card>
 	<Card title="Any stack, or none" icon="plug" type="check">
-		Serve routes on Node HTTP or fetch-native runtimes without a framework, or
-		register them on the router of Express, Hono, Fastify, and others.
+		Serve routes with a one-line server on Bun, Node, Deno, or Cloudflare
+		Workers, or register them on the router of Express, Hono, Fastify, and
+		others.
 	</Card>
 	<Card title="Typed responses" icon="list-checks" type="check">
 		Return direct success bodies for simple routes, or status-keyed response
@@ -300,8 +301,8 @@ npx skills add simoalanne/rest-rpc
 	<Step title="Choose the runtime" icon="plug">
 		Serve routes on the [Fetch](/docs/server/fetch/) or [Node
 		HTTP](/docs/server/node/) runtime or an [existing
-		framework](/docs/server/frameworks/), and call them with the [fetch
-		client](/docs/client/fetch-client/) or [TanStack
+		framework](/docs/server/framework-integration/), and call them with the
+		[fetch client](/docs/client/fetch-client/) or [TanStack
 		Query](/docs/client/tanstack-query/).
 	</Step>
 	<Step title="Describe the API" icon="share">
@@ -318,8 +319,8 @@ useful without the next:
 1. Declare routes and infer request and response types for handlers you write.
 2. Validate requests and responses at runtime.
 3. Extract a contract and call the routes with the typed client.
-4. Serve the routes with the catch-all handler, or register them on your
-   framework's router.
+4. Serve the routes with a one-line server, mount the catch-all handler, or
+   register them on your framework's router.
    :::
 
 ## Common Questions
@@ -337,9 +338,10 @@ useful without the next:
 		TanStack Query utils, or OpenAPI generation as they become useful.
 	</AccordionItem>
 	<AccordionItem title="Do I need a server framework?">
-		No. If an app only needs typed, validated endpoints, serve them directly on
-		Node HTTP, Bun, Deno, or Cloudflare Workers. If it needs a framework for
-		other reasons, register the routes on the framework's router instead.
+		No. If an app only needs typed, validated endpoints, serve them with a
+		one-line server on Node HTTP, Bun, Deno, or Cloudflare Workers. If it needs
+		a framework for other reasons, register the routes on the framework's router
+		instead.
 	</AccordionItem>
 	<AccordionItem title="Do I need to learn a new API model?">
 		The model is ordinary HTTP: methods, paths, request locations, status codes,

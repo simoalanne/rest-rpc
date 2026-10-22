@@ -12,7 +12,7 @@ Their response types are inferred from the handlers.
 
 Same code runs on other fetch-native runtimes such as Deno and Cloudflare Workers.
 See the [Fetch Runtime](/docs/server/fetch) for details, [Node HTTP](/docs/server/node) for `node:http`,
-and [Frameworks](/docs/server/frameworks) to use an existing framework's router.
+and [Framework Integration](/docs/server/framework-integration) to add the routes to an existing framework.
 
 ## Install
 
@@ -69,25 +69,15 @@ the client's result type.
 ## Register Routes
 
 ```ts server.ts
-import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server";
+import { createApp } from "@rest-rpc/server";
 import { routes } from "./routes";
 
-const handler = createCatchAllHandler(compileRoutes(routes));
-
-Bun.serve({
-	port: 3000,
-	async fetch(request) {
-		const result = await handler(request);
-		return result.matched
-			? result.response
-			: new Response("Not found", { status: 404 });
-	},
-});
+Bun.serve({ ...createApp(routes), port: 3000 });
 ```
 
-`compileRoutes` prepares the routes once. The catch-all handler routes each
-request to the matching route and resolves to its `response`, or reports
-`matched: false` so the server can respond otherwise.
+`createApp` returns an app that `Bun.serve()` serves directly, routing the
+requests with Bun's native router. To add the routes to an existing framework
+instead, see [Framework Integration](/docs/server/framework-integration).
 
 ## Create the Client
 
