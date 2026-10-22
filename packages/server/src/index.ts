@@ -38,6 +38,7 @@ export {
 	createOpenApiDocument,
 	RouteError,
 	routeError,
+	safe,
 	serializedBody,
 	type,
 } from "@rest-rpc/core";
@@ -45,6 +46,7 @@ export type {
 	BodyCodec,
 	BodyCodecOperations,
 	BodyValue,
+	ClientPromise,
 	SerializedBody,
 	CreateOpenApiDocumentOptions,
 	InferClientRequest,

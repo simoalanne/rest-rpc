@@ -10,7 +10,7 @@ export type {
 	FetchLike,
 	FetchOptions,
 } from "./client/index.ts";
-export { initClient } from "./client/index.ts";
+export { initClient, safe, type ClientPromise } from "./client/index.ts";
 export type {
 	AbsolutePath,
 	Contract,
