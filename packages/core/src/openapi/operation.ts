@@ -6,6 +6,7 @@ import type {
 	ResponseDeclaration,
 	ResponseHeadersSchema,
 } from "../contract/response.ts";
+import type { RouteErrorDeclaration } from "../contract/routeError.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { getPathParamNames } from "../contract/path.ts";
 
@@ -211,11 +212,68 @@ const createResponseHeaders = (
 	);
 };
 
+const createErrorBodySchema = (
+	code: string,
+	declaration: RouteErrorDeclaration,
+	converter: SchemaConverter | undefined,
+): OpenApiSchema => ({
+	type: "object",
+	properties: {
+		code: { const: code },
+		message: { type: "string" },
+		...(declaration.data && {
+			data: converter?.(declaration.data, "output") ?? {},
+		}),
+	},
+	required: declaration.data
+		? ["code", "message", "data"]
+		: ["code", "message"],
+});
+
+// Errors sharing a status are documented as one response.
+const createErrorResponses = (
+	errors: Readonly<Record<string, RouteErrorDeclaration>>,
+	converter: SchemaConverter | undefined,
+) => {
+	const byStatus = new Map<number, [string, RouteErrorDeclaration][]>();
+	for (const [code, declaration] of Object.entries(errors)) {
+		const group = byStatus.get(declaration.status) ?? [];
+		group.push([code, declaration]);
+		byStatus.set(declaration.status, group);
+	}
+
+	const responses: Record<string, OpenApiResponse> = {};
+	for (const [status, group] of byStatus) {
+		const schemas = group.map(([code, declaration]) =>
+			createErrorBodySchema(code, declaration, converter),
+		);
+		const headers = Object.assign(
+			{},
+			...group.map(([, declaration]) =>
+				createResponseHeaders(declaration.headers, converter),
+			),
+		);
+		responses[status] = {
+			description: group
+				.flatMap(([, declaration]) => declaration.description ?? [])
+				.join("\n"),
+			...(Object.keys(headers).length > 0 ? { headers } : {}),
+			content: {
+				"application/json": {
+					schema: schemas.length === 1 ? schemas[0] : { oneOf: schemas },
+				},
+			},
+		};
+	}
+	return responses;
+};
+
 const createResponses = (
 	route: RouteDeclaration,
 	converter: SchemaConverter | undefined,
 ) => {
 	const declared = Object.entries(route.responses);
+	const errors = createErrorResponses(route.errors ?? {}, converter);
 	// Responses inferred from a handler have no schema. `default` documents them
 	// without claiming a status, and keeps the required Responses Object non-empty.
 	if (declared.length === 0) {
@@ -224,6 +282,7 @@ const createResponses = (
 				description:
 					"Response inferred from the route handler; not documented.",
 			},
+			...errors,
 		};
 	}
 
@@ -232,7 +291,7 @@ const createResponses = (
 		responses[status] = createResponse(schema, converter);
 	}
 
-	return responses;
+	return { ...responses, ...errors };
 };
 
 export const createOperation = (
