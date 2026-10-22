@@ -23,6 +23,11 @@ export {
 	type RequestValidationErrorHandler,
 	type ResponseValidationErrorHandler,
 } from "./pipeline/compileRoutes.ts";
+export {
+	createApp,
+	type App,
+	type CreateAppOptions,
+} from "./pipeline/createApp.ts";
 export type {
 	CatchAllHandleOptions,
 	HandleOptions,

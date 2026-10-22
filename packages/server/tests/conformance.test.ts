@@ -1,13 +1,14 @@
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import {
 	compileRoutes,
+	createApp,
 	createCatchAllHandler,
 	route,
 	type,
 	type CatchAllHandleOptions,
 } from "@rest-rpc/server";
 import * as nodeAdapter from "@rest-rpc/server/node";
-import { createServer, type RequestListener } from "node:http";
+import { createServer, type RequestListener, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { RuntimeImplementationTree } from "../src/routing/match.ts";
 
@@ -547,5 +548,28 @@ describe("node adapter", () => {
 		// Params of another route, such as a wildcard mount, are not used.
 		await attached({}, "raw");
 		await attached(undefined, "raw");
+	});
+
+	it("serves an app with serve", async () => {
+		const app = createApp(
+			{ user: route.get("/users/:id").handler(({ params }) => params.id) },
+			{ mountPath: "/api" },
+		);
+		const server = await new Promise<Server>((resolve) => {
+			const started = nodeAdapter.serve(
+				app,
+				{ port: 0, hostname: "127.0.0.1" },
+				() => resolve(started),
+			);
+		});
+		try {
+			const { port } = server.address() as AddressInfo;
+			const user = await fetch(`http://127.0.0.1:${port}/api/users/1`);
+			expect(await user.json()).toBe("1");
+			const missing = await fetch(`http://127.0.0.1:${port}/users/1`);
+			expect(missing.status).toBe(404);
+		} finally {
+			await new Promise<void>((resolve) => server.close(() => resolve()));
+		}
 	});
 });

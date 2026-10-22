@@ -27,7 +27,7 @@ import { allMaybePromise, mapMaybePromise } from "./maybePromise.ts";
 /**
  * Per-request options for compiled routes and the catch-all handler.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#handle-options}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#handle-options}
  */
 export type HandleOptions = {
 	/**
@@ -52,7 +52,7 @@ export type HandleOptions = {
 /**
  * Per-request options for the catch-all handler.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#mount-path}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#mount-path}
  */
 export type CatchAllHandleOptions = HandleOptions & {
 	/**

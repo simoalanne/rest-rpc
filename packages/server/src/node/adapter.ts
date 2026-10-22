@@ -1,10 +1,17 @@
 import type { HttpMethod } from "@rest-rpc/core/contract";
-import type { IncomingMessage, ServerResponse } from "node:http";
+import {
+	createServer,
+	type IncomingMessage,
+	type Server,
+	type ServerResponse,
+} from "node:http";
+import type { AddressInfo } from "node:net";
 import { pipeline } from "node:stream/promises";
 import {
 	compileRoutes as compileFetchRoutes,
 	type CompileRoutesOptions,
 } from "../pipeline/compileRoutes.ts";
+import type { App } from "../pipeline/createApp.ts";
 import type {
 	CatchAllHandleOptions,
 	HandleOptions,
@@ -96,7 +103,7 @@ const writeFetchResponse = async (
 /**
  * A compiled route ready to be registered on a Node router.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/node#routes}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
  */
 export type NodeRoute = {
 	readonly method: HttpMethod;
@@ -118,7 +125,7 @@ export type NodeRoute = {
 /**
  * Indicates whether the Node HTTP catch-all handler dispatched a request to a rest-rpc route.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/node}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#catch-all-handler}
  */
 export type NodeRouteHandlerResult = { matched: boolean };
 
@@ -130,7 +137,7 @@ export type NodeRouteHandlerResult = { matched: boolean };
  * Pass the result to {@link createCatchAllHandler} to let rest-rpc do the
  * routing instead.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/node#routes}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
  */
 export function compileRoutes(
 	implementations: RuntimeImplementationTree,
@@ -166,7 +173,7 @@ export function compileRoutes(
  * @remarks Unmatched requests are left untouched and reported with
  * `matched: false` so the surrounding server can provide fallback routing.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/node}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#catch-all-handler}
  */
 export function createCatchAllHandler(
 	routes: readonly NodeRoute[],
@@ -197,4 +204,53 @@ export function createCatchAllHandler(
 		);
 		return { matched: true };
 	};
+}
+
+/**
+ * Customizes where the Node HTTP server started by {@link serve} listens.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/server/node#serve}
+ */
+export type ServeOptions = {
+	/** @default 3000 */
+	port?: number;
+	/** Listens on all interfaces when omitted, as `server.listen()` does. */
+	hostname?: string;
+};
+
+/**
+ * Starts a Node HTTP server that serves an app made with `createApp`.
+ *
+ * @remarks Returns the underlying server, so closing it is up to the caller.
+ * `onListen` receives the address the server listens on, including the port
+ * chosen for `port: 0`.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/server/node#serve}
+ */
+export function serve(
+	app: App,
+	options: ServeOptions = {},
+	onListen?: (address: AddressInfo) => void,
+): Server {
+	const server = createServer(async (request, response) => {
+		try {
+			await writeFetchResponse(
+				await app.fetch(toFetchRequest(request, response)),
+				response,
+			);
+		} catch {
+			// The app handles errors of the routes, so these come from reading the
+			// request or writing the response.
+			if (response.headersSent) {
+				response.destroy();
+			} else {
+				response.statusCode = 500;
+				response.end();
+			}
+		}
+	});
+	server.listen(options.port ?? 3000, options.hostname, () =>
+		onListen?.(server.address() as AddressInfo),
+	);
+	return server;
 }

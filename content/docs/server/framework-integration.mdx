@@ -1,0 +1,216 @@
+---
+title: Framework Integration
+description: Use rest-rpc as the framework, or integrate it into an existing one such as Hono or Express
+---
+
+## Scope of rest-rpc
+
+rest-rpc is a small framework. Its main purpose is type safety between the
+server and the client, with explicit HTTP behavior and no unnecessary
+abstraction. It deliberately skips implementing built-in features/helpers for common requirements
+like authentication, caching, dependency injection and "batteries included" functionality in general.
+It does not ship adapters for other frameworks or libraries and instead focuses on making the integration
+with them straightforward glue code thats easy to write and maintain.
+
+Whether your routes are implemented using the route builder or against an explicit
+[contract](/docs/contract-first), they are independent of routing and the
+server lifecycle. This makes it a separate decision where and how to serve
+them. Integrations with other frameworks are therefore straightforward because a route consists of
+plain HTTP consepts like methods, paths, status codes, and headers, and can naturally be served with
+web-standard `Request` and `Response`.
+
+Either way, common features may need an additional package, another
+framework, or your own implementation built on top of
+[middleware](/docs/middleware) and [context](/docs/context).
+Choose the setup that works best for your app: rest-rpc works the same in all of them.
+
+## Choosing an Integration
+
+rest-rpc does not provide framework-specific packages. Import from
+`@rest-rpc/server` for frameworks built on Fetch `Request`, such as Hono, and
+from `@rest-rpc/server/node` for frameworks built on Node's `IncomingMessage`,
+such as Express and Fastify. Both export the same functions.
+
+There are two ways to integrate, compared here with `createApp`:
+
+|                    | `createApp`   | Catch-all handler                         | Native router                                   |
+| ------------------ | ------------- | ----------------------------------------- | ----------------------------------------------- |
+| Server             | rest-rpc only | Your framework                            | Your framework                                  |
+| Routing            | rest-rpc      | rest-rpc, under one framework route       | The framework, one framework route per route    |
+| Framework features | None          | Per mount, such as middleware on `/api/*` | Per route, such as middleware on a single route |
+| Unmatched requests | `notFound`    | Passed back to the framework              | Never reach rest-rpc                            |
+| Errors             | `onError`     | The framework's error handling            | The framework's error handling                  |
+
+Use the [catch-all handler](#catch-all-handler) to mount all routes at once,
+and the [native router](#native-router) when the framework should see each
+route, such as to apply its middleware per route or list the routes in its own
+tooling.
+
+## Compiling Routes
+
+Both ways start by compiling the route tree with `compileRoutes`. It takes the
+[compile options](/docs/server/fetch#compile-options) of `createApp`, and
+`paramSyntax`:
+
+- `paramSyntax`: rewrites path params in compiled paths to `:name` (`"colon"`)
+  or `{name}` (`"braces"`) for routers that expect one of them. Paths keep the
+  markers they were declared with by default.
+
+It returns one route per method and path:
+
+```ts
+type FetchRoute = {
+	method: HttpMethod;
+	path: string;
+	handle: (request: Request, options?: HandleOptions) => Promise<Response>;
+};
+```
+
+`path` includes any [prefix](/docs/route-builder#path-prefixes) declared with
+`.prefix()`. The Node routes from `@rest-rpc/server/node` have the same shape,
+but `handle` takes `req, res` and writes the response to `res`.
+
+## Native Router
+
+Register each compiled route's `method` and `path` on the framework's router
+and call `route.handle()` from it. The framework does the routing, and
+`handle` runs validation, middleware, and the handler. Params the router sets,
+such as `req.params` in Express, are used instead of reading them from the
+request URL again.
+
+<Tabs>
+<Tab title="Hono">
+
+```ts server.ts
+import { Hono } from "hono";
+import { compileRoutes } from "@rest-rpc/server";
+import { routes } from "./routes";
+
+const app = new Hono();
+
+for (const route of compileRoutes(routes, { paramSyntax: "colon" })) {
+	app.on(route.method, route.path, (c) =>
+		route.handle(c.req.raw, { context: { user: c.var.user } }),
+	);
+}
+```
+
+</Tab>
+<Tab title="Express">
+
+```ts server.ts
+import express from "express";
+import { compileRoutes } from "@rest-rpc/server/node";
+import { routes } from "./routes";
+
+const app = express();
+
+for (const route of compileRoutes(routes, { paramSyntax: "colon" })) {
+	const method = route.method.toLowerCase() as
+		"get" | "post" | "put" | "patch" | "delete";
+	app[method](route.path, (req, res, next) => {
+		route.handle(req, res).catch(next);
+	});
+}
+```
+
+</Tab>
+</Tabs>
+
+## Catch-All Handler
+
+Pass the compiled routes to `createCatchAllHandler` and mount it on a single
+framework route or middleware. rest-rpc does the routing and resolves to
+`{ matched: true, response }` for the requests it handles, and to
+`{ matched: false }` for the rest, so the framework can continue with its own
+routes. The Node handler writes the response to `res` and resolves to
+`{ matched }`, leaving unmatched requests untouched.
+
+<Tabs>
+<Tab title="Hono">
+
+```ts server.ts
+import { Hono } from "hono";
+import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server";
+import { routes } from "./routes";
+
+const app = new Hono();
+const handler = createCatchAllHandler(compileRoutes(routes));
+
+app.all("/internal/*", async (c) => {
+	const result = await handler(c.req.raw, {
+		mountPath: "/internal",
+		context: { user: c.var.user },
+	});
+	return result.matched ? result.response : c.notFound();
+});
+```
+
+</Tab>
+<Tab title="Express">
+
+```ts server.ts
+import express from "express";
+import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server/node";
+import { routes } from "./routes";
+
+const app = express();
+const handler = createCatchAllHandler(compileRoutes(routes));
+
+app.use("/internal", (req, res, next) => {
+	handler(req, res, { mountPath: "/internal" }).then(
+		({ matched }) => matched || next(),
+		next,
+	);
+});
+```
+
+</Tab>
+</Tabs>
+
+### Mount Path
+
+When the handler is mounted under a path that is not part of the route paths,
+pass it as `mountPath`. Requests outside it are unmatched, and it is removed
+from the request path before matching. The Node handler reads the path from
+`req.originalUrl` when the framework sets it, as Express does when it removes
+the mount path from `req.url`, so pass the full mount path.
+
+`mountPath` is a per-request option, so one handler can serve the same routes
+under several mount paths. A path that clients use, such as `/api/v1`, belongs
+in the routes instead, declared with
+[`.prefix()`](/docs/route-builder#path-prefixes), so that clients and OpenAPI
+documents include it.
+
+## Handle Options
+
+Compiled routes and the catch-all handler take per-request options for passing
+framework values to rest-rpc:
+
+```ts
+type HandleOptions = {
+	context?: Record<string, unknown>;
+	params?: Record<string, string>;
+	body?: unknown;
+};
+```
+
+- `context`: values to seed the request [context](/docs/context) with before
+  middleware runs, such as an authenticated user or the native request. They
+  are not type-checked against the context types routes declare.
+- `params`: percent-decoded path params, for requests whose URL does not
+  contain the route path, such as after a rewrite. Otherwise params are used
+  from the router, or read from the request URL. The catch-all handler passes
+  the params it matched.
+- `body`: a request body already parsed by the framework, such as with
+  `express.json()`. The request body is then not read, but the value is still
+  validated against the route's body schema.
+
+## Error Handling
+
+Validation errors are answered with the
+[default validation error responses](/docs/http-behavior/errors), or with the
+error handlers from the [compile options](/docs/server/fetch#error-handling).
+Other errors thrown by handlers or middleware reject the promise returned by
+`handle` or the catch-all handler, so pass them to the framework's error
+handling, as the Express examples do with `next`.
