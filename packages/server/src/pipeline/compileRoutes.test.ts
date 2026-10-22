@@ -3,7 +3,7 @@ import { route } from "../builder/routeBuilder.ts";
 import { compileRoutes, createCatchAllHandler } from "./compileRoutes.ts";
 
 describe("compileRoutes", () => {
-	it("reports sent errors to onError and leaves undeclared codes to the framework", async () => {
+	it("sends declared and undeclared errors and reports them to onError", async () => {
 		const Gone = routeError("GONE", { status: 410 });
 		const onError = vi.fn();
 		const [declared, undeclared] = compileRoutes(
@@ -26,10 +26,12 @@ describe("compileRoutes", () => {
 			expect.objectContaining({ code: "GONE", status: 410 }),
 			request,
 		);
-		await expect(
-			undeclared!.handle(new Request("http://localhost/undeclared")),
-		).rejects.toThrow('threw undeclared error code "GONE"');
-		expect(onError).toHaveBeenCalledTimes(1);
+		const response = await undeclared!.handle(
+			new Request("http://localhost/undeclared"),
+		);
+		expect(response.status).toBe(410);
+		expect(await response.json()).toEqual({ code: "GONE", message: "GONE" });
+		expect(onError).toHaveBeenCalledTimes(2);
 	});
 });
 

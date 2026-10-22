@@ -1,6 +1,6 @@
 import type { ClientRouteError } from "../contract/response.ts";
 import { route } from "../contract/routeBuilder.ts";
-import { isRouteError, RouteError } from "../contract/routeError.ts";
+import { isDeclaredError, RouteError } from "../contract/routeError.ts";
 import { type } from "../standard-schema/type.ts";
 import { initClient } from "./initClient.ts";
 import { safe } from "./safe.ts";
@@ -12,23 +12,28 @@ describe("safe types", () => {
 			.response(type<string>())
 			.error("GONE", { status: 410 });
 		const client = initClient(declaration, { baseUrl: "" });
-		const [error, response] = await safe(client());
-		if (error) {
-			expectTypeOf(error).toEqualTypeOf<
+		const result = await safe(client());
+		if (result.error) {
+			expectTypeOf(result.error).toEqualTypeOf<
 				ClientRouteError<(typeof declaration)["~restrpc"]> | Error
 			>();
+			expectTypeOf(result.data).toEqualTypeOf<undefined>();
 		} else {
-			expectTypeOf(response.body).toEqualTypeOf<string>();
+			expectTypeOf(result.data.body).toEqualTypeOf<string>();
+		}
+		const { error, data } = await safe(client());
+		if (!error) {
+			expectTypeOf(data.body).toEqualTypeOf<string>();
 		}
 	});
 
-	it("narrows client errors to the route's errors with isRouteError", async () => {
+	it("narrows client errors to the route's errors with isDeclaredError", async () => {
 		const declaration = route
 			.get("/")
 			.error("GONE", { status: 410, data: type<{ id: string }>() });
 		const client = initClient(declaration, { baseUrl: "" });
-		const [error] = await safe(client());
-		if (isRouteError(error)) {
+		const { error } = await safe(client());
+		if (isDeclaredError(error)) {
 			expectTypeOf(error).toEqualTypeOf<
 				ClientRouteError<(typeof declaration)["~restrpc"]>
 			>();
@@ -39,14 +44,9 @@ describe("safe types", () => {
 		try {
 			await client();
 		} catch (caught) {
-			if (isRouteError(caught)) {
+			if (isDeclaredError(caught)) {
 				expectTypeOf(caught).toEqualTypeOf<RouteError>();
 			}
 		}
-	});
-
-	it("types errors of other promises as unknown", async () => {
-		const [error] = await safe(Promise.resolve(1));
-		expectTypeOf(error).toEqualTypeOf<unknown>();
 	});
 });

@@ -285,9 +285,9 @@ const get = route
 	.handler(({ params }) => findTodo(params.id));
 ```
 
-The route's declaration decides the response. Throwing an error whose code the
-route does not declare is a programmer error, so the server rejects instead of
-sending it. Declaring the same definition twice, for example on a shared base
+The route's declaration decides the response. An error whose code the route
+does not declare is [sent as thrown](/docs/http-behavior/errors#throwing-errors),
+but is not part of the route's types. Declaring the same definition twice, for example on a shared base
 and on a route, is allowed; declaring a different error with an existing code
 throws.
 

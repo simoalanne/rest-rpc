@@ -45,8 +45,7 @@ Constructor: `new Definition(data, options?)` when `data` is declared, otherwise
 `new Definition(options?)`. `options` is `{ message?, headers?, cause? }`, and
 `headers` is required when a headers schema is declared.
 
-`UNKNOWN_ERROR` is reserved; `routeError("UNKNOWN_ERROR")` throws. A status
-outside 400–599 throws.
+A status outside 400–599 throws.
 
 ### `.error(definition)` / `.error(code, options?)` (route builder)
 
@@ -106,17 +105,18 @@ Errors are thrown; success is returned. Handlers and middleware throw:
 - `new errors.CODE(...)`: `errors` on the handler and `.use()` request holds the
   definitions declared earlier in the chain.
 - `new Definition(...)` from an imported `routeError` definition, for domain code.
-- `new RouteError(code, ...)`: loose, not recommended.
+- `new RouteError(code, ...)`: loose. Sent as thrown when the route does not
+  declare the code, for errors that apply across routes, such as
+  `UNAUTHORIZED` from middleware.
 
 TypeScript cannot check that a thrown error is declared on the executing route.
 The pipeline does:
 
-| Thrown                            | Result                                                                              |
-| --------------------------------- | ----------------------------------------------------------------------------------- |
-| `RouteError` with a declared code | Resolved: declared status, validated `data` and headers, original error as `cause`. |
-| `RouteError` with a built-in code | Sent as thrown.                                                                     |
-| `RouteError` with any other code  | Rejects with an `Error` naming the route and code (programmer error).               |
-| Anything else                     | Rejects unchanged.                                                                  |
+| Thrown                               | Result                                                                              |
+| ------------------------------------ | ----------------------------------------------------------------------------------- |
+| `RouteError` with a declared code    | Resolved: declared status, validated `data` and headers, original error as `cause`. |
+| `RouteError` with an undeclared code | Sent as thrown, including built-ins. Not validated, and not part of route types.    |
+| Anything else                        | Rejects unchanged.                                                                  |
 
 Matching is by code, not class. The route's declaration is the source of truth.
 Validation of `data` and headers follows `disableResponseValidation`; a failure
@@ -141,14 +141,14 @@ The definitions are `routeError` classes exported from `@rest-rpc/server`, and
 the server creates built-in errors from them.
 
 Built-ins are sent whether or not the route declares them, because the server
-produces them. They are not part of route types, so clients receive an
-undeclared built-in as `UNKNOWN_ERROR`. Declaring the definition with
-`.error()` makes clients recognize it and types its `data`. This differs from
-other undeclared codes, which are programmer errors and are never sent.
+produces them. Like other undeclared codes, they are not part of route types,
+so clients receive an undeclared built-in as a `RouteError` that is not
+declared. Declaring the definition with `.error()` makes clients recognize it
+as declared and types its `data`.
 
 ### Layers
 
-| API                                      | Declared or built-in `RouteError` | Undeclared code / other error         |
+| API                                      | `RouteError`                      | Other error                           |
 | ---------------------------------------- | --------------------------------- | ------------------------------------- |
 | `compileRoutes`, `createCatchAllHandler` | serialized                        | rejects into the framework            |
 | `createApp` (and Node `serve`)           | serialized                        | serialized as `INTERNAL_SERVER_ERROR` |
@@ -176,55 +176,70 @@ the client checks 2xx statuses and content types without schemas.
 
 A call resolves with the success envelope or rejects with:
 
-- `RouteError` when a response arrived.
-- The original `Error` when no response arrived, or reading the body failed
-  (network failure, abort, timeout).
+- `RouteError` for every error response whose body has a `code`. `isDeclared`
+  is `true` when the route declares it.
+- A plain `Error` otherwise: a response outside the contract, or no response
+  (network failure, abort, timeout, failure reading the body). Errors of
+  reading the body are the original error.
+
+Undeclared `RouteError`s keep their values for general error handling, such as
+a project-wide `UNAUTHORIZED`, but they are not part of route types. Calls
+reject with `InferClientError<T> | Error`, and an undeclared `RouteError` is an
+`Error`.
 
 `HttpError` is removed.
 
 ### Classification
 
-A non-2xx response is a declared error when its decoded body is an object with
-a string `code`, the route declares that code, and the declared status equals
-the response status. With `validateResponses`, `data` and headers are validated.
+A non-2xx response whose decoded body is an object with a string `code` is a
+`RouteError` with the response status and headers, the body's `message` (or the
+code), and the body's `data`. It is declared when the route declares the code;
+the declared status must equal the response status, and with
+`validateResponses` its `data` and headers are validated. The client decides
+`isDeclared` from its own contract; it is not sent. A server matches thrown
+errors by code, so it never sends a declared code as undeclared, and a client
+`RouteError` with a declared code is always the declared error.
 
-Everything else that has a response becomes `UNKNOWN_ERROR`:
+Everything else that has a response rejects with an `Error`:
 
-| Situation                                                   | `data`       | `cause`        |
-| ----------------------------------------------------------- | ------------ | -------------- |
-| Non-2xx, undeclared code (incl. built-ins), or foreign body | decoded body | none           |
-| Declared code with a different status                       | decoded body | none           |
-| Declared code whose `data` or headers fail validation       | decoded body | issues         |
-| 2xx with an undeclared status or content type               | decoded body | none           |
-| 2xx whose body or headers fail validation                   | decoded body | issues         |
-| Body decoding fails                                         | `undefined`  | decoding error |
-| Stream item fails validation or cannot be decoded           | decoded item | issues / error |
+| Situation                                             | `message`                                    | `cause`        |
+| ----------------------------------------------------- | -------------------------------------------- | -------------- |
+| Non-2xx without a `code`, such as a proxy page        | `Request failed with status N.`              | none           |
+| Declared code with a different status                 | `Response did not match the route contract.` | none           |
+| Declared code whose `data` or headers fail validation | `Response did not match the route contract.` | issues         |
+| 2xx with an undeclared status or content type         | `Response did not match the route contract.` | none           |
+| 2xx whose body or headers fail validation             | `Response did not match the route contract.` | issues         |
+| Body decoding fails                                   | `Response body could not be decoded.`        | decoding error |
+| Stream item fails validation                          | `Response did not match the route contract.` | issues         |
+| Stream item cannot be decoded                         | `Event stream could not be decoded.`         | decoding error |
 
 Status and content type checks need declared responses, so routes with
 inferred responses accept every 2xx response. A `text/event-stream` response
-that breaks the contract is cancelled without being read, so its `data` is
-`undefined`. Validation needs schemas, so extracted contracts skip it.
-
-`message` is the body's `message` when it is a string, otherwise a generic one.
-`status` is always the response status.
+that breaks the contract is cancelled without being read. Validation needs
+schemas, so extracted contracts skip it.
 
 ### Types
 
 - `InferClientResponse<T>`: the success envelope. `InferClientSuccess` is
   removed because responses are success-only.
-- `InferClientError<T>`: declared variants plus `RouteError<"UNKNOWN_ERROR">`.
-  Calls reject with `InferClientError<T> | Error`.
+- `InferClientError<T>`: the declared variants, `never` for a route without
+  declared errors. Calls reject with `InferClientError<T> | Error`.
 - `ClientPromise<TData, TError>`: `Promise<TData>` with a type-only `~error`
   property. Client calls return it.
-- `safe(promise)`: resolves to `[null, data] | [error, undefined]`. The error
-  type is read from `ClientPromise`, or `unknown` for other promises.
-- `isRouteError(error)`: `error instanceof RouteError`, typed as
-  `error is Extract<T, RouteError>`, so a typed error from `safe()` or TanStack
-  narrows to the route's `RouteError`s without naming the route. An `unknown`
-  value narrows to `RouteError`. `instanceof RouteError` would also keep the
-  plain `Error` member as `RouteError<any, …>`, which leaves `data` as `any`.
+- `safe(promise)`: resolves to `SafeResult<TData, TError>`,
+  `{ error } | { data }` with the absent field typed `?: undefined`, as in
+  Standard Schema results. `data` is typed only after checking `error`, and
+  `result.error` is available without destructuring. The error type is read
+  from `ClientPromise`.
+- `isDeclaredError(error)`: `error instanceof RouteError && error.isDeclared`,
+  typed as `error is Extract<T, RouteError>`, so a typed error from `safe()` or
+  TanStack narrows to the route's declared errors without naming the route. An
+  `unknown` value narrows to `RouteError`.
+- `instanceof RouteError` matches undeclared errors too, for general error
+  handling. On a typed error it adds `RouteError<any, …>` to the declared
+  variants, so property access is `any`: it does not type specific codes.
 
-No safe client helper or third `safe()` element is provided: `isRouteError()`
+No safe client helper or extra `safe()` field is provided: `isDeclaredError()`
 is the one way to narrow typed errors, and a `catch` block that needs the
 route's codes uses `safe()` instead.
 
@@ -233,17 +248,17 @@ route's codes uses `safe()` instead.
 `call` and the local client return `ClientPromise` with the same types as the
 fetch client:
 
-| Thrown inside `call`                   | Rejection                                                                                  |
-| -------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Declared code, valid `data`            | the resolved `RouteError`                                                                  |
-| Undeclared built-in, or invalid `data` | `UNKNOWN_ERROR` with the built-in status, the wire body as `data`, the built-in as `cause` |
-| Undeclared code                        | an `Error` naming the route and code, with the thrown error as `cause`                     |
-| Other error                            | the `Error`, unchanged                                                                     |
+| Thrown inside `call`          | Rejection                                                    |
+| ----------------------------- | ------------------------------------------------------------ |
+| Declared code, valid `data`   | the resolved `RouteError`, declared                          |
+| Declared code, invalid `data` | the `INTERNAL_SERVER_ERROR` that would be sent, not declared |
+| Undeclared code               | the thrown `RouteError`, not declared                        |
+| Other error                   | the `Error`, unchanged                                       |
 
 ## TanStack Query
 
 The fetch client throws, so generated options no longer throw envelopes. The
-error type is `InferClientError<E> | Error`, narrowed with `isRouteError()`.
+error type is `InferClientError<E> | Error`, narrowed with `isDeclaredError()`.
 The package's own `InferClientError` is removed.
 
 ## OpenAPI

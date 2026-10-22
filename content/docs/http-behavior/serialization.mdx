@@ -194,5 +194,5 @@ when it needs an API only one of them has.
 
 On the server, an error thrown while deserializing responds with the
 `MALFORMED_REQUEST_BODY` [error](/docs/http-behavior/errors#built-in-errors)
-and status 400. On the client, a body that cannot be decoded rejects with
-[`UNKNOWN_ERROR`](/docs/client/fetch-client#handle-errors).
+and status 400. On the client, a body that cannot be decoded rejects with an
+[`Error`](/docs/client/fetch-client#typesafe-error-handling).

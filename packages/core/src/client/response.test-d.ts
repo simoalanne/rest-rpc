@@ -61,7 +61,7 @@ describe("client response inference", () => {
 		>().toEqualTypeOf<InferClientResponse<typeof get>>();
 	});
 
-	it("infers declared errors from their schema outputs and unknown errors", () => {
+	it("infers declared errors from their schema outputs", () => {
 		const NotFound = routeError("NOT_FOUND", {
 			status: 404,
 			data: type((input: number) => String(input)),
@@ -73,12 +73,6 @@ describe("client response inference", () => {
 			.get("/")
 			.error(NotFound)
 			.error("CONFLICT", { status: 409 });
-		type Unknown = RouteError<
-			"UNKNOWN_ERROR",
-			unknown,
-			number,
-			Record<string, string>
-		>;
 		expectTypeOf<InferClientError<typeof value>>().toEqualTypeOf<
 			| RouteError<
 					"NOT_FOUND",
@@ -87,10 +81,9 @@ describe("client response inference", () => {
 					Record<string, string> & { retry: number }
 			  >
 			| RouteError<"CONFLICT", undefined, 409, Record<string, string>>
-			| Unknown
 		>();
 		const plain = route.get("/");
-		expectTypeOf<InferClientError<typeof plain>>().toEqualTypeOf<Unknown>();
+		expectTypeOf<InferClientError<typeof plain>>().toBeNever();
 		const tree = { users: { value } };
 		expectTypeOf<
 			InferClientError<typeof tree>["users"]["value"]

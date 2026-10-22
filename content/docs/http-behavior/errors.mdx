@@ -23,10 +23,10 @@ Content-Type: application/json
   has data.
 - Declared error headers are sent as response headers.
 
-Any HTTP client can read these responses. The rest-rpc client recognizes a code
-when the route declares it with the received status, and turns every other
-response outside the contract into `UNKNOWN_ERROR`. See
-[Fetch Client](/docs/client/fetch-client#handle-errors).
+Any HTTP client can read these responses. The rest-rpc client rejects with a
+`RouteError` for each of them, and marks it as declared when the route declares
+the code with the received status. See
+[Fetch Client](/docs/client/fetch-client#typesafe-error-handling).
 
 ## Throwing Errors
 
@@ -37,11 +37,11 @@ The route's declaration decides the response: its status, and the validated
 `data` and headers. When `data` or headers fail validation, an
 `INTERNAL_SERVER_ERROR` is sent instead.
 
-Throwing an error whose code the route does not declare is a programmer error,
-so it is not sent. The route rejects with an error that names the route and the
-code, as it does for an undeclared response status. It reaches the framework's
-error handling, and [`createApp`](/docs/server/fetch) sends it as an
-`INTERNAL_SERVER_ERROR`. [Built-in errors](#built-in-errors) are the exception.
+An error whose code the route does not declare is sent as thrown, with its own
+status, `data` and headers, and without validation. Use it for errors that
+apply across routes, such as an `UNAUTHORIZED` thrown by auth middleware, and
+handle it in a client's general error handling. It is not part of the route's
+types, so declare the error when clients should handle it per call.
 
 ## Built-in Errors
 
@@ -55,10 +55,10 @@ The server sends these errors itself, whether or not a route declares them:
 | `INTERNAL_SERVER_ERROR`     | `InternalServerError`     | `500`  | none                                                   | [Response validation](/docs/http-behavior/schemas#response-validation-on-the-server) fails, including error data, or, with [`createApp`](/docs/server/fetch) only, a handler or middleware throws another error |
 | `NOT_FOUND`                 | `NotFound`                | `404`  | none                                                   | No route matches, with `createApp`'s default `notFound` only                                                                                                                                                    |
 
-A route that does not declare a built-in error still sends it, but clients do
-not know its code and receive it as `UNKNOWN_ERROR`, with the error response
-body as `data`. To handle a built-in error by its code, import its definition
-from `@rest-rpc/server` and declare it on the route:
+A route that does not declare a built-in error still sends it, and clients
+receive it as an undeclared `RouteError`. To handle a built-in error with typed
+`data`, import its definition from `@rest-rpc/server` and declare it on the
+route:
 
 ```ts
 import { RequestValidationFailed, route } from "@rest-rpc/server";
@@ -81,10 +81,6 @@ typed as `data`, with the `RequestValidationIssues` type:
 	headers: ValidationIssue[];
 }
 ```
-
-Built-in errors differ from errors with other codes a route does not declare:
-the server produces built-in errors, so they are always sent, while throwing an
-undeclared code is a programmer error that is [never sent](#throwing-errors).
 
 An invalid response is a server bug, so clients receive no validation details,
 not even that validation failed. For a response validation failure, the

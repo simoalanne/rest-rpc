@@ -26,10 +26,10 @@ export type {
 } from "./routeBuilder.types.ts";
 export { RouteBuilder, type RouteBuilderKind } from "./routeBuilder.ts";
 export {
-	isRouteError,
+	isDeclaredError,
+	markDeclared,
 	RouteError,
 	routeError,
-	UNKNOWN_ERROR,
 	type AnyRouteErrorClass,
 	type RouteErrorClass,
 	type RouteErrorClassFor,
@@ -66,7 +66,6 @@ export type {
 	ResponseOptions,
 	RouteResponses,
 	ServerResponse,
-	UnknownRouteError,
 } from "./response.ts";
 export type { ContractRouteEntry } from "./traversal.ts";
 export {

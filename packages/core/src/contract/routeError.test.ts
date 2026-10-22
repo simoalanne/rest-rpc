@@ -1,5 +1,10 @@
 import { type } from "../standard-schema/type.ts";
-import { isRouteError, RouteError, routeError } from "./routeError.ts";
+import {
+	isDeclaredError,
+	markDeclared,
+	RouteError,
+	routeError,
+} from "./routeError.ts";
 
 describe("routeError", () => {
 	it("creates RouteError subclasses that carry their declaration", () => {
@@ -44,7 +49,6 @@ describe("routeError", () => {
 	});
 
 	it.each([
-		["UNKNOWN_ERROR", 400, 'Error code "UNKNOWN_ERROR" is reserved.'],
 		["TOO_LOW", 399, 'Error status "399" must be from 400 to 599.'],
 		["TOO_HIGH", 600, 'Error status "600" must be from 400 to 599.'],
 	])("rejects the declaration %s with status %s", (code, status, message) => {
@@ -52,12 +56,12 @@ describe("routeError", () => {
 	});
 });
 
-describe("isRouteError", () => {
-	it("checks for RouteError instances", () => {
+describe("isDeclaredError", () => {
+	it("checks for RouteErrors marked as declared", () => {
 		const Gone = routeError("GONE", { status: 410 });
-		expect(isRouteError(new Gone())).toBe(true);
-		expect(isRouteError(new RouteError("UNKNOWN_ERROR"))).toBe(true);
-		expect(isRouteError(new Error("offline"))).toBe(false);
-		expect(isRouteError({ code: "GONE" })).toBe(false);
+		expect(isDeclaredError(markDeclared(new Gone()))).toBe(true);
+		expect(isDeclaredError(new Gone())).toBe(false);
+		expect(isDeclaredError(new Error("offline"))).toBe(false);
+		expect(isDeclaredError({ code: "GONE", isDeclared: true })).toBe(false);
 	});
 });

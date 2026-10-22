@@ -2,9 +2,6 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { Merge } from "../utils/typeUtils.ts";
 import type { ResponseHeadersSchema } from "./response.ts";
 
-/** The code of the error clients create for responses they do not recognize. */
-export const UNKNOWN_ERROR = "UNKNOWN_ERROR";
-
 /**
  * Options accepted by the `RouteError` constructor.
  *
@@ -29,8 +26,8 @@ export type RouteErrorOptions<
  *
  * @remarks Servers send `{ code, message, data? }` as JSON with the error's
  * status and headers. `cause` is never sent. Clients reject with a
- * `RouteError` whenever a response arrived; codes the route does not declare
- * become `UNKNOWN_ERROR`.
+ * `RouteError` for every error response with a `code`, and mark the ones the
+ * route declares with `isDeclared`.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/errors}
  */
@@ -49,6 +46,11 @@ export class RouteError<
 	readonly data: TData;
 	/** Error response headers. */
 	readonly headers: THeaders;
+	/**
+	 * Whether a client received this error as one the route declares, with
+	 * its declared status and validated `data`.
+	 */
+	readonly isDeclared: boolean = false;
 
 	constructor(
 		code: TCode,
@@ -66,28 +68,35 @@ export class RouteError<
 }
 
 /**
- * Checks whether a value is a `RouteError`, and narrows a typed client error
- * to the route's `RouteError`s.
+ * Checks whether an error is a `RouteError` the route declares, and narrows a
+ * typed client error to the route's declared errors.
  *
  * @remarks Narrows errors from `safe()` and TanStack Query, whose types list
  * the route's errors, so `data` is typed after checking `code`. An `unknown`
- * value, such as in a `catch` block, narrows to `RouteError`.
+ * value, such as in a `catch` block, narrows to `RouteError`. Use
+ * `instanceof RouteError` to also match errors the route does not declare.
  *
  * @example
  * ```ts
- * const [error, todo] = await safe(client.todos.get({ params: { id: "1" } }));
- * if (isRouteError(error) && error.code === "TODO_NOT_FOUND") {
+ * const { error } = await safe(client.todos.get({ params: { id: "1" } }));
+ * if (isDeclaredError(error) && error.code === "TODO_NOT_FOUND") {
  * 	console.log(error.data.id);
  * }
  * ```
  *
- * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#handle-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#typesafe-error-handling}
  */
-export function isRouteError<T>(
+export function isDeclaredError<T>(
 	error: T,
 ): error is unknown extends T ? T & RouteError : Extract<T, RouteError> {
-	return error instanceof RouteError;
+	return error instanceof RouteError && error.isDeclared;
 }
+
+/** Marks an error a client received as one the route declares. */
+export const markDeclared = <T extends RouteError>(error: T): T => {
+	(error as { isDeclared: boolean }).isDeclared = true;
+	return error;
+};
 
 /** The declaration of an error a route can respond with. */
 export type RouteErrorDeclaration = {
@@ -212,9 +221,6 @@ export function routeError<
 	const TCode extends string,
 	const TOptions extends RouteErrorDefinitionOptions | undefined = undefined,
 >(code: TCode, options?: TOptions): RouteErrorClassFor<TCode, TOptions> {
-	if (code === UNKNOWN_ERROR) {
-		throw new Error(`Error code "${UNKNOWN_ERROR}" is reserved.`);
-	}
 	const { status = 400, message, data, headers, description } = options ?? {};
 	if (!Number.isInteger(status) || status < 400 || status > 599) {
 		throw new Error(`Error status "${status}" must be from 400 to 599.`);

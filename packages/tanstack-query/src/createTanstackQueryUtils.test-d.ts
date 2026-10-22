@@ -1,16 +1,19 @@
-import { route, routeError, type, type SseEvent } from "@rest-rpc/core";
+import {
+	isDeclaredError,
+	route,
+	routeError,
+	type,
+	type InferClientError,
+	type InferClientRequest,
+	type InferClientResponse,
+	type SseEvent,
+} from "@rest-rpc/core";
 import {
 	QueryClient,
 	skipToken,
 	type InfiniteData,
 } from "@tanstack/query-core";
-import {
-	createTanstackQueryUtils,
-	isRouteError,
-	type InferClientError,
-	type InferClientRequest,
-	type InferClientResponse,
-} from "./index.ts";
+import { createTanstackQueryUtils } from "./index.ts";
 
 const get = route
 	.get("/users/{id}")
@@ -37,7 +40,7 @@ describe("createTanstackQueryUtils types", () => {
 				expectTypeOf(error).toEqualTypeOf<
 					InferClientError<typeof get> | Error
 				>();
-				if (isRouteError(error) && error.code === "NOT_FOUND") {
+				if (isDeclaredError(error) && error.code === "NOT_FOUND") {
 					expectTypeOf(error.data).toEqualTypeOf<{ id: string }>();
 				}
 			},

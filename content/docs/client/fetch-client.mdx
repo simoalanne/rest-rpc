@@ -39,7 +39,7 @@ if (response.status === 200) {
 ```
 
 A call resolves with a successful response and rejects with an error otherwise.
-See [Handle Errors](#handle-errors).
+See [Handle Errors](#typesafe-error-handling).
 
 ### Select a Request Media Type
 
@@ -51,22 +51,36 @@ schema. It is optional when the route declares one media type.
 await client.todos.import({ contentType: "text/csv", body: csv });
 ```
 
-## Handle Errors
+## Typesafe Error Handling
 
-A non-2xx response rejects with a `RouteError`:
+An error response whose JSON body has a `code` rejects with a `RouteError`:
 
-- A JSON body with a `code` the route
-  [declares](/docs/route-builder#declare-errors) with the received status
-  rejects with that error. Its `data` and declared headers are typed.
-- Every other error response rejects with `UNKNOWN_ERROR`: undeclared codes,
-  including the server's
-  [built-in errors](/docs/http-behavior/errors#built-in-errors), and other
-  bodies such as a proxy's error page.
+| Field     | Value                     |
+| --------- | ------------------------- |
+| `code`    | The `code` of the body    |
+| `status`  | The response status       |
+| `message` | The `message` of the body |
+| `data`    | The `data` of the body    |
+| `headers` | The response headers      |
 
-A 2xx response rejects with `UNKNOWN_ERROR` when it breaks the route
-contract: a status or content type the route's declared responses do not
-include, a body that cannot be decoded, or, with
-[response validation](#response-validation), a body or headers that fail it.
+An error whose code the route [declares](/docs/route-builder#declare-errors) is
+part of the route's types: its `data` and declared headers are typed, and
+validated with [response validation](#response-validation).
+Errors the route does not declare, such as an `UNAUTHORIZED` sent by auth
+middleware or an undeclared [built-in error](/docs/http-behavior/errors#built-in-errors),
+keep their values but are typed only as `Error`.
+
+Everything else rejects with a plain `Error`:
+
+- Other error responses, such as a proxy's error page. The `message` includes
+  the status.
+- Responses that break the route contract: a declared error code with another
+  status, a 2xx status or content type the route's declared responses do not
+  include, a body that cannot be decoded, or, with response validation, a body
+  or headers that fail it. The `cause` holds the validation issues or the
+  decoding error.
+- No response, such as on network failures, timeouts and aborted requests. The
+  call rejects with the original error.
 
 :::warning
 Routes with [inferred responses](/docs/route-builder#return-responses) declare
@@ -75,22 +89,15 @@ no statuses at runtime, so every 2xx response resolves. An
 bodies, headers and error `data` are not validated.
 :::
 
-When no response arrived, such as on network failures, timeouts and aborted
-requests, the call rejects with the original error instead.
-
-| Field     | Declared error                                    | `UNKNOWN_ERROR`                                            |
-| --------- | ------------------------------------------------- | ---------------------------------------------------------- |
-| `status`  | The response status                               | The response status                                        |
-| `message` | The `message` of the body                         | The body's `message` when it is a string, or a generic one |
-| `data`    | The `data` of the body                            | The decoded body, or `undefined` when it cannot be decoded |
-| `headers` | The response headers, with declared headers typed | The response headers                                       |
-| `cause`   | none                                              | Validation issues or the decoding error, when there is one |
+Use [`safe()`](#with-safe) to handle the errors a route declares as expected
+domain errors, and `try`/`catch` for general error handling.
 
 ### With try/catch
 
-A `catch` block receives `unknown`, so `isRouteError()` narrows a caught error
-only to `RouteError`, without the route's codes or `data` types. Catch errors
-when only their kind matters:
+`try`/`catch` suits general error handling, such as logging, redirecting on
+`UNAUTHORIZED` or showing a generic failure. `instanceof RouteError` matches
+declared and undeclared errors, but does not type them with the route's codes
+or `data`:
 
 ```ts twoslash
 // ---cut-start---
@@ -112,12 +119,12 @@ import type { routes } from "./server";
 declare const api: typeof routes;
 const client = initClient(api, { baseUrl: "http://localhost:3000" });
 // ---cut-end---
-import { isRouteError } from "@rest-rpc/core";
+import { RouteError } from "@rest-rpc/core";
 
 try {
 	await client.todos.get({ params: { id: "todo_1" } });
 } catch (error) {
-	if (isRouteError(error)) {
+	if (error instanceof RouteError) {
 		console.log(error.status, error.code);
 	}
 	throw error;
@@ -126,9 +133,10 @@ try {
 
 ### With `safe()`
 
-`safe()` resolves a call to an `[error, data]` tuple instead of rejecting, with
-the error typed for the route. Narrow it with `isRouteError()` and then by
-`code` when errors are part of the application logic:
+`safe()` suits expected domain errors. It resolves a call to an `{ error }` or
+`{ data }` result instead of rejecting, with the error typed for the route, and
+`data` is typed only after checking `error`. `isDeclaredError()` narrows the
+error to the route's declared errors, and checking `code` types their `data`:
 
 ```ts twoslash
 // ---cut-start---
@@ -150,19 +158,18 @@ import type { routes } from "./server";
 declare const api: typeof routes;
 const client = initClient(api, { baseUrl: "http://localhost:3000" });
 // ---cut-end---
-import { isRouteError, safe } from "@rest-rpc/core";
+import { isDeclaredError, safe } from "@rest-rpc/core";
 
-const [error, response] = await safe(
+const { error, data } = await safe(
 	client.todos.get({ params: { id: "todo_1" } }),
 );
-if (isRouteError(error)) {
-	if (error.code === "TODO_NOT_FOUND") {
-		console.log(error.data);
-	}
+
+if (isDeclaredError(error)) {
+	console.log(error);
 } else if (error) {
 	throw error;
 } else {
-	console.log(response.body);
+	console.log(data.body);
 }
 ```
 
@@ -395,7 +402,7 @@ const client = initClient(api, {
 ```
 
 The client receives the schema output on success, and a failure rejects with
-an [`UNKNOWN_ERROR`](#handle-errors). The decoded response is the server's schema
+an [`Error`](#typesafe-error-handling). The decoded response is the server's schema
 output, but the client validates it as schema input. Schemas whose input and
 output types differ, such as transforms, may fail on the client.
 
@@ -453,11 +460,11 @@ type TodoEvent = InferClientStreamData<typeof events>;
 | ------------------------------------------ | ---------------------------------------------------------------------------------------- |
 | `InferClientRequest<Route, GlobalHeaders>` | The request passed to the route call, or `undefined` for routes without input.           |
 | `InferClientResponse<Route>`               | Every response envelope of the route.                                                    |
-| `InferClientError<Route>`                  | The declared errors of the route and `UNKNOWN_ERROR`.                                    |
+| `InferClientError<Route>`                  | The declared errors of the route.                                                        |
 | `InferClientStreamData<Route>`             | The `data` of each event from a [streaming route](#consume-streams), without `SseEvent`. |
 
-Calls reject with `InferClientError<Route>` when a response arrived, and with
-other `Error`s otherwise.
+Calls reject with `InferClientError<Route>` for declared errors, and with other
+`Error`s otherwise.
 
 `InferClientRequest` accepts the type of your `globalHeaders` as a second
 argument, so headers that `globalHeaders` always provides become optional:

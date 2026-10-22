@@ -7,6 +7,7 @@ import type {
 	DeclaredClientResponse,
 } from "../contract/response.ts";
 import {
+	markDeclared,
 	RouteError,
 	type RouteErrorDeclaration,
 } from "../contract/routeError.ts";
@@ -16,8 +17,8 @@ import {
 } from "../standard-schema/index.ts";
 import { parseSseStream } from "./stream.ts";
 import {
+	contractError,
 	contractMismatch,
-	unknownError,
 	validateResponseValue,
 } from "./validateResponse.ts";
 import type { FetchArgs } from "./request.ts";
@@ -42,14 +43,14 @@ export type InferClientResponse<T extends RouteTree> = T extends {
 		};
 
 /**
- * Infers the `RouteError`s a route's client call rejects with when a response
- * arrived.
+ * Infers the `RouteError`s a route declares, which its client call rejects
+ * with.
  *
- * @remarks Includes the route's declared errors and `UNKNOWN_ERROR`. Calls
- * also reject with other `Error`s when no response arrived. Pass a route tree
- * to infer a matching tree of types.
+ * @remarks Calls also reject with other `Error`s, such as when no response
+ * arrived or it does not match the route contract. Pass a route tree to infer
+ * a matching tree of types.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#handle-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#typesafe-error-handling}
  */
 export type InferClientError<T extends RouteTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
@@ -92,14 +93,13 @@ const readHeaders = async (
 	schema: ResponseDeclaration | RouteErrorDeclaration | undefined,
 	rawResponse: Response,
 	validate: boolean,
-	body: unknown,
 ) => {
 	const headers = Object.fromEntries(rawResponse.headers.entries());
 	if (!schema?.headers || !validate) return headers;
 
 	const result = await validateStandardSchema(schema.headers, headers);
 	if (result.issues) {
-		throw unknownError(rawResponse, body, contractMismatch, result.issues);
+		throw contractError(contractMismatch, result.issues);
 	}
 	// Keep headers the schema does not declare.
 	return { ...headers, ...result.value };
@@ -135,25 +135,18 @@ const readBody = async (
 		);
 	} catch (cause) {
 		if (readFailure) throw readFailure.error;
-		throw unknownError(
-			rawResponse,
-			undefined,
-			"Response body could not be decoded.",
-			cause,
-		);
+		throw contractError("Response body could not be decoded.", cause);
 	}
 };
 
 const readValidated = async (
-	rawResponse: Response,
 	schema: StandardSchemaV1 | undefined,
 	value: unknown,
 	validate: boolean,
-	body: unknown,
 ) => {
 	const result = await validateResponseValue(schema, value, validate);
 	if (result.issues) {
-		throw unknownError(rawResponse, body, contractMismatch, result.issues);
+		throw contractError(contractMismatch, result.issues);
 	}
 	return result.value;
 };
@@ -167,9 +160,10 @@ const readCode = (body: unknown) =>
 		: undefined;
 
 /**
- * Reads a non-2xx response into a `RouteError`. Only a code the route
- * declares with the received status is recognized; everything else becomes
- * `UNKNOWN_ERROR`.
+ * Reads a non-2xx response into a `RouteError` when its body has a `code`.
+ * A code the route declares is marked as declared after its status, `data` and
+ * headers are checked; one that breaks the declaration becomes an `Error`, like
+ * bodies without a code.
  */
 const readErrorResponse = async (
 	rawResponse: Response,
@@ -177,33 +171,39 @@ const readErrorResponse = async (
 	route: RouteDeclaration,
 	validate: boolean,
 	codecs: BodyCodecRegistry,
-): Promise<RouteError> => {
+): Promise<Error> => {
 	const { status } = rawResponse;
 	const body = await readBody(rawResponse, mediaType, codecs);
 	const code = readCode(body);
-	const declaration =
-		code !== undefined && route.errors && Object.hasOwn(route.errors, code)
-			? route.errors[code]
-			: undefined;
-	if (!declaration || declaration.status !== status) {
-		return unknownError(
-			rawResponse,
-			body,
-			`Request failed with status ${status}.`,
-		);
+	if (code === undefined) {
+		return new Error(`Request failed with status ${status}.`);
 	}
 
 	const { message, data } = body as { message?: unknown; data?: unknown };
-	const [validatedData, headers] = await Promise.all([
-		readValidated(rawResponse, declaration.data, data, validate, body),
-		readHeaders(declaration, rawResponse, validate, body),
-	]);
-	return new RouteError(code!, {
+	const options = {
 		status,
 		message: typeof message === "string" ? message : code,
-		data: validatedData,
-		headers,
-	});
+	};
+	const declaration =
+		route.errors && Object.hasOwn(route.errors, code)
+			? route.errors[code]
+			: undefined;
+	if (!declaration) {
+		return new RouteError(code, {
+			...options,
+			data,
+			headers: Object.fromEntries(rawResponse.headers.entries()),
+		});
+	}
+	if (declaration.status !== status) return contractError(contractMismatch);
+
+	const [validatedData, headers] = await Promise.all([
+		readValidated(declaration.data, data, validate),
+		readHeaders(declaration, rawResponse, validate),
+	]);
+	return markDeclared(
+		new RouteError(code, { ...options, data: validatedData, headers }),
+	);
 };
 
 export type RouteRequestFn = <E extends RouteDeclaration & { path: string }>(
@@ -213,7 +213,8 @@ export type RouteRequestFn = <E extends RouteDeclaration & { path: string }>(
 
 /**
  * Reads a fetch response into a status envelope, or rejects with a
- * `RouteError` for error responses and responses outside the route contract.
+ * `RouteError` for error responses with a `code`, and an `Error` for other
+ * responses outside the route contract.
  *
  * @remarks `text/event-stream` responses are parsed as SSE streams. Routes
  * without response declarations, such as routes with inferred responses,
@@ -255,14 +256,10 @@ export const fetchResponse = async <
 		// A stream may never end, so it is cancelled instead of read.
 		if (breaksContract) {
 			rawResponse.body?.cancel().catch(() => {});
-			throw unknownError(rawResponse, undefined, contractMismatch);
+			throw contractError(contractMismatch);
 		}
 		if (rawResponse.body === null) {
-			throw unknownError(
-				rawResponse,
-				undefined,
-				"Server returned no stream body.",
-			);
+			throw contractError("Server returned no stream body.");
 		}
 		const body = parseSseStream(
 			schema?.content?.[STREAM_CONTENT_TYPE],
@@ -274,25 +271,23 @@ export const fetchResponse = async <
 		return {
 			status,
 			contentType,
-			headers: await readHeaders(schema, rawResponse, validateResponse, body),
+			headers: await readHeaders(schema, rawResponse, validateResponse),
 			body,
 		};
 	}
 
 	const value = await readBody(rawResponse, mediaType, codecs);
 	if (breaksContract) {
-		throw unknownError(rawResponse, value, contractMismatch);
+		throw contractError(contractMismatch);
 	}
 	return {
 		status,
 		contentType,
-		headers: await readHeaders(schema, rawResponse, validateResponse, value),
+		headers: await readHeaders(schema, rawResponse, validateResponse),
 		body: await readValidated(
-			rawResponse,
 			schema?.content?.[mediaType],
 			value,
 			validateResponse,
-			value,
 		),
 	};
 };

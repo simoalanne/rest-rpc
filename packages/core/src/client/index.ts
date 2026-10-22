@@ -22,4 +22,4 @@ export type {
 	InferClientStreamData,
 } from "./response.ts";
 export type { SseEvent } from "../contract/sse.ts";
-export { safe, type ClientPromise } from "./safe.ts";
+export { safe, type ClientPromise, type SafeResult } from "./safe.ts";

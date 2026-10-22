@@ -113,13 +113,3 @@ export const observeError = (
 		// Ignored, like a rejected observer.
 	}
 };
-
-export const builtInCodes: ReadonlySet<string> = new Set(
-	[
-		RequestValidationFailed,
-		MalformedRequestBody,
-		UnsupportedMediaType,
-		InternalServerError,
-		NotFound,
-	].map(({ code }) => code),
-);

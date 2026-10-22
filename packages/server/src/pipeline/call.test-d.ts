@@ -38,9 +38,9 @@ describe("call types", () => {
 	});
 
 	it("rejects with the client errors of the route", async () => {
-		const [error] = await safe(call(withContext));
+		const { error } = await safe(call(withContext));
 		expectTypeOf(error).toEqualTypeOf<
-			InferClientError<typeof withContext> | Error | null
+			InferClientError<typeof withContext> | Error | undefined
 		>();
 	});
 

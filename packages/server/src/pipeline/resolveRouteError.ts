@@ -1,6 +1,5 @@
 import { RouteError } from "@rest-rpc/core";
 import type { RouteDeclaration } from "@rest-rpc/core/contract";
-import { builtInCodes } from "./errors.ts";
 import {
 	validateResponseHeaders,
 	validateResponseValue,
@@ -12,11 +11,8 @@ export const errorBody = ({ code, message, data }: RouteError) =>
 
 /**
  * Resolves a thrown error against the route's declaration: the declared
- * status applies and `data` and headers are validated. Built-in errors the
- * route does not declare are sent as thrown.
- *
- * @remarks Throws when the route does not declare the code, because the
- * error cannot be sent as part of the route's contract.
+ * status applies and `data` and headers are validated. Errors the route does
+ * not declare are sent as thrown.
  */
 export const resolveRouteError = async (
 	route: RouteDeclaration,
@@ -24,13 +20,7 @@ export const resolveRouteError = async (
 	disableValidation: boolean,
 ): Promise<RouteError> => {
 	const declaration = route.errors?.[error.code];
-	if (!declaration) {
-		if (builtInCodes.has(error.code)) return error;
-		throw new Error(
-			`Route "${route.method} ${route.path}" threw undeclared error code "${error.code}".`,
-			{ cause: error },
-		);
-	}
+	if (!declaration) return error;
 
 	try {
 		const [data, headers] = disableValidation

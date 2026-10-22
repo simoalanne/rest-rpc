@@ -53,18 +53,15 @@ describe("resolveRouteError", () => {
 		});
 	});
 
-	it("passes undeclared built-in errors and rejects other undeclared codes", async () => {
+	it("passes undeclared errors as thrown", async () => {
 		const builtIn = new RequestValidationFailed({
 			body: [],
 			query: [],
 			params: [],
 			headers: [],
 		});
+		const gone = new RouteError("GONE", { status: 410, data: { id: 1 } });
 		expect(await resolveRouteError(declaration, builtIn, false)).toBe(builtIn);
-		await expect(
-			resolveRouteError(declaration, new RouteError("GONE"), false),
-		).rejects.toThrow(
-			'Route "GET /users/:id" threw undeclared error code "GONE".',
-		);
+		expect(await resolveRouteError(declaration, gone, false)).toBe(gone);
 	});
 });

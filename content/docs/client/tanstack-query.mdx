@@ -42,6 +42,9 @@ const todo = useQuery(
 );
 ```
 
+`data` is the response envelope. Use TanStack Query's `select` option to read
+only the `body`.
+
 ## Infinite Queries
 
 Use `infiniteQueryOptions()` when each page should be fetched with route
@@ -199,7 +202,6 @@ await queryClient.invalidateQueries({
 ## Mutations
 
 ```tsx
-import { isRouteError } from "@rest-rpc/tanstack-query";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 const queryClient = useQueryClient();
@@ -210,11 +212,6 @@ const createTodo = useMutation(
 			await queryClient.invalidateQueries({
 				queryKey: restrpc.todos.list.queryKey(),
 			});
-		},
-		onError(error) {
-			if (isRouteError(error) && error.code === "TODO_EXISTS") {
-				console.log(error.message);
-			}
 		},
 	}),
 );
@@ -256,51 +253,21 @@ const todo = useQuery(
 );
 ```
 
-## Error Model
+## Typesafe Error Handling
 
-TanStack Query uses success and error channels.
+The `error` of a query or mutation holds the same errors that
+[`safe()`](/docs/client/fetch-client#with-safe) returns, narrowed the same way:
 
-Response envelopes get mapped to the `data` key. Use TanStack Query's `select`
-option to read only the `body`.
+```tsx
+import { isDeclaredError } from "@rest-rpc/core";
 
-The errors the [Fetch client](/docs/client/fetch-client#handle-errors) rejects
-with get mapped to the `error` key: a `RouteError` with a declared code or
-`UNKNOWN_ERROR` when a response arrived, and the original `Error` otherwise.
-
-`isRouteError()` and `RouteError` are re-exported from
-`@rest-rpc/tanstack-query`. Narrow `error` with `isRouteError()` and then by
-`code` to type its `data`, as in [Safe Results](/docs/client/fetch-client#safe-results).
-
-## Type Helpers
-
-Use the type helpers when a route's TanStack Query types need to be reused, for
-example in custom hooks or cache updates. Each helper takes a route from the
-contract, or a route tree to infer a matching tree of types.
-
-```ts
-import type {
-	InferClientError,
-	InferClientRequest,
-	InferClientResponse,
-} from "@rest-rpc/tanstack-query";
-import { api } from "./client-contract";
-
-type TodoData = InferClientResponse<typeof api.todos.get>;
-type TodoError = InferClientError<typeof api.todos.get> | Error;
-type CreateTodoVariables = InferClientRequest<typeof api.todos.create>;
+const createTodo = useMutation(
+	restrpc.todos.create.mutationOptions({
+		onError(error) {
+			if (isDeclaredError(error) && error.code === "TODO_EXISTS") {
+				console.log(error.message);
+			}
+		},
+	}),
+);
 ```
-
-| Type                                       | Infers                                                                                 |
-| ------------------------------------------ | -------------------------------------------------------------------------------------- |
-| `InferClientResponse<Route>`               | The `data` of a query or mutation.                                                     |
-| `InferClientError<Route>`                  | The `RouteError`s of a query or mutation, as described in [Error Model](#error-model). |
-| `InferClientRequest<Route, GlobalHeaders>` | The `request` of a query and the variables passed to `mutate()`.                       |
-| `InferClientStreamData<Route>`             | The `data` of each event in a [streamed query](#streamed-queries).                     |
-
-The helpers are re-exported from
-[`@rest-rpc/core`](/docs/client/fetch-client#type-helpers). The `error` of a
-query or mutation is `InferClientError<Route> | Error`.
-
-`TanstackQueryUtilsFor<typeof api>` is the type of the whole util tree returned
-by `createTanstackQueryUtils()`. It accepts the type of your `globalHeaders` as a
-second argument.

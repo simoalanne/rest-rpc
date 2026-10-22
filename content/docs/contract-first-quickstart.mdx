@@ -107,23 +107,26 @@ The contract itself contains no framework or handler code.
 Import the shared contract directly. No contract extraction step is needed.
 
 ```ts client.ts
-import { initClient, isRouteError, safe } from "@rest-rpc/core";
+import { initClient, isDeclaredError, safe } from "@rest-rpc/core";
 import { api } from "./contract";
 
 const client = initClient(api, { baseUrl: "http://localhost:3000" });
 
 const created = await client.todos.create({ body: { title: "Write docs" } });
-const [error, response] = await safe(
+const result = await safe(
 	client.todos.get({
 		params: { id: created.body.id },
 		query: { uppercase: "yes" },
 	}),
 );
 
-if (!error) {
-	console.log(response.body.title);
-} else if (isRouteError(error) && error.code === "TODO_NOT_FOUND") {
-	console.log(error.message);
+if (!result.error) {
+	console.log(result.data.body.title);
+} else if (
+	isDeclaredError(result.error) &&
+	result.error.code === "TODO_NOT_FOUND"
+) {
+	console.log(result.error.message);
 }
 ```
 

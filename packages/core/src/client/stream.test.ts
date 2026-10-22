@@ -34,7 +34,7 @@ describe("stream", () => {
 			{ data: { count: 2 } },
 		]);
 	});
-	it("rejects frames that cannot be decoded as unknown errors", async () => {
+	it("rejects frames that cannot be decoded as errors", async () => {
 		for (const [frames, cause] of [
 			["data: {\n\n", expect.any(SyntaxError)],
 			["id: one\n\n", new Error("SSE frame has no data field.")],
@@ -42,7 +42,10 @@ describe("stream", () => {
 		] as const) {
 			await expect(
 				collect(parseSseStream(undefined, stream(frames), false)),
-			).rejects.toMatchObject({ code: "UNKNOWN_ERROR", status: 201, cause });
+			).rejects.toMatchObject({
+				message: "Event stream could not be decoded.",
+				cause,
+			});
 		}
 	});
 
@@ -56,7 +59,7 @@ describe("stream", () => {
 		).rejects.toBe(failure);
 	});
 
-	it("rejects schema failures as unknown errors with the event data unless validation is disabled", async () => {
+	it("rejects schema failures as errors with the issues unless validation is disabled", async () => {
 		const schema: StandardSchemaV1 = {
 			"~standard": {
 				version: 1,
@@ -67,9 +70,7 @@ describe("stream", () => {
 		await expect(
 			collect(parseSseStream(schema, stream("data: 1\n\n"), true)),
 		).rejects.toMatchObject({
-			code: "UNKNOWN_ERROR",
-			status: 201,
-			data: 1,
+			message: "Response did not match the route contract.",
 			cause: [{ message: "invalid chunk" }],
 		});
 		expect(

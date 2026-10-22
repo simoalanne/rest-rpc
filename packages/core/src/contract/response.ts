@@ -2,7 +2,7 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { RouteDeclaration } from "./routeDeclaration.ts";
 import type { InferSchema, RequestScalar } from "./request.ts";
 import type { SseEvent } from "./sse.ts";
-import type { RouteError, UNKNOWN_ERROR } from "./routeError.ts";
+import type { RouteError } from "./routeError.ts";
 import type { Merge } from "../utils/typeUtils.ts";
 
 /**
@@ -203,28 +203,21 @@ type ClientErrorData<TDeclaration> = TDeclaration extends {
 	? InferSchema<TData, "output">
 	: undefined;
 
-/** The error a client creates for a response the route does not declare. */
-export type UnknownRouteError = RouteError<
-	typeof UNKNOWN_ERROR,
-	unknown,
-	number,
-	Record<string, string>
->;
-
-/** The declared errors of a route as received by clients, and unknown errors. */
-export type ClientRouteError<E extends RouteDeclaration> =
-	| (E extends { errors: infer TErrors }
-			? {
-					[TCode in Extract<keyof TErrors, string>]: TErrors[TCode] extends {
-						status: infer TStatus extends number;
-					}
-						? RouteError<
-								TCode,
-								ClientErrorData<TErrors[TCode]>,
-								TStatus,
-								ClientErrorHeaders<TErrors[TCode]>
-							>
-						: never;
-				}[Extract<keyof TErrors, string>]
-			: never)
-	| UnknownRouteError;
+/** The declared errors of a route as received by clients. */
+// The top-level conditional keeps editors from displaying this alias instead of the resolved union.
+export type ClientRouteError<E extends RouteDeclaration> = E extends {
+	errors: infer TErrors;
+}
+	? {
+			[TCode in Extract<keyof TErrors, string>]: TErrors[TCode] extends {
+				status: infer TStatus extends number;
+			}
+				? RouteError<
+						TCode,
+						ClientErrorData<TErrors[TCode]>,
+						TStatus,
+						ClientErrorHeaders<TErrors[TCode]>
+					>
+				: never;
+		}[Extract<keyof TErrors, string>]
+	: never;

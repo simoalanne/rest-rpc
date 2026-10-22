@@ -7,7 +7,7 @@ import {
 	type InferClientResponse,
 } from "@rest-rpc/core";
 import { normalizeMediaType } from "@rest-rpc/core/codecs";
-import { UNKNOWN_ERROR, type RouteDeclaration } from "@rest-rpc/core/contract";
+import { markDeclared, type RouteDeclaration } from "@rest-rpc/core/contract";
 import type { ContextOf } from "../builder/routeBuilder.types.ts";
 import {
 	isImplementedRoute,
@@ -16,7 +16,7 @@ import {
 	type RuntimeImplementationTree,
 } from "../routing/match.ts";
 import { executeRoute, type RouteResult } from "./handleHttpRoute.ts";
-import { errorBody, resolveRouteError } from "./resolveRouteError.ts";
+import { resolveRouteError } from "./resolveRouteError.ts";
 import { toSseEvent } from "./sse.ts";
 
 /** Options accepted by `call`. */
@@ -55,20 +55,13 @@ type CallResult<TRoute extends ImplementedRoute> = ClientPromise<
 	InferClientError<TRoute> | Error
 >;
 
-// Mirrors the fetch client: errors the route declares are received as is,
-// and other error responses become unknown errors.
+// Mirrors the fetch client: the error that would be sent is received, and
+// marked as declared when the route declares its code.
 const toClientError = async (route: RouteDeclaration, error: RouteError) => {
 	const resolved = await resolveRouteError(route, error, false);
-	if (route.errors && Object.hasOwn(route.errors, resolved.code)) {
-		return resolved;
-	}
-	return new RouteError(UNKNOWN_ERROR, {
-		status: resolved.status,
-		message: resolved.message,
-		data: errorBody(resolved),
-		headers: resolved.headers,
-		cause: resolved,
-	});
+	return route.errors && Object.hasOwn(route.errors, resolved.code)
+		? markDeclared(resolved)
+		: resolved;
 };
 
 const callRoute = async (
@@ -102,9 +95,9 @@ const callRoute = async (
  * Calls a route handler locally, without HTTP serialization.
  *
  * @remarks options can be used to provide values HTTP request would normally
- * provide. Rejects like the fetch client: with the route's declared errors,
- * with `UNKNOWN_ERROR` for other error responses, and with other errors
- * thrown by the handler unchanged.
+ * provide. Rejects like the fetch client: with the `RouteError` that would be
+ * sent, marked as declared when the route declares its code. Other errors
+ * thrown by the handler reject unchanged.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/local-client#one-off-calls}
  */

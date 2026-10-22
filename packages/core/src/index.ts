@@ -10,7 +10,12 @@ export type {
 	FetchLike,
 	FetchOptions,
 } from "./client/index.ts";
-export { initClient, safe, type ClientPromise } from "./client/index.ts";
+export {
+	initClient,
+	safe,
+	type ClientPromise,
+	type SafeResult,
+} from "./client/index.ts";
 export type {
 	AbsolutePath,
 	Contract,
@@ -19,7 +24,7 @@ export type {
 export { extractContract } from "./contract/extract.ts";
 export { route } from "./contract/routeBuilder.ts";
 export {
-	isRouteError,
+	isDeclaredError,
 	RouteError,
 	routeError,
 	type RouteErrorDefinitionOptions,

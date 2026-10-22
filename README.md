@@ -66,7 +66,7 @@ await writeFile("contract.json", JSON.stringify(extractContract(routes)));
 ```
 
 ```ts
-import { initClient, isRouteError, safe } from "@rest-rpc/core";
+import { initClient, isDeclaredError, safe } from "@rest-rpc/core";
 import type { routes } from "./routes";
 import contract from "./contract.json";
 
@@ -75,14 +75,14 @@ const client = initClient(api, { baseUrl: "http://localhost:3000" });
 
 const created = await client.todos.create({ body: { title: "Write docs" } });
 
-// Calls reject with typed errors, or resolve to [error, data] with safe().
-const [error, todo] = await safe(
+// Calls reject with typed errors, or resolve to { error } or { data } with safe().
+const { error, data } = await safe(
 	client.todos.get({ params: { id: created.body.id } }),
 );
 
 if (!error) {
-	console.log(todo.body.title);
-} else if (isRouteError(error) && error.code === "TODO_NOT_FOUND") {
+	console.log(data.body.title);
+} else if (isDeclaredError(error) && error.code === "TODO_NOT_FOUND") {
 	console.log("Todo not found");
 } else {
 	throw error;

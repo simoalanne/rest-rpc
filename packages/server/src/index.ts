@@ -41,7 +41,7 @@ export {
 export {
 	bodyCodec,
 	createOpenApiDocument,
-	isRouteError,
+	isDeclaredError,
 	RouteError,
 	routeError,
 	safe,
@@ -53,6 +53,8 @@ export type {
 	BodyCodecOperations,
 	BodyValue,
 	ClientPromise,
+	InferClientError,
+	SafeResult,
 	SerializedBody,
 	CreateOpenApiDocumentOptions,
 	InferClientRequest,

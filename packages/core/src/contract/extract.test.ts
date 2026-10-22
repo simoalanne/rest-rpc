@@ -99,21 +99,17 @@ describe("extractContract", () => {
 		respond.mockImplementation(async () =>
 			Response.json({ name: "Ada" }, { status: 202 }),
 		);
-		await expect(
-			client.users.get({ params: { id: "1" } }),
-		).rejects.toMatchObject({ code: "UNKNOWN_ERROR", status: 202 });
+		await expect(client.users.get({ params: { id: "1" } })).rejects.toThrow(
+			"Response did not match the route contract.",
+		);
 
 		respond.mockImplementation(
 			async () =>
 				new Response("Ada", { headers: { "content-type": "text/plain" } }),
 		);
-		await expect(
-			client.users.get({ params: { id: "1" } }),
-		).rejects.toMatchObject({
-			code: "UNKNOWN_ERROR",
-			status: 200,
-			data: "Ada",
-		});
+		await expect(client.users.get({ params: { id: "1" } })).rejects.toThrow(
+			"Response did not match the route contract.",
+		);
 	});
 
 	it("resolves prefixed tree-derived paths", () => {

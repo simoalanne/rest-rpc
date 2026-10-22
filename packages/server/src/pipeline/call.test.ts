@@ -61,6 +61,7 @@ describe("call", () => {
 			code: "NOT_FOUND",
 			status: 404,
 			data: "1",
+			isDeclared: true,
 		});
 
 		const rejecting: StandardSchemaV1 = {
@@ -75,10 +76,9 @@ describe("call", () => {
 			.body(rejecting)
 			.handler(() => "ok");
 		await expect(call(invalid, { body: {} })).rejects.toMatchObject({
-			code: "UNKNOWN_ERROR",
+			code: "REQUEST_VALIDATION_FAILED",
 			status: 400,
-			data: { code: "REQUEST_VALIDATION_FAILED" },
-			cause: { code: "REQUEST_VALIDATION_FAILED" },
+			isDeclared: false,
 		});
 
 		const declared = route
@@ -90,12 +90,13 @@ describe("call", () => {
 			code: "REQUEST_VALIDATION_FAILED",
 			status: 400,
 			data: { body: [{ message: "invalid" }] },
+			isDeclared: true,
 		});
 
-		thrown.mockImplementation(() => new RouteError("GONE"));
-		await expect(call(implementation, { body: { id: 1 } })).rejects.toThrow(
-			'threw undeclared error code "GONE"',
-		);
+		const gone = new RouteError("GONE", { status: 410 });
+		thrown.mockImplementation(() => gone);
+		await expect(call(implementation, { body: { id: 1 } })).rejects.toBe(gone);
+		expect(gone.isDeclared).toBe(false);
 	});
 
 	it("passes params of dynamic path segments without a params schema", async () => {

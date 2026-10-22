@@ -103,8 +103,8 @@ An extracted contract has no schemas:
 
 Statuses and content types of declared responses are still checked, and error
 responses are classified: declared codes reject with their error, and anything
-else, such as an error page from a proxy, rejects with
-[`UNKNOWN_ERROR`](/docs/client/fetch-client#handle-errors).
+else, such as an error page from a proxy, rejects with an
+[`Error`](/docs/client/fetch-client#typesafe-error-handling).
 
 Declared schemas still validate requests and responses on the server. If the
 client needs runtime schemas, use a [shared contract](/docs/contract-first)
