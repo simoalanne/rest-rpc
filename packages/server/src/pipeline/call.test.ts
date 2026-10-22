@@ -1,4 +1,5 @@
-import { type } from "@rest-rpc/core";
+import { RouteError, routeError, type } from "@rest-rpc/core";
+import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import { call, initLocalClient } from "./call.ts";
 import { sse } from "./sse.ts";
 import { route } from "../builder/routeBuilder.ts";
@@ -38,6 +39,51 @@ describe("call", () => {
 		expect(request).toMatchObject({ params: { id: 1 } });
 		expect(request.signal.aborted).toBe(false);
 		expect(request.context.get("user")).toBe("Ada");
+	});
+
+	it("rejects like the fetch client for declared, built-in and undeclared errors", async () => {
+		const NotFound = routeError("NOT_FOUND", {
+			status: 404,
+			data: type((id: number) => String(id)),
+		});
+		const thrown = vi.fn((): RouteError => new NotFound(1));
+		const implementation = route
+			.post("/")
+			.body(type<{ id: number }>())
+			.error(NotFound)
+			.handler((): string => {
+				throw thrown();
+			});
+		await expect(
+			call(implementation, { body: { id: 1 } }),
+		).rejects.toMatchObject({
+			code: "NOT_FOUND",
+			status: 404,
+			data: "1",
+		});
+
+		const rejecting: StandardSchemaV1 = {
+			"~standard": {
+				version: 1,
+				vendor: "test",
+				validate: () => ({ issues: [{ message: "invalid" }] }),
+			},
+		};
+		const invalid = route
+			.post("/")
+			.body(rejecting)
+			.handler(() => "ok");
+		await expect(call(invalid, { body: {} })).rejects.toMatchObject({
+			code: "UNKNOWN_ERROR",
+			status: 400,
+			data: { code: "REQUEST_VALIDATION_FAILED" },
+			cause: { code: "REQUEST_VALIDATION_FAILED" },
+		});
+
+		thrown.mockImplementation(() => new RouteError("GONE"));
+		await expect(call(implementation, { body: { id: 1 } })).rejects.toThrow(
+			'threw undeclared error code "GONE"',
+		);
 	});
 
 	it("passes params of dynamic path segments without a params schema", async () => {

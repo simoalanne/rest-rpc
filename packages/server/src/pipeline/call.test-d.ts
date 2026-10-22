@@ -1,5 +1,7 @@
 import {
+	safe,
 	type,
+	type InferClientError,
 	type InferClientRequest,
 	type InferClientResponse,
 } from "@rest-rpc/core";
@@ -29,6 +31,13 @@ describe("call types", () => {
 				body: "a",
 			}),
 		).resolves.toEqualTypeOf<InferClientResponse<typeof withRequest>>();
+	});
+
+	it("rejects with the client errors of the route", async () => {
+		const [error] = await safe(call(withContext));
+		expectTypeOf(error).toEqualTypeOf<
+			InferClientError<typeof withContext> | Error | null
+		>();
 	});
 
 	it("requires the request only when the client requires it", () => {
