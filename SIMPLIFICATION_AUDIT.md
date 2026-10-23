@@ -16,12 +16,6 @@ Most are one-line edits.
 | ----------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------- |
 | `CONTRIBUTING.md:28-35` | Repeats the Public API rules from `AGENTS.md` and leaves out the `@rest-rpc/server/node` exception. | Add the exception, or replace the section with a pointer to `AGENTS.md` so there is one copy. | decision   |
 
-## 3. The client response reader takes a request function only to call it once
-
-- **`packages/core/src/client/response.ts:209-235`, `packages/core/src/client/initClient.ts:91-104`**
-  - Problem: `fetchResponse` receives `request: RouteRequestFn` plus the call arguments, and its first line calls `request`. Only `initClient` passes a real function. The tests in `response.test.ts` pass `async () => response`. This seam adds a type (`RouteRequestFn`) and two wrapper closures in `initClient`.
-  - Change: have it take the received `Response` instead: `readResponse(rawResponse, route, validate, codecs)`. `initClient` then calls `readResponse(await executeRequest(route, args, requestOptions), …)`, and the tests pass the `Response` directly. **certain**
-
 ## 4. Server re-implements core helpers
 
 One "use or move to core" refactor covers all of these.

@@ -22,7 +22,6 @@ import {
 	contractMismatch,
 	validateResponseValue,
 } from "./validateResponse.ts";
-import type { FetchArgs } from "./request.ts";
 
 /**
  * Infers a route's client result.
@@ -205,11 +204,6 @@ const readErrorResponse = async (
 	);
 };
 
-export type RouteRequestFn = <E extends RouteDeclaration & { path: string }>(
-	route: E,
-	...args: FetchArgs<E>
-) => Promise<Response>;
-
 /**
  * Reads a fetch response into a status envelope, or rejects with a
  * `RouteError` for error responses with a `code`, and an `Error` for other
@@ -222,16 +216,12 @@ export type RouteRequestFn = <E extends RouteDeclaration & { path: string }>(
  * included. `contentType` is the received base media type, or `undefined`
  * without a content type.
  */
-export const fetchResponse = async <
-	E extends RouteDeclaration & { path: string },
->(
-	request: RouteRequestFn,
+export const readResponse = async <E extends RouteDeclaration>(
+	rawResponse: Response,
+	route: E,
 	validateResponse: boolean,
 	codecs: BodyCodecRegistry,
-	route: E,
-	...args: FetchArgs<E>
 ) => {
-	const rawResponse = await request(route, ...args);
 	const { status } = rawResponse;
 	const mediaType = normalizeMediaType(rawResponse.headers.get("content-type"));
 	const contentType = mediaType || undefined;

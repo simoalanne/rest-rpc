@@ -10,10 +10,7 @@ import {
 	type FetchLike,
 	executeRequest,
 } from "./request.ts";
-import {
-	fetchResponse as fetchRouteResponse,
-	type RouteRequestFn,
-} from "./response.ts";
+import { readResponse } from "./response.ts";
 import type {
 	ClientRouteError,
 	DeclaredClientResponse,
@@ -86,26 +83,19 @@ export function initClient<
 ): ApiClientFor<TContract, TGlobalHeaders> {
 	const codecs = createBodyCodecRegistry(options.bodyCodecs ?? []);
 	const requestOptions = { ...options, codecs };
-	const request: RouteRequestFn = (route, ...args) =>
-		executeRequest(route, args, requestOptions);
-
-	const fetchResponse = (
-		route: RouteDeclaration & { path: string },
-		...args: FetchArgs
-	) =>
-		fetchRouteResponse(
-			request,
-			options.validateResponses ?? false,
-			codecs,
-			route,
-			...args,
-		);
+	const validate = options.validateResponses ?? false;
 
 	return mapContractRoutes(contract, (node, routePath) => {
 		const resolvedRoute = {
 			...node,
 			path: resolveRoutePath(node, routePath),
 		};
-		return (...args: FetchArgs) => fetchResponse(resolvedRoute, ...args);
+		return async (...args: FetchArgs) =>
+			readResponse(
+				await executeRequest(resolvedRoute, args, requestOptions),
+				resolvedRoute,
+				validate,
+				codecs,
+			);
 	}) as ApiClientFor<TContract, TGlobalHeaders>;
 }
