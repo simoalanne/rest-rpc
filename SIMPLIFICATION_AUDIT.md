@@ -33,9 +33,6 @@ Most are one-line edits.
 
 ## 9. Repo scripts and config leftovers
 
-- **`package.json:16,18,20,27,32`**
-  - Problem: these scripts are pure aliases: `lint:verify` (= `lint`), `check:verify` (= `check`), `api:docs` (= `api:docs:verify`), `lint:write` (= `lint:staged`), and `typecheck:workspace` (only called by `typecheck`).
-  - Change: delete the aliases and point `.github/workflows/ci.yml:37` at `pnpm run check`. **certain**
 - **`package.json:26`**
   - Problem: `release:github:notes` passes `--notes`, which `scripts/create-github-release.ts` never reads.
   - Change: drop the flag. **certain**
