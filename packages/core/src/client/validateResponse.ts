@@ -11,10 +11,6 @@ export const validateResponseValue = async (
 ): Promise<StandardSchemaV1.Result<unknown>> =>
 	validate && schema ? validateStandardSchema(schema, value) : { value };
 
-/**
- * Creates the error for a received response the route contract does not
- * describe.
- */
 export const contractError = (message: string, cause?: unknown) =>
 	new Error(message, cause === undefined ? undefined : { cause });
 

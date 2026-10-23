@@ -3,10 +3,9 @@ import type {
 	RouteDeclaration,
 	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
-import type { Merge } from "../utils/typeUtils.ts";
+import type { EmptyObject, IsUnion, Merge } from "../utils/typeUtils.ts";
 import type { PathParamNames } from "./path.ts";
 
-/** Scalar value accepted by ordinary HTTP request schemas. */
 export type RequestScalar = string | number | boolean;
 
 /** An ordinary query schema whose wire input contains scalar or array values. */
@@ -21,7 +20,6 @@ export type RequestParamsSchema = StandardSchemaV1<
 	unknown
 >;
 
-/** A whole-object schema for request headers. */
 export type RequestHeadersSchema = StandardSchemaV1<
 	Record<string, RequestScalar | undefined>,
 	unknown
@@ -31,7 +29,6 @@ export type RequestBodySchema = StandardSchemaV1;
 
 type RightMerge<TLeft, TRight> = Merge<Omit<TLeft, keyof TRight> & TRight>;
 
-/** Infers the input or output type of one Standard Schema. */
 export type InferSchema<
 	TSchema extends StandardSchemaV1,
 	TIO extends "input" | "output",
@@ -60,21 +57,7 @@ type InferSchemas<
 		? InferSchema<TSchema, TIO>
 		: never;
 
-/** Intersects the input types of an ordered Standard Schema list. */
-export type InferSchemaInputs<TSchemas extends readonly StandardSchemaV1[]> =
-	InferSchemas<TSchemas, "input">;
-
-/** Right-merges the output types of an ordered Standard Schema list. */
-export type InferSchemaOutputs<TSchemas extends readonly StandardSchemaV1[]> =
-	InferSchemas<TSchemas, "output">;
-
 type RequestSegment = "query" | "params" | "headers";
-
-type IsUnion<T, TAll = T> = T extends unknown
-	? [TAll] extends [T]
-		? false
-		: true
-	: never;
 
 type InferRequestSegments<TRequest, TIO extends "input" | "output"> = {
 	[
@@ -111,9 +94,7 @@ type InferRequestBody<TBody, TIO extends "input" | "output"> = {
 
 type DeclaredRequest<E> = E extends { request: infer TRequest }
 	? TRequest
-	: EmptyRequest;
-
-type EmptyRequest = Record<never, never>;
+	: EmptyObject;
 
 // A declared path includes the prefix; a path derived from tree keys adds only
 // static segments to it.
@@ -127,13 +108,13 @@ type ParamsPath<E> = E extends { path: infer TPath extends string }
 type PathParamsRequest<E> =
 	ParamsPath<E> extends infer TPath
 		? [PathParamNames<TPath>] extends [never]
-			? EmptyRequest
+			? EmptyObject
 			: {
 					params: readonly [
 						StandardSchemaV1<{ [TName in PathParamNames<TPath>]: string }>,
 					];
 				}
-		: EmptyRequest;
+		: EmptyObject;
 
 type RequestWithPathParams<E> =
 	DeclaredRequest<E> extends { params: readonly StandardSchemaV1[] }
@@ -180,4 +161,4 @@ export type ClientRequestForDeclaration<
 > = OptionalRequestHeaders<InferRequestFor<E, "input", never>, TOptionalKeys>;
 
 export type ServerRequest<E extends { request?: RouteRequestDeclaration }> =
-	InferRequestFor<E, "output", Record<never, never>>;
+	InferRequestFor<E, "output", EmptyObject>;

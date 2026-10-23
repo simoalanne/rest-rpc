@@ -2,10 +2,7 @@ import { bodyCodec, type BodyValue, type SseEvent } from "@rest-rpc/core";
 
 const sseBrand = Symbol("rest-rpc.sse");
 
-/**
- * Sends SSE bodies as-is, since they are already framed and encoded. Listed
- * before custom codecs so it overrides them.
- */
+/** Sends already framed SSE bodies as-is, listed before custom codecs so it overrides them. */
 export const sseBodyCodec = bodyCodec("text/event-stream", {
 	serialize: (body) => body as BodyValue,
 });
@@ -90,6 +87,5 @@ export function sse<T>(event: SseEvent<T>): SseServerEvent<T> {
 			"SSE retry must be a non-negative safe integer in milliseconds.",
 		);
 	}
-	serializeData(event.data);
 	return { ...event, [sseBrand]: true };
 }

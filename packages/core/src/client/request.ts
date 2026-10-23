@@ -4,7 +4,8 @@ import {
 	type BodyValue,
 	type SerializedBody,
 } from "../codecs/index.ts";
-import type { RouteDeclaration, RouteTree } from "../contract/contract.ts";
+import type { Contract } from "../contract/contract.ts";
+import type { RouteDeclaration } from "../contract/routeDeclaration.ts";
 import { replacePathParams } from "../contract/path.ts";
 import type { HttpMethod } from "../contract/routeDeclaration.ts";
 import type {
@@ -81,7 +82,7 @@ type ClientRequestValue<T> = [T] extends [never] ? undefined : T;
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
  */
 export type InferClientRequest<
-	T extends RouteTree,
+	T extends Contract,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
@@ -90,7 +91,7 @@ export type InferClientRequest<
 			ClientRequestForDeclaration<TRoute, GlobalHeaderKeys<TGlobalHeaders>>
 		>
 	: {
-			[K in keyof T]: T[K] extends RouteTree
+			[K in keyof T]: T[K] extends Contract
 				? InferClientRequest<T[K], TGlobalHeaders>
 				: never;
 		};

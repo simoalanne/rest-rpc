@@ -92,7 +92,7 @@ optional `id`, `event`, and `retry` fields, and the client always parses
 ## Custom Codecs
 
 Create a codec with `bodyCodec(mediaTypes, operations)` and pass it in
-`bodyCodecs` to `compileRoutes` or the client. The same codec works on the
+`bodyCodecs` to `createApp` or the client. The same codec works on the
 client and on both server runtimes. `mediaTypes` is a media type, a pattern, or
 a list of both, and a codec has a `serialize` function, a `deserialize`
 function, or both.
@@ -108,7 +108,7 @@ default deserializer.
 <Tab title="Server">
 
 ```ts
-import { bodyCodec, compileRoutes } from "@rest-rpc/server";
+import { bodyCodec, createApp } from "@rest-rpc/server";
 import { routes } from "./routes";
 
 const binaryCodec = bodyCodec("application/octet-stream", {
@@ -121,7 +121,7 @@ const binaryCodec = bodyCodec("application/octet-stream", {
 	deserialize: async (source) => new Uint8Array(await source.arrayBuffer()),
 });
 
-const compiledRoutes = compileRoutes(routes, {
+const app = createApp(routes, {
 	bodyCodecs: [binaryCodec],
 });
 ```

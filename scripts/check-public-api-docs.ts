@@ -140,7 +140,6 @@ const checkWildcardExports = (
 
 const checkEntryPoint = (
 	root: string,
-	packageDir: string,
 	packageName: string,
 	program: ts.Program,
 	entryPath: string,
@@ -217,7 +216,6 @@ const checkPackage = (root: string, packageDir: string) => {
 	return entryPoints.flatMap(([subpath, target]) =>
 		checkEntryPoint(
 			root,
-			packageDir,
 			path.posix.join(packageJson.name, subpath),
 			program,
 			path.join(packageDir, target),
@@ -225,7 +223,7 @@ const checkPackage = (root: string, packageDir: string) => {
 	);
 };
 
-export const checkWorkspace = (root = process.cwd()) => {
+const checkWorkspace = (root = process.cwd()) => {
 	const packagesDir = path.join(root, "packages");
 
 	return fs

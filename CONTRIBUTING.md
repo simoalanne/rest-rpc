@@ -27,12 +27,14 @@ git checkout -b my-feature-branch
 
 ## Public API
 
-The public API of each published package is its root entry point. Subpath-only exports are internal
-unless they are also re-exported from the package root.
+The public API of each published package is its root entry point. The only public subpath is
+`@rest-rpc/server/node`. Other subpaths are internal, and their exports are not public API unless
+they are also re-exported from the package root. `scripts/check-public-api-docs.ts` lists the
+public subpaths.
 
-- Do not use wildcard exports from package root entry points. Export each public symbol explicitly.
-- Every package root export must have a TSDoc comment on the declaration itself, not on the re-export.
-- Root-exported functions must use regular function declarations so generated API references can identify them as functions.
+- Do not use wildcard exports from public entry points. Export each public symbol explicitly so the public surface is reviewable.
+- Every exported declaration in a public entry point must have a TSDoc comment on the declaration itself, not on the re-export.
+- Functions exported from a public entry point must be regular function declarations, not arrow functions, so generated API references can identify them as functions. Non-exported functions should be arrow functions by default.
 
 ## Verification
 

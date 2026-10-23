@@ -1,4 +1,5 @@
 import {
+	defaultRouteState,
 	RouteBuilder,
 	type BuilderFor,
 	type BuilderKind,
@@ -56,7 +57,6 @@ type HandledRoute<
 	>;
 };
 
-/** Resolves the handler operation for a complete route declaration. */
 export type HandlerMethodFor<
 	TRoute extends RouteDeclaration,
 	TContext extends object = EmptyObject,
@@ -67,7 +67,6 @@ export type HandlerMethodFor<
 	): HandledRoute<TRoute, TContext, TResult>;
 };
 
-/** Builder kind of the server route builder. */
 export interface ServerRouteBuilderKind<
 	TContext extends object = EmptyObject,
 > extends BuilderKind {
@@ -105,18 +104,7 @@ export class ServerRouteBuilder<
 		handler: HandlerFor<HandlerRoute<TState>, TContext, TResult> &
 			ValidHandlerResult<HandlerRoute<TState>, TResult>,
 	): HandledRoute<HandlerRoute<TState>, TContext, TResult> {
-		const state: ServerRouteBuilderState = this["~restrpc"];
-		return this.clone({
-			...(state.method
-				? {}
-				: {
-						method: "POST",
-						path: undefined,
-						responses: {},
-					}),
-			...state,
-			handler,
-		});
+		return this.clone({ ...defaultRouteState(this["~restrpc"]), handler });
 	}
 
 	/** Wraps downstream execution after request validation. @see {@link https://rest-rpc.vercel.app/docs/middleware} */

@@ -8,16 +8,13 @@ import {
 } from "@rest-rpc/core/standard-schema";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import { allMaybePromise, mapMaybePromise } from "./maybePromise.ts";
-import { isSseServerEvent, sse } from "./sse.ts";
+import { isSseServerEvent } from "./sse.ts";
 import {
 	RequestValidationFailed,
 	responseValidationFailed,
 	type ResponseValidationLocation,
 } from "./errors.ts";
 
-/**
- * Decoded request segments passed into server request validation.
- */
 export type RequestSegments = {
 	body?: unknown;
 	query?: Record<string, unknown>;
@@ -52,10 +49,7 @@ const setQueryValue = (
 	else data[key] = [value];
 };
 
-/**
- * Parses a raw query string without the leading `?`. Keys ending in `[]`
- * collect arrays; other repeated keys keep the last value.
- */
+/** Keys ending in `[]` collect arrays; other repeated keys keep the last value. */
 export function parseQuery(search: string): Record<string, unknown> {
 	const data: Record<string, unknown> = {};
 	// Only encoded queries need `URLSearchParams` to decode them.
@@ -164,11 +158,7 @@ const noRequestSegments: RequestSegmentValues = {
 	headers: undefined,
 };
 
-/**
- * Validates decoded request segments, ignoring segments the route does not
- * declare, except params, which are passed through without a schema. The body
- * is validated with the schemas of `mediaType`.
- */
+/** Segments the route does not declare are ignored, except params, which pass through without a schema. */
 export function validateRequestSegments(
 	route: RouteDeclaration,
 	segments: RequestSegments,
@@ -213,16 +203,13 @@ export const validateResponseValue = (
 };
 
 export const validateResponseHeaders = (
-	schema: { headers?: ResponseHeadersSchema } | undefined,
+	schema: ResponseHeadersSchema | undefined,
 	headers: Record<string, unknown> | undefined,
 ): MaybePromise<Record<string, unknown> | undefined> => {
 	if (!schema) return undefined;
 
-	const declaredHeaders = schema.headers;
-	if (!declaredHeaders) return undefined;
-
 	return mapMaybePromise(
-		validateStandardSchema(declaredHeaders, headers ?? {}),
+		validateStandardSchema(schema, headers ?? {}),
 		(result) => {
 			if (result.issues) {
 				throw responseValidationFailed("headers", result.issues);
@@ -238,10 +225,10 @@ export async function* validateResponseStreamChunks(
 ) {
 	for await (const chunk of body) {
 		if (isSseServerEvent(chunk)) {
-			yield sse({
+			yield {
 				...chunk,
 				data: await validateResponseValue(schema, chunk.data, "stream"),
-			});
+			};
 		} else {
 			yield await validateResponseValue(schema, chunk, "stream");
 		}

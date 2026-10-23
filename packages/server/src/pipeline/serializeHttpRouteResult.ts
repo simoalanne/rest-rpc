@@ -7,7 +7,6 @@ import {
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import type { HttpRouteResult } from "./handleHttpRoute.ts";
 import { mapMaybePromise } from "./maybePromise.ts";
-import { errorBody } from "./resolveRouteError.ts";
 
 const encodeChunks = async function* (
 	body: AsyncIterable<unknown>,
@@ -30,11 +29,7 @@ const setHeaders = (headers: Headers, values?: Record<string, unknown>) => {
 	}
 };
 
-/**
- * Serializes a route result into a Fetch `Response`, encoding the body with
- * the codec for its media type. The result's headers override the headers of
- * a `SerializedBody` returned by the codec.
- */
+/** The result's headers override the headers of a `SerializedBody` returned by the codec. */
 export function serializeHttpRouteResult(
 	result: HttpRouteResult,
 	codecs: BodyCodecRegistry,
@@ -76,6 +71,10 @@ export function serializeHttpRouteResult(
 		});
 	});
 }
+
+/** The JSON body of an error response. */
+const errorBody = ({ code, message, data }: RouteError) =>
+	data === undefined ? { code, message } : { code, message, data };
 
 /** Serializes an error as a JSON `{ code, message, data? }` response. */
 export function serializeRouteError(error: RouteError): Response {

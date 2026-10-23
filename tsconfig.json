@@ -6,7 +6,6 @@
 		"moduleResolution": "NodeNext",
 		"types": ["node", "vitest/globals"],
 		"strict": true,
-		"experimentalDecorators": true,
 		"skipLibCheck": true,
 		"allowImportingTsExtensions": true,
 		"verbatimModuleSyntax": true,

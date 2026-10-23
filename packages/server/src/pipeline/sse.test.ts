@@ -53,12 +53,18 @@ describe("sse", () => {
 		},
 	);
 
-	it("rejects data with no JSON representation or failed serialization", () => {
-		expect(() => sse({ data: undefined })).toThrow(
-			"SSE event data must have a JSON representation.",
-		);
-		expect(() => sse({ data: 1n })).toThrow(
-			"SSE event data must be JSON serializable.",
-		);
-	});
+	it.each([
+		[undefined, "SSE event data must have a JSON representation."],
+		[1n, "SSE event data must be JSON serializable."],
+	])(
+		"rejects event data %s with no JSON representation when framed",
+		async (data, message) => {
+			async function* values() {
+				yield sse({ data });
+			}
+			await expect(
+				frameSseStream(values())[Symbol.asyncIterator]().next(),
+			).rejects.toThrow(message);
+		},
+	);
 });

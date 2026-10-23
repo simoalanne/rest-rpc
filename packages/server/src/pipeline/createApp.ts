@@ -1,13 +1,13 @@
 import type { AbsolutePath } from "@rest-rpc/core";
-import type { HttpMethod } from "@rest-rpc/core/contract";
+import { joinPrefix, type HttpMethod } from "@rest-rpc/core/contract";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import type { RuntimeImplementationTree } from "../routing/match.ts";
 import {
 	compileRoutes,
 	createCatchAllHandler,
+	type CatchAllHandleOptions,
 	type CompileRoutesOptions,
 } from "./compileRoutes.ts";
-import type { CatchAllHandleOptions } from "./handleHttpRoute.ts";
 import { InternalServerError, NotFound, observeError } from "./errors.ts";
 import { mapMaybePromise } from "./maybePromise.ts";
 import { serializeRouteError } from "./serializeHttpRouteResult.ts";
@@ -133,11 +133,7 @@ export function createApp<TArgs extends unknown[] = []>(
 	const routes: App<TArgs>["routes"] = {};
 	for (const route of compiled) {
 		// The mount path alone serves the `/` route, as in the catch-all handler.
-		const path = mountPath
-			? route.path === "/"
-				? mountPath
-				: `${mountPath}${route.path}`
-			: route.path;
+		const path = joinPrefix(mountPath, route.path as AbsolutePath);
 		(routes[path] ??= {})[route.method] = async (request, ...args) => {
 			try {
 				const handleOptions = readHandleOptions(request, args);

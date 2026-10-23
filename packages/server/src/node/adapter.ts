@@ -9,13 +9,11 @@ import type { AddressInfo } from "node:net";
 import { pipeline } from "node:stream/promises";
 import {
 	compileRoutes as compileFetchRoutes,
+	type CatchAllHandleOptions,
 	type CompileRoutesOptions,
+	type HandleOptions,
 } from "../pipeline/compileRoutes.ts";
 import type { App } from "../pipeline/createApp.ts";
-import type {
-	CatchAllHandleOptions,
-	HandleOptions,
-} from "../pipeline/handleHttpRoute.ts";
 import {
 	createRouteMatcher,
 	parsePathParams,

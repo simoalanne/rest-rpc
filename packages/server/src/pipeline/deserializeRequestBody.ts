@@ -22,10 +22,6 @@ const toInvalidBody = (): DeserializedRequestBody => ({
 	rejection: new MalformedRequestBody(),
 });
 
-/**
- * Deserializes a request body with the codec for its received base media
- * type.
- */
 export function deserializeRequestBody(
 	request: Request,
 	mediaType: string,

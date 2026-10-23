@@ -19,19 +19,17 @@ export { sse, type SseServerEvent } from "./pipeline/sse.ts";
 export {
 	compileRoutes,
 	createCatchAllHandler,
+	type CatchAllHandleOptions,
 	type CompileRoutesOptions,
 	type FetchRoute,
 	type FetchRouteHandlerResult,
+	type HandleOptions,
 } from "./pipeline/compileRoutes.ts";
 export {
 	createApp,
 	type App,
 	type CreateAppOptions,
 } from "./pipeline/createApp.ts";
-export type {
-	CatchAllHandleOptions,
-	HandleOptions,
-} from "./pipeline/handleHttpRoute.ts";
 export {
 	call,
 	initLocalClient,

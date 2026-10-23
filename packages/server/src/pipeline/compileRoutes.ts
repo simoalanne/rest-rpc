@@ -1,4 +1,4 @@
-import { RouteError, type BodyCodec } from "@rest-rpc/core";
+import { RouteError, type AbsolutePath, type BodyCodec } from "@rest-rpc/core";
 import {
 	createBodyCodecRegistry,
 	normalizeMediaType,
@@ -17,12 +17,7 @@ import {
 	type RuntimeImplementationTree,
 } from "../routing/match.ts";
 import { resolveRequestMediaType } from "./requestContentType.ts";
-import {
-	handleHttpRoute,
-	type CatchAllHandleOptions,
-	type HandleOptions,
-	type HttpRouteResult,
-} from "./handleHttpRoute.ts";
+import { handleHttpRoute, type HttpRouteResult } from "./handleHttpRoute.ts";
 import { deserializeRequestBody } from "./deserializeRequestBody.ts";
 import { observeError } from "./errors.ts";
 import { resolveRouteError } from "./resolveRouteError.ts";
@@ -81,6 +76,45 @@ export type CompileRoutesOptions = {
 	 * @default false
 	 */
 	disableResponseValidation?: boolean;
+};
+
+/**
+ * Per-request options for compiled routes and the catch-all handler.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#handle-options}
+ */
+export type HandleOptions = {
+	/**
+	 * Initial context values, set before middleware runs. Values are not
+	 * type-checked against the context types routes declare.
+	 */
+	context?: Record<string, unknown>;
+	/**
+	 * Percent-decoded path params, for requests whose URL does not contain the
+	 * route path. When omitted, params a router set as `request.params`, as Bun
+	 * and Express do, are used, or else they are read from the request URL.
+	 */
+	params?: Record<string, string>;
+	/**
+	 * An already decoded request body, such as one parsed by a framework's body
+	 * parser. When the key is present, even as `undefined`, the request body is
+	 * not read. The value is still validated against the route's body schema.
+	 */
+	body?: unknown;
+};
+
+/**
+ * Per-request options for the catch-all handler.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#mount-path}
+ */
+export type CatchAllHandleOptions = HandleOptions & {
+	/**
+	 * The path the catch-all handler is mounted at, such as `/api`. Requests
+	 * outside it are unmatched, and it is removed from the request path before
+	 * matching. Route paths do not include it.
+	 */
+	mountPath?: AbsolutePath;
 };
 
 /**

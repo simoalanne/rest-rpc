@@ -1,9 +1,4 @@
-/**
- * Reads the path of a request URL or Node request target.
- *
- * @remarks The path is not normalized or decoded, so it is matched as the
- * client sent it. An origin in front of the path is skipped.
- */
+/** The path is not normalized or decoded, and an origin in front of it is skipped. */
 export function readRequestPathname(url: string): string {
 	const queryStart = url.indexOf("?");
 	const pathEnd = queryStart === -1 ? url.length : queryStart;
@@ -15,23 +10,13 @@ export function readRequestPathname(url: string): string {
 		: url.slice(pathStart, pathEnd);
 }
 
-/**
- * Reads the raw query of a request URL or Node request target, without the
- * leading `?`.
- *
- * @remarks The query is not decoded.
- */
+/** Reads the raw query without the leading `?`. */
 export function readRequestSearch(url: string): string {
 	const queryStart = url.indexOf("?");
 	return queryStart === -1 ? "" : url.slice(queryStart + 1);
 }
 
-/**
- * Removes a mount path, such as `/api`, from the start of a request path.
- *
- * @remarks Returns `undefined` when the path is not under the mount path. The
- * mount path itself resolves to `/`.
- */
+/** Returns `undefined` outside the mount path, and `/` for the mount path itself. */
 export function stripMountPath(
 	pathname: string,
 	mountPath: string,

@@ -7,17 +7,14 @@ import type {
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import type { SseServerEvent } from "../pipeline/sse.ts";
 import type { Context, DefaultContext } from "./context.ts";
-import type { EmptyObject, MaybePromise, Merge } from "@rest-rpc/core/utils";
+import type {
+	EmptyObject,
+	IsUnion,
+	MaybePromise,
+	Merge,
+} from "@rest-rpc/core/utils";
 
-/**
- * HTTP response shape from which a handler-based route infers its contract.
- *
- * @remarks An `AsyncIterable` body always denotes an SSE stream. Providing
- * `contentType` selects a custom-content response for non-stream bodies;
- * otherwise bodies use JSON.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/route-builder#return-responses}
- */
+/** An `AsyncIterable` body is an SSE stream, and `contentType` selects custom content for other bodies. */
 export type ImplicitResponseEnvelope =
 	| {
 			status: number;
@@ -174,12 +171,10 @@ export type InferredRoute<TRoute, TResult> = Merge<
 	}
 >;
 
-/** Untyped route handler stored in a completed runtime route declaration. */
 export type RuntimeRouteHandler = (
 	request: unknown,
 ) => unknown | Promise<unknown>;
 
-/** Runtime declaration of a server route, including its handler and middleware. */
 export type ServerRouteBuilderState = Partial<RouteDeclaration> & {
 	readonly handler?: unknown;
 	readonly middleware?: readonly RuntimeRouteHandler[];
@@ -195,12 +190,6 @@ type WithSseServerEvents<T> = T extends {
 }
 	? Omit<T, "body"> & { body: WithSseItems<T["body"]> }
 	: T;
-
-type IsUnion<T, TAll = T> = T extends unknown
-	? [TAll] extends [T]
-		? false
-		: true
-	: never;
 
 // Handlers may return the body of a route's only declared response directly,
 // unless that response has several media types to select from.
@@ -244,10 +233,6 @@ type ErrorsOf<TRoute extends RouteDeclaration> = TRoute extends {
 	? TErrors
 	: EmptyObject;
 
-/**
- * Infers the validated request, handler fields, application context, and
- * declared error classes received by a handler.
- */
 export type RouteRequest<
 	TRoute extends RouteDeclaration,
 	TContext extends object = EmptyObject,
@@ -261,9 +246,6 @@ export type RouteRequest<
 		}
 >;
 
-/**
- * Infers the complete handler signature for a route declaration.
- */
 export type RouteHandler<
 	TRoute extends RouteDeclaration,
 	TContext extends object = EmptyObject,
@@ -271,10 +253,7 @@ export type RouteHandler<
 	...args: [request: RouteRequest<TRoute, TContext>]
 ) => HandlerResult<TRoute>;
 
-/**
- * A route, a nested object of routes, or a contract implementer tree, whose
- * `$context()` and `use()` methods are ignored.
- */
+/** A route, a route tree, or a contract implementer tree, whose `$context()` and `use()` are ignored. */
 export type HandlerTree =
 	| { readonly "~restrpc": RouteDeclaration }
 	| { readonly [key: string]: HandlerTree | ((...args: never) => unknown) };
@@ -294,17 +273,23 @@ type WithoutContext<TRoute extends RouteDeclaration> =
 		: TRoute;
 
 /**
- * Infers handler signatures for a route or a nested object tree of routes,
- * using each route's selected context.
+ * Infers the handler signature for a route declaration.
+ *
+ * @remarks Use a route declared without `.handler()` to write its handler
+ * separately. Pass a route tree or a contract implementer to infer a matching
+ * tree of handler types. The context is the one selected with `$context()`, or
+ * `DefaultContext` for contract routes passed directly.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/route-builder#type-helpers}
  */
-export type RouteHandlerFor<T extends HandlerTree> = T extends {
+export type InferServerHandler<T extends HandlerTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
 	? RouteHandler<WithoutContext<TRoute>, ContextOf<TRoute>>
 	: {
-			[K in keyof T as T[K] extends HandlerTree ? K : never]: RouteHandlerFor<
-				Extract<T[K], HandlerTree>
-			>;
+			[
+				K in keyof T as T[K] extends HandlerTree ? K : never
+			]: InferServerHandler<Extract<T[K], HandlerTree>>;
 		};
 
 export type HasDeclaredResponses<TRoute> = TRoute extends {
@@ -315,10 +300,7 @@ export type HasDeclaredResponses<TRoute> = TRoute extends {
 		: true
 	: false;
 
-/**
- * Results a handler may return. Routes with declared responses must return one
- * of them; other routes infer their responses from any valid result.
- */
+/** Routes with declared responses must return one of them; other routes may return any valid result. */
 export type AllowedHandlerResult<
 	TRoute extends RouteDeclaration,
 	TContext extends object,
@@ -332,19 +314,6 @@ export type ValidHandlerResult<TRoute extends RouteDeclaration, TResult> =
 	HasDeclaredResponses<TRoute> extends true
 		? unknown
 		: ValidImplicitResult<TResult>;
-
-/**
- * Infers the handler signature for a route declaration.
- *
- * @remarks Use a route declared without `.handler()` to write its handler
- * separately. Pass a route tree or a contract implementer to infer a matching
- * tree of handler types. The context is the one selected with `$context()`, or
- * `DefaultContext` for contract routes passed directly.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/route-builder#type-helpers}
- */
-export type InferServerHandler<TRoute extends HandlerTree> =
-	RouteHandlerFor<TRoute>;
 
 type HandlerRequests<T> = T extends (...args: never) => unknown
 	? Parameters<T>[0]
@@ -378,7 +347,6 @@ export type InferServerResponse<TRoute extends HandlerTree> = HandlerResponses<
 	InferServerHandler<TRoute>
 >;
 
-/** Unchecked application output returned by middleware. */
 export type MiddlewareReturn = unknown;
 
 type Controls = {
@@ -395,21 +363,13 @@ type UnknownRequest = {
 
 export type RequestFields = Partial<UnknownRequest>;
 
-/**
- * Validated declaration-position request data, handler fields, context, and controls for inline middleware.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/middleware}
- */
+/** The request inline middleware receives, typed by its route. */
 export type MiddlewareRequest<
 	TRoute extends RouteDeclaration,
 	TContext extends object,
 > = RouteRequest<TRoute, TContext> & UnknownRequest & Controls;
 
-/**
- * Handler fields, global context, unknown request locations, and controls for reusable middleware.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/middleware}
- */
+/** The request reusable middleware receives, with request segments typed as unknown. */
 export type ReusableMiddlewareRequest<
 	TRequest extends RequestFields,
 	TContext extends object,

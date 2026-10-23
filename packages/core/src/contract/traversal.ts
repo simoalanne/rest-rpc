@@ -1,4 +1,5 @@
-import type { Contract, RouteDeclaration, RouteTree } from "./contract.ts";
+import type { Contract } from "./contract.ts";
+import type { RouteDeclaration } from "./routeDeclaration.ts";
 import { resolveRoutePath } from "./path.ts";
 
 type Tree<T> = Record<string, unknown> | T;
@@ -26,7 +27,6 @@ const mapObjectValues = <TLeaf>(
 				{} as Record<string, unknown>,
 			);
 
-/** Detects a route leaf in a contract or implementation tree. */
 export const isRouteLeaf = (
 	value: unknown,
 ): value is { readonly "~restrpc": RouteDeclaration } =>
@@ -43,7 +43,7 @@ export const mapContractRoutes = (
 	);
 
 export function* contractRouteEntries(
-	contract: RouteTree,
+	contract: Contract,
 	path: string[] = [],
 ): Generator<ContractRouteEntry> {
 	if (isRouteLeaf(contract)) {

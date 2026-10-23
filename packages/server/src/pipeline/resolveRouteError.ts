@@ -5,15 +5,7 @@ import {
 	validateResponseValue,
 } from "./validation.ts";
 
-/** The JSON body of an error response. */
-export const errorBody = ({ code, message, data }: RouteError) =>
-	data === undefined ? { code, message } : { code, message, data };
-
-/**
- * Resolves a thrown error against the route's declaration: the declared
- * status applies and `data` and headers are validated. Errors the route does
- * not declare are sent as thrown.
- */
+/** Applies the declared status and validates `data` and headers; undeclared errors are sent as thrown. */
 export const resolveRouteError = async (
 	route: RouteDeclaration,
 	error: RouteError,
@@ -27,7 +19,7 @@ export const resolveRouteError = async (
 			? [error.data, declaration.headers ? error.headers : undefined]
 			: await Promise.all([
 					validateResponseValue(declaration.data, error.data, "data"),
-					validateResponseHeaders(declaration, error.headers),
+					validateResponseHeaders(declaration.headers, error.headers),
 				]);
 		return new RouteError(error.code, {
 			status: declaration.status,

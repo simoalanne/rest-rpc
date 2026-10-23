@@ -1,1 +1,1 @@
-export type { EmptyObject, MaybePromise, Merge } from "./typeUtils.ts";
+export type { EmptyObject, IsUnion, MaybePromise, Merge } from "./typeUtils.ts";

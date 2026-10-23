@@ -38,18 +38,19 @@ See [Streaming](/docs/streaming) for stream handlers.
 
 ## Implement Routes
 
+Pass a contract route to `implement()` to get a server route builder for it,
+then attach its handler:
+
 ```ts server.ts
 import { implement } from "@rest-rpc/server";
 import { api } from "./contract";
 import { createTodo, findTodo } from "./todos";
 
-const implementer = implement(api);
-
-const create = implementer.todos.create.handler(({ body: { title } }) =>
+const create = implement(api.todos.create).handler(({ body: { title } }) =>
 	createTodo(title),
 );
 
-const get = implementer.todos.get.handler(({ params, errors }) => {
+const get = implement(api.todos.get).handler(({ params, errors }) => {
 	const todo = findTodo(params.id);
 	if (!todo) throw new errors.TODO_NOT_FOUND();
 	return todo;
@@ -65,27 +66,42 @@ responses, and throw the contract's declared errors. Compile and register the co
 
 Context and middleware are supported in contract-first routes. See [Context](/docs/context) and [Middleware](/docs/middleware) for details.
 
-`$context<T>()` and `.use()` can be called on the root builder to share context and middleware across all routes:
+Call `$context<T>()` and `.use()` on an implemented route before `.handler()`:
 
 ```ts
-const implementer = implement(api)
+const create = implement(api.todos.create)
 	.$context<{ user: { id: string } }>()
-	.use(yourMiddleware);
-const createTodo = implementer.todos.create.handler(yourHandler);
+	.use(authenticate)
+	.handler(({ body, context }) => createTodo(body.title, context.get("user")));
 ```
 
-Alternatively, call them on a specific route to share context and middleware only with that route:
+### Share Across Routes
+
+To share context and middleware with several routes, pass a contract tree to
+`implement()`. The implementer mirrors the tree, and `$context<T>()` and
+`.use()` on it apply to every route in the tree:
 
 ```ts
-const implementer = implement(api);
-const create = implementer.todos.create
+const todos = implement(api.todos)
 	.$context<{ user: { id: string } }>()
-	.use(yourMiddleware)
-	.handler(yourHandler);
+	.use(authenticate);
+
+export const routes = {
+	todos: {
+		create: todos.create.handler(({ body, context }) =>
+			createTodo(body.title, context.get("user")),
+		),
+		get: todos.get.handler(({ params, errors }) => {
+			const todo = findTodo(params.id);
+			if (!todo) throw new errors.TODO_NOT_FOUND();
+			return todo;
+		}),
+	},
+};
 ```
 
 :::error[Reserved Keys]
-Don't use `use` or `$context` as top-level keys in your contract. They are reserved for the implementation builder.
+Don't use `use` or `$context` as top-level keys of a contract tree passed to `implement()`. They are reserved for the implementer.
 :::
 
 ## Use in a Client
