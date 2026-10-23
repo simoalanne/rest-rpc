@@ -20,9 +20,6 @@ Most are one-line edits.
 
 One "use or move to core" refactor covers all of these.
 
-- **`packages/server/src/builder/routeBuilder.ts:108-119`**
-  - Problem: `handler()` repeats core's `defaultRouteState` (`core/src/contract/routeBuilder.ts:129`): POST, `path: undefined`, `responses: {}`.
-  - Change: export `defaultRouteState` through the internal contract barrel, or make it a protected builder method, and reuse it. **certain**
 - **`packages/server/src/pipeline/createApp.ts:136-140`**
   - Problem: the mount path join is `joinPrefix` from `core/src/contract/path.ts:4`.
   - Change: export `joinPrefix` and reuse it. **certain**

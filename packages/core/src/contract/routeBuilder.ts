@@ -126,7 +126,9 @@ const mergeOpenApi = (
 	};
 };
 
-const defaultRouteState = (state: RouteBuilderState): RouteBuilderState => ({
+export const defaultRouteState = (
+	state: RouteBuilderState,
+): RouteBuilderState => ({
 	method: "POST",
 	path: undefined,
 	responses: {},

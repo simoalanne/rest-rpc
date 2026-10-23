@@ -17,7 +17,11 @@ export type {
 	RootBuilderState,
 } from "./routeBuilder.types.ts";
 // `RouteBuilderKind` is named by core's `route`.
-export { RouteBuilder, type RouteBuilderKind } from "./routeBuilder.ts";
+export {
+	defaultRouteState,
+	RouteBuilder,
+	type RouteBuilderKind,
+} from "./routeBuilder.ts";
 export {
 	markDeclared,
 	RouteError,
