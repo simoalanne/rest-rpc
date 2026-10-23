@@ -33,9 +33,6 @@ Most are one-line edits.
 
 ## 9. Repo scripts and config leftovers
 
-- **`tsconfig.build.json:10`**
-  - Problem: it excludes `**/*.type-test.ts`, but no such files exist. Type tests use `.test-d.ts`.
-  - Change: delete the entry. **certain**
 - **`scripts/check-public-api-docs.ts:143,228`**
   - Problem: the `packageDir` parameter of `checkEntryPoint` is unused, and `checkWorkspace` is exported but never imported.
   - Change: delete the parameter and the `export`. **certain**
