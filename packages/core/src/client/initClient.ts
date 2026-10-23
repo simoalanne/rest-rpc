@@ -20,13 +20,6 @@ import type {
 } from "../contract/response.ts";
 import type { ClientPromise } from "./safe.ts";
 
-export type FetchResponseFn<
-	E extends RouteDeclaration,
-	TGlobalHeaders extends ClientHeaders = Record<never, string>,
-> = (
-	...args: FetchArgs<E, TGlobalHeaders>
-) => ClientPromise<DeclaredClientResponse<E>, ClientRouteError<E> | Error>;
-
 /**
  * Infers the callable client operation for one declared route.
  *
@@ -36,7 +29,11 @@ export type FetchResponseFn<
 export type ApiClientRouteValue<
 	E extends RouteDeclaration = RouteDeclaration,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
-> = E extends RouteDeclaration ? FetchResponseFn<E, TGlobalHeaders> : never;
+> = E extends RouteDeclaration
+	? (
+			...args: FetchArgs<E, TGlobalHeaders>
+		) => ClientPromise<DeclaredClientResponse<E>, ClientRouteError<E> | Error>
+	: never;
 
 /**
  * Infers the client tree for a contract.

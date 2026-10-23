@@ -3,7 +3,6 @@ export {
 	type ApiClientFor,
 	type ApiClientOptions,
 	type ApiClientRouteValue,
-	type FetchResponseFn,
 } from "./initClient.ts";
 export {
 	type ClientHeaders,
