@@ -12,9 +12,6 @@ Confidence: **certain** means the change keeps behavior or fixes a contradiction
 
 Overlap and verbosity, not errors.
 
-- **`content/docs/contract-first.mdx:14-62`**
-  - Problem: repeats the declare, implement and client code from `contract-first-quickstart.mdx`. The two pages also implement routes differently: the quickstart uses `implement(api.todos.create)` and this page uses `implement(api).todos.create`.
-  - Change: keep only what this page adds (the implementer tree, context and middleware on the root and on single routes, reserved keys), link to the quickstart for the full example, and pick one `implement` style. **decision**
 - **`content/docs/server/framework-integration.mdx:6-25`**
   - Problem: "Scope of rest-rpc" is three paragraphs of positioning prose, with typos ("consepts", "thats"), before any integration content.
   - Change: cut it to one or two sentences, or move it to the landing page. **decision**

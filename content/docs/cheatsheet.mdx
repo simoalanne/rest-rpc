@@ -299,6 +299,7 @@ export const api = {
 			.get("/todos/:id")
 			.response(todoSchema)
 			.error("TODO_NOT_FOUND", { status: 404 }),
+		create: route.body(newTodoSchema).response(todoSchema),
 	},
 };
 ```
@@ -306,9 +307,21 @@ export const api = {
 ```ts server.ts
 import { implement } from "@rest-rpc/server";
 
-const impl = implement(api).$context<{ user: User }>().use(auth); // `use`/`$context` are reserved keys
+// Implement one contract route, with its own $context<T>() and .use() if needed...
+const get = implement(api.todos.get).handler(({ params }) =>
+	findTodo(params.id),
+);
+
+// ...or implement a contract tree to share context and middleware with every
+// route in it. `use`/`$context` are reserved top-level keys.
+const todos = implement(api.todos).$context<{ user: User }>().use(auth);
 export const routes = {
-	todos: { get: impl.todos.get.handler(({ params }) => findTodo(params.id)) },
+	todos: {
+		get: todos.get.handler(({ params }) => findTodo(params.id)),
+		create: todos.create.handler(({ body, context }) =>
+			createTodo(body, context.get("user")),
+		),
+	},
 };
 ```
 
