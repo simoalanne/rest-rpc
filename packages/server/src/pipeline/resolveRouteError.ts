@@ -5,10 +5,6 @@ import {
 	validateResponseValue,
 } from "./validation.ts";
 
-/** The JSON body of an error response. */
-export const errorBody = ({ code, message, data }: RouteError) =>
-	data === undefined ? { code, message } : { code, message, data };
-
 /**
  * Resolves a thrown error against the route's declaration: the declared
  * status applies and `data` and headers are validated. Errors the route does

@@ -7,7 +7,6 @@ import {
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import type { HttpRouteResult } from "./handleHttpRoute.ts";
 import { mapMaybePromise } from "./maybePromise.ts";
-import { errorBody } from "./resolveRouteError.ts";
 
 const encodeChunks = async function* (
 	body: AsyncIterable<unknown>,
@@ -76,6 +75,10 @@ export function serializeHttpRouteResult(
 		});
 	});
 }
+
+/** The JSON body of an error response. */
+const errorBody = ({ code, message, data }: RouteError) =>
+	data === undefined ? { code, message } : { code, message, data };
 
 /** Serializes an error as a JSON `{ code, message, data? }` response. */
 export function serializeRouteError(error: RouteError): Response {

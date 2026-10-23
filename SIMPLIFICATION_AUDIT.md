@@ -24,9 +24,6 @@ Most are one-line edits.
 
 ## 7. Server module boundaries
 
-- **`packages/server/src/pipeline/resolveRouteError.ts:9`**
-  - Problem: `errorBody` is defined here but only used by `serializeHttpRouteResult.ts:84`.
-  - Change: move it there. **certain**
 - **`packages/server/src/pipeline/handleHttpRoute.ts:31-63`**
   - Problem: `HandleOptions` and `CatchAllHandleOptions` are the public options of compiled routes and the catch-all handler. They live in the route executor module, and `compileRoutes.ts`, `createApp.ts` and `node/adapter.ts` import them from it.
   - Change: move them to `compileRoutes.ts`, next to `CompileRoutesOptions` and `FetchRoute`, and update `index.ts:31-34`. **certain**
