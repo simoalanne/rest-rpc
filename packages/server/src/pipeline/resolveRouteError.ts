@@ -23,7 +23,7 @@ export const resolveRouteError = async (
 			? [error.data, declaration.headers ? error.headers : undefined]
 			: await Promise.all([
 					validateResponseValue(declaration.data, error.data, "data"),
-					validateResponseHeaders(declaration, error.headers),
+					validateResponseHeaders(declaration.headers, error.headers),
 				]);
 		return new RouteError(error.code, {
 			status: declaration.status,

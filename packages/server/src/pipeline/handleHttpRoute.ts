@@ -96,7 +96,7 @@ const normalizeResponseResult = (
 		? schema.headers
 			? result.headers
 			: undefined
-		: validateResponseHeaders(schema, result.headers);
+		: validateResponseHeaders(schema.headers, result.headers);
 
 	if (content === undefined) {
 		return mapMaybePromise(validatedHeaders, (headers) => ({

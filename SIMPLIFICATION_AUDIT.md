@@ -22,12 +22,6 @@ Most are one-line edits.
   - Problem: `sse()` stringifies `data` only to check it. `validateResponseStreamChunks` then re-wraps each validated chunk with `sse()`, which checks the metadata and stringifies `data` again. Framing (`sse.ts:53`) stringifies it a third time. The framing step already throws the same `TypeError` during stream iteration, which is where an error thrown by the handler's `sse()` call would surface anyway.
   - Change: delete the eager `serializeData(event.data)` in `sse()`. In `validation.ts`, yield `{ ...chunk, data }` (the spread keeps the brand) instead of calling `sse()` again. Move the assertion in `sse.test.ts:56-63` to `frameSseStream`. **decision**: `sse()` would no longer throw at once for data that isn't JSON when called outside a stream.
 
-## 7. Server module boundaries
-
-- **`packages/server/src/pipeline/validation.ts:215-222`**
-  - Problem: `validateResponseHeaders` accepts `schema | undefined` and guards against it. Both callers (`handleHttpRoute.ts:138`, `resolveRouteError.ts:290`) always pass a defined declaration.
-  - Change: take `ResponseHeadersSchema | undefined` directly (pass `.headers` at the call sites), leaving one guard. **certain**
-
 ## 8. Small core simplifications and unjustified guards
 
 - **`packages/core/src/contract/path.ts:22-37`**

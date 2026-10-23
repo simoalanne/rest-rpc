@@ -213,16 +213,13 @@ export const validateResponseValue = (
 };
 
 export const validateResponseHeaders = (
-	schema: { headers?: ResponseHeadersSchema } | undefined,
+	schema: ResponseHeadersSchema | undefined,
 	headers: Record<string, unknown> | undefined,
 ): MaybePromise<Record<string, unknown> | undefined> => {
 	if (!schema) return undefined;
 
-	const declaredHeaders = schema.headers;
-	if (!declaredHeaders) return undefined;
-
 	return mapMaybePromise(
-		validateStandardSchema(declaredHeaders, headers ?? {}),
+		validateStandardSchema(schema, headers ?? {}),
 		(result) => {
 			if (result.issues) {
 				throw responseValidationFailed("headers", result.issues);

@@ -118,9 +118,7 @@ describe("validation", () => {
 		expect(await validateResponseValue(undefined, "raw", "body")).toBe("raw");
 		expect(
 			await validateResponseHeaders(
-				{
-					headers: schema(() => ({ value: { count: 2, absent: undefined } })),
-				},
+				schema(() => ({ value: { count: 2, absent: undefined } })),
 				{},
 			),
 		).toEqual({ count: 2, absent: undefined });
@@ -144,7 +142,10 @@ describe("validation", () => {
 			cause: { location: "body", issues },
 		});
 		await expect(async () =>
-			validateResponseHeaders({ headers: schema(() => ({ issues })) }, {}),
+			validateResponseHeaders(
+				schema(() => ({ issues })),
+				{},
+			),
 		).rejects.toMatchObject({ cause: { location: "headers", issues } });
 	});
 
