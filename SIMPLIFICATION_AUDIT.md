@@ -33,9 +33,6 @@ Most are one-line edits.
 
 ## 9. Repo scripts and config leftovers
 
-- **`tsconfig.json:9`**
-  - Problem: `experimentalDecorators` is set, but the repo has no decorators.
-  - Change: delete it. **certain**
 - **`tsconfig.build.json:10`**
   - Problem: it excludes `**/*.type-test.ts`, but no such files exist. Type tests use `.test-d.ts`.
   - Change: delete the entry. **certain**
