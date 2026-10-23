@@ -8,16 +8,6 @@ Confidence: **certain** means the change keeps behavior or fixes a contradiction
 
 ---
 
-## 10. Doc trimming
-
-Overlap and verbosity, not errors.
-
-- **`content/docs/server/framework-integration.mdx:6-25`**
-  - Problem: "Scope of rest-rpc" is three paragraphs of positioning prose, with typos ("consepts", "thats"), before any integration content.
-  - Change: cut it to one or two sentences, or move it to the landing page. **decision**
-
----
-
 ## Declaration emit check
 
 This answers whether the export trims break consumers that compile with `declaration: true`.

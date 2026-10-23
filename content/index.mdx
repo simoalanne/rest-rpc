@@ -310,8 +310,11 @@ npx skills add simoalanne/rest-rpc
 :::tip[Small by design]
 `rest-rpc` stays focused on the API boundary so it can fit into code you already
 have. It types and validates what crosses the wire, and leaves routing features,
-plugins, and server lifecycle to your stack. Adopt it one step at a time, each
-useful without the next:
+plugins, and server lifecycle to your stack. There is no built-in
+authentication, caching, or dependency injection, and no framework adapters:
+keep your framework's features, add a package, or build your own on
+[middleware](/docs/middleware/) and [context](/docs/context/). Adopt it one step
+at a time, each useful without the next:
 
 1. Declare routes and infer request and response types for handlers you write.
 2. Validate requests and responses at runtime.
@@ -338,7 +341,8 @@ useful without the next:
 		No. If an app only needs typed, validated endpoints, serve them with a
 		one-line server on Node HTTP, Bun, Deno, or Cloudflare Workers. If it needs
 		a framework for other reasons, register the routes on the framework's router
-		instead.
+		instead. Routes do not depend on how they are served, so you can change this
+		later without changing them.
 	</AccordionItem>
 	<AccordionItem title="Do I need to learn a new API model?">
 		The model is ordinary HTTP: methods, paths, request locations, status codes,
