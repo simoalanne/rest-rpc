@@ -84,22 +84,6 @@ const getSchemaProperties = (schema: OpenApiSchema) => {
 		: {};
 };
 
-type SchemaRequiredKeys =
-	| { type: "known"; keys: unknown[] }
-	| { type: "unknown" };
-
-const getRequiredSchemaKeys = (schema: OpenApiSchema): SchemaRequiredKeys => {
-	if (Array.isArray(schema.required)) {
-		return { type: "known", keys: schema.required };
-	}
-
-	if (schema.type === "object" || schema.properties) {
-		return { type: "known", keys: [] };
-	}
-
-	return { type: "unknown" };
-};
-
 const mapContent = <TValue>(
 	content: Readonly<Record<string, TValue>>,
 	toSchema: (value: TValue) => OpenApiSchema,
@@ -129,10 +113,10 @@ const createParameters = (
 				? { allOf: [properties[name], propertySchema] }
 				: propertySchema;
 		}
-		const schemaRequiredKeys = getRequiredSchemaKeys(jsonSchema);
-		if (schemaRequiredKeys.type === "known") {
-			for (const name of schemaRequiredKeys.keys) requiredKeys.add(name);
-		}
+		const required = Array.isArray(jsonSchema.required)
+			? jsonSchema.required
+			: [];
+		for (const name of required) requiredKeys.add(name);
 	}
 
 	return Object.entries(properties).map(([name, propertySchema]) => {

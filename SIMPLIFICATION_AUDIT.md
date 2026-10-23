@@ -16,12 +16,6 @@ Most are one-line edits.
 | ----------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------- |
 | `CONTRIBUTING.md:28-35` | Repeats the Public API rules from `AGENTS.md` and leaves out the `@rest-rpc/server/node` exception. | Add the exception, or replace the section with a pointer to `AGENTS.md` so there is one copy. | decision   |
 
-## 5. OpenAPI internals exported for tests
-
-- **`packages/core/src/openapi/operation.ts:87-101,132-135`**
-  - Problem: `getRequiredSchemaKeys` returns a `known`/`unknown` union, but its caller treats `unknown` the same as known-with-no-keys.
-  - Change: replace it with `Array.isArray(jsonSchema.required) ? jsonSchema.required : []` and delete `SchemaRequiredKeys`. **certain**
-
 ## 6. `sse()` serializes event data up to three times
 
 - **`packages/server/src/pipeline/sse.ts:93`, `packages/server/src/pipeline/validation.ts:240-244`**
