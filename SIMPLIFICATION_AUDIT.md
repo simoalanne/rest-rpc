@@ -16,12 +16,6 @@ Most are one-line edits.
 | ----------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------- |
 | `CONTRIBUTING.md:28-35` | Repeats the Public API rules from `AGENTS.md` and leaves out the `@rest-rpc/server/node` exception. | Add the exception, or replace the section with a pointer to `AGENTS.md` so there is one copy. | decision   |
 
-## 6. `sse()` serializes event data up to three times
-
-- **`packages/server/src/pipeline/sse.ts:93`, `packages/server/src/pipeline/validation.ts:240-244`**
-  - Problem: `sse()` stringifies `data` only to check it. `validateResponseStreamChunks` then re-wraps each validated chunk with `sse()`, which checks the metadata and stringifies `data` again. Framing (`sse.ts:53`) stringifies it a third time. The framing step already throws the same `TypeError` during stream iteration, which is where an error thrown by the handler's `sse()` call would surface anyway.
-  - Change: delete the eager `serializeData(event.data)` in `sse()`. In `validation.ts`, yield `{ ...chunk, data }` (the spread keeps the brand) instead of calling `sse()` again. Move the assertion in `sse.test.ts:56-63` to `frameSseStream`. **decision**: `sse()` would no longer throw at once for data that isn't JSON when called outside a stream.
-
 ## 8. Small core simplifications and unjustified guards
 
 - **`packages/core/src/contract/extract.ts:45`, `packages/core/src/client/response.ts:250-251`**

@@ -90,6 +90,5 @@ export function sse<T>(event: SseEvent<T>): SseServerEvent<T> {
 			"SSE retry must be a non-negative safe integer in milliseconds.",
 		);
 	}
-	serializeData(event.data);
 	return { ...event, [sseBrand]: true };
 }

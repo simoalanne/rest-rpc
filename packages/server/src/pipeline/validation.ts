@@ -8,7 +8,7 @@ import {
 } from "@rest-rpc/core/standard-schema";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import { allMaybePromise, mapMaybePromise } from "./maybePromise.ts";
-import { isSseServerEvent, sse } from "./sse.ts";
+import { isSseServerEvent } from "./sse.ts";
 import {
 	RequestValidationFailed,
 	responseValidationFailed,
@@ -235,10 +235,10 @@ export async function* validateResponseStreamChunks(
 ) {
 	for await (const chunk of body) {
 		if (isSseServerEvent(chunk)) {
-			yield sse({
+			yield {
 				...chunk,
 				data: await validateResponseValue(schema, chunk.data, "stream"),
-			});
+			};
 		} else {
 			yield await validateResponseValue(schema, chunk, "stream");
 		}
