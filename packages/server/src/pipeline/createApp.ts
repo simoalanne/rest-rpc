@@ -5,9 +5,9 @@ import type { RuntimeImplementationTree } from "../routing/match.ts";
 import {
 	compileRoutes,
 	createCatchAllHandler,
+	type CatchAllHandleOptions,
 	type CompileRoutesOptions,
 } from "./compileRoutes.ts";
-import type { CatchAllHandleOptions } from "./handleHttpRoute.ts";
 import { InternalServerError, NotFound, observeError } from "./errors.ts";
 import { mapMaybePromise } from "./maybePromise.ts";
 import { serializeRouteError } from "./serializeHttpRouteResult.ts";

@@ -1,4 +1,4 @@
-import { RouteError, type AbsolutePath } from "@rest-rpc/core";
+import { RouteError } from "@rest-rpc/core";
 import { isAsyncIterable, normalizeMediaType } from "@rest-rpc/core/codecs";
 import type {
 	ResponseContentDeclaration,
@@ -22,45 +22,6 @@ import { sseBody } from "./sse.ts";
 import { createContext } from "../builder/context.ts";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import { allMaybePromise, mapMaybePromise } from "./maybePromise.ts";
-
-/**
- * Per-request options for compiled routes and the catch-all handler.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#handle-options}
- */
-export type HandleOptions = {
-	/**
-	 * Initial context values, set before middleware runs. Values are not
-	 * type-checked against the context types routes declare.
-	 */
-	context?: Record<string, unknown>;
-	/**
-	 * Percent-decoded path params, for requests whose URL does not contain the
-	 * route path. When omitted, params a router set as `request.params`, as Bun
-	 * and Express do, are used, or else they are read from the request URL.
-	 */
-	params?: Record<string, string>;
-	/**
-	 * An already decoded request body, such as one parsed by a framework's body
-	 * parser. When the key is present, even as `undefined`, the request body is
-	 * not read. The value is still validated against the route's body schema.
-	 */
-	body?: unknown;
-};
-
-/**
- * Per-request options for the catch-all handler.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#mount-path}
- */
-export type CatchAllHandleOptions = HandleOptions & {
-	/**
-	 * The path the catch-all handler is mounted at, such as `/api`. Requests
-	 * outside it are unmatched, and it is removed from the request path before
-	 * matching. Route paths do not include it.
-	 */
-	mountPath?: AbsolutePath;
-};
 
 /** Inputs needed to invoke one route handler with decoded request segments. */
 type ExecuteRouteOptions = {
