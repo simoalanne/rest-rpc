@@ -16,16 +16,6 @@ Most are one-line edits.
 | ----------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------- |
 | `CONTRIBUTING.md:28-35` | Repeats the Public API rules from `AGENTS.md` and leaves out the `@rest-rpc/server/node` exception. | Add the exception, or replace the section with a pointer to `AGENTS.md` so there is one copy. | decision   |
 
-## 2. Dead exports and alias layers
-
-Mostly deletions.
-
-The internal subpath barrels are part of the type surface. When a consumer compiles with `declaration: true`, TypeScript names types it can't inline through any path in the `exports` map. Removing a re-export that inferred types depend on breaks the consumer's declaration emit, even if nothing in this repo imports it. The items below were tested for this; see "Declaration emit check" at the end of this file.
-
-- **Server symbols that are exported but only used in their own module**
-  - Locations: `handleHttpRoute.ts:66` `ExecuteRouteOptions`, `:187` `isResponseEnvelope`, `:290` `StreamErrorObserver`; `routing/match.ts:131` `ParamSyntax`, `:153` `MatchedRoute`. `ParamSyntax` also duplicates `CompileRoutesOptions["paramSyntax"]`.
-  - Change: drop `export`, and use `NonNullable<CompileRoutesOptions["paramSyntax"]>` in place of `ParamSyntax`. **certain**
-
 ## 3. The client response reader takes a request function only to call it once
 
 - **`packages/core/src/client/response.ts:209-235`, `packages/core/src/client/initClient.ts:91-104`**

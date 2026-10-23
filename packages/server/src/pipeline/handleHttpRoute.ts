@@ -63,7 +63,7 @@ export type CatchAllHandleOptions = HandleOptions & {
 };
 
 /** Inputs needed to invoke one route handler with decoded request segments. */
-export type ExecuteRouteOptions = {
+type ExecuteRouteOptions = {
 	request: RequestSegments;
 	/** Aborts when the client disconnects. */
 	signal: AbortSignal;
@@ -184,7 +184,7 @@ export type HttpRouteResult = {
 };
 
 /** A handler result with a numeric `status` is a response envelope; anything else is a 200 body. */
-export const isResponseEnvelope = (
+const isResponseEnvelope = (
 	value: unknown,
 ): value is ImplicitResponseEnvelope =>
 	typeof value === "object" &&
@@ -287,7 +287,7 @@ export function executeRoute(
 }
 
 /** Observes a `RouteError` that ends a stream after its response started. */
-export type StreamErrorObserver = (error: RouteError) => void;
+type StreamErrorObserver = (error: RouteError) => void;
 
 const observeStream = async function* (
 	stream: AsyncIterable<unknown>,

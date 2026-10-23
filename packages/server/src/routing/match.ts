@@ -10,6 +10,7 @@ import {
 } from "@rest-rpc/core/contract";
 import { addRoute, createRouter, findRoute } from "rou3";
 import type { RuntimeRouteHandler } from "../builder/routeBuilder.types.ts";
+import type { CompileRoutesOptions } from "../pipeline/compileRoutes.ts";
 
 const splitPath = (path: string) => path.split("/").filter(Boolean);
 
@@ -127,9 +128,6 @@ export function flattenRouteImplementations(
 		.sort((left, right) => compareRouteSpecificity(left.route, right.route));
 }
 
-/** Param marker style used in compiled route paths. */
-export type ParamSyntax = "colon" | "braces";
-
 /**
  * Normalizes a route path and optionally rewrites param markers.
  *
@@ -137,7 +135,7 @@ export type ParamSyntax = "colon" | "braces";
  */
 export function resolveImplementationPath(
 	path: string,
-	paramSyntax?: ParamSyntax,
+	paramSyntax?: CompileRoutesOptions["paramSyntax"],
 ): string {
 	const normalized = `/${splitPath(path).join("/")}`;
 	if (paramSyntax === "colon") return toColonPath(normalized);
@@ -150,7 +148,7 @@ const decodePathSegment = (segment: string) =>
 	segment.includes("%") ? decodeURIComponent(segment) : segment;
 
 /** A route matched by a route matcher, with its percent-decoded params. */
-export type MatchedRoute<TRoute> = {
+type MatchedRoute<TRoute> = {
 	route: TRoute;
 	/** `undefined` for routes without params. */
 	params: Record<string, string> | undefined;
