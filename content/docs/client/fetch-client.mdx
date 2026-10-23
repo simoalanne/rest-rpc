@@ -254,9 +254,6 @@ async function connect() {
 ```ts
 const client = initClient(api, {
 	baseUrl: "https://api.example.com",
-	globalHeaders: {
-		authorization: () => `Bearer ${readToken()}`,
-	},
 	timeoutMs: 10_000,
 	fetchOptions: {
 		credentials: "include",

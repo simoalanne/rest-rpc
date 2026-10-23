@@ -44,9 +44,6 @@ Overlap and verbosity, not errors.
 - **`content/docs/openapi.mdx:86-122`**
   - Problem: a long second `transformParameter` example for a Zod-meta workaround overlaps the Transform Hooks example (`:170-199`).
   - Change: keep one of them. **decision**
-- **`content/docs/client/fetch-client.mdx:252-265`**
-  - Problem: the Client Options example repeats the `globalHeaders` authorization provider that Global Headers (`:309-323`) shows next.
-  - Change: drop `globalHeaders` from the first example. **certain**
 - **`content/docs/http-behavior/schemas.mdx:177-188`, `content/docs/http-behavior/serialization.mdx:111-127`**
   - Problem: the server option examples use `compileRoutes`, while the rest of the docs present `createApp` as the default path. The options are the same.
   - Change: show `createApp`. **decision**, low payoff.
