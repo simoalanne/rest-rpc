@@ -3,7 +3,7 @@ import type { RouteDeclaration } from "./routeDeclaration.ts";
 import type { InferSchema, RequestScalar } from "./request.ts";
 import type { SseEvent } from "./sse.ts";
 import type { RouteError } from "./routeError.ts";
-import type { Merge } from "../utils/typeUtils.ts";
+import type { IsUnion, Merge } from "../utils/typeUtils.ts";
 
 /**
  * A whole-object schema for response headers whose output contains scalar
@@ -49,12 +49,6 @@ export type ResponseOptions = {
 };
 
 export type RouteResponses = Record<number, ResponseDeclaration>;
-
-type IsUnion<T, TAll = T> = T extends unknown
-	? [TAll] extends [T]
-		? false
-		: true
-	: never;
 
 type ResponseContent<TResponse> = TResponse extends {
 	content: infer TContent;

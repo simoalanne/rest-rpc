@@ -16,14 +16,6 @@ Most are one-line edits.
 | ----------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------- |
 | `CONTRIBUTING.md:28-35` | Repeats the Public API rules from `AGENTS.md` and leaves out the `@rest-rpc/server/node` exception. | Add the exception, or replace the section with a pointer to `AGENTS.md` so there is one copy. | decision   |
 
-## 4. Server re-implements core helpers
-
-One "use or move to core" refactor covers all of these.
-
-- **`IsUnion`, defined in `core/src/contract/request.ts:73`, `core/src/contract/response.ts:53` and `server/src/builder/routeBuilder.types.ts:199`**
-  - Problem: three identical copies.
-  - Change: move it to `core/src/utils/typeUtils.ts`, next to `EmptyObject`. In the same pass, replace `request.ts:116` `EmptyRequest` and the inline `Record<never, never>` at `request.ts:183` with `EmptyObject`. **certain**
-
 ## 5. OpenAPI internals exported for tests
 
 - **`packages/core/src/openapi/operation.ts:114,162,180,297-300,155`**

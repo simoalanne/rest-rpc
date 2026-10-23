@@ -5,4 +5,10 @@ export type Merge<T> = T extends unknown
 
 export type EmptyObject = Record<never, never>;
 
+export type IsUnion<T, TAll = T> = T extends unknown
+	? [TAll] extends [T]
+		? false
+		: true
+	: never;
+
 export type MaybePromise<T> = T | Promise<T>;

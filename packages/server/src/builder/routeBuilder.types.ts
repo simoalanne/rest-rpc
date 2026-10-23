@@ -7,7 +7,12 @@ import type {
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import type { SseServerEvent } from "../pipeline/sse.ts";
 import type { Context, DefaultContext } from "./context.ts";
-import type { EmptyObject, MaybePromise, Merge } from "@rest-rpc/core/utils";
+import type {
+	EmptyObject,
+	IsUnion,
+	MaybePromise,
+	Merge,
+} from "@rest-rpc/core/utils";
 
 /**
  * HTTP response shape from which a handler-based route infers its contract.
@@ -195,12 +200,6 @@ type WithSseServerEvents<T> = T extends {
 }
 	? Omit<T, "body"> & { body: WithSseItems<T["body"]> }
 	: T;
-
-type IsUnion<T, TAll = T> = T extends unknown
-	? [TAll] extends [T]
-		? false
-		: true
-	: never;
 
 // Handlers may return the body of a route's only declared response directly,
 // unless that response has several media types to select from.

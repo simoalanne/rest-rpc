@@ -3,7 +3,7 @@ import type {
 	RouteDeclaration,
 	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
-import type { Merge } from "../utils/typeUtils.ts";
+import type { EmptyObject, IsUnion, Merge } from "../utils/typeUtils.ts";
 import type { PathParamNames } from "./path.ts";
 
 /** Scalar value accepted by ordinary HTTP request schemas. */
@@ -62,12 +62,6 @@ type InferSchemas<
 
 type RequestSegment = "query" | "params" | "headers";
 
-type IsUnion<T, TAll = T> = T extends unknown
-	? [TAll] extends [T]
-		? false
-		: true
-	: never;
-
 type InferRequestSegments<TRequest, TIO extends "input" | "output"> = {
 	[
 		TKey in Extract<keyof TRequest, RequestSegment>
@@ -103,9 +97,7 @@ type InferRequestBody<TBody, TIO extends "input" | "output"> = {
 
 type DeclaredRequest<E> = E extends { request: infer TRequest }
 	? TRequest
-	: EmptyRequest;
-
-type EmptyRequest = Record<never, never>;
+	: EmptyObject;
 
 // A declared path includes the prefix; a path derived from tree keys adds only
 // static segments to it.
@@ -119,13 +111,13 @@ type ParamsPath<E> = E extends { path: infer TPath extends string }
 type PathParamsRequest<E> =
 	ParamsPath<E> extends infer TPath
 		? [PathParamNames<TPath>] extends [never]
-			? EmptyRequest
+			? EmptyObject
 			: {
 					params: readonly [
 						StandardSchemaV1<{ [TName in PathParamNames<TPath>]: string }>,
 					];
 				}
-		: EmptyRequest;
+		: EmptyObject;
 
 type RequestWithPathParams<E> =
 	DeclaredRequest<E> extends { params: readonly StandardSchemaV1[] }
@@ -172,4 +164,4 @@ export type ClientRequestForDeclaration<
 > = OptionalRequestHeaders<InferRequestFor<E, "input", never>, TOptionalKeys>;
 
 export type ServerRequest<E extends { request?: RouteRequestDeclaration }> =
-	InferRequestFor<E, "output", Record<never, never>>;
+	InferRequestFor<E, "output", EmptyObject>;
