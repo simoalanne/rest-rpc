@@ -20,7 +20,7 @@
 		"fmt:check": "oxfmt --check",
 		"changeset:version": "changeset version && pnpm install --lockfile-only --no-frozen-lockfile",
 		"release": "pnpm run build:packages && changeset publish",
-		"release:github:notes": "node scripts/create-github-release.ts --notes",
+		"release:github:notes": "node scripts/create-github-release.ts",
 		"api:docs:verify": "node scripts/check-public-api-docs.ts",
 		"readme:sync": "node scripts/sync-readme.ts",
 		"readme:verify": "node scripts/sync-readme.ts --check",

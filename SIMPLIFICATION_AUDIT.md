@@ -33,9 +33,6 @@ Most are one-line edits.
 
 ## 9. Repo scripts and config leftovers
 
-- **`package.json:26`**
-  - Problem: `release:github:notes` passes `--notes`, which `scripts/create-github-release.ts` never reads.
-  - Change: drop the flag. **certain**
 - **`tsconfig.json:9`**
   - Problem: `experimentalDecorators` is set, but the repo has no decorators.
   - Change: delete it. **certain**
