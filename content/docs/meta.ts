@@ -4,6 +4,7 @@ export default defineMeta({
 	pages: [
 		"quickstart",
 		"contract-first-quickstart",
+		"cheatsheet",
 		"route-builder",
 		"middleware",
 		"context",

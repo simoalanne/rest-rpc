@@ -1,43 +1,69 @@
 # rest-rpc
 
-REST APIs with RPC-like ergonomics.
+REST APIs with RPC-like ergonomics: an HTTP route builder with sensible
+defaults, and typed clients that call the routes like ordinary functions.
+Schemas are any [Standard Schema](https://standardschema.dev) (Zod, Valibot,
+ArkType). This is a compact cheatsheet of the whole API, and each section links
+to the full [documentation](https://rest-rpc.vercel.app/docs/quickstart).
 
-Define HTTP routes with an expressive route builder and sensible defaults.
-Call them through a typed client that feels like ordinary function calls.
+| Package                                                                         | Contains                                                                        |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| [`@rest-rpc/core`](https://npmx.dev/package/@rest-rpc/core)                     | Contracts, Fetch client, contract extraction, OpenAPI                           |
+| [`@rest-rpc/server`](https://npmx.dev/package/@rest-rpc/server)                 | Route builder and handlers for Fetch runtimes, `@rest-rpc/server/node` for Node |
+| [`@rest-rpc/tanstack-query`](https://npmx.dev/package/@rest-rpc/tanstack-query) | TanStack Query options and keys                                                 |
 
-Define routes alongside handlers and infer their response types. A separately
-shared contract is also supported.
+## Contents
 
-## Features
+- [Quickstart](#quickstart)
+- [Route Builder](#route-builder)
+  - [Methods, Paths and Prefixes](#methods-paths-and-prefixes)
+  - [Request Segments, Reuse and Handler Arguments](#request-segments-reuse-and-handler-arguments)
+  - [Responses](#responses)
+  - [Errors](#errors)
+  - [Media Types](#media-types)
+  - [Type Helpers](#type-helpers)
+- [Middleware and Context](#middleware-and-context)
+- [Streaming](#streaming)
+- [Contract-first](#contract-first)
+- [HTTP Behavior](#http-behavior)
+  - [Schemas and Validation](#schemas-and-validation)
+  - [Serialization and Codecs](#serialization-and-codecs)
+  - [Errors](#errors-1)
+- [Server](#server)
+  - [Fetch Runtimes](#fetch-runtimes)
+  - [Node HTTP](#node-http)
+  - [Framework Integration](#framework-integration)
+- [Client](#client)
+  - [Contract Extraction](#contract-extraction)
+  - [Fetch Client](#fetch-client)
+  - [Local Client](#local-client)
+  - [TanStack Query](#tanstack-query)
+- [OpenAPI](#openapi)
 
-- Fluent route builder for HTTP
-- Typed handlers for Node HTTP and Fetch runtimes, registrable on any framework's router.
-- One-line servers for Bun, Node, and other Fetch runtimes, with Bun's native router on Bun.
-- Typed Fetch client and TanStack Query utils.
-- Typed errors sent as plain JSON, separate from successful responses
-- Typed Server-Sent Event streams and custom request/response bodies
-- Standard Schema validation
-- OpenAPI generation from route declarations
-- Contract-first development
+## [Quickstart](https://rest-rpc.vercel.app/docs/quickstart)
 
-## Example
-
-Define HTTP routes:
+Responses are inferred from handler return values, so `.response()` is optional
+and not needed for the common case. Declare it for runtime validation or OpenAPI.
 
 ```ts routes.ts
+import { route } from "@rest-rpc/server";
+import { z } from "zod";
+
+const todos = new Map<string, { id: string; title: string }>();
+
 export const routes = {
 	todos: {
-		// Defaults to POST /todos/create with a 200 JSON response.
-		create: route
-			.body(z.object({ title: z.string() }))
-			.handler(({ body: { title } }) => createTodo(title)),
-		// GET /todos/:id with path params and a declared 404 error.
+		// No method: POST /todos/create, JSON body, 200 response.
+		create: route.body(z.object({ title: z.string() })).handler(({ body }) => {
+			const todo = { id: crypto.randomUUID(), title: body.title };
+			todos.set(todo.id, todo);
+			return todo; // the response type is inferred from the return value
+		}),
 		get: route
 			.get("/todos/:id")
-			.params(z.object({ id: z.string() }))
 			.error("TODO_NOT_FOUND", { status: 404 })
 			.handler(({ params, errors }) => {
-				const todo = findTodo(params.id);
+				const todo = todos.get(params.id); // params: { id: string }
 				if (!todo) throw new errors.TODO_NOT_FOUND();
 				return todo;
 			}),
@@ -45,56 +71,580 @@ export const routes = {
 };
 ```
 
-Serve them with Bun, or with `serve` from `@rest-rpc/server/node` on Node:
-
 ```ts server.ts
 import { createApp } from "@rest-rpc/server";
-import { routes } from "./routes";
 
-Bun.serve({ ...createApp(routes), port: 3000 });
+export default createApp(routes); // served by Bun, Deno and Workers as is
 ```
 
-Extract a minimal client contract from the route tree at build time, then call
-the routes as typed functions:
-
-```ts extract-contract.ts
-import { writeFile } from "node:fs/promises";
+```ts client-contract.ts
 import { extractContract } from "@rest-rpc/core";
 import { routes } from "./routes";
 
-await writeFile("contract.json", JSON.stringify(extractContract(routes)));
-```
-
-```ts
-import { initClient, isDeclaredError, safe } from "@rest-rpc/core";
-import type { routes } from "./routes";
-import contract from "./contract.json";
-
-const api = contract as unknown as typeof routes;
-const client = initClient(api, { baseUrl: "http://localhost:3000" });
-
-const created = await client.todos.create({ body: { title: "Write docs" } });
-
-// Calls reject with typed errors, or resolve to { error } or { data } with safe().
-const { error, data } = await safe(
-	client.todos.get({ params: { id: created.body.id } }),
-);
-
-if (!error) {
-	console.log(data.body.title);
-} else if (isDeclaredError(error) && error.code === "TODO_NOT_FOUND") {
-	console.log("Todo not found");
-} else {
-	throw error;
+// Bun-specific: a macro runs at bundle time and inlines the contract, so no
+// server code ships. Other bundlers use the script under Contract Extraction.
+export function getApi() {
+	return extractContract(routes);
 }
 ```
 
-## Documentation
+```ts client.ts
+import { initClient } from "@rest-rpc/core";
+import { getApi } from "./client-contract" with { type: "macro" };
 
-Full documentation is available at [rest-rpc.vercel.app](https://rest-rpc.vercel.app).
+const client = initClient(getApi(), { baseUrl: "http://localhost:3000" });
 
-## Packages
+// Calls resolve to an envelope { status, contentType, body, headers }, not the body.
+const created = await client.todos.create({ body: { title: "Write docs" } });
+const todo = await client.todos.get({ params: { id: created.body.id } });
+console.log(todo.status, todo.body.title); // 200 "Write docs"
 
-- [`@rest-rpc/core`](https://npmx.dev/package/@rest-rpc/core): Route declarations, Fetch client, and OpenAPI generation.
-- [`@rest-rpc/server`](https://npmx.dev/package/@rest-rpc/server): Servers and route handlers for Fetch (`@rest-rpc/server`) and Node HTTP (`@rest-rpc/server/node`) runtimes.
-- [`@rest-rpc/tanstack-query`](https://npmx.dev/package/@rest-rpc/tanstack-query): TanStack Query utils.
+// An unknown id rejects with a RouteError { code: "TODO_NOT_FOUND", status: 404 }.
+```
+
+## [Route Builder](https://rest-rpc.vercel.app/docs/route-builder)
+
+### [Methods, Paths and Prefixes](https://rest-rpc.vercel.app/docs/route-builder#choose-a-method-and-path)
+
+```ts
+// Without a path, the tree keys form it. Without a method, the route is a POST.
+export const routes = {
+	todos: {
+		list: route.get().handler(listTodos), // GET /todos/list
+		tags: { create: route.handler(createTag) }, // POST /todos/tags/create
+		get: route.get("/todos/:id").handler(getTodo), // explicit, keys ignored
+		update: route.patch("/todos/{id}").handler(updateTodo), // {id} works too
+	},
+};
+
+// Prefixes are part of the contract, unlike createApp's mountPath.
+route.prefix("/api/v1").get("/todos"); // GET /api/v1/todos
+route.prefix("/api/v1").get(); // at todos.list: GET /api/v1/todos/list
+```
+
+### [Request Segments, Reuse and Handler Arguments](https://rest-rpc.vercel.app/docs/route-builder#handler-arguments)
+
+```ts
+// Every builder method returns a new value, so partial builders are shareable bases.
+const authed = route
+	.$context<{ user: User }>()
+	.headers(z.object({ authorization: z.string() })) // lowercase names
+	.metadata({ auth: "required" }) // shallow-merged
+	.openAPI({ tags: ["Todos"] }) // merged, tags combined
+	.error("UNAUTHORIZED", { status: 401 });
+
+const update = authed
+	.patch("/todos/:id")
+	.params(z.object({ id: z.coerce.number() })) // must cover every path param
+	.query(z.object({ notify: z.enum(["yes", "no"]).optional() }))
+	.body(z.object({ title: z.string() })) // not available on GET
+	.body(z.object({ done: z.boolean() })) // stacked schemas merge their outputs
+	.handler(
+		({
+			params, // { id: number } from the path, { id: string } without .params()
+			query, // { notify?: "yes" | "no" } from the query string
+			headers, // { authorization: string } from the base
+			body, // { title: string; done: boolean } from the request body
+			contentType, // request media type, narrows body when several are declared
+			context, // per-request values from middleware or the host
+			errors, // declared error classes: throw new errors.UNAUTHORIZED()
+			route, // the declaration: method, path, metadata
+			signal, // aborts when the client disconnects
+		}) => updateTodo(params.id, body),
+	);
+```
+
+### [Responses](https://rest-rpc.vercel.app/docs/route-builder#return-responses)
+
+```ts
+// Inferred: return a body (200), or an envelope with a numeric 2xx status.
+route.handler(() => todo);
+route.handler(() => ({
+	status: 201,
+	body: "Created",
+	contentType: "text/plain", // defaults to application/json
+	headers: { location: "/todos/1" },
+}));
+
+// Declared: runtime-validated, typed, and included in OpenAPI.
+route
+	.response(todoSchema) // 200 JSON
+	.response(todoSchema, {
+		status: 201, // 201-299, each status declared once
+		headers: z.object({ location: z.string() }),
+		description: "Created", // OpenAPI
+	})
+	.response({ status: 204 }); // bodyless
+```
+
+### [Errors](https://rest-rpc.vercel.app/docs/route-builder#declare-errors)
+
+```ts
+import { routeError } from "@rest-rpc/server";
+
+route
+	.get("/todos/:id")
+	.error("TODO_NOT_FOUND", {
+		status: 404, // 400-599, defaults to 400
+		data: z.object({ id: z.string() }),
+		headers: z.object({ "x-reason": z.string() }),
+		message: "Todo not found", // defaults to the code
+		description: "No todo has this id", // OpenAPI
+	})
+	.handler(({ params, errors }) => {
+		throw new errors.TODO_NOT_FOUND(
+			{ id: params.id }, // data comes first when declared
+			{ headers: { "x-reason": "deleted" }, message: "Deleted", cause },
+		);
+	});
+
+// Define once, throw from any code, declare on routes with .error(TodoNotFound).
+export const TodoNotFound = routeError("TODO_NOT_FOUND", { status: 404 });
+```
+
+Errors are sent as JSON `{ code, message, data? }`, and clients reject with
+them. Errors under HTTP Behavior lists every failure and what each side gets.
+
+### [Media Types](https://rest-rpc.vercel.app/docs/route-builder#declare-media-types)
+
+```ts
+// Records are keyed by media type; a plain schema means application/json.
+route
+	.post("/todos/import")
+	.body({ "application/json": z.array(todoInput), "text/csv": z.string() })
+	.response({ "application/json": importResult, "text/event-stream": progress })
+	.handler(({ contentType, body }) => {
+		const todos = contentType === "text/csv" ? parseCsv(body) : body; // narrowed
+		return wantsProgress()
+			? { status: 200, contentType: "text/event-stream", body: live(todos) }
+			: { status: 200, contentType: "application/json", body: save(todos) };
+	});
+```
+
+### [Type Helpers](https://rest-rpc.vercel.app/docs/route-builder#type-helpers)
+
+```ts
+import type {
+	InferServerHandler,
+	InferServerRequest,
+	InferServerResponse,
+} from "@rest-rpc/server";
+
+// Infer from a route without .handler() (or a contract route), then attach it.
+const declaration = route.get("/todos/:id").response(todoSchema);
+
+type GetRequest = InferServerRequest<typeof declaration>; // { params, query, headers, body }
+type GetResponse = InferServerResponse<typeof declaration>; // declared envelopes
+const getTodo: InferServerHandler<typeof declaration> = ({ params }) =>
+	findTodo(params.id);
+export const get = declaration.handler(getTodo);
+
+type Requests = InferServerRequest<typeof routes>; // a tree infers a tree of types
+```
+
+## [Middleware](https://rest-rpc.vercel.app/docs/middleware) and [Context](https://rest-rpc.vercel.app/docs/context)
+
+Middleware is onion-style and runs after request validation: each `.use()`
+wraps every middleware declared after it, with the handler innermost. Code
+before `await next()` runs outermost first, code after it innermost first.
+Return values are not type checked, so declare a `.response()` for each status
+middleware can return.
+
+```ts
+const timed = route.use(async ({ next }) => {
+	const started = performance.now();
+	try {
+		return await next(); // return another value, or skip next(), to short-circuit
+	} finally {
+		console.log(performance.now() - started);
+	}
+});
+
+// Reusable, optionally restricted to routes with matching request and errors.
+const Unauthorized = routeError("UNAUTHORIZED", { status: 401 });
+const attachUser = route.$context<{ user?: User }>().middleware<{
+	headers: { authorization: string };
+	errors: { UNAUTHORIZED: typeof Unauthorized };
+}>(async ({ headers, errors, context, next }) => {
+	const user = await authenticate(headers.authorization);
+	if (!user) throw new errors.UNAUTHORIZED();
+	context.set("user", user);
+	return next();
+});
+
+// Context is typed per builder with $context<T>(), and created per request.
+// Host values are seeded with the `context` option of createApp or handle().
+const profile = route
+	.$context<{ user?: User }>()
+	.headers(z.object({ authorization: z.string() }))
+	.error(Unauthorized)
+	.use(attachUser)
+	.handler(({ context }) => context.get("user"));
+
+declare module "@rest-rpc/server" {
+	interface DefaultContext {
+		env: { DATABASE_URL: string }; // typed for every route
+	}
+}
+```
+
+## [Streaming](https://rest-rpc.vercel.app/docs/streaming)
+
+```ts
+import { sse } from "@rest-rpc/server";
+
+const events = route
+	.get("/todos/events")
+	.headers(z.object({ "last-event-id": z.string().optional() })) // resume manually
+	.streamResponse(z.object({ message: z.string() })) // optional, validates each item
+	.handler(async function* ({ headers, signal }) {
+		yield { message: "Created" }; // plain data
+		yield sse({
+			data: { message: "Done" },
+			id: "2", // what clients resume from
+			event: "todo.updated",
+			retry: 2_000,
+		});
+		while (!signal.aborted) yield await nextEvent({ signal });
+	});
+```
+
+## [Contract-first](https://rest-rpc.vercel.app/docs/contract-first)
+
+A contract has no handlers to infer from, so every successful response must be
+declared with `.response()` or `.streamResponse()`. Clients take the contract
+directly, without extraction, and `validateResponses` can use its schemas.
+
+```ts contract.ts
+import { route } from "@rest-rpc/core"; // same builder, no handlers
+
+export const api = {
+	todos: {
+		get: route
+			.get("/todos/:id")
+			.response(todoSchema)
+			.error("TODO_NOT_FOUND", { status: 404 }),
+	},
+};
+```
+
+```ts server.ts
+import { implement } from "@rest-rpc/server";
+
+const impl = implement(api).$context<{ user: User }>().use(auth); // `use`/`$context` are reserved keys
+export const routes = {
+	todos: { get: impl.todos.get.handler(({ params }) => findTodo(params.id)) },
+};
+```
+
+## HTTP Behavior
+
+### [Schemas and Validation](https://rest-rpc.vercel.app/docs/http-behavior/schemas)
+
+```ts
+import { type } from "@rest-rpc/server";
+
+route.body(type<{ title: string }>()); // types only, no runtime validation
+type((input: number) => input.toString()); // with a (possibly async) mapping
+
+// Skips schema validation only: types, OpenAPI and decoding are unaffected.
+compileRoutes(routes, {
+	disableRequestValidation: true,
+	disableResponseValidation: true,
+});
+```
+
+Clients send schema input and handlers receive schema output. What each
+declaration guarantees at runtime:
+
+| Declaration                         | Server                               | Fetch client                                                                 | OpenAPI                     |
+| ----------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------- | --------------------------- |
+| Request schemas                     | Validated before middleware, or 400  | Not validated                                                                | Parameters and request body |
+| Inferred response                   | Not validated                        | Types only, any 2xx resolves                                                 | Placeholder `default`       |
+| `.response()` / `.streamResponse()` | Validated, or 500                    | Status and media type checked; body and headers with `validateResponses` (1) | Documented                  |
+| `.error()`                          | `data` and headers validated, or 500 | Code and status recognized; `data` with `validateResponses` (1)              | Documented                  |
+| `type<T>()`                         | Types only                           | Types only                                                                   | Empty schema                |
+
+(1) `validateResponses` needs a shared contract. An extracted contract has no
+schemas, so the option has no effect.
+
+### [Serialization and Codecs](https://rest-rpc.vercel.app/docs/http-behavior/serialization)
+
+| Location / media type               | Encoding                                                    |
+| ----------------------------------- | ----------------------------------------------------------- |
+| Params, headers                     | Strings; schemas coerce (`z.coerce.number()`)               |
+| Query                               | `key=value`, arrays as `key[]=a&key[]=b`, no nested objects |
+| `application/json`, `+json`         | JSON value                                                  |
+| `application/x-www-form-urlencoded` | `URLSearchParams`                                           |
+| `multipart/form-data`               | `FormData`                                                  |
+| `text/*`                            | `string`                                                    |
+| Other                               | `Blob` or `Uint8Array` sent, `Blob` received                |
+
+```ts
+import { bodyCodec } from "@rest-rpc/core";
+
+// Same codec works on the client and both server runtimes; pass it as `bodyCodecs`.
+const binary = bodyCodec("application/octet-stream", {
+	serialize: (value) => value as Uint8Array,
+	deserialize: async (source) => new Uint8Array(await source.arrayBuffer()),
+});
+```
+
+### [Errors](https://rest-rpc.vercel.app/docs/http-behavior/errors)
+
+| What happens                                   | Server sends                                                                     | Fetch client gets                               |
+| ---------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------- |
+| A declared error is thrown                     | Its status, with validated `data` and headers                                    | Typed `RouteError`, `isDeclaredError()` is true |
+| An undeclared `RouteError` is thrown           | Its own status, `data` and headers, unvalidated                                  | Untyped `RouteError`                            |
+| Any other error is thrown                      | `INTERNAL_SERVER_ERROR` 500 with `createApp`, otherwise the framework handles it | Untyped `RouteError` with `createApp`           |
+| Request validation fails                       | `REQUEST_VALIDATION_FAILED` 400, issues per segment as `data`                    | Untyped `RouteError` (2)                        |
+| The request body cannot be decoded             | `MALFORMED_REQUEST_BODY` 400                                                     | Untyped `RouteError` (2)                        |
+| The `Content-Type` is not declared             | `UNSUPPORTED_MEDIA_TYPE` 415                                                     | Untyped `RouteError` (2)                        |
+| A response or error `data` fails validation    | `INTERNAL_SERVER_ERROR` 500, without details                                     | Untyped `RouteError` (2)                        |
+| No route matches (`createApp`)                 | `NOT_FOUND` 404                                                                  | Untyped `RouteError` (2)                        |
+| A response breaks the contract                 | -                                                                                | Plain `Error`, details in `cause`               |
+| An error response is not from rest-rpc         | -                                                                                | Plain `Error` with the status in `message`      |
+| There is no response (network, timeout, abort) | -                                                                                | The original error                              |
+
+(2) Typed when the route declares the built-in error's definition:
+
+```ts
+import { RequestValidationFailed } from "@rest-rpc/server";
+
+route.body(todoInput).error(RequestValidationFailed); // types its issues as `data`
+// Also exported: MalformedRequestBody, UnsupportedMediaType, InternalServerError, NotFound
+```
+
+## Server
+
+### [Fetch Runtimes](https://rest-rpc.vercel.app/docs/server/fetch)
+
+```ts
+import { createApp } from "@rest-rpc/server";
+
+export default createApp(routes, {
+	mountPath: "/internal", // served under, not part of route paths (use .prefix() for that)
+	context: (request, env: Env) => ({ db: env.DB }), // extra fetch args, e.g. Workers env
+	notFound: (request) => new Response("Not found", { status: 404 }),
+	onError: (error, request) =>
+		error.status >= 500 && console.error(error.cause),
+	bodyCodecs: [binary], // plus the other compileRoutes options
+});
+
+const app = createApp(routes); // Bun: native router via app.routes
+Bun.serve({ ...app, routes: { ...app.routes, "/health": new Response("ok") } });
+```
+
+### [Node HTTP](https://rest-rpc.vercel.app/docs/server/node)
+
+```ts
+import { createApp } from "@rest-rpc/server";
+import { serve } from "@rest-rpc/server/node";
+
+const server = serve(createApp(routes), { port: 3000 }, onListening);
+process.on("SIGTERM", () => server.close()); // returns the http.Server
+```
+
+### [Framework Integration](https://rest-rpc.vercel.app/docs/server/framework-integration)
+
+```ts
+// Native router, Express: one framework route per rest-rpc route.
+// Node frameworks import from @rest-rpc/server/node, Fetch ones from @rest-rpc/server.
+import { compileRoutes } from "@rest-rpc/server/node";
+
+for (const r of compileRoutes(routes, { paramSyntax: "colon" })) {
+	app[r.method.toLowerCase()](r.path, (req, res, next) => {
+		r.handle(req, res, {
+			context: { user: req.user }, // seeds the request context
+			params: req.params, // already matched
+			body: req.body, // already parsed, still validated
+		}).catch(next); // other errors go to the framework
+	});
+}
+```
+
+```ts
+// Catch-all, Hono: rest-rpc routes under one mount, unmatched requests fall through.
+import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server";
+
+const handler = createCatchAllHandler(compileRoutes(routes));
+app.all("/internal/*", async (c) => {
+	const result = await handler(c.req.raw, {
+		mountPath: "/internal",
+		context: { user: c.var.user },
+	});
+	return result.matched ? result.response : c.notFound();
+});
+```
+
+## Client
+
+### [Contract Extraction](https://rest-rpc.vercel.app/docs/client/contract-extraction)
+
+```ts scripts/extract-contract.ts
+// Build time: keeps methods, paths, media types, statuses and error codes, no schemas.
+await writeFile("contract.json", JSON.stringify(extractContract(routes)));
+```
+
+```ts client-contract.ts
+// Browser code imports only @rest-rpc/core, this module and the JSON file.
+import type { routes } from "../server/routes"; // type-only, erased from the bundle
+import contract from "./contract.json";
+
+export const api = contract as unknown as typeof routes;
+```
+
+### [Fetch Client](https://rest-rpc.vercel.app/docs/client/fetch-client)
+
+```ts
+import { initClient, isDeclaredError, RouteError, safe } from "@rest-rpc/core";
+
+const client = initClient(api, {
+	baseUrl: "https://api.example.com",
+	globalHeaders: { authorization: () => `Bearer ${readToken()}` }, // static or per request
+	timeoutMs: 10_000,
+	fetchOptions: { credentials: "include" },
+	fetch: customFetch,
+	validateResponses: true, // shared contracts only
+});
+
+// Resolves to a status-discriminated { status, contentType, body, headers }.
+const res = await client.todos.get(
+	{ params: { id: "1" } },
+	{ signal, cache: "no-store", additionalHeaders: { "x-trace-id": traceId } },
+);
+await client.todos.import({ contentType: "text/csv", body: csv });
+await client.health(undefined, { cache: "no-store" }); // options without input
+
+// Errors: reject by default, or resolve to { error } | { data } with safe().
+const { error, data } = await safe(client.todos.get({ params: { id: "1" } }));
+if (isDeclaredError(error) && error.code === "TODO_NOT_FOUND") {
+	console.log(error.data);
+} else if (error instanceof RouteError) {
+	console.log(error.status, error.code); // undeclared
+} else if (error) {
+	throw error; // network, contract violation, non rest-rpc error
+} else {
+	console.log(data.body);
+}
+
+// Streams: async iterable of { data, id?, event?, retry? }, no auto-reconnect.
+const stream = await client.todos.events(undefined, {
+	additionalHeaders: { "last-event-id": lastId },
+});
+if (stream.status === 200) {
+	for await (const { data, id, event, retry } of stream.body) console.log(data);
+}
+```
+
+```ts
+import type {
+	ApiClientFor,
+	ClientPromise,
+	InferClientError,
+	InferClientRequest,
+	InferClientResponse,
+	InferClientStreamData,
+} from "@rest-rpc/core";
+
+type Get = typeof api.todos.get;
+type GetRequest = InferClientRequest<Get, typeof globalHeaders>; // provided headers optional
+type GetResponse = InferClientResponse<Get>; // every response envelope
+type GetError = InferClientError<Get>; // declared errors
+type TodoEvent = InferClientStreamData<typeof api.todos.events>; // event data
+type Responses = InferClientResponse<typeof api>; // a tree infers a tree of types
+type Client = ApiClientFor<typeof api>;
+
+// Return calls directly with ClientPromise to keep the error type for safe().
+const getTodo = (id: string): ClientPromise<GetResponse, GetError> =>
+	client.todos.get({ params: { id } });
+```
+
+### [Local Client](https://rest-rpc.vercel.app/docs/client/local-client)
+
+```ts
+import { call, initLocalClient } from "@rest-rpc/server";
+
+// In-process: validation, middleware and handler, no HTTP encoding.
+// Same request and result as a Fetch client call, and rejects the same way.
+const res = await call(getTodo, { params: { id: "1" } }, { context, signal });
+const local = initLocalClient(routes); // mirrors the route tree
+await local.todos.create(
+	{ body: { title: "Write docs" } },
+	{ context, signal },
+);
+```
+
+### [TanStack Query](https://rest-rpc.vercel.app/docs/client/tanstack-query)
+
+```ts
+import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
+import { skipToken } from "@tanstack/query-core";
+
+const restrpc = createTanstackQueryUtils(api, { baseUrl }); // Fetch client options
+
+useQuery(
+	restrpc.todos.get.queryOptions({
+		request: id ? { params: { id } } : skipToken,
+		fetchOptions: { cache: "no-store", additionalHeaders }, // per-call options
+		queryKey: ["todos", "detail", id], // optional custom key
+		select: (res) => res.body, // data is the response envelope
+		staleTime: 60_000, // any other TanStack Query option
+	}),
+);
+useInfiniteQuery(
+	restrpc.todos.page.infiniteQueryOptions({
+		request: (cursor: string | undefined) => ({ query: { cursor } }),
+		initialPageParam: undefined,
+		getNextPageParam: (last) => last.body.nextCursor,
+	}),
+);
+useQuery(
+	restrpc.todos.events.streamedQueryOptions({
+		initialValue: "", // defaults to an array of events
+		reducer: (text, event) => text + event.data.message,
+	}),
+);
+const create = useMutation(
+	restrpc.todos.create.mutationOptions({
+		onError: (error) => isDeclaredError(error) && toast(error.message),
+	}),
+);
+create.mutate({ body: { title: "Write docs" } });
+
+restrpc.todos.get.queryKey({ params: { id: "1" } }); // ["todos", "get", { params: { id: "1" } }]
+restrpc.todos.get.queryKey(); // prefix matching every todos.get query
+restrpc.todos.create.mutationKey(); // ["todos", "create"]
+```
+
+## [OpenAPI](https://rest-rpc.vercel.app/docs/openapi)
+
+```ts
+import { createOpenApiDocument } from "@rest-rpc/server"; // or @rest-rpc/core for contracts
+
+// Only declared .response() / .streamResponse() schemas are documented.
+const document = createOpenApiDocument(routes, {
+	info: { title: "Todo API", version: "1.0.0" },
+	servers: [{ url: "https://api.example.com" }], // also components, tags
+	// Without a converter, schemas are emitted as empty Schema Objects.
+	schemaConverter: (schema, mode) =>
+		z.toJSONSchema(schema as z.ZodType, { io: mode }),
+	// transformParameter works the same way for generated parameters.
+	transformOperation: ({ route, routePath, operation }) => ({
+		...operation,
+		operationId: routePath.join("."),
+	}),
+});
+
+// Operation details, merged across calls. Responses and errors take `description`.
+route.openAPI({
+	summary: "List todos",
+	description: "Lists todos of the current user.",
+	operationId: "listTodos",
+	tags: ["Todos"],
+	deprecated: false,
+	security: [{ bearerAuth: [] }],
+	externalDocs: { url: "https://example.com/docs" },
+	extensions: { "x-internal": true },
+});
+```

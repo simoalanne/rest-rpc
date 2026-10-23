@@ -16,7 +16,9 @@ This repo is `rest-rpc`, a TypeScript library for defining REST APIs with RPC-li
 - `pnpm run typecheck` - Run workspace typechecking.
 - `pnpm run test` - Run runtime and type tests with Vitest.
 - `pnpm run lint` - Run lint verification.
-- `pnpm run check` - Run lint, typechecking, tests, and API documentation verification in sequence. Use this as the broad all-in-one pass.
+- `pnpm run readme:sync` - Regenerate the root `README.md` table of contents, then copy the README to every package README and to `content/docs/cheatsheet.mdx`.
+- `pnpm run readme:verify` - Fail when the copies are out of sync with the root `README.md`.
+- `pnpm run check` - Run lint, typechecking, tests, API documentation verification, and README sync verification in sequence. Use this as the broad all-in-one pass.
 
 ### Formatting
 
@@ -37,5 +39,8 @@ A command that exits successfully is successful. Do not report warnings from suc
 
 For documentation related tasks:
 
-- README.md is shared across root and all packages and describes the project user-facing features concisely. It should link to the actual documentation in `content/docs/` for broader context. Task asking to update documentation generally means updating the mdx files in `content/docs/`, not updating the README.md files unless the user explicitly asks to update the README.md.
+- The root `README.md` is a compact cheatsheet of the whole public API, aiming for roughly 500 lines. Readability wins over the line count. It is the source for the package READMEs and `content/docs/cheatsheet.mdx`, which `pnpm run readme:sync` generates: edit only the root `README.md`, then run the sync. The sync also regenerates the README's `## Contents` section from its headings and leaves it out of the MDX page, so do not edit it by hand. The skill in `skills/rest-rpc` points agents to the copy installed in `node_modules`.
+- The cheatsheet follows the structure of `content/docs/`, which is the source of truth. Each section heading links to its docs page or section. Prefer focused code examples with short comments over prose. Show options, handler arguments, and result fields in the code itself, with a comment where the meaning isn't obvious, instead of listing them in prose under the example.
+- When a change to `content/docs/` or to the public API changes what a cheatsheet section shows, update `README.md` and run `pnpm run readme:sync`. Otherwise a task asking to update documentation means updating the mdx files in `content/docs/`.
+- Keep `README.md` valid MDX, since it is also published as a docs page: no HTML comments, and no `<` or `{` in prose outside code.
 - Library is currently pre v1.0.0 and is not yet stable. Breaking changes are expected until v1.0.0 is released.

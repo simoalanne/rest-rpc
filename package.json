@@ -26,8 +26,10 @@
 		"release:github:notes": "node scripts/create-github-release.ts --notes",
 		"api:docs": "pnpm run api:docs:verify",
 		"api:docs:verify": "node scripts/check-public-api-docs.ts",
-		"check": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run api:docs:verify",
-		"check:verify": "pnpm run lint:verify && pnpm run typecheck && pnpm run test && pnpm run api:docs:verify",
+		"readme:sync": "node scripts/sync-readme.ts",
+		"readme:verify": "node scripts/sync-readme.ts --check",
+		"check": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run api:docs:verify && pnpm run readme:verify",
+		"check:verify": "pnpm run lint:verify && pnpm run typecheck && pnpm run test && pnpm run api:docs:verify && pnpm run readme:verify",
 		"docs:dev": "pnpm --filter content dev",
 		"docs:build": "pnpm --filter content build",
 		"docs:preview": "pnpm --filter content preview"
