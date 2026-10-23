@@ -22,9 +22,6 @@ Mostly deletions.
 
 The internal subpath barrels are part of the type surface. When a consumer compiles with `declaration: true`, TypeScript names types it can't inline through any path in the `exports` map. Removing a re-export that inferred types depend on breaks the consumer's declaration emit, even if nothing in this repo imports it. The items below were tested for this; see "Declaration emit check" at the end of this file.
 
-- **`packages/server/src/builder/routeBuilder.types.ts:300-308,346-347`**
-  - Problem: `InferServerHandler` is just an alias of `RouteHandlerFor`, and the tests use the internal name.
-  - Change: merge them under the public name and update `routeBuilder.test-d.ts`. **certain**
 - **Server symbols that are exported but only used in their own module**
   - Locations: `handleHttpRoute.ts:66` `ExecuteRouteOptions`, `:187` `isResponseEnvelope`, `:290` `StreamErrorObserver`; `routing/match.ts:131` `ParamSyntax`, `:153` `MatchedRoute`. `ParamSyntax` also duplicates `CompileRoutesOptions["paramSyntax"]`.
   - Change: drop `export`, and use `NonNullable<CompileRoutesOptions["paramSyntax"]>` in place of `ParamSyntax`. **certain**

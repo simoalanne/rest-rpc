@@ -294,17 +294,23 @@ type WithoutContext<TRoute extends RouteDeclaration> =
 		: TRoute;
 
 /**
- * Infers handler signatures for a route or a nested object tree of routes,
- * using each route's selected context.
+ * Infers the handler signature for a route declaration.
+ *
+ * @remarks Use a route declared without `.handler()` to write its handler
+ * separately. Pass a route tree or a contract implementer to infer a matching
+ * tree of handler types. The context is the one selected with `$context()`, or
+ * `DefaultContext` for contract routes passed directly.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/route-builder#type-helpers}
  */
-export type RouteHandlerFor<T extends HandlerTree> = T extends {
+export type InferServerHandler<T extends HandlerTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
 	? RouteHandler<WithoutContext<TRoute>, ContextOf<TRoute>>
 	: {
-			[K in keyof T as T[K] extends HandlerTree ? K : never]: RouteHandlerFor<
-				Extract<T[K], HandlerTree>
-			>;
+			[
+				K in keyof T as T[K] extends HandlerTree ? K : never
+			]: InferServerHandler<Extract<T[K], HandlerTree>>;
 		};
 
 export type HasDeclaredResponses<TRoute> = TRoute extends {
@@ -332,19 +338,6 @@ export type ValidHandlerResult<TRoute extends RouteDeclaration, TResult> =
 	HasDeclaredResponses<TRoute> extends true
 		? unknown
 		: ValidImplicitResult<TResult>;
-
-/**
- * Infers the handler signature for a route declaration.
- *
- * @remarks Use a route declared without `.handler()` to write its handler
- * separately. Pass a route tree or a contract implementer to infer a matching
- * tree of handler types. The context is the one selected with `$context()`, or
- * `DefaultContext` for contract routes passed directly.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/route-builder#type-helpers}
- */
-export type InferServerHandler<TRoute extends HandlerTree> =
-	RouteHandlerFor<TRoute>;
 
 type HandlerRequests<T> = T extends (...args: never) => unknown
 	? Parameters<T>[0]
