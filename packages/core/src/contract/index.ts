@@ -34,6 +34,7 @@ export {
 	getPathParamNames,
 	getPathParamSegmentName,
 	isPathParamSegment,
+	joinPrefix,
 	toColonPath,
 	toOpenApiPath,
 } from "./path.ts";

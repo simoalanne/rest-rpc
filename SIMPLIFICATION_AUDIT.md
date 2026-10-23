@@ -20,9 +20,6 @@ Most are one-line edits.
 
 One "use or move to core" refactor covers all of these.
 
-- **`packages/server/src/pipeline/createApp.ts:136-140`**
-  - Problem: the mount path join is `joinPrefix` from `core/src/contract/path.ts:4`.
-  - Change: export `joinPrefix` and reuse it. **certain**
 - **`IsUnion`, defined in `core/src/contract/request.ts:73`, `core/src/contract/response.ts:53` and `server/src/builder/routeBuilder.types.ts:199`**
   - Problem: three identical copies.
   - Change: move it to `core/src/utils/typeUtils.ts`, next to `EmptyObject`. In the same pass, replace `request.ts:116` `EmptyRequest` and the inline `Record<never, never>` at `request.ts:183` with `EmptyObject`. **certain**
