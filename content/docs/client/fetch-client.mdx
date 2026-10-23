@@ -276,9 +276,9 @@ const client = initClient(api, {
 			description: "Custom fetch-compatible function used to send requests.",
 		},
 		fetchOptions: {
-			type: "ApiClientFetchOptions",
+			type: 'Omit<FetchOptions, "signal" | "additionalHeaders">',
 			description:
-				"Default fetch options merged into every request. Excludes `signal`, which can only be passed per call.",
+				"Default fetch options merged into every request. Excludes `signal` and `additionalHeaders`, which can only be passed per call.",
 		},
 		bodyCodecs: {
 			type: "readonly BodyCodec[]",
