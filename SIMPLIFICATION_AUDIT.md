@@ -22,15 +22,6 @@ Mostly deletions.
 
 The internal subpath barrels are part of the type surface. When a consumer compiles with `declaration: true`, TypeScript names types it can't inline through any path in the `exports` map. Removing a re-export that inferred types depend on breaks the consumer's declaration emit, even if nothing in this repo imports it. The items below were tested for this; see "Declaration emit check" at the end of this file.
 
-- **`packages/core/src/contract/index.ts:1-75`**
-  - Problem: this barrel re-exports about 30 symbols that nothing outside core imports and that consumers' emitted declarations don't reference.
-  - Safe to remove: `AnyRouteErrorClass`, `BodyContent`, `ClientRouteError`, `ContentFor`, `ContractRouteEntry`, `DeclaredClientResponse`, `DefaultBodyContentType`, `extractContract`, `InferSchemaInputs`, `InferSchemaOutputs`, `isDeclaredError`, `KnownBodyContentType`, `MediaType`, `PathParamNames`, `RequestBodyDeclaration`, `RequestBodySchema`, `RequestHeadersSchema`, `RequestParamsSchema`, `RequestQuerySchema`, `resolveRoutePath`, `ResponseOptions`, `RouteErrorClass`, `RouteErrorDeclaration`, `RouteErrorDefinitionOptions`, `RouteErrorOptions`, `RouteErrors`, `RouteMetadata`, `RouteRequestDeclaration`, `RouteResponses`, `RouteTree`.
-  - **Must stay** (removing them failed the check):
-    - `RouteErrorClassFor`: `routeError()` classes, every route that declares an error, clients, and the server's own built-in errors in `errors.ts`, so the server build breaks too.
-    - `RouteBuilderKind`: core's `route`.
-    - `OpenApiRouteOptions`: implemented contract routes and clients made from a contract.
-  - Also load-bearing, and kept by the trim anyway: `RouteBuilder`, `RootBuilderState`, `StandardSchemaV1` from `/standard-schema`, and `EmptyObject` from `/utils`.
-  - Change: delete the safe entries and keep the load-bearing ones, with a comment saying why they stay. **certain** for what the check covers.
 - **`packages/core/src/client/index.ts:9,10,24`**
   - Problem: `constructBaseRequest`, `ApiClientFetchOptions` and the `SseEvent` re-export have no consumers. The root imports `SseEvent` from `contract/sse.ts`.
   - Change: delete them. **certain**
