@@ -24,9 +24,6 @@ Most are one-line edits.
 
 ## 8. Small core simplifications and unjustified guards
 
-- **`packages/core/src/contract/routeBuilder.ts:303-314`**
-  - Problem: `headers()` writes out by hand what `addRequestSegment` (`:168`) does.
-  - Change: widen `addRequestSegment`'s segment type to include `"headers"` and call it. **certain**
 - **`packages/core/src/contract/extract.ts:45`, `packages/core/src/client/response.ts:250-251`**
   - Problem: `extractContract` leaves out `responses` when it's empty, even though `RouteDeclaration` requires it. This forces the `?? {}` and `?.` guards in the client.
   - Change: always emit `responses`, then drop the guards. **decision**: each route with inferred responses gains `"responses":{}` in the extracted JSON.

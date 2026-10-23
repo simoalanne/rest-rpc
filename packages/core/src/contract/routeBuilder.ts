@@ -169,7 +169,7 @@ type RequiredParamsCheck<TSchema extends RequestParamsSchema> = [
 
 const addRequestSegment = (
 	state: RouteBuilderState,
-	segment: "query" | "params",
+	segment: "query" | "params" | "headers",
 	schema: StandardSchemaV1,
 ): RouteBuilderState => ({
 	...state,
@@ -305,14 +305,9 @@ export class RouteBuilder<
 	headers<const TSchema extends RequestHeadersSchema>(
 		schema: TSchema,
 	): BuilderFor<TKind, WithRequest<TState, "headers", TSchema>> {
-		const state = defaultRouteState(this["~restrpc"]);
-		return this.clone({
-			...state,
-			request: {
-				...state.request,
-				headers: appendSchema(state.request?.headers, schema),
-			},
-		});
+		return this.clone(
+			addRequestSegment(defaultRouteState(this["~restrpc"]), "headers", schema),
+		);
 	}
 
 	/** Declares URL query parameters. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-request-segments} */
