@@ -60,14 +60,6 @@ type InferSchemas<
 		? InferSchema<TSchema, TIO>
 		: never;
 
-/** Intersects the input types of an ordered Standard Schema list. */
-export type InferSchemaInputs<TSchemas extends readonly StandardSchemaV1[]> =
-	InferSchemas<TSchemas, "input">;
-
-/** Right-merges the output types of an ordered Standard Schema list. */
-export type InferSchemaOutputs<TSchemas extends readonly StandardSchemaV1[]> =
-	InferSchemas<TSchemas, "output">;
-
 type RequestSegment = "query" | "params" | "headers";
 
 type IsUnion<T, TAll = T> = T extends unknown
