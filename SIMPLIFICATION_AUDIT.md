@@ -31,12 +31,6 @@ Most are one-line edits.
   - Problem: `isAsyncIterable` also checks that `[Symbol.asyncIterator]` is a function. That only guards an object with a non-function `Symbol.asyncIterator` key, which no realistic handler returns, and it has a dedicated test.
   - Change: drop the check and the test. **decision**
 
-## 9. Repo scripts and config leftovers
-
-- **`scripts/check-public-api-docs.ts:143,228`**
-  - Problem: the `packageDir` parameter of `checkEntryPoint` is unused, and `checkWorkspace` is exported but never imported.
-  - Change: delete the parameter and the `export`. **certain**
-
 ## 10. Doc trimming
 
 Overlap and verbosity, not errors.
