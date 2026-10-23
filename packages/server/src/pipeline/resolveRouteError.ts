@@ -5,11 +5,7 @@ import {
 	validateResponseValue,
 } from "./validation.ts";
 
-/**
- * Resolves a thrown error against the route's declaration: the declared
- * status applies and `data` and headers are validated. Errors the route does
- * not declare are sent as thrown.
- */
+/** Applies the declared status and validates `data` and headers; undeclared errors are sent as thrown. */
 export const resolveRouteError = async (
 	route: RouteDeclaration,
 	error: RouteError,

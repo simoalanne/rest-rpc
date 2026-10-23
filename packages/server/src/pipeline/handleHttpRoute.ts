@@ -211,10 +211,7 @@ const normalizeHandlerResult = (
 
 const noErrors = {};
 
-/**
- * Validates decoded request segments, executes middleware and the handler, and
- * validates the selected output. Validation errors are thrown.
- */
+/** Validates the request, runs middleware and the handler, and validates the output, throwing validation errors. */
 export function executeRoute(
 	implementation: RuntimeImplementation,
 	options: ExecuteRouteOptions,
@@ -276,10 +273,7 @@ const toHttpRouteResult = (
 	};
 };
 
-/**
- * Validates an HTTP request, executes middleware and its handler, and
- * normalizes the selected output. Errors, including `RouteError`s, propagate.
- */
+/** Runs a route and normalizes its output for serialization. Errors, including `RouteError`s, propagate. */
 export function handleHttpRoute(
 	implementation: RuntimeImplementation,
 	options: ExecuteRouteOptions & { onStreamError?: StreamErrorObserver },

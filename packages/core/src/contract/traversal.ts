@@ -27,7 +27,6 @@ const mapObjectValues = <TLeaf>(
 				{} as Record<string, unknown>,
 			);
 
-/** Detects a route leaf in a contract or implementation tree. */
 export const isRouteLeaf = (
 	value: unknown,
 ): value is { readonly "~restrpc": RouteDeclaration } =>

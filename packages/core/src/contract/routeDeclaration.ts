@@ -6,16 +6,13 @@ import type {
 import type { RouteResponses } from "./response.ts";
 import type { RouteErrorDeclaration } from "./routeError.ts";
 
-/** An HTTP method supported by a rest-rpc route. */
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
 /** An absolute URL path that begins with a slash. */
 export type AbsolutePath = `/${string}`;
 
-/** Application-defined metadata attached to a route. */
 export type RouteMetadata = Record<string, unknown>;
 
-/** OpenAPI metadata attached to one route. */
 export type OpenApiRouteOptions = {
 	summary?: string;
 	description?: string;
@@ -32,7 +29,6 @@ export type RequestBodyDeclaration = {
 	readonly [mediaType: string]: readonly RequestBodySchema[];
 };
 
-/** Canonical ordered request-schema declarations nested on a route. */
 export type RouteRequestDeclaration = {
 	body?: RequestBodyDeclaration;
 	query?: readonly RequestBodySchema[];
@@ -40,7 +36,6 @@ export type RouteRequestDeclaration = {
 	headers?: readonly RequestHeadersSchema[];
 };
 
-/** Error declarations keyed by error code. */
 export type RouteErrors = {
 	readonly [code: string]: RouteErrorDeclaration;
 };

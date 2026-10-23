@@ -15,9 +15,6 @@ import {
 	type ResponseValidationLocation,
 } from "./errors.ts";
 
-/**
- * Decoded request segments passed into server request validation.
- */
 export type RequestSegments = {
 	body?: unknown;
 	query?: Record<string, unknown>;
@@ -52,10 +49,7 @@ const setQueryValue = (
 	else data[key] = [value];
 };
 
-/**
- * Parses a raw query string without the leading `?`. Keys ending in `[]`
- * collect arrays; other repeated keys keep the last value.
- */
+/** Keys ending in `[]` collect arrays; other repeated keys keep the last value. */
 export function parseQuery(search: string): Record<string, unknown> {
 	const data: Record<string, unknown> = {};
 	// Only encoded queries need `URLSearchParams` to decode them.
@@ -164,11 +158,7 @@ const noRequestSegments: RequestSegmentValues = {
 	headers: undefined,
 };
 
-/**
- * Validates decoded request segments, ignoring segments the route does not
- * declare, except params, which are passed through without a schema. The body
- * is validated with the schemas of `mediaType`.
- */
+/** Segments the route does not declare are ignored, except params, which pass through without a schema. */
 export function validateRequestSegments(
 	route: RouteDeclaration,
 	segments: RequestSegments,

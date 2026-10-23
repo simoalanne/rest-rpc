@@ -8,7 +8,6 @@ import type {
 	SerializedBody,
 } from "./types.ts";
 
-/** Body operations looked up by media type from custom and default codecs. */
 export type BodyCodecRegistry = {
 	/** Serializes a value with the codec for the base media type of `contentType`. */
 	serialize: (
@@ -59,10 +58,7 @@ const assertBaseMediaType = (
 	return body;
 };
 
-/**
- * Creates a registry from custom codecs, which take precedence over the
- * default codecs. Serializers and deserializers are selected independently.
- */
+/** Custom codecs take precedence over the defaults, and serializers and deserializers are selected independently. */
 export function createBodyCodecRegistry(
 	codecs: readonly BodyCodec[],
 ): BodyCodecRegistry {

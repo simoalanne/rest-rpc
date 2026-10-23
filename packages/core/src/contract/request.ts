@@ -6,7 +6,6 @@ import type {
 import type { EmptyObject, IsUnion, Merge } from "../utils/typeUtils.ts";
 import type { PathParamNames } from "./path.ts";
 
-/** Scalar value accepted by ordinary HTTP request schemas. */
 export type RequestScalar = string | number | boolean;
 
 /** An ordinary query schema whose wire input contains scalar or array values. */
@@ -21,7 +20,6 @@ export type RequestParamsSchema = StandardSchemaV1<
 	unknown
 >;
 
-/** A whole-object schema for request headers. */
 export type RequestHeadersSchema = StandardSchemaV1<
 	Record<string, RequestScalar | undefined>,
 	unknown
@@ -31,7 +29,6 @@ export type RequestBodySchema = StandardSchemaV1;
 
 type RightMerge<TLeft, TRight> = Merge<Omit<TLeft, keyof TRight> & TRight>;
 
-/** Infers the input or output type of one Standard Schema. */
 export type InferSchema<
 	TSchema extends StandardSchemaV1,
 	TIO extends "input" | "output",

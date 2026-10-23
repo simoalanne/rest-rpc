@@ -43,10 +43,7 @@ const compareRouteSpecificity = (
 	return left.method.localeCompare(right.method);
 };
 
-/**
- * A flattened route declaration with its handler and middleware, and values
- * derived from the declaration once instead of per request.
- */
+/** A route's declaration and handler, with values derived once instead of per request. */
 export type RuntimeImplementation = {
 	route: RouteDeclaration & { path: string };
 	handler: (...args: never[]) => unknown;
@@ -61,7 +58,6 @@ export type RuntimeImplementation = {
 	defaultResponseMediaTypes: Readonly<Record<number, string>>;
 };
 
-/** A route leaf whose declaration has a handler attached. */
 export type ImplementedRoute = {
 	readonly "~restrpc": RouteDeclaration & {
 		readonly handler: (...args: never[]) => unknown;
@@ -69,12 +65,10 @@ export type ImplementedRoute = {
 	};
 };
 
-/** An implementation or nested implementation tree consumed at runtime. */
 export type RuntimeImplementationTree =
 	| ImplementedRoute
 	| { readonly [key: string]: RuntimeImplementationTree };
 
-/** Detects a route leaf whose declaration has a handler attached. */
 export function isImplementedRoute(value: unknown): value is ImplementedRoute {
 	return (
 		isRouteLeaf(value) &&
@@ -84,7 +78,6 @@ export function isImplementedRoute(value: unknown): value is ImplementedRoute {
 	);
 }
 
-/** Separates a route declaration from its handler and derives its runtime values. */
 export function toRuntimeImplementation(
 	declaration: ImplementedRoute["~restrpc"],
 ): RuntimeImplementation {
@@ -128,11 +121,7 @@ export function flattenRouteImplementations(
 		.sort((left, right) => compareRouteSpecificity(left.route, right.route));
 }
 
-/**
- * Normalizes a route path and optionally rewrites param markers.
- *
- * @remarks Without `paramSyntax` the declared markers are kept as written.
- */
+/** Normalizes a route path; `paramSyntax` rewrites its param markers. */
 export function resolveImplementationPath(
 	path: string,
 	paramSyntax?: CompileRoutesOptions["paramSyntax"],
@@ -154,11 +143,7 @@ type MatchedRoute<TRoute> = {
 	params: Record<string, string> | undefined;
 };
 
-/**
- * Compiles routes into a method and path matcher.
- *
- * @remarks Matching follows rou3 semantics.
- */
+/** Compiles routes into a method and path matcher using rou3. */
 export function createRouteMatcher<
 	TRoute extends { readonly method: string; readonly path: string },
 >(
@@ -186,7 +171,6 @@ export type PathParams = {
 	params: readonly { name: string; index: number }[];
 };
 
-/** Parses the param segments of a route path. */
 export function parsePathParams(path: string): PathParams {
 	const segments = splitPath(path);
 	return {
@@ -199,13 +183,7 @@ export function parsePathParams(path: string): PathParams {
 	};
 }
 
-/**
- * Reads the percent-decoded params of a route path from a request `pathname`.
- *
- * @remarks `pathname` may have extra leading segments, such as a mount prefix
- * the router did not strip, so params are aligned to the end of `pathname`.
- * Throws when `pathname` has fewer segments than the route path.
- */
+/** Params are aligned to the end of `pathname`, which may start with a mount prefix the router did not strip. */
 export function readPathParams(
 	{ path, segmentCount, params }: PathParams,
 	pathname: string,
@@ -227,14 +205,7 @@ export function readPathParams(
 	return values;
 }
 
-/**
- * Reads the params a router attached to the request as `request.params`, as
- * Bun's router and Express do.
- *
- * @remarks Returns `undefined` unless every param of the route path is a
- * string, so the params can be read from the URL instead. Values are expected
- * to be percent-decoded already.
- */
+/** Reads `request.params` set by a router such as Bun's or Express, or `undefined` unless every param is a string. */
 export function readAttachedPathParams(
 	{ params }: PathParams,
 	request: object,
@@ -248,11 +219,7 @@ export function readAttachedPathParams(
 	return values as Record<string, string>;
 }
 
-/**
- * Checks that caller-provided params include every param of a route path.
- *
- * @remarks Values are not decoded; callers pass them already decoded.
- */
+/** Checks that caller-provided params include every param of a route path. */
 export function assertPathParams(
 	{ path, params }: PathParams,
 	values: Record<string, string>,

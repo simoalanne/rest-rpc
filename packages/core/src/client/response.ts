@@ -204,18 +204,7 @@ const readErrorResponse = async (
 	);
 };
 
-/**
- * Reads a fetch response into a status envelope, or rejects with a
- * `RouteError` for error responses with a `code`, and an `Error` for other
- * responses outside the route contract.
- *
- * @remarks `text/event-stream` responses are parsed as SSE streams. Routes
- * without response declarations, such as routes with inferred responses,
- * accept every 2xx status. Routes with declarations, including extracted
- * ones, reject undeclared statuses and undeclared media types, streams
- * included. `contentType` is the received base media type, or `undefined`
- * without a content type.
- */
+/** Rejects with a `RouteError` for error responses with a `code`, and an `Error` for other responses outside the route contract. */
 export const readResponse = async <E extends RouteDeclaration>(
 	rawResponse: Response,
 	route: E,

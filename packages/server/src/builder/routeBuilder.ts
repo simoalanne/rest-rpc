@@ -57,7 +57,6 @@ type HandledRoute<
 	>;
 };
 
-/** Resolves the handler operation for a complete route declaration. */
 export type HandlerMethodFor<
 	TRoute extends RouteDeclaration,
 	TContext extends object = EmptyObject,
@@ -68,7 +67,6 @@ export type HandlerMethodFor<
 	): HandledRoute<TRoute, TContext, TResult>;
 };
 
-/** Builder kind of the server route builder. */
 export interface ServerRouteBuilderKind<
 	TContext extends object = EmptyObject,
 > extends BuilderKind {

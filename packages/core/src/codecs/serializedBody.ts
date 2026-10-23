@@ -24,6 +24,5 @@ export function serializedBody(
 	} as SerializedBody;
 }
 
-/** Detects bodies created with `serializedBody()`. */
 export const isSerializedBody = (value: unknown): value is SerializedBody =>
 	typeof value === "object" && value !== null && serializedBodyBrand in value;

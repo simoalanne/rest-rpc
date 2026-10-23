@@ -196,15 +196,46 @@ create.mutate({ body: { title: "Write docs" } });
 
 </Tab>
 
-<Tab title="cURL">
+<Tab title="HTTP">
 
-```sh
-curl http://localhost:3000/todos/create \
-	-H 'content-type: application/json' \
-	-d '{"title":"Write docs"}'
+```http
+# No method or path declared: POST, at the path of the route's keys.
+POST /todos/create HTTP/1.1
+Content-Type: application/json
 
-curl 'http://localhost:3000/todos/todo_1?uppercase=yes' \
-	-H 'x-request-id: req_1'
+{ "title": "Write docs" }
+```
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{ "id": "todo_1", "title": "Write docs" }
+```
+
+```http
+GET /todos/todo_1?uppercase=yes HTTP/1.1
+X-Request-Id: req_1
+```
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+X-Powered-By: rest-rpc
+
+{ "id": "todo_1", "title": "WRITE DOCS" }
+```
+
+```http
+# A declared error is sent as JSON with its status.
+GET /todos/missing HTTP/1.1
+```
+
+```http
+HTTP/1.1 404 Not Found
+Content-Type: application/json
+
+{ "code": "TODO_NOT_FOUND", "message": "TODO_NOT_FOUND" }
 ```
 
 </Tab>

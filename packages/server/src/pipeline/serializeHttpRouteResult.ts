@@ -29,11 +29,7 @@ const setHeaders = (headers: Headers, values?: Record<string, unknown>) => {
 	}
 };
 
-/**
- * Serializes a route result into a Fetch `Response`, encoding the body with
- * the codec for its media type. The result's headers override the headers of
- * a `SerializedBody` returned by the codec.
- */
+/** The result's headers override the headers of a `SerializedBody` returned by the codec. */
 export function serializeHttpRouteResult(
 	result: HttpRouteResult,
 	codecs: BodyCodecRegistry,

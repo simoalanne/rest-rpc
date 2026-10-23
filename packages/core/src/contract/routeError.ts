@@ -98,7 +98,6 @@ export const markDeclared = <T extends RouteError>(error: T): T => {
 	return error;
 };
 
-/** The declaration of an error a route can respond with. */
 export type RouteErrorDeclaration = {
 	readonly code: string;
 	readonly status: number;
@@ -151,10 +150,7 @@ type ConstructArgs<TDeclaration> = TDeclaration extends {
 	? [data: StandardSchemaV1.InferInput<TData>, ...OptionsArg<TDeclaration>]
 	: OptionsArg<TDeclaration>;
 
-/**
- * An error class created by `routeError`, which carries its declaration as
- * static fields.
- */
+/** An error class created by `routeError`, with its declaration as static fields. */
 export type RouteErrorClass<
 	TCode extends string = string,
 	TDeclaration extends { status: number } = { status: number },
@@ -172,13 +168,11 @@ export type RouteErrorClass<
 	readonly code: TCode;
 } & TDeclaration;
 
-/** Any error class created by `routeError`. */
 export type AnyRouteErrorClass = (abstract new (
 	...args: never[]
 ) => RouteError) &
 	RouteErrorDeclaration;
 
-/** Resolves the class type `routeError` returns for its options. */
 export type RouteErrorClassFor<
 	TCode extends string,
 	TOptions extends RouteErrorDefinitionOptions | undefined,

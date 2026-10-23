@@ -212,19 +212,13 @@ const addError = (
 	};
 };
 
-/** Builder kind of the core route builder. */
 export interface RouteBuilderKind extends BuilderKind {
 	readonly builder: this["state"] extends infer TState extends BuilderState
 		? Omit<RouteBuilder<TState>, TState["omit"]>
 		: never;
 }
 
-/**
- * Immutable fluent route builder.
- *
- * @remarks Every method returns a new builder typed by `TKind`, which lets
- * packages extending the builder keep their own builder type.
- */
+/** Immutable route builder whose methods return a new builder typed by `TKind`. */
 export class RouteBuilder<
 	TState extends BuilderState = RootBuilderState,
 	TKind extends BuilderKind = RouteBuilderKind,
