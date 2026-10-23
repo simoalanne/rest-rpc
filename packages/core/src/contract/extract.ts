@@ -1,4 +1,4 @@
-import type { RouteTree } from "./contract.ts";
+import type { Contract } from "./contract.ts";
 import { resolveRoutePath } from "./path.ts";
 import { mapContractRoutes } from "./traversal.ts";
 
@@ -26,7 +26,7 @@ import { mapContractRoutes } from "./traversal.ts";
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/contract-extraction}
  */
-export function extractContract<const TRoutes extends RouteTree>(
+export function extractContract<const TRoutes extends Contract>(
 	routes: TRoutes,
 ): TRoutes {
 	return mapContractRoutes(routes, (route, routePath) => ({

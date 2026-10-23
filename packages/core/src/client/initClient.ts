@@ -1,4 +1,5 @@
-import type { Contract, RouteDeclaration } from "../contract/contract.ts";
+import type { Contract } from "../contract/contract.ts";
+import type { RouteDeclaration } from "../contract/routeDeclaration.ts";
 import { mapContractRoutes } from "../contract/traversal.ts";
 import { resolveRoutePath } from "../contract/path.ts";
 import { createBodyCodecRegistry, type BodyCodec } from "../codecs/index.ts";

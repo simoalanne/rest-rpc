@@ -1,5 +1,6 @@
 import { normalizeMediaType, type BodyCodecRegistry } from "../codecs/index.ts";
-import type { RouteDeclaration, RouteTree } from "../contract/contract.ts";
+import type { Contract } from "../contract/contract.ts";
+import type { RouteDeclaration } from "../contract/routeDeclaration.ts";
 import type { SseEvent } from "../contract/sse.ts";
 import type {
 	ClientRouteError,
@@ -32,14 +33,12 @@ import type { FetchArgs } from "./request.ts";
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#call-routes}
  */
-export type InferClientResponse<T extends RouteTree> = T extends {
+export type InferClientResponse<T extends Contract> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
 	? DeclaredClientResponse<TRoute>
 	: {
-			[K in keyof T]: T[K] extends RouteTree
-				? InferClientResponse<T[K]>
-				: never;
+			[K in keyof T]: T[K] extends Contract ? InferClientResponse<T[K]> : never;
 		};
 
 /**
@@ -52,12 +51,12 @@ export type InferClientResponse<T extends RouteTree> = T extends {
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#typesafe-error-handling}
  */
-export type InferClientError<T extends RouteTree> = T extends {
+export type InferClientError<T extends Contract> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
 	? ClientRouteError<TRoute>
 	: {
-			[K in keyof T]: T[K] extends RouteTree ? InferClientError<T[K]> : never;
+			[K in keyof T]: T[K] extends Contract ? InferClientError<T[K]> : never;
 		};
 
 /**
@@ -70,12 +69,12 @@ export type InferClientError<T extends RouteTree> = T extends {
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#consume-streams}
  */
-export type InferClientStreamData<T extends RouteTree> = T extends {
+export type InferClientStreamData<T extends Contract> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
 	? ClientStreamDataForDeclaration<TRoute>
 	: {
-			[K in keyof T]: T[K] extends RouteTree
+			[K in keyof T]: T[K] extends Contract
 				? InferClientStreamData<T[K]>
 				: never;
 		};
