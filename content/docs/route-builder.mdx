@@ -106,7 +106,7 @@ const tenant = route
 
 const getTodo = tenant
 	.get("/todos/:id")
-	.params(z.object({ id: z.coerce<number>() }))
+	.params(z.object({ id: z.coerce.number() }))
 	.handler(({ params }) => findTodo(params.tenant, params.id));
 ```
 
