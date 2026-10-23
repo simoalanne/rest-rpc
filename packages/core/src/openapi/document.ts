@@ -2,10 +2,8 @@ import type { Contract } from "../contract/contract.ts";
 import { toOpenApiPath } from "../contract/path.ts";
 import { contractRouteEntries } from "../contract/traversal.ts";
 import type {
-	OpenApiParameter,
 	OpenApiOperation,
 	OperationTransformContext,
-	ParameterTransformContext,
 	SchemaConverter,
 } from "./operation.ts";
 import { createOperation } from "./operation.ts";
@@ -47,8 +45,8 @@ export type OpenApiDocument = {
  * Options for generating an OpenAPI document from a contract.
  *
  * @remarks Without a `schemaConverter`, or when it returns `undefined`, a
- * declared schema becomes an empty OpenAPI Schema Object. Transform hooks can
- * adjust generated parameters and operations for project-specific conventions.
+ * declared schema becomes an empty OpenAPI Schema Object. `transformOperation`
+ * can adjust each generated operation for project-specific conventions.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/openapi}
  */
@@ -65,8 +63,6 @@ export type CreateOpenApiDocumentOptions = {
 	tags?: OpenApiDocument["tags"];
 	/** Converts Standard Schema declarations into OpenAPI Schema Objects. */
 	schemaConverter?: SchemaConverter;
-	/** Allows project-specific changes to generated parameter objects. */
-	transformParameter?: (context: ParameterTransformContext) => OpenApiParameter;
 	/** Allows project-specific changes to each generated operation. */
 	transformOperation?: (context: OperationTransformContext) => OpenApiOperation;
 };

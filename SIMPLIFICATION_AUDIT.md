@@ -15,9 +15,6 @@ Overlap and verbosity, not errors.
 - **`content/docs/server/framework-integration.mdx:6-25`**
   - Problem: "Scope of rest-rpc" is three paragraphs of positioning prose, with typos ("consepts", "thats"), before any integration content.
   - Change: cut it to one or two sentences, or move it to the landing page. **decision**
-- **`content/docs/openapi.mdx:86-122`**
-  - Problem: a long second `transformParameter` example for a Zod-meta workaround overlaps the Transform Hooks example (`:170-199`).
-  - Change: keep one of them. **decision**
 - **`content/docs/http-behavior/schemas.mdx:177-188`, `content/docs/http-behavior/serialization.mdx:111-127`**
   - Problem: the server option examples use `compileRoutes`, while the rest of the docs present `createApp` as the default path. The options are the same.
   - Change: show `createApp`. **decision**, low payoff.

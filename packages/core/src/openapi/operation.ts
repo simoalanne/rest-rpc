@@ -12,7 +12,7 @@ import { getPathParamNames } from "../contract/path.ts";
 
 type OpenApiSchema = Record<string, unknown>;
 
-export type OpenApiParameter = {
+type OpenApiParameter = {
 	name: string;
 	in: "path" | "query" | "header" | "cookie";
 	required?: boolean;
@@ -57,12 +57,6 @@ export type SchemaConverter = (
 	mode: "input" | "output",
 ) => OpenApiSchema | undefined;
 
-export type ParameterTransformContext = {
-	route: RouteDeclaration;
-	routePath: readonly string[];
-	parameter: OpenApiParameter;
-};
-
 export type OperationTransformContext = {
 	route: RouteDeclaration;
 	routePath: readonly string[];
@@ -71,7 +65,6 @@ export type OperationTransformContext = {
 
 type CreateOperationOptions = {
 	schemaConverter?: SchemaConverter;
-	transformParameter?: (context: ParameterTransformContext) => OpenApiParameter;
 	transformOperation?: (context: OperationTransformContext) => OpenApiOperation;
 };
 
@@ -288,11 +281,7 @@ export const createOperation = (
 		...createPathParameters(route, options),
 		...createParameters(request?.query, "query", options),
 		...createParameters(request?.headers, "header", options),
-	].map(
-		(parameter) =>
-			options.transformParameter?.({ route, routePath, parameter }) ??
-			parameter,
-	);
+	];
 	const requestBody = createRequestBody(request?.body, options.schemaConverter);
 	const { extensions, ...openApi } = route.openApi ?? {};
 	const operation: OpenApiOperation = {

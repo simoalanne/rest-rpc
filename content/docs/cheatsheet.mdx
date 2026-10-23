@@ -617,7 +617,6 @@ const document = createOpenApiDocument(routes, {
 	// Without a converter, schemas are emitted as empty Schema Objects.
 	schemaConverter: (schema, mode) =>
 		z.toJSONSchema(schema as z.ZodType, { io: mode }),
-	// transformParameter works the same way for generated parameters.
 	transformOperation: ({ route, routePath, operation }) => ({
 		...operation,
 		operationId: routePath.join("."),

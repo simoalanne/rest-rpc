@@ -100,7 +100,7 @@ describe("operation", () => {
 		});
 	});
 
-	it("falls back to empty schemas and original operations when hooks return undefined", () => {
+	it("falls back to empty schemas and the original operation when the hook returns undefined", () => {
 		const declared = route
 			.get("/")
 			.query(type<{ q: string }>())
@@ -108,9 +108,6 @@ describe("operation", () => {
 		const transformOperation = vi.fn(
 			() => undefined,
 		) as unknown as CreateOpenApiDocumentOptions["transformOperation"];
-		const transformParameter = vi.fn(
-			() => undefined,
-		) as unknown as CreateOpenApiDocumentOptions["transformParameter"];
 		expect(
 			operationOf(declared, {
 				schemaConverter: () => undefined,
@@ -119,14 +116,6 @@ describe("operation", () => {
 		).toMatchObject({
 			responses: { 200: { content: { "application/json": { schema: {} } } } },
 		});
-		expect(
-			operationOf(declared, {
-				schemaConverter: () => ({ properties: { q: { type: "string" } } }),
-				transformParameter,
-			}).parameters,
-		).toEqual([
-			{ name: "q", in: "query", required: false, schema: { type: "string" } },
-		]);
 	});
 
 	it("combines repeated parameter constraints and unions required query keys", () => {
@@ -206,7 +195,7 @@ describe("operation", () => {
 		});
 	});
 
-	it("passes transformed parameters into the operation hook with the contract path", () => {
+	it("passes the generated operation and contract path into the operation hook", () => {
 		const list = route
 			.get("/users")
 			.query(type<{ q: string }>())
@@ -219,21 +208,25 @@ describe("operation", () => {
 			{ users: { list } },
 			{
 				schemaConverter: () => ({ properties: { q: { type: "string" } } }),
-				transformParameter: ({ parameter }) => ({
-					...parameter,
-					description: "Search",
-				}),
 				transformOperation,
 			},
 		);
-		expect(operation.parameters?.[0]?.description).toBe("Search");
 		expect(operation.operationId).toBe("users.list");
-		expect(transformOperation).toHaveBeenCalledWith(
-			expect.objectContaining({
-				route: list["~restrpc"],
-				routePath: ["users", "list"],
-			}),
-		);
+		expect(transformOperation).toHaveBeenCalledWith({
+			route: list["~restrpc"],
+			routePath: ["users", "list"],
+			operation: {
+				parameters: [
+					{
+						name: "q",
+						in: "query",
+						required: false,
+						schema: { type: "string" },
+					},
+				],
+				responses: { 204: { description: "" } },
+			},
+		});
 	});
 
 	it("documents dynamic path segments without a params schema as strings", () => {
