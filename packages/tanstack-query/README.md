@@ -361,7 +361,7 @@ route.body(type<{ title: string }>()); // types only, no runtime validation
 type((input: number) => input.toString()); // with a (possibly async) mapping
 
 // Skips schema validation only: types, OpenAPI and decoding are unaffected.
-compileRoutes(routes, {
+createApp(routes, {
 	disableRequestValidation: true,
 	disableResponseValidation: true,
 });
@@ -441,7 +441,7 @@ export default createApp(routes, {
 	notFound: (request) => new Response("Not found", { status: 404 }),
 	onError: (error, request) =>
 		error.status >= 500 && console.error(error.cause),
-	bodyCodecs: [binary], // plus the other compileRoutes options
+	bodyCodecs: [binary], // also disableRequestValidation, disableResponseValidation
 });
 
 const app = createApp(routes); // Bun: native router via app.routes
