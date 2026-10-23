@@ -22,9 +22,6 @@ Mostly deletions.
 
 The internal subpath barrels are part of the type surface. When a consumer compiles with `declaration: true`, TypeScript names types it can't inline through any path in the `exports` map. Removing a re-export that inferred types depend on breaks the consumer's declaration emit, even if nothing in this repo imports it. The items below were tested for this; see "Declaration emit check" at the end of this file.
 
-- **`packages/core/src/standard-schema/index.ts:3`**
-  - Problem: the `type` re-export is unused. The root imports `type.ts` directly.
-  - Change: delete it. **certain**
 - **`packages/core/src/contract/request.ts:63-69`**
   - Problem: `InferSchemaInputs` and `InferSchemaOutputs` aren't used anywhere.
   - Change: delete them. **certain**
