@@ -52,11 +52,7 @@ HTTP method, path, 200 response, and `TODO_NOT_FOUND` error with status 404. The
 ## Implement and Register Routes
 
 ```ts server.ts
-import {
-	compileRoutes,
-	createCatchAllHandler,
-	implement,
-} from "@rest-rpc/server";
+import { createApp, implement } from "@rest-rpc/server";
 import { api } from "./contract";
 
 type Todo = { id: string; title: string; completed: boolean };
@@ -83,20 +79,7 @@ const get = implement(api.todos.get).handler(({ params, query, errors }) => {
 
 const routes = { todos: { create, get } };
 
-const handler = createCatchAllHandler(compileRoutes(routes));
-
-Bun.serve({
-	port: 3000,
-	async fetch(request) {
-		const result = await handler(request);
-		return result.matched
-			? result.response
-			: Response.json(
-					{ code: "NOT_FOUND", message: "Not found." },
-					{ status: 404 },
-				);
-	},
-});
+Bun.serve({ ...createApp(routes), port: 3000 });
 ```
 
 `implement()` keeps each handler's request and result tied to its declaration.

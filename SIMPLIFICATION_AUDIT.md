@@ -12,10 +12,9 @@ Confidence: **certain** means the change keeps behavior or fixes a contradiction
 
 Most are one-line edits.
 
-| Location                                           | What's wrong                                                                                                                                                                              | Change                                                                                                               | Confidence |
-| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `content/docs/contract-first-quickstart.mdx:53-99` | Builds the server by hand from `compileRoutes` + `createCatchAllHandler` + a copied `NOT_FOUND` JSON body. `createApp` does all of this, and the server-first quickstart already uses it. | Replace with `Bun.serve({ ...createApp(routes), port: 3000 })`. This drops about 15 lines and the copied error body. | certain    |
-| `CONTRIBUTING.md:28-35`                            | Repeats the Public API rules from `AGENTS.md` and leaves out the `@rest-rpc/server/node` exception.                                                                                       | Add the exception, or replace the section with a pointer to `AGENTS.md` so there is one copy.                        | decision   |
+| Location                | What's wrong                                                                                        | Change                                                                                        | Confidence |
+| ----------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------- |
+| `CONTRIBUTING.md:28-35` | Repeats the Public API rules from `AGENTS.md` and leaves out the `@rest-rpc/server/node` exception. | Add the exception, or replace the section with a pointer to `AGENTS.md` so there is one copy. | decision   |
 
 ## 2. Dead exports and alias layers
 
