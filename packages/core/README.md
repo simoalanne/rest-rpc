@@ -233,7 +233,7 @@ import type {
 // Infer from a route without .handler() (or a contract route), then attach it.
 const declaration = route.get("/todos/:id").response(todoSchema);
 
-type GetRequest = InferServerRequest<typeof declaration>; // { params, query, headers, body }
+type GetRequest = InferServerRequest<typeof declaration>; // handler argument: { params, ..., context, signal }
 type GetResponse = InferServerResponse<typeof declaration>; // declared envelopes
 const getTodo: InferServerHandler<typeof declaration> = ({ params }) =>
 	findTodo(params.id);
