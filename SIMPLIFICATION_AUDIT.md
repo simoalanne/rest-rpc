@@ -22,10 +22,6 @@ Mostly deletions.
 
 The internal subpath barrels are part of the type surface. When a consumer compiles with `declaration: true`, TypeScript names types it can't inline through any path in the `exports` map. Removing a re-export that inferred types depend on breaks the consumer's declaration emit, even if nothing in this repo imports it. The items below were tested for this; see "Declaration emit check" at the end of this file.
 
-- **`packages/core/src/client/index.ts:9,10,24`**
-  - Problem: `constructBaseRequest`, `ApiClientFetchOptions` and the `SseEvent` re-export have no consumers. The root imports `SseEvent` from `contract/sse.ts`.
-  - Change: delete them. **certain**
-  - Note: `FetchResponseFn` (`:6`) is referenced by every emitted client type. Delete it only together with the inlining below; inlining was tested and emits through root-public `ClientPromise` and `FetchOptions` instead.
 - **`packages/core/src/standard-schema/index.ts:3`**
   - Problem: the `type` re-export is unused. The root imports `type.ts` directly.
   - Change: delete it. **certain**
