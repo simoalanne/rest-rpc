@@ -18,9 +18,6 @@ Most are one-line edits.
 
 ## 5. OpenAPI internals exported for tests
 
-- **`packages/core/src/openapi/operation.ts:114,162,180,297-300,155`**
-  - Problem: `createParameters`, `createRequestBody` and `createResponse` are exported only for `operation.test.ts`. `createOperation`'s `routePath = []` default and the `route.path ?? ""` fallback exist so those tests can pass raw declarations. The real caller always passes a resolved path and a `routePath`.
-  - Change: test through `createOpenApiDocument`, as `document.test.ts` already does. Then unexport the helpers, make `routePath` required, and type `route` as `RouteDeclaration & { path: string }`. **certain**, medium effort because of the test rewrite.
 - **`packages/core/src/openapi/operation.ts:87-101,132-135`**
   - Problem: `getRequiredSchemaKeys` returns a `known`/`unknown` union, but its caller treats `unknown` the same as known-with-no-keys.
   - Change: replace it with `Array.isArray(jsonSchema.required) ? jsonSchema.required : []` and delete `SchemaRequiredKeys`. **certain**

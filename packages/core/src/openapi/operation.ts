@@ -111,7 +111,7 @@ const mapContent = <TValue>(
 		]),
 	);
 
-export const createParameters = (
+const createParameters = (
 	schemas: readonly StandardSchemaV1[] | undefined,
 	location: "path" | "query" | "header",
 	options: CreateOperationOptions,
@@ -147,19 +147,19 @@ export const createParameters = (
 
 // Dynamic path segments without a params schema are received as strings.
 const createPathParameters = (
-	route: RouteDeclaration,
+	route: RouteDeclaration & { path: string },
 	options: CreateOperationOptions,
 ): OpenApiParameter[] =>
 	route.request?.params?.length
 		? createParameters(route.request.params, "path", options)
-		: getPathParamNames(route.path ?? "").map((name) => ({
+		: getPathParamNames(route.path).map((name) => ({
 				name,
 				in: "path",
 				required: true,
 				schema: { type: "string" },
 			}));
 
-export const createRequestBody = (
+const createRequestBody = (
 	body: RequestBodyDeclaration | undefined,
 	converter: SchemaConverter | undefined,
 ): OpenApiRequestBody | undefined => {
@@ -177,7 +177,7 @@ export const createRequestBody = (
 	};
 };
 
-export const createResponse = (
+const createResponse = (
 	responseDeclaration: ResponseDeclaration,
 	converter: SchemaConverter | undefined,
 ): OpenApiResponse => {
@@ -295,9 +295,9 @@ const createResponses = (
 };
 
 export const createOperation = (
-	route: RouteDeclaration,
+	route: RouteDeclaration & { path: string },
 	options: CreateOperationOptions,
-	routePath: readonly string[] = [],
+	routePath: readonly string[],
 ): OpenApiOperation => {
 	const { request } = route;
 	const parameters = [
