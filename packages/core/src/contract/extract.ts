@@ -42,20 +42,18 @@ export function extractContract<const TRoutes extends Contract>(
 			}),
 			// Media types keep a `null` schema, so the client checks statuses and
 			// content types without validating bodies.
-			...(Object.keys(route.responses ?? {}).length > 0 && {
-				responses: Object.fromEntries(
-					Object.entries(route.responses).map(([status, { content }]) => [
-						status,
-						content
-							? {
-									content: Object.fromEntries(
-										Object.keys(content).map((mediaType) => [mediaType, null]),
-									),
-								}
-							: {},
-					]),
-				),
-			}),
+			responses: Object.fromEntries(
+				Object.entries(route.responses).map(([status, { content }]) => [
+					status,
+					content
+						? {
+								content: Object.fromEntries(
+									Object.keys(content).map((mediaType) => [mediaType, null]),
+								),
+							}
+						: {},
+				]),
+			),
 			...(route.errors && {
 				errors: Object.fromEntries(
 					Object.entries(route.errors).map(([code, { status }]) => [

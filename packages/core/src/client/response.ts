@@ -236,8 +236,8 @@ export const readResponse = async <E extends RouteDeclaration>(
 		);
 	}
 
-	const schema: ResponseDeclaration | undefined = route.responses?.[status];
-	const declaresResponses = Object.keys(route.responses ?? {}).length > 0;
+	const schema: ResponseDeclaration | undefined = route.responses[status];
+	const declaresResponses = Object.keys(route.responses).length > 0;
 	const breaksContract =
 		(!schema && declaresResponses) ||
 		(mediaType && schema?.content && !(mediaType in schema.content));

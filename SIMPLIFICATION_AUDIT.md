@@ -18,9 +18,6 @@ Most are one-line edits.
 
 ## 8. Small core simplifications and unjustified guards
 
-- **`packages/core/src/contract/extract.ts:45`, `packages/core/src/client/response.ts:250-251`**
-  - Problem: `extractContract` leaves out `responses` when it's empty, even though `RouteDeclaration` requires it. This forces the `?? {}` and `?.` guards in the client.
-  - Change: always emit `responses`, then drop the guards. **decision**: each route with inferred responses gains `"responses":{}` in the extracted JSON.
 - **`packages/core/src/codecs/operations.ts:21`, `packages/server/src/pipeline/handleHttpRoute.test.ts:423-428`**
   - Problem: `isAsyncIterable` also checks that `[Symbol.asyncIterator]` is a function. That only guards an object with a non-function `Symbol.asyncIterator` key, which no realistic handler returns, and it has a dedicated test.
   - Change: drop the check and the test. **decision**
