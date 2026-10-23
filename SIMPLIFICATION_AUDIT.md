@@ -24,9 +24,6 @@ Most are one-line edits.
 
 ## 8. Small core simplifications and unjustified guards
 
-- **`packages/core/src/contract/path.ts:22-37`**
-  - Problem: `pathParamNameFromCaptures` throws an error that can't happen, because the regex always captures exactly one group.
-  - Change: inline it as `match[1] ?? match[2]`. **certain**
 - **`packages/core/src/contract/routeBuilder.ts:303-314`**
   - Problem: `headers()` writes out by hand what `addRequestSegment` (`:168`) does.
   - Change: widen `addRequestSegment`'s segment type to include `"headers"` and call it. **certain**

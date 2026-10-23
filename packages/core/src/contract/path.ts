@@ -19,21 +19,9 @@ export const resolveRoutePath = (
 
 const pathParamSegmentPattern = /^(?::([^/]+)|\{([^/]+)\})$/;
 
-const pathParamNameFromCaptures = (
-	colonName: string | undefined,
-	openApiName: string | undefined,
-) => {
-	const name = colonName ?? openApiName;
-	if (name === undefined) {
-		throw new Error("Expected path param match to include a name.");
-	}
-	return name;
-};
-
 export const getPathParamSegmentName = (segment: string) => {
 	const match = pathParamSegmentPattern.exec(segment);
-	if (!match) return undefined;
-	return pathParamNameFromCaptures(match[1], match[2]);
+	return match ? (match[1] ?? match[2]) : undefined;
 };
 
 export const isPathParamSegment = (segment: string) =>
