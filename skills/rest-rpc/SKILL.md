@@ -1,6 +1,6 @@
 ---
 name: rest-rpc
-description: Use rest-rpc in TypeScript apps with server-first route builders or contract-first API design, Node and Fetch server runtimes, framework integration, typed clients, TanStack Query, OpenAPI, streaming, and monorepo architecture. Use hosted docs for current API details.
+description: Use rest-rpc in TypeScript apps with server-first route builders or contract-first API design, Node and Fetch server runtimes, framework integration, typed clients, TanStack Query, OpenAPI, streaming, and monorepo architecture. Start from the cheatsheet in the installed package's README.
 ---
 
 # rest-rpc
@@ -9,167 +9,68 @@ Use this skill for `rest-rpc` work: setup, contracts, server integration, client
 
 ## Core Model
 
-`rest-rpc` provides REST APIs with RPC-like ergonomics. HTTP is the foundation:
-methods, paths, params, query, headers, bodies, statuses, content types, and
-streams, described with an expressive route builder and sensible defaults.
-There is no separate RPC protocol or transport to learn.
+`rest-rpc` is a small type-safety layer for HTTP APIs, not a framework and not a
+separate RPC protocol. Routes are plain HTTP (methods, paths, params, query,
+headers, bodies, statuses, content types, streams) described with a route
+builder. Server-first is the default: response types are inferred from handlers
+and clients use a contract extracted at build time. Contract-first shares a
+contract package between server and client instead.
 
-Clients are derived from server implementations with a small build-time extraction step. When the client should be independent of the server and both should depend on a shared contract, contract-first development is also fully supported.
+An app that only needs typed endpoints can serve them directly with `createApp`.
+An app with a framework keeps the framework's routing, middleware, auth,
+dependency injection, and deployment conventions, and registers compiled routes
+on it.
 
-## Library Philosophy
+## Read the Cheatsheet First
 
-`rest-rpc` is a small type-safety layer for HTTP APIs. It types and validates
-what crosses the wire and what reaches handlers. It is not a framework: an app
-that only needs typed endpoints can serve them directly on Node HTTP or a
-fetch-native runtime, and an app that uses a framework keeps the framework's
-routing, modules, plugins, middleware, dependency injection, auth, and
-deployment conventions. Declare routes with `route` or `implement` from
-`@rest-rpc/server`, compile them with `compileRoutes` from `@rest-rpc/server`
-(Fetch) or `@rest-rpc/server/node`, then serve them with `createCatchAllHandler` or register each
-compiled route on the framework's router.
-
-## Minimal Example
-
-Define HTTP routes in a module without side effects:
-
-```ts routes.ts
-import { route } from "@rest-rpc/server";
-import { z } from "zod";
-
-const todos = new Map<string, { id: string; title: string }>();
-
-export const routes = {
-	todos: {
-		create: route
-			.body(z.object({ title: z.string().min(1) }))
-			.handler(({ body: { title } }) => {
-				const todo = { id: crypto.randomUUID(), title };
-				todos.set(todo.id, todo);
-				return todo;
-			}),
-		get: route
-			.get("/todos/:id")
-			.params(z.object({ id: z.string() }))
-			.error("TODO_NOT_FOUND", { status: 404 })
-			.handler(({ params, errors }) => {
-				const todo = todos.get(params.id);
-				if (!todo) throw new errors.TODO_NOT_FOUND();
-				return todo;
-			}),
-	},
-};
-```
-
-A handler returns a body for a 200 response, or an envelope with a numeric 2xx
-`status`. Errors are declared with `.error()` and thrown; they are sent as JSON
-`{ code, message, data? }` and clients reject with them. Serve the routes:
-
-```ts server.ts
-import { createServer } from "node:http";
-import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server/node";
-import { routes } from "./routes";
-
-const handler = createCatchAllHandler(compileRoutes(routes));
-
-createServer(async (req, res) => {
-	const { matched } = await handler(req, res);
-	if (!matched) res.writeHead(404).end();
-}).listen(3000);
-```
-
-To use a framework's router instead, loop `compileRoutes(routes)` and register
-each `route.method` and `route.path` with a handler that calls
-`route.handle(...)` with the native request. rest-rpc reads request bodies
-itself, so skip the framework's body parsing on those routes.
-
-Extract the client contract from the route tree at build time, then call the
-routes as typed functions:
-
-```ts extract-contract.ts
-import { writeFile } from "node:fs/promises";
-import { extractContract } from "@rest-rpc/core";
-import { routes } from "./routes";
-
-await writeFile("contract.json", JSON.stringify(extractContract(routes)));
-```
-
-```ts
-import { initClient, safe } from "@rest-rpc/core";
-import type { routes } from "./routes";
-import contract from "./contract.json";
-
-const api = contract as unknown as typeof routes;
-const client = initClient(api, { baseUrl: "http://localhost:3000" });
-
-const created = await client.todos.create({ body: { title: "Write docs" } });
-const [error, response] = await safe(
-	client.todos.get({ params: { id: created.body.id } }),
-);
-if (!error) console.log(response.body.title);
-```
-
-## Packages
-
-Use only packages required by the detected stack:
-
-- `@rest-rpc/core`: route declarations, clients, OpenAPI and contract extraction
-- `@rest-rpc/tanstack-query`: TanStack Query integration
-- `@rest-rpc/server`: route handlers. The root serves Fetch `Request`/`Response` runtimes and frameworks (Bun, Deno, Workers, Hono). Import `compileRoutes` and `createCatchAllHandler` from `@rest-rpc/server/node` for Node `IncomingMessage`/`ServerResponse` servers and frameworks (`node:http`, Express, Fastify)
-
-## When To Read Docs
-
-The hosted docs are the source of truth for current APIs. Do not fetch docs for trivial architecture choices already covered here or on project's existing architecture. Do fetch docs before using unfamiliar exports, adding an integration, writing examples, or changing behavior that depends on exact package APIs.
-
-Prefer targeted retrieval:
-
-### Via MCP (Preferred)
-
-The full documentation is available via MCP tools.
-
-If tools are not installed they can be added using:
-
-For Codex:
+Every `@rest-rpc/*` package ships the same `README.md`: a cheatsheet of the
+whole API with code examples, matching the installed version. Read it before
+writing rest-rpc code:
 
 ```bash
-codex mcp add rest-rpc --url https://rest-rpc.vercel.app/mcp
+cat node_modules/@rest-rpc/core/README.md
 ```
 
-For Claude Code:
+Any installed `@rest-rpc/*` package works. In a monorepo, read it from the
+workspace package that depends on rest-rpc, and verify the path instead of
+guessing. If no package is installed yet, read the hosted copy at
+`https://rest-rpc.vercel.app/docs/cheatsheet`.
 
-```bash
-claude mcp add --transport http rest-rpc https://rest-rpc.vercel.app/mcp
-```
+Each cheatsheet section heading links to the full documentation for that
+section.
 
-1. MCP `search_docs`
-2. MCP `get_page`
-3. MCP `list_pages` or `get_navigation` when discovery is needed
+## When the Cheatsheet Is Not Enough
 
-### Via fetching docs directly from the hosted site (only when MCP is unavailable)
+Use the hosted docs only for details the cheatsheet does not cover, such as
+exact edge-case behavior, every option of an API, or full integration guides.
+The hosted docs describe the latest release, which can differ from the
+installed version.
 
-Useful indexes:
-
-- `https://rest-rpc.vercel.app/agent-readability.json`
-- `https://rest-rpc.vercel.app/llms.txt`
-
-### Via reading source code (when the documentation does not cover the needed details)
-
-Read the source code from the installed package location. Exact paths differ based on package manager,
-do not guess the install location and verify the path before reading. Each package ships `dist/` that contains
-the transpiled JavaScript files and the TypeScript type declaration files. Each exported symbol is documented with
-TSDoc comments. The source code is the ultimate source of truth for the current API, but it is not a substitute for the hosted docs.
+1. MCP tools, preferred: `search_docs`, then `get_page`, and `list_pages` or
+   `get_navigation` for discovery. Add the server if it is missing:
+   - Codex: `codex mcp add rest-rpc --url https://rest-rpc.vercel.app/mcp`
+   - Claude Code: `claude mcp add --transport http rest-rpc https://rest-rpc.vercel.app/mcp`
+2. Without MCP, fetch the page the cheatsheet links to, or use the indexes at
+   `https://rest-rpc.vercel.app/llms.txt` and
+   `https://rest-rpc.vercel.app/agent-readability.json`.
+3. For details the docs do not cover, read the installed package's `dist/`:
+   transpiled JavaScript and `.d.ts` files with TSDoc on every export.
 
 ## Project Workflow
 
-For implementation tasks:
-
-1. Inspect package manager, TypeScript config, framework/runtime, existing API shape, validation library, workspace layout, and installed `rest-rpc` versions.
-2. Read targeted docs only when exact current API details are needed.
-3. Install missing `rest-rpc` packages with the detected package manager.
-4. Use the server runtime that matches the project's native request type. Prefer normal framework organization such as Express routers, Fastify plugins, Hono route modules, or framework catch-all routes.
-5. Declare routes with the runtime's `route` builder and export the completed route tree from a module without side effects. Request segment schemas validate requests, and handler returns infer response types.
-6. Extract the client contract with `extractContract(routes)` at build time, and give it the route tree type with a type-only import in client code.
-7. Loop `compileRoutes(routes)` when registering with a framework router. Use `createCatchAllHandler(compileRoutes(routes))` when rest-rpc should do the routing. Pass framework values that handlers need through the `context` option of `handle`.
-8. Register routes in multiple modules when useful; route trees and handlers don't have to be monolithic.
-9. Use typed client utils for direct calls. Use `@rest-rpc/tanstack-query` for query/mutation options and keys when TanStack Query should be used instead.
-10. If using contract-first declare contract in a package that both server and client depend on. Use `implement` to convert the contract into a server route tree and add handlers. Use the contract directly on the `initClient` call to create a typed client. No extraction step is needed when the contract is shared.
-11. Let types infer from the route declarations. If inference is not enough, prefer exported helper types over new ad-hoc types.
+1. Inspect package manager, TypeScript config, framework/runtime, existing API
+   shape, validation library, workspace layout, and installed `rest-rpc`
+   versions.
+2. Install only the packages the stack needs: `@rest-rpc/server` for routes,
+   `@rest-rpc/core` for clients, contracts and OpenAPI, and
+   `@rest-rpc/tanstack-query` when the app uses TanStack Query.
+3. Use the server runtime that matches the project's native request type:
+   `@rest-rpc/server` for Fetch `Request` (Bun, Deno, Workers, Hono) and
+   `@rest-rpc/server/node` for Node `IncomingMessage` (`node:http`, Express,
+   Fastify). Follow the framework's normal organization, such as Express
+   routers, Fastify plugins, or Hono route modules.
+4. Export route trees from modules without side effects, so contract
+   extraction can import them at build time. Route trees can be split across
+   modules and composed.
+5. Let types infer from route declarations. When inference is not enough,
+   prefer the exported type helpers over ad-hoc types.
