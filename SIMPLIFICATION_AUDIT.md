@@ -16,12 +16,6 @@ Most are one-line edits.
 | ----------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------- |
 | `CONTRIBUTING.md:28-35` | Repeats the Public API rules from `AGENTS.md` and leaves out the `@rest-rpc/server/node` exception. | Add the exception, or replace the section with a pointer to `AGENTS.md` so there is one copy. | decision   |
 
-## 8. Small core simplifications and unjustified guards
-
-- **`packages/core/src/codecs/operations.ts:21`, `packages/server/src/pipeline/handleHttpRoute.test.ts:423-428`**
-  - Problem: `isAsyncIterable` also checks that `[Symbol.asyncIterator]` is a function. That only guards an object with a non-function `Symbol.asyncIterator` key, which no realistic handler returns, and it has a dedicated test.
-  - Change: drop the check and the test. **decision**
-
 ## 10. Doc trimming
 
 Overlap and verbosity, not errors.
