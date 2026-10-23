@@ -8,14 +8,6 @@ Confidence: **certain** means the change keeps behavior or fixes a contradiction
 
 ---
 
-## 1. Docs that contradict the code
-
-Most are one-line edits.
-
-| Location                | What's wrong                                                                                        | Change                                                                                        | Confidence |
-| ----------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------- |
-| `CONTRIBUTING.md:28-35` | Repeats the Public API rules from `AGENTS.md` and leaves out the `@rest-rpc/server/node` exception. | Add the exception, or replace the section with a pointer to `AGENTS.md` so there is one copy. | decision   |
-
 ## 10. Doc trimming
 
 Overlap and verbosity, not errors.
