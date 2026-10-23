@@ -20,9 +20,6 @@ Most are one-line edits.
 
 One "use or move to core" refactor covers all of these.
 
-- **`packages/server/src/builder/implement.ts:16-17,36-47`**
-  - Problem: has its own `mapContractRoutes` and an `isContractRoute` wrapper over `isRouteLeaf`. Core's `mapContractRoutes` (`traversal.ts:35`) already does this, and both callers only read `route["~restrpc"]`.
-  - Change: use core's version and delete the local copies. **certain**
 - **`packages/server/src/builder/routeBuilder.ts:108-119`**
   - Problem: `handler()` repeats core's `defaultRouteState` (`core/src/contract/routeBuilder.ts:129`): POST, `path: undefined`, `responses: {}`.
   - Change: export `defaultRouteState` through the internal contract barrel, or make it a protected builder method, and reuse it. **certain**

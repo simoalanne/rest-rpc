@@ -1,4 +1,8 @@
-import { isRouteLeaf, type Contract } from "@rest-rpc/core/contract";
+import {
+	isRouteLeaf,
+	mapContractRoutes,
+	type Contract,
+} from "@rest-rpc/core/contract";
 import type { ContractImplementer } from "./implement.types.ts";
 import type {
 	RuntimeRouteHandler,
@@ -7,18 +11,9 @@ import type {
 import type { DefaultContext } from "./context.ts";
 import { ServerRouteBuilder } from "./routeBuilder.ts";
 
-type RuntimeRoute = { readonly "~restrpc": ServerRouteBuilderState };
-
-type RuntimeContractTree =
-	| RuntimeRoute
-	| { readonly [key: string]: RuntimeContractTree };
-
-const isContractRoute = (value: RuntimeContractTree): value is RuntimeRoute =>
-	isRouteLeaf(value);
-
-const assertUnimplementedRoutes = (contract: RuntimeContractTree): void => {
-	if (isContractRoute(contract)) {
-		const state = contract["~restrpc"];
+const assertUnimplementedRoutes = (contract: Contract): void => {
+	if (isRouteLeaf(contract)) {
+		const state: ServerRouteBuilderState = contract["~restrpc"];
 		if (state.handler !== undefined) {
 			throw new Error("Cannot implement a route that already has a handler.");
 		}
@@ -33,34 +28,20 @@ const assertUnimplementedRoutes = (contract: RuntimeContractTree): void => {
 	}
 };
 
-const mapContractRoutes = (
-	contract: RuntimeContractTree,
-	map: (route: RuntimeRoute) => RuntimeRoute,
-): RuntimeContractTree => {
-	if (isContractRoute(contract)) return map(contract);
-
-	return Object.fromEntries(
-		Object.entries(contract).map(([key, child]) => [
-			key,
-			mapContractRoutes(child, map),
-		]),
-	);
-};
-
 const appendMiddlewareToRoutes = (
-	contract: RuntimeContractTree,
+	contract: Contract,
 	middleware: RuntimeRouteHandler,
-): RuntimeContractTree =>
-	mapContractRoutes(contract, (route) => {
-		const state = route["~restrpc"];
+): Contract =>
+	mapContractRoutes(contract, (declaration) => {
+		const state: ServerRouteBuilderState = declaration;
 		return new ServerRouteBuilder({
 			...state,
 			middleware: [...(state.middleware ?? []), middleware],
 		});
-	});
+	}) as Contract;
 
-const createImplementer = (contract: RuntimeContractTree): object => {
-	if (isContractRoute(contract)) return contract;
+const createImplementer = (contract: Contract): object => {
+	if (isRouteLeaf(contract)) return contract;
 
 	return {
 		...contract,
@@ -81,12 +62,11 @@ const createImplementer = (contract: RuntimeContractTree): object => {
 export function implement<const TContract extends Contract>(
 	contract: TContract,
 ): ContractImplementer<TContract, DefaultContext> {
-	const runtimeContract = contract as unknown as RuntimeContractTree;
-	assertUnimplementedRoutes(runtimeContract);
+	assertUnimplementedRoutes(contract);
 	return createImplementer(
 		mapContractRoutes(
-			runtimeContract,
-			(route) => new ServerRouteBuilder(route["~restrpc"]),
-		),
+			contract,
+			(declaration) => new ServerRouteBuilder(declaration),
+		) as Contract,
 	) as ContractImplementer<TContract, DefaultContext>;
 }
