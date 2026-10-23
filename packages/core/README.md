@@ -233,7 +233,7 @@ import type {
 // Infer from a route without .handler() (or a contract route), then attach it.
 const declaration = route.get("/todos/:id").response(todoSchema);
 
-type GetRequest = InferServerRequest<typeof declaration>; // { params, query, headers, body }
+type GetRequest = InferServerRequest<typeof declaration>; // handler argument: { params, ..., context, signal }
 type GetResponse = InferServerResponse<typeof declaration>; // declared envelopes
 const getTodo: InferServerHandler<typeof declaration> = ({ params }) =>
 	findTodo(params.id);
@@ -324,6 +324,7 @@ export const api = {
 			.get("/todos/:id")
 			.response(todoSchema)
 			.error("TODO_NOT_FOUND", { status: 404 }),
+		create: route.body(newTodoSchema).response(todoSchema),
 	},
 };
 ```
@@ -331,9 +332,21 @@ export const api = {
 ```ts server.ts
 import { implement } from "@rest-rpc/server";
 
-const impl = implement(api).$context<{ user: User }>().use(auth); // `use`/`$context` are reserved keys
+// Implement one contract route, with its own $context<T>() and .use() if needed...
+const get = implement(api.todos.get).handler(({ params }) =>
+	findTodo(params.id),
+);
+
+// ...or implement a contract tree to share context and middleware with every
+// route in it. `use`/`$context` are reserved top-level keys.
+const todos = implement(api.todos).$context<{ user: User }>().use(auth);
 export const routes = {
-	todos: { get: impl.todos.get.handler(({ params }) => findTodo(params.id)) },
+	todos: {
+		get: todos.get.handler(({ params }) => findTodo(params.id)),
+		create: todos.create.handler(({ body, context }) =>
+			createTodo(body, context.get("user")),
+		),
+	},
 };
 ```
 
@@ -348,7 +361,7 @@ route.body(type<{ title: string }>()); // types only, no runtime validation
 type((input: number) => input.toString()); // with a (possibly async) mapping
 
 // Skips schema validation only: types, OpenAPI and decoding are unaffected.
-compileRoutes(routes, {
+createApp(routes, {
 	disableRequestValidation: true,
 	disableResponseValidation: true,
 });
@@ -428,7 +441,7 @@ export default createApp(routes, {
 	notFound: (request) => new Response("Not found", { status: 404 }),
 	onError: (error, request) =>
 		error.status >= 500 && console.error(error.cause),
-	bodyCodecs: [binary], // plus the other compileRoutes options
+	bodyCodecs: [binary], // also disableRequestValidation, disableResponseValidation
 });
 
 const app = createApp(routes); // Bun: native router via app.routes
@@ -629,7 +642,6 @@ const document = createOpenApiDocument(routes, {
 	// Without a converter, schemas are emitted as empty Schema Objects.
 	schemaConverter: (schema, mode) =>
 		z.toJSONSchema(schema as z.ZodType, { io: mode }),
-	// transformParameter works the same way for generated parameters.
 	transformOperation: ({ route, routePath, operation }) => ({
 		...operation,
 		operationId: routePath.join("."),

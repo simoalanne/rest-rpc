@@ -3,10 +3,5 @@
 	"compilerOptions": {
 		"declaration": true
 	},
-	"exclude": [
-		"content/**",
-		"**/*.test.ts",
-		"**/*.test-d.ts",
-		"**/*.type-test.ts"
-	]
+	"exclude": ["content/**", "**/*.test.ts", "**/*.test-d.ts"]
 }

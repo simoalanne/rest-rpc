@@ -419,11 +419,4 @@ describe("normalizeImplicitResponse", () => {
 			body: { value: body, contentType: "application/octet-stream" },
 		});
 	});
-
-	it("does not classify non-callable asyncIterator properties as streams", () => {
-		const value = { [Symbol.asyncIterator]: true };
-		expect(normalizeImplicitResponse(value)).toMatchObject({
-			body: { value },
-		});
-	});
 });

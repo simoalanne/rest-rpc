@@ -3,14 +3,9 @@ import type { RouteDeclaration } from "./routeDeclaration.ts";
 import type { InferSchema, RequestScalar } from "./request.ts";
 import type { SseEvent } from "./sse.ts";
 import type { RouteError } from "./routeError.ts";
-import type { Merge } from "../utils/typeUtils.ts";
+import type { IsUnion, Merge } from "../utils/typeUtils.ts";
 
-/**
- * A whole-object schema for response headers whose output contains scalar
- * values. The counterpart of `RequestHeadersSchema`.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/route-builder}
- */
+/** A whole-object schema for response headers whose output contains scalar values. */
 export type ResponseHeadersSchema = StandardSchemaV1<
 	unknown,
 	Record<string, RequestScalar | undefined>
@@ -21,14 +16,7 @@ export type ResponseContentDeclaration = {
 	readonly [mediaType: string]: StandardSchemaV1;
 };
 
-/**
- * Canonical declaration for one route response.
- *
- * @remarks A `text/event-stream` entry is always an SSE stream, and its schema
- * validates each item.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/serialization}
- */
+/** A `text/event-stream` entry is always an SSE stream whose schema validates each item. */
 export type ResponseDeclaration = {
 	content?: ResponseContentDeclaration;
 	headers?: ResponseHeadersSchema;
@@ -49,12 +37,6 @@ export type ResponseOptions = {
 };
 
 export type RouteResponses = Record<number, ResponseDeclaration>;
-
-type IsUnion<T, TAll = T> = T extends unknown
-	? [TAll] extends [T]
-		? false
-		: true
-	: never;
 
 type ResponseContent<TResponse> = TResponse extends {
 	content: infer TContent;
@@ -203,7 +185,6 @@ type ClientErrorData<TDeclaration> = TDeclaration extends {
 	? InferSchema<TData, "output">
 	: undefined;
 
-/** The declared errors of a route as received by clients. */
 // The top-level conditional keeps editors from displaying this alias instead of the resolved union.
 export type ClientRouteError<E extends RouteDeclaration> = E extends {
 	errors: infer TErrors;

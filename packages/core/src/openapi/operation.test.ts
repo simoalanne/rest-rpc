@@ -1,11 +1,23 @@
+import type { Contract } from "../contract/contract.ts";
 import { route } from "../contract/routeBuilder.ts";
 import { type } from "../standard-schema/type.ts";
 import {
-	createOperation,
-	createParameters,
-	createRequestBody,
-	createResponse,
-} from "./operation.ts";
+	createOpenApiDocument,
+	type CreateOpenApiDocumentOptions,
+} from "./document.ts";
+
+// Documents a contract with one route and returns that route's operation.
+const operationOf = (
+	contract: Contract,
+	options: Omit<CreateOpenApiDocumentOptions, "info"> = {},
+) => {
+	const { paths } = createOpenApiDocument(contract, {
+		info: { title: "Test", version: "1" },
+		...options,
+	});
+	const [pathItem] = Object.values(paths);
+	return Object.values(pathItem!)[0]!;
+};
 
 describe("operation", () => {
 	it("documents declared response descriptions, headers and content types", () => {
@@ -19,21 +31,22 @@ describe("operation", () => {
 					? { type: "object" }
 					: { type: "string" },
 		);
+		const declared = route
+			.get("/")
+			.response(
+				{ "text/plain": text, "application/json": json },
+				{ headers, description: "Created" },
+			);
 		expect(
-			createResponse(
-				{
-					content: { "text/plain": text, "application/json": json },
-					headers,
-					description: "Created",
-				},
-				converter,
-			),
+			operationOf(declared, { schemaConverter: converter }).responses,
 		).toEqual({
-			description: "Created",
-			headers: { count: { schema: { type: "integer" } } },
-			content: {
-				"text/plain": { schema: { type: "string" } },
-				"application/json": { schema: { type: "object" } },
+			200: {
+				description: "Created",
+				headers: { count: { schema: { type: "integer" } } },
+				content: {
+					"text/plain": { schema: { type: "string" } },
+					"application/json": { schema: { type: "object" } },
+				},
 			},
 		});
 	});
@@ -41,11 +54,11 @@ describe("operation", () => {
 	it("documents declared errors grouped by status next to inferred responses", () => {
 		const data = type<{ id: string }>();
 		const headers = type<{ "retry-after": number }>();
-		const declaration = route
+		const declared = route
 			.get("/")
 			.error("NOT_FOUND", { status: 404, data, description: "Missing" })
 			.error("GONE", { status: 404, headers, description: "Deleted" })
-			.error("CONFLICT", { status: 409 })["~restrpc"];
+			.error("CONFLICT", { status: 409 });
 		const converter = (schema: unknown) =>
 			schema === headers
 				? { properties: { "retry-after": { type: "integer" } } }
@@ -60,7 +73,7 @@ describe("operation", () => {
 			required: ["code", "message", ...Object.keys(extra)],
 		});
 		expect(
-			createOperation(declaration, { schemaConverter: converter }).responses,
+			operationOf(declared, { schemaConverter: converter }).responses,
 		).toEqual({
 			default: {
 				description:
@@ -87,50 +100,42 @@ describe("operation", () => {
 		});
 	});
 
-	it("falls back to empty schemas and original operations when hooks return undefined", () => {
-		const declaration = route
+	it("falls back to empty schemas and the original operation when the hook returns undefined", () => {
+		const declared = route
 			.get("/")
 			.query(type<{ q: string }>())
-			.response(type<string>())["~restrpc"];
-		type Options = Parameters<typeof createOperation>[1];
+			.response(type<string>());
 		const transformOperation = vi.fn(
 			() => undefined,
-		) as unknown as Options["transformOperation"];
-		const transformParameter = vi.fn(
-			() => undefined,
-		) as unknown as Options["transformParameter"];
+		) as unknown as CreateOpenApiDocumentOptions["transformOperation"];
 		expect(
-			createOperation(declaration, {
+			operationOf(declared, {
 				schemaConverter: () => undefined,
 				transformOperation,
 			}),
 		).toMatchObject({
 			responses: { 200: { content: { "application/json": { schema: {} } } } },
 		});
-		expect(
-			createOperation(declaration, {
-				schemaConverter: () => ({ properties: { q: { type: "string" } } }),
-				transformParameter,
-			}).parameters,
-		).toEqual([
-			{ name: "q", in: "query", required: false, schema: { type: "string" } },
-		]);
 	});
+
 	it("combines repeated parameter constraints and unions required query keys", () => {
 		const first = type<{ id: string }>();
 		const second = type<{ id: string; optional?: string }>();
-		const options = {
-			schemaConverter: (schema: unknown) =>
-				schema === first
-					? { properties: { id: { type: "string" } }, required: ["id"] }
-					: {
-							properties: {
-								id: { minLength: 1 },
-								optional: { type: "string" },
-							},
+		const params = type<{ id: string; optional: string }>();
+		const schemaConverter = (schema: unknown) =>
+			schema === first
+				? { properties: { id: { type: "string" } }, required: ["id"] }
+				: {
+						properties: {
+							id: { minLength: 1 },
+							optional: { type: "string" },
 						},
-		};
-		expect(createParameters([first, second], "query", options)).toEqual([
+					};
+		expect(
+			operationOf(route.get("/").query(first).query(second), {
+				schemaConverter,
+			}).parameters,
+		).toEqual([
 			{
 				name: "id",
 				in: "query",
@@ -145,79 +150,89 @@ describe("operation", () => {
 			},
 		]);
 		expect(
-			createParameters([second], "path", options).map(
-				(parameter) => parameter.required,
-			),
+			operationOf(route.get("/:id/:optional").params(params), {
+				schemaConverter,
+			}).parameters?.map((parameter) => parameter.required),
 		).toEqual([true, true]);
 	});
 
 	it("combines stacked request schemas per media type", () => {
 		const json = type<{ name: string }>();
-		const body = createRequestBody(
-			{ "text/plain": [type<string>()], "application/json": [json, json] },
-			(schema) => (schema === json ? { type: "object" } : { type: "string" }),
-		);
-		expect(body?.content).toEqual({
+		const declared = route
+			.post("/")
+			.body({ "text/plain": type<string>(), "application/json": json })
+			.body(json);
+		expect(
+			operationOf(declared, {
+				schemaConverter: (schema) =>
+					schema === json ? { type: "object" } : { type: "string" },
+			}).requestBody?.content,
+		).toEqual({
 			"text/plain": { schema: { type: "string" } },
 			"application/json": {
 				schema: { allOf: [{ type: "object" }, { type: "object" }] },
 			},
 		});
-		expect(createRequestBody(undefined, undefined)).toBeUndefined();
+		expect(operationOf(route.get("/")).requestBody).toBeUndefined();
 	});
 
 	it("omits content for bodyless responses and uses SSE for streams", () => {
-		expect(createResponse({}, undefined)).toEqual({
-			description: "",
-		});
 		expect(
-			createResponse(
-				{
-					content: { "text/event-stream": type<string>() },
-					description: "Updates",
-				},
-				() => ({ type: "string" }),
-			),
+			operationOf(route.get("/").response({ status: 204 })).responses,
+		).toEqual({ 204: { description: "" } });
+		expect(
+			operationOf(
+				route
+					.get("/")
+					.streamResponse(type<string>(), { description: "Updates" }),
+				{ schemaConverter: () => ({ type: "string" }) },
+			).responses,
 		).toEqual({
-			description: "Updates",
-			content: { "text/event-stream": { schema: { type: "string" } } },
+			200: {
+				description: "Updates",
+				content: { "text/event-stream": { schema: { type: "string" } } },
+			},
 		});
 	});
 
-	it("passes transformed parameters into the operation hook with the contract path", () => {
-		const declaration = route
+	it("passes the generated operation and contract path into the operation hook", () => {
+		const list = route
 			.get("/users")
 			.query(type<{ q: string }>())
-			.response({ status: 204 })["~restrpc"];
+			.response({ status: 204 });
 		const transformOperation = vi.fn(({ operation }) => ({
 			...operation,
 			operationId: "users.list",
 		}));
-		const operation = createOperation(
-			declaration,
+		const operation = operationOf(
+			{ users: { list } },
 			{
 				schemaConverter: () => ({ properties: { q: { type: "string" } } }),
-				transformParameter: ({ parameter }) => ({
-					...parameter,
-					description: "Search",
-				}),
 				transformOperation,
 			},
-			["users", "list"],
 		);
-		expect(operation.parameters?.[0]?.description).toBe("Search");
 		expect(operation.operationId).toBe("users.list");
-		expect(transformOperation).toHaveBeenCalledWith(
-			expect.objectContaining({
-				route: declaration,
-				routePath: ["users", "list"],
-			}),
-		);
+		expect(transformOperation).toHaveBeenCalledWith({
+			route: list["~restrpc"],
+			routePath: ["users", "list"],
+			operation: {
+				parameters: [
+					{
+						name: "q",
+						in: "query",
+						required: false,
+						schema: { type: "string" },
+					},
+				],
+				responses: { 204: { description: "" } },
+			},
+		});
 	});
 
 	it("documents dynamic path segments without a params schema as strings", () => {
-		const declaration = route.get("/users/:id/posts/{slug}")["~restrpc"];
-		expect(createOperation(declaration, {}).parameters).toEqual([
+		expect(
+			operationOf(route.get("/users/:id/posts/{slug}")).parameters,
+		).toEqual([
 			{ name: "id", in: "path", required: true, schema: { type: "string" } },
 			{ name: "slug", in: "path", required: true, schema: { type: "string" } },
 		]);

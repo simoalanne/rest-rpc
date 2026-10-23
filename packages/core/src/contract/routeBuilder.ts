@@ -126,7 +126,9 @@ const mergeOpenApi = (
 	};
 };
 
-const defaultRouteState = (state: RouteBuilderState): RouteBuilderState => ({
+export const defaultRouteState = (
+	state: RouteBuilderState,
+): RouteBuilderState => ({
 	method: "POST",
 	path: undefined,
 	responses: {},
@@ -167,7 +169,7 @@ type RequiredParamsCheck<TSchema extends RequestParamsSchema> = [
 
 const addRequestSegment = (
 	state: RouteBuilderState,
-	segment: "query" | "params",
+	segment: "query" | "params" | "headers",
 	schema: StandardSchemaV1,
 ): RouteBuilderState => ({
 	...state,
@@ -210,19 +212,13 @@ const addError = (
 	};
 };
 
-/** Builder kind of the core route builder. */
 export interface RouteBuilderKind extends BuilderKind {
 	readonly builder: this["state"] extends infer TState extends BuilderState
 		? Omit<RouteBuilder<TState>, TState["omit"]>
 		: never;
 }
 
-/**
- * Immutable fluent route builder.
- *
- * @remarks Every method returns a new builder typed by `TKind`, which lets
- * packages extending the builder keep their own builder type.
- */
+/** Immutable route builder whose methods return a new builder typed by `TKind`. */
 export class RouteBuilder<
 	TState extends BuilderState = RootBuilderState,
 	TKind extends BuilderKind = RouteBuilderKind,
@@ -303,14 +299,9 @@ export class RouteBuilder<
 	headers<const TSchema extends RequestHeadersSchema>(
 		schema: TSchema,
 	): BuilderFor<TKind, WithRequest<TState, "headers", TSchema>> {
-		const state = defaultRouteState(this["~restrpc"]);
-		return this.clone({
-			...state,
-			request: {
-				...state.request,
-				headers: appendSchema(state.request?.headers, schema),
-			},
-		});
+		return this.clone(
+			addRequestSegment(defaultRouteState(this["~restrpc"]), "headers", schema),
+		);
 	}
 
 	/** Declares URL query parameters. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-request-segments} */

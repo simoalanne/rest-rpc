@@ -57,7 +57,9 @@ describe("extractContract", () => {
 		};
 		const contract = extractContract({ health: withHandler });
 		expect(JSON.parse(JSON.stringify(contract))).toEqual({
-			health: { "~restrpc": { method: "GET", path: "/health" } },
+			health: {
+				"~restrpc": { method: "GET", path: "/health", responses: {} },
+			},
 		});
 	});
 
@@ -116,6 +118,6 @@ describe("extractContract", () => {
 		const api = route.prefix("/api");
 		expect(
 			extractContract({ todos: { list: api.get() } }).todos.list["~restrpc"],
-		).toEqual({ method: "GET", path: "/api/todos/list" });
+		).toEqual({ method: "GET", path: "/api/todos/list", responses: {} });
 	});
 });

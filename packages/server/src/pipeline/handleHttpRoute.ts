@@ -1,4 +1,4 @@
-import { RouteError, type AbsolutePath } from "@rest-rpc/core";
+import { RouteError } from "@rest-rpc/core";
 import { isAsyncIterable, normalizeMediaType } from "@rest-rpc/core/codecs";
 import type {
 	ResponseContentDeclaration,
@@ -23,47 +23,8 @@ import { createContext } from "../builder/context.ts";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import { allMaybePromise, mapMaybePromise } from "./maybePromise.ts";
 
-/**
- * Per-request options for compiled routes and the catch-all handler.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#handle-options}
- */
-export type HandleOptions = {
-	/**
-	 * Initial context values, set before middleware runs. Values are not
-	 * type-checked against the context types routes declare.
-	 */
-	context?: Record<string, unknown>;
-	/**
-	 * Percent-decoded path params, for requests whose URL does not contain the
-	 * route path. When omitted, params a router set as `request.params`, as Bun
-	 * and Express do, are used, or else they are read from the request URL.
-	 */
-	params?: Record<string, string>;
-	/**
-	 * An already decoded request body, such as one parsed by a framework's body
-	 * parser. When the key is present, even as `undefined`, the request body is
-	 * not read. The value is still validated against the route's body schema.
-	 */
-	body?: unknown;
-};
-
-/**
- * Per-request options for the catch-all handler.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#mount-path}
- */
-export type CatchAllHandleOptions = HandleOptions & {
-	/**
-	 * The path the catch-all handler is mounted at, such as `/api`. Requests
-	 * outside it are unmatched, and it is removed from the request path before
-	 * matching. Route paths do not include it.
-	 */
-	mountPath?: AbsolutePath;
-};
-
 /** Inputs needed to invoke one route handler with decoded request segments. */
-export type ExecuteRouteOptions = {
+type ExecuteRouteOptions = {
 	request: RequestSegments;
 	/** Aborts when the client disconnects. */
 	signal: AbortSignal;
@@ -135,7 +96,7 @@ const normalizeResponseResult = (
 		? schema.headers
 			? result.headers
 			: undefined
-		: validateResponseHeaders(schema, result.headers);
+		: validateResponseHeaders(schema.headers, result.headers);
 
 	if (content === undefined) {
 		return mapMaybePromise(validatedHeaders, (headers) => ({
@@ -184,7 +145,7 @@ export type HttpRouteResult = {
 };
 
 /** A handler result with a numeric `status` is a response envelope; anything else is a 200 body. */
-export const isResponseEnvelope = (
+const isResponseEnvelope = (
 	value: unknown,
 ): value is ImplicitResponseEnvelope =>
 	typeof value === "object" &&
@@ -250,10 +211,7 @@ const normalizeHandlerResult = (
 
 const noErrors = {};
 
-/**
- * Validates decoded request segments, executes middleware and the handler, and
- * validates the selected output. Validation errors are thrown.
- */
+/** Validates the request, runs middleware and the handler, and validates the output, throwing validation errors. */
 export function executeRoute(
 	implementation: RuntimeImplementation,
 	options: ExecuteRouteOptions,
@@ -287,7 +245,7 @@ export function executeRoute(
 }
 
 /** Observes a `RouteError` that ends a stream after its response started. */
-export type StreamErrorObserver = (error: RouteError) => void;
+type StreamErrorObserver = (error: RouteError) => void;
 
 const observeStream = async function* (
 	stream: AsyncIterable<unknown>,
@@ -315,10 +273,7 @@ const toHttpRouteResult = (
 	};
 };
 
-/**
- * Validates an HTTP request, executes middleware and its handler, and
- * normalizes the selected output. Errors, including `RouteError`s, propagate.
- */
+/** Runs a route and normalizes its output for serialization. Errors, including `RouteError`s, propagate. */
 export function handleHttpRoute(
 	implementation: RuntimeImplementation,
 	options: ExecuteRouteOptions & { onStreamError?: StreamErrorObserver },

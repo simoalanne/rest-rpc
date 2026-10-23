@@ -1,4 +1,5 @@
-import type { Contract, RouteDeclaration } from "../contract/contract.ts";
+import type { Contract } from "../contract/contract.ts";
+import type { RouteDeclaration } from "../contract/routeDeclaration.ts";
 import { mapContractRoutes } from "../contract/traversal.ts";
 import { resolveRoutePath } from "../contract/path.ts";
 import { createBodyCodecRegistry, type BodyCodec } from "../codecs/index.ts";
@@ -9,22 +10,12 @@ import {
 	type FetchLike,
 	executeRequest,
 } from "./request.ts";
-import {
-	fetchResponse as fetchRouteResponse,
-	type RouteRequestFn,
-} from "./response.ts";
+import { readResponse } from "./response.ts";
 import type {
 	ClientRouteError,
 	DeclaredClientResponse,
 } from "../contract/response.ts";
 import type { ClientPromise } from "./safe.ts";
-
-export type FetchResponseFn<
-	E extends RouteDeclaration,
-	TGlobalHeaders extends ClientHeaders = Record<never, string>,
-> = (
-	...args: FetchArgs<E, TGlobalHeaders>
-) => ClientPromise<DeclaredClientResponse<E>, ClientRouteError<E> | Error>;
 
 /**
  * Infers the callable client operation for one declared route.
@@ -35,7 +26,11 @@ export type FetchResponseFn<
 export type ApiClientRouteValue<
 	E extends RouteDeclaration = RouteDeclaration,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
-> = E extends RouteDeclaration ? FetchResponseFn<E, TGlobalHeaders> : never;
+> = E extends RouteDeclaration
+	? (
+			...args: FetchArgs<E, TGlobalHeaders>
+		) => ClientPromise<DeclaredClientResponse<E>, ClientRouteError<E> | Error>
+	: never;
 
 /**
  * Infers the client tree for a contract.
@@ -88,26 +83,19 @@ export function initClient<
 ): ApiClientFor<TContract, TGlobalHeaders> {
 	const codecs = createBodyCodecRegistry(options.bodyCodecs ?? []);
 	const requestOptions = { ...options, codecs };
-	const request: RouteRequestFn = (route, ...args) =>
-		executeRequest(route, args, requestOptions);
-
-	const fetchResponse = (
-		route: RouteDeclaration & { path: string },
-		...args: FetchArgs
-	) =>
-		fetchRouteResponse(
-			request,
-			options.validateResponses ?? false,
-			codecs,
-			route,
-			...args,
-		);
+	const validate = options.validateResponses ?? false;
 
 	return mapContractRoutes(contract, (node, routePath) => {
 		const resolvedRoute = {
 			...node,
 			path: resolveRoutePath(node, routePath),
 		};
-		return (...args: FetchArgs) => fetchResponse(resolvedRoute, ...args);
+		return async (...args: FetchArgs) =>
+			readResponse(
+				await executeRequest(resolvedRoute, args, requestOptions),
+				resolvedRoute,
+				validate,
+				codecs,
+			);
 	}) as ApiClientFor<TContract, TGlobalHeaders>;
 }

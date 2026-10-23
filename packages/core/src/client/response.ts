@@ -1,5 +1,6 @@
 import { normalizeMediaType, type BodyCodecRegistry } from "../codecs/index.ts";
-import type { RouteDeclaration, RouteTree } from "../contract/contract.ts";
+import type { Contract } from "../contract/contract.ts";
+import type { RouteDeclaration } from "../contract/routeDeclaration.ts";
 import type { SseEvent } from "../contract/sse.ts";
 import type {
 	ClientRouteError,
@@ -21,7 +22,6 @@ import {
 	contractMismatch,
 	validateResponseValue,
 } from "./validateResponse.ts";
-import type { FetchArgs } from "./request.ts";
 
 /**
  * Infers a route's client result.
@@ -32,14 +32,12 @@ import type { FetchArgs } from "./request.ts";
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#call-routes}
  */
-export type InferClientResponse<T extends RouteTree> = T extends {
+export type InferClientResponse<T extends Contract> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
 	? DeclaredClientResponse<TRoute>
 	: {
-			[K in keyof T]: T[K] extends RouteTree
-				? InferClientResponse<T[K]>
-				: never;
+			[K in keyof T]: T[K] extends Contract ? InferClientResponse<T[K]> : never;
 		};
 
 /**
@@ -52,12 +50,12 @@ export type InferClientResponse<T extends RouteTree> = T extends {
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#typesafe-error-handling}
  */
-export type InferClientError<T extends RouteTree> = T extends {
+export type InferClientError<T extends Contract> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
 	? ClientRouteError<TRoute>
 	: {
-			[K in keyof T]: T[K] extends RouteTree ? InferClientError<T[K]> : never;
+			[K in keyof T]: T[K] extends Contract ? InferClientError<T[K]> : never;
 		};
 
 /**
@@ -70,12 +68,12 @@ export type InferClientError<T extends RouteTree> = T extends {
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#consume-streams}
  */
-export type InferClientStreamData<T extends RouteTree> = T extends {
+export type InferClientStreamData<T extends Contract> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDeclaration;
 }
 	? ClientStreamDataForDeclaration<TRoute>
 	: {
-			[K in keyof T]: T[K] extends RouteTree
+			[K in keyof T]: T[K] extends Contract
 				? InferClientStreamData<T[K]>
 				: never;
 		};
@@ -206,33 +204,13 @@ const readErrorResponse = async (
 	);
 };
 
-export type RouteRequestFn = <E extends RouteDeclaration & { path: string }>(
+/** Rejects with a `RouteError` for error responses with a `code`, and an `Error` for other responses outside the route contract. */
+export const readResponse = async <E extends RouteDeclaration>(
+	rawResponse: Response,
 	route: E,
-	...args: FetchArgs<E>
-) => Promise<Response>;
-
-/**
- * Reads a fetch response into a status envelope, or rejects with a
- * `RouteError` for error responses with a `code`, and an `Error` for other
- * responses outside the route contract.
- *
- * @remarks `text/event-stream` responses are parsed as SSE streams. Routes
- * without response declarations, such as routes with inferred responses,
- * accept every 2xx status. Routes with declarations, including extracted
- * ones, reject undeclared statuses and undeclared media types, streams
- * included. `contentType` is the received base media type, or `undefined`
- * without a content type.
- */
-export const fetchResponse = async <
-	E extends RouteDeclaration & { path: string },
->(
-	request: RouteRequestFn,
 	validateResponse: boolean,
 	codecs: BodyCodecRegistry,
-	route: E,
-	...args: FetchArgs<E>
 ) => {
-	const rawResponse = await request(route, ...args);
 	const { status } = rawResponse;
 	const mediaType = normalizeMediaType(rawResponse.headers.get("content-type"));
 	const contentType = mediaType || undefined;
@@ -247,8 +225,8 @@ export const fetchResponse = async <
 		);
 	}
 
-	const schema: ResponseDeclaration | undefined = route.responses?.[status];
-	const declaresResponses = Object.keys(route.responses ?? {}).length > 0;
+	const schema: ResponseDeclaration | undefined = route.responses[status];
+	const declaresResponses = Object.keys(route.responses).length > 0;
 	const breaksContract =
 		(!schema && declaresResponses) ||
 		(mediaType && schema?.content && !(mediaType in schema.content));

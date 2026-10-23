@@ -12,7 +12,7 @@ import { getPathParamNames } from "../contract/path.ts";
 
 type OpenApiSchema = Record<string, unknown>;
 
-export type OpenApiParameter = {
+type OpenApiParameter = {
 	name: string;
 	in: "path" | "query" | "header" | "cookie";
 	required?: boolean;
@@ -57,12 +57,6 @@ export type SchemaConverter = (
 	mode: "input" | "output",
 ) => OpenApiSchema | undefined;
 
-export type ParameterTransformContext = {
-	route: RouteDeclaration;
-	routePath: readonly string[];
-	parameter: OpenApiParameter;
-};
-
 export type OperationTransformContext = {
 	route: RouteDeclaration;
 	routePath: readonly string[];
@@ -71,7 +65,6 @@ export type OperationTransformContext = {
 
 type CreateOperationOptions = {
 	schemaConverter?: SchemaConverter;
-	transformParameter?: (context: ParameterTransformContext) => OpenApiParameter;
 	transformOperation?: (context: OperationTransformContext) => OpenApiOperation;
 };
 
@@ -82,22 +75,6 @@ const getSchemaProperties = (schema: OpenApiSchema) => {
 		!Array.isArray(properties)
 		? (properties as Record<string, OpenApiSchema>)
 		: {};
-};
-
-type SchemaRequiredKeys =
-	| { type: "known"; keys: unknown[] }
-	| { type: "unknown" };
-
-const getRequiredSchemaKeys = (schema: OpenApiSchema): SchemaRequiredKeys => {
-	if (Array.isArray(schema.required)) {
-		return { type: "known", keys: schema.required };
-	}
-
-	if (schema.type === "object" || schema.properties) {
-		return { type: "known", keys: [] };
-	}
-
-	return { type: "unknown" };
 };
 
 const mapContent = <TValue>(
@@ -111,7 +88,7 @@ const mapContent = <TValue>(
 		]),
 	);
 
-export const createParameters = (
+const createParameters = (
 	schemas: readonly StandardSchemaV1[] | undefined,
 	location: "path" | "query" | "header",
 	options: CreateOperationOptions,
@@ -129,10 +106,10 @@ export const createParameters = (
 				? { allOf: [properties[name], propertySchema] }
 				: propertySchema;
 		}
-		const schemaRequiredKeys = getRequiredSchemaKeys(jsonSchema);
-		if (schemaRequiredKeys.type === "known") {
-			for (const name of schemaRequiredKeys.keys) requiredKeys.add(name);
-		}
+		const required = Array.isArray(jsonSchema.required)
+			? jsonSchema.required
+			: [];
+		for (const name of required) requiredKeys.add(name);
 	}
 
 	return Object.entries(properties).map(([name, propertySchema]) => {
@@ -147,19 +124,19 @@ export const createParameters = (
 
 // Dynamic path segments without a params schema are received as strings.
 const createPathParameters = (
-	route: RouteDeclaration,
+	route: RouteDeclaration & { path: string },
 	options: CreateOperationOptions,
 ): OpenApiParameter[] =>
 	route.request?.params?.length
 		? createParameters(route.request.params, "path", options)
-		: getPathParamNames(route.path ?? "").map((name) => ({
+		: getPathParamNames(route.path).map((name) => ({
 				name,
 				in: "path",
 				required: true,
 				schema: { type: "string" },
 			}));
 
-export const createRequestBody = (
+const createRequestBody = (
 	body: RequestBodyDeclaration | undefined,
 	converter: SchemaConverter | undefined,
 ): OpenApiRequestBody | undefined => {
@@ -177,7 +154,7 @@ export const createRequestBody = (
 	};
 };
 
-export const createResponse = (
+const createResponse = (
 	responseDeclaration: ResponseDeclaration,
 	converter: SchemaConverter | undefined,
 ): OpenApiResponse => {
@@ -295,20 +272,16 @@ const createResponses = (
 };
 
 export const createOperation = (
-	route: RouteDeclaration,
+	route: RouteDeclaration & { path: string },
 	options: CreateOperationOptions,
-	routePath: readonly string[] = [],
+	routePath: readonly string[],
 ): OpenApiOperation => {
 	const { request } = route;
 	const parameters = [
 		...createPathParameters(route, options),
 		...createParameters(request?.query, "query", options),
 		...createParameters(request?.headers, "header", options),
-	].map(
-		(parameter) =>
-			options.transformParameter?.({ route, routePath, parameter }) ??
-			parameter,
-	);
+	];
 	const requestBody = createRequestBody(request?.body, options.schemaConverter);
 	const { extensions, ...openApi } = route.openApi ?? {};
 	const operation: OpenApiOperation = {

@@ -13,7 +13,6 @@ import type {
 	InferServerRequest,
 	InferServerResponse,
 	RouteHandler,
-	RouteHandlerFor,
 	RouteRequest,
 } from "./routeBuilder.types.ts";
 
@@ -78,7 +77,9 @@ describe("routeBuilder types", () => {
 	it("infers handler signatures for a route tree", () => {
 		const declaration = contractRoute.get("/").response(type<string>());
 		const tree = { users: { get: declaration } };
-		expectTypeOf<RouteHandlerFor<typeof tree>["users"]["get"]>().toEqualTypeOf<
+		expectTypeOf<
+			InferServerHandler<typeof tree>["users"]["get"]
+		>().toEqualTypeOf<
 			RouteHandler<(typeof declaration)["~restrpc"], DefaultContext>
 		>();
 	});
@@ -123,7 +124,7 @@ describe("routeBuilder types", () => {
 
 	it("returns envelopes or the body of a single declared response", () => {
 		const declared = contractRoute.get("/").response(type<string>());
-		type Handler = RouteHandlerFor<typeof declared>;
+		type Handler = InferServerHandler<typeof declared>;
 		type Envelope = {
 			status: 200;
 			contentType?: "application/json";
@@ -135,7 +136,7 @@ describe("routeBuilder types", () => {
 		const created = contractRoute
 			.post("/")
 			.response(type<string>(), { status: 201 });
-		type CreatedHandler = RouteHandlerFor<typeof created>;
+		type CreatedHandler = InferServerHandler<typeof created>;
 		type CreatedEnvelope = {
 			status: 201;
 			contentType?: "application/json";

@@ -11,12 +11,7 @@ import type {
 } from "./routeDeclaration.ts";
 import type { EmptyObject, Merge } from "../utils/typeUtils.ts";
 
-/**
- * Type-level state of a route builder.
- *
- * @remarks `method` is `undefined` only on the untouched root builder. `omit`
- * lists the builder methods that are no longer available.
- */
+/** `omit` lists the builder methods that are no longer available. */
 export type BuilderState = {
 	method: HttpMethod | undefined;
 	path: AbsolutePath | undefined;
@@ -29,7 +24,6 @@ export type BuilderState = {
 	omit: PropertyKey;
 };
 
-/** Builder state of the untouched root builder. */
 export type RootBuilderState = {
 	method: undefined;
 	path: undefined;
@@ -42,10 +36,7 @@ export type RootBuilderState = {
 	omit: never;
 };
 
-/**
- * Replaces the `TChanges` fields of a builder state. Leaving the root without
- * choosing a method selects `POST`, matching the runtime default.
- */
+/** Leaving the root without choosing a method selects `POST`, matching the runtime default. */
 export type NextState<
 	TState extends BuilderState,
 	TChanges extends Partial<BuilderState>,
@@ -59,23 +50,18 @@ export type NextState<
 			: TState[TKey];
 };
 
-/**
- * Maps a builder state to the builder type returned by builder methods, so
- * packages extending the builder get their own builder type back.
- */
+/** Maps a builder state to a builder type, so packages extending the builder get their own type back. */
 export interface BuilderKind {
 	// `unknown` so applying a kind does not intersect the state with `BuilderState`.
 	readonly state: unknown;
 	readonly builder: unknown;
 }
 
-/** Resolves the builder type of a builder kind for a state. */
 export type BuilderFor<
 	TKind extends BuilderKind,
 	TState extends BuilderState,
 > = (TKind & { readonly state: TState })["builder"];
 
-/** Resolves the public route declaration represented by builder state. */
 export type DeclarationFor<TState extends BuilderState> =
 	TState["method"] extends HttpMethod
 		? Merge<

@@ -45,10 +45,7 @@ const parseFrame = async (
 	return { ...event, data: validated.value };
 };
 
-/**
- * Parses a `text/event-stream` response into events. Events that cannot be
- * decoded or fail validation end the stream with an `Error`.
- */
+/** Events that cannot be decoded or fail validation end the stream with an `Error`. */
 export async function* parseSseStream(
 	schema: StandardSchemaV1 | undefined,
 	response: Response & { body: ReadableStream<Uint8Array<ArrayBuffer>> },

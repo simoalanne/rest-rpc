@@ -80,46 +80,7 @@ const document = createOpenApiDocument(routes, {
 For object-shaped path and query schemas, rest-rpc reads top-level
 `properties` and `required` from the converted JSON Schema to create OpenAPI
 parameters. Schema records and headers do not always
-carry parameter-level requiredness in the converted schema. Use
-`transformParameter` when generated parameters need project-specific metadata.
-
-```ts
-const search = route
-	.get("/search")
-	.query(
-		z.object({
-			q: z
-				.string()
-				.min(1)
-				.meta({ openApi: { required: true } }),
-			cursor: z
-				.string()
-				.optional()
-				.meta({ openApi: { required: false } }),
-		}),
-	)
-	.response(z.array(todoSchema));
-
-const routes = { search };
-
-const document = createOpenApiDocument(routes, {
-	info: {
-		title: "Todo API",
-		version: "1.0.0",
-	},
-	schemaConverter: (schema, mode) =>
-		z.toJSONSchema(schema as z.ZodType, { io: mode }),
-	transformParameter: ({ parameter }) => {
-		const metadata = parameter.schema as
-			{ openApi?: { required?: boolean } } | undefined;
-		const required = metadata?.openApi?.required;
-
-		return typeof required === "boolean"
-			? { ...parameter, required }
-			: parameter;
-	},
-});
-```
+carry parameter-level requiredness in the converted schema.
 
 ## Route Metadata
 
@@ -169,9 +130,9 @@ documented only when the route declares them.
 
 ## Transform Hooks
 
-Use `transformParameter` and `transformOperation` when generated output needs
-project-specific changes. Both transform contexts include `routePath`, the route
-key path from the contract tree.
+Use `transformOperation` when generated output needs project-specific changes.
+The transform context includes `routePath`, the route key path from the
+contract tree.
 
 ```ts
 const document = createOpenApiDocument(routes, {
@@ -180,10 +141,6 @@ const document = createOpenApiDocument(routes, {
 		version: "1.0.0",
 	},
 	schemaConverter,
-	transformParameter: ({ parameter }) =>
-		parameter.name === "preview"
-			? { ...parameter, required: false }
-			: parameter,
 	transformOperation: ({ route, routePath, operation }) => {
 		if (route.metadata?.auth === "required") {
 			return {

@@ -22,7 +22,8 @@ For each route, the contract keeps only:
   declaration shape, `request.body`, with empty schema lists,
 - the status and media types of each declared response, as
   `responses: { 200: { content: { "application/json": null } } }`, so the
-  client rejects undeclared statuses and content types,
+  client rejects undeclared statuses and content types. Routes with inferred
+  responses get `responses: {}`,
 - the status of each [declared error](/docs/route-builder#declare-errors), as
   `errors: { CODE: { status } }`, so the client recognizes declared error
   codes.

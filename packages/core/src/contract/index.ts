@@ -1,73 +1,50 @@
-export type {
-	BodyContent,
-	DefaultBodyContentType,
-	KnownBodyContentType,
-	MediaType,
-} from "./body.ts";
+// Some exports have no importers in this repo but must stay: declaration emit
+// in consumer packages names them through this subpath.
 export type {
 	AbsolutePath,
 	HttpMethod,
+	// Named by implemented contract routes and by clients made from a contract.
 	OpenApiRouteOptions,
 	RouteDeclaration,
-	RouteErrors,
-	RouteMetadata,
-	RouteRequestDeclaration,
-	RequestBodyDeclaration,
 } from "./routeDeclaration.ts";
-export type { Contract, RouteTree } from "./contract.ts";
+export type { Contract } from "./contract.ts";
 export type {
 	BuilderFor,
 	BuilderKind,
 	BuilderState,
-	ContentFor,
 	DeclarationFor,
 	NextState,
 	RootBuilderState,
 } from "./routeBuilder.types.ts";
-export { RouteBuilder, type RouteBuilderKind } from "./routeBuilder.ts";
+// `RouteBuilderKind` is named by core's `route`.
 export {
-	isDeclaredError,
+	defaultRouteState,
+	RouteBuilder,
+	type RouteBuilderKind,
+} from "./routeBuilder.ts";
+export {
 	markDeclared,
 	RouteError,
 	routeError,
-	type AnyRouteErrorClass,
-	type RouteErrorClass,
+	// Named by `routeError()` classes, routes that declare errors, clients, and
+	// the server's built-in errors.
 	type RouteErrorClassFor,
-	type RouteErrorDeclaration,
-	type RouteErrorDefinitionOptions,
-	type RouteErrorOptions,
 } from "./routeError.ts";
-export { extractContract } from "./extract.ts";
 export {
 	getPathParamNames,
 	getPathParamSegmentName,
 	isPathParamSegment,
-	resolveRoutePath,
+	joinPrefix,
 	toColonPath,
 	toOpenApiPath,
-	type PathParamNames,
 } from "./path.ts";
+export type { RequestScalar, ServerRequest } from "./request.ts";
 export type {
-	InferSchemaInputs,
-	InferSchemaOutputs,
-	RequestBodySchema,
-	RequestHeadersSchema,
-	RequestParamsSchema,
-	RequestQuerySchema,
-	RequestScalar,
-	ServerRequest,
-} from "./request.ts";
-export type {
-	ClientRouteError,
-	DeclaredClientResponse,
 	ResponseContentDeclaration,
 	ResponseDeclaration,
 	ResponseHeadersSchema,
-	ResponseOptions,
-	RouteResponses,
 	ServerResponse,
 } from "./response.ts";
-export type { ContractRouteEntry } from "./traversal.ts";
 export {
 	contractRouteEntries,
 	isRouteLeaf,

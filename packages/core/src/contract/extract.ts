@@ -1,4 +1,4 @@
-import type { RouteTree } from "./contract.ts";
+import type { Contract } from "./contract.ts";
 import { resolveRoutePath } from "./path.ts";
 import { mapContractRoutes } from "./traversal.ts";
 
@@ -26,7 +26,7 @@ import { mapContractRoutes } from "./traversal.ts";
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/contract-extraction}
  */
-export function extractContract<const TRoutes extends RouteTree>(
+export function extractContract<const TRoutes extends Contract>(
 	routes: TRoutes,
 ): TRoutes {
 	return mapContractRoutes(routes, (route, routePath) => ({
@@ -42,20 +42,18 @@ export function extractContract<const TRoutes extends RouteTree>(
 			}),
 			// Media types keep a `null` schema, so the client checks statuses and
 			// content types without validating bodies.
-			...(Object.keys(route.responses ?? {}).length > 0 && {
-				responses: Object.fromEntries(
-					Object.entries(route.responses).map(([status, { content }]) => [
-						status,
-						content
-							? {
-									content: Object.fromEntries(
-										Object.keys(content).map((mediaType) => [mediaType, null]),
-									),
-								}
-							: {},
-					]),
-				),
-			}),
+			responses: Object.fromEntries(
+				Object.entries(route.responses).map(([status, { content }]) => [
+					status,
+					content
+						? {
+								content: Object.fromEntries(
+									Object.keys(content).map((mediaType) => [mediaType, null]),
+								),
+							}
+						: {},
+				]),
+			),
 			...(route.errors && {
 				errors: Object.fromEntries(
 					Object.entries(route.errors).map(([code, { status }]) => [

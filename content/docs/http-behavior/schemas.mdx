@@ -76,14 +76,14 @@ enabled. See [Fetch Client](/docs/client/fetch-client#response-validation).
 
 ## Disabling Server Validation
 
-`compileRoutes` accepts `disableRequestValidation` and
+`createApp` accepts `disableRequestValidation` and
 `disableResponseValidation` options. Both default to `false`. These options
 disable only schema validation. Request decoding, content-type checks, route
 matching, response status and content-type selection, and response serialization
 still run normally.
 
 ```ts
-compileRoutes(routes, {
+createApp(routes, {
 	disableRequestValidation: true,
 	disableResponseValidation: true,
 });

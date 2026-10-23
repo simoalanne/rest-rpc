@@ -106,7 +106,7 @@ const tenant = route
 
 const getTodo = tenant
 	.get("/todos/:id")
-	.params(z.object({ id: z.coerce<number>() }))
+	.params(z.object({ id: z.coerce.number() }))
 	.handler(({ params }) => findTodo(params.tenant, params.id));
 ```
 
@@ -452,9 +452,10 @@ type CreateTodoRequest = ServerRequests["todos"]["create"];
 
 ### Infer Server Request
 
-`InferServerRequest` is the validated request a handler receives, without
-context or `signal`. Use it to pass validated input to code that does
-not depend on the server framework.
+`InferServerRequest` is the object a handler receives, with every field listed
+in [Handler Arguments](#handler-arguments), including `context` and `signal`.
+Use it to pass validated input to code that does not depend on the server
+framework.
 
 ```ts twoslash
 import type { InferServerRequest } from "@rest-rpc/server";

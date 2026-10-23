@@ -7,10 +7,7 @@ export const joinPrefix = (
 ): AbsolutePath =>
 	prefix === undefined ? path : path === "/" ? prefix : `${prefix}${path}`;
 
-/**
- * Returns the declared path, which already includes the prefix, or the path
- * derived from the route's tree keys with the prefix prepended.
- */
+/** The declared path, which includes the prefix, or the path of the tree keys under the prefix. */
 export const resolveRoutePath = (
 	route: Pick<RouteDeclaration, "path" | "prefix">,
 	treePath: readonly string[],
@@ -19,27 +16,14 @@ export const resolveRoutePath = (
 
 const pathParamSegmentPattern = /^(?::([^/]+)|\{([^/]+)\})$/;
 
-const pathParamNameFromCaptures = (
-	colonName: string | undefined,
-	openApiName: string | undefined,
-) => {
-	const name = colonName ?? openApiName;
-	if (name === undefined) {
-		throw new Error("Expected path param match to include a name.");
-	}
-	return name;
-};
-
 export const getPathParamSegmentName = (segment: string) => {
 	const match = pathParamSegmentPattern.exec(segment);
-	if (!match) return undefined;
-	return pathParamNameFromCaptures(match[1], match[2]);
+	return match ? (match[1] ?? match[2]) : undefined;
 };
 
 export const isPathParamSegment = (segment: string) =>
 	getPathParamSegmentName(segment) !== undefined;
 
-/** Returns the names of the dynamic segments of a path, in order. */
 export const getPathParamNames = (path: string) =>
 	path.split("/").flatMap((segment) => {
 		const name = getPathParamSegmentName(segment);

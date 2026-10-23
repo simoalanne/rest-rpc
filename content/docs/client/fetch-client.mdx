@@ -254,9 +254,6 @@ async function connect() {
 ```ts
 const client = initClient(api, {
 	baseUrl: "https://api.example.com",
-	globalHeaders: {
-		authorization: () => `Bearer ${readToken()}`,
-	},
 	timeoutMs: 10_000,
 	fetchOptions: {
 		credentials: "include",
@@ -276,12 +273,12 @@ const client = initClient(api, {
 			description: "Custom fetch-compatible function used to send requests.",
 		},
 		fetchOptions: {
-			type: "ApiClientFetchOptions",
+			type: 'Omit<FetchOptions, "signal" | "additionalHeaders">',
 			description:
-				"Default fetch options merged into every request. Excludes `signal`, which can only be passed per call.",
+				"Default fetch options merged into every request. Excludes `signal` and `additionalHeaders`, which can only be passed per call.",
 		},
 		bodyCodecs: {
-			type: "readonly BodyCodec<Response>[]",
+			type: "readonly BodyCodec[]",
 			description:
 				"Custom body codecs that take precedence over the defaults. See Serialization and Codecs.",
 		},

@@ -10,7 +10,7 @@ A local call runs the same route pipeline as an HTTP request:
 3. The handler output is validated with the route's response schemas.
 
 The steps that only exist for HTTP are skipped: body decoding, request content
-type checks, body size limits, and response serialization. The result is the
+type checks, and response serialization. The result is the
 validated output, not an encoded `Response`.
 
 ## One-off Calls
