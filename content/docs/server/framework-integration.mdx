@@ -211,7 +211,6 @@ type HandleOptions = {
 [Declared and built-in errors](/docs/http-behavior/errors) are sent as error
 responses, and observed with `onError` from the
 [compile options](/docs/server/fetch#error-handling). Other errors thrown by
-handlers or middleware, including errors with a code the route does not
-declare, reject the promise returned by `handle` or the catch-all handler, so
-pass them to the framework's error handling, as the Express examples do with
-`next`.
+handlers or middleware reject the promise returned by `handle` or the
+catch-all handler, so pass them to the framework's error handling, as the
+Express examples do with `next`.
