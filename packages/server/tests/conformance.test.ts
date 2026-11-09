@@ -583,11 +583,11 @@ describe("node adapter", () => {
 			{ mountPath: "/api" },
 		);
 		const server = await new Promise<Server>((resolve) => {
-			const started = nodeAdapter.serve(
-				app,
-				{ port: 0, hostname: "127.0.0.1" },
-				() => resolve(started),
-			);
+			const started = nodeAdapter.serve(app, {
+				port: 0,
+				hostname: "127.0.0.1",
+				onListen: () => resolve(started),
+			});
 		});
 		try {
 			const { port } = server.address() as AddressInfo;

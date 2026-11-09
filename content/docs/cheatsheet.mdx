@@ -442,7 +442,10 @@ Bun.serve({ ...app, routes: { ...app.routes, "/health": new Response("ok") } });
 import { createApp } from "@rest-rpc/server";
 import { serve } from "@rest-rpc/server/node";
 
-const server = serve(createApp(routes), { port: 3000 }, onListening);
+const server = serve(createApp(routes), {
+	port: 3000,
+	onListen: ({ port }) => log(port),
+});
 process.on("SIGTERM", () => server.close()); // returns the http.Server
 ```
 
