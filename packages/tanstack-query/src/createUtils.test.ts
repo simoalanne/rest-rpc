@@ -1,118 +1,175 @@
-import {
-	QueryClient,
-	skipToken,
-	type QueryFunction,
-} from "@tanstack/query-core";
-import { createTanstackUtilsForRoute } from "./createUtils.ts";
+import { route, routeError, type } from "@rest-rpc/core";
+import { MutationObserver, QueryClient, skipToken } from "@tanstack/query-core";
+import { createTanstackQueryUtils } from "./createUtils.ts";
 
-describe("createUtils", () => {
-	it("builds route keys and forwards query requests, fetch options, and the query signal", async () => {
-		const fetchData = vi.fn().mockResolvedValue("result");
-		const utils = createTanstackUtilsForRoute({
-			routePath: ["users", "list"],
-			fetchData,
-		});
-		const request = { page: 1 };
-		const signal = new AbortController().signal;
-		const options = utils.queryOptions({
-			request,
-			staleTime: 100,
-			fetchOptions: { credentials: "include" },
-		});
-		expect(options.queryKey).toEqual(["users", "list", request]);
-		expect(options.staleTime).toBe(100);
-		expect(options).not.toHaveProperty("request");
-		expect(options).not.toHaveProperty("fetchOptions");
-		expect(
-			await (
-				options.queryFn as (context: {
-					signal: AbortSignal;
-				}) => Promise<unknown>
-			)({ signal }),
-		).toBe("result");
-		expect(fetchData).toHaveBeenCalledWith(request, {
-			credentials: "include",
-			signal,
-		});
-		expect(utils.queryKey()).toEqual(["users", "list"]);
-		expect(utils.queryKey(request)).toEqual(options.queryKey);
-		expect(utils.mutationKey()).toEqual(["users", "list"]);
+const UserNotFound = routeError("USER_NOT_FOUND", { status: 404 });
+const contract = {
+	users: {
+		get: route
+			.get("/users/{id}")
+			.params(type<{ id: string }>())
+			.response(type<{ name: string }>())
+			.error(UserNotFound),
+		list: route
+			.get("/users")
+			.query(type<{ page: number }>())
+			.response(type<{ names: string[] }>()),
+		create: route
+			.post("/users")
+			.body(type<{ name: string }>())
+			.response(type<{ name: string }>()),
+	},
+	events: route.get("/events").streamResponse(type<{ value: number }>()),
+};
+
+const setup = (respond: () => Response) => {
+	const fetch = vi.fn(
+		async (_input: string | URL | Request, _init?: RequestInit) => respond(),
+	);
+	const utils = createTanstackQueryUtils(contract, {
+		baseUrl: "https://example.test",
+		fetch,
+	});
+	return { fetch, utils, client: new QueryClient() };
+};
+
+const eventStream = () =>
+	new Response('data: {"value":1}\n\ndata: {"value":2}\n\n', {
+		headers: { "content-type": "text/event-stream" },
 	});
 
-	it("uses skipToken for disabled queries and preserves explicit query keys", () => {
-		const utils = createTanstackUtilsForRoute({
-			routePath: ["list"],
-			fetchData: vi.fn(),
-		});
-		for (const options of [
-			utils.queryOptions({ request: skipToken }),
-			utils.infiniteQueryOptions({ request: skipToken }),
-			utils.streamedQueryOptions!({ request: skipToken }),
-		]) {
-			expect(options.queryFn).toBe(skipToken);
-			expect(options.queryKey).toEqual(["list"]);
-		}
+describe("createTanstackQueryUtils", () => {
+	it("mirrors the contract tree in query and mutation keys", () => {
+		const { utils } = setup(() => Response.json({}));
+		const request = { params: { id: "1" } };
+		expect(utils.users.get.queryKey(request)).toEqual([
+			"users",
+			"get",
+			request,
+		]);
+		expect(utils.events.queryKey()).toEqual(["events"]);
+		expect(utils.users.create.mutationKey()).toEqual(["users", "create"]);
+		expect(utils.users.get.queryOptions({ request }).queryKey).toEqual(
+			utils.users.get.queryKey(request),
+		);
 		expect(
-			utils.queryOptions({ request: skipToken, queryKey: ["custom"] }).queryKey,
+			utils.users.get.queryOptions({ request, queryKey: ["custom"] }).queryKey,
 		).toEqual(["custom"]);
 	});
 
-	it("maps infinite page parameters to requests and forwards mutation variables", async () => {
-		const fetchData = vi.fn().mockResolvedValue("ok");
-		const utils = createTanstackUtilsForRoute({
-			routePath: ["list"],
-			fetchData,
-		});
-		const options = utils.infiniteQueryOptions({
-			request: (page: number) => ({ page }),
-			initialPageParam: 0,
-		});
-		await (
-			options.queryFn as (context: { pageParam: number }) => Promise<unknown>
-		)({ pageParam: 2 });
-		expect(options.queryKey).toEqual(["list"]);
-		expect(fetchData).toHaveBeenLastCalledWith(
-			{ page: 2 },
-			{ signal: undefined },
+	it("fetches queries with the request, fetch options, and query signal", async () => {
+		const { fetch, utils, client } = setup(() =>
+			Response.json({ name: "Ada" }),
 		);
-		const mutation = utils.mutationOptions({
+		const options = utils.users.get.queryOptions({
+			request: { params: { id: "1" } },
+			staleTime: 100,
 			fetchOptions: { credentials: "include" },
 		});
-		await (mutation.mutationFn as (request: unknown) => Promise<unknown>)({
-			name: "Ada",
+		expect(options.staleTime).toBe(100);
+		expect(options).not.toHaveProperty("request");
+		expect(options).not.toHaveProperty("fetchOptions");
+		expect(await client.query(options)).toMatchObject({
+			status: 200,
+			body: { name: "Ada" },
 		});
-		expect(fetchData).toHaveBeenLastCalledWith(
-			{ name: "Ada" },
-			{ credentials: "include" },
-		);
+		const [url, init] = fetch.mock.lastCall!;
+		expect(String(url)).toBe("https://example.test/users/1");
+		expect(init).toMatchObject({ credentials: "include" });
+		expect(init?.signal).toBeInstanceOf(AbortSignal);
+		client.clear();
 	});
 
-	it("accumulates streamed chunks, unwraps response envelopes, and supports reducers", async () => {
-		async function* stream() {
-			yield 1;
-			yield 2;
+	it("rejects with the client's errors", async () => {
+		const { utils, client } = setup(() =>
+			Response.json(
+				{ code: "USER_NOT_FOUND", message: "Missing" },
+				{ status: 404 },
+			),
+		);
+		await expect(
+			client.query(
+				utils.users.get.queryOptions({
+					request: { params: { id: "1" } },
+					retry: false,
+				}),
+			),
+		).rejects.toMatchObject({ code: "USER_NOT_FOUND", status: 404 });
+		client.clear();
+	});
+
+	it("uses skipToken for disabled queries", () => {
+		const { fetch, utils } = setup(() => Response.json({}));
+		for (const options of [
+			utils.users.get.queryOptions({ request: skipToken }),
+			utils.users.list.infiniteQueryOptions({
+				request: skipToken,
+				initialPageParam: 0,
+				getNextPageParam: () => undefined,
+			}),
+			utils.events.streamedQueryOptions({ request: skipToken }),
+		]) {
+			expect(options.queryFn).toBe(skipToken);
 		}
-		const client = new QueryClient();
-		const utils = createTanstackUtilsForRoute({
-			routePath: ["stream"],
-			fetchData: async () => ({ body: stream() }),
-		});
-		const options = utils.streamedQueryOptions!();
 		expect(
-			await client.fetchQuery({
-				queryKey: ["stream"],
-				queryFn: options.queryFn as QueryFunction,
-			}),
-		).toEqual([1, 2]);
-		const reduced = utils.streamedQueryOptions!({
-			initialValue: 0,
-			reducer: (total, chunk) => Number(total) + Number(chunk),
+			utils.users.get.queryOptions({ request: skipToken }).queryKey,
+		).toEqual(["users", "get"]);
+		expect(fetch).not.toHaveBeenCalled();
+	});
+
+	it("maps infinite page parameters to requests", async () => {
+		const { fetch, utils, client } = setup(() =>
+			Response.json({ names: ["Ada"] }),
+		);
+		const options = utils.users.list.infiniteQueryOptions({
+			request: (page: number) => ({ query: { page } }),
+			initialPageParam: 2,
+			getNextPageParam: () => undefined,
 		});
-		expect(
-			await client.fetchQuery({
-				queryKey: ["sum"],
-				queryFn: reduced.queryFn as QueryFunction,
+		expect(options.queryKey).toEqual(["users", "list"]);
+		const data = await client.infiniteQuery(options);
+		expect(data.pages[0]).toMatchObject({ body: { names: ["Ada"] } });
+		expect(String(fetch.mock.lastCall![0])).toBe(
+			"https://example.test/users?page=2",
+		);
+		client.clear();
+	});
+
+	it("forwards mutation variables and fetch options", async () => {
+		const { fetch, utils, client } = setup(() =>
+			Response.json({ name: "Ada" }),
+		);
+		const observer = new MutationObserver(
+			client,
+			utils.users.create.mutationOptions({
+				fetchOptions: { credentials: "include" },
 			}),
+		);
+		expect(await observer.mutate({ body: { name: "Ada" } })).toMatchObject({
+			body: { name: "Ada" },
+		});
+		expect(fetch.mock.lastCall![1]).toMatchObject({
+			method: "POST",
+			body: JSON.stringify({ name: "Ada" }),
+			credentials: "include",
+		});
+		client.clear();
+	});
+
+	it("accumulates streamed events and supports reducers", async () => {
+		const { utils, client } = setup(eventStream);
+		expect(await client.query(utils.events.streamedQueryOptions())).toEqual([
+			{ data: { value: 1 } },
+			{ data: { value: 2 } },
+		]);
+		expect(
+			await client.query(
+				utils.events.streamedQueryOptions({
+					queryKey: ["sum"],
+					initialValue: 0,
+					reducer: (total, event) => total + event.data.value,
+				}),
+			),
 		).toBe(3);
 		client.clear();
 	});

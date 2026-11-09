@@ -1,21 +1,15 @@
-import {
-	initClient,
-	type InferClientError,
-	type InferClientRequest,
-	type InferClientResponse,
+import type {
+	InferClientError,
+	InferClientRequest,
+	InferClientResponse,
 } from "@rest-rpc/core";
 import type {
-	ApiClientOptions,
 	ClientHeaders,
 	ClientResponseBody,
 	FetchArgs,
 	FetchOptions,
 } from "@rest-rpc/core/client";
-import {
-	mapContractRoutes,
-	type Contract,
-	type RouteDeclaration,
-} from "@rest-rpc/core/contract";
+import type { Contract, RouteDeclaration } from "@rest-rpc/core/contract";
 import type {
 	DataTag,
 	InfiniteData,
@@ -26,7 +20,6 @@ import type {
 	QueryObserverOptions,
 	skipToken,
 } from "@tanstack/query-core";
-import { createTanstackUtilsForRoute } from "./createUtils.ts";
 
 type NoInferValue<T> = [T][T extends unknown ? 0 : never];
 
@@ -370,41 +363,3 @@ export type TanstackQueryUtilsFor<
 > = T extends QueryRoute
 	? TanstackQueryRouteValue<T, TGlobalHeaders>
 	: TanstackQueryTreeFor<T, TGlobalHeaders>;
-
-/**
- * Options used to create TanStack Query utils from a contract.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/client/tanstack-query#setup}
- */
-export type CreateTanstackQueryUtilsOptions<
-	TGlobalHeaders extends ClientHeaders = Record<never, string>,
-> = ApiClientOptions<TGlobalHeaders>;
-
-/**
- * Creates a TanStack Query util tree that mirrors a contract.
- *
- * @remarks Generated utils create options and stable query keys; they do not
- * create a `QueryClient` or call framework-specific hooks.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/client/tanstack-query#setup}
- */
-export function createTanstackQueryUtils<
-	TContract extends Contract,
-	const TGlobalHeaders extends ClientHeaders = Record<never, string>,
->(
-	contract: TContract,
-	options: CreateTanstackQueryUtilsOptions<TGlobalHeaders>,
-): TanstackQueryUtilsFor<TContract, TGlobalHeaders> {
-	const client: unknown = initClient(contract, options);
-
-	return mapContractRoutes(contract, (_route, path) => {
-		const routeFetchFn = path.reduce(
-			(node, key) => (node as Record<string, unknown>)[key],
-			client,
-		) as (...args: unknown[]) => Promise<unknown>;
-		return createTanstackUtilsForRoute({
-			routePath: path,
-			fetchData: (request, fetchOptions) => routeFetchFn(request, fetchOptions),
-		});
-	}) as TanstackQueryUtilsFor<TContract, TGlobalHeaders>;
-}
