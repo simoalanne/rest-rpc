@@ -6,7 +6,7 @@ import type {
 	MutationOptions,
 	QueryKey,
 	QueryObserverOptions,
-	skipToken,
+	SkipToken,
 } from "@tanstack/query-core";
 
 type NoInferValue<T> = [T][T extends unknown ? 0 : never];
@@ -81,9 +81,9 @@ type WithFetchOptions<T, TFetchOptions> = T & { fetchOptions?: TFetchOptions };
 type RequestOption<F extends ClientRoute> = [RouteRequestValue<F>] extends [
 	never,
 ]
-	? { request?: typeof skipToken }
+	? { request?: SkipToken }
 	: {
-			request: RouteRequestValue<F> | typeof skipToken;
+			request: RouteRequestValue<F> | SkipToken;
 		};
 
 type QueryOptionsFor<
@@ -141,11 +141,11 @@ type InfiniteQueryOptionsFor<
 		initialPageParam: TInitialPageParam;
 		queryKey?: QueryKey;
 	} & ([RouteRequestValue<F>] extends [never]
-			? { request?: typeof skipToken }
+			? { request?: SkipToken }
 			: {
 					request:
 						| ((pageParam: TPageParam) => RouteRequestValue<F>)
-						| typeof skipToken;
+						| SkipToken;
 				}) &
 		([TInitialPageParam] extends [TPageParam] ? unknown : never),
 	QueryFetchOptions<F>
@@ -321,7 +321,11 @@ type TanstackQueryStreamRouteValue<F extends ClientRoute> =
 			}
 		: Record<never, never>;
 
-type TanstackQueryRouteValue<F extends ClientRoute> =
+/**
+ * The TanStack Query option and key utils of one client route. Streaming
+ * routes also get `streamedQueryOptions`.
+ */
+export type TanstackQueryRouteValue<F extends ClientRoute> =
 	TanstackQueryBaseRouteValue<F> & TanstackQueryStreamRouteValue<F>;
 
 type TanstackQueryTreeFor<T> = {

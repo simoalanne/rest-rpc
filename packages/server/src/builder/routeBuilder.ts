@@ -72,6 +72,7 @@ type HandledRoute<
 	>;
 };
 
+/** The `handler()` method that completes a route. */
 export type HandlerMethodFor<
 	TRoute extends RouteDefinition,
 	TContext extends object = EmptyObject,
@@ -82,6 +83,7 @@ export type HandlerMethodFor<
 	): HandledRoute<TRoute, TContext, TResult>;
 };
 
+/** Maps a builder state to the server route builder type, without the methods it omits. */
 export interface ServerRouteBuilderKind<
 	TContext extends object = EmptyObject,
 > extends BuilderKind {

@@ -11,7 +11,8 @@ import type { ExtendContext } from "./context.ts";
 
 type ContractRoute = { readonly "~restrpc": RouteDefinition };
 
-type ContractImplementerNode<
+/** A contract implementer subtree, or a leaf with handler, middleware and context methods. */
+export type ContractImplementerNode<
 	TContract extends Contract,
 	TContext extends object,
 > = TContract extends ContractRoute
@@ -39,7 +40,8 @@ type ContractImplementerNode<
 			>;
 		};
 
-type ImplementerRootMethods<
+/** The `$context()` and `use()` methods of a contract implementer tree. */
+export type ImplementerRootMethods<
 	TContract extends Contract,
 	TContext extends object,
 > = {
@@ -56,7 +58,8 @@ type ImplementerRootMethods<
 	): ContractImplementerRoot<TContract, TContext>;
 };
 
-type ContractImplementerRoot<
+/** The root of a contract implementer tree, with methods applied to every route in it. */
+export type ContractImplementerRoot<
 	TContract extends Contract,
 	TContext extends object,
 > = TContract extends ContractRoute

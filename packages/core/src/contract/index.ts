@@ -1,9 +1,6 @@
-// Some exports have no importers in this repo but must stay: declaration emit
-// in consumer packages names them through this subpath.
 export type {
 	AbsolutePath,
 	HttpMethod,
-	// Named by implemented contract routes and by clients made from a contract.
 	OpenApiRouteOptions,
 	RouteDefinition,
 } from "./routeDefinition.ts";
@@ -15,8 +12,14 @@ export type {
 	DefinitionFor,
 	NextState,
 	RootBuilderState,
+	WithBody,
+	WithError,
+	WithHttpMethod,
+	WithMeta,
+	WithPrefix,
+	WithRequest,
+	WithResponse,
 } from "./routeBuilder.types.ts";
-// `RouteBuilderKind` is named by core's `route`.
 export {
 	defaultRouteState,
 	RouteBuilder,
@@ -26,8 +29,6 @@ export {
 	markDefined,
 	RouteError,
 	routeError,
-	// Named by `routeError()` classes, routes that define errors, clients, and
-	// the server's built-in errors.
 	type RouteErrorClassFor,
 } from "./routeError.ts";
 export {

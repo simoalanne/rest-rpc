@@ -1,6 +1,7 @@
 packages:
   - "packages/*"
   - "benchmarks"
+  - "declarations"
   - "content/"
 
 allowBuilds:
