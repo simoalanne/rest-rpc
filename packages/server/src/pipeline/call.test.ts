@@ -47,7 +47,7 @@ describe("call", () => {
 			status: 404,
 			data: type((id: number) => String(id)),
 		});
-		const thrown = vi.fn((): RouteError => new NotFound(1));
+		const thrown = vi.fn((): RouteError => new NotFound({ data: 1 }));
 		const implementation = route
 			.post("/")
 			.body(type<{ id: number }>())

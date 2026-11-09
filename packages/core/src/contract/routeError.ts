@@ -128,27 +128,28 @@ type InputOf<TSchema> = TSchema extends StandardSchemaV1
 	? StandardSchemaV1.InferInput<TSchema>
 	: undefined;
 
-type ConstructOptions<TDeclaration> = Merge<
-	{ message?: string; cause?: unknown } & (TDeclaration extends {
-		headers: infer THeaders extends StandardSchemaV1;
-	}
-		? { headers: StandardSchemaV1.InferInput<THeaders> }
-		: EmptyHeaders)
->;
-
-type EmptyHeaders = { headers?: never };
-
-type OptionsArg<TDeclaration> = TDeclaration extends {
-	headers: StandardSchemaV1;
-}
-	? [options: ConstructOptions<TDeclaration>]
-	: [options?: ConstructOptions<TDeclaration>];
-
-type ConstructArgs<TDeclaration> = TDeclaration extends {
+type DataOption<TDeclaration> = TDeclaration extends {
 	data: infer TData extends StandardSchemaV1;
 }
-	? [data: StandardSchemaV1.InferInput<TData>, ...OptionsArg<TDeclaration>]
-	: OptionsArg<TDeclaration>;
+	? { data: StandardSchemaV1.InferInput<TData> }
+	: { data?: never };
+
+type HeadersOption<TDeclaration> = TDeclaration extends {
+	headers: infer THeaders extends StandardSchemaV1;
+}
+	? { headers: StandardSchemaV1.InferInput<THeaders> }
+	: { headers?: never };
+
+type ConstructOptions<TDeclaration> = Merge<
+	{ message?: string; cause?: unknown } & DataOption<TDeclaration> &
+		HeadersOption<TDeclaration>
+>;
+
+type ConstructArgs<TDeclaration> = TDeclaration extends
+	| { data: StandardSchemaV1 }
+	| { headers: StandardSchemaV1 }
+	? [options: ConstructOptions<TDeclaration>]
+	: [options?: ConstructOptions<TDeclaration>];
 
 /** An error class created by `routeError`, with its declaration as static fields. */
 export type RouteErrorClass<
@@ -193,9 +194,9 @@ export type RouteErrorClassFor<
 /**
  * Defines an error that routes declare with `.error()` and code throws.
  *
- * @remarks Returns a subclass of `RouteError`. Construct it with the `data`
- * input first when a `data` schema is declared, and with `headers` in the
- * options when a headers schema is declared. The route's declaration decides
+ * @remarks Returns a subclass of `RouteError`. Construct it with an options
+ * object of `data`, `headers`, `message` and `cause`. `data` and `headers`
+ * are required when their schemas are declared. The route's declaration decides
  * the response, so throwing an error the executing route does not declare is
  * a programmer error.
  *
@@ -206,7 +207,7 @@ export type RouteErrorClassFor<
  * 	data: z.object({ id: z.string() }),
  * });
  *
- * throw new UserNotFound({ id: "42" });
+ * throw new UserNotFound({ data: { id: "42" } });
  * ```
  *
  * @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-errors}
@@ -228,15 +229,11 @@ export function routeError<
 		static readonly headers = headers;
 		static readonly description = description;
 
-		constructor(...args: unknown[]) {
-			const [value, constructOptions] = (
-				data ? args : [undefined, args[0]]
-			) as [unknown, ConstructOptions<object> | undefined];
+		constructor(errorOptions: Omit<RouteErrorOptions, "status"> = {}) {
 			super(code, {
-				...constructOptions,
+				...errorOptions,
 				status,
-				message: constructOptions?.message ?? message,
-				data: value,
+				message: errorOptions.message ?? message,
 			});
 		}
 	} as never;

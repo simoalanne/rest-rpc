@@ -285,10 +285,10 @@ describe.each([
 				.get("/limited")
 				.error(RateLimited)
 				.handler((): string => {
-					throw new RateLimited(
-						{ limit: 10 },
-						{ headers: { "retry-after": 30 } },
-					);
+					throw new RateLimited({
+						data: { limit: 10 },
+						headers: { "retry-after": 30 },
+					});
 				}),
 		};
 		await serve(routes, {}, async (url) => {

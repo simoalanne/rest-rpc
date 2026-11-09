@@ -137,10 +137,12 @@ const toValidatedRequest = ([
 		headers.errors.length > 0
 	) {
 		throw new RequestValidationFailed({
-			body: body.errors,
-			query: query.errors,
-			params: params.errors,
-			headers: headers.errors,
+			data: {
+				body: body.errors,
+				query: query.errors,
+				params: params.errors,
+				headers: headers.errors,
+			},
 		});
 	}
 	return {

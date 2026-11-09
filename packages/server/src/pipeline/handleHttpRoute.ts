@@ -209,8 +209,6 @@ const normalizeHandlerResult = (
 	);
 };
 
-const noErrors = {};
-
 /** Validates the request, runs middleware and the handler, and validates the output, throwing validation errors. */
 export function executeRoute(
 	implementation: RuntimeImplementation,
@@ -232,7 +230,7 @@ export function executeRoute(
 			signal: options.signal,
 			contentType: mediaType,
 			route,
-			errors: route.errors ?? noErrors,
+			errors: implementation.errorFactories,
 		}),
 	);
 	return mapMaybePromise(handlerResult, (result) =>

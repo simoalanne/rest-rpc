@@ -44,7 +44,7 @@ const get = route
 	.error("TODO_NOT_FOUND", { status: 404 })
 	.handler(({ params, query, errors }) => {
 		const todo = findTodo(params.id);
-		if (!todo) throw new errors.TODO_NOT_FOUND();
+		if (!todo) throw errors.TODO_NOT_FOUND();
 		return {
 			status: 200,
 			headers: { "x-powered-by": "rest-rpc" },
@@ -87,7 +87,7 @@ const get = route
 	.error("TODO_NOT_FOUND", { status: 404 })
 	.handler(({ params, query, errors }) => {
 		const todo = findTodo(params.id);
-		if (!todo) throw new errors.TODO_NOT_FOUND();
+		if (!todo) throw errors.TODO_NOT_FOUND();
 		return {
 			status: 200,
 			headers: { "x-powered-by": "rest-rpc" },
@@ -153,7 +153,7 @@ const get = route
 	.error("TODO_NOT_FOUND", { status: 404 })
 	.handler(({ params, query, errors }) => {
 		const todo = findTodo(params.id);
-		if (!todo) throw new errors.TODO_NOT_FOUND();
+		if (!todo) throw errors.TODO_NOT_FOUND();
 		return {
 			status: 200,
 			headers: { "x-powered-by": "rest-rpc" },

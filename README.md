@@ -64,7 +64,7 @@ export const routes = {
 			.error("TODO_NOT_FOUND", { status: 404 })
 			.handler(({ params, errors }) => {
 				const todo = todos.get(params.id); // params: { id: string }
-				if (!todo) throw new errors.TODO_NOT_FOUND();
+				if (!todo) throw errors.TODO_NOT_FOUND();
 				return todo;
 			}),
 	},
@@ -147,7 +147,7 @@ const update = authed
 			body, // { title: string; done: boolean } from the request body
 			contentType, // request media type, narrows body when several are declared
 			context, // per-request values from middleware or the host
-			errors, // declared error classes: throw new errors.UNAUTHORIZED()
+			errors, // declared errors, created without new: throw errors.UNAUTHORIZED()
 			route, // the declaration: method, path, metadata
 			signal, // aborts when the client disconnects
 		}) => updateTodo(params.id, body),
@@ -192,10 +192,12 @@ route
 		description: "No todo has this id", // OpenAPI
 	})
 	.handler(({ params, errors }) => {
-		throw new errors.TODO_NOT_FOUND(
-			{ id: params.id }, // data comes first when declared
-			{ headers: { "x-reason": "deleted" }, message: "Deleted", cause },
-		);
+		throw errors.TODO_NOT_FOUND({
+			data: { id: params.id }, // required when declared
+			headers: { "x-reason": "deleted" }, // required when declared
+			message: "Deleted", // overrides the declared message
+			cause, // never sent
+		});
 	});
 
 // Define once, throw from any code, declare on routes with .error(TodoNotFound).
@@ -267,7 +269,7 @@ const attachUser = route.$context<{ user?: User }>().middleware<{
 	errors: { UNAUTHORIZED: typeof Unauthorized };
 }>(async ({ headers, errors, context, next }) => {
 	const user = await authenticate(headers.authorization);
-	if (!user) throw new errors.UNAUTHORIZED();
+	if (!user) throw errors.UNAUTHORIZED();
 	context.set("user", user);
 	return next();
 });

@@ -3,6 +3,7 @@ import {
 	routeError,
 	type,
 	type InferClientResponse,
+	type RouteError,
 } from "@rest-rpc/core";
 import type { ServerResponse } from "@rest-rpc/core/contract";
 import { sse } from "../pipeline/sse.ts";
@@ -165,21 +166,28 @@ describe("route errors", () => {
 		data: type<{ id: string }>(),
 	});
 
-	it("types declared error classes on middleware and the handler and keeps responses inferred", () => {
+	it("types declared error factories on middleware and the handler and keeps responses inferred", () => {
 		const value = route
 			.error(Unauthorized)
 			.get("/users/:id")
 			.use(({ errors, next }) => {
-				expectTypeOf(errors.UNAUTHORIZED).toEqualTypeOf<typeof Unauthorized>();
+				expectTypeOf(errors.UNAUTHORIZED).toEqualTypeOf<
+					(
+						...args: ConstructorParameters<typeof Unauthorized>
+					) => InstanceType<typeof Unauthorized>
+				>();
+				errors.UNAUTHORIZED();
 				return next();
 			})
 			.error(NotFound)
 			.handler(({ errors, params }) => {
-				expectTypeOf(errors).toEqualTypeOf<{
-					UNAUTHORIZED: typeof Unauthorized;
-					NOT_FOUND: typeof NotFound;
-				}>();
-				if (!params.id) throw new errors.NOT_FOUND({ id: params.id });
+				expectTypeOf(errors).toHaveProperty("UNAUTHORIZED");
+				expectTypeOf(errors.NOT_FOUND).returns.toEqualTypeOf<
+					RouteError<"NOT_FOUND", { id: string }, 404, Record<string, unknown>>
+				>();
+				// @ts-expect-error The data input is required.
+				errors.NOT_FOUND();
+				if (!params.id) throw errors.NOT_FOUND({ data: { id: params.id } });
 				return { id: params.id };
 			});
 		expectTypeOf<
@@ -195,7 +203,9 @@ describe("route errors", () => {
 		const auth = route.middleware<{
 			errors: { UNAUTHORIZED: typeof Unauthorized };
 		}>(({ errors, next }) => {
-			expectTypeOf(errors.UNAUTHORIZED).toEqualTypeOf<typeof Unauthorized>();
+			expectTypeOf(errors.UNAUTHORIZED).returns.toEqualTypeOf<
+				RouteError<"UNAUTHORIZED", undefined, 401, Record<string, unknown>>
+			>();
 			return next();
 		});
 		route.get("/me").error(Unauthorized).use(auth);

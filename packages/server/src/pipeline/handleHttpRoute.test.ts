@@ -52,21 +52,24 @@ describe("handleHttpRoute", () => {
 		expect(contexts[0]).not.toBe(contexts[1]);
 	});
 
-	it("passes the declared error classes to middleware and the handler", async () => {
-		const Gone = routeError("GONE", { status: 410 });
+	it("passes factories of the declared errors to middleware and the handler", async () => {
+		const Gone = routeError("GONE", { status: 410, data: type<number>() });
 		const implementation = route
 			.get("/")
 			.error(Gone)
 			.use(({ errors, next }) => {
-				expect(errors.GONE).toBe(Gone);
+				expect(errors.GONE({ data: 1 })).toBeInstanceOf(Gone);
 				return next();
 			})
 			.handler(({ errors }): string => {
-				throw new errors.GONE();
+				throw errors.GONE({ data: 2, message: "Gone" });
 			});
-		await expect(async () => execute(implementation)).rejects.toBeInstanceOf(
-			Gone,
-		);
+		await expect(async () => execute(implementation)).rejects.toMatchObject({
+			code: "GONE",
+			status: 410,
+			message: "Gone",
+			data: 2,
+		});
 	});
 
 	it("rejects invalid requests without invoking the handler", async () => {

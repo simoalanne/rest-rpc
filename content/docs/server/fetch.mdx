@@ -32,7 +32,7 @@ const getTodo = route
 	.error("TODO_NOT_FOUND", { status: 404 })
 	.handler(({ params, errors }) => {
 		const todo = todos.get(params.id);
-		if (!todo) throw new errors.TODO_NOT_FOUND();
+		if (!todo) throw errors.TODO_NOT_FOUND();
 		return todo;
 	});
 
