@@ -41,9 +41,9 @@ describe("validation", () => {
 	});
 
 	it("merges stacked schema outputs with later keys taking precedence", async () => {
-		const declaration = route.post("/")["~restrpc"];
+		const definition = route.post("/")["~restrpc"];
 		const stacked = {
-			...declaration,
+			...definition,
 			request: {
 				body: {
 					"application/json": [
@@ -62,19 +62,19 @@ describe("validation", () => {
 		});
 	});
 
-	it("ignores undeclared segments", async () => {
-		const declaration = route.post("/")["~restrpc"];
+	it("ignores segments without schemas", async () => {
+		const definition = route.post("/")["~restrpc"];
 		expect(
-			(await validateRequestSegments(declaration, { body: "unused" })).body,
+			(await validateRequestSegments(definition, { body: "unused" })).body,
 		).toBeUndefined();
 	});
 
 	it("rejects nonobject stacked outputs", async () => {
-		const declaration = route.post("/")["~restrpc"];
+		const definition = route.post("/")["~restrpc"];
 		await expect(async () =>
 			validateRequestSegments(
 				{
-					...declaration,
+					...definition,
 					request: {
 						body: { "text/plain": [schema(() => ({ value: 1 })), type()] },
 					},
@@ -88,7 +88,7 @@ describe("validation", () => {
 	it("groups failures by request segment and stops a failing schema stack", async () => {
 		const issues = [{ message: "invalid" }];
 		const later = vi.fn(() => ({ value: {} }));
-		const declaration = {
+		const definition = {
 			...route.post("/")["~restrpc"],
 			request: {
 				body: {
@@ -98,7 +98,7 @@ describe("validation", () => {
 			},
 		};
 		await expect(async () =>
-			validateRequestSegments(declaration, {}, "application/json"),
+			validateRequestSegments(definition, {}, "application/json"),
 		).rejects.toMatchObject({
 			code: "REQUEST_VALIDATION_FAILED",
 			status: 400,

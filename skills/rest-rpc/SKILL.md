@@ -72,5 +72,5 @@ installed version.
 4. Export route trees from modules without side effects, so contract
    extraction can import them at build time. Route trees can be split across
    modules and composed.
-5. Let types infer from route declarations. When inference is not enough,
+5. Let types infer from route definitions. When inference is not enough,
    prefer the exported type helpers over ad-hoc types.

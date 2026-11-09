@@ -14,7 +14,7 @@ describe("resolveRequestMediaType", () => {
 			.handler(() => undefined)["~restrpc"],
 	);
 
-	it("selects declared media types", () => {
+	it("selects defined media types", () => {
 		expect(resolveRequestMediaType(implementation, "text/plain")).toBe(
 			"text/plain",
 		);
@@ -23,7 +23,7 @@ describe("resolveRequestMediaType", () => {
 		});
 	});
 
-	it("uses the only declared media type when the content type is missing", () => {
+	it("uses the only defined media type when the content type is missing", () => {
 		const single = toRuntimeImplementation(
 			route
 				.post("/")

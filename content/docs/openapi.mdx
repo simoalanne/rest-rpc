@@ -1,13 +1,13 @@
 ---
 title: OpenAPI
-description: Generate an OpenAPI document from HTTP route declarations.
+description: Generate an OpenAPI document from HTTP route definitions.
 ---
 
 `createOpenApiDocument()` generates an OpenAPI document from server routes or a
 separately shared contract. HTTP methods, paths, schemas, and operation
 metadata come from the same route builder used by the server and client.
 
-Declare response schemas with `.response()` or `.streamResponse()` to include
+Define response schemas with `.response()` or `.streamResponse()` to include
 responses in OpenAPI. Responses inferred from handlers have no schema, so their
 routes get a placeholder `default` response that does not claim a status or
 body.
@@ -46,9 +46,9 @@ path are derived from their tree keys. The document includes:
 - route methods and paths
 - path, query, and header parameters
 - request bodies with a schema per media type
-- status-keyed responses with a schema per media type and declared headers
+- status-keyed responses with a schema per media type and defined headers
 - streams as `text/event-stream` responses
-- a `default` placeholder response for routes without declared responses
+- a `default` placeholder response for routes without defined responses
 - route [`.openAPI()`](#route-metadata) metadata
 
 The document targets OpenAPI `3.1.0` unless the `openapi` option sets another
@@ -104,7 +104,7 @@ const create = route
 
 ## Response Descriptions
 
-Each declared response produces a status-keyed OpenAPI response. Describe it
+Each defined response produces a status-keyed OpenAPI response. Describe it
 with the `description` option of `.response()` or `.streamResponse()`. Pass
 only options to describe a bodyless response:
 
@@ -121,12 +121,12 @@ const remove = route
 
 ## Errors
 
-Each [declared error](/docs/route-builder#declare-errors) produces a JSON
+Each [defined error](/docs/route-builder#define-errors) produces a JSON
 response for its status, whose body schema is `{ code, message, data? }` with
 `code` as a constant. Errors that share a status are documented as one response
 whose schema is a `oneOf` of their bodies, and whose description joins their
 descriptions. [Built-in errors](/docs/http-behavior/errors#built-in-errors) are
-documented only when the route declares them.
+documented only when the route defines them.
 
 ## Transform Hooks
 

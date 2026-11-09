@@ -1,6 +1,6 @@
 ---
 title: Streaming
-description: Declare and serve typed Server-Sent Event streams.
+description: Define and serve typed Server-Sent Event streams.
 ---
 
 Streaming routes send Server-Sent Events (SSE). Handlers produce an async
@@ -9,10 +9,10 @@ iterable, and each yielded value becomes one event. See
 wire format and [Fetch Client](/docs/client/fetch-client#consume-streams) for
 consuming streams.
 
-## Declare a Stream
+## Define a Stream
 
 Returning an async iterable infers a stream. Use `.streamResponse()` when
-you want to declare and validate its data schema.
+you want to define and validate its data schema.
 
 ```ts
 const events = route
@@ -27,10 +27,10 @@ const events = route
 `.streamResponse(schema)` is the same as
 `.response({ "text/event-stream": schema })`. A `text/event-stream` schema always
 describes the stream's items, so a status can also offer a stream next to other
-[media types](/docs/route-builder#declare-media-types), with the handler
+[media types](/docs/route-builder#define-media-types), with the handler
 selecting one with its returned `contentType`.
 
-Throw a [declared error](/docs/route-builder#declare-errors) before the stream
+Throw a [defined error](/docs/route-builder#define-errors) before the stream
 starts to respond with an error instead:
 
 ```ts
@@ -46,7 +46,7 @@ const events = route
 ```
 
 Stream schemas describe event data. Event data must be JSON serializable.
-Declared schemas validate each value as it is yielded. An invalid value ends
+Defined schemas validate each value as it is yielded. An invalid value ends
 the stream instead of producing an error response.
 
 ## Add Event Metadata

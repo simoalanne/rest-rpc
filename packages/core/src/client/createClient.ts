@@ -1,5 +1,5 @@
 import type { Contract } from "../contract/contract.ts";
-import type { RouteDeclaration } from "../contract/routeDeclaration.ts";
+import type { RouteDefinition } from "../contract/routeDefinition.ts";
 import { mapContractRoutes } from "../contract/traversal.ts";
 import { resolveRoutePath } from "../contract/path.ts";
 import { createBodyCodecRegistry, type BodyCodec } from "../codecs/index.ts";
@@ -13,23 +13,23 @@ import {
 import { readResponse } from "./response.ts";
 import type {
 	ClientRouteError,
-	DeclaredClientResponse,
+	DefinedClientResponse,
 } from "../contract/response.ts";
 import type { ClientPromise } from "./safe.ts";
 
 /**
- * Infers the callable client operation for one declared route.
+ * Infers the callable client operation for one defined route.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#call-routes}
  */
 export type ApiClientRouteValue<
-	E extends RouteDeclaration = RouteDeclaration,
+	E extends RouteDefinition = RouteDefinition,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
-> = E extends RouteDeclaration
+> = E extends RouteDefinition
 	? (
 			...args: FetchArgs<E, TGlobalHeaders>
-		) => ClientPromise<DeclaredClientResponse<E>, ClientRouteError<E> | Error>
+		) => ClientPromise<DefinedClientResponse<E>, ClientRouteError<E> | Error>
 	: never;
 
 /**
@@ -40,7 +40,7 @@ export type ApiClientRouteValue<
 export type ApiClientFor<
 	T extends Contract = Contract,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
-> = T extends { readonly "~restrpc": infer TRoute extends RouteDeclaration }
+> = T extends { readonly "~restrpc": infer TRoute extends RouteDefinition }
 	? ApiClientRouteValue<TRoute, TGlobalHeaders>
 	: {
 			[K in keyof T]: T[K] extends Contract
@@ -51,7 +51,7 @@ export type ApiClientFor<
 /**
  * Options used to create a typed fetch client.
  *
- * @remarks Literal keys in `globalHeaders` make matching declared
+ * @remarks Literal keys in `globalHeaders` make matching defined
  * headers optional at individual call sites. Per-call Fetch options override
  * defaults from `fetchOptions`.
  *

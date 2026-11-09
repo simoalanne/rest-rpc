@@ -1,6 +1,6 @@
 import type {
 	RequestScalar,
-	RouteDeclaration,
+	RouteDefinition,
 	ServerRequest,
 	ServerResponse,
 } from "@rest-rpc/core/contract";
@@ -86,8 +86,8 @@ type ImplicitResponseHeaders<TResponse> = TResponse extends {
 	? THeaders
 	: never;
 
-// Groups every envelope returned with one status into one declaration.
-type ImplicitResponseDeclaration<TResponse> =
+// Groups every envelope returned with one status into one definition.
+type ImplicitResponseDefinition<TResponse> =
 	ImplicitResponseContent<TResponse> &
 		([ImplicitResponseHeaders<TResponse>] extends [never]
 			? unknown
@@ -101,7 +101,7 @@ type ResponseStatuses<TResponse> = TResponse extends {
 
 type InferredResponses<TResponse> = {
 	[TStatus in ResponseStatuses<TResponse>]: Merge<
-		ImplicitResponseDeclaration<Extract<TResponse, { status: TStatus }>>
+		ImplicitResponseDefinition<Extract<TResponse, { status: TStatus }>>
 	>;
 };
 
@@ -175,7 +175,7 @@ export type RuntimeRouteHandler = (
 	request: unknown,
 ) => unknown | Promise<unknown>;
 
-export type ServerRouteBuilderState = Partial<RouteDeclaration> & {
+export type ServerRouteBuilderState = Partial<RouteDefinition> & {
 	readonly handler?: unknown;
 	readonly middleware?: readonly RuntimeRouteHandler[];
 };
@@ -191,9 +191,9 @@ type WithSseServerEvents<T> = T extends {
 	? Omit<T, "body"> & { body: WithSseItems<T["body"]> }
 	: T;
 
-// Handlers may return the body of a route's only declared response directly,
+// Handlers may return the body of a route's only defined response directly,
 // unless that response has several media types to select from.
-type PlainResponseBody<TRoute extends RouteDeclaration> = [
+type PlainResponseBody<TRoute extends RouteDefinition> = [
 	IsUnion<keyof TRoute["responses"]>,
 ] extends [false]
 	? ServerResponse<TRoute> extends infer TResponse
@@ -205,7 +205,7 @@ type PlainResponseBody<TRoute extends RouteDeclaration> = [
 		: never
 	: never;
 
-type HandlerResult<TRoute extends RouteDeclaration> = MaybePromise<
+type HandlerResult<TRoute extends RouteDefinition> = MaybePromise<
 	WithSseServerEvents<ServerResponse<TRoute>> | PlainResponseBody<TRoute>
 >;
 
@@ -214,14 +214,14 @@ type HandlerFields = {
 	/** Aborts when the client disconnects. */
 	signal: AbortSignal;
 	/**
-	 * The request body media type. Routes with a body narrow it to the declared
+	 * The request body media type. Routes with a body narrow it to the defined
 	 * media types, and routes without one never receive it.
 	 */
 	contentType?: string;
 };
 
 // Routes without a body schema have no request media type.
-type BodylessFields<TRoute extends RouteDeclaration> = TRoute extends {
+type BodylessFields<TRoute extends RouteDefinition> = TRoute extends {
 	request: { body: object };
 }
 	? EmptyObject
@@ -236,14 +236,14 @@ type ErrorFactories<TErrors> = {
 		: TErrors[K];
 };
 
-type ErrorsOf<TRoute extends RouteDeclaration> = TRoute extends {
+type ErrorsOf<TRoute extends RouteDefinition> = TRoute extends {
 	errors: infer TErrors;
 }
 	? ErrorFactories<TErrors>
 	: EmptyObject;
 
 export type RouteRequest<
-	TRoute extends RouteDeclaration,
+	TRoute extends RouteDefinition,
 	TContext extends object = EmptyObject,
 > = Merge<
 	ServerRequest<TRoute> &
@@ -256,7 +256,7 @@ export type RouteRequest<
 >;
 
 export type RouteHandler<
-	TRoute extends RouteDeclaration,
+	TRoute extends RouteDefinition,
 	TContext extends object = EmptyObject,
 > = (
 	...args: [request: RouteRequest<TRoute, TContext>]
@@ -264,11 +264,11 @@ export type RouteHandler<
 
 /** A route, a route tree, or a contract implementer tree, whose `$context()` and `use()` are ignored. */
 export type HandlerTree =
-	| { readonly "~restrpc": RouteDeclaration }
+	| { readonly "~restrpc": RouteDefinition }
 	| { readonly [key: string]: HandlerTree | ((...args: never) => unknown) };
 
 // Server routes and implementer leaves carry their selected context as a
-// type-only declaration field. Contract routes do not, because the context is
+// type-only definition field. Contract routes do not, because the context is
 // selected when they are implemented.
 export type ContextOf<TRoute> = TRoute extends {
 	readonly context?: infer TContext extends object;
@@ -276,15 +276,15 @@ export type ContextOf<TRoute> = TRoute extends {
 	? TContext
 	: DefaultContext;
 
-type WithoutContext<TRoute extends RouteDeclaration> =
+type WithoutContext<TRoute extends RouteDefinition> =
 	"context" extends keyof TRoute
-		? Extract<Omit<TRoute, "context">, RouteDeclaration>
+		? Extract<Omit<TRoute, "context">, RouteDefinition>
 		: TRoute;
 
 /**
- * Infers the handler signature for a route declaration.
+ * Infers the handler signature for a route definition.
  *
- * @remarks Use a route declared without `.handler()` to write its handler
+ * @remarks Use a route defined without `.handler()` to write its handler
  * separately. Pass a route tree or a contract implementer to infer a matching
  * tree of handler types. The context is the one selected with `$context()`, or
  * `DefaultContext` for contract routes passed directly.
@@ -292,7 +292,7 @@ type WithoutContext<TRoute extends RouteDeclaration> =
  * @see {@link https://rest-rpc.vercel.app/docs/route-builder#type-helpers}
  */
 export type InferServerHandler<T extends HandlerTree> = T extends {
-	readonly "~restrpc": infer TRoute extends RouteDeclaration;
+	readonly "~restrpc": infer TRoute extends RouteDefinition;
 }
 	? RouteHandler<WithoutContext<TRoute>, ContextOf<TRoute>>
 	: {
@@ -301,7 +301,7 @@ export type InferServerHandler<T extends HandlerTree> = T extends {
 			]: InferServerHandler<Extract<T[K], HandlerTree>>;
 		};
 
-export type HasDeclaredResponses<TRoute> = TRoute extends {
+export type HasDefinedResponses<TRoute> = TRoute extends {
 	responses: infer TResponses;
 }
 	? keyof TResponses extends never
@@ -309,18 +309,18 @@ export type HasDeclaredResponses<TRoute> = TRoute extends {
 		: true
 	: false;
 
-/** Routes with declared responses must return one of them; other routes may return any valid result. */
+/** Routes with defined responses must return one of them; other routes may return any valid result. */
 export type AllowedHandlerResult<
-	TRoute extends RouteDeclaration,
+	TRoute extends RouteDefinition,
 	TContext extends object,
 > =
-	HasDeclaredResponses<TRoute> extends true
+	HasDefinedResponses<TRoute> extends true
 		? ReturnType<RouteHandler<TRoute, TContext>>
 		: unknown;
 
 /** Rejects invalid implicit response envelopes. */
-export type ValidHandlerResult<TRoute extends RouteDeclaration, TResult> =
-	HasDeclaredResponses<TRoute> extends true
+export type ValidHandlerResult<TRoute extends RouteDefinition, TResult> =
+	HasDefinedResponses<TRoute> extends true
 		? unknown
 		: ValidImplicitResult<TResult>;
 
@@ -374,7 +374,7 @@ export type RequestFields = Partial<UnknownRequest>;
 
 /** The request inline middleware receives, typed by its route. */
 export type MiddlewareRequest<
-	TRoute extends RouteDeclaration,
+	TRoute extends RouteDefinition,
 	TContext extends object,
 > = RouteRequest<TRoute, TContext> & UnknownRequest & Controls;
 
@@ -388,6 +388,6 @@ export type ReusableMiddlewareRequest<
 		? { errors: ErrorFactories<TErrors> }
 		: EmptyObject) &
 	UnknownRequest & {
-		route: RouteDeclaration;
+		route: RouteDefinition;
 		context: Context<TContext>;
 	} & Controls;

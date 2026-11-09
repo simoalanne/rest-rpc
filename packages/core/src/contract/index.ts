@@ -5,14 +5,14 @@ export type {
 	HttpMethod,
 	// Named by implemented contract routes and by clients made from a contract.
 	OpenApiRouteOptions,
-	RouteDeclaration,
-} from "./routeDeclaration.ts";
+	RouteDefinition,
+} from "./routeDefinition.ts";
 export type { Contract } from "./contract.ts";
 export type {
 	BuilderFor,
 	BuilderKind,
 	BuilderState,
-	DeclarationFor,
+	DefinitionFor,
 	NextState,
 	RootBuilderState,
 } from "./routeBuilder.types.ts";
@@ -23,10 +23,10 @@ export {
 	type RouteBuilderKind,
 } from "./routeBuilder.ts";
 export {
-	markDeclared,
+	markDefined,
 	RouteError,
 	routeError,
-	// Named by `routeError()` classes, routes that declare errors, clients, and
+	// Named by `routeError()` classes, routes that define errors, clients, and
 	// the server's built-in errors.
 	type RouteErrorClassFor,
 } from "./routeError.ts";
@@ -40,8 +40,8 @@ export {
 } from "./path.ts";
 export type { RequestScalar, ServerRequest } from "./request.ts";
 export type {
-	ResponseContentDeclaration,
-	ResponseDeclaration,
+	ResponseContentDefinition,
+	ResponseDefinition,
 	ResponseHeadersSchema,
 	ServerResponse,
 } from "./response.ts";

@@ -7,7 +7,7 @@ import { routeError } from "./routeError.ts";
 const schema = type<{ name: string }>();
 
 describe("routeBuilder", () => {
-	it("reuses partial routes without sharing later declarations", () => {
+	it("reuses partial routes without sharing later definitions", () => {
 		const base = route.body(schema);
 		const first = base.response(schema);
 		const second = base.response(schema, { status: 201 });
@@ -69,7 +69,7 @@ describe("routeBuilder", () => {
 	it("rejects duplicate response statuses across stream and body responses", () => {
 		expect(() =>
 			new RouteBuilder().response(schema).streamResponse(schema),
-		).toThrow('Response status "200" has already been declared.');
+		).toThrow('Response status "200" has already been defined.');
 	});
 
 	it.each([199, 300, 404, 200.5, NaN])(
@@ -81,7 +81,7 @@ describe("routeBuilder", () => {
 		},
 	);
 
-	it("declares errors by definition or inline and rejects conflicting codes", () => {
+	it("defines errors by definition or inline and rejects conflicting codes", () => {
 		const Unauthorized = routeError("UNAUTHORIZED", { status: 401 });
 		const authed = route.error(Unauthorized);
 		const value = authed.error(Unauthorized).error("INVALID", { data: schema });
@@ -93,7 +93,7 @@ describe("routeBuilder", () => {
 		});
 		expect(authed["~restrpc"].responses).toEqual({});
 		expect(() => authed.error("UNAUTHORIZED")).toThrow(
-			'Error code "UNAUTHORIZED" has already been declared.',
+			'Error code "UNAUTHORIZED" has already been defined.',
 		);
 	});
 

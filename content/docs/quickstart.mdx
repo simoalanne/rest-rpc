@@ -7,7 +7,7 @@ description: Define HTTP routes with handlers and call them through a typed clie
 with sensible defaults, and a typed client to call the routes.
 
 This guide uses Bun and Zod to build two routes: a minimal create operation
-and a GET with path params, query input, and a declared error. Their response
+and a GET with path params, query input, and a defined error. Their response
 types are inferred from the handlers.
 
 Same code runs on other fetch-native runtimes such as Deno and Cloudflare Workers.
@@ -100,7 +100,7 @@ bundler setups.
 ## Call the Routes
 
 ```ts client.ts
-import { createClient, isDeclaredError, safe } from "@rest-rpc/core";
+import { createClient, isDefinedError, safe } from "@rest-rpc/core";
 import { getApi } from "./client-contract" with { type: "macro" };
 
 const client = createClient(getApi(), { baseUrl: "http://localhost:3000" });
@@ -116,7 +116,7 @@ const result = await safe(
 if (!result.error) {
 	console.log(result.data.body.title);
 } else if (
-	isDeclaredError(result.error) &&
+	isDefinedError(result.error) &&
 	result.error.code === "TODO_NOT_FOUND"
 ) {
 	console.log(result.error.message);
@@ -132,7 +132,7 @@ endpoints.
 
 ## Next Steps
 
-- [Route Builder](/docs/route-builder) covers declared responses, errors, media types, streams, and metadata.
+- [Route Builder](/docs/route-builder) covers defined responses, errors, media types, streams, and metadata.
 - [Fetch Client](/docs/client/fetch-client) covers client behavior and options.
 - [TanStack Query](/docs/client/tanstack-query) adds query and mutation utils.
 - [Contract-first Quickstart](/docs/contract-first-quickstart) builds the same API from a separately shared contract.

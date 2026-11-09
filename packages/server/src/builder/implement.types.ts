@@ -1,4 +1,4 @@
-import type { Contract, RouteDeclaration } from "@rest-rpc/core/contract";
+import type { Contract, RouteDefinition } from "@rest-rpc/core/contract";
 import type { HandlerMethodFor } from "./routeBuilder.ts";
 import type {
 	MiddlewareRequest,
@@ -8,7 +8,7 @@ import type {
 } from "./routeBuilder.types.ts";
 import type { EmptyObject } from "@rest-rpc/core/utils";
 
-type ContractRoute = { readonly "~restrpc": RouteDeclaration };
+type ContractRoute = { readonly "~restrpc": RouteDefinition };
 
 type ContractImplementerNode<
 	TContract extends Contract,

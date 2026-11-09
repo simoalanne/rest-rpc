@@ -42,17 +42,17 @@ const getProfile = route
 	}));
 ```
 
-Middleware runs in declaration order; work after `await next()` runs in reverse
+Middleware runs in definition order; work after `await next()` runs in reverse
 order. Request schemas validate before middleware runs, regardless of setter order.
 
 Middleware receives the same arguments as the handler, including
-[context](/docs/context), the request `signal`, and the declared `errors`.
-Declare request schemas and errors before `.use()` to receive their types.
+[context](/docs/context), the request `signal`, and the defined `errors`.
+Define request schemas and errors before `.use()` to receive their types.
 
 ## Reuse Middleware
 
 When a middleware function should be applied to multiple routes,
-declare it once with `route.middleware()` and pass it to `.use()`.
+define it once with `route.middleware()` and pass it to `.use()`.
 
 ```ts
 const transaction = route.middleware(({ next }) =>
@@ -67,7 +67,7 @@ Adding middleware to one builder branch leaves sibling stacks unchanged.
 
 :::tip
 If the middleware should only be usable on a route with a specific request shape
-or declared errors, pass them as a type argument. The middleware can then only be
+or defined errors, pass them as a type argument. The middleware can then only be
 used on routes whose request and errors match it.
 :::
 
@@ -97,19 +97,19 @@ const getUserProfile = authenticated.get("/profile").handler(({ context }) => ({
 
 Without the type argument, reusable middleware receives `errors` with unknown
 values. It can still throw an imported [error definition](/docs/route-builder#define-errors-once),
-which routes that use the middleware must declare.
+which routes that use the middleware must define.
 
 ## Outputs and Errors
 
 Middleware receives and returns raw application output. A value returned by
 middleware is handled like a handler result: response validation and
 serialization run after the chain completes. Middleware return values are not
-type checked and do not change the client contract, so declare a
+type checked and do not change the client contract, so define a
 `.response()` for every status your middleware can return.
 
 Downstream errors propagate through `next()`, allowing middleware to catch errors
 or clean up in `finally`. Catch errors of your own domain code there to throw
-the route's declared errors instead:
+the route's defined errors instead:
 
 ```ts
 const users = route.error(UserNotFound).use(async ({ next }) => {

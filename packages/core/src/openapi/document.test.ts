@@ -18,7 +18,7 @@ describe("document", () => {
 			paths: {},
 		});
 	});
-	it("documents routes without declared responses with a default placeholder", () => {
+	it("documents routes without defined responses with a default placeholder", () => {
 		const inferred = {
 			"~restrpc": {
 				...route.get("/").response({ status: 204 })["~restrpc"],

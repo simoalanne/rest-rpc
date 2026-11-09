@@ -1,5 +1,5 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import type { RouteDeclaration } from "./routeDeclaration.ts";
+import type { RouteDefinition } from "./routeDefinition.ts";
 import type { InferSchema, RequestScalar } from "./request.ts";
 import type { SseEvent } from "./sse.ts";
 import type { RouteError } from "./routeError.ts";
@@ -12,21 +12,21 @@ export type ResponseHeadersSchema = StandardSchemaV1<
 >;
 
 /** Response body schemas keyed by base media type. */
-export type ResponseContentDeclaration = {
+export type ResponseContentDefinition = {
 	readonly [mediaType: string]: StandardSchemaV1;
 };
 
 /** A `text/event-stream` entry is always an SSE stream whose schema validates each item. */
-export type ResponseDeclaration = {
-	content?: ResponseContentDeclaration;
+export type ResponseDefinition = {
+	content?: ResponseContentDefinition;
 	headers?: ResponseHeadersSchema;
 	description?: string;
 };
 
 /**
- * HTTP metadata associated with a declared response.
+ * HTTP metadata associated with a defined response.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-responses}
+ * @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-responses}
  */
 export type ResponseOptions = {
 	/** HTTP status of the response, from 200 to 299. Defaults to 200. */
@@ -36,7 +36,7 @@ export type ResponseOptions = {
 	description?: string;
 };
 
-export type RouteResponses = Record<number, ResponseDeclaration>;
+export type RouteResponses = Record<number, ResponseDefinition>;
 
 type ResponseContent<TResponse> = TResponse extends {
 	content: infer TContent;
@@ -107,7 +107,7 @@ type ServerResponseEntry<TStatus extends number, TResponse> = [
 			: never
 		: never;
 
-// Clients receive every response header; declared headers narrow their keys.
+// Clients receive every response header; defined headers narrow their keys.
 type ClientResponseHeaders<TResponse> = [
 	ResponseHeadersFor<TResponse>,
 ] extends [never]
@@ -151,9 +151,9 @@ type ResponseEntryFor<
 	? ClientResponseEntry<TStatus, TResponse>
 	: ServerResponseEntry<TStatus, TResponse>;
 
-/** Maps each declared status to its response entry. */
+/** Maps each defined status to its response entry. */
 type ResponseUnion<
-	E extends RouteDeclaration,
+	E extends RouteDefinition,
 	TSide extends "client" | "server",
 > = E extends { responses: infer TResponses }
 	? {
@@ -163,30 +163,30 @@ type ResponseUnion<
 		}[keyof TResponses]
 	: never;
 
-export type DeclaredClientResponse<E extends RouteDeclaration> = ResponseUnion<
+export type DefinedClientResponse<E extends RouteDefinition> = ResponseUnion<
 	E,
 	"client"
 >;
 
-export type ServerResponse<E extends RouteDeclaration> = ResponseUnion<
+export type ServerResponse<E extends RouteDefinition> = ResponseUnion<
 	E,
 	"server"
 >;
 
-type ClientErrorHeaders<TDeclaration> = TDeclaration extends {
+type ClientErrorHeaders<TDefinition> = TDefinition extends {
 	headers: infer THeaders extends ResponseHeadersSchema;
 }
 	? Record<string, string> & InferSchema<THeaders, "output">
 	: Record<string, string>;
 
-type ClientErrorData<TDeclaration> = TDeclaration extends {
+type ClientErrorData<TDefinition> = TDefinition extends {
 	data: infer TData extends StandardSchemaV1;
 }
 	? InferSchema<TData, "output">
 	: undefined;
 
 // The top-level conditional keeps editors from displaying this alias instead of the resolved union.
-export type ClientRouteError<E extends RouteDeclaration> = E extends {
+export type ClientRouteError<E extends RouteDefinition> = E extends {
 	errors: infer TErrors;
 }
 	? {

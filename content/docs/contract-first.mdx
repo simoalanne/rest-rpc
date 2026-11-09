@@ -1,17 +1,17 @@
 ---
 title: Contract-first
-description: Declare routes in a shared contract and implement them separately.
+description: Define routes in a shared contract and implement them separately.
 ---
 
-Import `route` from `@rest-rpc/core` to declare a route independently
+Import `route` from `@rest-rpc/core` to define a route independently
 of its server implementation. The contract can be shared directly with a Fetch
 client and implemented with `@rest-rpc/server`.
 
-The declaration methods are the same as the [Route Builder](/docs/route-builder).
-The difference is that responses are declared with schemas rather than inferred
+The definition methods are the same as the [Route Builder](/docs/route-builder).
+The difference is that responses are defined with schemas rather than inferred
 from handlers.
 
-## Declare Routes
+## Define Routes
 
 ```ts contract.ts
 import { route } from "@rest-rpc/core";
@@ -31,7 +31,7 @@ export const api = { todos: { create, get } };
 ```
 
 Use `.response()` for each successful response, `.streamResponse()` for
-streams, and `.error()` for each [error](/docs/route-builder#declare-errors).
+streams, and `.error()` for each [error](/docs/route-builder#define-errors).
 These schemas define handler and client types and provide
 [runtime validation](/docs/http-behavior/schemas).
 See [Streaming](/docs/streaming) for stream handlers.
@@ -59,8 +59,8 @@ const get = implement(api.todos.get).handler(({ params, errors }) => {
 export const routes = { todos: { create, get } };
 ```
 
-The implementation must match the contract's request segments and declared
-responses, and throw the contract's declared errors. Compile and register the completed routes as usual.
+The implementation must match the contract's request segments and defined
+responses, and throw the contract's defined errors. Compile and register the completed routes as usual.
 
 ## Context And Middleware
 

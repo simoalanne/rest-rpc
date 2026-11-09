@@ -79,12 +79,12 @@ type CreateAppOptions = {
 
 - `mountPath`: the path the routes are served under, such as `/internal`.
   Route paths do not include it. A path that clients use, such as `/api/v1`,
-  belongs in the routes instead, declared with
+  belongs in the routes instead, defined with
   [`.prefix()`](/docs/route-builder#path-prefixes), so that clients and OpenAPI
   documents include it.
 - `context`: values to seed the request [context](/docs/context) with before
   middleware runs, or a function, sync or async, that returns them for each
-  request. They are not type-checked against the context types routes declare.
+  request. They are not type-checked against the context types routes define.
   If the function throws, the response is an `INTERNAL_SERVER_ERROR`.
 
   ```ts
@@ -152,7 +152,7 @@ chunks. To send it with its own headers, return it wrapped in
 
 ## Error Handling
 
-[Declared and built-in errors](/docs/http-behavior/errors) are sent as JSON
+[Defined and built-in errors](/docs/http-behavior/errors) are sent as JSON
 error responses. `onError` observes each of them, and `RouteError`s that end a
 stream after its response started, such as stream item validation failures. It
 is not awaited, and errors it throws or rejects with are ignored, so it cannot

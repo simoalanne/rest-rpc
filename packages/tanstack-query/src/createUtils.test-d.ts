@@ -1,5 +1,5 @@
 import {
-	isDeclaredError,
+	isDefinedError,
 	route,
 	routeError,
 	type,
@@ -30,7 +30,7 @@ const utils = createTanstackQueryUtils(
 );
 
 describe("createTanstackQueryUtils types", () => {
-	it("preserves mutation variables, successful results, and declared errors", () => {
+	it("preserves mutation variables, successful results, and defined errors", () => {
 		const options = utils.get.mutationOptions({
 			onSuccess: (data, variables) => {
 				expectTypeOf(data).toEqualTypeOf<InferClientResponse<typeof get>>();
@@ -40,7 +40,7 @@ describe("createTanstackQueryUtils types", () => {
 				expectTypeOf(error).toEqualTypeOf<
 					InferClientError<typeof get> | Error
 				>();
-				if (isDeclaredError(error) && error.code === "NOT_FOUND") {
+				if (isDefinedError(error) && error.code === "NOT_FOUND") {
 					expectTypeOf(error.data).toEqualTypeOf<{ id: string }>();
 				}
 			},

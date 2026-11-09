@@ -18,7 +18,7 @@ to the full [documentation](/docs/quickstart).
 ## [Quickstart](/docs/quickstart)
 
 Responses are inferred from handler return values, so `.response()` is optional
-and not needed for the common case. Declare it for runtime validation or OpenAPI.
+and not needed for the common case. Define it for runtime validation or OpenAPI.
 
 ```ts routes.ts
 import { route } from "@rest-rpc/server";
@@ -120,10 +120,10 @@ const update = authed
 			query, // { notify?: "yes" | "no" } from the query string
 			headers, // { authorization: string } from the base
 			body, // { title: string; done: boolean } from the request body
-			contentType, // request media type, narrows body when several are declared
+			contentType, // request media type, narrows body when several are defined
 			context, // per-request values from middleware or the host
-			errors, // declared errors, created without new: throw errors.UNAUTHORIZED()
-			route, // the declaration: method, path, meta
+			errors, // defined errors, created without new: throw errors.UNAUTHORIZED()
+			route, // the definition: method, path, meta
 			signal, // aborts when the client disconnects
 		}) => updateTodo(params.id, body),
 	);
@@ -141,18 +141,18 @@ route.handler(() => ({
 	headers: { location: "/todos/1" },
 }));
 
-// Declared: runtime-validated, typed, and included in OpenAPI.
+// Defined: runtime-validated, typed, and included in OpenAPI.
 route
 	.response(todoSchema) // 200 JSON
 	.response(todoSchema, {
-		status: 201, // 201-299, each status declared once
+		status: 201, // 201-299, each status defined once
 		headers: z.object({ location: z.string() }),
 		description: "Created", // OpenAPI
 	})
 	.response({ status: 204 }); // bodyless
 ```
 
-### [Errors](/docs/route-builder#declare-errors)
+### [Errors](/docs/route-builder#define-errors)
 
 ```ts
 import { routeError } from "@rest-rpc/server";
@@ -168,21 +168,21 @@ route
 	})
 	.handler(({ params, errors }) => {
 		throw errors.TODO_NOT_FOUND({
-			data: { id: params.id }, // required when declared
-			headers: { "x-reason": "deleted" }, // required when declared
-			message: "Deleted", // overrides the declared message
+			data: { id: params.id }, // required when defined
+			headers: { "x-reason": "deleted" }, // required when defined
+			message: "Deleted", // overrides the defined message
 			cause, // never sent
 		});
 	});
 
-// Define once, throw from any code, declare on routes with .error(TodoNotFound).
+// Define once, throw from any code, add to routes with .error(TodoNotFound).
 export const TodoNotFound = routeError("TODO_NOT_FOUND", { status: 404 });
 ```
 
 Errors are sent as JSON `{ code, message, data? }`, and clients reject with
 them. Errors under HTTP Behavior lists every failure and what each side gets.
 
-### [Media Types](/docs/route-builder#declare-media-types)
+### [Media Types](/docs/route-builder#define-media-types)
 
 ```ts
 // Records are keyed by media type; a plain schema means application/json.
@@ -208,13 +208,13 @@ import type {
 } from "@rest-rpc/server";
 
 // Infer from a route without .handler() (or a contract route), then attach it.
-const declaration = route.get("/todos/:id").response(todoSchema);
+const definition = route.get("/todos/:id").response(todoSchema);
 
-type GetRequest = InferServerRequest<typeof declaration>; // handler argument: { params, ..., context, signal }
-type GetResponse = InferServerResponse<typeof declaration>; // declared envelopes
-const getTodo: InferServerHandler<typeof declaration> = ({ params }) =>
+type GetRequest = InferServerRequest<typeof definition>; // handler argument: { params, ..., context, signal }
+type GetResponse = InferServerResponse<typeof definition>; // defined envelopes
+const getTodo: InferServerHandler<typeof definition> = ({ params }) =>
 	findTodo(params.id);
-export const get = declaration.handler(getTodo);
+export const get = definition.handler(getTodo);
 
 type Requests = InferServerRequest<typeof routes>; // a tree infers a tree of types
 ```
@@ -222,9 +222,9 @@ type Requests = InferServerRequest<typeof routes>; // a tree infers a tree of ty
 ## [Middleware](/docs/middleware) and [Context](/docs/context)
 
 Middleware is onion-style and runs after request validation: each `.use()`
-wraps every middleware declared after it, with the handler innermost. Code
+wraps every middleware defined after it, with the handler innermost. Code
 before `await next()` runs outermost first, code after it innermost first.
-Return values are not type checked, so declare a `.response()` for each status
+Return values are not type checked, so define a `.response()` for each status
 middleware can return.
 
 ```ts
@@ -289,7 +289,7 @@ const events = route
 ## [Contract-first](/docs/contract-first)
 
 A contract has no handlers to infer from, so every successful response must be
-declared with `.response()` or `.streamResponse()`. Clients take the contract
+defined with `.response()` or `.streamResponse()`. Clients take the contract
 directly, without extraction, and `validateResponses` can use its schemas.
 
 ```ts contract.ts
@@ -345,9 +345,9 @@ createApp(routes, {
 ```
 
 Clients send schema input and handlers receive schema output. What each
-declaration guarantees at runtime:
+definition guarantees at runtime:
 
-| Declaration                         | Server                               | Fetch client                                                                 | OpenAPI                     |
+| Definition                          | Server                               | Fetch client                                                                 | OpenAPI                     |
 | ----------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------- | --------------------------- |
 | Request schemas                     | Validated before middleware, or 400  | Not validated                                                                | Parameters and request body |
 | Inferred response                   | Not validated                        | Types only, any 2xx resolves                                                 | Placeholder `default`       |
@@ -382,21 +382,21 @@ const binary = bodyCodec("application/octet-stream", {
 
 ### [Errors](/docs/http-behavior/errors)
 
-| What happens                                   | Server sends                                                                     | Fetch client gets                               |
-| ---------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------- |
-| A declared error is thrown                     | Its status, with validated `data` and headers                                    | Typed `RouteError`, `isDeclaredError()` is true |
-| An undeclared `RouteError` is thrown           | Its own status, `data` and headers, unvalidated                                  | Untyped `RouteError`                            |
-| Any other error is thrown                      | `INTERNAL_SERVER_ERROR` 500 with `createApp`, otherwise the framework handles it | Untyped `RouteError` with `createApp`           |
-| Request validation fails                       | `REQUEST_VALIDATION_FAILED` 400, issues per segment as `data`                    | Untyped `RouteError` (2)                        |
-| The request body cannot be decoded             | `MALFORMED_REQUEST_BODY` 400                                                     | Untyped `RouteError` (2)                        |
-| The `Content-Type` is not declared             | `UNSUPPORTED_MEDIA_TYPE` 415                                                     | Untyped `RouteError` (2)                        |
-| A response or error `data` fails validation    | `INTERNAL_SERVER_ERROR` 500, without details                                     | Untyped `RouteError` (2)                        |
-| No route matches (`createApp`)                 | `NOT_FOUND` 404                                                                  | Untyped `RouteError` (2)                        |
-| A response breaks the contract                 | -                                                                                | Plain `Error`, details in `cause`               |
-| An error response is not from rest-rpc         | -                                                                                | Plain `Error` with the status in `message`      |
-| There is no response (network, timeout, abort) | -                                                                                | The original error                              |
+| What happens                                       | Server sends                                                                     | Fetch client gets                              |
+| -------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------- |
+| A defined error is thrown                          | Its status, with validated `data` and headers                                    | Typed `RouteError`, `isDefinedError()` is true |
+| A `RouteError` the route does not define is thrown | Its own status, `data` and headers, unvalidated                                  | Untyped `RouteError`                           |
+| Any other error is thrown                          | `INTERNAL_SERVER_ERROR` 500 with `createApp`, otherwise the framework handles it | Untyped `RouteError` with `createApp`          |
+| Request validation fails                           | `REQUEST_VALIDATION_FAILED` 400, issues per segment as `data`                    | Untyped `RouteError` (2)                       |
+| The request body cannot be decoded                 | `MALFORMED_REQUEST_BODY` 400                                                     | Untyped `RouteError` (2)                       |
+| The `Content-Type` is not defined                  | `UNSUPPORTED_MEDIA_TYPE` 415                                                     | Untyped `RouteError` (2)                       |
+| A response or error `data` fails validation        | `INTERNAL_SERVER_ERROR` 500, without details                                     | Untyped `RouteError` (2)                       |
+| No route matches (`createApp`)                     | `NOT_FOUND` 404                                                                  | Untyped `RouteError` (2)                       |
+| A response breaks the contract                     | -                                                                                | Plain `Error`, details in `cause`              |
+| An error response is not from rest-rpc             | -                                                                                | Plain `Error` with the status in `message`     |
+| There is no response (network, timeout, abort)     | -                                                                                | The original error                             |
 
-(2) Typed when the route declares the built-in error's definition:
+(2) Typed when the route adds the built-in error's definition:
 
 ```ts
 import { RequestValidationFailed } from "@rest-rpc/server";
@@ -487,12 +487,7 @@ export const api = contract as unknown as typeof routes;
 ### [Fetch Client](/docs/client/fetch-client)
 
 ```ts
-import {
-	createClient,
-	isDeclaredError,
-	RouteError,
-	safe,
-} from "@rest-rpc/core";
+import { createClient, isDefinedError, RouteError, safe } from "@rest-rpc/core";
 
 const client = createClient(api, {
 	baseUrl: "https://api.example.com",
@@ -513,10 +508,10 @@ await client.health(undefined, { cache: "no-store" }); // options without input
 
 // Errors: reject by default, or resolve to { error } | { data } with safe().
 const { error, data } = await safe(client.todos.get({ params: { id: "1" } }));
-if (isDeclaredError(error) && error.code === "TODO_NOT_FOUND") {
+if (isDefinedError(error) && error.code === "TODO_NOT_FOUND") {
 	console.log(error.data);
 } else if (error instanceof RouteError) {
-	console.log(error.status, error.code); // undeclared
+	console.log(error.status, error.code); // not defined by the route
 } else if (error) {
 	throw error; // network, contract violation, non rest-rpc error
 } else {
@@ -545,7 +540,7 @@ import type {
 type Get = typeof api.todos.get;
 type GetRequest = InferClientRequest<Get, typeof globalHeaders>; // provided headers optional
 type GetResponse = InferClientResponse<Get>; // every response envelope
-type GetError = InferClientError<Get>; // declared errors
+type GetError = InferClientError<Get>; // defined errors
 type TodoEvent = InferClientStreamData<typeof api.todos.events>; // event data
 type Responses = InferClientResponse<typeof api>; // a tree infers a tree of types
 type Client = ApiClientFor<typeof api>;
@@ -602,7 +597,7 @@ useQuery(
 );
 const create = useMutation(
 	restrpc.todos.create.mutationOptions({
-		onError: (error) => isDeclaredError(error) && toast(error.message),
+		onError: (error) => isDefinedError(error) && toast(error.message),
 	}),
 );
 create.mutate({ body: { title: "Write docs" } });
@@ -617,7 +612,7 @@ restrpc.todos.create.mutationKey(); // ["todos", "create"]
 ```ts
 import { createOpenApiDocument } from "@rest-rpc/server"; // or @rest-rpc/core for contracts
 
-// Only declared .response() / .streamResponse() schemas are documented.
+// Only defined .response() / .streamResponse() schemas are documented.
 const document = createOpenApiDocument(routes, {
 	info: { title: "Todo API", version: "1.0.0" },
 	servers: [{ url: "https://api.example.com" }], // also components, tags

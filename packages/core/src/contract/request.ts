@@ -1,8 +1,8 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type {
-	RouteDeclaration,
-	RouteRequestDeclaration,
-} from "./routeDeclaration.ts";
+	RouteDefinition,
+	RouteRequestDefinition,
+} from "./routeDefinition.ts";
 import type { EmptyObject, IsUnion, Merge } from "../utils/typeUtils.ts";
 import type { PathParamNames } from "./path.ts";
 
@@ -67,7 +67,7 @@ type InferRequestSegments<TRequest, TIO extends "input" | "output"> = {
 		: never;
 };
 
-// Clients select a media type only when several are declared; handlers always
+// Clients select a media type only when several are defined; handlers always
 // receive the selected one.
 type BodyContentTypeField<
 	TMediaType,
@@ -79,7 +79,7 @@ type BodyContentTypeField<
 		: { contentType?: TMediaType }
 	: { contentType: TMediaType };
 
-/** One request body variant per declared media type, discriminated by `contentType`. */
+/** One request body variant per defined media type, discriminated by `contentType`. */
 type InferRequestBody<TBody, TIO extends "input" | "output"> = {
 	[TMediaType in Extract<keyof TBody, string>]: BodyContentTypeField<
 		TMediaType,
@@ -92,11 +92,11 @@ type InferRequestBody<TBody, TIO extends "input" | "output"> = {
 	};
 }[Extract<keyof TBody, string>];
 
-type DeclaredRequest<E> = E extends { request: infer TRequest }
+type DefinedRequest<E> = E extends { request: infer TRequest }
 	? TRequest
 	: EmptyObject;
 
-// A declared path includes the prefix; a path derived from tree keys adds only
+// A defined path includes the prefix; a path derived from tree keys adds only
 // static segments to it.
 type ParamsPath<E> = E extends { path: infer TPath extends string }
 	? TPath
@@ -117,13 +117,13 @@ type PathParamsRequest<E> =
 		: EmptyObject;
 
 type RequestWithPathParams<E> =
-	DeclaredRequest<E> extends { params: readonly StandardSchemaV1[] }
-		? DeclaredRequest<E>
-		: DeclaredRequest<E> & PathParamsRequest<E>;
+	DefinedRequest<E> extends { params: readonly StandardSchemaV1[] }
+		? DefinedRequest<E>
+		: DefinedRequest<E> & PathParamsRequest<E>;
 
-/** Infers each declared request segment, or `TEmpty` when none is declared. */
+/** Infers each defined request segment, or `TEmpty` when none is defined. */
 type InferRequestFor<
-	E extends { request?: RouteRequestDeclaration },
+	E extends { request?: RouteRequestDefinition },
 	TIO extends "input" | "output",
 	TEmpty,
 > =
@@ -155,10 +155,10 @@ type OptionalRequestHeaders<T, TOptionalKeys extends PropertyKey> = [
 			>
 		: T;
 
-export type ClientRequestForDeclaration<
-	E extends RouteDeclaration,
+export type ClientRequestForDefinition<
+	E extends RouteDefinition,
 	TOptionalKeys extends PropertyKey = never,
 > = OptionalRequestHeaders<InferRequestFor<E, "input", never>, TOptionalKeys>;
 
-export type ServerRequest<E extends { request?: RouteRequestDeclaration }> =
+export type ServerRequest<E extends { request?: RouteRequestDefinition }> =
 	InferRequestFor<E, "output", EmptyObject>;

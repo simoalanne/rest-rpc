@@ -1,10 +1,10 @@
 import type { Contract } from "./contract.ts";
-import type { RouteDeclaration } from "./routeDeclaration.ts";
+import type { RouteDefinition } from "./routeDefinition.ts";
 import { resolveRoutePath } from "./path.ts";
 
 type Tree<T> = Record<string, unknown> | T;
 export type ContractRouteEntry = {
-	route: RouteDeclaration & { path: string };
+	route: RouteDefinition & { path: string };
 	path: string[];
 };
 
@@ -29,14 +29,14 @@ const mapObjectValues = <TLeaf>(
 
 export const isRouteLeaf = (
 	value: unknown,
-): value is { readonly "~restrpc": RouteDeclaration } =>
+): value is { readonly "~restrpc": RouteDefinition } =>
 	typeof value === "object" && value !== null && "~restrpc" in value;
 
 export const mapContractRoutes = (
 	contract: Contract,
-	mappingFn: (route: RouteDeclaration, path: string[]) => unknown,
+	mappingFn: (route: RouteDefinition, path: string[]) => unknown,
 ) =>
-	mapObjectValues<{ readonly "~restrpc": RouteDeclaration }>(
+	mapObjectValues<{ readonly "~restrpc": RouteDefinition }>(
 		contract,
 		isRouteLeaf,
 		(route, path) => mappingFn(route["~restrpc"], path),
@@ -47,10 +47,10 @@ export function* contractRouteEntries(
 	path: string[] = [],
 ): Generator<ContractRouteEntry> {
 	if (isRouteLeaf(contract)) {
-		const declaration = contract["~restrpc"];
+		const definition = contract["~restrpc"];
 		const route = {
-			...declaration,
-			path: resolveRoutePath(declaration, path),
+			...definition,
+			path: resolveRoutePath(definition, path),
 		};
 		yield { route, path };
 		return;

@@ -32,8 +32,8 @@ const appendMiddlewareToRoutes = (
 	contract: Contract,
 	middleware: RuntimeRouteHandler,
 ): Contract =>
-	mapContractRoutes(contract, (declaration) => {
-		const state: ServerRouteBuilderState = declaration;
+	mapContractRoutes(contract, (definition) => {
+		const state: ServerRouteBuilderState = definition;
 		return new ServerRouteBuilder({
 			...state,
 			middleware: [...(state.middleware ?? []), middleware],
@@ -66,7 +66,7 @@ export function implement<const TContract extends Contract>(
 	return createImplementer(
 		mapContractRoutes(
 			contract,
-			(declaration) => new ServerRouteBuilder(declaration),
+			(definition) => new ServerRouteBuilder(definition),
 		) as Contract,
 	) as ContractImplementer<TContract, DefaultContext>;
 }

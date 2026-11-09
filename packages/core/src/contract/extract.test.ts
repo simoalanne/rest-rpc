@@ -63,7 +63,7 @@ describe("extractContract", () => {
 		});
 	});
 
-	it("creates a client that recognizes declared error codes", async () => {
+	it("creates a client that recognizes defined error codes", async () => {
 		const fetch = vi.fn(async () =>
 			Response.json(
 				{ code: "USER_NOT_FOUND", message: "Missing", data: { id: "1" } },

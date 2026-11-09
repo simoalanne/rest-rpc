@@ -27,7 +27,7 @@ export type RouteErrorOptions<
  * @remarks Servers send `{ code, message, data? }` as JSON with the error's
  * status and headers. `cause` is never sent. Clients reject with a
  * `RouteError` for every error response with a `code`, and mark the ones the
- * route declares with `isDeclared`.
+ * route defines with `isDefined`.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/errors}
  */
@@ -38,7 +38,7 @@ export class RouteError<
 	THeaders = Record<string, unknown>,
 > extends Error {
 	override readonly name = "RouteError";
-	/** Identifies the error. Routes declare each code at most once. */
+	/** Identifies the error. Routes define each code at most once. */
 	readonly code: TCode;
 	/** The HTTP status of the error response. */
 	readonly status: TStatus;
@@ -47,10 +47,10 @@ export class RouteError<
 	/** Error response headers. */
 	readonly headers: THeaders;
 	/**
-	 * Whether a client received this error as one the route declares, with
-	 * its declared status and validated `data`.
+	 * Whether a client received this error as one the route defines, with
+	 * its defined status and validated `data`.
 	 */
-	readonly isDeclared: boolean = false;
+	readonly isDefined: boolean = false;
 
 	constructor(
 		code: TCode,
@@ -68,37 +68,37 @@ export class RouteError<
 }
 
 /**
- * Checks whether an error is a `RouteError` the route declares, and narrows a
- * typed client error to the route's declared errors.
+ * Checks whether an error is a `RouteError` the route defines, and narrows a
+ * typed client error to the route's defined errors.
  *
  * @remarks Narrows errors from `safe()` and TanStack Query, whose types list
  * the route's errors, so `data` is typed after checking `code`. An `unknown`
  * value, such as in a `catch` block, narrows to `RouteError`. Use
- * `instanceof RouteError` to also match errors the route does not declare.
+ * `instanceof RouteError` to also match errors the route does not define.
  *
  * @example
  * ```ts
  * const { error } = await safe(client.todos.get({ params: { id: "1" } }));
- * if (isDeclaredError(error) && error.code === "TODO_NOT_FOUND") {
+ * if (isDefinedError(error) && error.code === "TODO_NOT_FOUND") {
  * 	console.log(error.data.id);
  * }
  * ```
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#typesafe-error-handling}
  */
-export function isDeclaredError<T>(
+export function isDefinedError<T>(
 	error: T,
 ): error is unknown extends T ? T & RouteError : Extract<T, RouteError> {
-	return error instanceof RouteError && error.isDeclared;
+	return error instanceof RouteError && error.isDefined;
 }
 
-/** Marks an error a client received as one the route declares. */
-export const markDeclared = <T extends RouteError>(error: T): T => {
-	(error as { isDeclared: boolean }).isDeclared = true;
+/** Marks an error a client received as one the route defines. */
+export const markDefined = <T extends RouteError>(error: T): T => {
+	(error as { isDefined: boolean }).isDefined = true;
 	return error;
 };
 
-export type RouteErrorDeclaration = {
+export type RouteErrorDefinition = {
 	readonly code: string;
 	readonly status: number;
 	readonly message?: string;
@@ -110,7 +110,7 @@ export type RouteErrorDeclaration = {
 /**
  * Options of `routeError` and the route builder's `.error()`.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-errors}
  */
 export type RouteErrorDefinitionOptions = {
 	/** HTTP status of the error, from 400 to 599. @default 400 */
@@ -128,51 +128,51 @@ type InputOf<TSchema> = TSchema extends StandardSchemaV1
 	? StandardSchemaV1.InferInput<TSchema>
 	: undefined;
 
-type DataOption<TDeclaration> = TDeclaration extends {
+type DataOption<TDefinition> = TDefinition extends {
 	data: infer TData extends StandardSchemaV1;
 }
 	? { data: StandardSchemaV1.InferInput<TData> }
 	: { data?: never };
 
-type HeadersOption<TDeclaration> = TDeclaration extends {
+type HeadersOption<TDefinition> = TDefinition extends {
 	headers: infer THeaders extends StandardSchemaV1;
 }
 	? { headers: StandardSchemaV1.InferInput<THeaders> }
 	: { headers?: never };
 
-type ConstructOptions<TDeclaration> = Merge<
-	{ message?: string; cause?: unknown } & DataOption<TDeclaration> &
-		HeadersOption<TDeclaration>
+type ConstructOptions<TDefinition> = Merge<
+	{ message?: string; cause?: unknown } & DataOption<TDefinition> &
+		HeadersOption<TDefinition>
 >;
 
-type ConstructArgs<TDeclaration> = TDeclaration extends
+type ConstructArgs<TDefinition> = TDefinition extends
 	| { data: StandardSchemaV1 }
 	| { headers: StandardSchemaV1 }
-	? [options: ConstructOptions<TDeclaration>]
-	: [options?: ConstructOptions<TDeclaration>];
+	? [options: ConstructOptions<TDefinition>]
+	: [options?: ConstructOptions<TDefinition>];
 
-/** An error class created by `routeError`, with its declaration as static fields. */
+/** An error class created by `routeError`, with its definition as static fields. */
 export type RouteErrorClass<
 	TCode extends string = string,
-	TDeclaration extends { status: number } = { status: number },
+	TDefinition extends { status: number } = { status: number },
 > = {
 	new (
-		...args: ConstructArgs<TDeclaration>
+		...args: ConstructArgs<TDefinition>
 	): RouteError<
 		TCode,
-		InputOf<TDeclaration extends { data: infer TData } ? TData : undefined>,
-		TDeclaration["status"],
-		TDeclaration extends { headers: infer THeaders extends StandardSchemaV1 }
+		InputOf<TDefinition extends { data: infer TData } ? TData : undefined>,
+		TDefinition["status"],
+		TDefinition extends { headers: infer THeaders extends StandardSchemaV1 }
 			? StandardSchemaV1.InferInput<THeaders>
 			: Record<string, unknown>
 	>;
 	readonly code: TCode;
-} & TDeclaration;
+} & TDefinition;
 
 export type AnyRouteErrorClass = (abstract new (
 	...args: never[]
 ) => RouteError) &
-	RouteErrorDeclaration;
+	RouteErrorDefinition;
 
 export type RouteErrorClassFor<
 	TCode extends string,
@@ -192,12 +192,12 @@ export type RouteErrorClassFor<
 >;
 
 /**
- * Defines an error that routes declare with `.error()` and code throws.
+ * Defines an error that routes add with `.error()` and code throws.
  *
  * @remarks Returns a subclass of `RouteError`. Construct it with an options
  * object of `data`, `headers`, `message` and `cause`. `data` and `headers`
- * are required when their schemas are declared. The route's declaration decides
- * the response, so throwing an error the executing route does not declare is
+ * are required when their schemas are defined. The route's definition decides
+ * the response, so throwing an error the executing route does not define is
  * a programmer error.
  *
  * @example
@@ -210,7 +210,7 @@ export type RouteErrorClassFor<
  * throw new UserNotFound({ data: { id: "42" } });
  * ```
  *
- * @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-errors}
  */
 export function routeError<
 	const TCode extends string,

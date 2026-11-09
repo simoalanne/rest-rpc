@@ -1,9 +1,9 @@
 import { RouteError } from "@rest-rpc/core";
 import { isAsyncIterable, normalizeMediaType } from "@rest-rpc/core/codecs";
 import type {
-	ResponseContentDeclaration,
-	ResponseDeclaration,
-	RouteDeclaration,
+	ResponseContentDefinition,
+	ResponseDefinition,
+	RouteDefinition,
 } from "@rest-rpc/core/contract";
 import type {
 	ImplicitResponseEnvelope,
@@ -29,7 +29,7 @@ type ExecuteRouteOptions = {
 	/** Aborts when the client disconnects. */
 	signal: AbortSignal;
 	/**
-	 * The declared body media type selected for the request. Handlers receive
+	 * The defined body media type selected for the request. Handlers receive
 	 * it as `contentType`.
 	 */
 	mediaType?: string;
@@ -49,20 +49,20 @@ export type RouteResult = {
 };
 
 const getResponseSchema = (
-	route: RouteDeclaration,
+	route: RouteDefinition,
 	status: number,
-): ResponseDeclaration => {
+): ResponseDefinition => {
 	const response = route.responses[status];
 	if (!response) {
 		throw new Error(
-			`Route response for "${route.method} ${route.path}" returned undeclared status ${status}.`,
+			`Route response for "${route.method} ${route.path}" returned status ${status}, which it does not define.`,
 		);
 	}
 
 	return response;
 };
 
-type DeclaredResponseEnvelope = {
+type DefinedResponseEnvelope = {
 	status: number;
 	body?: unknown;
 	contentType?: string;
@@ -71,7 +71,7 @@ type DeclaredResponseEnvelope = {
 
 // A response with one media type may omit it; otherwise the handler selects one.
 const selectResponseMediaType = (
-	content: ResponseContentDeclaration,
+	content: ResponseContentDefinition,
 	selected: unknown,
 	defaultMediaType: string | undefined,
 ): string => {
@@ -87,7 +87,7 @@ const selectResponseMediaType = (
 
 const normalizeResponseResult = (
 	implementation: RuntimeImplementation,
-	result: DeclaredResponseEnvelope,
+	result: DefinedResponseEnvelope,
 	disableValidation: boolean,
 ): MaybePromise<RouteResult> => {
 	const schema = getResponseSchema(implementation.route, result.status);
@@ -174,7 +174,7 @@ const toImplicitBody = (
 		? { stream: body }
 		: { value: body, contentType: contentType ?? "application/json" };
 
-/** Normalizes the result of a handler on a route without declared responses. */
+/** Normalizes the result of a handler on a route without defined responses. */
 export const normalizeImplicitResponse = (result: unknown): RouteResult => {
 	if (!isResponseEnvelope(result)) {
 		return { status: 200, body: toImplicitBody(result, undefined) };
@@ -199,7 +199,7 @@ const normalizeHandlerResult = (
 		return normalizeImplicitResponse(handlerResult);
 	}
 
-	// Types only allow plain bodies on routes with a single declared status.
+	// Types only allow plain bodies on routes with a single defined status.
 	return normalizeResponseResult(
 		implementation,
 		isResponseEnvelope(handlerResult)

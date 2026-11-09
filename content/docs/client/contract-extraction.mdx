@@ -18,14 +18,14 @@ For each route, the contract keeps only:
 
 - the HTTP method,
 - the path, with paths derived from tree keys resolved,
-- the request body media types, when the route declares a body. They keep the
-  declaration shape, `request.body`, with empty schema lists,
-- the status and media types of each declared response, as
+- the request body media types, when the route defines a body. They keep the
+  definition shape, `request.body`, with empty schema lists,
+- the status and media types of each defined response, as
   `responses: { 200: { content: { "application/json": null } } }`, so the
-  client rejects undeclared statuses and content types. Routes with inferred
+  client rejects other statuses and content types. Routes with inferred
   responses get `responses: {}`,
-- the status of each [declared error](/docs/route-builder#declare-errors), as
-  `errors: { CODE: { status } }`, so the client recognizes declared error
+- the status of each [defined error](/docs/route-builder#define-errors), as
+  `errors: { CODE: { status } }`, so the client recognizes defined error
   codes.
 
 Schemas, metadata, OpenAPI details, and handlers are left out. The
@@ -100,14 +100,14 @@ An extracted contract has no schemas:
 - [Client response validation](/docs/client/fetch-client#response-validation)
   is not available, for responses or for error `data`.
 - Routes with [inferred responses](/docs/route-builder#return-responses) have
-  no declared statuses, so the client accepts every 2xx response from them.
+  no defined statuses, so the client accepts every 2xx response from them.
 
-Statuses and content types of declared responses are still checked, and error
-responses are classified: declared codes reject with their error, and anything
+Statuses and content types of defined responses are still checked, and error
+responses are classified: defined codes reject with their error, and anything
 else, such as an error page from a proxy, rejects with an
 [`Error`](/docs/client/fetch-client#typesafe-error-handling).
 
-Declared schemas still validate requests and responses on the server. If the
+Defined schemas still validate requests and responses on the server. If the
 client needs runtime schemas, use a [shared contract](/docs/contract-first)
 instead.
 

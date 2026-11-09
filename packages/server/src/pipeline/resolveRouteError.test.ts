@@ -11,16 +11,16 @@ const UserNotFound = routeError("USER_NOT_FOUND", {
 		"x-id": `${input["x-id"]}`,
 	})),
 });
-const declaration = route.get("/users/:id").error(UserNotFound)["~restrpc"];
+const definition = route.get("/users/:id").error(UserNotFound)["~restrpc"];
 
 describe("resolveRouteError", () => {
-	it("applies the declaration and validates data and headers unless disabled", async () => {
+	it("applies the definition and validates data and headers unless disabled", async () => {
 		const thrown = new RouteError("USER_NOT_FOUND", {
 			message: "Missing",
 			data: 1,
 			headers: { "x-id": 1 },
 		});
-		expect(await resolveRouteError(declaration, thrown, false)).toMatchObject({
+		expect(await resolveRouteError(definition, thrown, false)).toMatchObject({
 			code: "USER_NOT_FOUND",
 			status: 404,
 			message: "Missing",
@@ -28,7 +28,7 @@ describe("resolveRouteError", () => {
 			headers: { "x-id": "1" },
 			cause: thrown,
 		});
-		expect(await resolveRouteError(declaration, thrown, true)).toMatchObject({
+		expect(await resolveRouteError(definition, thrown, true)).toMatchObject({
 			status: 404,
 			data: 1,
 			headers: { "x-id": 1 },
@@ -53,12 +53,12 @@ describe("resolveRouteError", () => {
 		});
 	});
 
-	it("passes undeclared errors as thrown", async () => {
+	it("passes other errors as thrown", async () => {
 		const builtIn = new RequestValidationFailed({
 			data: { body: [], query: [], params: [], headers: [] },
 		});
 		const gone = new RouteError("GONE", { status: 410, data: { id: 1 } });
-		expect(await resolveRouteError(declaration, builtIn, false)).toBe(builtIn);
-		expect(await resolveRouteError(declaration, gone, false)).toBe(gone);
+		expect(await resolveRouteError(definition, builtIn, false)).toBe(builtIn);
+		expect(await resolveRouteError(definition, gone, false)).toBe(gone);
 	});
 });

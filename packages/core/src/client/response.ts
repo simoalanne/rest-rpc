@@ -1,16 +1,16 @@
 import { normalizeMediaType, type BodyCodecRegistry } from "../codecs/index.ts";
 import type { Contract } from "../contract/contract.ts";
-import type { RouteDeclaration } from "../contract/routeDeclaration.ts";
+import type { RouteDefinition } from "../contract/routeDefinition.ts";
 import type { SseEvent } from "../contract/sse.ts";
 import type {
 	ClientRouteError,
-	ResponseDeclaration,
-	DeclaredClientResponse,
+	ResponseDefinition,
+	DefinedClientResponse,
 } from "../contract/response.ts";
 import {
-	markDeclared,
+	markDefined,
 	RouteError,
-	type RouteErrorDeclaration,
+	type RouteErrorDefinition,
 } from "../contract/routeError.ts";
 import {
 	validateStandardSchema,
@@ -33,15 +33,15 @@ import {
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#call-routes}
  */
 export type InferClientResponse<T extends Contract> = T extends {
-	readonly "~restrpc": infer TRoute extends RouteDeclaration;
+	readonly "~restrpc": infer TRoute extends RouteDefinition;
 }
-	? DeclaredClientResponse<TRoute>
+	? DefinedClientResponse<TRoute>
 	: {
 			[K in keyof T]: T[K] extends Contract ? InferClientResponse<T[K]> : never;
 		};
 
 /**
- * Infers the `RouteError`s a route declares, which its client call rejects
+ * Infers the `RouteError`s a route defines, which its client call rejects
  * with.
  *
  * @remarks Calls also reject with other `Error`s, such as when no response
@@ -51,7 +51,7 @@ export type InferClientResponse<T extends Contract> = T extends {
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#typesafe-error-handling}
  */
 export type InferClientError<T extends Contract> = T extends {
-	readonly "~restrpc": infer TRoute extends RouteDeclaration;
+	readonly "~restrpc": infer TRoute extends RouteDefinition;
 }
 	? ClientRouteError<TRoute>
 	: {
@@ -69,17 +69,17 @@ export type InferClientError<T extends Contract> = T extends {
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#consume-streams}
  */
 export type InferClientStreamData<T extends Contract> = T extends {
-	readonly "~restrpc": infer TRoute extends RouteDeclaration;
+	readonly "~restrpc": infer TRoute extends RouteDefinition;
 }
-	? ClientStreamDataForDeclaration<TRoute>
+	? ClientStreamDataForDefinition<TRoute>
 	: {
 			[K in keyof T]: T[K] extends Contract
 				? InferClientStreamData<T[K]>
 				: never;
 		};
 
-type ClientStreamDataForDeclaration<E extends RouteDeclaration> =
-	DeclaredClientResponse<E> extends infer TResponse
+type ClientStreamDataForDefinition<E extends RouteDefinition> =
+	DefinedClientResponse<E> extends infer TResponse
 		? TResponse extends { body: AsyncIterable<SseEvent<infer TData>> }
 			? TData
 			: never
@@ -88,7 +88,7 @@ type ClientStreamDataForDeclaration<E extends RouteDeclaration> =
 const STREAM_CONTENT_TYPE = "text/event-stream";
 
 const readHeaders = async (
-	schema: ResponseDeclaration | RouteErrorDeclaration | undefined,
+	schema: ResponseDefinition | RouteErrorDefinition | undefined,
 	rawResponse: Response,
 	validate: boolean,
 ) => {
@@ -99,7 +99,7 @@ const readHeaders = async (
 	if (result.issues) {
 		throw contractError(contractMismatch, result.issues);
 	}
-	// Keep headers the schema does not declare.
+	// Keep headers the schema does not define.
 	return { ...headers, ...result.value };
 };
 
@@ -159,14 +159,14 @@ const readCode = (body: unknown) =>
 
 /**
  * Reads a non-2xx response into a `RouteError` when its body has a `code`.
- * A code the route declares is marked as declared after its status, `data` and
- * headers are checked; one that breaks the declaration becomes an `Error`, like
+ * A code the route defines is marked as defined after its status, `data` and
+ * headers are checked; one that breaks the definition becomes an `Error`, like
  * bodies without a code.
  */
 const readErrorResponse = async (
 	rawResponse: Response,
 	mediaType: string,
-	route: RouteDeclaration,
+	route: RouteDefinition,
 	validate: boolean,
 	codecs: BodyCodecRegistry,
 ): Promise<Error> => {
@@ -182,30 +182,30 @@ const readErrorResponse = async (
 		status,
 		message: typeof message === "string" ? message : code,
 	};
-	const declaration =
+	const definition =
 		route.errors && Object.hasOwn(route.errors, code)
 			? route.errors[code]
 			: undefined;
-	if (!declaration) {
+	if (!definition) {
 		return new RouteError(code, {
 			...options,
 			data,
 			headers: Object.fromEntries(rawResponse.headers.entries()),
 		});
 	}
-	if (declaration.status !== status) return contractError(contractMismatch);
+	if (definition.status !== status) return contractError(contractMismatch);
 
 	const [validatedData, headers] = await Promise.all([
-		readValidated(declaration.data, data, validate),
-		readHeaders(declaration, rawResponse, validate),
+		readValidated(definition.data, data, validate),
+		readHeaders(definition, rawResponse, validate),
 	]);
-	return markDeclared(
+	return markDefined(
 		new RouteError(code, { ...options, data: validatedData, headers }),
 	);
 };
 
 /** Rejects with a `RouteError` for error responses with a `code`, and an `Error` for other responses outside the route contract. */
-export const readResponse = async <E extends RouteDeclaration>(
+export const readResponse = async <E extends RouteDefinition>(
 	rawResponse: Response,
 	route: E,
 	validateResponse: boolean,
@@ -225,10 +225,10 @@ export const readResponse = async <E extends RouteDeclaration>(
 		);
 	}
 
-	const schema: ResponseDeclaration | undefined = route.responses[status];
-	const declaresResponses = Object.keys(route.responses).length > 0;
+	const schema: ResponseDefinition | undefined = route.responses[status];
+	const definesResponses = Object.keys(route.responses).length > 0;
 	const breaksContract =
-		(!schema && declaresResponses) ||
+		(!schema && definesResponses) ||
 		(mediaType && schema?.content && !(mediaType in schema.content));
 	if (mediaType === STREAM_CONTENT_TYPE) {
 		// A stream may never end, so it is cancelled instead of read.
@@ -270,8 +270,8 @@ export const readResponse = async <E extends RouteDeclaration>(
 	};
 };
 
-export type ClientResponseBody<TRoute extends RouteDeclaration> =
-	DeclaredClientResponse<TRoute> extends infer TResponse
+export type ClientResponseBody<TRoute extends RouteDefinition> =
+	DefinedClientResponse<TRoute> extends infer TResponse
 		? TResponse extends { body: infer TBody }
 			? TBody
 			: never

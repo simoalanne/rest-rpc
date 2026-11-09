@@ -44,15 +44,15 @@ describe("call types", () => {
 		>();
 	});
 
-	it("types the data of declared built-in errors", () => {
-		const declared = route
+	it("types the data of defined built-in errors", () => {
+		const defined = route
 			.post("/")
 			.body(type<{ name: string }>())
 			.error(RequestValidationFailed)
 			.handler(() => "ok");
 		expectTypeOf<
 			Extract<
-				InferClientError<typeof declared>,
+				InferClientError<typeof defined>,
 				{ code: "REQUEST_VALIDATION_FAILED" }
 			>["data"]
 		>().toEqualTypeOf<RequestValidationIssues>();

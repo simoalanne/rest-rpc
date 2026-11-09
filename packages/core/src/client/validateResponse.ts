@@ -3,7 +3,7 @@ import {
 	type StandardSchemaV1,
 } from "../standard-schema/index.ts";
 
-/** Validates a received value, unless validation is disabled or undeclared. */
+/** Validates a received value, unless validation is disabled or no schema is defined. */
 export const validateResponseValue = async (
 	schema: StandardSchemaV1 | undefined,
 	value: unknown,

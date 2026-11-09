@@ -1,28 +1,28 @@
 import { RouteError } from "@rest-rpc/core";
-import type { RouteDeclaration } from "@rest-rpc/core/contract";
+import type { RouteDefinition } from "@rest-rpc/core/contract";
 import {
 	validateResponseHeaders,
 	validateResponseValue,
 } from "./validation.ts";
 
-/** Applies the declared status and validates `data` and headers; undeclared errors are sent as thrown. */
+/** Applies the defined status and validates `data` and headers; other errors are sent as thrown. */
 export const resolveRouteError = async (
-	route: RouteDeclaration,
+	route: RouteDefinition,
 	error: RouteError,
 	disableValidation: boolean,
 ): Promise<RouteError> => {
-	const declaration = route.errors?.[error.code];
-	if (!declaration) return error;
+	const definition = route.errors?.[error.code];
+	if (!definition) return error;
 
 	try {
 		const [data, headers] = disableValidation
-			? [error.data, declaration.headers ? error.headers : undefined]
+			? [error.data, definition.headers ? error.headers : undefined]
 			: await Promise.all([
-					validateResponseValue(declaration.data, error.data, "data"),
-					validateResponseHeaders(declaration.headers, error.headers),
+					validateResponseValue(definition.data, error.data, "data"),
+					validateResponseHeaders(definition.headers, error.headers),
 				]);
 		return new RouteError(error.code, {
-			status: declaration.status,
+			status: definition.status,
 			message: error.message,
 			data,
 			headers: headers ?? {},

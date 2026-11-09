@@ -28,7 +28,7 @@ export type ResponseValidationLocation = "body" | "headers" | "stream" | "data";
  * The built-in error sent when request validation fails, with the issues as
  * its `data`.
  *
- * @remarks Declare it with `.error()` to make clients recognize it.
+ * @remarks Define it with `.error()` to make clients recognize it.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/errors#built-in-errors}
  */
@@ -41,7 +41,7 @@ export const RequestValidationFailed = routeError("REQUEST_VALIDATION_FAILED", {
 /**
  * The built-in error sent when the request body cannot be decoded.
  *
- * @remarks Declare it with `.error()` to make clients recognize it.
+ * @remarks Define it with `.error()` to make clients recognize it.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/errors#built-in-errors}
  */
@@ -51,10 +51,10 @@ export const MalformedRequestBody = routeError("MALFORMED_REQUEST_BODY", {
 });
 
 /**
- * The built-in error sent when the request `Content-Type` is not declared, or
- * missing when the route declares several media types.
+ * The built-in error sent when the request `Content-Type` is not defined, or
+ * missing when the route defines several media types.
  *
- * @remarks Declare it with `.error()` to make clients recognize it.
+ * @remarks Define it with `.error()` to make clients recognize it.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/errors#built-in-errors}
  */
@@ -68,7 +68,7 @@ export const UnsupportedMediaType = routeError("UNSUPPORTED_MEDIA_TYPE", {
  * `createApp` for other thrown errors. Its `cause` holds the reason and is
  * never sent.
  *
- * @remarks Declare it with `.error()` to make clients recognize it.
+ * @remarks Define it with `.error()` to make clients recognize it.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/errors#built-in-errors}
  */
@@ -81,7 +81,7 @@ export const InternalServerError = routeError("INTERNAL_SERVER_ERROR", {
  * The built-in error `createApp` sends by default for requests that match no
  * route.
  *
- * @remarks Declare it with `.error()` to make clients recognize it.
+ * @remarks Define it with `.error()` to make clients recognize it.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/errors#built-in-errors}
  */

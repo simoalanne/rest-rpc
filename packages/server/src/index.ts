@@ -39,7 +39,7 @@ export {
 export {
 	bodyCodec,
 	createOpenApiDocument,
-	isDeclaredError,
+	isDefinedError,
 	RouteError,
 	routeError,
 	safe,

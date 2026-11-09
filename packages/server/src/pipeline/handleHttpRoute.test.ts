@@ -52,7 +52,7 @@ describe("handleHttpRoute", () => {
 		expect(contexts[0]).not.toBe(contexts[1]);
 	});
 
-	it("passes factories of the declared errors to middleware and the handler", async () => {
+	it("passes factories of the defined errors to middleware and the handler", async () => {
 		const Gone = routeError("GONE", { status: 410, data: type<number>() });
 		const implementation = route
 			.get("/")
@@ -81,7 +81,7 @@ describe("handleHttpRoute", () => {
 		expect(handler).not.toHaveBeenCalled();
 	});
 
-	it("transforms declared bodies and headers unless response validation is disabled", async () => {
+	it("transforms defined bodies and headers unless response validation is disabled", async () => {
 		const implementation = route
 			.get("/")
 			.response(
@@ -115,7 +115,7 @@ describe("handleHttpRoute", () => {
 	});
 
 	it.each(["body", "headers"] as const)(
-		"rejects declared %s validation failures",
+		"rejects defined %s validation failures",
 		async (location) => {
 			const implementation = route
 				.get("/")
@@ -131,7 +131,7 @@ describe("handleHttpRoute", () => {
 		},
 	);
 
-	it("validates declared stream chunks lazily", async () => {
+	it("validates defined stream chunks lazily", async () => {
 		async function* chunks() {
 			yield "2";
 		}
@@ -202,7 +202,7 @@ describe("handleHttpRoute", () => {
 		);
 	});
 
-	it("dispatches declared envelopes and plain bodies through response validation", async () => {
+	it("dispatches defined envelopes and plain bodies through response validation", async () => {
 		const schema = type((value: string) => value.toUpperCase());
 		expect(
 			await execute({
@@ -229,13 +229,13 @@ describe("handleHttpRoute", () => {
 			body: { value: "HELLO", contentType: "application/json" },
 		});
 	});
-	it("rejects an undeclared response status even with response validation disabled", async () => {
-		const declared = route
+	it("rejects an unknown response status even with response validation disabled", async () => {
+		const defined = route
 			.get("/")
 			.response(type<string>())
 			.handler(() => ({ status: 200, body: "ok" }));
 		const implementation = {
-			...flattenRouteImplementations(declared)[0]!,
+			...flattenRouteImplementations(defined)[0]!,
 			handler: () => ({ status: 404, body: "missing" }),
 		};
 		await expect(async () =>
@@ -244,18 +244,18 @@ describe("handleHttpRoute", () => {
 				signal,
 				disableResponseValidation: true,
 			}),
-		).rejects.toThrow("returned undeclared status 404");
+		).rejects.toThrow("returned status 404, which it does not define");
 	});
 
-	it("requires a declared response content type and normalizes the selection", async () => {
-		const declared = route
+	it("requires a defined response content type and normalizes the selection", async () => {
+		const defined = route
 			.get("/")
 			.response({
 				"text/plain": type<string>(),
 				"text/html": type((value: string) => `<p>${value}</p>`),
 			})
 			.handler(() => ({ status: 200, body: "ok", contentType: "text/plain" }));
-		const implementation = flattenRouteImplementations(declared)[0]!;
+		const implementation = flattenRouteImplementations(defined)[0]!;
 		const run = (contentType?: string) =>
 			handleHttpRoute(
 				{
@@ -280,7 +280,7 @@ describe("handleHttpRoute", () => {
 
 	it("validates the request body with the schemas of the selected media type", async () => {
 		const seen = vi.fn();
-		const declared = route
+		const defined = route
 			.post("/")
 			.body({
 				"text/plain": type((value: string) => value.toUpperCase()),
@@ -290,7 +290,7 @@ describe("handleHttpRoute", () => {
 				seen(contentType, body);
 				return { status: 204 };
 			});
-		const implementation = flattenRouteImplementations(declared)[0]!;
+		const implementation = flattenRouteImplementations(defined)[0]!;
 		const run = (mediaType: string, body: unknown) =>
 			handleHttpRoute(implementation, {
 				request: { body },
