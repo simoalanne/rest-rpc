@@ -25,8 +25,9 @@ import { createApp } from "@rest-rpc/server";
 import { serve } from "@rest-rpc/server/node";
 import { routes } from "./routes";
 
-const server = serve(createApp(routes), { port: 3000 }, (address) => {
-	console.log(`Listening on port ${address.port}`);
+const server = serve(createApp(routes), {
+	port: 3000,
+	onListen: (address) => console.log(`Listening on port ${address.port}`),
 });
 
 process.on("SIGTERM", () => server.close());
@@ -36,12 +37,14 @@ process.on("SIGTERM", () => server.close());
 type ServeOptions = {
 	port?: number;
 	hostname?: string;
+	onListen?: (address: AddressInfo) => void;
 };
 ```
 
-- `port`: defaults to `3000`. With `0`, a free port is chosen and passed to the
-  callback.
+- `port`: defaults to `3000`. With `0`, a free port is chosen and passed to
+  `onListen`.
 - `hostname`: listens on all interfaces when omitted, as `server.listen()` does.
+- `onListen`: called once the server listens, with the address it listens on.
 
 `serve` returns the underlying `http.Server`, so closing it and handling its
 events are up to you.

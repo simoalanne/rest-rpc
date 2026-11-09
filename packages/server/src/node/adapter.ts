@@ -214,22 +214,21 @@ export type ServeOptions = {
 	port?: number;
 	/** Listens on all interfaces when omitted, as `server.listen()` does. */
 	hostname?: string;
+	/**
+	 * Called once the server listens, with its address, including the port
+	 * chosen for `port: 0`.
+	 */
+	onListen?: (address: AddressInfo) => void;
 };
 
 /**
  * Starts a Node HTTP server that serves an app made with `createApp`.
  *
  * @remarks Returns the underlying server, so closing it is up to the caller.
- * `onListen` receives the address the server listens on, including the port
- * chosen for `port: 0`.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/node#serve}
  */
-export function serve(
-	app: App,
-	options: ServeOptions = {},
-	onListen?: (address: AddressInfo) => void,
-): Server {
+export function serve(app: App, options: ServeOptions = {}): Server {
 	const server = createServer(async (request, response) => {
 		try {
 			await writeFetchResponse(
@@ -248,7 +247,7 @@ export function serve(
 		}
 	});
 	server.listen(options.port ?? 3000, options.hostname, () =>
-		onListen?.(server.address() as AddressInfo),
+		options.onListen?.(server.address() as AddressInfo),
 	);
 	return server;
 }
