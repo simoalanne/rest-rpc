@@ -65,8 +65,9 @@ only the `body`.
 ## Infinite Queries
 
 Use `infiniteQueryOptions()` when each page should be fetched with route
-request input. The query key is inferred from the route and does not include the
-request, so every page for the route shares one infinite query cache entry.
+request input. The query key includes the request of the initial page, so every
+page shares one cache entry while queries with different input, such as another
+`status` below, are cached separately.
 
 `initialPageParam` and the values returned by `getNextPageParam` describe
 pagination state. The `request` callback maps each page parameter to the route
@@ -162,16 +163,26 @@ const todos = useInfiniteQuery(
 ## Query Keys
 
 Query keys are the route's key path in the route tree, followed by the request
-input when there is one. Use `queryKey()` to get the key outside an options
-object. The returned key is typed for TanStack Query APIs.
+input when there is one. Infinite and streamed queries cache different data than
+regular queries, so their keys add a `"~infinite"` or `"~streamed"` segment after
+the route path. Use `queryKey()`, `infiniteQueryKey()` and `streamedQueryKey()`
+to get the keys outside an options object. The returned keys are typed for
+TanStack Query APIs.
 
 ```ts
 restrpc.todos.get.queryKey({ params: { id: "todo_1" } }); // ["todos", "get", { params: { id: "todo_1" } }]
 restrpc.todos.list.queryKey(); // ["todos", "list"]
+
+// The request of an infinite query is the one of its initial page.
+restrpc.todos.page.infiniteQueryKey({
+	query: { cursor: undefined, status: "open", limit: 50 },
+}); // ["todos", "page", "~infinite", { query: { ... } }]
+restrpc.todos.events.streamedQueryKey(); // ["todos", "events", "~streamed"]
 ```
 
-Because keys share the route path as a prefix, `restrpc.todos.get.queryKey()`
-without a request matches every `todos.get` query when used as a filter.
+Without a request, a key is a prefix matching every query of its kind for the
+route when used as a filter. `queryKey()` without a request matches every query
+of the route, including infinite and streamed ones.
 
 ```ts
 const todoKey = restrpc.todos.get.queryKey({ params: { id: "todo_1" } });
@@ -197,7 +208,8 @@ await queryClient.invalidateQueries({
 
 ## Custom Query Keys
 
-Pass `queryKey` in options when a query needs a custom key.
+Pass `queryKey` in options when a query needs a custom key, such as two streamed
+queries of a route that accumulate data with different reducers.
 
 ```tsx
 const todo = useQuery(

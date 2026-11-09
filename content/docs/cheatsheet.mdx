@@ -614,7 +614,9 @@ const create = useMutation(
 create.mutate({ body: { title: "Write docs" } });
 
 restrpc.todos.get.queryKey({ params: { id: "1" } }); // ["todos", "get", { params: { id: "1" } }]
-restrpc.todos.get.queryKey(); // prefix matching every todos.get query
+restrpc.todos.get.queryKey(); // prefix matching every todos.get query of any kind
+restrpc.todos.page.infiniteQueryKey(request); // ["todos", "page", "~infinite", request], request of the initial page
+restrpc.todos.events.streamedQueryKey(); // ["todos", "events", "~streamed"]
 restrpc.todos.create.mutationKey(); // ["todos", "create"]
 ```
 

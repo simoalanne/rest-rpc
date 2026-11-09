@@ -246,8 +246,18 @@ type UseQueryArgs<
 	TData = RouteDataFor<F>,
 > = OptionsArgument<QueryOptionsFor<F, TData>>;
 
-type QueryKeyArgs<F extends ClientRoute> =
-	RouteRequestValue<F> extends never ? [] : [request: RouteRequestValue<F>];
+// Without a request, a key is a prefix matching every query of its kind.
+type QueryKeyArgs<F extends ClientRoute> = [RouteRequestValue<F>] extends [
+	never,
+]
+	? []
+	: [request?: RouteRequestValue<F>];
+
+type RouteQueryKeyTag<F extends ClientRoute, TData> = DataTag<
+	QueryKey,
+	TData,
+	RouteErrorFor<F>
+>;
 
 type RouteQueryOptionsMethod<F extends ClientRoute> = {
 	<TData = RouteDataFor<F>>(
@@ -272,17 +282,28 @@ type TanstackQueryBaseRouteValue<F extends ClientRoute> = {
 		options: InfiniteQueryOptionsFor<F, TInitialPageParam, TPageParam, TData>,
 	) => InfiniteQueryOptionsResultFor<F, TPageParam, TData>;
 	mutationKey: () => MutationKey;
-	queryKey: (
+	queryKey: (...args: QueryKeyArgs<F>) => RouteQueryKeyTag<F, RouteDataFor<F>>;
+	// The request is the one of the initial page.
+	infiniteQueryKey: <TPageParam = unknown>(
 		...args: QueryKeyArgs<F>
-	) => DataTag<QueryKey, RouteDataFor<F>, RouteErrorFor<F>>;
+	) => RouteQueryKeyTag<F, InfiniteQueryDataFor<F, TPageParam>>;
 };
 
-type TanstackQueryStreamRouteValue<F extends ClientRoute> = [
-	RouteResponseBody<F>,
-] extends [never]
-	? Record<never, never>
+type IsStreamRoute<F extends ClientRoute> = [RouteResponseBody<F>] extends [
+	never,
+]
+	? false
 	: RouteResponseBody<F> extends AsyncIterable<unknown>
+		? true
+		: false;
+
+type TanstackQueryStreamRouteValue<F extends ClientRoute> =
+	IsStreamRoute<F> extends true
 		? {
+				// A reducer's cache data can be given as `TData`.
+				streamedQueryKey: <TData = StreamedQueryDataFor<F>>(
+					...args: QueryKeyArgs<F>
+				) => RouteQueryKeyTag<F, TData>;
 				streamedQueryOptions: {
 					// Default accumulation fixes the cache data to the route's event array.
 					<TSelectedData = StreamedQueryDataFor<F>>(

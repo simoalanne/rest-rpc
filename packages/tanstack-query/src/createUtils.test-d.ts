@@ -175,6 +175,32 @@ describe("createTanstackQueryUtils types", () => {
 			>[0]
 		>().toEqualTypeOf<InferClientRequest<typeof empty>>();
 		utils.empty.queryKey();
+		// @ts-expect-error Routes without input take no request.
+		utils.empty.queryKey({});
+		utils.get.queryKey();
+		expectTypeOf(
+			new QueryClient().getQueryData(
+				utils.get.queryKey({ params: { id: "1" } }),
+			),
+		).toEqualTypeOf<InferClientResponse<typeof get> | undefined>();
+		// @ts-expect-error The id is a string.
+		utils.get.queryKey({ params: { id: 1 } });
+	});
+
+	it("tags keys of each query kind with the kind's cache data", () => {
+		expectTypeOf(
+			new QueryClient().getQueryData(utils.get.infiniteQueryKey<number>()),
+		).toEqualTypeOf<
+			InfiniteData<InferClientResponse<typeof get>, number> | undefined
+		>();
+		expectTypeOf(
+			new QueryClient().getQueryData(utils.events.streamedQueryKey()),
+		).toEqualTypeOf<Array<SseEvent<{ value: number }>> | undefined>();
+		expectTypeOf(
+			new QueryClient().getQueryData(utils.events.streamedQueryKey<number>()),
+		).toEqualTypeOf<number | undefined>();
+		// @ts-expect-error Non-stream routes have no streamed queries.
+		utils.get.streamedQueryKey();
 	});
 
 	it("infers selected data and infinite page request parameters", () => {

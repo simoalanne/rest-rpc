@@ -46,6 +46,7 @@ describe("createTanstackQueryUtils", () => {
 			"get",
 			request,
 		]);
+		expect(utils.users.get.queryKey()).toEqual(["users", "get"]);
 		expect(utils.events.queryKey()).toEqual(["events"]);
 		expect(utils.users.create.mutationKey()).toEqual(["users", "create"]);
 		expect(utils.users.get.queryOptions({ request }).queryKey).toEqual(
@@ -54,6 +55,34 @@ describe("createTanstackQueryUtils", () => {
 		expect(
 			utils.users.get.queryOptions({ request, queryKey: ["custom"] }).queryKey,
 		).toEqual(["custom"]);
+	});
+
+	it("separates query kinds with a segment after the route path", () => {
+		const { utils } = setup(() => Response.json({}));
+		const request = { query: { page: 1 } };
+		expect(utils.users.list.infiniteQueryKey()).toEqual([
+			"users",
+			"list",
+			"~infinite",
+		]);
+		expect(utils.users.list.infiniteQueryKey(request)).toEqual([
+			"users",
+			"list",
+			"~infinite",
+			request,
+		]);
+		expect(utils.events.streamedQueryKey()).toEqual(["events", "~streamed"]);
+		expect(utils.events.queryOptions().queryKey).toEqual(["events"]);
+		expect(utils.events.streamedQueryOptions().queryKey).toEqual(
+			utils.events.streamedQueryKey(),
+		);
+		expect(
+			utils.users.list.infiniteQueryOptions({
+				request: skipToken,
+				initialPageParam: 0,
+				getNextPageParam: () => undefined,
+			}).queryKey,
+		).toEqual(["users", "list", "~infinite"]);
 	});
 
 	it("fetches queries with the request, fetch options, and query signal", async () => {
@@ -125,7 +154,9 @@ describe("createTanstackQueryUtils", () => {
 			initialPageParam: 2,
 			getNextPageParam: () => undefined,
 		});
-		expect(options.queryKey).toEqual(["users", "list"]);
+		expect(options.queryKey).toEqual(
+			utils.users.list.infiniteQueryKey({ query: { page: 2 } }),
+		);
 		const data = await client.infiniteQuery(options);
 		expect(data.pages[0]).toMatchObject({ body: { names: ["Ada"] } });
 		expect(String(fetch.mock.lastCall![0])).toBe(
