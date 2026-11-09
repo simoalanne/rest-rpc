@@ -12,7 +12,7 @@
 		"build:packages": "pnpm -r --filter './packages/**' build",
 		"bench:typecheck": "pnpm --filter benchmarks bench:typecheck",
 		"test": "vitest run --typecheck",
-		"typecheck": "pnpm -r --parallel --no-bail --filter './packages/**' typecheck",
+		"typecheck": "pnpm -r --parallel --no-bail --filter './packages/**' --filter ./declarations typecheck",
 		"lint": "oxlint",
 		"lint:staged": "lint-staged",
 		"lint:unsafe": "oxlint --fix-dangerously",
