@@ -7,7 +7,7 @@ description: Generate an OpenAPI document from HTTP route definitions.
 separately shared contract. HTTP methods, paths, schemas, and operation
 metadata come from the same route builder used by the server and client.
 
-Define response schemas with `.response()` or `.streamResponse()` to include
+Define response schemas with `.response()` to include
 responses in OpenAPI. Responses inferred from handlers have no schema, so their
 routes get a placeholder `default` response that does not claim a status or
 body.
@@ -105,7 +105,7 @@ const create = route
 ## Response Descriptions
 
 Each defined response produces a status-keyed OpenAPI response. Describe it
-with the `description` option of `.response()` or `.streamResponse()`. Pass
+with the `description` option of `.response()`. Pass
 only options to describe a bodyless response:
 
 ```ts

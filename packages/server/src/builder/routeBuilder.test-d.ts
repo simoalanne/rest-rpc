@@ -6,7 +6,7 @@ import {
 	type RouteError,
 } from "@rest-rpc/core";
 import type { ServerResponse } from "@rest-rpc/core/contract";
-import { sse } from "../pipeline/sse.ts";
+import { sseEvent } from "../pipeline/sse.ts";
 import type { Context, DefaultContext } from "./context.ts";
 import { route } from "./routeBuilder.ts";
 import type {
@@ -287,7 +287,7 @@ describe("implicit response inference", () => {
 	it("infers plain, stream, and SSE data independently of metadata", () => {
 		const plain = route.handler(() => ({ id: "one" }));
 		async function* chunks() {
-			yield sse({ data: { count: 1 }, id: "one" });
+			yield sseEvent({ count: 1 }, { id: "one" });
 		}
 		const stream = route.handler(chunks);
 		const envelope = route

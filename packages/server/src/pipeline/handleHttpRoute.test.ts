@@ -1,9 +1,9 @@
-import { routeError, type } from "@rest-rpc/core";
+import { routeError, sse, type } from "@rest-rpc/core";
 import {
 	handleHttpRoute,
 	normalizeImplicitResponse,
 } from "./handleHttpRoute.ts";
-import { sse } from "./sse.ts";
+import { sseEvent } from "./sse.ts";
 import {
 	flattenRouteImplementations,
 	type RuntimeImplementationTree,
@@ -137,7 +137,7 @@ describe("handleHttpRoute", () => {
 		}
 		const implementation = route
 			.get("/")
-			.streamResponse(type((value: string) => Number(value)))
+			.response(sse(type((value: string) => Number(value))))
 			.handler(() => ({ status: 200, body: chunks() }));
 		for (const disabled of [false, true]) {
 			const result = await handleHttpRoute(
@@ -158,7 +158,7 @@ describe("handleHttpRoute", () => {
 
 	it("frames inferred streams as SSE and preserves headers", async () => {
 		async function* values() {
-			yield sse({ data: 1, id: "one" });
+			yield sseEvent(1, { id: "one" });
 		}
 		const result = await execute(
 			route.get("/").handler(() => ({
@@ -188,7 +188,7 @@ describe("handleHttpRoute", () => {
 			flattenRouteImplementations(
 				route
 					.get("/")
-					.streamResponse(rejected)
+					.response(sse(rejected))
 					.handler(() => ({ status: 200, body: values() })),
 			)[0]!,
 			{ request: {}, signal, onStreamError },

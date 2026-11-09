@@ -1,4 +1,4 @@
-import { route, routeError, type } from "@rest-rpc/core";
+import { route, routeError, sse, type } from "@rest-rpc/core";
 import { MutationObserver, QueryClient, skipToken } from "@tanstack/query-core";
 import { createTanstackQueryUtils } from "./createUtils.ts";
 
@@ -19,7 +19,7 @@ const contract = {
 			.body(type<{ name: string }>())
 			.response(type<{ name: string }>()),
 	},
-	events: route.get("/events").streamResponse(type<{ value: number }>()),
+	events: route.get("/events").response(sse(type<{ value: number }>())),
 };
 
 const setup = (respond: () => Response) => {

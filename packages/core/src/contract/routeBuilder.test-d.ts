@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { type } from "../standard-schema/type.ts";
 import { route } from "./routeBuilder.ts";
+import { sse } from "./sse.ts";
 import { routeError } from "./routeError.ts";
 import type { OpenApiRouteOptions } from "./routeDefinition.ts";
 
@@ -43,15 +44,23 @@ describe("routeBuilder types", () => {
 		expectTypeOf(output["~restrpc"].responses).toEqualTypeOf<{
 			200: { content: { "application/json": typeof schema } };
 		}>();
-		const stream = route.get("/events").streamResponse(schema, {
+		const stream = route.get("/events").response(sse(schema), {
 			headers,
 			description: "Events",
 		});
 		expectTypeOf(stream["~restrpc"].responses).toEqualTypeOf<{
 			200: {
-				content: { "text/event-stream": typeof schema };
+				content: { readonly "text/event-stream": typeof schema };
 				headers: typeof headers;
 			};
+		}>();
+		const both = route.response({
+			...sse(schema),
+			"application/json": schema,
+		});
+		expectTypeOf(both["~restrpc"].responses[200].content).toEqualTypeOf<{
+			readonly "text/event-stream": typeof schema;
+			readonly "application/json": typeof schema;
 		}>();
 	});
 
@@ -86,7 +95,7 @@ describe("routeBuilder types", () => {
 			.get("/")
 			.response(type<string>())
 			.response({ status: 204 })
-			.streamResponse(type<number>(), { status: 206 });
+			.response(sse(type<number>()), { status: 206 });
 		expectTypeOf<keyof (typeof value)["~restrpc"]["responses"]>().toEqualTypeOf<
 			200 | 204 | 206
 		>();

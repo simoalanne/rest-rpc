@@ -1,4 +1,5 @@
 import { route } from "./routeBuilder.ts";
+import { sse } from "./sse.ts";
 import { type } from "../standard-schema/type.ts";
 import type { ServerResponse } from "./response.ts";
 
@@ -48,7 +49,7 @@ describe("response inference", () => {
 	it("uses schema inputs for streams", () => {
 		const stream = route
 			.get("/")
-			.streamResponse(type((input: string) => Number(input)));
+			.response(sse(type((input: string) => Number(input))));
 		expectTypeOf<
 			ServerResponse<(typeof stream)["~restrpc"]>["body"]
 		>().toEqualTypeOf<AsyncIterable<string>>();

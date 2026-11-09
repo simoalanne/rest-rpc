@@ -72,7 +72,7 @@ const todos = useInfiniteQuery(
 ## Streamed Queries
 
 Use `streamedQueryOptions()` for routes with one successful stream response,
-defined with `.streamResponse()` or inferred from a handler that returns an
+defined with `.response(sse(schema))` or inferred from a handler that returns an
 async iterable. The util passes the envelope's async iterable body to TanStack
 Query and stores the materialized stream data.
 

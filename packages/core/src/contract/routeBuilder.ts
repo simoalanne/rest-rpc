@@ -410,20 +410,6 @@ export class RouteBuilder<
 			),
 		);
 	}
-
-	/** Defines a streaming response, the same as a `text/event-stream` response whose schema validates each item. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/streaming} */
-	streamResponse<
-		const TSchema extends StandardSchemaV1,
-		const TOptions extends ResponseOptions | undefined = undefined,
-	>(
-		schema: TSchema,
-		options?: TOptions,
-	): BuilderFor<
-		TKind,
-		WithResponse<TState, { "text/event-stream": TSchema }, TOptions>
-	> {
-		return this.response({ "text/event-stream": schema }, options) as never;
-	}
 }
 
 /**

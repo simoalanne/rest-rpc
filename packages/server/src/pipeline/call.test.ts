@@ -2,7 +2,7 @@ import { RouteError, routeError, type } from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import { call, createLocalClient } from "./call.ts";
 import { RequestValidationFailed } from "./errors.ts";
-import { sse } from "./sse.ts";
+import { sseEvent } from "./sse.ts";
 import { route } from "../builder/routeBuilder.ts";
 
 describe("call", () => {
@@ -110,7 +110,7 @@ describe("call", () => {
 
 	it("yields stream items as SSE events", async () => {
 		async function* values() {
-			yield sse({ data: 1, id: "one" });
+			yield sseEvent(1, { id: "one" });
 			yield 2;
 		}
 		const { body } = await call(route.get("/").handler(() => values()));
