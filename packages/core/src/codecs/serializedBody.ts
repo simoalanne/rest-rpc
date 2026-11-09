@@ -15,11 +15,11 @@ const serializedBodyBrand = Symbol("rest-rpc.serializedBody");
  */
 export function serializedBody(
 	body: BodyValue,
-	headers?: ConstructorParameters<typeof Headers>[0],
+	options: { headers?: ConstructorParameters<typeof Headers>[0] } = {},
 ): SerializedBody {
 	return {
 		body,
-		headers: new Headers(headers),
+		headers: new Headers(options.headers),
 		[serializedBodyBrand]: true,
 	} as SerializedBody;
 }

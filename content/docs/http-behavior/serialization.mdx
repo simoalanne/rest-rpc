@@ -165,7 +165,7 @@ including parameters, and returns the serialized body:
   must be a Fetch request body. On the server it must be a value the runtime can
   send. See
   [Request and Response Bodies](/docs/server/fetch#request-and-response-bodies).
-- `serializedBody(body, headers)` sends a body with its own headers, for codecs
+- `serializedBody(body, { headers })` sends a body with its own headers, for codecs
   that set headers such as `content-encoding`. Without a `content-type` header,
   the Fetch `Request` or `Response` sets one for the body, such as
   `multipart/form-data` with its generated boundary for `FormData`. A
@@ -178,8 +178,10 @@ import { bodyCodec, serializedBody } from "@rest-rpc/core";
 const gzipJsonCodec = bodyCodec("application/json", {
 	serialize: (value) =>
 		serializedBody(gzip(JSON.stringify(value)), {
-			"content-type": "application/json",
-			"content-encoding": "gzip",
+			headers: {
+				"content-type": "application/json",
+				"content-encoding": "gzip",
+			},
 		}),
 });
 ```
