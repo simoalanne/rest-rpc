@@ -246,24 +246,26 @@ const timed = route.use(async ({ next }) => {
 	}
 });
 
-// Reusable, optionally restricted to routes with matching request and errors.
-const Unauthorized = routeError("UNAUTHORIZED", { status: 401 });
-const attachUser = route.$context<{ user?: User }>().middleware<{
-	headers: { authorization: string };
-	errors: { UNAUTHORIZED: typeof Unauthorized };
-}>(async ({ headers, errors, context, next }) => {
-	const user = await authenticate(headers.authorization);
-	if (!user) throw errors.UNAUTHORIZED();
-	context.set("user", user);
-	return next();
-});
-
 // Context is typed per builder with $context<T>(), and created per request.
 // Host values are seeded with the `context` option of createApp or handle().
-const profile = route
+const Unauthorized = routeError("UNAUTHORIZED", { status: 401 });
+const authenticated = route
 	.$context<{ user?: User }>()
 	.headers(z.object({ authorization: z.string() }))
-	.error(Unauthorized)
+	.error(Unauthorized);
+
+// Reusable, typed by its builder and usable on routes with matching request,
+// errors and context. route.middleware<{ headers: ... }>() requires fields by type.
+const attachUser = authenticated.middleware(
+	async ({ headers, errors, context, next }) => {
+		const user = await authenticate(headers.authorization);
+		if (!user) throw errors.UNAUTHORIZED();
+		context.set("user", user);
+		return next();
+	},
+);
+
+const profile = authenticated
 	.use(attachUser)
 	.handler(({ context }) => context.get("user"));
 

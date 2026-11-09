@@ -9,13 +9,11 @@ import type { Merge } from "@rest-rpc/core/utils";
  */
 export interface DefaultContext {}
 
-/**
- * The context selected with `$context<TValues>()`: `DefaultContext` merged
- * with `TValues`, whose types win for keys in both.
- */
-export type WithDefaultContext<TValues extends object> = Merge<
-	Omit<DefaultContext, keyof TValues> & TValues
->;
+/** `TContext` extended with `TValues`, whose types win for keys in both. */
+export type ExtendContext<
+	TContext extends object,
+	TValues extends object,
+> = Merge<Omit<TContext, keyof TValues> & TValues>;
 
 /** A typed per-request value store shared by route middleware and handlers. */
 export type Context<TValues extends object> = {

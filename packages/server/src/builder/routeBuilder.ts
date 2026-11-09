@@ -8,9 +8,10 @@ import {
 	type NextState,
 	type RootBuilderState,
 	type RouteDefinition,
+	type ServerRequest,
 } from "@rest-rpc/core/contract";
 import type { EmptyObject, Merge } from "@rest-rpc/core/utils";
-import type { DefaultContext, WithDefaultContext } from "./context.ts";
+import type { DefaultContext, ExtendContext } from "./context.ts";
 import type {
 	AllowedHandlerResult,
 	HasDefinedResponses,
@@ -25,12 +26,26 @@ import type {
 	ValidHandlerResult,
 } from "./routeBuilder.types.ts";
 
-type RootOnlyMethod = "$context" | "middleware";
-
 // The route a handler or middleware receives. The root defaults to POST.
 type HandlerRoute<TState extends BuilderState> = Extract<
 	DefinitionFor<NextState<TState, EmptyObject>>,
 	RouteDefinition
+>;
+
+type ErrorsOf<TValue> = TValue extends { errors: infer TErrors }
+	? TErrors
+	: EmptyObject;
+
+// Reusable middleware receives the request segments and errors defined on its
+// builder, plus those passed as a type argument.
+type ReusableRequestFor<
+	TState extends BuilderState,
+	TRequest extends RequestFields,
+> = Merge<
+	Omit<ServerRequest<HandlerRoute<TState>>, keyof TRequest> &
+		Omit<TRequest, "errors"> & {
+			errors: Merge<ErrorsOf<HandlerRoute<TState>> & ErrorsOf<TRequest>>;
+		}
 >;
 
 // Handler types are not exported, so emitted definitions of completed routes
@@ -71,11 +86,7 @@ export interface ServerRouteBuilderKind<
 	TContext extends object = EmptyObject,
 > extends BuilderKind {
 	readonly builder: this["state"] extends infer TState extends BuilderState
-		? Omit<
-				ServerRouteBuilder<TState, TContext>,
-				| TState["omit"]
-				| (TState["method"] extends undefined ? never : RootOnlyMethod)
-			>
+		? Omit<ServerRouteBuilder<TState, TContext>, TState["omit"]>
 		: never;
 }
 
@@ -112,13 +123,7 @@ export class ServerRouteBuilder<
 		middleware: (
 			request: MiddlewareRequest<HandlerRoute<TState>, TContext>,
 		) => MiddlewareReturn,
-	): BuilderFor<
-		ServerRouteBuilderKind<TContext>,
-		NextState<
-			TState,
-			{ method: TState["method"]; omit: TState["omit"] | RootOnlyMethod }
-		>
-	> {
+	): BuilderFor<ServerRouteBuilderKind<TContext>, TState> {
 		const state: ServerRouteBuilderState = this["~restrpc"];
 		return this.clone({
 			...state,
@@ -129,18 +134,28 @@ export class ServerRouteBuilder<
 		});
 	}
 
-	/** Defines a reusable middleware function on the untouched route root. @see {@link https://rest-rpc.vercel.app/docs/middleware} */
-	middleware<TRequest extends RequestFields = RequestFields>(
+	/** Defines a reusable middleware function typed by this builder's request, errors and context. @see {@link https://rest-rpc.vercel.app/docs/middleware} */
+	middleware<TRequest extends RequestFields = EmptyObject>(
 		callback: (
-			request: ReusableMiddlewareRequest<TRequest, TContext>,
+			request: ReusableMiddlewareRequest<
+				ReusableRequestFor<TState, TRequest>,
+				TContext
+			>,
 		) => MiddlewareReturn,
-	): typeof callback {
-		return callback;
+	): <TRouteContext extends TContext>(
+		request: ReusableMiddlewareRequest<
+			ReusableRequestFor<TState, TRequest>,
+			TRouteContext
+		>,
+	) => MiddlewareReturn {
+		// The callback only reads and writes keys of TContext, so it runs on any
+		// route whose context extends it.
+		return callback as never;
 	}
 
-	/** Selects the typed per-request context store for this builder, merged with `DefaultContext`. @see {@link https://rest-rpc.vercel.app/docs/context} */
+	/** Adds typed values to the per-request context store of this builder, whose types win for keys already in it. @see {@link https://rest-rpc.vercel.app/docs/context} */
 	$context<TValues extends object>(): BuilderFor<
-		ServerRouteBuilderKind<WithDefaultContext<TValues>>,
+		ServerRouteBuilderKind<ExtendContext<TContext, TValues>>,
 		TState
 	> {
 		return this as never;

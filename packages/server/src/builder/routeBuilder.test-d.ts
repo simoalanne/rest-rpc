@@ -8,7 +8,8 @@ import {
 import type { ServerResponse } from "@rest-rpc/core/contract";
 import { respond } from "../pipeline/respond.ts";
 import { sseEvent } from "../pipeline/sse.ts";
-import type { Context, DefaultContext, WithDefaultContext } from "./context.ts";
+import type { Context, DefaultContext, ExtendContext } from "./context.ts";
+import { implement } from "./implement.ts";
 import { route } from "./routeBuilder.ts";
 import type {
 	InferServerHandler,
@@ -90,7 +91,7 @@ describe("routeBuilder types", () => {
 		const defined = fieldRoute.get("/").params(type<{ id: string }>());
 		type Request = InferServerRequest<typeof defined>;
 		expectTypeOf<Request["context"]>().toEqualTypeOf<
-			Context<WithDefaultContext<Values>>
+			Context<ExtendContext<DefaultContext, Values>>
 		>();
 		expectTypeOf<Request["params"]>().toEqualTypeOf<{ id: string }>();
 		expectTypeOf<Request["route"]>().not.toHaveProperty("context");
@@ -98,7 +99,7 @@ describe("routeBuilder types", () => {
 		const completed = fieldRoute.handler(() => "ok");
 		expectTypeOf<
 			InferServerRequest<typeof completed>["context"]
-		>().toEqualTypeOf<Context<WithDefaultContext<Values>>>();
+		>().toEqualTypeOf<Context<ExtendContext<DefaultContext, Values>>>();
 		const contractDefined = contractRoute.get("/");
 		expectTypeOf<
 			InferServerRequest<typeof contractDefined>["context"]
@@ -211,6 +212,77 @@ describe("route errors", () => {
 			expectTypeOf(errors.UNAUTHORIZED).toEqualTypeOf<unknown>();
 			return next();
 		});
+	});
+
+	it("applies reusable middleware to routes whose context extends its own", () => {
+		const timing = route.middleware(({ next }) => next());
+		const setUser = route
+			.$context<{ user: string }>()
+			.middleware(({ context, next }) => {
+				context.set("user", "1");
+				return next();
+			});
+		const withUser = route.$context<{ user: string; tenant: string }>();
+		withUser
+			.use(timing)
+			.use(setUser)
+			.get("/")
+			.use(timing)
+			.handler(() => "ok");
+		implement({ get: route.get("/").response(type<string>()) })
+			.$context<{ user: string }>()
+			.use(timing)
+			.use(setUser);
+		// @ts-expect-error The route context does not define user.
+		route.use(setUser);
+		// @ts-expect-error The route context types user differently.
+		route.$context<{ user: number }>().use(setUser);
+	});
+
+	it("extends context at any builder stage", () => {
+		route
+			.headers(type<{ authorization: string }>())
+			.$context<{ user: string }>()
+			.use(({ next }) => next())
+			.$context<{ tenant: string }>()
+			.get("/")
+			.$context<{ user: number }>()
+			.handler(({ context }) => {
+				expectTypeOf(context.get("user")).toEqualTypeOf<number>();
+				expectTypeOf(context.get("tenant")).toEqualTypeOf<string>();
+				// @ts-expect-error Context keys must be defined.
+				context.get("missing");
+			});
+	});
+
+	it("types reusable middleware by the request and errors of its builder", () => {
+		const authed = route
+			.$context<{ user: string }>()
+			.headers(type<{ authorization: string }>())
+			.error(Unauthorized)
+			.use(({ next }) => next());
+		const auth = authed.middleware<{ query: { debug: string } }>(
+			({ headers, query, errors, context, next }) => {
+				expectTypeOf(headers).toEqualTypeOf<{ authorization: string }>();
+				expectTypeOf(query).toEqualTypeOf<{ debug: string }>();
+				if (!headers.authorization) throw errors.UNAUTHORIZED();
+				context.set("user", query.debug);
+				return next();
+			},
+		);
+		authed
+			.query(type<{ debug: string }>())
+			.use(auth)
+			.get("/")
+			.handler(() => "ok");
+		// @ts-expect-error The route does not define the authorization header.
+		route.$context<{ user: string }>().error(Unauthorized).use(auth);
+		route
+			.$context<{ user: string }>()
+			.headers(type<{ authorization: string }>())
+			.query(type<{ debug: string }>())
+			// @ts-expect-error The route does not define UNAUTHORIZED.
+			.use(auth);
 	});
 });
 
