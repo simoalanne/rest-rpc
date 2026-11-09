@@ -22,8 +22,9 @@ const getProfile = authenticatedRoute
 	.handler(({ context }) => context.get("user"));
 ```
 
-`$context<T>()` is available on the root `route` builder and replaces the
-[global context](#global-context) type for routes built from it. For contract-first
+`$context<T>()` is available on the root `route` builder and adds `T` to the
+[global context](#global-context) type for routes built from it. Where a key is
+in both, its type from `T` is used. For contract-first
 routes, call it on the `implement()` result. See
 [Contract-first](/docs/contract-first#context-and-middleware).
 

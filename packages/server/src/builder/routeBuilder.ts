@@ -10,7 +10,7 @@ import {
 	type RouteDefinition,
 } from "@rest-rpc/core/contract";
 import type { EmptyObject, Merge } from "@rest-rpc/core/utils";
-import type { DefaultContext } from "./context.ts";
+import type { DefaultContext, WithDefaultContext } from "./context.ts";
 import type {
 	AllowedHandlerResult,
 	HasDefinedResponses,
@@ -138,9 +138,9 @@ export class ServerRouteBuilder<
 		return callback;
 	}
 
-	/** Selects the typed per-request context store for this builder. @see {@link https://rest-rpc.vercel.app/docs/context} */
+	/** Selects the typed per-request context store for this builder, merged with `DefaultContext`. @see {@link https://rest-rpc.vercel.app/docs/context} */
 	$context<TValues extends object>(): BuilderFor<
-		ServerRouteBuilderKind<TValues>,
+		ServerRouteBuilderKind<WithDefaultContext<TValues>>,
 		TState
 	> {
 		return this as never;

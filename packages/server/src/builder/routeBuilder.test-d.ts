@@ -8,7 +8,7 @@ import {
 import type { ServerResponse } from "@rest-rpc/core/contract";
 import { respond } from "../pipeline/respond.ts";
 import { sseEvent } from "../pipeline/sse.ts";
-import type { Context, DefaultContext } from "./context.ts";
+import type { Context, DefaultContext, WithDefaultContext } from "./context.ts";
 import { route } from "./routeBuilder.ts";
 import type {
 	InferServerHandler,
@@ -89,14 +89,16 @@ describe("routeBuilder types", () => {
 	it("infers the context selected for a server route", () => {
 		const defined = fieldRoute.get("/").params(type<{ id: string }>());
 		type Request = InferServerRequest<typeof defined>;
-		expectTypeOf<Request["context"]>().toEqualTypeOf<Context<Values>>();
+		expectTypeOf<Request["context"]>().toEqualTypeOf<
+			Context<WithDefaultContext<Values>>
+		>();
 		expectTypeOf<Request["params"]>().toEqualTypeOf<{ id: string }>();
 		expectTypeOf<Request["route"]>().not.toHaveProperty("context");
 		expectTypeOf<Request["route"]["method"]>().toEqualTypeOf<"GET">();
 		const completed = fieldRoute.handler(() => "ok");
 		expectTypeOf<
 			InferServerRequest<typeof completed>["context"]
-		>().toEqualTypeOf<Context<Values>>();
+		>().toEqualTypeOf<Context<WithDefaultContext<Values>>>();
 		const contractDefined = contractRoute.get("/");
 		expectTypeOf<
 			InferServerRequest<typeof contractDefined>["context"]

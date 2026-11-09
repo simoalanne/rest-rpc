@@ -1,3 +1,5 @@
+import type { Merge } from "@rest-rpc/core/utils";
+
 /**
  * The default application context shared by handlers and middleware. Augment
  * this interface with `declare module "@rest-rpc/server"`. Defaults to an empty
@@ -6,6 +8,14 @@
  * @default {}
  */
 export interface DefaultContext {}
+
+/**
+ * The context selected with `$context<TValues>()`: `DefaultContext` merged
+ * with `TValues`, whose types win for keys in both.
+ */
+export type WithDefaultContext<TValues extends object> = Merge<
+	Omit<DefaultContext, keyof TValues> & TValues
+>;
 
 /** A typed per-request value store shared by route middleware and handlers. */
 export type Context<TValues extends object> = {
