@@ -2,6 +2,7 @@ import { RouteError, routeError, type } from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import { call, createLocalClient } from "./call.ts";
 import { RequestValidationFailed } from "./errors.ts";
+import { respond } from "./respond.ts";
 import { sseEvent } from "./sse.ts";
 import { route } from "../builder/routeBuilder.ts";
 
@@ -22,7 +23,7 @@ describe("call", () => {
 			)
 			.handler((request) => {
 				seen(request);
-				return { status: 200, body: "2", headers: { total: 1 } };
+				return respond("2", { headers: { total: 1 } });
 			});
 		expect(
 			await call(

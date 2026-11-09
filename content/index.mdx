@@ -22,7 +22,7 @@ middleware, and deployment model.
 ```ts twoslash
 // ---cut-start---
 // @filename: server.ts
-import { route } from "@rest-rpc/server";
+import { respond, route } from "@rest-rpc/server";
 import { z } from "zod";
 
 declare function createTodo(title: string): { id: string; title: string };
@@ -45,15 +45,12 @@ const get = route
 	.handler(({ params, query, errors }) => {
 		const todo = findTodo(params.id);
 		if (!todo) throw errors.TODO_NOT_FOUND();
-		return {
-			status: 200,
-			headers: { "x-powered-by": "rest-rpc" },
-			body: {
-				...todo,
-				title:
-					query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title,
-			},
-		};
+		const title =
+			query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title;
+		return respond(
+			{ ...todo, title },
+			{ headers: { "x-powered-by": "rest-rpc" } },
+		);
 	});
 
 export const routes = { todos: { create, get } };
@@ -65,7 +62,7 @@ export const routes = { todos: { create, get } };
 ```ts twoslash
 // ---cut-start---
 // @filename: server.ts
-import { route } from "@rest-rpc/server";
+import { respond, route } from "@rest-rpc/server";
 import { z } from "zod";
 
 declare function createTodo(title: string): { id: string; title: string };
@@ -88,15 +85,12 @@ const get = route
 	.handler(({ params, query, errors }) => {
 		const todo = findTodo(params.id);
 		if (!todo) throw errors.TODO_NOT_FOUND();
-		return {
-			status: 200,
-			headers: { "x-powered-by": "rest-rpc" },
-			body: {
-				...todo,
-				title:
-					query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title,
-			},
-		};
+		const title =
+			query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title;
+		return respond(
+			{ ...todo, title },
+			{ headers: { "x-powered-by": "rest-rpc" } },
+		);
 	});
 
 export const routes = { todos: { create, get } };
@@ -131,7 +125,7 @@ if (response.status === 200) {
 ```tsx twoslash
 // ---cut-start---
 // @filename: server.ts
-import { route } from "@rest-rpc/server";
+import { respond, route } from "@rest-rpc/server";
 import { z } from "zod";
 
 declare function createTodo(title: string): { id: string; title: string };
@@ -154,15 +148,12 @@ const get = route
 	.handler(({ params, query, errors }) => {
 		const todo = findTodo(params.id);
 		if (!todo) throw errors.TODO_NOT_FOUND();
-		return {
-			status: 200,
-			headers: { "x-powered-by": "rest-rpc" },
-			body: {
-				...todo,
-				title:
-					query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title,
-			},
-		};
+		const title =
+			query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title;
+		return respond(
+			{ ...todo, title },
+			{ headers: { "x-powered-by": "rest-rpc" } },
+		);
 	});
 
 export const routes = { todos: { create, get } };

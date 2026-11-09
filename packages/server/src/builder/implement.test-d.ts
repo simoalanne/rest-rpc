@@ -1,6 +1,7 @@
 import { route, type } from "@rest-rpc/core";
 import type { Context } from "./context.ts";
 import { implement } from "./implement.ts";
+import { respond } from "../pipeline/respond.ts";
 import type { ContractImplementer } from "./implement.types.ts";
 import type {
 	InferServerHandler,
@@ -40,7 +41,7 @@ describe("implement types", () => {
 			expectTypeOf(request.params).toEqualTypeOf<{ id: string }>();
 			expectTypeOf(request.context.get("requestId")).toEqualTypeOf<string>();
 
-			return { status: 200, body: { name: "Ada" } };
+			return respond({ name: "Ada" });
 		});
 	});
 
@@ -59,14 +60,14 @@ describe("implement types", () => {
 				expectTypeOf(request).toEqualTypeOf<
 					RouteRequest<(typeof transformed)["~restrpc"], Values>
 				>();
-				return { status: 200, body: request.context.get("requestId") };
+				return respond(request.context.get("requestId"));
 			});
 	});
 
 	it("accepts separately typed handlers and replaces context", () => {
 		const handler: RouteHandler<(typeof transformed)["~restrpc"], Values> = ({
 			params,
-		}) => ({ status: 200, body: String(params.id) });
+		}) => respond(String(params.id));
 		implementation.users.get.handler(handler);
 		implementation
 			.$context<{ count: number }>()
@@ -74,7 +75,7 @@ describe("implement types", () => {
 				expectTypeOf(context.get("count")).toEqualTypeOf<number>();
 				// @ts-expect-error Replacing context removes its previous keys.
 				context.get("requestId");
-				return { status: 200, body: "ok" };
+				return respond("ok");
 			});
 	});
 

@@ -6,6 +6,7 @@ import {
 	type RouteError,
 } from "@rest-rpc/core";
 import type { ServerResponse } from "@rest-rpc/core/contract";
+import { respond } from "../pipeline/respond.ts";
 import { sseEvent } from "../pipeline/sse.ts";
 import type { Context, DefaultContext } from "./context.ts";
 import { route } from "./routeBuilder.ts";
@@ -23,11 +24,11 @@ const fieldRoute = route.$context<Values>();
 describe("routeBuilder types", () => {
 	it("checks defined response statuses and bodies", () => {
 		const defined = route.get("/").response(type<{ id: string }>());
-		defined.handler(() => ({ status: 200, body: { id: "ok" } }));
+		defined.handler(() => respond({ id: "ok" }));
 		// @ts-expect-error The route only defines status 200.
-		defined.handler(() => ({ status: 404, body: { id: "missing" } }));
+		defined.handler(() => respond({ id: "missing" }, { status: 404 }));
 		// @ts-expect-error The defined body requires a string id.
-		defined.handler(() => ({ status: 200, body: { id: 1 } }));
+		defined.handler(() => respond({ id: 1 }));
 	});
 
 	it("limits context access and writes to defined keys and values", () => {
@@ -111,9 +112,10 @@ describe("routeBuilder types", () => {
 		expectTypeOf<InferServerRequest<typeof defined>>().toEqualTypeOf<
 			RouteRequest<Route, DefaultContext>
 		>();
-		expectTypeOf<InferServerResponse<typeof defined>>().toEqualTypeOf<
-			{ status: 200; contentType?: "application/json"; body: string } | string
-		>();
+		type Response = InferServerResponse<typeof defined>;
+		expectTypeOf("ok").toExtend<Response>();
+		expectTypeOf(respond("ok")).toExtend<Response>();
+		expectTypeOf({ status: 200 as const, body: "ok" }).not.toExtend<Response>();
 		const tree = { users: { get: defined } };
 		expectTypeOf<
 			InferServerRequest<typeof tree>["users"]["get"]
@@ -123,29 +125,18 @@ describe("routeBuilder types", () => {
 		>().toEqualTypeOf<InferServerResponse<typeof defined>>();
 	});
 
-	it("returns envelopes or the body of a single defined response", () => {
-		const defined = contractRoute.get("/").response(type<string>());
-		type Handler = InferServerHandler<typeof defined>;
-		type Envelope = {
-			status: 200;
-			contentType?: "application/json";
-			body: string;
-		};
-		expectTypeOf<ReturnType<Handler>>().toEqualTypeOf<
-			Envelope | string | Promise<Envelope | string>
-		>();
-		const created = contractRoute
-			.post("/")
-			.response(type<string>(), { status: 201 });
-		type CreatedHandler = InferServerHandler<typeof created>;
-		type CreatedEnvelope = {
-			status: 201;
-			contentType?: "application/json";
-			body: string;
-		};
-		expectTypeOf<ReturnType<CreatedHandler>>().toEqualTypeOf<
-			CreatedEnvelope | string | Promise<CreatedEnvelope | string>
-		>();
+	it("returns respond() results or the body of a single defined response", () => {
+		const created = route.post("/").response(type<string>(), { status: 201 });
+		created.handler(() => "ok");
+		created.handler(() => respond("ok"));
+		created.handler(() => respond("ok", { status: 201 }));
+		// @ts-expect-error The route only defines status 201.
+		created.handler(() => respond("ok", { status: 200 }));
+		// @ts-expect-error The defined body is a string.
+		created.handler(() => respond(1));
+		const empty = route.delete("/").response({ status: 204 });
+		empty.handler(() => {});
+		empty.handler(() => respond(undefined, { status: 204 }));
 	});
 
 	it("requires envelopes when multiple responses are defined", () => {
@@ -153,9 +144,12 @@ describe("routeBuilder types", () => {
 			.get("/")
 			.response(type<string>())
 			.response(type<{ id: string }>(), { status: 201 });
-		defined.handler(() => ({ status: 200, body: "ok" }));
+		defined.handler(() => respond("ok"));
+		defined.handler(() => respond({ id: "new" }, { status: 201 }));
 		// @ts-expect-error Plain bodies are ambiguous between defined statuses.
 		defined.handler(() => "ok");
+		// @ts-expect-error Only status 200 is the default among several.
+		defined.handler(() => respond({ id: "new" }));
 	});
 });
 
@@ -224,15 +218,15 @@ describe("implicit response inference", () => {
 			.get("/")
 			.handler(() =>
 				Math.random() > 0.5
-					? ({ status: 201, body: { id: "new" } } as const)
-					: ({ status: 202, body: { queued: true } } as const),
+					? respond({ id: "new" }, { status: 201 })
+					: respond({ queued: true }, { status: 202 }),
 			);
 		const asyncRoute = route
 			.get("/")
 			.handler(async () =>
 				Math.random() > 0.5
-					? ({ status: 201, body: { id: "new" } } as const)
-					: ({ status: 202, body: { queued: true } } as const),
+					? respond({ id: "new" }, { status: 201 })
+					: respond({ queued: true }, { status: 202 }),
 			);
 		expectTypeOf<InferClientResponse<typeof sync>>().toEqualTypeOf<
 			InferClientResponse<typeof asyncRoute>
@@ -244,11 +238,13 @@ describe("implicit response inference", () => {
 
 	it("rejects inferred statuses outside 2xx", () => {
 		// @ts-expect-error Errors are thrown instead of returned.
-		route.handler(() => ({ status: 404, body: { message: "missing" } }));
+		route.handler(() => respond({ message: "missing" }, { status: 404 }));
 	});
 
 	it("infers empty bodies, custom media, and response headers", () => {
-		const empty = route.get("/").handler(() => ({ status: 204 }));
+		const empty = route
+			.get("/")
+			.handler(() => respond(undefined, { status: 204 }));
 		expectTypeOf<ServerResponse<(typeof empty)["~restrpc"]>>().toEqualTypeOf<{
 			status: 204;
 		}>();
@@ -262,12 +258,12 @@ describe("implicit response inference", () => {
 			body: undefined;
 			headers: Record<string, string>;
 		}>();
-		const custom = route.get("/").handler(() => ({
-			status: 200,
-			body: "ok",
-			contentType: "text/plain",
-			headers: { count: 2, enabled: true, omitted: undefined },
-		}));
+		const custom = route.get("/").handler(() =>
+			respond("ok", {
+				contentType: "text/plain",
+				headers: { count: 2, enabled: true, omitted: undefined },
+			}),
+		);
 		expectTypeOf<InferClientResponse<typeof custom>["headers"]>().toEqualTypeOf<
 			Record<string, string> & {
 				readonly count: 2;
@@ -290,9 +286,7 @@ describe("implicit response inference", () => {
 			yield sseEvent({ count: 1 }, { id: "one" });
 		}
 		const stream = route.handler(chunks);
-		const envelope = route
-			.get("/")
-			.handler(() => ({ status: 200, body: chunks() }));
+		const envelope = route.get("/").handler(() => respond(chunks()));
 		expectTypeOf<InferClientResponse<typeof plain>>().toEqualTypeOf<{
 			status: 200;
 			contentType: "application/json";
@@ -321,24 +315,24 @@ describe("implicit response inference", () => {
 			.handler(() =>
 				Math.random() > 0.5
 					? { id: "one" }
-					: { status: 202, body: { queued: true } },
+					: respond({ queued: true }, { status: 202 }),
 			);
 		type Client = InferClientResponse<typeof mixed>;
 		expectTypeOf<Client["status"]>().toEqualTypeOf<200 | 202>();
 		expectTypeOf<Extract<Client, { status: 200 }>["body"]>().toEqualTypeOf<{
 			readonly id: "one";
 		}>();
-		const textStatus = route.handler(() => ({ id: "one", status: "open" }));
-		expectTypeOf<InferClientResponse<typeof textStatus>>().toEqualTypeOf<{
+		const statusField = route.handler(() => ({ status: 201, body: "ok" }));
+		expectTypeOf<InferClientResponse<typeof statusField>>().toEqualTypeOf<{
 			status: 200;
 			contentType: "application/json";
-			body: { readonly id: "one"; readonly status: "open" };
+			body: { readonly status: 201; readonly body: "ok" };
 			headers: Record<string, string>;
 		}>();
 	});
 
-	it("rejects invalid envelope headers", () => {
+	it("rejects non-scalar respond() headers", () => {
 		// @ts-expect-error Response headers must be transport scalars.
-		route.handler(() => ({ status: 200, headers: { count: {} } }));
+		respond(undefined, { headers: { count: {} } });
 	});
 });

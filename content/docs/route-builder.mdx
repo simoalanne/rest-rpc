@@ -164,28 +164,29 @@ const stacked = route
 
 ## Return Responses
 
-A handler returns either a response envelope or a body:
+A handler returns a body, or a response created with `respond()`:
 
-- An object with a numeric `status` is a response envelope:
-  `{ status, body?, contentType?, headers? }`.
 - `undefined` is a status 200 response without a body.
-- Any other value is the response body with status 200.
+- An async iterable is an SSE [stream](#return-streams).
+- Any other value is a JSON body with status 200.
+- `respond(body, options?)` sets the `status`, `contentType`, or `headers` of
+  the response. An `undefined` body sends no body.
+
+Only `respond()` results are read as responses, so a returned body may have any
+shape, including a `status` field of its own.
 
 Without defined responses, the returned statuses and body types become the
 client's result type. Returned statuses are successful, from 200 to 299.
 Errors are [thrown](#define-errors) instead:
 
 ```ts
+import { respond, route } from "@rest-rpc/server";
+
 const created = route
 	.post("/todos")
 	.body(z.object({ title: z.string() }))
-	.handler(({ body }) => ({ status: 201, body: createTodo(body.title) }));
+	.handler(({ body }) => respond(createTodo(body.title), { status: 201 }));
 ```
-
-:::note
-A body that has a numeric `status` field of its own is read as an envelope.
-Return it wrapped, as `{ status: 200, body: value }`.
-:::
 
 ## Define Responses
 
@@ -202,9 +203,14 @@ const get = route
 	.handler(({ params }) => findTodo(params.id));
 ```
 
+A plain return value is the body of the only defined response, with its
+status. With several statuses or media types, return `respond()` with the
+`status` or `contentType` to send. Its `status` defaults to the route's only
+status, or to 200 among several.
+
 Pass only options for a bodyless response, such as `.response({ status: 204 })`.
 Define status-specific response headers with the `headers` option and return
-them as `headers`. The option is available on every response, including
+them with `respond()`. The option is available on every response, including
 bodyless and stream responses:
 
 ```ts
@@ -217,11 +223,8 @@ route
 	})
 	.handler(({ body }) => {
 		const todo = createTodo(body.title);
-		return {
-			status: 201,
-			body: todo,
-			headers: { location: `/todos/${todo.id}` },
-		};
+		// 201 is the only defined status, so `status` may be omitted.
+		return respond(todo, { headers: { location: `/todos/${todo.id}` } });
 	});
 ```
 
@@ -331,8 +334,8 @@ select the request media type with `contentType` in the
 `.body()` calls [stack](#stacking-schemas) schemas per media type, and a schema
 passed alone counts as `application/json`.
 
-Without defined responses, return the body in an envelope with its
-`contentType`, and the media type is inferred. See
+Without defined responses, return `respond(body, { contentType })`, and the
+media type is inferred. See
 [Serialization and Codecs](/docs/http-behavior/serialization) for decoded value
 types and compatible codecs.
 
@@ -358,8 +361,8 @@ const todos = route
 	.response({ ...sse(todoSchema), "application/json": z.array(todoSchema) })
 	.handler(() =>
 		wantsStream()
-			? { status: 200, contentType: "text/event-stream", body: streamTodos() }
-			: { status: 200, contentType: "application/json", body: listTodos() },
+			? respond(streamTodos(), { contentType: "text/event-stream" })
+			: respond(listTodos(), { contentType: "application/json" }),
 	);
 ```
 
@@ -402,8 +405,7 @@ const remove = authenticated
 	.params(z.object({ id: z.string() }))
 	.response({ status: 204 })
 	.handler(({ params }) => {
-		deleteTodo(params.id);
-		return { status: 204 };
+		deleteTodo(params.id); // undefined is the bodyless 204
 	});
 ```
 
@@ -477,13 +479,14 @@ const update = updateDefinition.handler(updateTodo);
 
 ### Infer Server Response
 
-`InferServerResponse` is the union of response envelopes a handler can return
-for the responses defined with `.response()`. When responses are inferred
+`InferServerResponse` is the union of `respond()` results, and the plain body
+when allowed, that a handler can return for the responses defined with
+`.response()`. When responses are inferred
 from the handler, there is no defined response to infer before `.handler()`.
 
 ```ts twoslash
 import type { InferServerResponse } from "@rest-rpc/server";
-import { route } from "@rest-rpc/server";
+import { respond, route } from "@rest-rpc/server";
 import z from "zod";
 
 const todoSchema = z.object({ id: z.string(), title: z.string() });
@@ -498,8 +501,8 @@ type CreateTodoResponse = InferServerResponse<typeof createDefinition>;
 
 const createTodo = (title: string): CreateTodoResponse =>
 	title.length > 100
-		? { status: 202 }
-		: { status: 201, body: { id: "todo_1", title } };
+		? respond(undefined, { status: 202 })
+		: respond({ id: "todo_1", title }, { status: 201 });
 
 const create = createDefinition.handler(({ body }) => createTodo(body.title));
 ```

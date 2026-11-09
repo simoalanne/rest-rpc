@@ -1,10 +1,13 @@
 import type {
-	RequestScalar,
 	RouteDefinition,
 	ServerRequest,
 	ServerResponse,
 } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
+import type {
+	ResponseEnvelope,
+	ResponseEnvelopeFields,
+} from "../pipeline/respond.ts";
 import type { SseServerEvent } from "../pipeline/sse.ts";
 import type { Context, DefaultContext } from "./context.ts";
 import type {
@@ -13,21 +16,6 @@ import type {
 	MaybePromise,
 	Merge,
 } from "@rest-rpc/core/utils";
-
-/** An `AsyncIterable` body is an SSE stream, and `contentType` selects custom content for other bodies. */
-export type ImplicitResponseEnvelope =
-	| {
-			status: number;
-			body?: never;
-			contentType?: string;
-			headers?: Record<string, RequestScalar | undefined>;
-	  }
-	| {
-			status: number;
-			body: unknown;
-			contentType?: string;
-			headers?: Record<string, RequestScalar | undefined>;
-	  };
 
 type InferredSchema<TInput, TOutput = TInput> = StandardSchemaV1<
 	TInput,
@@ -105,33 +93,14 @@ type InferredResponses<TResponse> = {
 	>;
 };
 
-type EnvelopeKey = "status" | "body" | "contentType" | "headers";
-
-// TypeScript adds optional `undefined` envelope keys to plain object members
-// returned next to envelopes; they are not part of the body.
-type WithoutNormalizedEnvelopeKeys<T> = [
-	Extract<keyof T, EnvelopeKey>,
-] extends [never]
-	? T
-	: {
-			[
-				TKey in keyof T as TKey extends EnvelopeKey
-					? [T[TKey]] extends [undefined]
-						? {} extends Pick<T, TKey>
-							? never
-							: TKey
-						: TKey
-					: TKey
-			]: T[TKey];
-		};
-
-// A member with a numeric status is an envelope, `undefined` is a bodyless 200,
-// and any other value is the 200 body.
-type ResponseEnvelopeOf<TResult> = TResult extends { status: number }
-	? TResult
-	: TResult extends undefined | void
-		? { status: 200 }
-		: { status: 200; body: WithoutNormalizedEnvelopeKeys<TResult> };
+// `respond()` results carry their own envelope fields, `undefined` is a
+// bodyless 200, and any other value is the 200 body.
+type EnvelopeOf<TResult> =
+	TResult extends ResponseEnvelope<unknown, object>
+		? ResponseEnvelopeFields<TResult>
+		: TResult extends undefined | void
+			? { status: 200 }
+			: { status: 200; body: TResult };
 
 // rest-rpc frames SSE itself, so `text/event-stream` bodies must be streams.
 type ValidStreamEnvelopes<TEnvelope> =
@@ -158,19 +127,12 @@ type SuccessStatuses<TEnvelope> = [NonSuccessStatus<TEnvelope>] extends [never]
 
 export type ValidImplicitResult<TResult> = [Awaited<TResult>] extends [never]
 	? never
-	: [Extract<Awaited<TResult>, { status: number }>] extends [never]
-		? unknown
-		: Extract<
-					Awaited<TResult>,
-					{ status: number }
-			  > extends ImplicitResponseEnvelope
-			? ValidStreamEnvelopes<Extract<Awaited<TResult>, { status: number }>> &
-					SuccessStatuses<Extract<Awaited<TResult>, { status: number }>>
-			: never;
+	: ValidStreamEnvelopes<EnvelopeOf<Awaited<TResult>>> &
+			SuccessStatuses<EnvelopeOf<Awaited<TResult>>>;
 
 export type InferredRoute<TRoute, TResult> = Merge<
 	Omit<TRoute, "responses"> & {
-		responses: InferredResponses<ResponseEnvelopeOf<Awaited<TResult>>>;
+		responses: InferredResponses<EnvelopeOf<Awaited<TResult>>>;
 	}
 >;
 
@@ -194,6 +156,29 @@ type WithSseServerEvents<T> = T extends {
 	? Omit<T, "body"> & { body: WithSseItems<T["body"]> }
 	: T;
 
+type DefinedStatus<TRoute extends RouteDefinition> = Extract<
+	keyof TRoute["responses"],
+	number
+>;
+
+// `respond()` may omit the route's only status, or 200 among several.
+type DefaultStatus<TRoute extends RouteDefinition> =
+	IsUnion<DefinedStatus<TRoute>> extends true
+		? Extract<DefinedStatus<TRoute>, 200>
+		: DefinedStatus<TRoute>;
+
+type RespondFor<TRoute extends RouteDefinition, TResponse> = TResponse extends {
+	status: infer TStatus extends number;
+}
+	? ResponseEnvelope<
+			TResponse extends { body: infer TBody } ? TBody : undefined,
+			Omit<TResponse, "status" | "body"> &
+				(TStatus extends DefaultStatus<TRoute>
+					? { status?: TStatus }
+					: { status: TStatus })
+		>
+	: never;
+
 // Handlers may return the body of a route's only defined response directly,
 // unless that response has several media types to select from.
 type PlainResponseBody<TRoute extends RouteDefinition> = [
@@ -203,13 +188,14 @@ type PlainResponseBody<TRoute extends RouteDefinition> = [
 		? [IsUnion<TResponse>] extends [false]
 			? TResponse extends { body: infer TBody }
 				? WithSseItems<TBody>
-				: never
+				: undefined | void
 			: never
 		: never
 	: never;
 
 type HandlerResult<TRoute extends RouteDefinition> = MaybePromise<
-	WithSseServerEvents<ServerResponse<TRoute>> | PlainResponseBody<TRoute>
+	| RespondFor<TRoute, WithSseServerEvents<ServerResponse<TRoute>>>
+	| PlainResponseBody<TRoute>
 >;
 
 /** Request fields every handler and middleware receives besides the validated request. */

@@ -157,15 +157,19 @@ const update = authed
 ### [Responses](https://rest-rpc.vercel.app/docs/route-builder#return-responses)
 
 ```ts
-// Inferred: return a body (200), or an envelope with a numeric 2xx status.
+import { respond } from "@rest-rpc/server";
+
+// Inferred: a plain value is a 200 JSON body, of any shape.
 route.handler(() => todo);
 route.handler(() => {}); // 200 without a body
-route.handler(() => ({
-	status: 201,
-	body: "Created",
-	contentType: "text/plain", // defaults to application/json
-	headers: { location: "/todos/1" },
-}));
+// respond() sets anything else. Only its results are read as responses.
+route.handler(() =>
+	respond("Created", {
+		status: 201, // 2xx, defaults to 200
+		contentType: "text/plain", // defaults to application/json
+		headers: { location: "/todos/1" },
+	}),
+);
 
 // Defined: runtime-validated, typed, and included in OpenAPI.
 route
@@ -176,6 +180,10 @@ route
 		description: "Created", // OpenAPI
 	})
 	.response({ status: 204 }); // bodyless
+
+// A plain value is the body of the only defined response. respond() may omit
+// the only status, or 200 among several.
+route.response(todoSchema, { status: 201 }).handler(() => todo); // 201
 ```
 
 ### [Errors](https://rest-rpc.vercel.app/docs/route-builder#define-errors)
@@ -219,8 +227,8 @@ route
 	.handler(({ contentType, body }) => {
 		const todos = contentType === "text/csv" ? parseCsv(body) : body; // narrowed
 		return wantsProgress()
-			? { status: 200, contentType: "text/event-stream", body: live(todos) }
-			: { status: 200, contentType: "application/json", body: save(todos) };
+			? respond(live(todos), { contentType: "text/event-stream" })
+			: respond(save(todos), { contentType: "application/json" });
 	});
 ```
 
@@ -237,7 +245,7 @@ import type {
 const definition = route.get("/todos/:id").response(todoSchema);
 
 type GetRequest = InferServerRequest<typeof definition>; // handler argument: { params, ..., context, signal }
-type GetResponse = InferServerResponse<typeof definition>; // defined envelopes
+type GetResponse = InferServerResponse<typeof definition>; // body or respond() results
 const getTodo: InferServerHandler<typeof definition> = ({ params }) =>
 	findTodo(params.id);
 export const get = definition.handler(getTodo);
