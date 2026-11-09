@@ -5,6 +5,7 @@ import {
 	createCatchAllHandler,
 	route,
 	routeError,
+	sse,
 	type,
 	type CatchAllHandleOptions,
 } from "@rest-rpc/server";
@@ -329,7 +330,7 @@ describe.each([
 		const routes = {
 			events: route
 				.get("/header-events")
-				.streamResponse(type<number>(), {
+				.response(sse(type<number>()), {
 					headers: type<{ "x-stream-id": string }>(),
 				})
 				.handler(() => ({
@@ -351,7 +352,7 @@ describe.each([
 		const routes = {
 			events: route
 				.get("/invalid-events")
-				.streamResponse(invalid)
+				.response(sse(invalid))
 				.handler(() => ({
 					status: 200,
 					body: (async function* () {

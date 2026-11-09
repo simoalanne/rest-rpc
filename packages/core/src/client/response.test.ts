@@ -2,6 +2,7 @@ import { bodyCodec } from "../codecs/bodyCodec.ts";
 import { createBodyCodecRegistry } from "../codecs/registry.ts";
 import type { BodyContent } from "../contract/body.ts";
 import { route } from "../contract/routeBuilder.ts";
+import { sse } from "../contract/sse.ts";
 import { type } from "../standard-schema/type.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { routeError, RouteError } from "../contract/routeError.ts";
@@ -200,9 +201,7 @@ describe("client response decoding", () => {
 		["wrong content type", contractMismatch],
 		["missing body", "Server returned no stream body."],
 	])("rejects streams with %s as errors", async (failure, message) => {
-		const definition = route.get("/").streamResponse(type<number>())[
-			"~restrpc"
-		];
+		const definition = route.get("/").response(sse(type<number>()))["~restrpc"];
 		const response =
 			failure === "missing body"
 				? new Response(null, {

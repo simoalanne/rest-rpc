@@ -30,11 +30,11 @@ const get = route
 export const api = { todos: { create, get } };
 ```
 
-Use `.response()` for each successful response, `.streamResponse()` for
+Use `.response()` for each successful response, with `sse(schema)` for
 streams, and `.error()` for each [error](/docs/route-builder#define-errors).
 These schemas define handler and client types and provide
 [runtime validation](/docs/http-behavior/schemas).
-See [Streaming](/docs/streaming) for stream handlers.
+See [Server-Sent Events](/docs/streaming) for stream handlers.
 
 ## Implement Routes
 

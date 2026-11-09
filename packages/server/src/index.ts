@@ -15,7 +15,7 @@ export {
 	type RequestValidationIssues,
 	type ValidationIssue,
 } from "./pipeline/errors.ts";
-export { sse, type SseServerEvent } from "./pipeline/sse.ts";
+export { sseEvent, type SseServerEvent } from "./pipeline/sse.ts";
 export {
 	compileRoutes,
 	createCatchAllHandler,
@@ -44,6 +44,7 @@ export {
 	routeError,
 	safe,
 	serializedBody,
+	sse,
 	type,
 } from "@rest-rpc/core";
 export type {

@@ -3,6 +3,7 @@ import type { BodyContent } from "./body.ts";
 import { resolveRoutePath } from "./path.ts";
 import { RouteBuilder, route } from "./routeBuilder.ts";
 import { routeError } from "./routeError.ts";
+import { sse } from "./sse.ts";
 
 const schema = type<{ name: string }>();
 
@@ -25,7 +26,7 @@ describe("routeBuilder", () => {
 		expect(
 			new RouteBuilder()
 				.response({ status: 204, description: "Deleted" })
-				.streamResponse(schema, { headers, description: "Events" })["~restrpc"]
+				.response(sse(schema), { headers, description: "Events" })["~restrpc"]
 				.responses,
 		).toEqual({
 			204: { description: "Deleted" },
@@ -68,7 +69,7 @@ describe("routeBuilder", () => {
 
 	it("rejects duplicate response statuses across stream and body responses", () => {
 		expect(() =>
-			new RouteBuilder().response(schema).streamResponse(schema),
+			new RouteBuilder().response(schema).response(sse(schema)),
 		).toThrow('Response status "200" has already been defined.');
 	});
 

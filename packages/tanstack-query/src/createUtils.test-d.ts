@@ -2,6 +2,7 @@ import {
 	isDefinedError,
 	route,
 	routeError,
+	sse,
 	type,
 	type InferClientError,
 	type InferClientRequest,
@@ -23,7 +24,7 @@ const get = route
 		routeError("NOT_FOUND", { status: 404, data: type<{ id: string }>() }),
 	);
 const empty = route.get("/health").response({ status: 204 });
-const events = route.get("/events").streamResponse(type<{ value: number }>());
+const events = route.get("/events").response(sse(type<{ value: number }>()));
 const utils = createTanstackQueryUtils(
 	{ get, empty, events },
 	{ baseUrl: "https://example.test" },

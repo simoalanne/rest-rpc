@@ -62,7 +62,7 @@ const create = route
 ```
 
 Inferred responses provide type checking without runtime response validation.
-Add `.response()` or `.streamResponse()` when runtime validation is needed.
+Add `.response()` when runtime validation is needed.
 Defined stream schemas validate each item as it is yielded.
 
 Response validation failures produce an `INTERNAL_SERVER_ERROR` response with

@@ -67,8 +67,12 @@ export const sseBody = (body: AsyncIterable<unknown>) => ({
 	contentType: "text/event-stream",
 });
 
-/** Wraps stream data with optional Server-Sent Event metadata. */
-export function sse<T>(event: SseEvent<T>): SseServerEvent<T> {
+/** Wraps stream data with Server-Sent Event metadata. */
+export function sseEvent<T>(
+	data: T,
+	options: Omit<SseEvent<T>, "data"> = {},
+): SseServerEvent<T> {
+	const event = { ...options, data };
 	if (event.id !== undefined && /[\0\r\n]/u.test(event.id)) {
 		throw new TypeError(
 			"SSE event id must be a string without NUL, carriage return, or line feed.",

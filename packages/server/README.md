@@ -23,7 +23,7 @@ to the full [documentation](https://rest-rpc.vercel.app/docs/quickstart).
   - [Media Types](#media-types)
   - [Type Helpers](#type-helpers)
 - [Middleware and Context](#middleware-and-context)
-- [Streaming](#streaming)
+- [Server-Sent Events](#server-sent-events)
 - [Contract-first](#contract-first)
 - [HTTP Behavior](#http-behavior)
   - [Schemas and Validation](#schemas-and-validation)
@@ -215,7 +215,7 @@ them. Errors under HTTP Behavior lists every failure and what each side gets.
 route
 	.post("/todos/import")
 	.body({ "application/json": z.array(todoInput), "text/csv": z.string() })
-	.response({ "application/json": importResult, "text/event-stream": progress })
+	.response({ "application/json": importResult, ...sse(progress) })
 	.handler(({ contentType, body }) => {
 		const todos = contentType === "text/csv" ? parseCsv(body) : body; // narrowed
 		return wantsProgress()
@@ -291,23 +291,25 @@ declare module "@rest-rpc/server" {
 }
 ```
 
-## [Streaming](https://rest-rpc.vercel.app/docs/streaming)
+## [Server-Sent Events](https://rest-rpc.vercel.app/docs/streaming)
 
 ```ts
-import { sse } from "@rest-rpc/server";
+import { sse, sseEvent } from "@rest-rpc/server";
 
 const events = route
 	.get("/todos/events")
 	.headers(z.object({ "last-event-id": z.string().optional() })) // resume manually
-	.streamResponse(z.object({ message: z.string() })) // optional, validates each item
+	.response(sse(z.object({ message: z.string() }))) // optional, validates each item
 	.handler(async function* ({ headers, signal }) {
 		yield { message: "Created" }; // plain data
-		yield sse({
-			data: { message: "Done" },
-			id: "2", // what clients resume from
-			event: "todo.updated",
-			retry: 2_000,
-		});
+		yield sseEvent(
+			{ message: "Done" },
+			{
+				id: "2", // what clients resume from
+				event: "todo.updated",
+				retry: 2_000,
+			},
+		);
 		while (!signal.aborted) yield await nextEvent({ signal });
 	});
 ```
@@ -315,7 +317,7 @@ const events = route
 ## [Contract-first](https://rest-rpc.vercel.app/docs/contract-first)
 
 A contract has no handlers to infer from, so every successful response must be
-defined with `.response()` or `.streamResponse()`. Clients take the contract
+defined with `.response()`. Clients take the contract
 directly, without extraction, and `validateResponses` can use its schemas.
 
 ```ts contract.ts
@@ -373,13 +375,13 @@ createApp(routes, {
 Clients send schema input and handlers receive schema output. What each
 definition guarantees at runtime:
 
-| Definition                          | Server                               | Fetch client                                                                 | OpenAPI                     |
-| ----------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------- | --------------------------- |
-| Request schemas                     | Validated before middleware, or 400  | Not validated                                                                | Parameters and request body |
-| Inferred response                   | Not validated                        | Types only, any 2xx resolves                                                 | Placeholder `default`       |
-| `.response()` / `.streamResponse()` | Validated, or 500                    | Status and media type checked; body and headers with `validateResponses` (1) | Documented                  |
-| `.error()`                          | `data` and headers validated, or 500 | Code and status recognized; `data` with `validateResponses` (1)              | Documented                  |
-| `type<T>()`                         | Types only                           | Types only                                                                   | Empty schema                |
+| Definition        | Server                               | Fetch client                                                                 | OpenAPI                     |
+| ----------------- | ------------------------------------ | ---------------------------------------------------------------------------- | --------------------------- |
+| Request schemas   | Validated before middleware, or 400  | Not validated                                                                | Parameters and request body |
+| Inferred response | Not validated                        | Types only, any 2xx resolves                                                 | Placeholder `default`       |
+| `.response()`     | Validated, or 500                    | Status and media type checked; body and headers with `validateResponses` (1) | Documented                  |
+| `.error()`        | `data` and headers validated, or 500 | Code and status recognized; `data` with `validateResponses` (1)              | Documented                  |
+| `type<T>()`       | Types only                           | Types only                                                                   | Empty schema                |
 
 (1) `validateResponses` needs a shared contract. An extracted contract has no
 schemas, so the option has no effect.
@@ -638,7 +640,7 @@ restrpc.todos.create.mutationKey(); // ["todos", "create"]
 ```ts
 import { createOpenApiDocument } from "@rest-rpc/server"; // or @rest-rpc/core for contracts
 
-// Only defined .response() / .streamResponse() schemas are documented.
+// Only defined .response() schemas are documented.
 const document = createOpenApiDocument(routes, {
 	info: { title: "Todo API", version: "1.0.0" },
 	servers: [{ url: "https://api.example.com" }], // also components, tags

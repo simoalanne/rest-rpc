@@ -1,7 +1,7 @@
 import { route } from "../contract/routeBuilder.ts";
 import { type RouteError, routeError } from "../contract/routeError.ts";
 import { type } from "../standard-schema/type.ts";
-import type { SseEvent } from "../contract/sse.ts";
+import { sse, type SseEvent } from "../contract/sse.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type {
 	InferClientError,
@@ -47,7 +47,7 @@ describe("client response inference", () => {
 	it("uses transformed schema outputs for streams", () => {
 		const stream = route
 			.get("/")
-			.streamResponse(type((input: string) => Number(input)));
+			.response(sse(type((input: string) => Number(input))));
 		expectTypeOf<InferClientResponse<typeof stream>["body"]>().toEqualTypeOf<
 			AsyncIterable<SseEvent<number>>
 		>();
@@ -91,10 +91,10 @@ describe("client response inference", () => {
 	});
 
 	it("unwraps stream event data", () => {
-		const output = route.streamResponse(type((input: string) => Number(input)));
+		const output = route.response(sse(type((input: string) => Number(input))));
 		const response = route
 			.get("/")
-			.streamResponse(type<{ value: number }>())
+			.response(sse(type<{ value: number }>()))
 			.response(type<{ message: string }>(), { status: 201 });
 		const plain = route.response(type<string>());
 		expectTypeOf<

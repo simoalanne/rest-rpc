@@ -7,7 +7,7 @@ import {
 	validateResponseHeaders,
 	validateResponseStreamChunks,
 } from "./validation.ts";
-import { sse } from "./sse.ts";
+import { sseEvent } from "./sse.ts";
 
 const schema = <T>(
 	validate: StandardSchemaV1<unknown, T>["~standard"]["validate"],
@@ -151,7 +151,7 @@ describe("validation", () => {
 
 	it("validates stream data while preserving SSE metadata and reports stream failures lazily", async () => {
 		async function* values() {
-			yield sse({ data: "1", id: "event-1" });
+			yield sseEvent("1", { id: "event-1" });
 			yield "bad";
 		}
 		const chunks = validateResponseStreamChunks(

@@ -205,7 +205,7 @@ const get = route
 Pass only options for a bodyless response, such as `.response({ status: 204 })`.
 Define status-specific response headers with the `headers` option and return
 them as `headers`. The option is available on every response, including
-bodyless responses and `.streamResponse()`:
+bodyless and stream responses:
 
 ```ts
 route
@@ -338,27 +338,24 @@ types and compatible codecs.
 
 ## Return Streams
 
-Returning an async iterable infers an SSE stream. Use `.streamResponse()` to
-define its data schema.
+Returning an async iterable infers an SSE stream. Use `sse(schema)` to define
+its data schema.
 
 ```ts
 const events = route
 	.get("/todos/events")
-	.streamResponse(z.object({ id: z.string(), message: z.string() }))
+	.response(sse(z.object({ id: z.string(), message: z.string() })))
 	.handler(() => streamTodoEvents());
 ```
 
-`.streamResponse(schema)` is sugar for `.response({ "text/event-stream": schema })`,
-so it defines the whole status. To offer a stream and another media type on the
-same status, define both in one record and select one with `contentType`:
+`sse(schema)` is `{ "text/event-stream": schema }`, where the schema describes
+the data of each event. To offer a stream and another media type on the same
+status, spread it into one record and select one with `contentType`:
 
 ```ts
 const todos = route
 	.get("/todos")
-	.response({
-		"application/json": z.array(todoSchema),
-		"text/event-stream": todoSchema,
-	})
+	.response({ ...sse(todoSchema), "application/json": z.array(todoSchema) })
 	.handler(() =>
 		wantsStream()
 			? { status: 200, contentType: "text/event-stream", body: streamTodos() }
@@ -366,7 +363,7 @@ const todos = route
 	);
 ```
 
-See [Streaming](/docs/streaming) for handlers, event metadata, validation, and
+See [Server-Sent Events](/docs/streaming) for handlers, event metadata, validation, and
 resuming streams.
 
 ## Add Metadata and OpenAPI Details

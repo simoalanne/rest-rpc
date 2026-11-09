@@ -421,7 +421,7 @@ import type {
 	InferClientResponse,
 	InferClientStreamData,
 } from "@rest-rpc/core";
-import { route } from "@rest-rpc/server";
+import { route, sse } from "@rest-rpc/server";
 import z from "zod";
 
 const update = route
@@ -445,7 +445,7 @@ type GetFirstTodoError = InferClientError<typeof getFirst>;
 
 const events = route
 	.get("/todos/events")
-	.streamResponse(z.object({ id: z.string(), message: z.string() }))
+	.response(sse(z.object({ id: z.string(), message: z.string() })))
 	.handler(async function* () {
 		yield { id: "todo_1", message: "Created" };
 	});

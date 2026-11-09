@@ -1,5 +1,5 @@
 ---
-title: Streaming
+title: Server-Sent Events
 description: Define and serve typed Server-Sent Event streams.
 ---
 
@@ -11,24 +11,27 @@ consuming streams.
 
 ## Define a Stream
 
-Returning an async iterable infers a stream. Use `.streamResponse()` when
-you want to define and validate its data schema.
+Returning an async iterable infers a stream. Define a response with
+`sse(schema)` when you want to define and validate its data schema.
 
 ```ts
+import { route, sse } from "@rest-rpc/server";
+
 const events = route
 	.get("/todos/events")
-	.streamResponse(z.object({ id: z.string(), message: z.string() }))
+	.response(sse(z.object({ id: z.string(), message: z.string() })))
 	.handler(async function* () {
 		yield { id: "todo_1", message: "Created" };
 		yield { id: "todo_1", message: "Completed" };
 	});
 ```
 
-`.streamResponse(schema)` is the same as
-`.response({ "text/event-stream": schema })`. A `text/event-stream` schema always
-describes the stream's items, so a status can also offer a stream next to other
-[media types](/docs/route-builder#define-media-types), with the handler
-selecting one with its returned `contentType`.
+`sse(schema)` is the same as `{ "text/event-stream": schema }`. A
+`text/event-stream` schema always describes the data of each event, so a status
+can also offer a stream next to other
+[media types](/docs/route-builder#define-media-types) by spreading
+`sse(schema)` into the record, with the handler selecting one with its returned
+`contentType`.
 
 Throw a [defined error](/docs/route-builder#define-errors) before the stream
 starts to respond with an error instead:
@@ -37,7 +40,7 @@ starts to respond with an error instead:
 const events = route
 	.get("/todos/events")
 	.headers(z.object({ authorization: z.string() }))
-	.streamResponse(z.object({ id: z.string(), message: z.string() }))
+	.response(sse(z.object({ id: z.string(), message: z.string() })))
 	.error("UNAUTHORIZED", { status: 401 })
 	.handler(({ headers, errors }) => {
 		if (!authorize(headers.authorization)) throw errors.UNAUTHORIZED();
@@ -51,24 +54,22 @@ the stream instead of producing an error response.
 
 ## Add Event Metadata
 
-Yield data directly when an event does not need metadata. Use `sse()` to add an
-event ID, event name, or retry hint:
+Yield data directly when an event does not need metadata. Use `sseEvent()` to
+add an event ID, event name, or retry hint:
 
 ```ts
-import { route, sse } from "@rest-rpc/server";
+import { route, sseEvent } from "@rest-rpc/server";
 
 const events = route.get("/todos/events").handler(async function* () {
 	yield { id: "todo_1", message: "Created" };
-	yield sse({
-		data: { id: "todo_1", message: "Completed" },
-		id: "event_2",
-		event: "todo.updated",
-		retry: 2_000,
-	});
+	yield sseEvent(
+		{ id: "todo_1", message: "Completed" },
+		{ id: "event_2", event: "todo.updated", retry: 2_000 },
+	);
 });
 ```
 
-`sse()` throws when `id` or `event` contain line breaks, or when `retry` is not
+`sseEvent()` throws when `id` or `event` contain line breaks, or when `retry` is not
 a non-negative integer number of milliseconds.
 
 ## Stop a Stream
@@ -102,4 +103,4 @@ const events = route
 To resume streams the same way across routes, read the header in the host and
 [seed the context](/docs/context#values-from-the-host) with it instead.
 
-Give events an `id` with `sse()` so clients have a value to resume from.
+Give events an `id` with `sseEvent()` so clients have a value to resume from.

@@ -1,5 +1,6 @@
 import type { Contract } from "../contract/contract.ts";
 import { route } from "../contract/routeBuilder.ts";
+import { sse } from "../contract/sse.ts";
 import { type } from "../standard-schema/type.ts";
 import {
 	createOpenApiDocument,
@@ -184,7 +185,7 @@ describe("operation", () => {
 			operationOf(
 				route
 					.get("/")
-					.streamResponse(type<string>(), { description: "Updates" }),
+					.response(sse(type<string>()), { description: "Updates" }),
 				{ schemaConverter: () => ({ type: "string" }) },
 			).responses,
 		).toEqual({
