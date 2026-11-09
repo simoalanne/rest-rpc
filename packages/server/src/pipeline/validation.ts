@@ -1,6 +1,6 @@
 import type {
 	ResponseHeadersSchema,
-	RouteDeclaration,
+	RouteDefinition,
 } from "@rest-rpc/core/contract";
 import {
 	type StandardSchemaV1,
@@ -29,7 +29,7 @@ type SegmentValidationResult = {
 
 const noIssues: readonly StandardSchemaV1.Issue[] = [];
 
-const undeclaredSegment: SegmentValidationResult = {
+const skippedSegment: SegmentValidationResult = {
 	data: undefined,
 	errors: noIssues,
 };
@@ -70,7 +70,7 @@ export function parseQuery(search: string): Record<string, unknown> {
 	return data;
 }
 
-const isDeclared = (
+const hasSchemas = (
 	schemas: readonly StandardSchemaV1[] | undefined,
 ): schemas is readonly StandardSchemaV1[] =>
 	schemas !== undefined && schemas.length > 0;
@@ -110,7 +110,7 @@ const validateRequestSegment = (
 	schemas: readonly StandardSchemaV1[] | undefined,
 	input: unknown,
 ): MaybePromise<SegmentValidationResult> => {
-	if (!isDeclared(schemas)) return undeclaredSegment;
+	if (!hasSchemas(schemas)) return skippedSegment;
 	if (schemas.length > 1) return validateStackedRequestSegment(schemas, input);
 
 	return mapMaybePromise(
@@ -160,9 +160,9 @@ const noRequestSegments: RequestSegmentValues = {
 	headers: undefined,
 };
 
-/** Segments the route does not declare are ignored, except params, which pass through without a schema. */
+/** Segments the route does not define are ignored, except params, which pass through without a schema. */
 export function validateRequestSegments(
-	route: RouteDeclaration,
+	route: RouteDefinition,
 	segments: RequestSegments,
 	mediaType?: string,
 ): MaybePromise<RequestSegmentValues> {
@@ -180,7 +180,7 @@ export function validateRequestSegments(
 			),
 			validateRequestSegment(requestSchemas.query, segments.query),
 			// Params of dynamic path segments without a schema are passed as strings.
-			isDeclared(requestSchemas.params)
+			hasSchemas(requestSchemas.params)
 				? validateRequestSegment(requestSchemas.params, segments.params)
 				: { data: segments.params, errors: noIssues },
 			validateRequestSegment(requestSchemas.headers, segments.headers),

@@ -61,7 +61,7 @@ describe("client response inference", () => {
 		>().toEqualTypeOf<InferClientResponse<typeof get>>();
 	});
 
-	it("infers declared errors from their schema outputs", () => {
+	it("infers defined errors from their schema outputs", () => {
 		const NotFound = routeError("NOT_FOUND", {
 			status: 404,
 			data: type((input: number) => String(input)),

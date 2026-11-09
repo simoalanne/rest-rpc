@@ -7,7 +7,7 @@ import {
 	type InferClientResponse,
 } from "@rest-rpc/core";
 import { normalizeMediaType } from "@rest-rpc/core/codecs";
-import { markDeclared, type RouteDeclaration } from "@rest-rpc/core/contract";
+import { markDefined, type RouteDefinition } from "@rest-rpc/core/contract";
 import type { ContextOf } from "../builder/routeBuilder.types.ts";
 import {
 	isImplementedRoute,
@@ -56,11 +56,11 @@ type CallResult<TRoute extends ImplementedRoute> = ClientPromise<
 >;
 
 // Mirrors the fetch client: the error that would be sent is received, and
-// marked as declared when the route declares its code.
-const toClientError = async (route: RouteDeclaration, error: RouteError) => {
+// marked as defined when the route defines its code.
+const toClientError = async (route: RouteDefinition, error: RouteError) => {
 	const resolved = await resolveRouteError(route, error, false);
 	return route.errors && Object.hasOwn(route.errors, resolved.code)
-		? markDeclared(resolved)
+		? markDefined(resolved)
 		: resolved;
 };
 
@@ -96,7 +96,7 @@ const callRoute = async (
  *
  * @remarks options can be used to provide values HTTP request would normally
  * provide. Rejects like the fetch client: with the `RouteError` that would be
- * sent, marked as declared when the route declares its code. Other errors
+ * sent, marked as defined when the route defines its code. Other errors
  * thrown by the handler reject unchanged.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/local-client#one-off-calls}

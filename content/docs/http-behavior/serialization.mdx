@@ -5,7 +5,7 @@ description: How values are encoded over HTTP and how to customize body codecs.
 
 HTTP values travel through URL strings, headers, or request and response bodies.
 These rules are shared by the client and the server. See the
-[Route Builder](/docs/route-builder) for declaring the interface and
+[Route Builder](/docs/route-builder) for defining the interface and
 [Schemas and Validation](/docs/http-behavior/schemas) for validation boundaries.
 
 ## Path, Query, and Headers
@@ -26,7 +26,7 @@ The server reconstructs `tag[]=one&tag[]=two` as `{ tag: ["one", "two"] }`.
 A single `tag[]=one` remains an array. Repeated scalar keys such as
 `tag=one&tag=two` keep the last value.
 
-Declare header schemas with lowercase names. Incoming header names are
+Define header schemas with lowercase names. Incoming header names are
 normalized to lowercase, so uppercase schema keys do not match them.
 
 ## Bodies and Media Types
@@ -34,8 +34,8 @@ normalized to lowercase, so uppercase schema keys do not match them.
 Body codecs serialize values into HTTP bodies and deserialize HTTP bodies into
 values. Schemas operate on values before encoding and after decoding.
 
-A schema passed to `.body()` or `.response()` declares a JSON body. Other media
-types are declared with a record of schemas keyed by base media type, lowercase
+A schema passed to `.body()` or `.response()` defines a JSON body. Other media
+types are defined with a record of schemas keyed by base media type, lowercase
 and without parameters:
 
 ```ts
@@ -52,7 +52,7 @@ Each media type has its own schema, and requests and responses are unions
 discriminated by `contentType`. The client selects the request media type with
 [`contentType` in the request](/docs/client/fetch-client#select-a-request-media-type),
 and the handler selects the response media type with its returned
-`contentType`. Either may be omitted when one media type is declared.
+`contentType`. Either may be omitted when one media type is defined.
 
 Outgoing codecs are selected from the selected media type. Incoming codecs and
 schemas are selected from the received `Content-Type` header. Matching uses the
@@ -60,8 +60,8 @@ lowercase base media type without parameters, so
 `application/json; charset=utf-8` matches `application/json`.
 
 A request is rejected with `415` before validation when its `Content-Type` is
-not declared by the route, or when it has no `Content-Type` and the route
-declares several media types. Without a `Content-Type`, a route with one
+not defined by the route, or when it has no `Content-Type` and the route
+defines several media types. Without a `Content-Type`, a route with one
 media type uses it. Routes without a body schema ignore the request body and
 its `Content-Type`, and their handlers receive no `contentType`. A client
 response without a content type or body decodes to `undefined`.

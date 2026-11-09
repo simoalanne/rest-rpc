@@ -42,7 +42,7 @@ export type CompileRoutesOptions = {
 	bodyCodecs?: readonly BodyCodec[];
 	/**
 	 * Rewrites param markers in compiled paths to `:name` (`"colon"`) or
-	 * `{name}` (`"braces"`). Declared markers are kept when omitted.
+	 * `{name}` (`"braces"`). Markers are kept as written when omitted.
 	 */
 	paramSyntax?: "colon" | "braces";
 	/**
@@ -54,7 +54,7 @@ export type CompileRoutesOptions = {
 	onError?: (error: RouteError, request: Request) => void;
 	/**
 	 * When set to `true`, disables request schema validation. Handlers receive
-	 * the declared request segments without schema validation. The schemas are
+	 * the defined request segments without schema validation. The schemas are
 	 * still used for type inference and OpenAPI generation.
 	 *
 	 * @remarks Do not disable request validation if you are using schemas that
@@ -86,7 +86,7 @@ export type CompileRoutesOptions = {
 export type HandleOptions = {
 	/**
 	 * Initial context values, set before middleware runs. Values are not
-	 * type-checked against the context types routes declare.
+	 * type-checked against the context types routes define.
 	 */
 	context?: Record<string, unknown>;
 	/**
@@ -179,7 +179,7 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
 	return async (implementation, pathParams, request, handleOptions) => {
 		const schemas = implementation.route.request;
 		// The URL is only read for the params of dynamic path segments and a
-		// declared query, and params a router attached to the request are used
+		// defined query, and params a router attached to the request are used
 		// as-is.
 		let params: Record<string, string> | undefined;
 		if (pathParams.params.length > 0) {

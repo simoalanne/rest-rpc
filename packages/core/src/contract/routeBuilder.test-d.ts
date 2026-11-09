@@ -2,7 +2,7 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { type } from "../standard-schema/type.ts";
 import { route } from "./routeBuilder.ts";
 import { routeError } from "./routeError.ts";
-import type { OpenApiRouteOptions } from "./routeDeclaration.ts";
+import type { OpenApiRouteOptions } from "./routeDefinition.ts";
 
 describe("routeBuilder types", () => {
 	it("preserves method, path and response status literals", () => {
@@ -17,7 +17,7 @@ describe("routeBuilder types", () => {
 		>().toEqualTypeOf<200>();
 	});
 
-	it("normalizes declarations without expanding schemas", () => {
+	it("normalizes definitions without expanding schemas", () => {
 		const schema = type<{ name: string }>();
 		const value = route.body(schema).response(schema);
 		expectTypeOf(value["~restrpc"]).toEqualTypeOf<{
@@ -36,7 +36,7 @@ describe("routeBuilder types", () => {
 		}>();
 	});
 
-	it("keeps descriptions out of declaration types and accepts stream headers", () => {
+	it("keeps descriptions out of definition types and accepts stream headers", () => {
 		const schema = type<string>();
 		const headers = type<{ "x-cursor": string }>();
 		const output = route.response(schema, { description: "Name" });
@@ -95,7 +95,7 @@ describe("routeBuilder types", () => {
 		}>();
 	});
 
-	it("accumulates declared errors by code and keeps methods selectable", () => {
+	it("accumulates defined errors by code and keeps methods selectable", () => {
 		const Unauthorized = routeError("UNAUTHORIZED", { status: 401 });
 		const authed = route.error(Unauthorized);
 		const value = authed.get("/me").error("INVALID", { data: type<string>() });

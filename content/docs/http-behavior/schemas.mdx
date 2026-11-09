@@ -23,12 +23,12 @@ or add defaults, so the two types can differ.
 | Server handler output or response body | Schema input  |
 | Client result or response body         | Schema output |
 
-For inferred handler responses, there is no declared response schema: client
+For inferred handler responses, there is no defined response schema: client
 result types come from the handler's return value.
 
 ## Request Validation
 
-The server decodes a request, then validates its declared request schemas before
+The server decodes a request, then validates its defined request schemas before
 running middleware and the handler. The handler receives validated schema
 output. Request validation failures produce a `REQUEST_VALIDATION_FAILED`
 error response with status 400. See [Errors](/docs/http-behavior/errors#built-in-errors)
@@ -50,8 +50,8 @@ for the handler.
 
 ## Response Validation on the Server
 
-Declared response schemas validate the handler's response body before
-serialization. Declared response headers are validated too. The server sends
+Defined response schemas validate the handler's response body before
+serialization. Defined response headers are validated too. The server sends
 the validated schema output.
 
 ```ts
@@ -63,7 +63,7 @@ const create = route
 
 Inferred responses provide type checking without runtime response validation.
 Add `.response()` or `.streamResponse()` when runtime validation is needed.
-Declared stream schemas validate each item as it is yielded.
+Defined stream schemas validate each item as it is yielded.
 
 Response validation failures produce an `INTERNAL_SERVER_ERROR` response with
 status 500, without validation details. See
@@ -89,7 +89,7 @@ createApp(routes, {
 });
 ```
 
-The schemas remain part of the route declaration and are still used for type
+The schemas remain part of the route definition and are still used for type
 inference and OpenAPI generation.
 
 :::warning
@@ -114,7 +114,7 @@ const getTodo = route
 
 ## Type Utility
 
-When you don't need runtime validation, use the built-in `type<T>()` utility to declare
+When you don't need runtime validation, use the built-in `type<T>()` utility to define
 schemas with only TypeScript types. The utility accepts an optional mapping function
 to transform input to output. The mapping function can be asynchronous.
 

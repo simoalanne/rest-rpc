@@ -3,32 +3,30 @@ import { route } from "../builder/routeBuilder.ts";
 import { compileRoutes, createCatchAllHandler } from "./compileRoutes.ts";
 
 describe("compileRoutes", () => {
-	it("sends declared and undeclared errors and reports them to onError", async () => {
+	it("sends defined and other errors and reports them to onError", async () => {
 		const Gone = routeError("GONE", { status: 410 });
 		const onError = vi.fn();
-		const [declared, undeclared] = compileRoutes(
+		const [defined, other] = compileRoutes(
 			{
-				declared: route
-					.get("/declared")
+				defined: route
+					.get("/defined")
 					.error(Gone)
 					.handler((): string => {
 						throw new Gone();
 					}),
-				undeclared: route.get("/undeclared").handler((): string => {
+				other: route.get("/other").handler((): string => {
 					throw new Gone();
 				}),
 			},
 			{ onError },
 		);
-		const request = new Request("http://localhost/declared");
-		expect((await declared!.handle(request)).status).toBe(410);
+		const request = new Request("http://localhost/defined");
+		expect((await defined!.handle(request)).status).toBe(410);
 		expect(onError).toHaveBeenCalledWith(
 			expect.objectContaining({ code: "GONE", status: 410 }),
 			request,
 		);
-		const response = await undeclared!.handle(
-			new Request("http://localhost/undeclared"),
-		);
+		const response = await other!.handle(new Request("http://localhost/other"));
 		expect(response.status).toBe(410);
 		expect(await response.json()).toEqual({ code: "GONE", message: "GONE" });
 		expect(onError).toHaveBeenCalledTimes(2);

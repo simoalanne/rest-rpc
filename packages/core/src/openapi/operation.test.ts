@@ -20,7 +20,7 @@ const operationOf = (
 };
 
 describe("operation", () => {
-	it("documents declared response descriptions, headers and content types", () => {
+	it("documents defined response descriptions, headers and content types", () => {
 		const headers = type<{ count: number }>();
 		const text = type<string>();
 		const json = type<{ name: string }>();
@@ -31,14 +31,14 @@ describe("operation", () => {
 					? { type: "object" }
 					: { type: "string" },
 		);
-		const declared = route
+		const defined = route
 			.get("/")
 			.response(
 				{ "text/plain": text, "application/json": json },
 				{ headers, description: "Created" },
 			);
 		expect(
-			operationOf(declared, { schemaConverter: converter }).responses,
+			operationOf(defined, { schemaConverter: converter }).responses,
 		).toEqual({
 			200: {
 				description: "Created",
@@ -51,10 +51,10 @@ describe("operation", () => {
 		});
 	});
 
-	it("documents declared errors grouped by status next to inferred responses", () => {
+	it("documents defined errors grouped by status next to inferred responses", () => {
 		const data = type<{ id: string }>();
 		const headers = type<{ "retry-after": number }>();
-		const declared = route
+		const defined = route
 			.get("/")
 			.error("NOT_FOUND", { status: 404, data, description: "Missing" })
 			.error("GONE", { status: 404, headers, description: "Deleted" })
@@ -73,7 +73,7 @@ describe("operation", () => {
 			required: ["code", "message", ...Object.keys(extra)],
 		});
 		expect(
-			operationOf(declared, { schemaConverter: converter }).responses,
+			operationOf(defined, { schemaConverter: converter }).responses,
 		).toEqual({
 			default: {
 				description:
@@ -101,7 +101,7 @@ describe("operation", () => {
 	});
 
 	it("falls back to empty schemas and the original operation when the hook returns undefined", () => {
-		const declared = route
+		const defined = route
 			.get("/")
 			.query(type<{ q: string }>())
 			.response(type<string>());
@@ -109,7 +109,7 @@ describe("operation", () => {
 			() => undefined,
 		) as unknown as CreateOpenApiDocumentOptions["transformOperation"];
 		expect(
-			operationOf(declared, {
+			operationOf(defined, {
 				schemaConverter: () => undefined,
 				transformOperation,
 			}),
@@ -158,12 +158,12 @@ describe("operation", () => {
 
 	it("combines stacked request schemas per media type", () => {
 		const json = type<{ name: string }>();
-		const declared = route
+		const defined = route
 			.post("/")
 			.body({ "text/plain": type<string>(), "application/json": json })
 			.body(json);
 		expect(
-			operationOf(declared, {
+			operationOf(defined, {
 				schemaConverter: (schema) =>
 					schema === json ? { type: "object" } : { type: "string" },
 			}).requestBody?.content,

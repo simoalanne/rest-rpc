@@ -28,5 +28,5 @@ export type BodyContent = {
 	readonly [mediaType: `${string}/${string}`]: StandardSchemaV1;
 };
 
-/** The media type of a body declared with only a schema. */
+/** The media type of a body defined with only a schema. */
 export type DefaultBodyContentType = "application/json";

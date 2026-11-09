@@ -100,7 +100,7 @@ describe("match", () => {
 });
 
 describe("resolveImplementationPath", () => {
-	it("keeps declared markers unless a param syntax is requested", () => {
+	it("keeps defined markers unless a param syntax is requested", () => {
 		expect(resolveImplementationPath("/users/{id}/:tab")).toBe(
 			"/users/{id}/:tab",
 		);
@@ -159,7 +159,7 @@ describe("assertPathParams", () => {
 		).toBeUndefined();
 	});
 
-	it("rejects params declared on a path without dynamic segments", () => {
+	it("rejects params defined on a path without dynamic segments", () => {
 		expect(() =>
 			flattenRouteImplementations({
 				user: route
@@ -168,7 +168,7 @@ describe("assertPathParams", () => {
 					.handler(() => "ok"),
 			}),
 		).toThrow(
-			'Route "GET /users" declares params, but its path has no dynamic segments.',
+			'Route "GET /users" defines params, but its path has no dynamic segments.',
 		);
 	});
 });

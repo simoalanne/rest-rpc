@@ -1,4 +1,4 @@
-import type { AbsolutePath, RouteDeclaration } from "./routeDeclaration.ts";
+import type { AbsolutePath, RouteDefinition } from "./routeDefinition.ts";
 
 /** Joins a prefix and a path. The `/` path resolves to the prefix itself. */
 export const joinPrefix = (
@@ -7,9 +7,9 @@ export const joinPrefix = (
 ): AbsolutePath =>
 	prefix === undefined ? path : path === "/" ? prefix : `${prefix}${path}`;
 
-/** The declared path, which includes the prefix, or the path of the tree keys under the prefix. */
+/** The defined path, which includes the prefix, or the path of the tree keys under the prefix. */
 export const resolveRoutePath = (
-	route: Pick<RouteDeclaration, "path" | "prefix">,
+	route: Pick<RouteDefinition, "path" | "prefix">,
 	treePath: readonly string[],
 ): AbsolutePath =>
 	route.path ?? joinPrefix(route.prefix, `/${treePath.join("/")}`);

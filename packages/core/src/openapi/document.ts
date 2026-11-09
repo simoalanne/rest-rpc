@@ -45,7 +45,7 @@ export type OpenApiDocument = {
  * Options for generating an OpenAPI document from a contract.
  *
  * @remarks Without a `schemaConverter`, or when it returns `undefined`, a
- * declared schema becomes an empty OpenAPI Schema Object. `transformOperation`
+ * defined schema becomes an empty OpenAPI Schema Object. `transformOperation`
  * can adjust each generated operation for project-specific conventions.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/openapi}
@@ -61,7 +61,7 @@ export type CreateOpenApiDocumentOptions = {
 	components?: OpenApiDocument["components"];
 	/** Tags available for grouping generated operations. */
 	tags?: OpenApiDocument["tags"];
-	/** Converts Standard Schema declarations into OpenAPI Schema Objects. */
+	/** Converts Standard Schema definitions into OpenAPI Schema Objects. */
 	schemaConverter?: SchemaConverter;
 	/** Allows project-specific changes to each generated operation. */
 	transformOperation?: (context: OperationTransformContext) => OpenApiOperation;

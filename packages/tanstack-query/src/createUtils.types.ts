@@ -9,7 +9,7 @@ import type {
 	FetchArgs,
 	FetchOptions,
 } from "@rest-rpc/core/client";
-import type { Contract, RouteDeclaration } from "@rest-rpc/core/contract";
+import type { Contract, RouteDefinition } from "@rest-rpc/core/contract";
 import type {
 	DataTag,
 	InfiniteData,
@@ -23,7 +23,7 @@ import type {
 
 type NoInferValue<T> = [T][T extends unknown ? 0 : never];
 
-type QueryRoute = { readonly "~restrpc": RouteDeclaration };
+type QueryRoute = { readonly "~restrpc": RouteDefinition };
 
 type RouteFor<E extends QueryRoute> = E["~restrpc"];
 

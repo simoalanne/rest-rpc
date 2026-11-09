@@ -30,7 +30,7 @@ export type CreateAppOptions<TArgs extends unknown[] = []> = Omit<
 	/**
 	 * Initial context values for each request, set before middleware runs, or
 	 * a function that returns them for the request. Values are not
-	 * type-checked against the context types routes declare.
+	 * type-checked against the context types routes define.
 	 *
 	 * @remarks The function also receives the arguments the runtime passes to
 	 * `fetch` after the request, such as the `env` of Cloudflare Workers. Their

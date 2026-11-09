@@ -1,15 +1,15 @@
 ---
 title: Contract-first Quickstart
-description: Declare a shared HTTP interface, implement it, and use it in a typed client.
+description: Define a shared HTTP interface, implement it, and use it in a typed client.
 ---
 
 A separate contract is useful when the HTTP interface should be shared
-independently of its implementation. Declare it with the core route builder,
+independently of its implementation. Define it with the core route builder,
 implement it with `@rest-rpc/server`, and pass the same contract to the client.
 
 This guide builds the same two routes as the [Quickstart](/docs/quickstart),
 using Bun and Zod. The methods, paths, requests, statuses, and client
-results are equivalent, but the response types are declared explicitly rather
+results are equivalent, but the response types are defined explicitly rather
 than inferred from handlers.
 
 ## Install
@@ -18,7 +18,7 @@ than inferred from handlers.
 npm i @rest-rpc/core @rest-rpc/server zod
 ```
 
-## Declare the Contract
+## Define the Contract
 
 Put the contract somewhere both server and client can import.
 
@@ -46,7 +46,7 @@ const get = route
 export const api = { todos: { create, get } };
 ```
 
-`todos.create` uses the default `POST /todos/create`. `todos.get` declares its
+`todos.create` uses the default `POST /todos/create`. `todos.get` defines its
 HTTP method, path, 200 response, and `TODO_NOT_FOUND` error with status 404. The schemas also provide runtime validation of handler results.
 
 ## Implement and Register Routes
@@ -82,7 +82,7 @@ const routes = { todos: { create, get } };
 Bun.serve({ ...createApp(routes), port: 3000 });
 ```
 
-`implement()` keeps each handler's request and result tied to its declaration.
+`implement()` keeps each handler's request and result tied to its definition.
 The contract itself contains no framework or handler code.
 
 ## Call the Routes
@@ -90,7 +90,7 @@ The contract itself contains no framework or handler code.
 Import the shared contract directly. No contract extraction step is needed.
 
 ```ts client.ts
-import { createClient, isDeclaredError, safe } from "@rest-rpc/core";
+import { createClient, isDefinedError, safe } from "@rest-rpc/core";
 import { api } from "./contract";
 
 const client = createClient(api, { baseUrl: "http://localhost:3000" });
@@ -106,7 +106,7 @@ const result = await safe(
 if (!result.error) {
 	console.log(result.data.body.title);
 } else if (
-	isDeclaredError(result.error) &&
+	isDefinedError(result.error) &&
 	result.error.code === "TODO_NOT_FOUND"
 ) {
 	console.log(result.error.message);
@@ -115,7 +115,7 @@ if (!result.error) {
 
 ## Next Steps
 
-- [Contract-first](/docs/contract-first) covers declarations, implementation, context, and middleware.
+- [Contract-first](/docs/contract-first) covers definitions, implementation, context, and middleware.
 - [Schemas and Validation](/docs/http-behavior/schemas) covers runtime validation.
 - [Framework Integration](/docs/server/framework-integration) covers adding the routes to an existing framework.
 - [Fetch Client](/docs/client/fetch-client) and [TanStack Query](/docs/client/tanstack-query) cover client usage.

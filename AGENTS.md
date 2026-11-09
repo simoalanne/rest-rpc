@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repo is `rest-rpc`, a TypeScript library for defining REST APIs with RPC-like ergonomics. It provides a type-safe way to declare HTTP routes, generate client contracts, and handle requests and responses. Both contract-first and server-first development approaches are supported but server-first is the recommended approach and what documentation shows.
+This repo is `rest-rpc`, a TypeScript library for defining REST APIs with RPC-like ergonomics. It provides a type-safe way to define HTTP routes, generate client contracts, and handle requests and responses. Both contract-first and server-first development approaches are supported but server-first is the recommended approach and what documentation shows.
 
 ## Packages
 

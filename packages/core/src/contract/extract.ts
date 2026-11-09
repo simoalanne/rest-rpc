@@ -6,8 +6,8 @@ import { mapContractRoutes } from "./traversal.ts";
  * Extracts the minimal JSON-compatible client contract from a route tree.
  *
  * @remarks Keeps only each route's method, resolved path, request body media
- * types, declared response statuses and media types, and the status of each
- * declared error code. The request body keeps the declaration shape with empty
+ * types, defined response statuses and media types, and the status of each
+ * defined error code. The request body keeps the definition shape with empty
  * schema lists, and response media types keep `null` schemas. Schemas,
  * metadata, and handlers are left out, so the result can be serialized and
  * shipped to a client without server code.

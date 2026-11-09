@@ -42,7 +42,7 @@ describe("call", () => {
 		expect(request.context.get("user")).toBe("Ada");
 	});
 
-	it("rejects like the fetch client for declared, built-in and undeclared errors", async () => {
+	it("rejects like the fetch client for defined, built-in and other errors", async () => {
 		const NotFound = routeError("NOT_FOUND", {
 			status: 404,
 			data: type((id: number) => String(id)),
@@ -61,7 +61,7 @@ describe("call", () => {
 			code: "NOT_FOUND",
 			status: 404,
 			data: "1",
-			isDeclared: true,
+			isDefined: true,
 		});
 
 		const rejecting: StandardSchemaV1 = {
@@ -78,25 +78,25 @@ describe("call", () => {
 		await expect(call(invalid, { body: {} })).rejects.toMatchObject({
 			code: "REQUEST_VALIDATION_FAILED",
 			status: 400,
-			isDeclared: false,
+			isDefined: false,
 		});
 
-		const declared = route
+		const defined = route
 			.post("/")
 			.body(rejecting)
 			.error(RequestValidationFailed)
 			.handler(() => "ok");
-		await expect(call(declared, { body: {} })).rejects.toMatchObject({
+		await expect(call(defined, { body: {} })).rejects.toMatchObject({
 			code: "REQUEST_VALIDATION_FAILED",
 			status: 400,
 			data: { body: [{ message: "invalid" }] },
-			isDeclared: true,
+			isDefined: true,
 		});
 
 		const gone = new RouteError("GONE", { status: 410 });
 		thrown.mockImplementation(() => gone);
 		await expect(call(implementation, { body: { id: 1 } })).rejects.toBe(gone);
-		expect(gone.isDeclared).toBe(false);
+		expect(gone.isDefined).toBe(false);
 	});
 
 	it("passes params of dynamic path segments without a params schema", async () => {

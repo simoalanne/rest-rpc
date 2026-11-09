@@ -1,12 +1,12 @@
 import type {
-	RequestBodyDeclaration,
-	RouteDeclaration,
-} from "../contract/routeDeclaration.ts";
+	RequestBodyDefinition,
+	RouteDefinition,
+} from "../contract/routeDefinition.ts";
 import type {
-	ResponseDeclaration,
+	ResponseDefinition,
 	ResponseHeadersSchema,
 } from "../contract/response.ts";
-import type { RouteErrorDeclaration } from "../contract/routeError.ts";
+import type { RouteErrorDefinition } from "../contract/routeError.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { getPathParamNames } from "../contract/path.ts";
 
@@ -58,7 +58,7 @@ export type SchemaConverter = (
 ) => OpenApiSchema | undefined;
 
 export type OperationTransformContext = {
-	route: RouteDeclaration;
+	route: RouteDefinition;
 	routePath: readonly string[];
 	operation: OpenApiOperation;
 };
@@ -124,7 +124,7 @@ const createParameters = (
 
 // Dynamic path segments without a params schema are received as strings.
 const createPathParameters = (
-	route: RouteDeclaration & { path: string },
+	route: RouteDefinition & { path: string },
 	options: CreateOperationOptions,
 ): OpenApiParameter[] =>
 	route.request?.params?.length
@@ -137,7 +137,7 @@ const createPathParameters = (
 			}));
 
 const createRequestBody = (
-	body: RequestBodyDeclaration | undefined,
+	body: RequestBodyDefinition | undefined,
 	converter: SchemaConverter | undefined,
 ): OpenApiRequestBody | undefined => {
 	if (!body) return undefined;
@@ -155,13 +155,13 @@ const createRequestBody = (
 };
 
 const createResponse = (
-	responseDeclaration: ResponseDeclaration,
+	responseDefinition: ResponseDefinition,
 	converter: SchemaConverter | undefined,
 ): OpenApiResponse => {
-	const { content } = responseDeclaration;
-	const headers = createResponseHeaders(responseDeclaration.headers, converter);
+	const { content } = responseDefinition;
+	const headers = createResponseHeaders(responseDefinition.headers, converter);
 	const response: OpenApiResponse = {
-		description: responseDeclaration.description ?? "",
+		description: responseDefinition.description ?? "",
 		...(headers ? { headers } : {}),
 	};
 	if (content === undefined) return response;
@@ -191,48 +191,46 @@ const createResponseHeaders = (
 
 const createErrorBodySchema = (
 	code: string,
-	declaration: RouteErrorDeclaration,
+	definition: RouteErrorDefinition,
 	converter: SchemaConverter | undefined,
 ): OpenApiSchema => ({
 	type: "object",
 	properties: {
 		code: { const: code },
 		message: { type: "string" },
-		...(declaration.data && {
-			data: converter?.(declaration.data, "output") ?? {},
+		...(definition.data && {
+			data: converter?.(definition.data, "output") ?? {},
 		}),
 	},
-	required: declaration.data
-		? ["code", "message", "data"]
-		: ["code", "message"],
+	required: definition.data ? ["code", "message", "data"] : ["code", "message"],
 });
 
 // Errors sharing a status are documented as one response.
 const createErrorResponses = (
-	errors: Readonly<Record<string, RouteErrorDeclaration>>,
+	errors: Readonly<Record<string, RouteErrorDefinition>>,
 	converter: SchemaConverter | undefined,
 ) => {
-	const byStatus = new Map<number, [string, RouteErrorDeclaration][]>();
-	for (const [code, declaration] of Object.entries(errors)) {
-		const group = byStatus.get(declaration.status) ?? [];
-		group.push([code, declaration]);
-		byStatus.set(declaration.status, group);
+	const byStatus = new Map<number, [string, RouteErrorDefinition][]>();
+	for (const [code, definition] of Object.entries(errors)) {
+		const group = byStatus.get(definition.status) ?? [];
+		group.push([code, definition]);
+		byStatus.set(definition.status, group);
 	}
 
 	const responses: Record<string, OpenApiResponse> = {};
 	for (const [status, group] of byStatus) {
-		const schemas = group.map(([code, declaration]) =>
-			createErrorBodySchema(code, declaration, converter),
+		const schemas = group.map(([code, definition]) =>
+			createErrorBodySchema(code, definition, converter),
 		);
 		const headers = Object.assign(
 			{},
-			...group.map(([, declaration]) =>
-				createResponseHeaders(declaration.headers, converter),
+			...group.map(([, definition]) =>
+				createResponseHeaders(definition.headers, converter),
 			),
 		);
 		responses[status] = {
 			description: group
-				.flatMap(([, declaration]) => declaration.description ?? [])
+				.flatMap(([, definition]) => definition.description ?? [])
 				.join("\n"),
 			...(Object.keys(headers).length > 0 ? { headers } : {}),
 			content: {
@@ -246,14 +244,14 @@ const createErrorResponses = (
 };
 
 const createResponses = (
-	route: RouteDeclaration,
+	route: RouteDefinition,
 	converter: SchemaConverter | undefined,
 ) => {
-	const declared = Object.entries(route.responses);
+	const defined = Object.entries(route.responses);
 	const errors = createErrorResponses(route.errors ?? {}, converter);
 	// Responses inferred from a handler have no schema. `default` documents them
 	// without claiming a status, and keeps the required Responses Object non-empty.
-	if (declared.length === 0) {
+	if (defined.length === 0) {
 		return {
 			default: {
 				description:
@@ -264,7 +262,7 @@ const createResponses = (
 	}
 
 	const responses: Record<string, OpenApiResponse> = {};
-	for (const [status, schema] of declared) {
+	for (const [status, schema] of defined) {
 		responses[status] = createResponse(schema, converter);
 	}
 
@@ -272,7 +270,7 @@ const createResponses = (
 };
 
 export const createOperation = (
-	route: RouteDeclaration & { path: string },
+	route: RouteDefinition & { path: string },
 	options: CreateOperationOptions,
 	routePath: readonly string[],
 ): OpenApiOperation => {

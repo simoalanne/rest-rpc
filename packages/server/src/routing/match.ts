@@ -6,7 +6,7 @@ import {
 	isRouteLeaf,
 	toColonPath,
 	toOpenApiPath,
-	type RouteDeclaration,
+	type RouteDefinition,
 } from "@rest-rpc/core/contract";
 import type { RouteError } from "@rest-rpc/core";
 import { addRoute, createRouter, findRoute } from "rou3";
@@ -16,8 +16,8 @@ import type { CompileRoutesOptions } from "../pipeline/compileRoutes.ts";
 const splitPath = (path: string) => path.split("/").filter(Boolean);
 
 const compareRouteSpecificity = (
-	left: RouteDeclaration & { path: string },
-	right: RouteDeclaration & { path: string },
+	left: RouteDefinition & { path: string },
+	right: RouteDefinition & { path: string },
 ) => {
 	const leftSegments = splitPath(left.path);
 	const rightSegments = splitPath(right.path);
@@ -44,25 +44,25 @@ const compareRouteSpecificity = (
 	return left.method.localeCompare(right.method);
 };
 
-/** A route's declaration and handler, with values derived once instead of per request. */
+/** A route's definition and handler, with values derived once instead of per request. */
 export type RuntimeImplementation = {
-	route: RouteDeclaration & { path: string };
+	route: RouteDefinition & { path: string };
 	handler: (...args: never[]) => unknown;
 	middleware?: readonly RuntimeRouteHandler[];
-	/** The first declared response status, sent for plain handler results. */
+	/** The first defined response status, sent for plain handler results. */
 	defaultStatus: number | undefined;
-	/** The first declared request body media type. */
+	/** The first defined request body media type. */
 	defaultBodyMediaType: string | undefined;
-	/** Whether the request body declares several media types. */
+	/** Whether the request body defines several media types. */
 	requiresBodyContentType: boolean;
-	/** The media type of each declared response status that declares exactly one. */
+	/** The media type of each defined response status that defines exactly one. */
 	defaultResponseMediaTypes: Readonly<Record<number, string>>;
-	/** Creates each declared error by code, received by handlers and middleware as `errors`. */
+	/** Creates each defined error by code, received by handlers and middleware as `errors`. */
 	errorFactories: Readonly<Record<string, (options?: unknown) => RouteError>>;
 };
 
 export type ImplementedRoute = {
-	readonly "~restrpc": RouteDeclaration & {
+	readonly "~restrpc": RouteDefinition & {
 		readonly handler: (...args: never[]) => unknown;
 		readonly middleware?: readonly RuntimeRouteHandler[];
 	};
@@ -84,7 +84,7 @@ export function isImplementedRoute(value: unknown): value is ImplementedRoute {
 type ErrorClass = new (options?: unknown) => RouteError;
 
 const createErrorFactories = (
-	errors: RouteDeclaration["errors"] = {},
+	errors: RouteDefinition["errors"] = {},
 ): RuntimeImplementation["errorFactories"] =>
 	Object.fromEntries(
 		Object.entries(errors).map(([code, definition]) => [
@@ -94,16 +94,16 @@ const createErrorFactories = (
 	);
 
 export function toRuntimeImplementation(
-	declaration: ImplementedRoute["~restrpc"],
+	definition: ImplementedRoute["~restrpc"],
 ): RuntimeImplementation {
-	const { handler, middleware, ...route } = declaration;
+	const { handler, middleware, ...route } = definition;
 	if (
 		route.request?.params?.length &&
 		// A path derived from tree keys adds no dynamic segments to the prefix.
 		getPathParamNames(route.path ?? route.prefix ?? "").length === 0
 	) {
 		throw new Error(
-			`Route "${route.method} ${route.path ?? route.prefix ?? "(derived path)"}" declares params, but its path has no dynamic segments.`,
+			`Route "${route.method} ${route.path ?? route.prefix ?? "(derived path)"}" defines params, but its path has no dynamic segments.`,
 		);
 	}
 	const bodyMediaTypes = Object.keys(route.request?.body ?? {});

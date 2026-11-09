@@ -5,17 +5,17 @@ import {
 	type SerializedBody,
 } from "../codecs/index.ts";
 import type { Contract } from "../contract/contract.ts";
-import type { RouteDeclaration } from "../contract/routeDeclaration.ts";
+import type { RouteDefinition } from "../contract/routeDefinition.ts";
 import { replacePathParams } from "../contract/path.ts";
-import type { HttpMethod } from "../contract/routeDeclaration.ts";
+import type { HttpMethod } from "../contract/routeDefinition.ts";
 import type {
-	ClientRequestForDeclaration,
+	ClientRequestForDefinition,
 	RequestScalar,
 } from "../contract/request.ts";
 
 /**
  * Fetch options accepted by a route call, plus headers added outside the
- * declared route input.
+ * defined route input.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#per-call-options}
  */
@@ -44,7 +44,7 @@ export type ClientHeaderValue =
 	| undefined
 	| (() => RequestScalar | undefined | Promise<RequestScalar | undefined>);
 
-/** Transport headers added by the client outside the declared route input. */
+/** Transport headers added by the client outside the defined route input. */
 export type ClientHeaders = Record<string, ClientHeaderValue>;
 
 type LiteralKeys<T> = {
@@ -85,10 +85,10 @@ export type InferClientRequest<
 	T extends Contract,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > = T extends {
-	readonly "~restrpc": infer TRoute extends RouteDeclaration;
+	readonly "~restrpc": infer TRoute extends RouteDefinition;
 }
 	? ClientRequestValue<
-			ClientRequestForDeclaration<TRoute, GlobalHeaderKeys<TGlobalHeaders>>
+			ClientRequestForDefinition<TRoute, GlobalHeaderKeys<TGlobalHeaders>>
 		>
 	: {
 			[K in keyof T]: T[K] extends Contract
@@ -97,10 +97,10 @@ export type InferClientRequest<
 		};
 
 export type FetchArgs<
-	E extends RouteDeclaration = RouteDeclaration,
+	E extends RouteDefinition = RouteDefinition,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > =
-	ClientRequestForDeclaration<
+	ClientRequestForDefinition<
 		E,
 		GlobalHeaderKeys<TGlobalHeaders>
 	> extends infer TRequest
@@ -202,7 +202,7 @@ export const constructBaseRequest = (
 	return {
 		url,
 		body,
-		// Calls select a media type when the route declares several.
+		// Calls select a media type when the route defines several.
 		contentType: contentType ?? Object.keys(route.request?.body ?? {})[0],
 		headers: stringifyHeaders(headers),
 	};

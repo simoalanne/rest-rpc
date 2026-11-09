@@ -20,7 +20,7 @@ Both ways start by compiling the route tree with `compileRoutes`. It takes the
 
 - `paramSyntax`: rewrites path params in compiled paths to `:name` (`"colon"`)
   or `{name}` (`"braces"`) for routers that expect one of them. Paths keep the
-  markers they were declared with by default.
+  markers they were written with by default.
 
 It returns one route per method and path:
 
@@ -32,7 +32,7 @@ type FetchRoute = {
 };
 ```
 
-`path` includes any [prefix](/docs/route-builder#path-prefixes) declared with
+`path` includes any [prefix](/docs/route-builder#path-prefixes) defined with
 `.prefix()`. The Node routes from `@rest-rpc/server/node` have the same shape,
 but `handle` takes `req, res` and writes the response to `res`.
 
@@ -51,7 +51,7 @@ type HandleOptions = {
 
 - `context`: values to seed the request [context](/docs/context) with before
   middleware runs, such as an authenticated user or the native request. They
-  are not type-checked against the context types routes declare.
+  are not type-checked against the context types routes define.
 - `params`: percent-decoded path params, for requests whose URL does not
   contain the route path, such as after a rewrite. Otherwise params a router
   sets, such as `req.params` in Express, are used, or else they are read from
@@ -168,13 +168,13 @@ the mount path from `req.url`, so pass the full mount path.
 
 `mountPath` is a per-request option, so one handler can serve the same routes
 under several mount paths. A path that clients use, such as `/api/v1`, belongs
-in the routes instead, declared with
+in the routes instead, defined with
 [`.prefix()`](/docs/route-builder#path-prefixes), so that clients and OpenAPI
 documents include it.
 
 ## Error Handling
 
-[Declared and built-in errors](/docs/http-behavior/errors) are sent as error
+[Defined and built-in errors](/docs/http-behavior/errors) are sent as error
 responses, and observed with `onError` from the
 [compile options](/docs/server/fetch#error-handling). Other errors thrown by
 handlers or middleware reject the promise returned by `handle` or the

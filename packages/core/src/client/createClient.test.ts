@@ -34,7 +34,7 @@ describe("createClient", () => {
 		).toBe(3);
 	});
 
-	it("rejects a response media type outside the declaration even without validation", async () => {
+	it("rejects a response media type outside the definition even without validation", async () => {
 		const client = createClient(route.response(type<string>()), {
 			baseUrl: "",
 			fetch: async () =>

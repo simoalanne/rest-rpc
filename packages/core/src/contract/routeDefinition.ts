@@ -4,7 +4,7 @@ import type {
 	RequestParamsSchema,
 } from "./request.ts";
 import type { RouteResponses } from "./response.ts";
-import type { RouteErrorDeclaration } from "./routeError.ts";
+import type { RouteErrorDefinition } from "./routeError.ts";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
@@ -25,36 +25,36 @@ export type OpenApiRouteOptions = {
 };
 
 /** Ordered body schemas keyed by base media type. */
-export type RequestBodyDeclaration = {
+export type RequestBodyDefinition = {
 	readonly [mediaType: string]: readonly RequestBodySchema[];
 };
 
-export type RouteRequestDeclaration = {
-	body?: RequestBodyDeclaration;
+export type RouteRequestDefinition = {
+	body?: RequestBodyDefinition;
 	query?: readonly RequestBodySchema[];
 	params?: readonly RequestParamsSchema[];
 	headers?: readonly RequestHeadersSchema[];
 };
 
 export type RouteErrors = {
-	readonly [code: string]: RouteErrorDeclaration;
+	readonly [code: string]: RouteErrorDefinition;
 };
 
 /**
- * The contract information retained for one declared route.
+ * The contract information retained for one defined route.
  *
- * @remarks Applications normally create route declarations with `route`
+ * @remarks Applications normally create route definitions with `route`
  * instead of constructing this representation directly.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/route-builder}
  */
-export type RouteDeclaration = {
+export type RouteDefinition = {
 	/** The full path, including any prefix, or `undefined` to derive it from tree keys. */
 	path: AbsolutePath | undefined;
 	/** Prefix prepended to a path derived from tree keys. */
 	prefix?: AbsolutePath;
 	method: HttpMethod;
-	request?: RouteRequestDeclaration;
+	request?: RouteRequestDefinition;
 	responses: RouteResponses;
 	errors?: RouteErrors;
 	meta?: RouteMeta;

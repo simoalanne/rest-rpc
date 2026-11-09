@@ -1,5 +1,5 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import type { RouteErrorDeclaration } from "./routeError.ts";
+import type { RouteErrorDefinition } from "./routeError.ts";
 import type { DefaultBodyContentType } from "./body.ts";
 import type {
 	AbsolutePath,
@@ -7,8 +7,8 @@ import type {
 	OpenApiRouteOptions,
 	RouteErrors,
 	RouteMeta,
-	RouteRequestDeclaration,
-} from "./routeDeclaration.ts";
+	RouteRequestDefinition,
+} from "./routeDefinition.ts";
 import type { EmptyObject, Merge } from "../utils/typeUtils.ts";
 
 /** `omit` lists the builder methods that are no longer available. */
@@ -62,7 +62,7 @@ export type BuilderFor<
 	TState extends BuilderState,
 > = (TKind & { readonly state: TState })["builder"];
 
-export type DeclarationFor<TState extends BuilderState> =
+export type DefinitionFor<TState extends BuilderState> =
 	TState["method"] extends HttpMethod
 		? Merge<
 				{
@@ -108,7 +108,7 @@ export type WithPrefix<
 	TPrefix extends AbsolutePath,
 > = NextState<TState, { prefix: JoinPrefix<TState["prefix"], TPrefix> }>;
 
-// GET routes cannot declare a body, so `get` and `body` exclude each other. A
+// GET routes cannot define a body, so `get` and `body` exclude each other. A
 // method path includes the prefix, so no prefix can be added after it.
 export type WithHttpMethod<
 	TState extends BuilderState,
@@ -131,7 +131,7 @@ export type WithHttpMethod<
 
 type AppendRequest<
 	TRequest,
-	TKey extends keyof RouteRequestDeclaration,
+	TKey extends keyof RouteRequestDefinition,
 	TValue,
 > = Omit<TRequest, TKey> &
 	Record<
@@ -156,7 +156,7 @@ export type ContentFor<TSchemaOrContent> =
 		? { [TKey in DefaultBodyContentType]: TSchemaOrContent }
 		: TSchemaOrContent;
 
-// Each body appends its schemas to the media types it declares.
+// Each body appends its schemas to the media types it defines.
 type AppendBody<TBody, TContent> = Merge<{
 	[
 		TMediaType in keyof TBody | keyof TContent
@@ -229,7 +229,7 @@ export type WithResponse<
 
 export type WithError<
 	TState extends BuilderState,
-	TDefinition extends RouteErrorDeclaration,
+	TDefinition extends RouteErrorDefinition,
 > = NextState<
 	TState,
 	{

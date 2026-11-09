@@ -21,20 +21,20 @@ type Values = { requestId: string };
 const fieldRoute = route.$context<Values>();
 
 describe("routeBuilder types", () => {
-	it("checks declared response statuses and bodies", () => {
-		const declared = route.get("/").response(type<{ id: string }>());
-		declared.handler(() => ({ status: 200, body: { id: "ok" } }));
-		// @ts-expect-error The route only declares status 200.
-		declared.handler(() => ({ status: 404, body: { id: "missing" } }));
-		// @ts-expect-error The declared body requires a string id.
-		declared.handler(() => ({ status: 200, body: { id: 1 } }));
+	it("checks defined response statuses and bodies", () => {
+		const defined = route.get("/").response(type<{ id: string }>());
+		defined.handler(() => ({ status: 200, body: { id: "ok" } }));
+		// @ts-expect-error The route only defines status 200.
+		defined.handler(() => ({ status: 404, body: { id: "missing" } }));
+		// @ts-expect-error The defined body requires a string id.
+		defined.handler(() => ({ status: 200, body: { id: 1 } }));
 	});
 
-	it("limits context access and writes to declared keys and values", () => {
+	it("limits context access and writes to defined keys and values", () => {
 		route.$context<{ count: number }>().handler(({ context }) => {
 			context.set("count", 1);
 			expectTypeOf(context.get("count")).toEqualTypeOf<number>();
-			// @ts-expect-error Context keys must be declared.
+			// @ts-expect-error Context keys must be defined.
 			context.get("missing");
 			// @ts-expect-error Context values must match their key.
 			context.set("count", "1");
@@ -63,7 +63,7 @@ describe("routeBuilder types", () => {
 			});
 	});
 
-	it("narrows the request media type to the declared body media types", () => {
+	it("narrows the request media type to the defined body media types", () => {
 		route.get("/").handler(({ contentType }) => {
 			expectTypeOf(contentType).toEqualTypeOf<undefined>();
 		});
@@ -76,18 +76,18 @@ describe("routeBuilder types", () => {
 	});
 
 	it("infers handler signatures for a route tree", () => {
-		const declaration = contractRoute.get("/").response(type<string>());
-		const tree = { users: { get: declaration } };
+		const definition = contractRoute.get("/").response(type<string>());
+		const tree = { users: { get: definition } };
 		expectTypeOf<
 			InferServerHandler<typeof tree>["users"]["get"]
 		>().toEqualTypeOf<
-			RouteHandler<(typeof declaration)["~restrpc"], DefaultContext>
+			RouteHandler<(typeof definition)["~restrpc"], DefaultContext>
 		>();
 	});
 
 	it("infers the context selected for a server route", () => {
-		const declared = fieldRoute.get("/").params(type<{ id: string }>());
-		type Request = InferServerRequest<typeof declared>;
+		const defined = fieldRoute.get("/").params(type<{ id: string }>());
+		type Request = InferServerRequest<typeof defined>;
 		expectTypeOf<Request["context"]>().toEqualTypeOf<Context<Values>>();
 		expectTypeOf<Request["params"]>().toEqualTypeOf<{ id: string }>();
 		expectTypeOf<Request["route"]>().not.toHaveProperty("context");
@@ -96,36 +96,36 @@ describe("routeBuilder types", () => {
 		expectTypeOf<
 			InferServerRequest<typeof completed>["context"]
 		>().toEqualTypeOf<Context<Values>>();
-		const contractDeclared = contractRoute.get("/");
+		const contractDefined = contractRoute.get("/");
 		expectTypeOf<
-			InferServerRequest<typeof contractDeclared>["context"]
+			InferServerRequest<typeof contractDefined>["context"]
 		>().toEqualTypeOf<Context<DefaultContext>>();
 	});
 
 	it("infers handler requests and responses from the handler signature", () => {
-		const declared = contractRoute
+		const defined = contractRoute
 			.get("/{id}")
 			.params(type<{ id: string }>())
 			.response(type<string>());
-		type Route = (typeof declared)["~restrpc"];
-		expectTypeOf<InferServerRequest<typeof declared>>().toEqualTypeOf<
+		type Route = (typeof defined)["~restrpc"];
+		expectTypeOf<InferServerRequest<typeof defined>>().toEqualTypeOf<
 			RouteRequest<Route, DefaultContext>
 		>();
-		expectTypeOf<InferServerResponse<typeof declared>>().toEqualTypeOf<
+		expectTypeOf<InferServerResponse<typeof defined>>().toEqualTypeOf<
 			{ status: 200; contentType?: "application/json"; body: string } | string
 		>();
-		const tree = { users: { get: declared } };
+		const tree = { users: { get: defined } };
 		expectTypeOf<
 			InferServerRequest<typeof tree>["users"]["get"]
-		>().toEqualTypeOf<Parameters<InferServerHandler<typeof declared>>[0]>();
+		>().toEqualTypeOf<Parameters<InferServerHandler<typeof defined>>[0]>();
 		expectTypeOf<
 			InferServerResponse<typeof tree>["users"]["get"]
-		>().toEqualTypeOf<InferServerResponse<typeof declared>>();
+		>().toEqualTypeOf<InferServerResponse<typeof defined>>();
 	});
 
-	it("returns envelopes or the body of a single declared response", () => {
-		const declared = contractRoute.get("/").response(type<string>());
-		type Handler = InferServerHandler<typeof declared>;
+	it("returns envelopes or the body of a single defined response", () => {
+		const defined = contractRoute.get("/").response(type<string>());
+		type Handler = InferServerHandler<typeof defined>;
 		type Envelope = {
 			status: 200;
 			contentType?: "application/json";
@@ -148,14 +148,14 @@ describe("routeBuilder types", () => {
 		>();
 	});
 
-	it("requires envelopes when multiple responses are declared", () => {
-		const declared = route
+	it("requires envelopes when multiple responses are defined", () => {
+		const defined = route
 			.get("/")
 			.response(type<string>())
 			.response(type<{ id: string }>(), { status: 201 });
-		declared.handler(() => ({ status: 200, body: "ok" }));
-		// @ts-expect-error Plain bodies are ambiguous between declared statuses.
-		declared.handler(() => "ok");
+		defined.handler(() => ({ status: 200, body: "ok" }));
+		// @ts-expect-error Plain bodies are ambiguous between defined statuses.
+		defined.handler(() => "ok");
 	});
 });
 
@@ -166,7 +166,7 @@ describe("route errors", () => {
 		data: type<{ id: string }>(),
 	});
 
-	it("types declared error factories on middleware and the handler and keeps responses inferred", () => {
+	it("types defined error factories on middleware and the handler and keeps responses inferred", () => {
 		const value = route
 			.error(Unauthorized)
 			.get("/users/:id")
@@ -199,7 +199,7 @@ describe("route errors", () => {
 		});
 	});
 
-	it("requires the errors a reusable middleware declares on routes that use it", () => {
+	it("requires the errors a reusable middleware defines on routes that use it", () => {
 		const auth = route.middleware<{
 			errors: { UNAUTHORIZED: typeof Unauthorized };
 		}>(({ errors, next }) => {
@@ -209,7 +209,7 @@ describe("route errors", () => {
 			return next();
 		});
 		route.get("/me").error(Unauthorized).use(auth);
-		// @ts-expect-error The route does not declare UNAUTHORIZED.
+		// @ts-expect-error The route does not define UNAUTHORIZED.
 		route.get("/me").use(auth);
 		route.middleware(({ errors, next }) => {
 			expectTypeOf(errors.UNAUTHORIZED).toEqualTypeOf<unknown>();

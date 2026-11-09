@@ -19,7 +19,7 @@ The client has the same route tree shape as the contract.
 
 ## Call Routes
 
-The route declaration determines the request and result shapes.
+The route definition determines the request and result shapes.
 
 ```ts
 const created = await client.todos.create({ body: { title: "Write docs" } });
@@ -28,9 +28,9 @@ const response = await client.todos.get({ params: { id: created.body.id } });
 
 A call returns a `status`-discriminated union with `contentType`, `body`, and
 `headers`. `contentType` is the received base media type, or `undefined` when
-the response has no content type. When a status declares several media types,
+the response has no content type. When a status defines several media types,
 checking `contentType` narrows `body`. `headers` is a record of every response
-header with lowercase names, and declared response headers are typed.
+header with lowercase names, and defined response headers are typed.
 
 ```ts
 if (response.status === 200) {
@@ -43,9 +43,9 @@ See [Handle Errors](#typesafe-error-handling).
 
 ### Select a Request Media Type
 
-When a route declares several request body media types, `contentType` in the
+When a route defines several request body media types, `contentType` in the
 request selects the one used to encode the body, and narrows `body` to its
-schema. It is optional when the route declares one media type.
+schema. It is optional when the route defines one media type.
 
 ```ts
 await client.todos.import({ contentType: "text/csv", body: csv });
@@ -63,19 +63,19 @@ An error response whose JSON body has a `code` rejects with a `RouteError`:
 | `data`    | The `data` of the body    |
 | `headers` | The response headers      |
 
-An error whose code the route [declares](/docs/route-builder#declare-errors) is
-part of the route's types: its `data` and declared headers are typed, and
+An error whose code the route [defines](/docs/route-builder#define-errors) is
+part of the route's types: its `data` and defined headers are typed, and
 validated with [response validation](#response-validation).
-Errors the route does not declare, such as an `UNAUTHORIZED` sent by auth
-middleware or an undeclared [built-in error](/docs/http-behavior/errors#built-in-errors),
+Errors the route does not define, such as an `UNAUTHORIZED` sent by auth
+middleware or a [built-in error](/docs/http-behavior/errors#built-in-errors),
 keep their values but are typed only as `Error`.
 
 Everything else rejects with a plain `Error`:
 
 - Other error responses, such as a proxy's error page. The `message` includes
   the status.
-- Responses that break the route contract: a declared error code with another
-  status, a 2xx status or content type the route's declared responses do not
+- Responses that break the route contract: a defined error code with another
+  status, a 2xx status or content type the route's defined responses do not
   include, a body that cannot be decoded, or, with response validation, a body
   or headers that fail it. The `cause` holds the validation issues or the
   decoding error.
@@ -83,20 +83,20 @@ Everything else rejects with a plain `Error`:
   call rejects with the original error.
 
 :::warning
-Routes with [inferred responses](/docs/route-builder#return-responses) declare
+Routes with [inferred responses](/docs/route-builder#return-responses) define
 no statuses at runtime, so every 2xx response resolves. An
 [extracted contract](/docs/client/contract-extraction) has no schemas, so its
 bodies, headers and error `data` are not validated.
 :::
 
-Use [`safe()`](#with-safe) to handle the errors a route declares as expected
+Use [`safe()`](#with-safe) to handle the errors a route defines as expected
 domain errors, and `try`/`catch` for general error handling.
 
 ### With try/catch
 
 `try`/`catch` suits general error handling, such as logging, redirecting on
 `UNAUTHORIZED` or showing a generic failure. `instanceof RouteError` matches
-declared and undeclared errors, but does not type them with the route's codes
+errors whether or not the route defines them, but does not type them with the route's codes
 or `data`:
 
 ```ts twoslash
@@ -135,8 +135,8 @@ try {
 
 `safe()` suits expected domain errors. It resolves a call to an `{ error }` or
 `{ data }` result instead of rejecting, with the error typed for the route, and
-`data` is typed only after checking `error`. `isDeclaredError()` narrows the
-error to the route's declared errors, and checking `code` types their `data`:
+`data` is typed only after checking `error`. `isDefinedError()` narrows the
+error to the route's defined errors, and checking `code` types their `data`:
 
 ```ts twoslash
 // ---cut-start---
@@ -158,13 +158,13 @@ import type { routes } from "./server";
 declare const api: typeof routes;
 const client = createClient(api, { baseUrl: "http://localhost:3000" });
 // ---cut-end---
-import { isDeclaredError, safe } from "@rest-rpc/core";
+import { isDefinedError, safe } from "@rest-rpc/core";
 
 const { error, data } = await safe(
 	client.todos.get({ params: { id: "todo_1" } }),
 );
 
-if (isDeclaredError(error)) {
+if (isDefinedError(error)) {
 	console.log(error);
 } else if (error) {
 	throw error;
@@ -295,7 +295,7 @@ const client = createClient(api, {
 			type: "boolean",
 			default: "false",
 			description:
-				"Validates response bodies, declared response headers, and stream event data against the contract's schemas.",
+				"Validates response bodies, defined response headers, and stream event data against the contract's schemas.",
 		},
 	}}
 />
@@ -319,7 +319,7 @@ const client = createClient(api, {
 });
 ```
 
-A global header with a guaranteed value makes a matching declared route header
+A global header with a guaranteed value makes a matching defined route header
 optional in client calls. A provider that can return `undefined` does not.
 
 ## Custom Fetch
@@ -364,7 +364,7 @@ const response = await client.todos.get(
 ```
 
 Use `additionalHeaders` for transport headers needed only by this call. Headers
-declared by the route remain part of the typed request object.
+defined by the route remain part of the typed request object.
 
 ```ts
 const response = await client.todos.get(
@@ -388,7 +388,7 @@ const response = await client.health(undefined, {
 ## Response Validation
 
 The client decodes response bodies without schema validation by default.
-Enable `validateResponses` to validate decoded bodies, declared response
+Enable `validateResponses` to validate decoded bodies, defined response
 headers, and stream event data:
 
 ```ts
@@ -457,10 +457,10 @@ type TodoEvent = InferClientStreamData<typeof events>;
 | ------------------------------------------ | ---------------------------------------------------------------------------------------- |
 | `InferClientRequest<Route, GlobalHeaders>` | The request passed to the route call, or `undefined` for routes without input.           |
 | `InferClientResponse<Route>`               | Every response envelope of the route.                                                    |
-| `InferClientError<Route>`                  | The declared errors of the route.                                                        |
+| `InferClientError<Route>`                  | The defined errors of the route.                                                         |
 | `InferClientStreamData<Route>`             | The `data` of each event from a [streaming route](#consume-streams), without `SseEvent`. |
 
-Calls reject with `InferClientError<Route>` for declared errors, and with other
+Calls reject with `InferClientError<Route>` for defined errors, and with other
 `Error`s otherwise.
 
 `InferClientRequest` accepts the type of your `globalHeaders` as a second

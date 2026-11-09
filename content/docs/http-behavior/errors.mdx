@@ -1,11 +1,11 @@
 ---
 title: Errors
-description: How declared and built-in errors are sent, and how other errors reach your framework.
+description: How defined and built-in errors are sent, and how other errors reach your framework.
 ---
 
 Routes return successful responses and throw errors. A route
-[declares](/docs/route-builder#declare-errors) each error it can respond with
-by a unique code, and clients reject with the declared error when they receive
+[defines](/docs/route-builder#define-errors) each error it can respond with
+by a unique code, and clients reject with the defined error when they receive
 it.
 
 ## Wire Format
@@ -21,10 +21,10 @@ Content-Type: application/json
 
 - `code` and `message` are always present, and `data` is present when the error
   has data.
-- Declared error headers are sent as response headers.
+- Defined error headers are sent as response headers.
 
 Any HTTP client can read these responses. The rest-rpc client rejects with a
-`RouteError` for each of them, and marks it as declared when the route declares
+`RouteError` for each of them, and marks it as defined when the route defines
 the code with the received status. See
 [Fetch Client](/docs/client/fetch-client#typesafe-error-handling).
 
@@ -34,31 +34,31 @@ Throw `errors.CODE(...)` from a handler or middleware, or throw
 `new Definition(...)` for an error defined with `routeError()` from any code.
 Both create a `RouteError`.
 
-The route's declaration decides the response: its status, and the validated
+The route's definition decides the response: its status, and the validated
 `data` and headers. When `data` or headers fail validation, an
 `INTERNAL_SERVER_ERROR` is sent instead.
 
-An error whose code the route does not declare is sent as thrown, with its own
+An error whose code the route does not define is sent as thrown, with its own
 status, `data` and headers, and without validation. Use it for errors that
 apply across routes, such as an `UNAUTHORIZED` thrown by auth middleware, and
 handle it in a client's general error handling. It is not part of the route's
-types, so declare the error when clients should handle it per call.
+types, so define the error when clients should handle it per call.
 
 ## Built-in Errors
 
-The server sends these errors itself, whether or not a route declares them:
+The server sends these errors itself, whether or not a route defines them:
 
 | Code                        | Definition                | Status | `data`                                                 | Sent when                                                                                                                                                                                                       |
 | --------------------------- | ------------------------- | ------ | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `REQUEST_VALIDATION_FAILED` | `RequestValidationFailed` | `400`  | Issues grouped by `body`, `query`, `params`, `headers` | [Request validation](/docs/http-behavior/schemas#request-validation) fails                                                                                                                                      |
 | `MALFORMED_REQUEST_BODY`    | `MalformedRequestBody`    | `400`  | none                                                   | The request body cannot be decoded                                                                                                                                                                              |
-| `UNSUPPORTED_MEDIA_TYPE`    | `UnsupportedMediaType`    | `415`  | none                                                   | The request `Content-Type` is not declared by a route with a body, or missing when several media types are                                                                                                      |
+| `UNSUPPORTED_MEDIA_TYPE`    | `UnsupportedMediaType`    | `415`  | none                                                   | The request `Content-Type` is not defined by a route with a body, or missing when several media types are                                                                                                       |
 | `INTERNAL_SERVER_ERROR`     | `InternalServerError`     | `500`  | none                                                   | [Response validation](/docs/http-behavior/schemas#response-validation-on-the-server) fails, including error data, or, with [`createApp`](/docs/server/fetch) only, a handler or middleware throws another error |
 | `NOT_FOUND`                 | `NotFound`                | `404`  | none                                                   | No route matches, with `createApp`'s default `notFound` only                                                                                                                                                    |
 
-A route that does not declare a built-in error still sends it, and clients
-receive it as an undeclared `RouteError`. To handle a built-in error with typed
-`data`, import its definition from `@rest-rpc/server` and declare it on the
+A route that does not add a built-in error still sends it, and clients
+receive it as an untyped `RouteError`. To handle a built-in error with typed
+`data`, import its definition from `@rest-rpc/server` and add it to the
 route:
 
 ```ts

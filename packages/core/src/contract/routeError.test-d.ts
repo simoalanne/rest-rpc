@@ -2,7 +2,7 @@ import { type } from "../standard-schema/type.ts";
 import { RouteError, routeError } from "./routeError.ts";
 
 describe("routeError types", () => {
-	it("requires data and headers inputs only when their schemas are declared", () => {
+	it("requires data and headers inputs only when their schemas are defined", () => {
 		const Plain = routeError("PLAIN");
 		new Plain();
 		// @ts-expect-error Errors without a data schema take no data.
@@ -22,7 +22,7 @@ describe("routeError types", () => {
 			headers: type<{ "retry-after": number }>(),
 		});
 		new WithHeaders({ headers: { "retry-after": 1 } });
-		// @ts-expect-error Declared headers are required.
+		// @ts-expect-error Defined headers are required.
 		new WithHeaders();
 	});
 

@@ -4,16 +4,16 @@ import {
 	type BuilderFor,
 	type BuilderKind,
 	type BuilderState,
-	type DeclarationFor,
+	type DefinitionFor,
 	type NextState,
 	type RootBuilderState,
-	type RouteDeclaration,
+	type RouteDefinition,
 } from "@rest-rpc/core/contract";
 import type { EmptyObject, Merge } from "@rest-rpc/core/utils";
 import type { DefaultContext } from "./context.ts";
 import type {
 	AllowedHandlerResult,
-	HasDeclaredResponses,
+	HasDefinedResponses,
 	InferredRoute,
 	MiddlewareRequest,
 	MiddlewareReturn,
@@ -29,26 +29,26 @@ type RootOnlyMethod = "$context" | "middleware";
 
 // The route a handler or middleware receives. The root defaults to POST.
 type HandlerRoute<TState extends BuilderState> = Extract<
-	DeclarationFor<NextState<TState, EmptyObject>>,
-	RouteDeclaration
+	DefinitionFor<NextState<TState, EmptyObject>>,
+	RouteDefinition
 >;
 
-// Handler types are not exported, so emitted declarations of completed routes
+// Handler types are not exported, so emitted definitions of completed routes
 // expand to plain objects instead of referencing internal aliases. For the same
 // reason, `HandlerMethodFor` lives here rather than in routeBuilder.types.ts.
 type HandlerFor<
-	TRoute extends RouteDeclaration,
+	TRoute extends RouteDefinition,
 	TContext extends object,
 	TResult,
 > = (request: RouteRequest<TRoute, TContext>) => TResult;
 
 type HandledRoute<
-	TRoute extends RouteDeclaration,
+	TRoute extends RouteDefinition,
 	TContext extends object,
 	TResult,
 > = {
 	readonly "~restrpc": Merge<
-		(HasDeclaredResponses<TRoute> extends true
+		(HasDefinedResponses<TRoute> extends true
 			? TRoute
 			: InferredRoute<TRoute, TResult>) & {
 			readonly handler: HandlerFor<TRoute, TContext, TResult>;
@@ -58,7 +58,7 @@ type HandledRoute<
 };
 
 export type HandlerMethodFor<
-	TRoute extends RouteDeclaration,
+	TRoute extends RouteDefinition,
 	TContext extends object = EmptyObject,
 > = {
 	handler<const TResult extends AllowedHandlerResult<TRoute, TContext>>(
@@ -84,8 +84,8 @@ export class ServerRouteBuilder<
 	TState extends BuilderState = RootBuilderState,
 	TContext extends object = EmptyObject,
 > extends RouteBuilder<TState, ServerRouteBuilderKind<TContext>> {
-	/** Route declaration. `context` is a type-only field holding the context selected with `$context()`. */
-	declare readonly "~restrpc": DeclarationFor<TState> & {
+	/** Route definition. `context` is a type-only field holding the context selected with `$context()`. */
+	declare readonly "~restrpc": DefinitionFor<TState> & {
 		readonly context?: TContext;
 	};
 
@@ -129,7 +129,7 @@ export class ServerRouteBuilder<
 		});
 	}
 
-	/** Declares a reusable middleware function on the untouched route root. @see {@link https://rest-rpc.vercel.app/docs/middleware} */
+	/** Defines a reusable middleware function on the untouched route root. @see {@link https://rest-rpc.vercel.app/docs/middleware} */
 	middleware<TRequest extends RequestFields = RequestFields>(
 		callback: (
 			request: ReusableMiddlewareRequest<TRequest, TContext>,
@@ -148,9 +148,9 @@ export class ServerRouteBuilder<
 }
 
 /**
- * Entry point for declaring routes with handlers.
+ * Entry point for defining routes with handlers.
  *
- * @remarks Responses are inferred from the handler unless they are declared
+ * @remarks Responses are inferred from the handler unless they are defined
  * before `.handler()`. Routes are runtime-independent: the same route works
  * with the Fetch and Node HTTP handlers.
  *

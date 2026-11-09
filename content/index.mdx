@@ -199,7 +199,7 @@ create.mutate({ body: { title: "Write docs" } });
 <Tab title="HTTP">
 
 ```http
-# No method or path declared: POST, at the path of the route's keys.
+# No method or path defined: POST, at the path of the route's keys.
 POST /todos/create HTTP/1.1
 Content-Type: application/json
 
@@ -227,7 +227,7 @@ X-Powered-By: rest-rpc
 ```
 
 ```http
-# A declared error is sent as JSON with its status.
+# A defined error is sent as JSON with its status.
 GET /todos/missing HTTP/1.1
 ```
 
@@ -254,7 +254,7 @@ Content-Type: application/json
 		title="Learn the route builder"
 		href="/docs/route-builder/"
 		icon="map"
-		cta="Explore route declarations"
+		cta="Explore route definitions"
 	>
 		Choose request segments, responses, HTTP details, streams, and metadata in
 		one builder.
@@ -278,10 +278,10 @@ npx skills add simoalanne/rest-rpc
 <CardGroup cols={2}>
 	<Card title="REST APIs" icon="route" type="check">
 		Build methods, paths, request locations, response bodies, and metadata with
-		a fluent API that keeps invalid combinations out of route declarations.
+		a fluent API that keeps invalid combinations out of route definitions.
 	</Card>
 	<Card title="Optional shared contracts" icon="server" type="check">
-		Declare an HTTP interface separately when it should be shared independently
+		Define an HTTP interface separately when it should be shared independently
 		of the server implementation.
 	</Card>
 	<Card title="Composable route builders" icon="blocks" type="check">
@@ -300,7 +300,7 @@ npx skills add simoalanne/rest-rpc
 	</Card>
 	<Card title="Typed responses" icon="list-checks" type="check">
 		Return direct success bodies for simple routes, or status-keyed response
-		envelopes, and throw declared errors that clients receive typed.
+		envelopes, and throw defined errors that clients receive typed.
 	</Card>
 	<Card title="Schema options" icon="shield-check" type="check">
 		Use Standard Schema-compatible libraries such as Zod, Valibot, or ArkType.
@@ -347,7 +347,7 @@ keep your framework's features, add a package, or build your own on
 [middleware](/docs/middleware/) and [context](/docs/context/). Adopt it one step
 at a time, each useful without the next:
 
-1. Declare routes and infer request and response types for handlers you write.
+1. Define routes and infer request and response types for handlers you write.
 2. Validate requests and responses at runtime.
 3. Extract a contract and call the routes with the typed client.
 4. Serve the routes with a one-line server, mount the catch-all handler, or
@@ -361,7 +361,7 @@ at a time, each useful without the next:
 		`rest-rpc` is for developers who want end-to-end type safety and RPC-like
 		ergonomics without replacing familiar HTTP concepts. You keep methods,
 		paths, headers, bodies, status codes, and your existing framework, while
-		route declarations connect server and client types.
+		route definitions connect server and client types.
 	</AccordionItem>
 	<AccordionItem title="Do I have to restructure my app?">
 		No. Keep your framework, middleware, authentication, database access, and
@@ -381,14 +381,14 @@ at a time, each useful without the next:
 		with sensible defaults for methods, paths, and success statuses.
 	</AccordionItem>
 	<AccordionItem title="Can I have a separate contract?">
-		Yes. Declare the HTTP interface independently, implement it with
+		Yes. Define the HTTP interface independently, implement it with
 		`@rest-rpc/server`, and share it directly with clients. See the
 		[Contract-first Quickstart](/docs/contract-first-quickstart/).
 	</AccordionItem>
 	<AccordionItem title="What happens when something breaks?">
 		You debug the same boundary you would debug by hand: method, path, query,
 		headers, body, status, and response shape. Because those pieces live in one
-		route declaration, type errors and validation errors point back to that
-		declaration.
+		route definition, type errors and validation errors point back to that
+		definition.
 	</AccordionItem>
 </Accordion>

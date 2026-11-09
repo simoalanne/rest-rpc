@@ -67,7 +67,7 @@ describe("createClient types", () => {
 		client.length({ body: 1 });
 	});
 
-	it("narrows response envelopes by their declared status", async () => {
+	it("narrows response envelopes by their defined status", async () => {
 		const client = createClient(
 			route
 				.get()

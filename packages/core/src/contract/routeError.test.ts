@@ -1,13 +1,13 @@
 import { type } from "../standard-schema/type.ts";
 import {
-	isDeclaredError,
-	markDeclared,
+	isDefinedError,
+	markDefined,
 	RouteError,
 	routeError,
 } from "./routeError.ts";
 
 describe("routeError", () => {
-	it("creates RouteError subclasses that carry their declaration", () => {
+	it("creates RouteError subclasses that carry their definition", () => {
 		const data = type<{ id: string }>();
 		const UserNotFound = routeError("USER_NOT_FOUND", {
 			status: 404,
@@ -51,17 +51,17 @@ describe("routeError", () => {
 	it.each([
 		["TOO_LOW", 399, 'Error status "399" must be from 400 to 599.'],
 		["TOO_HIGH", 600, 'Error status "600" must be from 400 to 599.'],
-	])("rejects the declaration %s with status %s", (code, status, message) => {
+	])("rejects the definition %s with status %s", (code, status, message) => {
 		expect(() => routeError(code, { status })).toThrow(message);
 	});
 });
 
-describe("isDeclaredError", () => {
-	it("checks for RouteErrors marked as declared", () => {
+describe("isDefinedError", () => {
+	it("checks for RouteErrors marked as defined", () => {
 		const Gone = routeError("GONE", { status: 410 });
-		expect(isDeclaredError(markDeclared(new Gone()))).toBe(true);
-		expect(isDeclaredError(new Gone())).toBe(false);
-		expect(isDeclaredError(new Error("offline"))).toBe(false);
-		expect(isDeclaredError({ code: "GONE", isDeclared: true })).toBe(false);
+		expect(isDefinedError(markDefined(new Gone()))).toBe(true);
+		expect(isDefinedError(new Gone())).toBe(false);
+		expect(isDefinedError(new Error("offline"))).toBe(false);
+		expect(isDefinedError({ code: "GONE", isDefined: true })).toBe(false);
 	});
 });

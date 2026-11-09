@@ -5,17 +5,17 @@ import type {
 	AbsolutePath,
 	HttpMethod,
 	OpenApiRouteOptions,
-	RouteDeclaration,
+	RouteDefinition,
 	RouteMeta,
-} from "./routeDeclaration.ts";
+} from "./routeDefinition.ts";
 import type {
 	RequestHeadersSchema,
 	RequestParamsSchema,
 	RequestQuerySchema,
 } from "./request.ts";
 import type {
-	ResponseContentDeclaration,
-	ResponseDeclaration,
+	ResponseContentDefinition,
+	ResponseDefinition,
 	ResponseOptions,
 } from "./response.ts";
 import {
@@ -28,7 +28,7 @@ import type {
 	BuilderFor,
 	BuilderKind,
 	BuilderState,
-	DeclarationFor,
+	DefinitionFor,
 	NextState,
 	RootBuilderState,
 	WithBody,
@@ -40,7 +40,7 @@ import type {
 	WithResponse,
 } from "./routeBuilder.types.ts";
 
-type RouteBuilderState = Partial<RouteDeclaration>;
+type RouteBuilderState = Partial<RouteDefinition>;
 
 // Generic constraints skip excess property checks, so keys that are not media
 // types are rejected explicitly. This sends response options to their overload.
@@ -83,17 +83,17 @@ const assertMediaTypes = (content: object) => {
 
 const toContent = (
 	schemaOrContent: StandardSchemaV1 | BodyContent,
-): ResponseContentDeclaration => {
+): ResponseContentDefinition => {
 	if (isStandardSchema(schemaOrContent)) {
 		return { "application/json": schemaOrContent };
 	}
 	assertMediaTypes(schemaOrContent);
-	return schemaOrContent as ResponseContentDeclaration;
+	return schemaOrContent as ResponseContentDefinition;
 };
 
 const appendBody = (
 	state: RouteBuilderState,
-	content: ResponseContentDeclaration,
+	content: ResponseContentDefinition,
 ): RouteBuilderState => {
 	const body = { ...state.request?.body };
 	for (const [mediaType, schema] of Object.entries(content)) {
@@ -102,7 +102,7 @@ const appendBody = (
 	return { ...state, request: { ...state.request, body } };
 };
 
-// Errors are declared with `.error()`, so responses are successful.
+// Errors are defined with `.error()`, so responses are successful.
 const assertSuccessStatus = (status: number) => {
 	if (!Number.isInteger(status) || status < 200 || status > 299) {
 		throw new Error(`Response status "${status}" must be from 200 to 299.`);
@@ -182,11 +182,11 @@ const addRequestSegment = (
 const addResponse = (
 	state: RouteBuilderState,
 	status: number,
-	schema: ResponseDeclaration,
+	schema: ResponseDefinition,
 ): RouteBuilderState => {
 	assertSuccessStatus(status);
 	if (state.responses?.[status]) {
-		throw new Error(`Response status "${status}" has already been declared.`);
+		throw new Error(`Response status "${status}" has already been defined.`);
 	}
 	return {
 		...state,
@@ -194,16 +194,16 @@ const addResponse = (
 	};
 };
 
-// Shared bases may declare the same definition a route declares again.
+// Shared bases may add the same definition a route adds again.
 const addError = (
 	state: RouteBuilderState,
 	definition: AnyRouteErrorClass,
 ): RouteBuilderState => {
-	const declared = state.errors?.[definition.code];
-	if (declared === definition) return state;
-	if (declared) {
+	const defined = state.errors?.[definition.code];
+	if (defined === definition) return state;
+	if (defined) {
 		throw new Error(
-			`Error code "${definition.code}" has already been declared.`,
+			`Error code "${definition.code}" has already been defined.`,
 		);
 	}
 	return {
@@ -223,10 +223,10 @@ export class RouteBuilder<
 	TState extends BuilderState = RootBuilderState,
 	TKind extends BuilderKind = RouteBuilderKind,
 > {
-	readonly "~restrpc": DeclarationFor<TState>;
+	readonly "~restrpc": DefinitionFor<TState>;
 
 	constructor(state: RouteBuilderState = {}) {
-		this["~restrpc"] = { ...state } as DeclarationFor<TState>;
+		this["~restrpc"] = { ...state } as DefinitionFor<TState>;
 	}
 
 	// Typed as `never` so each builder method returns its declared type.
@@ -243,46 +243,46 @@ export class RouteBuilder<
 		return this.clone({ ...state, prefix: joinPrefix(state.prefix, prefix) });
 	}
 
-	/** Declares a GET route. @see {@link https://rest-rpc.vercel.app/docs/route-builder} */
+	/** Defines a GET route. @see {@link https://rest-rpc.vercel.app/docs/route-builder} */
 	get<const TPath extends AbsolutePath | undefined = undefined>(
 		path?: TPath,
 	): BuilderFor<TKind, WithHttpMethod<TState, "GET", TPath>> {
 		return this.clone(httpState(this["~restrpc"], "GET", path));
 	}
 
-	/** Declares a POST route. @see {@link https://rest-rpc.vercel.app/docs/route-builder} */
+	/** Defines a POST route. @see {@link https://rest-rpc.vercel.app/docs/route-builder} */
 	post<const TPath extends AbsolutePath | undefined = undefined>(
 		path?: TPath,
 	): BuilderFor<TKind, WithHttpMethod<TState, "POST", TPath>> {
 		return this.clone(httpState(this["~restrpc"], "POST", path));
 	}
 
-	/** Declares a PUT route. @see {@link https://rest-rpc.vercel.app/docs/route-builder} */
+	/** Defines a PUT route. @see {@link https://rest-rpc.vercel.app/docs/route-builder} */
 	put<const TPath extends AbsolutePath | undefined = undefined>(
 		path?: TPath,
 	): BuilderFor<TKind, WithHttpMethod<TState, "PUT", TPath>> {
 		return this.clone(httpState(this["~restrpc"], "PUT", path));
 	}
 
-	/** Declares a PATCH route. @see {@link https://rest-rpc.vercel.app/docs/route-builder} */
+	/** Defines a PATCH route. @see {@link https://rest-rpc.vercel.app/docs/route-builder} */
 	patch<const TPath extends AbsolutePath | undefined = undefined>(
 		path?: TPath,
 	): BuilderFor<TKind, WithHttpMethod<TState, "PATCH", TPath>> {
 		return this.clone(httpState(this["~restrpc"], "PATCH", path));
 	}
 
-	/** Declares a DELETE route. @see {@link https://rest-rpc.vercel.app/docs/route-builder} */
+	/** Defines a DELETE route. @see {@link https://rest-rpc.vercel.app/docs/route-builder} */
 	delete<const TPath extends AbsolutePath | undefined = undefined>(
 		path?: TPath,
 	): BuilderFor<TKind, WithHttpMethod<TState, "DELETE", TPath>> {
 		return this.clone(httpState(this["~restrpc"], "DELETE", path));
 	}
 
-	/** Declares a JSON request body. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-request-segments} */
+	/** Defines a JSON request body. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-request-segments} */
 	body<const TSchema extends StandardSchemaV1>(
 		schema: TSchema,
 	): BuilderFor<TKind, WithBody<TState, TSchema>>;
-	/** Declares request body schemas keyed by media type. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-request-segments} */
+	/** Defines request body schemas keyed by media type. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-request-segments} */
 	body<const TContent extends BodyContent>(
 		content: MediaTypeKeysOnly<TContent>,
 	): BuilderFor<TKind, WithBody<TState, TContent>>;
@@ -295,7 +295,7 @@ export class RouteBuilder<
 		);
 	}
 
-	/** Declares request headers. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-request-segments} */
+	/** Defines request headers. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-request-segments} */
 	headers<const TSchema extends RequestHeadersSchema>(
 		schema: TSchema,
 	): BuilderFor<TKind, WithRequest<TState, "headers", TSchema>> {
@@ -304,7 +304,7 @@ export class RouteBuilder<
 		);
 	}
 
-	/** Declares URL query parameters. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-request-segments} */
+	/** Defines URL query parameters. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-request-segments} */
 	query<const TSchema extends RequestQuerySchema>(
 		schema: TSchema,
 	): BuilderFor<TKind, WithRequest<TState, "query", TSchema>> {
@@ -313,7 +313,7 @@ export class RouteBuilder<
 		);
 	}
 
-	/** Declares path parameters. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-request-segments} */
+	/** Defines path parameters. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-request-segments} */
 	params<const TSchema extends RequestParamsSchema>(
 		schema: TSchema & RequiredParamsCheck<TSchema>,
 	): BuilderFor<TKind, WithRequest<TState, "params", TSchema>> {
@@ -344,7 +344,7 @@ export class RouteBuilder<
 		});
 	}
 
-	/** Declares a successful JSON response. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-responses} */
+	/** Defines a successful JSON response. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-responses} */
 	response<
 		const TSchema extends StandardSchemaV1,
 		const TOptions extends ResponseOptions | undefined = undefined,
@@ -352,7 +352,7 @@ export class RouteBuilder<
 		schema: TSchema,
 		options?: TOptions,
 	): BuilderFor<TKind, WithResponse<TState, TSchema, TOptions>>;
-	/** Declares successful response schemas keyed by media type. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-responses} */
+	/** Defines successful response schemas keyed by media type. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-responses} */
 	response<
 		const TContent extends BodyContent,
 		const TOptions extends ResponseOptions | undefined = undefined,
@@ -360,7 +360,7 @@ export class RouteBuilder<
 		content: MediaTypeKeysOnly<TContent>,
 		options?: TOptions,
 	): BuilderFor<TKind, WithResponse<TState, TContent, TOptions>>;
-	/** Declares a successful response without a body. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-responses} */
+	/** Defines a successful response without a body. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-responses} */
 	response<const TOptions extends ResponseOptions | undefined = undefined>(
 		options?: TOptions,
 	): BuilderFor<TKind, WithResponse<TState, undefined, TOptions>>;
@@ -373,23 +373,23 @@ export class RouteBuilder<
 			!isStandardSchema(schemaOrContentOrOptions) &&
 			!isBodyContent(schemaOrContentOrOptions)
 		) {
-			const { status = 200, ...declaration } = schemaOrContentOrOptions ?? {};
-			return this.clone(addResponse(state, status, declaration));
+			const { status = 200, ...definition } = schemaOrContentOrOptions ?? {};
+			return this.clone(addResponse(state, status, definition));
 		}
-		const { status = 200, ...declaration } = options ?? {};
+		const { status = 200, ...definition } = options ?? {};
 		return this.clone(
 			addResponse(state, status, {
-				...declaration,
+				...definition,
 				content: toContent(schemaOrContentOrOptions),
 			}),
 		);
 	}
 
-	/** Declares an error defined with `routeError`. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-errors} */
+	/** Adds an error defined with `routeError`. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-errors} */
 	error<const TDefinition extends AnyRouteErrorClass>(
 		definition: TDefinition,
 	): BuilderFor<TKind, WithError<TState, TDefinition>>;
-	/** Declares an error, the same as declaring `routeError(code, options)`. The status defaults to 400. @see {@link https://rest-rpc.vercel.app/docs/route-builder#declare-errors} */
+	/** Adds an error, the same as adding `routeError(code, options)`. The status defaults to 400. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-errors} */
 	error<
 		const TCode extends string,
 		const TOptions extends RouteErrorDefinitionOptions | undefined = undefined,
@@ -411,7 +411,7 @@ export class RouteBuilder<
 		);
 	}
 
-	/** Declares a streaming response, the same as a `text/event-stream` response whose schema validates each item. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/streaming} */
+	/** Defines a streaming response, the same as a `text/event-stream` response whose schema validates each item. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/streaming} */
 	streamResponse<
 		const TSchema extends StandardSchemaV1,
 		const TOptions extends ResponseOptions | undefined = undefined,
@@ -427,10 +427,10 @@ export class RouteBuilder<
 }
 
 /**
- * Entry point for declaring contract-first routes.
+ * Entry point for defining contract-first routes.
  *
  * @remarks Every builder method returns a new route value, so partially built
- * routes can be reused safely across declarations.
+ * routes can be reused safely across definitions.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/route-builder}
  */

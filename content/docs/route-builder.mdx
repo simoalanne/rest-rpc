@@ -7,7 +7,7 @@ A route builder describes an HTTP interface: a method and path, the request
 segments it reads, the responses it returns, and the errors it throws.
 
 Schemas can come from Zod, Valibot, ArkType, or another Standard Schema library.
-The built-in `type<T>()` utility declares types without runtime validation. See
+The built-in `type<T>()` utility defines types without runtime validation. See
 [Schemas and Validation](/docs/http-behavior/schemas).
 
 ## Start with Defaults
@@ -56,7 +56,7 @@ const getTodo = route
 	.handler(({ params }) => findTodo(params.id)); // params: { id: string }
 ```
 
-Declare `.params()` to validate or transform them. Other router syntax, such as
+Define `.params()` to validate or transform them. Other router syntax, such as
 wildcards or regular expressions, is not officially supported.
 
 The path can also be omitted, in which case the route keeps deriving its path
@@ -88,7 +88,7 @@ OpenAPI documents use the prefixed paths. A route without a method path
 derives its path from its tree keys and prepends the prefix to it.
 
 A prefix can contain dynamic segments. They are params like the ones of the
-method path, and a route's params are either all inferred or all declared:
+method path, and a route's params are either all inferred or all defined:
 
 - Without any `.params()` schema, every dynamic segment is inferred as a
   string param.
@@ -96,7 +96,7 @@ method path, and a route's params are either all inferred or all declared:
   of every dynamic segment, including those of the prefix.
 
 :::tip
-When adding explicit `params()` schemas, declare the prefix schema separately from route specific schemas
+When adding explicit `params()` schemas, define the prefix schema separately from route specific schemas
 by stacking them. This allows the prefix schema to be reused across multiple routes without needing to redefine it each time.
 
 ```ts
@@ -112,7 +112,7 @@ const getTodo = tenant
 
 :::
 
-## Declare Request Segments
+## Define Request Segments
 
 Use `.params()`, `.query()`, `.headers()`, and `.body()` to read each HTTP
 request location.
@@ -136,7 +136,7 @@ The following rules apply to request segments:
 
 - `.params()` schemas replace the inferred string params, so they must cover
   every dynamic path segment, including those of prefixes. Their keys cannot be optional, and a route that
-  declares params must have dynamic segments.
+  defines params must have dynamic segments.
 - `.body()` is not available on GET routes, and `.get()` is not available after `.body()`.
 
 Header schemas must use lowercase names. See
@@ -145,7 +145,7 @@ for how each location is encoded.
 
 ## Stacking Schemas
 
-Stacking schemas is supported for `body`, `query`, `params`, and `headers`. Each schema is validated in declaration order
+Stacking schemas is supported for `body`, `query`, `params`, and `headers`. Each schema is validated in definition order
 against the original request value. The schema outputs are shallow-merged into a single object.
 
 :::warning
@@ -170,9 +170,9 @@ A handler returns either a response envelope or a body:
   `{ status, body?, contentType?, headers? }`.
 - Any other value is the response body with status 200.
 
-Without declared responses, the returned statuses and body types become the
+Without defined responses, the returned statuses and body types become the
 client's result type. Returned statuses are successful, from 200 to 299.
-Errors are [thrown](#declare-errors) instead:
+Errors are [thrown](#define-errors) instead:
 
 ```ts
 const created = route
@@ -186,12 +186,12 @@ A body that has a numeric `status` field of its own is read as an envelope.
 Return it wrapped, as `{ status: 200, body: value }`.
 :::
 
-## Declare Responses
+## Define Responses
 
-Use `.response(schema, options)` to declare successful response schemas with
+Use `.response(schema, options)` to define successful response schemas with
 runtime validation. Set a status from 201 to 299 with the `status` option. Each
-status can be declared once, and a handler returning a status that is not
-declared fails at runtime.
+status can be defined once, and a handler returning a status that is not
+defined fails at runtime.
 
 ```ts
 const get = route
@@ -202,7 +202,7 @@ const get = route
 ```
 
 Pass only options for a bodyless response, such as `.response({ status: 204 })`.
-Declare status-specific response headers with the `headers` option and return
+Define status-specific response headers with the `headers` option and return
 them as `headers`. The option is available on every response, including
 bodyless responses and `.streamResponse()`:
 
@@ -224,9 +224,9 @@ route
 	});
 ```
 
-## Declare Errors
+## Define Errors
 
-Errors are thrown, not returned. Declare each error a route can respond with,
+Errors are thrown, not returned. Define each error a route can respond with,
 by a unique code, with `.error(code, options)`:
 
 ```ts
@@ -250,18 +250,18 @@ const get = route
 | `message`     | The code | Default message, overridable when thrown.                         |
 | `description` | none     | Describes the error in [OpenAPI](/docs/openapi) documents.        |
 
-Handlers and [middleware](/docs/middleware) receive the declared errors as
+Handlers and [middleware](/docs/middleware) receive the defined errors as
 `errors`, which create the error without `new`. The error is sent as a JSON `{ code, message, data? }` response with
 its status, and clients reject with it. See
 [Errors](/docs/http-behavior/errors).
 
-Declaring errors does not declare responses, so a route that only declares
+Defining errors does not define responses, so a route that only defines
 errors still infers its responses from the handler.
 
 ### Define Errors Once
 
 Code outside the handler cannot receive `errors`. Define the error with
-`routeError()`, declare the definition on routes, and throw it from any code
+`routeError()`, add the definition to routes with `.error()`, and throw it from any code
 that imports it:
 
 ```ts
@@ -285,13 +285,13 @@ const get = route
 	.handler(({ params }) => findTodo(params.id));
 ```
 
-The route's declaration decides the response. An error whose code the route
-does not declare is [sent as thrown](/docs/http-behavior/errors#throwing-errors),
-but is not part of the route's types. Declaring the same definition twice, for example on a shared base
-and on a route, is allowed; declaring a different error with an existing code
+The route's definition decides the response. An error whose code the route
+does not define is [sent as thrown](/docs/http-behavior/errors#throwing-errors),
+but is not part of the route's types. Adding the same definition twice, for example on a shared base
+and on a route, is allowed; adding a different error with an existing code
 throws.
 
-## Declare Media Types
+## Define Media Types
 
 Bodies passed as a schema are JSON. For text, forms, binary values, or several
 media types, pass a record of schemas keyed by base media type:
@@ -324,13 +324,13 @@ const importTodos = route
 	});
 ```
 
-`contentType` may be omitted when a status declares one media type. Clients
+`contentType` may be omitted when a status defines one media type. Clients
 select the request media type with `contentType` in the
 [request](/docs/client/fetch-client#select-a-request-media-type). Repeated
 `.body()` calls [stack](#stacking-schemas) schemas per media type, and a schema
 passed alone counts as `application/json`.
 
-Without declared responses, return the body in an envelope with its
+Without defined responses, return the body in an envelope with its
 `contentType`, and the media type is inferred. See
 [Serialization and Codecs](/docs/http-behavior/serialization) for decoded value
 types and compatible codecs.
@@ -338,7 +338,7 @@ types and compatible codecs.
 ## Return Streams
 
 Returning an async iterable infers an SSE stream. Use `.streamResponse()` to
-declare its data schema.
+define its data schema.
 
 ```ts
 const events = route
@@ -348,8 +348,8 @@ const events = route
 ```
 
 `.streamResponse(schema)` is sugar for `.response({ "text/event-stream": schema })`,
-so it declares the whole status. To offer a stream and another media type on the
-same status, declare both in one record and select one with `contentType`:
+so it defines the whole status. To offer a stream and another media type on the
+same status, define both in one record and select one with `contentType`:
 
 ```ts
 const todos = route
@@ -417,10 +417,10 @@ A handler receives one object containing:
 
 - The validated request: `params`, `query`, `headers`, and `body`.
 - `context`: the per-request [context](/docs/context) shared with middleware.
-- `route`: the route declaration, including its method, path, and `meta`.
-- `errors`: the [declared errors](#declare-errors), to throw.
+- `route`: the route definition, including its method, path, and `meta`.
+- `errors`: the [defined errors](#define-errors), to throw.
 - `contentType`: the request body media type. Routes with a body narrow it to
-  their declared media types, and `body` with it.
+  their defined media types, and `body` with it.
 - `signal`: an `AbortSignal` that aborts when the client disconnects.
 
 Native request objects are not passed to handlers. To make them or other host
@@ -433,12 +433,12 @@ route, such as service functions or separately written handlers. For
 client-side types, see
 [Fetch Client](/docs/client/fetch-client#type-helpers).
 
-Infer from a route declared without `.handler()`, or from a contract route. A
+Infer from a route defined without `.handler()`, or from a contract route. A
 type inferred from a completed route cannot be used inside that route's own
 handler, because the route's type depends on the handler.
 
 Each helper also accepts a route tree and infers a matching tree of types.
-Declare one type for your routes and index into it where a route's type is
+Define one type for your routes and index into it where a route's type is
 needed:
 
 ```ts
@@ -462,26 +462,26 @@ import type { InferServerRequest } from "@rest-rpc/server";
 import { route } from "@rest-rpc/server";
 import z from "zod";
 
-const updateDeclaration = route
+const updateDefinition = route
 	.patch("/todos/:id")
 	.params(z.object({ id: z.string() }))
 	.body(z.object({ title: z.string() }));
 
-type UpdateTodoRequest = InferServerRequest<typeof updateDeclaration>;
+type UpdateTodoRequest = InferServerRequest<typeof updateDefinition>;
 
 const updateTodo = ({ params, body }: UpdateTodoRequest) => ({
 	id: params.id,
 	title: body.title,
 });
 
-const update = updateDeclaration.handler(updateTodo);
+const update = updateDefinition.handler(updateTodo);
 ```
 
 ### Infer Server Response
 
 `InferServerResponse` is the union of response envelopes a handler can return
-for the responses declared with `.response()`. When responses are inferred
-from the handler, there is no declared response to infer before `.handler()`.
+for the responses defined with `.response()`. When responses are inferred
+from the handler, there is no defined response to infer before `.handler()`.
 
 ```ts twoslash
 import type { InferServerResponse } from "@rest-rpc/server";
@@ -490,26 +490,26 @@ import z from "zod";
 
 const todoSchema = z.object({ id: z.string(), title: z.string() });
 
-const createDeclaration = route
+const createDefinition = route
 	.post("/todos")
 	.body(z.object({ title: z.string() }))
 	.response(todoSchema, { status: 201 })
 	.response({ status: 202 });
 
-type CreateTodoResponse = InferServerResponse<typeof createDeclaration>;
+type CreateTodoResponse = InferServerResponse<typeof createDefinition>;
 
 const createTodo = (title: string): CreateTodoResponse =>
 	title.length > 100
 		? { status: 202 }
 		: { status: 201, body: { id: "todo_1", title } };
 
-const create = createDeclaration.handler(({ body }) => createTodo(body.title));
+const create = createDefinition.handler(({ body }) => createTodo(body.title));
 ```
 
 ### Infer Server Handler
 
 `InferServerHandler` is the full handler signature, including context and
-`signal`. Use it to write a handler separately from its declaration:
+`signal`. Use it to write a handler separately from its definition:
 
 ```ts twoslash
 import { route, type InferServerHandler } from "@rest-rpc/server";
@@ -517,13 +517,13 @@ import z from "zod";
 
 const todoSchema = z.object({ id: z.string(), title: z.string() });
 
-const getDeclaration = route
+const getDefinition = route
 	.get("/todos/:id")
 	.params(z.object({ id: z.string() }))
 	.response(todoSchema)
 	.error("TODO_NOT_FOUND", { status: 404 });
 
-const getTodo: InferServerHandler<typeof getDeclaration> = ({
+const getTodo: InferServerHandler<typeof getDefinition> = ({
 	params,
 	errors,
 }) => {
@@ -531,5 +531,5 @@ const getTodo: InferServerHandler<typeof getDeclaration> = ({
 	return { id: params.id, title: "Write docs" };
 };
 
-const get = getDeclaration.handler(getTodo);
+const get = getDefinition.handler(getTodo);
 ```

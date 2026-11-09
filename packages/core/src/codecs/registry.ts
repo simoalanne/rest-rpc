@@ -52,7 +52,7 @@ const assertBaseMediaType = (
 		: null;
 	if (contentType !== null && normalizeMediaType(contentType) !== mediaType) {
 		throw new Error(
-			"Codec content-type must retain the declared base media type",
+			"Codec content-type must retain the defined base media type",
 		);
 	}
 	return body;
