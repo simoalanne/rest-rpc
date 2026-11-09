@@ -33,13 +33,17 @@ describe("createBodyCodecRegistry", () => {
 				{
 					mediaTypes: ["text/plain"],
 					serialize: async (value) =>
-						serializedBody(String(value), { "content-type": contentType }),
+						serializedBody(String(value), {
+							headers: { "content-type": contentType },
+						}),
 				},
 			]);
 		await expect(
 			registry("text/plain; charset=utf-8").serialize("text", "text/plain"),
 		).resolves.toEqual(
-			serializedBody("text", { "content-type": "text/plain; charset=utf-8" }),
+			serializedBody("text", {
+				headers: { "content-type": "text/plain; charset=utf-8" },
+			}),
 		);
 		await expect(
 			registry("application/json").serialize("text", "text/plain"),
