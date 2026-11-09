@@ -6,7 +6,7 @@ import type {
 	HttpMethod,
 	OpenApiRouteOptions,
 	RouteDeclaration,
-	RouteMetadata,
+	RouteMeta,
 } from "./routeDeclaration.ts";
 import type {
 	RequestHeadersSchema,
@@ -34,7 +34,7 @@ import type {
 	WithBody,
 	WithError,
 	WithHttpMethod,
-	WithMetadata,
+	WithMeta,
 	WithPrefix,
 	WithRequest,
 	WithResponse,
@@ -323,13 +323,13 @@ export class RouteBuilder<
 	}
 
 	/** Adds application metadata, shallow-merged with earlier metadata. @see {@link https://rest-rpc.vercel.app/docs/route-builder#add-metadata-and-openapi-details} */
-	metadata<const TMetadata extends RouteMetadata>(
-		metadata: TMetadata,
-	): BuilderFor<TKind, WithMetadata<TState, TMetadata>> {
+	meta<const TMeta extends RouteMeta>(
+		meta: TMeta,
+	): BuilderFor<TKind, WithMeta<TState, TMeta>> {
 		const state = defaultRouteState(this["~restrpc"]);
 		return this.clone({
 			...state,
-			metadata: { ...state.metadata, ...metadata },
+			meta: { ...state.meta, ...meta },
 		});
 	}
 

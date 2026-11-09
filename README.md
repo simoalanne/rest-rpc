@@ -129,7 +129,7 @@ route.prefix("/api/v1").get(); // at todos.list: GET /api/v1/todos/list
 const authed = route
 	.$context<{ user: User }>()
 	.headers(z.object({ authorization: z.string() })) // lowercase names
-	.metadata({ auth: "required" }) // shallow-merged
+	.meta({ auth: "required" }) // shallow-merged
 	.openAPI({ tags: ["Todos"] }) // merged, tags combined
 	.error("UNAUTHORIZED", { status: 401 });
 
@@ -148,7 +148,7 @@ const update = authed
 			contentType, // request media type, narrows body when several are declared
 			context, // per-request values from middleware or the host
 			errors, // declared errors, created without new: throw errors.UNAUTHORIZED()
-			route, // the declaration: method, path, metadata
+			route, // the declaration: method, path, meta
 			signal, // aborts when the client disconnects
 		}) => updateTodo(params.id, body),
 	);
