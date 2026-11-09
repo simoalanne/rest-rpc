@@ -1,17 +1,16 @@
-import { createClient } from "@rest-rpc/core";
-import type {
-	ApiClientOptions,
-	ClientHeaders,
-	FetchOptions,
-} from "@rest-rpc/core/client";
-import { mapContractRoutes, type Contract } from "@rest-rpc/core/contract";
 import {
 	type MutationKey,
 	type QueryKey,
 	experimental_streamedQuery as streamedQuery,
 	skipToken,
 } from "@tanstack/query-core";
-import type { TanstackQueryUtilsFor } from "./createUtils.types.ts";
+import type {
+	TanstackQueryClient,
+	TanstackQueryUtilsFor,
+} from "./createUtils.types.ts";
+
+// Fetch options for the fetch client, call options for the local client.
+type FetchOptions = Record<string, unknown>;
 
 type OptionsWithFetchOptions = Record<string, unknown> & {
 	fetchOptions?: FetchOptions;
@@ -131,40 +130,28 @@ const createUtilsForRoute = ({
 	};
 };
 
+const mapClientRoutes = (node: unknown, path: string[]): unknown =>
+	typeof node === "function"
+		? createUtilsForRoute({ routePath: path, fetchData: node as FetchData })
+		: Object.fromEntries(
+				Object.entries(node as Record<string, unknown>).map(([key, child]) => [
+					key,
+					mapClientRoutes(child, [...path, key]),
+				]),
+			);
+
 /**
- * Options used to create TanStack Query utils from a contract.
+ * Creates a TanStack Query util tree that mirrors a client.
+ *
+ * @remarks Accepts a client created with `createClient` or
+ * `createLocalClient`. Generated utils call the client's routes, create
+ * options and stable query keys; they do not create a `QueryClient` or call
+ * framework-specific hooks.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/tanstack-query#setup}
  */
-export type CreateTanstackQueryUtilsOptions<
-	TGlobalHeaders extends ClientHeaders = Record<never, string>,
-> = ApiClientOptions<TGlobalHeaders>;
-
-/**
- * Creates a TanStack Query util tree that mirrors a contract.
- *
- * @remarks Generated utils create options and stable query keys; they do not
- * create a `QueryClient` or call framework-specific hooks.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/client/tanstack-query#setup}
- */
-export function createTanstackQueryUtils<
-	TContract extends Contract,
-	const TGlobalHeaders extends ClientHeaders = Record<never, string>,
->(
-	contract: TContract,
-	options: CreateTanstackQueryUtilsOptions<TGlobalHeaders>,
-): TanstackQueryUtilsFor<TContract, TGlobalHeaders> {
-	const client: unknown = createClient(contract, options);
-
-	return mapContractRoutes(contract, (_route, path) => {
-		const routeFetchFn = path.reduce(
-			(node, key) => (node as Record<string, unknown>)[key],
-			client,
-		) as (...args: unknown[]) => Promise<unknown>;
-		return createUtilsForRoute({
-			routePath: path,
-			fetchData: (request, fetchOptions) => routeFetchFn(request, fetchOptions),
-		});
-	}) as TanstackQueryUtilsFor<TContract, TGlobalHeaders>;
+export function createTanstackQueryUtils<TClient extends TanstackQueryClient>(
+	client: TClient,
+): TanstackQueryUtilsFor<TClient> {
+	return mapClientRoutes(client, []) as TanstackQueryUtilsFor<TClient>;
 }

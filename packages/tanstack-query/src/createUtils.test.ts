@@ -1,4 +1,4 @@
-import { route, routeError, sse, type } from "@rest-rpc/core";
+import { createClient, route, routeError, sse, type } from "@rest-rpc/core";
 import { MutationObserver, QueryClient, skipToken } from "@tanstack/query-core";
 import { createTanstackQueryUtils } from "./createUtils.ts";
 
@@ -26,10 +26,9 @@ const setup = (respond: () => Response) => {
 	const fetch = vi.fn(
 		async (_input: string | URL | Request, _init?: RequestInit) => respond(),
 	);
-	const utils = createTanstackQueryUtils(contract, {
-		baseUrl: "https://example.test",
-		fetch,
-	});
+	const utils = createTanstackQueryUtils(
+		createClient(contract, { baseUrl: "https://example.test", fetch }),
+	);
 	return { fetch, utils, client: new QueryClient() };
 };
 
@@ -39,7 +38,7 @@ const eventStream = () =>
 	});
 
 describe("createTanstackQueryUtils", () => {
-	it("mirrors the contract tree in query and mutation keys", () => {
+	it("mirrors the client tree in query and mutation keys", () => {
 		const { utils } = setup(() => Response.json({}));
 		const request = { params: { id: "1" } };
 		expect(utils.users.get.queryKey(request)).toEqual([
