@@ -255,6 +255,13 @@ describe("implicit response inference", () => {
 		expectTypeOf<
 			InferClientResponse<typeof empty>["body"]
 		>().toEqualTypeOf<undefined>();
+		const nothing = route.handler(() => {});
+		expectTypeOf<InferClientResponse<typeof nothing>>().toEqualTypeOf<{
+			status: 200;
+			contentType: undefined;
+			body: undefined;
+			headers: Record<string, string>;
+		}>();
 		const custom = route.get("/").handler(() => ({
 			status: 200,
 			body: "ok",

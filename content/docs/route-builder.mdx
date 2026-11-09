@@ -168,6 +168,7 @@ A handler returns either a response envelope or a body:
 
 - An object with a numeric `status` is a response envelope:
   `{ status, body?, contentType?, headers? }`.
+- `undefined` is a status 200 response without a body.
 - Any other value is the response body with status 200.
 
 Without defined responses, the returned statuses and body types become the

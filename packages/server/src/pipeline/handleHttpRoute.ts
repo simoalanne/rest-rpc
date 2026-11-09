@@ -176,6 +176,8 @@ const toImplicitBody = (
 
 /** Normalizes the result of a handler on a route without defined responses. */
 export const normalizeImplicitResponse = (result: unknown): RouteResult => {
+	// `undefined` has no JSON representation, so it is sent without a body.
+	if (result === undefined) return { status: 200 };
 	if (!isResponseEnvelope(result)) {
 		return { status: 200, body: toImplicitBody(result, undefined) };
 	}

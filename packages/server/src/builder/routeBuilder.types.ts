@@ -125,10 +125,13 @@ type WithoutNormalizedEnvelopeKeys<T> = [
 			]: T[TKey];
 		};
 
-// A member with a numeric status is an envelope; any other value is the 200 body.
+// A member with a numeric status is an envelope, `undefined` is a bodyless 200,
+// and any other value is the 200 body.
 type ResponseEnvelopeOf<TResult> = TResult extends { status: number }
 	? TResult
-	: { status: 200; body: WithoutNormalizedEnvelopeKeys<TResult> };
+	: TResult extends undefined | void
+		? { status: 200 }
+		: { status: 200; body: WithoutNormalizedEnvelopeKeys<TResult> };
 
 // rest-rpc frames SSE itself, so `text/event-stream` bodies must be streams.
 type ValidStreamEnvelopes<TEnvelope> =

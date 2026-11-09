@@ -134,6 +134,7 @@ const update = authed
 ```ts
 // Inferred: return a body (200), or an envelope with a numeric 2xx status.
 route.handler(() => todo);
+route.handler(() => {}); // 200 without a body
 route.handler(() => ({
 	status: 201,
 	body: "Created",

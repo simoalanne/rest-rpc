@@ -318,9 +318,12 @@ describe("handleHttpRoute", () => {
 });
 
 describe("normalizeImplicitResponse", () => {
+	it("sends undefined output without a body", () => {
+		expect(normalizeImplicitResponse(undefined)).toEqual({ status: 200 });
+	});
+
 	it.each([
 		null,
-		undefined,
 		"hello",
 		42,
 		{ data: "ordinary" },
