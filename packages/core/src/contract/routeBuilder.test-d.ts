@@ -66,13 +66,13 @@ describe("routeBuilder types", () => {
 		expectTypeOf(route.post()).toHaveProperty("body");
 	});
 
-	it("merges repeated metadata and OpenAPI details", () => {
+	it("merges repeated meta and OpenAPI details", () => {
 		const value = route
-			.metadata({ auth: "required", scope: "read" })
+			.meta({ auth: "required", scope: "read" })
 			.openAPI({ tags: ["Todos"] })
-			.metadata({ scope: "write" })
+			.meta({ scope: "write" })
 			.openAPI({ summary: "List todos" });
-		expectTypeOf(value["~restrpc"].metadata).toEqualTypeOf<{
+		expectTypeOf(value["~restrpc"].meta).toEqualTypeOf<{
 			readonly auth: "required";
 			readonly scope: "write";
 		}>();

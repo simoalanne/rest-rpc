@@ -370,13 +370,13 @@ resuming streams.
 
 ## Add Metadata and OpenAPI Details
 
-`.metadata()` attaches application information. `.openAPI()` describes the
+`.meta()` attaches application information. `.openAPI()` describes the
 operation for OpenAPI generation.
 
 ```ts
 const list = route
 	.get("/todos")
-	.metadata({ auth: "required" })
+	.meta({ auth: "required" })
 	.openAPI({ summary: "List todos", tags: ["Todos"] })
 	.response(z.array(todoSchema))
 	.handler(() => listTodos());
@@ -395,7 +395,7 @@ be shared as a base for other routes without affecting them:
 ```ts
 const authenticated = route
 	.headers(z.object({ authorization: z.string() }))
-	.metadata({ auth: "required" })
+	.meta({ auth: "required" })
 	.error("UNAUTHORIZED", { status: 401 });
 
 const list = authenticated.get("/todos").handler(() => listTodos());
@@ -417,7 +417,7 @@ A handler receives one object containing:
 
 - The validated request: `params`, `query`, `headers`, and `body`.
 - `context`: the per-request [context](/docs/context) shared with middleware.
-- `route`: the route declaration, including its method, path, and `metadata`.
+- `route`: the route declaration, including its method, path, and `meta`.
 - `errors`: the [declared errors](#declare-errors), to throw.
 - `contentType`: the request body media type. Routes with a body narrow it to
   their declared media types, and `body` with it.

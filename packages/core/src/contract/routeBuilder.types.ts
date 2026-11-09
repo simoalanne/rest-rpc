@@ -6,7 +6,7 @@ import type {
 	HttpMethod,
 	OpenApiRouteOptions,
 	RouteErrors,
-	RouteMetadata,
+	RouteMeta,
 	RouteRequestDeclaration,
 } from "./routeDeclaration.ts";
 import type { EmptyObject, Merge } from "../utils/typeUtils.ts";
@@ -19,7 +19,7 @@ export type BuilderState = {
 	request: object;
 	responses: object;
 	errors: RouteErrors;
-	metadata: RouteMetadata | undefined;
+	meta: RouteMeta | undefined;
 	openApi: boolean;
 	omit: PropertyKey;
 };
@@ -31,7 +31,7 @@ export type RootBuilderState = {
 	request: EmptyObject;
 	responses: EmptyObject;
 	errors: EmptyObject;
-	metadata: undefined;
+	meta: undefined;
 	openApi: false;
 	omit: never;
 };
@@ -79,8 +79,8 @@ export type DeclarationFor<TState extends BuilderState> =
 					} & (keyof TState["errors"] extends never
 						? EmptyObject
 						: { errors: TState["errors"] }) &
-					(TState["metadata"] extends RouteMetadata
-						? { readonly metadata: TState["metadata"] }
+					(TState["meta"] extends RouteMeta
+						? { readonly meta: TState["meta"] }
 						: EmptyObject) &
 					(TState["prefix"] extends AbsolutePath
 						? { readonly prefix: TState["prefix"] }
@@ -184,15 +184,15 @@ export type WithBody<TState extends BuilderState, TSchemaOrContent> = NextState<
 	}
 >;
 
-export type WithMetadata<
+export type WithMeta<
 	TState extends BuilderState,
-	TMetadata extends RouteMetadata,
+	TMeta extends RouteMeta,
 > = NextState<
 	TState,
 	{
-		metadata: TState["metadata"] extends RouteMetadata
-			? Merge<Omit<TState["metadata"], keyof TMetadata> & TMetadata>
-			: TMetadata;
+		meta: TState["meta"] extends RouteMeta
+			? Merge<Omit<TState["meta"], keyof TMeta> & TMeta>
+			: TMeta;
 	}
 >;
 

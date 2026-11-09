@@ -11,7 +11,7 @@ export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 /** An absolute URL path that begins with a slash. */
 export type AbsolutePath = `/${string}`;
 
-export type RouteMetadata = Record<string, unknown>;
+export type RouteMeta = Record<string, unknown>;
 
 export type OpenApiRouteOptions = {
 	summary?: string;
@@ -57,6 +57,6 @@ export type RouteDeclaration = {
 	request?: RouteRequestDeclaration;
 	responses: RouteResponses;
 	errors?: RouteErrors;
-	metadata?: RouteMetadata;
+	meta?: RouteMeta;
 	openApi?: OpenApiRouteOptions;
 };

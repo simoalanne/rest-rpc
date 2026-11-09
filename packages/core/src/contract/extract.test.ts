@@ -10,7 +10,7 @@ const routes = {
 		get: route
 			.get("/users/:id")
 			.params(type<{ id: string }>())
-			.metadata({ auth: "required" })
+			.meta({ auth: "required" })
 			.response(user)
 			.error("USER_NOT_FOUND", { status: 404, data: type<{ id: string }>() }),
 		create: route
