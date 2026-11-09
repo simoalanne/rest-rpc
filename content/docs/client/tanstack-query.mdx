@@ -1,6 +1,6 @@
 ---
 title: TanStack Query
-description: Create typed TanStack Query utils and combine them with your Tanstack Query setup to call your routes over HTTP.
+description: Create typed TanStack Query utils from a client and combine them with your TanStack Query setup.
 ---
 
 ## Install
@@ -11,18 +11,35 @@ npm i @rest-rpc/tanstack-query
 
 ## Setup
 
-`createTanstackQueryUtils()` takes a contract and the same options as the
-[Fetch Client](/docs/client/fetch-client). It returns a util tree with the same
-shape as the contract. The utils create options objects and keys; they do not
-create a `QueryClient` or call hooks.
+`createTanstackQueryUtils()` takes a client created with
+[`createClient()`](/docs/client/fetch-client). It returns a util tree with the
+same shape as the client, whose utils call the client's routes. The utils create
+options objects and keys; they do not create a `QueryClient` or call hooks.
 
 ```ts
+import { createClient } from "@rest-rpc/core";
 import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
 import { api } from "./client-contract";
 
-export const restrpc = createTanstackQueryUtils(api, {
+export const client = createClient(api, {
 	baseUrl: "https://api.example.com",
 });
+export const restrpc = createTanstackQueryUtils(client);
+```
+
+The same client can still be called directly where a query is not needed.
+
+### With a Local Client
+
+A [Local Client](/docs/client/local-client#local-client) works the same way.
+`fetchOptions` then takes the local client's call options, such as `context`.
+
+```ts
+import { createLocalClient } from "@rest-rpc/server";
+import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
+import { routes } from "./routes";
+
+export const restrpc = createTanstackQueryUtils(createLocalClient(routes));
 ```
 
 ## Queries
@@ -235,7 +252,8 @@ queryClient.setMutationDefaults(restrpc.todos.create.mutationKey(), {
 ## Fetch Options
 
 Generated options accept normal TanStack Query options plus `fetchOptions`,
-which accepts the Fetch client's [per-call options](/docs/client/fetch-client#per-call-options).
+which accepts the client's per-call options: the Fetch client's [per-call options](/docs/client/fetch-client#per-call-options),
+or a local client's [call options](/docs/client/local-client#one-off-calls).
 Query options do not accept `signal`, because the cancellation signal provided
 by TanStack Query is passed to the request automatically.
 

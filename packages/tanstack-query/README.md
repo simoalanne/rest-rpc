@@ -607,7 +607,7 @@ await local.todos.create(
 import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
 import { skipToken } from "@tanstack/query-core";
 
-const restrpc = createTanstackQueryUtils(api, { baseUrl }); // Fetch client options
+const restrpc = createTanstackQueryUtils(createClient(api, { baseUrl })); // or createLocalClient(routes)
 
 useQuery(
 	restrpc.todos.get.queryOptions({

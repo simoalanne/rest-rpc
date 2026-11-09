@@ -165,12 +165,13 @@ export declare const api: typeof routes;
 // @filename: client.tsx
 import { api } from "./client-contract";
 // ---cut-end---
+import { createClient } from "@rest-rpc/core";
 import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
-const restrpc = createTanstackQueryUtils(api, {
-	baseUrl: "http://localhost:3000",
-});
+const restrpc = createTanstackQueryUtils(
+	createClient(api, { baseUrl: "http://localhost:3000" }),
+);
 
 const todo = useQuery(
 	restrpc.todos.get.queryOptions({

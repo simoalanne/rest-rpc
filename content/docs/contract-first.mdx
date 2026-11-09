@@ -106,8 +106,8 @@ Don't use `use` or `$context` as top-level keys of a contract tree passed to `im
 
 ## Use in a Client
 
-Pass the shared contract directly to `createClient()` or
-`createTanstackQueryUtils()`. No [contract extraction](/docs/client/contract-extraction)
+Pass the shared contract directly to `createClient()`, and the client to
+`createTanstackQueryUtils()` if you use TanStack Query. No [contract extraction](/docs/client/contract-extraction)
 step is needed, and the client can [validate responses](/docs/client/fetch-client#response-validation)
 with the contract's schemas.
 

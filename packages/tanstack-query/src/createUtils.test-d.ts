@@ -1,4 +1,5 @@
 import {
+	createClient,
 	isDefinedError,
 	route,
 	routeError,
@@ -26,8 +27,7 @@ const get = route
 const empty = route.get("/health").response({ status: 204 });
 const events = route.get("/events").response(sse(type<{ value: number }>()));
 const utils = createTanstackQueryUtils(
-	{ get, empty, events },
-	{ baseUrl: "https://example.test" },
+	createClient({ get, empty, events }, { baseUrl: "https://example.test" }),
 );
 
 describe("createTanstackQueryUtils types", () => {
@@ -59,10 +59,12 @@ describe("createTanstackQueryUtils types", () => {
 			.get("/")
 			.headers(type<{ token: string; optional?: string }>())
 			.response(type<string>());
-		const securedUtils = createTanstackQueryUtils(secured, {
-			baseUrl: "",
-			globalHeaders: { token: async () => "token" },
-		});
+		const securedUtils = createTanstackQueryUtils(
+			createClient(secured, {
+				baseUrl: "",
+				globalHeaders: { token: async () => "token" },
+			}),
+		);
 		securedUtils.queryOptions({ request: {} });
 		expectTypeOf<
 			Parameters<
@@ -71,10 +73,12 @@ describe("createTanstackQueryUtils types", () => {
 				>
 			>[0]
 		>().toEqualTypeOf<{ headers?: { token?: string; optional?: string } }>();
-		const uncertainUtils = createTanstackQueryUtils(secured, {
-			baseUrl: "",
-			globalHeaders: { token: (): string | undefined => undefined },
-		});
+		const uncertainUtils = createTanstackQueryUtils(
+			createClient(secured, {
+				baseUrl: "",
+				globalHeaders: { token: (): string | undefined => undefined },
+			}),
+		);
 		// @ts-expect-error An optional provider does not satisfy the token requirement.
 		uncertainUtils.queryOptions({ request: {} });
 	});
