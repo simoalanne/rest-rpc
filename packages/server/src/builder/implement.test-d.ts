@@ -1,5 +1,5 @@
 import { route, type } from "@rest-rpc/core";
-import type { Context } from "./context.ts";
+import type { Context, WithDefaultContext } from "./context.ts";
 import { implement } from "./implement.ts";
 import { respond } from "../pipeline/respond.ts";
 import type { ContractImplementer } from "./implement.types.ts";
@@ -83,15 +83,15 @@ describe("implement types", () => {
 		const implementation = implement(contract).$context<Values>();
 		expectTypeOf<
 			InferServerRequest<typeof implementation.users.get>["context"]
-		>().toEqualTypeOf<Context<Values>>();
+		>().toEqualTypeOf<Context<WithDefaultContext<Values>>>();
 		type Handlers = InferServerHandler<typeof implementation>;
 		expectTypeOf<keyof Handlers>().toEqualTypeOf<"users">();
 		expectTypeOf<
 			InferServerRequest<typeof implementation>["users"]["get"]["context"]
-		>().toEqualTypeOf<Context<Values>>();
+		>().toEqualTypeOf<Context<WithDefaultContext<Values>>>();
 		const leaf = implement(contract).users.get.$context<{ count: number }>();
 		expectTypeOf<InferServerRequest<typeof leaf>["context"]>().toEqualTypeOf<
-			Context<{ count: number }>
+			Context<WithDefaultContext<{ count: number }>>
 		>();
 	});
 });

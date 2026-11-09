@@ -10,6 +10,7 @@ import {
 	RequestValidationFailed,
 	type RequestValidationIssues,
 } from "./errors.ts";
+import type { WithDefaultContext } from "../builder/context.ts";
 import { route } from "../builder/routeBuilder.ts";
 
 const withRequest = route
@@ -66,7 +67,7 @@ describe("call types", () => {
 
 	it("accepts a partial context", () => {
 		expectTypeOf<CallOptions<typeof withContext>["context"]>().toEqualTypeOf<
-			{ user?: string } | undefined
+			Partial<WithDefaultContext<{ user: string }>> | undefined
 		>();
 	});
 });

@@ -294,7 +294,7 @@ const profile = route
 
 declare module "@rest-rpc/server" {
 	interface DefaultContext {
-		env: { DATABASE_URL: string }; // typed for every route
+		env: { DATABASE_URL: string }; // typed for every route, merged with $context<T>()
 	}
 }
 ```
