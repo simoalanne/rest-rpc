@@ -74,7 +74,7 @@ export type ApiClientOptions<
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client}
  */
-export function initClient<
+export function createClient<
 	TContract extends Contract,
 	const TGlobalHeaders extends ClientHeaders = Record<never, string>,
 >(

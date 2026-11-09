@@ -89,10 +89,10 @@ export function getApi() {
 ```
 
 ```ts client.ts
-import { initClient } from "@rest-rpc/core";
+import { createClient } from "@rest-rpc/core";
 import { getApi } from "./client-contract" with { type: "macro" };
 
-const client = initClient(getApi(), { baseUrl: "http://localhost:3000" });
+const client = createClient(getApi(), { baseUrl: "http://localhost:3000" });
 
 // Calls resolve to an envelope { status, contentType, body, headers }, not the body.
 const created = await client.todos.create({ body: { title: "Write docs" } });
@@ -512,9 +512,14 @@ export const api = contract as unknown as typeof routes;
 ### [Fetch Client](https://rest-rpc.vercel.app/docs/client/fetch-client)
 
 ```ts
-import { initClient, isDeclaredError, RouteError, safe } from "@rest-rpc/core";
+import {
+	createClient,
+	isDeclaredError,
+	RouteError,
+	safe,
+} from "@rest-rpc/core";
 
-const client = initClient(api, {
+const client = createClient(api, {
 	baseUrl: "https://api.example.com",
 	globalHeaders: { authorization: () => `Bearer ${readToken()}` }, // static or per request
 	timeoutMs: 10_000,
@@ -578,12 +583,12 @@ const getTodo = (id: string): ClientPromise<GetResponse, GetError> =>
 ### [Local Client](https://rest-rpc.vercel.app/docs/client/local-client)
 
 ```ts
-import { call, initLocalClient } from "@rest-rpc/server";
+import { call, createLocalClient } from "@rest-rpc/server";
 
 // In-process: validation, middleware and handler, no HTTP encoding.
 // Same request and result as a Fetch client call, and rejects the same way.
 const res = await call(getTodo, { params: { id: "1" } }, { context, signal });
-const local = initLocalClient(routes); // mirrors the route tree
+const local = createLocalClient(routes); // mirrors the route tree
 await local.todos.create(
 	{ body: { title: "Write docs" } },
 	{ context, signal },

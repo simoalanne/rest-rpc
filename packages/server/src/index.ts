@@ -32,7 +32,7 @@ export {
 } from "./pipeline/createApp.ts";
 export {
 	call,
-	initLocalClient,
+	createLocalClient,
 	type CallOptions,
 	type LocalClient,
 } from "./pipeline/call.ts";

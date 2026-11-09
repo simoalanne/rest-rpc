@@ -3,14 +3,14 @@ title: Fetch Client
 description: Create a typed Fetch client to call your routes over HTTP.
 ---
 
-`initClient()` creates a typed Fetch client from a runtime contract. When the
+`createClient()` creates a typed Fetch client from a runtime contract. When the
 routes are implemented in the server, [extract a contract](/docs/client/contract-extraction) first.
 
 ```ts
-import { initClient } from "@rest-rpc/core";
+import { createClient } from "@rest-rpc/core";
 import { api } from "./client-contract";
 
-const client = initClient(api, {
+const client = createClient(api, {
 	baseUrl: "https://api.example.com",
 });
 ```
@@ -114,10 +114,10 @@ const get = route
 export const routes = { todos: { get } };
 
 // @filename: client.ts
-import { initClient } from "@rest-rpc/core";
+import { createClient } from "@rest-rpc/core";
 import type { routes } from "./server";
 declare const api: typeof routes;
-const client = initClient(api, { baseUrl: "http://localhost:3000" });
+const client = createClient(api, { baseUrl: "http://localhost:3000" });
 // ---cut-end---
 import { RouteError } from "@rest-rpc/core";
 
@@ -153,10 +153,10 @@ const get = route
 export const routes = { todos: { get } };
 
 // @filename: client.ts
-import { initClient } from "@rest-rpc/core";
+import { createClient } from "@rest-rpc/core";
 import type { routes } from "./server";
 declare const api: typeof routes;
-const client = initClient(api, { baseUrl: "http://localhost:3000" });
+const client = createClient(api, { baseUrl: "http://localhost:3000" });
 // ---cut-end---
 import { isDeclaredError, safe } from "@rest-rpc/core";
 
@@ -252,7 +252,7 @@ async function connect() {
 ## Client Options
 
 ```ts
-const client = initClient(api, {
+const client = createClient(api, {
 	baseUrl: "https://api.example.com",
 	timeoutMs: 10_000,
 	fetchOptions: {
@@ -310,7 +310,7 @@ by synchronous or asynchronous functions. A provider is useful for values that
 can change during the lifetime of the client, such as an access token.
 
 ```ts
-const client = initClient(api, {
+const client = createClient(api, {
 	baseUrl: "https://api.example.com",
 	globalHeaders: {
 		authorization: () => `Bearer ${readToken()}`,
@@ -327,7 +327,7 @@ optional in client calls. A provider that can return `undefined` does not.
 If you need to wrap the fetch client with custom logic, pass a `fetch` function.
 
 ```ts
-const client = initClient(api, {
+const client = createClient(api, {
 	baseUrl: "https://api.example.com",
 	fetch: async (url, init) => {
 		const startedAt = performance.now();
@@ -392,7 +392,7 @@ Enable `validateResponses` to validate decoded bodies, declared response
 headers, and stream event data:
 
 ```ts
-const client = initClient(api, {
+const client = createClient(api, {
 	baseUrl: "https://api.example.com",
 	validateResponses: true,
 });

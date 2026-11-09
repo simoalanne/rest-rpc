@@ -2,7 +2,7 @@ import type { ClientRouteError } from "../contract/response.ts";
 import { route } from "../contract/routeBuilder.ts";
 import { isDeclaredError, RouteError } from "../contract/routeError.ts";
 import { type } from "../standard-schema/type.ts";
-import { initClient } from "./initClient.ts";
+import { createClient } from "./createClient.ts";
 import { safe } from "./safe.ts";
 
 describe("safe types", () => {
@@ -11,7 +11,7 @@ describe("safe types", () => {
 			.get("/")
 			.response(type<string>())
 			.error("GONE", { status: 410 });
-		const client = initClient(declaration, { baseUrl: "" });
+		const client = createClient(declaration, { baseUrl: "" });
 		const result = await safe(client());
 		if (result.error) {
 			expectTypeOf(result.error).toEqualTypeOf<
@@ -31,7 +31,7 @@ describe("safe types", () => {
 		const declaration = route
 			.get("/")
 			.error("GONE", { status: 410, data: type<{ id: string }>() });
-		const client = initClient(declaration, { baseUrl: "" });
+		const client = createClient(declaration, { baseUrl: "" });
 		const { error } = await safe(client());
 		if (isDeclaredError(error)) {
 			expectTypeOf(error).toEqualTypeOf<

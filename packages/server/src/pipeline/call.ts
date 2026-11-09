@@ -112,7 +112,7 @@ export function call<TRoute extends ImplementedRoute>(
 	) as CallResult<TRoute>;
 }
 
-/** The client returned by `initLocalClient`. */
+/** The client returned by `createLocalClient`. */
 export type LocalClient<T extends RuntimeImplementationTree> =
 	T extends ImplementedRoute
 		? (...args: CallArgs<T>) => CallResult<T>
@@ -122,13 +122,13 @@ export type LocalClient<T extends RuntimeImplementationTree> =
 				]: LocalClient<Extract<T[K], RuntimeImplementationTree>>;
 			};
 
-const createLocalClient = (tree: RuntimeImplementationTree): unknown =>
+const buildLocalClient = (tree: RuntimeImplementationTree): unknown =>
 	isImplementedRoute(tree)
 		? (...args: CallArgs<typeof tree>) => call(tree, ...args)
 		: Object.fromEntries(
 				Object.entries(tree).map(([key, child]) => [
 					key,
-					createLocalClient(child),
+					buildLocalClient(child),
 				]),
 			);
 
@@ -138,8 +138,8 @@ const createLocalClient = (tree: RuntimeImplementationTree): unknown =>
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/local-client#local-client}
  */
-export function initLocalClient<const T extends RuntimeImplementationTree>(
+export function createLocalClient<const T extends RuntimeImplementationTree>(
 	routes: T,
 ): LocalClient<T> {
-	return createLocalClient(routes) as LocalClient<T>;
+	return buildLocalClient(routes) as LocalClient<T>;
 }

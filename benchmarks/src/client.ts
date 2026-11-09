@@ -1,5 +1,5 @@
 import type { router } from "./router/index.ts";
-import { initClient } from "@rest-rpc/core";
-export const client = initClient({} as typeof router, {
+import { createClient } from "@rest-rpc/core";
+export const client = createClient({} as typeof router, {
 	baseUrl: "http://localhost:3000",
 });

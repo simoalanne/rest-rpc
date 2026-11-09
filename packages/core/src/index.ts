@@ -11,7 +11,7 @@ export type {
 	FetchOptions,
 } from "./client/index.ts";
 export {
-	initClient,
+	createClient,
 	safe,
 	type ClientPromise,
 	type SafeResult,

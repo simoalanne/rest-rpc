@@ -1,8 +1,8 @@
 import { route } from "../contract/routeBuilder.ts";
 import { type } from "../standard-schema/type.ts";
-import { initClient } from "./initClient.ts";
+import { createClient } from "./createClient.ts";
 
-describe("initClient", () => {
+describe("createClient", () => {
 	it("mirrors nested contracts and resolves implicit paths", async () => {
 		const fetch = vi.fn(async () => Response.json("Ada"));
 		const contract = {
@@ -10,7 +10,7 @@ describe("initClient", () => {
 				find: route.body(type<{ id: number }>()).response(type<string>()),
 			},
 		};
-		const client = initClient(contract, {
+		const client = createClient(contract, {
 			baseUrl: "https://example.test",
 			fetch,
 		});
@@ -27,15 +27,15 @@ describe("initClient", () => {
 	it("maps response bodies only when validation is enabled", async () => {
 		const contract = route.response(type((value: string) => value.length));
 		const options = { baseUrl: "", fetch: async () => Response.json("Ada") };
-		expect((await initClient(contract, options)()).body).toBe("Ada");
+		expect((await createClient(contract, options)()).body).toBe("Ada");
 		expect(
-			(await initClient(contract, { ...options, validateResponses: true })())
+			(await createClient(contract, { ...options, validateResponses: true })())
 				.body,
 		).toBe(3);
 	});
 
 	it("rejects a response media type outside the declaration even without validation", async () => {
-		const client = initClient(route.response(type<string>()), {
+		const client = createClient(route.response(type<string>()), {
 			baseUrl: "",
 			fetch: async () =>
 				new Response("Ada", { headers: { "content-type": "text/plain" } }),

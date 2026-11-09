@@ -90,10 +90,10 @@ The contract itself contains no framework or handler code.
 Import the shared contract directly. No contract extraction step is needed.
 
 ```ts client.ts
-import { initClient, isDeclaredError, safe } from "@rest-rpc/core";
+import { createClient, isDeclaredError, safe } from "@rest-rpc/core";
 import { api } from "./contract";
 
-const client = initClient(api, { baseUrl: "http://localhost:3000" });
+const client = createClient(api, { baseUrl: "http://localhost:3000" });
 
 const created = await client.todos.create({ body: { title: "Write docs" } });
 const result = await safe(

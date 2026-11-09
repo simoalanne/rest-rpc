@@ -1,4 +1,4 @@
-import { initClient } from "@rest-rpc/core";
+import { createClient } from "@rest-rpc/core";
 import type {
 	ApiClientOptions,
 	ClientHeaders,
@@ -155,7 +155,7 @@ export function createTanstackQueryUtils<
 	contract: TContract,
 	options: CreateTanstackQueryUtilsOptions<TGlobalHeaders>,
 ): TanstackQueryUtilsFor<TContract, TGlobalHeaders> {
-	const client: unknown = initClient(contract, options);
+	const client: unknown = createClient(contract, options);
 
 	return mapContractRoutes(contract, (_route, path) => {
 		const routeFetchFn = path.reduce(

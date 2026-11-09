@@ -1,4 +1,4 @@
-import { initClient } from "../client/initClient.ts";
+import { createClient } from "../client/createClient.ts";
 import { type } from "../standard-schema/type.ts";
 import { extractContract } from "./extract.ts";
 import { route } from "./routeBuilder.ts";
@@ -70,7 +70,7 @@ describe("extractContract", () => {
 				{ status: 404 },
 			),
 		);
-		const client = initClient(extractContract(routes), {
+		const client = createClient(extractContract(routes), {
 			baseUrl: "https://example.test",
 			fetch,
 		});
@@ -89,7 +89,7 @@ describe("extractContract", () => {
 
 	it("creates a client that checks response statuses and media types without schemas", async () => {
 		const respond = vi.fn(async () => Response.json({ name: 1 }));
-		const client = initClient(extractContract(routes), {
+		const client = createClient(extractContract(routes), {
 			baseUrl: "https://example.test",
 			fetch: respond,
 			validateResponses: true,

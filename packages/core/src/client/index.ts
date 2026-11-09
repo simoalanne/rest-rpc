@@ -1,9 +1,9 @@
 export {
-	initClient,
+	createClient,
 	type ApiClientFor,
 	type ApiClientOptions,
 	type ApiClientRouteValue,
-} from "./initClient.ts";
+} from "./createClient.ts";
 export {
 	type ClientHeaders,
 	type ClientHeaderValue,
