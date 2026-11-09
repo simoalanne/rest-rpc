@@ -40,7 +40,7 @@ const events = route
 	.streamResponse(z.object({ id: z.string(), message: z.string() }))
 	.error("UNAUTHORIZED", { status: 401 })
 	.handler(({ headers, errors }) => {
-		if (!authorize(headers.authorization)) throw new errors.UNAUTHORIZED();
+		if (!authorize(headers.authorization)) throw errors.UNAUTHORIZED();
 		return streamTodoEvents();
 	});
 ```

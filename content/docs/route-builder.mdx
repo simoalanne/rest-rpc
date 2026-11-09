@@ -237,21 +237,21 @@ const get = route
 	.error("TODO_NOT_FOUND", { status: 404, data: z.object({ id: z.string() }) })
 	.handler(({ params, errors }) => {
 		const todo = findTodo(params.id);
-		if (!todo) throw new errors.TODO_NOT_FOUND({ id: params.id });
+		if (!todo) throw errors.TODO_NOT_FOUND({ data: { id: params.id } });
 		return todo;
 	});
 ```
 
-| Option        | Default  | Description                                                   |
-| ------------- | -------- | ------------------------------------------------------------- |
-| `status`      | `400`    | The HTTP status, from 400 to 599.                             |
-| `data`        | none     | Schema of the error's `data` field, passed first when thrown. |
-| `headers`     | none     | Response headers schema, passed as `headers` when thrown.     |
-| `message`     | The code | Default message, overridable when thrown.                     |
-| `description` | none     | Describes the error in [OpenAPI](/docs/openapi) documents.    |
+| Option        | Default  | Description                                                       |
+| ------------- | -------- | ----------------------------------------------------------------- |
+| `status`      | `400`    | The HTTP status, from 400 to 599.                                 |
+| `data`        | none     | Schema of the error's `data` field, passed as `data` when thrown. |
+| `headers`     | none     | Response headers schema, passed as `headers` when thrown.         |
+| `message`     | The code | Default message, overridable when thrown.                         |
+| `description` | none     | Describes the error in [OpenAPI](/docs/openapi) documents.        |
 
 Handlers and [middleware](/docs/middleware) receive the declared errors as
-`errors`. The error is sent as a JSON `{ code, message, data? }` response with
+`errors`, which create the error without `new`. The error is sent as a JSON `{ code, message, data? }` response with
 its status, and clients reject with it. See
 [Errors](/docs/http-behavior/errors).
 
@@ -274,7 +274,7 @@ export const TodoNotFound = routeError("TODO_NOT_FOUND", {
 
 export const findTodo = (id: string) => {
 	const todo = todos.get(id);
-	if (!todo) throw new TodoNotFound({ id });
+	if (!todo) throw new TodoNotFound({ data: { id } });
 	return todo;
 };
 
@@ -527,7 +527,7 @@ const getTodo: InferServerHandler<typeof getDeclaration> = ({
 	params,
 	errors,
 }) => {
-	if (params.id !== "todo_1") throw new errors.TODO_NOT_FOUND();
+	if (params.id !== "todo_1") throw errors.TODO_NOT_FOUND();
 	return { id: params.id, title: "Write docs" };
 };
 

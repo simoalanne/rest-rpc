@@ -43,7 +43,7 @@ describe("resolveRouteError", () => {
 		const Invalid = routeError("INVALID", { data: invalid });
 		const resolved = await resolveRouteError(
 			route.error(Invalid)["~restrpc"],
-			new Invalid("value"),
+			new Invalid({ data: "value" }),
 			false,
 		);
 		expect(resolved).toMatchObject({
@@ -55,10 +55,7 @@ describe("resolveRouteError", () => {
 
 	it("passes undeclared errors as thrown", async () => {
 		const builtIn = new RequestValidationFailed({
-			body: [],
-			query: [],
-			params: [],
-			headers: [],
+			data: { body: [], query: [], params: [], headers: [] },
 		});
 		const gone = new RouteError("GONE", { status: 410, data: { id: 1 } });
 		expect(await resolveRouteError(declaration, builtIn, false)).toBe(builtIn);

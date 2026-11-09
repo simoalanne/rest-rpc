@@ -433,7 +433,7 @@ const update = route
 const getFirst = route
 	.error("TODO_NOT_FOUND", { status: 404 })
 	.handler(({ errors }) => {
-		if (Math.random() < 0.5) throw new errors.TODO_NOT_FOUND();
+		if (Math.random() < 0.5) throw errors.TODO_NOT_FOUND();
 		return { id: "todo_1", title: "Write docs" };
 	});
 

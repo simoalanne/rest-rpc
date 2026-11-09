@@ -8,6 +8,7 @@ import {
 	toOpenApiPath,
 	type RouteDeclaration,
 } from "@rest-rpc/core/contract";
+import type { RouteError } from "@rest-rpc/core";
 import { addRoute, createRouter, findRoute } from "rou3";
 import type { RuntimeRouteHandler } from "../builder/routeBuilder.types.ts";
 import type { CompileRoutesOptions } from "../pipeline/compileRoutes.ts";
@@ -56,6 +57,8 @@ export type RuntimeImplementation = {
 	requiresBodyContentType: boolean;
 	/** The media type of each declared response status that declares exactly one. */
 	defaultResponseMediaTypes: Readonly<Record<number, string>>;
+	/** Creates each declared error by code, received by handlers and middleware as `errors`. */
+	errorFactories: Readonly<Record<string, (options?: unknown) => RouteError>>;
 };
 
 export type ImplementedRoute = {
@@ -77,6 +80,18 @@ export function isImplementedRoute(value: unknown): value is ImplementedRoute {
 		"handler" in value["~restrpc"]
 	);
 }
+
+type ErrorClass = new (options?: unknown) => RouteError;
+
+const createErrorFactories = (
+	errors: RouteDeclaration["errors"] = {},
+): RuntimeImplementation["errorFactories"] =>
+	Object.fromEntries(
+		Object.entries(errors).map(([code, definition]) => [
+			code,
+			(options?: unknown) => new (definition as unknown as ErrorClass)(options),
+		]),
+	);
 
 export function toRuntimeImplementation(
 	declaration: ImplementedRoute["~restrpc"],
@@ -107,6 +122,7 @@ export function toRuntimeImplementation(
 		defaultBodyMediaType: bodyMediaTypes[0],
 		requiresBodyContentType: bodyMediaTypes.length > 1,
 		defaultResponseMediaTypes,
+		errorFactories: createErrorFactories(route.errors),
 	};
 }
 

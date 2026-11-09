@@ -30,8 +30,9 @@ the code with the received status. See
 
 ## Throwing Errors
 
-Throw `new errors.CODE(...)` from a handler or middleware, or throw an error
-defined with `routeError()` from any code. Both create a `RouteError`.
+Throw `errors.CODE(...)` from a handler or middleware, or throw
+`new Definition(...)` for an error defined with `routeError()` from any code.
+Both create a `RouteError`.
 
 The route's declaration decides the response: its status, and the validated
 `data` and headers. When `data` or headers fail validation, an

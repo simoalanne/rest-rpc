@@ -22,7 +22,7 @@ describe("routeError", () => {
 		});
 
 		const cause = new Error("missing row");
-		const error = new UserNotFound({ id: "1" }, { cause });
+		const error = new UserNotFound({ data: { id: "1" }, cause });
 		expect(error).toBeInstanceOf(RouteError);
 		expect(error).toMatchObject({
 			name: "RouteError",
@@ -33,9 +33,9 @@ describe("routeError", () => {
 			headers: {},
 			cause,
 		});
-		expect(new UserNotFound({ id: "1" }, { message: "Gone" }).message).toBe(
-			"Gone",
-		);
+		expect(
+			new UserNotFound({ data: { id: "1" }, message: "Gone" }).message,
+		).toBe("Gone");
 	});
 
 	it("defaults to status 400 and the code as message, without data", () => {

@@ -52,7 +52,7 @@ const create = implement(api.todos.create).handler(({ body: { title } }) =>
 
 const get = implement(api.todos.get).handler(({ params, errors }) => {
 	const todo = findTodo(params.id);
-	if (!todo) throw new errors.TODO_NOT_FOUND();
+	if (!todo) throw errors.TODO_NOT_FOUND();
 	return todo;
 });
 
@@ -93,7 +93,7 @@ export const routes = {
 		),
 		get: todos.get.handler(({ params, errors }) => {
 			const todo = findTodo(params.id);
-			if (!todo) throw new errors.TODO_NOT_FOUND();
+			if (!todo) throw errors.TODO_NOT_FOUND();
 			return todo;
 		}),
 	},

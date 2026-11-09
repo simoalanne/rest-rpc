@@ -32,7 +32,7 @@ const getProfile = route
 	})
 	.use(async ({ headers, context, errors, next }) => {
 		const user = await authenticate(headers.authorization);
-		if (!user) throw new errors.UNAUTHORIZED();
+		if (!user) throw errors.UNAUTHORIZED();
 		context.set("user", user);
 		return next();
 	})
@@ -79,7 +79,7 @@ const attachUser = route.$context<{ user?: User }>().middleware<{
 	errors: { UNAUTHORIZED: typeof Unauthorized };
 }>(async ({ headers, errors, next, context }) => {
 	const user = await authenticate(headers.authorization);
-	if (!user) throw new errors.UNAUTHORIZED();
+	if (!user) throw errors.UNAUTHORIZED();
 	context.set("user", user);
 	return await next();
 });
@@ -117,7 +117,7 @@ const users = route.error(UserNotFound).use(async ({ next }) => {
 		return await next();
 	} catch (error) {
 		if (error instanceof RecordNotFound) {
-			throw new UserNotFound({ id: error.id }, { cause: error });
+			throw new UserNotFound({ data: { id: error.id }, cause: error });
 		}
 		throw error;
 	}

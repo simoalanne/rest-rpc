@@ -227,10 +227,19 @@ type BodylessFields<TRoute extends RouteDeclaration> = TRoute extends {
 	? EmptyObject
 	: { contentType?: undefined };
 
+// Handlers and middleware throw `errors.CODE(...)` without `new`.
+type ErrorFactories<TErrors> = {
+	[K in keyof TErrors]: TErrors[K] extends abstract new (
+		...args: infer TArgs
+	) => infer TError
+		? (...args: TArgs) => TError
+		: TErrors[K];
+};
+
 type ErrorsOf<TRoute extends RouteDeclaration> = TRoute extends {
 	errors: infer TErrors;
 }
-	? TErrors
+	? ErrorFactories<TErrors>
 	: EmptyObject;
 
 export type RouteRequest<
@@ -374,7 +383,10 @@ export type ReusableMiddlewareRequest<
 	TRequest extends RequestFields,
 	TContext extends object,
 > = HandlerFields &
-	TRequest &
+	Omit<TRequest, "errors"> &
+	(TRequest extends { errors: infer TErrors }
+		? { errors: ErrorFactories<TErrors> }
+		: EmptyObject) &
 	UnknownRequest & {
 		route: RouteDeclaration;
 		context: Context<TContext>;
