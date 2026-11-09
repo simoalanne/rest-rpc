@@ -1,6 +1,6 @@
 ---
 title: Local Client
-description: Call route handlers in-process with call or initLocalClient.
+description: Call route handlers in-process with call or createLocalClient.
 ---
 
 A local call runs the same route pipeline as an HTTP request:
@@ -58,14 +58,14 @@ so [`safe()`](/docs/client/fetch-client#with-safe) works with it too:
 
 ## Local Client
 
-When you want to call several routes or create a reusable client, `initLocalClient()` creates one that mirrors the route tree.
+When you want to call several routes or create a reusable client, `createLocalClient()` creates one that mirrors the route tree.
 It is the local equivalent of the [Fetch client](/docs/client/fetch-client).
 
 ```ts
-import { initLocalClient } from "@rest-rpc/server";
+import { createLocalClient } from "@rest-rpc/server";
 import { routes } from "./routes";
 
-const client = initLocalClient(routes);
+const client = createLocalClient(routes);
 
 const created = await client.todos.create({ body: { title: "Write docs" } });
 const response = await client.todos.get(

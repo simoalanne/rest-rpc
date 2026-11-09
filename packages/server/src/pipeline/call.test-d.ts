@@ -5,7 +5,7 @@ import {
 	type InferClientRequest,
 	type InferClientResponse,
 } from "@rest-rpc/core";
-import { call, initLocalClient, type CallOptions } from "./call.ts";
+import { call, createLocalClient, type CallOptions } from "./call.ts";
 import {
 	RequestValidationFailed,
 	type RequestValidationIssues,
@@ -71,9 +71,9 @@ describe("call types", () => {
 	});
 });
 
-describe("initLocalClient types", () => {
+describe("createLocalClient types", () => {
 	it("mirrors the route tree with call() arguments at each leaf", () => {
-		const client = initLocalClient({ items: { create: withRequest } });
+		const client = createLocalClient({ items: { create: withRequest } });
 		expectTypeOf(client.items.create).parameters.toEqualTypeOf<
 			[
 				request: InferClientRequest<typeof withRequest>,

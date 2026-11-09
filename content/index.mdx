@@ -107,11 +107,11 @@ export declare const api: typeof routes;
 
 // @filename: client.ts
 // ---cut-end---
-import { initClient } from "@rest-rpc/core";
+import { createClient } from "@rest-rpc/core";
 // Extracted from the routes at build time with extractContract(routes).
 import { api } from "./client-contract";
 
-const client = initClient(api, { baseUrl: "http://localhost:3000" });
+const client = createClient(api, { baseUrl: "http://localhost:3000" });
 
 const created = await client.todos.create({ body: { title: "Write docs" } });
 const response = await client.todos.get({

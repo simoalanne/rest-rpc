@@ -1,10 +1,10 @@
 import { route } from "../contract/routeBuilder.ts";
 import { type } from "../standard-schema/type.ts";
-import { initClient } from "./initClient.ts";
+import { createClient } from "./createClient.ts";
 
-describe("initClient types", () => {
+describe("createClient types", () => {
 	it("allows empty requests and optional or guaranteed segmented headers", () => {
-		const empty = initClient(route.get("/").response({ status: 204 }), {
+		const empty = createClient(route.get("/").response({ status: 204 }), {
 			baseUrl: "",
 		});
 		empty();
@@ -13,15 +13,15 @@ describe("initClient types", () => {
 			.get("/")
 			.headers(type<{ token: string; optional?: string }>())
 			.response({ status: 204 });
-		const literal = initClient(contract, {
+		const literal = createClient(contract, {
 			baseUrl: "",
 			globalHeaders: { token: "value" },
 		});
-		const asyncProvider = initClient(contract, {
+		const asyncProvider = createClient(contract, {
 			baseUrl: "",
 			globalHeaders: { token: async () => "value" },
 		});
-		const optionalProvider = initClient(contract, {
+		const optionalProvider = createClient(contract, {
 			baseUrl: "",
 			globalHeaders: { token: (): string | undefined => undefined },
 		});
@@ -36,7 +36,7 @@ describe("initClient types", () => {
 		optionalProvider({ headers: { token: "value" } });
 		// @ts-expect-error An optional provider cannot guarantee the required token.
 		optionalProvider({});
-		const optional = initClient(
+		const optional = createClient(
 			route
 				.get("/")
 				.headers(type<{ token?: string }>())
@@ -52,7 +52,7 @@ describe("initClient types", () => {
 				.body(type((value: string) => Number(value)))
 				.response(type((value: string) => value.length)),
 		};
-		const client = initClient(contract, { baseUrl: "" });
+		const client = createClient(contract, { baseUrl: "" });
 		expectTypeOf(client.length).parameter(0).toEqualTypeOf<{
 			contentType?: "application/json";
 			body: string;
@@ -68,7 +68,7 @@ describe("initClient types", () => {
 	});
 
 	it("narrows response envelopes by their declared status", async () => {
-		const client = initClient(
+		const client = createClient(
 			route
 				.get()
 				.response(type<{ name: string }>())

@@ -100,10 +100,10 @@ bundler setups.
 ## Call the Routes
 
 ```ts client.ts
-import { initClient, isDeclaredError, safe } from "@rest-rpc/core";
+import { createClient, isDeclaredError, safe } from "@rest-rpc/core";
 import { getApi } from "./client-contract" with { type: "macro" };
 
-const client = initClient(getApi(), { baseUrl: "http://localhost:3000" });
+const client = createClient(getApi(), { baseUrl: "http://localhost:3000" });
 
 const created = await client.todos.create({ body: { title: "Write docs" } });
 const result = await safe(

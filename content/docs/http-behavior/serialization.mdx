@@ -130,7 +130,7 @@ const app = createApp(routes, {
 <Tab title="Client">
 
 ```ts
-import { bodyCodec, initClient } from "@rest-rpc/core";
+import { bodyCodec, createClient } from "@rest-rpc/core";
 import { contract } from "./contract";
 
 const binaryCodec = bodyCodec("application/octet-stream", {
@@ -143,7 +143,7 @@ const binaryCodec = bodyCodec("application/octet-stream", {
 	deserialize: async (source) => new Uint8Array(await source.arrayBuffer()),
 });
 
-const client = initClient(contract, {
+const client = createClient(contract, {
 	baseUrl: "https://api.example.com",
 	bodyCodecs: [binaryCodec],
 });
