@@ -5,10 +5,7 @@ import type {
 	ResponseDefinition,
 	RouteDefinition,
 } from "@rest-rpc/core/contract";
-import type {
-	ImplicitResponseEnvelope,
-	RuntimeRouteHandler,
-} from "../builder/routeBuilder.types.ts";
+import type { RuntimeRouteHandler } from "../builder/routeBuilder.types.ts";
 import type { RuntimeImplementation } from "../routing/match.ts";
 import {
 	type RequestSegments,
@@ -18,6 +15,7 @@ import {
 	validateResponseStreamChunks,
 } from "./validation.ts";
 import { invokeWithMiddleware } from "../builder/middleware.ts";
+import { isResponseEnvelope, type RespondOptions } from "./respond.ts";
 import { sseBody } from "./sse.ts";
 import { createContext } from "../builder/context.ts";
 import type { MaybePromise } from "@rest-rpc/core/utils";
@@ -144,15 +142,6 @@ export type HttpRouteResult = {
 	body?: { value: unknown; contentType: string };
 };
 
-/** A handler result with a numeric `status` is a response envelope; anything else is a 200 body. */
-const isResponseEnvelope = (
-	value: unknown,
-): value is ImplicitResponseEnvelope =>
-	typeof value === "object" &&
-	value !== null &&
-	"status" in value &&
-	typeof value.status === "number";
-
 // Errors are thrown, so inferred statuses are successful.
 const assertImplicitStatus = (status: number) => {
 	if (!Number.isInteger(status) || status < 200 || status > 299) {
@@ -174,21 +163,17 @@ const toImplicitBody = (
 		? { stream: body }
 		: { value: body, contentType: contentType ?? "application/json" };
 
+// Only `respond()` results are envelopes; any other value is the body.
+const toEnvelope = (result: unknown): RespondOptions & { body?: unknown } =>
+	isResponseEnvelope(result) ? result : { body: result };
+
 /** Normalizes the result of a handler on a route without defined responses. */
 export const normalizeImplicitResponse = (result: unknown): RouteResult => {
+	const { status = 200, body, contentType, headers } = toEnvelope(result);
+	assertImplicitStatus(status);
 	// `undefined` has no JSON representation, so it is sent without a body.
-	if (result === undefined) return { status: 200 };
-	if (!isResponseEnvelope(result)) {
-		return { status: 200, body: toImplicitBody(result, undefined) };
-	}
-	assertImplicitStatus(result.status);
-	const { status, headers } = result;
-	if (!("body" in result)) return { status, headers };
-	return {
-		status,
-		headers,
-		body: toImplicitBody(result.body, result.contentType),
-	};
+	if (body === undefined) return { status, headers };
+	return { status, headers, body: toImplicitBody(body, contentType) };
 };
 
 const normalizeHandlerResult = (
@@ -201,12 +186,12 @@ const normalizeHandlerResult = (
 		return normalizeImplicitResponse(handlerResult);
 	}
 
-	// Types only allow plain bodies on routes with a single defined status.
+	// Types only allow plain bodies on routes with a single defined status, and
+	// a missing `respond()` status on its only or 200 status.
+	const { status = defaultStatus, ...result } = toEnvelope(handlerResult);
 	return normalizeResponseResult(
 		implementation,
-		isResponseEnvelope(handlerResult)
-			? handlerResult
-			: { status: defaultStatus, body: handlerResult },
+		{ status, ...result },
 		disableResponseValidation,
 	);
 };

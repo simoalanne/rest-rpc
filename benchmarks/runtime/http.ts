@@ -2,19 +2,19 @@
 // body routes of bun-http-framework-benchmark without any network so framework
 // overhead dominates. Run with `bun benchmarks/runtime/http.ts` or
 // `node benchmarks/runtime/http.ts`, optionally filtering cases by name.
-import { compileRoutes, route, type } from "@rest-rpc/server";
+import { compileRoutes, respond, route, type } from "@rest-rpc/server";
 
 const routes = {
 	query: route
 		.get("/id/:id")
 		.params(type<{ id: string }>())
 		.query(type<{ name: string }>())
-		.handler(({ params, query }) => ({
-			status: 200,
-			body: `${params.id} ${query.name}`,
-			contentType: "text/plain",
-			headers: { "x-powered-by": "benchmark" },
-		})),
+		.handler(({ params, query }) =>
+			respond(`${params.id} ${query.name}`, {
+				contentType: "text/plain",
+				headers: { "x-powered-by": "benchmark" },
+			}),
+		),
 	json: route
 		.post("/json")
 		.body(type<unknown>())

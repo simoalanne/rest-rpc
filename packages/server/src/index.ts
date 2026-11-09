@@ -15,6 +15,11 @@ export {
 	type RequestValidationIssues,
 	type ValidationIssue,
 } from "./pipeline/errors.ts";
+export {
+	respond,
+	type RespondOptions,
+	type ResponseEnvelope,
+} from "./pipeline/respond.ts";
 export { sseEvent, type SseServerEvent } from "./pipeline/sse.ts";
 export {
 	compileRoutes,

@@ -36,10 +36,7 @@ const getProfile = route
 		context.set("user", user);
 		return next();
 	})
-	.handler(({ context }) => ({
-		status: 200,
-		body: { user: context.get("user")! },
-	}));
+	.handler(({ context }) => ({ user: context.get("user")! }));
 ```
 
 Middleware runs in definition order; work after `await next()` runs in reverse

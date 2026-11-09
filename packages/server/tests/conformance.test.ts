@@ -3,6 +3,7 @@ import {
 	compileRoutes,
 	createApp,
 	createCatchAllHandler,
+	respond,
 	route,
 	routeError,
 	sse,
@@ -113,11 +114,11 @@ const validationRoutes = {
 		.post("/invalid-request")
 		.body(invalid)
 		.response({ status: 204 })
-		.handler(() => ({ status: 204 })),
+		.handler(() => respond(undefined, { status: 204 })),
 	response: route
 		.get("/invalid-response")
 		.response(invalid)
-		.handler(() => ({ status: 200, body: "unchecked" })),
+		.handler(() => respond("unchecked")),
 };
 
 const postJson = (url: string, body: unknown) =>
@@ -141,11 +142,10 @@ describe.each([
 				.body(type<{ name: string }>())
 				.handler(({ params, body, signal }) => {
 					expect(signal).toBeInstanceOf(AbortSignal);
-					return {
-						status: 201,
-						body: { id: params.id, name: body.name },
-						headers: { "x-route": "create", "x-count": 1 },
-					};
+					return respond(
+						{ id: params.id, name: body.name },
+						{ status: 201, headers: { "x-route": "create", "x-count": 1 } },
+					);
 				}),
 		};
 		await serve(
@@ -206,7 +206,7 @@ describe.each([
 	});
 
 	it("rejects a request body content type the route does not declare", async () => {
-		const handler = vi.fn(() => ({ status: 204 as const }));
+		const handler = vi.fn(() => respond(undefined, { status: 204 }));
 		const routes = {
 			echo: route.post("/echo").body(type<{ name: string }>()).handler(handler),
 		};
@@ -226,7 +226,7 @@ describe.each([
 	});
 
 	it("ignores the request body of routes without a body schema", async () => {
-		const handler = vi.fn(() => ({ status: 204 as const }));
+		const handler = vi.fn(() => respond(undefined, { status: 204 }));
 		const routes = { ping: route.post("/ping").handler(handler) };
 		await serve(routes, {}, async (url) => {
 			const response = await fetch(`${url}/ping`, {
@@ -333,13 +333,14 @@ describe.each([
 				.response(sse(type<number>()), {
 					headers: type<{ "x-stream-id": string }>(),
 				})
-				.handler(() => ({
-					status: 200,
-					body: (async function* () {
-						yield 1;
-					})(),
-					headers: { "x-stream-id": "stream_1" },
-				})),
+				.handler(() =>
+					respond(
+						(async function* () {
+							yield 1;
+						})(),
+						{ headers: { "x-stream-id": "stream_1" } },
+					),
+				),
 		};
 		await serve(routes, {}, async (url) => {
 			const response = await fetch(`${url}/header-events`);
@@ -353,12 +354,13 @@ describe.each([
 			events: route
 				.get("/invalid-events")
 				.response(sse(invalid))
-				.handler(() => ({
-					status: 200,
-					body: (async function* () {
-						yield "unchecked";
-					})(),
-				})),
+				.handler(() =>
+					respond(
+						(async function* () {
+							yield "unchecked";
+						})(),
+					),
+				),
 		};
 		await serve(routes, {}, async (url) => {
 			// Adapters differ in whether status and headers are already committed
@@ -372,11 +374,13 @@ describe.each([
 
 	it("sends bodiless responses without a body", async () => {
 		const routes = {
-			inferred: route.delete("/inferred").handler(() => ({ status: 204 })),
+			inferred: route
+				.delete("/inferred")
+				.handler(() => respond(undefined, { status: 204 })),
 			declared: route
 				.delete("/declared")
 				.response({ status: 204 })
-				.handler(() => ({ status: 204 })),
+				.handler(() => respond(undefined, { status: 204 })),
 		};
 		await serve(routes, {}, async (url) => {
 			for (const path of ["inferred", "declared"]) {
@@ -472,7 +476,7 @@ describe.each([
 			form: route.get("/form").handler(() => {
 				const body = new FormData();
 				body.set("name", "Ada");
-				return { status: 200, contentType: "multipart/form-data", body };
+				return respond(body, { contentType: "multipart/form-data" });
 			}),
 		};
 		await serve(routes, {}, async (url) => {
@@ -484,14 +488,15 @@ describe.each([
 
 	it("streams binary response bodies", async () => {
 		const routes = {
-			bytes: route.get("/bytes").handler(() => ({
-				status: 200,
-				contentType: "application/octet-stream",
-				body: (async function* () {
-					yield new TextEncoder().encode("A");
-					yield new TextEncoder().encode("B");
-				})(),
-			})),
+			bytes: route.get("/bytes").handler(() =>
+				respond(
+					(async function* () {
+						yield new TextEncoder().encode("A");
+						yield new TextEncoder().encode("B");
+					})(),
+					{ contentType: "application/octet-stream" },
+				),
+			),
 		};
 		await serve(routes, {}, async (url) => {
 			const response = await fetch(`${url}/bytes`);

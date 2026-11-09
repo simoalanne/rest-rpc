@@ -3,6 +3,7 @@ import {
 	handleHttpRoute,
 	normalizeImplicitResponse,
 } from "./handleHttpRoute.ts";
+import { respond } from "./respond.ts";
 import { sseEvent } from "./sse.ts";
 import {
 	flattenRouteImplementations,
@@ -93,11 +94,7 @@ describe("handleHttpRoute", () => {
 					})),
 				},
 			)
-			.handler(() => ({
-				status: 200,
-				body: "2",
-				headers: { count: 2 },
-			}));
+			.handler(() => respond("2", { headers: { count: 2 } }));
 		const run = (disableResponseValidation: boolean) =>
 			handleHttpRoute(flattenRouteImplementations(implementation)[0]!, {
 				request: {},
@@ -123,7 +120,7 @@ describe("handleHttpRoute", () => {
 					location === "body" ? rejected : type<string>(),
 					location === "headers" ? { headers: rejected } : {},
 				)
-				.handler(() => ({ status: 200, body: "ok", headers: {} }));
+				.handler(() => respond("ok", { headers: {} }));
 			await expect(async () => execute(implementation)).rejects.toMatchObject({
 				code: "INTERNAL_SERVER_ERROR",
 				cause: { location },
@@ -138,7 +135,7 @@ describe("handleHttpRoute", () => {
 		const implementation = route
 			.get("/")
 			.response(sse(type((value: string) => Number(value))))
-			.handler(() => ({ status: 200, body: chunks() }));
+			.handler(() => respond(chunks()));
 		for (const disabled of [false, true]) {
 			const result = await handleHttpRoute(
 				flattenRouteImplementations(implementation)[0]!,
@@ -161,11 +158,11 @@ describe("handleHttpRoute", () => {
 			yield sseEvent(1, { id: "one" });
 		}
 		const result = await execute(
-			route.get("/").handler(() => ({
-				status: 201,
-				body: values(),
-				headers: { count: 1 },
-			})),
+			route
+				.get("/")
+				.handler(() =>
+					respond(values(), { status: 201, headers: { count: 1 } }),
+				),
 		);
 		if (!("body" in result)) throw new Error("Expected stream");
 		expect(result).toMatchObject({
@@ -189,7 +186,7 @@ describe("handleHttpRoute", () => {
 				route
 					.get("/")
 					.response(sse(rejected))
-					.handler(() => ({ status: 200, body: values() })),
+					.handler(() => respond(values())),
 			)[0]!,
 			{ request: {}, signal, onStreamError },
 		);
@@ -206,9 +203,7 @@ describe("handleHttpRoute", () => {
 		const schema = type((value: string) => value.toUpperCase());
 		expect(
 			await execute({
-				get: route
-					.response(schema)
-					.handler(() => ({ status: 200, body: "hello" })),
+				get: route.response(schema).handler(() => respond("hello")),
 			}),
 		).toMatchObject({
 			status: 200,
@@ -233,10 +228,10 @@ describe("handleHttpRoute", () => {
 		const defined = route
 			.get("/")
 			.response(type<string>())
-			.handler(() => ({ status: 200, body: "ok" }));
+			.handler(() => respond("ok"));
 		const implementation = {
 			...flattenRouteImplementations(defined)[0]!,
-			handler: () => ({ status: 404, body: "missing" }),
+			handler: () => respond("missing", { status: 404 }),
 		};
 		await expect(async () =>
 			handleHttpRoute(implementation, {
@@ -254,13 +249,13 @@ describe("handleHttpRoute", () => {
 				"text/plain": type<string>(),
 				"text/html": type((value: string) => `<p>${value}</p>`),
 			})
-			.handler(() => ({ status: 200, body: "ok", contentType: "text/plain" }));
+			.handler(() => respond("ok", { contentType: "text/plain" }));
 		const implementation = flattenRouteImplementations(defined)[0]!;
 		const run = (contentType?: string) =>
 			handleHttpRoute(
 				{
 					...implementation,
-					handler: () => ({ status: 200, body: "ok", contentType }),
+					handler: () => respond("ok", { contentType }),
 				},
 				{ request: {}, signal },
 			);
@@ -288,7 +283,7 @@ describe("handleHttpRoute", () => {
 			})
 			.handler(({ contentType, body }) => {
 				seen(contentType, body);
-				return { status: 204 };
+				return respond(undefined, { status: 204 });
 			});
 		const implementation = flattenRouteImplementations(defined)[0]!;
 		const run = (mediaType: string, body: unknown) =>
@@ -318,17 +313,21 @@ describe("handleHttpRoute", () => {
 });
 
 describe("normalizeImplicitResponse", () => {
-	it("sends undefined output without a body", () => {
-		expect(normalizeImplicitResponse(undefined)).toEqual({ status: 200 });
-	});
+	it.each([undefined, respond(undefined, { status: 204 })])(
+		"sends %j without a body",
+		(value) => {
+			expect(normalizeImplicitResponse(value)).not.toHaveProperty("body");
+		},
+	);
 
 	it.each([
 		null,
 		"hello",
 		42,
 		{ data: "ordinary" },
-		{ contentType: 1, data: "ordinary" },
 		{ contentType: "text/plain", data: "ordinary" },
+		{ status: 204, body: "ordinary" },
+		{ id: 1, status: "open" },
 	])("uses JSON for ordinary output %j", (value) => {
 		expect(normalizeImplicitResponse(value)).toEqual({
 			status: 200,
@@ -336,38 +335,17 @@ describe("normalizeImplicitResponse", () => {
 		});
 	});
 
-	it("gives status envelopes precedence over other fields", () => {
-		expect(
-			normalizeImplicitResponse({
-				status: 204,
-				contentType: "text/plain",
-				data: "ignored",
-			}),
-		).toEqual({ status: 204, headers: undefined });
-	});
-
-	it("distinguishes an absent body from an explicitly undefined body", () => {
-		expect(normalizeImplicitResponse({ status: 204 })).not.toHaveProperty(
-			"body",
-		);
-		expect(
-			normalizeImplicitResponse({ status: 200, body: undefined }),
-		).toHaveProperty("body", {
-			value: undefined,
-			contentType: "application/json",
-		});
-	});
-
 	it.each([200, 299])(
 		"accepts the 2xx status %s and preserves headers",
 		(status) => {
 			expect(
-				normalizeImplicitResponse({
-					status,
-					body: "hello",
-					contentType: "text/plain",
-					headers: { count: 2 },
-				}),
+				normalizeImplicitResponse(
+					respond("hello", {
+						status,
+						contentType: "text/plain",
+						headers: { count: 2 },
+					}),
+				),
 			).toEqual({
 				status,
 				headers: { count: 2 },
@@ -376,23 +354,12 @@ describe("normalizeImplicitResponse", () => {
 		},
 	);
 
-	it.each([
-		{ status: "200" },
-		{ status: undefined },
-		{ id: 1, status: "open" },
-	])("treats a non-numeric status as part of a 200 body %j", (value) => {
-		expect(normalizeImplicitResponse(value)).toEqual({
-			status: 200,
-			body: { value, contentType: "application/json" },
-		});
-	});
-
 	it.each([199, 300, 404, 200.5, NaN, Infinity])(
 		"rejects the inferred status %s outside 2xx",
 		(status) => {
-			expect(() => normalizeImplicitResponse({ status })).toThrow(
-				"must be from 200 to 299",
-			);
+			expect(() =>
+				normalizeImplicitResponse(respond(undefined, { status })),
+			).toThrow("must be from 200 to 299");
 		},
 	);
 
@@ -402,11 +369,10 @@ describe("normalizeImplicitResponse", () => {
 			const stream = (async function* () {})();
 			expect(
 				normalizeImplicitResponse(
-					mode === "plain" ? stream : { status: 201, body: stream },
+					mode === "plain" ? stream : respond(stream, { status: 201 }),
 				),
 			).toEqual({
 				status: mode === "plain" ? 200 : 201,
-				headers: undefined,
 				body: { stream },
 			});
 		},
@@ -415,11 +381,9 @@ describe("normalizeImplicitResponse", () => {
 	it("passes streams with an explicit content type to the body codecs", () => {
 		const body = new ReadableStream<Uint8Array>();
 		expect(
-			normalizeImplicitResponse({
-				status: 200,
-				body,
-				contentType: "application/octet-stream",
-			}),
+			normalizeImplicitResponse(
+				respond(body, { contentType: "application/octet-stream" }),
+			),
 		).toEqual({
 			status: 200,
 			body: { value: body, contentType: "application/octet-stream" },

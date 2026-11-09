@@ -1,5 +1,6 @@
 import { route, type } from "@rest-rpc/core";
 import { implement } from "./implement.ts";
+import { respond } from "../pipeline/respond.ts";
 import type { ServerRouteBuilderState } from "./routeBuilder.types.ts";
 
 const contract = {
@@ -31,7 +32,7 @@ describe("implement", () => {
 	});
 
 	it("should attach handlers to nested contract routes", () => {
-		const handler = () => ({ status: 200 as const, body: { name: "Ada" } });
+		const handler = () => respond({ name: "Ada" }, { status: 200 });
 		const implementedRoute = implement(contract).users.get.handler(handler);
 
 		expect(routeState(implementedRoute).handler).toBe(handler);
@@ -39,10 +40,9 @@ describe("implement", () => {
 	});
 
 	it("should reject contracts that already contain a handler", () => {
-		const implementedRoute = implement(contract.users.get).handler(() => ({
-			status: 200,
-			body: { name: "Ada" },
-		}));
+		const implementedRoute = implement(contract.users.get).handler(() =>
+			respond({ name: "Ada" }),
+		);
 
 		expect(() => implement(implementedRoute)).toThrow(
 			"Cannot implement a route that already has a handler.",
