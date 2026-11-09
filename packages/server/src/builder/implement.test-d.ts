@@ -1,5 +1,5 @@
 import { route, type } from "@rest-rpc/core";
-import type { Context, WithDefaultContext } from "./context.ts";
+import type { Context, DefaultContext, ExtendContext } from "./context.ts";
 import { implement } from "./implement.ts";
 import { respond } from "../pipeline/respond.ts";
 import type { ContractImplementer } from "./implement.types.ts";
@@ -64,17 +64,19 @@ describe("implement types", () => {
 			});
 	});
 
-	it("accepts separately typed handlers and replaces context", () => {
+	it("accepts separately typed handlers and extends context", () => {
 		const handler: RouteHandler<(typeof transformed)["~restrpc"], Values> = ({
 			params,
 		}) => respond(String(params.id));
 		implementation.users.get.handler(handler);
 		implementation
 			.$context<{ count: number }>()
-			.users.get.handler(({ context }) => {
+			.users.get.$context<{ requestId: number }>()
+			.handler(({ context }) => {
 				expectTypeOf(context.get("count")).toEqualTypeOf<number>();
-				// @ts-expect-error Replacing context removes its previous keys.
-				context.get("requestId");
+				expectTypeOf(context.get("requestId")).toEqualTypeOf<number>();
+				// @ts-expect-error Context keys must be defined.
+				context.get("missing");
 				return respond("ok");
 			});
 	});
@@ -83,15 +85,15 @@ describe("implement types", () => {
 		const implementation = implement(contract).$context<Values>();
 		expectTypeOf<
 			InferServerRequest<typeof implementation.users.get>["context"]
-		>().toEqualTypeOf<Context<WithDefaultContext<Values>>>();
+		>().toEqualTypeOf<Context<ExtendContext<DefaultContext, Values>>>();
 		type Handlers = InferServerHandler<typeof implementation>;
 		expectTypeOf<keyof Handlers>().toEqualTypeOf<"users">();
 		expectTypeOf<
 			InferServerRequest<typeof implementation>["users"]["get"]["context"]
-		>().toEqualTypeOf<Context<WithDefaultContext<Values>>>();
+		>().toEqualTypeOf<Context<ExtendContext<DefaultContext, Values>>>();
 		const leaf = implement(contract).users.get.$context<{ count: number }>();
 		expectTypeOf<InferServerRequest<typeof leaf>["context"]>().toEqualTypeOf<
-			Context<WithDefaultContext<{ count: number }>>
+			Context<ExtendContext<DefaultContext, { count: number }>>
 		>();
 	});
 });

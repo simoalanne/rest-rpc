@@ -7,7 +7,7 @@ import type {
 	ReusableMiddlewareRequest,
 } from "./routeBuilder.types.ts";
 import type { EmptyObject } from "@rest-rpc/core/utils";
-import type { WithDefaultContext } from "./context.ts";
+import type { ExtendContext } from "./context.ts";
 
 type ContractRoute = { readonly "~restrpc": RouteDefinition };
 
@@ -20,10 +20,10 @@ type ContractImplementerNode<
 				readonly context?: TContext;
 			};
 		} & HandlerMethodFor<TContract["~restrpc"], TContext> & {
-				/** Selects the typed per-request context store for this implementation, merged with `DefaultContext`. @see {@link https://rest-rpc.vercel.app/docs/context} */
+				/** Adds typed values to the per-request context store of this implementation, whose types win for keys already in it. @see {@link https://rest-rpc.vercel.app/docs/context} */
 				$context<TValues extends object>(): ContractImplementerNode<
 					TContract,
-					WithDefaultContext<TValues>
+					ExtendContext<TContext, TValues>
 				>;
 				/** Wraps this contract leaf with middleware. @see {@link https://rest-rpc.vercel.app/docs/middleware} */
 				use(
@@ -43,10 +43,10 @@ type ImplementerRootMethods<
 	TContract extends Contract,
 	TContext extends object,
 > = {
-	/** Selects the typed per-request context store for this implementation tree, merged with `DefaultContext`. @see {@link https://rest-rpc.vercel.app/docs/context} */
+	/** Adds typed values to the per-request context store of this implementation tree, whose types win for keys already in it. @see {@link https://rest-rpc.vercel.app/docs/context} */
 	$context<TValues extends object>(): ContractImplementerRoot<
 		TContract,
-		WithDefaultContext<TValues>
+		ExtendContext<TContext, TValues>
 	>;
 	/** Applies middleware to each route in this implementation tree. @see {@link https://rest-rpc.vercel.app/docs/middleware} */
 	use(
