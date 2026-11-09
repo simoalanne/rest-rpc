@@ -33,6 +33,18 @@ type TanstackQueryUtilFunctions = {
 	) => Record<string, unknown>;
 	mutationKey: () => MutationKey;
 	queryKey: (request?: unknown) => QueryKey;
+	infiniteQueryKey: (request?: unknown) => QueryKey;
+	streamedQueryKey: (request?: unknown) => QueryKey;
+};
+
+type QueryKeyKind = "query" | "infinite" | "streamed";
+
+// Each kind caches different data, so infinite and streamed keys add a segment
+// after the route path. Keys still share the route path as a prefix.
+const kindSegments: Record<QueryKeyKind, readonly string[]> = {
+	query: [],
+	infinite: ["~infinite"],
+	streamed: ["~streamed"],
 };
 
 type FetchData = (
@@ -47,10 +59,12 @@ const createUtilsForRoute = ({
 	routePath: string[];
 	fetchData: FetchData;
 }): TanstackQueryUtilFunctions => {
-	const queryKeyFor = (request: unknown): QueryKey =>
-		request === undefined || request === skipToken
-			? routePath
-			: [...routePath, request];
+	const queryKeyFor = (kind: QueryKeyKind, request: unknown): QueryKey => {
+		const key = [...routePath, ...kindSegments[kind]];
+		return request === undefined || request === skipToken
+			? key
+			: [...key, request];
+	};
 
 	return {
 		mutationOptions: (options) => {
@@ -65,7 +79,7 @@ const createUtilsForRoute = ({
 			const { fetchOptions, request, queryKey, ...tanstackOptions } =
 				options ?? {};
 			return {
-				queryKey: queryKey ?? queryKeyFor(request),
+				queryKey: queryKey ?? queryKeyFor("query", request),
 				queryFn:
 					request === skipToken
 						? skipToken
@@ -77,7 +91,16 @@ const createUtilsForRoute = ({
 		infiniteQueryOptions: (options) => {
 			const { fetchOptions, request, queryKey, ...tanstackOptions } = options;
 			return {
-				queryKey: queryKey ?? routePath,
+				// The request of the initial page identifies the query, so infinite
+				// queries with different inputs are cached separately.
+				queryKey:
+					queryKey ??
+					queryKeyFor(
+						"infinite",
+						typeof request === "function"
+							? request(tanstackOptions.initialPageParam)
+							: undefined,
+					),
 				queryFn:
 					request === skipToken
 						? skipToken
@@ -115,7 +138,7 @@ const createUtilsForRoute = ({
 				return stream;
 			};
 			return {
-				queryKey: queryKey ?? queryKeyFor(request),
+				queryKey: queryKey ?? queryKeyFor("streamed", request),
 				queryFn:
 					request === skipToken
 						? skipToken
@@ -126,7 +149,9 @@ const createUtilsForRoute = ({
 			};
 		},
 		mutationKey: () => routePath,
-		queryKey: queryKeyFor,
+		queryKey: (request) => queryKeyFor("query", request),
+		infiniteQueryKey: (request) => queryKeyFor("infinite", request),
+		streamedQueryKey: (request) => queryKeyFor("streamed", request),
 	};
 };
 
