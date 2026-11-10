@@ -4,7 +4,9 @@ import {
 	route as contractRoute,
 } from "@rest-rpc/core";
 import {
+	compileRoutes,
 	createApp,
+	createCatchAllHandler,
 	createLocalClient,
 	implement,
 	route,
@@ -42,6 +44,15 @@ export const withStreamResponse = route.get().response(sse(schema));
 export const withErrorClass = route.error(Unauthorized);
 export const withErrorCode = route.error("NOT_FOUND", { status: 404 });
 export const withMiddleware = route.use(({ next }) => next());
+export const respondingMiddleware = route
+	.response(schema)
+	.response({ status: 204 })
+	.use(async ({ respond, next }) =>
+		Math.random() > 0.5 ? respond(undefined, { status: 204 }) : next(),
+	);
+export const responding = respondingMiddleware
+	.get("/responding")
+	.handler(({ respond }) => respond(undefined, { status: 204 }));
 
 // A shared base extended after middleware.
 export const authenticated = route
@@ -52,17 +63,18 @@ export const authenticated = route
 	.use(({ next }) => next())
 	.$context<{ tenant: string }>();
 
-// Reusable middleware.
+// Reusable middleware, including one that injects context.
 export const timing = route.middleware(({ next }) => next());
+export const injecting = route.middleware(({ next }) =>
+	next({ context: { requestId: "1" } }),
+);
+export const injected = route.use(injecting);
 export const typedMiddleware = route.middleware<{
 	headers: { authorization: string };
 	errors: { UNAUTHORIZED: typeof Unauthorized };
 }>(({ next }) => next());
-export const baseMiddleware = authenticated.middleware(
-	({ headers, context, next }) => {
-		context.set("user", headers.authorization);
-		return next();
-	},
+export const baseMiddleware = authenticated.middleware(({ headers, next }) =>
+	next({ context: { user: headers.authorization } }),
 );
 
 // Completed server routes and a route tree.
@@ -71,7 +83,7 @@ export const getItem = authenticated
 	.get("/items/:id")
 	.handler(({ params, context }) => ({
 		id: params.id,
-		user: context.get("user"),
+		user: context.user,
 	}));
 export const routes = {
 	items: {
@@ -124,7 +136,11 @@ export const implementedRoute = implement(contract).users.get.handler(
 );
 
 // Apps and clients.
-export const app = createApp(routes);
+export const app = createApp(routes, {
+	context: { user: "user", tenant: "tenant" },
+});
+export const compiledRoutes = compileRoutes(routes);
+export const catchAllHandler = createCatchAllHandler(compiledRoutes);
 export const extractedContract = extractContract(routes);
 export const serverClient = createClient(extractedContract, {
 	baseUrl: "http://localhost",

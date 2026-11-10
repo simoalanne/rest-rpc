@@ -4,6 +4,7 @@ import {
 	normalizeMediaType,
 } from "@rest-rpc/core/codecs";
 import type { HttpMethod } from "@rest-rpc/core/contract";
+import type { EmptyObject } from "@rest-rpc/core/utils";
 import {
 	assertPathParams,
 	createRouteMatcher,
@@ -15,6 +16,7 @@ import {
 	resolveImplementationPath,
 	type RuntimeImplementation,
 	type RuntimeImplementationTree,
+	type TreeInitialContext,
 } from "../routing/match.ts";
 import { resolveRequestMediaType } from "./requestContentType.ts";
 import { handleHttpRoute, type HttpRouteResult } from "./handleHttpRoute.ts";
@@ -79,43 +81,60 @@ export type CompileRoutesOptions = {
 };
 
 /**
+ * The `context` option of a route tree's handlers: required when its routes
+ * require initial context.
+ */
+export type ContextOption<TContext extends object> = object extends TContext
+	? {
+			/** The initial context the routes require, provided before middleware runs. */
+			context?: TContext;
+		}
+	: {
+			/** The initial context the routes require, provided before middleware runs. */
+			context: TContext;
+		};
+
+/**
  * Per-request options for compiled routes and the catch-all handler.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#handle-options}
  */
-export type HandleOptions = {
-	/**
-	 * Initial context values, set before middleware runs. Values are not
-	 * type-checked against the context types routes define.
-	 */
-	context?: Record<string, unknown>;
-	/**
-	 * Percent-decoded path params, for requests whose URL does not contain the
-	 * route path. When omitted, params a router set as `request.params`, as Bun
-	 * and Express do, are used, or else they are read from the request URL.
-	 */
-	params?: Record<string, string>;
-	/**
-	 * An already decoded request body, such as one parsed by a framework's body
-	 * parser. When the key is present, even as `undefined`, the request body is
-	 * not read. The value is still validated against the route's body schema.
-	 */
-	body?: unknown;
-};
+export type HandleOptions<TContext extends object = EmptyObject> =
+	ContextOption<TContext> & {
+		/**
+		 * Percent-decoded path params, for requests whose URL does not contain the
+		 * route path. When omitted, params a router set as `request.params`, as Bun
+		 * and Express do, are used, or else they are read from the request URL.
+		 */
+		params?: Record<string, string>;
+		/**
+		 * An already decoded request body, such as one parsed by a framework's body
+		 * parser. When the key is present, even as `undefined`, the request body is
+		 * not read. The value is still validated against the route's body schema.
+		 */
+		body?: unknown;
+	};
 
 /**
  * Per-request options for the catch-all handler.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#mount-path}
  */
-export type CatchAllHandleOptions = HandleOptions & {
-	/**
-	 * The path the catch-all handler is mounted at, such as `/api`. Requests
-	 * outside it are unmatched, and it is removed from the request path before
-	 * matching. Route paths do not include it.
-	 */
-	mountPath?: AbsolutePath;
-};
+export type CatchAllHandleOptions<TContext extends object = EmptyObject> =
+	HandleOptions<TContext> & {
+		/**
+		 * The path the catch-all handler is mounted at, such as `/api`. Requests
+		 * outside it are unmatched, and it is removed from the request path before
+		 * matching. Route paths do not include it.
+		 */
+		mountPath?: AbsolutePath;
+	};
+
+/** Options, which are required when the routes require initial context. */
+export type OptionsArgs<
+	TContext extends object,
+	TOptions,
+> = object extends TContext ? [options?: TOptions] : [options: TOptions];
 
 /**
  * Result of dispatching a request with the Fetch catch-all handler.
@@ -134,7 +153,7 @@ export type FetchRouteHandlerResult =
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
  */
-export type FetchRoute = {
+export type FetchRoute<TContext extends object = EmptyObject> = {
 	readonly method: HttpMethod;
 	/** Route path with param markers per `paramSyntax`. */
 	readonly path: string;
@@ -144,7 +163,7 @@ export type FetchRoute = {
 	 */
 	readonly handle: (
 		request: Request,
-		options?: HandleOptions,
+		...options: OptionsArgs<TContext, HandleOptions<TContext>>
 	) => Promise<Response>;
 };
 
@@ -152,7 +171,7 @@ type FetchDispatch = (
 	implementation: RuntimeImplementation,
 	pathParams: PathParams,
 	request: Request,
-	options: HandleOptions | undefined,
+	options: HandleOptions<object> | undefined,
 ) => Promise<Response>;
 
 const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
@@ -269,10 +288,10 @@ const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
  */
-export function compileRoutes(
-	implementations: RuntimeImplementationTree,
+export function compileRoutes<TRoutes extends RuntimeImplementationTree>(
+	implementations: TRoutes,
 	options: CompileRoutesOptions = {},
-): FetchRoute[] {
+): FetchRoute<TreeInitialContext<TRoutes>>[] {
 	const dispatch = createFetchDispatch(options);
 
 	return flattenRouteImplementations(implementations).map((implementation) => {
@@ -284,7 +303,7 @@ export function compileRoutes(
 		return {
 			method: implementation.route.method,
 			path,
-			handle: (request, handleOptions) =>
+			handle: (request, ...[handleOptions]) =>
 				dispatch(implementation, pathParams, request, handleOptions),
 		};
 	});
@@ -298,15 +317,15 @@ export function compileRoutes(
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#catch-all-handler}
  */
-export function createCatchAllHandler(
-	routes: readonly FetchRoute[],
+export function createCatchAllHandler<TContext extends object>(
+	routes: readonly FetchRoute<TContext>[],
 ): (
 	request: Request,
-	options?: CatchAllHandleOptions,
+	...options: OptionsArgs<TContext, CatchAllHandleOptions<TContext>>
 ) => Promise<FetchRouteHandlerResult> {
 	const matchRoute = createRouteMatcher(routes);
 
-	return async (request, options) => {
+	return async (request, ...[options]) => {
 		const pathname = readRequestPathname(request.url);
 		const routePath = options?.mountPath
 			? stripMountPath(pathname, options.mountPath)
@@ -324,7 +343,9 @@ export function createCatchAllHandler(
 			matched: true,
 			response: await route.handle(
 				request,
-				params && !options?.params ? { ...options, params } : options,
+				...((params && !options?.params
+					? [{ ...options, params }]
+					: [options]) as OptionsArgs<TContext, HandleOptions<TContext>>),
 			),
 		};
 	};

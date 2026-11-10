@@ -6,11 +6,16 @@ import type {
 } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import type {
+	RespondOptions,
 	ResponseEnvelope,
 	ResponseEnvelopeFields,
 } from "../pipeline/respond.ts";
 import type { SseServerEvent } from "../pipeline/sse.ts";
-import type { Context, DefaultContext } from "./context.ts";
+import type {
+	DefaultContext,
+	ExtendContext,
+	InjectContext,
+} from "./context.ts";
 import type {
 	EmptyObject,
 	IsUnion,
@@ -199,6 +204,26 @@ type HandlerResult<TRoute extends RouteDefinition> = MaybePromise<
 	| PlainResponseBody<TRoute>
 >;
 
+/**
+ * The `respond` handlers and middleware receive: `respond()`, with `status`
+ * limited to `TStatus`.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/route-builder#return-responses}
+ */
+export type RouteRespond<TStatus extends number = number> = <
+	TBody,
+	const TOptions extends Omit<RespondOptions, "status"> & {
+		status?: TStatus;
+	} = {},
+>(
+	body: TBody,
+	options?: TOptions,
+) => ResponseEnvelope<TBody, NoInfer<TOptions>>;
+
+// Routes with defined responses respond with one of their statuses.
+type RespondStatusFor<TRoute extends RouteDefinition> =
+	HasDefinedResponses<TRoute> extends true ? DefinedStatus<TRoute> : number;
+
 /** Request fields every handler and middleware receives besides the validated request. */
 type HandlerFields = {
 	/** Aborts when the client disconnects. */
@@ -240,8 +265,10 @@ export type RouteRequest<
 		HandlerFields &
 		BodylessFields<TRoute> & {
 			route: TRoute;
-			context: Context<TContext>;
+			context: Readonly<TContext>;
 			errors: ErrorsOf<TRoute>;
+			/** Returns a response with a status, media type, or headers the route defines. */
+			respond: RouteRespond<RespondStatusFor<TRoute>>;
 		}
 >;
 
@@ -257,18 +284,35 @@ export type HandlerTree =
 	| { readonly "~restrpc": RouteDefinition }
 	| { readonly [key: string]: HandlerTree | ((...args: never) => unknown) };
 
-// Server routes and implementer leaves carry their selected context as a
-// type-only definition field. Contract routes do not, because the context is
-// selected when they are implemented.
+// Server routes and implementer leaves carry their handler context and the
+// initial context the host provides as type-only definition fields. Contract
+// routes do not, because the context is selected when they are implemented.
 export type ContextOf<TRoute> = TRoute extends {
 	readonly context?: infer TContext extends object;
 }
 	? TContext
 	: DefaultContext;
 
+/** The initial context the host must provide for a route. */
+export type InitialContextOf<TRoute> = TRoute extends {
+	readonly initialContext?: (context: infer TContext extends object) => void;
+}
+	? TContext
+	: DefaultContext;
+
+/**
+ * Type-only definition fields of a server route: the context its handler
+ * receives, and the initial context the host provides. The initial context is
+ * a parameter, so a route tree requires the intersection of its routes'.
+ */
+export type ContextFields<TInitial extends object, TContext extends object> = {
+	readonly context?: TContext;
+	readonly initialContext?: (context: TInitial) => void;
+};
+
 type WithoutContext<TRoute extends RouteDefinition> =
 	"context" extends keyof TRoute
-		? Extract<Omit<TRoute, "context">, RouteDefinition>
+		? Extract<Omit<TRoute, "context" | "initialContext">, RouteDefinition>
 		: TRoute;
 
 /**
@@ -346,10 +390,48 @@ export type InferServerResponse<TRoute extends HandlerTree> = HandlerResponses<
 	InferServerHandler<TRoute>
 >;
 
-export type MiddlewareReturn = unknown;
+declare const injectedContext: unique symbol;
+
+/**
+ * A response middleware may return: the response `next()` resolves to, a
+ * `respond()` result, or an object of the same shape, such as a response
+ * restored from a cache.
+ */
+export type MiddlewareResponse = RespondOptions & { readonly body?: unknown };
+
+/**
+ * The response `next()` resolves to: the downstream result as a `respond()`
+ * envelope with its status set. It carries the context injected with `next()`
+ * as a type-only key, so returning it types the context of later middleware
+ * and the handler.
+ */
+export type NextResponse<TInjected extends object> = ResponseEnvelope<
+	unknown,
+	Omit<RespondOptions, "status"> & { status: number }
+> & { readonly [injectedContext]: TInjected };
+
+/** The context a middleware returning `TResponse` injects. */
+export type InjectedOf<TResponse> = [
+	TResponse extends { readonly [injectedContext]: infer TInjected }
+		? TInjected
+		: never,
+] extends [infer TInjected extends object]
+	? [TInjected] extends [never]
+		? EmptyObject
+		: TInjected
+	: EmptyObject;
+
+/** Options of `next()`. */
+export type NextOptions<TInjected extends object> = {
+	/** Values added to the context of later middleware and the handler. */
+	context?: TInjected;
+};
 
 type Controls = {
-	next(): Promise<unknown>;
+	/** Runs later middleware and the handler, and resolves to their response. */
+	next<TInjected extends object = EmptyObject>(
+		options?: NextOptions<TInjected>,
+	): Promise<NextResponse<TInjected>>;
 };
 
 type UnknownRequest = {
@@ -377,7 +459,7 @@ type MiddlewareRoute<TRoute extends RouteDefinition> = TRoute extends {
 	? TRoute
 	: TRoute & { readonly meta?: Partial<MetaShapeOf<TRoute>> };
 
-/** The request inline middleware receives, typed by its route. */
+/** The request inline middleware receives, typed by its route and context. */
 export type MiddlewareRequest<
 	TRoute extends RouteDefinition,
 	TContext extends object,
@@ -397,5 +479,59 @@ export type ReusableMiddlewareRequest<
 		route: Omit<RouteDefinition, "meta"> & {
 			readonly meta?: Partial<TMetaShape>;
 		};
-		context: Context<TContext>;
+		context: Readonly<TContext>;
+		/** Returns a response with a status, media type, or headers. */
+		respond: RouteRespond;
 	} & Controls;
+
+/**
+ * Middleware defined with `route.middleware()`. It carries the context it
+ * reads as a type-only field, so `.use()` can add the context it reads and the
+ * route lacks to the route's initial context.
+ */
+export type ReusableMiddleware<
+	TRequest extends RequestFields,
+	TContext extends object,
+	TResult extends MaybePromise<MiddlewareResponse>,
+	TMetaShape extends object = DefaultMeta,
+> = ((
+	request: ReusableMiddlewareRequest<TRequest, TContext, TMetaShape>,
+) => TResult) & {
+	readonly "~restrpc": { readonly context?: TContext };
+};
+
+/** Any middleware defined with `route.middleware()`. */
+// oxlint-disable-next-line typescript/no-explicit-any
+export type AnyReusableMiddleware = ReusableMiddleware<any, any, any, any>;
+
+type MiddlewareContext<TMiddleware extends AnyReusableMiddleware> = NonNullable<
+	TMiddleware["~restrpc"]["context"]
+>;
+
+// Context the middleware reads but the route does not have yet.
+type MissingContext<
+	TContext extends object,
+	TMiddleware extends AnyReusableMiddleware,
+> = Omit<MiddlewareContext<TMiddleware>, keyof TContext>;
+
+/** The route's initial context after using reusable middleware: the context it reads and the route lacks is provided by the host. */
+export type InitialAfterReusable<
+	TInitial extends object,
+	TContext extends object,
+	TMiddleware extends AnyReusableMiddleware,
+> = ExtendContext<TInitial, MissingContext<TContext, TMiddleware>>;
+
+/** The context after using reusable middleware: missing context it reads is added, then the context it injects. */
+export type ContextAfterReusable<
+	TContext extends object,
+	TMiddleware extends AnyReusableMiddleware,
+> = ContextAfterInline<
+	ExtendContext<TContext, MissingContext<TContext, TMiddleware>>,
+	Awaited<ReturnType<TMiddleware>>
+>;
+
+/** The context after inline middleware that returns `TResponse`. */
+export type ContextAfterInline<
+	TContext extends object,
+	TResponse,
+> = InjectContext<TContext, InjectedOf<TResponse>>;

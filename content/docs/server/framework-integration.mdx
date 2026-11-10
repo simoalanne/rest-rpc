@@ -43,15 +43,15 @@ framework values to rest-rpc:
 
 ```ts
 type HandleOptions = {
-	context?: Record<string, unknown>;
+	context?: TContext; // required when the routes declare initial context
 	params?: Record<string, string>;
 	body?: unknown;
 };
 ```
 
-- `context`: values to seed the request [context](/docs/middleware#context) with before
-  middleware runs, such as an authenticated user or the native request. They
-  are not type-checked against the context types routes define.
+- `context`: the [initial context](/docs/middleware#values-from-the-host) the
+  routes declare, such as an authenticated user or the native request. It is
+  required when they declare initial context.
 - `params`: percent-decoded path params, for requests whose URL does not
   contain the route path, such as after a rewrite. Otherwise params a router
   sets, such as `req.params` in Express, are used, or else they are read from

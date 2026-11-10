@@ -65,12 +65,10 @@ Bun.serve({
 ```ts
 type CreateAppOptions = {
 	mountPath?: AbsolutePath;
+	// Required when the routes declare initial context.
 	context?:
-		| Record<string, unknown>
-		| ((
-				request: Request,
-				...args: TArgs
-		  ) => Record<string, unknown> | Promise<Record<string, unknown>>);
+		| TContext
+		| ((request: Request, ...args: TArgs) => TContext | Promise<TContext>);
 	notFound?: (
 		request: Request,
 	) => Promise<Response> | Response | Promise<void> | void;
@@ -82,14 +80,15 @@ type CreateAppOptions = {
   belongs in the routes instead, defined with
   [`.prefix()`](/docs/route-builder#path-prefixes), so that clients and OpenAPI
   documents include it.
-- `context`: values to seed the request [context](/docs/middleware#context) with before
-  middleware runs, or a function, sync or async, that returns them for each
-  request. They are not type-checked against the context types routes define.
-  If the function throws, the response is an `INTERNAL_SERVER_ERROR`.
+- `context`: the [initial context](/docs/middleware#values-from-the-host) the
+  routes declare, or a function, sync or async, that returns it for each
+  request. It is required when the routes declare initial context, and must
+  satisfy the initial context of every route. If the function throws, the
+  response is an `INTERNAL_SERVER_ERROR`.
 
   ```ts
   createApp(routes, {
-  	context: async (request) => ({ user: await authenticate(request) }),
+  	context: async (request) => ({ db, headers: request.headers }),
   });
   ```
 

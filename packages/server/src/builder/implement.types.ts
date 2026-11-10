@@ -1,42 +1,76 @@
 import type { Contract, RouteDefinition } from "@rest-rpc/core/contract";
+import type { EmptyObject, MaybePromise } from "@rest-rpc/core/utils";
 import type { HandlerMethodFor } from "./routeBuilder.ts";
 import type {
+	AnyReusableMiddleware,
+	ContextAfterInline,
+	ContextAfterReusable,
+	ContextFields,
+	InitialAfterReusable,
 	MetaShapeOf,
 	MiddlewareRequest,
-	MiddlewareReturn,
+	MiddlewareResponse,
 	RequestFields,
 	ReusableMiddlewareRequest,
 } from "./routeBuilder.types.ts";
-import type { EmptyObject } from "@rest-rpc/core/utils";
 import type { ExtendContext } from "./context.ts";
 
 type ContractRoute = { readonly "~restrpc": RouteDefinition };
 
+/** A contract implementer leaf, with handler, middleware and context methods. */
+export type ContractImplementerLeaf<
+	TContract extends ContractRoute,
+	TInitial extends object,
+	TContext extends object = TInitial,
+> = {
+	readonly "~restrpc": TContract["~restrpc"] &
+		ContextFields<TInitial, TContext>;
+} & HandlerMethodFor<TContract["~restrpc"], TInitial, TContext> & {
+		/** Declares initial context the host provides for this implementation. Repeated declarations must all be satisfied. @see {@link https://rest-rpc.vercel.app/docs/middleware#context} */
+		$context<TValues extends object>(): ContractImplementerLeaf<
+			TContract,
+			ExtendContext<TInitial, TValues>,
+			ExtendContext<TContext, TValues>
+		>;
+		/** Wraps this contract leaf with middleware. @see {@link https://rest-rpc.vercel.app/docs/middleware} */
+		use<TResult extends MaybePromise<MiddlewareResponse>>(
+			middleware: (
+				request: MiddlewareRequest<TContract["~restrpc"], TContext>,
+			) => TResult,
+		): ContractImplementerLeaf<
+			TContract,
+			TInitial,
+			ContextAfterInline<TContext, Awaited<TResult>>
+		>;
+		/** Wraps this contract leaf with middleware defined with `route.middleware()`. @see {@link https://rest-rpc.vercel.app/docs/middleware#reuse-middleware} */
+		use<TMiddleware extends AnyReusableMiddleware>(
+			middleware: TMiddleware &
+				NoInfer<
+					(
+						request: MiddlewareRequest<
+							TContract["~restrpc"],
+							ContextAfterReusable<TContext, TMiddleware>
+						>,
+					) => unknown
+				>,
+		): ContractImplementerLeaf<
+			TContract,
+			InitialAfterReusable<TInitial, TContext, TMiddleware>,
+			ContextAfterReusable<TContext, TMiddleware>
+		>;
+	};
+
 /** A contract implementer subtree, or a leaf with handler, middleware and context methods. */
 export type ContractImplementerNode<
 	TContract extends Contract,
-	TContext extends object,
+	TInitial extends object,
+	TContext extends object = TInitial,
 > = TContract extends ContractRoute
-	? {
-			readonly "~restrpc": TContract["~restrpc"] & {
-				readonly context?: TContext;
-			};
-		} & HandlerMethodFor<TContract["~restrpc"], TContext> & {
-				/** Adds typed values to the per-request context store of this implementation, whose types win for keys already in it. @see {@link https://rest-rpc.vercel.app/docs/middleware#context} */
-				$context<TValues extends object>(): ContractImplementerNode<
-					TContract,
-					ExtendContext<TContext, TValues>
-				>;
-				/** Wraps this contract leaf with middleware. @see {@link https://rest-rpc.vercel.app/docs/middleware} */
-				use(
-					middleware: (
-						request: MiddlewareRequest<TContract["~restrpc"], TContext>,
-					) => MiddlewareReturn,
-				): ContractImplementerNode<TContract, TContext>;
-			}
+	? ContractImplementerLeaf<TContract, TInitial, TContext>
 	: {
 			readonly [TKey in keyof TContract]: ContractImplementerNode<
 				Extract<TContract[TKey], Contract>,
+				TInitial,
 				TContext
 			>;
 		};
@@ -51,39 +85,65 @@ type ContractMetaShape<TContract> = TContract extends ContractRoute
 /** The `$context()` and `use()` methods of a contract implementer tree. */
 export type ImplementerRootMethods<
 	TContract extends Contract,
-	TContext extends object,
+	TInitial extends object,
+	TContext extends object = TInitial,
+	TMetaShape extends object = ContractMetaShape<TContract>,
 > = {
-	/** Adds typed values to the per-request context store of this implementation tree, whose types win for keys already in it. @see {@link https://rest-rpc.vercel.app/docs/middleware#context} */
+	/** Declares initial context the host provides for every route in this implementation tree. Repeated declarations must all be satisfied. @see {@link https://rest-rpc.vercel.app/docs/middleware#context} */
 	$context<TValues extends object>(): ContractImplementerRoot<
 		TContract,
+		ExtendContext<TInitial, TValues>,
 		ExtendContext<TContext, TValues>
 	>;
 	/** Applies middleware to each route in this implementation tree. @see {@link https://rest-rpc.vercel.app/docs/middleware} */
-	use(
+	use<TResult extends MaybePromise<MiddlewareResponse>>(
 		middleware: (
-			request: ReusableMiddlewareRequest<
-				RequestFields,
-				TContext,
-				ContractMetaShape<TContract>
+			request: ReusableMiddlewareRequest<RequestFields, TContext, TMetaShape>,
+		) => TResult,
+	): ContractImplementerRoot<
+		TContract,
+		TInitial,
+		ContextAfterInline<TContext, Awaited<TResult>>
+	>;
+	/** Applies middleware defined with `route.middleware()` to each route in this implementation tree. @see {@link https://rest-rpc.vercel.app/docs/middleware#reuse-middleware} */
+	use<TMiddleware extends AnyReusableMiddleware>(
+		middleware: TMiddleware &
+			NoInfer<
+				(
+					request: ReusableMiddlewareRequest<
+						RequestFields,
+						ContextAfterReusable<TContext, TMiddleware>,
+						TMetaShape
+					>,
+				) => unknown
 			>,
-		) => MiddlewareReturn,
-	): ContractImplementerRoot<TContract, TContext>;
+	): ContractImplementerRoot<
+		TContract,
+		InitialAfterReusable<TInitial, TContext, TMiddleware>,
+		ContextAfterReusable<TContext, TMiddleware>
+	>;
 };
 
 /** The root of a contract implementer tree, with methods applied to every route in it. */
 export type ContractImplementerRoot<
 	TContract extends Contract,
-	TContext extends object,
+	TInitial extends object,
+	TContext extends object = TInitial,
 > = TContract extends ContractRoute
-	? ContractImplementerNode<TContract, TContext>
+	? ContractImplementerNode<TContract, TInitial, TContext>
 	: {
 			readonly [
 				TKey in Exclude<keyof TContract, "use" | "$context">
-			]: ContractImplementerNode<Extract<TContract[TKey], Contract>, TContext>;
-		} & ImplementerRootMethods<TContract, TContext>;
+			]: ContractImplementerNode<
+				Extract<TContract[TKey], Contract>,
+				TInitial,
+				TContext
+			>;
+		} & ImplementerRootMethods<TContract, TInitial, TContext>;
 
 /** Recursively exposes middleware and handler attachment on every route in a core contract. */
 export type ContractImplementer<
 	TContract extends Contract,
-	TContext extends object = EmptyObject,
-> = ContractImplementerRoot<TContract, TContext>;
+	TInitial extends object = EmptyObject,
+	TContext extends object = TInitial,
+> = ContractImplementerRoot<TContract, TInitial, TContext>;

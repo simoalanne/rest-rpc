@@ -1,5 +1,5 @@
 import { route, type } from "@rest-rpc/core";
-import type { Context, DefaultContext, ExtendContext } from "./context.ts";
+import type { DefaultContext, ExtendContext } from "./context.ts";
 import { implement } from "./implement.ts";
 import { respond } from "../pipeline/respond.ts";
 import type { ContractImplementer } from "./implement.types.ts";
@@ -39,7 +39,7 @@ describe("implement types", () => {
 
 		implementation.users.get.handler((request) => {
 			expectTypeOf(request.params).toEqualTypeOf<{ id: string }>();
-			expectTypeOf(request.context.get("requestId")).toEqualTypeOf<string>();
+			expectTypeOf(request.context.requestId).toEqualTypeOf<string>();
 
 			return respond({ name: "Ada" });
 		});
@@ -49,18 +49,22 @@ describe("implement types", () => {
 		implementation
 			.use(({ signal, context, next }) => {
 				expectTypeOf(signal).toEqualTypeOf<AbortSignal>();
-				context.set("requestId", "1");
-				return next();
+				expectTypeOf(context.requestId).toEqualTypeOf<string>();
+				return next({ context: { tenant: "t" } });
 			})
-			.users.get.use(({ params, next }) => {
+			.users.get.use(({ params, context, next }) => {
 				expectTypeOf(params.id).toEqualTypeOf<number>();
+				expectTypeOf(context.tenant).toEqualTypeOf<string>();
 				return next();
 			})
 			.handler((request) => {
 				expectTypeOf(request).toEqualTypeOf<
-					RouteRequest<(typeof transformed)["~restrpc"], Values>
+					RouteRequest<
+						(typeof transformed)["~restrpc"],
+						{ requestId: string; tenant: string }
+					>
 				>();
-				return respond(request.context.get("requestId"));
+				return respond(request.context.requestId);
 			});
 	});
 
@@ -71,12 +75,12 @@ describe("implement types", () => {
 		implementation.users.get.handler(handler);
 		implementation
 			.$context<{ count: number }>()
-			.users.get.$context<{ requestId: number }>()
+			.users.get.$context<{ requestId: "1" }>()
 			.handler(({ context }) => {
-				expectTypeOf(context.get("count")).toEqualTypeOf<number>();
-				expectTypeOf(context.get("requestId")).toEqualTypeOf<number>();
-				// @ts-expect-error Context keys must be defined.
-				context.get("missing");
+				expectTypeOf(context.count).toEqualTypeOf<number>();
+				expectTypeOf(context.requestId).toEqualTypeOf<"1">();
+				// @ts-expect-error Context keys must be declared or injected.
+				void context.missing;
 				return respond("ok");
 			});
 	});
@@ -85,15 +89,15 @@ describe("implement types", () => {
 		const implementation = implement(contract).$context<Values>();
 		expectTypeOf<
 			InferServerRequest<typeof implementation.users.get>["context"]
-		>().toEqualTypeOf<Context<ExtendContext<DefaultContext, Values>>>();
+		>().toEqualTypeOf<Readonly<ExtendContext<DefaultContext, Values>>>();
 		type Handlers = InferServerHandler<typeof implementation>;
 		expectTypeOf<keyof Handlers>().toEqualTypeOf<"users">();
 		expectTypeOf<
 			InferServerRequest<typeof implementation>["users"]["get"]["context"]
-		>().toEqualTypeOf<Context<ExtendContext<DefaultContext, Values>>>();
+		>().toEqualTypeOf<Readonly<ExtendContext<DefaultContext, Values>>>();
 		const leaf = implement(contract).users.get.$context<{ count: number }>();
 		expectTypeOf<InferServerRequest<typeof leaf>["context"]>().toEqualTypeOf<
-			Context<ExtendContext<DefaultContext, { count: number }>>
+			Readonly<ExtendContext<DefaultContext, { count: number }>>
 		>();
 	});
 });

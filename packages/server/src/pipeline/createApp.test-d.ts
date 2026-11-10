@@ -2,9 +2,14 @@ import { route } from "../builder/routeBuilder.ts";
 import { serve } from "../node/adapter.ts";
 import { createApp, type App } from "./createApp.ts";
 
-const routes = { health: route.get("/health").handler(() => "ok") };
-
 type Env = { DB: { name: string } };
+
+const routes = {
+	health: route
+		.$context<{ db?: Env["DB"] | number }>()
+		.get("/health")
+		.handler(() => "ok"),
+};
 
 describe("createApp", () => {
 	it("infers the runtime arguments from the context function", () => {

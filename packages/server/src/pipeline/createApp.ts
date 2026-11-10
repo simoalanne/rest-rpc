@@ -1,7 +1,10 @@
 import type { AbsolutePath } from "@rest-rpc/core";
 import { joinPrefix, type HttpMethod } from "@rest-rpc/core/contract";
-import type { MaybePromise } from "@rest-rpc/core/utils";
-import type { RuntimeImplementationTree } from "../routing/match.ts";
+import type { EmptyObject, MaybePromise } from "@rest-rpc/core/utils";
+import type {
+	RuntimeImplementationTree,
+	TreeInitialContext,
+} from "../routing/match.ts";
 import {
 	compileRoutes,
 	createCatchAllHandler,
@@ -18,30 +21,15 @@ import { serializeRouteError } from "./serializeHttpRouteResult.ts";
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#app-options}
  */
-export type CreateAppOptions<TArgs extends unknown[] = []> = Omit<
-	CompileRoutesOptions,
-	"paramSyntax"
-> & {
+export type CreateAppOptions<
+	TArgs extends unknown[] = [],
+	TContext extends object = EmptyObject,
+> = Omit<CompileRoutesOptions, "paramSyntax"> & {
 	/**
 	 * The path the routes are served under, such as `/api`. Route paths do not
 	 * include it.
 	 */
 	mountPath?: AbsolutePath;
-	/**
-	 * Initial context values for each request, set before middleware runs, or
-	 * a function that returns them for the request. Values are not
-	 * type-checked against the context types routes define.
-	 *
-	 * @remarks The function also receives the arguments the runtime passes to
-	 * `fetch` after the request, such as the `env` of Cloudflare Workers. Their
-	 * types are inferred from the parameters of the function.
-	 */
-	context?:
-		| Record<string, unknown>
-		| ((
-				request: Request,
-				...args: TArgs
-		  ) => Record<string, unknown> | Promise<Record<string, unknown>>);
 	/**
 	 * Returns the response for requests that match no route. Returning
 	 * nothing keeps the default response.
@@ -49,7 +37,22 @@ export type CreateAppOptions<TArgs extends unknown[] = []> = Omit<
 	 * @default A `NOT_FOUND` error response.
 	 */
 	notFound?: (request: Request) => Response | void | Promise<Response | void>;
+	/**
+	 * The initial context the routes require for each request, or a function
+	 * that returns it for the request. Required when the routes require
+	 * initial context.
+	 *
+	 * @remarks The function also receives the arguments the runtime passes to
+	 * `fetch` after the request, such as the `env` of Cloudflare Workers. Their
+	 * types are inferred from the parameters of the function.
+	 */
+	context?: AppContext<TArgs, TContext>;
 };
+
+/** The `context` option of {@link createApp}: the initial context, or a function that returns it for a request. */
+export type AppContext<TArgs extends unknown[], TContext extends object> =
+	| TContext
+	| ((request: Request, ...args: TArgs) => TContext | Promise<TContext>);
 
 /**
  * A Fetch app that serves a route tree.
@@ -95,34 +98,55 @@ const defaultNotFound = () => serializeRouteError(new NotFound());
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#usage}
  */
-export function createApp<TArgs extends unknown[] = []>(
+export function createApp<
+	TRoutes extends RuntimeImplementationTree<EmptyObject>,
+	TArgs extends unknown[] = [],
+>(
+	implementations: TRoutes,
+	options?: CreateAppOptions<TArgs, TreeInitialContext<TRoutes>>,
+): App<TArgs>;
+/**
+ * Creates a Fetch app that serves a route tree whose routes require initial
+ * context, so `context` is required.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#usage}
+ */
+export function createApp<
+	TRoutes extends RuntimeImplementationTree,
+	TArgs extends unknown[] = [],
+>(
+	implementations: TRoutes,
+	options: CreateAppOptions<TArgs, TreeInitialContext<TRoutes>> & {
+		context: AppContext<TArgs, TreeInitialContext<TRoutes>>;
+	},
+): App<TArgs>;
+export function createApp(
 	implementations: RuntimeImplementationTree,
-	options: CreateAppOptions<TArgs> = {},
-): App<TArgs> {
+	options?: CreateAppOptions<unknown[], object>,
+): App<unknown[]> {
 	const {
 		mountPath,
 		context,
 		notFound = defaultNotFound,
 		...compileOptions
-	} = options;
+	} = options ?? {};
 	const respondWithInternalError = (error: unknown, request: Request) => {
 		const internal = new InternalServerError({ cause: error });
 		observeError(compileOptions.onError, internal, request);
 		return serializeRouteError(internal);
 	};
-	const compiled = compileRoutes(implementations, {
+	const compiled = compileRoutes<RuntimeImplementationTree>(implementations, {
 		...compileOptions,
 		paramSyntax: "colon",
 	});
-	const handler = createCatchAllHandler(compiled);
-	// A plain context is shared, since each request copies it into its own
-	// context.
-	const sharedOptions: CatchAllHandleOptions = { mountPath };
+	const handler = createCatchAllHandler<object>(compiled);
+	// A plain context is shared: middleware injects values into new objects.
+	const sharedOptions: CatchAllHandleOptions<object> = { mountPath };
 	if (typeof context === "object") sharedOptions.context = context;
 	const readHandleOptions = (
 		request: Request,
-		args: TArgs,
-	): MaybePromise<CatchAllHandleOptions> =>
+		args: unknown[],
+	): MaybePromise<CatchAllHandleOptions<object>> =>
 		typeof context === "function"
 			? mapMaybePromise(context(request, ...args), (values) => ({
 					mountPath,
@@ -130,7 +154,7 @@ export function createApp<TArgs extends unknown[] = []>(
 				}))
 			: sharedOptions;
 
-	const routes: App<TArgs>["routes"] = {};
+	const routes: App<unknown[]>["routes"] = {};
 	for (const route of compiled) {
 		// The mount path alone serves the `/` route, as in the catch-all handler.
 		const path = joinPrefix(mountPath, route.path as AbsolutePath);

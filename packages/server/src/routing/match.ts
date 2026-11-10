@@ -1,3 +1,4 @@
+import type { EmptyObject, Merge } from "@rest-rpc/core/utils";
 import {
 	contractRouteEntries,
 	getPathParamNames,
@@ -61,16 +62,39 @@ export type RuntimeImplementation = {
 	errorFactories: Readonly<Record<string, (options?: unknown) => RouteError>>;
 };
 
-export type ImplementedRoute = {
+// `TContext` is the initial context the routes accept. By default they may
+// require any.
+export type ImplementedRoute<TContext extends object = never> = {
 	readonly "~restrpc": RouteDefinition & {
 		readonly handler: (...args: never[]) => unknown;
 		readonly middleware?: readonly RuntimeRouteHandler[];
+		readonly initialContext?: (context: TContext) => void;
 	};
 };
 
-export type RuntimeImplementationTree =
-	| ImplementedRoute
-	| { readonly [key: string]: RuntimeImplementationTree };
+export type RuntimeImplementationTree<TContext extends object = never> =
+	| ImplementedRoute<TContext>
+	| { readonly [key: string]: RuntimeImplementationTree<TContext> };
+
+// The `initialContext` parameter types of the routes in a tree, as a union.
+type InitialContextParameters<T> = T extends {
+	readonly "~restrpc": { readonly initialContext?: infer TParameter };
+}
+	? NonNullable<TParameter>
+	: T extends object
+		? { [K in keyof T]: InitialContextParameters<T[K]> }[keyof T]
+		: never;
+
+/**
+ * The initial context a route tree requires: the intersection of its routes'
+ * initial contexts.
+ */
+export type TreeInitialContext<T> =
+	InitialContextParameters<T> extends (context: infer TContext) => void
+		? [TContext] extends [never]
+			? EmptyObject
+			: Extract<Merge<TContext>, object>
+		: EmptyObject;
 
 export function isImplementedRoute(value: unknown): value is ImplementedRoute {
 	return (

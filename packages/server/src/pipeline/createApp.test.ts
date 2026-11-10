@@ -123,7 +123,7 @@ describe("createApp", () => {
 		const user = route
 			.$context<{ user: string }>()
 			.get("/user")
-			.handler(({ context }) => context.get("user"));
+			.handler(({ context }) => context.user);
 		const contexts = [
 			{ user: "plain" },
 			(request: Request) => ({ user: request.headers.get("x-user")! }),
@@ -147,7 +147,7 @@ describe("createApp", () => {
 		const user = route
 			.$context<{ user: string }>()
 			.get("/user")
-			.handler(({ context }) => context.get("user"));
+			.handler(({ context }) => context.user);
 		const app = createApp(
 			{ user },
 			{ context: (_request, env: { user: string }) => ({ user: env.user }) },
