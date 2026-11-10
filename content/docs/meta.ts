@@ -7,7 +7,6 @@ export default defineMeta({
 		"cheatsheet",
 		"route-builder",
 		"middleware",
-		"context",
 		"streaming",
 		"contract-first",
 		"http-behavior",

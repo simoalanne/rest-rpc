@@ -70,6 +70,7 @@ export type {
 	BodyCodecOperations,
 	BodyValue,
 	ClientPromise,
+	DefaultMeta,
 	InferClientError,
 	SafeResult,
 	SerializedBody,

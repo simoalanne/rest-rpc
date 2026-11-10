@@ -62,24 +62,14 @@ export const routes = { todos: { create, get } };
 The implementation must match the contract's request segments and defined
 responses, and throw the contract's defined errors. Compile and register the completed routes as usual.
 
-## Context And Middleware
+## Context, Middleware and Metadata
 
-Context and middleware are supported in contract-first routes. See [Context](/docs/context) and [Middleware](/docs/middleware) for details.
+[Context, middleware and metadata](/docs/middleware) work as for server-first
+routes, with two differences.
 
-Call `$context<T>()` and `.use()` on an implemented route before `.handler()`:
-
-```ts
-const create = implement(api.todos.create)
-	.$context<{ user: { id: string } }>()
-	.use(authenticate)
-	.handler(({ body, context }) => createTodo(body.title, context.get("user")));
-```
-
-### Share Across Routes
-
-To share context and middleware with several routes, pass a contract tree to
-`implement()`. The implementer mirrors the tree, and `$context<T>()` and
-`.use()` on it apply to every route in the tree:
+`$context<T>()` and `.use()` are called on the `implement()` result, before
+`.handler()`. Pass a contract tree to `implement()` to share them with every
+route in the tree:
 
 ```ts
 const todos = implement(api.todos)
@@ -99,6 +89,10 @@ export const routes = {
 	},
 };
 ```
+
+Metadata is part of the contract, so declare its shape with `$meta<T>()` and
+set it with `.meta()` on contract routes. Middleware on the implementation
+reads `route.meta` with the shape of the routes it runs on.
 
 :::error[Reserved Keys]
 Don't use `use` or `$context` as top-level keys of a contract tree passed to `implement()`. They are reserved for the implementer.

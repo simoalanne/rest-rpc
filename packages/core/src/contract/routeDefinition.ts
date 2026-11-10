@@ -11,7 +11,20 @@ export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 /** An absolute URL path that begins with a slash. */
 export type AbsolutePath = `/${string}`;
 
-export type RouteMeta = Record<string, unknown>;
+// Interfaces have no index signature, so metadata shapes are plain objects.
+export type RouteMeta = object;
+
+/**
+ * The default route metadata shape, which `.meta()` values must match. Augment
+ * this interface with `declare module "@rest-rpc/core"`, or with
+ * `declare module "@rest-rpc/server"` in server code. While it has no keys,
+ * `.meta()` is unavailable until a shape is declared with `$meta()`.
+ *
+ * @default {}
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/middleware#metadata}
+ */
+export interface DefaultMeta {}
 
 export type OpenApiRouteOptions = {
 	summary?: string;
@@ -58,5 +71,7 @@ export type RouteDefinition = {
 	responses: RouteResponses;
 	errors?: RouteErrors;
 	meta?: RouteMeta;
+	/** Type-only metadata shape declared with `$meta()` and `DefaultMeta`, with no runtime value. */
+	metaShape?: RouteMeta;
 	openApi?: OpenApiRouteOptions;
 };

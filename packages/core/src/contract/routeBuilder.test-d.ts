@@ -3,7 +3,7 @@ import { type } from "../standard-schema/type.ts";
 import { route } from "./routeBuilder.ts";
 import { sse } from "./sse.ts";
 import { routeError } from "./routeError.ts";
-import type { OpenApiRouteOptions } from "./routeDefinition.ts";
+import type { DefaultMeta, OpenApiRouteOptions } from "./routeDefinition.ts";
 
 describe("routeBuilder types", () => {
 	it("preserves method, path and response status literals", () => {
@@ -34,6 +34,7 @@ describe("routeBuilder types", () => {
 					content: { "application/json": StandardSchemaV1<{ name: string }> };
 				};
 			};
+			readonly metaShape?: DefaultMeta;
 		}>();
 	});
 
@@ -77,6 +78,7 @@ describe("routeBuilder types", () => {
 
 	it("merges repeated meta and OpenAPI details", () => {
 		const value = route
+			.$meta<{ auth: "required" | "optional"; scope: string }>()
 			.meta({ auth: "required", scope: "read" })
 			.openAPI({ tags: ["Todos"] })
 			.meta({ scope: "write" })
@@ -88,6 +90,17 @@ describe("routeBuilder types", () => {
 		expectTypeOf(
 			value["~restrpc"].openApi,
 		).toEqualTypeOf<OpenApiRouteOptions>();
+	});
+
+	it("offers meta once a shape is declared and checks values against it", () => {
+		expectTypeOf(route).not.toHaveProperty("meta");
+		const value = route
+			.$meta<{ auth: boolean; scope: string }>()
+			.get()
+			.$meta<{ scope: number }>();
+		value.meta({ auth: true, scope: 1 });
+		// @ts-expect-error `scope` is a number in the later shape.
+		value.meta({ scope: "read" });
 	});
 
 	it("defaults response statuses to 200 and reads them from options", () => {

@@ -6,7 +6,6 @@ import type {
 	HttpMethod,
 	OpenApiRouteOptions,
 	RouteDefinition,
-	RouteMeta,
 } from "./routeDefinition.ts";
 import type {
 	RequestHeadersSchema,
@@ -35,6 +34,8 @@ import type {
 	WithError,
 	WithHttpMethod,
 	WithMeta,
+	WithMetaShape,
+	OmittedMethods,
 	WithPrefix,
 	WithRequest,
 	WithResponse,
@@ -214,7 +215,7 @@ const addError = (
 
 export interface RouteBuilderKind extends BuilderKind {
 	readonly builder: this["state"] extends infer TState extends BuilderState
-		? Omit<RouteBuilder<TState>, TState["omit"]>
+		? Omit<RouteBuilder<TState>, OmittedMethods<TState>>
 		: never;
 }
 
@@ -322,8 +323,16 @@ export class RouteBuilder<
 		);
 	}
 
-	/** Adds application metadata, shallow-merged with earlier metadata. @see {@link https://rest-rpc.vercel.app/docs/route-builder#add-metadata-and-openapi-details} */
-	meta<const TMeta extends RouteMeta>(
+	/** Declares the metadata shape that `.meta()` values must match, whose types win for keys already in it. @see {@link https://rest-rpc.vercel.app/docs/middleware#metadata} */
+	$meta<TShape extends object>(): BuilderFor<
+		TKind,
+		WithMetaShape<TState, TShape>
+	> {
+		return this as never;
+	}
+
+	/** Adds metadata matching the declared shape, shallow-merged with earlier metadata. @see {@link https://rest-rpc.vercel.app/docs/middleware#metadata} */
+	meta<const TMeta extends Partial<TState["metaShape"]>>(
 		meta: TMeta,
 	): BuilderFor<TKind, WithMeta<TState, TMeta>> {
 		const state = defaultRouteState(this["~restrpc"]);
@@ -420,4 +429,5 @@ export class RouteBuilder<
  *
  * @see {@link https://rest-rpc.vercel.app/docs/route-builder}
  */
-export const route = new RouteBuilder();
+export const route: BuilderFor<RouteBuilderKind, RootBuilderState> =
+	new RouteBuilder();

@@ -1,11 +1,16 @@
 ---
 title: Middleware
-description: Wrap route execution with shared application context.
+description: Wrap route execution, share per-request context, and describe routes with metadata.
 ---
 
 Use `.use()` to implement guards, transactions, cleanup, timing, and caching
 around route handlers. Route middleware runs after request validation, so it
-receives the same validated request as the handler.
+receives the same validated request as the handler. Middleware shares values
+with handlers through [context](#context), and reads what each route declares
+about itself from its [metadata](#metadata).
+
+For contract-first routes, these are called on the `implement()` result. See
+[Contract-first](/docs/contract-first#context-middleware-and-metadata).
 
 ## Add Middleware
 
@@ -43,8 +48,117 @@ Middleware runs in definition order; work after `await next()` runs in reverse
 order. Request schemas validate before middleware runs, regardless of setter order.
 
 Middleware receives the same arguments as the handler, including
-[context](/docs/context), the request `signal`, and the defined `errors`.
+[context](#context), the request `signal`, and the defined `errors`.
 Define request schemas and errors before `.use()` to receive their types.
+
+## Context
+
+Route handlers and middleware share a context object that is created for each
+request. Use `context.set()` to store values and `context.get()` to read them.
+
+Use `route.$context<T>()` to type the context for a set of routes. Routes built
+from the returned builder share that type:
+
+```ts
+const authenticatedRoute = route.$context<{
+	user: { id: string; name: string };
+}>();
+
+const getProfile = authenticatedRoute
+	.get("/profile")
+	.use(authenticate)
+	.handler(({ context }) => context.get("user"));
+```
+
+`$context<T>()` can be called at any point of a route chain and adds `T` to the
+context type of routes built from it, starting from the
+[global context](#global-context). Where a key is already in the context, its
+type from `T` is used.
+
+:::tip
+The context type does not guarantee that a value has been set. Set required
+values in middleware that runs before any handler or middleware reads them.
+:::
+
+### Global Context
+
+To avoid having to specify a context type for every route, define a default
+context type for your application globally by augmenting `DefaultContext` in
+`@rest-rpc/server`:
+
+```ts
+declare module "@rest-rpc/server" {
+	interface DefaultContext {
+		env: {
+			DATABASE_URL: string;
+		};
+	}
+}
+```
+
+### Values from the Host
+
+To make values from the surrounding server available in the context, such as a
+user authenticated by framework middleware or the native request, seed the
+context when handling the request. Seeded values are set before route
+middleware runs. With `createApp`, pass the values or a function that returns
+them per request as its [`context`](/docs/server/fetch#app-options) option:
+
+```ts
+createApp(routes, {
+	context: async (request) => ({ user: await authenticate(request) }),
+});
+```
+
+When [integrating with a framework](/docs/server/framework-integration), pass them as the
+`context` [handle option](/docs/server/framework-integration#handle-options) of the
+catch-all handler or a compiled route:
+
+```ts
+await handler(request, { context: { user: await authenticate(request) } });
+```
+
+## Metadata
+
+Route metadata is how a route describes itself to code that runs on many
+routes, such as reusable middleware and
+[OpenAPI transforms](/docs/openapi#transform-hooks). `route.$meta<T>()`
+declares the shape of the metadata for routes built from the returned builder.
+`.meta()` is available once a shape is declared, and only accepts values of
+that shape:
+
+```ts
+type Permission = "todos:read" | "todos:write";
+
+const app = route.$meta<{ access: "public" | "signed-in" | Permission }>();
+
+app.get("/health").meta({ access: "public" });
+app.post("/todos").meta({ access: "todos:delete" }); // type error
+```
+
+Repeated `.meta()` calls are shallow-merged. Like `$context<T>()`, `$meta<T>()`
+can be called at any point of a route chain, and where a key is already in the
+shape, its type from `T` is used.
+
+Middleware and handlers read the metadata from `route.meta`. Reusable
+middleware and inline middleware added before `.meta()` receive it as
+`Partial<T> | undefined`, since the route may set any of its keys or none.
+Handlers and inline middleware added after `.meta()` receive the values set on
+the route.
+
+### Global Metadata
+
+To use one shape for every route without calling `$meta<T>()`, augment
+`DefaultMeta`. It also types `route.meta` in OpenAPI transforms. For routes
+defined with `@rest-rpc/core`, augment `@rest-rpc/core` instead.
+
+```ts
+declare module "@rest-rpc/server" {
+	interface DefaultMeta {
+		access: "public" | "signed-in" | Permission;
+	}
+}
+```
 
 ## Reuse Middleware
 
@@ -63,8 +177,8 @@ const getTodos = base.get("/todos").handler(() => listTodos());
 Adding middleware to one builder branch leaves sibling stacks unchanged.
 
 Reusable middleware is typed by the builder it is defined on: its request
-schemas, errors and context. It can only be used on routes whose request,
-errors and context match it.
+schemas, errors, context and metadata shape. It can only be used on routes
+whose request, errors, context and metadata match it.
 
 ```ts
 const Unauthorized = routeError("UNAUTHORIZED", { status: 401 });
@@ -100,6 +214,46 @@ them as a type argument, such as
 Without a defined error or type argument, reusable middleware receives `errors` with unknown
 values. It can still throw an imported [error definition](/docs/route-builder#define-errors-once),
 which routes that use the middleware must define.
+
+### Check Permissions
+
+Context and metadata together let one reusable middleware enforce access for
+every route. Each route declares its access in its metadata, and the middleware
+compares it with the user that the [host](#values-from-the-host) seeds in the
+context:
+
+```ts
+const app = route
+	.$context<{ user?: User }>()
+	.$meta<{ access: "public" | "signed-in" | Permission }>()
+	.error("UNAUTHORIZED", { status: 401 })
+	.error("FORBIDDEN", { status: 403 });
+
+const authorize = app.middleware(({ route, context, errors, next }) => {
+	// Routes without metadata require a signed-in user.
+	const access = route.meta?.access ?? "signed-in";
+	if (access === "public") return next();
+	const user = context.get("user");
+	if (!user) throw errors.UNAUTHORIZED();
+	if (access !== "signed-in" && !user.permissions.includes(access)) {
+		throw errors.FORBIDDEN();
+	}
+	return next();
+});
+
+const api = app.use(authorize);
+
+const health = api
+	.get("/health")
+	.meta({ access: "public" })
+	.handler(() => "ok");
+
+const createTodo = api
+	.post("/todos")
+	.meta({ access: "todos:write" })
+	.body(z.object({ title: z.string() }))
+	.handler(({ body }) => insertTodo(body));
+```
 
 ## Outputs and Errors
 

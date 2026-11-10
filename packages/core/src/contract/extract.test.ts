@@ -8,6 +8,7 @@ const user = type<{ name: string }>();
 const routes = {
 	users: {
 		get: route
+			.$meta<{ auth: "required" }>()
 			.get("/users/:id")
 			.params(type<{ id: string }>())
 			.meta({ auth: "required" })

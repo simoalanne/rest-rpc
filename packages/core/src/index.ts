@@ -19,6 +19,7 @@ export {
 export type {
 	AbsolutePath,
 	Contract,
+	DefaultMeta,
 	RouteDefinition,
 } from "./contract/index.ts";
 export { extractContract } from "./contract/extract.ts";
