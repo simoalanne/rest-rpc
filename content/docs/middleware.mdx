@@ -5,8 +5,8 @@ description: Wrap route execution, share per-request context, and describe route
 
 Use `.use()` to implement guards, transactions, cleanup, timing, and caching
 around route handlers. Route middleware runs after request validation, so it
-receives the same validated request as the handler. Middleware shares values
-with handlers through [context](#context), and reads what each route declares
+receives the same validated request as the handler. Middleware passes values
+to handlers through [context](#context), and reads what each route declares
 about itself from its [metadata](#metadata).
 
 For contract-first routes, these are called on the `implement()` result. See
@@ -14,17 +14,18 @@ For contract-first routes, these are called on the `implement()` result. See
 
 ## Add Middleware
 
-`next()` executes the remaining middleware and handler. Return its result to
-forward downstream output, or return another value to replace it. Returning
-without calling `next()` short-circuits the chain. Call `next()` at most once.
+`next()` runs the remaining middleware and the handler, and resolves to their
+response. Middleware returns that response, or a [`respond()`](/docs/route-builder#return-responses)
+result to short-circuit the chain without calling `next()`. Returning a value
+that is not a response is a type error, and throws at runtime. Call `next()` at
+most once.
 
 ```ts
 import { route } from "@rest-rpc/server";
 
 const getProfile = route
-	.$context<{ user?: User }>()
+	.$context<{ headers: Headers }>()
 	.get("/profile")
-	.headers(z.object({ authorization: z.string().optional() }))
 	.response(z.object({ user: userSchema }))
 	.error("UNAUTHORIZED", { status: 401 })
 	.use(async ({ next }) => {
@@ -35,13 +36,12 @@ const getProfile = route
 			console.log(performance.now() - started);
 		}
 	})
-	.use(async ({ headers, context, errors, next }) => {
-		const user = await authenticate(headers.authorization);
+	.use(async ({ context, errors, next }) => {
+		const user = await authenticate(context.headers.get("authorization"));
 		if (!user) throw errors.UNAUTHORIZED();
-		context.set("user", user);
-		return next();
+		return next({ context: { user } });
 	})
-	.handler(({ context }) => ({ user: context.get("user")! }));
+	.handler(({ context }) => ({ user: context.user }));
 ```
 
 Middleware runs in definition order; work after `await next()` runs in reverse
@@ -53,60 +53,61 @@ Define request schemas and errors before `.use()` to receive their types.
 
 ## Context
 
-Route handlers and middleware share a context object that is created for each
-request. Use `context.set()` to store values and `context.get()` to read them.
+Handlers and middleware receive a readonly `context` object for each request.
+It holds two kinds of values:
 
-Use `route.$context<T>()` to type the context for a set of routes. Routes built
-from the returned builder share that type:
+- Initial context, which the host provides for every request. Declare it with
+  `route.$context<T>()`.
+- Injected context, which middleware adds with `next({ context })`. It is
+  available to all later middleware and the handler.
 
 ```ts
-const authenticatedRoute = route.$context<{
-	user: { id: string; name: string };
-}>();
+const app = route.$context<{ db: Db; headers: Headers }>();
 
-const getProfile = authenticatedRoute
+const withSession = app.use(async ({ context, next }) => {
+	const user = await findSession(
+		context.db,
+		context.headers.get("authorization"),
+	);
+	return next({ context: { user } }); // user: User | undefined
+});
+
+const getProfile = withSession
 	.get("/profile")
-	.use(authenticate)
-	.handler(({ context }) => context.get("user"));
+	.handler(({ context }) => context.user);
 ```
 
-`$context<T>()` can be called at any point of a route chain and adds `T` to the
-context type of routes built from it, starting from the
-[global context](#global-context). Where a key is already in the context, its
-type from `T` is used.
+Injected values are typed for everything after the middleware that injects
+them, so they never need a non-null assertion. To inject a value only some
+requests have, inject it on every path with an optional type, as above.
 
-:::tip
-The context type does not guarantee that a value has been set. Set required
-values in middleware that runs before any handler or middleware reads them.
-:::
+`$context<T>()` can be called at any point of a route chain. Every declaration
+is a requirement of the routes built from it, so repeated declarations of a key
+must all be satisfied, starting from the [global context](#global-context).
 
 ### Global Context
 
-To avoid having to specify a context type for every route, define a default
-context type for your application globally by augmenting `DefaultContext` in
+To declare initial context every route requires, augment `DefaultContext` in
 `@rest-rpc/server`:
 
 ```ts
 declare module "@rest-rpc/server" {
 	interface DefaultContext {
-		env: {
-			DATABASE_URL: string;
-		};
+		db: Db;
 	}
 }
 ```
 
 ### Values from the Host
 
-To make values from the surrounding server available in the context, such as a
-user authenticated by framework middleware or the native request, seed the
-context when handling the request. Seeded values are set before route
-middleware runs. With `createApp`, pass the values or a function that returns
-them per request as its [`context`](/docs/server/fetch#app-options) option:
+The host provides the initial context of each request, such as a database
+client, a user authenticated by framework middleware or the native request.
+With `createApp`, pass the values or a function that returns them per request
+as its [`context`](/docs/server/fetch#app-options) option:
 
 ```ts
 createApp(routes, {
-	context: async (request) => ({ user: await authenticate(request) }),
+	context: async (request) => ({ db, headers: request.headers }),
 });
 ```
 
@@ -115,8 +116,11 @@ When [integrating with a framework](/docs/server/framework-integration), pass th
 catch-all handler or a compiled route:
 
 ```ts
-await handler(request, { context: { user: await authenticate(request) } });
+await handler(request, { context: { db, headers: request.headers } });
 ```
+
+The option is required, and type checked, when routes declare initial context.
+A route tree requires the initial context of all of its routes.
 
 ## Metadata
 
@@ -136,9 +140,9 @@ app.get("/health").meta({ access: "public" });
 app.post("/todos").meta({ access: "todos:delete" }); // type error
 ```
 
-Repeated `.meta()` calls are shallow-merged. Like `$context<T>()`, `$meta<T>()`
-can be called at any point of a route chain, and where a key is already in the
-shape, its type from `T` is used.
+Repeated `.meta()` calls are shallow-merged. `$meta<T>()` can be called at any
+point of a route chain, and where a key is already in the shape, its type from
+`T` is used.
 
 Middleware and handlers read the metadata from `route.meta`. Reusable
 middleware and inline middleware added before `.meta()` receive it as
@@ -178,31 +182,32 @@ Adding middleware to one builder branch leaves sibling stacks unchanged.
 
 Reusable middleware is typed by the builder it is defined on: its request
 schemas, errors, context and metadata shape. It can only be used on routes
-whose request, errors, context and metadata match it.
+whose request, errors and metadata match it. Context it reads that the route
+does not have yet becomes initial context of the route, which the host provides.
 
 ```ts
 const Unauthorized = routeError("UNAUTHORIZED", { status: 401 });
 
 const authenticated = route
-	.$context<{ user?: User }>()
+	.$context<{ db: Db }>()
 	.headers(z.object({ authorization: z.string() }))
 	.error(Unauthorized);
 
 const attachUser = authenticated.middleware(
 	async ({ headers, errors, next, context }) => {
-		const user = await authenticate(headers.authorization);
+		const user = await authenticate(context.db, headers.authorization);
 		if (!user) throw errors.UNAUTHORIZED();
-		context.set("user", user);
-		return await next();
+		return next({ context: { user } });
 	},
 );
 
-const getUserProfile = authenticated
+// Requires db from the host, and receives user from attachUser.
+const getUserProfile = route
+	.headers(z.object({ authorization: z.string() }))
+	.error(Unauthorized)
 	.use(attachUser)
 	.get("/profile")
-	.handler(({ context }) => ({
-		user: getProfileForUser(context.get("user")!.id),
-	}));
+	.handler(({ context }) => ({ user: getProfileForUser(context.user.id) }));
 ```
 
 :::tip
@@ -215,53 +220,30 @@ Without a defined error or type argument, reusable middleware receives `errors` 
 values. It can still throw an imported [error definition](/docs/route-builder#define-errors-once),
 which routes that use the middleware must define.
 
-### Check Permissions
+## Responses and Errors
 
-Context and metadata together let one reusable middleware enforce access for
-every route. Each route declares its access in its metadata, and the middleware
-compares it with the user that the [host](#values-from-the-host) seeds in the
-context:
+`next()` resolves to the downstream response as a `respond()` envelope, with
+its `status`, `body`, `headers` and `contentType`. Response validation and
+serialization run once, after the chain completes.
+
+Middleware returns that response, or ends the chain with the `respond` it
+receives, which only accepts the statuses defined before the middleware. An
+object of the same shape, with any of those fields, is a response too. A
+response kept outside the request has the type `MiddlewareResponse`, and
+middleware may return it as-is. Responses that middleware creates or changes are validated like the handler's.
+Throw [defined errors](/docs/route-builder#define-errors) for failures instead
+of returning error responses.
 
 ```ts
-const app = route
-	.$context<{ user?: User }>()
-	.$meta<{ access: "public" | "signed-in" | Permission }>()
-	.error("UNAUTHORIZED", { status: 401 })
-	.error("FORBIDDEN", { status: 403 });
-
-const authorize = app.middleware(({ route, context, errors, next }) => {
-	// Routes without metadata require a signed-in user.
-	const access = route.meta?.access ?? "signed-in";
-	if (access === "public") return next();
-	const user = context.get("user");
-	if (!user) throw errors.UNAUTHORIZED();
-	if (access !== "signed-in" && !user.permissions.includes(access)) {
-		throw errors.FORBIDDEN();
-	}
-	return next();
-});
-
-const api = app.use(authorize);
-
-const health = api
-	.get("/health")
-	.meta({ access: "public" })
-	.handler(() => "ok");
-
-const createTodo = api
-	.post("/todos")
-	.meta({ access: "todos:write" })
-	.body(z.object({ title: z.string() }))
-	.handler(({ body }) => insertTodo(body));
+const listTodos = route
+	.get("/todos")
+	.response(z.array(todoSchema))
+	.response({ status: 204 })
+	.use(async ({ respond, next }) =>
+		isPaused() ? respond(undefined, { status: 204 }) : next(),
+	)
+	.handler(() => findTodos());
 ```
-
-## Outputs and Errors
-
-Middleware receives and returns raw application output. A value returned by
-middleware is handled like a handler result: response validation and
-serialization run after the chain completes. Middleware return values are not
-type checked and do not change the client contract, so define a
-`.response()` for every status your middleware can return.
 
 Downstream errors propagate through `next()`, allowing middleware to catch errors
 or clean up in `finally`. Catch errors of your own domain code there to throw

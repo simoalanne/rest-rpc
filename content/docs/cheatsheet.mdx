@@ -120,8 +120,9 @@ const update = authed
 			headers, // { authorization: string } from the base
 			body, // { title: string; done: boolean } from the request body
 			contentType, // request media type, narrows body when several are defined
-			context, // per-request values from middleware or the host
+			context, // readonly: initial values from the host, plus values middleware injects
 			errors, // defined errors, created without new: throw errors.UNAUTHORIZED()
+			respond, // respond(), limited to the defined statuses
 			route, // the definition: method, path, meta
 			signal, // aborts when the client disconnects
 		}) => updateTodo(params.id, body),
@@ -131,13 +132,13 @@ const update = authed
 ### [Responses](/docs/route-builder#return-responses)
 
 ```ts
-import { respond } from "@rest-rpc/server";
+import { respond } from "@rest-rpc/server"; // for code outside handlers and middleware
 
 // Inferred: a plain value is a 200 JSON body, of any shape.
 route.handler(() => todo);
 route.handler(() => {}); // 200 without a body
 // respond() sets anything else. Only its results are read as responses.
-route.handler(() =>
+route.handler(({ respond }) =>
 	respond("Created", {
 		status: 201, // 2xx, defaults to 200
 		contentType: "text/plain", // defaults to application/json
@@ -158,6 +159,7 @@ route
 // A plain value is the body of the only defined response. respond() may omit
 // the only status, or 200 among several.
 route.response(todoSchema, { status: 201 }).handler(() => todo); // 201
+const created = (todo: Todo) => respond(todo, { status: 201 }); // outside a handler
 ```
 
 ### [Errors](/docs/route-builder#define-errors)
@@ -198,7 +200,7 @@ route
 	.post("/todos/import")
 	.body({ "application/json": z.array(todoInput), "text/csv": z.string() })
 	.response({ "application/json": importResult, ...sse(progress) })
-	.handler(({ contentType, body }) => {
+	.handler(({ contentType, body, respond }) => {
 		const todos = contentType === "text/csv" ? parseCsv(body) : body; // narrowed
 		return wantsProgress()
 			? respond(live(todos), { contentType: "text/event-stream" })
@@ -232,57 +234,68 @@ type Requests = InferServerRequest<typeof routes>; // a tree infers a tree of ty
 Middleware is onion-style and runs after request validation: each `.use()`
 wraps every middleware defined after it, with the handler innermost. Code
 before `await next()` runs outermost first, code after it innermost first.
-Return values are not type checked, so define a `.response()` for each status
-middleware can return.
+Middleware returns the response of `next()`, or a `respond()` result to
+short-circuit, and throws defined errors for failures.
 
 ```ts
 const timed = route.use(async ({ next }) => {
 	const started = performance.now();
 	try {
-		return await next(); // return another value, or skip next(), to short-circuit
+		return await next(); // the downstream response: { status, body, headers }
 	} finally {
 		console.log(performance.now() - started);
 	}
 });
 
-// Context is typed per builder with $context<T>(), and created per request.
-// Host values are seeded with the `context` option of createApp or handle().
+// Ends the chain without the handler. An object of the same shape works too.
+const paused = route
+	.response(todoSchema)
+	.response({ status: 204 })
+	.use(async ({ respond, next }) =>
+		isPaused() ? respond(undefined, { status: 204 }) : next(),
+	);
+
+// $context<T>() declares initial context the host provides. createApp, handle()
+// and call() require it, for every route in the tree.
 const Unauthorized = routeError("UNAUTHORIZED", { status: 401 });
 const authenticated = route
-	.$context<{ user?: User }>()
+	.$context<{ db: Db }>()
 	.headers(z.object({ authorization: z.string() }))
 	.error(Unauthorized);
 
 // Reusable, typed by its builder and usable on routes with matching request,
-// errors and context. route.middleware<{ headers: ... }>() requires fields by type.
+// errors and metadata. Context it reads and a route lacks becomes the route's
+// initial context. route.middleware<{ headers: ... }>() requires fields by type.
 const attachUser = authenticated.middleware(
 	async ({ headers, errors, context, next }) => {
-		const user = await authenticate(headers.authorization);
+		const user = await authenticate(context.db, headers.authorization);
 		if (!user) throw errors.UNAUTHORIZED();
-		context.set("user", user);
-		return next();
+		return next({ context: { user } }); // typed for later middleware and the handler
 	},
 );
 
 const profile = authenticated
 	.use(attachUser)
-	.handler(({ context }) => context.get("user"));
+	.handler(({ context }) => context.user);
+
+createApp({ profile }, { context: (request) => ({ db }) }); // required: db
 
 // Metadata describes a route to shared code. .meta() exists once $meta<T>()
 // declares a shape, and only accepts values of it.
 const app = route.$meta<{ access: "public" | "signed-in" | Permission }>();
 
 // Reusable and earlier inline middleware read route.meta as Partial<T> | undefined.
-const authorize = app.middleware(({ route, context, next }) => {
+const authorize = app.middleware(({ route, next }) => {
 	const access = route.meta?.access ?? "signed-in";
-	return access === "public" || hasAccess(context, access) ? next() : forbid();
+	if (access !== "public") checkAccess(access); // throws a defined error
+	return next();
 });
 
 app.use(authorize).get("/health").meta({ access: "public" }); // shallow-merged
 
 declare module "@rest-rpc/server" {
 	interface DefaultContext {
-		env: { DATABASE_URL: string }; // typed for every route, merged with $context<T>()
+		env: { DATABASE_URL: string }; // required for every route, with $context<T>()
 	}
 	interface DefaultMeta {
 		access: "public" | "signed-in" | Permission; // merged with $meta<T>()
@@ -343,12 +356,12 @@ const get = implement(api.todos.get).handler(({ params }) =>
 
 // ...or implement a contract tree to share context and middleware with every
 // route in it. `use`/`$context` are reserved top-level keys.
-const todos = implement(api.todos).$context<{ user: User }>().use(auth);
+const todos = implement(api.todos).$context<{ db: Db }>().use(attachUser);
 export const routes = {
 	todos: {
 		get: todos.get.handler(({ params }) => findTodo(params.id)),
 		create: todos.create.handler(({ body, context }) =>
-			createTodo(body, context.get("user")),
+			createTodo(body, context.user),
 		),
 	},
 };

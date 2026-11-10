@@ -73,13 +73,13 @@ route in the tree:
 
 ```ts
 const todos = implement(api.todos)
-	.$context<{ user: { id: string } }>()
-	.use(authenticate);
+	.$context<{ headers: Headers }>()
+	.use(authenticate); // injects user
 
 export const routes = {
 	todos: {
 		create: todos.create.handler(({ body, context }) =>
-			createTodo(body.title, context.get("user")),
+			createTodo(body.title, context.user),
 		),
 		get: todos.get.handler(({ params, errors }) => {
 			const todo = findTodo(params.id);

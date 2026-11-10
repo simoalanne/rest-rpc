@@ -40,7 +40,7 @@ describe("call", () => {
 		const request = seen.mock.calls[0]![0];
 		expect(request).toMatchObject({ params: { id: 1 } });
 		expect(request.signal.aborted).toBe(false);
-		expect(request.context.get("user")).toBe("Ada");
+		expect(request.context).toEqual({ user: "Ada" });
 	});
 
 	it("rejects like the fetch client for defined, built-in and other errors", async () => {

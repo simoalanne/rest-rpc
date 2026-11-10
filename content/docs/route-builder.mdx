@@ -164,7 +164,8 @@ const stacked = route
 
 ## Return Responses
 
-A handler returns a body, or a response created with `respond()`:
+A handler returns a body, or a response created with `respond()`, which it
+receives with the request:
 
 - `undefined` is a status 200 response without a body.
 - An async iterable is an SSE [stream](#return-streams).
@@ -173,19 +174,22 @@ A handler returns a body, or a response created with `respond()`:
   the response. An `undefined` body sends no body.
 
 Only `respond()` results are read as responses, so a returned body may have any
-shape, including a `status` field of its own.
+shape, including a `status` field of its own. Code outside handlers and
+middleware imports `respond` from `@rest-rpc/server` instead.
 
 Without defined responses, the returned statuses and body types become the
 client's result type. Returned statuses are successful, from 200 to 299.
 Errors are [thrown](#define-errors) instead:
 
 ```ts
-import { respond, route } from "@rest-rpc/server";
+import { route } from "@rest-rpc/server";
 
 const created = route
 	.post("/todos")
 	.body(z.object({ title: z.string() }))
-	.handler(({ body }) => respond(createTodo(body.title), { status: 201 }));
+	.handler(({ body, respond }) =>
+		respond(createTodo(body.title), { status: 201 }),
+	);
 ```
 
 ## Define Responses
@@ -206,7 +210,8 @@ const get = route
 A plain return value is the body of the only defined response, with its
 status. With several statuses or media types, return `respond()` with the
 `status` or `contentType` to send. Its `status` defaults to the route's only
-status, or to 200 among several.
+status, or to 200 among several, and the `respond` a handler receives only
+accepts the statuses the route defines.
 
 Pass only options for a bodyless response, such as `.response({ status: 204 })`.
 Define status-specific response headers with the `headers` option and return
@@ -221,7 +226,7 @@ route
 		status: 201,
 		headers: z.object({ location: z.string() }),
 	})
-	.handler(({ body }) => {
+	.handler(({ body, respond }) => {
 		const todo = createTodo(body.title);
 		// 201 is the only defined status, so `status` may be omitted.
 		return respond(todo, { headers: { location: `/todos/${todo.id}` } });
@@ -359,7 +364,7 @@ status, spread it into one record and select one with `contentType`:
 const todos = route
 	.get("/todos")
 	.response({ ...sse(todoSchema), "application/json": z.array(todoSchema) })
-	.handler(() =>
+	.handler(({ respond }) =>
 		wantsStream()
 			? respond(streamTodos(), { contentType: "text/event-stream" })
 			: respond(listTodos(), { contentType: "application/json" }),
@@ -416,7 +421,7 @@ A route cannot be changed after `.handler()` is attached.
 A handler receives one object containing:
 
 - The validated request: `params`, `query`, `headers`, and `body`.
-- `context`: the per-request [context](/docs/middleware#context) shared with middleware.
+- `context`: the [context](/docs/middleware#context): initial values the host provides, and values middleware injects.
 - `route`: the route definition, including its method, path, and `meta`.
 - `errors`: the [defined errors](#define-errors), to throw.
 - `contentType`: the request body media type. Routes with a body narrow it to

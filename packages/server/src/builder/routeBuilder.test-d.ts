@@ -8,13 +8,14 @@ import {
 import type { ServerResponse } from "@rest-rpc/core/contract";
 import { respond } from "../pipeline/respond.ts";
 import { sseEvent } from "../pipeline/sse.ts";
-import type { Context, DefaultContext, ExtendContext } from "./context.ts";
+import type { DefaultContext, ExtendContext } from "./context.ts";
 import { implement } from "./implement.ts";
 import { route } from "./routeBuilder.ts";
 import type {
 	InferServerHandler,
 	InferServerRequest,
 	InferServerResponse,
+	InitialContextOf,
 	RouteHandler,
 	RouteRequest,
 } from "./routeBuilder.types.ts";
@@ -32,14 +33,13 @@ describe("routeBuilder types", () => {
 		defined.handler(() => respond({ id: 1 }));
 	});
 
-	it("limits context access and writes to defined keys and values", () => {
+	it("types the context as a readonly object of the declared values", () => {
 		route.$context<{ count: number }>().handler(({ context }) => {
-			context.set("count", 1);
-			expectTypeOf(context.get("count")).toEqualTypeOf<number>();
-			// @ts-expect-error Context keys must be defined.
-			context.get("missing");
-			// @ts-expect-error Context values must match their key.
-			context.set("count", "1");
+			expectTypeOf(context.count).toEqualTypeOf<number>();
+			// @ts-expect-error The context is readonly.
+			context.count = 1;
+			// @ts-expect-error Context keys must be declared or injected.
+			void context.missing;
 			return "ok";
 		});
 	});
@@ -47,21 +47,21 @@ describe("routeBuilder types", () => {
 	it("passes handler fields and context through middleware to the handler", () => {
 		const middleware = fieldRoute.middleware(({ signal, context, next }) => {
 			expectTypeOf(signal).toEqualTypeOf<AbortSignal>();
-			expectTypeOf(context.get("requestId")).toEqualTypeOf<string>();
+			expectTypeOf(context.requestId).toEqualTypeOf<string>();
 			return next();
 		});
 		fieldRoute
 			.use(middleware)
 			.get("/")
 			.params(type<{ id: string }>())
-			.use(({ params, context, next }) => {
+			.use(({ params, next }) => {
 				expectTypeOf(params).toEqualTypeOf<{ id: string }>();
-				context.set("requestId", params.id);
-				return next();
+				return next({ context: { itemId: params.id } });
 			})
 			.handler(({ signal, context }) => {
 				expectTypeOf(signal).toEqualTypeOf<AbortSignal>();
-				return context.get("requestId");
+				expectTypeOf(context.itemId).toEqualTypeOf<string>();
+				return context.requestId;
 			});
 	});
 
@@ -91,7 +91,7 @@ describe("routeBuilder types", () => {
 		const defined = fieldRoute.get("/").params(type<{ id: string }>());
 		type Request = InferServerRequest<typeof defined>;
 		expectTypeOf<Request["context"]>().toEqualTypeOf<
-			Context<ExtendContext<DefaultContext, Values>>
+			Readonly<ExtendContext<DefaultContext, Values>>
 		>();
 		expectTypeOf<Request["params"]>().toEqualTypeOf<{ id: string }>();
 		expectTypeOf<Request["route"]>().not.toHaveProperty("context");
@@ -99,11 +99,11 @@ describe("routeBuilder types", () => {
 		const completed = fieldRoute.handler(() => "ok");
 		expectTypeOf<
 			InferServerRequest<typeof completed>["context"]
-		>().toEqualTypeOf<Context<ExtendContext<DefaultContext, Values>>>();
+		>().toEqualTypeOf<Readonly<ExtendContext<DefaultContext, Values>>>();
 		const contractDefined = contractRoute.get("/");
 		expectTypeOf<
 			InferServerRequest<typeof contractDefined>["context"]
-		>().toEqualTypeOf<Context<DefaultContext>>();
+		>().toEqualTypeOf<Readonly<DefaultContext>>();
 	});
 
 	it("infers handler requests and responses from the handler signature", () => {
@@ -214,44 +214,55 @@ describe("route errors", () => {
 		});
 	});
 
-	it("applies reusable middleware to routes whose context extends its own", () => {
+	it("adds the context reusable middleware reads and the route lacks to the initial context", () => {
 		const timing = route.middleware(({ next }) => next());
-		const setUser = route
+		const readUser = route
 			.$context<{ user: string }>()
 			.middleware(({ context, next }) => {
-				context.set("user", "1");
+				expectTypeOf(context.user).toEqualTypeOf<string>();
 				return next();
 			});
-		const withUser = route.$context<{ user: string; tenant: string }>();
-		withUser
+		route
+			.$context<{ user: string; tenant: string }>()
 			.use(timing)
-			.use(setUser)
+			.use(readUser)
 			.get("/")
 			.use(timing)
 			.handler(() => "ok");
+		const added = route
+			.use(readUser)
+			.get("/")
+			.handler(({ context }) => context.user);
+		expectTypeOf<InitialContextOf<(typeof added)["~restrpc"]>>().toEqualTypeOf<
+			ExtendContext<DefaultContext, { user: string }>
+		>();
+		const injected = route
+			.use(({ next }) => next({ context: { user: "1" } }))
+			.use(readUser)
+			.get("/")
+			.handler(() => "ok");
+		expectTypeOf<
+			InitialContextOf<(typeof injected)["~restrpc"]>
+		>().toEqualTypeOf<DefaultContext>();
 		implement({ get: route.get("/").response(type<string>()) })
-			.$context<{ user: string }>()
 			.use(timing)
-			.use(setUser);
-		// @ts-expect-error The route context does not define user.
-		route.use(setUser);
+			.use(readUser);
 		// @ts-expect-error The route context types user differently.
-		route.$context<{ user: number }>().use(setUser);
+		route.$context<{ user: number }>().use(readUser);
 	});
 
-	it("extends context at any builder stage", () => {
+	it("intersects context declared at any builder stage", () => {
 		route
 			.headers(type<{ authorization: string }>())
 			.$context<{ user: string }>()
 			.use(({ next }) => next())
 			.$context<{ tenant: string }>()
 			.get("/")
-			.$context<{ user: number }>()
+			.$context<{ user: "admin" }>()
 			.handler(({ context }) => {
-				expectTypeOf(context.get("user")).toEqualTypeOf<number>();
-				expectTypeOf(context.get("tenant")).toEqualTypeOf<string>();
-				// @ts-expect-error Context keys must be defined.
-				context.get("missing");
+				expectTypeOf(context.user).toEqualTypeOf<"admin">();
+				expectTypeOf(context.tenant).toEqualTypeOf<string>();
+				return "ok";
 			});
 	});
 
@@ -265,9 +276,9 @@ describe("route errors", () => {
 			({ headers, query, errors, context, next }) => {
 				expectTypeOf(headers).toEqualTypeOf<{ authorization: string }>();
 				expectTypeOf(query).toEqualTypeOf<{ debug: string }>();
+				expectTypeOf(context.user).toEqualTypeOf<string>();
 				if (!headers.authorization) throw errors.UNAUTHORIZED();
-				context.set("user", query.debug);
-				return next();
+				return next({ context: { debug: query.debug } });
 			},
 		);
 		authed
@@ -422,12 +433,14 @@ describe("route metadata", () => {
 		});
 		base
 			.use(authorize)
-			.use(({ route }) => {
+			.use(({ route, next }) => {
 				expectTypeOf(route.meta).toEqualTypeOf<Partial<Access> | undefined>();
+				return next();
 			})
 			.meta({ access: "admin" })
-			.use(({ route }) => {
+			.use(({ route, next }) => {
 				expectTypeOf(route.meta).toEqualTypeOf<{ readonly access: "admin" }>();
+				return next();
 			});
 		route
 			.$meta<{ access: "owner" }>()
@@ -445,11 +458,124 @@ describe("route metadata", () => {
 			expectTypeOf(route.meta).toEqualTypeOf<Partial<Access> | undefined>();
 			return next();
 		});
-		todos.create.use(({ route }) => {
+		todos.create.use(({ route, next }) => {
 			expectTypeOf(route.meta).toEqualTypeOf<Partial<Access> | undefined>();
+			return next();
 		});
-		todos.list.use(({ route }) => {
+		todos.list.use(({ route, next }) => {
 			expectTypeOf(route.meta).toEqualTypeOf<{ readonly access: "public" }>();
+			return next();
 		});
+	});
+});
+
+describe("middleware responses", () => {
+	type User = { id: string };
+	const user: User = { id: "1" };
+	const findUser = (): User | undefined => user;
+
+	it("requires middleware to return a response", () => {
+		route.use(({ next }) => next());
+		route.use(() => respond("cached"));
+		// @ts-expect-error Middleware must return a response.
+		route.use(({ next }) => {
+			void next();
+		});
+		// @ts-expect-error A plain value is not a response.
+		route.use(() => "stopped");
+		route.use(async ({ next }) => {
+			const response = await next();
+			expectTypeOf(response.status).toEqualTypeOf<number>();
+			expectTypeOf(response.body).toEqualTypeOf<unknown>();
+			return response;
+		});
+	});
+
+	it("infers responses returned synchronously on one branch and from next() on another", () => {
+		route
+			.response(type<string>())
+			.get("/")
+			.use(({ respond, next }) => {
+				if (Math.random() > 0.5) return respond("cached");
+				return next();
+			})
+			.handler(() => "ok");
+		route
+			.use(({ respond, next }) =>
+				Math.random() > 0.5 ? respond("cached") : next({ context: { user } }),
+			)
+			.get("/")
+			.handler(({ context }) => {
+				expectTypeOf(context.user).toEqualTypeOf<User>();
+				return "ok";
+			});
+		const reusable = route.middleware(({ respond, next }) =>
+			Math.random() > 0.5 ? respond("cached") : next({ context: { user } }),
+		);
+		route
+			.use(reusable)
+			.get("/")
+			.handler(({ context }) => {
+				expectTypeOf(context.user).toEqualTypeOf<User>();
+				return "ok";
+			});
+	});
+
+	it("accepts objects of the response shape without respond()", () => {
+		route.use(() => ({ status: 200, body: "cached" }));
+		route.use(async ({ next }) => {
+			const { body, status } = await next();
+			return { status, body };
+		});
+		// @ts-expect-error An object without response fields is not a response.
+		route.use(() => ({ id: "1" }));
+	});
+
+	it("receives respond limited to the statuses the route defines", () => {
+		const cached = route
+			.response(type<string>())
+			.response({ status: 204 })
+			.use(({ respond }) => {
+				if (Math.random() > 0.5) return respond(undefined, { status: 204 });
+				// @ts-expect-error The route does not define status 404.
+				return respond(undefined, { status: 404 });
+			})
+			.get("/");
+		cached.handler(({ respond }) => respond("ok"));
+		cached.handler(({ respond }) => respond(undefined, { status: 204 }));
+		// @ts-expect-error The route does not define status 201.
+		cached.handler(({ respond }) => respond("ok", { status: 201 }));
+		route.get("/").handler(({ respond }) => respond("ok", { status: 202 }));
+		route.middleware(({ respond }) => respond(undefined, { status: 204 }));
+	});
+
+	it("types the context of later middleware and the handler with injected values", () => {
+		route
+			.use(async ({ next }) => {
+				if (Math.random() > 0.5) return respond("cached");
+				return next({ context: { user } });
+			})
+			.use(async ({ next }) => {
+				const response = await next({ context: { tenant: "t" } });
+				return { ...response, headers: { "x-cache": "miss" } };
+			})
+			.use(({ next }) => next({ context: { maybeUser: findUser() } }))
+			.get("/")
+			.handler(({ context }) => {
+				expectTypeOf(context.user).toEqualTypeOf<User>();
+				expectTypeOf(context.tenant).toEqualTypeOf<string>();
+				expectTypeOf(context.maybeUser).toEqualTypeOf<User | undefined>();
+				return "ok";
+			});
+		const inject = route.middleware(({ next }) =>
+			next({ context: { tenant: "t" } }),
+		);
+		route
+			.use(inject)
+			.get("/")
+			.handler(({ context }) => {
+				expectTypeOf(context.tenant).toEqualTypeOf<string>();
+				return "ok";
+			});
 	});
 });

@@ -1,4 +1,5 @@
 import type { HttpMethod } from "@rest-rpc/core/contract";
+import type { EmptyObject } from "@rest-rpc/core/utils";
 import {
 	createServer,
 	type IncomingMessage,
@@ -12,6 +13,7 @@ import {
 	type CatchAllHandleOptions,
 	type CompileRoutesOptions,
 	type HandleOptions,
+	type OptionsArgs,
 } from "../pipeline/compileRoutes.ts";
 import type { App } from "../pipeline/createApp.ts";
 import {
@@ -19,6 +21,7 @@ import {
 	parsePathParams,
 	readAttachedPathParams,
 	type RuntimeImplementationTree,
+	type TreeInitialContext,
 } from "../routing/match.ts";
 import { readRequestPathname, stripMountPath } from "../routing/requestUrl.ts";
 
@@ -103,7 +106,7 @@ const writeFetchResponse = async (
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
  */
-export type NodeRoute = {
+export type NodeRoute<TContext extends object = EmptyObject> = {
 	readonly method: HttpMethod;
 	/** Route path with param markers per `paramSyntax`. */
 	readonly path: string;
@@ -116,7 +119,7 @@ export type NodeRoute = {
 	readonly handle: (
 		request: IncomingMessage,
 		response: ServerResponse,
-		options?: HandleOptions,
+		...options: OptionsArgs<TContext, HandleOptions<TContext>>
 	) => Promise<void>;
 };
 
@@ -137,16 +140,20 @@ export type NodeRouteHandlerResult = { matched: boolean };
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
  */
-export function compileRoutes(
-	implementations: RuntimeImplementationTree,
+export function compileRoutes<TRoutes extends RuntimeImplementationTree>(
+	implementations: TRoutes,
 	options: CompileRoutesOptions = {},
-): NodeRoute[] {
-	return compileFetchRoutes(implementations, options).map((route) => {
+): NodeRoute<TreeInitialContext<TRoutes>>[] {
+	const routes = compileFetchRoutes<RuntimeImplementationTree>(
+		implementations,
+		options,
+	);
+	return routes.map((route) => {
 		const pathParams = parsePathParams(route.path);
 		return {
 			method: route.method,
 			path: route.path,
-			handle: async (request, response, handleOptions) => {
+			handle: async (request, response, ...[handleOptions]) => {
 				// Params a router such as Express set on the Node request are lost
 				// when it is converted, so they are passed on.
 				const params =
@@ -173,16 +180,16 @@ export function compileRoutes(
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#catch-all-handler}
  */
-export function createCatchAllHandler(
-	routes: readonly NodeRoute[],
+export function createCatchAllHandler<TContext extends object>(
+	routes: readonly NodeRoute<TContext>[],
 ): (
 	request: IncomingMessage,
 	response: ServerResponse,
-	options?: CatchAllHandleOptions,
+	...options: OptionsArgs<TContext, CatchAllHandleOptions<TContext>>
 ) => Promise<NodeRouteHandlerResult> {
-	const matchRoute = createRouteMatcher(routes);
+	const matchRoute = createRouteMatcher(routes as readonly NodeRoute<object>[]);
 
-	return async (request, response, options) => {
+	return async (request, response, ...[options]) => {
 		const pathname = readRequestPathname(readRequestTarget(request));
 		const routePath = options?.mountPath
 			? stripMountPath(pathname, options.mountPath)

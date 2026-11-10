@@ -8,7 +8,8 @@ import {
 } from "@rest-rpc/core";
 import { normalizeMediaType } from "@rest-rpc/core/codecs";
 import { markDefined, type RouteDefinition } from "@rest-rpc/core/contract";
-import type { ContextOf } from "../builder/routeBuilder.types.ts";
+import type { InitialContextOf } from "../builder/routeBuilder.types.ts";
+import type { ContextOption, OptionsArgs } from "./compileRoutes.ts";
 import {
 	isImplementedRoute,
 	toRuntimeImplementation,
@@ -19,19 +20,23 @@ import { executeRoute, type RouteResult } from "./handleHttpRoute.ts";
 import { resolveRouteError } from "./resolveRouteError.ts";
 import { toSseEvent } from "./sse.ts";
 
-/** Options accepted by `call`. */
+/** Options accepted by `call`. `context` is required when the route requires initial context. */
 export type CallOptions<TRoute extends ImplementedRoute> = Pick<
 	FetchOptions,
 	"signal"
-> & {
-	context?: Partial<ContextOf<TRoute["~restrpc"]>>;
-};
+> &
+	ContextOption<InitialContextOf<TRoute["~restrpc"]>>;
 
 type CallArgs<TRoute extends ImplementedRoute> = [
 	InferClientRequest<TRoute>,
 ] extends [undefined]
-	? [request?: undefined, options?: CallOptions<TRoute>]
-	: [request: InferClientRequest<TRoute>, options?: CallOptions<TRoute>];
+	? object extends InitialContextOf<TRoute["~restrpc"]>
+		? [request?: undefined, options?: CallOptions<TRoute>]
+		: [request: undefined, options: CallOptions<TRoute>]
+	: [
+			request: InferClientRequest<TRoute>,
+			...OptionsArgs<InitialContextOf<TRoute["~restrpc"]>, CallOptions<TRoute>>,
+		];
 
 const toSseEvents = async function* (stream: AsyncIterable<unknown>) {
 	for await (const item of stream) yield toSseEvent(item);

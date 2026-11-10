@@ -27,6 +27,8 @@ const withContext = route
 	.get("/")
 	.handler(() => "ok");
 
+const withPlain = route.get("/").handler(() => "ok");
+
 describe("call types", () => {
 	it("returns the client response of the route", () => {
 		expectTypeOf(
@@ -39,7 +41,9 @@ describe("call types", () => {
 	});
 
 	it("rejects with the client errors of the route", async () => {
-		const { error } = await safe(call(withContext));
+		const { error } = await safe(
+			call(withContext, undefined, { context: { user: "Ada" } }),
+		);
 		expectTypeOf(error).toEqualTypeOf<
 			InferClientError<typeof withContext> | Error | undefined
 		>();
@@ -60,15 +64,16 @@ describe("call types", () => {
 	});
 
 	it("requires the request only when the client requires it", () => {
-		call(withContext);
+		call(withPlain);
 		// @ts-expect-error params and body are required
 		call(withRequest);
 	});
 
-	it("accepts a partial context", () => {
+	it("requires the initial context of the route", () => {
 		expectTypeOf<CallOptions<typeof withContext>["context"]>().toEqualTypeOf<
-			Partial<ExtendContext<DefaultContext, { user: string }>> | undefined
+			ExtendContext<DefaultContext, { user: string }>
 		>();
+		call(withContext, undefined, { context: { user: "Ada" } });
 	});
 });
 

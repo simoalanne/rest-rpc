@@ -15,9 +15,8 @@ import {
 	validateResponseStreamChunks,
 } from "./validation.ts";
 import { invokeWithMiddleware } from "../builder/middleware.ts";
-import { isResponseEnvelope, type RespondOptions } from "./respond.ts";
+import { isResponseEnvelope, respond, type RespondOptions } from "./respond.ts";
 import { sseBody } from "./sse.ts";
-import { createContext } from "../builder/context.ts";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import { allMaybePromise, mapMaybePromise } from "./maybePromise.ts";
 
@@ -31,8 +30,8 @@ type ExecuteRouteOptions = {
 	 * it as `contentType`.
 	 */
 	mediaType?: string;
-	/** Initial context values, set before middleware runs. */
-	context?: Record<string, unknown>;
+	/** The initial context the host provides. */
+	context?: object;
 	disableRequestValidation?: boolean;
 	disableResponseValidation?: boolean;
 };
@@ -196,6 +195,8 @@ const normalizeHandlerResult = (
 	);
 };
 
+const emptyContext = Object.freeze({});
+
 /** Validates the request, runs middleware and the handler, and validates the output, throwing validation errors. */
 export function executeRoute(
 	implementation: RuntimeImplementation,
@@ -208,17 +209,23 @@ export function executeRoute(
 		? options.request
 		: validateRequestSegments(route, options.request, mediaType);
 	const handlerResult = mapMaybePromise(validation, (validatedRequest) =>
-		invokeWithMiddleware(implementation.middleware, handler, {
-			body: validatedRequest.body,
-			query: validatedRequest.query,
-			params: validatedRequest.params,
-			headers: validatedRequest.headers,
-			context: createContext(options.context),
-			signal: options.signal,
-			contentType: mediaType,
-			route,
-			errors: implementation.errorFactories,
-		}),
+		invokeWithMiddleware(
+			implementation.middleware,
+			handler,
+			{
+				body: validatedRequest.body,
+				query: validatedRequest.query,
+				params: validatedRequest.params,
+				headers: validatedRequest.headers,
+				context: options.context ?? emptyContext,
+				signal: options.signal,
+				contentType: mediaType,
+				route,
+				errors: implementation.errorFactories,
+				respond,
+			},
+			implementation.defaultStatus ?? 200,
+		),
 	);
 	return mapMaybePromise(handlerResult, (result) =>
 		normalizeHandlerResult(

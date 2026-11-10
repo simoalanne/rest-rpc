@@ -17,8 +17,8 @@ const routeState = (value: unknown) =>
 
 describe("implement", () => {
 	it("should apply root middleware to every route without mutating the contract", () => {
-		const middleware1 = () => "first";
-		const middleware2 = () => "second";
+		const middleware1 = () => respond("first");
+		const middleware2 = () => respond("second");
 		const implementation = implement(contract)
 			.use(middleware1)
 			.use(middleware2);
@@ -50,7 +50,9 @@ describe("implement", () => {
 	});
 
 	it("should reject contracts that already contain middleware", () => {
-		const implementedRoute = implement(contract.users.get).use(() => {});
+		const implementedRoute = implement(contract.users.get).use(({ next }) =>
+			next(),
+		);
 
 		expect(() => implement(implementedRoute)).toThrow(
 			"Cannot implement a route that already has middleware.",

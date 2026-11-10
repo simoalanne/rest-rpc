@@ -32,25 +32,26 @@ const execute = (implementation: RuntimeImplementationTree) => {
 };
 
 describe("handleHttpRoute", () => {
-	it("shares context with middleware and creates a fresh store per request", async () => {
-		const contexts: unknown[] = [];
+	it("passes the host context and injected values to middleware and the handler", async () => {
 		const implementation = route
 			.$context<{ count: number }>()
-			.use(({ context, next }) => {
-				contexts.push(context);
-				context.set("count", 1);
-				return next();
-			})
+			.use(({ context, next }) =>
+				next({ context: { count: context.count + 1, step: "outer" } }),
+			)
 			.get("/")
-			.use(({ context, next }) => {
-				expect(context).toBe(contexts.at(-1));
-				context.set("count", context.get("count") + 1);
-				return next();
-			})
-			.handler(({ context }) => context.get("count"));
-		expect(await execute(implementation)).toMatchObject({ body: { value: 2 } });
-		expect(await execute(implementation)).toMatchObject({ body: { value: 2 } });
-		expect(contexts[0]).not.toBe(contexts[1]);
+			.use(({ context, next }) =>
+				next({ context: { count: context.count + 1 } }),
+			)
+			.handler(({ context }) => context);
+		const flattened = flattenRouteImplementations(implementation)[0]!;
+		const run = (count: number) =>
+			handleHttpRoute(flattened, { request: {}, signal, context: { count } });
+		expect(await run(0)).toMatchObject({
+			body: { value: { count: 2, step: "outer" } },
+		});
+		expect(await run(5)).toMatchObject({
+			body: { value: { count: 7, step: "outer" } },
+		});
 	});
 
 	it("passes factories of the defined errors to middleware and the handler", async () => {
@@ -224,6 +225,31 @@ describe("handleHttpRoute", () => {
 			body: { value: "HELLO", contentType: "application/json" },
 		});
 	});
+	it("passes respond to middleware and the handler", async () => {
+		const cached = route
+			.headers(type<{ "if-none-match"?: string }>())
+			.response(type<string>())
+			.response({ status: 204 })
+			.use(async ({ headers, respond, next }) =>
+				headers["if-none-match"] === "v1"
+					? respond(undefined, { status: 204 })
+					: next(),
+			);
+		const flattened = flattenRouteImplementations({
+			get: cached.handler(({ respond }) => respond("fresh", { headers: {} })),
+		})[0]!;
+		const run = (headers: Record<string, string>) =>
+			handleHttpRoute(flattened, { request: { headers }, signal });
+		expect(await run({ "if-none-match": "v1" })).toEqual({
+			status: 204,
+			headers: undefined,
+		});
+		expect(await run({})).toMatchObject({
+			status: 200,
+			body: { value: "fresh", contentType: "application/json" },
+		});
+	});
+
 	it("rejects an unknown response status even with response validation disabled", async () => {
 		const defined = route
 			.get("/")
