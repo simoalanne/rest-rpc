@@ -1,4 +1,5 @@
 import type {
+	DefaultMeta,
 	RequestBodyDefinition,
 	RouteDefinition,
 } from "../contract/routeDefinition.ts";
@@ -58,7 +59,8 @@ export type SchemaConverter = (
 ) => OpenApiSchema | undefined;
 
 export type OperationTransformContext = {
-	route: RouteDefinition;
+	/** The route, with `meta` typed by `DefaultMeta`. */
+	route: Omit<RouteDefinition, "meta"> & { meta?: Partial<DefaultMeta> };
 	routePath: readonly string[];
 	operation: OpenApiOperation;
 };

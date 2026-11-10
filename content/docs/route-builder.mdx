@@ -371,13 +371,14 @@ resuming streams.
 
 ## Add Metadata and OpenAPI Details
 
-`.meta()` attaches application information. `.openAPI()` describes the
-operation for OpenAPI generation.
+`.meta()` attaches [route metadata](/docs/middleware#metadata) of a shape declared with
+`$meta<T>()`. `.openAPI()` describes the operation for OpenAPI generation.
 
 ```ts
 const list = route
+	.$meta<{ access: "public" | "signed-in" }>()
 	.get("/todos")
-	.meta({ auth: "required" })
+	.meta({ access: "signed-in" })
 	.openAPI({ summary: "List todos", tags: ["Todos"] })
 	.response(z.array(todoSchema))
 	.handler(() => listTodos());
@@ -396,7 +397,6 @@ be shared as a base for other routes without affecting them:
 ```ts
 const authenticated = route
 	.headers(z.object({ authorization: z.string() }))
-	.meta({ auth: "required" })
 	.error("UNAUTHORIZED", { status: 401 });
 
 const list = authenticated.get("/todos").handler(() => listTodos());
@@ -416,7 +416,7 @@ A route cannot be changed after `.handler()` is attached.
 A handler receives one object containing:
 
 - The validated request: `params`, `query`, `headers`, and `body`.
-- `context`: the per-request [context](/docs/context) shared with middleware.
+- `context`: the per-request [context](/docs/middleware#context) shared with middleware.
 - `route`: the route definition, including its method, path, and `meta`.
 - `errors`: the [defined errors](#define-errors), to throw.
 - `contentType`: the request body media type. Routes with a body narrow it to
@@ -424,7 +424,7 @@ A handler receives one object containing:
 - `signal`: an `AbortSignal` that aborts when the client disconnects.
 
 Native request objects are not passed to handlers. To make them or other host
-values available, [seed the context](/docs/context#values-from-the-host).
+values available, [seed the context](/docs/middleware#values-from-the-host).
 
 ## Type Helpers
 

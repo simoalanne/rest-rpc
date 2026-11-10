@@ -1,4 +1,5 @@
 import type {
+	DefaultMeta,
 	RouteDefinition,
 	ServerRequest,
 	ServerResponse,
@@ -361,22 +362,40 @@ type UnknownRequest = {
 
 export type RequestFields = Partial<UnknownRequest>;
 
+/** The metadata shape a route carries, or `DefaultMeta` for routes without one. */
+export type MetaShapeOf<TRoute> = TRoute extends {
+	readonly metaShape?: infer TShape;
+}
+	? Exclude<TShape, undefined>
+	: DefaultMeta;
+
+// Later `.meta()` calls may set metadata, so middleware added before any is
+// set reads the declared shape.
+type MiddlewareRoute<TRoute extends RouteDefinition> = TRoute extends {
+	meta: object;
+}
+	? TRoute
+	: TRoute & { readonly meta?: Partial<MetaShapeOf<TRoute>> };
+
 /** The request inline middleware receives, typed by its route. */
 export type MiddlewareRequest<
 	TRoute extends RouteDefinition,
 	TContext extends object,
-> = RouteRequest<TRoute, TContext> & UnknownRequest & Controls;
+> = RouteRequest<MiddlewareRoute<TRoute>, TContext> & UnknownRequest & Controls;
 
-/** The request reusable middleware receives, with request segments typed as unknown. */
+/** The request reusable middleware receives, with request segments typed as unknown and `route.meta` typed by the declared shape. */
 export type ReusableMiddlewareRequest<
 	TRequest extends RequestFields,
 	TContext extends object,
+	TMetaShape extends object = DefaultMeta,
 > = HandlerFields &
 	Omit<TRequest, "errors"> &
 	(TRequest extends { errors: infer TErrors }
 		? { errors: ErrorFactories<TErrors> }
 		: EmptyObject) &
 	UnknownRequest & {
-		route: RouteDefinition;
+		route: Omit<RouteDefinition, "meta"> & {
+			readonly meta?: Partial<TMetaShape>;
+		};
 		context: Context<TContext>;
 	} & Controls;

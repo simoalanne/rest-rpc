@@ -29,7 +29,8 @@ export const withBodyContent = route
 	.body({ "application/json": schema });
 export const patched = route.patch();
 export const deleted = route.delete("/items/:id");
-export const withMeta = route.meta({ cacheKey: "items" });
+export const withMetaShape = route.$meta<{ cacheKey: string }>();
+export const withMeta = withMetaShape.meta({ cacheKey: "items" });
 export const withOpenApi = route.openAPI({ summary: "Items" });
 export const withResponse = route.get().response(schema);
 export const withStatusResponse = route.get().response(schema, { status: 201 });
@@ -81,6 +82,7 @@ export const routes = {
 
 // Partially built contract routes.
 export const contractBase = contractRoute
+	.$meta<{ cacheKey: string }>()
 	.prefix("/users")
 	.headers(type<{ authorization: string }>())
 	.error(Unauthorized);

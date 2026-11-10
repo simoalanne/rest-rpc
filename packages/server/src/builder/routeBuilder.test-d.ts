@@ -410,3 +410,46 @@ describe("implicit response inference", () => {
 		respond(undefined, { headers: { count: {} } });
 	});
 });
+
+describe("route metadata", () => {
+	type Access = { access: "public" | "admin" };
+	const base = route.$meta<Access>();
+
+	it("types middleware route meta as the values set before it, or the shape", () => {
+		const authorize = base.middleware(({ route, next }) => {
+			expectTypeOf(route.meta).toEqualTypeOf<Partial<Access> | undefined>();
+			return next();
+		});
+		base
+			.use(authorize)
+			.use(({ route }) => {
+				expectTypeOf(route.meta).toEqualTypeOf<Partial<Access> | undefined>();
+			})
+			.meta({ access: "admin" })
+			.use(({ route }) => {
+				expectTypeOf(route.meta).toEqualTypeOf<{ readonly access: "admin" }>();
+			});
+		route
+			.$meta<{ access: "owner" }>()
+			// @ts-expect-error The route meta does not match the middleware shape.
+			.use(authorize);
+	});
+
+	it("types implementer middleware route meta from the contract shape", () => {
+		const contractBase = contractRoute.$meta<Access>();
+		const contract = {
+			list: contractBase.get("/").meta({ access: "public" }),
+			create: contractBase.post("/"),
+		};
+		const todos = implement(contract).use(({ route, next }) => {
+			expectTypeOf(route.meta).toEqualTypeOf<Partial<Access> | undefined>();
+			return next();
+		});
+		todos.create.use(({ route }) => {
+			expectTypeOf(route.meta).toEqualTypeOf<Partial<Access> | undefined>();
+		});
+		todos.list.use(({ route }) => {
+			expectTypeOf(route.meta).toEqualTypeOf<{ readonly access: "public" }>();
+		});
+	});
+});

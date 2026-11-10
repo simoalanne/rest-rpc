@@ -6,6 +6,7 @@ import {
 	type BuilderState,
 	type DefinitionFor,
 	type NextState,
+	type OmittedMethods,
 	type RootBuilderState,
 	type RouteDefinition,
 	type ServerRequest,
@@ -88,7 +89,7 @@ export interface ServerRouteBuilderKind<
 	TContext extends object = EmptyObject,
 > extends BuilderKind {
 	readonly builder: this["state"] extends infer TState extends BuilderState
-		? Omit<ServerRouteBuilder<TState, TContext>, TState["omit"]>
+		? Omit<ServerRouteBuilder<TState, TContext>, OmittedMethods<TState>>
 		: never;
 }
 
@@ -136,18 +137,20 @@ export class ServerRouteBuilder<
 		});
 	}
 
-	/** Defines a reusable middleware function typed by this builder's request, errors and context. @see {@link https://rest-rpc.vercel.app/docs/middleware} */
+	/** Defines a reusable middleware function typed by this builder's request, errors, context and metadata shape. @see {@link https://rest-rpc.vercel.app/docs/middleware} */
 	middleware<TRequest extends RequestFields = EmptyObject>(
 		callback: (
 			request: ReusableMiddlewareRequest<
 				ReusableRequestFor<TState, TRequest>,
-				TContext
+				TContext,
+				TState["metaShape"]
 			>,
 		) => MiddlewareReturn,
 	): <TRouteContext extends TContext>(
 		request: ReusableMiddlewareRequest<
 			ReusableRequestFor<TState, TRequest>,
-			TRouteContext
+			TRouteContext,
+			TState["metaShape"]
 		>,
 	) => MiddlewareReturn {
 		// The callback only reads and writes keys of TContext, so it runs on any
@@ -155,7 +158,7 @@ export class ServerRouteBuilder<
 		return callback as never;
 	}
 
-	/** Adds typed values to the per-request context store of this builder, whose types win for keys already in it. @see {@link https://rest-rpc.vercel.app/docs/context} */
+	/** Adds typed values to the per-request context store of this builder, whose types win for keys already in it. @see {@link https://rest-rpc.vercel.app/docs/middleware#context} */
 	$context<TValues extends object>(): BuilderFor<
 		ServerRouteBuilderKind<ExtendContext<TContext, TValues>>,
 		TState
@@ -173,4 +176,7 @@ export class ServerRouteBuilder<
  *
  * @see {@link https://rest-rpc.vercel.app/docs/quickstart#define-and-register-routes}
  */
-export const route = new ServerRouteBuilder<RootBuilderState, DefaultContext>();
+export const route: BuilderFor<
+	ServerRouteBuilderKind<DefaultContext>,
+	RootBuilderState
+> = new ServerRouteBuilder<RootBuilderState, DefaultContext>();

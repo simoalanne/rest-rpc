@@ -104,7 +104,6 @@ route.prefix("/api/v1").get(); // at todos.list: GET /api/v1/todos/list
 const authed = route
 	.$context<{ user: User }>()
 	.headers(z.object({ authorization: z.string() })) // lowercase names
-	.meta({ auth: "required" }) // shallow-merged
 	.openAPI({ tags: ["Todos"] }) // merged, tags combined
 	.error("UNAUTHORIZED", { status: 401 });
 
@@ -228,7 +227,7 @@ export const get = definition.handler(getTodo);
 type Requests = InferServerRequest<typeof routes>; // a tree infers a tree of types
 ```
 
-## [Middleware](/docs/middleware) and [Context](/docs/context)
+## [Middleware, Context and Metadata](/docs/middleware)
 
 Middleware is onion-style and runs after request validation: each `.use()`
 wraps every middleware defined after it, with the handler innermost. Code
@@ -269,9 +268,24 @@ const profile = authenticated
 	.use(attachUser)
 	.handler(({ context }) => context.get("user"));
 
+// Metadata describes a route to shared code. .meta() exists once $meta<T>()
+// declares a shape, and only accepts values of it.
+const app = route.$meta<{ access: "public" | "signed-in" | Permission }>();
+
+// Reusable and earlier inline middleware read route.meta as Partial<T> | undefined.
+const authorize = app.middleware(({ route, context, next }) => {
+	const access = route.meta?.access ?? "signed-in";
+	return access === "public" || hasAccess(context, access) ? next() : forbid();
+});
+
+app.use(authorize).get("/health").meta({ access: "public" }); // shallow-merged
+
 declare module "@rest-rpc/server" {
 	interface DefaultContext {
 		env: { DATABASE_URL: string }; // typed for every route, merged with $context<T>()
+	}
+	interface DefaultMeta {
+		access: "public" | "signed-in" | Permission; // merged with $meta<T>()
 	}
 }
 ```

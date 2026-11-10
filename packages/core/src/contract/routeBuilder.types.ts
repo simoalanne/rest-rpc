@@ -3,6 +3,7 @@ import type { RouteErrorDefinition } from "./routeError.ts";
 import type { DefaultBodyContentType } from "./body.ts";
 import type {
 	AbsolutePath,
+	DefaultMeta,
 	HttpMethod,
 	OpenApiRouteOptions,
 	RouteErrors,
@@ -20,6 +21,8 @@ export type BuilderState = {
 	responses: object;
 	errors: RouteErrors;
 	meta: RouteMeta | undefined;
+	/** The shape declared with `$meta()` and `DefaultMeta`, which `.meta()` values must match. */
+	metaShape: object;
 	openApi: boolean;
 	omit: PropertyKey;
 };
@@ -32,6 +35,7 @@ export type RootBuilderState = {
 	responses: EmptyObject;
 	errors: EmptyObject;
 	meta: undefined;
+	metaShape: DefaultMeta;
 	openApi: false;
 	omit: never;
 };
@@ -49,6 +53,11 @@ export type NextState<
 				: "POST"
 			: TState[TKey];
 };
+
+/** The builder methods a state leaves out. `.meta()` needs a declared metadata shape. */
+export type OmittedMethods<TState extends BuilderState> =
+	| TState["omit"]
+	| (keyof TState["metaShape"] extends never ? "meta" : never);
 
 /** Maps a builder state to a builder type, so packages extending the builder get their own type back. */
 export interface BuilderKind {
@@ -81,8 +90,9 @@ export type DefinitionFor<TState extends BuilderState> =
 						: { errors: TState["errors"] }) &
 					(TState["meta"] extends RouteMeta
 						? { readonly meta: TState["meta"] }
-						: EmptyObject) &
-					(TState["prefix"] extends AbsolutePath
+						: EmptyObject) & {
+						readonly metaShape?: TState["metaShape"];
+					} & (TState["prefix"] extends AbsolutePath
 						? { readonly prefix: TState["prefix"] }
 						: EmptyObject) &
 					(TState["openApi"] extends true
@@ -194,6 +204,15 @@ export type WithMeta<
 			? Merge<Omit<TState["meta"], keyof TMeta> & TMeta>
 			: TMeta;
 	}
+>;
+
+// Types from the new shape win for keys already in it, as with `$context()`.
+export type WithMetaShape<
+	TState extends BuilderState,
+	TShape extends object,
+> = NextState<
+	TState,
+	{ metaShape: Merge<Omit<TState["metaShape"], keyof TShape> & TShape> }
 >;
 
 type StatusFor<TOptions> = TOptions extends {
