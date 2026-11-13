@@ -47,6 +47,7 @@ export {
 	respond,
 	type RespondOptions,
 	type ResponseEnvelope,
+	type ResponseEnvelopeBase,
 } from "./pipeline/respond.ts";
 export { sseEvent, type SseServerEvent } from "./pipeline/sse.ts";
 export {

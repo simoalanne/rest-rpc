@@ -32,10 +32,21 @@ export type RespondOptions = {
  *
  * @see {@link https://rest-rpc.vercel.app/docs/route-builder#return-responses}
  */
-export type ResponseEnvelope<TBody, TOptions extends object> = TOptions & {
+export type ResponseEnvelope<TBody, TOptions extends object> = TOptions &
+	ResponseEnvelopeBase<TBody>;
+
+/**
+ * The body of a {@link ResponseEnvelope} and the brand that tells it apart
+ * from a plain body.
+ *
+ * @remarks An interface, so that declarations name it instead of spelling out
+ * the brand, which they cannot name, when `respond()` is called without
+ * options.
+ */
+export interface ResponseEnvelopeBase<TBody> {
 	readonly body: TBody;
 	readonly [respondBrand]: true;
-};
+}
 
 /** The fields of a `respond()` result, with the default status and without an undefined body. */
 export type ResponseEnvelopeFields<T> = Merge<
