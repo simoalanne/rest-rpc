@@ -4,9 +4,9 @@ import {
 	type BodyValue,
 	type SerializedBody,
 } from "../codecs/index.ts";
-import type { Contract } from "../contract/contract.ts";
 import type { RouteDefinition } from "../contract/routeDefinition.ts";
 import { replacePathParams } from "../contract/path.ts";
+import type { ClientTypeSource } from "./response.ts";
 import type { HttpMethod } from "../contract/routeDefinition.ts";
 import type {
 	ClientRequestForDefinition,
@@ -75,26 +75,29 @@ type ClientRequestValue<T> = [T] extends [never] ? undefined : T;
  * Infers the request passed to a client route call.
  *
  * @remarks Routes without request input infer `undefined`, which the route
- * call accepts. Pass the type of the client's `globalHeaders` as the second
- * argument to make headers that it always provides optional. Pass a route tree
- * to infer a matching tree of request types.
+ * call accepts. Pass a client route function, such as
+ * `typeof client.users.get`, whose headers that `globalHeaders` provides are
+ * already optional. When passing a route instead, pass the type of the
+ * client's `globalHeaders` as the second argument to make those headers
+ * optional. Pass a client or route tree to infer a matching tree of request
+ * types.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
  */
 export type InferClientRequest<
-	T extends Contract,
+	T extends ClientTypeSource,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
-> = T extends {
-	readonly "~restrpc": infer TRoute extends RouteDefinition;
-}
-	? ClientRequestValue<
-			ClientRequestForDefinition<TRoute, GlobalHeaderKeys<TGlobalHeaders>>
-		>
-	: {
-			[K in keyof T]: T[K] extends Contract
-				? InferClientRequest<T[K], TGlobalHeaders>
-				: never;
-		};
+> = T extends (...args: infer TArgs) => Promise<unknown>
+	? TArgs[0]
+	: T extends { readonly "~restrpc": infer TRoute extends RouteDefinition }
+		? ClientRequestValue<
+				ClientRequestForDefinition<TRoute, GlobalHeaderKeys<TGlobalHeaders>>
+			>
+		: {
+				[K in keyof T]: T[K] extends ClientTypeSource
+					? InferClientRequest<T[K], TGlobalHeaders>
+					: never;
+			};
 
 export type FetchArgs<
 	E extends RouteDefinition = RouteDefinition,

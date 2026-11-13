@@ -1,6 +1,14 @@
 import { route } from "../contract/routeBuilder.ts";
 import { type } from "../standard-schema/type.ts";
+import { routeError } from "../contract/routeError.ts";
+import { sse } from "../contract/sse.ts";
 import { createClient } from "./createClient.ts";
+import type { InferClientRequest } from "./request.ts";
+import type {
+	InferClientError,
+	InferClientResponse,
+	InferClientStreamData,
+} from "./response.ts";
 
 describe("createClient types", () => {
 	it("allows empty requests and optional or guaranteed segmented headers", () => {
@@ -79,5 +87,35 @@ describe("createClient types", () => {
 		if (response.status === 200)
 			expectTypeOf(response.body).toEqualTypeOf<{ name: string }>();
 		else expectTypeOf(response.body).toEqualTypeOf<{ id: string }>();
+	});
+
+	it("infers the type helpers from client route functions like from routes", () => {
+		const get = route
+			.get("/:id")
+			.headers(type<{ authorization: string; tenant: string }>())
+			.error(routeError("NOT_FOUND", { status: 404 }))
+			.response(type<{ name: string }>());
+		const events = route.get("/events").response(sse(type<number>()));
+		const globalHeaders = { authorization: "token" };
+		const client = createClient(
+			{ get, events },
+			{ baseUrl: "", globalHeaders },
+		);
+		expectTypeOf<InferClientRequest<typeof client.get>>().toEqualTypeOf<
+			InferClientRequest<typeof get, typeof globalHeaders>
+		>();
+		expectTypeOf<InferClientRequest<typeof client.events>>().toEqualTypeOf<
+			InferClientRequest<typeof events>
+		>();
+		expectTypeOf<InferClientResponse<typeof client>["get"]>().toEqualTypeOf<
+			InferClientResponse<typeof get>
+		>();
+		expectTypeOf<InferClientError<typeof client.get>>().toEqualTypeOf<
+			InferClientError<typeof get>
+		>();
+		expectTypeOf<InferClientError<typeof client.events>>().toBeNever();
+		expectTypeOf<
+			InferClientStreamData<typeof client.events>
+		>().toEqualTypeOf<number>();
 	});
 });

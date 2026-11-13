@@ -23,67 +23,94 @@ import {
 	validateResponseValue,
 } from "./validateResponse.ts";
 
+type ClientRouteFunction = (...args: never[]) => Promise<unknown>;
+
+// A route, a client route function, or a tree of either.
+export type ClientTypeSource =
+	| Contract
+	| ClientRouteFunction
+	| { readonly [key: string]: ClientTypeSource };
+
+// Drops the plain `Error` a call also rejects with. `RouteError` extends
+// `Error`, so `Exclude<TError, Error>` would drop the defined errors too.
+type DefinedErrorsOf<TError> = TError extends unknown
+	? Error extends TError
+		? never
+		: TError
+	: never;
+
 /**
  * Infers a route's client result.
  *
  * @remarks Every route resolves with status-discriminated envelopes of its
- * successful responses. Pass a route tree to infer a matching tree of results.
+ * successful responses. Pass a client route function, such as
+ * `typeof client.users.get`, or a route. Pass a client or route tree to infer
+ * a matching tree of results.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#call-routes}
  */
-export type InferClientResponse<T extends Contract> = T extends {
-	readonly "~restrpc": infer TRoute extends RouteDefinition;
-}
-	? DefinedClientResponse<TRoute>
-	: {
-			[K in keyof T]: T[K] extends Contract ? InferClientResponse<T[K]> : never;
-		};
+export type InferClientResponse<T extends ClientTypeSource> =
+	T extends ClientRouteFunction
+		? Awaited<ReturnType<T>>
+		: T extends { readonly "~restrpc": infer TRoute extends RouteDefinition }
+			? DefinedClientResponse<TRoute>
+			: {
+					[K in keyof T]: T[K] extends ClientTypeSource
+						? InferClientResponse<T[K]>
+						: never;
+				};
 
 /**
  * Infers the `RouteError`s a route defines, which its client call rejects
  * with.
  *
  * @remarks Calls also reject with other `Error`s, such as when no response
- * arrived or it does not match the route contract. Pass a route tree to infer
- * a matching tree of types.
+ * arrived or it does not match the route contract. Pass a client route
+ * function or a route. Pass a client or route tree to infer a matching tree of
+ * types.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#typesafe-error-handling}
  */
-export type InferClientError<T extends Contract> = T extends {
-	readonly "~restrpc": infer TRoute extends RouteDefinition;
-}
-	? ClientRouteError<TRoute>
-	: {
-			[K in keyof T]: T[K] extends Contract ? InferClientError<T[K]> : never;
-		};
+export type InferClientError<T extends ClientTypeSource> =
+	T extends ClientRouteFunction
+		? ReturnType<T> extends { readonly "~error"?: infer TError }
+			? DefinedErrorsOf<Exclude<TError, undefined>>
+			: never
+		: T extends { readonly "~restrpc": infer TRoute extends RouteDefinition }
+			? ClientRouteError<TRoute>
+			: {
+					[K in keyof T]: T[K] extends ClientTypeSource
+						? InferClientError<T[K]>
+						: never;
+				};
 
 /**
  * Infers the `data` of each event received from a streaming route.
  *
  * @remarks Unwraps the `SseEvent` values of stream responses. Routes without
- * a stream response infer `never`. Pass a route tree to infer a matching tree
- * of event data types.
+ * a stream response infer `never`. Pass a client route function or a route.
+ * Pass a client or route tree to infer a matching tree of event data types.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#consume-streams}
  */
-export type InferClientStreamData<T extends Contract> = T extends {
-	readonly "~restrpc": infer TRoute extends RouteDefinition;
-}
-	? ClientStreamDataForDefinition<TRoute>
-	: {
-			[K in keyof T]: T[K] extends Contract
-				? InferClientStreamData<T[K]>
-				: never;
-		};
+export type InferClientStreamData<T extends ClientTypeSource> =
+	T extends ClientRouteFunction
+		? StreamDataOf<Awaited<ReturnType<T>>>
+		: T extends { readonly "~restrpc": infer TRoute extends RouteDefinition }
+			? StreamDataOf<DefinedClientResponse<TRoute>>
+			: {
+					[K in keyof T]: T[K] extends ClientTypeSource
+						? InferClientStreamData<T[K]>
+						: never;
+				};
 
-type ClientStreamDataForDefinition<E extends RouteDefinition> =
-	DefinedClientResponse<E> extends infer TResponse
-		? TResponse extends { body: AsyncIterable<SseEvent<infer TData>> }
-			? TData
-			: never
-		: never;
+type StreamDataOf<TResponse> = TResponse extends {
+	body: AsyncIterable<SseEvent<infer TData>>;
+}
+	? TData
+	: never;
 
 const STREAM_CONTENT_TYPE = "text/event-stream";
 

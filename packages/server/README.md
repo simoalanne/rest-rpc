@@ -605,12 +605,17 @@ import type {
 	InferClientStreamData,
 } from "@rest-rpc/core";
 
-type Get = typeof api.todos.get;
-type GetRequest = InferClientRequest<Get, typeof globalHeaders>; // provided headers optional
+type Get = typeof client.todos.get; // a client route function
+type GetRequest = InferClientRequest<Get>; // globalHeaders already optional
 type GetResponse = InferClientResponse<Get>; // every response envelope
 type GetError = InferClientError<Get>; // defined errors
-type TodoEvent = InferClientStreamData<typeof api.todos.events>; // event data
-type Responses = InferClientResponse<typeof api>; // a tree infers a tree of types
+type TodoEvent = InferClientStreamData<typeof client.todos.events>; // event data
+type Responses = InferClientResponse<typeof client>; // a tree infers a tree of types
+// Without a client, pass a route and the globalHeaders type instead.
+type RouteRequest = InferClientRequest<
+	typeof api.todos.get,
+	typeof globalHeaders
+>;
 type Client = ApiClientFor<typeof api>;
 
 // Return calls directly with ClientPromise to keep the error type for safe().
