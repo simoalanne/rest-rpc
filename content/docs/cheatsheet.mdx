@@ -551,6 +551,9 @@ const res = await client.todos.get(
 );
 await client.todos.import({ contentType: "text/csv", body: csv });
 await client.health(undefined, { cache: "no-store" }); // options without input
+// query and headers without required fields, and a body whose schema accepts
+// undefined, may be omitted, and so may a request without required fields.
+await client.todos.list();
 
 // Errors: reject by default, or resolve to { error } | { data } with safe().
 const { error, data } = await safe(client.todos.get({ params: { id: "1" } }));

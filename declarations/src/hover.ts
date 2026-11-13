@@ -124,6 +124,12 @@ export const optionalQuery = optionalClient.query;
 export const optionalHeaders = optionalClient.headers;
 export const optionalFields = optionalClient.body;
 export const optionalBody = optionalClient.optionalBody;
+export const omitted = () =>
+	Promise.all([
+		optionalClient.query(),
+		optionalClient.headers(),
+		optionalClient.optionalBody(),
+	]);
 
 const implemented = implement(optionalContract);
 export const implementedQuery = implemented.query.handler(

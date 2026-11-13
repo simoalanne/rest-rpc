@@ -60,6 +60,49 @@ describe("request inference", () => {
 		>().toEqualTypeOf<undefined>();
 	});
 
+	it("lets clients omit segments the server always receives", () => {
+		const optional = route
+			.get("/")
+			.query(type<{ page?: number }>())
+			.headers(type<{ "x-trace"?: string }>());
+		expectTypeOf<InferClientRequest<typeof optional>>().toEqualTypeOf<{
+			query?: { page?: number };
+			headers?: { "x-trace"?: string };
+		}>();
+		expectTypeOf<ServerRequest<(typeof optional)["~restrpc"]>>().toEqualTypeOf<{
+			query: { page?: number };
+			headers: { "x-trace"?: string };
+		}>();
+
+		// An omitted body is `undefined`, so only its schema can make it optional.
+		const fields = route.post("/").body(type<{ note?: string }>());
+		expectTypeOf<InferClientRequest<typeof fields>>().toEqualTypeOf<{
+			contentType?: "application/json";
+			body: { note?: string };
+		}>();
+		const omittable = route.post("/").body(type<string | undefined>());
+		expectTypeOf<InferClientRequest<typeof omittable>>().toEqualTypeOf<{
+			contentType?: "application/json";
+			body?: string | undefined;
+		}>();
+		expectTypeOf<
+			ServerRequest<(typeof omittable)["~restrpc"]>
+		>().toEqualTypeOf<{
+			contentType: "application/json";
+			body: string | undefined;
+		}>();
+
+		// Without a body, there is no content type to select a media type with.
+		const selected = route
+			.post("/")
+			.body(type<string | undefined>())
+			.body({ "text/plain": type<string>() });
+		expectTypeOf<InferClientRequest<typeof selected>>().toEqualTypeOf<
+			| { contentType: "application/json"; body: string | undefined }
+			| { contentType: "text/plain"; body: string }
+		>();
+	});
+
 	it("discriminates body variants by media type", () => {
 		const single = route.post("/").body({ "text/plain": type<string>() });
 		expectTypeOf<InferClientRequest<typeof single>>().toEqualTypeOf<{
@@ -76,12 +119,12 @@ describe("request inference", () => {
 			| {
 					contentType: "application/json";
 					body: { url: string };
-					query: { dryRun?: boolean };
+					query?: { dryRun?: boolean };
 			  }
 			| {
 					contentType: "multipart/form-data";
 					body: FormData;
-					query: { dryRun?: boolean };
+					query?: { dryRun?: boolean };
 			  }
 		>();
 		expectTypeOf<ServerRequest<(typeof value)["~restrpc"]>>().toEqualTypeOf<

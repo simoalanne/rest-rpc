@@ -26,11 +26,14 @@ export type TanstackQueryClient =
 	| ClientRoute
 	| { readonly [key: string]: TanstackQueryClient };
 
-type RouteRequestValue<F extends ClientRoute> = [Parameters<F>[0]] extends [
-	undefined,
-]
-	? never
-	: Parameters<F>[0];
+// `undefined` when the request may be omitted.
+type RouteRequestValue<F extends ClientRoute> = Parameters<F>[0];
+
+// The request without `undefined`, or `never` for routes without request input.
+type DefinedRequest<F extends ClientRoute> = Exclude<
+	RouteRequestValue<F>,
+	undefined
+>;
 
 type RouteDataFor<F extends ClientRoute> = Awaited<ReturnType<F>>;
 
@@ -39,9 +42,6 @@ type RouteErrorFor<F extends ClientRoute> =
 	ReturnType<F> extends { readonly "~error"?: infer TError }
 		? Exclude<TError, undefined> | Error
 		: Error;
-
-type MutationVariablesFor<F extends ClientRoute> =
-	RouteRequestValue<F> extends never ? undefined : RouteRequestValue<F>;
 
 type InfiniteQueryDataFor<
 	F extends ClientRoute,
@@ -78,13 +78,11 @@ type QueryFetchOptions<F extends ClientRoute> = Omit<
 >;
 type WithFetchOptions<T, TFetchOptions> = T & { fetchOptions?: TFetchOptions };
 
-type RequestOption<F extends ClientRoute> = [RouteRequestValue<F>] extends [
-	never,
-]
-	? { request?: SkipToken }
-	: {
-			request: RouteRequestValue<F> | SkipToken;
-		};
+// `TRequest` is the request, or the function that returns it for a page.
+type RequestOption<F extends ClientRoute, TRequest> =
+	undefined extends RouteRequestValue<F>
+		? { request?: TRequest | SkipToken }
+		: { request: TRequest | SkipToken };
 
 type QueryOptionsFor<
 	F extends ClientRoute,
@@ -95,7 +93,7 @@ type QueryOptionsFor<
 		"queryKey" | "queryFn"
 	> & {
 		queryKey?: QueryKey;
-	} & RequestOption<F>,
+	} & RequestOption<F, DefinedRequest<F>>,
 	QueryFetchOptions<F>
 >;
 
@@ -112,18 +110,14 @@ type QueryOptionsResultFor<
 
 type MutationOptionsFor<F extends ClientRoute> = WithFetchOptions<
 	Omit<
-		MutationOptions<RouteDataFor<F>, RouteErrorFor<F>, MutationVariablesFor<F>>,
+		MutationOptions<RouteDataFor<F>, RouteErrorFor<F>, RouteRequestValue<F>>,
 		"mutationFn"
 	>,
 	RouteFetchOptions<F>
 >;
 
 type MutationOptionsResultFor<F extends ClientRoute> = F extends ClientRoute
-	? MutationOptions<
-			RouteDataFor<F>,
-			RouteErrorFor<F>,
-			MutationVariablesFor<F>
-		> & {
+	? MutationOptions<RouteDataFor<F>, RouteErrorFor<F>, RouteRequestValue<F>> & {
 			mutationKey: MutationKey;
 		}
 	: never;
@@ -146,13 +140,12 @@ type InfiniteQueryOptionsFor<
 	> & {
 		initialPageParam: TInitialPageParam;
 		queryKey?: QueryKey;
-	} & ([RouteRequestValue<F>] extends [never]
-			? { request?: SkipToken }
-			: {
-					request:
-						| ((pageParam: TPageParam) => RouteRequestValue<F>)
-						| SkipToken;
-				}) &
+	} & RequestOption<
+			F,
+			[DefinedRequest<F>] extends [never]
+				? never
+				: (pageParam: TPageParam) => DefinedRequest<F>
+		> &
 		([TInitialPageParam] extends [TPageParam] ? unknown : never),
 	QueryFetchOptions<F>
 >;
@@ -235,7 +228,8 @@ type StreamedSimpleQueryArgs<
 	TSelectedData,
 > = OptionsArgument<
 	WithFetchOptions<
-		StreamedQuerySimpleOptions<F, TSelectedData> & RequestOption<F>,
+		StreamedQuerySimpleOptions<F, TSelectedData> &
+			RequestOption<F, DefinedRequest<F>>,
 		QueryFetchOptions<F>
 	>
 >;
@@ -246,7 +240,8 @@ type StreamedReducedQueryArgs<
 	TSelectedData,
 > = OptionsArgument<
 	WithFetchOptions<
-		StreamedQueryReducedOptions<F, TData, TSelectedData> & RequestOption<F>,
+		StreamedQueryReducedOptions<F, TData, TSelectedData> &
+			RequestOption<F, DefinedRequest<F>>,
 		QueryFetchOptions<F>
 	>
 >;
@@ -257,11 +252,9 @@ type UseQueryArgs<
 > = OptionsArgument<QueryOptionsFor<F, TData>>;
 
 // Without a request, a key is a prefix matching every query of its kind.
-type QueryKeyArgs<F extends ClientRoute> = [RouteRequestValue<F>] extends [
-	never,
-]
+type QueryKeyArgs<F extends ClientRoute> = [DefinedRequest<F>] extends [never]
 	? []
-	: [request?: RouteRequestValue<F>];
+	: [request?: DefinedRequest<F>];
 
 type RouteQueryKeyTag<F extends ClientRoute, TData> = DataTag<
 	QueryKey,

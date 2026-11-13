@@ -26,6 +26,17 @@ const created = await client.todos.create({ body: { title: "Write docs" } });
 const response = await client.todos.get({ params: { id: created.body.id } });
 ```
 
+A `query` or `headers` object without required fields may be omitted, since the
+server receives `{}` for it. A `body` may be omitted when its schema accepts
+`undefined` and the route defines one media type, because the server then
+validates `undefined`. A request without required fields may be omitted
+entirely:
+
+```ts
+// The route's query is z.object({ page: z.number().optional() }).
+const todos = await client.todos.list();
+```
+
 A call returns a union with one member per status and media type:
 
 ```ts

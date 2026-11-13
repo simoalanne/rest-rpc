@@ -33,9 +33,12 @@ describe("createClient types", () => {
 			baseUrl: "",
 			globalHeaders: { token: (): string | undefined => undefined },
 		});
-		expectTypeOf(literal).parameter(0).toEqualTypeOf<{
-			headers?: { token?: string; optional?: string };
-		}>();
+		expectTypeOf(literal)
+			.parameter(0)
+			.toEqualTypeOf<
+				{ headers?: { token?: string; optional?: string } } | undefined
+			>();
+		literal();
 		expectTypeOf(asyncProvider)
 			.parameter(0)
 			.toEqualTypeOf<Parameters<typeof literal>[0]>();
