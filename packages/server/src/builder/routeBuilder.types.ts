@@ -244,13 +244,13 @@ type BodylessFields<TRoute extends RouteDefinition> = TRoute extends {
 	: { contentType?: undefined };
 
 // Handlers and middleware throw `errors.CODE(...)` without `new`.
-type ErrorFactories<TErrors> = {
+type ErrorFactories<TErrors> = Merge<{
 	[K in keyof TErrors]: TErrors[K] extends abstract new (
 		...args: infer TArgs
 	) => infer TError
 		? (...args: TArgs) => TError
 		: TErrors[K];
-};
+}>;
 
 type ErrorsOf<TRoute extends RouteDefinition> = TRoute extends {
 	errors: infer TErrors;
@@ -266,7 +266,7 @@ export type RouteRequest<
 		HandlerFields &
 		BodylessFields<TRoute> & {
 			route: TRoute;
-			context: Readonly<TContext>;
+			context: Merge<Readonly<TContext>>;
 			errors: ErrorsOf<TRoute>;
 			/** Returns a response with a status, media type, or headers the route defines. */
 			respond: RouteRespond<RespondStatusFor<TRoute>>;
@@ -311,10 +311,12 @@ export type ContextFields<TInitial extends object, TContext extends object> = {
 	readonly initialContext?: (context: TInitial) => void;
 };
 
-type WithoutContext<TRoute extends RouteDefinition> =
-	"context" extends keyof TRoute
-		? Extract<Omit<TRoute, "context" | "initialContext">, RouteDefinition>
-		: TRoute;
+// The route as handlers receive it: the runtime strips the handler, and the
+// context fields exist only in types.
+type HandlerRouteOf<TRoute extends RouteDefinition> = Extract<
+	Merge<Omit<TRoute, "handler" | "context" | "initialContext">>,
+	RouteDefinition
+>;
 
 /**
  * Infers the handler signature for a route definition.
@@ -329,7 +331,7 @@ type WithoutContext<TRoute extends RouteDefinition> =
 export type InferServerHandler<T extends HandlerTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDefinition;
 }
-	? RouteHandler<WithoutContext<TRoute>, ContextOf<TRoute>>
+	? RouteHandler<HandlerRouteOf<TRoute>, ContextOf<TRoute>>
 	: {
 			[
 				K in keyof T as T[K] extends HandlerTree ? K : never

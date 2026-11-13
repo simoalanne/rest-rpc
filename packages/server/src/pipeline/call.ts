@@ -8,6 +8,7 @@ import {
 } from "@rest-rpc/core";
 import { normalizeMediaType } from "@rest-rpc/core/codecs";
 import { markDefined, type RouteDefinition } from "@rest-rpc/core/contract";
+import type { Merge } from "@rest-rpc/core/utils";
 import type { InitialContextOf } from "../builder/routeBuilder.types.ts";
 import type { ContextOption, OptionsArgs } from "./compileRoutes.ts";
 import {
@@ -21,11 +22,10 @@ import { resolveRouteError } from "./resolveRouteError.ts";
 import { toSseEvent } from "./sse.ts";
 
 /** Options accepted by `call`. `context` is required when the route requires initial context. */
-export type CallOptions<TRoute extends ImplementedRoute> = Pick<
-	FetchOptions,
-	"signal"
-> &
-	ContextOption<InitialContextOf<TRoute["~restrpc"]>>;
+export type CallOptions<TRoute extends ImplementedRoute> = Merge<
+	Pick<FetchOptions, "signal"> &
+		ContextOption<InitialContextOf<TRoute["~restrpc"]>>
+>;
 
 type CallArgs<TRoute extends ImplementedRoute> = [
 	InferClientRequest<TRoute>,
@@ -61,10 +61,10 @@ const toCallResult = ({
 });
 
 /** The promise a local call returns, which carries the errors it rejects with. */
-type CallResult<TRoute extends ImplementedRoute> = ClientPromise<
-	InferClientResponse<TRoute>,
-	InferClientError<TRoute> | Error
->;
+// The conditional keeps editors from displaying this alias instead of the resolved promise.
+type CallResult<TRoute extends ImplementedRoute> = TRoute extends unknown
+	? ClientPromise<InferClientResponse<TRoute>, InferClientError<TRoute> | Error>
+	: never;
 
 // Mirrors the fetch client: the error that would be sent is received, and
 // marked as defined when the route defines its code.

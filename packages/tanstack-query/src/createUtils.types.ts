@@ -99,12 +99,16 @@ type QueryOptionsFor<
 	QueryFetchOptions<F>
 >;
 
+// The `F extends ClientRoute` conditionals of the result types keep editors
+// from displaying the alias instead of the TanStack Query options it resolves to.
 type QueryOptionsResultFor<
 	F extends ClientRoute,
 	TData = RouteDataFor<F>,
-> = QueryObserverOptions<RouteDataFor<F>, RouteErrorFor<F>, TData> & {
-	queryKey: DataTag<QueryKey, RouteDataFor<F>, RouteErrorFor<F>>;
-};
+> = F extends ClientRoute
+	? QueryObserverOptions<RouteDataFor<F>, RouteErrorFor<F>, TData> & {
+			queryKey: DataTag<QueryKey, RouteDataFor<F>, RouteErrorFor<F>>;
+		}
+	: never;
 
 type MutationOptionsFor<F extends ClientRoute> = WithFetchOptions<
 	Omit<
@@ -114,13 +118,15 @@ type MutationOptionsFor<F extends ClientRoute> = WithFetchOptions<
 	RouteFetchOptions<F>
 >;
 
-type MutationOptionsResultFor<F extends ClientRoute> = MutationOptions<
-	RouteDataFor<F>,
-	RouteErrorFor<F>,
-	MutationVariablesFor<F>
-> & {
-	mutationKey: MutationKey;
-};
+type MutationOptionsResultFor<F extends ClientRoute> = F extends ClientRoute
+	? MutationOptions<
+			RouteDataFor<F>,
+			RouteErrorFor<F>,
+			MutationVariablesFor<F>
+		> & {
+			mutationKey: MutationKey;
+		}
+	: never;
 
 type InfiniteQueryOptionsFor<
 	F extends ClientRoute,
@@ -155,19 +161,21 @@ type InfiniteQueryOptionsResultFor<
 	F extends ClientRoute,
 	TPageParam,
 	TData = InfiniteQueryDataFor<F, TPageParam>,
-> = InfiniteQueryObserverOptions<
-	RouteDataFor<F>,
-	RouteErrorFor<F>,
-	TData,
-	QueryKey,
-	TPageParam
-> & {
-	queryKey: DataTag<
-		QueryKey,
-		InfiniteQueryDataFor<F, TPageParam>,
-		RouteErrorFor<F>
-	>;
-};
+> = F extends ClientRoute
+	? InfiniteQueryObserverOptions<
+			RouteDataFor<F>,
+			RouteErrorFor<F>,
+			TData,
+			QueryKey,
+			TPageParam
+		> & {
+			queryKey: DataTag<
+				QueryKey,
+				InfiniteQueryDataFor<F, TPageParam>,
+				RouteErrorFor<F>
+			>;
+		}
+	: never;
 
 type StreamedQueryRefetchMode = "append" | "reset" | "replace";
 
@@ -211,9 +219,11 @@ type StreamedQueryOptionsResultFor<
 	F extends ClientRoute,
 	TData,
 	TSelectedData,
-> = QueryObserverOptions<TData, RouteErrorFor<F>, TSelectedData, TData> & {
-	queryKey: DataTag<QueryKey, TData, RouteErrorFor<F>>;
-};
+> = F extends ClientRoute
+	? QueryObserverOptions<TData, RouteErrorFor<F>, TSelectedData, TData> & {
+			queryKey: DataTag<QueryKey, TData, RouteErrorFor<F>>;
+		}
+	: never;
 
 type OptionsArgument<TOptions> =
 	Record<never, never> extends TOptions
