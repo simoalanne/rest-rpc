@@ -221,7 +221,7 @@ type StatusFor<TOptions> = TOptions extends {
 	? TStatus
 	: 200;
 
-type ResponseHeadersFor<TOptions> = TOptions extends {
+type ResponseHeadersOption<TOptions> = TOptions extends {
 	headers: infer THeaders;
 }
 	? { headers: THeaders }
@@ -232,7 +232,7 @@ type ResponseFor<TSchemaOrContent, TOptions> = ([TSchemaOrContent] extends [
 ]
 	? EmptyObject
 	: { content: ContentFor<TSchemaOrContent> }) &
-	ResponseHeadersFor<TOptions>;
+	ResponseHeadersOption<TOptions>;
 
 export type WithResponse<
 	TState extends BuilderState,

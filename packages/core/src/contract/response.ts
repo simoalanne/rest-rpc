@@ -2,7 +2,7 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { RouteDefinition } from "./routeDefinition.ts";
 import type { InferSchema, RequestScalar } from "./request.ts";
 import type { SseEvent } from "./sse.ts";
-import type { RouteError } from "./routeError.ts";
+import type { ErrorSchemaValue, RouteError } from "./routeError.ts";
 import type { IsUnion, Merge } from "../utils/typeUtils.ts";
 
 /** A whole-object schema for response headers whose output contains scalar values. */
@@ -38,12 +38,6 @@ export type ResponseOptions = {
 
 export type RouteResponses = Record<number, ResponseDefinition>;
 
-type ResponseContent<TResponse> = TResponse extends {
-	content: infer TContent;
-}
-	? TContent
-	: never;
-
 // `keyof never` is every key, so bodyless responses are checked first.
 type ResponseMediaType<TResponse> = TResponse extends {
 	content: infer TContent;
@@ -65,12 +59,13 @@ type ResponseHeadersMetadata<TResponse, TIO extends "input" | "output"> = [
 			headers: InferSchema<ResponseHeadersFor<TResponse>, TIO>;
 		};
 
-type ContentSchema<TResponse, TMediaType> =
-	ResponseContent<TResponse> extends infer TContent
-		? TMediaType extends keyof TContent
-			? Extract<TContent[TMediaType], StandardSchemaV1>
-			: never
-		: never;
+type ContentSchema<TResponse, TMediaType> = TResponse extends {
+	content: infer TContent;
+}
+	? TMediaType extends keyof TContent
+		? Extract<TContent[TMediaType], StandardSchemaV1>
+		: never
+	: never;
 
 // `text/event-stream` schemas describe stream items. Handlers produce schema
 // inputs, and clients receive schema outputs wrapped in SSE events.
@@ -155,7 +150,11 @@ type ResponseEntryFor<
 	? ClientResponseEntry<TStatus, TResponse>
 	: ServerResponseEntry<TStatus, TResponse>;
 
-/** Maps each defined status to its response entry. */
+/**
+ * Maps each defined status to its response entry. The conditional always
+ * matches. It keeps editors and declaration emit from referring to this alias
+ * instead of the resolved union.
+ */
 type ResponseUnion<
 	E extends RouteDefinition,
 	TSide extends "client" | "server",
@@ -177,18 +176,6 @@ export type ServerResponse<E extends RouteDefinition> = ResponseUnion<
 	"server"
 >;
 
-type ClientErrorHeaders<TDefinition> = TDefinition extends {
-	headers: infer THeaders extends ResponseHeadersSchema;
-}
-	? Record<string, string> & InferSchema<THeaders, "output">
-	: Record<string, string>;
-
-type ClientErrorData<TDefinition> = TDefinition extends {
-	data: infer TData extends StandardSchemaV1;
-}
-	? InferSchema<TData, "output">
-	: undefined;
-
 // The top-level conditional keeps editors from displaying this alias instead of the resolved union.
 export type ClientRouteError<E extends RouteDefinition> = E extends {
 	errors: infer TErrors;
@@ -199,9 +186,10 @@ export type ClientRouteError<E extends RouteDefinition> = E extends {
 			}
 				? RouteError<
 						TCode,
-						ClientErrorData<TErrors[TCode]>,
+						ErrorSchemaValue<TErrors[TCode], "data", "output", undefined>,
 						TStatus,
-						ClientErrorHeaders<TErrors[TCode]>
+						Record<string, string> &
+							ErrorSchemaValue<TErrors[TCode], "headers", "output", unknown>
 					>
 				: never;
 		}[Extract<keyof TErrors, string>]

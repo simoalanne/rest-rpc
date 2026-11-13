@@ -110,6 +110,17 @@ describe("call", () => {
 		});
 	});
 
+	it("receives an omitted query and headers as empty objects, as over HTTP", async () => {
+		const implementation = route
+			.get("/items")
+			.query(type<{ page?: string }>())
+			.headers(type<{ "x-trace"?: string }>())
+			.handler(({ query, headers }) => ({ query, headers }));
+		expect(await call(implementation)).toMatchObject({
+			body: { query: {}, headers: {} },
+		});
+	});
+
 	it("yields stream items as SSE events", async () => {
 		async function* values() {
 			yield sseEvent(1, { id: "one" });

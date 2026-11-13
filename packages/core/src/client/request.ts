@@ -69,8 +69,6 @@ type GlobalHeaderKeys<TGlobalHeaders extends ClientHeaders> = {
 		: TKey;
 }[LiteralKeys<TGlobalHeaders>];
 
-type ClientRequestValue<T> = [T] extends [never] ? undefined : T;
-
 /**
  * Infers the request passed to a client route call.
  *
@@ -88,29 +86,42 @@ export type InferClientRequest<
 	T extends ClientTypeSource,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > = T extends (...args: infer TArgs) => Promise<unknown>
-	? TArgs[0]
+	? // An omittable request is optional in the call, which adds `undefined`.
+		[Exclude<TArgs[0], undefined>] extends [never]
+		? undefined
+		: Exclude<TArgs[0], undefined>
 	: T extends { readonly "~restrpc": infer TRoute extends RouteDefinition }
-		? ClientRequestValue<
-				ClientRequestForDefinition<TRoute, GlobalHeaderKeys<TGlobalHeaders>>
-			>
+		? ClientRequestForDefinition<TRoute, GlobalHeaderKeys<TGlobalHeaders>>
 		: {
 				[K in keyof T]: T[K] extends ClientTypeSource
 					? InferClientRequest<T[K], TGlobalHeaders>
 					: never;
 			};
 
+// A request without required fields may be omitted, unless options are required.
+export type RequestArgs<
+	TRequest,
+	TOptionsArgs extends readonly unknown[],
+> = undefined extends TRequest
+	? OmittableRequestArgs<TRequest, TOptionsArgs>
+	: {} extends TRequest
+		? OmittableRequestArgs<TRequest, TOptionsArgs>
+		: [request: TRequest, ...TOptionsArgs];
+
+type OmittableRequestArgs<
+	TRequest,
+	TOptionsArgs extends readonly unknown[],
+> = TOptionsArgs extends readonly [unknown]
+	? [request: TRequest | undefined, ...TOptionsArgs]
+	: [request?: TRequest, ...TOptionsArgs];
+
 export type FetchArgs<
 	E extends RouteDefinition = RouteDefinition,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
-> =
-	ClientRequestForDefinition<
-		E,
-		GlobalHeaderKeys<TGlobalHeaders>
-	> extends infer TRequest
-		? [TRequest] extends [never]
-			? [request?: undefined, options?: FetchOptions]
-			: [request: TRequest, options?: FetchOptions]
-		: never;
+> = RequestArgs<
+	ClientRequestForDefinition<E, GlobalHeaderKeys<TGlobalHeaders>>,
+	[options?: FetchOptions]
+>;
 
 type GroupedRequestInput = {
 	contentType?: string;

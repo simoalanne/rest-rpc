@@ -72,7 +72,10 @@ describe("createTanstackQueryUtils types", () => {
 					ReturnType<typeof securedUtils.mutationOptions>["mutationFn"]
 				>
 			>[0]
-		>().toEqualTypeOf<{ headers?: { token?: string; optional?: string } }>();
+		>().toEqualTypeOf<
+			{ headers?: { token?: string; optional?: string } } | undefined
+		>();
+		securedUtils.queryOptions();
 		const uncertainUtils = createTanstackQueryUtils(
 			createClient(secured, {
 				baseUrl: "",

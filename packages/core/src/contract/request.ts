@@ -67,29 +67,32 @@ type InferRequestSegments<TRequest, TIO extends "input" | "output"> = {
 		: never;
 };
 
-// Clients select a media type only when several are defined; handlers always
-// receive the selected one.
-type BodyContentTypeField<
+// Clients select a media type only when several are defined, and may then omit
+// a body whose schema accepts `undefined`. Handlers always receive the
+// selected media type.
+type BodyFields<
 	TMediaType,
-	TMediaTypes,
-	TIO extends "input" | "output",
-> = TIO extends "input"
-	? IsUnion<TMediaTypes> extends true
-		? { contentType: TMediaType }
-		: { contentType?: TMediaType }
-	: { contentType: TMediaType };
+	TBody,
+	TOmittable extends boolean,
+> = TOmittable extends true
+	? { contentType?: TMediaType } & (undefined extends TBody
+			? { body?: TBody }
+			: { body: TBody })
+	: { contentType: TMediaType; body: TBody };
 
 /** One request body variant per defined media type, discriminated by `contentType`. */
 type InferRequestBody<TBody, TIO extends "input" | "output"> = {
-	[TMediaType in Extract<keyof TBody, string>]: BodyContentTypeField<
+	[TMediaType in Extract<keyof TBody, string>]: BodyFields<
 		TMediaType,
-		Extract<keyof TBody, string>,
-		TIO
-	> & {
-		body: TBody[TMediaType] extends readonly StandardSchemaV1[]
+		TBody[TMediaType] extends readonly StandardSchemaV1[]
 			? InferSchemas<TBody[TMediaType], TIO>
-			: never;
-	};
+			: never,
+		TIO extends "input"
+			? IsUnion<Extract<keyof TBody, string>> extends true
+				? false
+				: true
+			: false
+	>;
 }[Extract<keyof TBody, string>];
 
 type DefinedRequest<E> = E extends { request: infer TRequest }
@@ -105,16 +108,13 @@ type ParamsPath<E> = E extends { path: infer TPath extends string }
 		: undefined;
 
 // Dynamic path segments without a params schema are received as strings.
-type PathParamsRequest<E> =
-	ParamsPath<E> extends infer TPath
-		? [PathParamNames<TPath>] extends [never]
-			? EmptyObject
-			: {
-					params: readonly [
-						StandardSchemaV1<{ [TName in PathParamNames<TPath>]: string }>,
-					];
-				}
-		: EmptyObject;
+type PathParamsRequest<E> = [PathParamNames<ParamsPath<E>>] extends [never]
+	? EmptyObject
+	: {
+			params: readonly [
+				StandardSchemaV1<{ [TName in PathParamNames<ParamsPath<E>>]: string }>,
+			];
+		};
 
 type RequestWithPathParams<E> =
 	DefinedRequest<E> extends { params: readonly StandardSchemaV1[] }
@@ -128,37 +128,51 @@ type InferRequestFor<
 	TEmpty,
 > =
 	RequestWithPathParams<E> extends infer TRequest
-		? TRequest extends { body: infer TBody }
-			? Merge<
-					InferRequestSegments<TRequest, TIO> & InferRequestBody<TBody, TIO>
+		? [Extract<keyof TRequest, RequestSegment | "body">] extends [never]
+			? TEmpty
+			: Merge<
+					InferRequestSegments<TRequest, TIO> &
+						(TRequest extends { body: infer TBody }
+							? InferRequestBody<TBody, TIO>
+							: unknown)
 				>
-			: [Extract<keyof TRequest, RequestSegment>] extends [never]
-				? TEmpty
-				: InferRequestSegments<TRequest, TIO>
 		: never;
 
-type OptionalHeaders<H, TOptionalKeys extends PropertyKey> = Merge<
-	Omit<H, Extract<keyof H, TOptionalKeys>> &
-		Partial<Pick<H, Extract<keyof H, TOptionalKeys>>>
+type PartialKeys<T, TKey extends keyof T> = Merge<
+	Omit<T, TKey> & Partial<Pick<T, TKey>>
 >;
 
-type OptionalRequestHeaders<T, TOptionalKeys extends PropertyKey> = [
-	T,
-] extends [never]
-	? never
-	: T extends { headers: infer H }
-		? Merge<
-				Omit<T, "headers"> &
-					({} extends OptionalHeaders<H, TOptionalKeys>
-						? { headers?: OptionalHeaders<H, TOptionalKeys> }
-						: { headers: OptionalHeaders<H, TOptionalKeys> })
-			>
-		: T;
+// Headers that `globalHeaders` provide are optional.
+type WithGlobalHeaders<T, TOptionalKeys extends PropertyKey> = T extends {
+	headers: infer H;
+}
+	? Omit<T, "headers"> & {
+			headers: PartialKeys<H, Extract<keyof H, TOptionalKeys>>;
+		}
+	: T;
 
+// A query or headers segment without required fields may be omitted, since
+// the server always receives at least `{}`.
+type OmittableSegments<T> = {
+	[TKey in keyof T]: TKey extends "query" | "headers"
+		? {} extends T[TKey]
+			? TKey
+			: never
+		: never;
+}[keyof T];
+
+/** The request a client sends, or `undefined` for routes without request input. */
 export type ClientRequestForDefinition<
 	E extends RouteDefinition,
 	TOptionalKeys extends PropertyKey = never,
-> = OptionalRequestHeaders<InferRequestFor<E, "input", never>, TOptionalKeys>;
+> =
+	InferRequestFor<E, "input", undefined> extends infer TRequest
+		? TRequest extends object
+			? WithGlobalHeaders<TRequest, TOptionalKeys> extends infer T
+				? PartialKeys<T, OmittableSegments<T>>
+				: never
+			: TRequest
+		: never;
 
 export type ServerRequest<E extends { request?: RouteRequestDefinition }> =
 	InferRequestFor<E, "output", EmptyObject>;

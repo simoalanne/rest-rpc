@@ -1,6 +1,7 @@
 import type { LowercaseHeadersOptionCheck } from "./headers.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { Merge } from "../utils/typeUtils.ts";
+import type { InferSchema } from "./request.ts";
 import type { ResponseHeadersSchema } from "./response.ts";
 
 /**
@@ -133,26 +134,29 @@ export type RouteErrorDefinitionOptions = {
 	description?: string;
 };
 
-type InputOf<TSchema> = TSchema extends StandardSchemaV1
-	? StandardSchemaV1.InferInput<TSchema>
-	: undefined;
+type ErrorSchemaKey = "data" | "headers";
 
-type DataOption<TDefinition> = TDefinition extends {
-	data: infer TData extends StandardSchemaV1;
-}
-	? { data: StandardSchemaV1.InferInput<TData> }
-	: { data?: never };
+/** The input or output of an error definition's `data` or `headers` schema, or `TMissing` without one. */
+export type ErrorSchemaValue<
+	TDefinition,
+	TKey extends ErrorSchemaKey,
+	TIO extends "input" | "output",
+	TMissing,
+> =
+	TDefinition extends Record<TKey, infer TSchema extends StandardSchemaV1>
+		? InferSchema<TSchema, TIO>
+		: TMissing;
 
-type HeadersOption<TDefinition> = TDefinition extends {
-	headers: infer THeaders extends StandardSchemaV1;
-}
-	? { headers: StandardSchemaV1.InferInput<THeaders> }
-	: { headers?: never };
+// `data` and `headers` are required when their schemas are defined.
+type SchemaOption<TDefinition, TKey extends ErrorSchemaKey> =
+	TDefinition extends Record<TKey, StandardSchemaV1>
+		? Record<TKey, ErrorSchemaValue<TDefinition, TKey, "input", never>>
+		: Partial<Record<TKey, never>>;
 
 type ConstructOptions<TDefinition> = Merge<
 	Pick<RouteErrorOptions, "message" | "cookies" | "cause"> &
-		DataOption<TDefinition> &
-		HeadersOption<TDefinition>
+		SchemaOption<TDefinition, "data"> &
+		SchemaOption<TDefinition, "headers">
 >;
 
 type ConstructArgs<TDefinition> = TDefinition extends
@@ -170,11 +174,9 @@ export type RouteErrorClass<
 		...args: ConstructArgs<TDefinition>
 	): RouteError<
 		TCode,
-		InputOf<TDefinition extends { data: infer TData } ? TData : undefined>,
+		ErrorSchemaValue<TDefinition, "data", "input", undefined>,
 		TDefinition["status"],
-		TDefinition extends { headers: infer THeaders extends StandardSchemaV1 }
-			? StandardSchemaV1.InferInput<THeaders>
-			: Record<string, unknown>
+		ErrorSchemaValue<TDefinition, "headers", "input", Record<string, unknown>>
 	>;
 	readonly code: TCode;
 } & TDefinition;

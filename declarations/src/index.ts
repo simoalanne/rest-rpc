@@ -50,6 +50,10 @@ export const respondingMiddleware = route
 	.use(async ({ respond, next }) =>
 		Math.random() > 0.5 ? respond(undefined, { status: 204 }) : next(),
 	);
+export const respondingWithDefaultStatus = route
+	.get("/default-status")
+	.response(schema)
+	.handler(({ respond }) => respond({ name: "default" }));
 export const responding = respondingMiddleware
 	.get("/responding")
 	.handler(({ respond }) => respond(undefined, { status: 204 }));
