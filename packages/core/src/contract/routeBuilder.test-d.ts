@@ -146,13 +146,9 @@ describe("routeBuilder types", () => {
 		route.get("/").response(type<string>(), { headers: type<Lowercase>() });
 		// @ts-expect-error Received header names are lowercase.
 		route.get("/").response(type<string>(), { headers: type<Uppercase>() });
-		route
-			.get("/")
-			// @ts-expect-error Received header names are lowercase.
-			.response(
-				{ "text/plain": type<string>() },
-				{ headers: type<Uppercase>() },
-			);
+		const text = { "text/plain": type<string>() };
+		// @ts-expect-error Received header names are lowercase.
+		route.get("/").response(text, { headers: type<Uppercase>() });
 		// @ts-expect-error Received header names are lowercase.
 		route.get("/").response({ status: 204, headers: type<Uppercase>() });
 		route.get("/").error("LIMITED", { headers: type<Lowercase>() });
