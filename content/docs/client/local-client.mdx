@@ -33,8 +33,7 @@ const response = await call(getTodo, { params: { id: "1" } });
 [same response](/docs/client/fetch-client#call-routes) as a Fetch client call. Request segments are schema
 inputs, the values a client would send, and handlers receive the schema output.
 A request body media type is selected with `contentType` in the request, as in a
-[Fetch client call](/docs/client/fetch-client#select-a-request-media-type). An omitted `query` or
-`headers` is received as `{}`, as over HTTP.
+[Fetch client call](/docs/client/fetch-client#select-a-request-media-type).
 
 The optional third argument replaces what an HTTP request would otherwise provide:
 

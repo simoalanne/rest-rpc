@@ -38,10 +38,6 @@ export type ResponseEnvelope<TBody, TOptions extends object> = TOptions &
 /**
  * The body of a {@link ResponseEnvelope} and the brand that tells it apart
  * from a plain body.
- *
- * @remarks An interface, so that declarations name it instead of spelling out
- * the brand, which they cannot name, when `respond()` is called without
- * options.
  */
 export interface ResponseEnvelopeBase<TBody> {
 	readonly body: TBody;

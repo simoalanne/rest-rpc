@@ -9,7 +9,7 @@ This repo is `rest-rpc`, a TypeScript library for defining REST APIs with RPC-li
 - `@rest-rpc/core` - core library that has contract,client and openapi code.
 - `@rest-rpc/server` - route builder, handlers, validation and serialization. Runtime handlers are exported from the root (Fetch `Request`/`Response`) and the `@rest-rpc/server/node` subpath (Node `IncomingMessage`/`ServerResponse`).
 - `@rest-rpc/tanstack-query` - TanStack Query options and key utils
-- `declarations/` - private package whose `src/index.ts` exports values built with the public API the way a consumer library would. Its typecheck emits declarations, so it fails when an exported type cannot be named from a package entry point. Add a case when the public API gains a new builder stage or result type. `src/hover.ts` uses the public API the way an application would, to hover in an editor when checking how public types display: types that resolve to a readable shape should show it fully, without internal alias names.
+- `declarations/` - private package whose `src/index.ts` exports values built with the public API the way a consumer library would. Its typecheck emits declarations, so it fails when an exported type cannot be named from a package entry point. Add a case when the public API gains a new builder stage or result type.
 - `content/` contains documentation for the library and its packages. documentation is written in mdx and uses https://useblume.dev/.
 
 ### Commands
