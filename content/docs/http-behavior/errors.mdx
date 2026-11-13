@@ -22,6 +22,7 @@ Content-Type: application/json
 - `code` and `message` are always present, and `data` is present when the error
   has data.
 - Defined error headers are sent as response headers.
+- `cookies` are sent as `Set-Cookie` headers, one per value.
 
 Any HTTP client can read these responses. The rest-rpc client rejects with a
 `RouteError` for each of them, and marks it as defined when the route defines
@@ -32,7 +33,17 @@ the code with the received status. See
 
 Throw `errors.CODE(...)` from a handler or middleware, or throw
 `new Definition(...)` for an error defined with `routeError()` from any code.
-Both create a `RouteError`.
+Both create a `RouteError` and take the same options:
+
+```ts
+throw errors.SESSION_EXPIRED({
+	data: { userId }, // required when the definition has a `data` schema
+	headers: { "x-reason": "expired" }, // required when it has a `headers` schema
+	cookies: ["session=; Max-Age=0"], // each sent as its own `Set-Cookie` header
+	message: "Sign in again", // overrides the defined message
+	cause: error, // never sent
+});
+```
 
 The route's definition decides the response: its status, and the validated
 `data` and headers. When `data` or headers fail validation, an

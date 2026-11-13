@@ -26,17 +26,26 @@ const created = await client.todos.create({ body: { title: "Write docs" } });
 const response = await client.todos.get({ params: { id: created.body.id } });
 ```
 
-A call returns a `status`-discriminated union with `contentType`, `body`, and
-`headers`. `contentType` is the received base media type, or `undefined` when
-the response has no content type. When a status defines several media types,
-checking `contentType` narrows `body`. `headers` is a record of every response
-header with lowercase names, and defined response headers are typed.
+A call returns a union with one member per status and media type:
+
+```ts
+type Result = {
+	status: 200; // checking `status` narrows the result
+	contentType: "application/json"; // received base media type, or undefined
+	body: Todo; // checking `contentType` narrows it when a status has several
+	headers: Record<string, string>; // lowercase names, defined headers typed
+	cookies: readonly string[]; // `Set-Cookie` values, empty in browsers
+};
+```
 
 ```ts
 if (response.status === 200) {
 	console.log(response.body.title);
 }
 ```
+
+Browsers hide `Set-Cookie` from `fetch` and store the cookies themselves, so
+`cookies` is filled only in server runtimes.
 
 A call resolves with a successful response and rejects with an error otherwise.
 See [Handle Errors](#typesafe-error-handling).
@@ -55,13 +64,17 @@ await client.todos.import({ contentType: "text/csv", body: csv });
 
 An error response whose JSON body has a `code` rejects with a `RouteError`:
 
-| Field     | Value                     |
-| --------- | ------------------------- |
-| `code`    | The `code` of the body    |
-| `status`  | The response status       |
-| `message` | The `message` of the body |
-| `data`    | The `data` of the body    |
-| `headers` | The response headers      |
+```ts
+class RouteError extends Error {
+	code: string; // the body's `code`
+	status: number;
+	message: string; // the body's `message`, or the code
+	data: unknown; // the body's `data`, typed for defined errors
+	headers: Record<string, string>;
+	cookies: readonly string[]; // `Set-Cookie` values, empty in browsers
+	isDefined: boolean; // the route defines the code with this status
+}
+```
 
 An error whose code the route [defines](/docs/route-builder#define-errors) is
 part of the route's types: its `data` and defined headers are typed, and

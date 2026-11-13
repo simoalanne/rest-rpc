@@ -168,6 +168,7 @@ route.handler(({ respond }) =>
 		status: 201, // 2xx, defaults to 200
 		contentType: "text/plain", // defaults to application/json
 		headers: { location: "/todos/1" },
+		cookies: ["session=abc; HttpOnly"], // each its own Set-Cookie header
 	}),
 );
 
@@ -205,6 +206,7 @@ route
 		throw errors.TODO_NOT_FOUND({
 			data: { id: params.id }, // required when defined
 			headers: { "x-reason": "deleted" }, // required when defined
+			cookies: ["session=; Max-Age=0"], // each its own Set-Cookie header
 			message: "Deleted", // overrides the defined message
 			cause, // never sent
 		});
@@ -566,7 +568,8 @@ const client = createClient(api, {
 	validateResponses: true, // shared contracts only
 });
 
-// Resolves to a status-discriminated { status, contentType, body, headers }.
+// Resolves to a status-discriminated { status, contentType, body, headers, cookies }.
+// cookies are the Set-Cookie values, which browsers hide, so empty there.
 const res = await client.todos.get(
 	{ params: { id: "1" } },
 	{ signal, cache: "no-store", additionalHeaders: { "x-trace-id": traceId } },

@@ -114,20 +114,25 @@ type StreamDataOf<TResponse> = TResponse extends {
 
 const STREAM_CONTENT_TYPE = "text/event-stream";
 
+// Joined `Set-Cookie` values cannot be split again, so they are read as
+// `cookies` instead of a header.
 const readHeaders = async (
 	schema: ResponseDefinition | RouteErrorDefinition | undefined,
 	rawResponse: Response,
 	validate: boolean,
 ) => {
-	const headers = Object.fromEntries(rawResponse.headers.entries());
-	if (!schema?.headers || !validate) return headers;
+	const headers = Object.fromEntries(
+		[...rawResponse.headers].filter(([name]) => name !== "set-cookie"),
+	);
+	const cookies = rawResponse.headers.getSetCookie();
+	if (!schema?.headers || !validate) return { headers, cookies };
 
 	const result = await validateStandardSchema(schema.headers, headers);
 	if (result.issues) {
 		throw contractError(contractMismatch, result.issues);
 	}
 	// Keep headers the schema does not define.
-	return { ...headers, ...result.value };
+	return { headers: { ...headers, ...result.value }, cookies };
 };
 
 // Failures of reading the body stay transport failures, while bodies that
@@ -216,18 +221,18 @@ const readErrorResponse = async (
 	if (!definition) {
 		return new RouteError(code, {
 			...options,
+			...(await readHeaders(undefined, rawResponse, false)),
 			data,
-			headers: Object.fromEntries(rawResponse.headers.entries()),
 		});
 	}
 	if (definition.status !== status) return contractError(contractMismatch);
 
-	const [validatedData, headers] = await Promise.all([
+	const [validatedData, received] = await Promise.all([
 		readValidated(definition.data, data, validate),
 		readHeaders(definition, rawResponse, validate),
 	]);
 	return markDefined(
-		new RouteError(code, { ...options, data: validatedData, headers }),
+		new RouteError(code, { ...options, ...received, data: validatedData }),
 	);
 };
 
@@ -276,7 +281,7 @@ export const readResponse = async <E extends RouteDefinition>(
 		return {
 			status,
 			contentType,
-			headers: await readHeaders(schema, rawResponse, validateResponse),
+			...(await readHeaders(schema, rawResponse, validateResponse)),
 			body,
 		};
 	}
@@ -288,7 +293,7 @@ export const readResponse = async <E extends RouteDefinition>(
 	return {
 		status,
 		contentType,
-		headers: await readHeaders(schema, rawResponse, validateResponse),
+		...(await readHeaders(schema, rawResponse, validateResponse)),
 		body: await readValidated(
 			schema?.content?.[mediaType],
 			value,

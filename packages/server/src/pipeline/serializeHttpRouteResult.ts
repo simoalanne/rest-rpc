@@ -22,11 +22,16 @@ const toBodyInit = (value: unknown) =>
 		? ReadableStream.from(encodeChunks(value))
 		: value) as ConstructorParameters<typeof Response>[0];
 
-const setHeaders = (headers: Headers, values?: Record<string, unknown>) => {
+const setHeaders = (
+	headers: Headers,
+	values: Record<string, unknown> | undefined,
+	cookies: readonly string[] | undefined,
+) => {
 	for (const name in values) {
 		const value = values[name];
 		if (value !== undefined) headers.set(name, String(value));
 	}
+	for (const cookie of cookies ?? []) headers.append("set-cookie", cookie);
 };
 
 /** The result's headers override the headers of a `SerializedBody` returned by the codec. */
@@ -36,7 +41,7 @@ export function serializeHttpRouteResult(
 ): MaybePromise<Response> {
 	if (!result.body) {
 		const headers = new Headers();
-		setHeaders(headers, result.headers);
+		setHeaders(headers, result.headers, result.cookies);
 		return new Response(null, { status: result.status, headers });
 	}
 
@@ -45,6 +50,7 @@ export function serializeHttpRouteResult(
 	// headers to set.
 	if (
 		result.headers === undefined &&
+		!result.cookies?.length &&
 		contentType === "application/json" &&
 		codecs.serializesJson(contentType)
 	) {
@@ -57,13 +63,13 @@ export function serializeHttpRouteResult(
 			serialized.headers.forEach((headerValue, name) =>
 				headers.set(name, headerValue),
 			);
-			setHeaders(headers, result.headers);
+			setHeaders(headers, result.headers, result.cookies);
 			return new Response(toBodyInit(serialized.body), {
 				status: result.status,
 				headers,
 			});
 		}
-		setHeaders(headers, result.headers);
+		setHeaders(headers, result.headers, result.cookies);
 		headers.set("content-type", contentType);
 		return new Response(toBodyInit(serialized), {
 			status: result.status,
@@ -79,6 +85,6 @@ const errorBody = ({ code, message, data }: RouteError) =>
 /** Serializes an error as a JSON `{ code, message, data? }` response. */
 export function serializeRouteError(error: RouteError): Response {
 	const headers = new Headers();
-	setHeaders(headers, error.headers as Record<string, unknown>);
+	setHeaders(headers, error.headers as Record<string, unknown>, error.cookies);
 	return Response.json(errorBody(error), { status: error.status, headers });
 }

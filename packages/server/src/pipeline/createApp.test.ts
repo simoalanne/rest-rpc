@@ -1,4 +1,4 @@
-import { type } from "@rest-rpc/core";
+import { routeError, type } from "@rest-rpc/core";
 import { route } from "../builder/routeBuilder.ts";
 import { createApp } from "./createApp.ts";
 
@@ -169,5 +169,43 @@ describe("createApp", () => {
 		});
 		const response = await app.fetch(new Request("http://localhost/todos/1"));
 		expect(response.status).toBe(500);
+	});
+
+	it("sends each set-cookie value as its own header", async () => {
+		const Expired = routeError("SESSION_EXPIRED", { status: 401 });
+		const cookies = ["session=1; HttpOnly", "theme=dark"];
+		const app = createApp({
+			inferred: route
+				.get("/inferred")
+				.handler(({ respond }) => respond("ok", { cookies })),
+			defined: route
+				.get("/defined")
+				.response(type<string>())
+				.use(async ({ next }) => {
+					const response = await next();
+					return {
+						...response,
+						cookies: [...(response.cookies ?? []), "seen=1"],
+					};
+				})
+				.handler(({ respond }) => respond("ok", { cookies })),
+			expired: route
+				.get("/expired")
+				.error(Expired)
+				.handler(({ errors }): string => {
+					throw errors.SESSION_EXPIRED({ cookies: ["session=; Max-Age=0"] });
+				}),
+		});
+		const read = async (path: string) =>
+			(await app.fetch(new Request(`http://localhost${path}`))).headers;
+
+		expect((await read("/inferred")).getSetCookie()).toEqual(cookies);
+		expect((await read("/defined")).getSetCookie()).toEqual([
+			...cookies,
+			"seen=1",
+		]);
+		expect((await read("/expired")).getSetCookie()).toEqual([
+			"session=; Max-Age=0",
+		]);
 	});
 });
