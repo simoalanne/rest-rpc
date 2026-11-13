@@ -19,6 +19,7 @@ to the full [documentation](https://rest-rpc.vercel.app/docs/quickstart).
   - [Methods, Paths and Prefixes](#methods-paths-and-prefixes)
   - [Request Segments, Reuse and Handler Arguments](#request-segments-reuse-and-handler-arguments)
   - [Responses](#responses)
+  - [Static Responses](#static-responses)
   - [Errors](#errors)
   - [Media Types](#media-types)
   - [Type Helpers](#type-helpers)
@@ -186,6 +187,17 @@ route
 // the only status, or 200 among several.
 route.response(todoSchema, { status: 201 }).handler(() => todo); // 201
 const created = (todo: Todo) => respond(todo, { status: 201 }); // outside a handler
+```
+
+### [Static Responses](https://rest-rpc.vercel.app/docs/route-builder#static-responses)
+
+```ts
+// The same response for every request, serialized once. Not on routes that
+// read the request or run middleware.
+route.get("/health").static({ ok: true });
+route
+	.get("/robots.txt")
+	.static(respond("User-agent: *", { contentType: "text/plain" }));
 ```
 
 ### [Errors](https://rest-rpc.vercel.app/docs/route-builder#define-errors)
@@ -489,7 +501,7 @@ export default createApp(routes, {
 });
 
 const app = createApp(routes); // Bun: native router via app.routes
-Bun.serve({ ...app, routes: { ...app.routes, "/health": new Response("ok") } });
+Bun.serve({ ...app, routes: { ...app.routes, "/ping": new Response("ok") } });
 ```
 
 ### [Node HTTP](https://rest-rpc.vercel.app/docs/server/node)

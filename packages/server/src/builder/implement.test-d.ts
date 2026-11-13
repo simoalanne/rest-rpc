@@ -100,4 +100,20 @@ describe("implement types", () => {
 			Readonly<ExtendContext<DefaultContext, { count: number }>>
 		>();
 	});
+
+	it("offers static() on contract routes without request input or middleware", () => {
+		const api = {
+			health: route.get("/health").response(type<{ ok: boolean }>()),
+			users: contract.users,
+		};
+		implement(api).health.static({ ok: true });
+		// @ts-expect-error The contract route has params.
+		implement(api).users.get.static({ name: "Ada" });
+		const leaf = implement(api).health.use(({ next }) => next());
+		// @ts-expect-error The leaf runs middleware.
+		leaf.static({ ok: true });
+		const tree = implement(api).use(({ next }) => next());
+		// @ts-expect-error The tree runs middleware.
+		tree.health.static({ ok: true });
+	});
 });

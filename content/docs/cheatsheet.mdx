@@ -163,6 +163,17 @@ route.response(todoSchema, { status: 201 }).handler(() => todo); // 201
 const created = (todo: Todo) => respond(todo, { status: 201 }); // outside a handler
 ```
 
+### [Static Responses](/docs/route-builder#static-responses)
+
+```ts
+// The same response for every request, serialized once. Not on routes that
+// read the request or run middleware.
+route.get("/health").static({ ok: true });
+route
+	.get("/robots.txt")
+	.static(respond("User-agent: *", { contentType: "text/plain" }));
+```
+
 ### [Errors](/docs/route-builder#define-errors)
 
 ```ts
@@ -464,7 +475,7 @@ export default createApp(routes, {
 });
 
 const app = createApp(routes); // Bun: native router via app.routes
-Bun.serve({ ...app, routes: { ...app.routes, "/health": new Response("ok") } });
+Bun.serve({ ...app, routes: { ...app.routes, "/ping": new Response("ok") } });
 ```
 
 ### [Node HTTP](/docs/server/node)

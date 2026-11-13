@@ -243,6 +243,20 @@ route
 	});
 ```
 
+## Static Responses
+
+`.static(value)` completes a route with a response that is the same for every
+request. The value is anything a handler could return, and it is validated and
+serialized once, when the routes are compiled. It is not available on routes
+that read the request or run middleware.
+
+```ts
+route.get("/health").static({ ok: true });
+route
+	.get("/robots.txt")
+	.static(respond("User-agent: *", { contentType: "text/plain" }));
+```
+
 ## Define Errors
 
 Errors are thrown, not returned. Define each error a route can respond with,

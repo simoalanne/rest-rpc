@@ -3,6 +3,7 @@ import {
 	isAsyncIterable,
 	isSerializedBody,
 	type BodyCodecRegistry,
+	type BodyValue,
 } from "@rest-rpc/core/codecs";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import type { HttpRouteResult } from "./handleHttpRoute.ts";
@@ -34,29 +35,26 @@ const setHeaders = (
 	for (const cookie of cookies ?? []) headers.append("set-cookie", cookie);
 };
 
+/** A serialized route result: the parts a `Response` is built from. */
+export type SerializedHttpResponse = {
+	status: number;
+	headers: Headers;
+	body: BodyValue | null;
+};
+
 /** The result's headers override the headers of a `SerializedBody` returned by the codec. */
-export function serializeHttpRouteResult(
+export function serializeHttpResponseParts(
 	result: HttpRouteResult,
 	codecs: BodyCodecRegistry,
-): MaybePromise<Response> {
+): MaybePromise<SerializedHttpResponse> {
+	const { status } = result;
 	if (!result.body) {
 		const headers = new Headers();
 		setHeaders(headers, result.headers, result.cookies);
-		return new Response(null, { status: result.status, headers });
+		return { status, headers, body: null };
 	}
 
 	const { value, contentType } = result.body;
-	// `Response.json` serializes faster than the JSON codec, but only without
-	// headers to set.
-	if (
-		result.headers === undefined &&
-		!result.cookies?.length &&
-		contentType === "application/json" &&
-		codecs.serializesJson(contentType)
-	) {
-		return Response.json(value, { status: result.status });
-	}
-
 	return mapMaybePromise(codecs.serialize(value, contentType), (serialized) => {
 		const headers = new Headers();
 		if (isSerializedBody(serialized)) {
@@ -64,18 +62,38 @@ export function serializeHttpRouteResult(
 				headers.set(name, headerValue),
 			);
 			setHeaders(headers, result.headers, result.cookies);
-			return new Response(toBodyInit(serialized.body), {
-				status: result.status,
-				headers,
-			});
+			return { status, headers, body: serialized.body };
 		}
 		setHeaders(headers, result.headers, result.cookies);
 		headers.set("content-type", contentType);
-		return new Response(toBodyInit(serialized), {
-			status: result.status,
-			headers,
-		});
+		return { status, headers, body: serialized };
 	});
+}
+
+export function serializeHttpRouteResult(
+	result: HttpRouteResult,
+	codecs: BodyCodecRegistry,
+): MaybePromise<Response> {
+	// `Response.json` serializes faster than the JSON codec, but only without
+	// headers to set.
+	if (
+		result.body &&
+		result.headers === undefined &&
+		!result.cookies?.length &&
+		result.body.contentType === "application/json" &&
+		codecs.serializesJson(result.body.contentType)
+	) {
+		return Response.json(result.body.value, { status: result.status });
+	}
+
+	return mapMaybePromise(
+		serializeHttpResponseParts(result, codecs),
+		({ status, headers, body }) =>
+			new Response(body === null ? null : toBodyInit(body), {
+				status,
+				headers,
+			}),
+	);
 }
 
 /** The JSON body of an error response. */

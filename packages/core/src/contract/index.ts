@@ -41,6 +41,7 @@ export {
 	joinPrefix,
 	toColonPath,
 	toOpenApiPath,
+	type PathParamNames,
 } from "./path.ts";
 export type { RequestScalar, ServerRequest } from "./request.ts";
 export type { LowercaseHeadersOptionCheck } from "./headers.ts";

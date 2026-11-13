@@ -2,6 +2,10 @@ import { routeError, type } from "@rest-rpc/core";
 import { route } from "../builder/routeBuilder.ts";
 import { createApp } from "./createApp.ts";
 
+// Entries of routes completed with `.static()` are `Response` values instead.
+const handlerOf = (entry: unknown) =>
+	entry as (request: Request, ...args: unknown[]) => Promise<Response>;
+
 const routes = {
 	root: route.get("/").handler(() => "root"),
 	todos: {
@@ -63,7 +67,9 @@ describe("createApp", () => {
 		const app = createApp(routes, { onError });
 		for (const response of [
 			await app.fetch(new Request("http://localhost/fail")),
-			await app.routes["/fail"]!.GET!(new Request("http://localhost/fail")),
+			await handlerOf(app.routes["/fail"]!.GET)(
+				new Request("http://localhost/fail"),
+			),
 		]) {
 			expect(response.status).toBe(500);
 			expect(await response.json()).toEqual({
@@ -115,7 +121,9 @@ describe("createApp", () => {
 			new Request("http://localhost/api/todos/a%2Fb"),
 			{ params: { id: "a/b" } },
 		);
-		const response = await app.routes["/api/todos/:id"]!.GET!(request);
+		const response = await handlerOf(app.routes["/api/todos/:id"]!.GET)(
+			request,
+		);
 		expect(await response.json()).toBe("a/b");
 	});
 
@@ -138,7 +146,7 @@ describe("createApp", () => {
 				});
 			const fromFetch = await app.fetch(request());
 			expect(await fromFetch.json()).toBe(expected[index]);
-			const fromRoutes = await app.routes["/user"]!.GET!(request());
+			const fromRoutes = await handlerOf(app.routes["/user"]!.GET)(request());
 			expect(await fromRoutes.json()).toBe(expected[index]);
 		}
 	});
@@ -155,7 +163,7 @@ describe("createApp", () => {
 		const request = () => new Request("http://localhost/user");
 		const fromFetch = await app.fetch(request(), { user: "fetch" });
 		expect(await fromFetch.json()).toBe("fetch");
-		const fromRoutes = await app.routes["/user"]!.GET!(request(), {
+		const fromRoutes = await handlerOf(app.routes["/user"]!.GET)(request(), {
 			user: "routes",
 		});
 		expect(await fromRoutes.json()).toBe("routes");

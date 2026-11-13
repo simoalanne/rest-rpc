@@ -2,6 +2,7 @@ import { RouteError, type AbsolutePath, type BodyCodec } from "@rest-rpc/core";
 import {
 	createBodyCodecRegistry,
 	normalizeMediaType,
+	type BodyCodecRegistry,
 } from "@rest-rpc/core/codecs";
 import type { HttpMethod } from "@rest-rpc/core/contract";
 import type { EmptyObject } from "@rest-rpc/core/utils";
@@ -31,9 +32,9 @@ import { parseQuery } from "./validation.ts";
 import {
 	readRequestPathname,
 	readRequestSearch,
-	stripMountPath,
 } from "../routing/requestUrl.ts";
 import { sseBodyCodec } from "./sse.ts";
+import { prepareStaticResponse } from "./staticResponse.ts";
 
 /**
  * Customizes paths, request parsing, validation and error observation for compiled Fetch routes.
@@ -165,6 +166,14 @@ export type FetchRoute<TContext extends object = EmptyObject> = {
 		request: Request,
 		...options: OptionsArgs<TContext, HandleOptions<TContext>>
 	) => Promise<Response>;
+	/**
+	 * The response of a route completed with `.static()`, for routers that
+	 * serve a `Response` as is. It is `undefined` for other routes.
+	 *
+	 * @remarks It is the same object for every request, so call `handle` to
+	 * send the response in other ways.
+	 */
+	readonly staticResponse?: Response;
 };
 
 type FetchDispatch = (
@@ -174,11 +183,10 @@ type FetchDispatch = (
 	options: HandleOptions<object> | undefined,
 ) => Promise<Response>;
 
-const createFetchDispatch = (options: CompileRoutesOptions): FetchDispatch => {
-	const codecs = createBodyCodecRegistry([
-		sseBodyCodec,
-		...(options.bodyCodecs ?? []),
-	]);
+const createFetchDispatch = (
+	options: CompileRoutesOptions,
+	codecs: BodyCodecRegistry,
+): FetchDispatch => {
 	const { disableRequestValidation, disableResponseValidation, onError } =
 		options;
 	const respondWithError = async (
@@ -292,16 +300,34 @@ export function compileRoutes<TRoutes extends RuntimeImplementationTree>(
 	implementations: TRoutes,
 	options: CompileRoutesOptions = {},
 ): FetchRoute<TreeInitialContext<TRoutes>>[] {
-	const dispatch = createFetchDispatch(options);
+	const codecs = createBodyCodecRegistry([
+		sseBodyCodec,
+		...(options.bodyCodecs ?? []),
+	]);
+	const dispatch = createFetchDispatch(options, codecs);
 
 	return flattenRouteImplementations(implementations).map((implementation) => {
 		const path = resolveImplementationPath(
 			implementation.route.path,
 			options.paramSyntax,
 		);
+		const { method } = implementation.route;
+		if (implementation.isStatic) {
+			const createResponse = prepareStaticResponse(
+				implementation,
+				codecs,
+				options.disableResponseValidation ?? false,
+			);
+			return {
+				method,
+				path,
+				handle: async () => createResponse(),
+				staticResponse: createResponse(),
+			};
+		}
 		const pathParams = parsePathParams(path);
 		return {
-			method: implementation.route.method,
+			method,
 			path,
 			handle: (request, ...[handleOptions]) =>
 				dispatch(implementation, pathParams, request, handleOptions),
@@ -326,11 +352,7 @@ export function createCatchAllHandler<TContext extends object>(
 	const matchRoute = createRouteMatcher(routes);
 
 	return async (request, ...[options]) => {
-		const pathname = readRequestPathname(request.url);
-		const routePath = options?.mountPath
-			? stripMountPath(pathname, options.mountPath)
-			: pathname;
-		const match = routePath && matchRoute(request.method, routePath);
+		const match = matchRoute(request.method, request.url, options?.mountPath);
 		if (!match) {
 			return { matched: false, response: undefined };
 		}
