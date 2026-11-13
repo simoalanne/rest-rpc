@@ -13,6 +13,7 @@ import type { RouteError } from "@rest-rpc/core";
 import { addRoute, createRouter, findRoute } from "rou3";
 import type { RuntimeRouteHandler } from "../builder/routeBuilder.types.ts";
 import type { CompileRoutesOptions } from "../pipeline/compileRoutes.ts";
+import { readRequestPathname, stripMountPath } from "./requestUrl.ts";
 
 const splitPath = (path: string) => path.split("/").filter(Boolean);
 
@@ -50,6 +51,8 @@ export type RuntimeImplementation = {
 	route: RouteDefinition & { path: string };
 	handler: (...args: never[]) => unknown;
 	middleware?: readonly RuntimeRouteHandler[];
+	/** Whether the route was completed with `.static()`, so its response is prepared once. */
+	isStatic: boolean;
 	/** The first defined response status, sent for plain handler results. */
 	defaultStatus: number | undefined;
 	/** The first defined request body media type. */
@@ -68,6 +71,7 @@ export type ImplementedRoute<TContext extends object = never> = {
 	readonly "~restrpc": RouteDefinition & {
 		readonly handler: (...args: never[]) => unknown;
 		readonly middleware?: readonly RuntimeRouteHandler[];
+		readonly static?: true;
 		readonly initialContext?: (context: TContext) => void;
 	};
 };
@@ -120,7 +124,7 @@ const createErrorFactories = (
 export function toRuntimeImplementation(
 	definition: ImplementedRoute["~restrpc"],
 ): RuntimeImplementation {
-	const { handler, middleware, ...route } = definition;
+	const { handler, middleware, static: isStatic, ...route } = definition;
 	if (
 		route.request?.params?.length &&
 		// A path derived from tree keys adds no dynamic segments to the prefix.
@@ -142,6 +146,7 @@ export function toRuntimeImplementation(
 		route: route as RuntimeImplementation["route"],
 		handler,
 		middleware,
+		isStatic: isStatic === true,
 		defaultStatus: firstStatus === undefined ? undefined : Number(firstStatus),
 		defaultBodyMediaType: bodyMediaTypes[0],
 		requiresBodyContentType: bodyMediaTypes.length > 1,
@@ -183,19 +188,32 @@ type MatchedRoute<TRoute> = {
 	params: Record<string, string> | undefined;
 };
 
-/** Compiles routes into a method and path matcher using rou3. */
+/**
+ * Compiles routes into a matcher using rou3. It matches the path of a request
+ * URL or target, without the mount path, and requests outside the mount path
+ * are unmatched.
+ */
 export function createRouteMatcher<
 	TRoute extends { readonly method: string; readonly path: string },
 >(
 	routes: readonly TRoute[],
-): (method: string, pathname: string) => MatchedRoute<TRoute> | undefined {
+): (
+	method: string,
+	url: string,
+	mountPath?: string,
+) => MatchedRoute<TRoute> | undefined {
 	const router = createRouter<TRoute>();
 	for (const route of routes) {
 		addRoute(router, route.method, toColonPath(route.path), route);
 	}
 
-	return (method, pathname) => {
-		const match = findRoute(router, method, pathname);
+	return (method, url, mountPath) => {
+		const pathname = readRequestPathname(url);
+		const routePath = mountPath
+			? stripMountPath(pathname, mountPath)
+			: pathname;
+		if (!routePath) return undefined;
+		const match = findRoute(router, method, routePath);
 		if (!match) return undefined;
 		// rou3 creates the params per match, so they are decoded in place.
 		const { params } = match;

@@ -393,6 +393,24 @@ describe.each([
 		});
 	});
 
+	it("serves the same static response to every request", async () => {
+		const routes = {
+			robots: route.get("/robots.txt").static(
+				respond("User-agent: *", {
+					contentType: "text/plain",
+					headers: { "cache-control": "max-age=60" },
+				}),
+			),
+		};
+		await serve(routes, {}, async (url) => {
+			for (let index = 0; index < 2; index += 1) {
+				const response = await fetch(`${url}/robots.txt`);
+				expect(response.headers.get("cache-control")).toBe("max-age=60");
+				expect(await response.text()).toBe("User-agent: *");
+			}
+		});
+	});
+
 	it("serves routes without a path at their tree keys", async () => {
 		const routes = {
 			users: {

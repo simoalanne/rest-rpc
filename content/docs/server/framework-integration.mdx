@@ -29,6 +29,7 @@ type FetchRoute = {
 	method: HttpMethod;
 	path: string;
 	handle: (request: Request, options?: HandleOptions) => Promise<Response>;
+	staticResponse?: Response; // .static() routes: the same object every time
 };
 ```
 

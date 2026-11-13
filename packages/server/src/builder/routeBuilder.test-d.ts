@@ -593,4 +593,31 @@ describe("middleware responses", () => {
 				return "ok";
 			});
 	});
+
+	it("types static values like handler results", () => {
+		const handled = route.get("/").handler(() => ({ ok: true }));
+		const staticRoute = route.get("/").static({ ok: true });
+		expectTypeOf<InferClientResponse<typeof staticRoute>>().toEqualTypeOf<
+			InferClientResponse<typeof handled>
+		>();
+		// @ts-expect-error The defined body requires a string id.
+		route.get("/").response(type<{ id: string }>()).static({ id: 1 });
+		// @ts-expect-error Static values are not awaited.
+		route.get("/").static(Promise.resolve("ok"));
+		const stream = respond(new ReadableStream(), { contentType: "text/plain" });
+		// @ts-expect-error Streams can be sent only once.
+		route.get("/").static(stream);
+	});
+
+	it("omits static() from routes that read the request or run middleware", () => {
+		// @ts-expect-error The path has params.
+		route.get("/:id").static("ok");
+		// @ts-expect-error The prefix has params.
+		route.prefix("/orgs/{org}").static("ok");
+		// @ts-expect-error The route defines a request segment.
+		route.get("/").query(type<{ page: string }>()).static("ok");
+		const withMiddleware = route.use(({ next }) => next()).get("/");
+		// @ts-expect-error The route runs middleware.
+		withMiddleware.static("ok");
+	});
 });

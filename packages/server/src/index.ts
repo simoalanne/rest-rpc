@@ -11,6 +11,7 @@ export {
 	type HandlerMethodFor,
 	type ServerRouteBuilder,
 	type ServerRouteBuilderKind,
+	type StaticMethodFor,
 } from "./builder/routeBuilder.ts";
 export type {
 	AnyReusableMiddleware,

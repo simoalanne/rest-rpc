@@ -23,7 +23,6 @@ import {
 	type RuntimeImplementationTree,
 	type TreeInitialContext,
 } from "../routing/match.ts";
-import { readRequestPathname, stripMountPath } from "../routing/requestUrl.ts";
 
 // A body is present only when framed by content-length or transfer-encoding.
 const hasBody = (req: IncomingMessage) =>
@@ -190,11 +189,11 @@ export function createCatchAllHandler<TContext extends object>(
 	const matchRoute = createRouteMatcher(routes as readonly NodeRoute<object>[]);
 
 	return async (request, response, ...[options]) => {
-		const pathname = readRequestPathname(readRequestTarget(request));
-		const routePath = options?.mountPath
-			? stripMountPath(pathname, options.mountPath)
-			: pathname;
-		const match = routePath && matchRoute(request.method ?? "GET", routePath);
+		const match = matchRoute(
+			request.method ?? "GET",
+			readRequestTarget(request),
+			options?.mountPath,
+		);
 		if (!match) {
 			return { matched: false };
 		}

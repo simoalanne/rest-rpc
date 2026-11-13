@@ -22,6 +22,7 @@ import type {
 	HasDefinedResponses,
 	InferredRoute,
 	InitialAfterReusable,
+	IsStaticRoute,
 	MiddlewareRequest,
 	MiddlewareResponse,
 	RequestFields,
@@ -31,6 +32,7 @@ import type {
 	RuntimeRouteHandler,
 	ServerRouteBuilderState,
 	ValidHandlerResult,
+	ValidStaticResult,
 } from "./routeBuilder.types.ts";
 // The route a handler or middleware receives. The root defaults to POST.
 type HandlerRoute<TState extends BuilderState> = Extract<
@@ -92,6 +94,28 @@ export type HandlerMethodFor<
 	): HandledRoute<TRoute, TInitial, TContext, TResult>;
 };
 
+/** The `static()` method that completes a route with the same response for every request. */
+export type StaticMethodFor<
+	TRoute extends RouteDefinition,
+	TInitial extends object = EmptyObject,
+	TContext extends object = TInitial,
+> = {
+	static<const TResult extends AllowedHandlerResult<TRoute, EmptyObject>>(
+		value: TResult & ValidStaticResult<TRoute, TResult>,
+	): HandledRoute<TRoute, TInitial, TContext, TResult>;
+};
+
+// `.static()` completes routes without request segments, path params or
+// middleware, so nothing runs for their requests. `.use()` omits it.
+type StaticOmitted<TState extends BuilderState> =
+	IsStaticRoute<TState> extends true ? never : "static";
+
+type WithoutStatic<TState extends BuilderState> = {
+	[TKey in keyof BuilderState]: TKey extends "omit"
+		? TState["omit"] | "static"
+		: TState[TKey];
+};
+
 /** Maps a builder state to the server route builder type, without the methods it omits. */
 export interface ServerRouteBuilderKind<
 	TInitial extends object = EmptyObject,
@@ -100,7 +124,7 @@ export interface ServerRouteBuilderKind<
 	readonly builder: this["state"] extends infer TState extends BuilderState
 		? Omit<
 				ServerRouteBuilder<TState, TInitial, TContext>,
-				OmittedMethods<TState>
+				OmittedMethods<TState> | StaticOmitted<TState>
 			>
 		: never;
 }
@@ -137,6 +161,22 @@ export class ServerRouteBuilder<
 		return this.clone({ ...defaultRouteState(this["~restrpc"]), handler });
 	}
 
+	/** Completes the route with a response that is the same for every request, serialized once instead of per request. Routes with request segments, path params or middleware cannot be static. @see {@link https://rest-rpc.vercel.app/docs/route-builder#static-responses} */
+	static<
+		const TResult extends AllowedHandlerResult<
+			HandlerRoute<TState>,
+			EmptyObject
+		>,
+	>(
+		value: TResult & ValidStaticResult<HandlerRoute<TState>, TResult>,
+	): HandledRoute<HandlerRoute<TState>, TInitial, TContext, TResult> {
+		return this.clone({
+			...defaultRouteState(this["~restrpc"]),
+			handler: () => value,
+			static: true,
+		});
+	}
+
 	/** Wraps downstream execution after request validation. It returns the response of `next()`, which can add context, or a `respond()` result. @see {@link https://rest-rpc.vercel.app/docs/middleware} */
 	use<TResult extends MaybePromise<MiddlewareResponse>>(
 		middleware: (
@@ -147,7 +187,7 @@ export class ServerRouteBuilder<
 			TInitial,
 			ContextAfterInline<TContext, Awaited<TResult>>
 		>,
-		TState
+		WithoutStatic<TState>
 	>;
 	/** Wraps downstream execution with middleware defined with `route.middleware()` that reads context the route lacks, which becomes initial context the host provides. @see {@link https://rest-rpc.vercel.app/docs/middleware#reuse-middleware} */
 	use<TMiddleware extends AnyReusableMiddleware>(
@@ -165,7 +205,7 @@ export class ServerRouteBuilder<
 			InitialAfterReusable<TInitial, TContext, TMiddleware>,
 			ContextAfterReusable<TContext, TMiddleware>
 		>,
-		TState
+		WithoutStatic<TState>
 	>;
 	use(middleware: (request: never) => unknown): never {
 		const state: ServerRouteBuilderState = this["~restrpc"];

@@ -1,6 +1,7 @@
 import type {
 	DefaultMeta,
 	LowercaseHeadersOptionCheck,
+	PathParamNames,
 	RouteDefinition,
 	ServerRequest,
 	ServerResponse,
@@ -9,6 +10,7 @@ import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import type {
 	RespondOptions,
 	ResponseEnvelope,
+	ResponseEnvelopeBase,
 	ResponseEnvelopeFields,
 } from "../pipeline/respond.ts";
 import type { SseServerEvent } from "../pipeline/sse.ts";
@@ -150,6 +152,8 @@ export type RuntimeRouteHandler = (
 export type ServerRouteBuilderState = Partial<RouteDefinition> & {
 	readonly handler?: unknown;
 	readonly middleware?: readonly RuntimeRouteHandler[];
+	/** Set by `.static()`, whose handler returns the same response for every request. */
+	readonly static?: true;
 };
 
 type WithSseItems<T> =
@@ -357,6 +361,33 @@ export type ValidHandlerResult<TRoute extends RouteDefinition, TResult> =
 	HasDefinedResponses<TRoute> extends true
 		? unknown
 		: ValidImplicitResult<TResult>;
+
+/** Whether a route reads no request input, so `.static()` can complete it. */
+export type IsStaticRoute<TRoute> = keyof (TRoute extends {
+	request: infer TRequest;
+}
+	? TRequest
+	: EmptyObject) extends never
+	? [
+			| PathParamNames<TRoute extends { path: infer TPath } ? TPath : never>
+			| PathParamNames<
+					TRoute extends { prefix: infer TPrefix } ? TPrefix : never
+			  >,
+		] extends [never]
+		? true
+		: false
+	: false;
+
+type StaticBody<TResult> =
+	TResult extends ResponseEnvelopeBase<infer TBody> ? TBody : TResult;
+
+/** Rejects promises, and stream bodies, which can be sent only once. */
+export type ValidStaticResult<TRoute extends RouteDefinition, TResult> = [
+	| Extract<TResult, PromiseLike<unknown>>
+	| Extract<StaticBody<TResult>, AsyncIterable<unknown> | ReadableStream>,
+] extends [never]
+	? ValidHandlerResult<TRoute, TResult>
+	: never;
 
 type HandlerRequests<T> = T extends (...args: never) => unknown
 	? Parameters<T>[0]

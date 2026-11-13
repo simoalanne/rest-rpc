@@ -5,11 +5,12 @@ import type {
 	RuntimeImplementationTree,
 	TreeInitialContext,
 } from "../routing/match.ts";
+import { createRouteMatcher } from "../routing/match.ts";
 import {
 	compileRoutes,
-	createCatchAllHandler,
-	type CatchAllHandleOptions,
 	type CompileRoutesOptions,
+	type FetchRoute,
+	type HandleOptions,
 } from "./compileRoutes.ts";
 import { InternalServerError, NotFound, observeError } from "./errors.ts";
 import { mapMaybePromise } from "./maybePromise.ts";
@@ -73,13 +74,15 @@ export type App<TArgs extends unknown[] = []> = {
 	 * The routes in the format of Bun's `routes` server option, so Bun's
 	 * native router routes requests. Other runtimes ignore it, and `fetch`
 	 * serves every request on its own.
+	 *
+	 * @remarks Routes completed with `.static()` are `Response` values.
 	 */
 	routes: Record<
 		string,
 		Partial<
 			Record<
 				HttpMethod,
-				(request: Request, ...args: TArgs) => Promise<Response>
+				((request: Request, ...args: TArgs) => Promise<Response>) | Response
 			>
 		>
 	>;
@@ -139,38 +142,46 @@ export function createApp(
 		...compileOptions,
 		paramSyntax: "colon",
 	});
-	const handler = createCatchAllHandler<object>(compiled);
+	const matchRoute = createRouteMatcher(compiled);
 	// A plain context is shared: middleware injects values into new objects.
-	const sharedOptions: CatchAllHandleOptions<object> = { mountPath };
+	const sharedOptions: HandleOptions<object> = {};
 	if (typeof context === "object") sharedOptions.context = context;
 	const readHandleOptions = (
 		request: Request,
 		args: unknown[],
-	): MaybePromise<CatchAllHandleOptions<object>> =>
+	): MaybePromise<HandleOptions<object>> =>
 		typeof context === "function"
 			? mapMaybePromise(context(request, ...args), (values) => ({
-					mountPath,
 					context: values,
 				}))
 			: sharedOptions;
+	// Static routes read no context, so the context function is not called.
+	const handle = async (
+		route: FetchRoute<object>,
+		request: Request,
+		args: unknown[],
+		params?: Record<string, string>,
+	) => {
+		if (route.staticResponse) return route.handle(request);
+		const handleOptions = readHandleOptions(request, args);
+		const options =
+			handleOptions instanceof Promise ? await handleOptions : handleOptions;
+		return route.handle(request, params ? { ...options, params } : options);
+	};
 
 	const routes: App<unknown[]>["routes"] = {};
 	for (const route of compiled) {
 		// The mount path alone serves the `/` route, as in the catch-all handler.
 		const path = joinPrefix(mountPath, route.path as AbsolutePath);
-		(routes[path] ??= {})[route.method] = async (request, ...args) => {
-			try {
-				const handleOptions = readHandleOptions(request, args);
-				return await route.handle(
-					request,
-					handleOptions instanceof Promise
-						? await handleOptions
-						: handleOptions,
-				);
-			} catch (error) {
-				return respondWithInternalError(error, request);
-			}
-		};
+		(routes[path] ??= {})[route.method] =
+			route.staticResponse ??
+			(async (request, ...args) => {
+				try {
+					return await handle(route, request, args);
+				} catch (error) {
+					return respondWithInternalError(error, request);
+				}
+			});
 	}
 
 	return {
@@ -178,16 +189,10 @@ export function createApp(
 		// a trailing slash, here too, so they are served the same everywhere.
 		fetch: async (request, ...args) => {
 			try {
-				const handleOptions = readHandleOptions(request, args);
-				const result = await handler(
-					request,
-					handleOptions instanceof Promise
-						? await handleOptions
-						: handleOptions,
-				);
-				return result.matched
-					? result.response
-					: ((await notFound(request)) ?? defaultNotFound());
+				const match = matchRoute(request.method, request.url, mountPath);
+				if (!match) return (await notFound(request)) ?? defaultNotFound();
+				// The matched params are passed on, so they are not parsed again.
+				return await handle(match.route, request, args, match.params);
 			} catch (error) {
 				return respondWithInternalError(error, request);
 			}
