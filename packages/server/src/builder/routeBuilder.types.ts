@@ -188,17 +188,14 @@ type RespondFor<TRoute extends RouteDefinition, TResponse> = TResponse extends {
 
 // Handlers may return the body of a route's only defined response directly,
 // unless that response has several media types to select from.
-type PlainResponseBody<TRoute extends RouteDefinition> = [
-	IsUnion<keyof TRoute["responses"]>,
-] extends [false]
-	? ServerResponse<TRoute> extends infer TResponse
-		? [IsUnion<TResponse>] extends [false]
-			? TResponse extends { body: infer TBody }
+type PlainResponseBody<TRoute extends RouteDefinition> =
+	ServerResponse<TRoute> extends infer TResponse
+		? IsUnion<TResponse> extends true
+			? never
+			: TResponse extends { body: infer TBody }
 				? WithSseItems<TBody>
 				: undefined | void
-			: never
-		: never
-	: never;
+		: never;
 
 type HandlerResult<TRoute extends RouteDefinition> = MaybePromise<
 	| RespondFor<TRoute, WithSseServerEvents<ServerResponse<TRoute>>>
