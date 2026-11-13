@@ -38,12 +38,6 @@ export type ResponseOptions = {
 
 export type RouteResponses = Record<number, ResponseDefinition>;
 
-type ResponseContent<TResponse> = TResponse extends {
-	content: infer TContent;
-}
-	? TContent
-	: never;
-
 // `keyof never` is every key, so bodyless responses are checked first.
 type ResponseMediaType<TResponse> = TResponse extends {
 	content: infer TContent;
@@ -65,12 +59,13 @@ type ResponseHeadersMetadata<TResponse, TIO extends "input" | "output"> = [
 			headers: InferSchema<ResponseHeadersFor<TResponse>, TIO>;
 		};
 
-type ContentSchema<TResponse, TMediaType> =
-	ResponseContent<TResponse> extends infer TContent
-		? TMediaType extends keyof TContent
-			? Extract<TContent[TMediaType], StandardSchemaV1>
-			: never
-		: never;
+type ContentSchema<TResponse, TMediaType> = TResponse extends {
+	content: infer TContent;
+}
+	? TMediaType extends keyof TContent
+		? Extract<TContent[TMediaType], StandardSchemaV1>
+		: never
+	: never;
 
 // `text/event-stream` schemas describe stream items. Handlers produce schema
 // inputs, and clients receive schema outputs wrapped in SSE events.
@@ -155,7 +150,11 @@ type ResponseEntryFor<
 	? ClientResponseEntry<TStatus, TResponse>
 	: ServerResponseEntry<TStatus, TResponse>;
 
-/** Maps each defined status to its response entry. */
+/**
+ * Maps each defined status to its response entry. The conditional always
+ * matches. It keeps editors and declaration emit from referring to this alias
+ * instead of the resolved union.
+ */
 type ResponseUnion<
 	E extends RouteDefinition,
 	TSide extends "client" | "server",

@@ -108,16 +108,13 @@ type ParamsPath<E> = E extends { path: infer TPath extends string }
 		: undefined;
 
 // Dynamic path segments without a params schema are received as strings.
-type PathParamsRequest<E> =
-	ParamsPath<E> extends infer TPath
-		? [PathParamNames<TPath>] extends [never]
-			? EmptyObject
-			: {
-					params: readonly [
-						StandardSchemaV1<{ [TName in PathParamNames<TPath>]: string }>,
-					];
-				}
-		: EmptyObject;
+type PathParamsRequest<E> = [PathParamNames<ParamsPath<E>>] extends [never]
+	? EmptyObject
+	: {
+			params: readonly [
+				StandardSchemaV1<{ [TName in PathParamNames<ParamsPath<E>>]: string }>,
+			];
+		};
 
 type RequestWithPathParams<E> =
 	DefinedRequest<E> extends { params: readonly StandardSchemaV1[] }

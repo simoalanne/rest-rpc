@@ -411,6 +411,8 @@ export type NextResponse<TInjected extends object> = ResponseEnvelope<
 > & { readonly [injectedContext]: TInjected };
 
 /** The context a middleware returning `TResponse` injects. */
+// The tuple collects the injected context of every member of a union of
+// responses, so responses that inject nothing do not add `EmptyObject` to it.
 export type InjectedOf<TResponse> = [
 	TResponse extends { readonly [injectedContext]: infer TInjected }
 		? TInjected

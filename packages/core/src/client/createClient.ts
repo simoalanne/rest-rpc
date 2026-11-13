@@ -26,11 +26,14 @@ import type { ClientPromise } from "./safe.ts";
 export type ApiClientRouteValue<
 	E extends RouteDefinition = RouteDefinition,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
-> = E extends RouteDefinition
-	? (
-			...args: FetchArgs<E, TGlobalHeaders>
-		) => ClientPromise<DefinedClientResponse<E>, ClientRouteError<E> | Error>
-	: never;
+> =
+	// The conditional always matches. It keeps editors from displaying this
+	// alias instead of the function type, which a type alias cannot flatten.
+	E extends RouteDefinition
+		? (
+				...args: FetchArgs<E, TGlobalHeaders>
+			) => ClientPromise<DefinedClientResponse<E>, ClientRouteError<E> | Error>
+		: never;
 
 /**
  * Infers the client tree for a contract.
