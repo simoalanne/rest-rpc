@@ -4,7 +4,6 @@
 import {
 	createClient,
 	extractContract,
-	route as contractRoute,
 	safe,
 	type InferClientError,
 	type InferClientRequest,
@@ -12,7 +11,6 @@ import {
 } from "@rest-rpc/core";
 import {
 	createLocalClient,
-	implement,
 	route,
 	routeError,
 	sse,
@@ -76,13 +74,12 @@ export const useClient = async () => {
 		params: { id: "1" },
 		query: { expand: true },
 	});
-	const created = await client.todos.create({ body: { title: "x" } });
 	const inferred = await client.todos.inferred();
 	const events = await client.todos.events();
 	const { error, data } = await safe(
 		client.todos.get({ params: { id: "1" }, query: { expand: true } }),
 	);
-	return { todo, created, inferred, events, error, data };
+	return { todo, inferred, events, error, data };
 };
 
 export type ClientRequest = InferClientRequest<typeof client.todos.get>;
@@ -99,41 +96,3 @@ export const queryOptions = utils.todos.get.queryOptions({
 });
 export const mutationOptions = utils.todos.create.mutationOptions();
 export const queryKey = utils.todos.get.queryKey();
-
-// Requests whose segments are all optional.
-const optionalContract = {
-	query: contractRoute
-		.get("/query")
-		.query(type<{ page?: number }>())
-		.response({ status: 204 }),
-	headers: contractRoute
-		.get("/headers")
-		.headers(type<{ "x-trace"?: string }>())
-		.response({ status: 204 }),
-	body: contractRoute
-		.post("/body")
-		.body(type<{ note?: string }>())
-		.response({ status: 204 }),
-	optionalBody: contractRoute
-		.post("/optional-body")
-		.body(type<string | undefined>())
-		.response({ status: 204 }),
-};
-const optionalClient = createClient(optionalContract, { baseUrl: "" });
-export const optionalQuery = optionalClient.query;
-export const optionalHeaders = optionalClient.headers;
-export const optionalFields = optionalClient.body;
-export const optionalBody = optionalClient.optionalBody;
-export const omitted = () =>
-	Promise.all([
-		optionalClient.query(),
-		optionalClient.headers(),
-		optionalClient.optionalBody(),
-	]);
-
-const implemented = implement(optionalContract);
-export const implementedQuery = implemented.query.handler(
-	({ query: implementedQueryValue }) => {
-		void implementedQueryValue;
-	},
-);
