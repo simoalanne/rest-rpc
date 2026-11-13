@@ -1,6 +1,6 @@
 {
 	"name": "@rest-rpc/tanstack-query",
-	"version": "0.0.0",
+	"version": "0.1.1",
 	"description": "TanStack Query utils for rest-rpc clients",
 	"keywords": [
 		"api-contract",
