@@ -1,4 +1,7 @@
-import type { RequestScalar } from "@rest-rpc/core/contract";
+import type {
+	LowercaseHeadersOptionCheck,
+	RequestScalar,
+} from "@rest-rpc/core/contract";
 import type { Merge } from "@rest-rpc/core/utils";
 
 const respondBrand = Symbol("rest-rpc.respond");
@@ -20,6 +23,8 @@ export type RespondOptions = {
 	 */
 	contentType?: string;
 	headers?: Record<string, RequestScalar | undefined>;
+	/** `Set-Cookie` header values, each sent as its own header. */
+	cookies?: readonly string[];
 };
 
 /**
@@ -54,7 +59,7 @@ export type ResponseEnvelopeFields<T> = Merge<
  */
 export function respond<TBody, const TOptions extends RespondOptions = {}>(
 	body: TBody,
-	options?: TOptions,
+	options?: TOptions & LowercaseHeadersOptionCheck<TOptions>,
 ): ResponseEnvelope<TBody, NoInfer<TOptions>> {
 	// `NoInfer` keeps the handler's expected return type from inferring options.
 	return { ...options, body, [respondBrand]: true } as ResponseEnvelope<

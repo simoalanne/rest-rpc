@@ -332,4 +332,28 @@ describe("client error responses", () => {
 			cause: [{ message: "invalid" }],
 		});
 	});
+
+	it("reads set-cookie values as cookies instead of a header", async () => {
+		const headers = new Headers({ "content-type": "application/json" });
+		headers.append("set-cookie", "a=1; Expires=Wed, 21 Oct 2026 07:28:00 GMT");
+		headers.append("set-cookie", "b=2");
+		const response = await decode(
+			new Response(JSON.stringify({ name: "Ada" }), { status: 201, headers }),
+		);
+		expect(response.cookies).toEqual([
+			"a=1; Expires=Wed, 21 Oct 2026 07:28:00 GMT",
+			"b=2",
+		]);
+		expect(response.headers).not.toHaveProperty("set-cookie");
+
+		const error = await decode(
+			Response.json(
+				{ code: "SESSION_EXPIRED" },
+				{ status: 401, headers: { "set-cookie": "session=; Max-Age=0" } },
+			),
+		).catch((caught: unknown) => caught);
+		expect(error).toBeInstanceOf(RouteError);
+		expect(error).toMatchObject({ cookies: ["session=; Max-Age=0"] });
+		expect((error as RouteError).headers).not.toHaveProperty("set-cookie");
+	});
 });

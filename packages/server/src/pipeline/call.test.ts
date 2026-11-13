@@ -23,7 +23,7 @@ describe("call", () => {
 			)
 			.handler((request) => {
 				seen(request);
-				return respond("2", { headers: { total: 1 } });
+				return respond("2", { headers: { total: 1 }, cookies: ["a=1"] });
 			});
 		expect(
 			await call(
@@ -36,6 +36,7 @@ describe("call", () => {
 			contentType: "application/json",
 			body: 2,
 			headers: { total: 2 },
+			cookies: ["a=1"],
 		});
 		const request = seen.mock.calls[0]![0];
 		expect(request).toMatchObject({ params: { id: 1 } });

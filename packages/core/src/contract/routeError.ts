@@ -1,3 +1,4 @@
+import type { LowercaseHeadersOptionCheck } from "./headers.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { Merge } from "../utils/typeUtils.ts";
 import type { ResponseHeadersSchema } from "./response.ts";
@@ -18,6 +19,8 @@ export type RouteErrorOptions<
 	message?: string;
 	data?: TData;
 	headers?: THeaders;
+	/** `Set-Cookie` header values, each sent as its own header. */
+	cookies?: readonly string[];
 	cause?: unknown;
 };
 
@@ -47,6 +50,11 @@ export class RouteError<
 	/** Error response headers. */
 	readonly headers: THeaders;
 	/**
+	 * `Set-Cookie` header values of the error response. Browsers hide them
+	 * from `fetch`, so a browser client receives none.
+	 */
+	readonly cookies: readonly string[];
+	/**
 	 * Whether a client received this error as one the route defines, with
 	 * its defined status and validated `data`.
 	 */
@@ -64,6 +72,7 @@ export class RouteError<
 		this.status = options.status ?? (400 as TStatus);
 		this.data = options.data as TData;
 		this.headers = options.headers ?? ({} as THeaders);
+		this.cookies = options.cookies ?? [];
 	}
 }
 
@@ -141,7 +150,8 @@ type HeadersOption<TDefinition> = TDefinition extends {
 	: { headers?: never };
 
 type ConstructOptions<TDefinition> = Merge<
-	{ message?: string; cause?: unknown } & DataOption<TDefinition> &
+	Pick<RouteErrorOptions, "message" | "cookies" | "cause"> &
+		DataOption<TDefinition> &
 		HeadersOption<TDefinition>
 >;
 
@@ -195,7 +205,7 @@ export type RouteErrorClassFor<
  * Defines an error that routes add with `.error()` and code throws.
  *
  * @remarks Returns a subclass of `RouteError`. Construct it with an options
- * object of `data`, `headers`, `message` and `cause`. `data` and `headers`
+ * object of `data`, `headers`, `cookies`, `message` and `cause`. `data` and `headers`
  * are required when their schemas are defined. The route's definition decides
  * the response, so throwing an error the executing route does not define is
  * a programmer error.
@@ -215,7 +225,10 @@ export type RouteErrorClassFor<
 export function routeError<
 	const TCode extends string,
 	const TOptions extends RouteErrorDefinitionOptions | undefined = undefined,
->(code: TCode, options?: TOptions): RouteErrorClassFor<TCode, TOptions> {
+>(
+	code: TCode,
+	options?: TOptions & LowercaseHeadersOptionCheck<TOptions>,
+): RouteErrorClassFor<TCode, TOptions> {
 	const { status = 400, message, data, headers, description } = options ?? {};
 	if (!Number.isInteger(status) || status < 400 || status > 599) {
 		throw new Error(`Error status "${status}" must be from 400 to 599.`);

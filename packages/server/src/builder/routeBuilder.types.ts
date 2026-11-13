@@ -1,5 +1,6 @@
 import type {
 	DefaultMeta,
+	LowercaseHeadersOptionCheck,
 	RouteDefinition,
 	ServerRequest,
 	ServerResponse,
@@ -217,7 +218,7 @@ export type RouteRespond<TStatus extends number = number> = <
 	} = {},
 >(
 	body: TBody,
-	options?: TOptions,
+	options?: TOptions & LowercaseHeadersOptionCheck<TOptions>,
 ) => ResponseEnvelope<TBody, NoInfer<TOptions>>;
 
 // Routes with defined responses respond with one of their statuses.

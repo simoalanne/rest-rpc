@@ -36,10 +36,14 @@ type ExecuteRouteOptions = {
 	disableResponseValidation?: boolean;
 };
 
-/** A validated route result before SSE framing and header serialization. */
-export type RouteResult = {
-	status: number;
+type ResponseHeaderFields = {
 	headers?: Record<string, unknown>;
+	cookies?: readonly string[];
+};
+
+/** A validated route result before SSE framing and header serialization. */
+export type RouteResult = ResponseHeaderFields & {
+	status: number;
 	body?:
 		| { value: unknown; contentType: string }
 		| { stream: AsyncIterable<unknown> };
@@ -59,11 +63,10 @@ const getResponseSchema = (
 	return response;
 };
 
-type DefinedResponseEnvelope = {
+type DefinedResponseEnvelope = ResponseHeaderFields & {
 	status: number;
 	body?: unknown;
 	contentType?: string;
-	headers?: Record<string, unknown>;
 };
 
 // A response with one media type may omit it; otherwise the handler selects one.
@@ -89,6 +92,11 @@ const normalizeResponseResult = (
 ): MaybePromise<RouteResult> => {
 	const schema = getResponseSchema(implementation.route, result.status);
 	const { content } = schema;
+	const withHeaders = (headers: RouteResult["headers"]) => ({
+		status: result.status,
+		headers,
+		cookies: result.cookies,
+	});
 	const validatedHeaders = disableValidation
 		? schema.headers
 			? result.headers
@@ -96,10 +104,7 @@ const normalizeResponseResult = (
 		: validateResponseHeaders(schema.headers, result.headers);
 
 	if (content === undefined) {
-		return mapMaybePromise(validatedHeaders, (headers) => ({
-			status: result.status,
-			headers,
-		}));
+		return mapMaybePromise(validatedHeaders, withHeaders);
 	}
 
 	const mediaType = selectResponseMediaType(
@@ -111,8 +116,7 @@ const normalizeResponseResult = (
 	if (mediaType === "text/event-stream") {
 		const body = result.body as AsyncIterable<unknown>;
 		return mapMaybePromise(validatedHeaders, (headers) => ({
-			status: result.status,
-			headers,
+			...withHeaders(headers),
 			body: {
 				stream: disableValidation
 					? body
@@ -127,17 +131,15 @@ const normalizeResponseResult = (
 	return mapMaybePromise(
 		allMaybePromise([validatedHeaders, validatedValue]),
 		([headers, value]) => ({
-			status: result.status,
-			headers,
+			...withHeaders(headers),
 			body: { value, contentType: mediaType },
 		}),
 	);
 };
 
 /** A validated logical response for the Fetch and Node handlers to serialize and write. */
-export type HttpRouteResult = {
+export type HttpRouteResult = ResponseHeaderFields & {
 	status: number;
-	headers?: Record<string, unknown>;
 	body?: { value: unknown; contentType: string };
 };
 
@@ -168,11 +170,17 @@ const toEnvelope = (result: unknown): RespondOptions & { body?: unknown } =>
 
 /** Normalizes the result of a handler on a route without defined responses. */
 export const normalizeImplicitResponse = (result: unknown): RouteResult => {
-	const { status = 200, body, contentType, headers } = toEnvelope(result);
+	const {
+		status = 200,
+		body,
+		contentType,
+		headers,
+		cookies,
+	} = toEnvelope(result);
 	assertImplicitStatus(status);
 	// `undefined` has no JSON representation, so it is sent without a body.
-	if (body === undefined) return { status, headers };
-	return { status, headers, body: toImplicitBody(body, contentType) };
+	if (body === undefined) return { status, headers, cookies };
+	return { status, headers, cookies, body: toImplicitBody(body, contentType) };
 };
 
 const normalizeHandlerResult = (
@@ -256,11 +264,12 @@ const toHttpRouteResult = (
 	result: RouteResult,
 	observe: StreamErrorObserver | undefined,
 ): HttpRouteResult => {
-	const { status, headers, body } = result;
+	const { status, headers, cookies, body } = result;
 	if (!body || !("stream" in body)) return result as HttpRouteResult;
 	return {
 		status,
 		headers,
+		cookies,
 		body: sseBody(observe ? observeStream(body.stream, observe) : body.stream),
 	};
 };

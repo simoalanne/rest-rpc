@@ -298,6 +298,18 @@ describe("route errors", () => {
 });
 
 describe("implicit response inference", () => {
+	it("rejects respond() header names with uppercase letters", () => {
+		const headers: Record<string, string> = {};
+		respond("ok", { headers: { "x-total": 1 } });
+		respond("ok", { headers });
+		// @ts-expect-error Received header names are lowercase.
+		respond("ok", { headers: { "X-Total": 1 } });
+		route.get("/").handler(({ respond }) =>
+			// @ts-expect-error Received header names are lowercase.
+			respond("ok", { headers: { "X-Total": 1 } }),
+		);
+	});
+
 	it("preserves sync and async status unions", () => {
 		const sync = route
 			.get("/")
@@ -342,6 +354,7 @@ describe("implicit response inference", () => {
 			contentType: undefined;
 			body: undefined;
 			headers: Record<string, string>;
+			cookies: readonly string[];
 		}>();
 		const custom = route.get("/").handler(() =>
 			respond("ok", {
@@ -377,6 +390,7 @@ describe("implicit response inference", () => {
 			contentType: "application/json";
 			body: { readonly id: "one" };
 			headers: Record<string, string>;
+			cookies: readonly string[];
 		}>();
 		expectTypeOf<InferClientResponse<typeof stream>["body"]>().toEqualTypeOf<
 			AsyncIterable<{
@@ -413,6 +427,7 @@ describe("implicit response inference", () => {
 			contentType: "application/json";
 			body: { readonly status: 201; readonly body: "ok" };
 			headers: Record<string, string>;
+			cookies: readonly string[];
 		}>();
 	});
 

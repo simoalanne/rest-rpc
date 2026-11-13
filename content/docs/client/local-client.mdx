@@ -29,8 +29,8 @@ const getTodo = route
 const response = await call(getTodo, { params: { id: "1" } });
 ```
 
-`call()` takes the same request and returns the same response as a
-[Fetch client](/docs/client/fetch-client) call. Request segments are schema
+`call()` takes the same request and returns the
+[same response](/docs/client/fetch-client#call-routes) as a Fetch client call. Request segments are schema
 inputs, the values a client would send, and handlers receive the schema output.
 A request body media type is selected with `contentType` in the request, as in a
 [Fetch client call](/docs/client/fetch-client#select-a-request-media-type).

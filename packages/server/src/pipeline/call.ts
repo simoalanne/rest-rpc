@@ -43,7 +43,12 @@ const toSseEvents = async function* (stream: AsyncIterable<unknown>) {
 };
 
 // Mirrors the fetch client, which reports the received base media type.
-const toCallResult = ({ status, headers = {}, body }: RouteResult) => ({
+const toCallResult = ({
+	status,
+	headers = {},
+	cookies = [],
+	body,
+}: RouteResult) => ({
 	status,
 	contentType:
 		body &&
@@ -51,6 +56,7 @@ const toCallResult = ({ status, headers = {}, body }: RouteResult) => ({
 			? "text/event-stream"
 			: normalizeMediaType(body.contentType)),
 	headers,
+	cookies,
 	body: body && ("stream" in body ? toSseEvents(body.stream) : body.value),
 });
 

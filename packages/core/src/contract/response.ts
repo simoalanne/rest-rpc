@@ -123,6 +123,8 @@ type ClientResponseEntry<TStatus extends number, TResponse> = [
 			contentType: undefined;
 			body: undefined;
 			headers: ClientResponseHeaders<TResponse>;
+			/** Received `Set-Cookie` values. Browsers hide them from `fetch`, so it is empty there. */
+			cookies: readonly string[];
 		}
 	: ResponseMediaType<TResponse> extends infer TMediaType
 		? TMediaType extends string
@@ -131,6 +133,8 @@ type ClientResponseEntry<TStatus extends number, TResponse> = [
 					contentType: TMediaType;
 					body: ClientBody<TResponse, TMediaType>;
 					headers: ClientResponseHeaders<TResponse>;
+					/** Received `Set-Cookie` values. Browsers hide them from `fetch`, so it is empty there. */
+					cookies: readonly string[];
 				}
 			: never
 		: never;

@@ -26,8 +26,10 @@ The server reconstructs `tag[]=one&tag[]=two` as `{ tag: ["one", "two"] }`.
 A single `tag[]=one` remains an array. Repeated scalar keys such as
 `tag=one&tag=two` keep the last value.
 
-Define header schemas with lowercase names. Incoming header names are
-normalized to lowercase, so uppercase schema keys do not match them.
+Define header schemas and `respond()` headers with lowercase names. Received
+header names are normalized to lowercase, so uppercase names would never match
+them and are a type error. Schemas with `string` keys, such as `z.record()`, are
+not checked.
 
 ## Bodies and Media Types
 

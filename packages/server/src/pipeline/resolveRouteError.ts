@@ -26,6 +26,7 @@ export const resolveRouteError = async (
 			message: error.message,
 			data,
 			headers: headers ?? {},
+			cookies: error.cookies,
 			cause: error,
 		});
 	} catch (failure) {

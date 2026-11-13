@@ -139,7 +139,8 @@ The following rules apply to request segments:
   defines params must have dynamic segments.
 - `.body()` is not available on GET routes, and `.get()` is not available after `.body()`.
 
-Header schemas must use lowercase names. See
+Header schemas and `respond()` headers must use lowercase names, and an
+uppercase name is a type error. See
 [Serialization and Codecs](/docs/http-behavior/serialization#path-query-and-headers)
 for how each location is encoded.
 
@@ -170,8 +171,17 @@ receives with the request:
 - `undefined` is a status 200 response without a body.
 - An async iterable is an SSE [stream](#return-streams).
 - Any other value is a JSON body with status 200.
-- `respond(body, options?)` sets the `status`, `contentType`, or `headers` of
-  the response. An `undefined` body sends no body.
+- `respond(body, options?)` sets the other parts of the response. An
+  `undefined` body sends no body.
+
+```ts
+respond(body, {
+	status: 201, // 200-299. Defaults to 200, or the route's only status
+	contentType: "text/csv", // defaults to application/json, or the only media type
+	headers: { location: "/todos/1" },
+	cookies: ["session=abc; HttpOnly"], // each sent as its own `Set-Cookie` header
+});
+```
 
 Only `respond()` results are read as responses, so a returned body may have any
 shape, including a `status` field of its own. Code outside handlers and

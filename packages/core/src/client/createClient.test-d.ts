@@ -70,6 +70,7 @@ describe("createClient types", () => {
 			contentType: "application/json";
 			body: number;
 			headers: Record<string, string>;
+			cookies: readonly string[];
 		}>();
 		// @ts-expect-error Requests use the schema input, not its transformed output.
 		client.length({ body: 1 });

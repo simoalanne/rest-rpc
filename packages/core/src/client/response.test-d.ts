@@ -41,6 +41,7 @@ describe("client response inference", () => {
 			contentType: undefined;
 			body: undefined;
 			headers: Record<string, string>;
+			cookies: readonly string[];
 		}>();
 	});
 

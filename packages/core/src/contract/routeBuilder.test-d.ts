@@ -136,6 +136,33 @@ describe("routeBuilder types", () => {
 		route.get("/users/:id").params(type<{ id: string; include?: string }>());
 	});
 
+	it("rejects header names with uppercase letters", () => {
+		type Lowercase = { "x-total": number };
+		type Uppercase = { "X-Total": number };
+		route.get("/").headers(type<{ authorization: string }>());
+		route.get("/").headers(type<Record<string, string>>());
+		// @ts-expect-error Received header names are lowercase.
+		route.get("/").headers(type<{ Authorization: string }>());
+		route.get("/").response(type<string>(), { headers: type<Lowercase>() });
+		// @ts-expect-error Received header names are lowercase.
+		route.get("/").response(type<string>(), { headers: type<Uppercase>() });
+		route
+			.get("/")
+			// @ts-expect-error Received header names are lowercase.
+			.response(
+				{ "text/plain": type<string>() },
+				{ headers: type<Uppercase>() },
+			);
+		// @ts-expect-error Received header names are lowercase.
+		route.get("/").response({ status: 204, headers: type<Uppercase>() });
+		route.get("/").error("LIMITED", { headers: type<Lowercase>() });
+		// @ts-expect-error Received header names are lowercase.
+		route.get("/").error("LIMITED", { headers: type<Uppercase>() });
+		routeError("LIMITED", { status: 429, headers: type<Lowercase>() });
+		// @ts-expect-error Received header names are lowercase.
+		routeError("LIMITED", { status: 429, headers: type<Uppercase>() });
+	});
+
 	it("only allows prefixes before a method is selected", () => {
 		// @ts-expect-error A method path already includes the prefix.
 		route.get("/todos").prefix("/api");

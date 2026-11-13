@@ -1,3 +1,7 @@
+import type {
+	LowercaseHeadersCheck,
+	LowercaseHeadersOptionCheck,
+} from "./headers.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { BodyContent } from "./body.ts";
 import { joinPrefix } from "./path.ts";
@@ -298,7 +302,7 @@ export class RouteBuilder<
 
 	/** Defines request headers. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-request-segments} */
 	headers<const TSchema extends RequestHeadersSchema>(
-		schema: TSchema,
+		schema: TSchema & LowercaseHeadersCheck<TSchema>,
 	): BuilderFor<TKind, WithRequest<TState, "headers", TSchema>> {
 		return this.clone(
 			addRequestSegment(defaultRouteState(this["~restrpc"]), "headers", schema),
@@ -359,7 +363,7 @@ export class RouteBuilder<
 		const TOptions extends ResponseOptions | undefined = undefined,
 	>(
 		schema: TSchema,
-		options?: TOptions,
+		options?: TOptions & LowercaseHeadersOptionCheck<TOptions>,
 	): BuilderFor<TKind, WithResponse<TState, TSchema, TOptions>>;
 	/** Defines successful response schemas keyed by media type. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-responses} */
 	response<
@@ -367,11 +371,11 @@ export class RouteBuilder<
 		const TOptions extends ResponseOptions | undefined = undefined,
 	>(
 		content: MediaTypeKeysOnly<TContent>,
-		options?: TOptions,
+		options?: TOptions & LowercaseHeadersOptionCheck<TOptions>,
 	): BuilderFor<TKind, WithResponse<TState, TContent, TOptions>>;
 	/** Defines a successful response without a body. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-responses} */
 	response<const TOptions extends ResponseOptions | undefined = undefined>(
-		options?: TOptions,
+		options?: TOptions & LowercaseHeadersOptionCheck<TOptions>,
 	): BuilderFor<TKind, WithResponse<TState, undefined, TOptions>>;
 	response(
 		schemaOrContentOrOptions?: StandardSchemaV1 | BodyContent | ResponseOptions,
@@ -404,7 +408,7 @@ export class RouteBuilder<
 		const TOptions extends RouteErrorDefinitionOptions | undefined = undefined,
 	>(
 		code: TCode,
-		options?: TOptions,
+		options?: TOptions & LowercaseHeadersOptionCheck<TOptions>,
 	): BuilderFor<TKind, WithError<TState, RouteErrorClassFor<TCode, TOptions>>>;
 	error(
 		definitionOrCode: AnyRouteErrorClass | string,
