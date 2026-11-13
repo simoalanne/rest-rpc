@@ -9,8 +9,6 @@ import type {
 	SkipToken,
 } from "@tanstack/query-core";
 
-type NoInferValue<T> = [T][T extends unknown ? 0 : never];
-
 /**
  * A route function of a client created with `createClient` or
  * `createLocalClient`.
@@ -134,7 +132,7 @@ type InfiniteQueryOptionsFor<
 			RouteErrorFor<F>,
 			TData,
 			QueryKey,
-			NoInferValue<TPageParam>
+			NoInfer<TPageParam>
 		>,
 		"initialPageParam" | "queryFn" | "queryKey"
 	> & {

@@ -14,7 +14,6 @@ export {
 	type InferClientRequest,
 } from "./request.ts";
 export type {
-	ClientResponseBody,
 	InferClientError,
 	InferClientResponse,
 	InferClientStreamData,

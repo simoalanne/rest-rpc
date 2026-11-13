@@ -301,10 +301,3 @@ export const readResponse = async <E extends RouteDefinition>(
 		),
 	};
 };
-
-export type ClientResponseBody<TRoute extends RouteDefinition> =
-	DefinedClientResponse<TRoute> extends infer TResponse
-		? TResponse extends { body: infer TBody }
-			? TBody
-			: never
-		: never;
