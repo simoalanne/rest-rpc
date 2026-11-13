@@ -38,7 +38,7 @@ type HandlerRoute<TState extends BuilderState> = Extract<
 	RouteDefinition
 >;
 
-type ErrorsOf<TValue> = TValue extends { errors: infer TErrors }
+type RouteErrorsOf<TValue> = TValue extends { errors: infer TErrors }
 	? TErrors
 	: EmptyObject;
 
@@ -50,7 +50,9 @@ type ReusableRequestFor<
 > = Merge<
 	Omit<ServerRequest<HandlerRoute<TState>>, keyof TRequest> &
 		Omit<TRequest, "errors"> & {
-			errors: Merge<ErrorsOf<HandlerRoute<TState>> & ErrorsOf<TRequest>>;
+			errors: Merge<
+				RouteErrorsOf<HandlerRoute<TState>> & RouteErrorsOf<TRequest>
+			>;
 		}
 >;
 

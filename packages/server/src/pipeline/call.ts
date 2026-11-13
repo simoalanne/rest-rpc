@@ -7,7 +7,9 @@ import {
 	type InferClientResponse,
 } from "@rest-rpc/core";
 import { normalizeMediaType } from "@rest-rpc/core/codecs";
+import type { RequestArgs } from "@rest-rpc/core/client";
 import { markDefined, type RouteDefinition } from "@rest-rpc/core/contract";
+import type { Merge } from "@rest-rpc/core/utils";
 import type { InitialContextOf } from "../builder/routeBuilder.types.ts";
 import type { ContextOption, OptionsArgs } from "./compileRoutes.ts";
 import {
@@ -18,25 +20,19 @@ import {
 } from "../routing/match.ts";
 import { executeRoute, type RouteResult } from "./handleHttpRoute.ts";
 import { resolveRouteError } from "./resolveRouteError.ts";
+import type { RequestSegments } from "./validation.ts";
 import { toSseEvent } from "./sse.ts";
 
 /** Options accepted by `call`. `context` is required when the route requires initial context. */
-export type CallOptions<TRoute extends ImplementedRoute> = Pick<
-	FetchOptions,
-	"signal"
-> &
-	ContextOption<InitialContextOf<TRoute["~restrpc"]>>;
+export type CallOptions<TRoute extends ImplementedRoute> = Merge<
+	Pick<FetchOptions, "signal"> &
+		ContextOption<InitialContextOf<TRoute["~restrpc"]>>
+>;
 
-type CallArgs<TRoute extends ImplementedRoute> = [
+type CallArgs<TRoute extends ImplementedRoute> = RequestArgs<
 	InferClientRequest<TRoute>,
-] extends [undefined]
-	? object extends InitialContextOf<TRoute["~restrpc"]>
-		? [request?: undefined, options?: CallOptions<TRoute>]
-		: [request: undefined, options: CallOptions<TRoute>]
-	: [
-			request: InferClientRequest<TRoute>,
-			...OptionsArgs<InitialContextOf<TRoute["~restrpc"]>, CallOptions<TRoute>>,
-		];
+	OptionsArgs<InitialContextOf<TRoute["~restrpc"]>, CallOptions<TRoute>>
+>;
 
 const toSseEvents = async function* (stream: AsyncIterable<unknown>) {
 	for await (const item of stream) yield toSseEvent(item);
@@ -61,10 +57,10 @@ const toCallResult = ({
 });
 
 /** The promise a local call returns, which carries the errors it rejects with. */
-type CallResult<TRoute extends ImplementedRoute> = ClientPromise<
-	InferClientResponse<TRoute>,
-	InferClientError<TRoute> | Error
->;
+// The conditional keeps editors from displaying this alias instead of the resolved promise.
+type CallResult<TRoute extends ImplementedRoute> = TRoute extends unknown
+	? ClientPromise<InferClientResponse<TRoute>, InferClientError<TRoute> | Error>
+	: never;
 
 // Mirrors the fetch client: the error that would be sent is received, and
 // marked as defined when the route defines its code.
@@ -82,14 +78,20 @@ const callRoute = async (
 ) => {
 	const implementation = toRuntimeImplementation(route["~restrpc"]);
 	const { signal, context } = options;
-	const { contentType } = (request ?? {}) as { contentType?: string };
+	// Over HTTP, a defined query and headers are at least `{}`.
+	const {
+		query = {},
+		headers = {},
+		contentType,
+		...segments
+	} = (request ?? {}) as RequestSegments & { contentType?: string };
 	// Routes without a body schema have no request media type.
 	const mediaType =
 		implementation.route.request?.body &&
 		(normalizeMediaType(contentType) || implementation.defaultBodyMediaType);
 	try {
 		const result = await executeRoute(implementation, {
-			request: request ?? {},
+			request: { ...segments, query, headers },
 			signal: signal ?? new AbortController().signal,
 			mediaType,
 			context,

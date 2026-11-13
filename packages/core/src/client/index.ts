@@ -8,12 +8,12 @@ export {
 	type ClientHeaders,
 	type ClientHeaderValue,
 	type FetchArgs,
+	type RequestArgs,
 	type FetchLike,
 	type FetchOptions,
 	type InferClientRequest,
 } from "./request.ts";
 export type {
-	ClientResponseBody,
 	InferClientError,
 	InferClientResponse,
 	InferClientStreamData,

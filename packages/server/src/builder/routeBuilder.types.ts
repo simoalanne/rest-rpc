@@ -188,17 +188,14 @@ type RespondFor<TRoute extends RouteDefinition, TResponse> = TResponse extends {
 
 // Handlers may return the body of a route's only defined response directly,
 // unless that response has several media types to select from.
-type PlainResponseBody<TRoute extends RouteDefinition> = [
-	IsUnion<keyof TRoute["responses"]>,
-] extends [false]
-	? ServerResponse<TRoute> extends infer TResponse
-		? [IsUnion<TResponse>] extends [false]
-			? TResponse extends { body: infer TBody }
+type PlainResponseBody<TRoute extends RouteDefinition> =
+	ServerResponse<TRoute> extends infer TResponse
+		? IsUnion<TResponse> extends true
+			? never
+			: TResponse extends { body: infer TBody }
 				? WithSseItems<TBody>
 				: undefined | void
-			: never
-		: never
-	: never;
+		: never;
 
 type HandlerResult<TRoute extends RouteDefinition> = MaybePromise<
 	| RespondFor<TRoute, WithSseServerEvents<ServerResponse<TRoute>>>
@@ -244,13 +241,13 @@ type BodylessFields<TRoute extends RouteDefinition> = TRoute extends {
 	: { contentType?: undefined };
 
 // Handlers and middleware throw `errors.CODE(...)` without `new`.
-type ErrorFactories<TErrors> = {
+type ErrorFactories<TErrors> = Merge<{
 	[K in keyof TErrors]: TErrors[K] extends abstract new (
 		...args: infer TArgs
 	) => infer TError
 		? (...args: TArgs) => TError
 		: TErrors[K];
-};
+}>;
 
 type ErrorsOf<TRoute extends RouteDefinition> = TRoute extends {
 	errors: infer TErrors;
@@ -266,7 +263,7 @@ export type RouteRequest<
 		HandlerFields &
 		BodylessFields<TRoute> & {
 			route: TRoute;
-			context: Readonly<TContext>;
+			context: Merge<Readonly<TContext>>;
 			errors: ErrorsOf<TRoute>;
 			/** Returns a response with a status, media type, or headers the route defines. */
 			respond: RouteRespond<RespondStatusFor<TRoute>>;
@@ -311,10 +308,12 @@ export type ContextFields<TInitial extends object, TContext extends object> = {
 	readonly initialContext?: (context: TInitial) => void;
 };
 
-type WithoutContext<TRoute extends RouteDefinition> =
-	"context" extends keyof TRoute
-		? Extract<Omit<TRoute, "context" | "initialContext">, RouteDefinition>
-		: TRoute;
+// The route as handlers receive it: the runtime strips the handler, and the
+// context fields exist only in types.
+type HandlerRouteOf<TRoute extends RouteDefinition> = Extract<
+	Merge<Omit<TRoute, "handler" | "context" | "initialContext">>,
+	RouteDefinition
+>;
 
 /**
  * Infers the handler signature for a route definition.
@@ -329,7 +328,7 @@ type WithoutContext<TRoute extends RouteDefinition> =
 export type InferServerHandler<T extends HandlerTree> = T extends {
 	readonly "~restrpc": infer TRoute extends RouteDefinition;
 }
-	? RouteHandler<WithoutContext<TRoute>, ContextOf<TRoute>>
+	? RouteHandler<HandlerRouteOf<TRoute>, ContextOf<TRoute>>
 	: {
 			[
 				K in keyof T as T[K] extends HandlerTree ? K : never
@@ -412,6 +411,8 @@ export type NextResponse<TInjected extends object> = ResponseEnvelope<
 > & { readonly [injectedContext]: TInjected };
 
 /** The context a middleware returning `TResponse` injects. */
+// The tuple collects the injected context of every member of a union of
+// responses, so responses that inject nothing do not add `EmptyObject` to it.
 export type InjectedOf<TResponse> = [
 	TResponse extends { readonly [injectedContext]: infer TInjected }
 		? TInjected
