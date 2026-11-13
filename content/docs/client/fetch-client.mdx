@@ -415,14 +415,10 @@ Use the type helpers when a client request or result type needs to be reused,
 for example in your own wrapper functions.
 
 ```ts twoslash
-import type {
-	InferClientError,
-	InferClientRequest,
-	InferClientResponse,
-	InferClientStreamData,
-} from "@rest-rpc/core";
+// ---cut-start---
+// @filename: server.ts
 import { route, sse } from "@rest-rpc/server";
-import z from "zod";
+import { z } from "zod";
 
 const update = route
 	.patch("/todos/:id")
@@ -430,18 +426,11 @@ const update = route
 	.body(z.object({ title: z.string() }))
 	.handler(({ params, body }) => ({ id: params.id, title: body.title }));
 
-const getFirst = route
+const get = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.string() }))
 	.error("TODO_NOT_FOUND", { status: 404 })
-	.handler(({ errors }) => {
-		if (Math.random() < 0.5) throw errors.TODO_NOT_FOUND();
-		return { id: "todo_1", title: "Write docs" };
-	});
-
-type UpdateTodoRequest = InferClientRequest<typeof update>;
-
-type GetFirstTodoResponse = InferClientResponse<typeof getFirst>;
-
-type GetFirstTodoError = InferClientError<typeof getFirst>;
+	.handler(({ params }) => ({ id: params.id, title: "Write docs" }));
 
 const events = route
 	.get("/todos/events")
@@ -450,7 +439,28 @@ const events = route
 		yield { id: "todo_1", message: "Created" };
 	});
 
-type TodoEvent = InferClientStreamData<typeof events>;
+export const routes = { todos: { update, get, events } };
+
+// @filename: client.ts
+import { createClient } from "@rest-rpc/core";
+import type { routes } from "./server";
+declare const api: typeof routes;
+const client = createClient(api, { baseUrl: "http://localhost:3000" });
+// ---cut-end---
+import type {
+	InferClientError,
+	InferClientRequest,
+	InferClientResponse,
+	InferClientStreamData,
+} from "@rest-rpc/core";
+
+type UpdateTodoRequest = InferClientRequest<typeof client.todos.update>;
+
+type GetTodoResponse = InferClientResponse<typeof client.todos.get>;
+
+type GetTodoError = InferClientError<typeof client.todos.get>;
+
+type TodoEvent = InferClientStreamData<typeof client.todos.events>;
 ```
 
 | Type                                       | Infers                                                                                   |
@@ -463,8 +473,12 @@ type TodoEvent = InferClientStreamData<typeof events>;
 Calls reject with `InferClientError<Route>` for defined errors, and with other
 `Error`s otherwise.
 
-`InferClientRequest` accepts the type of your `globalHeaders` as a second
-argument, so headers that `globalHeaders` always provides become optional:
+Headers that the client's `globalHeaders` always provides are optional in the
+inferred request.
+
+Code without a client can pass the type of a route instead. Pass the type of
+your `globalHeaders` as the second argument of `InferClientRequest` to make the
+headers it always provides optional:
 
 ```ts
 import type { InferClientRequest } from "@rest-rpc/core";
@@ -481,14 +495,13 @@ type UpdateTodoRequest = InferClientRequest<
 `ApiClientFor<typeof api>` is the type of the whole client created from a
 contract.
 
-Each helper also accepts a route tree and infers a matching tree of types, so
-one exported type covers every route:
+Each helper also accepts a client or route tree and infers a matching tree of
+types, so one exported type covers every route:
 
 ```ts
 import type { InferClientResponse } from "@rest-rpc/core";
-import type { api } from "./client-contract";
 
-export type ClientResponses = InferClientResponse<typeof api>;
+export type ClientResponses = InferClientResponse<typeof client>;
 
 type TodoResponse = ClientResponses["todos"]["get"];
 ```
