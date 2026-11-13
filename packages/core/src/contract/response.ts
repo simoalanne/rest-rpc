@@ -2,7 +2,7 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { RouteDefinition } from "./routeDefinition.ts";
 import type { InferSchema, RequestScalar } from "./request.ts";
 import type { SseEvent } from "./sse.ts";
-import type { RouteError } from "./routeError.ts";
+import type { ErrorSchemaValue, RouteError } from "./routeError.ts";
 import type { IsUnion, Merge } from "../utils/typeUtils.ts";
 
 /** A whole-object schema for response headers whose output contains scalar values. */
@@ -177,18 +177,6 @@ export type ServerResponse<E extends RouteDefinition> = ResponseUnion<
 	"server"
 >;
 
-type ClientErrorHeaders<TDefinition> = TDefinition extends {
-	headers: infer THeaders extends ResponseHeadersSchema;
-}
-	? Record<string, string> & InferSchema<THeaders, "output">
-	: Record<string, string>;
-
-type ClientErrorData<TDefinition> = TDefinition extends {
-	data: infer TData extends StandardSchemaV1;
-}
-	? InferSchema<TData, "output">
-	: undefined;
-
 // The top-level conditional keeps editors from displaying this alias instead of the resolved union.
 export type ClientRouteError<E extends RouteDefinition> = E extends {
 	errors: infer TErrors;
@@ -199,9 +187,10 @@ export type ClientRouteError<E extends RouteDefinition> = E extends {
 			}
 				? RouteError<
 						TCode,
-						ClientErrorData<TErrors[TCode]>,
+						ErrorSchemaValue<TErrors[TCode], "data", "output", undefined>,
 						TStatus,
-						ClientErrorHeaders<TErrors[TCode]>
+						Record<string, string> &
+							ErrorSchemaValue<TErrors[TCode], "headers", "output", unknown>
 					>
 				: never;
 		}[Extract<keyof TErrors, string>]
