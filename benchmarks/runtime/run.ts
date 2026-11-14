@@ -13,12 +13,23 @@ const json = [
 	"-b",
 	'{"hello":"world"}',
 ];
-const cases: Record<string, string[]> = {
+const allCases: Record<string, string[]> = {
 	text: [`${base}/`],
 	"params + query": [`${base}/id/1?name=bun`],
 	"json body": ["-m", "POST", ...json, `${base}/json`],
 	middleware: [`${base}/middleware`],
 };
+// Arguments select the cases whose name includes any of them, such as
+// `pnpm bench:http query middleware`.
+const filters = process.argv.slice(2);
+const cases = Object.fromEntries(
+	Object.entries(allCases).filter(
+		([name]) =>
+			filters.length === 0 || filters.some((filter) => name.includes(filter)),
+	),
+);
+if (Object.keys(cases).length === 0)
+	throw new Error(`No cases match ${filters.join(", ")}.`);
 
 const startServer = async () => {
 	const server = spawn(

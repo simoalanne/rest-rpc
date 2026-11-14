@@ -19,5 +19,11 @@ starting a fresh server per case. Requires `bun` and `bombardier` on `PATH`.
 pnpm bench:http
 ```
 
+Pass case names, or parts of them, to run only those cases:
+
+```sh
+pnpm bench:http query middleware
+```
+
 It prints req/s and the server memory before and after each case. A run
 takes about a minute. Compare runs on the same machine only.
