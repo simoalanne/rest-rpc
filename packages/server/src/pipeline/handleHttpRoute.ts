@@ -183,7 +183,8 @@ export const normalizeImplicitResponse = (result: unknown): RouteResult => {
 	return { status, headers, cookies, body: toImplicitBody(body, contentType) };
 };
 
-const normalizeHandlerResult = (
+/** Normalizes and validates a handler result, synchronously when the response schemas and headers are. */
+export const normalizeHandlerResult = (
 	implementation: RuntimeImplementation,
 	handlerResult: unknown,
 	disableResponseValidation: boolean,
@@ -206,46 +207,42 @@ const normalizeHandlerResult = (
 const emptyContext = Object.freeze({});
 
 /** Validates the request, runs middleware and the handler, and validates the output, throwing validation errors. */
-export function executeRoute(
+export async function executeRoute(
 	implementation: RuntimeImplementation,
 	options: ExecuteRouteOptions,
-): MaybePromise<RouteResult> {
+): Promise<RouteResult> {
 	const { route } = implementation;
 	const handler = implementation.handler as RuntimeRouteHandler;
 	const { mediaType } = options;
-	const validation = options.disableRequestValidation
+	const request = options.disableRequestValidation
 		? options.request
-		: validateRequestSegments(route, options.request, mediaType);
-	const handlerResult = mapMaybePromise(validation, (validatedRequest) =>
-		invokeWithMiddleware(
-			implementation.middleware,
-			handler,
-			{
-				body: validatedRequest.body,
-				query: validatedRequest.query,
-				params: validatedRequest.params,
-				headers: validatedRequest.headers,
-				context: options.context ?? emptyContext,
-				signal: options.signal,
-				contentType: mediaType,
-				route,
-				errors: implementation.errorFactories,
-				respond,
-			},
-			implementation.defaultStatus ?? 200,
-		),
+		: await validateRequestSegments(route, options.request, mediaType);
+	const result = await invokeWithMiddleware(
+		implementation.middleware,
+		handler,
+		{
+			body: request.body,
+			query: request.query,
+			params: request.params,
+			headers: request.headers,
+			context: options.context ?? emptyContext,
+			signal: options.signal,
+			contentType: mediaType,
+			route,
+			errors: implementation.errorFactories,
+			respond,
+		},
+		implementation.defaultStatus ?? 200,
 	);
-	return mapMaybePromise(handlerResult, (result) =>
-		normalizeHandlerResult(
-			implementation,
-			result,
-			options.disableResponseValidation ?? false,
-		),
+	return normalizeHandlerResult(
+		implementation,
+		result,
+		options.disableResponseValidation ?? false,
 	);
 }
 
 /** Observes a `RouteError` that ends a stream after its response started. */
-type StreamErrorObserver = (error: RouteError) => void;
+export type StreamErrorObserver = (error: RouteError) => void;
 
 const observeStream = async function* (
 	stream: AsyncIterable<unknown>,
@@ -259,8 +256,8 @@ const observeStream = async function* (
 	}
 };
 
-// Only stream bodies change; other results are already HTTP results.
-const toHttpRouteResult = (
+/** Frames a stream body as SSE; other results are already HTTP results. */
+export const toHttpRouteResult = (
 	result: RouteResult,
 	observe: StreamErrorObserver | undefined,
 ): HttpRouteResult => {
@@ -273,13 +270,3 @@ const toHttpRouteResult = (
 		body: sseBody(observe ? observeStream(body.stream, observe) : body.stream),
 	};
 };
-
-/** Runs a route and normalizes its output for serialization. Errors, including `RouteError`s, propagate. */
-export function handleHttpRoute(
-	implementation: RuntimeImplementation,
-	options: ExecuteRouteOptions & { onStreamError?: StreamErrorObserver },
-): MaybePromise<HttpRouteResult> {
-	return mapMaybePromise(executeRoute(implementation, options), (result) =>
-		toHttpRouteResult(result, options.onStreamError),
-	);
-}

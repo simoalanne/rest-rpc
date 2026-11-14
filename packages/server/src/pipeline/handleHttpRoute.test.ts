@@ -1,12 +1,15 @@
 import { routeError, sse, type } from "@rest-rpc/core";
 import {
-	handleHttpRoute,
+	executeRoute,
 	normalizeImplicitResponse,
+	toHttpRouteResult,
+	type StreamErrorObserver,
 } from "./handleHttpRoute.ts";
 import { respond } from "./respond.ts";
 import { sseEvent } from "./sse.ts";
 import {
 	flattenRouteImplementations,
+	type RuntimeImplementation,
 	type RuntimeImplementationTree,
 } from "../routing/match.ts";
 import { route } from "../builder/routeBuilder.ts";
@@ -21,6 +24,18 @@ const rejected: StandardSchemaV1<unknown, Record<string, string>> = {
 };
 
 const signal = new AbortController().signal;
+
+// The steps the Fetch dispatch runs before serializing the result.
+const handleHttpRoute = async (
+	implementation: RuntimeImplementation,
+	options: Parameters<typeof executeRoute>[1] & {
+		onStreamError?: StreamErrorObserver;
+	},
+) =>
+	toHttpRouteResult(
+		await executeRoute(implementation, options),
+		options.onStreamError,
+	);
 
 const execute = (implementation: RuntimeImplementationTree) => {
 	const flattened = flattenRouteImplementations(implementation)[0]!;

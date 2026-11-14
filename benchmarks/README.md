@@ -19,5 +19,27 @@ starting a fresh server per case. Requires `bun` and `bombardier` on `PATH`.
 pnpm bench:http
 ```
 
+Pass case names, or parts of them, to run only those cases:
+
+```sh
+pnpm bench:http query middleware
+```
+
+Set `BENCH_RUNTIME` to serve the routes with the Node adapter's `serve()`
+instead of `createApp` on Bun's native router: `node` runs it on Node, and
+`bun-node` on Bun's `node:http`.
+
+```sh
+BENCH_RUNTIME=node pnpm bench:http
+```
+
+Set `BENCH_SERVER` to load an executable compiled from `runtime/http.ts`
+instead, such as one built with `bun compile`:
+
+```sh
+bun compile benchmarks/runtime/http.ts --outfile server
+BENCH_SERVER=./server pnpm bench:http
+```
+
 It prints req/s and the server memory before and after each case. A run
 takes about a minute. Compare runs on the same machine only.
