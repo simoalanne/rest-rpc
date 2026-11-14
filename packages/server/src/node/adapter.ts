@@ -9,12 +9,12 @@ import {
 import type { AddressInfo } from "node:net";
 import { pipeline } from "node:stream/promises";
 import {
-	compileRoutes as compileFetchRoutes,
+	createRouteHandlers as createFetchRouteHandlers,
 	type CatchAllHandleOptions,
-	type CompileRoutesOptions,
+	type CreateRouteHandlersOptions,
 	type HandleOptions,
 	type OptionsArgs,
-} from "../pipeline/compileRoutes.ts";
+} from "../pipeline/createRouteHandlers.ts";
 import type { App } from "../pipeline/createApp.ts";
 import {
 	createRouteMatcher,
@@ -130,20 +130,20 @@ export type NodeRoute<TContext extends object = EmptyObject> = {
 export type NodeRouteHandlerResult = { matched: boolean };
 
 /**
- * Compiles a route tree into Node routes to register on a router.
+ * Creates one Node route handler per method and path of a route tree, to
+ * register on a router.
  *
  * @remarks Each route converts the Node request to a Fetch `Request`, runs the
  * same pipeline as the Fetch routes and writes the Fetch `Response` back.
- * Pass the result to {@link createCatchAllHandler} to let rest-rpc do the
- * routing instead.
+ * Use {@link createCatchAllHandler} to let rest-rpc do the routing instead.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
  */
-export function compileRoutes<TRoutes extends RuntimeImplementationTree>(
+export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
 	implementations: TRoutes,
-	options: CompileRoutesOptions = {},
+	options: CreateRouteHandlersOptions = {},
 ): NodeRoute<TreeInitialContext<TRoutes>>[] {
-	const routes = compileFetchRoutes<RuntimeImplementationTree>(
+	const routes = createFetchRouteHandlers<RuntimeImplementationTree>(
 		implementations,
 		options,
 	);
@@ -172,27 +172,36 @@ export function compileRoutes<TRoutes extends RuntimeImplementationTree>(
 }
 
 /**
- * Creates a Node HTTP catch-all handler that routes requests to compiled routes.
+ * Creates a Node HTTP catch-all handler that routes requests to the routes of
+ * a route tree.
  *
  * @remarks Unmatched requests are left untouched and reported with
  * `matched: false` so the surrounding server can provide fallback routing.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#catch-all-handler}
  */
-export function createCatchAllHandler<TContext extends object>(
-	routes: readonly NodeRoute<TContext>[],
+export function createCatchAllHandler<
+	TRoutes extends RuntimeImplementationTree,
+>(
+	implementations: TRoutes,
+	options: CreateRouteHandlersOptions = {},
 ): (
 	request: IncomingMessage,
 	response: ServerResponse,
-	...options: OptionsArgs<TContext, CatchAllHandleOptions<TContext>>
+	...options: OptionsArgs<
+		TreeInitialContext<TRoutes>,
+		CatchAllHandleOptions<TreeInitialContext<TRoutes>>
+	>
 ) => Promise<NodeRouteHandlerResult> {
-	const matchRoute = createRouteMatcher(routes as readonly NodeRoute<object>[]);
+	const matchRoute = createRouteMatcher(
+		createRouteHandlers<RuntimeImplementationTree>(implementations, options),
+	);
 
-	return async (request, response, ...[options]) => {
+	return async (request, response, ...[handleOptions]) => {
 		const match = matchRoute(
 			request.method ?? "GET",
 			readRequestTarget(request),
-			options?.mountPath,
+			handleOptions?.mountPath,
 		);
 		if (!match) {
 			return { matched: false };
@@ -204,7 +213,9 @@ export function createCatchAllHandler<TContext extends object>(
 		await route.handle(
 			request,
 			response,
-			params && !options?.params ? { ...options, params } : options,
+			params && !handleOptions?.params
+				? { ...handleOptions, params }
+				: handleOptions,
 		);
 		return { matched: true };
 	};

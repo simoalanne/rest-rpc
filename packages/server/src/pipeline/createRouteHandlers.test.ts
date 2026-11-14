@@ -1,8 +1,11 @@
 import { routeError, type } from "@rest-rpc/core";
 import { route } from "../builder/routeBuilder.ts";
-import { compileRoutes, createCatchAllHandler } from "./compileRoutes.ts";
+import {
+	createRouteHandlers,
+	createCatchAllHandler,
+} from "./createRouteHandlers.ts";
 
-describe("compileRoutes", () => {
+describe("createRouteHandlers", () => {
 	it("orders static segments before params for routers that match in order", () => {
 		const paths = [
 			"/:group/:id/edit",
@@ -13,7 +16,7 @@ describe("compileRoutes", () => {
 		const tree = Object.fromEntries(
 			paths.map((path) => [path, route.get(path).handler(() => path)]),
 		);
-		expect(compileRoutes(tree).map(({ path }) => path)).toEqual(
+		expect(createRouteHandlers(tree).map(({ path }) => path)).toEqual(
 			[...paths].reverse(),
 		);
 	});
@@ -21,7 +24,7 @@ describe("compileRoutes", () => {
 	it("sends defined and other errors and reports them to onError", async () => {
 		const Gone = routeError("GONE", { status: 410 });
 		const onError = vi.fn();
-		const [defined, other] = compileRoutes(
+		const [defined, other] = createRouteHandlers(
 			{
 				defined: route
 					.get("/defined")
@@ -50,14 +53,12 @@ describe("compileRoutes", () => {
 
 describe("createCatchAllHandler", () => {
 	it("passes its decoded matched params instead of params attached by another router", async () => {
-		const handler = createCatchAllHandler(
-			compileRoutes({
-				user: route
-					.get("/users/:id")
-					.params(type<{ id: string }>())
-					.handler(({ params }) => params.id),
-			}),
-		);
+		const handler = createCatchAllHandler({
+			user: route
+				.get("/users/:id")
+				.params(type<{ id: string }>())
+				.handler(({ params }) => params.id),
+		});
 		// A router that mounted the catch-all at `/:id/*` attached its own params.
 		const request = Object.assign(new Request("http://localhost/users/a%20b"), {
 			params: { id: "mount" },

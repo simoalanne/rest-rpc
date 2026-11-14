@@ -1,6 +1,5 @@
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import {
-	compileRoutes,
 	createApp,
 	createCatchAllHandler,
 	respond,
@@ -74,7 +73,7 @@ type Serve = (
 ) => Promise<void>;
 
 const serveFetch: Serve = (routes, options, run) => {
-	const handler = createCatchAllHandler(compileRoutes(routes));
+	const handler = createCatchAllHandler(routes);
 	return withFetchServer(
 		async (request) =>
 			(await handler(request, options.handleOptions)).response ??
@@ -84,9 +83,7 @@ const serveFetch: Serve = (routes, options, run) => {
 };
 
 const serveNode: Serve = (routes, options, run) => {
-	const handler = nodeAdapter.createCatchAllHandler(
-		nodeAdapter.compileRoutes(routes),
-	);
+	const handler = nodeAdapter.createCatchAllHandler(routes);
 	return withHttpServer(async (req, res) => {
 		try {
 			if (!(await handler(req, res, options.handleOptions)).matched) {
@@ -554,11 +551,9 @@ describe.each([
 
 describe("node adapter", () => {
 	it("matches the full request target when a router strips the mount path", async () => {
-		const handler = nodeAdapter.createCatchAllHandler(
-			nodeAdapter.compileRoutes({
-				user: route.get("/users/:id").handler(({ params }) => params.id),
-			}),
-		);
+		const handler = nodeAdapter.createCatchAllHandler({
+			user: route.get("/users/:id").handler(({ params }) => params.id),
+		});
 		await withHttpServer(
 			async (req, res) => {
 				// Express keeps the full target in `originalUrl` for `app.use("/api")`.
@@ -573,7 +568,7 @@ describe("node adapter", () => {
 	});
 
 	it("uses params a router such as Express set on the request", async () => {
-		const [user] = nodeAdapter.compileRoutes({
+		const [user] = nodeAdapter.createRouteHandlers({
 			user: route
 				.get("/users/:id")
 				.params(type<{ id: string }>())

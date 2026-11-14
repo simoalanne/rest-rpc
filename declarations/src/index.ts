@@ -4,7 +4,7 @@ import {
 	route as contractRoute,
 } from "@rest-rpc/core";
 import {
-	compileRoutes,
+	createRouteHandlers,
 	createApp,
 	createCatchAllHandler,
 	createLocalClient,
@@ -143,8 +143,8 @@ export const implementedRoute = implement(contract).users.get.handler(
 export const app = createApp(routes, {
 	context: { user: "user", tenant: "tenant" },
 });
-export const compiledRoutes = compileRoutes(routes);
-export const catchAllHandler = createCatchAllHandler(compiledRoutes);
+export const routeHandlers = createRouteHandlers(routes);
+export const catchAllHandler = createCatchAllHandler(routes);
 export const extractedContract = extractContract(routes);
 export const serverClient = createClient(extractedContract, {
 	baseUrl: "http://localhost",

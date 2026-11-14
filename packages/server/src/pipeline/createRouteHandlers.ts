@@ -41,11 +41,12 @@ import { sseBodyCodec } from "./sse.ts";
 import { prepareStaticResponse } from "./staticResponse.ts";
 
 /**
- * Customizes paths, request parsing, validation and error observation for compiled Fetch routes.
+ * Customizes request parsing, validation and error observation of route
+ * handlers and catch-all handlers.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#compile-options}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#route-options}
  */
-export type CompileRoutesOptions = {
+export type CreateRouteHandlersOptions = {
 	bodyCodecs?: readonly BodyCodec[];
 	/**
 	 * Observes every error sent as an error response, and `RouteError`s that
@@ -183,7 +184,7 @@ type FetchDispatch = (
 ) => Promise<Response>;
 
 const createFetchDispatch = (
-	options: CompileRoutesOptions,
+	options: CreateRouteHandlersOptions,
 	codecs: BodyCodecRegistry,
 ): FetchDispatch => {
 	const { disableRequestValidation, disableResponseValidation, onError } =
@@ -287,16 +288,17 @@ const createFetchDispatch = (
 };
 
 /**
- * Compiles a route tree into Fetch routes to register on a router.
+ * Creates one Fetch route handler per method and path of a route tree, to
+ * register on a router.
  *
- * @remarks Pass the result to {@link createCatchAllHandler} to let rest-rpc
- * do the routing instead.
+ * @remarks Use {@link createCatchAllHandler} to let rest-rpc do the routing
+ * instead.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
  */
-export function compileRoutes<TRoutes extends RuntimeImplementationTree>(
+export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
 	implementations: TRoutes,
-	options: CompileRoutesOptions = {},
+	options: CreateRouteHandlersOptions = {},
 ): FetchRoute<TreeInitialContext<TRoutes>>[] {
 	const codecs = createBodyCodecRegistry([
 		sseBodyCodec,
@@ -331,23 +333,36 @@ export function compileRoutes<TRoutes extends RuntimeImplementationTree>(
 }
 
 /**
- * Creates a Fetch catch-all handler that routes requests to compiled routes.
+ * Creates a Fetch catch-all handler that routes requests to the routes of a
+ * route tree.
  *
  * @remarks An unmatched request is returned to the caller with `matched: false`
  * so the surrounding runtime can provide fallback routing.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#catch-all-handler}
  */
-export function createCatchAllHandler<TContext extends object>(
-	routes: readonly FetchRoute<TContext>[],
+export function createCatchAllHandler<
+	TRoutes extends RuntimeImplementationTree,
+>(
+	implementations: TRoutes,
+	options: CreateRouteHandlersOptions = {},
 ): (
 	request: Request,
-	...options: OptionsArgs<TContext, CatchAllHandleOptions<TContext>>
+	...options: OptionsArgs<
+		TreeInitialContext<TRoutes>,
+		CatchAllHandleOptions<TreeInitialContext<TRoutes>>
+	>
 ) => Promise<FetchRouteHandlerResult> {
-	const matchRoute = createRouteMatcher(routes);
+	const matchRoute = createRouteMatcher(
+		createRouteHandlers<RuntimeImplementationTree>(implementations, options),
+	);
 
-	return async (request, ...[options]) => {
-		const match = matchRoute(request.method, request.url, options?.mountPath);
+	return async (request, ...[handleOptions]) => {
+		const match = matchRoute(
+			request.method,
+			request.url,
+			handleOptions?.mountPath,
+		);
 		if (!match) {
 			return { matched: false, response: undefined };
 		}
@@ -360,9 +375,9 @@ export function createCatchAllHandler<TContext extends object>(
 			matched: true,
 			response: await route.handle(
 				request,
-				...((params && !options?.params
-					? [{ ...options, params }]
-					: [options]) as OptionsArgs<TContext, HandleOptions<TContext>>),
+				params && !handleOptions?.params
+					? { ...handleOptions, params }
+					: handleOptions,
 			),
 		};
 	};

@@ -7,10 +7,10 @@ import type {
 } from "../routing/match.ts";
 import { createRouteMatcher } from "../routing/match.ts";
 import {
-	compileRoutes,
-	type CompileRoutesOptions,
+	createRouteHandlers,
+	type CreateRouteHandlersOptions,
 	type FetchRoute,
-} from "./compileRoutes.ts";
+} from "./createRouteHandlers.ts";
 import { InternalServerError, NotFound, observeError } from "./errors.ts";
 import { serializeRouteError } from "./serializeHttpRouteResult.ts";
 
@@ -23,7 +23,7 @@ import { serializeRouteError } from "./serializeHttpRouteResult.ts";
 export type CreateAppOptions<
 	TArgs extends unknown[] = [],
 	TContext extends object = EmptyObject,
-> = CompileRoutesOptions & {
+> = CreateRouteHandlersOptions & {
 	/**
 	 * The path the routes are served under, such as `/api`. Route paths do not
 	 * include it.
@@ -93,7 +93,7 @@ const defaultNotFound = () => serializeRouteError(new NotFound());
  *
  * @remarks Errors that are not sent as error responses by the routes, such as
  * errors thrown by handlers, are sent as `INTERNAL_SERVER_ERROR` responses
- * with the thrown error as `cause`. Use {@link compileRoutes} and
+ * with the thrown error as `cause`. Use {@link createRouteHandlers} and
  * {@link createCatchAllHandler} instead to serve the routes from an existing
  * server or framework.
  *
@@ -136,7 +136,7 @@ export function createApp(
 		observeError(compileOptions.onError, internal, request);
 		return serializeRouteError(internal);
 	};
-	const compiled = compileRoutes<RuntimeImplementationTree>(
+	const compiled = createRouteHandlers<RuntimeImplementationTree>(
 		implementations,
 		compileOptions,
 	);

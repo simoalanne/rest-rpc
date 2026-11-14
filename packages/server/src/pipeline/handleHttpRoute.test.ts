@@ -2,7 +2,7 @@ import { routeError, sse, type } from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import { route } from "../builder/routeBuilder.ts";
 import type { RuntimeImplementationTree } from "../routing/match.ts";
-import { compileRoutes } from "./compileRoutes.ts";
+import { createRouteHandlers } from "./createRouteHandlers.ts";
 import { createApp, type CreateAppOptions } from "./createApp.ts";
 import { respond } from "./respond.ts";
 import { sseEvent } from "./sse.ts";
@@ -329,7 +329,7 @@ describe("route pipeline", () => {
 	it.each([199, 300, 404])(
 		"rejects the inferred status %s outside 2xx",
 		async (status) => {
-			const [compiled] = compileRoutes({
+			const [compiled] = createRouteHandlers({
 				route: route.get("/").handler(() => respond(undefined, { status })),
 			});
 			await expect(
@@ -354,7 +354,7 @@ describe("route pipeline", () => {
 
 	it("rejects with ordinary handler errors", async () => {
 		const error = new Error("handler failed");
-		const [compiled] = compileRoutes({
+		const [compiled] = createRouteHandlers({
 			route: route.get("/").handler((): string => {
 				throw error;
 			}),

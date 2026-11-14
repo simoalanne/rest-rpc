@@ -52,14 +52,14 @@ export {
 } from "./pipeline/respond.ts";
 export { sseEvent, type SseServerEvent } from "./pipeline/sse.ts";
 export {
-	compileRoutes,
+	createRouteHandlers,
 	createCatchAllHandler,
 	type CatchAllHandleOptions,
-	type CompileRoutesOptions,
+	type CreateRouteHandlersOptions,
 	type FetchRoute,
 	type FetchRouteHandlerResult,
 	type HandleOptions,
-} from "./pipeline/compileRoutes.ts";
+} from "./pipeline/createRouteHandlers.ts";
 export {
 	createApp,
 	type App,

@@ -465,7 +465,7 @@ route.body(todoInput).error(RequestValidationFailed); // types its issues as `da
 import { createApp } from "@rest-rpc/server";
 
 export default createApp(routes, {
-	mountPath: "/internal", // served under, not part of route paths (use .prefix() for that)
+	mountPath: "/api", // served under, not part of route paths (use .prefix() for that)
 	context: (request, env: Env) => ({ db: env.DB }), // extra fetch args, e.g. Workers env
 	notFound: (request) => new Response("Not found", { status: 404 }),
 	onError: (error, request) =>
@@ -495,9 +495,9 @@ process.on("SIGTERM", () => server.close()); // returns the http.Server
 ```ts
 // Native router, Express: one framework route per rest-rpc route.
 // Node frameworks import from @rest-rpc/server/node, Fetch ones from @rest-rpc/server.
-import { compileRoutes } from "@rest-rpc/server/node";
+import { createRouteHandlers } from "@rest-rpc/server/node";
 
-for (const r of compileRoutes(routes)) {
+for (const r of createRouteHandlers(routes)) {
 	app[r.method.toLowerCase()](r.path, (req, res, next) => {
 		r.handle(req, res, {
 			context: { user: req.user }, // seeds the request context
@@ -510,12 +510,12 @@ for (const r of compileRoutes(routes)) {
 
 ```ts
 // Catch-all, Hono: rest-rpc routes under one mount, unmatched requests fall through.
-import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server";
+import { createCatchAllHandler } from "@rest-rpc/server";
 
-const handler = createCatchAllHandler(compileRoutes(routes));
-app.all("/internal/*", async (c) => {
+const handler = createCatchAllHandler(routes); // also takes the route options
+app.all("/api/*", async (c) => {
 	const result = await handler(c.req.raw, {
-		mountPath: "/internal",
+		mountPath: "/api",
 		context: { user: c.var.user },
 	});
 	return result.matched ? result.response : c.notFound();

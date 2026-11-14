@@ -11,7 +11,7 @@ import type { RequestArgs } from "@rest-rpc/core/client";
 import { markDefined, type RouteDefinition } from "@rest-rpc/core/contract";
 import type { Merge } from "@rest-rpc/core/utils";
 import type { InitialContextOf } from "../builder/routeBuilder.types.ts";
-import type { ContextOption, OptionsArgs } from "./compileRoutes.ts";
+import type { ContextOption, OptionsArgs } from "./createRouteHandlers.ts";
 import {
 	isImplementedRoute,
 	toRuntimeImplementation,

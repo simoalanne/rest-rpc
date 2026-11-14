@@ -60,7 +60,7 @@ Bun.serve({
 
 ## App Options
 
-`createApp` takes the [compile options](#compile-options) and these:
+`createApp` takes the [route options](#route-options) and these:
 
 ```ts
 type CreateAppOptions = {
@@ -75,11 +75,11 @@ type CreateAppOptions = {
 };
 ```
 
-- `mountPath`: the path the routes are served under, such as `/internal`.
-  Route paths do not include it. A path that clients use, such as `/api/v1`,
+- `mountPath`: the path the routes are served under, such as `/api`. Route
+  paths do not include it, so clients put it in their base URL. A path that
+  clients and OpenAPI documents should include in each route, such as `/v1`,
   belongs in the routes instead, defined with
-  [`.prefix()`](/docs/route-builder#path-prefixes), so that clients and OpenAPI
-  documents include it.
+  [`.prefix()`](/docs/route-builder#path-prefixes).
 - `context`: the [initial context](/docs/middleware#values-from-the-host) the
   routes declare, or a function, sync or async, that returns it for each
   request. It is required when the routes declare initial context, and must
@@ -112,10 +112,10 @@ handlers, are sent as
 [`INTERNAL_SERVER_ERROR`](/docs/http-behavior/errors#built-in-errors) responses
 and passed to [`onError`](#error-handling).
 
-## Compile Options
+## Route Options
 
 ```ts
-type CompileRoutesOptions = {
+type CreateRouteHandlersOptions = {
 	bodyCodecs?: readonly BodyCodec[];
 	disableRequestValidation?: boolean;
 	disableResponseValidation?: boolean;
@@ -128,8 +128,8 @@ type CompileRoutesOptions = {
   [Disabling Server Validation](/docs/http-behavior/schemas#disabling-server-validation).
 - `onError`: see [Error Handling](#error-handling).
 
-The same options are taken by `compileRoutes` when
-[integrating with a framework](/docs/server/framework-integration#compiling-routes).
+The same options are taken by `createRouteHandlers` and `createCatchAllHandler`
+when [integrating with a framework](/docs/server/framework-integration#creating-route-handlers).
 
 ## Paths
 

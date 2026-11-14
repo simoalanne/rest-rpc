@@ -13,11 +13,11 @@ the framework should see each route, such as to apply its middleware per route,
 or mount all routes under one framework route with the
 [catch-all handler](#catch-all-handler).
 
-## Compiling Routes
+## Creating Route Handlers
 
-Both ways start by compiling the route tree with `compileRoutes`. It takes the
-[compile options](/docs/server/fetch#compile-options) and returns one route per
-method and path:
+Both ways take the route tree and the
+[route options](/docs/server/fetch#route-options). `createRouteHandlers`
+returns one route per method and path:
 
 ```ts
 type FetchRoute = {
@@ -38,7 +38,7 @@ but `handle` takes `req, res` and writes the response to `res`.
 
 ## Handle Options
 
-Compiled routes and the catch-all handler take per-request options for passing
+Route handlers and the catch-all handler take per-request options for passing
 framework values to rest-rpc:
 
 ```ts
@@ -63,7 +63,7 @@ type HandleOptions = {
 
 ## Native Router
 
-Register each compiled route's `method` and `path` on the framework's router
+Register each route's `method` and `path` on the framework's router
 and call `route.handle()` from it. The framework does the routing, and
 `handle` runs validation, middleware, and the handler.
 
@@ -72,12 +72,12 @@ and call `route.handle()` from it. The framework does the routing, and
 
 ```ts server.ts
 import { Hono } from "hono";
-import { compileRoutes } from "@rest-rpc/server";
+import { createRouteHandlers } from "@rest-rpc/server";
 import { routes } from "./routes";
 
 const app = new Hono();
 
-for (const route of compileRoutes(routes)) {
+for (const route of createRouteHandlers(routes)) {
 	app.on(route.method, route.path, (c) =>
 		route.handle(c.req.raw, { context: { user: c.var.user } }),
 	);
@@ -89,12 +89,12 @@ for (const route of compileRoutes(routes)) {
 
 ```ts server.ts
 import express from "express";
-import { compileRoutes } from "@rest-rpc/server/node";
+import { createRouteHandlers } from "@rest-rpc/server/node";
 import { routes } from "./routes";
 
 const app = express();
 
-for (const route of compileRoutes(routes)) {
+for (const route of createRouteHandlers(routes)) {
 	const method = route.method.toLowerCase() as
 		"get" | "post" | "put" | "patch" | "delete";
 	app[method](route.path, (req, res, next) => {
@@ -108,7 +108,7 @@ for (const route of compileRoutes(routes)) {
 
 ## Catch-All Handler
 
-Pass the compiled routes to `createCatchAllHandler` and mount it on a single
+Pass the route tree to `createCatchAllHandler` and mount it on a single
 framework route or middleware. rest-rpc does the routing, using
 [rou3](https://github.com/h3js/rou3), and resolves to
 `{ matched: true, response }` for the requests it handles, and to
@@ -121,15 +121,15 @@ routes. The Node handler writes the response to `res` and resolves to
 
 ```ts server.ts
 import { Hono } from "hono";
-import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server";
+import { createCatchAllHandler } from "@rest-rpc/server";
 import { routes } from "./routes";
 
 const app = new Hono();
-const handler = createCatchAllHandler(compileRoutes(routes));
+const handler = createCatchAllHandler(routes);
 
-app.all("/internal/*", async (c) => {
+app.all("/api/*", async (c) => {
 	const result = await handler(c.req.raw, {
-		mountPath: "/internal",
+		mountPath: "/api",
 		context: { user: c.var.user },
 	});
 	return result.matched ? result.response : c.notFound();
@@ -141,14 +141,14 @@ app.all("/internal/*", async (c) => {
 
 ```ts server.ts
 import express from "express";
-import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server/node";
+import { createCatchAllHandler } from "@rest-rpc/server/node";
 import { routes } from "./routes";
 
 const app = express();
-const handler = createCatchAllHandler(compileRoutes(routes));
+const handler = createCatchAllHandler(routes);
 
-app.use("/internal", (req, res, next) => {
-	handler(req, res, { mountPath: "/internal" }).then(
+app.use("/api", (req, res, next) => {
+	handler(req, res, { mountPath: "/api" }).then(
 		({ matched }) => matched || next(),
 		next,
 	);
@@ -167,16 +167,16 @@ from the request path before matching. The Node handler reads the path from
 the mount path from `req.url`, so pass the full mount path.
 
 `mountPath` is a per-request option, so one handler can serve the same routes
-under several mount paths. A path that clients use, such as `/api/v1`, belongs
-in the routes instead, defined with
-[`.prefix()`](/docs/route-builder#path-prefixes), so that clients and OpenAPI
-documents include it.
+under several mount paths. Route paths do not include it, so clients put it in
+their base URL. A path that clients and OpenAPI documents should include in
+each route, such as `/v1`, belongs in the routes instead, defined with
+[`.prefix()`](/docs/route-builder#path-prefixes).
 
 ## Error Handling
 
 [Defined and built-in errors](/docs/http-behavior/errors) are sent as error
 responses, and observed with `onError` from the
-[compile options](/docs/server/fetch#error-handling). Other errors thrown by
+[route options](/docs/server/fetch#error-handling). Other errors thrown by
 handlers or middleware reject the promise returned by `handle` or the
 catch-all handler, so pass them to the framework's error handling, as the
 Express examples do with `next`.
