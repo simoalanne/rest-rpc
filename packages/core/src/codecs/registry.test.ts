@@ -23,7 +23,11 @@ describe("createBodyCodecRegistry", () => {
 		]);
 		expect(registry.serialize({}, "application/json")).toBe("x");
 		expect(
-			await registry.deserialize(Response.json({ a: 1 }), "application/json"),
+			await registry.deserialize(
+				Response.json({ a: 1 }),
+				"application/json",
+				"application/json",
+			),
 		).toEqual({ a: 1 });
 	});
 

@@ -99,8 +99,8 @@ describe("route pipeline", () => {
 				bodyCodecs: [
 					{
 						mediaTypes: ["application/json"],
-						deserialize: async (source) =>
-							((await (source as Request).json()) as { value: string }).value,
+						deserialize: async (body) =>
+							(JSON.parse(await body.text()) as { value: string }).value,
 					},
 				],
 			},

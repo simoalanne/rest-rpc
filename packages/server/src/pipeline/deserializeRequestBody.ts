@@ -1,4 +1,7 @@
-import type { BodyCodecRegistry } from "@rest-rpc/core/codecs";
+import type {
+	BodyCodecRegistry,
+	DeserializeSource,
+} from "@rest-rpc/core/codecs";
 import type { RouteError } from "@rest-rpc/core";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import { MalformedRequestBody } from "./errors.ts";
@@ -23,8 +26,9 @@ const toInvalidBody = (): DeserializedRequestBody => ({
 });
 
 export function deserializeRequestBody(
-	request: Request,
+	source: DeserializeSource,
 	mediaType: string,
+	contentType: string,
 	codecs: BodyCodecRegistry,
 ): MaybePromise<DeserializedRequestBody> {
 	// Reading `request.body` would create a stream and slow down decoding, so a
@@ -32,7 +36,7 @@ export function deserializeRequestBody(
 	if (!mediaType) return noBody;
 
 	try {
-		const body = codecs.deserialize(request, mediaType);
+		const body = codecs.deserialize(source, mediaType, contentType);
 		return body instanceof Promise
 			? body.then(toDeserialized, toInvalidBody)
 			: toDeserialized(body);

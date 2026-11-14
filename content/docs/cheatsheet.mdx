@@ -427,8 +427,10 @@ import { bodyCodec } from "@rest-rpc/core";
 
 // Same codec works on the client and both server runtimes; pass it as `bodyCodecs`.
 const binary = bodyCodec("application/octet-stream", {
-	serialize: (value) => value as Uint8Array,
-	deserialize: async (source) => new Uint8Array(await source.arrayBuffer()),
+	serialize: (value, contentType) => value as Uint8Array, // full content type, with params
+	// body: text(), arrayBuffer(), blob() or the body stream; not a Request on Node
+	deserialize: async (body, contentType) =>
+		new Uint8Array(await body.arrayBuffer()),
 });
 ```
 

@@ -122,7 +122,7 @@ const binaryCodec = bodyCodec("application/octet-stream", {
 		}
 		return value;
 	},
-	deserialize: async (source) => new Uint8Array(await source.arrayBuffer()),
+	deserialize: async (body) => new Uint8Array(await body.arrayBuffer()),
 });
 
 const app = createApp(routes, {
@@ -144,7 +144,7 @@ const binaryCodec = bodyCodec("application/octet-stream", {
 		}
 		return value;
 	},
-	deserialize: async (source) => new Uint8Array(await source.arrayBuffer()),
+	deserialize: async (body) => new Uint8Array(await body.arrayBuffer()),
 });
 
 const client = createClient(contract, {
@@ -190,13 +190,35 @@ const gzipJsonCodec = bodyCodec("application/json", {
 });
 ```
 
-### Deserializer Source
+### Incoming Body
 
-`deserialize(source)` returns the value to validate. `source` is typed as
-`Request | Response`: the client passes the Fetch `Response` and the server the
-Fetch `Request`. Both share the Fetch body methods, such as `json()` and
-`arrayBuffer()`. A codec used only on one side can treat `source` as that type
-when it needs an API only one of them has.
+`deserialize(body, contentType)` returns the value to validate. Like the
+serializer, it receives the full content type, including parameters such as
+`charset` or a multipart boundary. `body` is an `IncomingBody`, read once with
+one of its members:
+
+```ts
+type IncomingBody = {
+	text(): Promise<string>;
+	arrayBuffer(): Promise<ArrayBuffer>;
+	blob(): Promise<Blob>; // typed with the content type
+	body: ReadableStream<Uint8Array> | null;
+};
+```
+
+The client and Fetch servers pass the Fetch `Response` or `Request`, and the
+Node server passes an object that reads the request stream. A codec that uses
+only these members works on the client and on both server runtimes.
+
+```ts
+const csvCodec = bodyCodec("text/csv", {
+	serialize: (rows) => toCsv(rows as string[][]),
+	deserialize: async (body, contentType) =>
+		parseCsv(await body.text(), {
+			header: contentType.includes("header=present"),
+		}),
+});
+```
 
 On the server, an error thrown while deserializing responds with the
 `MALFORMED_REQUEST_BODY` [error](/docs/http-behavior/errors#built-in-errors)

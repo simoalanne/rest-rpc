@@ -1,7 +1,7 @@
 import { bodyCodec } from "./bodyCodec.ts";
 import { isAsyncIterable } from "./operations.ts";
 import { serializedBody } from "./serializedBody.ts";
-import type { BodyCodec } from "./types.ts";
+import type { BodyCodec, IncomingBody } from "./types.ts";
 
 /** The built-in JSON serializer. Fetch handlers detect it to send `Response.json` instead. */
 export const serializeJson = (value: unknown) => {
@@ -10,11 +10,24 @@ export const serializeJson = (value: unknown) => {
 	return body;
 };
 
+/** The built-in JSON deserializer. Sources with a `json` method, such as Fetch requests and responses, are read with it instead. */
+export const deserializeJson = async (body: IncomingBody): Promise<unknown> =>
+	JSON.parse(await body.text());
+
+/** The built-in multipart deserializer. Sources with a `formData` method, such as Fetch requests and responses, are read with it instead. */
+export const deserializeFormData = async (
+	body: IncomingBody,
+	contentType: string,
+): Promise<FormData> =>
+	new Response(await body.arrayBuffer(), {
+		headers: { "content-type": contentType },
+	}).formData();
+
 /** Fetch-compatible built-in codecs, ordered from specific formats to binary fallback. */
 export const defaultBodyCodecs: readonly BodyCodec[] = [
 	bodyCodec(["application/json", /\+json$/], {
 		serialize: serializeJson,
-		deserialize: (source) => source.json(),
+		deserialize: deserializeJson,
 	}),
 	bodyCodec("application/x-www-form-urlencoded", {
 		serialize: (value) => {
@@ -22,7 +35,7 @@ export const defaultBodyCodecs: readonly BodyCodec[] = [
 				throw new TypeError("Expected URLSearchParams body");
 			return value;
 		},
-		deserialize: async (source) => new URLSearchParams(await source.text()),
+		deserialize: async (body) => new URLSearchParams(await body.text()),
 	}),
 	bodyCodec("multipart/form-data", {
 		serialize: (value) => {
@@ -31,7 +44,7 @@ export const defaultBodyCodecs: readonly BodyCodec[] = [
 			// Fetch sets the content type with the generated boundary.
 			return serializedBody(value);
 		},
-		deserialize: (source) => source.formData(),
+		deserialize: deserializeFormData,
 	}),
 	bodyCodec(/^text\//, {
 		serialize: (value) => {
@@ -39,7 +52,7 @@ export const defaultBodyCodecs: readonly BodyCodec[] = [
 				throw new TypeError("Expected string body");
 			return value;
 		},
-		deserialize: (source) => source.text(),
+		deserialize: (body) => body.text(),
 	}),
 	bodyCodec(/.*/, {
 		serialize: (value) => {
@@ -54,6 +67,6 @@ export const defaultBodyCodecs: readonly BodyCodec[] = [
 				"Expected Blob, Uint8Array, ReadableStream or AsyncIterable body",
 			);
 		},
-		deserialize: (source) => source.blob(),
+		deserialize: (body) => body.blob(),
 	}),
 ];

@@ -1,12 +1,29 @@
-import { defaultBodyCodecs, serializeJson } from "./defaults.ts";
+import {
+	defaultBodyCodecs,
+	deserializeFormData,
+	deserializeJson,
+	serializeJson,
+} from "./defaults.ts";
 import { normalizeMediaType } from "./operations.ts";
 import { isSerializedBody } from "./serializedBody.ts";
 import type {
 	BodyCodec,
+	BodyDeserializer,
 	BodySerializer,
+	IncomingBody,
 	BodyValue,
 	SerializedBody,
 } from "./types.ts";
+
+/** An incoming body, optionally with the Fetch methods the built-in codecs read natively. */
+export type DeserializeSource = IncomingBody &
+	Partial<Pick<Response, "json" | "formData">>;
+
+// Native Fetch methods decode faster than reading the text first.
+const nativeDeserializers = new Map<BodyDeserializer, "json" | "formData">([
+	[deserializeJson, "json"],
+	[deserializeFormData, "formData"],
+]);
 
 export type BodyCodecRegistry = {
 	/** Serializes a value with the codec for the base media type of `contentType`. */
@@ -14,8 +31,15 @@ export type BodyCodecRegistry = {
 		value: unknown,
 		contentType: string,
 	) => BodyValue | SerializedBody | Promise<BodyValue | SerializedBody>;
-	/** Deserializes a source with the codec for a base media type. */
-	deserialize: (source: Request | Response, mediaType: string) => unknown;
+	/**
+	 * Deserializes a source with the codec for its base media type, passing the
+	 * complete content type to the codec.
+	 */
+	deserialize: (
+		source: DeserializeSource,
+		mediaType: string,
+		contentType: string,
+	) => unknown;
 	/** Whether `contentType` is serialized by the built-in JSON serializer. */
 	serializesJson: (contentType: string) => boolean;
 };
@@ -91,7 +115,12 @@ export function createBodyCodecRegistry(
 				? result.then((resolved) => assertBaseMediaType(resolved, mediaType))
 				: assertBaseMediaType(result, mediaType);
 		},
-		deserialize: (source, mediaType) => findDeserializer(mediaType)!(source),
+		deserialize: (source, mediaType, contentType) => {
+			const deserialize = findDeserializer(mediaType)!;
+			const native = nativeDeserializers.get(deserialize);
+			const read = native && source[native];
+			return read ? read.call(source) : deserialize(source, contentType);
+		},
 		serializesJson: (contentType) =>
 			resolveSerializer(contentType).serialize === serializeJson,
 	};

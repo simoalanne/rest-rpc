@@ -51,6 +51,7 @@ export type {
 	BodyDeserializer,
 	BodySerializer,
 	BodyValue,
+	IncomingBody,
 	SerializedBody,
 } from "./codecs/index.ts";
 export { bodyCodec, serializedBody } from "./codecs/index.ts";

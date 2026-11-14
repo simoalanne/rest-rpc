@@ -220,9 +220,8 @@ const createFetchDispatch = (
 		let body: unknown;
 		let mediaType: string | undefined;
 		if (schemas?.body) {
-			const receivedMediaType = normalizeMediaType(
-				request.headers.get("content-type"),
-			);
+			const contentType = request.headers.get("content-type") ?? "";
+			const receivedMediaType = normalizeMediaType(contentType);
 			const selected = resolveRequestMediaType(
 				implementation,
 				receivedMediaType,
@@ -238,6 +237,7 @@ const createFetchDispatch = (
 				const deserialized = await deserializeRequestBody(
 					request,
 					receivedMediaType,
+					contentType,
 					codecs,
 				);
 				if (deserialized.rejection) {
