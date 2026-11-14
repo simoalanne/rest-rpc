@@ -42,14 +42,28 @@ const cases = Object.fromEntries(
 if (Object.keys(cases).length === 0)
 	throw new Error(`No cases match ${filters.join(", ")}.`);
 
+const entry = (name: string) =>
+	fileURLToPath(new URL(`./${name}`, import.meta.url));
+// `BENCH_RUNTIME` selects how the routes are served: with createApp on Bun's
+// native router, or with the Node adapter on Node or on Bun. `BENCH_SERVER`
+// runs an executable built from http.ts instead, such as with `bun compile`.
+const servers: Record<string, string[]> = {
+	bun: ["bun", entry("http.ts")],
+	node: ["node", entry("node.ts")],
+	"bun-node": ["bun", entry("node.ts")],
+};
+if (!process.env.BENCH_SERVER && !servers[process.env.BENCH_RUNTIME ?? "bun"])
+	throw new Error(
+		`BENCH_RUNTIME must be one of ${Object.keys(servers).join(", ")}.`,
+	);
+
 const startServer = async () => {
 	// A server left running would answer in place of the new one.
 	if (await fetch(base).catch(() => undefined))
 		throw new Error(`${base} is already in use.`);
-	// `BENCH_SERVER` runs an executable built from http.ts, such as with `bun compile`.
 	const [command, ...args] = process.env.BENCH_SERVER
 		? [process.env.BENCH_SERVER]
-		: ["bun", fileURLToPath(new URL("./http.ts", import.meta.url))];
+		: servers[process.env.BENCH_RUNTIME ?? "bun"]!;
 	const server = spawn(command!, args, {
 		env: { ...process.env, PORT: "3737", NODE_ENV: "production" },
 	});

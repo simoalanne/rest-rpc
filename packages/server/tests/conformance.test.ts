@@ -593,6 +593,42 @@ describe("node adapter", () => {
 		await attached(undefined, "raw");
 	});
 
+	it("stops a stream when the client disconnects", async () => {
+		const { promise: stopped, resolve: stop } = Promise.withResolvers<void>();
+		const app = createApp({
+			events: route.get("/events").handler(async function* () {
+				try {
+					for (let count = 0; ; count += 1) {
+						yield count;
+						await new Promise((resolve) => setTimeout(resolve, 5));
+					}
+				} finally {
+					stop();
+				}
+			}),
+		});
+		const server = await new Promise<Server>((resolve) => {
+			const started = nodeAdapter.serve(app, {
+				port: 0,
+				hostname: "127.0.0.1",
+				onListen: () => resolve(started),
+			});
+		});
+		try {
+			const { port } = server.address() as AddressInfo;
+			const controller = new AbortController();
+			const response = await fetch(`http://127.0.0.1:${port}/events`, {
+				signal: controller.signal,
+			});
+			await response.body!.getReader().read();
+			controller.abort();
+			await stopped;
+		} finally {
+			server.closeAllConnections();
+			await new Promise<void>((resolve) => server.close(() => resolve()));
+		}
+	});
+
 	it("serves an app with serve", async () => {
 		const app = createApp(
 			{ user: route.get("/users/:id").handler(({ params }) => params.id) },
