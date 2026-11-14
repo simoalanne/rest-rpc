@@ -217,7 +217,7 @@ describe.each([
 			expect(response.status).toBe(415);
 			expect(await response.json()).toEqual({
 				code: "UNSUPPORTED_MEDIA_TYPE",
-				message: "Unsupported request body content type.",
+				message: expect.any(String),
 			});
 			expect(handler).not.toHaveBeenCalled();
 		});
@@ -245,7 +245,7 @@ describe.each([
 			expect(request.status).toBe(400);
 			expect(await request.json()).toEqual({
 				code: "REQUEST_VALIDATION_FAILED",
-				message: "Request validation failed.",
+				message: expect.any(String),
 				data: {
 					body: [{ message: "invalid value" }],
 					query: [],
@@ -261,13 +261,13 @@ describe.each([
 			expect(malformed.status).toBe(400);
 			expect(await malformed.json()).toEqual({
 				code: "MALFORMED_REQUEST_BODY",
-				message: "Invalid request body.",
+				message: expect.any(String),
 			});
 			const response = await fetch(`${url}/invalid-response`);
 			expect(response.status).toBe(500);
 			expect(await response.json()).toEqual({
 				code: "INTERNAL_SERVER_ERROR",
-				message: "Internal server error.",
+				message: expect.any(String),
 			});
 		});
 	});

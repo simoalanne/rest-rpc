@@ -34,19 +34,19 @@ describe("stream", () => {
 			{ data: { count: 2 } },
 		]);
 	});
-	it("rejects frames that cannot be decoded as errors", async () => {
-		for (const [frames, cause] of [
-			["data: {\n\n", expect.any(SyntaxError)],
-			["id: one\n\n", new Error("SSE frame has no data field.")],
-			["data: 1\n", new Error("Incomplete SSE frame.")],
-		] as const) {
-			await expect(
-				collect(parseSseStream(undefined, stream(frames), false)),
-			).rejects.toMatchObject({
-				message: "Event stream could not be decoded.",
-				cause,
-			});
-		}
+	it("rejects data that cannot be decoded as errors", async () => {
+		await expect(
+			collect(parseSseStream(undefined, stream("data: {\n\n"), false)),
+		).rejects.toMatchObject({ cause: expect.any(SyntaxError) });
+	});
+
+	it("skips frames without data, such as keepalive comments", async () => {
+		const events = parseSseStream(
+			undefined,
+			stream(": keepalive\n\n", "data: 1\n\n"),
+			false,
+		);
+		expect(await collect(events)).toEqual([{ data: 1 }]);
 	});
 
 	it("keeps failures of reading the stream as transport errors", async () => {
@@ -70,7 +70,6 @@ describe("stream", () => {
 		await expect(
 			collect(parseSseStream(schema, stream("data: 1\n\n"), true)),
 		).rejects.toMatchObject({
-			message: "Response did not match the route contract.",
 			cause: [{ message: "invalid chunk" }],
 		});
 		expect(

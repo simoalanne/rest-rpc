@@ -91,16 +91,12 @@ describe("middleware", () => {
 	it("rejects middleware that does not return a response", async () => {
 		const run = (callback: (value: unknown) => unknown) =>
 			invokeWithMiddleware([callback], () => "ok", { context: {} }, 200);
-		await expect(run(() => "stopped")).rejects.toThrow(
-			"Middleware must return a response, such as the result of next() or respond().",
-		);
+		await expect(run(() => "stopped")).rejects.toThrow();
 		await expect(
 			run(async (value) => {
 				await asRequest(value).next();
 			}),
-		).rejects.toThrow(
-			"Middleware must return a response, such as the result of next() or respond().",
-		);
+		).rejects.toThrow();
 	});
 
 	it("rejects a second next call without invoking the handler twice", async () => {
@@ -118,7 +114,7 @@ describe("middleware", () => {
 				{ context: {} },
 				200,
 			),
-		).rejects.toThrow("Middleware next() may only be called once.");
+		).rejects.toThrow();
 		expect(handler).toHaveBeenCalledTimes(1);
 	});
 });

@@ -296,16 +296,22 @@ export const executeRequest = async (
 	try {
 		const { additionalHeaders: _additionalHeaders, ...requestFetchOptions } =
 			fetchOptions ?? {};
+		const headers: Record<string, string> = {
+			...clientHeaders,
+			...requestHeaders,
+		};
+		// A body's content type replaces one passed as a header, also when the
+		// runtime sets it, such as for `FormData`.
+		if (serialized) {
+			delete headers["content-type"];
+			Object.assign(headers, serialized.headers);
+		}
 		const init: RequestInit = {
 			...options.fetchOptions,
 			...requestFetchOptions,
 			method: route.method,
 			body: serialized?.body,
-			headers: {
-				...clientHeaders,
-				...normalizeHeaders(requestHeaders),
-				...serialized?.headers,
-			},
+			headers,
 			signal: signalState?.signal ?? fetchOptions?.signal,
 		};
 		const fetchImpl =

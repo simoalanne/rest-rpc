@@ -56,6 +56,8 @@ discriminated by `contentType`. The client selects the request media type with
 and the handler selects the response media type with its returned
 `contentType`. Either may be omitted when one media type is defined.
 
+A body's content type always replaces a `content-type` passed in headers.
+
 Outgoing codecs are selected from the selected media type. Incoming codecs and
 schemas are selected from the received `Content-Type` header. Matching uses the
 lowercase base media type without parameters, so

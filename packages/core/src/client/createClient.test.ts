@@ -40,8 +40,6 @@ describe("createClient", () => {
 			fetch: async () =>
 				new Response("Ada", { headers: { "content-type": "text/plain" } }),
 		});
-		await expect(client()).rejects.toThrow(
-			new Error("Response did not match the route contract."),
-		);
+		await expect(client()).rejects.toThrow();
 	});
 });

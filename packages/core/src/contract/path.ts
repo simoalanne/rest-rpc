@@ -1,5 +1,11 @@
 import type { AbsolutePath, RouteDefinition } from "./routeDefinition.ts";
 
+/** Rejects a path that ends with a slash, which doubles the slash where it is joined with another path. */
+export type NoTrailingSlashCheck<TPath extends string> =
+	TPath extends `${string}/`
+		? { "~error": `Path "${TPath}" must not end with a slash, such as "/api".` }
+		: unknown;
+
 /** Joins a prefix and a path. The `/` path resolves to the prefix itself. */
 export const joinPrefix = (
 	prefix: AbsolutePath | undefined,

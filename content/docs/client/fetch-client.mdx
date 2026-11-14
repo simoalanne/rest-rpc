@@ -377,7 +377,9 @@ const response = await client.todos.get(
 ```
 
 Use `additionalHeaders` for transport headers needed only by this call. Headers
-defined by the route remain part of the typed request object.
+defined by the route remain part of the typed request object. When a header is
+set more than once, route headers take precedence over `additionalHeaders`,
+which take precedence over `globalHeaders`.
 
 ```ts
 const response = await client.todos.get(

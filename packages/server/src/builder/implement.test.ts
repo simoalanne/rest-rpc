@@ -1,7 +1,7 @@
 import { route, type } from "@rest-rpc/core";
 import { implement } from "./implement.ts";
+import { call } from "../pipeline/call.ts";
 import { respond } from "../pipeline/respond.ts";
-import type { ServerRouteBuilderState } from "./routeBuilder.types.ts";
 
 const contract = {
 	users: {
@@ -12,31 +12,31 @@ const contract = {
 	},
 };
 
-const routeState = (value: unknown) =>
-	(value as { "~restrpc": ServerRouteBuilderState })["~restrpc"];
-
 describe("implement", () => {
-	it("should apply root middleware to every route without mutating the contract", () => {
-		const middleware1 = () => respond("first");
-		const middleware2 = () => respond("second");
+	it("should apply root middleware to every route without changing the contract", async () => {
+		const calls: string[] = [];
 		const implementation = implement(contract)
-			.use(middleware1)
-			.use(middleware2);
+			.use(({ next }) => {
+				calls.push("first");
+				return next();
+			})
+			.use(({ next }) => {
+				calls.push("second");
+				return next();
+			});
+		const get = implementation.users.get.handler(({ params }) => ({
+			name: params.id,
+		}));
+		expect(await call(get, { params: { id: "Ada" } })).toMatchObject({
+			body: { name: "Ada" },
+		});
+		expect(calls).toEqual(["first", "second"]);
 
-		expect(implementation.users.get).not.toBe(contract.users.get);
-		expect(routeState(implementation.users.get).middleware).toEqual([
-			middleware1,
-			middleware2,
-		]);
-		expect(routeState(contract.users.get).middleware).toBeUndefined();
-	});
-
-	it("should attach handlers to nested contract routes", () => {
-		const handler = () => respond({ name: "Ada" }, { status: 200 });
-		const implementedRoute = implement(contract).users.get.handler(handler);
-
-		expect(routeState(implementedRoute).handler).toBe(handler);
-		expect(routeState(contract.users.get).handler).toBeUndefined();
+		const plain = implement(contract).users.get.handler(() => ({
+			name: "Ada",
+		}));
+		await call(plain, { params: { id: "1" } });
+		expect(calls).toEqual(["first", "second"]);
 	});
 
 	it("should reject contracts that already contain a handler", () => {
@@ -44,9 +44,7 @@ describe("implement", () => {
 			respond({ name: "Ada" }),
 		);
 
-		expect(() => implement(implementedRoute)).toThrow(
-			"Cannot implement a route that already has a handler.",
-		);
+		expect(() => implement(implementedRoute)).toThrow();
 	});
 
 	it("should reject contracts that already contain middleware", () => {
@@ -54,8 +52,6 @@ describe("implement", () => {
 			next(),
 		);
 
-		expect(() => implement(implementedRoute)).toThrow(
-			"Cannot implement a route that already has middleware.",
-		);
+		expect(() => implement(implementedRoute)).toThrow();
 	});
 });

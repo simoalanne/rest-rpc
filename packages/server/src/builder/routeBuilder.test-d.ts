@@ -378,6 +378,31 @@ describe("implicit response inference", () => {
 		}>();
 	});
 
+	it("infers the received base media type of inferred content types", () => {
+		const csv = route
+			.get("/")
+			.handler(() => respond("a", { contentType: "Text/CSV; charset=utf-8" }));
+		expectTypeOf<
+			InferClientResponse<typeof csv>["contentType"]
+		>().toEqualTypeOf<"text/csv">();
+		const events = route.get("/").handler(() =>
+			respond(
+				(async function* () {
+					yield 1;
+				})(),
+				{ contentType: "text/event-stream; charset=utf-8" },
+			),
+		);
+		expectTypeOf<InferClientResponse<typeof events>["body"]>().toEqualTypeOf<
+			AsyncIterable<{
+				data: number;
+				id?: string;
+				event?: string;
+				retry?: number;
+			}>
+		>();
+	});
+
 	it("infers plain, stream, and SSE data independently of metadata", () => {
 		const plain = route.handler(() => ({ id: "one" }));
 		async function* chunks() {

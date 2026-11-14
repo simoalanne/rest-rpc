@@ -3,6 +3,21 @@ import { route } from "../builder/routeBuilder.ts";
 import { compileRoutes, createCatchAllHandler } from "./compileRoutes.ts";
 
 describe("compileRoutes", () => {
+	it("orders static segments before params for routers that match in order", () => {
+		const paths = [
+			"/:group/:id/edit",
+			"/users/:id/edit",
+			"/users/me/:action",
+			"/users/me/edit",
+		] as const;
+		const tree = Object.fromEntries(
+			paths.map((path) => [path, route.get(path).handler(() => path)]),
+		);
+		expect(compileRoutes(tree).map(({ path }) => path)).toEqual(
+			[...paths].reverse(),
+		);
+	});
+
 	it("sends defined and other errors and reports them to onError", async () => {
 		const Gone = routeError("GONE", { status: 410 });
 		const onError = vi.fn();

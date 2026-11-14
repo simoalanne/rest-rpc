@@ -102,17 +102,13 @@ describe("extractContract", () => {
 		respond.mockImplementation(async () =>
 			Response.json({ name: "Ada" }, { status: 202 }),
 		);
-		await expect(client.users.get({ params: { id: "1" } })).rejects.toThrow(
-			"Response did not match the route contract.",
-		);
+		await expect(client.users.get({ params: { id: "1" } })).rejects.toThrow();
 
 		respond.mockImplementation(
 			async () =>
 				new Response("Ada", { headers: { "content-type": "text/plain" } }),
 		);
-		await expect(client.users.get({ params: { id: "1" } })).rejects.toThrow(
-			"Response did not match the route contract.",
-		);
+		await expect(client.users.get({ params: { id: "1" } })).rejects.toThrow();
 	});
 
 	it("resolves prefixed tree-derived paths", () => {

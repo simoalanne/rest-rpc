@@ -33,12 +33,23 @@ type InferredSchema<TInput, TOutput = TInput> = StandardSchemaV1<
 
 type SseData<T> = T extends SseServerEvent<infer TData> ? TData : T;
 
+type Trim<T extends string> = T extends ` ${infer TRest}`
+	? Trim<TRest>
+	: T extends `${infer TRest} `
+		? Trim<TRest>
+		: T;
+
+// Clients receive the lowercase base media type, without parameters.
+type BaseMediaType<T extends string> = Lowercase<
+	Trim<T extends `${infer TBase};${string}` ? TBase : T>
+>;
+
 // Async iterables without a content type are SSE streams; other bodies without
 // one are JSON.
 type ImplicitContentType<TResponse> = TResponse extends {
 	contentType: infer TContentType extends string;
 }
-	? TContentType
+	? BaseMediaType<TContentType>
 	: TResponse extends { body: AsyncIterable<unknown> }
 		? "text/event-stream"
 		: "application/json";

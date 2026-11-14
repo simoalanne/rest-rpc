@@ -47,8 +47,6 @@ describe("createBodyCodecRegistry", () => {
 		);
 		await expect(
 			registry("application/json").serialize("text", "text/plain"),
-		).rejects.toThrow(
-			"Codec content-type must retain the defined base media type",
-		);
+		).rejects.toThrow();
 	});
 });

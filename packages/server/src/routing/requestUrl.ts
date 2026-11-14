@@ -21,14 +21,11 @@ export function stripMountPath(
 	pathname: string,
 	mountPath: string,
 ): string | undefined {
-	if (mountPath.endsWith("/")) {
-		throw new TypeError(
-			`Mount path "${mountPath}" must not end with a slash, such as "/api".`,
-		);
-	}
-	if (!pathname.startsWith(mountPath)) return undefined;
-	if (pathname.length === mountPath.length) return "/";
-	return pathname[mountPath.length] === "/"
-		? pathname.slice(mountPath.length)
+	// A trailing slash is ignored, as one on the request path is.
+	const base = mountPath.endsWith("/") ? mountPath.slice(0, -1) : mountPath;
+	if (!pathname.startsWith(base)) return undefined;
+	if (pathname.length === base.length) return "/";
+	return pathname[base.length] === "/"
+		? pathname.slice(base.length)
 		: undefined;
 }

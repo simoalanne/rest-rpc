@@ -75,10 +75,7 @@ const selectResponseMediaType = (
 	selected: unknown,
 	defaultMediaType: string | undefined,
 ): string => {
-	const mediaType =
-		typeof selected === "string"
-			? normalizeMediaType(selected)
-			: defaultMediaType;
+	const mediaType = typeof selected === "string" ? selected : defaultMediaType;
 	if (mediaType === undefined || !(mediaType in content)) {
 		throw new Error("Unsupported response body contentType.");
 	}
@@ -169,7 +166,7 @@ const toEnvelope = (result: unknown): RespondOptions & { body?: unknown } =>
 	isResponseEnvelope(result) ? result : { body: result };
 
 /** Normalizes the result of a handler on a route without defined responses. */
-export const normalizeImplicitResponse = (result: unknown): RouteResult => {
+const normalizeImplicitResponse = (result: unknown): RouteResult => {
 	const {
 		status = 200,
 		body,
@@ -242,7 +239,7 @@ export async function executeRoute(
 }
 
 /** Observes a `RouteError` that ends a stream after its response started. */
-export type StreamErrorObserver = (error: RouteError) => void;
+type StreamErrorObserver = (error: RouteError) => void;
 
 const observeStream = async function* (
 	stream: AsyncIterable<unknown>,

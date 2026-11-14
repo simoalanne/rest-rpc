@@ -163,4 +163,13 @@ describe("routeBuilder types", () => {
 		// @ts-expect-error A method path already includes the prefix.
 		route.get("/todos").prefix("/api");
 	});
+
+	it("rejects prefixes that end with a slash", () => {
+		route.prefix("/api");
+		route.prefix("/tenants/:tenant");
+		// @ts-expect-error The slash would double where the prefix is joined.
+		route.prefix("/api/");
+		// @ts-expect-error The slash would double where the prefix is joined.
+		route.prefix("/");
+	});
 });

@@ -163,9 +163,13 @@ export function createApp(
 	};
 
 	const routes: App<unknown[]>["routes"] = {};
+	// A trailing slash of the mount path is ignored, as in `fetch`.
+	const mountPrefix = mountPath?.endsWith("/")
+		? ((mountPath.slice(0, -1) || undefined) as AbsolutePath | undefined)
+		: mountPath;
 	for (const route of compiled) {
 		// The mount path alone serves the `/` route, as in the catch-all handler.
-		const path = joinPrefix(mountPath, route.path as AbsolutePath);
+		const path = joinPrefix(mountPrefix, route.path as AbsolutePath);
 		(routes[path] ??= {})[route.method] =
 			route.staticResponse ??
 			((request, ...args) => handle(route, request, args));

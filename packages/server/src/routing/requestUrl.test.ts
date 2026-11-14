@@ -34,10 +34,4 @@ describe("stripMountPath", () => {
 		expect(stripMountPath("/api", "/api")).toBe("/");
 		expect(stripMountPath("/apix/users", "/api")).toBeUndefined();
 	});
-
-	it("rejects a mount path with a trailing slash", () => {
-		expect(() => stripMountPath("/api/users", "/api/")).toThrow(
-			'Mount path "/api/" must not end with a slash',
-		);
-	});
 });
