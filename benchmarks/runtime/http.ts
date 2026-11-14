@@ -1,4 +1,12 @@
 import { createApp, respond, route, type } from "@rest-rpc/server";
+import { z } from "zod";
+
+const todo = z.object({
+	id: z.number(),
+	title: z.string(),
+	done: z.boolean(),
+	tags: z.array(z.string()),
+});
 
 const routes = {
 	text: route
@@ -26,6 +34,27 @@ const routes = {
 		)
 		.get("/middleware")
 		.handler(({ context }) => context.user),
+	// Validates every request segment and a defined response with headers.
+	validated: route
+		.put("/todos/:id")
+		.params(z.object({ id: z.coerce.number() }))
+		.query(z.object({ notify: z.enum(["yes", "no"]).optional() }))
+		.headers(z.object({ authorization: z.string() }))
+		.body(todo.omit({ id: true }))
+		.response(todo, { headers: z.object({ etag: z.string() }) })
+		.handler(async ({ params, body, respond }) =>
+			respond({ id: params.id, ...body }, { headers: { etag: '"1"' } }),
+		),
+	// A defined error with validated data.
+	error: route
+		.get("/missing/:id")
+		.error("TODO_NOT_FOUND", {
+			status: 404,
+			data: z.object({ id: z.string() }),
+		})
+		.handler(({ params, errors }) => {
+			throw errors.TODO_NOT_FOUND({ data: { id: params.id } });
+		}),
 };
 
 export default createApp(routes);

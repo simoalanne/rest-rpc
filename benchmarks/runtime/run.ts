@@ -7,17 +7,28 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
 const base = "http://127.0.0.1:3737";
-const json = [
-	"-H",
-	"content-type: application/json",
-	"-b",
-	'{"hello":"world"}',
-];
-const allCases: Record<string, string[]> = {
-	text: [`${base}/`],
-	"params + query": [`${base}/id/1?name=bun`],
-	"json body": ["-m", "POST", ...json, `${base}/json`],
-	middleware: [`${base}/middleware`],
+const json = ["-H", "content-type: application/json"];
+// Cases expect 2xx responses unless they set `status`.
+const allCases: Record<string, { args: string[]; status?: "4xx" }> = {
+	text: { args: [`${base}/`] },
+	"params + query": { args: [`${base}/id/1?name=bun`] },
+	"json body": {
+		args: ["-m", "POST", ...json, "-b", '{"hello":"world"}', `${base}/json`],
+	},
+	middleware: { args: [`${base}/middleware`] },
+	validated: {
+		args: [
+			"-m",
+			"PUT",
+			...json,
+			"-H",
+			"authorization: Bearer token",
+			"-b",
+			'{"title":"Write benchmarks","done":false,"tags":["perf","http"]}',
+			`${base}/todos/1?notify=yes`,
+		],
+	},
+	error: { args: [`${base}/missing/1`], status: "4xx" },
 };
 // Arguments select the cases whose name includes any of them, such as
 // `pnpm bench:http query middleware`.
@@ -63,7 +74,7 @@ const memoryUsage = (pid: number) =>
 	);
 
 const results = [];
-for (const [name, args] of Object.entries(cases)) {
+for (const [name, { args, status = "2xx" }] of Object.entries(cases)) {
 	const server = await startServer();
 	try {
 		console.log(
@@ -71,9 +82,17 @@ for (const [name, args] of Object.entries(cases)) {
 		);
 		const before = memoryUsage(server.pid!);
 		bombardier("2s", args);
-		const { rps, req2xx, others } = bombardier("10s", args);
-		if (others > 0 || req2xx === 0)
-			throw new Error(`${name}: ${others} non-2xx responses`);
+		const result = bombardier("10s", args);
+		const expected = result[`req${status}`];
+		const total = ["1xx", "2xx", "3xx", "4xx", "5xx"].reduce(
+			(sum, bucket) => sum + result[`req${bucket}`],
+			result.others,
+		);
+		if (expected === 0 || expected !== total)
+			throw new Error(
+				`${name}: ${total - expected} of ${total} responses are not ${status}`,
+			);
+		const { rps } = result;
 		const after = memoryUsage(server.pid!);
 		results.push({
 			case: name,
