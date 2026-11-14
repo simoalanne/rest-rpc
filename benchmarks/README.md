@@ -25,5 +25,13 @@ Pass case names, or parts of them, to run only those cases:
 pnpm bench:http query middleware
 ```
 
+Set `BENCH_SERVER` to load an executable compiled from `runtime/http.ts`
+instead, such as one built with `bun compile`:
+
+```sh
+bun compile benchmarks/runtime/http.ts --outfile server
+BENCH_SERVER=./server pnpm bench:http
+```
+
 It prints req/s and the server memory before and after each case. A run
 takes about a minute. Compare runs on the same machine only.

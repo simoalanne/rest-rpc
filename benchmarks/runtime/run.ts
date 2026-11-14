@@ -28,7 +28,7 @@ const allCases: Record<string, { args: string[]; status?: "4xx" }> = {
 			`${base}/todos/1?notify=yes`,
 		],
 	},
-	error: { args: [`${base}/missing/1`], status: "4xx" },
+	error: { args: [`${base}/todos/1`], status: "4xx" },
 };
 // Arguments select the cases whose name includes any of them, such as
 // `pnpm bench:http query middleware`.
@@ -43,13 +43,16 @@ if (Object.keys(cases).length === 0)
 	throw new Error(`No cases match ${filters.join(", ")}.`);
 
 const startServer = async () => {
-	const server = spawn(
-		"bun",
-		[fileURLToPath(new URL("./http.ts", import.meta.url))],
-		{
-			env: { ...process.env, PORT: "3737", NODE_ENV: "production" },
-		},
-	);
+	// A server left running would answer in place of the new one.
+	if (await fetch(base).catch(() => undefined))
+		throw new Error(`${base} is already in use.`);
+	// `BENCH_SERVER` runs an executable built from http.ts, such as with `bun compile`.
+	const [command, ...args] = process.env.BENCH_SERVER
+		? [process.env.BENCH_SERVER]
+		: ["bun", fileURLToPath(new URL("./http.ts", import.meta.url))];
+	const server = spawn(command!, args, {
+		env: { ...process.env, PORT: "3737", NODE_ENV: "production" },
+	});
 	while (!(await fetch(base).catch(() => undefined))) await sleep(50);
 	return server;
 };

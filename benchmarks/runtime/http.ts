@@ -8,6 +8,8 @@ const todo = z.object({
 	tags: z.array(z.string()),
 });
 
+const todos = new Map<string, z.infer<typeof todo>>();
+
 const routes = {
 	text: route
 		.get("/")
@@ -37,7 +39,7 @@ const routes = {
 	// Validates every request segment and a defined response with headers.
 	validated: route
 		.put("/todos/:id")
-		.params(z.object({ id: z.coerce.number() }))
+		.params(z.object({ id: z.coerce.number<string>() }))
 		.query(z.object({ notify: z.enum(["yes", "no"]).optional() }))
 		.headers(z.object({ authorization: z.string() }))
 		.body(todo.omit({ id: true }))
@@ -45,15 +47,17 @@ const routes = {
 		.handler(async ({ params, body, respond }) =>
 			respond({ id: params.id, ...body }, { headers: { etag: '"1"' } }),
 		),
-	// A defined error with validated data.
+	// A defined error with validated data, since no todo is stored.
 	error: route
-		.get("/missing/:id")
+		.get("/todos/:id")
 		.error("TODO_NOT_FOUND", {
 			status: 404,
 			data: z.object({ id: z.string() }),
 		})
 		.handler(({ params, errors }) => {
-			throw errors.TODO_NOT_FOUND({ data: { id: params.id } });
+			const stored = todos.get(params.id);
+			if (!stored) throw errors.TODO_NOT_FOUND({ data: { id: params.id } });
+			return stored;
 		}),
 };
 
