@@ -1,5 +1,4 @@
 import type { MaybePromise } from "@rest-rpc/core/utils";
-import { mapMaybePromise } from "../pipeline/maybePromise.ts";
 import { isResponseEnvelope, respond } from "../pipeline/respond.ts";
 import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
 
@@ -24,7 +23,7 @@ const toResponse = (result: unknown, status: number): unknown => {
 	return result.status === undefined ? { ...result, status } : result;
 };
 
-// Returns synchronous handler results directly; only `next` is always async.
+// Without middleware, synchronous handler results are returned directly.
 export const invokeWithMiddleware = (
 	middleware: readonly RuntimeRouteHandler[] | undefined,
 	handler: RuntimeRouteHandler,
@@ -32,17 +31,18 @@ export const invokeWithMiddleware = (
 	defaultStatus: number,
 ): MaybePromise<unknown> => {
 	if (!middleware?.length) return handler(request);
-	const dispatch = (index: number, context: object): MaybePromise<unknown> => {
+	const dispatch = async (index: number, context: object): Promise<unknown> => {
 		const callback = middleware[index];
 		if (!callback) {
-			return mapMaybePromise(handler({ ...request, context }), (result) =>
-				toResponse(result, defaultStatus),
-			);
+			return toResponse(await handler({ ...request, context }), defaultStatus);
 		}
 		let called = false;
-		const next = async (options?: NextOptions): Promise<unknown> => {
-			if (called)
-				throw new TypeError("Middleware next() may only be called once.");
+		const next = (options?: NextOptions): Promise<unknown> => {
+			if (called) {
+				return Promise.reject(
+					new TypeError("Middleware next() may only be called once."),
+				);
+			}
 			called = true;
 			const injected = options?.context;
 			return dispatch(
@@ -50,10 +50,7 @@ export const invokeWithMiddleware = (
 				injected ? { ...context, ...injected } : context,
 			);
 		};
-		return mapMaybePromise(
-			callback({ ...request, context, next }),
-			toMiddlewareResponse,
-		);
+		return toMiddlewareResponse(await callback({ ...request, context, next }));
 	};
 	return dispatch(0, request.context);
 };
