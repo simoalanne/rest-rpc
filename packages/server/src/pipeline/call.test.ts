@@ -11,7 +11,7 @@ describe("call", () => {
 		const seen = vi.fn();
 		const implementation = route
 			.$context<{ user: string }>()
-			.get("/items/{id}")
+			.get("/items/:id")
 			.params(type((value: { id: string }) => ({ id: Number(value.id) })))
 			.response(
 				type((value: string) => Number(value)),
@@ -103,7 +103,7 @@ describe("call", () => {
 
 	it("passes params of dynamic path segments without a params schema", async () => {
 		const implementation = route
-			.get("/items/{id}")
+			.get("/items/:id")
 			.handler(({ params }) => params.id);
 		expect(await call(implementation, { params: { id: "1" } })).toMatchObject({
 			body: "1",

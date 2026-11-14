@@ -13,7 +13,7 @@ const routes = {
 			.get("/todos/:id")
 			.params(type<{ id: string }>())
 			.handler(({ params }) => params.id),
-		update: route.patch("/todos/{id}").handler(({ params }) => params.id),
+		update: route.patch("/todos/:id").handler(({ params }) => params.id),
 		fail: route.get("/fail").handler((): string => {
 			throw new Error("boom");
 		}),

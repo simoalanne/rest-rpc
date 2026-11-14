@@ -47,8 +47,8 @@ const todo = route
 Use `.get(path)`, `.post(path)`, `.put(path)`, `.patch(path)`, or `.delete(path)`.
 A method can be selected once per route.
 
-Paths can contain dynamic segments using either `:id` or `{id}` syntax. Without
-a `.params()` schema, each dynamic segment is a string param:
+Paths can contain dynamic segments written as `:id`. Without a `.params()`
+schema, each dynamic segment is a string param:
 
 ```ts
 const getTodo = route

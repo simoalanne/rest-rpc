@@ -19,22 +19,21 @@ const compile = (tree: RuntimeImplementationTree) =>
 	}));
 
 describe("match", () => {
-	it.each(["/users/:id/items/:id", "/users/{id}/items/{id}"] as const)(
-		"rejects repeated parameter names in %s",
-		(path) => {
-			expect(() =>
-				createRouteMatcher(
-					compile({ item: route.get(path).handler(() => "ok") }),
-				),
-			).toThrow();
-		},
-	);
+	it("rejects repeated parameter names", () => {
+		expect(() =>
+			createRouteMatcher(
+				compile({
+					item: route.get("/users/:id/items/:id").handler(() => "ok"),
+				}),
+			),
+		).toThrow();
+	});
 
 	it("sorts static segments before dynamic segments at every differing depth", () => {
 		const paths = [
-			"/{group}/{id}/edit",
-			"/users/{id}/edit",
-			"/users/me/{action}",
+			"/:group/:id/edit",
+			"/users/:id/edit",
+			"/users/me/:action",
 			"/users/me/edit",
 		] as const;
 		const tree = Object.fromEntries(
@@ -45,22 +44,20 @@ describe("match", () => {
 		).toEqual([...paths].reverse());
 		const match = createRouteMatcher(compile(tree));
 		expect(match("GET", "/users/me/edit")?.route.path).toBe("/users/me/edit");
-		expect(match("GET", "/users/42/edit")?.route.path).toBe("/users/{id}/edit");
-		expect(match("GET", "/teams/42/edit")?.route.path).toBe(
-			"/{group}/{id}/edit",
-		);
+		expect(match("GET", "/users/42/edit")?.route.path).toBe("/users/:id/edit");
+		expect(match("GET", "/teams/42/edit")?.route.path).toBe("/:group/:id/edit");
 	});
 
 	it("matches complete paths and allows a trailing slash", () => {
 		const match = createRouteMatcher(
 			compile({
-				file: route.get("/files/{name}/v1.0").handler(() => "file"),
+				file: route.get("/files/:name/v1.0").handler(() => "file"),
 				root: route.get("/").handler(() => "root"),
 			}),
 		);
 		const matchPath = (path: string) => match("GET", path);
 		expect(matchPath("/files/a%20b/v1.0/")).toMatchObject({
-			route: { path: "/files/{name}/v1.0" },
+			route: { path: "/files/:name/v1.0" },
 			params: { name: "a b" },
 		});
 		expect(matchPath("/files/a/v1x0")).toBeUndefined();
@@ -73,7 +70,7 @@ describe("match", () => {
 	});
 
 	it("prefers static routes and respects method", () => {
-		const dynamic = route.get("/users/{id}").handler(() => "dynamic");
+		const dynamic = route.get("/users/:id").handler(() => "dynamic");
 		const fixed = route.get("/users/me").handler(() => "fixed");
 		const match = createRouteMatcher(compile({ dynamic, fixed }));
 		expect(match("GET", "/users/me")?.route.implementation.handler).toBe(
@@ -100,22 +97,17 @@ describe("match", () => {
 });
 
 describe("resolveImplementationPath", () => {
-	it("keeps defined markers unless a param syntax is requested", () => {
-		expect(resolveImplementationPath("/users/{id}/:tab")).toBe(
-			"/users/{id}/:tab",
+	it("normalizes slashes and keeps params as written", () => {
+		expect(resolveImplementationPath("//users/:id/:tab/")).toBe(
+			"/users/:id/:tab",
 		);
-		expect(resolveImplementationPath("/users/{id}", "colon")).toBe(
-			"/users/:id",
-		);
-		expect(resolveImplementationPath("/users/:id", "braces")).toBe(
-			"/users/{id}",
-		);
+		expect(resolveImplementationPath("/files/{name}")).toBe("/files/{name}");
 	});
 });
 
 describe("readPathParams", () => {
 	it("reads decoded params aligned to the end of the request path", () => {
-		const path = parsePathParams("/users/{id}/items/:item");
+		const path = parsePathParams("/users/:id/items/:item");
 		expect(readPathParams(path, "/users/a%20b/items/1/")).toEqual({
 			id: "a b",
 			item: "1",
@@ -128,18 +120,18 @@ describe("readPathParams", () => {
 			{},
 		);
 		expect(() => readPathParams(path, "/items/1")).toThrow(
-			'Request path "/items/1" has fewer segments than route path "/users/{id}/items/:item".',
+			'Request path "/items/1" has fewer segments than route path "/users/:id/items/:item".',
 		);
 	});
 });
 
 describe("assertPathParams", () => {
 	it("requires every route param", () => {
-		const path = parsePathParams("/users/{id}/items/:item");
+		const path = parsePathParams("/users/:id/items/:item");
 		const params = { id: "1", item: "2" };
 		expect(assertPathParams(path, params)).toBe(params);
 		expect(() => assertPathParams(path, { id: "1" })).toThrow(
-			'Params for route path "/users/{id}/items/:item" are missing "item".',
+			'Params for route path "/users/:id/items/:item" are missing "item".',
 		);
 	});
 

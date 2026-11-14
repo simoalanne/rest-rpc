@@ -18,7 +18,7 @@ import {
 import { createTanstackQueryUtils } from "./index.ts";
 
 const get = route
-	.get("/users/{id}")
+	.get("/users/:id")
 	.params(type<{ id: string }>())
 	.response(type<{ name: string }>())
 	.error(

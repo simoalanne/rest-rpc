@@ -25,7 +25,7 @@ import { serializeRouteError } from "./serializeHttpRouteResult.ts";
 export type CreateAppOptions<
 	TArgs extends unknown[] = [],
 	TContext extends object = EmptyObject,
-> = Omit<CompileRoutesOptions, "paramSyntax"> & {
+> = CompileRoutesOptions & {
 	/**
 	 * The path the routes are served under, such as `/api`. Route paths do not
 	 * include it.
@@ -138,10 +138,10 @@ export function createApp(
 		observeError(compileOptions.onError, internal, request);
 		return serializeRouteError(internal);
 	};
-	const compiled = compileRoutes<RuntimeImplementationTree>(implementations, {
-		...compileOptions,
-		paramSyntax: "colon",
-	});
+	const compiled = compileRoutes<RuntimeImplementationTree>(
+		implementations,
+		compileOptions,
+	);
 	const matchRoute = createRouteMatcher(compiled);
 	// A plain context is shared: middleware injects values into new objects.
 	const sharedOptions: HandleOptions<object> = {};

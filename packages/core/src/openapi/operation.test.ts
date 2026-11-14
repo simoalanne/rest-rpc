@@ -231,11 +231,16 @@ describe("operation", () => {
 	});
 
 	it("documents dynamic path segments without a params schema as strings", () => {
-		expect(
-			operationOf(route.get("/users/:id/posts/{slug}")).parameters,
-		).toEqual([
-			{ name: "id", in: "path", required: true, schema: { type: "string" } },
-			{ name: "slug", in: "path", required: true, schema: { type: "string" } },
-		]);
+		expect(operationOf(route.get("/users/:id/posts/:slug")).parameters).toEqual(
+			[
+				{ name: "id", in: "path", required: true, schema: { type: "string" } },
+				{
+					name: "slug",
+					in: "path",
+					required: true,
+					schema: { type: "string" },
+				},
+			],
+		);
 	});
 });

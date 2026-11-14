@@ -14,7 +14,7 @@ import type { DefaultContext, ExtendContext } from "../builder/context.ts";
 import { route } from "../builder/routeBuilder.ts";
 
 const withRequest = route
-	.post("/items/{id}")
+	.post("/items/:id")
 	.params(type<{ id: string }>())
 	.body({
 		"text/plain": type<string>(),

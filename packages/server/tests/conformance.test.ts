@@ -137,7 +137,7 @@ describe.each([
 	it("serves params, body, headers and the request signal under a mount path", async () => {
 		const routes = {
 			create: route
-				.post("/users/{id}")
+				.post("/users/:id")
 				.params(type<{ id: string }>())
 				.body(type<{ name: string }>())
 				.handler(({ params, body, signal }) => {
@@ -165,9 +165,7 @@ describe.each([
 
 	it("passes params of dynamic path segments without a params schema as strings", async () => {
 		const routes = {
-			post: route
-				.get("/users/:id/posts/{slug}")
-				.handler(({ params }) => params),
+			post: route.get("/users/:id/posts/:slug").handler(({ params }) => params),
 		};
 		await serve(routes, {}, async (url) => {
 			const response = await fetch(`${url}/users/1/posts/a%20b`);
@@ -539,7 +537,7 @@ describe.each([
 	it("uses parsed params instead of reading the request URL", async () => {
 		const routes = {
 			user: route
-				.get("/users/{id}")
+				.get("/users/:id")
 				.params(type<{ id: string }>())
 				.handler(({ params }) => params.id),
 		};

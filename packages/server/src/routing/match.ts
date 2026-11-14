@@ -5,14 +5,11 @@ import {
 	getPathParamSegmentName,
 	isPathParamSegment,
 	isRouteLeaf,
-	toColonPath,
-	toOpenApiPath,
 	type RouteDefinition,
 } from "@rest-rpc/core/contract";
 import type { RouteError } from "@rest-rpc/core";
 import { addRoute, createRouter, findRoute } from "rou3";
 import type { RuntimeRouteHandler } from "../builder/routeBuilder.types.ts";
-import type { CompileRoutesOptions } from "../pipeline/compileRoutes.ts";
 import { readRequestPathname, stripMountPath } from "./requestUrl.ts";
 
 const splitPath = (path: string) => path.split("/").filter(Boolean);
@@ -166,15 +163,9 @@ export function flattenRouteImplementations(
 		.sort((left, right) => compareRouteSpecificity(left.route, right.route));
 }
 
-/** Normalizes a route path; `paramSyntax` rewrites its param markers. */
-export function resolveImplementationPath(
-	path: string,
-	paramSyntax?: CompileRoutesOptions["paramSyntax"],
-): string {
-	const normalized = `/${splitPath(path).join("/")}`;
-	if (paramSyntax === "colon") return toColonPath(normalized);
-	if (paramSyntax === "braces") return toOpenApiPath(normalized);
-	return normalized;
+/** Normalizes a route path. */
+export function resolveImplementationPath(path: string): string {
+	return `/${splitPath(path).join("/")}`;
 }
 
 // Most segments are not encoded, so only those with `%` are decoded.
@@ -204,7 +195,7 @@ export function createRouteMatcher<
 ) => MatchedRoute<TRoute> | undefined {
 	const router = createRouter<TRoute>();
 	for (const route of routes) {
-		addRoute(router, route.method, toColonPath(route.path), route);
+		addRoute(router, route.method, route.path, route);
 	}
 
 	return (method, url, mountPath) => {

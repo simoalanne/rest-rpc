@@ -39,8 +39,6 @@ export {
 	getPathParamSegmentName,
 	isPathParamSegment,
 	joinPrefix,
-	toColonPath,
-	toOpenApiPath,
 	type PathParamNames,
 } from "./path.ts";
 export type { RequestScalar, ServerRequest } from "./request.ts";

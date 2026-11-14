@@ -108,7 +108,7 @@ describe("routeBuilder types", () => {
 
 	it("infers handler requests and responses from the handler signature", () => {
 		const defined = contractRoute
-			.get("/{id}")
+			.get("/:id")
 			.params(type<{ id: string }>())
 			.response(type<string>());
 		type Route = (typeof defined)["~restrpc"];
@@ -613,7 +613,7 @@ describe("middleware responses", () => {
 		// @ts-expect-error The path has params.
 		route.get("/:id").static("ok");
 		// @ts-expect-error The prefix has params.
-		route.prefix("/orgs/{org}").static("ok");
+		route.prefix("/orgs/:org").static("ok");
 		// @ts-expect-error The route defines a request segment.
 		route.get("/").query(type<{ page: string }>()).static("ok");
 		const withMiddleware = route.use(({ next }) => next()).get("/");

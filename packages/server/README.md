@@ -114,7 +114,6 @@ export const routes = {
 		list: route.get().handler(listTodos), // GET /todos/list
 		tags: { create: route.handler(createTag) }, // POST /todos/tags/create
 		get: route.get("/todos/:id").handler(getTodo), // explicit, keys ignored
-		update: route.patch("/todos/{id}").handler(updateTodo), // {id} works too
 	},
 };
 
@@ -524,7 +523,7 @@ process.on("SIGTERM", () => server.close()); // returns the http.Server
 // Node frameworks import from @rest-rpc/server/node, Fetch ones from @rest-rpc/server.
 import { compileRoutes } from "@rest-rpc/server/node";
 
-for (const r of compileRoutes(routes, { paramSyntax: "colon" })) {
+for (const r of compileRoutes(routes)) {
 	app[r.method.toLowerCase()](r.path, (req, res, next) => {
 		r.handle(req, res, {
 			context: { user: req.user }, // seeds the request context

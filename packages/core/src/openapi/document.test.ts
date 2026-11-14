@@ -40,7 +40,7 @@ describe("document", () => {
 		const contract = {
 			users: {
 				get: route.get("/users/:id").response(type<string>()),
-				remove: route.delete("/users/{id}").response({ status: 204 }),
+				remove: route.delete("/users/:id").response({ status: 204 }),
 				create: route.body(type<string>()).response(type<string>()),
 			},
 		};

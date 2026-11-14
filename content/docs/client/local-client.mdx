@@ -22,7 +22,7 @@ import { call, route } from "@rest-rpc/server";
 import z from "zod";
 
 const getTodo = route
-	.get("/todos/{id}")
+	.get("/todos/:id")
 	.params(z.object({ id: z.coerce.number<string>() }))
 	.handler(({ params }) => ({ id: params.id, title: "Write docs" }));
 
