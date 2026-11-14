@@ -42,7 +42,10 @@ export type SerializedHttpResponse = {
 	body: BodyValue | null;
 };
 
-/** The result's headers override the headers of a `SerializedBody` returned by the codec. */
+/**
+ * The result's headers override the headers of a `SerializedBody` returned by
+ * the codec, except `content-type`, which is always the body's.
+ */
 export function serializeHttpResponseParts(
 	result: HttpRouteResult,
 	codecs: BodyCodecRegistry,
@@ -62,6 +65,10 @@ export function serializeHttpResponseParts(
 				headers.set(name, headerValue),
 			);
 			setHeaders(headers, result.headers, result.cookies);
+			// Without a codec content type, the runtime sets one, such as for `FormData`.
+			const bodyContentType = serialized.headers.get("content-type");
+			if (bodyContentType === null) headers.delete("content-type");
+			else headers.set("content-type", bodyContentType);
 			return { status, headers, body: serialized.body };
 		}
 		setHeaders(headers, result.headers, result.cookies);
@@ -104,5 +111,6 @@ const errorBody = ({ code, message, data }: RouteError) =>
 export function serializeRouteError(error: RouteError): Response {
 	const headers = new Headers();
 	setHeaders(headers, error.headers as Record<string, unknown>, error.cookies);
+	headers.delete("content-type");
 	return Response.json(errorBody(error), { status: error.status, headers });
 }

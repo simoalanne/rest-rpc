@@ -4,7 +4,7 @@ import type {
 } from "./headers.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { BodyContent } from "./body.ts";
-import { joinPrefix } from "./path.ts";
+import { joinPrefix, type NoTrailingSlashCheck } from "./path.ts";
 import type {
 	AbsolutePath,
 	HttpMethod,
@@ -151,14 +151,6 @@ const httpState = (
 	responses: { ...state.responses },
 });
 
-const assertPrefix = (prefix: string) => {
-	if (!prefix.startsWith("/") || prefix.length < 2 || prefix.endsWith("/")) {
-		throw new Error(
-			`Prefix "${prefix}" must start with a slash and not end with one, such as "/api".`,
-		);
-	}
-};
-
 type OptionalKeys<T> = {
 	[TKey in keyof T]-?: Record<never, never> extends Pick<T, TKey>
 		? TKey
@@ -241,9 +233,8 @@ export class RouteBuilder<
 
 	/** Prepends a path prefix to the route path, before a method is selected. @see {@link https://rest-rpc.vercel.app/docs/route-builder#path-prefixes} */
 	prefix<const TPrefix extends AbsolutePath>(
-		prefix: TPrefix,
+		prefix: TPrefix & NoTrailingSlashCheck<TPrefix>,
 	): BuilderFor<TKind, WithPrefix<TState, TPrefix>> {
-		assertPrefix(prefix);
 		const state = defaultRouteState(this["~restrpc"]);
 		return this.clone({ ...state, prefix: joinPrefix(state.prefix, prefix) });
 	}

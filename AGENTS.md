@@ -36,6 +36,15 @@ A command that exits successfully is successful. Do not report warnings from suc
 - Every exported declaration in a public entry point must have a TSDoc comment on the declaration itself, not on the re-export.
 - Any function that is exported from a public entry point must be written as regular function, not an arrow function. This is required for API reference generation to be able to separate variables from functions. Non-exported functions should be arrow functions by default.
 
+### Tests
+
+- A test pins behavior. Pin only what a user of the public API relies on: documented behavior, plus realistic misuse whose outcome matters for correctness or security.
+- Test through public entry points. Test an internal function directly only for logic that is hard to reach otherwise, and assert results rather than intermediate shapes.
+- Do not pin error messages, internal state, output ordering or undefined edge cases. When misuse already fails somewhere, the exact failure is not a promise.
+- When code does something the docs do not promise, do not add a test that makes it a requirement. Leave it unpinned, or document it first if users should rely on it.
+- Prefer compile-time errors over runtime checks for incorrect API use, and pin them with type tests. Name the error only when the default TypeScript error would not explain why the code is wrong.
+- Do not add runtime checks for values the types already reject. Add a runtime check only for what types cannot express, fail as early as possible, such as when routes are compiled rather than per request, and document it when it is not obvious.
+
 ### Notes
 
 For documentation related tasks:

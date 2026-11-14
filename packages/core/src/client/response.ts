@@ -135,36 +135,15 @@ const readHeaders = async (
 	return { headers: { ...headers, ...result.value }, cookies };
 };
 
-// Failures of reading the body stay transport failures, while bodies that
-// cannot be decoded are part of the response. Reads are tracked instead of
-// buffering the body, so codecs can still stream it.
 const readBody = async (
 	rawResponse: Response,
 	mediaType: string,
 	codecs: BodyCodecRegistry,
 ) => {
 	if (!mediaType || rawResponse.body === null) return undefined;
-	const reader = rawResponse.body.getReader();
-	let readFailure: { error: unknown } | undefined;
-	const body = new ReadableStream<Uint8Array>({
-		pull: async (controller) => {
-			const chunk = await reader.read().catch((error: unknown) => {
-				readFailure = { error };
-				throw error;
-			});
-			if (chunk.done) controller.close();
-			else controller.enqueue(chunk.value);
-		},
-		cancel: (reason) => reader.cancel(reason),
-	});
-	const { status, statusText, headers } = rawResponse;
 	try {
-		return await codecs.deserialize(
-			new Response(body, { status, statusText, headers }),
-			mediaType,
-		);
+		return await codecs.deserialize(rawResponse, mediaType);
 	} catch (cause) {
-		if (readFailure) throw readFailure.error;
 		throw contractError("Response body could not be decoded.", cause);
 	}
 };

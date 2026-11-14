@@ -28,6 +28,9 @@ type FetchRoute = {
 };
 ```
 
+Routes are ordered with static segments before params, so routers that match
+in registration order, such as Express, match `/users/me` before `/users/:id`.
+
 `path` includes any [prefix](/docs/route-builder#path-prefixes) defined with
 `.prefix()` and writes params as `:name`, which most routers accept. Rewrite
 them for a router that expects another syntax. The Node routes from `@rest-rpc/server/node` have the same shape,

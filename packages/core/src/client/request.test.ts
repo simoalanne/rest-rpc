@@ -107,7 +107,7 @@ describe("request", () => {
 		expect(request.headers).toEqual({ count: "0" });
 	});
 
-	it("serializes JSON and applies header precedence case-insensitively", async () => {
+	it("serializes JSON and applies header precedence", async () => {
 		const fetch = vi.fn(async () => new Response(null, { status: 204 }));
 		await executeRequest(
 			{
@@ -116,9 +116,13 @@ describe("request", () => {
 				request: { body: { "application/json": [] } },
 			},
 			[
-				{ body: { name: "Ada" }, headers: { "X-Token": "request" } },
+				{ body: { name: "Ada" }, headers: { "x-token": "request" } },
 				{
-					additionalHeaders: { "x-token": "additional", "X-Extra": 2 },
+					additionalHeaders: {
+						"x-token": "additional",
+						"X-Extra": 2,
+						"Content-Type": "text/plain",
+					},
 					cache: "no-store",
 				},
 			],
@@ -148,6 +152,26 @@ describe("request", () => {
 		);
 	});
 
+	it("leaves the content type of a FormData body to the runtime over a passed header", async () => {
+		const fetch = vi.fn(
+			async (_input: unknown, _init?: RequestInit) =>
+				new Response(null, { status: 204 }),
+		);
+		await executeRequest(
+			{
+				method: "POST",
+				path: "/upload",
+				request: { body: { "multipart/form-data": [] } },
+			},
+			[
+				{ body: new FormData() },
+				{ additionalHeaders: { "content-type": "multipart/form-data" } },
+			],
+			{ baseUrl: "", codecs, fetch },
+		);
+		expect(fetch.mock.calls[0]![1]!.headers).not.toHaveProperty("content-type");
+	});
+
 	it("rejects a missing path param instead of sending it as undefined", async () => {
 		const fetch = vi.fn(async () => new Response(null, { status: 204 }));
 		await expect(
@@ -156,7 +180,7 @@ describe("request", () => {
 				codecs,
 				fetch,
 			}),
-		).rejects.toThrow('Missing path param "id" for route "GET /users/:id".');
+		).rejects.toThrow();
 		expect(fetch).not.toHaveBeenCalled();
 	});
 });

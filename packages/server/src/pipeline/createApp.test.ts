@@ -37,6 +37,13 @@ describe("createApp", () => {
 		expect(outside.status).toBe(404);
 	});
 
+	it("serves routes under a mount path with a trailing slash", async () => {
+		const app = createApp(routes, { mountPath: "/api/" });
+		const todo = await app.fetch(new Request("http://localhost/api/todos/1"));
+		expect(await todo.json()).toBe("1");
+		expect(Object.keys(app.routes)).toContain("/api/todos/:id");
+	});
+
 	it("returns notFound for unmatched requests", async () => {
 		const fallback = await createApp(routes).fetch(
 			new Request("http://localhost/missing"),
@@ -44,7 +51,7 @@ describe("createApp", () => {
 		expect(fallback.status).toBe(404);
 		expect(await fallback.json()).toEqual({
 			code: "NOT_FOUND",
-			message: "Not found.",
+			message: expect.any(String),
 		});
 
 		const custom = await createApp(routes, {
@@ -74,7 +81,7 @@ describe("createApp", () => {
 			expect(response.status).toBe(500);
 			expect(await response.json()).toEqual({
 				code: "INTERNAL_SERVER_ERROR",
-				message: "Internal server error.",
+				message: expect.any(String),
 			});
 		}
 		expect(onError).toHaveBeenCalledTimes(2);

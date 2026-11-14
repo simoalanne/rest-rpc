@@ -1,30 +1,11 @@
 import { isAsyncIterable, type BodyCodecRegistry } from "@rest-rpc/core/codecs";
-import { getPathParamNames } from "@rest-rpc/core/contract";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import type { RuntimeImplementation } from "../routing/match.ts";
 import {
 	normalizeHandlerResult,
 	type HttpRouteResult,
 } from "./handleHttpRoute.ts";
-import { isResponseEnvelope } from "./respond.ts";
 import { serializeHttpResponseParts } from "./serializeHttpRouteResult.ts";
-
-// The same checks as `ValidStaticResult`, for values that bypass the types.
-// They run on the value itself, before codecs could reject it less clearly.
-const describeInvalidStaticValue = (value: unknown): string | undefined => {
-	if (value instanceof Promise) {
-		value.catch(() => {});
-		return "cannot be a promise, since static values are not awaited. Use .handler() for async responses.";
-	}
-	const body = isResponseEnvelope(value) ? value.body : value;
-	if (typeof body === "function") {
-		return "cannot be a function, since static values are sent as is, not called. Use .handler() to compute a response.";
-	}
-	if (body instanceof ReadableStream || isAsyncIterable(body)) {
-		return "cannot be a stream, which can be sent only once. Use .handler() for streams.";
-	}
-	return undefined;
-};
 
 /**
  * Runs the handler of a static route once, and validates and serializes its
@@ -36,19 +17,8 @@ export const prepareStaticResponse = (
 	codecs: BodyCodecRegistry,
 	disableResponseValidation: boolean,
 ): (() => Response) => {
-	const { method, path, request } = implementation.route;
+	const { method, path } = implementation.route;
 	const name = `"${method} ${path}"`;
-	// Types omit `.static()` from these routes, but untyped code could still
-	// skip their middleware and request validation.
-	if (
-		implementation.middleware?.length ||
-		Object.values(request ?? {}).some(Boolean) ||
-		getPathParamNames(path).length > 0
-	) {
-		throw new Error(
-			`Static route ${name} cannot have middleware, request segments or path params.`,
-		);
-	}
 	// Each step must complete synchronously, so failures throw here.
 	const prepare = <T>(step: () => MaybePromise<T>): T => {
 		let value: MaybePromise<T>;
@@ -68,19 +38,15 @@ export const prepareStaticResponse = (
 
 	// The handler of a static route returns its value without reading the request.
 	const value = (implementation.handler as () => unknown)();
-	const invalid = describeInvalidStaticValue(value);
-	if (invalid) {
-		throw new Error(`Static response of route ${name} ${invalid}`);
-	}
-	// Stream values are rejected above, so the result has no stream to frame.
+	// Types reject stream values, so the result has no stream to frame.
 	const result = prepare(() =>
 		normalizeHandlerResult(implementation, value, disableResponseValidation),
 	) as HttpRouteResult;
 	const { status, headers, body } = prepare(() =>
 		serializeHttpResponseParts(result, codecs),
 	);
-	// Other bodies are read again for every response, but a stream only once.
-	// Values that are streams are rejected above, so this catches codecs.
+	// Other bodies are read again for every response, but a stream only once,
+	// and a codec may serialize any value to one.
 	if (body instanceof ReadableStream || isAsyncIterable(body)) {
 		throw new Error(
 			`Static response of route ${name} cannot serialize to a stream, which can be sent only once.`,

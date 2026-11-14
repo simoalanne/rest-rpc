@@ -65,10 +65,7 @@ export class RouteError<
 		code: TCode,
 		options: RouteErrorOptions<TData, TStatus, THeaders> = {},
 	) {
-		super(
-			options.message ?? code,
-			"cause" in options ? { cause: options.cause } : undefined,
-		);
+		super(options.message ?? code, { cause: options.cause });
 		this.code = code;
 		this.status = options.status ?? (400 as TStatus);
 		this.data = options.data as TData;

@@ -6,7 +6,8 @@ import {
 	validateResponseValue,
 } from "./validateResponse.ts";
 
-const decodeFrame = (frame: string): SseEvent<unknown> => {
+// Frames without data, such as keepalive comments, decode to `undefined`.
+const decodeFrame = (frame: string): SseEvent<unknown> | undefined => {
 	const result: SseEvent<unknown> = { data: undefined };
 
 	for (const line of frame.split("\n")) {
@@ -16,10 +17,7 @@ const decodeFrame = (frame: string): SseEvent<unknown> => {
 		if (line.startsWith("retry: ")) result.retry = Number(line.slice(7));
 	}
 
-	if (result.data === undefined) {
-		throw new Error("SSE frame has no data field.");
-	}
-	return result;
+	return result.data === undefined ? undefined : result;
 };
 
 // Frames that cannot be decoded are part of the response, while errors of
@@ -31,13 +29,14 @@ const parseFrame = async (
 	frame: string,
 	schema: StandardSchemaV1 | undefined,
 	validate: boolean,
-): Promise<SseEvent<unknown>> => {
-	let event: SseEvent<unknown>;
+): Promise<SseEvent<unknown> | undefined> => {
+	let event: SseEvent<unknown> | undefined;
 	try {
 		event = decodeFrame(frame);
 	} catch (error) {
 		throw decodeError(error);
 	}
+	if (!event) return undefined;
 	const validated = await validateResponseValue(schema, event.data, validate);
 	if (validated.issues) {
 		throw contractError(contractMismatch, validated.issues);
@@ -59,18 +58,17 @@ export async function* parseSseStream(
 		while (boundary >= 0) {
 			const frame = buffer.slice(0, boundary);
 			buffer = buffer.slice(boundary + 2);
-			if (frame) {
-				yield await parseFrame(frame, schema, validate);
-			}
+			const event = frame
+				? await parseFrame(frame, schema, validate)
+				: undefined;
+			if (event) yield event;
 			boundary = buffer.indexOf("\n\n");
 		}
 	};
 
+	// An incomplete last frame is dropped.
 	for await (const chunk of decoded) {
 		buffer += chunk;
 		for await (const event of readFrames()) yield event;
-	}
-	if (buffer.length > 0) {
-		throw decodeError(new Error("Incomplete SSE frame."));
 	}
 }
