@@ -156,17 +156,35 @@ export function createApp(
 				}))
 			: sharedOptions;
 	// Static routes read no context, so the context function is not called.
-	const handle = async (
+	const handle = (
 		route: FetchRoute<object>,
 		request: Request,
 		args: unknown[],
 		params?: Record<string, string>,
-	) => {
+	): Promise<Response> => {
 		if (route.staticResponse) return route.handle(request);
+		const handleRoute = (options: HandleOptions<object>) =>
+			route.handle(request, params ? { ...options, params } : options);
 		const handleOptions = readHandleOptions(request, args);
-		const options =
-			handleOptions instanceof Promise ? await handleOptions : handleOptions;
-		return route.handle(request, params ? { ...options, params } : options);
+		return handleOptions instanceof Promise
+			? handleOptions.then(handleRoute)
+			: handleRoute(handleOptions);
+	};
+	// One promise per request: errors thrown synchronously or rejected become
+	// internal error responses.
+	const handleSafely = (
+		route: FetchRoute<object>,
+		request: Request,
+		args: unknown[],
+		params?: Record<string, string>,
+	): Promise<Response> => {
+		try {
+			return handle(route, request, args, params).catch((error) =>
+				respondWithInternalError(error, request),
+			);
+		} catch (error) {
+			return Promise.resolve(respondWithInternalError(error, request));
+		}
 	};
 
 	const routes: App<unknown[]>["routes"] = {};
@@ -175,13 +193,7 @@ export function createApp(
 		const path = joinPrefix(mountPath, route.path as AbsolutePath);
 		(routes[path] ??= {})[route.method] =
 			route.staticResponse ??
-			(async (request, ...args) => {
-				try {
-					return await handle(route, request, args);
-				} catch (error) {
-					return respondWithInternalError(error, request);
-				}
-			});
+			((request, ...args) => handleSafely(route, request, args));
 	}
 
 	return {
