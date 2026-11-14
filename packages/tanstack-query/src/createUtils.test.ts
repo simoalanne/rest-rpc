@@ -6,7 +6,7 @@ const UserNotFound = routeError("USER_NOT_FOUND", { status: 404 });
 const contract = {
 	users: {
 		get: route
-			.get("/users/{id}")
+			.get("/users/:id")
 			.params(type<{ id: string }>())
 			.response(type<{ name: string }>())
 			.error(UserNotFound),

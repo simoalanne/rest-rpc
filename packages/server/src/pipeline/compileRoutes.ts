@@ -44,11 +44,6 @@ import { prepareStaticResponse } from "./staticResponse.ts";
 export type CompileRoutesOptions = {
 	bodyCodecs?: readonly BodyCodec[];
 	/**
-	 * Rewrites param markers in compiled paths to `:name` (`"colon"`) or
-	 * `{name}` (`"braces"`). Markers are kept as written when omitted.
-	 */
-	paramSyntax?: "colon" | "braces";
-	/**
 	 * Observes every error sent as an error response, and `RouteError`s that
 	 * end a stream after its response started, such as stream item validation
 	 * failures. It is not awaited, and errors it throws or rejects with are
@@ -156,7 +151,7 @@ export type FetchRouteHandlerResult =
  */
 export type FetchRoute<TContext extends object = EmptyObject> = {
 	readonly method: HttpMethod;
-	/** Route path with param markers per `paramSyntax`. */
+	/** Route path with `:name` params. */
 	readonly path: string;
 	/**
 	 * Handles a request already routed to this route. Params and the body are
@@ -307,10 +302,7 @@ export function compileRoutes<TRoutes extends RuntimeImplementationTree>(
 	const dispatch = createFetchDispatch(options, codecs);
 
 	return flattenRouteImplementations(implementations).map((implementation) => {
-		const path = resolveImplementationPath(
-			implementation.route.path,
-			options.paramSyntax,
-		);
+		const path = resolveImplementationPath(implementation.route.path);
 		const { method } = implementation.route;
 		if (implementation.isStatic) {
 			const createResponse = prepareStaticResponse(

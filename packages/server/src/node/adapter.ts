@@ -107,7 +107,7 @@ const writeFetchResponse = async (
  */
 export type NodeRoute<TContext extends object = EmptyObject> = {
 	readonly method: HttpMethod;
-	/** Route path with param markers per `paramSyntax`. */
+	/** Route path with `:name` params. */
 	readonly path: string;
 	/**
 	 * Handles a request already routed to this route and writes the result,

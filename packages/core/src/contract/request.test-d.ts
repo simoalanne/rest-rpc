@@ -33,7 +33,7 @@ describe("request inference", () => {
 	});
 
 	it("infers string params from dynamic path segments without a params schema", () => {
-		const value = route.get("/users/:id/posts/{slug}");
+		const value = route.get("/users/:id/posts/:slug");
 		expectTypeOf<InferClientRequest<typeof value>>().toEqualTypeOf<{
 			params: { id: string; slug: string };
 		}>();
@@ -181,17 +181,23 @@ describe("request inference", () => {
 	});
 
 	it("infers requests for a route tree", () => {
-		const get = route.get("/users/{id}").params(type<{ id: string }>());
+		const get = route.get("/users/:id").params(type<{ id: string }>());
 		const tree = { users: { get } };
 		expectTypeOf<
 			InferClientRequest<typeof tree>["users"]["get"]
 		>().toEqualTypeOf<InferClientRequest<typeof get>>();
 	});
 
+	it("infers params only from :name segments", () => {
+		expectTypeOf<
+			InferClientRequest<ReturnType<typeof route.get<"/users/:id/{tab}">>>
+		>().toEqualTypeOf<{ params: { id: string } }>();
+	});
+
 	it("infers params from prefixes", () => {
 		const tenant = route.prefix("/tenants/:tenant");
 		expectTypeOf<
-			InferClientRequest<ReturnType<typeof tenant.get<"/todos/{id}">>>
+			InferClientRequest<ReturnType<typeof tenant.get<"/todos/:id">>>
 		>().toEqualTypeOf<{ params: { tenant: string; id: string } }>();
 		// A path derived from tree keys keeps the prefix params.
 		expectTypeOf<

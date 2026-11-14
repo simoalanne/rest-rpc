@@ -14,12 +14,8 @@ export const resolveRoutePath = (
 ): AbsolutePath =>
 	route.path ?? joinPrefix(route.prefix, `/${treePath.join("/")}`);
 
-const pathParamSegmentPattern = /^(?::([^/]+)|\{([^/]+)\})$/;
-
-export const getPathParamSegmentName = (segment: string) => {
-	const match = pathParamSegmentPattern.exec(segment);
-	return match ? (match[1] ?? match[2]) : undefined;
-};
+export const getPathParamSegmentName = (segment: string) =>
+	segment.length > 1 && segment.startsWith(":") ? segment.slice(1) : undefined;
 
 export const isPathParamSegment = (segment: string) =>
 	getPathParamSegmentName(segment) !== undefined;
@@ -32,10 +28,10 @@ export const getPathParamNames = (path: string) =>
 
 type PathParamSegmentName<TSegment extends string> =
 	TSegment extends `:${infer TName}`
-		? TName
-		: TSegment extends `{${infer TName}}`
-			? TName
-			: never;
+		? TName extends ""
+			? never
+			: TName
+		: never;
 
 /** The names of the dynamic segments of a literal path, or `never` without any. */
 export type PathParamNames<TPath> =
@@ -57,8 +53,6 @@ export const replacePathParams = (
 		})
 		.join("/");
 
-export const toColonPath = (path: string) =>
-	replacePathParams(path, (name) => `:${name}`);
-
+/** Rewrites `:name` params to the `{name}` form OpenAPI paths use. */
 export const toOpenApiPath = (path: string) =>
 	replacePathParams(path, (name) => `{${name}}`);

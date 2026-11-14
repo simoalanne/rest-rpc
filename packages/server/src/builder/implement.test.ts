@@ -6,7 +6,7 @@ import type { ServerRouteBuilderState } from "./routeBuilder.types.ts";
 const contract = {
 	users: {
 		get: route
-			.get("/users/{id}")
+			.get("/users/:id")
 			.params(type<{ id: string }>())
 			.response(type<{ name: string }>()),
 	},

@@ -94,7 +94,7 @@ describe("request", () => {
 	it("encodes path segments, repeated query values and defined headers", () => {
 		const request = constructBaseRequest(
 			"https://example.test",
-			{ method: "GET", path: "/users/{id}/:slug" },
+			{ method: "GET", path: "/users/:id/:slug" },
 			{
 				params: { id: "a/b", slug: "hello world" },
 				query: { tags: ["a", "b"], missing: undefined, page: 0 },

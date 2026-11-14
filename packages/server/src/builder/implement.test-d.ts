@@ -13,14 +13,14 @@ import type {
 const contract = {
 	users: {
 		get: route
-			.get("/users/{id}")
+			.get("/users/:id")
 			.params(type<{ id: string }>())
 			.response(type<{ name: string }>()),
 	},
 };
 
 const transformed = route
-	.get("/users/{id}")
+	.get("/users/:id")
 	.params(type((value: { id: string }) => ({ id: Number(value.id) })))
 	.response(type<string>());
 const transformedContract = { users: { get: transformed } };

@@ -8,11 +8,11 @@ import type { DefaultMeta, OpenApiRouteOptions } from "./routeDefinition.ts";
 describe("routeBuilder types", () => {
 	it("preserves method, path and response status literals", () => {
 		const value = route
-			.get("/users/{id}")
+			.get("/users/:id")
 			.params(type<{ id: string }>())
 			.response(type<string>());
 		expectTypeOf(value["~restrpc"].method).toEqualTypeOf<"GET">();
-		expectTypeOf(value["~restrpc"].path).toEqualTypeOf<"/users/{id}">();
+		expectTypeOf(value["~restrpc"].path).toEqualTypeOf<"/users/:id">();
 		expectTypeOf<
 			keyof (typeof value)["~restrpc"]["responses"]
 		>().toEqualTypeOf<200>();

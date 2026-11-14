@@ -16,13 +16,8 @@ or mount all routes under one framework route with the
 ## Compiling Routes
 
 Both ways start by compiling the route tree with `compileRoutes`. It takes the
-[compile options](/docs/server/fetch#compile-options) and `paramSyntax`:
-
-- `paramSyntax`: rewrites path params in compiled paths to `:name` (`"colon"`)
-  or `{name}` (`"braces"`) for routers that expect one of them. Paths keep the
-  markers they were written with by default.
-
-It returns one route per method and path:
+[compile options](/docs/server/fetch#compile-options) and returns one route per
+method and path:
 
 ```ts
 type FetchRoute = {
@@ -34,7 +29,8 @@ type FetchRoute = {
 ```
 
 `path` includes any [prefix](/docs/route-builder#path-prefixes) defined with
-`.prefix()`. The Node routes from `@rest-rpc/server/node` have the same shape,
+`.prefix()` and writes params as `:name`, which most routers accept. Rewrite
+them for a router that expects another syntax. The Node routes from `@rest-rpc/server/node` have the same shape,
 but `handle` takes `req, res` and writes the response to `res`.
 
 ## Handle Options
@@ -78,7 +74,7 @@ import { routes } from "./routes";
 
 const app = new Hono();
 
-for (const route of compileRoutes(routes, { paramSyntax: "colon" })) {
+for (const route of compileRoutes(routes)) {
 	app.on(route.method, route.path, (c) =>
 		route.handle(c.req.raw, { context: { user: c.var.user } }),
 	);
@@ -95,7 +91,7 @@ import { routes } from "./routes";
 
 const app = express();
 
-for (const route of compileRoutes(routes, { paramSyntax: "colon" })) {
+for (const route of compileRoutes(routes)) {
 	const method = route.method.toLowerCase() as
 		"get" | "post" | "put" | "patch" | "delete";
 	app[method](route.path, (req, res, next) => {
