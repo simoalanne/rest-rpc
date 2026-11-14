@@ -20,7 +20,11 @@ import {
 	type TreeInitialContext,
 } from "../routing/match.ts";
 import { resolveRequestMediaType } from "./requestContentType.ts";
-import { handleHttpRoute, type HttpRouteResult } from "./handleHttpRoute.ts";
+import {
+	executeRoute,
+	toHttpRouteResult,
+	type RouteResult,
+} from "./handleHttpRoute.ts";
 import { deserializeRequestBody } from "./deserializeRequestBody.ts";
 import { observeError } from "./errors.ts";
 import { resolveRouteError } from "./resolveRouteError.ts";
@@ -230,15 +234,11 @@ const createFetchDispatch = (
 			if (handleOptions && "body" in handleOptions) {
 				body = handleOptions.body;
 			} else {
-				const deserializing = deserializeRequestBody(
+				const deserialized = await deserializeRequestBody(
 					request,
 					receivedMediaType,
 					codecs,
 				);
-				const deserialized =
-					deserializing instanceof Promise
-						? await deserializing
-						: deserializing;
 				if (deserialized.rejection) {
 					return respondWithError(
 						implementation,
@@ -250,9 +250,9 @@ const createFetchDispatch = (
 			}
 		}
 
-		let result: HttpRouteResult;
+		let result: RouteResult;
 		try {
-			const handled = handleHttpRoute(implementation, {
+			result = await executeRoute(implementation, {
 				request: {
 					params,
 					query: schemas?.query?.length
@@ -268,10 +268,7 @@ const createFetchDispatch = (
 				context: handleOptions?.context,
 				disableRequestValidation,
 				disableResponseValidation,
-				onStreamError:
-					onError && ((error) => observeError(onError, error, request)),
 			});
-			result = handled instanceof Promise ? await handled : handled;
 		} catch (error) {
 			if (error instanceof RouteError) {
 				return respondWithError(implementation, error, request);
@@ -279,7 +276,13 @@ const createFetchDispatch = (
 			throw error;
 		}
 
-		return serializeHttpRouteResult(result, codecs);
+		return serializeHttpRouteResult(
+			toHttpRouteResult(
+				result,
+				onError && ((error) => observeError(onError, error, request)),
+			),
+			codecs,
+		);
 	};
 };
 

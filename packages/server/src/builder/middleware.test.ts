@@ -91,7 +91,7 @@ describe("middleware", () => {
 	it("rejects middleware that does not return a response", async () => {
 		const run = (callback: (value: unknown) => unknown) =>
 			invokeWithMiddleware([callback], () => "ok", { context: {} }, 200);
-		expect(() => run(() => "stopped")).toThrow(
+		await expect(run(() => "stopped")).rejects.toThrow(
 			"Middleware must return a response, such as the result of next() or respond().",
 		);
 		await expect(

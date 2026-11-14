@@ -7,6 +7,7 @@
 	},
 	"dependencies": {
 		"@rest-rpc/core": "workspace:*",
-		"@rest-rpc/server": "workspace:*"
+		"@rest-rpc/server": "workspace:*",
+		"zod": "^4.6.7"
 	}
 }

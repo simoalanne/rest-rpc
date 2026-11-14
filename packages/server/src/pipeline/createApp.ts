@@ -1,6 +1,6 @@
 import type { AbsolutePath } from "@rest-rpc/core";
 import { joinPrefix, type HttpMethod } from "@rest-rpc/core/contract";
-import type { EmptyObject, MaybePromise } from "@rest-rpc/core/utils";
+import type { EmptyObject } from "@rest-rpc/core/utils";
 import type {
 	RuntimeImplementationTree,
 	TreeInitialContext,
@@ -10,10 +10,8 @@ import {
 	compileRoutes,
 	type CompileRoutesOptions,
 	type FetchRoute,
-	type HandleOptions,
 } from "./compileRoutes.ts";
 import { InternalServerError, NotFound, observeError } from "./errors.ts";
-import { mapMaybePromise } from "./maybePromise.ts";
 import { serializeRouteError } from "./serializeHttpRouteResult.ts";
 
 /**
@@ -143,19 +141,9 @@ export function createApp(
 		compileOptions,
 	);
 	const matchRoute = createRouteMatcher(compiled);
-	// A plain context is shared: middleware injects values into new objects.
-	const sharedOptions: HandleOptions<object> = {};
-	if (typeof context === "object") sharedOptions.context = context;
-	const readHandleOptions = (
-		request: Request,
-		args: unknown[],
-	): MaybePromise<HandleOptions<object>> =>
-		typeof context === "function"
-			? mapMaybePromise(context(request, ...args), (values) => ({
-					context: values,
-				}))
-			: sharedOptions;
 	// Static routes read no context, so the context function is not called.
+	// Errors become internal error responses on the route's own promise, so a
+	// request creates one promise.
 	const handle = (
 		route: FetchRoute<object>,
 		request: Request,
@@ -163,28 +151,15 @@ export function createApp(
 		params?: Record<string, string>,
 	): Promise<Response> => {
 		if (route.staticResponse) return route.handle(request);
-		const handleRoute = (options: HandleOptions<object>) =>
-			route.handle(request, params ? { ...options, params } : options);
-		const handleOptions = readHandleOptions(request, args);
-		return handleOptions instanceof Promise
-			? handleOptions.then(handleRoute)
-			: handleRoute(handleOptions);
-	};
-	// One promise per request: errors thrown synchronously or rejected become
-	// internal error responses.
-	const handleSafely = (
-		route: FetchRoute<object>,
-		request: Request,
-		args: unknown[],
-		params?: Record<string, string>,
-	): Promise<Response> => {
-		try {
-			return handle(route, request, args, params).catch((error) =>
-				respondWithInternalError(error, request),
-			);
-		} catch (error) {
-			return Promise.resolve(respondWithInternalError(error, request));
-		}
+		const handleRoute = (values: object | undefined) =>
+			route.handle(request, { context: values, params });
+		// Routes are async functions, so only the context function may throw
+		// synchronously.
+		const response =
+			typeof context === "function"
+				? (async () => handleRoute(await context(request, ...args)))()
+				: handleRoute(context);
+		return response.catch((error) => respondWithInternalError(error, request));
 	};
 
 	const routes: App<unknown[]>["routes"] = {};
@@ -193,7 +168,7 @@ export function createApp(
 		const path = joinPrefix(mountPath, route.path as AbsolutePath);
 		(routes[path] ??= {})[route.method] =
 			route.staticResponse ??
-			((request, ...args) => handleSafely(route, request, args));
+			((request, ...args) => handle(route, request, args));
 	}
 
 	return {

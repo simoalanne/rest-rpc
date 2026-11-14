@@ -2,11 +2,12 @@ import { isAsyncIterable, type BodyCodecRegistry } from "@rest-rpc/core/codecs";
 import { getPathParamNames } from "@rest-rpc/core/contract";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import type { RuntimeImplementation } from "../routing/match.ts";
-import { handleHttpRoute } from "./handleHttpRoute.ts";
+import {
+	normalizeHandlerResult,
+	type HttpRouteResult,
+} from "./handleHttpRoute.ts";
 import { isResponseEnvelope } from "./respond.ts";
 import { serializeHttpResponseParts } from "./serializeHttpRouteResult.ts";
-
-const neverAborted = new AbortController().signal;
 
 // The same checks as `ValidStaticResult`, for values that bypass the types.
 // They run on the value itself, before codecs could reject it less clearly.
@@ -66,20 +67,15 @@ export const prepareStaticResponse = (
 	};
 
 	// The handler of a static route returns its value without reading the request.
-	const invalid = describeInvalidStaticValue(
-		(implementation.handler as () => unknown)(),
-	);
+	const value = (implementation.handler as () => unknown)();
+	const invalid = describeInvalidStaticValue(value);
 	if (invalid) {
 		throw new Error(`Static response of route ${name} ${invalid}`);
 	}
+	// Stream values are rejected above, so the result has no stream to frame.
 	const result = prepare(() =>
-		handleHttpRoute(implementation, {
-			request: {},
-			signal: neverAborted,
-			disableRequestValidation: true,
-			disableResponseValidation,
-		}),
-	);
+		normalizeHandlerResult(implementation, value, disableResponseValidation),
+	) as HttpRouteResult;
 	const { status, headers, body } = prepare(() =>
 		serializeHttpResponseParts(result, codecs),
 	);
