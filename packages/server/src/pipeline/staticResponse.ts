@@ -3,9 +3,27 @@ import { getPathParamNames } from "@rest-rpc/core/contract";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import type { RuntimeImplementation } from "../routing/match.ts";
 import { handleHttpRoute } from "./handleHttpRoute.ts";
+import { isResponseEnvelope } from "./respond.ts";
 import { serializeHttpResponseParts } from "./serializeHttpRouteResult.ts";
 
 const neverAborted = new AbortController().signal;
+
+// The same checks as `ValidStaticResult`, for values that bypass the types.
+// They run on the value itself, before codecs could reject it less clearly.
+const describeInvalidStaticValue = (value: unknown): string | undefined => {
+	if (value instanceof Promise) {
+		value.catch(() => {});
+		return "cannot be a promise, since static values are not awaited. Use .handler() for async responses.";
+	}
+	const body = isResponseEnvelope(value) ? value.body : value;
+	if (typeof body === "function") {
+		return "cannot be a function, since static values are sent as is, not called. Use .handler() to compute a response.";
+	}
+	if (body instanceof ReadableStream || isAsyncIterable(body)) {
+		return "cannot be a stream, which can be sent only once. Use .handler() for streams.";
+	}
+	return undefined;
+};
 
 /**
  * Runs the handler of a static route once, and validates and serializes its
@@ -47,6 +65,13 @@ export const prepareStaticResponse = (
 		);
 	};
 
+	// The handler of a static route returns its value without reading the request.
+	const invalid = describeInvalidStaticValue(
+		(implementation.handler as () => unknown)(),
+	);
+	if (invalid) {
+		throw new Error(`Static response of route ${name} ${invalid}`);
+	}
 	const result = prepare(() =>
 		handleHttpRoute(implementation, {
 			request: {},
@@ -59,6 +84,7 @@ export const prepareStaticResponse = (
 		serializeHttpResponseParts(result, codecs),
 	);
 	// Other bodies are read again for every response, but a stream only once.
+	// Values that are streams are rejected above, so this catches codecs.
 	if (body instanceof ReadableStream || isAsyncIterable(body)) {
 		throw new Error(
 			`Static response of route ${name} cannot serialize to a stream, which can be sent only once.`,
