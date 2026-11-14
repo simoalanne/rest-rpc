@@ -247,8 +247,9 @@ route
 
 `.static(value)` completes a route with a response that is the same for every
 request. The value is anything a handler could return, and it is validated and
-serialized once, when the routes are compiled. It is not available on routes
-that read the request or run middleware.
+serialized once, when the routes are compiled. It is sent as is, so it cannot be
+a function, a promise or a stream: use `.handler()` to compute a response. It is
+not available on routes that read the request or run middleware.
 
 ```ts
 route.get("/health").static({ ok: true });

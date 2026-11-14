@@ -2,6 +2,7 @@ import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import { route } from "../builder/routeBuilder.ts";
 import { compileRoutes } from "./compileRoutes.ts";
 import { createApp } from "./createApp.ts";
+import { respond } from "./respond.ts";
 
 const schema = (
 	validate: StandardSchemaV1["~standard"]["validate"],
@@ -32,6 +33,36 @@ describe("static routes", () => {
 		expect(() => compileRoutes({ item: builder.static(1) })).toThrow(
 			"cannot have middleware",
 		);
+	});
+
+	// Values are created in the test, so a rejected promise is handled in time.
+	it.each<[string, () => unknown, string]>([
+		[
+			"a promise",
+			() => Promise.reject(new Error("rejected")),
+			"cannot be a promise",
+		],
+		["a function", () => () => "ok", "cannot be a function"],
+		["a function body", () => respond(() => "ok"), "cannot be a function"],
+		[
+			"a stream body",
+			() => respond(new ReadableStream(), { contentType: "text/plain" }),
+			"cannot be a stream",
+		],
+		[
+			"an async iterable",
+			async function* () {
+				yield "ok";
+			},
+			"cannot be a stream",
+		],
+	])("names values that bypass the types: %s", (_, createValue, message) => {
+		const builder = route.get("/value") as unknown as {
+			static(value: unknown): never;
+		};
+		expect(() =>
+			compileRoutes({ value: builder.static(createValue()) }),
+		).toThrow(message);
 	});
 
 	it("is a Response in app routes and does not call the context function", async () => {

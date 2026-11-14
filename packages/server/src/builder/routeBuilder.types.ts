@@ -381,13 +381,26 @@ export type IsStaticRoute<TRoute> = keyof (TRoute extends {
 type StaticBody<TResult> =
 	TResult extends ResponseEnvelopeBase<infer TBody> ? TBody : TResult;
 
-/** Rejects promises, and stream bodies, which can be sent only once. */
-export type ValidStaticResult<TRoute extends RouteDefinition, TResult> = [
-	| Extract<TResult, PromiseLike<unknown>>
-	| Extract<StaticBody<TResult>, AsyncIterable<unknown> | ReadableStream>,
-] extends [never]
-	? ValidHandlerResult<TRoute, TResult>
-	: never;
+type Includes<T, TValue> = [Extract<T, TValue>] extends [never] ? false : true;
+
+/** Rejects promises, function bodies, which are not called, and stream bodies, which can be sent only once. */
+export type ValidStaticResult<TRoute extends RouteDefinition, TResult> =
+	Includes<TResult, PromiseLike<unknown>> extends true
+		? {
+				"~error": "Static values are not awaited. Use .handler() for async responses.";
+			}
+		: Includes<StaticBody<TResult>, (...args: never) => unknown> extends true
+			? {
+					"~error": "Static values are sent as is, not called. Use .handler() to compute a response.";
+				}
+			: Includes<
+						StaticBody<TResult>,
+						AsyncIterable<unknown> | ReadableStream
+				  > extends true
+				? {
+						"~error": "Static bodies cannot be streams, which can be sent only once. Use .handler() for streams.";
+					}
+				: ValidHandlerResult<TRoute, TResult>;
 
 type HandlerRequests<T> = T extends (...args: never) => unknown
 	? Parameters<T>[0]
