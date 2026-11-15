@@ -10,7 +10,7 @@ const todo = z.object({
 
 const todos = new Map<string, z.infer<typeof todo>>();
 
-const routes = {
+export const routes = {
 	text: route
 		.get("/")
 		.static(respond("Hello, World!", { contentType: "text/plain" })),

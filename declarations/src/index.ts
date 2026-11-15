@@ -14,6 +14,7 @@ import {
 	sse,
 	type,
 } from "@rest-rpc/server";
+import * as node from "@rest-rpc/server/node";
 import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
 
 const Unauthorized = routeError("UNAUTHORIZED", { status: 401 });
@@ -145,6 +146,11 @@ export const app = createApp(routes, {
 });
 export const routeHandlers = createRouteHandlers(routes);
 export const catchAllHandler = createCatchAllHandler(routes);
+export const nodeApp = node.createApp(routes, {
+	context: { user: "user", tenant: "tenant" },
+});
+export const nodeRouteHandlers = node.createRouteHandlers(routes);
+export const nodeCatchAllHandler = node.createCatchAllHandler(routes);
 export const extractedContract = extractContract(routes);
 export const serverClient = createClient(extractedContract, {
 	baseUrl: "http://localhost",

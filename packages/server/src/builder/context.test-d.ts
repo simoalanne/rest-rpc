@@ -4,6 +4,7 @@ import {
 	createRouteHandlers,
 	createCatchAllHandler,
 } from "../pipeline/createRouteHandlers.ts";
+import { createApp as createNodeApp } from "../node/adapter.ts";
 import { createApp } from "../pipeline/createApp.ts";
 import { implement } from "./implement.ts";
 import { route } from "./routeBuilder.ts";
@@ -76,6 +77,19 @@ describe("host context", () => {
 		createApp({ withUser, withDb }, { context: { user: "1" } });
 		createApp(
 			{ nested: { withUser }, withDb },
+			{ context: async () => ({ user: "1", db: 1 }) },
+		);
+	});
+
+	it("requires the initial context of a Node app", () => {
+		createNodeApp({ open, injected });
+		// @ts-expect-error The routes require user.
+		createNodeApp({ open, withUser });
+		createNodeApp({ withUser }, { context: { user: "1" } });
+		// @ts-expect-error The routes require db too.
+		createNodeApp({ withUser, withDb }, { context: { user: "1" } });
+		createNodeApp(
+			{ withUser, withDb },
 			{ context: async () => ({ user: "1", db: 1 }) },
 		);
 	});

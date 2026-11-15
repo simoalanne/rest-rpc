@@ -482,14 +482,16 @@ Bun.serve({ ...app, routes: { ...app.routes, "/ping": new Response("ok") } });
 ### [Node HTTP](/docs/server/node)
 
 ```ts
-import { createApp } from "@rest-rpc/server";
-import { serve } from "@rest-rpc/server/node";
+import { createServer } from "node:http";
+import { createApp } from "@rest-rpc/server/node";
 
-const server = serve(createApp(routes), {
-	port: 3000,
-	onListen: ({ port }) => log(port),
+// A request listener with the same options, but Node's request in context and notFound.
+const app = createApp(routes, {
+	context: (req) => ({ user: req.headers.authorization }),
+	notFound: (req, res) => void res.writeHead(404).end(), // writing nothing keeps NOT_FOUND
 });
-process.on("SIGTERM", () => server.close()); // returns the http.Server
+const server = createServer(app).listen(3000);
+process.on("SIGTERM", () => server.close());
 ```
 
 ### [Framework Integration](/docs/server/framework-integration)

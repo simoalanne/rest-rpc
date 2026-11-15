@@ -1,5 +1,6 @@
 import { route } from "../builder/routeBuilder.ts";
-import { serve } from "../node/adapter.ts";
+import type { IncomingMessage } from "node:http";
+import { createApp as createNodeApp, type NodeApp } from "../node/adapter.ts";
 import { createApp, type App } from "./createApp.ts";
 
 type Env = { DB: { name: string } };
@@ -25,11 +26,17 @@ describe("createApp", () => {
 		expectTypeOf(app.fetch).parameters.toEqualTypeOf<[Request, Env]>();
 	});
 
-	it("is served on Node only without runtime arguments", () => {
-		serve(createApp(routes));
-		serve(
+	it("passes the Node request to the context function of a Node app", () => {
+		expectTypeOf(createNodeApp(routes)).toEqualTypeOf<NodeApp>();
+		createNodeApp(routes, {
+			context: (request) => {
+				expectTypeOf(request).toEqualTypeOf<IncomingMessage>();
+				return { db: 1 };
+			},
+		});
+		createNodeApp(routes, {
 			// @ts-expect-error Node passes no arguments after the request.
-			createApp(routes, { context: (_request, env: Env) => ({ db: env.DB }) }),
-		);
+			context: (_request, env: Env) => ({ db: env.DB }),
+		});
 	});
 });

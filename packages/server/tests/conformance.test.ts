@@ -11,13 +11,13 @@ import {
 	type,
 	type BodyCodec,
 	type CatchAllHandleOptions,
+	type RouteError,
 } from "@rest-rpc/server";
 import * as nodeAdapter from "@rest-rpc/server/node";
 import {
 	createServer,
 	type IncomingMessage,
 	type RequestListener,
-	type Server,
 	type ServerResponse,
 } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -845,27 +845,143 @@ describe("node adapter", () => {
 		await attached({}, "raw");
 		await attached(undefined, "raw");
 	});
+});
 
-	it("serves an app with serve", async () => {
-		const app = createApp(
-			{ user: route.get("/users/:id").handler(({ params }) => params.id) },
-			{ mountPath: "/api" },
-		);
-		const server = await new Promise<Server>((resolve) => {
-			const started = nodeAdapter.serve(app, {
-				port: 0,
-				hostname: "127.0.0.1",
-				onListen: () => resolve(started),
-			});
-		});
-		try {
-			const { port } = server.address() as AddressInfo;
-			const user = await fetch(`http://127.0.0.1:${port}/api/users/1`);
-			expect(await user.json()).toBe("1");
-			const missing = await fetch(`http://127.0.0.1:${port}/users/1`);
+// Apps
+
+type AppOptions = {
+	mountPath?: `/${string}`;
+	context?: () => object | Promise<object>;
+	onError?: (error: RouteError) => void;
+	/** Responds with 404 "custom" from `notFound` instead of the default. */
+	customNotFound?: boolean;
+};
+
+type ServeApp = (
+	routes: RuntimeImplementationTree,
+	options: AppOptions,
+	run: (url: string) => Promise<void>,
+) => Promise<void>;
+
+const serveFetchApp: ServeApp = (routes, options, run) => {
+	// The cases use initial context that the generic route tree type omits.
+	const app = createApp(routes, {
+		mountPath: options.mountPath,
+		context: options.context,
+		onError: options.onError,
+		notFound: options.customNotFound
+			? () => new Response("custom", { status: 404 })
+			: undefined,
+	} as never);
+	return withFetchServer((request) => app.fetch(request), run);
+};
+
+const serveNodeApp: ServeApp = (routes, options, run) =>
+	withHttpServer(
+		nodeAdapter.createApp(routes, {
+			mountPath: options.mountPath,
+			context: options.context,
+			onError: options.onError,
+			notFound: options.customNotFound
+				? (_req: IncomingMessage, res: ServerResponse) => {
+						res.statusCode = 404;
+						res.end("custom");
+					}
+				: undefined,
+		} as never),
+		run,
+	);
+
+describe.each([
+	{ name: "fetch", serve: serveFetchApp },
+	{ name: "node", serve: serveNodeApp },
+])("$name app conformance", ({ serve }) => {
+	const user = route
+		.get("/users/:id")
+		.params(type<{ id: string }>())
+		.handler(({ params }) => params.id);
+
+	it("serves routes under the mount path and sends NOT_FOUND outside it", async () => {
+		await serve({ user }, { mountPath: "/api" }, async (url) => {
+			expect(await (await fetch(`${url}/api/users/1`)).json()).toBe("1");
+			const missing = await fetch(`${url}/users/1`);
 			expect(missing.status).toBe(404);
-		} finally {
-			await new Promise<void>((resolve) => server.close(() => resolve()));
-		}
+			expect(await missing.json()).toMatchObject({ code: "NOT_FOUND" });
+		});
+	});
+
+	it("sends the notFound response for unmatched requests", async () => {
+		await serve({ user }, { customNotFound: true }, async (url) => {
+			const missing = await fetch(`${url}/missing`);
+			expect(missing.status).toBe(404);
+			expect(await missing.text()).toBe("custom");
+		});
+	});
+
+	it("seeds the context from a function, which static routes do not call", async () => {
+		const context = vi.fn(async () => ({ user: "Ada" }));
+		const routes = {
+			me: route
+				.$context<{ user: string }>()
+				.get("/me")
+				.handler(({ context }) => context.user),
+			robots: route
+				.get("/robots.txt")
+				.static(respond("User-agent: *", { contentType: "text/plain" })),
+		};
+		await serve(routes, { context }, async (url) => {
+			expect(await (await fetch(`${url}/me`)).json()).toBe("Ada");
+			expect(await (await fetch(`${url}/robots.txt`)).text()).toBe(
+				"User-agent: *",
+			);
+			expect(context).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	it("sends errors the routes do not handle as internal server errors and observes them", async () => {
+		const failure = new Error("handler failed");
+		const onError = vi.fn();
+		const routes = {
+			fail: route.get("/fail").handler((): string => {
+				throw failure;
+			}),
+			failContext: route
+				.$context<{ user: string }>()
+				.get("/context")
+				.handler(({ context }) => context.user),
+		};
+		const context = () => {
+			throw failure;
+		};
+		await serve(routes, { onError, context }, async (url) => {
+			for (const path of ["fail", "context"]) {
+				const response = await fetch(`${url}/${path}`);
+				expect(response.status).toBe(500);
+				expect(await response.json()).toMatchObject({
+					code: "INTERNAL_SERVER_ERROR",
+				});
+			}
+			expect(onError).toHaveBeenCalledWith(
+				expect.objectContaining({
+					code: "INTERNAL_SERVER_ERROR",
+					cause: failure,
+				}),
+				expect.anything(),
+			);
+		});
+	});
+
+	it("closes the connection when a stream fails after the response started", async () => {
+		const routes = {
+			events: route.get("/failing-events").handler(async function* () {
+				yield 1;
+				throw new Error("stream failed");
+			}),
+		};
+		await serve(routes, {}, async (url) => {
+			const response = await fetch(`${url}/failing-events`);
+			expect(response.status).toBe(200);
+			await expect(response.text()).rejects.toThrow();
+		});
 	});
 });

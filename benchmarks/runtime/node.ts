@@ -1,5 +1,6 @@
 // Serves the routes of http.ts with the Node adapter. Runs under Node and Bun.
-import { serve } from "@rest-rpc/server/node";
-import app from "./http.ts";
+import { createApp } from "@rest-rpc/server/node";
+import { createServer } from "node:http";
+import { routes } from "./http.ts";
 
-serve(app, { port: Number(process.env.PORT ?? 3000) });
+createServer(createApp(routes)).listen(Number(process.env.PORT ?? 3000));

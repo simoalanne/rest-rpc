@@ -1,22 +1,19 @@
+import { RouteError, type AbsolutePath } from "@rest-rpc/core";
 import type { HttpMethod } from "@rest-rpc/core/contract";
-import { RouteError } from "@rest-rpc/core";
 import type { EmptyObject } from "@rest-rpc/core/utils";
-import {
-	createServer,
-	type IncomingMessage,
-	type Server,
-	type ServerResponse,
-} from "node:http";
-import type { AddressInfo } from "node:net";
-import { pipeline } from "node:stream/promises";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import type {
 	CatchAllHandleOptions,
 	CreateRouteHandlersOptions,
 	HandleOptions,
 	OptionsArgs,
 } from "../pipeline/createRouteHandlers.ts";
-import type { App } from "../pipeline/createApp.ts";
 import { compileRouteTree } from "../pipeline/dispatch.ts";
+import {
+	InternalServerError,
+	NotFound,
+	observeError,
+} from "../pipeline/errors.ts";
 import {
 	serializeHttpResponseParts,
 	serializeRouteErrorParts,
@@ -28,7 +25,6 @@ import {
 } from "../routing/match.ts";
 import {
 	createRequestSignal,
-	hasBody,
 	nodeRequestReader,
 	readRequestTarget,
 } from "./request.ts";
@@ -38,61 +34,65 @@ import {
 	writeNodeResponse,
 } from "./response.ts";
 
-/** Reads a Node request as a Fetch `Request` that aborts when the client disconnects. */
-const toFetchRequest = (req: IncomingMessage, res: ServerResponse): Request => {
-	const headers = new Headers();
-	for (let index = 0; index < req.rawHeaders.length; index += 2) {
-		headers.append(req.rawHeaders[index], req.rawHeaders[index + 1]);
-	}
-	const url = readRequestTarget(req);
-	return new Request(
-		url.startsWith("/")
-			? `http://${req.headers.host ?? "localhost"}${url}`
-			: url,
-		{
-			method: req.method,
-			headers,
-			body: hasBody(req)
-				? ReadableStream.from(req as AsyncIterable<Uint8Array>)
-				: null,
-			duplex: "half",
-			signal: createRequestSignal(res),
-		} as RequestInit & { duplex: "half" },
+type CompiledNodeRoute = NodeRoute<object> & { isStatic: boolean };
+
+const writeRouteError = (response: ServerResponse, error: RouteError) =>
+	writeNodeResponse(
+		response,
+		serializeRouteErrorParts(error, createNodeHeaders),
+	);
+
+const compileNodeRoutes = (
+	implementations: RuntimeImplementationTree,
+	options: CreateRouteHandlersOptions<IncomingMessage>,
+): CompiledNodeRoute[] => {
+	const { routes, dispatch, codecs } = compileRouteTree(
+		implementations,
+		options,
+		nodeRequestReader,
+		createNodeHeaders,
+	);
+	return routes.map(
+		({ method, path, implementation, pathParams, staticResponse }) => {
+			if (staticResponse) {
+				const write = createStaticWriter(staticResponse);
+				return {
+					method,
+					path,
+					isStatic: true,
+					handle: (_request, response) => write(response),
+				};
+			}
+			return {
+				method,
+				path,
+				isStatic: false,
+				handle: async (request, response, ...[handleOptions]) => {
+					const result = await dispatch(
+						implementation,
+						pathParams,
+						request,
+						createRequestSignal(response),
+						handleOptions,
+					);
+					await (result instanceof RouteError
+						? writeRouteError(response, result)
+						: writeNodeResponse(
+								response,
+								await serializeHttpResponseParts(
+									result,
+									codecs,
+									createNodeHeaders,
+								),
+							));
+				},
+			};
+		},
 	);
 };
 
-/** Writes a Fetch `Response` to a Node `ServerResponse`, streaming its body. */
-const writeFetchResponse = async (
-	response: Response,
-	res: ServerResponse,
-): Promise<void> => {
-	if (res.destroyed) {
-		await response.body?.cancel();
-		return;
-	}
-	res.statusCode = response.status;
-	for (const [name, value] of response.headers) {
-		if (name !== "set-cookie") res.setHeader(name, value);
-	}
-	const cookies = response.headers.getSetCookie();
-	if (cookies.length > 0) res.setHeader("set-cookie", cookies);
-	if (!response.body) {
-		res.end();
-		return;
-	}
-	try {
-		await pipeline(response.body as AsyncIterable<Uint8Array>, res);
-	} catch (error) {
-		if (
-			(error as NodeJS.ErrnoException).code !== "ERR_STREAM_PREMATURE_CLOSE"
-		) {
-			throw error;
-		}
-	}
-};
-
 /**
- * A compiled route ready to be registered on a Node router.
+ * A Node route handler ready to be registered on a router.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
  */
@@ -133,53 +133,8 @@ export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
 	implementations: TRoutes,
 	options: CreateRouteHandlersOptions<IncomingMessage> = {},
 ): NodeRoute<TreeInitialContext<TRoutes>>[] {
-	const { routes, dispatch, codecs } = compileRouteTree(
-		implementations,
-		options,
-		nodeRequestReader,
-		createNodeHeaders,
-	);
-
-	return routes.map(
-		({
-			method,
-			path,
-			implementation,
-			pathParams,
-			staticResponse,
-		}): NodeRoute<object> => {
-			if (staticResponse) {
-				const write = createStaticWriter(staticResponse);
-				return {
-					method,
-					path,
-					handle: (_request, response) => write(response),
-				};
-			}
-			return {
-				method,
-				path,
-				handle: async (request, response, ...[handleOptions]) => {
-					const result = await dispatch(
-						implementation,
-						pathParams,
-						request,
-						createRequestSignal(response),
-						handleOptions,
-					);
-					await writeNodeResponse(
-						response,
-						result instanceof RouteError
-							? serializeRouteErrorParts(result, createNodeHeaders)
-							: await serializeHttpResponseParts(
-									result,
-									codecs,
-									createNodeHeaders,
-								),
-					);
-				},
-			};
-		},
+	return compileNodeRoutes(implementations, options).map(
+		({ method, path, handle }) => ({ method, path, handle }),
 	) as NodeRoute<TreeInitialContext<TRoutes>>[];
 }
 
@@ -206,7 +161,7 @@ export function createCatchAllHandler<
 	>
 ) => Promise<NodeRouteHandlerResult> {
 	const matchRoute = createRouteMatcher(
-		createRouteHandlers<RuntimeImplementationTree>(implementations, options),
+		compileNodeRoutes(implementations, options),
 	);
 
 	return async (request, response, ...[handleOptions]) => {
@@ -234,49 +189,126 @@ export function createCatchAllHandler<
 }
 
 /**
- * Customizes where the Node HTTP server started by {@link serve} listens.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/server/node#serve}
+ * The `context` option of the Node {@link createApp}: the initial context, or
+ * a function that returns it for a request.
  */
-export type ServeOptions = {
-	/** @default 3000 */
-	port?: number;
-	/** Listens on all interfaces when omitted, as `server.listen()` does. */
-	hostname?: string;
-	/**
-	 * Called once the server listens, with its address, including the port
-	 * chosen for `port: 0`.
-	 */
-	onListen?: (address: AddressInfo) => void;
-};
+export type NodeAppContext<TContext extends object> =
+	| TContext
+	| ((request: IncomingMessage) => TContext | Promise<TContext>);
 
 /**
- * Starts a Node HTTP server that serves an app made with `createApp`.
+ * Customizes the routes, not found responses, request parsing and error
+ * observation of a Node app.
  *
- * @remarks Returns the underlying server, so closing it is up to the caller.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/server/node#serve}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/node#app-options}
  */
-export function serve(app: App, options: ServeOptions = {}): Server {
-	const server = createServer(async (request, response) => {
-		try {
-			await writeFetchResponse(
-				await app.fetch(toFetchRequest(request, response)),
-				response,
-			);
-		} catch {
-			// The app handles errors of the routes, so these come from reading the
-			// request or writing the response.
-			if (response.headersSent) {
-				response.destroy();
-			} else {
-				response.statusCode = 500;
-				response.end();
-			}
-		}
-	});
-	server.listen(options.port ?? 3000, options.hostname, () =>
-		options.onListen?.(server.address() as AddressInfo),
+export type CreateNodeAppOptions<TContext extends object = EmptyObject> =
+	CreateRouteHandlersOptions<IncomingMessage> & {
+		/**
+		 * The path the routes are served under, such as `/api`. Route paths do
+		 * not include it.
+		 */
+		mountPath?: AbsolutePath;
+		/**
+		 * Writes the response for requests that match no route. When it writes
+		 * nothing, the default response is sent.
+		 *
+		 * @default A `NOT_FOUND` error response.
+		 */
+		notFound?: (
+			request: IncomingMessage,
+			response: ServerResponse,
+		) => void | Promise<void>;
+		/**
+		 * The initial context the routes require for each request, or a function
+		 * that returns it for the request. Required when the routes require
+		 * initial context.
+		 */
+		context?: NodeAppContext<TContext>;
+	};
+
+/**
+ * A Node request listener that serves a route tree, to pass to
+ * `http.createServer()`.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/server/node#usage}
+ */
+export type NodeApp = (
+	request: IncomingMessage,
+	response: ServerResponse,
+) => Promise<void>;
+
+/**
+ * Creates a Node request listener that serves a route tree.
+ *
+ * @remarks Errors that are not sent as error responses by the routes, such as
+ * errors thrown by handlers, are sent as `INTERNAL_SERVER_ERROR` responses
+ * with the thrown error as `cause`, or close the connection when the response
+ * already started. Use {@link createRouteHandlers} and
+ * {@link createCatchAllHandler} instead to serve the routes from a framework.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/server/node#usage}
+ */
+export function createApp<
+	TRoutes extends RuntimeImplementationTree<EmptyObject>,
+>(
+	implementations: TRoutes,
+	options?: CreateNodeAppOptions<TreeInitialContext<TRoutes>>,
+): NodeApp;
+/**
+ * Creates a Node request listener that serves a route tree whose routes
+ * require initial context, so `context` is required.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/server/node#usage}
+ */
+export function createApp<TRoutes extends RuntimeImplementationTree>(
+	implementations: TRoutes,
+	options: CreateNodeAppOptions<TreeInitialContext<TRoutes>> & {
+		context: NodeAppContext<TreeInitialContext<TRoutes>>;
+	},
+): NodeApp;
+export function createApp(
+	implementations: RuntimeImplementationTree,
+	options?: CreateNodeAppOptions<object>,
+): NodeApp {
+	const { mountPath, context, notFound, ...routeOptions } = options ?? {};
+	const matchRoute = createRouteMatcher(
+		compileNodeRoutes(implementations, routeOptions),
 	);
-	return server;
+	const respondWithNotFound = async (
+		request: IncomingMessage,
+		response: ServerResponse,
+	) => {
+		await notFound?.(request, response);
+		if (!response.headersSent && !response.writableEnded) {
+			await writeRouteError(response, new NotFound());
+		}
+	};
+
+	return async (request, response) => {
+		try {
+			const match = matchRoute(
+				request.method ?? "GET",
+				readRequestTarget(request),
+				mountPath,
+			);
+			if (!match) return await respondWithNotFound(request, response);
+			const { route, params } = match;
+			// Static routes read no context, so the context function is not called.
+			const values =
+				route.isStatic || typeof context !== "function"
+					? context
+					: await context(request);
+			await route.handle(request, response, { context: values, params });
+		} catch (error) {
+			const internal = new InternalServerError({ cause: error });
+			observeError(routeOptions.onError, internal, request);
+			// A started response cannot change its status, so it is cut short.
+			if (response.headersSent) response.destroy();
+			else
+				await writeRouteError(response, internal).catch(() =>
+					response.destroy(),
+				);
+		}
+	};
 }
