@@ -396,7 +396,7 @@ type Includes<T, TValue> = [Extract<T, TValue>] extends [never] ? false : true;
 
 /** Rejects promises, function bodies, which are not called, and stream bodies, which can be sent only once. */
 export type ValidStaticResult<TRoute extends RouteDefinition, TResult> =
-	Includes<TResult, PromiseLike<unknown>> extends true
+	Includes<TResult | StaticBody<TResult>, PromiseLike<unknown>> extends true
 		? {
 				"~error": "Static values are not awaited. Use .handler() for async responses.";
 			}

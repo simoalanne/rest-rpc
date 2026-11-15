@@ -629,13 +629,16 @@ describe("middleware responses", () => {
 		route.get("/").response(type<{ id: string }>()).static({ id: 1 });
 		// @ts-expect-error Static values are not awaited.
 		route.get("/").static(Promise.resolve("ok"));
+		// @ts-expect-error Static bodies are not awaited.
+		route.get("/").static(respond(Promise.resolve("ok"), { status: 200 }));
 		// @ts-expect-error Static values are not called.
 		route.get("/").static(() => "ok");
 		// @ts-expect-error Static bodies are not called.
 		route.get("/").static(respond(() => "ok", { status: 200 }));
-		const stream = respond(new ReadableStream(), { contentType: "text/plain" });
 		// @ts-expect-error Streams can be sent only once.
-		route.get("/").static(stream);
+		route.get("/").static(new ReadableStream());
+		// @ts-expect-error Streams can be sent only once.
+		route.get("/").static(respond(new ReadableStream(), { status: 200 }));
 	});
 
 	it("omits static() from routes that read the request or run middleware", () => {
