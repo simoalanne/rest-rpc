@@ -1,5 +1,6 @@
 import { createBodyCodecRegistry } from "./registry.ts";
 import { serializedBody } from "./serializedBody.ts";
+import type { IncomingBody } from "./types.ts";
 
 const codecs = createBodyCodecRegistry([]);
 
@@ -12,6 +13,7 @@ describe("defaults", () => {
 		expect(
 			await codecs.deserialize(
 				Response.json(value),
+				"application/problem+json",
 				"application/problem+json",
 			),
 		).toEqual(value);
@@ -34,10 +36,39 @@ describe("defaults", () => {
 		const mediaType = "application/x-www-form-urlencoded";
 		const body = new URLSearchParams("tag=a&tag=b");
 		expect(codecs.serialize(body, mediaType)).toBe(body);
-		expect(await codecs.deserialize(new Response(body), mediaType)).toEqual(
-			body,
-		);
+		expect(
+			await codecs.deserialize(new Response(body), mediaType, mediaType),
+		).toEqual(body);
 		expect(() => codecs.serialize("tag=a", mediaType)).toThrow();
+	});
+
+	it("decodes incoming bodies that are not Fetch requests or responses", async () => {
+		// Only the incoming body methods, as the Node server passes.
+		const incoming = (response: Response): IncomingBody => ({
+			text: () => response.text(),
+			json: async () => JSON.parse(await response.text()),
+			arrayBuffer: () => response.arrayBuffer(),
+			blob: () => response.blob(),
+			body: null,
+		});
+		expect(
+			await codecs.deserialize(
+				incoming(Response.json({ a: 1 })),
+				"application/json",
+				"application/json; charset=utf-8",
+			),
+		).toEqual({ a: 1 });
+
+		const form = new FormData();
+		form.set("name", "Ada");
+		const multipart = new Response(form);
+		const contentType = multipart.headers.get("content-type")!;
+		const decoded = await codecs.deserialize(
+			incoming(multipart),
+			"multipart/form-data",
+			contentType,
+		);
+		expect((decoded as FormData).get("name")).toBe("Ada");
 	});
 
 	it("accepts text strings and binary values but rejects other body shapes", () => {

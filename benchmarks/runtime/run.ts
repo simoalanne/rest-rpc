@@ -45,8 +45,9 @@ if (Object.keys(cases).length === 0)
 const entry = (name: string) =>
 	fileURLToPath(new URL(`./${name}`, import.meta.url));
 // `BENCH_RUNTIME` selects how the routes are served: with createApp on Bun's
-// native router, or with the Node adapter on Node or on Bun. `BENCH_SERVER`
-// runs an executable built from http.ts instead, such as with `bun compile`.
+// native router, or with `@rest-rpc/server/node` on Node or on Bun.
+// `BENCH_SERVER` runs an executable built from http.ts instead, such as with
+// `bun compile`.
 const servers: Record<string, string[]> = {
 	bun: ["bun", entry("http.ts")],
 	node: ["node", entry("node.ts")],

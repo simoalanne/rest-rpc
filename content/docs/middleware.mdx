@@ -113,7 +113,7 @@ createApp(routes, {
 
 When [integrating with a framework](/docs/server/framework-integration), pass them as the
 `context` [handle option](/docs/server/framework-integration#handle-options) of the
-catch-all handler or a compiled route:
+catch-all handler or a route handler:
 
 ```ts
 await handler(request, { context: { db, headers: request.headers } });

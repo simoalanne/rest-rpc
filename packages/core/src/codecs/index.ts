@@ -4,6 +4,7 @@ export type {
 	BodyDeserializer,
 	BodySerializer,
 	BodyValue,
+	IncomingBody,
 	SerializedBody,
 } from "./types.ts";
 export { isSerializedBody, serializedBody } from "./serializedBody.ts";

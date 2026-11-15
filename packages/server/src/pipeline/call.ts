@@ -11,7 +11,7 @@ import type { RequestArgs } from "@rest-rpc/core/client";
 import { markDefined, type RouteDefinition } from "@rest-rpc/core/contract";
 import type { Merge } from "@rest-rpc/core/utils";
 import type { InitialContextOf } from "../builder/routeBuilder.types.ts";
-import type { ContextOption, OptionsArgs } from "./compileRoutes.ts";
+import type { ContextOption, OptionsArgs } from "./handleOptions.ts";
 import {
 	isImplementedRoute,
 	toRuntimeImplementation,
@@ -62,13 +62,20 @@ type CallResult<TRoute extends ImplementedRoute> = TRoute extends unknown
 	? ClientPromise<InferClientResponse<TRoute>, InferClientError<TRoute> | Error>
 	: never;
 
-// Mirrors the fetch client: the error that would be sent is received, and
-// marked as defined when the route defines its code.
+// Mirrors the fetch client: a new error is received with what would be sent,
+// marked as defined when the route defines its code. Errors sent as thrown,
+// such as validation failures, are received as is.
 const toClientError = async (route: RouteDefinition, error: RouteError) => {
-	const resolved = await resolveRouteError(route, error, false);
-	return route.errors && Object.hasOwn(route.errors, resolved.code)
-		? markDefined(resolved)
-		: resolved;
+	const { error: observed, response } = await resolveRouteError(
+		route,
+		error,
+		false,
+	);
+	if (response === observed) return observed;
+	const { code, message, status, data, headers, cookies } = response;
+	return markDefined(
+		new RouteError(code, { message, status, data, headers, cookies }),
+	);
 };
 
 const callRoute = async (
