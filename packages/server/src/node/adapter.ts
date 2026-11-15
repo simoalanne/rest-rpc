@@ -1,4 +1,5 @@
 import type { HttpMethod } from "@rest-rpc/core/contract";
+import { RouteError } from "@rest-rpc/core";
 import type { EmptyObject } from "@rest-rpc/core/utils";
 import {
 	createServer,
@@ -8,44 +9,34 @@ import {
 } from "node:http";
 import type { AddressInfo } from "node:net";
 import { pipeline } from "node:stream/promises";
-import {
-	createRouteHandlers as createFetchRouteHandlers,
-	type CatchAllHandleOptions,
-	type CreateRouteHandlersOptions,
-	type HandleOptions,
-	type OptionsArgs,
+import type {
+	CatchAllHandleOptions,
+	CreateRouteHandlersOptions,
+	HandleOptions,
+	OptionsArgs,
 } from "../pipeline/createRouteHandlers.ts";
 import type { App } from "../pipeline/createApp.ts";
+import { compileRouteTree } from "../pipeline/dispatch.ts";
+import {
+	serializeHttpResponseParts,
+	serializeRouteErrorParts,
+} from "../pipeline/serializeHttpRouteResult.ts";
 import {
 	createRouteMatcher,
-	parsePathParams,
-	readAttachedPathParams,
 	type RuntimeImplementationTree,
 	type TreeInitialContext,
 } from "../routing/match.ts";
-
-// A body is present only when framed by content-length or transfer-encoding.
-const hasBody = (req: IncomingMessage) =>
-	req.method !== "GET" &&
-	req.method !== "HEAD" &&
-	(req.headers["transfer-encoding"] !== undefined ||
-		Number(req.headers["content-length"]) > 0);
-
-/** Aborts when the response closes before it is fully written. */
-const createRequestSignal = (res: ServerResponse): AbortSignal => {
-	const controller = new AbortController();
-	const close = () => !res.writableFinished && controller.abort();
-	if (res.closed) close();
-	else res.once("close", close);
-	return controller.signal;
-};
-
-// Express removes the mount path from `req.url` and keeps the full request
-// target in `originalUrl`.
-const readRequestTarget = (req: IncomingMessage) =>
-	(req as IncomingMessage & { originalUrl?: string }).originalUrl ??
-	req.url ??
-	"/";
+import {
+	createRequestSignal,
+	hasBody,
+	nodeRequestReader,
+	readRequestTarget,
+} from "./request.ts";
+import {
+	createNodeHeaders,
+	createStaticWriter,
+	writeNodeResponse,
+} from "./response.ts";
 
 /** Reads a Node request as a Fetch `Request` that aborts when the client disconnects. */
 const toFetchRequest = (req: IncomingMessage, res: ServerResponse): Request => {
@@ -133,42 +124,63 @@ export type NodeRouteHandlerResult = { matched: boolean };
  * Creates one Node route handler per method and path of a route tree, to
  * register on a router.
  *
- * @remarks Each route converts the Node request to a Fetch `Request`, runs the
- * same pipeline as the Fetch routes and writes the Fetch `Response` back.
- * Use {@link createCatchAllHandler} to let rest-rpc do the routing instead.
+ * @remarks Use {@link createCatchAllHandler} to let rest-rpc do the routing
+ * instead.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
  */
 export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
 	implementations: TRoutes,
-	options: CreateRouteHandlersOptions = {},
+	options: CreateRouteHandlersOptions<IncomingMessage> = {},
 ): NodeRoute<TreeInitialContext<TRoutes>>[] {
-	const routes = createFetchRouteHandlers<RuntimeImplementationTree>(
+	const { routes, dispatch, codecs } = compileRouteTree(
 		implementations,
 		options,
+		nodeRequestReader,
+		createNodeHeaders,
 	);
-	return routes.map((route) => {
-		const pathParams = parsePathParams(route.path);
-		return {
-			method: route.method,
-			path: route.path,
-			handle: async (request, response, ...[handleOptions]) => {
-				// Params a router such as Express set on the Node request are lost
-				// when it is converted, so they are passed on.
-				const params =
-					pathParams.params.length > 0 && !handleOptions?.params
-						? readAttachedPathParams(pathParams, request)
-						: undefined;
-				await writeFetchResponse(
-					await route.handle(
-						toFetchRequest(request, response),
-						params ? { ...handleOptions, params } : handleOptions,
-					),
-					response,
-				);
-			},
-		};
-	});
+
+	return routes.map(
+		({
+			method,
+			path,
+			implementation,
+			pathParams,
+			staticResponse,
+		}): NodeRoute<object> => {
+			if (staticResponse) {
+				const write = createStaticWriter(staticResponse);
+				return {
+					method,
+					path,
+					handle: (_request, response) => write(response),
+				};
+			}
+			return {
+				method,
+				path,
+				handle: async (request, response, ...[handleOptions]) => {
+					const result = await dispatch(
+						implementation,
+						pathParams,
+						request,
+						createRequestSignal(response),
+						handleOptions,
+					);
+					await writeNodeResponse(
+						response,
+						result instanceof RouteError
+							? serializeRouteErrorParts(result, createNodeHeaders)
+							: await serializeHttpResponseParts(
+									result,
+									codecs,
+									createNodeHeaders,
+								),
+					);
+				},
+			};
+		},
+	) as NodeRoute<TreeInitialContext<TRoutes>>[];
 }
 
 /**
@@ -184,7 +196,7 @@ export function createCatchAllHandler<
 	TRoutes extends RuntimeImplementationTree,
 >(
 	implementations: TRoutes,
-	options: CreateRouteHandlersOptions = {},
+	options: CreateRouteHandlersOptions<IncomingMessage> = {},
 ): (
 	request: IncomingMessage,
 	response: ServerResponse,

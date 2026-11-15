@@ -23,8 +23,18 @@ const toBodyInit = (value: unknown) =>
 		? ReadableStream.from(encodeChunks(value))
 		: value) as ConstructorParameters<typeof Response>[0];
 
+/**
+ * The header operations serialization uses, implemented by Fetch `Headers`
+ * and by the plain header object the Node server writes.
+ */
+export type HeaderSink = {
+	set(name: string, value: string): void;
+	append(name: "set-cookie", value: string): void;
+	delete(name: string): void;
+};
+
 const setHeaders = (
-	headers: Headers,
+	headers: HeaderSink,
 	values: Record<string, unknown> | undefined,
 	cookies: readonly string[] | undefined,
 ) => {
@@ -35,31 +45,34 @@ const setHeaders = (
 	for (const cookie of cookies ?? []) headers.append("set-cookie", cookie);
 };
 
-/** A serialized route result: the parts a `Response` is built from. */
-export type SerializedHttpResponse = {
+/** A serialized route result: the parts a response is written from. */
+export type SerializedHttpResponse<THeaders extends HeaderSink = Headers> = {
 	status: number;
-	headers: Headers;
+	headers: THeaders;
 	body: BodyValue | null;
 };
+
+const createFetchHeaders = () => new Headers();
 
 /**
  * The result's headers override the headers of a `SerializedBody` returned by
  * the codec, except `content-type`, which is always the body's.
  */
-export function serializeHttpResponseParts(
+export function serializeHttpResponseParts<THeaders extends HeaderSink>(
 	result: HttpRouteResult,
 	codecs: BodyCodecRegistry,
-): MaybePromise<SerializedHttpResponse> {
+	createHeaders: () => THeaders,
+): MaybePromise<SerializedHttpResponse<THeaders>> {
 	const { status } = result;
 	if (!result.body) {
-		const headers = new Headers();
+		const headers = createHeaders();
 		setHeaders(headers, result.headers, result.cookies);
 		return { status, headers, body: null };
 	}
 
 	const { value, contentType } = result.body;
 	return mapMaybePromise(codecs.serialize(value, contentType), (serialized) => {
-		const headers = new Headers();
+		const headers = createHeaders();
 		if (isSerializedBody(serialized)) {
 			serialized.headers.forEach((headerValue, name) =>
 				headers.set(name, headerValue),
@@ -94,7 +107,7 @@ export function serializeHttpRouteResult(
 	}
 
 	return mapMaybePromise(
-		serializeHttpResponseParts(result, codecs),
+		serializeHttpResponseParts(result, codecs, createFetchHeaders),
 		({ status, headers, body }) =>
 			new Response(body === null ? null : toBodyInit(body), {
 				status,
@@ -106,6 +119,21 @@ export function serializeHttpRouteResult(
 /** The JSON body of an error response. */
 const errorBody = ({ code, message, data }: RouteError) =>
 	data === undefined ? { code, message } : { code, message, data };
+
+/** Serializes an error as the parts of a JSON `{ code, message, data? }` response. */
+export function serializeRouteErrorParts<THeaders extends HeaderSink>(
+	error: RouteError,
+	createHeaders: () => THeaders,
+): SerializedHttpResponse<THeaders> {
+	const headers = createHeaders();
+	setHeaders(headers, error.headers as Record<string, unknown>, error.cookies);
+	headers.set("content-type", "application/json");
+	return {
+		status: error.status,
+		headers,
+		body: JSON.stringify(errorBody(error)),
+	};
+}
 
 /** Serializes an error as a JSON `{ code, message, data? }` response. */
 export function serializeRouteError(error: RouteError): Response {

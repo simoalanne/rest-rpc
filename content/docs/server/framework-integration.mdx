@@ -59,7 +59,9 @@ type HandleOptions = {
 - `body`: a request body already parsed by the framework, such as with
   `express.json()`. It is used instead of reading the raw body from
   `Request.body`, or from the request stream in Node, and is still validated
-  against the route's body schema.
+  against the route's body schema. A body parser reads the request body, so
+  pass the parsed body whenever one ran: a route that has to read a body that
+  was already read rejects instead of responding.
 
 ## Native Router
 

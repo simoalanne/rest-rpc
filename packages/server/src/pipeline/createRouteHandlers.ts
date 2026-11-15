@@ -1,44 +1,22 @@
 import { RouteError, type AbsolutePath, type BodyCodec } from "@rest-rpc/core";
-import {
-	createBodyCodecRegistry,
-	normalizeMediaType,
-	type BodyCodecRegistry,
-} from "@rest-rpc/core/codecs";
+import type { BodyCodecRegistry } from "@rest-rpc/core/codecs";
 import type { HttpMethod } from "@rest-rpc/core/contract";
-import type { EmptyObject } from "@rest-rpc/core/utils";
+import type { EmptyObject, MaybePromise } from "@rest-rpc/core/utils";
 import {
-	assertPathParams,
 	createRouteMatcher,
-	flattenRouteImplementations,
-	parsePathParams,
-	readAttachedPathParams,
-	readPathParams,
-	type PathParams,
-	resolveImplementationPath,
-	type RuntimeImplementation,
 	type RuntimeImplementationTree,
 	type TreeInitialContext,
 } from "../routing/match.ts";
-import { resolveRequestMediaType } from "./requestContentType.ts";
 import {
-	executeRoute,
-	toHttpRouteResult,
-	type RouteResult,
-} from "./handleHttpRoute.ts";
-import { deserializeRequestBody } from "./deserializeRequestBody.ts";
-import { observeError } from "./errors.ts";
-import { resolveRouteError } from "./resolveRouteError.ts";
+	bodyAlreadyRead,
+	compileRouteTree,
+	type DispatchResult,
+	type RequestReader,
+} from "./dispatch.ts";
 import {
 	serializeHttpRouteResult,
 	serializeRouteError,
 } from "./serializeHttpRouteResult.ts";
-import { parseQuery } from "./validation.ts";
-import {
-	readRequestPathname,
-	readRequestSearch,
-} from "../routing/requestUrl.ts";
-import { sseBodyCodec } from "./sse.ts";
-import { prepareStaticResponse } from "./staticResponse.ts";
 
 /**
  * Customizes request parsing, validation and error observation of route
@@ -46,15 +24,16 @@ import { prepareStaticResponse } from "./staticResponse.ts";
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#route-options}
  */
-export type CreateRouteHandlersOptions = {
+export type CreateRouteHandlersOptions<TRequest = Request> = {
 	bodyCodecs?: readonly BodyCodec[];
 	/**
 	 * Observes every error sent as an error response, and `RouteError`s that
 	 * end a stream after its response started, such as stream item validation
 	 * failures. It is not awaited, and errors it throws or rejects with are
-	 * ignored, so it cannot change the response.
+	 * ignored, so it cannot change the response. It receives the Fetch
+	 * `Request`, or the Node `IncomingMessage` with `@rest-rpc/server/node`.
 	 */
-	onError?: (error: RouteError, request: Request) => void;
+	onError?: (error: RouteError, request: TRequest) => void;
 	/**
 	 * When set to `true`, disables request schema validation. Handlers receive
 	 * the defined request segments without schema validation. The schemas are
@@ -176,116 +155,29 @@ export type FetchRoute<TContext extends object = EmptyObject> = {
 	readonly staticResponse?: Response;
 };
 
-type FetchDispatch = (
-	implementation: RuntimeImplementation,
-	pathParams: PathParams,
-	request: Request,
-	options: HandleOptions<object> | undefined,
-) => Promise<Response>;
-
-const createFetchDispatch = (
-	options: CreateRouteHandlersOptions,
-	codecs: BodyCodecRegistry,
-): FetchDispatch => {
-	const { disableRequestValidation, disableResponseValidation, onError } =
-		options;
-	const respondWithError = async (
-		implementation: RuntimeImplementation,
-		error: RouteError,
-		request: Request,
-	) => {
-		const resolved = await resolveRouteError(
-			implementation.route,
-			error,
-			disableResponseValidation ?? false,
-		);
-		observeError(onError, resolved, request);
-		return serializeRouteError(resolved);
-	};
-
-	return async (implementation, pathParams, request, handleOptions) => {
-		const schemas = implementation.route.request;
-		// The URL is only read for the params of dynamic path segments and a
-		// defined query, and params a router attached to the request are used
-		// as-is.
-		let params: Record<string, string> | undefined;
-		if (pathParams.params.length > 0) {
-			params = handleOptions?.params
-				? assertPathParams(pathParams, handleOptions.params)
-				: (readAttachedPathParams(pathParams, request) ??
-					readPathParams(pathParams, readRequestPathname(request.url)));
-		}
-
-		// Routes without a body schema ignore the request body and its content type.
-		let body: unknown;
-		let mediaType: string | undefined;
-		if (schemas?.body) {
-			const contentType = request.headers.get("content-type") ?? "";
-			const receivedMediaType = normalizeMediaType(contentType);
-			const selected = resolveRequestMediaType(
-				implementation,
-				receivedMediaType,
-			);
-			if (selected instanceof RouteError) {
-				return respondWithError(implementation, selected, request);
-			}
-			mediaType = selected;
-
-			if (handleOptions && "body" in handleOptions) {
-				body = handleOptions.body;
-			} else {
-				const deserialized = await deserializeRequestBody(
-					request,
-					receivedMediaType,
-					contentType,
-					codecs,
-				);
-				if (deserialized.rejection) {
-					return respondWithError(
-						implementation,
-						deserialized.rejection,
-						request,
-					);
-				}
-				body = deserialized.body;
-			}
-		}
-
-		let result: RouteResult;
-		try {
-			result = await executeRoute(implementation, {
-				request: {
-					params,
-					query: schemas?.query?.length
-						? parseQuery(readRequestSearch(request.url))
-						: undefined,
-					headers: schemas?.headers?.length
-						? Object.fromEntries(request.headers)
-						: undefined,
-					body,
-				},
-				signal: request.signal,
-				mediaType,
-				context: handleOptions?.context,
-				disableRequestValidation,
-				disableResponseValidation,
-			});
-		} catch (error) {
-			if (error instanceof RouteError) {
-				return respondWithError(implementation, error, request);
-			}
-			throw error;
-		}
-
-		return serializeHttpRouteResult(
-			toHttpRouteResult(
-				result,
-				onError && ((error) => observeError(onError, error, request)),
-			),
-			codecs,
-		);
-	};
+// The body was read when it can no longer be, so codecs do not fail on it as
+// if it were malformed.
+const readFetchBody = (request: Request) => {
+	if (request.bodyUsed) throw bodyAlreadyRead();
+	return request;
 };
+
+const fetchRequestReader: RequestReader<Request> = {
+	url: (request) => request.url,
+	contentType: (request) => request.headers.get("content-type") ?? "",
+	headers: (request) => Object.fromEntries(request.headers),
+	body: readFetchBody,
+};
+
+const createFetchHeaders = () => new Headers();
+
+const toFetchResponse = (
+	result: DispatchResult,
+	codecs: BodyCodecRegistry,
+): MaybePromise<Response> =>
+	result instanceof RouteError
+		? serializeRouteError(result)
+		: serializeHttpRouteResult(result, codecs);
 
 /**
  * Creates one Fetch route handler per method and path of a route tree, to
@@ -300,36 +192,44 @@ export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
 	implementations: TRoutes,
 	options: CreateRouteHandlersOptions = {},
 ): FetchRoute<TreeInitialContext<TRoutes>>[] {
-	const codecs = createBodyCodecRegistry([
-		sseBodyCodec,
-		...(options.bodyCodecs ?? []),
-	]);
-	const dispatch = createFetchDispatch(options, codecs);
+	const { routes, dispatch, codecs } = compileRouteTree(
+		implementations,
+		options,
+		fetchRequestReader,
+		createFetchHeaders,
+	);
 
-	return flattenRouteImplementations(implementations).map((implementation) => {
-		const path = resolveImplementationPath(implementation.route.path);
-		const { method } = implementation.route;
-		if (implementation.isStatic) {
-			const createResponse = prepareStaticResponse(
-				implementation,
-				codecs,
-				options.disableResponseValidation ?? false,
-			);
+	return routes.map(
+		({ method, path, implementation, pathParams, staticResponse }) => {
+			if (staticResponse) {
+				// Codecs may return views of a `SharedArrayBuffer`, which `BodyInit` omits.
+				const { status, headers, body } = staticResponse;
+				const init = body as ConstructorParameters<typeof Response>[0];
+				const createResponse = () => new Response(init, { status, headers });
+				return {
+					method,
+					path,
+					handle: async () => createResponse(),
+					staticResponse: createResponse(),
+				};
+			}
 			return {
 				method,
 				path,
-				handle: async () => createResponse(),
-				staticResponse: createResponse(),
+				handle: async (request, ...[handleOptions]) =>
+					toFetchResponse(
+						await dispatch(
+							implementation,
+							pathParams,
+							request,
+							request.signal,
+							handleOptions,
+						),
+						codecs,
+					),
 			};
-		}
-		const pathParams = parsePathParams(path);
-		return {
-			method,
-			path,
-			handle: (request, ...[handleOptions]) =>
-				dispatch(implementation, pathParams, request, handleOptions),
-		};
-	});
+		},
+	);
 }
 
 /**

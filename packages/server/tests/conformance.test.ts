@@ -1,17 +1,27 @@
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import {
+	bodyCodec,
 	createApp,
 	createCatchAllHandler,
 	respond,
 	route,
 	routeError,
+	serializedBody,
 	sse,
 	type,
+	type BodyCodec,
 	type CatchAllHandleOptions,
 } from "@rest-rpc/server";
 import * as nodeAdapter from "@rest-rpc/server/node";
-import { createServer, type RequestListener, type Server } from "node:http";
+import {
+	createServer,
+	type IncomingMessage,
+	type RequestListener,
+	type Server,
+	type ServerResponse,
+} from "node:http";
 import type { AddressInfo } from "node:net";
+import { pipeline } from "node:stream/promises";
 import type { RuntimeImplementationTree } from "../src/routing/match.ts";
 
 const withHttpServer = async (
@@ -32,31 +42,60 @@ const withHttpServer = async (
 	}
 };
 
+// A failure after the response started can only be reported by closing the
+// connection.
+const fail = (res: ServerResponse) => {
+	if (res.headersSent) {
+		res.destroy();
+	} else {
+		res.statusCode = 500;
+		res.end();
+	}
+};
+
+const consume = async (req: IncomingMessage) => {
+	for await (const _chunk of req);
+};
+
+// Streams in both directions, as Fetch runtimes do, so stream cases compare.
 const withFetchServer = (
 	handler: (request: Request) => Response | Promise<Response>,
 	run: (url: string) => Promise<void>,
 ) =>
 	withHttpServer(async (req, res) => {
 		try {
-			const chunks: Buffer[] = [];
-			for await (const chunk of req) chunks.push(Buffer.from(chunk));
 			const headers = new Headers();
-			for (const [name, value] of Object.entries(req.headers)) {
-				if (value !== undefined)
-					headers.set(name, Array.isArray(value) ? value.join(", ") : value);
+			for (let index = 0; index < req.rawHeaders.length; index += 2) {
+				headers.append(req.rawHeaders[index]!, req.rawHeaders[index + 1]!);
 			}
+			const controller = new AbortController();
+			res.once("close", () => !res.writableFinished && controller.abort());
+			const hasBody = req.method !== "GET" && req.method !== "HEAD";
 			const response = await handler(
 				new Request(`http://${req.headers.host}${req.url}`, {
 					method: req.method,
 					headers,
-					body: chunks.length ? Buffer.concat(chunks) : undefined,
-				}),
+					body: hasBody
+						? ReadableStream.from(req as AsyncIterable<Uint8Array>)
+						: undefined,
+					duplex: "half",
+					signal: controller.signal,
+				} as RequestInit & { duplex: "half" }),
 			);
-			res.writeHead(response.status, Object.fromEntries(response.headers));
-			res.end(Buffer.from(await response.arrayBuffer()));
-		} catch (error) {
-			res.statusCode = 500;
-			res.end(String(error));
+			const outgoing: Record<string, string | string[]> = Object.fromEntries(
+				response.headers,
+			);
+			const cookies = response.headers.getSetCookie();
+			if (cookies.length > 0) outgoing["set-cookie"] = cookies;
+			res.writeHead(response.status, outgoing);
+			if (response.body) {
+				res.flushHeaders();
+				await pipeline(response.body as AsyncIterable<Uint8Array>, res);
+			} else {
+				res.end();
+			}
+		} catch {
+			fail(res);
 		}
 	}, run);
 
@@ -64,6 +103,9 @@ const withFetchServer = (
 
 type ServeOptions = {
 	handleOptions?: CatchAllHandleOptions;
+	bodyCodecs?: readonly BodyCodec[];
+	/** Reads the request body before rest-rpc, as a body parser does. */
+	readBody?: boolean;
 };
 
 type Serve = (
@@ -73,27 +115,40 @@ type Serve = (
 ) => Promise<void>;
 
 const serveFetch: Serve = (routes, options, run) => {
-	const handler = createCatchAllHandler(routes);
-	return withFetchServer(
-		async (request) =>
+	const handler = createCatchAllHandler(routes, {
+		bodyCodecs: options.bodyCodecs,
+	});
+	return withFetchServer(async (request) => {
+		if (options.readBody) await request.text();
+		return (
 			(await handler(request, options.handleOptions)).response ??
-			new Response("unmatched", { status: 404 }),
-		run,
-	);
+			new Response("unmatched", { status: 404 })
+		);
+	}, run);
 };
 
 const serveNode: Serve = (routes, options, run) => {
-	const handler = nodeAdapter.createCatchAllHandler(routes);
+	const handler = nodeAdapter.createCatchAllHandler(routes, {
+		bodyCodecs: options.bodyCodecs,
+	});
 	return withHttpServer(async (req, res) => {
 		try {
+			if (options.readBody) await consume(req);
 			if (!(await handler(req, res, options.handleOptions)).matched) {
 				res.statusCode = 404;
 				res.end("unmatched");
 			}
 		} catch {
-			res.destroy();
+			fail(res);
 		}
 	}, run);
+};
+
+/** A promise resolved by calling `resolve`. */
+const signal = () => {
+	let resolve!: () => void;
+	const promise = new Promise<void>((done) => (resolve = done));
+	return { promise, resolve };
 };
 
 // Fixtures
@@ -546,6 +601,209 @@ describe.each([
 				expect(await response.json()).toBe("parsed");
 			},
 		);
+	});
+
+	it("reads chunked request bodies without a content length", async () => {
+		const routes = {
+			echo: route
+				.post("/echo")
+				.body(type<{ name: string }>())
+				.handler(({ body }) => body.name),
+		};
+		await serve(routes, {}, async (url) => {
+			const encoder = new TextEncoder();
+			const response = await fetch(`${url}/echo`, {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: ReadableStream.from([
+					encoder.encode('{"name":'),
+					encoder.encode('"Ada"}'),
+				]),
+				duplex: "half",
+			} as RequestInit & { duplex: "half" });
+			expect(await response.json()).toBe("Ada");
+		});
+	});
+
+	it("passes the incoming body and complete content type to custom codecs", async () => {
+		const bodyCodecs = [
+			bodyCodec("text/csv", {
+				deserialize: async (body, contentType) => ({
+					text: await body.text(),
+					contentType,
+				}),
+			}),
+			bodyCodec("application/x-ndjson", {
+				deserialize: async (body) => new Response(body.body).text(),
+			}),
+		];
+		const routes = {
+			csv: route
+				.post("/csv")
+				.body({ "text/csv": type<{ text: string; contentType: string }>() })
+				.handler(({ body }) => body),
+			ndjson: route
+				.post("/ndjson")
+				.body({ "application/x-ndjson": type<string>() })
+				.handler(({ body }) => body),
+		};
+		await serve(routes, { bodyCodecs }, async (url) => {
+			const csv = await fetch(`${url}/csv`, {
+				method: "POST",
+				headers: { "content-type": "text/csv; header=present" },
+				body: "a,b",
+			});
+			expect(await csv.json()).toEqual({
+				text: "a,b",
+				contentType: "text/csv; header=present",
+			});
+			const ndjson = await fetch(`${url}/ndjson`, {
+				method: "POST",
+				headers: { "content-type": "application/x-ndjson" },
+				body: '{"a":1}\n',
+			});
+			expect(await ndjson.json()).toBe('{"a":1}\n');
+		});
+	});
+
+	it("rejects a request whose body was read before the route without a parsed body", async () => {
+		const routes = {
+			echo: route
+				.post("/echo")
+				.body(type<string>())
+				.handler(({ body }) => body),
+		};
+		await serve(routes, { readBody: true }, async (url) => {
+			// The handler promise rejects, which the host turns into a 500,
+			// instead of a malformed body response.
+			const response = await postJson(`${url}/echo`, "raw");
+			expect(response.status).toBe(500);
+		});
+	});
+
+	it("sends text bodies with characters outside ASCII intact", async () => {
+		const text = "Hyvää päivää ✓";
+		const routes = {
+			json: route.get("/json").handler(() => ({ text })),
+			text: route
+				.get("/text")
+				.handler(() => respond(text, { contentType: "text/plain" })),
+			static: route
+				.get("/static")
+				.static(respond(text, { contentType: "text/plain" })),
+		};
+		await serve(routes, {}, async (url) => {
+			expect(await (await fetch(`${url}/json`)).json()).toEqual({ text });
+			expect(await (await fetch(`${url}/text`)).text()).toBe(text);
+			expect(await (await fetch(`${url}/static`)).text()).toBe(text);
+		});
+	});
+
+	it("sends each cookie as its own set-cookie header", async () => {
+		const routes = {
+			login: route
+				.post("/login")
+				.handler(() =>
+					respond("ok", { cookies: ["session=abc; HttpOnly", "theme=dark"] }),
+				),
+		};
+		await serve(routes, {}, async (url) => {
+			const response = await fetch(`${url}/login`, { method: "POST" });
+			expect(response.headers.getSetCookie()).toEqual([
+				"session=abc; HttpOnly",
+				"theme=dark",
+			]);
+		});
+	});
+
+	it("sends the headers of a serialized body with the route's headers, and a runtime content type without one", async () => {
+		const bodyCodecs = [
+			bodyCodec("text/x-custom", {
+				serialize: (value) =>
+					serializedBody(String(value), {
+						headers: { "x-codec": "custom", "x-route": "codec" },
+					}),
+			}),
+		];
+		const routes = {
+			custom: route.get("/custom").handler(() =>
+				respond("value", {
+					contentType: "text/x-custom",
+					headers: { "x-route": "route" },
+				}),
+			),
+		};
+		await serve(routes, { bodyCodecs }, async (url) => {
+			const response = await fetch(`${url}/custom`);
+			expect(response.headers.get("content-type")).toMatch(/^text\/plain/);
+			expect(response.headers.get("x-codec")).toBe("custom");
+			expect(response.headers.get("x-route")).toBe("route");
+			expect(await response.text()).toBe("value");
+		});
+	});
+
+	it("aborts the request signal when the client disconnects", async () => {
+		const { promise: started, resolve: start } = signal();
+		const { promise: aborted, resolve: abort } = signal();
+		const routes = {
+			wait: route.get("/wait").handler(
+				({ signal }) =>
+					new Promise<string>((resolve) => {
+						signal.addEventListener("abort", () => {
+							abort();
+							resolve("aborted");
+						});
+						start();
+					}),
+			),
+		};
+		await serve(routes, {}, async (url) => {
+			const controller = new AbortController();
+			const response = fetch(`${url}/wait`, { signal: controller.signal });
+			await started;
+			controller.abort();
+			await expect(response).rejects.toThrow();
+			await aborted;
+		});
+	});
+
+	it("ends a stream's generator when the client disconnects", async () => {
+		const { promise: ended, resolve: end } = signal();
+		const routes = {
+			ticks: route.get("/ticks").handler(async function* () {
+				try {
+					for (let tick = 0; ; tick += 1) {
+						yield tick;
+						await new Promise((resolve) => setTimeout(resolve, 5));
+					}
+				} finally {
+					end();
+				}
+			}),
+		};
+		await serve(routes, {}, async (url) => {
+			const controller = new AbortController();
+			const response = await fetch(`${url}/ticks`, {
+				signal: controller.signal,
+			});
+			await response.body!.getReader().read();
+			controller.abort();
+			await ended;
+		});
+	});
+
+	it("closes the connection when a stream fails after the response started", async () => {
+		const routes = {
+			events: route.get("/failing-events").handler(async function* () {
+				yield 1;
+				throw new Error("stream failed");
+			}),
+		};
+		await serve(routes, {}, async (url) => {
+			const response = await fetch(`${url}/failing-events`);
+			expect(response.status).toBe(200);
+			await expect(response.text()).rejects.toThrow();
+		});
 	});
 });
 
