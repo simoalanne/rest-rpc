@@ -14,7 +14,9 @@ export const serializeJson = (value: unknown) => {
 export const defaultBodyCodecs: readonly BodyCodec[] = [
 	bodyCodec(["application/json", /\+json$/], {
 		serialize: serializeJson,
-		deserialize: async (body) => JSON.parse(await body.text()),
+		// Returned without an async wrapper, so Fetch's native parser adds no
+		// promise per request.
+		deserialize: (body) => body.json(),
 	}),
 	bodyCodec("application/x-www-form-urlencoded", {
 		serialize: (value) => {

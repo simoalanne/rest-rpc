@@ -201,6 +201,7 @@ one of its members:
 ```ts
 type IncomingBody = {
 	text(): Promise<string>;
+	json(): Promise<unknown>;
 	arrayBuffer(): Promise<ArrayBuffer>;
 	blob(): Promise<Blob>; // typed with the content type
 	body: ReadableStream<Uint8Array> | null;

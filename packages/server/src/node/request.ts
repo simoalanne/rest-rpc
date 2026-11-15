@@ -49,12 +49,14 @@ const createNodeBody = (
 	let stream: ReadableStream<Uint8Array> | null | undefined;
 	const read = () =>
 		(buffer ??= framed ? readBuffer(request) : Promise.resolve(emptyBuffer));
+	// Decoded like Fetch `text()`, which drops a byte order mark.
+	const text = async () => {
+		const decoded = (await read()).toString("utf8");
+		return decoded.charCodeAt(0) === utf8Bom ? decoded.slice(1) : decoded;
+	};
 	return {
-		// Decoded like Fetch `text()`, which drops a byte order mark.
-		text: async () => {
-			const text = (await read()).toString("utf8");
-			return text.charCodeAt(0) === utf8Bom ? text.slice(1) : text;
-		},
+		text,
+		json: async () => JSON.parse(await text()),
 		arrayBuffer: async () => {
 			const bytes = await read();
 			return bytes.buffer.slice(

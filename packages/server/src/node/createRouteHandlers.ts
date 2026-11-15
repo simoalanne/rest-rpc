@@ -1,8 +1,7 @@
-import { RouteError } from "@rest-rpc/core";
 import type { HttpMethod } from "@rest-rpc/core/contract";
 import type { EmptyObject } from "@rest-rpc/core/utils";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { compileRouteTree } from "../pipeline/dispatch.ts";
+import { compileRouteTree, type ResponseWriter } from "../pipeline/dispatch.ts";
 import type {
 	CatchAllHandleOptions,
 	CreateRouteHandlersOptions,
@@ -28,15 +27,22 @@ import {
 /** A Node route, and whether it was completed with `.static()`. */
 export type CompiledNodeRoute = NodeRoute<object> & { isStatic: boolean };
 
+const nodeResponseWriter: ResponseWriter<ServerResponse, void> = {
+	result: (result, response, codecs) =>
+		writeNodeResult(response, result, codecs),
+	error: (error, response) => writeNodeError(response, error),
+};
+
 /** Compiles a route tree into Node routes, for the handlers of this runtime. */
 export const compileNodeRoutes = (
 	implementations: RuntimeImplementationTree,
 	options: CreateRouteHandlersOptions<IncomingMessage>,
 ): CompiledNodeRoute[] => {
-	const { routes, dispatch, codecs } = compileRouteTree(
+	const { routes, dispatch } = compileRouteTree(
 		implementations,
 		options,
 		nodeRequestReader,
+		nodeResponseWriter,
 	);
 	return routes.map(
 		({ method, path, implementation, pathParams, staticResponse }) => {
@@ -53,18 +59,15 @@ export const compileNodeRoutes = (
 				method,
 				path,
 				isStatic: false,
-				handle: async (request, response, ...[handleOptions]) => {
-					const result = await dispatch(
+				handle: (request, response, ...[handleOptions]) =>
+					dispatch(
 						implementation,
 						pathParams,
 						request,
+						response,
 						createRequestSignal(response),
 						handleOptions,
-					);
-					await (result instanceof RouteError
-						? writeNodeError(response, result)
-						: writeNodeResult(response, result, codecs));
-				},
+					),
 			};
 		},
 	);

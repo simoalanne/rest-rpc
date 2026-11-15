@@ -6,6 +6,7 @@ import {
 	type IncomingBody,
 } from "@rest-rpc/core/codecs";
 import type { HttpMethod } from "@rest-rpc/core/contract";
+import type { MaybePromise } from "@rest-rpc/core/utils";
 import {
 	assertPathParams,
 	flattenRouteImplementations,
@@ -53,14 +54,28 @@ export type RequestReader<TRequest> = {
 /** A route result to serialize, or an error to send as an error response. */
 export type DispatchResult = HttpRouteResult | RouteError;
 
-/** Runs a route for a request routed to it, before the response is written. */
-export type Dispatch<TRequest> = (
+/**
+ * Turns a dispatch result into a runtime's response. It runs inside the
+ * dispatch, so a request creates one promise.
+ */
+export type ResponseWriter<TTarget, TOut> = {
+	result: (
+		result: HttpRouteResult,
+		target: TTarget,
+		codecs: BodyCodecRegistry,
+	) => MaybePromise<TOut>;
+	error: (error: RouteError, target: TTarget) => MaybePromise<TOut>;
+};
+
+/** Runs a route for a request routed to it and responds with the writer. */
+export type Dispatch<TRequest, TTarget, TOut> = (
 	implementation: RuntimeImplementation,
 	pathParams: PathParams,
 	request: TRequest,
+	target: TTarget,
 	signal: AbortSignal,
 	options: HandleOptions<object> | undefined,
-) => Promise<DispatchResult>;
+) => Promise<TOut>;
 
 /** The error for a body read before the route, which would otherwise look malformed. */
 export const bodyAlreadyRead = () =>
@@ -68,17 +83,19 @@ export const bodyAlreadyRead = () =>
 		"The request body was already read. Pass the parsed body as the `body` option.",
 	);
 
-const createDispatch = <TRequest extends object>(
+const createDispatch = <TRequest extends object, TTarget, TOut>(
 	options: CreateRouteHandlersOptions<TRequest>,
 	codecs: BodyCodecRegistry,
 	reader: RequestReader<TRequest>,
-): Dispatch<TRequest> => {
+	writer: ResponseWriter<TTarget, TOut>,
+): Dispatch<TRequest, TTarget, TOut> => {
 	const { disableRequestValidation, disableResponseValidation, onError } =
 		options;
 	const toErrorResponse = async (
 		implementation: RuntimeImplementation,
 		error: RouteError,
 		request: TRequest,
+		target: TTarget,
 	) => {
 		const resolved = await resolveRouteError(
 			implementation.route,
@@ -86,10 +103,17 @@ const createDispatch = <TRequest extends object>(
 			disableResponseValidation ?? false,
 		);
 		observeError(onError, resolved, request);
-		return resolved;
+		return writer.error(resolved, target);
 	};
 
-	return async (implementation, pathParams, request, signal, handleOptions) => {
+	return async (
+		implementation,
+		pathParams,
+		request,
+		target,
+		signal,
+		handleOptions,
+	) => {
 		const schemas = implementation.route.request;
 		// The URL is only read for the params of dynamic path segments and a
 		// defined query, and params a router attached to the request are used
@@ -113,7 +137,7 @@ const createDispatch = <TRequest extends object>(
 				receivedMediaType,
 			);
 			if (selected instanceof RouteError) {
-				return toErrorResponse(implementation, selected, request);
+				return toErrorResponse(implementation, selected, request, target);
 			}
 			mediaType = selected;
 
@@ -131,6 +155,7 @@ const createDispatch = <TRequest extends object>(
 						implementation,
 						deserialized.rejection,
 						request,
+						target,
 					);
 				}
 				body = deserialized.body;
@@ -158,14 +183,18 @@ const createDispatch = <TRequest extends object>(
 			});
 		} catch (error) {
 			if (error instanceof RouteError) {
-				return toErrorResponse(implementation, error, request);
+				return toErrorResponse(implementation, error, request, target);
 			}
 			throw error;
 		}
 
-		return toHttpRouteResult(
-			result,
-			onError && ((error) => observeError(onError, error, request)),
+		return writer.result(
+			toHttpRouteResult(
+				result,
+				onError && ((error) => observeError(onError, error, request)),
+			),
+			target,
+			codecs,
 		);
 	};
 };
@@ -184,10 +213,11 @@ export type CompiledRoute = {
  * Flattens a route tree, prepares static responses and creates the dispatch
  * shared by the handlers of a runtime.
  */
-export const compileRouteTree = <TRequest extends object>(
+export const compileRouteTree = <TRequest extends object, TTarget, TOut>(
 	implementations: RuntimeImplementationTree,
 	options: CreateRouteHandlersOptions<TRequest>,
 	reader: RequestReader<TRequest>,
+	writer: ResponseWriter<TTarget, TOut>,
 ) => {
 	const codecs = createBodyCodecRegistry([
 		sseBodyCodec,
@@ -213,7 +243,7 @@ export const compileRouteTree = <TRequest extends object>(
 	);
 	return {
 		routes,
-		dispatch: createDispatch(options, codecs, reader),
+		dispatch: createDispatch(options, codecs, reader, writer),
 		codecs,
 	};
 };

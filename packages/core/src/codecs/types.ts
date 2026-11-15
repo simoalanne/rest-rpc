@@ -48,6 +48,8 @@ export type BodySerializer = (
 export type IncomingBody = {
 	/** Reads the body as UTF-8 text. */
 	text(): Promise<string>;
+	/** Reads the body as UTF-8 text and parses it as JSON. */
+	json(): Promise<unknown>;
 	/** Reads the body as bytes. */
 	arrayBuffer(): Promise<ArrayBuffer>;
 	/** Reads the body as a `Blob` typed with the content type. */

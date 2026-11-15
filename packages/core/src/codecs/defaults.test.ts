@@ -46,6 +46,7 @@ describe("defaults", () => {
 		// Only the incoming body methods, as the Node server passes.
 		const incoming = (response: Response): IncomingBody => ({
 			text: () => response.text(),
+			json: async () => JSON.parse(await response.text()),
 			arrayBuffer: () => response.arrayBuffer(),
 			blob: () => response.blob(),
 			body: null,

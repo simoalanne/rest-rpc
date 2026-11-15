@@ -1,7 +1,6 @@
-import { RouteError } from "@rest-rpc/core";
 import type { HttpMethod } from "@rest-rpc/core/contract";
 import type { EmptyObject } from "@rest-rpc/core/utils";
-import { compileRouteTree } from "../pipeline/dispatch.ts";
+import { compileRouteTree, type ResponseWriter } from "../pipeline/dispatch.ts";
 import type {
 	CatchAllHandleOptions,
 	CreateRouteHandlersOptions,
@@ -59,6 +58,11 @@ export type FetchRoute<TContext extends object = EmptyObject> = {
 	readonly staticResponse?: Response;
 };
 
+const fetchResponseWriter: ResponseWriter<undefined, Response> = {
+	result: (result, _target, codecs) => serializeFetchResult(result, codecs),
+	error: serializeFetchError,
+};
+
 /**
  * Creates one Fetch route handler per method and path of a route tree, to
  * register on a router.
@@ -72,10 +76,11 @@ export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
 	implementations: TRoutes,
 	options: CreateRouteHandlersOptions = {},
 ): FetchRoute<TreeInitialContext<TRoutes>>[] {
-	const { routes, dispatch, codecs } = compileRouteTree(
+	const { routes, dispatch } = compileRouteTree(
 		implementations,
 		options,
 		fetchRequestReader,
+		fetchResponseWriter,
 	);
 
 	return routes.map(
@@ -92,18 +97,15 @@ export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
 			return {
 				method,
 				path,
-				handle: async (request, ...[handleOptions]) => {
-					const result = await dispatch(
+				handle: (request, ...[handleOptions]) =>
+					dispatch(
 						implementation,
 						pathParams,
 						request,
+						undefined,
 						request.signal,
 						handleOptions,
-					);
-					return result instanceof RouteError
-						? serializeFetchError(result)
-						: serializeFetchResult(result, codecs);
-				},
+					),
 			};
 		},
 	);
