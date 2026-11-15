@@ -32,7 +32,9 @@ export type SerializedHttpResponse = {
 
 /**
  * The result's headers override the headers of a `SerializedBody` returned by
- * the codec, except `content-type`, which is always the body's.
+ * the codec, except `content-type`. That is the codec's, or else the selected
+ * content type. A `FormData` body has none, so the runtime sets the one it
+ * generates with the multipart boundary.
  */
 export function serializeHttpResponseParts(
 	result: HttpRouteResult,
@@ -47,19 +49,14 @@ export function serializeHttpResponseParts(
 
 	const { value, contentType } = result.body;
 	return mapMaybePromise(codecs.serialize(value, contentType), (serialized) => {
-		if (isSerializedBody(serialized)) {
-			const headers: ResponseHeaders = { ...serialized.headers };
-			setHeaders(headers, result.headers, result.cookies);
-			// Without a codec content type, the runtime sets one, such as for `FormData`.
-			const bodyContentType = serialized.headers["content-type"];
-			if (bodyContentType === undefined) delete headers["content-type"];
-			else headers["content-type"] = bodyContentType;
-			return { status, headers, body: serialized.body };
-		}
-		const headers: ResponseHeaders = {};
+		const { body, headers: bodyHeaders } = isSerializedBody(serialized)
+			? serialized
+			: { body: serialized, headers: undefined };
+		const headers: ResponseHeaders = { ...bodyHeaders };
 		setHeaders(headers, result.headers, result.cookies);
-		headers["content-type"] = contentType;
-		return { status, headers, body: serialized };
+		if (body instanceof FormData) delete headers["content-type"];
+		else headers["content-type"] = bodyHeaders?.["content-type"] ?? contentType;
+		return { status, headers, body };
 	});
 }
 

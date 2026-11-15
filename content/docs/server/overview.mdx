@@ -110,8 +110,8 @@ A codec's `deserialize` receives an
 
 Handlers can return any value supported by the default codecs. A custom
 serializer must return a body the runtime can send, such as a string, `Blob`,
-`FormData`, byte array, or `ReadableStream`, or an async iterable of byte
-chunks. To send it with its own headers, return it wrapped in
+`FormData`, byte array, `ReadableStream` of bytes, or an async iterable of
+string or byte chunks. To send it with its own headers, return it wrapped in
 [`serializedBody()`](/docs/http-behavior/serialization#serializer-result).
 
 ## Error Handling

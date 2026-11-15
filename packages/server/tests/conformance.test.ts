@@ -579,6 +579,23 @@ describe.each([
 		});
 	});
 
+	it("sends Blob response bodies with the selected content type", async () => {
+		const routes = {
+			file: route.get("/file").handler(() =>
+				respond(new Blob(["file"], { type: "text/plain" }), {
+					contentType: "application/octet-stream",
+				}),
+			),
+		};
+		await serve(routes, {}, async (url) => {
+			const response = await fetch(`${url}/file`);
+			expect(response.headers.get("content-type")).toBe(
+				"application/octet-stream",
+			);
+			expect(await response.text()).toBe("file");
+		});
+	});
+
 	it("streams binary response bodies", async () => {
 		const routes = {
 			bytes: route.get("/bytes").handler(() =>
@@ -763,7 +780,7 @@ describe.each([
 		});
 	});
 
-	it("sends the headers of a serialized body with the route's headers, and a runtime content type without one", async () => {
+	it("sends the headers of a serialized body with the route's headers, and the selected content type without one", async () => {
 		const bodyCodecs = [
 			bodyCodec("text/x-custom", {
 				serialize: (value) =>
@@ -782,7 +799,7 @@ describe.each([
 		};
 		await serve(routes, { bodyCodecs }, async (url) => {
 			const response = await fetch(`${url}/custom`);
-			expect(response.headers.get("content-type")).toMatch(/^text\/plain/);
+			expect(response.headers.get("content-type")).toBe("text/x-custom");
 			expect(response.headers.get("x-codec")).toBe("custom");
 			expect(response.headers.get("x-route")).toBe("route");
 			expect(await response.text()).toBe("value");

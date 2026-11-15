@@ -171,11 +171,10 @@ including parameters, and returns the serialized body:
   [Request and Response Bodies](/docs/server/overview#request-and-response-bodies).
 - `serializedBody(body, { headers })` sends a body with its own headers, for codecs
   that set headers such as `content-encoding`. `headers` is a plain object of
-  header names and values. Without a `content-type` header, the runtime sets
-  one for the body, such as
-  `multipart/form-data` with its generated boundary for `FormData`. A
-  `content-type` header may change parameters but must keep the
-  selected base media type, since content types are part of route types.
+  header names and values. Without a `content-type` header, the selected
+  content type is sent. A `content-type` header may change parameters but must
+  keep the selected base media type, since content types are part of route
+  types.
 
 ```ts
 import { bodyCodec, serializedBody } from "@rest-rpc/core";
@@ -190,6 +189,9 @@ const gzipJsonCodec = bodyCodec("application/json", {
 		}),
 });
 ```
+
+A `FormData` body is always sent with the `multipart/form-data` content type the
+runtime generates with its boundary, so codecs return it as is.
 
 ### Incoming Body
 

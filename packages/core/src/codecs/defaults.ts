@@ -1,7 +1,6 @@
 import { bodyCodec } from "./bodyCodec.ts";
 import { isAsyncIterable } from "./operations.ts";
-import { serializedBody } from "./serializedBody.ts";
-import type { BodyCodec } from "./types.ts";
+import type { BodyCodec, BodyValue } from "./types.ts";
 
 /** The built-in JSON serializer. Fetch handlers detect it to send `Response.json` instead. */
 export const serializeJson = (value: unknown) => {
@@ -30,8 +29,7 @@ export const defaultBodyCodecs: readonly BodyCodec[] = [
 		serialize: (value) => {
 			if (!(value instanceof FormData))
 				throw new TypeError("Expected FormData body");
-			// Fetch sets the content type with the generated boundary.
-			return serializedBody(value);
+			return value;
 		},
 		// The content type carries the multipart boundary.
 		deserialize: async (body, contentType) =>
@@ -55,7 +53,8 @@ export const defaultBodyCodecs: readonly BodyCodec[] = [
 				value instanceof ReadableStream ||
 				isAsyncIterable(value)
 			)
-				return value;
+				// Chunks are not read here, so they are sent as the handler yields them.
+				return value as BodyValue;
 			throw new TypeError(
 				"Expected Blob, Uint8Array, ReadableStream or AsyncIterable body",
 			);
