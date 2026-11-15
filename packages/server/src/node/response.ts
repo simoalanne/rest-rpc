@@ -1,4 +1,4 @@
-import type { RouteError } from "@rest-rpc/core";
+import type { ErrorResponse } from "../pipeline/resolveRouteError.ts";
 import {
 	isAsyncIterable,
 	type BodyCodecRegistry,
@@ -115,6 +115,6 @@ export const writeNodeResult = async (
 /** Writes an error as a JSON `{ code, message, data? }` response. */
 export const writeNodeError = (
 	response: ServerResponse,
-	error: RouteError,
+	error: ErrorResponse,
 ): Promise<void> =>
 	writeNodeResponse(response, serializeRouteErrorParts(error));

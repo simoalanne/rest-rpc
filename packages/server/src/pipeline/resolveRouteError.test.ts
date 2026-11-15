@@ -14,25 +14,24 @@ const UserNotFound = routeError("USER_NOT_FOUND", {
 const definition = route.get("/users/:id").error(UserNotFound)["~restrpc"];
 
 describe("resolveRouteError", () => {
-	it("applies the definition and validates data and headers unless disabled", async () => {
+	it("sends the definition's status and validated data and headers, observing the thrown error", async () => {
 		const thrown = new RouteError("USER_NOT_FOUND", {
 			message: "Missing",
 			data: 1,
 			headers: { "x-id": 1 },
 		});
-		expect(await resolveRouteError(definition, thrown, false)).toMatchObject({
+		const resolved = await resolveRouteError(definition, thrown, false);
+		expect(resolved.error).toBe(thrown);
+		expect(resolved.response).toMatchObject({
 			code: "USER_NOT_FOUND",
 			status: 404,
 			message: "Missing",
 			data: { id: "1" },
 			headers: { "x-id": "1" },
-			cause: thrown,
 		});
-		expect(await resolveRouteError(definition, thrown, true)).toMatchObject({
-			status: 404,
-			data: 1,
-			headers: { "x-id": 1 },
-		});
+		expect(
+			(await resolveRouteError(definition, thrown, true)).response,
+		).toMatchObject({ status: 404, data: 1, headers: { "x-id": 1 } });
 	});
 
 	it("turns invalid data into a response validation failure", async () => {
@@ -41,24 +40,29 @@ describe("resolveRouteError", () => {
 			"~standard": { version: 1, vendor: "test", validate: () => ({ issues }) },
 		};
 		const Invalid = routeError("INVALID", { data: invalid });
-		const resolved = await resolveRouteError(
+		const { error, response } = await resolveRouteError(
 			route.error(Invalid)["~restrpc"],
 			new Invalid({ data: "value" }),
 			false,
 		);
-		expect(resolved).toMatchObject({
+		expect(error).toMatchObject({
 			code: "INTERNAL_SERVER_ERROR",
 			status: 500,
 			cause: { location: "data", issues },
 		});
+		expect(response).toBe(error);
 	});
 
-	it("passes other errors as thrown", async () => {
+	it("sends other errors as thrown", async () => {
 		const builtIn = new RequestValidationFailed({
 			data: { body: [], query: [], params: [], headers: [] },
 		});
 		const gone = new RouteError("GONE", { status: 410, data: { id: 1 } });
-		expect(await resolveRouteError(definition, builtIn, false)).toBe(builtIn);
-		expect(await resolveRouteError(definition, gone, false)).toBe(gone);
+		for (const error of [builtIn, gone]) {
+			expect(await resolveRouteError(definition, error, false)).toEqual({
+				error,
+				response: error,
+			});
+		}
 	});
 });

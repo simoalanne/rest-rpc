@@ -49,6 +49,12 @@ The route's definition decides the response: its status, and the validated
 `data` and headers. When `data` or headers fail validation, an
 `INTERNAL_SERVER_ERROR` is sent instead.
 
+[`onError`](/docs/server/overview#error-handling) receives the thrown error as
+is, with the `data`, headers and `cause` it was thrown with. Errors created with
+`errors.CODE()` or a definition already have the defined status. A
+`new RouteError(code)` for a code the route defines keeps its own status, which
+defaults to 400, even though the response uses the defined one.
+
 An error whose code the route does not define is sent as thrown, with its own
 status, `data` and headers, and without validation. Use it for errors that
 apply across routes, such as an `UNAUTHORIZED` thrown by auth middleware, and

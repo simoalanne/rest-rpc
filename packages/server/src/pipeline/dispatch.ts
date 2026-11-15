@@ -35,10 +35,11 @@ import {
 	type RouteResult,
 } from "./handleHttpRoute.ts";
 import { resolveRequestMediaType } from "./requestContentType.ts";
-import { resolveRouteError } from "./resolveRouteError.ts";
+import { resolveRouteError, type ErrorResponse } from "./resolveRouteError.ts";
 import type { SerializedHttpResponse } from "./serializeHttpRouteResult.ts";
 import { sseBodyCodec } from "./sse.ts";
 import { prepareStaticResponse } from "./staticResponse.ts";
+import { mapMaybePromise } from "./maybePromise.ts";
 import { parseQuery } from "./validation.ts";
 
 /** Reads the parts of a runtime's request that routes use. */
@@ -64,7 +65,7 @@ export type ResponseWriter<TTarget, TOut> = {
 		target: TTarget,
 		codecs: BodyCodecRegistry,
 	) => MaybePromise<TOut>;
-	error: (error: RouteError, target: TTarget) => MaybePromise<TOut>;
+	error: (error: ErrorResponse, target: TTarget) => MaybePromise<TOut>;
 };
 
 /** Runs a route for a request routed to it and responds with the writer. */
@@ -91,20 +92,24 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 ): Dispatch<TRequest, TTarget, TOut> => {
 	const { disableRequestValidation, disableResponseValidation, onError } =
 		options;
-	const toErrorResponse = async (
+	// Synchronous when the error's schemas are, so it adds no promise.
+	const toErrorResponse = (
 		implementation: RuntimeImplementation,
 		error: RouteError,
 		request: TRequest,
 		target: TTarget,
-	) => {
-		const resolved = await resolveRouteError(
-			implementation.route,
-			error,
-			disableResponseValidation ?? false,
+	): MaybePromise<TOut> =>
+		mapMaybePromise(
+			resolveRouteError(
+				implementation.route,
+				error,
+				disableResponseValidation ?? false,
+			),
+			(resolved) => {
+				observeError(onError, resolved.error, request);
+				return writer.error(resolved.response, target);
+			},
 		);
-		observeError(onError, resolved, request);
-		return writer.error(resolved, target);
-	};
 
 	return async (
 		implementation,

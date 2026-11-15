@@ -1,4 +1,4 @@
-import type { RouteError } from "@rest-rpc/core";
+import type { ErrorResponse } from "../pipeline/resolveRouteError.ts";
 import { isAsyncIterable, type BodyCodecRegistry } from "@rest-rpc/core/codecs";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import type { HttpRouteResult } from "../pipeline/handleHttpRoute.ts";
@@ -69,5 +69,5 @@ export const serializeFetchResult = (
 };
 
 /** Serializes an error as a JSON `{ code, message, data? }` Fetch `Response`. */
-export const serializeFetchError = (error: RouteError): Response =>
+export const serializeFetchError = (error: ErrorResponse): Response =>
 	toFetchResponse(serializeRouteErrorParts(error));

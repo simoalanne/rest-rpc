@@ -1,4 +1,3 @@
-import type { RouteError } from "@rest-rpc/core";
 import {
 	isSerializedBody,
 	type BodyCodecRegistry,
@@ -7,6 +6,7 @@ import {
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import type { HttpRouteResult } from "./handleHttpRoute.ts";
 import { mapMaybePromise } from "./maybePromise.ts";
+import type { ErrorResponse } from "./resolveRouteError.ts";
 
 /** Response headers with lowercase names. `set-cookie` holds every cookie. */
 export type ResponseHeaders = Record<string, string | string[]>;
@@ -64,15 +64,15 @@ export function serializeHttpResponseParts(
 }
 
 /** The JSON body of an error response. */
-const errorBody = ({ code, message, data }: RouteError) =>
+const errorBody = ({ code, message, data }: ErrorResponse) =>
 	data === undefined ? { code, message } : { code, message, data };
 
 /** Serializes an error as the parts of a JSON `{ code, message, data? }` response. */
 export function serializeRouteErrorParts(
-	error: RouteError,
+	error: ErrorResponse,
 ): SerializedHttpResponse {
 	const headers: ResponseHeaders = {};
-	setHeaders(headers, error.headers as Record<string, unknown>, error.cookies);
+	setHeaders(headers, error.headers, error.cookies);
 	headers["content-type"] = "application/json";
 	return {
 		status: error.status,

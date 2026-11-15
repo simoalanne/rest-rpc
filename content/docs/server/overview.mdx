@@ -130,8 +130,10 @@ export default createApp(routes, {
 });
 ```
 
-A response validation failure is sent as an `INTERNAL_SERVER_ERROR` whose
-`cause` holds the validation `location` and `issues`.
+`onError` receives a thrown error as it was thrown, so its `cause` is the one
+it was thrown with. A response validation failure is sent as an
+`INTERNAL_SERVER_ERROR` whose `cause` holds the validation `location` and
+`issues`.
 
 Other errors thrown by handlers or middleware depend on the level. Route
 handlers and the catch-all handler reject with them, for the framework's error

@@ -104,6 +104,7 @@ const withFetchServer = (
 type ServeOptions = {
 	handleOptions?: CatchAllHandleOptions;
 	bodyCodecs?: readonly BodyCodec[];
+	onError?: (error: RouteError) => void;
 	/** Reads the request body before rest-rpc, as a body parser does. */
 	readBody?: boolean;
 };
@@ -117,6 +118,7 @@ type Serve = (
 const serveFetch: Serve = (routes, options, run) => {
 	const handler = createCatchAllHandler(routes, {
 		bodyCodecs: options.bodyCodecs,
+		onError: options.onError,
 	});
 	return withFetchServer(async (request) => {
 		if (options.readBody) await request.text();
@@ -130,6 +132,7 @@ const serveFetch: Serve = (routes, options, run) => {
 const serveNode: Serve = (routes, options, run) => {
 	const handler = node.createCatchAllHandler(routes, {
 		bodyCodecs: options.bodyCodecs,
+		onError: options.onError,
 	});
 	return withHttpServer(async (req, res) => {
 		try {
@@ -354,6 +357,28 @@ describe.each([
 				message: "Slow down",
 				data: { limit: 10 },
 			});
+		});
+	});
+
+	it("observes a thrown declared error as thrown, with its own cause", async () => {
+		const Gone = routeError("GONE", { status: 410 });
+		const failure = new Error("record deleted");
+		const thrown = new Gone({ cause: failure });
+		const onError = vi.fn();
+		const routes = {
+			gone: route
+				.get("/gone")
+				.error(Gone)
+				.handler((): string => {
+					throw thrown;
+				}),
+		};
+		await serve(routes, { onError }, async (url) => {
+			expect((await fetch(`${url}/gone`)).status).toBe(410);
+			expect(onError).toHaveBeenCalledOnce();
+			const [observed] = onError.mock.calls[0]!;
+			expect(observed).toBe(thrown);
+			expect(observed.cause).toBe(failure);
 		});
 	});
 
