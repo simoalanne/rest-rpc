@@ -142,7 +142,11 @@ const readBody = async (
 ) => {
 	if (!mediaType || rawResponse.body === null) return undefined;
 	try {
-		return await codecs.deserialize(rawResponse, mediaType);
+		return await codecs.deserialize(
+			rawResponse,
+			mediaType,
+			rawResponse.headers.get("content-type") ?? "",
+		);
 	} catch (cause) {
 		throw contractError("Response body could not be decoded.", cause);
 	}

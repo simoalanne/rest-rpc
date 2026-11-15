@@ -7,12 +7,13 @@ import type {
 } from "../routing/match.ts";
 import { createRouteMatcher } from "../routing/match.ts";
 import {
-	compileRoutes,
-	type CompileRoutesOptions,
-	type FetchRoute,
-} from "./compileRoutes.ts";
-import { InternalServerError, NotFound, observeError } from "./errors.ts";
-import { serializeRouteError } from "./serializeHttpRouteResult.ts";
+	InternalServerError,
+	NotFound,
+	observeError,
+} from "../pipeline/errors.ts";
+import type { CreateRouteHandlersOptions } from "../pipeline/handleOptions.ts";
+import { createRouteHandlers, type FetchRoute } from "./createRouteHandlers.ts";
+import { serializeFetchError } from "./response.ts";
 
 /**
  * Customizes the routes, not found responses, request parsing and error
@@ -23,7 +24,7 @@ import { serializeRouteError } from "./serializeHttpRouteResult.ts";
 export type CreateAppOptions<
 	TArgs extends unknown[] = [],
 	TContext extends object = EmptyObject,
-> = CompileRoutesOptions & {
+> = CreateRouteHandlersOptions & {
 	/**
 	 * The path the routes are served under, such as `/api`. Route paths do not
 	 * include it.
@@ -57,8 +58,8 @@ export type AppContext<TArgs extends unknown[], TContext extends object> =
  * A Fetch app that serves a route tree.
  *
  * @remarks Runtimes that serve a default-exported `fetch` handler, such as
- * Bun, Deno and Cloudflare Workers, can serve it as is. `Bun.serve()` accepts
- * it directly or spread with other server options.
+ * Bun, Deno and Cloudflare Workers, serve it as is. Spread it into
+ * `Bun.serve()` to set other server options.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#usage}
  */
@@ -86,14 +87,14 @@ export type App<TArgs extends unknown[] = []> = {
 	>;
 };
 
-const defaultNotFound = () => serializeRouteError(new NotFound());
+const defaultNotFound = () => serializeFetchError(new NotFound());
 
 /**
  * Creates a Fetch app that serves a route tree.
  *
  * @remarks Errors that are not sent as error responses by the routes, such as
  * errors thrown by handlers, are sent as `INTERNAL_SERVER_ERROR` responses
- * with the thrown error as `cause`. Use {@link compileRoutes} and
+ * with the thrown error as `cause`. Use {@link createRouteHandlers} and
  * {@link createCatchAllHandler} instead to serve the routes from an existing
  * server or framework.
  *
@@ -134,9 +135,9 @@ export function createApp(
 	const respondWithInternalError = (error: unknown, request: Request) => {
 		const internal = new InternalServerError({ cause: error });
 		observeError(compileOptions.onError, internal, request);
-		return serializeRouteError(internal);
+		return serializeFetchError(internal);
 	};
-	const compiled = compileRoutes<RuntimeImplementationTree>(
+	const compiled = createRouteHandlers<RuntimeImplementationTree>(
 		implementations,
 		compileOptions,
 	);

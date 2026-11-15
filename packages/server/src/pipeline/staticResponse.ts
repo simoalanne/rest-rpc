@@ -5,18 +5,21 @@ import {
 	normalizeHandlerResult,
 	type HttpRouteResult,
 } from "./handleHttpRoute.ts";
-import { serializeHttpResponseParts } from "./serializeHttpRouteResult.ts";
+import {
+	serializeHttpResponseParts,
+	type SerializedHttpResponse,
+} from "./serializeHttpRouteResult.ts";
 
 /**
  * Runs the handler of a static route once, and validates and serializes its
  * response, throwing when the routes are compiled instead of on a request.
- * Returns a function that creates a new `Response` with the same body.
+ * Returns the parts every response of the route is written from.
  */
 export const prepareStaticResponse = (
 	implementation: RuntimeImplementation,
 	codecs: BodyCodecRegistry,
 	disableResponseValidation: boolean,
-): (() => Response) => {
+): SerializedHttpResponse => {
 	const { method, path } = implementation.route;
 	const name = `"${method} ${path}"`;
 	// Each step must complete synchronously, so failures throw here.
@@ -42,9 +45,8 @@ export const prepareStaticResponse = (
 	const result = prepare(() =>
 		normalizeHandlerResult(implementation, value, disableResponseValidation),
 	) as HttpRouteResult;
-	const { status, headers, body } = prepare(() =>
-		serializeHttpResponseParts(result, codecs),
-	);
+	const parts = prepare(() => serializeHttpResponseParts(result, codecs));
+	const { body } = parts;
 	// Other bodies are read again for every response, but a stream only once,
 	// and a codec may serialize any value to one.
 	if (body instanceof ReadableStream || isAsyncIterable(body)) {
@@ -52,7 +54,5 @@ export const prepareStaticResponse = (
 			`Static response of route ${name} cannot serialize to a stream, which can be sent only once.`,
 		);
 	}
-	// Codecs may return views of a `SharedArrayBuffer`, which `BodyInit` omits.
-	const init = body as ConstructorParameters<typeof Response>[0];
-	return () => new Response(init, { status, headers });
+	return parts;
 };

@@ -100,10 +100,10 @@ export const responseValidationFailed = (
 const ignore = () => {};
 
 // Observers cannot change the response, so their failures are ignored.
-export const observeError = (
-	onError: ((error: RouteError, request: Request) => void) | undefined,
+export const observeError = <TRequest>(
+	onError: ((error: RouteError, request: TRequest) => void) | undefined,
 	error: RouteError,
-	request: Request,
+	request: TRequest,
 ) => {
 	if (!onError) return;
 	try {

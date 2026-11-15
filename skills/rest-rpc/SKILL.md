@@ -18,7 +18,7 @@ contract package between server and client instead.
 
 An app that only needs typed endpoints can serve them directly with `createApp`.
 An app with a framework keeps the framework's routing, middleware, auth,
-dependency injection, and deployment conventions, and registers compiled routes
+dependency injection, and deployment conventions, and registers route handlers
 on it.
 
 ## Read the Cheatsheet First

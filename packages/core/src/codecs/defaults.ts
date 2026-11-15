@@ -14,7 +14,9 @@ export const serializeJson = (value: unknown) => {
 export const defaultBodyCodecs: readonly BodyCodec[] = [
 	bodyCodec(["application/json", /\+json$/], {
 		serialize: serializeJson,
-		deserialize: (source) => source.json(),
+		// Returned without an async wrapper, so Fetch's native parser adds no
+		// promise per request.
+		deserialize: (body) => body.json(),
 	}),
 	bodyCodec("application/x-www-form-urlencoded", {
 		serialize: (value) => {
@@ -22,7 +24,7 @@ export const defaultBodyCodecs: readonly BodyCodec[] = [
 				throw new TypeError("Expected URLSearchParams body");
 			return value;
 		},
-		deserialize: async (source) => new URLSearchParams(await source.text()),
+		deserialize: async (body) => new URLSearchParams(await body.text()),
 	}),
 	bodyCodec("multipart/form-data", {
 		serialize: (value) => {
@@ -31,7 +33,11 @@ export const defaultBodyCodecs: readonly BodyCodec[] = [
 			// Fetch sets the content type with the generated boundary.
 			return serializedBody(value);
 		},
-		deserialize: (source) => source.formData(),
+		// The content type carries the multipart boundary.
+		deserialize: async (body, contentType) =>
+			new Response(await body.arrayBuffer(), {
+				headers: { "content-type": contentType },
+			}).formData(),
 	}),
 	bodyCodec(/^text\//, {
 		serialize: (value) => {
@@ -39,7 +45,7 @@ export const defaultBodyCodecs: readonly BodyCodec[] = [
 				throw new TypeError("Expected string body");
 			return value;
 		},
-		deserialize: (source) => source.text(),
+		deserialize: (body) => body.text(),
 	}),
 	bodyCodec(/.*/, {
 		serialize: (value) => {
@@ -54,6 +60,6 @@ export const defaultBodyCodecs: readonly BodyCodec[] = [
 				"Expected Blob, Uint8Array, ReadableStream or AsyncIterable body",
 			);
 		},
-		deserialize: (source) => source.blob(),
+		deserialize: (body) => body.blob(),
 	}),
 ];

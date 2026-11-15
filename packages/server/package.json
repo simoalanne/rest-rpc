@@ -32,7 +32,7 @@
 	"types": "./src/index.ts",
 	"exports": {
 		".": "./src/index.ts",
-		"./node": "./src/node/adapter.ts"
+		"./node": "./src/node/index.ts"
 	},
 	"publishConfig": {
 		"main": "./dist/index.js",
@@ -43,8 +43,8 @@
 				"import": "./dist/index.js"
 			},
 			"./node": {
-				"types": "./dist/node/adapter.d.ts",
-				"import": "./dist/node/adapter.js"
+				"types": "./dist/node/index.d.ts",
+				"import": "./dist/node/index.js"
 			}
 		}
 	},

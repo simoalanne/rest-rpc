@@ -7,8 +7,8 @@ import type { BodyCodec, BodyCodecOperations } from "./types.ts";
  * ```ts
  * const msgpack = bodyCodec("application/msgpack", {
  * 	serialize: (value) => encode(value),
- * 	deserialize: async (source) =>
- * 		decode(new Uint8Array(await source.arrayBuffer())),
+ * 	deserialize: async (body) =>
+ * 		decode(new Uint8Array(await body.arrayBuffer())),
  * });
  * ```
  *

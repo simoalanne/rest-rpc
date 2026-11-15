@@ -427,8 +427,10 @@ import { bodyCodec } from "@rest-rpc/core";
 
 // Same codec works on the client and both server runtimes; pass it as `bodyCodecs`.
 const binary = bodyCodec("application/octet-stream", {
-	serialize: (value) => value as Uint8Array,
-	deserialize: async (source) => new Uint8Array(await source.arrayBuffer()),
+	serialize: (value, contentType) => value as Uint8Array, // full content type, with params
+	// body: text(), json(), arrayBuffer(), blob() or the body stream; not a Request on Node
+	deserialize: async (body, contentType) =>
+		new Uint8Array(await body.arrayBuffer()),
 });
 ```
 
@@ -459,13 +461,24 @@ route.body(todoInput).error(RequestValidationFailed); // types its issues as `da
 
 ## Server
 
-### [Fetch Runtimes](/docs/server/fetch)
+### [Serving Routes](/docs/server/overview)
+
+```ts
+// The same functions from @rest-rpc/server (Fetch) and @rest-rpc/server/node (Node),
+// from most to least of each request handled by rest-rpc:
+createApp(routes, options); // routes, 404s and thrown errors: the handler the runtime calls
+createCatchAllHandler(routes, options); // routes under one framework route, unmatched fall through
+createRouteHandlers(routes, options); // one route per rest-rpc route for the framework's router
+// Thrown errors reject from the last two, for the framework to handle.
+```
+
+### [Fetch](/docs/server/fetch)
 
 ```ts
 import { createApp } from "@rest-rpc/server";
 
 export default createApp(routes, {
-	mountPath: "/internal", // served under, not part of route paths (use .prefix() for that)
+	mountPath: "/api", // served under, not part of route paths (use .prefix() for that)
 	context: (request, env: Env) => ({ db: env.DB }), // extra fetch args, e.g. Workers env
 	notFound: (request) => new Response("Not found", { status: 404 }),
 	onError: (error, request) =>
@@ -473,21 +486,28 @@ export default createApp(routes, {
 	bodyCodecs: [binary], // also disableRequestValidation, disableResponseValidation
 });
 
-const app = createApp(routes); // Bun: native router via app.routes
-Bun.serve({ ...app, routes: { ...app.routes, "/ping": new Response("ok") } });
+// app.routes is routed by Bun's native router. Bun server options:
+const app = createApp(routes);
+Bun.serve({
+	...app,
+	port: 8080,
+	routes: { ...app.routes, "/ping": new Response("ok") },
+});
 ```
 
-### [Node HTTP](/docs/server/node)
+### [Node](/docs/server/node)
 
 ```ts
-import { createApp } from "@rest-rpc/server";
-import { serve } from "@rest-rpc/server/node";
+import { createServer } from "node:http";
+import { createApp } from "@rest-rpc/server/node";
 
-const server = serve(createApp(routes), {
-	port: 3000,
-	onListen: ({ port }) => log(port),
+// A request listener with the same options, but Node's request in context and notFound.
+const app = createApp(routes, {
+	context: (req) => ({ user: req.headers.authorization }),
+	notFound: (req, res) => void res.writeHead(404).end(), // writing nothing keeps NOT_FOUND
 });
-process.on("SIGTERM", () => server.close()); // returns the http.Server
+const server = createServer(app).listen(3000);
+process.on("SIGTERM", () => server.close());
 ```
 
 ### [Framework Integration](/docs/server/framework-integration)
@@ -495,9 +515,9 @@ process.on("SIGTERM", () => server.close()); // returns the http.Server
 ```ts
 // Native router, Express: one framework route per rest-rpc route.
 // Node frameworks import from @rest-rpc/server/node, Fetch ones from @rest-rpc/server.
-import { compileRoutes } from "@rest-rpc/server/node";
+import { createRouteHandlers } from "@rest-rpc/server/node";
 
-for (const r of compileRoutes(routes)) {
+for (const r of createRouteHandlers(routes)) {
 	app[r.method.toLowerCase()](r.path, (req, res, next) => {
 		r.handle(req, res, {
 			context: { user: req.user }, // seeds the request context
@@ -510,12 +530,12 @@ for (const r of compileRoutes(routes)) {
 
 ```ts
 // Catch-all, Hono: rest-rpc routes under one mount, unmatched requests fall through.
-import { compileRoutes, createCatchAllHandler } from "@rest-rpc/server";
+import { createCatchAllHandler } from "@rest-rpc/server";
 
-const handler = createCatchAllHandler(compileRoutes(routes));
-app.all("/internal/*", async (c) => {
+const handler = createCatchAllHandler(routes); // also takes the route options
+app.all("/api/*", async (c) => {
 	const result = await handler(c.req.raw, {
-		mountPath: "/internal",
+		mountPath: "/api",
 		context: { user: c.var.user },
 	});
 	return result.matched ? result.response : c.notFound();

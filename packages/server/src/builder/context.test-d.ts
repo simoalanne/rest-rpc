@@ -1,10 +1,11 @@
 import { type } from "@rest-rpc/core";
 import { call } from "../pipeline/call.ts";
 import {
-	compileRoutes,
+	createRouteHandlers,
 	createCatchAllHandler,
-} from "../pipeline/compileRoutes.ts";
-import { createApp } from "../pipeline/createApp.ts";
+} from "../fetch/createRouteHandlers.ts";
+import { createApp as createNodeApp } from "../node/createApp.ts";
+import { createApp } from "../fetch/createApp.ts";
 import { implement } from "./implement.ts";
 import { route } from "./routeBuilder.ts";
 
@@ -80,17 +81,30 @@ describe("host context", () => {
 		);
 	});
 
-	it("requires the initial context of compiled routes and the catch-all handler", () => {
-		const routes = compileRoutes({ withUser, withDb });
+	it("requires the initial context of a Node app", () => {
+		createNodeApp({ open, injected });
+		// @ts-expect-error The routes require user.
+		createNodeApp({ open, withUser });
+		createNodeApp({ withUser }, { context: { user: "1" } });
+		// @ts-expect-error The routes require db too.
+		createNodeApp({ withUser, withDb }, { context: { user: "1" } });
+		createNodeApp(
+			{ withUser, withDb },
+			{ context: async () => ({ user: "1", db: 1 }) },
+		);
+	});
+
+	it("requires the initial context of route handlers and the catch-all handler", () => {
+		const routes = createRouteHandlers({ withUser, withDb });
 		const request = new Request("http://localhost/user");
 		// @ts-expect-error The routes require user and db.
 		void routes[0]!.handle(request);
 		void routes[0]!.handle(request, { context: { user: "1", db: 1 } });
-		const handler = createCatchAllHandler(routes);
+		const handler = createCatchAllHandler({ withUser, withDb });
 		// @ts-expect-error The routes require user and db.
 		void handler(request);
 		void handler(request, { context: { user: "1", db: 1 } });
-		void compileRoutes({ open })[0]!.handle(request);
+		void createRouteHandlers({ open })[0]!.handle(request);
 	});
 
 	it("requires the initial context of a called route", () => {

@@ -20,7 +20,8 @@ export type BodyValue =
  */
 export type SerializedBody = {
 	readonly body: BodyValue;
-	readonly headers: Headers;
+	/** Headers with lowercase names. */
+	readonly headers: Readonly<Record<string, string>>;
 };
 
 /**
@@ -34,14 +35,38 @@ export type BodySerializer = (
 ) => BodyValue | SerializedBody | Promise<BodyValue | SerializedBody>;
 
 /**
+ * The body of an incoming request or response, read once with one of its
+ * methods.
+ *
+ * @remarks Fetch `Request` and `Response` objects are incoming bodies, so the
+ * client and Fetch servers pass them as is. The Node server passes an object
+ * that reads the request stream, so a codec should not rely on other
+ * properties of `Request`.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/serialization#incoming-body}
+ */
+export type IncomingBody = {
+	/** Reads the body as UTF-8 text. */
+	text(): Promise<string>;
+	/** Reads the body as UTF-8 text and parses it as JSON. */
+	json(): Promise<unknown>;
+	/** Reads the body as bytes. */
+	arrayBuffer(): Promise<ArrayBuffer>;
+	/** Reads the body as a `Blob` typed with the content type. */
+	blob(): Promise<Blob>;
+	/** The body as a stream, or `null` when the request has no body. */
+	readonly body: ReadableStream<Uint8Array> | null;
+};
+
+/**
  * Reads an incoming body and returns a value for schema validation.
  *
- * @remarks The client passes the Fetch `Response` and the server the Fetch
- * `Request`. Both share the Fetch body methods, so one codec works on both
- * sides. A codec used only on one side can treat `source` as that type.
+ * @remarks It receives the complete content type of the body, with parameters
+ * such as `charset`, as the serializer does.
  */
 export type BodyDeserializer = (
-	source: Request | Response,
+	body: IncomingBody,
+	contentType: string,
 ) => unknown | Promise<unknown>;
 
 /**

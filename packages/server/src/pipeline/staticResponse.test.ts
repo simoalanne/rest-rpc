@@ -1,6 +1,6 @@
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import { route } from "../builder/routeBuilder.ts";
-import { compileRoutes } from "./compileRoutes.ts";
+import { createRouteHandlers } from "../fetch/createRouteHandlers.ts";
 
 const schema = (
 	validate: StandardSchemaV1["~standard"]["validate"],
@@ -14,11 +14,11 @@ describe("static routes", () => {
 			.get("/invalid")
 			.response(schema(() => ({ issues: [{ message: "invalid" }] })))
 			.static({ id: 1 });
-		expect(() => compileRoutes({ invalid })).toThrow();
+		expect(() => createRouteHandlers({ invalid })).toThrow();
 		const async = route
 			.get("/async")
 			.response(schema(async (value) => ({ value })))
 			.static({ id: 1 });
-		expect(() => compileRoutes({ async })).toThrow();
+		expect(() => createRouteHandlers({ async })).toThrow();
 	});
 });

@@ -1,0 +1,103 @@
+import { type } from "@rest-rpc/core";
+import { route } from "../builder/routeBuilder.ts";
+import { createApp } from "./createApp.ts";
+
+// Behavior shared with the Node app is covered by the app conformance tests.
+
+// Entries of routes completed with `.static()` are `Response` values instead.
+const handlerOf = (entry: unknown) =>
+	entry as (request: Request, ...args: unknown[]) => Promise<Response>;
+
+const routes = {
+	root: route.get("/").handler(() => "root"),
+	todos: {
+		get: route
+			.get("/todos/:id")
+			.params(type<{ id: string }>())
+			.handler(({ params }) => params.id),
+		update: route.patch("/todos/:id").handler(({ params }) => params.id),
+		fail: route.get("/fail").handler((): string => {
+			throw new Error("boom");
+		}),
+	},
+};
+
+const user = route
+	.$context<{ user: string }>()
+	.get("/user")
+	.handler(({ context }) => context.user);
+
+describe("createApp", () => {
+	it("lists routes in Bun's routes format with colon params", async () => {
+		const app = createApp(routes, { mountPath: "/api" });
+		const listed = {
+			"/api": ["GET"],
+			"/api/todos/:id": ["GET", "PATCH"],
+			"/api/fail": ["GET"],
+		};
+		for (const mountPath of ["/api", "/api/"] as const) {
+			const { routes: entries } = createApp(routes, { mountPath });
+			expect(
+				Object.fromEntries(
+					Object.entries(entries).map(([path, methods]) => [
+						path,
+						Object.keys(methods),
+					]),
+				),
+			).toEqual(listed);
+		}
+
+		// Bun's router attaches the decoded params to the request.
+		const request = Object.assign(
+			new Request("http://localhost/api/todos/a%2Fb"),
+			{ params: { id: "a/b" } },
+		);
+		const response = await handlerOf(app.routes["/api/todos/:id"]!.GET)(
+			request,
+		);
+		expect(await response.json()).toBe("a/b");
+	});
+
+	it("sends errors the routes do not handle from Bun's routes as internal server errors and reports them", async () => {
+		const onError = vi.fn();
+		const app = createApp(routes, { onError });
+		const response = await handlerOf(app.routes["/fail"]!.GET)(
+			new Request("http://localhost/fail"),
+		);
+		expect(response.status).toBe(500);
+		expect(await response.json()).toMatchObject({
+			code: "INTERNAL_SERVER_ERROR",
+		});
+		expect(onError).toHaveBeenCalledWith(
+			expect.objectContaining({ code: "INTERNAL_SERVER_ERROR" }),
+			expect.any(Request),
+		);
+	});
+
+	it("seeds the context of Bun's routes from the request", async () => {
+		const app = createApp(
+			{ user },
+			{
+				context: async (request) => ({ user: request.headers.get("x-user")! }),
+			},
+		);
+		const response = await handlerOf(app.routes["/user"]!.GET)(
+			new Request("http://localhost/user", { headers: { "x-user": "Ada" } }),
+		);
+		expect(await response.json()).toBe("Ada");
+	});
+
+	it("passes the runtime arguments after the request to the context function", async () => {
+		const app = createApp(
+			{ user },
+			{ context: (_request, env: { user: string }) => ({ user: env.user }) },
+		);
+		const request = () => new Request("http://localhost/user");
+		const fromFetch = await app.fetch(request(), { user: "fetch" });
+		expect(await fromFetch.json()).toBe("fetch");
+		const fromRoutes = await handlerOf(app.routes["/user"]!.GET)(request(), {
+			user: "routes",
+		});
+		expect(await fromRoutes.json()).toBe("routes");
+	});
+});

@@ -49,6 +49,12 @@ The route's definition decides the response: its status, and the validated
 `data` and headers. When `data` or headers fail validation, an
 `INTERNAL_SERVER_ERROR` is sent instead.
 
+[`onError`](/docs/server/overview#error-handling) receives the thrown error as
+is, with the `data`, headers and `cause` it was thrown with. Errors created with
+`errors.CODE()` or a definition already have the defined status. A
+`new RouteError(code)` for a code the route defines keeps its own status, which
+defaults to 400, even though the response uses the defined one.
+
 An error whose code the route does not define is sent as thrown, with its own
 status, `data` and headers, and without validation. Use it for errors that
 apply across routes, such as an `UNAUTHORIZED` thrown by auth middleware, and
@@ -59,13 +65,13 @@ types, so define the error when clients should handle it per call.
 
 The server sends these errors itself, whether or not a route defines them:
 
-| Code                        | Definition                | Status | `data`                                                 | Sent when                                                                                                                                                                                                       |
-| --------------------------- | ------------------------- | ------ | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `REQUEST_VALIDATION_FAILED` | `RequestValidationFailed` | `400`  | Issues grouped by `body`, `query`, `params`, `headers` | [Request validation](/docs/http-behavior/schemas#request-validation) fails                                                                                                                                      |
-| `MALFORMED_REQUEST_BODY`    | `MalformedRequestBody`    | `400`  | none                                                   | The request body cannot be decoded                                                                                                                                                                              |
-| `UNSUPPORTED_MEDIA_TYPE`    | `UnsupportedMediaType`    | `415`  | none                                                   | The request `Content-Type` is not defined by a route with a body, or missing when several media types are                                                                                                       |
-| `INTERNAL_SERVER_ERROR`     | `InternalServerError`     | `500`  | none                                                   | [Response validation](/docs/http-behavior/schemas#response-validation-on-the-server) fails, including error data, or, with [`createApp`](/docs/server/fetch) only, a handler or middleware throws another error |
-| `NOT_FOUND`                 | `NotFound`                | `404`  | none                                                   | No route matches, with `createApp`'s default `notFound` only                                                                                                                                                    |
+| Code                        | Definition                | Status | `data`                                                 | Sent when                                                                                                                                                                                                                     |
+| --------------------------- | ------------------------- | ------ | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `REQUEST_VALIDATION_FAILED` | `RequestValidationFailed` | `400`  | Issues grouped by `body`, `query`, `params`, `headers` | [Request validation](/docs/http-behavior/schemas#request-validation) fails                                                                                                                                                    |
+| `MALFORMED_REQUEST_BODY`    | `MalformedRequestBody`    | `400`  | none                                                   | The request body cannot be decoded                                                                                                                                                                                            |
+| `UNSUPPORTED_MEDIA_TYPE`    | `UnsupportedMediaType`    | `415`  | none                                                   | The request `Content-Type` is not defined by a route with a body, or missing when several media types are                                                                                                                     |
+| `INTERNAL_SERVER_ERROR`     | `InternalServerError`     | `500`  | none                                                   | [Response validation](/docs/http-behavior/schemas#response-validation-on-the-server) fails, including error data, or, with [`createApp`](/docs/server/overview#create-app) only, a handler or middleware throws another error |
+| `NOT_FOUND`                 | `NotFound`                | `404`  | none                                                   | No route matches, with `createApp`'s default `notFound` only                                                                                                                                                                  |
 
 A route that does not add a built-in error still sends it, and clients
 receive it as an untyped `RouteError`. To handle a built-in error with typed
@@ -97,7 +103,7 @@ typed as `data`, with the `RequestValidationIssues` type:
 An invalid response is a server bug, so clients receive no validation details,
 not even that validation failed. For a response validation failure, the
 error's `cause` holds the validation `location` and `issues`, and is available
-to [`onError`](/docs/server/fetch#error-handling).
+to [`onError`](/docs/server/overview#error-handling).
 
 A stream item that fails validation cannot change the response status. The
 stream ends instead.
@@ -105,6 +111,6 @@ stream ends instead.
 ## Other Errors
 
 Other errors thrown by handlers, middleware, or custom serializers are not sent
-as error responses by compiled routes. They reject the handler promise, and
+as error responses by route handlers and the catch-all handler. They reject the handler promise, and
 reach the framework's error handling when routes are registered on a framework.
 `createApp` sends them as `INTERNAL_SERVER_ERROR` responses.
