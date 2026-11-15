@@ -39,49 +39,65 @@ const readBuffer = (request: IncomingMessage) =>
 
 const utf8Bom = 0xfeff;
 
-/** Reads a Node request body once, the first time a codec asks for it. */
-const createNodeBody = (
-	request: IncomingMessage,
-	contentType: string,
-): IncomingBody => {
-	const framed = hasBody(request);
-	let buffer: Promise<Buffer> | undefined;
-	let stream: ReadableStream<Uint8Array> | null | undefined;
-	const read = () =>
-		(buffer ??= framed ? readBuffer(request) : Promise.resolve(emptyBuffer));
+/**
+ * Reads a Node request body once, the first time a codec asks for it. A class
+ * keeps the methods on the prototype, so a request allocates one object.
+ */
+class NodeBody implements IncomingBody {
+	#request: IncomingMessage;
+	#contentType: string;
+	#framed: boolean;
+	#buffer: Promise<Buffer> | undefined;
+	#stream: ReadableStream<Uint8Array> | null | undefined;
+
+	constructor(request: IncomingMessage, contentType: string) {
+		this.#request = request;
+		this.#contentType = contentType;
+		this.#framed = hasBody(request);
+	}
+
+	#read(): Promise<Buffer> {
+		return (this.#buffer ??= this.#framed
+			? readBuffer(this.#request)
+			: Promise.resolve(emptyBuffer));
+	}
+
 	// Decoded like Fetch `text()`, which drops a byte order mark.
-	const text = async () => {
-		const decoded = (await read()).toString("utf8");
+	async text(): Promise<string> {
+		const decoded = (await this.#read()).toString("utf8");
 		return decoded.charCodeAt(0) === utf8Bom ? decoded.slice(1) : decoded;
-	};
-	return {
-		text,
-		json: async () => JSON.parse(await text()),
-		arrayBuffer: async () => {
-			const bytes = await read();
-			return bytes.buffer.slice(
-				bytes.byteOffset,
-				bytes.byteOffset + bytes.byteLength,
-			) as ArrayBuffer;
-		},
-		blob: async () =>
-			new Blob([(await read()) as Uint8Array<ArrayBuffer>], {
-				type: contentType,
-			}),
-		get body() {
-			stream ??= framed
-				? ReadableStream.from(request as AsyncIterable<Uint8Array>)
-				: null;
-			return stream;
-		},
-	};
-};
+	}
+
+	async json(): Promise<unknown> {
+		return JSON.parse(await this.text());
+	}
+
+	async arrayBuffer(): Promise<ArrayBuffer> {
+		const bytes = await this.#read();
+		return bytes.buffer.slice(
+			bytes.byteOffset,
+			bytes.byteOffset + bytes.byteLength,
+		) as ArrayBuffer;
+	}
+
+	async blob(): Promise<Blob> {
+		return new Blob([(await this.#read()) as Uint8Array<ArrayBuffer>], {
+			type: this.#contentType,
+		});
+	}
+
+	get body(): ReadableStream<Uint8Array> | null {
+		return (this.#stream ??= this.#framed
+			? ReadableStream.from(this.#request as AsyncIterable<Uint8Array>)
+			: null);
+	}
+}
 
 const readNodeBody = (request: IncomingMessage, contentType: string) => {
 	if (request.readableDidRead || request.readableEnded) {
 		throw bodyAlreadyRead();
 	}
-	return createNodeBody(request, contentType);
+	return new NodeBody(request, contentType);
 };
 
 // Node joins repeated headers itself, except `set-cookie`, which is an array.
