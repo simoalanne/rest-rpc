@@ -1,7 +1,7 @@
 /**
  * A body a serializer can return. On the client it must be a Fetch request
  * body. On the server it must be a value the runtime can send; async iterables
- * are sent as streams.
+ * are sent as streams, with strings encoded as UTF-8.
  */
 export type BodyValue =
 	| string
@@ -10,8 +10,8 @@ export type BodyValue =
 	| Blob
 	| FormData
 	| URLSearchParams
-	| ReadableStream
-	| AsyncIterable<unknown>;
+	| ReadableStream<Uint8Array>
+	| AsyncIterable<string | Uint8Array>;
 
 /**
  * A body sent with its own headers, created with `serializedBody()`.

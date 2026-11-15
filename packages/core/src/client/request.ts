@@ -222,21 +222,21 @@ export const constructBaseRequest = (
 	};
 };
 
-// A plain body is sent with the selected content type, and a serialized body
-// with its own headers.
+// A body is sent with the content type of its serialized headers, or else the
+// selected one. Fetch sets the content type of `FormData` with its generated
+// multipart boundary.
 const toRequestBody = (
 	serialized: BodyValue | SerializedBody,
 	contentType: string,
-) =>
-	isSerializedBody(serialized)
-		? {
-				body: serialized.body as RequestInit["body"],
-				headers: { ...serialized.headers },
-			}
-		: {
-				body: serialized as RequestInit["body"],
-				headers: { "content-type": contentType },
-			};
+) => {
+	const { body, headers } = isSerializedBody(serialized)
+		? serialized
+		: { body: serialized, headers: undefined };
+	const requestHeaders: Record<string, string> = { ...headers };
+	if (body instanceof FormData) delete requestHeaders["content-type"];
+	else requestHeaders["content-type"] ??= contentType;
+	return { body: body as RequestInit["body"], headers: requestHeaders };
+};
 
 export type ExecuteRequestOptions = {
 	baseUrl: string;
@@ -300,8 +300,8 @@ export const executeRequest = async (
 			...clientHeaders,
 			...requestHeaders,
 		};
-		// A body's content type replaces one passed as a header, also when the
-		// runtime sets it, such as for `FormData`.
+		// A body's content type replaces one passed as a header, also when
+		// Fetch sets it for `FormData`.
 		if (serialized) {
 			delete headers["content-type"];
 			Object.assign(headers, serialized.headers);

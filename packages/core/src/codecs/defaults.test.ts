@@ -1,5 +1,4 @@
 import { createBodyCodecRegistry } from "./registry.ts";
-import { serializedBody } from "./serializedBody.ts";
 import type { IncomingBody } from "./types.ts";
 
 const codecs = createBodyCodecRegistry([]);
@@ -22,11 +21,9 @@ describe("defaults", () => {
 		).toThrow();
 	});
 
-	it("leaves the multipart content type to the runtime", () => {
+	it("serializes FormData as is", () => {
 		const body = new FormData();
-		expect(codecs.serialize(body, "multipart/form-data")).toEqual(
-			serializedBody(body),
-		);
+		expect(codecs.serialize(body, "multipart/form-data")).toBe(body);
 		expect(() =>
 			codecs.serialize({ name: "Ada" }, "multipart/form-data"),
 		).toThrow();

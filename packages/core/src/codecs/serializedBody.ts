@@ -3,13 +3,15 @@ import type { BodyValue, SerializedBody } from "./types.ts";
 const serializedBodyBrand = Symbol("rest-rpc.serializedBody");
 
 /**
- * Creates a body that is sent with its own headers instead of the selected
- * content type. Without a `content-type` header, the runtime sets one for the
- * body, such as `multipart/form-data` with its generated boundary for
- * `FormData`.
+ * Creates a body that is sent with its own headers. Without a `content-type`
+ * header, the selected content type is sent.
  *
- * @remarks A `content-type` header may change parameters but must keep the
- * selected base media type, since content types are part of route types.
+ * @remarks A `FormData` body is always sent with the `multipart/form-data`
+ * content type the runtime generates with its boundary, so a `content-type`
+ * header is ignored for it.
+ *
+ * A `content-type` header may change parameters but must keep the selected
+ * base media type, since content types are part of route types.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/serialization#serializer-result}
  */
