@@ -4,9 +4,9 @@ const serializedBodyBrand = Symbol("rest-rpc.serializedBody");
 
 /**
  * Creates a body that is sent with its own headers instead of the selected
- * content type. Without a `content-type` header, the Fetch `Request` or
- * `Response` sets one for the body, such as `multipart/form-data` with its
- * generated boundary for `FormData`.
+ * content type. Without a `content-type` header, the runtime sets one for the
+ * body, such as `multipart/form-data` with its generated boundary for
+ * `FormData`.
  *
  * @remarks A `content-type` header may change parameters but must keep the
  * selected base media type, since content types are part of route types.
@@ -15,13 +15,13 @@ const serializedBodyBrand = Symbol("rest-rpc.serializedBody");
  */
 export function serializedBody(
 	body: BodyValue,
-	options: { headers?: ConstructorParameters<typeof Headers>[0] } = {},
+	options: { headers?: Record<string, string> } = {},
 ): SerializedBody {
-	return {
-		body,
-		headers: new Headers(options.headers),
-		[serializedBodyBrand]: true,
-	} as SerializedBody;
+	const headers: Record<string, string> = {};
+	for (const name in options.headers) {
+		headers[name.toLowerCase()] = options.headers[name]!;
+	}
+	return { body, headers, [serializedBodyBrand]: true } as SerializedBody;
 }
 
 export const isSerializedBody = (value: unknown): value is SerializedBody =>

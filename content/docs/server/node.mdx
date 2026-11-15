@@ -1,19 +1,13 @@
 ---
-title: Node HTTP
+title: Node
 description: Serve rest-rpc routes with Node.js node:http
 ---
 
-`@rest-rpc/server/node` serves routes on `node:http`, reading the Node request
-and writing the Node response directly. Routes behave the same as on the
-[Fetch runtime](/docs/server/fetch), including streamed responses. To add the
-routes to an existing framework such as Express or Fastify, see
-[Framework Integration](/docs/server/framework-integration).
-
-## Install
-
-```package-install
-npm i @rest-rpc/server
-```
+`@rest-rpc/server/node` serves routes with Node's `IncomingMessage` and
+`ServerResponse`, reading and writing them directly. See
+[Serving Routes](/docs/server/overview) for what is shared with
+[Fetch](/docs/server/fetch), and [Framework Integration](/docs/server/framework-integration)
+to add the routes to a framework such as Express or Fastify.
 
 ## Usage
 
@@ -37,7 +31,7 @@ The listener also works with `https.createServer()`.
 
 ## App Options
 
-`createApp` takes the [route options](/docs/server/fetch#route-options) and
+`createApp` takes the [route options](/docs/server/overview#route-options) and
 these:
 
 ```ts
@@ -53,8 +47,8 @@ type CreateNodeAppOptions = {
 };
 ```
 
-- `mountPath`: the path the routes are served under, as on the
-  [Fetch runtime](/docs/server/fetch#app-options).
+- `mountPath`: the path the routes are served under, such as `/api`. See
+  [Mount Path](/docs/server/overview#mount-path).
 - `context`: the [initial context](/docs/middleware#values-from-the-host) the
   routes declare, or a function, sync or async, that returns it for each
   request. It is required when the routes declare initial context. If the
@@ -81,9 +75,8 @@ type CreateNodeAppOptions = {
   });
   ```
 
-`onError` receives the `IncomingMessage` as its request. Errors a route does not
-send as an error response, such as errors thrown by handlers, are sent as
+Errors a route does not send as an error response, such as errors thrown by
+handlers, are sent as
 [`INTERNAL_SERVER_ERROR`](/docs/http-behavior/errors#built-in-errors) responses
-and passed to [`onError`](/docs/server/fetch#error-handling). When the response
-already started, such as a stream that fails, the connection is closed
-instead, so the client sees an incomplete response.
+and passed to [`onError`](/docs/server/overview#error-handling), which receives
+the `IncomingMessage` as its request.

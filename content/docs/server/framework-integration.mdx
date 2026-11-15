@@ -11,12 +11,14 @@ as Express and Fastify. Both export the same functions.
 Register each route on the framework's [native router](#native-router) when
 the framework should see each route, such as to apply its middleware per route,
 or mount all routes under one framework route with the
-[catch-all handler](#catch-all-handler).
+[catch-all handler](#catch-all-handler). See
+[Choosing a Level](/docs/server/overview#choosing-a-level) for how they compare
+with `createApp`.
 
 ## Creating Route Handlers
 
 Both ways take the route tree and the
-[route options](/docs/server/fetch#route-options). `createRouteHandlers`
+[route options](/docs/server/overview#route-options). `createRouteHandlers`
 returns one route per method and path:
 
 ```ts
@@ -57,7 +59,7 @@ type HandleOptions = {
   sets, such as `req.params` in Express, are used, or else they are read from
   the request URL. The catch-all handler passes the params it matched.
 - `body`: a request body already parsed by the framework, such as with
-  `express.json()`. It is used instead of reading the raw body from
+  `express.json()`. When it is defined, it is used instead of reading the raw body from
   `Request.body`, or from the request stream in Node, and is still validated
   against the route's body schema. A body parser reads the request body, so
   pass the parsed body whenever one ran: a route that has to read a body that
@@ -163,22 +165,16 @@ app.use("/api", (req, res, next) => {
 ### Mount Path
 
 When the handler is mounted under a path that is not part of the route paths,
-pass it as `mountPath`. Requests outside it are unmatched, and it is removed
-from the request path before matching. The Node handler reads the path from
-`req.originalUrl` when the framework sets it, as Express does when it removes
-the mount path from `req.url`, so pass the full mount path.
-
-`mountPath` is a per-request option, so one handler can serve the same routes
-under several mount paths. Route paths do not include it, so clients put it in
-their base URL. A path that clients and OpenAPI documents should include in
-each route, such as `/v1`, belongs in the routes instead, defined with
-[`.prefix()`](/docs/route-builder#path-prefixes).
+pass it as [`mountPath`](/docs/server/overview#mount-path). It is a
+per-request option, so one handler can serve the same routes under several
+mount paths. The Node handler reads the path from `req.originalUrl` when the
+framework sets it, as Express does when it removes the mount path from
+`req.url`, so pass the full mount path.
 
 ## Error Handling
 
 [Defined and built-in errors](/docs/http-behavior/errors) are sent as error
-responses, and observed with `onError` from the
-[route options](/docs/server/fetch#error-handling). Other errors thrown by
+responses, and observed with [`onError`](/docs/server/overview#error-handling). Other errors thrown by
 handlers or middleware reject the promise returned by `handle` or the
 catch-all handler, so pass them to the framework's error handling, as the
 Express examples do with `next`.

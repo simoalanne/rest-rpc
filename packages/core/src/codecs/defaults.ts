@@ -1,7 +1,7 @@
 import { bodyCodec } from "./bodyCodec.ts";
 import { isAsyncIterable } from "./operations.ts";
 import { serializedBody } from "./serializedBody.ts";
-import type { BodyCodec, IncomingBody } from "./types.ts";
+import type { BodyCodec } from "./types.ts";
 
 /** The built-in JSON serializer. Fetch handlers detect it to send `Response.json` instead. */
 export const serializeJson = (value: unknown) => {
@@ -10,24 +10,11 @@ export const serializeJson = (value: unknown) => {
 	return body;
 };
 
-/** The built-in JSON deserializer. Sources with a `json` method, such as Fetch requests and responses, are read with it instead. */
-export const deserializeJson = async (body: IncomingBody): Promise<unknown> =>
-	JSON.parse(await body.text());
-
-/** The built-in multipart deserializer. Sources with a `formData` method, such as Fetch requests and responses, are read with it instead. */
-export const deserializeFormData = async (
-	body: IncomingBody,
-	contentType: string,
-): Promise<FormData> =>
-	new Response(await body.arrayBuffer(), {
-		headers: { "content-type": contentType },
-	}).formData();
-
 /** Fetch-compatible built-in codecs, ordered from specific formats to binary fallback. */
 export const defaultBodyCodecs: readonly BodyCodec[] = [
 	bodyCodec(["application/json", /\+json$/], {
 		serialize: serializeJson,
-		deserialize: deserializeJson,
+		deserialize: async (body) => JSON.parse(await body.text()),
 	}),
 	bodyCodec("application/x-www-form-urlencoded", {
 		serialize: (value) => {
@@ -44,7 +31,11 @@ export const defaultBodyCodecs: readonly BodyCodec[] = [
 			// Fetch sets the content type with the generated boundary.
 			return serializedBody(value);
 		},
-		deserialize: deserializeFormData,
+		// The content type carries the multipart boundary.
+		deserialize: async (body, contentType) =>
+			new Response(await body.arrayBuffer(), {
+				headers: { "content-type": contentType },
+			}).formData(),
 	}),
 	bodyCodec(/^text\//, {
 		serialize: (value) => {

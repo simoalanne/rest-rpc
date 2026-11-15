@@ -3,7 +3,7 @@ import {
 	createBodyCodecRegistry,
 	normalizeMediaType,
 	type BodyCodecRegistry,
-	type DeserializeSource,
+	type IncomingBody,
 } from "@rest-rpc/core/codecs";
 import type { HttpMethod } from "@rest-rpc/core/contract";
 import {
@@ -24,7 +24,7 @@ import {
 import type {
 	CreateRouteHandlersOptions,
 	HandleOptions,
-} from "./createRouteHandlers.ts";
+} from "./handleOptions.ts";
 import { deserializeRequestBody } from "./deserializeRequestBody.ts";
 import { observeError } from "./errors.ts";
 import {
@@ -35,10 +35,7 @@ import {
 } from "./handleHttpRoute.ts";
 import { resolveRequestMediaType } from "./requestContentType.ts";
 import { resolveRouteError } from "./resolveRouteError.ts";
-import type {
-	HeaderSink,
-	SerializedHttpResponse,
-} from "./serializeHttpRouteResult.ts";
+import type { SerializedHttpResponse } from "./serializeHttpRouteResult.ts";
 import { sseBodyCodec } from "./sse.ts";
 import { prepareStaticResponse } from "./staticResponse.ts";
 import { parseQuery } from "./validation.ts";
@@ -50,7 +47,7 @@ export type RequestReader<TRequest> = {
 	contentType: (request: TRequest) => string;
 	headers: (request: TRequest) => Record<string, string>;
 	/** Throws when the body was already read, such as by a body parser. */
-	body: (request: TRequest, contentType: string) => DeserializeSource;
+	body: (request: TRequest, contentType: string) => IncomingBody;
 };
 
 /** A route result to serialize, or an error to send as an error response. */
@@ -120,7 +117,7 @@ const createDispatch = <TRequest extends object>(
 			}
 			mediaType = selected;
 
-			if (handleOptions && "body" in handleOptions) {
+			if (handleOptions?.body !== undefined) {
 				body = handleOptions.body;
 			} else {
 				const deserialized = await deserializeRequestBody(
@@ -174,41 +171,30 @@ const createDispatch = <TRequest extends object>(
 };
 
 /** A route of a compiled route tree, before a runtime makes a handler of it. */
-export type CompiledRoute<THeaders extends HeaderSink> = {
+export type CompiledRoute = {
 	method: HttpMethod;
 	path: string;
 	implementation: RuntimeImplementation;
 	pathParams: PathParams;
 	/** The response of a route completed with `.static()`. */
-	staticResponse?: SerializedHttpResponse<THeaders>;
-};
-
-/** A route tree compiled for one runtime. */
-export type CompiledRouteTree<TRequest, THeaders extends HeaderSink> = {
-	routes: CompiledRoute<THeaders>[];
-	dispatch: Dispatch<TRequest>;
-	codecs: BodyCodecRegistry;
+	staticResponse?: SerializedHttpResponse;
 };
 
 /**
  * Flattens a route tree, prepares static responses and creates the dispatch
  * shared by the handlers of a runtime.
  */
-export const compileRouteTree = <
-	TRequest extends object,
-	THeaders extends HeaderSink,
->(
+export const compileRouteTree = <TRequest extends object>(
 	implementations: RuntimeImplementationTree,
 	options: CreateRouteHandlersOptions<TRequest>,
 	reader: RequestReader<TRequest>,
-	createHeaders: () => THeaders,
-): CompiledRouteTree<TRequest, THeaders> => {
+) => {
 	const codecs = createBodyCodecRegistry([
 		sseBodyCodec,
 		...(options.bodyCodecs ?? []),
 	]);
 	const routes = flattenRouteImplementations(implementations).map(
-		(implementation): CompiledRoute<THeaders> => {
+		(implementation): CompiledRoute => {
 			const path = resolveImplementationPath(implementation.route.path);
 			return {
 				method: implementation.route.method,
@@ -220,7 +206,6 @@ export const compileRouteTree = <
 							implementation,
 							codecs,
 							options.disableResponseValidation ?? false,
-							createHeaders,
 						)
 					: undefined,
 			};

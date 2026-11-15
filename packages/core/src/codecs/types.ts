@@ -20,7 +20,8 @@ export type BodyValue =
  */
 export type SerializedBody = {
 	readonly body: BodyValue;
-	readonly headers: Headers;
+	/** Headers with lowercase names. */
+	readonly headers: Readonly<Record<string, string>>;
 };
 
 /**

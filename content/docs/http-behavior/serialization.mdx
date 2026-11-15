@@ -82,7 +82,7 @@ response without a content type or body decodes to `undefined`.
 
 The client uses these codecs for requests and responses. The server follows the
 same mapping and can also send streams. See
-[Request and Response Bodies](/docs/server/fetch#request-and-response-bodies).
+[Request and Response Bodies](/docs/server/overview#request-and-response-bodies).
 
 ## Streams
 
@@ -168,10 +168,11 @@ including parameters, and returns the serialized body:
   [previously selected content type](#bodies-and-media-types). On the client it
   must be a Fetch request body. On the server it must be a value the runtime can
   send. See
-  [Request and Response Bodies](/docs/server/fetch#request-and-response-bodies).
+  [Request and Response Bodies](/docs/server/overview#request-and-response-bodies).
 - `serializedBody(body, { headers })` sends a body with its own headers, for codecs
-  that set headers such as `content-encoding`. Without a `content-type` header,
-  the Fetch `Request` or `Response` sets one for the body, such as
+  that set headers such as `content-encoding`. `headers` is a plain object of
+  header names and values. Without a `content-type` header, the runtime sets
+  one for the body, such as
   `multipart/form-data` with its generated boundary for `FormData`. A
   `content-type` header may change parameters but must keep the
   selected base media type, since content types are part of route types.

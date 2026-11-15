@@ -79,7 +79,7 @@ const get = implement(api.todos.get).handler(({ params, query, errors }) => {
 
 const routes = { todos: { create, get } };
 
-Bun.serve({ ...createApp(routes), port: 3000 });
+export default createApp(routes);
 ```
 
 `implement()` keeps each handler's request and result tied to its definition.

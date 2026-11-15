@@ -1,4 +1,4 @@
-import type { DeserializeSource } from "@rest-rpc/core/codecs";
+import type { IncomingBody } from "@rest-rpc/core/codecs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { bodyAlreadyRead, type RequestReader } from "../pipeline/dispatch.ts";
 
@@ -43,7 +43,7 @@ const utf8Bom = 0xfeff;
 const createNodeBody = (
 	request: IncomingMessage,
 	contentType: string,
-): DeserializeSource => {
+): IncomingBody => {
 	const framed = hasBody(request);
 	let buffer: Promise<Buffer> | undefined;
 	let stream: ReadableStream<Uint8Array> | null | undefined;

@@ -1,24 +1,20 @@
 ---
-title: Fetch Runtime
+title: Fetch
 description: Serve rest-rpc routes with Fetch Request and Response
 ---
 
-The Fetch runtime serves rest-rpc routes with Fetch `Request` and `Response`,
-on fetch-native runtimes such as Bun, Deno, and Cloudflare Workers. For
-`node:http`, see [Node HTTP](/docs/server/node). To add the routes to an
-existing framework such as Hono or Express, see
-[Framework Integration](/docs/server/framework-integration).
-
-## Install
-
-```package-install
-npm i @rest-rpc/server
-```
+`@rest-rpc/server` serves routes with Fetch `Request` and `Response`, on
+fetch-native runtimes such as Bun, Deno, and Cloudflare Workers. See
+[Serving Routes](/docs/server/overview) for what is shared with
+[Node](/docs/server/node), and [Framework Integration](/docs/server/framework-integration)
+to add the routes to a framework such as Hono.
 
 ## Usage
 
 `createApp` turns a route tree into an app with a `fetch` handler. Runtimes such
-as Bun, Deno, and Cloudflare Workers serve it when it is the default export:
+as Bun, Deno, and Cloudflare Workers serve it when it is the default export. The
+app also has `routes` in the format of Bun's `routes` server option, so on Bun
+the requests are routed by Bun's native router:
 
 ```ts server.ts
 import { createApp, route } from "@rest-rpc/server";
@@ -41,12 +37,9 @@ export const routes = { todos: { get: getTodo } };
 export default createApp(routes);
 ```
 
-### Bun
-
-The app also has a `routes` property in the format of Bun's `routes` server
-option, so Bun's native router routes the requests. Pass the app to
-`Bun.serve()` to set other server options, and spread `app.routes` to add your
-own routes next to it:
+:::tip[Bun Server Options]
+To set other Bun server options, spread the app into `Bun.serve()`, and spread
+`app.routes` to add your own routes:
 
 ```ts server.ts
 const app = createApp(routes);
@@ -58,9 +51,12 @@ Bun.serve({
 });
 ```
 
+:::
+
 ## App Options
 
-`createApp` takes the [route options](#route-options) and these:
+`createApp` takes the [route options](/docs/server/overview#route-options) and
+these:
 
 ```ts
 type CreateAppOptions = {
@@ -75,11 +71,8 @@ type CreateAppOptions = {
 };
 ```
 
-- `mountPath`: the path the routes are served under, such as `/api`. Route
-  paths do not include it, so clients put it in their base URL. A path that
-  clients and OpenAPI documents should include in each route, such as `/v1`,
-  belongs in the routes instead, defined with
-  [`.prefix()`](/docs/route-builder#path-prefixes).
+- `mountPath`: the path the routes are served under, such as `/api`. See
+  [Mount Path](/docs/server/overview#mount-path).
 - `context`: the [initial context](/docs/middleware#values-from-the-host) the
   routes declare, or a function, sync or async, that returns it for each
   request. It is required when the routes declare initial context, and must
@@ -110,65 +103,4 @@ type CreateAppOptions = {
 Errors a route does not send as an error response, such as errors thrown by
 handlers, are sent as
 [`INTERNAL_SERVER_ERROR`](/docs/http-behavior/errors#built-in-errors) responses
-and passed to [`onError`](#error-handling).
-
-## Route Options
-
-```ts
-type CreateRouteHandlersOptions = {
-	bodyCodecs?: readonly BodyCodec[];
-	disableRequestValidation?: boolean;
-	disableResponseValidation?: boolean;
-	onError?: (error: RouteError, request: Request) => void;
-};
-```
-
-- `bodyCodecs`: see [Request and Response Bodies](#request-and-response-bodies).
-- `disableRequestValidation`, `disableResponseValidation`: see
-  [Disabling Server Validation](/docs/http-behavior/schemas#disabling-server-validation).
-- `onError`: see [Error Handling](#error-handling).
-
-The same options are taken by `createRouteHandlers` and `createCatchAllHandler`
-when [integrating with a framework](/docs/server/framework-integration#creating-route-handlers).
-
-## Paths
-
-Path params are written as `:name`. Matching follows
-[rou3](https://github.com/h3js/rou3): static segments take precedence over
-params, and one trailing slash is ignored. Param values are percent-decoded.
-
-## Request and Response Bodies
-
-Request bodies are decoded with custom `bodyCodecs` first and the
-[default codecs](/docs/http-behavior/serialization#default-codecs) after them.
-A codec's `deserialize` receives the Fetch `Request`.
-
-Handlers can return any value supported by the default codecs. A custom
-serializer must return a Fetch `Response` body, such as a string, `Blob`,
-`FormData`, byte array, or `ReadableStream`, or an async iterable of byte
-chunks. To send it with its own headers, return it wrapped in
-[`serializedBody()`](/docs/http-behavior/serialization#serializer-result).
-
-## Error Handling
-
-[Defined and built-in errors](/docs/http-behavior/errors) are sent as JSON
-error responses. `onError` observes each of them, and `RouteError`s that end a
-stream after its response started, such as stream item validation failures. It
-is not awaited, and errors it throws or rejects with are ignored, so it cannot
-change the response:
-
-```ts
-export default createApp(routes, {
-	onError: (error, request) => {
-		if (error.status >= 500) console.error(request.url, error, error.cause);
-	},
-});
-```
-
-`request` is the Fetch `Request`. With `@rest-rpc/server/node`, it is the Node
-`IncomingMessage`.
-
-A response validation failure is sent as an `INTERNAL_SERVER_ERROR` whose
-`cause` holds the validation `location` and `issues`. With `createApp`,
-`onError` also receives the `INTERNAL_SERVER_ERROR` created for other thrown
-errors, whose `cause` is the thrown error.
+and passed to [`onError`](/docs/server/overview#error-handling).

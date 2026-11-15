@@ -1,7 +1,4 @@
-import type {
-	BodyCodecRegistry,
-	DeserializeSource,
-} from "@rest-rpc/core/codecs";
+import type { BodyCodecRegistry, IncomingBody } from "@rest-rpc/core/codecs";
 import type { RouteError } from "@rest-rpc/core";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import { MalformedRequestBody } from "./errors.ts";
@@ -26,7 +23,7 @@ const toInvalidBody = (): DeserializedRequestBody => ({
 });
 
 export function deserializeRequestBody(
-	source: DeserializeSource,
+	source: IncomingBody,
 	mediaType: string,
 	contentType: string,
 	codecs: BodyCodecRegistry,

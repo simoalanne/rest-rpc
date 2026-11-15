@@ -7,7 +7,6 @@ import {
 } from "./handleHttpRoute.ts";
 import {
 	serializeHttpResponseParts,
-	type HeaderSink,
 	type SerializedHttpResponse,
 } from "./serializeHttpRouteResult.ts";
 
@@ -16,12 +15,11 @@ import {
  * response, throwing when the routes are compiled instead of on a request.
  * Returns the parts every response of the route is written from.
  */
-export const prepareStaticResponse = <THeaders extends HeaderSink>(
+export const prepareStaticResponse = (
 	implementation: RuntimeImplementation,
 	codecs: BodyCodecRegistry,
 	disableResponseValidation: boolean,
-	createHeaders: () => THeaders,
-): SerializedHttpResponse<THeaders> => {
+): SerializedHttpResponse => {
 	const { method, path } = implementation.route;
 	const name = `"${method} ${path}"`;
 	// Each step must complete synchronously, so failures throw here.
@@ -47,9 +45,7 @@ export const prepareStaticResponse = <THeaders extends HeaderSink>(
 	const result = prepare(() =>
 		normalizeHandlerResult(implementation, value, disableResponseValidation),
 	) as HttpRouteResult;
-	const parts = prepare(() =>
-		serializeHttpResponseParts(result, codecs, createHeaders),
-	);
+	const parts = prepare(() => serializeHttpResponseParts(result, codecs));
 	const { body } = parts;
 	// Other bodies are read again for every response, but a stream only once,
 	// and a codec may serialize any value to one.

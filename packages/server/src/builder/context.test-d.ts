@@ -3,9 +3,9 @@ import { call } from "../pipeline/call.ts";
 import {
 	createRouteHandlers,
 	createCatchAllHandler,
-} from "../pipeline/createRouteHandlers.ts";
-import { createApp as createNodeApp } from "../node/adapter.ts";
-import { createApp } from "../pipeline/createApp.ts";
+} from "../fetch/createRouteHandlers.ts";
+import { createApp as createNodeApp } from "../node/createApp.ts";
+import { createApp } from "../fetch/createApp.ts";
 import { implement } from "./implement.ts";
 import { route } from "./routeBuilder.ts";
 

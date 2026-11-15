@@ -31,8 +31,9 @@ to the full [documentation](https://rest-rpc.vercel.app/docs/quickstart).
   - [Serialization and Codecs](#serialization-and-codecs)
   - [Errors](#errors-1)
 - [Server](#server)
-  - [Fetch Runtimes](#fetch-runtimes)
-  - [Node HTTP](#node-http)
+  - [Serving Routes](#serving-routes)
+  - [Fetch](#fetch)
+  - [Node](#node)
   - [Framework Integration](#framework-integration)
 - [Client](#client)
   - [Contract Extraction](#contract-extraction)
@@ -487,7 +488,18 @@ route.body(todoInput).error(RequestValidationFailed); // types its issues as `da
 
 ## Server
 
-### [Fetch Runtimes](https://rest-rpc.vercel.app/docs/server/fetch)
+### [Serving Routes](https://rest-rpc.vercel.app/docs/server/overview)
+
+```ts
+// The same functions from @rest-rpc/server (Fetch) and @rest-rpc/server/node (Node),
+// from most to least of each request handled by rest-rpc:
+createApp(routes, options); // routes, 404s and thrown errors: the handler the runtime calls
+createCatchAllHandler(routes, options); // routes under one framework route, unmatched fall through
+createRouteHandlers(routes, options); // one route per rest-rpc route for the framework's router
+// Thrown errors reject from the last two, for the framework to handle.
+```
+
+### [Fetch](https://rest-rpc.vercel.app/docs/server/fetch)
 
 ```ts
 import { createApp } from "@rest-rpc/server";
@@ -501,11 +513,16 @@ export default createApp(routes, {
 	bodyCodecs: [binary], // also disableRequestValidation, disableResponseValidation
 });
 
-const app = createApp(routes); // Bun: native router via app.routes
-Bun.serve({ ...app, routes: { ...app.routes, "/ping": new Response("ok") } });
+// app.routes is routed by Bun's native router. Bun server options:
+const app = createApp(routes);
+Bun.serve({
+	...app,
+	port: 8080,
+	routes: { ...app.routes, "/ping": new Response("ok") },
+});
 ```
 
-### [Node HTTP](https://rest-rpc.vercel.app/docs/server/node)
+### [Node](https://rest-rpc.vercel.app/docs/server/node)
 
 ```ts
 import { createServer } from "node:http";

@@ -2,8 +2,8 @@ import { routeError, sse, type } from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import { route } from "../builder/routeBuilder.ts";
 import type { RuntimeImplementationTree } from "../routing/match.ts";
-import { createRouteHandlers } from "./createRouteHandlers.ts";
-import { createApp, type CreateAppOptions } from "./createApp.ts";
+import { createRouteHandlers } from "../fetch/createRouteHandlers.ts";
+import { createApp, type CreateAppOptions } from "../fetch/createApp.ts";
 import { respond } from "./respond.ts";
 import { sseEvent } from "./sse.ts";
 

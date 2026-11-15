@@ -231,7 +231,7 @@ const toRequestBody = (
 	isSerializedBody(serialized)
 		? {
 				body: serialized.body as RequestInit["body"],
-				headers: Object.fromEntries(serialized.headers),
+				headers: { ...serialized.headers },
 			}
 		: {
 				body: serialized as RequestInit["body"],

@@ -1,6 +1,6 @@
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import { route } from "../builder/routeBuilder.ts";
-import { createRouteHandlers } from "./createRouteHandlers.ts";
+import { createRouteHandlers } from "../fetch/createRouteHandlers.ts";
 
 const schema = (
 	validate: StandardSchemaV1["~standard"]["validate"],

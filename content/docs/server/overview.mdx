@@ -1,0 +1,141 @@
+---
+title: Serving Routes
+description: Choose how much of each request rest-rpc handles, on Fetch or Node
+---
+
+`@rest-rpc/server` serves routes with Fetch `Request` and `Response`, on
+runtimes such as Bun, Deno and Cloudflare Workers. `@rest-rpc/server/node`
+serves them with Node's `IncomingMessage` and `ServerResponse`, reading and
+writing them directly. Both export the same functions, and routes behave the
+same on both.
+
+```package-install
+npm i @rest-rpc/server
+```
+
+## Choosing a Level
+
+The functions differ in how much of each request rest-rpc handles:
+
+|                     | `createRouteHandlers`                       | `createCatchAllHandler`               | `createApp`                           |
+| ------------------- | ------------------------------------------- | ------------------------------------- | ------------------------------------- |
+| Routing             | The framework, one route per rest-rpc route | rest-rpc, under one framework route   | rest-rpc                              |
+| Unmatched requests  | Not routed to rest-rpc                      | Left to the host, as `matched: false` | `notFound`, or a `NOT_FOUND` error    |
+| Other thrown errors | Reject, for the host to handle              | Reject, for the host to handle        | `INTERNAL_SERVER_ERROR`               |
+| Initial context     | Per request                                 | Per request                           | A value, or a function of the request |
+| Returns             | Routes to register                          | A handler to mount                    | The handler the runtime calls         |
+
+- Use [`createApp`](#create-app) when rest-rpc serves every request.
+- Use the [catch-all handler](/docs/server/framework-integration#catch-all-handler)
+  to add the routes to a framework under one route, such as `/api/*`.
+- Use [route handlers](/docs/server/framework-integration#native-router) when
+  the framework should see each route, such as to apply its middleware per
+  route.
+
+### Create App
+
+`createApp` returns the function the runtime calls for each request, and does
+not start a server: a `fetch` handler on Fetch runtimes, and a request listener
+for `http.createServer()` on Node. The runtime's own API starts, configures and
+closes the server.
+
+<Tabs>
+<Tab title="Fetch">
+
+```ts server.ts
+import { createApp } from "@rest-rpc/server";
+import { routes } from "./routes";
+
+export default createApp(routes);
+```
+
+</Tab>
+<Tab title="Node">
+
+```ts server.ts
+import { createServer } from "node:http";
+import { createApp } from "@rest-rpc/server/node";
+import { routes } from "./routes";
+
+createServer(createApp(routes)).listen(3000);
+```
+
+</Tab>
+</Tabs>
+
+See [Fetch](/docs/server/fetch) and [Node](/docs/server/node) for the app
+options of each runtime, and [Framework Integration](/docs/server/framework-integration)
+for the other two.
+
+## Route Options
+
+Every function takes these options after the route tree:
+
+```ts
+type CreateRouteHandlersOptions = {
+	bodyCodecs?: readonly BodyCodec[];
+	disableRequestValidation?: boolean;
+	disableResponseValidation?: boolean;
+	onError?: (error: RouteError, request: TRequest) => void;
+};
+```
+
+- `bodyCodecs`: see [Request and Response Bodies](#request-and-response-bodies).
+- `disableRequestValidation`, `disableResponseValidation`: see
+  [Disabling Server Validation](/docs/http-behavior/schemas#disabling-server-validation).
+- `onError`: see [Error Handling](#error-handling). `request` is the Fetch
+  `Request`, or the Node `IncomingMessage` with `@rest-rpc/server/node`.
+
+## Paths
+
+Path params are written as `:name`. Matching follows
+[rou3](https://github.com/h3js/rou3): static segments take precedence over
+params, and one trailing slash is ignored. Param values are percent-decoded.
+
+### Mount Path
+
+`createApp` and the catch-all handler take a `mountPath`, such as `/api`, to
+serve the routes under. Requests outside it are unmatched, and it is removed
+from the request path before matching. Route paths do not include it, so
+clients put it in their base URL. A path that clients and OpenAPI documents
+should include in each route, such as `/v1`, belongs in the routes instead,
+defined with [`.prefix()`](/docs/route-builder#path-prefixes).
+
+## Request and Response Bodies
+
+Request bodies are decoded with custom `bodyCodecs` first and the
+[default codecs](/docs/http-behavior/serialization#default-codecs) after them.
+A codec's `deserialize` receives an
+[`IncomingBody`](/docs/http-behavior/serialization#incoming-body).
+
+Handlers can return any value supported by the default codecs. A custom
+serializer must return a body the runtime can send, such as a string, `Blob`,
+`FormData`, byte array, or `ReadableStream`, or an async iterable of byte
+chunks. To send it with its own headers, return it wrapped in
+[`serializedBody()`](/docs/http-behavior/serialization#serializer-result).
+
+## Error Handling
+
+[Defined and built-in errors](/docs/http-behavior/errors) are sent as JSON
+error responses. `onError` observes each of them, and `RouteError`s that end a
+stream after its response started, such as stream item validation failures. It
+is not awaited, and errors it throws or rejects with are ignored, so it cannot
+change the response:
+
+```ts
+export default createApp(routes, {
+	onError: (error, request) => {
+		if (error.status >= 500) console.error(error, error.cause);
+	},
+});
+```
+
+A response validation failure is sent as an `INTERNAL_SERVER_ERROR` whose
+`cause` holds the validation `location` and `issues`.
+
+Other errors thrown by handlers or middleware depend on the level. Route
+handlers and the catch-all handler reject with them, for the framework's error
+handling. `createApp` sends them as `INTERNAL_SERVER_ERROR` responses and
+passes them to `onError` with the thrown error as `cause`. When the response
+already started, such as a stream that fails, the connection is closed
+instead, so the client sees an incomplete response.

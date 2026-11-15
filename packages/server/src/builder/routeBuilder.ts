@@ -261,7 +261,7 @@ export class ServerRouteBuilder<
  * before `.handler()`. Routes are runtime-independent: the same route works
  * with the Fetch and Node HTTP handlers.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/quickstart#define-and-register-routes}
+ * @see {@link https://rest-rpc.vercel.app/docs/quickstart#define-routes}
  */
 export const route: BuilderFor<
 	ServerRouteBuilderKind<DefaultContext, DefaultContext>,

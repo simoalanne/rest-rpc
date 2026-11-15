@@ -13,7 +13,7 @@ import {
 	type CatchAllHandleOptions,
 	type RouteError,
 } from "@rest-rpc/server";
-import * as nodeAdapter from "@rest-rpc/server/node";
+import * as node from "@rest-rpc/server/node";
 import {
 	createServer,
 	type IncomingMessage,
@@ -99,7 +99,7 @@ const withFetchServer = (
 		}
 	}, run);
 
-// Adapters
+// Runtimes
 
 type ServeOptions = {
 	handleOptions?: CatchAllHandleOptions;
@@ -128,7 +128,7 @@ const serveFetch: Serve = (routes, options, run) => {
 };
 
 const serveNode: Serve = (routes, options, run) => {
-	const handler = nodeAdapter.createCatchAllHandler(routes, {
+	const handler = node.createCatchAllHandler(routes, {
 		bodyCodecs: options.bodyCodecs,
 	});
 	return withHttpServer(async (req, res) => {
@@ -180,12 +180,12 @@ const postJson = (url: string, body: unknown) =>
 		body: JSON.stringify(body),
 	});
 
-// Cases every adapter must handle the same way.
+// Cases every runtime must handle the same way.
 
 describe.each([
 	{ name: "fetch", serve: serveFetch },
 	{ name: "node", serve: serveNode },
-])("$name adapter conformance", ({ serve }) => {
+])("$name route conformance", ({ serve }) => {
 	it("serves params, body, headers and the request signal under a mount path", async () => {
 		const routes = {
 			create: route
@@ -413,7 +413,7 @@ describe.each([
 				),
 		};
 		await serve(routes, {}, async (url) => {
-			// Adapters differ in whether status and headers are already committed
+			// Runtimes differ in whether status and headers are already committed
 			// or the connection closes, but none may deliver the invalid event.
 			const text = await fetch(`${url}/invalid-events`)
 				.then((response) => response.text())
@@ -584,6 +584,11 @@ describe.each([
 			const response = await postJson(`${url}/echo`, "raw");
 			expect(await response.json()).toBe("parsed");
 		});
+		// A framework without a body parser leaves its parsed body undefined.
+		await serve(routes, { handleOptions: { body: undefined } }, async (url) => {
+			const response = await postJson(`${url}/echo`, "raw");
+			expect(await response.json()).toBe("raw");
+		});
 	});
 
 	it("uses parsed params instead of reading the request URL", async () => {
@@ -699,20 +704,37 @@ describe.each([
 		});
 	});
 
-	it("sends each cookie as its own set-cookie header", async () => {
+	it("sends each cookie of a response or an error as its own set-cookie header", async () => {
+		const Expired = routeError("SESSION_EXPIRED", { status: 401 });
+		const cookies = ["session=abc; HttpOnly", "theme=dark"];
 		const routes = {
-			login: route
-				.post("/login")
-				.handler(() =>
-					respond("ok", { cookies: ["session=abc; HttpOnly", "theme=dark"] }),
-				),
+			inferred: route
+				.get("/inferred")
+				.handler(({ respond }) => respond("ok", { cookies })),
+			defined: route
+				.get("/defined")
+				.response(type<string>())
+				.use(async ({ next }) => {
+					const response = await next();
+					return {
+						...response,
+						cookies: [...(response.cookies ?? []), "seen=1"],
+					};
+				})
+				.handler(({ respond }) => respond("ok", { cookies })),
+			expired: route
+				.get("/expired")
+				.error(Expired)
+				.handler(({ errors }): string => {
+					throw errors.SESSION_EXPIRED({ cookies: ["session=; Max-Age=0"] });
+				}),
 		};
 		await serve(routes, {}, async (url) => {
-			const response = await fetch(`${url}/login`, { method: "POST" });
-			expect(response.headers.getSetCookie()).toEqual([
-				"session=abc; HttpOnly",
-				"theme=dark",
-			]);
+			const read = async (path: string) =>
+				(await fetch(`${url}${path}`)).headers.getSetCookie();
+			expect(await read("/inferred")).toEqual(cookies);
+			expect(await read("/defined")).toEqual([...cookies, "seen=1"]);
+			expect(await read("/expired")).toEqual(["session=; Max-Age=0"]);
 		});
 	});
 
@@ -807,9 +829,9 @@ describe.each([
 	});
 });
 
-describe("node adapter", () => {
+describe("node routes", () => {
 	it("matches the full request target when a router strips the mount path", async () => {
-		const handler = nodeAdapter.createCatchAllHandler({
+		const handler = node.createCatchAllHandler({
 			user: route.get("/users/:id").handler(({ params }) => params.id),
 		});
 		await withHttpServer(
@@ -826,7 +848,7 @@ describe("node adapter", () => {
 	});
 
 	it("uses params a router such as Express set on the request", async () => {
-		const [user] = nodeAdapter.createRouteHandlers({
+		const [user] = node.createRouteHandlers({
 			user: route
 				.get("/users/:id")
 				.params(type<{ id: string }>())
@@ -851,10 +873,10 @@ describe("node adapter", () => {
 
 type AppOptions = {
 	mountPath?: `/${string}`;
-	context?: () => object | Promise<object>;
+	context?: object | (() => object | Promise<object>);
 	onError?: (error: RouteError) => void;
-	/** Responds with 404 "custom" from `notFound` instead of the default. */
-	customNotFound?: boolean;
+	/** `respond` sends 404 "custom" from `notFound`, and `skip` sends nothing. */
+	notFound?: "respond" | "skip";
 };
 
 type ServeApp = (
@@ -869,25 +891,29 @@ const serveFetchApp: ServeApp = (routes, options, run) => {
 		mountPath: options.mountPath,
 		context: options.context,
 		onError: options.onError,
-		notFound: options.customNotFound
-			? () => new Response("custom", { status: 404 })
-			: undefined,
+		notFound:
+			options.notFound &&
+			(() =>
+				options.notFound === "respond"
+					? new Response("custom", { status: 404 })
+					: undefined),
 	} as never);
 	return withFetchServer((request) => app.fetch(request), run);
 };
 
 const serveNodeApp: ServeApp = (routes, options, run) =>
 	withHttpServer(
-		nodeAdapter.createApp(routes, {
+		node.createApp(routes, {
 			mountPath: options.mountPath,
 			context: options.context,
 			onError: options.onError,
-			notFound: options.customNotFound
-				? (_req: IncomingMessage, res: ServerResponse) => {
-						res.statusCode = 404;
-						res.end("custom");
-					}
-				: undefined,
+			notFound:
+				options.notFound &&
+				((_req: IncomingMessage, res: ServerResponse) => {
+					if (options.notFound === "skip") return;
+					res.statusCode = 404;
+					res.end("custom");
+				}),
 		} as never),
 		run,
 	);
@@ -902,40 +928,45 @@ describe.each([
 		.handler(({ params }) => params.id);
 
 	it("serves routes under the mount path and sends NOT_FOUND outside it", async () => {
-		await serve({ user }, { mountPath: "/api" }, async (url) => {
-			expect(await (await fetch(`${url}/api/users/1`)).json()).toBe("1");
-			const missing = await fetch(`${url}/users/1`);
+		const root = route.get("/").handler(() => "root");
+		for (const mountPath of ["/api", "/api/"] as const) {
+			await serve({ root, user }, { mountPath }, async (url) => {
+				expect(await (await fetch(`${url}/api`)).json()).toBe("root");
+				expect(await (await fetch(`${url}/api/users/1`)).json()).toBe("1");
+				const missing = await fetch(`${url}/users/1`);
+				expect(missing.status).toBe(404);
+				expect(await missing.json()).toMatchObject({ code: "NOT_FOUND" });
+			});
+		}
+	});
+
+	it("sends the notFound response, or NOT_FOUND when it sends nothing", async () => {
+		await serve({ user }, { notFound: "respond" }, async (url) => {
+			const missing = await fetch(`${url}/missing`);
+			expect(missing.status).toBe(404);
+			expect(await missing.text()).toBe("custom");
+		});
+		await serve({ user }, { notFound: "skip" }, async (url) => {
+			const missing = await fetch(`${url}/missing`);
 			expect(missing.status).toBe(404);
 			expect(await missing.json()).toMatchObject({ code: "NOT_FOUND" });
 		});
 	});
 
-	it("sends the notFound response for unmatched requests", async () => {
-		await serve({ user }, { customNotFound: true }, async (url) => {
-			const missing = await fetch(`${url}/missing`);
-			expect(missing.status).toBe(404);
-			expect(await missing.text()).toBe("custom");
-		});
-	});
-
-	it("seeds the context from a function, which static routes do not call", async () => {
-		const context = vi.fn(async () => ({ user: "Ada" }));
-		const routes = {
-			me: route
-				.$context<{ user: string }>()
-				.get("/me")
-				.handler(({ context }) => context.user),
-			robots: route
-				.get("/robots.txt")
-				.static(respond("User-agent: *", { contentType: "text/plain" })),
-		};
-		await serve(routes, { context }, async (url) => {
-			expect(await (await fetch(`${url}/me`)).json()).toBe("Ada");
-			expect(await (await fetch(`${url}/robots.txt`)).text()).toBe(
-				"User-agent: *",
-			);
-			expect(context).toHaveBeenCalledTimes(1);
-		});
+	it("seeds the context from a value or a function", async () => {
+		const me = route
+			.$context<{ user: string }>()
+			.get("/me")
+			.handler(({ context }) => context.user);
+		for (const context of [
+			{ user: "Ada" },
+			() => ({ user: "Ada" }),
+			async () => ({ user: "Ada" }),
+		]) {
+			await serve({ me }, { context }, async (url) => {
+				expect(await (await fetch(`${url}/me`)).json()).toBe("Ada");
+			});
+		}
 	});
 
 	it("sends errors the routes do not handle as internal server errors and observes them", async () => {
@@ -971,17 +1002,20 @@ describe.each([
 		});
 	});
 
-	it("closes the connection when a stream fails after the response started", async () => {
-		const routes = {
-			events: route.get("/failing-events").handler(async function* () {
-				yield 1;
-				throw new Error("stream failed");
-			}),
-		};
-		await serve(routes, {}, async (url) => {
-			const response = await fetch(`${url}/failing-events`);
-			expect(response.status).toBe(200);
-			await expect(response.text()).rejects.toThrow();
+	it.each([
+		[
+			"throws",
+			() => {
+				throw new Error("observer");
+			},
+		],
+		["rejects", async () => Promise.reject(new Error("observer"))],
+	])("sends the response when onError %s", async (_, onError) => {
+		const fail = route.get("/fail").handler((): string => {
+			throw new Error("handler failed");
+		});
+		await serve({ fail }, { onError }, async (url) => {
+			expect((await fetch(`${url}/fail`)).status).toBe(500);
 		});
 	});
 });

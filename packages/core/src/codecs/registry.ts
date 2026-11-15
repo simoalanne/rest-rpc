@@ -1,29 +1,13 @@
-import {
-	defaultBodyCodecs,
-	deserializeFormData,
-	deserializeJson,
-	serializeJson,
-} from "./defaults.ts";
+import { defaultBodyCodecs, serializeJson } from "./defaults.ts";
 import { normalizeMediaType } from "./operations.ts";
 import { isSerializedBody } from "./serializedBody.ts";
 import type {
 	BodyCodec,
-	BodyDeserializer,
 	BodySerializer,
 	IncomingBody,
 	BodyValue,
 	SerializedBody,
 } from "./types.ts";
-
-/** An incoming body, optionally with the Fetch methods the built-in codecs read natively. */
-export type DeserializeSource = IncomingBody &
-	Partial<Pick<Response, "json" | "formData">>;
-
-// Native Fetch methods decode faster than reading the text first.
-const nativeDeserializers = new Map<BodyDeserializer, "json" | "formData">([
-	[deserializeJson, "json"],
-	[deserializeFormData, "formData"],
-]);
 
 export type BodyCodecRegistry = {
 	/** Serializes a value with the codec for the base media type of `contentType`. */
@@ -32,11 +16,11 @@ export type BodyCodecRegistry = {
 		contentType: string,
 	) => BodyValue | SerializedBody | Promise<BodyValue | SerializedBody>;
 	/**
-	 * Deserializes a source with the codec for its base media type, passing the
+	 * Deserializes a body with the codec for its base media type, passing the
 	 * complete content type to the codec.
 	 */
 	deserialize: (
-		source: DeserializeSource,
+		body: IncomingBody,
 		mediaType: string,
 		contentType: string,
 	) => unknown;
@@ -72,9 +56,12 @@ const assertBaseMediaType = (
 	mediaType: string,
 ) => {
 	const contentType = isSerializedBody(body)
-		? body.headers.get("content-type")
-		: null;
-	if (contentType !== null && normalizeMediaType(contentType) !== mediaType) {
+		? body.headers["content-type"]
+		: undefined;
+	if (
+		contentType !== undefined &&
+		normalizeMediaType(contentType) !== mediaType
+	) {
 		throw new Error(
 			"Codec content-type must retain the defined base media type",
 		);
@@ -115,12 +102,8 @@ export function createBodyCodecRegistry(
 				? result.then((resolved) => assertBaseMediaType(resolved, mediaType))
 				: assertBaseMediaType(result, mediaType);
 		},
-		deserialize: (source, mediaType, contentType) => {
-			const deserialize = findDeserializer(mediaType)!;
-			const native = nativeDeserializers.get(deserialize);
-			const read = native && source[native];
-			return read ? read.call(source) : deserialize(source, contentType);
-		},
+		deserialize: (body, mediaType, contentType) =>
+			findDeserializer(mediaType)!(body, contentType),
 		serializesJson: (contentType) =>
 			resolveSerializer(contentType).serialize === serializeJson,
 	};
