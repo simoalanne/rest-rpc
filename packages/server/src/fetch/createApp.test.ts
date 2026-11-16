@@ -59,9 +59,8 @@ describe("createApp", () => {
 		expect(await response.json()).toBe("a/b");
 	});
 
-	it("sends errors the routes do not handle from Bun's routes as internal server errors and reports them", async () => {
-		const onError = vi.fn();
-		const app = createApp(routes, { onError });
+	it("sends errors the routes do not handle from Bun's routes as internal server errors", async () => {
+		const app = createApp(routes);
 		const response = await handlerOf(app.routes["/fail"]!.GET)(
 			new Request("http://localhost/fail"),
 		);
@@ -69,10 +68,6 @@ describe("createApp", () => {
 		expect(await response.json()).toMatchObject({
 			code: "INTERNAL_SERVER_ERROR",
 		});
-		expect(onError).toHaveBeenCalledWith(
-			expect.objectContaining({ code: "INTERNAL_SERVER_ERROR" }),
-			expect.any(Request),
-		);
 	});
 
 	it("seeds the context of Bun's routes from the request", async () => {
@@ -100,6 +95,23 @@ describe("createApp", () => {
 			user: "routes",
 		});
 		expect(await fromRoutes.json()).toBe("routes");
+	});
+
+	it("passes the runtime arguments after the request to interceptors", async () => {
+		const seen: unknown[] = [];
+		const record = interceptor(({ args, next }) => {
+			seen.push(args);
+			return next();
+		});
+		const app = createApp<typeof routes, [string]>(routes, {
+			interceptors: [record],
+		});
+		await app.fetch(new Request("http://localhost/"), "fetch");
+		await handlerOf(app.routes["/"]!.GET)(
+			new Request("http://localhost/"),
+			"routes",
+		);
+		expect(seen).toEqual([["fetch"], ["routes"]]);
 	});
 
 	it("continues interceptors with a request they pass to next, as often as they call it", async () => {

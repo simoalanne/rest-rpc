@@ -1,5 +1,6 @@
 import { route } from "../builder/routeBuilder.ts";
 import { createApp, type App } from "./createApp.ts";
+import { interceptor } from "./interceptor.ts";
 
 type Env = { DB: { name: string } };
 
@@ -22,5 +23,21 @@ describe("createApp", () => {
 		});
 		expectTypeOf(app).toEqualTypeOf<App<[env: Env]>>();
 		expectTypeOf(app.fetch).parameters.toEqualTypeOf<[Request, Env]>();
+	});
+
+	it("leaves the runtime arguments to the context function when interceptors read them", () => {
+		const withEnv = interceptor(({ args, next }) => {
+			expectTypeOf(args).toEqualTypeOf<readonly unknown[]>();
+			return next();
+		});
+		expectTypeOf(
+			createApp(routes, { interceptors: [withEnv] }),
+		).toEqualTypeOf<App>();
+		expectTypeOf(
+			createApp(routes, {
+				context: (_request, env: Env) => ({ db: env.DB }),
+				interceptors: [withEnv],
+			}),
+		).toEqualTypeOf<App<[env: Env]>>();
 	});
 });

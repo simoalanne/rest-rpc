@@ -3,7 +3,6 @@ import { route } from "../contract/routeBuilder.ts";
 import { raw } from "../contract/raw.ts";
 import { sse } from "../contract/sse.ts";
 import { type } from "../standard-schema/type.ts";
-import { errorFormat } from "../codecs/errorFormat.ts";
 import {
 	createOpenApiDocument,
 	type CreateOpenApiDocumentOptions,
@@ -102,49 +101,6 @@ describe("operation", () => {
 				content: { "application/json": { schema: body("CONFLICT") } },
 			},
 		});
-	});
-
-	it("documents errors in the error format, with an empty schema without openAPI", () => {
-		const data = type<{ id: string }>();
-		const defined = route
-			.get("/")
-			.response(type<string>())
-			.error("NOT_FOUND", { status: 404, data });
-		const format = {
-			contentType: "application/problem+json",
-			serialize: () => ({}),
-			deserialize: () => undefined,
-		};
-		const problemJson = errorFormat({
-			...format,
-			openAPI: ({ code, status, data }) => ({
-				properties: { type: { const: code }, status: { const: status }, data },
-			}),
-		});
-		const converter = () => ({ type: "object" });
-		expect(
-			operationOf(defined, {
-				schemaConverter: converter,
-				errorFormat: problemJson,
-			}).responses[404],
-		).toEqual({
-			description: "",
-			content: {
-				"application/problem+json": {
-					schema: {
-						properties: {
-							type: { const: "NOT_FOUND" },
-							status: { const: 404 },
-							data: { type: "object" },
-						},
-					},
-				},
-			},
-		});
-		expect(
-			operationOf(defined, { errorFormat: errorFormat(format) }).responses[404]
-				.content,
-		).toEqual({ "application/problem+json": { schema: {} } });
 	});
 
 	it("documents a raw response as the default response with its description", () => {

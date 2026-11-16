@@ -1,11 +1,7 @@
 import type { AbsolutePath } from "@rest-rpc/core";
 import type { EmptyObject } from "@rest-rpc/core/utils";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import {
-	InternalServerError,
-	NotFound,
-	observeError,
-} from "../pipeline/errors.ts";
+import { InternalServerError, NotFound } from "../pipeline/errors.ts";
 import type { CreateRouteHandlersOptions } from "../pipeline/handleOptions.ts";
 import {
 	createRouteMatcher,
@@ -14,9 +10,7 @@ import {
 } from "../routing/match.ts";
 import { compileNodeRoutes } from "./createRouteHandlers.ts";
 import { readRequestTarget } from "./request.ts";
-import { writeNodeResponse } from "./response.ts";
-import { createAppErrorSerializer } from "../pipeline/dispatch.ts";
-import type { ErrorResponse } from "../pipeline/resolveRouteError.ts";
+import { writeNodeError } from "./response.ts";
 import { intercept, type NodeInterceptor } from "./interceptor.ts";
 
 /**
@@ -28,28 +22,17 @@ export type NodeAppContext<TContext extends object> =
 	| ((request: IncomingMessage) => TContext | Promise<TContext>);
 
 /**
- * Customizes the routes, not found responses, request parsing and error
- * observation of a Node app.
+ * Customizes the routes, request parsing and interceptors of a Node app.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/node#app-options}
  */
 export type CreateNodeAppOptions<TContext extends object = EmptyObject> =
-	CreateRouteHandlersOptions<IncomingMessage> & {
+	CreateRouteHandlersOptions & {
 		/**
 		 * The path the routes are served under, such as `/api`. Route paths do
 		 * not include it.
 		 */
 		mountPath?: AbsolutePath;
-		/**
-		 * Writes the response for requests that match no route. When it writes
-		 * nothing, the default response is sent.
-		 *
-		 * @default A `NOT_FOUND` error response.
-		 */
-		notFound?: (
-			request: IncomingMessage,
-			response: ServerResponse,
-		) => void | Promise<void>;
 		/**
 		 * Functions around everything the app does for a request, the first
 		 * outermost. They run before routing.
@@ -107,32 +90,17 @@ export function createApp(
 	implementations: RuntimeImplementationTree,
 	options?: CreateNodeAppOptions<object>,
 ): NodeApp {
-	const { mountPath, context, notFound, interceptors, ...routeOptions } =
-		options ?? {};
-	const serializeError = createAppErrorSerializer(routeOptions);
-	const writeNodeError = async (
-		response: ServerResponse,
-		error: ErrorResponse,
-	) => writeNodeResponse(response, await serializeError(error));
+	const { mountPath, context, interceptors, ...routeOptions } = options ?? {};
 	const matchRoute = createRouteMatcher(
 		compileNodeRoutes(implementations, routeOptions),
 	);
-	const respondWithNotFound = async (
-		request: IncomingMessage,
-		response: ServerResponse,
-	) => {
-		await notFound?.(request, response);
-		if (!response.headersSent && !response.writableEnded) {
-			await writeNodeError(response, new NotFound());
-		}
-	};
 
 	const serve = async (
 		request: IncomingMessage,
 		response: ServerResponse,
 		match: ReturnType<typeof matchRoute>,
 	) => {
-		if (!match) return respondWithNotFound(request, response);
+		if (!match) return writeNodeError(response, new NotFound());
 		const { route, params } = match;
 		// Static routes read no context, so the context function is not called.
 		const values =
@@ -151,18 +119,24 @@ export function createApp(
 			);
 			// Static routes are sent as they are. Errors an interceptor throws
 			// are sent as internal errors too.
-			await (interceptors?.length && !match?.route.isStatic
-				? intercept(
-						interceptors,
-						request,
-						response,
-						match?.route.definition,
-						() => serve(request, response, match),
-					)
-				: serve(request, response, match));
+			if (!interceptors?.length || match?.route.isStatic) {
+				await serve(request, response, match);
+				return;
+			}
+			await intercept(
+				interceptors,
+				request,
+				response,
+				match?.route.definition,
+				() => serve(request, response, match),
+			);
+			// An interceptor that caught an error, or skipped `next()`, may have
+			// written nothing, which would leave the request open.
+			if (!response.headersSent && !response.destroyed) {
+				throw new Error("The interceptors finished without a response.");
+			}
 		} catch (error) {
 			const internal = new InternalServerError({ cause: error });
-			observeError(routeOptions.onError, internal, request);
 			// A started response cannot change its status, so it is cut short.
 			if (response.headersSent) response.destroy();
 			else

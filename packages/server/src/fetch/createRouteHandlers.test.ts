@@ -21,33 +21,24 @@ describe("createRouteHandlers", () => {
 		);
 	});
 
-	it("sends defined and other errors and reports them to onError", async () => {
+	it("sends defined and other route errors", async () => {
 		const Gone = routeError("GONE", { status: 410 });
-		const onError = vi.fn();
-		const [defined, other] = createRouteHandlers(
-			{
-				defined: route
-					.get("/defined")
-					.error(Gone)
-					.handler((): string => {
-						throw new Gone();
-					}),
-				other: route.get("/other").handler((): string => {
+		const [defined, other] = createRouteHandlers({
+			defined: route
+				.get("/defined")
+				.error(Gone)
+				.handler((): string => {
 					throw new Gone();
 				}),
-			},
-			{ onError },
-		);
+			other: route.get("/other").handler((): string => {
+				throw new Gone();
+			}),
+		});
 		const request = new Request("http://localhost/defined");
 		expect((await defined!.handle(request)).status).toBe(410);
-		expect(onError).toHaveBeenCalledWith(
-			expect.objectContaining({ code: "GONE", status: 410 }),
-			request,
-		);
 		const response = await other!.handle(new Request("http://localhost/other"));
 		expect(response.status).toBe(410);
 		expect(await response.json()).toEqual({ code: "GONE", message: "GONE" });
-		expect(onError).toHaveBeenCalledTimes(2);
 	});
 });
 

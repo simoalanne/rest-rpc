@@ -71,7 +71,11 @@ export {
 	type App,
 	type CreateAppOptions,
 } from "./fetch/createApp.ts";
-export { interceptor, type Interceptor } from "./fetch/interceptor.ts";
+export {
+	errorResponse,
+	interceptor,
+	type Interceptor,
+} from "./fetch/interceptor.ts";
 export {
 	call,
 	createLocalClient,
@@ -81,7 +85,6 @@ export {
 export {
 	bodyCodec,
 	createOpenApiDocument,
-	errorFormat,
 	isDefinedError,
 	raw,
 	RouteError,
@@ -98,9 +101,6 @@ export type {
 	BodyValue,
 	ClientPromise,
 	DefaultMeta,
-	ErrorFormat,
-	ErrorFormatError,
-	ErrorFormatFields,
 	InferClientError,
 	InterceptedRoute,
 	SafeResult,

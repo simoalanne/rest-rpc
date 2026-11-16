@@ -1,7 +1,6 @@
 import { RouteError } from "@rest-rpc/core";
 import {
 	createBodyCodecRegistry,
-	defaultErrorFormat,
 	normalizeMediaType,
 	type BodyCodecRegistry,
 	type IncomingBody,
@@ -32,7 +31,6 @@ import type {
 	HandleOptions,
 } from "./handleOptions.ts";
 import { deserializeRequestBody } from "./deserializeRequestBody.ts";
-import { observeError } from "./errors.ts";
 import {
 	executeRoute,
 	toHttpRouteResult,
@@ -41,10 +39,7 @@ import {
 } from "./handleHttpRoute.ts";
 import { resolveRequestMediaType } from "./requestContentType.ts";
 import { resolveRouteError, type ErrorResponse } from "./resolveRouteError.ts";
-import {
-	createErrorSerializer,
-	type SerializedHttpResponse,
-} from "./serializeHttpRouteResult.ts";
+import type { SerializedHttpResponse } from "./serializeHttpRouteResult.ts";
 import { sseBodyCodec } from "./sse.ts";
 import { prepareStaticResponse } from "./staticResponse.ts";
 import { mapMaybePromise } from "./maybePromise.ts";
@@ -71,11 +66,6 @@ export type RequestReader<TRequest> = {
 	body: (request: TRequest, contentType: string) => IncomingBody;
 };
 
-/** Serializes an error response in the app's error format. */
-export type ErrorSerializer = (
-	error: ErrorResponse,
-) => MaybePromise<SerializedHttpResponse>;
-
 /** A route result to serialize, or an error to send as an error response. */
 export type DispatchResult = HttpRouteResult | RouteError;
 
@@ -89,8 +79,7 @@ export type ResponseWriter<TTarget, TOut> = {
 		target: TTarget,
 		codecs: BodyCodecRegistry,
 	) => MaybePromise<TOut>;
-	/** Writes a serialized error response. */
-	error: (parts: SerializedHttpResponse, target: TTarget) => MaybePromise<TOut>;
+	error: (error: ErrorResponse, target: TTarget) => MaybePromise<TOut>;
 };
 
 /** Runs a route for a request routed to it and responds with the writer. */
@@ -110,19 +99,16 @@ export const bodyAlreadyRead = () =>
 	);
 
 const createDispatch = <TRequest extends object, TTarget, TOut>(
-	options: CreateRouteHandlersOptions<TRequest>,
+	options: CreateRouteHandlersOptions,
 	codecs: BodyCodecRegistry,
-	serializeError: ErrorSerializer,
 	reader: RequestReader<TRequest>,
 	writer: ResponseWriter<TTarget, TOut>,
 ): Dispatch<TRequest, TTarget, TOut> => {
-	const { disableRequestValidation, disableResponseValidation, onError, sse } =
-		options;
+	const { disableRequestValidation, disableResponseValidation, sse } = options;
 	// Synchronous when the error's schemas are, so it adds no promise.
 	const toErrorResponse = (
 		implementation: RuntimeImplementation,
 		error: RouteError,
-		request: TRequest,
 		target: TTarget,
 	): MaybePromise<TOut> =>
 		mapMaybePromise(
@@ -131,12 +117,7 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 				error,
 				disableResponseValidation ?? false,
 			),
-			(resolved) => {
-				observeError(onError, resolved.error, request);
-				return mapMaybePromise(serializeError(resolved.response), (parts) =>
-					writer.error(parts, target),
-				);
-			},
+			(resolved) => writer.error(resolved.response, target),
 		);
 
 	return async (
@@ -184,7 +165,7 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 					) as Record<string, string | undefined>;
 				} catch (error) {
 					if (error instanceof RouteError) {
-						return toErrorResponse(implementation, error, request, target);
+						return toErrorResponse(implementation, error, target);
 					}
 					throw error;
 				}
@@ -193,7 +174,7 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 			}
 			const mediaType = resolveRequestMediaType(declared, receivedMediaType);
 			if (mediaType instanceof RouteError) {
-				return toErrorResponse(implementation, mediaType, request, target);
+				return toErrorResponse(implementation, mediaType, target);
 			}
 
 			if (handleOptions?.body !== undefined) {
@@ -209,7 +190,6 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 					return toErrorResponse(
 						implementation,
 						deserialized.rejection,
-						request,
 						target,
 					);
 				}
@@ -236,34 +216,14 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 			});
 		} catch (error) {
 			if (error instanceof RouteError) {
-				return toErrorResponse(implementation, error, request, target);
+				return toErrorResponse(implementation, error, target);
 			}
 			throw error;
 		}
 
-		return writer.result(
-			toHttpRouteResult(
-				result,
-				onError && ((error) => observeError(onError, error, request)),
-				sse,
-			),
-			target,
-			codecs,
-		);
+		return writer.result(toHttpRouteResult(result, sse), target, codecs);
 	};
 };
-
-/**
- * The error serializer of an app's own error responses, such as not found
- * responses, with the codecs and error format of its options.
- */
-export const createAppErrorSerializer = (
-	options: CreateRouteHandlersOptions<never>,
-): ErrorSerializer =>
-	createErrorSerializer(
-		options.errorFormat ?? defaultErrorFormat,
-		createBodyCodecRegistry(options.bodyCodecs ?? []),
-	);
 
 /** A route of a compiled route tree, before a runtime makes a handler of it. */
 export type CompiledRoute = {
@@ -283,7 +243,7 @@ export type CompiledRoute = {
  */
 export const compileRouteTree = <TRequest extends object, TTarget, TOut>(
 	implementations: RuntimeImplementationTree,
-	options: CreateRouteHandlersOptions<TRequest>,
+	options: CreateRouteHandlersOptions,
 	reader: RequestReader<TRequest>,
 	writer: ResponseWriter<TTarget, TOut>,
 ) => {
@@ -291,10 +251,6 @@ export const compileRouteTree = <TRequest extends object, TTarget, TOut>(
 		sseBodyCodec,
 		...(options.bodyCodecs ?? []),
 	]);
-	const serializeError = createErrorSerializer(
-		options.errorFormat ?? defaultErrorFormat,
-		codecs,
-	);
 	const routes = flattenRouteImplementations(implementations).map(
 		(implementation): CompiledRoute => {
 			const path = resolveImplementationPath(implementation.route.path);
@@ -316,8 +272,7 @@ export const compileRouteTree = <TRequest extends object, TTarget, TOut>(
 	);
 	return {
 		routes,
-		dispatch: createDispatch(options, codecs, serializeError, reader, writer),
+		dispatch: createDispatch(options, codecs, reader, writer),
 		codecs,
-		serializeError,
 	};
 };

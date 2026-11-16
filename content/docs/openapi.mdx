@@ -146,11 +146,6 @@ whose schema is a `oneOf` of their bodies, and whose description joins their
 descriptions. [Built-in errors](/docs/http-behavior/errors#built-in-errors) are
 documented only when the route defines them.
 
-With an [error format](/docs/http-behavior/errors#error-format), pass it as
-`errorFormat` to document error responses under its content type, with the
-schema its `openAPI` function returns for each error. Without `openAPI`, the
-schema is empty.
-
 ## Transform Hooks
 
 Use `transformOperation` when generated output needs project-specific changes.

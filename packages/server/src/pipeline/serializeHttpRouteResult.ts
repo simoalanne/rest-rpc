@@ -2,7 +2,6 @@ import {
 	isSerializedBody,
 	type BodyCodecRegistry,
 	type BodyValue,
-	type ErrorFormat,
 } from "@rest-rpc/core/codecs";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import type { HttpRouteResult } from "./handleHttpRoute.ts";
@@ -64,28 +63,20 @@ export function serializeHttpResponseParts(
 	});
 }
 
-/**
- * Creates the serializer of error responses: the error format returns the
- * body, and the body codec for its content type encodes it. The error's
- * headers, `content-type` included, are sent as with other responses.
- */
-export const createErrorSerializer =
-	(format: ErrorFormat, codecs: BodyCodecRegistry) =>
-	(error: ErrorResponse): MaybePromise<SerializedHttpResponse> =>
-		serializeHttpResponseParts(
-			{
-				status: error.status,
-				headers: error.headers,
-				cookies: error.cookies,
-				body: {
-					value: format.serialize({
-						code: error.code,
-						status: error.status,
-						message: error.message,
-						data: error.data,
-					}),
-					contentType: format.contentType,
-				},
-			},
-			codecs,
-		);
+/** The JSON body of an error response. */
+const errorBody = ({ code, message, data }: ErrorResponse) =>
+	data === undefined ? { code, message } : { code, message, data };
+
+/** Serializes an error as the parts of a JSON `{ code, message, data? }` response. */
+export function serializeRouteErrorParts(
+	error: ErrorResponse,
+): SerializedHttpResponse {
+	const headers: ResponseHeaders = {};
+	setHeaders(headers, error.headers, error.cookies);
+	headers["content-type"] = "application/json";
+	return {
+		status: error.status,
+		headers,
+		body: JSON.stringify(errorBody(error)),
+	};
+}

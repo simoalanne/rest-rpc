@@ -1,35 +1,15 @@
-import type {
-	AbsolutePath,
-	BodyCodec,
-	ErrorFormat,
-	RouteError,
-} from "@rest-rpc/core";
+import type { AbsolutePath, BodyCodec } from "@rest-rpc/core";
 import type { EmptyObject } from "@rest-rpc/core/utils";
 import type { SseOptions } from "./sse.ts";
 
 /**
- * Customizes request parsing, validation and error observation of route
+ * Customizes request parsing and validation of route
  * handlers and catch-all handlers.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/overview#route-options}
  */
-export type CreateRouteHandlersOptions<TRequest = Request> = {
+export type CreateRouteHandlersOptions = {
 	bodyCodecs?: readonly BodyCodec[];
-	/**
-	 * How error responses are sent, the same as the client's. Built-in errors
-	 * use it too. The body codec for its content type encodes the body.
-	 *
-	 * @default A JSON `{ code, message, data? }` body.
-	 */
-	errorFormat?: ErrorFormat;
-	/**
-	 * Observes every error sent as an error response, and `RouteError`s that
-	 * end a stream after its response started, such as stream item validation
-	 * failures. It is not awaited, and errors it throws or rejects with are
-	 * ignored, so it cannot change the response. It receives the Fetch
-	 * `Request`, or the Node `IncomingMessage` with `@rest-rpc/server/node`.
-	 */
-	onError?: (error: RouteError, request: TRequest) => void;
 	/**
 	 * When set to `true`, disables request schema validation. Handlers receive
 	 * the defined request segments without schema validation. The schemas are
