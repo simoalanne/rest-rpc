@@ -294,9 +294,16 @@ describe("client error responses", () => {
 		await expectError(read(notFound({ code: "USER_NOT_FOUND" }, 410)));
 	});
 
-	it("rejects a body without a code as an error with the status in its message", async () => {
+	it("rejects a body without a code as an error with the received response as its cause", async () => {
 		await expectError(read(notFound("Bad gateway", 502)), {
 			message: expect.stringContaining("502"),
+			cause: {
+				status: 502,
+				contentType: "application/json",
+				headers: { "x-retry": "2" },
+				cookies: [],
+				body: "Bad gateway",
+			},
 		});
 	});
 
