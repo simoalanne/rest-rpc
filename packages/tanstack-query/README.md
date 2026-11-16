@@ -474,7 +474,7 @@ const binary = bodyCodec("application/octet-stream", {
 | A response or error `data` fails validation        | `INTERNAL_SERVER_ERROR` 500, without details                                     | Untyped `RouteError` (2)                       |
 | No route matches (`createApp`)                     | `NOT_FOUND` 404                                                                  | Untyped `RouteError` (2)                       |
 | A response breaks the contract                     | -                                                                                | Plain `Error`, details in `cause`              |
-| An error response is not from rest-rpc             | -                                                                                | Plain `Error` with the status in `message`     |
+| An error response is not from rest-rpc             | -                                                                                | Plain `Error`, the response in `cause`         |
 | There is no response (network, timeout, abort)     | -                                                                                | The original error                             |
 
 (2) Typed when the route adds the built-in error's definition:

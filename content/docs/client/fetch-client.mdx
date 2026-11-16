@@ -86,7 +86,8 @@ keep their values but are typed only as `Error`.
 Everything else rejects with a plain `Error`:
 
 - Other error responses, such as a proxy's error page. The `message` includes
-  the status.
+  the status, and the `cause` holds the received response, as
+  `{ status, contentType, headers, cookies, body }` with the decoded body.
 - Responses that break the route contract: a defined error code with another
   status, a 2xx status or content type the route's defined responses do not
   include, a body that cannot be decoded, or, with response validation, a body
