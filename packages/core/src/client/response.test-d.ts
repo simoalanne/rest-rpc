@@ -18,7 +18,6 @@ describe("client response inference", () => {
 			.response(raw());
 		expectTypeOf<InferClientResponse<typeof legacy>>().toEqualTypeOf<{
 			status: number;
-			contentType: string | undefined;
 			body: unknown;
 			headers: Record<string, string>;
 			cookies: readonly string[];
@@ -32,10 +31,7 @@ describe("client response inference", () => {
 		const value = route
 			.get("/")
 			.response(
-				{
-					"text/plain": type((input: string) => Number(input)),
-					"application/json": type<{ value: number }>(),
-				},
+				type((input: string | { value: number }) => input),
 				{
 					headers: type((input: { count: string }) => ({
 						count: Number(input.count),
@@ -45,18 +41,14 @@ describe("client response inference", () => {
 			.response({ status: 204 });
 		type Client = InferClientResponse<typeof value>;
 		expectTypeOf<Client["status"]>().toEqualTypeOf<200 | 204>();
-		expectTypeOf<
-			Extract<Client, { contentType: "text/plain" }>["body"]
-		>().toEqualTypeOf<number>();
-		expectTypeOf<
-			Extract<Client, { contentType: "application/json"; status: 200 }>["body"]
-		>().toEqualTypeOf<{ value: number }>();
+		expectTypeOf<Extract<Client, { status: 200 }>["body"]>().toEqualTypeOf<
+			string | { value: number }
+		>();
 		expectTypeOf<Extract<Client, { status: 200 }>["headers"]>().toEqualTypeOf<
 			Record<string, string> & { count: number }
 		>();
 		expectTypeOf<Extract<Client, { status: 204 }>>().toEqualTypeOf<{
 			status: 204;
-			contentType: undefined;
 			body: undefined;
 			headers: Record<string, string>;
 			cookies: readonly string[];
@@ -129,21 +121,13 @@ describe("client response inference", () => {
 		>().toEqualTypeOf<number>();
 	});
 
-	it("types event-stream content as a stream and keeps non-literal statuses on both sides", () => {
-		const stream = route
-			.get("/")
-			.response({ "text/event-stream": type<string>() });
-		expectTypeOf<InferClientResponse<typeof stream>["body"]>().toEqualTypeOf<
-			AsyncIterable<SseEvent<string>>
-		>();
+	it("keeps non-literal statuses", () => {
 		type Wide = {
 			readonly "~restrpc": {
 				method: "GET";
 				path: "/";
 				responses: {
-					[status: number]: {
-						content: { "application/json": StandardSchemaV1<string> };
-					};
+					[status: number]: { body: StandardSchemaV1<string> };
 				};
 			};
 		};

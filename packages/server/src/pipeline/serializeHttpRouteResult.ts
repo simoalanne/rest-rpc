@@ -31,9 +31,9 @@ export type SerializedHttpResponse = {
 };
 
 /**
- * The result's headers override the headers of a `SerializedBody` returned by
- * the codec, except `content-type`. That is the codec's, or else the selected
- * content type. A `FormData` body has none, so the runtime sets the one it
+ * The result's headers, `content-type` included, override the headers of a
+ * `SerializedBody` returned by the codec. Without either, the content type is
+ * the selected one. A `FormData` body has none, so the runtime sets the one it
  * generates with the multipart boundary.
  */
 export function serializeHttpResponseParts(
@@ -48,14 +48,17 @@ export function serializeHttpResponseParts(
 	}
 
 	const { value, contentType } = result.body;
-	return mapMaybePromise(codecs.serialize(value, contentType), (serialized) => {
+	// `FormData` is multipart, whatever the headers say.
+	const codecType =
+		value instanceof FormData ? "multipart/form-data" : contentType;
+	return mapMaybePromise(codecs.serialize(value, codecType), (serialized) => {
 		const { body, headers: bodyHeaders } = isSerializedBody(serialized)
 			? serialized
 			: { body: serialized, headers: undefined };
 		const headers: ResponseHeaders = { ...bodyHeaders };
 		setHeaders(headers, result.headers, result.cookies);
 		if (body instanceof FormData) delete headers["content-type"];
-		else headers["content-type"] = bodyHeaders?.["content-type"] ?? contentType;
+		else headers["content-type"] ??= contentType;
 		return { status, headers, body };
 	});
 }

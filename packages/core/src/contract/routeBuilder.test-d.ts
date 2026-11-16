@@ -26,14 +26,10 @@ describe("routeBuilder types", () => {
 			readonly method: "POST";
 			readonly path: undefined;
 			request: {
-				body: {
-					"application/json": readonly [StandardSchemaV1<{ name: string }>];
-				};
+				body: readonly [StandardSchemaV1<{ name: string }>];
 			};
 			responses: {
-				200: {
-					content: { "application/json": StandardSchemaV1<{ name: string }> };
-				};
+				200: { body: StandardSchemaV1<{ name: string }> };
 			};
 			readonly metaShape?: DefaultMeta;
 		}>();
@@ -44,7 +40,7 @@ describe("routeBuilder types", () => {
 		const headers = type<{ "x-cursor": string }>();
 		const output = route.response(schema, { description: "Name" });
 		expectTypeOf(output["~restrpc"].responses).toEqualTypeOf<{
-			200: { content: { "application/json": typeof schema } };
+			200: { body: typeof schema };
 		}>();
 		const stream = route.get("/events").response(sse(schema), {
 			headers,
@@ -52,17 +48,9 @@ describe("routeBuilder types", () => {
 		});
 		expectTypeOf(stream["~restrpc"].responses).toEqualTypeOf<{
 			200: {
-				content: { readonly "text/event-stream": typeof schema };
+				sse: typeof schema;
 				headers: typeof headers;
 			};
-		}>();
-		const both = route.response({
-			...sse(schema),
-			"application/json": schema,
-		});
-		expectTypeOf(both["~restrpc"].responses[200].content).toEqualTypeOf<{
-			readonly "text/event-stream": typeof schema;
-			readonly "application/json": typeof schema;
 		}>();
 	});
 
@@ -158,9 +146,9 @@ describe("routeBuilder types", () => {
 		route.get("/").response(type<string>(), { headers: type<Lowercase>() });
 		// @ts-expect-error Received header names are lowercase.
 		route.get("/").response(type<string>(), { headers: type<Uppercase>() });
-		const text = { "text/plain": type<string>() };
+		const stream = sse(type<string>());
 		// @ts-expect-error Received header names are lowercase.
-		route.get("/").response(text, { headers: type<Uppercase>() });
+		route.get("/").response(stream, { headers: type<Uppercase>() });
 		// @ts-expect-error Received header names are lowercase.
 		route.get("/").response({ status: 204, headers: type<Uppercase>() });
 		route.get("/").error("LIMITED", { headers: type<Lowercase>() });

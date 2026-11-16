@@ -124,7 +124,6 @@ export type FetchArgs<
 >;
 
 type GroupedRequestInput = {
-	contentType?: string;
 	body?: unknown;
 	query?: unknown;
 	params?: Record<string, unknown>;
@@ -135,7 +134,7 @@ type GroupedRequestInput = {
 type ClientRequestRoute = {
 	method: HttpMethod;
 	path: string;
-	request?: { body?: Readonly<Record<string, unknown>> };
+	request?: { body?: readonly unknown[] };
 };
 
 const createRequestSignal = (
@@ -211,30 +210,32 @@ export const constructBaseRequest = (
 	route: ClientRequestRoute,
 	args: GroupedRequestInput | undefined,
 ) => {
-	const { contentType, body, query, params, headers } = args ?? {};
+	const { body, query, params, headers } = args ?? {};
 	const url = `${baseUrl}${serializeParams(route, params)}${serializeQuery(query)}`;
+	const requestHeaders = normalizeHeaders(stringifyHeaders(headers));
 	return {
 		url,
-		body,
-		// Calls select a media type when the route defines several.
-		contentType: contentType ?? Object.keys(route.request?.body ?? {})[0],
-		headers: stringifyHeaders(headers),
+		body: route.request?.body ? body : undefined,
+		// The call's headers state a body's content type, and it is JSON otherwise.
+		contentType: requestHeaders["content-type"] as string | undefined,
+		headers: requestHeaders,
 	};
 };
 
-// A body is sent with the content type of its serialized headers, or else the
-// selected one. Fetch sets the content type of `FormData` with its generated
-// multipart boundary.
+// A body is sent with the content type the call states, or else that of its
+// serialized headers. Fetch sets the content type of `FormData` with its
+// generated multipart boundary.
 const toRequestBody = (
 	serialized: BodyValue | SerializedBody,
-	contentType: string,
+	contentType: string | undefined,
 ) => {
 	const { body, headers } = isSerializedBody(serialized)
 		? serialized
 		: { body: serialized, headers: undefined };
 	const requestHeaders: Record<string, string> = { ...headers };
+	requestHeaders["content-type"] =
+		contentType ?? requestHeaders["content-type"] ?? "application/json";
 	if (body instanceof FormData) delete requestHeaders["content-type"];
-	else requestHeaders["content-type"] ??= contentType;
 	return { body: body as RequestInit["body"], headers: requestHeaders };
 };
 
@@ -276,9 +277,15 @@ export const executeRequest = async (
 	} = constructBaseRequest(options.baseUrl, route, requestArgs);
 
 	const serialized =
-		body !== undefined && contentType !== undefined
+		body !== undefined
 			? toRequestBody(
-					await options.codecs.serialize(body, contentType),
+					await options.codecs.serialize(
+						body,
+						// `FormData` is multipart, whatever the headers say.
+						body instanceof FormData
+							? "multipart/form-data"
+							: (contentType ?? "application/json"),
+					),
 					contentType,
 				)
 			: undefined;
@@ -300,8 +307,8 @@ export const executeRequest = async (
 			...clientHeaders,
 			...requestHeaders,
 		};
-		// A body's content type replaces one passed as a header, also when
-		// Fetch sets it for `FormData`.
+		// A body's content type replaces one from the client's headers, also
+		// when Fetch sets it for `FormData`.
 		if (serialized) {
 			delete headers["content-type"];
 			Object.assign(headers, serialized.headers);

@@ -51,13 +51,18 @@ path are derived from their tree keys. The document includes:
 
 - route methods and paths
 - path, query, and header parameters
-- request bodies with a schema per media type
-- status-keyed responses with a schema per media type and defined headers
+- request bodies, under the content types the headers schema declares
+- status-keyed responses, with their content types and defined headers
 - streams as `text/event-stream` responses
 - a `default` placeholder response for routes without defined responses, and
   a `default` response for [raw responses](/docs/route-builder#raw-responses)
   with their description
 - route [`.openAPI()`](#route-metadata) metadata
+
+A body's content types come from the `const` or `enum` of the `content-type`
+header in its converted headers schema. A body is `application/json` without
+one, and `*/*` when its value can't be read. The `content-type` header itself
+isn't listed with the other headers.
 
 The document targets OpenAPI `3.1.0` unless the `openapi` option sets another
 version. `servers`, `components`, and `tags` options are copied to the document.

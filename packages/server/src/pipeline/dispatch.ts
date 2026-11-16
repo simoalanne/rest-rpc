@@ -40,7 +40,18 @@ import type { SerializedHttpResponse } from "./serializeHttpRouteResult.ts";
 import { sseBodyCodec } from "./sse.ts";
 import { prepareStaticResponse } from "./staticResponse.ts";
 import { mapMaybePromise } from "./maybePromise.ts";
-import { parseQuery } from "./validation.ts";
+import { parseQuery, validateRequestHeaders } from "./validation.ts";
+
+// Request headers schemas see the normalized media type, while the codec gets
+// the full header. The headers are copied, since Node's are the request's own.
+const withNormalizedContentType = (
+	headers: Record<string, string | undefined>,
+): Record<string, string | undefined> => {
+	const contentType = headers["content-type"];
+	return contentType === undefined
+		? headers
+		: { ...headers, "content-type": normalizeMediaType(contentType) };
+};
 
 /** Reads the parts of a runtime's request that routes use. */
 export type RequestReader<TRequest> = {
@@ -131,20 +142,42 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 					readPathParams(pathParams, readRequestPathname(reader.url(request))));
 		}
 
+		let headers = schemas?.headers?.length
+			? withNormalizedContentType(reader.headers(request))
+			: undefined;
+		let headersValidated = false;
+
 		// Routes without a body schema ignore the request body and its content type.
 		let body: unknown;
-		let mediaType: string | undefined;
 		if (schemas?.body) {
 			const contentType = reader.contentType(request);
 			const receivedMediaType = normalizeMediaType(contentType);
-			const selected = resolveRequestMediaType(
-				implementation,
-				receivedMediaType,
-			);
-			if (selected instanceof RouteError) {
-				return toErrorResponse(implementation, selected, request, target);
+			// The validated headers state the content types the route accepts, so
+			// they are validated before the body is decoded.
+			let declared: unknown;
+			if (disableRequestValidation) declared = receivedMediaType || undefined;
+			else if (headers) {
+				try {
+					const validated = validateRequestHeaders(
+						implementation.route,
+						headers,
+					);
+					headers = (
+						validated instanceof Promise ? await validated : validated
+					) as Record<string, string | undefined>;
+				} catch (error) {
+					if (error instanceof RouteError) {
+						return toErrorResponse(implementation, error, request, target);
+					}
+					throw error;
+				}
+				headersValidated = true;
+				declared = headers["content-type"];
 			}
-			mediaType = selected;
+			const mediaType = resolveRequestMediaType(declared, receivedMediaType);
+			if (mediaType instanceof RouteError) {
+				return toErrorResponse(implementation, mediaType, request, target);
+			}
 
 			if (handleOptions?.body !== undefined) {
 				body = handleOptions.body;
@@ -175,13 +208,11 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 					query: schemas?.query?.length
 						? parseQuery(readRequestSearch(reader.url(request)))
 						: undefined,
-					headers: schemas?.headers?.length
-						? reader.headers(request)
-						: undefined,
+					headers,
 					body,
 				},
 				signal,
-				mediaType,
+				headersValidated,
 				context: handleOptions?.context,
 				disableRequestValidation,
 				disableResponseValidation,

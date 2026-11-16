@@ -1,7 +1,6 @@
 import { RouteError } from "@rest-rpc/core";
 import { isAsyncIterable, normalizeMediaType } from "@rest-rpc/core/codecs";
 import type {
-	ResponseContentDefinition,
 	ResponseDefinition,
 	RouteDefinition,
 } from "@rest-rpc/core/contract";
@@ -26,11 +25,8 @@ type ExecuteRouteOptions = {
 	request: RequestSegments;
 	/** Aborts when the client disconnects. */
 	signal: AbortSignal;
-	/**
-	 * The defined body media type selected for the request. Handlers receive
-	 * it as `contentType`.
-	 */
-	mediaType?: string;
+	/** Whether the headers were validated before the body was decoded. */
+	headersValidated?: boolean;
 	/** The initial context the host provides. */
 	context?: object;
 	disableRequestValidation?: boolean;
@@ -67,21 +63,13 @@ const getResponseSchema = (
 type DefinedResponseEnvelope = ResponseHeaderFields & {
 	status: number;
 	body?: unknown;
-	contentType?: string;
 	sse?: RespondOptions["sse"];
 };
 
-// A response with one media type may omit it; otherwise the handler selects one.
-const selectResponseMediaType = (
-	content: ResponseContentDefinition,
-	selected: unknown,
-	defaultMediaType: string | undefined,
-): string => {
-	const mediaType = typeof selected === "string" ? selected : defaultMediaType;
-	if (mediaType === undefined || !(mediaType in content)) {
-		throw new Error("Unsupported response body contentType.");
-	}
-	return mediaType;
+// A body's content type is its `content-type` header, and JSON without one.
+const contentTypeOf = (headers: Record<string, unknown> | undefined) => {
+	const contentType = headers?.["content-type"];
+	return typeof contentType === "string" ? contentType : undefined;
 };
 
 const normalizeResponseResult = (
@@ -90,7 +78,6 @@ const normalizeResponseResult = (
 	disableValidation: boolean,
 ): MaybePromise<RouteResult> => {
 	const schema = getResponseSchema(implementation.route, result.status);
-	const { content } = schema;
 	const withHeaders = (headers: RouteResult["headers"]) => ({
 		status: result.status,
 		headers,
@@ -102,37 +89,34 @@ const normalizeResponseResult = (
 			: undefined
 		: validateResponseHeaders(schema.headers, result.headers);
 
-	if (content === undefined) {
-		return mapMaybePromise(validatedHeaders, withHeaders);
-	}
-
-	const mediaType = selectResponseMediaType(
-		content,
-		result.contentType,
-		implementation.defaultResponseMediaTypes[result.status],
-	);
-	// A `text/event-stream` schema validates each item of the stream.
-	if (mediaType === "text/event-stream") {
+	// An `sse` schema validates each item of the stream.
+	if (schema.sse) {
 		const body = result.body as AsyncIterable<unknown>;
+		const items = schema.sse;
 		return mapMaybePromise(validatedHeaders, (headers) => ({
 			...withHeaders(headers),
 			body: {
 				stream: disableValidation
 					? body
-					: validateResponseStreamChunks(body, content[mediaType]!),
+					: validateResponseStreamChunks(body, items),
 				sse: result.sse,
 			},
 		}));
 	}
+	if (!schema.body) return mapMaybePromise(validatedHeaders, withHeaders);
 
 	const validatedValue = disableValidation
 		? result.body
-		: validateResponseValue(content[mediaType], result.body, "body");
+		: validateResponseValue(schema.body, result.body, "body");
+	// The validated headers, which are also the ones sent, select the codec.
 	return mapMaybePromise(
 		allMaybePromise([validatedHeaders, validatedValue]),
 		([headers, value]) => ({
 			...withHeaders(headers),
-			body: { value, contentType: mediaType },
+			body: {
+				value,
+				contentType: contentTypeOf(headers) ?? "application/json",
+			},
 		}),
 	);
 };
@@ -152,7 +136,7 @@ const assertImplicitStatus = (status: number) => {
 	}
 };
 
-// Async iterables are SSE streams unless another content type sends them
+// Async iterables are SSE streams unless a `content-type` header sends them
 // through the body codecs.
 const toImplicitBody = (
 	body: unknown,
@@ -171,14 +155,7 @@ const toEnvelope = (result: unknown): RespondOptions & { body?: unknown } =>
 
 /** Normalizes the result of a handler on a route without defined responses. */
 const normalizeImplicitResponse = (result: unknown): RouteResult => {
-	const {
-		status = 200,
-		body,
-		contentType,
-		headers,
-		cookies,
-		sse,
-	} = toEnvelope(result);
+	const { status = 200, body, headers, cookies, sse } = toEnvelope(result);
 	assertImplicitStatus(status);
 	// `undefined` has no JSON representation, so it is sent without a body.
 	if (body === undefined) return { status, headers, cookies };
@@ -186,7 +163,7 @@ const normalizeImplicitResponse = (result: unknown): RouteResult => {
 		status,
 		headers,
 		cookies,
-		body: toImplicitBody(body, contentType, sse),
+		body: toImplicitBody(body, contentTypeOf(headers), sse),
 	};
 };
 
@@ -223,10 +200,13 @@ export async function executeRoute(
 ): Promise<RouteResult | Response> {
 	const { route } = implementation;
 	const handler = implementation.handler as RuntimeRouteHandler;
-	const { mediaType } = options;
 	const request = options.disableRequestValidation
 		? options.request
-		: await validateRequestSegments(route, options.request, mediaType);
+		: await validateRequestSegments(
+				route,
+				options.request,
+				options.headersValidated,
+			);
 	const result = await invokeWithMiddleware(
 		implementation.middleware,
 		handler,
@@ -237,7 +217,6 @@ export async function executeRoute(
 			headers: request.headers,
 			context: options.context ?? emptyContext,
 			signal: options.signal,
-			contentType: mediaType,
 			route,
 			errors: implementation.errorFactories,
 			respond,

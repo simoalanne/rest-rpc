@@ -1,20 +1,17 @@
-import type { RouteError } from "@rest-rpc/core";
-import type { RuntimeImplementation } from "../routing/match.ts";
+import { RouteError } from "@rest-rpc/core";
+import { normalizeMediaType } from "@rest-rpc/core/codecs";
 import { UnsupportedMediaType } from "./errors.ts";
 
-/** Without a content type, a route with one body media type uses it, and a route with several requires one. */
+/**
+ * The media type of a request body: the `content-type` its validated headers
+ * declare, or else JSON, which a body without a content type is too.
+ */
 export function resolveRequestMediaType(
-	implementation: RuntimeImplementation,
+	declared: unknown,
 	receivedMediaType: string,
-): string | undefined | RouteError {
-	if (receivedMediaType) {
-		return receivedMediaType in (implementation.route.request?.body ?? {})
-			? receivedMediaType
-			: new UnsupportedMediaType();
-	}
-	return implementation.requiresBodyContentType
-		? new UnsupportedMediaType({
-				message: "Request body content type is required.",
-			})
-		: implementation.defaultBodyMediaType;
+): string | RouteError {
+	if (typeof declared === "string") return normalizeMediaType(declared);
+	return !receivedMediaType || receivedMediaType === "application/json"
+		? "application/json"
+		: new UnsupportedMediaType();
 }

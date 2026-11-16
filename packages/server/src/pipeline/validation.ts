@@ -160,11 +160,38 @@ const noRequestSegments: RequestSegmentValues = {
 	headers: undefined,
 };
 
-/** Segments the route does not define are ignored, except params, which pass through without a schema. */
+/**
+ * Validates request headers alone, before the body is decoded, since they
+ * declare its content type. Throws like {@link validateRequestSegments}.
+ */
+export function validateRequestHeaders(
+	route: RouteDefinition,
+	headers: Record<string, string | undefined>,
+): MaybePromise<unknown> {
+	return mapMaybePromise(
+		validateRequestSegment(route.request?.headers, headers),
+		(result) => {
+			if (result.errors.length === 0) return result.data;
+			throw new RequestValidationFailed({
+				data: {
+					body: noIssues,
+					query: noIssues,
+					params: noIssues,
+					headers: result.errors,
+				},
+			});
+		},
+	);
+}
+
+/**
+ * Segments the route does not define are ignored, except params, which pass
+ * through without a schema. Headers already validated are passed through.
+ */
 export function validateRequestSegments(
 	route: RouteDefinition,
 	segments: RequestSegments,
-	mediaType?: string,
+	headersValidated = false,
 ): MaybePromise<RequestSegmentValues> {
 	const requestSchemas = route.request;
 	if (!requestSchemas) {
@@ -174,16 +201,15 @@ export function validateRequestSegments(
 	}
 	return mapMaybePromise(
 		allMaybePromise([
-			validateRequestSegment(
-				mediaType === undefined ? undefined : requestSchemas.body?.[mediaType],
-				segments.body,
-			),
+			validateRequestSegment(requestSchemas.body, segments.body),
 			validateRequestSegment(requestSchemas.query, segments.query),
 			// Params of dynamic path segments without a schema are passed as strings.
 			hasSchemas(requestSchemas.params)
 				? validateRequestSegment(requestSchemas.params, segments.params)
 				: { data: segments.params, errors: noIssues },
-			validateRequestSegment(requestSchemas.headers, segments.headers),
+			headersValidated
+				? { data: segments.headers, errors: noIssues }
+				: validateRequestSegment(requestSchemas.headers, segments.headers),
 		]),
 		toValidatedRequest,
 	);

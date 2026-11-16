@@ -113,7 +113,7 @@ describe("request", () => {
 			{
 				method: "POST",
 				path: "/users",
-				request: { body: { "application/json": [] } },
+				request: { body: [] },
 			},
 			[
 				{ body: { name: "Ada" }, headers: { "x-token": "request" } },
@@ -161,7 +161,7 @@ describe("request", () => {
 			{
 				method: "POST",
 				path: "/upload",
-				request: { body: { "multipart/form-data": [] } },
+				request: { body: [] },
 			},
 			[
 				{ body: new FormData() },

@@ -3,7 +3,7 @@ import type {
 	LowercaseHeadersOptionCheck,
 } from "./headers.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
-import type { BodyContent } from "./body.ts";
+import type { EmptyObject } from "../utils/typeUtils.ts";
 import { joinPrefix, type NoTrailingSlashCheck } from "./path.ts";
 import type {
 	AbsolutePath,
@@ -17,11 +17,8 @@ import type {
 	RequestQuerySchema,
 } from "./request.ts";
 import { isRawResponse, type RawResponse } from "./raw.ts";
-import type {
-	ResponseContentDefinition,
-	ResponseDefinition,
-	ResponseOptions,
-} from "./response.ts";
+import type { ResponseDefinition, ResponseOptions } from "./response.ts";
+import { isSseResponse, sseSchema, type SseResponse } from "./sse.ts";
 import {
 	routeError,
 	type AnyRouteErrorClass,
@@ -51,12 +48,6 @@ import type {
 
 type RouteBuilderState = Partial<RouteDefinition>;
 
-// Generic constraints skip excess property checks, so keys that are not media
-// types are rejected explicitly. This sends response options to their overload.
-type MediaTypeKeysOnly<TContent> = TContent & {
-	[TKey in Exclude<keyof TContent, `${string}/${string}`>]: never;
-};
-
 const isStandardSchema = (value: unknown): value is StandardSchemaV1 =>
 	(typeof value === "object" || typeof value === "function") &&
 	value !== null &&
@@ -66,50 +57,6 @@ const appendSchema = <TSchema extends StandardSchemaV1>(
 	schemas: readonly TSchema[] | undefined,
 	schema: TSchema,
 ) => [...(schemas ?? []), schema];
-
-// The first `.response()` argument is a schema, a content record, or options.
-// Media type keys contain a slash and option keys never do, so any slash marks
-// a content record. Its keys are validated separately.
-const isBodyContent = (value: unknown): value is BodyContent =>
-	typeof value === "object" &&
-	value !== null &&
-	Object.keys(value).some((key) => key.includes("/"));
-
-// Keys are matched against normalized received media types as-is.
-const assertMediaTypes = (content: object) => {
-	for (const mediaType of Object.keys(content)) {
-		if (
-			!mediaType.includes("/") ||
-			mediaType !== mediaType.toLowerCase() ||
-			mediaType.includes(";")
-		) {
-			throw new Error(
-				`Media type "${mediaType}" must be a lowercase base media type such as "application/json".`,
-			);
-		}
-	}
-};
-
-const toContent = (
-	schemaOrContent: StandardSchemaV1 | BodyContent,
-): ResponseContentDefinition => {
-	if (isStandardSchema(schemaOrContent)) {
-		return { "application/json": schemaOrContent };
-	}
-	assertMediaTypes(schemaOrContent);
-	return schemaOrContent as ResponseContentDefinition;
-};
-
-const appendBody = (
-	state: RouteBuilderState,
-	content: ResponseContentDefinition,
-): RouteBuilderState => {
-	const body = { ...state.request?.body };
-	for (const [mediaType, schema] of Object.entries(content)) {
-		body[mediaType] = appendSchema(body[mediaType], schema);
-	}
-	return { ...state, request: { ...state.request, body } };
-};
 
 // Errors are defined with `.error()`, so responses are successful.
 const assertSuccessStatus = (status: number) => {
@@ -170,7 +117,7 @@ type RequiredParamsCheck<TSchema extends RequestParamsSchema> = [
 
 const addRequestSegment = (
 	state: RouteBuilderState,
-	segment: "query" | "params" | "headers",
+	segment: "body" | "query" | "params" | "headers",
 	schema: StandardSchemaV1,
 ): RouteBuilderState => ({
 	...state,
@@ -278,20 +225,12 @@ export class RouteBuilder<
 		return this.clone(httpState(this["~restrpc"], "DELETE", path));
 	}
 
-	/** Defines a JSON request body. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-request-segments} */
+	/** Defines the request body, JSON unless the headers declare a `content-type`. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-request-segments} */
 	body<const TSchema extends StandardSchemaV1>(
 		schema: TSchema,
-	): BuilderFor<TKind, WithBody<TState, TSchema>>;
-	/** Defines request body schemas keyed by media type. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-request-segments} */
-	body<const TContent extends BodyContent>(
-		content: MediaTypeKeysOnly<TContent>,
-	): BuilderFor<TKind, WithBody<TState, TContent>>;
-	body(schemaOrContent: StandardSchemaV1 | BodyContent): never {
+	): BuilderFor<TKind, WithBody<TState, TSchema>> {
 		return this.clone(
-			appendBody(
-				defaultRouteState(this["~restrpc"]),
-				toContent(schemaOrContent),
-			),
+			addRequestSegment(defaultRouteState(this["~restrpc"]), "body", schema),
 		);
 	}
 
@@ -352,58 +291,52 @@ export class RouteBuilder<
 		});
 	}
 
-	/** Defines a successful JSON response. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-responses} */
+	/** Defines a successful response, JSON unless its headers declare a `content-type`. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-responses} */
 	response<
 		const TSchema extends StandardSchemaV1,
 		const TOptions extends ResponseOptions | undefined = undefined,
 	>(
 		schema: TSchema & AfterRawResponseCheck<TState>,
 		options?: TOptions & LowercaseHeadersOptionCheck<TOptions>,
-	): BuilderFor<TKind, WithResponse<TState, TSchema, TOptions>>;
-	/** Defines successful response schemas keyed by media type. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-responses} */
+	): BuilderFor<TKind, WithResponse<TState, { body: TSchema }, TOptions>>;
+	/** Defines a successful Server-Sent Event stream response with `sse(schema)`. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/streaming} */
 	response<
-		const TContent extends BodyContent,
+		const TSchema extends StandardSchemaV1,
 		const TOptions extends ResponseOptions | undefined = undefined,
 	>(
-		content: MediaTypeKeysOnly<TContent> & AfterRawResponseCheck<TState>,
+		stream: SseResponse<TSchema> & AfterRawResponseCheck<TState>,
 		options?: TOptions & LowercaseHeadersOptionCheck<TOptions>,
-	): BuilderFor<TKind, WithResponse<TState, TContent, TOptions>>;
+	): BuilderFor<TKind, WithResponse<TState, { sse: TSchema }, TOptions>>;
 	/** Defines a successful response without a body. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-responses} */
 	response<const TOptions extends ResponseOptions | undefined = undefined>(
 		options?: TOptions &
 			LowercaseHeadersOptionCheck<TOptions> &
 			AfterRawResponseCheck<TState>,
-	): BuilderFor<TKind, WithResponse<TState, undefined, TOptions>>;
+	): BuilderFor<TKind, WithResponse<TState, EmptyObject, TOptions>>;
 	/** Defines the route's only response as the Fetch `Response` its handler returns, sent as it is. @see {@link https://rest-rpc.vercel.app/docs/route-builder#raw-responses} */
 	response(
 		raw: RawResponse & RawResponseCheck<TState>,
 	): BuilderFor<TKind, WithRawResponse<TState>>;
 	response(
-		schemaOrContentOrOptions?:
+		bodyOrOptions?:
 			| StandardSchemaV1
-			| BodyContent
+			| SseResponse
 			| ResponseOptions
 			| RawResponse,
 		options?: ResponseOptions,
 	): never {
 		const state = defaultRouteState(this["~restrpc"]);
-		if (isRawResponse(schemaOrContentOrOptions)) {
-			return this.clone({ ...state, raw: schemaOrContentOrOptions });
+		if (isRawResponse(bodyOrOptions)) {
+			return this.clone({ ...state, raw: bodyOrOptions });
 		}
-		if (
-			!isStandardSchema(schemaOrContentOrOptions) &&
-			!isBodyContent(schemaOrContentOrOptions)
-		) {
-			const { status = 200, ...definition } = schemaOrContentOrOptions ?? {};
-			return this.clone(addResponse(state, status, definition));
-		}
-		const { status = 200, ...definition } = options ?? {};
-		return this.clone(
-			addResponse(state, status, {
-				...definition,
-				content: toContent(schemaOrContentOrOptions),
-			}),
-		);
+		const body = isSseResponse(bodyOrOptions)
+			? { sse: sseSchema(bodyOrOptions) }
+			: isStandardSchema(bodyOrOptions)
+				? { body: bodyOrOptions }
+				: undefined;
+		const { status = 200, ...definition } =
+			(body ? options : (bodyOrOptions as ResponseOptions | undefined)) ?? {};
+		return this.clone(addResponse(state, status, { ...definition, ...body }));
 	}
 
 	/** Adds an error defined with `routeError`. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-errors} */

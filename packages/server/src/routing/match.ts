@@ -52,12 +52,6 @@ export type RuntimeImplementation = {
 	isStatic: boolean;
 	/** The first defined response status, sent for plain handler results. */
 	defaultStatus: number | undefined;
-	/** The first defined request body media type. */
-	defaultBodyMediaType: string | undefined;
-	/** Whether the request body defines several media types. */
-	requiresBodyContentType: boolean;
-	/** The media type of each defined response status that defines exactly one. */
-	defaultResponseMediaTypes: Readonly<Record<number, string>>;
 	/** Creates each defined error by code, received by handlers and middleware as `errors`. */
 	errorFactories: Readonly<Record<string, (options?: unknown) => RouteError>>;
 };
@@ -131,13 +125,6 @@ export function toRuntimeImplementation(
 			`Route "${route.method} ${route.path ?? route.prefix ?? "(derived path)"}" defines params, but its path has no dynamic segments.`,
 		);
 	}
-	const bodyMediaTypes = Object.keys(route.request?.body ?? {});
-	const defaultResponseMediaTypes: Record<number, string> = {};
-	for (const [status, response] of Object.entries(route.responses)) {
-		const mediaTypes = Object.keys(response.content ?? {});
-		if (mediaTypes.length === 1)
-			defaultResponseMediaTypes[Number(status)] = mediaTypes[0]!;
-	}
 	const firstStatus = Object.keys(route.responses)[0];
 	return {
 		route: route as RuntimeImplementation["route"],
@@ -145,9 +132,6 @@ export function toRuntimeImplementation(
 		middleware,
 		isStatic: isStatic === true,
 		defaultStatus: firstStatus === undefined ? undefined : Number(firstStatus),
-		defaultBodyMediaType: bodyMediaTypes[0],
-		requiresBodyContentType: bodyMediaTypes.length > 1,
-		defaultResponseMediaTypes,
 		errorFactories: createErrorFactories(route.errors),
 	};
 }

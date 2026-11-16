@@ -1,12 +1,11 @@
 import { type } from "../standard-schema/type.ts";
-import type { BodyContent } from "./body.ts";
 import { extractContract } from "./extract.ts";
 import { RouteBuilder, route } from "./routeBuilder.ts";
 import { routeError } from "./routeError.ts";
 import { sse } from "./sse.ts";
 
 const schema = type<{ name: string }>();
-const json = { content: { "application/json": null } };
+const json = { body: null };
 
 describe("routeBuilder", () => {
 	it("reuses partial routes without sharing later definitions", () => {
@@ -20,14 +19,6 @@ describe("routeBuilder", () => {
 		expect(contract.first["~restrpc"].responses).toEqual({ 200: json });
 		expect(contract.second["~restrpc"].responses).toEqual({ 201: json });
 	});
-
-	it.each(["Text/Plain", "text/plain; charset=utf-8"])(
-		"rejects the media type key %s",
-		(mediaType) => {
-			const content = { [mediaType]: schema } as BodyContent;
-			expect(() => route.body(content)).toThrow();
-		},
-	);
 
 	it("rejects duplicate response statuses across stream and body responses", () => {
 		expect(() =>

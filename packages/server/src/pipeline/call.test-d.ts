@@ -16,10 +16,8 @@ import { route } from "../builder/routeBuilder.ts";
 const withRequest = route
 	.post("/items/:id")
 	.params(type<{ id: string }>())
-	.body({
-		"text/plain": type<string>(),
-		"application/json": type<{ name: string }>(),
-	})
+	.headers(type<{ "content-type": "text/plain" }>())
+	.body(type<string>())
 	.handler(() => "ok");
 
 const withContext = route
@@ -33,7 +31,7 @@ describe("call types", () => {
 	it("returns the client response of the route", () => {
 		expectTypeOf(
 			call(withRequest, {
-				contentType: "text/plain",
+				headers: { "content-type": "text/plain" },
 				params: { id: "1" },
 				body: "a",
 			}),

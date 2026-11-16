@@ -6,10 +6,7 @@ import {
 	type InferClientRequest,
 	type InferClientResponse,
 } from "@rest-rpc/core";
-import {
-	createBodyCodecRegistry,
-	normalizeMediaType,
-} from "@rest-rpc/core/codecs";
+import { createBodyCodecRegistry } from "@rest-rpc/core/codecs";
 import { readResponse, type RequestArgs } from "@rest-rpc/core/client";
 import { markDefined, type RouteDefinition } from "@rest-rpc/core/contract";
 import type { Merge } from "@rest-rpc/core/utils";
@@ -41,7 +38,7 @@ const toSseEvents = async function* (stream: AsyncIterable<unknown>) {
 	for await (const item of stream) yield toSseEvent(item);
 };
 
-// Mirrors the fetch client, which reports the received base media type.
+// Mirrors the fetch client, which receives the content type that is sent.
 const toCallResult = ({
 	status,
 	headers = {},
@@ -49,12 +46,13 @@ const toCallResult = ({
 	body,
 }: RouteResult) => ({
 	status,
-	contentType:
-		body &&
-		("stream" in body
-			? "text/event-stream"
-			: normalizeMediaType(body.contentType)),
-	headers,
+	headers: body
+		? {
+				"content-type":
+					"stream" in body ? "text/event-stream" : body.contentType,
+				...headers,
+			}
+		: headers,
 	cookies,
 	body: body && ("stream" in body ? toSseEvents(body.stream) : body.value),
 });
@@ -94,19 +92,13 @@ const callRoute = async (
 	const {
 		query = {},
 		headers = {},
-		contentType,
 		...segments
-	} = (request ?? {}) as RequestSegments & { contentType?: string };
-	// Routes without a body schema have no request media type.
-	const mediaType =
-		implementation.route.request?.body &&
-		(normalizeMediaType(contentType) || implementation.defaultBodyMediaType);
+	} = (request ?? {}) as RequestSegments;
 	let result: RouteResult | Response;
 	try {
 		result = await executeRoute(implementation, {
 			request: { ...segments, query, headers },
 			signal: signal ?? new AbortController().signal,
-			mediaType,
 			context,
 		});
 	} catch (error) {

@@ -26,12 +26,8 @@ const events = route
 	});
 ```
 
-`sse(schema)` is the same as `{ "text/event-stream": schema }`. A
-`text/event-stream` schema always describes the data of each event, so a status
-can also offer a stream next to other
-[media types](/docs/route-builder#define-media-types) by spreading
-`sse(schema)` into the record, with the handler selecting one with its returned
-`contentType`.
+The schema passed to `sse()` describes the data of each event. A status
+defines either a stream or another body.
 
 Throw a [defined error](/docs/route-builder#define-errors) before the stream
 starts to respond with an error instead:

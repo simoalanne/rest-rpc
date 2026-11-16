@@ -60,6 +60,7 @@ export const serializeFetchResult = (
 		result.headers === undefined &&
 		!result.cookies?.length &&
 		result.body.contentType === "application/json" &&
+		!(result.body.value instanceof FormData) &&
 		codecs.serializesJson(result.body.contentType)
 	) {
 		return Response.json(result.body.value, { status: result.status });

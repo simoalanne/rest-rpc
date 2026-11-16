@@ -194,7 +194,6 @@ const readErrorResponse = async (
 		return new Error(`Request failed with status ${status}.`, {
 			cause: {
 				status,
-				contentType: mediaType || undefined,
 				...(await readHeaders(undefined, rawResponse, false)),
 				body,
 			},
@@ -238,7 +237,6 @@ export const readResponse = async <E extends RouteDefinition>(
 ) => {
 	const { status } = rawResponse;
 	const mediaType = normalizeMediaType(rawResponse.headers.get("content-type"));
-	const contentType = mediaType || undefined;
 
 	if (!rawResponse.ok) {
 		throw await readErrorResponse(
@@ -250,12 +248,17 @@ export const readResponse = async <E extends RouteDefinition>(
 		);
 	}
 
+	// A status must be defined, and a stream must be received for an `sse`
+	// response and only for one. A declared `content-type` is checked with the
+	// other response headers.
 	const schema: ResponseDefinition | undefined = route.responses[status];
-	const definesResponses = Object.keys(route.responses).length > 0;
-	const breaksContract =
-		(!schema && definesResponses) ||
-		(mediaType && schema?.content && !(mediaType in schema.content));
-	if (mediaType === STREAM_CONTENT_TYPE) {
+	const isStream = mediaType === STREAM_CONTENT_TYPE;
+	const breaksContract = schema
+		? isStream
+			? "body" in schema && !("sse" in schema)
+			: "sse" in schema && !("body" in schema)
+		: Object.keys(route.responses).length > 0;
+	if (isStream) {
 		// A stream may never end, so it is cancelled instead of read.
 		if (breaksContract) {
 			rawResponse.body?.cancel().catch(() => {});
@@ -265,7 +268,7 @@ export const readResponse = async <E extends RouteDefinition>(
 			throw contractError("Server returned no stream body.");
 		}
 		const body = parseSseStream(
-			schema?.content?.[STREAM_CONTENT_TYPE],
+			schema?.sse,
 			rawResponse as Response & {
 				body: ReadableStream<Uint8Array<ArrayBuffer>>;
 			},
@@ -274,7 +277,6 @@ export const readResponse = async <E extends RouteDefinition>(
 		);
 		return {
 			status,
-			contentType,
 			...(await readHeaders(schema, rawResponse, validateResponse)),
 			body,
 		};
@@ -286,12 +288,7 @@ export const readResponse = async <E extends RouteDefinition>(
 	}
 	return {
 		status,
-		contentType,
 		...(await readHeaders(schema, rawResponse, validateResponse)),
-		body: await readValidated(
-			schema?.content?.[mediaType],
-			value,
-			validateResponse,
-		),
+		body: await readValidated(schema?.body, value, validateResponse),
 	};
 };

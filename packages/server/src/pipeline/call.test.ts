@@ -33,9 +33,8 @@ describe("call", () => {
 			),
 		).toEqual({
 			status: 200,
-			contentType: "application/json",
 			body: 2,
-			headers: { total: 2 },
+			headers: { "content-type": "application/json", total: 2 },
 			cookies: ["a=1"],
 		});
 		const request = seen.mock.calls[0]![0];
@@ -54,7 +53,6 @@ describe("call", () => {
 		);
 		expect(await call(implementation)).toEqual({
 			status: 201,
-			contentType: "text/csv",
 			body: "a,b",
 			headers: { "content-type": "text/csv", "x-id": "1" },
 			cookies: [],

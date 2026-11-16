@@ -108,23 +108,31 @@ describe("route pipeline", () => {
 		expect(await response.json()).toBe("decoded");
 	});
 
-	it("validates the request body with the schemas of the received media type", async () => {
+	it("decodes request bodies with the content type the headers declare, and JSON otherwise", async () => {
 		const seen = vi.fn();
-		const implementation = route
+		const declared = route
 			.post("/")
-			.body({
-				"text/plain": type((value: string) => value.toUpperCase()),
-				"application/json": type((value: { name: string }) => value.name),
-			})
-			.handler(({ contentType, body }) => {
-				seen(contentType, body);
+			.headers(
+				type(
+					(headers: { "content-type": "text/plain" | "application/json" }) =>
+						headers,
+				),
+			)
+			.body(
+				type((value: string | { name: string }) =>
+					typeof value === "string" ? value.toUpperCase() : value.name,
+				),
+			)
+			.handler(({ headers, body }) => {
+				seen(headers["content-type"], body);
 			});
-		await send(implementation, {
+		// Headers schemas see the media type without its parameters.
+		await send(declared, {
 			method: "POST",
-			headers: { "content-type": "text/plain" },
+			headers: { "content-type": "text/plain; charset=utf-8" },
 			body: "ada",
 		});
-		await send(implementation, {
+		await send(declared, {
 			method: "POST",
 			headers: { "content-type": "application/json" },
 			body: '{"name":"Grace"}',
@@ -133,6 +141,17 @@ describe("route pipeline", () => {
 			["text/plain", "ADA"],
 			["application/json", "Grace"],
 		]);
+
+		const json = route
+			.post("/")
+			.body(type<{ name: string }>())
+			.handler(({ body }) => body.name);
+		const text = await send(json, {
+			method: "POST",
+			headers: { "content-type": "text/plain" },
+			body: "Ada",
+		});
+		expect(text.status).toBe(415);
 	});
 
 	it("sends transformed defined bodies and headers unless response validation is disabled", async () => {
@@ -397,17 +416,17 @@ describe("route pipeline", () => {
 		},
 	);
 
-	it("sends inferred 2xx statuses with their media type and headers", async () => {
+	it("sends inferred 2xx statuses with their content type and headers", async () => {
 		const response = await send(
 			route.get("/").handler(() =>
 				respond("hello", {
 					status: 299,
-					contentType: "text/plain",
-					headers: { count: 2 },
+					headers: { "content-type": "text/plain", count: 2 },
 				}),
 			),
 		);
 		expect(response.status).toBe(299);
+		expect(response.headers.get("content-type")).toBe("text/plain");
 		expect(response.headers.get("count")).toBe("2");
 		expect(await response.text()).toBe("hello");
 	});
@@ -429,10 +448,7 @@ describe("route pipeline", () => {
 			route.get("/").handler(() => {
 				const body = new FormData();
 				body.set("name", "Ada");
-				return respond(body, {
-					contentType: "multipart/form-data",
-					headers: { "content-type": "text/plain" },
-				});
+				return respond(body, { headers: { "content-type": "text/plain" } });
 			}),
 		);
 		expect((await response.formData()).get("name")).toBe("Ada");

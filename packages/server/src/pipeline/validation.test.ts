@@ -45,17 +45,13 @@ describe("validation", () => {
 		const stacked = {
 			...definition,
 			request: {
-				body: {
-					"application/json": [
-						schema(() => ({ value: { first: true, shared: 1 } })),
-						schema(async () => ({ value: { second: true, shared: 2 } })),
-					],
-				},
+				body: [
+					schema(() => ({ value: { first: true, shared: 1 } })),
+					schema(async () => ({ value: { second: true, shared: 2 } })),
+				],
 			},
 		};
-		expect(
-			(await validateRequestSegments(stacked, {}, "application/json")).body,
-		).toEqual({
+		expect((await validateRequestSegments(stacked, {})).body).toEqual({
 			first: true,
 			second: true,
 			shared: 2,
@@ -76,11 +72,10 @@ describe("validation", () => {
 				{
 					...definition,
 					request: {
-						body: { "text/plain": [schema(() => ({ value: 1 })), type()] },
+						body: [schema(() => ({ value: 1 })), type()],
 					},
 				},
 				{},
-				"text/plain",
 			),
 		).rejects.toThrow();
 	});
@@ -90,17 +85,12 @@ describe("validation", () => {
 		const definition = {
 			...route.post("/")["~restrpc"],
 			request: {
-				body: {
-					"application/json": [
-						schema(() => ({ issues })),
-						schema(() => ({ value: {} })),
-					],
-				},
+				body: [schema(() => ({ issues })), schema(() => ({ value: {} }))],
 				query: [schema(() => ({ issues }))],
 			},
 		};
 		await expect(async () =>
-			validateRequestSegments(definition, {}, "application/json"),
+			validateRequestSegments(definition, {}),
 		).rejects.toMatchObject({
 			code: "REQUEST_VALIDATION_FAILED",
 			status: 400,

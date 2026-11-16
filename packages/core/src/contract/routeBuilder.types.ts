@@ -1,6 +1,4 @@
-import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { RouteErrorDefinition } from "./routeError.ts";
-import type { DefaultBodyContentType } from "./body.ts";
 import type { RawResponses } from "./raw.ts";
 import type {
 	AbsolutePath,
@@ -161,36 +159,16 @@ export type WithRequest<
 	{ request: AppendRequest<TState["request"], TKey, TSchema> }
 >;
 
-/** Normalizes a `.body()` or `.response()` argument to a media type record. */
-export type ContentFor<TSchemaOrContent> =
-	TSchemaOrContent extends StandardSchemaV1
-		? { [TKey in DefaultBodyContentType]: TSchemaOrContent }
-		: TSchemaOrContent;
-
-// Each body appends its schemas to the media types it defines.
-type AppendBody<TBody, TContent> = Merge<{
-	[
-		TMediaType in keyof TBody | keyof TContent
-	]: TMediaType extends keyof TContent
-		? TMediaType extends keyof TBody
-			? TBody[TMediaType] extends readonly unknown[]
-				? readonly [...TBody[TMediaType], TContent[TMediaType]]
-				: never
-			: readonly [TContent[TMediaType]]
-		: TMediaType extends keyof TBody
-			? TBody[TMediaType]
-			: never;
-}>;
-
-export type WithBody<TState extends BuilderState, TSchemaOrContent> = NextState<
+export type WithBody<TState extends BuilderState, TSchema> = NextState<
 	TState,
 	{
 		omit: TState["omit"] | "get";
 		request: Omit<TState["request"], "body"> & {
-			body: AppendBody<
-				TState["request"] extends { body: infer TBody } ? TBody : EmptyObject,
-				ContentFor<TSchemaOrContent>
-			>;
+			body: TState["request"] extends {
+				body: infer TBody extends readonly unknown[];
+			}
+				? readonly [...TBody, TSchema]
+				: readonly [TSchema];
 		};
 	}
 >;
@@ -228,22 +206,16 @@ type ResponseHeadersOption<TOptions> = TOptions extends {
 	? { headers: THeaders }
 	: EmptyObject;
 
-type ResponseFor<TSchemaOrContent, TOptions> = ([TSchemaOrContent] extends [
-	undefined,
-]
-	? EmptyObject
-	: { content: ContentFor<TSchemaOrContent> }) &
-	ResponseHeadersOption<TOptions>;
-
+/** The body of a defined response: `{ body }`, `{ sse }`, or none. */
 export type WithResponse<
 	TState extends BuilderState,
-	TSchemaOrContent,
+	TBody extends object,
 	TOptions,
 > = NextState<
 	TState,
 	{
 		responses: TState["responses"] &
-			Record<StatusFor<TOptions>, ResponseFor<TSchemaOrContent, TOptions>>;
+			Record<StatusFor<TOptions>, TBody & ResponseHeadersOption<TOptions>>;
 	}
 >;
 

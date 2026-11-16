@@ -178,8 +178,7 @@ receives with the request:
 ```ts
 respond(body, {
 	status: 201, // 200-299. Defaults to 200, or the route's only status
-	contentType: "text/csv", // defaults to application/json, or the only media type
-	headers: { location: "/todos/1" },
+	headers: { "content-type": "text/csv", location: "/todos/1" }, // JSON without a content type
 	cookies: ["session=abc; HttpOnly"], // each sent as its own `Set-Cookie` header
 });
 ```
@@ -230,8 +229,7 @@ route
 ```
 
 The route doesn't describe the response, so its client result is loosely
-typed: `status` is a `number`, `contentType` a `string` or `undefined`, and
-`body` is `unknown`. The client decodes the body by its received content type,
+typed: `status` is a `number` and `body` is `unknown`. The client decodes the body by its received content type,
 as for every route. A handler that returns a `Response` on only some paths
 makes the whole route loosely typed. Defined errors stay typed.
 
@@ -272,9 +270,8 @@ const get = route
 ```
 
 A plain return value is the body of the only defined response, with its
-status. With several statuses or media types, return `respond()` with the
-`status` or `contentType` to send. Its `status` defaults to the route's only
-status, or to 200 among several, and the `respond` a handler receives only
+status. With several statuses, return `respond()` with the `status` to send.
+Its `status` defaults to the route's only status, or to 200 among several, and the `respond` a handler receives only
 accepts the statuses the route defines.
 
 Pass only options for a bodyless response, such as `.response({ status: 204 })`.
@@ -315,7 +312,9 @@ refinement, throws when the routes are compiled.
 route.get("/health").static({ ok: true });
 route
 	.get("/robots.txt")
-	.static(respond("User-agent: *", { contentType: "text/plain" }));
+	.static(
+		respond("User-agent: *", { headers: { "content-type": "text/plain" } }),
+	);
 ```
 
 ## Define Errors
@@ -385,47 +384,64 @@ but is not part of the route's types. Adding the same definition twice, for exam
 and on a route, is allowed; adding a different error with an existing code
 throws.
 
-## Define Media Types
+## Content Types
 
-Bodies passed as a schema are JSON. For text, forms, binary values, or several
-media types, pass a record of schemas keyed by base media type:
-
-```ts
-const report = route
-	.get("/todos/report")
-	.response({ "text/plain": z.string() })
-	.handler(() => createTodoReport());
-```
-
-With several media types, requests and responses are unions discriminated by
-`contentType`. The handler receives the request media type with a narrowed
-`body`, and selects a response media type with its returned `contentType`:
+A body is JSON unless a `content-type` header says otherwise. A route accepts
+the request content types its headers schema declares, and answers any other
+with `415`. A route that declares none only accepts JSON:
 
 ```ts
 const importTodos = route
 	.post("/todos/import")
-	.body({
-		"application/json": z.array(z.object({ title: z.string() })),
-		"text/csv": z.string(),
-	})
-	.response({ "application/json": z.object({ count: z.number() }) })
-	.handler(({ contentType, body }) => {
-		const titles =
-			contentType === "text/csv"
-				? body.split("\n")
-				: body.map((todo) => todo.title);
-		return { count: titles.length };
-	});
+	.headers(z.object({ "content-type": z.literal("text/csv") }))
+	.body(z.string())
+	.response(z.object({ count: z.number() }))
+	.handler(({ body }) => ({ count: body.split("\n").length }));
 ```
 
-`contentType` may be omitted when a status defines one media type. Clients
-select the request media type with `contentType` in the
-[request](/docs/client/fetch-client#select-a-request-media-type). Repeated
-`.body()` calls [stack](#stacking-schemas) schemas per media type, and a schema
-passed alone counts as `application/json`.
+The headers schema sees the media type without its parameters, so
+`text/csv; charset=utf-8` is validated as `text/csv`, and a multipart request
+as `multipart/form-data` without its boundary. The codec gets the full header.
+Clients write the content type in the call's
+[headers](/docs/client/fetch-client#send-other-content-types). To accept
+several, declare them as a union, with a body schema for each:
 
-Without defined responses, return `respond(body, { contentType })`, and the
-media type is inferred. See
+```ts
+route
+	.post("/todos/import")
+	.headers(
+		z.object({ "content-type": z.enum(["application/json", "text/csv"]) }),
+	)
+	.body(z.union([z.array(z.object({ title: z.string() })), z.string()]))
+	.handler(({ headers, body }) =>
+		headers["content-type"] === "text/csv" ? importCsv(body) : importJson(body),
+	);
+```
+
+Responses state their content type the same way. A defined response declares
+it in its headers schema, where a default sends it without the handler writing
+it. Without defined responses, the header passed to `respond()` is sent as
+written, parameters included:
+
+```ts
+const report = route
+	.get("/todos/report")
+	.response(z.string(), {
+		headers: z.object({
+			"content-type": z.literal("text/plain").default("text/plain"),
+		}),
+	})
+	.handler(() => createTodoReport());
+
+const exportTodos = route.get("/todos/export").handler(({ respond }) =>
+	respond(toCsv(listTodos()), {
+		headers: { "content-type": "text/csv; charset=utf-8" },
+	}),
+);
+```
+
+A `FormData` body is always sent as `multipart/form-data`, with the boundary
+Fetch generates. See
 [Serialization and Codecs](/docs/http-behavior/serialization) for decoded value
 types and compatible codecs.
 
@@ -441,20 +457,8 @@ const events = route
 	.handler(() => streamTodoEvents());
 ```
 
-`sse(schema)` is `{ "text/event-stream": schema }`, where the schema describes
-the data of each event. To offer a stream and another media type on the same
-status, spread it into one record and select one with `contentType`:
-
-```ts
-const todos = route
-	.get("/todos")
-	.response({ ...sse(todoSchema), "application/json": z.array(todoSchema) })
-	.handler(({ respond }) =>
-		wantsStream()
-			? respond(streamTodos(), { contentType: "text/event-stream" })
-			: respond(listTodos(), { contentType: "application/json" }),
-	);
-```
+The schema passed to `sse()` describes the data of each event. A status
+defines either a body or a stream.
 
 See [Server-Sent Events](/docs/streaming) for handlers, event metadata, validation, and
 resuming streams.
@@ -509,8 +513,6 @@ A handler receives one object containing:
 - `context`: the [context](/docs/middleware#context): initial values the host provides, and values middleware injects.
 - `route`: the route definition, including its method, path, and `meta`.
 - `errors`: the [defined errors](#define-errors), to throw.
-- `contentType`: the request body media type. Routes with a body narrow it to
-  their defined media types, and `body` with it.
 - `signal`: an `AbortSignal` that aborts when the client disconnects.
 
 Native request objects are not passed to handlers. To make them or other host

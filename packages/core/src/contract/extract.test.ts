@@ -15,21 +15,21 @@ const routes = {
 			.response(user)
 			.error("USER_NOT_FOUND", { status: 404, data: type<{ id: string }>() }),
 		create: route
-			.body({ "application/json": user, "text/plain": type<string>() })
+			.body(user)
 			.openAPI({ summary: "Create user" })
 			.response(user, { status: 201 }),
 	},
 };
 
 describe("extractContract", () => {
-	it("keeps only methods, resolved paths, request body media types, response statuses and media types, and error statuses", () => {
+	it("keeps only methods, resolved paths, request bodies, response statuses and bodies, and error statuses", () => {
 		expect(extractContract(routes)).toEqual({
 			users: {
 				get: {
 					"~restrpc": {
 						method: "GET",
 						path: "/users/:id",
-						responses: { 200: { content: { "application/json": null } } },
+						responses: { 200: { body: null } },
 						errors: { USER_NOT_FOUND: { status: 404 } },
 					},
 				},
@@ -37,8 +37,8 @@ describe("extractContract", () => {
 					"~restrpc": {
 						method: "POST",
 						path: "/users/create",
-						request: { body: { "application/json": [], "text/plain": [] } },
-						responses: { 201: { content: { "application/json": null } } },
+						request: { body: [] },
+						responses: { 201: { body: null } },
 					},
 				},
 			},
@@ -88,7 +88,7 @@ describe("extractContract", () => {
 		);
 	});
 
-	it("creates a client that checks response statuses and media types without schemas", async () => {
+	it("creates a client that checks response statuses without schemas", async () => {
 		const respond = vi.fn(async () => Response.json({ name: 1 }));
 		const client = createClient(extractContract(routes), {
 			baseUrl: "https://example.test",
@@ -101,12 +101,6 @@ describe("extractContract", () => {
 
 		respond.mockImplementation(async () =>
 			Response.json({ name: "Ada" }, { status: 202 }),
-		);
-		await expect(client.users.get({ params: { id: "1" } })).rejects.toThrow();
-
-		respond.mockImplementation(
-			async () =>
-				new Response("Ada", { headers: { "content-type": "text/plain" } }),
 		);
 		await expect(client.users.get({ params: { id: "1" } })).rejects.toThrow();
 	});
