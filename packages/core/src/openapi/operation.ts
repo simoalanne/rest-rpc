@@ -19,6 +19,8 @@ type OpenApiParameter = {
 	in: "path" | "query" | "header" | "cookie";
 	required?: boolean;
 	description?: string;
+	style?: "form";
+	explode?: boolean;
 	schema?: OpenApiSchema;
 	content?: Record<string, { schema?: OpenApiSchema }>;
 };
@@ -116,12 +118,16 @@ const createParameters = (
 	}
 
 	return Object.entries(properties).map(([name, propertySchema]) => {
-		return {
+		const parameter: OpenApiParameter = {
 			name,
 			in: location,
 			required: location === "path" || requiredKeys.has(name),
 			schema: propertySchema,
 		};
+		// Query arrays are sent and parsed as repeated `name[]=value` keys.
+		return location === "query" && propertySchema.type === "array"
+			? { ...parameter, name: `${name}[]`, style: "form", explode: true }
+			: parameter;
 	});
 };
 

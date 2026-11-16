@@ -252,4 +252,23 @@ describe("operation", () => {
 			],
 		);
 	});
+
+	it("documents query arrays the way they are sent", () => {
+		const tags = { type: "array", items: { type: "string" } };
+		const list = route.get("/").query(type<{ tags?: string[] }>());
+		expect(
+			operationOf(list, {
+				schemaConverter: () => ({ type: "object", properties: { tags } }),
+			}).parameters,
+		).toEqual([
+			{
+				name: "tags[]",
+				in: "query",
+				required: false,
+				style: "form",
+				explode: true,
+				schema: tags,
+			},
+		]);
+	});
 });
