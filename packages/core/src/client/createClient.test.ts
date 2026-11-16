@@ -1,7 +1,5 @@
 import { route } from "../contract/routeBuilder.ts";
 import { type } from "../standard-schema/type.ts";
-import { errorFormat } from "../codecs/errorFormat.ts";
-import { isDefinedError } from "../contract/routeError.ts";
 import { createClient } from "./createClient.ts";
 import { clientInterceptor } from "./interceptor.ts";
 
@@ -121,38 +119,5 @@ describe("createClient", () => {
 		});
 		await client();
 		expect(seen).toHaveBeenCalledWith({ access: "public" });
-	});
-
-	it("reads error responses with the error format", async () => {
-		// A lossy format: the status maps back to the code.
-		const plainText = errorFormat({
-			contentType: "text/plain",
-			serialize: ({ message }) => message,
-			deserialize: (body, { status }) =>
-				status === 404 && typeof body === "string"
-					? { code: "MISSING", message: body }
-					: undefined,
-		});
-		const contract = route
-			.get("/")
-			.error("MISSING", { status: 404 })
-			.response(type<string>());
-		const respondWith = (status: number) =>
-			createClient(contract, {
-				origin: "http://localhost",
-				errorFormat: plainText,
-				fetch: async () =>
-					new Response("Not here", {
-						status,
-						headers: { "content-type": "text/plain" },
-					}),
-			})().catch((error: unknown) => error);
-		const missing = await respondWith(404);
-		expect(isDefinedError(missing)).toBe(true);
-		expect(missing).toMatchObject({ code: "MISSING", message: "Not here" });
-		const other = await respondWith(500);
-		expect(other).toBeInstanceOf(Error);
-		expect(isDefinedError(other)).toBe(false);
-		expect(other).not.toHaveProperty("code");
 	});
 });

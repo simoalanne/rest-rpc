@@ -7,7 +7,6 @@ import type {
 	SchemaConverter,
 } from "./operation.ts";
 import { createOperation } from "./operation.ts";
-import type { ErrorFormat } from "../codecs/index.ts";
 
 type OpenApiPathItem = Partial<
 	Record<"get" | "post" | "put" | "delete" | "patch", OpenApiOperation>
@@ -64,13 +63,6 @@ export type CreateOpenApiDocumentOptions = {
 	tags?: OpenApiDocument["tags"];
 	/** Converts Standard Schema definitions into OpenAPI Schema Objects. */
 	schemaConverter?: SchemaConverter;
-	/**
-	 * The error format of the server, which documents the content type and
-	 * schema of error responses.
-	 *
-	 * @default A JSON `{ code, message, data? }` body.
-	 */
-	errorFormat?: ErrorFormat;
 	/** Allows project-specific changes to each generated operation. */
 	transformOperation?: (context: OperationTransformContext) => OpenApiOperation;
 };

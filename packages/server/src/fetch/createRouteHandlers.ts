@@ -14,6 +14,7 @@ import {
 } from "../routing/match.ts";
 import { fetchRequestReader } from "./request.ts";
 import {
+	serializeFetchError,
 	serializeFetchResult,
 	toFetchResponse,
 	withoutBody,
@@ -60,7 +61,7 @@ export type FetchRoute<TContext extends object = EmptyObject> = {
 
 const fetchResponseWriter: ResponseWriter<undefined, Response> = {
 	result: (result, _target, codecs) => serializeFetchResult(result, codecs),
-	error: toFetchResponse,
+	error: serializeFetchError,
 };
 
 /**

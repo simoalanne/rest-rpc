@@ -174,7 +174,8 @@ framework sets it, as Express does when it removes the mount path from
 ## Error Handling
 
 [Defined and built-in errors](/docs/http-behavior/errors) are sent as error
-responses, and observed with [`onError`](/docs/server/overview#error-handling). Other errors thrown by
+responses. Other errors thrown by
 handlers or middleware reject the promise returned by `handle` or the
 catch-all handler, so pass them to the framework's error handling, as the
-Express examples do with `next`.
+Express examples do with `next`. The framework's middleware does what
+[interceptors](/docs/server/fetch#interceptors) do for `createApp`.

@@ -3,12 +3,7 @@ import type { AbsolutePath } from "../contract/routeDefinition.ts";
 import type { RouteDefinition } from "../contract/routeDefinition.ts";
 import { mapContractRoutes } from "../contract/traversal.ts";
 import { resolveRoutePath } from "../contract/path.ts";
-import {
-	createBodyCodecRegistry,
-	defaultErrorFormat,
-	type BodyCodec,
-	type ErrorFormat,
-} from "../codecs/index.ts";
+import { createBodyCodecRegistry, type BodyCodec } from "../codecs/index.ts";
 import type { SseFormat } from "../contract/sse.ts";
 import {
 	type ApiClientFetchOptions,
@@ -86,12 +81,6 @@ export type ApiClientOptions<
 	mountPath?: AbsolutePath;
 	bodyCodecs?: readonly BodyCodec[];
 	/**
-	 * How error responses are read, the same as the server's.
-	 *
-	 * @default A JSON `{ code, message, data? }` body.
-	 */
-	errorFormat?: ErrorFormat;
-	/**
 	 * Sends each request, the `Request` the last interceptor sends.
 	 *
 	 * @default `globalThis.fetch`
@@ -146,7 +135,6 @@ export function createClient<
 				resolvedRoute,
 				validate,
 				codecs,
-				options.errorFormat ?? defaultErrorFormat,
 				options.sse?.format,
 			);
 	}) as ApiClientFor<TContract, TGlobalHeaders>;

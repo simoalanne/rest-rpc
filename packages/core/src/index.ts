@@ -56,10 +56,7 @@ export type {
 	BodyDeserializer,
 	BodySerializer,
 	BodyValue,
-	ErrorFormat,
-	ErrorFormatError,
-	ErrorFormatFields,
 	IncomingBody,
 	SerializedBody,
 } from "./codecs/index.ts";
-export { bodyCodec, errorFormat, serializedBody } from "./codecs/index.ts";
+export { bodyCodec, serializedBody } from "./codecs/index.ts";

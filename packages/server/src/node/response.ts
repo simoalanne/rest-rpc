@@ -1,3 +1,4 @@
+import type { ErrorResponse } from "../pipeline/resolveRouteError.ts";
 import type { BodyCodecRegistry } from "@rest-rpc/core/codecs";
 import type { OutgoingHttpHeaders, ServerResponse } from "node:http";
 import { pipeline } from "node:stream/promises";
@@ -6,6 +7,7 @@ import { cancelBody, toHeadResponse } from "../pipeline/headResponse.ts";
 import { fromFetchResponse } from "../pipeline/rawResponse.ts";
 import {
 	serializeHttpResponseParts,
+	serializeRouteErrorParts,
 	type SerializedHttpResponse,
 } from "../pipeline/serializeHttpRouteResult.ts";
 
@@ -116,3 +118,10 @@ export const writeNodeResult = async (
 			? fromFetchResponse(result)
 			: await serializeHttpResponseParts(result, codecs),
 	);
+
+/** Writes an error as a JSON `{ code, message, data? }` response. */
+export const writeNodeError = (
+	response: ServerResponse,
+	error: ErrorResponse,
+): Promise<void> =>
+	writeNodeResponse(response, serializeRouteErrorParts(error));

@@ -311,11 +311,6 @@ const client = createClient(api, {
 			description:
 				"Functions around each HTTP exchange, the first outermost. See Interceptors.",
 		},
-		errorFormat: {
-			type: "ErrorFormat",
-			description:
-				"How error responses are read, the same as the server's. JSON `{ code, message, data? }` by default. See Error Format.",
-		},
 		fetchOptions: {
 			type: 'Omit<FetchOptions, "signal" | "additionalHeaders">',
 			description:

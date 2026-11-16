@@ -1,4 +1,4 @@
-import { routeError, type, type RouteError } from "@rest-rpc/core";
+import { routeError, type } from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 
 /**
@@ -96,20 +96,3 @@ export const responseValidationFailed = (
 	location: ResponseValidationLocation,
 	issues: readonly ValidationIssue[],
 ) => new InternalServerError({ cause: { location, issues } });
-
-const ignore = () => {};
-
-// Observers cannot change the response, so their failures are ignored.
-export const observeError = <TRequest>(
-	onError: ((error: RouteError, request: TRequest) => void) | undefined,
-	error: RouteError,
-	request: TRequest,
-) => {
-	if (!onError) return;
-	try {
-		const result: unknown = onError(error, request);
-		if (result instanceof Promise) result.catch(ignore);
-	} catch {
-		// Ignored, like a rejected observer.
-	}
-};

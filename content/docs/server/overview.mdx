@@ -20,7 +20,7 @@ The functions differ in how much of each request rest-rpc handles:
 |                     | `createRouteHandlers`                       | `createCatchAllHandler`               | `createApp`                           |
 | ------------------- | ------------------------------------------- | ------------------------------------- | ------------------------------------- |
 | Routing             | The framework, one route per rest-rpc route | rest-rpc, under one framework route   | rest-rpc                              |
-| Unmatched requests  | Not routed to rest-rpc                      | Left to the host, as `matched: false` | `notFound`, or a `NOT_FOUND` error    |
+| Unmatched requests  | Not routed to rest-rpc                      | Left to the host, as `matched: false` | A `NOT_FOUND` error                   |
 | Other thrown errors | Reject, for the host to handle              | Reject, for the host to handle        | `INTERNAL_SERVER_ERROR`               |
 | Initial context     | Per request                                 | Per request                           | A value, or a function of the request |
 | Returns             | Routes to register                          | A handler to mount                    | The handler the runtime calls         |
@@ -74,21 +74,15 @@ Every function takes these options after the route tree:
 ```ts
 type CreateRouteHandlersOptions = {
 	bodyCodecs?: readonly BodyCodec[];
-	errorFormat?: ErrorFormat;
 	disableRequestValidation?: boolean;
 	disableResponseValidation?: boolean;
-	onError?: (error: RouteError, request: TRequest) => void;
 	sse?: SseOptions;
 };
 ```
 
 - `bodyCodecs`: see [Request and Response Bodies](#request-and-response-bodies).
-- `errorFormat`: the body and content type of error responses. See
-  [Error Format](/docs/http-behavior/errors#error-format).
 - `disableRequestValidation`, `disableResponseValidation`: see
   [Disabling Server Validation](/docs/http-behavior/schemas#disabling-server-validation).
-- `onError`: see [Error Handling](#error-handling). `request` is the Fetch
-  `Request`, or the Node `IncomingMessage` with `@rest-rpc/server/node`.
 - `sse`: the data format, keepalive and initial comment of Server-Sent Event
   responses. See [Data Format](/docs/streaming#data-format) and
   [Stream Options](/docs/streaming#stream-options).
@@ -123,28 +117,11 @@ string or byte chunks. To send it with its own headers, return it wrapped in
 
 ## Error Handling
 
-[Defined and built-in errors](/docs/http-behavior/errors) are sent as error
-responses, JSON by default. `onError` observes each of them, and `RouteError`s that end a
-stream after its response started, such as stream item validation failures. It
-is not awaited, and errors it throws or rejects with are ignored, so it cannot
-change the response:
-
-```ts
-export default createApp(routes, {
-	onError: (error, request) => {
-		if (error.status >= 500) console.error(error, error.cause);
-	},
-});
-```
-
-`onError` receives a thrown error as it was thrown, so its `cause` is the one
-it was thrown with. A response validation failure is sent as an
-`INTERNAL_SERVER_ERROR` whose `cause` holds the validation `location` and
-`issues`.
+[Defined and built-in errors](/docs/http-behavior/errors) are sent as JSON
+error responses.
 
 Other errors thrown by handlers or middleware depend on the level. Route
 handlers and the catch-all handler reject with them, for the framework's error
-handling. `createApp` sends them as `INTERNAL_SERVER_ERROR` responses and
-passes them to `onError` with the thrown error as `cause`. When the response
+handling. `createApp` sends them as `INTERNAL_SERVER_ERROR` responses. When the response
 already started, such as a stream that fails, the connection is closed
 instead, so the client sees an incomplete response.

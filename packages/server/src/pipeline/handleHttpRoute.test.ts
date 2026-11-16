@@ -212,7 +212,6 @@ describe("route pipeline", () => {
 	it.each(["body", "headers"] as const)(
 		"sends defined %s validation failures as internal server errors",
 		async (location) => {
-			const onError = vi.fn();
 			const implementation = route
 				.get("/")
 				.response(
@@ -220,15 +219,12 @@ describe("route pipeline", () => {
 					location === "headers" ? { headers: rejected } : {},
 				)
 				.handler(() => respond("ok", { headers: {} }));
-			const response = await send(implementation, undefined, { onError });
+			const response = await send(implementation);
 			expect(response.status).toBe(500);
-			expect(onError).toHaveBeenCalledWith(
-				expect.objectContaining({
-					code: "INTERNAL_SERVER_ERROR",
-					cause: expect.objectContaining({ location }),
-				}),
-				expect.any(Request),
-			);
+			expect(await response.json()).toEqual({
+				code: "INTERNAL_SERVER_ERROR",
+				message: expect.any(String),
+			});
 		},
 	);
 
@@ -376,29 +372,6 @@ describe("route pipeline", () => {
 			options,
 		);
 		expect(await overridden.text()).toBe("data: 1\n\n");
-	});
-
-	it("reports route errors that end a started stream", async () => {
-		const onError = vi.fn();
-		const response = await send(
-			route
-				.get("/")
-				.response(sse(rejected))
-				.handler(() =>
-					respond(
-						(async function* () {
-							yield "bad";
-						})(),
-					),
-				),
-			undefined,
-			{ onError },
-		);
-		await response.text().catch(() => {});
-		expect(onError).toHaveBeenCalledWith(
-			expect.objectContaining({ code: "INTERNAL_SERVER_ERROR" }),
-			expect.any(Request),
-		);
 	});
 
 	it("sends an undefined result without a body", async () => {

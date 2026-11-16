@@ -9,7 +9,6 @@ import {
 	createApp,
 	createCatchAllHandler,
 	createLocalClient,
-	errorFormat,
 	implement,
 	interceptor,
 	raw,
@@ -189,12 +188,7 @@ export const userEvents = queryUtils.users.events.streamedQueryOptions({
 	request: { headers: authorization },
 });
 
-// Interceptors and error formats.
+// Interceptors.
 export const passThrough = interceptor(({ next }) => next());
 export const nodePassThrough = node.interceptor(({ next }) => next());
 export const clientPassThrough = clientInterceptor(({ next }) => next());
-export const textErrors = errorFormat({
-	contentType: "text/plain",
-	serialize: ({ message }) => message,
-	deserialize: () => undefined,
-});

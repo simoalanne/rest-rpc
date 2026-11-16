@@ -1,4 +1,3 @@
-import { RouteError } from "@rest-rpc/core";
 import { isAsyncIterable, normalizeMediaType } from "@rest-rpc/core/codecs";
 import type {
 	ResponseDefinition,
@@ -235,25 +234,9 @@ export async function executeRoute(
 	);
 }
 
-/** Observes a `RouteError` that ends a stream after its response started. */
-type StreamErrorObserver = (error: RouteError) => void;
-
-const observeStream = async function* (
-	stream: AsyncIterable<unknown>,
-	observe: StreamErrorObserver,
-) {
-	try {
-		yield* stream;
-	} catch (error) {
-		if (error instanceof RouteError) observe(error);
-		throw error;
-	}
-};
-
 /** Frames a stream body as SSE; other results are already HTTP results. */
 export const toHttpRouteResult = (
 	result: RouteResult | Response,
-	observe: StreamErrorObserver | undefined,
 	sse: SseOptions | undefined,
 ): HttpRouteResult | Response => {
 	if (result instanceof Response) return result;
@@ -263,7 +246,7 @@ export const toHttpRouteResult = (
 		status,
 		headers,
 		cookies,
-		body: sseBody(observe ? observeStream(body.stream, observe) : body.stream, {
+		body: sseBody(body.stream, {
 			...sse,
 			...body.sse,
 		}),

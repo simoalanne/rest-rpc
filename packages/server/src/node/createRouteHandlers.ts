@@ -19,7 +19,11 @@ import {
 	readRequestTarget,
 } from "./request.ts";
 import { fromFetchResponse } from "../pipeline/rawResponse.ts";
-import { writeNodeResponse, writeNodeResult } from "./response.ts";
+import {
+	writeNodeError,
+	writeNodeResponse,
+	writeNodeResult,
+} from "./response.ts";
 
 /** A Node route, its definition, and whether it was completed with `.static()`. */
 export type CompiledNodeRoute = NodeRoute<object> & {
@@ -30,13 +34,13 @@ export type CompiledNodeRoute = NodeRoute<object> & {
 const nodeResponseWriter: ResponseWriter<ServerResponse, void> = {
 	result: (result, response, codecs) =>
 		writeNodeResult(response, result, codecs),
-	error: (parts, response) => writeNodeResponse(response, parts),
+	error: (error, response) => writeNodeError(response, error),
 };
 
 /** Compiles a route tree into Node routes, for the handlers of this runtime. */
 export const compileNodeRoutes = (
 	implementations: RuntimeImplementationTree,
-	options: CreateRouteHandlersOptions<IncomingMessage>,
+	options: CreateRouteHandlersOptions,
 ): CompiledNodeRoute[] => {
 	const { routes, dispatch } = compileRouteTree(
 		implementations,
@@ -127,7 +131,7 @@ export type NodeRouteHandlerResult = { matched: boolean };
  */
 export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
 	implementations: TRoutes,
-	options: CreateRouteHandlersOptions<IncomingMessage> = {},
+	options: CreateRouteHandlersOptions = {},
 ): NodeRoute<TreeInitialContext<TRoutes>>[] {
 	return compileNodeRoutes(implementations, options).map(
 		({ method, path, handle }) => ({ method, path, handle }),
@@ -147,7 +151,7 @@ export function createCatchAllHandler<
 	TRoutes extends RuntimeImplementationTree,
 >(
 	implementations: TRoutes,
-	options: CreateRouteHandlersOptions<IncomingMessage> = {},
+	options: CreateRouteHandlersOptions = {},
 ): (
 	request: IncomingMessage,
 	response: ServerResponse,

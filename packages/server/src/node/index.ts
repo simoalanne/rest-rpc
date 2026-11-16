@@ -10,4 +10,8 @@ export {
 	type NodeApp,
 	type NodeAppContext,
 } from "./createApp.ts";
-export { interceptor, type NodeInterceptor } from "./interceptor.ts";
+export {
+	interceptor,
+	writeErrorResponse,
+	type NodeInterceptor,
+} from "./interceptor.ts";

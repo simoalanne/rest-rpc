@@ -1,11 +1,11 @@
-import { createClient, isDefinedError } from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import {
 	bodyCodec,
 	createApp,
 	createCatchAllHandler,
-	errorFormat,
+	errorResponse,
 	interceptor,
+	InternalServerError,
 	respond,
 	route,
 	routeError,
@@ -14,8 +14,6 @@ import {
 	type,
 	type BodyCodec,
 	type CatchAllHandleOptions,
-	type ErrorFormat,
-	type RouteError,
 } from "@rest-rpc/server";
 import * as node from "@rest-rpc/server/node";
 import {
@@ -108,8 +106,6 @@ const withFetchServer = (
 type ServeOptions = {
 	handleOptions?: CatchAllHandleOptions;
 	bodyCodecs?: readonly BodyCodec[];
-	errorFormat?: ErrorFormat;
-	onError?: (error: RouteError) => void;
 	/** Reads the request body before rest-rpc, as a body parser does. */
 	readBody?: boolean;
 };
@@ -123,8 +119,6 @@ type Serve = (
 const serveFetch: Serve = (routes, options, run) => {
 	const handler = createCatchAllHandler(routes, {
 		bodyCodecs: options.bodyCodecs,
-		errorFormat: options.errorFormat,
-		onError: options.onError,
 	});
 	return withFetchServer(async (request) => {
 		if (options.readBody) await request.text();
@@ -138,8 +132,6 @@ const serveFetch: Serve = (routes, options, run) => {
 const serveNode: Serve = (routes, options, run) => {
 	const handler = node.createCatchAllHandler(routes, {
 		bodyCodecs: options.bodyCodecs,
-		errorFormat: options.errorFormat,
-		onError: options.onError,
 	});
 	return withHttpServer(async (req, res) => {
 		try {
@@ -182,23 +174,6 @@ const validationRoutes = {
 		.response(invalid)
 		.handler(() => respond("unchecked")),
 };
-
-// RFC 9457 problem details, with the code in the problem type.
-const problemJson = errorFormat({
-	contentType: "application/problem+json",
-	serialize: ({ code, status, message, data }) => ({
-		type: `urn:error:${code}`,
-		title: message,
-		status,
-		data,
-	}),
-	deserialize: (body) => {
-		const { type, title, data } = body as Record<string, unknown>;
-		return typeof type === "string" && type.startsWith("urn:error:")
-			? { code: type.slice("urn:error:".length), message: String(title), data }
-			: undefined;
-	},
-});
 
 const postJson = (url: string, body: unknown) =>
 	fetch(url, {
@@ -381,68 +356,6 @@ describe.each([
 				message: "Slow down",
 				data: { limit: 10 },
 			});
-		});
-	});
-
-	it("sends errors in the error format, which the client reads with the same format", async () => {
-		const Limited = routeError("LIMITED", {
-			status: 429,
-			data: type<{ limit: number }>(),
-		});
-		const routes = {
-			limited: route
-				.get("/limited")
-				.error(Limited)
-				.handler((): string => {
-					throw new Limited({ data: { limit: 10 } });
-				}),
-			...validationRoutes,
-		};
-		await serve(routes, { errorFormat: problemJson }, async (url) => {
-			const invalid = await postJson(`${url}/invalid-request`, {});
-			expect(invalid.status).toBe(400);
-			expect(invalid.headers.get("content-type")).toBe(
-				"application/problem+json",
-			);
-			expect(await invalid.json()).toMatchObject({
-				type: "urn:error:REQUEST_VALIDATION_FAILED",
-				status: 400,
-			});
-
-			const client = createClient(routes, {
-				origin: url,
-				errorFormat: problemJson,
-				validateResponses: true,
-			});
-			const error = await client.limited().catch((error: unknown) => error);
-			expect(isDefinedError(error)).toBe(true);
-			expect(error).toMatchObject({
-				code: "LIMITED",
-				status: 429,
-				data: { limit: 10 },
-			});
-		});
-	});
-
-	it("observes a thrown declared error as thrown, with its own cause", async () => {
-		const Gone = routeError("GONE", { status: 410 });
-		const failure = new Error("record deleted");
-		const thrown = new Gone({ cause: failure });
-		const onError = vi.fn();
-		const routes = {
-			gone: route
-				.get("/gone")
-				.error(Gone)
-				.handler((): string => {
-					throw thrown;
-				}),
-		};
-		await serve(routes, { onError }, async (url) => {
-			expect((await fetch(`${url}/gone`)).status).toBe(410);
-			expect(onError).toHaveBeenCalledOnce();
-			const [observed] = onError.mock.calls[0]!;
-			expect(observed).toBe(thrown);
-			expect(observed.cause).toBe(failure);
 		});
 	});
 
@@ -1059,17 +972,23 @@ describe("node routes", () => {
 type AppOptions = {
 	mountPath?: `/${string}`;
 	context?: object | (() => object | Promise<object>);
-	onError?: (error: RouteError) => void;
-	/** `respond` sends 404 "custom" from `notFound`, and `skip` sends nothing. */
-	notFound?: "respond" | "skip";
-	errorFormat?: ErrorFormat;
 	/**
 	 * `cors` answers preflights and adds `access-control-allow-origin` to every
-	 * response, `throw` throws before calling `next`, and `route` sends the
-	 * matched route's path, or `none`, as `x-route`.
+	 * response, `throw` throws before calling `next`, `route` sends the
+	 * matched route's path, or `none`, as `x-route`, and `notFound` sends 404
+	 * "custom" for unmatched requests, and `report` adds the errors `next`
+	 * rejects with to `reported` without rethrowing them.
 	 */
-	interceptors?: readonly ("cors" | "throw" | "route")[];
+	interceptors?: readonly (
+		| "cors"
+		| "throw"
+		| "route"
+		| "notFound"
+		| "report"
+	)[];
 };
+
+const reported: unknown[] = [];
 
 const fetchInterceptors = {
 	cors: interceptor(async ({ request, next }) => {
@@ -1079,7 +998,9 @@ const fetchInterceptors = {
 				headers: { "access-control-allow-origin": "*" },
 			});
 		}
-		const response = await next();
+		const response = await next().catch((cause) =>
+			errorResponse(new InternalServerError({ cause })),
+		);
 		const headers = new Headers(response.headers);
 		headers.set("access-control-allow-origin", "*");
 		return new Response(response.body, { status: response.status, headers });
@@ -1093,6 +1014,15 @@ const fetchInterceptors = {
 		headers.set("x-route", route?.path ?? "none");
 		return new Response(response.body, { status: response.status, headers });
 	}),
+	notFound: interceptor(({ route, next }) =>
+		route ? next() : new Response("custom", { status: 404 }),
+	),
+	report: interceptor(({ next }) =>
+		next().catch((error) => {
+			reported.push(error);
+			return errorResponse(new InternalServerError({ cause: error }));
+		}),
+	),
 };
 
 const nodeInterceptors = {
@@ -1108,6 +1038,16 @@ const nodeInterceptors = {
 		response.setHeader("x-route", route?.path ?? "none");
 		return next();
 	}),
+	notFound: node.interceptor(({ response, route, next }) => {
+		if (route) return next();
+		response.writeHead(404).end("custom");
+	}),
+	// Writes nothing, so the app sends the internal error.
+	report: node.interceptor(({ next }) =>
+		next().catch((error) => {
+			reported.push(error);
+		}),
+	),
 };
 
 type ServeApp = (
@@ -1121,15 +1061,7 @@ const serveFetchApp: ServeApp = (routes, options, run) => {
 	const app = createApp(routes, {
 		mountPath: options.mountPath,
 		context: options.context,
-		onError: options.onError,
-		errorFormat: options.errorFormat,
 		interceptors: options.interceptors?.map((name) => fetchInterceptors[name]),
-		notFound:
-			options.notFound &&
-			(() =>
-				options.notFound === "respond"
-					? new Response("custom", { status: 404 })
-					: undefined),
 	} as never);
 	return withFetchServer((request) => app.fetch(request), run);
 };
@@ -1139,16 +1071,7 @@ const serveNodeApp: ServeApp = (routes, options, run) =>
 		node.createApp(routes, {
 			mountPath: options.mountPath,
 			context: options.context,
-			onError: options.onError,
-			errorFormat: options.errorFormat,
 			interceptors: options.interceptors?.map((name) => nodeInterceptors[name]),
-			notFound:
-				options.notFound &&
-				((_req: IncomingMessage, res: ServerResponse) => {
-					if (options.notFound === "skip") return;
-					res.statusCode = 404;
-					res.end("custom");
-				}),
 		} as never),
 		run,
 	);
@@ -1175,16 +1098,12 @@ describe.each([
 		}
 	});
 
-	it("sends the notFound response, or NOT_FOUND when it sends nothing", async () => {
-		await serve({ user }, { notFound: "respond" }, async (url) => {
+	it("sends an interceptor's response for unmatched requests", async () => {
+		await serve({ user }, { interceptors: ["notFound"] }, async (url) => {
 			const missing = await fetch(`${url}/missing`);
 			expect(missing.status).toBe(404);
 			expect(await missing.text()).toBe("custom");
-		});
-		await serve({ user }, { notFound: "skip" }, async (url) => {
-			const missing = await fetch(`${url}/missing`);
-			expect(missing.status).toBe(404);
-			expect(await missing.json()).toMatchObject({ code: "NOT_FOUND" });
+			expect(await (await fetch(`${url}/users/1`)).json()).toBe("1");
 		});
 	});
 
@@ -1204,9 +1123,8 @@ describe.each([
 		}
 	});
 
-	it("sends errors the routes do not handle as internal server errors and observes them", async () => {
+	it("sends errors the routes do not handle as internal server errors", async () => {
 		const failure = new Error("handler failed");
-		const onError = vi.fn();
 		const routes = {
 			fail: route.get("/fail").handler((): string => {
 				throw failure;
@@ -1219,56 +1137,12 @@ describe.each([
 		const context = () => {
 			throw failure;
 		};
-		await serve(routes, { onError, context }, async (url) => {
+		await serve(routes, { context }, async (url) => {
 			for (const path of ["fail", "context"]) {
 				const response = await fetch(`${url}/${path}`);
 				expect(response.status).toBe(500);
 				expect(await response.json()).toMatchObject({
 					code: "INTERNAL_SERVER_ERROR",
-				});
-			}
-			expect(onError).toHaveBeenCalledWith(
-				expect.objectContaining({
-					code: "INTERNAL_SERVER_ERROR",
-					cause: failure,
-				}),
-				expect.anything(),
-			);
-		});
-	});
-
-	it.each([
-		[
-			"throws",
-			() => {
-				throw new Error("observer");
-			},
-		],
-		["rejects", async () => Promise.reject(new Error("observer"))],
-	])("sends the response when onError %s", async (_, onError) => {
-		const fail = route.get("/fail").handler((): string => {
-			throw new Error("handler failed");
-		});
-		await serve({ fail }, { onError }, async (url) => {
-			expect((await fetch(`${url}/fail`)).status).toBe(500);
-		});
-	});
-
-	it("sends its own error responses in the error format", async () => {
-		const fail = route.get("/fail").handler((): string => {
-			throw new Error("handler failed");
-		});
-		await serve({ fail }, { errorFormat: problemJson }, async (url) => {
-			for (const [path, code] of [
-				["missing", "NOT_FOUND"],
-				["fail", "INTERNAL_SERVER_ERROR"],
-			]) {
-				const response = await fetch(`${url}/${path}`);
-				expect(response.headers.get("content-type")).toBe(
-					"application/problem+json",
-				);
-				expect(await response.json()).toMatchObject({
-					type: `urn:error:${code}`,
 				});
 			}
 		});
@@ -1312,22 +1186,45 @@ describe.each([
 		);
 	});
 
-	it("sends errors interceptors throw as internal server errors and observes them", async () => {
-		const onError = vi.fn();
-		await serve(
-			{ user },
-			{ interceptors: ["cors", "throw"], onError },
-			async (url) => {
-				const response = await fetch(`${url}/users/1`);
-				expect(response.status).toBe(500);
-				expect(await response.json()).toMatchObject({
-					code: "INTERNAL_SERVER_ERROR",
-				});
-				expect(onError).toHaveBeenCalledWith(
-					expect.objectContaining({ code: "INTERNAL_SERVER_ERROR" }),
-					expect.anything(),
-				);
-			},
-		);
+	it("rejects next() only with thrown values that are not route errors", async () => {
+		const failure = new Error("handler failed");
+		const Gone = routeError("GONE", { status: 410 });
+		const routes = {
+			fail: route.get("/fail").handler((): string => {
+				throw failure;
+			}),
+			invalid: route
+				.get("/invalid")
+				.response(invalid)
+				.handler(() => respond("unchecked")),
+			gone: route
+				.get("/gone")
+				.error(Gone)
+				.handler((): string => {
+					throw new Gone();
+				}),
+		};
+		reported.length = 0;
+		await serve(routes, { interceptors: ["report"] }, async (url) => {
+			const response = await fetch(`${url}/fail`);
+			expect(response.status).toBe(500);
+			expect(await response.json()).toMatchObject({
+				code: "INTERNAL_SERVER_ERROR",
+			});
+			// Route errors, response validation failures included, are responses.
+			expect((await fetch(`${url}/invalid`)).status).toBe(500);
+			expect((await fetch(`${url}/gone`)).status).toBe(410);
+		});
+		expect(reported).toEqual([failure]);
+	});
+
+	it("sends errors interceptors throw as internal server errors", async () => {
+		await serve({ user }, { interceptors: ["cors", "throw"] }, async (url) => {
+			const response = await fetch(`${url}/users/1`);
+			expect(response.status).toBe(500);
+			expect(await response.json()).toMatchObject({
+				code: "INTERNAL_SERVER_ERROR",
+			});
+		});
 	});
 });

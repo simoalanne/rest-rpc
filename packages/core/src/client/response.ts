@@ -1,9 +1,4 @@
-import {
-	normalizeMediaType,
-	type BodyCodecRegistry,
-	defaultErrorFormat,
-	type ErrorFormat,
-} from "../codecs/index.ts";
+import { normalizeMediaType, type BodyCodecRegistry } from "../codecs/index.ts";
 import type { Contract } from "../contract/contract.ts";
 import type { RouteDefinition } from "../contract/routeDefinition.ts";
 import type { SseEvent, SseFormat } from "../contract/sse.ts";
@@ -169,10 +164,17 @@ const readValidated = async (
 	return result.value;
 };
 
+const readCode = (body: unknown) =>
+	typeof body === "object" &&
+	body !== null &&
+	"code" in body &&
+	typeof body.code === "string"
+		? body.code
+		: undefined;
+
 /**
- * Reads a non-2xx response into a `RouteError` when the error format reads a
- * code from its body, and otherwise into an `Error` whose `cause` holds the
- * received response.
+ * Reads a non-2xx response into a `RouteError` when its body has a `code`, and
+ * otherwise into an `Error` whose `cause` holds the received response.
  * A code the route defines is marked as defined after its status, `data` and
  * headers are checked; one that breaks the definition becomes an `Error`, like
  * bodies without a code.
@@ -183,15 +185,11 @@ const readErrorResponse = async (
 	route: RouteDefinition,
 	validate: boolean,
 	codecs: BodyCodecRegistry,
-	format: ErrorFormat,
 ): Promise<Error> => {
 	const { status } = rawResponse;
 	const body = await readBody(rawResponse, mediaType, codecs);
-	const fields = format.deserialize(body, {
-		status,
-		headers: rawResponse.headers,
-	});
-	if (fields === undefined) {
+	const code = readCode(body);
+	if (code === undefined) {
 		// The cause mirrors the envelope of a successful response.
 		return new Error(`Request failed with status ${status}.`, {
 			cause: {
@@ -202,8 +200,11 @@ const readErrorResponse = async (
 		});
 	}
 
-	const { code, message, data } = fields;
-	const options = { status, message: message ?? code };
+	const { message, data } = body as { message?: unknown; data?: unknown };
+	const options = {
+		status,
+		message: typeof message === "string" ? message : code,
+	};
 	const definition =
 		route.errors && Object.hasOwn(route.errors, code)
 			? route.errors[code]
@@ -226,13 +227,12 @@ const readErrorResponse = async (
 	);
 };
 
-/** Rejects with a `RouteError` for error responses in the error format, and an `Error` for other responses outside the route contract. */
+/** Rejects with a `RouteError` for error responses with a `code`, and an `Error` for other responses outside the route contract. */
 export const readResponse = async <E extends RouteDefinition>(
 	rawResponse: Response,
 	route: E,
 	validateResponse: boolean,
 	codecs: BodyCodecRegistry,
-	errorFormat: ErrorFormat = defaultErrorFormat,
 	sseFormat?: SseFormat,
 ) => {
 	const { status } = rawResponse;
@@ -245,7 +245,6 @@ export const readResponse = async <E extends RouteDefinition>(
 			route,
 			validateResponse,
 			codecs,
-			errorFormat,
 		);
 	}
 
