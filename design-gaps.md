@@ -12,11 +12,10 @@ protocol it implements.
 - Case 6, the error format, is lower value and needs a new feature, but it
   covers a gap with no realistic escape hatch.
 - Cases 7 to 10 (server-sent events, redirects, raw responses and `HEAD`
-  requests) are done, or covered by returning a Fetch `Response`. Their numbers
-  are kept so references to the other cases stay valid.
+  requests) are done, or covered by returning a Fetch `Response`. Case 12, the
+  OpenAPI document, is documented as a best-effort conversion for now. Their
+  numbers are kept so references to the other cases stay valid.
 - Case 11 is CORS, which apps can't add cleanly today.
-- Case 12 is `createOpenApiDocument()`: gaps between the document it generates
-  and what the server actually does.
 - Case 13 is interceptors on the server and the client: one primitive that
   replaces users' own wrappers, and covers most of case 11.
 - Case 14 is wildcard path params, which may not be worth doing.
@@ -37,12 +36,11 @@ those have to land, or be explicitly decided against, first.
 
 ### Before stable: changing these later would break users
 
-| Case                              | Why it can't wait                                                                                                                                                                                                                                                                                         |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Content types as headers          | Removes the `contentType` option, handler argument, client input and result field, and the media-type records in `.body()` and `.response()`. It's the most breaking change here, and cases 1 to 5 are built on whichever design is chosen, so it has to be decided first.                                |
-| 1 and 2: honest client body types | `Jsonify<T>` and `Blob` for binary narrow existing client types. Ship them with the opt-out, so apps whose codecs restore native types keep their types.                                                                                                                                                  |
-| 4: stream chunk types in handlers | Restricting the handler's return type to `string \| Uint8Array` chunks is a breaking type change.                                                                                                                                                                                                         |
-| 12: OpenAPI output                | Fixing `requestBody.required`, the `tags[]` query parameter and a default `operationId` changes the documents people generate SDKs from. Either fix these first, or state that the exact document shape is outside the stability promise. A separate `@rest-rpc/openapi` package would make that natural. |
+| Case                              | Why it can't wait                                                                                                                                                                                                                                                          |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Content types as headers          | Removes the `contentType` option, handler argument, client input and result field, and the media-type records in `.body()` and `.response()`. It's the most breaking change here, and cases 1 to 5 are built on whichever design is chosen, so it has to be decided first. |
+| 1 and 2: honest client body types | `Jsonify<T>` and `Blob` for binary narrow existing client types. Ship them with the opt-out, so apps whose codecs restore native types keep their types.                                                                                                                   |
+| 4: stream chunk types in handlers | Restricting the handler's return type to `string \| Uint8Array` chunks is a breaking type change.                                                                                                                                                                          |
 
 ### After stable: additive
 
@@ -379,8 +377,9 @@ To settle:
    the normalized media type, or every multipart route uses `startsWith`.
 2. **Arrays without `[]`.** `<select multiple name="tags">` sends
    `tags=a&tags=b`, and under the query rules only the last value is kept. HTML
-   forms need `name="tags[]"`. It's the same ambiguity case 12 describes for
-   query strings, so it's one documented caveat for all three places.
+   forms need `name="tags[]"`. It's the same ambiguity as in query strings,
+   where `tags=a` could be a string or an array, so it's one documented caveat
+   for all three places.
 3. **Multipart responses.** These are rare. Decoding them to an object on the
    client is symmetric, but they could also stay `FormData`.
 4. **Node.** Multipart decoding has to produce `File`s on both runtimes. Check
@@ -1020,115 +1019,6 @@ With the server interceptor from case 13, this may not need its own feature. A
 preflight answer and headers added to every response are a few lines in an
 interceptor, so `cors` could be a small helper built on it, or a docs example.
 
-## 12. OpenAPI document
-
-`createOpenApiDocument()` is about 400 lines (`packages/core/src/openapi/`) with
-11 tests. The docs present its output as a complete description of the API, but
-libraries that generate OpenAPI usually have far more code, or rely on external
-libraries for the hard parts: JSON Schema conversion and the differences between
-OpenAPI versions. Most edge cases here are untested and assumed to work, and no
-test checks the output against the OpenAPI schema or runs it through an SDK
-generator.
-
-I generated a document from a small contract using Zod's `z.toJSONSchema()` as
-the `schemaConverter`, as the docs show, with `unrepresentable: "any"` and
-`openapi: "3.0.3"`:
-
-```ts
-const node = z.lazy(() =>
-	z.object({ name: z.string(), children: z.array(node) }),
-);
-const tag = z.object({ id: z.string() });
-
-const contract = {
-	tree: route
-		.post("/tree")
-		.body(z.object({ root: node }))
-		.response(
-			z.object({ a: tag, b: tag, at: z.date(), maybe: z.string().nullable() }),
-		),
-	list: route
-		.get("/todos")
-		.query(z.object({ tags: z.array(z.string()).optional() })),
-	me: route.get("/me").headers(z.object({ authorization: z.string() })),
-};
-```
-
-### What the document gets wrong
-
-These were confirmed from that output and the code:
-
-| Gap                               | What happens                                                                                                                                                                                                                                                         |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `openapi` is only a label         | `"3.0.3"` changes the version field and nothing else. The output still has 3.1-only constructs: `type: ["string", "null"]`, `$schema`, `$defs`, and `const` in every error body. A 3.0 tool rejects it or misreads it.                                               |
-| Broken references                 | The converter emits `$ref: "#/$defs/__schema0"` for the recursive schema. Inside an OpenAPI document, `#/…` resolves from the document root, where there's no `$defs`, so the reference is broken.                                                                   |
-| No reusable components            | `tag` is used twice and inlined twice. Nothing goes into `components/schemas`, so SDK generators emit anonymous, duplicated types such as `TreeResponseA` and `TreeResponseB`.                                                                                       |
-| Every request body is optional    | `requestBody.required` is never set, and OpenAPI defaults it to `false`. Generated SDKs make every body optional.                                                                                                                                                    |
-| Query arrays don't match the wire | The document gives `tags` the default style, `tags=a&tags=b`. The client sends `tags[]=a&tags[]=b`, and the server only collects arrays from keys ending in `[]`. It keeps the last repeated `tags` value. So a generated SDK sends a request that fails validation. |
-| `authorization` as a header param | A headers schema is the right way to type auth at runtime, but OpenAPI says header parameters named `Authorization`, `Accept` and `Content-Type` are ignored. Auth should become a security scheme.                                                                  |
-| SSE items as the body             | A stream's item schema is documented as the schema of the whole `text/event-stream` body. OpenAPI 3.2 added `itemSchema` for this. Before 3.2, the document should say the body is a stream.                                                                         |
-| Inferred routes have no responses | Quickstart recommends inferred responses as the default, but those routes only get a `default` placeholder. An SDK generated from an app written the recommended way has no response types at all.                                                                   |
-| Built-in errors are missing       | `REQUEST_VALIDATION_FAILED`, `UNSUPPORTED_MEDIA_TYPE` and `INTERNAL_SERVER_ERROR` can come from any route, but they're only documented when a route defines them.                                                                                                    |
-| No `operationId` by default       | Generators invent names from the method and path. The contract's tree keys (`todos.list`) are the obvious default, but they're only used if `transformOperation` sets them.                                                                                          |
-| Dates are documented as `{}`      | `z.date()` has no JSON Schema, so Zod's converter throws by default, and with `unrepresentable: "any"` it emits `{}`. What's actually sent is an ISO string (case 1).                                                                                                |
-| Cookies                           | Request cookies and `set-cookie` response cookies aren't documented.                                                                                                                                                                                                 |
-
-### Fix sketch
-
-Three steps, in order of cost.
-
-**1. Be honest about what it does.** Add a "Limitations" section to
-`content/docs/openapi.mdx` listing the gaps above, and stop implying the
-document is ready for SDK generation. This is cheap and can be done now.
-
-**2. Fix the cheap correctness bugs in the current code:**
-
-- Set `requestBody.required: true` unless the body schema accepts `undefined`.
-- Document query arrays the way they're actually sent: name the parameter
-  `tags[]`, with `style: form` and `explode: true`. It looks unusual, but it
-  describes the wire exactly, and generated SDKs then send what the server
-  parses.
-
-  Accepting repeated keys (`tags=a&tags=b`) on the server instead doesn't work
-  on its own. Without knowing the schema, `tags=a` is ambiguous: it could be the
-  string `"a"` or the array `["a"]`. The `[]` suffix exists to carry that
-  information on the wire. The server would need to know which keys are arrays,
-  and Standard Schema doesn't expose a schema's shape. The `schemaConverter` is
-  optional and only used for OpenAPI, so the runtime can't rely on it either.
-  The only other option is per schema: accept a string or an array and normalize
-  it, such as with `z.union([z.string(), z.array(z.string())])` and a
-  transform. That moves the ambiguity into every array query schema, so it's
-  worth documenting but not making the default.
-
-- Use the route's tree keys as the default `operationId`.
-- Document built-in errors on every route, or add an option to.
-- Map a declared `authorization` header to a security scheme, or at least warn
-  about it in the docs.
-
-**3. Use libraries for the hard parts instead of reimplementing them:**
-
-- **Schema conversion:** [Standard JSON Schema](https://standardschema.dev),
-  the companion spec to Standard Schema, lets schema libraries produce JSON
-  Schema for a requested target, including OpenAPI 3.0. Using it would replace
-  the hand-written `schemaConverter` and make the `openapi` version actually
-  select the output format. Check which Zod, Valibot and ArkType versions
-  implement it.
-- **References:** hoist `$defs` into `components/schemas` and rewrite the
-  `$ref`s. That's custom code, but it's well-defined, and it also gives reusable
-  components for schemas the user names.
-- **Validation in tests:** a devDependency OpenAPI validator, such as
-  `@apidevtools/swagger-parser`, run against the generated documents, plus one
-  SDK generator round trip. This catches the class of bugs above without adding
-  a runtime dependency.
-
-If a runtime dependency is needed, move the generator to its own package, such
-as `@rest-rpc/openapi`. That keeps the dependency out of `@rest-rpc/core`, and
-lets OpenAPI support be versioned on its own. The bundle-size benefit is smaller
-than it looks, because client bundles already tree-shake an unused
-`createOpenApiDocument`. The real gain is keeping core's dependencies and scope
-small. It isn't worth dropping OpenAPI, and it isn't worth reimplementing every
-OpenAPI version's quirks by hand either.
-
 ## 13. Interceptors
 
 ### Server
@@ -1233,7 +1123,7 @@ problems are elsewhere:
   regex parameter. They'd need translating per framework, or a documented
   "not supported by framework integration" caveat.
 - **OpenAPI:** there's no standard way to describe a parameter that spans
-  several segments, so case 12's limitations would have to include it.
+  several segments, so the document can't describe it exactly.
 - **The client:** it has to encode the value without escaping the `/`s, unlike
   other params.
 
@@ -1293,16 +1183,15 @@ could list them:
 
 ## Summary
 
-| Case                                   | Today                                                           | Fix sketch                                                                 | New concept     |
-| -------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------- |
-| Content types as headers               | Content type is its own concept in five places                  | Only a `content-type` header; JSON unless it says otherwise                | One fewer       |
-| 1. Native values in JSON               | Client typed `Date`, receives `string`                          | `Jsonify<T>` client bodies                                                 | No              |
-| 2. Binary bodies                       | Client typed server's type, gets `Blob`                         | Client type from what the `content-type` header decodes to                 | No              |
-| 3. Content type parameters             | Type error, or a server-wide custom codec                       | Solved by content types as headers                                         | No              |
-| 4. Raw stream chunks                   | Compiles, connection cut at runtime                             | Restrict handler stream chunks to `string \| Uint8Array`                   | No              |
-| 5. Content types known only at runtime | Cast, octet-stream, or inferred route                           | Solved by content types as headers                                         | No              |
-| 6. Error response format               | Fixed JSON; rewrite responses on both ends                      | Two-way `errorFormat` shared by server and client                          | Yes             |
-| 11. CORS                               | Wrap `fetch`; on Bun, every route                               | `cors` option, with methods and headers derived from routes                | Yes             |
-| 12. OpenAPI document                   | Broken refs, wrong query style, 3.0 label only, optional bodies | Document limitations, fix cheap bugs, Standard JSON Schema and a validator | Maybe a package |
-| 13. Interceptors                       | Wrap `createApp` (and every Bun route) or replace `fetch`       | One `intercept(request, next)` hook on the app and the client              | Yes             |
-| 14. Wildcard path params (maybe)       | Not supported                                                   | `:path*` rest segment where routers support it                             | Yes             |
+| Case                                   | Today                                                     | Fix sketch                                                    | New concept |
+| -------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------- | ----------- |
+| Content types as headers               | Content type is its own concept in five places            | Only a `content-type` header; JSON unless it says otherwise   | One fewer   |
+| 1. Native values in JSON               | Client typed `Date`, receives `string`                    | `Jsonify<T>` client bodies                                    | No          |
+| 2. Binary bodies                       | Client typed server's type, gets `Blob`                   | Client type from what the `content-type` header decodes to    | No          |
+| 3. Content type parameters             | Type error, or a server-wide custom codec                 | Solved by content types as headers                            | No          |
+| 4. Raw stream chunks                   | Compiles, connection cut at runtime                       | Restrict handler stream chunks to `string \| Uint8Array`      | No          |
+| 5. Content types known only at runtime | Cast, octet-stream, or inferred route                     | Solved by content types as headers                            | No          |
+| 6. Error response format               | Fixed JSON; rewrite responses on both ends                | Two-way `errorFormat` shared by server and client             | Yes         |
+| 11. CORS                               | Wrap `fetch`; on Bun, every route                         | `cors` option, with methods and headers derived from routes   | Yes         |
+| 13. Interceptors                       | Wrap `createApp` (and every Bun route) or replace `fetch` | One `intercept(request, next)` hook on the app and the client | Yes         |
+| 14. Wildcard path params (maybe)       | Not supported                                             | `:path*` rest segment where routers support it                | Yes         |

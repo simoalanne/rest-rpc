@@ -7,6 +7,12 @@ description: Generate an OpenAPI document from HTTP route definitions.
 separately shared contract. HTTP methods, paths, schemas, and operation
 metadata come from the same route builder used by the server and client.
 
+:::warning
+The document is a best-effort conversion of the routes. It isn't guaranteed to
+describe every route completely, or to work with every OpenAPI tool or SDK
+generator, so check the output with the tools you use it with.
+:::
+
 Define response schemas with `.response()` to include
 responses in OpenAPI. Responses inferred from handlers have no schema, so their
 routes get a placeholder `default` response that does not claim a status or
@@ -83,6 +89,11 @@ For object-shaped path and query schemas, rest-rpc reads top-level
 `properties` and `required` from the converted JSON Schema to create OpenAPI
 parameters. Schema records and headers do not always
 carry parameter-level requiredness in the converted schema.
+
+A query parameter whose converted schema has `type: "array"` is documented as
+`name[]` with `style: form` and `explode: true`, because the client sends
+arrays as repeated `name[]=value` keys and the server only reads arrays from
+those keys.
 
 ## Route Metadata
 
