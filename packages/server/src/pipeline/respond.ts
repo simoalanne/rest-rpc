@@ -61,6 +61,13 @@ export type ResponseEnvelopeFields<T> = Merge<
 			: unknown)
 >;
 
+/** Rejects a `Response` body, which is sent as it is instead of with options. */
+export type RespondBodyCheck<TBody> = [Extract<TBody, Response>] extends [never]
+	? unknown
+	: {
+			"~error": "Return a Response directly. respond() options don't apply to it.";
+		};
+
 /**
  * Returns a response with a status, media type, or headers other than the
  * defaults of a plain return value.
@@ -71,7 +78,7 @@ export type ResponseEnvelopeFields<T> = Merge<
  * @see {@link https://rest-rpc.vercel.app/docs/route-builder#return-responses}
  */
 export function respond<TBody, const TOptions extends RespondOptions = {}>(
-	body: TBody,
+	body: TBody & RespondBodyCheck<TBody>,
 	options?: TOptions & LowercaseHeadersOptionCheck<TOptions>,
 ): ResponseEnvelope<TBody, NoInfer<TOptions>> {
 	// `NoInfer` keeps the handler's expected return type from inferring options.

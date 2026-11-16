@@ -476,13 +476,47 @@ describe.each([
 					headers: { "cache-control": "max-age=60" },
 				}),
 			),
+			legacy: route
+				.get("/legacy.txt")
+				.static(
+					new Response("legacy", { headers: { "content-type": "text/plain" } }),
+				),
 		};
 		await serve(routes, {}, async (url) => {
 			for (let index = 0; index < 2; index += 1) {
 				const response = await fetch(`${url}/robots.txt`);
 				expect(response.headers.get("cache-control")).toBe("max-age=60");
 				expect(await response.text()).toBe("User-agent: *");
+				const raw = await fetch(`${url}/legacy.txt`);
+				expect(raw.headers.get("content-type")).toBe("text/plain");
+				expect(await raw.text()).toBe("legacy");
 			}
+		});
+	});
+
+	it("answers HEAD requests to GET routes with the GET status and headers, without a body", async () => {
+		let streamed = false;
+		const routes = {
+			todo: route
+				.get("/todos/:id")
+				.handler(({ params }) =>
+					respond({ id: params.id }, { headers: { etag: '"1"' } }),
+				),
+			events: route.get("/events").handler(async function* () {
+				streamed = true;
+				yield 1;
+			}),
+		};
+		await serve(routes, {}, async (url) => {
+			const head = await fetch(`${url}/todos/1`, { method: "HEAD" });
+			expect(head.status).toBe(200);
+			expect(head.headers.get("etag")).toBe('"1"');
+			expect(head.headers.get("content-type")).toBe("application/json");
+			expect(await head.text()).toBe("");
+			// The generator of a stream body never runs.
+			const events = await fetch(`${url}/events`, { method: "HEAD" });
+			expect(await events.text()).toBe("");
+			expect(streamed).toBe(false);
 		});
 	});
 
@@ -803,6 +837,42 @@ describe.each([
 			expect(response.headers.get("x-codec")).toBe("custom");
 			expect(response.headers.get("x-route")).toBe("route");
 			expect(await response.text()).toBe("value");
+		});
+	});
+
+	it("sends a returned Response with the changes middleware makes", async () => {
+		const withRequestId = route.use(async ({ next }) => {
+			const response = await next({ context: { format: "xml" } });
+			return {
+				...response,
+				headers: { ...response.headers, "x-request-id": "1" },
+			};
+		});
+		const routes = {
+			redirect: withRequestId
+				.get("/redirect")
+				.handler(() => Response.redirect("https://example.com/next", 302)),
+			legacy: withRequestId.get("/legacy").handler(({ context }) => {
+				const headers = new Headers({ "content-type": "application/xml" });
+				headers.append("set-cookie", "a=1");
+				headers.append("set-cookie", "b=2");
+				return new Response(`<${context.format} />`, {
+					status: 202,
+					headers,
+				});
+			}),
+		};
+		await serve(routes, {}, async (url) => {
+			const response = await fetch(`${url}/legacy`);
+			expect(response.status).toBe(202);
+			expect(response.headers.get("content-type")).toBe("application/xml");
+			expect(response.headers.get("x-request-id")).toBe("1");
+			expect(response.headers.getSetCookie()).toEqual(["a=1", "b=2"]);
+			expect(await response.text()).toBe("<xml />");
+			const redirect = await fetch(`${url}/redirect`, { redirect: "manual" });
+			expect(redirect.status).toBe(302);
+			expect(redirect.headers.get("location")).toBe("https://example.com/next");
+			expect(redirect.headers.get("x-request-id")).toBe("1");
 		});
 	});
 

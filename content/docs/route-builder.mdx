@@ -170,6 +170,7 @@ receives with the request:
 
 - `undefined` is a status 200 response without a body.
 - An async iterable is an SSE [stream](#return-streams).
+- A Fetch `Response` is sent as it is. See [raw responses](#raw-responses).
 - Any other value is a JSON body with status 200.
 - `respond(body, options?)` sets the other parts of the response. An
   `undefined` body sends no body.
@@ -200,6 +201,59 @@ const created = route
 	.handler(({ body, respond }) =>
 		respond(createTodo(body.title), { status: 201 }),
 	);
+```
+
+### Raw Responses
+
+Return a Fetch `Response` for a response the builder can't express. The
+request is still validated and middleware still runs, but the response is sent
+as it is: response validation and codecs don't run, and on Node it is written to
+the `ServerResponse`.
+
+```ts
+route
+	.get("/legacy/export")
+	.query(z.object({ format: z.enum(["xml", "xls"]) }))
+	.handler(
+		async ({ query }) =>
+			new Response(await legacyExport(query.format), {
+				headers: { "content-type": contentTypeFor(query.format) },
+			}),
+	);
+
+// Redirects are responses too. The client follows them like any fetch.
+route
+	.get("/files/:id/download")
+	.handler(async ({ params }) =>
+		Response.redirect(await signedUrl(params.id), 302),
+	);
+```
+
+The route doesn't describe the response, so its client result is loosely
+typed: `status` is a `number`, `contentType` a `string` or `undefined`, and
+`body` is `unknown`. The client decodes the body by its received content type,
+as for every route. A handler that returns a `Response` on only some paths
+makes the whole route loosely typed. Defined errors stay typed.
+
+Middleware receives the `Response` as the `body` of the response `next()`
+resolves to, with its `status`, `headers` and `cookies`. Those fields are what's
+sent, with the body of the `Response`, so middleware that adds a header works
+on raw routes too. Read them instead of the `Response`'s own status and
+headers, which middleware changes don't update.
+
+A `Response` is returned directly: `respond()` doesn't accept one, because its
+options can't apply to it.
+
+To declare a raw route, such as in a [contract](/docs/contract-first), use
+`.response(raw())` as its only response. Its handler must return a `Response`,
+and OpenAPI documents it as a `default` response with the description you pass:
+
+```ts
+import { raw } from "@rest-rpc/core";
+
+const legacyExport = route
+	.get("/legacy/export")
+	.response(raw({ description: "The export in its legacy format" }));
 ```
 
 ## Define Responses
@@ -248,7 +302,9 @@ route
 `.static(value)` completes a route with a response that is the same for every
 request. The value is anything a handler could return, and it is validated and
 serialized once, when the routes are compiled. It is sent as is, so it cannot be
-a function, a promise or a stream: use `.handler()` to compute a response. It is
+a function, a promise or a stream: use `.handler()` to compute a response. A
+Fetch `Response` is cloned for every request, and sent as a
+[raw response](#raw-responses). It is
 not available on routes that read the request or run middleware.
 
 Since compiling routes is synchronous, the route's response schemas and body

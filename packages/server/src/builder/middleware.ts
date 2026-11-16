@@ -1,4 +1,5 @@
 import type { MaybePromise } from "@rest-rpc/core/utils";
+import { toRawEnvelope } from "../pipeline/rawResponse.ts";
 import { isResponseEnvelope, respond } from "../pipeline/respond.ts";
 import type { RuntimeRouteHandler } from "./routeBuilder.types.ts";
 
@@ -19,6 +20,7 @@ const toMiddlewareResponse = (result: unknown): unknown => {
 
 // Middleware receives the handler result as an envelope with its status set.
 const toResponse = (result: unknown, status: number): unknown => {
+	if (result instanceof Response) return toRawEnvelope(result);
 	if (!isResponseEnvelope(result)) return respond(result, { status });
 	return result.status === undefined ? { ...result, status } : result;
 };

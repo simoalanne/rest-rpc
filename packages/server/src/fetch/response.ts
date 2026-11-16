@@ -2,6 +2,7 @@ import type { ErrorResponse } from "../pipeline/resolveRouteError.ts";
 import { isAsyncIterable, type BodyCodecRegistry } from "@rest-rpc/core/codecs";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import type { HttpRouteResult } from "../pipeline/handleHttpRoute.ts";
+import { cancelBody } from "../pipeline/headResponse.ts";
 import { mapMaybePromise } from "../pipeline/maybePromise.ts";
 import {
 	serializeHttpResponseParts,
@@ -46,11 +47,12 @@ export const toFetchResponse = ({
 		headers: toFetchHeaders(headers),
 	});
 
-/** Serializes a route result as a Fetch `Response`. */
+/** Serializes a route result as a Fetch `Response`. A returned `Response` is sent as is. */
 export const serializeFetchResult = (
-	result: HttpRouteResult,
+	result: HttpRouteResult | Response,
 	codecs: BodyCodecRegistry,
 ): MaybePromise<Response> => {
+	if (result instanceof Response) return result;
 	// `Response.json` serializes faster than the JSON codec, but only without
 	// headers to set.
 	if (
@@ -71,3 +73,9 @@ export const serializeFetchResult = (
 /** Serializes an error as a JSON `{ code, message, data? }` Fetch `Response`. */
 export const serializeFetchError = (error: ErrorResponse): Response =>
 	toFetchResponse(serializeRouteErrorParts(error));
+
+/** The response to a `HEAD` request: the `GET` response without its body, which is cancelled unread. */
+export const withoutBody = (response: Response): Response => {
+	void cancelBody(response.body);
+	return new Response(null, response);
+};

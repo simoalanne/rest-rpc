@@ -1,6 +1,7 @@
 import { route } from "../contract/routeBuilder.ts";
 import { type RouteError, routeError } from "../contract/routeError.ts";
 import { type } from "../standard-schema/type.ts";
+import { raw } from "../contract/raw.ts";
 import { sse, type SseEvent } from "../contract/sse.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type {
@@ -10,6 +11,23 @@ import type {
 } from "./response.ts";
 
 describe("client response inference", () => {
+	it("types raw responses loosely and keeps defined errors", () => {
+		const legacy = route
+			.get("/legacy")
+			.error("NOT_FOUND", { status: 404 })
+			.response(raw());
+		expectTypeOf<InferClientResponse<typeof legacy>>().toEqualTypeOf<{
+			status: number;
+			contentType: string | undefined;
+			body: unknown;
+			headers: Record<string, string>;
+			cookies: readonly string[];
+		}>();
+		expectTypeOf<
+			InferClientError<typeof legacy>["code"]
+		>().toEqualTypeOf<"NOT_FOUND">();
+	});
+
 	it("uses transformed schema outputs in response unions", () => {
 		const value = route
 			.get("/")

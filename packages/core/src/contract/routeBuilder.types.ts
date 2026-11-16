@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { RouteErrorDefinition } from "./routeError.ts";
 import type { DefaultBodyContentType } from "./body.ts";
+import type { RawResponses } from "./raw.ts";
 import type {
 	AbsolutePath,
 	DefaultMeta,
@@ -245,6 +246,23 @@ export type WithResponse<
 			Record<StatusFor<TOptions>, ResponseFor<TSchemaOrContent, TOptions>>;
 	}
 >;
+
+export type WithRawResponse<TState extends BuilderState> = NextState<
+	TState,
+	{ responses: RawResponses }
+>;
+
+/** Rejects `raw()` on a route that already defines responses. */
+export type RawResponseCheck<TState extends BuilderState> =
+	keyof TState["responses"] extends never
+		? unknown
+		: { "~error": "raw() must be a route's only response." };
+
+/** Rejects other responses on a route defined with `raw()`. */
+export type AfterRawResponseCheck<TState extends BuilderState> =
+	number extends keyof TState["responses"]
+		? { "~error": "raw() must be a route's only response." }
+		: unknown;
 
 export type WithError<
 	TState extends BuilderState,

@@ -18,6 +18,7 @@ import {
 	nodeRequestReader,
 	readRequestTarget,
 } from "./request.ts";
+import { fromFetchResponse } from "../pipeline/rawResponse.ts";
 import {
 	writeNodeError,
 	writeNodeResponse,
@@ -52,7 +53,12 @@ export const compileNodeRoutes = (
 					path,
 					isStatic: true,
 					handle: (_request, response) =>
-						writeNodeResponse(response, staticResponse),
+						writeNodeResponse(
+							response,
+							staticResponse instanceof Response
+								? fromFetchResponse(staticResponse.clone())
+								: staticResponse,
+						),
 				};
 			}
 			return {

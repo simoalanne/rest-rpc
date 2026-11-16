@@ -13,13 +13,14 @@ import {
 /**
  * Runs the handler of a static route once, and validates and serializes its
  * response, throwing when the routes are compiled instead of on a request.
- * Returns the parts every response of the route is written from.
+ * Returns the parts every response of the route is written from, or the
+ * returned `Response` to clone.
  */
 export const prepareStaticResponse = (
 	implementation: RuntimeImplementation,
 	codecs: BodyCodecRegistry,
 	disableResponseValidation: boolean,
-): SerializedHttpResponse => {
+): SerializedHttpResponse | Response => {
 	const { method, path } = implementation.route;
 	const name = `"${method} ${path}"`;
 	// Each step must complete synchronously, so failures throw here.
@@ -41,6 +42,8 @@ export const prepareStaticResponse = (
 
 	// The handler of a static route returns its value without reading the request.
 	const value = (implementation.handler as () => unknown)();
+	// A `Response` is cloned for every request, so the original is never read.
+	if (value instanceof Response) return value;
 	// Types reject stream values, so the result has no stream to frame.
 	const result = prepare(() =>
 		normalizeHandlerResult(implementation, value, disableResponseValidation),

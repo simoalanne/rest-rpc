@@ -182,7 +182,7 @@ type MatchedRoute<TRoute> = {
 /**
  * Compiles routes into a matcher using rou3. It matches the path of a request
  * URL or target, without the mount path, and requests outside the mount path
- * are unmatched.
+ * are unmatched. A `HEAD` request matches the `GET` route of its path.
  */
 export function createRouteMatcher<
 	TRoute extends { readonly method: string; readonly path: string },
@@ -204,7 +204,11 @@ export function createRouteMatcher<
 			? stripMountPath(pathname, mountPath)
 			: pathname;
 		if (!routePath) return undefined;
-		const match = findRoute(router, method, routePath);
+		const match = findRoute(
+			router,
+			method === "HEAD" ? "GET" : method,
+			routePath,
+		);
 		if (!match) return undefined;
 		// rou3 creates the params per match, so they are decoded in place.
 		const { params } = match;

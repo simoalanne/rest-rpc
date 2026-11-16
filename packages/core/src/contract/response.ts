@@ -125,7 +125,10 @@ type ClientResponseEntry<TStatus extends number, TResponse> = [
 		? TMediaType extends string
 			? {
 					status: TStatus;
-					contentType: TMediaType;
+					// Any media type includes none, as for a returned `Response` without a body.
+					contentType: string extends TMediaType
+						? TMediaType | undefined
+						: TMediaType;
 					body: ClientBody<TResponse, TMediaType>;
 					headers: ClientResponseHeaders<TResponse>;
 					/** Received `Set-Cookie` values. Browsers hide them from `fetch`, so it is empty there. */

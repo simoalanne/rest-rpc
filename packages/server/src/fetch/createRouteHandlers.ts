@@ -14,9 +14,10 @@ import {
 } from "../routing/match.ts";
 import { fetchRequestReader } from "./request.ts";
 import {
-	serializeFetchError,
 	serializeFetchResult,
+	serializeFetchError,
 	toFetchResponse,
+	withoutBody,
 } from "./response.ts";
 
 /**
@@ -86,26 +87,37 @@ export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
 	return routes.map(
 		({ method, path, implementation, pathParams, staticResponse }) => {
 			if (staticResponse) {
-				const createResponse = () => toFetchResponse(staticResponse);
+				const createResponse = () =>
+					staticResponse instanceof Response
+						? staticResponse.clone()
+						: toFetchResponse(staticResponse);
 				return {
 					method,
 					path,
-					handle: async () => createResponse(),
+					handle: async (request: Request, ..._options: unknown[]) =>
+						request.method === "HEAD"
+							? withoutBody(createResponse())
+							: createResponse(),
 					staticResponse: createResponse(),
 				};
 			}
 			return {
 				method,
 				path,
-				handle: (request, ...[handleOptions]) =>
-					dispatch(
+				handle: (request, ...[handleOptions]) => {
+					const response = dispatch(
 						implementation,
 						pathParams,
 						request,
 						undefined,
 						request.signal,
 						handleOptions,
-					),
+					);
+					// A `HEAD` request runs the `GET` route, and is sent without the body.
+					return request.method === "HEAD"
+						? response.then(withoutBody)
+						: response;
+				},
 			};
 		},
 	);

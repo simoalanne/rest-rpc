@@ -1,5 +1,6 @@
 import type { Contract } from "../contract/contract.ts";
 import { route } from "../contract/routeBuilder.ts";
+import { raw } from "../contract/raw.ts";
 import { sse } from "../contract/sse.ts";
 import { type } from "../standard-schema/type.ts";
 import {
@@ -97,6 +98,15 @@ describe("operation", () => {
 				description: expect.any(String),
 				content: { "application/json": { schema: body("CONFLICT") } },
 			},
+		});
+	});
+
+	it("documents a raw response as the default response with its description", () => {
+		const legacy = route
+			.get("/legacy")
+			.response(raw({ description: "Legacy export" }));
+		expect(operationOf(legacy).responses).toEqual({
+			default: { description: "Legacy export" },
 		});
 	});
 

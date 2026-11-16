@@ -145,6 +145,12 @@ route.handler(({ respond }) =>
 		cookies: ["session=abc; HttpOnly"], // each its own Set-Cookie header
 	}),
 );
+// A Fetch Response is sent as it is, and the client result is loosely typed.
+route.handler(
+	() => new Response(xml, { headers: { "content-type": "application/xml" } }),
+);
+route.handler(() => Response.redirect(signedUrl, 302)); // the client follows it
+route.response(raw()).handler(() => new Response(xml)); // declared, as in contracts
 
 // Defined: runtime-validated, typed, and included in OpenAPI.
 route

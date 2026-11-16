@@ -9,6 +9,7 @@ import {
 	createCatchAllHandler,
 	createLocalClient,
 	implement,
+	raw,
 	route,
 	routeError,
 	sse,
@@ -42,6 +43,8 @@ export const withContentResponse = route
 	.response({ "application/json": schema });
 export const withEmptyResponse = route.get().response({ status: 204 });
 export const withStreamResponse = route.get().response(sse(schema));
+export const withRawResponse = route.get().response(raw());
+export const contractRaw = contractRoute.get("/raw").response(raw());
 export const withErrorClass = route.error(Unauthorized);
 export const withErrorCode = route.error("NOT_FOUND", { status: 404 });
 export const withMiddleware = route.use(({ next }) => next());

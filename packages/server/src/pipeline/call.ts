@@ -6,8 +6,11 @@ import {
 	type InferClientRequest,
 	type InferClientResponse,
 } from "@rest-rpc/core";
-import { normalizeMediaType } from "@rest-rpc/core/codecs";
-import type { RequestArgs } from "@rest-rpc/core/client";
+import {
+	createBodyCodecRegistry,
+	normalizeMediaType,
+} from "@rest-rpc/core/codecs";
+import { readResponse, type RequestArgs } from "@rest-rpc/core/client";
 import { markDefined, type RouteDefinition } from "@rest-rpc/core/contract";
 import type { Merge } from "@rest-rpc/core/utils";
 import type { InitialContextOf } from "../builder/routeBuilder.types.ts";
@@ -78,6 +81,8 @@ const toClientError = async (route: RouteDefinition, error: RouteError) => {
 	);
 };
 
+const defaultCodecs = createBodyCodecRegistry([]);
+
 const callRoute = async (
 	route: ImplementedRoute,
 	request: unknown,
@@ -96,19 +101,23 @@ const callRoute = async (
 	const mediaType =
 		implementation.route.request?.body &&
 		(normalizeMediaType(contentType) || implementation.defaultBodyMediaType);
+	let result: RouteResult | Response;
 	try {
-		const result = await executeRoute(implementation, {
+		result = await executeRoute(implementation, {
 			request: { ...segments, query, headers },
 			signal: signal ?? new AbortController().signal,
 			mediaType,
 			context,
 		});
-		return toCallResult(result);
 	} catch (error) {
 		throw error instanceof RouteError
 			? await toClientError(implementation.route, error)
 			: error;
 	}
+	// A returned `Response` is received as the fetch client receives it.
+	return result instanceof Response
+		? readResponse(result, implementation.route, false, defaultCodecs)
+		: toCallResult(result);
 };
 
 /**

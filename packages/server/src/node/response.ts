@@ -1,12 +1,10 @@
 import type { ErrorResponse } from "../pipeline/resolveRouteError.ts";
-import {
-	isAsyncIterable,
-	type BodyCodecRegistry,
-	type BodyValue,
-} from "@rest-rpc/core/codecs";
+import type { BodyCodecRegistry } from "@rest-rpc/core/codecs";
 import type { OutgoingHttpHeaders, ServerResponse } from "node:http";
 import { pipeline } from "node:stream/promises";
 import type { HttpRouteResult } from "../pipeline/handleHttpRoute.ts";
+import { cancelBody, toHeadResponse } from "../pipeline/headResponse.ts";
+import { fromFetchResponse } from "../pipeline/rawResponse.ts";
 import {
 	serializeHttpResponseParts,
 	serializeRouteErrorParts,
@@ -57,16 +55,17 @@ const writeStream = async (
 	}
 };
 
-const cancel = async (body: BodyValue | null) => {
-	if (isAsyncIterable(body)) await body[Symbol.asyncIterator]().return?.();
-};
-
-/** Writes serialized response parts to a Node `ServerResponse`. */
+/**
+ * Writes serialized response parts to a Node `ServerResponse`, without the
+ * body for a `HEAD` request.
+ */
 export const writeNodeResponse = async (
 	response: ServerResponse,
-	{ status, headers, body }: SerializedHttpResponse,
+	parts: SerializedHttpResponse,
 ): Promise<void> => {
-	if (response.destroyed) return cancel(body);
+	const { status, headers, body } =
+		response.req.method === "HEAD" ? await toHeadResponse(parts) : parts;
+	if (response.destroyed) return cancelBody(body);
 	if (body === null) {
 		response.writeHead(status, headers);
 		response.end();
@@ -107,13 +106,18 @@ export const writeNodeResponse = async (
 	);
 };
 
-/** Serializes a route result and writes it to a Node `ServerResponse`. */
+/** Serializes a route result and writes it to a Node `ServerResponse`. A returned `Response` is written as is. */
 export const writeNodeResult = async (
 	response: ServerResponse,
-	result: HttpRouteResult,
+	result: HttpRouteResult | Response,
 	codecs: BodyCodecRegistry,
 ): Promise<void> =>
-	writeNodeResponse(response, await serializeHttpResponseParts(result, codecs));
+	writeNodeResponse(
+		response,
+		result instanceof Response
+			? fromFetchResponse(result)
+			: await serializeHttpResponseParts(result, codecs),
+	);
 
 /** Writes an error as a JSON `{ code, message, data? }` response. */
 export const writeNodeError = (

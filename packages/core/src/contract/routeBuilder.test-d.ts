@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { type } from "../standard-schema/type.ts";
 import { route } from "./routeBuilder.ts";
+import { raw } from "./raw.ts";
 import { sse } from "./sse.ts";
 import { routeError } from "./routeError.ts";
 import type { DefaultMeta, OpenApiRouteOptions } from "./routeDefinition.ts";
@@ -126,6 +127,17 @@ describe("routeBuilder types", () => {
 		>();
 		expectTypeOf(value["~restrpc"].errors.INVALID.status).toEqualTypeOf<400>();
 		expectTypeOf(value["~restrpc"].responses).toEqualTypeOf<{}>();
+	});
+
+	it("allows raw() only as a route's only response", () => {
+		const todo = type<{ id: string }>();
+		route.get("/").response(raw());
+		// @ts-expect-error raw() must be a route's only response.
+		route.get("/").response(todo).response(raw());
+		// @ts-expect-error raw() must be a route's only response.
+		route.get("/").response(raw()).response(todo);
+		// @ts-expect-error raw() must be a route's only response.
+		route.get("/").response(raw()).response({ status: 204 });
 	});
 
 	it("rejects optional params schema keys", () => {

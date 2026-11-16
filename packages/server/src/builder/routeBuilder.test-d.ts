@@ -1,7 +1,9 @@
 import {
+	raw,
 	route as contractRoute,
 	routeError,
 	type,
+	type InferClientError,
 	type InferClientResponse,
 	type RouteError,
 } from "@rest-rpc/core";
@@ -403,6 +405,46 @@ describe("implicit response inference", () => {
 		>();
 	});
 
+	it("types routes that may return a Response loosely, keeping defined errors", () => {
+		const NotFound = routeError("NOT_FOUND", { status: 404 });
+		const raw = route
+			.get("/")
+			.error(NotFound)
+			.handler(() =>
+				Math.random() > 0.5 ? new Response("raw") : { id: "one" },
+			);
+		expectTypeOf<InferClientResponse<typeof raw>>().toEqualTypeOf<{
+			status: number;
+			contentType: string | undefined;
+			body: unknown;
+			headers: Record<string, string>;
+			cookies: readonly string[];
+		}>();
+		expectTypeOf<InferClientError<typeof raw>>().toEqualTypeOf<
+			RouteError<"NOT_FOUND", undefined, 404, Record<string, string>>
+		>();
+	});
+
+	it("requires routes defined with raw() to return a Response", () => {
+		const declared = route.get("/").response(raw());
+		declared.handler(() => new Response("raw"));
+		// @ts-expect-error The handler must return a Response.
+		declared.handler(() => ({ id: "one" }));
+	});
+
+	it("rejects a Response passed to respond()", () => {
+		route.get("/").handler(({ respond }) =>
+			// @ts-expect-error Return a Response directly. respond() options don't apply to it.
+			respond(new Response("raw")),
+		);
+		route.use(({ respond }) =>
+			// @ts-expect-error Middleware's respond() rejects one too.
+			respond(new Response("raw")),
+		);
+		// @ts-expect-error Any Response in the body type is rejected.
+		respond(Math.random() > 0.5 ? new Response("raw") : "text");
+	});
+
 	it("infers plain, stream, and SSE data independently of metadata", () => {
 		const plain = route.handler(() => ({ id: "one" }));
 		async function* chunks() {
@@ -639,6 +681,10 @@ describe("middleware responses", () => {
 		route.get("/").static(new ReadableStream());
 		// @ts-expect-error Streams can be sent only once.
 		route.get("/").static(respond(new ReadableStream(), { status: 200 }));
+		// A Response is cloned for every request, but respond() options can't apply to it.
+		route.get("/").static(new Response("ok"));
+		// @ts-expect-error Return a Response directly.
+		route.get("/").static(respond(new Response("ok"), { status: 200 }));
 	});
 
 	it("omits static() from routes that read the request or run middleware", () => {
