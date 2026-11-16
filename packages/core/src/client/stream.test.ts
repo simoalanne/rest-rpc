@@ -31,9 +31,44 @@ describe("stream", () => {
 		);
 		expect(await collect(events)).toEqual([
 			{ data: { count: 1 }, id: "one", event: "update", retry: 100 },
-			{ data: { count: 2 } },
+			{ data: { count: 2 }, id: "one" },
 		]);
 	});
+	it("splits lines on LF, CRLF and CR, also across chunks", async () => {
+		const events = parseSseStream(
+			undefined,
+			stream("data: 1\r\n\r\n", "data: 2\r", "\n\r\n", "data: 3\r\r"),
+			false,
+		);
+		expect(await collect(events)).toEqual([
+			{ data: 1 },
+			{ data: 2 },
+			{ data: 3 },
+		]);
+	});
+
+	it("reads fields as the SSE spec defines them", async () => {
+		const events = parseSseStream(
+			undefined,
+			stream(
+				// optional space, joined data lines, and an id that persists
+				'id: one\ndata:{"a":\ndata: 1}\n\n',
+				"data: 2\n\n",
+				// a field without a colon has an empty value
+				"data\n\n",
+				// ids containing NUL and retry values that aren't digits are ignored
+				"id: t\0wo\nretry: soon\ndata: 3\n\n",
+			),
+			false,
+		);
+		expect(await collect(events)).toEqual([
+			{ id: "one", data: { a: 1 } },
+			{ id: "one", data: 2 },
+			{ id: "one", data: "" },
+			{ id: "one", data: 3 },
+		]);
+	});
+
 	it("rejects data that cannot be decoded as errors", async () => {
 		await expect(
 			collect(parseSseStream(undefined, stream("data: {\n\n"), false)),
@@ -88,7 +123,7 @@ describe("stream", () => {
 		);
 		expect(await collect(events)).toEqual([
 			{ id: "one", event: "update", retry: 100, data: 2 },
-			{ data: 3 },
+			{ id: "one", data: 3 },
 		]);
 	});
 });

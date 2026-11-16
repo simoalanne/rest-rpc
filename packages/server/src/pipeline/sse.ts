@@ -1,10 +1,23 @@
-import { bodyCodec, type BodyValue, type SseEvent } from "@rest-rpc/core";
+import {
+	bodyCodec,
+	serializedBody,
+	type BodyValue,
+	type SseEvent,
+	type SseFormat,
+} from "@rest-rpc/core";
 
 const sseBrand = Symbol("rest-rpc.sse");
 
-/** Sends already framed SSE bodies as-is, listed before custom codecs so it overrides them. */
+/**
+ * Sends already framed SSE bodies as-is, listed before custom codecs so it
+ * overrides them. `cache-control: no-cache` keeps proxies from caching or
+ * buffering the stream, and a handler's own header replaces it.
+ */
 export const sseBodyCodec = bodyCodec("text/event-stream", {
-	serialize: (body) => body as BodyValue,
+	serialize: (body) =>
+		serializedBody(body as BodyValue, {
+			headers: { "cache-control": "no-cache" },
+		}),
 });
 
 /** A branded SSE value yielded by server handlers when event metadata is needed. */
@@ -41,13 +54,41 @@ export const toSseEvent = (value: unknown): SseEvent<unknown> => {
 	return event;
 };
 
-const formatSseEvent = (value: unknown) => {
+/**
+ * Options of Server-Sent Event responses.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/streaming#stream-options}
+ */
+export type SseOptions = {
+	/** The data format of events, the same as the client's. JSON by default. */
+	format?: SseFormat;
+	/**
+	 * Milliseconds without an event before a `: keepalive` comment is sent, so
+	 * proxies don't close an idle connection. Off by default.
+	 */
+	keepAlive?: number;
+	/**
+	 * Sends a `: ok` comment right after the headers, so buffering proxies
+	 * forward the start of the stream. Off by default.
+	 */
+	initialComment?: boolean;
+};
+
+const lineBreak = /\r\n|\r|\n/;
+
+const formatSseEvent = (
+	value: unknown,
+	serialize: (data: unknown) => string,
+) => {
 	const event = toSseEvent(value);
 	return [
 		event.id === undefined ? undefined : `id: ${event.id}`,
 		event.event === undefined ? undefined : `event: ${event.event}`,
 		event.retry === undefined ? undefined : `retry: ${event.retry}`,
-		`data: ${serializeData(event.data)}`,
+		// Data that spans lines is sent as one `data` field per line.
+		...serialize(event.data)
+			.split(lineBreak)
+			.map((line) => `data: ${line}`),
 		"",
 		"",
 	]
@@ -55,15 +96,62 @@ const formatSseEvent = (value: unknown) => {
 		.join("\n");
 };
 
-export async function* frameSseStream(
-	body: AsyncIterable<unknown>,
+async function* withKeepAlive(
+	events: AsyncIterable<string>,
+	interval: number,
 ): AsyncIterable<string> {
-	for await (const value of body) yield formatSseEvent(value);
+	const iterator = events[Symbol.asyncIterator]();
+	try {
+		let next = iterator.next();
+		// A disconnected client cancels the body, which ends this loop.
+		while (true) {
+			let timer: ReturnType<typeof setTimeout> | undefined;
+			const idle = new Promise<undefined>((resolve) => {
+				timer = setTimeout(() => resolve(undefined), interval);
+			});
+			let result: IteratorResult<string> | undefined;
+			try {
+				result = await Promise.race([next, idle]);
+			} finally {
+				clearTimeout(timer);
+			}
+			if (!result) {
+				yield ": keepalive\n\n";
+				continue;
+			}
+			if (result.done) return;
+			yield result.value;
+			next = iterator.next();
+		}
+	} finally {
+		await iterator.return?.();
+	}
 }
 
+async function* frameEvents(
+	body: AsyncIterable<unknown>,
+	serialize: (data: unknown) => string,
+	initialComment: boolean | undefined,
+): AsyncIterable<string> {
+	if (initialComment) yield ": ok\n\n";
+	for await (const value of body) yield formatSseEvent(value, serialize);
+}
+
+export const frameSseStream = (
+	body: AsyncIterable<unknown>,
+	{ format, keepAlive, initialComment }: SseOptions = {},
+): AsyncIterable<string> => {
+	const events = frameEvents(
+		body,
+		format ? format.serialize : serializeData,
+		initialComment,
+	);
+	return keepAlive === undefined ? events : withKeepAlive(events, keepAlive);
+};
+
 /** Frames stream items as an SSE response body that body codecs pass through. */
-export const sseBody = (body: AsyncIterable<unknown>) => ({
-	value: frameSseStream(body),
+export const sseBody = (body: AsyncIterable<unknown>, options: SseOptions) => ({
+	value: frameSseStream(body, options),
 	contentType: "text/event-stream",
 });
 

@@ -42,7 +42,12 @@ export type {
 	OpenApiDocument,
 } from "./openapi/index.ts";
 export { createOpenApiDocument } from "./openapi/index.ts";
-export { sse, type SseEvent } from "./contract/sse.ts";
+export {
+	sse,
+	sseFormat,
+	type SseEvent,
+	type SseFormat,
+} from "./contract/sse.ts";
 export { type } from "./standard-schema/type.ts";
 export type { ApiClientRouteValue } from "./client/index.ts";
 export type {

@@ -1,5 +1,6 @@
 import type { AbsolutePath, BodyCodec, RouteError } from "@rest-rpc/core";
 import type { EmptyObject } from "@rest-rpc/core/utils";
+import type { SseOptions } from "./sse.ts";
 
 /**
  * Customizes request parsing, validation and error observation of route
@@ -41,6 +42,11 @@ export type CreateRouteHandlersOptions<TRequest = Request> = {
 	 * @default false
 	 */
 	disableResponseValidation?: boolean;
+	/**
+	 * Options of Server-Sent Event responses. A `respond()` call's `sse` option
+	 * overrides `keepAlive` and `initialComment` for its stream.
+	 */
+	sse?: SseOptions;
 };
 
 /**

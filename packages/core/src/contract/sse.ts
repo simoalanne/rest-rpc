@@ -22,3 +22,31 @@ export function sse<const TSchema extends StandardSchemaV1>(
 ): { readonly "text/event-stream": TSchema } {
 	return { "text/event-stream": schema };
 }
+
+/**
+ * Serializes the data of each Server-Sent Event, and deserializes it on the
+ * client.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/streaming#data-format}
+ */
+export type SseFormat = {
+	/** Returns the event data to send. It may span several lines. */
+	serialize: (data: unknown) => string;
+	/** Reads the data of a received event, with its lines joined by `\n`. */
+	deserialize: (data: string) => unknown;
+};
+
+/**
+ * Defines the data format of Server-Sent Events, instead of JSON.
+ *
+ * @remarks Pass the same format to the server and the client in their `sse`
+ * option. It changes how data is sent, not its types.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/streaming#data-format}
+ */
+export function sseFormat<T>(format: {
+	serialize: (data: T) => string;
+	deserialize: (data: string) => T;
+}): SseFormat {
+	return format as SseFormat;
+}

@@ -3,6 +3,7 @@ import type {
 	RequestScalar,
 } from "@rest-rpc/core/contract";
 import type { Merge } from "@rest-rpc/core/utils";
+import type { SseOptions } from "./sse.ts";
 
 const respondBrand = Symbol("rest-rpc.respond");
 
@@ -25,6 +26,11 @@ export type RespondOptions = {
 	headers?: Record<string, RequestScalar | undefined>;
 	/** `Set-Cookie` header values, each sent as its own header. */
 	cookies?: readonly string[];
+	/**
+	 * Overrides the app's Server-Sent Event options for this stream. It is
+	 * ignored when the body isn't a Server-Sent Event stream.
+	 */
+	sse?: Pick<SseOptions, "keepAlive" | "initialComment">;
 };
 
 /**
