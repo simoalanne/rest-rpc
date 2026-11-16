@@ -1,4 +1,4 @@
-import { routeError, sse, type } from "@rest-rpc/core";
+import { createClient, routeError, sse, sseFormat, type } from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import { route } from "../builder/routeBuilder.ts";
 import type { RuntimeImplementationTree } from "../routing/match.ts";
@@ -271,6 +271,92 @@ describe("route pipeline", () => {
 		expect(response.headers.get("count")).toBe("1");
 		expect(response.headers.get("content-type")).toMatch(/^text\/event-stream/);
 		expect(await response.text()).toBe("id: one\ndata: 1\n\n");
+	});
+
+	it("sends streams with cache-control: no-cache unless the handler sets it", async () => {
+		const stream = async function* () {
+			yield 1;
+		};
+		const byDefault = await send(route.get("/").handler(stream));
+		expect(byDefault.headers.get("cache-control")).toBe("no-cache");
+		const overridden = await send(
+			route
+				.get("/")
+				.handler(() =>
+					respond(stream(), { headers: { "cache-control": "no-store" } }),
+				),
+		);
+		expect(overridden.headers.get("cache-control")).toBe("no-store");
+	});
+
+	it("sends and reads events with a custom data format", async () => {
+		const lines = sseFormat({
+			serialize: (data: string[]) => data.join("\n"),
+			deserialize: (data) => data.split("\n"),
+		});
+		const routes = {
+			events: route.get("/").handler(async function* () {
+				yield ["first", "second"];
+			}),
+		};
+		const app = createApp(routes, { sse: { format: lines } });
+		const client = createClient(routes, {
+			baseUrl: "http://localhost",
+			fetch: (input, init) => app.fetch(new Request(input, init)),
+			sse: { format: lines },
+		});
+		const { body } = await client.events();
+		const events = [];
+		for await (const event of body) events.push(event);
+		expect(events).toEqual([{ data: ["first", "second"] }]);
+	});
+
+	it("sends a keepalive comment after the stream is idle", async () => {
+		vi.useFakeTimers();
+		try {
+			let resolve!: (value: number) => void;
+			const next = new Promise<number>((settle) => {
+				resolve = settle;
+			});
+			const response = await send(
+				route.get("/").handler(async function* () {
+					yield await next;
+				}),
+				undefined,
+				{ sse: { keepAlive: 1_000 } },
+			);
+			const reader = response
+				.body!.pipeThrough(new TextDecoderStream())
+				.getReader();
+			const first = reader.read();
+			await vi.advanceTimersByTimeAsync(1_000);
+			expect((await first).value).toBe(": keepalive\n\n");
+			resolve(1);
+			expect((await reader.read()).value).toBe("data: 1\n\n");
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("sends an initial comment unless the response overrides it", async () => {
+		const stream = async function* () {
+			yield 1;
+		};
+		const options = { sse: { initialComment: true } };
+		const byDefault = await send(
+			route.get("/").handler(stream),
+			undefined,
+			options,
+		);
+		expect(await byDefault.text()).toBe(": ok\n\ndata: 1\n\n");
+		const overridden = await send(
+			route
+				.get("/")
+				.handler(() => respond(stream(), { sse: { initialComment: false } })),
+			undefined,
+			options,
+		);
+		expect(await overridden.text()).toBe("data: 1\n\n");
 	});
 
 	it("reports route errors that end a started stream", async () => {

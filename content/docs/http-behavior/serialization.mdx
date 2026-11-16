@@ -89,9 +89,12 @@ same mapping and can also send streams. See
 A `text/event-stream` response is always a server-sent event stream, handled by
 rest-rpc on both ends, and custom codecs cannot override it. Its schema
 validates each item. The server frames each value a
-[streaming route](/docs/streaming) yields as JSON in an SSE `data` field, with
+[streaming route](/docs/streaming) yields as JSON in an SSE `data` field, or in the
+[data format](/docs/streaming#data-format) set with the `sse` option, with
 optional `id`, `event`, and `retry` fields, and the client always parses
-`text/event-stream` responses as an SSE stream.
+`text/event-stream` responses as an SSE stream. Stream responses are sent with
+`cache-control: no-cache`, so proxies don't cache or buffer them. A
+`cache-control` header the handler sets replaces it.
 
 ## Custom Codecs
 

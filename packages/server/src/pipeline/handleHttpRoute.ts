@@ -16,7 +16,7 @@ import {
 } from "./validation.ts";
 import { invokeWithMiddleware } from "../builder/middleware.ts";
 import { isResponseEnvelope, respond, type RespondOptions } from "./respond.ts";
-import { sseBody } from "./sse.ts";
+import { sseBody, type SseOptions } from "./sse.ts";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import { allMaybePromise, mapMaybePromise } from "./maybePromise.ts";
 
@@ -46,7 +46,7 @@ export type RouteResult = ResponseHeaderFields & {
 	status: number;
 	body?:
 		| { value: unknown; contentType: string }
-		| { stream: AsyncIterable<unknown> };
+		| { stream: AsyncIterable<unknown>; sse?: RespondOptions["sse"] };
 };
 
 const getResponseSchema = (
@@ -67,6 +67,7 @@ type DefinedResponseEnvelope = ResponseHeaderFields & {
 	status: number;
 	body?: unknown;
 	contentType?: string;
+	sse?: RespondOptions["sse"];
 };
 
 // A response with one media type may omit it; otherwise the handler selects one.
@@ -118,6 +119,7 @@ const normalizeResponseResult = (
 				stream: disableValidation
 					? body
 					: validateResponseStreamChunks(body, content[mediaType]!),
+				sse: result.sse,
 			},
 		}));
 	}
@@ -154,11 +156,12 @@ const assertImplicitStatus = (status: number) => {
 const toImplicitBody = (
 	body: unknown,
 	contentType: string | undefined,
+	sse: RespondOptions["sse"],
 ): NonNullable<RouteResult["body"]> =>
 	isAsyncIterable(body) &&
 	(contentType === undefined ||
 		normalizeMediaType(contentType) === "text/event-stream")
-		? { stream: body }
+		? { stream: body, sse }
 		: { value: body, contentType: contentType ?? "application/json" };
 
 // Only `respond()` results are envelopes; any other value is the body.
@@ -173,11 +176,17 @@ const normalizeImplicitResponse = (result: unknown): RouteResult => {
 		contentType,
 		headers,
 		cookies,
+		sse,
 	} = toEnvelope(result);
 	assertImplicitStatus(status);
 	// `undefined` has no JSON representation, so it is sent without a body.
 	if (body === undefined) return { status, headers, cookies };
-	return { status, headers, cookies, body: toImplicitBody(body, contentType) };
+	return {
+		status,
+		headers,
+		cookies,
+		body: toImplicitBody(body, contentType, sse),
+	};
 };
 
 /** Normalizes and validates a handler result, synchronously when the response schemas and headers are. */
@@ -257,6 +266,7 @@ const observeStream = async function* (
 export const toHttpRouteResult = (
 	result: RouteResult,
 	observe: StreamErrorObserver | undefined,
+	sse: SseOptions | undefined,
 ): HttpRouteResult => {
 	const { status, headers, cookies, body } = result;
 	if (!body || !("stream" in body)) return result as HttpRouteResult;
@@ -264,6 +274,9 @@ export const toHttpRouteResult = (
 		status,
 		headers,
 		cookies,
-		body: sseBody(observe ? observeStream(body.stream, observe) : body.stream),
+		body: sseBody(observe ? observeStream(body.stream, observe) : body.stream, {
+			...sse,
+			...body.sse,
+		}),
 	};
 };

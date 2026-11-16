@@ -50,7 +50,11 @@ export {
 	type ResponseEnvelope,
 	type ResponseEnvelopeBase,
 } from "./pipeline/respond.ts";
-export { sseEvent, type SseServerEvent } from "./pipeline/sse.ts";
+export {
+	sseEvent,
+	type SseOptions,
+	type SseServerEvent,
+} from "./pipeline/sse.ts";
 export {
 	createRouteHandlers,
 	createCatchAllHandler,
@@ -82,6 +86,7 @@ export {
 	safe,
 	serializedBody,
 	sse,
+	sseFormat,
 	type,
 } from "@rest-rpc/core";
 export type {
@@ -100,4 +105,5 @@ export type {
 	RouteErrorDefinitionOptions,
 	RouteErrorOptions,
 	SseEvent,
+	SseFormat,
 } from "@rest-rpc/core";

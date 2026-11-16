@@ -219,8 +219,10 @@ if (response.status === 200) {
 }
 ```
 
-Every `text/event-stream` response is parsed as an SSE stream. Body codecs are
-not consulted for it.
+Every `text/event-stream` response is parsed as an SSE stream, following the
+[SSE spec](https://html.spec.whatwg.org/multipage/server-sent-events.html#parsing-an-event-stream).
+Body codecs are not consulted for it. As in `EventSource`, `id` is the last
+event ID: an event without an `id` field carries the previous one.
 
 The initial request and later stream iteration can fail independently. Pass an
 `AbortSignal` in the per-call options to cancel both the request and stream:
@@ -300,6 +302,11 @@ const client = createClient(api, {
 			type: "ClientHeaders",
 			description:
 				"Headers added to every request. Each value may be static or provided for each request.",
+		},
+		sse: {
+			type: "{ format?: SseFormat }",
+			description:
+				"The data format of Server-Sent Events, the same as the server's. JSON by default. See Server-Sent Events.",
 		},
 		timeoutMs: {
 			type: "number",

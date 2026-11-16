@@ -1,7 +1,7 @@
 import { normalizeMediaType, type BodyCodecRegistry } from "../codecs/index.ts";
 import type { Contract } from "../contract/contract.ts";
 import type { RouteDefinition } from "../contract/routeDefinition.ts";
-import type { SseEvent } from "../contract/sse.ts";
+import type { SseEvent, SseFormat } from "../contract/sse.ts";
 import type {
 	ClientRouteError,
 	ResponseDefinition,
@@ -234,6 +234,7 @@ export const readResponse = async <E extends RouteDefinition>(
 	route: E,
 	validateResponse: boolean,
 	codecs: BodyCodecRegistry,
+	sseFormat?: SseFormat,
 ) => {
 	const { status } = rawResponse;
 	const mediaType = normalizeMediaType(rawResponse.headers.get("content-type"));
@@ -269,6 +270,7 @@ export const readResponse = async <E extends RouteDefinition>(
 				body: ReadableStream<Uint8Array<ArrayBuffer>>;
 			},
 			validateResponse,
+			sseFormat,
 		);
 		return {
 			status,

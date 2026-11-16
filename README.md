@@ -345,7 +345,7 @@ declare module "@rest-rpc/server" {
 ## [Server-Sent Events](https://rest-rpc.vercel.app/docs/streaming)
 
 ```ts
-import { sse, sseEvent } from "@rest-rpc/server";
+import { sse, sseEvent, sseFormat } from "@rest-rpc/server";
 
 const events = route
 	.get("/todos/events")
@@ -363,6 +363,21 @@ const events = route
 		);
 		while (!signal.aborted) yield await nextEvent({ signal });
 	});
+
+// Optional: the same data format on both ends, JSON by default
+const superjsonEvents = sseFormat({
+	serialize: (data) => superjson.stringify(data),
+	deserialize: (data) => superjson.parse(data),
+});
+createApp(routes, {
+	sse: {
+		format: superjsonEvents,
+		keepAlive: 15_000, // ": keepalive" comment after 15 s without an event
+		initialComment: true, // ": ok" comment right after the headers
+	},
+});
+createClient(api, { baseUrl, sse: { format: superjsonEvents } });
+respond(stream, { sse: { keepAlive: 5_000 } }); // per stream
 ```
 
 ## [Contract-first](https://rest-rpc.vercel.app/docs/contract-first)

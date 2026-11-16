@@ -77,6 +77,7 @@ type CreateRouteHandlersOptions = {
 	disableRequestValidation?: boolean;
 	disableResponseValidation?: boolean;
 	onError?: (error: RouteError, request: TRequest) => void;
+	sse?: SseOptions;
 };
 ```
 
@@ -85,6 +86,9 @@ type CreateRouteHandlersOptions = {
   [Disabling Server Validation](/docs/http-behavior/schemas#disabling-server-validation).
 - `onError`: see [Error Handling](#error-handling). `request` is the Fetch
   `Request`, or the Node `IncomingMessage` with `@rest-rpc/server/node`.
+- `sse`: the data format, keepalive and initial comment of Server-Sent Event
+  responses. See [Data Format](/docs/streaming#data-format) and
+  [Stream Options](/docs/streaming#stream-options).
 
 ## Paths
 

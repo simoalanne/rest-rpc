@@ -3,6 +3,7 @@ import type { RouteDefinition } from "../contract/routeDefinition.ts";
 import { mapContractRoutes } from "../contract/traversal.ts";
 import { resolveRoutePath } from "../contract/path.ts";
 import { createBodyCodecRegistry, type BodyCodec } from "../codecs/index.ts";
+import type { SseFormat } from "../contract/sse.ts";
 import {
 	type ApiClientFetchOptions,
 	type ClientHeaders,
@@ -68,6 +69,11 @@ export type ApiClientOptions<
 	fetch?: FetchLike;
 	fetchOptions?: ApiClientFetchOptions;
 	globalHeaders?: TGlobalHeaders;
+	/** Options of Server-Sent Event responses. */
+	sse?: {
+		/** The data format of events, the same as the server's. JSON by default. */
+		format?: SseFormat;
+	};
 	timeoutMs?: number;
 	validateResponses?: boolean;
 };
@@ -99,6 +105,7 @@ export function createClient<
 				resolvedRoute,
 				validate,
 				codecs,
+				options.sse?.format,
 			);
 	}) as ApiClientFor<TContract, TGlobalHeaders>;
 }

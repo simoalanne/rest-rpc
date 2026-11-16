@@ -48,8 +48,8 @@ const events = route
 	});
 ```
 
-Stream schemas describe event data. Event data must be JSON serializable.
-Defined schemas validate each value as it is yielded. An invalid value ends
+Stream schemas describe event data. Event data is sent as JSON, so it must be
+JSON serializable unless you set a [data format](#data-format). Defined schemas validate each value as it is yielded. An invalid value ends
 the stream instead of producing an error response.
 
 ## Add Event Metadata
@@ -71,6 +71,57 @@ const events = route.get("/todos/events").handler(async function* () {
 
 `sseEvent()` throws when `id` or `event` contain line breaks, or when `retry` is not
 a non-negative integer number of milliseconds.
+
+## Data Format
+
+Event data is JSON by default. Define another format with `sseFormat()`, and
+pass the same format to the server and the client in their `sse` option:
+
+```ts
+import { sseFormat } from "@rest-rpc/server";
+
+const superjsonEvents = sseFormat({
+	serialize: (data) => superjson.stringify(data), // may span several lines
+	deserialize: (data) => superjson.parse(data),
+});
+
+createApp(routes, { sse: { format: superjsonEvents } });
+createClient(api, { baseUrl, sse: { format: superjsonEvents } });
+```
+
+Data that spans several lines is sent as one `data` field per line, and the
+client joins them with `\n` before `deserialize` reads them. A format changes
+how data is sent, not its types.
+
+## Stream Options
+
+Proxies and load balancers may close a connection that has been idle for a
+while, or buffer the start of a response. Comments, which clients ignore, keep
+the stream moving:
+
+```ts
+createApp(routes, {
+	sse: {
+		keepAlive: 15_000, // a ": keepalive" comment after 15 s without an event
+		initialComment: true, // a ": ok" comment right after the headers
+	},
+});
+```
+
+Both are off by default. A `respond()` call's `sse` option overrides them for
+its stream:
+
+```ts
+const events = route
+	.get("/todos/events")
+	.handler(({ respond }) =>
+		respond(streamTodoEvents(), { sse: { keepAlive: 5_000 } }),
+	);
+```
+
+The option is ignored when the body isn't a stream. The keepalive timer starts
+again after each event, and stops when the stream ends or the client
+disconnects.
 
 ## Stop a Stream
 

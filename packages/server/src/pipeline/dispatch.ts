@@ -90,7 +90,7 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 	reader: RequestReader<TRequest>,
 	writer: ResponseWriter<TTarget, TOut>,
 ): Dispatch<TRequest, TTarget, TOut> => {
-	const { disableRequestValidation, disableResponseValidation, onError } =
+	const { disableRequestValidation, disableResponseValidation, onError, sse } =
 		options;
 	// Synchronous when the error's schemas are, so it adds no promise.
 	const toErrorResponse = (
@@ -197,6 +197,7 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 			toHttpRouteResult(
 				result,
 				onError && ((error) => observeError(onError, error, request)),
+				sse,
 			),
 			target,
 			codecs,
