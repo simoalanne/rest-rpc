@@ -63,7 +63,7 @@ export const api = contract as unknown as typeof routes;
 import { createClient } from "@rest-rpc/core";
 import { api } from "./client-contract";
 
-const client = createClient(api, { baseUrl: "http://localhost:3000" });
+const client = createClient(api, { origin: "http://localhost:3000" });
 ```
 
 The `import type` is erased from the client bundle. The client's TypeScript
@@ -87,7 +87,7 @@ export function getApi() {
 import { createClient } from "@rest-rpc/core";
 import { getApi } from "./client-contract.macro" with { type: "macro" };
 
-const client = createClient(getApi(), { baseUrl: "http://localhost:3000" });
+const client = createClient(getApi(), { origin: "http://localhost:3000" });
 ```
 
 Other bundlers can use a macro integration such as `unplugin-macros`.

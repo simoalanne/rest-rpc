@@ -10,7 +10,8 @@ it.
 
 ## Wire Format
 
-Every error response rest-rpc sends is JSON with the error's status:
+By default, every error response rest-rpc sends is JSON with the error's
+status. An [error format](#error-format) changes the body and its content type:
 
 ```http
 HTTP/1.1 404 Not Found
@@ -28,6 +29,57 @@ Any HTTP client can read these responses. The rest-rpc client rejects with a
 `RouteError` for each of them, and marks it as defined when the route defines
 the code with the received status. See
 [Fetch Client](/docs/client/fetch-client#typesafe-error-handling).
+
+## Error Format
+
+An error format sends errors in another format, such as RFC 9457
+`application/problem+json` or plain text. Create one with `errorFormat()` and
+pass it as `errorFormat` to the server, the
+[client](/docs/client/fetch-client#client-options) and
+[`createOpenApiDocument()`](/docs/openapi#errors):
+
+```ts
+import { errorFormat } from "@rest-rpc/server";
+
+export const problemJson = errorFormat({
+	contentType: "application/problem+json",
+	// Server: the body of an error response.
+	serialize: ({ code, status, message, data }) => ({
+		type: `https://example.com/errors/${code}`,
+		title: message,
+		status,
+		code,
+		data,
+	}),
+	// Client: the code, message and data of a body, or undefined when the
+	// body is not in this format.
+	deserialize: (body, { status, headers }) =>
+		isProblem(body)
+			? { code: body.code, message: body.title, data: body.data }
+			: undefined,
+	// OpenAPI: the body schema of an error, given the schema of its data.
+	openAPI: ({ code, status, data }) => problemSchema(code, data),
+});
+```
+
+```ts
+createApp(routes, { errorFormat: problemJson });
+createClient(api, { origin, errorFormat: problemJson });
+```
+
+- The body codec for `contentType` encodes the body that `serialize` returns,
+  so a `+json` type is sent as JSON and a `text/*` type as a string.
+- Built-in errors and the `NOT_FOUND` response of `createApp` use the format
+  too, so the whole API is consistent.
+- Route types don't change. A definition's code, status, `data` and headers
+  stay typed, and the client validates them as before.
+- When `deserialize` returns `undefined`, the call rejects with a plain
+  `Error`, as it does by default for a body without a code.
+- `message` defaults to the code when `deserialize` leaves it out.
+
+A lossy format works too. A plain-text format can send only the message, and
+its `deserialize` can map the status back to a code, which works when a route
+defines at most one code per status.
 
 ## Throwing Errors
 

@@ -1,6 +1,7 @@
 import { type } from "@rest-rpc/core";
 import { route } from "../builder/routeBuilder.ts";
 import { createApp } from "./createApp.ts";
+import { interceptor } from "./interceptor.ts";
 
 // Behavior shared with the Node app is covered by the app conformance tests.
 
@@ -99,5 +100,47 @@ describe("createApp", () => {
 			user: "routes",
 		});
 		expect(await fromRoutes.json()).toBe("routes");
+	});
+
+	it("continues interceptors with a request they pass to next, as often as they call it", async () => {
+		const echo = route
+			.get("/echo")
+			.headers(type<{ "x-attempt": string }>())
+			.handler(({ headers }) => headers["x-attempt"]);
+		let attempts = 0;
+		const retry = interceptor(async ({ request, next }) => {
+			const first = await next();
+			if (first.status !== 503) return first;
+			const headers = new Headers(request.headers);
+			headers.set("x-attempt", "2");
+			return next(new Request(request, { headers }));
+		});
+		const flaky = interceptor(({ next }) =>
+			++attempts === 1 ? new Response(null, { status: 503 }) : next(),
+		);
+		const app = createApp({ echo }, { interceptors: [retry, flaky] });
+		const response = await app.fetch(new Request("http://localhost/echo"));
+		expect(await response.json()).toBe("2");
+		expect(attempts).toBe(2);
+	});
+
+	it("runs interceptors with the route for Bun's routes, except static ones", async () => {
+		const tagged = interceptor(async ({ next, route }) => {
+			const response = await next();
+			response.headers.set("x-route", route!.path!);
+			return response;
+		});
+		const app = createApp(
+			{ ...routes, about: route.get("/about").static("about") },
+			{ interceptors: [tagged] },
+		);
+		const response = await handlerOf(app.routes["/todos/:id"]!.GET)(
+			Object.assign(new Request("http://localhost/todos/1"), {
+				params: { id: "1" },
+			}),
+		);
+		expect(await response.json()).toBe("1");
+		expect(response.headers.get("x-route")).toBe("/todos/:id");
+		expect(app.routes["/about"]!.GET).toBeInstanceOf(Response);
 	});
 });

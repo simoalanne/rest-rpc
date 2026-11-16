@@ -1,11 +1,16 @@
 import { RouteError } from "@rest-rpc/core";
 import {
 	createBodyCodecRegistry,
+	defaultErrorFormat,
 	normalizeMediaType,
 	type BodyCodecRegistry,
 	type IncomingBody,
 } from "@rest-rpc/core/codecs";
-import type { HttpMethod } from "@rest-rpc/core/contract";
+import type {
+	AbsolutePath,
+	HttpMethod,
+	RouteDefinition,
+} from "@rest-rpc/core/contract";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import {
 	assertPathParams,
@@ -36,7 +41,10 @@ import {
 } from "./handleHttpRoute.ts";
 import { resolveRequestMediaType } from "./requestContentType.ts";
 import { resolveRouteError, type ErrorResponse } from "./resolveRouteError.ts";
-import type { SerializedHttpResponse } from "./serializeHttpRouteResult.ts";
+import {
+	createErrorSerializer,
+	type SerializedHttpResponse,
+} from "./serializeHttpRouteResult.ts";
 import { sseBodyCodec } from "./sse.ts";
 import { prepareStaticResponse } from "./staticResponse.ts";
 import { mapMaybePromise } from "./maybePromise.ts";
@@ -63,6 +71,11 @@ export type RequestReader<TRequest> = {
 	body: (request: TRequest, contentType: string) => IncomingBody;
 };
 
+/** Serializes an error response in the app's error format. */
+export type ErrorSerializer = (
+	error: ErrorResponse,
+) => MaybePromise<SerializedHttpResponse>;
+
 /** A route result to serialize, or an error to send as an error response. */
 export type DispatchResult = HttpRouteResult | RouteError;
 
@@ -76,7 +89,8 @@ export type ResponseWriter<TTarget, TOut> = {
 		target: TTarget,
 		codecs: BodyCodecRegistry,
 	) => MaybePromise<TOut>;
-	error: (error: ErrorResponse, target: TTarget) => MaybePromise<TOut>;
+	/** Writes a serialized error response. */
+	error: (parts: SerializedHttpResponse, target: TTarget) => MaybePromise<TOut>;
 };
 
 /** Runs a route for a request routed to it and responds with the writer. */
@@ -98,6 +112,7 @@ export const bodyAlreadyRead = () =>
 const createDispatch = <TRequest extends object, TTarget, TOut>(
 	options: CreateRouteHandlersOptions<TRequest>,
 	codecs: BodyCodecRegistry,
+	serializeError: ErrorSerializer,
 	reader: RequestReader<TRequest>,
 	writer: ResponseWriter<TTarget, TOut>,
 ): Dispatch<TRequest, TTarget, TOut> => {
@@ -118,7 +133,9 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 			),
 			(resolved) => {
 				observeError(onError, resolved.error, request);
-				return writer.error(resolved.response, target);
+				return mapMaybePromise(serializeError(resolved.response), (parts) =>
+					writer.error(parts, target),
+				);
 			},
 		);
 
@@ -236,10 +253,24 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 	};
 };
 
+/**
+ * The error serializer of an app's own error responses, such as not found
+ * responses, with the codecs and error format of its options.
+ */
+export const createAppErrorSerializer = (
+	options: CreateRouteHandlersOptions<never>,
+): ErrorSerializer =>
+	createErrorSerializer(
+		options.errorFormat ?? defaultErrorFormat,
+		createBodyCodecRegistry(options.bodyCodecs ?? []),
+	);
+
 /** A route of a compiled route tree, before a runtime makes a handler of it. */
 export type CompiledRoute = {
 	method: HttpMethod;
 	path: string;
+	/** The route's definition with its resolved path, for interceptors. */
+	definition: RouteDefinition;
 	implementation: RuntimeImplementation;
 	pathParams: PathParams;
 	/** The response of a route completed with `.static()`, or the `Response` it returned. */
@@ -260,12 +291,17 @@ export const compileRouteTree = <TRequest extends object, TTarget, TOut>(
 		sseBodyCodec,
 		...(options.bodyCodecs ?? []),
 	]);
+	const serializeError = createErrorSerializer(
+		options.errorFormat ?? defaultErrorFormat,
+		codecs,
+	);
 	const routes = flattenRouteImplementations(implementations).map(
 		(implementation): CompiledRoute => {
 			const path = resolveImplementationPath(implementation.route.path);
 			return {
 				method: implementation.route.method,
 				path,
+				definition: { ...implementation.route, path: path as AbsolutePath },
 				implementation,
 				pathParams: parsePathParams(path),
 				staticResponse: implementation.isStatic
@@ -280,7 +316,8 @@ export const compileRouteTree = <TRequest extends object, TTarget, TOut>(
 	);
 	return {
 		routes,
-		dispatch: createDispatch(options, codecs, reader, writer),
+		dispatch: createDispatch(options, codecs, serializeError, reader, writer),
 		codecs,
+		serializeError,
 	};
 };

@@ -22,7 +22,7 @@ import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
 import { api } from "./client-contract";
 
 export const client = createClient(api, {
-	baseUrl: "https://api.example.com",
+	origin: "https://api.example.com",
 });
 export const restrpc = createTanstackQueryUtils(client);
 ```

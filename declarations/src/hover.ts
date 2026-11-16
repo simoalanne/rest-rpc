@@ -63,7 +63,6 @@ const routes = {
 
 const contract = extractContract(routes);
 const client = createClient(contract, {
-	baseUrl: "",
 	globalHeaders: { "x-tenant": "a" },
 });
 export const getTodo = client.todos.get;

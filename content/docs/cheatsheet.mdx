@@ -67,7 +67,7 @@ export function getApi() {
 import { createClient } from "@rest-rpc/core";
 import { getApi } from "./client-contract" with { type: "macro" };
 
-const client = createClient(getApi(), { baseUrl: "http://localhost:3000" });
+const client = createClient(getApi(), { origin: "http://localhost:3000" });
 
 // Calls resolve to an envelope { status, body, headers }, not the body.
 const created = await client.todos.create({ body: { title: "Write docs" } });
@@ -365,7 +365,7 @@ createApp(routes, {
 		initialComment: true, // ": ok" comment right after the headers
 	},
 });
-createClient(api, { baseUrl, sse: { format: superjsonEvents } });
+createClient(api, { origin, sse: { format: superjsonEvents } });
 respond(stream, { sse: { keepAlive: 5_000 } }); // per stream
 ```
 
@@ -490,6 +490,30 @@ route.body(todoInput).error(RequestValidationFailed); // types its issues as `da
 // Also exported: MalformedRequestBody, UnsupportedMediaType, InternalServerError, NotFound
 ```
 
+Errors are JSON `{ code, message, data? }` by default. An error format changes that for the
+server, the client and OpenAPI, built-in errors included:
+
+```ts
+import { errorFormat } from "@rest-rpc/server";
+
+const problemJson = errorFormat({
+	contentType: "application/problem+json", // its body codec encodes the body
+	serialize: ({ code, status, message, data }) => ({
+		title: message,
+		status,
+		code,
+		data,
+	}),
+	// The code, message and data of a body, or undefined to reject with a plain Error.
+	deserialize: (body, { status, headers }) =>
+		isProblem(body)
+			? { code: body.code, message: body.title, data: body.data }
+			: undefined,
+	openAPI: ({ code, status, data }) => problemSchema(code, data), // optional
+});
+createApp(routes, { errorFormat: problemJson }); // also createClient, createOpenApiDocument
+```
+
 ## Server
 
 ### [Serving Routes](/docs/server/overview)
@@ -506,7 +530,7 @@ createRouteHandlers(routes, options); // one route per rest-rpc route for the fr
 ### [Fetch](/docs/server/fetch)
 
 ```ts
-import { createApp } from "@rest-rpc/server";
+import { createApp, interceptor } from "@rest-rpc/server";
 
 export default createApp(routes, {
 	mountPath: "/api", // served under, not part of route paths (use .prefix() for that)
@@ -514,8 +538,18 @@ export default createApp(routes, {
 	notFound: (request) => new Response("Not found", { status: 404 }),
 	onError: (error, request) =>
 		error.status >= 500 && console.error(error.cause),
-	bodyCodecs: [binary], // also disableRequestValidation, disableResponseValidation
+	bodyCodecs: [binary], // also errorFormat, disableRequestValidation, disableResponseValidation
+	interceptors: [cors, apiKey], // run first to last around everything
 });
+
+// Every request, unmatched ones and OPTIONS included, except .static() routes.
+// Bun's app.routes run them too.
+const apiKey = interceptor(({ request, next, route }) =>
+	route?.meta?.access === "public" || // route is undefined when none matches
+	request.headers.get("x-api-key") === API_KEY
+		? next() // or next(request) to continue with another request, also more than once
+		: new Response("Forbidden", { status: 403 }),
+);
 
 // app.routes is routed by Bun's native router. Bun server options:
 const app = createApp(routes);
@@ -530,12 +564,22 @@ Bun.serve({
 
 ```ts
 import { createServer } from "node:http";
-import { createApp } from "@rest-rpc/server/node";
+import { createApp, interceptor } from "@rest-rpc/server/node";
 
 // A request listener with the same options, but Node's request in context and notFound.
 const app = createApp(routes, {
 	context: (req) => ({ user: req.headers.authorization }),
 	notFound: (req, res) => void res.writeHead(404).end(), // writing nothing keeps NOT_FOUND
+	// From @rest-rpc/server/node, with { request, response, next, route }.
+	// Headers set before next() are on every response.
+	interceptors: [
+		interceptor(({ request, response, next }) => {
+			response.setHeader("access-control-allow-origin", "*");
+			return request.method === "OPTIONS"
+				? void response.writeHead(204).end()
+				: next();
+		}),
+	],
 });
 const server = createServer(app).listen(3000);
 process.on("SIGTERM", () => server.close());
@@ -593,15 +637,32 @@ export const api = contract as unknown as typeof routes;
 ### [Fetch Client](/docs/client/fetch-client)
 
 ```ts
-import { createClient, isDefinedError, RouteError, safe } from "@rest-rpc/core";
+import {
+	clientInterceptor,
+	createClient,
+	isDefinedError,
+	RouteError,
+	safe,
+} from "@rest-rpc/core";
 
 const client = createClient(api, {
-	baseUrl: "https://api.example.com",
+	origin: "https://api.example.com", // browsers default to the page's origin
+	mountPath: "/api", // the server's mountPath
 	globalHeaders: { authorization: () => `Bearer ${readToken()}` }, // static or per request
 	timeoutMs: 10_000,
 	fetchOptions: { credentials: "include" },
-	fetch: customFetch,
+	fetch: customFetch, // (request: Request) => Promise<Response>, such as app.fetch
 	validateResponses: true, // shared contracts only
+	errorFormat: problemJson, // the server's, JSON { code, message, data? } by default
+	interceptors: [refreshOn401], // first to last around each exchange, before decoding
+});
+
+const refreshOn401 = clientInterceptor(async ({ request, next, route }) => {
+	const response = await next(request.clone()); // next() may be called more than once
+	if (response.status !== 401 || route.meta?.access === "public")
+		return response;
+	request.headers.set("authorization", `Bearer ${await refreshToken()}`);
+	return next(request);
 });
 
 // Resolves to a status-discriminated { status, body, headers, cookies }.
@@ -686,7 +747,7 @@ await local.todos.create(
 import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
 import { skipToken } from "@tanstack/query-core";
 
-const restrpc = createTanstackQueryUtils(createClient(api, { baseUrl })); // or createLocalClient(routes)
+const restrpc = createTanstackQueryUtils(createClient(api, { origin })); // or createLocalClient(routes)
 
 useQuery(
 	restrpc.todos.get.queryOptions({
@@ -732,7 +793,7 @@ import { createOpenApiDocument } from "@rest-rpc/server"; // or @rest-rpc/core f
 // Only defined .response() schemas are documented.
 const document = createOpenApiDocument(routes, {
 	info: { title: "Todo API", version: "1.0.0" },
-	servers: [{ url: "https://api.example.com" }], // also components, tags
+	servers: [{ url: "https://api.example.com" }], // also components, tags, errorFormat
 	// Without a converter, schemas are emitted as empty Schema Objects.
 	schemaConverter: (schema, mode) =>
 		z.toJSONSchema(schema as z.ZodType, { io: mode }),

@@ -1,4 +1,4 @@
-import type { HttpMethod } from "@rest-rpc/core/contract";
+import type { HttpMethod, RouteDefinition } from "@rest-rpc/core/contract";
 import type { EmptyObject } from "@rest-rpc/core/utils";
 import { compileRouteTree, type ResponseWriter } from "../pipeline/dispatch.ts";
 import type {
@@ -15,7 +15,6 @@ import {
 import { fetchRequestReader } from "./request.ts";
 import {
 	serializeFetchResult,
-	serializeFetchError,
 	toFetchResponse,
 	withoutBody,
 } from "./response.ts";
@@ -61,7 +60,7 @@ export type FetchRoute<TContext extends object = EmptyObject> = {
 
 const fetchResponseWriter: ResponseWriter<undefined, Response> = {
 	result: (result, _target, codecs) => serializeFetchResult(result, codecs),
-	error: serializeFetchError,
+	error: toFetchResponse,
 };
 
 /**
@@ -77,6 +76,19 @@ export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
 	implementations: TRoutes,
 	options: CreateRouteHandlersOptions = {},
 ): FetchRoute<TreeInitialContext<TRoutes>>[] {
+	return compileFetchRoutes(implementations, options);
+}
+
+/** A Fetch route with its definition, for the interceptors of an app. */
+export type CompiledFetchRoute = FetchRoute<object> & {
+	definition: RouteDefinition;
+};
+
+/** Compiles a route tree into Fetch routes with their definitions. */
+export const compileFetchRoutes = (
+	implementations: RuntimeImplementationTree,
+	options: CreateRouteHandlersOptions,
+): CompiledFetchRoute[] => {
 	const { routes, dispatch } = compileRouteTree(
 		implementations,
 		options,
@@ -85,7 +97,14 @@ export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
 	);
 
 	return routes.map(
-		({ method, path, implementation, pathParams, staticResponse }) => {
+		({
+			method,
+			path,
+			definition,
+			implementation,
+			pathParams,
+			staticResponse,
+		}): CompiledFetchRoute => {
 			if (staticResponse) {
 				const createResponse = () =>
 					staticResponse instanceof Response
@@ -94,6 +113,7 @@ export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
 				return {
 					method,
 					path,
+					definition,
 					handle: async (request: Request, ..._options: unknown[]) =>
 						request.method === "HEAD"
 							? withoutBody(createResponse())
@@ -104,6 +124,7 @@ export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
 			return {
 				method,
 				path,
+				definition,
 				handle: (request, ...[handleOptions]) => {
 					const response = dispatch(
 						implementation,
@@ -121,7 +142,7 @@ export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
 			};
 		},
 	);
-}
+};
 
 /**
  * Creates a Fetch catch-all handler that routes requests to the routes of a

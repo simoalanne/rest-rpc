@@ -82,7 +82,7 @@ const superjsonEvents = sseFormat({
 });
 
 createApp(routes, { sse: { format: superjsonEvents } });
-createClient(api, { baseUrl, sse: { format: superjsonEvents } });
+createClient(api, { origin, sse: { format: superjsonEvents } });
 ```
 
 Data that spans several lines is sent as one `data` field per line, and the

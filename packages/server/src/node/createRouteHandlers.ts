@@ -1,4 +1,4 @@
-import type { HttpMethod } from "@rest-rpc/core/contract";
+import type { HttpMethod, RouteDefinition } from "@rest-rpc/core/contract";
 import type { EmptyObject } from "@rest-rpc/core/utils";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { compileRouteTree, type ResponseWriter } from "../pipeline/dispatch.ts";
@@ -19,19 +19,18 @@ import {
 	readRequestTarget,
 } from "./request.ts";
 import { fromFetchResponse } from "../pipeline/rawResponse.ts";
-import {
-	writeNodeError,
-	writeNodeResponse,
-	writeNodeResult,
-} from "./response.ts";
+import { writeNodeResponse, writeNodeResult } from "./response.ts";
 
-/** A Node route, and whether it was completed with `.static()`. */
-export type CompiledNodeRoute = NodeRoute<object> & { isStatic: boolean };
+/** A Node route, its definition, and whether it was completed with `.static()`. */
+export type CompiledNodeRoute = NodeRoute<object> & {
+	isStatic: boolean;
+	definition: RouteDefinition;
+};
 
 const nodeResponseWriter: ResponseWriter<ServerResponse, void> = {
 	result: (result, response, codecs) =>
 		writeNodeResult(response, result, codecs),
-	error: (error, response) => writeNodeError(response, error),
+	error: (parts, response) => writeNodeResponse(response, parts),
 };
 
 /** Compiles a route tree into Node routes, for the handlers of this runtime. */
@@ -46,11 +45,19 @@ export const compileNodeRoutes = (
 		nodeResponseWriter,
 	);
 	return routes.map(
-		({ method, path, implementation, pathParams, staticResponse }) => {
+		({
+			method,
+			path,
+			definition,
+			implementation,
+			pathParams,
+			staticResponse,
+		}): CompiledNodeRoute => {
 			if (staticResponse) {
 				return {
 					method,
 					path,
+					definition,
 					isStatic: true,
 					handle: (_request, response) =>
 						writeNodeResponse(
@@ -64,6 +71,7 @@ export const compileNodeRoutes = (
 			return {
 				method,
 				path,
+				definition,
 				isStatic: false,
 				handle: (request, response, ...[handleOptions]) =>
 					dispatch(

@@ -74,6 +74,7 @@ Every function takes these options after the route tree:
 ```ts
 type CreateRouteHandlersOptions = {
 	bodyCodecs?: readonly BodyCodec[];
+	errorFormat?: ErrorFormat;
 	disableRequestValidation?: boolean;
 	disableResponseValidation?: boolean;
 	onError?: (error: RouteError, request: TRequest) => void;
@@ -82,6 +83,8 @@ type CreateRouteHandlersOptions = {
 ```
 
 - `bodyCodecs`: see [Request and Response Bodies](#request-and-response-bodies).
+- `errorFormat`: the body and content type of error responses. See
+  [Error Format](/docs/http-behavior/errors#error-format).
 - `disableRequestValidation`, `disableResponseValidation`: see
   [Disabling Server Validation](/docs/http-behavior/schemas#disabling-server-validation).
 - `onError`: see [Error Handling](#error-handling). `request` is the Fetch
@@ -101,7 +104,7 @@ params, and one trailing slash is ignored. Param values are percent-decoded.
 `createApp` and the catch-all handler take a `mountPath`, such as `/api`, to
 serve the routes under. Requests outside it are unmatched, and it is removed
 from the request path before matching. Route paths do not include it, so
-clients put it in their base URL. A path that clients and OpenAPI documents
+clients pass the same [`mountPath`](/docs/client/fetch-client#client-options). A path that clients and OpenAPI documents
 should include in each route, such as `/v1`, belongs in the routes instead,
 defined with [`.prefix()`](/docs/route-builder#path-prefixes).
 
@@ -120,8 +123,8 @@ string or byte chunks. To send it with its own headers, return it wrapped in
 
 ## Error Handling
 
-[Defined and built-in errors](/docs/http-behavior/errors) are sent as JSON
-error responses. `onError` observes each of them, and `RouteError`s that end a
+[Defined and built-in errors](/docs/http-behavior/errors) are sent as error
+responses, JSON by default. `onError` observes each of them, and `RouteError`s that end a
 stream after its response started, such as stream item validation failures. It
 is not awaited, and errors it throws or rejects with are ignored, so it cannot
 change the response:

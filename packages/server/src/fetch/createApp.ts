@@ -12,8 +12,17 @@ import {
 	observeError,
 } from "../pipeline/errors.ts";
 import type { CreateRouteHandlersOptions } from "../pipeline/handleOptions.ts";
-import { createRouteHandlers, type FetchRoute } from "./createRouteHandlers.ts";
-import { serializeFetchError } from "./response.ts";
+import {
+	compileFetchRoutes,
+	type CompiledFetchRoute,
+} from "./createRouteHandlers.ts";
+
+type Match = { route: CompiledFetchRoute; params?: Record<string, string> };
+import { createAppErrorSerializer } from "../pipeline/dispatch.ts";
+import type { ErrorResponse } from "../pipeline/resolveRouteError.ts";
+import { mapMaybePromise } from "../pipeline/maybePromise.ts";
+import { intercept, type Interceptor } from "./interceptor.ts";
+import { toFetchResponse } from "./response.ts";
 
 /**
  * Customizes the routes, not found responses, request parsing and error
@@ -37,6 +46,11 @@ export type CreateAppOptions<
 	 * @default A `NOT_FOUND` error response.
 	 */
 	notFound?: (request: Request) => Response | void | Promise<Response | void>;
+	/**
+	 * Functions around everything the app does for a request, the first
+	 * outermost. They run before routing, for Bun's native `routes` too.
+	 */
+	interceptors?: readonly Interceptor[];
 	/**
 	 * The initial context the routes require for each request, or a function
 	 * that returns it for the request. Required when the routes require
@@ -74,7 +88,8 @@ export type App<TArgs extends unknown[] = []> = {
 	 * native router routes requests. Other runtimes ignore it, and `fetch`
 	 * serves every request on its own.
 	 *
-	 * @remarks Routes completed with `.static()` are `Response` values.
+	 * @remarks Routes completed with `.static()` are `Response` values, which
+	 * interceptors do not run for.
 	 */
 	routes: Record<
 		string,
@@ -86,8 +101,6 @@ export type App<TArgs extends unknown[] = []> = {
 		>
 	>;
 };
-
-const defaultNotFound = () => serializeFetchError(new NotFound());
 
 /**
  * Creates a Fetch app that serves a route tree.
@@ -126,27 +139,25 @@ export function createApp(
 	implementations: RuntimeImplementationTree,
 	options?: CreateAppOptions<unknown[], object>,
 ): App<unknown[]> {
-	const {
-		mountPath,
-		context,
-		notFound = defaultNotFound,
-		...compileOptions
-	} = options ?? {};
+	const { mountPath, context, notFound, interceptors, ...compileOptions } =
+		options ?? {};
+	const serializeError = createAppErrorSerializer(compileOptions);
+	const respondWithError = (error: ErrorResponse) =>
+		mapMaybePromise(serializeError(error), toFetchResponse);
 	const respondWithInternalError = (error: unknown, request: Request) => {
 		const internal = new InternalServerError({ cause: error });
 		observeError(compileOptions.onError, internal, request);
-		return serializeFetchError(internal);
+		return respondWithError(internal);
 	};
-	const compiled = createRouteHandlers<RuntimeImplementationTree>(
-		implementations,
-		compileOptions,
-	);
+	const compiled = compileFetchRoutes(implementations, compileOptions);
 	const matchRoute = createRouteMatcher(compiled);
+	const matchRequest = (request: Request): Match | undefined =>
+		matchRoute(request.method, request.url, mountPath);
 	// Static routes read no context, so the context function is not called.
 	// Errors become internal error responses on the route's own promise, so a
 	// request creates one promise.
 	const handle = (
-		route: FetchRoute<object>,
+		route: CompiledFetchRoute,
 		request: Request,
 		args: unknown[],
 		params?: Record<string, string>,
@@ -163,6 +174,49 @@ export function createApp(
 		return response.catch((error) => respondWithInternalError(error, request));
 	};
 
+	const serve = async (
+		request: Request,
+		args: unknown[],
+		match: Match | undefined,
+	): Promise<Response> => {
+		try {
+			if (!match) {
+				return (
+					(await notFound?.(request)) ??
+					(await respondWithError(new NotFound()))
+				);
+			}
+			// The matched params are passed on, so they are not parsed again.
+			return await handle(match.route, request, args, match.params);
+		} catch (error) {
+			return respondWithInternalError(error, request);
+		}
+	};
+
+	// Static routes are sent as they are. Other requests run the interceptors
+	// with the matched route, and a request passed to `next` is matched again.
+	// Errors an interceptor throws are sent as internal errors too.
+	const run = (
+		request: Request,
+		args: unknown[],
+		match: Match | undefined,
+	): Promise<Response> => {
+		if (!interceptors?.length || match?.route.staticResponse) {
+			return serve(request, args, match);
+		}
+		return intercept(
+			interceptors,
+			request,
+			match?.route.definition,
+			(current) =>
+				serve(
+					current,
+					args,
+					current === request ? match : matchRequest(current),
+				),
+		).catch((error) => respondWithInternalError(error, request));
+	};
+
 	const routes: App<unknown[]>["routes"] = {};
 	// A trailing slash of the mount path is ignored, as in `fetch`.
 	const mountPrefix = mountPath?.endsWith("/")
@@ -171,23 +225,23 @@ export function createApp(
 	for (const route of compiled) {
 		// The mount path alone serves the `/` route, as in the catch-all handler.
 		const path = joinPrefix(mountPrefix, route.path as AbsolutePath);
+		// Bun attaches the params to the request, so they are read from there.
 		(routes[path] ??= {})[route.method] =
 			route.staticResponse ??
-			((request, ...args) => handle(route, request, args));
+			((request, ...args) => run(request, args, { route }));
 	}
 
 	return {
 		// Bun routes requests the native routes do not match, such as ones with
 		// a trailing slash, here too, so they are served the same everywhere.
 		fetch: async (request, ...args) => {
+			let match: Match | undefined;
 			try {
-				const match = matchRoute(request.method, request.url, mountPath);
-				if (!match) return (await notFound(request)) ?? defaultNotFound();
-				// The matched params are passed on, so they are not parsed again.
-				return await handle(match.route, request, args, match.params);
+				match = matchRequest(request);
 			} catch (error) {
 				return respondWithInternalError(error, request);
 			}
+			return run(request, args, match);
 		},
 		routes,
 	};

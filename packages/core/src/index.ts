@@ -2,6 +2,8 @@ export type {
 	ApiClientFor,
 	ApiClientOptions,
 	ClientHeaders,
+	ClientInterceptor,
+	InterceptedRoute,
 	ClientHeaderValue,
 	InferClientError,
 	InferClientRequest,
@@ -11,6 +13,7 @@ export type {
 	FetchOptions,
 } from "./client/index.ts";
 export {
+	clientInterceptor,
 	createClient,
 	safe,
 	type ClientPromise,
@@ -53,7 +56,10 @@ export type {
 	BodyDeserializer,
 	BodySerializer,
 	BodyValue,
+	ErrorFormat,
+	ErrorFormatError,
+	ErrorFormatFields,
 	IncomingBody,
 	SerializedBody,
 } from "./codecs/index.ts";
-export { bodyCodec, serializedBody } from "./codecs/index.ts";
+export { bodyCodec, errorFormat, serializedBody } from "./codecs/index.ts";

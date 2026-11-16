@@ -23,11 +23,9 @@ const contract = {
 };
 
 const setup = (respond: () => Response) => {
-	const fetch = vi.fn(
-		async (_input: string | URL | Request, _init?: RequestInit) => respond(),
-	);
+	const fetch = vi.fn(async (_request: Request) => respond());
 	const utils = createTanstackQueryUtils(
-		createClient(contract, { baseUrl: "https://example.test", fetch }),
+		createClient(contract, { origin: "https://example.test", fetch }),
 	);
 	return { fetch, utils, client: new QueryClient() };
 };
@@ -101,10 +99,10 @@ describe("createTanstackQueryUtils", () => {
 			status: 200,
 			body: { name: "Ada" },
 		});
-		const [url, init] = fetch.mock.lastCall!;
-		expect(String(url)).toBe("https://example.test/users/1");
-		expect(init).toMatchObject({ credentials: "include" });
-		expect(init?.signal).toBeInstanceOf(AbortSignal);
+		const [request] = fetch.mock.lastCall!;
+		expect(request.url).toBe("https://example.test/users/1");
+		expect(request.credentials).toBe("include");
+		expect(request.signal).toBeInstanceOf(AbortSignal);
 		client.clear();
 	});
 
@@ -159,7 +157,7 @@ describe("createTanstackQueryUtils", () => {
 		);
 		const data = await client.infiniteQuery(options);
 		expect(data.pages[0]).toMatchObject({ body: { names: ["Ada"] } });
-		expect(String(fetch.mock.lastCall![0])).toBe(
+		expect(fetch.mock.lastCall![0].url).toBe(
 			"https://example.test/users?page=2",
 		);
 		client.clear();
@@ -178,11 +176,9 @@ describe("createTanstackQueryUtils", () => {
 		expect(await observer.mutate({ body: { name: "Ada" } })).toMatchObject({
 			body: { name: "Ada" },
 		});
-		expect(fetch.mock.lastCall![1]).toMatchObject({
-			method: "POST",
-			body: JSON.stringify({ name: "Ada" }),
-			credentials: "include",
-		});
+		const [request] = fetch.mock.lastCall!;
+		expect(request).toMatchObject({ method: "POST", credentials: "include" });
+		expect(await request.text()).toBe(JSON.stringify({ name: "Ada" }));
 		client.clear();
 	});
 

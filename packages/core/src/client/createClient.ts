@@ -1,8 +1,14 @@
 import type { Contract } from "../contract/contract.ts";
+import type { AbsolutePath } from "../contract/routeDefinition.ts";
 import type { RouteDefinition } from "../contract/routeDefinition.ts";
 import { mapContractRoutes } from "../contract/traversal.ts";
 import { resolveRoutePath } from "../contract/path.ts";
-import { createBodyCodecRegistry, type BodyCodec } from "../codecs/index.ts";
+import {
+	createBodyCodecRegistry,
+	defaultErrorFormat,
+	type BodyCodec,
+	type ErrorFormat,
+} from "../codecs/index.ts";
 import type { SseFormat } from "../contract/sse.ts";
 import {
 	type ApiClientFetchOptions,
@@ -12,6 +18,7 @@ import {
 	executeRequest,
 } from "./request.ts";
 import { readResponse } from "./response.ts";
+import type { ClientInterceptor } from "./interceptor.ts";
 import type {
 	ClientRouteError,
 	DefinedClientResponse,
@@ -64,11 +71,39 @@ export type ApiClientFor<
 export type ApiClientOptions<
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > = {
-	baseUrl: string;
+	/**
+	 * The origin of the server, such as `https://api.example.com`, without a
+	 * path. In browsers it defaults to the page's origin.
+	 *
+	 * @remarks Required outside browsers, where a URL without an origin
+	 * cannot be resolved.
+	 */
+	origin?: string;
+	/**
+	 * The path the routes are served under, such as `/api`, the same as the
+	 * server's `mountPath`. Route paths do not include it.
+	 */
+	mountPath?: AbsolutePath;
 	bodyCodecs?: readonly BodyCodec[];
+	/**
+	 * How error responses are read, the same as the server's.
+	 *
+	 * @default A JSON `{ code, message, data? }` body.
+	 */
+	errorFormat?: ErrorFormat;
+	/**
+	 * Sends each request, the `Request` the last interceptor sends.
+	 *
+	 * @default `globalThis.fetch`
+	 */
 	fetch?: FetchLike;
 	fetchOptions?: ApiClientFetchOptions;
 	globalHeaders?: TGlobalHeaders;
+	/**
+	 * Functions around each HTTP exchange, the first outermost, such as for
+	 * logging, retries or refreshing credentials.
+	 */
+	interceptors?: readonly ClientInterceptor[];
 	/** Options of Server-Sent Event responses. */
 	sse?: {
 		/** The data format of events, the same as the server's. JSON by default. */
@@ -88,10 +123,16 @@ export function createClient<
 	const TGlobalHeaders extends ClientHeaders = Record<never, string>,
 >(
 	contract: TContract,
-	options: ApiClientOptions<TGlobalHeaders>,
+	options: ApiClientOptions<TGlobalHeaders> = {},
 ): ApiClientFor<TContract, TGlobalHeaders> {
 	const codecs = createBodyCodecRegistry(options.bodyCodecs ?? []);
-	const requestOptions = { ...options, codecs };
+	// A trailing slash of the mount path is ignored, as on the server.
+	const mountPath = options.mountPath?.endsWith("/")
+		? ((options.mountPath.slice(0, -1) || undefined) as
+				| AbsolutePath
+				| undefined)
+		: options.mountPath;
+	const requestOptions = { ...options, mountPath, codecs };
 	const validate = options.validateResponses ?? false;
 
 	return mapContractRoutes(contract, (node, routePath) => {
@@ -105,6 +146,7 @@ export function createClient<
 				resolvedRoute,
 				validate,
 				codecs,
+				options.errorFormat ?? defaultErrorFormat,
 				options.sse?.format,
 			);
 	}) as ApiClientFor<TContract, TGlobalHeaders>;
