@@ -26,13 +26,12 @@ const created = await client.todos.create({ body: { title: "Write docs" } });
 const response = await client.todos.get({ params: { id: created.body.id } });
 ```
 
-A call returns a union with one member per status and media type:
+A call returns a union with one member per status:
 
 ```ts
 type Result = {
 	status: 200; // checking `status` narrows the result
-	contentType: "application/json"; // received base media type, or undefined
-	body: Todo; // checking `contentType` narrows it when a status has several
+	body: Todo;
 	headers: Record<string, string>; // lowercase names, defined headers typed
 	cookies: readonly string[]; // `Set-Cookie` values, empty in browsers
 };
@@ -50,14 +49,20 @@ Browsers hide `Set-Cookie` from `fetch` and store the cookies themselves, so
 A call resolves with a successful response and rejects with an error otherwise.
 See [Handle Errors](#typesafe-error-handling).
 
-### Select a Request Media Type
+### Send Other Content Types
 
-When a route defines several request body media types, `contentType` in the
-request selects the one used to encode the body, and narrows `body` to its
-schema. It is optional when the route defines one media type.
+A body is sent as JSON unless the call's headers include a `content-type`,
+which a route [declares](/docs/route-builder#content-types) in its headers
+schema. The header selects the codec that encodes the body. One set in
+`additionalHeaders` or `globalHeaders` doesn't, and the server would answer it
+with `415`. A `FormData` body is always sent as `multipart/form-data`, with the
+boundary `fetch` generates.
 
 ```ts
-await client.todos.import({ contentType: "text/csv", body: csv });
+await client.todos.import({
+	headers: { "content-type": "text/csv" },
+	body: csv,
+});
 ```
 
 ## Typesafe Error Handling
@@ -87,11 +92,12 @@ Everything else rejects with a plain `Error`:
 
 - Other error responses, such as a proxy's error page. The `message` includes
   the status, and the `cause` holds the received response, as
-  `{ status, contentType, headers, cookies, body }` with the decoded body.
+  `{ status, headers, cookies, body }` with the decoded body.
 - Responses that break the route contract: a defined error code with another
-  status, a 2xx status or content type the route's defined responses do not
-  include, a body that cannot be decoded, or, with response validation, a body
-  or headers that fail it. The `cause` holds the validation issues or the
+  status, a 2xx status the route's defined responses do not include, a stream
+  where a body is defined or a body where a stream is, a body that cannot be
+  decoded, or, with response validation, a body or headers that fail it, a
+  declared `content-type` included. The `cause` holds the validation issues or the
   decoding error.
 - No response, such as on network failures, timeouts and aborted requests. The
   call rejects with the original error.

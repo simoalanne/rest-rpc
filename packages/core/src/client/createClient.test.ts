@@ -33,13 +33,4 @@ describe("createClient", () => {
 				.body,
 		).toBe(3);
 	});
-
-	it("rejects a response media type outside the definition even without validation", async () => {
-		const client = createClient(route.response(type<string>()), {
-			baseUrl: "",
-			fetch: async () =>
-				new Response("Ada", { headers: { "content-type": "text/plain" } }),
-		});
-		await expect(client()).rejects.toThrow();
-	});
 });

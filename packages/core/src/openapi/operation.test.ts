@@ -23,22 +23,24 @@ const operationOf = (
 
 describe("operation", () => {
 	it("documents defined response descriptions, headers and content types", () => {
-		const headers = type<{ count: number }>();
-		const text = type<string>();
-		const json = type<{ name: string }>();
+		const headers = type<{
+			count: number;
+			"content-type": "text/plain" | "application/json";
+		}>();
+		const body = type<string | { name: string }>();
 		const converter = vi.fn((schema: unknown, _mode: "input" | "output") =>
 			schema === headers
-				? { properties: { count: { type: "integer" } } }
-				: schema === json
-					? { type: "object" }
-					: { type: "string" },
+				? {
+						properties: {
+							count: { type: "integer" },
+							"content-type": { enum: ["text/plain", "application/json"] },
+						},
+					}
+				: { type: "string" },
 		);
 		const defined = route
 			.get("/")
-			.response(
-				{ "text/plain": text, "application/json": json },
-				{ headers, description: "Created" },
-			);
+			.response(body, { headers, description: "Created" });
 		expect(
 			operationOf(defined, { schemaConverter: converter }).responses,
 		).toEqual({
@@ -47,7 +49,7 @@ describe("operation", () => {
 				headers: { count: { schema: { type: "integer" } } },
 				content: {
 					"text/plain": { schema: { type: "string" } },
-					"application/json": { schema: { type: "object" } },
+					"application/json": { schema: { type: "string" } },
 				},
 			},
 		});
@@ -166,23 +168,29 @@ describe("operation", () => {
 		).toEqual([true, true]);
 	});
 
-	it("combines stacked request schemas per media type", () => {
+	it("combines stacked request schemas under the content type the headers declare", () => {
 		const json = type<{ name: string }>();
-		const defined = route
-			.post("/")
-			.body({ "text/plain": type<string>(), "application/json": json })
-			.body(json);
+		const headers = type<{ "content-type": "text/csv" }>();
+		const converter = (schema: unknown) =>
+			schema === headers
+				? { properties: { "content-type": { const: "text/csv" } } }
+				: { type: "object" };
+		const stacked = route.post("/").body(json).body(json);
 		expect(
-			operationOf(defined, {
-				schemaConverter: (schema) =>
-					schema === json ? { type: "object" } : { type: "string" },
-			}).requestBody?.content,
+			operationOf(stacked, { schemaConverter: converter }).requestBody?.content,
 		).toEqual({
-			"text/plain": { schema: { type: "string" } },
 			"application/json": {
 				schema: { allOf: [{ type: "object" }, { type: "object" }] },
 			},
 		});
+		const csv = operationOf(route.post("/").headers(headers).body(json), {
+			schemaConverter: converter,
+		});
+		expect(csv.requestBody?.content).toEqual({
+			"text/csv": { schema: { type: "object" } },
+		});
+		// OpenAPI ignores a `content-type` header parameter.
+		expect(csv.parameters).toBeUndefined();
 		expect(operationOf(route.get("/")).requestBody).toBeUndefined();
 	});
 

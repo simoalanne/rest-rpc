@@ -1,6 +1,5 @@
 import { bodyCodec } from "../codecs/bodyCodec.ts";
 import { createBodyCodecRegistry } from "../codecs/registry.ts";
-import type { BodyContent } from "../contract/body.ts";
 import { route } from "../contract/routeBuilder.ts";
 import { sse } from "../contract/sse.ts";
 import { type } from "../standard-schema/type.ts";
@@ -93,10 +92,7 @@ describe("client response decoding", () => {
 	it.each([undefined, "application/unknown"])(
 		"handles absent or unknown response content types (%s)",
 		async (contentType) => {
-			const content = {
-				[contentType ?? "application/json"]: type(),
-			} as BodyContent;
-			const definition = route.get("/").response(content)["~restrpc"];
+			const definition = route.get("/").response(type())["~restrpc"];
 			const response = new Response("hello", {
 				headers: contentType ? { "content-type": contentType } : {},
 			});
@@ -113,9 +109,7 @@ describe("client response decoding", () => {
 	);
 
 	it("falls back to binary decoding when a custom codec has no deserializer", async () => {
-		const definition = route
-			.get("/")
-			.response({ "application/custom": type() })["~restrpc"];
+		const definition = route.get("/").response(type())["~restrpc"];
 		expect(
 			await readResponse(
 				new Response("hello", {
@@ -130,7 +124,7 @@ describe("client response decoding", () => {
 		).toHaveProperty("body", expect.any(Blob));
 	});
 
-	it("rejects undecodable bodies, unknown statuses and unknown media types as errors", async () => {
+	it("rejects undecodable bodies and unknown statuses as errors", async () => {
 		await expectError(
 			decode(
 				new Response("{", {
@@ -143,14 +137,6 @@ describe("client response decoding", () => {
 			},
 		);
 		await expectError(decode(Response.json({ name: "Ada" }, { status: 202 })));
-		await expectError(
-			decode(
-				new Response("Ada", {
-					status: 201,
-					headers: { "content-type": "text/plain" },
-				}),
-			),
-		);
 	});
 
 	it("passes the body to codecs without buffering it", async () => {
@@ -158,9 +144,7 @@ describe("client response decoding", () => {
 		const body = new ReadableStream<Uint8Array>({
 			start: (controller) => controller.enqueue(encoder.encode("first")),
 		});
-		const definition = route
-			.get("/")
-			.response({ "application/custom": type<string>() })["~restrpc"];
+		const definition = route.get("/").response(type<string>())["~restrpc"];
 		const result = await readResponse(
 			new Response(body, {
 				headers: { "content-type": "application/custom" },
@@ -299,8 +283,7 @@ describe("client error responses", () => {
 			message: expect.stringContaining("502"),
 			cause: {
 				status: 502,
-				contentType: "application/json",
-				headers: { "x-retry": "2" },
+				headers: { "content-type": "application/json", "x-retry": "2" },
 				cookies: [],
 				body: "Bad gateway",
 			},

@@ -8,40 +8,33 @@ describe("response inference", () => {
 		const value = route
 			.get("/")
 			.response(
+				type((input: string | { value: number }) => input),
 				{
-					"text/plain": type((input: string) => Number(input)),
-					"application/json": type<{ value: number }>(),
-				},
-				{
-					headers: type((input: { count: string }) => ({
-						count: Number(input.count),
-					})),
+					headers: type(
+						(input: {
+							count: string;
+							"content-type": "text/plain" | "application/json";
+						}) => ({ ...input, count: Number(input.count) }),
+					),
 				},
 			)
 			.response({ status: 204 })
 			.response(type<{ id: string }>(), { status: 201 });
 		type Server = ServerResponse<(typeof value)["~restrpc"]>;
 		expectTypeOf<Server["status"]>().toEqualTypeOf<200 | 201 | 204>();
-		expectTypeOf<Extract<Server, { status: 200 }>>().toEqualTypeOf<
-			| {
-					status: 200;
-					contentType: "text/plain";
-					body: string;
-					headers: { count: string };
-			  }
-			| {
-					status: 200;
-					contentType: "application/json";
-					body: { value: number };
-					headers: { count: string };
-			  }
-		>();
+		expectTypeOf<Extract<Server, { status: 200 }>>().toEqualTypeOf<{
+			status: 200;
+			body: string | { value: number };
+			headers: {
+				count: string;
+				"content-type": "text/plain" | "application/json";
+			};
+		}>();
 		expectTypeOf<Extract<Server, { status: 204 }>>().toEqualTypeOf<{
 			status: 204;
 		}>();
 		expectTypeOf<Extract<Server, { status: 201 }>>().toEqualTypeOf<{
 			status: 201;
-			contentType?: "application/json";
 			body: { id: string };
 		}>();
 	});

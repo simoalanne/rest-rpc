@@ -67,18 +67,6 @@ describe("routeBuilder types", () => {
 			});
 	});
 
-	it("narrows the request media type to the defined body media types", () => {
-		route.get("/").handler(({ contentType }) => {
-			expectTypeOf(contentType).toEqualTypeOf<undefined>();
-		});
-		route
-			.post("/")
-			.body(type<string>())
-			.handler(({ contentType }) => {
-				expectTypeOf(contentType).toEqualTypeOf<"application/json">();
-			});
-	});
-
 	it("infers handler signatures for a route tree", () => {
 		const definition = contractRoute.get("/").response(type<string>());
 		const tree = { users: { get: definition } };
@@ -353,14 +341,12 @@ describe("implicit response inference", () => {
 		const nothing = route.handler(() => {});
 		expectTypeOf<InferClientResponse<typeof nothing>>().toEqualTypeOf<{
 			status: 200;
-			contentType: undefined;
 			body: undefined;
 			headers: Record<string, string>;
 			cookies: readonly string[];
 		}>();
 		const custom = route.get("/").handler(() =>
 			respond("ok", {
-				contentType: "text/plain",
 				headers: { count: 2, enabled: true, omitted: undefined },
 			}),
 		);
@@ -380,19 +366,21 @@ describe("implicit response inference", () => {
 		}>();
 	});
 
-	it("infers the received base media type of inferred content types", () => {
-		const csv = route
-			.get("/")
-			.handler(() => respond("a", { contentType: "Text/CSV; charset=utf-8" }));
+	it("infers content types from content-type headers as they are written", () => {
+		const csv = route.get("/").handler(() =>
+			respond("a", {
+				headers: { "content-type": "text/csv; charset=utf-8" },
+			}),
+		);
 		expectTypeOf<
-			InferClientResponse<typeof csv>["contentType"]
-		>().toEqualTypeOf<"text/csv">();
+			InferClientResponse<typeof csv>["headers"]["content-type"]
+		>().toEqualTypeOf<"text/csv; charset=utf-8">();
 		const events = route.get("/").handler(() =>
 			respond(
 				(async function* () {
 					yield 1;
 				})(),
-				{ contentType: "text/event-stream; charset=utf-8" },
+				{ headers: { "content-type": "text/event-stream; charset=utf-8" } },
 			),
 		);
 		expectTypeOf<InferClientResponse<typeof events>["body"]>().toEqualTypeOf<
@@ -415,7 +403,6 @@ describe("implicit response inference", () => {
 			);
 		expectTypeOf<InferClientResponse<typeof raw>>().toEqualTypeOf<{
 			status: number;
-			contentType: string | undefined;
 			body: unknown;
 			headers: Record<string, string>;
 			cookies: readonly string[];
@@ -454,7 +441,6 @@ describe("implicit response inference", () => {
 		const envelope = route.get("/").handler(() => respond(chunks()));
 		expectTypeOf<InferClientResponse<typeof plain>>().toEqualTypeOf<{
 			status: 200;
-			contentType: "application/json";
 			body: { readonly id: "one" };
 			headers: Record<string, string>;
 			cookies: readonly string[];
@@ -491,7 +477,6 @@ describe("implicit response inference", () => {
 		const statusField = route.handler(() => ({ status: 201, body: "ok" }));
 		expectTypeOf<InferClientResponse<typeof statusField>>().toEqualTypeOf<{
 			status: 200;
-			contentType: "application/json";
 			body: { readonly status: 201; readonly body: "ok" };
 			headers: Record<string, string>;
 			cookies: readonly string[];

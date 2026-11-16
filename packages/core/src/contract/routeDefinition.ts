@@ -38,13 +38,13 @@ export type OpenApiRouteOptions = {
 	extensions?: Record<`x-${string}`, unknown>;
 };
 
-/** Ordered body schemas keyed by base media type. */
-export type RequestBodyDefinition = {
-	readonly [mediaType: string]: readonly RequestBodySchema[];
-};
-
+/**
+ * The request segments of a route, each an ordered list of stacked schemas. The
+ * body's content type is a `content-type` header, so a headers schema declares
+ * it.
+ */
 export type RouteRequestDefinition = {
-	body?: RequestBodyDefinition;
+	body?: readonly RequestBodySchema[];
 	query?: readonly RequestBodySchema[];
 	params?: readonly RequestParamsSchema[];
 	headers?: readonly RequestHeadersSchema[];

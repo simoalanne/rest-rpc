@@ -69,7 +69,7 @@ import { getApi } from "./client-contract" with { type: "macro" };
 
 const client = createClient(getApi(), { baseUrl: "http://localhost:3000" });
 
-// Calls resolve to an envelope { status, contentType, body, headers }, not the body.
+// Calls resolve to an envelope { status, body, headers }, not the body.
 const created = await client.todos.create({ body: { title: "Write docs" } });
 const todo = await client.todos.get({ params: { id: created.body.id } });
 console.log(todo.status, todo.body.title); // 200 "Write docs"
@@ -118,7 +118,6 @@ const update = authed
 			query, // { notify?: "yes" | "no" } from the query string
 			headers, // { authorization: string } from the base
 			body, // { title: string; done: boolean } from the request body
-			contentType, // request media type, narrows body when several are defined
 			context, // readonly: initial values from the host, plus values middleware injects
 			errors, // defined errors, created without new: throw errors.UNAUTHORIZED()
 			respond, // respond(), limited to the defined statuses
@@ -140,8 +139,7 @@ route.handler(() => {}); // 200 without a body
 route.handler(({ respond }) =>
 	respond("Created", {
 		status: 201, // 2xx, defaults to 200
-		contentType: "text/plain", // defaults to application/json
-		headers: { location: "/todos/1" },
+		headers: { "content-type": "text/plain", location: "/todos/1" }, // JSON without one
 		cookies: ["session=abc; HttpOnly"], // each its own Set-Cookie header
 	}),
 );
@@ -176,7 +174,9 @@ const created = (todo: Todo) => respond(todo, { status: 201 }); // outside a han
 route.get("/health").static({ ok: true });
 route
 	.get("/robots.txt")
-	.static(respond("User-agent: *", { contentType: "text/plain" }));
+	.static(
+		respond("User-agent: *", { headers: { "content-type": "text/plain" } }),
+	);
 ```
 
 ### [Errors](/docs/route-builder#define-errors)
@@ -210,20 +210,30 @@ export const TodoNotFound = routeError("TODO_NOT_FOUND", { status: 404 });
 Errors are sent as JSON `{ code, message, data? }`, and clients reject with
 them. Errors under HTTP Behavior lists every failure and what each side gets.
 
-### [Media Types](/docs/route-builder#define-media-types)
+### [Content Types](/docs/route-builder#content-types)
 
 ```ts
-// Records are keyed by media type; a plain schema means application/json.
+// A body is JSON unless a content-type header says otherwise.
 route
 	.post("/todos/import")
-	.body({ "application/json": z.array(todoInput), "text/csv": z.string() })
-	.response({ "application/json": importResult, ...sse(progress) })
-	.handler(({ contentType, body, respond }) => {
-		const todos = contentType === "text/csv" ? parseCsv(body) : body; // narrowed
-		return wantsProgress()
-			? respond(live(todos), { contentType: "text/event-stream" })
-			: respond(save(todos), { contentType: "application/json" });
-	});
+	// The content types the route accepts. Others are answered with 415.
+	.headers(z.object({ "content-type": z.literal("text/csv") })) // without parameters
+	.body(z.string())
+	.handler(({ body }) => save(parseCsv(body)));
+await client.todos.import({
+	headers: { "content-type": "text/csv" },
+	body: csv,
+});
+
+// A declared response states its own in the headers schema. A default sends it.
+route
+	.get("/todos/export")
+	.response(z.string(), {
+		headers: z.object({
+			"content-type": z.literal("text/csv").default("text/csv"),
+		}),
+	})
+	.handler(() => toCsv(todos));
 ```
 
 ### [Type Helpers](/docs/route-builder#type-helpers)
@@ -420,13 +430,13 @@ createApp(routes, {
 Clients send schema input and handlers receive schema output. What each
 definition guarantees at runtime:
 
-| Definition        | Server                               | Fetch client                                                                 | OpenAPI                     |
-| ----------------- | ------------------------------------ | ---------------------------------------------------------------------------- | --------------------------- |
-| Request schemas   | Validated before middleware, or 400  | Not validated                                                                | Parameters and request body |
-| Inferred response | Not validated                        | Types only, any 2xx resolves                                                 | Placeholder `default`       |
-| `.response()`     | Validated, or 500                    | Status and media type checked; body and headers with `validateResponses` (1) | Documented                  |
-| `.error()`        | `data` and headers validated, or 500 | Code and status recognized; `data` with `validateResponses` (1)              | Documented                  |
-| `type<T>()`       | Types only                           | Types only                                                                   | Empty schema                |
+| Definition        | Server                               | Fetch client                                                             | OpenAPI                     |
+| ----------------- | ------------------------------------ | ------------------------------------------------------------------------ | --------------------------- |
+| Request schemas   | Validated before middleware, or 400  | Not validated                                                            | Parameters and request body |
+| Inferred response | Not validated                        | Types only, any 2xx resolves                                             | Placeholder `default`       |
+| `.response()`     | Validated, or 500                    | Status and stream checked; body and headers with `validateResponses` (1) | Documented                  |
+| `.error()`        | `data` and headers validated, or 500 | Code and status recognized; `data` with `validateResponses` (1)          | Documented                  |
+| `type<T>()`       | Types only                           | Types only                                                               | Empty schema                |
 
 (1) `validateResponses` needs a shared contract. An extracted contract has no
 schemas, so the option has no effect.
@@ -464,7 +474,7 @@ const binary = bodyCodec("application/octet-stream", {
 | Any other error is thrown                          | `INTERNAL_SERVER_ERROR` 500 with `createApp`, otherwise the framework handles it | Untyped `RouteError` with `createApp`          |
 | Request validation fails                           | `REQUEST_VALIDATION_FAILED` 400, issues per segment as `data`                    | Untyped `RouteError` (2)                       |
 | The request body cannot be decoded                 | `MALFORMED_REQUEST_BODY` 400                                                     | Untyped `RouteError` (2)                       |
-| The `Content-Type` is not defined                  | `UNSUPPORTED_MEDIA_TYPE` 415                                                     | Untyped `RouteError` (2)                       |
+| The `content-type` is not one the route declares   | `UNSUPPORTED_MEDIA_TYPE` 415                                                     | Untyped `RouteError` (2)                       |
 | A response or error `data` fails validation        | `INTERNAL_SERVER_ERROR` 500, without details                                     | Untyped `RouteError` (2)                       |
 | No route matches (`createApp`)                     | `NOT_FOUND` 404                                                                  | Untyped `RouteError` (2)                       |
 | A response breaks the contract                     | -                                                                                | Plain `Error`, details in `cause`              |
@@ -568,7 +578,7 @@ app.all("/api/*", async (c) => {
 ### [Contract Extraction](/docs/client/contract-extraction)
 
 ```ts scripts/extract-contract.ts
-// Build time: keeps methods, paths, media types, statuses and error codes, no schemas.
+// Build time: keeps methods, paths, statuses and error codes, no schemas.
 await writeFile("contract.json", JSON.stringify(extractContract(routes)));
 ```
 
@@ -594,13 +604,16 @@ const client = createClient(api, {
 	validateResponses: true, // shared contracts only
 });
 
-// Resolves to a status-discriminated { status, contentType, body, headers, cookies }.
+// Resolves to a status-discriminated { status, body, headers, cookies }.
 // cookies are the Set-Cookie values, which browsers hide, so empty there.
 const res = await client.todos.get(
 	{ params: { id: "1" } },
 	{ signal, cache: "no-store", additionalHeaders: { "x-trace-id": traceId } },
 );
-await client.todos.import({ contentType: "text/csv", body: csv });
+await client.todos.import({
+	headers: { "content-type": "text/csv" },
+	body: csv,
+});
 await client.health(undefined, { cache: "no-store" }); // options without input
 
 // Errors: reject by default, or resolve to { error } | { data } with safe().

@@ -28,9 +28,10 @@ export const withHeaders = route.headers(type<{ authorization: string }>());
 export const withQuery = route.query(type<{ page: string }>());
 export const withParams = route.get("/:id").params(type<{ id: string }>());
 export const withBody = route.post("/items").body(schema);
-export const withBodyContent = route
+export const withBodyContentType = route
 	.put("/items")
-	.body({ "application/json": schema });
+	.headers(type<{ "content-type": "text/csv" }>())
+	.body(type<string>());
 export const patched = route.patch();
 export const deleted = route.delete("/items/:id");
 export const withMetaShape = route.$meta<{ cacheKey: string }>();
@@ -38,9 +39,9 @@ export const withMeta = withMetaShape.meta({ cacheKey: "items" });
 export const withOpenApi = route.openAPI({ summary: "Items" });
 export const withResponse = route.get().response(schema);
 export const withStatusResponse = route.get().response(schema, { status: 201 });
-export const withContentResponse = route
-	.get()
-	.response({ "application/json": schema });
+export const withContentTypeResponse = route.get().response(type<string>(), {
+	headers: type<{ "content-type": "text/csv" }>(),
+});
 export const withEmptyResponse = route.get().response({ status: 204 });
 export const withStreamResponse = route.get().response(sse(schema));
 export const withRawResponse = route.get().response(raw());

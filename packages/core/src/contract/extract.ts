@@ -5,10 +5,10 @@ import { mapContractRoutes } from "./traversal.ts";
 /**
  * Extracts the minimal JSON-compatible client contract from a route tree.
  *
- * @remarks Keeps only each route's method, resolved path, request body media
- * types, defined response statuses and media types, and the status of each
- * defined error code. The request body keeps the definition shape with empty
- * schema lists, and response media types keep `null` schemas. Schemas,
+ * @remarks Keeps only each route's method, resolved path, whether it has a
+ * request body, its defined response statuses and whether each has a body or
+ * a stream, and the status of each defined error code. The request body is an
+ * empty schema list, and response bodies keep `null` schemas. Schemas,
  * metadata, and handlers are left out, so the result can be serialized and
  * shipped to a client without server code.
  * The return type keeps the route tree type for client inference.
@@ -33,25 +33,16 @@ export function extractContract<const TRoutes extends Contract>(
 		"~restrpc": {
 			method: route.method,
 			path: resolveRoutePath(route, routePath),
-			...(route.request?.body && {
-				request: {
-					body: Object.fromEntries(
-						Object.keys(route.request.body).map((mediaType) => [mediaType, []]),
-					),
-				},
-			}),
-			// Media types keep a `null` schema, so the client checks statuses and
-			// content types without validating bodies.
+			...(route.request?.body && { request: { body: [] } }),
+			// A `null` schema keeps whether a status has a body or a stream, so the
+			// client checks them without validating bodies.
 			responses: Object.fromEntries(
-				Object.entries(route.responses).map(([status, { content }]) => [
+				Object.entries(route.responses).map(([status, response]) => [
 					status,
-					content
-						? {
-								content: Object.fromEntries(
-									Object.keys(content).map((mediaType) => [mediaType, null]),
-								),
-							}
-						: {},
+					{
+						...(response.body && { body: null }),
+						...(response.sse && { sse: null }),
+					},
 				]),
 			),
 			...(route.errors && {

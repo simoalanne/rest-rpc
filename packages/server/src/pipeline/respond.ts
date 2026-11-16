@@ -19,10 +19,9 @@ export type RespondOptions = {
 	 */
 	status?: number;
 	/**
-	 * Media type of the body. Defaults to `application/json`, or to the only
-	 * media type the status defines.
+	 * Response headers. A `content-type` header selects the body's codec, and
+	 * a body without one is JSON.
 	 */
-	contentType?: string;
 	headers?: Record<string, RequestScalar | undefined>;
 	/** `Set-Cookie` header values, each sent as its own header. */
 	cookies?: readonly string[];
@@ -69,8 +68,8 @@ export type RespondBodyCheck<TBody> = [Extract<TBody, Response>] extends [never]
 		};
 
 /**
- * Returns a response with a status, media type, or headers other than the
- * defaults of a plain return value.
+ * Returns a response with a status or headers, such as a `content-type`, other
+ * than the defaults of a plain return value.
  *
  * @remarks Any other value a handler returns is the response body, so only
  * `respond()` results are read as responses. An `undefined` body sends no body.

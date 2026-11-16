@@ -4,8 +4,8 @@ Places where the current API either can't express an ordinary route, gives the
 client a type that doesn't match what it receives, or doesn't follow the
 protocol it implements.
 
-- [Content types as headers](#content-types-as-headers) is decided: content
-  types stop being their own concept. It solves the old cases 3 (content type
+- [Content types as headers](#content-types-as-headers) is implemented: content
+  types are no longer their own concept. It solves the old cases 3 (content type
   parameters) and 5 (content types known only at runtime) by construction, and
   cases 1, 2 and 4 build on it.
 - Cases 1, 2 and 4 are about body types. They're ordered by how many users are
@@ -37,14 +37,18 @@ those have to land, or be explicitly decided against, first.
 
 ### Before stable: changing these later would break users
 
-| Case                              | Why it can't wait                                                                                                                                                                 |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Content types as headers          | Removes the `contentType` option, handler argument, client input and result field, and the media-type records in `.body()` and `.response()`. It's the most breaking change here. |
-| 1 and 2: honest client body types | `Jsonify<T>` and `Blob` for binary narrow existing client types. Ship them with the opt-out, so apps whose codecs restore native types keep their types.                          |
-| 4: stream chunk types in handlers | Restricting the handler's return type to `string \| Uint8Array` chunks is a breaking type change.                                                                                 |
+| Case                              | Why it can't wait                                                                                                                                        |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 and 2: honest client body types | `Jsonify<T>` and `Blob` for binary narrow existing client types. Ship them with the opt-out, so apps whose codecs restore native types keep their types. |
+| 4: stream chunk types in handlers | Restricting the handler's return type to `string \| Uint8Array` chunks is a breaking type change.                                                        |
 
 ### After stable: additive
 
+- Loosening how strictly the client states content types, which only relaxes
+  types: a `FormData` body could make the call's `content-type` header
+  optional, since it's sent as multipart anyway, and a `content-type` in
+  `globalHeaders` or `additionalHeaders` could select the codec too. Decide
+  together with sending typed objects as multipart.
 - 6: the error format option.
 - 11 and 13: CORS and the interceptors.
 - 14: wildcard path params.

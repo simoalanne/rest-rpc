@@ -25,7 +25,6 @@ describe("request inference", () => {
 			{ first: string; shared: string } & { second: string; shared: string }
 		>();
 		expectTypeOf<ServerRequest<(typeof value)["~restrpc"]>>().toEqualTypeOf<{
-			contentType: "application/json";
 			body: { first: number; second: number; shared: string };
 			params: { id: number };
 			query: { page: number };
@@ -77,68 +76,32 @@ describe("request inference", () => {
 		// An omitted body is `undefined`, so only its schema can make it optional.
 		const fields = route.post("/").body(type<{ note?: string }>());
 		expectTypeOf<InferClientRequest<typeof fields>>().toEqualTypeOf<{
-			contentType?: "application/json";
 			body: { note?: string };
 		}>();
 		const omittable = route.post("/").body(type<string | undefined>());
 		expectTypeOf<InferClientRequest<typeof omittable>>().toEqualTypeOf<{
-			contentType?: "application/json";
 			body?: string | undefined;
 		}>();
 		expectTypeOf<
 			ServerRequest<(typeof omittable)["~restrpc"]>
 		>().toEqualTypeOf<{
-			contentType: "application/json";
 			body: string | undefined;
 		}>();
-
-		// Without a body, there is no content type to select a media type with.
-		const selected = route
-			.post("/")
-			.body(type<string | undefined>())
-			.body({ "text/plain": type<string>() });
-		expectTypeOf<InferClientRequest<typeof selected>>().toEqualTypeOf<
-			| { contentType: "application/json"; body: string | undefined }
-			| { contentType: "text/plain"; body: string }
-		>();
 	});
 
-	it("discriminates body variants by media type", () => {
-		const single = route.post("/").body({ "text/plain": type<string>() });
-		expectTypeOf<InferClientRequest<typeof single>>().toEqualTypeOf<{
-			contentType?: "text/plain";
+	it("types the content type of a body as a header", () => {
+		const csv = route
+			.post("/")
+			.headers(type<{ "content-type": "text/csv" }>())
+			.body(type<string>());
+		expectTypeOf<InferClientRequest<typeof csv>>().toEqualTypeOf<{
+			headers: { "content-type": "text/csv" };
 			body: string;
 		}>();
-
-		const value = route
-			.post("/")
-			.body(type<{ url: string }>())
-			.body({ "multipart/form-data": type<FormData>() })
-			.query(type<{ dryRun?: boolean }>());
-		expectTypeOf<InferClientRequest<typeof value>>().toEqualTypeOf<
-			| {
-					contentType: "application/json";
-					body: { url: string };
-					query?: { dryRun?: boolean };
-			  }
-			| {
-					contentType: "multipart/form-data";
-					body: FormData;
-					query?: { dryRun?: boolean };
-			  }
-		>();
-		expectTypeOf<ServerRequest<(typeof value)["~restrpc"]>>().toEqualTypeOf<
-			| {
-					contentType: "application/json";
-					body: { url: string };
-					query: { dryRun?: boolean };
-			  }
-			| {
-					contentType: "multipart/form-data";
-					body: FormData;
-					query: { dryRun?: boolean };
-			  }
-		>();
+		expectTypeOf<ServerRequest<(typeof csv)["~restrpc"]>>().toEqualTypeOf<{
+			headers: { "content-type": "text/csv" };
+			body: string;
+		}>();
 	});
 
 	it("distinguishes segmented and empty requests", () => {

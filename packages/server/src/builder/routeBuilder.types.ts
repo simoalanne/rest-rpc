@@ -46,23 +46,33 @@ type BaseMediaType<T extends string> = Lowercase<
 	Trim<T extends `${infer TBase};${string}` ? TBase : T>
 >;
 
-// Async iterables without a content type are SSE streams; other bodies without
-// one are JSON.
+// The base media type of an envelope's `content-type` header, if it has one.
 type ImplicitContentType<TResponse> = TResponse extends {
-	contentType: infer TContentType extends string;
+	headers: { "content-type": infer TContentType extends string };
 }
 	? BaseMediaType<TContentType>
-	: TResponse extends { body: AsyncIterable<unknown> }
-		? "text/event-stream"
-		: "application/json";
+	: undefined;
 
-// The bodies of the envelopes returned with one media type.
-type ImplicitBody<TResponse, TMediaType> = TResponse extends {
-	body: infer TBody;
+// Async iterables are SSE streams unless a `content-type` header sends them
+// through the body codecs; other bodies are JSON without one.
+type IsSseEnvelope<TResponse> = TResponse extends {
+	body: AsyncIterable<unknown>;
 }
-	? ImplicitContentType<TResponse> extends TMediaType
+	? ImplicitContentType<TResponse> extends undefined | "text/event-stream"
+		? true
+		: false
+	: false;
+
+type SseBodies<TResponse> = TResponse extends { body: infer TBody }
+	? IsSseEnvelope<TResponse> extends true
 		? TBody
 		: never
+	: never;
+
+type PlainBodies<TResponse> = TResponse extends { body: infer TBody }
+	? IsSseEnvelope<TResponse> extends true
+		? never
+		: TBody
 	: never;
 
 type ImplicitStreamSchema<TBody> =
@@ -70,25 +80,15 @@ type ImplicitStreamSchema<TBody> =
 		? InferredSchema<TItem, SseData<TItem>>
 		: never;
 
-// A `text/event-stream` schema describes stream items.
-type ImplicitBodySchema<TResponse, TMediaType> =
-	TMediaType extends "text/event-stream"
-		? ImplicitStreamSchema<ImplicitBody<TResponse, TMediaType>>
-		: InferredSchema<ImplicitBody<TResponse, TMediaType>>;
-
-type ImplicitResponseContent<TResponse> = [
-	Extract<TResponse, { body: unknown }>,
-] extends [never]
+// The envelopes of one status share one body schema, with SSE streams apart.
+type ImplicitResponseContent<TResponse> = ([PlainBodies<TResponse>] extends [
+	never,
+]
 	? unknown
-	: {
-			content: {
-				[
-					TMediaType in ImplicitContentType<
-						Extract<TResponse, { body: unknown }>
-					>
-				]: ImplicitBodySchema<TResponse, TMediaType>;
-			};
-		};
+	: { body: InferredSchema<PlainBodies<TResponse>> }) &
+	([SseBodies<TResponse>] extends [never]
+		? unknown
+		: { sse: ImplicitStreamSchema<SseBodies<TResponse>> });
 
 type ImplicitResponseHeaders<TResponse> = TResponse extends {
 	headers: infer THeaders;
@@ -125,12 +125,19 @@ type EnvelopeOf<TResult> =
 			: { status: 200; body: TResult };
 
 // rest-rpc frames SSE itself, so `text/event-stream` bodies must be streams.
-type ValidStreamEnvelopes<TEnvelope> =
-	Extract<TEnvelope, { contentType: "text/event-stream" }> extends {
-		body: AsyncIterable<unknown>;
-	}
-		? unknown
-		: never;
+type InvalidStreamEnvelope<TEnvelope> = TEnvelope extends unknown
+	? ImplicitContentType<TEnvelope> extends "text/event-stream"
+		? TEnvelope extends { body: AsyncIterable<unknown> }
+			? never
+			: TEnvelope
+		: never
+	: never;
+
+type ValidStreamEnvelopes<TEnvelope> = [
+	InvalidStreamEnvelope<TEnvelope>,
+] extends [never]
+	? unknown
+	: never;
 
 type NonSuccessStatus<TEnvelope> = TEnvelope extends {
 	status: infer TStatus extends number;
@@ -251,19 +258,7 @@ type RespondStatusFor<TRoute extends RouteDefinition> =
 type HandlerFields = {
 	/** Aborts when the client disconnects. */
 	signal: AbortSignal;
-	/**
-	 * The request body media type. Routes with a body narrow it to the defined
-	 * media types, and routes without one never receive it.
-	 */
-	contentType?: string;
 };
-
-// Routes without a body schema have no request media type.
-type BodylessFields<TRoute extends RouteDefinition> = TRoute extends {
-	request: { body: object };
-}
-	? EmptyObject
-	: { contentType?: undefined };
 
 // Handlers and middleware throw `errors.CODE(...)` without `new`.
 type ErrorFactories<TErrors> = Merge<{
@@ -285,12 +280,11 @@ export type RouteRequest<
 	TContext extends object = EmptyObject,
 > = Merge<
 	ServerRequest<TRoute> &
-		HandlerFields &
-		BodylessFields<TRoute> & {
+		HandlerFields & {
 			route: TRoute;
 			context: Merge<Readonly<TContext>>;
 			errors: ErrorsOf<TRoute>;
-			/** Returns a response with a status, media type, or headers the route defines. */
+			/** Returns a response with a status or headers the route defines. */
 			respond: RouteRespond<RespondStatusFor<TRoute>>;
 		}
 >;

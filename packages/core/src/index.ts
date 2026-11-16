@@ -31,11 +31,6 @@ export {
 	type RouteErrorDefinitionOptions,
 	type RouteErrorOptions,
 } from "./contract/routeError.ts";
-export type {
-	BodyContent,
-	KnownBodyContentType,
-	MediaType,
-} from "./contract/body.ts";
 export type { ResponseOptions } from "./contract/response.ts";
 export { raw, type RawResponse } from "./contract/raw.ts";
 export type {
@@ -48,6 +43,7 @@ export {
 	sseFormat,
 	type SseEvent,
 	type SseFormat,
+	type SseResponse,
 } from "./contract/sse.ts";
 export { type } from "./standard-schema/type.ts";
 export type { ApiClientRouteValue } from "./client/index.ts";

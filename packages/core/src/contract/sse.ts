@@ -8,20 +8,38 @@ export type SseEvent<T> = {
 	retry?: number;
 };
 
+const sseResponseBrand = Symbol("rest-rpc.sse-response");
+
+/**
+ * A Server-Sent Event stream response declared with {@link sse}, whose schema
+ * validates the data of each event.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/streaming}
+ */
+export type SseResponse<TSchema extends StandardSchemaV1 = StandardSchemaV1> = {
+	readonly [sseResponseBrand]: TSchema;
+};
+
 /**
  * Defines a `text/event-stream` response whose schema validates the data of
  * each event.
  *
- * @remarks The same as `{ "text/event-stream": schema }`, so it can be spread
- * next to other media types of the same response.
+ * @remarks Pass it to `.response()` in place of a body schema.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/streaming}
  */
 export function sse<const TSchema extends StandardSchemaV1>(
 	schema: TSchema,
-): { readonly "text/event-stream": TSchema } {
-	return { "text/event-stream": schema };
+): SseResponse<TSchema> {
+	return { [sseResponseBrand]: schema };
 }
+
+export const isSseResponse = (value: unknown): value is SseResponse =>
+	typeof value === "object" && value !== null && sseResponseBrand in value;
+
+/** The schema of each event's data in a stream declared with {@link sse}. */
+export const sseSchema = (value: SseResponse): StandardSchemaV1 =>
+	value[sseResponseBrand];
 
 /**
  * Serializes the data of each Server-Sent Event, and deserializes it on the

@@ -65,12 +65,10 @@ describe("createClient types", () => {
 		};
 		const client = createClient(contract, { baseUrl: "" });
 		expectTypeOf(client.length).parameter(0).toEqualTypeOf<{
-			contentType?: "application/json";
 			body: string;
 		}>();
 		expectTypeOf(client.length).returns.resolves.toEqualTypeOf<{
 			status: 200;
-			contentType: "application/json";
 			body: number;
 			headers: Record<string, string>;
 			cookies: readonly string[];

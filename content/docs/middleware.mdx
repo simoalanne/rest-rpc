@@ -223,7 +223,7 @@ which routes that use the middleware must define.
 ## Responses and Errors
 
 `next()` resolves to the downstream response as a `respond()` envelope, with
-its `status`, `body`, `headers` and `contentType`. A returned Fetch `Response`
+its `status`, `body` and `headers`. A returned Fetch `Response`
 is the `body`, and its status and headers fill the other fields, as
 [raw responses](/docs/route-builder#raw-responses) describe. Response validation and
 serialization run once, after the chain completes.

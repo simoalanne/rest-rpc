@@ -12,11 +12,9 @@ export type RawResponse = {
 	readonly [rawBrand]: { readonly description?: string };
 };
 
-/** The responses of a raw route: any status, with any or no media type. */
+/** The responses of a raw route: any status, with any or no body. */
 export type RawResponses = {
-	[status: number]: {
-		content: { [mediaType: string]: StandardSchemaV1<unknown> };
-	};
+	[status: number]: { body: StandardSchemaV1<unknown> };
 };
 
 /**

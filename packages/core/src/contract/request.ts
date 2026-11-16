@@ -3,7 +3,7 @@ import type {
 	RouteDefinition,
 	RouteRequestDefinition,
 } from "./routeDefinition.ts";
-import type { EmptyObject, IsUnion, Merge } from "../utils/typeUtils.ts";
+import type { EmptyObject, Merge } from "../utils/typeUtils.ts";
 import type { PathParamNames } from "./path.ts";
 
 export type RequestScalar = string | number | boolean;
@@ -67,33 +67,20 @@ type InferRequestSegments<TRequest, TIO extends "input" | "output"> = {
 		: never;
 };
 
-// Clients select a media type only when several are defined, and may then omit
-// a body whose schema accepts `undefined`. Handlers always receive the
-// selected media type.
-type BodyFields<
-	TMediaType,
+// Clients may omit a body whose schema accepts `undefined`. Its content type is
+// a `content-type` header, so it is part of the headers.
+type InferRequestBody<
 	TBody,
-	TOmittable extends boolean,
-> = TOmittable extends true
-	? { contentType?: TMediaType } & (undefined extends TBody
-			? { body?: TBody }
-			: { body: TBody })
-	: { contentType: TMediaType; body: TBody };
-
-/** One request body variant per defined media type, discriminated by `contentType`. */
-type InferRequestBody<TBody, TIO extends "input" | "output"> = {
-	[TMediaType in Extract<keyof TBody, string>]: BodyFields<
-		TMediaType,
-		TBody[TMediaType] extends readonly StandardSchemaV1[]
-			? InferSchemas<TBody[TMediaType], TIO>
-			: never,
-		TIO extends "input"
-			? IsUnion<Extract<keyof TBody, string>> extends true
-				? false
-				: true
-			: false
-	>;
-}[Extract<keyof TBody, string>];
+	TIO extends "input" | "output",
+> = TBody extends readonly StandardSchemaV1[]
+	? InferSchemas<TBody, TIO> extends infer TValue
+		? TIO extends "input"
+			? undefined extends TValue
+				? { body?: TValue }
+				: { body: TValue }
+			: { body: TValue }
+		: never
+	: never;
 
 type DefinedRequest<E> = E extends { request: infer TRequest }
 	? TRequest

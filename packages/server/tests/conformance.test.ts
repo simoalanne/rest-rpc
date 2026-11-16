@@ -289,7 +289,7 @@ describe.each([
 			});
 			expect(response.status).toBe(204);
 			expect(handler).toHaveBeenCalledWith(
-				expect.objectContaining({ body: undefined, contentType: undefined }),
+				expect.objectContaining({ body: undefined }),
 			);
 		});
 	});
@@ -472,8 +472,10 @@ describe.each([
 		const routes = {
 			robots: route.get("/robots.txt").static(
 				respond("User-agent: *", {
-					contentType: "text/plain",
-					headers: { "cache-control": "max-age=60" },
+					headers: {
+						"content-type": "text/plain",
+						"cache-control": "max-age=60",
+					},
 				}),
 			),
 			legacy: route
@@ -558,13 +560,17 @@ describe.each([
 		const routes = {
 			decode: route
 				.post("/decode")
-				.body({
-					"application/json": type<unknown>(),
-					"application/x-www-form-urlencoded": type<URLSearchParams>(),
-					"multipart/form-data": type<FormData>(),
-					"text/plain": type<string>(),
-					"application/octet-stream": type<Blob>(),
-				})
+				.headers(
+					type<{
+						"content-type":
+							| "application/json"
+							| "application/x-www-form-urlencoded"
+							| "multipart/form-data"
+							| "text/plain"
+							| "application/octet-stream";
+					}>(),
+				)
+				.body(type<unknown>())
 				.handler(({ body }) => describeBody(body)),
 		};
 		await serve(routes, {}, async (url) => {
@@ -603,7 +609,7 @@ describe.each([
 			form: route.get("/form").handler(() => {
 				const body = new FormData();
 				body.set("name", "Ada");
-				return respond(body, { contentType: "multipart/form-data" });
+				return respond(body);
 			}),
 		};
 		await serve(routes, {}, async (url) => {
@@ -613,11 +619,11 @@ describe.each([
 		});
 	});
 
-	it("sends Blob response bodies with the selected content type", async () => {
+	it("sends Blob response bodies with the content type of their header", async () => {
 		const routes = {
 			file: route.get("/file").handler(() =>
 				respond(new Blob(["file"], { type: "text/plain" }), {
-					contentType: "application/octet-stream",
+					headers: { "content-type": "application/octet-stream" },
 				}),
 			),
 		};
@@ -638,7 +644,7 @@ describe.each([
 						yield new TextEncoder().encode("A");
 						yield new TextEncoder().encode("B");
 					})(),
-					{ contentType: "application/octet-stream" },
+					{ headers: { "content-type": "application/octet-stream" } },
 				),
 			),
 		};
@@ -721,11 +727,13 @@ describe.each([
 		const routes = {
 			csv: route
 				.post("/csv")
-				.body({ "text/csv": type<{ text: string; contentType: string }>() })
+				.headers(type<{ "content-type": "text/csv" }>())
+				.body(type<{ text: string; contentType: string }>())
 				.handler(({ body }) => body),
 			ndjson: route
 				.post("/ndjson")
-				.body({ "application/x-ndjson": type<string>() })
+				.headers(type<{ "content-type": "application/x-ndjson" }>())
+				.body(type<string>())
 				.handler(({ body }) => body),
 		};
 		await serve(routes, { bodyCodecs }, async (url) => {
@@ -768,10 +776,12 @@ describe.each([
 			json: route.get("/json").handler(() => ({ text })),
 			text: route
 				.get("/text")
-				.handler(() => respond(text, { contentType: "text/plain" })),
+				.handler(() =>
+					respond(text, { headers: { "content-type": "text/plain" } }),
+				),
 			static: route
 				.get("/static")
-				.static(respond(text, { contentType: "text/plain" })),
+				.static(respond(text, { headers: { "content-type": "text/plain" } })),
 		};
 		await serve(routes, {}, async (url) => {
 			expect(await (await fetch(`${url}/json`)).json()).toEqual({ text });
@@ -814,7 +824,7 @@ describe.each([
 		});
 	});
 
-	it("sends the headers of a serialized body with the route's headers, and the selected content type without one", async () => {
+	it("sends the headers of a serialized body under the route's headers, content type included", async () => {
 		const bodyCodecs = [
 			bodyCodec("text/x-custom", {
 				serialize: (value) =>
@@ -826,8 +836,7 @@ describe.each([
 		const routes = {
 			custom: route.get("/custom").handler(() =>
 				respond("value", {
-					contentType: "text/x-custom",
-					headers: { "x-route": "route" },
+					headers: { "content-type": "text/x-custom", "x-route": "route" },
 				}),
 			),
 		};

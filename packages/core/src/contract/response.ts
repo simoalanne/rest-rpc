@@ -3,7 +3,7 @@ import type { RouteDefinition } from "./routeDefinition.ts";
 import type { InferSchema, RequestScalar } from "./request.ts";
 import type { SseEvent } from "./sse.ts";
 import type { ErrorSchemaValue, RouteError } from "./routeError.ts";
-import type { IsUnion, Merge } from "../utils/typeUtils.ts";
+import type { Merge } from "../utils/typeUtils.ts";
 
 /** A whole-object schema for response headers whose output contains scalar values. */
 export type ResponseHeadersSchema = StandardSchemaV1<
@@ -11,14 +11,14 @@ export type ResponseHeadersSchema = StandardSchemaV1<
 	Record<string, RequestScalar | undefined>
 >;
 
-/** Response body schemas keyed by base media type. */
-export type ResponseContentDefinition = {
-	readonly [mediaType: string]: StandardSchemaV1;
-};
-
-/** A `text/event-stream` entry is always an SSE stream whose schema validates each item. */
+/**
+ * A defined response: a body schema, or an `sse` schema that validates each
+ * item of a Server-Sent Event stream. Its content type is a `content-type`
+ * header, so a headers schema declares it.
+ */
 export type ResponseDefinition = {
-	content?: ResponseContentDefinition;
+	body?: StandardSchemaV1;
+	sse?: StandardSchemaV1;
 	headers?: ResponseHeadersSchema;
 	description?: string;
 };
@@ -38,12 +38,24 @@ export type ResponseOptions = {
 
 export type RouteResponses = Record<number, ResponseDefinition>;
 
-// `keyof never` is every key, so bodyless responses are checked first.
-type ResponseMediaType<TResponse> = TResponse extends {
-	content: infer TContent;
+type BodySchema<TResponse> = TResponse extends {
+	body: infer TSchema extends StandardSchemaV1;
 }
-	? Extract<keyof TContent, string>
+	? TSchema
 	: never;
+
+type SseSchema<TResponse> = TResponse extends {
+	sse: infer TSchema extends StandardSchemaV1;
+}
+	? TSchema
+	: never;
+
+// `keyof never` is every key, so bodyless responses are checked first.
+type HasBody<TResponse> = [
+	BodySchema<TResponse> | SseSchema<TResponse>,
+] extends [never]
+	? false
+	: true;
 
 type ResponseHeadersFor<TResponse> = TResponse extends {
 	headers: infer THeaders extends ResponseHeadersSchema;
@@ -59,48 +71,37 @@ type ResponseHeadersMetadata<TResponse, TIO extends "input" | "output"> = [
 			headers: InferSchema<ResponseHeadersFor<TResponse>, TIO>;
 		};
 
-type ContentSchema<TResponse, TMediaType> = TResponse extends {
-	content: infer TContent;
-}
-	? TMediaType extends keyof TContent
-		? Extract<TContent[TMediaType], StandardSchemaV1>
-		: never
-	: never;
-
-// `text/event-stream` schemas describe stream items. Handlers produce schema
-// inputs, and clients receive schema outputs wrapped in SSE events.
-type ServerBody<TResponse, TMediaType> = TMediaType extends "text/event-stream"
-	? AsyncIterable<InferSchema<ContentSchema<TResponse, TMediaType>, "input">>
-	: InferSchema<ContentSchema<TResponse, TMediaType>, "input">;
-
-type ClientBody<TResponse, TMediaType> = TMediaType extends "text/event-stream"
-	? AsyncIterable<
-			SseEvent<InferSchema<ContentSchema<TResponse, TMediaType>, "output">>
-		>
-	: InferSchema<ContentSchema<TResponse, TMediaType>, "output">;
-
-// A response with several media types must select one; a single media type
-// may be omitted.
-type ServerContentType<TResponse, TMediaType> =
-	IsUnion<ResponseMediaType<TResponse>> extends true
-		? { contentType: TMediaType }
-		: { contentType?: TMediaType };
-
-type ServerResponseEntry<TStatus extends number, TResponse> = [
-	ResponseMediaType<TResponse>,
+type InferOptional<TSchema, TIO extends "input" | "output"> = [
+	TSchema,
 ] extends [never]
-	? Merge<{ status: TStatus } & ResponseHeadersMetadata<TResponse, "input">>
-	: ResponseMediaType<TResponse> extends infer TMediaType
-		? TMediaType extends string
-			? Merge<
-					{
-						status: TStatus;
-						body: ServerBody<TResponse, TMediaType>;
-					} & ServerContentType<TResponse, TMediaType> &
-						ResponseHeadersMetadata<TResponse, "input">
-				>
-			: never
+	? never
+	: TSchema extends StandardSchemaV1
+		? InferSchema<TSchema, TIO>
 		: never;
+
+// `sse` schemas describe stream items. Handlers produce schema inputs, and
+// clients receive schema outputs wrapped in SSE events.
+type ServerBody<TResponse> =
+	| InferOptional<BodySchema<TResponse>, "input">
+	| ([SseSchema<TResponse>] extends [never]
+			? never
+			: AsyncIterable<InferOptional<SseSchema<TResponse>, "input">>);
+
+type ClientBody<TResponse> =
+	| InferOptional<BodySchema<TResponse>, "output">
+	| ([SseSchema<TResponse>] extends [never]
+			? never
+			: AsyncIterable<SseEvent<InferOptional<SseSchema<TResponse>, "output">>>);
+
+type ServerResponseEntry<TStatus extends number, TResponse> =
+	HasBody<TResponse> extends false
+		? Merge<{ status: TStatus } & ResponseHeadersMetadata<TResponse, "input">>
+		: Merge<
+				{
+					status: TStatus;
+					body: ServerBody<TResponse>;
+				} & ResponseHeadersMetadata<TResponse, "input">
+			>;
 
 // Clients receive every response header; defined headers narrow their keys.
 type ClientResponseHeaders<TResponse> = [
@@ -110,32 +111,13 @@ type ClientResponseHeaders<TResponse> = [
 	: Record<string, string> &
 			InferSchema<ResponseHeadersFor<TResponse>, "output">;
 
-type ClientResponseEntry<TStatus extends number, TResponse> = [
-	ResponseMediaType<TResponse>,
-] extends [never]
-	? {
-			status: TStatus;
-			contentType: undefined;
-			body: undefined;
-			headers: ClientResponseHeaders<TResponse>;
-			/** Received `Set-Cookie` values. Browsers hide them from `fetch`, so it is empty there. */
-			cookies: readonly string[];
-		}
-	: ResponseMediaType<TResponse> extends infer TMediaType
-		? TMediaType extends string
-			? {
-					status: TStatus;
-					// Any media type includes none, as for a returned `Response` without a body.
-					contentType: string extends TMediaType
-						? TMediaType | undefined
-						: TMediaType;
-					body: ClientBody<TResponse, TMediaType>;
-					headers: ClientResponseHeaders<TResponse>;
-					/** Received `Set-Cookie` values. Browsers hide them from `fetch`, so it is empty there. */
-					cookies: readonly string[];
-				}
-			: never
-		: never;
+type ClientResponseEntry<TStatus extends number, TResponse> = {
+	status: TStatus;
+	body: HasBody<TResponse> extends false ? undefined : ClientBody<TResponse>;
+	headers: ClientResponseHeaders<TResponse>;
+	/** Received `Set-Cookie` values. Browsers hide them from `fetch`, so it is empty there. */
+	cookies: readonly string[];
+};
 
 type ResponseKey = number | `${number}`;
 

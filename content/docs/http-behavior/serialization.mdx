@@ -31,44 +31,45 @@ header names are normalized to lowercase, so uppercase names would never match
 them and are a type error. Schemas with `string` keys, such as `z.record()`, are
 not checked.
 
-## Bodies and Media Types
+## Bodies and Content Types
 
 Body codecs serialize values into HTTP bodies and deserialize HTTP bodies into
 values. Schemas operate on values before encoding and after decoding.
 
-A schema passed to `.body()` or `.response()` defines a JSON body. Other media
-types are defined with a record of schemas keyed by base media type, lowercase
-and without parameters:
+A body is JSON unless a `content-type` header says otherwise. The header's base
+media type, lowercase and without parameters, selects the codec, and the codec
+receives the full header value:
+
+- **Requests:** a route declares the content types it accepts in its headers
+  schema, and the client writes the header in the call's
+  [headers](/docs/client/fetch-client#send-other-content-types). The server
+  validates the headers before it decodes the body, and the headers schema sees
+  the base media type, so `application/json; charset=utf-8` is validated as
+  `application/json`.
+- **Responses:** the header the handler writes, or a declared headers schema
+  fills in, is sent as written and selects the codec.
 
 ```ts
 route
 	.post("/todos/import")
-	.body({
-		"application/json": z.array(z.object({ title: z.string() })),
-		"text/csv": z.string(),
-	})
-	.response({ "text/plain": z.string() });
+	.headers(z.object({ "content-type": z.literal("text/csv") }))
+	.body(z.string())
+	.response(z.string(), {
+		headers: z.object({
+			"content-type": z.literal("text/plain").default("text/plain"),
+		}),
+	});
 ```
 
-Each media type has its own schema, and requests and responses are unions
-discriminated by `contentType`. The client selects the request media type with
-[`contentType` in the request](/docs/client/fetch-client#select-a-request-media-type),
-and the handler selects the response media type with its returned
-`contentType`. Either may be omitted when one media type is defined.
+A request is rejected with `415` before its body is decoded when its
+`Content-Type` isn't one its validated headers declare, or, on a route that
+declares none, when it isn't JSON. A request without a `Content-Type` is read as
+JSON. Routes without a body schema ignore the request body and its
+`Content-Type`. A client response without a content type or body decodes to
+`undefined`.
 
-A body's content type always replaces a `content-type` passed in headers.
-
-Outgoing codecs are selected from the selected media type. Incoming codecs and
-schemas are selected from the received `Content-Type` header. Matching uses the
-lowercase base media type without parameters, so
-`application/json; charset=utf-8` matches `application/json`.
-
-A request is rejected with `415` before validation when its `Content-Type` is
-not defined by the route, or when it has no `Content-Type` and the route
-defines several media types. Without a `Content-Type`, a route with one
-media type uses it. Routes without a body schema ignore the request body and
-its `Content-Type`, and their handlers receive no `contentType`. A client
-response without a content type or body decodes to `undefined`.
+A `FormData` body is always sent as `multipart/form-data` with the boundary the
+runtime generates, whatever the headers say.
 
 ## Default Codecs
 
@@ -168,16 +169,15 @@ both ends.
 including parameters, and returns the serialized body:
 
 - A plain body is sent with the
-  [previously selected content type](#bodies-and-media-types). On the client it
+  [selected content type](#bodies-and-content-types). On the client it
   must be a Fetch request body. On the server it must be a value the runtime can
   send. See
   [Request and Response Bodies](/docs/server/overview#request-and-response-bodies).
 - `serializedBody(body, { headers })` sends a body with its own headers, for codecs
   that set headers such as `content-encoding`. `headers` is a plain object of
-  header names and values. Without a `content-type` header, the selected
-  content type is sent. A `content-type` header may change parameters but must
-  keep the selected base media type, since content types are part of route
-  types.
+  header names and values. A `content-type` header the handler or the call
+  sets replaces the codec's. A codec's `content-type` header may change
+  parameters but must keep the selected base media type.
 
 ```ts
 import { bodyCodec, serializedBody } from "@rest-rpc/core";
