@@ -1,4 +1,5 @@
 import {
+	clientInterceptor,
 	createClient,
 	extractContract,
 	route as contractRoute,
@@ -8,7 +9,9 @@ import {
 	createApp,
 	createCatchAllHandler,
 	createLocalClient,
+	errorFormat,
 	implement,
+	interceptor,
 	raw,
 	route,
 	routeError,
@@ -157,10 +160,10 @@ export const nodeRouteHandlers = node.createRouteHandlers(routes);
 export const nodeCatchAllHandler = node.createCatchAllHandler(routes);
 export const extractedContract = extractContract(routes);
 export const serverClient = createClient(extractedContract, {
-	baseUrl: "http://localhost",
+	origin: "http://localhost",
 });
 export const localClient = createLocalClient(routes);
-export const client = createClient(contract, { baseUrl: "http://localhost" });
+export const client = createClient(contract, { origin: "http://localhost" });
 
 // TanStack Query utils and their options.
 export const queryUtils = createTanstackQueryUtils(client);
@@ -184,4 +187,14 @@ export const usersPage = queryUtils.users.list.infiniteQueryOptions({
 });
 export const userEvents = queryUtils.users.events.streamedQueryOptions({
 	request: { headers: authorization },
+});
+
+// Interceptors and error formats.
+export const passThrough = interceptor(({ next }) => next());
+export const nodePassThrough = node.interceptor(({ next }) => next());
+export const clientPassThrough = clientInterceptor(({ next }) => next());
+export const textErrors = errorFormat({
+	contentType: "text/plain",
+	serialize: ({ message }) => message,
+	deserialize: () => undefined,
 });

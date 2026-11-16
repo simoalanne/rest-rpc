@@ -105,7 +105,7 @@ import { createClient } from "@rest-rpc/core";
 // Extracted from the routes at build time with extractContract(routes).
 import { api } from "./client-contract";
 
-const client = createClient(api, { baseUrl: "http://localhost:3000" });
+const client = createClient(api, { origin: "http://localhost:3000" });
 
 const created = await client.todos.create({ body: { title: "Write docs" } });
 const response = await client.todos.get({
@@ -170,7 +170,7 @@ import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
 const restrpc = createTanstackQueryUtils(
-	createClient(api, { baseUrl: "http://localhost:3000" }),
+	createClient(api, { origin: "http://localhost:3000" }),
 );
 
 const todo = useQuery(

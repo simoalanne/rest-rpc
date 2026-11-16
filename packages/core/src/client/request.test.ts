@@ -6,20 +6,22 @@ const codecs = createBodyCodecRegistry([]);
 describe("request", () => {
 	it("passes caller cancellation through to fetch", async () => {
 		const controller = new AbortController();
-		const fetch = vi.fn(async () => new Response(null, { status: 204 }));
+		const fetch = vi.fn(
+			async (_request: Request) => new Response(null, { status: 204 }),
+		);
 		await executeRequest(
 			{ method: "GET", path: "/" },
 			[undefined, { signal: controller.signal }],
 			{
-				baseUrl: "",
+				origin: "http://localhost",
 				codecs,
 				fetch,
 			},
 		);
-		expect(fetch.mock.calls[0]).toEqual([
-			"/",
-			expect.objectContaining({ signal: controller.signal }),
-		]);
+		const [request] = fetch.mock.calls[0]!;
+		expect(request.url).toBe("http://localhost/");
+		controller.abort();
+		expect(request.signal.aborted).toBe(true);
 	});
 
 	it.each(["timeout", "caller", "combined timeout", "combined caller"])(
@@ -33,11 +35,11 @@ describe("request", () => {
 					started = resolve;
 				});
 				const fetch = vi.fn(
-					(_input: unknown, init?: RequestInit) =>
+					(request: Request) =>
 						new Promise<Response>((_resolve, reject) => {
-							init!.signal!.addEventListener(
+							request.signal.addEventListener(
 								"abort",
-								() => reject(init!.signal!.reason),
+								() => reject(request.signal.reason),
 								{ once: true },
 							);
 							started();
@@ -50,7 +52,7 @@ describe("request", () => {
 						{ signal: source !== "timeout" ? controller.signal : undefined },
 					],
 					{
-						baseUrl: "",
+						origin: "http://localhost",
 						codecs,
 						fetch,
 						timeoutMs: source !== "caller" ? 100 : undefined,
@@ -75,11 +77,11 @@ describe("request", () => {
 			let signal: AbortSignal | null | undefined;
 			const body = new ReadableStream<Uint8Array>({});
 			const response = await executeRequest({ method: "GET", path: "/" }, [], {
-				baseUrl: "",
+				origin: "http://localhost",
 				codecs,
 				timeoutMs: 100,
-				fetch: async (_input, init) => {
-					signal = init?.signal;
+				fetch: async (request) => {
+					signal = request.signal;
 					return new Response(body);
 				},
 			});
@@ -94,6 +96,7 @@ describe("request", () => {
 	it("encodes path segments, repeated query values and defined headers", () => {
 		const request = constructBaseRequest(
 			"https://example.test",
+			"/api",
 			{ method: "GET", path: "/users/:id/:slug" },
 			{
 				params: { id: "a/b", slug: "hello world" },
@@ -102,13 +105,20 @@ describe("request", () => {
 			},
 		);
 		expect(request.url).toBe(
-			"https://example.test/users/a%2Fb/hello%20world?tags%5B%5D=a&tags%5B%5D=b&page=0",
+			"https://example.test/api/users/a%2Fb/hello%20world?tags%5B%5D=a&tags%5B%5D=b&page=0",
 		);
 		expect(request.headers).toEqual({ count: "0" });
+		// The mount path alone serves the `/` route.
+		expect(
+			constructBaseRequest(undefined, "/api", { method: "GET", path: "/" }, {})
+				.url,
+		).toBe("/api");
 	});
 
 	it("serializes JSON and applies header precedence", async () => {
-		const fetch = vi.fn(async () => new Response(null, { status: 204 }));
+		const fetch = vi.fn(
+			async (_request: Request) => new Response(null, { status: 204 }),
+		);
 		await executeRequest(
 			{
 				method: "POST",
@@ -127,7 +137,7 @@ describe("request", () => {
 				},
 			],
 			{
-				baseUrl: "https://example.test",
+				origin: "https://example.test",
 				codecs,
 				fetch,
 				globalHeaders: {
@@ -137,25 +147,23 @@ describe("request", () => {
 				fetchOptions: { cache: "reload" },
 			},
 		);
-		expect(fetch).toHaveBeenCalledWith(
-			"https://example.test/users",
-			expect.objectContaining({
-				method: "POST",
-				body: '{"name":"Ada"}',
-				cache: "no-store",
-				headers: {
-					"x-token": "request",
-					"x-extra": "2",
-					"content-type": "application/json",
-				},
-			}),
-		);
+		const [request] = fetch.mock.calls[0]!;
+		expect(request).toMatchObject({
+			url: "https://example.test/users",
+			method: "POST",
+			cache: "no-store",
+		});
+		expect(Object.fromEntries(request.headers)).toEqual({
+			"x-token": "request",
+			"x-extra": "2",
+			"content-type": "application/json",
+		});
+		expect(await request.text()).toBe('{"name":"Ada"}');
 	});
 
 	it("leaves the content type of a FormData body to the runtime over a passed header", async () => {
 		const fetch = vi.fn(
-			async (_input: unknown, _init?: RequestInit) =>
-				new Response(null, { status: 204 }),
+			async (_request: Request) => new Response(null, { status: 204 }),
 		);
 		await executeRequest(
 			{
@@ -167,16 +175,19 @@ describe("request", () => {
 				{ body: new FormData() },
 				{ additionalHeaders: { "content-type": "multipart/form-data" } },
 			],
-			{ baseUrl: "", codecs, fetch },
+			{ origin: "http://localhost", codecs, fetch },
 		);
-		expect(fetch.mock.calls[0]![1]!.headers).not.toHaveProperty("content-type");
+		// Fetch sets the multipart content type with its boundary.
+		expect(fetch.mock.calls[0]![0].headers.get("content-type")).toMatch(
+			/^multipart\/form-data; boundary=/,
+		);
 	});
 
 	it("rejects a missing path param instead of sending it as undefined", async () => {
 		const fetch = vi.fn(async () => new Response(null, { status: 204 }));
 		await expect(
 			executeRequest({ method: "GET", path: "/users/:id" }, [{ params: {} }], {
-				baseUrl: "",
+				origin: "http://localhost",
 				codecs,
 				fetch,
 			}),

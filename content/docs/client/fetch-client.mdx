@@ -11,11 +11,17 @@ import { createClient } from "@rest-rpc/core";
 import { api } from "./client-contract";
 
 const client = createClient(api, {
-	baseUrl: "https://api.example.com",
+	origin: "https://api.example.com",
 });
 ```
 
-The client has the same route tree shape as the contract.
+The client has the same route tree shape as the contract. In a browser app
+served from the same origin as the routes, no options are needed:
+
+```ts
+const client = createClient(api); // routes at the origin's root
+const client = createClient(api, { mountPath: "/api" }); // routes under /api
+```
 
 ## Call Routes
 
@@ -137,7 +143,7 @@ export const routes = { todos: { get } };
 import { createClient } from "@rest-rpc/core";
 import type { routes } from "./server";
 declare const api: typeof routes;
-const client = createClient(api, { baseUrl: "http://localhost:3000" });
+const client = createClient(api, { origin: "http://localhost:3000" });
 // ---cut-end---
 import { RouteError } from "@rest-rpc/core";
 
@@ -176,7 +182,7 @@ export const routes = { todos: { get } };
 import { createClient } from "@rest-rpc/core";
 import type { routes } from "./server";
 declare const api: typeof routes;
-const client = createClient(api, { baseUrl: "http://localhost:3000" });
+const client = createClient(api, { origin: "http://localhost:3000" });
 // ---cut-end---
 import { isDefinedError, safe } from "@rest-rpc/core";
 
@@ -275,7 +281,7 @@ async function connect() {
 
 ```ts
 const client = createClient(api, {
-	baseUrl: "https://api.example.com",
+	origin: "https://api.example.com",
 	timeoutMs: 10_000,
 	fetchOptions: {
 		credentials: "include",
@@ -285,14 +291,30 @@ const client = createClient(api, {
 
 <TypeTable
 	type={{
-		baseUrl: {
+		origin: {
 			type: "string",
-			required: true,
-			description: "Base URL used to build route requests.",
+			description:
+				"The server's origin, such as `https://api.example.com`, without a path. Browsers default to the page's origin. Required outside browsers.",
+		},
+		mountPath: {
+			type: "AbsolutePath",
+			description:
+				"The path the routes are served under, such as `/api`, the same as the server's `mountPath`.",
 		},
 		fetch: {
-			type: "FetchLike",
-			description: "Custom fetch-compatible function used to send requests.",
+			type: "(request: Request) => Promise<Response>",
+			description:
+				"Sends each request. Defaults to the global `fetch`. See Custom Fetch.",
+		},
+		interceptors: {
+			type: "readonly ClientInterceptor[]",
+			description:
+				"Functions around each HTTP exchange, the first outermost. See Interceptors.",
+		},
+		errorFormat: {
+			type: "ErrorFormat",
+			description:
+				"How error responses are read, the same as the server's. JSON `{ code, message, data? }` by default. See Error Format.",
 		},
 		fetchOptions: {
 			type: 'Omit<FetchOptions, "signal" | "additionalHeaders">',
@@ -338,7 +360,7 @@ can change during the lifetime of the client, such as an access token.
 
 ```ts
 const client = createClient(api, {
-	baseUrl: "https://api.example.com",
+	origin: "https://api.example.com",
 	globalHeaders: {
 		authorization: () => `Bearer ${readToken()}`,
 		"x-client-version": "2026-09",
@@ -349,22 +371,57 @@ const client = createClient(api, {
 A global header with a guaranteed value makes a matching defined route header
 optional in client calls. A provider that can return `undefined` does not.
 
-## Custom Fetch
+## Interceptors
 
-If you need to wrap the fetch client with custom logic, pass a `fetch` function.
+An interceptor wraps each HTTP exchange, for logging, retries, or refreshing
+credentials. Create one with `clientInterceptor()`, which types the function
+and returns it unchanged:
 
 ```ts
-const client = createClient(api, {
-	baseUrl: "https://api.example.com",
-	fetch: async (url, init) => {
-		const startedAt = performance.now();
+import { clientInterceptor, createClient } from "@rest-rpc/core";
 
-		try {
-			return await fetch(url, init);
-		} finally {
-			console.log("API request took", performance.now() - startedAt);
-		}
-	},
+const refreshOn401 = clientInterceptor(async ({ request, next, route }) => {
+	// A request body can be read once, so it is cloned before a retry.
+	const response = await next(request.clone());
+	if (response.status !== 401 || route.meta?.access === "public") {
+		return response;
+	}
+	await refreshToken();
+	request.headers.set("authorization", `Bearer ${readToken()}`);
+	return next(request);
+});
+
+const client = createClient(api, {
+	origin: "https://api.example.com",
+	interceptors: [logging, refreshOn401],
+});
+```
+
+- `request` is a Fetch `Request` with the call's signal, which carries
+  `timeoutMs` and the caller's abort.
+- `next()` sends the request, and `next(request)` sends another one, through
+  the later interceptors to `fetch`. It may be called more than once.
+- `route` is the called route's definition, including its
+  [`meta`](/docs/middleware#metadata), so per-route behavior needs no URL
+  parsing.
+- Interceptors run in order, the first outermost, before the response is
+  decoded, so they receive error responses too.
+
+## Custom Fetch
+
+`fetch` sends each request. It receives a Fetch `Request`, the one the last
+[interceptor](#interceptors) sends, and defaults to the global `fetch`. For
+logic around each request, prefer interceptors.
+
+Any function that takes a `Request` works, so a Fetch app can serve the client
+in the same process, such as in tests:
+
+```ts
+import { app } from "./server";
+
+const client = createClient(api, {
+	origin: "http://localhost",
+	fetch: app.fetch,
 });
 ```
 
@@ -422,7 +479,7 @@ headers, and stream event data:
 
 ```ts
 const client = createClient(api, {
-	baseUrl: "https://api.example.com",
+	origin: "https://api.example.com",
 	validateResponses: true,
 });
 ```
@@ -474,7 +531,7 @@ export const routes = { todos: { update, get, events } };
 import { createClient } from "@rest-rpc/core";
 import type { routes } from "./server";
 declare const api: typeof routes;
-const client = createClient(api, { baseUrl: "http://localhost:3000" });
+const client = createClient(api, { origin: "http://localhost:3000" });
 // ---cut-end---
 import type {
 	InferClientError,

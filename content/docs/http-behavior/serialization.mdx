@@ -152,7 +152,7 @@ const binaryCodec = bodyCodec("application/octet-stream", {
 });
 
 const client = createClient(contract, {
-	baseUrl: "https://api.example.com",
+	origin: "https://api.example.com",
 	bodyCodecs: [binaryCodec],
 });
 ```

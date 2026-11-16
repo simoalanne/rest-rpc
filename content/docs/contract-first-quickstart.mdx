@@ -93,7 +93,7 @@ Import the shared contract directly. No contract extraction step is needed.
 import { createClient, isDefinedError, safe } from "@rest-rpc/core";
 import { api } from "./contract";
 
-const client = createClient(api, { baseUrl: "http://localhost:3000" });
+const client = createClient(api, { origin: "http://localhost:3000" });
 
 const created = await client.todos.create({ body: { title: "Write docs" } });
 const result = await safe(

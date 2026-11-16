@@ -11,7 +11,7 @@ describe("safe types", () => {
 			.get("/")
 			.response(type<string>())
 			.error("GONE", { status: 410 });
-		const client = createClient(definition, { baseUrl: "" });
+		const client = createClient(definition);
 		const result = await safe(client());
 		if (result.error) {
 			expectTypeOf(result.error).toEqualTypeOf<
@@ -31,7 +31,7 @@ describe("safe types", () => {
 		const definition = route
 			.get("/")
 			.error("GONE", { status: 410, data: type<{ id: string }>() });
-		const client = createClient(definition, { baseUrl: "" });
+		const client = createClient(definition);
 		const { error } = await safe(client());
 		if (isDefinedError(error)) {
 			expectTypeOf(error).toEqualTypeOf<

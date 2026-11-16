@@ -103,7 +103,7 @@ bundler setups.
 import { createClient, isDefinedError, safe } from "@rest-rpc/core";
 import { getApi } from "./client-contract" with { type: "macro" };
 
-const client = createClient(getApi(), { baseUrl: "http://localhost:3000" });
+const client = createClient(getApi(), { origin: "http://localhost:3000" });
 
 const created = await client.todos.create({ body: { title: "Write docs" } });
 const result = await safe(

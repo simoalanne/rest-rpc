@@ -14,7 +14,10 @@ import {
 } from "../routing/match.ts";
 import { compileNodeRoutes } from "./createRouteHandlers.ts";
 import { readRequestTarget } from "./request.ts";
-import { writeNodeError } from "./response.ts";
+import { writeNodeResponse } from "./response.ts";
+import { createAppErrorSerializer } from "../pipeline/dispatch.ts";
+import type { ErrorResponse } from "../pipeline/resolveRouteError.ts";
+import { intercept, type NodeInterceptor } from "./interceptor.ts";
 
 /**
  * The `context` option of the Node {@link createApp}: the initial context, or
@@ -47,6 +50,11 @@ export type CreateNodeAppOptions<TContext extends object = EmptyObject> =
 			request: IncomingMessage,
 			response: ServerResponse,
 		) => void | Promise<void>;
+		/**
+		 * Functions around everything the app does for a request, the first
+		 * outermost. They run before routing.
+		 */
+		interceptors?: readonly NodeInterceptor[];
 		/**
 		 * The initial context the routes require for each request, or a function
 		 * that returns it for the request. Required when the routes require
@@ -99,7 +107,13 @@ export function createApp(
 	implementations: RuntimeImplementationTree,
 	options?: CreateNodeAppOptions<object>,
 ): NodeApp {
-	const { mountPath, context, notFound, ...routeOptions } = options ?? {};
+	const { mountPath, context, notFound, interceptors, ...routeOptions } =
+		options ?? {};
+	const serializeError = createAppErrorSerializer(routeOptions);
+	const writeNodeError = async (
+		response: ServerResponse,
+		error: ErrorResponse,
+	) => writeNodeResponse(response, await serializeError(error));
 	const matchRoute = createRouteMatcher(
 		compileNodeRoutes(implementations, routeOptions),
 	);
@@ -113,6 +127,21 @@ export function createApp(
 		}
 	};
 
+	const serve = async (
+		request: IncomingMessage,
+		response: ServerResponse,
+		match: ReturnType<typeof matchRoute>,
+	) => {
+		if (!match) return respondWithNotFound(request, response);
+		const { route, params } = match;
+		// Static routes read no context, so the context function is not called.
+		const values =
+			route.isStatic || typeof context !== "function"
+				? context
+				: await context(request);
+		await route.handle(request, response, { context: values, params });
+	};
+
 	return async (request, response) => {
 		try {
 			const match = matchRoute(
@@ -120,14 +149,17 @@ export function createApp(
 				readRequestTarget(request),
 				mountPath,
 			);
-			if (!match) return await respondWithNotFound(request, response);
-			const { route, params } = match;
-			// Static routes read no context, so the context function is not called.
-			const values =
-				route.isStatic || typeof context !== "function"
-					? context
-					: await context(request);
-			await route.handle(request, response, { context: values, params });
+			// Static routes are sent as they are. Errors an interceptor throws
+			// are sent as internal errors too.
+			await (interceptors?.length && !match?.route.isStatic
+				? intercept(
+						interceptors,
+						request,
+						response,
+						match?.route.definition,
+						() => serve(request, response, match),
+					)
+				: serve(request, response, match));
 		} catch (error) {
 			const internal = new InternalServerError({ cause: error });
 			observeError(routeOptions.onError, internal, request);

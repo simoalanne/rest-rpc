@@ -27,7 +27,7 @@ const get = route
 const empty = route.get("/health").response({ status: 204 });
 const events = route.get("/events").response(sse(type<{ value: number }>()));
 const utils = createTanstackQueryUtils(
-	createClient({ get, empty, events }, { baseUrl: "https://example.test" }),
+	createClient({ get, empty, events }, { origin: "https://example.test" }),
 );
 
 describe("createTanstackQueryUtils types", () => {
@@ -61,7 +61,6 @@ describe("createTanstackQueryUtils types", () => {
 			.response(type<string>());
 		const securedUtils = createTanstackQueryUtils(
 			createClient(secured, {
-				baseUrl: "",
 				globalHeaders: { token: async () => "token" },
 			}),
 		);
@@ -78,7 +77,6 @@ describe("createTanstackQueryUtils types", () => {
 		securedUtils.queryOptions();
 		const uncertainUtils = createTanstackQueryUtils(
 			createClient(secured, {
-				baseUrl: "",
 				globalHeaders: { token: (): string | undefined => undefined },
 			}),
 		);

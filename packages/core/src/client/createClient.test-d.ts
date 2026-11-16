@@ -12,9 +12,7 @@ import type {
 
 describe("createClient types", () => {
 	it("allows empty requests and optional or guaranteed segmented headers", () => {
-		const empty = createClient(route.get("/").response({ status: 204 }), {
-			baseUrl: "",
-		});
+		const empty = createClient(route.get("/").response({ status: 204 }));
 		empty();
 		empty(undefined, {});
 		const contract = route
@@ -22,15 +20,12 @@ describe("createClient types", () => {
 			.headers(type<{ token: string; optional?: string }>())
 			.response({ status: 204 });
 		const literal = createClient(contract, {
-			baseUrl: "",
 			globalHeaders: { token: "value" },
 		});
 		const asyncProvider = createClient(contract, {
-			baseUrl: "",
 			globalHeaders: { token: async () => "value" },
 		});
 		const optionalProvider = createClient(contract, {
-			baseUrl: "",
 			globalHeaders: { token: (): string | undefined => undefined },
 		});
 		expectTypeOf(literal)
@@ -52,7 +47,6 @@ describe("createClient types", () => {
 				.get("/")
 				.headers(type<{ token?: string }>())
 				.response({ status: 204 }),
-			{ baseUrl: "" },
 		);
 		optional({});
 	});
@@ -63,7 +57,7 @@ describe("createClient types", () => {
 				.body(type((value: string) => Number(value)))
 				.response(type((value: string) => value.length)),
 		};
-		const client = createClient(contract, { baseUrl: "" });
+		const client = createClient(contract);
 		expectTypeOf(client.length).parameter(0).toEqualTypeOf<{
 			body: string;
 		}>();
@@ -83,7 +77,6 @@ describe("createClient types", () => {
 				.get()
 				.response(type<{ name: string }>())
 				.response(type<{ id: string }>(), { status: 201 }),
-			{ baseUrl: "" },
 		);
 		const response = await client();
 		if (response.status === 200)
@@ -99,10 +92,7 @@ describe("createClient types", () => {
 			.response(type<{ name: string }>());
 		const events = route.get("/events").response(sse(type<number>()));
 		const globalHeaders = { authorization: "token" };
-		const client = createClient(
-			{ get, events },
-			{ baseUrl: "", globalHeaders },
-		);
+		const client = createClient({ get, events }, { globalHeaders });
 		expectTypeOf<InferClientRequest<typeof client.get>>().toEqualTypeOf<
 			InferClientRequest<typeof get, typeof globalHeaders>
 		>();

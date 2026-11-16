@@ -68,6 +68,7 @@ type CreateAppOptions = {
 	notFound?: (
 		request: Request,
 	) => Promise<Response> | Response | Promise<void> | void;
+	interceptors?: readonly Interceptor[];
 };
 ```
 
@@ -99,8 +100,90 @@ type CreateAppOptions = {
   keep the default response, the
   [`NOT_FOUND`](/docs/http-behavior/errors#built-in-errors) error, and only run
   side effects.
+- `interceptors`: functions around everything the app does for a request. See
+  [Interceptors](#interceptors).
 
 Errors a route does not send as an error response, such as errors thrown by
 handlers, are sent as
 [`INTERNAL_SERVER_ERROR`](/docs/http-behavior/errors#built-in-errors) responses
 and passed to [`onError`](/docs/server/overview#error-handling).
+
+## Interceptors
+
+An interceptor wraps everything the app does for a request, for work that
+has to happen before routing or on every response, such as API key checks,
+request IDs, logging, or CORS. Create one with `interceptor()`, which types the
+function and returns it unchanged:
+
+```ts
+import { createApp, interceptor } from "@rest-rpc/server";
+
+const apiKey = interceptor(({ request, next }) =>
+	request.headers.get("x-api-key") === API_KEY
+		? next()
+		: new Response("Forbidden", { status: 403 }),
+);
+
+const timing = interceptor(async ({ next, route }) => {
+	const started = performance.now();
+	const response = await next();
+	// The route path, such as `/todos/:id`, keeps metric labels bounded.
+	metrics.record(route?.path ?? "unmatched", performance.now() - started);
+	return response;
+});
+
+export default createApp(routes, { interceptors: [timing, apiKey] });
+```
+
+- Interceptors run in order, the first outermost, and the app's own handling
+  is innermost.
+- They receive every request, including ones that match no route and
+  `OPTIONS` preflights, and the app's `routes` for Bun run them too.
+- [Static routes](/docs/route-builder#static-responses) skip them, since their
+  response is prebuilt. Complete a route with `.handler()` instead when an
+  interceptor must see it, such as for CORS headers.
+- `route` is the matched route's definition, with its path and
+  [`meta`](/docs/middleware#metadata), or `undefined` when no route matches.
+- `next()` continues with the request, and `next(request)` with another one,
+  which is routed again. It may be called more than once, such as to retry,
+  and resolves with the final response, error responses and `notFound`
+  included.
+- An error an interceptor throws is sent as an
+  [`INTERNAL_SERVER_ERROR`](/docs/http-behavior/errors#built-in-errors)
+  response and passed to `onError`.
+
+Interceptors are about HTTP, not routes, so they are untyped. Per-route logic
+with typed context belongs in [middleware](/docs/middleware), which runs after
+request validation.
+
+### CORS
+
+CORS headers have to be on every response, error responses included, or the
+browser hides the response from the client, and preflights have to be
+answered before routing. One interceptor does both:
+
+```ts
+const cors = interceptor(async ({ request, next }) => {
+	const headers = {
+		"access-control-allow-origin": "https://app.example.com",
+		vary: "Origin",
+	};
+	if (request.method === "OPTIONS") {
+		return new Response(null, {
+			status: 204,
+			headers: {
+				...headers,
+				"access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE",
+				"access-control-allow-headers": "content-type, authorization",
+			},
+		});
+	}
+	const response = await next();
+	// A returned `Response` may have immutable headers, so it is copied.
+	const copy = new Response(response.body, response);
+	for (const [name, value] of Object.entries(headers)) {
+		copy.headers.set(name, value);
+	}
+	return copy;
+});
+```

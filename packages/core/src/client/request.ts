@@ -5,9 +5,10 @@ import {
 	type SerializedBody,
 } from "../codecs/index.ts";
 import type { RouteDefinition } from "../contract/routeDefinition.ts";
-import { replacePathParams } from "../contract/path.ts";
+import { joinPrefix, replacePathParams } from "../contract/path.ts";
 import type { ClientTypeSource } from "./response.ts";
-import type { HttpMethod } from "../contract/routeDefinition.ts";
+import type { AbsolutePath, HttpMethod } from "../contract/routeDefinition.ts";
+import { intercept, type ClientInterceptor } from "./interceptor.ts";
 import type {
 	ClientRequestForDefinition,
 	RequestScalar,
@@ -29,14 +30,12 @@ export type ApiClientFetchOptions = Omit<
 >;
 
 /**
- * The fetch-compatible function shape used by the core client.
+ * The function the client sends each request with: `fetch`, or any function
+ * that takes a Fetch `Request`, such as a Fetch app's `fetch`.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#custom-fetch}
  */
-export type FetchLike = (
-	input: string | URL | Request,
-	init?: RequestInit,
-) => Promise<Response>;
+export type FetchLike = (request: Request) => Promise<Response>;
 
 /** A static client header or a provider evaluated for each request. */
 export type ClientHeaderValue =
@@ -206,12 +205,18 @@ const serializeQuery = (query: unknown) => {
 };
 
 export const constructBaseRequest = (
-	baseUrl: string,
+	origin: string | undefined,
+	mountPath: AbsolutePath | undefined,
 	route: ClientRequestRoute,
 	args: GroupedRequestInput | undefined,
 ) => {
 	const { body, query, params, headers } = args ?? {};
-	const url = `${baseUrl}${serializeParams(route, params)}${serializeQuery(query)}`;
+	// The mount path alone serves the `/` route, as on the server.
+	const path = joinPrefix(
+		mountPath,
+		serializeParams(route, params) as AbsolutePath,
+	);
+	const url = `${origin ?? ""}${path}${serializeQuery(query)}`;
 	const requestHeaders = normalizeHeaders(stringifyHeaders(headers));
 	return {
 		url,
@@ -240,11 +245,14 @@ const toRequestBody = (
 };
 
 export type ExecuteRequestOptions = {
-	baseUrl: string;
+	origin?: string;
+	/** Without a trailing slash. */
+	mountPath?: AbsolutePath;
 	codecs: BodyCodecRegistry;
 	fetch?: FetchLike;
 	fetchOptions?: ApiClientFetchOptions;
 	globalHeaders?: ClientHeaders;
+	interceptors?: readonly ClientInterceptor[];
 	timeoutMs?: number;
 };
 
@@ -262,6 +270,23 @@ const resolveHeaders = async (
 	return Object.fromEntries(entries.filter((entry) => entry !== undefined));
 };
 
+// A stream body needs half duplex to be part of a `Request`. Only browsers
+// resolve a URL without an origin, against the page.
+const toRequest = (url: string, init: RequestInit, origin?: string) => {
+	if (init.body instanceof ReadableStream) {
+		(init as { duplex?: "half" }).duplex = "half";
+	}
+	try {
+		return new Request(url, init);
+	} catch (error) {
+		if (origin !== undefined) throw error;
+		throw new TypeError(
+			"The client `origin` option is required outside browsers.",
+			{ cause: error },
+		);
+	}
+};
+
 export const executeRequest = async (
 	route: ClientRequestRoute,
 	args: readonly unknown[],
@@ -274,7 +299,12 @@ export const executeRequest = async (
 		body,
 		contentType,
 		headers: requestHeaders,
-	} = constructBaseRequest(options.baseUrl, route, requestArgs);
+	} = constructBaseRequest(
+		options.origin,
+		options.mountPath,
+		route,
+		requestArgs,
+	);
 
 	const serialized =
 		body !== undefined
@@ -321,9 +351,11 @@ export const executeRequest = async (
 			headers,
 			signal: signalState?.signal ?? fetchOptions?.signal,
 		};
-		const fetchImpl =
-			options.fetch ?? ((input, init) => globalThis.fetch(input, init));
-		return await fetchImpl(url, init);
+		const send = options.fetch ?? ((request) => globalThis.fetch(request));
+		const request = toRequest(url, init, options.origin);
+		return await (options.interceptors?.length
+			? intercept(options.interceptors, route as RouteDefinition, request, send)
+			: send(request));
 	} finally {
 		signalState?.cleanup();
 	}

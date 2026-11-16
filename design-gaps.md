@@ -5,10 +5,6 @@ done, so the document is empty when nothing is left.
 
 - Cases 1, 2 and 4 are client body types and stream chunks, which change
   existing types. Form bodies as objects changes how forms decode.
-- Case 6, the error format, needs a new feature, but covers a gap with no
-  realistic escape hatch.
-- Case 13 is interceptors on the server and the client: one primitive that
-  replaces users' own wrappers, CORS included.
 - Case 14 is wildcard path params, which may not be worth doing.
 - [Docs to write](#docs-to-write) lists decisions the docs still have to
   explain.
@@ -35,8 +31,6 @@ The API can be considered stable once everything left only adds to it.
   optional, since it's sent as multipart anyway, and a `content-type` in
   `globalHeaders` or `additionalHeaders` could select the codec too. Decide
   together with sending typed objects as multipart.
-- 6: the error format option.
-- 13: the interceptors.
 - 14: wildcard path params.
 
 ## Form bodies as objects
@@ -376,213 +370,6 @@ That works on the wire, but the client type is still wrong: an
 - **Client type:** follows case 2, so it's a `Blob`. It could become a
   `ReadableStream<Uint8Array>` if the client gets a streaming body mode later.
 
-## 6. Error response format
-
-Every error rest-rpc sends is `application/json` with
-`{ code, message, data? }`. Nothing can change that format: not a codec, not
-`onError` (which only observes), and not route options. A route can't send RFC
-9457 `application/problem+json`, and it can't send a plain-text error either.
-
-```ts
-const getTodo = route
-	.get("/todos/:id")
-	.error("TODO_NOT_FOUND", { status: 404, data: z.object({ id: z.string() }) })
-	.handler(({ params, errors }) => {
-		const todo = db.todos.find(params.id);
-		if (!todo) throw errors.TODO_NOT_FOUND({ data: { id: params.id } });
-		return todo;
-	});
-```
-
-```http
-HTTP/1.1 404 Not Found
-Content-Type: application/json
-
-{ "code": "TODO_NOT_FOUND", "message": "TODO_NOT_FOUND", "data": { "id": "42" } }
-```
-
-This is the only format on offer, even when the API has to follow a published
-error format.
-
-On the client, an error response without a string `code` in its body rejects
-with a plain `Error("Request failed with status 404.")`. That's how a
-problem+json or plain-text error from a proxy or another server arrives. This
-behaviour is reasonable on its own: an unknown error format isn't mistaken for a
-typed error. One edge exists, though. A problem+json body with a `code`
-extension member would be read as a `RouteError`, because `+json` is decoded as
-JSON and the client only looks for `code`.
-
-### Escape hatch
-
-None that's realistic:
-
-- **Rewrite the responses:** wrap `createApp`'s `fetch` (or the Node handler) to
-  parse every JSON error response and rewrite it. On Node, that means
-  intercepting `ServerResponse` writes. It works, but every response pays for
-  it.
-- **The cost on the client:** a rewritten error no longer has `code` in the
-  shape the client expects, so typed errors become plain `Error`s. You'd have to
-  rewrite responses back on the client too, with a custom `fetch`.
-- **Use framework integration instead of `createApp`:** this doesn't help.
-  Route handlers write `RouteError`s themselves, and only other errors reach the
-  framework.
-
-`createApp`'s `notFound` can already send its own response. That's the only
-error response whose format can be chosen today.
-
-### Fix sketch
-
-A two-way error format, shared by the server and the client the same way codecs
-are, with an optional OpenAPI schema:
-
-```ts
-const problemJson = errorFormat({
-	contentType: "application/problem+json",
-	// server: a RouteError to a body
-	serialize: ({ code, status, message, data }) => ({
-		type: `https://example.com/errors/${code}`,
-		title: message,
-		status,
-		code,
-		...data,
-	}),
-	// client: a body back to the fields of a RouteError, or undefined when the
-	// body isn't in this format, which rejects with a plain Error as today
-	deserialize: (body) =>
-		isProblem(body)
-			? { code: body.code, message: body.title, data: omitProblemFields(body) }
-			: undefined,
-	// OpenAPI: the schema of error responses, given a definition's data schema
-	openAPI: (dataSchema) => problemSchema(dataSchema),
-});
-
-createApp(routes, { errorFormat: problemJson });
-createClient(api, { baseUrl, errorFormat: problemJson });
-```
-
-- Route types don't change. A definition's code, status and `data` stay typed,
-  and only the wire format changes. The format is one stated, documented rule,
-  so you can still tell from the API how to read its errors.
-- Lossy formats work too. A `text/plain` format could send only the message, and
-  its `deserialize` could map the status back to a code. That works when each
-  status is defined by at most one error code on a route, and otherwise the
-  error is untyped.
-- Built-in errors such as `REQUEST_VALIDATION_FAILED` go through the same
-  format, so the whole API is consistent.
-
-## 13. Interceptors
-
-### Server
-
-Cross-cutting work that has to happen before routing, or to every response,
-including errors, has no place in rest-rpc today:
-
-- cheap checks such as an API key, an allowed IP or a maintenance mode;
-- request IDs, logging and timing across every route;
-- headers on every response, such as CORS or security headers. CORS also has
-  to answer `OPTIONS` preflights, and its headers have to be on error
-  responses, or the browser hides the error from the client.
-
-Route middleware can't do these: it runs after request validation by design,
-and it doesn't see error responses, `notFound`, or preflights. So users wrap
-`createApp` themselves. On Bun that also means wrapping every native route,
-because its router calls the handlers in `routes` directly, and rebuilding
-static routes, which are `Response` values.
-
-**Fix sketch:** a list of interceptors on `createApp`, each wrapping everything
-rest-rpc does for a request, composed like middleware:
-
-```ts
-import { interceptor } from "@rest-rpc/server";
-
-const apiKey = interceptor(({ request, next }) =>
-	request.headers.get("x-api-key") === env.API_KEY
-		? next()
-		: new Response("Forbidden", { status: 403 }),
-);
-
-const timing = interceptor(async ({ next }) => {
-	const started = performance.now();
-	const response = await next();
-	response.headers.set(
-		"server-timing",
-		`app;dur=${performance.now() - started}`,
-	);
-	return response;
-});
-
-createApp(routes, { interceptors: [timing, apiKey, cors] });
-```
-
-- **Shape:** `interceptor()` types the function, like `bodyCodec()` and
-  `sseFormat()`, and returns it unchanged. It takes one object argument, like
-  handlers and `.use()`, so a field can be added later without changing the
-  signature. `next()` continues with the
-  same request, and `next(request)` with another one.
-- **Order:** onion-style, like `.use()`: the first interceptor wraps every one
-  after it, and rest-rpc's own handling is innermost. Each concern is its own
-  function, so apps and libraries can ship them and combine them without
-  wrapping one in another.
-- **Reuse:** the runner can share the middleware composition. The difference is
-  that an interceptor may call `next` more than once, to retry, which
-  middleware forbids.
-- It runs before routing, so it sees every request, including unmatched ones
-  and `OPTIONS`.
-- `next` returns the final response, including error responses and `notFound`.
-- `createApp` applies it to Bun's native `routes` too, so nothing has to be
-  wrapped per route.
-- CORS is then a docs example rather than its own option: one interceptor
-  answers preflights and adds the headers to every response.
-- It's untyped on purpose: it's about HTTP, not routes. Typed, per-route logic
-  stays in middleware.
-- Node `createApp` needs its own shape, probably `{ req, res, next }`, because
-  it writes to a `ServerResponse` instead of returning a `Response`. That's an
-  open question.
-
-### Client
-
-The client has the `fetch` option as its escape hatch, but replacing `fetch` is
-easy to get wrong:
-
-- `(input, init)` has to be passed on exactly as received, including `signal`,
-  which carries `timeoutMs` and the caller's abort.
-- Retrying a request with a body means rebuilding it, because a body can only be
-  read once.
-- Refreshing a token and replaying the request needs the same care, and has to
-  avoid loops.
-- It doesn't know which route is being called, so per-route logic has to parse
-  the URL back into a route.
-
-**Fix sketch:** the same list on `createClient`, with the route as context:
-
-```ts
-import { clientInterceptor } from "@rest-rpc/core";
-
-const refreshOn401 = clientInterceptor(async ({ request, next, route }) => {
-	const response = await next(request.clone());
-	if (response.status !== 401 || route.meta?.access === "public") {
-		return response;
-	}
-	await refreshToken();
-	request.headers.set("authorization", `Bearer ${readToken()}`);
-	return next(request);
-});
-
-createClient(api, { baseUrl, interceptors: [logging, refreshOn401] });
-```
-
-- `request` is a Fetch `Request`, so cloning and replaying it is standard and
-  safe.
-- `next` calls `fetch`, or the `fetch` option, with the signal handled.
-- `clientInterceptor()` has its own name, since `@rest-rpc/server` re-exports
-  core helpers and code may import from both.
-- `route` gives the route definition, including `meta`, so per-route
-  behaviour needs no URL parsing.
-- It runs before the response is decoded, so it sees error responses too.
-
-Both lists are the same primitive with the same scope: functions around the
-HTTP exchange, composed in order. Neither needs a plugin system.
-
 ## 14. Wildcard path params (maybe)
 
 Only `:name` segments are supported, so a route can't match the rest of a path.
@@ -629,8 +416,6 @@ the before-stable items are done.
   - Request bodies are read whole before they're decoded, multipart included.
     Streaming uploads are out of scope: a custom codec gets the raw body
     stream, and an upload route can live on the host framework.
-  - The error format stays `{ code, message, data? }` unless the option is
-    added.
 
 ### Decided against, with the reasons
 
@@ -652,8 +437,7 @@ the before-stable items are done.
 - **Middleware before request validation:** this is by design. If declaration
   order decided whether input is validated, as in tRPC or oRPC, that would be a
   bigger security footgun than the cheap work it would save. Cheap checks belong
-  outside rest-rpc, or in the server interceptor (case 13), which runs before
-  routing.
+  outside rest-rpc, or in a server interceptor, which runs before routing.
 
 ### Security boundaries
 
@@ -670,7 +454,7 @@ could list them:
   - TLS.
 - **Left to the app:**
   - authentication and authorization, in middleware or an interceptor;
-  - CORS, until interceptors land, and then as an interceptor;
+  - CORS, as an interceptor;
   - `Set-Cookie` attributes such as `HttpOnly`, `Secure` and `SameSite`, which
     `cookies` sends as written;
   - CSRF. A route decodes only the content types it declares, JSON by default,
@@ -693,12 +477,10 @@ could list them:
 
 ## Summary
 
-| Case                             | Today                                                     | Fix sketch                                                  | New concept |
-| -------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------- | ----------- |
-| 1. Native values in JSON         | Client typed `Date`, receives `string`                    | `Jsonify<T>` client bodies                                  | No          |
-| 2. Binary bodies                 | Client typed server's type, gets `Blob`                   | Client type from what the `content-type` header decodes to  | No          |
-| 4. Raw stream chunks             | Compiles, connection cut at runtime                       | Restrict handler stream chunks to `string \| Uint8Array`    | No          |
-| Form bodies as objects           | `URLSearchParams` and `FormData`, read by field name      | Objects under the query rules, converted in the form codecs | No          |
-| 6. Error response format         | Fixed JSON; rewrite responses on both ends                | Two-way `errorFormat` shared by server and client           | Yes         |
-| 13. Interceptors                 | Wrap `createApp` (and every Bun route) or replace `fetch` | An `interceptors` list on the app and the client            | Yes         |
-| 14. Wildcard path params (maybe) | Not supported                                             | `:path*` rest segment where routers support it              | Yes         |
+| Case                             | Today                                                | Fix sketch                                                  | New concept |
+| -------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------- | ----------- |
+| 1. Native values in JSON         | Client typed `Date`, receives `string`               | `Jsonify<T>` client bodies                                  | No          |
+| 2. Binary bodies                 | Client typed server's type, gets `Blob`              | Client type from what the `content-type` header decodes to  | No          |
+| 4. Raw stream chunks             | Compiles, connection cut at runtime                  | Restrict handler stream chunks to `string \| Uint8Array`    | No          |
+| Form bodies as objects           | `URLSearchParams` and `FormData`, read by field name | Objects under the query rules, converted in the form codecs | No          |
+| 14. Wildcard path params (maybe) | Not supported                                        | `:path*` rest segment where routers support it              | Yes         |

@@ -320,8 +320,8 @@ describe("route pipeline", () => {
 		};
 		const app = createApp(routes, { sse: { format: lines } });
 		const client = createClient(routes, {
-			baseUrl: "http://localhost",
-			fetch: (input, init) => app.fetch(new Request(input, init)),
+			origin: "http://localhost",
+			fetch: app.fetch,
 			sse: { format: lines },
 		});
 		const { body } = await client.events();

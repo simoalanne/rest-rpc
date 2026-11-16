@@ -65,14 +65,14 @@ describe("extractContract", () => {
 	});
 
 	it("creates a client that recognizes defined error codes", async () => {
-		const fetch = vi.fn(async () =>
+		const fetch = vi.fn(async (_request: Request) =>
 			Response.json(
 				{ code: "USER_NOT_FOUND", message: "Missing", data: { id: "1" } },
 				{ status: 404 },
 			),
 		);
 		const client = createClient(extractContract(routes), {
-			baseUrl: "https://example.test",
+			origin: "https://example.test",
 			fetch,
 		});
 		await expect(
@@ -82,16 +82,16 @@ describe("extractContract", () => {
 			status: 404,
 			data: { id: "1" },
 		});
-		expect(fetch).toHaveBeenCalledWith(
-			"https://example.test/users/1",
-			expect.objectContaining({ method: "GET" }),
-		);
+		expect(fetch.mock.calls[0]![0]).toMatchObject({
+			method: "GET",
+			url: "https://example.test/users/1",
+		});
 	});
 
 	it("creates a client that checks response statuses without schemas", async () => {
 		const respond = vi.fn(async () => Response.json({ name: 1 }));
 		const client = createClient(extractContract(routes), {
-			baseUrl: "https://example.test",
+			origin: "https://example.test",
 			fetch: respond,
 			validateResponses: true,
 		});

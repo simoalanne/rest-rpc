@@ -1,4 +1,9 @@
-import type { AbsolutePath, BodyCodec, RouteError } from "@rest-rpc/core";
+import type {
+	AbsolutePath,
+	BodyCodec,
+	ErrorFormat,
+	RouteError,
+} from "@rest-rpc/core";
 import type { EmptyObject } from "@rest-rpc/core/utils";
 import type { SseOptions } from "./sse.ts";
 
@@ -10,6 +15,13 @@ import type { SseOptions } from "./sse.ts";
  */
 export type CreateRouteHandlersOptions<TRequest = Request> = {
 	bodyCodecs?: readonly BodyCodec[];
+	/**
+	 * How error responses are sent, the same as the client's. Built-in errors
+	 * use it too. The body codec for its content type encodes the body.
+	 *
+	 * @default A JSON `{ code, message, data? }` body.
+	 */
+	errorFormat?: ErrorFormat;
 	/**
 	 * Observes every error sent as an error response, and `RouteError`s that
 	 * end a stream after its response started, such as stream item validation

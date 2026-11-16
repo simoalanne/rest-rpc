@@ -20,3 +20,8 @@ export {
 	type InferClientStreamData,
 } from "./response.ts";
 export { safe, type ClientPromise, type SafeResult } from "./safe.ts";
+export {
+	clientInterceptor,
+	type ClientInterceptor,
+	type InterceptedRoute,
+} from "./interceptor.ts";

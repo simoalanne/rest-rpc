@@ -11,6 +11,11 @@ import type { RouteErrorDefinition } from "../contract/routeError.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { getPathParamNames } from "../contract/path.ts";
 import { rawDescription } from "../contract/raw.ts";
+import {
+	defaultErrorFormat,
+	normalizeMediaType,
+	type ErrorFormat,
+} from "../codecs/index.ts";
 
 type OpenApiSchema = Record<string, unknown>;
 
@@ -70,6 +75,7 @@ export type OperationTransformContext = {
 
 type CreateOperationOptions = {
 	schemaConverter?: SchemaConverter;
+	errorFormat?: ErrorFormat;
 	transformOperation?: (context: OperationTransformContext) => OpenApiOperation;
 };
 
@@ -231,22 +237,21 @@ const createErrorBodySchema = (
 	code: string,
 	definition: RouteErrorDefinition,
 	converter: SchemaConverter | undefined,
-): OpenApiSchema => ({
-	type: "object",
-	properties: {
-		code: { const: code },
-		message: { type: "string" },
-		...(definition.data && {
-			data: converter?.(definition.data, "output") ?? {},
-		}),
-	},
-	required: definition.data ? ["code", "message", "data"] : ["code", "message"],
-});
+	format: ErrorFormat,
+): OpenApiSchema =>
+	format.openAPI?.({
+		code,
+		status: definition.status,
+		data: definition.data
+			? (converter?.(definition.data, "output") ?? {})
+			: undefined,
+	}) ?? {};
 
 // Errors sharing a status are documented as one response.
 const createErrorResponses = (
 	errors: Readonly<Record<string, RouteErrorDefinition>>,
 	converter: SchemaConverter | undefined,
+	format: ErrorFormat,
 ) => {
 	const byStatus = new Map<number, [string, RouteErrorDefinition][]>();
 	for (const [code, definition] of Object.entries(errors)) {
@@ -258,7 +263,7 @@ const createErrorResponses = (
 	const responses: Record<string, OpenApiResponse> = {};
 	for (const [status, group] of byStatus) {
 		const schemas = group.map(([code, definition]) =>
-			createErrorBodySchema(code, definition, converter),
+			createErrorBodySchema(code, definition, converter, format),
 		);
 		const headers = Object.assign(
 			{},
@@ -272,7 +277,7 @@ const createErrorResponses = (
 				.join("\n"),
 			...(Object.keys(headers).length > 0 ? { headers } : {}),
 			content: {
-				"application/json": {
+				[normalizeMediaType(format.contentType)]: {
 					schema: schemas.length === 1 ? schemas[0] : { oneOf: schemas },
 				},
 			},
@@ -283,10 +288,15 @@ const createErrorResponses = (
 
 const createResponses = (
 	route: RouteDefinition,
-	converter: SchemaConverter | undefined,
+	options: CreateOperationOptions,
 ) => {
+	const converter = options.schemaConverter;
 	const defined = Object.entries(route.responses);
-	const errors = createErrorResponses(route.errors ?? {}, converter);
+	const errors = createErrorResponses(
+		route.errors ?? {},
+		converter,
+		options.errorFormat ?? defaultErrorFormat,
+	);
 	// Responses inferred from a handler, or sent as the `Response` it returns,
 	// have no schema. `default` documents them without claiming a status, and
 	// keeps the required Responses Object non-empty.
@@ -327,7 +337,7 @@ export const createOperation = (
 		...extensions,
 		...(parameters.length > 0 ? { parameters } : {}),
 		...(requestBody ? { requestBody } : {}),
-		responses: createResponses(route, options.schemaConverter),
+		responses: createResponses(route, options),
 	};
 
 	return (
