@@ -1,39 +1,24 @@
 # Design gaps
 
-Places where the current API either can't express an ordinary route, gives the
-client a type that doesn't match what it receives, or doesn't follow the
-protocol it implements.
+Open design questions and follow-ups. An item is removed once it's decided and
+done, so the document is empty when nothing is left.
 
-- [Content types as headers](#content-types-as-headers) is implemented: content
-  types are no longer their own concept. It solves the old cases 3 (content type
-  parameters) and 5 (content types known only at runtime) by construction, and
-  cases 1, 2 and 4 build on it.
-- Cases 1, 2 and 4 are about body types. They're ordered by how many users are
-  likely to hit them.
-- Case 6, the error format, is lower value and needs a new feature, but it
-  covers a gap with no realistic escape hatch.
-- Cases 7 to 10 (server-sent events, redirects, raw responses and `HEAD`
-  requests) are done, or covered by returning a Fetch `Response`. Case 12, the
-  OpenAPI document, is documented as a best-effort conversion for now. Case
-  numbers are kept so references to the other cases stay valid.
-- Case 11 is CORS, which apps can't add cleanly today.
+- Cases 1, 2 and 4 are client body types and stream chunks, which change
+  existing types. Form bodies as objects changes how forms decode.
+- Case 6, the error format, needs a new feature, but covers a gap with no
+  realistic escape hatch.
 - Case 13 is interceptors on the server and the client: one primitive that
-  replaces users' own wrappers, and covers most of case 11.
+  replaces users' own wrappers, CORS included.
 - Case 14 is wildcard path params, which may not be worth doing.
-- The end lists what was considered and decided against, and the security
-  boundaries to document.
-- [Path to stable](#path-to-stable), below, sorts all of it into what has to
-  land before a stable release and what can be added later.
+- [Docs to write](#docs-to-write) lists decisions the docs still have to
+  explain.
 
 Each case shows realistic code as it works today, the best escape hatch
 available, and a sketch of a fix. The sketches are directions, not final API.
-The types and errors quoted below were checked against the current code.
 
 ## Path to stable
 
-The API can be considered stable once everything left only adds to it. Most
-cases here are additive. Only a few change existing types or behaviour, and
-those have to land, or be explicitly decided against, first.
+The API can be considered stable once everything left only adds to it.
 
 ### Before stable: changing these later would break users
 
@@ -41,6 +26,7 @@ those have to land, or be explicitly decided against, first.
 | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1 and 2: honest client body types | `Jsonify<T>` and `Blob` for binary narrow existing client types. Ship them with the opt-out, so apps whose codecs restore native types keep their types. |
 | 4: stream chunk types in handlers | Restricting the handler's return type to `string \| Uint8Array` chunks is a breaking type change.                                                        |
+| Form bodies as objects            | Form bodies decode to objects instead of `URLSearchParams` and `FormData`.                                                                               |
 
 ### After stable: additive
 
@@ -50,221 +36,10 @@ those have to land, or be explicitly decided against, first.
   `globalHeaders` or `additionalHeaders` could select the codec too. Decide
   together with sending typed objects as multipart.
 - 6: the error format option.
-- 11 and 13: CORS and the interceptors.
+- 13: the interceptors.
 - 14: wildcard path params.
 
-### Decided trade-offs to document, not change
-
-- JSON by default, with any other content type stated in a `content-type`
-  header. A content type is never inferred from a value, except where there's
-  nothing to choose: SSE for async iterables, raw for a returned `Response`,
-  and `multipart/form-data` for `FormData`, whose boundary only Fetch can
-  generate.
-- A route decodes only the request content types it declares.
-- One body schema per status. It can be a union, but a body type can't be
-  paired with a content type. Pairing can be added later without breaking
-  anything.
-- Interceptors are outside the typed contract. They can change anything about
-  the response, and the docs say what that means instead of restricting it.
-- Request validation runs before middleware.
-- No request body size limits.
-- Request bodies are read whole before they're decoded, multipart included.
-  Streaming uploads are out of scope: they'd make every common form harder to
-  handle. A custom codec gets the raw body stream, and an upload route can live
-  on the host framework.
-- The error format stays `{ code, message, data? }` unless the option is added.
-- The security boundaries listed at the end.
-
-### Docs to write once the "before stable" items are done
-
-- Rewrite the HTTP behaviour pages to explain the contract: how content types
-  are chosen, what the client receives compared with what the server sends,
-  and the pitfalls.
-- Explain the decided-against items, with the reasons.
-- Add the security boundaries section.
-
-## Content types as headers
-
-Today a content type is its own concept, in five places: the `contentType`
-option of `respond()`, the `contentType` handler argument, `contentType` in the
-client's input and result, and media-type-keyed records in `.body()` and
-`.response()`. Its gaps, such as parameters on declared types and types known
-only at runtime, would each make that system bigger to fix. Instead, a content
-type is only ever a `content-type` header, on both the request and the response.
-
-### The rule
-
-> A body is JSON unless a `content-type` header says otherwise. The header's
-> media type selects the codec, and the full value, parameters included, goes
-> to the codec. An async iterable is SSE, a returned `Response` is sent as it
-> is, and `FormData` is sent as `multipart/form-data` with the boundary Fetch
-> generates, ignoring any `content-type` header.
-
-The content type is never inferred from any other value. A `Blob` returned
-without a header is a type error, because it can't be sent as JSON (case 1).
-Inferring from values is a list that never ends: strings as `text/plain`, a
-`Blob` with its own type, then an empty `blob.type`, a string that's really
-HTML. One default, and an error that points to the header, is a rule that
-doesn't grow, and the header marks the places where a route does something other
-than JSON.
-
-That gives one mental model for the whole API:
-
-- **Request:** a typed `Request`, with params, query, headers and body.
-- **Response:** a typed `new Response(body, { status, headers })`.
-- **Codecs:** the one controlled place that decides how bodies go over the wire,
-  selected by the `content-type` header. They're registered by media type, as
-  today, and get the full header value.
-
-Libraries that focus on type safety, such as tRPC, oRPC, Hono RPC and Elysia,
-don't key schemas by media type either. They key responses by status, default
-to JSON, and use a header or a helper as the escape hatch. What this design
-gives up, typed pairing between several content types on one route, is the
-feature none of them built.
-
-### Responses
-
-```ts
-// Default: JSON
-route.get("/todos/:id").handler(({ params }) => db.todos.find(params.id));
-
-// Another type: set the header, parameters included.
-route.get("/todos/export").handler(({ respond }) =>
-	respond(toCsv(todos), {
-		headers: { "content-type": "text/csv; charset=utf-8" },
-	}),
-); // client body: string, from the literal header
-
-// A content type known only at runtime is just a string.
-route.get("/users/:id/avatar").handler(async ({ params, respond }) => {
-	const file = await storage.get(`avatars/${params.id}`);
-	return respond(file, { headers: { "content-type": file.type } });
-}); // client body: Blob
-
-route.get("/file").handler(() => blob); // type error: set a content-type header
-
-// Declared: the content type is part of the headers schema. With one value, a
-// schema default sets it, so the handler never writes it.
-route
-	.get("/todos/export")
-	.response(z.string(), {
-		headers: z.object({
-			"content-type": z.literal("text/csv").default("text/csv"),
-		}),
-	})
-	.handler(() => toCsv(todos)); // sent as text/csv. client body: string
-
-// Patterns come from the schema library, not from rest-rpc.
-route.get("/users/:id/avatar").response(z.instanceof(Blob), {
-	headers: z.object({
-		"content-type": z.templateLiteral(["image/", z.string()]),
-	}),
-});
-
-// SSE: a stream is a body shape, not a content type, so it keeps its marker.
-route.get("/todos/activity").response(sse(change));
-```
-
-- Response headers are validated as the handler wrote them, and the codec is
-  selected from the validated headers, which are also the ones sent. A schema
-  default fills a missing `content-type`. Only if it's still missing after
-  validation does rest-rpc fall back to JSON. A schema that requires a
-  `content-type` without a default makes the handler write it, and the types
-  say so.
-- The value is sent and received as written, such as `text/csv; charset=utf-8`
-  with `z.string().startsWith("text/csv")`. The server writes it itself, so
-  there's nothing to normalize.
-- The client reads it as `res.headers["content-type"]`, which replaces
-  `res.contentType`.
-
-### Requests
-
-```ts
-// JSON, as today
-route.post("/todos").body(todoInput);
-
-// Another type is declared the ordinary way, in the headers.
-route
-	.post("/todos/import")
-	.headers(z.object({ "content-type": z.literal("text/csv") }))
-	.body(z.string());
-
-await client.todos.create({ body: { title: "Write docs" } }); // JSON
-await client.todos.import({
-	headers: { "content-type": "text/csv" },
-	body: csv,
-});
-await client.files.upload({ body: formData }); // multipart, boundary from fetch
-```
-
-- **A route decodes only the content types it declares.** The server validates
-  the headers before it decodes the body, and selects the codec from the
-  validated `content-type`. Without one, the body must be JSON, and any other
-  content type is answered with `415`. A schema checks a value's shape, not the
-  format it was sent in, so a handler would otherwise receive a value from a
-  decoder its author never chose, such as a form's strings where JSON would have
-  numbers. Today the body is decoded before the request is validated, so this
-  changes the order.
-- An object schema that doesn't declare `content-type` strips it, so the route
-  is JSON only. Unchecked and loose headers schemas let every header through,
-  which is the user's choice, as with any other header.
-- **Schemas see the normalized media type**, lowercase and without parameters,
-  so `z.literal("text/csv")` matches senders that add a charset, and
-  `z.literal("multipart/form-data")` matches despite the `boundary`. The codec
-  gets the full header value. It's the one header a schema sees in a different
-  form than it arrived, which needs a line in the docs.
-- **The client call writes the content type**, the same literal the schema
-  declares. The call site is where the request is built, so that's where a body
-  that isn't JSON should be visible. A schema default can't do it for requests,
-  because the client doesn't run the route's schemas: an extracted contract
-  drops them. The codec is chosen from the call's typed `headers`, so a
-  `content-type` in `additionalHeaders` or `globalHeaders` doesn't select one,
-  and the server would answer it with `415` anyway.
-- **A `FormData` body** is always sent as `multipart/form-data`, and any
-  `content-type` header is ignored. The boundary has to come from Fetch, so a
-  header written by hand would only break it. The route still declares
-  `multipart/form-data` to accept it.
-- **OpenAPI:** content keys come from the `const` or `enum` of the converted
-  headers schema, and `content-type` is left out of the documented header
-  parameters, since OpenAPI ignores it there. Without a readable value, the
-  content key is `*/*`.
-
-### Several content types on one route
-
-One schema per status, which can be a union. The body and the header are each
-validated, and OpenAPI lists every content type, but they aren't paired:
-
-```ts
-route
-	.get("/todos")
-	.headers(z.object({ accept: z.string().optional() }))
-	.response(z.union([z.array(todo), z.string()]), {
-		headers: z.object({
-			"content-type": z.enum(["application/json", "text/csv"]),
-		}),
-	})
-	.handler(({ headers, respond }) =>
-		headers.accept === "text/csv"
-			? respond(toCsv(todos), { headers: { "content-type": "text/csv" } })
-			: respond(todos, { headers: { "content-type": "application/json" } }),
-	);
-```
-
-- The schema doesn't stop `toCsv(todos)` from being sent with
-  `application/json`. The `respond()` call does, as long as the JSON-safe check
-  from case 1 runs per call.
-- The client can't narrow `body` by checking `res.headers["content-type"]`,
-  because TypeScript doesn't narrow a union by a nested property. It narrows by
-  the value instead, or casts. Case 2 describes the client types of such
-  unions.
-- The same applies to request bodies: a union body, and a header check in the
-  handler.
-
-Pairing could come back later as an additive form, such as several `.response()`
-calls for one status told apart by a literal `content-type`. Routes with a
-single schema wouldn't change.
-
-### Form bodies as objects
+## Form bodies as objects
 
 Today `application/x-www-form-urlencoded` decodes to `URLSearchParams` and
 `multipart/form-data` to `FormData`. Both are values that schemas can't
@@ -294,11 +69,7 @@ the schema describes the form:
 ```ts
 route
 	.post("/todos/:id/attachments")
-	.headers(
-		z.object({
-			"content-type": z.string().startsWith("multipart/form-data"),
-		}),
-	)
+	.headers(z.object({ "content-type": z.literal("multipart/form-data") }))
 	.body(
 		z.object({
 			title: z.string(),
@@ -341,14 +112,13 @@ await client.todos.attach({
 - **A `FormData` instance** is what a React form gives you. Converting it to an
   object and casting, or building it back from a loosely typed object, would be
   busywork that loses as much type safety as it pretends to add. So a
-  `FormData` body is always sent as it is, with the inference exception from
-  [the rule](#the-rule). It isn't type-checked on the client, but the server
+  `FormData` body is always sent as it is, as multipart. It isn't type-checked on the client, but the server
   decodes it to the same object and validates it, so a mismatch is still caught,
   as a `400`.
 - **`URLSearchParams`** stops being a value type. It's only the urlencoded side
   of the same rules, and the client sends an object with the urlencoded header.
 
-Decided details:
+Decided details for the implementation:
 
 1. **Arrays use `[]` keys.** Query strings and both form types read arrays
    only from `key[]` keys, the convention OpenAPI describes with `style: form`
@@ -356,17 +126,15 @@ Decided details:
    and only the last value is kept, so HTML forms use `name="tags[]"`. Without
    the suffix, `tags=a` could be a string or an array, and the server can't tell
    which from the schema. It's one documented caveat for all three places.
-2. **Multipart responses (decided).** The conversion lives in the form codecs:
+2. **Multipart responses.** The conversion lives in the form codecs:
    `deserialize` turns the decoded form into an object, and `serialize` builds
    one from an object, passing a `FormData` instance through unchanged. The
    client and the server share the codecs, so request bodies on the server and
    response bodies on the client are objects alike, with nothing to decide
    separately.
-3. **Node (checked).** Both runtimes already decode multipart with the same
-   codec, which reads the body and hands it to Fetch's `Response.formData()`, so
-   file fields are `File`s on Node too. The conformance tests cover it on both.
-   Converting that `FormData` to an object is a plain function on top, the same
-   on every runtime.
+3. **Runtimes.** Both already decode multipart to `FormData` with `File`
+   fields through the same codec, so converting it to an object is a plain
+   function on top, the same on every runtime.
 
 ## 1. Native values in JSON responses
 
@@ -455,7 +223,13 @@ instead.
 ```ts
 const download = route
 	.get("/files/:id")
-	.response({ "application/octet-stream": z.instanceof(Uint8Array) })
+	.response(z.instanceof(Uint8Array), {
+		headers: z.object({
+			"content-type": z
+				.literal("application/octet-stream")
+				.default("application/octet-stream"),
+		}),
+	})
 	.handler(({ params }) => storage.read(params.id)); // Uint8Array
 
 const { body } = await client.files.download({ params: { id } });
@@ -468,7 +242,7 @@ Inferred routes have the same problem:
 ```ts
 route.get("/files/:id").handler(({ params, respond }) =>
 	respond(storage.read(params.id), {
-		contentType: "application/octet-stream",
+		headers: { "content-type": "application/octet-stream" },
 	}),
 ); // client body: Uint8Array<ArrayBuffer>
 ```
@@ -504,9 +278,8 @@ A declared schema for a binary type then describes only the server side. A
 custom codec could declare the type it decodes to, so the client type follows
 the codec instead of the table.
 
-A body union under one header, as in
-[several content types on one route](#several-content-types-on-one-route), needs
-rules to stay honest, because `Jsonify<Blob>` would be an empty object that
+A body union under one header, such as a route that sends JSON or CSV from one
+status, needs rules to stay honest, because `Jsonify<Blob>` would be an empty object that
 almost anything is assignable to:
 
 - **`respond()` call sites are paired.** In `respond(value, { headers })`, both
@@ -566,7 +339,7 @@ const exportNdjson = route.get("/todos/export.ndjson").handler(({ respond }) =>
 		(async function* () {
 			for await (const todo of db.todos.stream()) yield todo; // objects
 		})(),
-		{ contentType: "application/x-ndjson" },
+		{ headers: { "content-type": "application/x-ndjson" } },
 	),
 );
 // compiles. client body: AsyncGenerator<Todo>
@@ -697,95 +470,6 @@ createClient(api, { baseUrl, errorFormat: problemJson });
 - Built-in errors such as `REQUEST_VALIDATION_FAILED` go through the same
   format, so the whole API is consistent.
 
-## 11. CORS
-
-`createApp` has no CORS support. `onError` can't add headers, and route
-middleware never sees a preflight, because no route answers `OPTIONS`. CORS
-headers also have to be on error responses, or the browser hides the error from
-the client, and those are written by rest-rpc itself.
-
-How much work it takes depends on the runtime:
-
-- **Fetch runtimes (Deno, Workers):** wrap `fetch` once. Answer `OPTIONS`, and
-  add the headers to every response.
-- **Bun:** wrapping `fetch` isn't enough, because Bun's native router calls the
-  handlers in `routes` directly. Every route has to be wrapped separately, and
-  an `OPTIONS` entry added for each path. Static routes are `Response` values,
-  so they have to be rebuilt with the headers.
-
-  ```ts
-  const app = createApp(routes);
-  const withCors = (response: Response) => {
-  	const headers = new Headers(response.headers);
-  	headers.set("access-control-allow-origin", "https://app.example.com");
-  	headers.set("access-control-expose-headers", "location, x-request-id");
-  	return new Response(response.body, { status: response.status, headers });
-  };
-
-  Bun.serve({
-  	fetch: async (request) => withCors(await app.fetch(request)),
-  	routes: Object.fromEntries(
-  		Object.entries(app.routes).map(([path, methods]) => [
-  			path,
-  			{
-  				...Object.fromEntries(
-  					Object.entries(methods).map(([method, handler]) => [
-  						method,
-  						handler instanceof Response
-  							? withCors(handler) // static: rebuilt once
-  							: async (request: Request) => withCors(await handler(request)),
-  					]),
-  				),
-  				OPTIONS: () => preflight(Object.keys(methods)),
-  			},
-  		]),
-  	),
-  });
-  ```
-
-  Dropping `routes` and serving only `fetch` avoids this, but gives up Bun's
-  native routing.
-
-- **Node `createApp`:** wrap the handler, and set headers on the
-  `ServerResponse` before rest-rpc writes it.
-- **Framework integration:** use the framework's CORS middleware, such as Hono's
-  `cors()` or the Express `cors` package. This works, but it means dropping
-  down a level just for CORS. Exposed headers also have to be listed by hand,
-  and kept in sync with the routes.
-
-### Fix sketch
-
-A minimal `cors` option on both `createApp`s, applied to every response,
-errors included, and to Bun's `routes`:
-
-```ts
-createApp(routes, {
-	cors: {
-		origin: ["https://app.example.com"], // or a function of the request origin
-		credentials: true,
-		maxAge: 600,
-	},
-});
-```
-
-The rest can be derived from the routes:
-
-- **Preflight methods:** from the routes defined at each path. A path with only
-  `GET` and `PATCH` routes answers with those, instead of a fixed list.
-- **Allowed request headers:** from each route's headers schema, plus
-  `content-type` for routes with a body.
-- **Exposed response headers:** from declared response headers and error
-  headers, so a declared `location` or `x-request-id` is readable from the
-  browser without listing it again. This is something a framework's CORS
-  middleware can't do, because it doesn't know the routes.
-
-Anything beyond the minimal options, such as per-route policies, still drops
-down to framework integration.
-
-With the server interceptor from case 13, this may not need its own feature. A
-preflight answer and headers added to every response are a few lines in an
-interceptor, so `cors` could be a small helper built on it, or a docs example.
-
 ## 13. Interceptors
 
 ### Server
@@ -795,44 +479,65 @@ including errors, has no place in rest-rpc today:
 
 - cheap checks such as an API key, an allowed IP or a maintenance mode;
 - request IDs, logging and timing across every route;
-- headers on every response, such as CORS (case 11) or security headers.
+- headers on every response, such as CORS or security headers. CORS also has
+  to answer `OPTIONS` preflights, and its headers have to be on error
+  responses, or the browser hides the error from the client.
 
 Route middleware can't do these: it runs after request validation by design,
 and it doesn't see error responses, `notFound`, or preflights. So users wrap
-`createApp` themselves. On Bun that also means wrapping every native route, as
-case 11 shows.
+`createApp` themselves. On Bun that also means wrapping every native route,
+because its router calls the handlers in `routes` directly, and rebuilding
+static routes, which are `Response` values.
 
-**Fix sketch:** one hook on `createApp` that wraps everything rest-rpc does for
-a request:
+**Fix sketch:** a list of interceptors on `createApp`, each wrapping everything
+rest-rpc does for a request, composed like middleware:
 
 ```ts
-createApp(routes, {
-	intercept: async (request, next) => {
-		if (request.headers.get("x-api-key") !== env.API_KEY) {
-			return new Response("Forbidden", { status: 403 });
-		}
-		const started = performance.now();
-		const response = await next(request);
-		response.headers.set("x-request-id", crypto.randomUUID());
-		response.headers.set(
-			"server-timing",
-			`app;dur=${performance.now() - started}`,
-		);
-		return response;
-	},
+import { interceptor } from "@rest-rpc/server";
+
+const apiKey = interceptor(({ request, next }) =>
+	request.headers.get("x-api-key") === env.API_KEY
+		? next()
+		: new Response("Forbidden", { status: 403 }),
+);
+
+const timing = interceptor(async ({ next }) => {
+	const started = performance.now();
+	const response = await next();
+	response.headers.set(
+		"server-timing",
+		`app;dur=${performance.now() - started}`,
+	);
+	return response;
 });
+
+createApp(routes, { interceptors: [timing, apiKey, cors] });
 ```
 
+- **Shape:** `interceptor()` types the function, like `bodyCodec()` and
+  `sseFormat()`, and returns it unchanged. It takes one object argument, like
+  handlers and `.use()`, so a field can be added later without changing the
+  signature. `next()` continues with the
+  same request, and `next(request)` with another one.
+- **Order:** onion-style, like `.use()`: the first interceptor wraps every one
+  after it, and rest-rpc's own handling is innermost. Each concern is its own
+  function, so apps and libraries can ship them and combine them without
+  wrapping one in another.
+- **Reuse:** the runner can share the middleware composition. The difference is
+  that an interceptor may call `next` more than once, to retry, which
+  middleware forbids.
 - It runs before routing, so it sees every request, including unmatched ones
   and `OPTIONS`.
 - `next` returns the final response, including error responses and `notFound`.
 - `createApp` applies it to Bun's native `routes` too, so nothing has to be
   wrapped per route.
+- CORS is then a docs example rather than its own option: one interceptor
+  answers preflights and adds the headers to every response.
 - It's untyped on purpose: it's about HTTP, not routes. Typed, per-route logic
   stays in middleware.
-- Node `createApp` needs its own shape, probably `(req, res, next)`, because it
-  writes to a `ServerResponse` instead of returning a `Response`. That's an open
-  question.
+- Node `createApp` needs its own shape, probably `{ req, res, next }`, because
+  it writes to a `ServerResponse` instead of returning a `Response`. That's an
+  open question.
 
 ### Client
 
@@ -848,32 +553,35 @@ easy to get wrong:
 - It doesn't know which route is being called, so per-route logic has to parse
   the URL back into a route.
 
-**Fix sketch:** the same hook on `createClient`, with the route as context:
+**Fix sketch:** the same list on `createClient`, with the route as context:
 
 ```ts
-createClient(api, {
-	baseUrl,
-	intercept: async (request, next, { route }) => {
-		let response = await next(request.clone());
-		if (response.status === 401 && route.meta?.access !== "public") {
-			await refreshToken();
-			request.headers.set("authorization", `Bearer ${readToken()}`);
-			response = await next(request);
-		}
+import { clientInterceptor } from "@rest-rpc/core";
+
+const refreshOn401 = clientInterceptor(async ({ request, next, route }) => {
+	const response = await next(request.clone());
+	if (response.status !== 401 || route.meta?.access === "public") {
 		return response;
-	},
+	}
+	await refreshToken();
+	request.headers.set("authorization", `Bearer ${readToken()}`);
+	return next(request);
 });
+
+createClient(api, { baseUrl, interceptors: [logging, refreshOn401] });
 ```
 
 - `request` is a Fetch `Request`, so cloning and replaying it is standard and
   safe.
 - `next` calls `fetch`, or the `fetch` option, with the signal handled.
-- The `route` context gives the route definition, including `meta`, so
-  per-route behaviour needs no URL parsing.
+- `clientInterceptor()` has its own name, since `@rest-rpc/server` re-exports
+  core helpers and code may import from both.
+- `route` gives the route definition, including `meta`, so per-route
+  behaviour needs no URL parsing.
 - It runs before the response is decoded, so it sees error responses too.
 
-Both hooks are the same primitive with the same scope: one function around the
-HTTP exchange. Neither needs a plugin system.
+Both lists are the same primitive with the same scope: functions around the
+HTTP exchange, composed in order. Neither needs a plugin system.
 
 ## 14. Wildcard path params (maybe)
 
@@ -900,7 +608,31 @@ Framework integration would translate it where it can and document where it
 can't. Until then, a catch-all handler mounted under the prefix covers the need
 on the host side.
 
-## Decided against
+## Docs to write
+
+Decisions that are made, but that the docs don't explain yet. Write them once
+the before-stable items are done.
+
+- Rewrite the HTTP behaviour pages to explain the contract: how content types
+  are chosen, what the client receives compared with what the server sends,
+  and the pitfalls.
+- Trade-offs to document, not change:
+  - A content type is never inferred from a value, except where there's
+    nothing to choose: SSE for async iterables, raw for a returned `Response`,
+    and `multipart/form-data` for `FormData`, whose boundary only Fetch can
+    generate.
+  - One body schema per status. It can be a union, but a body type can't be
+    paired with a content type. Pairing can be added later without breaking
+    anything.
+  - Interceptors are outside the typed contract. They can change anything about
+    the response, and the docs say what that means instead of restricting it.
+  - Request bodies are read whole before they're decoded, multipart included.
+    Streaming uploads are out of scope: a custom codec gets the raw body
+    stream, and an upload route can live on the host framework.
+  - The error format stays `{ code, message, data? }` unless the option is
+    added.
+
+### Decided against, with the reasons
 
 - **Request body size limits:** frameworks, proxies and gateways already
   provide them, and rest-rpc shouldn't maintain its own:
@@ -923,7 +655,7 @@ on the host side.
   outside rest-rpc, or in the server interceptor (case 13), which runs before
   routing.
 
-## Follow-up: document the security boundaries
+### Security boundaries
 
 The decisions above follow one rule: rest-rpc keeps few security-sensitive
 code paths, and leaves the rest to the host. That's only safe if the docs say
@@ -938,7 +670,7 @@ could list them:
   - TLS.
 - **Left to the app:**
   - authentication and authorization, in middleware or an interceptor;
-  - CORS, until case 11 or 13 lands;
+  - CORS, until interceptors land, and then as an interceptor;
   - `Set-Cookie` attributes such as `HttpOnly`, `Secure` and `SameSite`, which
     `cookies` sends as written;
   - CSRF. A route decodes only the content types it declares, JSON by default,
@@ -961,13 +693,12 @@ could list them:
 
 ## Summary
 
-| Case                               | Today                                                     | Fix sketch                                                    | New concept |
-| ---------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------- | ----------- |
-| Content types as headers (decided) | Content type is its own concept in five places            | Only a `content-type` header; JSON unless it says otherwise   | One fewer   |
-| 1. Native values in JSON           | Client typed `Date`, receives `string`                    | `Jsonify<T>` client bodies                                    | No          |
-| 2. Binary bodies                   | Client typed server's type, gets `Blob`                   | Client type from what the `content-type` header decodes to    | No          |
-| 4. Raw stream chunks               | Compiles, connection cut at runtime                       | Restrict handler stream chunks to `string \| Uint8Array`      | No          |
-| 6. Error response format           | Fixed JSON; rewrite responses on both ends                | Two-way `errorFormat` shared by server and client             | Yes         |
-| 11. CORS                           | Wrap `fetch`; on Bun, every route                         | `cors` option, with methods and headers derived from routes   | Yes         |
-| 13. Interceptors                   | Wrap `createApp` (and every Bun route) or replace `fetch` | One `intercept(request, next)` hook on the app and the client | Yes         |
-| 14. Wildcard path params (maybe)   | Not supported                                             | `:path*` rest segment where routers support it                | Yes         |
+| Case                             | Today                                                     | Fix sketch                                                  | New concept |
+| -------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------- | ----------- |
+| 1. Native values in JSON         | Client typed `Date`, receives `string`                    | `Jsonify<T>` client bodies                                  | No          |
+| 2. Binary bodies                 | Client typed server's type, gets `Blob`                   | Client type from what the `content-type` header decodes to  | No          |
+| 4. Raw stream chunks             | Compiles, connection cut at runtime                       | Restrict handler stream chunks to `string \| Uint8Array`    | No          |
+| Form bodies as objects           | `URLSearchParams` and `FormData`, read by field name      | Objects under the query rules, converted in the form codecs | No          |
+| 6. Error response format         | Fixed JSON; rewrite responses on both ends                | Two-way `errorFormat` shared by server and client           | Yes         |
+| 13. Interceptors                 | Wrap `createApp` (and every Bun route) or replace `fetch` | An `interceptors` list on the app and the client            | Yes         |
+| 14. Wildcard path params (maybe) | Not supported                                             | `:path*` rest segment where routers support it              | Yes         |
