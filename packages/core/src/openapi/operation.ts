@@ -10,6 +10,7 @@ import type {
 import type { RouteErrorDefinition } from "../contract/routeError.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import { getPathParamNames } from "../contract/path.ts";
+import { rawDescription } from "../contract/raw.ts";
 
 type OpenApiSchema = Record<string, unknown>;
 
@@ -251,13 +252,15 @@ const createResponses = (
 ) => {
 	const defined = Object.entries(route.responses);
 	const errors = createErrorResponses(route.errors ?? {}, converter);
-	// Responses inferred from a handler have no schema. `default` documents them
-	// without claiming a status, and keeps the required Responses Object non-empty.
+	// Responses inferred from a handler, or sent as the `Response` it returns,
+	// have no schema. `default` documents them without claiming a status, and
+	// keeps the required Responses Object non-empty.
 	if (defined.length === 0) {
 		return {
 			default: {
-				description:
-					"Response inferred from the route handler; not documented.",
+				description: route.raw
+					? (rawDescription(route.raw) ?? "")
+					: "Response inferred from the route handler; not documented.",
 			},
 			...errors,
 		};

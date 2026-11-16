@@ -16,6 +16,7 @@ import {
 } from "./validation.ts";
 import { invokeWithMiddleware } from "../builder/middleware.ts";
 import { isResponseEnvelope, respond, type RespondOptions } from "./respond.ts";
+import { fromRawEnvelope } from "./rawResponse.ts";
 import { sseBody, type SseOptions } from "./sse.ts";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import { allMaybePromise, mapMaybePromise } from "./maybePromise.ts";
@@ -212,11 +213,14 @@ export const normalizeHandlerResult = (
 
 const emptyContext = Object.freeze({});
 
-/** Validates the request, runs middleware and the handler, and validates the output, throwing validation errors. */
+/**
+ * Validates the request, runs middleware and the handler, and validates the
+ * output, throwing validation errors. A returned `Response` is sent as is.
+ */
 export async function executeRoute(
 	implementation: RuntimeImplementation,
 	options: ExecuteRouteOptions,
-): Promise<RouteResult> {
+): Promise<RouteResult | Response> {
 	const { route } = implementation;
 	const handler = implementation.handler as RuntimeRouteHandler;
 	const { mediaType } = options;
@@ -240,6 +244,11 @@ export async function executeRoute(
 		},
 		implementation.defaultStatus ?? 200,
 	);
+	if (result instanceof Response) return result;
+	// After middleware, a `Response` body is sent with the envelope's other fields.
+	if (isResponseEnvelope(result) && result.body instanceof Response) {
+		return fromRawEnvelope(result as Parameters<typeof fromRawEnvelope>[0]);
+	}
 	return normalizeHandlerResult(
 		implementation,
 		result,
@@ -264,10 +273,11 @@ const observeStream = async function* (
 
 /** Frames a stream body as SSE; other results are already HTTP results. */
 export const toHttpRouteResult = (
-	result: RouteResult,
+	result: RouteResult | Response,
 	observe: StreamErrorObserver | undefined,
 	sse: SseOptions | undefined,
-): HttpRouteResult => {
+): HttpRouteResult | Response => {
+	if (result instanceof Response) return result;
 	const { status, headers, cookies, body } = result;
 	if (!body || !("stream" in body)) return result as HttpRouteResult;
 	return {

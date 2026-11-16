@@ -31,7 +31,8 @@ export const api = { todos: { create, get } };
 ```
 
 Use `.response()` for each successful response, with `sse(schema)` for
-streams, and `.error()` for each [error](/docs/route-builder#define-errors).
+streams or [`raw()`](/docs/route-builder#raw-responses) for a returned Fetch
+`Response`, and `.error()` for each [error](/docs/route-builder#define-errors).
 These schemas define handler and client types and provide
 [runtime validation](/docs/http-behavior/schemas).
 See [Server-Sent Events](/docs/streaming) for stream handlers.

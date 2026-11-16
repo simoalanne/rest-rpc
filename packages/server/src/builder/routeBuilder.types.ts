@@ -2,12 +2,14 @@ import type {
 	DefaultMeta,
 	LowercaseHeadersOptionCheck,
 	PathParamNames,
+	RawResponses,
 	RouteDefinition,
 	ServerRequest,
 	ServerResponse,
 } from "@rest-rpc/core/contract";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import type {
+	RespondBodyCheck,
 	RespondOptions,
 	ResponseEnvelope,
 	ResponseEnvelopeBase,
@@ -150,9 +152,13 @@ export type ValidImplicitResult<TResult> = [Awaited<TResult>] extends [never]
 	: ValidStreamEnvelopes<EnvelopeOf<Awaited<TResult>>> &
 			SuccessStatuses<EnvelopeOf<Awaited<TResult>>>;
 
+// A returned `Response` is sent as is, so a route that may return one
+// describes any response, like a route defined with `raw()`.
 export type InferredRoute<TRoute, TResult> = Merge<
 	Omit<TRoute, "responses"> & {
-		responses: InferredResponses<EnvelopeOf<Awaited<TResult>>>;
+		responses: [Extract<Awaited<TResult>, Response>] extends [never]
+			? InferredResponses<EnvelopeOf<Awaited<TResult>>>
+			: RawResponses;
 	}
 >;
 
@@ -212,9 +218,13 @@ type PlainResponseBody<TRoute extends RouteDefinition> =
 				: undefined | void
 		: never;
 
+// Routes defined with `raw()` describe every status, and return a `Response`.
 type HandlerResult<TRoute extends RouteDefinition> = MaybePromise<
-	| RespondFor<TRoute, WithSseServerEvents<ServerResponse<TRoute>>>
-	| PlainResponseBody<TRoute>
+	number extends DefinedStatus<TRoute>
+		? Response
+		:
+				| RespondFor<TRoute, WithSseServerEvents<ServerResponse<TRoute>>>
+				| PlainResponseBody<TRoute>
 >;
 
 /**
@@ -229,7 +239,7 @@ export type RouteRespond<TStatus extends number = number> = <
 		status?: TStatus;
 	} = {},
 >(
-	body: TBody,
+	body: TBody & RespondBodyCheck<TBody>,
 	options?: TOptions & LowercaseHeadersOptionCheck<TOptions>,
 ) => ResponseEnvelope<TBody, NoInfer<TOptions>>;
 

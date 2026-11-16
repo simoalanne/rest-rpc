@@ -37,6 +37,7 @@ export type {
 	MediaType,
 } from "./contract/body.ts";
 export type { ResponseOptions } from "./contract/response.ts";
+export { raw, type RawResponse } from "./contract/raw.ts";
 export type {
 	CreateOpenApiDocumentOptions,
 	OpenApiDocument,

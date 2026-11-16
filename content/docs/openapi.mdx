@@ -48,7 +48,9 @@ path are derived from their tree keys. The document includes:
 - request bodies with a schema per media type
 - status-keyed responses with a schema per media type and defined headers
 - streams as `text/event-stream` responses
-- a `default` placeholder response for routes without defined responses
+- a `default` placeholder response for routes without defined responses, and
+  a `default` response for [raw responses](/docs/route-builder#raw-responses)
+  with their description
 - route [`.openAPI()`](#route-metadata) metadata
 
 The document targets OpenAPI `3.1.0` unless the `openapi` option sets another

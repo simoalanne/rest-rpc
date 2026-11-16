@@ -11,7 +11,9 @@ A local call runs the same route pipeline as an HTTP request:
 
 The steps that only exist for HTTP are skipped: body decoding, request content
 type checks, and response serialization. The result is the
-validated output, not an encoded `Response`.
+validated output, not an encoded `Response`. A
+[raw response](/docs/route-builder#raw-responses) a handler returns is the
+exception: it is read as the fetch client reads it, with the default codecs.
 
 ## One-off Calls
 

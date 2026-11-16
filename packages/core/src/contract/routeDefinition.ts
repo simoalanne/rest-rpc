@@ -3,6 +3,7 @@ import type {
 	RequestHeadersSchema,
 	RequestParamsSchema,
 } from "./request.ts";
+import type { RawResponse } from "./raw.ts";
 import type { RouteResponses } from "./response.ts";
 import type { RouteErrorDefinition } from "./routeError.ts";
 
@@ -69,6 +70,8 @@ export type RouteDefinition = {
 	method: HttpMethod;
 	request?: RouteRequestDefinition;
 	responses: RouteResponses;
+	/** Set by `.response(raw())`: the handler returns a Fetch `Response`. */
+	raw?: RawResponse;
 	errors?: RouteErrors;
 	meta?: RouteMeta;
 	/** Type-only metadata shape declared with `$meta()` and `DefaultMeta`, with no runtime value. */

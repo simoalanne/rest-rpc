@@ -16,6 +16,7 @@ import type {
 	RequestParamsSchema,
 	RequestQuerySchema,
 } from "./request.ts";
+import { isRawResponse, type RawResponse } from "./raw.ts";
 import type {
 	ResponseContentDefinition,
 	ResponseDefinition,
@@ -28,11 +29,13 @@ import {
 	type RouteErrorDefinitionOptions,
 } from "./routeError.ts";
 import type {
+	AfterRawResponseCheck,
 	BuilderFor,
 	BuilderKind,
 	BuilderState,
 	DefinitionFor,
 	NextState,
+	RawResponseCheck,
 	RootBuilderState,
 	WithBody,
 	WithError,
@@ -42,6 +45,7 @@ import type {
 	OmittedMethods,
 	WithPrefix,
 	WithRequest,
+	WithRawResponse,
 	WithResponse,
 } from "./routeBuilder.types.ts";
 
@@ -353,7 +357,7 @@ export class RouteBuilder<
 		const TSchema extends StandardSchemaV1,
 		const TOptions extends ResponseOptions | undefined = undefined,
 	>(
-		schema: TSchema,
+		schema: TSchema & AfterRawResponseCheck<TState>,
 		options?: TOptions & LowercaseHeadersOptionCheck<TOptions>,
 	): BuilderFor<TKind, WithResponse<TState, TSchema, TOptions>>;
 	/** Defines successful response schemas keyed by media type. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-responses} */
@@ -361,18 +365,31 @@ export class RouteBuilder<
 		const TContent extends BodyContent,
 		const TOptions extends ResponseOptions | undefined = undefined,
 	>(
-		content: MediaTypeKeysOnly<TContent>,
+		content: MediaTypeKeysOnly<TContent> & AfterRawResponseCheck<TState>,
 		options?: TOptions & LowercaseHeadersOptionCheck<TOptions>,
 	): BuilderFor<TKind, WithResponse<TState, TContent, TOptions>>;
 	/** Defines a successful response without a body. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-responses} */
 	response<const TOptions extends ResponseOptions | undefined = undefined>(
-		options?: TOptions & LowercaseHeadersOptionCheck<TOptions>,
+		options?: TOptions &
+			LowercaseHeadersOptionCheck<TOptions> &
+			AfterRawResponseCheck<TState>,
 	): BuilderFor<TKind, WithResponse<TState, undefined, TOptions>>;
+	/** Defines the route's only response as the Fetch `Response` its handler returns, sent as it is. @see {@link https://rest-rpc.vercel.app/docs/route-builder#raw-responses} */
 	response(
-		schemaOrContentOrOptions?: StandardSchemaV1 | BodyContent | ResponseOptions,
+		raw: RawResponse & RawResponseCheck<TState>,
+	): BuilderFor<TKind, WithRawResponse<TState>>;
+	response(
+		schemaOrContentOrOptions?:
+			| StandardSchemaV1
+			| BodyContent
+			| ResponseOptions
+			| RawResponse,
 		options?: ResponseOptions,
 	): never {
 		const state = defaultRouteState(this["~restrpc"]);
+		if (isRawResponse(schemaOrContentOrOptions)) {
+			return this.clone({ ...state, raw: schemaOrContentOrOptions });
+		}
 		if (
 			!isStandardSchema(schemaOrContentOrOptions) &&
 			!isBodyContent(schemaOrContentOrOptions)

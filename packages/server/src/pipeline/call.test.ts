@@ -44,6 +44,23 @@ describe("call", () => {
 		expect(request.context).toEqual({ user: "Ada" });
 	});
 
+	it("receives a returned Response as the fetch client does", async () => {
+		const implementation = route.get("/").handler(
+			() =>
+				new Response("a,b", {
+					status: 201,
+					headers: { "content-type": "text/csv", "x-id": "1" },
+				}),
+		);
+		expect(await call(implementation)).toEqual({
+			status: 201,
+			contentType: "text/csv",
+			body: "a,b",
+			headers: { "content-type": "text/csv", "x-id": "1" },
+			cookies: [],
+		});
+	});
+
 	it("rejects like the fetch client for defined, built-in and other errors", async () => {
 		const NotFound = routeError("NOT_FOUND", {
 			status: 404,

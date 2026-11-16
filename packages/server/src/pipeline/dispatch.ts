@@ -61,7 +61,7 @@ export type DispatchResult = HttpRouteResult | RouteError;
  */
 export type ResponseWriter<TTarget, TOut> = {
 	result: (
-		result: HttpRouteResult,
+		result: HttpRouteResult | Response,
 		target: TTarget,
 		codecs: BodyCodecRegistry,
 	) => MaybePromise<TOut>;
@@ -167,7 +167,7 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 			}
 		}
 
-		let result: RouteResult;
+		let result: RouteResult | Response;
 		try {
 			result = await executeRoute(implementation, {
 				request: {
@@ -211,8 +211,8 @@ export type CompiledRoute = {
 	path: string;
 	implementation: RuntimeImplementation;
 	pathParams: PathParams;
-	/** The response of a route completed with `.static()`. */
-	staticResponse?: SerializedHttpResponse;
+	/** The response of a route completed with `.static()`, or the `Response` it returned. */
+	staticResponse?: SerializedHttpResponse | Response;
 };
 
 /**

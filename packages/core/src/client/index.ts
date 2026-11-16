@@ -13,9 +13,10 @@ export {
 	type FetchOptions,
 	type InferClientRequest,
 } from "./request.ts";
-export type {
-	InferClientError,
-	InferClientResponse,
-	InferClientStreamData,
+export {
+	readResponse,
+	type InferClientError,
+	type InferClientResponse,
+	type InferClientStreamData,
 } from "./response.ts";
 export { safe, type ClientPromise, type SafeResult } from "./safe.ts";
