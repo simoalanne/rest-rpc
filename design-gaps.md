@@ -30,20 +30,11 @@
 
 - **Document that an empty file input is sent as an empty `File`**, with
   the form bodies item.
-- **Replace the README cheatsheet with runnable examples:**
-  - Move the interceptor lifecycle example from the interceptors page into
-    the examples package, so it's typechecked and run.
-  - A private examples package of self-contained files, each one task, about
-    15 to 40 lines. `check` typechecks them and a test runs them, with the
-    client served by `fetch: app.fetch`.
-  - One example for the basics, and the rest for what can't be guessed by
-    copying existing routes: content types as headers, interceptors, defined
-    and undefined errors, SSE, raw `Response`s, `.static()`, context and
-    middleware, framework mounting, the client options and interceptors,
-    TanStack Query and contract-first.
-  - One way per task, with comments only where an agent would otherwise
-    change the code.
-  - Generate the docs cheatsheet page and a `CHEATSHEET.md` in each published
+- **Make the cheatsheet examples checked files:**
+  - A private examples package with one file per cheatsheet section, and the
+    interceptor lifecycle example. `check` typechecks them and a test runs
+    them.
+  - Generate the cheatsheet page and a `CHEATSHEET.md` in each published
     package from the files.
   - A short hand-written README: an introduction, installation, one example
     and links. Package READMEs copy it.
