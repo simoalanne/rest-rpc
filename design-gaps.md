@@ -38,7 +38,12 @@
   - A response that declares a `content-type` is typed as its schema output
     on the client, so the schema has to match what the codec decodes, such as
     `string` for `text/*` and `Blob` for binary.
-  - Interceptors are outside the typed contract.
+  - Interceptors are outside the typed contract. An error they throw isn't
+    resolved against the route, so a code the route declares is thrown with
+    the route's own error class, or the client trusts a shape nothing
+    checked. Undeclared codes are sent as thrown, as anywhere else.
+  - `onError` wraps every Fetch response body to report late stream
+    failures, at about 1.6 µs per response.
   - Request bodies are read whole before they're decoded.
   - Arrays only come from `key[]` keys, so HTML forms use `name="tags[]"`.
   - An empty file input is sent as an empty `File`.

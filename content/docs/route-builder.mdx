@@ -8,7 +8,7 @@ segments it reads, the responses it returns, and the errors it throws.
 
 Schemas can come from Zod, Valibot, ArkType, or another Standard Schema library.
 The built-in `type<T>()` utility defines types without runtime validation. See
-[Schemas and Validation](/docs/http-behavior/schemas).
+[Validation](/docs/http-behavior/validation).
 
 ## Start with Defaults
 
@@ -141,7 +141,7 @@ The following rules apply to request segments:
 
 Header schemas and `respond()` headers must use lowercase names, and an
 uppercase name is a type error. See
-[Serialization and Codecs](/docs/http-behavior/serialization#path-query-and-headers)
+[Encoding and Content Types](/docs/http-behavior/encoding#params-query-and-headers)
 for how each location is encoded.
 
 ## Stacking Schemas
@@ -386,7 +386,7 @@ const get = route
 ```
 
 The route's definition decides the response. An error whose code the route
-does not define is [sent as thrown](/docs/http-behavior/errors#throwing-errors),
+does not define is [sent as thrown](/docs/http-behavior/errors#defined-and-undefined-errors),
 but is not part of the route's types. Adding the same definition twice, for example on a shared base
 and on a route, is allowed; adding a different error with an existing code
 throws.
@@ -449,7 +449,7 @@ const exportTodos = route.get("/todos/export").handler(({ respond }) =>
 
 A `FormData` body is always sent as `multipart/form-data`, with the boundary
 Fetch generates. See
-[Serialization and Codecs](/docs/http-behavior/serialization) for decoded value
+[Encoding and Content Types](/docs/http-behavior/encoding) for decoded value
 types and compatible codecs.
 
 ## Return Streams

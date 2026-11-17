@@ -12,7 +12,7 @@ import type { BodyCodec, BodyCodecOperations } from "./types.ts";
  * });
  * ```
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/serialization#custom-codecs}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#custom-codecs}
  */
 export function bodyCodec(
 	mediaTypes: string | RegExp | readonly (string | RegExp)[],

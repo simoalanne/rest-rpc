@@ -16,7 +16,7 @@ export type BodyValue =
 /**
  * A body sent with its own headers, created with `serializedBody()`.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/serialization#serializer-result}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#custom-codecs}
  */
 export type SerializedBody = {
 	readonly body: BodyValue;
@@ -43,7 +43,7 @@ export type BodySerializer = (
  * that reads the request stream, so a codec should not rely on other
  * properties of `Request`.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/serialization#incoming-body}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#custom-codecs}
  */
 export type IncomingBody = {
 	/** Reads the body as UTF-8 text. */
@@ -84,7 +84,7 @@ export type BodyCodecOperations =
  * precedence over patterns. Patterns are tested in codec order when no string
  * matches.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/serialization#custom-codecs}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#custom-codecs}
  */
 export type BodyCodec = {
 	mediaTypes: readonly (string | RegExp)[];

@@ -4,7 +4,7 @@ import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 /**
  * A Standard Schema validation issue surfaced by server request validation.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/schemas#request-validation}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/validation#requests}
  */
 export type ValidationIssue = StandardSchemaV1.Issue;
 
