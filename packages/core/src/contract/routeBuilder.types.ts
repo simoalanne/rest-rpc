@@ -236,6 +236,12 @@ export type AfterRawResponseCheck<TState extends BuilderState> =
 		? { "~error": "raw() must be a route's only response." }
 		: unknown;
 
+/** Rejects a response for a status the route already defines. */
+export type NewStatusCheck<TState extends BuilderState, TOptions> =
+	StatusFor<TOptions> extends keyof TState["responses"]
+		? { "~error": "The route already defines a response for this status." }
+		: unknown;
+
 export type WithError<
 	TState extends BuilderState,
 	TDefinition extends RouteErrorDefinition,

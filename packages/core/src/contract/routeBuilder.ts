@@ -31,6 +31,7 @@ import type {
 	BuilderKind,
 	BuilderState,
 	DefinitionFor,
+	NewStatusCheck,
 	NextState,
 	RawResponseCheck,
 	RootBuilderState,
@@ -296,7 +297,9 @@ export class RouteBuilder<
 		const TSchema extends StandardSchemaV1,
 		const TOptions extends ResponseOptions | undefined = undefined,
 	>(
-		schema: TSchema & AfterRawResponseCheck<TState>,
+		schema: TSchema &
+			AfterRawResponseCheck<TState> &
+			NewStatusCheck<TState, TOptions>,
 		options?: TOptions & LowercaseHeadersOptionCheck<TOptions>,
 	): BuilderFor<TKind, WithResponse<TState, { body: TSchema }, TOptions>>;
 	/** Defines a successful Server-Sent Event stream response with `sse(schema)`. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/streaming} */
@@ -304,14 +307,17 @@ export class RouteBuilder<
 		const TSchema extends StandardSchemaV1,
 		const TOptions extends ResponseOptions | undefined = undefined,
 	>(
-		stream: SseResponse<TSchema> & AfterRawResponseCheck<TState>,
+		stream: SseResponse<TSchema> &
+			AfterRawResponseCheck<TState> &
+			NewStatusCheck<TState, TOptions>,
 		options?: TOptions & LowercaseHeadersOptionCheck<TOptions>,
 	): BuilderFor<TKind, WithResponse<TState, { sse: TSchema }, TOptions>>;
 	/** Defines a successful response without a body. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-responses} */
 	response<const TOptions extends ResponseOptions | undefined = undefined>(
 		options?: TOptions &
 			LowercaseHeadersOptionCheck<TOptions> &
-			AfterRawResponseCheck<TState>,
+			AfterRawResponseCheck<TState> &
+			NewStatusCheck<TState, TOptions>,
 	): BuilderFor<TKind, WithResponse<TState, EmptyObject, TOptions>>;
 	/** Defines the route's only response as the Fetch `Response` its handler returns, sent as it is. @see {@link https://rest-rpc.vercel.app/docs/route-builder#raw-responses} */
 	response(

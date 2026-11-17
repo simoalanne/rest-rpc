@@ -78,9 +78,16 @@ enabled. See [Fetch Client](/docs/client/fetch-client#response-validation).
 
 `createApp` accepts `disableRequestValidation` and
 `disableResponseValidation` options. Both default to `false`. These options
-disable only schema validation. Request decoding, content-type checks, route
-matching, response status and content-type selection, and response serialization
-still run normally.
+disable only schema validation. Route matching, request decoding, response
+status selection and response serialization still run normally.
+
+Content types are declared in headers schemas, so they follow the same rule:
+
+- Without request validation, a route with a body accepts every request
+  content type, and decodes the body with the codec it selects.
+- Without response validation, a headers schema default such as
+  `z.literal("text/csv").default("text/csv")` is not applied, so the body is
+  sent as JSON unless the handler writes the `content-type` header.
 
 ```ts
 createApp(routes, {

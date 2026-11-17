@@ -168,7 +168,10 @@ const createRequestBody = (
 	const convertedSchemas = request.body.map(
 		(schema) => converter?.(schema, "input") ?? {},
 	);
+	// A schema can't tell whether it accepts a missing body, so a defined body
+	// is documented as required.
 	return {
+		required: true,
 		content: toContent(
 			contentTypesOf(request.headers ?? [], converter, "input"),
 			convertedSchemas.length === 1

@@ -95,6 +95,10 @@ For object-shaped path and query schemas, rest-rpc reads top-level
 parameters. Schema records and headers do not always
 carry parameter-level requiredness in the converted schema.
 
+A defined request body is documented as required. Set `required: false` in
+[`transformOperation`](#transform-hooks) for a route whose body schema accepts
+a missing body.
+
 A query parameter whose converted schema has `type: "array"` is documented as
 `name[]` with `style: form` and `explode: true`, because the client sends
 arrays as repeated `name[]=value` keys and the server only reads arrays from
