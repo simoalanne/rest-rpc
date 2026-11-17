@@ -83,6 +83,23 @@ describe("createApp", () => {
 		expect(await response.json()).toBe("Ada");
 	});
 
+	it("sends HEAD error responses without a body", async () => {
+		const fail = route.get("/fail").handler((): string => {
+			throw new Error("handler failed");
+		});
+		const app = createApp({ fail });
+		for (const [path, status] of [
+			["/fail", 500],
+			["/missing", 404],
+		] as const) {
+			const response = await app.fetch(
+				new Request(`http://localhost${path}`, { method: "HEAD" }),
+			);
+			expect(response.status).toBe(status);
+			expect(response.body).toBeNull();
+		}
+	});
+
 	it("passes the runtime arguments after the request to the context function", async () => {
 		const app = createApp(
 			{ user },

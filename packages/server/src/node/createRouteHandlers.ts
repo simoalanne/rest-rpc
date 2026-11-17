@@ -19,11 +19,13 @@ import {
 	readRequestTarget,
 } from "./request.ts";
 import { fromFetchResponse } from "../pipeline/rawResponse.ts";
+import { writeNodeResponse, writeNodeResult } from "./response.ts";
+import { RouteError } from "@rest-rpc/core";
 import {
-	writeNodeError,
-	writeNodeResponse,
-	writeNodeResult,
-} from "./response.ts";
+	intercept,
+	writeErrorResponse,
+	type NodeInterceptor,
+} from "./interceptor.ts";
 
 /** A Node route, its definition, and whether it was completed with `.static()`. */
 export type CompiledNodeRoute = NodeRoute<object> & {
@@ -34,7 +36,6 @@ export type CompiledNodeRoute = NodeRoute<object> & {
 const nodeResponseWriter: ResponseWriter<ServerResponse, void> = {
 	result: (result, response, codecs) =>
 		writeNodeResult(response, result, codecs),
-	error: (error, response) => writeNodeError(response, error),
 };
 
 /** Compiles a route tree into Node routes, for the handlers of this runtime. */
@@ -121,19 +122,61 @@ export type NodeRoute<TContext extends object = EmptyObject> = {
 export type NodeRouteHandlerResult = { matched: boolean };
 
 /**
+ * Customizes the routes, request parsing and interceptors of Node route
+ * handlers and the catch-all handler.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#interceptors}
+ */
+export type NodeRouteHandlersOptions = CreateRouteHandlersOptions & {
+	/**
+	 * Functions around each route's `handle`, the first outermost. They run
+	 * after the framework routed the request, so `route` is always defined.
+	 */
+	interceptors?: readonly NodeInterceptor[];
+};
+
+// Route errors are written as error responses, and other thrown values reject
+// for the framework's error handling. Static routes skip interceptors, as in
+// `createApp`.
+const toNodeRoutes = (
+	implementations: RuntimeImplementationTree,
+	{ interceptors, ...options }: NodeRouteHandlersOptions,
+): CompiledNodeRoute[] =>
+	compileNodeRoutes(implementations, options).map((route) => {
+		if (route.isStatic) return route;
+		const { definition, handle } = route;
+		return {
+			...route,
+			handle: (request, response, ...handleOptions) =>
+				(interceptors?.length
+					? intercept(interceptors, request, response, definition, () =>
+							handle(request, response, ...handleOptions),
+						)
+					: handle(request, response, ...handleOptions)
+				).catch((error: unknown) => {
+					if (error instanceof RouteError && !response.headersSent) {
+						return writeErrorResponse(response, error);
+					}
+					throw error;
+				}),
+		};
+	});
+
+/**
  * Creates one Node route handler per method and path of a route tree, to
  * register on a router.
  *
- * @remarks Use {@link createCatchAllHandler} to let rest-rpc do the routing
- * instead.
+ * @remarks `handle` writes `RouteError`s as error responses, and rejects with
+ * other thrown values, for the framework's error handling. Use
+ * {@link createCatchAllHandler} to let rest-rpc do the routing instead.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
  */
 export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
 	implementations: TRoutes,
-	options: CreateRouteHandlersOptions = {},
+	options: NodeRouteHandlersOptions = {},
 ): NodeRoute<TreeInitialContext<TRoutes>>[] {
-	return compileNodeRoutes(implementations, options).map(
+	return toNodeRoutes(implementations, options).map(
 		({ method, path, handle }) => ({ method, path, handle }),
 	) as NodeRoute<TreeInitialContext<TRoutes>>[];
 }
@@ -143,7 +186,9 @@ export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
  * a route tree.
  *
  * @remarks Unmatched requests are left untouched and reported with
- * `matched: false` so the surrounding server can provide fallback routing.
+ * `matched: false` so the surrounding server can provide fallback routing,
+ * and interceptors only run for matched requests. Errors are handled as by
+ * the `handle` of {@link createRouteHandlers}.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#catch-all-handler}
  */
@@ -151,7 +196,7 @@ export function createCatchAllHandler<
 	TRoutes extends RuntimeImplementationTree,
 >(
 	implementations: TRoutes,
-	options: CreateRouteHandlersOptions = {},
+	options: NodeRouteHandlersOptions = {},
 ): (
 	request: IncomingMessage,
 	response: ServerResponse,
@@ -160,9 +205,7 @@ export function createCatchAllHandler<
 		CatchAllHandleOptions<TreeInitialContext<TRoutes>>
 	>
 ) => Promise<NodeRouteHandlerResult> {
-	const matchRoute = createRouteMatcher(
-		compileNodeRoutes(implementations, options),
-	);
+	const matchRoute = createRouteMatcher(toNodeRoutes(implementations, options));
 
 	return async (request, response, ...[handleOptions]) => {
 		const match = matchRoute(

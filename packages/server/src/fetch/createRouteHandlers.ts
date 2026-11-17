@@ -13,11 +13,12 @@ import {
 	type TreeInitialContext,
 } from "../routing/match.ts";
 import { fetchRequestReader } from "./request.ts";
+import { RouteError } from "@rest-rpc/core";
+import { errorResponse, intercept, type Interceptor } from "./interceptor.ts";
 import {
-	serializeFetchError,
+	respondTo,
 	serializeFetchResult,
 	toFetchResponse,
-	withoutBody,
 } from "./response.ts";
 
 /**
@@ -61,23 +62,61 @@ export type FetchRoute<TContext extends object = EmptyObject> = {
 
 const fetchResponseWriter: ResponseWriter<undefined, Response> = {
 	result: (result, _target, codecs) => serializeFetchResult(result, codecs),
-	error: serializeFetchError,
+};
+
+/**
+ * Customizes the routes, request parsing and interceptors of Fetch route
+ * handlers and the catch-all handler.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#interceptors}
+ */
+export type FetchRouteHandlersOptions = CreateRouteHandlersOptions & {
+	/**
+	 * Functions around each route's `handle`, the first outermost. They run
+	 * after the framework routed the request, so `route` is always defined,
+	 * and `args` is empty.
+	 */
+	interceptors?: readonly Interceptor[];
 };
 
 /**
  * Creates one Fetch route handler per method and path of a route tree, to
  * register on a router.
  *
- * @remarks Use {@link createCatchAllHandler} to let rest-rpc do the routing
- * instead.
+ * @remarks `handle` sends `RouteError`s as error responses, and rejects with
+ * other thrown values, for the framework's error handling. Use
+ * {@link createCatchAllHandler} to let rest-rpc do the routing instead.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
  */
 export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
 	implementations: TRoutes,
-	options: CreateRouteHandlersOptions = {},
+	options: FetchRouteHandlersOptions = {},
 ): FetchRoute<TreeInitialContext<TRoutes>>[] {
-	return compileFetchRoutes(implementations, options);
+	const { interceptors, ...compileOptions } = options;
+	return compileFetchRoutes(implementations, compileOptions).map(
+		({ method, path, definition, handle, staticResponse }) => ({
+			method,
+			path,
+			staticResponse,
+			// Static routes skip interceptors, as in `createApp`.
+			handle: (request, ...handleOptions) =>
+				respondTo(
+					request,
+					staticResponse !== undefined
+						? handle(request, ...handleOptions)
+						: (interceptors?.length
+								? intercept(interceptors, request, definition, [], (current) =>
+										handle(current, ...handleOptions),
+									)
+								: handle(request, ...handleOptions)
+							).catch((error: unknown) => {
+								if (error instanceof RouteError) return errorResponse(error);
+								throw error;
+							}),
+				),
+		}),
+	);
 }
 
 /** A Fetch route with its definition, for the interceptors of an app. */
@@ -115,10 +154,8 @@ export const compileFetchRoutes = (
 					method,
 					path,
 					definition,
-					handle: async (request: Request, ..._options: unknown[]) =>
-						request.method === "HEAD"
-							? withoutBody(createResponse())
-							: createResponse(),
+					handle: async (_request: Request, ..._options: unknown[]) =>
+						createResponse(),
 					staticResponse: createResponse(),
 				};
 			}
@@ -126,20 +163,15 @@ export const compileFetchRoutes = (
 				method,
 				path,
 				definition,
-				handle: (request, ...[handleOptions]) => {
-					const response = dispatch(
+				handle: (request, ...[handleOptions]) =>
+					dispatch(
 						implementation,
 						pathParams,
 						request,
 						undefined,
 						request.signal,
 						handleOptions,
-					);
-					// A `HEAD` request runs the `GET` route, and is sent without the body.
-					return request.method === "HEAD"
-						? response.then(withoutBody)
-						: response;
-				},
+					),
 			};
 		},
 	);
@@ -150,7 +182,9 @@ export const compileFetchRoutes = (
  * route tree.
  *
  * @remarks An unmatched request is returned to the caller with `matched: false`
- * so the surrounding runtime can provide fallback routing.
+ * so the surrounding runtime can provide fallback routing, and interceptors
+ * only run for matched requests. Errors are handled as by the `handle` of
+ * {@link createRouteHandlers}.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#catch-all-handler}
  */
@@ -158,7 +192,7 @@ export function createCatchAllHandler<
 	TRoutes extends RuntimeImplementationTree,
 >(
 	implementations: TRoutes,
-	options: CreateRouteHandlersOptions = {},
+	options: FetchRouteHandlersOptions = {},
 ): (
 	request: Request,
 	...options: OptionsArgs<

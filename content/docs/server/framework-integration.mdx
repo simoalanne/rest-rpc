@@ -177,5 +177,26 @@ framework sets it, as Express does when it removes the mount path from
 responses. Other errors thrown by
 handlers or middleware reject the promise returned by `handle` or the
 catch-all handler, so pass them to the framework's error handling, as the
-Express examples do with `next`. The framework's middleware does what
-[interceptors](/docs/server/fetch#interceptors) do for `createApp`.
+Express examples do with `next`.
+
+## Interceptors
+
+Both ways take `interceptors`, the same functions as the
+[Fetch](/docs/server/fetch#interceptors) or
+[Node](/docs/server/node#interceptors) `createApp` takes. They run around each
+route's `handle` after the framework routed the request, so `route` is always
+defined, and the catch-all handler runs them only for matched requests. The
+framework's own middleware sees error responses only as responses, so report
+errors with their `cause` with `onError`:
+
+```ts
+import { createRouteHandlers, onError } from "@rest-rpc/server";
+
+const handlers = createRouteHandlers(routes, {
+	interceptors: [onError((error) => logger.error(error))],
+});
+```
+
+`next()` rejects with every error, as in `createApp`. Route errors no
+interceptor catches are sent as error responses, and other errors reject
+`handle` for the framework.

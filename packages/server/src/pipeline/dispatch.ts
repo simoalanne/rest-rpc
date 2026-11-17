@@ -38,11 +38,10 @@ import {
 	type RouteResult,
 } from "./handleHttpRoute.ts";
 import { resolveRequestMediaType } from "./requestContentType.ts";
-import { resolveRouteError, type ErrorResponse } from "./resolveRouteError.ts";
+import { resolveRouteError, toSentError } from "./resolveRouteError.ts";
 import type { SerializedHttpResponse } from "./serializeHttpRouteResult.ts";
 import { sseBodyCodec } from "./sse.ts";
 import { prepareStaticResponse } from "./staticResponse.ts";
-import { mapMaybePromise } from "./maybePromise.ts";
 import { parseQuery, validateRequestHeaders } from "./validation.ts";
 
 // Request headers schemas see the normalized media type, while the codec gets
@@ -66,11 +65,8 @@ export type RequestReader<TRequest> = {
 	body: (request: TRequest, contentType: string) => IncomingBody;
 };
 
-/** A route result to serialize, or an error to send as an error response. */
-export type DispatchResult = HttpRouteResult | RouteError;
-
 /**
- * Turns a dispatch result into a runtime's response. It runs inside the
+ * Turns a route result into a runtime's response. It runs inside the
  * dispatch, so a request creates one promise.
  */
 export type ResponseWriter<TTarget, TOut> = {
@@ -79,10 +75,12 @@ export type ResponseWriter<TTarget, TOut> = {
 		target: TTarget,
 		codecs: BodyCodecRegistry,
 	) => MaybePromise<TOut>;
-	error: (error: ErrorResponse, target: TTarget) => MaybePromise<TOut>;
 };
 
-/** Runs a route for a request routed to it and responds with the writer. */
+/**
+ * Runs a route for a request routed to it and responds with the writer. Route
+ * errors reject with the error as it is sent, so interceptors observe it.
+ */
 export type Dispatch<TRequest, TTarget, TOut> = (
 	implementation: RuntimeImplementation,
 	pathParams: PathParams,
@@ -105,20 +103,18 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 	writer: ResponseWriter<TTarget, TOut>,
 ): Dispatch<TRequest, TTarget, TOut> => {
 	const { disableRequestValidation, disableResponseValidation, sse } = options;
-	// Synchronous when the error's schemas are, so it adds no promise.
-	const toErrorResponse = (
+	const rejectWith = async (
 		implementation: RuntimeImplementation,
 		error: RouteError,
-		target: TTarget,
-	): MaybePromise<TOut> =>
-		mapMaybePromise(
-			resolveRouteError(
+	): Promise<never> => {
+		throw toSentError(
+			await resolveRouteError(
 				implementation.route,
 				error,
 				disableResponseValidation ?? false,
 			),
-			(resolved) => writer.error(resolved.response, target),
 		);
+	};
 
 	return async (
 		implementation,
@@ -165,7 +161,7 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 					) as Record<string, string | undefined>;
 				} catch (error) {
 					if (error instanceof RouteError) {
-						return toErrorResponse(implementation, error, target);
+						return rejectWith(implementation, error);
 					}
 					throw error;
 				}
@@ -174,7 +170,7 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 			}
 			const mediaType = resolveRequestMediaType(declared, receivedMediaType);
 			if (mediaType instanceof RouteError) {
-				return toErrorResponse(implementation, mediaType, target);
+				return rejectWith(implementation, mediaType);
 			}
 
 			if (handleOptions?.body !== undefined) {
@@ -187,11 +183,7 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 					codecs,
 				);
 				if (deserialized.rejection) {
-					return toErrorResponse(
-						implementation,
-						deserialized.rejection,
-						target,
-					);
+					return rejectWith(implementation, deserialized.rejection);
 				}
 				body = deserialized.body;
 			}
@@ -216,7 +208,7 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 			});
 		} catch (error) {
 			if (error instanceof RouteError) {
-				return toErrorResponse(implementation, error, target);
+				return rejectWith(implementation, error);
 			}
 			throw error;
 		}

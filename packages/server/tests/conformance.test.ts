@@ -5,7 +5,7 @@ import {
 	createCatchAllHandler,
 	errorResponse,
 	interceptor,
-	InternalServerError,
+	onError,
 	respond,
 	route,
 	routeError,
@@ -108,6 +108,8 @@ type ServeOptions = {
 	bodyCodecs?: readonly BodyCodec[];
 	/** Reads the request body before rest-rpc, as a body parser does. */
 	readBody?: boolean;
+	/** Adds the errors an `onError` interceptor receives. */
+	reported?: unknown[];
 };
 
 type Serve = (
@@ -119,6 +121,9 @@ type Serve = (
 const serveFetch: Serve = (routes, options, run) => {
 	const handler = createCatchAllHandler(routes, {
 		bodyCodecs: options.bodyCodecs,
+		interceptors: options.reported && [
+			onError((error) => void options.reported!.push(error)),
+		],
 	});
 	return withFetchServer(async (request) => {
 		if (options.readBody) await request.text();
@@ -132,6 +137,9 @@ const serveFetch: Serve = (routes, options, run) => {
 const serveNode: Serve = (routes, options, run) => {
 	const handler = node.createCatchAllHandler(routes, {
 		bodyCodecs: options.bodyCodecs,
+		interceptors: options.reported && [
+			node.onError((error) => void options.reported!.push(error)),
+		],
 	});
 	return withHttpServer(async (req, res) => {
 		try {
@@ -188,6 +196,30 @@ describe.each([
 	{ name: "fetch", serve: serveFetch },
 	{ name: "node", serve: serveNode },
 ])("$name route conformance", ({ serve }) => {
+	it("runs interceptors around matched routes, sending route errors and rejecting with others", async () => {
+		const failure = new Error("handler failed");
+		const Gone = routeError("GONE", { status: 410 });
+		const routes = {
+			fail: route.get("/fail").handler((): string => {
+				throw failure;
+			}),
+			gone: route
+				.get("/gone")
+				.error(Gone)
+				.handler((): string => {
+					throw new Gone();
+				}),
+		};
+		const reported: unknown[] = [];
+		await serve(routes, { reported }, async (url) => {
+			expect((await fetch(`${url}/gone`)).status).toBe(410);
+			// The handler rejects, for the framework's error handling.
+			expect((await fetch(`${url}/fail`)).status).toBe(500);
+			expect((await fetch(`${url}/missing`)).status).toBe(404);
+		});
+		expect(reported).toEqual([expect.any(Gone), failure]);
+	});
+
 	it("serves params, body, headers and the request signal under a mount path", async () => {
 		const routes = {
 			create: route
@@ -974,14 +1006,16 @@ type AppOptions = {
 	context?: object | (() => object | Promise<object>);
 	/**
 	 * `cors` answers preflights and adds `access-control-allow-origin` to every
-	 * response, `throw` throws before calling `next`, `route` sends the
+	 * response, error responses included, `throw` throws before calling
+	 * `next`, `limit` throws a `RATE_LIMITED` route error, `route` sends the
 	 * matched route's path, or `none`, as `x-route`, and `notFound` sends 404
-	 * "custom" for unmatched requests, and `report` adds the errors `next`
-	 * rejects with to `reported` without rethrowing them.
+	 * "custom" for unmatched requests, and `report` is an `onError` that adds
+	 * errors to `reported`.
 	 */
 	interceptors?: readonly (
 		| "cors"
 		| "throw"
+		| "limit"
 		| "route"
 		| "notFound"
 		| "report"
@@ -989,6 +1023,7 @@ type AppOptions = {
 };
 
 const reported: unknown[] = [];
+const RateLimited = routeError("RATE_LIMITED", { status: 429 });
 
 const fetchInterceptors = {
 	cors: interceptor(async ({ request, next }) => {
@@ -998,9 +1033,7 @@ const fetchInterceptors = {
 				headers: { "access-control-allow-origin": "*" },
 			});
 		}
-		const response = await next().catch((cause) =>
-			errorResponse(new InternalServerError({ cause })),
-		);
+		const response = await next().catch(errorResponse);
 		const headers = new Headers(response.headers);
 		headers.set("access-control-allow-origin", "*");
 		return new Response(response.body, { status: response.status, headers });
@@ -1008,8 +1041,11 @@ const fetchInterceptors = {
 	throw: interceptor(() => {
 		throw new Error("interceptor failed");
 	}),
+	limit: interceptor(() => {
+		throw new RateLimited();
+	}),
 	route: interceptor(async ({ next, route }) => {
-		const response = await next();
+		const response = await next().catch(errorResponse);
 		const headers = new Headers(response.headers);
 		headers.set("x-route", route?.path ?? "none");
 		return new Response(response.body, { status: response.status, headers });
@@ -1017,12 +1053,7 @@ const fetchInterceptors = {
 	notFound: interceptor(({ route, next }) =>
 		route ? next() : new Response("custom", { status: 404 }),
 	),
-	report: interceptor(({ next }) =>
-		next().catch((error) => {
-			reported.push(error);
-			return errorResponse(new InternalServerError({ cause: error }));
-		}),
-	),
+	report: onError((error) => void reported.push(error)),
 };
 
 const nodeInterceptors = {
@@ -1034,6 +1065,9 @@ const nodeInterceptors = {
 	throw: node.interceptor(() => {
 		throw new Error("interceptor failed");
 	}),
+	limit: node.interceptor(() => {
+		throw new RateLimited();
+	}),
 	route: node.interceptor(({ response, next, route }) => {
 		response.setHeader("x-route", route?.path ?? "none");
 		return next();
@@ -1042,12 +1076,7 @@ const nodeInterceptors = {
 		if (route) return next();
 		response.writeHead(404).end("custom");
 	}),
-	// Writes nothing, so the app sends the internal error.
-	report: node.interceptor(({ next }) =>
-		next().catch((error) => {
-			reported.push(error);
-		}),
-	),
+	report: node.onError((error) => void reported.push(error)),
 };
 
 type ServeApp = (
@@ -1186,7 +1215,7 @@ describe.each([
 		);
 	});
 
-	it("rejects next() only with thrown values that are not route errors", async () => {
+	it("rejects next() with every error, route errors as they are sent", async () => {
 		const failure = new Error("handler failed");
 		const Gone = routeError("GONE", { status: 410 });
 		const routes = {
@@ -1211,11 +1240,52 @@ describe.each([
 			expect(await response.json()).toMatchObject({
 				code: "INTERNAL_SERVER_ERROR",
 			});
-			// Route errors, response validation failures included, are responses.
 			expect((await fetch(`${url}/invalid`)).status).toBe(500);
 			expect((await fetch(`${url}/gone`)).status).toBe(410);
+			expect((await fetch(`${url}/missing`)).status).toBe(404);
 		});
-		expect(reported).toEqual([failure]);
+		expect(reported).toEqual([
+			failure,
+			expect.objectContaining({
+				code: "INTERNAL_SERVER_ERROR",
+				cause: expect.objectContaining({ location: "body" }),
+			}),
+			expect.any(Gone),
+			expect.objectContaining({ code: "NOT_FOUND" }),
+		]);
+	});
+
+	it("sends route errors interceptors throw with their status", async () => {
+		await serve({ user }, { interceptors: ["cors", "limit"] }, async (url) => {
+			const response = await fetch(`${url}/users/1`);
+			expect(response.status).toBe(429);
+			expect(response.headers.get("access-control-allow-origin")).toBe("*");
+			expect(await response.json()).toMatchObject({ code: "RATE_LIMITED" });
+		});
+	});
+
+	it("reports a response body that fails while it streams", async () => {
+		const failure = new Error("stream failed");
+		const routes = {
+			stream: route.get("/stream").handler(
+				() =>
+					new Response(
+						new ReadableStream({
+							start(controller) {
+								controller.enqueue(new TextEncoder().encode("partial"));
+								controller.error(failure);
+							},
+						}),
+					),
+			),
+		};
+		reported.length = 0;
+		await serve(routes, { interceptors: ["report"] }, async (url) => {
+			await expect(
+				fetch(`${url}/stream`).then((response) => response.text()),
+			).rejects.toThrow();
+		});
+		await vi.waitFor(() => expect(reported).toEqual([failure]));
 	});
 
 	it("sends errors interceptors throw as internal server errors", async () => {

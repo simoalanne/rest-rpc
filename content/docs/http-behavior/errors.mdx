@@ -107,6 +107,6 @@ stream ends instead.
 Other errors thrown by handlers, middleware, or custom serializers are not sent
 as error responses by route handlers and the catch-all handler. They reject the handler promise, and
 reach the framework's error handling when routes are registered on a framework.
-`createApp` sends them as `INTERNAL_SERVER_ERROR` responses, and its
-interceptors' `next()` rejects with them, so an
-[interceptor](/docs/server/fetch#what-next-returns) can report them.
+`createApp` sends them as `INTERNAL_SERVER_ERROR` responses. Interceptors'
+`next()` rejects with them and with every `RouteError`, so an
+[`onError` interceptor](/docs/server/fetch#reporting-errors) reports both.

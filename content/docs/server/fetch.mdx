@@ -110,20 +110,23 @@ request IDs, logging, or CORS. Create one with `interceptor()`, which types the
 function and returns it unchanged:
 
 ```ts
-import { createApp, interceptor } from "@rest-rpc/server";
+import { createApp, interceptor, routeError } from "@rest-rpc/server";
 
-const apiKey = interceptor(({ request, next }) =>
-	request.headers.get("x-api-key") === API_KEY
-		? next()
-		: new Response("Forbidden", { status: 403 }),
-);
+const Forbidden = routeError("FORBIDDEN", { status: 403 });
+
+const apiKey = interceptor(({ request, next }) => {
+	if (request.headers.get("x-api-key") !== API_KEY) throw new Forbidden();
+	return next();
+});
 
 const timing = interceptor(async ({ next, route }) => {
 	const started = performance.now();
-	const response = await next();
-	// The route path, such as `/todos/:id`, keeps metric labels bounded.
-	metrics.record(route?.path ?? "unmatched", performance.now() - started);
-	return response;
+	try {
+		return await next();
+	} finally {
+		// The route path, such as `/todos/:id`, keeps metric labels bounded.
+		metrics.record(route?.path ?? "unmatched", performance.now() - started);
+	}
 });
 
 export default createApp(routes, { interceptors: [timing, apiKey] });
@@ -143,12 +146,13 @@ export default createApp(routes, { interceptors: [timing, apiKey] });
   such as the `env` of Cloudflare Workers. They are untyped, so narrow them
   where they are read: `const [env] = args as [Env]`.
 - `next()` continues with the later interceptors and the app. It resolves
-  with the response, error responses included, and rejects only for bugs. See
-  [What `next()` Returns](#what-next-returns). It may be called more than
-  once, such as to retry.
-- An error an interceptor throws is sent as an
-  [`INTERNAL_SERVER_ERROR`](/docs/http-behavior/errors#built-in-errors)
-  response.
+  with the response, and rejects with every error thrown after it, route
+  errors included. See [What `next()` Returns](#what-next-returns). It may be
+  called more than once, such as to retry.
+- An interceptor sends an error by throwing it. Whatever no interceptor
+  catches, the app sends as [`errorResponse()`](#error-responses) does: a
+  `RouteError` with its status, and anything else as an
+  [`INTERNAL_SERVER_ERROR`](/docs/http-behavior/errors#built-in-errors).
 
 `next(request)` continues with another request, such as one with other
 headers. The matched route reads it, but routing isn't repeated, so changing
@@ -170,9 +174,9 @@ request validation.
 ### Not Found
 
 The app matches the route before the interceptors run. When no route
-matches, `route` is `undefined`, and calling `next()` would resolve with the
-app's `NOT_FOUND` error response. An interceptor that sends its own response
-instead doesn't call `next()`:
+matches, `route` is `undefined`, and calling `next()` rejects with the app's
+`NOT_FOUND` error. An interceptor that sends its own response instead doesn't
+call `next()`:
 
 ```ts
 const notFound = interceptor(({ route, next }) =>
@@ -182,73 +186,84 @@ const notFound = interceptor(({ route, next }) =>
 
 ### What `next()` Returns
 
-| What happens in the app                                                                                                                             | `next()`                                          |
-| --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| The route returns a response                                                                                                                        | Resolves with it                                  |
-| A `RouteError` is thrown: a [defined or built-in error](/docs/http-behavior/errors), such as a request validation failure or a handler's `NotFound` | Resolves with its JSON error response             |
-| No route matches, so `route` is `undefined`                                                                                                         | Resolves with the `NOT_FOUND` JSON error response |
-| Anything else is thrown, such as an `Error` from a handler, middleware, the `context` function or a codec                                           | Rejects with the thrown value, unchanged          |
+| What happens in the app                                                                                                                             | `next()`                                                               |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| The route returns a response                                                                                                                        | Resolves with it, before its body streams                              |
+| A `RouteError` is thrown: a [defined or built-in error](/docs/http-behavior/errors), such as a request validation failure or a handler's `NotFound` | Rejects with it, with the status, `data` and headers it is sent with   |
+| A response fails validation                                                                                                                         | Rejects with an `INTERNAL_SERVER_ERROR` whose `cause` holds the issues |
+| No route matches, so `route` is `undefined`                                                                                                         | Rejects with a `NOT_FOUND` error                                       |
+| Anything else is thrown, such as an `Error` from a handler, middleware, the `context` function or a codec                                           | Rejects with the thrown value, unchanged                               |
 
-Every outcome the contract describes, including errors, arrives as a response
-whose status you can read. A rejection only ever means a bug. When nothing
-catches it, the app sends an `INTERNAL_SERVER_ERROR` response.
+A rejected route error keeps its class, message and `cause`, so
+`error instanceof NotFound` works, and the `data` is the validated value the
+client receives.
 
-So error reporting is a `try`/`catch` around `next()`:
+### Reporting Errors
+
+`onError(callback)` creates an interceptor that calls `callback` with every
+error thrown after it, and rethrows it, so the app still sends it:
 
 ```ts
-const logErrors = interceptor(async ({ request, next }) => {
-	try {
-		return await next();
-	} catch (error) {
-		// The thrown value as is, such as an `Error` with its stack and `cause`.
-		console.error(request.method, request.url, error);
-		throw error; // The app sends INTERNAL_SERVER_ERROR.
-	}
+import { createApp, onError } from "@rest-rpc/server";
+
+export default createApp(routes, {
+	interceptors: [
+		onError((error, { request, route }) => {
+			logger.error({ method: request.method, path: route?.path, error });
+		}),
+	],
 });
 ```
 
-`next()` resolves before the response body streams, so a stream that fails
-later can't be caught here. The stream ends, and the client receives an
-incomplete response.
+It also reports a response body that fails while it streams, after `next()`
+resolved, such as a returned `Response` whose stream errors. A client that
+cancels the body is not reported. Writing the same thing by hand is a
+`try`/`catch` around `next()` plus a wrapped body, which is what `onError` is.
 
 ### Error Responses
 
-`errorResponse(error)` creates the `Response` the app sends for a
-`RouteError`: its status and headers, and a JSON `{ code, message, data? }`
-body. The [client](/docs/client/fetch-client) decodes that response as a
-`RouteError`, so an error an interceptor sends is handled like any other. No
-route definition applies, so the error is sent with its own status, `data`
-and headers, without validation:
+`errorResponse(error)` creates the `Response` the app sends for a thrown
+value: a `RouteError` with its status and headers and a JSON
+`{ code, message, data? }` body, and anything else as an
+`INTERNAL_SERVER_ERROR` with the value as `cause`. The
+[client](/docs/client/fetch-client) decodes it as a `RouteError`. A
+`RouteError` an interceptor throws is sent the same way, with its own status,
+`data` and headers, without validation:
 
 ```ts
-import { errorResponse, interceptor, routeError } from "@rest-rpc/server";
-
 const RateLimited = routeError("RATE_LIMITED", { status: 429 });
 
-const rateLimit = interceptor(({ request, next }) =>
-	limiter.allow(request) ? next() : errorResponse(new RateLimited()),
-);
+const rateLimit = interceptor(({ request, next }) => {
+	if (!limiter.allow(request)) throw new RateLimited();
+	return next();
+});
 // The client rejects with a RouteError whose code is "RATE_LIMITED".
+```
+
+The app sends errors after every interceptor ran. An interceptor that catches
+with `errorResponse` sends them earlier, so the interceptors before it receive
+error responses as responses, and the ones after it still receive the
+rejections:
+
+```ts
+createApp(routes, {
+	interceptors: [
+		cors, // next() resolves with every response, error responses included
+		interceptor(({ next }) => next().catch(errorResponse)),
+		onError((error) => logger.error(error)), // receives the errors
+		rateLimit,
+	],
+});
 ```
 
 ### CORS
 
 CORS headers have to be on every response, error responses included, or the
 browser hides the response from the client, and preflights have to be
-answered before routing. One interceptor does both.
-
-When `next()` rejects, the app creates its `INTERNAL_SERVER_ERROR` response
-after the interceptors, so headers they add can't be on it. The interceptor
-creates that response itself instead, with `errorResponse()`, so it gets the
-headers too:
+answered before routing. One interceptor does both, placed before one that
+catches with [`errorResponse`](#error-responses):
 
 ```ts
-import {
-	errorResponse,
-	interceptor,
-	InternalServerError,
-} from "@rest-rpc/server";
-
 const cors = interceptor(async ({ request, next }) => {
 	const headers = {
 		"access-control-allow-origin": "https://app.example.com",
@@ -264,18 +279,16 @@ const cors = interceptor(async ({ request, next }) => {
 			},
 		});
 	}
-	let response: Response;
-	try {
-		response = await next(); // Every RouteError arrives here as a response.
-	} catch {
-		// Only bugs get here: the response the app would send, with the headers.
-		response = errorResponse(new InternalServerError());
-	}
+	const response = await next();
 	// A returned `Response` may have immutable headers, so it is copied.
 	const copy = new Response(response.body, response);
 	for (const [name, value] of Object.entries(headers)) {
 		copy.headers.set(name, value);
 	}
 	return copy;
+});
+
+export default createApp(routes, {
+	interceptors: [cors, interceptor(({ next }) => next().catch(errorResponse))],
 });
 ```

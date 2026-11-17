@@ -3,6 +3,7 @@ export {
 	createCatchAllHandler,
 	type NodeRoute,
 	type NodeRouteHandlerResult,
+	type NodeRouteHandlersOptions,
 } from "./createRouteHandlers.ts";
 export {
 	createApp,
@@ -12,6 +13,7 @@ export {
 } from "./createApp.ts";
 export {
 	interceptor,
+	onError,
 	writeErrorResponse,
 	type NodeInterceptor,
 } from "./interceptor.ts";

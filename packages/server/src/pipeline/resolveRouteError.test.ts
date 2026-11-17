@@ -2,7 +2,7 @@ import { RouteError, routeError, type } from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import { route } from "../builder/routeBuilder.ts";
 import { RequestValidationFailed } from "./errors.ts";
-import { resolveRouteError } from "./resolveRouteError.ts";
+import { resolveRouteError, toSentError } from "./resolveRouteError.ts";
 
 const UserNotFound = routeError("USER_NOT_FOUND", {
 	status: 404,
@@ -32,6 +32,28 @@ describe("resolveRouteError", () => {
 		expect(
 			(await resolveRouteError(definition, thrown, true)).response,
 		).toMatchObject({ status: 404, data: 1, headers: { "x-id": 1 } });
+	});
+
+	it("rejects with the error as sent, keeping its class, message and cause", async () => {
+		const cause = new Error("lookup failed");
+		const thrown = new UserNotFound({
+			message: "Missing",
+			data: 1,
+			headers: { "x-id": 1 },
+			cause,
+		});
+		const sent = toSentError(
+			await resolveRouteError(definition, thrown, false),
+		);
+		expect(sent).toBeInstanceOf(UserNotFound);
+		expect(sent).toMatchObject({
+			message: "Missing",
+			status: 404,
+			data: { id: "1" },
+			headers: { "x-id": "1" },
+			cause,
+		});
+		expect(thrown.data).toBe(1);
 	});
 
 	it("turns invalid data into a response validation failure", async () => {

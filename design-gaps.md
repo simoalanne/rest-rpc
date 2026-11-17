@@ -2,25 +2,16 @@
 
 ## Before stable
 
-- **Route errors reject `next()`.** Interceptors receive every `RouteError`
-  thrown, `cause` included, after it's resolved against the route, so its
-  status and `data` are the ones sent. The app sends an error no interceptor
-  catches. Update the CORS example and the `next()` table in the server docs.
-  - Decide how a stream that fails after `next()` resolves is reported on
-    Fetch. Node already rejects `next()`.
-  - Decide how framework integration observes errors, since route handlers
-    write error responses themselves.
-- **JSON client bodies typed as `Jsonify<T>`.** `Date` becomes `string`,
-  `Map` and `Set` become an empty-object type (never `{}`), and `undefined`
-  properties become optional. Values that can't be sent as JSON, such as
-  `bigint`, are a type error per `respond()` call. Pin with type tests against
+- **JSON client bodies typed as `Jsonify<T>`**, only where the body is
+  always JSON: responses whose headers schema declares no `content-type`, SSE
+  event data, and error `data`. `Date` becomes `string`, `Map` and `Set`
+  become an empty-object type (never `{}`), and `undefined` properties become
+  optional. For those responses, a schema output with values JSON can't send,
+  such as `bigint`, is a type error at `.response()`. A response that declares
+  a `content-type` keeps the schema output. Pin with type tests against
   `JSON.parse(JSON.stringify(value))`.
-- **Client body types from the `content-type` header.** `text/*` is `string`,
-  forms are objects, SSE is a stream of `Jsonify<item>`, and anything else,
-  or a `string` header, is `Blob`. Under a JSON header, apply `Jsonify` only to
-  body members that can be sent as JSON.
-- **Opt-out for both client body types.** A global, type-only switch declared
-  by augmenting an interface in `@rest-rpc/core`, for codecs that restore
+- **Opt-out for `Jsonify`.** A global, type-only switch declared by
+  augmenting an interface in `@rest-rpc/core`, for JSON codecs that restore
   native types.
 - **Raw stream chunks.** An async iterable with a non-SSE `content-type` is
   restricted to `AsyncIterable<string | Uint8Array> | ReadableStream<Uint8Array>`.
@@ -35,12 +26,6 @@
   - A `FormData` body makes the call's `content-type` header optional.
   - The urlencoded serializer throws a `TypeError` for a `Blob` value.
 
-## Additive
-
-- **Routes at the matched path for interceptors**, for any method, so
-  preflights can list the allowed methods and a wrong method can be answered
-  with `405`.
-
 ## Docs
 
 - **Rewrite the HTTP behaviour pages.** Cover how content types are chosen,
@@ -50,6 +35,9 @@
   - Content types are only inferred for async iterables (SSE), returned
     `Response`s (raw) and `FormData` (multipart).
   - One body schema per status.
+  - A response that declares a `content-type` is typed as its schema output
+    on the client, so the schema has to match what the codec decodes, such as
+    `string` for `text/*` and `Blob` for binary.
   - Interceptors are outside the typed contract.
   - Request bodies are read whole before they're decoded.
   - Arrays only come from `key[]` keys, so HTML forms use `name="tags[]"`.
@@ -64,8 +52,20 @@
   - What rest-rpc guarantees: request validation issues are sent to the
     caller, response validation failures are hidden as `500`s, and `cause`s
     are never sent.
-- **Interceptor examples** for a problem+json error format on the server and
-  the client, and for serving a path prefix before routing, such as
+- **Document interceptors as the standard pattern they are**, in one place
+  per runtime: the order they run in, what runs before and after `next()`,
+  what `next()` resolves and rejects with, where the app writes errors, and
+  how a `next().catch(errorResponse)` interceptor changes that for the ones
+  before it. Point out that frameworks often split the same pattern into
+  named hooks that each solve a narrower problem.
+  - Lead with one copyable example of the full lifecycle of a request:
+    interceptors, the `catch` interceptor, `onError`, the context function,
+    middleware and the handler. Each step logs when it runs before and after
+    `next()`, so running it shows the order, including for a request that
+    fails validation, a handler that throws and a path that matches no route.
+    It belongs in the examples package, so it's typechecked and run.
+- **Interceptor examples** for CORS, a problem+json error format on the
+  server and the client, and serving a path prefix before routing, such as
   `/files/*`.
 - **Replace the README cheatsheet with runnable examples:**
   - A private examples package of self-contained files, each one task, about

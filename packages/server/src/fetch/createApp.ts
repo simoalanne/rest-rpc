@@ -6,7 +6,7 @@ import type {
 	TreeInitialContext,
 } from "../routing/match.ts";
 import { createRouteMatcher } from "../routing/match.ts";
-import { InternalServerError, NotFound } from "../pipeline/errors.ts";
+import { NotFound } from "../pipeline/errors.ts";
 import type { CreateRouteHandlersOptions } from "../pipeline/handleOptions.ts";
 import {
 	compileFetchRoutes,
@@ -14,8 +14,8 @@ import {
 } from "./createRouteHandlers.ts";
 
 type Match = { route: CompiledFetchRoute; params?: Record<string, string> };
-import { intercept, type Interceptor } from "./interceptor.ts";
-import { serializeFetchError } from "./response.ts";
+import { errorResponse, intercept, type Interceptor } from "./interceptor.ts";
+import { respondTo } from "./response.ts";
 
 /**
  * Customizes the routes, request parsing and interceptors of an app.
@@ -91,9 +91,10 @@ export type App<TArgs extends unknown[] = []> = {
 /**
  * Creates a Fetch app that serves a route tree.
  *
- * @remarks Errors that are not sent as error responses by the routes, such as
- * errors thrown by handlers, are sent as `INTERNAL_SERVER_ERROR` responses
- * with the thrown error as `cause`. Use {@link createRouteHandlers} and
+ * @remarks Errors no interceptor catches are sent as `errorResponse()` sends
+ * them: `RouteError`s as error responses, and other thrown values, such
+ * as errors thrown by handlers, as `INTERNAL_SERVER_ERROR` responses with the
+ * thrown value as `cause`. Use {@link createRouteHandlers} and
  * {@link createCatchAllHandler} instead to serve the routes from an existing
  * server or framework.
  *
@@ -126,21 +127,18 @@ export function createApp(
 	options?: CreateAppOptions<unknown[], object>,
 ): App<unknown[]> {
 	const { mountPath, context, interceptors, ...compileOptions } = options ?? {};
-	const respondWithInternalError = (error: unknown) =>
-		serializeFetchError(new InternalServerError({ cause: error }));
 	const compiled = compileFetchRoutes(implementations, compileOptions);
 	const matchRoute = createRouteMatcher(compiled);
 	const matchRequest = (request: Request): Match | undefined =>
 		matchRoute(request.method, request.url, mountPath);
 	// Static routes read no context, so the context function is not called.
-	// Errors the routes do not send as responses reject, so interceptors
-	// observe them.
+	// Errors reject, `NOT_FOUND` included, so interceptors observe them.
 	const serve = (
 		request: Request,
 		args: unknown[],
 		match: Match | undefined,
 	): Promise<Response> => {
-		if (!match) return Promise.resolve(serializeFetchError(new NotFound()));
+		if (!match) return Promise.reject(new NotFound());
 		const { route, params } = match;
 		if (route.staticResponse) return route.handle(request);
 		// The matched params are passed on, so they are not parsed again.
@@ -155,22 +153,26 @@ export function createApp(
 
 	// Static routes are sent as they are. Other requests run the interceptors
 	// with the matched route, which a request passed to `next` keeps. Errors
-	// that reach the outermost interceptor's caller are sent as internal errors.
+	// that reach the outermost interceptor's caller are sent with
+	// `errorResponse`.
 	const run = (
 		request: Request,
 		args: unknown[],
 		match: Match | undefined,
 	): Promise<Response> =>
-		(!interceptors?.length || match?.route.staticResponse
-			? serve(request, args, match)
-			: intercept(
-					interceptors,
-					request,
-					match?.route.definition,
-					args,
-					(current) => serve(current, args, match),
-				)
-		).catch(respondWithInternalError);
+		respondTo(
+			request,
+			(!interceptors?.length || match?.route.staticResponse
+				? serve(request, args, match)
+				: intercept(
+						interceptors,
+						request,
+						match?.route.definition,
+						args,
+						(current) => serve(current, args, match),
+					)
+			).catch(errorResponse),
+		);
 
 	const routes: App<unknown[]>["routes"] = {};
 	// A trailing slash of the mount path is ignored, as in `fetch`.
@@ -194,7 +196,7 @@ export function createApp(
 			try {
 				match = matchRequest(request);
 			} catch (error) {
-				return respondWithInternalError(error);
+				return respondTo(request, Promise.resolve(errorResponse(error)));
 			}
 			return run(request, args, match);
 		},
