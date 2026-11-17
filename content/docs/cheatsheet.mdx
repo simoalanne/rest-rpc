@@ -434,33 +434,38 @@ export default app;
 
 ## Browser Clients
 
-A browser client needs the routes' contract without the server code.
-`extractContract()` keeps the methods, paths, statuses and error codes, and the
-types come from a type-only import.
+A bundler macro runs `extractContract()` at build time and inlines the routes'
+methods, paths, statuses and error codes, so no server code ships. Bun runs
+macros itself, and Vite and other bundlers with `unplugin-macros`.
 
 See [Contract Extraction](/docs/client/contract-extraction)
 
 ```ts
-// scripts/extract-contract.ts, run at build time
-import { writeFile } from "node:fs/promises";
+// client/contract.ts
 import { extractContract } from "@rest-rpc/core";
-import { routes } from "../server/routes";
+import { routes } from "../server/routes.ts";
 
-await writeFile(
-	"client/contract.json",
-	JSON.stringify(extractContract(routes)),
-);
+export function getApi() {
+	return extractContract(routes);
+}
 ```
 
 ```ts
 // client/api.ts
 import { createClient } from "@rest-rpc/core";
-import type { routes } from "../server/routes"; // erased from the bundle
-import contract from "./contract.json";
+import { getApi } from "./contract.ts" with { type: "macro" };
 
-export const client = createClient(contract as unknown as typeof routes, {
+export const client = createClient(getApi(), {
 	origin: "https://api.example.com",
 });
+```
+
+```ts
+// vite.config.ts, not needed with Bun
+import Macros from "unplugin-macros/vite";
+import { defineConfig } from "vite";
+
+export default defineConfig({ plugins: [Macros()] });
 ```
 
 ## Client Options
