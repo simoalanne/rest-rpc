@@ -134,11 +134,9 @@ describe("routeBuilder types", () => {
 		route.get("/").response(todo, { status: 201 }).response(todo);
 		// @ts-expect-error The route already defines a response for this status.
 		route.get("/").response(todo).response(todo);
+		const created = route.get("/").response(todo, { status: 201 });
 		// @ts-expect-error The route already defines a response for this status.
-		route
-			.get("/")
-			.response(todo, { status: 201 })
-			.response(todo, { status: 201 });
+		created.response(todo, { status: 201 });
 		// @ts-expect-error The route already defines a response for this status.
 		route.get("/").response({ status: 204 }).response({ status: 204 });
 		// @ts-expect-error The route already defines a response for this status.
