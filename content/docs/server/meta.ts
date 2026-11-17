@@ -1,6 +1,6 @@
 import { defineMeta } from "blume";
 
 export default defineMeta({
-	pages: ["overview", "fetch", "node", "framework-integration"],
+	pages: ["overview", "fetch", "node", "interceptors", "framework-integration"],
 	title: "Server",
 });

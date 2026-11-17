@@ -19,7 +19,7 @@ import { toFetchResponse } from "./response.ts";
  * interceptor sends an error by throwing it. The app sends what reaches it
  * with {@link errorResponse}.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#interceptors}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/interceptors}
  */
 export type Interceptor = (args: {
 	request: Request;
@@ -57,7 +57,7 @@ export type Interceptor = (args: {
  * });
  * ```
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#interceptors}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/interceptors}
  */
 export function interceptor(interceptor: Interceptor): Interceptor {
 	return interceptor;
@@ -106,7 +106,7 @@ export const intercept = (
  * });
  * ```
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#error-responses}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/interceptors#sending-errors}
  */
 export function errorResponse(error: unknown): Response {
 	return toFetchResponse(serializeRouteErrorParts(asRouteError(error)));
@@ -131,7 +131,7 @@ export function errorResponse(error: unknown): Response {
  * });
  * ```
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#reporting-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/interceptors#reporting-errors}
  */
 export function onError(
 	callback: (

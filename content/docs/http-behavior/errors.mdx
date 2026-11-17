@@ -57,21 +57,13 @@ The definition decides what's sent: its status, and `data` and headers
 validated by its schemas. When they fail validation, an `INTERNAL_SERVER_ERROR`
 is sent instead.
 
-An error whose code the route doesn't define is sent as thrown, with its own
-status, `data` and headers, unvalidated. Clients receive it as a `RouteError`
-that `isDefinedError()` rejects, with `code`, `status` and `data` still
-readable. It suits errors that apply across routes, such as an `UNAUTHORIZED`
-from auth middleware:
+An error whose code the route doesn't define is sent as thrown. Clients get
+an untyped `RouteError`, with `code`, `status` and `data` still readable,
+which suits errors that apply across routes:
 
 ```ts
 throw new RouteError("RATE_LIMITED", { status: 429 });
 ```
-
-[Interceptors](/docs/server/fetch#interceptors) are outside routes, so an error
-they throw is never checked against the route's definitions. To send a code
-the route defines, throw that route's error class, which is typed against the
-definition. A bare `new RouteError()` with a defined code reaches clients as
-the defined error with whatever shape it had.
 
 ## Built-in Errors
 
@@ -100,15 +92,7 @@ const create = route
 
 ## Other Errors
 
-Anything thrown that isn't a `RouteError`, such as a handler's `Error`, depends
-on how routes are served:
-
-- `createApp` sends it as an `INTERNAL_SERVER_ERROR` with the thrown value as
-  `cause`, which is never sent.
-- [Route handlers and the catch-all handler](/docs/server/framework-integration#error-handling)
-  reject with it, for the framework's error handling.
-- When a response already started, such as a stream that fails, the
-  connection is closed, and the client sees an incomplete response.
-
-[`onError`](/docs/server/fetch#reporting-errors) reports these and route
-errors, with their `cause`, in all three cases.
+Anything else thrown, such as a handler's `Error`, is sent by `createApp` as
+an `INTERNAL_SERVER_ERROR`, while
+[framework handlers](/docs/server/framework-integration#error-handling) reject
+with it for the framework. Its `cause` is never sent.

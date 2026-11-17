@@ -305,7 +305,7 @@ Fetch `Response` is cloned for every request, and sent as a
 not available on routes that read the request or run middleware.
 
 A static route is for public content that anyone may read. It skips
-[interceptors](/docs/server/fetch#interceptors) and middleware, so it serves
+[interceptors](/docs/server/interceptors) and middleware, so it serves
 at full throughput, but nothing in the API layer can restrict it. Use
 `.handler()` for a response that is the same every time but needs
 authentication or authorization, and put headers that interceptors would add,
