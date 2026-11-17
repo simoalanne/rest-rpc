@@ -28,25 +28,21 @@ The server validates params, query, headers and body before middleware and the
 handler run. A failure is answered with
 [`REQUEST_VALIDATION_FAILED`](/docs/http-behavior/errors#built-in-errors) and
 status `400`, with the issues of each location as `data`, and the handler
-doesn't run.
+doesn't run. Params, query and headers arrive as
+[strings](/docs/http-behavior/encoding#params-query-and-headers), so their
+schemas coerce.
 
-Params, query and headers arrive as strings, so a schema that expects a number
-has to coerce it. `z.number()` compiles, since the client sends numbers as
-strings, but every call fails validation. See
-[Params, Query and Headers](/docs/http-behavior/encoding#params-query-and-headers).
+A schema that strips unknown keys, such as `z.object()`, passes on only the
+keys it declares. One that keeps them, such as `z.looseObject()`, passes on
+anything the request sent, `__proto__` included, so don't deep-merge such a
+body into another object.
 
 ## Responses
 
-A defined response's body and headers are validated before they're sent, and
-the validated output is what's sent. A stream validates each item as it's
-yielded. A failure is a server bug, so the client gets an
-`INTERNAL_SERVER_ERROR` with status `500` and no details, and the issues are
-the error's `cause` on the server, where
-[`onError`](/docs/server/fetch#reporting-errors) can report them. A stream that
-already started ends instead.
-
-Responses inferred from the handler's return value are type-checked but not
-validated. Add `.response(schema)` for runtime validation.
+A defined response is validated before it's sent, and a stream each item as
+it's yielded. A failure is a server bug, so the client gets a bare
+`INTERNAL_SERVER_ERROR`, and the issues stay on the server as its `cause`.
+Responses inferred from the handler are type-checked but not validated.
 
 ## What the Client Receives
 
@@ -64,12 +60,9 @@ const { body } = await client.getTodo({ params: { id: "1" } });
 body.dueAt; // typed Date, but the string "2026-11-17T12:00:00.000Z" at runtime
 ```
 
-`Map` and `Set` arrive as `{}`, `undefined` properties are missing, and a
-`bigint` makes the server throw. Use schemas whose output is what JSON sends,
-such as `z.iso.datetime()` for dates, or convert on the client. With
-[`validateResponses`](/docs/client/fetch-client#response-validation), the
-client runs the schema on what it received, so a `z.coerce.date()` schema gives
-a `Date` back.
+Use schemas whose output is what JSON sends, such as `z.iso.datetime()`, or
+restore the value on the client with a `z.coerce.date()` schema and
+[`validateResponses`](/docs/client/fetch-client#response-validation).
 
 ## Disabling Validation
 
@@ -90,14 +83,10 @@ createApp(
 );
 ```
 
-- Coercions, transforms and defaults don't apply, in requests or responses.
-- A route with a body accepts every request content type.
-- A response headers schema default doesn't apply, so a
-  `z.literal("text/csv").default("text/csv")` header isn't sent, and the body is
-  sent as JSON unless the handler sets `content-type`.
-
-Disable validation only with schemas that don't change values. `type<T>()` per
-route is the narrower opt-out.
+Coercions, transforms and defaults don't apply, a header default such as a
+`content-type` included, and a route with a body accepts any content type.
+Disable validation only with schemas that don't change values, or use
+`type<T>()` on the routes that need it.
 
 ## Types Without Validation
 

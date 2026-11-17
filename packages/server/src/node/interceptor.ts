@@ -101,7 +101,7 @@ export const intercept = (
  * );
  * ```
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/node#error-responses}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/node#interceptors}
  */
 export function writeErrorResponse(
 	response: ServerResponse,
@@ -129,7 +129,7 @@ export function writeErrorResponse(
  * });
  * ```
  *
- * @see {@link https://rest-rpc.vercel.app/docs/server/node#reporting-errors}
+ * @see {@link https://rest-rpc.vercel.app/docs/server/node#interceptors}
  */
 export function onError(
 	callback: (

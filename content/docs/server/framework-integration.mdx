@@ -181,22 +181,15 @@ Express examples do with `next`.
 
 ## Interceptors
 
-Both ways take `interceptors`, the same functions as the
-[Fetch](/docs/server/fetch#interceptors) or
-[Node](/docs/server/node#interceptors) `createApp` takes. They run around each
-route's `handle` after the framework routed the request, so `route` is always
-defined, and the catch-all handler runs them only for matched requests. The
-framework's own middleware sees error responses only as responses, so report
-errors with their `cause` with `onError`:
+Framework middleware only sees error responses, without their `cause`. Both
+ways take [`interceptors`](/docs/server/interceptors), which run around each
+matched route's `handle`, so `route` is always defined:
 
 ```ts
-import { createRouteHandlers, onError } from "@rest-rpc/server";
-
 const handlers = createRouteHandlers(routes, {
 	interceptors: [onError((error) => logger.error(error))],
 });
 ```
 
-`next()` rejects with every error, as in `createApp`. Route errors no
-interceptor catches are sent as error responses, and other errors reject
-`handle` for the framework.
+Route errors no interceptor catches are still sent as error responses, and
+other errors reject `handle`.
