@@ -34,32 +34,15 @@
     objects too. A `FormData` instance is sent as it is.
   - A `FormData` body makes the call's `content-type` header optional.
   - The urlencoded serializer throws a `TypeError` for a `Blob` value.
-- **Null-prototype objects in `parseQuery`**, with a test for
-  `__proto__[]=x`. This can land before the form work.
 
 ## Additive
 
-- **A repeated response status is a type error.** Today `.response()` for a
-  status the route already defines only throws when the route is defined.
 - **Routes at the matched path for interceptors**, for any method, so
   preflights can list the allowed methods and a wrong method can be answered
   with `405`.
-- **OpenAPI `requestBody.required`**, set unless the body schema accepts
-  `undefined`.
 
 ## Docs
 
-- **Fix the stale content type docs:**
-  - "Disabling Server Validation" in `schemas.mdx` says content-type checks
-    and content-type selection still run. Without request validation, a route
-    with a body accepts every request content type. Without response
-    validation, a headers schema default such as
-    `z.literal("text/csv").default("text/csv")` isn't applied, so the body is
-    sent as JSON unless the handler writes the `content-type` header.
-  - The `UnsupportedMediaType` TSDoc still mentions routes that define several
-    media types. It's sent when the request content type of a route with a
-    body isn't one its headers schema declares, or isn't JSON when it declares
-    none.
 - **Rewrite the HTTP behaviour pages.** Cover how content types are chosen,
   what the client receives compared with what the server sends, and the
   pitfalls.

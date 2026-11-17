@@ -20,9 +20,11 @@ describe("routeBuilder", () => {
 		expect(contract.second["~restrpc"].responses).toEqual({ 201: json });
 	});
 
+	// Literal statuses are a type error, so only a status typed `number` gets here.
 	it("rejects duplicate response statuses across stream and body responses", () => {
+		const status: number = 200;
 		expect(() =>
-			new RouteBuilder().response(schema).response(sse(schema)),
+			new RouteBuilder().response(schema).response(sse(schema), { status }),
 		).toThrow();
 	});
 

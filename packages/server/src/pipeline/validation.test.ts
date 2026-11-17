@@ -23,6 +23,14 @@ describe("validation", () => {
 		});
 	});
 
+	it("does not let a __proto__ key give the query inherited values", () => {
+		for (const query of ["__proto__[]=x", "__proto__%5B%5D=x"]) {
+			const parsed = parseQuery(query);
+			expect(parsed.length).toBeUndefined();
+			expect(parsed.push).toBeUndefined();
+		}
+	});
+
 	it("parses queries like URLSearchParams", () => {
 		for (const query of [
 			"",

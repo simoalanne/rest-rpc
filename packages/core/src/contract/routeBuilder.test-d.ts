@@ -128,6 +128,23 @@ describe("routeBuilder types", () => {
 		route.get("/").response(raw()).response({ status: 204 });
 	});
 
+	it("rejects a second response for the same status", () => {
+		const todo = type<{ id: string }>();
+		route.get("/").response(todo).response({ status: 204 });
+		route.get("/").response(todo, { status: 201 }).response(todo);
+		// @ts-expect-error The route already defines a response for this status.
+		route.get("/").response(todo).response(todo);
+		// @ts-expect-error The route already defines a response for this status.
+		route
+			.get("/")
+			.response(todo, { status: 201 })
+			.response(todo, { status: 201 });
+		// @ts-expect-error The route already defines a response for this status.
+		route.get("/").response({ status: 204 }).response({ status: 204 });
+		// @ts-expect-error The route already defines a response for this status.
+		route.get("/").response(sse(todo)).response(todo);
+	});
+
 	it("rejects optional params schema keys", () => {
 		route.get("/users/:id").params(type<{ id: string }>());
 		// @ts-expect-error Path params are always present.

@@ -194,6 +194,13 @@ describe("operation", () => {
 		expect(operationOf(route.get("/")).requestBody).toBeUndefined();
 	});
 
+	it("documents defined request bodies as required", () => {
+		const body = type<{ name: string }>();
+		expect(operationOf(route.post("/").body(body)).requestBody?.required).toBe(
+			true,
+		);
+	});
+
 	it("omits content for bodyless responses and uses SSE for streams", () => {
 		expect(
 			operationOf(route.get("/").response({ status: 204 })).responses,

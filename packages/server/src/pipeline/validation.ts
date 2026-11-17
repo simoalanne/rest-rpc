@@ -51,7 +51,9 @@ const setQueryValue = (
 
 /** Keys ending in `[]` collect arrays; other repeated keys keep the last value. */
 export function parseQuery(search: string): Record<string, unknown> {
-	const data: Record<string, unknown> = {};
+	// Without a prototype, a `__proto__` key is an ordinary key, and fields the
+	// query doesn't contain read as undefined instead of inherited values.
+	const data: Record<string, unknown> = Object.create(null);
 	// Only encoded queries need `URLSearchParams` to decode them.
 	if (search.includes("%") || search.includes("+")) {
 		new URLSearchParams(search).forEach((value, wireKey) =>
