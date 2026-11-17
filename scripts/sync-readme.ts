@@ -13,7 +13,7 @@ const contentsHeading = "## Contents";
 
 const frontmatter = `---
 title: Cheatsheet
-description: The whole rest-rpc API in one page, with links to each section's documentation.
+description: Common rest-rpc patterns, each a complete example, with links to the documentation.
 ---
 `;
 
