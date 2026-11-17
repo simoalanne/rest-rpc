@@ -510,35 +510,34 @@ import {
 	createApp,
 	errorResponse,
 	interceptor,
-	InternalServerError,
+	onError,
 } from "@rest-rpc/server";
 
 export default createApp(routes, {
 	mountPath: "/api", // served under, not part of route paths (use .prefix() for that)
 	context: (request, env: Env) => ({ db: env.DB }), // extra fetch args, e.g. Workers env
 	bodyCodecs: [binary], // also disableRequestValidation, disableResponseValidation
-	interceptors: [logErrors, apiKey, notFound], // run first to last around everything
+	interceptors: [cors, sendErrors, logErrors, apiKey, notFound], // first to last around everything
 });
 
 // Every request, unmatched ones and OPTIONS included, except .static() routes,
 // which are for public content. Bun's app.routes run them too.
-const apiKey = interceptor(
-	({ request, next, route, args }) =>
-		route?.meta?.access === "public" || // route is undefined when none matches
-		request.headers.get("x-api-key") === API_KEY // args: the extra fetch args, untyped
-			? next() // or next(request) with other headers, also more than once
-			: errorResponse(new Forbidden()), // a RouteError's response, decoded by clients as one
-);
-// next() resolves with every response, RouteErrors included, and rejects only
-// with other thrown values, such as a handler's Error. The app sends those as 500s.
-const logErrors = interceptor(async ({ next }) => {
-	try {
-		return await next();
-	} catch (error) {
-		console.error(error);
-		throw error; // or return errorResponse(new InternalServerError()) to add headers
-	}
+const apiKey = interceptor(({ request, next, route, args }) => {
+	if (
+		route?.meta?.access !== "public" && // route is undefined when none matches
+		request.headers.get("x-api-key") !== API_KEY // args: the extra fetch args, untyped
+	)
+		throw new Forbidden(); // sent as the app sends any error, decoded by clients as one
+	return next(); // or next(request) with other headers, also more than once
 });
+// next() rejects with every error thrown after it: RouteErrors as they are sent,
+// NOT_FOUND included, and other values unchanged. onError reports them, and failing streams.
+const logErrors = onError((error, { request }) =>
+	console.error(request.url, error),
+);
+// The app sends what reaches it after all interceptors. Catching with errorResponse
+// sends errors earlier, so interceptors before it, such as CORS, receive them as responses.
+const sendErrors = interceptor(({ next }) => next().catch(errorResponse));
 const notFound = interceptor(
 	({ route, next }) =>
 		route ? next() : new Response("Not found", { status: 404 }), // instead of NOT_FOUND
@@ -563,9 +562,9 @@ import { createApp, interceptor } from "@rest-rpc/server/node";
 const app = createApp(routes, {
 	context: (req) => ({ user: req.headers.authorization }),
 	// From @rest-rpc/server/node, with { request, response, next, route }.
-	// Headers set before next() are on every response. next() resolves once
-	// the response is written, and rejects like the Fetch one, or when a stream fails.
-	// writeErrorResponse(response, error) writes a RouteError's response.
+	// Headers set before next() are on every response, error responses included.
+	// next() resolves once the response is written, and rejects like the Fetch one,
+	// or when a stream fails. onError and writeErrorResponse(response, error) too.
 	interceptors: [
 		interceptor(({ request, response, next }) => {
 			response.setHeader("access-control-allow-origin", "*");
@@ -584,9 +583,12 @@ process.on("SIGTERM", () => server.close());
 ```ts
 // Native router, Express: one framework route per rest-rpc route.
 // Node frameworks import from @rest-rpc/server/node, Fetch ones from @rest-rpc/server.
-import { createRouteHandlers } from "@rest-rpc/server/node";
+import { createRouteHandlers, onError } from "@rest-rpc/server/node";
 
-for (const r of createRouteHandlers(routes)) {
+// interceptors run around each route's handle, after the framework routed it.
+for (const r of createRouteHandlers(routes, {
+	interceptors: [onError(report)],
+})) {
 	app[r.method.toLowerCase()](r.path, (req, res, next) => {
 		r.handle(req, res, {
 			context: { user: req.user }, // seeds the request context

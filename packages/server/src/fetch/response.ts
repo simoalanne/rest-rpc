@@ -1,4 +1,3 @@
-import type { ErrorResponse } from "../pipeline/resolveRouteError.ts";
 import { isAsyncIterable, type BodyCodecRegistry } from "@rest-rpc/core/codecs";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import type { HttpRouteResult } from "../pipeline/handleHttpRoute.ts";
@@ -6,7 +5,6 @@ import { cancelBody } from "../pipeline/headResponse.ts";
 import { mapMaybePromise } from "../pipeline/maybePromise.ts";
 import {
 	serializeHttpResponseParts,
-	serializeRouteErrorParts,
 	type ResponseHeaders,
 	type SerializedHttpResponse,
 } from "../pipeline/serializeHttpRouteResult.ts";
@@ -71,12 +69,19 @@ export const serializeFetchResult = (
 	);
 };
 
-/** Serializes an error as a JSON `{ code, message, data? }` Fetch `Response`. */
-export const serializeFetchError = (error: ErrorResponse): Response =>
-	toFetchResponse(serializeRouteErrorParts(error));
-
-/** The response to a `HEAD` request: the `GET` response without its body, which is cancelled unread. */
-export const withoutBody = (response: Response): Response => {
+// The `GET` response without its body, which is cancelled unread.
+const withoutBody = (response: Response): Response => {
 	void cancelBody(response.body);
 	return new Response(null, response);
 };
+
+/**
+ * The response sent for a request. A `HEAD` request runs the `GET` route, so
+ * its response is sent without the body. Applied once where a response leaves
+ * rest-rpc, so interceptors see the same responses for both methods.
+ */
+export const respondTo = (
+	request: Request,
+	response: Promise<Response>,
+): Promise<Response> =>
+	request.method === "HEAD" ? response.then(withoutBody) : response;

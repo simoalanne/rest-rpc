@@ -1,6 +1,7 @@
 import { RouteError } from "@rest-rpc/core";
 import type { RouteDefinition } from "@rest-rpc/core/contract";
 import type { MaybePromise } from "@rest-rpc/core/utils";
+import { InternalServerError } from "./errors.ts";
 import { allMaybePromise, mapMaybePromise } from "./maybePromise.ts";
 import {
 	validateResponseHeaders,
@@ -33,6 +34,34 @@ const asSent = (error: RouteError): ResolvedRouteError => ({
 const toValidationFailure = (failure: unknown): ResolvedRouteError => {
 	if (failure instanceof RouteError) return asSent(failure);
 	throw failure;
+};
+
+/**
+ * The error an app sends for a thrown value: a `RouteError` as it is, and
+ * anything else as an internal error with the value as `cause`.
+ */
+export const asRouteError = (error: unknown): RouteError =>
+	error instanceof RouteError
+		? error
+		: new InternalServerError({ cause: error });
+
+/**
+ * The thrown error with the status, `data` and headers it is sent with,
+ * keeping its class, message and `cause`, or the thrown error itself when it
+ * is sent as thrown.
+ */
+export const toSentError = ({
+	error,
+	response,
+}: ResolvedRouteError): RouteError => {
+	if (response === error) return error;
+	const descriptors = Object.getOwnPropertyDescriptors(error);
+	return Object.create(Object.getPrototypeOf(error), {
+		...descriptors,
+		status: { ...descriptors.status, value: response.status },
+		data: { ...descriptors.data, value: response.data },
+		headers: { ...descriptors.headers, value: response.headers },
+	}) as RouteError;
 };
 
 /**

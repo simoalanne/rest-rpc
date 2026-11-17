@@ -60,6 +60,7 @@ export {
 	createCatchAllHandler,
 	type FetchRoute,
 	type FetchRouteHandlerResult,
+	type FetchRouteHandlersOptions,
 } from "./fetch/createRouteHandlers.ts";
 export type {
 	CatchAllHandleOptions,
@@ -74,6 +75,7 @@ export {
 export {
 	errorResponse,
 	interceptor,
+	onError,
 	type Interceptor,
 } from "./fetch/interceptor.ts";
 export {

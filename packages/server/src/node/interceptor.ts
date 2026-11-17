@@ -1,6 +1,8 @@
-import type { InterceptedRoute, RouteError } from "@rest-rpc/core";
+import type { InterceptedRoute } from "@rest-rpc/core";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { writeNodeError } from "./response.ts";
+import { asRouteError } from "../pipeline/resolveRouteError.ts";
+import { serializeRouteErrorParts } from "../pipeline/serializeHttpRouteResult.ts";
+import { writeNodeResponse } from "./response.ts";
 
 /**
  * A function around everything a Node app does for a request, for work
@@ -9,14 +11,15 @@ import { writeNodeError } from "./response.ts";
  *
  * @remarks It receives every request, including ones that match no route,
  * except those a route completed with `.static()` serves. `next()` continues
- * with the app and resolves once the response is written, streams included,
- * for every `RouteError` too. It rejects only with other thrown values, such
- * as an `Error` a handler throws, unchanged, and with stream failures. Headers
- * set on `response` before `next()` are sent with every response, and an
- * interceptor that writes its own response does not call `next()`. Errors
- * that reach the app are sent as `INTERNAL_SERVER_ERROR` responses, or close
- * the connection when the response already started, and so does finishing
- * without a response.
+ * with the app and resolves once the response is written, streams included.
+ * It rejects with every error thrown after it: `RouteError`s with the status,
+ * `data` and headers they are sent with, such as validation failures and
+ * `NOT_FOUND`, other values unchanged, and stream failures. An interceptor
+ * sends an error by throwing it. Headers set on `response` before `next()`
+ * are sent with every response, and an interceptor that writes its own
+ * response does not call `next()`. The app sends what reaches it with
+ * {@link writeErrorResponse}, or closes the connection when the response
+ * already started, and finishing without a response is an error.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/node#interceptors}
  */
@@ -29,8 +32,8 @@ export type NodeInterceptor = (args: {
 	 */
 	route: InterceptedRoute | undefined;
 	/**
-	 * Handles the request with the later interceptors and the app. Resolves
-	 * for every `RouteError`, and rejects with other thrown values.
+	 * Handles the request with the later interceptors and the app. Rejects
+	 * with every error thrown after this interceptor.
 	 */
 	next: () => Promise<void>;
 }) => void | Promise<void>;
@@ -41,9 +44,11 @@ export type NodeInterceptor = (args: {
  *
  * @example
  * ```ts
- * const apiKey = interceptor(({ request, response, next }) => {
- * 	if (request.headers["x-api-key"] === env.API_KEY) return next();
- * 	response.writeHead(403).end("Forbidden");
+ * const Forbidden = routeError("FORBIDDEN", { status: 403 });
+ *
+ * const apiKey = interceptor(({ request, next }) => {
+ * 	if (request.headers["x-api-key"] !== env.API_KEY) throw new Forbidden();
+ * 	return next();
  * });
  * ```
  *
@@ -75,22 +80,24 @@ export const intercept = (
 };
 
 /**
- * Writes the response the app sends for a `RouteError`: its status and
- * headers, and a JSON `{ code, message, data? }` body. Clients decode it as a
- * `RouteError`, so an interceptor can send an error they handle like any
- * other.
+ * Writes the response the app sends for a thrown value: a `RouteError` with
+ * its status and headers and a JSON `{ code, message, data? }` body, and
+ * anything else as an `INTERNAL_SERVER_ERROR` with the value as `cause`.
+ * Clients decode it as a `RouteError`.
  *
- * @remarks No route definition applies, so the error is sent with its own
- * status, `data` and headers, without validation.
+ * @remarks An interceptor that catches with it turns errors into responses
+ * for the interceptors before it. A `RouteError` thrown outside a route is
+ * sent with its own status, `data` and headers, without validation. A
+ * response that already started can't become an error response, so check
+ * `response.headersSent` first.
  *
  * @example
  * ```ts
- * const RateLimited = routeError("RATE_LIMITED", { status: 429 });
- *
- * const rateLimit = interceptor(({ request, response, next }) =>
- * 	limiter.allow(request)
- * 		? next()
- * 		: writeErrorResponse(response, new RateLimited()),
+ * const sendErrors = interceptor(({ response, next }) =>
+ * 	next().catch((error) => {
+ * 		if (response.headersSent) throw error;
+ * 		return writeErrorResponse(response, error);
+ * 	}),
  * );
  * ```
  *
@@ -98,7 +105,44 @@ export const intercept = (
  */
 export function writeErrorResponse(
 	response: ServerResponse,
-	error: RouteError,
+	error: unknown,
 ): Promise<void> {
-	return writeNodeError(response, error);
+	return writeNodeResponse(
+		response,
+		serializeRouteErrorParts(asRouteError(error)),
+	);
+}
+
+/**
+ * Creates an interceptor that calls `callback` with every error thrown after
+ * it, stream failures included, then rethrows the error.
+ *
+ * @remarks Interceptors after one that turns errors into responses, such as
+ * with {@link writeErrorResponse}, receive no errors, so place it after them.
+ *
+ * @example
+ * ```ts
+ * createApp(routes, {
+ * 	interceptors: [
+ * 		onError((error, { request }) => logger.error(error, request.url)),
+ * 	],
+ * });
+ * ```
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/server/node#reporting-errors}
+ */
+export function onError(
+	callback: (
+		error: unknown,
+		args: Parameters<NodeInterceptor>[0],
+	) => void | Promise<void>,
+): NodeInterceptor {
+	return async (args) => {
+		try {
+			await args.next();
+		} catch (error) {
+			await callback(error, args);
+			throw error;
+		}
+	};
 }

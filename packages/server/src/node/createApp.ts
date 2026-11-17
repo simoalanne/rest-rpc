@@ -1,7 +1,7 @@
 import type { AbsolutePath } from "@rest-rpc/core";
 import type { EmptyObject } from "@rest-rpc/core/utils";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { InternalServerError, NotFound } from "../pipeline/errors.ts";
+import { NotFound } from "../pipeline/errors.ts";
 import type { CreateRouteHandlersOptions } from "../pipeline/handleOptions.ts";
 import {
 	createRouteMatcher,
@@ -10,8 +10,11 @@ import {
 } from "../routing/match.ts";
 import { compileNodeRoutes } from "./createRouteHandlers.ts";
 import { readRequestTarget } from "./request.ts";
-import { writeNodeError } from "./response.ts";
-import { intercept, type NodeInterceptor } from "./interceptor.ts";
+import {
+	intercept,
+	writeErrorResponse,
+	type NodeInterceptor,
+} from "./interceptor.ts";
 
 /**
  * The `context` option of the Node {@link createApp}: the initial context, or
@@ -60,10 +63,11 @@ export type NodeApp = (
 /**
  * Creates a Node request listener that serves a route tree.
  *
- * @remarks Errors that are not sent as error responses by the routes, such as
- * errors thrown by handlers, are sent as `INTERNAL_SERVER_ERROR` responses
- * with the thrown error as `cause`, or close the connection when the response
- * already started. Use {@link createRouteHandlers} and
+ * @remarks Errors no interceptor catches are written as
+ * `writeErrorResponse()` writes them: `RouteError`s as error responses, and
+ * other thrown values, such as errors thrown by handlers, as
+ * `INTERNAL_SERVER_ERROR` responses with the thrown value as `cause`. They
+ * close the connection instead when the response already started. Use {@link createRouteHandlers} and
  * {@link createCatchAllHandler} instead to serve the routes from a framework.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/node#usage}
@@ -100,7 +104,8 @@ export function createApp(
 		response: ServerResponse,
 		match: ReturnType<typeof matchRoute>,
 	) => {
-		if (!match) return writeNodeError(response, new NotFound());
+		// `NOT_FOUND` rejects like other errors, so interceptors observe it.
+		if (!match) throw new NotFound();
 		const { route, params } = match;
 		// Static routes read no context, so the context function is not called.
 		const values =
@@ -117,8 +122,7 @@ export function createApp(
 				readRequestTarget(request),
 				mountPath,
 			);
-			// Static routes are sent as they are. Errors an interceptor throws
-			// are sent as internal errors too.
+			// Static routes are sent as they are.
 			if (!interceptors?.length || match?.route.isStatic) {
 				await serve(request, response, match);
 				return;
@@ -136,11 +140,10 @@ export function createApp(
 				throw new Error("The interceptors finished without a response.");
 			}
 		} catch (error) {
-			const internal = new InternalServerError({ cause: error });
 			// A started response cannot change its status, so it is cut short.
 			if (response.headersSent) response.destroy();
 			else
-				await writeNodeError(response, internal).catch(() =>
+				await writeErrorResponse(response, error).catch(() =>
 					response.destroy(),
 				);
 		}
