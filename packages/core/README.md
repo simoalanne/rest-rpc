@@ -27,8 +27,8 @@ to the full [documentation](https://rest-rpc.vercel.app/docs/quickstart).
 - [Server-Sent Events](#server-sent-events)
 - [Contract-first](#contract-first)
 - [HTTP Behavior](#http-behavior)
-  - [Schemas and Validation](#schemas-and-validation)
-  - [Serialization and Codecs](#serialization-and-codecs)
+  - [Validation](#validation)
+  - [Encoding and Content Types](#encoding-and-content-types)
   - [Errors](#errors-1)
 - [Server](#server)
   - [Serving Routes](#serving-routes)
@@ -439,7 +439,7 @@ export const routes = {
 
 ## HTTP Behavior
 
-### [Schemas and Validation](https://rest-rpc.vercel.app/docs/http-behavior/schemas)
+### [Validation](https://rest-rpc.vercel.app/docs/http-behavior/validation)
 
 ```ts
 import { type } from "@rest-rpc/server";
@@ -468,7 +468,7 @@ definition guarantees at runtime:
 (1) `validateResponses` needs a shared contract. An extracted contract has no
 schemas, so the option has no effect.
 
-### [Serialization and Codecs](https://rest-rpc.vercel.app/docs/http-behavior/serialization)
+### [Encoding and Content Types](https://rest-rpc.vercel.app/docs/http-behavior/encoding)
 
 | Location / media type               | Encoding                                                    |
 | ----------------------------------- | ----------------------------------------------------------- |

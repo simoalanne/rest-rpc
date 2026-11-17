@@ -4,10 +4,12 @@ description: Define and serve typed Server-Sent Event streams.
 ---
 
 Streaming routes send Server-Sent Events (SSE). Handlers produce an async
-iterable, and each yielded value becomes one event. See
-[Serialization and Codecs](/docs/http-behavior/serialization#streams) for the
-wire format and [Fetch Client](/docs/client/fetch-client#consume-streams) for
-consuming streams.
+iterable, and each yielded value becomes one event, sent as JSON in its `data`
+field. Responses are `text/event-stream` with `cache-control: no-cache`, so
+proxies don't cache or buffer them, and a `cache-control` the handler sets
+replaces it. Custom codecs can't replace SSE. See
+[Fetch Client](/docs/client/fetch-client#consume-streams) for consuming
+streams.
 
 ## Define a Stream
 

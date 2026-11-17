@@ -1,0 +1,127 @@
+---
+title: Encoding and Content Types
+description: How params, query, headers and bodies are sent, and how to send other formats than JSON.
+---
+
+## Params, Query and Headers
+
+The client turns each value into a string, and the server's schemas receive
+those strings:
+
+```ts
+const search = route
+	.get("/users/:id/todos")
+	.params(z.object({ id: z.coerce.number<number>() }))
+	.query(
+		z.object({
+			page: z.coerce.number<number>().optional(),
+			tags: z.array(z.string()).optional(),
+		}),
+	)
+	.headers(z.object({ "x-request-id": z.string() }))
+	.handler(({ params, query }) => findTodos(params.id, query));
+
+await client.search({
+	params: { id: 7 },
+	query: { page: 2, tags: ["home", "urgent"] },
+	headers: { "x-request-id": "r1" },
+});
+// GET /users/7/todos?page=2&tags[]=home&tags[]=urgent
+// The schemas receive { id: "7" }, { page: "2", tags: ["home", "urgent"] }
+// and { "x-request-id": "r1" }.
+```
+
+- Numbers are coerced with `z.coerce.number<number>()`. The `<number>` makes
+  the client accept a number instead of `unknown`.
+- Booleans use `z.stringbool()`, since `z.coerce.boolean()` reads `"false"`
+  as `true`.
+- Arrays are sent as `key[]` keys, and only those become arrays, so HTML forms
+  name the field `tags[]`.
+- Header names are lowercase.
+
+## Bodies
+
+A body is JSON unless a `content-type` header says otherwise. A route declares
+the request content types it accepts, and the response content type it sends,
+in its headers schemas:
+
+```ts
+const importTodos = route
+	.post("/todos/import")
+	.headers(z.object({ "content-type": z.literal("text/csv") }))
+	.body(z.string())
+	.response(z.string(), {
+		headers: z.object({
+			"content-type": z.literal("text/plain").default("text/plain"),
+		}),
+	})
+	.handler(({ body }) => `${importCsv(body)} todos imported`);
+
+await client.importTodos({
+	headers: { "content-type": "text/csv" },
+	body: "title\nShip\nTest",
+});
+```
+
+A request with another `Content-Type` gets
+[`UNSUPPORTED_MEDIA_TYPE`](/docs/http-behavior/errors#built-in-errors) and
+`415`, and a route that declares none accepts JSON. An async iterable is sent
+as [Server-Sent Events](/docs/streaming), a returned `Response` as it is, and
+`FormData` as `multipart/form-data`, whatever the header says.
+
+Each content type is encoded by a codec:
+
+| Content type                        | Value                                        |
+| ----------------------------------- | -------------------------------------------- |
+| `application/json`, `*+json`        | JSON value                                   |
+| `application/x-www-form-urlencoded` | `URLSearchParams`                            |
+| `multipart/form-data`               | `FormData`                                   |
+| `text/*`                            | `string`                                     |
+| any other                           | `Blob` or `Uint8Array` sent, `Blob` received |
+
+The schema of a non-JSON body describes that value, such as `z.string()` for
+`text/csv` and `z.instanceof(Blob)` for a file. The client's result type is the
+schema output, so a schema that says otherwise is a type the body won't have.
+
+## Custom Codecs
+
+`bodyCodec(mediaTypes, { serialize, deserialize })` encodes another format.
+Pass the same codec in `bodyCodecs` to the client and the server:
+
+```ts
+import { bodyCodec } from "@rest-rpc/core";
+
+const csv = bodyCodec("text/csv", {
+	serialize: (rows) => toCsv(rows as string[][]),
+	deserialize: async (body, contentType) =>
+		parseCsv(await body.text(), {
+			header: contentType.includes("header=present"),
+		}),
+});
+
+createApp(routes, { bodyCodecs: [csv] });
+createClient(api, { origin, bodyCodecs: [csv] });
+```
+
+- `mediaTypes` is a media type, a pattern such as `/\+json$/`, or a list.
+  Custom codecs win over the defaults, so `bodyCodec("application/json", ...)`
+  replaces the JSON codec, and a missing `serialize` or `deserialize` falls
+  back to the default.
+- `body` has the Fetch body methods, such as `text()` and `arrayBuffer()`.
+- A body that fails to decode is answered with
+  [`MALFORMED_REQUEST_BODY`](/docs/http-behavior/errors#built-in-errors) and
+  `400`.
+
+To send headers with a body, such as `content-encoding`, return
+`serializedBody(body, { headers })`:
+
+```ts
+import { bodyCodec, serializedBody } from "@rest-rpc/core";
+
+const gzipJson = bodyCodec("application/json", {
+	serialize: (value) =>
+		serializedBody(gzip(JSON.stringify(value)), {
+			headers: { "content-encoding": "gzip" },
+		}),
+});
+```

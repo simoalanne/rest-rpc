@@ -13,7 +13,7 @@ const serializedBodyBrand = Symbol("rest-rpc.serializedBody");
  * A `content-type` header may change parameters but must keep the selected
  * base media type, since content types are part of route types.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/serialization#serializer-result}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#custom-codecs}
  */
 export function serializedBody(
 	body: BodyValue,

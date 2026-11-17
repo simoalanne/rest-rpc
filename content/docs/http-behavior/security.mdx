@@ -1,0 +1,52 @@
+---
+title: Security
+description: What rest-rpc guarantees, and what the host and the app have to handle.
+---
+
+## What rest-rpc Guarantees
+
+- **Requests are validated before your code runs.** Middleware and handlers
+  only receive schema output, and an invalid request gets a `400` with the
+  issues.
+- **Response validation failures aren't exposed.** The client gets a bare
+  `INTERNAL_SERVER_ERROR`, not even that validation failed.
+- **`cause` is never sent.** An error's `cause`, such as the `Error` behind an
+  `INTERNAL_SERVER_ERROR` or the issues of a response validation failure, only
+  exists on the server.
+- **Undeclared request content types are rejected.** A route with a body
+  answers any other `Content-Type` with `415` before reading the body, so a
+  JSON route never decodes a form post.
+- **The query parser can't be used for prototype pollution.** A `__proto__`
+  key is an ordinary key.
+
+## Left to the Host
+
+rest-rpc reads requests whole and has no limits of its own:
+
+- **Body size.** The Node `createApp` reads any body it's sent. Put a limit in
+  front of it, such as a proxy's, or use a runtime that has one, such as Bun's
+  `maxRequestBodySize`.
+- **Rate limiting, timeouts and TLS**, in the proxy or the runtime. Rate
+  limits that depend on the route can be an
+  [interceptor](/docs/server/fetch#interceptors).
+
+## Left to the App
+
+- **Authentication and authorization**, in [middleware](/docs/middleware) for
+  typed per-route checks, or an interceptor for checks before routing.
+- **CORS**, as an [interceptor](/docs/server/fetch#cors).
+- **Cookies.** rest-rpc sends `cookies` as written, so set `HttpOnly`,
+  `Secure` and `SameSite` yourself.
+- **CSRF.** A JSON request body needs a `Content-Type` that browsers only send
+  cross-origin after a CORS preflight, which protects JSON routes. Routes that
+  accept forms, and `GET` routes with side effects, need their own protection.
+- **Merging request bodies.** A schema that keeps unknown keys, such as
+  `z.looseObject()`, or disabled validation, lets any key through, including
+  `__proto__`. Don't deep-merge such a body into another object:
+
+  ```ts
+  .body(z.looseObject({ title: z.string() }))
+  .handler(({ body }) => deepMerge(settings, body)); // a "__proto__" key pollutes Object.prototype
+  ```
+
+  A schema that strips unknown keys, such as `z.object()`, prevents it.

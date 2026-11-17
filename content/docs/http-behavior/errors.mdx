@@ -1,16 +1,9 @@
 ---
 title: Errors
-description: How defined and built-in errors are sent, and how other errors reach your framework.
+description: What an error response contains, which errors clients can handle typed, and where other errors go.
 ---
 
-Routes return successful responses and throw errors. A route
-[defines](/docs/route-builder#define-errors) each error it can respond with
-by a unique code, and clients reject with the defined error when they receive
-it.
-
-## Wire Format
-
-Every error response rest-rpc sends is JSON with the error's status:
+Every error rest-rpc sends is a JSON response with the error's status:
 
 ```http
 HTTP/1.1 404 Not Found
@@ -19,58 +12,81 @@ Content-Type: application/json
 { "code": "TODO_NOT_FOUND", "message": "Todo not found", "data": { "id": "42" } }
 ```
 
-- `code` and `message` are always present, and `data` is present when the error
-  has data.
-- Defined error headers are sent as response headers.
-- `cookies` are sent as `Set-Cookie` headers, one per value.
+`data` is present when the error has data, the error's headers are response
+headers, and each of its `cookies` is a `Set-Cookie` header. Any HTTP client
+can read it, and the rest-rpc client rejects with a `RouteError`.
 
-Any HTTP client can read these responses. The rest-rpc client rejects with a
-`RouteError` for each of them, and marks it as defined when the route defines
-the code with the received status. See
-[Fetch Client](/docs/client/fetch-client#typesafe-error-handling).
+## Defined and Undefined Errors
 
-## Throwing Errors
-
-Throw `errors.CODE(...)` from a handler or middleware, or throw
-`new Definition(...)` for an error defined with `routeError()` from any code.
-Both create a `RouteError` and take the same options:
+A route [defines](/docs/route-builder#define-errors) the errors clients handle
+per call. Throw them with `errors.CODE()` in handlers and middleware, or with
+the class `routeError()` creates anywhere:
 
 ```ts
-throw errors.SESSION_EXPIRED({
-	data: { userId }, // required when the definition has a `data` schema
-	headers: { "x-reason": "expired" }, // required when it has a `headers` schema
-	cookies: ["session=; Max-Age=0"], // each sent as its own `Set-Cookie` header
-	message: "Sign in again", // overrides the defined message
+const TodoNotFound = routeError("TODO_NOT_FOUND", {
+	status: 404,
+	data: z.object({ id: z.string() }),
+});
+
+const getTodo = route
+	.get("/todos/:id")
+	.error(TodoNotFound)
+	.handler(({ params, errors }) => {
+		const todo = findTodo(params.id);
+		if (!todo) throw errors.TODO_NOT_FOUND({ data: { id: params.id } });
+		return todo;
+	});
+
+const result = await safe(client.getTodo({ params: { id: "42" } }));
+if (isDefinedError(result.error)) result.error.data.id; // typed: string
+```
+
+Both take the same options:
+
+```ts
+throw errors.TODO_NOT_FOUND({
+	data: { id }, // required when the definition has a `data` schema
+	headers: { "x-reason": "deleted" }, // required when it has a `headers` schema
+	cookies: ["session=; Max-Age=0"],
+	message: "Todo was deleted", // replaces the defined message
 	cause: error, // never sent
 });
 ```
 
-The route's definition decides the response: its status, and the validated
-`data` and headers. When `data` or headers fail validation, an
-`INTERNAL_SERVER_ERROR` is sent instead.
+The definition decides what's sent: its status, and `data` and headers
+validated by its schemas. When they fail validation, an `INTERNAL_SERVER_ERROR`
+is sent instead.
 
-An error whose code the route does not define is sent as thrown, with its own
-status, `data` and headers, and without validation. Use it for errors that
-apply across routes, such as an `UNAUTHORIZED` thrown by auth middleware, and
-handle it in a client's general error handling. It is not part of the route's
-types, so define the error when clients should handle it per call.
+An error whose code the route doesn't define is sent as thrown, with its own
+status, `data` and headers, unvalidated. Clients receive it as a `RouteError`
+that `isDefinedError()` rejects, with `code`, `status` and `data` still
+readable. It suits errors that apply across routes, such as an `UNAUTHORIZED`
+from auth middleware:
+
+```ts
+throw new RouteError("RATE_LIMITED", { status: 429 });
+```
+
+[Interceptors](/docs/server/fetch#interceptors) are outside routes, so an error
+they throw is never checked against the route's definitions. To send a code
+the route defines, throw that route's error class, which is typed against the
+definition. A bare `new RouteError()` with a defined code reaches clients as
+the defined error with whatever shape it had.
 
 ## Built-in Errors
 
-The server sends these errors itself, whether or not a route defines them:
+The server sends these itself:
 
-| Code                        | Definition                | Status | `data`                                                 | Sent when                                                                                                                                                                                                                     |
-| --------------------------- | ------------------------- | ------ | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `REQUEST_VALIDATION_FAILED` | `RequestValidationFailed` | `400`  | Issues grouped by `body`, `query`, `params`, `headers` | [Request validation](/docs/http-behavior/schemas#request-validation) fails                                                                                                                                                    |
-| `MALFORMED_REQUEST_BODY`    | `MalformedRequestBody`    | `400`  | none                                                   | The request body cannot be decoded                                                                                                                                                                                            |
-| `UNSUPPORTED_MEDIA_TYPE`    | `UnsupportedMediaType`    | `415`  | none                                                   | The request `Content-Type` of a route with a body is not one its headers declare, or not JSON when they declare none                                                                                                          |
-| `INTERNAL_SERVER_ERROR`     | `InternalServerError`     | `500`  | none                                                   | [Response validation](/docs/http-behavior/schemas#response-validation-on-the-server) fails, including error data, or, with [`createApp`](/docs/server/overview#create-app) only, a handler or middleware throws another error |
-| `NOT_FOUND`                 | `NotFound`                | `404`  | none                                                   | No route matches, with `createApp`                                                                                                                                                                                            |
+| Code                        | Status | Sent when                                                                                                                             |
+| --------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `REQUEST_VALIDATION_FAILED` | `400`  | [Request validation](/docs/http-behavior/validation#requests) fails. `data` has the issues by `body`, `query`, `params` and `headers` |
+| `MALFORMED_REQUEST_BODY`    | `400`  | The request body can't be decoded                                                                                                     |
+| `UNSUPPORTED_MEDIA_TYPE`    | `415`  | The request [`Content-Type`](/docs/http-behavior/encoding#bodies) isn't one the route accepts                                         |
+| `INTERNAL_SERVER_ERROR`     | `500`  | [Response validation](/docs/http-behavior/validation#responses) fails, or, with `createApp`, anything else is thrown                  |
+| `NOT_FOUND`                 | `404`  | No route matches, with `createApp`                                                                                                    |
 
-A route that does not add a built-in error still sends it, and clients
-receive it as an untyped `RouteError`. To handle a built-in error with typed
-`data`, import its definition from `@rest-rpc/server` and add it to the
-route:
+Clients receive them as undefined errors. Add a built-in error's definition to
+a route to make its `data` typed:
 
 ```ts
 import { RequestValidationFailed, route } from "@rest-rpc/server";
@@ -78,35 +94,21 @@ import { RequestValidationFailed, route } from "@rest-rpc/server";
 const create = route
 	.post("/todos")
 	.body(z.object({ title: z.string() }))
-	.error(RequestValidationFailed)
+	.error(RequestValidationFailed) // data: { body, query, params, headers } issues
 	.handler(({ body }) => createTodo(body.title));
 ```
 
-Clients of that route then receive `REQUEST_VALIDATION_FAILED` with its issues
-typed as `data`, with the `RequestValidationIssues` type:
-
-```ts
-{
-	body: ValidationIssue[];
-	query: ValidationIssue[];
-	params: ValidationIssue[];
-	headers: ValidationIssue[];
-}
-```
-
-An invalid response is a server bug, so clients receive no validation details,
-not even that validation failed. For a response validation failure, the
-error's `cause` holds the validation `location` and `issues`, and is never
-sent.
-
-A stream item that fails validation cannot change the response status. The
-stream ends instead.
-
 ## Other Errors
 
-Other errors thrown by handlers, middleware, or custom serializers are not sent
-as error responses by route handlers and the catch-all handler. They reject the handler promise, and
-reach the framework's error handling when routes are registered on a framework.
-`createApp` sends them as `INTERNAL_SERVER_ERROR` responses. Interceptors'
-`next()` rejects with them and with every `RouteError`, so an
-[`onError` interceptor](/docs/server/fetch#reporting-errors) reports both.
+Anything thrown that isn't a `RouteError`, such as a handler's `Error`, depends
+on how routes are served:
+
+- `createApp` sends it as an `INTERNAL_SERVER_ERROR` with the thrown value as
+  `cause`, which is never sent.
+- [Route handlers and the catch-all handler](/docs/server/framework-integration#error-handling)
+  reject with it, for the framework's error handling.
+- When a response already started, such as a stream that fails, the
+  connection is closed, and the client sees an incomplete response.
+
+[`onError`](/docs/server/fetch#reporting-errors) reports these and route
+errors, with their `cause`, in all three cases.

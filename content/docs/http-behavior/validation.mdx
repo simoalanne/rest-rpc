@@ -1,0 +1,116 @@
+---
+title: Validation
+description: What is validated, when, and which type each side sees.
+---
+
+Schemas are [Standard Schema](https://standardschema.dev) schemas, such as Zod,
+Valibot or ArkType, or `type<T>()` for types without validation. One schema
+gives two types, and each side of a route sees one of them:
+
+```ts
+const list = route
+	.get("/todos")
+	.query(z.object({ page: z.coerce.number<number>().int().min(1).default(1) }))
+	.response(z.object({ items: z.array(todo), total: z.number() }))
+	.handler(({ query }) => listTodos(query.page)); // query.page: number, never undefined
+
+await client.list({ query: {} }); // page is optional for the caller: the schema input
+```
+
+| Side                             | Request schemas | Response schemas |
+| -------------------------------- | --------------- | ---------------- |
+| Client call / handler return     | input           | input            |
+| Handler argument / client result | output          | output           |
+
+## Requests
+
+The server validates params, query, headers and body before middleware and the
+handler run. A failure is answered with
+[`REQUEST_VALIDATION_FAILED`](/docs/http-behavior/errors#built-in-errors) and
+status `400`, with the issues of each location as `data`, and the handler
+doesn't run.
+
+Params, query and headers arrive as strings, so a schema that expects a number
+has to coerce it. `z.number()` compiles, since the client sends numbers as
+strings, but every call fails validation. See
+[Params, Query and Headers](/docs/http-behavior/encoding#params-query-and-headers).
+
+## Responses
+
+A defined response's body and headers are validated before they're sent, and
+the validated output is what's sent. A stream validates each item as it's
+yielded. A failure is a server bug, so the client gets an
+`INTERNAL_SERVER_ERROR` with status `500` and no details, and the issues are
+the error's `cause` on the server, where
+[`onError`](/docs/server/fetch#reporting-errors) can report them. A stream that
+already started ends instead.
+
+Responses inferred from the handler's return value are type-checked but not
+validated. Add `.response(schema)` for runtime validation.
+
+## What the Client Receives
+
+The client's result type is the response schema's output, but the body went
+through JSON on the way. A value JSON can't represent arrives as what JSON made
+of it:
+
+```ts
+const getTodo = route
+	.get("/todos/:id")
+	.response(z.object({ title: z.string(), dueAt: z.date() }))
+	.handler(() => ({ title: "Ship", dueAt: new Date() }));
+
+const { body } = await client.getTodo({ params: { id: "1" } });
+body.dueAt; // typed Date, but the string "2026-11-17T12:00:00.000Z" at runtime
+```
+
+`Map` and `Set` arrive as `{}`, `undefined` properties are missing, and a
+`bigint` makes the server throw. Use schemas whose output is what JSON sends,
+such as `z.iso.datetime()` for dates, or convert on the client. With
+[`validateResponses`](/docs/client/fetch-client#response-validation), the
+client runs the schema on what it received, so a `z.coerce.date()` schema gives
+a `Date` back.
+
+## Disabling Validation
+
+`disableRequestValidation` and `disableResponseValidation` turn schema
+validation off. Everything else still runs, and the types stay as if the
+schemas ran:
+
+```ts
+const getTodo = route
+	.get("/todos/:id")
+	.params(z.object({ id: z.coerce.number<number>() }))
+	.response(z.object({ title: z.string().default("Untitled") }))
+	.handler(({ params }) => findTodo(params.id)); // params.id is the string "1"
+
+createApp(
+	{ getTodo },
+	{ disableRequestValidation: true, disableResponseValidation: true },
+);
+```
+
+- Coercions, transforms and defaults don't apply, in requests or responses.
+- A route with a body accepts every request content type.
+- A response headers schema default doesn't apply, so a
+  `z.literal("text/csv").default("text/csv")` header isn't sent, and the body is
+  sent as JSON unless the handler sets `content-type`.
+
+Disable validation only with schemas that don't change values. `type<T>()` per
+route is the narrower opt-out.
+
+## Types Without Validation
+
+`type<T>()` is a schema that only carries a type. An optional function maps
+input to output, and may be async:
+
+```ts
+import { type } from "@rest-rpc/server";
+
+const create = route
+	.post("/todos")
+	.body(type<{ title: string }>()) // accepted as is
+	.handler(({ body }) => createTodo(body.title));
+
+const idToString = type((id: number) => String(id)); // input number, output string
+```

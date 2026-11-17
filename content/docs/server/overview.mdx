@@ -34,13 +34,8 @@ The functions differ in how much of each request rest-rpc handles:
 
 ### Create App
 
-`createApp` returns the function the runtime calls for each request, and does
-not start a server: a `fetch` handler on Fetch runtimes, and a request listener
-for `http.createServer()` on Node. The runtime's own API starts, configures and
-closes the server.
-
-<Tabs>
-<Tab title="Fetch">
+`createApp` returns the function the runtime calls for each request, and
+doesn't start a server:
 
 ```ts server.ts
 import { createApp } from "@rest-rpc/server";
@@ -49,23 +44,9 @@ import { routes } from "./routes";
 export default createApp(routes);
 ```
 
-</Tab>
-<Tab title="Node">
-
-```ts server.ts
-import { createServer } from "node:http";
-import { createApp } from "@rest-rpc/server/node";
-import { routes } from "./routes";
-
-createServer(createApp(routes)).listen(3000);
-```
-
-</Tab>
-</Tabs>
-
-See [Fetch](/docs/server/fetch) and [Node](/docs/server/node) for the app
-options of each runtime, and [Framework Integration](/docs/server/framework-integration)
-for the other two.
+See [Fetch](/docs/server/fetch) and [Node](/docs/server/node) for each
+runtime, and [Framework Integration](/docs/server/framework-integration) for
+the other two.
 
 ## Route Options
 
@@ -80,9 +61,10 @@ type CreateRouteHandlersOptions = {
 };
 ```
 
-- `bodyCodecs`: see [Request and Response Bodies](#request-and-response-bodies).
+- `bodyCodecs`: codecs for other formats. See
+  [Custom Codecs](/docs/http-behavior/encoding#custom-codecs).
 - `disableRequestValidation`, `disableResponseValidation`: see
-  [Disabling Server Validation](/docs/http-behavior/schemas#disabling-server-validation).
+  [Disabling Validation](/docs/http-behavior/validation#disabling-validation).
 - `sse`: the data format, keepalive and initial comment of Server-Sent Event
   responses. See [Data Format](/docs/streaming#data-format) and
   [Stream Options](/docs/streaming#stream-options).
@@ -98,30 +80,6 @@ params, and one trailing slash is ignored. Param values are percent-decoded.
 `createApp` and the catch-all handler take a `mountPath`, such as `/api`, to
 serve the routes under. Requests outside it are unmatched, and it is removed
 from the request path before matching. Route paths do not include it, so
-clients pass the same [`mountPath`](/docs/client/fetch-client#client-options). A path that clients and OpenAPI documents
+clients pass the same `mountPath`. A path that clients and OpenAPI documents
 should include in each route, such as `/v1`, belongs in the routes instead,
 defined with [`.prefix()`](/docs/route-builder#path-prefixes).
-
-## Request and Response Bodies
-
-Request bodies are decoded with custom `bodyCodecs` first and the
-[default codecs](/docs/http-behavior/serialization#default-codecs) after them.
-A codec's `deserialize` receives an
-[`IncomingBody`](/docs/http-behavior/serialization#incoming-body).
-
-Handlers can return any value supported by the default codecs. A custom
-serializer must return a body the runtime can send, such as a string, `Blob`,
-`FormData`, byte array, `ReadableStream` of bytes, or an async iterable of
-string or byte chunks. To send it with its own headers, return it wrapped in
-[`serializedBody()`](/docs/http-behavior/serialization#serializer-result).
-
-## Error Handling
-
-[Defined and built-in errors](/docs/http-behavior/errors) are sent as JSON
-error responses.
-
-Other errors thrown by handlers or middleware depend on the level. Route
-handlers and the catch-all handler reject with them, for the framework's error
-handling. `createApp` sends them as `INTERNAL_SERVER_ERROR` responses. When the response
-already started, such as a stream that fails, the connection is closed
-instead, so the client sees an incomplete response.
