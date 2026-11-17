@@ -28,51 +28,11 @@
 
 ## Docs
 
-- **Rewrite the HTTP behaviour pages.** Cover how content types are chosen,
-  what the client receives compared with what the server sends, and the
-  pitfalls.
-- **Document these trade-offs:**
-  - Content types are only inferred for async iterables (SSE), returned
-    `Response`s (raw) and `FormData` (multipart).
-  - One body schema per status.
-  - A response that declares a `content-type` is typed as its schema output
-    on the client, so the schema has to match what the codec decodes, such as
-    `string` for `text/*` and `Blob` for binary.
-  - Interceptors are outside the typed contract. An error they throw isn't
-    resolved against the route, so a code the route declares is thrown with
-    the route's own error class, or the client trusts a shape nothing
-    checked. Undeclared codes are sent as thrown, as anywhere else.
-  - `onError` wraps every Fetch response body to report late stream
-    failures, at about 1.6 µs per response.
-  - Request bodies are read whole before they're decoded.
-  - Arrays only come from `key[]` keys, so HTML forms use `name="tags[]"`.
-  - An empty file input is sent as an empty `File`.
-  - Request validation runs before middleware.
-- **Security boundaries page:**
-  - Left to the host or proxy: body size limits (Node `createApp` has
-    nothing in front of it), rate limiting, timeouts and TLS.
-  - Left to the app: authentication, CORS, `Set-Cookie` attributes, CSRF,
-    and not deep-merging request bodies that a non-stripping schema or
-    disabled validation let through.
-  - What rest-rpc guarantees: request validation issues are sent to the
-    caller, response validation failures are hidden as `500`s, and `cause`s
-    are never sent.
-- **Document interceptors as the standard pattern they are**, in one place
-  per runtime: the order they run in, what runs before and after `next()`,
-  what `next()` resolves and rejects with, where the app writes errors, and
-  how a `next().catch(errorResponse)` interceptor changes that for the ones
-  before it. Point out that frameworks often split the same pattern into
-  named hooks that each solve a narrower problem.
-  - Lead with one copyable example of the full lifecycle of a request:
-    interceptors, the `catch` interceptor, `onError`, the context function,
-    middleware and the handler. Each step logs when it runs before and after
-    `next()`, so running it shows the order, including for a request that
-    fails validation, a handler that throws and a path that matches no route.
-    It belongs in the examples package, so it's typechecked and run.
-- **Interceptor examples** for CORS, a problem+json error format on the
-  server and the client, and serving a path prefix before routing, such as
-  `/files/*`.
+- **Document that an empty file input is sent as an empty `File`**, with
+  the form bodies item.
 - **Replace the README cheatsheet with runnable examples:**
+  - Move the interceptor lifecycle example from the interceptors page into
+    the examples package, so it's typechecked and run.
   - A private examples package of self-contained files, each one task, about
     15 to 40 lines. `check` typechecks them and a test runs them, with the
     client served by `fetch: app.fetch`.

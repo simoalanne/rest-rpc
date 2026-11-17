@@ -226,7 +226,7 @@ export class RouteBuilder<
 		return this.clone(httpState(this["~restrpc"], "DELETE", path));
 	}
 
-	/** Defines the request body, JSON unless the headers declare a `content-type`. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-request-segments} */
+	/** Defines the request body, JSON unless the headers declare a `content-type`. @see {@link https://rest-rpc.vercel.app/docs/route-builder#request-segments} */
 	body<const TSchema extends StandardSchemaV1>(
 		schema: TSchema,
 	): BuilderFor<TKind, WithBody<TState, TSchema>> {
@@ -235,7 +235,7 @@ export class RouteBuilder<
 		);
 	}
 
-	/** Defines request headers. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-request-segments} */
+	/** Defines request headers. @see {@link https://rest-rpc.vercel.app/docs/route-builder#request-segments} */
 	headers<const TSchema extends RequestHeadersSchema>(
 		schema: TSchema & LowercaseHeadersCheck<TSchema>,
 	): BuilderFor<TKind, WithRequest<TState, "headers", TSchema>> {
@@ -244,7 +244,7 @@ export class RouteBuilder<
 		);
 	}
 
-	/** Defines URL query parameters. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-request-segments} */
+	/** Defines URL query parameters. @see {@link https://rest-rpc.vercel.app/docs/route-builder#request-segments} */
 	query<const TSchema extends RequestQuerySchema>(
 		schema: TSchema,
 	): BuilderFor<TKind, WithRequest<TState, "query", TSchema>> {
@@ -253,7 +253,7 @@ export class RouteBuilder<
 		);
 	}
 
-	/** Defines path parameters. @see {@link https://rest-rpc.vercel.app/docs/route-builder#define-request-segments} */
+	/** Defines path parameters. @see {@link https://rest-rpc.vercel.app/docs/route-builder#request-segments} */
 	params<const TSchema extends RequestParamsSchema>(
 		schema: TSchema & RequiredParamsCheck<TSchema>,
 	): BuilderFor<TKind, WithRequest<TState, "params", TSchema>> {

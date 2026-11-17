@@ -77,13 +77,10 @@ const getProfile = withSession
 	.handler(({ context }) => context.user);
 ```
 
-Injected values are typed for everything after the middleware that injects
-them, so they never need a non-null assertion. To inject a value only some
-requests have, inject it on every path with an optional type, as above.
-
-`$context<T>()` can be called at any point of a route chain. Every declaration
-is a requirement of the routes built from it, so repeated declarations of a key
-must all be satisfied, starting from the [global context](#global-context).
+Injected values are typed for everything after the middleware, without
+non-null assertions. A value only some requests have is injected on every path
+with an optional type, as `user` above. `$context<T>()` can be called anywhere
+in a chain, and every declaration is a requirement the host has to meet.
 
 ### Global Context
 
@@ -217,24 +214,18 @@ them as a type argument, such as
 :::
 
 Without a defined error or type argument, reusable middleware receives `errors` with unknown
-values. It can still throw an imported [error definition](/docs/route-builder#define-errors-once),
+values. It can still throw an imported [error definition](/docs/route-builder#define-errors),
 which routes that use the middleware must define.
 
 ## Responses and Errors
 
-`next()` resolves to the downstream response as a `respond()` envelope, with
-its `status`, `body` and `headers`. A returned Fetch `Response`
-is the `body`, and its status and headers fill the other fields, as
-[raw responses](/docs/route-builder#raw-responses) describe. Response validation and
-serialization run once, after the chain completes.
-
-Middleware returns that response, or ends the chain with the `respond` it
-receives, which only accepts the statuses defined before the middleware. An
-object of the same shape, with any of those fields, is a response too. A
-response kept outside the request has the type `MiddlewareResponse`, and
-middleware may return it as-is. Responses that middleware creates or changes are validated like the handler's.
-Throw [defined errors](/docs/route-builder#define-errors) for failures instead
-of returning error responses.
+`next()` resolves to the response as `{ status, body, headers, cookies }`, the
+fields `respond()` takes. Middleware returns it, changed or not, or ends the
+chain without calling `next()` by returning `respond()`, which takes the
+statuses defined before the middleware. Whatever it returns is validated and
+serialized once, after the chain, like a handler's response. A returned Fetch
+`Response` is the `body`, as [raw responses](/docs/route-builder#raw-responses)
+describe. Failures are thrown as [errors](/docs/route-builder#define-errors).
 
 ```ts
 const listTodos = route

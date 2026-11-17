@@ -57,12 +57,11 @@ See [Handle Errors](#typesafe-error-handling).
 
 ### Send Other Content Types
 
-A body is sent as JSON unless the call's headers include a `content-type`,
-which a route [declares](/docs/route-builder#content-types) in its headers
-schema. The header selects the codec that encodes the body. One set in
-`additionalHeaders` or `globalHeaders` doesn't, and the server would answer it
-with `415`. A `FormData` body is always sent as `multipart/form-data`, with the
-boundary `fetch` generates.
+A body is sent as JSON unless the call's `content-type` header, which the
+route [declares](/docs/http-behavior/encoding#bodies), says otherwise. Only the
+call's own headers choose the format: a `content-type` in `additionalHeaders`
+or `globalHeaders` doesn't, and the server answers it with `415`. `FormData`
+is always sent as `multipart/form-data`.
 
 ```ts
 await client.todos.import({
@@ -319,7 +318,7 @@ const client = createClient(api, {
 		bodyCodecs: {
 			type: "readonly BodyCodec[]",
 			description:
-				"Custom body codecs that take precedence over the defaults. See Serialization and Codecs.",
+				"Codecs for other formats, the same as the server's. See Encoding and Content Types.",
 		},
 		globalHeaders: {
 			type: "ClientHeaders",
@@ -343,9 +342,6 @@ const client = createClient(api, {
 		},
 	}}
 />
-
-See [Encoding and Content Types](/docs/http-behavior/encoding) for the default body codecs
-and how to override them with `bodyCodecs`.
 
 ## Global Headers
 
@@ -479,10 +475,14 @@ const client = createClient(api, {
 });
 ```
 
-The client receives the schema output on success, and a failure rejects with
-an [`Error`](#typesafe-error-handling). The decoded response is the server's schema
-output, but the client validates it as schema input. Schemas whose input and
-output types differ, such as transforms, may fail on the client.
+The client runs the schema again on what it decoded, and resolves with its
+output, or rejects with an [`Error`](#typesafe-error-handling). What it decoded
+is the server's output after JSON, so a schema has to accept that:
+
+- `z.coerce.date()` accepts the date string JSON made of the server's `Date`,
+  and gives the client a `Date` back.
+- `z.string().transform(Number)` already gave the server a number, which the
+  string schema then rejects on the client.
 
 :::note
 Validation requires runtime schemas, so it only applies to a

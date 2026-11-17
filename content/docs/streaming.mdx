@@ -3,13 +3,8 @@ title: Server-Sent Events
 description: Define and serve typed Server-Sent Event streams.
 ---
 
-Streaming routes send Server-Sent Events (SSE). Handlers produce an async
-iterable, and each yielded value becomes one event, sent as JSON in its `data`
-field. Responses are `text/event-stream` with `cache-control: no-cache`, so
-proxies don't cache or buffer them, and a `cache-control` the handler sets
-replaces it. Custom codecs can't replace SSE. See
-[Fetch Client](/docs/client/fetch-client#consume-streams) for consuming
-streams.
+Streaming routes send Server-Sent Events (SSE): each value a handler yields
+is one event, with the value as JSON in its `data` field.
 
 ## Define a Stream
 
@@ -47,8 +42,10 @@ const events = route
 ```
 
 Stream schemas describe event data. Event data is sent as JSON, so it must be
-JSON serializable unless you set a [data format](#data-format). Defined schemas validate each value as it is yielded. An invalid value ends
-the stream instead of producing an error response.
+JSON serializable unless you set a [data format](#data-format). Defined schemas validate each value as it is yielded. Once the stream
+started, an invalid value or an error the handler throws ends the stream
+instead of sending an error response, and
+[`onError`](/docs/server/interceptors#reporting-errors) reports it.
 
 ## Add Event Metadata
 

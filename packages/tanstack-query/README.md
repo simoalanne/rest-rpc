@@ -237,7 +237,7 @@ export const TodoNotFound = routeError("TODO_NOT_FOUND", { status: 404 });
 Errors are sent as JSON `{ code, message, data? }`, and clients reject with
 them. Errors under HTTP Behavior lists every failure and what each side gets.
 
-### [Content Types](https://rest-rpc.vercel.app/docs/route-builder#content-types)
+### [Content Types](https://rest-rpc.vercel.app/docs/http-behavior/encoding#bodies)
 
 ```ts
 // A body is JSON unless a content-type header says otherwise.
