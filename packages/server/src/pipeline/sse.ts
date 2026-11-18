@@ -57,7 +57,7 @@ export const toSseEvent = (value: unknown): SseEvent<unknown> => {
 /**
  * Options of Server-Sent Event responses.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/streaming#stream-options}
+ * @see {@link https://rest-rpc.vercel.app/docs/server-sent-events#stream-options}
  */
 export type SseOptions = {
 	/** The data format of events, the same as the client's. JSON by default. */

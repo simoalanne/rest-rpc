@@ -1,269 +1,121 @@
 ---
 title: Interceptors
-description: Run route-aware logic around every request the app serves.
+description: Run code around every request the app serves.
 ---
 
-Interceptors run route-aware logic around requests, for apps served without a
-framework, or with one when you don't want two competing abstractions. A
-framework often has its own option for the same job, such as CORS or rate
-limiting middleware, so with [framework integration](/docs/server/framework-integration)
-you may need few of them.
+An interceptor is a function around everything the app does for a request. It
+receives the request and the matched route, calls `next()` for the rest, and
+returns the response. Interceptors are for app-wide work that rest-rpc leaves
+to the app, such as API keys, CORS, rate limits or logging. Per-route logic
+with typed context belongs in [middleware](/docs/middleware). Served from a
+[framework](/docs/server/framework-integration), the framework's own
+middleware often does the same job.
 
-rest-rpc itself has no such features: no CORS, rate limiting, request body
-size limits, timeouts or compression. Interceptors are where they go when you
-need them from rest-rpc. An interceptor is the usual middleware pattern: work
-before `next()`, `next()` for the rest, work after it. Per-route logic with
-typed context belongs in [middleware](/docs/middleware).
+The [client](/docs/client/fetch-client#interceptors) has interceptors with the
+same shape around each HTTP exchange.
 
-## The Lifecycle
+## Write an Interceptor
 
-Run this to see where each part runs, including for failures:
-
-```ts server.ts
-import {
-	createApp,
-	errorResponse,
-	interceptor,
-	onError,
-	route,
-} from "@rest-rpc/server";
-import { z } from "zod";
-
-const timing = interceptor(async ({ next }) => {
-	console.log("timing: before next");
-	try {
-		const response = await next();
-		console.log(`timing: after next, ${response.status}`);
-		return response;
-	} catch (error) {
-		console.log("timing: next rejected"); // never: sendErrors catches first
-		throw error;
-	}
-});
-
-// Turns errors into responses for the interceptors before it.
-const sendErrors = interceptor(({ next }) => next().catch(errorResponse));
-
-const report = onError((error) =>
-	console.log(`onError: ${(error as Error).message}`),
-);
-
-const getTodo = route
-	.$context<{ user: string }>()
-	.get("/todos/:id")
-	.params(z.object({ id: z.string().regex(/^\d+$|^fail$/) }))
-	.use(async ({ next }) => {
-		console.log("middleware: before next");
-		try {
-			return await next();
-		} finally {
-			console.log("middleware: after next");
-		}
-	})
-	.handler(({ params, context }) => {
-		console.log(`handler: ${params.id} for ${context.user}`);
-		if (params.id === "fail") throw new Error("handler failed");
-		return { id: params.id };
-	});
-
-const app = createApp(
-	{ getTodo },
-	{
-		context: () => {
-			console.log("context");
-			return { user: "ada" };
-		},
-		interceptors: [timing, sendErrors, report],
-	},
-);
-
-for (const path of ["/todos/1", "/todos/abc", "/todos/fail", "/missing"]) {
-	console.log(path);
-	await app.fetch(new Request(`http://localhost${path}`));
-}
-```
-
-```txt
-/todos/1
-  timing: before next
-  context
-  middleware: before next
-  handler: 1 for ada
-  middleware: after next
-  timing: after next, 200
-/todos/abc                    (request validation fails: no middleware, no handler)
-  timing: before next
-  context
-  onError: Request validation failed.
-  timing: after next, 400
-/todos/fail
-  timing: before next
-  context
-  middleware: before next
-  handler: fail for ada
-  middleware: after next
-  onError: handler failed
-  timing: after next, 500
-/missing                      (no route: no context)
-  timing: before next
-  onError: Not found.
-  timing: after next, 404
-```
-
-Interceptors run in order, the first outermost, before routing and the
-`context` function. An error rejects `next()` back through every interceptor
-until one catches it. Without `sendErrors`, `timing` would log "next
-rejected", and the app would send the error after the last interceptor.
-
-## Writing Interceptors
+`interceptor()` types the function and returns it unchanged. Pass interceptors
+to `createApp` in `interceptors`:
 
 ```ts
-import { createApp, interceptor, routeError } from "@rest-rpc/server";
+import { createApp, interceptor } from "@rest-rpc/server";
 
-const Forbidden = routeError("FORBIDDEN", { status: 403 });
-
-const apiKey = interceptor(({ request, route, next }) => {
-	if (route?.meta?.access === "public") return next();
-	if (request.headers.get("x-api-key") !== API_KEY) throw new Forbidden();
-	return next();
+const logging = interceptor(async ({ request, route, next }) => {
+	const response = await next();
+	console.log(request.method, route?.path, response.status);
+	return response;
 });
 
-export default createApp(routes, { interceptors: [apiKey] });
+export default createApp(routes, { interceptors: [logging] });
 ```
-
-- `route` is the matched route's definition, with its path and
-  [`meta`](/docs/middleware#metadata), or `undefined` when nothing matches.
-- Every request runs them, except for [static routes](/docs/route-builder#static-responses).
-- Errors are thrown, and a `RouteError` is sent with its own status.
-- `next(request)` continues with another request, such as one with other
-  headers. Routing isn't repeated, so keep its URL and method.
-- `args` are what the runtime passed to `fetch` after the request, such as
-  the `env` of Cloudflare Workers: `const [env] = args as [Env]`.
-
-## What `next()` Returns
-
-| What happens                                                                        | `next()`                                                             |
-| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| The route responds                                                                  | Resolves with the `Response`                                         |
-| A `RouteError` is thrown, such as a validation failure or `errors.TODO_NOT_FOUND()` | Rejects with it, with the status, `data` and headers it's sent with  |
-| A response fails validation                                                         | Rejects with an `INTERNAL_SERVER_ERROR` whose `cause` has the issues |
-| No route matches                                                                    | Rejects with `NOT_FOUND`                                             |
-| Anything else is thrown                                                             | Rejects with it, unchanged                                           |
-
-A route error keeps its class, so `error instanceof TodoNotFound` works.
-
-## Reporting Errors
-
-`onError(callback)` calls `callback` with every error thrown after it, a body
-that fails while it streams included, and rethrows it:
 
 ```ts
-const report = onError((error, { request, route }) => {
-	logger.error({ method: request.method, path: route?.path, error });
-});
+type Interceptor = (args: {
+	request: Request;
+	/**
+	 * The matched route's definition, with its `path` and `meta`, or
+	 * `undefined` when no route matches the request.
+	 */
+	route: InterceptedRoute | undefined;
+	/**
+	 * What the runtime passed to `fetch` after the request, such as the `env`
+	 * of Cloudflare Workers. Untyped, so narrow them where they are read:
+	 * `const [env] = args as [Env]`.
+	 */
+	args: readonly unknown[];
+	/**
+	 * Handles the request with the later interceptors and the route. Pass
+	 * another request to continue with it, such as one with other headers.
+	 * Routing is not repeated, so keep its URL and method.
+	 */
+	next: (request?: Request) => Promise<Response>;
+}) => Response | Promise<Response>;
 ```
 
-Place it after interceptors that turn errors into responses.
+An interceptor that returns a `Response` without calling `next()` answers the
+request itself, and one that throws sends an error.
+
+## Order
+
+The app matches the route first, then runs the interceptors in order, the
+first outermost. The last one's `next()` runs the route: the
+[context](/docs/middleware#values-from-the-host) function, request validation,
+middleware and the handler. `next()` resolves when the response starts, before
+its body streams.
+
+Interceptors run for every request, including ones that match no route, except
+for [static routes](/docs/route-builder#static-responses), which are sent as
+they are.
+
+## Errors
+
+`next()` resolves with the responses the route sends, and rejects with every
+error thrown after the interceptor:
+
+- A `RouteError` rejects as it's sent, with its status, `data` and headers.
+  This includes request validation failures, `NOT_FOUND` when no route
+  matches, and the route's own errors, which keep their class.
+- A response that fails validation rejects with an `INTERNAL_SERVER_ERROR`
+  whose `cause` has the issues.
+- Anything else rejects unchanged.
+
+An interceptor sends an error by throwing it, and a `RouteError` is sent with
+its own status. It isn't checked against the route, so to send a code the
+route [defines](/docs/http-behavior/errors#defined-and-undefined-errors),
+throw the route's own error class.
 
 ## Sending Errors
 
 What no interceptor catches, the app sends with `errorResponse(error)`: a
 `RouteError` as a JSON `{ code, message, data? }` response with its status,
 and anything else as an `INTERNAL_SERVER_ERROR`. An interceptor that catches
-with it sends errors earlier, so the ones before it get error responses as
-responses:
+with it sends errors earlier, so the interceptors before it receive error
+responses instead of rejections:
 
 ```ts
-const sendErrors = interceptor(({ next }) => next().catch(errorResponse));
+import { createApp, errorResponse, interceptor } from "@rest-rpc/server";
 
-createApp(routes, { interceptors: [cors, sendErrors, report, apiKey] });
-```
-
-An error an interceptor throws isn't checked against the route, so to send a
-code the route [defines](/docs/http-behavior/errors#defined-and-undefined-errors),
-throw the route's own error class.
-
-## Not Found
-
-Without a matching route, `next()` rejects with `NOT_FOUND`. To send
-something else, don't call it:
-
-```ts
-const notFound = interceptor(({ route, next }) =>
-	route ? next() : new Response("Not found", { status: 404 }),
-);
-```
-
-## CORS
-
-CORS headers have to be on every response, error responses included, and
-preflights are answered before routing:
-
-```ts
-const corsHeaders = {
-	"access-control-allow-origin": "https://app.example.com",
-	vary: "Origin",
-};
-
-const cors = interceptor(async ({ request, next }) => {
-	if (request.method === "OPTIONS") {
-		return new Response(null, {
-			status: 204,
-			headers: {
-				...corsHeaders,
-				"access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE",
-				"access-control-allow-headers": "content-type, authorization",
-			},
-		});
-	}
-	const response = await next();
-	const copy = new Response(response.body, response); // headers may be immutable
-	for (const [name, value] of Object.entries(corsHeaders)) {
-		copy.headers.set(name, value);
-	}
-	return copy;
-});
-
-// sendErrors after cors, so error responses get the headers too.
-createApp(routes, { interceptors: [cors, sendErrors] });
-```
-
-## Problem Details
-
-To send errors as `application/problem+json`, rewrite the error response.
-Keeping `code`, `message` and `data` lets the rest-rpc client decode it as
-before:
-
-```ts
-const problemJson = interceptor(async ({ next }) => {
-	const response = await next().catch(errorResponse);
-	if (response.ok) return response;
-	const { code, message, data } = await response.json();
-	const headers = new Headers(response.headers);
-	headers.set("content-type", "application/problem+json");
-	return Response.json(
-		{
-			type: `https://api.example.com/errors/${code}`,
-			title: message,
-			status: response.status,
-			code,
-			message,
-			data,
-		},
-		{ status: response.status, headers },
-	);
+createApp(routes, {
+	interceptors: [
+		cors, // receives error responses too
+		interceptor(({ next }) => next().catch(errorResponse)),
+		apiKey,
+	],
 });
 ```
 
-## Serving a Path Before Routing
+## Reporting Errors
 
-An interceptor that doesn't call `next()` answers the request itself, such as
-for files under a prefix the routes don't define:
+`onError(callback)` creates an interceptor that calls `callback` with every
+error thrown after it, a body that fails while it streams included, and then
+rethrows it. Place it after interceptors that turn errors into responses:
 
 ```ts
-const files = interceptor(({ request, next }) => {
-	const { pathname } = new URL(request.url);
-	if (!pathname.startsWith("/files/")) return next();
-	return serveFile(pathname.slice("/files/".length));
+import { onError } from "@rest-rpc/server";
+
+const report = onError((error, { request, route }) => {
+	logger.error({ method: request.method, path: route?.path, error });
 });
 ```

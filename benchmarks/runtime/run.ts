@@ -24,11 +24,11 @@ const allCases: Record<string, { args: string[]; status?: "4xx" }> = {
 			"-H",
 			"authorization: Bearer token",
 			"-b",
-			'{"title":"Write benchmarks","done":false,"tags":["perf","http"]}',
-			`${base}/todos/1?notify=yes`,
+			'{"title":"Write benchmarks","published":false,"tags":["perf","http"]}',
+			`${base}/posts/1?notify=yes`,
 		],
 	},
-	error: { args: [`${base}/todos/1`], status: "4xx" },
+	error: { args: [`${base}/posts/1`], status: "4xx" },
 };
 // Arguments select the cases whose name includes any of them, such as
 // `pnpm bench:http query middleware`.

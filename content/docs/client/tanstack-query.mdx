@@ -50,10 +50,10 @@ The util accepts request input, Fetch options, and TanStack Query options in one
 ```tsx
 import { useQuery } from "@tanstack/react-query";
 
-const todo = useQuery(
-	restrpc.todos.get.queryOptions({
+const post = useQuery(
+	restrpc.posts.get.queryOptions({
 		request: {
-			params: { id: "todo_1" },
+			params: { id: "post_1" },
 		},
 	}),
 );
@@ -76,8 +76,8 @@ request used for its API call.
 ```tsx
 import { useInfiniteQuery } from "@tanstack/react-query";
 
-const todos = useInfiniteQuery(
-	restrpc.todos.page.infiniteQueryOptions({
+const posts = useInfiniteQuery(
+	restrpc.posts.feed.infiniteQueryOptions({
 		request: (cursor: string | undefined) => ({
 			query: { cursor, status: "open", limit: 50 },
 		}),
@@ -103,14 +103,14 @@ API.
 ```tsx
 import { useQuery } from "@tanstack/react-query";
 
-const events = useQuery(restrpc.todos.events.streamedQueryOptions());
+const events = useQuery(restrpc.notifications.streamedQueryOptions());
 ```
 
 By default, SSE events accumulate into an array.
 
 ```ts
 events.data;
-// Array<SseEvent<{ id: string; message: string }>> | undefined
+// Array<SseEvent<{ postId: string; message: string }>> | undefined
 ```
 
 Pass `initialValue` and `reducer` when you want a different accumulated data
@@ -118,7 +118,7 @@ shape.
 
 ```tsx
 const messages = useQuery(
-	restrpc.todos.events.streamedQueryOptions({
+	restrpc.notifications.streamedQueryOptions({
 		initialValue: "",
 		reducer: (text, event) => `${text}${event.data.message}`,
 	}),
@@ -139,8 +139,8 @@ To disable a query in type-safe way you can use `skipToken` as request input.
 ```tsx
 import { skipToken } from "@tanstack/query-core";
 
-const todo = useQuery(
-	restrpc.todos.get.queryOptions({
+const post = useQuery(
+	restrpc.posts.get.queryOptions({
 		request: selectedId ? { params: { id: selectedId } } : skipToken,
 	}),
 );
@@ -149,8 +149,8 @@ const todo = useQuery(
 For infinite queries, pass `skipToken` instead of the `request` callback.
 
 ```tsx
-const todos = useInfiniteQuery(
-	restrpc.todos.page.infiniteQueryOptions({
+const posts = useInfiniteQuery(
+	restrpc.posts.feed.infiniteQueryOptions({
 		request: status
 			? (cursor: string | undefined) => ({ query: { cursor, status } })
 			: skipToken,
@@ -170,14 +170,14 @@ to get the keys outside an options object. The returned keys are typed for
 TanStack Query APIs.
 
 ```ts
-restrpc.todos.get.queryKey({ params: { id: "todo_1" } }); // ["todos", "get", { params: { id: "todo_1" } }]
-restrpc.todos.list.queryKey(); // ["todos", "list"]
+restrpc.posts.get.queryKey({ params: { id: "post_1" } }); // ["posts", "get", { params: { id: "post_1" } }]
+restrpc.posts.list.queryKey(); // ["posts", "list"]
 
 // The request of an infinite query is the one of its initial page.
-restrpc.todos.page.infiniteQueryKey({
+restrpc.posts.feed.infiniteQueryKey({
 	query: { cursor: undefined, status: "open", limit: 50 },
-}); // ["todos", "page", "~infinite", { query: { ... } }]
-restrpc.todos.events.streamedQueryKey(); // ["todos", "events", "~streamed"]
+}); // ["posts", "feed", "~infinite", { query: { ... } }]
+restrpc.notifications.streamedQueryKey(); // ["notifications", "~streamed"]
 ```
 
 Without a request, a key is a prefix matching every query of its kind for the
@@ -185,24 +185,24 @@ route when used as a filter. `queryKey()` without a request matches every query
 of the route, including infinite and streamed ones.
 
 ```ts
-const todoKey = restrpc.todos.get.queryKey({ params: { id: "todo_1" } });
+const postKey = restrpc.posts.get.queryKey({ params: { id: "post_1" } });
 
-const todo = queryClient.getQueryData(todoKey);
+const post = queryClient.getQueryData(postKey);
 
-queryClient.setQueryData(todoKey, (current) =>
+queryClient.setQueryData(postKey, (current) =>
 	current && current.status === 200
 		? {
 				...current,
 				body: {
 					...current.body,
-					completed: true,
+					title: "Edited",
 				},
 			}
 		: current,
 );
 
 await queryClient.invalidateQueries({
-	queryKey: todoKey,
+	queryKey: postKey,
 });
 ```
 
@@ -212,10 +212,10 @@ Pass `queryKey` in options when a query needs a custom key, such as two streamed
 queries of a route that accumulate data with different reducers.
 
 ```tsx
-const todo = useQuery(
-	restrpc.todos.get.queryOptions({
-		request: { params: { id: "todo_1" } },
-		queryKey: ["todos", "detail", "todo_1"],
+const post = useQuery(
+	restrpc.posts.get.queryOptions({
+		request: { params: { id: "post_1" } },
+		queryKey: ["posts", "detail", "post_1"],
 	}),
 );
 ```
@@ -224,7 +224,7 @@ Use the same custom key with TanStack Query cache APIs.
 
 ```ts
 await queryClient.invalidateQueries({
-	queryKey: ["todos", "detail", "todo_1"],
+	queryKey: ["posts", "detail", "post_1"],
 });
 ```
 
@@ -235,11 +235,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 const queryClient = useQueryClient();
 
-const createTodo = useMutation(
-	restrpc.todos.create.mutationOptions({
+const createPost = useMutation(
+	restrpc.posts.create.mutationOptions({
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({
-				queryKey: restrpc.todos.list.queryKey(),
+				queryKey: restrpc.posts.list.queryKey(),
 			});
 		},
 	}),
@@ -247,8 +247,8 @@ const createTodo = useMutation(
 ```
 
 ```tsx
-createTodo.mutate({
-	body: { title: "Write docs" },
+createPost.mutate({
+	body: { title: "Hello", body: "First post" },
 });
 ```
 
@@ -256,7 +256,7 @@ Mutation options use the route path as their default mutation key. Use
 `mutationKey()` with TanStack Query APIs that filter or configure mutations.
 
 ```ts
-queryClient.setMutationDefaults(restrpc.todos.create.mutationKey(), {
+queryClient.setMutationDefaults(restrpc.posts.create.mutationKey(), {
 	retry: 2,
 });
 ```
@@ -270,9 +270,9 @@ Query options do not accept `signal`, because the cancellation signal provided
 by TanStack Query is passed to the request automatically.
 
 ```tsx
-const todo = useQuery(
-	restrpc.todos.get.queryOptions({
-		request: { params: { id: "todo_1" } },
+const post = useQuery(
+	restrpc.posts.get.queryOptions({
+		request: { params: { id: "post_1" } },
 		fetchOptions: {
 			cache: "no-store",
 			additionalHeaders: {
@@ -291,10 +291,10 @@ The `error` of a query or mutation holds the same errors that
 ```tsx
 import { isDefinedError } from "@rest-rpc/core";
 
-const createTodo = useMutation(
-	restrpc.todos.create.mutationOptions({
+const createPost = useMutation(
+	restrpc.posts.create.mutationOptions({
 		onError(error) {
-			if (isDefinedError(error) && error.code === "TODO_EXISTS") {
+			if (isDefinedError(error) && error.code === "SLUG_TAKEN") {
 				console.log(error.message);
 			}
 		},

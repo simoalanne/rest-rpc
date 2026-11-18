@@ -11,12 +11,12 @@ const handlerOf = (entry: unknown) =>
 
 const routes = {
 	root: route.get("/").handler(() => "root"),
-	todos: {
+	posts: {
 		get: route
-			.get("/todos/:id")
+			.get("/posts/:id")
 			.params(type<{ id: string }>())
 			.handler(({ params }) => params.id),
-		update: route.patch("/todos/:id").handler(({ params }) => params.id),
+		update: route.patch("/posts/:id").handler(({ params }) => params.id),
 		fail: route.get("/fail").handler((): string => {
 			throw new Error("boom");
 		}),
@@ -33,7 +33,7 @@ describe("createApp", () => {
 		const app = createApp(routes, { mountPath: "/api" });
 		const listed = {
 			"/api": ["GET"],
-			"/api/todos/:id": ["GET", "PATCH"],
+			"/api/posts/:id": ["GET", "PATCH"],
 			"/api/fail": ["GET"],
 		};
 		for (const mountPath of ["/api", "/api/"] as const) {
@@ -50,10 +50,10 @@ describe("createApp", () => {
 
 		// Bun's router attaches the decoded params to the request.
 		const request = Object.assign(
-			new Request("http://localhost/api/todos/a%2Fb"),
+			new Request("http://localhost/api/posts/a%2Fb"),
 			{ params: { id: "a/b" } },
 		);
-		const response = await handlerOf(app.routes["/api/todos/:id"]!.GET)(
+		const response = await handlerOf(app.routes["/api/posts/:id"]!.GET)(
 			request,
 		);
 		expect(await response.json()).toBe("a/b");
@@ -163,13 +163,13 @@ describe("createApp", () => {
 			{ ...routes, about: route.get("/about").static("about") },
 			{ interceptors: [tagged] },
 		);
-		const response = await handlerOf(app.routes["/todos/:id"]!.GET)(
-			Object.assign(new Request("http://localhost/todos/1"), {
+		const response = await handlerOf(app.routes["/posts/:id"]!.GET)(
+			Object.assign(new Request("http://localhost/posts/1"), {
 				params: { id: "1" },
 			}),
 		);
 		expect(await response.json()).toBe("1");
-		expect(response.headers.get("x-route")).toBe("/todos/:id");
+		expect(response.headers.get("x-route")).toBe("/posts/:id");
 		expect(app.routes["/about"]!.GET).toBeInstanceOf(Response);
 	});
 });

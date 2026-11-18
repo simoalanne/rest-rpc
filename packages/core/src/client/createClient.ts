@@ -79,6 +79,7 @@ export type ApiClientOptions<
 	 * server's `mountPath`. Route paths do not include it.
 	 */
 	mountPath?: AbsolutePath;
+	/** Codecs for other body formats, the same as the server's. */
 	bodyCodecs?: readonly BodyCodec[];
 	/**
 	 * Sends each request, the `Request` the last interceptor sends.
@@ -86,7 +87,15 @@ export type ApiClientOptions<
 	 * @default `globalThis.fetch`
 	 */
 	fetch?: FetchLike;
+	/**
+	 * Fetch options merged into every request. Per-call options override them,
+	 * and `signal` and `additionalHeaders` can only be passed per call.
+	 */
 	fetchOptions?: ApiClientFetchOptions;
+	/**
+	 * Headers added to every request, each a value or a function called for
+	 * each request. Defined headers they set are optional at call sites.
+	 */
 	globalHeaders?: TGlobalHeaders;
 	/**
 	 * Functions around each HTTP exchange, the first outermost, such as for
@@ -98,7 +107,14 @@ export type ApiClientOptions<
 		/** The data format of events, the same as the server's. JSON by default. */
 		format?: SseFormat;
 	};
+	/** Aborts a request when fetch does not return in time. */
 	timeoutMs?: number;
+	/**
+	 * Validates response bodies, defined response headers and stream event data
+	 * against the contract's schemas.
+	 *
+	 * @default false
+	 */
 	validateResponses?: boolean;
 };
 

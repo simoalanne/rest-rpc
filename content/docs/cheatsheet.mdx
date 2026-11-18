@@ -54,12 +54,14 @@ import { z } from "zod";
 const api = route.prefix("/api");
 
 export const routes = {
-	todos: {
-		list: api.get("/todos").handler(() => [{ id: "1", title: "Ship" }]), // GET /api/todos
-		get: api.get("/todos/:id").handler(({ params }) => ({ id: params.id })), // params.id: string
+	posts: {
+		list: api
+			.get("/posts")
+			.handler(() => [{ id: "1", title: "Hello", body: "First post" }]), // GET /api/posts
+		get: api.get("/posts/:id").handler(({ params }) => ({ id: params.id })), // params.id: string
 		create: api
-			.body(z.object({ title: z.string() }))
-			.handler(({ body }) => ({ id: "2", title: body.title })), // POST /api/todos/create
+			.body(z.object({ title: z.string(), body: z.string() }))
+			.handler(({ body }) => ({ id: "2", title: body.title, body: body.body })), // POST /api/posts/create
 	},
 };
 ```
@@ -77,18 +79,18 @@ import { route } from "@rest-rpc/server";
 import { z } from "zod";
 
 const search = route
-	.get("/users/:id/todos")
+	.get("/users/:id/posts")
 	.params(z.object({ id: z.coerce.number<number>() }))
 	.query(
 		z.object({
-			done: z.stringbool().optional(),
+			published: z.stringbool().optional(),
 			tags: z.array(z.string()).optional(),
 		}),
 	)
 	.headers(z.object({ "x-request-id": z.string() }))
 	.handler(({ params, query, headers }) => ({
 		userId: params.id, // number
-		done: query.done, // boolean | undefined
+		published: query.published, // boolean | undefined
 		tags: query.tags ?? [], // sent as tags[]=a&tags[]=b
 		requestId: headers["x-request-id"],
 	}));
@@ -105,14 +107,18 @@ import { route } from "@rest-rpc/server";
 import { z } from "zod";
 
 const create = route
-	.post("/todos")
-	.body(z.object({ title: z.string() }))
+	.post("/posts")
+	.body(z.object({ title: z.string(), body: z.string() }))
 	.handler(({ body, respond }) => {
-		const todo = { id: crypto.randomUUID(), title: body.title };
-		return respond(todo, {
+		const post = {
+			id: crypto.randomUUID(),
+			title: body.title,
+			body: body.body,
+		};
+		return respond(post, {
 			status: 201,
-			headers: { location: `/todos/${todo.id}` },
-			cookies: ["last-created=1; HttpOnly"],
+			headers: { location: `/posts/${post.id}` },
+			cookies: ["draft=; Max-Age=0"],
 		});
 	});
 ```
@@ -128,19 +134,21 @@ See [Define Responses](/docs/route-builder#define-responses)
 import { route } from "@rest-rpc/server";
 import { z } from "zod";
 
-const todo = z.object({ id: z.string(), title: z.string() });
+const post = z.object({ id: z.string(), title: z.string(), body: z.string() });
 
 const create = route
-	.post("/todos")
-	.body(z.object({ title: z.string() }))
-	.response(todo, { status: 201, headers: z.object({ location: z.string() }) })
-	.response({ status: 202 }) // no body
+	.post("/posts")
+	.body(z.object({ title: z.string(), body: z.string() }))
+	.response(post, { status: 201, headers: z.object({ location: z.string() }) })
 	.handler(({ body, respond }) => {
-		if (body.title.length > 100) return respond(undefined, { status: 202 });
-		const created = { id: crypto.randomUUID(), title: body.title };
+		const created = {
+			id: crypto.randomUUID(),
+			title: body.title,
+			body: body.body,
+		};
 		return respond(created, {
 			status: 201,
-			headers: { location: `/todos/${created.id}` },
+			headers: { location: `/posts/${created.id}` },
 		});
 	});
 ```
@@ -157,19 +165,19 @@ import { createClient, isDefinedError, safe } from "@rest-rpc/core";
 import { createApp, route } from "@rest-rpc/server";
 import { z } from "zod";
 
-const todos = new Map([["1", { id: "1", title: "Ship" }]]);
+const posts = new Map([["1", { id: "1", title: "Hello", body: "First post" }]]);
 
 const routes = {
 	get: route
-		.get("/todos/:id")
-		.error("TODO_NOT_FOUND", {
+		.get("/posts/:id")
+		.error("POST_NOT_FOUND", {
 			status: 404,
 			data: z.object({ id: z.string() }),
 		})
 		.handler(({ params, errors }) => {
-			const todo = todos.get(params.id);
-			if (!todo) throw errors.TODO_NOT_FOUND({ data: { id: params.id } });
-			return todo;
+			const post = posts.get(params.id);
+			if (!post) throw errors.POST_NOT_FOUND({ data: { id: params.id } });
+			return post;
 		}),
 };
 
@@ -181,7 +189,7 @@ const client = createClient(routes, {
 
 const { error, data } = await safe(client.get({ params: { id: "2" } }));
 if (isDefinedError(error))
-	console.log(error.code, error.data.id); // "TODO_NOT_FOUND" "2"
+	console.log(error.code, error.data.id); // "POST_NOT_FOUND" "2"
 else if (error) throw error;
 else console.log(data.body.title);
 ```
@@ -197,23 +205,23 @@ See [Define Errors](/docs/route-builder#define-errors)
 import { route, routeError } from "@rest-rpc/server";
 import { z } from "zod";
 
-const TodoNotFound = routeError("TODO_NOT_FOUND", {
+const PostNotFound = routeError("POST_NOT_FOUND", {
 	status: 404,
 	data: z.object({ id: z.string() }),
 });
 
-const todos = new Map([["1", { id: "1", title: "Ship" }]]);
+const posts = new Map([["1", { id: "1", title: "Hello", body: "First post" }]]);
 
-const findTodo = (id: string) => {
-	const todo = todos.get(id);
-	if (!todo) throw new TodoNotFound({ data: { id } });
-	return todo;
+const findPost = (id: string) => {
+	const post = posts.get(id);
+	if (!post) throw new PostNotFound({ data: { id } });
+	return post;
 };
 
 const get = route
-	.get("/todos/:id")
-	.error(TodoNotFound)
-	.handler(({ params }) => findTodo(params.id));
+	.get("/posts/:id")
+	.error(PostNotFound)
+	.handler(({ params }) => findPost(params.id));
 ```
 
 ## Middleware and Context
@@ -278,20 +286,23 @@ const profile = base
 
 Return an async iterable to stream events. The client iterates them.
 
-See [Server-Sent Events](/docs/streaming)
+See [Server-Sent Events](/docs/server-sent-events)
 
 ```ts
 import { createClient } from "@rest-rpc/core";
 import { createApp, route, sse, sseEvent } from "@rest-rpc/server";
 import { z } from "zod";
 
+const messages = ["Ada liked your post", "Grace commented on your post"];
+
 const routes = {
-	ticks: route
-		.get("/ticks")
-		.response(sse(z.object({ count: z.number() }))) // optional, validates each event
+	notifications: route
+		.get("/notifications")
+		.response(sse(z.object({ message: z.string() }))) // optional, validates each event
 		.handler(async function* ({ signal }) {
-			for (let count = 1; count <= 3 && !signal.aborted; count++) {
-				yield sseEvent({ count }, { id: String(count) });
+			for (const [i, message] of messages.entries()) {
+				if (signal.aborted) break;
+				yield sseEvent({ message }, { id: String(i) });
 			}
 		}),
 };
@@ -302,33 +313,63 @@ const client = createClient(routes, {
 	fetch: app.fetch,
 });
 
-const { body } = await client.ticks();
-for await (const event of body) console.log(event.id, event.data.count);
+const { body } = await client.notifications();
+for await (const event of body) console.log(event.id, event.data.message);
 ```
 
 ## Other Content Types
 
-A body is JSON unless a `content-type` header says otherwise. The route
-declares it in its headers schemas.
+A body is JSON unless a `content-type` header says otherwise. Here a route
+takes an image as `multipart/form-data`, and another returns it as a `Blob`.
 
 See [Encoding and Content Types](/docs/http-behavior/encoding#bodies)
 
 ```ts
-import { route } from "@rest-rpc/server";
+import { createClient } from "@rest-rpc/core";
+import { createApp, route } from "@rest-rpc/server";
 import { z } from "zod";
 
-const importTodos = route
-	.post("/todos/import")
-	.headers(z.object({ "content-type": z.literal("text/csv") }))
-	.body(z.string())
-	.response(z.string(), {
-		headers: z.object({
-			"content-type": z.literal("text/plain").default("text/plain"),
-		}),
-	})
-	.handler(({ body }) => `${body.split("\n").length - 1} todos imported`);
+const images = new Map<string, Blob>();
 
-// The client sends it with the header: { headers: { "content-type": "text/csv" }, body: csv }
+const routes = {
+	posts: {
+		upload: route
+			.post("/posts/:id/image")
+			.headers(z.object({ "content-type": z.literal("multipart/form-data") }))
+			.body(z.instanceof(FormData))
+			.handler(({ params, body }) => {
+				images.set(params.id, body.get("image") as File);
+				return { url: `/posts/${params.id}/image` };
+			}),
+		image: route
+			.get("/posts/:id/image")
+			.error("IMAGE_NOT_FOUND", { status: 404 })
+			.handler(({ params, errors, respond }) => {
+				const image = images.get(params.id);
+				if (!image) throw errors.IMAGE_NOT_FOUND();
+				return respond(image, { headers: { "content-type": image.type } });
+			}),
+	},
+};
+
+const app = createApp(routes);
+const client = createClient(routes, {
+	origin: "http://localhost",
+	fetch: app.fetch,
+});
+
+const form = new FormData();
+form.set(
+	"image",
+	new File(["image bytes"], "cover.png", { type: "image/png" }),
+);
+await client.posts.upload({
+	params: { id: "post_1" },
+	headers: { "content-type": "multipart/form-data" },
+	body: form,
+});
+
+const { body } = await client.posts.image({ params: { id: "post_1" } }); // Blob
 ```
 
 ## Raw and Static Responses
@@ -342,7 +383,7 @@ See [Raw Responses](/docs/route-builder#raw-responses)
 import { route } from "@rest-rpc/server";
 
 const download = route
-	.get("/files/:id")
+	.get("/images/:id")
 	.handler(({ params }) =>
 		Response.redirect(`https://cdn.example.com/${params.id}`, 302),
 	);
@@ -352,7 +393,7 @@ const health = route.get("/health").static({ ok: true });
 
 ## Interceptors
 
-Interceptors run around every request, routing included, for what rest-rpc
+Interceptors run around every request the app serves, for what rest-rpc
 leaves to the app, such as API keys, CORS and error reporting.
 
 See [Interceptors](/docs/server/interceptors)
@@ -364,20 +405,12 @@ import {
 	interceptor,
 	onError,
 	route,
-	routeError,
 } from "@rest-rpc/server";
 
-const Forbidden = routeError("FORBIDDEN", { status: 403 });
-
-const apiKey = interceptor(({ request, next }) => {
-	if (request.headers.get("x-api-key") !== "secret") throw new Forbidden();
-	return next();
-});
-
-const cors = interceptor(async ({ next }) => {
+const requestId = interceptor(async ({ next }) => {
 	const response = await next();
 	const copy = new Response(response.body, response); // its headers may be immutable
-	copy.headers.set("access-control-allow-origin", "*");
+	copy.headers.set("x-request-id", crypto.randomUUID());
 	return copy;
 });
 
@@ -385,10 +418,9 @@ const routes = { hello: route.get("/hello").handler(() => "Hello") };
 
 export default createApp(routes, {
 	interceptors: [
-		cors,
-		interceptor(({ next }) => next().catch(errorResponse)), // errors reach cors as responses
+		requestId,
+		interceptor(({ next }) => next().catch(errorResponse)), // errors reach requestId as responses
 		onError((error) => console.error(error)), // every error, with its cause
-		apiKey,
 	],
 });
 ```
@@ -461,7 +493,7 @@ export const client = createClient(getApi(), {
 ```
 
 ```ts
-// vite.config.ts, not needed with Bun
+// vite.config.ts
 import Macros from "unplugin-macros/vite";
 import { defineConfig } from "vite";
 
@@ -512,10 +544,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
 const routes = {
-	todos: {
-		list: route.get("/todos").handler(() => [{ id: "1", title: "Ship" }]),
+	posts: {
+		list: route
+			.get("/posts")
+			.handler(() => [{ id: "1", title: "Hello", body: "First post" }]),
 		create: route
-			.body(z.object({ title: z.string() }))
+			.body(z.object({ title: z.string(), body: z.string() }))
 			.handler(({ body }) => body),
 	},
 };
@@ -524,22 +558,26 @@ const restrpc = createTanstackQueryUtils(
 	createClient(routes, { origin: "https://api.example.com" }),
 );
 
-export function Todos() {
+export function Posts() {
 	const queryClient = useQueryClient();
-	const todos = useQuery(
-		restrpc.todos.list.queryOptions({ select: (response) => response.body }),
+	const posts = useQuery(
+		restrpc.posts.list.queryOptions({ select: (response) => response.body }),
 	);
 	const create = useMutation(
-		restrpc.todos.create.mutationOptions({
+		restrpc.posts.create.mutationOptions({
 			onSuccess: () =>
 				queryClient.invalidateQueries({
-					queryKey: restrpc.todos.list.queryKey(),
+					queryKey: restrpc.posts.list.queryKey(),
 				}),
 		}),
 	);
 	return (
-		<button onClick={() => create.mutate({ body: { title: "New" } })}>
-			{todos.data?.length ?? 0} todos
+		<button
+			onClick={() =>
+				create.mutate({ body: { title: "Hello", body: "First post" } })
+			}
+		>
+			{posts.data?.length ?? 0} posts
 		</button>
 	);
 }
@@ -558,19 +596,22 @@ import { createApp, implement } from "@rest-rpc/server";
 import { z } from "zod";
 
 const api = {
-	todos: {
+	posts: {
 		get: route
-			.get("/todos/:id")
-			.response(z.object({ id: z.string(), title: z.string() }))
-			.error("TODO_NOT_FOUND", { status: 404 }),
+			.get("/posts/:id")
+			.response(
+				z.object({ id: z.string(), title: z.string(), body: z.string() }),
+			)
+			.error("POST_NOT_FOUND", { status: 404 }),
 	},
 };
 
 const routes = {
-	todos: {
-		get: implement(api.todos.get).handler(({ params }) => ({
+	posts: {
+		get: implement(api.posts.get).handler(({ params }) => ({
 			id: params.id,
-			title: "Ship",
+			title: "Hello",
+			body: "First post",
 		})),
 	},
 };
@@ -615,17 +656,21 @@ import { createOpenApiDocument, route } from "@rest-rpc/server";
 import { z } from "zod";
 
 const routes = {
-	todos: {
+	posts: {
 		list: route
-			.get("/todos")
-			.response(z.array(z.object({ id: z.string(), title: z.string() })))
-			.openAPI({ summary: "List todos", tags: ["Todos"] })
-			.handler(() => [{ id: "1", title: "Ship" }]),
+			.get("/posts")
+			.response(
+				z.array(
+					z.object({ id: z.string(), title: z.string(), body: z.string() }),
+				),
+			)
+			.openAPI({ summary: "List posts", tags: ["Posts"] })
+			.handler(() => [{ id: "1", title: "Hello", body: "First post" }]),
 	},
 };
 
 const document = createOpenApiDocument(routes, {
-	info: { title: "Todo API", version: "1.0.0" },
+	info: { title: "Blog API", version: "1.0.0" },
 	schemaConverter: (schema, io) => z.toJSONSchema(schema as z.ZodType, { io }),
 });
 ```
@@ -642,14 +687,17 @@ import type { InferClientResponse } from "@rest-rpc/core";
 import { route, type InferServerRequest } from "@rest-rpc/server";
 import { z } from "zod";
 
-const update = route.patch("/todos/:id").body(z.object({ title: z.string() }));
+const update = route
+	.patch("/posts/:id")
+	.body(z.object({ title: z.string(), body: z.string() }));
 
-const updateTodo = ({ params, body }: InferServerRequest<typeof update>) => ({
+const updatePost = ({ params, body }: InferServerRequest<typeof update>) => ({
 	id: params.id,
 	title: body.title,
+	body: body.body,
 });
 
-const routes = { update: update.handler(updateTodo) };
+const routes = { update: update.handler(updatePost) };
 
-type UpdateResponse = InferClientResponse<typeof routes.update>; // { status: 200; body: { id; title }; ... }
+type UpdateResponse = InferClientResponse<typeof routes.update>; // { status: 200; body: { id; title; body }; ... }
 ```

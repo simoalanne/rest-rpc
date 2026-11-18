@@ -26,28 +26,28 @@ Put the contract somewhere both server and client can import.
 import { route } from "@rest-rpc/core";
 import { z } from "zod";
 
-const todoSchema = z.object({
+const postSchema = z.object({
 	id: z.string(),
 	title: z.string(),
-	completed: z.boolean(),
+	body: z.string(),
 });
 
 const create = route
-	.body(z.object({ title: z.string().min(1) }))
-	.response(todoSchema);
+	.body(z.object({ title: z.string().min(1), body: z.string() }))
+	.response(postSchema);
 
 const get = route
-	.get("/todos/:id")
+	.get("/posts/:id")
 	.params(z.object({ id: z.string() }))
-	.query(z.object({ uppercase: z.enum(["yes", "no"]).optional() }))
-	.response(todoSchema)
-	.error("TODO_NOT_FOUND", { status: 404 });
+	.query(z.object({ preview: z.stringbool().optional() }))
+	.response(postSchema)
+	.error("POST_NOT_FOUND", { status: 404 });
 
-export const api = { todos: { create, get } };
+export const api = { posts: { create, get } };
 ```
 
-`todos.create` uses the default `POST /todos/create`. `todos.get` defines its
-HTTP method, path, 200 response, and `TODO_NOT_FOUND` error with status 404. The schemas also provide runtime validation of handler results.
+`posts.create` uses the default `POST /posts/create`. `posts.get` defines its
+HTTP method, path, 200 response, and `POST_NOT_FOUND` error with status 404. The schemas also provide runtime validation of handler results.
 
 ## Implement and Register Routes
 
@@ -55,29 +55,31 @@ HTTP method, path, 200 response, and `TODO_NOT_FOUND` error with status 404. The
 import { createApp, implement } from "@rest-rpc/server";
 import { api } from "./contract";
 
-type Todo = { id: string; title: string; completed: boolean };
-const todos = new Map<string, Todo>();
+type Post = { id: string; title: string; body: string };
+const posts = new Map<string, Post>();
 
-const create = implement(api.todos.create).handler(({ body: { title } }) => {
-	const todo: Todo = {
-		id: crypto.randomUUID(),
-		title,
-		completed: false,
-	};
-	todos.set(todo.id, todo);
-	return todo;
-});
+const create = implement(api.posts.create).handler(
+	({ body: { title, body } }) => {
+		const post: Post = {
+			id: crypto.randomUUID(),
+			title,
+			body,
+		};
+		posts.set(post.id, post);
+		return post;
+	},
+);
 
-const get = implement(api.todos.get).handler(({ params, query, errors }) => {
-	const todo = todos.get(params.id);
-	if (!todo) throw errors.TODO_NOT_FOUND();
+const get = implement(api.posts.get).handler(({ params, query, errors }) => {
+	const post = posts.get(params.id);
+	if (!post) throw errors.POST_NOT_FOUND();
 	return {
-		...todo,
-		title: query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title,
+		...post,
+		body: query.preview ? post.body.slice(0, 40) : post.body,
 	};
 });
 
-const routes = { todos: { create, get } };
+const routes = { posts: { create, get } };
 
 export default createApp(routes);
 ```
@@ -95,11 +97,13 @@ import { api } from "./contract";
 
 const client = createClient(api, { origin: "http://localhost:3000" });
 
-const created = await client.todos.create({ body: { title: "Write docs" } });
+const created = await client.posts.create({
+	body: { title: "Hello", body: "First post" },
+});
 const result = await safe(
-	client.todos.get({
+	client.posts.get({
 		params: { id: created.body.id },
-		query: { uppercase: "yes" },
+		query: { preview: "true" },
 	}),
 );
 
@@ -107,7 +111,7 @@ if (!result.error) {
 	console.log(result.data.body.title);
 } else if (
 	isDefinedError(result.error) &&
-	result.error.code === "TODO_NOT_FOUND"
+	result.error.code === "POST_NOT_FOUND"
 ) {
 	console.log(result.error.message);
 }

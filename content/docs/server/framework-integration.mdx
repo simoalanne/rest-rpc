@@ -11,9 +11,7 @@ as Express and Fastify. Both export the same functions.
 Register each route on the framework's [native router](#native-router) when
 the framework should see each route, such as to apply its middleware per route,
 or mount all routes under one framework route with the
-[catch-all handler](#catch-all-handler). See
-[Choosing a Level](/docs/server/overview#choosing-a-level) for how they compare
-with `createApp`.
+[catch-all handler](#catch-all-handler).
 
 ## Creating Route Handlers
 
@@ -45,25 +43,31 @@ framework values to rest-rpc:
 
 ```ts
 type HandleOptions = {
-	context?: TContext; // required when the routes declare initial context
+	/**
+	 * The initial context the routes require, such as an authenticated user or
+	 * the native request. Required when the routes require initial context.
+	 */
+	context?: TContext;
+	/**
+	 * Percent-decoded path params, for requests whose URL does not contain the
+	 * route path, such as after a rewrite. When omitted, params a router sets,
+	 * such as `req.params` in Express, are used, or else they are read from the
+	 * request URL. The catch-all handler passes the params it matched.
+	 */
 	params?: Record<string, string>;
+	/**
+	 * A request body already parsed by the framework, such as with
+	 * `express.json()`. When it is defined, the request body is not read, and the
+	 * value is still validated against the route's body schema. Pass the parsed
+	 * body whenever a body parser ran, since a route that has to read a body that
+	 * was already read rejects instead of responding.
+	 */
 	body?: unknown;
 };
 ```
 
-- `context`: the [initial context](/docs/middleware#values-from-the-host) the
-  routes declare, such as an authenticated user or the native request. It is
-  required when they declare initial context.
-- `params`: percent-decoded path params, for requests whose URL does not
-  contain the route path, such as after a rewrite. Otherwise params a router
-  sets, such as `req.params` in Express, are used, or else they are read from
-  the request URL. The catch-all handler passes the params it matched.
-- `body`: a request body already parsed by the framework, such as with
-  `express.json()`. When it is defined, it is used instead of reading the raw body from
-  `Request.body`, or from the request stream in Node, and is still validated
-  against the route's body schema. A body parser reads the request body, so
-  pass the parsed body whenever one ran: a route that has to read a body that
-  was already read rejects instead of responding.
+See [Values from the Host](/docs/middleware#values-from-the-host) for what
+`context` holds.
 
 ## Native Router
 

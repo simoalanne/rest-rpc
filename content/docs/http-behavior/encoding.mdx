@@ -10,7 +10,7 @@ those strings:
 
 ```ts
 const search = route
-	.get("/users/:id/todos")
+	.get("/users/:id/posts")
 	.params(z.object({ id: z.coerce.number<number>() }))
 	.query(
 		z.object({
@@ -19,15 +19,15 @@ const search = route
 		}),
 	)
 	.headers(z.object({ "x-request-id": z.string() }))
-	.handler(({ params, query }) => findTodos(params.id, query));
+	.handler(({ params, query }) => findPosts(params.id, query));
 
 await client.search({
 	params: { id: 7 },
-	query: { page: 2, tags: ["home", "urgent"] },
+	query: { page: 2, tags: ["news", "release"] },
 	headers: { "x-request-id": "r1" },
 });
-// GET /users/7/todos?page=2&tags[]=home&tags[]=urgent
-// The schemas receive { id: "7" }, { page: "2", tags: ["home", "urgent"] }
+// GET /users/7/posts?page=2&tags[]=news&tags[]=release
+// The schemas receive { id: "7" }, { page: "2", tags: ["news", "release"] }
 // and { "x-request-id": "r1" }.
 ```
 
@@ -42,32 +42,56 @@ await client.search({
 ## Bodies
 
 A body is JSON unless a `content-type` header says otherwise. A route declares
-the request content types it accepts, and the response content type it sends,
-in its headers schemas:
+the request content types it accepts in its headers schema, and a handler sets
+the response's with `respond()`:
 
-```ts
-const importTodos = route
-	.post("/todos/import")
-	.headers(z.object({ "content-type": z.literal("text/csv") }))
-	.body(z.string())
-	.response(z.string(), {
-		headers: z.object({
-			"content-type": z.literal("text/plain").default("text/plain"),
-		}),
-	})
-	.handler(({ body }) => `${importCsv(body)} todos imported`);
+```ts twoslash
+import { createClient } from "@rest-rpc/core";
+import { route } from "@rest-rpc/server";
+import { z } from "zod";
+declare function savePostImage(
+	id: string,
+	image: FormDataEntryValue | null,
+): { url: string };
+declare function findPostImage(id: string): Blob;
+declare const file: File;
+// ---cut---
+const upload = route
+	.post("/posts/:id/image")
+	.headers(z.object({ "content-type": z.literal("multipart/form-data") }))
+	.body(z.instanceof(FormData))
+	.handler(({ params, body }) => savePostImage(params.id, body.get("image")));
 
-await client.importTodos({
-	headers: { "content-type": "text/csv" },
-	body: "title\nShip\nTest",
+const image = route.get("/posts/:id/image").handler(({ params, respond }) => {
+	const image = findPostImage(params.id);
+	return respond(image, { headers: { "content-type": image.type } });
 });
+// ---cut-start---
+const client = createClient(
+	{ posts: { upload, image } },
+	{ origin: "http://localhost" },
+);
+// ---cut-end---
+
+const form = new FormData();
+form.set("image", file);
+await client.posts.upload({
+	params: { id: "post_1" },
+	headers: { "content-type": "multipart/form-data" },
+	body: form,
+});
+const { body } = await client.posts.image({ params: { id: "post_1" } });
+//      ^?
 ```
 
 A request with another `Content-Type` gets
 [`UNSUPPORTED_MEDIA_TYPE`](/docs/http-behavior/errors#built-in-errors) and
 `415`, and a route that declares none accepts JSON. An async iterable is sent
-as [Server-Sent Events](/docs/streaming), a returned `Response` as it is, and
-`FormData` as `multipart/form-data`, whatever the header says.
+as [Server-Sent Events](/docs/server-sent-events), a returned `Response` as it is, and
+`FormData` as `multipart/form-data`, whatever the header says. On the client,
+only a call's own `content-type` header chooses the format: one in
+`additionalHeaders` or `globalHeaders` doesn't, and the server answers it with
+`415`.
 
 Each content type is encoded by a codec:
 
@@ -80,8 +104,9 @@ Each content type is encoded by a codec:
 | any other                           | `Blob` or `Uint8Array` sent, `Blob` received |
 
 The schema of a non-JSON body describes that value, such as `z.string()` for
-`text/csv` and `z.instanceof(Blob)` for a file. The client's result type is the
-schema output, so a schema that says otherwise is a type the body won't have.
+`text/plain` and `z.instanceof(Blob)` for a file. The client's result type is
+the schema output, so a schema that says otherwise is a type the body won't
+have.
 
 ## Custom Codecs
 

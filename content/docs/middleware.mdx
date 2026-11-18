@@ -61,7 +61,15 @@ It holds two kinds of values:
 - Injected context, which middleware adds with `next({ context })`. It is
   available to all later middleware and the handler.
 
-```ts
+```ts twoslash
+import { route } from "@rest-rpc/server";
+type Db = { url: string };
+type User = { id: string; name: string };
+declare function findSession(
+	db: Db,
+	token: string | null,
+): Promise<User | undefined>;
+// ---cut---
 const app = route.$context<{ db: Db; headers: Headers }>();
 
 const withSession = app.use(async ({ context, next }) => {
@@ -69,12 +77,13 @@ const withSession = app.use(async ({ context, next }) => {
 		context.db,
 		context.headers.get("authorization"),
 	);
-	return next({ context: { user } }); // user: User | undefined
+	return next({ context: { user } });
 });
 
 const getProfile = withSession
 	.get("/profile")
 	.handler(({ context }) => context.user);
+//                                 ^?
 ```
 
 Injected values are typed for everything after the middleware, without
@@ -129,12 +138,12 @@ declares the shape of the metadata for routes built from the returned builder.
 that shape:
 
 ```ts
-type Permission = "todos:read" | "todos:write";
+type Permission = "posts:read" | "posts:write";
 
 const app = route.$meta<{ access: "public" | "signed-in" | Permission }>();
 
 app.get("/health").meta({ access: "public" });
-app.post("/todos").meta({ access: "todos:delete" }); // type error
+app.post("/posts").meta({ access: "posts:delete" }); // type error
 ```
 
 Repeated `.meta()` calls are shallow-merged. `$meta<T>()` can be called at any
@@ -172,7 +181,7 @@ const transaction = route.middleware(({ next }) =>
 );
 const base = route.use(transaction);
 
-const getTodos = base.get("/todos").handler(() => listTodos());
+const getPosts = base.get("/posts").handler(() => listPosts());
 ```
 
 Adding middleware to one builder branch leaves sibling stacks unchanged.
@@ -228,14 +237,11 @@ serialized once, after the chain, like a handler's response. A returned Fetch
 describe. Failures are thrown as [errors](/docs/route-builder#define-errors).
 
 ```ts
-const listTodos = route
-	.get("/todos")
-	.response(z.array(todoSchema))
-	.response({ status: 204 })
-	.use(async ({ respond, next }) =>
-		isPaused() ? respond(undefined, { status: 204 }) : next(),
-	)
-	.handler(() => findTodos());
+const listPosts = route
+	.get("/posts")
+	.response(z.array(postSchema))
+	.use(async ({ respond, next }) => (isPaused() ? respond([]) : next()))
+	.handler(() => findPosts());
 ```
 
 Downstream errors propagate through `next()`, allowing middleware to catch errors

@@ -28,8 +28,10 @@ const client = createClient(api, { mountPath: "/api" }); // routes under /api
 The route definition determines the request and result shapes.
 
 ```ts
-const created = await client.todos.create({ body: { title: "Write docs" } });
-const response = await client.todos.get({ params: { id: created.body.id } });
+const created = await client.posts.create({
+	body: { title: "Hello", body: "First post" },
+});
+const response = await client.posts.get({ params: { id: created.body.id } });
 ```
 
 A call returns a union with one member per status:
@@ -37,7 +39,7 @@ A call returns a union with one member per status:
 ```ts
 type Result = {
 	status: 200; // checking `status` narrows the result
-	body: Todo;
+	body: Post;
 	headers: Record<string, string>; // lowercase names, defined headers typed
 	cookies: readonly string[]; // `Set-Cookie` values, empty in browsers
 };
@@ -54,21 +56,6 @@ Browsers hide `Set-Cookie` from `fetch` and store the cookies themselves, so
 
 A call resolves with a successful response and rejects with an error otherwise.
 See [Handle Errors](#typesafe-error-handling).
-
-### Send Other Content Types
-
-A body is sent as JSON unless the call's `content-type` header, which the
-route [declares](/docs/http-behavior/encoding#bodies), says otherwise. Only the
-call's own headers choose the format: a `content-type` in `additionalHeaders`
-or `globalHeaders` doesn't, and the server answers it with `415`. `FormData`
-is always sent as `multipart/form-data`.
-
-```ts
-await client.todos.import({
-	headers: { "content-type": "text/csv" },
-	body: csv,
-});
-```
 
 ## Typesafe Error Handling
 
@@ -131,12 +118,16 @@ import { route } from "@rest-rpc/server";
 import { z } from "zod";
 
 const get = route
-	.get("/todos/:id")
+	.get("/posts/:id")
 	.params(z.object({ id: z.string() }))
-	.error("TODO_NOT_FOUND", { status: 404, data: z.object({ id: z.string() }) })
-	.handler(({ params }) => ({ id: params.id, title: "Write docs" }));
+	.error("POST_NOT_FOUND", { status: 404, data: z.object({ id: z.string() }) })
+	.handler(({ params }) => ({
+		id: params.id,
+		title: "Hello",
+		body: "First post",
+	}));
 
-export const routes = { todos: { get } };
+export const routes = { posts: { get } };
 
 // @filename: client.ts
 import { createClient } from "@rest-rpc/core";
@@ -147,7 +138,7 @@ const client = createClient(api, { origin: "http://localhost:3000" });
 import { RouteError } from "@rest-rpc/core";
 
 try {
-	await client.todos.get({ params: { id: "todo_1" } });
+	await client.posts.get({ params: { id: "post_1" } });
 } catch (error) {
 	if (error instanceof RouteError) {
 		console.log(error.status, error.code);
@@ -170,12 +161,16 @@ import { route } from "@rest-rpc/server";
 import { z } from "zod";
 
 const get = route
-	.get("/todos/:id")
+	.get("/posts/:id")
 	.params(z.object({ id: z.string() }))
-	.error("TODO_NOT_FOUND", { status: 404, data: z.object({ id: z.string() }) })
-	.handler(({ params }) => ({ id: params.id, title: "Write docs" }));
+	.error("POST_NOT_FOUND", { status: 404, data: z.object({ id: z.string() }) })
+	.handler(({ params }) => ({
+		id: params.id,
+		title: "Hello",
+		body: "First post",
+	}));
 
-export const routes = { todos: { get } };
+export const routes = { posts: { get } };
 
 // @filename: client.ts
 import { createClient } from "@rest-rpc/core";
@@ -186,7 +181,7 @@ const client = createClient(api, { origin: "http://localhost:3000" });
 import { isDefinedError, safe } from "@rest-rpc/core";
 
 const { error, data } = await safe(
-	client.todos.get({ params: { id: "todo_1" } }),
+	client.posts.get({ params: { id: "post_1" } }),
 );
 
 if (isDefinedError(error)) {
@@ -205,14 +200,21 @@ return the call directly and annotate it with `ClientPromise`.
 
 ## Consume Streams
 
-A [streaming route](/docs/streaming) returns an async iterable of `SseEvent<T>`
+A [streaming route](/docs/server-sent-events) returns an async iterable of `SseEvent<T>`
 values as its `body`. Application data is available on `event.data`:
 
 ```ts
-export type SseEvent<T> = {
+type SseEvent<T> = {
+	/** The event's data, decoded with the `sse.format`, JSON by default. */
 	data: T;
+	/**
+	 * The last event ID: the event's `id` field, or the previous event's when
+	 * it has none, as in `EventSource`.
+	 */
 	id?: string;
+	/** The event name from the `event` field. */
 	event?: string;
+	/** The reconnection time in milliseconds from the `retry` field. */
 	retry?: number;
 };
 ```
@@ -220,7 +222,7 @@ export type SseEvent<T> = {
 Narrow the response before iterating its body:
 
 ```ts
-const response = await client.todos.events();
+const response = await client.notifications();
 
 if (response.status === 200) {
 	for await (const event of response.body) {
@@ -232,15 +234,14 @@ if (response.status === 200) {
 
 Every `text/event-stream` response is parsed as an SSE stream, following the
 [SSE spec](https://html.spec.whatwg.org/multipage/server-sent-events.html#parsing-an-event-stream).
-Body codecs are not consulted for it. As in `EventSource`, `id` is the last
-event ID: an event without an `id` field carries the previous one.
+Body codecs are not consulted for it.
 
 The initial request and later stream iteration can fail independently. Pass an
 `AbortSignal` in the per-call options to cancel both the request and stream:
 
 ```ts
 const controller = new AbortController();
-const response = await client.todos.events(undefined, {
+const response = await client.notifications(undefined, {
 	signal: controller.signal,
 });
 
@@ -255,26 +256,35 @@ metadata only: the client does not reconnect automatically, send the last event
 ID, or filter events by name.
 
 To resume a stream, send the last received event ID in the `last-event-id`
-header. See [Resume a Stream](/docs/streaming#resume-a-stream) for reading it
+header. See [Resume a Stream](/docs/server-sent-events#resume-a-stream) for reading it
 on the server.
 
 ```ts
+const controller = new AbortController();
 let lastEventId: string | undefined;
+let retryMs = 3_000;
 
-async function connect() {
-	const response = await client.todos.events(undefined, {
-		additionalHeaders: {
-			"last-event-id": lastEventId,
-		},
-	});
-	if (response.status !== 200) return;
-
-	for await (const event of response.body) {
-		lastEventId = event.id ?? lastEventId;
-		handleTodoEvent(event.data);
+while (!controller.signal.aborted) {
+	try {
+		const response = await client.notifications(undefined, {
+			signal: controller.signal,
+			additionalHeaders: { "last-event-id": lastEventId },
+		});
+		for await (const event of response.body) {
+			lastEventId = event.id;
+			retryMs = event.retry ?? retryMs;
+			handleNotification(event.data);
+		}
+	} catch (error) {
+		if (controller.signal.aborted) break;
+		if (error instanceof RouteError && error.status < 500) throw error;
 	}
+	await new Promise((resolve) => setTimeout(resolve, retryMs));
 }
 ```
+
+The loop reconnects when the stream ends or fails, after the server's `retry`
+time, and stops on an abort or a client error such as `401`.
 
 ## Client Options
 
@@ -288,60 +298,58 @@ const client = createClient(api, {
 });
 ```
 
-<TypeTable
-	type={{
-		origin: {
-			type: "string",
-			description:
-				"The server's origin, such as `https://api.example.com`, without a path. Browsers default to the page's origin. Required outside browsers.",
-		},
-		mountPath: {
-			type: "AbsolutePath",
-			description:
-				"The path the routes are served under, such as `/api`, the same as the server's `mountPath`.",
-		},
-		fetch: {
-			type: "(request: Request) => Promise<Response>",
-			description:
-				"Sends each request. Defaults to the global `fetch`. See Custom Fetch.",
-		},
-		interceptors: {
-			type: "readonly ClientInterceptor[]",
-			description:
-				"Functions around each HTTP exchange, the first outermost. See Interceptors.",
-		},
-		fetchOptions: {
-			type: 'Omit<FetchOptions, "signal" | "additionalHeaders">',
-			description:
-				"Default fetch options merged into every request. Excludes `signal` and `additionalHeaders`, which can only be passed per call.",
-		},
-		bodyCodecs: {
-			type: "readonly BodyCodec[]",
-			description:
-				"Codecs for other formats, the same as the server's. See Encoding and Content Types.",
-		},
-		globalHeaders: {
-			type: "ClientHeaders",
-			description:
-				"Headers added to every request. Each value may be static or provided for each request.",
-		},
-		sse: {
-			type: "{ format?: SseFormat }",
-			description:
-				"The data format of Server-Sent Events, the same as the server's. JSON by default. See Server-Sent Events.",
-		},
-		timeoutMs: {
-			type: "number",
-			description: "Aborts a request when fetch does not return in time.",
-		},
-		validateResponses: {
-			type: "boolean",
-			default: "false",
-			description:
-				"Validates response bodies, defined response headers, and stream event data against the contract's schemas.",
-		},
-	}}
-/>
+```ts
+type ApiClientOptions = {
+	/**
+	 * The server's origin, such as `https://api.example.com`, without a path.
+	 * Browsers default to the page's origin. Required outside browsers.
+	 */
+	origin?: string;
+	/**
+	 * The path the routes are served under, such as `/api`, the same as the
+	 * server's `mountPath`.
+	 */
+	mountPath?: AbsolutePath;
+	/**
+	 * Sends each request, the `Request` the last interceptor sends. Defaults to
+	 * the global `fetch`.
+	 */
+	fetch?: (request: Request) => Promise<Response>;
+	/**
+	 * Functions around each HTTP exchange, the first outermost, such as for
+	 * logging, retries or refreshing credentials.
+	 */
+	interceptors?: readonly ClientInterceptor[];
+	/**
+	 * Fetch options merged into every request. Per-call options override them,
+	 * and `signal` and `additionalHeaders` can only be passed per call.
+	 */
+	fetchOptions?: Omit<FetchOptions, "signal" | "additionalHeaders">;
+	/** Codecs for other body formats, the same as the server's. */
+	bodyCodecs?: readonly BodyCodec[];
+	/**
+	 * Headers added to every request, each a value or a function called for
+	 * each request. Defined headers they set are optional at call sites.
+	 */
+	globalHeaders?: ClientHeaders;
+	sse?: {
+		/** The data format of events, the same as the server's. JSON by default. */
+		format?: SseFormat;
+	};
+	/** Aborts a request when fetch does not return in time. */
+	timeoutMs?: number;
+	/**
+	 * Validates response bodies, defined response headers and stream event data
+	 * against the contract's schemas. `false` by default.
+	 */
+	validateResponses?: boolean;
+};
+```
+
+See [Custom Fetch](#custom-fetch), [Interceptors](#interceptors),
+[Global Headers](#global-headers),
+[Encoding and Content Types](/docs/http-behavior/encoding) and
+[Server-Sent Events](/docs/server-sent-events) for more on each.
 
 ## Global Headers
 
@@ -427,9 +435,9 @@ Pass fetch options as the second argument. They override matching defaults in
 `signal` is passed.
 
 ```ts
-const response = await client.todos.get(
+const response = await client.posts.get(
 	{
-		params: { id: "todo_1" },
+		params: { id: "post_1" },
 		headers: { "x-request-id": "req_1" },
 	},
 	{
@@ -444,8 +452,8 @@ set more than once, route headers take precedence over `additionalHeaders`,
 which take precedence over `globalHeaders`.
 
 ```ts
-const response = await client.todos.get(
-	{ params: { id: "todo_1" } },
+const response = await client.posts.get(
+	{ params: { id: "post_1" } },
 	{
 		additionalHeaders: {
 			"x-trace-id": traceId,
@@ -502,25 +510,33 @@ import { route, sse } from "@rest-rpc/server";
 import { z } from "zod";
 
 const update = route
-	.patch("/todos/:id")
+	.patch("/posts/:id")
 	.params(z.object({ id: z.string() }))
-	.body(z.object({ title: z.string() }))
-	.handler(({ params, body }) => ({ id: params.id, title: body.title }));
+	.body(z.object({ title: z.string(), body: z.string() }))
+	.handler(({ params, body }) => ({
+		id: params.id,
+		title: body.title,
+		body: body.body,
+	}));
 
 const get = route
-	.get("/todos/:id")
+	.get("/posts/:id")
 	.params(z.object({ id: z.string() }))
-	.error("TODO_NOT_FOUND", { status: 404 })
-	.handler(({ params }) => ({ id: params.id, title: "Write docs" }));
+	.error("POST_NOT_FOUND", { status: 404 })
+	.handler(({ params }) => ({
+		id: params.id,
+		title: "Hello",
+		body: "First post",
+	}));
 
-const events = route
-	.get("/todos/events")
-	.response(sse(z.object({ id: z.string(), message: z.string() })))
+const notifications = route
+	.get("/notifications")
+	.response(sse(z.object({ postId: z.string(), message: z.string() })))
 	.handler(async function* () {
-		yield { id: "todo_1", message: "Created" };
+		yield { postId: "post_1", message: "Ada liked your post" };
 	});
 
-export const routes = { todos: { update, get, events } };
+export const routes = { posts: { update, get }, notifications };
 
 // @filename: client.ts
 import { createClient } from "@rest-rpc/core";
@@ -535,13 +551,13 @@ import type {
 	InferClientStreamData,
 } from "@rest-rpc/core";
 
-type UpdateTodoRequest = InferClientRequest<typeof client.todos.update>;
+type UpdatePostRequest = InferClientRequest<typeof client.posts.update>;
 
-type GetTodoResponse = InferClientResponse<typeof client.todos.get>;
+type GetPostResponse = InferClientResponse<typeof client.posts.get>;
 
-type GetTodoError = InferClientError<typeof client.todos.get>;
+type GetPostError = InferClientError<typeof client.posts.get>;
 
-type TodoEvent = InferClientStreamData<typeof client.todos.events>;
+type NotificationEvent = InferClientStreamData<typeof client.notifications>;
 ```
 
 | Type                                       | Infers                                                                                   |
@@ -567,8 +583,8 @@ import type { api } from "./client-contract";
 
 const globalHeaders = { authorization: () => `Bearer ${getToken()}` };
 
-type UpdateTodoRequest = InferClientRequest<
-	typeof api.todos.update,
+type UpdatePostRequest = InferClientRequest<
+	typeof api.posts.update,
 	typeof globalHeaders
 >;
 ```
@@ -584,5 +600,5 @@ import type { InferClientResponse } from "@rest-rpc/core";
 
 export type ClientResponses = InferClientResponse<typeof client>;
 
-type TodoResponse = ClientResponses["todos"]["get"];
+type PostResponse = ClientResponses["posts"]["get"];
 ```

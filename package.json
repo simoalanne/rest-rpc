@@ -25,8 +25,9 @@
 		"api:docs:verify": "node scripts/check-public-api-docs.ts",
 		"readme:sync": "node scripts/sync-readme.ts",
 		"readme:verify": "node scripts/sync-readme.ts --check",
-		"check": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run api:docs:verify && pnpm run readme:verify",
+		"check": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run api:docs:verify && pnpm run readme:verify && pnpm run docs:validate",
 		"docs:dev": "pnpm --filter content dev",
+		"docs:validate": "pnpm --filter content validate",
 		"docs:build": "pnpm --filter content build",
 		"docs:preview": "pnpm --filter content preview"
 	},

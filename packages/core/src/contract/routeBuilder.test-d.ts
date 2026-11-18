@@ -69,9 +69,9 @@ describe("routeBuilder types", () => {
 		const value = route
 			.$meta<{ auth: "required" | "optional"; scope: string }>()
 			.meta({ auth: "required", scope: "read" })
-			.openAPI({ tags: ["Todos"] })
+			.openAPI({ tags: ["Posts"] })
 			.meta({ scope: "write" })
-			.openAPI({ summary: "List todos" });
+			.openAPI({ summary: "List posts" });
 		expectTypeOf(value["~restrpc"].meta).toEqualTypeOf<{
 			readonly auth: "required";
 			readonly scope: "write";
@@ -118,29 +118,29 @@ describe("routeBuilder types", () => {
 	});
 
 	it("allows raw() only as a route's only response", () => {
-		const todo = type<{ id: string }>();
+		const post = type<{ id: string }>();
 		route.get("/").response(raw());
 		// @ts-expect-error raw() must be a route's only response.
-		route.get("/").response(todo).response(raw());
+		route.get("/").response(post).response(raw());
 		// @ts-expect-error raw() must be a route's only response.
-		route.get("/").response(raw()).response(todo);
+		route.get("/").response(raw()).response(post);
 		// @ts-expect-error raw() must be a route's only response.
 		route.get("/").response(raw()).response({ status: 204 });
 	});
 
 	it("rejects a second response for the same status", () => {
-		const todo = type<{ id: string }>();
-		route.get("/").response(todo).response({ status: 204 });
-		route.get("/").response(todo, { status: 201 }).response(todo);
+		const post = type<{ id: string }>();
+		route.get("/").response(post).response({ status: 204 });
+		route.get("/").response(post, { status: 201 }).response(post);
 		// @ts-expect-error The route already defines a response for this status.
-		route.get("/").response(todo).response(todo);
-		const created = route.get("/").response(todo, { status: 201 });
+		route.get("/").response(post).response(post);
+		const created = route.get("/").response(post, { status: 201 });
 		// @ts-expect-error The route already defines a response for this status.
-		created.response(todo, { status: 201 });
+		created.response(post, { status: 201 });
 		// @ts-expect-error The route already defines a response for this status.
 		route.get("/").response({ status: 204 }).response({ status: 204 });
 		// @ts-expect-error The route already defines a response for this status.
-		route.get("/").response(sse(todo)).response(todo);
+		route.get("/").response(sse(post)).response(post);
 	});
 
 	it("rejects optional params schema keys", () => {
@@ -176,7 +176,7 @@ describe("routeBuilder types", () => {
 
 	it("only allows prefixes before a method is selected", () => {
 		// @ts-expect-error A method path already includes the prefix.
-		route.get("/todos").prefix("/api");
+		route.get("/posts").prefix("/api");
 	});
 
 	it("rejects prefixes that end with a slash", () => {

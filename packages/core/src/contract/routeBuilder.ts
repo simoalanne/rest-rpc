@@ -302,7 +302,7 @@ export class RouteBuilder<
 			NewStatusCheck<TState, TOptions>,
 		options?: TOptions & LowercaseHeadersOptionCheck<TOptions>,
 	): BuilderFor<TKind, WithResponse<TState, { body: TSchema }, TOptions>>;
-	/** Defines a successful Server-Sent Event stream response with `sse(schema)`. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/streaming} */
+	/** Defines a successful Server-Sent Event stream response with `sse(schema)`. The status defaults to 200. @see {@link https://rest-rpc.vercel.app/docs/server-sent-events} */
 	response<
 		const TSchema extends StandardSchemaV1,
 		const TOptions extends ResponseOptions | undefined = undefined,

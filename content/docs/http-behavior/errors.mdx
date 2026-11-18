@@ -9,7 +9,7 @@ Every error rest-rpc sends is a JSON response with the error's status:
 HTTP/1.1 404 Not Found
 Content-Type: application/json
 
-{ "code": "TODO_NOT_FOUND", "message": "Todo not found", "data": { "id": "42" } }
+{ "code": "POST_NOT_FOUND", "message": "Post not found", "data": { "id": "42" } }
 ```
 
 `data` is present when the error has data, the error's headers are response
@@ -19,36 +19,15 @@ can read it, and the rest-rpc client rejects with a `RouteError`.
 ## Defined and Undefined Errors
 
 A route [defines](/docs/route-builder#define-errors) the errors clients handle
-per call. Throw them with `errors.CODE()` in handlers and middleware, or with
-the class `routeError()` creates anywhere:
+per call. Handlers and middleware throw them with `errors.CODE()`, and other
+code with the class `routeError()` creates. Both take the same options:
 
 ```ts
-const TodoNotFound = routeError("TODO_NOT_FOUND", {
-	status: 404,
-	data: z.object({ id: z.string() }),
-});
-
-const getTodo = route
-	.get("/todos/:id")
-	.error(TodoNotFound)
-	.handler(({ params, errors }) => {
-		const todo = findTodo(params.id);
-		if (!todo) throw errors.TODO_NOT_FOUND({ data: { id: params.id } });
-		return todo;
-	});
-
-const result = await safe(client.getTodo({ params: { id: "42" } }));
-if (isDefinedError(result.error)) result.error.data.id; // typed: string
-```
-
-Both take the same options:
-
-```ts
-throw errors.TODO_NOT_FOUND({
+throw errors.POST_NOT_FOUND({
 	data: { id }, // required when the definition has a `data` schema
 	headers: { "x-reason": "deleted" }, // required when it has a `headers` schema
 	cookies: ["session=; Max-Age=0"],
-	message: "Todo was deleted", // replaces the defined message
+	message: "Post was deleted", // replaces the defined message
 	cause: error, // never sent
 });
 ```
@@ -84,10 +63,10 @@ a route to make its `data` typed:
 import { RequestValidationFailed, route } from "@rest-rpc/server";
 
 const create = route
-	.post("/todos")
-	.body(z.object({ title: z.string() }))
+	.post("/posts")
+	.body(z.object({ title: z.string(), body: z.string() }))
 	.error(RequestValidationFailed) // data: { body, query, params, headers } issues
-	.handler(({ body }) => createTodo(body.title));
+	.handler(({ body }) => createPost(body));
 ```
 
 ## Other Errors

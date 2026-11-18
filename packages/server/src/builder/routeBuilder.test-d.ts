@@ -521,15 +521,15 @@ describe("route metadata", () => {
 			list: contractBase.get("/").meta({ access: "public" }),
 			create: contractBase.post("/"),
 		};
-		const todos = implement(contract).use(({ route, next }) => {
+		const posts = implement(contract).use(({ route, next }) => {
 			expectTypeOf(route.meta).toEqualTypeOf<Partial<Access> | undefined>();
 			return next();
 		});
-		todos.create.use(({ route, next }) => {
+		posts.create.use(({ route, next }) => {
 			expectTypeOf(route.meta).toEqualTypeOf<Partial<Access> | undefined>();
 			return next();
 		});
-		todos.list.use(({ route, next }) => {
+		posts.list.use(({ route, next }) => {
 			expectTypeOf(route.meta).toEqualTypeOf<{ readonly access: "public" }>();
 			return next();
 		});
