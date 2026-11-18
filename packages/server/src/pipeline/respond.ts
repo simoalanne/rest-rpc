@@ -1,7 +1,4 @@
-import type {
-	LowercaseHeadersOptionCheck,
-	RequestScalar,
-} from "@rest-rpc/core/contract";
+import type { LowercaseHeadersOptionCheck } from "@rest-rpc/core/contract";
 import type { Merge } from "@rest-rpc/core/utils";
 import type { SseOptions } from "./sse.ts";
 
@@ -22,7 +19,7 @@ export type RespondOptions = {
 	 * Response headers. A `content-type` header selects the body's codec, and
 	 * a body without one is JSON.
 	 */
-	headers?: Record<string, RequestScalar | undefined>;
+	headers?: Record<string, unknown>;
 	/** `Set-Cookie` header values, each sent as its own header. */
 	cookies?: readonly string[];
 	/**

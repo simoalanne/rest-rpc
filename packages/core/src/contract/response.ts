@@ -1,14 +1,14 @@
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { RouteDefinition } from "./routeDefinition.ts";
-import type { InferSchema, RequestScalar } from "./request.ts";
+import type { InferSchema } from "./request.ts";
 import type { SseEvent } from "./sse.ts";
 import type { ErrorSchemaValue, RouteError } from "./routeError.ts";
 import type { Merge } from "../utils/typeUtils.ts";
 
-/** A whole-object schema for response headers whose output contains scalar values. */
+/** A whole-object schema for response headers, whose output values are sent as strings. */
 export type ResponseHeadersSchema = StandardSchemaV1<
 	unknown,
-	Record<string, RequestScalar | undefined>
+	Record<string, unknown>
 >;
 
 /**

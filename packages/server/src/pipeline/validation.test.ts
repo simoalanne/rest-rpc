@@ -94,7 +94,12 @@ describe("validation", () => {
 			...route.post("/")["~restrpc"],
 			request: {
 				body: [schema(() => ({ issues })), schema(() => ({ value: {} }))],
-				query: [schema(() => ({ issues }))],
+				query: [
+					schema(() => ({ issues })) as StandardSchemaV1<
+						Record<string, unknown>,
+						unknown
+					>,
+				],
 			},
 		};
 		await expect(async () =>

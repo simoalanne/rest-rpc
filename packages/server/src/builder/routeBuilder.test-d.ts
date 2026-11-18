@@ -482,11 +482,6 @@ describe("implicit response inference", () => {
 			cookies: readonly string[];
 		}>();
 	});
-
-	it("rejects non-scalar respond() headers", () => {
-		// @ts-expect-error Response headers must be transport scalars.
-		respond(undefined, { headers: { count: {} } });
-	});
 });
 
 describe("route metadata", () => {

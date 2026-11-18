@@ -11,11 +11,7 @@ import type {
 	OpenApiRouteOptions,
 	RouteDefinition,
 } from "./routeDefinition.ts";
-import type {
-	RequestHeadersSchema,
-	RequestParamsSchema,
-	RequestQuerySchema,
-} from "./request.ts";
+import type { RecordSchema } from "./request.ts";
 import { isRawResponse, type RawResponse } from "./raw.ts";
 import type { ResponseDefinition, ResponseOptions } from "./response.ts";
 import { isSseResponse, sseSchema, type SseResponse } from "./sse.ts";
@@ -110,7 +106,7 @@ type OptionalKeys<T> = {
 }[keyof T];
 
 // Path params are always present, so params schemas cannot make keys optional.
-type RequiredParamsCheck<TSchema extends RequestParamsSchema> = [
+type RequiredParamsCheck<TSchema extends RecordSchema> = [
 	OptionalKeys<StandardSchemaV1.InferInput<TSchema>>,
 ] extends [never]
 	? unknown
@@ -236,7 +232,7 @@ export class RouteBuilder<
 	}
 
 	/** Defines request headers. @see {@link https://rest-rpc.vercel.app/docs/route-builder#request-segments} */
-	headers<const TSchema extends RequestHeadersSchema>(
+	headers<const TSchema extends RecordSchema>(
 		schema: TSchema & LowercaseHeadersCheck<TSchema>,
 	): BuilderFor<TKind, WithRequest<TState, "headers", TSchema>> {
 		return this.clone(
@@ -245,7 +241,7 @@ export class RouteBuilder<
 	}
 
 	/** Defines URL query parameters. @see {@link https://rest-rpc.vercel.app/docs/route-builder#request-segments} */
-	query<const TSchema extends RequestQuerySchema>(
+	query<const TSchema extends RecordSchema>(
 		schema: TSchema,
 	): BuilderFor<TKind, WithRequest<TState, "query", TSchema>> {
 		return this.clone(
@@ -254,7 +250,7 @@ export class RouteBuilder<
 	}
 
 	/** Defines path parameters. @see {@link https://rest-rpc.vercel.app/docs/route-builder#request-segments} */
-	params<const TSchema extends RequestParamsSchema>(
+	params<const TSchema extends RecordSchema>(
 		schema: TSchema & RequiredParamsCheck<TSchema>,
 	): BuilderFor<TKind, WithRequest<TState, "params", TSchema>> {
 		return this.clone(

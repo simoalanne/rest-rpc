@@ -43,7 +43,7 @@ export {
 	type PathParamNames,
 } from "./path.ts";
 export type { RawResponses } from "./raw.ts";
-export type { RequestScalar, ServerRequest } from "./request.ts";
+export type { ServerRequest } from "./request.ts";
 export type { LowercaseHeadersOptionCheck } from "./headers.ts";
 export type {
 	ResponseDefinition,

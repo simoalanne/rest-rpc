@@ -31,13 +31,16 @@ await client.search({
 // and { "x-request-id": "r1" }.
 ```
 
-- Numbers are coerced with `z.coerce.number<number>()`. The `<number>` makes
-  the client accept a number instead of `unknown`.
+- Numbers are coerced with `z.coerce.number()`, which accepts any value from
+  the client. `z.coerce.number<number>()` makes the client accept only numbers.
 - Booleans use `z.stringbool()`, since `z.coerce.boolean()` reads `"false"`
   as `true`.
 - Other values are sent with `String()`, and `undefined` query and header
   values are left out. A `Date` arrives as `"Tue Nov 17 2026 …"` and `null` as
-  `"null"`, so send dates as ISO strings.
+  `"null"`, so send dates as ISO strings. Response headers are sent the same
+  way.
+- Params, query and headers schemas take an object. A schema whose input is
+  `unknown`, such as `z.preprocess()`, needs its input typed as an object.
 - Arrays are sent as `key[]` keys, and only those become arrays, so HTML forms
   name the field `tags[]`. A repeated key without `[]` keeps its last value,
   and an empty array sends nothing, so it arrives as `undefined`.
