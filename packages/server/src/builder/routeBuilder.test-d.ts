@@ -393,6 +393,13 @@ describe("implicit response inference", () => {
 		>();
 	});
 
+	it("accepts handlers that only throw", () => {
+		const stub = route.get("/").handler(() => {
+			throw new Error("Not implemented");
+		});
+		expectTypeOf<InferClientResponse<typeof stub>>().toBeNever();
+	});
+
 	it("types routes that may return a Response loosely, keeping defined errors", () => {
 		const NotFound = routeError("NOT_FOUND", { status: 404 });
 		const raw = route

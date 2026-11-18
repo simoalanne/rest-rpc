@@ -153,8 +153,10 @@ type SuccessStatuses<TEnvelope> = [NonSuccessStatus<TEnvelope>] extends [never]
 	? unknown
 	: never;
 
+// A handler that only throws returns `never`: a route without a successful
+// response.
 export type ValidImplicitResult<TResult> = [Awaited<TResult>] extends [never]
-	? never
+	? unknown
 	: ValidStreamEnvelopes<EnvelopeOf<Awaited<TResult>>> &
 			SuccessStatuses<EnvelopeOf<Awaited<TResult>>>;
 
