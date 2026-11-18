@@ -26,7 +26,7 @@ const list = route
 const client = createClient({ list }, { origin: "http://localhost" });
 // ---cut-end---
 
-await client.list({ query: { page: 1 } });
+const { body } = await client.list({ query: { page: 1 } });
 ```
 
 | Side                             | Request schemas | Response schemas |

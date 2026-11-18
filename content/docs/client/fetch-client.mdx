@@ -139,7 +139,7 @@ const client = createClient(api, { origin: "http://localhost:3000" });
 import { RouteError } from "@rest-rpc/core";
 
 try {
-	await client.posts.get({ params: { id: "post_1" } });
+	const { body } = await client.posts.get({ params: { id: "post_1" } });
 } catch (error) {
 	if (error instanceof RouteError) {
 		console.log(error.status, error.code);

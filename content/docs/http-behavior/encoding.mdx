@@ -30,7 +30,7 @@ const search = route
 const client = createClient({ search }, { origin: "http://localhost" });
 // ---cut-end---
 
-await client.search({
+const { body } = await client.search({
 	params: { id: 7 },
 	query: { page: 2, sort: "new", tags: ["news", "release"] },
 	headers: { "x-request-id": "r1" },
@@ -80,7 +80,7 @@ const client = createClient(
 
 const form = new FormData();
 form.set("image", file);
-await client.posts.upload({
+const uploaded = await client.posts.upload({
 	params: { id: "post_1" },
 	headers: { "content-type": "multipart/form-data" },
 	body: form,
@@ -365,7 +365,7 @@ const updatePost = route
 	.body(z.object({ title: z.string(), image: z.instanceof(File) }))
 	.handler(({ params, body }) => savePost(params.id, body.title, body.image));
 
-await client.updatePost({
+const { body } = await client.updatePost({
 	params: { id: "post_1" },
 	headers: { "content-type": "multipart/form-data" },
 	body: { title: "Hello", image: file },
