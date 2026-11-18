@@ -37,11 +37,15 @@ const response = await client.posts.get({ params: { id: created.body.id } });
 A call returns a union with one member per status:
 
 ```ts
-type Result = {
-	status: 200; // checking `status` narrows the result
-	body: Post;
-	headers: Record<string, string>; // lowercase names, defined headers typed
-	cookies: readonly string[]; // `Set-Cookie` values, empty in browsers
+type Result<TStatus, TBody, THeaders> = {
+	/** Checking it narrows the result to that response. */
+	status: TStatus;
+	/** `undefined` for a response without a body. */
+	body: TBody;
+	/** Received headers with lowercase names, defined headers typed. */
+	headers: Record<string, string> & THeaders;
+	/** `Set-Cookie` values. Browsers hide them from `fetch`, so it's empty there. */
+	cookies: readonly string[];
 };
 ```
 
@@ -50,9 +54,6 @@ if (response.status === 200) {
 	console.log(response.body.title);
 }
 ```
-
-Browsers hide `Set-Cookie` from `fetch` and store the cookies themselves, so
-`cookies` is filled only in server runtimes.
 
 A call resolves with a successful response and rejects with an error otherwise.
 See [Handle Errors](#typesafe-error-handling).
@@ -465,7 +466,8 @@ const response = await client.posts.get(
 );
 ```
 
-If you need to pass options to a route without request input, pass `undefined` for the request input.
+A route without required input can be called without it. To pass per-call
+options to one, pass `undefined` as the input:
 
 ```ts
 const response = await client.health(undefined, {
