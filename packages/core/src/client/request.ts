@@ -221,14 +221,12 @@ export const constructBaseRequest = (
 	return {
 		url,
 		body: route.request?.body ? body : undefined,
-		// The call's headers state a body's content type, and it is JSON otherwise.
-		contentType: requestHeaders["content-type"] as string | undefined,
 		headers: requestHeaders,
 	};
 };
 
-// A body is sent with the content type the call states, or else that of its
-// serialized headers. Fetch sets the content type of `FormData` with its
+// A body is sent with the content type of its serialized headers, or else the
+// one the headers state. Fetch sets the content type of `FormData` with its
 // generated multipart boundary.
 const toRequestBody = (
 	serialized: BodyValue | SerializedBody,
@@ -238,8 +236,7 @@ const toRequestBody = (
 		? serialized
 		: { body: serialized, headers: undefined };
 	const requestHeaders: Record<string, string> = { ...headers };
-	requestHeaders["content-type"] =
-		contentType ?? requestHeaders["content-type"] ?? "application/json";
+	requestHeaders["content-type"] ??= contentType ?? "application/json";
 	if (body instanceof FormData) delete requestHeaders["content-type"];
 	return { body: body as RequestInit["body"], headers: requestHeaders };
 };
@@ -297,7 +294,6 @@ export const executeRequest = async (
 	const {
 		url,
 		body,
-		contentType,
 		headers: requestHeaders,
 	} = constructBaseRequest(
 		options.origin,
@@ -306,25 +302,31 @@ export const executeRequest = async (
 		requestArgs,
 	);
 
+	const globalHeaders = await resolveHeaders(options.globalHeaders ?? {});
+	const additionalHeaders = stringifyHeaders(fetchOptions?.additionalHeaders);
+	// The call's headers override the client's, `content-type` included, so the
+	// codec sees every header but those interceptors add.
+	const outgoingHeaders: Record<string, string> = {
+		...normalizeHeaders(globalHeaders),
+		...normalizeHeaders(additionalHeaders),
+		...requestHeaders,
+	};
+	const contentType = outgoingHeaders["content-type"];
+
 	const serialized =
 		body !== undefined
 			? toRequestBody(
-					await options.codecs.serialize(
-						body,
+					await options.codecs.serialize(body, {
+						...outgoingHeaders,
 						// `FormData` is multipart, whatever the headers say.
-						body instanceof FormData
-							? "multipart/form-data"
-							: (contentType ?? "application/json"),
-					),
+						"content-type":
+							body instanceof FormData
+								? "multipart/form-data"
+								: (contentType ?? "application/json"),
+					}),
 					contentType,
 				)
 			: undefined;
-	const globalHeaders = await resolveHeaders(options.globalHeaders ?? {});
-	const additionalHeaders = stringifyHeaders(fetchOptions?.additionalHeaders);
-	const clientHeaders = {
-		...normalizeHeaders(globalHeaders),
-		...normalizeHeaders(additionalHeaders),
-	};
 	const signalState = createRequestSignal(
 		fetchOptions?.signal,
 		options.timeoutMs,
@@ -333,12 +335,9 @@ export const executeRequest = async (
 	try {
 		const { additionalHeaders: _additionalHeaders, ...requestFetchOptions } =
 			fetchOptions ?? {};
-		const headers: Record<string, string> = {
-			...clientHeaders,
-			...requestHeaders,
-		};
-		// A body's content type replaces one from the client's headers, also
-		// when Fetch sets it for `FormData`.
+		const headers = outgoingHeaders;
+		// A body's content type replaces the stated one, also when Fetch sets it
+		// for `FormData`.
 		if (serialized) {
 			delete headers["content-type"];
 			Object.assign(headers, serialized.headers);

@@ -3,7 +3,8 @@ title: Errors
 description: What an error response contains, which errors clients can handle typed, and where other errors go.
 ---
 
-Every error rest-rpc sends is a JSON response with the error's status:
+Every error rest-rpc sends is a JSON response with the error's status, whatever
+body codecs are configured:
 
 ```http
 HTTP/1.1 404 Not Found

@@ -1,4 +1,6 @@
+import { bodyCodec } from "../codecs/bodyCodec.ts";
 import { createBodyCodecRegistry } from "../codecs/registry.ts";
+import { serializedBody } from "../codecs/serializedBody.ts";
 import { constructBaseRequest, executeRequest } from "./request.ts";
 
 const codecs = createBodyCodecRegistry([]);
@@ -131,7 +133,6 @@ describe("request", () => {
 					additionalHeaders: {
 						"x-token": "additional",
 						"X-Extra": 2,
-						"Content-Type": "text/plain",
 					},
 					cache: "no-store",
 				},
@@ -161,6 +162,42 @@ describe("request", () => {
 		expect(await request.text()).toBe('{"name":"Ada"}');
 	});
 
+	it("chooses the body format from the call's, additional or global content type", async () => {
+		const fetch = vi.fn(
+			async (_request: Request) => new Response(null, { status: 204 }),
+		);
+		const post = (call: object, additional: object = {}) =>
+			executeRequest(
+				{ method: "POST", path: "/", request: { body: [] } },
+				[{ body: "Ada", ...call }, { additionalHeaders: additional }],
+				{
+					origin: "http://localhost",
+					codecs,
+					fetch,
+					globalHeaders: { "Content-Type": "text/plain" },
+				},
+			);
+		await post({});
+		await post({}, { "content-type": "text/csv" });
+		await post(
+			{ headers: { "content-type": "application/json" } },
+			{
+				"content-type": "text/csv",
+			},
+		);
+		const sent = await Promise.all(
+			fetch.mock.calls.map(async ([request]) => [
+				request.headers.get("content-type"),
+				await request.text(),
+			]),
+		);
+		expect(sent).toEqual([
+			["text/plain", "Ada"],
+			["text/csv", "Ada"],
+			["application/json", '"Ada"'],
+		]);
+	});
+
 	it("leaves the content type of a FormData body to the runtime over a passed header", async () => {
 		const fetch = vi.fn(
 			async (_request: Request) => new Response(null, { status: 204 }),
@@ -181,6 +218,45 @@ describe("request", () => {
 		expect(fetch.mock.calls[0]![0].headers.get("content-type")).toMatch(
 			/^multipart\/form-data; boundary=/,
 		);
+	});
+
+	it("passes the call's headers to the codec and sends the headers it returns over them", async () => {
+		const fetch = vi.fn(
+			async (_request: Request) => new Response(null, { status: 204 }),
+		);
+		const seen = vi.fn();
+		const text = bodyCodec("text/plain", {
+			serialize: (value, headers) => {
+				seen(headers);
+				return serializedBody(String(value), {
+					headers: {
+						"content-type": "text/plain; charset=utf-8",
+						"x-format": "codec",
+					},
+				});
+			},
+		});
+		await executeRequest(
+			{ method: "POST", path: "/", request: { body: [] } },
+			[
+				{
+					headers: { "content-type": "text/plain", "x-format": "call" },
+					body: "Ada",
+				},
+			],
+			{
+				origin: "http://localhost",
+				codecs: createBodyCodecRegistry([text]),
+				fetch,
+			},
+		);
+		expect(seen).toHaveBeenCalledWith({
+			"content-type": "text/plain",
+			"x-format": "call",
+		});
+		const { headers } = fetch.mock.calls[0]![0];
+		expect(headers.get("content-type")).toBe("text/plain; charset=utf-8");
+		expect(headers.get("x-format")).toBe("codec");
 	});
 
 	it("rejects a missing path param instead of sending it as undefined", async () => {

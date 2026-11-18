@@ -1,4 +1,12 @@
-import { createClient, routeError, sse, sseFormat, type } from "@rest-rpc/core";
+import {
+	bodyCodec,
+	createClient,
+	routeError,
+	serializedBody,
+	sse,
+	sseFormat,
+	type,
+} from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import { route } from "../builder/routeBuilder.ts";
 import type { RuntimeImplementationTree } from "../routing/match.ts";
@@ -302,6 +310,80 @@ describe("route pipeline", () => {
 				),
 		);
 		expect(overridden.headers.get("cache-control")).toBe("no-store");
+	});
+
+	it("passes headers sent with a body to the codec that reads it", async () => {
+		const bytes = bodyCodec("application/octet-stream", {
+			serialize: (value) =>
+				value instanceof Uint8Array
+					? serializedBody(value, { headers: { "x-body": "bytes" } })
+					: (value as Blob),
+			deserialize: async (body, headers) =>
+				headers["x-body"] === "bytes"
+					? new Uint8Array(await body.arrayBuffer())
+					: body.blob(),
+		});
+		const routes = {
+			echo: route
+				.post("/")
+				.headers(
+					type(
+						(headers: { "content-type": "application/octet-stream" }) =>
+							headers,
+					),
+				)
+				.body(type((body: Uint8Array) => body))
+				.handler(({ body }) =>
+					respond(body, {
+						headers: { "content-type": "application/octet-stream" },
+					}),
+				),
+		};
+		const app = createApp(routes, { bodyCodecs: [bytes] });
+		const client = createClient(routes, {
+			origin: "http://localhost",
+			fetch: app.fetch,
+			bodyCodecs: [bytes],
+		});
+		const { body } = await client.echo({
+			headers: { "content-type": "application/octet-stream" },
+			body: new Uint8Array([1, 2]),
+		});
+		expect(body).toEqual(new Uint8Array([1, 2]));
+	});
+
+	it("lets the codec that sends a result read and replace its headers", async () => {
+		const attachments = bodyCodec("application/pdf", {
+			serialize: (value, headers) =>
+				value instanceof File && headers["content-disposition"] === "attachment"
+					? serializedBody(value, {
+							headers: {
+								"content-disposition": `attachment; filename="${value.name}"`,
+							},
+						})
+					: (value as Blob),
+		});
+		const file = new File(["%PDF"], "post.pdf");
+		const download = (headers: Record<string, string>) =>
+			send(
+				route.get("/").handler(() =>
+					respond(file, {
+						headers: { "content-type": "application/pdf", ...headers },
+					}),
+				),
+				undefined,
+				{ bodyCodecs: [attachments] },
+			);
+		expect(
+			(await download({ "content-disposition": "attachment" })).headers.get(
+				"content-disposition",
+			),
+		).toBe('attachment; filename="post.pdf"');
+		expect(
+			(await download({ "content-disposition": "inline" })).headers.get(
+				"content-disposition",
+			),
+		).toBe("inline");
 	});
 
 	it("sends and reads events with a custom data format", async () => {

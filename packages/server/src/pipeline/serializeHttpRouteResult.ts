@@ -8,6 +8,8 @@ import type { HttpRouteResult } from "./handleHttpRoute.ts";
 import { mapMaybePromise } from "./maybePromise.ts";
 import type { ErrorResponse } from "./resolveRouteError.ts";
 
+type OutgoingContentType = { readonly "content-type": string };
+
 /** Response headers with lowercase names. `set-cookie` holds every cookie. */
 export type ResponseHeaders = Record<string, string | string[]>;
 
@@ -31,8 +33,8 @@ export type SerializedHttpResponse = {
 };
 
 /**
- * The result's headers, `content-type` included, override the headers of a
- * `SerializedBody` returned by the codec. Without either, the content type is
+ * The headers of a `SerializedBody` returned by the codec, `content-type`
+ * included, override the result's headers. Without either, the content type is
  * the selected one. A `FormData` body has none, so the runtime sets the one it
  * generates with the multipart boundary.
  */
@@ -48,19 +50,31 @@ export function serializeHttpResponseParts(
 	}
 
 	const { value, contentType } = result.body;
+	// The codec sees the result's headers with the selected content type.
+	const outgoing: Record<string, string> = {};
+	setHeaders(outgoing, result.headers, undefined);
+	const declaredContentType = outgoing["content-type"];
 	// `FormData` is multipart, whatever the headers say.
-	const codecType =
+	outgoing["content-type"] =
 		value instanceof FormData ? "multipart/form-data" : contentType;
-	return mapMaybePromise(codecs.serialize(value, codecType), (serialized) => {
-		const { body, headers: bodyHeaders } = isSerializedBody(serialized)
-			? serialized
-			: { body: serialized, headers: undefined };
-		const headers: ResponseHeaders = { ...bodyHeaders };
-		setHeaders(headers, result.headers, result.cookies);
-		if (body instanceof FormData) delete headers["content-type"];
-		else headers["content-type"] ??= contentType;
-		return { status, headers, body };
-	});
+	return mapMaybePromise(
+		codecs.serialize(value, outgoing as typeof outgoing & OutgoingContentType),
+		(serialized) => {
+			const { body, headers: bodyHeaders } = isSerializedBody(serialized)
+				? serialized
+				: { body: serialized, headers: undefined };
+			const headers: ResponseHeaders = bodyHeaders
+				? { ...outgoing, ...bodyHeaders }
+				: outgoing;
+			if (body instanceof FormData) delete headers["content-type"];
+			else {
+				headers["content-type"] =
+					bodyHeaders?.["content-type"] ?? declaredContentType ?? contentType;
+			}
+			if (result.cookies?.length) headers["set-cookie"] = [...result.cookies];
+			return { status, headers, body };
+		},
+	);
 }
 
 /** The JSON body of an error response. */

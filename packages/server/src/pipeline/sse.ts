@@ -11,13 +11,15 @@ const sseBrand = Symbol("rest-rpc.sse");
 /**
  * Sends already framed SSE bodies as-is, listed before custom codecs so it
  * overrides them. `cache-control: no-cache` keeps proxies from caching or
- * buffering the stream, and a handler's own header replaces it.
+ * buffering the stream, unless the handler sets its own.
  */
 export const sseBodyCodec = bodyCodec("text/event-stream", {
-	serialize: (body) =>
-		serializedBody(body as BodyValue, {
-			headers: { "cache-control": "no-cache" },
-		}),
+	serialize: (body, headers) =>
+		headers["cache-control"] === undefined
+			? serializedBody(body as BodyValue, {
+					headers: { "cache-control": "no-cache" },
+				})
+			: (body as BodyValue),
 });
 
 /** A branded SSE value yielded by server handlers when event metadata is needed. */

@@ -41,7 +41,7 @@ type Trim<T extends string> = T extends ` ${infer TRest}`
 		? Trim<TRest>
 		: T;
 
-// Clients receive the lowercase base media type, without parameters.
+// The lowercase base media type, without parameters, used to detect SSE envelopes.
 type BaseMediaType<T extends string> = Lowercase<
 	Trim<T extends `${infer TBase};${string}` ? TBase : T>
 >;

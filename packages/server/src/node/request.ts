@@ -39,15 +39,18 @@ const readBuffer = (request: IncomingMessage) =>
 
 const utf8Bom = 0xfeff;
 
+const bodyUsed = () => new TypeError("The request body was already read.");
+
 /**
  * Reads a Node request body once, the first time a codec asks for it. A class
- * keeps the methods on the prototype, so a request allocates one object.
+ * keeps the methods on the prototype, so a request allocates one object. Like
+ * a Fetch body, it can be read once, since every read consumes the request.
  */
 class NodeBody implements IncomingBody {
 	#request: IncomingMessage;
 	#contentType: string;
 	#framed: boolean;
-	#buffer: Promise<Buffer> | undefined;
+	#used = false;
 	#stream: ReadableStream<Uint8Array> | null | undefined;
 
 	constructor(request: IncomingMessage, contentType: string) {
@@ -57,9 +60,11 @@ class NodeBody implements IncomingBody {
 	}
 
 	#read(): Promise<Buffer> {
-		return (this.#buffer ??= this.#framed
+		if (this.#used) return Promise.reject(bodyUsed());
+		this.#used = true;
+		return this.#framed
 			? readBuffer(this.#request)
-			: Promise.resolve(emptyBuffer));
+			: Promise.resolve(emptyBuffer);
 	}
 
 	// Decoded like Fetch `text()`, which drops a byte order mark.
@@ -72,11 +77,17 @@ class NodeBody implements IncomingBody {
 		return JSON.parse(await this.text());
 	}
 
+	// A buffer that owns its whole memory is returned without a copy. Small
+	// buffers are slices of a shared pool, so they are copied.
 	async arrayBuffer(): Promise<ArrayBuffer> {
 		const bytes = await this.#read();
-		return bytes.buffer.slice(
-			bytes.byteOffset,
-			bytes.byteOffset + bytes.byteLength,
+		return (
+			bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength
+				? bytes.buffer
+				: bytes.buffer.slice(
+						bytes.byteOffset,
+						bytes.byteOffset + bytes.byteLength,
+					)
 		) as ArrayBuffer;
 	}
 
@@ -86,8 +97,12 @@ class NodeBody implements IncomingBody {
 		});
 	}
 
+	// The stream is created once and returned again, as on a Fetch body.
 	get body(): ReadableStream<Uint8Array> | null {
-		return (this.#stream ??= this.#framed
+		if (this.#stream !== undefined) return this.#stream;
+		if (this.#used) throw bodyUsed();
+		this.#used = true;
+		return (this.#stream = this.#framed
 			? ReadableStream.from(this.#request as AsyncIterable<Uint8Array>)
 			: null);
 	}
