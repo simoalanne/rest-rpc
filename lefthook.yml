@@ -3,5 +3,8 @@ pre-commit:
     - name: lint
       run: pnpm run lint:staged
       stage_fixed: true
+    - name: readme sync
+      glob: "README.md"
+      run: pnpm run readme:sync && git add content/docs/cheatsheet.mdx packages/*/README.md
     - name: typecheck
       run: pnpm run typecheck
