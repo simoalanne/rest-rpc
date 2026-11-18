@@ -85,9 +85,12 @@ export {
 	type LocalClient,
 } from "./pipeline/call.ts";
 export {
+	binaryCodec,
 	bodyCodec,
 	createOpenApiDocument,
+	formDataCodec,
 	isDefinedError,
+	jsonCodec,
 	raw,
 	RouteError,
 	routeError,
@@ -95,7 +98,9 @@ export {
 	serializedBody,
 	sse,
 	sseFormat,
+	textCodec,
 	type,
+	urlEncodedCodec,
 } from "@rest-rpc/core";
 export type {
 	BodyCodec,
