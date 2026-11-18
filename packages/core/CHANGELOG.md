@@ -1,5 +1,17 @@
 # @rest-rpc/core
 
+## 0.5.0
+
+### Minor Changes
+
+- 3d6507c: Export the built-in body codecs from `@rest-rpc/core` and `@rest-rpc/server` as `jsonCodec`, `urlEncodedCodec`, `formDataCodec`, `textCodec` and `binaryCodec`, so a custom codec can call one for the values it doesn't handle. Their operations are both defined and typed with what they return, such as `Promise<FormData>` from `formDataCodec.deserialize()`.
+
+`IncomingBody` has a `formData()` method, which the Node server implements too, so a codec reads a multipart body with `await body.formData()` on every runtime. An object implementing `IncomingBody` must add it.
+
+### Patch Changes
+
+- 34a29eb: Show a client call's resolved response, such as `{ status: 200; body: Post; ... }`, on hover in editors instead of an internal `ClientResponseEntry` type.
+
 ## 0.4.0
 
 ### Minor Changes

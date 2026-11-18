@@ -1,5 +1,21 @@
 # @rest-rpc/server
 
+## 0.5.0
+
+### Minor Changes
+
+- 3d6507c: Export the built-in body codecs from `@rest-rpc/core` and `@rest-rpc/server` as `jsonCodec`, `urlEncodedCodec`, `formDataCodec`, `textCodec` and `binaryCodec`, so a custom codec can call one for the values it doesn't handle. Their operations are both defined and typed with what they return, such as `Promise<FormData>` from `formDataCodec.deserialize()`.
+
+`IncomingBody` has a `formData()` method, which the Node server implements too, so a codec reads a multipart body with `await body.formData()` on every runtime. An object implementing `IncomingBody` must add it.
+
+- 99c0b66: Remove `createLocalClient()` and the `LocalClient` type. To call an app in process with the same behavior as over HTTP, such as in tests, pass its `fetch` to `createClient(routes, { fetch: app.fetch })`. `createClient` and `ApiClientOptions` are now exported from `@rest-rpc/server` too. To call one route without HTTP, use `call()`.
+
+### Patch Changes
+
+- b38ff78: Run interceptors for `OPTIONS` requests to `app.routes`, as `app.fetch` does, so an interceptor answers CORS preflights when Bun serves `app.routes` without `app.fetch`. Bun answered them with its own `404` before. A preflight no interceptor answers is sent `NOT_FOUND`.
+- 5deb097: Re-export the rest of `@rest-rpc/core` except `route` from `@rest-rpc/server`, so server code and its tests import only `@rest-rpc/server`: `clientInterceptor()`, `extractContract()` and the `AbsolutePath`, `ApiClientFor`, `ApiClientRouteValue`, `BodyDeserializer`, `BodySerializer`, `BuiltInBodyCodec`, `ClientHeaders`, `ClientInterceptor`, `Contract`, `FetchLike`, `FetchOptions`, `IncomingBody`, `InferClientStreamData`, `ResponseOptions`, `RouteDefinition` and `SseResponse` types.
+- d3b9f08: Accept handlers that only throw, such as a stub that throws a defined `NOT_IMPLEMENTED` error, without a return type annotation.
+
 ## 0.4.0
 
 ### Minor Changes
