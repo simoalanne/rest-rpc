@@ -33,7 +33,8 @@ export type CreateAppOptions<
 	mountPath?: AbsolutePath;
 	/**
 	 * Functions around everything the app does for a request, the first
-	 * outermost. They run before routing, for Bun's native `routes` too.
+	 * outermost. They run after the route is matched and before it runs, for
+	 * Bun's native `routes` too.
 	 */
 	interceptors?: readonly Interceptor[];
 	/**

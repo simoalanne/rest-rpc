@@ -90,14 +90,15 @@ how data is sent, not its types.
 
 ## Stream Options
 
-Proxies and load balancers may close a connection that has been idle for a
-while, or buffer the start of a response. Comments, which clients ignore, keep
-the stream moving:
+Servers, proxies and load balancers may close a connection that has been idle
+for a while, or buffer the start of a response. Comments, which clients ignore,
+keep the stream moving. Set `keepAlive` lower than your server's idle timeout,
+if it has one:
 
 ```ts
 createApp(routes, {
 	sse: {
-		keepAlive: 15_000, // a ": keepalive" comment after 15 s without an event
+		keepAlive: 5_000, // a ": keepalive" comment after 5 s without an event
 		initialComment: true, // a ": ok" comment right after the headers
 	},
 });
@@ -110,7 +111,7 @@ its stream:
 const notifications = route
 	.get("/notifications")
 	.handler(({ respond }) =>
-		respond(streamNotifications(), { sse: { keepAlive: 5_000 } }),
+		respond(streamNotifications(), { sse: { keepAlive: 2_000 } }),
 	);
 ```
 

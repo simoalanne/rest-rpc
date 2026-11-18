@@ -6,7 +6,7 @@ import { writeNodeResponse } from "./response.ts";
 
 /**
  * A function around everything a Node app does for a request, for work
- * before routing or on every response, such as API key checks, logging, or
+ * before the route runs or on every response, such as API key checks, logging, or
  * CORS headers and preflights.
  *
  * @remarks It receives every request, including ones that match no route,

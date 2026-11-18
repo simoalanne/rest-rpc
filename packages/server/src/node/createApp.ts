@@ -38,7 +38,7 @@ export type CreateNodeAppOptions<TContext extends object = EmptyObject> =
 		mountPath?: AbsolutePath;
 		/**
 		 * Functions around everything the app does for a request, the first
-		 * outermost. They run before routing.
+		 * outermost. They run after the route is matched and before it runs.
 		 */
 		interceptors?: readonly NodeInterceptor[];
 		/**
