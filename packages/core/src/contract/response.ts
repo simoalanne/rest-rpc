@@ -111,13 +111,21 @@ type ClientResponseHeaders<TResponse> = [
 	: Record<string, string> &
 			InferSchema<ResponseHeadersFor<TResponse>, "output">;
 
-type ClientResponseEntry<TStatus extends number, TResponse> = {
-	status: TStatus;
-	body: HasBody<TResponse> extends false ? undefined : ClientBody<TResponse>;
-	headers: ClientResponseHeaders<TResponse>;
-	/** Received `Set-Cookie` values. Browsers hide them from `fetch`, so it is empty there. */
-	cookies: readonly string[];
-};
+// The conditional always matches. It keeps editors from displaying this alias
+// instead of the resolved object.
+type ClientResponseEntry<TStatus extends number, TResponse> = [
+	TResponse,
+] extends [unknown]
+	? {
+			status: TStatus;
+			body: HasBody<TResponse> extends false
+				? undefined
+				: ClientBody<TResponse>;
+			headers: ClientResponseHeaders<TResponse>;
+			/** Received `Set-Cookie` values. Browsers hide them from `fetch`, so it is empty there. */
+			cookies: readonly string[];
+		}
+	: never;
 
 type ResponseKey = number | `${number}`;
 

@@ -1,0 +1,449 @@
+const PostNotFound: RouteErrorClassFor<"POST_NOT_FOUND", {
+    readonly status: 404;
+    readonly data: StandardSchemaV1<{
+        id: string;
+    }, {
+        id: string;
+    }>;
+}>
+
+type Post = {
+    id: string;
+    title: string;
+    published: boolean;
+}
+
+const routes: {
+    posts: {
+        get: HandledRoute<{
+            readonly method: "GET";
+            readonly path: "/posts/:id";
+            request: {
+                query: readonly [StandardSchemaV1<{
+                    expand: boolean;
+                }, {
+                    expand: boolean;
+                }>];
+                headers: readonly [StandardSchemaV1<{
+                    "x-tenant": string;
+                }, {
+                    "x-tenant": string;
+                }>];
+            };
+            responses: {
+                200: {
+                    body: StandardSchemaV1<Post, Post>;
+                };
+            };
+            errors: {
+                POST_NOT_FOUND: RouteErrorClassFor<"POST_NOT_FOUND", {
+                    readonly status: 404;
+                    readonly data: StandardSchemaV1<{
+                        id: string;
+                    }, {
+                        id: string;
+                    }>;
+                }>;
+            };
+            readonly metaShape?: DefaultMeta | undefined;
+        }, {
+            ...;
+        }, {
+            ...;
+        }, ResponseEnvelope<...>>;
+        create: HandledRoute<...>;
+        inferred: HandledRoute<...>;
+        events: HandledRoute<...>;
+    };
+}
+
+const params: {
+    id: string;
+}
+
+const query: {
+    expand: boolean;
+}
+
+const headers: {
+    "x-tenant": string;
+}
+
+const context: {
+    readonly user: string;
+}
+
+const errors: {
+    POST_NOT_FOUND: (options: {
+        message?: string | undefined;
+        cookies?: readonly string[] | undefined;
+        cause?: unknown;
+        data: {
+            id: string;
+        };
+        headers?: undefined;
+    }) => RouteError<"POST_NOT_FOUND", {
+        id: string;
+    }, 404, Record<string, unknown>>;
+}
+
+const respond: RouteRespond<200>
+
+(parameter) body: {
+    title: string;
+}
+
+(parameter) respond: RouteRespond<201 | 204>
+
+const contract: {
+    posts: {
+        get: HandledRoute<{
+            readonly method: "GET";
+            readonly path: "/posts/:id";
+            request: {
+                query: readonly [StandardSchemaV1<{
+                    expand: boolean;
+                }, {
+                    expand: boolean;
+                }>];
+                headers: readonly [StandardSchemaV1<{
+                    "x-tenant": string;
+                }, {
+                    "x-tenant": string;
+                }>];
+            };
+            responses: {
+                200: {
+                    body: StandardSchemaV1<Post, Post>;
+                };
+            };
+            errors: {
+                POST_NOT_FOUND: RouteErrorClassFor<"POST_NOT_FOUND", {
+                    readonly status: 404;
+                    readonly data: StandardSchemaV1<{
+                        id: string;
+                    }, {
+                        id: string;
+                    }>;
+                }>;
+            };
+            readonly metaShape?: DefaultMeta | undefined;
+        }, {
+            ...;
+        }, {
+            ...;
+        }, ResponseEnvelope<...>>;
+        create: HandledRoute<...>;
+        inferred: HandledRoute<...>;
+        events: HandledRoute<...>;
+    };
+}
+
+const client: {
+    posts: {
+        get: (request: {
+            query: {
+                expand: boolean;
+            };
+            params: {
+                id: string;
+            };
+            headers?: {
+                "x-tenant"?: string | undefined;
+            } | undefined;
+        }, options?: FetchOptions | undefined) => ClientPromise<{
+            status: 200;
+            body: Post;
+            headers: Record<string, string>;
+            cookies: readonly string[];
+        }, Error | RouteError<"POST_NOT_FOUND", {
+            id: string;
+        }, 404, Record<string, string>>>;
+        create: (request: {
+            body: {
+                title: string;
+            };
+        }, options?: FetchOptions | undefined) => ClientPromise<{
+            status: 201;
+            body: Post;
+            headers: Record<...>;
+            cookies: readonly string[];
+        } | {
+            ...;
+        }, Error>;
+        inferred: (request?: undefined, options?: FetchOptions | undefined) => ClientPromise<...>;
+        events: (request?: undefined, options?: FetchOptions | undefined) => ClientPromise<...>;
+    };
+}
+
+const getPost: (request: {
+    query: {
+        expand: boolean;
+    };
+    params: {
+        id: string;
+    };
+    headers?: {
+        "x-tenant"?: string | undefined;
+    } | undefined;
+}, options?: FetchOptions | undefined) => ClientPromise<{
+    status: 200;
+    body: Post;
+    headers: Record<string, string>;
+    cookies: readonly string[];
+}, Error | RouteError<"POST_NOT_FOUND", {
+    id: string;
+}, 404, Record<string, string>>>
+
+const createPost: (request: {
+    body: {
+        title: string;
+    };
+}, options?: FetchOptions | undefined) => ClientPromise<{
+    status: 201;
+    body: Post;
+    headers: Record<string, string>;
+    cookies: readonly string[];
+} | {
+    status: 204;
+    body: undefined;
+    headers: Record<string, string>;
+    cookies: readonly string[];
+}, Error>
+
+const useClient: () => Promise<{
+    post: {
+        status: 200;
+        body: Post;
+        headers: Record<string, string>;
+        cookies: readonly string[];
+    };
+    inferred: {
+        status: number;
+        body: unknown;
+        headers: Record<string, string>;
+        cookies: readonly string[];
+    };
+    events: {
+        status: 200;
+        body: AsyncIterable<SseEvent<{
+            n: number;
+        }>>;
+        headers: Record<string, string>;
+        cookies: readonly string[];
+    };
+    error: Error | RouteError<"POST_NOT_FOUND", {
+        id: string;
+    }, 404, Record<string, string>> | undefined;
+    data: {
+        status: 200;
+        body: Post;
+        headers: Record<string, string>;
+        cookies: readonly string[];
+    } | undefined;
+}>
+
+const post: {
+    status: 200;
+    body: Post;
+    headers: Record<string, string>;
+    cookies: readonly string[];
+}
+
+const inferred: {
+    status: number;
+    body: unknown;
+    headers: Record<string, string>;
+    cookies: readonly string[];
+}
+
+const events: {
+    status: 200;
+    body: AsyncIterable<SseEvent<{
+        n: number;
+    }>>;
+    headers: Record<string, string>;
+    cookies: readonly string[];
+}
+
+const error: Error | RouteError<"POST_NOT_FOUND", {
+    id: string;
+}, 404, Record<string, string>> | undefined
+
+const data: {
+    status: 200;
+    body: Post;
+    headers: Record<string, string>;
+    cookies: readonly string[];
+} | undefined
+
+type ClientRequest = {
+    query: {
+        expand: boolean;
+    };
+    params: {
+        id: string;
+    };
+    headers?: {
+        "x-tenant"?: string | undefined;
+    } | undefined;
+}
+
+type ClientResponse = {
+    status: 200;
+    body: Post;
+    headers: Record<string, string>;
+    cookies: readonly string[];
+}
+
+type ClientError = RouteError<"POST_NOT_FOUND", {
+    id: string;
+}, 404, Record<string, string>>
+
+type ServerRequest = {
+    headers: {
+        "x-tenant": string;
+    };
+    query: {
+        expand: boolean;
+    };
+    params: {
+        id: string;
+    };
+    signal: AbortSignal;
+    route: {
+        readonly metaShape?: DefaultMeta | undefined;
+        readonly method: "GET";
+        readonly path: "/posts/:id";
+        request: {
+            query: readonly [StandardSchemaV1<{
+                expand: boolean;
+            }, {
+                expand: boolean;
+            }>];
+            headers: readonly [StandardSchemaV1<{
+                "x-tenant": string;
+            }, {
+                "x-tenant": string;
+            }>];
+        };
+        responses: {
+            200: {
+                body: StandardSchemaV1<Post, Post>;
+            };
+        };
+        errors: {
+            POST_NOT_FOUND: RouteErrorClassFor<"POST_NOT_FOUND", {
+                readonly status: 404;
+                readonly data: StandardSchemaV1<{
+                    id: string;
+                }, {
+                    id: string;
+                }>;
+            }>;
+        };
+    };
+    context: {
+        ...;
+    };
+    errors: {
+        ...;
+    };
+    respond: RouteRespond<...>;
+}
+
+const utils: TanstackQueryTreeFor<{
+    posts: {
+        get: (request: {
+            query: {
+                expand: boolean;
+            };
+            params: {
+                id: string;
+            };
+            headers?: {
+                "x-tenant"?: string | undefined;
+            } | undefined;
+        }, options?: FetchOptions | undefined) => ClientPromise<{
+            status: 200;
+            body: Post;
+            headers: Record<string, string>;
+            cookies: readonly string[];
+        }, Error | RouteError<"POST_NOT_FOUND", {
+            id: string;
+        }, 404, Record<string, string>>>;
+        create: (request: {
+            body: {
+                title: string;
+            };
+        }, options?: FetchOptions | undefined) => ClientPromise<{
+            status: 201;
+            body: Post;
+            headers: Record<...>;
+            cookies: readonly string[];
+        } | {
+            ...;
+        }, Error>;
+        inferred: (request?: undefined, options?: FetchOptions | undefined) => ClientPromise<...>;
+        events: (request?: undefined, options?: FetchOptions | undefined) => ClientPromise<...>;
+    };
+}>
+
+const queryOptions: QueryObserverOptions<{
+    status: 200;
+    body: Post;
+    headers: Record<string, string>;
+    cookies: readonly string[];
+}, Error | RouteError<"POST_NOT_FOUND", {
+    id: string;
+}, 404, Record<string, string>>, {
+    status: 200;
+    body: Post;
+    headers: Record<string, string>;
+    cookies: readonly string[];
+}, {
+    status: 200;
+    body: Post;
+    headers: Record<string, string>;
+    cookies: readonly string[];
+}, readonly unknown[], never> & {
+    queryKey: readonly unknown[] & {
+        [dataTagSymbol]: {
+            status: 200;
+            body: Post;
+            headers: Record<string, string>;
+            cookies: readonly string[];
+        };
+        [dataTagErrorSymbol]: Error | RouteError<...>;
+    };
+}
+
+const mutationOptions: MutationOptions<{
+    status: 201;
+    body: Post;
+    headers: Record<string, string>;
+    cookies: readonly string[];
+} | {
+    status: 204;
+    body: undefined;
+    headers: Record<string, string>;
+    cookies: readonly string[];
+}, Error, {
+    body: {
+        title: string;
+    };
+}, unknown> & {
+    mutationKey: MutationKey;
+}
+
+const queryKey: readonly unknown[] & {
+    [dataTagSymbol]: {
+        status: 200;
+        body: Post;
+        headers: Record<string, string>;
+        cookies: readonly string[];
+    };
+    [dataTagErrorSymbol]: Error | RouteError<"POST_NOT_FOUND", {
+        id: string;
+    }, 404, Record<string, string>>;
+}
