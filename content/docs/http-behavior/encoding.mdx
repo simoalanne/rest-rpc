@@ -327,3 +327,51 @@ const attachments = bodyCodec("application/pdf", {
 Browsers hide response headers from cross-origin requests unless the server
 lists them in `Access-Control-Expose-Headers`, so add a header like `x-body`
 there when the client runs on another origin.
+
+## Typed Multipart Bodies
+
+A body with a file and other fields can be typed as an object, with a codec
+that sends the object as `multipart/form-data`. It marks the requests it
+encodes with a header, and leaves `FormData` to the built-in codec, so HTML
+forms and other clients that send `FormData` work as before:
+
+```ts
+import { bodyCodec, formDataCodec, serializedBody } from "@rest-rpc/core";
+
+const multipart = bodyCodec("multipart/form-data", {
+	serialize: (value) => {
+		if (value instanceof FormData) return formDataCodec.serialize(value);
+		const form = new FormData();
+		for (const [key, field] of Object.entries(value as object)) {
+			form.append(key, field instanceof Blob ? field : JSON.stringify(field));
+		}
+		return serializedBody(form, { headers: { "x-form-fields": "json" } });
+	},
+	deserialize: async (body, headers) => {
+		const form = await formDataCodec.deserialize(body);
+		if (headers["x-form-fields"] !== "json") return form;
+		return Object.fromEntries(
+			[...form].map(([key, part]) => [
+				key,
+				typeof part === "string" ? JSON.parse(part) : part,
+			]),
+		);
+	},
+});
+
+const updatePost = route
+	.put("/posts/:id")
+	.headers(z.object({ "content-type": z.literal("multipart/form-data") }))
+	.body(z.object({ title: z.string(), image: z.instanceof(File) }))
+	.handler(({ params, body }) => savePost(params.id, body.title, body.image));
+
+await client.updatePost({
+	params: { id: "post_1" },
+	headers: { "content-type": "multipart/form-data" },
+	body: { title: "Hello", image: file },
+});
+```
+
+Fields other than files are sent as JSON, so they keep their types. A route
+whose body schema is an object rejects plain `FormData`, whose fields are
+strings, so routes that take forms keep a `FormData` schema.
