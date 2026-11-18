@@ -19,7 +19,7 @@ declare function listPosts(page: number): {
 // ---cut---
 const list = route
 	.get("/posts")
-	.query(z.object({ page: z.coerce.number<number>().int().min(1).default(1) }))
+	.query(z.object({ page: z.coerce.number().int().min(1).default(1) }))
 	.response(z.object({ items: z.array(post), total: z.number() }))
 	.handler(({ query }) => listPosts(query.page));
 //                                       ^?
@@ -66,7 +66,7 @@ schemas ran:
 ```ts
 const getPost = route
 	.get("/posts/:id")
-	.params(z.object({ id: z.coerce.number<number>() }))
+	.params(z.object({ id: z.coerce.number() }))
 	.response(z.object({ title: z.string().default("Untitled") }))
 	.handler(({ params }) => findPost(params.id)); // params.id is the string "1"
 

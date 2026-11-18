@@ -25,14 +25,14 @@ import z from "zod";
 
 const getPost = route
 	.get("/posts/:id")
-	.params(z.object({ id: z.coerce.number<string>() }))
+	.params(z.object({ id: z.coerce.number() }))
 	.handler(({ params }) => ({
 		id: params.id,
 		title: "Hello",
 		body: "First post",
 	}));
 
-const response = await call(getPost, { params: { id: "1" } });
+const response = await call(getPost, { params: { id: 1 } });
 ```
 
 `call()` takes the same request and returns the same response as a Fetch

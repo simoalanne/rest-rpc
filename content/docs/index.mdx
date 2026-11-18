@@ -40,14 +40,17 @@ const create = route
 const get = route
 	.get("/posts/:id")
 	.params(z.object({ id: z.string() }))
-	.query(z.object({ preview: z.stringbool().optional() }))
+	.query(z.object({ preview: z.enum(["true", "false"]).optional() }))
 	.headers(z.object({ "x-request-id": z.string().optional() }))
 	.error("POST_NOT_FOUND", { status: 404 })
 	.handler(({ params, query, errors }) => {
 		const post = findPost(params.id);
 		if (!post) throw errors.POST_NOT_FOUND();
 		return respond(
-			{ ...post, body: query.preview ? post.body.slice(0, 40) : post.body },
+			{
+				...post,
+				body: query.preview === "true" ? post.body.slice(0, 40) : post.body,
+			},
 			{ headers: { "x-powered-by": "rest-rpc" } },
 		);
 	});
@@ -81,14 +84,17 @@ const create = route
 const get = route
 	.get("/posts/:id")
 	.params(z.object({ id: z.string() }))
-	.query(z.object({ preview: z.stringbool().optional() }))
+	.query(z.object({ preview: z.enum(["true", "false"]).optional() }))
 	.headers(z.object({ "x-request-id": z.string().optional() }))
 	.error("POST_NOT_FOUND", { status: 404 })
 	.handler(({ params, query, errors }) => {
 		const post = findPost(params.id);
 		if (!post) throw errors.POST_NOT_FOUND();
 		return respond(
-			{ ...post, body: query.preview ? post.body.slice(0, 40) : post.body },
+			{
+				...post,
+				body: query.preview === "true" ? post.body.slice(0, 40) : post.body,
+			},
 			{ headers: { "x-powered-by": "rest-rpc" } },
 		);
 	});
@@ -147,14 +153,17 @@ const create = route
 const get = route
 	.get("/posts/:id")
 	.params(z.object({ id: z.string() }))
-	.query(z.object({ preview: z.stringbool().optional() }))
+	.query(z.object({ preview: z.enum(["true", "false"]).optional() }))
 	.headers(z.object({ "x-request-id": z.string().optional() }))
 	.error("POST_NOT_FOUND", { status: 404 })
 	.handler(({ params, query, errors }) => {
 		const post = findPost(params.id);
 		if (!post) throw errors.POST_NOT_FOUND();
 		return respond(
-			{ ...post, body: query.preview ? post.body.slice(0, 40) : post.body },
+			{
+				...post,
+				body: query.preview === "true" ? post.body.slice(0, 40) : post.body,
+			},
 			{ headers: { "x-powered-by": "rest-rpc" } },
 		);
 	});
