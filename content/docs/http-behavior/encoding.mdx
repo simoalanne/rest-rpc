@@ -212,22 +212,56 @@ To receive another value, such as a stream or a `Uint8Array`, use a
 ## Custom Codecs
 
 `bodyCodec(mediaTypes, { serialize, deserialize })` encodes another format.
-Pass the same codec in `bodyCodecs` to the client and the server:
+Pass the same codec in `bodyCodecs` to the client and the server.
+
+A common reason is values JSON can't represent. A `Date` returned by a handler
+is typed as a `Date` on the client but [arrives as a string](#what-the-client-receives),
+and a `Map`, `Set` or `bigint` doesn't survive at all.
+[superjson](https://www.npmjs.com/package/superjson) encodes them as JSON with
+the type of each value, so they arrive as what the types say, with no
+conversion on the client. Set its content type once, on a base route whose
+middleware sends every response with it:
 
 ```ts
-import { bodyCodec } from "@rest-rpc/core";
+import { bodyCodec, createClient } from "@rest-rpc/core";
+import { createApp, route } from "@rest-rpc/server";
+import superjson from "superjson";
 
-const csv = bodyCodec("text/csv", {
-	serialize: (rows) => toCsv(rows as string[][]),
-	deserialize: async (body, headers) =>
-		parseCsv(await body.text(), {
-			header: headers["content-type"]?.includes("header=present"),
-		}),
+const superjsonCodec = bodyCodec("application/vnd.superjson+json", {
+	serialize: (value) => superjson.stringify(value),
+	deserialize: async (body) => superjson.parse(await body.text()),
 });
 
-createApp(routes, { bodyCodecs: [csv] });
-createClient(api, { origin, bodyCodecs: [csv] });
+const superjsonRoute = route.use(async ({ next }) => {
+	const response = await next();
+	return {
+		...response,
+		headers: {
+			...response.headers,
+			"content-type": "application/vnd.superjson+json",
+		},
+	};
+});
+
+const getPost = superjsonRoute
+	.get("/posts/:id")
+	.handler(({ params }) => ({ id: params.id, publishedAt: new Date() }));
+
+createApp(routes, { bodyCodecs: [superjsonCodec] });
+const client = createClient(api, { bodyCodecs: [superjsonCodec] });
+
+const { body } = await client.getPost({ params: { id: "1" } });
+body.publishedAt; // a Date, as typed
 ```
+
+- A `vnd.` media type names a format of its own, and the `+json` suffix says
+  it's JSON underneath, so clients without the codec still read it as JSON.
+  The exact media type takes precedence over the JSON codec's `+json` pattern.
+- Errors are thrown past the middleware, so they stay JSON for every client.
+- A stream returned from a route on the base is sent to the codec, which
+  can't encode it, so build stream routes from `route`.
+- To receive request bodies in the format too, declare its content type in
+  the route's [headers schema](#bodies).
 
 - `mediaTypes` is a media type, a pattern such as `/\+json$/`, or a list.
   Custom codecs win over the defaults, so `bodyCodec("application/json", ...)`
