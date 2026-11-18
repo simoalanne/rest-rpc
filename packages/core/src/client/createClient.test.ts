@@ -44,11 +44,14 @@ describe("createClient", () => {
 		const fetch = vi.fn(async (_request: Request) => Response.json("Ada"));
 		const contract = { users: route.get("/users").response(type<string>()) };
 		await createClient(contract, {
-			origin: "https://example.test",
+			origin: "https://example.test/",
 			mountPath: "/api/",
 			fetch,
 		}).users();
 		expect(fetch.mock.calls[0]![0].url).toBe("https://example.test/api/users");
+		expect(() =>
+			createClient(contract, { origin: "https://example.test/api" }),
+		).toThrow(TypeError);
 		await expect(createClient(contract, { fetch }).users()).rejects.toThrow(
 			TypeError,
 		);

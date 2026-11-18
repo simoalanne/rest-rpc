@@ -37,7 +37,7 @@ export type FetchLike = (request: Request) => Promise<Response>;
 /**
  * Transport headers added by the client outside the defined route input. A
  * function is a provider called for each request, whose awaited result is the
- * value.
+ * value, and a promise is awaited.
  */
 export type ClientHeaders = Record<string, unknown>;
 
@@ -53,7 +53,7 @@ type LiteralKeys<T> = {
 
 type ResolvedHeaderValue<T> = T extends (...args: never[]) => infer TResult
 	? Awaited<TResult>
-	: T;
+	: Awaited<T>;
 
 type GlobalHeaderKeys<TGlobalHeaders extends ClientHeaders> = {
 	[TKey in LiteralKeys<TGlobalHeaders>]: undefined extends ResolvedHeaderValue<
@@ -253,7 +253,7 @@ const resolveHeaders = async (
 ): Promise<Record<string, string>> => {
 	const entries = await Promise.all(
 		Object.entries(headers).map(async ([name, value]) => {
-			const resolved = typeof value === "function" ? await value() : value;
+			const resolved = await (typeof value === "function" ? value() : value);
 			return resolved === undefined
 				? undefined
 				: ([name, String(resolved)] as const);

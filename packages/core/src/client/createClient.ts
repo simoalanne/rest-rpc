@@ -71,7 +71,8 @@ export type ApiClientOptions<
 	 * path. In browsers it defaults to the page's origin.
 	 *
 	 * @remarks Required outside browsers, where a URL without an origin
-	 * cannot be resolved.
+	 * cannot be resolved. A trailing slash is ignored, and an origin with a
+	 * path throws a `TypeError` when the client is created.
 	 */
 	origin?: string;
 	/**
@@ -93,8 +94,9 @@ export type ApiClientOptions<
 	 */
 	fetchOptions?: ApiClientFetchOptions;
 	/**
-	 * Headers added to every request, each a value or a function called for
-	 * each request. Defined headers they set are optional at call sites.
+	 * Headers added to every request, each a value, a promise of one, or a
+	 * function called for each request. Defined headers they set are optional
+	 * at call sites.
 	 */
 	globalHeaders?: TGlobalHeaders;
 	/**
@@ -118,6 +120,18 @@ export type ApiClientOptions<
 	validateResponses?: boolean;
 };
 
+// A trailing slash is ignored, and a path throws when the client is created
+// instead of sending requests under it, since it belongs in `mountPath`.
+const toOrigin = (origin: string) => {
+	const url = new URL(origin);
+	if (url.pathname !== "/" || url.search || url.hash) {
+		throw new TypeError(
+			`The client \`origin\` "${origin}" must not have a path. Pass the path as \`mountPath\`.`,
+		);
+	}
+	return url.origin;
+};
+
 /**
  * Creates a typed fetch client whose shape mirrors a contract.
  *
@@ -137,7 +151,12 @@ export function createClient<
 				| AbsolutePath
 				| undefined)
 		: options.mountPath;
-	const requestOptions = { ...options, mountPath, codecs };
+	const requestOptions = {
+		...options,
+		origin: options.origin === undefined ? undefined : toOrigin(options.origin),
+		mountPath,
+		codecs,
+	};
 	const validate = options.validateResponses ?? false;
 
 	return mapContractRoutes(contract, (node, routePath) => {

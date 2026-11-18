@@ -143,6 +143,18 @@ describe("routeBuilder types", () => {
 		route.get("/").response(sse(post)).response(post);
 	});
 
+	it("rejects response statuses outside 200 to 299", () => {
+		const post = type<{ id: string }>();
+		route.get("/").response(post, { status: 299 });
+		route.get("/").response(post, { status: 200 as number });
+		// @ts-expect-error Errors use .error(), and other statuses raw().
+		route.get("/").response(post, { status: 404 });
+		// @ts-expect-error Errors use .error(), and other statuses raw().
+		route.get("/").response(sse(post), { status: 500 });
+		// @ts-expect-error Errors use .error(), and other statuses raw().
+		route.get("/").response({ status: 302 });
+	});
+
 	it("accepts params, query and headers schemas with any object input", () => {
 		const coerced = {} as StandardSchemaV1<{ id: unknown }, { id: number }>;
 		const value = route

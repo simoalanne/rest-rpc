@@ -12,6 +12,7 @@ export type {
 	BuilderState,
 	DefinitionFor,
 	NextState,
+	IsNonSuccessStatus,
 	OmittedMethods,
 	RootBuilderState,
 	WithBody,

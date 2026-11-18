@@ -143,6 +143,7 @@ describe("request", () => {
 				fetch,
 				globalHeaders: {
 					"X-Token": async () => "global",
+					"x-version": Promise.resolve("2026-09"),
 					omitted: () => undefined,
 				},
 				fetchOptions: { cache: "reload" },
@@ -157,6 +158,7 @@ describe("request", () => {
 		expect(Object.fromEntries(request.headers)).toEqual({
 			"x-token": "request",
 			"x-extra": "2",
+			"x-version": "2026-09",
 			"content-type": "application/json",
 		});
 		expect(await request.text()).toBe('{"name":"Ada"}');
