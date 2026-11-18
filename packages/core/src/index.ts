@@ -4,7 +4,6 @@ export type {
 	ClientHeaders,
 	ClientInterceptor,
 	InterceptedRoute,
-	ClientHeaderValue,
 	InferClientError,
 	InferClientRequest,
 	InferClientResponse,

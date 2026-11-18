@@ -1,8 +1,5 @@
-import type {
-	RequestBodySchema,
-	RequestHeadersSchema,
-	RequestParamsSchema,
-} from "./request.ts";
+import type { StandardSchemaV1 } from "../standard-schema/index.ts";
+import type { RecordSchema } from "./request.ts";
 import type { RawResponse } from "./raw.ts";
 import type { RouteResponses } from "./response.ts";
 import type { RouteErrorDefinition } from "./routeError.ts";
@@ -44,10 +41,10 @@ export type OpenApiRouteOptions = {
  * it.
  */
 export type RouteRequestDefinition = {
-	body?: readonly RequestBodySchema[];
-	query?: readonly RequestBodySchema[];
-	params?: readonly RequestParamsSchema[];
-	headers?: readonly RequestHeadersSchema[];
+	body?: readonly StandardSchemaV1[];
+	query?: readonly RecordSchema[];
+	params?: readonly RecordSchema[];
+	headers?: readonly RecordSchema[];
 };
 
 export type RouteErrors = {

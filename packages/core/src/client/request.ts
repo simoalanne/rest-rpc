@@ -9,10 +9,7 @@ import { joinPrefix, replacePathParams } from "../contract/path.ts";
 import type { ClientTypeSource } from "./response.ts";
 import type { AbsolutePath, HttpMethod } from "../contract/routeDefinition.ts";
 import { intercept, type ClientInterceptor } from "./interceptor.ts";
-import type {
-	ClientRequestForDefinition,
-	RequestScalar,
-} from "../contract/request.ts";
+import type { ClientRequestForDefinition } from "../contract/request.ts";
 
 /**
  * Fetch options accepted by a route call, plus headers added outside the
@@ -21,7 +18,7 @@ import type {
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#per-call-options}
  */
 export type FetchOptions = Omit<RequestInit, "method" | "body" | "headers"> & {
-	additionalHeaders?: Record<string, RequestScalar | undefined>;
+	additionalHeaders?: Record<string, unknown>;
 };
 
 export type ApiClientFetchOptions = Omit<
@@ -37,14 +34,12 @@ export type ApiClientFetchOptions = Omit<
  */
 export type FetchLike = (request: Request) => Promise<Response>;
 
-/** A static client header or a provider evaluated for each request. */
-export type ClientHeaderValue =
-	| RequestScalar
-	| undefined
-	| (() => RequestScalar | undefined | Promise<RequestScalar | undefined>);
-
-/** Transport headers added by the client outside the defined route input. */
-export type ClientHeaders = Record<string, ClientHeaderValue>;
+/**
+ * Transport headers added by the client outside the defined route input. A
+ * function is a provider called for each request, whose awaited result is the
+ * value.
+ */
+export type ClientHeaders = Record<string, unknown>;
 
 type LiteralKeys<T> = {
 	[K in keyof T]: string extends K

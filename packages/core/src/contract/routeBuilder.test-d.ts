@@ -143,6 +143,22 @@ describe("routeBuilder types", () => {
 		route.get("/").response(sse(post)).response(post);
 	});
 
+	it("accepts params, query and headers schemas with any object input", () => {
+		const coerced = {} as StandardSchemaV1<{ id: unknown }, { id: number }>;
+		const value = route
+			.get("/users/:id")
+			.params(coerced)
+			.query(type<{ since: Date }>())
+			.headers(type<{ "x-count": unknown }>());
+		expectTypeOf<
+			NonNullable<(typeof value)["~restrpc"]["request"]>["params"]
+		>().toEqualTypeOf<readonly [typeof coerced]>();
+		// @ts-expect-error A query is an object of named values.
+		route.get("/").query(type<string>());
+		// @ts-expect-error Headers are an object of named values.
+		route.get("/").headers(type<string[]>());
+	});
+
 	it("rejects optional params schema keys", () => {
 		route.get("/users/:id").params(type<{ id: string }>());
 		// @ts-expect-error Path params are always present.
