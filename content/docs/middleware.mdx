@@ -121,7 +121,9 @@ When [integrating with a framework](/docs/server/framework-integration), pass th
 catch-all handler or a route handler:
 
 ```ts
-await handler(request, { context: { db, headers: request.headers } });
+const response = await handler(request, {
+	context: { db, headers: request.headers },
+});
 ```
 
 The option is required, and type checked, when routes declare initial context.
