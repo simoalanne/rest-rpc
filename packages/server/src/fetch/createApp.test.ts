@@ -32,9 +32,9 @@ describe("createApp", () => {
 	it("lists routes in Bun's routes format with colon params", async () => {
 		const app = createApp(routes, { mountPath: "/api" });
 		const listed = {
-			"/api": ["GET"],
-			"/api/posts/:id": ["GET", "PATCH"],
-			"/api/fail": ["GET"],
+			"/api": ["OPTIONS", "GET"],
+			"/api/posts/:id": ["OPTIONS", "GET", "PATCH"],
+			"/api/fail": ["OPTIONS", "GET"],
 		};
 		for (const mountPath of ["/api", "/api/"] as const) {
 			const { routes: entries } = createApp(routes, { mountPath });
@@ -171,5 +171,25 @@ describe("createApp", () => {
 		expect(await response.json()).toBe("1");
 		expect(response.headers.get("x-route")).toBe("/posts/:id");
 		expect(app.routes["/about"]!.GET).toBeInstanceOf(Response);
+	});
+
+	it("runs interceptors for OPTIONS requests to Bun's routes", async () => {
+		const preflight = interceptor(({ request, next }) =>
+			request.method === "OPTIONS"
+				? new Response(null, { status: 204 })
+				: next(),
+		);
+		const options = new Request("http://localhost/posts/1", {
+			method: "OPTIONS",
+		});
+		const answered = await handlerOf(
+			createApp(routes, { interceptors: [preflight] }).routes["/posts/:id"]!
+				.OPTIONS,
+		)(options);
+		expect(answered.status).toBe(204);
+		const unanswered = await handlerOf(
+			createApp(routes).routes["/posts/:id"]!.OPTIONS,
+		)(options);
+		expect(unanswered.status).toBe(404);
 	});
 });

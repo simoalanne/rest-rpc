@@ -75,13 +75,15 @@ export type App<TArgs extends unknown[] = []> = {
 	 * serves every request on its own.
 	 *
 	 * @remarks Routes completed with `.static()` are `Response` values, which
-	 * interceptors do not run for.
+	 * interceptors do not run for. Every path also has an `OPTIONS` entry that
+	 * runs the interceptors without a route, as `fetch` does, so they can
+	 * answer CORS preflights.
 	 */
 	routes: Record<
 		string,
 		Partial<
 			Record<
-				HttpMethod,
+				HttpMethod | "OPTIONS",
 				((request: Request, ...args: TArgs) => Promise<Response>) | Response
 			>
 		>
@@ -183,7 +185,12 @@ export function createApp(
 		// The mount path alone serves the `/` route, as in the catch-all handler.
 		const path = joinPrefix(mountPrefix, route.path as AbsolutePath);
 		// Bun attaches the params to the request, so they are read from there.
-		(routes[path] ??= {})[route.method] =
+		// Bun answers a method a path lacks itself, so `OPTIONS` reaches the
+		// interceptors only through an entry. No route matches it, as in `fetch`.
+		const methods = (routes[path] ??= {
+			OPTIONS: (request, ...args) => run(request, args, undefined),
+		});
+		methods[route.method] =
 			route.staticResponse ??
 			((request, ...args) => run(request, args, { route }));
 	}
