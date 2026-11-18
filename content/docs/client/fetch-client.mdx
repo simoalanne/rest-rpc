@@ -302,7 +302,8 @@ const client = createClient(api, {
 type ApiClientOptions = {
 	/**
 	 * The server's origin, such as `https://api.example.com`, without a path.
-	 * Browsers default to the page's origin. Required outside browsers.
+	 * A trailing slash is ignored, and a path throws when the client is
+	 * created. Browsers default to the page's origin. Required outside browsers.
 	 */
 	origin?: string;
 	/**
@@ -328,8 +329,9 @@ type ApiClientOptions = {
 	/** Codecs for other body formats, the same as the server's. */
 	bodyCodecs?: readonly BodyCodec[];
 	/**
-	 * Headers added to every request, each a value or a function called for
-	 * each request. Defined headers they set are optional at call sites.
+	 * Headers added to every request, each a value, a promise of one, or a
+	 * function called for each request. Defined headers they set are optional
+	 * at call sites.
 	 */
 	globalHeaders?: ClientHeaders;
 	sse?: {
@@ -353,9 +355,10 @@ See [Custom Fetch](#custom-fetch), [Interceptors](#interceptors),
 
 ## Global Headers
 
-`globalHeaders` adds headers to every request. Values can be static or provided
-by synchronous or asynchronous functions. A provider is useful for values that
-can change during the lifetime of the client, such as an access token.
+`globalHeaders` adds headers to every request. Values can be static, promises,
+or provided by synchronous or asynchronous functions, which are called for every
+request. A provider is useful for values that can change during the lifetime of
+the client, such as an access token.
 
 ```ts
 const client = createClient(api, {

@@ -28,6 +28,12 @@ describe("createClient types", () => {
 		const optionalProvider = createClient(contract, {
 			globalHeaders: { token: (): string | undefined => undefined },
 		});
+		const promised = createClient(contract, {
+			globalHeaders: { token: Promise.resolve("value") },
+		});
+		const optionalPromise = createClient(contract, {
+			globalHeaders: { token: Promise.resolve<string | undefined>(undefined) },
+		});
 		expectTypeOf(literal)
 			.parameter(0)
 			.toEqualTypeOf<
@@ -39,6 +45,9 @@ describe("createClient types", () => {
 			.toEqualTypeOf<Parameters<typeof literal>[0]>();
 		literal({});
 		asyncProvider({ headers: { optional: "value" } });
+		promised();
+		// @ts-expect-error A promise of undefined cannot guarantee the required token.
+		optionalPromise({});
 		optionalProvider({ headers: { token: "value" } });
 		// @ts-expect-error An optional provider cannot guarantee the required token.
 		optionalProvider({});

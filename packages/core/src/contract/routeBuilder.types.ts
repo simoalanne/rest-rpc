@@ -240,7 +240,25 @@ export type AfterRawResponseCheck<TState extends BuilderState> =
 export type NewStatusCheck<TState extends BuilderState, TOptions> =
 	StatusFor<TOptions> extends keyof TState["responses"]
 		? { "~error": "The route already defines a response for this status." }
-		: unknown;
+		: true extends IsNonSuccessStatus<StatusFor<TOptions>>
+			? {
+					"~error": "Response statuses are from 200 to 299. Define errors with .error(), and redirects and other statuses with .response(raw()).";
+				}
+			: unknown;
+
+type Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
+
+/**
+ * Whether a status literal is outside 200 to 299, for each member of a union.
+ * A widened `number` is checked at runtime instead.
+ */
+export type IsNonSuccessStatus<TStatus extends number> = number extends TStatus
+	? false
+	: TStatus extends unknown
+		? `${TStatus}` extends `2${Digit}${Digit}`
+			? false
+			: true
+		: never;
 
 export type WithError<
 	TState extends BuilderState,

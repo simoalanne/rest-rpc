@@ -1,5 +1,6 @@
 import type {
 	DefaultMeta,
+	IsNonSuccessStatus,
 	LowercaseHeadersOptionCheck,
 	PathParamNames,
 	RawResponses,
@@ -142,11 +143,9 @@ type ValidStreamEnvelopes<TEnvelope> = [
 type NonSuccessStatus<TEnvelope> = TEnvelope extends {
 	status: infer TStatus extends number;
 }
-	? number extends TStatus
-		? never
-		: `${TStatus}` extends `2${string}`
-			? never
-			: TStatus
+	? true extends IsNonSuccessStatus<TStatus>
+		? TStatus
+		: never
 	: never;
 
 // Errors are thrown, so inferred statuses are successful.
