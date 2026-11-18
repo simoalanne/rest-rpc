@@ -160,7 +160,7 @@ describe("request inference", () => {
 	it("infers params from prefixes", () => {
 		const tenant = route.prefix("/tenants/:tenant");
 		expectTypeOf<
-			InferClientRequest<ReturnType<typeof tenant.get<"/todos/:id">>>
+			InferClientRequest<ReturnType<typeof tenant.get<"/posts/:id">>>
 		>().toEqualTypeOf<{ params: { tenant: string; id: string } }>();
 		// A path derived from tree keys keeps the prefix params.
 		expectTypeOf<

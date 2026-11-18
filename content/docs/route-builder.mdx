@@ -15,10 +15,14 @@ import { route } from "@rest-rpc/server";
 import { z } from "zod";
 
 const create = route
-	.body(z.object({ title: z.string() }))
-	.handler(({ body: { title } }) => ({ id: crypto.randomUUID(), title }));
+	.body(z.object({ title: z.string(), body: z.string() }))
+	.handler(({ body: { title, body } }) => ({
+		id: crypto.randomUUID(),
+		title,
+		body,
+	}));
 
-export const routes = { todos: { create } }; // POST /todos/create
+export const routes = { posts: { create } }; // POST /posts/create
 ```
 
 Without a method, a route is `POST`, and without a path, its path is its keys
@@ -28,17 +32,24 @@ they're served or given to a client.
 
 ## Choose a Method and Path
 
-```ts
+```ts twoslash
+import { route } from "@rest-rpc/server";
+import { z } from "zod";
+declare function searchPosts(term: string): string[];
+declare function findPost(id: string): { id: string };
+declare function listPosts(): { id: string }[];
+// ---cut---
 const search = route
-	.get("/todos/search")
+	.get("/posts/search")
 	.query(z.object({ term: z.string() }))
-	.handler(({ query }) => searchTodos(query.term));
+	.handler(({ query }) => searchPosts(query.term));
 
-const getTodo = route
-	.get("/todos/:id")
-	.handler(({ params }) => findTodo(params.id)); // params: { id: string }
+const getPost = route
+	.get("/posts/:id")
+	.handler(({ params }) => findPost(params.id));
+//           ^?
 
-const listTodos = route.get().handler(() => listTodos()); // GET, path from its tree keys
+const list = route.get().handler(() => listPosts()); // GET, path from its tree keys
 ```
 
 The methods are `.get()`, `.post()`, `.put()`, `.patch()` and `.delete()`,
@@ -56,10 +67,10 @@ const tenant = route
 	.prefix("/tenants/:tenant")
 	.params(z.object({ tenant: z.string() }));
 
-const getTodo = tenant
-	.get("/todos/:id") // GET /tenants/:tenant/todos/:id
+const getPost = tenant
+	.get("/posts/:id") // GET /tenants/:tenant/posts/:id
 	.params(z.object({ id: z.coerce.number<number>() }))
-	.handler(({ params }) => findTodo(params.tenant, params.id));
+	.handler(({ params }) => findPost(params.tenant, params.id));
 ```
 
 Params are all inferred or all defined: once a route has a `.params()`
@@ -69,13 +80,13 @@ schema, its schemas have to cover every segment, the prefix's included.
 
 ```ts
 const update = route
-	.patch("/todos/:id")
+	.patch("/posts/:id")
 	.params(z.object({ id: z.string() }))
 	.query(z.object({ notify: z.stringbool().optional() }))
 	.headers(z.object({ "x-request-id": z.string().optional() }))
 	.body(z.object({ title: z.string() }))
 	.handler(({ params, query, headers, body }) =>
-		updateTodo(params.id, body.title, {
+		updatePost(params.id, body.title, {
 			notify: query.notify,
 			requestId: headers["x-request-id"],
 		}),
@@ -95,7 +106,7 @@ const update = route
 const base = route.body(z.object({ title: z.string() }));
 const create = base
 	.body(z.object({ description: z.string().optional() }))
-	.handler(({ body }) => createTodo(body.title, body.description));
+	.handler(({ body }) => createPost(body.title, body.description));
 ```
 
 See [Encoding and Content Types](/docs/http-behavior/encoding) for what each
@@ -108,20 +119,20 @@ response:
 
 ```ts
 const create = route
-	.post("/todos")
-	.body(z.object({ title: z.string() }))
+	.post("/posts")
+	.body(z.object({ title: z.string(), body: z.string() }))
 	.handler(({ body, respond }) => {
-		const todo = createTodo(body.title);
-		return respond(todo, {
+		const post = createPost(body);
+		return respond(post, {
 			status: 201, // 200 to 299
-			headers: { location: `/todos/${todo.id}` },
+			headers: { location: `/posts/${post.id}` },
 			cookies: ["seen=1; HttpOnly"], // each its own Set-Cookie header
 		});
 	});
 ```
 
 - `undefined` is a response without a body.
-- An async iterable is a [stream](/docs/streaming).
+- An async iterable is a [stream](/docs/server-sent-events).
 - A Fetch `Response` is sent as it is: see [Raw Responses](#raw-responses).
 - Anything else is a JSON body, a `status` field included, since only
   `respond()` results are read as responses.
@@ -135,19 +146,19 @@ client's result type. Errors are [thrown](#define-errors), not returned.
 
 ```ts
 route
-	.post("/todos")
-	.body(z.object({ title: z.string() }))
-	.response(todoSchema, {
+	.post("/posts")
+	.body(z.object({ title: z.string(), body: z.string() }))
+	.response(postSchema, {
 		status: 201,
 		headers: z.object({ location: z.string() }),
 	})
 	.response({ status: 202 }) // no body
 	.handler(({ body, respond }) => {
-		if (isQueued(body)) return respond(undefined, { status: 202 });
-		const todo = createTodo(body.title);
-		return respond(todo, {
+		if (needsReview(body)) return respond(undefined, { status: 202 });
+		const post = createPost(body);
+		return respond(post, {
 			status: 201,
-			headers: { location: `/todos/${todo.id}` },
+			headers: { location: `/posts/${post.id}` },
 		});
 	});
 ```
@@ -165,7 +176,7 @@ still runs, but the response is sent as it is, without validation or codecs:
 
 ```ts
 route
-	.get("/files/:id/download")
+	.get("/images/:id")
 	.handler(async ({ params }) =>
 		Response.redirect(await signedUrl(params.id), 302),
 	);
@@ -209,14 +220,14 @@ middleware receive it in `errors`:
 
 ```ts
 const get = route
-	.get("/todos/:id")
+	.get("/posts/:id")
 	.params(z.object({ id: z.string() }))
-	.response(todoSchema)
-	.error("TODO_NOT_FOUND", { status: 404, data: z.object({ id: z.string() }) })
+	.response(postSchema)
+	.error("POST_NOT_FOUND", { status: 404, data: z.object({ id: z.string() }) })
 	.handler(({ params, errors }) => {
-		const todo = findTodo(params.id);
-		if (!todo) throw errors.TODO_NOT_FOUND({ data: { id: params.id } });
-		return todo;
+		const post = findPost(params.id);
+		if (!post) throw errors.POST_NOT_FOUND({ data: { id: params.id } });
+		return post;
 	});
 ```
 
@@ -234,41 +245,27 @@ to routes, and throw it with `new` anywhere:
 ```ts
 import { route, routeError } from "@rest-rpc/server";
 
-export const TodoNotFound = routeError("TODO_NOT_FOUND", {
+export const PostNotFound = routeError("POST_NOT_FOUND", {
 	status: 404,
 	data: z.object({ id: z.string() }),
 });
 
-export const findTodo = (id: string) => {
-	const todo = todos.get(id);
-	if (!todo) throw new TodoNotFound({ data: { id } });
-	return todo;
+export const findPost = (id: string) => {
+	const post = posts.get(id);
+	if (!post) throw new PostNotFound({ data: { id } });
+	return post;
 };
 
 const get = route
-	.get("/todos/:id")
-	.error(TodoNotFound)
-	.handler(({ params }) => findTodo(params.id));
+	.get("/posts/:id")
+	.error(PostNotFound)
+	.handler(({ params }) => findPost(params.id));
 ```
 
 Adding the same definition twice, such as on a base and a route, is fine, and
 a different error with the same code throws. Defining errors doesn't define
 responses. See [Errors](/docs/http-behavior/errors) for what's sent, and for
 errors a route doesn't define.
-
-## Return Streams
-
-Returning an async iterable sends Server-Sent Events. `sse(schema)` defines
-and validates the data of each event:
-
-```ts
-const events = route
-	.get("/todos/events")
-	.response(sse(z.object({ id: z.string(), message: z.string() })))
-	.handler(() => streamTodoEvents());
-```
-
-See [Server-Sent Events](/docs/streaming).
 
 ## Metadata and OpenAPI
 
@@ -278,14 +275,11 @@ See [Server-Sent Events](/docs/streaming).
 ```ts
 const list = route
 	.$meta<{ access: "public" | "signed-in" }>()
-	.get("/todos")
+	.get("/posts")
 	.meta({ access: "signed-in" })
-	.openAPI({ summary: "List todos", tags: ["Todos"] })
-	.handler(() => listTodos());
+	.openAPI({ summary: "List posts", tags: ["Posts"] })
+	.handler(() => listPosts());
 ```
-
-Both can be called more than once: metadata is shallow-merged, and OpenAPI
-details are merged with tags combined.
 
 ## Reuse Builders
 
@@ -297,13 +291,10 @@ const authenticated = route
 	.headers(z.object({ authorization: z.string() }))
 	.error("UNAUTHORIZED", { status: 401 });
 
-const list = authenticated.get("/todos").handler(() => listTodos());
+const list = authenticated.get("/posts").handler(() => listPosts());
 const remove = authenticated
-	.delete("/todos/:id")
-	.response({ status: 204 })
-	.handler(({ params }) => {
-		deleteTodo(params.id);
-	});
+	.delete("/posts/:id")
+	.handler(({ params }) => deletePost(params.id));
 ```
 
 ## Handler Arguments
@@ -330,7 +321,7 @@ also takes a route tree:
 import type { InferServerRequest } from "@rest-rpc/server";
 import type { routes } from "./routes";
 
-type CreateTodoRequest = InferServerRequest<typeof routes>["todos"]["create"];
+type CreatePostRequest = InferServerRequest<typeof routes>["posts"]["create"];
 ```
 
 ### Infer Server Request
@@ -343,18 +334,18 @@ import { route } from "@rest-rpc/server";
 import z from "zod";
 
 const updateDefinition = route
-	.patch("/todos/:id")
+	.patch("/posts/:id")
 	.params(z.object({ id: z.string() }))
 	.body(z.object({ title: z.string() }));
 
-type UpdateTodoRequest = InferServerRequest<typeof updateDefinition>;
+type UpdatePostRequest = InferServerRequest<typeof updateDefinition>;
 
-const updateTodo = ({ params, body }: UpdateTodoRequest) => ({
+const updatePost = ({ params, body }: UpdatePostRequest) => ({
 	id: params.id,
 	title: body.title,
 });
 
-const update = updateDefinition.handler(updateTodo);
+const update = updateDefinition.handler(updatePost);
 ```
 
 ### Infer Server Response
@@ -367,22 +358,28 @@ import type { InferServerResponse } from "@rest-rpc/server";
 import { respond, route } from "@rest-rpc/server";
 import z from "zod";
 
-const todoSchema = z.object({ id: z.string(), title: z.string() });
+const postSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+	body: z.string(),
+});
 
 const createDefinition = route
-	.post("/todos")
-	.body(z.object({ title: z.string() }))
-	.response(todoSchema, { status: 201 })
+	.post("/posts")
+	.body(z.object({ title: z.string(), body: z.string() }))
+	.response(postSchema, { status: 201 })
 	.response({ status: 202 });
 
-type CreateTodoResponse = InferServerResponse<typeof createDefinition>;
+type CreatePostResponse = InferServerResponse<typeof createDefinition>;
 
-const createTodo = (title: string): CreateTodoResponse =>
-	title.length > 100
+const createPost = (title: string, body: string): CreatePostResponse =>
+	body.includes("http")
 		? respond(undefined, { status: 202 })
-		: respond({ id: "todo_1", title }, { status: 201 });
+		: respond({ id: "post_1", title, body }, { status: 201 });
 
-const create = createDefinition.handler(({ body }) => createTodo(body.title));
+const create = createDefinition.handler(({ body }) =>
+	createPost(body.title, body.body),
+);
 ```
 
 ### Infer Server Handler
@@ -393,21 +390,25 @@ The full handler signature, to write a handler apart from its definition:
 import { route, type InferServerHandler } from "@rest-rpc/server";
 import z from "zod";
 
-const todoSchema = z.object({ id: z.string(), title: z.string() });
+const postSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+	body: z.string(),
+});
 
 const getDefinition = route
-	.get("/todos/:id")
+	.get("/posts/:id")
 	.params(z.object({ id: z.string() }))
-	.response(todoSchema)
-	.error("TODO_NOT_FOUND", { status: 404 });
+	.response(postSchema)
+	.error("POST_NOT_FOUND", { status: 404 });
 
-const getTodo: InferServerHandler<typeof getDefinition> = ({
+const getPost: InferServerHandler<typeof getDefinition> = ({
 	params,
 	errors,
 }) => {
-	if (params.id !== "todo_1") throw errors.TODO_NOT_FOUND();
-	return { id: params.id, title: "Write docs" };
+	if (params.id !== "post_1") throw errors.POST_NOT_FOUND();
+	return { id: params.id, title: "Hello", body: "First post" };
 };
 
-const get = getDefinition.handler(getTodo);
+const get = getDefinition.handler(getPost);
 ```

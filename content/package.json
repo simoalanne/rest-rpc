@@ -6,7 +6,8 @@
 		"dev": "blume dev",
 		"build": "blume build",
 		"preview": "blume preview",
-		"doctor": "blume doctor"
+		"doctor": "blume doctor",
+		"validate": "blume validate --strict"
 	},
 	"dependencies": {
 		"@modelcontextprotocol/sdk": "^1.32.1",

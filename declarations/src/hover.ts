@@ -19,37 +19,44 @@ import {
 } from "@rest-rpc/server";
 import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
 
-const TodoNotFound = routeError("TODO_NOT_FOUND", {
+const PostNotFound = routeError("POST_NOT_FOUND", {
 	status: 404,
 	data: type<{ id: string }>(),
 });
 
-type Todo = { id: string; title: string; done: boolean };
+type Post = { id: string; title: string; published: boolean };
 
 const routes = {
-	todos: {
+	posts: {
 		get: route
-			.get("/todos/:id")
+			.get("/posts/:id")
 			.$context<{ user: string }>()
 			.query(type<{ expand: boolean }>())
 			.headers(type<{ "x-tenant": string }>())
-			.response(type<Todo>())
-			.error(TodoNotFound)
+			.response(type<Post>())
+			.error(PostNotFound)
 			.handler((request) => {
 				const { params, query, headers, context, errors, respond } = request;
-				if (context.user === "") throw errors.TODO_NOT_FOUND({ data: params });
+				if (context.user === "") throw errors.POST_NOT_FOUND({ data: params });
 				return respond(
-					{ id: params.id, title: headers["x-tenant"], done: query.expand },
+					{
+						id: params.id,
+						title: headers["x-tenant"],
+						published: query.expand,
+					},
 					{ status: 200 },
 				);
 			}),
 		create: route
-			.post("/todos")
+			.post("/posts")
 			.body(type<{ title: string }>())
-			.response(type<Todo>(), { status: 201 })
+			.response(type<Post>(), { status: 201 })
 			.response({ status: 204 })
 			.handler(({ body, respond }) =>
-				respond({ id: "1", title: body.title, done: false }, { status: 201 }),
+				respond(
+					{ id: "1", title: body.title, published: false },
+					{ status: 201 },
+				),
 			),
 		inferred: route.get("/inferred").handler(() => ({ ok: true })),
 		events: route
@@ -65,33 +72,33 @@ const contract = extractContract(routes);
 const client = createClient(contract, {
 	globalHeaders: { "x-tenant": "a" },
 });
-export const getTodo = client.todos.get;
-export const createTodo = client.todos.create;
+export const getPost = client.posts.get;
+export const createPost = client.posts.create;
 
 export const useClient = async () => {
-	const todo = await client.todos.get({
+	const post = await client.posts.get({
 		params: { id: "1" },
 		query: { expand: true },
 	});
-	const inferred = await client.todos.inferred();
-	const events = await client.todos.events();
+	const inferred = await client.posts.inferred();
+	const events = await client.posts.events();
 	const { error, data } = await safe(
-		client.todos.get({ params: { id: "1" }, query: { expand: true } }),
+		client.posts.get({ params: { id: "1" }, query: { expand: true } }),
 	);
-	return { todo, inferred, events, error, data };
+	return { post, inferred, events, error, data };
 };
 
-export type ClientRequest = InferClientRequest<typeof client.todos.get>;
-export type ClientResponse = InferClientResponse<typeof client.todos.get>;
-export type ClientError = InferClientError<typeof client.todos.get>;
-export type ServerRequest = InferServerRequest<typeof routes.todos.get>;
+export type ClientRequest = InferClientRequest<typeof client.posts.get>;
+export type ClientResponse = InferClientResponse<typeof client.posts.get>;
+export type ClientError = InferClientError<typeof client.posts.get>;
+export type ServerRequest = InferServerRequest<typeof routes.posts.get>;
 
 const local = createLocalClient(routes);
-export const localGet = local.todos.get;
+export const localGet = local.posts.get;
 
 const utils = createTanstackQueryUtils(client);
-export const queryOptions = utils.todos.get.queryOptions({
+export const queryOptions = utils.posts.get.queryOptions({
 	request: { params: { id: "1" }, query: { expand: true } },
 });
-export const mutationOptions = utils.todos.create.mutationOptions();
-export const queryKey = utils.todos.get.queryKey();
+export const mutationOptions = utils.posts.create.mutationOptions();
+export const queryKey = utils.posts.get.queryKey();

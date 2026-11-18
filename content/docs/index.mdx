@@ -1,11 +1,9 @@
 ---
 title: REST APIs with RPC-like ergonomics.
-slug: index
-seo:
-  description: Define REST APIs with RPC-like ergonomics.
+description: Define REST APIs with RPC-like ergonomics.
+sidebar:
+  label: Introduction
 ---
-
-<span data-home-page />
 
 Define REST APIs with an expressive HTTP route builder and sensible defaults.
 Call them through a typed client that feels like ordinary function calls.
@@ -25,35 +23,36 @@ middleware, and deployment model.
 import { respond, route } from "@rest-rpc/server";
 import { z } from "zod";
 
-declare function createTodo(title: string): { id: string; title: string };
-declare function findTodo(
+declare function createPost(
+	title: string,
+	body: string,
+): { id: string; title: string; body: string };
+declare function findPost(
 	id: string,
-): { id: string; title: string } | undefined;
+): { id: string; title: string; body: string } | undefined;
 // ---cut-end---
-// POST /todos/create, JSON body, 200 result.
+// POST /posts/create, JSON body, 200 result.
 const create = route
-	.body(z.object({ title: z.string() }))
-	.handler(({ body: { title } }) => createTodo(title));
+	.body(z.object({ title: z.string(), body: z.string() }))
+	.handler(({ body: { title, body } }) => createPost(title, body));
 
-// GET /todos/:id with params, query, headers, an error, and response headers.
+// GET /posts/:id with params, query, headers, an error, and response headers.
 const get = route
-	.get("/todos/:id")
+	.get("/posts/:id")
 	.params(z.object({ id: z.string() }))
-	.query(z.object({ uppercase: z.enum(["yes", "no"]).optional() }))
+	.query(z.object({ preview: z.stringbool().optional() }))
 	.headers(z.object({ "x-request-id": z.string().optional() }))
-	.error("TODO_NOT_FOUND", { status: 404 })
+	.error("POST_NOT_FOUND", { status: 404 })
 	.handler(({ params, query, errors }) => {
-		const todo = findTodo(params.id);
-		if (!todo) throw errors.TODO_NOT_FOUND();
-		const title =
-			query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title;
+		const post = findPost(params.id);
+		if (!post) throw errors.POST_NOT_FOUND();
 		return respond(
-			{ ...todo, title },
+			{ ...post, body: query.preview ? post.body.slice(0, 40) : post.body },
 			{ headers: { "x-powered-by": "rest-rpc" } },
 		);
 	});
 
-export const routes = { todos: { create, get } };
+export const routes = { posts: { create, get } };
 ```
 
 </Tab>
@@ -65,35 +64,36 @@ export const routes = { todos: { create, get } };
 import { respond, route } from "@rest-rpc/server";
 import { z } from "zod";
 
-declare function createTodo(title: string): { id: string; title: string };
-declare function findTodo(
+declare function createPost(
+	title: string,
+	body: string,
+): { id: string; title: string; body: string };
+declare function findPost(
 	id: string,
-): { id: string; title: string } | undefined;
+): { id: string; title: string; body: string } | undefined;
 
-// POST /todos/create, JSON body, 200 result.
+// POST /posts/create, JSON body, 200 result.
 const create = route
-	.body(z.object({ title: z.string() }))
-	.handler(({ body: { title } }) => createTodo(title));
+	.body(z.object({ title: z.string(), body: z.string() }))
+	.handler(({ body: { title, body } }) => createPost(title, body));
 
-// GET /todos/:id with params, query, headers, an error, and response headers.
+// GET /posts/:id with params, query, headers, an error, and response headers.
 const get = route
-	.get("/todos/:id")
+	.get("/posts/:id")
 	.params(z.object({ id: z.string() }))
-	.query(z.object({ uppercase: z.enum(["yes", "no"]).optional() }))
+	.query(z.object({ preview: z.stringbool().optional() }))
 	.headers(z.object({ "x-request-id": z.string().optional() }))
-	.error("TODO_NOT_FOUND", { status: 404 })
+	.error("POST_NOT_FOUND", { status: 404 })
 	.handler(({ params, query, errors }) => {
-		const todo = findTodo(params.id);
-		if (!todo) throw errors.TODO_NOT_FOUND();
-		const title =
-			query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title;
+		const post = findPost(params.id);
+		if (!post) throw errors.POST_NOT_FOUND();
 		return respond(
-			{ ...todo, title },
+			{ ...post, body: query.preview ? post.body.slice(0, 40) : post.body },
 			{ headers: { "x-powered-by": "rest-rpc" } },
 		);
 	});
 
-export const routes = { todos: { create, get } };
+export const routes = { posts: { create, get } };
 
 // @filename: client-contract.ts
 import type { routes } from "./server";
@@ -107,10 +107,12 @@ import { api } from "./client-contract";
 
 const client = createClient(api, { origin: "http://localhost:3000" });
 
-const created = await client.todos.create({ body: { title: "Write docs" } });
-const response = await client.todos.get({
+const created = await client.posts.create({
+	body: { title: "Hello", body: "First post" },
+});
+const response = await client.posts.get({
 	params: { id: created.body.id },
-	query: { uppercase: "yes" },
+	query: { preview: "true" },
 	headers: { "x-request-id": "req_1" },
 });
 
@@ -128,35 +130,36 @@ if (response.status === 200) {
 import { respond, route } from "@rest-rpc/server";
 import { z } from "zod";
 
-declare function createTodo(title: string): { id: string; title: string };
-declare function findTodo(
+declare function createPost(
+	title: string,
+	body: string,
+): { id: string; title: string; body: string };
+declare function findPost(
 	id: string,
-): { id: string; title: string } | undefined;
+): { id: string; title: string; body: string } | undefined;
 
-// POST /todos/create, JSON body, 200 result.
+// POST /posts/create, JSON body, 200 result.
 const create = route
-	.body(z.object({ title: z.string() }))
-	.handler(({ body: { title } }) => createTodo(title));
+	.body(z.object({ title: z.string(), body: z.string() }))
+	.handler(({ body: { title, body } }) => createPost(title, body));
 
-// GET /todos/:id with params, query, headers, an error, and response headers.
+// GET /posts/:id with params, query, headers, an error, and response headers.
 const get = route
-	.get("/todos/:id")
+	.get("/posts/:id")
 	.params(z.object({ id: z.string() }))
-	.query(z.object({ uppercase: z.enum(["yes", "no"]).optional() }))
+	.query(z.object({ preview: z.stringbool().optional() }))
 	.headers(z.object({ "x-request-id": z.string().optional() }))
-	.error("TODO_NOT_FOUND", { status: 404 })
+	.error("POST_NOT_FOUND", { status: 404 })
 	.handler(({ params, query, errors }) => {
-		const todo = findTodo(params.id);
-		if (!todo) throw errors.TODO_NOT_FOUND();
-		const title =
-			query.uppercase === "yes" ? todo.title.toUpperCase() : todo.title;
+		const post = findPost(params.id);
+		if (!post) throw errors.POST_NOT_FOUND();
 		return respond(
-			{ ...todo, title },
+			{ ...post, body: query.preview ? post.body.slice(0, 40) : post.body },
 			{ headers: { "x-powered-by": "rest-rpc" } },
 		);
 	});
 
-export const routes = { todos: { create, get } };
+export const routes = { posts: { create, get } };
 
 // @filename: client-contract.ts
 import type { routes } from "./server";
@@ -173,17 +176,17 @@ const restrpc = createTanstackQueryUtils(
 	createClient(api, { origin: "http://localhost:3000" }),
 );
 
-const todo = useQuery(
-	restrpc.todos.get.queryOptions({
+const post = useQuery(
+	restrpc.posts.get.queryOptions({
 		request: {
-			params: { id: "todo_1" },
-			query: { uppercase: "yes" },
+			params: { id: "post_1" },
+			query: { preview: "true" },
 		},
 	}),
 );
-const create = useMutation(restrpc.todos.create.mutationOptions());
+const create = useMutation(restrpc.posts.create.mutationOptions());
 
-create.mutate({ body: { title: "Write docs" } });
+create.mutate({ body: { title: "Hello", body: "First post" } });
 ```
 
 </Tab>
@@ -192,21 +195,21 @@ create.mutate({ body: { title: "Write docs" } });
 
 ```http
 # No method or path defined: POST, at the path of the route's keys.
-POST /todos/create HTTP/1.1
+POST /posts/create HTTP/1.1
 Content-Type: application/json
 
-{ "title": "Write docs" }
+{ "title": "Hello", "body": "Routes return data and clients call them like functions." }
 ```
 
 ```http
 HTTP/1.1 200 OK
 Content-Type: application/json
 
-{ "id": "todo_1", "title": "Write docs" }
+{ "id": "post_1", "title": "Hello", "body": "Routes return data and clients call them like functions." }
 ```
 
 ```http
-GET /todos/todo_1?uppercase=yes HTTP/1.1
+GET /posts/post_1?preview=true HTTP/1.1
 X-Request-Id: req_1
 ```
 
@@ -215,19 +218,19 @@ HTTP/1.1 200 OK
 Content-Type: application/json
 X-Powered-By: rest-rpc
 
-{ "id": "todo_1", "title": "WRITE DOCS" }
+{ "id": "post_1", "title": "Hello", "body": "Routes return data and clients call them" }
 ```
 
 ```http
 # A defined error is sent as JSON with its status.
-GET /todos/missing HTTP/1.1
+GET /posts/missing HTTP/1.1
 ```
 
 ```http
 HTTP/1.1 404 Not Found
 Content-Type: application/json
 
-{ "code": "TODO_NOT_FOUND", "message": "TODO_NOT_FOUND" }
+{ "code": "POST_NOT_FOUND", "message": "POST_NOT_FOUND" }
 ```
 
 </Tab>

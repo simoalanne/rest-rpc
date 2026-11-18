@@ -85,8 +85,8 @@ export class RouteError<
  *
  * @example
  * ```ts
- * const { error } = await safe(client.todos.get({ params: { id: "1" } }));
- * if (isDefinedError(error) && error.code === "TODO_NOT_FOUND") {
+ * const { error } = await safe(client.posts.get({ params: { id: "1" } }));
+ * if (isDefinedError(error) && error.code === "POST_NOT_FOUND") {
  * 	console.log(error.data.id);
  * }
  * ```

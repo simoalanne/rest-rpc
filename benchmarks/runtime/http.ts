@@ -1,14 +1,14 @@
 import { createApp, respond, route, type } from "@rest-rpc/server";
 import { z } from "zod";
 
-const todo = z.object({
+const post = z.object({
 	id: z.number(),
 	title: z.string(),
-	done: z.boolean(),
+	published: z.boolean(),
 	tags: z.array(z.string()),
 });
 
-const todos = new Map<string, z.infer<typeof todo>>();
+const posts = new Map<string, z.infer<typeof post>>();
 
 export const routes = {
 	text: route
@@ -38,25 +38,25 @@ export const routes = {
 		.handler(({ context }) => context.user),
 	// Validates every request segment and a defined response with headers.
 	validated: route
-		.put("/todos/:id")
+		.put("/posts/:id")
 		.params(z.object({ id: z.coerce.number<string>() }))
 		.query(z.object({ notify: z.enum(["yes", "no"]).optional() }))
 		.headers(z.object({ authorization: z.string() }))
-		.body(todo.omit({ id: true }))
-		.response(todo, { headers: z.object({ etag: z.string() }) })
+		.body(post.omit({ id: true }))
+		.response(post, { headers: z.object({ etag: z.string() }) })
 		.handler(async ({ params, body, respond }) =>
 			respond({ id: params.id, ...body }, { headers: { etag: '"1"' } }),
 		),
-	// A defined error with validated data, since no todo is stored.
+	// A defined error with validated data, since no post is stored.
 	error: route
-		.get("/todos/:id")
-		.error("TODO_NOT_FOUND", {
+		.get("/posts/:id")
+		.error("POST_NOT_FOUND", {
 			status: 404,
 			data: z.object({ id: z.string() }),
 		})
 		.handler(({ params, errors }) => {
-			const stored = todos.get(params.id);
-			if (!stored) throw errors.TODO_NOT_FOUND({ data: { id: params.id } });
+			const stored = posts.get(params.id);
+			if (!stored) throw errors.POST_NOT_FOUND({ data: { id: params.id } });
 			return stored;
 		}),
 };

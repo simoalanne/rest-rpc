@@ -23,16 +23,18 @@ import { createOpenApiDocument, route } from "@rest-rpc/server";
 import { z } from "zod";
 
 const list = route
-	.get("/todos")
-	.response(z.array(z.object({ id: z.string(), title: z.string() })))
-	.openAPI({ summary: "List todos" })
-	.handler(() => [{ id: "todo_1", title: "Write docs" }]);
+	.get("/posts")
+	.response(
+		z.array(z.object({ id: z.string(), title: z.string(), body: z.string() })),
+	)
+	.openAPI({ summary: "List posts" })
+	.handler(() => [{ id: "post_1", title: "Hello", body: "First post" }]);
 
-const routes = { todos: { list } };
+const routes = { posts: { list } };
 
 const document = createOpenApiDocument(routes, {
 	info: {
-		title: "Todo API",
+		title: "Blog API",
 		version: "1.0.0",
 	},
 	servers: [{ url: "https://api.example.com" }],
@@ -79,7 +81,7 @@ import { z } from "zod";
 
 const document = createOpenApiDocument(routes, {
 	info: {
-		title: "Todo API",
+		title: "Blog API",
 		version: "1.0.0",
 	},
 	schemaConverter: (schema, mode) => {
@@ -111,17 +113,17 @@ Use `.openAPI()` on a route builder for operation metadata. It accepts
 `externalDocs`, and `extensions`. `extensions` keys must start with `x-` and
 are added to the operation.
 
-calling `.openAPI()` more than once merges the details, so a shared base builder can set common `tags` or `security`.
+Calling `.openAPI()` more than once merges the details, so a shared base builder can set common `tags` or `security`.
 
 ```ts
 const create = route
-	.post("/todos")
-	.body(z.object({ title: z.string().min(1) }))
+	.post("/posts")
+	.body(z.object({ title: z.string().min(1), body: z.string() }))
 	.openAPI({
-		summary: "Create a todo",
-		operationId: "createTodo",
+		summary: "Create a post",
+		operationId: "createPost",
 	})
-	.response(todoSchema, { status: 201 });
+	.response(postSchema);
 ```
 
 ## Response Descriptions
@@ -132,12 +134,12 @@ only options to describe a bodyless response:
 
 ```ts
 const remove = route
-	.delete("/todos/:id")
+	.delete("/posts/:id")
 	.params(z.object({ id: z.string() }))
-	.response({ status: 204, description: "Todo deleted." })
-	.error("TODO_NOT_FOUND", {
+	.response({ status: 204, description: "Post deleted." })
+	.error("POST_NOT_FOUND", {
 		status: 404,
-		description: "No todo has this id.",
+		description: "No post has this id.",
 	});
 ```
 
@@ -159,7 +161,7 @@ contract tree.
 ```ts
 const document = createOpenApiDocument(routes, {
 	info: {
-		title: "Todo API",
+		title: "Blog API",
 		version: "1.0.0",
 	},
 	schemaConverter,

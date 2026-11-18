@@ -2,12 +2,13 @@ import { defineMeta } from "blume";
 
 export default defineMeta({
 	pages: [
+		"index",
 		"quickstart",
 		"contract-first-quickstart",
 		"cheatsheet",
 		"route-builder",
 		"middleware",
-		"streaming",
+		"server-sent-events",
 		"contract-first",
 		"http-behavior",
 		"server",

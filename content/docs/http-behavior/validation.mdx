@@ -7,12 +7,25 @@ Schemas are [Standard Schema](https://standardschema.dev) schemas, such as Zod,
 Valibot or ArkType, or `type<T>()` for types without validation. One schema
 gives two types, and each side of a route sees one of them:
 
-```ts
+```ts twoslash
+import { createClient } from "@rest-rpc/core";
+import { route } from "@rest-rpc/server";
+import { z } from "zod";
+const post = z.object({ id: z.string(), title: z.string(), body: z.string() });
+declare function listPosts(page: number): {
+	items: z.infer<typeof post>[];
+	total: number;
+};
+// ---cut---
 const list = route
-	.get("/todos")
+	.get("/posts")
 	.query(z.object({ page: z.coerce.number<number>().int().min(1).default(1) }))
-	.response(z.object({ items: z.array(todo), total: z.number() }))
-	.handler(({ query }) => listTodos(query.page)); // query.page: number, never undefined
+	.response(z.object({ items: z.array(post), total: z.number() }))
+	.handler(({ query }) => listPosts(query.page));
+//                                       ^?
+// ---cut-start---
+const client = createClient({ list }, { origin: "http://localhost" });
+// ---cut-end---
 
 await client.list({ query: {} }); // page is optional for the caller: the schema input
 ```
@@ -50,14 +63,22 @@ The client's result type is the response schema's output, but the body went
 through JSON on the way. A value JSON can't represent arrives as what JSON made
 of it:
 
-```ts
-const getTodo = route
-	.get("/todos/:id")
-	.response(z.object({ title: z.string(), dueAt: z.date() }))
-	.handler(() => ({ title: "Ship", dueAt: new Date() }));
+```ts twoslash
+import { createClient } from "@rest-rpc/core";
+import { route } from "@rest-rpc/server";
+import { z } from "zod";
+// ---cut---
+const getPost = route
+	.get("/posts/:id")
+	.response(z.object({ title: z.string(), publishedAt: z.date() }))
+	.handler(() => ({ title: "Hello", publishedAt: new Date() }));
+// ---cut-start---
+const client = createClient({ getPost }, { origin: "http://localhost" });
+// ---cut-end---
 
-const { body } = await client.getTodo({ params: { id: "1" } });
-body.dueAt; // typed Date, but the string "2026-11-17T12:00:00.000Z" at runtime
+const { body } = await client.getPost({ params: { id: "1" } });
+body.publishedAt; // the string "2026-11-17T12:00:00.000Z" at runtime
+//   ^?
 ```
 
 Use schemas whose output is what JSON sends, such as `z.iso.datetime()`, or
@@ -71,14 +92,14 @@ validation off. Everything else still runs, and the types stay as if the
 schemas ran:
 
 ```ts
-const getTodo = route
-	.get("/todos/:id")
+const getPost = route
+	.get("/posts/:id")
 	.params(z.object({ id: z.coerce.number<number>() }))
 	.response(z.object({ title: z.string().default("Untitled") }))
-	.handler(({ params }) => findTodo(params.id)); // params.id is the string "1"
+	.handler(({ params }) => findPost(params.id)); // params.id is the string "1"
 
 createApp(
-	{ getTodo },
+	{ getPost },
 	{ disableRequestValidation: true, disableResponseValidation: true },
 );
 ```
@@ -97,9 +118,9 @@ input to output, and may be async:
 import { type } from "@rest-rpc/server";
 
 const create = route
-	.post("/todos")
-	.body(type<{ title: string }>()) // accepted as is
-	.handler(({ body }) => createTodo(body.title));
+	.post("/posts")
+	.body(type<{ title: string; body: string }>()) // accepted as is
+	.handler(({ body }) => createPost(body));
 
 const idToString = type((id: number) => String(id)); // input number, output string
 ```

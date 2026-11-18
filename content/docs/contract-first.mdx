@@ -17,17 +17,23 @@ from handlers.
 import { route } from "@rest-rpc/core";
 import { z } from "zod";
 
-const todoSchema = z.object({ id: z.string(), title: z.string() });
+const postSchema = z.object({
+	id: z.string(),
+	title: z.string(),
+	body: z.string(),
+});
 
-const create = route.body(z.object({ title: z.string() })).response(todoSchema);
+const create = route
+	.body(z.object({ title: z.string(), body: z.string() }))
+	.response(postSchema);
 
 const get = route
-	.get("/todos/:id")
+	.get("/posts/:id")
 	.params(z.object({ id: z.string() }))
-	.response(todoSchema)
-	.error("TODO_NOT_FOUND", { status: 404 });
+	.response(postSchema)
+	.error("POST_NOT_FOUND", { status: 404 });
 
-export const api = { todos: { create, get } };
+export const api = { posts: { create, get } };
 ```
 
 Use `.response()` for each successful response, with `sse(schema)` for
@@ -35,7 +41,7 @@ streams or [`raw()`](/docs/route-builder#raw-responses) for a returned Fetch
 `Response`, and `.error()` for each [error](/docs/route-builder#define-errors).
 These schemas define handler and client types and provide
 [runtime validation](/docs/http-behavior/validation).
-See [Server-Sent Events](/docs/streaming) for stream handlers.
+See [Server-Sent Events](/docs/server-sent-events) for stream handlers.
 
 ## Implement Routes
 
@@ -45,19 +51,19 @@ then attach its handler:
 ```ts server.ts
 import { implement } from "@rest-rpc/server";
 import { api } from "./contract";
-import { createTodo, findTodo } from "./todos";
+import { createPost, findPost } from "./posts";
 
-const create = implement(api.todos.create).handler(({ body: { title } }) =>
-	createTodo(title),
+const create = implement(api.posts.create).handler(
+	({ body: { title, body } }) => createPost(title, body),
 );
 
-const get = implement(api.todos.get).handler(({ params, errors }) => {
-	const todo = findTodo(params.id);
-	if (!todo) throw errors.TODO_NOT_FOUND();
-	return todo;
+const get = implement(api.posts.get).handler(({ params, errors }) => {
+	const post = findPost(params.id);
+	if (!post) throw errors.POST_NOT_FOUND();
+	return post;
 });
 
-export const routes = { todos: { create, get } };
+export const routes = { posts: { create, get } };
 ```
 
 The implementation must match the contract's request segments and defined
@@ -73,19 +79,19 @@ routes, with two differences.
 route in the tree:
 
 ```ts
-const todos = implement(api.todos)
+const posts = implement(api.posts)
 	.$context<{ headers: Headers }>()
 	.use(authenticate); // injects user
 
 export const routes = {
-	todos: {
-		create: todos.create.handler(({ body, context }) =>
-			createTodo(body.title, context.user),
+	posts: {
+		create: posts.create.handler(({ body, context }) =>
+			createPost(body.title, body.body, context.user),
 		),
-		get: todos.get.handler(({ params, errors }) => {
-			const todo = findTodo(params.id);
-			if (!todo) throw errors.TODO_NOT_FOUND();
-			return todo;
+		get: posts.get.handler(({ params, errors }) => {
+			const post = findPost(params.id);
+			if (!post) throw errors.POST_NOT_FOUND();
+			return post;
 		}),
 	},
 };

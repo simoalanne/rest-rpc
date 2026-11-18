@@ -23,7 +23,7 @@ export default defineConfig({
 		sources: [
 			filesystem({
 				root: ".",
-				include: ["index.mdx", "docs/**/*.{md,mdx}"],
+				include: ["docs/**/*.{md,mdx}"],
 			}),
 			githubReleases({
 				prefix: "changelog",
@@ -33,6 +33,10 @@ export default defineConfig({
 			}),
 		],
 	},
+	redirects: [
+		{ from: "/", to: "/docs", status: 307 },
+		{ from: "/docs/streaming", to: "/docs/server-sent-events" },
+	],
 	search: {
 		indexing: { includeCodeBlocks: true },
 	},
@@ -42,7 +46,7 @@ export default defineConfig({
 	},
 	navigation: {
 		tabs: [
-			{ label: "Docs", path: "/docs", href: "/docs/quickstart" },
+			{ label: "Docs", path: "/docs", href: "/docs" },
 			{ label: "Changelog", path: "/changelog", href: "/changelog" },
 		],
 	},

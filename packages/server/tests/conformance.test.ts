@@ -261,13 +261,13 @@ describe.each([
 
 	it("serves prefixed tree-derived routes with params from the prefix", async () => {
 		const routes = {
-			todos: route
+			posts: route
 				.prefix("/tenants/:tenant")
 				.get()
 				.handler(({ params }) => params),
 		};
 		await serve(routes, {}, async (url) => {
-			const response = await fetch(`${url}/tenants/acme/todos`);
+			const response = await fetch(`${url}/tenants/acme/posts`);
 			expect(await response.json()).toEqual({ tenant: "acme" });
 		});
 	});
@@ -508,8 +508,8 @@ describe.each([
 	it("answers HEAD requests to GET routes with the GET status and headers, without a body", async () => {
 		let streamed = false;
 		const routes = {
-			todo: route
-				.get("/todos/:id")
+			post: route
+				.get("/posts/:id")
 				.handler(({ params }) =>
 					respond({ id: params.id }, { headers: { etag: '"1"' } }),
 				),
@@ -519,7 +519,7 @@ describe.each([
 			}),
 		};
 		await serve(routes, {}, async (url) => {
-			const head = await fetch(`${url}/todos/1`, { method: "HEAD" });
+			const head = await fetch(`${url}/posts/1`, { method: "HEAD" });
 			expect(head.status).toBe(200);
 			expect(head.headers.get("etag")).toBe('"1"');
 			expect(head.headers.get("content-type")).toBe("application/json");

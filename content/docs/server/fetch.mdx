@@ -4,10 +4,7 @@ description: Serve rest-rpc routes with Fetch Request and Response
 ---
 
 `@rest-rpc/server` serves routes with Fetch `Request` and `Response`, on
-fetch-native runtimes such as Bun, Deno, and Cloudflare Workers. See
-[Serving Routes](/docs/server/overview) for what is shared with
-[Node](/docs/server/node), and [Framework Integration](/docs/server/framework-integration)
-to add the routes to a framework such as Hono.
+fetch-native runtimes such as Bun, Deno, and Cloudflare Workers.
 
 ## Usage
 
@@ -20,19 +17,21 @@ the requests are routed by Bun's native router:
 import { createApp, route } from "@rest-rpc/server";
 import { z } from "zod";
 
-const todos = new Map([["todo_1", { id: "todo_1", title: "Write docs" }]]);
+const posts = new Map([
+	["post_1", { id: "post_1", title: "Hello", body: "First post" }],
+]);
 
-const getTodo = route
-	.get("/todos/:id")
+const getPost = route
+	.get("/posts/:id")
 	.params(z.object({ id: z.string() }))
-	.error("TODO_NOT_FOUND", { status: 404 })
+	.error("POST_NOT_FOUND", { status: 404 })
 	.handler(({ params, errors }) => {
-		const todo = todos.get(params.id);
-		if (!todo) throw errors.TODO_NOT_FOUND();
-		return todo;
+		const post = posts.get(params.id);
+		if (!post) throw errors.POST_NOT_FOUND();
+		return post;
 	});
 
-export const routes = { todos: { get: getTodo } };
+export const routes = { posts: { get: getPost } };
 
 export default createApp(routes);
 ```
@@ -60,41 +59,37 @@ these:
 
 ```ts
 type CreateAppOptions = {
+	/**
+	 * The path the routes are served under, such as `/api`. Route paths do not
+	 * include it.
+	 */
 	mountPath?: AbsolutePath;
-	// Required when the routes declare initial context.
+	/**
+	 * The initial context the routes require for each request, or a function
+	 * that returns it for the request. Required when the routes require initial
+	 * context, and must satisfy the initial context of every route. If the
+	 * function throws, the response is an `INTERNAL_SERVER_ERROR`.
+	 */
 	context?:
 		| TContext
 		| ((request: Request, ...args: TArgs) => TContext | Promise<TContext>);
+	/**
+	 * Functions around everything the app does for a request, the first
+	 * outermost. They run before routing, for Bun's native `routes` too.
+	 */
 	interceptors?: readonly Interceptor[];
 };
 ```
 
-- `mountPath`: the path the routes are served under, such as `/api`. See
-  [Mount Path](/docs/server/overview#mount-path).
-- `context`: the [initial context](/docs/middleware#values-from-the-host) the
-  routes declare, or a function, sync or async, that returns it for each
-  request. It is required when the routes declare initial context, and must
-  satisfy the initial context of every route. If the function throws, the
-  response is an `INTERNAL_SERVER_ERROR`.
+The `context` function also receives the arguments the runtime passes to `fetch` after the
+request, such as the `env` bindings of Cloudflare Workers, with their types
+inferred from its parameters:
 
-  ```ts
-  createApp(routes, {
-  	context: async (request) => ({ db, headers: request.headers }),
-  });
-  ```
-
-  The function also receives what the runtime passes to `fetch` after the
-  request, such as the `env` bindings of Cloudflare Workers or the connection
-  info of Deno. Their types are inferred from the function's parameters:
-
-  ```ts
-  export default createApp(routes, {
-  	context: (request, env: Env) => ({ db: env.DB }),
-  }) satisfies ExportedHandler<Env>;
-  ```
-
-- `interceptors`: functions around everything the app does for a request. See
-  [Interceptors](/docs/server/interceptors).
+```ts
+export default createApp(routes, {
+	context: (request, env: Env) => ({ db: env.DB }),
+}) satisfies ExportedHandler<Env>;
+```
 
 Thrown errors are sent as [error responses](/docs/http-behavior/errors), and
 requests that match no route as `NOT_FOUND`.

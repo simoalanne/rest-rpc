@@ -108,7 +108,7 @@ describe("extractContract", () => {
 	it("resolves prefixed tree-derived paths", () => {
 		const api = route.prefix("/api");
 		expect(
-			extractContract({ todos: { list: api.get() } }).todos.list["~restrpc"],
-		).toEqual({ method: "GET", path: "/api/todos/list", responses: {} });
+			extractContract({ posts: { list: api.get() } }).posts.list["~restrpc"],
+		).toEqual({ method: "GET", path: "/api/posts/list", responses: {} });
 	});
 });

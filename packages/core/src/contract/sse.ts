@@ -14,7 +14,7 @@ const sseResponseBrand = Symbol("rest-rpc.sse-response");
  * A Server-Sent Event stream response declared with {@link sse}, whose schema
  * validates the data of each event.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/streaming}
+ * @see {@link https://rest-rpc.vercel.app/docs/server-sent-events}
  */
 export type SseResponse<TSchema extends StandardSchemaV1 = StandardSchemaV1> = {
 	readonly [sseResponseBrand]: TSchema;
@@ -26,7 +26,7 @@ export type SseResponse<TSchema extends StandardSchemaV1 = StandardSchemaV1> = {
  *
  * @remarks Pass it to `.response()` in place of a body schema.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/streaming}
+ * @see {@link https://rest-rpc.vercel.app/docs/server-sent-events}
  */
 export function sse<const TSchema extends StandardSchemaV1>(
 	schema: TSchema,
@@ -45,7 +45,7 @@ export const sseSchema = (value: SseResponse): StandardSchemaV1 =>
  * Serializes the data of each Server-Sent Event, and deserializes it on the
  * client.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/streaming#data-format}
+ * @see {@link https://rest-rpc.vercel.app/docs/server-sent-events#data-format}
  */
 export type SseFormat = {
 	/** Returns the event data to send. It may span several lines. */
@@ -60,7 +60,7 @@ export type SseFormat = {
  * @remarks Pass the same format to the server and the client in their `sse`
  * option. It changes how data is sent, not its types.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/streaming#data-format}
+ * @see {@link https://rest-rpc.vercel.app/docs/server-sent-events#data-format}
  */
 export function sseFormat<T>(format: {
 	serialize: (data: T) => string;

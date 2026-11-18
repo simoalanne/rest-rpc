@@ -51,11 +51,11 @@ describe("routeBuilder", () => {
 	it("prepends prefixes in order to method paths and tree-derived paths", () => {
 		const api = route.prefix("/api").prefix("/v1");
 		const contract = extractContract({
-			todos: api.get("/todos"),
+			posts: api.get("/posts"),
 			root: api.get("/"),
 			list: api.get(),
 		});
-		expect(contract.todos["~restrpc"].path).toBe("/api/v1/todos");
+		expect(contract.posts["~restrpc"].path).toBe("/api/v1/posts");
 		expect(contract.root["~restrpc"].path).toBe("/api/v1");
 		expect(contract.list["~restrpc"].path).toBe("/api/v1/list");
 	});
