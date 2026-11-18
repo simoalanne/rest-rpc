@@ -27,10 +27,10 @@ re-exports what it needs from `@rest-rpc/core`. Client code imports
 - [Defined Responses](#defined-responses)
 - [Errors](#errors)
 - [Shared Errors](#shared-errors)
-- [Middleware and Context](#middleware-and-context)
-- [Metadata](#metadata)
+- [Middleware, Context and Metadata](#middleware-context-and-metadata)
 - [Server-Sent Events](#server-sent-events)
-- [Other Content Types](#other-content-types)
+- [Content Types](#content-types)
+- [Codecs](#codecs)
 - [Raw and Static Responses](#raw-and-static-responses)
 - [Interceptors](#interceptors)
 - [Node](#node)
@@ -270,62 +270,41 @@ const get = route
 	.handler(({ params }) => findPost(params.id));
 ```
 
-## Middleware and Context
+## Middleware, Context and Metadata
 
 Middleware runs after validation, around the handler, and passes typed values
-to it through context. Initial context comes from the host.
+to it through context. Initial context comes from the host, and routes describe
+themselves to shared middleware with metadata of a declared shape.
 
 See [Middleware](https://rest-rpc.vercel.app/docs/middleware)
 
 ```ts
 import { createApp, route } from "@rest-rpc/server";
 
-const authenticated = route
+const base = route
+	.$meta<{ access: "public" | "signed-in" }>()
 	.$context<{ headers: Headers }>() // provided by the app below
 	.error("UNAUTHORIZED", { status: 401 })
-	.use(({ context, errors, next }) => {
-		const token = context.headers.get("authorization");
-		if (!token) throw errors.UNAUTHORIZED();
-		return next({ context: { user: { id: token } } });
+	.use(({ route, context, errors, next }) => {
+		const user = context.headers.get("authorization");
+		if (!user && route.meta?.access !== "public") throw errors.UNAUTHORIZED();
+		return next({ context: { user } });
 	});
 
 const routes = {
-	me: authenticated.get("/me").handler(({ context }) => context.user), // user is typed
+	health: base
+		.get("/health")
+		.meta({ access: "public" })
+		.handler(() => "ok"),
+	me: base
+		.get("/me")
+		.meta({ access: "signed-in" })
+		.handler(({ context }) => context.user), // string | null
 };
 
 export default createApp(routes, {
 	context: (request) => ({ headers: request.headers }), // or an object, such as { db }
 });
-```
-
-## Metadata
-
-Routes describe themselves to shared middleware with metadata of a declared
-shape.
-
-See [Metadata](https://rest-rpc.vercel.app/docs/middleware#metadata)
-
-```ts
-import { route } from "@rest-rpc/server";
-
-const base = route
-	.$meta<{ access: "public" | "signed-in" }>()
-	.$context<{ user?: string }>()
-	.error("UNAUTHORIZED", { status: 401 })
-	.use(({ route, context, errors, next }) => {
-		if (route.meta?.access !== "public" && !context.user)
-			throw errors.UNAUTHORIZED();
-		return next();
-	});
-
-const health = base
-	.get("/health")
-	.meta({ access: "public" })
-	.handler(() => "ok");
-const profile = base
-	.get("/profile")
-	.meta({ access: "signed-in" })
-	.handler(({ context }) => context.user);
 ```
 
 ## Server-Sent Events
@@ -368,58 +347,63 @@ const { body } = await client.notifications();
 for await (const event of body) console.log(event.id, event.data.message);
 ```
 
-## Other Content Types
+## Content Types
 
-A body is JSON unless a `content-type` header says otherwise. Here a route
-takes an image as `multipart/form-data`, and another returns it as a `Blob`.
+A body is JSON unless a `content-type` header says otherwise. These codecs
+are built in, and each is exported the same way from `@rest-rpc/server` and
+`@rest-rpc/core`.
 
 See [Encoding and Content Types](https://rest-rpc.vercel.app/docs/http-behavior/encoding#bodies)
 
 ```ts
-import { createApp, createClient, route } from "@rest-rpc/server";
-import { z } from "zod";
+import {
+	jsonCodec, // application/json and +json: any value JSON.stringify encodes
+	urlEncodedCodec, // application/x-www-form-urlencoded: URLSearchParams
+	formDataCodec, // multipart/form-data: FormData
+	textCodec, // text/*: strings, decoded as UTF-8
+	binaryCodec, // any other media type: Blob, Uint8Array, ReadableStream or async iterable, received as a Blob
+} from "@rest-rpc/server";
+```
 
-const images = new Map<string, Blob>();
+## Codecs
+
+A codec encodes another format. Pass the same codec in `bodyCodecs` to the
+client and the server. Custom codecs win over the built-in ones.
+
+See [Custom Codecs](https://rest-rpc.vercel.app/docs/http-behavior/encoding#custom-codecs)
+
+```ts
+import { bodyCodec, createApp, createClient, route } from "@rest-rpc/server";
+
+const csvCodec = bodyCodec("text/csv", {
+	serialize: (rows) =>
+		(rows as string[][]).map((row) => row.join(",")).join("\n"),
+	deserialize: async (body) =>
+		(await body.text()).split("\n").map((line) => line.split(",")),
+});
 
 const routes = {
 	posts: {
-		upload: route
-			.post("/posts/:id/image")
-			.headers(z.object({ "content-type": z.literal("multipart/form-data") }))
-			.body(z.instanceof(FormData))
-			.handler(({ params, body }) => {
-				images.set(params.id, body.get("image") as File);
-				return { url: `/posts/${params.id}/image` };
-			}),
-		image: route
-			.get("/posts/:id/image")
-			.error("IMAGE_NOT_FOUND", { status: 404 })
-			.handler(({ params, errors, respond }) => {
-				const image = images.get(params.id);
-				if (!image) throw errors.IMAGE_NOT_FOUND();
-				return respond(image, { headers: { "content-type": image.type } });
-			}),
+		csv: route.get("/posts.csv").handler(({ respond }) =>
+			respond(
+				[
+					["id", "title"],
+					["post_1", "Hello"],
+				],
+				{ headers: { "content-type": "text/csv" } },
+			),
+		),
 	},
 };
 
-const app = createApp(routes);
+const app = createApp(routes, { bodyCodecs: [csvCodec] });
 const client = createClient(routes, {
 	origin: "http://localhost",
 	fetch: app.fetch,
+	bodyCodecs: [csvCodec],
 });
 
-const form = new FormData();
-form.set(
-	"image",
-	new File(["image bytes"], "cover.png", { type: "image/png" }),
-);
-await client.posts.upload({
-	params: { id: "post_1" },
-	headers: { "content-type": "multipart/form-data" },
-	body: form,
-});
-
-const { body } = await client.posts.image({ params: { id: "post_1" } }); // Blob
+const { body } = await client.posts.csv(); // string[][]
 ```
 
 ## Raw and Static Responses
