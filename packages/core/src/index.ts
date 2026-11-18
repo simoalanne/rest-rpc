@@ -55,7 +55,16 @@ export type {
 	BodyDeserializer,
 	BodySerializer,
 	BodyValue,
+	BuiltInBodyCodec,
 	IncomingBody,
 	SerializedBody,
 } from "./codecs/index.ts";
-export { bodyCodec, serializedBody } from "./codecs/index.ts";
+export {
+	binaryCodec,
+	bodyCodec,
+	formDataCodec,
+	jsonCodec,
+	serializedBody,
+	textCodec,
+	urlEncodedCodec,
+} from "./codecs/index.ts";

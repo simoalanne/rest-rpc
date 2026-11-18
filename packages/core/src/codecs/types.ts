@@ -60,6 +60,8 @@ export type IncomingBody = {
 	arrayBuffer(): Promise<ArrayBuffer>;
 	/** Reads the body as a `Blob` typed with the content type. */
 	blob(): Promise<Blob>;
+	/** Parses a `multipart/form-data` or `application/x-www-form-urlencoded` body. */
+	formData(): Promise<FormData>;
 	/** The body as a stream, or `null` when the request has no body. */
 	readonly body: ReadableStream<Uint8Array> | null;
 };
@@ -96,3 +98,22 @@ export type BodyCodecOperations =
 export type BodyCodec = {
 	mediaTypes: readonly (string | RegExp)[];
 } & BodyCodecOperations;
+
+/**
+ * A built-in codec, such as `formDataCodec`, whose operations are both defined
+ * and typed with what they return, so a custom codec can call them.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#custom-codecs}
+ */
+export type BuiltInBodyCodec<TSerialized extends BodyValue, TDecoded> = {
+	readonly mediaTypes: readonly (string | RegExp)[];
+	/** Returns the value as is, or throws when it is not a value of the codec. */
+	serialize(
+		value: unknown,
+		headers?: Readonly<Record<string, string>>,
+	): TSerialized;
+	deserialize(
+		body: IncomingBody,
+		headers?: Readonly<Record<string, string>>,
+	): Promise<TDecoded>;
+};

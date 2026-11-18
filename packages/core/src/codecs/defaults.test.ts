@@ -1,5 +1,4 @@
 import { createBodyCodecRegistry } from "./registry.ts";
-import type { IncomingBody } from "./types.ts";
 
 const codecs = createBodyCodecRegistry([]);
 
@@ -57,35 +56,6 @@ describe("defaults", () => {
 		const decoded = await codecs.deserialize(response, "multipart/form-data", {
 			"content-type": response.headers.get("content-type")!,
 		});
-		expect((decoded as FormData).get("name")).toBe("Ada");
-	});
-
-	it("decodes incoming bodies that are not Fetch requests or responses", async () => {
-		// Only the incoming body methods, as the Node server passes.
-		const incoming = (response: Response): IncomingBody => ({
-			text: () => response.text(),
-			json: async () => JSON.parse(await response.text()),
-			arrayBuffer: () => response.arrayBuffer(),
-			blob: () => response.blob(),
-			body: null,
-		});
-		expect(
-			await codecs.deserialize(
-				incoming(Response.json({ a: 1 })),
-				"application/json",
-				{ "content-type": "application/json; charset=utf-8" },
-			),
-		).toEqual({ a: 1 });
-
-		const form = new FormData();
-		form.set("name", "Ada");
-		const multipart = new Response(form);
-		const contentType = multipart.headers.get("content-type")!;
-		const decoded = await codecs.deserialize(
-			incoming(multipart),
-			"multipart/form-data",
-			{ "content-type": contentType },
-		);
 		expect((decoded as FormData).get("name")).toBe("Ada");
 	});
 

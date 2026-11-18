@@ -97,6 +97,14 @@ class NodeBody implements IncomingBody {
 		});
 	}
 
+	// Parsed like a Fetch body, with the content type that carries the
+	// multipart boundary.
+	async formData(): Promise<FormData> {
+		return new Response((await this.#read()) as Uint8Array<ArrayBuffer>, {
+			headers: { "content-type": this.#contentType },
+		}).formData();
+	}
+
 	// The stream is created once and returned again, as on a Fetch body.
 	get body(): ReadableStream<Uint8Array> | null {
 		if (this.#stream !== undefined) return this.#stream;

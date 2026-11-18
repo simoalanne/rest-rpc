@@ -111,15 +111,43 @@ const { body } = await client.posts.image({ params: { id: "post_1" } });
   [Server-Sent Events](/docs/server-sent-events), and a returned `Response` as
   it is. [Errors](/docs/http-behavior/errors) are always JSON.
 
-Each content type is encoded by a codec:
+Each content type is encoded by a codec, exported from `@rest-rpc/core` and
+`@rest-rpc/server` so a [custom codec](#custom-codecs) can call one for the
+values it doesn't handle:
 
-| Content type                        | Value                                                  |
-| ----------------------------------- | ------------------------------------------------------ |
-| `application/json`, `*+json`        | JSON value                                             |
-| `application/x-www-form-urlencoded` | `URLSearchParams`                                      |
-| `multipart/form-data`               | `FormData`                                             |
-| `text/*`                            | `string`, decoded as UTF-8                             |
-| any other                           | `Blob`, `Uint8Array` or a stream sent, `Blob` received |
+```ts
+/** `application/json` and `*+json`. Throws for values JSON can't encode, such as `undefined`. */
+const jsonCodec: {
+	serialize(value: unknown): string;
+	deserialize(body: IncomingBody): Promise<unknown>;
+};
+
+/** `application/x-www-form-urlencoded`. */
+const urlEncodedCodec: {
+	serialize(value: unknown): URLSearchParams; // throws for other values
+	deserialize(body: IncomingBody): Promise<URLSearchParams>;
+};
+
+/** `multipart/form-data`. */
+const formDataCodec: {
+	serialize(value: unknown): FormData; // throws for other values
+	deserialize(body: IncomingBody): Promise<FormData>;
+};
+
+/** `text/*`, decoded as UTF-8. */
+const textCodec: {
+	serialize(value: unknown): string; // throws for other values
+	deserialize(body: IncomingBody): Promise<string>;
+};
+
+/** Every other media type. Streams are sent as their chunks arrive. */
+const binaryCodec: {
+	serialize(
+		value: unknown,
+	): Blob | Uint8Array | ReadableStream | AsyncIterable<string | Uint8Array>;
+	deserialize(body: IncomingBody): Promise<Blob>; // whatever was sent
+};
+```
 
 The schema of a non-JSON body describes that value, such as `z.string()` for
 `text/plain` and `z.instanceof(Blob)` for a file. The client's type stays the
