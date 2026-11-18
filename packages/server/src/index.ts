@@ -78,15 +78,11 @@ export {
 	onError,
 	type Interceptor,
 } from "./fetch/interceptor.ts";
-export {
-	call,
-	createLocalClient,
-	type CallOptions,
-	type LocalClient,
-} from "./pipeline/call.ts";
+export { call, type CallOptions } from "./pipeline/call.ts";
 export {
 	binaryCodec,
 	bodyCodec,
+	createClient,
 	createOpenApiDocument,
 	formDataCodec,
 	isDefinedError,
@@ -103,6 +99,7 @@ export {
 	urlEncodedCodec,
 } from "@rest-rpc/core";
 export type {
+	ApiClientOptions,
 	BodyCodec,
 	BodyCodecOperations,
 	BodyValue,

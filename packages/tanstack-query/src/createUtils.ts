@@ -9,7 +9,7 @@ import type {
 	TanstackQueryUtilsFor,
 } from "./createUtils.types.ts";
 
-// Fetch options for the fetch client, call options for the local client.
+// The per-call options of the client's route functions.
 type FetchOptions = Record<string, unknown>;
 
 type OptionsWithFetchOptions = Record<string, unknown> & {
@@ -168,8 +168,7 @@ const mapClientRoutes = (node: unknown, path: string[]): unknown =>
 /**
  * Creates a TanStack Query util tree that mirrors a client.
  *
- * @remarks Accepts a client created with `createClient` or
- * `createLocalClient`. Generated utils call the client's routes, create
+ * @remarks Accepts a client created with `createClient`. Generated utils call the client's routes, create
  * options and stable query keys; they do not create a `QueryClient` or call
  * framework-specific hooks.
  *

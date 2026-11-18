@@ -8,7 +8,6 @@ import {
 	createRouteHandlers,
 	createApp,
 	createCatchAllHandler,
-	createLocalClient,
 	implement,
 	interceptor,
 	raw,
@@ -161,7 +160,6 @@ export const extractedContract = extractContract(routes);
 export const serverClient = createClient(extractedContract, {
 	origin: "http://localhost",
 });
-export const localClient = createLocalClient(routes);
 export const client = createClient(contract, { origin: "http://localhost" });
 
 // TanStack Query utils and their options.

@@ -29,19 +29,6 @@ export const restrpc = createTanstackQueryUtils(client);
 
 The same client can still be called directly where a query is not needed.
 
-### With a Local Client
-
-A [Local Client](/docs/client/local-client#local-client) works the same way.
-`fetchOptions` then takes the local client's call options, such as `context`.
-
-```ts
-import { createLocalClient } from "@rest-rpc/server";
-import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
-import { routes } from "./routes";
-
-export const restrpc = createTanstackQueryUtils(createLocalClient(routes));
-```
-
 ## Queries
 
 Use `queryOptions()` to create a typed TanStack Query options object for a route.
@@ -264,8 +251,7 @@ queryClient.setMutationDefaults(restrpc.posts.create.mutationKey(), {
 ## Fetch Options
 
 Generated options accept normal TanStack Query options plus `fetchOptions`,
-which accepts the client's per-call options: the Fetch client's [per-call options](/docs/client/fetch-client#per-call-options),
-or a local client's [call options](/docs/client/local-client#one-off-calls).
+which accepts the Fetch client's [per-call options](/docs/client/fetch-client#per-call-options).
 Query options do not accept `signal`, because the cancellation signal provided
 by TanStack Query is passed to the request automatically.
 

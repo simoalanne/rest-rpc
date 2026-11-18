@@ -1,6 +1,6 @@
 import { RouteError, routeError, type } from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
-import { call, createLocalClient } from "./call.ts";
+import { call } from "./call.ts";
 import { RequestValidationFailed } from "./errors.ts";
 import { respond } from "./respond.ts";
 import { sseEvent } from "./sse.ts";
@@ -145,14 +145,5 @@ describe("call", () => {
 		const events = [];
 		for await (const event of body) events.push(event);
 		expect(events).toStrictEqual([{ data: 1, id: "one" }, { data: 2 }]);
-	});
-});
-
-describe("createLocalClient", () => {
-	it("calls the routes of a nested route tree", async () => {
-		const client = createLocalClient({
-			health: { get: route.get("/health").handler(() => "ok") },
-		});
-		expect(await client.health.get()).toMatchObject({ body: "ok" });
 	});
 });

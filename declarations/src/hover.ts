@@ -10,7 +10,6 @@ import {
 	type InferClientResponse,
 } from "@rest-rpc/core";
 import {
-	createLocalClient,
 	route,
 	routeError,
 	sse,
@@ -92,9 +91,6 @@ export type ClientRequest = InferClientRequest<typeof client.posts.get>;
 export type ClientResponse = InferClientResponse<typeof client.posts.get>;
 export type ClientError = InferClientError<typeof client.posts.get>;
 export type ServerRequest = InferServerRequest<typeof routes.posts.get>;
-
-const local = createLocalClient(routes);
-export const localGet = local.posts.get;
 
 const utils = createTanstackQueryUtils(client);
 export const queryOptions = utils.posts.get.queryOptions({
