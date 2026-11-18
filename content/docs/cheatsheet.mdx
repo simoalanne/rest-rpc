@@ -362,17 +362,15 @@ const csvCodec = bodyCodec("text/csv", {
 
 const routes = {
 	posts: {
-		csv: route
-			.get("/posts.csv")
-			.handler(({ respond }) =>
-				respond(
-					[
-						["id", "title"],
-						["post_1", "Hello"],
-					],
-					{ headers: { "content-type": "text/csv" } },
-				),
+		csv: route.get("/posts.csv").handler(({ respond }) =>
+			respond(
+				[
+					["id", "title"],
+					["post_1", "Hello"],
+				],
+				{ headers: { "content-type": "text/csv" } },
 			),
+		),
 	},
 };
 
