@@ -123,12 +123,13 @@ const search = route
 
 ## Status, Headers and Cookies
 
-Return the body, or `respond()` to set the rest of the response.
+Return the body, or `respond()` to set the rest of the response. The client
+receives them with lowercase header names.
 
 See [Return Responses](https://rest-rpc.vercel.app/docs/route-builder#return-responses)
 
 ```ts
-import { route } from "@rest-rpc/server";
+import { createApp, createClient, route } from "@rest-rpc/server";
 import { z } from "zod";
 
 const create = route
@@ -146,6 +147,20 @@ const create = route
 			cookies: ["draft=; Max-Age=0"],
 		});
 	});
+
+const app = createApp({ create });
+const client = createClient(
+	{ create },
+	{
+		origin: "http://localhost",
+		fetch: app.fetch,
+	},
+);
+
+const { status, headers } = await client.create({
+	body: { title: "Hello", body: "First post" },
+});
+console.log(status, headers.location); // 201 "/posts/..."
 ```
 
 ## Defined Responses
@@ -277,7 +292,7 @@ const routes = {
 };
 
 export default createApp(routes, {
-	context: (request) => ({ headers: request.headers }),
+	context: (request) => ({ headers: request.headers }), // or an object, such as { db }
 });
 ```
 

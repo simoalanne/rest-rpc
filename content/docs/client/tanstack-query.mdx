@@ -42,12 +42,12 @@ const post = useQuery(
 		request: {
 			params: { id: "post_1" },
 		},
+		select: (response) => response.body,
 	}),
 );
 ```
 
-`data` is the response envelope. Use TanStack Query's `select` option to read
-only the `body`.
+The query's data is the response envelope, so `select` reads its `body`.
 
 ## Infinite Queries
 
