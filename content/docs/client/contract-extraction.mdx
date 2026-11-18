@@ -27,10 +27,12 @@ export function getApi() {
 import { createClient } from "@rest-rpc/core";
 import { getApi } from "./contract.ts" with { type: "macro" };
 
-export const client = createClient(getApi(), {
-	origin: "http://localhost:3000",
-});
+export const client = createClient(getApi());
 ```
+
+In a browser, the client calls the page's origin. Pass the
+[client options](/docs/client/fetch-client#client-options) for an API on
+another origin or under a mount path.
 
 Bun supports macros natively. For Vite, esbuild, Rolldown, Rollup, webpack or
 Rspack, use [`unplugin-macros`](https://github.com/unplugin/unplugin-macros):

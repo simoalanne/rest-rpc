@@ -127,10 +127,13 @@ const create = route
 	});
 
 const app = createApp({ create });
-const client = createClient({ create }, {
-	origin: "http://localhost",
-	fetch: app.fetch,
-});
+const client = createClient(
+	{ create },
+	{
+		origin: "http://localhost",
+		fetch: app.fetch,
+	},
+);
 
 const { status, headers } = await client.create({
 	body: { title: "Hello", body: "First post" },
@@ -510,9 +513,7 @@ export function getApi() {
 import { createClient } from "@rest-rpc/core";
 import { getApi } from "./contract.ts" with { type: "macro" };
 
-export const client = createClient(getApi(), {
-	origin: "https://api.example.com",
-});
+export const client = createClient(getApi()); // the page's origin, or pass { origin }
 ```
 
 ```ts
