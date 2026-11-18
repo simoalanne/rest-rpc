@@ -33,10 +33,7 @@ export default defineConfig({
 			}),
 		],
 	},
-	redirects: [
-		{ from: "/", to: "/docs", status: 307 },
-		{ from: "/docs/streaming", to: "/docs/server-sent-events" },
-	],
+	redirects: [{ from: "/", to: "/docs", status: 307 }],
 	search: {
 		indexing: { includeCodeBlocks: true },
 	},
