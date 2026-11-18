@@ -47,7 +47,6 @@ const search = route
 const getPost = route
 	.get("/posts/:id")
 	.handler(({ params }) => findPost(params.id));
-//           ^?
 
 const list = route.get().handler(() => listPosts()); // GET, path from its tree keys
 ```

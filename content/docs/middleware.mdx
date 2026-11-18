@@ -83,7 +83,6 @@ const withSession = app.use(async ({ context, next }) => {
 const getProfile = withSession
 	.get("/profile")
 	.handler(({ context }) => context.user);
-//                                 ^?
 ```
 
 Injected values are typed for everything after the middleware, without

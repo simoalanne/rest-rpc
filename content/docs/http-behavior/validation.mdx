@@ -22,7 +22,6 @@ const list = route
 	.query(z.object({ page: z.coerce.number().int().min(1).default(1) }))
 	.response(z.object({ items: z.array(post), total: z.number() }))
 	.handler(({ query }) => listPosts(query.page));
-//                                       ^?
 // ---cut-start---
 const client = createClient({ list }, { origin: "http://localhost" });
 // ---cut-end---

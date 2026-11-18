@@ -86,7 +86,6 @@ await client.posts.upload({
 	body: form,
 });
 const { body } = await client.posts.image({ params: { id: "post_1" } });
-//      ^?
 ```
 
 - A request is sent in the format of its `content-type` header, and as JSON
@@ -152,7 +151,6 @@ const client = createClient({ getPost }, { origin: "http://localhost" });
 
 const { body } = await client.getPost({ params: { id: "1" } });
 body.publishedAt; // the string "2026-11-17T12:00:00.000Z" at runtime
-//   ^?
 ```
 
 Use schemas whose output is what JSON sends, such as `z.iso.datetime()`, or
@@ -178,7 +176,6 @@ const client = createClient({ download }, { origin: "http://localhost" });
 
 const { body } = await client.download({ params: { id: "1" } });
 body; // a Blob at runtime
-// ^?
 ```
 
 To receive another value, such as a stream or a `Uint8Array`, use a
