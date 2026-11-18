@@ -1,9 +1,27 @@
 ---
-title: Local Client
-description: Call route handlers in-process with call or createLocalClient.
+title: Local Calls
+description: Call one route in-process with call(), without HTTP.
 ---
 
-A local call runs the same route pipeline as an HTTP request:
+To call routes in the same process with the same behavior as over HTTP, such
+as in tests of the app, pass the app's `fetch` to the
+[Fetch client](/docs/client/fetch-client#custom-fetch). Requests are encoded,
+intercepted and decoded as in production:
+
+```ts
+import { createApp, createClient } from "@rest-rpc/server";
+
+const app = createApp(routes);
+const client = createClient(routes, {
+	origin: "http://localhost",
+	fetch: app.fetch,
+});
+```
+
+`call()` runs one route without HTTP, for when skipping it is the point: a test
+of one route with its context passed directly, or a route that runs another
+route's validation and middleware. It runs the same route pipeline as an HTTP
+request:
 
 1. The input is validated with the route's request schemas.
 2. The route's middleware and handler run.
@@ -15,9 +33,7 @@ validated output, not an encoded `Response`. A
 [raw response](/docs/route-builder#raw-responses) a handler returns is the
 exception: it is read as the fetch client reads it, with the default codecs.
 
-## One-off Calls
-
-Use `call()` to invoke a single route handler without creating a local client.
+## Call a Route
 
 ```ts twoslash
 import { call, route } from "@rest-rpc/server";
@@ -60,23 +76,3 @@ A local call rejects like a Fetch client call, so
   [built-in errors](/docs/http-behavior/errors#built-in-errors), rejects as
   thrown.
 - Other errors thrown by the handler reject unchanged.
-
-## Local Client
-
-When you want to call several routes or create a reusable client, `createLocalClient()` creates one that mirrors the route tree.
-It is the local equivalent of the Fetch client.
-
-```ts
-import { createLocalClient } from "@rest-rpc/server";
-import { routes } from "./routes";
-
-const client = createLocalClient(routes);
-
-const created = await client.posts.create({
-	body: { title: "Hello", body: "First post" },
-});
-const response = await client.posts.get(
-	{ params: { id: created.body.id } },
-	{ context: { user: { id: "user_1" } } },
-);
-```

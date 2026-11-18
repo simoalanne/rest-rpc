@@ -12,6 +12,10 @@ ArkType). Below are the common patterns, each a complete example. See the
 | [`@rest-rpc/server`](https://npmx.dev/package/@rest-rpc/server)                 | Route builder and handlers for Fetch runtimes, `@rest-rpc/server/node` for Node |
 | [`@rest-rpc/tanstack-query`](https://npmx.dev/package/@rest-rpc/tanstack-query) | TanStack Query options and keys                                                 |
 
+Server code, its tests included, imports from `@rest-rpc/server`, which
+re-exports what it needs from `@rest-rpc/core`. Client code imports
+`@rest-rpc/core`.
+
 ## Contents
 
 - [Hello World](#hello-world)
@@ -45,8 +49,7 @@ process, which is also how to test it.
 See [Quickstart](https://rest-rpc.vercel.app/docs/quickstart)
 
 ```ts
-import { createClient } from "@rest-rpc/core";
-import { createApp, route } from "@rest-rpc/server";
+import { createApp, createClient, route } from "@rest-rpc/server";
 
 const routes = {
 	hello: route.get("/hello").handler(() => ({ message: "Hello" })),
@@ -183,8 +186,13 @@ Errors are thrown. A defined error is typed on the client, and any other
 See [Errors](https://rest-rpc.vercel.app/docs/http-behavior/errors)
 
 ```ts
-import { createClient, isDefinedError, safe } from "@rest-rpc/core";
-import { createApp, route } from "@rest-rpc/server";
+import {
+	createApp,
+	createClient,
+	isDefinedError,
+	route,
+	safe,
+} from "@rest-rpc/server";
 import { z } from "zod";
 
 const posts = new Map([["1", { id: "1", title: "Hello", body: "First post" }]]);
@@ -310,8 +318,13 @@ Return an async iterable to stream events. The client iterates them.
 See [Server-Sent Events](https://rest-rpc.vercel.app/docs/server-sent-events)
 
 ```ts
-import { createClient } from "@rest-rpc/core";
-import { createApp, route, sse, sseEvent } from "@rest-rpc/server";
+import {
+	createApp,
+	createClient,
+	route,
+	sse,
+	sseEvent,
+} from "@rest-rpc/server";
 import { z } from "zod";
 
 const messages = ["Ada liked your post", "Grace commented on your post"];
@@ -346,8 +359,7 @@ takes an image as `multipart/form-data`, and another returns it as a `Blob`.
 See [Encoding and Content Types](https://rest-rpc.vercel.app/docs/http-behavior/encoding#bodies)
 
 ```ts
-import { createClient } from "@rest-rpc/core";
-import { createApp, route } from "@rest-rpc/server";
+import { createApp, createClient, route } from "@rest-rpc/server";
 import { z } from "zod";
 
 const images = new Map<string, Blob>();
@@ -648,9 +660,10 @@ const client = createClient(api, {
 ## Local Calls
 
 `call()` runs one route in process, through validation and middleware, without
-HTTP.
+HTTP. To call the app in process with HTTP behavior, pass `app.fetch` to
+`createClient` as in [Hello World](#hello-world).
 
-See [Local Client](https://rest-rpc.vercel.app/docs/client/local-client)
+See [Local Calls](https://rest-rpc.vercel.app/docs/client/local-calls)
 
 ```ts
 import { call, route } from "@rest-rpc/server";

@@ -9,14 +9,11 @@ import type {
 	SkipToken,
 } from "@tanstack/query-core";
 
-/**
- * A route function of a client created with `createClient` or
- * `createLocalClient`.
- */
+/** A route function of a client created with `createClient`. */
 type ClientRoute = (...args: never[]) => Promise<unknown>;
 
 /**
- * A client tree created with `createClient` or `createLocalClient`.
+ * A client tree created with `createClient`.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/tanstack-query#setup}
  */
@@ -67,7 +64,7 @@ type StreamedQueryDataFor<F extends ClientRoute> = [
 	? never
 	: Array<RouteStreamChunk<F>>;
 
-// Fetch options for the fetch client, call options for the local client.
+// The per-call options of the client's route functions.
 type RouteFetchOptions<F extends ClientRoute> = NonNullable<Parameters<F>[1]>;
 
 type QueryFetchOptions<F extends ClientRoute> = Omit<
@@ -336,8 +333,8 @@ type TanstackQueryTreeFor<T> = {
 /**
  * Infers the generated TanStack Query util tree for a client.
  *
- * @remarks The util tree mirrors the client, created with `createClient` or
- * `createLocalClient`. Each route exposes query, mutation, query-key, and
+ * @remarks The util tree mirrors the client, created with `createClient`.
+ * Each route exposes query, mutation, query-key, and
  * mutation-key utils; eligible streaming routes also expose streamed query
  * options.
  *

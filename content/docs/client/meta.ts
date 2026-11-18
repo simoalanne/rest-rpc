@@ -5,7 +5,7 @@ export default defineMeta({
 		"contract-extraction",
 		"fetch-client",
 		"tanstack-query",
-		"local-client",
+		"local-calls",
 	],
 	title: "Client",
 });

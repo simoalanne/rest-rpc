@@ -2,10 +2,9 @@ import {
 	safe,
 	type,
 	type InferClientError,
-	type InferClientRequest,
 	type InferClientResponse,
 } from "@rest-rpc/core";
-import { call, createLocalClient, type CallOptions } from "./call.ts";
+import { call, type CallOptions } from "./call.ts";
 import {
 	RequestValidationFailed,
 	type RequestValidationIssues,
@@ -72,17 +71,5 @@ describe("call types", () => {
 			ExtendContext<DefaultContext, { user: string }>
 		>();
 		call(withContext, undefined, { context: { user: "Ada" } });
-	});
-});
-
-describe("createLocalClient types", () => {
-	it("mirrors the route tree with call() arguments at each leaf", () => {
-		const client = createLocalClient({ items: { create: withRequest } });
-		expectTypeOf(client.items.create).parameters.toEqualTypeOf<
-			[
-				request: InferClientRequest<typeof withRequest>,
-				options?: CallOptions<typeof withRequest>,
-			]
-		>();
 	});
 });

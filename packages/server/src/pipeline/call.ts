@@ -13,10 +13,8 @@ import type { Merge } from "@rest-rpc/core/utils";
 import type { InitialContextOf } from "../builder/routeBuilder.types.ts";
 import type { ContextOption, OptionsArgs } from "./handleOptions.ts";
 import {
-	isImplementedRoute,
 	toRuntimeImplementation,
 	type ImplementedRoute,
-	type RuntimeImplementationTree,
 } from "../routing/match.ts";
 import { executeRoute, type RouteResult } from "./handleHttpRoute.ts";
 import { resolveRouteError } from "./resolveRouteError.ts";
@@ -120,7 +118,7 @@ const callRoute = async (
  * sent, marked as defined when the route defines its code. Other errors
  * thrown by the handler reject unchanged.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/client/local-client#one-off-calls}
+ * @see {@link https://rest-rpc.vercel.app/docs/client/local-calls#call-a-route}
  */
 export function call<TRoute extends ImplementedRoute>(
 	route: TRoute,
@@ -131,36 +129,4 @@ export function call<TRoute extends ImplementedRoute>(
 		request,
 		options as CallOptions<ImplementedRoute>,
 	) as CallResult<TRoute>;
-}
-
-/** The client returned by `createLocalClient`. */
-export type LocalClient<T extends RuntimeImplementationTree> =
-	T extends ImplementedRoute
-		? (...args: CallArgs<T>) => CallResult<T>
-		: {
-				[
-					K in keyof T as T[K] extends RuntimeImplementationTree ? K : never
-				]: LocalClient<Extract<T[K], RuntimeImplementationTree>>;
-			};
-
-const buildLocalClient = (tree: RuntimeImplementationTree): unknown =>
-	isImplementedRoute(tree)
-		? (...args: CallArgs<typeof tree>) => call(tree, ...args)
-		: Object.fromEntries(
-				Object.entries(tree).map(([key, child]) => [
-					key,
-					buildLocalClient(child),
-				]),
-			);
-
-/**
- * Creates a local client for a route tree, whose leaves call their route
- * handlers with `call`.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/client/local-client#local-client}
- */
-export function createLocalClient<const T extends RuntimeImplementationTree>(
-	routes: T,
-): LocalClient<T> {
-	return buildLocalClient(routes) as LocalClient<T>;
 }
