@@ -102,17 +102,17 @@ import { z } from "zod";
 
 const search = route
 	.get("/users/:id/posts")
-	.params(z.object({ id: z.coerce.number<number>() }))
+	.params(z.object({ id: z.coerce.number() }))
 	.query(
 		z.object({
-			published: z.stringbool().optional(),
+			sort: z.enum(["new", "top"]).optional(),
 			tags: z.array(z.string()).optional(),
 		}),
 	)
 	.headers(z.object({ "x-request-id": z.string() }))
 	.handler(({ params, query, headers }) => ({
 		userId: params.id, // number
-		published: query.published, // boolean | undefined
+		sort: query.sort ?? "new",
 		tags: query.tags ?? [], // sent as tags[]=a&tags[]=b
 		requestId: headers["x-request-id"],
 	}));
@@ -658,7 +658,7 @@ import { z } from "zod";
 
 const double = route
 	.get("/double/:n")
-	.params(z.object({ n: z.coerce.number<number>() }))
+	.params(z.object({ n: z.coerce.number() }))
 	.handler(({ params }) => params.n * 2);
 
 const { body } = await call(double, { params: { n: 21 } });

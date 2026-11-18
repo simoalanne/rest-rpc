@@ -69,7 +69,7 @@ const tenant = route
 
 const getPost = tenant
 	.get("/posts/:id") // GET /tenants/:tenant/posts/:id
-	.params(z.object({ id: z.coerce.number<number>() }))
+	.params(z.object({ id: z.coerce.number() }))
 	.handler(({ params }) => findPost(params.tenant, params.id));
 ```
 
@@ -82,12 +82,12 @@ schema, its schemas have to cover every segment, the prefix's included.
 const update = route
 	.patch("/posts/:id")
 	.params(z.object({ id: z.string() }))
-	.query(z.object({ notify: z.stringbool().optional() }))
+	.query(z.object({ notify: z.enum(["true", "false"]).optional() }))
 	.headers(z.object({ "x-request-id": z.string().optional() }))
 	.body(z.object({ title: z.string() }))
 	.handler(({ params, query, headers, body }) =>
 		updatePost(params.id, body.title, {
-			notify: query.notify,
+			notify: query.notify === "true",
 			requestId: headers["x-request-id"],
 		}),
 	);

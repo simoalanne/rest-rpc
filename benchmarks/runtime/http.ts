@@ -39,7 +39,7 @@ export const routes = {
 	// Validates every request segment and a defined response with headers.
 	validated: route
 		.put("/posts/:id")
-		.params(z.object({ id: z.coerce.number<string>() }))
+		.params(z.object({ id: z.coerce.number() }))
 		.query(z.object({ notify: z.enum(["yes", "no"]).optional() }))
 		.headers(z.object({ authorization: z.string() }))
 		.body(post.omit({ id: true }))
