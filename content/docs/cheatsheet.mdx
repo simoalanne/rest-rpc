@@ -188,8 +188,7 @@ const client = createClient(routes, {
 });
 
 const { error, data } = await safe(client.get({ params: { id: "2" } }));
-if (isDefinedError(error))
-	console.log(error.code, error.data.id); // "POST_NOT_FOUND" "2"
+if (isDefinedError(error)) console.log(error.code, error.data.id); // "POST_NOT_FOUND" "2"
 else if (error) throw error;
 else console.log(data.body.title);
 ```
