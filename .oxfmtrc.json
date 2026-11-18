@@ -10,5 +10,5 @@
 	"arrowParens": "always",
 	"bracketSameLine": false,
 	"bracketSpacing": true,
-	"ignorePatterns": ["**/dist"]
+	"ignorePatterns": ["**/dist", "content/docs/cheatsheet.mdx"]
 }
