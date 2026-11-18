@@ -25,13 +25,19 @@ export type SerializedBody = {
 };
 
 /**
- * Serializes an outgoing value for the complete selected content type. A
- * `BodyValue` is sent with the selected content type, and a `SerializedBody`
- * with its own headers.
+ * Serializes an outgoing value. A `BodyValue` is sent with the selected
+ * content type, and a `SerializedBody` with its own headers.
+ *
+ * @remarks It receives the headers sent with the body, with lowercase names:
+ * those of the handler's response on the server, and those of the request on
+ * the client, without headers that interceptors add. `content-type` is the
+ * complete selected content type.
  */
 export type BodySerializer = (
 	value: unknown,
-	contentType: string,
+	headers: Readonly<Record<string, string>> & {
+		readonly "content-type": string;
+	},
 ) => BodyValue | SerializedBody | Promise<BodyValue | SerializedBody>;
 
 /**
@@ -61,12 +67,13 @@ export type IncomingBody = {
 /**
  * Reads an incoming body and returns a value for schema validation.
  *
- * @remarks It receives the complete content type of the body, with parameters
- * such as `charset`, as the serializer does.
+ * @remarks It receives the headers of the request or response as received,
+ * with lowercase names, so `content-type` keeps parameters such as `charset`.
+ * Headers sent with `serializedBody()` arrive here, apart from `set-cookie`.
  */
 export type BodyDeserializer = (
 	body: IncomingBody,
-	contentType: string,
+	headers: Readonly<Record<string, string>>,
 ) => unknown | Promise<unknown>;
 
 /**

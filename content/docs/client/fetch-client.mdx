@@ -484,13 +484,21 @@ const client = createClient(api, {
 ```
 
 The client runs the schema again on what it decoded, and resolves with its
-output, or rejects with an [`Error`](#typesafe-error-handling). What it decoded
-is the server's output after JSON, so a schema has to accept that:
+output, or rejects with an [`Error`](#typesafe-error-handling). The server sent
+the schema's output, so a schema whose output its input rejects fails on the
+client:
 
-- `z.coerce.date()` accepts the date string JSON made of the server's `Date`,
-  and gives the client a `Date` back.
-- `z.string().transform(Number)` already gave the server a number, which the
-  string schema then rejects on the client.
+```ts
+const getPost = route
+	.get("/posts/:id")
+	.response(z.string().transform((title) => ({ title })))
+	.handler(() => "Hello");
+// The server sends { "title": "Hello" }, which z.string() rejects on the client.
+```
+
+What the client decodes is also what the codec made of the body, such as a
+string for a `Date`. See
+[what the client receives](/docs/http-behavior/encoding#what-the-client-receives).
 
 :::note
 Validation requires runtime schemas, so it only applies to a

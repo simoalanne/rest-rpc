@@ -25,7 +25,7 @@ const toInvalidBody = (): DeserializedRequestBody => ({
 export function deserializeRequestBody(
 	source: IncomingBody,
 	mediaType: string,
-	contentType: string,
+	headers: Readonly<Record<string, string>>,
 	codecs: BodyCodecRegistry,
 ): MaybePromise<DeserializedRequestBody> {
 	// Reading `request.body` would create a stream and slow down decoding, so a
@@ -33,7 +33,7 @@ export function deserializeRequestBody(
 	if (!mediaType) return noBody;
 
 	try {
-		const body = codecs.deserialize(source, mediaType, contentType);
+		const body = codecs.deserialize(source, mediaType, headers);
 		return body instanceof Promise
 			? body.then(toDeserialized, toInvalidBody)
 			: toDeserialized(body);

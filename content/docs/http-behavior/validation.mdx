@@ -27,7 +27,7 @@ const list = route
 const client = createClient({ list }, { origin: "http://localhost" });
 // ---cut-end---
 
-await client.list({ query: {} }); // page is optional for the caller: the schema input
+await client.list({ query: { page: 1 } });
 ```
 
 | Side                             | Request schemas | Response schemas |
@@ -56,34 +56,6 @@ A defined response is validated before it's sent, and a stream each item as
 it's yielded. A failure is a server bug, so the client gets a bare
 `INTERNAL_SERVER_ERROR`, and the issues stay on the server as its `cause`.
 Responses inferred from the handler are type-checked but not validated.
-
-## What the Client Receives
-
-The client's result type is the response schema's output, but the body went
-through JSON on the way. A value JSON can't represent arrives as what JSON made
-of it:
-
-```ts twoslash
-import { createClient } from "@rest-rpc/core";
-import { route } from "@rest-rpc/server";
-import { z } from "zod";
-// ---cut---
-const getPost = route
-	.get("/posts/:id")
-	.response(z.object({ title: z.string(), publishedAt: z.date() }))
-	.handler(() => ({ title: "Hello", publishedAt: new Date() }));
-// ---cut-start---
-const client = createClient({ getPost }, { origin: "http://localhost" });
-// ---cut-end---
-
-const { body } = await client.getPost({ params: { id: "1" } });
-body.publishedAt; // the string "2026-11-17T12:00:00.000Z" at runtime
-//   ^?
-```
-
-Use schemas whose output is what JSON sends, such as `z.iso.datetime()`, or
-restore the value on the client with a `z.coerce.date()` schema and
-[`validateResponses`](/docs/client/fetch-client#response-validation).
 
 ## Disabling Validation
 

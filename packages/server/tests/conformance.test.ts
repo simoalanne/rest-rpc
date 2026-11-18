@@ -721,12 +721,38 @@ describe.each([
 		});
 	});
 
-	it("passes the incoming body and complete content type to custom codecs", async () => {
+	it("rejects a body a codec reads twice as malformed", async () => {
+		const bodyCodecs = [
+			bodyCodec("text/plain", {
+				deserialize: async (body) => {
+					await body.text();
+					return body.text();
+				},
+			}),
+		];
+		const routes = {
+			echo: route
+				.post("/echo")
+				.headers(type<{ "content-type": "text/plain" }>())
+				.body(type<string>())
+				.handler(({ body }) => body),
+		};
+		await serve(routes, { bodyCodecs }, async (url) => {
+			const response = await fetch(`${url}/echo`, {
+				method: "POST",
+				headers: { "content-type": "text/plain" },
+				body: "Ada",
+			});
+			expect(response.status).toBe(400);
+		});
+	});
+
+	it("passes the incoming body and received headers to custom codecs", async () => {
 		const bodyCodecs = [
 			bodyCodec("text/csv", {
-				deserialize: async (body, contentType) => ({
+				deserialize: async (body, headers) => ({
 					text: await body.text(),
-					contentType,
+					contentType: headers["content-type"],
 				}),
 			}),
 			bodyCodec("application/x-ndjson", {
@@ -833,12 +859,16 @@ describe.each([
 		});
 	});
 
-	it("sends the headers of a serialized body under the route's headers, content type included", async () => {
+	it("sends the headers of a serialized body over the route's headers, content type included", async () => {
 		const bodyCodecs = [
 			bodyCodec("text/x-custom", {
 				serialize: (value) =>
 					serializedBody(String(value), {
-						headers: { "x-codec": "custom", "x-route": "codec" },
+						headers: {
+							"content-type": "text/x-custom; charset=utf-8",
+							"x-codec": "custom",
+							"x-route": "codec",
+						},
 					}),
 			}),
 		];
@@ -851,9 +881,11 @@ describe.each([
 		};
 		await serve(routes, { bodyCodecs }, async (url) => {
 			const response = await fetch(`${url}/custom`);
-			expect(response.headers.get("content-type")).toBe("text/x-custom");
+			expect(response.headers.get("content-type")).toBe(
+				"text/x-custom; charset=utf-8",
+			);
 			expect(response.headers.get("x-codec")).toBe("custom");
-			expect(response.headers.get("x-route")).toBe("route");
+			expect(response.headers.get("x-route")).toBe("codec");
 			expect(await response.text()).toBe("value");
 		});
 	});

@@ -3,8 +3,9 @@ import type { BodyValue, SerializedBody } from "./types.ts";
 const serializedBodyBrand = Symbol("rest-rpc.serializedBody");
 
 /**
- * Creates a body that is sent with its own headers. Without a `content-type`
- * header, the selected content type is sent.
+ * Creates a body that is sent with its own headers. They replace the headers
+ * sent with the body, such as those a handler or a call sets, and without a
+ * `content-type` header, the selected content type is sent.
  *
  * @remarks A `FormData` body is always sent with the `multipart/form-data`
  * content type the runtime generates with its boundary, so a `content-type`

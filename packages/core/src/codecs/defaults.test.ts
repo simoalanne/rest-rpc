@@ -6,37 +6,58 @@ const codecs = createBodyCodecRegistry([]);
 describe("defaults", () => {
 	it("round-trips JSON including structured suffix media types", async () => {
 		const value = { message: "missing" };
-		expect(codecs.serialize(value, "application/problem+json")).toBe(
-			JSON.stringify(value),
-		);
+		expect(
+			codecs.serialize(value, { "content-type": "application/problem+json" }),
+		).toBe(JSON.stringify(value));
 		expect(
 			await codecs.deserialize(
 				Response.json(value),
 				"application/problem+json",
-				"application/problem+json",
+				{ "content-type": "application/problem+json" },
 			),
 		).toEqual(value);
 		expect(() =>
-			codecs.serialize(undefined, "application/problem+json"),
+			codecs.serialize(undefined, {
+				"content-type": "application/problem+json",
+			}),
 		).toThrow();
 	});
 
 	it("serializes FormData as is", () => {
 		const body = new FormData();
-		expect(codecs.serialize(body, "multipart/form-data")).toBe(body);
+		expect(
+			codecs.serialize(body, { "content-type": "multipart/form-data" }),
+		).toBe(body);
 		expect(() =>
-			codecs.serialize({ name: "Ada" }, "multipart/form-data"),
+			codecs.serialize(
+				{ name: "Ada" },
+				{ "content-type": "multipart/form-data" },
+			),
 		).toThrow();
 	});
 
 	it("preserves URLSearchParams and decodes repeated form values", async () => {
 		const mediaType = "application/x-www-form-urlencoded";
 		const body = new URLSearchParams("tag=a&tag=b");
-		expect(codecs.serialize(body, mediaType)).toBe(body);
+		expect(codecs.serialize(body, { "content-type": mediaType })).toBe(body);
 		expect(
-			await codecs.deserialize(new Response(body), mediaType, mediaType),
+			await codecs.deserialize(new Response(body), mediaType, {
+				"content-type": mediaType,
+			}),
 		).toEqual(body);
-		expect(() => codecs.serialize("tag=a", mediaType)).toThrow();
+		expect(() =>
+			codecs.serialize("tag=a", { "content-type": mediaType }),
+		).toThrow();
+	});
+
+	it("decodes multipart Fetch bodies", async () => {
+		const form = new FormData();
+		form.set("name", "Ada");
+		const response = new Response(form);
+		const decoded = await codecs.deserialize(response, "multipart/form-data", {
+			"content-type": response.headers.get("content-type")!,
+		});
+		expect((decoded as FormData).get("name")).toBe("Ada");
 	});
 
 	it("decodes incoming bodies that are not Fetch requests or responses", async () => {
@@ -52,7 +73,7 @@ describe("defaults", () => {
 			await codecs.deserialize(
 				incoming(Response.json({ a: 1 })),
 				"application/json",
-				"application/json; charset=utf-8",
+				{ "content-type": "application/json; charset=utf-8" },
 			),
 		).toEqual({ a: 1 });
 
@@ -63,24 +84,30 @@ describe("defaults", () => {
 		const decoded = await codecs.deserialize(
 			incoming(multipart),
 			"multipart/form-data",
-			contentType,
+			{ "content-type": contentType },
 		);
 		expect((decoded as FormData).get("name")).toBe("Ada");
 	});
 
 	it("accepts text strings and binary values but rejects other body shapes", () => {
-		expect(codecs.serialize("Ada", "text/plain")).toBe("Ada");
-		expect(() => codecs.serialize(1, "text/plain")).toThrow();
+		expect(codecs.serialize("Ada", { "content-type": "text/plain" })).toBe(
+			"Ada",
+		);
+		expect(() =>
+			codecs.serialize(1, { "content-type": "text/plain" }),
+		).toThrow();
 		for (const body of [
 			new Uint8Array([1]),
 			new Blob(["data"]),
 			new ReadableStream(),
 			(async function* () {})(),
 		]) {
-			expect(codecs.serialize(body, "application/octet-stream")).toBe(body);
+			expect(
+				codecs.serialize(body, { "content-type": "application/octet-stream" }),
+			).toBe(body);
 		}
 		expect(() =>
-			codecs.serialize("data", "application/octet-stream"),
+			codecs.serialize("data", { "content-type": "application/octet-stream" }),
 		).toThrow();
 	});
 });

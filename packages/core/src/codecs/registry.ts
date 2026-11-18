@@ -10,19 +10,16 @@ import type {
 } from "./types.ts";
 
 export type BodyCodecRegistry = {
-	/** Serializes a value with the codec for the base media type of `contentType`. */
-	serialize: (
-		value: unknown,
-		contentType: string,
-	) => BodyValue | SerializedBody | Promise<BodyValue | SerializedBody>;
+	/** Serializes a value with the codec for the base media type of its `content-type` header. */
+	serialize: BodySerializer;
 	/**
 	 * Deserializes a body with the codec for its base media type, passing the
-	 * complete content type to the codec.
+	 * received headers to the codec.
 	 */
 	deserialize: (
 		body: IncomingBody,
 		mediaType: string,
-		contentType: string,
+		headers: Readonly<Record<string, string>>,
 	) => unknown;
 	/** Whether `contentType` is serialized by the built-in JSON serializer. */
 	serializesJson: (contentType: string) => boolean;
@@ -95,15 +92,17 @@ export function createBodyCodecRegistry(
 	};
 
 	return {
-		serialize: (value, contentType) => {
-			const { mediaType, serialize } = resolveSerializer(contentType);
-			const result = serialize(value, contentType);
+		serialize: (value, headers) => {
+			const { mediaType, serialize } = resolveSerializer(
+				headers["content-type"],
+			);
+			const result = serialize(value, headers);
 			return result instanceof Promise
 				? result.then((resolved) => assertBaseMediaType(resolved, mediaType))
 				: assertBaseMediaType(result, mediaType);
 		},
-		deserialize: (body, mediaType, contentType) =>
-			findDeserializer(mediaType)!(body, contentType),
+		deserialize: (body, mediaType, headers) =>
+			findDeserializer(mediaType)!(body, headers),
 		serializesJson: (contentType) =>
 			resolveSerializer(contentType).serialize === serializeJson,
 	};

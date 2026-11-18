@@ -35,9 +35,13 @@ await client.search({
   the client accept a number instead of `unknown`.
 - Booleans use `z.stringbool()`, since `z.coerce.boolean()` reads `"false"`
   as `true`.
+- Other values are sent with `String()`, and `undefined` query and header
+  values are left out. A `Date` arrives as `"Tue Nov 17 2026 …"` and `null` as
+  `"null"`, so send dates as ISO strings.
 - Arrays are sent as `key[]` keys, and only those become arrays, so HTML forms
-  name the field `tags[]`.
-- Header names are lowercase.
+  name the field `tags[]`. A repeated key without `[]` keeps its last value,
+  and an empty array sends nothing, so it arrives as `undefined`.
+- Header names are sent lowercase.
 
 ## Bodies
 
@@ -84,29 +88,100 @@ const { body } = await client.posts.image({ params: { id: "post_1" } });
 //      ^?
 ```
 
-A request with another `Content-Type` gets
-[`UNSUPPORTED_MEDIA_TYPE`](/docs/http-behavior/errors#built-in-errors) and
-`415`, and a route that declares none accepts JSON. An async iterable is sent
-as [Server-Sent Events](/docs/server-sent-events), a returned `Response` as it is, and
-`FormData` as `multipart/form-data`, whatever the header says. On the client,
-only a call's own `content-type` header chooses the format: one in
-`additionalHeaders` or `globalHeaders` doesn't, and the server answers it with
-`415`.
+- A request is sent in the format of its `content-type` header, and as JSON
+  without one. Like other headers, the call's overrides one in
+  `additionalHeaders`, which overrides one in `globalHeaders`.
+- The server decodes the content types the headers schema declares, and JSON
+  when it declares none. A content type the headers schema rejects fails
+  [validation](/docs/http-behavior/validation#requests) with `400`, and a route
+  that declares none answers one other than JSON with
+  [`UNSUPPORTED_MEDIA_TYPE`](/docs/http-behavior/errors#built-in-errors) and
+  `415`.
+- A request without a `content-type` is read as having no body. The client
+  sets `application/json` itself, but other clients, such as `curl`, have to
+  send it.
+- Headers schemas see the base media type without parameters such as
+  `charset` or `boundary`, so `z.literal("multipart/form-data")` matches what
+  the browser sends. Codecs receive the full header.
+- `FormData` is sent as `multipart/form-data` with the boundary the runtime
+  generates, whatever the header says. A route that declares the header still
+  requires it in the call, and the client replaces it with the generated one.
+- A response is sent in the format of the `content-type` a handler sets, and
+  as JSON without one. An async iterable is sent as
+  [Server-Sent Events](/docs/server-sent-events), and a returned `Response` as
+  it is. [Errors](/docs/http-behavior/errors) are always JSON.
 
 Each content type is encoded by a codec:
 
-| Content type                        | Value                                        |
-| ----------------------------------- | -------------------------------------------- |
-| `application/json`, `*+json`        | JSON value                                   |
-| `application/x-www-form-urlencoded` | `URLSearchParams`                            |
-| `multipart/form-data`               | `FormData`                                   |
-| `text/*`                            | `string`                                     |
-| any other                           | `Blob` or `Uint8Array` sent, `Blob` received |
+| Content type                        | Value                                                  |
+| ----------------------------------- | ------------------------------------------------------ |
+| `application/json`, `*+json`        | JSON value                                             |
+| `application/x-www-form-urlencoded` | `URLSearchParams`                                      |
+| `multipart/form-data`               | `FormData`                                             |
+| `text/*`                            | `string`, decoded as UTF-8                             |
+| any other                           | `Blob`, `Uint8Array` or a stream sent, `Blob` received |
 
 The schema of a non-JSON body describes that value, such as `z.string()` for
-`text/plain` and `z.instanceof(Blob)` for a file. The client's result type is
-the schema output, so a schema that says otherwise is a type the body won't
-have.
+`text/plain` and `z.instanceof(Blob)` for a file. The client's type stays the
+schema's, so see [what the client receives](#what-the-client-receives) when a
+codec gives it another value.
+
+The default codecs read a body whole: the server before the handler runs, and
+the client before the call resolves. To stream binary data or large text, use
+a [custom codec](#custom-codecs) whose `deserialize` returns `body.body`.
+
+## What the Client Receives
+
+The client's result type is the response schema's output, or the handler's
+return type without one, but the body went through a codec on the way. A value
+JSON can't represent arrives as what JSON made of it:
+
+```ts twoslash
+import { createClient } from "@rest-rpc/core";
+import { route } from "@rest-rpc/server";
+import { z } from "zod";
+// ---cut---
+const getPost = route
+	.get("/posts/:id")
+	.response(z.object({ title: z.string(), publishedAt: z.date() }))
+	.handler(() => ({ title: "Hello", publishedAt: new Date() }));
+// ---cut-start---
+const client = createClient({ getPost }, { origin: "http://localhost" });
+// ---cut-end---
+
+const { body } = await client.getPost({ params: { id: "1" } });
+body.publishedAt; // the string "2026-11-17T12:00:00.000Z" at runtime
+//   ^?
+```
+
+Use schemas whose output is what JSON sends, such as `z.iso.datetime()`, or
+restore the value on the client with a `z.coerce.date()` schema and
+[`validateResponses`](/docs/client/fetch-client#response-validation).
+
+A binary body arrives as a `Blob`, whatever the server sent, and a stream is
+read to the end before the call resolves:
+
+```ts twoslash
+import { createClient } from "@rest-rpc/core";
+import { route } from "@rest-rpc/server";
+declare function exportPost(id: string): ReadableStream<Uint8Array>;
+// ---cut---
+const download = route.get("/posts/:id/export").handler(({ params, respond }) =>
+	respond(exportPost(params.id), {
+		headers: { "content-type": "application/octet-stream" },
+	}),
+);
+// ---cut-start---
+const client = createClient({ download }, { origin: "http://localhost" });
+// ---cut-end---
+
+const { body } = await client.download({ params: { id: "1" } });
+body; // a Blob at runtime
+// ^?
+```
+
+To receive another value, such as a stream or a `Uint8Array`, use a
+[custom codec](#custom-codecs) on both sides.
 
 ## Custom Codecs
 
@@ -118,9 +193,9 @@ import { bodyCodec } from "@rest-rpc/core";
 
 const csv = bodyCodec("text/csv", {
 	serialize: (rows) => toCsv(rows as string[][]),
-	deserialize: async (body, contentType) =>
+	deserialize: async (body, headers) =>
 		parseCsv(await body.text(), {
-			header: contentType.includes("header=present"),
+			header: headers["content-type"]?.includes("header=present"),
 		}),
 });
 
@@ -133,6 +208,10 @@ createClient(api, { origin, bodyCodecs: [csv] });
   replaces the JSON codec, and a missing `serialize` or `deserialize` falls
   back to the default.
 - `body` has the Fetch body methods, such as `text()` and `arrayBuffer()`.
+- `serialize` receives the headers sent with the body, and `deserialize` the
+  received ones. Names are lowercase, and `content-type` keeps parameters
+  such as `charset`. On the client, `serialize` doesn't see headers that
+  interceptors add.
 - A body that fails to decode is answered with
   [`MALFORMED_REQUEST_BODY`](/docs/http-behavior/errors#built-in-errors) and
   `400`.
@@ -150,3 +229,41 @@ const gzipJson = bodyCodec("application/json", {
 		}),
 });
 ```
+
+`deserialize` receives these headers, so a codec can say how to read a body.
+This one returns a `Uint8Array` where the default returns a `Blob`:
+
+```ts
+const bytes = bodyCodec("application/octet-stream", {
+	serialize: (value) =>
+		value instanceof Uint8Array
+			? serializedBody(value, { headers: { "x-body": "bytes" } })
+			: (value as Blob),
+	deserialize: async (body, headers) =>
+		headers["x-body"] === "bytes"
+			? new Uint8Array(await body.arrayBuffer())
+			: body.blob(),
+});
+```
+
+The headers a codec returns replace those a handler or a call sets, apart from
+the base media type of `content-type`. Check a header before replacing it, and
+return only the headers the codec adds or changes. This codec names the
+downloads a handler marks as attachments after the file:
+
+```ts
+const attachments = bodyCodec("application/pdf", {
+	serialize: (value, headers) =>
+		value instanceof File && headers["content-disposition"] === "attachment"
+			? serializedBody(value, {
+					headers: {
+						"content-disposition": `attachment; filename="${value.name}"`,
+					},
+				})
+			: (value as Blob),
+});
+```
+
+Browsers hide response headers from cross-origin requests unless the server
+lists them in `Access-Control-Expose-Headers`, so add a header like `x-body`
+there when the client runs on another origin.

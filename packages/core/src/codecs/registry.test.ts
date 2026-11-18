@@ -11,23 +11,31 @@ describe("createBodyCodecRegistry", () => {
 			},
 			{ mediaTypes: [/^text\//], serialize: () => "custom text" },
 		]);
-		expect(registry.serialize({}, "application/vnd.api+json")).toBe("exact");
-		expect(registry.serialize({}, "application/x-json")).toBe("pattern");
-		expect(registry.serialize("a", "text/plain")).toBe("custom text");
-		expect(registry.serialize({}, "application/json")).toBe("{}");
+		expect(
+			registry.serialize({}, { "content-type": "application/vnd.api+json" }),
+		).toBe("exact");
+		expect(
+			registry.serialize({}, { "content-type": "application/x-json" }),
+		).toBe("pattern");
+		expect(registry.serialize("a", { "content-type": "text/plain" })).toBe(
+			"custom text",
+		);
+		expect(registry.serialize({}, { "content-type": "application/json" })).toBe(
+			"{}",
+		);
 	});
 
 	it("selects serializers and deserializers independently", async () => {
 		const registry = createBodyCodecRegistry([
 			{ mediaTypes: ["application/json"], serialize: () => "x" },
 		]);
-		expect(registry.serialize({}, "application/json")).toBe("x");
+		expect(registry.serialize({}, { "content-type": "application/json" })).toBe(
+			"x",
+		);
 		expect(
-			await registry.deserialize(
-				Response.json({ a: 1 }),
-				"application/json",
-				"application/json",
-			),
+			await registry.deserialize(Response.json({ a: 1 }), "application/json", {
+				"content-type": "application/json",
+			}),
 		).toEqual({ a: 1 });
 	});
 
@@ -43,14 +51,18 @@ describe("createBodyCodecRegistry", () => {
 				},
 			]);
 		await expect(
-			registry("text/plain; charset=utf-8").serialize("text", "text/plain"),
+			registry("text/plain; charset=utf-8").serialize("text", {
+				"content-type": "text/plain",
+			}),
 		).resolves.toEqual(
 			serializedBody("text", {
 				headers: { "content-type": "text/plain; charset=utf-8" },
 			}),
 		);
 		await expect(
-			registry("application/json").serialize("text", "text/plain"),
+			registry("application/json").serialize("text", {
+				"content-type": "text/plain",
+			}),
 		).rejects.toThrow();
 	});
 });

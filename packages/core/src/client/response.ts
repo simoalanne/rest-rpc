@@ -116,14 +116,17 @@ const STREAM_CONTENT_TYPE = "text/event-stream";
 
 // Joined `Set-Cookie` values cannot be split again, so they are read as
 // `cookies` instead of a header.
+const readHeaderRecord = (rawResponse: Response) =>
+	Object.fromEntries(
+		[...rawResponse.headers].filter(([name]) => name !== "set-cookie"),
+	);
+
 const readHeaders = async (
 	schema: ResponseDefinition | RouteErrorDefinition | undefined,
 	rawResponse: Response,
 	validate: boolean,
 ) => {
-	const headers = Object.fromEntries(
-		[...rawResponse.headers].filter(([name]) => name !== "set-cookie"),
-	);
+	const headers = readHeaderRecord(rawResponse);
 	const cookies = rawResponse.headers.getSetCookie();
 	if (!schema?.headers || !validate) return { headers, cookies };
 
@@ -145,7 +148,7 @@ const readBody = async (
 		return await codecs.deserialize(
 			rawResponse,
 			mediaType,
-			rawResponse.headers.get("content-type") ?? "",
+			readHeaderRecord(rawResponse),
 		);
 	} catch (cause) {
 		throw contractError("Response body could not be decoded.", cause);

@@ -31,11 +31,14 @@ export const defaultBodyCodecs: readonly BodyCodec[] = [
 				throw new TypeError("Expected FormData body");
 			return value;
 		},
-		// The content type carries the multipart boundary.
-		deserialize: async (body, contentType) =>
-			new Response(await body.arrayBuffer(), {
-				headers: { "content-type": contentType },
-			}).formData(),
+		// Fetch requests and responses parse their own body. Other bodies are
+		// read whole, with the content type that carries the multipart boundary.
+		deserialize: async (body, headers) =>
+			typeof (body as Partial<Response>).formData === "function"
+				? (body as Response).formData()
+				: new Response(await body.arrayBuffer(), {
+						headers: { "content-type": headers["content-type"] ?? "" },
+					}).formData(),
 	}),
 	bodyCodec(/^text\//, {
 		serialize: (value) => {

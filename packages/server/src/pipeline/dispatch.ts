@@ -136,8 +136,10 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 					readPathParams(pathParams, readRequestPathname(reader.url(request))));
 		}
 
+		// The received headers are read once, for the headers schema and the codec.
+		let receivedHeaders: Record<string, string> | undefined;
 		let headers = schemas?.headers?.length
-			? withNormalizedContentType(reader.headers(request))
+			? withNormalizedContentType((receivedHeaders = reader.headers(request)))
 			: undefined;
 		let headersValidated = false;
 
@@ -179,7 +181,7 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 				const deserialized = await deserializeRequestBody(
 					reader.body(request, contentType),
 					receivedMediaType,
-					contentType,
+					receivedHeaders ?? reader.headers(request),
 					codecs,
 				);
 				if (deserialized.rejection) {
