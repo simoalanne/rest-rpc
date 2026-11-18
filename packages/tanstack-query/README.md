@@ -535,9 +535,7 @@ export function getApi() {
 import { createClient } from "@rest-rpc/core";
 import { getApi } from "./contract.ts" with { type: "macro" };
 
-export const client = createClient(getApi(), {
-	origin: "https://api.example.com",
-});
+export const client = createClient(getApi()); // the page's origin, or pass { origin }
 ```
 
 ```ts
