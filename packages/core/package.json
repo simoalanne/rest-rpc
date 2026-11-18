@@ -17,7 +17,7 @@
 		"valibot",
 		"zod"
 	],
-	"homepage": "https://github.com/simoalanne/rest-rpc#readme",
+	"homepage": "https://rest-rpc.vercel.app/docs",
 	"license": "MIT",
 	"repository": {
 		"type": "git",

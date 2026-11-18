@@ -44,16 +44,12 @@ section.
 Use the hosted docs only for details the cheatsheet does not cover, such as
 exact edge-case behavior, every option of an API, or full integration guides.
 The hosted docs describe the latest release, which can differ from the
-installed version.
+installed version. Web search may not find them, so fetch them directly:
 
-1. MCP tools, preferred: `search_docs`, then `get_page`, and `list_pages` or
-   `get_navigation` for discovery. Add the server if it is missing:
-   - Codex: `codex mcp add rest-rpc --url https://rest-rpc.vercel.app/mcp`
-   - Claude Code: `claude mcp add --transport http rest-rpc https://rest-rpc.vercel.app/mcp`
-2. Without MCP, fetch the page the cheatsheet links to, or use the indexes at
-   `https://rest-rpc.vercel.app/llms.txt` and
-   `https://rest-rpc.vercel.app/agent-readability.json`.
-3. For details the docs do not cover, read the installed package's `dist/`:
+1. Fetch `https://rest-rpc.vercel.app/llms.txt`. It lists every page with
+   its description, including the pages cheatsheet sections link to, and how
+   to fetch them as Markdown or all in one file.
+2. For details the docs do not cover, read the installed package's `dist/`:
    transpiled JavaScript and `.d.ts` files with TSDoc on every export.
 
 ## Project Workflow
