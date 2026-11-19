@@ -1,5 +1,11 @@
 # @rest-rpc/tanstack-query
 
+## 0.6.0
+
+### Minor Changes
+
+- dc89bc1: Add a `fetch` function to each route's TanStack Query utils that calls the underlying client route directly
+
 ## 0.5.0
 
 No changes in this release.
