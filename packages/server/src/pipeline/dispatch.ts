@@ -37,7 +37,8 @@ import {
 	type HttpRouteResult,
 	type RouteResult,
 } from "./handleHttpRoute.ts";
-import { resolveRequestMediaType } from "./requestContentType.ts";
+import { UnsupportedMediaType } from "./errors.ts";
+import { acceptsRequestMediaType } from "./requestContentType.ts";
 import { resolveRouteError, toSentError } from "./resolveRouteError.ts";
 import type { SerializedHttpResponse } from "./serializeHttpRouteResult.ts";
 import { sseBodyCodec } from "./sse.ts";
@@ -170,9 +171,8 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 				headersValidated = true;
 				declared = headers["content-type"];
 			}
-			const mediaType = resolveRequestMediaType(declared, receivedMediaType);
-			if (mediaType instanceof RouteError) {
-				return rejectWith(implementation, mediaType);
+			if (!acceptsRequestMediaType(declared, receivedMediaType)) {
+				return rejectWith(implementation, new UnsupportedMediaType());
 			}
 
 			if (handleOptions?.body !== undefined) {

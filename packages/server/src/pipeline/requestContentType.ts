@@ -1,17 +1,16 @@
-import { RouteError } from "@rest-rpc/core";
-import { normalizeMediaType } from "@rest-rpc/core/codecs";
-import { UnsupportedMediaType } from "./errors.ts";
-
 /**
- * The media type of a request body: the `content-type` its validated headers
- * declare, or else JSON, which a body without a content type is too.
+ * Whether a route accepts the media type of a request body. A route whose
+ * validated headers declare a content type accepts it, since the headers schema
+ * already checked it. Otherwise a route accepts JSON, and multipart, whose
+ * boundary Fetch generates for `FormData` so the call can't state it. A request
+ * without a content type is read as having no body, which the body schema
+ * validates.
  */
-export function resolveRequestMediaType(
+export const acceptsRequestMediaType = (
 	declared: unknown,
 	receivedMediaType: string,
-): string | RouteError {
-	if (typeof declared === "string") return normalizeMediaType(declared);
-	return !receivedMediaType || receivedMediaType === "application/json"
-		? "application/json"
-		: new UnsupportedMediaType();
-}
+): boolean =>
+	typeof declared === "string" ||
+	!receivedMediaType ||
+	receivedMediaType === "application/json" ||
+	receivedMediaType === "multipart/form-data";

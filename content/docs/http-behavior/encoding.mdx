@@ -46,9 +46,9 @@ const { body } = await client.search({
 
 ## Bodies
 
-A body is JSON unless a `content-type` header says otherwise. A route declares
-the request content types it accepts in its headers schema, and a handler sets
-the response's with `respond()`:
+A body is JSON unless a `content-type` header says otherwise, and `FormData`
+is always multipart. A route declares other request content types it accepts
+in its headers schema, and a handler sets the response's with `respond()`:
 
 ```ts twoslash
 import { createClient } from "@rest-rpc/core";
@@ -63,7 +63,6 @@ declare const file: File;
 // ---cut---
 const upload = route
 	.post("/posts/:id/image")
-	.headers(z.object({ "content-type": z.literal("multipart/form-data") }))
 	.body(z.instanceof(FormData))
 	.handler(({ params, body }) => savePostImage(params.id, body.get("image")));
 
@@ -82,7 +81,6 @@ const form = new FormData();
 form.set("image", file);
 const uploaded = await client.posts.upload({
 	params: { id: "post_1" },
-	headers: { "content-type": "multipart/form-data" },
 	body: form,
 });
 const { body } = await client.posts.image({ params: { id: "post_1" } });
@@ -92,11 +90,13 @@ const { body } = await client.posts.image({ params: { id: "post_1" } });
   without one. Like other headers, the call's overrides one in
   `additionalHeaders`, which overrides one in `globalHeaders`.
 - The server decodes the content types the headers schema declares, and JSON
-  when it declares none. A content type the headers schema rejects fails
-  [validation](/docs/http-behavior/validation#requests) with `400`, and a route
-  that declares none answers one other than JSON with
+  or `multipart/form-data` when it declares none. A content type the headers
+  schema rejects fails [validation](/docs/http-behavior/validation#requests)
+  with `400`, and a route that declares none answers any other with
   [`UNSUPPORTED_MEDIA_TYPE`](/docs/http-behavior/errors#built-in-errors) and
-  `415`.
+  `415`. A route without a declared content type therefore also receives
+  `FormData` when a client sends it, so its body schema decides whether to
+  accept it.
 - A request without a `content-type` is read as having no body. The client
   sets `application/json` itself, but other clients, such as `curl`, have to
   send it.
@@ -104,8 +104,9 @@ const { body } = await client.posts.image({ params: { id: "post_1" } });
   `charset` or `boundary`, so `z.literal("multipart/form-data")` matches what
   the browser sends. Codecs receive the full header.
 - `FormData` is sent as `multipart/form-data` with the boundary the runtime
-  generates, whatever the header says. A route that declares the header still
-  requires it in the call, and the client replaces it with the generated one.
+  generates, whatever the header says, both in requests and in responses. A
+  route that declares the header still requires it in the call, and the client
+  replaces it with the generated one.
 - A response is sent in the format of the `content-type` a handler sets, and
   as JSON without one. An async iterable is sent as
   [Server-Sent Events](/docs/server-sent-events), and a returned `Response` as
