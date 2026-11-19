@@ -199,4 +199,10 @@ describe("createTanstackQueryUtils", () => {
 		).toBe(3);
 		client.clear();
 	});
+
+	it("allows to call the underlying fetch function directly", async () => {
+		const { utils } = setup(() => Response.json({ name: "Ada" }));
+		const data = await utils.users.get.fetch({ params: { id: "1" } });
+		expect(data).toMatchObject({ body: { name: "Ada" } });
+	});
 });

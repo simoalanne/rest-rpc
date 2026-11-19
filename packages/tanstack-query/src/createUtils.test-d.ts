@@ -241,4 +241,10 @@ describe("createTanstackQueryUtils types", () => {
 		// @ts-expect-error A reducer requires an initial value.
 		utils.events.streamedQueryOptions({ reducer: (total: number) => total });
 	});
+
+	it("allows to call the underlying fetch function directly", async () => {
+		const data = await utils.get.fetch({ params: { id: "1" } });
+		expectTypeOf(data).toEqualTypeOf<InferClientResponse<typeof get>>();
+		expectTypeOf(data.body).toEqualTypeOf<{ name: string }>();
+	});
 });

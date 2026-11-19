@@ -447,3 +447,22 @@ const queryKey: readonly unknown[] & {
         id: string;
     }, 404, Record<string, string>>;
 }
+
+const fetchPost: (request: {
+    query: {
+        expand: boolean;
+    };
+    params: {
+        id: string;
+    };
+    headers?: {
+        "x-tenant"?: string | undefined;
+    } | undefined;
+}, options?: FetchOptions | undefined) => ClientPromise<{
+    status: 200;
+    body: Post;
+    headers: Record<string, string>;
+    cookies: readonly string[];
+}, Error | RouteError<"POST_NOT_FOUND", {
+    id: string;
+}, 404, Record<string, string>>>

@@ -268,6 +268,7 @@ type MutationOptionsArgs<F extends ClientRoute> = OptionsArgument<
 >;
 
 type TanstackQueryBaseRouteValue<F extends ClientRoute> = {
+	fetch: (...args: Parameters<F>) => ReturnType<F>;
 	mutationOptions: (
 		...args: MutationOptionsArgs<F>
 	) => MutationOptionsResultFor<F>;
