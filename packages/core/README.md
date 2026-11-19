@@ -38,6 +38,7 @@ re-exports what it needs from `@rest-rpc/core`. Client code imports
 - [Browser Clients](#browser-clients)
 - [Client Options](#client-options)
 - [TanStack Query](#tanstack-query)
+- [Direct Calls from TanStack Query Utils](#direct-calls-from-tanstack-query-utils)
 - [Contract-first](#contract-first)
 - [Local Calls](#local-calls)
 - [OpenAPI](#openapi)
@@ -612,6 +613,37 @@ export function Posts() {
 			{posts.data?.length ?? 0} posts
 		</button>
 	);
+}
+```
+
+## Direct Calls from TanStack Query Utils
+
+Call a route through the utils with `fetch()` when TanStack Query is not needed, such as in a router loader, so the app keeps only the utils around.
+
+See [Direct Fetch Calls](https://rest-rpc.vercel.app/docs/client/tanstack-query#direct-fetch-calls)
+
+```ts
+import { createClient } from "@rest-rpc/core";
+import { route } from "@rest-rpc/server";
+import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
+
+const routes = {
+	posts: {
+		get: route.get("/posts/:id").handler(({ params }) => ({
+			id: params.id,
+			title: "Hello",
+			body: "First post",
+		})),
+	},
+};
+
+const restrpc = createTanstackQueryUtils(
+	createClient(routes, { origin: "https://api.example.com" }),
+);
+
+export async function loadPost(id: string) {
+	const { body: post } = await restrpc.posts.get.fetch({ params: { id } });
+	return post;
 }
 ```
 

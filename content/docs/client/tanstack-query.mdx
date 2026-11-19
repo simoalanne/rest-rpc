@@ -215,6 +215,16 @@ await queryClient.invalidateQueries({
 });
 ```
 
+## Direct Fetch Calls
+
+Use `fetch()` when you need direct access to the underlying [Fetch Client](/docs/client/fetch-client#call-routes) call.
+
+```ts
+const { body: post } = await restrpc.posts.get.fetch({
+	params: { id: "post_1" },
+});
+```
+
 ## Mutations
 
 ```tsx

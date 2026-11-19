@@ -98,3 +98,4 @@ export const queryOptions = utils.posts.get.queryOptions({
 });
 export const mutationOptions = utils.posts.create.mutationOptions();
 export const queryKey = utils.posts.get.queryKey();
+export const fetchPost = utils.posts.get.fetch;

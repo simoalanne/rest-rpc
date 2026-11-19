@@ -21,6 +21,7 @@ type OptionsWithFetchOptions = Record<string, unknown> & {
 	request?: unknown;
 };
 type TanstackQueryUtilFunctions = {
+	fetch: (request?: unknown, fetchOptions?: FetchOptions) => Promise<unknown>;
 	mutationOptions: (
 		options?: OptionsWithFetchOptions,
 	) => Record<string, unknown>;
@@ -67,6 +68,7 @@ const createUtilsForRoute = ({
 	};
 
 	return {
+		fetch: fetchData,
 		mutationOptions: (options) => {
 			const { fetchOptions, ...mutationOptions } = options ?? {};
 			return {
