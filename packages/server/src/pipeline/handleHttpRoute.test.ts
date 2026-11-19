@@ -162,6 +162,25 @@ describe("route pipeline", () => {
 		expect(text.status).toBe(415);
 	});
 
+	it("receives and sends FormData without a declared content type", async () => {
+		const routes = {
+			echo: route
+				.post("/echo")
+				.body(type<FormData>())
+				.handler(({ body, respond }) => respond(body)),
+		};
+		const app = createApp(routes);
+		const client = createClient(routes, {
+			origin: "http://localhost",
+			fetch: app.fetch,
+		});
+		const form = new FormData();
+		form.append("name", "Ada");
+		const { status, body } = await client.echo({ body: form });
+		expect(status).toBe(200);
+		expect(body.get("name")).toBe("Ada");
+	});
+
 	it("sends transformed defined bodies and headers unless response validation is disabled", async () => {
 		const implementation = route
 			.get("/")
