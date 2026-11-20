@@ -41,7 +41,6 @@ import { UnsupportedMediaType } from "./errors.ts";
 import { acceptsRequestMediaType } from "./requestContentType.ts";
 import { resolveRouteError, toSentError } from "./resolveRouteError.ts";
 import type { SerializedHttpResponse } from "./serializeHttpRouteResult.ts";
-import { sseBodyCodec } from "./sse.ts";
 import { prepareStaticResponse } from "./staticResponse.ts";
 import { parseQuery, validateRequestHeaders } from "./validation.ts";
 
@@ -241,10 +240,7 @@ export const compileRouteTree = <TRequest extends object, TTarget, TOut>(
 	reader: RequestReader<TRequest>,
 	writer: ResponseWriter<TTarget, TOut>,
 ) => {
-	const codecs = createBodyCodecRegistry([
-		sseBodyCodec,
-		...(options.bodyCodecs ?? []),
-	]);
+	const codecs = createBodyCodecRegistry(options.bodyCodecs ?? []);
 	const routes = flattenRouteImplementations(implementations).map(
 		(implementation): CompiledRoute => {
 			const path = resolveImplementationPath(implementation.route.path);

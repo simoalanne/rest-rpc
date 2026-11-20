@@ -123,7 +123,10 @@ const normalizeResponseResult = (
 /** A validated logical response for the Fetch and Node handlers to serialize and write. */
 export type HttpRouteResult = ResponseHeaderFields & {
 	status: number;
-	body?: { value: unknown; contentType: string };
+	/** A value for the codecs, or a framed SSE stream, which skips them. */
+	body?:
+		| { value: unknown; contentType: string }
+		| { events: AsyncIterable<string> };
 };
 
 // Errors are thrown, so inferred statuses are successful.

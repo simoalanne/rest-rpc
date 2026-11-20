@@ -1,4 +1,5 @@
 import { bodyCodec } from "./bodyCodec.ts";
+import { BodySerializationError } from "./errors.ts";
 import { isAsyncIterable } from "./operations.ts";
 import type {
 	BodyCodec,
@@ -19,7 +20,10 @@ export const serializeJson = (value: unknown): string => {
 const builtIn = <TSerialized extends BodyValue, TDecoded>(
 	mediaTypes: string | RegExp | readonly (string | RegExp)[],
 	operations: {
-		serialize: (value: unknown) => TSerialized;
+		serialize: (
+			value: unknown,
+			headers?: Readonly<Record<string, string>>,
+		) => TSerialized;
 		deserialize: (body: IncomingBody) => Promise<TDecoded>;
 	},
 ) =>
@@ -38,7 +42,7 @@ const builtIn = <TSerialized extends BodyValue, TDecoded>(
  * request. Use schemas whose output JSON can represent, or a codec for a
  * format that can.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#bodies}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#built-in-codecs}
  */
 export const jsonCodec: BuiltInBodyCodec<string, unknown> = builtIn(
 	["application/json", /\+json$/],
@@ -52,17 +56,22 @@ export const jsonCodec: BuiltInBodyCodec<string, unknown> = builtIn(
 
 /**
  * The built-in codec of `application/x-www-form-urlencoded`. It serializes
- * `URLSearchParams` and throws for other values.
+ * `URLSearchParams` and throws a `BodySerializationError` for other values.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#bodies}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#built-in-codecs}
  */
 export const urlEncodedCodec: BuiltInBodyCodec<
 	URLSearchParams,
 	URLSearchParams
 > = builtIn("application/x-www-form-urlencoded", {
-	serialize: (value) => {
-		if (!(value instanceof URLSearchParams))
-			throw new TypeError("Expected URLSearchParams body");
+	serialize: (value, headers) => {
+		if (!(value instanceof URLSearchParams)) {
+			throw new BodySerializationError({
+				value,
+				expected: ["URLSearchParams"],
+				headers,
+			});
+		}
 		return value;
 	},
 	deserialize: async (body) => new URLSearchParams(await body.text()),
@@ -70,19 +79,24 @@ export const urlEncodedCodec: BuiltInBodyCodec<
 
 /**
  * The built-in codec of `multipart/form-data`. It serializes `FormData` and
- * throws for other values.
+ * throws a `BodySerializationError` for other values.
  *
  * @remarks Wrap it in a custom codec to send other values as multipart, such
  * as objects with `File` fields.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#custom-codecs}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#built-in-codecs}
  */
 export const formDataCodec: BuiltInBodyCodec<FormData, FormData> = builtIn(
 	"multipart/form-data",
 	{
-		serialize: (value) => {
-			if (!(value instanceof FormData))
-				throw new TypeError("Expected FormData body");
+		serialize: (value, headers) => {
+			if (!(value instanceof FormData)) {
+				throw new BodySerializationError({
+					value,
+					expected: ["FormData"],
+					headers,
+				});
+			}
 			return value;
 		},
 		deserialize: (body) => body.formData(),
@@ -91,13 +105,19 @@ export const formDataCodec: BuiltInBodyCodec<FormData, FormData> = builtIn(
 
 /**
  * The built-in codec of `text/*` media types. It serializes strings and throws
- * for other values, and decodes bodies as UTF-8.
+ * a `BodySerializationError` for other values, and decodes bodies as UTF-8.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#bodies}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#built-in-codecs}
  */
 export const textCodec: BuiltInBodyCodec<string, string> = builtIn(/^text\//, {
-	serialize: (value) => {
-		if (typeof value !== "string") throw new TypeError("Expected string body");
+	serialize: (value, headers) => {
+		if (typeof value !== "string") {
+			throw new BodySerializationError({
+				value,
+				expected: ["string"],
+				headers,
+			});
+		}
 		return value;
 	},
 	deserialize: (body) => body.text(),
@@ -115,10 +135,10 @@ export const textCodec: BuiltInBodyCodec<string, string> = builtIn(/^text\//, {
  * `Uint8Array` rejects every request. Type received binary
  * bodies as `Blob`, or decode them with a custom codec.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#bodies}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#built-in-codecs}
  */
 export const binaryCodec: BuiltInBodyCodec<BodyValue, Blob> = builtIn(/.*/, {
-	serialize: (value) => {
+	serialize: (value, headers) => {
 		if (
 			value instanceof Blob ||
 			value instanceof Uint8Array ||
@@ -126,9 +146,11 @@ export const binaryCodec: BuiltInBodyCodec<BodyValue, Blob> = builtIn(/.*/, {
 			isAsyncIterable(value)
 		)
 			return value as BodyValue;
-		throw new TypeError(
-			"Expected Blob, Uint8Array, ReadableStream or AsyncIterable body",
-		);
+		throw new BodySerializationError({
+			value,
+			expected: ["Blob", "Uint8Array", "ReadableStream", "AsyncIterable"],
+			headers,
+		});
 	},
 	deserialize: (body) => body.blob(),
 });

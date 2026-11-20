@@ -1,4 +1,8 @@
-import { normalizeMediaType, type BodyCodecRegistry } from "../codecs/index.ts";
+import {
+	createBodyCodecRegistry,
+	normalizeMediaType,
+	type BodyCodecRegistry,
+} from "../codecs/index.ts";
 import type { Contract } from "../contract/contract.ts";
 import type { RouteDefinition } from "../contract/routeDefinition.ts";
 import type { SseEvent, SseFormat } from "../contract/sse.ts";
@@ -175,6 +179,10 @@ const readCode = (body: unknown) =>
 		? body.code
 		: undefined;
 
+// Errors are always JSON and can't be customized with codecs, so custom codecs
+// never read them.
+const defaultCodecs = createBodyCodecRegistry([]);
+
 /**
  * Reads a non-2xx response into a `RouteError` when its body has a `code`, and
  * otherwise into an `Error` whose `cause` holds the received response.
@@ -187,10 +195,9 @@ const readErrorResponse = async (
 	mediaType: string,
 	route: RouteDefinition,
 	validate: boolean,
-	codecs: BodyCodecRegistry,
 ): Promise<Error> => {
 	const { status } = rawResponse;
-	const body = await readBody(rawResponse, mediaType, codecs);
+	const body = await readBody(rawResponse, mediaType, defaultCodecs);
 	const code = readCode(body);
 	if (code === undefined) {
 		// The cause mirrors the envelope of a successful response.
@@ -247,7 +254,6 @@ export const readResponse = async <E extends RouteDefinition>(
 			mediaType,
 			route,
 			validateResponse,
-			codecs,
 		);
 	}
 

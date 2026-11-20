@@ -86,7 +86,9 @@ createClient(api, { origin, sse: { format: superjsonEvents } });
 
 Data that spans several lines is sent as one `data` field per line, and the
 client joins them with `\n` before `deserialize` reads them. A format changes
-how data is sent, not its types.
+how data is sent, not its types. Streams don't use
+[body codecs](/docs/http-behavior/encoding#codecs), so a format is the only way
+to change how event data is encoded.
 
 ## Stream Options
 

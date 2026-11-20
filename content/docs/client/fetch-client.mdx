@@ -327,7 +327,7 @@ type ApiClientOptions = {
 	 * and `signal` and `additionalHeaders` can only be passed per call.
 	 */
 	fetchOptions?: Omit<FetchOptions, "signal" | "additionalHeaders">;
-	/** Codecs for other body formats, the same as the server's. */
+	/** Codecs for other body formats, selected before the built-in ones. */
 	bodyCodecs?: readonly BodyCodec[];
 	/**
 	 * Headers added to every request, each a value, a promise of one, or a

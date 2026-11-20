@@ -80,7 +80,10 @@ export type ApiClientOptions<
 	 * server's `mountPath`. Route paths do not include it.
 	 */
 	mountPath?: AbsolutePath;
-	/** Codecs for other body formats, the same as the server's. */
+	/**
+	 * Codecs for other body formats, selected before the built-in ones. Pass
+	 * the same codecs as the server's.
+	 */
 	bodyCodecs?: readonly BodyCodec[];
 	/**
 	 * Sends each request, the `Request` the last interceptor sends.

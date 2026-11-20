@@ -9,6 +9,10 @@ import type { SseOptions } from "./sse.ts";
  * @see {@link https://rest-rpc.vercel.app/docs/server/overview#route-options}
  */
 export type CreateRouteHandlersOptions = {
+	/**
+	 * Codecs for other body formats, selected before the built-in ones. Pass
+	 * the same codecs as the client's.
+	 */
 	bodyCodecs?: readonly BodyCodec[];
 	/**
 	 * When set to `true`, disables request schema validation. Handlers receive

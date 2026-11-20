@@ -62,6 +62,7 @@ export type {
 export {
 	binaryCodec,
 	bodyCodec,
+	BodySerializationError,
 	formDataCodec,
 	jsonCodec,
 	serializedBody,

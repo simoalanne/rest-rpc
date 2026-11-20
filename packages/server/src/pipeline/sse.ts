@@ -1,26 +1,6 @@
-import {
-	bodyCodec,
-	serializedBody,
-	type BodyValue,
-	type SseEvent,
-	type SseFormat,
-} from "@rest-rpc/core";
+import type { SseEvent, SseFormat } from "@rest-rpc/core";
 
 const sseBrand = Symbol("rest-rpc.sse");
-
-/**
- * Sends already framed SSE bodies as-is, listed before custom codecs so it
- * overrides them. `cache-control: no-cache` keeps proxies from caching or
- * buffering the stream, unless the handler sets its own.
- */
-export const sseBodyCodec = bodyCodec("text/event-stream", {
-	serialize: (body, headers) =>
-		headers["cache-control"] === undefined
-			? serializedBody(body as BodyValue, {
-					headers: { "cache-control": "no-cache" },
-				})
-			: (body as BodyValue),
-});
 
 /** A branded SSE value yielded by server handlers when event metadata is needed. */
 export type SseServerEvent<T> = SseEvent<T> & {
@@ -151,10 +131,9 @@ export const frameSseStream = (
 	return keepAlive === undefined ? events : withKeepAlive(events, keepAlive);
 };
 
-/** Frames stream items as an SSE response body that body codecs pass through. */
+/** Frames stream items as an SSE response body, which is sent without codecs. */
 export const sseBody = (body: AsyncIterable<unknown>, options: SseOptions) => ({
-	value: frameSseStream(body, options),
-	contentType: "text/event-stream",
+	events: frameSseStream(body, options),
 });
 
 /** Wraps stream data with Server-Sent Event metadata. */

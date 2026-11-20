@@ -55,6 +55,7 @@ export const serializeFetchResult = (
 	// headers to set.
 	if (
 		result.body &&
+		"value" in result.body &&
 		result.headers === undefined &&
 		!result.cookies?.length &&
 		result.body.contentType === "application/json" &&

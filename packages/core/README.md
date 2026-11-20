@@ -350,11 +350,12 @@ for await (const event of body) console.log(event.id, event.data.message);
 
 ## Content Types
 
-A body is JSON unless a `content-type` header says otherwise. These codecs
-are built in, and each is exported the same way from `@rest-rpc/server` and
+A body is JSON unless a `content-type` header says otherwise, and `FormData`
+is always `multipart/form-data`. The header's media type selects one of these
+built-in codecs, each exported the same way from `@rest-rpc/server` and
 `@rest-rpc/core`.
 
-See [Encoding and Content Types](https://rest-rpc.vercel.app/docs/http-behavior/encoding#bodies)
+See [Encoding and Content Types](https://rest-rpc.vercel.app/docs/http-behavior/encoding#built-in-codecs)
 
 ```ts
 import {
@@ -369,42 +370,69 @@ import {
 ## Codecs
 
 A codec encodes another format. Pass the same codec in `bodyCodecs` to the
-client and the server. Custom codecs win over the built-in ones.
+client and the server. Custom codecs are selected before the built-in ones.
 
 See [Custom Codecs](https://rest-rpc.vercel.app/docs/http-behavior/encoding#custom-codecs)
 
 ```ts
-import { bodyCodec, createApp, createClient, route } from "@rest-rpc/server";
+import {
+	binaryCodec,
+	bodyCodec,
+	createApp,
+	createClient,
+	route,
+	serializedBody,
+} from "@rest-rpc/server";
+import superjson from "superjson";
 
-const csvCodec = bodyCodec("text/csv", {
-	serialize: (rows) =>
-		(rows as string[][]).map((row) => row.join(",")).join("\n"),
-	deserialize: async (body) =>
-		(await body.text()).split("\n").map((line) => line.split(",")),
+const superjsonCodec = bodyCodec("application/vnd.superjson+json", {
+	serialize: (value) => superjson.stringify(value),
+	deserialize: async (body) => superjson.parse(await body.text()),
+});
+
+const bytes = bodyCodec("application/octet-stream", {
+	serialize: (value) =>
+		value instanceof Uint8Array
+			? serializedBody(value, { headers: { "x-body": "uint8array" } })
+			: binaryCodec.serialize(value),
+	deserialize: async (body, headers) =>
+		headers["x-body"] === "uint8array"
+			? new Uint8Array(await body.arrayBuffer())
+			: binaryCodec.deserialize(body),
 });
 
 const routes = {
 	posts: {
-		csv: route.get("/posts.csv").handler(({ respond }) =>
-			respond(
-				[
-					["id", "title"],
-					["post_1", "Hello"],
-				],
-				{ headers: { "content-type": "text/csv" } },
+		get: route
+			.get("/posts/:id")
+			.handler(({ params, respond }) =>
+				respond(
+					{ id: params.id, publishedAt: new Date() },
+					{ headers: { "content-type": "application/vnd.superjson+json" } },
+				),
 			),
+		export: route.get("/posts/:id/export").handler(({ respond }) =>
+			respond(new TextEncoder().encode("Hello"), {
+				headers: { "content-type": "application/octet-stream" },
+			}),
 		),
 	},
 };
 
-const app = createApp(routes, { bodyCodecs: [csvCodec] });
+const bodyCodecs = [superjsonCodec, bytes];
+const app = createApp(routes, { bodyCodecs });
 const client = createClient(routes, {
 	origin: "http://localhost",
 	fetch: app.fetch,
-	bodyCodecs: [csvCodec],
+	bodyCodecs,
 });
 
-const { body } = await client.posts.csv(); // string[][]
+const { body: post } = await client.posts.get({ params: { id: "post_1" } });
+post.publishedAt; // a Date
+const { body: exported } = await client.posts.export({
+	params: { id: "post_1" },
+});
+exported; // a Uint8Array
 ```
 
 ## Raw and Static Responses

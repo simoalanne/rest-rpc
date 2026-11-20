@@ -16,8 +16,9 @@ export type RespondOptions = {
 	 */
 	status?: number;
 	/**
-	 * Response headers. A `content-type` header selects the body's codec, and
-	 * a body without one is JSON.
+	 * Response headers. A `content-type` header selects the body's codec.
+	 * Without one, an async iterable is a Server-Sent Event stream and other
+	 * bodies are JSON. `FormData` is always sent as `multipart/form-data`.
 	 */
 	headers?: Record<string, unknown>;
 	/** `Set-Cookie` header values, each sent as its own header. */

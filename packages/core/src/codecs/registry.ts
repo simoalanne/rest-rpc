@@ -1,13 +1,6 @@
 import { defaultBodyCodecs, serializeJson } from "./defaults.ts";
 import { normalizeMediaType } from "./operations.ts";
-import { isSerializedBody } from "./serializedBody.ts";
-import type {
-	BodyCodec,
-	BodySerializer,
-	IncomingBody,
-	BodyValue,
-	SerializedBody,
-} from "./types.ts";
+import type { BodyCodec, BodySerializer, IncomingBody } from "./types.ts";
 
 export type BodyCodecRegistry = {
 	/** Serializes a value with the codec for the base media type of its `content-type` header. */
@@ -25,9 +18,9 @@ export type BodyCodecRegistry = {
 	serializesJson: (contentType: string) => boolean;
 };
 
-// Indexes one operation of every codec that has it. Strings are looked up
-// directly; the first codec listing a string owns it.
-const indexOperation = <TOperation>(
+// Indexes one operation of every codec in a group that has it. Strings are
+// looked up directly; the first codec listing a string owns it.
+const indexGroup = <TOperation>(
 	codecs: readonly BodyCodec[],
 	operation: (codec: BodyCodec) => TOperation | undefined,
 ) => {
@@ -46,64 +39,51 @@ const indexOperation = <TOperation>(
 		patterns.find(([pattern]) => pattern.test(mediaType))?.[1];
 };
 
-// Content types are part of route types, so a codec may change parameters but
-// not the base media type.
-const assertBaseMediaType = (
-	body: BodyValue | SerializedBody,
-	mediaType: string,
-) => {
-	const contentType = isSerializedBody(body)
-		? body.headers["content-type"]
-		: undefined;
-	if (
-		contentType !== undefined &&
-		normalizeMediaType(contentType) !== mediaType
-	) {
-		throw new Error(
-			"Codec content-type must retain the defined base media type",
-		);
-	}
-	return body;
-};
+const findDefaultSerializer = indexGroup(
+	defaultBodyCodecs,
+	(codec) => codec.serialize,
+);
+const findDefaultDeserializer = indexGroup(
+	defaultBodyCodecs,
+	(codec) => codec.deserialize,
+);
 
-/** Custom codecs take precedence over the defaults, and serializers and deserializers are selected independently. */
+/**
+ * Every custom codec takes precedence over the defaults, a pattern included,
+ * and serializers and deserializers are selected independently.
+ */
 export function createBodyCodecRegistry(
 	codecs: readonly BodyCodec[],
 ): BodyCodecRegistry {
-	const all = [...codecs, ...defaultBodyCodecs];
-	const findSerializer = indexOperation(all, (codec) => codec.serialize);
-	const findDeserializer = indexOperation(all, (codec) => codec.deserialize);
+	const findCustomSerializer = indexGroup(codecs, (codec) => codec.serialize);
+	const findCustomDeserializer = indexGroup(
+		codecs,
+		(codec) => codec.deserialize,
+	);
+	const findSerializer = (mediaType: string) =>
+		findCustomSerializer(mediaType) ?? findDefaultSerializer(mediaType);
+	const findDeserializer = (mediaType: string) =>
+		findCustomDeserializer(mediaType) ?? findDefaultDeserializer(mediaType);
 
 	// Serialized content types come from application code, so each one is
 	// resolved once. The default binary codec matches every media type, so
 	// lookups always find an operation.
-	const serializers = new Map<
-		string,
-		{ mediaType: string; serialize: BodySerializer }
-	>();
+	const serializers = new Map<string, BodySerializer>();
 	const resolveSerializer = (contentType: string) => {
-		let resolved = serializers.get(contentType);
-		if (!resolved) {
-			const mediaType = normalizeMediaType(contentType);
-			resolved = { mediaType, serialize: findSerializer(mediaType)! };
-			serializers.set(contentType, resolved);
+		let serialize = serializers.get(contentType);
+		if (!serialize) {
+			serialize = findSerializer(normalizeMediaType(contentType))!;
+			serializers.set(contentType, serialize);
 		}
-		return resolved;
+		return serialize;
 	};
 
 	return {
-		serialize: (value, headers) => {
-			const { mediaType, serialize } = resolveSerializer(
-				headers["content-type"],
-			);
-			const result = serialize(value, headers);
-			return result instanceof Promise
-				? result.then((resolved) => assertBaseMediaType(resolved, mediaType))
-				: assertBaseMediaType(result, mediaType);
-		},
+		serialize: (value, headers) =>
+			resolveSerializer(headers["content-type"])(value, headers),
 		deserialize: (body, mediaType, headers) =>
 			findDeserializer(mediaType)!(body, headers),
 		serializesJson: (contentType) =>
-			resolveSerializer(contentType).serialize === serializeJson,
+			resolveSerializer(contentType) === serializeJson,
 	};
 }

@@ -54,7 +54,7 @@ Every function takes these options after the route tree:
 
 ```ts
 type CreateRouteHandlersOptions = {
-	/** Codecs for body formats other than the built-in ones. */
+	/** Codecs for other body formats, selected before the built-in ones. */
 	bodyCodecs?: readonly BodyCodec[];
 	/** Skips request validation. The types stay as if the schemas ran. */
 	disableRequestValidation?: boolean;

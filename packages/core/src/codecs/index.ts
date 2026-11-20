@@ -10,6 +10,7 @@ export type {
 } from "./types.ts";
 export { isSerializedBody, serializedBody } from "./serializedBody.ts";
 export { bodyCodec } from "./bodyCodec.ts";
+export { BodySerializationError } from "./errors.ts";
 export { isAsyncIterable, normalizeMediaType } from "./operations.ts";
 export { createBodyCodecRegistry, type BodyCodecRegistry } from "./registry.ts";
 export {

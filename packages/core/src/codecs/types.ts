@@ -16,7 +16,7 @@ export type BodyValue =
 /**
  * A body sent with its own headers, created with `serializedBody()`.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#custom-codecs}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#codec-headers}
  */
 export type SerializedBody = {
 	readonly body: BodyValue;
@@ -89,11 +89,13 @@ export type BodyCodecOperations =
 /**
  * Serializes and deserializes bodies of the base media types it lists.
  *
- * @remarks Strings match a lowercase base media type exactly and take
- * precedence over patterns. Patterns are tested in codec order when no string
- * matches.
+ * @remarks A codec is selected by the lowercase base media type of the
+ * `content-type`. Custom codecs are searched before the built-in ones, and in
+ * each, a codec that lists the media type as a string comes before the first
+ * codec with a pattern that matches it. `serialize` and `deserialize` are
+ * selected separately.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#custom-codecs}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#codec-selection}
  */
 export type BodyCodec = {
 	mediaTypes: readonly (string | RegExp)[];
@@ -103,11 +105,15 @@ export type BodyCodec = {
  * A built-in codec, such as `formDataCodec`, whose operations are both defined
  * and typed with what they return, so a custom codec can call them.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#custom-codecs}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#built-in-codecs}
  */
 export type BuiltInBodyCodec<TSerialized extends BodyValue, TDecoded> = {
 	readonly mediaTypes: readonly (string | RegExp)[];
-	/** Returns the value as is, or throws when it is not a value of the codec. */
+	/**
+	 * Returns the value as is. The JSON codec throws the errors of
+	 * `JSON.stringify`, and the others a `BodySerializationError` for a value
+	 * they don't encode.
+	 */
 	serialize(
 		value: unknown,
 		headers?: Readonly<Record<string, string>>,

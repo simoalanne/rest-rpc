@@ -82,6 +82,7 @@ export { call, type CallOptions } from "./pipeline/call.ts";
 export {
 	binaryCodec,
 	bodyCodec,
+	BodySerializationError,
 	clientInterceptor,
 	createClient,
 	createOpenApiDocument,

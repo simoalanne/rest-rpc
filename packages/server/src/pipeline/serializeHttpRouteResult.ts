@@ -1,5 +1,7 @@
 import {
+	createBodyCodecRegistry,
 	isSerializedBody,
+	normalizeMediaType,
 	type BodyCodecRegistry,
 	type BodyValue,
 } from "@rest-rpc/core/codecs";
@@ -9,6 +11,12 @@ import { mapMaybePromise } from "./maybePromise.ts";
 import type { ErrorResponse } from "./resolveRouteError.ts";
 
 type OutgoingContentType = { readonly "content-type": string };
+
+const SSE = "text/event-stream";
+
+// `text/event-stream` can't be customized with codecs, so a body that isn't a stream
+// is sent with the built-in codecs, which never call custom ones.
+const defaultCodecs = createBodyCodecRegistry([]);
 
 /** Response headers with lowercase names. `set-cookie` holds every cookie. */
 export type ResponseHeaders = Record<string, string | string[]>;
@@ -49,6 +57,20 @@ export function serializeHttpResponseParts(
 		return { status, headers, body: null };
 	}
 
+	// SSE can't be customized with codecs, so it skips them. `cache-control:
+	// no-cache` keeps proxies from caching or buffering the stream, unless the
+	// handler sets its own.
+	if ("events" in result.body) {
+		const headers: ResponseHeaders = {};
+		setHeaders(headers, result.headers, result.cookies);
+		// A declared content type keeps its parameters, such as `charset`.
+		if (normalizeMediaType(headers["content-type"] as string) !== SSE) {
+			headers["content-type"] = SSE;
+		}
+		headers["cache-control"] ??= "no-cache";
+		return { status, headers, body: result.body.events };
+	}
+
 	const { value, contentType } = result.body;
 	// The codec sees the result's headers with the selected content type.
 	const outgoing: Record<string, string> = {};
@@ -57,8 +79,15 @@ export function serializeHttpResponseParts(
 	// `FormData` is multipart, whatever the headers say.
 	outgoing["content-type"] =
 		value instanceof FormData ? "multipart/form-data" : contentType;
+	const selected =
+		normalizeMediaType(outgoing["content-type"]) === SSE
+			? defaultCodecs
+			: codecs;
 	return mapMaybePromise(
-		codecs.serialize(value, outgoing as typeof outgoing & OutgoingContentType),
+		selected.serialize(
+			value,
+			outgoing as typeof outgoing & OutgoingContentType,
+		),
 		(serialized) => {
 			const { body, headers: bodyHeaders } = isSerializedBody(serialized)
 				? serialized

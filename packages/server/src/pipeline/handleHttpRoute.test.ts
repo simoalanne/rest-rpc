@@ -1,6 +1,7 @@
 import {
 	bodyCodec,
 	createClient,
+	isDefinedError,
 	routeError,
 	serializedBody,
 	sse,
@@ -371,6 +372,33 @@ describe("route pipeline", () => {
 		expect(body).toEqual(new Uint8Array([1, 2]));
 	});
 
+	it("sends the content type a codec returns, and reads it with its codec", async () => {
+		const versioned = bodyCodec("application/json", {
+			serialize: (value) =>
+				serializedBody(JSON.stringify(value), {
+					headers: { "content-type": "application/vnd.blog.v2+json" },
+				}),
+		});
+		const v2 = bodyCodec("application/vnd.blog.v2+json", {
+			deserialize: async (body) => ({ v2: await body.json() }),
+		});
+		const routes = {
+			post: route.get("/").handler(() => ({ title: "Hello" })),
+		};
+		const app = createApp(routes, { bodyCodecs: [versioned] });
+		const response = await app.fetch(new Request("http://localhost/"));
+		expect(response.headers.get("content-type")).toBe(
+			"application/vnd.blog.v2+json",
+		);
+		const client = createClient(routes, {
+			origin: "http://localhost",
+			fetch: app.fetch,
+			bodyCodecs: [v2],
+		});
+		const { body } = await client.post();
+		expect(body).toEqual({ v2: { title: "Hello" } });
+	});
+
 	it("lets the codec that sends a result read and replace its headers", async () => {
 		const attachments = bodyCodec("application/pdf", {
 			serialize: (value, headers) =>
@@ -403,6 +431,45 @@ describe("route pipeline", () => {
 				"content-disposition",
 			),
 		).toBe("inline");
+	});
+
+	it("sends and reads events and errors without custom codecs", async () => {
+		const unused = () => {
+			throw new Error("Custom codec called");
+		};
+		const catchAll = bodyCodec(/.*/, {
+			serialize: unused,
+			deserialize: unused,
+		});
+		const events = bodyCodec("text/event-stream", {
+			serialize: unused,
+			deserialize: unused,
+		});
+		const Gone = routeError("GONE", { status: 410 });
+		const routes = {
+			events: route.get("/events").handler(async function* () {
+				yield 1;
+			}),
+			gone: route
+				.get("/gone")
+				.error(Gone)
+				.handler(({ errors }): string => {
+					throw errors.GONE();
+				}),
+		};
+		const bodyCodecs = [events, catchAll];
+		const app = createApp(routes, { bodyCodecs });
+		const client = createClient(routes, {
+			origin: "http://localhost",
+			fetch: app.fetch,
+			bodyCodecs,
+		});
+		const { body } = await client.events();
+		const received = [];
+		for await (const event of body) received.push(event);
+		expect(received).toEqual([{ data: 1 }]);
+		const error = await client.gone().catch((error: unknown) => error);
+		expect(isDefinedError(error) && error.code).toBe("GONE");
 	});
 
 	it("sends and reads events with a custom data format", async () => {

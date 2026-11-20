@@ -1,3 +1,4 @@
+import { BodySerializationError, formDataCodec } from "../index.ts";
 import { createBodyCodecRegistry } from "./registry.ts";
 
 const codecs = createBodyCodecRegistry([]);
@@ -79,5 +80,32 @@ describe("defaults", () => {
 		expect(() =>
 			codecs.serialize("data", { "content-type": "application/octet-stream" }),
 		).toThrow();
+	});
+
+	it("throws BodySerializationError with the media type and value kinds", () => {
+		const error = (() => {
+			try {
+				codecs.serialize(
+					{ title: "Hello" },
+					{ "content-type": "image/png; charset=binary" },
+				);
+			} catch (error) {
+				return error;
+			}
+		})();
+		expect(error).toBeInstanceOf(BodySerializationError);
+		expect(error).toBeInstanceOf(TypeError);
+		expect(error).toMatchObject({
+			mediaType: "image/png",
+			expected: ["Blob", "Uint8Array", "ReadableStream", "AsyncIterable"],
+			received: "Object",
+		});
+		expect(() => formDataCodec.serialize(null)).toThrow(
+			expect.objectContaining({
+				mediaType: undefined,
+				expected: ["FormData"],
+				received: "null",
+			}),
+		);
 	});
 });

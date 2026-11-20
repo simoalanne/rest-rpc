@@ -52,8 +52,8 @@ export const MalformedRequestBody = routeError("MALFORMED_REQUEST_BODY", {
 
 /**
  * The built-in error sent when the request `Content-Type` of a route with a
- * body is not one its headers schema declares, or not JSON when it declares
- * none.
+ * body is not one its headers schema declares, or not `application/json` or
+ * `multipart/form-data` when it declares none.
  *
  * @remarks Define it with `.error()` to make clients recognize it.
  *

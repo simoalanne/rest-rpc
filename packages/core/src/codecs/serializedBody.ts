@@ -11,10 +11,11 @@ const serializedBodyBrand = Symbol("rest-rpc.serializedBody");
  * content type the runtime generates with its boundary, so a `content-type`
  * header is ignored for it.
  *
- * A `content-type` header may change parameters but must keep the selected
- * base media type, since content types are part of route types.
+ * A `content-type` header replaces the selected one, and the receiving side
+ * decodes the body with the codec of the content type it receives. Route
+ * types and OpenAPI documents still show the declared content type.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#custom-codecs}
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/encoding#codec-headers}
  */
 export function serializedBody(
 	body: BodyValue,

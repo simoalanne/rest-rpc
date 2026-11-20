@@ -222,7 +222,7 @@ export class RouteBuilder<
 		return this.clone(httpState(this["~restrpc"], "DELETE", path));
 	}
 
-	/** Defines the request body, JSON unless the headers declare a `content-type`. @see {@link https://rest-rpc.vercel.app/docs/route-builder#request-segments} */
+	/** Defines the request body. The route accepts the content types its headers declare in `content-type`, or JSON and `multipart/form-data` without one. @see {@link https://rest-rpc.vercel.app/docs/route-builder#request-segments} */
 	body<const TSchema extends StandardSchemaV1>(
 		schema: TSchema,
 	): BuilderFor<TKind, WithBody<TState, TSchema>> {
