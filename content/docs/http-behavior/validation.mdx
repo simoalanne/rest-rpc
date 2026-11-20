@@ -10,7 +10,7 @@ gives two types, and each side of a route sees one of them:
 ```ts twoslash
 import { createClient } from "@rest-rpc/core";
 import { route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 const post = z.object({ id: z.string(), title: z.string(), body: z.string() });
 declare function listPosts(page: number): {
 	items: z.infer<typeof post>[];
@@ -63,14 +63,14 @@ validation off. Everything else still runs, and the types stay as if the
 schemas ran:
 
 ```ts
-const getPost = route
+const get = route
 	.get("/posts/:id")
 	.params(z.object({ id: z.coerce.number() }))
 	.response(z.object({ title: z.string().default("Untitled") }))
 	.handler(({ params }) => findPost(params.id)); // params.id is the string "1"
 
 createApp(
-	{ getPost },
+	{ posts: { get } },
 	{ disableRequestValidation: true, disableResponseValidation: true },
 );
 ```

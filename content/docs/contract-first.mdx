@@ -15,7 +15,7 @@ from handlers.
 
 ```ts contract.ts
 import { route } from "@rest-rpc/core";
-import { z } from "zod";
+import * as z from "zod";
 
 const postSchema = z.object({
 	id: z.string(),
@@ -33,7 +33,7 @@ const get = route
 	.response(postSchema)
 	.error("POST_NOT_FOUND", { status: 404 });
 
-export const api = { posts: { create, get } };
+export const contract = { posts: { create, get } };
 ```
 
 Use `.response()` for each successful response, with `sse(schema)` for
@@ -50,20 +50,20 @@ then attach its handler:
 
 ```ts server.ts
 import { implement } from "@rest-rpc/server";
-import { api } from "./contract";
-import { createPost, findPost } from "./posts";
+import { contract } from "./contract.ts";
+import { createPost, findPost } from "./posts.ts";
 
-const create = implement(api.posts.create).handler(
+const create = implement(contract.posts.create).handler(
 	({ body: { title, body } }) => createPost(title, body),
 );
 
-const get = implement(api.posts.get).handler(({ params, errors }) => {
+const get = implement(contract.posts.get).handler(({ params, errors }) => {
 	const post = findPost(params.id);
 	if (!post) throw errors.POST_NOT_FOUND();
 	return post;
 });
 
-export const routes = { posts: { create, get } };
+export const router = { posts: { create, get } };
 ```
 
 The implementation must match the contract's request segments and defined
@@ -79,11 +79,11 @@ routes, with two differences.
 route in the tree:
 
 ```ts
-const posts = implement(api.posts)
+const posts = implement(contract.posts)
 	.$context<{ headers: Headers }>()
 	.use(authenticate); // injects user
 
-export const routes = {
+export const router = {
 	posts: {
 		create: posts.create.handler(({ body, context }) =>
 			createPost(body.title, body.body, context.user),

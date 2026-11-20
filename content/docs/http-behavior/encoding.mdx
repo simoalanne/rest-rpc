@@ -11,7 +11,7 @@ the strings:
 ```ts twoslash
 import { createClient } from "@rest-rpc/core";
 import { route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 declare function findPosts(userId: number, query: object): string[];
 // ---cut---
 const search = route
@@ -60,7 +60,7 @@ handler sets the response's with `respond()`:
 ```ts twoslash
 import { createClient } from "@rest-rpc/core";
 import { route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 declare function savePostImage(
 	id: string,
 	image: FormDataEntryValue | null,
@@ -254,17 +254,17 @@ arrives as what JSON made of it:
 ```ts twoslash
 import { createClient } from "@rest-rpc/core";
 import { route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 // ---cut---
-const getPost = route
+const get = route
 	.get("/posts/:id")
 	.response(z.object({ title: z.string(), publishedAt: z.date() }))
 	.handler(() => ({ title: "Hello", publishedAt: new Date() }));
 // ---cut-start---
-const client = createClient({ getPost }, { origin: "http://localhost" });
+const client = createClient({ posts: { get } }, { origin: "http://localhost" });
 // ---cut-end---
 
-const { body } = await client.getPost({ params: { id: "1" } });
+const { body } = await client.posts.get({ params: { id: "1" } });
 body.publishedAt; // the string "2026-11-17T12:00:00.000Z" at runtime
 ```
 
@@ -338,14 +338,14 @@ const superjsonRoute = route.use(async ({ next }) => {
 	};
 });
 
-const getPost = superjsonRoute
+const get = superjsonRoute
 	.get("/posts/:id")
 	.handler(({ params }) => ({ id: params.id, publishedAt: new Date() }));
 
-createApp(routes, { bodyCodecs: [superjsonCodec] });
-const client = createClient(api, { bodyCodecs: [superjsonCodec] });
+createApp(router, { bodyCodecs: [superjsonCodec] });
+const client = createClient(getContract(), { bodyCodecs: [superjsonCodec] });
 
-const { body } = await client.getPost({ params: { id: "1" } });
+const { body } = await client.posts.get({ params: { id: "1" } });
 body.publishedAt; // a Date, as typed
 ```
 
@@ -384,8 +384,8 @@ const bytes = bodyCodec("application/octet-stream", {
 			: binaryCodec.deserialize(body),
 });
 
-createApp(routes, { bodyCodecs: [bytes] });
-const client = createClient(api, { bodyCodecs: [bytes] });
+createApp(router, { bodyCodecs: [bytes] });
+const client = createClient(getContract(), { bodyCodecs: [bytes] });
 
 const { body } = await client.download({ params: { id: "1" } });
 body; // a Uint8Array, as typed

@@ -12,7 +12,7 @@ alone.
 
 ```ts
 import { route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
 const create = route
 	.body(z.object({ title: z.string(), body: z.string() }))
@@ -22,7 +22,7 @@ const create = route
 		body,
 	}));
 
-export const routes = { posts: { create } }; // POST /posts/create
+export const router = { posts: { create } }; // POST /posts/create
 ```
 
 Without a method, a route is `POST`, and without a path, its path is its keys
@@ -34,7 +34,7 @@ they're served or given to a client.
 
 ```ts twoslash
 import { route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 declare function searchPosts(term: string): string[];
 declare function findPost(id: string): { id: string };
 declare function listPosts(): { id: string }[];
@@ -44,7 +44,7 @@ const search = route
 	.query(z.object({ term: z.string() }))
 	.handler(({ query }) => searchPosts(query.term));
 
-const getPost = route
+const get = route
 	.get("/posts/:id")
 	.handler(({ params }) => findPost(params.id));
 
@@ -66,7 +66,7 @@ const tenant = route
 	.prefix("/tenants/:tenant")
 	.params(z.object({ tenant: z.string() }));
 
-const getPost = tenant
+const get = tenant
 	.get("/posts/:id") // GET /tenants/:tenant/posts/:id
 	.params(z.object({ id: z.coerce.number() }))
 	.handler(({ params }) => findPost(params.tenant, params.id));
@@ -318,9 +318,9 @@ also takes a route tree:
 
 ```ts
 import type { InferServerRequest } from "@rest-rpc/server";
-import type { routes } from "./routes";
+import type { router } from "./router.ts";
 
-type CreatePostRequest = InferServerRequest<typeof routes>["posts"]["create"];
+type CreatePostRequest = InferServerRequest<typeof router>["posts"]["create"];
 ```
 
 ### Infer Server Request
@@ -330,7 +330,7 @@ The object a handler receives, with every [argument](#handler-arguments):
 ```ts twoslash
 import type { InferServerRequest } from "@rest-rpc/server";
 import { route } from "@rest-rpc/server";
-import z from "zod";
+import * as z from "zod";
 
 const updateDefinition = route
 	.patch("/posts/:id")
@@ -355,7 +355,7 @@ responses have nothing to infer before `.handler()`:
 ```ts twoslash
 import type { InferServerResponse } from "@rest-rpc/server";
 import { respond, route } from "@rest-rpc/server";
-import z from "zod";
+import * as z from "zod";
 
 const postSchema = z.object({
 	id: z.string(),
@@ -387,7 +387,7 @@ The full handler signature, to write a handler apart from its definition:
 
 ```ts twoslash
 import { route, type InferServerHandler } from "@rest-rpc/server";
-import z from "zod";
+import * as z from "zod";
 
 const postSchema = z.object({
 	id: z.string(),

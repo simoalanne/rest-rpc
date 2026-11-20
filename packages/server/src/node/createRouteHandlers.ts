@@ -40,11 +40,11 @@ const nodeResponseWriter: ResponseWriter<ServerResponse, void> = {
 
 /** Compiles a route tree into Node routes, for the handlers of this runtime. */
 export const compileNodeRoutes = (
-	implementations: RuntimeImplementationTree,
+	router: RuntimeImplementationTree,
 	options: CreateRouteHandlersOptions,
 ): CompiledNodeRoute[] => {
 	const { routes, dispatch } = compileRouteTree(
-		implementations,
+		router,
 		options,
 		nodeRequestReader,
 		nodeResponseWriter,
@@ -93,7 +93,7 @@ export const compileNodeRoutes = (
 };
 
 /**
- * A Node route handler ready to be registered on a router.
+ * A Node route handler ready to be registered on a framework's router.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
  */
@@ -139,10 +139,10 @@ export type NodeRouteHandlersOptions = CreateRouteHandlersOptions & {
 // for the framework's error handling. Static routes skip interceptors, as in
 // `createApp`.
 const toNodeRoutes = (
-	implementations: RuntimeImplementationTree,
+	router: RuntimeImplementationTree,
 	{ interceptors, ...options }: NodeRouteHandlersOptions,
 ): CompiledNodeRoute[] =>
-	compileNodeRoutes(implementations, options).map((route) => {
+	compileNodeRoutes(router, options).map((route) => {
 		if (route.isStatic) return route;
 		const { definition, handle } = route;
 		return {
@@ -164,7 +164,7 @@ const toNodeRoutes = (
 
 /**
  * Creates one Node route handler per method and path of a route tree, to
- * register on a router.
+ * register on a framework's router.
  *
  * @remarks `handle` writes `RouteError`s as error responses, and rejects with
  * other thrown values, for the framework's error handling. Use
@@ -172,13 +172,15 @@ const toNodeRoutes = (
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
  */
-export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
-	implementations: TRoutes,
+export function createRouteHandlers<TRouter extends RuntimeImplementationTree>(
+	router: TRouter,
 	options: NodeRouteHandlersOptions = {},
-): NodeRoute<TreeInitialContext<TRoutes>>[] {
-	return toNodeRoutes(implementations, options).map(
-		({ method, path, handle }) => ({ method, path, handle }),
-	) as NodeRoute<TreeInitialContext<TRoutes>>[];
+): NodeRoute<TreeInitialContext<TRouter>>[] {
+	return toNodeRoutes(router, options).map(({ method, path, handle }) => ({
+		method,
+		path,
+		handle,
+	})) as NodeRoute<TreeInitialContext<TRouter>>[];
 }
 
 /**
@@ -193,19 +195,19 @@ export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#catch-all-handler}
  */
 export function createCatchAllHandler<
-	TRoutes extends RuntimeImplementationTree,
+	TRouter extends RuntimeImplementationTree,
 >(
-	implementations: TRoutes,
+	router: TRouter,
 	options: NodeRouteHandlersOptions = {},
 ): (
 	request: IncomingMessage,
 	response: ServerResponse,
 	...options: OptionsArgs<
-		TreeInitialContext<TRoutes>,
-		CatchAllHandleOptions<TreeInitialContext<TRoutes>>
+		TreeInitialContext<TRouter>,
+		CatchAllHandleOptions<TreeInitialContext<TRouter>>
 	>
 ) => Promise<NodeRouteHandlerResult> {
-	const matchRoute = createRouteMatcher(toNodeRoutes(implementations, options));
+	const matchRoute = createRouteMatcher(toNodeRoutes(router, options));
 
 	return async (request, response, ...[handleOptions]) => {
 		const match = matchRoute(

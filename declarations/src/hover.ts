@@ -25,7 +25,7 @@ const PostNotFound = routeError("POST_NOT_FOUND", {
 
 type Post = { id: string; title: string; published: boolean };
 
-const routes = {
+const router = {
 	posts: {
 		get: route
 			.get("/posts/:id")
@@ -67,7 +67,7 @@ const routes = {
 	},
 };
 
-const contract = extractContract(routes);
+const contract = extractContract(router);
 const client = createClient(contract, {
 	globalHeaders: { "x-tenant": "a" },
 });
@@ -90,12 +90,12 @@ export const useClient = async () => {
 export type ClientRequest = InferClientRequest<typeof client.posts.get>;
 export type ClientResponse = InferClientResponse<typeof client.posts.get>;
 export type ClientError = InferClientError<typeof client.posts.get>;
-export type ServerRequest = InferServerRequest<typeof routes.posts.get>;
+export type ServerRequest = InferServerRequest<typeof router.posts.get>;
 
-const utils = createTanstackQueryUtils(client);
-export const queryOptions = utils.posts.get.queryOptions({
+const queryUtils = createTanstackQueryUtils(client);
+export const queryOptions = queryUtils.posts.get.queryOptions({
 	request: { params: { id: "1" }, query: { expand: true } },
 });
-export const mutationOptions = utils.posts.create.mutationOptions();
-export const queryKey = utils.posts.get.queryKey();
-export const fetchPost = utils.posts.get.fetch;
+export const mutationOptions = queryUtils.posts.create.mutationOptions();
+export const queryKey = queryUtils.posts.get.queryKey();
+export const fetchPost = queryUtils.posts.get.fetch;

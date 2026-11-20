@@ -73,10 +73,10 @@ export type NodeApp = (
  * @see {@link https://rest-rpc.vercel.app/docs/server/node#usage}
  */
 export function createApp<
-	TRoutes extends RuntimeImplementationTree<EmptyObject>,
+	TRouter extends RuntimeImplementationTree<EmptyObject>,
 >(
-	implementations: TRoutes,
-	options?: CreateNodeAppOptions<TreeInitialContext<TRoutes>>,
+	router: TRouter,
+	options?: CreateNodeAppOptions<TreeInitialContext<TRouter>>,
 ): NodeApp;
 /**
  * Creates a Node request listener that serves a route tree whose routes
@@ -84,19 +84,19 @@ export function createApp<
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/node#usage}
  */
-export function createApp<TRoutes extends RuntimeImplementationTree>(
-	implementations: TRoutes,
-	options: CreateNodeAppOptions<TreeInitialContext<TRoutes>> & {
-		context: NodeAppContext<TreeInitialContext<TRoutes>>;
+export function createApp<TRouter extends RuntimeImplementationTree>(
+	router: TRouter,
+	options: CreateNodeAppOptions<TreeInitialContext<TRouter>> & {
+		context: NodeAppContext<TreeInitialContext<TRouter>>;
 	},
 ): NodeApp;
 export function createApp(
-	implementations: RuntimeImplementationTree,
+	router: RuntimeImplementationTree,
 	options?: CreateNodeAppOptions<object>,
 ): NodeApp {
 	const { mountPath, context, interceptors, ...routeOptions } = options ?? {};
 	const matchRoute = createRouteMatcher(
-		compileNodeRoutes(implementations, routeOptions),
+		compileNodeRoutes(router, routeOptions),
 	);
 
 	const serve = async (

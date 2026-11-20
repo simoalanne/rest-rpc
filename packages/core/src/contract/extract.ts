@@ -19,17 +19,19 @@ import { mapContractRoutes } from "./traversal.ts";
  * @example
  * ```ts
  * import { extractContract } from "@rest-rpc/core";
- * import { routes } from "./server/routes";
+ * import { router } from "./router.ts";
  *
- * export const api = extractContract(routes);
+ * export function getContract() {
+ * 	return extractContract(router);
+ * }
  * ```
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/contract-extraction}
  */
-export function extractContract<const TRoutes extends Contract>(
-	routes: TRoutes,
-): TRoutes {
-	return mapContractRoutes(routes, (route, routePath) => ({
+export function extractContract<const TRouter extends Contract>(
+	router: TRouter,
+): TRouter {
+	return mapContractRoutes(router, (route, routePath) => ({
 		"~restrpc": {
 			method: route.method,
 			path: resolveRoutePath(route, routePath),
@@ -54,5 +56,5 @@ export function extractContract<const TRoutes extends Contract>(
 				),
 			}),
 		},
-	})) as TRoutes;
+	})) as TRouter;
 }

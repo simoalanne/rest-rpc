@@ -21,7 +21,7 @@ export type FetchOptions = Omit<RequestInit, "method" | "body" | "headers"> & {
 	additionalHeaders?: Record<string, unknown>;
 };
 
-export type ApiClientFetchOptions = Omit<
+export type ClientFetchOptions = Omit<
 	FetchOptions,
 	"signal" | "additionalHeaders"
 >;
@@ -242,7 +242,7 @@ export type ExecuteRequestOptions = {
 	mountPath?: AbsolutePath;
 	codecs: BodyCodecRegistry;
 	fetch?: FetchLike;
-	fetchOptions?: ApiClientFetchOptions;
+	fetchOptions?: ClientFetchOptions;
 	globalHeaders?: ClientHeaders;
 	interceptors?: readonly ClientInterceptor[];
 	timeoutMs?: number;

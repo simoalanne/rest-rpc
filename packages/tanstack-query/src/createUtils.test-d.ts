@@ -26,13 +26,13 @@ const get = route
 	);
 const empty = route.get("/health").response({ status: 204 });
 const events = route.get("/events").response(sse(type<{ value: number }>()));
-const utils = createTanstackQueryUtils(
+const queryUtils = createTanstackQueryUtils(
 	createClient({ get, empty, events }, { origin: "https://example.test" }),
 );
 
 describe("createTanstackQueryUtils types", () => {
 	it("preserves mutation variables, successful results, and defined errors", () => {
-		const options = utils.get.mutationOptions({
+		const options = queryUtils.get.mutationOptions({
 			onSuccess: (data, variables) => {
 				expectTypeOf(data).toEqualTypeOf<InferClientResponse<typeof get>>();
 				expectTypeOf(variables).toEqualTypeOf<{ params: { id: string } }>();
@@ -85,7 +85,7 @@ describe("createTanstackQueryUtils types", () => {
 	});
 
 	it("tags infinite query caches with pages and page parameters", () => {
-		const options = utils.get.infiniteQueryOptions({
+		const options = queryUtils.get.infiniteQueryOptions({
 			initialPageParam: 0,
 			request: (page) => ({ params: { id: String(page) } }),
 			getNextPageParam: () => undefined,
@@ -102,12 +102,12 @@ describe("createTanstackQueryUtils types", () => {
 		).toEqualTypeOf<
 			InfiniteData<InferClientResponse<typeof get>, number> | undefined
 		>();
-		utils.get.infiniteQueryOptions({
+		queryUtils.get.infiniteQueryOptions({
 			initialPageParam: 0,
 			request: skipToken,
 			getNextPageParam: () => undefined,
 		});
-		const query = utils.get.queryOptions({
+		const query = queryUtils.get.queryOptions({
 			request: skipToken,
 			select: (data) => data.body.name,
 		});
@@ -120,7 +120,7 @@ describe("createTanstackQueryUtils types", () => {
 	});
 
 	it("keeps reduced stream cache data distinct from selected data and validates refetch modes", () => {
-		const reduced = utils.events.streamedQueryOptions({
+		const reduced = queryUtils.events.streamedQueryOptions({
 			initialValue: 0,
 			reducer: (total, chunk) => total + chunk.data.value,
 			select: (total) => {
@@ -135,7 +135,7 @@ describe("createTanstackQueryUtils types", () => {
 		expectTypeOf<
 			ReturnType<NonNullable<typeof reduced.select>>
 		>().toEqualTypeOf<string>();
-		const simple = utils.events.streamedQueryOptions({
+		const simple = queryUtils.events.streamedQueryOptions({
 			request: skipToken,
 			refetchMode: "replace",
 			select: (events) => events.length,
@@ -146,22 +146,22 @@ describe("createTanstackQueryUtils types", () => {
 		expectTypeOf<
 			ReturnType<NonNullable<typeof simple.select>>
 		>().toEqualTypeOf<number>();
-		utils.events.streamedQueryOptions({ refetchMode: "reset" });
+		queryUtils.events.streamedQueryOptions({ refetchMode: "reset" });
 		// @ts-expect-error Refetch modes are restricted.
-		utils.events.streamedQueryOptions({ refetchMode: "merge" });
+		queryUtils.events.streamedQueryOptions({ refetchMode: "merge" });
 		// @ts-expect-error Initial values require a reducer.
-		utils.events.streamedQueryOptions({ initialValue: 0 });
+		queryUtils.events.streamedQueryOptions({ initialValue: 0 });
 	});
 	it("requires requests only for routes with input and preserves success data in tagged keys", () => {
-		const options = utils.get.queryOptions({
+		const options = queryUtils.get.queryOptions({
 			request: { params: { id: "1" } },
 		});
-		utils.get.queryOptions({ request: skipToken });
-		utils.empty.queryOptions();
+		queryUtils.get.queryOptions({ request: skipToken });
+		queryUtils.empty.queryOptions();
 		// @ts-expect-error Required params cannot be omitted.
-		utils.get.queryOptions();
+		queryUtils.get.queryOptions();
 		// @ts-expect-error The id is a string.
-		utils.get.queryOptions({ request: { params: { id: 1 } } });
+		queryUtils.get.queryOptions({ request: { params: { id: 1 } } });
 		expectTypeOf<
 			InferClientResponse<typeof get>["status"]
 		>().toEqualTypeOf<200>();
@@ -171,48 +171,50 @@ describe("createTanstackQueryUtils types", () => {
 		expectTypeOf<
 			Parameters<
 				NonNullable<
-					ReturnType<typeof utils.empty.mutationOptions>["mutationFn"]
+					ReturnType<typeof queryUtils.empty.mutationOptions>["mutationFn"]
 				>
 			>[0]
 		>().toEqualTypeOf<InferClientRequest<typeof empty>>();
-		utils.empty.queryKey();
+		queryUtils.empty.queryKey();
 		// @ts-expect-error Routes without input take no request.
-		utils.empty.queryKey({});
-		utils.get.queryKey();
+		queryUtils.empty.queryKey({});
+		queryUtils.get.queryKey();
 		expectTypeOf(
 			new QueryClient().getQueryData(
-				utils.get.queryKey({ params: { id: "1" } }),
+				queryUtils.get.queryKey({ params: { id: "1" } }),
 			),
 		).toEqualTypeOf<InferClientResponse<typeof get> | undefined>();
 		// @ts-expect-error The id is a string.
-		utils.get.queryKey({ params: { id: 1 } });
+		queryUtils.get.queryKey({ params: { id: 1 } });
 	});
 
 	it("tags keys of each query kind with the kind's cache data", () => {
 		expectTypeOf(
-			new QueryClient().getQueryData(utils.get.infiniteQueryKey<number>()),
+			new QueryClient().getQueryData(queryUtils.get.infiniteQueryKey<number>()),
 		).toEqualTypeOf<
 			InfiniteData<InferClientResponse<typeof get>, number> | undefined
 		>();
 		expectTypeOf(
-			new QueryClient().getQueryData(utils.events.streamedQueryKey()),
+			new QueryClient().getQueryData(queryUtils.events.streamedQueryKey()),
 		).toEqualTypeOf<Array<SseEvent<{ value: number }>> | undefined>();
 		expectTypeOf(
-			new QueryClient().getQueryData(utils.events.streamedQueryKey<number>()),
+			new QueryClient().getQueryData(
+				queryUtils.events.streamedQueryKey<number>(),
+			),
 		).toEqualTypeOf<number | undefined>();
 		// @ts-expect-error Non-stream routes have no streamed queries.
-		utils.get.streamedQueryKey();
+		queryUtils.get.streamedQueryKey();
 	});
 
 	it("infers selected data and infinite page request parameters", () => {
-		utils.get.queryOptions({
+		queryUtils.get.queryOptions({
 			request: { params: { id: "1" } },
 			select: (response) => {
 				expectTypeOf(response.body).toEqualTypeOf<{ name: string }>();
 				return response.body.name;
 			},
 		});
-		utils.get.infiniteQueryOptions({
+		queryUtils.get.infiniteQueryOptions({
 			initialPageParam: 0,
 			request: (page) => {
 				expectTypeOf(page).toEqualTypeOf<number>();
@@ -225,10 +227,10 @@ describe("createTanstackQueryUtils types", () => {
 	it("exposes streaming options only for streams and infers reducer chunks", () => {
 		expectTypeOf(
 			new QueryClient().getQueryData(
-				utils.events.streamedQueryOptions().queryKey,
+				queryUtils.events.streamedQueryOptions().queryKey,
 			),
 		).toEqualTypeOf<Array<SseEvent<{ value: number }>> | undefined>();
-		utils.events.streamedQueryOptions({
+		queryUtils.events.streamedQueryOptions({
 			initialValue: 0,
 			reducer: (total, chunk) => {
 				expectTypeOf(total).toEqualTypeOf<number>();
@@ -237,13 +239,15 @@ describe("createTanstackQueryUtils types", () => {
 			},
 		});
 		// @ts-expect-error Non-stream routes have no streaming options.
-		utils.get.streamedQueryOptions();
+		queryUtils.get.streamedQueryOptions();
 		// @ts-expect-error A reducer requires an initial value.
-		utils.events.streamedQueryOptions({ reducer: (total: number) => total });
+		queryUtils.events.streamedQueryOptions({
+			reducer: (total: number) => total,
+		});
 	});
 
 	it("allows to call the underlying fetch function directly", async () => {
-		const data = await utils.get.fetch({ params: { id: "1" } });
+		const data = await queryUtils.get.fetch({ params: { id: "1" } });
 		expectTypeOf(data).toEqualTypeOf<InferClientResponse<typeof get>>();
 		expectTypeOf(data.body).toEqualTypeOf<{ name: string }>();
 	});

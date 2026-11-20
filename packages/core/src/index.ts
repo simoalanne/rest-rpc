@@ -1,6 +1,6 @@
 export type {
-	ApiClientFor,
-	ApiClientOptions,
+	ClientFor,
+	CreateClientOptions,
 	ClientHeaders,
 	ClientInterceptor,
 	InterceptedRoute,
@@ -48,7 +48,7 @@ export {
 	type SseResponse,
 } from "./contract/sse.ts";
 export { type } from "./standard-schema/type.ts";
-export type { ApiClientRouteValue } from "./client/index.ts";
+export type { ClientRouteValue } from "./client/index.ts";
 export type {
 	BodyCodec,
 	BodyCodecOperations,

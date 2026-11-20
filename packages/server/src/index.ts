@@ -103,9 +103,9 @@ export {
 } from "@rest-rpc/core";
 export type {
 	AbsolutePath,
-	ApiClientFor,
-	ApiClientOptions,
-	ApiClientRouteValue,
+	ClientFor,
+	CreateClientOptions,
+	ClientRouteValue,
 	BodyCodec,
 	BodyCodecOperations,
 	BodyDeserializer,

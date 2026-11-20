@@ -1,5 +1,5 @@
 import { createApp, respond, route, type } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
 const post = z.object({
 	id: z.number(),

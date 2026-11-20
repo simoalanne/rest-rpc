@@ -24,10 +24,10 @@ const contract = {
 
 const setup = (respond: () => Response) => {
 	const fetch = vi.fn(async (_request: Request) => respond());
-	const utils = createTanstackQueryUtils(
+	const queryUtils = createTanstackQueryUtils(
 		createClient(contract, { origin: "https://example.test", fetch }),
 	);
-	return { fetch, utils, client: new QueryClient() };
+	return { fetch, queryUtils, client: new QueryClient() };
 };
 
 const eventStream = () =>
@@ -37,45 +37,49 @@ const eventStream = () =>
 
 describe("createTanstackQueryUtils", () => {
 	it("mirrors the client tree in query and mutation keys", () => {
-		const { utils } = setup(() => Response.json({}));
+		const { queryUtils } = setup(() => Response.json({}));
 		const request = { params: { id: "1" } };
-		expect(utils.users.get.queryKey(request)).toEqual([
+		expect(queryUtils.users.get.queryKey(request)).toEqual([
 			"users",
 			"get",
 			request,
 		]);
-		expect(utils.users.get.queryKey()).toEqual(["users", "get"]);
-		expect(utils.events.queryKey()).toEqual(["events"]);
-		expect(utils.users.create.mutationKey()).toEqual(["users", "create"]);
-		expect(utils.users.get.queryOptions({ request }).queryKey).toEqual(
-			utils.users.get.queryKey(request),
+		expect(queryUtils.users.get.queryKey()).toEqual(["users", "get"]);
+		expect(queryUtils.events.queryKey()).toEqual(["events"]);
+		expect(queryUtils.users.create.mutationKey()).toEqual(["users", "create"]);
+		expect(queryUtils.users.get.queryOptions({ request }).queryKey).toEqual(
+			queryUtils.users.get.queryKey(request),
 		);
 		expect(
-			utils.users.get.queryOptions({ request, queryKey: ["custom"] }).queryKey,
+			queryUtils.users.get.queryOptions({ request, queryKey: ["custom"] })
+				.queryKey,
 		).toEqual(["custom"]);
 	});
 
 	it("separates query kinds with a segment after the route path", () => {
-		const { utils } = setup(() => Response.json({}));
+		const { queryUtils } = setup(() => Response.json({}));
 		const request = { query: { page: 1 } };
-		expect(utils.users.list.infiniteQueryKey()).toEqual([
+		expect(queryUtils.users.list.infiniteQueryKey()).toEqual([
 			"users",
 			"list",
 			"~infinite",
 		]);
-		expect(utils.users.list.infiniteQueryKey(request)).toEqual([
+		expect(queryUtils.users.list.infiniteQueryKey(request)).toEqual([
 			"users",
 			"list",
 			"~infinite",
 			request,
 		]);
-		expect(utils.events.streamedQueryKey()).toEqual(["events", "~streamed"]);
-		expect(utils.events.queryOptions().queryKey).toEqual(["events"]);
-		expect(utils.events.streamedQueryOptions().queryKey).toEqual(
-			utils.events.streamedQueryKey(),
+		expect(queryUtils.events.streamedQueryKey()).toEqual([
+			"events",
+			"~streamed",
+		]);
+		expect(queryUtils.events.queryOptions().queryKey).toEqual(["events"]);
+		expect(queryUtils.events.streamedQueryOptions().queryKey).toEqual(
+			queryUtils.events.streamedQueryKey(),
 		);
 		expect(
-			utils.users.list.infiniteQueryOptions({
+			queryUtils.users.list.infiniteQueryOptions({
 				request: skipToken,
 				initialPageParam: 0,
 				getNextPageParam: () => undefined,
@@ -84,10 +88,10 @@ describe("createTanstackQueryUtils", () => {
 	});
 
 	it("fetches queries with the request, fetch options, and query signal", async () => {
-		const { fetch, utils, client } = setup(() =>
+		const { fetch, queryUtils, client } = setup(() =>
 			Response.json({ name: "Ada" }),
 		);
-		const options = utils.users.get.queryOptions({
+		const options = queryUtils.users.get.queryOptions({
 			request: { params: { id: "1" } },
 			staleTime: 100,
 			fetchOptions: { credentials: "include" },
@@ -107,7 +111,7 @@ describe("createTanstackQueryUtils", () => {
 	});
 
 	it("rejects with the client's errors", async () => {
-		const { utils, client } = setup(() =>
+		const { queryUtils, client } = setup(() =>
 			Response.json(
 				{ code: "USER_NOT_FOUND", message: "Missing" },
 				{ status: 404 },
@@ -115,7 +119,7 @@ describe("createTanstackQueryUtils", () => {
 		);
 		await expect(
 			client.query(
-				utils.users.get.queryOptions({
+				queryUtils.users.get.queryOptions({
 					request: { params: { id: "1" } },
 					retry: false,
 				}),
@@ -125,35 +129,35 @@ describe("createTanstackQueryUtils", () => {
 	});
 
 	it("uses skipToken for disabled queries", () => {
-		const { fetch, utils } = setup(() => Response.json({}));
+		const { fetch, queryUtils } = setup(() => Response.json({}));
 		for (const options of [
-			utils.users.get.queryOptions({ request: skipToken }),
-			utils.users.list.infiniteQueryOptions({
+			queryUtils.users.get.queryOptions({ request: skipToken }),
+			queryUtils.users.list.infiniteQueryOptions({
 				request: skipToken,
 				initialPageParam: 0,
 				getNextPageParam: () => undefined,
 			}),
-			utils.events.streamedQueryOptions({ request: skipToken }),
+			queryUtils.events.streamedQueryOptions({ request: skipToken }),
 		]) {
 			expect(options.queryFn).toBe(skipToken);
 		}
 		expect(
-			utils.users.get.queryOptions({ request: skipToken }).queryKey,
+			queryUtils.users.get.queryOptions({ request: skipToken }).queryKey,
 		).toEqual(["users", "get"]);
 		expect(fetch).not.toHaveBeenCalled();
 	});
 
 	it("maps infinite page parameters to requests", async () => {
-		const { fetch, utils, client } = setup(() =>
+		const { fetch, queryUtils, client } = setup(() =>
 			Response.json({ names: ["Ada"] }),
 		);
-		const options = utils.users.list.infiniteQueryOptions({
+		const options = queryUtils.users.list.infiniteQueryOptions({
 			request: (page: number) => ({ query: { page } }),
 			initialPageParam: 2,
 			getNextPageParam: () => undefined,
 		});
 		expect(options.queryKey).toEqual(
-			utils.users.list.infiniteQueryKey({ query: { page: 2 } }),
+			queryUtils.users.list.infiniteQueryKey({ query: { page: 2 } }),
 		);
 		const data = await client.infiniteQuery(options);
 		expect(data.pages[0]).toMatchObject({ body: { names: ["Ada"] } });
@@ -164,12 +168,12 @@ describe("createTanstackQueryUtils", () => {
 	});
 
 	it("forwards mutation variables and fetch options", async () => {
-		const { fetch, utils, client } = setup(() =>
+		const { fetch, queryUtils, client } = setup(() =>
 			Response.json({ name: "Ada" }),
 		);
 		const observer = new MutationObserver(
 			client,
-			utils.users.create.mutationOptions({
+			queryUtils.users.create.mutationOptions({
 				fetchOptions: { credentials: "include" },
 			}),
 		);
@@ -183,14 +187,13 @@ describe("createTanstackQueryUtils", () => {
 	});
 
 	it("accumulates streamed events and supports reducers", async () => {
-		const { utils, client } = setup(eventStream);
-		expect(await client.query(utils.events.streamedQueryOptions())).toEqual([
-			{ data: { value: 1 } },
-			{ data: { value: 2 } },
-		]);
+		const { queryUtils, client } = setup(eventStream);
+		expect(
+			await client.query(queryUtils.events.streamedQueryOptions()),
+		).toEqual([{ data: { value: 1 } }, { data: { value: 2 } }]);
 		expect(
 			await client.query(
-				utils.events.streamedQueryOptions({
+				queryUtils.events.streamedQueryOptions({
 					queryKey: ["sum"],
 					initialValue: 0,
 					reducer: (total, event) => total + event.data.value,
@@ -201,8 +204,8 @@ describe("createTanstackQueryUtils", () => {
 	});
 
 	it("allows to call the underlying fetch function directly", async () => {
-		const { utils } = setup(() => Response.json({ name: "Ada" }));
-		const data = await utils.users.get.fetch({ params: { id: "1" } });
+		const { queryUtils } = setup(() => Response.json({ name: "Ada" }));
+		const data = await queryUtils.users.get.fetch({ params: { id: "1" } });
 		expect(data).toMatchObject({ body: { name: "Ada" } });
 	});
 });

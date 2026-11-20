@@ -15,13 +15,13 @@ the requests are routed by Bun's native router:
 
 ```ts server.ts
 import { createApp, route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
 const posts = new Map([
 	["post_1", { id: "post_1", title: "Hello", body: "First post" }],
 ]);
 
-const getPost = route
+const get = route
 	.get("/posts/:id")
 	.params(z.object({ id: z.string() }))
 	.error("POST_NOT_FOUND", { status: 404 })
@@ -31,9 +31,9 @@ const getPost = route
 		return post;
 	});
 
-export const routes = { posts: { get: getPost } };
+export const router = { posts: { get } };
 
-export default createApp(routes);
+export default createApp(router);
 ```
 
 :::tip[Bun Server Options]
@@ -41,7 +41,7 @@ To set other Bun server options, spread the app into `Bun.serve()`, and spread
 `app.routes` to add your own routes:
 
 ```ts server.ts
-const app = createApp(routes);
+const app = createApp(router);
 
 Bun.serve({
 	...app,
@@ -87,7 +87,7 @@ request, such as the `env` bindings of Cloudflare Workers, with their types
 inferred from its parameters:
 
 ```ts
-export default createApp(routes, {
+export default createApp(router, {
 	context: (request, env: Env) => ({ db: env.DB }),
 }) satisfies ExportedHandler<Env>;
 ```

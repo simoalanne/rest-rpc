@@ -54,13 +54,13 @@ See [Quickstart](https://rest-rpc.vercel.app/docs/quickstart)
 ```ts
 import { createApp, createClient, route } from "@rest-rpc/server";
 
-const routes = {
+const router = {
 	hello: route.get("/hello").handler(() => ({ message: "Hello" })),
 };
 
-const app = createApp(routes); // `export default app` to serve it on Bun, Deno or Workers
+const app = createApp(router); // `export default app` to serve it on Bun, Deno or Workers
 
-const client = createClient(routes, {
+const client = createClient(router, {
 	origin: "http://localhost",
 	fetch: app.fetch,
 });
@@ -77,17 +77,17 @@ See [Route Builder](https://rest-rpc.vercel.app/docs/route-builder#choose-a-meth
 
 ```ts
 import { route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
-const api = route.prefix("/api");
+const base = route.prefix("/api");
 
-export const routes = {
+export const router = {
 	posts: {
-		list: api
+		list: base
 			.get("/posts")
 			.handler(() => [{ id: "1", title: "Hello", body: "First post" }]), // GET /api/posts
-		get: api.get("/posts/:id").handler(({ params }) => ({ id: params.id })), // params.id: string
-		create: api
+		get: base.get("/posts/:id").handler(({ params }) => ({ id: params.id })), // params.id: string
+		create: base
 			.body(z.object({ title: z.string(), body: z.string() }))
 			.handler(({ body }) => ({ id: "2", title: body.title, body: body.body })), // POST /api/posts/create
 	},
@@ -104,7 +104,7 @@ See [Validation](https://rest-rpc.vercel.app/docs/http-behavior/validation)
 
 ```ts
 import { route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
 const search = route
 	.get("/users/:id/posts")
@@ -133,7 +133,7 @@ See [Return Responses](https://rest-rpc.vercel.app/docs/route-builder#return-res
 
 ```ts
 import { createApp, createClient, route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
 const create = route
 	.post("/posts")
@@ -151,14 +151,13 @@ const create = route
 		});
 	});
 
-const app = createApp({ create });
-const client = createClient(
-	{ create },
-	{
-		origin: "http://localhost",
-		fetch: app.fetch,
-	},
-);
+const router = { create };
+
+const app = createApp(router);
+const client = createClient(router, {
+	origin: "http://localhost",
+	fetch: app.fetch,
+});
 
 const { status, headers } = await client.create({
 	body: { title: "Hello", body: "First post" },
@@ -175,7 +174,7 @@ See [Define Responses](https://rest-rpc.vercel.app/docs/route-builder#define-res
 
 ```ts
 import { route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
 const post = z.object({ id: z.string(), title: z.string(), body: z.string() });
 
@@ -211,11 +210,11 @@ import {
 	route,
 	safe,
 } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
 const posts = new Map([["1", { id: "1", title: "Hello", body: "First post" }]]);
 
-const routes = {
+const router = {
 	get: route
 		.get("/posts/:id")
 		.error("POST_NOT_FOUND", {
@@ -229,8 +228,8 @@ const routes = {
 		}),
 };
 
-const app = createApp(routes);
-const client = createClient(routes, {
+const app = createApp(router);
+const client = createClient(router, {
 	origin: "http://localhost",
 	fetch: app.fetch,
 });
@@ -250,7 +249,7 @@ See [Define Errors](https://rest-rpc.vercel.app/docs/route-builder#define-errors
 
 ```ts
 import { route, routeError } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
 const PostNotFound = routeError("POST_NOT_FOUND", {
 	status: 404,
@@ -292,7 +291,7 @@ const base = route
 		return next({ context: { user } });
 	});
 
-const routes = {
+const router = {
 	health: base
 		.get("/health")
 		.meta({ access: "public" })
@@ -303,7 +302,7 @@ const routes = {
 		.handler(({ context }) => context.user), // string | null
 };
 
-export default createApp(routes, {
+export default createApp(router, {
 	context: (request) => ({ headers: request.headers }), // or an object, such as { db }
 });
 ```
@@ -322,11 +321,11 @@ import {
 	sse,
 	sseEvent,
 } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
 const messages = ["Ada liked your post", "Grace commented on your post"];
 
-const routes = {
+const router = {
 	notifications: route
 		.get("/notifications")
 		.response(sse(z.object({ message: z.string() }))) // optional, validates each event
@@ -338,8 +337,8 @@ const routes = {
 		}),
 };
 
-const app = createApp(routes);
-const client = createClient(routes, {
+const app = createApp(router);
+const client = createClient(router, {
 	origin: "http://localhost",
 	fetch: app.fetch,
 });
@@ -401,7 +400,7 @@ const bytes = bodyCodec("application/octet-stream", {
 			: binaryCodec.deserialize(body),
 });
 
-const routes = {
+const router = {
 	posts: {
 		get: route
 			.get("/posts/:id")
@@ -420,8 +419,8 @@ const routes = {
 };
 
 const bodyCodecs = [superjsonCodec, bytes];
-const app = createApp(routes, { bodyCodecs });
-const client = createClient(routes, {
+const app = createApp(router, { bodyCodecs });
+const client = createClient(router, {
 	origin: "http://localhost",
 	fetch: app.fetch,
 	bodyCodecs,
@@ -477,9 +476,9 @@ const requestId = interceptor(async ({ next }) => {
 	return copy;
 });
 
-const routes = { hello: route.get("/hello").handler(() => "Hello") };
+const router = { hello: route.get("/hello").handler(() => "Hello") };
 
-export default createApp(routes, {
+export default createApp(router, {
 	interceptors: [
 		requestId,
 		interceptor(({ next }) => next().catch(errorResponse)), // errors reach requestId as responses
@@ -499,15 +498,15 @@ import { createServer } from "node:http";
 import { route } from "@rest-rpc/server";
 import { createApp } from "@rest-rpc/server/node";
 
-const routes = { hello: route.get("/hello").handler(() => "Hello") };
+const router = { hello: route.get("/hello").handler(() => "Hello") };
 
-createServer(createApp(routes)).listen(3000);
+createServer(createApp(router)).listen(3000);
 ```
 
 ## Frameworks
 
-Mount the routes in a framework under one route, or register each on its
-router.
+Mount the routes in a framework under one route, or register each on the
+framework's router.
 
 See [Framework Integration](https://rest-rpc.vercel.app/docs/server/framework-integration)
 
@@ -515,8 +514,8 @@ See [Framework Integration](https://rest-rpc.vercel.app/docs/server/framework-in
 import { Hono } from "hono";
 import { createCatchAllHandler, route } from "@rest-rpc/server";
 
-const routes = { hello: route.get("/hello").handler(() => "Hello") };
-const handler = createCatchAllHandler(routes);
+const router = { hello: route.get("/hello").handler(() => "Hello") };
+const handler = createCatchAllHandler(router);
 
 const app = new Hono();
 app.all("/api/*", async (c) => {
@@ -531,26 +530,56 @@ export default app;
 
 A bundler macro runs `extractContract()` at build time and inlines the routes'
 methods, paths, statuses and error codes, so no server code ships. Bun runs
-macros itself, and Vite and other bundlers with `unplugin-macros`.
+macros itself, and Vite and other bundlers with `unplugin-macros`. The client
+sections below use these files.
 
 See [Contract Extraction](https://rest-rpc.vercel.app/docs/client/contract-extraction)
 
 ```ts
-// client/contract.ts
-import { extractContract } from "@rest-rpc/core";
-import { routes } from "../server/routes.ts";
+// router.ts
+import { route } from "@rest-rpc/server";
+import * as z from "zod";
 
-export function getApi() {
-	return extractContract(routes);
+const posts = new Map([["1", { id: "1", title: "Hello", body: "First post" }]]);
+
+export const router = {
+	posts: {
+		list: route.get("/posts").handler(() => [...posts.values()]),
+		get: route
+			.get("/posts/:id")
+			.error("POST_NOT_FOUND", { status: 404 })
+			.handler(({ params, errors }) => {
+				const post = posts.get(params.id);
+				if (!post) throw errors.POST_NOT_FOUND();
+				return post;
+			}),
+		create: route
+			.body(z.object({ title: z.string(), body: z.string() }))
+			.handler(({ body }) => {
+				const post = { id: crypto.randomUUID(), ...body };
+				posts.set(post.id, post);
+				return post;
+			}),
+	},
+};
+```
+
+```ts
+// contract.ts
+import { extractContract } from "@rest-rpc/core";
+import { router } from "./router.ts";
+
+export function getContract() {
+	return extractContract(router);
 }
 ```
 
 ```ts
-// client/api.ts
+// client.ts
 import { createClient } from "@rest-rpc/core";
-import { getApi } from "./contract.ts" with { type: "macro" };
+import { getContract } from "./contract" with { type: "macro" };
 
-export const client = createClient(getApi()); // the page's origin, or pass { origin }
+export const client = createClient(getContract()); // the page's origin, or pass { origin }
 ```
 
 ```ts
@@ -569,10 +598,9 @@ each request.
 See [Fetch Client](https://rest-rpc.vercel.app/docs/client/fetch-client#client-options)
 
 ```ts
+// client.ts
 import { clientInterceptor, createClient } from "@rest-rpc/core";
-import { route } from "@rest-rpc/server";
-
-const routes = { hello: route.get("/hello").handler(() => "Hello") };
+import { getContract } from "./contract" with { type: "macro" };
 
 const logging = clientInterceptor(async ({ request, next }) => {
 	const response = await next();
@@ -580,7 +608,7 @@ const logging = clientInterceptor(async ({ request, next }) => {
 	return response;
 });
 
-const client = createClient(routes, {
+export const client = createClient(getContract(), {
 	origin: "https://api.example.com",
 	mountPath: "/api",
 	globalHeaders: {
@@ -597,38 +625,31 @@ Query and mutation options for each route, with typed keys.
 
 See [TanStack Query](https://rest-rpc.vercel.app/docs/client/tanstack-query)
 
-```tsx
+```ts
+// client.ts
 import { createClient } from "@rest-rpc/core";
-import { route } from "@rest-rpc/server";
 import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
+import { getContract } from "./contract" with { type: "macro" };
+
+export const client = createClient(getContract());
+export const queryUtils = createTanstackQueryUtils(client);
+```
+
+```tsx
+// posts.tsx
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { z } from "zod";
-
-const routes = {
-	posts: {
-		list: route
-			.get("/posts")
-			.handler(() => [{ id: "1", title: "Hello", body: "First post" }]),
-		create: route
-			.body(z.object({ title: z.string(), body: z.string() }))
-			.handler(({ body }) => body),
-	},
-};
-
-const restrpc = createTanstackQueryUtils(
-	createClient(routes, { origin: "https://api.example.com" }),
-);
+import { queryUtils } from "./client";
 
 export function Posts() {
 	const queryClient = useQueryClient();
 	const posts = useQuery(
-		restrpc.posts.list.queryOptions({ select: (response) => response.body }),
+		queryUtils.posts.list.queryOptions({ select: (response) => response.body }),
 	);
 	const create = useMutation(
-		restrpc.posts.create.mutationOptions({
+		queryUtils.posts.create.mutationOptions({
 			onSuccess: () =>
 				queryClient.invalidateQueries({
-					queryKey: restrpc.posts.list.queryKey(),
+					queryKey: queryUtils.posts.list.queryKey(),
 				}),
 		}),
 	);
@@ -646,31 +667,17 @@ export function Posts() {
 
 ## Direct Calls from TanStack Query Utils
 
-Call a route through the utils with `fetch()` when TanStack Query is not needed, such as in a router loader, so the app keeps only the utils around.
+Call a route through the utils with `fetch()` when TanStack Query is not
+needed, such as in a router loader, so the app keeps only the utils around.
 
 See [Direct Fetch Calls](https://rest-rpc.vercel.app/docs/client/tanstack-query#direct-fetch-calls)
 
 ```ts
-import { createClient } from "@rest-rpc/core";
-import { route } from "@rest-rpc/server";
-import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
-
-const routes = {
-	posts: {
-		get: route.get("/posts/:id").handler(({ params }) => ({
-			id: params.id,
-			title: "Hello",
-			body: "First post",
-		})),
-	},
-};
-
-const restrpc = createTanstackQueryUtils(
-	createClient(routes, { origin: "https://api.example.com" }),
-);
+// loaders.ts
+import { queryUtils } from "./client";
 
 export async function loadPost(id: string) {
-	const { body: post } = await restrpc.posts.get.fetch({ params: { id } });
+	const { body: post } = await queryUtils.posts.get.fetch({ params: { id } });
 	return post;
 }
 ```
@@ -683,11 +690,11 @@ them on the server. The client uses the contract directly, schemas included.
 See [Contract-first](https://rest-rpc.vercel.app/docs/contract-first)
 
 ```ts
-import { createClient, route } from "@rest-rpc/core";
-import { createApp, implement } from "@rest-rpc/server";
-import { z } from "zod";
+// contract.ts
+import { route } from "@rest-rpc/core";
+import * as z from "zod";
 
-const api = {
+export const contract = {
 	posts: {
 		get: route
 			.get("/posts/:id")
@@ -697,10 +704,16 @@ const api = {
 			.error("POST_NOT_FOUND", { status: 404 }),
 	},
 };
+```
 
-const routes = {
+```ts
+// server.ts
+import { createApp, implement } from "@rest-rpc/server";
+import { contract } from "./contract.ts";
+
+const router = {
 	posts: {
-		get: implement(api.posts.get).handler(({ params }) => ({
+		get: implement(contract.posts.get).handler(({ params }) => ({
 			id: params.id,
 			title: "Hello",
 			body: "First post",
@@ -708,12 +721,15 @@ const routes = {
 	},
 };
 
-const app = createApp(routes);
-const client = createClient(api, {
-	origin: "http://localhost",
-	fetch: app.fetch,
-	validateResponses: true,
-});
+export default createApp(router);
+```
+
+```ts
+// client.ts
+import { createClient } from "@rest-rpc/core";
+import { contract } from "./contract";
+
+export const client = createClient(contract, { validateResponses: true });
 ```
 
 ## Local Calls
@@ -726,7 +742,7 @@ See [Local Calls](https://rest-rpc.vercel.app/docs/client/local-calls)
 
 ```ts
 import { call, route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
 const double = route
 	.get("/double/:n")
@@ -746,9 +762,9 @@ See [OpenAPI](https://rest-rpc.vercel.app/docs/openapi)
 
 ```ts
 import { createOpenApiDocument, route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
-const routes = {
+const router = {
 	posts: {
 		list: route
 			.get("/posts")
@@ -762,7 +778,7 @@ const routes = {
 	},
 };
 
-const document = createOpenApiDocument(routes, {
+const document = createOpenApiDocument(router, {
 	info: { title: "Blog API", version: "1.0.0" },
 	schemaConverter: (schema, io) => z.toJSONSchema(schema as z.ZodType, { io }),
 });
@@ -778,19 +794,22 @@ See [Type Helpers](https://rest-rpc.vercel.app/docs/route-builder#type-helpers)
 ```ts
 import type { InferClientResponse } from "@rest-rpc/core";
 import { route, type InferServerRequest } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
-const update = route
+const updateDefinition = route
 	.patch("/posts/:id")
 	.body(z.object({ title: z.string(), body: z.string() }));
 
-const updatePost = ({ params, body }: InferServerRequest<typeof update>) => ({
+const updatePost = ({
+	params,
+	body,
+}: InferServerRequest<typeof updateDefinition>) => ({
 	id: params.id,
 	title: body.title,
 	body: body.body,
 });
 
-const routes = { update: update.handler(updatePost) };
+const router = { posts: { update: updateDefinition.handler(updatePost) } };
 
-type UpdateResponse = InferClientResponse<typeof routes.update>; // { status: 200; body: { id; title; body }; ... }
+type UpdateResponse = InferClientResponse<typeof router.posts.update>; // { status: 200; body: { id; title; body }; ... }
 ```

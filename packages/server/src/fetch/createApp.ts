@@ -104,11 +104,11 @@ export type App<TArgs extends unknown[] = []> = {
  * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#usage}
  */
 export function createApp<
-	TRoutes extends RuntimeImplementationTree<EmptyObject>,
+	TRouter extends RuntimeImplementationTree<EmptyObject>,
 	TArgs extends unknown[] = [],
 >(
-	implementations: TRoutes,
-	options?: CreateAppOptions<TArgs, TreeInitialContext<TRoutes>>,
+	router: TRouter,
+	options?: CreateAppOptions<TArgs, TreeInitialContext<TRouter>>,
 ): App<TArgs>;
 /**
  * Creates a Fetch app that serves a route tree whose routes require initial
@@ -117,20 +117,20 @@ export function createApp<
  * @see {@link https://rest-rpc.vercel.app/docs/server/fetch#usage}
  */
 export function createApp<
-	TRoutes extends RuntimeImplementationTree,
+	TRouter extends RuntimeImplementationTree,
 	TArgs extends unknown[] = [],
 >(
-	implementations: TRoutes,
-	options: CreateAppOptions<TArgs, TreeInitialContext<TRoutes>> & {
-		context: AppContext<TArgs, TreeInitialContext<TRoutes>>;
+	router: TRouter,
+	options: CreateAppOptions<TArgs, TreeInitialContext<TRouter>> & {
+		context: AppContext<TArgs, TreeInitialContext<TRouter>>;
 	},
 ): App<TArgs>;
 export function createApp(
-	implementations: RuntimeImplementationTree,
+	router: RuntimeImplementationTree,
 	options?: CreateAppOptions<unknown[], object>,
 ): App<unknown[]> {
 	const { mountPath, context, interceptors, ...compileOptions } = options ?? {};
-	const compiled = compileFetchRoutes(implementations, compileOptions);
+	const compiled = compileFetchRoutes(router, compileOptions);
 	const matchRoute = createRouteMatcher(compiled);
 	const matchRequest = (request: Request): Match | undefined =>
 		matchRoute(request.method, request.url, mountPath);

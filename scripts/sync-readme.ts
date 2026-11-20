@@ -66,9 +66,17 @@ const withContents = (readme: string) => {
 	return body.slice(0, firstSection) + contents + body.slice(firstSection);
 };
 
+// GitHub and npm don't render code block titles, so the README names a file
+// in a first-line comment, which the docs page renders as the block's title.
+const toCodeBlockTitles = (markdown: string) =>
+	markdown.replaceAll(
+		/^```(\w+)\n\/\/ ([\w./-]+\.\w+)\n/gm,
+		(_, language, fileName) => `\`\`\`${language} ${fileName}\n`,
+	);
+
 const toCheatsheet = (readme: string) => {
 	// The page title comes from the frontmatter, so drop the README heading.
-	const body = removeContents(readme)
+	const body = toCodeBlockTitles(removeContents(readme))
 		.replace(/^# .*\n+/, "")
 		.replaceAll(docsUrl, "/docs/");
 	return `${frontmatter}\n${body}`;

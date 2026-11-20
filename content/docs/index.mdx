@@ -19,9 +19,9 @@ middleware, and deployment model.
 
 ```ts twoslash
 // ---cut-start---
-// @filename: server.ts
+// @filename: router.ts
 import { respond, route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
 declare function createPost(
 	title: string,
@@ -55,7 +55,7 @@ const get = route
 		);
 	});
 
-export const routes = { posts: { create, get } };
+export const router = { posts: { create, get } };
 ```
 
 </Tab>
@@ -63,9 +63,9 @@ export const routes = { posts: { create, get } };
 
 ```ts twoslash
 // ---cut-start---
-// @filename: server.ts
+// @filename: router.ts
 import { respond, route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
 declare function createPost(
 	title: string,
@@ -99,19 +99,19 @@ const get = route
 		);
 	});
 
-export const routes = { posts: { create, get } };
+export const router = { posts: { create, get } };
 
-// @filename: client-contract.ts
-import type { routes } from "./server";
-export declare const api: typeof routes;
+// @filename: contract.ts
+import type { router } from "./router";
+export declare function getContract(): typeof router;
 
 // @filename: client.ts
 // ---cut-end---
 import { createClient } from "@rest-rpc/core";
-// Extracted from the routes at build time with extractContract(routes).
-import { api } from "./client-contract";
+// getContract() runs extractContract(router) at build time.
+import { getContract } from "./contract" with { type: "macro" };
 
-const client = createClient(api, { origin: "http://localhost:3000" });
+const client = createClient(getContract(), { origin: "http://localhost:3000" });
 
 const created = await client.posts.create({
 	body: { title: "Hello", body: "First post" },
@@ -132,9 +132,9 @@ if (response.status === 200) {
 
 ```tsx twoslash
 // ---cut-start---
-// @filename: server.ts
+// @filename: router.ts
 import { respond, route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
 declare function createPost(
 	title: string,
@@ -168,32 +168,32 @@ const get = route
 		);
 	});
 
-export const routes = { posts: { create, get } };
+export const router = { posts: { create, get } };
 
-// @filename: client-contract.ts
-import type { routes } from "./server";
-export declare const api: typeof routes;
+// @filename: contract.ts
+import type { router } from "./router";
+export declare function getContract(): typeof router;
 
 // @filename: client.tsx
-import { api } from "./client-contract";
+import { getContract } from "./contract" with { type: "macro" };
 // ---cut-end---
 import { createClient } from "@rest-rpc/core";
 import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
-const restrpc = createTanstackQueryUtils(
-	createClient(api, { origin: "http://localhost:3000" }),
+const queryUtils = createTanstackQueryUtils(
+	createClient(getContract(), { origin: "http://localhost:3000" }),
 );
 
 const post = useQuery(
-	restrpc.posts.get.queryOptions({
+	queryUtils.posts.get.queryOptions({
 		request: {
 			params: { id: "post_1" },
 			query: { preview: "true" },
 		},
 	}),
 );
-const create = useMutation(restrpc.posts.create.mutationOptions());
+const create = useMutation(queryUtils.posts.create.mutationOptions());
 
 create.mutate({ body: { title: "Hello", body: "First post" } });
 ```

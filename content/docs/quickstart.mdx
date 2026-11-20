@@ -22,9 +22,9 @@ npm i @rest-rpc/core @rest-rpc/server zod
 
 ## Define Routes
 
-```ts routes.ts
+```ts router.ts
 import { route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
 type Post = { id: string; title: string; body: string };
 const posts = new Map<string, Post>();
@@ -55,7 +55,7 @@ const get = route
 		};
 	});
 
-export const routes = { posts: { create, get } };
+export const router = { posts: { create, get } };
 ```
 
 `posts.create` uses `POST /posts/create`, reads a JSON body, and returns the
@@ -70,9 +70,9 @@ the client's result type.
 
 ```ts server.ts
 import { createApp } from "@rest-rpc/server";
-import { routes } from "./routes";
+import { router } from "./router.ts";
 
-export default createApp(routes);
+export default createApp(router);
 ```
 
 Run it with `bun server.ts`, which serves it on port 3000. To add the routes to
@@ -85,12 +85,12 @@ Extract a minimal contract from the routes with a
 [Bun macro](https://bun.com/docs/bundler/macros). The macro runs at bundle time
 and inlines the contract into the client, so no server code is shipped:
 
-```ts client-contract.ts
+```ts contract.ts
 import { extractContract } from "@rest-rpc/core";
-import { routes } from "./routes";
+import { router } from "./router.ts";
 
-export function getApi() {
-	return extractContract(routes);
+export function getContract() {
+	return extractContract(router);
 }
 ```
 
@@ -101,9 +101,9 @@ Vite and other bundlers run the same macro with `unplugin-macros`. See
 
 ```ts client.ts
 import { createClient, isDefinedError, safe } from "@rest-rpc/core";
-import { getApi } from "./client-contract" with { type: "macro" };
+import { getContract } from "./contract" with { type: "macro" };
 
-const client = createClient(getApi(), { origin: "http://localhost:3000" });
+const client = createClient(getContract(), { origin: "http://localhost:3000" });
 
 const created = await client.posts.create({
 	body: { title: "Hello", body: "First post" },

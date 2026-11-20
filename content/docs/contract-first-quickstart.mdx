@@ -24,7 +24,7 @@ Put the contract somewhere both server and client can import.
 
 ```ts contract.ts
 import { route } from "@rest-rpc/core";
-import { z } from "zod";
+import * as z from "zod";
 
 const postSchema = z.object({
 	id: z.string(),
@@ -43,7 +43,7 @@ const get = route
 	.response(postSchema)
 	.error("POST_NOT_FOUND", { status: 404 });
 
-export const api = { posts: { create, get } };
+export const contract = { posts: { create, get } };
 ```
 
 `posts.create` uses the default `POST /posts/create`. `posts.get` defines its
@@ -53,12 +53,12 @@ HTTP method, path, 200 response, and `POST_NOT_FOUND` error with status 404. The
 
 ```ts server.ts
 import { createApp, implement } from "@rest-rpc/server";
-import { api } from "./contract";
+import { contract } from "./contract.ts";
 
 type Post = { id: string; title: string; body: string };
 const posts = new Map<string, Post>();
 
-const create = implement(api.posts.create).handler(
+const create = implement(contract.posts.create).handler(
 	({ body: { title, body } }) => {
 		const post: Post = {
 			id: crypto.randomUUID(),
@@ -70,18 +70,20 @@ const create = implement(api.posts.create).handler(
 	},
 );
 
-const get = implement(api.posts.get).handler(({ params, query, errors }) => {
-	const post = posts.get(params.id);
-	if (!post) throw errors.POST_NOT_FOUND();
-	return {
-		...post,
-		body: query.preview === "true" ? post.body.slice(0, 40) : post.body,
-	};
-});
+const get = implement(contract.posts.get).handler(
+	({ params, query, errors }) => {
+		const post = posts.get(params.id);
+		if (!post) throw errors.POST_NOT_FOUND();
+		return {
+			...post,
+			body: query.preview === "true" ? post.body.slice(0, 40) : post.body,
+		};
+	},
+);
 
-const routes = { posts: { create, get } };
+const router = { posts: { create, get } };
 
-export default createApp(routes);
+export default createApp(router);
 ```
 
 `implement()` keeps each handler's request and result tied to its definition.
@@ -93,9 +95,9 @@ Import the shared contract directly. No contract extraction step is needed.
 
 ```ts client.ts
 import { createClient, isDefinedError, safe } from "@rest-rpc/core";
-import { api } from "./contract";
+import { contract } from "./contract";
 
-const client = createClient(api, { origin: "http://localhost:3000" });
+const client = createClient(contract, { origin: "http://localhost:3000" });
 
 const created = await client.posts.create({
 	body: { title: "Hello", body: "First post" },

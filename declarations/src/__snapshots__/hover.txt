@@ -13,7 +13,7 @@ type Post = {
     published: boolean;
 }
 
-const routes: {
+const router: {
     posts: {
         get: HandledRoute<{
             readonly method: "GET";
@@ -352,7 +352,7 @@ type ServerRequest = {
     respond: RouteRespond<...>;
 }
 
-const utils: TanstackQueryTreeFor<{
+const queryUtils: TanstackQueryTreeFor<{
     posts: {
         get: (request: {
             query: {

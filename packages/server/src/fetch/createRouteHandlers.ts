@@ -34,7 +34,7 @@ export type FetchRouteHandlerResult =
 	| { matched: false; response: undefined };
 
 /**
- * A compiled route ready to be registered on a router.
+ * A compiled route ready to be registered on a framework's router.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
  */
@@ -81,7 +81,7 @@ export type FetchRouteHandlersOptions = CreateRouteHandlersOptions & {
 
 /**
  * Creates one Fetch route handler per method and path of a route tree, to
- * register on a router.
+ * register on a framework's router.
  *
  * @remarks `handle` sends `RouteError`s as error responses, and rejects with
  * other thrown values, for the framework's error handling. Use
@@ -89,12 +89,12 @@ export type FetchRouteHandlersOptions = CreateRouteHandlersOptions & {
  *
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#native-router}
  */
-export function createRouteHandlers<TRoutes extends RuntimeImplementationTree>(
-	implementations: TRoutes,
+export function createRouteHandlers<TRouter extends RuntimeImplementationTree>(
+	router: TRouter,
 	options: FetchRouteHandlersOptions = {},
-): FetchRoute<TreeInitialContext<TRoutes>>[] {
+): FetchRoute<TreeInitialContext<TRouter>>[] {
 	const { interceptors, ...compileOptions } = options;
-	return compileFetchRoutes(implementations, compileOptions).map(
+	return compileFetchRoutes(router, compileOptions).map(
 		({ method, path, definition, handle, staticResponse }) => ({
 			method,
 			path,
@@ -126,11 +126,11 @@ export type CompiledFetchRoute = FetchRoute<object> & {
 
 /** Compiles a route tree into Fetch routes with their definitions. */
 export const compileFetchRoutes = (
-	implementations: RuntimeImplementationTree,
+	router: RuntimeImplementationTree,
 	options: CreateRouteHandlersOptions,
 ): CompiledFetchRoute[] => {
 	const { routes, dispatch } = compileRouteTree(
-		implementations,
+		router,
 		options,
 		fetchRequestReader,
 		fetchResponseWriter,
@@ -189,19 +189,19 @@ export const compileFetchRoutes = (
  * @see {@link https://rest-rpc.vercel.app/docs/server/framework-integration#catch-all-handler}
  */
 export function createCatchAllHandler<
-	TRoutes extends RuntimeImplementationTree,
+	TRouter extends RuntimeImplementationTree,
 >(
-	implementations: TRoutes,
+	router: TRouter,
 	options: FetchRouteHandlersOptions = {},
 ): (
 	request: Request,
 	...options: OptionsArgs<
-		TreeInitialContext<TRoutes>,
-		CatchAllHandleOptions<TreeInitialContext<TRoutes>>
+		TreeInitialContext<TRouter>,
+		CatchAllHandleOptions<TreeInitialContext<TRouter>>
 	>
 ) => Promise<FetchRouteHandlerResult> {
 	const matchRoute = createRouteMatcher(
-		createRouteHandlers<RuntimeImplementationTree>(implementations, options),
+		createRouteHandlers<RuntimeImplementationTree>(router, options),
 	);
 
 	return async (request, ...[handleOptions]) => {

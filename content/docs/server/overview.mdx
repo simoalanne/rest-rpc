@@ -39,9 +39,9 @@ doesn't start a server:
 
 ```ts server.ts
 import { createApp } from "@rest-rpc/server";
-import { routes } from "./routes";
+import { router } from "./router.ts";
 
-export default createApp(routes);
+export default createApp(router);
 ```
 
 See [Fetch](/docs/server/fetch) and [Node](/docs/server/node) for each

@@ -6,7 +6,7 @@ import { resolveRoutePath } from "../contract/path.ts";
 import { createBodyCodecRegistry, type BodyCodec } from "../codecs/index.ts";
 import type { SseFormat } from "../contract/sse.ts";
 import {
-	type ApiClientFetchOptions,
+	type ClientFetchOptions,
 	type ClientHeaders,
 	type FetchArgs,
 	type FetchLike,
@@ -26,7 +26,7 @@ import type { ClientPromise } from "./safe.ts";
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#call-routes}
  */
-export type ApiClientRouteValue<
+export type ClientRouteValue<
 	E extends RouteDefinition = RouteDefinition,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > =
@@ -43,14 +43,14 @@ export type ApiClientRouteValue<
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#type-helpers}
  */
-export type ApiClientFor<
+export type ClientFor<
 	T extends Contract = Contract,
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > = T extends { readonly "~restrpc": infer TRoute extends RouteDefinition }
-	? ApiClientRouteValue<TRoute, TGlobalHeaders>
+	? ClientRouteValue<TRoute, TGlobalHeaders>
 	: {
 			[K in keyof T]: T[K] extends Contract
-				? ApiClientFor<T[K], TGlobalHeaders>
+				? ClientFor<T[K], TGlobalHeaders>
 				: never;
 		};
 
@@ -63,7 +63,7 @@ export type ApiClientFor<
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#client-options}
  */
-export type ApiClientOptions<
+export type CreateClientOptions<
 	TGlobalHeaders extends ClientHeaders = Record<never, string>,
 > = {
 	/**
@@ -95,7 +95,7 @@ export type ApiClientOptions<
 	 * Fetch options merged into every request. Per-call options override them,
 	 * and `signal` and `additionalHeaders` can only be passed per call.
 	 */
-	fetchOptions?: ApiClientFetchOptions;
+	fetchOptions?: ClientFetchOptions;
 	/**
 	 * Headers added to every request, each a value, a promise of one, or a
 	 * function called for each request. Defined headers they set are optional
@@ -145,8 +145,8 @@ export function createClient<
 	const TGlobalHeaders extends ClientHeaders = Record<never, string>,
 >(
 	contract: TContract,
-	options: ApiClientOptions<TGlobalHeaders> = {},
-): ApiClientFor<TContract, TGlobalHeaders> {
+	options: CreateClientOptions<TGlobalHeaders> = {},
+): ClientFor<TContract, TGlobalHeaders> {
 	const codecs = createBodyCodecRegistry(options.bodyCodecs ?? []);
 	// A trailing slash of the mount path is ignored, as on the server.
 	const mountPath = options.mountPath?.endsWith("/")
@@ -175,5 +175,5 @@ export function createClient<
 				codecs,
 				options.sse?.format,
 			);
-	}) as ApiClientFor<TContract, TGlobalHeaders>;
+	}) as ClientFor<TContract, TGlobalHeaders>;
 }

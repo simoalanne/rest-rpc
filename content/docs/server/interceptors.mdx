@@ -28,7 +28,7 @@ const logging = interceptor(async ({ request, route, next }) => {
 	return response;
 });
 
-export default createApp(routes, { interceptors: [logging] });
+export default createApp(router, { interceptors: [logging] });
 ```
 
 ```ts
@@ -97,7 +97,7 @@ responses instead of rejections:
 ```ts
 import { createApp, errorResponse, interceptor } from "@rest-rpc/server";
 
-createApp(routes, {
+createApp(router, {
 	interceptors: [
 		cors, // receives error responses too
 		interceptor(({ next }) => next().catch(errorResponse)),

@@ -14,20 +14,20 @@ Import the [shared contract](/docs/contract-first) directly and skip this page.
 
 Run it as a bundler macro so the bundle gets plain JSON:
 
-```ts src/client/contract.ts
+```ts contract.ts
 import { extractContract } from "@rest-rpc/core";
-import { routes } from "../server/routes.ts";
+import { router } from "./router.ts";
 
-export function getApi() {
-	return extractContract(routes);
+export function getContract() {
+	return extractContract(router);
 }
 ```
 
-```ts src/client/client.ts
+```ts client.ts
 import { createClient } from "@rest-rpc/core";
-import { getApi } from "./contract.ts" with { type: "macro" };
+import { getContract } from "./contract" with { type: "macro" };
 
-export const client = createClient(getApi());
+export const client = createClient(getContract());
 ```
 
 In a browser, the client calls the page's origin. Pass the
@@ -46,7 +46,7 @@ export default defineConfig({
 });
 ```
 
-The routes module runs at build time, so keep it free of side effects like
+`router.ts` runs at build time, so keep it free of side effects like
 starting the server or connecting to a database.
 
 ## Extract Routes without a Macro
@@ -57,12 +57,9 @@ JSON in watch mode:
 ```ts scripts/extract-contract.ts
 import { writeFile } from "node:fs/promises";
 import { extractContract } from "@rest-rpc/core";
-import { routes } from "../src/server/routes.ts";
+import { router } from "../router.ts";
 
-await writeFile(
-	"src/client/contract.json",
-	JSON.stringify(extractContract(routes)),
-);
+await writeFile("contract.json", JSON.stringify(extractContract(router)));
 ```
 
 ```json package.json
@@ -74,12 +71,12 @@ await writeFile(
 }
 ```
 
-```ts src/client/client.ts
+```ts client.ts
 import { createClient } from "@rest-rpc/core";
-import type { routes } from "../server/routes.ts";
+import type { router } from "./router";
 import contract from "./contract.json";
 
-export const client = createClient(contract as unknown as typeof routes, {
+export const client = createClient(contract as unknown as typeof router, {
 	origin: "http://localhost:3000",
 });
 ```

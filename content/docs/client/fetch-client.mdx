@@ -6,11 +6,11 @@ description: Create a typed Fetch client to call your routes over HTTP.
 `createClient()` creates a typed Fetch client from a runtime contract. When the
 routes are implemented in the server, [extract a contract](/docs/client/contract-extraction) first.
 
-```ts
+```ts client.ts
 import { createClient } from "@rest-rpc/core";
-import { api } from "./client-contract";
+import { getContract } from "./contract" with { type: "macro" };
 
-const client = createClient(api, {
+const client = createClient(getContract(), {
 	origin: "https://api.example.com",
 });
 ```
@@ -19,8 +19,8 @@ The client has the same route tree shape as the contract. In a browser app
 served from the same origin as the routes, no options are needed:
 
 ```ts
-const client = createClient(api); // routes at the origin's root
-const client = createClient(api, { mountPath: "/api" }); // routes under /api
+const client = createClient(getContract()); // routes at the origin's root
+const client = createClient(getContract(), { mountPath: "/api" }); // routes under /api
 ```
 
 ## Call Routes
@@ -114,9 +114,9 @@ or `data`:
 
 ```ts twoslash
 // ---cut-start---
-// @filename: server.ts
+// @filename: router.ts
 import { route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
 const get = route
 	.get("/posts/:id")
@@ -128,13 +128,13 @@ const get = route
 		body: "First post",
 	}));
 
-export const routes = { posts: { get } };
+export const router = { posts: { get } };
 
 // @filename: client.ts
 import { createClient } from "@rest-rpc/core";
-import type { routes } from "./server";
-declare const api: typeof routes;
-const client = createClient(api, { origin: "http://localhost:3000" });
+import type { router } from "./router";
+declare function getContract(): typeof router;
+const client = createClient(getContract(), { origin: "http://localhost:3000" });
 // ---cut-end---
 import { RouteError } from "@rest-rpc/core";
 
@@ -157,9 +157,9 @@ error to the route's defined errors, and checking `code` types their `data`:
 
 ```ts twoslash
 // ---cut-start---
-// @filename: server.ts
+// @filename: router.ts
 import { route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
 const get = route
 	.get("/posts/:id")
@@ -171,13 +171,13 @@ const get = route
 		body: "First post",
 	}));
 
-export const routes = { posts: { get } };
+export const router = { posts: { get } };
 
 // @filename: client.ts
 import { createClient } from "@rest-rpc/core";
-import type { routes } from "./server";
-declare const api: typeof routes;
-const client = createClient(api, { origin: "http://localhost:3000" });
+import type { router } from "./router";
+declare function getContract(): typeof router;
+const client = createClient(getContract(), { origin: "http://localhost:3000" });
 // ---cut-end---
 import { isDefinedError, safe } from "@rest-rpc/core";
 
@@ -290,7 +290,7 @@ time, and stops on an abort or a client error such as `401`.
 ## Client Options
 
 ```ts
-const client = createClient(api, {
+const client = createClient(getContract(), {
 	origin: "https://api.example.com",
 	timeoutMs: 10_000,
 	fetchOptions: {
@@ -300,7 +300,7 @@ const client = createClient(api, {
 ```
 
 ```ts
-type ApiClientOptions = {
+type CreateClientOptions = {
 	/**
 	 * The server's origin, such as `https://api.example.com`, without a path.
 	 * A trailing slash is ignored, and a path throws when the client is
@@ -362,7 +362,7 @@ request. A provider is useful for values that can change during the lifetime of
 the client, such as an access token.
 
 ```ts
-const client = createClient(api, {
+const client = createClient(getContract(), {
 	origin: "https://api.example.com",
 	globalHeaders: {
 		authorization: () => `Bearer ${readToken()}`,
@@ -394,7 +394,7 @@ const refreshOn401 = clientInterceptor(async ({ request, next, route }) => {
 	return next(request);
 });
 
-const client = createClient(api, {
+const client = createClient(getContract(), {
 	origin: "https://api.example.com",
 	interceptors: [logging, refreshOn401],
 });
@@ -420,9 +420,10 @@ Any function that takes a `Request` works, so a Fetch app can serve the client
 in the same process, such as in tests:
 
 ```ts
-import { app } from "./server";
+import { router } from "./router.ts";
+import app from "./server.ts";
 
-const client = createClient(api, {
+const client = createClient(router, {
 	origin: "http://localhost",
 	fetch: app.fetch,
 });
@@ -482,7 +483,7 @@ Enable `validateResponses` to validate decoded bodies, defined response
 headers, and stream event data:
 
 ```ts
-const client = createClient(api, {
+const client = createClient(getContract(), {
 	origin: "https://api.example.com",
 	validateResponses: true,
 });
@@ -494,7 +495,7 @@ the schema's output, so a schema whose output its input rejects fails on the
 client:
 
 ```ts
-const getPost = route
+const get = route
 	.get("/posts/:id")
 	.response(z.string().transform((title) => ({ title })))
 	.handler(() => "Hello");
@@ -518,9 +519,9 @@ for example in your own wrapper functions.
 
 ```ts twoslash
 // ---cut-start---
-// @filename: server.ts
+// @filename: router.ts
 import { route, sse } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
 const update = route
 	.patch("/posts/:id")
@@ -549,13 +550,13 @@ const notifications = route
 		yield { postId: "post_1", message: "Ada liked your post" };
 	});
 
-export const routes = { posts: { update, get }, notifications };
+export const router = { posts: { update, get }, notifications };
 
 // @filename: client.ts
 import { createClient } from "@rest-rpc/core";
-import type { routes } from "./server";
-declare const api: typeof routes;
-const client = createClient(api, { origin: "http://localhost:3000" });
+import type { router } from "./router";
+declare function getContract(): typeof router;
+const client = createClient(getContract(), { origin: "http://localhost:3000" });
 // ---cut-end---
 import type {
 	InferClientError,
@@ -592,17 +593,17 @@ headers it always provides optional:
 
 ```ts
 import type { InferClientRequest } from "@rest-rpc/core";
-import type { api } from "./client-contract";
+import type { router } from "./router";
 
 const globalHeaders = { authorization: () => `Bearer ${getToken()}` };
 
 type UpdatePostRequest = InferClientRequest<
-	typeof api.posts.update,
+	typeof router.posts.update,
 	typeof globalHeaders
 >;
 ```
 
-`ApiClientFor<typeof api>` is the type of the whole client created from a
+`ClientFor<typeof router>` is the type of the whole client created from a
 contract.
 
 Each helper also accepts a client or route tree and infers a matching tree of

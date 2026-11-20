@@ -95,7 +95,7 @@ export const getItem = authenticated
 		id: params.id,
 		user: context.user,
 	}));
-export const routes = {
+export const router = {
 	items: {
 		get: getItem,
 		list: route.get("/items").handler(() => [] as string[]),
@@ -146,17 +146,17 @@ export const implementedRoute = implement(contract).users.get.handler(
 );
 
 // Apps and clients.
-export const app = createApp(routes, {
+export const app = createApp(router, {
 	context: { user: "user", tenant: "tenant" },
 });
-export const routeHandlers = createRouteHandlers(routes);
-export const catchAllHandler = createCatchAllHandler(routes);
-export const nodeApp = node.createApp(routes, {
+export const routeHandlers = createRouteHandlers(router);
+export const catchAllHandler = createCatchAllHandler(router);
+export const nodeApp = node.createApp(router, {
 	context: { user: "user", tenant: "tenant" },
 });
-export const nodeRouteHandlers = node.createRouteHandlers(routes);
-export const nodeCatchAllHandler = node.createCatchAllHandler(routes);
-export const extractedContract = extractContract(routes);
+export const nodeRouteHandlers = node.createRouteHandlers(router);
+export const nodeCatchAllHandler = node.createCatchAllHandler(router);
+export const extractedContract = extractContract(router);
 export const serverClient = createClient(extractedContract, {
 	origin: "http://localhost",
 });

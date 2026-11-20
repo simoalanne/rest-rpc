@@ -80,8 +80,8 @@ const superjsonEvents = sseFormat({
 	deserialize: (data) => superjson.parse(data),
 });
 
-createApp(routes, { sse: { format: superjsonEvents } });
-createClient(api, { origin, sse: { format: superjsonEvents } });
+createApp(router, { sse: { format: superjsonEvents } });
+createClient(getContract(), { origin, sse: { format: superjsonEvents } });
 ```
 
 Data that spans several lines is sent as one `data` field per line, and the
@@ -98,7 +98,7 @@ keep the stream moving. Set `keepAlive` lower than your server's idle timeout,
 if it has one:
 
 ```ts
-createApp(routes, {
+createApp(router, {
 	sse: {
 		keepAlive: 5_000, // a ": keepalive" comment after 5 s without an event
 		initialComment: true, // a ": ok" comment right after the headers

@@ -16,15 +16,15 @@ npm i @rest-rpc/tanstack-query
 same shape as the client, whose utils call the client's routes. The utils create
 options objects and keys; they do not create a `QueryClient` or call hooks.
 
-```ts
+```ts client.ts
 import { createClient } from "@rest-rpc/core";
 import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
-import { api } from "./client-contract";
+import { getContract } from "./contract" with { type: "macro" };
 
-export const client = createClient(api, {
+export const client = createClient(getContract(), {
 	origin: "https://api.example.com",
 });
-export const restrpc = createTanstackQueryUtils(client);
+export const queryUtils = createTanstackQueryUtils(client);
 ```
 
 The same client can still be called directly where a query is not needed.
@@ -38,7 +38,7 @@ The util accepts request input, Fetch options, and TanStack Query options in one
 import { useQuery } from "@tanstack/react-query";
 
 const post = useQuery(
-	restrpc.posts.get.queryOptions({
+	queryUtils.posts.get.queryOptions({
 		request: {
 			params: { id: "post_1" },
 		},
@@ -64,7 +64,7 @@ request used for its API call.
 import { useInfiniteQuery } from "@tanstack/react-query";
 
 const posts = useInfiniteQuery(
-	restrpc.posts.feed.infiniteQueryOptions({
+	queryUtils.posts.feed.infiniteQueryOptions({
 		request: (cursor: string | undefined) => ({
 			query: { cursor, status: "open", limit: 50 },
 		}),
@@ -90,7 +90,7 @@ API.
 ```tsx
 import { useQuery } from "@tanstack/react-query";
 
-const events = useQuery(restrpc.notifications.streamedQueryOptions());
+const events = useQuery(queryUtils.notifications.streamedQueryOptions());
 ```
 
 By default, SSE events accumulate into an array.
@@ -105,7 +105,7 @@ shape.
 
 ```tsx
 const messages = useQuery(
-	restrpc.notifications.streamedQueryOptions({
+	queryUtils.notifications.streamedQueryOptions({
 		initialValue: "",
 		reducer: (text, event) => `${text}${event.data.message}`,
 	}),
@@ -127,7 +127,7 @@ To disable a query in type-safe way you can use `skipToken` as request input.
 import { skipToken } from "@tanstack/query-core";
 
 const post = useQuery(
-	restrpc.posts.get.queryOptions({
+	queryUtils.posts.get.queryOptions({
 		request: selectedId ? { params: { id: selectedId } } : skipToken,
 	}),
 );
@@ -137,7 +137,7 @@ For infinite queries, pass `skipToken` instead of the `request` callback.
 
 ```tsx
 const posts = useInfiniteQuery(
-	restrpc.posts.feed.infiniteQueryOptions({
+	queryUtils.posts.feed.infiniteQueryOptions({
 		request: status
 			? (cursor: string | undefined) => ({ query: { cursor, status } })
 			: skipToken,
@@ -157,14 +157,14 @@ to get the keys outside an options object. The returned keys are typed for
 TanStack Query APIs.
 
 ```ts
-restrpc.posts.get.queryKey({ params: { id: "post_1" } }); // ["posts", "get", { params: { id: "post_1" } }]
-restrpc.posts.list.queryKey(); // ["posts", "list"]
+queryUtils.posts.get.queryKey({ params: { id: "post_1" } }); // ["posts", "get", { params: { id: "post_1" } }]
+queryUtils.posts.list.queryKey(); // ["posts", "list"]
 
 // The request of an infinite query is the one of its initial page.
-restrpc.posts.feed.infiniteQueryKey({
+queryUtils.posts.feed.infiniteQueryKey({
 	query: { cursor: undefined, status: "open", limit: 50 },
 }); // ["posts", "feed", "~infinite", { query: { ... } }]
-restrpc.notifications.streamedQueryKey(); // ["notifications", "~streamed"]
+queryUtils.notifications.streamedQueryKey(); // ["notifications", "~streamed"]
 ```
 
 Without a request, a key is a prefix matching every query of its kind for the
@@ -172,7 +172,7 @@ route when used as a filter. `queryKey()` without a request matches every query
 of the route, including infinite and streamed ones.
 
 ```ts
-const postKey = restrpc.posts.get.queryKey({ params: { id: "post_1" } });
+const postKey = queryUtils.posts.get.queryKey({ params: { id: "post_1" } });
 
 const post = queryClient.getQueryData(postKey);
 
@@ -200,7 +200,7 @@ queries of a route that accumulate data with different reducers.
 
 ```tsx
 const post = useQuery(
-	restrpc.posts.get.queryOptions({
+	queryUtils.posts.get.queryOptions({
 		request: { params: { id: "post_1" } },
 		queryKey: ["posts", "detail", "post_1"],
 	}),
@@ -220,7 +220,7 @@ await queryClient.invalidateQueries({
 Use `fetch()` when you need direct access to the underlying [Fetch Client](/docs/client/fetch-client#call-routes) call.
 
 ```ts
-const { body: post } = await restrpc.posts.get.fetch({
+const { body: post } = await queryUtils.posts.get.fetch({
 	params: { id: "post_1" },
 });
 ```
@@ -233,10 +233,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 const queryClient = useQueryClient();
 
 const createPost = useMutation(
-	restrpc.posts.create.mutationOptions({
+	queryUtils.posts.create.mutationOptions({
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({
-				queryKey: restrpc.posts.list.queryKey(),
+				queryKey: queryUtils.posts.list.queryKey(),
 			});
 		},
 	}),
@@ -253,7 +253,7 @@ Mutation options use the route path as their default mutation key. Use
 `mutationKey()` with TanStack Query APIs that filter or configure mutations.
 
 ```ts
-queryClient.setMutationDefaults(restrpc.posts.create.mutationKey(), {
+queryClient.setMutationDefaults(queryUtils.posts.create.mutationKey(), {
 	retry: 2,
 });
 ```
@@ -267,7 +267,7 @@ by TanStack Query is passed to the request automatically.
 
 ```tsx
 const post = useQuery(
-	restrpc.posts.get.queryOptions({
+	queryUtils.posts.get.queryOptions({
 		request: { params: { id: "post_1" } },
 		fetchOptions: {
 			cache: "no-store",
@@ -288,7 +288,7 @@ The `error` of a query or mutation holds the same errors that
 import { isDefinedError } from "@rest-rpc/core";
 
 const createPost = useMutation(
-	restrpc.posts.create.mutationOptions({
+	queryUtils.posts.create.mutationOptions({
 		onError(error) {
 			if (isDefinedError(error) && error.code === "SLUG_TAKEN") {
 				console.log(error.message);

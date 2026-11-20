@@ -20,7 +20,7 @@ body.
 
 ```ts
 import { createOpenApiDocument, route } from "@rest-rpc/server";
-import { z } from "zod";
+import * as z from "zod";
 
 const list = route
 	.get("/posts")
@@ -30,9 +30,9 @@ const list = route
 	.openAPI({ summary: "List posts" })
 	.handler(() => [{ id: "post_1", title: "Hello", body: "First post" }]);
 
-const routes = { posts: { list } };
+const router = { posts: { list } };
 
-const document = createOpenApiDocument(routes, {
+const document = createOpenApiDocument(router, {
 	info: {
 		title: "Blog API",
 		version: "1.0.0",
@@ -77,9 +77,9 @@ particular schema, rest-rpc emits an empty OpenAPI Schema Object for that schema
 
 ```ts
 import { createOpenApiDocument } from "@rest-rpc/core";
-import { z } from "zod";
+import * as z from "zod";
 
-const document = createOpenApiDocument(routes, {
+const document = createOpenApiDocument(router, {
 	info: {
 		title: "Blog API",
 		version: "1.0.0",
@@ -159,7 +159,7 @@ The transform context includes `routePath`, the route key path from the
 contract tree.
 
 ```ts
-const document = createOpenApiDocument(routes, {
+const document = createOpenApiDocument(router, {
 	info: {
 		title: "Blog API",
 		version: "1.0.0",

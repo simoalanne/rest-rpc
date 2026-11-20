@@ -50,7 +50,7 @@ type HandleOptions = {
 	context?: TContext;
 	/**
 	 * Percent-decoded path params, for requests whose URL does not contain the
-	 * route path, such as after a rewrite. When omitted, params a router sets,
+	 * route path, such as after a rewrite. When omitted, params a routes sets,
 	 * such as `req.params` in Express, are used, or else they are read from the
 	 * request URL. The catch-all handler passes the params it matched.
 	 */
@@ -81,11 +81,11 @@ and call `route.handle()` from it. The framework does the routing, and
 ```ts server.ts
 import { Hono } from "hono";
 import { createRouteHandlers } from "@rest-rpc/server";
-import { routes } from "./routes";
+import { router } from "./router.ts";
 
 const app = new Hono();
 
-for (const route of createRouteHandlers(routes)) {
+for (const route of createRouteHandlers(router)) {
 	app.on(route.method, route.path, (c) =>
 		route.handle(c.req.raw, { context: { user: c.var.user } }),
 	);
@@ -98,11 +98,11 @@ for (const route of createRouteHandlers(routes)) {
 ```ts server.ts
 import express from "express";
 import { createRouteHandlers } from "@rest-rpc/server/node";
-import { routes } from "./routes";
+import { router } from "./router.ts";
 
 const app = express();
 
-for (const route of createRouteHandlers(routes)) {
+for (const route of createRouteHandlers(router)) {
 	const method = route.method.toLowerCase() as
 		"get" | "post" | "put" | "patch" | "delete";
 	app[method](route.path, (req, res, next) => {
@@ -130,10 +130,10 @@ routes. The Node handler writes the response to `res` and resolves to
 ```ts server.ts
 import { Hono } from "hono";
 import { createCatchAllHandler } from "@rest-rpc/server";
-import { routes } from "./routes";
+import { router } from "./router.ts";
 
 const app = new Hono();
-const handler = createCatchAllHandler(routes);
+const handler = createCatchAllHandler(router);
 
 app.all("/api/*", async (c) => {
 	const result = await handler(c.req.raw, {
@@ -150,10 +150,10 @@ app.all("/api/*", async (c) => {
 ```ts server.ts
 import express from "express";
 import { createCatchAllHandler } from "@rest-rpc/server/node";
-import { routes } from "./routes";
+import { router } from "./router.ts";
 
 const app = express();
-const handler = createCatchAllHandler(routes);
+const handler = createCatchAllHandler(router);
 
 app.use("/api", (req, res, next) => {
 	handler(req, res, { mountPath: "/api" }).then(
@@ -190,7 +190,7 @@ ways take [`interceptors`](/docs/server/interceptors), which run around each
 matched route's `handle`, so `route` is always defined:
 
 ```ts
-const handlers = createRouteHandlers(routes, {
+const handlers = createRouteHandlers(router, {
 	interceptors: [onError((error) => logger.error(error))],
 });
 ```
