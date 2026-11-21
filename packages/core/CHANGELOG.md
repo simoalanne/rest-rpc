@@ -1,5 +1,17 @@
 # @rest-rpc/core
 
+## 0.6.0
+
+### Minor Changes
+
+- bddf9bc: Throw `BodySerializationError` from the built-in codecs' `serialize` for a value they don't encode. It extends `TypeError` and carries the `mediaType` the value was serialized for, the value kinds the codec `expected`, and the kind of value it `received`. The JSON codec still throws the errors of `JSON.stringify`.
+- f150152: Rename the client types to match the other `Client` types: `ApiClientFor` is now `ClientFor`, `ApiClientOptions` is now `CreateClientOptions`, and `ApiClientRouteValue` is now `ClientRouteValue`.
+- bddf9bc: Custom codecs take precedence over the built-in ones for every media type they match, patterns included. A codec such as `bodyCodec(/.*/, ...)` now also handles `application/json`, `application/x-www-form-urlencoded` and `multipart/form-data`, which used to stay with the built-in codecs because they list them as strings. Within the custom codecs, a media type listed as a string is still selected before patterns.
+
+A codec may now send another base media type in the `content-type` of a `serializedBody()` instead of throwing. The receiving side decodes the body with the codec of the content type it receives, while route types and OpenAPI documents still show the declared one.
+
+- bddf9bc: Server-Sent Events and error responses never use body codecs, on either side. The server writes event streams without passing them through the codecs, and the client reads error bodies with the built-in codecs only, so a custom codec that matches `application/json`, such as a catch-all pattern, no longer breaks defined errors.
+
 ## 0.5.0
 
 ### Minor Changes
