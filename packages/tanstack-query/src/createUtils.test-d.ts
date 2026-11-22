@@ -207,6 +207,17 @@ describe("createTanstackQueryUtils types", () => {
 		queryUtils.get.queryKey({ params: { id: 1 } });
 	});
 
+	it("reserves key() on every node of the util tree", () => {
+		expectTypeOf(queryUtils.key).returns.toEqualTypeOf<QueryKey>();
+		expectTypeOf(queryUtils.get.key).returns.toEqualTypeOf<QueryKey>();
+		const client = createClient(
+			{ settings: { key: get } },
+			{ origin: "https://example.test" },
+		);
+		// @ts-expect-error `key` is reserved for key().
+		createTanstackQueryUtils(client);
+	});
+
 	it("tags keys of each query kind with the kind's cache data", () => {
 		expectTypeOf(
 			new QueryClient().getQueryData(queryUtils.get.infiniteQueryKey<number>()),

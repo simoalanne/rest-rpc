@@ -315,6 +315,8 @@ type TanstackQueryBaseRouteValue<F extends ClientRoute> = {
 			options: InfiniteQueryOptionsFor<F, TInitialPageParam, TPageParam, TData>,
 		): InfiniteQueryOptionsResultFor<F, TPageParam, TData>;
 	};
+	// The key that matches every query of the route, of every kind.
+	key: () => QueryKey;
 	mutationKey: () => MutationKey;
 	queryKey: (...args: QueryKeyArgs<F>) => RouteQueryKeyTag<F, RouteDataFor<F>>;
 	// The request is the one of the initial page.
@@ -364,7 +366,21 @@ export type TanstackQueryRouteValue<F extends ClientRoute> =
 
 type TanstackQueryTreeFor<T> = {
 	[K in keyof T]: TanstackQueryUtilsFor<T[K]>;
+} & {
+	/** The key that matches every query of the routes in this tree. */
+	key: () => QueryKey;
 };
+
+// Each tree has its own `key()`, so the client tree can't use it as a key.
+export type ReservedKeyCheck<T> = T extends ClientRoute
+	? unknown
+	: ("key" extends keyof T
+			? {
+					key: {
+						"~error": "`key` is reserved for the key() of each util tree. Rename the route or group.";
+					};
+				}
+			: unknown) & { [K in keyof T]: ReservedKeyCheck<T[K]> };
 
 /**
  * Infers the generated TanStack Query util tree for a client.

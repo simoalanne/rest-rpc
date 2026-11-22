@@ -648,7 +648,7 @@ export function Posts() {
 		queryUtils.posts.create.mutationOptions({
 			onSuccess: () =>
 				queryClient.invalidateQueries({
-					queryKey: queryUtils.posts.list.queryKey(),
+					queryKey: queryUtils.posts.list.key(),
 				}),
 		}),
 	);
