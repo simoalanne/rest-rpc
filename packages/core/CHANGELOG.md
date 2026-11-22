@@ -1,5 +1,48 @@
 # @rest-rpc/core
 
+## 0.7.0
+
+### Minor Changes
+
+- c04340d: Add `contractFromJson<typeof router>(json)`, which types a contract that `extractContract()` wrote to JSON as the route tree it was extracted from, so it no longer needs an `as unknown as` cast. It throws a `TypeError` when the value doesn't have the shape of an extracted contract.
+- c04340d: `isDefinedError()` takes an optional second argument, a client route or tree or a route or route tree, and narrows the error to their defined errors. A caught error is `unknown`, so `isDefinedError(error)` narrows it only to `RouteError`, and `isDefinedError(error, client.posts.create)` now types its `code` and `data` for that route, or for every route of a tree. The argument is only read for its type.
+- c04340d: The client passes fetch options to `fetch` as its second argument when the client's `fetchOptions` or the call set any, the way the global `fetch` takes them. Options a `Request` doesn't keep, such as ones a runtime or framework adds to `fetch`, now reach it instead of being dropped. A custom `fetch` receives them too, and `FetchLike` takes them as an optional second parameter. Calls without fetch options still call `fetch(request)`.
+- c04340d: `createOpenApiDocument()` needs no options. `info.title` defaults to `"API"` and `info.version` to `"0.0.0"`. `info`, `servers`, `tags` and `externalDocs` accept any other fields of their OpenAPI objects, such as `contact` or `license` in `info`, and copy them to the document as they are. The document's other top-level fields, `security`, `externalDocs` and `x-` extensions, are now copied to the document like `servers`, `components` and `tags`.
+
+Every operation gets an `operationId` by default, its route's key path in the route tree, such as `posts.get`, the name of its client call. `.openAPI({ operationId })` still sets another, and an empty value leaves it out.
+
+OpenAPI documents are more complete:
+
+- Every path segment is documented as a parameter, as a string when the params schema doesn't convert it, so documents without a schema converter stay valid.
+- A parameter's or response header's `description` and `deprecated` are set on the parameter or header itself, and response headers are marked `required` when their schema requires them.
+- `accept` and `authorization` header parameters are left out like `content-type`, since OpenAPI ignores them. Use `security` for credentials.
+
+Documents target OpenAPI 3.2, and `openapi` defaults to `3.2.1` instead of `3.1.0`. Streams are documented with an `itemSchema` that describes each event, with the event data's schema as the `contentSchema` of its JSON `data`, and responses and errors without a description no longer get an empty one. `$self` and `jsonSchemaDialect` are copied to the document like the other top-level fields.
+
+A request body without a declared `content-type` is documented as `application/json` and `multipart/form-data`, the content types the server accepts for it.
+
+- f341bac: Remove the `timeoutMs` client option. A timeout is now an interceptor, which decides what the time covers, such as only the wait for the response or the body too:
+
+```ts
+const timeout = (ms: number) =>
+	clientInterceptor(({ request, next }) =>
+		next(
+			new Request(request, {
+				signal: AbortSignal.any([request.signal, AbortSignal.timeout(ms)]),
+			}),
+		),
+	);
+
+createClient(contract, { interceptors: [timeout(10_000)] });
+```
+
+The call's `signal` is now passed to the `Request` unchanged.
+
+### Patch Changes
+
+- c04340d: Add a `default` condition next to `import` in each package's `exports`, so resolvers that don't use the `import` condition, such as some bundler plugins, find the entry points.
+- c04340d: Type the `path` of an intercepted route as always set. Client and server interceptors receive the path resolved from the route tree, also for routes that take their path from their key, so `route.path` no longer needs an `undefined` check.
+
 ## 0.6.0
 
 ### Minor Changes
