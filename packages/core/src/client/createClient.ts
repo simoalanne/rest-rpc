@@ -112,8 +112,6 @@ export type CreateClientOptions<
 		/** The data format of events, the same as the server's. JSON by default. */
 		format?: SseFormat;
 	};
-	/** Aborts a request when fetch does not return in time. */
-	timeoutMs?: number;
 	/**
 	 * Validates response bodies, defined response headers and stream event data
 	 * against the contract's schemas.

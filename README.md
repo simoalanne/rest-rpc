@@ -615,7 +615,6 @@ export const client = createClient(getContract(), {
 		authorization: () => `Bearer ${localStorage.getItem("token")}`,
 	},
 	interceptors: [logging],
-	timeoutMs: 10_000,
 });
 ```
 

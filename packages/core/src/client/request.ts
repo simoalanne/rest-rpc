@@ -131,23 +131,6 @@ type ClientRequestRoute = {
 	request?: { body?: readonly unknown[] };
 };
 
-const createRequestSignal = (
-	signal: RequestInit["signal"],
-	timeoutMs: number | undefined,
-) => {
-	if (!timeoutMs) return null;
-
-	const timeoutController = new AbortController();
-	const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
-
-	return {
-		signal: signal
-			? AbortSignal.any([signal, timeoutController.signal])
-			: timeoutController.signal,
-		cleanup: () => clearTimeout(timeoutId),
-	};
-};
-
 const normalizeHeaders = (
 	headers: Record<string, string> | undefined,
 ): Record<string, string> =>
@@ -245,7 +228,6 @@ export type ExecuteRequestOptions = {
 	fetchOptions?: ClientFetchOptions;
 	globalHeaders?: ClientHeaders;
 	interceptors?: readonly ClientInterceptor[];
-	timeoutMs?: number;
 };
 
 const resolveHeaders = async (
@@ -322,35 +304,25 @@ export const executeRequest = async (
 					contentType,
 				)
 			: undefined;
-	const signalState = createRequestSignal(
-		fetchOptions?.signal,
-		options.timeoutMs,
-	);
-
-	try {
-		const { additionalHeaders: _additionalHeaders, ...requestFetchOptions } =
-			fetchOptions ?? {};
-		const headers = outgoingHeaders;
-		// A body's content type replaces the stated one, also when Fetch sets it
-		// for `FormData`.
-		if (serialized) {
-			delete headers["content-type"];
-			Object.assign(headers, serialized.headers);
-		}
-		const init: RequestInit = {
-			...options.fetchOptions,
-			...requestFetchOptions,
-			method: route.method,
-			body: serialized?.body,
-			headers,
-			signal: signalState?.signal ?? fetchOptions?.signal,
-		};
-		const send = options.fetch ?? ((request) => globalThis.fetch(request));
-		const request = toRequest(url, init, options.origin);
-		return await (options.interceptors?.length
-			? intercept(options.interceptors, route as RouteDefinition, request, send)
-			: send(request));
-	} finally {
-		signalState?.cleanup();
+	const { additionalHeaders: _additionalHeaders, ...requestFetchOptions } =
+		fetchOptions ?? {};
+	const headers = outgoingHeaders;
+	// A body's content type replaces the stated one, also when Fetch sets it
+	// for `FormData`.
+	if (serialized) {
+		delete headers["content-type"];
+		Object.assign(headers, serialized.headers);
 	}
+	const init: RequestInit = {
+		...options.fetchOptions,
+		...requestFetchOptions,
+		method: route.method,
+		body: serialized?.body,
+		headers,
+	};
+	const send = options.fetch ?? ((request) => globalThis.fetch(request));
+	const request = toRequest(url, init, options.origin);
+	return options.interceptors?.length
+		? intercept(options.interceptors, route as RouteDefinition, request, send)
+		: send(request);
 };

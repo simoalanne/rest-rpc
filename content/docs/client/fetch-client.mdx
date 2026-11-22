@@ -292,7 +292,6 @@ time, and stops on an abort or a client error such as `401`.
 ```ts
 const client = createClient(getContract(), {
 	origin: "https://api.example.com",
-	timeoutMs: 10_000,
 	fetchOptions: {
 		credentials: "include",
 	},
@@ -339,8 +338,6 @@ type CreateClientOptions = {
 		/** The data format of events, the same as the server's. JSON by default. */
 		format?: SseFormat;
 	};
-	/** Aborts a request when fetch does not return in time. */
-	timeoutMs?: number;
 	/**
 	 * Validates response bodies, defined response headers and stream event data
 	 * against the contract's schemas. `false` by default.
@@ -400,8 +397,7 @@ const client = createClient(getContract(), {
 });
 ```
 
-- `request` is a Fetch `Request` with the call's signal, which carries
-  `timeoutMs` and the caller's abort.
+- `request` is a Fetch `Request` with the call's signal.
 - `next()` sends the request, and `next(request)` sends another one, through
   the later interceptors to `fetch`. It may be called more than once.
 - `route` is the called route's definition, including its
@@ -409,6 +405,31 @@ const client = createClient(getContract(), {
   parsing.
 - Interceptors run in order, the first outermost, before the response is
   decoded, so they receive error responses too.
+
+### Timeouts
+
+A timeout is an interceptor that sends the request with a signal that aborts
+after a time:
+
+```ts
+const timeout = (ms: number) =>
+	clientInterceptor(({ request, next }) =>
+		next(
+			new Request(request, {
+				signal: AbortSignal.any([request.signal, AbortSignal.timeout(ms)]),
+			}),
+		),
+	);
+
+const client = createClient(getContract(), {
+	interceptors: [timeout(10_000)],
+});
+```
+
+The call rejects with a `TimeoutError`, and the caller's abort still applies.
+The signal also covers reading the body, so a stream ends when the time runs
+out. To time only the wait for the response, abort with your own timer and
+clear it once `next()` resolves.
 
 ## Custom Fetch
 
@@ -436,8 +457,7 @@ result does not keep, such as each `Set-Cookie` header from
 ## Per-Call Options
 
 Pass fetch options as the second argument. They override matching defaults in
-`fetchOptions`. Use `signal` for cancellation. `timeoutMs` still applies when a
-`signal` is passed.
+`fetchOptions`. Use `signal` for cancellation.
 
 ```ts
 const response = await client.posts.get(
