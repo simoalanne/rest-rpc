@@ -20,7 +20,8 @@ This repo is `rest-rpc`, a TypeScript library for defining REST APIs with RPC-li
 - `pnpm run readme:sync` - Regenerate the root `README.md` table of contents, then copy the README to every package README and to `content/docs/cheatsheet.mdx`.
 - `pnpm run readme:verify` - Fail when the copies are out of sync with the root `README.md`.
 - `pnpm run docs:validate` - Check the docs for broken links and anchors with `blume validate --strict`.
-- `pnpm run check` - Run lint, typechecking, tests, API documentation verification, README sync verification and docs validation in sequence. Use this as the broad all-in-one pass.
+- `pnpm run docs:build` - Build the docs site, which also type-checks the `twoslash` code blocks.
+- `pnpm run check` - Run lint, typechecking, tests, API documentation verification, README sync verification, docs validation and the docs build in sequence. Use this as the broad all-in-one pass.
 
 ### Formatting
 
@@ -63,7 +64,7 @@ For documentation related tasks:
   - `contract.ts`: what the client is created from. Server-first, it exports `getContract()`, which returns `extractContract(router)` and is imported as a macro. Contract-first, it exports `const contract`. The no-macro variant writes `contract.json`.
   - `client.ts`: exports `client` from `createClient()` and `queryUtils` from `createTanstackQueryUtils()`.
   - A route constant is named by its key in the router, such as `get`, `list` or `create`, and its resource is the parent key: `{ posts: { get } }`. Handler and domain functions are a verb and a noun, such as `findPost` or `updatePost`. A partial route kept for the type helpers is `<key>Definition`, such as `updateDefinition`. A builder that routes are built from is named for what it adds, such as `base`, `authenticated` or `withSession`, never `app`.
-  - Relative imports in server-side files (`router.ts`, `server.ts`, `contract.ts`, scripts) end in `.ts`, since runtimes such as Node and Deno run them directly. Client files that a bundler compiles omit the extension, except a macro import such as `./contract.ts` with `{ type: "macro" }`, which `unplugin-macros` resolves the way Node does.
+  - Relative imports in server-side files (`router.ts`, `server.ts`, `contract.ts`, scripts) end in `.ts`, since runtimes such as Node and Deno run them directly. Client files that a bundler compiles omit the extension, except a macro import such as `./contract.ts` with `{ type: "macro" }`, which `unplugin-macros` runs in the bundler's runtime, where Node needs the extension.
 - Examples use a blog API: posts `{ id, title, body }`, users, and notifications for streams. Show only what the example is about: JSON unless the section is about content types, and status 200 unless it is about statuses.
 - Keep comments in examples only when they say what the code does not show, such as the resulting request, an inferred type or an output.
 - Document options as a type whose fields carry TSDoc comments, based on the TSDoc in the source without its links, rather than as a prose list after the type.
