@@ -148,6 +148,33 @@ try {
 }
 ```
 
+A caught error is `unknown`, so `isDefinedError(error)` narrows it only to
+`RouteError`. Pass the client route or tree the error can come from as the
+second argument to narrow it to their defined errors. A route or route tree
+works too, for code that has no client to pass, such as where clients are
+created per request. The argument is only read for its type:
+
+```ts
+try {
+	await client.posts.create({ body });
+} catch (error) {
+	if (
+		isDefinedError(error, client.posts.create) &&
+		error.code === "SLUG_TAKEN"
+	) {
+		console.log(error.message);
+	}
+	throw error;
+}
+
+// One handler for every route, such as for errors defined on a shared builder
+const handleError = (error: unknown) => {
+	if (isDefinedError(error, contract) && error.code === "UNAUTHORIZED") {
+		redirectToSignIn();
+	}
+};
+```
+
 ### With `safe()`
 
 `safe()` suits expected domain errors. It resolves a call to an `{ error }` or
