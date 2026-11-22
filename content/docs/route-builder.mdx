@@ -137,7 +137,11 @@ const create = route
   `respond()` results are read as responses.
 
 Without `.response()`, the statuses and bodies the handler returns are the
-client's result type. Errors are [thrown](#define-errors), not returned.
+client's result type. Values the handler returns keep their literal types, such
+as `"draft"`. A value built in a variable or a function before it's returned
+has the type TypeScript gave it there, where strings in objects widen to
+`string`, so annotate it or use `as const` where the client should see the
+literals. Errors are [thrown](#define-errors), not returned.
 
 ## Define Responses
 
