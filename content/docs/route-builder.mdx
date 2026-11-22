@@ -320,6 +320,22 @@ const remove = authenticated
 Native request objects aren't passed. To use them,
 [put them in the context](/docs/middleware#values-from-the-host).
 
+## Route Definitions
+
+Every route keeps its definition under `~restrpc`, the same one handlers,
+middleware and interceptors receive as `route`. The key keeps it apart from the
+builder's methods. Read it in your own code, such as for a route's method,
+path or `meta`:
+
+```ts
+const { method, path, meta } = get["~restrpc"]; // "GET", "/posts/:id", { ... }
+```
+
+- `path` is `undefined` for a route that takes its path from its key in the
+  route tree, until the tree is served or a client is created. `route` in
+  handlers, middleware and interceptors has it resolved.
+- It's read-only. Build routes with the builder.
+
 ## Type Helpers
 
 The type helpers give a route's types to code outside it, such as services or
