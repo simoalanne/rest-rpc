@@ -63,6 +63,8 @@ export const router = { posts: { create, get } };
 
 ```ts twoslash
 // ---cut-start---
+// @allowImportingTsExtensions
+// @noEmit
 // @filename: router.ts
 import { respond, route } from "@rest-rpc/server";
 import * as z from "zod";
@@ -132,6 +134,8 @@ if (response.status === 200) {
 
 ```tsx twoslash
 // ---cut-start---
+// @allowImportingTsExtensions
+// @noEmit
 // @filename: router.ts
 import { respond, route } from "@rest-rpc/server";
 import * as z from "zod";

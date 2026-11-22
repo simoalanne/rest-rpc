@@ -46,9 +46,13 @@ export default defineConfig({
 });
 ```
 
-`unplugin-macros` resolves the macro import the way Node does, not with the
-bundler's resolution, so the import keeps its `.ts` extension and can't use the
-bundler's path aliases.
+`unplugin-macros` runs the macro in the runtime the bundler runs on, not through
+the bundler, so the bundler's path aliases don't apply to the macro import or to
+what `contract.ts` imports. Their imports follow the runtime's rules instead:
+Node needs the extension on every relative import, as it does for server code,
+while Bun also resolves imports without one. Importing `./contract.ts` works on
+both, and type-checks with `allowImportingTsExtensions` in the client's
+`tsconfig.json`.
 
 ## Extract Routes without a Macro
 
