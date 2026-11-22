@@ -43,6 +43,12 @@ describe("implement types", () => {
 
 			return respond({ name: "Ada" });
 		});
+		const health = route.get("/health").response(type<string>());
+		implement({ admin: { use: health } });
+		// @ts-expect-error `use` is reserved for the implementer's methods.
+		implement({ use: health });
+		// @ts-expect-error `$context` is reserved for the implementer's methods.
+		implement({ $context: health });
 	});
 
 	it("passes handler fields and transformed requests through middleware", () => {

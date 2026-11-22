@@ -18,6 +18,17 @@ import type { ExtendContext } from "./context.ts";
 
 type ContractRoute = { readonly "~restrpc": RouteDefinition };
 
+// The root of an implementer tree has `use()` and `$context()`, so the
+// contract's top-level keys can't use them.
+export type ReservedImplementerKeyCheck<TContract> =
+	TContract extends ContractRoute
+		? unknown
+		: {
+				[TKey in Extract<keyof TContract, "use" | "$context">]: {
+					"~error": "`use` and `$context` are reserved for the implementer's methods. Rename the top-level route or group.";
+				};
+			};
+
 // A contract is what clients rely on, so its routes define their responses
 // instead of inferring them from the handler.
 type HasResponse<TRoute extends RouteDefinition> = [

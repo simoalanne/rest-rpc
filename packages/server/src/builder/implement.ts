@@ -3,7 +3,10 @@ import {
 	mapContractRoutes,
 	type Contract,
 } from "@rest-rpc/core/contract";
-import type { ContractImplementer } from "./implement.types.ts";
+import type {
+	ContractImplementer,
+	ReservedImplementerKeyCheck,
+} from "./implement.types.ts";
 import type {
 	RuntimeRouteHandler,
 	ServerRouteBuilderState,
@@ -60,7 +63,7 @@ const createImplementer = (contract: Contract): object => {
  * @see {@link https://rest-rpc.vercel.app/docs/contract-first}
  */
 export function implement<const TContract extends Contract>(
-	contract: TContract,
+	contract: TContract & ReservedImplementerKeyCheck<TContract>,
 ): ContractImplementer<TContract, DefaultContext> {
 	assertUnimplementedRoutes(contract);
 	return createImplementer(

@@ -105,7 +105,7 @@ set it with `.meta()` on contract routes. Middleware on the implementation
 reads `route.meta` with the shape of the routes it runs on.
 
 :::error[Reserved Keys]
-Don't use `use` or `$context` as top-level keys of a contract tree passed to `implement()`. They are reserved for the implementer.
+Don't use `use` or `$context` as top-level keys of a contract tree passed to `implement()`. They are reserved for the implementer, and using them is a type error.
 :::
 
 ## Use in a Client
