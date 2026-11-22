@@ -113,8 +113,13 @@ The server sends a response body with the first content type that applies:
 2. `multipart/form-data` for `FormData`, whatever the headers say.
 3. [Server-Sent Events](/docs/server-sent-events) for an async iterable,
    unless the handler sets another `content-type`.
-4. The `content-type` header the handler sets with `respond()`.
+4. The `content-type` header the handler sets with `respond()`. A route that
+   [defines its responses](/docs/route-builder#define-responses) sends it only
+   when the response's headers schema declares it.
 5. `application/json`.
+
+The body's value doesn't choose the content type, so a `Blob` without a
+`content-type` is encoded as JSON too.
 
 [Errors](/docs/http-behavior/errors) are always JSON, and the client reads a
 response without a `content-type` as having no body.

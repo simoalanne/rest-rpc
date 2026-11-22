@@ -163,9 +163,16 @@ route
 ```
 
 - `status` defaults to `200`, and each status is defined once.
+- A response without a body takes only options, such as `.response()` or
+  `.response({ status: 204 })`. A schema always defines a body, so a schema for
+  `undefined` defines a JSON body that can't be encoded.
 - A plain return value is the body of the only defined response. With several,
   `respond()` takes one of the defined statuses.
-- `headers` works on every response, bodyless and stream ones included.
+- `headers` works on every response, bodyless and stream ones included. A
+  defined response sends only the headers its schema declares, so a
+  `content-type` that sets the body's
+  [content type](/docs/http-behavior/encoding#response-content-type) is declared
+  there too.
 
 ## Raw Responses
 
