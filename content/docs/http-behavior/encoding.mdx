@@ -46,6 +46,9 @@ const { body } = await client.search({
   `"Fri Nov 20 2026 12:00:00 GMT+0000 (Coordinated Universal Time)"`,
   rather than an ISO string, and an object as `"[object Object]"`. Send dates
   with `toISOString()`, and objects as separate keys.
+- Booleans arrive as `"true"` and `"false"`, so a schema reads them by value,
+  such as with `z.stringbool()`. Coercing by truthiness, as `z.coerce.boolean()`
+  does, reads every non-empty string as `true`, `"false"` included.
 - Header names are sent lowercase, and response headers are sent with
   `String()` too.
 
