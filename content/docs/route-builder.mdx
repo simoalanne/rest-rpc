@@ -275,19 +275,31 @@ a different error with the same code throws. Defining errors doesn't define
 responses. See [Errors](/docs/http-behavior/errors) for what's sent, and for
 errors a route doesn't define.
 
-## Metadata and OpenAPI
+## Describe Routes for OpenAPI
 
-`.meta()` attaches [metadata](/docs/middleware#metadata) of the shape
-`$meta<T>()` declares, and `.openAPI()` describes the operation:
+`.openAPI()` sets the route's [operation details](/docs/openapi#operation-details),
+such as its summary and tags. Responses and errors take a `description` in
+their own options:
 
 ```ts
-const list = route
-	.$meta<{ access: "public" | "signed-in" }>()
-	.get("/posts")
-	.meta({ access: "signed-in" })
-	.openAPI({ summary: "List posts", tags: ["Posts"] })
-	.handler(() => listPosts());
+const remove = route
+	.delete("/posts/:id")
+	.params(z.object({ id: z.string() }))
+	.openAPI({ summary: "Delete a post", tags: ["Posts"] })
+	.response({ status: 204, description: "Post deleted." })
+	.error("POST_NOT_FOUND", { status: 404, description: "No post has this id." })
+	.handler(({ params }) => deletePost(params.id));
 ```
+
+- `.response(schema, { description })` and `.response({ description })`
+  describe a response.
+- `.error(code, { description })` and `routeError(code, { description })`
+  describe an error.
+- `raw({ description })` describes a [raw response](#raw-responses).
+- Request and response schemas describe themselves through the
+  [schema converter](/docs/openapi#schema-conversion).
+
+See [OpenAPI](/docs/openapi) for how they're documented.
 
 ## Reuse Builders
 

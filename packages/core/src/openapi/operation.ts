@@ -19,6 +19,7 @@ type OpenApiParameter = {
 	in: "path" | "query" | "header" | "cookie";
 	required?: boolean;
 	description?: string;
+	deprecated?: boolean;
 	style?: "form";
 	explode?: boolean;
 	schema?: OpenApiSchema;
@@ -32,9 +33,15 @@ type OpenApiRequestBody = {
 };
 
 type OpenApiResponse = {
-	description: string;
-	headers?: Record<string, { description?: string; schema?: OpenApiSchema }>;
-	content?: Record<string, { schema?: OpenApiSchema }>;
+	description?: string;
+	headers?: Record<
+		string,
+		{ description?: string; required?: boolean; schema?: OpenApiSchema }
+	>;
+	content?: Record<
+		string,
+		{ schema?: OpenApiSchema; itemSchema?: OpenApiSchema }
+	>;
 };
 
 type OpenApiExternalDocs = {
@@ -83,8 +90,9 @@ const getSchemaProperties = (schema: OpenApiSchema) => {
 };
 
 // A body's content type is its `content-type` header. A `const` or `enum`
-// lists it, a header without a readable value allows any, and a body without
-// one is JSON.
+// lists it, a header without a readable value allows any, and without one a
+// response body is JSON, and a request body JSON or multipart, as the server
+// accepts.
 const contentTypesOf = (
 	headers: readonly StandardSchemaV1[],
 	converter: SchemaConverter | undefined,
@@ -99,11 +107,26 @@ const contentTypesOf = (
 		if (Array.isArray(header.enum)) return header.enum.map(String);
 		return ["*/*"];
 	}
-	return ["application/json"];
+	return mode === "input"
+		? ["application/json", "multipart/form-data"]
+		: ["application/json"];
 };
 
 const toContent = (contentTypes: readonly string[], schema: OpenApiSchema) =>
 	Object.fromEntries(contentTypes.map((type) => [type, { schema }]));
+
+// Parameter and header objects carry their own description, which tools show
+// instead of the schema's.
+const describedBy = (schema: OpenApiSchema) => ({
+	...(typeof schema.description === "string" && {
+		description: schema.description,
+	}),
+	...(schema.deprecated === true && { deprecated: true }),
+});
+
+// OpenAPI ignores these header parameters: the body's content type, the
+// content types the client accepts, and the credentials `security` describes.
+const ignoredHeaders = new Set(["content-type", "accept", "authorization"]);
 
 const createParameters = (
 	schemas: readonly StandardSchemaV1[] | undefined,
@@ -129,13 +152,13 @@ const createParameters = (
 		for (const name of required) requiredKeys.add(name);
 	}
 
-	// OpenAPI ignores a `content-type` header parameter: it is the body's.
-	delete properties["content-type"];
-	return Object.entries(properties).map(([name, propertySchema]) => {
+	return Object.entries(properties).flatMap(([name, propertySchema]) => {
+		if (location === "header" && ignoredHeaders.has(name)) return [];
 		const parameter: OpenApiParameter = {
 			name,
 			in: location,
 			required: location === "path" || requiredKeys.has(name),
+			...describedBy(propertySchema),
 			schema: propertySchema,
 		};
 		// Query arrays are sent and parsed as repeated `name[]=value` keys.
@@ -145,19 +168,27 @@ const createParameters = (
 	});
 };
 
-// Dynamic path segments without a params schema are received as strings.
+// Every segment of the path template is a parameter, as OpenAPI requires. One
+// the params schema doesn't convert is received as a string.
 const createPathParameters = (
 	route: RouteDefinition & { path: string },
 	options: CreateOperationOptions,
-): OpenApiParameter[] =>
-	route.request?.params?.length
-		? createParameters(route.request.params, "path", options)
-		: getPathParamNames(route.path).map((name) => ({
+): OpenApiParameter[] => {
+	const fromSchema = new Map(
+		createParameters(route.request?.params, "path", options).map(
+			(parameter) => [parameter.name, parameter],
+		),
+	);
+	return getPathParamNames(route.path).map(
+		(name) =>
+			fromSchema.get(name) ?? {
 				name,
 				in: "path",
 				required: true,
 				schema: { type: "string" },
-			}));
+			},
+	);
+};
 
 const createRequestBody = (
 	request: RouteRequestDefinition | undefined,
@@ -188,16 +219,34 @@ const createResponse = (
 	const { body, sse } = responseDefinition;
 	const headers = createResponseHeaders(responseDefinition.headers, converter);
 	const response: OpenApiResponse = {
-		description: responseDefinition.description ?? "",
+		...(responseDefinition.description && {
+			description: responseDefinition.description,
+		}),
 		...(headers ? { headers } : {}),
 	};
+	// The schema describes each event, whose JSON `data` the sse schema
+	// validates, as OpenAPI 3.2 models Server-Sent Events.
 	if (sse) {
 		return {
 			...response,
-			content: toContent(
-				["text/event-stream"],
-				converter?.(sse, "output") ?? {},
-			),
+			content: {
+				"text/event-stream": {
+					itemSchema: {
+						type: "object",
+						required: ["data"],
+						properties: {
+							data: {
+								type: "string",
+								contentMediaType: "application/json",
+								contentSchema: converter?.(sse, "output") ?? {},
+							},
+							event: { type: "string" },
+							id: { type: "string" },
+							retry: { type: "integer", minimum: 0 },
+						},
+					},
+				},
+			},
 		};
 	}
 	if (!body) return response;
@@ -222,12 +271,21 @@ const createResponseHeaders = (
 	if (!headers) return undefined;
 
 	const schema = converter?.(headers, "output") ?? {};
-	return Object.fromEntries(
-		Object.entries(getSchemaProperties(schema))
-			// The `content-type` header is the body's content key instead.
-			.filter(([name]) => name !== "content-type")
-			.map(([name, propertySchema]) => [name, { schema: propertySchema }]),
+	const required = new Set(
+		Array.isArray(schema.required) ? schema.required : [],
 	);
+	const entries = Object.entries(getSchemaProperties(schema))
+		// The `content-type` header is the body's content key instead.
+		.filter(([name]) => name !== "content-type")
+		.map(([name, propertySchema]) => [
+			name,
+			{
+				...describedBy(propertySchema),
+				...(required.has(name) && { required: true }),
+				schema: propertySchema,
+			},
+		]);
+	return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 };
 
 const createErrorBodySchema = (
@@ -269,10 +327,11 @@ const createErrorResponses = (
 				createResponseHeaders(definition.headers, converter),
 			),
 		);
+		const description = group
+			.flatMap(([, definition]) => definition.description ?? [])
+			.join("\n");
 		responses[status] = {
-			description: group
-				.flatMap(([, definition]) => definition.description ?? [])
-				.join("\n"),
+			...(description && { description }),
 			...(Object.keys(headers).length > 0 ? { headers } : {}),
 			content: {
 				"application/json": {
@@ -295,11 +354,16 @@ const createResponses = (
 	// keeps the required Responses Object non-empty.
 	if (defined.length === 0) {
 		return {
-			default: {
-				description: route.raw
-					? (rawDescription(route.raw) ?? "")
-					: "Response inferred from the route handler; not documented.",
-			},
+			default: route.raw
+				? {
+						...(rawDescription(route.raw) && {
+							description: rawDescription(route.raw),
+						}),
+					}
+				: {
+						description:
+							"Response inferred from the route handler; not documented.",
+					},
 			...errors,
 		};
 	}
@@ -324,8 +388,15 @@ export const createOperation = (
 		...createParameters(request?.headers, "header", options),
 	];
 	const requestBody = createRequestBody(request, options.schemaConverter);
-	const { extensions, ...openApi } = route.openApi ?? {};
+	const { extensions, operationId, ...openApi } = route.openApi ?? {};
+	// The key path is unique in the tree, and the name of the client call. A
+	// route that sets `operationId`, even to an empty value, keeps its own.
+	const id =
+		route.openApi && "operationId" in route.openApi
+			? operationId
+			: routePath.join(".");
 	const operation: OpenApiOperation = {
+		...(id ? { operationId: id } : {}),
 		...openApi,
 		...extensions,
 		...(parameters.length > 0 ? { parameters } : {}),

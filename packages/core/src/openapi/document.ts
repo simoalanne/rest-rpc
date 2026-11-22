@@ -20,7 +20,11 @@ type OpenApiPathItem = Partial<
 export type OpenApiDocument = {
 	/** OpenAPI specification version for the generated document. */
 	openapi: string;
-	/** Human-readable API metadata. */
+	/** The URI of the document itself. */
+	$self?: string;
+	/** The default JSON Schema dialect of the document's schemas. */
+	jsonSchemaDialect?: string;
+	/** Human-readable API metadata, with any other Info Object fields, such as `contact` or `license`. */
 	info: {
 		/** API title shown by OpenAPI tooling. */
 		title: string;
@@ -28,15 +32,24 @@ export type OpenApiDocument = {
 		version: string;
 		/** Optional longer API description. */
 		description?: string;
+		[key: string]: unknown;
 	};
-	/** Server URLs where the API is available. */
-	servers?: Array<{ url: string; description?: string }>;
+	/** Server URLs where the API is available, with any other Server Object fields. */
+	servers?: Array<{
+		url: string;
+		description?: string;
+		[key: string]: unknown;
+	}>;
 	/** Generated OpenAPI paths keyed by path template. */
 	paths: Record<string, OpenApiPathItem>;
 	/** Reusable OpenAPI components such as security schemes. */
 	components?: Record<string, unknown>;
-	/** Tags available for grouping generated operations. */
-	tags?: Array<{ name: string; description?: string }>;
+	/** Tags available for grouping generated operations, with any other Tag Object fields. */
+	tags?: Array<{ name: string; description?: string; [key: string]: unknown }>;
+	/** Security requirements of every operation, referencing schemes declared in `components`. */
+	security?: Array<Record<string, string[]>>;
+	/** A link to external documentation of the API. */
+	externalDocs?: { url: string; description?: string; [key: string]: unknown };
 	/** OpenAPI extension fields. */
 	[key: `x-${string}`]: unknown;
 };
@@ -44,23 +57,19 @@ export type OpenApiDocument = {
 /**
  * Options for generating an OpenAPI document from a contract.
  *
- * @remarks Without a `schemaConverter`, or when it returns `undefined`, a
- * defined schema becomes an empty OpenAPI Schema Object. `transformOperation`
- * can adjust each generated operation for project-specific conventions.
+ * @remarks The document fields are those of the document except `paths`,
+ * which the routes produce, and are copied to it as they are. Without a
+ * `schemaConverter`, or when it returns `undefined`, a defined schema becomes
+ * an empty OpenAPI Schema Object. `transformOperation` can adjust each
+ * generated operation for project-specific conventions.
  *
- * @see {@link https://rest-rpc.vercel.app/docs/openapi}
+ * @see {@link https://rest-rpc.vercel.app/docs/openapi#document-options}
  */
-export type CreateOpenApiDocumentOptions = {
-	/** OpenAPI specification version to emit. */
-	openapi?: string;
-	/** Human-readable API metadata for the document. */
-	info: OpenApiDocument["info"];
-	/** Server URLs where the API is available. */
-	servers?: OpenApiDocument["servers"];
-	/** Reusable OpenAPI components such as security schemes. */
-	components?: OpenApiDocument["components"];
-	/** Tags available for grouping generated operations. */
-	tags?: OpenApiDocument["tags"];
+export type CreateOpenApiDocumentOptions = Partial<
+	Omit<OpenApiDocument, "info" | "paths">
+> & {
+	/** Human-readable API metadata. `title` defaults to `"API"` and `version` to `"0.0.0"`. */
+	info?: Partial<OpenApiDocument["info"]>;
 	/** Converts Standard Schema definitions into OpenAPI Schema Objects. */
 	schemaConverter?: SchemaConverter;
 	/** Allows project-specific changes to each generated operation. */
@@ -74,14 +83,19 @@ export type CreateOpenApiDocumentOptions = {
  */
 export function createOpenApiDocument(
 	contract: Contract,
-	options: CreateOpenApiDocumentOptions,
+	options: CreateOpenApiDocumentOptions = {},
 ): OpenApiDocument {
+	const {
+		openapi = "3.2.1",
+		info,
+		schemaConverter: _schemaConverter,
+		transformOperation: _transformOperation,
+		...fields
+	} = options;
 	const document: OpenApiDocument = {
-		openapi: options.openapi ?? "3.1.0",
-		info: options.info,
-		...(options.servers ? { servers: options.servers } : {}),
-		...(options.components ? { components: options.components } : {}),
-		...(options.tags ? { tags: options.tags } : {}),
+		openapi,
+		info: { title: "API", version: "0.0.0", ...info },
+		...fields,
 		paths: {},
 	};
 
