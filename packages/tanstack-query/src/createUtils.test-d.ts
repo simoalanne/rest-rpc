@@ -14,6 +14,8 @@ import {
 	QueryClient,
 	skipToken,
 	type InfiniteData,
+	type QueryFunction,
+	type QueryKey,
 } from "@tanstack/query-core";
 import { createTanstackQueryUtils } from "./index.ts";
 
@@ -26,6 +28,7 @@ const get = route
 	);
 const empty = route.get("/health").response({ status: 204 });
 const events = route.get("/events").response(sse(type<{ value: number }>()));
+type GetResponse = InferClientResponse<typeof get>;
 const queryUtils = createTanstackQueryUtils(
 	createClient({ get, empty, events }, { origin: "https://example.test" }),
 );
@@ -102,11 +105,14 @@ describe("createTanstackQueryUtils types", () => {
 		).toEqualTypeOf<
 			InfiniteData<InferClientResponse<typeof get>, number> | undefined
 		>();
-		queryUtils.get.infiniteQueryOptions({
+		type PageQueryFn = QueryFunction<GetResponse, QueryKey, number>;
+		expectTypeOf(options.queryFn).toExtend<PageQueryFn>();
+		const skipped = queryUtils.get.infiniteQueryOptions({
 			initialPageParam: 0,
 			request: skipToken,
 			getNextPageParam: () => undefined,
 		});
+		expectTypeOf(skipped.queryFn).not.toExtend<PageQueryFn>();
 		const query = queryUtils.get.queryOptions({
 			request: skipToken,
 			select: (data) => data.body.name,
@@ -156,7 +162,20 @@ describe("createTanstackQueryUtils types", () => {
 		const options = queryUtils.get.queryOptions({
 			request: { params: { id: "1" } },
 		});
-		queryUtils.get.queryOptions({ request: skipToken });
+		// Options with a request have a query function, as suspense hooks require.
+		expectTypeOf(options.queryFn).toExtend<QueryFunction<GetResponse>>();
+		expectTypeOf(queryUtils.empty.queryOptions().queryFn).toExtend<
+			QueryFunction<InferClientResponse<typeof empty>>
+		>();
+		const request = Math.random() > 0.5 ? { params: { id: "1" } } : skipToken;
+		for (const skippable of [
+			queryUtils.get.queryOptions({ request: skipToken }),
+			queryUtils.get.queryOptions({ request }),
+		]) {
+			expectTypeOf(skippable.queryFn).not.toExtend<
+				QueryFunction<GetResponse>
+			>();
+		}
 		queryUtils.empty.queryOptions();
 		// @ts-expect-error Required params cannot be omitted.
 		queryUtils.get.queryOptions();

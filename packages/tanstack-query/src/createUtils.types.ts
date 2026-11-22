@@ -4,6 +4,7 @@ import type {
 	InfiniteQueryObserverOptions,
 	MutationKey,
 	MutationOptions,
+	QueryFunction,
 	QueryKey,
 	QueryObserverOptions,
 	SkipToken,
@@ -74,32 +75,38 @@ type QueryFetchOptions<F extends ClientRoute> = Omit<
 type WithFetchOptions<T, TFetchOptions> = T & { fetchOptions?: TFetchOptions };
 
 // `TRequest` is the request, or the function that returns it for a page.
-type RequestOption<F extends ClientRoute, TRequest> =
+// `TSkip` is `never` for options that always run their query.
+type RequestOption<F extends ClientRoute, TRequest, TSkip = SkipToken> =
 	undefined extends RouteRequestValue<F>
-		? { request?: TRequest | SkipToken }
-		: { request: TRequest | SkipToken };
+		? { request?: TRequest | TSkip }
+		: { request: TRequest | TSkip };
 
 type QueryOptionsFor<
 	F extends ClientRoute,
 	TData = RouteDataFor<F>,
+	TSkip = SkipToken,
 > = WithFetchOptions<
 	Omit<
 		QueryObserverOptions<RouteDataFor<F>, RouteErrorFor<F>, TData>,
 		"queryKey" | "queryFn"
 	> & {
 		queryKey?: QueryKey;
-	} & RequestOption<F, DefinedRequest<F>>,
+	} & RequestOption<F, DefinedRequest<F>, TSkip>,
 	QueryFetchOptions<F>
 >;
 
 // The `F extends ClientRoute` conditionals of the result types keep editors
 // from displaying the alias instead of the TanStack Query options it resolves to.
+// `TQueryFn` is a query function for options that always run their query,
+// as suspense hooks require.
 type QueryOptionsResultFor<
 	F extends ClientRoute,
 	TData = RouteDataFor<F>,
+	TQueryFn = unknown,
 > = F extends ClientRoute
 	? QueryObserverOptions<RouteDataFor<F>, RouteErrorFor<F>, TData> & {
 			queryKey: DataTag<QueryKey, RouteDataFor<F>, RouteErrorFor<F>>;
+			queryFn: TQueryFn;
 		}
 	: never;
 
@@ -122,6 +129,7 @@ type InfiniteQueryOptionsFor<
 	TInitialPageParam,
 	TPageParam,
 	TData = InfiniteQueryDataFor<F, TPageParam>,
+	TSkip = SkipToken,
 > = WithFetchOptions<
 	Omit<
 		InfiniteQueryObserverOptions<
@@ -139,7 +147,8 @@ type InfiniteQueryOptionsFor<
 			F,
 			[DefinedRequest<F>] extends [never]
 				? never
-				: (pageParam: TPageParam) => DefinedRequest<F>
+				: (pageParam: TPageParam) => DefinedRequest<F>,
+			TSkip
 		> &
 		([TInitialPageParam] extends [TPageParam] ? unknown : never),
 	QueryFetchOptions<F>
@@ -149,6 +158,7 @@ type InfiniteQueryOptionsResultFor<
 	F extends ClientRoute,
 	TPageParam,
 	TData = InfiniteQueryDataFor<F, TPageParam>,
+	TQueryFn = unknown,
 > = F extends ClientRoute
 	? InfiniteQueryObserverOptions<
 			RouteDataFor<F>,
@@ -162,6 +172,7 @@ type InfiniteQueryOptionsResultFor<
 				InfiniteQueryDataFor<F, TPageParam>,
 				RouteErrorFor<F>
 			>;
+			queryFn: TQueryFn;
 		}
 	: never;
 
@@ -257,7 +268,11 @@ type RouteQueryKeyTag<F extends ClientRoute, TData> = DataTag<
 	RouteErrorFor<F>
 >;
 
+// The first signature, without `skipToken`, types options for suspense hooks.
 type RouteQueryOptionsMethod<F extends ClientRoute> = {
+	<TData = RouteDataFor<F>>(
+		...args: OptionsArgument<QueryOptionsFor<F, TData, never>>
+	): QueryOptionsResultFor<F, TData, QueryFunction<RouteDataFor<F>>>;
 	<TData = RouteDataFor<F>>(
 		...args: UseQueryArgs<F, TData>
 	): QueryOptionsResultFor<F, TData>;
@@ -273,13 +288,33 @@ type TanstackQueryBaseRouteValue<F extends ClientRoute> = {
 		...args: MutationOptionsArgs<F>
 	) => MutationOptionsResultFor<F>;
 	queryOptions: RouteQueryOptionsMethod<F>;
-	infiniteQueryOptions: <
-		TInitialPageParam,
-		TPageParam = TInitialPageParam,
-		TData = InfiniteQueryDataFor<F, TPageParam>,
-	>(
-		options: InfiniteQueryOptionsFor<F, TInitialPageParam, TPageParam, TData>,
-	) => InfiniteQueryOptionsResultFor<F, TPageParam, TData>;
+	infiniteQueryOptions: {
+		<
+			TInitialPageParam,
+			TPageParam = TInitialPageParam,
+			TData = InfiniteQueryDataFor<F, TPageParam>,
+		>(
+			options: InfiniteQueryOptionsFor<
+				F,
+				TInitialPageParam,
+				TPageParam,
+				TData,
+				never
+			>,
+		): InfiniteQueryOptionsResultFor<
+			F,
+			TPageParam,
+			TData,
+			QueryFunction<RouteDataFor<F>, QueryKey, TPageParam>
+		>;
+		<
+			TInitialPageParam,
+			TPageParam = TInitialPageParam,
+			TData = InfiniteQueryDataFor<F, TPageParam>,
+		>(
+			options: InfiniteQueryOptionsFor<F, TInitialPageParam, TPageParam, TData>,
+		): InfiniteQueryOptionsResultFor<F, TPageParam, TData>;
+	};
 	mutationKey: () => MutationKey;
 	queryKey: (...args: QueryKeyArgs<F>) => RouteQueryKeyTag<F, RouteDataFor<F>>;
 	// The request is the one of the initial page.
