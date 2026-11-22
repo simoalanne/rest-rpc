@@ -45,6 +45,13 @@ which suits errors that apply across routes:
 throw new RouteError("RATE_LIMITED", { status: 429 });
 ```
 
+So a route doesn't need to define every error it can throw, only those its
+callers handle per call. Errors every caller handles the same way, such as a
+rate limit or an expired session, can stay undefined and be handled in one
+place, such as a [client interceptor](/docs/client/fetch-client#interceptors).
+To type an error on every route instead, define it on the builder they're built
+from.
+
 ## Built-in Errors
 
 The server sends these itself:

@@ -3,18 +3,37 @@ import { type } from "../standard-schema/type.ts";
 import { createOpenApiDocument } from "./document.ts";
 
 describe("document", () => {
-	it("preserves document metadata", () => {
+	it("copies document fields and defaults the required ones", () => {
 		const options = {
 			openapi: "3.0.3",
-			info: { title: "Users", version: "1", description: "API" },
-			servers: [{ url: "https://example.test", description: "Primary" }],
+			info: {
+				title: "Users",
+				version: "1",
+				description: "API",
+				license: { name: "MIT" },
+			},
+			servers: [
+				{
+					url: "https://{region}.example.test",
+					description: "Primary",
+					variables: { region: { default: "eu" } },
+				},
+			],
 			tags: [{ name: "users", description: "Users" }],
 			components: {
 				securitySchemes: { token: { type: "http", scheme: "bearer" } },
 			},
+			security: [{ token: [] }],
+			externalDocs: { url: "https://example.test/docs" },
+			"x-logo": { url: "https://example.test/logo.png" },
 		};
 		expect(createOpenApiDocument({}, options)).toEqual({
 			...options,
+			paths: {},
+		});
+		expect(createOpenApiDocument({})).toEqual({
+			openapi: "3.2.1",
+			info: { title: "API", version: "0.0.0" },
 			paths: {},
 		});
 	});
@@ -55,7 +74,10 @@ describe("document", () => {
 			"get",
 		]);
 		expect(document.paths["/users/create"]?.post?.requestBody?.content).toEqual(
-			{ "application/json": { schema: {} } },
+			{
+				"application/json": { schema: {} },
+				"multipart/form-data": { schema: {} },
+			},
 		);
 	});
 });

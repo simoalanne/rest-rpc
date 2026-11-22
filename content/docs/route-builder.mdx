@@ -137,7 +137,11 @@ const create = route
   `respond()` results are read as responses.
 
 Without `.response()`, the statuses and bodies the handler returns are the
-client's result type. Errors are [thrown](#define-errors), not returned.
+client's result type. Values the handler returns keep their literal types, such
+as `"draft"`. A value built in a variable or a function before it's returned
+has the type TypeScript gave it there, where strings in objects widen to
+`string`, so annotate it or use `as const` where the client should see the
+literals. Errors are [thrown](#define-errors), not returned.
 
 ## Define Responses
 
@@ -163,9 +167,14 @@ route
 ```
 
 - `status` defaults to `200`, and each status is defined once.
+- A response without a body takes only options, such as `.response()` or
+  `.response({ status: 204 })`. A schema always defines a body, so a schema for
+  `undefined` defines a JSON body that can't be encoded.
 - A plain return value is the body of the only defined response. With several,
   `respond()` takes one of the defined statuses.
-- `headers` works on every response, bodyless and stream ones included.
+- `headers` works on every response, bodyless and stream ones included. Its
+  schema decides which headers are sent, as
+  [Validation](/docs/http-behavior/validation#responses) describes.
 
 ## Raw Responses
 
@@ -266,19 +275,31 @@ a different error with the same code throws. Defining errors doesn't define
 responses. See [Errors](/docs/http-behavior/errors) for what's sent, and for
 errors a route doesn't define.
 
-## Metadata and OpenAPI
+## Describe Routes for OpenAPI
 
-`.meta()` attaches [metadata](/docs/middleware#metadata) of the shape
-`$meta<T>()` declares, and `.openAPI()` describes the operation:
+`.openAPI()` sets the route's [operation details](/docs/openapi#operation-details),
+such as its summary and tags. Responses and errors take a `description` in
+their own options:
 
 ```ts
-const list = route
-	.$meta<{ access: "public" | "signed-in" }>()
-	.get("/posts")
-	.meta({ access: "signed-in" })
-	.openAPI({ summary: "List posts", tags: ["Posts"] })
-	.handler(() => listPosts());
+const remove = route
+	.delete("/posts/:id")
+	.params(z.object({ id: z.string() }))
+	.openAPI({ summary: "Delete a post", tags: ["Posts"] })
+	.response({ status: 204, description: "Post deleted." })
+	.error("POST_NOT_FOUND", { status: 404, description: "No post has this id." })
+	.handler(({ params }) => deletePost(params.id));
 ```
+
+- `.response(schema, { description })` and `.response({ description })`
+  describe a response.
+- `.error(code, { description })` and `routeError(code, { description })`
+  describe an error.
+- `raw({ description })` describes a [raw response](#raw-responses).
+- Request and response schemas describe themselves through the
+  [schema converter](/docs/openapi#schema-conversion).
+
+See [OpenAPI](/docs/openapi) for how they're documented.
 
 ## Reuse Builders
 
@@ -308,6 +329,22 @@ const remove = authenticated
 
 Native request objects aren't passed. To use them,
 [put them in the context](/docs/middleware#values-from-the-host).
+
+## Route Definitions
+
+Every route keeps its definition under `~restrpc`, the same one handlers,
+middleware and interceptors receive as `route`. The key keeps it apart from the
+builder's methods. Read it in your own code, such as for a route's method,
+path or `meta`:
+
+```ts
+const { method, path, meta } = get["~restrpc"]; // "GET", "/posts/:id", { ... }
+```
+
+- `path` is `undefined` for a route that takes its path from its key in the
+  route tree, until the tree is served or a client is created. `route` in
+  handlers, middleware and interceptors has it resolved.
+- It's read-only. Build routes with the builder.
 
 ## Type Helpers
 

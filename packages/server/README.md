@@ -577,7 +577,7 @@ export function getContract() {
 ```ts
 // client.ts
 import { createClient } from "@rest-rpc/core";
-import { getContract } from "./contract" with { type: "macro" };
+import { getContract } from "./contract.ts" with { type: "macro" };
 
 export const client = createClient(getContract()); // the page's origin, or pass { origin }
 ```
@@ -600,7 +600,7 @@ See [Fetch Client](https://rest-rpc.vercel.app/docs/client/fetch-client#client-o
 ```ts
 // client.ts
 import { clientInterceptor, createClient } from "@rest-rpc/core";
-import { getContract } from "./contract" with { type: "macro" };
+import { getContract } from "./contract.ts" with { type: "macro" };
 
 const logging = clientInterceptor(async ({ request, next }) => {
 	const response = await next();
@@ -628,7 +628,7 @@ See [TanStack Query](https://rest-rpc.vercel.app/docs/client/tanstack-query)
 // client.ts
 import { createClient } from "@rest-rpc/core";
 import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
-import { getContract } from "./contract" with { type: "macro" };
+import { getContract } from "./contract.ts" with { type: "macro" };
 
 export const client = createClient(getContract());
 export const queryUtils = createTanstackQueryUtils(client);
@@ -648,7 +648,7 @@ export function Posts() {
 		queryUtils.posts.create.mutationOptions({
 			onSuccess: () =>
 				queryClient.invalidateQueries({
-					queryKey: queryUtils.posts.list.queryKey(),
+					queryKey: queryUtils.posts.list.key(),
 				}),
 		}),
 	);

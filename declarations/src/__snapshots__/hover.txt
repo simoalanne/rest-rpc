@@ -416,6 +416,7 @@ const queryOptions: QueryObserverOptions<{
         };
         [dataTagErrorSymbol]: Error | RouteError<...>;
     };
+    queryFn: QueryFunction<...>;
 }
 
 const mutationOptions: MutationOptions<{

@@ -19,7 +19,7 @@ options objects and keys; they do not create a `QueryClient` or call hooks.
 ```ts client.ts
 import { createClient } from "@rest-rpc/core";
 import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
-import { getContract } from "./contract" with { type: "macro" };
+import { getContract } from "./contract.ts" with { type: "macro" };
 
 export const client = createClient(getContract(), {
 	origin: "https://api.example.com",
@@ -28,6 +28,31 @@ export const queryUtils = createTanstackQueryUtils(client);
 ```
 
 The same client can still be called directly where a query is not needed.
+
+```ts
+type TanstackQueryUtilsOptions = {
+	/**
+	 * Keys that start every query and mutation key of the utils, such as
+	 * values sent with every request that change its response.
+	 */
+	prefix?: QueryKey;
+};
+```
+
+A [query key](#query-keys) holds the route and its request, not what the client
+adds to every request. When such a value changes the response, such as a locale
+sent in `globalHeaders`, pass it as the `prefix`, so queries for different values
+don't share cache entries:
+
+```ts
+const createQueryUtils = (locale: string) =>
+	createTanstackQueryUtils(
+		createClient(getContract(), {
+			globalHeaders: { "accept-language": locale },
+		}),
+		{ prefix: ["locale", locale] },
+	);
+```
 
 ## Queries
 
@@ -149,12 +174,29 @@ const posts = useInfiniteQuery(
 
 ## Query Keys
 
-Query keys are the route's key path in the route tree, followed by the request
-input when there is one. Infinite and streamed queries cache different data than
-regular queries, so their keys add a `"~infinite"` or `"~streamed"` segment after
-the route path. Use `queryKey()`, `infiniteQueryKey()` and `streamedQueryKey()`
-to get the keys outside an options object. The returned keys are typed for
-TanStack Query APIs.
+Query keys are the [prefix](#setup), if any, and the route's key path in the
+route tree, followed by the request input when there is one. Infinite and
+streamed queries cache different data than regular queries, so their keys add a
+`"~infinite"` or `"~streamed"` segment after the route path.
+
+Use `key()` to match queries in TanStack Query filters, such as to invalidate
+them. Every node of the util tree has it: the root's matches every query of the
+utils, a group's every query of its routes, and a route's every query of the
+route, of every kind.
+
+```ts
+await queryClient.invalidateQueries({ queryKey: queryUtils.key() });
+await queryClient.invalidateQueries({ queryKey: queryUtils.posts.key() });
+await queryClient.invalidateQueries({ queryKey: queryUtils.posts.get.key() });
+```
+
+:::error[Reserved Keys]
+Don't use `key` as a route or group key of a client passed to `createTanstackQueryUtils()`. It is reserved for `key()`, and using it is a type error.
+:::
+
+Use `queryKey()`, `infiniteQueryKey()` and `streamedQueryKey()` for the key of
+one query, such as to read or update its data. They are typed with the query's
+data for TanStack Query APIs.
 
 ```ts
 queryUtils.posts.get.queryKey({ params: { id: "post_1" } }); // ["posts", "get", { params: { id: "post_1" } }]
@@ -167,9 +209,8 @@ queryUtils.posts.feed.infiniteQueryKey({
 queryUtils.notifications.streamedQueryKey(); // ["notifications", "~streamed"]
 ```
 
-Without a request, a key is a prefix matching every query of its kind for the
-route when used as a filter. `queryKey()` without a request matches every query
-of the route, including infinite and streamed ones.
+Without a request, they return the key that matches every query of their kind
+for the route.
 
 ```ts
 const postKey = queryUtils.posts.get.queryKey({ params: { id: "post_1" } });
@@ -187,10 +228,6 @@ queryClient.setQueryData(postKey, (current) =>
 			}
 		: current,
 );
-
-await queryClient.invalidateQueries({
-	queryKey: postKey,
-});
 ```
 
 ## Custom Query Keys
@@ -236,7 +273,7 @@ const createPost = useMutation(
 	queryUtils.posts.create.mutationOptions({
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({
-				queryKey: queryUtils.posts.list.queryKey(),
+				queryKey: queryUtils.posts.list.key(),
 			});
 		},
 	}),
@@ -249,7 +286,7 @@ createPost.mutate({
 });
 ```
 
-Mutation options use the route path as their default mutation key. Use
+Mutation options use the prefix and the route path as their default mutation key. Use
 `mutationKey()` with TanStack Query APIs that filter or configure mutations.
 
 ```ts

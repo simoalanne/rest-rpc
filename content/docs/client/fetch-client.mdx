@@ -8,7 +8,7 @@ routes are implemented in the server, [extract a contract](/docs/client/contract
 
 ```ts client.ts
 import { createClient } from "@rest-rpc/core";
-import { getContract } from "./contract" with { type: "macro" };
+import { getContract } from "./contract.ts" with { type: "macro" };
 
 const client = createClient(getContract(), {
 	origin: "https://api.example.com",
@@ -146,6 +146,33 @@ try {
 	}
 	throw error;
 }
+```
+
+A caught error is `unknown`, so `isDefinedError(error)` narrows it only to
+`RouteError`. Pass the client route or tree the error can come from as the
+second argument to narrow it to their defined errors. A route or route tree
+works too, for code that has no client to pass, such as where clients are
+created per request. The argument is only read for its type:
+
+```ts
+try {
+	await client.posts.create({ body });
+} catch (error) {
+	if (
+		isDefinedError(error, client.posts.create) &&
+		error.code === "SLUG_TAKEN"
+	) {
+		console.log(error.message);
+	}
+	throw error;
+}
+
+// One handler for every route, such as for errors defined on a shared builder
+const handleError = (error: unknown) => {
+	if (isDefinedError(error, contract) && error.code === "UNAUTHORIZED") {
+		redirectToSignIn();
+	}
+};
 ```
 
 ### With `safe()`
@@ -312,10 +339,11 @@ type CreateClientOptions = {
 	 */
 	mountPath?: AbsolutePath;
 	/**
-	 * Sends each request, the `Request` the last interceptor sends. Defaults to
+	 * Sends each request, the `Request` the last interceptor sends, with the
+	 * fetch options as the second argument when the call has any. Defaults to
 	 * the global `fetch`.
 	 */
-	fetch?: (request: Request) => Promise<Response>;
+	fetch?: (request: Request, init?: RequestInit) => Promise<Response>;
 	/**
 	 * Functions around each HTTP exchange, the first outermost, such as for
 	 * logging, retries or refreshing credentials.
@@ -436,6 +464,11 @@ clear it once `next()` resolves.
 `fetch` sends each request. It receives a Fetch `Request`, the one the last
 [interceptor](#interceptors) sends, and defaults to the global `fetch`. For
 logic around each request, prefer interceptors.
+
+When the client's `fetchOptions` or the call set any [fetch options](#per-call-options),
+`fetch` also receives them as its second argument, the way the global `fetch`
+does. That's how options a `Request` doesn't keep, such as ones a runtime or
+framework adds to `fetch`, reach it.
 
 Any function that takes a `Request` works, so a Fetch app can serve the client
 in the same process, such as in tests:

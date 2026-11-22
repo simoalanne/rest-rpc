@@ -92,10 +92,7 @@ export const resolveRouteError = (
 		},
 	});
 	if (disableValidation) {
-		return toResolved([
-			error.data,
-			definition.headers ? error.headers : undefined,
-		]);
+		return toResolved([error.data, error.headers]);
 	}
 
 	let resolved: MaybePromise<ResolvedRouteError>;

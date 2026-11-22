@@ -89,6 +89,18 @@ export type InferClientError<T extends ClientTypeSource> =
 						: never;
 				};
 
+// The defined errors of a route, or the union of those of every route in a
+// tree, for `isDefinedError()`.
+export type DefinedErrorIn<T extends ClientTypeSource> = T extends
+	| ClientRouteFunction
+	| { readonly "~restrpc": RouteDefinition }
+	? InferClientError<T>
+	: {
+			[K in keyof T]: T[K] extends ClientTypeSource
+				? DefinedErrorIn<T[K]>
+				: never;
+		}[keyof T];
+
 /**
  * Infers the `data` of each event received from a streaming route.
  *

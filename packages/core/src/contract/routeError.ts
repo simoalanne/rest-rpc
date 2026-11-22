@@ -3,6 +3,7 @@ import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 import type { Merge } from "../utils/typeUtils.ts";
 import type { InferSchema } from "./request.ts";
 import type { ResponseHeadersSchema } from "./response.ts";
+import type { ClientTypeSource, DefinedErrorIn } from "../client/response.ts";
 
 /**
  * Options accepted by the `RouteError` constructor.
@@ -80,8 +81,11 @@ export class RouteError<
  *
  * @remarks Narrows errors from `safe()` and TanStack Query, whose types list
  * the route's errors, so `data` is typed after checking `code`. An `unknown`
- * value, such as in a `catch` block, narrows to `RouteError`. Use
- * `instanceof RouteError` to also match errors the route does not define.
+ * value, such as in a `catch` block, narrows to `RouteError`, or to the
+ * defined errors of the route or tree passed as `source`: a client route or
+ * tree, or a route or route tree. `source` is only read for its type, so
+ * pass the one the error can come from. Use `instanceof RouteError` to also
+ * match errors the route does not define.
  *
  * @example
  * ```ts
@@ -95,7 +99,12 @@ export class RouteError<
  */
 export function isDefinedError<T>(
 	error: T,
-): error is unknown extends T ? T & RouteError : Extract<T, RouteError> {
+): error is unknown extends T ? T & RouteError : Extract<T, RouteError>;
+export function isDefinedError<TSource extends ClientTypeSource>(
+	error: unknown,
+	source: TSource,
+): error is DefinedErrorIn<TSource>;
+export function isDefinedError(error: unknown): boolean {
 	return error instanceof RouteError && error.isDefined;
 }
 

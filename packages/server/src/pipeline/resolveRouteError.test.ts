@@ -32,6 +32,20 @@ describe("resolveRouteError", () => {
 		expect(
 			(await resolveRouteError(definition, thrown, true)).response,
 		).toMatchObject({ status: 404, data: 1, headers: { "x-id": 1 } });
+		// Without a headers schema, the thrown headers are sent.
+		const withoutSchema = route.get("/").error("BUSY", { status: 503 });
+		for (const disableValidation of [false, true]) {
+			const busy = new RouteError("BUSY", { headers: { "retry-after": 5 } });
+			expect(
+				(
+					await resolveRouteError(
+						withoutSchema["~restrpc"],
+						busy,
+						disableValidation,
+					)
+				).response.headers,
+			).toEqual({ "retry-after": 5 });
+		}
 	});
 
 	it("rejects with the error as sent, keeping its class, message and cause", async () => {

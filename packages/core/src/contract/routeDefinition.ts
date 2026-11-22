@@ -24,14 +24,27 @@ export type RouteMeta = object;
  */
 export interface DefaultMeta {}
 
+/**
+ * The OpenAPI operation fields of a route, set with `.openAPI()`.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/openapi#operation-details}
+ */
 export type OpenApiRouteOptions = {
+	/** A short summary of what the operation does. */
 	summary?: string;
+	/** A longer description of the operation. */
 	description?: string;
+	/** A unique identifier of the operation, used by SDK generators for method names. Defaults to the route's key path in the route tree, such as `posts.get`, and an empty value leaves it out. */
 	operationId?: string;
+	/** Tags that group the operation, merged with the tags of earlier calls. */
 	tags?: string[];
+	/** Marks the operation as deprecated. */
 	deprecated?: boolean;
+	/** Security requirements, referencing schemes declared in `components`. */
 	security?: Array<Record<string, string[]>>;
+	/** A link to external documentation of the operation. */
 	externalDocs?: { url: string; description?: string };
+	/** Extension fields whose keys start with `x-`, added to the operation and merged with those of earlier calls. */
 	extensions?: Record<`x-${string}`, unknown>;
 };
 

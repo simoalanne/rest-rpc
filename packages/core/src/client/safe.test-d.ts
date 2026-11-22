@@ -41,11 +41,25 @@ describe("safe types", () => {
 				expectTypeOf(error.data).toEqualTypeOf<{ id: string }>();
 			}
 		}
+		const other = route.get("/other").error("BUSY", { status: 503 });
+		const tree = createClient({ get: definition, other });
+		type Gone = ClientRouteError<(typeof definition)["~restrpc"]>;
 		try {
 			await client();
 		} catch (caught) {
 			if (isDefinedError(caught)) {
 				expectTypeOf(caught).toEqualTypeOf<RouteError>();
+			}
+			if (isDefinedError(caught, client)) {
+				expectTypeOf(caught).toEqualTypeOf<Gone>();
+			}
+			if (isDefinedError(caught, definition)) {
+				expectTypeOf(caught).toEqualTypeOf<Gone>();
+			}
+			if (isDefinedError(caught, tree)) {
+				expectTypeOf(caught).toEqualTypeOf<
+					Gone | ClientRouteError<(typeof other)["~restrpc"]>
+				>();
 			}
 		}
 	});

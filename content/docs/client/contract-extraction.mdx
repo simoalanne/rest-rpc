@@ -25,7 +25,7 @@ export function getContract() {
 
 ```ts client.ts
 import { createClient } from "@rest-rpc/core";
-import { getContract } from "./contract" with { type: "macro" };
+import { getContract } from "./contract.ts" with { type: "macro" };
 
 export const client = createClient(getContract());
 ```
@@ -46,8 +46,13 @@ export default defineConfig({
 });
 ```
 
-`router.ts` runs at build time, so keep it free of side effects like
-starting the server or connecting to a database.
+`unplugin-macros` runs the macro in the runtime the bundler runs on, not through
+the bundler, so the bundler's path aliases don't apply to the macro import or to
+what `contract.ts` imports. Their imports follow the runtime's rules instead:
+Node needs the extension on every relative import, as it does for server code,
+while Bun also resolves imports without one. Importing `./contract.ts` works on
+both, and type-checks with `allowImportingTsExtensions` in the client's
+`tsconfig.json`.
 
 ## Extract Routes without a Macro
 
@@ -72,14 +77,37 @@ await writeFile("contract.json", JSON.stringify(extractContract(router)));
 ```
 
 ```ts client.ts
-import { createClient } from "@rest-rpc/core";
+import { contractFromJson, createClient } from "@rest-rpc/core";
 import type { router } from "./router";
-import contract from "./contract.json";
+import json from "./contract.json";
 
-export const client = createClient(contract as unknown as typeof router, {
+export const client = createClient(contractFromJson<typeof router>(json), {
 	origin: "http://localhost:3000",
 });
 ```
+
+A JSON import is typed by its values, or not at all, so `contractFromJson()`
+types it as the route tree it was extracted from, and throws when the file
+doesn't have the shape of an extracted contract. A macro returns the contract
+with its type, so only this setup needs the type import of the router.
+
+## What Extraction Runs
+
+Both ways import `router.ts` at build time, and with it every module it
+imports. Whatever those modules do when imported happens during the build too:
+
+- A module that throws, such as one that validates environment variables,
+  fails the build.
+- A module that keeps the process alive, such as one that opens a database
+  connection, starts a timer or listens on a port, keeps the macro or the
+  script from finishing.
+- Other side effects, such as writing log files, run in the build's working
+  directory.
+
+Keep these out of the modules routes import. Give handlers their services
+through [context](/docs/middleware#values-from-the-host) that the server
+creates, create them on first use, or share a [contract](/docs/contract-first)
+that imports no server code.
 
 ## Limitations
 

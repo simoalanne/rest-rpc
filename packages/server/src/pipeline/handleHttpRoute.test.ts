@@ -182,7 +182,7 @@ describe("route pipeline", () => {
 		expect(body.get("name")).toBe("Ada");
 	});
 
-	it("sends transformed defined bodies and headers unless response validation is disabled", async () => {
+	it("sends transformed defined bodies and headers unless response validation is disabled, and every header without a headers schema", async () => {
 		const implementation = route
 			.get("/")
 			.response(
@@ -193,7 +193,9 @@ describe("route pipeline", () => {
 					})),
 				},
 			)
-			.handler(() => respond("2", { headers: { count: 2 } }));
+			.handler(() =>
+				respond("2", { headers: { count: 2, "x-undeclared": "1" } }),
+			);
 		for (const [disableResponseValidation, body, count] of [
 			[false, 2, "3"],
 			[true, "2", "2"],
@@ -203,6 +205,30 @@ describe("route pipeline", () => {
 			});
 			expect(response.headers.get("count")).toBe(count);
 			expect(await response.json()).toBe(body);
+		}
+		// The headers schema's output is sent, without the headers it strips.
+		expect((await send(implementation)).headers.get("x-undeclared")).toBeNull();
+
+		// Without a headers schema, the handler's and middleware's headers are sent.
+		const withoutSchema = route
+			.use(async ({ next }) => {
+				const response = await next();
+				return { ...response, headers: { ...response.headers, "x-mw": "1" } };
+			})
+			.get("/")
+			.response(type<Blob>())
+			.handler(({ respond }) =>
+				respond(new Blob(["%PDF"]), {
+					headers: { "content-type": "application/pdf" },
+				}),
+			);
+		for (const disableResponseValidation of [false, true]) {
+			const response = await send(withoutSchema, undefined, {
+				disableResponseValidation,
+			});
+			expect(response.headers.get("content-type")).toBe("application/pdf");
+			expect(response.headers.get("x-mw")).toBe("1");
+			expect(await response.text()).toBe("%PDF");
 		}
 	});
 

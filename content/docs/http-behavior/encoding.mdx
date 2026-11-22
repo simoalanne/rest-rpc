@@ -46,6 +46,9 @@ const { body } = await client.search({
   `"Fri Nov 20 2026 12:00:00 GMT+0000 (Coordinated Universal Time)"`,
   rather than an ISO string, and an object as `"[object Object]"`. Send dates
   with `toISOString()`, and objects as separate keys.
+- Booleans arrive as `"true"` and `"false"`, so a schema reads them by value,
+  such as with `z.stringbool()`. Coercing by truthiness, as `z.coerce.boolean()`
+  does, reads every non-empty string as `true`, `"false"` included.
 - Header names are sent lowercase, and response headers are sent with
   `String()` too.
 
@@ -113,8 +116,13 @@ The server sends a response body with the first content type that applies:
 2. `multipart/form-data` for `FormData`, whatever the headers say.
 3. [Server-Sent Events](/docs/server-sent-events) for an async iterable,
    unless the handler sets another `content-type`.
-4. The `content-type` header the handler sets with `respond()`.
+4. The `content-type` header the handler sets with `respond()`, which a
+   response's headers schema has to
+   [let through](/docs/http-behavior/validation#responses) when it has one.
 5. `application/json`.
+
+The body's value doesn't choose the content type, so a `Blob` without a
+`content-type` is encoded as JSON too.
 
 [Errors](/docs/http-behavior/errors) are always JSON, and the client reads a
 response without a `content-type` as having no body.

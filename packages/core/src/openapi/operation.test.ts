@@ -32,9 +32,10 @@ describe("operation", () => {
 			schema === headers
 				? {
 						properties: {
-							count: { type: "integer" },
+							count: { type: "integer", description: "Total count." },
 							"content-type": { enum: ["text/plain", "application/json"] },
 						},
+						required: ["count"],
 					}
 				: { type: "string" },
 		);
@@ -46,7 +47,13 @@ describe("operation", () => {
 		).toEqual({
 			200: {
 				description: "Created",
-				headers: { count: { schema: { type: "integer" } } },
+				headers: {
+					count: {
+						description: "Total count.",
+						required: true,
+						schema: { type: "integer", description: "Total count." },
+					},
+				},
 				content: {
 					"text/plain": { schema: { type: "string" } },
 					"application/json": { schema: { type: "string" } },
@@ -97,7 +104,6 @@ describe("operation", () => {
 				},
 			},
 			409: {
-				description: expect.any(String),
 				content: { "application/json": { schema: body("CONFLICT") } },
 			},
 		});
@@ -166,9 +172,42 @@ describe("operation", () => {
 				schemaConverter,
 			}).parameters?.map((parameter) => parameter.required),
 		).toEqual([true, true]);
+		const headers = type<{
+			"x-version": string;
+			accept: string;
+			authorization: string;
+		}>();
+		expect(
+			operationOf(route.get("/").headers(headers), {
+				schemaConverter: () => ({
+					properties: {
+						"x-version": {
+							type: "string",
+							description: "API version.",
+							deprecated: true,
+						},
+						accept: { type: "string" },
+						authorization: { type: "string" },
+					},
+				}),
+			}).parameters,
+		).toEqual([
+			{
+				name: "x-version",
+				in: "header",
+				required: false,
+				description: "API version.",
+				deprecated: true,
+				schema: {
+					type: "string",
+					description: "API version.",
+					deprecated: true,
+				},
+			},
+		]);
 	});
 
-	it("combines stacked request schemas under the content type the headers declare", () => {
+	it("combines stacked request schemas under the content type the headers declare, or JSON and multipart", () => {
 		const json = type<{ name: string }>();
 		const headers = type<{ "content-type": "text/csv" }>();
 		const converter = (schema: unknown) =>
@@ -180,6 +219,9 @@ describe("operation", () => {
 			operationOf(stacked, { schemaConverter: converter }).requestBody?.content,
 		).toEqual({
 			"application/json": {
+				schema: { allOf: [{ type: "object" }, { type: "object" }] },
+			},
+			"multipart/form-data": {
 				schema: { allOf: [{ type: "object" }, { type: "object" }] },
 			},
 		});
@@ -201,10 +243,10 @@ describe("operation", () => {
 		);
 	});
 
-	it("omits content for bodyless responses and uses SSE for streams", () => {
+	it("omits content and descriptions a response doesn't have, and documents each event of a stream", () => {
 		expect(
 			operationOf(route.get("/").response({ status: 204 })).responses,
-		).toEqual({ 204: { description: expect.any(String) } });
+		).toEqual({ 204: {} });
 		expect(
 			operationOf(
 				route
@@ -215,19 +257,36 @@ describe("operation", () => {
 		).toEqual({
 			200: {
 				description: "Updates",
-				content: { "text/event-stream": { schema: { type: "string" } } },
+				content: {
+					"text/event-stream": {
+						itemSchema: {
+							type: "object",
+							required: ["data"],
+							properties: {
+								data: {
+									type: "string",
+									contentMediaType: "application/json",
+									contentSchema: { type: "string" },
+								},
+								event: { type: "string" },
+								id: { type: "string" },
+								retry: { type: "integer", minimum: 0 },
+							},
+						},
+					},
+				},
 			},
 		});
 	});
 
-	it("passes the generated operation and contract path into the operation hook", () => {
+	it("defaults the operation id to the key path and passes the operation and path into the hook", () => {
 		const list = route
 			.get("/users")
 			.query(type<{ q: string }>())
 			.response({ status: 204 });
 		const transformOperation = vi.fn(({ operation }) => ({
 			...operation,
-			operationId: "users.list",
+			operationId: "listUsers",
 		}));
 		const operation = operationOf(
 			{ users: { list } },
@@ -236,11 +295,19 @@ describe("operation", () => {
 				transformOperation,
 			},
 		);
-		expect(operation.operationId).toBe("users.list");
+		expect(operation.operationId).toBe("listUsers");
+		expect(
+			operationOf({ users: { list: list.openAPI({ operationId: "find" }) } })
+				.operationId,
+		).toBe("find");
+		expect(
+			operationOf({ users: { list: list.openAPI({ operationId: "" }) } }),
+		).not.toHaveProperty("operationId");
 		expect(transformOperation).toHaveBeenCalledWith({
 			route: list["~restrpc"],
 			routePath: ["users", "list"],
 			operation: {
+				operationId: "users.list",
 				parameters: [
 					{
 						name: "q",
@@ -249,23 +316,34 @@ describe("operation", () => {
 						schema: { type: "string" },
 					},
 				],
-				responses: { 204: { description: expect.any(String) } },
+				responses: { 204: {} },
 			},
 		});
 	});
 
-	it("documents dynamic path segments without a params schema as strings", () => {
+	it("documents every dynamic path segment, as a string when no schema converts it", () => {
+		const asStrings = [
+			{ name: "id", in: "path", required: true, schema: { type: "string" } },
+			{ name: "slug", in: "path", required: true, schema: { type: "string" } },
+		];
+		const params = type<{ id: string; slug: string }>();
 		expect(operationOf(route.get("/users/:id/posts/:slug")).parameters).toEqual(
-			[
-				{ name: "id", in: "path", required: true, schema: { type: "string" } },
-				{
-					name: "slug",
-					in: "path",
-					required: true,
-					schema: { type: "string" },
-				},
-			],
+			asStrings,
 		);
+		expect(
+			operationOf(route.get("/users/:id/posts/:slug").params(params))
+				.parameters,
+		).toEqual(asStrings);
+		expect(
+			operationOf(route.get("/users/:id/posts/:slug").params(params), {
+				schemaConverter: () => ({
+					properties: { id: { type: "integer" }, other: { type: "string" } },
+				}),
+			}).parameters,
+		).toEqual([
+			{ name: "id", in: "path", required: true, schema: { type: "integer" } },
+			asStrings[1],
+		]);
 	});
 
 	it("documents query arrays the way they are sent", () => {

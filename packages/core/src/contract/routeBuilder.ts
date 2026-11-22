@@ -277,7 +277,7 @@ export class RouteBuilder<
 		});
 	}
 
-	/** Adds OpenAPI metadata, merged with earlier details. @see {@link https://rest-rpc.vercel.app/docs/openapi#route-metadata} */
+	/** Adds OpenAPI metadata, merged with earlier details. @see {@link https://rest-rpc.vercel.app/docs/openapi#operation-details} */
 	openAPI(
 		openApi: OpenApiRouteOptions,
 	): BuilderFor<TKind, NextState<TState, { openApi: true }>> {

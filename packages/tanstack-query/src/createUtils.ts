@@ -5,6 +5,7 @@ import {
 	skipToken,
 } from "@tanstack/query-core";
 import type {
+	ReservedKeyCheck,
 	TanstackQueryClient,
 	TanstackQueryUtilsFor,
 } from "./createUtils.types.ts";
@@ -32,6 +33,7 @@ type TanstackQueryUtilFunctions = {
 	streamedQueryOptions: (
 		options?: OptionsWithFetchOptions,
 	) => Record<string, unknown>;
+	key: () => QueryKey;
 	mutationKey: () => MutationKey;
 	queryKey: (request?: unknown) => QueryKey;
 	infiniteQueryKey: (request?: unknown) => QueryKey;
@@ -57,7 +59,8 @@ const createUtilsForRoute = ({
 	routePath,
 	fetchData,
 }: {
-	routePath: string[];
+	// The prefix and the route's keys in the client tree.
+	routePath: readonly unknown[];
 	fetchData: FetchData;
 }): TanstackQueryUtilFunctions => {
 	const queryKeyFor = (kind: QueryKeyKind, request: unknown): QueryKey => {
@@ -150,6 +153,7 @@ const createUtilsForRoute = ({
 				...tanstackOptions,
 			};
 		},
+		key: () => routePath,
 		mutationKey: () => routePath,
 		queryKey: (request) => queryKeyFor("query", request),
 		infiniteQueryKey: (request) => queryKeyFor("infinite", request),
@@ -157,27 +161,39 @@ const createUtilsForRoute = ({
 	};
 };
 
-const mapClientRoutes = (node: unknown, path: string[]): unknown =>
+const mapClientRoutes = (node: unknown, path: readonly unknown[]): unknown =>
 	typeof node === "function"
 		? createUtilsForRoute({ routePath: path, fetchData: node as FetchData })
-		: Object.fromEntries(
-				Object.entries(node as Record<string, unknown>).map(([key, child]) => [
-					key,
-					mapClientRoutes(child, [...path, key]),
-				]),
-			);
+		: {
+				...Object.fromEntries(
+					Object.entries(node as Record<string, unknown>).map(
+						([key, child]) => [key, mapClientRoutes(child, [...path, key])],
+					),
+				),
+				key: () => path,
+			};
 
 /**
  * Creates a TanStack Query util tree that mirrors a client.
  *
  * @remarks Accepts a client created with `createClient`. Generated utils call the client's routes, create
  * options and stable query keys; they do not create a `QueryClient` or call
- * framework-specific hooks.
+ * framework-specific hooks. Every node of the tree has `key()`, the key that
+ * matches all of its queries, so `key` is reserved in the client tree.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/tanstack-query#setup}
  */
 export function createTanstackQueryUtils<TClient extends TanstackQueryClient>(
-	client: TClient,
+	client: TClient & ReservedKeyCheck<TClient>,
+	options: {
+		/**
+		 * Keys that start every query and mutation key of the utils, such as
+		 * values sent with every request that change its response.
+		 */
+		prefix?: QueryKey;
+	} = {},
 ): TanstackQueryUtilsFor<TClient> {
-	return mapClientRoutes(client, []) as TanstackQueryUtilsFor<TClient>;
+	return mapClientRoutes(client, [
+		...(options.prefix ?? []),
+	]) as TanstackQueryUtilsFor<TClient>;
 }

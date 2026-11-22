@@ -6,22 +6,27 @@ import { constructBaseRequest, executeRequest } from "./request.ts";
 const codecs = createBodyCodecRegistry([]);
 
 describe("request", () => {
-	it("passes caller cancellation through to fetch", async () => {
+	it("sends the call's signal on the request and its fetch options to fetch", async () => {
 		const controller = new AbortController();
 		const fetch = vi.fn(
-			async (_request: Request) => new Response(null, { status: 204 }),
+			async (_request: Request, _init?: RequestInit) =>
+				new Response(null, { status: 204 }),
 		);
+		const options = { origin: "http://localhost", codecs, fetch };
+		await executeRequest({ method: "GET", path: "/" }, [], options);
 		await executeRequest(
 			{ method: "GET", path: "/" },
-			[undefined, { signal: controller.signal }],
-			{
-				origin: "http://localhost",
-				codecs,
-				fetch,
-			},
+			[undefined, { signal: controller.signal, cache: "no-store", next: 60 }],
+			{ ...options, fetchOptions: { credentials: "include" } },
 		);
-		const [request] = fetch.mock.calls[0]!;
-		expect(request.url).toBe("http://localhost/");
+		expect(fetch.mock.calls[0]).toHaveLength(1);
+		const [request, init] = fetch.mock.calls[1]!;
+		expect(init).toEqual({
+			credentials: "include",
+			cache: "no-store",
+			next: 60,
+		});
+		expect(request.cache).toBe("no-store");
 		controller.abort();
 		expect(request.signal.aborted).toBe(true);
 	});

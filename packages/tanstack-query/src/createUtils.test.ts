@@ -54,6 +54,48 @@ describe("createTanstackQueryUtils", () => {
 			queryUtils.users.get.queryOptions({ request, queryKey: ["custom"] })
 				.queryKey,
 		).toEqual(["custom"]);
+		expect(queryUtils.key()).toEqual([]);
+		expect(queryUtils.users.key()).toEqual(["users"]);
+		expect(queryUtils.users.get.key()).toEqual(["users", "get"]);
+	});
+
+	it("starts every query and mutation key with the prefix", async () => {
+		const scoped = createTanstackQueryUtils(
+			createClient(contract, {
+				origin: "https://example.test",
+				fetch: async () => Response.json({ name: "Ada" }),
+			}),
+			{ prefix: ["tenant", 1] },
+		);
+		const request = { params: { id: "1" } };
+		expect(scoped.key()).toEqual(["tenant", 1]);
+		expect(scoped.users.key()).toEqual(["tenant", 1, "users"]);
+		expect(scoped.users.get.queryKey(request)).toEqual([
+			"tenant",
+			1,
+			"users",
+			"get",
+			request,
+		]);
+		expect(scoped.users.get.infiniteQueryKey()).toEqual([
+			"tenant",
+			1,
+			"users",
+			"get",
+			"~infinite",
+		]);
+		expect(scoped.users.create.mutationOptions().mutationKey).toEqual([
+			"tenant",
+			1,
+			"users",
+			"create",
+		]);
+		const client = new QueryClient();
+		await client.fetchQuery(scoped.users.get.queryOptions({ request }));
+		await client.invalidateQueries({ queryKey: scoped.users.key() });
+		expect(
+			client.getQueryState(scoped.users.get.queryKey(request))?.isInvalidated,
+		).toBe(true);
 	});
 
 	it("separates query kinds with a segment after the route path", () => {

@@ -44,27 +44,33 @@
 		"exports": {
 			".": {
 				"types": "./dist/index.d.ts",
-				"import": "./dist/index.js"
+				"import": "./dist/index.js",
+				"default": "./dist/index.js"
 			},
 			"./client": {
 				"types": "./dist/client/index.d.ts",
-				"import": "./dist/client/index.js"
+				"import": "./dist/client/index.js",
+				"default": "./dist/client/index.js"
 			},
 			"./codecs": {
 				"types": "./dist/codecs/index.d.ts",
-				"import": "./dist/codecs/index.js"
+				"import": "./dist/codecs/index.js",
+				"default": "./dist/codecs/index.js"
 			},
 			"./contract": {
 				"types": "./dist/contract/index.d.ts",
-				"import": "./dist/contract/index.js"
+				"import": "./dist/contract/index.js",
+				"default": "./dist/contract/index.js"
 			},
 			"./standard-schema": {
 				"types": "./dist/standard-schema/index.d.ts",
-				"import": "./dist/standard-schema/index.js"
+				"import": "./dist/standard-schema/index.js",
+				"default": "./dist/standard-schema/index.js"
 			},
 			"./utils": {
 				"types": "./dist/utils/index.d.ts",
-				"import": "./dist/utils/index.js"
+				"import": "./dist/utils/index.js",
+				"default": "./dist/utils/index.js"
 			}
 		}
 	},

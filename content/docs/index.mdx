@@ -63,6 +63,8 @@ export const router = { posts: { create, get } };
 
 ```ts twoslash
 // ---cut-start---
+// @allowImportingTsExtensions
+// @noEmit
 // @filename: router.ts
 import { respond, route } from "@rest-rpc/server";
 import * as z from "zod";
@@ -109,7 +111,7 @@ export declare function getContract(): typeof router;
 // ---cut-end---
 import { createClient } from "@rest-rpc/core";
 // getContract() runs extractContract(router) at build time.
-import { getContract } from "./contract" with { type: "macro" };
+import { getContract } from "./contract.ts" with { type: "macro" };
 
 const client = createClient(getContract(), { origin: "http://localhost:3000" });
 
@@ -132,6 +134,8 @@ if (response.status === 200) {
 
 ```tsx twoslash
 // ---cut-start---
+// @allowImportingTsExtensions
+// @noEmit
 // @filename: router.ts
 import { respond, route } from "@rest-rpc/server";
 import * as z from "zod";
@@ -175,7 +179,7 @@ import type { router } from "./router";
 export declare function getContract(): typeof router;
 
 // @filename: client.tsx
-import { getContract } from "./contract" with { type: "macro" };
+import { getContract } from "./contract.ts" with { type: "macro" };
 // ---cut-end---
 import { createClient } from "@rest-rpc/core";
 import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";

@@ -18,6 +18,33 @@ import type { ExtendContext } from "./context.ts";
 
 type ContractRoute = { readonly "~restrpc": RouteDefinition };
 
+// The root of an implementer tree has `use()` and `$context()`, so the
+// contract's top-level keys can't use them.
+export type ReservedImplementerKeyCheck<TContract> =
+	TContract extends ContractRoute
+		? unknown
+		: {
+				[TKey in Extract<keyof TContract, "use" | "$context">]: {
+					"~error": "`use` and `$context` are reserved for the implementer's methods. Rename the top-level route or group.";
+				};
+			};
+
+// A contract is what clients rely on, so its routes define their responses
+// instead of inferring them from the handler.
+type HasResponse<TRoute extends RouteDefinition> = [
+	keyof TRoute["responses"],
+] extends [never]
+	? TRoute extends { raw: object }
+		? true
+		: false
+	: true;
+
+type MissingResponse = {
+	handler(handler: {
+		"~error": "Contract routes define their responses. Add .response() to the contract route.";
+	}): never;
+};
+
 /**
  * A contract implementer leaf, with handler, middleware and context methods.
  * `TStatic` is `false` once middleware is added, which removes `static()`.
@@ -30,12 +57,14 @@ export type ContractImplementerLeaf<
 > = {
 	readonly "~restrpc": TContract["~restrpc"] &
 		ContextFields<TInitial, TContext>;
-} & HandlerMethodFor<TContract["~restrpc"], TInitial, TContext> &
-	(TStatic extends true
-		? IsStaticRoute<TContract["~restrpc"]> extends true
-			? StaticMethodFor<TContract["~restrpc"], TInitial, TContext>
-			: EmptyObject
-		: EmptyObject) & {
+} & (HasResponse<TContract["~restrpc"]> extends true
+	? HandlerMethodFor<TContract["~restrpc"], TInitial, TContext> &
+			(TStatic extends true
+				? IsStaticRoute<TContract["~restrpc"]> extends true
+					? StaticMethodFor<TContract["~restrpc"], TInitial, TContext>
+					: EmptyObject
+				: EmptyObject)
+	: MissingResponse) & {
 		/** Declares initial context the host provides for this implementation. Repeated declarations must all be satisfied. @see {@link https://rest-rpc.vercel.app/docs/middleware#context} */
 		$context<TValues extends object>(): ContractImplementerLeaf<
 			TContract,

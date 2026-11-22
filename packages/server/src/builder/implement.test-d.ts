@@ -1,4 +1,4 @@
-import { route, type } from "@rest-rpc/core";
+import { raw, route, type } from "@rest-rpc/core";
 import type { DefaultContext, ExtendContext } from "./context.ts";
 import { implement } from "./implement.ts";
 import { respond } from "../pipeline/respond.ts";
@@ -43,6 +43,12 @@ describe("implement types", () => {
 
 			return respond({ name: "Ada" });
 		});
+		const health = route.get("/health").response(type<string>());
+		implement({ admin: { use: health } });
+		// @ts-expect-error `use` is reserved for the implementer's methods.
+		implement({ use: health });
+		// @ts-expect-error `$context` is reserved for the implementer's methods.
+		implement({ $context: health });
 	});
 
 	it("passes handler fields and transformed requests through middleware", () => {
@@ -101,11 +107,18 @@ describe("implement types", () => {
 		>();
 	});
 
-	it("offers static() on contract routes without request input or middleware", () => {
+	it("offers handler() on contract routes with responses and static() on those without request input or middleware", () => {
 		const api = {
 			health: route.get("/health").response(type<{ ok: boolean }>()),
+			empty: route.delete("/session").response({ status: 204 }),
+			file: route.get("/file").response(raw()),
+			inferred: route.get("/inferred"),
 			users: contract.users,
 		};
+		implement(api).empty.handler(() => respond(undefined, { status: 204 }));
+		implement(api).file.handler(() => new Response("file"));
+		// @ts-expect-error A contract route defines its responses.
+		implement(api).inferred.handler(() => "any value");
 		implement(api).health.static({ ok: true });
 		// @ts-expect-error The contract route has params.
 		implement(api).users.get.static({ name: "Ada" });

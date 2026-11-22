@@ -101,7 +101,7 @@ Vite and other bundlers run the same macro with `unplugin-macros`. See
 
 ```ts client.ts
 import { createClient, isDefinedError, safe } from "@rest-rpc/core";
-import { getContract } from "./contract" with { type: "macro" };
+import { getContract } from "./contract.ts" with { type: "macro" };
 
 const client = createClient(getContract(), { origin: "http://localhost:3000" });
 

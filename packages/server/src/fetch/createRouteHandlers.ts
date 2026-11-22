@@ -1,4 +1,4 @@
-import type { HttpMethod, RouteDefinition } from "@rest-rpc/core/contract";
+import type { HttpMethod } from "@rest-rpc/core/contract";
 import type { EmptyObject } from "@rest-rpc/core/utils";
 import { compileRouteTree, type ResponseWriter } from "../pipeline/dispatch.ts";
 import type {
@@ -13,7 +13,7 @@ import {
 	type TreeInitialContext,
 } from "../routing/match.ts";
 import { fetchRequestReader } from "./request.ts";
-import { RouteError } from "@rest-rpc/core";
+import { RouteError, type InterceptedRoute } from "@rest-rpc/core";
 import { errorResponse, intercept, type Interceptor } from "./interceptor.ts";
 import {
 	respondTo,
@@ -121,7 +121,7 @@ export function createRouteHandlers<TRouter extends RuntimeImplementationTree>(
 
 /** A Fetch route with its definition, for the interceptors of an app. */
 export type CompiledFetchRoute = FetchRoute<object> & {
-	definition: RouteDefinition;
+	definition: InterceptedRoute;
 };
 
 /** Compiles a route tree into Fetch routes with their definitions. */

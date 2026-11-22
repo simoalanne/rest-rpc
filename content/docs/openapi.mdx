@@ -3,14 +3,16 @@ title: OpenAPI
 description: Generate an OpenAPI document from HTTP route definitions.
 ---
 
-`createOpenApiDocument()` generates an OpenAPI document from server routes or a
-separately shared contract. HTTP methods, paths, schemas, and operation
+`createOpenApiDocument()` generates an OpenAPI 3.2 document from server routes
+or a separately shared contract. HTTP methods, paths, schemas, and operation
 metadata come from the same route builder used by the server and client.
 
 :::warning
 The document is a best-effort conversion of the routes. It isn't guaranteed to
 describe every route completely, or to work with every OpenAPI tool or SDK
-generator, so check the output with the tools you use it with.
+generator, so check the output with the tools you use it with. It follows the
+latest OpenAPI version, so a document for an older one, set with `openapi`, may
+need [transforms](#transform-hooks) to be correct.
 :::
 
 Define response schemas with `.response()` to include
@@ -46,6 +48,61 @@ The `createOpenApiDocument()` function is also exported from the `@rest-rpc/core
 and works identically with a shared contract too.
 :::
 
+## Document Options
+
+Every option is optional. The document fields are those of an OpenAPI
+document, except `paths`, which the routes produce, and are copied to it as
+they are. Their objects, such as `info`, also take any other fields their
+OpenAPI object has, copied as they are too:
+
+```ts
+type CreateOpenApiDocumentOptions = {
+	/** OpenAPI specification version to emit. Defaults to `3.2.1`. */
+	openapi?: string;
+	/** The URI of the document itself. */
+	$self?: string;
+	/** The default JSON Schema dialect of the document's schemas. */
+	jsonSchemaDialect?: string;
+	/** Human-readable API metadata. `title` defaults to `"API"` and `version` to `"0.0.0"`. */
+	info?: {
+		title?: string;
+		version?: string;
+		description?: string;
+		[key: string]: unknown; // such as `contact` or `license`
+	};
+	/** Server URLs where the API is available. */
+	servers?: Array<{
+		url: string;
+		description?: string;
+		[key: string]: unknown;
+	}>;
+	/** Reusable OpenAPI components such as security schemes. */
+	components?: Record<string, unknown>;
+	/** Tags available for grouping generated operations. */
+	tags?: Array<{ name: string; description?: string; [key: string]: unknown }>;
+	/** Security requirements of every operation, referencing schemes declared in `components`. */
+	security?: Array<Record<string, string[]>>;
+	/** A link to external documentation of the API. */
+	externalDocs?: { url: string; description?: string; [key: string]: unknown };
+	/** OpenAPI extension fields. */
+	[key: `x-${string}`]: unknown;
+	/** Converts Standard Schema definitions into OpenAPI Schema Objects. */
+	schemaConverter?: (
+		schema: StandardSchemaV1,
+		mode: "input" | "output",
+	) => Record<string, unknown> | undefined;
+	/** Allows project-specific changes to each generated operation. */
+	transformOperation?: (context: {
+		route: RouteDefinition;
+		routePath: readonly string[];
+		operation: OpenApiOperation;
+	}) => OpenApiOperation;
+};
+```
+
+See [Schema Conversion](#schema-conversion) and [Transform Hooks](#transform-hooks)
+for the two functions.
+
 ## What Is Included
 
 Every route in the tree becomes an operation, including routes whose method and
@@ -55,19 +112,22 @@ path are derived from their tree keys. The document includes:
 - path, query, and header parameters
 - request bodies, under the content types the headers schema declares
 - status-keyed responses, with their content types and defined headers
-- streams as `text/event-stream` responses
+- streams as `text/event-stream` responses, whose `itemSchema` describes each
+  event, with the event data's schema as the `contentSchema` of its JSON `data`
 - a `default` placeholder response for routes without defined responses, and
   a `default` response for [raw responses](/docs/route-builder#raw-responses)
-  with their description
-- route [`.openAPI()`](#route-metadata) metadata
+- the route's [operation details](#operation-details) and
+  [descriptions](#responses-and-errors)
 
 A body's content types come from the `const` or `enum` of the `content-type`
-header in its converted headers schema. A body is `application/json` without
-one, and `*/*` when its value can't be read. The `content-type` header itself
-isn't listed with the other headers.
-
-The document targets OpenAPI `3.1.0` unless the `openapi` option sets another
-version. `servers`, `components`, and `tags` options are copied to the document.
+header in its converted headers schema. Without one, a request body is
+`application/json` and `multipart/form-data`, the
+[types the server accepts](/docs/http-behavior/encoding#accepted-content-types),
+and a response body `application/json`. A body is `*/*` when the header's value
+can't be read. The `content-type` header itself
+isn't listed with the other headers, and neither are `accept` and
+`authorization`, which OpenAPI ignores as parameters. Describe credentials with
+[`security`](#operation-details).
 
 ## Schema Conversion
 
@@ -92,10 +152,42 @@ const document = createOpenApiDocument(router, {
 });
 ```
 
-For object-shaped path and query schemas, rest-rpc reads top-level
+Request schemas convert with `mode: "input"`, the values a client sends, and
+response schemas with `mode: "output"`, the values it receives. Anything the
+converted schema carries ends up in the document with it, so zod's
+`.describe()` and `.meta()` describe parameters and bodies:
+
+```ts
+const postSchema = z
+	.object({
+		id: z
+			.string()
+			.meta({ description: "The post's id.", examples: ["post_1"] }),
+		title: z.string().min(1).describe("The post's title."),
+		body: z.string(),
+	})
+	.meta({ title: "Post", description: "A blog post." });
+
+const get = route
+	.get("/posts/:id")
+	.params(z.object({ id: postSchema.shape.id }))
+	.response(postSchema, { description: "The post." })
+	.handler(({ params }) => findPost(params.id));
+```
+
+The `id` parameter gets its description and examples, and the response schema
+its title and description. Leave `id` out of `.meta()` for schemas you
+document: zod then converts the schema to a `$ref` into `$defs` of its own, and
+a `#/$defs/...` reference resolves against the whole OpenAPI document, which
+has no such `$defs`.
+
+For object-shaped params, query and headers schemas, rest-rpc reads top-level
 `properties` and `required` from the converted JSON Schema to create OpenAPI
-parameters. Schema records and headers do not always
-carry parameter-level requiredness in the converted schema.
+parameters, and response headers the same way. A property's `description` and
+`deprecated` become the parameter's or header's own. Every segment of the path
+is a required parameter, and one its schema doesn't convert is a string.
+Schema records and headers do not always carry parameter-level requiredness in
+the converted schema.
 
 A defined request body is documented as required. Set `required: false` in
 [`transformOperation`](#transform-hooks) for a route whose body schema accepts
@@ -106,44 +198,63 @@ A query parameter whose converted schema has `type: "array"` is documented as
 arrays as repeated `name[]=value` keys and the server only reads arrays from
 those keys.
 
-## Route Metadata
+## Operation Details
 
-Use `.openAPI()` on a route builder for operation metadata. It accepts
-`summary`, `description`, `operationId`, `tags`, `deprecated`, `security`,
-`externalDocs`, and `extensions`. `extensions` keys must start with `x-` and
-are added to the operation.
-
-Calling `.openAPI()` more than once merges the details, so a shared base builder can set common `tags` or `security`.
+`.openAPI()` sets the fields of the route's operation:
 
 ```ts
-const create = route
+type OpenApiRouteOptions = {
+	/** A short summary of what the operation does. */
+	summary?: string;
+	/** A longer description of the operation. */
+	description?: string;
+	/** A unique identifier of the operation, used by SDK generators for method names. Defaults to the route's key path in the route tree, such as `posts.get`, and an empty value leaves it out. */
+	operationId?: string;
+	/** Tags that group the operation, merged with the tags of earlier calls. */
+	tags?: string[];
+	/** Marks the operation as deprecated. */
+	deprecated?: boolean;
+	/** Security requirements, referencing schemes declared in `components`. */
+	security?: Array<Record<string, string[]>>;
+	/** A link to external documentation of the operation. */
+	externalDocs?: { url: string; description?: string };
+	/** Extension fields whose keys start with `x-`, added to the operation and merged with those of earlier calls. */
+	extensions?: Record<`x-${string}`, unknown>;
+};
+```
+
+An operation's `operationId` is the route's key path, such as `posts.get` for
+`{ posts: { get } }`, the same name as its client call, so it's unique in the
+document. Set `operationId` to name it otherwise, or to `""` on a shared base to
+leave it out.
+
+Calling `.openAPI()` again, such as on a route built from a shared base, merges
+its `tags` and `extensions` with the earlier ones, and replaces the other
+fields it sets:
+
+```ts
+const authenticated = route.openAPI({
+	tags: ["Authenticated"],
+	security: [{ bearerAuth: [] }],
+});
+
+const create = authenticated
 	.post("/posts")
 	.body(z.object({ title: z.string().min(1), body: z.string() }))
+	.response(postSchema)
 	.openAPI({
 		summary: "Create a post",
 		operationId: "createPost",
-	})
-	.response(postSchema);
-```
-
-## Response Descriptions
-
-Each defined response produces a status-keyed OpenAPI response. Describe it
-with the `description` option of `.response()`. Pass
-only options to describe a bodyless response:
-
-```ts
-const remove = route
-	.delete("/posts/:id")
-	.params(z.object({ id: z.string() }))
-	.response({ status: 204, description: "Post deleted." })
-	.error("POST_NOT_FOUND", {
-		status: 404,
-		description: "No post has this id.",
+		tags: ["Posts"],
 	});
+// tags: ["Authenticated", "Posts"], security: [{ bearerAuth: [] }]
 ```
 
-## Errors
+## Responses and Errors
+
+Each defined response produces a response keyed by its status, with the
+`description` of [its options](/docs/route-builder#describe-routes-for-openapi),
+if it has one. A response without a body has no content.
 
 Each [defined error](/docs/route-builder#define-errors) produces a JSON
 response for its status, whose body schema is `{ code, message, data? }` with
@@ -152,29 +263,42 @@ whose schema is a `oneOf` of their bodies, and whose description joins their
 descriptions. [Built-in errors](/docs/http-behavior/errors#built-in-errors) are
 documented only when the route defines them.
 
+A [raw response](/docs/route-builder#raw-responses) is documented as `default`,
+with the description `raw()` takes.
+
 ## Transform Hooks
 
 Use `transformOperation` when generated output needs project-specific changes.
-The transform context includes `routePath`, the route key path from the
-contract tree.
+It receives the route with its [metadata](/docs/middleware#metadata), and
+`routePath`, the route's key path in the route tree. It returns the operation
+to use.
+
+Metadata that middleware reads, such as the access a route requires, can then
+describe the same rule in the document:
 
 ```ts
+declare module "@rest-rpc/server" {
+	interface DefaultMeta {
+		access: "public" | "signed-in";
+	}
+}
+
 const document = createOpenApiDocument(router, {
 	info: {
 		title: "Blog API",
 		version: "1.0.0",
 	},
-	schemaConverter,
-	transformOperation: ({ route, routePath, operation }) => {
-		if (route.meta?.auth === "required") {
-			return {
-				...operation,
-				operationId: routePath.join("."),
-				security: [{ bearerAuth: [] }],
-			};
-		}
-
-		return operation;
+	components: {
+		securitySchemes: { bearerAuth: { type: "http", scheme: "bearer" } },
 	},
+	schemaConverter,
+	transformOperation: ({ route, operation }) =>
+		route.meta?.access === "signed-in"
+			? { ...operation, security: [{ bearerAuth: [] }] }
+			: operation,
 });
 ```
+
+`route.meta` holds the values `.meta()` set. It's typed by `DefaultMeta`,
+which has no keys until you augment it, since the document is generated from
+routes of any metadata shape.
