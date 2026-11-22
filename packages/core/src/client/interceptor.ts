@@ -1,13 +1,16 @@
 import type {
+	AbsolutePath,
 	DefaultMeta,
 	RouteDefinition,
 } from "../contract/routeDefinition.ts";
 
 /**
- * The route an interceptor receives. Routes may have no meta, so each key of
- * {@link DefaultMeta} is optional.
+ * The route an interceptor receives, with its path resolved from the route
+ * tree. Routes may have no meta, so each key of {@link DefaultMeta} is
+ * optional.
  */
 export type InterceptedRoute = RouteDefinition & {
+	path: AbsolutePath;
 	meta?: Partial<DefaultMeta>;
 };
 

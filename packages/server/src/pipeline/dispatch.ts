@@ -1,15 +1,11 @@
-import { RouteError } from "@rest-rpc/core";
+import { RouteError, type InterceptedRoute } from "@rest-rpc/core";
 import {
 	createBodyCodecRegistry,
 	normalizeMediaType,
 	type BodyCodecRegistry,
 	type IncomingBody,
 } from "@rest-rpc/core/codecs";
-import type {
-	AbsolutePath,
-	HttpMethod,
-	RouteDefinition,
-} from "@rest-rpc/core/contract";
+import type { AbsolutePath, HttpMethod } from "@rest-rpc/core/contract";
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import {
 	assertPathParams,
@@ -223,7 +219,7 @@ export type CompiledRoute = {
 	method: HttpMethod;
 	path: string;
 	/** The route's definition with its resolved path, for interceptors. */
-	definition: RouteDefinition;
+	definition: InterceptedRoute;
 	implementation: RuntimeImplementation;
 	pathParams: PathParams;
 	/** The response of a route completed with `.static()`, or the `Response` it returned. */

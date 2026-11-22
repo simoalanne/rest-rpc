@@ -8,7 +8,11 @@ import type { RouteDefinition } from "../contract/routeDefinition.ts";
 import { joinPrefix, replacePathParams } from "../contract/path.ts";
 import type { ClientTypeSource } from "./response.ts";
 import type { AbsolutePath, HttpMethod } from "../contract/routeDefinition.ts";
-import { intercept, type ClientInterceptor } from "./interceptor.ts";
+import {
+	intercept,
+	type ClientInterceptor,
+	type InterceptedRoute,
+} from "./interceptor.ts";
 import type { ClientRequestForDefinition } from "../contract/request.ts";
 
 /**
@@ -338,6 +342,6 @@ export const executeRequest = async (
 		: (request: Request) => fetch(request);
 	const request = toRequest(url, init, options.origin);
 	return options.interceptors?.length
-		? intercept(options.interceptors, route as RouteDefinition, request, send)
+		? intercept(options.interceptors, route as InterceptedRoute, request, send)
 		: send(request);
 };

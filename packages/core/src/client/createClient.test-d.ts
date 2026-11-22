@@ -3,6 +3,7 @@ import { type } from "../standard-schema/type.ts";
 import { routeError } from "../contract/routeError.ts";
 import { sse } from "../contract/sse.ts";
 import { createClient } from "./createClient.ts";
+import { clientInterceptor } from "./interceptor.ts";
 import type { InferClientRequest } from "./request.ts";
 import type {
 	InferClientError,
@@ -118,5 +119,12 @@ describe("createClient types", () => {
 		expectTypeOf<
 			InferClientStreamData<typeof client.events>
 		>().toEqualTypeOf<number>();
+	});
+
+	it("types an intercepted route's path as resolved", () => {
+		clientInterceptor(({ route, next }) => {
+			expectTypeOf(route.path).toEqualTypeOf<`/${string}`>();
+			return next();
+		});
 	});
 });

@@ -1,4 +1,4 @@
-import type { HttpMethod, RouteDefinition } from "@rest-rpc/core/contract";
+import type { HttpMethod } from "@rest-rpc/core/contract";
 import type { EmptyObject } from "@rest-rpc/core/utils";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { compileRouteTree, type ResponseWriter } from "../pipeline/dispatch.ts";
@@ -20,7 +20,7 @@ import {
 } from "./request.ts";
 import { fromFetchResponse } from "../pipeline/rawResponse.ts";
 import { writeNodeResponse, writeNodeResult } from "./response.ts";
-import { RouteError } from "@rest-rpc/core";
+import { RouteError, type InterceptedRoute } from "@rest-rpc/core";
 import {
 	intercept,
 	writeErrorResponse,
@@ -30,7 +30,7 @@ import {
 /** A Node route, its definition, and whether it was completed with `.static()`. */
 export type CompiledNodeRoute = NodeRoute<object> & {
 	isStatic: boolean;
-	definition: RouteDefinition;
+	definition: InterceptedRoute;
 };
 
 const nodeResponseWriter: ResponseWriter<ServerResponse, void> = {
