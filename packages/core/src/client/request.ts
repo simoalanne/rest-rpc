@@ -28,11 +28,16 @@ export type ClientFetchOptions = Omit<
 
 /**
  * The function the client sends each request with: `fetch`, or any function
- * that takes a Fetch `Request`, such as a Fetch app's `fetch`.
+ * that takes a Fetch `Request`, such as a Fetch app's `fetch`. When a call has
+ * fetch options, such as `cache` or a runtime's own options, it also receives
+ * them as the second argument, as `fetch` does.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/client/fetch-client#custom-fetch}
  */
-export type FetchLike = (request: Request) => Promise<Response>;
+export type FetchLike = (
+	request: Request,
+	init?: RequestInit,
+) => Promise<Response>;
 
 /**
  * Transport headers added by the client outside the defined route input. A
@@ -304,8 +309,14 @@ export const executeRequest = async (
 					contentType,
 				)
 			: undefined;
-	const { additionalHeaders: _additionalHeaders, ...requestFetchOptions } =
-		fetchOptions ?? {};
+	// Options a `Request` does not keep, such as a runtime's own, reach fetch
+	// only as its second argument. The signal is already on the `Request`.
+	const {
+		additionalHeaders: _additionalHeaders,
+		signal,
+		...callFetchOptions
+	} = fetchOptions ?? {};
+	const sendOptions = { ...options.fetchOptions, ...callFetchOptions };
 	const headers = outgoingHeaders;
 	// A body's content type replaces the stated one, also when Fetch sets it
 	// for `FormData`.
@@ -314,13 +325,17 @@ export const executeRequest = async (
 		Object.assign(headers, serialized.headers);
 	}
 	const init: RequestInit = {
-		...options.fetchOptions,
-		...requestFetchOptions,
+		...sendOptions,
 		method: route.method,
 		body: serialized?.body,
 		headers,
+		signal,
 	};
-	const send = options.fetch ?? ((request) => globalThis.fetch(request));
+	const fetch: FetchLike =
+		options.fetch ?? ((request, init) => globalThis.fetch(request, init));
+	const send = Object.keys(sendOptions).length
+		? (request: Request) => fetch(request, sendOptions)
+		: (request: Request) => fetch(request);
 	const request = toRequest(url, init, options.origin);
 	return options.interceptors?.length
 		? intercept(options.interceptors, route as RouteDefinition, request, send)
