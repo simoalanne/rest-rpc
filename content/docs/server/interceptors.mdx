@@ -109,8 +109,9 @@ createApp(router, {
 ## Reporting Errors
 
 `onError(callback)` creates an interceptor that calls `callback` with every
-error thrown after it, a body that fails while it streams included, and then
-rethrows it. Place it after interceptors that turn errors into responses:
+error thrown after it, and then rethrows it. That includes a
+[Server-Sent Events](/docs/server-sent-events) stream that fails after the
+response started. Place it after interceptors that turn errors into responses:
 
 ```ts
 import { onError } from "@rest-rpc/server";
@@ -119,3 +120,7 @@ const report = onError((error, { request, route }) => {
 	logger.error({ method: request.method, path: route?.path, error });
 });
 ```
+
+`onError` doesn't report other bodies that fail while they stream, such as a
+raw `ReadableStream` or a returned `Response`. On
+[Node](/docs/server/node#interceptors), it reports every body.

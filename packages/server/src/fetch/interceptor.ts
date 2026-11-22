@@ -1,4 +1,5 @@
 import type { InterceptedRoute } from "@rest-rpc/core";
+import { normalizeMediaType } from "@rest-rpc/core/codecs";
 import { asRouteError } from "../pipeline/resolveRouteError.ts";
 import { serializeRouteErrorParts } from "../pipeline/serializeHttpRouteResult.ts";
 import { toFetchResponse } from "./response.ts";
@@ -112,15 +113,23 @@ export function errorResponse(error: unknown): Response {
 	return toFetchResponse(serializeRouteErrorParts(asRouteError(error)));
 }
 
+// Wrapping a body turns it into a stream the runtime reads chunk by chunk,
+// which costs buffered bodies their fast path, so only SSE streams are wrapped.
+const isEventStream = (response: Response) =>
+	normalizeMediaType(response.headers.get("content-type")) ===
+	"text/event-stream";
+
 /**
  * Creates an interceptor that calls `callback` with every error thrown after
- * it, then rethrows the error. This includes response bodies that fail while
- * they stream, after `next()` resolved. A client that cancels a body is not
- * reported.
+ * it, then rethrows the error. This includes `text/event-stream` bodies that
+ * fail while they stream, after `next()` resolved. A client that cancels a
+ * body is not reported.
  *
- * @remarks Interceptors after one that turns errors into responses, such as
- * with {@link errorResponse}, receive errors as responses, so place it after
- * them.
+ * @remarks Other bodies that fail while they stream, such as a raw
+ * `ReadableStream` or a returned `Response`, are not reported. Interceptors
+ * after one that turns errors
+ * into responses, such as with {@link errorResponse}, receive errors as
+ * responses, so place it after them.
  *
  * @example
  * ```ts
@@ -147,7 +156,8 @@ export function onError(
 			await callback(error, args);
 			throw error;
 		}
-		if (!response.body) return response;
+		// Reading `body` first would create a stream for a buffered body on Bun.
+		if (!isEventStream(response) || !response.body) return response;
 		const reader = response.body.getReader();
 		const body = new ReadableStream<Uint8Array>({
 			async pull(controller) {

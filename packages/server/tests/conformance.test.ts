@@ -1296,25 +1296,18 @@ describe.each([
 		});
 	});
 
-	it("reports a response body that fails while it streams", async () => {
+	it("reports a server-sent event stream that fails while it streams", async () => {
 		const failure = new Error("stream failed");
 		const routes = {
-			stream: route.get("/stream").handler(
-				() =>
-					new Response(
-						new ReadableStream({
-							start(controller) {
-								controller.enqueue(new TextEncoder().encode("partial"));
-								controller.error(failure);
-							},
-						}),
-					),
-			),
+			events: route.get("/events").handler(async function* () {
+				yield 1;
+				throw failure;
+			}),
 		};
 		reported.length = 0;
 		await serve(routes, { interceptors: ["report"] }, async (url) => {
 			await expect(
-				fetch(`${url}/stream`).then((response) => response.text()),
+				fetch(`${url}/events`).then((response) => response.text()),
 			).rejects.toThrow();
 		});
 		await vi.waitFor(() => expect(reported).toEqual([failure]));

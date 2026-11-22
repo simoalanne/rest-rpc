@@ -459,7 +459,7 @@ export default createApp(router, {
 	interceptors: [
 		requestId,
 		interceptor(({ next }) => next().catch(errorResponse)), // errors reach requestId as responses
-		onError((error) => console.error(error)), // every error, with its cause
+		onError((error) => console.error(error)), // errors before the response and in event streams
 	],
 });
 ```
