@@ -50,9 +50,6 @@ export default defineConfig({
 bundler's resolution, so the import keeps its `.ts` extension and can't use the
 bundler's path aliases.
 
-`router.ts` runs at build time, so keep it free of side effects like
-starting the server or connecting to a database.
-
 ## Extract Routes without a Macro
 
 For bundlers without macro support (e.g. Turbopack), write the contract to
@@ -89,6 +86,24 @@ A JSON import is typed by its values, or not at all, so `contractFromJson()`
 types it as the route tree it was extracted from, and throws when the file
 doesn't have the shape of an extracted contract. A macro returns the contract
 with its type, so only this setup needs the type import of the router.
+
+## What Extraction Runs
+
+Both ways import `router.ts` at build time, and with it every module it
+imports. Whatever those modules do when imported happens during the build too:
+
+- A module that throws, such as one that validates environment variables,
+  fails the build.
+- A module that keeps the process alive, such as one that opens a database
+  connection, starts a timer or listens on a port, keeps the macro or the
+  script from finishing.
+- Other side effects, such as writing log files, run in the build's working
+  directory.
+
+Keep these out of the modules routes import. Give handlers their services
+through [context](/docs/middleware#values-from-the-host) that the server
+creates, create them on first use, or share a [contract](/docs/contract-first)
+that imports no server code.
 
 ## Limitations
 
