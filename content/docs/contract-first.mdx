@@ -40,7 +40,9 @@ Use `.response()` for each successful response, with `sse(schema)` for
 streams or [`raw()`](/docs/route-builder#raw-responses) for a returned Fetch
 `Response`, and `.error()` for each [error](/docs/route-builder#define-errors).
 These schemas define handler and client types and provide
-[runtime validation](/docs/http-behavior/validation).
+[runtime validation](/docs/http-behavior/validation). A contract route has no
+handler to infer its response from, so `implement()` requires at least one
+`.response()`, which can be one without a body.
 See [Server-Sent Events](/docs/server-sent-events) for stream handlers.
 
 ## Implement Routes
