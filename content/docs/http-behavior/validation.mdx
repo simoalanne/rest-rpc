@@ -56,6 +56,12 @@ it's yielded. A failure is a server bug, so the client gets a bare
 `INTERNAL_SERVER_ERROR`, and the issues stay on the server as its `cause`.
 Responses inferred from the handler are type-checked but not validated.
 
+A headers schema is the contract for a response's headers, so what it outputs
+is sent. One that strips unknown keys, such as `z.object()`, sends only the
+headers it declares, and one that keeps them, such as `z.looseObject()`, sends
+the others too. A response or [error](/docs/route-builder#define-errors) without
+a headers schema sends the headers the handler and middleware set.
+
 ## Disabling Validation
 
 `disableRequestValidation` and `disableResponseValidation` turn schema

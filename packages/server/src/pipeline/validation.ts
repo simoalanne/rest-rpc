@@ -232,11 +232,13 @@ export const validateResponseValue = (
 	});
 };
 
+// A response without a headers schema declares no contract for its headers,
+// so it sends the headers it was given. With one, the schema's output is sent.
 export const validateResponseHeaders = (
 	schema: ResponseHeadersSchema | undefined,
 	headers: Record<string, unknown> | undefined,
 ): MaybePromise<Record<string, unknown> | undefined> => {
-	if (!schema) return undefined;
+	if (!schema) return headers;
 
 	return mapMaybePromise(
 		validateStandardSchema(schema, headers ?? {}),

@@ -232,8 +232,11 @@ which routes that use the middleware must define.
 `next()` resolves to the response as `{ status, body, headers, cookies }`, the
 fields `respond()` takes. Middleware returns it, changed or not, or ends the
 chain without calling `next()` by returning `respond()`, which takes the
-statuses defined before the middleware. Whatever it returns is validated and
-serialized once, after the chain, like a handler's response. A returned Fetch
+statuses defined before the middleware. Whatever it returns is validated against
+the route's defined responses and serialized once, after the chain, like a
+handler's response. A route with inferred responses takes its types from the
+handler and validates nothing, so define the responses of a route whose
+middleware responds by itself. A returned Fetch
 `Response` is the `body`, as [raw responses](/docs/route-builder#raw-responses)
 describe. Failures are thrown as [errors](/docs/route-builder#define-errors).
 

@@ -172,11 +172,9 @@ route
   `undefined` defines a JSON body that can't be encoded.
 - A plain return value is the body of the only defined response. With several,
   `respond()` takes one of the defined statuses.
-- `headers` works on every response, bodyless and stream ones included. A
-  defined response sends only the headers its schema declares, so a
-  `content-type` that sets the body's
-  [content type](/docs/http-behavior/encoding#response-content-type) is declared
-  there too.
+- `headers` works on every response, bodyless and stream ones included. Its
+  schema decides which headers are sent, as
+  [Validation](/docs/http-behavior/validation#responses) describes.
 
 ## Raw Responses
 

@@ -83,9 +83,7 @@ const normalizeResponseResult = (
 		cookies: result.cookies,
 	});
 	const validatedHeaders = disableValidation
-		? schema.headers
-			? result.headers
-			: undefined
+		? result.headers
 		: validateResponseHeaders(schema.headers, result.headers);
 
 	// An `sse` schema validates each item of the stream.
