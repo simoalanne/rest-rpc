@@ -19,6 +19,10 @@ starting a fresh server per case. Requires `bun` and `bombardier` on `PATH`.
 pnpm bench:http
 ```
 
+The `ready` and `stream` cases serve a small JSON body and a three-event
+stream behind each interceptor stack in `runtime/interceptors.ts`, such as
+`ready / onError`. `none` is their baseline.
+
 Pass case names, or parts of them, to run only those cases:
 
 ```sh
@@ -41,5 +45,14 @@ bun compile benchmarks/runtime/http.ts --outfile server
 BENCH_SERVER=./server pnpm bench:http
 ```
 
-It prints req/s and the server memory before and after each case. A run
-takes about a minute. Compare runs on the same machine only.
+Set `BENCH_PROFILE=1` to write a CPU profile of each case's server to
+`benchmarks/profiles`. Profiled req/s are not comparable with unprofiled runs.
+Bun's profiles sample JavaScript only, so work Bun does natively, such as
+sending a buffered body, does not appear in them.
+
+```sh
+BENCH_PROFILE=1 pnpm bench:http "ready / onError"
+```
+
+It prints req/s and the server memory before and after each case. A full run
+takes about five minutes. Compare runs on the same machine only.

@@ -1,5 +1,6 @@
 import { createApp, respond, route, type } from "@rest-rpc/server";
 import * as z from "zod";
+import { fetchStacks, stackName } from "./interceptors.ts";
 
 const post = z.object({
 	id: z.number(),
@@ -11,16 +12,22 @@ const post = z.object({
 const posts = new Map<string, z.infer<typeof post>>();
 
 export const routes = {
+	ready: route.get("/ready").handler(() => ({ ok: true })),
+	stream: route.get("/stream").handler(async function* () {
+		for (let id = 1; id <= 3; id++)
+			yield { id, title: `Post ${id}`, body: "Hello" };
+	}),
 	text: route
 		.get("/")
-		.static(respond("Hello, World!", { contentType: "text/plain" })),
+		.static(
+			respond("Hello, World!", { headers: { "content-type": "text/plain" } }),
+		),
 	query: route
 		.get("/id/:id")
 		.query(type<{ name: string }>())
 		.handler(({ params, query }) =>
 			respond(`${params.id} ${query.name}`, {
-				contentType: "text/plain",
-				headers: { "x-powered-by": "benchmark" },
+				headers: { "content-type": "text/plain", "x-powered-by": "benchmark" },
 			}),
 		),
 	jsonBody: route
@@ -61,4 +68,7 @@ export const routes = {
 		}),
 };
 
-export default createApp(routes);
+const interceptors = fetchStacks[stackName];
+if (!interceptors) throw new Error(`Unknown BENCH_STACK ${stackName}.`);
+
+export default createApp(routes, { interceptors });

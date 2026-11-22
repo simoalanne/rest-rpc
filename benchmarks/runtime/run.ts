@@ -3,13 +3,17 @@
 // case alone. Requires `bun` and `bombardier` on PATH.
 import { execFileSync, spawn } from "node:child_process";
 import { once } from "node:events";
+import { mkdirSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { fetchStacks } from "./interceptors.ts";
 
 const base = "http://127.0.0.1:3737";
 const json = ["-H", "content-type: application/json"];
-// Cases expect 2xx responses unless they set `status`.
-const allCases: Record<string, { args: string[]; status?: "4xx" }> = {
+type Case = { args: string[]; status?: "4xx"; stack?: string };
+// Cases expect 2xx responses unless they set `status`, and run without
+// interceptors unless they set a `stack` from interceptors.ts.
+const allCases: Record<string, Case> = {
 	text: { args: [`${base}/`] },
 	"params + query": { args: [`${base}/id/1?name=bun`] },
 	"json body": {
@@ -29,6 +33,13 @@ const allCases: Record<string, { args: string[]; status?: "4xx" }> = {
 		],
 	},
 	error: { args: [`${base}/posts/1`], status: "4xx" },
+	// A small JSON body and a short stream behind each interceptor stack.
+	...Object.fromEntries(
+		Object.keys(fetchStacks).flatMap((stack) => [
+			[`ready / ${stack}`, { args: [`${base}/ready`], stack }],
+			[`stream / ${stack}`, { args: [`${base}/stream`], stack }],
+		]),
+	),
 };
 // Arguments select the cases whose name includes any of them, such as
 // `pnpm bench:http query middleware`.
@@ -58,15 +69,37 @@ if (!process.env.BENCH_SERVER && !servers[process.env.BENCH_RUNTIME ?? "bun"])
 		`BENCH_RUNTIME must be one of ${Object.keys(servers).join(", ")}.`,
 	);
 
-const startServer = async () => {
+// `BENCH_PROFILE=1` writes a CPU profile of each case's server to
+// `benchmarks/profiles`. Profiling slows the server, so its req/s are not
+// comparable with an unprofiled run.
+const profileDir = fileURLToPath(new URL("../profiles", import.meta.url));
+const profileArgs = (name: string) => {
+	if (!process.env.BENCH_PROFILE || process.env.BENCH_SERVER) return [];
+	mkdirSync(profileDir, { recursive: true });
+	const runtime = process.env.BENCH_RUNTIME ?? "bun";
+	const file = `${runtime}-${name.replace(/[^a-z0-9]+/gi, "-")}`;
+	return [
+		"--cpu-prof",
+		`--cpu-prof-dir=${profileDir}`,
+		`--cpu-prof-name=${file}.cpuprofile`,
+	];
+};
+
+const startServer = async (name: string, stack = "none") => {
 	// A server left running would answer in place of the new one.
 	if (await fetch(base).catch(() => undefined))
 		throw new Error(`${base} is already in use.`);
 	const [command, ...args] = process.env.BENCH_SERVER
 		? [process.env.BENCH_SERVER]
 		: servers[process.env.BENCH_RUNTIME ?? "bun"]!;
-	const server = spawn(command!, args, {
-		env: { ...process.env, PORT: "3737", NODE_ENV: "production" },
+	const server = spawn(command!, [...profileArgs(name), ...args], {
+		env: {
+			...process.env,
+			PORT: "3737",
+			NODE_ENV: "production",
+			BENCH_STACK: stack,
+		},
+		stdio: ["ignore", "inherit", "inherit"],
 	});
 	while (!(await fetch(base).catch(() => undefined))) await sleep(50);
 	return server;
@@ -92,8 +125,8 @@ const memoryUsage = (pid: number) =>
 	);
 
 const results = [];
-for (const [name, { args, status = "2xx" }] of Object.entries(cases)) {
-	const server = await startServer();
+for (const [name, { args, status = "2xx", stack }] of Object.entries(cases)) {
+	const server = await startServer(name, stack);
 	try {
 		console.log(
 			`Case ${results.length + 1}/${Object.keys(cases).length}: ${name}`,

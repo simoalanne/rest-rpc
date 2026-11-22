@@ -2,5 +2,11 @@
 import { createApp } from "@rest-rpc/server/node";
 import { createServer } from "node:http";
 import { routes } from "./http.ts";
+import { nodeStacks, stackName } from "./interceptors.ts";
 
-createServer(createApp(routes)).listen(Number(process.env.PORT ?? 3000));
+const interceptors = nodeStacks[stackName];
+if (!interceptors) throw new Error(`Unknown BENCH_STACK ${stackName}.`);
+
+createServer(createApp(routes, { interceptors })).listen(
+	Number(process.env.PORT ?? 3000),
+);

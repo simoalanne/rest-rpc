@@ -5,3 +5,4 @@ dist/
 .vscode/
 .vercel
 .env*
+benchmarks/profiles/
