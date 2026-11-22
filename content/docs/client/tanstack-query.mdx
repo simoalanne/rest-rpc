@@ -19,7 +19,7 @@ options objects and keys; they do not create a `QueryClient` or call hooks.
 ```ts client.ts
 import { createClient } from "@rest-rpc/core";
 import { createTanstackQueryUtils } from "@rest-rpc/tanstack-query";
-import { getContract } from "./contract" with { type: "macro" };
+import { getContract } from "./contract.ts" with { type: "macro" };
 
 export const client = createClient(getContract(), {
 	origin: "https://api.example.com",

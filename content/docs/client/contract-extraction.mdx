@@ -25,7 +25,7 @@ export function getContract() {
 
 ```ts client.ts
 import { createClient } from "@rest-rpc/core";
-import { getContract } from "./contract" with { type: "macro" };
+import { getContract } from "./contract.ts" with { type: "macro" };
 
 export const client = createClient(getContract());
 ```
@@ -45,6 +45,10 @@ export default defineConfig({
 	plugins: [Macros()],
 });
 ```
+
+`unplugin-macros` resolves the macro import the way Node does, not with the
+bundler's resolution, so the import keeps its `.ts` extension and can't use the
+bundler's path aliases.
 
 `router.ts` runs at build time, so keep it free of side effects like
 starting the server or connecting to a database.

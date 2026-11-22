@@ -8,7 +8,7 @@ routes are implemented in the server, [extract a contract](/docs/client/contract
 
 ```ts client.ts
 import { createClient } from "@rest-rpc/core";
-import { getContract } from "./contract" with { type: "macro" };
+import { getContract } from "./contract.ts" with { type: "macro" };
 
 const client = createClient(getContract(), {
 	origin: "https://api.example.com",
