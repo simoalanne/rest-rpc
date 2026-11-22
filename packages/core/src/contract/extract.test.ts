@@ -1,6 +1,6 @@
 import { createClient } from "../client/createClient.ts";
 import { type } from "../standard-schema/type.ts";
-import { extractContract } from "./extract.ts";
+import { contractFromJson, extractContract } from "./extract.ts";
 import { route } from "./routeBuilder.ts";
 
 const user = type<{ name: string }>();
@@ -57,11 +57,19 @@ describe("extractContract", () => {
 			"~restrpc": { ...route.get("/health")["~restrpc"], handler: () => "ok" },
 		};
 		const contract = extractContract({ health: withHandler });
-		expect(JSON.parse(JSON.stringify(contract))).toEqual({
+		expect(contractFromJson(JSON.parse(JSON.stringify(contract)))).toEqual({
 			health: {
 				"~restrpc": { method: "GET", path: "/health", responses: {} },
 			},
 		});
+		for (const json of [
+			null,
+			[],
+			{ health: "/health" },
+			{ health: { "~restrpc": {} } },
+		]) {
+			expect(() => contractFromJson(json)).toThrow(TypeError);
+		}
 	});
 
 	it("creates a client that recognizes defined error codes", async () => {
@@ -71,7 +79,8 @@ describe("extractContract", () => {
 				{ status: 404 },
 			),
 		);
-		const client = createClient(extractContract(routes), {
+		const json = JSON.parse(JSON.stringify(extractContract(routes)));
+		const client = createClient(contractFromJson<typeof routes>(json), {
 			origin: "https://example.test",
 			fetch,
 		});

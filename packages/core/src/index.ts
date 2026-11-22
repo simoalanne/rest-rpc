@@ -24,7 +24,7 @@ export type {
 	DefaultMeta,
 	RouteDefinition,
 } from "./contract/index.ts";
-export { extractContract } from "./contract/extract.ts";
+export { contractFromJson, extractContract } from "./contract/extract.ts";
 export { route } from "./contract/routeBuilder.ts";
 export {
 	isDefinedError,

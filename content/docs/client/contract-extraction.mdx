@@ -72,14 +72,19 @@ await writeFile("contract.json", JSON.stringify(extractContract(router)));
 ```
 
 ```ts client.ts
-import { createClient } from "@rest-rpc/core";
+import { contractFromJson, createClient } from "@rest-rpc/core";
 import type { router } from "./router";
-import contract from "./contract.json";
+import json from "./contract.json";
 
-export const client = createClient(contract as unknown as typeof router, {
+export const client = createClient(contractFromJson<typeof router>(json), {
 	origin: "http://localhost:3000",
 });
 ```
+
+A JSON import is typed by its values, or not at all, so `contractFromJson()`
+types it as the route tree it was extracted from, and throws when the file
+doesn't have the shape of an extracted contract. A macro returns the contract
+with its type, so only this setup needs the type import of the router.
 
 ## Limitations
 
