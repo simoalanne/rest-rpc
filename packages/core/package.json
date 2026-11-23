@@ -1,6 +1,6 @@
 {
 	"name": "@rest-rpc/core",
-	"version": "0.6.0",
+	"version": "0.7.0",
 	"description": "Core rest-rpc contract, fetch client, schema, and OpenAPI utilities.",
 	"keywords": [
 		"api-contract",
