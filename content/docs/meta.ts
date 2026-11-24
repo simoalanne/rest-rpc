@@ -14,6 +14,7 @@ export default defineMeta({
 		"server",
 		"client",
 		"openapi",
+		"mcp-tools",
 		"api-reference",
 	],
 });

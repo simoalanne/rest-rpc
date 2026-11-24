@@ -8,8 +8,10 @@ import {
 	createRouteHandlers,
 	createApp,
 	createCatchAllHandler,
+	createToolsFromRoutes,
 	implement,
 	interceptor,
+	mergeTools,
 	raw,
 	route,
 	routeError,
@@ -156,6 +158,8 @@ export const nodeApp = node.createApp(router, {
 });
 export const nodeRouteHandlers = node.createRouteHandlers(router);
 export const nodeCatchAllHandler = node.createCatchAllHandler(router);
+export const toolsFromRoutes = createToolsFromRoutes(router);
+export const mergedTools = mergeTools(toolsFromRoutes);
 export const extractedContract = extractContract(router);
 export const serverClient = createClient(extractedContract, {
 	origin: "http://localhost",

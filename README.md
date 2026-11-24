@@ -42,6 +42,7 @@ re-exports what it needs from `@rest-rpc/core`. Client code imports
 - [Contract-first](#contract-first)
 - [Local Calls](#local-calls)
 - [OpenAPI](#openapi)
+- [MCP Tools](#mcp-tools)
 - [Type Helpers](#type-helpers)
 
 ## Hello World
@@ -781,6 +782,72 @@ const document = createOpenApiDocument(router, {
 	info: { title: "Blog API", version: "1.0.0" },
 	schemaConverter: (schema, io) => z.toJSONSchema(schema as z.ZodType, { io }),
 });
+```
+
+## MCP Tools
+
+`createToolsFromRoutes()` turns routes into tools, to register on an MCP server
+or in an agent framework. `mergeTools()` merges them into two tools for an API
+with many routes.
+
+See [MCP Tools](https://rest-rpc.vercel.app/docs/mcp-tools)
+
+```ts
+import {
+	createMcpHandler,
+	fromJsonSchema,
+	McpServer,
+} from "@modelcontextprotocol/server";
+import { createApp, createToolsFromRoutes, route } from "@rest-rpc/server";
+import * as z from "zod";
+
+const post = z.object({ id: z.string(), title: z.string(), body: z.string() });
+const posts = [{ id: "1", title: "Hello", body: "First post" }];
+
+const router = {
+	posts: {
+		search: route
+			.get("/posts/search")
+			.query(z.object({ text: z.string().describe("Words to find in posts") }))
+			.response(z.object({ posts: z.array(post) }))
+			.openAPI({ summary: "Search posts by their title and body" })
+			.handler(({ query }) => ({
+				posts: posts.filter(({ title, body }) =>
+					`${title} ${body}`.includes(query.text),
+				),
+			})),
+	},
+};
+
+const tools = createToolsFromRoutes(router, {
+	schemaConverter: (schema, io) => z.toJSONSchema(schema as z.ZodType, { io }),
+});
+
+const mcp = createMcpHandler(() => {
+	const server = new McpServer({ name: "blog", version: "1.0.0" });
+	for (const { definition, call } of tools) {
+		const { name, inputSchema, outputSchema, ...config } = definition;
+		server.registerTool(
+			name,
+			{
+				...config,
+				inputSchema: fromJsonSchema(inputSchema),
+				...(outputSchema && { outputSchema: fromJsonSchema(outputSchema) }),
+			},
+			(args) => call(args),
+		);
+	}
+	return server;
+});
+
+const app = createApp(router);
+
+export default {
+	fetch: (request: Request) =>
+		new URL(request.url).pathname === "/mcp"
+			? mcp.fetch(request)
+			: app.fetch(request),
+};
 ```
 
 ## Type Helpers

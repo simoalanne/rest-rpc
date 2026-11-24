@@ -76,6 +76,19 @@ export type CreateOpenApiDocumentOptions = Partial<
 	transformOperation?: (context: OperationTransformContext) => OpenApiOperation;
 };
 
+// A converted schema is embedded in the document, whose dialect is
+// `jsonSchemaDialect`, so its own `$schema` is left out.
+const withoutSchemaKeyword = (
+	converter: SchemaConverter | undefined,
+): SchemaConverter | undefined =>
+	converter &&
+	((schema, mode) => {
+		const converted = converter(schema, mode);
+		if (!converted) return converted;
+		const { $schema: _, ...rest } = converted;
+		return rest;
+	});
+
 /**
  * Generates an OpenAPI document object from HTTP routes in a contract.
  *
@@ -99,11 +112,19 @@ export function createOpenApiDocument(
 		paths: {},
 	};
 
+	const operationOptions = {
+		...options,
+		schemaConverter: withoutSchemaKeyword(options.schemaConverter),
+	};
 	for (const { route, path: routePath } of contractRouteEntries(contract)) {
 		const path = toOpenApiPath(route.path);
 		const method = route.method.toLowerCase() as keyof OpenApiPathItem;
 		document.paths[path] ??= {};
-		document.paths[path][method] = createOperation(route, options, routePath);
+		document.paths[path][method] = createOperation(
+			route,
+			operationOptions,
+			routePath,
+		);
 	}
 
 	return document;

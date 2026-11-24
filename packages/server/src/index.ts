@@ -138,3 +138,14 @@ export type {
 	SseFormat,
 	SseResponse,
 } from "@rest-rpc/core";
+export {
+	createToolsFromRoutes,
+	type AgentTool,
+	type CreateToolsFromRoutesOptions,
+	type JsonSchema,
+	type ToolAnnotations,
+	type ToolCallOptions,
+	type ToolDefinition,
+	type ToolResult,
+} from "./tools/toolsFromRoutes.ts";
+export { mergeTools } from "./tools/mergeTools.ts";
