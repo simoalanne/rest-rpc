@@ -8,7 +8,7 @@ import {
 import type { MaybePromise } from "@rest-rpc/core/utils";
 import type { HttpRouteResult } from "./handleHttpRoute.ts";
 import { mapMaybePromise } from "./maybePromise.ts";
-import type { ErrorResponse } from "./resolveRouteError.ts";
+import type { ErrorResponse } from "./asRouteError.ts";
 
 type OutgoingContentType = { readonly "content-type": string };
 

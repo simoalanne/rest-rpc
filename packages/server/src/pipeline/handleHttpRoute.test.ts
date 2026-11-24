@@ -78,6 +78,35 @@ describe("route pipeline", () => {
 		});
 	});
 
+	it("sends the output of an error's data schema, and an internal error for invalid data", async () => {
+		const Gone = routeError("GONE", {
+			status: 410,
+			data: type((id: number) => ({ id: String(id) })),
+		});
+		const valid = route
+			.get("/")
+			.error(Gone)
+			.handler(({ errors }): string => {
+				throw errors.GONE({ data: 1 });
+			});
+		const response = await send(valid);
+		expect(response.status).toBe(410);
+		expect(await response.json()).toMatchObject({ data: { id: "1" } });
+
+		const Invalid = routeError("INVALID", { status: 410, data: rejected });
+		const invalid = route
+			.get("/")
+			.error(Invalid)
+			.handler(({ errors }): string => {
+				throw errors.INVALID({ data: 1 });
+			});
+		const failed = await send(invalid);
+		expect(failed.status).toBe(500);
+		expect(await failed.json()).toMatchObject({
+			code: "INTERNAL_SERVER_ERROR",
+		});
+	});
+
 	it("rejects invalid requests without invoking the handler", async () => {
 		const handler = vi.fn(() => "ok");
 		const response = await send(

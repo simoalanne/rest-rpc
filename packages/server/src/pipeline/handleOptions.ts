@@ -33,7 +33,8 @@ export type CreateRouteHandlersOptions = {
 	 *
 	 * @remarks Do not disable response validation if you are using schemas that
 	 * transform or coerce values, as those transformations will not be applied to
-	 * the response body. See {@link https://rest-rpc.vercel.app/docs/http-behavior/validation#disabling-validation}.
+	 * the response body. Errors are validated when they're created, so their
+	 * `data` and headers are validated either way. See {@link https://rest-rpc.vercel.app/docs/http-behavior/validation#disabling-validation}.
 	 *
 	 * @default false
 	 */

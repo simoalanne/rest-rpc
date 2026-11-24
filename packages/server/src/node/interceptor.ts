@@ -1,6 +1,6 @@
 import type { InterceptedRoute } from "@rest-rpc/core";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { asRouteError } from "../pipeline/resolveRouteError.ts";
+import { asRouteError } from "../pipeline/asRouteError.ts";
 import { serializeRouteErrorParts } from "../pipeline/serializeHttpRouteResult.ts";
 import { writeNodeResponse } from "./response.ts";
 

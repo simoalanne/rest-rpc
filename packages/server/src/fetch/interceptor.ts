@@ -1,6 +1,6 @@
 import type { InterceptedRoute } from "@rest-rpc/core";
 import { normalizeMediaType } from "@rest-rpc/core/codecs";
-import { asRouteError } from "../pipeline/resolveRouteError.ts";
+import { asRouteError } from "../pipeline/asRouteError.ts";
 import { serializeRouteErrorParts } from "../pipeline/serializeHttpRouteResult.ts";
 import { toFetchResponse } from "./response.ts";
 

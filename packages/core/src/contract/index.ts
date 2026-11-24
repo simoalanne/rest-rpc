@@ -31,6 +31,7 @@ export {
 	type RouteBuilderKind,
 } from "./routeBuilder.ts";
 export {
+	InternalServerError,
 	markDefined,
 	RouteError,
 	routeError,

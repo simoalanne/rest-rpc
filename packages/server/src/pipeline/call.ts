@@ -17,7 +17,6 @@ import {
 	type ImplementedRoute,
 } from "../routing/match.ts";
 import { executeRoute, type RouteResult } from "./handleHttpRoute.ts";
-import { resolveRouteError } from "./resolveRouteError.ts";
 import type { RequestSegments } from "./validation.ts";
 import { toSseEvent } from "./sse.ts";
 
@@ -61,17 +60,15 @@ type CallResult<TRoute extends ImplementedRoute> = TRoute extends unknown
 	? ClientPromise<InferClientResponse<TRoute>, InferClientError<TRoute> | Error>
 	: never;
 
-// Mirrors the fetch client: a new error is received with what would be sent,
-// marked as defined when the route defines its code. Errors sent as thrown,
-// such as validation failures, are received as is.
-const toClientError = async (route: RouteDefinition, error: RouteError) => {
-	const { error: observed, response } = await resolveRouteError(
-		route,
-		error,
-		false,
-	);
-	if (response === observed) return observed;
-	const { code, message, status, data, headers, cookies } = response;
+// Mirrors the fetch client: an error the route defines is received as a new,
+// defined error with what is sent, and other errors as they are.
+const toClientError = (route: RouteDefinition, error: RouteError) => {
+	// Server routes keep their error classes, which contracts serialize as data.
+	const definition = route.errors?.[error.code] as
+		| (abstract new (...args: never[]) => RouteError)
+		| undefined;
+	if (!definition || !(error instanceof definition)) return error;
+	const { code, message, status, data, headers, cookies } = error;
 	return markDefined(
 		new RouteError(code, { message, status, data, headers, cookies }),
 	);
@@ -101,7 +98,7 @@ const callRoute = async (
 		});
 	} catch (error) {
 		throw error instanceof RouteError
-			? await toClientError(implementation.route, error)
+			? toClientError(implementation.route, error)
 			: error;
 	}
 	// A returned `Response` is received as the fetch client receives it.

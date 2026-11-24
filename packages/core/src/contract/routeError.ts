@@ -180,9 +180,9 @@ export type RouteErrorClass<
 		...args: ConstructArgs<TDefinition>
 	): RouteError<
 		TCode,
-		ErrorSchemaValue<TDefinition, "data", "input", undefined>,
+		ErrorSchemaValue<TDefinition, "data", "output", undefined>,
 		TDefinition["status"],
-		ErrorSchemaValue<TDefinition, "headers", "input", Record<string, unknown>>
+		ErrorSchemaValue<TDefinition, "headers", "output", Record<string, unknown>>
 	>;
 	readonly code: TCode;
 } & TDefinition;
@@ -214,9 +214,10 @@ export type RouteErrorClassFor<
  *
  * @remarks Returns a subclass of `RouteError`. Construct it with an options
  * object of `data`, `headers`, `cookies`, `message` and `cause`. `data` and `headers`
- * are required when their schemas are defined. The route's definition decides
- * the response, so throwing an error the executing route does not define is
- * a programmer error.
+ * are required when their schemas are defined, and the constructor validates
+ * them, so the error holds the schemas' output and is sent as it is. Invalid
+ * values throw an `INTERNAL_SERVER_ERROR` instead, with the issues in its
+ * `cause`. The schemas must be synchronous.
  *
  * @example
  * ```ts
@@ -242,6 +243,26 @@ export function routeError<
 		throw new Error(`Error status "${status}" must be from 400 to 599.`);
 	}
 
+	const validate = (
+		schema: StandardSchemaV1 | undefined,
+		value: unknown,
+		location: "data" | "headers",
+	) => {
+		if (!schema) return value;
+		const result = schema["~standard"].validate(value);
+		if (result instanceof Promise) {
+			throw new TypeError(
+				`The ${location} schema of error "${code}" is asynchronous. Error schemas must be synchronous.`,
+			);
+		}
+		if (result.issues) {
+			throw new InternalServerError({
+				cause: { location, issues: result.issues },
+			});
+		}
+		return result.value;
+	};
+
 	return class extends RouteError {
 		static readonly code = code;
 		static readonly status = status;
@@ -255,7 +276,27 @@ export function routeError<
 				...errorOptions,
 				status,
 				message: errorOptions.message ?? message,
+				data: validate(data, errorOptions.data, "data"),
+				// A headers schema is the contract for the error's headers, so its
+				// output is sent even when no headers are passed.
+				headers: (headers
+					? validate(headers, errorOptions.headers ?? {}, "headers")
+					: errorOptions.headers) as Record<string, unknown> | undefined,
 			});
 		}
 	} as never;
 }
+
+/**
+ * The built-in error sent when a response fails validation, and by
+ * `createApp` for other thrown errors. Its `cause` holds the reason and is
+ * never sent.
+ *
+ * @remarks Define it with `.error()` to make clients recognize it.
+ *
+ * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/errors#built-in-errors}
+ */
+export const InternalServerError = routeError("INTERNAL_SERVER_ERROR", {
+	status: 500,
+	message: "Internal server error.",
+});

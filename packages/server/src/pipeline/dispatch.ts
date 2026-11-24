@@ -1,4 +1,4 @@
-import { RouteError, type InterceptedRoute } from "@rest-rpc/core";
+import type { InterceptedRoute } from "@rest-rpc/core";
 import {
 	createBodyCodecRegistry,
 	normalizeMediaType,
@@ -35,7 +35,6 @@ import {
 } from "./handleHttpRoute.ts";
 import { UnsupportedMediaType } from "./errors.ts";
 import { acceptsRequestMediaType } from "./requestContentType.ts";
-import { resolveRouteError, toSentError } from "./resolveRouteError.ts";
 import type { SerializedHttpResponse } from "./serializeHttpRouteResult.ts";
 import { prepareStaticResponse } from "./staticResponse.ts";
 import { parseQuery, validateRequestHeaders } from "./validation.ts";
@@ -75,7 +74,7 @@ export type ResponseWriter<TTarget, TOut> = {
 
 /**
  * Runs a route for a request routed to it and responds with the writer. Route
- * errors reject with the error as it is sent, so interceptors observe it.
+ * errors reject as thrown, for interceptors and the app to send.
  */
 export type Dispatch<TRequest, TTarget, TOut> = (
 	implementation: RuntimeImplementation,
@@ -99,18 +98,6 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 	writer: ResponseWriter<TTarget, TOut>,
 ): Dispatch<TRequest, TTarget, TOut> => {
 	const { disableRequestValidation, disableResponseValidation, sse } = options;
-	const rejectWith = async (
-		implementation: RuntimeImplementation,
-		error: RouteError,
-	): Promise<never> => {
-		throw toSentError(
-			await resolveRouteError(
-				implementation.route,
-				error,
-				disableResponseValidation ?? false,
-			),
-		);
-	};
 
 	return async (
 		implementation,
@@ -149,25 +136,15 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 			let declared: unknown;
 			if (disableRequestValidation) declared = receivedMediaType || undefined;
 			else if (headers) {
-				try {
-					const validated = validateRequestHeaders(
-						implementation.route,
-						headers,
-					);
-					headers = (
-						validated instanceof Promise ? await validated : validated
-					) as Record<string, string | undefined>;
-				} catch (error) {
-					if (error instanceof RouteError) {
-						return rejectWith(implementation, error);
-					}
-					throw error;
-				}
+				const validated = validateRequestHeaders(implementation.route, headers);
+				headers = (
+					validated instanceof Promise ? await validated : validated
+				) as Record<string, string | undefined>;
 				headersValidated = true;
 				declared = headers["content-type"];
 			}
 			if (!acceptsRequestMediaType(declared, receivedMediaType)) {
-				return rejectWith(implementation, new UnsupportedMediaType());
+				throw new UnsupportedMediaType();
 			}
 
 			if (handleOptions?.body !== undefined) {
@@ -179,36 +156,26 @@ const createDispatch = <TRequest extends object, TTarget, TOut>(
 					receivedHeaders ?? reader.headers(request),
 					codecs,
 				);
-				if (deserialized.rejection) {
-					return rejectWith(implementation, deserialized.rejection);
-				}
+				if (deserialized.rejection) throw deserialized.rejection;
 				body = deserialized.body;
 			}
 		}
 
-		let result: RouteResult | Response;
-		try {
-			result = await executeRoute(implementation, {
-				request: {
-					params,
-					query: schemas?.query?.length
-						? parseQuery(readRequestSearch(reader.url(request)))
-						: undefined,
-					headers,
-					body,
-				},
-				signal,
-				headersValidated,
-				context: handleOptions?.context,
-				disableRequestValidation,
-				disableResponseValidation,
-			});
-		} catch (error) {
-			if (error instanceof RouteError) {
-				return rejectWith(implementation, error);
-			}
-			throw error;
-		}
+		const result: RouteResult | Response = await executeRoute(implementation, {
+			request: {
+				params,
+				query: schemas?.query?.length
+					? parseQuery(readRequestSearch(reader.url(request)))
+					: undefined,
+				headers,
+				body,
+			},
+			signal,
+			headersValidated,
+			context: handleOptions?.context,
+			disableRequestValidation,
+			disableResponseValidation,
+		});
 
 		return writer.result(toHttpRouteResult(result, sse), target, codecs);
 	};

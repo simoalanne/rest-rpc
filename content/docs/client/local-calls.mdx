@@ -75,11 +75,11 @@ context.
 A local call rejects like a Fetch client call, so
 [`safe()`](/docs/client/fetch-client#with-safe) works with it too:
 
-- A thrown error the route defines rejects with that error as defined, after
-  its `data` is validated.
+- An error of a class the route defines rejects as defined, with the
+  validated `data` it was created with.
 - A defined error whose `data` fails validation rejects with the
-  `INTERNAL_SERVER_ERROR` that would be sent.
-- A `RouteError` with a code the route does not define, including
-  [built-in errors](/docs/http-behavior/errors#built-in-errors), rejects as
-  thrown.
+  `INTERNAL_SERVER_ERROR` that creating it throws.
+- Any other `RouteError`, including
+  [built-in errors](/docs/http-behavior/errors#built-in-errors) and one with a
+  code the route defines but not its class, rejects as thrown.
 - Other errors thrown by the handler reject unchanged.

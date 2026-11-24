@@ -33,13 +33,17 @@ throw errors.POST_NOT_FOUND({
 });
 ```
 
-The definition decides what's sent: its status, and `data` and headers
-validated by its schemas. When they fail validation, an `INTERNAL_SERVER_ERROR`
-is sent instead.
+Creating the error validates `data` and headers with the definition's
+schemas, so the error holds their output and is sent as it is, with the
+definition's status. When they fail validation, creating it throws an
+`INTERNAL_SERVER_ERROR` instead, with the issues in its `cause`. Error schemas
+must be synchronous, and `disableResponseValidation` doesn't apply to them.
 
-An error whose code the route doesn't define is sent as thrown. Clients get
-an untyped `RouteError`, with `code`, `status` and `data` still readable,
-which suits errors that apply across routes:
+A route sends every `RouteError` as it is, so only the definition's own class
+is a defined error. A `RouteError` built with the same code is sent with its
+own status and data, and clients get an untyped `RouteError`, with `code`,
+`status` and `data` still readable. That suits errors that apply across
+routes:
 
 ```ts
 throw new RouteError("RATE_LIMITED", { status: 429 });

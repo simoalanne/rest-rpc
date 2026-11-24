@@ -1,4 +1,8 @@
 import { routeError, type } from "@rest-rpc/core";
+import { InternalServerError } from "@rest-rpc/core/contract";
+
+// Defined in core, since error constructors throw it for invalid data.
+export { InternalServerError };
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 
 /**
@@ -62,20 +66,6 @@ export const MalformedRequestBody = routeError("MALFORMED_REQUEST_BODY", {
 export const UnsupportedMediaType = routeError("UNSUPPORTED_MEDIA_TYPE", {
 	status: 415,
 	message: "Unsupported request body content type.",
-});
-
-/**
- * The built-in error sent when a response fails validation, and by
- * `createApp` for other thrown errors. Its `cause` holds the reason and is
- * never sent.
- *
- * @remarks Define it with `.error()` to make clients recognize it.
- *
- * @see {@link https://rest-rpc.vercel.app/docs/http-behavior/errors#built-in-errors}
- */
-export const InternalServerError = routeError("INTERNAL_SERVER_ERROR", {
-	status: 500,
-	message: "Internal server error.",
 });
 
 /**

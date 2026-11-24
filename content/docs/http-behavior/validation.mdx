@@ -83,6 +83,9 @@ createApp(
 
 Coercions, transforms and defaults don't apply, a header default such as a
 `content-type` included, and a route with a body accepts any content type.
+[Errors](/docs/http-behavior/errors#defined-and-undefined-errors) are
+validated when they're created, so their `data` and headers are validated
+either way.
 Disable validation only with schemas that don't change values, or use
 `type<T>()` on the routes that need it.
 

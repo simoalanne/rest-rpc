@@ -24,10 +24,17 @@ export function type<TInput, TOutput = TInput>(
 		"~standard": {
 			version: 1,
 			vendor: UNCHECKED_SCHEMA_VENDOR,
+			// Synchronous unless `map` returns a promise, so it can be an error's
+			// schema, which must be synchronous.
 			validate:
 				map === undefined
 					? (value) => ({ value: value as TOutput })
-					: async (value) => ({ value: await map(value as TInput) }),
+					: (value) => {
+							const mapped = map(value as TInput);
+							return mapped instanceof Promise
+								? mapped.then((output) => ({ value: output }))
+								: { value: mapped };
+						},
 		},
 	};
 }
