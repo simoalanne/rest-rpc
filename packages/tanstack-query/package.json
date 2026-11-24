@@ -1,18 +1,17 @@
 {
 	"name": "@rest-rpc/tanstack-query",
 	"version": "0.7.0",
-	"description": "TanStack Query utils for rest-rpc clients",
+	"description": "TanStack Query options and query keys for rest-rpc clients.",
 	"keywords": [
-		"api-contract",
 		"contract-first",
 		"data-fetching",
+		"end-to-end-type-safety",
 		"query-client",
 		"query-keys",
 		"query-options",
 		"react-query",
 		"rest",
 		"rest-rpc",
-		"rpc",
 		"tanstack-query",
 		"type-safe-api",
 		"typescript"

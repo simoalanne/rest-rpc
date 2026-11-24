@@ -1,9 +1,9 @@
 # rest-rpc
 
-REST APIs with RPC-like ergonomics: an HTTP route builder with sensible
-defaults, and typed clients that call the routes like ordinary functions.
-Schemas are any [Standard Schema](https://standardschema.dev) (Zod, Valibot,
-ArkType). Below are the common patterns, each a complete example. See the
+Type-safe HTTP APIs, for developers and agents. Write a route once with the
+route builder, and the same route is a validated HTTP endpoint, a typed fetch
+client, TanStack Query options, an agent tool, and an in-process call for
+tests. Below are the common patterns, each a complete example. See the
 [documentation](https://rest-rpc.vercel.app/docs/quickstart) for the rest.
 For agents, [llms.txt](https://rest-rpc.vercel.app/llms.txt) lists every
 docs page and the ways to fetch them.
@@ -97,9 +97,10 @@ export const router = {
 
 ## Request Validation
 
-Params, query, headers and body are validated before the handler runs, and an
-invalid request gets a `400`. Params, query and headers arrive as strings, so
-their schemas coerce.
+Params, query, headers and body are validated before the handler runs, with
+any [Standard Schema](https://standardschema.dev) such as Zod, Valibot or
+ArkType, and an invalid request gets a `400`. Params, query and headers arrive
+as strings, so their schemas coerce.
 
 See [Validation](https://rest-rpc.vercel.app/docs/http-behavior/validation)
 
