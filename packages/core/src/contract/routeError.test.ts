@@ -91,13 +91,7 @@ describe("routeError", () => {
 
 	it("rejects asynchronous schemas", () => {
 		const Async = routeError("ASYNC", {
-			data: {
-				"~standard": {
-					version: 1,
-					vendor: "test",
-					validate: async (value) => ({ value }),
-				},
-			},
+			data: type(async (value: number) => value),
 		});
 		expect(() => new Async({ data: 1 })).toThrow();
 	});
