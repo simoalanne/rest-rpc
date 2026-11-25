@@ -143,6 +143,7 @@ export {
 	type AgentTool,
 	type CreateToolsFromRoutesOptions,
 	type JsonSchema,
+	type JsonValue,
 	type ToolAnnotations,
 	type ToolCallOptions,
 	type ToolDefinition,

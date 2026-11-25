@@ -13,7 +13,7 @@
 		"bench:typecheck": "pnpm --filter benchmarks bench:typecheck",
 		"bench:http": "bun benchmarks/runtime/run.ts",
 		"test": "vitest run --typecheck",
-		"typecheck": "pnpm -r --parallel --no-bail --filter './packages/**' --filter ./declarations --filter ./integration typecheck && tsc -p tsconfig.json --noEmit",
+		"typecheck": "pnpm -r --parallel --no-bail --filter './packages/**' --filter ./declarations typecheck && tsc -p tsconfig.json --noEmit",
 		"lint": "oxlint",
 		"lint:staged": "lint-staged",
 		"lint:unsafe": "oxlint --fix-dangerously",

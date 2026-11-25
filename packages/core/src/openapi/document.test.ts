@@ -37,26 +37,6 @@ describe("document", () => {
 			paths: {},
 		});
 	});
-	it("leaves `$schema` out of converted schemas", () => {
-		const schema = type<{ title: string }>();
-		const document = createOpenApiDocument(
-			{
-				create: route
-					.post("/posts")
-					.query(schema)
-					.body(schema)
-					.response(schema),
-			},
-			{
-				schemaConverter: () => ({
-					$schema: "https://json-schema.org/draft/2020-12/schema",
-					type: "object",
-					properties: { title: { type: "string" } },
-				}),
-			},
-		);
-		expect(JSON.stringify(document)).not.toContain("$schema");
-	});
 	it("documents routes without defined responses with a default placeholder", () => {
 		const inferred = {
 			"~restrpc": {

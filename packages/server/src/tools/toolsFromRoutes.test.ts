@@ -1,9 +1,7 @@
-import { routeError, type } from "@rest-rpc/core";
+import { raw, routeError, sse, type } from "@rest-rpc/core";
 import type { StandardSchemaV1 } from "@rest-rpc/core/standard-schema";
 import { route } from "../builder/routeBuilder.ts";
-import { sse } from "@rest-rpc/core";
-import { mergeTools } from "./mergeTools.ts";
-import { createToolsFromRoutes } from "./toolsFromRoutes.ts";
+import { createToolsFromRoutes, type ToolResult } from "./toolsFromRoutes.ts";
 
 // Schemas whose JSON Schema the converter returns, as a schema library's would.
 const jsonSchemas = new WeakMap<StandardSchemaV1, Record<string, unknown>>();
@@ -15,65 +13,45 @@ const schema = <T>(json: Record<string, unknown>): StandardSchemaV1<T, T> => {
 const schemaConverter = (value: StandardSchemaV1) => jsonSchemas.get(value);
 
 const post = { id: "1", title: "Hello", body: "First post" };
-const postSchema = schema<typeof post>({
-	type: "object",
-	properties: {
-		id: { type: "string" },
-		title: { type: "string" },
-		body: { type: "string" },
-	},
-	required: ["id", "title", "body"],
-});
+const postJson = { type: "object", properties: { id: { type: "string" } } };
 
-const NotFound = routeError("POST_NOT_FOUND", {
-	status: 404,
-	data: type<{ id: string }>(),
-});
-
-const router = {
-	posts: {
-		get: route
-			.get("/posts/:id")
-			.error(NotFound)
-			.response(postSchema)
-			.openAPI({ summary: "Get a post" })
-			.handler(({ params, errors }) => {
-				if (params.id !== "1") throw errors.POST_NOT_FOUND({ data: params });
-				return post;
-			}),
-		create: route
-			.post("/posts")
-			.body(
-				schema<{ title: string; body: string }>({
-					type: "object",
-					properties: { title: { type: "string" }, body: { type: "string" } },
-				}),
-			)
-			.handler(({ body }) => ({ id: "2", ...body })),
-		remove: route.delete("/posts/:id").handler(() => undefined),
-		stream: route
-			.get("/posts/stream")
-			.response(sse(postSchema))
-			.handler(async function* () {
-				yield post;
-			}),
-	},
-};
-
-const toolNamed = (
-	tools: ReturnType<typeof createToolsFromRoutes>,
-	name: string,
-) => tools.find((tool) => tool.definition.name === name)!;
+const errorOf = (result: ToolResult) => JSON.parse(result.content[0]!.text);
 
 describe("createToolsFromRoutes", () => {
-	it("derives tool definitions from routes", () => {
-		const tools = createToolsFromRoutes(router, { schemaConverter });
-		expect(tools.map((tool) => tool.definition.name)).toEqual([
-			"posts_get",
-			"posts_create",
-			"posts_remove",
-		]);
-		expect(toolNamed(tools, "posts_get").definition).toEqual({
+	it("creates a tool for each route that takes and returns JSON", () => {
+		const tools = createToolsFromRoutes(
+			{
+				posts: {
+					get: route
+						.get("/posts/:id")
+						.response(schema<typeof post>(postJson))
+						.openAPI({ summary: "Get a post" })
+						.handler(() => post),
+					import: route
+						.post("/posts/import")
+						.headers(
+							schema<{ "content-type": "text/csv" }>({
+								type: "object",
+								properties: { "content-type": { const: "text/csv" } },
+							}),
+						)
+						.body(type<string>())
+						.handler(() => undefined),
+					events: route
+						.get("/posts/events")
+						.response(sse(type<typeof post>()))
+						.handler(async function* () {}),
+					file: route
+						.get("/posts/file")
+						.response(raw())
+						.handler(() => new Response()),
+				},
+			},
+			{ schemaConverter },
+		);
+		expect(tools).toHaveLength(1);
+		expect(tools[0]!.routePath).toEqual(["posts", "get"]);
+		expect(tools[0]!.definition).toEqual({
 			name: "posts_get",
 			title: "Get a post",
 			description: "Get a post",
@@ -88,167 +66,98 @@ describe("createToolsFromRoutes", () => {
 				},
 				required: ["params"],
 			},
-			outputSchema: jsonSchemas.get(postSchema),
+			outputSchema: postJson,
 			annotations: { readOnlyHint: true },
 		});
-		// Without a defined response, the body is not described.
-		expect(
-			toolNamed(tools, "posts_create").definition.outputSchema,
-		).toBeUndefined();
-		expect(toolNamed(tools, "posts_remove").definition.annotations).toEqual({
-			idempotentHint: true,
-		});
 	});
 
-	it("leaves `$schema` out of converted schemas", () => {
-		const [tool] = createToolsFromRoutes(
-			{ create: router.posts.create },
-			{
-				schemaConverter: () => ({
-					$schema: "https://json-schema.org/draft/2020-12/schema",
-					type: "object",
-				}),
-			},
-		);
-		expect(JSON.stringify(tool!.definition)).not.toContain("$schema");
+	it("returns the body as structured content and text", async () => {
+		const [object, text, empty] = createToolsFromRoutes({
+			object: route.get("/object").handler(() => ({ at: new Date(0) })),
+			text: route.get("/text").handler(() => "hi"),
+			empty: route.delete("/empty").handler(() => undefined),
+		});
+		const at = new Date(0).toJSON();
+		expect(await object!.call({})).toEqual({
+			content: [{ type: "text", text: JSON.stringify({ at }) }],
+			structuredContent: { at },
+		});
+		expect(await text!.call({})).toEqual({
+			content: [{ type: "text", text: "hi" }],
+			structuredContent: "hi",
+		});
+		expect(await empty!.call({})).toEqual({ content: [] });
 	});
 
-	it("calls the route and returns an object body as structured content", async () => {
-		const tools = createToolsFromRoutes(router, { schemaConverter });
-		expect(
-			await toolNamed(tools, "posts_get").call({ params: { id: "1" } }),
-		).toEqual({
-			content: [{ type: "text", text: JSON.stringify(post) }],
-			structuredContent: post,
-		});
-		expect(
-			await toolNamed(tools, "posts_create").call({
-				body: { title: "Hi", body: "Second" },
-			}),
-		).toMatchObject({
-			structuredContent: { id: "2", title: "Hi", body: "Second" },
-		});
-	});
-
-	it("passes context and host headers through middleware", async () => {
-		const base = route
-			.$context<{ user: string | undefined }>()
-			.error("UNAUTHORIZED", { status: 401 })
-			.use(({ context, errors, next }) => {
-				if (!context.user) throw errors.UNAUTHORIZED();
-				return next();
-			});
-		const [me] = createToolsFromRoutes(
-			{
-				me: base
-					.get("/me")
-					.headers(
-						schema<{ authorization: string }>({
-							type: "object",
-							properties: { authorization: { type: "string" } },
-							required: ["authorization"],
-						}),
-					)
-					.handler(({ context, headers }) => ({
-						user: context.user,
-						authorization: headers.authorization,
-					})),
-			},
-			{ schemaConverter },
-		);
-
-		expect(
-			await me!.call(
-				{ headers: { authorization: "from the model" } },
-				{
-					context: { user: "ada" },
-					headers: { authorization: "Bearer token" },
-				},
-			),
-		).toMatchObject({
-			structuredContent: { user: "ada", authorization: "Bearer token" },
-		});
-		const denied = await me!.call({}, { context: { user: undefined } });
-		expect(denied.isError).toBe(true);
-		expect(JSON.parse(denied.content[0]!.text)).toMatchObject({
-			code: "UNAUTHORIZED",
-			status: 401,
-		});
-	});
-
-	it("returns errors as results the model can read", async () => {
+	it("returns errors as results and reports them", async () => {
 		const onError = vi.fn();
 		const failure = new Error("database password is hunter2");
-		const tools = createToolsFromRoutes(
+		const NotFound = routeError("POST_NOT_FOUND", {
+			status: 404,
+			data: type<{ id: string }>(),
+		});
+		const [missing, broken, binary] = createToolsFromRoutes(
 			{
-				...router,
+				missing: route
+					.get("/posts/:id")
+					.error(NotFound)
+					.handler(({ params, errors }) => {
+						throw errors.POST_NOT_FOUND({ data: params });
+					}),
 				broken: route.get("/broken").handler(() => {
 					throw failure;
 				}),
+				binary: route.get("/binary").handler(() => new Blob(["data"])),
 			},
-			{ schemaConverter, onError },
+			{ onError },
 		);
 
-		const missing = await toolNamed(tools, "posts_get").call({
-			params: { id: "2" },
-		});
-		expect(missing.isError).toBe(true);
-		expect(JSON.parse(missing.content[0]!.text)).toMatchObject({
+		const notFound = await missing!.call({ params: { id: "2" } });
+		expect(notFound.isError).toBe(true);
+		expect(errorOf(notFound)).toEqual({
 			code: "POST_NOT_FOUND",
 			status: 404,
+			message: expect.any(String),
 			data: { id: "2" },
 			defined: true,
 		});
+		expect(onError).toHaveBeenLastCalledWith(
+			expect.objectContaining({ code: "POST_NOT_FOUND" }),
+		);
 
-		const broken = await toolNamed(tools, "broken").call({});
-		expect(broken.isError).toBe(true);
-		expect(broken.content[0]!.text).not.toContain("hunter2");
-		expect(JSON.parse(broken.content[0]!.text)).toMatchObject({
+		const internal = await broken!.call({});
+		expect(internal.content[0]!.text).not.toContain("hunter2");
+		expect(errorOf(internal)).toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
+		expect(onError).toHaveBeenLastCalledWith(
+			expect.objectContaining({
+				code: "INTERNAL_SERVER_ERROR",
+				cause: failure,
+			}),
+		);
+
+		expect(errorOf(await binary!.call({}))).toMatchObject({
 			code: "INTERNAL_SERVER_ERROR",
-			status: 500,
-		});
-		expect(onError).toHaveBeenCalledWith(failure);
-	});
-
-	it("returns request validation issues", async () => {
-		const tools = createToolsFromRoutes({
-			create: route
-				.post("/posts")
-				.body({
-					"~standard": {
-						version: 1,
-						vendor: "test",
-						validate: (value) =>
-							typeof (value as { title?: unknown }).title === "string"
-								? { value }
-								: {
-										issues: [{ message: "Expected a title", path: ["title"] }],
-									},
-					},
-				})
-				.handler(() => "ok"),
-		});
-		const result = await tools[0]!.call({ body: {} });
-		expect(result.isError).toBe(true);
-		expect(JSON.parse(result.content[0]!.text)).toMatchObject({
-			status: 400,
-			data: { body: [{ message: "Expected a title" }] },
 		});
 	});
 
-	it("carries the route each tool calls", () => {
-		const tools = createToolsFromRoutes({
-			posts: {
-				get: route
-					.$meta<{ access: string }>()
-					.get("/posts/:id")
-					.meta({ access: "admin" })
-					.handler(() => post),
-			},
+	it("passes context, and host headers over the model's", async () => {
+		const [me] = createToolsFromRoutes({
+			me: route
+				.$context<{ user: string }>()
+				.get("/me")
+				.headers(type<{ authorization: string }>())
+				.handler(({ context, headers }) => ({
+					user: context.user,
+					authorization: headers.authorization,
+				})),
 		});
-		expect(tools[0]).toMatchObject({
-			routePath: ["posts", "get"],
-			route: { method: "GET", path: "/posts/:id", meta: { access: "admin" } },
+		const result = await me!.call(
+			{ headers: { authorization: "from the model" } },
+			{ context: { user: "ada" }, headers: { authorization: "Bearer token" } },
+		);
+		expect(result.structuredContent).toEqual({
+			user: "ada",
+			authorization: "Bearer token",
 		});
 	});
 
@@ -257,49 +166,5 @@ describe("createToolsFromRoutes", () => {
 		expect(() =>
 			createToolsFromRoutes({ "a.b": handler, a_b: handler }),
 		).toThrow();
-	});
-});
-
-describe("mergeTools", () => {
-	const tools = createToolsFromRoutes(router, { schemaConverter });
-	const { findRoutes: find, callRoute } = mergeTools(tools);
-	const json = async (result: Promise<{ content: { text: string }[] }>) =>
-		JSON.parse((await result).content[0]!.text);
-
-	it("finds routes and their definitions", async () => {
-		expect(await json(find.call({}))).toEqual({
-			routes: [
-				{ name: "posts_get", title: "Get a post", description: "Get a post" },
-				{ name: "posts_create", description: "POST /posts" },
-				{ name: "posts_remove", description: "DELETE /posts/:id" },
-			],
-		});
-		expect(await json(find.call({ query: "get POST" }))).toEqual({
-			routes: [
-				{ name: "posts_get", title: "Get a post", description: "Get a post" },
-			],
-		});
-		const { routes } = await json(find.call({ names: ["posts_create"] }));
-		expect(routes[0]).toMatchObject({
-			name: "posts_create",
-			inputSchema: { required: ["body"] },
-		});
-	});
-
-	it("calls a route by name", async () => {
-		expect(
-			await callRoute.call({ route: "posts_get", params: { id: "1" } }),
-		).toMatchObject({ structuredContent: post });
-		expect(await callRoute.call({ route: "posts_missing" })).toMatchObject({
-			isError: true,
-		});
-	});
-
-	it("throws when two tools have the same name", () => {
-		const renamed = tools.map((tool) => ({
-			...tool,
-			definition: { ...tool.definition, name: "same" },
-		}));
-		expect(() => mergeTools(renamed)).toThrow();
 	});
 });

@@ -25,18 +25,13 @@ agent framework, such as the [AI SDK](https://ai-sdk.dev), that runs agents in
 your own process.
 
 :::warning[JSON Only]
-Tool arguments and results are JSON. Routes that send or receive anything else
-are left out: routes with [Server-Sent Event](/docs/server-sent-events) or
-[raw](/docs/route-builder#raw-responses) responses, and routes with a body
-whose declared `content-type` doesn't include `application/json`. A handler of
-a route that is a tool must return a JSON value or a string. A binary or
-streamed body fails the call with an `INTERNAL_SERVER_ERROR`.
+Tool arguments and results are JSON. Routes whose definition declares anything else are left out when the tools are created.
+When the route doesn't define a response schema, returning a body that isn't JSON fails the call at runtime with an `INTERNAL_SERVER_ERROR`.
 :::
 
 ## Create Tools
 
-`createToolsFromRoutes()` creates a tool for each route, with the same
-`schemaConverter` as OpenAPI:
+`createToolsFromRoutes()` converts each compatible route into a tool.
 
 ```ts router.ts
 import { route } from "@rest-rpc/server";
@@ -73,7 +68,7 @@ export const tools = createToolsFromRoutes(router, {
 
 ## Tool Definitions
 
-Each tool is plain data shaped like an MCP tool of protocol revision 2025-11-25,
+Each tool is plain data shaped like an MCP tool of protocol revision 2026-07-28,
 with the route it calls:
 
 ```ts
@@ -88,13 +83,11 @@ type ToolFromRoute = {
 		description?: string;
 		/**
 		 * An object of the route's `params`, `query`, `headers` and `body`. Each is
-		 * the `schemaConverter` output in input mode without `$schema`, nested as
-		 * it is, so convert schemas to be self-contained, and an `allOf` of
-		 * stacked schemas. Models
-		 * fill arguments from it, so describe fields, such as with `.describe()`.
+		 * the `schemaConverter` output in input mode.
+		 * Models fill arguments from it, so describe fields, such as with `.describe()`.
 		 */
 		inputSchema: JsonSchema;
-		/** The body schema of the route's only defined response, when it's an object. */
+		/** The body schema of the route's only defined response. */
 		outputSchema?: JsonSchema;
 		/** `readOnlyHint` for `GET`, and `idempotentHint` for `PUT` and `DELETE`. */
 		annotations?: ToolAnnotations;
@@ -103,7 +96,10 @@ type ToolFromRoute = {
 	 * Runs the route as a local call with the arguments the model sends, such as
 	 * `{ query: { text: "hello" } }`, and resolves with an MCP `CallToolResult`.
 	 */
-	call: (args: unknown, options?: ToolCallOptions) => Promise<ToolResult>;
+	call: (
+		args: Record<string, unknown>,
+		options?: ToolCallOptions,
+	) => Promise<ToolResult>;
 	/** The route the tool calls, with its metadata. */
 	route: RouteDefinition;
 	/** The route's key path in the route tree, such as `["posts", "search"]`. */
@@ -116,7 +112,8 @@ type ToolFromRoute = {
 Register the tools on an SDK server. The SDK's `createMcpHandler()` creates a
 server per request and serves it statelessly as a Fetch handler, next to the
 app or in the framework's router. The SDK takes schemas as Standard Schemas, so
-`fromJsonSchema()` wraps the definition's JSON Schemas:
+`fromJsonSchema()` wraps the definition's JSON Schemas. An input schema is an
+object, so the arguments are typed as one:
 
 ```ts server.ts
 import {
@@ -136,7 +133,7 @@ const mcp = createMcpHandler(() => {
 			name,
 			{
 				...config,
-				inputSchema: fromJsonSchema(inputSchema),
+				inputSchema: fromJsonSchema<Record<string, unknown>>(inputSchema),
 				...(outputSchema && { outputSchema: fromJsonSchema(outputSchema) }),
 			},
 			(args, { mcpReq }) => call(args, { signal: mcpReq.signal }),
@@ -155,6 +152,10 @@ export default {
 };
 ```
 
+Protocol revisions before 2026-07-28 allow only an object as
+`structuredContent` and `outputSchema`, so for their clients, leave out other
+values.
+
 ## Use in an Agent Framework
 
 An agent running in your own process doesn't need MCP. Map the tools to the
@@ -169,10 +170,11 @@ const agentTools = Object.fromEntries(
 		definition.name,
 		tool({
 			description: definition.description,
-			inputSchema: jsonSchema(definition.inputSchema),
+			inputSchema: jsonSchema<Record<string, unknown>>(definition.inputSchema),
 			execute: async (args) => {
 				const result = await call(args);
-				return result.structuredContent ?? result.content;
+				if (result.isError) throw new Error(result.content[0]?.text);
+				return result.structuredContent;
 			},
 		}),
 	]),
@@ -251,9 +253,9 @@ const searchRoutes: AgentTool = {
 		inputSchema: { type: "object", properties: { tag: { type: "string" } } },
 	},
 	call: async (args) => {
-		const { tag } = args as { tag?: string };
+		const { tag } = args;
 		const routes = tools
-			.filter(({ route }) => route.openApi?.tags?.includes(tag ?? ""))
+			.filter(({ route }) => route.openApi?.tags?.includes(String(tag)))
 			.map(({ definition }) => definition);
 		return {
 			content: [{ type: "text", text: JSON.stringify({ routes }) }],
@@ -291,25 +293,18 @@ const mcp = createMcpHandler(({ requestInfo }) => {
 
 ## Results and Errors
 
-`call()` resolves with a result shaped like an MCP `CallToolResult`, and
-doesn't reject. The result is the response body only. Its status, headers and
-cookies are left out, so a route whose result an agent needs, such as the ID of
-a created post, returns it in the body:
+`call()` resolves with an MCP `CallToolResult`, and doesn't reject. The result
+is the response body. Its status, headers and cookies are left out, so a route
+whose result an agent needs, such as the ID of a created post, should return it
+in the body:
 
-| Route outcome     | Result                                                            |
-| ----------------- | ----------------------------------------------------------------- |
-| An object body    | The JSON as text `content`, and the object as `structuredContent` |
-| Another JSON body | The JSON as text `content`                                        |
-| A string body     | The string as text `content`                                      |
-| No body           | Empty `content`                                                   |
-| A `RouteError`    | `isError`, with the error as JSON text `content`                  |
-| Any other error   | `isError`, with `INTERNAL_SERVER_ERROR` and no details            |
-
-A route without a defined response returns the body its handler returns, as
-over HTTP, without an `outputSchema` or response validation. An object body is
-still `structuredContent`, which MCP allows without a schema. A route with
-several defined responses has no `outputSchema` either, since its body depends
-on the status.
+| Route outcome   | Result                                                       |
+| --------------- | ------------------------------------------------------------ |
+| A body          | The body as `structuredContent`, and as JSON text `content`  |
+| A string body   | The string as `structuredContent`, and as it is in `content` |
+| No body         | Empty `content`                                              |
+| A `RouteError`  | `isError`, with the error as JSON text `content`             |
+| Any other error | `isError`, with `INTERNAL_SERVER_ERROR` and no details       |
 
 An error's JSON is the response an HTTP client receives, with its status and
 whether the route defines it, so the model can act on it, such as fixing its
@@ -330,8 +325,8 @@ arguments after a request validation error:
 ```ts
 type CreateToolsFromRoutesOptions = {
 	/**
-	 * Converts Standard Schema definitions into JSON Schema, the same converter
-	 * as OpenAPI's. Without it, or when it returns `undefined`, a segment
+	 * Converts Standard Schema definitions into JSON Schema.
+	 * Without it, or when it returns `undefined`, a segment
 	 * accepts any value.
 	 */
 	schemaConverter?: (
@@ -339,9 +334,11 @@ type CreateToolsFromRoutesOptions = {
 		mode: "input" | "output",
 	) => Record<string, unknown> | undefined;
 	/**
-	 * Called with errors sent to the model as `INTERNAL_SERVER_ERROR`, such as
-	 * errors thrown by handlers, whose details the model does not receive.
+	 * Called with each error a tool call returns, as the `RouteError` the model
+	 * receives. An error that isn't a `RouteError` is sent as
+	 * `INTERNAL_SERVER_ERROR`, with the thrown value as its `cause`, and the
+	 * model receives none of it.
 	 */
-	onError?: (error: unknown) => void;
+	onError?: (error: RouteError) => void;
 };
 ```

@@ -1,3 +1,4 @@
+import type { SchemaConverter } from "../openapi/operation.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
 
 type UppercaseKeys<T> = T extends object
@@ -27,3 +28,30 @@ export type LowercaseHeadersOptionCheck<TOptions> = TOptions extends {
 }
 	? { headers: LowercaseHeadersCheck<THeaders> }
 	: unknown;
+
+// A body's content type is its `content-type` header. A `const` or `enum`
+// lists it, a header without a readable value allows any, and without one a
+// response body is JSON, and a request body JSON or multipart, as the server
+// accepts.
+export const contentTypesOf = (
+	headers: readonly StandardSchemaV1[],
+	converter: SchemaConverter | undefined,
+	mode: "input" | "output",
+): readonly string[] => {
+	for (const schema of headers) {
+		const properties = converter?.(schema, mode)?.properties;
+		const header =
+			typeof properties === "object" && properties !== null
+				? (properties as Record<string, Record<string, unknown> | undefined>)[
+						"content-type"
+					]
+				: undefined;
+		if (!header) continue;
+		if (typeof header.const === "string") return [header.const];
+		if (Array.isArray(header.enum)) return header.enum.map(String);
+		return ["*/*"];
+	}
+	return mode === "input"
+		? ["application/json", "multipart/form-data"]
+		: ["application/json"];
+};

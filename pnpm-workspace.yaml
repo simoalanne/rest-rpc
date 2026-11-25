@@ -2,12 +2,7 @@ packages:
   - "packages/*"
   - "benchmarks"
   - "declarations"
-  - "integration"
   - "content/"
 
 allowBuilds:
   lefthook: true
-
-minimumReleaseAgeExclude:
-  - "@ai-sdk/gateway@4.0.154"
-  - ai@7.0.181

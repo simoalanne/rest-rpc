@@ -4,6 +4,7 @@ import {
 	type CreateOpenApiDocumentOptions,
 } from "@rest-rpc/core";
 import {
+	contentTypesOf,
 	contractRouteEntries,
 	getPathParamNames,
 	type DefaultMeta,
@@ -22,6 +23,15 @@ import type {
 
 /** A JSON Schema object. */
 export type JsonSchema = Record<string, unknown>;
+
+/** A JSON value. */
+export type JsonValue =
+	| string
+	| number
+	| boolean
+	| null
+	| JsonValue[]
+	| { [key: string]: JsonValue };
 
 /**
  * Hints about a tool's behavior, the `annotations` of an MCP tool.
@@ -43,7 +53,7 @@ export type ToolAnnotations = {
 
 /**
  * A tool definition, shaped like the MCP `Tool` of protocol revision
- * 2025-11-25.
+ * 2026-07-28.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/mcp-tools#tool-definitions}
  */
@@ -56,22 +66,23 @@ export type ToolDefinition = {
 	description?: string;
 	/** The JSON Schema of the arguments, an object. */
 	inputSchema: JsonSchema & { type: "object" };
-	/** The JSON Schema of `structuredContent`, an object, set when every successful result has one. */
-	outputSchema?: JsonSchema & { type: "object" };
+	/** The JSON Schema of a successful result's `structuredContent`, the body of the route's only defined response. */
+	outputSchema?: JsonSchema;
 	/** Hints about the tool's behavior. */
 	annotations?: ToolAnnotations;
 };
 
 /**
- * The result of a tool call, shaped like the MCP `CallToolResult`.
+ * The result of a tool call, shaped like the MCP `CallToolResult` of protocol
+ * revision 2026-07-28.
  *
  * @see {@link https://rest-rpc.vercel.app/docs/mcp-tools#results-and-errors}
  */
 export type ToolResult = {
-	/** The result as text: a string body, or the body or error as JSON. Empty when there is no body. */
+	/** The body as text: a string as it is, and other values as JSON. The error as JSON when `isError` is set. Empty when there is no body. */
 	content: Array<{ type: "text"; text: string }>;
-	/** A JSON object body. */
-	structuredContent?: Record<string, unknown>;
+	/** The body as JSON. */
+	structuredContent?: JsonValue;
 	/** Set when the call failed, with the error as JSON in `content`. */
 	isError?: boolean;
 };
@@ -106,7 +117,7 @@ export type AgentTool<TContext extends object = EmptyObject> = {
 	 * result. Errors resolve as results with `isError` instead of rejecting.
 	 */
 	call: (
-		args: unknown,
+		args: Record<string, unknown>,
 		...options: OptionsArgs<TContext, ToolCallOptions<TContext>>
 	) => Promise<ToolResult>;
 };
@@ -118,16 +129,18 @@ export type AgentTool<TContext extends object = EmptyObject> = {
  */
 export type CreateToolsFromRoutesOptions = {
 	/**
-	 * Converts Standard Schema definitions into JSON Schema, the same converter
-	 * as OpenAPI's. Without it, or when it returns `undefined`, a segment
+	 * Converts Standard Schema definitions into JSON Schema.
+	 * Without it, or when it returns `undefined`, a segment
 	 * accepts any value.
 	 */
 	schemaConverter?: CreateOpenApiDocumentOptions["schemaConverter"];
 	/**
-	 * Called with errors sent to the model as `INTERNAL_SERVER_ERROR`, such as
-	 * errors thrown by handlers, whose details the model does not receive.
+	 * Called with each error a tool call returns, as the `RouteError` the model
+	 * receives. An error that isn't a `RouteError` is sent as
+	 * `INTERNAL_SERVER_ERROR`, with the thrown value as its `cause`, and the
+	 * model receives none of it.
 	 */
-	onError?: (error: unknown) => void;
+	onError?: (error: RouteError) => void;
 };
 
 type Converter = NonNullable<CreateToolsFromRoutesOptions["schemaConverter"]>;
@@ -149,54 +162,25 @@ const hasRequired = (schema: JsonSchema): boolean =>
 	(Array.isArray(schema.allOf) &&
 		schema.allOf.some((part) => isObject(part) && hasRequired(part)));
 
-// Tool arguments are JSON, so a body is sent as JSON. A declared
-// `content-type` header, read as OpenAPI reads it, is sent with it, and a
-// route that doesn't accept JSON is left out with `null`.
-const requestContentType = (headers: readonly JsonSchema[]) => {
-	for (const schema of headers) {
-		const header = isObject(schema.properties)
-			? schema.properties["content-type"]
-			: undefined;
-		if (!isObject(header)) continue;
-		const declared =
-			typeof header.const === "string"
-				? [header.const]
-				: Array.isArray(header.enum)
-					? header.enum.map(String)
-					: ["application/json"];
-		return declared.includes("application/json") ? "application/json" : null;
-	}
-	return undefined;
-};
-
-type ToolRequest = {
-	definition: ToolDefinition;
-	contentType: string | undefined;
-};
-
-const createToolRequest = (
+const createToolDefinition = (
 	route: RouteDefinition & { path: string },
 	routePath: readonly string[],
 	converter: Converter | undefined,
-): ToolRequest | undefined => {
+): ToolDefinition | undefined => {
 	const responses = Object.values(route.responses);
 	// Streams and raw responses are not JSON.
 	if (route.raw || responses.some((response) => response.sse)) return;
 
-	// Converted schemas are nested in the input schema, where JSON Schema
-	// doesn't allow `$schema`, so it is left out.
-	const convert = (
-		schemas: readonly StandardSchemaV1[],
-		mode: "input" | "output" = "input",
-	) =>
-		schemas.map((schema) => {
-			const { $schema: _, ...converted } = converter?.(schema, mode) ?? {};
-			return converted;
-		});
+	const convert = (schemas: readonly StandardSchemaV1[]) =>
+		schemas.map((schema) => converter?.(schema, "input") ?? {});
 	const { params, query, headers, body } = route.request ?? {};
-	const headerSchemas = convert(headers ?? []);
-	const contentType = body ? requestContentType(headerSchemas) : undefined;
-	if (contentType === null) return;
+	// Tool arguments are JSON, so a route must accept a JSON body.
+	if (body) {
+		const accepted = contentTypesOf(headers ?? [], converter, "input");
+		if (!accepted.includes("application/json") && !accepted.includes("*/*")) {
+			return;
+		}
+	}
 
 	const properties: Record<string, JsonSchema> = {};
 	const required: string[] = [];
@@ -227,67 +211,55 @@ const createToolRequest = (
 		add("query", schema, hasRequired(schema));
 	}
 	if (headers) {
-		const schema = allOf(headerSchemas);
+		const schema = allOf(convert(headers));
 		add("headers", schema, hasRequired(schema));
 	}
 	if (body) add("body", allOf(convert(body)), true);
 
-	// A result has structured content only when its body is an object, so the
-	// output schema is advertised for a single defined response with one.
+	// With several defined responses, the body depends on the status.
 	const [response, ...otherResponses] = responses;
-	const output =
+	const outputSchema =
 		response?.body && otherResponses.length === 0
-			? convert([response.body], "output")[0]
+			? converter?.(response.body, "output")
 			: undefined;
 
 	const { summary, description } = route.openApi ?? {};
 	return {
-		contentType,
-		definition: {
-			name: toToolName(routePath),
-			...(summary && { title: summary }),
-			description: description ?? summary ?? `${route.method} ${route.path}`,
-			inputSchema: {
-				type: "object",
-				properties,
-				...(required.length > 0 && { required }),
-			},
-			...(output?.type === "object" && {
-				outputSchema: output as ToolDefinition["inputSchema"],
-			}),
-			...(route.method === "GET"
-				? { annotations: { readOnlyHint: true } }
-				: (route.method === "PUT" || route.method === "DELETE") && {
-						annotations: { idempotentHint: true },
-					}),
+		name: toToolName(routePath),
+		...(summary && { title: summary }),
+		description: description ?? summary ?? `${route.method} ${route.path}`,
+		inputSchema: {
+			type: "object",
+			properties,
+			...(required.length > 0 && { required }),
 		},
+		...(outputSchema && { outputSchema }),
+		...(route.method === "GET"
+			? { annotations: { readOnlyHint: true } }
+			: (route.method === "PUT" || route.method === "DELETE") && {
+					annotations: { idempotentHint: true },
+				}),
 	};
 };
 
-const isUnsupportedBody = (body: unknown) =>
-	body instanceof Blob ||
-	body instanceof ArrayBuffer ||
-	ArrayBuffer.isView(body) ||
-	body instanceof ReadableStream ||
-	(typeof body === "object" && body !== null && Symbol.asyncIterator in body);
+// Checks the body itself, not its contents, which are left to
+// `JSON.stringify()`.
+const isJsonBody = (body: unknown) => {
+	if (
+		body === null ||
+		typeof body === "string" ||
+		typeof body === "number" ||
+		typeof body === "boolean" ||
+		Array.isArray(body)
+	) {
+		return true;
+	}
 
-const toToolResult = (body: unknown): ToolResult => {
-	if (body === undefined) return { content: [] };
-	if (typeof body === "string") {
-		return { content: [{ type: "text", text: body }] };
-	}
-	if (isUnsupportedBody(body)) {
-		throw new TypeError(
-			"The route returned a binary or stream body, which tools do not return.",
-		);
-	}
-	// The JSON round trip gives the values the body has over HTTP.
-	const text = JSON.stringify(body);
-	const json: unknown = JSON.parse(text);
-	return {
-		content: [{ type: "text", text }],
-		...(isObject(json) && { structuredContent: json }),
-	};
+	if (typeof body !== "object") return false;
+	const proto = Object.getPrototypeOf(body);
+	const isPlainObject = proto === Object.prototype || proto === null;
+	const hasToJSON = typeof (body as { toJSON?: unknown }).toJSON === "function";
+	return isPlainObject || hasToJSON;
 };
 
 const toErrorResult = (error: RouteError): ToolResult => {
@@ -305,21 +277,35 @@ const toErrorResult = (error: RouteError): ToolResult => {
 	};
 };
 
+const toToolResult = (body: unknown): ToolResult => {
+	if (body === undefined) return { content: [] };
+	if (!isJsonBody(body)) {
+		throw new TypeError("The route returned a body that is not JSON.");
+	}
+	// MCP has the text be the serialized `structuredContent`. It is parsed from
+	// the text since `toJSON()` can change a value's shape. A string is sent as
+	// it is, which models read better than JSON.
+	const text = JSON.stringify(body);
+	const json = JSON.parse(text) as JsonValue;
+	return {
+		content: [{ type: "text", text: typeof json === "string" ? json : text }],
+		structuredContent: json,
+	};
+};
+
 const createCall =
-	(
-		route: ImplementedRoute,
-		contentType: string | undefined,
-		onError: CreateToolsFromRoutesOptions["onError"],
-	) =>
-	async (args: unknown, options: ToolCallOptions<object> = {}) => {
-		const { params, query, headers, body } = isObject(args) ? args : {};
+	(route: ImplementedRoute, onError: CreateToolsFromRoutesOptions["onError"]) =>
+	async (
+		{ params, query, headers, body }: Record<string, unknown>,
+		options: ToolCallOptions<object> = {},
+	) => {
 		const request = {
 			...(params !== undefined && { params }),
 			...(query !== undefined && { query }),
 			headers: {
 				...(isObject(headers) && headers),
 				...options.headers,
-				...(contentType && { "content-type": contentType }),
+				...(body !== undefined && { "content-type": "application/json" }),
 			},
 			...(body !== undefined && { body }),
 		};
@@ -334,12 +320,12 @@ const createCall =
 			);
 			return toToolResult(result.body);
 		} catch (error) {
-			// As over HTTP, other errors are sent without their details.
+			// As over HTTP, the model doesn't receive what isn't a `RouteError`.
 			const sent =
 				error instanceof RouteError
 					? error
 					: new InternalServerError({ cause: error });
-			if (sent instanceof InternalServerError) onError?.(error);
+			onError?.(sent);
 			return toErrorResult(sent);
 		}
 	};
@@ -377,9 +363,8 @@ export function createToolsFromRoutes<
 	const tools = [];
 	const names = new Set<string>();
 	for (const { route, path } of contractRouteEntries(router)) {
-		const request = createToolRequest(route, path, schemaConverter);
-		if (!request) continue;
-		const { definition, contentType } = request;
+		const definition = createToolDefinition(route, path, schemaConverter);
+		if (!definition) continue;
 		if (names.has(definition.name)) {
 			throw new Error(`Two routes have the tool name "${definition.name}".`);
 		}
@@ -389,7 +374,7 @@ export function createToolsFromRoutes<
 			definition,
 			route,
 			routePath: path,
-			call: createCall(leaf, contentType, onError) as AgentTool<object>["call"],
+			call: createCall(leaf, onError) as AgentTool<object>["call"],
 		});
 	}
 	return tools as never;

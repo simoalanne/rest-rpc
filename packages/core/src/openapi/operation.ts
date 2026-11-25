@@ -9,6 +9,7 @@ import type {
 } from "../contract/response.ts";
 import type { RouteErrorDefinition } from "../contract/routeError.ts";
 import type { StandardSchemaV1 } from "../standard-schema/index.ts";
+import { contentTypesOf } from "../contract/headers.ts";
 import { getPathParamNames } from "../contract/path.ts";
 import { rawDescription } from "../contract/raw.ts";
 
@@ -87,29 +88,6 @@ const getSchemaProperties = (schema: OpenApiSchema) => {
 		!Array.isArray(properties)
 		? (properties as Record<string, OpenApiSchema>)
 		: {};
-};
-
-// A body's content type is its `content-type` header. A `const` or `enum`
-// lists it, a header without a readable value allows any, and without one a
-// response body is JSON, and a request body JSON or multipart, as the server
-// accepts.
-const contentTypesOf = (
-	headers: readonly StandardSchemaV1[],
-	converter: SchemaConverter | undefined,
-	mode: "input" | "output",
-): readonly string[] => {
-	for (const schema of headers) {
-		const header = getSchemaProperties(converter?.(schema, mode) ?? {})[
-			"content-type"
-		];
-		if (!header) continue;
-		if (typeof header.const === "string") return [header.const];
-		if (Array.isArray(header.enum)) return header.enum.map(String);
-		return ["*/*"];
-	}
-	return mode === "input"
-		? ["application/json", "multipart/form-data"]
-		: ["application/json"];
 };
 
 const toContent = (contentTypes: readonly string[], schema: OpenApiSchema) =>

@@ -832,7 +832,7 @@ const mcp = createMcpHandler(() => {
 			name,
 			{
 				...config,
-				inputSchema: fromJsonSchema(inputSchema),
+				inputSchema: fromJsonSchema<Record<string, unknown>>(inputSchema),
 				...(outputSchema && { outputSchema: fromJsonSchema(outputSchema) }),
 			},
 			(args) => call(args),

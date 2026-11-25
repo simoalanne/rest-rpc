@@ -1,11 +1,12 @@
 import type { EmptyObject } from "@rest-rpc/core/utils";
 import type {
 	AgentTool,
+	JsonValue,
 	ToolDefinition,
 	ToolResult,
 } from "./toolsFromRoutes.ts";
 
-const toJsonResult = (value: Record<string, unknown>): ToolResult => ({
+const toJsonResult = (value: JsonValue): ToolResult => ({
 	content: [{ type: "text", text: JSON.stringify(value) }],
 	structuredContent: value,
 });
@@ -32,10 +33,10 @@ const toToolMap = <T extends { definition: ToolDefinition }>(
 	return byName;
 };
 
-const createFindTool = <TContext extends object>(
-	tools: readonly AgentTool<TContext>[],
-	byName: ReadonlyMap<string, AgentTool<TContext>>,
-): AgentTool<TContext> => ({
+const createFindTool = (
+	tools: readonly { definition: ToolDefinition }[],
+	byName: ReadonlyMap<string, { definition: ToolDefinition }>,
+): AgentTool => ({
 	definition: {
 		name: "find_routes",
 		description:
@@ -49,16 +50,12 @@ const createFindTool = <TContext extends object>(
 		},
 		annotations: { readOnlyHint: true },
 	},
-	call: async (args, ..._options) => {
-		const { query, names } = (args ?? {}) as {
-			query?: unknown;
-			names?: unknown;
-		};
+	call: async ({ query, names }) => {
 		if (Array.isArray(names)) {
 			return toJsonResult({
 				routes: names.flatMap(
 					(name) => byName.get(String(name))?.definition ?? [],
-				),
+				) as JsonValue[],
 			});
 		}
 		const words =
@@ -96,8 +93,7 @@ const createCallTool = <TContext extends object>(
 			required: ["route"],
 		},
 	},
-	call: async (args, ...options) => {
-		const { route, ...request } = (args ?? {}) as { route?: unknown };
+	call: async ({ route, ...request }, ...options) => {
 		const tool = byName.get(String(route));
 		if (tool) return tool.call(request, ...options);
 		const json = {
@@ -128,8 +124,8 @@ const createCallTool = <TContext extends object>(
 export function mergeTools<TContext extends object = EmptyObject>(
 	tools: readonly AgentTool<TContext>[],
 ): {
-	/** The `find_routes` tool, which finds tools and their definitions. */
-	findRoutes: AgentTool<TContext>;
+	/** The `find_routes` tool, which finds tools and their definitions. It calls no route, so it takes no context. */
+	findRoutes: AgentTool;
 	/** The `call_route` tool, which calls a tool by name. */
 	callRoute: AgentTool<TContext>;
 } {

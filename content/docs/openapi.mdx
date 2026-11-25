@@ -154,8 +154,7 @@ const document = createOpenApiDocument(router, {
 
 Request schemas convert with `mode: "input"`, the values a client sends, and
 response schemas with `mode: "output"`, the values it receives. Anything the
-converted schema carries ends up in the document with it, except `$schema`,
-since the document's dialect is `jsonSchemaDialect`, so zod's
+converted schema carries ends up in the document with it, so zod's
 `.describe()` and `.meta()` describe parameters and bodies:
 
 ```ts
