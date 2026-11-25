@@ -1,6 +1,6 @@
 # rest-rpc
 
-Type-safe HTTP APIs, for developers and agents. Write a route once with the
+Type-safe REST APIs, for developers and agents. Write a route once with the
 route builder, and the same route is a validated HTTP endpoint, a typed fetch
 client, TanStack Query options, an agent tool, and an in-process call for
 tests. Below are the common patterns, each a complete example. See the

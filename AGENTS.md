@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repo is `rest-rpc`, a TypeScript library for defining REST APIs with RPC-like ergonomics. It provides a type-safe way to define HTTP routes, generate client contracts, and handle requests and responses. Both contract-first and server-first development approaches are supported but server-first is the recommended approach and what documentation shows.
+This repo is `rest-rpc`, a TypeScript framework for defining Type-safe REST APIs. It provides a type-safe way to define HTTP routes, generate client contracts, and handle requests and responses. Both contract-first and implementation-first development approaches are supported but implementation-first is the recommended approach and what documentation shows.
 
 ## Packages
 
@@ -61,7 +61,7 @@ For documentation related tasks:
 - Examples use these names and one flat file layout:
   - `router` in `router.ts`: the route tree a server serves. Prose calls the shape a route tree, and "router" alone never means a framework's router; write "the framework's router" for that.
   - `server.ts`: serves the router, with `createApp(router)` or a framework app. It may define the router too when it is the only file.
-  - `contract.ts`: what the client is created from. Server-first, it exports `getContract()`, which returns `extractContract(router)` and is imported as a macro. Contract-first, it exports `const contract`. The no-macro variant writes `contract.json`.
+  - `contract.ts`: what the client is created from. implementation-first, it exports `getContract()`, which returns `extractContract(router)` and is imported as a macro. Contract-first, it exports `const contract`. The no-macro variant writes `contract.json`.
   - `client.ts`: exports `client` from `createClient()` and `queryUtils` from `createTanstackQueryUtils()`.
   - A route constant is named by its key in the router, such as `get`, `list` or `create`, and its resource is the parent key: `{ posts: { get } }`. Handler and domain functions are a verb and a noun, such as `findPost` or `updatePost`. A partial route kept for the type helpers is `<key>Definition`, such as `updateDefinition`. A builder that routes are built from is named for what it adds, such as `base`, `authenticated` or `withSession`, never `app`.
   - Relative imports in server-side files (`router.ts`, `server.ts`, `contract.ts`, scripts) end in `.ts`, since runtimes such as Node and Deno run them directly. Client files that a bundler compiles omit the extension, except a macro import such as `./contract.ts` with `{ type: "macro" }`, which `unplugin-macros` runs in the bundler's runtime, where Node needs the extension.

@@ -1,18 +1,15 @@
 ---
-title: REST APIs with RPC-like ergonomics.
-description: Define REST APIs with RPC-like ergonomics.
+title: Type-safe REST APIs, for developers and agents.
+description: Write a route once. It is your server handler, typed client, TanStack Query options and a tool for MCP servers and Agent SDKs.
 sidebar:
   label: Introduction
 ---
 
-Define REST APIs with an expressive HTTP route builder and sensible defaults.
-Call them through a typed client that feels like ordinary function calls.
+Types connect all of it. Most mistakes fail to compile, and changing a route
+fails every call that no longer fits it, so the compiler shows what a change
+breaks before anything runs.
 
-`rest-rpc` puts HTTP first. Define routes alongside their handlers and infer
-client types from their return values. Use your existing server framework,
-middleware, and deployment model.
-
-## Define Routes, Call Functions
+## One Route, Every Consumer
 
 <Tabs>
 <Tab title="Routes">
@@ -204,6 +201,64 @@ create.mutate({ body: { title: "Hello", body: "First post" } });
 
 </Tab>
 
+<Tab title="Agent Tool">
+
+```ts twoslash
+// ---cut-start---
+// @allowImportingTsExtensions
+// @noEmit
+// @filename: router.ts
+import { respond, route } from "@rest-rpc/server";
+import * as z from "zod";
+
+declare function createPost(
+	title: string,
+	body: string,
+): { id: string; title: string; body: string };
+declare function findPost(
+	id: string,
+): { id: string; title: string; body: string } | undefined;
+
+// POST /posts/create, JSON body, 200 result.
+const create = route
+	.body(z.object({ title: z.string(), body: z.string() }))
+	.handler(({ body: { title, body } }) => createPost(title, body));
+
+// GET /posts/:id with params, query, headers, an error, and response headers.
+const get = route
+	.get("/posts/:id")
+	.params(z.object({ id: z.string() }))
+	.query(z.object({ preview: z.enum(["true", "false"]).optional() }))
+	.headers(z.object({ "x-request-id": z.string().optional() }))
+	.error("POST_NOT_FOUND", { status: 404 })
+	.handler(({ params, query, errors }) => {
+		const post = findPost(params.id);
+		if (!post) throw errors.POST_NOT_FOUND();
+		return respond(
+			{
+				...post,
+				body: query.preview === "true" ? post.body.slice(0, 40) : post.body,
+			},
+			{ headers: { "x-powered-by": "rest-rpc" } },
+		);
+	});
+
+export const router = { posts: { create, get } };
+
+// @filename: tools.ts
+// ---cut-end---
+import { createToolsFromRoutes } from "@rest-rpc/server";
+import * as z from "zod";
+import { router } from "./router.ts";
+
+// posts_create and posts_get, to register on an MCP server or an agent SDK.
+export const tools = createToolsFromRoutes(router, {
+	schemaConverter: (schema, io) => z.toJSONSchema(schema as z.ZodType, { io }),
+});
+```
+
+</Tab>
+
 <Tab title="HTTP">
 
 ```http
@@ -249,6 +304,153 @@ Content-Type: application/json
 </Tab>
 </Tabs>
 
+## Mistakes Fail to Compile
+
+A request that doesn't match the route or a read of a field it doesn't return
+is a type error, in every client of the route:
+
+```ts twoslash
+// @errors: 2353 2551
+// ---cut-start---
+// @allowImportingTsExtensions
+// @noEmit
+// @filename: router.ts
+import { respond, route } from "@rest-rpc/server";
+import * as z from "zod";
+
+declare function createPost(
+	title: string,
+	body: string,
+): { id: string; title: string; body: string };
+declare function findPost(
+	id: string,
+): { id: string; title: string; body: string } | undefined;
+
+// POST /posts/create, JSON body, 200 result.
+const create = route
+	.body(z.object({ title: z.string(), body: z.string() }))
+	.handler(({ body: { title, body } }) => createPost(title, body));
+
+// GET /posts/:id with params, query, headers, an error, and response headers.
+const get = route
+	.get("/posts/:id")
+	.params(z.object({ id: z.string() }))
+	.query(z.object({ preview: z.enum(["true", "false"]).optional() }))
+	.headers(z.object({ "x-request-id": z.string().optional() }))
+	.error("POST_NOT_FOUND", { status: 404 })
+	.handler(({ params, query, errors }) => {
+		const post = findPost(params.id);
+		if (!post) throw errors.POST_NOT_FOUND();
+		return respond(
+			{
+				...post,
+				body: query.preview === "true" ? post.body.slice(0, 40) : post.body,
+			},
+			{ headers: { "x-powered-by": "rest-rpc" } },
+		);
+	});
+
+export const router = { posts: { create, get } };
+
+// @filename: contract.ts
+import type { router } from "./router";
+export declare function getContract(): typeof router;
+
+// @filename: client.ts
+import { createClient } from "@rest-rpc/core";
+import { getContract } from "./contract.ts" with { type: "macro" };
+const client = createClient(getContract(), { origin: "http://localhost:3000" });
+// ---cut-end---
+const response = await client.posts.get({ params: { postId: "post_1" } });
+
+if (response.status === 200) {
+	console.log(response.body.titel);
+}
+```
+
+Refactors work the same way: rename a field the handler returns, and every
+client and query that reads it stops compiling until it is updated. For a
+coding agent, `tsc` is the check that its change is complete.
+
+## Why rest-rpc
+
+<CardGroup cols={2}>
+	<Card title="Type safety at every step" icon="shield-check" type="check">
+		Params, query, headers, bodies, statuses and errors are typed from the route
+		to the handler and the client. Schemas validate the same values at runtime,
+		with Zod, Valibot, ArkType or any Standard Schema.
+	</Card>
+	<Card title="One source of truth" icon="route" type="check">
+		The route is the handler, client, query options, OpenAPI operation and agent
+		tool. Shared logic such as authentication is a builder that routes are built
+		from, written once instead of wired into every route.
+	</Card>
+	<Card title="Just HTTP" icon="globe" type="check">
+		No new protocol. Methods, paths, query, headers, status codes, content types
+		and streams are what they look like, and an existing endpoint in any
+		framework maps to a route one to one.
+	</Card>
+	<Card title="Small and obvious" icon="braces" type="check">
+		If you can write an REST API, you can read a route. The API is small, with
+		one way to do each thing and few concepts of its own, which makes it quick
+		to learn for developers and hard to misuse for agents.
+	</Card>
+</CardGroup>
+
+## Write Shared Logic Once
+
+Routes compose. A builder holds what a group of routes shares, such as
+context, errors and middleware, and every route built from it inherits them,
+typed:
+
+```ts
+const authenticated = route
+	.$context<{ headers: Headers }>()
+	.error("UNAUTHORIZED", { status: 401 })
+	.use(({ context, errors, next }) => {
+		const user = context.headers.get("authorization");
+		if (!user) throw errors.UNAUTHORIZED();
+		return next({ context: { user } });
+	});
+
+const router = {
+	me: authenticated.get("/me").handler(({ context }) => context.user),
+	posts: {
+		create: authenticated
+			.body(z.object({ title: z.string(), body: z.string() }))
+			.handler(({ body, context }) => createPost(context.user, body)),
+	},
+};
+```
+
+See [Middleware](/docs/middleware).
+
+## Fits What You Have
+
+`rest-rpc` follows existing standards and types the API boundary, and leaves
+the rest to your stack:
+
+- **Runtimes**: Fetch `Request` and `Response` on Bun, Deno and Cloudflare
+  Workers, or Node's `IncomingMessage` and `ServerResponse`.
+- **Frameworks**: serve routes with a one-line server, mount them under one
+  route, or register each one on Express, Hono, Fastify or others. See
+  [Serving Routes](/docs/server/overview).
+- **Standards**: Standard Schema for validation, OpenAPI for documentation and
+  MCP for agents.
+
+There is no built-in authentication, caching or dependency injection. Keep your
+framework's features, add a package, or build them on
+[middleware and context](/docs/middleware). Adopt it one step at a time, each
+useful without the next:
+
+1. Define routes and infer request and response types for handlers you write.
+2. Validate requests and responses at runtime.
+3. Extract a contract and call the routes with the typed client.
+4. Serve the routes with a one-line server, mount the catch-all handler, or
+   register them on your framework's router.
+
+## Get Started
+
 <CardGroup cols={2}>
 	<Card
 		title="Start building"
@@ -264,8 +466,15 @@ Content-Type: application/json
 		icon="map"
 		cta="Explore route definitions"
 	>
-		Choose request segments, responses, HTTP details, streams, and metadata in
-		one builder.
+		Describe requests, responses, errors and streams in one builder.
+	</Card>
+	<Card
+		title="Give agents tools"
+		href="/docs/mcp-tools/"
+		icon="bot"
+		cta="View MCP tools"
+	>
+		Serve the same routes to agents over MCP or an agent SDK.
 	</Card>
 	<Card
 		title="Generate OpenAPI"
@@ -277,104 +486,33 @@ Content-Type: application/json
 	</Card>
 </CardGroup>
 
+For coding agents, you can install the `rest-rpc` skill, which points them to the
+cheatsheet that ships with each package:
+
 ```package-install
 npx skills add simoalanne/rest-rpc
 ```
-
-## What You Get
-
-<CardGroup cols={2}>
-	<Card title="REST APIs" icon="route" type="check">
-		Build methods, paths, request locations, response bodies, and metadata with
-		a fluent API that keeps invalid combinations out of route definitions.
-	</Card>
-	<Card title="Optional shared contracts" icon="server" type="check">
-		Define an HTTP interface separately when it should be shared independently
-		of the server implementation.
-	</Card>
-	<Card title="Composable route builders" icon="blocks" type="check">
-		Describe methods, paths, request segments, and responses in one fluent
-		builder with sensible defaults.
-	</Card>
-	<Card title="RPC-like ergonomics" icon="braces" type="check">
-		Call routes and implement handlers as ordinary functions without
-		compromising HTTP semantics. Your server works exactly like it did before,
-		just with full type safety at the API boundary.
-	</Card>
-	<Card title="Any stack, or none" icon="plug" type="check">
-		Serve routes with a one-line server on Bun, Node, Deno, or Cloudflare
-		Workers, or register them on the router of Express, Hono, Fastify, and
-		others.
-	</Card>
-	<Card title="Typed responses" icon="list-checks" type="check">
-		Return direct success bodies for simple routes, or status-keyed response
-		envelopes, and throw defined errors that clients receive typed.
-	</Card>
-	<Card title="Schema options" icon="shield-check" type="check">
-		Use Standard Schema-compatible libraries such as Zod, Valibot, or ArkType.
-	</Card>
-	<Card title="Generated utils" icon="layers" type="check">
-		Derive typed fetch clients, TanStack Query options, query keys, and OpenAPI
-		documents from the same route tree.
-	</Card>
-	<Card title="Beyond basic JSON" icon="wrench" type="check">
-		Use typed streams, custom bodies, response headers, and content types in the
-		same route builder.
-	</Card>
-</CardGroup>
-
-## What's Next
-
-<Steps>
-	<Step title="Build the first route" icon="rocket">
-		Start with the [Quickstart](/docs/quickstart/) if you want the fastest
-		end-to-end example.
-	</Step>
-	<Step title="Shape the routes" icon="file-code">
-		Use the [Route Builder](/docs/route-builder/) to describe requests,
-		responses, and streams.
-	</Step>
-	<Step title="Choose the runtime" icon="plug">
-		Serve routes on the [Fetch](/docs/server/fetch/) or [Node
-		HTTP](/docs/server/node/) runtime or an [existing
-		framework](/docs/server/framework-integration/), and call them with the
-		[fetch client](/docs/client/fetch-client/) or [TanStack
-		Query](/docs/client/tanstack-query/).
-	</Step>
-	<Step title="Describe the API" icon="share">
-		Generate an [OpenAPI document](/docs/openapi/) without ceremony.
-	</Step>
-</Steps>
-
-:::tip[Small by design]
-`rest-rpc` stays focused on the API boundary so it can fit into code you already
-have. It types and validates what crosses the wire, and leaves routing features,
-plugins, and server lifecycle to your stack. There is no built-in
-authentication, caching, or dependency injection, and no framework adapters:
-keep your framework's features, add a package, or build your own on
-[middleware and context](/docs/middleware/). Adopt it one step
-at a time, each useful without the next:
-
-1. Define routes and infer request and response types for handlers you write.
-2. Validate requests and responses at runtime.
-3. Extract a contract and call the routes with the typed client.
-4. Serve the routes with a one-line server, mount the catch-all handler, or
-   register them on your framework's router.
-   :::
 
 ## Common Questions
 
 <Accordion>
 	<AccordionItem title="Who is rest-rpc for?">
-		`rest-rpc` is for developers who want end-to-end type safety and RPC-like
-		ergonomics without replacing familiar HTTP concepts. You keep methods,
-		paths, headers, bodies, status codes, and your existing framework, while
-		route definitions connect server and client types.
+		Teams that want an REST API whose types they can trust end to end, from the
+		handler to the browser, without giving up REST or their framework, and that
+		want the code to stay easy to change, by hand or by an agent.
+	</AccordionItem>
+	<AccordionItem title="What makes it good for coding agents?">
+		Agents need to check their work. Because the route connects server and
+		clients through types, a type check shows whether a change is complete. The
+		API is small, with one obvious way to do each thing, so generated code looks
+		like the docs, and the skill, the cheatsheet and llms.txt give agents the
+		docs of the installed version.
 	</AccordionItem>
 	<AccordionItem title="Do I have to restructure my app?">
 		No. Keep your framework, middleware, authentication, database access, and
 		deployment model. Add typed routes at the API boundary and adopt the client,
-		TanStack Query utils, or OpenAPI generation as they become useful.
+		TanStack Query utils, OpenAPI generation or agent tools as they become
+		useful.
 	</AccordionItem>
 	<AccordionItem title="Do I need a server framework?">
 		No. If an app only needs typed, validated endpoints, serve them with a
@@ -384,9 +522,11 @@ at a time, each useful without the next:
 		later without changing them.
 	</AccordionItem>
 	<AccordionItem title="Do I need to learn a new API model?">
-		The model is ordinary HTTP: methods, paths, request locations, status codes,
-		headers, and response bodies. The route builder describes them directly,
-		with sensible defaults for methods, paths, and success statuses.
+		No. The model is ordinary HTTP: methods, paths, request locations, status
+		codes, headers, and response bodies. The route builder describes them
+		directly, with sensible defaults for methods, paths, and success statuses.
+		Calling a route from the client feels like a function call, and the request
+		it sends is the one you defined.
 	</AccordionItem>
 	<AccordionItem title="Can I have a separate contract?">
 		Yes. Define the HTTP interface independently, implement it with

@@ -4,7 +4,7 @@ import { filesystem, githubReleases } from "blume/sources";
 
 export default defineConfig({
 	title: "rest-rpc",
-	description: "REST APIs with RPC-like ergonomics",
+	description: "Type-safe REST APIs, for developers and agents",
 	logo: {
 		image: "/icon.svg",
 		text: "rest-rpc",

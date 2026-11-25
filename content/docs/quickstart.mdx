@@ -3,8 +3,9 @@ title: Quickstart
 description: Define HTTP routes with handlers and call them through a typed client.
 ---
 
-`rest-rpc` builds REST APIs with RPC-like ergonomics: an HTTP route builder
-with sensible defaults, and a typed client to call the routes.
+A `rest-rpc` route is a plain HTTP endpoint and the source of its types: the
+handler's return value is what the typed client receives, and a call that
+doesn't match the route fails to compile.
 
 This guide uses Bun and Zod to build two routes: a minimal create operation
 and a GET with path params, query input, and a defined error. Their response

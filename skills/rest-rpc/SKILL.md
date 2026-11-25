@@ -1,6 +1,6 @@
 ---
 name: rest-rpc
-description: Use rest-rpc in TypeScript apps with server-first route builders or contract-first API design, Node and Fetch server runtimes, framework integration, typed clients, TanStack Query, OpenAPI, streaming, and monorepo architecture. Start from the cheatsheet in the installed package's README.
+description: Use rest-rpc in TypeScript apps with implementation-first route builders or contract-first API design, Node and Fetch server runtimes, framework integration, typed clients, TanStack Query, OpenAPI, streaming, and monorepo architecture. Start from the cheatsheet in the installed package's README.
 ---
 
 # rest-rpc
@@ -9,10 +9,9 @@ Use this skill for `rest-rpc` work: setup, contracts, server integration, client
 
 ## Core Model
 
-`rest-rpc` is a small type-safety layer for HTTP APIs, not a framework and not a
-separate RPC protocol. Routes are plain HTTP (methods, paths, params, query,
+`rest-rpc` is a TypeScript framework for defining Type-safe REST APIs. Routes are plain HTTP (methods, paths, params, query,
 headers, bodies, statuses, content types, streams) described with a route
-builder. Server-first is the default: response types are inferred from handlers
+builder. implementation-first is the default: response types are inferred from handlers
 and clients use a contract extracted at build time. Contract-first shares a
 contract package between server and client instead.
 
@@ -34,7 +33,7 @@ cat node_modules/@rest-rpc/core/README.md
 Any installed `@rest-rpc/*` package works. In a monorepo, read it from the
 workspace package that depends on rest-rpc, and verify the path instead of
 guessing. If no package is installed yet, read the hosted copy at
-`https://rest-rpc.vercel.app/docs/cheatsheet`.
+`https://rest-rpc.vercel.app/docs/cheatsheet.md`.
 
 Each cheatsheet section heading links to the full documentation for that
 section.
