@@ -1,6 +1,6 @@
 {
 	"name": "@rest-rpc/core",
-	"version": "0.8.0",
+	"version": "0.8.1",
 	"description": "Typed fetch client, route contracts and OpenAPI generation for rest-rpc.",
 	"keywords": [
 		"api-contract",

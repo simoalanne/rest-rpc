@@ -1,6 +1,6 @@
 {
 	"name": "@rest-rpc/tanstack-query",
-	"version": "0.8.0",
+	"version": "0.8.1",
 	"description": "TanStack Query options and query keys for rest-rpc clients.",
 	"keywords": [
 		"contract-first",
