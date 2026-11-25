@@ -27,3 +27,10 @@
 .prose pre.twoslash .twoslash-error-hover:hover > .twoslash-popup-container {
 	display: inline-flex;
 }
+
+/* Twoslash sizes error lines to their text (width: max-content), and twoslash code blocks can't scroll, so a long error message would widen the page. Wrap it inside the block instead. */
+.prose pre.twoslash .twoslash-error-line {
+	width: auto;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}

@@ -260,7 +260,7 @@ export const tools = createToolsFromRoutes(router, {
 
 <Tab title="HTTP">
 
-```http
+```http wrap
 # No method or path defined: POST, at the path of the route's keys.
 POST /posts/create HTTP/1.1
 Content-Type: application/json
@@ -268,19 +268,19 @@ Content-Type: application/json
 { "title": "Hello", "body": "Routes return data and clients call them like functions." }
 ```
 
-```http
+```http wrap
 HTTP/1.1 200 OK
 Content-Type: application/json
 
 { "id": "post_1", "title": "Hello", "body": "Routes return data and clients call them like functions." }
 ```
 
-```http
+```http wrap
 GET /posts/post_1?preview=true HTTP/1.1
 X-Request-Id: req_1
 ```
 
-```http
+```http wrap
 HTTP/1.1 200 OK
 Content-Type: application/json
 X-Powered-By: rest-rpc
@@ -288,12 +288,12 @@ X-Powered-By: rest-rpc
 { "id": "post_1", "title": "Hello", "body": "Routes return data and clients call them" }
 ```
 
-```http
+```http wrap
 # A defined error is sent as JSON with its status.
 GET /posts/missing HTTP/1.1
 ```
 
-```http
+```http wrap
 HTTP/1.1 404 Not Found
 Content-Type: application/json
 
