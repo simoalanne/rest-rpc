@@ -1,5 +1,11 @@
 # @rest-rpc/server
 
+## 0.8.1
+
+### Patch Changes
+
+- cf60813: Match routes with a built-in matcher instead of `rou3`, so `@rest-rpc/server` has no dependencies outside rest-rpc. Matching behaves as before.
+
 ## 0.8.0
 
 ### Minor Changes
